@@ -388,6 +388,7 @@ type SemanticModel struct {
     // Variable scoping
     GlobalArgs map[string]*Variable  // ARG before first FROM
     StageVars  map[string]map[string]*Variable  // Per-stage ARG/ENV
+    BuildArgs  map[string]string     // Build-time args from CLI (--build-arg)
 
     // Cross-stage references
     CopyFromRefs []CopyFromRef  // COPY --from=stage
@@ -430,11 +431,12 @@ type CopyFromRef struct {
 **Single-pass construction:**
 
 ```go
-func BuildSemanticModel(ast *parser.Result) *SemanticModel {
+func BuildSemanticModel(ast *parser.Result, buildArgs map[string]string) *SemanticModel {
     model := &SemanticModel{
         Stages: make(map[string]*Stage),
         GlobalArgs: make(map[string]*Variable),
         StageVars: make(map[string]map[string]*Variable),
+        BuildArgs: buildArgs, // Build-time args from CLI
     }
 
     var currentStage string
@@ -487,6 +489,31 @@ func BuildSemanticModel(ast *parser.Result) *SemanticModel {
     }
 
     return model
+}
+
+// ResolveVariable resolves a variable name to its value with proper precedence:
+// 1. BuildArgs (CLI --build-arg, highest priority)
+// 2. Stage-local variables (ARG/ENV in current stage)
+// 3. Global ARGs (ARG before first FROM)
+func (m *SemanticModel) ResolveVariable(name string, stage string) (string, bool) {
+    // 1. Check BuildArgs first (CLI overrides everything)
+    if val, ok := m.BuildArgs[name]; ok {
+        return val, true
+    }
+
+    // 2. Check stage-local variables
+    if stageVars, ok := m.StageVars[stage]; ok {
+        if variable, ok := stageVars[name]; ok {
+            return variable.Value, true
+        }
+    }
+
+    // 3. Check global ARGs
+    if variable, ok := m.GlobalArgs[name]; ok {
+        return variable.Value, true
+    }
+
+    return "", false
 }
 ```
 
@@ -563,14 +590,15 @@ func CheckCopyFromReferences(semantic *SemanticModel) []Violation {
 
 ### For Tally v1.0: Buildkit Parser + Semantic Model
 
-**Phase 1: AST-based linting**
+#### Phase 1: AST-based linting
 
 ```go
 // Parse with buildkit
 result, err := parser.Parse(reader)
 
-// Build semantic model
-semantic := BuildSemanticModel(result)
+// Build semantic model with build args from context (if available)
+buildArgs := config.BuildArgs // From CLI --build-arg flags
+semantic := BuildSemanticModel(result, buildArgs)
 
 // Run rules
 violations := RunRules(result.AST, semantic, config)
