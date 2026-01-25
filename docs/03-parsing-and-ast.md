@@ -383,7 +383,9 @@ Building a model of code's meaning beyond syntax:
 ```go
 type SemanticModel struct {
     // Stage management
-    Stages map[string]*Stage  // Stage name -> definition
+    Stages map[string]*Stage  // Stage name -> first definition
+    StageOrder []string        // Preserves stage declaration order
+    DuplicateStages []string   // Tracks duplicate stage names for DL3024 rule
 
     // Variable scoping
     GlobalArgs map[string]*Variable  // ARG before first FROM
@@ -458,12 +460,26 @@ func BuildSemanticModel(ast *parser.Result, buildArgs map[string]string) *Semant
             // New stage
             stageName := getStageName(node)
             currentStage = stageName
-            model.Stages[stageName] = &Stage{
-                Name: stageName,
-                BaseImage: getBaseImage(node),
-                Platform: getPlatform(node),
-                LineRange: getLineRange(node),
-                Variables: make(map[string]*Variable),
+
+            // Check for duplicate stage name
+            if _, exists := model.Stages[stageName]; exists {
+                // Track duplicate for DL3024 rule
+                model.DuplicateStages = append(model.DuplicateStages, stageName)
+            } else {
+                // First occurrence - create stage
+                model.Stages[stageName] = &Stage{
+                    Name: stageName,
+                    BaseImage: getBaseImage(node),
+                    Platform: getPlatform(node),
+                    LineRange: getLineRange(node),
+                    Variables: make(map[string]*Variable),
+                }
+                model.StageOrder = append(model.StageOrder, stageName)
+            }
+
+            // Initialize stage variables map even for duplicates
+            if model.StageVars[stageName] == nil {
+                model.StageVars[stageName] = make(map[string]*Variable)
             }
 
         case "env":
@@ -544,22 +560,18 @@ func CheckUndefinedVariables(ast *parser.Result, semantic *SemanticModel) []Viol
 
 // Check for duplicate stage names
 func CheckDuplicateStages(semantic *SemanticModel) []Violation {
-    seen := make(map[string]*Stage)
     var violations []Violation
 
-    for name, stage := range semantic.Stages {
-        if existing, ok := seen[name]; ok {
-            violations = append(violations, Violation{
-                Rule: "duplicate-stage-name",
-                Message: fmt.Sprintf("Stage '%s' already defined at line %d",
-                                   name, existing.LineRange.Start),
-                Location: Location{
-                    File: stage.File,
-                    Line: stage.LineRange.Start,
-                },
-            })
-        }
-        seen[name] = stage
+    // Duplicates are already tracked during semantic model construction
+    for _, stageName := range semantic.DuplicateStages {
+        firstDef := semantic.Stages[stageName]
+        violations = append(violations, Violation{
+            Rule: "duplicate-stage-name",
+            Message: fmt.Sprintf("Stage '%s' is already defined at line %d",
+                               stageName, firstDef.LineRange.Start),
+            // Note: This reports the duplicate, not the first occurrence
+            // For better UX, consider tracking all occurrences with a []Stage
+        })
     }
 
     return violations
