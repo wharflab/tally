@@ -267,8 +267,12 @@ func (r *SARIFReporter) Report(violations []Violation) error {
         return err
     }
 
-    run := sarif.NewRunWithInformationURI("tally", r.toolVersion,
-        "https://github.com/tinovyatkin/tally")
+    // Create run with tool driver that includes version
+    driver := sarif.NewDriver("tally").
+        WithVersion(r.toolVersion).
+        WithInformationURI("https://github.com/tinovyatkin/tally")
+
+    run := sarif.NewRun(*sarif.NewTool(driver))
 
     for _, v := range violations {
         // Convert violation to SARIF result
