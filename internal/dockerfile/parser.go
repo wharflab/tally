@@ -62,14 +62,14 @@ func Parse(r io.Reader) (*ParseResult, error) {
 
 // lineCountingReader wraps a reader and counts lines
 type lineCountingReader struct {
-	r             io.Reader
-	lines         *int
-	lastByte      byte
-	eofProcessed  bool
+	r            io.Reader
+	lines        *int
+	lastByte     byte
+	eofProcessed bool
 }
 
-func (l *lineCountingReader) Read(p []byte) (n int, err error) {
-	n, err = l.r.Read(p)
+func (l *lineCountingReader) Read(p []byte) (int, error) {
+	n, err := l.r.Read(p)
 	for i := range n {
 		if p[i] == '\n' {
 			*l.lines++
