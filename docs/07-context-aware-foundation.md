@@ -207,11 +207,16 @@ func (ctx *BuildContext) loadContextFiles() error {
     if data, err := os.ReadFile(dockerignorePath); err == nil {
         // Parse patterns using BuildKit's dockerignore package
         patterns, err := dockerignore.ReadAll(bytes.NewReader(data))
-        if err == nil {
-            ctx.Dockerignore = patterns
-            // Create Docker-compatible matcher (supports **, negation, etc.)
-            ctx.ignoreMatcher, _ = dockerignore.New(patterns)
+        if err != nil {
+            return fmt.Errorf("failed to parse .dockerignore: %w", err)
         }
+        ctx.Dockerignore = patterns
+        // Create Docker-compatible matcher (supports **, negation, etc.)
+        matcher, err := dockerignore.New(patterns)
+        if err != nil {
+            return fmt.Errorf("failed to create dockerignore matcher: %w", err)
+        }
+        ctx.ignoreMatcher = matcher
     }
 
     // Scan context directory
@@ -220,8 +225,15 @@ func (ctx *BuildContext) loadContextFiles() error {
             return err
         }
 
-        relPath, _ := filepath.Rel(ctx.ContextDir, path)
-        info, _ := d.Info()
+        relPath, err := filepath.Rel(ctx.ContextDir, path)
+        if err != nil {
+            return fmt.Errorf("failed to get relative path for %s: %w", path, err)
+        }
+
+        info, err := d.Info()
+        if err != nil {
+            return fmt.Errorf("failed to get file info for %s: %w", path, err)
+        }
 
         ctx.Files.files[relPath] = FileInfo{
             Path:    relPath,
@@ -232,8 +244,11 @@ func (ctx *BuildContext) loadContextFiles() error {
 
         return nil
     })
+    if err != nil {
+        return fmt.Errorf("failed to scan context directory: %w", err)
+    }
 
-    return err
+    return nil
 }
 ```
 
