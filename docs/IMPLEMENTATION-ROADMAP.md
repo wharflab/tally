@@ -1,752 +1,426 @@
 # Implementation Roadmap
 
-Prioritized action plan based on architectural research.
+Prioritized action plan based on architectural research (`docs/01`–`docs/09`).
 
-This roadmap provides the next 10 critical steps to transform tally from a single-rule demo into a production-ready Dockerfile linter.
+This roadmap focuses on building a scalable linter core (parsing, semantics, rules, processors, reporting) while:
 
----
-
-## Critical Insight: Dockerfiles Are Small
-
-The research (01-linter-pipeline-architecture.md) notes that **Dockerfiles are typically < 200 lines**. This fundamentally shapes our architecture:
-
-- ✅ Single-pass analysis is sufficient (no incremental parsing needed)
-- ✅ Performance optimization (parallelism, caching) is lower priority
-- ✅ Focus on correctness and rule coverage over speed
-- ✅ Memory usage is not a concern for individual files
+- baking in key lessons from the research docs (so we don’t refactor later), and
+- explicitly front-loading the few “decision spikes” that can otherwise block multiple tracks.
 
 ---
 
-## Code Reuse Opportunities
+## Critical Insight: Dockerfiles Are Small (But Repos Aren’t)
 
-Before building from scratch, consider these existing libraries:
+The research notes Dockerfiles are typically **< 200 lines** (often 50–100). This shapes feasibility:
+
+- ✅ Deep per-file semantic analysis is feasible (and can be a differentiator)
+- ✅ Multi-pass parsing is unnecessary for v1.0
+- ⚠️ Multi-file runs (many Dockerfiles) and build-context scanning can dominate runtime, so discovery + concurrency still matter
+
+---
+
+## Non-Negotiable Learnings to Bake Into the Architecture
+
+From `docs/01`–`docs/09`, these are the “don’t miss” architecture lessons:
+
+1. **Pipeline shape is stable:** discovery → parse (+source map) → semantic/context build → rules → processors (filter/dedup/sort) → reporting. (
+   [01](01-linter-pipeline-architecture.md))
+2. **Rich diagnostics are a feature, not polish:** plan a stable `Violation` schema with range (line+col), snippets, doc links, and (later) fixes. (
+   [02](02-buildx-bake-check-analysis.md), [05](05-reporters-and-output.md))
+3. **Progressive adoption matters:** experimental/opt-in rules + configurable failure threshold (`--fail-level`). ([02](02-buildx-bake-check-analysis.md), [09](09-hadolint-research.md))
+4. **Context must be optional:** rule API should accept an optional `BuildContext` and still work without it (v1.0 shouldn’t require full context). (
+   [07](07-context-aware-foundation.md))
+5. **Avoid future refactors:** keep parser concerns separate from rules; preserve enough trivia (comments, line/col, original text) for directives +
+   snippets. ([01](01-linter-pipeline-architecture.md), [03](03-parsing-and-ast.md), [04](04-inline-disables.md), [05](05-reporters-and-output.md))
+
+---
+
+## Code Reuse Opportunities (Prefer Reuse Over Reinvent)
+
+Before building new subsystems, evaluate these upstream building blocks:
 
 | Library | Use For | Notes |
 |---------|---------|-------|
-| `moby/buildkit/frontend/dockerfile/linter` | Study rule patterns | BuildKit has 22 working rules |
-| `moby/buildkit/frontend/dockerfile/dockerignore` | .dockerignore parsing | Docker-compatible pattern matching |
-| `github.com/owenrumney/go-sarif/v2` | SARIF output | Already planned |
-| `github.com/charmbracelet/lipgloss` | Terminal styling | Already planned |
-| `github.com/bmatcuk/doublestar/v4` | Glob patterns | For file discovery |
-
-**Note:** The BuildKit linter in `moby/buildkit/frontend/dockerfile/linter/` could potentially be imported directly for rules that overlap with their
-22 built-in checks.
+| `moby/buildkit/frontend/dockerfile/parser` | Dockerfile parsing | Already used (`internal/dockerfile`). Good enough for semantic linting. ([03](03-parsing-and-ast.md)) |
+| `moby/buildkit/frontend/dockerfile/linter` | Existing rule implementations | BuildKit has 22 working rules; consider importing/wrapping instead of rewriting overlapping checks. ([02](02-buildx-bake-check-analysis.md)) |
+| `moby/buildkit/frontend/dockerfile/dockerignore` | `.dockerignore` parsing/matching | Docker-compatible patterns; reuse for context-aware rules and discovery filtering. ([07](07-context-aware-foundation.md)) |
+| `moby/buildkit/frontend/dockerfile/shell` (and related) | Shell lexing helpers | Useful foundation for future ShellCheck integration and RUN parsing (don’t re-invent tokenization). ([09](09-hadolint-research.md)) |
+| `mvdan.cc/sh/v3/syntax` | Shell parsing (AST) | Robust parser/formatter for sh/bash/mksh; good base for deep `RUN` heredoc analysis and future shell rules. |
+| `github.com/wasilibs/go-shellcheck` | ShellCheck-as-library (WASM) | Optional: run upstream ShellCheck without shipping an external binary (heavier, but high coverage). |
+| `github.com/owenrumney/go-sarif/v2` | SARIF output | Standard CI/security tooling integration. ([05](05-reporters-and-output.md)) |
+| `github.com/charmbracelet/lipgloss` | Terminal output | Nice human output with minimal complexity. ([05](05-reporters-and-output.md)) |
+| `github.com/bmatcuk/doublestar/v4` | Glob patterns | For discovery (CLI input + directory scanning). ([01](01-linter-pipeline-architecture.md)) |
+| `containers/*` libraries | Registry & image metadata (future) | If we implement “trusted registries”, digest pinning, manifest/platform checks, consider using the existing containers ecosystem rather than hand-rolled HTTP clients. (Aligns with context-aware direction in [07](07-context-aware-foundation.md)) |
 
 ---
 
-## Priority 1: Restructure Rule System + Test Utilities
+## Decision Spikes (Do These Before Priority 1)
 
-**Goal:** Establish scalable rule architecture with testing foundation
+These are explicitly front-loaded to avoid cross-blocking later.
+
+1. **Spike A: Reuse BuildKit linter vs. reimplement**
+   - Build a tiny adapter that runs BuildKit’s linter on a Dockerfile and converts results into our `Violation`.
+   - Decide one of:
+     - **Reuse** (BuildKit as a rule provider),
+     - **Hybrid** (reuse overlapping rules + custom rules for hadolint parity),
+     - **Rewrite** (only reuse parser + helpers).
+
+2. **Spike B: Freeze `Violation` + output contract**
+   - Agree on required fields (range, severity, message, rule code, doc URL, optional snippet, optional fix suggestion).
+   - Ensure JSON + SARIF can be emitted without later schema churn. ([05](05-reporters-and-output.md))
+
+3. **Spike C: Source-map strategy**
+   - Confirm how we will provide line+column ranges and snippet extraction (parser trivia + raw source capture).
+   - This is a blocker for rich diagnostics and inline directives. ([02](02-buildx-bake-check-analysis.md), [05](05-reporters-and-output.md), [04](04-inline-disables.md))
+
+4. **Spike D: Shell commands + heredocs strategy (standardize early)**
+   - Goal: avoid per-rule ad-hoc regex/tokenization decisions; ensure consistent handling for `RUN`, `RUN <<EOF` and Dockerfile heredocs in `COPY`/
+     `ADD`.
+   - Decision (recommended):
+     - **Tier 1 (default):** use BuildKit’s lightweight shell lexer (`moby/buildkit/frontend/dockerfile/shell`) for word-splitting/tokenization when a
+       rule needs to recognize patterns inside `RUN` commands.
+     - **Tier 2 (deep/structured):** use `mvdan.cc/sh/v3/syntax` for rules that require real shell structure (heredocs, pipelines, conditionals) and
+       for future “ShellCheck-like” linting without an external binary.
+     - Keep all shell parsing behind an internal facade (`internal/shell/…`) so rule authors never pick libraries directly.
+   - Heredocs handling (must be first-class in our parse model):
+     - **Dockerfile heredocs in `COPY`/`ADD`:** treat as **inline sources** (virtual files) that are not subject to `.dockerignore` and do not require
+       build-context presence.
+     - **`RUN` heredocs:** treat heredoc bodies as **virtual scripts** for shell analysis (tokenization/AST), but do not attempt to infer filesystem
+       side effects (“files created by the script”) in v1.x.
+   - Cross-blocking: context-aware linting must know whether a file input came from build context vs. `COPY/ADD <<EOF` heredoc, otherwise rules like
+     “copy ignored file” or “missing file” will be wrong. ([07](07-context-aware-foundation.md))
+
+5. **Optional Spike E: Style/parser deep dive**
+   - If we want “format/style enforcement” or LSP later, validate the “BuildKit now, tree-sitter later” plan. ([03](03-parsing-and-ast.md))
+
+---
+
+## Priority 1: Core Rule System + Stable Data Model
+
+**Goal:** Establish the stable interfaces that everything else builds on (minimize future refactors).
 
 **Actions:**
 
-1. Create `internal/testutil/` package FIRST (needed for all rule testing):
+1. Expand `internal/testutil/` (already exists but empty) with helpers:
+   - Parse Dockerfile from string/file and return AST + raw source (for directives/snippets)
+   - Lint helpers for table-driven rule tests
 
-   ```go
-   // internal/testutil/lint.go
-   func LintString(dockerfile string, rules ...*Rule) []Violation
-   func LintFile(path string, rules ...*Rule) []Violation
-   func ParseString(dockerfile string) (*parser.Result, error)
-   ```
-
-2. Create `internal/rules/` directory structure:
+2. Create `internal/rules/` structure (or migrate from `internal/lint/` in-place):
 
    ```text
    internal/rules/
    ├── registry.go          # Rule registration
-   ├── rule.go              # Rule interface + Severity enum
-   ├── violation.go         # Violation struct
-   └── style/
-       ├── max_lines.go     # Move existing rule here
-       └── max_lines_test.go
+   ├── rule.go              # Rule metadata + execution contract
+   ├── severity.go          # Severity enum
+   ├── location.go          # Range/Location types (line+col)
+   └── violation.go         # Stable Violation schema
    ```
 
-3. Define core interfaces in `internal/rules/rule.go`:
+3. Define a **future-proof `Violation`** schema (don’t under-specify):
+   - `File`, `StartLine`, `StartColumn`, `EndLine`, `EndColumn`
+   - `RuleCode`, `Message`, `Detail` (optional), `Severity`, `DocURL`
+   - `SourceCode` (optional) and `SuggestedFix` (optional structured edit hint; supports “auto-fix suggestion” without auto-applying)
 
-   ```go
-   type Severity int
+4. Add **progressive adoption hooks** to `Rule` metadata:
+   - `EnabledByDefault`
+   - `IsExperimental`
 
-   const (
-       SeverityError Severity = iota   // Critical, must fix
-       SeverityWarning                  // Important, should fix
-       SeverityInfo                     // Suggestion
-       SeverityStyle                    // Cosmetic
-   )
+5. Add **dispatch hints** (optional but low-cost) to avoid scaling pain later:
+   - Declare which instruction types a rule cares about (bitset). ([01](01-linter-pipeline-architecture.md))
 
-   type Rule struct {
-       Code        string
-       Name        string
-       Description string
-       Category    string    // "security", "best-practices", "style", etc.
-       Severity    Severity
-       URL         string
-       Enabled     bool      // Default enabled state
-       Check       RuleFunc
-   }
-
-   type RuleFunc func(ast *parser.Result, semantic *SemanticModel) []Violation
-   ```
-
-4. Implement auto-registration pattern (init() functions)
-
-5. Move `max-lines` rule to new structure as template
-
-**References:**
-
-- [06-code-organization.md](06-code-organization.md) - Section "One File Per Rule"
-- [06-code-organization.md](06-code-organization.md) - Section "Rule Registry"
-- [09-hadolint-research.md](09-hadolint-research.md) - Section "Severity Levels"
+6. Make the rule execution signature **context-ready**:
+   - `ctx *context.BuildContext` can be `nil` (v1.0 works without it). ([07](07-context-aware-foundation.md))
 
 **Success Criteria:**
 
-- [ ] `internal/testutil/` package created with LintString helper
-- [ ] Rule interface defined with Severity enum
-- [ ] Registry implemented with Register() and GetRule() functions
-- [ ] max-lines rule migrated to new structure
-- [ ] Tests pass using new testutil helpers
+- [ ] Rules can be registered and enumerated
+- [ ] `Violation` schema is stable and used everywhere
+- [ ] `Violation.SuggestedFix` supports structured edit hints (even if we don’t auto-apply fixes yet)
+- [ ] Unit tests can lint a Dockerfile string without CLI wiring
+- [ ] Rule interface accepts optional context without forcing it
 
 ---
 
-## Priority 2: Build Semantic Model
+## Priority 2: Parser Facade + Source Map (Line/Column, Snippets, Comments)
 
-**Goal:** Enable advanced rules that need cross-instruction context
-
-**Key Insight:** Some violations (like DL3024 - duplicate stage names) should be detected DURING semantic model construction, not as separate rules.
-This is more efficient and architecturally cleaner.
+**Goal:** Provide the “compiler frontend” primitives required by multiple tracks (inline disables, reporters, SARIF).
 
 **Actions:**
 
-1. Create `internal/parser/semantic.go`:
+1. Extend `internal/dockerfile` parse output to include raw source:
+   - Preserve full file contents (or lines) for:
+     - snippet extraction
+     - directive parsing
+     - consistent location reporting
 
-   ```go
-   type SemanticModel struct {
-       // Stage management
-       Stages          map[string]*Stage    // Stage name → first definition
-       StageOrder      []string             // Preserves declaration order
-       DuplicateStages []DuplicateStage     // Track duplicates for DL3024
+2. Establish a `SourceMap` abstraction:
+   - Convert AST node positions into stable `Location` ranges
+   - Support file-level violations (no node) cleanly
 
-       // Variable scoping
-       GlobalArgs  map[string]*Variable           // ARG before first FROM
-       StageVars   map[string]map[string]*Variable // Per-stage ARG/ENV
-       BuildArgs   map[string]string              // CLI --build-arg overrides
+3. Capture comment trivia needed for:
+   - inline ignore directives ([04](04-inline-disables.md))
+   - future “documentation comment” checks ([03](03-parsing-and-ast.md))
 
-       // Cross-stage references
-       CopyFromRefs []CopyFromRef  // COPY --from references
-
-       // Base images
-       BaseImages []BaseImageRef
-
-       // Construction errors (violations detected during building)
-       ConstructionViolations []Violation
-   }
-
-   type DuplicateStage struct {
-       Name           string
-       FirstLine      int
-       DuplicateLine  int
-   }
-   ```
-
-2. Implement `BuildSemanticModel(ast, buildArgs)` function:
-   - Parse FROM instructions → stages (detect duplicates immediately)
-   - Track ARG/ENV → variables with scopes
-   - Support BuildArgs from CLI for proper variable resolution
-   - Collect COPY --from → cross-stage references
-   - Store base images with platforms
-   - Return construction violations (DL3024, etc.)
-
-3. Add `ResolveVariable(name, stage)` method with proper precedence:
-   1. BuildArgs (CLI --build-arg, highest priority)
-   2. Stage-local variables (ARG/ENV in current stage)
-   3. Global ARGs (ARG before first FROM)
-
-4. Update linter to pass semantic model to rules
-
-**References:**
-
-- [03-parsing-and-ast.md](03-parsing-and-ast.md) - Section "Semantic Analysis"
-- [03-parsing-and-ast.md](03-parsing-and-ast.md) - Section "Building the Semantic Model"
-- [01-linter-pipeline-architecture.md](01-linter-pipeline-architecture.md) - Section "2. Parsing Stage"
+4. Make heredocs first-class in the parse model:
+   - surface heredocs attached to `RUN`, `COPY`, `ADD` as structured data (name + content + options)
+   - tag each heredoc as either:
+     - **inline source** (`COPY/ADD <<EOF …`) or
+     - **inline script** (`RUN <<EOF …`)
+   - ensure context-aware rules can distinguish “build-context file” vs “inline heredoc content”
 
 **Success Criteria:**
 
-- [ ] SemanticModel struct defined with all fields
-- [ ] BuildSemanticModel() implemented with duplicate detection
-- [ ] ResolveVariable() method with correct precedence
-- [ ] DL3024 (duplicate stage names) detected during construction
-- [ ] Unit tests for semantic analysis
-- [ ] Can track stages, variables, and references
+- [ ] Every violation can report line+column (even if column is best-effort initially)
+- [ ] Reporter can show snippets without re-parsing the file
+- [ ] Inline directives can be parsed from source consistently
 
 ---
 
-## Priority 3: Implement Inline Disable Support
+## Priority 3: Semantic Model v1 (Keep It Extensible)
 
-**Goal:** Allow users to suppress specific violations with migration compatibility
-
-**Key Insight:** Support multiple syntax formats for easy migration from hadolint and buildx.
+**Goal:** Enable rules that need cross-instruction context without baking rule-specific logic everywhere.
 
 **Actions:**
 
-1. Create `internal/inline/` package:
-   - `directive.go` - Parse inline comments
-   - `filter.go` - Filter violations based on directives
-
-2. Support multiple syntax formats (migration compatibility):
-
-   ```dockerfile
-   # Primary tally syntax
-   # tally ignore=DL3006
-   # tally ignore=DL3006,DL3008
-   # tally global ignore=DL3003
-   # tally ignore=all
-
-   # Hadolint compatibility (for migration)
-   # hadolint ignore=DL3006,DL3008
-   # hadolint global ignore=DL3003
-
-   # BuildKit/buildx compatibility
-   # check=skip=DL3006,DL3008
-   ```
-
-3. Implement directive parsing with regex patterns:
-
-   ```go
-   var patterns = []struct {
-       pattern *regexp.Regexp
-       parser  func(matches []string) *Directive
-   }{
-       {tallyIgnorePattern, parseTallyIgnore},
-       {hadolintIgnorePattern, parseHadolintIgnore},  // Migration
-       {checkSkipPattern, parseCheckSkip},            // Buildx compat
-   }
-   ```
-
-4. Add post-filtering step to linter pipeline
-
-5. Track unused directives for warnings (optional rule)
-
-6. Validate rule codes in directives (warn on unknown codes)
-
-**References:**
-
-- [04-inline-disables.md](04-inline-disables.md) - Section "Recommended Implementation for Tally"
-- [04-inline-disables.md](04-inline-disables.md) - Section "Full Implementation"
-- [09-hadolint-research.md](09-hadolint-research.md) - Section "Inline Disable Mechanism"
+1. Build `SemanticModel` in a dedicated pass (or builder) and keep it parser-agnostic. ([03](03-parsing-and-ast.md))
+2. Track the v1 essentials:
+   - Stages + stage order
+   - Duplicate stage names (detected during construction when possible)
+   - ARG/ENV scoping (global vs stage-local)
+   - `COPY --from` references
+   - Base image refs (`FROM`, `--platform`)
+   - `SHELL` per stage (dialect/argv) for correct `RUN` parsing defaults
+3. Add the “easy extensions” now (cheap, unlocks many rules later):
+   - Variable reference tracking (enables unused/shadowed var rules)
+   - Comment associations (enables directive/doc checks)
+   - Stage graph hooks (enables “unreachable stage” style rules)
 
 **Success Criteria:**
 
-- [ ] Can parse `# tally ignore=` syntax
-- [ ] Can parse `# hadolint ignore=` syntax (migration)
-- [ ] Can parse `# check=skip=` syntax (buildx compat)
-- [ ] Filter() removes suppressed violations
-- [ ] Detect unused directives
-- [ ] Warn on unknown rule codes
-- [ ] Integration tests with all syntax variants
+- [ ] Semantic model supports stage + var resolution
+- [ ] Construction-time violations supported (when they’re more natural than separate rules)
+- [ ] Unit tests cover semantic resolution edge cases
 
 ---
 
-## Priority 4: Create Reporter Infrastructure + CI Formats
+## Priority 4: Inline Disable Directives (Post-Filter Approach)
 
-**Goal:** Support multiple output formats including CI/CD integration
+**Goal:** Allow users to suppress violations with migration compatibility.
+
+**Key takeaways to preserve:**
+
+- Use post-filtering (simplest) ([04](04-inline-disables.md))
+- Support compatibility syntax (hadolint / buildx)
+- Validate codes + detect unused directives
+- Define precedence explicitly: **inline > CLI > config > defaults** ([04](04-inline-disables.md))
+
+**Success Criteria:**
+
+- [ ] `# tally ignore=...` and `# tally global ignore=...`
+- [ ] `# hadolint ignore=...` and `# hadolint global ignore=...` (migration)
+- [ ] `# check=skip=...` (buildx compat)
+- [ ] Unknown codes warn; unused directives detectable
+
+---
+
+## Priority 5: Reporter Infrastructure (Multi-Output, CI Integrations, Exit Codes)
+
+**Goal:** Make results useful everywhere: terminal, CI annotations, and machine output.
 
 **Actions:**
 
-1. Create `internal/reporter/` package with interface:
+1. Implement reporters against the stable `Violation` schema:
+   - text (Lip Gloss)
+   - json
+   - github-actions annotations
+   - sarif (go-sarif)
+   - ensure reporters preserve and emit `SuggestedFix` data when present (at least JSON + SARIF)
 
-   ```go
-   type Reporter interface {
-       Report(violations []Violation, summary Summary) error
-   }
+2. Implement **multi-reporter output** (console + file) from the start:
+   - matches research (`[[output]]` pattern) and avoids later config churn ([05](05-reporters-and-output.md))
 
-   type Summary struct {
-       Total    int
-       Errors   int
-       Warnings int
-       Files    int
-   }
-   ```
+3. Add CLI flags for output ergonomics:
+   - `--format` (or `--output` blocks later)
+   - `--output=stdout|stderr|path`
+   - `--no-color`
+   - `--show-source/--hide-source`
 
-2. Implement reporters (most to least important):
-   - `text.go` - Human-readable colored output (use Lip Gloss)
-   - `json.go` - Machine-readable structured output
-   - `github_actions.go` - Native GitHub annotations (`::error file=...`)
-   - `sarif.go` - SARIF 2.1.0 format (use go-sarif)
+4. Define + test exit codes:
+   - `0` clean (or below threshold)
+   - `1` violations at/above threshold
+   - `2` parse/config error
 
-3. Add factory pattern for format selection
-
-4. Wire into CLI with `--format` flag
-
-5. **Define exit codes:**
-   - `0` - No violations (or only info/style with default threshold)
-   - `1` - Violations found at or above threshold
-   - `2` - Configuration/parse error
-
-6. Add `--fail-level` flag to control exit code threshold:
-   - `--fail-level=error` (default) - Exit 1 only on errors
-   - `--fail-level=warning` - Exit 1 on warnings or errors
-   - `--fail-level=none` - Always exit 0 (for CI that handles output)
-
-**References:**
-
-- [05-reporters-and-output.md](05-reporters-and-output.md) - Section "Core Reporter Pattern"
-- [05-reporters-and-output.md](05-reporters-and-output.md) - Section "Multiple Output Support"
-- [02-buildx-bake-check-analysis.md](02-buildx-bake-check-analysis.md) - Section "Exit Codes"
+5. Add `--fail-level` (error|warning|info|style|none) (aka “error mode”). ([02](02-buildx-bake-check-analysis.md), [09](09-hadolint-research.md))
 
 **Success Criteria:**
 
-- [ ] Reporter interface defined
-- [ ] Text reporter with colors (Lip Gloss)
-- [ ] JSON reporter with summary
-- [ ] GitHub Actions reporter (`::error` format)
-- [ ] SARIF reporter (replaces Priority 9)
-- [ ] Factory for format selection
-- [ ] CLI flag `--format=text|json|github-actions|sarif`
-- [ ] Exit codes documented and tested
-- [ ] `--fail-level` flag implemented
+- [ ] At least text + JSON are stable and snapshot-tested
+- [ ] GitHub Actions + SARIF available for CI
+- [ ] Multi-output works (stdout + file)
+- [ ] Exit codes match documented behavior
 
 ---
 
-## Priority 5: Implement File Discovery
+## Priority 6: File Discovery + Config Cascade + Optional Build Context
 
-**Goal:** Find all Dockerfiles to lint (prerequisite for multi-file linting)
-
-**Rationale:** File discovery must come BEFORE parallelism - you need files to parallelize over. Since Dockerfiles are small (< 200 lines),
-single-file performance is already fast; the bottleneck is finding and processing many files.
+**Goal:** Enable “lint the repo” workflows without sacrificing per-file correctness.
 
 **Actions:**
 
-1. Create `internal/discovery/` package
+1. Discovery:
+   - inputs: files, dirs, globs, multiple paths
+   - defaults: `Dockerfile`, `Dockerfile.*`, `*.Dockerfile`
+   - exclude patterns via `--exclude`
+   - optional `.gitignore` support (nice-to-have, not blocker)
 
-2. Support input types:
-   - Single file: `tally check Dockerfile`
-   - Directory: `tally check .` (find all Dockerfiles recursively)
-   - Multiple: `tally check Dockerfile build/Dockerfile.prod`
-   - Glob patterns: `tally check **/Dockerfile*`
+2. Config cascade per target file:
+   - discovery must return **(file path, config root)** pairs to avoid “wrong config applied to file” bugs
 
-3. Use `github.com/bmatcuk/doublestar/v4` for glob pattern matching
-
-4. Filter logic:
-   - Skip hidden directories (unless explicit)
-   - Respect `.gitignore` (optional `--respect-gitignore` flag)
-   - Default Dockerfile patterns: `Dockerfile`, `Dockerfile.*`, `*.Dockerfile`
-
-5. Add `--exclude` flag for patterns
-
-6. Use BuildKit's dockerignore package for pattern matching:
-
-   ```go
-   import "github.com/moby/buildkit/frontend/dockerfile/dockerignore"
-   ```
-
-**References:**
-
-- [01-linter-pipeline-architecture.md](01-linter-pipeline-architecture.md) - Section "1. File Discovery Stage"
-- [07-context-aware-foundation.md](07-context-aware-foundation.md) - Section ".dockerignore parsing"
+3. Build context (optional for v1.0, but API-ready):
+   - `.dockerignore` parsing (BuildKit matcher)
+   - context dir scanning (only when needed)
+   - treat `COPY/ADD` heredoc sources as **virtual inline files** (not affected by `.dockerignore`, not required to exist in context)
+   - caching hooks for expensive operations (registry, FS scans) ([07](07-context-aware-foundation.md))
 
 **Success Criteria:**
 
-- [ ] Can discover files from various inputs
-- [ ] Recursive directory search works
-- [ ] Glob patterns supported (doublestar)
-- [ ] Exclusion patterns work
-- [ ] Uses BuildKit's dockerignore for pattern matching
+- [ ] `tally check .` behaves predictably in repos
+- [ ] Each Dockerfile uses the nearest `.tally.toml` when present
+- [ ] Context can be provided but is not required
 
 ---
 
-## Priority 6: Implement Top 5 Critical Rules
+## Priority 7: Violation Processing Pipeline + Rule Configuration
 
-**Goal:** Provide immediate value with essential rules
-
-**Note:** DL3024 (duplicate stage names) is now detected during semantic model construction (Priority 2), not as a separate rule.
-
-**Actions:**
-Implement these rules (one file each in appropriate category):
-
-1. **DL3006** - Pin base image versions (`internal/rules/base/pin_version.go`)
-   - Check FROM instructions lack explicit tag
-   - Severity: warning
-
-2. **DL3004** - No sudo (`internal/rules/security/no_sudo.go`)
-   - Scan RUN instructions for sudo usage
-   - Severity: error
-
-3. **DL3020** - Use COPY not ADD (`internal/rules/instruction/copy_not_add.go`)
-   - Check for ADD when COPY is appropriate
-   - Severity: error
-
-4. **DL3002** - Don't run as root (`internal/rules/security/no_root_user.go`)
-   - Check last USER instruction is not root
-   - Severity: warning
-
-5. **DL4000** - MAINTAINER deprecated (`internal/rules/deprecation/maintainer.go`)
-   - Flag any MAINTAINER instruction (use LABEL instead)
-   - Severity: error
-
-Each rule needs:
-
-- Implementation file following existing patterns
-- Test file with table-driven tests
-- Examples (good/bad Dockerfiles in tests)
-
-**Rule Implementation Pattern** (from research):
-
-```go
-// internal/rules/security/no_sudo.go
-package security
-
-func init() {
-    rules.Register(NoSudoRule)
-}
-
-var NoSudoRule = &rules.Rule{
-    Code:        "DL3004",
-    Name:        "Do not use sudo",
-    Description: "Using sudo has unpredictable behavior in a Dockerfile",
-    Category:    "security",
-    Severity:    rules.SeverityError,
-    URL:         "https://github.com/hadolint/hadolint/wiki/DL3004",
-    Enabled:     true,
-    Check:       checkNoSudo,
-}
-
-func checkNoSudo(ast *parser.Result, semantic *parser.SemanticModel) []rules.Violation {
-    // Implementation
-}
-```
-
-**References:**
-
-- [08-hadolint-rules-reference.md](08-hadolint-rules-reference.md) - Section "Critical Priority"
-- [06-code-organization.md](06-code-organization.md) - Section "Rule Structure Template"
-- [09-hadolint-research.md](09-hadolint-research.md) - Section "Rule Implementation Pattern"
-
-**Success Criteria:**
-
-- [ ] All 5 rules implemented
-- [ ] Unit tests for each rule (using testutil)
-- [ ] Integration tests pass
-- [ ] Rules auto-register via init()
-
----
-
-## Priority 7: Add Violation Processing Pipeline + Severity Configuration
-
-**Goal:** Filter, deduplicate, sort violations and support severity overrides
+**Goal:** Centralize “policy” logic: filtering, severity overrides, sorting, snippets.
 
 **Actions:**
 
-1. Create processor chain in `internal/linter/pipeline.go`:
-
-   ```go
-   type Processor interface {
-       Process(violations []Violation) ([]Violation, error)
-   }
-   ```
-
-2. Implement processors:
-   - `InlineDisableFilter` - Apply `# tally ignore=` directives
-   - `SeverityOverrider` - Apply config-based severity changes
-   - `Deduplicator` - Remove exact duplicates
-   - `SortProcessor` - Sort by severity, file, line
-   - `MaxPerFileFilter` - Limit violations per file (configurable)
-
-3. Chain processors in linter
-
-4. Add severity override configuration support:
-
-   ```toml
-   # .tally.toml
-   [rules.DL3006]
-   severity = "error"    # Upgrade from warning
-
-   [rules.DL3002]
-   enabled = false       # Disable this rule
-   ```
-
-5. Update config loading to support per-rule configuration
-
-**References:**
-
-- [01-linter-pipeline-architecture.md](01-linter-pipeline-architecture.md) - Section "5. Processing Pipeline"
-- [04-inline-disables.md](04-inline-disables.md) - Section "Approach 3: Post-Filtering"
-- [09-hadolint-research.md](09-hadolint-research.md) - Section "Configuration System"
+1. Implement a processor chain (golangci-lint style). ([01](01-linter-pipeline-architecture.md))
+2. Include at least:
+   - Path normalization
+   - Inline disable filter
+   - Config exclusion filter (per-file)
+   - Severity overrides + enable/disable (per rule)
+   - Deduplication
+   - Sorting (stable output for snapshots)
+   - SourceCode/snippet attachment (enables rich diagnostics) ([02](02-buildx-bake-check-analysis.md), [05](05-reporters-and-output.md))
 
 **Success Criteria:**
 
-- [ ] Processor interface defined
-- [ ] Core processors implemented
-- [ ] Pipeline chains processors
-- [ ] Violations are filtered and sorted
-- [ ] Severity override configuration works
-- [ ] Per-rule enable/disable configuration works
+- [ ] Output is stable across runs (sorting)
+- [ ] Severity overrides and enable/disable work
+- [ ] Snippet attachment works without reporter-specific hacks
 
 ---
 
-## Priority 8: Add Rule CLI Commands
+## Priority 8: Implement an Initial Rule Baseline (Reuse-First)
 
-**Goal:** Enable rule discovery and management
+**Goal:** Deliver immediate value with minimal reinvention.
+
+**Approach (pick based on Spike A decision):**
+
+1. **Reuse path:** wrap BuildKit’s 22 rules as a baseline provider, then add hadolint-parity rules on top. ([02](02-buildx-bake-check-analysis.md))
+2. **Hybrid/Rewrite path:** implement the “top rules” list from hadolint research. ([08](08-hadolint-rules-reference.md), [09](09-hadolint-research.md))
+
+**Rule priority sanity check (from research):**
+
+- Top of list includes: `DL3006`, `DL3000`, `DL3002`, `DL3004`, `DL3008`, `DL3020`, `DL3025`, `DL4006`… ([08](08-hadolint-rules-reference.md))
+
+**Success Criteria:**
+
+- [ ] At least 5–10 high-value rules shipped (not just one demo rule)
+- [ ] Experimental rules supported as opt-in for “controversial” checks
+- [ ] Every rule has a doc URL and actionable message
+
+---
+
+## Priority 9: Rule CLI + Documentation Generation
+
+**Goal:** Make rule discovery and documentation frictionless.
 
 **Actions:**
 
-1. Add `tally rules` subcommand with subcommands:
-
-   ```bash
-   # List all rules
-   tally rules list
-   tally rules list --category=security
-   tally rules list --enabled=false
-
-   # Show rule details
-   tally rules show DL3006
-
-   # Output formats
-   tally rules list --format=json
-   ```
-
-2. Implement in `cmd/tally/cmd/rules.go`:
-
-   ```go
-   func listRules(ctx context.Context, cmd *cli.Command) error {
-       for _, rule := range rules.AllRules {
-           fmt.Printf("%s: %s [%s] %s\n",
-               rule.Code, rule.Name, rule.Category, rule.Severity)
-       }
-       return nil
-   }
-
-   func showRule(ctx context.Context, cmd *cli.Command) error {
-       code := cmd.Args().Get(0)
-       rule := rules.GetRule(code)
-       // Print detailed info including description, URL, examples
-   }
-   ```
-
-3. Add JSON output option for tooling integration
-
-**References:**
-
-- [06-code-organization.md](06-code-organization.md) - Section "Rule Discoverability"
-- [09-hadolint-research.md](09-hadolint-research.md) - Section "Rule Documentation"
+1. `tally rules list/show` (already planned)
+2. Add a docs generator hook:
+   - Generate Markdown from rule registry (name/description/examples placeholders)
+   - Enables a future docs site without hand-written drift ([06](06-code-organization.md), [02](02-buildx-bake-check-analysis.md))
 
 **Success Criteria:**
 
-- [ ] `tally rules list` shows all rules
-- [ ] `tally rules show DL3006` shows rule details
-- [ ] Filter by category, severity, enabled state
-- [ ] JSON output for tooling
+- [ ] `tally rules list` filters by category/severity/experimental
+- [ ] `tally rules show DL3006` prints stable, complete info
+- [ ] Docs generation produces deterministic output
 
 ---
 
-## Priority 9: Add File-Level Parallelism (Optional)
+## Priority 10: Integration Tests (Snapshots + Fixtures)
 
-**Goal:** Efficiently lint multiple files in large repositories
-
-**Rationale:** Since Dockerfiles are small (< 200 lines), single-file performance is already fast. Parallelism only helps when linting many files
-(e.g., monorepos with 100+ Dockerfiles). This is lower priority than correctness features.
+**Goal:** Lock behavior end-to-end and allow intentional output evolution.
 
 **Actions:**
 
-1. Implement worker pool in linter:
+1. Expand `internal/integration/testdata/`:
+   - clean
+   - critical rules
+   - multi-stage
+   - inline disables (tally/hadolint/buildx)
+   - config cascade (closest `.tally.toml`)
+   - reporter formats (text/json/sarif/github-actions)
 
-   ```go
-   func (l *Linter) LintFiles(paths []string) ([]Violation, error) {
-       // Use errgroup for parallel execution
-       // Each file linted independently
-       // Aggregate violations
-   }
-   ```
-
-2. Use `golang.org/x/sync/errgroup` for coordination
-
-3. Make worker count configurable:
-   - Default: `min(len(paths), runtime.NumCPU())`
-   - Flag: `--parallel=N`
-
-4. Ensure no shared mutable state between workers
-
-**References:**
-
-- [01-linter-pipeline-architecture.md](01-linter-pipeline-architecture.md) - Section "Option A: File-Level Parallelism"
+2. Snapshot:
+   - stable ordering
+   - color disabled for text snapshots
 
 **Success Criteria:**
 
-- [ ] Can lint multiple files in parallel
-- [ ] Worker pool limits concurrency
-- [ ] No race conditions (`go test -race` passes)
-- [ ] Benchmark shows improvement for 10+ files
+- [ ] Fixtures cover the “core pipeline” interactions (config + directives + reporting)
+- [ ] `UPDATE_SNAPS=true go test ./internal/integration/...` updates snapshots intentionally
 
 ---
 
-## Priority 10: Enhance Integration Tests
-
-**Goal:** Ensure end-to-end correctness
-
-**Actions:**
-
-1. Expand `internal/integration/testdata/` with fixtures:
-
-   ```text
-   testdata/
-   ├── critical_violations/
-   │   └── Dockerfile (triggers DL3004, DL3020)
-   ├── multi_stage/
-   │   ├── Dockerfile (tests stage rules, DL3024)
-   │   └── expected.json
-   ├── with_inline_disables/
-   │   ├── Dockerfile (tests # tally ignore=)
-   │   └── Dockerfile.hadolint (tests # hadolint ignore=)
-   ├── clean/
-   │   └── Dockerfile (no violations)
-   └── severity_override/
-       ├── Dockerfile
-       └── .tally.toml (tests severity config)
-   ```
-
-2. Add snapshot tests for each fixture:
-   - JSON output
-   - Violation counts
-   - Rule codes triggered
-   - Exit codes
-
-3. Test all reporters:
-   - Text output (no color for snapshot)
-   - JSON output
-   - SARIF output
-   - GitHub Actions output
-
-4. Test exit codes:
-   - Exit 0 on clean files
-   - Exit 1 on violations
-   - Exit 2 on parse errors
-
-5. Add `make test-integration` target
-
-**References:**
-
-- [06-code-organization.md](06-code-organization.md) - Section "Testing Strategy" → "Integration Tests"
-- Current: `internal/integration/integration_test.go`
-
-**Success Criteria:**
-
-- [ ] 5+ integration test fixtures
-- [ ] Snapshot tests with go-snaps
-- [ ] All reporters tested end-to-end
-- [ ] `UPDATE_SNAPS=true make test` updates snapshots
-
----
-
-## Implementation Notes
-
-### Order Dependencies (Updated)
+## Cross-Blocking / Dependency Map (Updated)
 
 ```text
-Priority 1 (Rules + Testutil)
+Decision Spikes (A/B/C)
     ↓
-Priority 2 (Semantic Model)  ←─────────────────────┐
-    ↓                                              │
-Priority 3 (Inline Disables)                       │
-    ↓                                              │
-Priority 4 (Reporters + CI formats)                │
-    ↓                                              │
-Priority 5 (File Discovery)                        │
-    ↓                                              │
-Priority 6 (Critical Rules) ───────────────────────┘
+Priority 1 (Rule system + stable Violation schema)
     ↓
-Priority 7 (Pipeline + Severity Config)
+Priority 2 (Parser facade + SourceMap)
     ↓
-Priority 8 (Rule CLI)
+Priority 3 (Semantic model)
     ↓
-Priority 9 (Parallelism) ─── Optional for v1.0
+Priority 4 (Inline directives) ─┐
+    ↓                          │
+Priority 7 (Processors) ───────┤
+    ↓                          │
+Priority 5 (Reporters) ────────┘
     ↓
-Priority 10 (Integration Tests)
+Priority 6 (Discovery + config cascade + optional context)
+    ↓
+Priority 8 (Initial rule baseline)
+    ↓
+Priority 9 (Rule CLI + docs generation)
+    ↓
+Priority 10 (Integration tests)
 ```
 
-**Key dependencies:**
+**Key blockers:**
 
-- **1 → All**: Testutil and rule interface needed everywhere
-- **2 → 6**: Semantic model needed for stage-aware rules
-- **3 → 7**: Inline disables integrated into pipeline
-- **4 → 10**: Reporters needed for integration test output
-- **5 → 9**: File discovery needed before parallelism
-
-### Key Design Principles
-
-1. **Incremental value**: Each step produces working software
-2. **Test-driven**: Add tests alongside implementation (testutil in Priority 1!)
-3. **Reuse over reinvent**: Use BuildKit packages where possible
-4. **Correctness over speed**: Parallelism is optional for v1.0
-5. **Migration-friendly**: Support hadolint/buildx syntax for easy adoption
-6. **Real-world ready**: Focus on rules users actually need
-
-### Post-Priority 10
-
-After completing these 10 priorities, tally will have:
-
-- ✅ Scalable rule system with auto-registration
-- ✅ Semantic analysis with duplicate stage detection
-- ✅ Inline disables (tally, hadolint, buildx syntax)
-- ✅ Multiple output formats (text, JSON, SARIF, GitHub Actions)
-- ✅ 5 critical rules (DL3006, DL3004, DL3020, DL3002, DL4000)
-- ✅ Processing pipeline with severity overrides
-- ✅ File discovery with glob patterns
-- ✅ Rule CLI commands
-- ✅ Optional file-level parallelism
-- ✅ Comprehensive integration tests
-
-**Next phases** (reference [08-hadolint-rules-reference.md](08-hadolint-rules-reference.md)):
-
-- Phase 2: Add 15 high-priority rules (package managers, multi-stage)
-- Phase 3: Add 20 medium-priority rules (best practices)
-- Phase 4: Context-aware rules ([07-context-aware-foundation.md](07-context-aware-foundation.md))
-- Phase 5: ShellCheck integration for RUN instruction validation
+- If `Violation` + `Location` aren’t stable early, reporters + SARIF + snapshots churn (fix via Spike B + Priority 1).
+- If we don’t have SourceMap, inline ignores and rich diagnostics both become hacks (fix via Spike C + Priority 2).
+- If rule API doesn’t accept optional context, adding `.dockerignore`/registry features later becomes signature churn (fix via Priority 1 +
+  [07](07-context-aware-foundation.md)).
 
 ---
 
-## Quick Reference
+## Feasibility & Deeper Dives (Post v1.0)
 
-| Priority | Focus | Key File(s) | Doc Reference |
-|----------|-------|-------------|---------------|
-| 1 | Rule system + Testutil | `internal/rules/`, `internal/testutil/` | [06](06-code-organization.md) |
-| 2 | Semantic model | `internal/parser/semantic.go` | [03](03-parsing-and-ast.md) |
-| 3 | Inline disables | `internal/inline/` | [04](04-inline-disables.md), [09](09-hadolint-research.md) |
-| 4 | Reporters + CI | `internal/reporter/` | [05](05-reporters-and-output.md) |
-| 5 | File discovery | `internal/discovery/` | [01](01-linter-pipeline-architecture.md) |
-| 6 | Critical rules | `internal/rules/*/` | [08](08-hadolint-rules-reference.md) |
-| 7 | Pipeline + Config | `internal/linter/pipeline.go` | [01](01-linter-pipeline-architecture.md) |
-| 8 | Rule CLI | `cmd/tally/cmd/rules.go` | [06](06-code-organization.md) |
-| 9 | Parallelism | `internal/linter/` | [01](01-linter-pipeline-architecture.md) |
-| 10 | Integration tests | `internal/integration/` | [06](06-code-organization.md) |
+Dockerfiles being small means we can afford “more semantic” features later without performance fear:
 
----
-
-## Tracking Progress
-
-Create a GitHub project or use this checklist to track implementation:
-
-```markdown
-## v1.0 Implementation Checklist
-
-### Foundation
-
-- [ ] Priority 1: Rule system + test utilities
-- [ ] Priority 2: Semantic model with DL3024 detection
-- [ ] Priority 3: Inline disable support (tally/hadolint/buildx)
-- [ ] Priority 4: Reporters (text, JSON, SARIF, GitHub Actions)
-- [ ] Priority 5: File discovery
-
-### Core Features
-
-- [ ] Priority 6: Top 5 critical rules
-- [ ] Priority 7: Processing pipeline + severity config
-- [ ] Priority 8: Rule CLI commands
-- [ ] Priority 9: File-level parallelism (optional)
-- [ ] Priority 10: Integration tests
-
-### Ready for v1.0 Release
-
-- [ ] All priorities complete
-- [ ] Exit codes documented (0/1/2)
-- [ ] Documentation updated
-- [ ] Examples added to README
-- [ ] Release notes written
-```
+- **Tree-sitter (optional):** style/format rules and LSP-friendly parsing. ([03](03-parsing-and-ast.md))
+- **ShellCheck integration:** track `SHELL` per stage + vars for RUN validation. ([09](09-hadolint-research.md))
+- **Context-aware rules:** file existence, `.dockerignore` correctness, platform/manifest checks. ([07](07-context-aware-foundation.md))
+- **Registry-backed checks:** trusted registries, digest pinning, platform validation (consider `containers/*` reuse).
+- **Suggested fixes / auto-fix:** start with structured “fix hints”, then actual edits later. ([05](05-reporters-and-output.md))
+- **Label schema validation:** hadolint-style label typing and “strict labels” mode. ([09](09-hadolint-research.md))

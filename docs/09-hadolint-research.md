@@ -590,21 +590,21 @@ Each rule has a wiki page:
 
 ### 10.4 Feature Parity Roadmap
 
-**Phase 1: Core (MVP)**
+#### Phase 1: Core (MVP)
 
 - 20 most important rules
 - Basic inline disables
 - JSON output
 - Config file support
 
-**Phase 2: Parity**
+#### Phase 2: Parity
 
 - All DL3xxx rules
 - Global ignores
 - Multiple output formats
 - Severity overrides
 
-**Phase 3: Beyond**
+#### Phase 3: Beyond
 
 - ShellCheck integration
 - Label schema validation
