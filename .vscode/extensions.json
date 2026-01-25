@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "golang.go",
+    "ms-azuretools.vscode-containers",
+    "rvben.rumdl",
+    "tekumara.typos-vscode",
+    "ms-vscode.makefile-tools",
+    "joshbolduc.commitlint",
+    "docker.docker",
+    "codecov.codecov"
+  ]
+}
