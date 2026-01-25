@@ -16,7 +16,7 @@ Context-aware linting analyzes Dockerfiles with **additional build-time informat
 - Multi-file Dockerfile relationships
 - Registry information (for base image validation)
 
-**Example: Why it matters**
+### Example: Why it matters
 
 ```dockerfile
 # Without context
@@ -101,6 +101,8 @@ func validateBasePlatform(from *Node, targetPlatform string, buildArgs map[strin
 // internal/context/context.go
 package context
 
+import "github.com/moby/buildkit/frontend/dockerfile/dockerignore"
+
 // BuildContext contains all contextual information for linting
 type BuildContext struct {
     // Build configuration
@@ -109,9 +111,10 @@ type BuildContext struct {
     Target    string  // Target stage for multi-stage builds
 
     // File system context
-    ContextDir   string      // Build context directory
-    Dockerignore []string    // Parsed .dockerignore patterns
-    Files        FileSet     // Available files in context
+    ContextDir   string              // Build context directory
+    Dockerignore []string            // Raw .dockerignore patterns
+    ignoreMatcher *dockerignore.Matcher  // Compiled Docker-compatible matcher
+    Files        FileSet              // Available files in context
 
     // External data
     Registry RegistryClient  // For base image validation
@@ -180,12 +183,13 @@ func (ctx *BuildContext) FileExists(path string) bool {
 }
 
 func (ctx *BuildContext) IsIgnored(path string) bool {
-    for _, pattern := range ctx.Dockerignore {
-        if match, _ := filepath.Match(pattern, path); match {
-            return true
-        }
+    if ctx.ignoreMatcher == nil {
+        return false
     }
-    return false
+    // Use Docker-compatible pattern matching from BuildKit
+    // Supports **, negation (!), and other Docker ignore syntax
+    matched, _ := ctx.ignoreMatcher.Matches(path)
+    return matched
 }
 
 func (ctx *BuildContext) ExpandVars(s string) string {
@@ -198,6 +202,18 @@ func (ctx *BuildContext) ExpandVars(s string) string {
 }
 
 func (ctx *BuildContext) loadContextFiles() error {
+    // Load .dockerignore first (needed for filtering during scan)
+    dockerignorePath := filepath.Join(ctx.ContextDir, ".dockerignore")
+    if data, err := os.ReadFile(dockerignorePath); err == nil {
+        // Parse patterns using BuildKit's dockerignore package
+        patterns, err := dockerignore.ReadAll(bytes.NewReader(data))
+        if err == nil {
+            ctx.Dockerignore = patterns
+            // Create Docker-compatible matcher (supports **, negation, etc.)
+            ctx.ignoreMatcher, _ = dockerignore.New(patterns)
+        }
+    }
+
     // Scan context directory
     err := filepath.WalkDir(ctx.ContextDir, func(path string, d os.DirEntry, err error) error {
         if err != nil {
@@ -217,25 +233,7 @@ func (ctx *BuildContext) loadContextFiles() error {
         return nil
     })
 
-    // Load .dockerignore
-    dockerignorePath := filepath.Join(ctx.ContextDir, ".dockerignore")
-    if data, err := os.ReadFile(dockerignorePath); err == nil {
-        ctx.Dockerignore = parseDockerignore(string(data))
-    }
-
     return err
-}
-
-func parseDockerignore(content string) []string {
-    var patterns []string
-    for _, line := range strings.Split(content, "\n") {
-        line = strings.TrimSpace(line)
-        if line == "" || strings.HasPrefix(line, "#") {
-            continue
-        }
-        patterns = append(patterns, line)
-    }
-    return patterns
 }
 ```
 
