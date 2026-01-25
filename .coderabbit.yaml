@@ -45,7 +45,6 @@ reviews:
   path_filters:
     - '!**/internal/integration/testdata/**'
     - '!CHANGELOG.md'
-    - '!**/docs/**'
 chat:
   auto_reply: true
 knowledge_base:
