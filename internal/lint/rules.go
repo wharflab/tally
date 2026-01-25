@@ -3,6 +3,7 @@ package lint
 import (
 	"fmt"
 
+	"github.com/tinovyatkin/tally/internal/config"
 	"github.com/tinovyatkin/tally/internal/dockerfile"
 )
 
@@ -28,13 +29,44 @@ type FileResult struct {
 	Issues []Issue `json:"issues"`
 }
 
-// CheckMaxLines checks if the Dockerfile exceeds the maximum line count
-func CheckMaxLines(result *dockerfile.ParseResult, maxLines int) *Issue {
-	if result.TotalLines > maxLines {
+// CheckMaxLines checks if the Dockerfile exceeds the maximum line count.
+//
+// The rule supports the following options:
+//   - Max: maximum number of lines allowed (0 = disabled)
+//   - SkipBlankLines: exclude blank lines from the count
+//   - SkipComments: exclude comment lines from the count
+//
+// Returns nil if the rule is disabled or the file passes the check.
+func CheckMaxLines(result *dockerfile.ParseResult, rule config.MaxLinesRule) *Issue {
+	if !rule.Enabled() {
+		return nil
+	}
+
+	// Calculate effective line count based on skip options
+	effectiveLines := result.TotalLines
+	skipped := 0
+
+	if rule.SkipBlankLines {
+		effectiveLines -= result.BlankLines
+		skipped += result.BlankLines
+	}
+
+	if rule.SkipComments {
+		effectiveLines -= result.CommentLines
+		skipped += result.CommentLines
+	}
+
+	if effectiveLines > rule.Max {
+		msg := fmt.Sprintf("file has %d lines", effectiveLines)
+		if skipped > 0 {
+			msg += fmt.Sprintf(" (excluding %d skipped)", skipped)
+		}
+		msg += fmt.Sprintf(", maximum allowed is %d", rule.Max)
+
 		return &Issue{
 			Rule:     "max-lines",
 			Line:     0, // File-level issue
-			Message:  fmt.Sprintf("file has %d lines, maximum allowed is %d", result.TotalLines, maxLines),
+			Message:  msg,
 			Severity: "error",
 		}
 	}

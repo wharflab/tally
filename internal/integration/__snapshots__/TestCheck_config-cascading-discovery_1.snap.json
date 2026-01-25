@@ -1,0 +1,14 @@
+[
+  {
+    "file": "testdata/nested/subdir/Dockerfile",
+    "lines": 3,
+    "issues": [
+      {
+        "rule": "max-lines",
+        "line": 0,
+        "message": "file has 3 lines, maximum allowed is 2",
+        "severity": "error"
+      }
+    ]
+  }
+]

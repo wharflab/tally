@@ -1,0 +1,7 @@
+[
+  {
+    "file": "testdata/with-config/Dockerfile",
+    "lines": 5,
+    "issues": null
+  }
+]

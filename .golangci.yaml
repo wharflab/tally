@@ -113,6 +113,10 @@ linters:
       - linters:
           - dupl
         path: ".*_test\\.go"
+      # goconst: allow repeated strings in tests (expected values)
+      - linters:
+          - goconst
+        path: ".*_test\\.go"
       # errcheck: allow unchecked Write in test http handlers
       - linters:
           - errcheck

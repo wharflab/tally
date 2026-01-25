@@ -1,0 +1,7 @@
+# Test config with skip options
+format = "json"
+
+[rules.max-lines]
+max = 5
+skip-blank-lines = true
+skip-comments = true

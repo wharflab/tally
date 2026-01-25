@@ -1,0 +1,5 @@
+# Test config file
+format = "json"
+
+[rules.max-lines]
+max = 3

@@ -9,6 +9,7 @@
 **Minimize code ownership** - This project heavily reuses existing, well-maintained libraries:
 - `github.com/moby/buildkit/frontend/dockerfile/parser` - Official Dockerfile parsing
 - `github.com/urfave/cli/v3` - CLI framework
+- `github.com/knadh/koanf/v2` - Configuration loading
 - `golang.org/x/sync` - Concurrency primitives
 
 Do not re-implement functionality that exists in these libraries.
@@ -72,6 +73,9 @@ go tool cover -html=coverage.txt -o=coverage.html
 │   ├── check.go                      # Check subcommand (linting)
 │   └── version.go                    # Version subcommand
 ├── internal/
+│   ├── config/                       # Configuration loading (koanf)
+│   │   ├── config.go                 # Config struct, loading, discovery
+│   │   └── config_test.go
 │   ├── dockerfile/                   # Dockerfile parsing (uses buildkit)
 │   │   ├── parser.go
 │   │   └── parser_test.go
@@ -118,18 +122,50 @@ go tool cover -html=coverage.txt -o=coverage.html
 
 Test fixtures are organized in separate directories under `testdata/` to support future context-aware features (dockerignore, config files, etc.)
 
+## Configuration System
+
+tally uses a cascading configuration system with the following priority (highest first):
+
+1. **CLI flags** - Always override everything
+2. **Environment variables** - `TALLY_*` prefix (e.g., `TALLY_RULES_MAX_LINES_MAX`)
+3. **Config file** - Closest `.tally.toml` or `tally.toml` found walking up from the target file
+4. **Built-in defaults**
+
+### Config File Format
+
+```toml
+format = "json"
+
+[rules.max-lines]
+max = 500
+skip-blank-lines = true
+skip-comments = true
+```
+
+### Key Files
+
+- `internal/config/config.go` - Config struct, loading logic, cascading discovery
+- Config file names: `.tally.toml` (hidden) or `tally.toml`
+
 ## Key Flags
 
+- `--config, -c`: Path to config file (overrides auto-discovery)
 - `--max-lines, -l`: Maximum number of lines allowed (0 = unlimited)
+- `--skip-blank-lines`: Exclude blank lines from line count
+- `--skip-comments`: Exclude comment lines from line count
 - `--format, -f`: Output format (text, json)
 
 ## Adding New Linting Rules
 
-1. Add the rule logic to `internal/lint/rules.go`
-2. Add unit tests to `internal/lint/rules_test.go`
-3. Add CLI flag to `cmd/tally/cmd/check.go`
-4. Add integration test cases to `internal/integration/`
-5. Update documentation
+1. Add rule config struct to `internal/config/config.go` (under `RulesConfig`)
+2. Add the rule logic to `internal/lint/rules.go` (accepting config struct)
+3. Add unit tests to `internal/lint/rules_test.go`
+4. Add CLI flags to `cmd/tally/cmd/check.go` (with env var sources)
+5. Wire up config loading in `loadConfigForFile()` in `check.go`
+6. Add integration test cases to `internal/integration/`
+7. Update documentation
+
+See the `max-lines` rule implementation as an exemplary pattern.
 
 ## Package Publishing
 

@@ -1,0 +1,14 @@
+[
+  {
+    "file": "testdata/with-config/Dockerfile",
+    "lines": 5,
+    "issues": [
+      {
+        "rule": "max-lines",
+        "line": 0,
+        "message": "file has 5 lines, maximum allowed is 3",
+        "severity": "error"
+      }
+    ]
+  }
+]

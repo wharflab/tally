@@ -2,9 +2,11 @@ package dockerfile
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 )
@@ -13,6 +15,10 @@ import (
 type ParseResult struct {
 	// TotalLines is the total number of lines in the Dockerfile
 	TotalLines int
+	// BlankLines is the number of blank (empty or whitespace-only) lines
+	BlankLines int
+	// CommentLines is the number of comment lines (starting with #)
+	CommentLines int
 	// AST is the parsed Dockerfile AST from BuildKit
 	AST *parser.Result
 }
@@ -44,47 +50,53 @@ func ParseFile(_ context.Context, path string) (*ParseResult, error) {
 
 // Parse parses a Dockerfile from a reader
 func Parse(r io.Reader) (*ParseResult, error) {
-	// Count lines first - we need to read the content twice
-	// Use a TeeReader to count lines while parsing
-	var lines int
-	countingReader := &lineCountingReader{r: r, lines: &lines}
+	// Read the entire content to count lines by category
+	content, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
 
-	ast, err := parser.Parse(countingReader)
+	// Count lines by category
+	stats := countLines(content)
+
+	// Parse from the buffered content
+	ast, err := parser.Parse(bytes.NewReader(content))
 	if err != nil {
 		return nil, err
 	}
 
 	return &ParseResult{
-		TotalLines: lines,
-		AST:        ast,
+		TotalLines:   stats.total,
+		BlankLines:   stats.blank,
+		CommentLines: stats.comments,
+		AST:          ast,
 	}, nil
 }
 
-// lineCountingReader wraps a reader and counts lines
-type lineCountingReader struct {
-	r            io.Reader
-	lines        *int
-	lastByte     byte
-	eofProcessed bool
+// lineStats contains counts of different line types.
+type lineStats struct {
+	total    int
+	blank    int
+	comments int
 }
 
-func (l *lineCountingReader) Read(p []byte) (int, error) {
-	n, err := l.r.Read(p)
-	for i := range n {
-		if p[i] == '\n' {
-			*l.lines++
+// countLines counts total, blank, and comment lines in content.
+func countLines(content []byte) lineStats {
+	var stats lineStats
+	scanner := bufio.NewScanner(bytes.NewReader(content))
+
+	for scanner.Scan() {
+		stats.total++
+		line := strings.TrimSpace(scanner.Text())
+
+		if line == "" {
+			stats.blank++
+		} else if strings.HasPrefix(line, "#") {
+			stats.comments++
 		}
-		l.lastByte = p[i]
 	}
-	// Count the last line if it doesn't end with newline
-	// Only do this once when we first hit EOF
-	if err == io.EOF && !l.eofProcessed {
-		l.eofProcessed = true
-		if l.lastByte != 0 && l.lastByte != '\n' {
-			*l.lines++
-		}
-	}
-	return n, err
+
+	return stats
 }
 
 // CountLines counts the number of lines in a file

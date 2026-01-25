@@ -64,23 +64,43 @@ func TestCheck(t *testing.T) {
 		name     string
 		dir      string
 		args     []string
+		env      []string
 		wantExit int
 	}{
-		{"simple", "simple", []string{"--format", "json"}, 0},
-		{"simple-max-lines-pass", "simple", []string{"--max-lines", "100", "--format", "json"}, 0},
-		{"simple-max-lines-fail", "simple", []string{"--max-lines", "2", "--format", "json"}, 0},
+		// Basic tests
+		{"simple", "simple", []string{"--format", "json"}, nil, 0},
+		{"simple-max-lines-pass", "simple", []string{"--max-lines", "100", "--format", "json"}, nil, 0},
+		{"simple-max-lines-fail", "simple", []string{"--max-lines", "2", "--format", "json"}, nil, 0},
+
+		// Config file discovery tests
+		{"config-file-discovery", "with-config", nil, nil, 0},
+		{"config-cascading-discovery", "nested/subdir", nil, nil, 0},
+		{"config-skip-options", "with-blanks-and-comments", nil, nil, 0},
+		{"cli-overrides-config", "with-config", []string{"--max-lines", "100"}, nil, 0},
+
+		// Environment variable tests
+		{
+			"env-var-override", "simple",
+			[]string{"--format", "json"},
+			[]string{"TALLY_RULES_MAX_LINES_MAX=2"},
+			0,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			dockerfilePath := filepath.Join("testdata", tc.dir, "Dockerfile")
 
-			args := append([]string{"check"}, tc.args...)
+			args := make([]string, 0, 1+len(tc.args)+1)
+			args = append(args, "check")
+			args = append(args, tc.args...)
 			args = append(args, dockerfilePath)
 			cmd := exec.Command(binaryPath, args...)
 			cmd.Env = append(os.Environ(),
 				"GOCOVERDIR="+coverageDir,
 			)
+			// Add test-specific environment variables
+			cmd.Env = append(cmd.Env, tc.env...)
 			output, err := cmd.CombinedOutput()
 
 			// Check exit code if expected to fail

@@ -6,9 +6,14 @@ This repository is a Go CLI for linting Dockerfiles and Containerfiles. It check
 
 - `main.go`: application entrypoint
 - `cmd/tally/cmd/`: CLI commands (`root.go`, `check.go`, `version.go`)
-- `internal/`: implementation packages (Dockerfile parsing, linting rules, version)
+- `internal/`: implementation packages
+  - `internal/config/`: configuration loading with cascading discovery (koanf)
+  - `internal/dockerfile/`: Dockerfile parsing (buildkit)
+  - `internal/lint/`: linting rules
+  - `internal/version/`: version info
 - `internal/integration/`: end-to-end tests with snapshots and fixtures
   - `internal/integration/testdata/<case>/Dockerfile`: test Dockerfiles
+  - `internal/integration/testdata/<case>/.tally.toml`: test config files
   - `internal/integration/__snapshots__/`: `go-snaps` snapshot outputs
 - `bin/` and `dist/`: local tools / release artifacts (ignored by Git)
 
@@ -24,6 +29,22 @@ Local usage examples:
 - `go run . check --help`
 - `go run . check Dockerfile`
 - `go run . check --max-lines 100 Dockerfile`
+- `go run . check --config .tally.toml Dockerfile`
+
+## Configuration
+
+tally uses cascading config discovery (like Ruff):
+- Config files: `.tally.toml` or `tally.toml`
+- Discovery: walks up from target file, uses closest config
+- Priority: CLI flags > env vars (`TALLY_*`) > config file > defaults
+
+Example config:
+```toml
+format = "json"
+[rules.max-lines]
+max = 500
+skip-blank-lines = true
+```
 
 ## Coding Style & Naming Conventions
 
