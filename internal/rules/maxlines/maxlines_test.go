@@ -139,6 +139,26 @@ func TestRule_ValidateConfig(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "nil config is valid",
+			config:  nil,
+			wantErr: false,
+		},
+		{
+			name:    "pointer config is valid",
+			config:  &Config{Max: 50},
+			wantErr: false,
+		},
+		{
+			name:    "nil pointer config is valid",
+			config:  (*Config)(nil),
+			wantErr: false,
+		},
+		{
+			name:    "pointer with negative max is invalid",
+			config:  &Config{Max: -5},
+			wantErr: true,
+		},
+		{
 			name:    "wrong type",
 			config:  "not a config",
 			wantErr: true,

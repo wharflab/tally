@@ -79,8 +79,19 @@ func (r *Rule) DefaultConfig() any {
 
 // ValidateConfig checks if the configuration is valid.
 func (r *Rule) ValidateConfig(config any) error {
-	cfg, ok := config.(Config)
-	if !ok {
+	if config == nil {
+		return nil
+	}
+	var cfg Config
+	switch v := config.(type) {
+	case Config:
+		cfg = v
+	case *Config:
+		if v == nil {
+			return nil
+		}
+		cfg = *v
+	default:
 		return fmt.Errorf("expected Config, got %T", config)
 	}
 	if cfg.Max < 0 {
