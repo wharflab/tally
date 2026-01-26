@@ -31,30 +31,11 @@ func TestMakeLintInput(t *testing.T) {
 	if string(input.Source) != content {
 		t.Errorf("Source = %q, want %q", string(input.Source), content)
 	}
-	if len(input.Lines) != 2 {
-		t.Errorf("len(Lines) = %d, want 2", len(input.Lines))
-	}
 	if input.Context != nil {
 		t.Error("Context should be nil")
 	}
 	if input.Config != nil {
 		t.Error("Config should be nil")
-	}
-}
-
-func TestMakeLintInput_LineStats(t *testing.T) {
-	content := "# comment\nFROM alpine\n\nRUN echo hello\n# another comment"
-	input := MakeLintInput(t, "Dockerfile", content)
-
-	// Verify LineStats is populated from parser
-	if input.LineStats.Total != 5 {
-		t.Errorf("LineStats.Total = %d, want 5", input.LineStats.Total)
-	}
-	if input.LineStats.Blank != 1 {
-		t.Errorf("LineStats.Blank = %d, want 1", input.LineStats.Blank)
-	}
-	if input.LineStats.Comments != 2 {
-		t.Errorf("LineStats.Comments = %d, want 2", input.LineStats.Comments)
 	}
 }
 

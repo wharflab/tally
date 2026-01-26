@@ -2,7 +2,10 @@
 package maxlines
 
 import (
+	"bytes"
 	"fmt"
+
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/tinovyatkin/tally/internal/rules"
 )
@@ -45,8 +48,9 @@ func (r *Rule) Metadata() rules.RuleMetadata {
 	}
 }
 
-// Check runs the max-lines rule.
-// It uses pre-computed LineStats from the parser for accurate line counting.
+// Check runs the max-lines rule using the AST for accurate line counting.
+// Like ESLint's max-lines, it uses parsed AST data for comments rather than
+// naive string matching.
 func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 	cfg := r.resolveConfig(input.Config)
 
@@ -55,20 +59,27 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	// Use pre-computed line stats from parser
-	// Start with total lines, subtract blank/comments if configured
-	count := input.LineStats.Total
-	if cfg.SkipBlankLines {
-		count -= input.LineStats.Blank
-	}
+	// Get total lines from the AST root node's EndLine
+	// This gives us the last line of actual content
+	totalLines := getTotalLines(input.AST, input.Source)
+
+	count := totalLines
+
+	// Subtract comment lines if configured (using AST's PrevComment data)
 	if cfg.SkipComments {
-		count -= input.LineStats.Comments
+		count -= countCommentLines(input.AST.AST)
+	}
+
+	// Subtract blank lines if configured (lines without any AST node)
+	if cfg.SkipBlankLines {
+		count -= countBlankLines(input.AST)
 	}
 
 	if count > cfg.Max {
+		// Report from the first line exceeding the limit (like ESLint)
 		return []rules.Violation{
 			rules.NewViolation(
-				rules.NewFileLocation(input.File),
+				rules.NewLineLocation(input.File, cfg.Max), // 0-based: line after max
 				r.Metadata().Code,
 				fmt.Sprintf("file has %d lines, maximum allowed is %d", count, cfg.Max),
 				r.Metadata().DefaultSeverity,
@@ -77,6 +88,112 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 	}
 
 	return nil
+}
+
+// getTotalLines returns the total number of lines from the AST or source.
+func getTotalLines(ast *parser.Result, source []byte) int {
+	if ast != nil && ast.AST != nil && ast.AST.EndLine > 0 {
+		return ast.AST.EndLine
+	}
+	// Fallback: count newlines in source
+	return bytes.Count(source, []byte{'\n'}) + 1
+}
+
+// countCommentLines counts lines that are comment-only using AST data.
+// BuildKit stores comments in Node.PrevComment for each node.
+func countCommentLines(node *parser.Node) int {
+	if node == nil {
+		return 0
+	}
+
+	count := 0
+
+	// Count comments attached to this node
+	count += len(node.PrevComment)
+
+	// Recursively count in children
+	for _, child := range node.Children {
+		count += countCommentLines(child)
+	}
+
+	// Count in Next chain
+	if node.Next != nil {
+		count += countCommentLines(node.Next)
+	}
+
+	return count
+}
+
+// countBlankLines counts lines that have no AST node content.
+// A blank line is one that has neither code nor comments.
+// This is only called when SkipBlankLines is enabled.
+func countBlankLines(ast *parser.Result) int {
+	if ast == nil || ast.AST == nil {
+		return 0
+	}
+
+	totalLines := ast.AST.EndLine
+	if totalLines <= 0 {
+		return 0
+	}
+
+	// Track which lines are occupied (have code or comments)
+	occupied := make(map[int]bool)
+
+	// The root node spans the entire file - process its children only
+	// Root comments (file header comments)
+	numRootComments := len(ast.AST.PrevComment)
+	for i := range numRootComments {
+		occupied[1+i] = true // Root comments start at line 1
+	}
+
+	// Process child instructions (the root node's Children contains instructions)
+	for _, child := range ast.AST.Children {
+		markOccupiedLines(child, occupied)
+	}
+
+	// Process Next chain (alternative structure for instructions)
+	if ast.AST.Next != nil {
+		markOccupiedLines(ast.AST.Next, occupied)
+	}
+
+	// Count unoccupied lines
+	blankCount := 0
+	for line := 1; line <= totalLines; line++ {
+		if !occupied[line] {
+			blankCount++
+		}
+	}
+	return blankCount
+}
+
+// markOccupiedLines recursively marks all lines that have AST content.
+func markOccupiedLines(node *parser.Node, occupied map[int]bool) {
+	if node == nil {
+		return
+	}
+
+	// Mark lines covered by this node's instruction
+	for line := node.StartLine; line <= node.EndLine; line++ {
+		occupied[line] = true
+	}
+
+	// Mark lines for preceding comments
+	// Each PrevComment entry represents one comment line before StartLine
+	numComments := len(node.PrevComment)
+	for i := range numComments {
+		occupied[node.StartLine-numComments+i] = true
+	}
+
+	// Recurse into children
+	for _, child := range node.Children {
+		markOccupiedLines(child, occupied)
+	}
+
+	// Recurse into Next chain (sibling instructions)
+	if node.Next != nil {
+		markOccupiedLines(node.Next, occupied)
+	}
 }
 
 // DefaultConfig returns the default configuration for this rule.

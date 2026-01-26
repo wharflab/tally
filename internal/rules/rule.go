@@ -20,22 +20,14 @@ type BuildContext struct {
 	// - RegistryClient interface{}
 }
 
-// LineStats contains counts of different line types in a Dockerfile.
-type LineStats struct {
-	// Total is the total number of lines.
-	Total int
-	// Blank is the number of blank (empty or whitespace-only) lines.
-	Blank int
-	// Comments is the number of comment lines (starting with #).
-	Comments int
-}
-
 // LintInput contains all the information a rule needs to check a Dockerfile.
+// Rules should work with the AST and typed instructions, not raw source text.
 type LintInput struct {
 	// File is the path to the Dockerfile being linted.
 	File string
 
 	// AST is the parsed Dockerfile AST from BuildKit.
+	// Use AST nodes for line information, not raw source counting.
 	AST *parser.Result
 
 	// Stages contains the parsed build stages with typed instructions.
@@ -49,12 +41,6 @@ type LintInput struct {
 	// Source is the raw source content of the Dockerfile.
 	// Used for snippet extraction and directive parsing.
 	Source []byte
-
-	// Lines is the source split into individual lines.
-	Lines []string
-
-	// LineStats contains pre-computed line counts from the parser.
-	LineStats LineStats
 
 	// Context is optional build context (nil in v1.0).
 	Context *BuildContext
