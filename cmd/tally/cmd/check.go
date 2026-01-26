@@ -38,12 +38,14 @@ func checkCommand() *cli.Command {
 				Sources: cli.EnvVars("TALLY_RULES_MAX_LINES_MAX"),
 			},
 			&cli.BoolFlag{
-				Name:  "skip-blank-lines",
-				Usage: "Exclude blank lines from the line count",
+				Name:    "skip-blank-lines",
+				Usage:   "Exclude blank lines from the line count",
+				Sources: cli.EnvVars("TALLY_RULES_MAX_LINES_SKIP_BLANK_LINES"),
 			},
 			&cli.BoolFlag{
-				Name:  "skip-comments",
-				Usage: "Exclude comment lines from the line count",
+				Name:    "skip-comments",
+				Usage:   "Exclude comment lines from the line count",
+				Sources: cli.EnvVars("TALLY_RULES_MAX_LINES_SKIP_COMMENTS"),
 			},
 			&cli.StringFlag{
 				Name:    "format",
