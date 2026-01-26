@@ -133,7 +133,7 @@ func TestViolation_JSON_WithFix(t *testing.T) {
 }
 
 func TestNewViolationFromBuildKitWarning(t *testing.T) {
-	// Test with location
+	// Test with location (0-based coordinates from BuildKit)
 	location := []parser.Range{
 		{
 			Start: parser.Position{Line: 5, Character: 1},
@@ -165,6 +165,7 @@ func TestNewViolationFromBuildKitWarning(t *testing.T) {
 	if v.Severity != SeverityWarning {
 		t.Errorf("Severity = %v, want %v", v.Severity, SeverityWarning)
 	}
+	// Direct mapping, 0-based coordinates preserved
 	if v.Location.Start.Line != 5 {
 		t.Errorf("Location.Start.Line = %d, want 5", v.Location.Start.Line)
 	}
@@ -187,7 +188,10 @@ func TestNewViolationFromBuildKitWarning_NoLocation(t *testing.T) {
 	if v.Location.File != "Dockerfile" {
 		t.Errorf("File = %q, want %q", v.Location.File, "Dockerfile")
 	}
-	if v.Location.Start.Line != 0 {
-		t.Errorf("Start.Line = %d, want 0 (file-level)", v.Location.Start.Line)
+	if v.Location.Start.Line != -1 {
+		t.Errorf("Start.Line = %d, want -1 (file-level sentinel)", v.Location.Start.Line)
+	}
+	if !v.Location.IsFileLevel() {
+		t.Error("IsFileLevel() = false, want true")
 	}
 }

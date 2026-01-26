@@ -13,8 +13,8 @@ func TestNewFileLocation(t *testing.T) {
 	if loc.File != "Dockerfile" {
 		t.Errorf("File = %q, want %q", loc.File, "Dockerfile")
 	}
-	if loc.Start.Line != 0 {
-		t.Errorf("Start.Line = %d, want 0", loc.Start.Line)
+	if loc.Start.Line != -1 {
+		t.Errorf("Start.Line = %d, want -1 (file-level sentinel)", loc.Start.Line)
 	}
 	if !loc.IsFileLevel() {
 		t.Error("IsFileLevel() = false, want true")
@@ -22,6 +22,7 @@ func TestNewFileLocation(t *testing.T) {
 }
 
 func TestNewLineLocation(t *testing.T) {
+	// 0-based: line 10 means the 11th line
 	loc := NewLineLocation("Dockerfile", 10)
 
 	if loc.File != "Dockerfile" {
@@ -33,6 +34,9 @@ func TestNewLineLocation(t *testing.T) {
 	if loc.Start.Column != 0 {
 		t.Errorf("Start.Column = %d, want 0", loc.Start.Column)
 	}
+	if loc.End.Line != -1 {
+		t.Errorf("End.Line = %d, want -1 (point location sentinel)", loc.End.Line)
+	}
 	if loc.IsFileLevel() {
 		t.Error("IsFileLevel() = true, want false")
 	}
@@ -42,6 +46,7 @@ func TestNewLineLocation(t *testing.T) {
 }
 
 func TestNewRangeLocation(t *testing.T) {
+	// 0-based coordinates
 	loc := NewRangeLocation("Dockerfile", 5, 3, 7, 10)
 
 	if loc.Start.Line != 5 {
@@ -58,6 +63,9 @@ func TestNewRangeLocation(t *testing.T) {
 	}
 	if loc.IsPointLocation() {
 		t.Error("IsPointLocation() = true, want false")
+	}
+	if loc.IsFileLevel() {
+		t.Error("IsFileLevel() = true, want false")
 	}
 }
 
@@ -83,6 +91,7 @@ func TestLocation_JSON(t *testing.T) {
 }
 
 func TestNewLocationFromRange(t *testing.T) {
+	// Both BuildKit and our Location use 0-based coordinates (LSP semantics)
 	r := parser.Range{
 		Start: parser.Position{Line: 5, Character: 10},
 		End:   parser.Position{Line: 7, Character: 25},
@@ -93,6 +102,7 @@ func TestNewLocationFromRange(t *testing.T) {
 	if loc.File != "Dockerfile" {
 		t.Errorf("File = %q, want %q", loc.File, "Dockerfile")
 	}
+	// Direct mapping, no conversion needed
 	if loc.Start.Line != 5 {
 		t.Errorf("Start.Line = %d, want 5", loc.Start.Line)
 	}
