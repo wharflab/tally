@@ -41,6 +41,7 @@ func NewFileLocation(file string) Location {
 	return Location{
 		File:  file,
 		Start: Position{Line: -1, Column: -1},
+		End:   Position{Line: -1, Column: -1},
 	}
 }
 
