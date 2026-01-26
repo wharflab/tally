@@ -31,7 +31,8 @@ type Location struct {
 	// Start is the starting position (inclusive, 0-based).
 	Start Position `json:"start"`
 	// End is the ending position (exclusive, LSP semantics).
-	// Points to the first position after the range. If negative, it's a point location.
+	// Points to the first position after the range.
+	// A point location has End.Line < 0 (unset) or End equals Start.
 	End Position `json:"end"`
 }
 
