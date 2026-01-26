@@ -140,9 +140,11 @@ func checkCommand() *cli.Command {
 						fmt.Printf("%s:%d: %s (%s)\n", result.File, line, v.Message, v.RuleCode)
 					}
 				}
-				if hasViolations {
-					os.Exit(1)
-				}
+			}
+
+			// Exit with error code if violations found (consistent for all formats)
+			if hasViolations {
+				os.Exit(1)
 			}
 
 			return nil
