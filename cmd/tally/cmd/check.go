@@ -64,12 +64,18 @@ func checkCommand() *cli.Command {
 
 			var allResults []FileResult
 			hasViolations := false
+			var configFormat string // Store format from first file's config
 
 			for _, file := range files {
 				// Load config for this specific file (cascading discovery)
 				cfg, err := loadConfigForFile(cmd, file)
 				if err != nil {
 					return fmt.Errorf("failed to load config for %s: %w", file, err)
+				}
+
+				// Store format from first file's config (used if CLI flag not set)
+				if configFormat == "" {
+					configFormat = cfg.Format
 				}
 
 				// Parse the Dockerfile
@@ -119,7 +125,7 @@ func checkCommand() *cli.Command {
 			}
 
 			// Output results
-			format := getFormat(cmd, allResults)
+			format := getFormat(cmd, configFormat)
 			switch format {
 			case "json":
 				enc := json.NewEncoder(os.Stdout)
@@ -186,18 +192,16 @@ func loadConfigForFile(cmd *cli.Command, targetPath string) (*config.Config, err
 }
 
 // getFormat determines the output format.
-func getFormat(cmd *cli.Command, results []FileResult) string {
+// Uses CLI flag if set, otherwise falls back to the provided config format.
+func getFormat(cmd *cli.Command, configFormat string) string {
 	// CLI flag takes precedence
 	if cmd.IsSet("format") {
 		return cmd.String("format")
 	}
 
-	// Otherwise use the format from the first result's config
-	if len(results) > 0 {
-		cfg, err := config.Load(results[0].File)
-		if err == nil {
-			return cfg.Format
-		}
+	// Use format from config if set
+	if configFormat != "" {
+		return configFormat
 	}
 
 	return "text"
