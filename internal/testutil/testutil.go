@@ -25,7 +25,7 @@ func ParseDockerfile(tb testing.TB, content string) *parser.Result {
 
 // MakeLintInput creates a LintInput for testing a rule.
 // Parses the Dockerfile content and constructs the input struct with full
-// BuildKit instruction parsing including Stages and MetaArgs.
+// BuildKit instruction parsing including Stages, MetaArgs, and LineStats.
 func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 	tb.Helper()
 
@@ -42,8 +42,13 @@ func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 		MetaArgs: result.MetaArgs,
 		Source:   result.Source,
 		Lines:    lines,
-		Context:  nil, // v1.0 doesn't require context
-		Config:   nil, // Set by individual tests if needed
+		LineStats: rules.LineStats{
+			Total:    result.TotalLines,
+			Blank:    result.BlankLines,
+			Comments: result.CommentLines,
+		},
+		Context: nil, // v1.0 doesn't require context
+		Config:  nil, // Set by individual tests if needed
 	}
 }
 

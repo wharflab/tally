@@ -3,7 +3,6 @@ package maxlines
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/tinovyatkin/tally/internal/rules"
 )
@@ -47,6 +46,7 @@ func (r *Rule) Metadata() rules.RuleMetadata {
 }
 
 // Check runs the max-lines rule.
+// It uses pre-computed LineStats from the parser for accurate line counting.
 func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 	cfg := r.resolveConfig(input.Config)
 
@@ -55,8 +55,15 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	// Count lines
-	count := countLines(input.Lines, cfg)
+	// Use pre-computed line stats from parser
+	// Start with total lines, subtract blank/comments if configured
+	count := input.LineStats.Total
+	if cfg.SkipBlankLines {
+		count -= input.LineStats.Blank
+	}
+	if cfg.SkipComments {
+		count -= input.LineStats.Comments
+	}
 
 	if count > cfg.Max {
 		return []rules.Violation{
@@ -113,27 +120,6 @@ func (r *Rule) resolveConfig(config any) Config {
 		return *cfg
 	}
 	return DefaultConfig()
-}
-
-// countLines counts lines according to the configuration.
-func countLines(lines []string, cfg Config) int {
-	count := 0
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-
-		// Skip blank lines if configured
-		if cfg.SkipBlankLines && trimmed == "" {
-			continue
-		}
-
-		// Skip comments if configured
-		if cfg.SkipComments && strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-
-		count++
-	}
-	return count
 }
 
 // New creates a new max-lines rule instance.

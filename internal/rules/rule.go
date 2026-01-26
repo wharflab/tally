@@ -20,6 +20,16 @@ type BuildContext struct {
 	// - RegistryClient interface{}
 }
 
+// LineStats contains counts of different line types in a Dockerfile.
+type LineStats struct {
+	// Total is the total number of lines.
+	Total int
+	// Blank is the number of blank (empty or whitespace-only) lines.
+	Blank int
+	// Comments is the number of comment lines (starting with #).
+	Comments int
+}
+
 // LintInput contains all the information a rule needs to check a Dockerfile.
 type LintInput struct {
 	// File is the path to the Dockerfile being linted.
@@ -42,6 +52,9 @@ type LintInput struct {
 
 	// Lines is the source split into individual lines.
 	Lines []string
+
+	// LineStats contains pre-computed line counts from the parser.
+	LineStats LineStats
 
 	// Context is optional build context (nil in v1.0).
 	Context *BuildContext
