@@ -21,13 +21,17 @@ type Position struct {
 // This extends parser.Range by adding the File path. BuildKit's Range only
 // contains Start/End positions without file context.
 //
+// Following LSP conventions, Start is inclusive and End is exclusive.
+// This means End points to the first position AFTER the covered text.
+//
 // See: github.com/moby/buildkit/frontend/dockerfile/parser.Range
 type Location struct {
 	// File is the path to the source file (not in parser.Range).
 	File string `json:"file"`
-	// Start is the starting position (inclusive).
+	// Start is the starting position (inclusive, 0-based).
 	Start Position `json:"start"`
-	// End is the ending position (inclusive). If zero, it's a point location.
+	// End is the ending position (exclusive, LSP semantics).
+	// Points to the first position after the range. If negative, it's a point location.
 	End Position `json:"end"`
 }
 
@@ -61,7 +65,8 @@ func NewRangeLocation(file string, startLine, startCol, endLine, endCol int) Loc
 
 // NewLocationFromRange converts a BuildKit parser.Range to our Location type.
 // This bridges BuildKit's internal types with our output schema.
-// Both use 0-based coordinates (LSP semantics).
+// Both use 0-based coordinates with End-exclusive semantics (LSP conventions).
+// The mapping is direct—no coordinate adjustment needed.
 func NewLocationFromRange(file string, r parser.Range) Location {
 	return Location{
 		File:  file,
