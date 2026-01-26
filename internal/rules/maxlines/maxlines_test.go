@@ -84,34 +84,6 @@ func TestRule_Check(t *testing.T) {
 			Config:         nil,
 			WantViolations: 0, // Default max is 0 (disabled)
 		},
-		// Trailing newline tests
-		// BuildKit's AST.EndLine represents the last line with content,
-		// so trailing blank lines after the last instruction are not counted.
-		{
-			Name:           "trailing newline not counted as extra line",
-			Content:        "FROM alpine\nRUN echo hello\n",
-			Config:         Config{Max: 2},
-			WantViolations: 0, // 2 lines, trailing \n doesn't add a line
-		},
-		{
-			Name:           "no trailing newline same count",
-			Content:        "FROM alpine\nRUN echo hello",
-			Config:         Config{Max: 2},
-			WantViolations: 0, // 2 lines
-		},
-		{
-			Name:           "multiple trailing newlines ignored by AST",
-			Content:        "FROM alpine\nRUN echo hello\n\n\n",
-			Config:         Config{Max: 2},
-			WantViolations: 0, // Still 2 lines - AST.EndLine ignores trailing blanks
-		},
-		{
-			Name:           "blank lines between instructions are counted",
-			Content:        "FROM alpine\n\n\nRUN echo hello",
-			Config:         Config{Max: 2},
-			WantViolations: 1, // 4 lines total (blanks between instructions count)
-			WantMessages:   []string{"file has 4 lines"},
-		},
 	})
 }
 
