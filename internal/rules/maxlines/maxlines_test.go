@@ -84,6 +84,35 @@ func TestRule_Check(t *testing.T) {
 			Config:         nil,
 			WantViolations: 0, // Default max is 0 (disabled)
 		},
+		// Trailing newline behavior:
+		// When SkipBlankLines is false, ALL blank lines count - including trailing ones.
+		// A single trailing \n is just a line terminator, not a blank line.
+		{
+			Name:           "single trailing newline is just terminator",
+			Content:        "FROM alpine\nRUN echo hello\n",
+			Config:         Config{Max: 2},
+			WantViolations: 0, // 2 lines - trailing \n is line terminator
+		},
+		{
+			Name:           "trailing blank lines count when not skipped",
+			Content:        "FROM alpine\nRUN echo hello\n\n\n",
+			Config:         Config{Max: 2},
+			WantViolations: 1, // 4 lines (2 content + 2 trailing blanks)
+			WantMessages:   []string{"file has 4 lines"},
+		},
+		{
+			Name:           "trailing blanks ignored when skipping blanks",
+			Content:        "FROM alpine\nRUN echo hello\n\n\n",
+			Config:         Config{Max: 2, SkipBlankLines: true},
+			WantViolations: 0, // 2 lines - all blanks skipped
+		},
+		{
+			Name:           "blank lines between instructions count",
+			Content:        "FROM alpine\n\n\nRUN echo hello",
+			Config:         Config{Max: 2},
+			WantViolations: 1, // 4 lines - blanks within content span count
+			WantMessages:   []string{"file has 4 lines"},
+		},
 	})
 }
 

@@ -78,9 +78,12 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 		count -= countCommentLines(input.AST.AST)
 	}
 
-	// Subtract blank lines if configured (lines without any AST node)
+	// Handle blank lines
 	if cfg.SkipBlankLines {
 		count -= countBlankLines(input.AST)
+	} else if count <= cfg.Max {
+		// Trailing blanks only matter if not already over limit
+		count += countTrailingBlanks(input.Source)
 	}
 
 	if count > cfg.Max {
@@ -105,6 +108,20 @@ func getTotalLines(ast *parser.Result, source []byte) int {
 	}
 	// Fallback: count newlines in source
 	return bytes.Count(source, []byte{'\n'}) + 1
+}
+
+// countTrailingBlanks counts blank lines after the last instruction.
+// A single trailing \n is just a line terminator; additional \n's are blank lines.
+func countTrailingBlanks(source []byte) int {
+	count := 0
+	for i := len(source) - 1; i >= 0 && source[i] == '\n'; i-- {
+		count++
+	}
+	// First newline is line terminator, rest are blank lines
+	if count > 1 {
+		return count - 1
+	}
+	return 0
 }
 
 // countCommentLines counts lines that are comment-only using AST data.
