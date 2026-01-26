@@ -28,9 +28,11 @@ From `docs/01`–`docs/09`, these are the “don’t miss” architecture lesson
 2. **Rich diagnostics are a feature, not polish:** plan a stable `Violation` schema with range (line+col), snippets, doc links, and (later) fixes. (
    [02](02-buildx-bake-check-analysis.md), [05](05-reporters-and-output.md))
 3. **Progressive adoption matters:** experimental/opt-in rules + configurable failure threshold (`--fail-level`). ([02](02-buildx-bake-check-analysis.md), [09](09-hadolint-research.md))
-4. **Context must be optional:** rule API should accept an optional `BuildContext` and still work without it (v1.0 shouldn’t require full context). (
+4. **Context must be optional:** rule API should accept an optional `BuildContext` and still work without it (v1.0 shouldn't require full context). (
    [07](07-context-aware-foundation.md))
-5. **Avoid future refactors:** keep parser concerns separate from rules; preserve enough trivia (comments, line/col, original text) for directives +
+5. **Parse failures stop the pipeline:** if parsing fails, report the parse error with location info and exit—do not run any rules. Rules can assume
+   AST is always valid (following ESLint's approach).
+6. **Avoid future refactors:** keep parser concerns separate from rules; preserve enough trivia (comments, line/col, original text) for directives +
    snippets. ([01](01-linter-pipeline-architecture.md), [03](03-parsing-and-ast.md), [04](04-inline-disables.md), [05](05-reporters-and-output.md))
 
 ---

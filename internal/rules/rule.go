@@ -22,11 +22,15 @@ type BuildContext struct {
 
 // LintInput contains all the information a rule needs to check a Dockerfile.
 // Rules should work with the AST and typed instructions, not raw source text.
+//
+// The linter guarantees that AST and Source are always valid (non-nil) when
+// Check is called. If parsing fails, the linter reports parse errors and
+// exits without invoking any rules (following ESLint's approach).
 type LintInput struct {
 	// File is the path to the Dockerfile being linted.
 	File string
 
-	// AST is the parsed Dockerfile AST from BuildKit.
+	// AST is the parsed Dockerfile AST from BuildKit (guaranteed non-nil).
 	// Use AST nodes for line information, not raw source counting.
 	AST *parser.Result
 
@@ -82,7 +86,8 @@ type Rule interface {
 	Metadata() RuleMetadata
 
 	// Check runs the rule against the given input and returns any violations.
-	// The context in input may be nil; rules must handle this gracefully.
+	// The AST and Source fields are guaranteed non-nil. The Context field
+	// may be nil in v1.0 (context-aware linting is optional).
 	Check(input LintInput) []Violation
 }
 
