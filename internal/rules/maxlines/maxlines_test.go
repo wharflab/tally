@@ -79,10 +79,10 @@ func TestRule_Check(t *testing.T) {
 			WantViolations: 0, // Only 2 code lines
 		},
 		{
-			Name:           "nil config uses defaults (disabled)",
+			Name:           "nil config uses defaults",
 			Content:        "FROM alpine\nRUN echo hello\nRUN echo world",
 			Config:         nil,
-			WantViolations: 0, // Default max is 0 (disabled)
+			WantViolations: 0, // Default max is 50, content is only 3 lines
 		},
 		// Trailing newline behavior:
 		// When SkipBlankLines is false, ALL blank lines count - including trailing ones.
