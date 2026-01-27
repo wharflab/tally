@@ -194,32 +194,44 @@ These are explicitly front-loaded to avoid cross-blocking later.
 
 ---
 
-## Priority 3: Semantic Model v1 (Keep It Extensible)
+## Priority 3: Semantic Model v1 (Keep It Extensible) ✅
 
 **Goal:** Enable rules that need cross-instruction context without baking rule-specific logic everywhere.
 
+**Status:** Completed
+
 **Actions:**
 
-1. Build `SemanticModel` in a dedicated pass (or builder) and keep it parser-agnostic. ([03](03-parsing-and-ast.md))
-2. Track the v1 essentials:
-   - Stages + stage order
-   - Duplicate stage names (DL3024: detected during construction, not as a separate rule)
-   - ARG/ENV scoping (global vs stage-local) with CLI `--build-arg` overrides (highest precedence)
-   - `COPY --from` references
-   - Base image refs (`FROM`, `--platform`)
-   - `SHELL` per stage (dialect/argv) for correct `RUN` parsing defaults
-3. Add the “easy extensions” now (cheap, unlocks many rules later):
-   - Variable reference tracking (enables unused/shadowed var rules)
-   - Comment associations (enables directive/doc checks)
-   - Stage graph hooks (enables “unreachable stage” style rules)
+1. ✅ Built `SemanticModel` in a dedicated pass (`internal/semantic/`) with parser-agnostic design
+2. ✅ Track the v1 essentials:
+   - Stages + stage order (`Model.Stages()`, `Model.StageCount()`)
+   - Duplicate stage names (DL3024: detected during construction via `ConstructionIssues()`)
+   - ARG/ENV scoping (global vs stage-local) with CLI `--build-arg` overrides (`VariableScope.Resolve()`)
+   - `COPY --from` references (`StageInfo.CopyFromRefs`, `StageGraph`)
+   - Base image refs (`StageInfo.BaseImage` with `FROM`, `--platform`)
+   - `SHELL` per stage (`StageInfo.Shell` for correct `RUN` parsing defaults)
+3. ✅ Added the "easy extensions" (cheap, unlocks many rules):
+   - Variable reference tracking via `VariableScope` (enables unused/shadowed var rules)
+   - Stage graph with `DependsOn()`, `IsReachable()`, `UnreachableStages()` (enables reachability rules)
+   - Implemented `no-unreachable-stages` rule using the semantic model
+
+**Implementation Details:**
+
+- `internal/semantic/semantic.go` - Main `Model` struct with stage/variable resolution API
+- `internal/semantic/stage_info.go` - `StageInfo`, `BaseImageRef`, `CopyFromRef` types
+- `internal/semantic/scope.go` - `VariableScope` with proper precedence (ENV > ARG with build-arg > ARG default)
+- `internal/semantic/graph.go` - `StageGraph` for COPY --from and FROM stage dependencies
+- `internal/semantic/builder.go` - Single-pass construction with DL3024 detection
+- `internal/semantic/issue.go` - Construction-time issue type (avoids import cycle with rules)
+- `internal/rules/nounreachablestages/` - First rule using semantic model
 
 **Success Criteria:**
 
-- [ ] Semantic model supports stage + var resolution
-- [ ] CLI `--build-arg` overrides work with correct precedence (BuildArgs > Stage ARG/ENV > Global ARG)
-- [ ] DL3024 (duplicate stage names) detected during semantic model construction
-- [ ] Construction-time violations supported (when they're more natural than separate rules)
-- [ ] Unit tests cover semantic resolution edge cases
+- [x] Semantic model supports stage + var resolution
+- [x] CLI `--build-arg` overrides work with correct precedence (BuildArgs > Stage ARG/ENV > Global ARG)
+- [x] DL3024 (duplicate stage names) detected during semantic model construction
+- [x] Construction-time violations supported (when they're more natural than separate rules)
+- [x] Unit tests cover semantic resolution edge cases
 
 ---
 

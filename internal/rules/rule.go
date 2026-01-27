@@ -55,6 +55,12 @@ type LintInput struct {
 	// Context is optional build context (nil in v1.0).
 	Context *BuildContext
 
+	// Semantic is the semantic model for cross-instruction analysis.
+	// Provides stage resolution, variable scoping, and COPY --from validation.
+	// May be nil for backward compatibility with rules that don't need it.
+	// Type is *semantic.Model but declared as any to avoid import cycle.
+	Semantic any
+
 	// Config is the rule-specific configuration (type depends on rule).
 	Config any
 }

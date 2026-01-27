@@ -90,6 +90,12 @@ func TestCheck(t *testing.T) {
 		// BuildKit linter warnings tests
 		// These test that BuildKit's built-in warnings are captured and surfaced
 		{"buildkit-warnings", "buildkit-warnings", []string{"--format", "json"}, nil, 1},
+
+		// Semantic model construction-time violations
+		{"duplicate-stage-name", "duplicate-stage-name", []string{"--format", "json"}, nil, 1},
+
+		// Unreachable stage detection
+		{"unreachable-stage", "unreachable-stage", []string{"--format", "json"}, nil, 1},
 	}
 
 	for _, tc := range testCases {

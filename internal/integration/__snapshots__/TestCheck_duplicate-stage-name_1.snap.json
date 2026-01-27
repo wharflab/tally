@@ -1,0 +1,42 @@
+[
+  {
+    "file": "testdata/duplicate-stage-name/Dockerfile",
+    "violations": [
+      {
+        "location": {
+          "file": "testdata/duplicate-stage-name/Dockerfile",
+          "start": {
+            "line": 4,
+            "column": 0
+          },
+          "end": {
+            "line": 4,
+            "column": 0
+          }
+        },
+        "rule": "DL3024",
+        "message": "Stage name \"builder\" is already used on stage 0",
+        "severity": "error",
+        "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3024"
+      },
+      {
+        "location": {
+          "file": "testdata/duplicate-stage-name/Dockerfile",
+          "start": {
+            "line": 1,
+            "column": 0
+          },
+          "end": {
+            "line": 1,
+            "column": 0
+          }
+        },
+        "rule": "no-unreachable-stages",
+        "message": "stage \"builder\" (index 0) is not reachable from the final stage and does not contribute to the final image",
+        "detail": "Consider removing this stage or using COPY --from to include its artifacts in the final image",
+        "severity": "warning",
+        "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/no-unreachable-stages.md"
+      }
+    ]
+  }
+]

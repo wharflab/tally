@@ -13,6 +13,8 @@ import (
 	"github.com/tinovyatkin/tally/internal/reporter"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/rules/maxlines"
+	_ "github.com/tinovyatkin/tally/internal/rules/nounreachablestages" // Register rule
+	"github.com/tinovyatkin/tally/internal/semantic"
 )
 
 // FileResult contains the linting results for a single file.
@@ -89,6 +91,11 @@ func checkCommand() *cli.Command {
 				// Store source for later use in text output
 				fileSources[file] = parseResult.Source
 
+				// Build semantic model for cross-instruction analysis
+				// Note: buildArgs will be populated when --build-arg flag is implemented
+				var buildArgs map[string]string
+				sem := semantic.NewModel(parseResult, buildArgs, file)
+
 				// Build base LintInput (without rule-specific config)
 				baseInput := rules.LintInput{
 					File:     file,
@@ -96,10 +103,19 @@ func checkCommand() *cli.Command {
 					Stages:   parseResult.Stages,
 					MetaArgs: parseResult.MetaArgs,
 					Source:   parseResult.Source,
+					Semantic: sem,
 				}
 
-				// Run all registered rules with rule-specific config
+				// Collect construction-time violations from semantic analysis
 				var violations []rules.Violation
+				for _, issue := range sem.ConstructionIssues() {
+					violations = append(violations, rules.NewViolation(
+						rules.NewLocationFromRange(issue.File, issue.Location),
+						issue.Code,
+						issue.Message,
+						rules.SeverityError,
+					).WithDocURL(issue.DocURL))
+				}
 				for _, rule := range rules.All() {
 					// Clone input and set rule-specific config
 					input := baseInput
