@@ -277,7 +277,7 @@ func (r *TextReporter) printSource(w io.Writer, loc rules.Location, source []byt
 	// Print lines with optional syntax highlighting
 	for i := start; i <= end; i++ {
 		isAffected := lineInRange(i, loc.Start.Line, loc.End.Line)
-		lineContent := lines[i-1]
+		lineContent := strings.TrimSuffix(lines[i-1], "\r") // Trim CRLF to avoid artifacts
 
 		// Format line number
 		var lineNum string
