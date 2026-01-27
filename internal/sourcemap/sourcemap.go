@@ -211,12 +211,17 @@ func (sm *SourceMap) CommentsForLine(line int) []Comment {
 			// Non-comment, non-empty line breaks the block
 			break
 		}
-		// Prepend to maintain line order
-		comments = append([]Comment{{
+		// Append in reverse order (will be reversed at the end)
+		comments = append(comments, Comment{
 			Line:        i,
 			Text:        trimmed,
 			IsDirective: isDirectiveComment(trimmed),
-		}}, comments...)
+		})
+	}
+
+	// Reverse to maintain line order (we collected in reverse)
+	for i, j := 0, len(comments)-1; i < j; i, j = i+1, j-1 {
+		comments[i], comments[j] = comments[j], comments[i]
 	}
 
 	return comments
