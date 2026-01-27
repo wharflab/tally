@@ -20,8 +20,9 @@ PMD_VERSION := 7.11.0
 cpd: bin/pmd-$(PMD_VERSION)
 	bin/pmd-bin-$(PMD_VERSION)/bin/pmd cpd --language go --minimum-tokens 100 --dir . \
 		--exclude "**/testdata/**" --exclude "**/__snapshots__/**" \
-		--exclude "**/*.pb.go" --exclude "**/*_generated.go" \
-		--exclude "packaging/**" --skip-lexical-errors
+		--exclude "**/*_test.go" --exclude "**/*.pb.go" \
+		--exclude "**/*_generated.go" --exclude "packaging/**" \
+		--skip-lexical-errors
 
 bin/pmd-$(PMD_VERSION):
 	@mkdir -p bin

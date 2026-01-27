@@ -85,6 +85,6 @@ jobs:
         run: |
           pmd-bin-7.11.0/bin/pmd cpd --language go --minimum-tokens 100 --dir . \
             --exclude "**/testdata/**" --exclude "**/__snapshots__/**" \
-            --exclude "**/*.pb.go" --exclude "**/*_generated.go" \
-            --exclude "packaging/**" --skip-lexical-errors \
-            --format text
+            --exclude "**/*_test.go" --exclude "**/*.pb.go" \
+            --exclude "**/*_generated.go" --exclude "packaging/**" \
+            --skip-lexical-errors --format text

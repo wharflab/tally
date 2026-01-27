@@ -82,7 +82,7 @@ This project uses multiple code quality tools:
    - Run locally: `make cpd`
    - Runs in CI on every PR
    - Threshold: 100 tokens minimum
-   - Exclusions: test fixtures, snapshots, generated files, packaging scripts
+   - Exclusions: test files, test fixtures, snapshots, generated files, packaging scripts
    - Configuration: `.pmd/cpd-config.xml`
 
 ## Coverage Collection
