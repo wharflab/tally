@@ -163,9 +163,10 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 
 		case *instructions.OnbuildCommand:
 			// Parse ONBUILD expression to extract COPY --from references
+			// Note: ONBUILD instructions execute when image is used as a base for another build,
+			// not in the current build, so we don't add edges to the graph here.
 			if copyCmd := b.parseOnbuildCopy(c.Expression); copyCmd != nil {
-				copyRef := b.processCopyFrom(copyCmd, info.Index, graph)
-				// Store in OnbuildCopyFromRefs since these execute when image is used as base
+				copyRef := b.processOnbuildCopyFrom(copyCmd, info.Index)
 				info.OnbuildCopyFromRefs = append(info.OnbuildCopyFromRefs, copyRef)
 			}
 		}
@@ -206,6 +207,39 @@ func (b *Builder) processCopyFrom(cmd *instructions.CopyCommand, stageIndex int,
 			// External image reference
 			ref.StageIndex = -1
 			graph.addExternalRef(stageIndex, cmd.From)
+		}
+	}
+
+	return ref
+}
+
+// processOnbuildCopyFrom analyzes a COPY --from reference from an ONBUILD instruction.
+// Unlike processCopyFrom, this does NOT add edges to the graph because ONBUILD
+// instructions only execute when the image is used as a base for another build.
+func (b *Builder) processOnbuildCopyFrom(cmd *instructions.CopyCommand, stageIndex int) CopyFromRef {
+	ref := CopyFromRef{
+		From:     cmd.From,
+		Command:  cmd,
+		Location: cmd.Location(),
+	}
+
+	// Try to resolve as stage reference (for informational purposes only)
+	if idx, err := strconv.Atoi(cmd.From); err == nil {
+		// Numeric reference
+		if idx >= 0 && idx < stageIndex {
+			ref.IsStageRef = true
+			ref.StageIndex = idx
+		} else {
+			ref.StageIndex = -1
+		}
+	} else {
+		// Named reference
+		normalized := normalizeStageRef(cmd.From)
+		if idx, found := b.stagesByName[normalized]; found && idx < stageIndex {
+			ref.IsStageRef = true
+			ref.StageIndex = idx
+		} else {
+			ref.StageIndex = -1
 		}
 	}
 

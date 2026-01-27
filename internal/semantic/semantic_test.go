@@ -1,6 +1,7 @@
 package semantic
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -574,9 +575,17 @@ ONBUILD RUN echo "not a copy"
 		t.Errorf("expected 0 regular COPY --from refs, got %d", len(info.CopyFromRefs))
 	}
 
-	// Builder stage should be reachable via ONBUILD COPY --from
-	if !model.Graph().IsReachable(0, 1) {
-		t.Error("builder stage should be reachable via ONBUILD COPY --from")
+	// ONBUILD COPY --from should NOT make the builder stage reachable in the current build.
+	// ONBUILD instructions only execute when the image is used as a base for another build.
+	if model.Graph().IsReachable(0, 1) {
+		t.Error("builder stage should NOT be reachable via ONBUILD COPY --from (ONBUILD executes in downstream builds)")
+	}
+
+	// Builder stage should be unreachable since it's only referenced by ONBUILD
+	unreachable := model.Graph().UnreachableStages()
+	hasBuilder := slices.Contains(unreachable, 0)
+	if !hasBuilder {
+		t.Error("builder stage should be unreachable (only referenced via ONBUILD)")
 	}
 }
 
