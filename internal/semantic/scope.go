@@ -150,8 +150,13 @@ func (s *VariableScope) Resolve(name string, buildArgs map[string]string) (strin
 	return "", false
 }
 
-// HasArg returns true if the variable is declared as an ARG in this scope
-// or any parent scope.
+// HasArg returns true if the variable is declared as an ARG anywhere in the
+// scope chain (this scope or any parent). This checks existence across the
+// entire scope chain, not resolvability - a global ARG will return true even
+// if the stage hasn't redeclared it.
+//
+// To check if a variable is actually resolvable in this stage's context,
+// use Resolve(name, nil) and check the boolean result.
 func (s *VariableScope) HasArg(name string) bool {
 	if _, found := s.args[name]; found {
 		return true
@@ -162,7 +167,10 @@ func (s *VariableScope) HasArg(name string) bool {
 	return false
 }
 
-// GetArg returns the ARG entry for the given name, or nil if not found.
+// GetArg returns the ARG entry for the given name, searching up the scope
+// chain. Like HasArg, this checks existence across the entire scope chain,
+// not resolvability - use Resolve to check if a variable is actually
+// accessible in this stage's context.
 func (s *VariableScope) GetArg(name string) *ArgEntry {
 	if arg, found := s.args[name]; found {
 		return arg
