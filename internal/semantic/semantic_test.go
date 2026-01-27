@@ -541,6 +541,96 @@ RUN echo "final"
 	}
 }
 
+func TestOnbuildCopyFrom(t *testing.T) {
+	content := `FROM golang:1.21 AS builder
+RUN go build -o /app
+
+FROM alpine:3.18
+ONBUILD COPY --from=builder /app /app
+ONBUILD RUN echo "not a copy"
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+
+	// Stage 1 should have ONBUILD COPY --from reference
+	info := model.StageInfo(1)
+	if len(info.OnbuildCopyFromRefs) != 1 {
+		t.Fatalf("expected 1 ONBUILD COPY --from ref, got %d", len(info.OnbuildCopyFromRefs))
+	}
+
+	ref := info.OnbuildCopyFromRefs[0]
+	if ref.From != "builder" {
+		t.Errorf("expected From='builder', got %q", ref.From)
+	}
+	if !ref.IsStageRef {
+		t.Error("should be a stage ref")
+	}
+	if ref.StageIndex != 0 {
+		t.Errorf("expected StageIndex=0, got %d", ref.StageIndex)
+	}
+
+	// Regular CopyFromRefs should be empty
+	if len(info.CopyFromRefs) != 0 {
+		t.Errorf("expected 0 regular COPY --from refs, got %d", len(info.CopyFromRefs))
+	}
+
+	// Builder stage should be reachable via ONBUILD COPY --from
+	if !model.Graph().IsReachable(0, 1) {
+		t.Error("builder stage should be reachable via ONBUILD COPY --from")
+	}
+}
+
+func TestOnbuildCopyFromNumeric(t *testing.T) {
+	content := `FROM golang:1.21
+RUN go build -o /app
+
+FROM alpine:3.18
+ONBUILD COPY --from=0 /app /app
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+
+	info := model.StageInfo(1)
+	if len(info.OnbuildCopyFromRefs) != 1 {
+		t.Fatalf("expected 1 ONBUILD COPY --from ref, got %d", len(info.OnbuildCopyFromRefs))
+	}
+
+	ref := info.OnbuildCopyFromRefs[0]
+	if ref.From != "0" {
+		t.Errorf("expected From='0', got %q", ref.From)
+	}
+	if !ref.IsStageRef {
+		t.Error("should be a stage ref")
+	}
+	if ref.StageIndex != 0 {
+		t.Errorf("expected StageIndex=0, got %d", ref.StageIndex)
+	}
+}
+
+func TestOnbuildCopyFromExternal(t *testing.T) {
+	content := `FROM alpine:3.18
+ONBUILD COPY --from=nginx:latest /etc/nginx/nginx.conf /nginx.conf
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+
+	info := model.StageInfo(0)
+	if len(info.OnbuildCopyFromRefs) != 1 {
+		t.Fatalf("expected 1 ONBUILD COPY --from ref, got %d", len(info.OnbuildCopyFromRefs))
+	}
+
+	ref := info.OnbuildCopyFromRefs[0]
+	if ref.From != "nginx:latest" {
+		t.Errorf("expected From='nginx:latest', got %q", ref.From)
+	}
+	if ref.IsStageRef {
+		t.Error("should not be a stage ref (external image)")
+	}
+	if ref.StageIndex != -1 {
+		t.Errorf("expected StageIndex=-1 for external, got %d", ref.StageIndex)
+	}
+}
+
 func TestNilParseResult(t *testing.T) {
 	model := NewModel(nil, nil, "Dockerfile")
 

@@ -30,6 +30,10 @@ type StageInfo struct {
 	// CopyFromRefs contains all COPY --from references in this stage.
 	CopyFromRefs []CopyFromRef
 
+	// OnbuildCopyFromRefs contains COPY --from references in ONBUILD instructions.
+	// These are triggered when the image is used as a base for another build.
+	OnbuildCopyFromRefs []CopyFromRef
+
 	// IsLastStage is true if this is the final stage in the Dockerfile.
 	IsLastStage bool
 }

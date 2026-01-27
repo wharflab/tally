@@ -160,6 +160,14 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 				copyRef := b.processCopyFrom(c, info.Index, graph)
 				info.CopyFromRefs = append(info.CopyFromRefs, copyRef)
 			}
+
+		case *instructions.OnbuildCommand:
+			// Parse ONBUILD expression to extract COPY --from references
+			if copyCmd := b.parseOnbuildCopy(c.Expression); copyCmd != nil {
+				copyRef := b.processCopyFrom(copyCmd, info.Index, graph)
+				// Store in OnbuildCopyFromRefs since these execute when image is used as base
+				info.OnbuildCopyFromRefs = append(info.OnbuildCopyFromRefs, copyRef)
+			}
 		}
 	}
 }
@@ -199,6 +207,37 @@ func (b *Builder) processCopyFrom(cmd *instructions.CopyCommand, stageIndex int,
 	}
 
 	return ref
+}
+
+// parseOnbuildCopy parses an ONBUILD expression to extract a COPY command.
+// Returns nil if the expression is not a COPY with --from.
+func (b *Builder) parseOnbuildCopy(expr string) *instructions.CopyCommand {
+	// Quick check: only parse if it looks like COPY --from
+	upper := strings.ToUpper(strings.TrimSpace(expr))
+	if !strings.HasPrefix(upper, "COPY") || !strings.Contains(upper, "--FROM") {
+		return nil
+	}
+
+	// Parse by wrapping in a minimal Dockerfile
+	dummyDockerfile := "FROM scratch\n" + expr + "\n"
+	result, err := parser.Parse(strings.NewReader(dummyDockerfile))
+	if err != nil {
+		return nil
+	}
+
+	stages, _, err := instructions.Parse(result.AST, nil)
+	if err != nil || len(stages) == 0 {
+		return nil
+	}
+
+	// Extract the COPY command
+	for _, cmd := range stages[0].Commands {
+		if copyCmd, ok := cmd.(*instructions.CopyCommand); ok && copyCmd.From != "" {
+			return copyCmd
+		}
+	}
+
+	return nil
 }
 
 // normalizeStageRef normalizes a stage reference for comparison.
