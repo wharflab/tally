@@ -231,6 +231,13 @@ func (r *TextReporter) printSource(w io.Writer, loc rules.Location, source []byt
 		end = start
 	}
 
+	// Honor exclusive end: when End.Column == 0, the range ends at previous line
+	// This matches SnippetForLocation semantics
+	markerEnd := end
+	if loc.End.Column == 0 && markerEnd > loc.Start.Line {
+		markerEnd--
+	}
+
 	// Bounds check
 	if start > len(lines) || start < 1 {
 		return
@@ -276,7 +283,7 @@ func (r *TextReporter) printSource(w io.Writer, loc rules.Location, source []byt
 
 	// Print lines with optional syntax highlighting
 	for i := start; i <= end; i++ {
-		isAffected := lineInRange(i, loc.Start.Line, loc.End.Line)
+		isAffected := lineInRange(i, loc.Start.Line, markerEnd)
 		lineContent := strings.TrimSuffix(lines[i-1], "\r") // Trim CRLF to avoid artifacts
 
 		// Format line number
