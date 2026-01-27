@@ -260,7 +260,7 @@ RUN echo $MYVAR
 	}
 }
 
-func TestVariableResolutionBuildArgOverridesAll(t *testing.T) {
+func TestVariableResolutionENVOverridesBuildArg(t *testing.T) {
 	content := `FROM alpine:3.18
 ARG MYVAR=arg_value
 ENV MYVAR=env_value
