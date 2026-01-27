@@ -18,19 +18,18 @@ lint-fix: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 PMD_VERSION := 7.20.0
 
 cpd: bin/pmd-$(PMD_VERSION)
-	@find . -type f -name "*.go" \
-		! -name "*_test.go" \
-		! -name "*.pb.go" \
-		! -name "*_generated.go" \
-		! -path "*/testdata/*" \
-		! -path "*/__snapshots__/*" \
-		! -path "*/packaging/*" \
-		! -path "*/bin/*" \
-		! -path "*/.git/*" \
-		> .cpd-files.txt
+	@find . -type f \( \
+		-name "*_test.go" \
+		-o -name "*.pb.go" \
+		-o -name "*_generated.go" \
+		-o -path "*/testdata/*" \
+		-o -path "*/__snapshots__/*" \
+		-o -path "*/packaging/*" \
+		-o -path "*/bin/*" \
+	\) > .cpd-exclude.txt
 	@bin/pmd-bin-$(PMD_VERSION)/bin/pmd cpd --language go --minimum-tokens 100 \
-		--file-list .cpd-files.txt
-	@rm -f .cpd-files.txt
+		--dir . --exclude-file-list .cpd-exclude.txt --format markdown
+	@rm -f .cpd-exclude.txt
 
 bin/pmd-$(PMD_VERSION):
 	@mkdir -p bin
