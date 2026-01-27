@@ -108,10 +108,11 @@ func DefaultTextOptions() TextOptions {
 
 // TextReporter formats violations as styled text output.
 type TextReporter struct {
-	opts      TextOptions
-	lexer     chroma.Lexer
-	formatter chroma.Formatter
-	style     *chroma.Style
+	opts         TextOptions
+	colorEnabled bool
+	lexer        chroma.Lexer
+	formatter    chroma.Formatter
+	style        *chroma.Style
 }
 
 // NewTextReporter creates a new text reporter with the given options.
@@ -119,12 +120,12 @@ func NewTextReporter(opts TextOptions) *TextReporter {
 	r := &TextReporter{opts: opts}
 
 	// Determine if colors should be used
-	colorEnabled := useColors
+	r.colorEnabled = useColors
 	if opts.Color != nil {
-		colorEnabled = *opts.Color
+		r.colorEnabled = *opts.Color
 	}
 
-	if colorEnabled && opts.SyntaxHighlight {
+	if r.colorEnabled && opts.SyntaxHighlight {
 		r.lexer = lexers.Get("docker")
 		if r.lexer == nil {
 			r.lexer = lexers.Fallback
@@ -176,11 +177,6 @@ func (r *TextReporter) Print(w io.Writer, violations []rules.Violation, sources 
 
 // printViolation formats a single violation.
 func (r *TextReporter) printViolation(w io.Writer, v rules.Violation, source []byte) error {
-	colorEnabled := useColors
-	if r.opts.Color != nil {
-		colorEnabled = *r.opts.Color
-	}
-
 	// Get severity style
 	sevStyle, ok := severityStyles[v.Severity]
 	if !ok {
@@ -189,7 +185,7 @@ func (r *TextReporter) printViolation(w io.Writer, v rules.Violation, source []b
 
 	// Header line: SEVERITY: RuleCode - URL
 	var header string
-	if colorEnabled {
+	if r.colorEnabled {
 		sevLabel := strings.ToUpper(v.Severity.String())
 		header = fmt.Sprintf("\n%s %s",
 			sevStyle.Render(sevLabel+":"),
@@ -206,7 +202,7 @@ func (r *TextReporter) printViolation(w io.Writer, v rules.Violation, source []b
 	fmt.Fprintln(w, header)
 
 	// Message
-	if colorEnabled {
+	if r.colorEnabled {
 		fmt.Fprintln(w, messageStyle.Render(v.Message))
 	} else {
 		fmt.Fprintln(w, v.Message)
@@ -214,14 +210,14 @@ func (r *TextReporter) printViolation(w io.Writer, v rules.Violation, source []b
 
 	// Source snippet
 	if r.opts.ShowSource && !v.Location.IsFileLevel() && len(source) > 0 {
-		r.printSource(w, v.Location, source, colorEnabled)
+		r.printSource(w, v.Location, source)
 	}
 
 	return nil
 }
 
 // printSource renders the source code snippet with optional syntax highlighting.
-func (r *TextReporter) printSource(w io.Writer, loc rules.Location, source []byte, colorEnabled bool) {
+func (r *TextReporter) printSource(w io.Writer, loc rules.Location, source []byte) {
 	lines := strings.Split(string(source), "\n")
 
 	// Get start/end lines (BuildKit uses 1-based line numbers)
@@ -273,7 +269,7 @@ func (r *TextReporter) printSource(w io.Writer, loc rules.Location, source []byt
 
 	// File:line header
 	fmt.Fprintln(w)
-	if colorEnabled {
+	if r.colorEnabled {
 		fmt.Fprintln(w, fileLocStyle.Render(fmt.Sprintf("%s:%d", loc.File, displayStart)))
 		fmt.Fprintln(w, separatorStyle.Render("────────────────────"))
 	} else {
@@ -288,7 +284,7 @@ func (r *TextReporter) printSource(w io.Writer, loc rules.Location, source []byt
 
 		// Format line number
 		var lineNum string
-		if colorEnabled {
+		if r.colorEnabled {
 			lineNum = lineNumStyle.Render(fmt.Sprintf(" %3d │", i))
 		} else {
 			lineNum = fmt.Sprintf(" %3d |", i)
@@ -297,7 +293,7 @@ func (r *TextReporter) printSource(w io.Writer, loc rules.Location, source []byt
 		// Format marker
 		var marker string
 		if isAffected {
-			if colorEnabled {
+			if r.colorEnabled {
 				marker = markerStyle.Render(">>>")
 			} else {
 				marker = ">>>"
@@ -308,7 +304,7 @@ func (r *TextReporter) printSource(w io.Writer, loc rules.Location, source []byt
 
 		// Format line content with optional syntax highlighting
 		var content string
-		if colorEnabled && r.lexer != nil && r.style != nil && r.formatter != nil {
+		if r.colorEnabled && r.lexer != nil && r.style != nil && r.formatter != nil {
 			content = r.highlightLine(lineContent)
 		} else {
 			content = lineContent
@@ -318,7 +314,7 @@ func (r *TextReporter) printSource(w io.Writer, loc rules.Location, source []byt
 	}
 
 	// Closing separator
-	if colorEnabled {
+	if r.colorEnabled {
 		fmt.Fprintln(w, separatorStyle.Render("────────────────────"))
 	} else {
 		fmt.Fprintln(w, "--------------------")
