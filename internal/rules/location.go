@@ -28,7 +28,7 @@ type Position struct {
 type Location struct {
 	// File is the path to the source file (not in parser.Range).
 	File string `json:"file"`
-	// Start is the starting position (inclusive, 0-based).
+	// Start is the starting position (inclusive, 1-based line numbers).
 	Start Position `json:"start"`
 	// End is the ending position (exclusive, LSP semantics).
 	// Points to the first position after the range.
