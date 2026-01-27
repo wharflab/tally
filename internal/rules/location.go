@@ -6,14 +6,14 @@ import "github.com/moby/buildkit/frontend/dockerfile/parser"
 // This is our JSON-serializable equivalent of parser.Position, which uses
 // "Character" instead of "Column" and lacks JSON tags.
 //
-// We use 0-based coordinates to align with BuildKit (LSP semantics).
+// We use 1-based line numbers to align with BuildKit's internal representation.
+// Note: BuildKit's AST uses 1-based lines (first line is 1), not 0-based.
 //
 // See: github.com/moby/buildkit/frontend/dockerfile/parser.Position
 type Position struct {
-	// Line is the 0-based line number (LSP semantics, same as BuildKit).
+	// Line is the 1-based line number (first line is 1, same as BuildKit).
 	Line int `json:"line"`
-	// Column is the 0-based column number (LSP semantics, same as BuildKit).
-	// Note: BuildKit uses "Character" for this field.
+	// Column is the 0-based column number (same as BuildKit's Character field).
 	Column int `json:"column"`
 }
 
@@ -28,7 +28,7 @@ type Position struct {
 type Location struct {
 	// File is the path to the source file (not in parser.Range).
 	File string `json:"file"`
-	// Start is the starting position (inclusive, 0-based).
+	// Start is the starting position (inclusive, 1-based line numbers).
 	Start Position `json:"start"`
 	// End is the ending position (exclusive, LSP semantics).
 	// Points to the first position after the range.
@@ -37,7 +37,7 @@ type Location struct {
 }
 
 // NewFileLocation creates a location for file-level issues (no specific line).
-// Uses -1 as sentinel since 0 is a valid line number in 0-based coordinates.
+// Uses -1 as sentinel since 0 would be invalid (lines are 1-based).
 func NewFileLocation(file string) Location {
 	return Location{
 		File:  file,
@@ -46,7 +46,7 @@ func NewFileLocation(file string) Location {
 	}
 }
 
-// NewLineLocation creates a location for a specific line (0-based).
+// NewLineLocation creates a location for a specific line (1-based).
 // Creates a point location (no range) at the start of the line.
 func NewLineLocation(file string, line int) Location {
 	return Location{
@@ -56,7 +56,8 @@ func NewLineLocation(file string, line int) Location {
 	}
 }
 
-// NewRangeLocation creates a location spanning multiple lines/columns (0-based).
+// NewRangeLocation creates a location spanning multiple lines/columns.
+// Lines are 1-based, columns are 0-based.
 func NewRangeLocation(file string, startLine, startCol, endLine, endCol int) Location {
 	return Location{
 		File:  file,
@@ -67,8 +68,7 @@ func NewRangeLocation(file string, startLine, startCol, endLine, endCol int) Loc
 
 // NewLocationFromRange converts a BuildKit parser.Range to our Location type.
 // This bridges BuildKit's internal types with our output schema.
-// Both use 0-based coordinates with End-exclusive semantics (LSP conventions).
-// The mapping is direct—no coordinate adjustment needed.
+// BuildKit uses 1-based line numbers. The mapping is direct—no adjustment needed.
 func NewLocationFromRange(file string, r parser.Range) Location {
 	return Location{
 		File:  file,

@@ -10,6 +10,7 @@ import (
 
 	"github.com/tinovyatkin/tally/internal/config"
 	"github.com/tinovyatkin/tally/internal/dockerfile"
+	"github.com/tinovyatkin/tally/internal/reporter"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/rules/maxlines"
 )
@@ -65,6 +66,7 @@ func checkCommand() *cli.Command {
 			var allResults []FileResult
 			hasViolations := false
 			var configFormat string // Store format from first file's config
+			fileSources := make(map[string][]byte)
 
 			for _, file := range files {
 				// Load config for this specific file (cascading discovery)
@@ -83,6 +85,9 @@ func checkCommand() *cli.Command {
 				if err != nil {
 					return fmt.Errorf("failed to parse %s: %w", file, err)
 				}
+
+				// Store source for later use in text output
+				fileSources[file] = parseResult.Source
 
 				// Build base LintInput (without rule-specific config)
 				baseInput := rules.LintInput{
@@ -134,11 +139,13 @@ func checkCommand() *cli.Command {
 					return fmt.Errorf("failed to encode JSON: %w", err)
 				}
 			default:
+				// Collect all violations for the reporter
+				var allViolations []rules.Violation
 				for _, result := range allResults {
-					for _, v := range result.Violations {
-						line := v.Line() + 1 // Convert 0-based to 1-based for display
-						fmt.Printf("%s:%d: %s (%s)\n", result.File, line, v.Message, v.RuleCode)
-					}
+					allViolations = append(allViolations, result.Violations...)
+				}
+				if err := reporter.PrintText(os.Stdout, allViolations, fileSources); err != nil {
+					return fmt.Errorf("failed to print results: %w", err)
 				}
 			}
 

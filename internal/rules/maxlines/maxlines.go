@@ -87,9 +87,10 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 
 	if count > cfg.Max {
 		// Report from the first line exceeding the limit (like ESLint)
+		// With 1-based line numbers, line (Max+1) is the first line over
 		return []rules.Violation{
 			rules.NewViolation(
-				rules.NewLineLocation(input.File, cfg.Max), // 0-based: line after max
+				rules.NewLineLocation(input.File, cfg.Max+1), // 1-based: first line over max
 				r.Metadata().Code,
 				fmt.Sprintf("file has %d lines, maximum allowed is %d", count, cfg.Max),
 				r.Metadata().DefaultSeverity,

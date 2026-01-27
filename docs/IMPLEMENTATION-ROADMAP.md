@@ -154,38 +154,43 @@ These are explicitly front-loaded to avoid cross-blocking later.
 
 ---
 
-## Priority 2: Parser Facade + Source Map (Line/Column, Snippets, Comments)
+## Priority 2: Parser Facade + Source Map (Line/Column, Snippets, Comments) ✅
 
-**Goal:** Provide the “compiler frontend” primitives required by multiple tracks (inline disables, reporters, SARIF).
+**Goal:** Provide the "compiler frontend" primitives required by multiple tracks (inline disables, reporters, SARIF).
+
+**Status:** Completed
 
 **Actions:**
 
-1. Extend `internal/dockerfile` parse output to include raw source:
-   - Preserve full file contents (or lines) for:
-     - snippet extraction
-     - directive parsing
-     - consistent location reporting
+1. ✅ Extend `internal/dockerfile` parse output to include raw source:
+   - `ParseResult.Source` preserves full file contents
+   - `LintInput.SourceMap()` provides line-based access
+   - `LintInput.Snippet()` and `SnippetForLocation()` for easy extraction
 
-2. Establish a `SourceMap` abstraction:
-   - Convert AST node positions into stable `Location` ranges
-   - Support file-level violations (no node) cleanly
+2. ✅ Establish a `SourceMap` abstraction (`internal/sourcemap/`):
+   - `SourceMap.Line(n)` - get single line
+   - `SourceMap.Snippet(start, end)` - extract line range
+   - `SourceMap.LineOffset(n)` - byte offset for column calculations
+   - `SourceMap.Comments()` - extract all comments with line numbers
+   - `SourceMap.CommentsForLine(n)` - get comments preceding a line
 
-3. Capture comment trivia needed for:
-   - inline ignore directives ([04](04-inline-disables.md))
-   - future “documentation comment” checks ([03](03-parsing-and-ast.md))
+3. ✅ Capture comment trivia needed for:
+   - `Comment` struct with `Line`, `Text`, and `IsDirective` fields
+   - Directive detection for: tally, hadolint, check=, syntax=, escape=
+   - `CommentsForLine()` matches BuildKit's PrevComment behavior
 
-4. Make heredocs first-class in the parse model:
-   - surface heredocs attached to `RUN`, `COPY`, `ADD` as structured data (name + content + options)
-   - tag each heredoc as either:
-     - **inline source** (`COPY/ADD <<EOF …`) or
-     - **inline script** (`RUN <<EOF …`)
-   - ensure context-aware rules can distinguish “build-context file” vs “inline heredoc content”
+4. ✅ Make heredocs first-class in the parse model (`internal/dockerfile/heredoc.go`):
+   - `HeredocInfo` struct wraps BuildKit's `parser.Heredoc` with classification
+   - `HeredocKindScript` for RUN heredocs
+   - `HeredocKindInlineSource` for COPY/ADD heredocs
+   - `ExtractHeredocs()` and `HasHeredocs()` functions
+   - Note: Requires `# syntax=docker/dockerfile:1` directive for heredoc parsing
 
 **Success Criteria:**
 
-- [ ] Every violation can report line+column (even if column is best-effort initially)
-- [ ] Reporter can show snippets without re-parsing the file
-- [ ] Inline directives can be parsed from source consistently
+- [x] Every violation can report line+column (via `Location` type with 0-based LSP semantics)
+- [x] Reporter can show snippets without re-parsing the file (`LintInput.SnippetForLocation()`)
+- [x] Inline directives can be parsed from source consistently (`SourceMap.Comments()` with `IsDirective` flag)
 
 ---
 
@@ -242,14 +247,20 @@ These are explicitly front-loaded to avoid cross-blocking later.
 
 **Goal:** Make results useful everywhere: terminal, CI annotations, and machine output.
 
+**Status:** Partially implemented (text reporter)
+
 **Actions:**
 
 1. Implement reporters against the stable `Violation` schema:
-   - text (Lip Gloss)
+   - ✅ text (BuildKit-style with source snippets) - `internal/reporter/buildkit.go`
    - json
    - github-actions annotations
    - sarif (go-sarif)
    - ensure reporters preserve and emit `SuggestedFix` data when present (at least JSON + SARIF)
+
+   **Note:** Text reporter adapted from BuildKit's `errdefs.Source.Print()` and `lint.Warning.PrintTo()`
+   without importing heavy dependencies (containerd, grpc). Produces output consistent with
+   `docker buildx build --check`.
 
 2. Implement **multi-reporter output** (console + file) from the start:
    - matches research (`[[output]]` pattern) and avoids later config churn ([05](05-reporters-and-output.md))

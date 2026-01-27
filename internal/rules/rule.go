@@ -3,6 +3,8 @@ package rules
 import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
+
+	"github.com/tinovyatkin/tally/internal/sourcemap"
 )
 
 // BuildContext provides optional build-time context for rules.
@@ -55,6 +57,51 @@ type LintInput struct {
 
 	// Config is the rule-specific configuration (type depends on rule).
 	Config any
+}
+
+// SourceMap creates a SourceMap for snippet extraction and line-based operations.
+// The SourceMap is computed on demand from Source.
+// Results are not cached; call once and reuse if needed multiple times.
+func (input LintInput) SourceMap() *sourcemap.SourceMap {
+	return sourcemap.New(input.Source)
+}
+
+// Snippet extracts a range of lines from the source (0-based, inclusive).
+// This is a convenience wrapper around SourceMap().Snippet().
+func (input LintInput) Snippet(startLine, endLine int) string {
+	return input.SourceMap().Snippet(startLine, endLine)
+}
+
+// SnippetForLocation extracts the source code at a location.
+// If the location is file-level (no specific line), returns empty string.
+// If the location is a point, returns just that line.
+// If the location is a range, returns all lines in the range.
+//
+// Note: Location uses 1-based line numbers, SourceMap uses 0-based.
+func (input LintInput) SnippetForLocation(loc Location) string {
+	if loc.IsFileLevel() {
+		return ""
+	}
+	sm := input.SourceMap()
+	// Convert from 1-based (Location) to 0-based (SourceMap)
+	if loc.IsPointLocation() {
+		if loc.Start.Line < 1 {
+			return ""
+		}
+		return sm.Line(loc.Start.Line - 1)
+	}
+	// End is exclusive, so we want lines [Start.Line, End.Line)
+	// For snippet we use inclusive, so endLine = End.Line - 1
+	// But if End.Column > 0, the end line is partially included
+	endLine := loc.End.Line
+	if loc.End.Column == 0 && endLine > loc.Start.Line {
+		endLine--
+	}
+	// Convert to 0-based for SourceMap, guard against non-positive lines
+	if loc.Start.Line < 1 || endLine < 1 {
+		return ""
+	}
+	return sm.Snippet(loc.Start.Line-1, endLine-1)
 }
 
 // RuleMetadata contains static information about a rule.
