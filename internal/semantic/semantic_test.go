@@ -725,6 +725,19 @@ COPY --from=webserver /app /webserver-app
 	if len(deps) != 2 {
 		t.Fatalf("expected 2 direct dependencies, got %d", len(deps))
 	}
+	// Verify actual values (order may vary, so check both are present)
+	hasDep0, hasDep1 := false, false
+	for _, d := range deps {
+		if d == 0 {
+			hasDep0 = true
+		}
+		if d == 1 {
+			hasDep1 = true
+		}
+	}
+	if !hasDep0 || !hasDep1 {
+		t.Errorf("expected dependencies on stages 0 and 1, got %v", deps)
+	}
 
 	// Stage 1 only directly depends on 0
 	deps = graph.DirectDependencies(1)
