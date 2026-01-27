@@ -23,6 +23,7 @@ This repository is a Go CLI for linting Dockerfiles and Containerfiles. It check
 - `make test`: runs `go test -race -count=1 -timeout=30s ./...`
 - `make lint`: runs `golangci-lint` for CI (no auto-fix)
 - `make lint-fix`: runs `golangci-lint` with `--fix` for local development
+- `make cpd`: runs PMD Copy/Paste Detector to find duplicate code (100 token threshold, excludes tests)
 - `make clean`: removes the built binary and deletes `bin/` + `dist/`
 
 Local usage examples:
@@ -62,5 +63,6 @@ skip-blank-lines = true
 ## Commit & Pull Request Guidelines
 
 - Follow semantic commit rules (Conventional Commits), e.g. `feat: ...`, `fix: ...`, `chore: ...` (enforced via `commitlint` in `.lefthook.yml`).
-- Run `make lint` and `make test` before opening a PR (Lefthook runs these on `pre-commit` and `make build` on `pre-push`).
+- Run `make lint`, `make cpd`, and `make test` before opening a PR (Lefthook runs these on `pre-commit` and `make build` on `pre-push`).
 - PRs should explain *what* changed and *why*, note any snapshot updates, and avoid committing build outputs (the `tally` binary is Git-ignored).
+- CI runs: tests, golangci-lint, and CPD (copy/paste detection) automatically on all PRs.

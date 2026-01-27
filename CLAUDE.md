@@ -78,12 +78,12 @@ This project uses multiple code quality tools:
    - Run locally: `make lint`
    - Runs in CI on every PR
 
-2. **PMD CPD (Copy/Paste Detector)** - Detects duplicate code patterns
+2. **PMD CPD (Copy/Paste Detector)** - Detects duplicate code patterns in production code
    - Run locally: `make cpd`
    - Runs in CI on every PR
-   - Threshold: 100 tokens minimum
-   - Exclusions: test files, test fixtures, snapshots, generated files, packaging scripts
-   - Configuration: `.pmd/cpd-config.xml`
+   - PMD 7.14.0, 100 token threshold
+   - Excludes: `*_test.go`, `*.pb.go`, `*_generated.go`, `testdata/`, `__snapshots__/`, `packaging/`
+   - Uses file-list approach for reliable exclusion (not pattern-based)
 
 ## Coverage Collection
 
