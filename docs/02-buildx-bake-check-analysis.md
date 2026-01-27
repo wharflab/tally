@@ -320,42 +320,77 @@ for _, child := range result.AST.Children {
 - `Node.StartLine/EndLine` - Source locations
 - `Node.Heredocs` - Attached heredoc content
 
-### 2. Context-Aware Validation
+### 2. Two-Phase Linting Architecture
 
-Some rules are context-aware:
+**Critical insight:** BuildKit's linting happens in **two distinct phases**:
 
-**CopyIgnoredFile rule:**
+#### Phase 1: Instruction Parsing (`instructions.Parse`)
+
+Most rules (20 of 22) run during `instructions.Parse(ast, linter)`:
 
 ```go
-// Check if file is excluded by .dockerignore
-func checkCopyIgnoredFile(copyInst *Node, dockerignore []string) []Warning {
-    for _, source := range copySources {
-        if isIgnored(source, dockerignore) {
-            warnings = append(warnings, Warning{
-                RuleName: "CopyIgnoredFile",
-                Detail: fmt.Sprintf("Attempting to copy %s which is excluded", source),
-                Location: getLocation(copyInst),
-            })
-        }
+// Parse Dockerfile and run syntax/semantic rules
+lint := linter.New(&linter.Config{Warn: warnFunc})
+stages, metaArgs, err := instructions.Parse(ast.AST, lint)
+```
+
+**Rules triggered in Phase 1:**
+
+- StageNameCasing, FromAsCasing, DuplicateStageName, ReservedStageName
+- ConsistentInstructionCasing, NoEmptyContinuation, JSONArgsRecommended
+- MaintainerDeprecated, LegacyKeyValueFormat, MultipleInstructionsDisallowed
+- UndefinedArgInFrom, UndefinedVar, InvalidDefaultArgInFrom
+- WorkdirRelativePath, SecretsUsedInArgOrEnv
+- RedundantTargetPlatform, FromPlatformFlagConstDisallowed
+- ExposeProtoCasing, ExposeInvalidFormat
+- InvalidDefinitionDescription (experimental)
+
+#### Phase 2: LLB Conversion (`dockerfile2llb.Dockerfile2LLB`)
+
+**Context-aware rules** run during LLB conversion, which requires build context:
+
+```go
+// In dockerfile2llb/convert.go
+dockerIgnorePatterns, err := opt.Client.DockerIgnorePatterns(ctx)
+dockerIgnoreMatcher, err = patternmatcher.New(dockerIgnorePatterns)
+
+// During COPY/ADD dispatch
+func validateCopySourcePath(src string, cfg *copyConfig) error {
+    if cfg.ignoreMatcher == nil {
+        return nil  // No context = skip this rule
     }
-    return warnings
+    ok, err := cfg.ignoreMatcher.MatchesOrParentMatches(src)
+    if ok {
+        msg := linter.RuleCopyIgnoredFile.Format(cmd, src)
+        cfg.opt.lint.Run(&linter.RuleCopyIgnoredFile, cfg.location, msg)
+    }
+    return nil
 }
 ```
 
-**Platform validation:**
+**Rules triggered in Phase 2 (context-aware):**
+
+- **CopyIgnoredFile** - requires `.dockerignore` patterns from build context
+- **InvalidBaseImagePlatform** - requires MetaResolver to pull image manifest
+
+**Implication for tally:** To support `CopyIgnoredFile`, we have two options:
+
+1. **Full LLB conversion** - Use BuildKit's `dockerfile2llb.Dockerfile2LLB()` with mocked client
+2. **Own implementation** - Parse `.dockerignore` ourselves using `moby/patternmatcher` and check COPY/ADD sources
+
+Option 2 is lighter and aligns with our context-aware foundation (Priority 6).
+
+**Platform validation (Phase 2):**
 
 ```go
-// Check if base image platform matches target
-func validateBasePlatform(from *Node, targetPlatform string) []Warning {
-    basePlatform := extractPlatform(from)
-    if basePlatform != "" && basePlatform != targetPlatform {
-        return []Warning{{
-            RuleName: "InvalidBaseImagePlatform",
-            Detail: fmt.Sprintf("Base platform %s doesn't match target %s",
-                               basePlatform, targetPlatform),
-        }}
+// InvalidBaseImagePlatform requires MetaResolver to fetch image manifest
+// This happens during LLB conversion, not instruction parsing
+func dispatchFrom(...) {
+    // Platform check requires resolving base image metadata
+    if d.platform != nil {
+        img, err := metaResolver.ResolveImageConfig(ctx, d.image, ...)
+        // Compare img.Platform with target platform
     }
-    return nil
 }
 ```
 

@@ -6,8 +6,33 @@
 
 ## Design Philosophy
 
-**Minimize code ownership** - This project heavily reuses existing, well-maintained libraries:
-- `github.com/moby/buildkit/frontend/dockerfile/parser` - Official Dockerfile parsing
+**Minimize code ownership** - This project exists in Go specifically to maximize reuse from the container ecosystem. We heavily reuse existing, well-maintained libraries:
+
+### Primary Sources (research these FIRST)
+
+Before implementing ANY data structure, type, or functionality, **actively research** whether something suitable exists in:
+
+1. **`github.com/moby/buildkit`** - The authoritative source for Dockerfile semantics
+   - `frontend/dockerfile/parser` - AST, Position, Range, Warning types
+   - `frontend/dockerfile/instructions` - Typed instruction parsing, Stage, Command types
+   - `frontend/dockerfile/linter` - LinterRule, rule definitions, LintWarnFunc
+   - `frontend/subrequests/lint` - LintResults, Warning output format
+   - `solver/pb` - Location, SourceInfo protobuf types
+
+2. **`github.com/containers/common`** - Podman/Buildah ecosystem utilities
+   - Configuration patterns, image reference handling
+
+3. **`github.com/opencontainers/image-spec`** - OCI image specification types
+
+### The 80% Rule
+
+**If an existing type/pattern covers 80% of our needs, prefer it over creating something new.** Wrap and extend if necessary rather than reinventing. Examples:
+- Use `parser.Range` internally, wrap with `rules.Location` only to add file path
+- Use BuildKit's `LintResults.Warning` structure as reference for our `Violation` schema
+- Consume parser's semantic data (LineStats, Stages) instead of re-parsing
+
+### Other Dependencies
+
 - `github.com/urfave/cli/v3` - CLI framework
 - `github.com/knadh/koanf/v2` - Configuration loading
 - `golang.org/x/sync` - Concurrency primitives

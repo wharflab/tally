@@ -1,7 +1,6 @@
 [
   {
     "file": "testdata/with-blanks-and-comments/Dockerfile",
-    "lines": 9,
-    "issues": null
+    "violations": null
   }
 ]

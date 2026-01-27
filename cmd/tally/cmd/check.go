@@ -10,8 +10,15 @@ import (
 
 	"github.com/tinovyatkin/tally/internal/config"
 	"github.com/tinovyatkin/tally/internal/dockerfile"
-	"github.com/tinovyatkin/tally/internal/lint"
+	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/tinovyatkin/tally/internal/rules/maxlines"
 )
+
+// FileResult contains the linting results for a single file.
+type FileResult struct {
+	File       string            `json:"file"`
+	Violations []rules.Violation `json:"violations"`
+}
 
 func checkCommand() *cli.Command {
 	return &cli.Command{
@@ -31,12 +38,14 @@ func checkCommand() *cli.Command {
 				Sources: cli.EnvVars("TALLY_RULES_MAX_LINES_MAX"),
 			},
 			&cli.BoolFlag{
-				Name:  "skip-blank-lines",
-				Usage: "Exclude blank lines from the line count",
+				Name:    "skip-blank-lines",
+				Usage:   "Exclude blank lines from the line count",
+				Sources: cli.EnvVars("TALLY_RULES_MAX_LINES_SKIP_BLANK_LINES"),
 			},
 			&cli.BoolFlag{
-				Name:  "skip-comments",
-				Usage: "Exclude comment lines from the line count",
+				Name:    "skip-comments",
+				Usage:   "Exclude comment lines from the line count",
+				Sources: cli.EnvVars("TALLY_RULES_MAX_LINES_SKIP_COMMENTS"),
 			},
 			&cli.StringFlag{
 				Name:    "format",
@@ -53,8 +62,9 @@ func checkCommand() *cli.Command {
 				files = []string{"Dockerfile"}
 			}
 
-			var allResults []lint.FileResult
-			hasIssues := false
+			var allResults []FileResult
+			hasViolations := false
+			var configFormat string // Store format from first file's config
 
 			for _, file := range files {
 				// Load config for this specific file (cascading discovery)
@@ -63,30 +73,59 @@ func checkCommand() *cli.Command {
 					return fmt.Errorf("failed to load config for %s: %w", file, err)
 				}
 
+				// Store format from first file's config (used if CLI flag not set)
+				if configFormat == "" {
+					configFormat = cfg.Format
+				}
+
 				// Parse the Dockerfile
 				parseResult, err := dockerfile.ParseFile(ctx, file)
 				if err != nil {
 					return fmt.Errorf("failed to parse %s: %w", file, err)
 				}
 
-				// Run linting rules
-				var issues []lint.Issue
-
-				// Check max-lines rule
-				if issue := lint.CheckMaxLines(parseResult, cfg.Rules.MaxLines); issue != nil {
-					issues = append(issues, *issue)
-					hasIssues = true
+				// Build base LintInput (without rule-specific config)
+				baseInput := rules.LintInput{
+					File:     file,
+					AST:      parseResult.AST,
+					Stages:   parseResult.Stages,
+					MetaArgs: parseResult.MetaArgs,
+					Source:   parseResult.Source,
 				}
 
-				allResults = append(allResults, lint.FileResult{
-					File:   file,
-					Lines:  parseResult.TotalLines,
-					Issues: issues,
+				// Run all registered rules with rule-specific config
+				var violations []rules.Violation
+				for _, rule := range rules.All() {
+					// Clone input and set rule-specific config
+					input := baseInput
+					input.Config = getRuleConfig(rule.Metadata().Code, cfg)
+					violations = append(violations, rule.Check(input)...)
+				}
+
+				// Convert BuildKit warnings to violations
+				for _, w := range parseResult.Warnings {
+					violations = append(violations, rules.NewViolationFromBuildKitWarning(
+						file,
+						w.RuleName,
+						w.Description,
+						w.URL,
+						w.Message,
+						w.Location,
+					))
+				}
+
+				if len(violations) > 0 {
+					hasViolations = true
+				}
+
+				allResults = append(allResults, FileResult{
+					File:       file,
+					Violations: violations,
 				})
 			}
 
 			// Output results
-			format := getFormat(cmd, allResults)
+			format := getFormat(cmd, configFormat)
 			switch format {
 			case "json":
 				enc := json.NewEncoder(os.Stdout)
@@ -96,13 +135,16 @@ func checkCommand() *cli.Command {
 				}
 			default:
 				for _, result := range allResults {
-					for _, issue := range result.Issues {
-						fmt.Printf("%s:%d: %s (%s)\n", result.File, issue.Line, issue.Message, issue.Rule)
+					for _, v := range result.Violations {
+						line := v.Line() + 1 // Convert 0-based to 1-based for display
+						fmt.Printf("%s:%d: %s (%s)\n", result.File, line, v.Message, v.RuleCode)
 					}
 				}
-				if hasIssues {
-					os.Exit(1)
-				}
+			}
+
+			// Exit with error code if violations found (consistent for all formats)
+			if hasViolations {
+				os.Exit(1)
 			}
 
 			return nil
@@ -151,22 +193,34 @@ func loadConfigForFile(cmd *cli.Command, targetPath string) (*config.Config, err
 	return cfg, nil
 }
 
-// getFormat determines the output format, using the first file's config as reference.
-func getFormat(cmd *cli.Command, results []lint.FileResult) string {
+// getFormat determines the output format.
+// Uses CLI flag if set, otherwise falls back to the provided config format.
+func getFormat(cmd *cli.Command, configFormat string) string {
 	// CLI flag takes precedence
 	if cmd.IsSet("format") {
 		return cmd.String("format")
 	}
 
-	// Otherwise use the format from the first result's config
-	// (This is a simplification - in practice all files might have different configs)
-	if len(results) > 0 {
-		// Load config for first file to get format
-		cfg, err := config.Load(results[0].File)
-		if err == nil {
-			return cfg.Format
-		}
+	// Use format from config if set
+	if configFormat != "" {
+		return configFormat
 	}
 
 	return "text"
+}
+
+// getRuleConfig returns the appropriate config for a rule based on its code.
+// This allows each rule to receive its own typed config from the global config.
+func getRuleConfig(ruleCode string, cfg *config.Config) any {
+	switch ruleCode {
+	case "max-lines":
+		return maxlines.Config{
+			Max:            cfg.Rules.MaxLines.Max,
+			SkipBlankLines: cfg.Rules.MaxLines.SkipBlankLines,
+			SkipComments:   cfg.Rules.MaxLines.SkipComments,
+		}
+	default:
+		// Unknown rules get nil config (use their defaults)
+		return nil
+	}
 }

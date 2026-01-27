@@ -1,13 +1,23 @@
 [
   {
     "file": "testdata/nested/subdir/Dockerfile",
-    "lines": 3,
-    "issues": [
+    "violations": [
       {
+        "location": {
+          "file": "testdata/nested/subdir/Dockerfile",
+          "start": {
+            "line": 2,
+            "column": 0
+          },
+          "end": {
+            "line": -1,
+            "column": -1
+          }
+        },
         "rule": "max-lines",
-        "line": 0,
         "message": "file has 3 lines, maximum allowed is 2",
-        "severity": "error"
+        "severity": "error",
+        "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/max-lines.md"
       }
     ]
   }

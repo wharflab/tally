@@ -30,43 +30,84 @@ COPY package.json /app/  # ✓ Can verify file exists and isn't ignored
 
 ## Current Landscape
 
-### BuildKit's Context-Aware Validation
+### BuildKit's Two-Phase Linting Architecture
 
-Docker buildx bake `--check` is already context-aware:
+**Critical insight:** BuildKit's linting happens in **two distinct phases**, not one:
 
-**CopyIgnoredFile rule:**
+#### Phase 1: `instructions.Parse(ast, linter)` — Syntax/Semantic Rules
+
+Most rules (20 of 22) run during instruction parsing. This is what tally currently integrates:
 
 ```go
-// Checks if COPY source is in .dockerignore
-func checkCopyIgnoredFile(copyInst *Node, dockerignore []string) []Warning {
-    for _, source := range copySources {
-        if isIgnored(source, dockerignore) {
-            warnings = append(warnings, Warning{
-                RuleName: "CopyIgnoredFile",
-                Detail: fmt.Sprintf("Attempting to copy %s which is excluded", source),
-            })
-        }
-    }
-    return warnings
-}
+lint := linter.New(&linter.Config{Warn: warnFunc})
+stages, metaArgs, err := instructions.Parse(ast.AST, lint)
+// Warnings for StageNameCasing, MaintainerDeprecated, UndefinedVar, etc.
 ```
 
-**Platform validation:**
+**No build context required** — these rules analyze the Dockerfile AST only.
+
+#### Phase 2: `dockerfile2llb.Dockerfile2LLB(opt)` — Context-Aware Rules
+
+**Only 2 rules** require build context and run during LLB conversion:
+
+1. **CopyIgnoredFile** — requires `.dockerignore` patterns
+2. **InvalidBaseImagePlatform** — requires image registry metadata
 
 ```go
-// Validates FROM --platform against target platform
-func validateBasePlatform(from *Node, targetPlatform string, buildArgs map[string]string) []Warning {
-    basePlatform := expandVars(extractPlatform(from), buildArgs)
-    if basePlatform != "" && basePlatform != targetPlatform {
-        return []Warning{{
-            RuleName: "InvalidBaseImagePlatform",
-            Detail: fmt.Sprintf("Base platform %s doesn't match target %s",
-                               basePlatform, targetPlatform),
-        }}
+// In dockerfile2llb/convert.go - context is loaded from client
+dockerIgnorePatterns, err := opt.Client.DockerIgnorePatterns(ctx)
+dockerIgnoreMatcher, err = patternmatcher.New(dockerIgnorePatterns)
+
+// During COPY/ADD dispatch
+func validateCopySourcePath(src string, cfg *copyConfig) error {
+    if cfg.ignoreMatcher == nil {
+        return nil  // No context = skip this rule
+    }
+    ok, err := cfg.ignoreMatcher.MatchesOrParentMatches(src)
+    if ok {
+        msg := linter.RuleCopyIgnoredFile.Format(cmd, src)
+        cfg.opt.lint.Run(&linter.RuleCopyIgnoredFile, cfg.location, msg)
     }
     return nil
 }
 ```
+
+#### Implications for Tally
+
+To support context-aware rules like `CopyIgnoredFile`, tally has **two options**:
+
+1. **Use BuildKit's LLB conversion** — Heavy, requires mocking `dockerui.Client` and `MetaResolver`
+2. **Implement our own checking** — Parse `.dockerignore` using `moby/patternmatcher`, check COPY/ADD sources from `instructions.Stage`
+
+**Recommended approach (Option 2):**
+
+```go
+// internal/context/dockerignore.go
+import "github.com/moby/patternmatcher"
+
+func (ctx *BuildContext) loadDockerignore() error {
+    patterns, err := dockerignore.ReadAll(bytes.NewReader(data))
+    ctx.ignoreMatcher, err = patternmatcher.New(patterns)
+    return err
+}
+
+// In context-aware rule
+func checkCopyIgnoredFile(stages []instructions.Stage, ctx *BuildContext) []Violation {
+    for _, stage := range stages {
+        for _, cmd := range stage.Commands {
+            if copy, ok := cmd.(*instructions.CopyCommand); ok {
+                for _, src := range copy.SourcesAndDest.Sources {
+                    if ctx.IsIgnored(src) {
+                        // Report violation
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+This aligns with Priority 6 (context-aware foundation) and reuses BuildKit's pattern matching.
 
 ### Advanced Context-Aware Checks
 
@@ -681,10 +722,12 @@ func TestContextAwareRules(t *testing.T) {
 
 ## Migration Path
 
-### Phase 1: Foundation (v1.0 - Current Sprint)
+### Phase 1: Foundation (v1.0 - Current Sprint) ✅
 
-- [x] Define BuildContext interface
-- [ ] Add context parameter to rule interface (optional)
+- [x] Define BuildContext interface (`internal/rules/rule.go`)
+- [x] Add context parameter to rule interface (optional) — `LintInput.Context`
+- [x] Parser provides `Stages` and `MetaArgs` from `instructions.Parse()`
+- [x] Parser captures BuildKit's 20 built-in linter warnings
 - [ ] Update linter to accept context
 - [ ] CLI flags for context options
 

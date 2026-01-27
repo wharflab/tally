@@ -1,7 +1,6 @@
 [
   {
     "file": "testdata/simple/Dockerfile",
-    "lines": 5,
-    "issues": null
+    "violations": null
   }
 ]

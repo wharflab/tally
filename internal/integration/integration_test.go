@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -70,11 +71,11 @@ func TestCheck(t *testing.T) {
 		// Basic tests
 		{"simple", "simple", []string{"--format", "json"}, nil, 0},
 		{"simple-max-lines-pass", "simple", []string{"--max-lines", "100", "--format", "json"}, nil, 0},
-		{"simple-max-lines-fail", "simple", []string{"--max-lines", "2", "--format", "json"}, nil, 0},
+		{"simple-max-lines-fail", "simple", []string{"--max-lines", "2", "--format", "json"}, nil, 1},
 
 		// Config file discovery tests
-		{"config-file-discovery", "with-config", nil, nil, 0},
-		{"config-cascading-discovery", "nested/subdir", nil, nil, 0},
+		{"config-file-discovery", "with-config", nil, nil, 1},
+		{"config-cascading-discovery", "nested/subdir", nil, nil, 1},
 		{"config-skip-options", "with-blanks-and-comments", nil, nil, 0},
 		{"cli-overrides-config", "with-config", []string{"--max-lines", "100"}, nil, 0},
 
@@ -83,8 +84,12 @@ func TestCheck(t *testing.T) {
 			"env-var-override", "simple",
 			[]string{"--format", "json"},
 			[]string{"TALLY_RULES_MAX_LINES_MAX=2"},
-			0,
+			1,
 		},
+
+		// BuildKit linter warnings tests
+		// These test that BuildKit's built-in warnings are captured and surfaced
+		{"buildkit-warnings", "buildkit-warnings", []string{"--format", "json"}, nil, 1},
 	}
 
 	for _, tc := range testCases {
@@ -103,11 +108,18 @@ func TestCheck(t *testing.T) {
 			cmd.Env = append(cmd.Env, tc.env...)
 			output, err := cmd.CombinedOutput()
 
-			// Check exit code if expected to fail
-			if tc.wantExit != 0 {
-				if err == nil {
-					t.Errorf("expected exit code %d, got 0", tc.wantExit)
+			// Check exit code
+			exitCode := 0
+			if err != nil {
+				var exitErr *exec.ExitError
+				if errors.As(err, &exitErr) {
+					exitCode = exitErr.ExitCode()
+				} else {
+					t.Fatalf("command failed to start: %v", err)
 				}
+			}
+			if exitCode != tc.wantExit {
+				t.Errorf("expected exit code %d, got %d", tc.wantExit, exitCode)
 			}
 
 			snaps.WithConfig(snaps.Ext(".json")).MatchStandaloneSnapshot(t, string(output))

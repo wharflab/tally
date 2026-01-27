@@ -1,13 +1,23 @@
 [
   {
     "file": "testdata/with-config/Dockerfile",
-    "lines": 5,
-    "issues": [
+    "violations": [
       {
+        "location": {
+          "file": "testdata/with-config/Dockerfile",
+          "start": {
+            "line": 2,
+            "column": 0
+          },
+          "end": {
+            "line": -1,
+            "column": -1
+          }
+        },
         "rule": "max-lines",
-        "line": 0,
-        "message": "file has 5 lines, maximum allowed is 3",
-        "severity": "error"
+        "message": "file has 3 lines, maximum allowed is 2",
+        "severity": "error",
+        "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/max-lines.md"
       }
     ]
   }

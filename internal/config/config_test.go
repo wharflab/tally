@@ -13,16 +13,19 @@ func TestDefault(t *testing.T) {
 		t.Errorf("Default format = %q, want %q", cfg.Format, "text")
 	}
 
-	if cfg.Rules.MaxLines.Max != 0 {
-		t.Errorf("Default MaxLines.Max = %d, want 0", cfg.Rules.MaxLines.Max)
+	// Default: 50 lines (P90 of 500 analyzed Dockerfiles)
+	if cfg.Rules.MaxLines.Max != 50 {
+		t.Errorf("Default MaxLines.Max = %d, want 50", cfg.Rules.MaxLines.Max)
 	}
 
-	if cfg.Rules.MaxLines.SkipBlankLines {
-		t.Error("Default MaxLines.SkipBlankLines = true, want false")
+	// Default: true (count only meaningful lines)
+	if !cfg.Rules.MaxLines.SkipBlankLines {
+		t.Error("Default MaxLines.SkipBlankLines = false, want true")
 	}
 
-	if cfg.Rules.MaxLines.SkipComments {
-		t.Error("Default MaxLines.SkipComments = true, want false")
+	// Default: true (count only instruction lines)
+	if !cfg.Rules.MaxLines.SkipComments {
+		t.Error("Default MaxLines.SkipComments = false, want true")
 	}
 }
 

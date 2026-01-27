@@ -2,4 +2,4 @@
 format = "json"
 
 [rules.max-lines]
-max = 3
+max = 2

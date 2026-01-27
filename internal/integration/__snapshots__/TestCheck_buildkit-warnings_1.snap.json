@@ -1,0 +1,43 @@
+[
+  {
+    "file": "testdata/buildkit-warnings/Dockerfile",
+    "violations": [
+      {
+        "location": {
+          "file": "testdata/buildkit-warnings/Dockerfile",
+          "start": {
+            "line": 2,
+            "column": 0
+          },
+          "end": {
+            "line": 2,
+            "column": 0
+          }
+        },
+        "rule": "StageNameCasing",
+        "message": "Stage name 'Builder' should be lowercase",
+        "detail": "Stage names should be lowercase",
+        "severity": "warning",
+        "docUrl": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/"
+      },
+      {
+        "location": {
+          "file": "testdata/buildkit-warnings/Dockerfile",
+          "start": {
+            "line": 3,
+            "column": 0
+          },
+          "end": {
+            "line": 3,
+            "column": 0
+          }
+        },
+        "rule": "MaintainerDeprecated",
+        "message": "Maintainer instruction is deprecated in favor of using label",
+        "detail": "The MAINTAINER instruction is deprecated, use a label instead to define an image author",
+        "severity": "warning",
+        "docUrl": "https://docs.docker.com/go/dockerfile/rule/maintainer-deprecated/"
+      }
+    ]
+  }
+]

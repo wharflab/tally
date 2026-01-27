@@ -28,9 +28,11 @@ From `docs/01`–`docs/09`, these are the “don’t miss” architecture lesson
 2. **Rich diagnostics are a feature, not polish:** plan a stable `Violation` schema with range (line+col), snippets, doc links, and (later) fixes. (
    [02](02-buildx-bake-check-analysis.md), [05](05-reporters-and-output.md))
 3. **Progressive adoption matters:** experimental/opt-in rules + configurable failure threshold (`--fail-level`). ([02](02-buildx-bake-check-analysis.md), [09](09-hadolint-research.md))
-4. **Context must be optional:** rule API should accept an optional `BuildContext` and still work without it (v1.0 shouldn’t require full context). (
+4. **Context must be optional:** rule API should accept an optional `BuildContext` and still work without it (v1.0 shouldn't require full context). (
    [07](07-context-aware-foundation.md))
-5. **Avoid future refactors:** keep parser concerns separate from rules; preserve enough trivia (comments, line/col, original text) for directives +
+5. **Parse failures stop the pipeline:** if parsing fails, report the parse error with location info and exit—do not run any rules. Rules can assume
+   AST is always valid (following ESLint's approach).
+6. **Avoid future refactors:** keep parser concerns separate from rules; preserve enough trivia (comments, line/col, original text) for directives +
    snippets. ([01](01-linter-pipeline-architecture.md), [03](03-parsing-and-ast.md), [04](04-inline-disables.md), [05](05-reporters-and-output.md))
 
 ---
@@ -42,8 +44,9 @@ Before building new subsystems, evaluate these upstream building blocks:
 | Library | Use For | Notes |
 |---------|---------|-------|
 | `moby/buildkit/frontend/dockerfile/parser` | Dockerfile parsing | Already used (`internal/dockerfile`). Good enough for semantic linting. ([03](03-parsing-and-ast.md)) |
-| `moby/buildkit/frontend/dockerfile/linter` | Existing rule implementations | BuildKit has 22 working rules; consider importing/wrapping instead of rewriting overlapping checks. ([02](02-buildx-bake-check-analysis.md)) |
-| `moby/buildkit/frontend/dockerfile/dockerignore` | `.dockerignore` parsing/matching | Docker-compatible patterns; reuse for context-aware rules and discovery filtering. ([07](07-context-aware-foundation.md)) |
+| `moby/buildkit/frontend/dockerfile/linter` | Existing rule implementations | ✅ **Now integrated.** Parser captures 20 Phase-1 warnings via `instructions.Parse()`. 2 Phase-2 rules (context-aware) need separate implementation. ([02](02-buildx-bake-check-analysis.md)) |
+| `moby/buildkit/frontend/dockerfile/dockerignore` | `.dockerignore` parsing | Parse `.dockerignore` files into pattern list. ([07](07-context-aware-foundation.md)) |
+| `github.com/moby/patternmatcher` | Pattern matching | Docker-compatible glob matching (**, negation). Used by BuildKit for `CopyIgnoredFile` rule. |
 | `moby/buildkit/frontend/dockerfile/shell` (and related) | Shell lexing helpers | Useful foundation for future ShellCheck integration and RUN parsing (don’t re-invent tokenization). ([09](09-hadolint-research.md)) |
 | `mvdan.cc/sh/v3/syntax` | Shell parsing (AST) | Robust parser/formatter for sh/bash/mksh; good base for deep `RUN` heredoc analysis and future shell rules. |
 | `github.com/wasilibs/go-shellcheck` | ShellCheck-as-library (WASM) | Optional: run upstream ShellCheck without shipping an external binary (heavier, but high coverage). |
@@ -58,20 +61,31 @@ Before building new subsystems, evaluate these upstream building blocks:
 
 These are explicitly front-loaded to avoid cross-blocking later.
 
-1. **Spike A: Reuse BuildKit linter vs. reimplement**
-   - Build a tiny adapter that runs BuildKit’s linter on a Dockerfile and converts results into our `Violation`.
-   - Decide one of:
-     - **Reuse** (BuildKit as a rule provider),
-     - **Hybrid** (reuse overlapping rules + custom rules for hadolint parity),
-     - **Rewrite** (only reuse parser + helpers).
+1. **Spike A: Reuse BuildKit linter vs. reimplement** ✅ DECIDED
+   - **Decision: Hybrid approach**
+   - BuildKit has **two-phase linting**:
+     - **Phase 1:** `instructions.Parse(ast, linter)` — triggers 20 syntax/semantic rules (no context needed)
+     - **Phase 2:** `dockerfile2llb.Dockerfile2LLB()` — triggers 2 context-aware rules (`CopyIgnoredFile`, `InvalidBaseImagePlatform`)
+   - **Implementation:**
+     - ✅ Parser now captures Phase 1 warnings via `linter.New(&linter.Config{Warn: warnFunc})`
+     - ✅ Parser provides typed `Stages` and `MetaArgs` from `instructions.Parse()`
+     - For Phase 2 rules: implement our own using `moby/patternmatcher` (lighter than full LLB conversion)
+     - Custom rules for hadolint parity built on top of typed instructions
 
-2. **Spike B: Freeze `Violation` + output contract**
-   - Agree on required fields (range, severity, message, rule code, doc URL, optional snippet, optional fix suggestion).
-   - Ensure JSON + SARIF can be emitted without later schema churn. ([05](05-reporters-and-output.md))
+2. **Spike B: Freeze `Violation` + output contract** ✅ DECIDED
+   - **Implemented in `internal/rules/violation.go`:**
+     - `Location` with `File`, `Start`, `End` (Position with Line/Column)
+     - `RuleCode`, `Message`, `Detail`, `Severity`, `DocURL`
+     - `SourceCode` (optional snippet)
+     - `SuggestedFix` with structured `TextEdit` array
+   - JSON marshaling tested and stable
 
-3. **Spike C: Source-map strategy**
-   - Confirm how we will provide line+column ranges and snippet extraction (parser trivia + raw source capture).
-   - This is a blocker for rich diagnostics and inline directives. ([02](02-buildx-bake-check-analysis.md), [05](05-reporters-and-output.md), [04](04-inline-disables.md))
+3. **Spike C: Source-map strategy** ✅ DECIDED
+   - **Implementation:**
+     - Parser preserves raw `Source []byte` for snippet extraction
+     - `ParseResult.AST` provides BuildKit node locations (line/column ranges)
+     - `LintInput` provides both `Source` and `Lines` for rules
+   - Sufficient for rich diagnostics and inline directives
 
 4. **Spike D: Shell commands + heredocs strategy (standardize early)**
    - Goal: avoid per-rule ad-hoc regex/tokenization decisions; ensure consistent handling for `RUN`, `RUN <<EOF` and Dockerfile heredocs in `COPY`/
@@ -95,9 +109,11 @@ These are explicitly front-loaded to avoid cross-blocking later.
 
 ---
 
-## Priority 1: Core Rule System + Stable Data Model
+## Priority 1: Core Rule System + Stable Data Model ✅
 
 **Goal:** Establish the stable interfaces that everything else builds on (minimize future refactors).
+
+**Status:** Completed
 
 **Actions:**
 
@@ -116,28 +132,25 @@ These are explicitly front-loaded to avoid cross-blocking later.
    └── violation.go         # Stable Violation schema
    ```
 
-3. Define a **future-proof `Violation`** schema (don’t under-specify):
+3. Define a **future-proof `Violation`** schema (don't under-specify):
    - `File`, `StartLine`, `StartColumn`, `EndLine`, `EndColumn`
    - `RuleCode`, `Message`, `Detail` (optional), `Severity`, `DocURL`
-   - `SourceCode` (optional) and `SuggestedFix` (optional structured edit hint; supports “auto-fix suggestion” without auto-applying)
+   - `SourceCode` (optional) and `SuggestedFix` (optional structured edit hint; supports "auto-fix suggestion" without auto-applying)
 
 4. Add **progressive adoption hooks** to `Rule` metadata:
    - `EnabledByDefault`
    - `IsExperimental`
 
-5. Add **dispatch hints** (optional but low-cost) to avoid scaling pain later:
-   - Declare which instruction types a rule cares about (bitset). ([01](01-linter-pipeline-architecture.md))
-
-6. Make the rule execution signature **context-ready**:
+5. Make the rule execution signature **context-ready**:
    - `ctx *context.BuildContext` can be `nil` (v1.0 works without it). ([07](07-context-aware-foundation.md))
 
 **Success Criteria:**
 
-- [ ] Rules can be registered and enumerated
-- [ ] `Violation` schema is stable and used everywhere
-- [ ] `Violation.SuggestedFix` supports structured edit hints (even if we don’t auto-apply fixes yet)
-- [ ] Unit tests can lint a Dockerfile string without CLI wiring
-- [ ] Rule interface accepts optional context without forcing it
+- [x] Rules can be registered and enumerated
+- [x] `Violation` schema is stable and used everywhere
+- [x] `Violation.SuggestedFix` supports structured edit hints (even if we don't auto-apply fixes yet)
+- [x] Unit tests can lint a Dockerfile string without CLI wiring
+- [x] Rule interface accepts optional context without forcing it
 
 ---
 
