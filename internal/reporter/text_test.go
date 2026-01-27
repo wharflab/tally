@@ -8,13 +8,14 @@ import (
 	"github.com/tinovyatkin/tally/internal/rules"
 )
 
-func TestPrintText_SingleViolation(t *testing.T) {
+func TestPrintTextPlain_SingleViolation(t *testing.T) {
 	source := []byte("FROM alpine\nRUN echo hello\nCMD [\"sh\"]")
 	violations := []rules.Violation{
 		{
 			Location: rules.NewRangeLocation("Dockerfile", 1, 0, 1, 14),
 			RuleCode: "TestRule",
 			Message:  "Test message",
+			Severity: rules.SeverityWarning,
 			DocURL:   "https://example.com/rule",
 		},
 	}
@@ -23,16 +24,19 @@ func TestPrintText_SingleViolation(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := PrintText(&buf, violations, sources)
+	err := PrintTextPlain(&buf, violations, sources)
 	if err != nil {
-		t.Fatalf("PrintText failed: %v", err)
+		t.Fatalf("PrintTextPlain failed: %v", err)
 	}
 
 	output := buf.String()
 
-	// Check header format
-	if !strings.Contains(output, "WARNING: TestRule - https://example.com/rule") {
+	// Check header format (uses severity label)
+	if !strings.Contains(output, "WARNING: TestRule") {
 		t.Errorf("Missing warning header, got:\n%s", output)
+	}
+	if !strings.Contains(output, "https://example.com/rule") {
+		t.Errorf("Missing URL, got:\n%s", output)
 	}
 	if !strings.Contains(output, "Test message") {
 		t.Errorf("Missing message, got:\n%s", output)
@@ -50,13 +54,51 @@ func TestPrintText_SingleViolation(t *testing.T) {
 	}
 }
 
-func TestPrintText_NoURL(t *testing.T) {
+func TestPrintTextPlain_DifferentSeverities(t *testing.T) {
+	source := []byte("FROM alpine")
+	tests := []struct {
+		severity rules.Severity
+		want     string
+	}{
+		{rules.SeverityError, "ERROR:"},
+		{rules.SeverityWarning, "WARNING:"},
+		{rules.SeverityInfo, "INFO:"},
+		{rules.SeverityStyle, "STYLE:"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			violations := []rules.Violation{
+				{
+					Location: rules.NewLineLocation("Dockerfile", 0),
+					RuleCode: "TestRule",
+					Message:  "Test",
+					Severity: tt.severity,
+				},
+			}
+			sources := map[string][]byte{"Dockerfile": source}
+
+			var buf bytes.Buffer
+			err := PrintTextPlain(&buf, violations, sources)
+			if err != nil {
+				t.Fatalf("PrintTextPlain failed: %v", err)
+			}
+
+			if !strings.Contains(buf.String(), tt.want) {
+				t.Errorf("Expected %q in output, got:\n%s", tt.want, buf.String())
+			}
+		})
+	}
+}
+
+func TestPrintTextPlain_NoURL(t *testing.T) {
 	source := []byte("FROM alpine\nRUN echo hello")
 	violations := []rules.Violation{
 		{
 			Location: rules.NewLineLocation("Dockerfile", 0),
 			RuleCode: "TestRule",
 			Message:  "Test message",
+			Severity: rules.SeverityWarning,
 			// No DocURL
 		},
 	}
@@ -65,26 +107,27 @@ func TestPrintText_NoURL(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := PrintText(&buf, violations, sources)
+	err := PrintTextPlain(&buf, violations, sources)
 	if err != nil {
-		t.Fatalf("PrintText failed: %v", err)
+		t.Fatalf("PrintTextPlain failed: %v", err)
 	}
 
 	output := buf.String()
 
-	// Should have rule name but no URL
+	// Should have rule name but no URL (check no " - " after rule code on same line)
 	if !strings.Contains(output, "WARNING: TestRule\n") {
 		t.Errorf("Expected 'WARNING: TestRule\\n' (no URL), got:\n%s", output)
 	}
 }
 
-func TestPrintText_FileLevel(t *testing.T) {
+func TestPrintTextPlain_FileLevel(t *testing.T) {
 	source := []byte("FROM alpine")
 	violations := []rules.Violation{
 		{
 			Location: rules.NewFileLocation("Dockerfile"),
 			RuleCode: "TestRule",
 			Message:  "File-level issue",
+			Severity: rules.SeverityWarning,
 		},
 	}
 	sources := map[string][]byte{
@@ -92,9 +135,9 @@ func TestPrintText_FileLevel(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := PrintText(&buf, violations, sources)
+	err := PrintTextPlain(&buf, violations, sources)
 	if err != nil {
-		t.Fatalf("PrintText failed: %v", err)
+		t.Fatalf("PrintTextPlain failed: %v", err)
 	}
 
 	output := buf.String()
@@ -109,23 +152,26 @@ func TestPrintText_FileLevel(t *testing.T) {
 	}
 }
 
-func TestPrintText_Sorted(t *testing.T) {
+func TestPrintTextPlain_Sorted(t *testing.T) {
 	source := []byte("line1\nline2\nline3\nline4\nline5")
 	violations := []rules.Violation{
 		{
 			Location: rules.NewLineLocation("b.dockerfile", 2),
 			RuleCode: "Rule2",
 			Message:  "Second file",
+			Severity: rules.SeverityWarning,
 		},
 		{
 			Location: rules.NewLineLocation("a.dockerfile", 4),
 			RuleCode: "Rule3",
 			Message:  "First file, later line",
+			Severity: rules.SeverityWarning,
 		},
 		{
 			Location: rules.NewLineLocation("a.dockerfile", 1),
 			RuleCode: "Rule1",
 			Message:  "First file, earlier line",
+			Severity: rules.SeverityWarning,
 		},
 	}
 	sources := map[string][]byte{
@@ -134,9 +180,9 @@ func TestPrintText_Sorted(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := PrintText(&buf, violations, sources)
+	err := PrintTextPlain(&buf, violations, sources)
 	if err != nil {
-		t.Fatalf("PrintText failed: %v", err)
+		t.Fatalf("PrintTextPlain failed: %v", err)
 	}
 
 	output := buf.String()
@@ -155,13 +201,14 @@ func TestPrintText_Sorted(t *testing.T) {
 	}
 }
 
-func TestPrintText_MultipleLines(t *testing.T) {
+func TestPrintTextPlain_MultipleLines(t *testing.T) {
 	source := []byte("FROM alpine\nRUN echo 1\nRUN echo 2\nRUN echo 3\nCMD [\"sh\"]")
 	violations := []rules.Violation{
 		{
 			Location: rules.NewRangeLocation("Dockerfile", 1, 0, 3, 10),
 			RuleCode: "MultiLine",
 			Message:  "Spans multiple lines",
+			Severity: rules.SeverityWarning,
 		},
 	}
 	sources := map[string][]byte{
@@ -169,9 +216,9 @@ func TestPrintText_MultipleLines(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := PrintText(&buf, violations, sources)
+	err := PrintTextPlain(&buf, violations, sources)
 	if err != nil {
-		t.Fatalf("PrintText failed: %v", err)
+		t.Fatalf("PrintTextPlain failed: %v", err)
 	}
 
 	output := buf.String()
@@ -190,7 +237,7 @@ func TestPrintText_MultipleLines(t *testing.T) {
 	}
 }
 
-func TestPrintSource_Padding(t *testing.T) {
+func TestPrintTextPlain_Padding(t *testing.T) {
 	// Test that we get context padding around the violation
 	source := []byte("line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8")
 	violations := []rules.Violation{
@@ -198,6 +245,7 @@ func TestPrintSource_Padding(t *testing.T) {
 			Location: rules.NewLineLocation("test", 4), // Line 5 (0-based: 4)
 			RuleCode: "Test",
 			Message:  "Middle line",
+			Severity: rules.SeverityWarning,
 		},
 	}
 	sources := map[string][]byte{
@@ -205,9 +253,9 @@ func TestPrintSource_Padding(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := PrintText(&buf, violations, sources)
+	err := PrintTextPlain(&buf, violations, sources)
 	if err != nil {
-		t.Fatalf("PrintText failed: %v", err)
+		t.Fatalf("PrintTextPlain failed: %v", err)
 	}
 
 	output := buf.String()
@@ -239,5 +287,56 @@ func TestLineInRange(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("lineInRange(%d, %d, %d) = %v, want %v", tt.line, tt.start, tt.end, got, tt.want)
 		}
+	}
+}
+
+func TestNewTextReporter_Options(t *testing.T) {
+	// Test with explicit options
+	colorOn := true
+	colorOff := false
+
+	tests := []struct {
+		name string
+		opts TextOptions
+	}{
+		{"default", DefaultTextOptions()},
+		{"color on", TextOptions{Color: &colorOn, SyntaxHighlight: true}},
+		{"color off", TextOptions{Color: &colorOff, SyntaxHighlight: false}},
+		{"custom style", TextOptions{SyntaxHighlight: true, ChromaStyle: "dracula"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := NewTextReporter(tt.opts)
+			if r == nil {
+				t.Fatal("NewTextReporter returned nil")
+			}
+		})
+	}
+}
+
+func TestTextReporter_Print(t *testing.T) {
+	source := []byte("FROM alpine\nRUN echo hello")
+	violations := []rules.Violation{
+		{
+			Location: rules.NewLineLocation("Dockerfile", 0),
+			RuleCode: "TestRule",
+			Message:  "Test message",
+			Severity: rules.SeverityError,
+		},
+	}
+	sources := map[string][]byte{"Dockerfile": source}
+
+	// Test with reporter instance
+	r := NewTextReporter(DefaultTextOptions())
+	var buf bytes.Buffer
+	err := r.Print(&buf, violations, sources)
+	if err != nil {
+		t.Fatalf("Print failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "TestRule") {
+		t.Errorf("Missing rule code in output:\n%s", output)
 	}
 }
