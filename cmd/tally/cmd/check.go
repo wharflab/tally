@@ -66,6 +66,7 @@ func checkCommand() *cli.Command {
 			var allResults []FileResult
 			hasViolations := false
 			var configFormat string // Store format from first file's config
+			fileSources := make(map[string][]byte)
 
 			for _, file := range files {
 				// Load config for this specific file (cascading discovery)
@@ -84,6 +85,9 @@ func checkCommand() *cli.Command {
 				if err != nil {
 					return fmt.Errorf("failed to parse %s: %w", file, err)
 				}
+
+				// Store source for later use in text output
+				fileSources[file] = parseResult.Source
 
 				// Build base LintInput (without rule-specific config)
 				baseInput := rules.LintInput{
@@ -135,23 +139,12 @@ func checkCommand() *cli.Command {
 					return fmt.Errorf("failed to encode JSON: %w", err)
 				}
 			default:
-				// Collect all violations and sources for the reporter
+				// Collect all violations for the reporter
 				var allViolations []rules.Violation
-				sources := make(map[string][]byte)
 				for _, result := range allResults {
 					allViolations = append(allViolations, result.Violations...)
-					// Find the source for this file
-					for _, r := range allResults {
-						if r.File == result.File {
-							// We need to get the source - re-read it
-							if src, err := os.ReadFile(result.File); err == nil {
-								sources[result.File] = src
-							}
-							break
-						}
-					}
 				}
-				if err := reporter.PrintText(os.Stdout, allViolations, sources); err != nil {
+				if err := reporter.PrintText(os.Stdout, allViolations, fileSources); err != nil {
 					return fmt.Errorf("failed to print results: %w", err)
 				}
 			}
