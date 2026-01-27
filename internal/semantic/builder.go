@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/tinovyatkin/tally/internal/dockerfile"
 )
@@ -100,9 +101,13 @@ func (b *Builder) processStageNaming(stage *instructions.Stage, index int) {
 
 	if existingIdx, exists := b.stagesByName[normalized]; exists {
 		// DL3024: Duplicate stage name
+		var loc parser.Range
+		if len(stage.Location) > 0 {
+			loc = stage.Location[0]
+		}
 		b.issues = append(b.issues, newIssue(
 			b.file,
-			stage.Location[0],
+			loc,
 			"DL3024",
 			fmt.Sprintf("Stage name %q is already used on stage %d", stage.Name, existingIdx),
 			"https://github.com/hadolint/hadolint/wiki/DL3024",
