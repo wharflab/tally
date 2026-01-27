@@ -71,12 +71,13 @@ jobs:
   cpd:
     name: Copy/Paste Detection
     runs-on: ubuntu-latest
+    env:
+      PMD_VERSION: 7.20.0
     steps:
       - uses: actions/checkout@v6
 
       - name: Setup PMD
         run: |
-          PMD_VERSION=7.20.0
           curl -fL "https://github.com/pmd/pmd/releases/download/pmd_releases%2F${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip" -o pmd.zip
           unzip -q pmd.zip
           rm pmd.zip
@@ -102,7 +103,7 @@ jobs:
 
           # Run CPD with exclusion list - fail build if duplications are found
           echo "🔍 Running CPD..."
-          if pmd-bin-7.20.0/bin/pmd cpd --language go --minimum-tokens 100 \
+          if "pmd-bin-${PMD_VERSION}/bin/pmd" cpd --language go --minimum-tokens 100 \
             --dir . --exclude-file-list exclude-files.txt --format text --debug; then
             echo "✅ No code duplications found!"
           else
