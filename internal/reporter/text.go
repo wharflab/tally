@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strings"
 
@@ -17,14 +16,15 @@ import (
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 
 	"github.com/tinovyatkin/tally/internal/rules"
 )
 
 // Styles for different parts of the output
 var (
-	// Color detection - disable colors if not a terminal or NO_COLOR is set
-	useColors = lipgloss.HasDarkBackground() || isTerminal()
+	// Color detection using termenv (respects NO_COLOR, CLICOLOR_FORCE, terminal detection)
+	useColors = termenv.EnvColorProfile() != termenv.Ascii
 
 	// Warning header style
 	warningStyle = lipgloss.NewStyle().
@@ -79,18 +79,6 @@ var (
 			Foreground(lipgloss.Color("245")), // Gray
 	}
 )
-
-// isTerminal checks if stdout is a terminal
-func isTerminal() bool {
-	if os.Getenv("NO_COLOR") != "" {
-		return false
-	}
-	fi, err := os.Stdout.Stat()
-	if err != nil {
-		return false
-	}
-	return (fi.Mode() & os.ModeCharDevice) != 0
-}
 
 // TextOptions configures the text reporter output.
 type TextOptions struct {
