@@ -216,6 +216,7 @@ func TestHeredocKind_String(t *testing.T) {
 		kind HeredocKind
 		want string
 	}{
+		{HeredocKindUnknown, "unknown"},
 		{HeredocKindScript, "script"},
 		{HeredocKindInlineSource, "inline-source"},
 		{HeredocKind(99), "unknown"},

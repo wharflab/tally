@@ -8,9 +8,13 @@ import (
 type HeredocKind int
 
 const (
+	// HeredocKindUnknown indicates a heredoc in an unrecognized instruction.
+	// This makes unclassified heredocs explicit rather than silently defaulting.
+	HeredocKindUnknown HeredocKind = iota
+
 	// HeredocKindScript indicates a heredoc in a RUN instruction.
 	// The content is a shell script to be executed.
-	HeredocKindScript HeredocKind = iota
+	HeredocKindScript
 
 	// HeredocKindInlineSource indicates a heredoc in COPY or ADD instruction.
 	// The content is an inline file that does not come from build context.
@@ -21,6 +25,8 @@ const (
 // String returns the string representation of the HeredocKind.
 func (k HeredocKind) String() string {
 	switch k {
+	case HeredocKindUnknown:
+		return "unknown"
 	case HeredocKindScript:
 		return "script"
 	case HeredocKindInlineSource:
@@ -91,6 +97,8 @@ func ExtractHeredocs(result *ParseResult) []HeredocInfo {
 }
 
 // classifyHeredoc determines the kind of heredoc based on instruction.
+// Returns HeredocKindUnknown for unrecognized instructions, allowing callers
+// to detect and handle unclassified heredocs explicitly.
 func classifyHeredoc(instruction string) HeredocKind {
 	switch instruction {
 	case "RUN":
@@ -98,8 +106,9 @@ func classifyHeredoc(instruction string) HeredocKind {
 	case "COPY", "ADD":
 		return HeredocKindInlineSource
 	default:
-		// Default to script for unknown instructions
-		return HeredocKindScript
+		// Return unknown for unrecognized instructions rather than guessing.
+		// Currently, only RUN, COPY, and ADD support heredocs in Docker.
+		return HeredocKindUnknown
 	}
 }
 
@@ -127,4 +136,9 @@ func (h HeredocInfo) IsInlineSource() bool {
 // IsScript returns true if the heredoc is a shell script (RUN).
 func (h HeredocInfo) IsScript() bool {
 	return h.Kind == HeredocKindScript
+}
+
+// IsUnknown returns true if the heredoc is from an unrecognized instruction.
+func (h HeredocInfo) IsUnknown() bool {
+	return h.Kind == HeredocKindUnknown
 }
