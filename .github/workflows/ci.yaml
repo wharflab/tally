@@ -71,18 +71,20 @@ jobs:
   cpd:
     name: Copy/Paste Detection
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
     steps:
       - uses: actions/checkout@v6
 
+      - name: Setup PMD
+        run: |
+          PMD_VERSION=7.11.0
+          curl -L "https://github.com/pmd/pmd/releases/download/pmd_releases%2F${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip" -o pmd.zip
+          unzip -q pmd.zip
+          rm pmd.zip
+
       - name: Run CPD
-        uses: pmd/pmd-github-action@v2
-        with:
-          version: 'latest'
-          analyzeModifiedFilesOnly: false
-          sourcePath: '.'
-          createGitHubAnnotations: true
-        env:
-          PMD_OPTS: '-Dcpd.language=go -Dcpd.minimumTokens=100 -Dcpd.skipDuplicates=false -Dcpd.skipLexicalErrors=true --exclude "**/testdata/**" --exclude "**/__snapshots__/**" --exclude "**/*.pb.go" --exclude "**/*_generated.go" --exclude "packaging/**"'
+        run: |
+          pmd-bin-7.11.0/bin/pmd cpd --language go --minimum-tokens 100 --dir . \
+            --exclude "**/testdata/**" --exclude "**/__snapshots__/**" \
+            --exclude "**/*.pb.go" --exclude "**/*_generated.go" \
+            --exclude "packaging/**" --skip-lexical-errors \
+            --format text
