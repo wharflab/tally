@@ -518,6 +518,29 @@ RUN echo "extending builder"
 	}
 }
 
+func TestBaseImageStageReachability(t *testing.T) {
+	content := `FROM alpine:3.18 AS base
+RUN echo "base"
+
+FROM base
+RUN echo "final"
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+
+	if !model.Graph().IsReachable(0, 1) {
+		t.Error("base stage should be reachable when used as FROM")
+	}
+
+	// Base stage used via FROM should not be unreachable
+	unreachable := model.Graph().UnreachableStages()
+	for _, idx := range unreachable {
+		if idx == 0 {
+			t.Error("base stage should not be unreachable when used as FROM")
+		}
+	}
+}
+
 func TestNilParseResult(t *testing.T) {
 	model := NewModel(nil, nil, "Dockerfile")
 
