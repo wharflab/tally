@@ -105,8 +105,11 @@ func (s *VariableScope) AddEnvCommand(cmd *instructions.EnvCommand) {
 // Precedence (highest first):
 //  1. Stage ENV (environment variables always take precedence)
 //  2. Stage ARG with build-arg override
-//  3. Stage ARG with default value
-//  4. Global ARG (via parent scope)
+//  3. Stage ARG with default value (inheriting from global if no local default)
+//
+// Note: Global ARGs are ONLY visible in a stage if the stage explicitly declares
+// them with `ARG NAME`. A global `ARG FOO=1` is NOT automatically available in
+// stage instructions until the stage redeclares it.
 //
 // Returns the value and true if found, or empty string and false if not.
 func (s *VariableScope) Resolve(name string, buildArgs map[string]string) (string, bool) {
@@ -137,11 +140,13 @@ func (s *VariableScope) Resolve(name string, buildArgs map[string]string) (strin
 		return "", false
 	}
 
-	// 3. Check parent scope (global ARGs)
+	// 3. For stage scopes (has parent), do NOT fall through to parent
+	// Global ARGs are only visible in stages that explicitly declare them
 	if s.parent != nil {
-		return s.parent.Resolve(name, buildArgs)
+		return "", false
 	}
 
+	// 4. For global scope (no parent), we're done
 	return "", false
 }
 
