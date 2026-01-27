@@ -10,6 +10,7 @@ import (
 
 	"github.com/tinovyatkin/tally/internal/config"
 	"github.com/tinovyatkin/tally/internal/dockerfile"
+	"github.com/tinovyatkin/tally/internal/reporter"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/rules/maxlines"
 )
@@ -134,11 +135,24 @@ func checkCommand() *cli.Command {
 					return fmt.Errorf("failed to encode JSON: %w", err)
 				}
 			default:
+				// Collect all violations and sources for the reporter
+				var allViolations []rules.Violation
+				sources := make(map[string][]byte)
 				for _, result := range allResults {
-					for _, v := range result.Violations {
-						line := v.Line() + 1 // Convert 0-based to 1-based for display
-						fmt.Printf("%s:%d: %s (%s)\n", result.File, line, v.Message, v.RuleCode)
+					allViolations = append(allViolations, result.Violations...)
+					// Find the source for this file
+					for _, r := range allResults {
+						if r.File == result.File {
+							// We need to get the source - re-read it
+							if src, err := os.ReadFile(result.File); err == nil {
+								sources[result.File] = src
+							}
+							break
+						}
 					}
+				}
+				if err := reporter.PrintText(os.Stdout, allViolations, sources); err != nil {
+					return fmt.Errorf("failed to print results: %w", err)
 				}
 			}
 
