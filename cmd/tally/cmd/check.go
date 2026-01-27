@@ -9,12 +9,14 @@ import (
 	"github.com/urfave/cli/v3"
 
 	"github.com/tinovyatkin/tally/internal/config"
+	"github.com/tinovyatkin/tally/internal/directive"
 	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/reporter"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/rules/maxlines"
 	_ "github.com/tinovyatkin/tally/internal/rules/nounreachablestages" // Register rule
 	"github.com/tinovyatkin/tally/internal/semantic"
+	"github.com/tinovyatkin/tally/internal/sourcemap"
 )
 
 // FileResult contains the linting results for a single file.
@@ -55,6 +57,16 @@ func checkCommand() *cli.Command {
 				Aliases: []string{"f"},
 				Usage:   "Output format: text, json",
 				Sources: cli.EnvVars("TALLY_FORMAT"),
+			},
+			&cli.BoolFlag{
+				Name:    "no-inline-directives",
+				Usage:   "Disable processing of inline ignore directives",
+				Sources: cli.EnvVars("TALLY_INLINE_DIRECTIVES_ENABLED"),
+			},
+			&cli.BoolFlag{
+				Name:    "warn-unused-directives",
+				Usage:   "Warn about unused ignore directives",
+				Sources: cli.EnvVars("TALLY_INLINE_DIRECTIVES_WARN_UNUSED"),
 			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -135,6 +147,42 @@ func checkCommand() *cli.Command {
 					))
 				}
 
+				// Parse inline directives
+				sm := sourcemap.New(parseResult.Source)
+				var validator directive.RuleValidator
+				if cfg.InlineDirectives.ValidateRules {
+					validator = rules.DefaultRegistry().Has
+				}
+				directiveResult := directive.Parse(sm, validator)
+
+				// Report parse errors as warnings
+				for _, parseErr := range directiveResult.Errors {
+					violations = append(violations, rules.NewViolation(
+						rules.NewLineLocation(file, parseErr.Line+1),
+						"invalid-ignore-directive",
+						parseErr.Message,
+						rules.SeverityWarning,
+					).WithDetail("Directive: "+parseErr.RawText))
+				}
+
+				// Filter violations based on inline directives
+				if cfg.InlineDirectives.Enabled && len(directiveResult.Directives) > 0 {
+					filterResult := directive.Filter(violations, directiveResult.Directives)
+					violations = filterResult.Violations
+
+					// Report unused directives if configured
+					if cfg.InlineDirectives.WarnUnused {
+						for _, unused := range filterResult.UnusedDirectives {
+							violations = append(violations, rules.NewViolation(
+								rules.NewLineLocation(file, unused.Line+1),
+								"unused-ignore-directive",
+								"ignore directive does not suppress any violations",
+								rules.SeverityWarning,
+							).WithDetail("Directive: "+unused.RawText))
+						}
+					}
+				}
+
 				if len(violations) > 0 {
 					hasViolations = true
 				}
@@ -211,6 +259,15 @@ func loadConfigForFile(cmd *cli.Command, targetPath string) (*config.Config, err
 
 	if cmd.IsSet("format") {
 		cfg.Format = cmd.String("format")
+	}
+
+	// --no-inline-directives flag inverts the enabled setting
+	if cmd.IsSet("no-inline-directives") {
+		cfg.InlineDirectives.Enabled = !cmd.Bool("no-inline-directives")
+	}
+
+	if cmd.IsSet("warn-unused-directives") {
+		cfg.InlineDirectives.WarnUnused = cmd.Bool("warn-unused-directives")
 	}
 
 	return cfg, nil

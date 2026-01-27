@@ -1,0 +1,24 @@
+[
+  {
+    "file": "testdata/inline-unused-directive/Dockerfile",
+    "violations": [
+      {
+        "location": {
+          "file": "testdata/inline-unused-directive/Dockerfile",
+          "start": {
+            "line": 1,
+            "column": 0
+          },
+          "end": {
+            "line": -1,
+            "column": -1
+          }
+        },
+        "rule": "unused-ignore-directive",
+        "message": "ignore directive does not suppress any violations",
+        "detail": "Directive: # tally ignore=DL3006",
+        "severity": "warning"
+      }
+    ]
+  }
+]

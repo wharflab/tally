@@ -38,6 +38,9 @@ type Config struct {
 	// Format specifies the output format: "text" or "json".
 	Format string `koanf:"format"`
 
+	// InlineDirectives controls inline suppression directives.
+	InlineDirectives InlineDirectivesConfig `koanf:"inline-directives"`
+
 	// ConfigFile is the path to the config file that was loaded (if any).
 	// This is metadata, not loaded from config.
 	ConfigFile string `koanf:"-"`
@@ -46,6 +49,29 @@ type Config struct {
 // RulesConfig contains configuration for all linting rules.
 type RulesConfig struct {
 	MaxLines MaxLinesRule `koanf:"max-lines"`
+}
+
+// InlineDirectivesConfig controls inline suppression directives.
+// Supports # tally ignore=..., # hadolint ignore=..., and # check=skip=...
+//
+// Example TOML configuration:
+//
+//	[inline-directives]
+//	enabled = true
+//	warn-unused = false
+//	validate-rules = true
+type InlineDirectivesConfig struct {
+	// Enabled controls whether inline directives are processed.
+	// Default: true
+	Enabled bool `koanf:"enabled"`
+
+	// WarnUnused reports warnings for directives that don't suppress any violations.
+	// Default: false
+	WarnUnused bool `koanf:"warn-unused"`
+
+	// ValidateRules reports warnings for unknown rule codes in directives.
+	// Default: false (allows BuildKit/hadolint rule codes for migration compatibility)
+	ValidateRules bool `koanf:"validate-rules"`
 }
 
 // MaxLinesRule configures the max-lines rule.
@@ -91,6 +117,11 @@ func Default() *Config {
 				SkipBlankLines: true, // Count only meaningful lines
 				SkipComments:   true, // Count only instruction lines
 			},
+		},
+		InlineDirectives: InlineDirectivesConfig{
+			Enabled:       true,  // Process inline directives by default
+			WarnUnused:    false, // Don't warn about unused directives by default
+			ValidateRules: false, // Don't validate rule codes (allows BuildKit/hadolint rules)
 		},
 	}
 }
@@ -143,9 +174,12 @@ func loadWithConfigPath(configPath string) (*Config, error) {
 // knownHyphenatedKeys maps dot-separated patterns to their hyphenated equivalents.
 // Add new entries here when adding rules with hyphenated names.
 var knownHyphenatedKeys = map[string]string{
-	"max.lines":        "max-lines",
-	"skip.blank.lines": "skip-blank-lines",
-	"skip.comments":    "skip-comments",
+	"max.lines":         "max-lines",
+	"skip.blank.lines":  "skip-blank-lines",
+	"skip.comments":     "skip-comments",
+	"inline.directives": "inline-directives",
+	"warn.unused":       "warn-unused",
+	"validate.rules":    "validate-rules",
 }
 
 // envKeyTransform converts environment variable names to config keys.

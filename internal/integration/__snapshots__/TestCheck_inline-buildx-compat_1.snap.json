@@ -1,0 +1,6 @@
+[
+  {
+    "file": "testdata/inline-buildx-compat/Dockerfile",
+    "violations": []
+  }
+]

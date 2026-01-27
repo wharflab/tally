@@ -1,0 +1,6 @@
+[
+  {
+    "file": "testdata/inline-ignore-global/Dockerfile",
+    "violations": []
+  }
+]

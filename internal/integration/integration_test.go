@@ -96,6 +96,43 @@ func TestCheck(t *testing.T) {
 
 		// Unreachable stage detection
 		{"unreachable-stage", "unreachable-stage", []string{"--format", "json"}, nil, 1},
+
+		// Inline directive tests
+		{
+			"inline-ignore-single", "inline-ignore-single",
+			[]string{"--format", "json"},
+			nil, 0,
+		},
+		{
+			"inline-ignore-global", "inline-ignore-global",
+			[]string{"--format", "json"},
+			nil, 0,
+		},
+		{
+			"inline-hadolint-compat", "inline-hadolint-compat",
+			[]string{"--format", "json"},
+			nil, 0,
+		},
+		{
+			"inline-buildx-compat", "inline-buildx-compat",
+			[]string{"--format", "json"},
+			nil, 0,
+		},
+		{
+			"inline-ignore-multiple-max-lines", "inline-ignore-multiple",
+			[]string{"--format", "json"},
+			nil, 0,
+		},
+		{
+			"inline-unused-directive", "inline-unused-directive",
+			[]string{"--format", "json", "--warn-unused-directives"},
+			nil, 1,
+		},
+		{
+			"inline-directives-disabled", "inline-directives-disabled",
+			[]string{"--format", "json", "--no-inline-directives"},
+			nil, 1,
+		},
 	}
 
 	for _, tc := range testCases {
