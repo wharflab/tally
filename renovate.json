@@ -15,6 +15,19 @@
   "semanticCommits": "enabled",
   "rebaseWhen": "conflicted",
   "rangeStrategy": "bump",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["^Makefile$", "^\\.github/workflows/ci\\.yaml$"],
+      "matchStrings": [
+        "PMD_VERSION\\s*[:=]\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)",
+        "pmd-bin-(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "pmd/pmd",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    }
+  ],
   "packageRules": [
     {
       "matchDepTypes": ["dependencies"],
@@ -34,6 +47,12 @@
       "matchFileNames": ["packaging/pypi/pyproject.toml"],
       "matchDepNames": ["python"],
       "enabled": false
+    },
+    {
+      "matchDatasources": ["github-releases"],
+      "matchDepNames": ["pmd/pmd"],
+      "automerge": true,
+      "groupName": "PMD"
     }
   ]
 }
