@@ -76,15 +76,25 @@ jobs:
 
       - name: Setup PMD
         run: |
-          PMD_VERSION=7.11.0
+          PMD_VERSION=7.14.0
           curl -L "https://github.com/pmd/pmd/releases/download/pmd_releases%2F${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip" -o pmd.zip
           unzip -q pmd.zip
           rm pmd.zip
 
       - name: Run CPD
         run: |
-          pmd-bin-7.11.0/bin/pmd cpd --language go --minimum-tokens 100 --dir . \
-            --exclude "**/testdata/**" --exclude "**/__snapshots__/**" \
-            --exclude "**/*_test.go" --exclude "**/*.pb.go" \
-            --exclude "**/*_generated.go" --exclude "packaging/**" \
-            --skip-lexical-errors --format text
+          # Create a list of Go files to analyze (exclude tests, generated files, and fixtures)
+          find . -type f -name "*.go" \
+            ! -name "*_test.go" \
+            ! -name "*.pb.go" \
+            ! -name "*_generated.go" \
+            ! -path "*/testdata/*" \
+            ! -path "*/__snapshots__/*" \
+            ! -path "*/packaging/*" \
+            ! -path "*/bin/*" \
+            ! -path "*/.git/*" \
+            > files-to-scan.txt
+
+          # Run CPD with the file list
+          pmd-bin-7.14.0/bin/pmd cpd --language go --minimum-tokens 100 \
+            --file-list files-to-scan.txt --skip-lexical-errors --format text

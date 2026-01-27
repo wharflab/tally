@@ -15,14 +15,22 @@ lint: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 lint-fix: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 	bin/golangci-lint run --fix
 
-PMD_VERSION := 7.11.0
+PMD_VERSION := 7.14.0
 
 cpd: bin/pmd-$(PMD_VERSION)
-	bin/pmd-bin-$(PMD_VERSION)/bin/pmd cpd --language go --minimum-tokens 100 --dir . \
-		--exclude "**/testdata/**" --exclude "**/__snapshots__/**" \
-		--exclude "**/*_test.go" --exclude "**/*.pb.go" \
-		--exclude "**/*_generated.go" --exclude "packaging/**" \
-		--skip-lexical-errors
+	@find . -type f -name "*.go" \
+		! -name "*_test.go" \
+		! -name "*.pb.go" \
+		! -name "*_generated.go" \
+		! -path "*/testdata/*" \
+		! -path "*/__snapshots__/*" \
+		! -path "*/packaging/*" \
+		! -path "*/bin/*" \
+		! -path "*/.git/*" \
+		> /tmp/cpd-files.txt
+	@bin/pmd-bin-$(PMD_VERSION)/bin/pmd cpd --language go --minimum-tokens 100 \
+		--file-list /tmp/cpd-files.txt --skip-lexical-errors
+	@rm /tmp/cpd-files.txt
 
 bin/pmd-$(PMD_VERSION):
 	@mkdir -p bin
