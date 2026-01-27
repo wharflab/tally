@@ -15,7 +15,7 @@ lint: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 lint-fix: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 	bin/golangci-lint run --fix
 
-PMD_VERSION := 7.14.0
+PMD_VERSION := 7.20.0
 
 cpd: bin/pmd-$(PMD_VERSION)
 	@find . -type f -name "*.go" \
