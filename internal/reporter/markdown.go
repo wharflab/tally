@@ -3,6 +3,7 @@ package reporter
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -105,18 +106,16 @@ func (r *MarkdownReporter) Report(violations []rules.Violation, _ map[string][]b
 }
 
 // SortViolationsBySeverity sorts violations by severity (errors first), then by file and line.
+// Uses stable sort to preserve original order for equal-priority items.
 func SortViolationsBySeverity(violations []rules.Violation) []rules.Violation {
 	sorted := make([]rules.Violation, len(violations))
 	copy(sorted, violations)
 
-	// Use stable sort to preserve order within same priority
-	for i := range len(sorted) - 1 {
-		for j := i + 1; j < len(sorted); j++ {
-			if shouldSwap(sorted[i], sorted[j]) {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
+	sort.SliceStable(sorted, func(i, j int) bool {
+		// shouldSwap returns true if i should come AFTER j,
+		// so we invert arguments to get "less than" semantics
+		return shouldSwap(sorted[j], sorted[i])
+	})
 
 	return sorted
 }
