@@ -14,9 +14,8 @@ import (
 	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/reporter"
 	"github.com/tinovyatkin/tally/internal/rules"
-	_ "github.com/tinovyatkin/tally/internal/rules/copyignoredfile" // Register rule
+	_ "github.com/tinovyatkin/tally/internal/rules/all" // Register all rules
 	"github.com/tinovyatkin/tally/internal/rules/maxlines"
-	_ "github.com/tinovyatkin/tally/internal/rules/nounreachablestages" // Register rule
 	"github.com/tinovyatkin/tally/internal/semantic"
 	"github.com/tinovyatkin/tally/internal/sourcemap"
 	"github.com/tinovyatkin/tally/internal/version"
@@ -512,7 +511,7 @@ func parseFailLevel(level string) (rules.Severity, error) {
 // This allows each rule to receive its own typed config from the global config.
 func getRuleConfig(ruleCode string, cfg *config.Config) any {
 	switch ruleCode {
-	case "max-lines":
+	case rules.TallyRulePrefix + "max-lines":
 		return maxlines.Config{
 			Max:            cfg.Rules.MaxLines.Max,
 			SkipBlankLines: cfg.Rules.MaxLines.SkipBlankLines,

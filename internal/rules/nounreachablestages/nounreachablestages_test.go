@@ -31,8 +31,8 @@ func TestMetadata(t *testing.T) {
 	r := New()
 	meta := r.Metadata()
 
-	if meta.Code != "no-unreachable-stages" {
-		t.Errorf("expected code 'no-unreachable-stages', got %q", meta.Code)
+	if meta.Code != "tally/no-unreachable-stages" {
+		t.Errorf("expected code 'tally/no-unreachable-stages', got %q", meta.Code)
 	}
 	if meta.DefaultSeverity != rules.SeverityWarning {
 		t.Errorf("expected warning severity, got %v", meta.DefaultSeverity)
@@ -90,8 +90,8 @@ COPY --from=builder /app /app
 	}
 
 	v := violations[0]
-	if v.RuleCode != "no-unreachable-stages" {
-		t.Errorf("expected rule code 'no-unreachable-stages', got %q", v.RuleCode)
+	if v.RuleCode != "tally/no-unreachable-stages" {
+		t.Errorf("expected rule code 'tally/no-unreachable-stages', got %q", v.RuleCode)
 	}
 	if !strings.Contains(v.Message, "unused") {
 		t.Errorf("message should mention stage name 'unused', got %q", v.Message)

@@ -179,7 +179,7 @@ func TestIsSecretKey(t *testing.T) {
 		{"PORT", false},
 		{"NAME", false},
 		{"PUBLIC_KEY", false}, // "public" overrides "key"
-		{"KEYBOARD", true},    // Contains "key" - substring match
+		{"KEYBOARD", false},   // No word boundary before "key" (BuildKit behavior)
 
 		// Edge cases
 		{"", false},

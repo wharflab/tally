@@ -11,8 +11,8 @@ func TestRule_Metadata(t *testing.T) {
 	r := New()
 	meta := r.Metadata()
 
-	if meta.Code != "max-lines" {
-		t.Errorf("Code = %q, want %q", meta.Code, "max-lines")
+	if meta.Code != "tally/max-lines" {
+		t.Errorf("Code = %q, want %q", meta.Code, "tally/max-lines")
 	}
 	// Enabled by default with sensible defaults (50 lines, skip blanks/comments)
 	if !meta.EnabledByDefault {
@@ -45,7 +45,7 @@ func TestRule_Check(t *testing.T) {
 			Content:        "FROM alpine\nRUN echo hello\nRUN echo world",
 			Config:         Config{Max: 2},
 			WantViolations: 1,
-			WantCodes:      []string{"max-lines"},
+			WantCodes:      []string{"tally/max-lines"},
 			WantMessages:   []string{"file has 3 lines, maximum allowed is 2"},
 		},
 		{

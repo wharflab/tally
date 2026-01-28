@@ -9,6 +9,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/tinovyatkin/tally/internal/dockerfile"
+	"github.com/tinovyatkin/tally/internal/rules"
 )
 
 // Builder constructs a semantic model from a parse result.
@@ -108,7 +109,7 @@ func (b *Builder) processStageNaming(stage *instructions.Stage, index int) {
 		b.issues = append(b.issues, newIssue(
 			b.file,
 			loc,
-			"DL3024",
+			rules.HadolintRulePrefix+"DL3024",
 			fmt.Sprintf("Stage name %q is already used on stage %d", stage.Name, existingIdx),
 			"https://github.com/hadolint/hadolint/wiki/DL3024",
 		))

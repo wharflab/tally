@@ -2,6 +2,18 @@
 
 A fast, configurable linter for Dockerfiles and Containerfiles.
 
+## Supported Rules
+
+tally integrates rules from multiple sources:
+
+| Source | Rules | Description |
+|--------|-------|-------------|
+| **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 15+ rules | Docker's official Dockerfile checks (automatically captured) |
+| **tally** | 3 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
+| **[Hadolint](https://github.com/hadolint/hadolint)** | 1 rule | Shell best practices (expanding) |
+
+**See [RULES.md](RULES.md) for the complete rules reference.**
+
 ## Installation
 
 ### NPM
@@ -85,12 +97,9 @@ tally check --exclude "vendor/*" --exclude "test/*" .
 tally check --exclude "*.bak" .
 ```
 
-## Available Rules
+## Rules Overview
 
-| Rule                | Description                               | Options                                    |
-| ------------------- | ----------------------------------------- | ------------------------------------------ |
-| `max-lines`         | Enforce maximum number of lines           | `max`, `skip-blank-lines`, `skip-comments` |
-| `copy-ignored-file` | Warn when COPY/ADD sources match .dockerignore | Requires `--context` flag            |
+For the complete list of all supported rules, see **[RULES.md](RULES.md)**.
 
 ### Context-Aware Rules
 

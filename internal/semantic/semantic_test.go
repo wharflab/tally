@@ -162,8 +162,8 @@ RUN echo "second"
 	}
 
 	v := violations[0]
-	if v.Code != "DL3024" {
-		t.Errorf("expected rule code 'DL3024', got %q", v.Code)
+	if v.Code != "hadolint/DL3024" {
+		t.Errorf("expected rule code 'hadolint/DL3024', got %q", v.Code)
 	}
 	if !strings.Contains(v.Message, "builder") {
 		t.Errorf("message should mention 'builder', got %q", v.Message)
@@ -187,8 +187,8 @@ RUN echo "second"
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation for case-insensitive duplicate, got %d", len(violations))
 	}
-	if violations[0].Code != "DL3024" {
-		t.Errorf("expected DL3024, got %q", violations[0].Code)
+	if violations[0].Code != "hadolint/DL3024" {
+		t.Errorf("expected hadolint/DL3024, got %q", violations[0].Code)
 	}
 }
 

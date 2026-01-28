@@ -4,7 +4,9 @@
 package secretsinargorenv
 
 import (
+	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
@@ -81,48 +83,50 @@ func (r *Rule) createViolation(loc rules.Location, instruction, key string) rule
 			"Use --mount=type=secret instead for build-time secrets.")
 }
 
-// secretPatterns are substrings that indicate a variable likely contains a secret.
-// These match BuildKit's isSecretKey logic.
-var secretPatterns = []string{
-	"apikey",
-	"api_key",
-	"auth",
-	"credential",
-	"credentials",
-	"key",
-	"password",
-	"passwd",
-	"pword",
-	"secret",
-	"token",
-}
+// Secret detection patterns from BuildKit.
+// Source: github.com/moby/buildkit/frontend/dockerfile/dockerfile2llb/convert.go
+// Function: getSecretsRegex()
+//
+// Pattern matches secret-like tokens at word boundaries (start/end of string or underscore).
+// Examples that match: API_KEY, DATABASE_PASSWORD, AUTH_TOKEN
+// Examples that don't match: MONKEY (no word boundary before "key"), MYPASSWORDHERE
+var (
+	secretsRegexpOnce sync.Once
+	secretsRegexp     *regexp.Regexp
+	allowRegexp       *regexp.Regexp
+)
 
-// allowPatterns are substrings that indicate a variable is NOT a secret.
-// If a key matches any allow pattern, it's not flagged.
-var allowPatterns = []string{
-	"public",
+// initSecretsRegexp compiles the secret detection regexps.
+func initSecretsRegexp() {
+	// Tokens that suggest a secret - must appear at word boundary
+	secretTokens := []string{
+		"apikey",
+		"auth",
+		"credential",
+		"credentials",
+		"key",
+		"password",
+		"pword",
+		"passwd",
+		"secret",
+		"token",
+	}
+	pattern := `(?i)(?:_|^)(?:` + strings.Join(secretTokens, "|") + `)(?:_|$)`
+	secretsRegexp = regexp.MustCompile(pattern)
+
+	// Tokens that indicate NOT a secret (e.g., PUBLIC_KEY is fine)
+	allowTokens := []string{
+		"public",
+	}
+	allowPattern := `(?i)(?:_|^)(?:` + strings.Join(allowTokens, "|") + `)(?:_|$)`
+	allowRegexp = regexp.MustCompile(allowPattern)
 }
 
 // isSecretKey checks if a variable name suggests it contains a secret.
-// This matches BuildKit's validateNoSecretKey logic.
+// Uses the same logic as BuildKit's validateNoSecretKey.
 func isSecretKey(key string) bool {
-	lower := strings.ToLower(key)
-
-	// First check if it matches any allow pattern
-	for _, allow := range allowPatterns {
-		if strings.Contains(lower, allow) {
-			return false
-		}
-	}
-
-	// Then check if it matches any secret pattern
-	for _, pattern := range secretPatterns {
-		if strings.Contains(lower, pattern) {
-			return true
-		}
-	}
-
-	return false
+	secretsRegexpOnce.Do(initSecretsRegexp)
+	return secretsRegexp.MatchString(key) && !allowRegexp.MatchString(key)
 }
 
 // New creates a new SecretsUsedInArgOrEnv rule instance.
