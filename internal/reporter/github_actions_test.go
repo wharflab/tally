@@ -57,6 +57,9 @@ func TestGitHubActionsReporter(t *testing.T) {
 	if !strings.Contains(lines[0], "line=5") {
 		t.Errorf("Expected line=5 in: %s", lines[0])
 	}
+	if !strings.Contains(lines[0], "col=1") {
+		t.Errorf("Expected col=1 (column 0 becomes 1-based) in: %s", lines[0])
+	}
 	if !strings.Contains(lines[0], "title=DL3006") {
 		t.Errorf("Expected title=DL3006 in: %s", lines[0])
 	}
@@ -142,6 +145,45 @@ func TestGitHubActionsReporterMessageEscaping(t *testing.T) {
 
 	if !strings.Contains(output, "%0A") {
 		t.Errorf("Expected %%0A (escaped newline) in: %s", output)
+	}
+}
+
+func TestGitHubActionsReporterPropertyEscaping(t *testing.T) {
+	violations := []rules.Violation{
+		{
+			Location: rules.Location{
+				File:  "path/to:file,with:special.Dockerfile",
+				Start: rules.Position{Line: 1, Column: 0},
+			},
+			RuleCode: "RULE:WITH,SPECIAL",
+			Message:  "Message with : and , should NOT be escaped",
+			Severity: rules.SeverityWarning,
+		},
+	}
+
+	var buf bytes.Buffer
+	reporter := NewGitHubActionsReporter(&buf)
+
+	err := reporter.Report(violations, nil)
+	if err != nil {
+		t.Fatalf("Report() error = %v", err)
+	}
+
+	output := buf.String()
+
+	// File path should have : and , escaped
+	if !strings.Contains(output, "file=path/to%3Afile%2Cwith%3Aspecial.Dockerfile") {
+		t.Errorf("Expected escaped file path, got: %s", output)
+	}
+
+	// Title (rule code) should have : and , escaped
+	if !strings.Contains(output, "title=RULE%3AWITH%2CSPECIAL") {
+		t.Errorf("Expected escaped title, got: %s", output)
+	}
+
+	// Message should NOT have : and , escaped (only in properties)
+	if !strings.Contains(output, "::Message with : and , should NOT be escaped") {
+		t.Errorf("Message should not escape : or , - got: %s", output)
 	}
 }
 

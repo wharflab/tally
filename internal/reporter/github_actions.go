@@ -33,11 +33,11 @@ func (r *GitHubActionsReporter) Report(violations []rules.Violation, _ map[strin
 		// Build the annotation
 		// Format: ::{level} file={file},line={line},col={col},title={title}::{message}
 		var parts []string
-		parts = append(parts, "file="+v.Location.File)
+		parts = append(parts, "file="+escapeGitHubProperty(v.Location.File))
 
 		if !v.Location.IsFileLevel() {
 			parts = append(parts, fmt.Sprintf("line=%d", v.Location.Start.Line))
-			if v.Location.Start.Column > 0 {
+			if v.Location.Start.Column >= 0 {
 				parts = append(parts, fmt.Sprintf("col=%d", v.Location.Start.Column+1)) // 1-based
 			}
 			if !v.Location.IsPointLocation() && v.Location.End.Line > v.Location.Start.Line {
@@ -46,7 +46,7 @@ func (r *GitHubActionsReporter) Report(violations []rules.Violation, _ map[strin
 		}
 
 		// Add rule code as title
-		parts = append(parts, "title="+v.RuleCode)
+		parts = append(parts, "title="+escapeGitHubProperty(v.RuleCode))
 
 		// Escape message (newlines not allowed in workflow commands)
 		message := escapeGitHubMessage(v.Message)
@@ -85,11 +85,24 @@ func severityToGitHubLevel(s rules.Severity) string {
 	}
 }
 
-// escapeGitHubMessage escapes special characters in GitHub Actions workflow commands.
+// escapeGitHubMessage escapes special characters in GitHub Actions workflow command messages.
+// Messages use escapeData() rules which escape "%", "\r", "\n" but NOT ":" or ",".
 // See: https://github.com/actions/toolkit/blob/main/packages/core/src/command.ts
 func escapeGitHubMessage(s string) string {
 	s = strings.ReplaceAll(s, "%", "%25")
 	s = strings.ReplaceAll(s, "\r", "%0D")
 	s = strings.ReplaceAll(s, "\n", "%0A")
+	return s
+}
+
+// escapeGitHubProperty escapes special characters in GitHub Actions workflow command properties.
+// Properties (file, title, etc.) use escapeProperty() rules which escape "%", "\r", "\n", ":", and ",".
+// See: https://github.com/actions/toolkit/blob/main/packages/core/src/command.ts
+func escapeGitHubProperty(s string) string {
+	s = strings.ReplaceAll(s, "%", "%25")
+	s = strings.ReplaceAll(s, "\r", "%0D")
+	s = strings.ReplaceAll(s, "\n", "%0A")
+	s = strings.ReplaceAll(s, ":", "%3A")
+	s = strings.ReplaceAll(s, ",", "%2C")
 	return s
 }
