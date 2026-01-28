@@ -3,6 +3,7 @@
 package copyignoredfile
 
 import (
+	"path/filepath"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -140,8 +141,14 @@ func isURL(path string) bool {
 }
 
 // normalizePath normalizes a source path for comparison.
+// Handles edge cases like trailing slashes, double slashes, and redundant segments.
 func normalizePath(path string) string {
-	return strings.TrimPrefix(path, "./")
+	cleaned := filepath.Clean(path)
+	// filepath.Clean converts "." to ".", keep it as-is for root context
+	if cleaned == "." {
+		return "."
+	}
+	return cleaned
 }
 
 // New creates a new copy-ignored-file rule instance.
