@@ -255,6 +255,7 @@ func isExcluded(absPath string, excludePatterns []string) bool {
 
 // splitPath splits a path into its individual directory and filename components.
 // For example, "/home/user/vendor/Dockerfile" returns ["home", "user", "vendor", "Dockerfile"].
+// On Windows, "C:\foo\bar" returns ["foo", "bar"] (drive letter is stripped).
 // Used by isExcluded to generate suffix subpaths for pattern matching.
 func splitPath(path string) []string {
 	var parts []string
@@ -264,7 +265,16 @@ func splitPath(path string) []string {
 			parts = append([]string{file}, parts...)
 		}
 		path = filepath.Clean(dir)
+
+		// Stop at Unix root or current directory
 		if path == "/" || path == "." {
+			break
+		}
+
+		// Stop at Windows volume root (e.g., "C:\")
+		// filepath.VolumeName returns "C:" for "C:\", empty for Unix paths
+		vol := filepath.VolumeName(path)
+		if vol != "" && (path == vol || path == vol+string(filepath.Separator)) {
 			break
 		}
 	}

@@ -265,6 +265,10 @@ func TestSplitPath(t *testing.T) {
 		{"a/b/c", []string{"a", "b", "c"}},
 		{"/a/b/c", []string{"a", "b", "c"}},
 		{"file.txt", []string{"file.txt"}},
+		// Windows-style paths (tested on all platforms via filepath.Clean normalization)
+		// Note: On Unix, these are treated as regular directory names, not drive letters
+		// The test verifies the loop terminates properly regardless of platform
+		{"C:/foo/bar", []string{"C:", "foo", "bar"}}, // Forward slashes work cross-platform
 	}
 
 	for _, tc := range tests {
