@@ -426,20 +426,20 @@ func getOutputConfig(cmd *cli.Command, cfg *config.Config) outputConfig {
 
 // determineExitCode returns the appropriate exit code based on violations and fail-level.
 func determineExitCode(violations []rules.Violation, failLevel string) int {
-	if len(violations) == 0 {
-		return ExitSuccess
-	}
-
 	// "none" means never fail due to violations
 	if failLevel == "none" {
 		return ExitSuccess
 	}
 
-	// Parse fail-level
+	// Parse fail-level first to catch config errors even with no violations
 	threshold, err := parseFailLevel(failLevel)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: invalid --fail-level %q\n", failLevel)
 		return ExitConfigError
+	}
+
+	if len(violations) == 0 {
+		return ExitSuccess
 	}
 
 	// Check if any violation meets or exceeds the threshold
