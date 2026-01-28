@@ -26,6 +26,14 @@
       "depNameTemplate": "pmd/pmd",
       "datasourceTemplate": "github-releases",
       "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^Makefile$"],
+      "matchStrings": ["DEADCODE_VERSION\\s*[:=]\\s*(?<currentValue>v\\S+)"],
+      "depNameTemplate": "golang.org/x/tools",
+      "datasourceTemplate": "go",
+      "versioningTemplate": "go"
     }
   ],
   "packageRules": [

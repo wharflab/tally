@@ -1,4 +1,4 @@
-.PHONY: build test lint lint-fix cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish
+.PHONY: build test lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish
 
 build:
 	CGO_ENABLED=0 go build -ldflags "-s -w" -o tally
@@ -8,12 +8,19 @@ test:
 
 GOLANGCI_LINT_VERSION := v2.8.0
 GORELEASER_VERSION := v2.13.3
+DEADCODE_VERSION := v0.41.0
 
 lint: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 	bin/golangci-lint run
 
 lint-fix: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 	bin/golangci-lint run --fix
+
+deadcode: bin/deadcode-$(DEADCODE_VERSION)
+	@tmp=$$(mktemp); \
+	bin/deadcode -test ./... >"$$tmp" 2>&1; \
+	if [ -s "$$tmp" ]; then cat "$$tmp"; rm "$$tmp"; exit 1; fi; \
+	rm "$$tmp"
 
 PMD_VERSION := 7.20.0
 
@@ -47,6 +54,11 @@ bin/golangci-lint-$(GOLANGCI_LINT_VERSION):
 bin/goreleaser-$(GORELEASER_VERSION):
 	@rm -f bin/goreleaser bin/goreleaser-*
 	GOBIN=$(CURDIR)/bin go install github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION)
+	@touch $@
+
+bin/deadcode-$(DEADCODE_VERSION):
+	@rm -f bin/deadcode bin/deadcode-*
+	GOBIN=$(CURDIR)/bin go install golang.org/x/tools/cmd/deadcode@$(DEADCODE_VERSION)
 	@touch $@
 
 clean:

@@ -157,22 +157,7 @@ func Register(rule Rule) {
 	defaultRegistry.Register(rule)
 }
 
-// Get retrieves a rule from the default registry.
-func Get(code string) Rule {
-	return defaultRegistry.Get(code)
-}
-
 // All returns all rules from the default registry.
 func All() []Rule {
 	return defaultRegistry.All()
-}
-
-// Codes returns all rule codes from the default registry.
-func Codes() []string {
-	return defaultRegistry.Codes()
-}
-
-// EnabledDefault returns rules enabled by default from the default registry.
-func EnabledDefault() []Rule {
-	return defaultRegistry.EnabledByDefault()
 }
