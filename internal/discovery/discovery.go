@@ -209,23 +209,38 @@ func discoverGlob(pattern string, opts Options, seen map[string]bool) ([]Discove
 	return globMatches(pattern, opts, seen)
 }
 
-// isExcluded checks if a path matches any exclusion pattern.
+// isExcluded checks if a path matches any exclusion pattern using a three-step
+// matching strategy:
+//
+//  1. Match against the full absolute path (for absolute patterns)
+//  2. Match against just the filename/basename (for simple patterns like "*.bak")
+//  3. Match against each suffix subpath produced by splitPath (for relative patterns
+//     like "vendor/*" or "test/**")
+//
+// The subpath matching (step 3) allows patterns like "vendor/*" to match files that
+// are direct children of any "vendor" directory component in the path, without
+// matching deeply nested files. For example, "vendor/*" matches "vendor/Dockerfile"
+// but not "sub/vendor/Dockerfile" when processed as a subpath.
+//
+// Complexity: O(patterns × path_depth) matching operations per file, which is
+// acceptable for typical directory hierarchies (5-10 levels) with modest patterns.
 func isExcluded(absPath string, excludePatterns []string) bool {
 	for _, pattern := range excludePatterns {
-		// Try matching against absolute path
+		// Step 1: Match against full absolute path
 		matched, err := doublestar.Match(pattern, absPath)
 		if err == nil && matched {
 			return true
 		}
 
-		// Try matching against just the filename
+		// Step 2: Match against just the filename
 		matched, err = doublestar.Match(pattern, filepath.Base(absPath))
 		if err == nil && matched {
 			return true
 		}
 
-		// Try matching against relative path components
-		// This handles patterns like "vendor/*" or "test/**"
+		// Step 3: Match against each suffix subpath from splitPath
+		// This enables patterns like "vendor/*" to match any vendor directory
+		// at any level in the path hierarchy
 		parts := splitPath(absPath)
 		for i := range parts {
 			subpath := filepath.Join(parts[i:]...)
@@ -238,7 +253,9 @@ func isExcluded(absPath string, excludePatterns []string) bool {
 	return false
 }
 
-// splitPath splits a path into its components.
+// splitPath splits a path into its individual directory and filename components.
+// For example, "/home/user/vendor/Dockerfile" returns ["home", "user", "vendor", "Dockerfile"].
+// Used by isExcluded to generate suffix subpaths for pattern matching.
 func splitPath(path string) []string {
 	var parts []string
 	for path != "" {
