@@ -37,6 +37,7 @@ func TestCheck_AWSKeyInHeredoc(t *testing.T) {
 						ShellDependantCmdLine: instructions.ShellDependantCmdLine{
 							Files: []instructions.ShellInlineFile{
 								{
+									// gitleaks:allow
 									// AWS access key: AKIA + 16 chars from [A-Z2-7]
 									Data: `AWS_ACCESS_KEY_ID=AKIAABCDEFGH23456723
 AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY`,
@@ -79,6 +80,7 @@ func TestCheck_PrivateKeyInCopyHeredoc(t *testing.T) {
 						SourcesAndDest: instructions.SourcesAndDest{
 							SourceContents: []instructions.SourceContent{
 								{
+									// gitleaks:allow
 									Path: "/root/.ssh/id_rsa",
 									Data: `-----BEGIN RSA PRIVATE KEY-----
 MIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MaWdP0rPpJz5
@@ -108,6 +110,7 @@ func TestCheck_GitHubTokenInEnv(t *testing.T) {
 				Commands: []instructions.Command{
 					&instructions.EnvCommand{
 						Env: []instructions.KeyValuePair{
+							// gitleaks:allow
 							// GitHub PAT: ghp_ + 36 alphanumeric (realistic entropy)
 							{Key: "GITHUB_TOKEN", Value: "ghp_SfE7gMq5K9pR2nLwHvYt3dXc8jU6bA1Z0iFo"},
 						},
@@ -159,6 +162,7 @@ func TestCheck_NoSecrets(t *testing.T) {
 func TestCheck_ARGDefaultWithSecret(t *testing.T) {
 	r := New()
 
+	// gitleaks:allow
 	// GitHub PAT: ghp_ + 36 alphanumeric (realistic entropy)
 	secretValue := "ghp_SfE7gMq5K9pR2nLwHvYt3dXc8jU6bA1Z0iFo" //nolint:gosec // test data
 	input := rules.LintInput{
@@ -187,6 +191,7 @@ func TestRedact(t *testing.T) {
 		{"short", "***"},
 		{"12345678", "***"},
 		{"123456789", "1234...6789"},
+		// gitleaks:allow
 		{"ghp_SfE7gMq5K9pR2nLwHvYt3dXc8jU6bA1Z0iFo", "ghp_...0iFo"},
 	}
 
@@ -201,6 +206,7 @@ func TestRedact(t *testing.T) {
 func TestCheck_SecretInRunCommand(t *testing.T) {
 	r := New()
 
+	// gitleaks:allow
 	// GitHub PAT: ghp_ + 36 alphanumeric (realistic entropy)
 	//nolint:gosec // test data
 	token := "ghp_SfE7gMq5K9pR2nLwHvYt3dXc8jU6bA1Z0iFo"
