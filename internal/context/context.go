@@ -103,10 +103,14 @@ func (ctx *BuildContext) IsIgnored(path string) (bool, error) {
 
 // FileExists checks if a file exists in the build context.
 // The path should be relative to the build context.
+// Returns false for directories (only regular files return true).
 func (ctx *BuildContext) FileExists(path string) bool {
 	fullPath := filepath.Join(ctx.ContextDir, path)
-	_, err := os.Stat(fullPath)
-	return err == nil
+	fi, err := os.Stat(fullPath)
+	if err != nil {
+		return false
+	}
+	return !fi.IsDir()
 }
 
 // IsHeredocFile checks if a path is a virtual heredoc file.

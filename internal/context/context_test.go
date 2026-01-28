@@ -111,6 +111,7 @@ func TestFileExists(t *testing.T) {
 		{"missing.txt", false},
 		{"subdir/nested.txt", true},
 		{"subdir/missing.txt", false},
+		{"subdir", false}, // directories return false
 	}
 
 	for _, tc := range tests {
