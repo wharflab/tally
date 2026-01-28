@@ -125,7 +125,8 @@ func New(opts Options) (Reporter, error) {
 	switch opts.Format {
 	case FormatText, "":
 		textOpts := TextOptions{
-			Color:           opts.Color,
+			Color: opts.Color,
+			// Enable syntax highlighting when color is auto-detected (nil) or explicitly enabled
 			SyntaxHighlight: opts.Color == nil || *opts.Color,
 			ShowSource:      opts.ShowSource,
 		}
