@@ -52,7 +52,8 @@ func TestMarkdownReporterSingleFile(t *testing.T) {
 
 	// Check error comes first (severity sorting)
 	lines := strings.Split(output, "\n")
-	var errorLine, warningLine int
+	errorLine := -1
+	warningLine := -1
 	for i, line := range lines {
 		if strings.Contains(line, "Use absolute WORKDIR") {
 			errorLine = i
@@ -60,6 +61,13 @@ func TestMarkdownReporterSingleFile(t *testing.T) {
 		if strings.Contains(line, "Stage name") {
 			warningLine = i
 		}
+	}
+	if errorLine == -1 || warningLine == -1 {
+		t.Fatalf(
+			"expected both error and warning lines to be present; got errorLine=%d warningLine=%d",
+			errorLine,
+			warningLine,
+		)
 	}
 	if errorLine >= warningLine {
 		t.Error("Expected error to come before warning in output")
