@@ -109,14 +109,14 @@ func (r *SARIFReporter) Report(violations []rules.Violation, _ map[string][]byte
 				WithStartLine(v.Location.Start.Line)
 
 			// Add column if available
-			if v.Location.Start.Column > 0 {
+			if v.Location.Start.Column >= 0 {
 				region.WithStartColumn(v.Location.Start.Column + 1) // SARIF uses 1-based columns
 			}
 
 			// Add end position if it's a range
 			if !v.Location.IsPointLocation() && v.Location.End.Line > 0 {
 				region.WithEndLine(v.Location.End.Line)
-				if v.Location.End.Column > 0 {
+				if v.Location.End.Column >= 0 {
 					region.WithEndColumn(v.Location.End.Column + 1)
 				}
 			}

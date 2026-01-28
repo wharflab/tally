@@ -175,6 +175,76 @@ func TestSARIFReporterEmpty(t *testing.T) {
 	}
 }
 
+func TestSARIFReporterColumnZero(t *testing.T) {
+	// Verify that column 0 (0-based) maps to SARIF column 1 (1-based)
+	violations := []rules.Violation{
+		{
+			Location: rules.Location{
+				File:  "Dockerfile",
+				Start: rules.Position{Line: 1, Column: 0},
+			},
+			RuleCode: "TEST",
+			Message:  "Column zero test",
+			Severity: rules.SeverityWarning,
+		},
+	}
+
+	var buf bytes.Buffer
+	reporter := NewSARIFReporter(&buf, "tally", "1.0.0", "")
+
+	err := reporter.Report(violations, nil)
+	if err != nil {
+		t.Fatalf("Report() error = %v", err)
+	}
+
+	var sarif map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &sarif); err != nil {
+		t.Fatalf("Failed to parse SARIF output: %v", err)
+	}
+
+	runs, ok := sarif["runs"].([]any)
+	if !ok || len(runs) == 0 {
+		t.Fatal("Expected runs array in SARIF output")
+	}
+	run, ok := runs[0].(map[string]any)
+	if !ok {
+		t.Fatal("Expected run to be map")
+	}
+	results, ok := run["results"].([]any)
+	if !ok || len(results) == 0 {
+		t.Fatal("Expected results array")
+	}
+	result, ok := results[0].(map[string]any)
+	if !ok {
+		t.Fatal("Expected result to be map")
+	}
+	locations, ok := result["locations"].([]any)
+	if !ok || len(locations) == 0 {
+		t.Fatal("Expected locations array")
+	}
+	location, ok := locations[0].(map[string]any)
+	if !ok {
+		t.Fatal("Expected location to be map")
+	}
+	physicalLocation, ok := location["physicalLocation"].(map[string]any)
+	if !ok {
+		t.Fatal("Expected physicalLocation to be map")
+	}
+	region, ok := physicalLocation["region"].(map[string]any)
+	if !ok {
+		t.Fatal("Expected region to be map")
+	}
+
+	// Column 0 in 0-based should become column 1 in 1-based SARIF
+	startColumn, ok := region["startColumn"].(float64)
+	if !ok {
+		t.Fatal("Expected startColumn in region")
+	}
+	if startColumn != 1 {
+		t.Errorf("Expected startColumn=1 (0-based column 0 maps to 1-based column 1), got %v", startColumn)
+	}
+}
+
 func TestSARIFReporterFileLevelViolation(t *testing.T) {
 	violations := []rules.Violation{
 		{

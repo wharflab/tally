@@ -49,7 +49,8 @@
                   "uri": "testdata/buildkit-warnings/Dockerfile"
                 },
                 "region": {
-                  "startLine": 2
+                  "startLine": 2,
+                  "startColumn": 1
                 }
               }
             }
@@ -69,7 +70,8 @@
                   "uri": "testdata/buildkit-warnings/Dockerfile"
                 },
                 "region": {
-                  "startLine": 3
+                  "startLine": 3,
+                  "startColumn": 1
                 }
               }
             }
