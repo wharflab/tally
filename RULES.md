@@ -42,13 +42,15 @@ Scans Dockerfile content for actual secret values (not just variable names):
 
 Uses gitleaks' curated database of 222+ secret patterns including AWS keys, GitHub tokens, private keys, and more.
 
-**Complements `buildkit/SecretsUsedInArgOrEnv`**: BuildKit's rule checks variable *names* (e.g., `GITHUB_TOKEN`), while this rule detects actual secret *values*.
+**Complements `buildkit/SecretsUsedInArgOrEnv`**: BuildKit's rule checks variable *names* (e.g., `GITHUB_TOKEN`), while this rule detects actual
+secret *values*.
 
 ### tally/max-lines
 
 Limits Dockerfile size to encourage modular builds. Enabled by default with a 50-line limit (P90 of analyzed public Dockerfiles).
 
 **Options:**
+
 - `max`: Maximum lines allowed (default: 50)
 - `skip-blank-lines`: Exclude blank lines from count (default: true)
 - `skip-comments`: Exclude comment lines from count (default: true)
@@ -105,6 +107,7 @@ See [Docker Build Checks](https://docs.docker.com/reference/build-checks/) for d
 [Hadolint](https://github.com/hadolint/hadolint) rules for Dockerfile and shell best practices.
 
 **Legend:**
+
 - ✅ Implemented by tally
 - 🔄 Covered by BuildKit rule (use that instead)
 - ⏳ Not yet implemented

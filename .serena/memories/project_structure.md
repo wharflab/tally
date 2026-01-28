@@ -1,6 +1,6 @@
 # Project Structure
 
-```
+```text
 .
 ├── main.go                           # Entry point
 ├── cmd/tally/cmd/                    # CLI commands (urfave/cli)
@@ -33,6 +33,7 @@
 ```
 
 ## Key Files
+
 - `main.go` - Entry point
 - `internal/config/config.go` - Config system with cascading discovery
 - `internal/lint/rules.go` - Linting rule implementations
@@ -42,5 +43,6 @@
 - `.goreleaser.yml` - Multi-platform release configuration
 
 ## Test Organization
+
 - Test fixtures in separate directories under `testdata/` to support future context-aware features (dockerignore, config files, etc.)
 - Integration tests use snapshot testing for output validation

@@ -17,5 +17,6 @@
     },
     "editor.defaultFormatter": "golang.go"
   },
-  "makefile.configureOnOpen": false
+  "makefile.configureOnOpen": false,
+  "cSpell.enabled": false
 }

@@ -110,7 +110,8 @@ Some rules require build context awareness. Enable them with the `--context` fla
 tally check --context . Dockerfile
 ```
 
-**copy-ignored-file**: Detects when `COPY` or `ADD` commands reference files that would be excluded by `.dockerignore`. This helps catch mistakes where files are copied but won't actually be included in the build.
+**copy-ignored-file**: Detects when `COPY` or `ADD` commands reference files that would be excluded by `.dockerignore`. This helps catch mistakes
+where files are copied but won't actually be included in the build.
 
 ```dockerfile
 # .dockerignore contains: *.log
@@ -394,6 +395,7 @@ tally check --format markdown Dockerfile
 ```
 
 Features:
+
 - Summary upfront with issue counts
 - Sorted by severity (errors first)
 - Emoji indicators: ❌ error, ⚠️ warning, ℹ️ info, 💅 style

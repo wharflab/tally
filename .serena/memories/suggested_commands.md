@@ -1,6 +1,7 @@
 # Suggested Commands
 
 ## Build & Run
+
 ```bash
 # Build the project
 go build ./...
@@ -13,6 +14,7 @@ go run . check --max-lines 100 Dockerfile
 ```
 
 ## Testing
+
 ```bash
 # Run all tests
 go test ./...
@@ -28,6 +30,7 @@ go test ./internal/integration/...
 ```
 
 ## Coverage Collection
+
 ```bash
 # Build with coverage
 go build -cover -o tally-cover .
@@ -43,6 +46,7 @@ go tool cover -html=coverage.txt -o=coverage.html
 ```
 
 ## Linting & Formatting
+
 ```bash
 # Lint and auto-fix
 make lint-fix
@@ -61,7 +65,9 @@ uv tool run typos
 ```
 
 ## Git Hooks
+
 Pre-commit hooks are managed by Lefthook (`.lefthook.yml`):
+
 - Go linting (golangci-lint)
 - TOML formatting (taplo)
 - Markdown linting (rumdl)
@@ -70,4 +76,5 @@ Pre-commit hooks are managed by Lefthook (`.lefthook.yml`):
 - Commit message validation (commitlint)
 
 ## Darwin-Specific Notes
+
 Standard Unix commands work on Darwin (macOS). The project uses `uv` for Python tool management and `npx` for Node.js tools.

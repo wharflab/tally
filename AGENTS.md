@@ -2,7 +2,8 @@
 
 ## Project Structure & Module Organization
 
-This repository is a Go CLI for linting Dockerfiles and Containerfiles. It checks container build files for best practices, security issues, and common mistakes.
+This repository is a Go CLI for linting Dockerfiles and Containerfiles. It checks container build files for best practices, security issues, and
+common mistakes.
 
 - `main.go`: application entrypoint
 - `cmd/tally/cmd/`: CLI commands (`root.go`, `check.go`, `version.go`)
@@ -27,6 +28,7 @@ This repository is a Go CLI for linting Dockerfiles and Containerfiles. It check
 - `make clean`: removes the built binary and deletes `bin/` + `dist/`
 
 Local usage examples:
+
 - `go run . check --help`
 - `go run . check Dockerfile`
 - `go run . check --max-lines 100 Dockerfile`
@@ -35,11 +37,13 @@ Local usage examples:
 ## Configuration
 
 tally uses cascading config discovery (like Ruff):
+
 - Config files: `.tally.toml` or `tally.toml`
 - Discovery: walks up from target file, uses closest config
 - Priority: CLI flags > env vars (`TALLY_*`) > config file > defaults
 
 Example config:
+
 ```toml
 format = "json"
 [rules.max-lines]

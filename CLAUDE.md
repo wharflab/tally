@@ -2,11 +2,13 @@
 
 ## Project Overview
 
-`tally` is a fast, configurable linter for Dockerfiles and Containerfiles. It checks container build files for best practices, security issues, and common mistakes.
+`tally` is a fast, configurable linter for Dockerfiles and Containerfiles. It checks container build files for best practices, security issues, and
+common mistakes.
 
 ## Design Philosophy
 
-**Minimize code ownership** - This project exists in Go specifically to maximize reuse from the container ecosystem. We heavily reuse existing, well-maintained libraries:
+**Minimize code ownership** - This project exists in Go specifically to maximize reuse from the container ecosystem. We heavily reuse existing,
+well-maintained libraries:
 
 ### Primary Sources (research these FIRST)
 
@@ -26,7 +28,9 @@ Before implementing ANY data structure, type, or functionality, **actively resea
 
 ### The 80% Rule
 
-**If an existing type/pattern covers 80% of our needs, prefer it over creating something new.** Wrap and extend if necessary rather than reinventing. Examples:
+**If an existing type/pattern covers 80% of our needs, prefer it over creating something new.** Wrap and extend if necessary rather than reinventing.
+Examples:
+
 - Use `parser.Range` internally, wrap with `rules.Location` only to add file path
 - Use BuildKit's `LintResults.Warning` structure as reference for our `Violation` schema
 - Consume parser's semantic data (LineStats, Stages) instead of re-parsing
@@ -39,7 +43,8 @@ Before implementing ANY data structure, type, or functionality, **actively resea
 
 Do not re-implement functionality that exists in these libraries.
 
-**Adding dependencies** - Before adding a new dependency, run `go list -m -versions <module>` to check available versions and use the latest stable release.
+**Adding dependencies** - Before adding a new dependency, run `go list -m -versions <module>` to check available versions and use the latest stable
+release.
 
 ## Build & Test Commands
 
@@ -87,7 +92,8 @@ This project uses multiple code quality tools:
 
 ## Coverage Collection
 
-Integration tests are built with coverage instrumentation (`-cover` flag). Coverage data is automatically collected to a temporary directory during test runs.
+Integration tests are built with coverage instrumentation (`-cover` flag). Coverage data is automatically collected to a temporary directory during
+test runs.
 
 ```bash
 # Run integration tests (coverage data is automatically collected)
@@ -113,7 +119,7 @@ go tool cover -html=coverage.txt -o=coverage.html
 
 ## Project Structure
 
-```
+```text
 .
 ├── main.go                           # Entry point
 ├── cmd/tally/cmd/                    # CLI commands (urfave/cli)
@@ -147,16 +153,19 @@ go tool cover -html=coverage.txt -o=coverage.html
 
 ## Testing Strategy
 
-**Integration tests are the preferred way to test and develop new features.** They provide true end-to-end coverage, ensuring the entire pipeline works correctly.
+**Integration tests are the preferred way to test and develop new features.** They provide true end-to-end coverage, ensuring the entire pipeline
+works correctly.
 
 ### Integration Tests (`internal/integration/`)
 
 **How it works:**
+
 1. `TestMain` builds the CLI binary with `-cover` flag for coverage instrumentation
 2. Tests run the CLI binary against test Dockerfiles
 3. Snapshots (`go-snaps`) verify the JSON output
 
 **Adding a new test case:**
+
 1. Create a new directory under `internal/integration/testdata/` with a `Dockerfile`
 2. Add a test case to `TestCheck`
 3. Run `UPDATE_SNAPS=true go test ./internal/integration/...` to generate snapshots
@@ -218,6 +227,7 @@ See the `max-lines` rule implementation as an exemplary pattern.
 ## Package Publishing
 
 Published to three package managers:
+
 - **NPM**: `@contino/tally` (with platform-specific optional dependencies)
 - **PyPI**: `tally-cli`
 - **RubyGems**: `tally-cli`
