@@ -22,15 +22,22 @@ type Reporter interface {
 	Report(violations []rules.Violation, sources map[string][]byte) error
 }
 
-// SortViolations sorts violations by file, then by line number for stable output.
+// SortViolations sorts violations by file, line, column, and rule code for stable output.
+// Uses SliceStable and compares all position fields plus rule code to ensure deterministic order.
 func SortViolations(violations []rules.Violation) []rules.Violation {
 	sorted := make([]rules.Violation, len(violations))
 	copy(sorted, violations)
-	sort.Slice(sorted, func(i, j int) bool {
+	sort.SliceStable(sorted, func(i, j int) bool {
 		if sorted[i].Location.File != sorted[j].Location.File {
 			return sorted[i].Location.File < sorted[j].Location.File
 		}
-		return sorted[i].Location.Start.Line < sorted[j].Location.Start.Line
+		if sorted[i].Location.Start.Line != sorted[j].Location.Start.Line {
+			return sorted[i].Location.Start.Line < sorted[j].Location.Start.Line
+		}
+		if sorted[i].Location.Start.Column != sorted[j].Location.Start.Column {
+			return sorted[i].Location.Start.Column < sorted[j].Location.Start.Column
+		}
+		return sorted[i].RuleCode < sorted[j].RuleCode
 	})
 	return sorted
 }
