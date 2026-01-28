@@ -1,0 +1,16 @@
+# Handle line endings automatically for files detected as text
+* text=auto
+
+# Ensure snapshot files always have LF line endings (for cross-platform testing)
+**/testdata/** text eol=lf
+**/__snapshots__/** text eol=lf
+*.snap.json text eol=lf
+*.snap.txt text eol=lf
+*.snap.md text eol=lf
+
+# Shell scripts always LF
+*.sh text eol=lf
+
+# Windows batch files always CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
