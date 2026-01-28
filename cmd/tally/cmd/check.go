@@ -152,53 +152,55 @@ func checkCommand() *cli.Command {
 					))
 				}
 
-				// Parse inline directives
-				sm := sourcemap.New(parseResult.Source)
-				var validator directive.RuleValidator
-				if cfg.InlineDirectives.ValidateRules {
-					validator = rules.DefaultRegistry().Has
-				}
-				directiveResult := directive.Parse(sm, validator)
+				// Parse and apply inline directives (only when enabled)
+				if cfg.InlineDirectives.Enabled {
+					sm := sourcemap.New(parseResult.Source)
+					var validator directive.RuleValidator
+					if cfg.InlineDirectives.ValidateRules {
+						validator = rules.DefaultRegistry().Has
+					}
+					directiveResult := directive.Parse(sm, validator)
 
-				// Report parse errors as warnings
-				for _, parseErr := range directiveResult.Errors {
-					violations = append(violations, rules.NewViolation(
-						rules.NewLineLocation(file, parseErr.Line+1),
-						"invalid-ignore-directive",
-						parseErr.Message,
-						rules.SeverityWarning,
-					).WithDetail("Directive: "+parseErr.RawText))
-				}
+					// Report parse errors as warnings
+					for _, parseErr := range directiveResult.Errors {
+						violations = append(violations, rules.NewViolation(
+							rules.NewLineLocation(file, parseErr.Line+1),
+							"invalid-ignore-directive",
+							parseErr.Message,
+							rules.SeverityWarning,
+						).WithDetail("Directive: "+parseErr.RawText))
+					}
 
-				// Filter violations based on inline directives
-				if cfg.InlineDirectives.Enabled && len(directiveResult.Directives) > 0 {
-					filterResult := directive.Filter(violations, directiveResult.Directives)
-					violations = filterResult.Violations
+					// Filter violations based on inline directives
+					if len(directiveResult.Directives) > 0 {
+						filterResult := directive.Filter(violations, directiveResult.Directives)
+						violations = filterResult.Violations
 
-					// Report unused directives if configured
-					if cfg.InlineDirectives.WarnUnused {
-						for _, unused := range filterResult.UnusedDirectives {
-							violations = append(violations, rules.NewViolation(
-								rules.NewLineLocation(file, unused.Line+1),
-								"unused-ignore-directive",
-								"ignore directive does not suppress any violations",
-								rules.SeverityWarning,
-							).WithDetail("Directive: "+unused.RawText))
+						// Report unused directives if configured
+						if cfg.InlineDirectives.WarnUnused {
+							for _, unused := range filterResult.UnusedDirectives {
+								violations = append(violations, rules.NewViolation(
+									rules.NewLineLocation(file, unused.Line+1),
+									"unused-ignore-directive",
+									"ignore directive does not suppress any violations",
+									rules.SeverityWarning,
+								).WithDetail("Directive: "+unused.RawText))
+							}
 						}
 					}
-				}
 
-				// Report directives without reason if configured
-				// Only applies to tally and hadolint sources (buildx doesn't support reason=)
-				if cfg.InlineDirectives.RequireReason {
-					for _, d := range directiveResult.Directives {
-						if d.Source != directive.SourceBuildx && d.Reason == "" {
-							violations = append(violations, rules.NewViolation(
-								rules.NewLineLocation(file, d.Line+1),
-								"missing-directive-reason",
-								"ignore directive is missing reason= explanation",
-								rules.SeverityWarning,
-							).WithDetail("Directive: "+d.RawText))
+					// Report directives without reason if configured
+					// Only applies to tally and hadolint sources (buildx doesn't support reason=)
+					if cfg.InlineDirectives.RequireReason {
+						for _, d := range directiveResult.Directives {
+							if d.Source != directive.SourceBuildx && d.Reason == "" {
+								violations = append(violations, rules.NewViolation(
+									rules.NewLineLocation(file, d.Line+1),
+									"missing-directive-reason",
+									"ignore directive is missing reason= explanation",
+									rules.SeverityWarning,
+								).WithDetail("Directive: "+d.RawText))
+							}
 						}
 					}
 				}
