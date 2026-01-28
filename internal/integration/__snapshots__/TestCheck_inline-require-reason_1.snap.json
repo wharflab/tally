@@ -17,7 +17,7 @@
           },
           "rule": "missing-directive-reason",
           "message": "ignore directive is missing reason= explanation",
-          "detail": "Directive: # tally ignore=StageNameCasing",
+          "detail": "Directive: # tally ignore=buildkit/StageNameCasing",
           "severity": "warning"
         },
         {

@@ -18,10 +18,10 @@ type Rule struct{}
 // Metadata returns the rule metadata.
 func (r *Rule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
-		Code:             "copy-ignored-file",
+		Code:             rules.BuildKitRulePrefix + "CopyIgnoredFile",
 		Name:             "COPY/ADD Ignored File",
 		Description:      "Detects COPY/ADD sources that would be ignored by .dockerignore",
-		DocURL:           "https://github.com/tinovyatkin/tally/blob/main/docs/rules/copy-ignored-file.md",
+		DocURL:           "https://docs.docker.com/go/dockerfile/rule/copy-ignored-file/",
 		DefaultSeverity:  rules.SeverityWarning,
 		Category:         "correctness",
 		EnabledByDefault: true,

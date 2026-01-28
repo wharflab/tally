@@ -15,7 +15,7 @@
               "column": 0
             }
           },
-          "rule": "StageNameCasing",
+          "rule": "buildkit/StageNameCasing",
           "message": "Stage name 'Build' should be lowercase",
           "detail": "Stage names should be lowercase",
           "severity": "warning",

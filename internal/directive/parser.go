@@ -11,20 +11,21 @@ import (
 // All patterns are case-insensitive for the directive keywords.
 // Patterns capture an optional reason after `;reason=` (BuildKit-style separator).
 // Rule lists allow optional whitespace around commas (e.g., "DL3006, DL3008").
+// Rule names can include / for namespaced rules (e.g., "buildkit/StageNameCasing").
 var (
 	// # tally [global] ignore=RULE1,RULE2[;reason=explanation]
 	tallyPattern = regexp.MustCompile(
-		`(?i)#\s*tally\s+(global\s+)?ignore\s*=\s*([A-Za-z0-9_,\s-]+?)(?:;reason\s*=\s*(.*))?$`)
+		`(?i)#\s*tally\s+(global\s+)?ignore\s*=\s*([A-Za-z0-9_,\s/.-]+?)(?:;reason\s*=\s*(.*))?$`)
 
 	// # hadolint [global] ignore=RULE1,RULE2[;reason=explanation]
 	// Note: ;reason= is a tally extension, not part of hadolint's native syntax
 	hadolintPattern = regexp.MustCompile(
-		`(?i)#\s*hadolint\s+(global\s+)?ignore\s*=\s*([A-Za-z0-9_,\s-]+?)(?:;reason\s*=\s*(.*))?$`)
+		`(?i)#\s*hadolint\s+(global\s+)?ignore\s*=\s*([A-Za-z0-9_,\s/.-]+?)(?:;reason\s*=\s*(.*))?$`)
 
 	// # check=skip=RULE1,RULE2[;reason=explanation] (buildx - always file-level/global)
 	// Note: ;reason= is a tally extension, BuildKit silently ignores it
 	buildxPattern = regexp.MustCompile(
-		`(?i)#\s*check\s*=\s*skip\s*=\s*([A-Za-z0-9_,\s-]+?)(?:;reason\s*=\s*(.*))?$`)
+		`(?i)#\s*check\s*=\s*skip\s*=\s*([A-Za-z0-9_,\s/.-]+?)(?:;reason\s*=\s*(.*))?$`)
 )
 
 // RuleValidator is a function that checks if a rule code is known.

@@ -36,8 +36,8 @@ func TestMetadata(t *testing.T) {
 	r := New()
 	meta := r.Metadata()
 
-	if meta.Code != "copy-ignored-file" {
-		t.Errorf("expected code %q, got %q", "copy-ignored-file", meta.Code)
+	if meta.Code != "buildkit/CopyIgnoredFile" {
+		t.Errorf("expected code %q, got %q", "buildkit/CopyIgnoredFile", meta.Code)
 	}
 
 	if meta.Category != "correctness" {
@@ -121,8 +121,8 @@ func TestCheck_IgnoredFile(t *testing.T) {
 		t.Fatalf("expected 1 violation, got %d", len(violations))
 	}
 
-	if violations[0].RuleCode != "copy-ignored-file" {
-		t.Errorf("expected code %q, got %q", "copy-ignored-file", violations[0].RuleCode)
+	if violations[0].RuleCode != "buildkit/CopyIgnoredFile" {
+		t.Errorf("expected code %q, got %q", "buildkit/CopyIgnoredFile", violations[0].RuleCode)
 	}
 }
 

@@ -15,11 +15,11 @@
               "column": 0
             }
           },
-          "rule": "copy-ignored-file",
+          "rule": "buildkit/CopyIgnoredFile",
           "message": "source 'ignored.txt' is excluded by .dockerignore and will not be copied",
           "detail": "The file or directory 'ignored.txt' matches a pattern in .dockerignore. This COPY/ADD will fail or copy unexpected files during build.",
           "severity": "warning",
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/copy-ignored-file.md"
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/copy-ignored-file/"
         }
       ]
     }

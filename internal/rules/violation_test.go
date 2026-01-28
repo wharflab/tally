@@ -150,8 +150,8 @@ func TestNewViolationFromBuildKitWarning(t *testing.T) {
 		location,
 	)
 
-	if v.RuleCode != "StageNameCasing" {
-		t.Errorf("RuleCode = %q, want %q", v.RuleCode, "StageNameCasing")
+	if v.RuleCode != "buildkit/StageNameCasing" {
+		t.Errorf("RuleCode = %q, want %q", v.RuleCode, "buildkit/StageNameCasing")
 	}
 	if v.Message != "Stage name 'Builder' should be lowercase" {
 		t.Errorf("Message = %q", v.Message)

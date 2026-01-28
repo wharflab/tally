@@ -15,7 +15,7 @@
               "column": 0
             }
           },
-          "rule": "StageNameCasing",
+          "rule": "buildkit/StageNameCasing",
           "message": "Stage name 'Builder' should be lowercase",
           "detail": "Stage names should be lowercase",
           "severity": "warning",
@@ -33,7 +33,7 @@
               "column": 0
             }
           },
-          "rule": "MaintainerDeprecated",
+          "rule": "buildkit/MaintainerDeprecated",
           "message": "Maintainer instruction is deprecated in favor of using label",
           "detail": "The MAINTAINER instruction is deprecated, use a label instead to define an image author",
           "severity": "warning",

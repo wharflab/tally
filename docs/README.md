@@ -134,6 +134,20 @@ This folder contains comprehensive architectural research and design documentati
 
 ---
 
+### 9. [Hadolint Research](09-hadolint-research.md)
+
+**Covers:** Research and analysis of Hadolint’s implementation, behavior, and compatibility considerations
+
+---
+
+### 10. [BuildKit Phase 2 Rules: Path Forward](10-buildkit-phase2-path-forward.md)
+
+**Covers:** Decision and roadmap for implementing BuildKit “Phase 2” lint rules in tally
+
+**Companion research:** [BuildKit Phase 2 Rules Integration Research](buildkit-phase2-rules-research.md)
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation

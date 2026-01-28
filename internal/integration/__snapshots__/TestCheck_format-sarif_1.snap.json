@@ -9,14 +9,14 @@
           "name": "tally",
           "rules": [
             {
-              "id": "MaintainerDeprecated",
+              "id": "buildkit/MaintainerDeprecated",
               "shortDescription": {
                 "text": "The MAINTAINER instruction is deprecated, use a label instead to define an image author"
               },
               "helpUri": "https://docs.docker.com/go/dockerfile/rule/maintainer-deprecated/"
             },
             {
-              "id": "StageNameCasing",
+              "id": "buildkit/StageNameCasing",
               "shortDescription": {
                 "text": "Stage names should be lowercase"
               },
@@ -36,7 +36,7 @@
       ],
       "results": [
         {
-          "ruleId": "StageNameCasing",
+          "ruleId": "buildkit/StageNameCasing",
           "ruleIndex": 1,
           "level": "warning",
           "message": {
@@ -57,7 +57,7 @@
           ]
         },
         {
-          "ruleId": "MaintainerDeprecated",
+          "ruleId": "buildkit/MaintainerDeprecated",
           "ruleIndex": 0,
           "level": "warning",
           "message": {
