@@ -391,6 +391,7 @@ func TestIsURL(t *testing.T) {
 		{"http://example.com/file", true},
 		{"https://example.com/file", true},
 		{"ftp://example.com/file", true},
+		{"git://github.com/user/repo.git", true},
 		{"file.txt", false},
 		{"./file.txt", false},
 		{"/abs/path", false},

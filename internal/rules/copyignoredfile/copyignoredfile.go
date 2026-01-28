@@ -137,7 +137,8 @@ func (r *Rule) checkCopyAdd(
 func isURL(path string) bool {
 	return strings.HasPrefix(path, "http://") ||
 		strings.HasPrefix(path, "https://") ||
-		strings.HasPrefix(path, "ftp://")
+		strings.HasPrefix(path, "ftp://") ||
+		strings.HasPrefix(path, "git://")
 }
 
 // normalizePath normalizes a source path for comparison.
