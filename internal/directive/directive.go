@@ -10,7 +10,10 @@
 //   - Global: Affects the entire file
 package directive
 
-import "math"
+import (
+	"math"
+	"strings"
+)
 
 // DirectiveType indicates the scope of a directive.
 type DirectiveType int
@@ -119,7 +122,7 @@ func matchesRule(pattern, ruleCode string) bool {
 
 	// Check if pattern matches the suffix (rule name without namespace)
 	// e.g., pattern "max-lines" should match ruleCode "tally/max-lines"
-	if idx := lastIndexByte(ruleCode, '/'); idx != -1 {
+	if idx := strings.LastIndexByte(ruleCode, '/'); idx != -1 {
 		if pattern == ruleCode[idx+1:] {
 			return true
 		}
@@ -127,23 +130,13 @@ func matchesRule(pattern, ruleCode string) bool {
 
 	// Check if ruleCode matches the suffix of pattern
 	// e.g., pattern "tally/max-lines" should match ruleCode "max-lines"
-	if idx := lastIndexByte(pattern, '/'); idx != -1 {
+	if idx := strings.LastIndexByte(pattern, '/'); idx != -1 {
 		if ruleCode == pattern[idx+1:] {
 			return true
 		}
 	}
 
 	return false
-}
-
-// lastIndexByte returns the index of the last instance of c in s, or -1 if c is not present.
-func lastIndexByte(s string, c byte) int {
-	for i := len(s) - 1; i >= 0; i-- {
-		if s[i] == c {
-			return i
-		}
-	}
-	return -1
 }
 
 // SuppressesLine returns true if this directive suppresses violations on the given line.
