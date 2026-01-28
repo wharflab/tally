@@ -91,7 +91,13 @@ func Discover(inputs []string, opts Options) ([]DiscoveredFile, error) {
 
 // discoverInput processes a single input (file, directory, or glob pattern).
 func discoverInput(input string, opts Options, seen map[string]bool) ([]DiscoveredFile, error) {
-	// First, check if it's a literal file or directory
+	// Check if the input contains glob characters. If so, treat it as a glob pattern
+	// without trying os.Stat (which fails on Windows with glob chars like *).
+	if containsGlobChars(input) {
+		return discoverGlob(input, opts, seen)
+	}
+
+	// Try as a literal file or directory
 	info, err := os.Stat(input)
 	if err == nil {
 		if info.IsDir() {
@@ -100,12 +106,23 @@ func discoverInput(input string, opts Options, seen map[string]bool) ([]Discover
 		return discoverFile(input, opts, seen)
 	}
 
-	// Not a literal path, treat as glob pattern
+	// Not a literal path, treat as glob pattern (for cases like non-existent patterns)
 	if !os.IsNotExist(err) {
 		return nil, err
 	}
 
 	return discoverGlob(input, opts, seen)
+}
+
+// containsGlobChars returns true if the path contains glob special characters.
+func containsGlobChars(path string) bool {
+	for _, c := range path {
+		switch c {
+		case '*', '?', '[', ']':
+			return true
+		}
+	}
+	return false
 }
 
 // discoverFile processes a specific file path.

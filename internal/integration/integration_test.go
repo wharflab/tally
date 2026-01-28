@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -23,7 +24,11 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
-	binaryPath = filepath.Join(tmpDir, "tally")
+	binaryName := "tally"
+	if runtime.GOOS == "windows" {
+		binaryName = "tally.exe"
+	}
+	binaryPath = filepath.Join(tmpDir, binaryName)
 
 	// Create coverage directory in project root for persistent coverage data
 	// If GOCOVERDIR is set externally, use that; otherwise use "./coverage"
