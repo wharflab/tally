@@ -12,8 +12,3 @@ func Version() string {
 	}
 	return version
 }
-
-// Commit returns the git commit hash
-func Commit() string {
-	return commit
-}

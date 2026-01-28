@@ -68,6 +68,23 @@ jobs:
         with:
           version: latest
 
+  deadcode:
+    name: Dead Code Detection
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Add deadcode problem matcher
+        run: echo "::add-matcher::.github/matchers/deadcode-matcher.json"
+
+      - name: Run deadcode
+        run: make deadcode
+
   cpd:
     name: Copy/Paste Detection
     runs-on: ubuntu-latest

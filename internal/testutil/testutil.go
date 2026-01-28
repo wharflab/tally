@@ -149,18 +149,3 @@ func AssertViolationCount(tb testing.TB, violations []rules.Violation, want int)
 		}
 	}
 }
-
-// AssertViolationAt fails if there's no violation at the specified line with the given code.
-func AssertViolationAt(tb testing.TB, violations []rules.Violation, line int, code string) {
-	tb.Helper()
-	for _, v := range violations {
-		if v.Line() == line && v.RuleCode == code {
-			return // Found
-		}
-	}
-	tb.Errorf("expected violation %q at line %d, not found", code, line)
-	tb.Logf("violations:")
-	for _, v := range violations {
-		tb.Logf("  - %s at line %d: %s", v.RuleCode, v.Line(), v.Message)
-	}
-}

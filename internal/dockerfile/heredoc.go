@@ -137,8 +137,3 @@ func (h HeredocInfo) IsInlineSource() bool {
 func (h HeredocInfo) IsScript() bool {
 	return h.Kind == HeredocKindScript
 }
-
-// IsUnknown returns true if the heredoc is from an unrecognized instruction.
-func (h HeredocInfo) IsUnknown() bool {
-	return h.Kind == HeredocKindUnknown
-}
