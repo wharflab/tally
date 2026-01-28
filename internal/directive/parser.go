@@ -9,22 +9,22 @@ import (
 
 // Regex patterns for directive parsing.
 // All patterns are case-insensitive for the directive keywords.
-// Patterns capture an optional reason after `reason=` (captures until end of line).
+// Patterns capture an optional reason after `;reason=` (BuildKit-style separator).
 // Rule lists allow optional whitespace around commas (e.g., "DL3006, DL3008").
 var (
-	// # tally [global] ignore=RULE1,RULE2 [reason=explanation]
+	// # tally [global] ignore=RULE1,RULE2[;reason=explanation]
 	tallyPattern = regexp.MustCompile(
-		`(?i)#\s*tally\s+(global\s+)?ignore\s*=\s*([A-Za-z0-9_,\s-]+)(?:\s+reason\s*=\s*(.*))?$`)
+		`(?i)#\s*tally\s+(global\s+)?ignore\s*=\s*([A-Za-z0-9_,\s-]+?)(?:;reason\s*=\s*(.*))?$`)
 
-	// # hadolint [global] ignore=RULE1,RULE2 [reason=explanation]
-	// Note: reason= is a tally extension, not part of hadolint's native syntax
+	// # hadolint [global] ignore=RULE1,RULE2[;reason=explanation]
+	// Note: ;reason= is a tally extension, not part of hadolint's native syntax
 	hadolintPattern = regexp.MustCompile(
-		`(?i)#\s*hadolint\s+(global\s+)?ignore\s*=\s*([A-Za-z0-9_,\s-]+)(?:\s+reason\s*=\s*(.*))?$`)
+		`(?i)#\s*hadolint\s+(global\s+)?ignore\s*=\s*([A-Za-z0-9_,\s-]+?)(?:;reason\s*=\s*(.*))?$`)
 
-	// # check=skip=RULE1,RULE2 (buildx - always file-level/global)
-	// Note: buildx does not support reason=, so we don't capture it
+	// # check=skip=RULE1,RULE2[;reason=explanation] (buildx - always file-level/global)
+	// Note: ;reason= is a tally extension, BuildKit silently ignores it
 	buildxPattern = regexp.MustCompile(
-		`(?i)#\s*check\s*=\s*skip\s*=\s*([A-Za-z0-9_,\s-]+)`)
+		`(?i)#\s*check\s*=\s*skip\s*=\s*([A-Za-z0-9_,\s-]+?)(?:;reason\s*=\s*(.*))?$`)
 )
 
 // RuleValidator is a function that checks if a rule code is known.
@@ -159,7 +159,7 @@ func parseHadolint(comment sourcemap.Comment, sm *sourcemap.SourceMap) (*Directi
 
 // parseBuildx attempts to parse a buildx-format directive.
 // buildx's check=skip is always file-level (global).
-// Note: buildx does not support reason=, so directives from this format will have empty Reason.
+// Note: ;reason= is a tally extension; BuildKit silently ignores unknown options.
 func parseBuildx(comment sourcemap.Comment) (*Directive, *ParseError) {
 	matches := buildxPattern.FindStringSubmatch(comment.Text)
 	if matches == nil {
@@ -167,6 +167,12 @@ func parseBuildx(comment sourcemap.Comment) (*Directive, *ParseError) {
 	}
 
 	rulesStr := matches[1]
+
+	// Extract optional reason from capture group 2
+	var reason string
+	if len(matches) > 2 {
+		reason = strings.TrimSpace(matches[2])
+	}
 
 	rules, err := parseRuleList(rulesStr)
 	if err != nil {
@@ -184,7 +190,7 @@ func parseBuildx(comment sourcemap.Comment) (*Directive, *ParseError) {
 		AppliesTo: GlobalRange(),
 		RawText:   comment.Text,
 		Source:    SourceBuildx,
-		// Reason is empty - buildx doesn't support reason=
+		Reason:    reason,
 	}, nil
 }
 

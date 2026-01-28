@@ -133,6 +133,11 @@ func TestCheck(t *testing.T) {
 			[]string{"--format", "json", "--no-inline-directives"},
 			nil, 1,
 		},
+		{
+			"inline-require-reason", "inline-require-reason",
+			[]string{"--format", "json", "--require-reason"},
+			nil, 1, // Warns about directive without reason
+		},
 	}
 
 	for _, tc := range testCases {

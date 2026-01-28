@@ -78,6 +78,10 @@ type Directive struct {
 
 	// Source indicates which format the directive used.
 	Source DirectiveSource
+
+	// Reason is an optional explanation for why the rule is being suppressed.
+	// Extracted from `reason=...` in the directive comment.
+	Reason string
 }
 
 // DirectiveSource identifies which syntax format was used.

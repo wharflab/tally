@@ -90,6 +90,29 @@ Suppress multiple rules with comma-separated values:
 FROM Ubuntu AS Build
 ```
 
+### Adding Reasons
+
+Document why a rule is being ignored using `;reason=` (BuildKit-style separator):
+
+```dockerfile
+# tally ignore=DL3006;reason=Using older base image for compatibility
+FROM ubuntu:16.04
+
+# tally global ignore=max-lines;reason=Generated file, size is expected
+FROM alpine
+
+# check=skip=StageNameCasing;reason=Legacy naming convention
+FROM alpine AS Build
+```
+
+Use `--require-reason` to enforce that all ignore directives include an explanation:
+
+```bash
+tally check --require-reason Dockerfile
+```
+
+Note: The `;reason=` syntax is a tally extension that works with all directive formats. BuildKit silently ignores the `reason` option.
+
 ### Migration Compatibility
 
 tally supports directive formats from other linters for easy migration:
@@ -120,6 +143,7 @@ FROM Ubuntu AS Build
 |------|-------------|
 | `--no-inline-directives` | Disable processing of inline ignore directives |
 | `--warn-unused-directives` | Warn about directives that don't suppress any violations |
+| `--require-reason` | Warn about ignore directives without `reason=` explanation |
 
 ### Configuration
 
@@ -130,6 +154,7 @@ Inline directive behavior can be configured in `.tally.toml`:
 enabled = true        # Process inline directives (default: true)
 warn-unused = false   # Warn about unused directives (default: false)
 validate-rules = false # Warn about unknown rule codes (default: false)
+require-reason = false # Require reason= on all ignore directives (default: false)
 ```
 
 ## Configuration
@@ -179,6 +204,7 @@ Configuration sources are applied in this order (highest priority first):
 | `TALLY_RULES_MAX_LINES_SKIP_COMMENTS` | Exclude comments (`true`/`false`) |
 | `TALLY_NO_INLINE_DIRECTIVES` | Disable inline directive processing (`true`/`false`) |
 | `TALLY_INLINE_DIRECTIVES_WARN_UNUSED` | Warn about unused directives (`true`/`false`) |
+| `TALLY_INLINE_DIRECTIVES_REQUIRE_REASON` | Require reason= on ignore directives (`true`/`false`) |
 
 ### CLI Flags
 

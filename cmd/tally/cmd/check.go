@@ -68,6 +68,11 @@ func checkCommand() *cli.Command {
 				Usage:   "Warn about unused ignore directives",
 				Sources: cli.EnvVars("TALLY_INLINE_DIRECTIVES_WARN_UNUSED"),
 			},
+			&cli.BoolFlag{
+				Name:    "require-reason",
+				Usage:   "Warn about ignore directives without reason= explanation",
+				Sources: cli.EnvVars("TALLY_INLINE_DIRECTIVES_REQUIRE_REASON"),
+			},
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			files := cmd.Args().Slice()
@@ -183,6 +188,21 @@ func checkCommand() *cli.Command {
 					}
 				}
 
+				// Report directives without reason if configured
+				// Only applies to tally and hadolint sources (buildx doesn't support reason=)
+				if cfg.InlineDirectives.RequireReason {
+					for _, d := range directiveResult.Directives {
+						if d.Source != directive.SourceBuildx && d.Reason == "" {
+							violations = append(violations, rules.NewViolation(
+								rules.NewLineLocation(file, d.Line+1),
+								"missing-directive-reason",
+								"ignore directive is missing reason= explanation",
+								rules.SeverityWarning,
+							).WithDetail("Directive: "+d.RawText))
+						}
+					}
+				}
+
 				if len(violations) > 0 {
 					hasViolations = true
 				}
@@ -268,6 +288,10 @@ func loadConfigForFile(cmd *cli.Command, targetPath string) (*config.Config, err
 
 	if cmd.IsSet("warn-unused-directives") {
 		cfg.InlineDirectives.WarnUnused = cmd.Bool("warn-unused-directives")
+	}
+
+	if cmd.IsSet("require-reason") {
+		cfg.InlineDirectives.RequireReason = cmd.Bool("require-reason")
 	}
 
 	return cfg, nil

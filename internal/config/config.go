@@ -60,6 +60,7 @@ type RulesConfig struct {
 //	enabled = true
 //	warn-unused = false
 //	validate-rules = true
+//	require-reason = false
 type InlineDirectivesConfig struct {
 	// Enabled controls whether inline directives are processed.
 	// Default: true
@@ -72,6 +73,11 @@ type InlineDirectivesConfig struct {
 	// ValidateRules reports warnings for unknown rule codes in directives.
 	// Default: false (allows BuildKit/hadolint rule codes for migration compatibility)
 	ValidateRules bool `koanf:"validate-rules"`
+
+	// RequireReason reports warnings for directives without a reason= explanation.
+	// Only applies to tally and hadolint directives (buildx doesn't support reason=).
+	// Default: false
+	RequireReason bool `koanf:"require-reason"`
 }
 
 // MaxLinesRule configures the max-lines rule.
@@ -122,6 +128,7 @@ func Default() *Config {
 			Enabled:       true,  // Process inline directives by default
 			WarnUnused:    false, // Don't warn about unused directives by default
 			ValidateRules: false, // Don't validate rule codes (allows BuildKit/hadolint rules)
+			RequireReason: false, // Don't require reason= by default
 		},
 	}
 }
@@ -180,6 +187,7 @@ var knownHyphenatedKeys = map[string]string{
 	"inline.directives": "inline-directives",
 	"warn.unused":       "warn-unused",
 	"validate.rules":    "validate-rules",
+	"require.reason":    "require-reason",
 }
 
 // envKeyTransform converts environment variable names to config keys.

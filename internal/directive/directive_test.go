@@ -580,7 +580,7 @@ func TestLineRange_Contains(t *testing.T) {
 }
 
 func TestParseTallyWithReason(t *testing.T) {
-	content := `# tally ignore=DL3006 reason=Legacy base image required
+	content := `# tally ignore=DL3006;reason=Legacy base image required
 FROM ubuntu`
 	sm := sourcemap.New([]byte(content))
 	result := Parse(sm, nil)
@@ -595,7 +595,7 @@ FROM ubuntu`
 }
 
 func TestParseTallyGlobalWithReason(t *testing.T) {
-	content := `# tally global ignore=max-lines reason=Generated file, size is expected
+	content := `# tally global ignore=max-lines;reason=Generated file, size is expected
 FROM alpine`
 	sm := sourcemap.New([]byte(content))
 	result := Parse(sm, nil)
@@ -613,7 +613,7 @@ FROM alpine`
 }
 
 func TestParseHadolintWithReason(t *testing.T) {
-	content := `# hadolint ignore=DL3006 reason=Using older ubuntu for compatibility
+	content := `# hadolint ignore=DL3006;reason=Using older ubuntu for compatibility
 FROM ubuntu`
 	sm := sourcemap.New([]byte(content))
 	result := Parse(sm, nil)
@@ -630,9 +630,9 @@ FROM ubuntu`
 	}
 }
 
-func TestParseBuildxNoReason(t *testing.T) {
-	// buildx doesn't support reason=, so it should always have empty reason
-	content := `# check=skip=DL3006
+func TestParseBuildxWithReason(t *testing.T) {
+	// ;reason= is a tally extension for buildx format
+	content := `# check=skip=DL3006;reason=BuildKit silently ignores this
 FROM ubuntu`
 	sm := sourcemap.New([]byte(content))
 	result := Parse(sm, nil)
@@ -644,8 +644,23 @@ FROM ubuntu`
 	if d.Source != SourceBuildx {
 		t.Errorf("expected SourceBuildx, got %v", d.Source)
 	}
+	if d.Reason != "BuildKit silently ignores this" {
+		t.Errorf("expected reason 'BuildKit silently ignores this', got %q", d.Reason)
+	}
+}
+
+func TestParseBuildxWithoutReason(t *testing.T) {
+	content := `# check=skip=DL3006
+FROM ubuntu`
+	sm := sourcemap.New([]byte(content))
+	result := Parse(sm, nil)
+
+	if len(result.Directives) != 1 {
+		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
+	}
+	d := result.Directives[0]
 	if d.Reason != "" {
-		t.Errorf("buildx should have empty reason, got %q", d.Reason)
+		t.Errorf("expected empty reason, got %q", d.Reason)
 	}
 }
 
@@ -665,7 +680,7 @@ FROM ubuntu`
 }
 
 func TestParseReasonCaseInsensitive(t *testing.T) {
-	content := `# tally ignore=DL3006 REASON=Some reason here
+	content := `# tally ignore=DL3006;REASON=Some reason here
 FROM ubuntu`
 	sm := sourcemap.New([]byte(content))
 	result := Parse(sm, nil)
@@ -680,7 +695,7 @@ FROM ubuntu`
 }
 
 func TestParseReasonWithSpecialChars(t *testing.T) {
-	content := `# tally ignore=DL3006 reason=This is a reason with: colons, commas, and (parentheses)!
+	content := `# tally ignore=DL3006;reason=This is a reason with: colons, commas, and (parentheses)!
 FROM ubuntu`
 	sm := sourcemap.New([]byte(content))
 	result := Parse(sm, nil)
