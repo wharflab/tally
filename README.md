@@ -310,7 +310,7 @@ tally check --format github-actions Dockerfile
 
 ### Markdown
 
-Concise markdown tables optimized for AI agents and token efficiency:
+Concise Markdown tables optimized for AI agents and token efficiency:
 
 ```bash
 tally check --format markdown Dockerfile
