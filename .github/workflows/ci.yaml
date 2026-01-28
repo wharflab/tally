@@ -53,6 +53,23 @@ jobs:
           files: junit.xml,junit-integration.xml
           fail_ci_if_error: true
 
+  test-windows:
+    name: Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: go build ./...
+
+      - name: Run tests
+        run: go test ./... -v -race
+
   lint:
     runs-on: ubuntu-latest
     steps:
