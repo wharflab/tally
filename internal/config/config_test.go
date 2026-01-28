@@ -9,8 +9,8 @@ import (
 func TestDefault(t *testing.T) {
 	cfg := Default()
 
-	if cfg.Format != "text" {
-		t.Errorf("Default format = %q, want %q", cfg.Format, "text")
+	if cfg.Output.Format != "text" {
+		t.Errorf("Default format = %q, want %q", cfg.Output.Format, "text")
 	}
 
 	// Default: 50 lines (P90 of 500 analyzed Dockerfiles)
@@ -153,8 +153,8 @@ func TestLoad(t *testing.T) {
 			t.Fatalf("Load() error = %v", err)
 		}
 
-		if cfg.Format != "text" {
-			t.Errorf("Format = %q, want %q", cfg.Format, "text")
+		if cfg.Output.Format != "text" {
+			t.Errorf("Format = %q, want %q", cfg.Output.Format, "text")
 		}
 
 		if cfg.ConfigFile != "" {
@@ -165,6 +165,7 @@ func TestLoad(t *testing.T) {
 	t.Run("loads config file", func(t *testing.T) {
 		configPath := filepath.Join(tmpDir, ".tally.toml")
 		configContent := `
+[output]
 format = "json"
 
 [rules.max-lines]
@@ -182,8 +183,8 @@ skip-comments = true
 			t.Fatalf("Load() error = %v", err)
 		}
 
-		if cfg.Format != "json" {
-			t.Errorf("Format = %q, want %q", cfg.Format, "json")
+		if cfg.Output.Format != "json" {
+			t.Errorf("Format = %q, want %q", cfg.Output.Format, "json")
 		}
 
 		if cfg.Rules.MaxLines.Max != 500 {
@@ -206,6 +207,7 @@ skip-comments = true
 	t.Run("environment variables override config", func(t *testing.T) {
 		configPath := filepath.Join(tmpDir, ".tally.toml")
 		configContent := `
+[output]
 format = "json"
 
 [rules.max-lines]
@@ -217,7 +219,7 @@ max = 500
 		defer os.Remove(configPath)
 
 		// Set environment variables
-		t.Setenv("TALLY_FORMAT", "text")
+		t.Setenv("TALLY_OUTPUT_FORMAT", "text")
 		t.Setenv("TALLY_RULES_MAX_LINES_MAX", "100")
 
 		cfg, err := Load(dockerfilePath)
@@ -225,8 +227,8 @@ max = 500
 			t.Fatalf("Load() error = %v", err)
 		}
 
-		if cfg.Format != "text" {
-			t.Errorf("Format = %q, want %q (env should override)", cfg.Format, "text")
+		if cfg.Output.Format != "text" {
+			t.Errorf("Format = %q, want %q (env should override)", cfg.Output.Format, "text")
 		}
 
 		if cfg.Rules.MaxLines.Max != 100 {
@@ -240,7 +242,7 @@ func TestEnvKeyTransform(t *testing.T) {
 		input string
 		want  string
 	}{
-		{"TALLY_FORMAT", "format"},
+		{"TALLY_OUTPUT_FORMAT", "output.format"},
 		{"TALLY_RULES_MAX_LINES_MAX", "rules.max-lines.max"},
 		{"TALLY_RULES_MAX_LINES_SKIP_BLANK_LINES", "rules.max-lines.skip-blank-lines"},
 		{"TALLY_RULES_MAX_LINES_SKIP_COMMENTS", "rules.max-lines.skip-comments"},

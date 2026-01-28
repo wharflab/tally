@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 
 	"github.com/alecthomas/chroma/v2"
@@ -157,15 +156,7 @@ func NewTextReporter(opts TextOptions) *TextReporter {
 
 // Print writes violations to the writer.
 func (r *TextReporter) Print(w io.Writer, violations []rules.Violation, sources map[string][]byte) error {
-	// Sort violations by file, then by line
-	sorted := make([]rules.Violation, len(violations))
-	copy(sorted, violations)
-	sort.Slice(sorted, func(i, j int) bool {
-		if sorted[i].Location.File != sorted[j].Location.File {
-			return sorted[i].Location.File < sorted[j].Location.File
-		}
-		return sorted[i].Location.Start.Line < sorted[j].Location.Start.Line
-	})
+	sorted := SortViolations(violations)
 
 	for _, v := range sorted {
 		if err := r.printViolation(w, v, sources[v.Location.File]); err != nil {

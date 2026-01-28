@@ -1,0 +1,189 @@
+package reporter
+
+import (
+	"fmt"
+	"io"
+	"sort"
+	"strconv"
+	"strings"
+
+	"github.com/tinovyatkin/tally/internal/rules"
+)
+
+// MarkdownReporter formats violations as concise markdown tables.
+// Designed for AI agents working on Dockerfiles - token-efficient and actionable.
+type MarkdownReporter struct {
+	writer io.Writer
+}
+
+// NewMarkdownReporter creates a new Markdown reporter.
+func NewMarkdownReporter(w io.Writer) *MarkdownReporter {
+	return &MarkdownReporter{writer: w}
+}
+
+// Report implements Reporter.
+func (r *MarkdownReporter) Report(violations []rules.Violation, _ map[string][]byte) error {
+	if len(violations) == 0 {
+		_, err := fmt.Fprintln(r.writer, "**No issues found**")
+		return err
+	}
+
+	sorted := SortViolationsBySeverity(violations)
+
+	// Count files and issues
+	fileSet := make(map[string]struct{})
+	for _, v := range sorted {
+		fileSet[v.Location.File] = struct{}{}
+	}
+	fileCount := len(fileSet)
+
+	// Write summary
+	if fileCount == 1 {
+		// Single file - get the filename
+		var filename string
+		for f := range fileSet {
+			filename = f
+		}
+		if _, err := fmt.Fprintf(r.writer, "**%d %s** in `%s`\n\n",
+			len(sorted), pluralize(len(sorted), "issue", "issues"), filename); err != nil {
+			return err
+		}
+
+		// Single file table (no File column)
+		if _, err := fmt.Fprintln(r.writer, "| Line | Issue |"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(r.writer, "|------|-------|"); err != nil {
+			return err
+		}
+
+		for _, v := range sorted {
+			line := v.Location.Start.Line
+			if v.Location.IsFileLevel() {
+				line = 0
+			}
+			lineStr := "-"
+			if line > 0 {
+				lineStr = strconv.Itoa(line)
+			}
+			if _, err := fmt.Fprintf(r.writer, "| %s | %s %s |\n",
+				lineStr, severityEmoji(v.Severity), escapeMarkdown(v.Message)); err != nil {
+				return err
+			}
+		}
+	} else {
+		// Multiple files
+		if _, err := fmt.Fprintf(r.writer, "**%d %s** across %d files\n\n",
+			len(sorted), pluralize(len(sorted), "issue", "issues"), fileCount); err != nil {
+			return err
+		}
+
+		// Multi-file table
+		if _, err := fmt.Fprintln(r.writer, "| File | Line | Issue |"); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintln(r.writer, "|------|------|-------|"); err != nil {
+			return err
+		}
+
+		for _, v := range sorted {
+			line := v.Location.Start.Line
+			if v.Location.IsFileLevel() {
+				line = 0
+			}
+			lineStr := "-"
+			if line > 0 {
+				lineStr = strconv.Itoa(line)
+			}
+			if _, err := fmt.Fprintf(r.writer, "| %s | %s | %s %s |\n",
+				v.Location.File, lineStr, severityEmoji(v.Severity), escapeMarkdown(v.Message)); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// SortViolationsBySeverity sorts violations by severity (errors first), then by file and line.
+// Uses stable sort to preserve original order for equal-priority items.
+func SortViolationsBySeverity(violations []rules.Violation) []rules.Violation {
+	sorted := make([]rules.Violation, len(violations))
+	copy(sorted, violations)
+
+	sort.SliceStable(sorted, func(i, j int) bool {
+		// shouldSwap returns true if i should come AFTER j,
+		// so we invert arguments to get "less than" semantics
+		return shouldSwap(sorted[j], sorted[i])
+	})
+
+	return sorted
+}
+
+// shouldSwap returns true if a should come after b in the sorted output.
+func shouldSwap(a, b rules.Violation) bool {
+	// Sort by severity first (error < warning < info < style)
+	aPriority := severityPriority(a.Severity)
+	bPriority := severityPriority(b.Severity)
+	if aPriority != bPriority {
+		return aPriority > bPriority
+	}
+
+	// Then by file
+	if a.Location.File != b.Location.File {
+		return a.Location.File > b.Location.File
+	}
+
+	// Then by line
+	return a.Location.Start.Line > b.Location.Start.Line
+}
+
+// severityPriority returns a numeric priority for sorting (lower = more severe).
+func severityPriority(s rules.Severity) int {
+	switch s {
+	case rules.SeverityError:
+		return 0
+	case rules.SeverityWarning:
+		return 1
+	case rules.SeverityInfo:
+		return 2
+	case rules.SeverityStyle:
+		return 3
+	default:
+		return 4
+	}
+}
+
+// severityEmoji returns an emoji indicator for the severity level.
+func severityEmoji(s rules.Severity) string {
+	switch s {
+	case rules.SeverityError:
+		return "❌"
+	case rules.SeverityWarning:
+		return "⚠️"
+	case rules.SeverityInfo:
+		return "ℹ️"
+	case rules.SeverityStyle:
+		return "💅"
+	default:
+		return "⚠️"
+	}
+}
+
+// escapeMarkdown escapes special markdown characters in table cells.
+func escapeMarkdown(s string) string {
+	// Escape pipe characters which break table formatting
+	s = strings.ReplaceAll(s, "|", "\\|")
+	// Replace newlines with spaces
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
+}
+
+// pluralize returns singular or plural form based on count.
+func pluralize(count int, singular, plural string) string {
+	if count == 1 {
+		return singular
+	}
+	return plural
+}

@@ -1,25 +1,35 @@
-[
-  {
-    "file": "testdata/unreachable-stage/Dockerfile",
-    "violations": [
-      {
-        "location": {
-          "file": "testdata/unreachable-stage/Dockerfile",
-          "start": {
-            "line": 4,
-            "column": 0
+{
+  "files": [
+    {
+      "file": "testdata/unreachable-stage/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/unreachable-stage/Dockerfile",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 0
+            }
           },
-          "end": {
-            "line": 4,
-            "column": 0
-          }
-        },
-        "rule": "no-unreachable-stages",
-        "message": "stage \"unused\" (index 1) is not reachable from the final stage and does not contribute to the final image",
-        "detail": "Consider removing this stage or using COPY --from to include its artifacts in the final image",
-        "severity": "warning",
-        "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/no-unreachable-stages.md"
-      }
-    ]
+          "rule": "no-unreachable-stages",
+          "message": "stage \"unused\" (index 1) is not reachable from the final stage and does not contribute to the final image",
+          "detail": "Consider removing this stage or using COPY --from to include its artifacts in the final image",
+          "severity": "warning",
+          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/no-unreachable-stages.md"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 0,
+    "warnings": 1,
+    "info": 0,
+    "style": 0,
+    "files": 1
   }
-]
+}

@@ -1,25 +1,35 @@
-[
-  {
-    "file": "testdata/inline-directives-disabled/Dockerfile",
-    "violations": [
-      {
-        "location": {
-          "file": "testdata/inline-directives-disabled/Dockerfile",
-          "start": {
-            "line": 2,
-            "column": 0
+{
+  "files": [
+    {
+      "file": "testdata/inline-directives-disabled/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/inline-directives-disabled/Dockerfile",
+            "start": {
+              "line": 2,
+              "column": 0
+            },
+            "end": {
+              "line": 2,
+              "column": 0
+            }
           },
-          "end": {
-            "line": 2,
-            "column": 0
-          }
-        },
-        "rule": "StageNameCasing",
-        "message": "Stage name 'Build' should be lowercase",
-        "detail": "Stage names should be lowercase",
-        "severity": "warning",
-        "docUrl": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/"
-      }
-    ]
+          "rule": "StageNameCasing",
+          "message": "Stage name 'Build' should be lowercase",
+          "detail": "Stage names should be lowercase",
+          "severity": "warning",
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 0,
+    "warnings": 1,
+    "info": 0,
+    "style": 0,
+    "files": 1
   }
-]
+}

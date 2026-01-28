@@ -265,47 +265,57 @@ These are explicitly front-loaded to avoid cross-blocking later.
 
 ---
 
-## Priority 5: Reporter Infrastructure (Multi-Output, CI Integrations, Exit Codes)
+## Priority 5: Reporter Infrastructure (Multi-Output, CI Integrations, Exit Codes) ✅
 
 **Goal:** Make results useful everywhere: terminal, CI annotations, and machine output.
 
-**Status:** Partially implemented (text reporter)
+**Status:** Completed
 
 **Actions:**
 
-1. Implement reporters against the stable `Violation` schema:
-   - ✅ text (BuildKit-style with source snippets) - `internal/reporter/buildkit.go`
-   - json
-   - github-actions annotations
-   - sarif (go-sarif)
-   - ensure reporters preserve and emit `SuggestedFix` data when present (at least JSON + SARIF)
+1. ✅ Implement reporters against the stable `Violation` schema:
+   - ✅ text (BuildKit-style with source snippets) - `internal/reporter/text.go`
+   - ✅ json (with summary statistics) - `internal/reporter/json.go`
+   - ✅ github-actions annotations - `internal/reporter/github_actions.go`
+   - ✅ sarif (go-sarif v2.3.3) - `internal/reporter/sarif.go`
+   - ✅ `SuggestedFix` preserved in JSON + SARIF output
 
    **Note:** Text reporter adapted from BuildKit's `errdefs.Source.Print()` and `lint.Warning.PrintTo()`
    without importing heavy dependencies (containerd, grpc). Produces output consistent with
    `docker buildx build --check`.
 
-2. Implement **multi-reporter output** (console + file) from the start:
-   - matches research (`[[output]]` pattern) and avoids later config churn ([05](05-reporters-and-output.md))
+2. ✅ Implement **multi-reporter output** (console + file):
+   - `reporter.GetWriter()` supports stdout, stderr, or file path
+   - `--output/-o` CLI flag for destination selection
 
-3. Add CLI flags for output ergonomics:
-   - `--format` (or `--output` blocks later)
-   - `--output=stdout|stderr|path`
-   - `--no-color`
+3. ✅ Add CLI flags for output ergonomics:
+   - `--format/-f` (text, json, sarif, github-actions)
+   - `--output/-o` (stdout, stderr, or file path)
+   - `--no-color` (respects `NO_COLOR` env var)
    - `--show-source/--hide-source`
 
-4. Define + test exit codes:
+4. ✅ Define + test exit codes:
    - `0` clean (or below threshold)
    - `1` violations at/above threshold
    - `2` parse/config error
 
-5. Add `--fail-level` (error|warning|info|style|none) (aka “error mode”). ([02](02-buildx-bake-check-analysis.md), [09](09-hadolint-research.md))
+5. ✅ Add `--fail-level` (error|warning|info|style|none) (aka "error mode"). ([02](02-buildx-bake-check-analysis.md), [09](09-hadolint-research.md))
+
+**Implementation Details:**
+
+- `internal/reporter/reporter.go` - `Reporter` interface, factory pattern, format parsing
+- `internal/reporter/json.go` - JSON with `files[]` array and `summary` object
+- `internal/reporter/sarif.go` - SARIF 2.1.0 using `github.com/owenrumney/go-sarif/v2`
+- `internal/reporter/github_actions.go` - `::warning`/`::error` workflow commands
+- `internal/config/config.go` - New `OutputConfig` struct with format, path, show-source, fail-level
+- `cmd/tally/cmd/check.go` - New flags and exit code logic
 
 **Success Criteria:**
 
-- [ ] At least text + JSON are stable and snapshot-tested
-- [ ] GitHub Actions + SARIF available for CI
-- [ ] Multi-output works (stdout + file)
-- [ ] Exit codes match documented behavior
+- [x] At least text + JSON are stable and snapshot-tested
+- [x] GitHub Actions + SARIF available for CI
+- [x] Multi-output works (stdout + file)
+- [x] Exit codes match documented behavior
 
 ---
 

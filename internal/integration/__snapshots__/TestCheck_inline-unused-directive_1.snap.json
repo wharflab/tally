@@ -1,24 +1,34 @@
-[
-  {
-    "file": "testdata/inline-unused-directive/Dockerfile",
-    "violations": [
-      {
-        "location": {
-          "file": "testdata/inline-unused-directive/Dockerfile",
-          "start": {
-            "line": 1,
-            "column": 0
+{
+  "files": [
+    {
+      "file": "testdata/inline-unused-directive/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/inline-unused-directive/Dockerfile",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": -1,
+              "column": -1
+            }
           },
-          "end": {
-            "line": -1,
-            "column": -1
-          }
-        },
-        "rule": "unused-ignore-directive",
-        "message": "ignore directive does not suppress any violations",
-        "detail": "Directive: # tally ignore=DL3006",
-        "severity": "warning"
-      }
-    ]
+          "rule": "unused-ignore-directive",
+          "message": "ignore directive does not suppress any violations",
+          "detail": "Directive: # tally ignore=DL3006",
+          "severity": "warning"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 0,
+    "warnings": 1,
+    "info": 0,
+    "style": 0,
+    "files": 1
   }
-]
+}

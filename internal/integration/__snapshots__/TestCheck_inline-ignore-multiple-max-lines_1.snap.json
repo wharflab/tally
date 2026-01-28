@@ -1,6 +1,11 @@
-[
-  {
-    "file": "testdata/inline-ignore-multiple/Dockerfile",
-    "violations": []
+{
+  "files": [],
+  "summary": {
+    "total": 0,
+    "errors": 0,
+    "warnings": 0,
+    "info": 0,
+    "style": 0,
+    "files": 0
   }
-]
+}
