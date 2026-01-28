@@ -109,3 +109,49 @@ func Parse(r io.Reader) (*ParseResult, error) {
 		Warnings: warnings,
 	}, nil
 }
+
+// ExtractHeredocFiles extracts virtual file paths from heredoc COPY/ADD commands.
+// These are inline files created by heredoc syntax (e.g., COPY <<EOF /app/file.txt)
+// that should not be checked against .dockerignore since they don't come from
+// the build context.
+func ExtractHeredocFiles(stages []instructions.Stage) map[string]bool {
+	heredocFiles := make(map[string]bool)
+
+	for _, stage := range stages {
+		for _, cmd := range stage.Commands {
+			collectHeredocPaths(cmd, heredocFiles)
+		}
+	}
+
+	return heredocFiles
+}
+
+// CollectHeredocPaths extracts heredoc paths from a single COPY/ADD command's
+// SourceContents into the provided map. This is useful for per-command filtering.
+func CollectHeredocPaths(sourceContents []instructions.SourceContent) map[string]bool {
+	paths := make(map[string]bool)
+	for _, sc := range sourceContents {
+		if sc.Path != "" {
+			paths[sc.Path] = true
+		}
+	}
+	return paths
+}
+
+// collectHeredocPaths is an internal helper that extracts heredoc paths from a command.
+func collectHeredocPaths(cmd instructions.Command, paths map[string]bool) {
+	switch c := cmd.(type) {
+	case *instructions.CopyCommand:
+		for _, sc := range c.SourceContents {
+			if sc.Path != "" {
+				paths[sc.Path] = true
+			}
+		}
+	case *instructions.AddCommand:
+		for _, sc := range c.SourceContents {
+			if sc.Path != "" {
+				paths[sc.Path] = true
+			}
+		}
+	}
+}

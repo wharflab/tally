@@ -8,6 +8,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/rules"
 )
 
@@ -77,13 +78,8 @@ func (r *Rule) checkCopyAdd(
 		return nil
 	}
 
-	// Build set of heredoc paths to skip
-	heredocPaths := make(map[string]bool)
-	for _, sc := range sourceContents {
-		if sc.Path != "" {
-			heredocPaths[sc.Path] = true
-		}
-	}
+	// Build set of heredoc paths to skip (using shared helper)
+	heredocPaths := dockerfile.CollectHeredocPaths(sourceContents)
 
 	var violations []rules.Violation
 

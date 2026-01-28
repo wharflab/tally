@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/urfave/cli/v3"
 
 	"github.com/tinovyatkin/tally/internal/config"
@@ -529,26 +528,5 @@ func getRuleConfig(ruleCode string, cfg *config.Config) any {
 // These are inline files created by heredoc syntax that should not be checked
 // against .dockerignore.
 func extractHeredocFiles(parseResult *dockerfile.ParseResult) map[string]bool {
-	heredocFiles := make(map[string]bool)
-
-	for _, stage := range parseResult.Stages {
-		for _, cmd := range stage.Commands {
-			switch c := cmd.(type) {
-			case *instructions.CopyCommand:
-				for _, sc := range c.SourceContents {
-					if sc.Path != "" {
-						heredocFiles[sc.Path] = true
-					}
-				}
-			case *instructions.AddCommand:
-				for _, sc := range c.SourceContents {
-					if sc.Path != "" {
-						heredocFiles[sc.Path] = true
-					}
-				}
-			}
-		}
-	}
-
-	return heredocFiles
+	return dockerfile.ExtractHeredocFiles(parseResult.Stages)
 }
