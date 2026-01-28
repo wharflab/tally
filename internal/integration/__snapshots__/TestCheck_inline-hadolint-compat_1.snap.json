@@ -1,0 +1,6 @@
+[
+  {
+    "file": "testdata/inline-hadolint-compat/Dockerfile",
+    "violations": []
+  }
+]

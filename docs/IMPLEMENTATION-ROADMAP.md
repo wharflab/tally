@@ -235,23 +235,33 @@ These are explicitly front-loaded to avoid cross-blocking later.
 
 ---
 
-## Priority 4: Inline Disable Directives (Post-Filter Approach)
+## Priority 4: Inline Disable Directives (Post-Filter Approach) ✅
 
 **Goal:** Allow users to suppress violations with migration compatibility.
 
-**Key takeaways to preserve:**
+**Status:** Completed
+
+**Key takeaways preserved:**
 
 - Use post-filtering (simplest) ([04](04-inline-disables.md))
 - Support compatibility syntax (hadolint / buildx)
 - Validate codes + detect unused directives
 - Define precedence explicitly: **inline > CLI > config > defaults** ([04](04-inline-disables.md))
 
+**Implementation Details:**
+
+- `internal/directive/directive.go` - Types: `Directive`, `DirectiveType`, `LineRange`, `ParseResult`, `ParseError`
+- `internal/directive/parser.go` - `Parse()` extracts directives from SourceMap comments using regex patterns
+- `internal/directive/filter.go` - `Filter()` applies directives to violations, tracks usage
+- Configuration in `internal/config/config.go`: `InlineDirectivesConfig` with `Enabled`, `WarnUnused`, `ValidateRules`
+- CLI flags: `--no-inline-directives`, `--warn-unused-directives`
+
 **Success Criteria:**
 
-- [ ] `# tally ignore=...` and `# tally global ignore=...`
-- [ ] `# hadolint ignore=...` and `# hadolint global ignore=...` (migration)
-- [ ] `# check=skip=...` (buildx compat)
-- [ ] Unknown codes warn; unused directives detectable
+- [x] `# tally ignore=...` and `# tally global ignore=...`
+- [x] `# hadolint ignore=...` and `# hadolint global ignore=...` (migration)
+- [x] `# check=skip=...` (buildx compat)
+- [x] Unknown codes warn (optional via `validate-rules` config); unused directives detectable via `--warn-unused-directives`
 
 ---
 
@@ -396,46 +406,49 @@ These are explicitly front-loaded to avoid cross-blocking later.
 
 **Goal:** Lock behavior end-to-end and allow intentional output evolution.
 
+**Status:** In Progress
+
 **Actions:**
 
 1. Expand `internal/integration/testdata/`:
-   - clean
-   - critical rules
-   - multi-stage
-   - inline disables (tally/hadolint/buildx)
-   - config cascade (closest `.tally.toml`)
-   - reporter formats (text/json/sarif/github-actions)
-   - exit codes (clean → 0, violations → 1, parse error → 2)
+   - ✅ clean (`simple/`)
+   - ✅ critical rules (`buildkit-warnings/`)
+   - ✅ multi-stage (`duplicate-stage-name/`, `unreachable-stage/`)
+   - ✅ inline disables (tally/hadolint/buildx) - 7 test fixtures added
+   - ✅ config cascade (closest `.tally.toml`) - `with-config/`, `nested/`
+   - reporter formats (text/json/sarif/github-actions) - JSON done, others pending
+   - ✅ exit codes (clean → 0, violations → 1)
 
 2. Snapshot:
-   - stable ordering
-   - color disabled for text snapshots
-   - exit code assertions
+   - ✅ stable ordering
+   - ✅ color disabled for text snapshots
+   - ✅ exit code assertions
 
 **Success Criteria:**
 
-- [ ] Fixtures cover the "core pipeline" interactions (config + directives + reporting)
-- [ ] Exit codes tested: 0 (clean), 1 (violations at/above threshold), 2 (parse/config error)
-- [ ] `UPDATE_SNAPS=true go test ./internal/integration/...` updates snapshots intentionally
+- [x] Fixtures cover the "core pipeline" interactions (config + directives + reporting)
+- [x] Exit codes tested: 0 (clean), 1 (violations at/above threshold)
+- [ ] Exit code 2 (parse/config error) tested
+- [x] `UPDATE_SNAPS=true go test ./internal/integration/...` updates snapshots intentionally
 
 ---
 
 ## Cross-Blocking / Dependency Map (Updated)
 
 ```text
-Decision Spikes (A/B/C)
+Decision Spikes (A/B/C) ✅
     ↓
-Priority 1 (Rule system + stable Violation schema)
+Priority 1 (Rule system + stable Violation schema) ✅
     ↓
-Priority 2 (Parser facade + SourceMap)
+Priority 2 (Parser facade + SourceMap) ✅
     ↓
-Priority 3 (Semantic model)
+Priority 3 (Semantic model) ✅
     ↓
-Priority 4 (Inline directives) ─┐
-    ↓                          │
-Priority 7 (Processors) ───────┤
-    ↓                          │
-Priority 5 (Reporters) ────────┘
+Priority 4 (Inline directives) ✅ ─┐
+    ↓                              │
+Priority 7 (Processors) ───────────┤
+    ↓                              │
+Priority 5 (Reporters) ────────────┘
     ↓
 Priority 6 (Discovery + config cascade + optional context)
     ↓
@@ -443,7 +456,7 @@ Priority 8 (Initial rule baseline)
     ↓
 Priority 9 (Rule CLI + docs generation)
     ↓
-Priority 10 (Integration tests)
+Priority 10 (Integration tests) - In Progress
 ```
 
 **Key blockers:**
