@@ -3,6 +3,7 @@ package reporter
 import (
 	"encoding/json"
 	"io"
+	"path/filepath"
 
 	"github.com/tinovyatkin/tally/internal/rules"
 )
@@ -44,10 +45,13 @@ func NewJSONReporter(w io.Writer) *JSONReporter {
 // Report implements Reporter.
 func (r *JSONReporter) Report(violations []rules.Violation, _ map[string][]byte) error {
 	// Group violations by file (deterministic order)
+	// Normalize paths to forward slashes for cross-platform consistency
 	byFile := make(map[string][]rules.Violation)
 	filesOrder := make([]string, 0)
 
 	for _, v := range SortViolations(violations) {
+		// Normalize file path in location for consistent output
+		v.Location.File = filepath.ToSlash(v.Location.File)
 		file := v.Location.File
 		if _, exists := byFile[file]; !exists {
 			filesOrder = append(filesOrder, file)

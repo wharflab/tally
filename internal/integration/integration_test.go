@@ -262,15 +262,17 @@ func TestCheck(t *testing.T) {
 				ext = ".json"
 			}
 
-			// For directory tests, normalize paths to be relative for snapshot stability
+			// Normalize output for cross-platform snapshot comparison
 			outputStr := string(output)
+			// Normalize line endings (Windows CRLF -> LF) for consistent snapshots
+			outputStr = strings.ReplaceAll(outputStr, "\r\n", "\n")
+
 			if tc.isDir {
 				// Replace absolute paths with relative ones for reproducible snapshots
-				// Use filepath.ToSlash for cross-platform compatibility (Windows backslashes -> slashes)
 				wd, err := os.Getwd()
 				if err == nil {
 					wdSlash := filepath.ToSlash(wd) + "/"
-					outputStr = strings.ReplaceAll(filepath.ToSlash(outputStr), wdSlash, "")
+					outputStr = strings.ReplaceAll(outputStr, wdSlash, "")
 				}
 			}
 

@@ -3,7 +3,6 @@ package discovery
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 )
 
@@ -255,44 +254,5 @@ func TestDiscoverNonexistent(t *testing.T) {
 
 	if len(results) != 0 {
 		t.Errorf("expected 0 results, got %d", len(results))
-	}
-}
-
-func TestSplitPath(t *testing.T) {
-	tests := []struct {
-		path string
-		want []string
-	}{
-		{"a/b/c", []string{"a", "b", "c"}},
-		{"/a/b/c", []string{"a", "b", "c"}},
-		{"file.txt", []string{"file.txt"}},
-	}
-
-	// Platform-specific test case for Windows drive letters
-	// On Windows: "C:/foo/bar" → ["foo", "bar"] (drive letter stripped)
-	// On Unix: "C:/foo/bar" → ["C:", "foo", "bar"] (C: is just a directory name)
-	if runtime.GOOS == "windows" {
-		tests = append(tests, struct {
-			path string
-			want []string
-		}{"C:/foo/bar", []string{"foo", "bar"}})
-	} else {
-		tests = append(tests, struct {
-			path string
-			want []string
-		}{"C:/foo/bar", []string{"C:", "foo", "bar"}})
-	}
-
-	for _, tc := range tests {
-		got := splitPath(tc.path)
-		if len(got) != len(tc.want) {
-			t.Errorf("splitPath(%q) = %v, want %v", tc.path, got, tc.want)
-			continue
-		}
-		for i := range got {
-			if got[i] != tc.want[i] {
-				t.Errorf("splitPath(%q)[%d] = %q, want %q", tc.path, i, got[i], tc.want[i])
-			}
-		}
 	}
 }

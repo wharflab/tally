@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
 )
@@ -226,84 +227,31 @@ func discoverGlob(pattern string, opts Options, seen map[string]bool) ([]Discove
 	return globMatches(pattern, opts, seen)
 }
 
-// isExcluded checks if a path matches any exclusion pattern using a three-step
-// matching strategy:
+// isExcluded checks if a path matches any exclusion pattern.
+// Patterns use doublestar glob syntax (**, *, ?, [...]).
 //
-//  1. Match against the full absolute path (for absolute patterns)
-//  2. Match against just the filename/basename (for simple patterns like "*.bak")
-//  3. Match against each suffix subpath produced by splitPath (for relative patterns
-//     like "vendor/*" or "test/**")
-//
-// The subpath matching (step 3) allows patterns like "vendor/*" to match files that
-// are direct children of any "vendor" directory component in the path, without
-// matching deeply nested files. For example, "vendor/*" matches "vendor/Dockerfile"
-// but not "sub/vendor/Dockerfile" when processed as a subpath.
-//
-// Complexity: O(patterns × path_depth) matching operations per file, which is
-// acceptable for typical directory hierarchies (5-10 levels) with modest patterns.
+// For relative patterns (e.g., "vendor/*"), we automatically prepend "**/" to
+// match at any directory depth. Use absolute patterns or leading "/" to match
+// from the root.
 //
 // Note: doublestar.Match expects forward slashes as path separators even on Windows.
-// We normalize all paths to forward slashes before matching for cross-platform compatibility.
 func isExcluded(absPath string, excludePatterns []string) bool {
-	// Normalize path to forward slashes for doublestar (which always uses /)
-	absPathSlash := filepath.ToSlash(absPath)
-	base := filepath.ToSlash(filepath.Base(absPath))
+	// Normalize path to forward slashes for doublestar
+	pathSlash := filepath.ToSlash(absPath)
 
 	for _, pattern := range excludePatterns {
-		// Normalize pattern to forward slashes as well
 		pattern = filepath.ToSlash(pattern)
 
-		// Step 1: Match against full absolute path
-		matched, err := doublestar.Match(pattern, absPathSlash)
-		if err == nil && matched {
-			return true
+		// For relative patterns, prepend **/ to match at any depth
+		// This makes "vendor/*" equivalent to "**/vendor/*"
+		if !strings.HasPrefix(pattern, "/") && !strings.HasPrefix(pattern, "**/") {
+			pattern = "**/" + pattern
 		}
 
-		// Step 2: Match against just the filename
-		matched, err = doublestar.Match(pattern, base)
+		matched, err := doublestar.Match(pattern, pathSlash)
 		if err == nil && matched {
 			return true
-		}
-
-		// Step 3: Match against each suffix subpath from splitPath
-		// This enables patterns like "vendor/*" to match any vendor directory
-		// at any level in the path hierarchy
-		parts := splitPath(absPath)
-		for i := range parts {
-			subpath := filepath.ToSlash(filepath.Join(parts[i:]...))
-			matched, err = doublestar.Match(pattern, subpath)
-			if err == nil && matched {
-				return true
-			}
 		}
 	}
 	return false
-}
-
-// splitPath splits a path into its individual directory and filename components.
-// For example, "/home/user/vendor/Dockerfile" returns ["home", "user", "vendor", "Dockerfile"].
-// On Windows, "C:\foo\bar" returns ["foo", "bar"] (drive letter is stripped).
-// Used by isExcluded to generate suffix subpaths for pattern matching.
-func splitPath(path string) []string {
-	var parts []string
-	for path != "" {
-		dir, file := filepath.Split(path)
-		if file != "" {
-			parts = append([]string{file}, parts...)
-		}
-		path = filepath.Clean(dir)
-
-		// Stop at Unix root or current directory
-		if path == "/" || path == "." {
-			break
-		}
-
-		// Stop at Windows volume root (e.g., "C:\")
-		// filepath.VolumeName returns "C:" for "C:\", empty for Unix paths
-		vol := filepath.VolumeName(path)
-		if vol != "" && (path == vol || path == vol+string(filepath.Separator)) {
-			break
-		}
-	}
-	return parts
 }
