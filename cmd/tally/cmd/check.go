@@ -1,17 +1,21 @@
 package cmd
 
 import (
-	"context"
+	stdcontext "context"
 	"fmt"
 	"os"
 
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/urfave/cli/v3"
 
 	"github.com/tinovyatkin/tally/internal/config"
+	"github.com/tinovyatkin/tally/internal/context"
 	"github.com/tinovyatkin/tally/internal/directive"
+	"github.com/tinovyatkin/tally/internal/discovery"
 	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/reporter"
 	"github.com/tinovyatkin/tally/internal/rules"
+	_ "github.com/tinovyatkin/tally/internal/rules/copyignoredfile" // Register rule
 	"github.com/tinovyatkin/tally/internal/rules/maxlines"
 	_ "github.com/tinovyatkin/tally/internal/rules/nounreachablestages" // Register rule
 	"github.com/tinovyatkin/tally/internal/semantic"
@@ -100,20 +104,50 @@ func checkCommand() *cli.Command {
 				Usage:   "Warn about ignore directives without reason= explanation",
 				Sources: cli.EnvVars("TALLY_INLINE_DIRECTIVES_REQUIRE_REASON"),
 			},
+			&cli.StringSliceFlag{
+				Name:    "exclude",
+				Usage:   "Glob pattern to exclude files (can be repeated)",
+				Sources: cli.EnvVars("TALLY_EXCLUDE"),
+			},
+			&cli.StringFlag{
+				Name:    "context",
+				Usage:   "Build context directory for context-aware rules",
+				Sources: cli.EnvVars("TALLY_CONTEXT"),
+			},
 		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			files := cmd.Args().Slice()
+		Action: func(ctx stdcontext.Context, cmd *cli.Command) error {
+			inputs := cmd.Args().Slice()
 
-			if len(files) == 0 {
-				// Default to Dockerfile in current directory
-				files = []string{"Dockerfile"}
+			if len(inputs) == 0 {
+				// Default to current directory
+				inputs = []string{"."}
 			}
 
-			var allViolations []rules.Violation //nolint:prealloc // Size unknown upfront
+			// Discover files using the discovery package
+			discoveryOpts := discovery.Options{
+				Patterns:        discovery.DefaultPatterns(),
+				ExcludePatterns: cmd.StringSlice("exclude"),
+				ContextDir:      cmd.String("context"),
+			}
+
+			discovered, err := discovery.Discover(inputs, discoveryOpts)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error: failed to discover files: %v\n", err)
+				return cli.Exit("", ExitConfigError)
+			}
+
+			if len(discovered) == 0 {
+				fmt.Fprintf(os.Stderr, "Error: no Dockerfiles found\n")
+				return cli.Exit("", ExitConfigError)
+			}
+
+			var allViolations []rules.Violation
 			fileSources := make(map[string][]byte)
 			var firstCfg *config.Config // Store first file's config for output settings
 
-			for _, file := range files {
+			for _, df := range discovered {
+				file := df.Path
+
 				// Load config for this specific file (cascading discovery)
 				cfg, err := loadConfigForFile(cmd, file)
 				if err != nil {
@@ -141,6 +175,17 @@ func checkCommand() *cli.Command {
 				var buildArgs map[string]string
 				sem := semantic.NewModel(parseResult, buildArgs, file)
 
+				// Create build context if context directory is specified
+				var buildCtx rules.BuildContext
+				if df.ContextDir != "" {
+					buildCtx, err = context.New(df.ContextDir, file,
+						context.WithHeredocFiles(extractHeredocFiles(parseResult)))
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "Warning: failed to create build context: %v\n", err)
+						// Continue without context - rules will skip context-aware checks
+					}
+				}
+
 				// Build base LintInput (without rule-specific config)
 				baseInput := rules.LintInput{
 					File:     file,
@@ -149,6 +194,7 @@ func checkCommand() *cli.Command {
 					MetaArgs: parseResult.MetaArgs,
 					Source:   parseResult.Source,
 					Semantic: sem,
+					Context:  buildCtx,
 				}
 
 				// Collect construction-time violations from semantic analysis
@@ -477,4 +523,32 @@ func getRuleConfig(ruleCode string, cfg *config.Config) any {
 		// Unknown rules get nil config (use their defaults)
 		return nil
 	}
+}
+
+// extractHeredocFiles extracts virtual file paths from heredoc COPY/ADD commands.
+// These are inline files created by heredoc syntax that should not be checked
+// against .dockerignore.
+func extractHeredocFiles(parseResult *dockerfile.ParseResult) map[string]bool {
+	heredocFiles := make(map[string]bool)
+
+	for _, stage := range parseResult.Stages {
+		for _, cmd := range stage.Commands {
+			switch c := cmd.(type) {
+			case *instructions.CopyCommand:
+				for _, sc := range c.SourceContents {
+					if sc.Path != "" {
+						heredocFiles[sc.Path] = true
+					}
+				}
+			case *instructions.AddCommand:
+				for _, sc := range c.SourceContents {
+					if sc.Path != "" {
+						heredocFiles[sc.Path] = true
+					}
+				}
+			}
+		}
+	}
+
+	return heredocFiles
 }

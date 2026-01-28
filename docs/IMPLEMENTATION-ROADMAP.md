@@ -319,32 +319,50 @@ These are explicitly front-loaded to avoid cross-blocking later.
 
 ---
 
-## Priority 6: File Discovery + Config Cascade + Optional Build Context
+## Priority 6: File Discovery + Config Cascade + Optional Build Context ✅
 
-**Goal:** Enable “lint the repo” workflows without sacrificing per-file correctness.
+**Goal:** Enable "lint the repo" workflows without sacrificing per-file correctness.
+
+**Status:** Completed
 
 **Actions:**
 
-1. Discovery:
-   - inputs: files, dirs, globs, multiple paths
-   - defaults: `Dockerfile`, `Dockerfile.*`, `*.Dockerfile`
-   - exclude patterns via `--exclude`
-   - optional `.gitignore` support (nice-to-have, not blocker)
+1. ✅ Discovery (`internal/discovery/`):
+   - `Discover()` accepts files, dirs, globs, multiple paths
+   - `DefaultPatterns()`: `Dockerfile`, `Dockerfile.*`, `*.Dockerfile`, `Containerfile`, `Containerfile.*`, `*.Containerfile`
+   - `--exclude` flag for glob patterns (supports `**` doublestar)
+   - Uses `github.com/bmatcuk/doublestar/v4` for pattern matching
 
-2. Config cascade per target file:
-   - discovery must return **(file path, config root)** pairs to avoid “wrong config applied to file” bugs
+2. ✅ Config cascade per target file:
+   - `DiscoveredFile` returns `(Path, ConfigRoot, ContextDir)` tuples
+   - Each discovered file uses its own directory for config lookup
 
-3. Build context (optional for v1.0, but API-ready):
-   - `.dockerignore` parsing (BuildKit matcher)
-   - context dir scanning (only when needed)
-   - treat `COPY/ADD` heredoc sources as **virtual inline files** (not affected by `.dockerignore`, not required to exist in context)
-   - caching hooks for expensive operations (registry, FS scans) ([07](07-context-aware-foundation.md))
+3. ✅ Build context (`internal/context/`):
+   - `BuildContext` type with lazy `.dockerignore` parsing
+   - Uses `github.com/moby/patternmatcher` for Docker-compatible matching
+   - Supports both `.dockerignore` and `.containerignore` (Podman)
+   - `IsIgnored()`, `FileExists()`, `HasIgnoreFile()` methods
+   - Heredoc tracking via `IsHeredocFile()` and `AddHeredocFile()`
+   - `--context` CLI flag enables context-aware rules
+
+4. ✅ Context-aware rule (`internal/rules/copyignoredfile/`):
+   - `copy-ignored-file` rule warns when COPY/ADD sources match `.dockerignore`
+   - Skips URLs, heredoc sources, and `--from=` stage copies
+   - Only runs when `--context` is provided
+
+**Implementation Details:**
+
+- `internal/discovery/discovery.go` - `Discover()`, `DiscoveredFile`, `Options`, `DefaultPatterns()`
+- `internal/context/context.go` - `BuildContext` with lazy pattern matcher initialization
+- `internal/context/dockerignore.go` - `LoadDockerignore()` supporting both ignore file variants
+- `internal/rules/copyignoredfile/copyignoredfile.go` - Context-aware COPY/ADD rule
+- `cmd/tally/cmd/check.go` - Added `--exclude`, `--context` flags; integrated discovery
 
 **Success Criteria:**
 
-- [ ] `tally check .` behaves predictably in repos
-- [ ] Each Dockerfile uses the nearest `.tally.toml` when present
-- [ ] Context can be provided but is not required
+- [x] `tally check .` behaves predictably in repos
+- [x] Each Dockerfile uses the nearest `.tally.toml` when present
+- [x] Context can be provided but is not required
 
 ---
 
@@ -458,9 +476,9 @@ Priority 4 (Inline directives) ✅ ─┐
     ↓                              │
 Priority 7 (Processors) ───────────┤
     ↓                              │
-Priority 5 (Reporters) ────────────┘
+Priority 5 (Reporters) ✅ ─────────┘
     ↓
-Priority 6 (Discovery + config cascade + optional context)
+Priority 6 (Discovery + config cascade + optional context) ✅
     ↓
 Priority 8 (Initial rule baseline)
     ↓

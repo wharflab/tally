@@ -1,0 +1,36 @@
+{
+  "files": [
+    {
+      "file": "testdata/context-copy-ignored/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/context-copy-ignored/Dockerfile",
+            "start": {
+              "line": 3,
+              "column": 0
+            },
+            "end": {
+              "line": 3,
+              "column": 0
+            }
+          },
+          "rule": "copy-ignored-file",
+          "message": "source 'ignored.txt' is excluded by .dockerignore and will not be copied",
+          "detail": "The file or directory 'ignored.txt' matches a pattern in .dockerignore. This COPY/ADD will fail or copy unexpected files during build.",
+          "severity": "warning",
+          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/copy-ignored-file.md"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 0,
+    "warnings": 1,
+    "info": 0,
+    "style": 0,
+    "files": 1
+  }
+}
+

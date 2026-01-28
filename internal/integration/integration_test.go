@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
@@ -62,127 +63,172 @@ func TestMain(m *testing.M) {
 
 func TestCheck(t *testing.T) {
 	testCases := []struct {
-		name     string
-		dir      string
-		args     []string
-		env      []string
-		wantExit int
-		snapExt  string // Snapshot file extension (default: ".json")
+		name       string
+		dir        string
+		args       []string
+		env        []string
+		wantExit   int
+		snapExt    string // Snapshot file extension (default: ".json")
+		isDir      bool   // If true, pass the directory instead of Dockerfile
+		useContext bool   // If true, add --context flag for context-aware tests
 	}{
 		// Basic tests
-		{"simple", "simple", []string{"--format", "json"}, nil, 0, ""},
-		{"simple-max-lines-pass", "simple", []string{"--max-lines", "100", "--format", "json"}, nil, 0, ""},
-		{"simple-max-lines-fail", "simple", []string{"--max-lines", "2", "--format", "json"}, nil, 1, ""},
+		{name: "simple", dir: "simple", args: []string{"--format", "json"}},
+		{
+			name: "simple-max-lines-pass",
+			dir:  "simple",
+			args: []string{"--max-lines", "100", "--format", "json"},
+		},
+		{
+			name:     "simple-max-lines-fail",
+			dir:      "simple",
+			args:     []string{"--max-lines", "2", "--format", "json"},
+			wantExit: 1,
+		},
 
 		// Config file discovery tests
-		{"config-file-discovery", "with-config", []string{"--format", "json"}, nil, 1, ""},
-		{"config-cascading-discovery", "nested/subdir", []string{"--format", "json"}, nil, 1, ""},
-		{"config-skip-options", "with-blanks-and-comments", []string{"--format", "json"}, nil, 0, ""},
-		{"cli-overrides-config", "with-config", []string{"--max-lines", "100", "--format", "json"}, nil, 0, ""},
+		{name: "config-file-discovery", dir: "with-config", args: []string{"--format", "json"}, wantExit: 1},
+		{name: "config-cascading-discovery", dir: "nested/subdir", args: []string{"--format", "json"}, wantExit: 1},
+		{name: "config-skip-options", dir: "with-blanks-and-comments", args: []string{"--format", "json"}},
+		{
+			name: "cli-overrides-config",
+			dir:  "with-config",
+			args: []string{"--max-lines", "100", "--format", "json"},
+		},
 
 		// Environment variable tests
 		{
-			"env-var-override", "simple",
-			[]string{"--format", "json"},
-			[]string{"TALLY_RULES_MAX_LINES_MAX=2"},
-			1, "",
+			name:     "env-var-override",
+			dir:      "simple",
+			args:     []string{"--format", "json"},
+			env:      []string{"TALLY_RULES_MAX_LINES_MAX=2"},
+			wantExit: 1,
 		},
 
 		// BuildKit linter warnings tests
-		// These test that BuildKit's built-in warnings are captured and surfaced
-		{"buildkit-warnings", "buildkit-warnings", []string{"--format", "json"}, nil, 1, ""},
+		{name: "buildkit-warnings", dir: "buildkit-warnings", args: []string{"--format", "json"}, wantExit: 1},
 
 		// Semantic model construction-time violations
-		{"duplicate-stage-name", "duplicate-stage-name", []string{"--format", "json"}, nil, 1, ""},
+		{name: "duplicate-stage-name", dir: "duplicate-stage-name", args: []string{"--format", "json"}, wantExit: 1},
 
 		// Unreachable stage detection
-		{"unreachable-stage", "unreachable-stage", []string{"--format", "json"}, nil, 1, ""},
+		{name: "unreachable-stage", dir: "unreachable-stage", args: []string{"--format", "json"}, wantExit: 1},
 
 		// Inline directive tests
+		{name: "inline-ignore-single", dir: "inline-ignore-single", args: []string{"--format", "json"}},
+		{name: "inline-ignore-global", dir: "inline-ignore-global", args: []string{"--format", "json"}},
+		{name: "inline-hadolint-compat", dir: "inline-hadolint-compat", args: []string{"--format", "json"}},
+		{name: "inline-buildx-compat", dir: "inline-buildx-compat", args: []string{"--format", "json"}},
+		{name: "inline-ignore-multiple-max-lines", dir: "inline-ignore-multiple", args: []string{"--format", "json"}},
 		{
-			"inline-ignore-single", "inline-ignore-single",
-			[]string{"--format", "json"},
-			nil, 0, "",
+			name:     "inline-unused-directive",
+			dir:      "inline-unused-directive",
+			args:     []string{"--format", "json", "--warn-unused-directives"},
+			wantExit: 1,
 		},
 		{
-			"inline-ignore-global", "inline-ignore-global",
-			[]string{"--format", "json"},
-			nil, 0, "",
+			name:     "inline-directives-disabled",
+			dir:      "inline-directives-disabled",
+			args:     []string{"--format", "json", "--no-inline-directives"},
+			wantExit: 1,
 		},
 		{
-			"inline-hadolint-compat", "inline-hadolint-compat",
-			[]string{"--format", "json"},
-			nil, 0, "",
-		},
-		{
-			"inline-buildx-compat", "inline-buildx-compat",
-			[]string{"--format", "json"},
-			nil, 0, "",
-		},
-		{
-			"inline-ignore-multiple-max-lines", "inline-ignore-multiple",
-			[]string{"--format", "json"},
-			nil, 0, "",
-		},
-		{
-			"inline-unused-directive", "inline-unused-directive",
-			[]string{"--format", "json", "--warn-unused-directives"},
-			nil, 1, "",
-		},
-		{
-			"inline-directives-disabled", "inline-directives-disabled",
-			[]string{"--format", "json", "--no-inline-directives"},
-			nil, 1, "",
-		},
-		{
-			"inline-require-reason", "inline-require-reason",
-			[]string{"--format", "json", "--require-reason"},
-			nil, 1, "", // Warns about directive without reason
+			name:     "inline-require-reason",
+			dir:      "inline-require-reason",
+			args:     []string{"--format", "json", "--require-reason"},
+			wantExit: 1,
 		},
 
 		// Output format tests
+		{name: "format-sarif", dir: "buildkit-warnings", args: []string{"--format", "sarif"}, wantExit: 1},
 		{
-			"format-sarif", "buildkit-warnings",
-			[]string{"--format", "sarif"},
-			nil, 1, "",
+			name:     "format-github-actions",
+			dir:      "buildkit-warnings",
+			args:     []string{"--format", "github-actions"},
+			wantExit: 1,
+			snapExt:  ".txt",
 		},
 		{
-			"format-github-actions", "buildkit-warnings",
-			[]string{"--format", "github-actions"},
-			nil, 1, ".txt", // Plain text workflow commands
-		},
-		{
-			"format-markdown", "buildkit-warnings",
-			[]string{"--format", "markdown"},
-			nil, 1, ".md", // Markdown table format
+			name:     "format-markdown",
+			dir:      "buildkit-warnings",
+			args:     []string{"--format", "markdown"},
+			wantExit: 1,
+			snapExt:  ".md",
 		},
 
 		// Fail-level tests
 		{
-			"fail-level-none", "buildkit-warnings",
-			[]string{"--format", "json", "--fail-level", "none"},
-			nil, 0, "", // No exit code even with violations
+			name: "fail-level-none",
+			dir:  "buildkit-warnings",
+			args: []string{"--format", "json", "--fail-level", "none"},
 		},
 		{
-			"fail-level-error", "buildkit-warnings",
-			[]string{"--format", "json", "--fail-level", "error"},
-			nil, 0, "", // Only warnings, no errors
+			name: "fail-level-error",
+			dir:  "buildkit-warnings",
+			args: []string{"--format", "json", "--fail-level", "error"},
 		},
 		{
-			"fail-level-warning", "buildkit-warnings",
-			[]string{"--format", "json", "--fail-level", "warning"},
-			nil, 1, "", // Has warnings
+			name:     "fail-level-warning",
+			dir:      "buildkit-warnings",
+			args:     []string{"--format", "json", "--fail-level", "warning"},
+			wantExit: 1,
+		},
+
+		// Context-aware rule tests
+		{
+			name:       "context-copy-ignored",
+			dir:        "context-copy-ignored",
+			args:       []string{"--format", "json"},
+			wantExit:   1,
+			useContext: true,
+		},
+		{
+			name:       "context-copy-heredoc",
+			dir:        "context-copy-heredoc",
+			args:       []string{"--format", "json"},
+			useContext: true,
+		},
+		{
+			name: "context-no-context-flag",
+			dir:  "context-copy-ignored",
+			args: []string{"--format", "json"},
+		},
+
+		// Discovery tests
+		{
+			name:  "discovery-directory",
+			dir:   "discovery-directory",
+			args:  []string{"--format", "json"},
+			isDir: true,
+		},
+		{
+			name:  "discovery-exclude",
+			dir:   "discovery-exclude",
+			args:  []string{"--format", "json", "--exclude", "test/*", "--exclude", "vendor/*"},
+			isDir: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			dockerfilePath := filepath.Join("testdata", tc.dir, "Dockerfile")
+			testdataDir := filepath.Join("testdata", tc.dir)
 
-			args := make([]string, 0, 1+len(tc.args)+1)
+			args := make([]string, 0, 1+len(tc.args)+2)
 			args = append(args, "check")
 			args = append(args, tc.args...)
-			args = append(args, dockerfilePath)
+
+			// Add context flag for context-aware tests
+			if tc.useContext {
+				args = append(args, "--context", testdataDir)
+			}
+
+			// Add target (directory or file)
+			if tc.isDir {
+				args = append(args, testdataDir)
+			} else {
+				args = append(args, filepath.Join(testdataDir, "Dockerfile"))
+			}
+
 			cmd := exec.Command(binaryPath, args...)
 			cmd.Env = append(os.Environ(),
 				"GOCOVERDIR="+coverageDir,
@@ -202,7 +248,7 @@ func TestCheck(t *testing.T) {
 				}
 			}
 			if exitCode != tc.wantExit {
-				t.Errorf("expected exit code %d, got %d", tc.wantExit, exitCode)
+				t.Errorf("expected exit code %d, got %d\noutput: %s", tc.wantExit, exitCode, output)
 			}
 
 			// Use appropriate snapshot extension based on output format
@@ -210,7 +256,18 @@ func TestCheck(t *testing.T) {
 			if ext == "" {
 				ext = ".json"
 			}
-			snaps.WithConfig(snaps.Ext(ext)).MatchStandaloneSnapshot(t, string(output))
+
+			// For directory tests, normalize paths to be relative for snapshot stability
+			outputStr := string(output)
+			if tc.isDir {
+				// Replace absolute paths with relative ones for reproducible snapshots
+				wd, err := os.Getwd()
+				if err == nil {
+					outputStr = strings.ReplaceAll(outputStr, wd+"/", "")
+				}
+			}
+
+			snaps.WithConfig(snaps.Ext(ext)).MatchStandaloneSnapshot(t, outputStr)
 		})
 	}
 }

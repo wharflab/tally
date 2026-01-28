@@ -77,6 +77,15 @@ func NewLocationFromRange(file string, r parser.Range) Location {
 	}
 }
 
+// NewLocationFromRanges creates a Location from a slice of BuildKit Ranges.
+// Uses the first range if multiple exist, or returns file-level if empty.
+func NewLocationFromRanges(file string, ranges []parser.Range) Location {
+	if len(ranges) == 0 {
+		return NewFileLocation(file)
+	}
+	return NewLocationFromRange(file, ranges[0])
+}
+
 // IsFileLevel returns true if this is a file-level location (no specific line).
 func (l Location) IsFileLevel() bool {
 	return l.Start.Line < 0

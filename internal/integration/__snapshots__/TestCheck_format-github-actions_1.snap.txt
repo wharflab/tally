@@ -1,2 +1,3 @@
 ::warning file=testdata/buildkit-warnings/Dockerfile,line=2,col=1,title=StageNameCasing::Stage name 'Builder' should be lowercase
 ::warning file=testdata/buildkit-warnings/Dockerfile,line=3,col=1,title=MaintainerDeprecated::Maintainer instruction is deprecated in favor of using label
+

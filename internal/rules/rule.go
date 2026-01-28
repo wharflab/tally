@@ -7,19 +7,21 @@ import (
 	"github.com/tinovyatkin/tally/internal/sourcemap"
 )
 
-// BuildContext provides optional build-time context for rules.
-// This is nil in v1.0 but allows rules to be context-aware in the future.
-type BuildContext struct {
-	// ContextDir is the path to the build context directory (optional).
-	ContextDir string
+// BuildContext is an interface for build-time context awareness.
+// Rules can type-assert this to *context.BuildContext if they need
+// context-aware features like .dockerignore checking.
+type BuildContext interface {
+	// IsIgnored checks if a path would be ignored by .dockerignore.
+	IsIgnored(path string) (bool, error)
 
-	// BuildArgs are --build-arg values passed to the build (optional).
-	BuildArgs map[string]string
+	// FileExists checks if a file exists in the build context.
+	FileExists(path string) bool
 
-	// Future fields for context-aware linting (post-v1.0):
-	// - DockerIgnorePatterns []string
-	// - ContextFiles map[string]bool (file existence cache)
-	// - RegistryClient interface{}
+	// IsHeredocFile checks if a path is a virtual heredoc file.
+	IsHeredocFile(path string) bool
+
+	// HasIgnoreFile returns true if a .dockerignore file exists.
+	HasIgnoreFile() bool
 }
 
 // LintInput contains all the information a rule needs to check a Dockerfile.
@@ -52,8 +54,9 @@ type LintInput struct {
 	// Used for snippet extraction and directive parsing.
 	Source []byte
 
-	// Context is optional build context (nil in v1.0).
-	Context *BuildContext
+	// Context is optional build context for context-aware rules.
+	// Rules should check for nil before using.
+	Context BuildContext
 
 	// Semantic is the semantic model for cross-instruction analysis.
 	// Provides stage resolution, variable scoping, and COPY --from validation.
