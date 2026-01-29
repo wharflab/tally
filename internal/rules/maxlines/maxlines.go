@@ -58,6 +58,43 @@ func (r *Rule) Metadata() rules.RuleMetadata {
 	}
 }
 
+// Schema returns the JSON Schema for this rule's configuration.
+// Follows ESLint's meta.schema pattern for rule options validation.
+// Supports either an integer shorthand (just max) or full object config.
+func (r *Rule) Schema() map[string]any {
+	return map[string]any{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"oneOf": []any{
+			map[string]any{
+				"type":    "integer",
+				"minimum": 0,
+			},
+			map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"max": map[string]any{
+						"type":        "integer",
+						"minimum":     0,
+						"default":     50,
+						"description": "Maximum number of lines allowed (0 = disabled)",
+					},
+					"skip-blank-lines": map[string]any{
+						"type":        "boolean",
+						"default":     true,
+						"description": "Exclude blank lines from the count",
+					},
+					"skip-comments": map[string]any{
+						"type":        "boolean",
+						"default":     true,
+						"description": "Exclude comment lines from the count",
+					},
+				},
+				"additionalProperties": false,
+			},
+		},
+	}
+}
+
 // Check runs the max-lines rule using the AST for accurate line counting.
 // Like ESLint's max-lines, it uses parsed AST data for comments rather than
 // naive string matching.
@@ -223,30 +260,13 @@ func (r *Rule) DefaultConfig() any {
 	return DefaultConfig()
 }
 
-// ValidateConfig checks if the configuration is valid.
+// ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *Rule) ValidateConfig(config any) error {
-	if config == nil {
-		return nil
-	}
-	var cfg Config
-	switch v := config.(type) {
-	case Config:
-		cfg = v
-	case *Config:
-		if v == nil {
-			return nil
-		}
-		cfg = *v
-	default:
-		return fmt.Errorf("expected Config, got %T", config)
-	}
-	if cfg.Max != nil && *cfg.Max < 0 {
-		return fmt.Errorf("max must be >= 0, got %d", *cfg.Max)
-	}
-	return nil
+	return configutil.ValidateWithSchema(config, r.Schema())
 }
 
 // resolveConfig extracts the Config from input, falling back to defaults.
+// Supports integer shorthand (just max value) or full object config.
 func (r *Rule) resolveConfig(config any) Config {
 	switch v := config.(type) {
 	case Config:
@@ -255,6 +275,17 @@ func (r *Rule) resolveConfig(config any) Config {
 		if v != nil {
 			return *v
 		}
+	case int:
+		// Integer shorthand: just the max value with default booleans
+		defaults := DefaultConfig()
+		defaults.Max = &v
+		return defaults
+	case float64:
+		// JSON numbers come as float64
+		maxVal := int(v)
+		defaults := DefaultConfig()
+		defaults.Max = &maxVal
+		return defaults
 	case map[string]any:
 		return configutil.Resolve(v, DefaultConfig())
 	}

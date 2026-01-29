@@ -2,10 +2,12 @@
 package configutil
 
 import (
+	"encoding/json"
 	"reflect"
 
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/v2"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 // Resolve merges user options over defaults and unmarshals to typed config.
@@ -77,4 +79,42 @@ func isZero(v reflect.Value) bool {
 	default:
 		return false
 	}
+}
+
+// ValidateWithSchema validates config against a JSON Schema.
+// The schema parameter is the map[string]any returned by ConfigurableRule.Schema().
+// Returns nil if valid, or an error describing validation failures.
+func ValidateWithSchema(config any, schema map[string]any) error {
+	if schema == nil {
+		return nil
+	}
+
+	// Handle nil config (including typed nil pointers like (*Config)(nil))
+	if config == nil || reflect.ValueOf(config).Kind() == reflect.Ptr && reflect.ValueOf(config).IsNil() {
+		return nil
+	}
+
+	// AddResource expects an unmarshaled JSON value (map[string]any), not bytes
+	compiler := jsonschema.NewCompiler()
+	if err := compiler.AddResource("schema.json", schema); err != nil {
+		return err
+	}
+
+	sch, err := compiler.Compile("schema.json")
+	if err != nil {
+		return err
+	}
+
+	// Convert config to JSON-compatible format for validation.
+	// The jsonschema library validates against unmarshaled JSON values.
+	configJSON, err := json.Marshal(config)
+	if err != nil {
+		return err
+	}
+	var configValue any
+	if err := json.Unmarshal(configJSON, &configValue); err != nil {
+		return err
+	}
+
+	return sch.Validate(configValue)
 }

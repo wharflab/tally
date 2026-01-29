@@ -44,6 +44,25 @@ func (r *Rule) Metadata() rules.RuleMetadata {
 	}
 }
 
+// Schema returns the JSON Schema for this rule's configuration.
+// Follows ESLint's meta.schema pattern for rule options validation.
+func (r *Rule) Schema() map[string]any {
+	return map[string]any{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type":    "object",
+		"properties": map[string]any{
+			"trusted-registries": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string", "minLength": 1},
+				"minItems":    1,
+				"uniqueItems": true,
+				"description": "Allowed registries (at least one required to enable rule)",
+			},
+		},
+		"additionalProperties": false,
+	}
+}
+
 // Check runs the DL3026 rule.
 func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 	cfg := r.resolveConfig(input.Config)
@@ -133,9 +152,9 @@ func (r *Rule) DefaultConfig() any {
 	return DefaultConfig()
 }
 
-// ValidateConfig checks if the configuration is valid.
+// ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *Rule) ValidateConfig(config any) error {
-	return nil
+	return configutil.ValidateWithSchema(config, r.Schema())
 }
 
 // resolveConfig extracts the Config from input, falling back to defaults.
