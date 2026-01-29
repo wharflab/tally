@@ -1,6 +1,8 @@
 package processor
 
 import (
+	"path/filepath"
+
 	"github.com/tinovyatkin/tally/internal/directive"
 	"github.com/tinovyatkin/tally/internal/rules"
 )
@@ -58,16 +60,19 @@ func (p *InlineDirectiveFilter) Process(
 	}
 
 	// Group violations by file for efficient processing
+	// Normalize paths for cross-platform compatibility (Windows uses backslashes)
 	byFile := make(map[string][]rules.Violation)
 	for _, v := range violations {
-		byFile[v.Location.File] = append(byFile[v.Location.File], v)
+		normalized := filepath.ToSlash(v.Location.File)
+		byFile[normalized] = append(byFile[normalized], v)
 	}
 
 	// Also include files from FileSources that have no violations
 	// (they may still have unused directives or directives without reasons)
 	for file := range ctx.FileSources {
-		if _, ok := byFile[file]; !ok {
-			byFile[file] = nil
+		normalized := filepath.ToSlash(file)
+		if _, ok := byFile[normalized]; !ok {
+			byFile[normalized] = nil
 		}
 	}
 
