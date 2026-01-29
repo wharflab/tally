@@ -141,7 +141,7 @@ func isRegistryTrusted(registry string, trusted []string) bool {
 func normalizeRegistry(registry string) string {
 	registry = strings.ToLower(registry)
 	switch registry {
-	case "index.docker.io", "registry-1.docker.io", "registry.hub.docker.com":
+	case "index.docker.io", "registry-1.docker.io", "registry.hub.docker.com", "hub.docker.com":
 		return "docker.io"
 	}
 	return registry
