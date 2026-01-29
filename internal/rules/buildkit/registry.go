@@ -45,6 +45,9 @@ type ruleEntry struct {
 
 // allRules defines the complete list of BuildKit rules with tally-specific metadata.
 // BuildKit doesn't export a registry, so we create one referencing their exported variables.
+//
+// MAINTENANCE: Keep this list in sync with BuildKit's exported linter.Rule* variables.
+// When upgrading BuildKit, check for new/removed rules in linter/linter.go.
 var allRules = []ruleEntry{
 	// Style rules - Formatting and naming conventions
 	{&linter.RuleStageNameCasing, rules.SeverityWarning, "style"},
@@ -112,8 +115,10 @@ func getDescription(rule linter.LinterRuleI) string {
 		return r.Description
 	case *linter.LinterRule[func() string]:
 		return r.Description
+	default:
+		// Unknown Format signature - return empty. Add new cases if BuildKit adds signatures.
+		return ""
 	}
-	return ""
 }
 
 // getURL extracts URL from a LinterRule.
@@ -127,8 +132,10 @@ func getURL(rule linter.LinterRuleI) string {
 		return r.URL
 	case *linter.LinterRule[func() string]:
 		return r.URL
+	default:
+		// Unknown Format signature - return empty. Add new cases if BuildKit adds signatures.
+		return ""
 	}
-	return ""
 }
 
 // Get returns the RuleInfo for a BuildKit rule name.
