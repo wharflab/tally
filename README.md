@@ -335,11 +335,17 @@ Dockerfile:2
 
 ### JSON
 
-Machine-readable format with summary statistics:
+Machine-readable format with summary statistics and scan metadata:
 
 ```bash
 tally check --format json Dockerfile
 ```
+
+The JSON output includes:
+- `files`: Array of files with their violations
+- `summary`: Aggregate statistics (total, errors, warnings, etc.)
+- `files_scanned`: Total number of files scanned
+- `rules_enabled`: Number of active rules (with `DefaultSeverity != "off"`)
 
 ```json
 {
@@ -367,7 +373,9 @@ tally check --format json Dockerfile
     "info": 0,
     "style": 0,
     "files": 1
-  }
+  },
+  "files_scanned": 1,
+  "rules_enabled": 7
 }
 ```
 
