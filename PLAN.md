@@ -64,8 +64,19 @@ type ExcludeConfig struct {
     Paths []string `koanf:"paths"` // Glob patterns
 }
 
-// RulesConfig is a map of rule code -> config
-type RulesConfig map[string]RuleConfig
+// RulesConfig contains rule selection and per-rule configuration.
+type RulesConfig struct {
+    // Include enables rules by pattern (e.g. "buildkit/*", "tally/max-lines")
+    Include []string `koanf:"include"`
+    // Exclude disables rules by pattern (takes precedence over Include)
+    Exclude []string `koanf:"exclude"`
+    // Tally contains configuration for tally/* rules
+    Tally map[string]RuleConfig `koanf:"tally"`
+    // Buildkit contains configuration for buildkit/* rules
+    Buildkit map[string]RuleConfig `koanf:"buildkit"`
+    // Hadolint contains configuration for hadolint/* rules
+    Hadolint map[string]RuleConfig `koanf:"hadolint"`
+}
 ```
 
 2. **Changes to `Config` struct**:
