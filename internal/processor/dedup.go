@@ -1,11 +1,17 @@
 package processor
 
 import (
-	"fmt"
 	"path/filepath"
 
 	"github.com/tinovyatkin/tally/internal/rules"
 )
+
+// violationKey uniquely identifies a violation for deduplication.
+type violationKey struct {
+	file string
+	line int
+	rule string
+}
 
 // Deduplication removes duplicate violations.
 // Two violations are considered duplicates if they have the same file, line, and rule code.
@@ -26,14 +32,17 @@ func (p *Deduplication) Name() string {
 // Process removes duplicate violations.
 // Keeps the first occurrence of each unique (file, line, rule) combination.
 func (p *Deduplication) Process(violations []rules.Violation, _ *Context) []rules.Violation {
-	seen := make(map[string]bool)
+	seen := make(map[violationKey]struct{})
 	return filterViolations(violations, func(v rules.Violation) bool {
-		// Key: file:line:rule (normalize path for cross-platform deduplication)
-		key := fmt.Sprintf("%s:%d:%s", filepath.ToSlash(v.Location.File), v.Location.Start.Line, v.RuleCode)
-		if seen[key] {
+		key := violationKey{
+			file: filepath.ToSlash(v.Location.File),
+			line: v.Location.Start.Line,
+			rule: v.RuleCode,
+		}
+		if _, exists := seen[key]; exists {
 			return false
 		}
-		seen[key] = true
+		seen[key] = struct{}{}
 		return true
 	})
 }
