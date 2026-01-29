@@ -61,25 +61,38 @@ func (p *InlineDirectiveFilter) Process(
 
 	// Group violations by file for efficient processing
 	// Normalize paths for cross-platform compatibility (Windows uses backslashes)
-	byFile := make(map[string][]rules.Violation)
+	// but preserve the canonical path for ConfigForFile lookup
+	type fileBucket struct {
+		path       string
+		violations []rules.Violation
+	}
+	byFile := make(map[string]*fileBucket)
 	for _, v := range violations {
 		normalized := filepath.ToSlash(v.Location.File)
-		byFile[normalized] = append(byFile[normalized], v)
+		bucket := byFile[normalized]
+		if bucket == nil {
+			bucket = &fileBucket{path: v.Location.File}
+			byFile[normalized] = bucket
+		}
+		bucket.violations = append(bucket.violations, v)
 	}
 
 	// Also include files from FileSources that have no violations
 	// (they may still have unused directives or directives without reasons)
 	for file := range ctx.FileSources {
 		normalized := filepath.ToSlash(file)
-		if _, ok := byFile[normalized]; !ok {
-			byFile[normalized] = nil
+		bucket := byFile[normalized]
+		if bucket == nil {
+			byFile[normalized] = &fileBucket{path: file}
+		} else if bucket.path == "" {
+			bucket.path = file
 		}
 	}
 
 	// Process each file
 	result := make([]rules.Violation, 0, len(violations))
-	for file, fileViolations := range byFile {
-		filtered := p.processFile(file, fileViolations, ctx)
+	for _, bucket := range byFile {
+		filtered := p.processFile(bucket.path, bucket.violations, ctx)
 		result = append(result, filtered...)
 	}
 
