@@ -13,9 +13,15 @@ type EnableFilter struct {
 }
 
 // NewEnableFilter creates a new enable filter processor.
+// Uses the default registry. For testing, use NewEnableFilterWithRegistry.
 func NewEnableFilter() *EnableFilter {
+	return NewEnableFilterWithRegistry(rules.DefaultRegistry())
+}
+
+// NewEnableFilterWithRegistry creates an enable filter with a custom registry.
+func NewEnableFilterWithRegistry(registry *rules.Registry) *EnableFilter {
 	return &EnableFilter{
-		registry: rules.DefaultRegistry(),
+		registry: registry,
 	}
 }
 
