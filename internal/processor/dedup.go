@@ -2,6 +2,7 @@ package processor
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/tinovyatkin/tally/internal/rules"
 )
@@ -27,8 +28,8 @@ func (p *Deduplication) Name() string {
 func (p *Deduplication) Process(violations []rules.Violation, _ *Context) []rules.Violation {
 	seen := make(map[string]bool)
 	return filterViolations(violations, func(v rules.Violation) bool {
-		// Key: file:line:rule
-		key := fmt.Sprintf("%s:%d:%s", v.Location.File, v.Location.Start.Line, v.RuleCode)
+		// Key: file:line:rule (normalize path for cross-platform deduplication)
+		key := fmt.Sprintf("%s:%d:%s", filepath.ToSlash(v.Location.File), v.Location.Start.Line, v.RuleCode)
 		if seen[key] {
 			return false
 		}
