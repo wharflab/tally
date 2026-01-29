@@ -3,7 +3,6 @@ package processor
 import (
 	"github.com/tinovyatkin/tally/internal/directive"
 	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/sourcemap"
 )
 
 // InlineDirectiveFilter applies inline ignore directives.
@@ -97,12 +96,10 @@ func (p *InlineDirectiveFilter) processFile(
 		return violations
 	}
 
-	source, ok := ctx.FileSources[file]
-	if !ok {
+	sm := ctx.GetSourceMap(file)
+	if sm == nil {
 		return violations
 	}
-
-	sm := sourcemap.New(source)
 
 	// Set up rule validator if configured
 	var validator directive.RuleValidator
