@@ -23,7 +23,10 @@ func (p *PathExclusionFilter) Name() string {
 // Process filters out violations for files that match exclusion patterns.
 func (p *PathExclusionFilter) Process(violations []rules.Violation, ctx *Context) []rules.Violation {
 	return filterViolations(violations, func(v rules.Violation) bool {
-		patterns := ctx.Config.Rules.GetExcludePaths(v.RuleCode)
+		// Get config for the violation's file
+		cfg := ctx.ConfigForFile(v.Location.File)
+
+		patterns := cfg.Rules.GetExcludePaths(v.RuleCode)
 		if len(patterns) == 0 {
 			return true
 		}

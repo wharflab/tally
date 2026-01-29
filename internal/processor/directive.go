@@ -42,8 +42,14 @@ func (p *InlineDirectiveFilter) Process(
 	// Reset additional violations for each run
 	p.additionalViolations = nil
 
-	if !ctx.Config.InlineDirectives.Enabled {
-		return violations
+	// Check if any file has inline directives enabled
+	// (we need to process each file to check its config)
+	if ctx.DefaultConfig != nil && !ctx.DefaultConfig.InlineDirectives.Enabled {
+		// Quick check: if default config has directives disabled and no per-file configs,
+		// we can skip processing entirely
+		if len(ctx.FileConfigs) == 0 {
+			return violations
+		}
 	}
 
 	// Group violations by file for efficient processing
@@ -83,6 +89,14 @@ func (p *InlineDirectiveFilter) processFile(
 	violations []rules.Violation,
 	ctx *Context,
 ) []rules.Violation {
+	// Get config for this specific file
+	cfg := ctx.ConfigForFile(file)
+
+	// Skip if inline directives are disabled for this file
+	if !cfg.InlineDirectives.Enabled {
+		return violations
+	}
+
 	source, ok := ctx.FileSources[file]
 	if !ok {
 		return violations
@@ -92,7 +106,7 @@ func (p *InlineDirectiveFilter) processFile(
 
 	// Set up rule validator if configured
 	var validator directive.RuleValidator
-	if ctx.Config.InlineDirectives.ValidateRules {
+	if cfg.InlineDirectives.ValidateRules {
 		validator = p.registry.Has
 	}
 
@@ -115,7 +129,7 @@ func (p *InlineDirectiveFilter) processFile(
 		violations = filterResult.Violations
 
 		// Report unused directives if configured
-		if ctx.Config.InlineDirectives.WarnUnused {
+		if cfg.InlineDirectives.WarnUnused {
 			for _, unused := range filterResult.UnusedDirectives {
 				p.additionalViolations = append(p.additionalViolations, rules.NewViolation(
 					rules.NewLineLocation(file, unused.Line+1),
@@ -128,7 +142,7 @@ func (p *InlineDirectiveFilter) processFile(
 	}
 
 	// Report directives without reason if configured
-	if ctx.Config.InlineDirectives.RequireReason {
+	if cfg.InlineDirectives.RequireReason {
 		for _, d := range directiveResult.Directives {
 			if d.Source != directive.SourceBuildx && d.Reason == "" {
 				p.additionalViolations = append(p.additionalViolations, rules.NewViolation(

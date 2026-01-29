@@ -41,8 +41,13 @@ type Processor interface {
 // NOTE: Context is not safe for concurrent access. The processor chain
 // runs sequentially, so no synchronization is needed.
 type Context struct {
-	// Config is the loaded configuration.
-	Config *config.Config
+	// FileConfigs maps file paths to their loaded configuration.
+	// Each file may have a different config due to cascading discovery.
+	FileConfigs map[string]*config.Config
+
+	// DefaultConfig is the fallback config when a file-specific config is not found.
+	// This is typically the first file's config (for output settings).
+	DefaultConfig *config.Config
 
 	// FileSources maps file paths to their raw source content.
 	// Used by SnippetAttachment for extracting source code.
@@ -54,12 +59,28 @@ type Context struct {
 }
 
 // NewContext creates a new processor context.
-func NewContext(cfg *config.Config, fileSources map[string][]byte) *Context {
+// fileConfigs maps each file path to its specific config.
+// defaultCfg is used for output settings and as fallback.
+func NewContext(
+	fileConfigs map[string]*config.Config,
+	defaultCfg *config.Config,
+	fileSources map[string][]byte,
+) *Context {
 	return &Context{
-		Config:      cfg,
-		FileSources: fileSources,
-		sourceMaps:  make(map[string]*sourcemap.SourceMap),
+		FileConfigs:   fileConfigs,
+		DefaultConfig: defaultCfg,
+		FileSources:   fileSources,
+		sourceMaps:    make(map[string]*sourcemap.SourceMap),
 	}
+}
+
+// ConfigForFile returns the config for a specific file.
+// Falls back to DefaultConfig if no file-specific config exists.
+func (ctx *Context) ConfigForFile(file string) *config.Config {
+	if cfg, ok := ctx.FileConfigs[file]; ok {
+		return cfg
+	}
+	return ctx.DefaultConfig
 }
 
 // GetSourceMap returns or creates a SourceMap for the given file.

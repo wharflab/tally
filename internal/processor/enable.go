@@ -27,8 +27,11 @@ func (p *EnableFilter) Name() string {
 // Process filters out violations for disabled rules.
 func (p *EnableFilter) Process(violations []rules.Violation, ctx *Context) []rules.Violation {
 	return filterViolations(violations, func(v rules.Violation) bool {
+		// Get config for the violation's file
+		cfg := ctx.ConfigForFile(v.Location.File)
+
 		// Check config-based enable/disable
-		enabled := ctx.Config.Rules.IsEnabled(v.RuleCode)
+		enabled := cfg.Rules.IsEnabled(v.RuleCode)
 
 		if enabled != nil {
 			// Config explicitly enables/disables this rule

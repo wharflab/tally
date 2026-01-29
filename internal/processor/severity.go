@@ -21,7 +21,10 @@ func (p *SeverityOverride) Name() string {
 // Process applies severity overrides from config.
 func (p *SeverityOverride) Process(violations []rules.Violation, ctx *Context) []rules.Violation {
 	return transformViolations(violations, func(v rules.Violation) rules.Violation {
-		override := ctx.Config.Rules.GetSeverity(v.RuleCode)
+		// Get config for the violation's file
+		cfg := ctx.ConfigForFile(v.Location.File)
+
+		override := cfg.Rules.GetSeverity(v.RuleCode)
 		if override == "" {
 			return v
 		}

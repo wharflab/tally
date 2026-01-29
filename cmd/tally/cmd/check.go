@@ -139,7 +139,8 @@ func checkCommand() *cli.Command {
 
 			var allViolations []rules.Violation
 			fileSources := make(map[string][]byte)
-			var firstCfg *config.Config // Store first file's config for output settings
+			fileConfigs := make(map[string]*config.Config) // Per-file configs
+			var firstCfg *config.Config                    // Store first file's config for output settings
 
 			for _, df := range discovered {
 				file := df.Path
@@ -150,6 +151,9 @@ func checkCommand() *cli.Command {
 					fmt.Fprintf(os.Stderr, "Error: failed to load config for %s: %v\n", file, err)
 					os.Exit(ExitConfigError)
 				}
+
+				// Store per-file config for processor chain
+				fileConfigs[file] = cfg
 
 				// Store first config for output settings
 				if firstCfg == nil {
@@ -240,7 +244,8 @@ func checkCommand() *cli.Command {
 			)
 
 			// Process all violations through the chain
-			procCtx := processor.NewContext(firstCfg, fileSources)
+			// Each file gets its own config for rule enable/disable, severity, etc.
+			procCtx := processor.NewContext(fileConfigs, firstCfg, fileSources)
 			allViolations = chain.Process(allViolations, procCtx)
 
 			// Add any additional violations from the inline directive filter

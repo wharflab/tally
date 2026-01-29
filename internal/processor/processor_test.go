@@ -15,7 +15,7 @@ func TestChain(t *testing.T) {
 
 	// Chain that filters out all violations
 	chain := NewChain(&mockProcessor{name: "filter-all", filter: func(v rules.Violation) bool { return false }})
-	ctx := NewContext(config.Default(), nil)
+	ctx := NewContext(nil, config.Default(), nil)
 
 	result := chain.Process(violations, ctx)
 	if len(result) != 0 {
@@ -29,7 +29,7 @@ func TestPathNormalization(t *testing.T) {
 	}
 
 	p := NewPathNormalization()
-	ctx := NewContext(config.Default(), nil)
+	ctx := NewContext(nil, config.Default(), nil)
 
 	result := p.Process(violations, ctx)
 	if len(result) != 1 {
@@ -56,7 +56,7 @@ func TestDeduplication(t *testing.T) {
 	}
 
 	p := NewDeduplication()
-	ctx := NewContext(config.Default(), nil)
+	ctx := NewContext(nil, config.Default(), nil)
 
 	result := p.Process(violations, ctx)
 	if len(result) != 3 {
@@ -72,7 +72,7 @@ func TestSorting(t *testing.T) {
 	}
 
 	p := NewSorting()
-	ctx := NewContext(config.Default(), nil)
+	ctx := NewContext(nil, config.Default(), nil)
 
 	result := p.Process(violations, ctx)
 	if len(result) != 3 {
@@ -109,7 +109,7 @@ func TestEnableFilter(t *testing.T) {
 	cfg.Rules.Exclude = append(cfg.Rules.Exclude, "tally/max-lines")
 
 	p := NewEnableFilter()
-	ctx := NewContext(cfg, nil)
+	ctx := NewContext(nil, cfg, nil)
 
 	result := p.Process(violations, ctx)
 	if len(result) != 1 {
@@ -133,7 +133,7 @@ func TestSeverityOverride(t *testing.T) {
 	cfg.Rules.Set("tally/max-lines", config.RuleConfig{Severity: "info"})
 
 	p := NewSeverityOverride()
-	ctx := NewContext(cfg, nil)
+	ctx := NewContext(nil, cfg, nil)
 
 	result := p.Process(violations, ctx)
 	if len(result) != 2 {
@@ -165,7 +165,7 @@ func TestPathExclusionFilter(t *testing.T) {
 	})
 
 	p := NewPathExclusionFilter()
-	ctx := NewContext(cfg, nil)
+	ctx := NewContext(nil, cfg, nil)
 
 	result := p.Process(violations, ctx)
 	if len(result) != 1 {
@@ -183,7 +183,7 @@ func TestSnippetAttachment(t *testing.T) {
 	}
 
 	p := NewSnippetAttachment()
-	ctx := NewContext(config.Default(), map[string][]byte{"file.txt": source})
+	ctx := NewContext(nil, config.Default(), map[string][]byte{"file.txt": source})
 
 	result := p.Process(violations, ctx)
 	if len(result) != 1 {
@@ -207,7 +207,7 @@ func TestEnableFilter_HadolintRules(t *testing.T) {
 	cfg.Rules.Exclude = append(cfg.Rules.Exclude, "hadolint/DL3024")
 
 	p := NewEnableFilter()
-	ctx := NewContext(cfg, nil)
+	ctx := NewContext(nil, cfg, nil)
 
 	result := p.Process(violations, ctx)
 	if len(result) != 1 {
@@ -229,7 +229,7 @@ func TestSeverityOverride_HadolintRules(t *testing.T) {
 	cfg.Rules.Set("hadolint/DL3024", config.RuleConfig{Severity: "warning"})
 
 	p := NewSeverityOverride()
-	ctx := NewContext(cfg, nil)
+	ctx := NewContext(nil, cfg, nil)
 
 	result := p.Process(violations, ctx)
 	if len(result) != 1 {
