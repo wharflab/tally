@@ -112,6 +112,13 @@ func (ctx *Context) GetSourceMap(file string) *sourcemap.SourceMap {
 
 	sm := sourcemap.New(source)
 	ctx.sourceMaps[file] = sm
+	// Also cache under path variants to avoid re-parsing if called with different separators
+	if windowsPath := strings.ReplaceAll(file, "/", "\\"); windowsPath != file {
+		ctx.sourceMaps[windowsPath] = sm
+	}
+	if unixPath := strings.ReplaceAll(file, "\\", "/"); unixPath != file {
+		ctx.sourceMaps[unixPath] = sm
+	}
 	return sm
 }
 
