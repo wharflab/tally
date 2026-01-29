@@ -12,8 +12,14 @@ import (
 //   - Parse errors in directives
 //   - Unused directives (if WarnUnused is enabled)
 //   - Missing reason= (if RequireReason is enabled)
+//
+// NOTE: This processor is stateful - it stores additional violations that must
+// be retrieved via AdditionalViolations() after Process() completes. The state
+// is reset on each Process() call, making it safe for sequential reuse but not
+// for concurrent or multi-pass processing.
 type InlineDirectiveFilter struct {
-	// additionalViolations collects directive-related warnings
+	// additionalViolations collects directive-related warnings.
+	// Reset on each Process() call.
 	additionalViolations []rules.Violation
 
 	// registry is used to validate rule codes
