@@ -76,10 +76,26 @@ func NewContext(
 
 // ConfigForFile returns the config for a specific file.
 // Falls back to DefaultConfig if no file-specific config exists.
+// Handles cross-platform path lookups by trying both forward and backslash variants.
 func (ctx *Context) ConfigForFile(file string) *config.Config {
+	// Try direct lookup first
 	if cfg, ok := ctx.FileConfigs[file]; ok {
 		return cfg
 	}
+
+	// On Windows, FileConfigs may have backslash paths while violations have forward slashes
+	// (due to PathNormalization processor). Try the backslash variant.
+	windowsPath := strings.ReplaceAll(file, "/", "\\")
+	if cfg, ok := ctx.FileConfigs[windowsPath]; ok {
+		return cfg
+	}
+
+	// Also try forward-slash variant when caller passes backslashes.
+	unixPath := strings.ReplaceAll(file, "\\", "/")
+	if cfg, ok := ctx.FileConfigs[unixPath]; ok {
+		return cfg
+	}
+
 	return ctx.DefaultConfig
 }
 
