@@ -252,6 +252,8 @@ func checkCommand() *cli.Command {
 			// (parse errors, unused directives, missing reasons)
 			additionalViolations := inlineFilter.AdditionalViolations()
 			if len(additionalViolations) > 0 {
+				// Apply PathNormalization for consistent path formats with main violations
+				additionalViolations = processor.NewPathNormalization().Process(additionalViolations, procCtx)
 				additionalViolations = processor.NewSnippetAttachment().Process(additionalViolations, procCtx)
 				allViolations = append(allViolations, additionalViolations...)
 				// Re-sort after adding directive warnings
