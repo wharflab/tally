@@ -25,7 +25,7 @@ func NewGitHubActionsReporter(w io.Writer) *GitHubActionsReporter {
 }
 
 // Report implements Reporter.
-func (r *GitHubActionsReporter) Report(violations []rules.Violation, _ map[string][]byte) error {
+func (r *GitHubActionsReporter) Report(violations []rules.Violation, _ map[string][]byte, _ ReportMetadata) error {
 	sorted := SortViolations(violations)
 
 	for _, v := range sorted {
@@ -84,6 +84,9 @@ func severityToGitHubLevel(s rules.Severity) string {
 		return ghLevelWarning
 	case rules.SeverityInfo, rules.SeverityStyle:
 		return ghLevelNotice
+	case rules.SeverityOff:
+		// Should never reach here - filtered by EnableFilter
+		return ghLevelWarning
 	default:
 		return ghLevelWarning
 	}

@@ -499,12 +499,9 @@ ENVIRONMENT = "production"
 
 # Target platform
 platform = "linux/amd64"
-
-# Rules that require context
-[rules]
-DL3060 = { enabled = true }  # COPY ignored file
-DL3061 = { enabled = true }  # COPY non-existent file
 ```
+
+Note: Context-aware rules like DL3060 (COPY ignored file) and DL3061 (COPY non-existent file) are enabled by default when running with `--context`.
 
 ### CLI Flags
 

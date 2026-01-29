@@ -3,6 +3,7 @@ package trustedbaseimage
 import (
 	"testing"
 
+	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
@@ -13,8 +14,9 @@ func TestMetadata(t *testing.T) {
 	if meta.Code != "hadolint/DL3026" {
 		t.Errorf("expected code hadolint/DL3026, got %s", meta.Code)
 	}
-	if meta.EnabledByDefault {
-		t.Error("expected rule to be disabled by default")
+	// Off by default, auto-enabled when trusted-registries configured
+	if meta.DefaultSeverity != rules.SeverityOff {
+		t.Errorf("expected DefaultSeverity=off, got %v", meta.DefaultSeverity)
 	}
 }
 

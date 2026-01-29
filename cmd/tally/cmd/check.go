@@ -230,12 +230,12 @@ func checkCommand() *cli.Command {
 			}
 
 			// Build processor chain for violation processing
-			// Order matters: filter first, then transform, then output preparation
+			// Order matters: severity first, then filter, then transform, then output preparation
 			inlineFilter := processor.NewInlineDirectiveFilter()
 			chain := processor.NewChain(
 				processor.NewPathNormalization(),   // Normalize paths for cross-platform consistency
-				processor.NewEnableFilter(),        // Filter disabled rules
-				processor.NewSeverityOverride(),    // Apply severity overrides from config
+				processor.NewSeverityOverride(),    // Apply severity overrides (must run before EnableFilter)
+				processor.NewEnableFilter(),        // Filter rules with severity="off"
 				processor.NewPathExclusionFilter(), // Apply per-rule path exclusions
 				inlineFilter,                       // Apply inline ignore directives
 				processor.NewDeduplication(),       // Remove duplicate violations
@@ -305,8 +305,14 @@ func checkCommand() *cli.Command {
 				return cli.Exit("", ExitConfigError)
 			}
 
+			// Calculate metadata for report
+			metadata := reporter.ReportMetadata{
+				FilesScanned: len(discovered),
+				RulesEnabled: countEnabledRules(),
+			}
+
 			// Report violations
-			if err := rep.Report(allViolations, fileSources); err != nil {
+			if err := rep.Report(allViolations, fileSources, metadata); err != nil {
 				fmt.Fprintf(os.Stderr, "Error: failed to write output: %v\n", err)
 				return cli.Exit("", ExitConfigError)
 			}
@@ -493,6 +499,19 @@ func getRuleConfig(ruleCode string, cfg *config.Config) any {
 	// Return the rule's options map from config
 	// The rule's resolveConfig method handles converting map to typed config
 	return cfg.Rules.GetOptions(ruleCode)
+}
+
+// countEnabledRules returns the number of rules with DefaultSeverity != Off.
+func countEnabledRules() int {
+	registry := rules.DefaultRegistry()
+	allRules := registry.All()
+	count := 0
+	for _, rule := range allRules {
+		if rule.Metadata().DefaultSeverity != rules.SeverityOff {
+			count++
+		}
+	}
+	return count
 }
 
 // extractHeredocFiles extracts virtual file paths from heredoc COPY/ADD commands.

@@ -37,7 +37,7 @@ func TestSARIFReporter(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewSARIFReporter(&buf, "tally", "1.0.0", "https://github.com/tinovyatkin/tally")
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -144,7 +144,7 @@ func TestSARIFReporterEmpty(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewSARIFReporter(&buf, "tally", "1.0.0", "")
 
-	err := reporter.Report(nil, nil)
+	err := reporter.Report(nil, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -192,7 +192,7 @@ func TestSARIFReporterColumnZero(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewSARIFReporter(&buf, "tally", "1.0.0", "")
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -258,7 +258,7 @@ func TestSARIFReporterFileLevelViolation(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewSARIFReporter(&buf, "tally", "1.0.0", "")
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}

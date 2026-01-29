@@ -14,6 +14,10 @@ type JSONOutput struct {
 	Files []FileResult `json:"files"`
 	// Summary contains aggregate statistics.
 	Summary Summary `json:"summary"`
+	// FilesScanned is the total number of files scanned.
+	FilesScanned int `json:"files_scanned"`
+	// RulesEnabled is the total number of rules that were active.
+	RulesEnabled int `json:"rules_enabled"`
 }
 
 // FileResult contains the linting results for a single file.
@@ -43,7 +47,7 @@ func NewJSONReporter(w io.Writer) *JSONReporter {
 }
 
 // Report implements Reporter.
-func (r *JSONReporter) Report(violations []rules.Violation, _ map[string][]byte) error {
+func (r *JSONReporter) Report(violations []rules.Violation, _ map[string][]byte, metadata ReportMetadata) error {
 	// Group violations by file (deterministic order)
 	// Normalize paths to forward slashes for cross-platform consistency
 	byFile := make(map[string][]rules.Violation)
@@ -61,8 +65,10 @@ func (r *JSONReporter) Report(violations []rules.Violation, _ map[string][]byte)
 
 	// Build output structure
 	output := JSONOutput{
-		Files:   make([]FileResult, 0, len(filesOrder)),
-		Summary: calculateSummary(violations, len(filesOrder)),
+		Files:        make([]FileResult, 0, len(filesOrder)),
+		Summary:      calculateSummary(violations, len(filesOrder)),
+		FilesScanned: metadata.FilesScanned,
+		RulesEnabled: metadata.RulesEnabled,
 	}
 
 	for _, file := range filesOrder {
@@ -99,6 +105,8 @@ func calculateSummary(violations []rules.Violation, fileCount int) Summary {
 			summary.Info++
 		case rules.SeverityStyle:
 			summary.Style++
+		case rules.SeverityOff:
+			// Should never reach here - filtered by EnableFilter
 		}
 	}
 

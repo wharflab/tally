@@ -36,7 +36,7 @@ func TestJSONReporter(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewJSONReporter(&buf)
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -108,7 +108,7 @@ func TestJSONReporterMultipleFiles(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewJSONReporter(&buf)
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -137,7 +137,7 @@ func TestJSONReporterEmpty(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewJSONReporter(&buf)
 
-	err := reporter.Report(nil, nil)
+	err := reporter.Report(nil, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}

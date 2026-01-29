@@ -235,3 +235,25 @@ func TestResolve_PointerFields(t *testing.T) {
 		t.Errorf("expected *PtrIntField=100, got %d", *result.PtrIntField)
 	}
 }
+
+func TestResolve_TrustedRegistries(t *testing.T) {
+	type Config struct {
+		TrustedRegistries []string `koanf:"trusted-registries"`
+	}
+
+	defaults := Config{
+		TrustedRegistries: nil,
+	}
+
+	opts := map[string]any{
+		"trusted-registries": []string{"docker.io"},
+	}
+
+	result := Resolve(opts, defaults)
+	if len(result.TrustedRegistries) != 1 {
+		t.Errorf("expected 1 registry, got %d: %v", len(result.TrustedRegistries), result.TrustedRegistries)
+	}
+	if result.TrustedRegistries[0] != "docker.io" {
+		t.Errorf("expected docker.io, got %s", result.TrustedRegistries[0])
+	}
+}

@@ -23,7 +23,7 @@ func NewMarkdownReporter(w io.Writer) *MarkdownReporter {
 }
 
 // Report implements Reporter.
-func (r *MarkdownReporter) Report(violations []rules.Violation, _ map[string][]byte) error {
+func (r *MarkdownReporter) Report(violations []rules.Violation, _ map[string][]byte, _ ReportMetadata) error {
 	if len(violations) == 0 {
 		_, err := fmt.Fprintln(r.writer, "**No issues found**")
 		return err
@@ -155,6 +155,8 @@ func severityPriority(s rules.Severity) int {
 		return 2
 	case rules.SeverityStyle:
 		return 3
+	case rules.SeverityOff:
+		return 5 // Should never reach here
 	default:
 		return 4
 	}
@@ -171,6 +173,8 @@ func severityEmoji(s rules.Severity) string {
 		return "ℹ️"
 	case rules.SeverityStyle:
 		return "💅"
+	case rules.SeverityOff:
+		return "⭕" // Should never reach here
 	default:
 		return "⚠️"
 	}

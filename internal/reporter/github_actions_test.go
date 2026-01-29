@@ -35,7 +35,7 @@ func TestGitHubActionsReporter(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewGitHubActionsReporter(&buf)
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -102,7 +102,7 @@ func TestGitHubActionsReporterEmpty(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewGitHubActionsReporter(&buf)
 
-	err := reporter.Report(nil, nil)
+	err := reporter.Report(nil, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -128,7 +128,7 @@ func TestGitHubActionsReporterMessageEscaping(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewGitHubActionsReporter(&buf)
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -162,7 +162,7 @@ func TestGitHubActionsReporterPropertyEscaping(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewGitHubActionsReporter(&buf)
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -219,7 +219,7 @@ func TestGitHubActionsReporterSorting(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewGitHubActionsReporter(&buf)
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}

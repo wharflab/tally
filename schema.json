@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://json.schemastore.org/tally.json",
+  "$defs": {
+    "DL3026Config": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/tinovyatkin/tally/internal/rules/trustedbaseimage/config",
+      "properties": {
+        "trusted-registries": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Allowed registries. If empty rule is disabled."
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Configuration for DL3026 rule"
+    },
+    "ExcludeConfig": {
+      "properties": {
+        "paths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Glob patterns for files to exclude (e.g. test/**)"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "InlineDirectivesConfig": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Process inline ignore directives",
+          "default": true
+        },
+        "warn-unused": {
+          "type": "boolean",
+          "description": "Warn about unused directives",
+          "default": false
+        },
+        "validate-rules": {
+          "type": "boolean",
+          "description": "Warn about unknown rule codes in directives",
+          "default": false
+        },
+        "require-reason": {
+          "type": "boolean",
+          "description": "Require reason= on all ignore directives",
+          "default": false
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "OutputConfig": {
+      "properties": {
+        "format": {
+          "type": "string",
+          "enum": [
+            "text",
+            "json",
+            "sarif",
+            "github-actions",
+            "markdown"
+          ],
+          "description": "Output format",
+          "default": "text"
+        },
+        "path": {
+          "type": "string",
+          "description": "Output destination: stdout, stderr, or file path",
+          "default": "stdout"
+        },
+        "show-source": {
+          "type": "boolean",
+          "description": "Show source code snippets in text output",
+          "default": true
+        },
+        "fail-level": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "info",
+            "style",
+            "none"
+          ],
+          "description": "Minimum severity for non-zero exit code",
+          "default": "style"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "RuleConfig": {
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": [
+            "error",
+            "warning",
+            "info",
+            "style"
+          ],
+          "description": "Override the rule's default severity"
+        },
+        "exclude": {
+          "$ref": "#/$defs/ExcludeConfig",
+          "description": "Path patterns where this rule should not run"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "RulesConfig": {
+      "properties": {
+        "include": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Enable rules by pattern (e.g. buildkit/*)"
+        },
+        "exclude": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "Disable rules by pattern (takes precedence)"
+        },
+        "tally": {
+          "additionalProperties": {
+            "$ref": "#/$defs/RuleConfig"
+          },
+          "type": "object",
+          "description": "Configuration for tally/* rules"
+        },
+        "buildkit": {
+          "additionalProperties": {
+            "$ref": "#/$defs/RuleConfig"
+          },
+          "type": "object",
+          "description": "Configuration for buildkit/* rules"
+        },
+        "hadolint": {
+          "additionalProperties": {
+            "$ref": "#/$defs/RuleConfig"
+          },
+          "type": "object",
+          "description": "Configuration for hadolint/* rules"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "max-linesConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/tinovyatkin/tally/internal/rules/maxlines/config",
+      "properties": {
+        "max": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum number of lines allowed (0 = disabled)",
+          "default": 50
+        },
+        "skip-blank-lines": {
+          "type": "boolean",
+          "description": "Exclude blank lines from the count",
+          "default": true
+        },
+        "skip-comments": {
+          "type": "boolean",
+          "description": "Exclude comment lines from the count",
+          "default": true
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Configuration for max-lines rule"
+    }
+  },
+  "$comment": "Auto-generated on 2026-01-29. Do not edit manually.",
+  "properties": {
+    "rules": {
+      "$ref": "#/$defs/RulesConfig",
+      "description": "Rule configuration"
+    },
+    "output": {
+      "$ref": "#/$defs/OutputConfig",
+      "description": "Output settings"
+    },
+    "inline-directives": {
+      "$ref": "#/$defs/InlineDirectivesConfig"
+    }
+  },
+  "additionalProperties": false,
+  "type": "object",
+  "title": "tally configuration",
+  "description": "Configuration schema for tally Dockerfile linter"
+}

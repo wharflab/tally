@@ -1,0 +1,2 @@
+[rules.hadolint.DL3026]
+trusted-registries = ["docker.io"]

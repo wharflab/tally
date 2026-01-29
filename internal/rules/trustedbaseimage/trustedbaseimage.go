@@ -16,7 +16,7 @@ import (
 // Config is the configuration for the trusted-base-image rule.
 type Config struct {
 	// TrustedRegistries is the list of allowed registries.
-	TrustedRegistries []string `json:"trusted-registries,omitempty" jsonschema:"description=Allowed registries. If empty rule is disabled."`
+	TrustedRegistries []string `json:"trusted-registries,omitempty" koanf:"trusted-registries"`
 }
 
 // DefaultConfig returns the default configuration.
@@ -37,9 +37,9 @@ func (r *Rule) Metadata() rules.RuleMetadata {
 		Name:             "Use only trusted base images",
 		Description:      "Use only an allowed registry in the FROM image",
 		DocURL:           "https://github.com/hadolint/hadolint/wiki/DL3026",
-		DefaultSeverity:  rules.SeverityError,
+		DefaultSeverity:  rules.SeverityOff, // Off by default, enabled when trusted-registries configured
 		Category:         "security",
-		EnabledByDefault: false, // Disabled by default since it requires configuration
+		EnabledByDefault: true,
 		IsExperimental:   false,
 	}
 }

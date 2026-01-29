@@ -32,6 +32,8 @@
     "info": 0,
     "style": 0,
     "files": 1
-  }
+  },
+  "files_scanned": 1,
+  "rules_enabled": 7
 }
 

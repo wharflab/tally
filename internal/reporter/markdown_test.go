@@ -33,7 +33,7 @@ func TestMarkdownReporterSingleFile(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewMarkdownReporter(&buf)
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -107,7 +107,7 @@ func TestMarkdownReporterMultipleFiles(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewMarkdownReporter(&buf)
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -129,7 +129,7 @@ func TestMarkdownReporterEmpty(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewMarkdownReporter(&buf)
 
-	err := reporter.Report(nil, nil)
+	err := reporter.Report(nil, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -178,7 +178,7 @@ func TestMarkdownReporterEscaping(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewMarkdownReporter(&buf)
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}
@@ -212,7 +212,7 @@ func TestMarkdownReporterFileLevelViolation(t *testing.T) {
 	var buf bytes.Buffer
 	reporter := NewMarkdownReporter(&buf)
 
-	err := reporter.Report(violations, nil)
+	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {
 		t.Fatalf("Report() error = %v", err)
 	}

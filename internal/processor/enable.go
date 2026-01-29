@@ -5,10 +5,10 @@ import (
 )
 
 // EnableFilter removes violations for disabled rules.
-// Uses config.Rules.IsEnabled() to check if a rule is enabled.
-// If no configuration exists for a rule, it uses the rule's EnabledByDefault from metadata.
+// Filters out violations with severity="off".
+// Also respects Include/Exclude patterns from config.
 type EnableFilter struct {
-	// registry is used to look up rule metadata for EnabledByDefault
+	// registry is used to look up rule metadata
 	registry *rules.Registry
 }
 
@@ -34,34 +34,27 @@ func (p *EnableFilter) Name() string {
 }
 
 // Process filters out violations for disabled rules.
+// Rules are disabled if:
+//  1. Severity is "off" (after SeverityOverride has run)
+//  2. Excluded by Include/Exclude patterns
 func (p *EnableFilter) Process(violations []rules.Violation, ctx *Context) []rules.Violation {
 	return filterViolations(violations, func(v rules.Violation) bool {
-		// Get config for the violation's file
+		// Filter out violations with severity="off"
+		// (SeverityOverride runs before this processor)
+		if v.Severity == rules.SeverityOff {
+			return false
+		}
+
+		// Check Include/Exclude patterns from config
 		cfg := ctx.ConfigForFile(v.Location.File)
-		if cfg == nil {
-			// No config - check rule's EnabledByDefault below
-			rule := p.registry.Get(v.RuleCode)
-			if rule != nil {
-				return rule.Metadata().EnabledByDefault
+		if cfg != nil {
+			enabled := cfg.Rules.IsEnabled(v.RuleCode)
+			if enabled != nil {
+				return *enabled
 			}
-			return true
 		}
 
-		// Check config-based enable/disable
-		enabled := cfg.Rules.IsEnabled(v.RuleCode)
-
-		if enabled != nil {
-			// Config explicitly enables/disables this rule
-			return *enabled
-		}
-
-		// No config - check rule's EnabledByDefault
-		rule := p.registry.Get(v.RuleCode)
-		if rule != nil {
-			return rule.Metadata().EnabledByDefault
-		}
-
-		// Unknown rule - default to enabled (e.g., BuildKit warnings)
+		// No explicit Include/Exclude - rule is enabled
 		return true
 	})
 }

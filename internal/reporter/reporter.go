@@ -17,10 +17,19 @@ import (
 	"github.com/tinovyatkin/tally/internal/rules"
 )
 
+// ReportMetadata contains contextual information about the lint run.
+type ReportMetadata struct {
+	// FilesScanned is the total number of files that were scanned.
+	FilesScanned int
+	// RulesEnabled is the total number of rules that were active (not "off").
+	RulesEnabled int
+}
+
 // Reporter formats and outputs lint violations.
 type Reporter interface {
 	// Report writes violations to the configured output.
-	Report(violations []rules.Violation, sources map[string][]byte) error
+	// The metadata parameter provides context like files scanned and rules enabled.
+	Report(violations []rules.Violation, sources map[string][]byte, metadata ReportMetadata) error
 }
 
 // SortViolations sorts violations by file, line, column, and rule code for stable output.
@@ -159,7 +168,7 @@ type textReporterAdapter struct {
 }
 
 // Report implements Reporter.
-func (a *textReporterAdapter) Report(violations []rules.Violation, sources map[string][]byte) error {
+func (a *textReporterAdapter) Report(violations []rules.Violation, sources map[string][]byte, _ ReportMetadata) error {
 	return a.reporter.Print(a.writer, violations, sources)
 }
 

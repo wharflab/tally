@@ -45,7 +45,7 @@ func NewSARIFReporter(w io.Writer, toolName, toolVersion, toolURI string) *SARIF
 }
 
 // Report implements Reporter.
-func (r *SARIFReporter) Report(violations []rules.Violation, _ map[string][]byte) error {
+func (r *SARIFReporter) Report(violations []rules.Violation, _ map[string][]byte, _ ReportMetadata) error {
 	// Create a new SARIF report (v2.1.0 for maximum compatibility)
 	report, err := sarif.New(sarif.Version210)
 	if err != nil {
@@ -174,6 +174,9 @@ func severityToSARIFLevel(s rules.Severity) string {
 	case rules.SeverityWarning:
 		return sarifLevelWarning
 	case rules.SeverityInfo, rules.SeverityStyle:
+		return sarifLevelNote
+	case rules.SeverityOff:
+		// Should never reach here - filtered by EnableFilter
 		return sarifLevelNote
 	default:
 		return sarifLevelWarning

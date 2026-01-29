@@ -219,6 +219,19 @@ func TestCheck(t *testing.T) {
 			isDir:    true,
 			wantExit: 1,
 		},
+
+		// Rule-specific tests
+		{
+			name: "trusted-registries-allowed",
+			dir:  "trusted-registries-allowed",
+			args: []string{"--format", "json"},
+		},
+		{
+			name:     "trusted-registries-untrusted",
+			dir:      "trusted-registries-untrusted",
+			args:     []string{"--format", "json"},
+			wantExit: 1,
+		},
 	}
 
 	for _, tc := range testCases {

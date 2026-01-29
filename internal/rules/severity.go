@@ -21,11 +21,17 @@ const (
 	SeverityInfo
 	// SeverityStyle indicates a style/formatting preference.
 	SeverityStyle
+
+	// SeverityOff disables the rule completely.
+	// Placed after other severities to avoid zero-value confusion.
+	SeverityOff
 )
 
 // String returns the string representation of the severity.
 func (s Severity) String() string {
 	switch s {
+	case SeverityOff:
+		return "off"
 	case SeverityError:
 		return "error"
 	case SeverityWarning:
@@ -62,6 +68,8 @@ func (s *Severity) UnmarshalJSON(data []byte) error {
 // ParseSeverity parses a severity string into a Severity value.
 func ParseSeverity(s string) (Severity, error) {
 	switch strings.ToLower(s) {
+	case "off":
+		return SeverityOff, nil
 	case "error":
 		return SeverityError, nil
 	case "warning", "warn":

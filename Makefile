@@ -1,4 +1,4 @@
-.PHONY: build test lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish
+.PHONY: build test lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema
 
 build:
 	CGO_ENABLED=0 go build -ldflags "-s -w" -o tally
@@ -60,6 +60,9 @@ bin/deadcode-$(DEADCODE_VERSION):
 	@rm -f bin/deadcode bin/deadcode-*
 	GOBIN=$(CURDIR)/bin go install golang.org/x/tools/cmd/deadcode@$(DEADCODE_VERSION)
 	@touch $@
+
+jsonschema:
+	go run gen/jsonschema.go > schema.json
 
 clean:
 	rm -f tally

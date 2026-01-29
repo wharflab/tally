@@ -15,7 +15,8 @@ import (
 //	skip-blank-lines = true
 type RuleConfig struct {
 	// Severity overrides the rule's default severity.
-	Severity string `json:"severity,omitempty" jsonschema:"enum=error,enum=warning,enum=info,enum=style" koanf:"severity"`
+	// Use "off" to disable the rule.
+	Severity string `json:"severity,omitempty" jsonschema:"enum=off,enum=error,enum=warning,enum=info,enum=style" koanf:"severity"`
 
 	// Exclude contains path patterns where this rule should not run.
 	Exclude ExcludeConfig `json:"exclude" koanf:"exclude"`
