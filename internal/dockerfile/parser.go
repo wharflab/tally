@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -148,16 +149,27 @@ func buildLinterConfig(cfg *config.Config, warnFunc linter.LintWarnFunc) *linter
 		// Handle "buildkit/*" - enable all experimental rules
 		if pattern == "buildkit/*" {
 			// Add known experimental rules
-			lintCfg.ExperimentalRules = append(lintCfg.ExperimentalRules, "InvalidDefinitionDescription")
+			lintCfg.ExperimentalRules = append(lintCfg.ExperimentalRules, experimentalBuildKitRules...)
 			continue
 		}
 		// Handle specific buildkit rule: "buildkit/InvalidDefinitionDescription"
-		if ns, name := parseRuleCode(pattern); ns == "buildkit" {
+		if ns, name := parseRuleCode(pattern); ns == "buildkit" && isExperimentalBuildKitRule(name) {
 			lintCfg.ExperimentalRules = append(lintCfg.ExperimentalRules, name)
 		}
 	}
 
 	return lintCfg
+}
+
+// experimentalBuildKitRules is the list of known experimental BuildKit linter rules.
+// These rules are disabled by default and must be explicitly enabled.
+var experimentalBuildKitRules = []string{
+	"InvalidDefinitionDescription",
+}
+
+// isExperimentalBuildKitRule checks if a rule name is a known experimental BuildKit rule.
+func isExperimentalBuildKitRule(name string) bool {
+	return slices.Contains(experimentalBuildKitRules, name)
 }
 
 // parseRuleCode parses a rule code into namespace and name.
