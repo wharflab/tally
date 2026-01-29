@@ -78,11 +78,6 @@ func (r *JSONReporter) Report(violations []rules.Violation, _ map[string][]byte,
 		})
 	}
 
-	// If no violations, still include empty files array
-	if output.Files == nil {
-		output.Files = []FileResult{}
-	}
-
 	enc := json.NewEncoder(r.writer)
 	enc.SetIndent("", "  ")
 	return enc.Encode(output)
