@@ -31,7 +31,8 @@ func (p *PathExclusionFilter) Process(violations []rules.Violation, ctx *Context
 		for _, pattern := range patterns {
 			matched, err := doublestar.Match(pattern, v.Location.File)
 			if err != nil {
-				// Invalid pattern - skip this check
+				// Invalid pattern - skip this check.
+				// Future: Validate patterns at config load time for better UX.
 				continue
 			}
 			if matched {
