@@ -90,7 +90,11 @@ func ValidateWithSchema(config any, schema map[string]any) error {
 	}
 
 	// Handle nil config (including typed nil pointers like (*Config)(nil))
-	if config == nil || reflect.ValueOf(config).Kind() == reflect.Ptr && reflect.ValueOf(config).IsNil() {
+	if config == nil {
+		return nil
+	}
+	rv := reflect.ValueOf(config)
+	if rv.Kind() == reflect.Ptr && rv.IsNil() {
 		return nil
 	}
 
