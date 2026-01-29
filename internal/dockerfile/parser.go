@@ -139,7 +139,7 @@ func buildLinterConfig(cfg *config.Config, warnFunc linter.LintWarnFunc) *linter
 			continue
 		}
 		// Handle specific buildkit rule: "buildkit/StageNameCasing"
-		if ns, name := parseRuleCode(pattern); ns == "buildkit" {
+		if ns, name := parseRuleCode(pattern); ns == "buildkit" && name != "" {
 			lintCfg.SkipRules = append(lintCfg.SkipRules, name)
 		}
 	}
