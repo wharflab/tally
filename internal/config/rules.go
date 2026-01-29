@@ -182,7 +182,8 @@ func (rc *RulesConfig) GetOptions(ruleCode string) map[string]any {
 
 // Set stores configuration for a rule.
 // Creates the namespace map if nil.
-func (rc *RulesConfig) Set(ruleCode string, cfg RuleConfig) {
+// Returns false if the namespace is unknown.
+func (rc *RulesConfig) Set(ruleCode string, cfg RuleConfig) bool {
 	ns, name := parseRuleCode(ruleCode)
 	switch ns {
 	case "tally":
@@ -190,16 +191,21 @@ func (rc *RulesConfig) Set(ruleCode string, cfg RuleConfig) {
 			rc.Tally = make(map[string]RuleConfig)
 		}
 		rc.Tally[name] = cfg
+		return true
 	case "buildkit":
 		if rc.Buildkit == nil {
 			rc.Buildkit = make(map[string]RuleConfig)
 		}
 		rc.Buildkit[name] = cfg
+		return true
 	case "hadolint":
 		if rc.Hadolint == nil {
 			rc.Hadolint = make(map[string]RuleConfig)
 		}
 		rc.Hadolint[name] = cfg
+		return true
+	default:
+		return false
 	}
 }
 
