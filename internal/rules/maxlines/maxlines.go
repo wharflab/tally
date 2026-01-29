@@ -254,6 +254,25 @@ func (r *Rule) resolveConfig(config any) Config {
 	if cfg, ok := config.(*Config); ok && cfg != nil {
 		return *cfg
 	}
+	// Try map[string]any (from new config system)
+	if opts, ok := config.(map[string]any); ok {
+		cfg := DefaultConfig()
+		switch v := opts["max"].(type) {
+		case int:
+			cfg.Max = v
+		case int64:
+			cfg.Max = int(v)
+		case float64:
+			cfg.Max = int(v)
+		}
+		if skip, ok := opts["skip-blank-lines"].(bool); ok {
+			cfg.SkipBlankLines = skip
+		}
+		if skip, ok := opts["skip-comments"].(bool); ok {
+			cfg.SkipComments = skip
+		}
+		return cfg
+	}
 	return DefaultConfig()
 }
 

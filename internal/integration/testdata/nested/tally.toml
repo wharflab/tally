@@ -1,5 +1,5 @@
 # Parent config (should be discovered from subdir)
 format = "json"
 
-[rules.max-lines]
+[rules."tally/max-lines"]
 max = 2

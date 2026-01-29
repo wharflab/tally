@@ -366,14 +366,16 @@ These are explicitly front-loaded to avoid cross-blocking later.
 
 ---
 
-## Priority 7: Violation Processing Pipeline + Rule Configuration
+## Priority 7: Violation Processing Pipeline + Rule Configuration ✅
 
-**Goal:** Centralize “policy” logic: filtering, severity overrides, sorting, snippets.
+**Goal:** Centralize "policy" logic: filtering, severity overrides, sorting, snippets.
+
+**Status:** Completed
 
 **Actions:**
 
-1. Implement a processor chain (golangci-lint style). ([01](01-linter-pipeline-architecture.md))
-2. Include at least:
+1. ✅ Implement a processor chain (golangci-lint style). ([01](01-linter-pipeline-architecture.md))
+2. ✅ Include at least:
    - Path normalization
    - Inline disable filter
    - Config exclusion filter (per-file)
@@ -382,11 +384,31 @@ These are explicitly front-loaded to avoid cross-blocking later.
    - Sorting (stable output for snapshots)
    - SourceCode/snippet attachment (enables rich diagnostics) ([02](02-buildx-bake-check-analysis.md), [05](05-reporters-and-output.md))
 
+**Implementation Details:**
+
+- `internal/processor/processor.go` - Core `Processor` interface, `Chain` type, `Context` with source map caching
+- `internal/processor/path.go` - `PathNormalization` processor
+- `internal/processor/dedup.go` - `Deduplication` processor
+- `internal/processor/sort.go` - `Sorting` processor
+- `internal/processor/snippet.go` - `SnippetAttachment` processor
+- `internal/processor/enable.go` - `EnableFilter` processor (respects per-rule enable/disable)
+- `internal/processor/severity.go` - `SeverityOverride` processor
+- `internal/processor/exclude.go` - `PathExclusionFilter` processor
+- `internal/processor/directive.go` - `InlineDirectiveFilter` processor
+- `internal/config/rules.go` - New `RulesConfig` with namespaced rule configuration
+- `internal/rules/buildkit/registry.go` - BuildKit rules registry (imports metadata from BuildKit)
+
+**Additional Optimizations:**
+
+- Parser passes disabled rules to BuildKit's `SkipRules` (avoids running disabled rules)
+- Parser passes enabled experimental rules to BuildKit's `ExperimentalRules`
+- BuildKit rule metadata imported directly from `github.com/moby/buildkit/frontend/dockerfile/linter`
+
 **Success Criteria:**
 
-- [ ] Output is stable across runs (sorting)
-- [ ] Severity overrides and enable/disable work
-- [ ] Snippet attachment works without reporter-specific hacks
+- [x] Output is stable across runs (sorting)
+- [x] Severity overrides and enable/disable work
+- [x] Snippet attachment works without reporter-specific hacks
 
 ---
 
@@ -474,13 +496,13 @@ Priority 3 (Semantic model) ✅
     ↓
 Priority 4 (Inline directives) ✅ ─┐
     ↓                              │
-Priority 7 (Processors) ───────────┤
+Priority 7 (Processors) ✅ ────────┤
     ↓                              │
 Priority 5 (Reporters) ✅ ─────────┘
     ↓
 Priority 6 (Discovery + config cascade + optional context) ✅
     ↓
-Priority 8 (Initial rule baseline)
+Priority 8 (Initial rule baseline) - In Progress
     ↓
 Priority 9 (Rule CLI + docs generation)
     ↓

@@ -11,7 +11,7 @@ import (
 // parseDockerfile is a test helper that parses a Dockerfile string.
 func parseDockerfile(t *testing.T, content string) *dockerfile.ParseResult {
 	t.Helper()
-	pr, err := dockerfile.Parse(strings.NewReader(content))
+	pr, err := dockerfile.Parse(strings.NewReader(content), nil)
 	if err != nil {
 		t.Fatalf("failed to parse Dockerfile: %v", err)
 	}

@@ -18,7 +18,8 @@
           "rule": "tally/max-lines",
           "message": "file has 3 lines, maximum allowed is 2",
           "severity": "error",
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/max-lines.md"
+          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/max-lines.md",
+          "sourceCode": "RUN apk add --no-cache curl"
         }
       ]
     }

@@ -5,10 +5,14 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/linter"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
+
+	"github.com/tinovyatkin/tally/internal/config"
+	"github.com/tinovyatkin/tally/internal/rules"
 )
 
 // LintWarning captures parameters from BuildKit's linter.LintWarnFunc callback.
@@ -54,19 +58,21 @@ func openDockerfile(path string) (io.Reader, func() error, error) {
 	return f, f.Close, nil
 }
 
-// ParseFile parses a Dockerfile and returns the parse result
-func ParseFile(_ context.Context, path string) (*ParseResult, error) {
+// ParseFile parses a Dockerfile and returns the parse result.
+// If cfg is provided, it's used to configure BuildKit's linter (skip disabled rules, etc.).
+func ParseFile(_ context.Context, path string, cfg *config.Config) (*ParseResult, error) {
 	r, closer, err := openDockerfile(path)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = closer() }()
 
-	return Parse(r)
+	return Parse(r, cfg)
 }
 
-// Parse parses a Dockerfile from a reader
-func Parse(r io.Reader) (*ParseResult, error) {
+// Parse parses a Dockerfile from a reader.
+// If cfg is provided, it's used to configure BuildKit's linter (skip disabled rules, etc.).
+func Parse(r io.Reader, cfg *config.Config) (*ParseResult, error) {
 	content, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
@@ -90,10 +96,11 @@ func Parse(r io.Reader) (*ParseResult, error) {
 		})
 	}
 
+	// Build BuildKit linter config from our config
+	lintCfg := buildLinterConfig(cfg, warnFunc)
+
 	// Create BuildKit linter to capture warnings during instruction parsing
-	lint := linter.New(&linter.Config{
-		Warn: warnFunc,
-	})
+	lint := linter.New(lintCfg)
 
 	// Parse into typed instructions (stages and meta args)
 	stages, metaArgs, err := instructions.Parse(ast.AST, lint)
@@ -108,6 +115,44 @@ func Parse(r io.Reader) (*ParseResult, error) {
 		Source:   content,
 		Warnings: warnings,
 	}, nil
+}
+
+// buildLinterConfig creates a BuildKit linter.Config from our config.
+// This optimizes BuildKit's linter by:
+//   - Setting SkipRules for explicitly disabled BuildKit rules
+//   - Setting ExperimentalRules for explicitly enabled experimental rules
+func buildLinterConfig(cfg *config.Config, warnFunc linter.LintWarnFunc) *linter.Config {
+	lintCfg := &linter.Config{
+		Warn: warnFunc,
+	}
+
+	if cfg == nil || cfg.Rules.PerRule == nil {
+		return lintCfg
+	}
+
+	// Check each configured rule to see if it's a BuildKit rule
+	for ruleCode, ruleCfg := range cfg.Rules.PerRule {
+		// Only process buildkit/ namespaced rules
+		if !strings.HasPrefix(ruleCode, rules.BuildKitRulePrefix) {
+			continue
+		}
+
+		// Extract BuildKit rule name (e.g., "buildkit/StageNameCasing" -> "StageNameCasing")
+		buildkitRuleName := strings.TrimPrefix(ruleCode, rules.BuildKitRulePrefix)
+
+		// If explicitly disabled, add to SkipRules
+		if ruleCfg.Enabled != nil && !*ruleCfg.Enabled {
+			lintCfg.SkipRules = append(lintCfg.SkipRules, buildkitRuleName)
+		}
+
+		// If explicitly enabled, could be an experimental rule - add to ExperimentalRules
+		// (BuildKit ignores this for non-experimental rules, so it's safe)
+		if ruleCfg.Enabled != nil && *ruleCfg.Enabled {
+			lintCfg.ExperimentalRules = append(lintCfg.ExperimentalRules, buildkitRuleName)
+		}
+	}
+
+	return lintCfg
 }
 
 // ExtractHeredocFiles extracts virtual file paths from heredoc COPY/ADD commands.

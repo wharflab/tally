@@ -12,7 +12,7 @@ import (
 // helper to create LintInput from Dockerfile content
 func makeLintInput(t *testing.T, content string) rules.LintInput {
 	t.Helper()
-	pr, err := dockerfile.Parse(strings.NewReader(content))
+	pr, err := dockerfile.Parse(strings.NewReader(content), nil)
 	if err != nil {
 		t.Fatalf("failed to parse: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestNoSemanticModel_NoViolation(t *testing.T) {
 	// Test graceful handling when semantic model is nil
 	pr, err := dockerfile.Parse(strings.NewReader(`FROM alpine:3.18
 RUN echo "hello"
-`))
+`), nil)
 	if err != nil {
 		t.Fatalf("failed to parse: %v", err)
 	}

@@ -19,7 +19,8 @@
           "message": "Stage name 'Build' should be lowercase",
           "detail": "Stage names should be lowercase",
           "severity": "warning",
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/"
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/",
+          "sourceCode": "FROM alpine AS Build"
         }
       ]
     }

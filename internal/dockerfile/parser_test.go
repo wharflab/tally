@@ -4,7 +4,10 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/tinovyatkin/tally/internal/config"
 )
 
 func TestParse_BasicParsing(t *testing.T) {
@@ -43,7 +46,7 @@ func TestParse_BasicParsing(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			result, err := ParseFile(context.Background(), dockerfilePath)
+			result, err := ParseFile(context.Background(), dockerfilePath, nil)
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("ParseFile() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -108,7 +111,7 @@ func TestParse_Stages(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			result, err := ParseFile(context.Background(), dockerfilePath)
+			result, err := ParseFile(context.Background(), dockerfilePath, nil)
 			if err != nil {
 				t.Fatalf("ParseFile() error = %v", err)
 			}
@@ -162,7 +165,7 @@ func TestParse_MetaArgs(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			result, err := ParseFile(context.Background(), dockerfilePath)
+			result, err := ParseFile(context.Background(), dockerfilePath, nil)
 			if err != nil {
 				t.Fatalf("ParseFile() error = %v", err)
 			}
@@ -216,7 +219,7 @@ func TestParse_BuildKitWarnings(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			result, err := ParseFile(context.Background(), dockerfilePath)
+			result, err := ParseFile(context.Background(), dockerfilePath, nil)
 			if err != nil {
 				t.Fatalf("ParseFile() error = %v", err)
 			}
@@ -245,12 +248,97 @@ func TestParse_Source(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := ParseFile(context.Background(), dockerfilePath)
+	result, err := ParseFile(context.Background(), dockerfilePath, nil)
 	if err != nil {
 		t.Fatalf("ParseFile() error = %v", err)
 	}
 
 	if string(result.Source) != content {
 		t.Errorf("Source = %q, want %q", string(result.Source), content)
+	}
+}
+
+func TestParse_SkipsDisabledBuildKitRules(t *testing.T) {
+	// Dockerfile that triggers StageNameCasing warning (uppercase stage name)
+	content := "FROM alpine:3.18 AS MyBuild\nRUN echo hello\n"
+
+	// Parse without config - should get the warning
+	resultNoConfig, err := Parse(strings.NewReader(content), nil)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	hasWarning := false
+	for _, w := range resultNoConfig.Warnings {
+		if w.RuleName == "StageNameCasing" {
+			hasWarning = true
+			break
+		}
+	}
+	if !hasWarning {
+		t.Error("expected StageNameCasing warning without config, got none")
+	}
+
+	// Parse with StageNameCasing disabled - should NOT get the warning
+	cfg := config.Default()
+	disabled := false
+	cfg.Rules.Set("buildkit/StageNameCasing", config.RuleConfig{Enabled: &disabled})
+
+	resultWithConfig, err := Parse(strings.NewReader(content), cfg)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	for _, w := range resultWithConfig.Warnings {
+		if w.RuleName == "StageNameCasing" {
+			t.Error("expected StageNameCasing warning to be skipped when disabled, but it was reported")
+		}
+	}
+}
+
+func TestParse_EnablesExperimentalRules(t *testing.T) {
+	// Dockerfile that triggers InvalidDefinitionDescription (experimental rule)
+	// This rule checks that comments for ARG/stage follow format: # name description
+	content := `# wrong format comment
+ARG MY_ARG
+FROM alpine:3.18
+`
+
+	// Parse without config - experimental rule should NOT trigger
+	resultNoConfig, err := Parse(strings.NewReader(content), nil)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	hasWarning := false
+	for _, w := range resultNoConfig.Warnings {
+		if w.RuleName == "InvalidDefinitionDescription" {
+			hasWarning = true
+			break
+		}
+	}
+	if hasWarning {
+		t.Error("expected no InvalidDefinitionDescription warning without enabling experimental, but got one")
+	}
+
+	// Parse with experimental rule enabled
+	cfg := config.Default()
+	enabled := true
+	cfg.Rules.Set("buildkit/InvalidDefinitionDescription", config.RuleConfig{Enabled: &enabled})
+
+	resultWithConfig, err := Parse(strings.NewReader(content), cfg)
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	hasWarning = false
+	for _, w := range resultWithConfig.Warnings {
+		if w.RuleName == "InvalidDefinitionDescription" {
+			hasWarning = true
+			break
+		}
+	}
+	if !hasWarning {
+		t.Error("expected InvalidDefinitionDescription warning when experimental enabled, got none")
 	}
 }

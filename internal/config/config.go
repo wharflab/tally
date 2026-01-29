@@ -66,11 +66,6 @@ type OutputConfig struct {
 	FailLevel string `koanf:"fail-level"`
 }
 
-// RulesConfig contains configuration for all linting rules.
-type RulesConfig struct {
-	MaxLines MaxLinesRule `koanf:"max-lines"`
-}
-
 // InlineDirectivesConfig controls inline suppression directives.
 // Supports # tally ignore=..., # hadolint ignore=..., and # check=skip=...
 //
@@ -100,41 +95,23 @@ type InlineDirectivesConfig struct {
 	RequireReason bool `koanf:"require-reason"`
 }
 
-// MaxLinesRule configures the max-lines rule.
-// This rule checks if a Dockerfile exceeds a maximum line count.
-//
-// Default: 50 lines (excluding blanks and comments).
-// This was determined by analyzing 500 public Dockerfiles on GitHub:
-// P90 = 53 lines. With skip-blank-lines and skip-comments enabled by default,
-// this provides a comfortable margin while flagging unusually long Dockerfiles.
-//
-// Example TOML configuration:
-//
-//	[rules.max-lines]
-//	max = 50
-//	skip-blank-lines = true
-//	skip-comments = true
-type MaxLinesRule struct {
-	// Max is the maximum number of lines allowed. 0 means disabled.
-	// Default: 50 (P90 of 500 analyzed Dockerfiles, counting only code lines).
-	Max int `koanf:"max"`
-
-	// SkipBlankLines excludes blank lines from the count when true.
-	// Default: true (count only meaningful lines).
-	SkipBlankLines bool `koanf:"skip-blank-lines"`
-
-	// SkipComments excludes comment lines from the count when true.
-	// Default: true (count only instruction lines).
-	SkipComments bool `koanf:"skip-comments"`
-}
-
-// Enabled returns true if the max-lines rule is enabled.
-func (r MaxLinesRule) Enabled() bool {
-	return r.Max > 0
-}
-
 // Default returns the default configuration.
 func Default() *Config {
+	// Set up default rule options
+	maxLinesDefaults := DefaultMaxLinesOptions()
+	rules := RulesConfig{
+		PerRule: map[string]RuleConfig{
+			"tally/max-lines": {
+				Enabled: boolPtr(true),
+				Options: map[string]any{
+					"max":              maxLinesDefaults.Max,
+					"skip-blank-lines": maxLinesDefaults.SkipBlankLines,
+					"skip-comments":    maxLinesDefaults.SkipComments,
+				},
+			},
+		},
+	}
+
 	return &Config{
 		Output: OutputConfig{
 			Format:     "text",
@@ -142,13 +119,7 @@ func Default() *Config {
 			ShowSource: true,
 			FailLevel:  "style", // Any violation causes exit code 1
 		},
-		Rules: RulesConfig{
-			MaxLines: MaxLinesRule{
-				Max:            50,   // P90 of 500 analyzed Dockerfiles
-				SkipBlankLines: true, // Count only meaningful lines
-				SkipComments:   true, // Count only instruction lines
-			},
-		},
+		Rules: rules,
 		InlineDirectives: InlineDirectivesConfig{
 			Enabled:       true,  // Process inline directives by default
 			WarnUnused:    false, // Don't warn about unused directives by default

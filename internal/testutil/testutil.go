@@ -17,7 +17,7 @@ import (
 func ParseDockerfile(tb testing.TB, content string) *dockerfile.ParseResult {
 	tb.Helper()
 
-	result, err := dockerfile.Parse(strings.NewReader(content))
+	result, err := dockerfile.Parse(strings.NewReader(content), nil)
 	if err != nil {
 		tb.Fatalf("failed to parse Dockerfile: %v", err)
 	}
@@ -30,7 +30,7 @@ func ParseDockerfile(tb testing.TB, content string) *dockerfile.ParseResult {
 func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 	tb.Helper()
 
-	result, err := dockerfile.Parse(strings.NewReader(content))
+	result, err := dockerfile.Parse(strings.NewReader(content), nil)
 	if err != nil {
 		tb.Fatalf("failed to parse Dockerfile: %v", err)
 	}

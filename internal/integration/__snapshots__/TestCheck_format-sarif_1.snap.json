@@ -50,7 +50,10 @@
                 },
                 "region": {
                   "startLine": 2,
-                  "startColumn": 1
+                  "startColumn": 1,
+                  "snippet": {
+                    "text": "FROM alpine:3.18 AS Builder"
+                  }
                 }
               }
             }
@@ -71,7 +74,10 @@
                 },
                 "region": {
                   "startLine": 3,
-                  "startColumn": 1
+                  "startColumn": 1,
+                  "snippet": {
+                    "text": "MAINTAINER test@example.com"
+                  }
                 }
               }
             }

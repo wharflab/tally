@@ -19,7 +19,8 @@
           "message": "stage \"builder\" (index 0) is not reachable from the final stage and does not contribute to the final image",
           "detail": "Consider removing this stage or using COPY --from to include its artifacts in the final image",
           "severity": "warning",
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/no-unreachable-stages.md"
+          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/no-unreachable-stages.md",
+          "sourceCode": "FROM alpine:3.18 AS builder"
         },
         {
           "location": {
@@ -36,7 +37,8 @@
           "rule": "hadolint/DL3024",
           "message": "Stage name \"builder\" is already used on stage 0",
           "severity": "error",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3024"
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3024",
+          "sourceCode": "FROM ubuntu:22.04 AS builder"
         }
       ]
     }

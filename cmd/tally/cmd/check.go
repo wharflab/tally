@@ -9,15 +9,13 @@ import (
 
 	"github.com/tinovyatkin/tally/internal/config"
 	"github.com/tinovyatkin/tally/internal/context"
-	"github.com/tinovyatkin/tally/internal/directive"
 	"github.com/tinovyatkin/tally/internal/discovery"
 	"github.com/tinovyatkin/tally/internal/dockerfile"
+	"github.com/tinovyatkin/tally/internal/processor"
 	"github.com/tinovyatkin/tally/internal/reporter"
 	"github.com/tinovyatkin/tally/internal/rules"
 	_ "github.com/tinovyatkin/tally/internal/rules/all" // Register all rules
-	"github.com/tinovyatkin/tally/internal/rules/maxlines"
 	"github.com/tinovyatkin/tally/internal/semantic"
-	"github.com/tinovyatkin/tally/internal/sourcemap"
 	"github.com/tinovyatkin/tally/internal/version"
 )
 
@@ -158,8 +156,8 @@ func checkCommand() *cli.Command {
 					firstCfg = cfg
 				}
 
-				// Parse the Dockerfile
-				parseResult, err := dockerfile.ParseFile(ctx, file)
+				// Parse the Dockerfile (pass config to optimize BuildKit's linter)
+				parseResult, err := dockerfile.ParseFile(ctx, file, cfg)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error: failed to parse %s: %v\n", file, err)
 					os.Exit(ExitConfigError)
@@ -224,10 +222,34 @@ func checkCommand() *cli.Command {
 					))
 				}
 
-				// Apply inline directives if enabled
-				violations = processInlineDirectives(file, parseResult.Source, violations, cfg)
-
 				allViolations = append(allViolations, violations...)
+			}
+
+			// Build processor chain for violation processing
+			// Order matters: filter first, then transform, then output preparation
+			inlineFilter := processor.NewInlineDirectiveFilter()
+			chain := processor.NewChain(
+				processor.NewPathNormalization(),   // Normalize paths for cross-platform consistency
+				processor.NewEnableFilter(),        // Filter disabled rules
+				processor.NewSeverityOverride(),    // Apply severity overrides from config
+				processor.NewPathExclusionFilter(), // Apply per-rule path exclusions
+				inlineFilter,                       // Apply inline ignore directives
+				processor.NewDeduplication(),       // Remove duplicate violations
+				processor.NewSorting(),             // Stable output ordering
+				processor.NewSnippetAttachment(),   // Attach source code snippets
+			)
+
+			// Process all violations through the chain
+			procCtx := processor.NewContext(firstCfg, fileSources)
+			allViolations = chain.Process(allViolations, procCtx)
+
+			// Add any additional violations from the inline directive filter
+			// (parse errors, unused directives, missing reasons)
+			additionalViolations := inlineFilter.AdditionalViolations()
+			if len(additionalViolations) > 0 {
+				allViolations = append(allViolations, additionalViolations...)
+				// Re-sort after adding directive warnings
+				allViolations = reporter.SortViolations(allViolations)
 			}
 
 			// Get output configuration
@@ -312,18 +334,33 @@ func loadConfigForFile(cmd *cli.Command, targetPath string) (*config.Config, err
 		}
 	}
 
-	// Apply CLI flag overrides (highest priority)
+	// Apply CLI flag overrides for max-lines rule
 	// Only override if the flag was explicitly set
-	if cmd.IsSet("max-lines") {
-		cfg.Rules.MaxLines.Max = cmd.Int("max-lines")
-	}
+	if cmd.IsSet("max-lines") || cmd.IsSet("skip-blank-lines") || cmd.IsSet("skip-comments") {
+		// Get current options or defaults
+		opts := cfg.Rules.GetOptions("tally/max-lines")
+		if opts == nil {
+			opts = make(map[string]any)
+		}
 
-	if cmd.IsSet("skip-blank-lines") {
-		cfg.Rules.MaxLines.SkipBlankLines = cmd.Bool("skip-blank-lines")
-	}
+		if cmd.IsSet("max-lines") {
+			opts["max"] = cmd.Int("max-lines")
+		}
+		if cmd.IsSet("skip-blank-lines") {
+			opts["skip-blank-lines"] = cmd.Bool("skip-blank-lines")
+		}
+		if cmd.IsSet("skip-comments") {
+			opts["skip-comments"] = cmd.Bool("skip-comments")
+		}
 
-	if cmd.IsSet("skip-comments") {
-		cfg.Rules.MaxLines.SkipComments = cmd.Bool("skip-comments")
+		// Get existing config or create new
+		ruleCfg := cfg.Rules.Get("tally/max-lines")
+		if ruleCfg != nil {
+			ruleCfg.Options = opts
+			cfg.Rules.Set("tally/max-lines", *ruleCfg)
+		} else {
+			cfg.Rules.Set("tally/max-lines", config.RuleConfig{Options: opts})
+		}
 	}
 
 	// Output settings are handled in getOutputConfig to avoid duplication
@@ -342,71 +379,6 @@ func loadConfigForFile(cmd *cli.Command, targetPath string) (*config.Config, err
 	}
 
 	return cfg, nil
-}
-
-// processInlineDirectives handles parsing and applying inline ignore directives.
-// It filters violations based on directives and reports directive-related warnings.
-func processInlineDirectives(
-	file string,
-	source []byte,
-	violations []rules.Violation,
-	cfg *config.Config,
-) []rules.Violation {
-	if !cfg.InlineDirectives.Enabled {
-		return violations
-	}
-
-	sm := sourcemap.New(source)
-	var validator directive.RuleValidator
-	if cfg.InlineDirectives.ValidateRules {
-		validator = rules.DefaultRegistry().Has
-	}
-	directiveResult := directive.Parse(sm, validator)
-
-	// Report parse errors as warnings
-	for _, parseErr := range directiveResult.Errors {
-		violations = append(violations, rules.NewViolation(
-			rules.NewLineLocation(file, parseErr.Line+1),
-			"invalid-ignore-directive",
-			parseErr.Message,
-			rules.SeverityWarning,
-		).WithDetail("Directive: "+parseErr.RawText))
-	}
-
-	// Filter violations based on inline directives
-	if len(directiveResult.Directives) > 0 {
-		filterResult := directive.Filter(violations, directiveResult.Directives)
-		violations = filterResult.Violations
-
-		// Report unused directives if configured
-		if cfg.InlineDirectives.WarnUnused {
-			for _, unused := range filterResult.UnusedDirectives {
-				violations = append(violations, rules.NewViolation(
-					rules.NewLineLocation(file, unused.Line+1),
-					"unused-ignore-directive",
-					"ignore directive does not suppress any violations",
-					rules.SeverityWarning,
-				).WithDetail("Directive: "+unused.RawText))
-			}
-		}
-	}
-
-	// Report directives without reason if configured
-	// Only applies to tally and hadolint sources (buildx doesn't support reason=)
-	if cfg.InlineDirectives.RequireReason {
-		for _, d := range directiveResult.Directives {
-			if d.Source != directive.SourceBuildx && d.Reason == "" {
-				violations = append(violations, rules.NewViolation(
-					rules.NewLineLocation(file, d.Line+1),
-					"missing-directive-reason",
-					"ignore directive is missing reason= explanation",
-					rules.SeverityWarning,
-				).WithDetail("Directive: "+d.RawText))
-			}
-		}
-	}
-
-	return violations
 }
 
 // outputConfig holds output configuration values.
@@ -510,17 +482,9 @@ func parseFailLevel(level string) (rules.Severity, error) {
 // getRuleConfig returns the appropriate config for a rule based on its code.
 // This allows each rule to receive its own typed config from the global config.
 func getRuleConfig(ruleCode string, cfg *config.Config) any {
-	switch ruleCode {
-	case rules.TallyRulePrefix + "max-lines":
-		return maxlines.Config{
-			Max:            cfg.Rules.MaxLines.Max,
-			SkipBlankLines: cfg.Rules.MaxLines.SkipBlankLines,
-			SkipComments:   cfg.Rules.MaxLines.SkipComments,
-		}
-	default:
-		// Unknown rules get nil config (use their defaults)
-		return nil
-	}
+	// Return the rule's options map from config
+	// The rule's resolveConfig method handles converting map to typed config
+	return cfg.Rules.GetOptions(ruleCode)
 }
 
 // extractHeredocFiles extracts virtual file paths from heredoc COPY/ADD commands.

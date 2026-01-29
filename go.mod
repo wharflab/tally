@@ -6,6 +6,7 @@ require (
 	github.com/alecthomas/chroma/v2 v2.23.1
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/distribution/reference v0.6.0
 	github.com/gkampitakis/go-snaps v0.5.19
 	github.com/knadh/koanf/parsers/toml/v2 v2.1.0
 	github.com/knadh/koanf/providers/env v1.0.0

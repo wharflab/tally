@@ -12,5 +12,6 @@ import (
 	_ "github.com/tinovyatkin/tally/internal/rules/redundanttargetplatform"
 	_ "github.com/tinovyatkin/tally/internal/rules/secretsinargorenv"
 	_ "github.com/tinovyatkin/tally/internal/rules/secretsincode"
+	_ "github.com/tinovyatkin/tally/internal/rules/trustedbaseimage"
 	_ "github.com/tinovyatkin/tally/internal/rules/workdirrelativepath"
 )

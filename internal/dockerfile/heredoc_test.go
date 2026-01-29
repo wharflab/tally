@@ -10,7 +10,7 @@ const syntaxDirective = "# syntax=docker/dockerfile:1\n"
 
 func TestExtractHeredocs_Empty(t *testing.T) {
 	content := "FROM alpine\nRUN echo hello"
-	result, err := Parse(strings.NewReader(content))
+	result, err := Parse(strings.NewReader(content), nil)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -28,7 +28,7 @@ echo hello
 echo world
 EOF
 `
-	result, err := Parse(strings.NewReader(content))
+	result, err := Parse(strings.NewReader(content), nil)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -66,7 +66,7 @@ key=value
 other=data
 EOF
 `
-	result, err := Parse(strings.NewReader(content))
+	result, err := Parse(strings.NewReader(content), nil)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -97,7 +97,7 @@ ADD <<EOF /app/data.txt
 some data
 EOF
 `
-	result, err := Parse(strings.NewReader(content))
+	result, err := Parse(strings.NewReader(content), nil)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -133,7 +133,7 @@ RUN <<'EOF2'
 echo "Done"
 EOF2
 `
-	result, err := Parse(strings.NewReader(content))
+	result, err := Parse(strings.NewReader(content), nil)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -198,7 +198,7 @@ EOF
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := Parse(strings.NewReader(tt.content))
+			result, err := Parse(strings.NewReader(tt.content), nil)
 			if err != nil {
 				t.Fatalf("Parse failed: %v", err)
 			}
@@ -252,7 +252,7 @@ RUN <<EOF
 echo test
 EOF
 `
-	result, err := Parse(strings.NewReader(content))
+	result, err := Parse(strings.NewReader(content), nil)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -276,7 +276,7 @@ RUN <<EOF
 echo "Hello $NAME"
 EOF
 `
-	result, err := Parse(strings.NewReader(content))
+	result, err := Parse(strings.NewReader(content), nil)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}
@@ -300,7 +300,7 @@ RUN <<'EOF'
 echo "Hello $NAME"
 EOF
 `
-	result, err := Parse(strings.NewReader(content))
+	result, err := Parse(strings.NewReader(content), nil)
 	if err != nil {
 		t.Fatalf("Parse failed: %v", err)
 	}

@@ -10,7 +10,7 @@ tally integrates rules from multiple sources:
 |--------|-------|-------------|
 | **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 15+ rules | Docker's official Dockerfile checks (automatically captured) |
 | **tally** | 3 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
-| **[Hadolint](https://github.com/hadolint/hadolint)** | 1 rule | Shell best practices (expanding) |
+| **[Hadolint](https://github.com/hadolint/hadolint)** | 2 rules | Shell best practices (expanding) |
 
 **See [RULES.md](RULES.md) for the complete rules reference.**
 
