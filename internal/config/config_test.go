@@ -210,11 +210,12 @@ skip-comments = true
 		}
 	})
 
-	t.Run("rule enable/disable via severity", func(t *testing.T) {
+	t.Run("rule include/exclude", func(t *testing.T) {
 		configPath := filepath.Join(tmpDir, ".tally.toml")
 		configContent := `
-[rules.buildkit.MaintainerDeprecated]
-severity = "off"
+[rules]
+include = ["tally/*"]
+exclude = ["buildkit/MaintainerDeprecated"]
 
 [rules.tally.max-lines]
 severity = "error"
@@ -230,16 +231,16 @@ max = 100
 			t.Fatalf("Load() error = %v", err)
 		}
 
-		// Check buildkit rule is disabled (severity=off)
+		// Check buildkit rule is disabled via exclude
 		enabled := cfg.Rules.IsEnabled("buildkit/MaintainerDeprecated")
 		if enabled == nil || *enabled != false {
-			t.Error("buildkit/MaintainerDeprecated should be disabled (severity=off)")
+			t.Error("buildkit/MaintainerDeprecated should be disabled via exclude")
 		}
 
-		// Check tally rule is enabled (has severity configured)
+		// Check tally rule is enabled via include
 		enabled = cfg.Rules.IsEnabled("tally/max-lines")
 		if enabled == nil || *enabled != true {
-			t.Error("tally/max-lines should be enabled")
+			t.Error("tally/max-lines should be enabled via include")
 		}
 
 		// Check unconfigured rule returns nil (use default)
@@ -306,14 +307,13 @@ func TestEnvKeyTransform(t *testing.T) {
 	}
 }
 
-func TestRulesConfigNestedStructure(t *testing.T) {
+func TestRulesConfigIncludeExclude(t *testing.T) {
 	rc := &RulesConfig{
+		Include: []string{"buildkit/*", "tally/*", "hadolint/DL3026"},
+		Exclude: []string{"buildkit/MaintainerDeprecated"},
 		Buildkit: map[string]RuleConfig{
 			"StageNameCasing": {
 				Severity: "warning",
-			},
-			"MaintainerDeprecated": {
-				Severity: "off", // disabled via severity
 			},
 		},
 		Tally: map[string]RuleConfig{
@@ -332,28 +332,25 @@ func TestRulesConfigNestedStructure(t *testing.T) {
 		},
 	}
 
-	// BuildKit rules via namespaced lookup
+	// BuildKit rules via include pattern
 	enabled := rc.IsEnabled("buildkit/StageNameCasing")
 	if enabled == nil || *enabled != true {
-		t.Error("buildkit/StageNameCasing should be enabled")
+		t.Error("buildkit/StageNameCasing should be enabled via include")
 	}
 
+	// Exclude takes precedence over include
 	enabled = rc.IsEnabled("buildkit/MaintainerDeprecated")
 	if enabled == nil || *enabled != false {
-		t.Error("buildkit/MaintainerDeprecated should be disabled (severity=off)")
+		t.Error("buildkit/MaintainerDeprecated should be disabled via exclude")
 	}
 
-	sev := rc.GetSeverity("buildkit/MaintainerDeprecated")
-	if sev != "off" {
-		t.Errorf("GetSeverity(buildkit/MaintainerDeprecated) = %q, want %q", sev, "off")
-	}
-
-	// Tally rules
+	// Tally rules via namespace wildcard
 	enabled = rc.IsEnabled("tally/max-lines")
 	if enabled == nil || *enabled != true {
-		t.Error("tally/max-lines should be enabled")
+		t.Error("tally/max-lines should be enabled via include")
 	}
 
+	// Check per-rule options still work
 	opts := rc.GetOptions("tally/max-lines")
 	if opts == nil {
 		t.Fatal("tally/max-lines options should not be nil")
@@ -362,22 +359,22 @@ func TestRulesConfigNestedStructure(t *testing.T) {
 		t.Errorf("tally/max-lines max = %v, want 100", opts["max"])
 	}
 
-	// Hadolint rules
+	// Hadolint rules via specific include
 	enabled = rc.IsEnabled("hadolint/DL3026")
 	if enabled == nil || *enabled != true {
-		t.Error("hadolint/DL3026 should be enabled")
+		t.Error("hadolint/DL3026 should be enabled via include")
 	}
 
-	// Unconfigured rule returns nil
-	enabled = rc.IsEnabled("buildkit/UndefinedVar")
+	// Unconfigured rule returns nil (not in include or exclude)
+	enabled = rc.IsEnabled("hadolint/DL3008")
 	if enabled != nil {
 		t.Errorf("unconfigured rule should return nil, got %v", *enabled)
 	}
 
-	// Test Set method with severity=off
-	rc.Set("hadolint/DL3008", RuleConfig{Severity: "off"})
-	enabled = rc.IsEnabled("hadolint/DL3008")
+	// Dynamic exclude via append
+	rc.Exclude = append(rc.Exclude, "hadolint/DL3026")
+	enabled = rc.IsEnabled("hadolint/DL3026")
 	if enabled == nil || *enabled != false {
-		t.Error("hadolint/DL3008 should be disabled after Set with severity=off")
+		t.Error("hadolint/DL3026 should be disabled after adding to exclude")
 	}
 }

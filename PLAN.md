@@ -22,8 +22,12 @@ show-source = true
 fail-level = "style"
 
 # Per-rule configuration with namespaced keys
-# Rules are organized by namespace: tally, buildkit, hadolint
-# Use severity = "off" to disable a rule (similar to ESLint)
+# Rule selection (Ruff-style include/exclude)
+[rules]
+include = ["buildkit/*", "tally/*"]           # Enable rules by namespace
+exclude = ["buildkit/MaintainerDeprecated", "hadolint/DL3006"]  # Disable specific rules
+
+# Per-rule configuration (severity, options)
 [rules.tally.max-lines]
 severity = "warning"    # Override default severity
 max = 100
@@ -36,12 +40,6 @@ exclude.paths = ["test/**", "testdata/**"]
 
 [rules.buildkit.StageNameCasing]
 severity = "info"       # Downgrade from default warning
-
-[rules.buildkit.MaintainerDeprecated]
-severity = "off"        # Disable a rule
-
-[rules.hadolint.DL3006]
-severity = "off"        # Disable hadolint-compat rule
 
 [rules.hadolint.DL3026]
 severity = "warning"
@@ -474,7 +472,7 @@ skip-comments = true
 
 - [ ] Output is stable across runs (sorting processor ensures deterministic order)
 - [ ] Severity overrides work via config (`[rules.buildkit.StageNameCasing] severity = "info"`)
-- [ ] Rules can be disabled via config (`[rules.buildkit.MaintainerDeprecated] severity = "off"`)
+- [ ] Rules can be enabled/disabled via include/exclude (`include = ["buildkit/*"]`, `exclude = ["buildkit/MaintainerDeprecated"]`)
 - [ ] BuildKit rules are individually configurable (all 22 in registry)
 - [ ] Snippet attachment works without reporter-specific hacks
 - [ ] Deduplication prevents same violation from appearing twice

@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/linter"
@@ -117,30 +118,53 @@ func Parse(r io.Reader, cfg *config.Config) (*ParseResult, error) {
 
 // buildLinterConfig creates a BuildKit linter.Config from our config.
 // This optimizes BuildKit's linter by:
-//   - Setting SkipRules for explicitly disabled BuildKit rules
-//   - Setting ExperimentalRules for explicitly enabled experimental rules
+//   - Setting SkipRules for explicitly excluded BuildKit rules
+//   - Setting ExperimentalRules for explicitly included experimental rules
 func buildLinterConfig(cfg *config.Config, warnFunc linter.LintWarnFunc) *linter.Config {
 	lintCfg := &linter.Config{
 		Warn: warnFunc,
 	}
 
-	if cfg == nil || cfg.Rules.Buildkit == nil {
+	if cfg == nil {
 		return lintCfg
 	}
 
-	// Check each configured BuildKit rule
-	for ruleName, ruleCfg := range cfg.Rules.Buildkit {
-		// If severity = "off", add to SkipRules
-		if ruleCfg.Severity == "off" {
-			lintCfg.SkipRules = append(lintCfg.SkipRules, ruleName)
-		} else if ruleCfg.Severity != "" {
-			// If explicitly configured (not off), could be an experimental rule
-			// Add to ExperimentalRules (BuildKit ignores this for non-experimental rules)
-			lintCfg.ExperimentalRules = append(lintCfg.ExperimentalRules, ruleName)
+	// Check Exclude patterns for buildkit rules
+	for _, pattern := range cfg.Rules.Exclude {
+		// Handle "buildkit/*" - skip all buildkit rules
+		if pattern == "buildkit/*" {
+			// Can't skip all at once in BuildKit, but this is rare
+			// Individual rules will be filtered by our processor
+			continue
+		}
+		// Handle specific buildkit rule: "buildkit/StageNameCasing"
+		if ns, name := parseRuleCode(pattern); ns == "buildkit" {
+			lintCfg.SkipRules = append(lintCfg.SkipRules, name)
+		}
+	}
+
+	// Check Include patterns for experimental rules
+	for _, pattern := range cfg.Rules.Include {
+		// Handle specific buildkit rule: "buildkit/InvalidDefinitionDescription"
+		if ns, name := parseRuleCode(pattern); ns == "buildkit" {
+			lintCfg.ExperimentalRules = append(lintCfg.ExperimentalRules, name)
+		}
+		// Handle "buildkit/*" - enable all experimental rules
+		if pattern == "buildkit/*" {
+			// Add known experimental rules
+			lintCfg.ExperimentalRules = append(lintCfg.ExperimentalRules, "InvalidDefinitionDescription")
 		}
 	}
 
 	return lintCfg
+}
+
+// parseRuleCode parses a rule code into namespace and name.
+func parseRuleCode(ruleCode string) (string, string) {
+	if idx := strings.Index(ruleCode, "/"); idx > 0 {
+		return ruleCode[:idx], ruleCode[idx+1:]
+	}
+	return "", ruleCode
 }
 
 // ExtractHeredocFiles extracts virtual file paths from heredoc COPY/ADD commands.

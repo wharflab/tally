@@ -239,7 +239,12 @@ path = "stdout"          # stdout, stderr, or file path
 show-source = true       # Show source code snippets
 fail-level = "style"     # Minimum severity for exit code 1
 
-# Rules are organized by namespace: tally, buildkit, hadolint
+# Rule selection (Ruff-style)
+[rules]
+include = ["buildkit/*", "tally/*"]           # Enable rules by namespace or specific rule
+exclude = ["buildkit/MaintainerDeprecated"]   # Disable specific rules
+
+# Per-rule configuration (severity, options)
 [rules.tally.max-lines]
 severity = "error"
 max = 500
@@ -247,10 +252,7 @@ skip-blank-lines = true
 skip-comments = true
 
 [rules.buildkit.StageNameCasing]
-severity = "warning"
-
-[rules.buildkit.MaintainerDeprecated]
-severity = "off"          # Disable this rule
+severity = "info"         # Downgrade severity
 
 [rules.hadolint.DL3026]
 severity = "warning"

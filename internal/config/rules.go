@@ -35,22 +35,32 @@ type ExcludeConfig struct {
 	Paths []string `koanf:"paths"`
 }
 
-// RulesConfig contains per-rule configuration organized by namespace.
+// RulesConfig contains rule selection and per-rule configuration.
 //
-// Example TOML:
+// Example TOML (Ruff-style selection):
+//
+//	[rules]
+//	include = ["buildkit/*"]                    # Enable all buildkit rules
+//	exclude = ["buildkit/MaintainerDeprecated"] # Disable specific rules
 //
 //	[rules.tally.max-lines]
-//	enabled = true
 //	severity = "warning"
 //	max = 100
 //
-//	[rules.buildkit.MaintainerDeprecated]
-//	enabled = false
-//
 //	[rules.hadolint.DL3026]
-//	enabled = true
+//	severity = "warning"
 //	trusted-registries = ["docker.io", "gcr.io"]
 type RulesConfig struct {
+	// Include explicitly enables rules. Supports patterns:
+	// - "buildkit/*" - all rules in namespace
+	// - "buildkit/StageNameCasing" - specific rule
+	// Empty means use each rule's default (EnabledByDefault).
+	Include []string `koanf:"include"`
+
+	// Exclude explicitly disables rules. Same pattern syntax as Include.
+	// Exclude takes precedence over Include.
+	Exclude []string `koanf:"exclude"`
+
 	// Tally contains configuration for tally/* rules.
 	Tally map[string]RuleConfig `koanf:"tally"`
 
@@ -89,26 +99,55 @@ func parseRuleCode(ruleCode string) (string, string) {
 	return "", ruleCode
 }
 
-// IsEnabled checks if a rule is enabled.
+// IsEnabled checks if a rule is enabled based on Include/Exclude patterns.
 // Returns nil if no configuration specifies enabled/disabled (use rule default).
-// A rule is disabled if severity = "off".
+// Exclude takes precedence over Include.
 func (rc *RulesConfig) IsEnabled(ruleCode string) *bool {
 	if rc == nil {
 		return nil
 	}
-	cfg := rc.Get(ruleCode)
-	if cfg == nil {
-		return nil
-	}
-	// severity = "off" disables the rule
-	if cfg.Severity == "off" {
+
+	// Check Exclude first (takes precedence)
+	if matchesAnyPattern(ruleCode, rc.Exclude) {
 		return boolPtr(false)
 	}
-	// Any other severity means enabled (if configured)
-	if cfg.Severity != "" {
+
+	// Check Include
+	if matchesAnyPattern(ruleCode, rc.Include) {
 		return boolPtr(true)
 	}
+
+	// No explicit config - use rule default
 	return nil
+}
+
+// matchesAnyPattern checks if ruleCode matches any pattern in the list.
+// Patterns can be:
+// - Exact match: "buildkit/StageNameCasing"
+// - Namespace wildcard: "buildkit/*"
+func matchesAnyPattern(ruleCode string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if matchesPattern(ruleCode, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchesPattern checks if ruleCode matches a single pattern.
+func matchesPattern(ruleCode, pattern string) bool {
+	// Exact match
+	if ruleCode == pattern {
+		return true
+	}
+
+	// Namespace wildcard: "buildkit/*" matches "buildkit/StageNameCasing"
+	if prefix, ok := strings.CutSuffix(pattern, "/*"); ok {
+		ns, _ := parseRuleCode(ruleCode)
+		return ns == prefix
+	}
+
+	return false
 }
 
 // GetSeverity returns the severity override for a rule.
