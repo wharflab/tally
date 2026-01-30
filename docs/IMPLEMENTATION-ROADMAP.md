@@ -416,20 +416,35 @@ These are explicitly front-loaded to avoid cross-blocking later.
 
 **Goal:** Deliver immediate value with minimal reinvention.
 
+**Status:** In Progress
+
 **Approach (pick based on Spike A decision):**
 
-1. **Reuse path:** wrap BuildKit’s 22 rules as a baseline provider, then add hadolint-parity rules on top. ([02](02-buildx-bake-check-analysis.md))
-2. **Hybrid/Rewrite path:** implement the “top rules” list from hadolint research. ([08](08-hadolint-rules-reference.md), [09](09-hadolint-research.md))
+1. **Reuse path:** wrap BuildKit's 22 rules as a baseline provider, then add hadolint-parity rules on top. ([02](02-buildx-bake-check-analysis.md))
+2. **Hybrid/Rewrite path:** implement the "top rules" list from hadolint research. ([08](08-hadolint-rules-reference.md), [09](09-hadolint-research.md))
 
 **Rule priority sanity check (from research):**
 
 - Top of list includes: `DL3006`, `DL3000`, `DL3002`, `DL3004`, `DL3008`, `DL3020`, `DL3025`, `DL4006`… ([08](08-hadolint-rules-reference.md))
 
+**Hadolint Rules Implemented:**
+
+- ✅ `DL3006` - Pin base image versions (warning) - `pinimageversions/`
+- ✅ `DL3007` - Avoid :latest tag (warning) - `avoidlatesttag/`
+- ✅ `DL3002` - Last USER should not be root (warning) - `lastusershouldnotberoot/`
+- ✅ `DL3004` - Do not use sudo (error) - `nosudo/`
+- ✅ `DL3020` - Use COPY instead of ADD (error) - `usecopynotadd/`
+- ✅ `DL4001` - wget OR curl, not both (warning) - `wgetorcurl/`
+
+**Previously Implemented:**
+
+- ✅ `DL3026` - Use only trusted base images (off by default) - `trustedbaseimage/`
+
 **Success Criteria:**
 
-- [ ] At least 5–10 high-value rules shipped (not just one demo rule)
-- [ ] Experimental rules supported as opt-in for “controversial” checks
-- [ ] Every rule has a doc URL and actionable message
+- [x] At least 5–10 high-value rules shipped (not just one demo rule)
+- [x] Experimental rules supported as opt-in for "controversial" checks
+- [x] Every rule has a doc URL and actionable message
 
 ---
 
