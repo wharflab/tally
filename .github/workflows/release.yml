@@ -223,7 +223,8 @@ jobs:
           # Clone the tap repository using SSH
           git clone git@github.com-tap:tinovyatkin/homebrew-tap.git tap
 
-          # Copy formula and commit
+          # Ensure Formula directory exists and copy formula
+          mkdir -p tap/Formula
           cp tally.rb tap/Formula/tally.rb
           cd tap
           git add Formula/tally.rb
