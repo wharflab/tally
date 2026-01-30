@@ -6,17 +6,9 @@ run:
 
 linters:
   default: all
-  disable-all: false
-  presets: []
-  custom:
-    customlint:
-      type: module
-      description: tally-specific linting rules
-      original-url: github.com/tinovyatkin/tally/_tools/customlint
-      path: ./_tools/customlint
-      settings: {}
   disable:
     - cyclop          # complexity metrics - covered by gocyclo
+    - depguard        # import restrictions - using forbidigo instead
     - dupword         # duplicate words - too noisy
     - err113          # dynamic errors - too strict for CLI tool
     - exhaustruct     # requires all struct fields - too strict
@@ -44,68 +36,68 @@ linters:
     - wrapcheck       # wrap all errors - too strict for internal packages
     - wsl             # whitespace linter - too strict
     - wsl_v5          # whitespace linter v5 - too strict
-  settings:
-    depguard:
-      rules:
-        main:
-          deny:
-            - pkg: github.com/sirupsen/logrus
-              desc: Use standard library log or slog
-            - pkg: github.com/go-logr/logr
-              desc: Use standard library log or slog
-    forbidigo:
-      analyze-types: true
-      forbid:
-        # Enforce buildkit usage for Dockerfile parsing (per CLAUDE.md philosophy)
-        - pattern: '.*'
-          msg: 'Use moby/buildkit/frontend/dockerfile/parser instead of docker/docker parser'
-          pkg: '^github\.com/docker/docker/builder/dockerfile/parser$'
-        # Enforce buildkit instruction types
-        - pattern: '.*'
-          msg: 'Use moby/buildkit/frontend/dockerfile/instructions instead'
-          pkg: '^github\.com/docker/docker/builder/dockerfile/instructions$'
-        # Prevent docker/docker API types
-        - pattern: '.*'
-          msg: 'Use moby/buildkit types or OCI image-spec types instead'
-          pkg: '^github\.com/docker/docker/api/types$'
-    dupl:
-      threshold: 100
-    errcheck:
-      check-type-assertions: true
-      check-blank: true
-    funlen:
-      lines: 500
-      statements: 50
-    goconst:
-      min-len: 3
-      min-occurrences: 3
-    gocritic:
-      disabled-checks:
-        - whyNoLint
-        - hugeParam
-        - rangeValCopy
-        - unnamedResult  # conflicts with nonamedreturns linter
-      enabled-tags:
-        - diagnostic
-        - experimental
-        - opinionated
-        - performance
-        - style
-    gocyclo:
-      min-complexity: 25
-    govet:
-      disable:
-        - fieldalignment
-        - shadow  # too strict for idiomatic Go err handling patterns
-      enable-all: true
-    lll:
-      line-length: 140
-    revive:
-      rules:
-        - name: unused-parameter
-          disabled: true
-    staticcheck:
-      checks: ["all", "-SA1019", "-SA4006"]
+
+linters-settings:
+  custom:
+    customlint:
+      type: module
+      description: tally-specific linting rules
+      original-url: github.com/tinovyatkin/tally/_tools/customlint
+      path: ./_tools/customlint
+      settings: {}
+  forbidigo:
+    analyze-types: true
+    forbid:
+      # Enforce buildkit usage for Dockerfile parsing (per CLAUDE.md philosophy)
+      - pattern: '.*'
+        msg: 'Use moby/buildkit/frontend/dockerfile/parser instead of docker/docker parser'
+        pkg: '^github\.com/docker/docker/builder/dockerfile/parser$'
+      # Enforce buildkit instruction types
+      - pattern: '.*'
+        msg: 'Use moby/buildkit/frontend/dockerfile/instructions instead'
+        pkg: '^github\.com/docker/docker/builder/dockerfile/instructions$'
+      # Prevent docker/docker API types
+      - pattern: '.*'
+        msg: 'Use moby/buildkit types or OCI image-spec types instead'
+        pkg: '^github\.com/docker/docker/api/types$'
+  dupl:
+    threshold: 100
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  funlen:
+    lines: 500
+    statements: 50
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  gocritic:
+    disabled-checks:
+      - whyNoLint
+      - hugeParam
+      - rangeValCopy
+      - unnamedResult  # conflicts with nonamedreturns linter
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+  gocyclo:
+    min-complexity: 25
+  govet:
+    disable:
+      - fieldalignment
+      - shadow  # too strict for idiomatic Go err handling patterns
+    enable-all: true
+  lll:
+    line-length: 140
+  revive:
+    rules:
+      - name: unused-parameter
+        disabled: true
+  staticcheck:
+    checks: ["all", "-SA1019", "-SA4006"]
   exclusions:
     generated: lax
     presets:
