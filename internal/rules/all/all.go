@@ -9,6 +9,7 @@ import (
 	_ "github.com/tinovyatkin/tally/internal/rules/copyignoredfile"
 	_ "github.com/tinovyatkin/tally/internal/rules/maxlines"
 	_ "github.com/tinovyatkin/tally/internal/rules/nounreachablestages"
+	_ "github.com/tinovyatkin/tally/internal/rules/pinimageversions"
 	_ "github.com/tinovyatkin/tally/internal/rules/redundanttargetplatform"
 	_ "github.com/tinovyatkin/tally/internal/rules/secretsinargorenv"
 	_ "github.com/tinovyatkin/tally/internal/rules/secretsincode"
