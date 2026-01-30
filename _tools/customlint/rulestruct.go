@@ -55,7 +55,13 @@ func runRuleStruct(pass *analysis.Pass) (any, error) {
 			}
 
 			// Check if there's documentation
-			if genDecl.Doc == nil || len(genDecl.Doc.List) == 0 {
+			// First check TypeSpec.Doc (individual type comment in grouped declarations)
+			// then fall back to GenDecl.Doc (comment before 'type' keyword)
+			doc := typeSpec.Doc
+			if doc == nil || len(doc.List) == 0 {
+				doc = genDecl.Doc
+			}
+			if doc == nil || len(doc.List) == 0 {
 				pass.Reportf(
 					typeSpec.Pos(),
 					"exported rule struct %s should have a documentation comment",
