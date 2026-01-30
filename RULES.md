@@ -237,10 +237,12 @@ skip-comments = true
 
 # Example 2: Enable "off by default" rules by providing config
 [rules.hadolint.DL3026]
-trusted-registries = ["docker.io", "ghcr.io"]  # Auto-enables with severity="warning"
+trusted-registries = ["docker.io", "ghcr.io"]
+# Providing trusted-registries auto-enables with severity="warning"
+# To use a different severity, set it explicitly: severity = "error"
 ```
 
-**Severity-based enabling:** Rules with `DefaultSeverity: "off"` (like DL3026) are automatically enabled with `severity: "warning"` when you provide configuration options for them.
+**Severity-based enabling:** Rules with `DefaultSeverity: "off"` (like DL3026) are automatically enabled with `severity: "warning"` when you provide configuration options for them, without needing to explicitly set `enabled = true` or `severity = "warning"`. To use a different severity, set the `severity` field explicitly in the rule's configuration block.
 
 ---
 
