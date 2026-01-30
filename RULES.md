@@ -228,19 +228,16 @@ Configure rules in `.tally.toml`:
 include = ["buildkit/*"]                     # Enable all buildkit rules
 exclude = ["buildkit/MaintainerDeprecated"]  # Disable specific rules
 
-# Per-rule configuration
+# Example 1: Configure rule options and override severity
 [rules.tally.max-lines]
+severity = "warning"          # Options: "off", "error", "warning", "info", "style"
 max = 500
 skip-blank-lines = true
 skip-comments = true
 
-# Enable "off by default" rules by providing config
+# Example 2: Enable "off by default" rules by providing config
 [rules.hadolint.DL3026]
 trusted-registries = ["docker.io", "ghcr.io"]  # Auto-enables with severity="warning"
-
-# Override severity
-[rules.tally.max-lines]
-severity = "warning"  # Options: "off", "error", "warning", "info", "style"
 ```
 
 **Severity-based enabling:** Rules with `DefaultSeverity: "off"` (like DL3026) are automatically enabled with `severity: "warning"` when you provide configuration options for them.
