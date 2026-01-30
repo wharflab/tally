@@ -256,48 +256,50 @@ func (m *mockProcessor) Process(violations []rules.Violation, ctx *Context) []ru
 }
 
 func TestSeverityOverride_AutoEnableOffRules(t *testing.T) {
-	// Create a mock rule with DefaultSeverity: Off
-	registry := rules.NewRegistry()
-	mockRule := &mockRuleWithMetadata{
-		code:            "hadolint/DL3026",
-		defaultSeverity: rules.SeverityOff,
-	}
-	registry.Register(mockRule)
-
-	violations := []rules.Violation{
-		rules.NewViolation(
-			rules.NewLineLocation("file.txt", 1),
-			"hadolint/DL3026",
-			"test violation",
-			rules.SeverityOff, // Created with DefaultSeverity: Off
-		),
+	testCases := []struct {
+		name    string
+		message string
+	}{
+		{"basic auto-enable", "test violation"},
+		{"with trusted registries", "untrusted registry"},
 	}
 
-	cfg := config.Default()
-	cfg.Rules.Set("hadolint/DL3026", config.RuleConfig{
-		Options: map[string]any{
-			"trusted-registries": []string{"docker.io"},
-		},
-	})
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			registry := rules.NewRegistry()
+			mockRule := &mockRuleWithMetadata{
+				code:            "hadolint/DL3026",
+				defaultSeverity: rules.SeverityOff,
+			}
+			registry.Register(mockRule)
 
-	// Debug: check what Get returns
-	ruleConfig := cfg.Rules.Get("hadolint/DL3026")
-	if ruleConfig == nil {
-		t.Fatal("RuleConfig is nil")
-	}
-	t.Logf("RuleConfig.Options: %v (len=%d)", ruleConfig.Options, len(ruleConfig.Options))
+			violations := []rules.Violation{
+				rules.NewViolation(
+					rules.NewLineLocation("file.txt", 1),
+					"hadolint/DL3026",
+					tc.message,
+					rules.SeverityOff,
+				),
+			}
 
-	p := NewSeverityOverrideWithRegistry(registry)
-	ctx := NewContext(nil, cfg, nil)
+			cfg := config.Default()
+			cfg.Rules.Set("hadolint/DL3026", config.RuleConfig{
+				Options: map[string]any{
+					"trusted-registries": []string{"docker.io"},
+				},
+			})
 
-	result := p.Process(violations, ctx)
-	if len(result) != 1 {
-		t.Fatalf("expected 1 violation, got %d", len(result))
-	}
+			p := NewSeverityOverrideWithRegistry(registry)
+			ctx := NewContext(nil, cfg, nil)
 
-	// Should be auto-enabled to Warning
-	if result[0].Severity != rules.SeverityWarning {
-		t.Errorf("expected severity=warning (auto-enabled), got %v", result[0].Severity)
+			result := p.Process(violations, ctx)
+			if len(result) != 1 {
+				t.Fatalf("expected 1 violation, got %d", len(result))
+			}
+			if result[0].Severity != rules.SeverityWarning {
+				t.Errorf("expected severity=warning (auto-enabled), got %v", result[0].Severity)
+			}
+		})
 	}
 }
 
@@ -316,51 +318,4 @@ func (m *mockRuleWithMetadata) Metadata() rules.RuleMetadata {
 
 func (m *mockRuleWithMetadata) Check(_ rules.LintInput) []rules.Violation {
 	return nil
-}
-
-func TestSeverityOverride_WithTrustedRegistries(t *testing.T) {
-	// Simulate DL3026 rule
-	registry := rules.NewRegistry()
-	mockRule := &mockRuleWithMetadata{
-		code:            "hadolint/DL3026",
-		defaultSeverity: rules.SeverityOff,
-	}
-	registry.Register(mockRule)
-
-	violations := []rules.Violation{
-		rules.NewViolation(
-			rules.NewLineLocation("file.txt", 1),
-			"hadolint/DL3026",
-			"untrusted registry",
-			rules.SeverityOff,
-		),
-	}
-
-	cfg := config.Default()
-	// Set config using the same pattern as the real config file
-	cfg.Rules.Set("hadolint/DL3026", config.RuleConfig{
-		Options: map[string]any{
-			"trusted-registries": []string{"docker.io"},
-		},
-	})
-
-	// Verify Get returns config with Options
-	ruleConfig := cfg.Rules.Get("hadolint/DL3026")
-	if ruleConfig == nil {
-		t.Fatal("RuleConfig is nil")
-	}
-	t.Logf("Options: %v (len=%d)", ruleConfig.Options, len(ruleConfig.Options))
-
-	p := NewSeverityOverrideWithRegistry(registry)
-	ctx := NewContext(nil, cfg, nil)
-
-	result := p.Process(violations, ctx)
-	if len(result) != 1 {
-		t.Fatalf("expected 1 violation, got %d", len(result))
-	}
-
-	// Should be auto-enabled to Warning
-	if result[0].Severity != rules.SeverityWarning {
-		t.Errorf("expected severity=warning (auto-enabled), got %v", result[0].Severity)
-	}
 }
