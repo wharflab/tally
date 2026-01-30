@@ -100,8 +100,9 @@ jobs:
               --team-id "$APPLE_TEAM_ID" \
               --wait
 
-            # Staple notarization ticket
-            xcrun stapler staple "$binary"
+            # Note: stapling is not supported for standalone Mach-O binaries
+            # (only .app bundles, .dmg, and .pkg). The notarization ticket is
+            # stored on Apple's servers and Gatekeeper checks online.
 
             # Clean up zip
             rm "${binary}.zip"
