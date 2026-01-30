@@ -10,6 +10,7 @@ import (
 	_ "github.com/tinovyatkin/tally/internal/rules/copyignoredfile"
 	_ "github.com/tinovyatkin/tally/internal/rules/lastusershouldnotberoot"
 	_ "github.com/tinovyatkin/tally/internal/rules/maxlines"
+	_ "github.com/tinovyatkin/tally/internal/rules/nosudo"
 	_ "github.com/tinovyatkin/tally/internal/rules/nounreachablestages"
 	_ "github.com/tinovyatkin/tally/internal/rules/pinimageversions"
 	_ "github.com/tinovyatkin/tally/internal/rules/redundanttargetplatform"
