@@ -50,8 +50,74 @@ jobs:
           name: dist
           path: dist.tar
 
-  publish-npm:
+  sign-macos:
     needs: build
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: dist
+
+      - name: Extract artifacts
+        run: tar -xvf dist.tar
+
+      - name: Import Code Signing Certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Sign macOS Binaries
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # Find and sign executable Mach-O binaries under darwin build dirs
+          find dist -type f -perm -111 -path '*_darwin_*/*' -print0 | while IFS= read -r -d '' binary; do
+            # Verify it's a Mach-O binary
+            if ! file "$binary" | grep -q 'Mach-O'; then
+              continue
+            fi
+
+            echo "Signing $binary"
+            codesign --force --options runtime --sign "$APPLE_TEAM_ID" "$binary"
+
+            # Verify signature
+            codesign --verify --verbose "$binary"
+
+            # Create zip for notarization (required)
+            zip "${binary}.zip" "$binary"
+
+            # Submit for notarization
+            xcrun notarytool submit "${binary}.zip" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_APP_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait
+
+            # Staple notarization ticket
+            xcrun stapler staple "$binary"
+
+            # Clean up zip
+            rm "${binary}.zip"
+          done
+
+      - name: Re-package signed artifacts
+        run: tar -cvf dist-signed.tar dist/
+
+      - name: Upload signed artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: dist-signed
+          path: dist-signed.tar
+
+  publish-npm:
+    needs: sign-macos
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ inputs.version || github.ref_name }}
@@ -63,8 +129,8 @@ jobs:
 
       - uses: actions/download-artifact@v7
         with:
-          name: dist
-      - run: tar -xvf dist.tar
+          name: dist-signed
+      - run: tar -xvf dist-signed.tar
 
       - uses: actions/setup-node@v6
         with:
@@ -80,7 +146,7 @@ jobs:
           ruby pack.rb publish_npm
 
   publish-pypi:
-    needs: build
+    needs: sign-macos
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ inputs.version || github.ref_name }}
@@ -92,8 +158,8 @@ jobs:
 
       - uses: actions/download-artifact@v7
         with:
-          name: dist
-      - run: tar -xvf dist.tar
+          name: dist-signed
+      - run: tar -xvf dist-signed.tar
 
       - name: Setup uv with python
         uses: astral-sh/setup-uv@v7
@@ -109,7 +175,7 @@ jobs:
           ruby pack.rb publish_pypi
 
   publish-gem:
-    needs: build
+    needs: sign-macos
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -124,8 +190,8 @@ jobs:
 
       - uses: actions/download-artifact@v7
         with:
-          name: dist
-      - run: tar -xvf dist.tar
+          name: dist-signed
+      - run: tar -xvf dist-signed.tar
 
       - name: Configure RubyGems Trusted Publishing
         uses: rubygems/configure-rubygems-credentials@main

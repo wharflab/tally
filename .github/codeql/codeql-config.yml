@@ -1,0 +1,13 @@
+name: CodeQL Configuration
+
+paths-ignore:
+  - '**/testdata/**'
+  - 'internal/integration/__snapshots__/**'
+  - 'packaging/**'
+  - 'bin/**'
+
+query-filters:
+  # Add exclusions here if needed based on performance/false positives
+  # Example:
+  # - exclude:
+  #     id: go/unsafe-quoting

@@ -75,7 +75,7 @@ func (r *Rule) checkMetaArgs(input rules.LintInput) []rules.Violation {
 
 // checkStageCommands scans commands within a stage.
 func (r *Rule) checkStageCommands(file string, commands []instructions.Command) []rules.Violation {
-	var violations []rules.Violation //nolint:prealloc // size unknown: depends on secret findings
+	var violations []rules.Violation
 	for _, cmd := range commands {
 		violations = append(violations, r.checkCommand(file, cmd)...)
 	}
@@ -123,7 +123,7 @@ func (r *Rule) checkRunCommand(file string, c *instructions.RunCommand) []rules.
 
 // checkCopyCommand scans COPY heredocs for secrets.
 func (r *Rule) checkCopyCommand(file string, c *instructions.CopyCommand) []rules.Violation {
-	var violations []rules.Violation //nolint:prealloc // size unknown: depends on secret findings
+	var violations []rules.Violation
 	for _, content := range c.SourceContents {
 		violations = append(violations,
 			r.scanContent(content.Data, file, c.Location(), "COPY heredoc")...)
@@ -133,7 +133,7 @@ func (r *Rule) checkCopyCommand(file string, c *instructions.CopyCommand) []rule
 
 // checkAddCommand scans ADD heredocs for secrets.
 func (r *Rule) checkAddCommand(file string, c *instructions.AddCommand) []rules.Violation {
-	var violations []rules.Violation //nolint:prealloc // size unknown: depends on secret findings
+	var violations []rules.Violation
 	for _, content := range c.SourceContents {
 		violations = append(violations,
 			r.scanContent(content.Data, file, c.Location(), "ADD heredoc")...)
@@ -192,7 +192,7 @@ func (r *Rule) scanContent(
 		return nil
 	}
 
-	var violations []rules.Violation
+	violations := make([]rules.Violation, 0, len(findings))
 	for _, finding := range findings {
 		loc := rules.NewLocationFromRanges(file, location)
 

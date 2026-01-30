@@ -1,20 +1,27 @@
-.PHONY: build test lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema
+.PHONY: build test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema print-gotestsum-bin
 
 build:
 	CGO_ENABLED=0 go build -ldflags "-s -w" -o tally
 
-test:
-	go test -race -count=1 -timeout=30s ./...
-
-GOLANGCI_LINT_VERSION := v2.8.0
+GOTESTSUM_VERSION := v1.13.0
+GOLANGCI_LINT_VERSION := v2.7.2
 GORELEASER_VERSION := v2.13.3
 DEADCODE_VERSION := v0.41.0
 
-lint: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
-	bin/golangci-lint run
+test: bin/gotestsum-$(GOTESTSUM_VERSION)
+	bin/gotestsum --format testname -- -race -count=1 -timeout=30s ./...
 
-lint-fix: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
-	bin/golangci-lint run --fix
+test-verbose: bin/gotestsum-$(GOTESTSUM_VERSION)
+	bin/gotestsum --format standard-verbose -- -race -count=1 -timeout=30s ./...
+
+lint: bin/golangci-lint-$(GOLANGCI_LINT_VERSION) bin/custom-gcl
+	bin/custom-gcl run
+
+bin/custom-gcl: bin/golangci-lint-$(GOLANGCI_LINT_VERSION) .custom-gcl.yml _tools/customlint/*.go
+	bin/golangci-lint custom
+
+lint-fix: bin/golangci-lint-$(GOLANGCI_LINT_VERSION) bin/custom-gcl
+	bin/custom-gcl run --fix
 
 deadcode: bin/deadcode-$(DEADCODE_VERSION)
 	@tmp=$$(mktemp); \
@@ -60,6 +67,16 @@ bin/deadcode-$(DEADCODE_VERSION):
 	@rm -f bin/deadcode bin/deadcode-*
 	GOBIN=$(CURDIR)/bin go install golang.org/x/tools/cmd/deadcode@$(DEADCODE_VERSION)
 	@touch $@
+
+bin/gotestsum-$(GOTESTSUM_VERSION):
+	@rm -f bin/gotestsum bin/gotestsum-*
+	@mkdir -p bin
+	GOBIN=$(CURDIR)/bin go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION)
+	@mv bin/gotestsum bin/gotestsum-$(GOTESTSUM_VERSION)
+	@touch bin/gotestsum-$(GOTESTSUM_VERSION)
+
+print-gotestsum-bin:
+	@echo bin/gotestsum-$(GOTESTSUM_VERSION)
 
 jsonschema:
 	go run gen/jsonschema.go > schema.json

@@ -1,4 +1,6 @@
-version: "2"
+# yaml-language-server: $schema=https://golangci-lint.run/jsonschema/golangci.jsonschema.json
+
+version: '2'
 
 run:
   concurrency: 4
@@ -6,12 +8,15 @@ run:
 
 linters:
   default: all
+  enable:
+    - customlint  # Custom tally-specific rules
   disable:
     - cyclop          # complexity metrics - covered by gocyclo
+    - depguard        # import restrictions - using forbidigo instead
+    - unqueryvet      # checksum mismatch issue with v1.4.0
     - dupword         # duplicate words - too noisy
     - err113          # dynamic errors - too strict for CLI tool
     - exhaustruct     # requires all struct fields - too strict
-    - forbidigo       # forbidden identifiers - not needed
     - forcetypeassert # force type assertions - handled by other linters
     - gochecknoglobals # global vars - CLI requires them
     - gochecknoinits  # init functions - CLI requires them
@@ -36,26 +41,43 @@ linters:
     - wrapcheck       # wrap all errors - too strict for internal packages
     - wsl             # whitespace linter - too strict
     - wsl_v5          # whitespace linter v5 - too strict
+
   settings:
-    depguard:
-      rules:
-        main:
-          deny:
-            - pkg: github.com/sirupsen/logrus
-              desc: Use standard library log or slog
-            - pkg: github.com/go-logr/logr
-              desc: Use standard library log or slog
+    custom:
+      customlint:
+        type: module
+
+    forbidigo:
+      analyze-types: true
+      forbid:
+        # Enforce buildkit usage for Dockerfile parsing (per CLAUDE.md philosophy)
+        - pattern: '.*'
+          msg: 'Use moby/buildkit/frontend/dockerfile/parser instead of docker/docker parser'
+          pkg: '^github\.com/docker/docker/builder/dockerfile/parser$'
+        # Enforce buildkit instruction types
+        - pattern: '.*'
+          msg: 'Use moby/buildkit/frontend/dockerfile/instructions instead'
+          pkg: '^github\.com/docker/docker/builder/dockerfile/instructions$'
+        # Prevent docker/docker API types
+        - pattern: '.*'
+          msg: 'Use moby/buildkit types or OCI image-spec types instead'
+          pkg: '^github\.com/docker/docker/api/types$'
+
     dupl:
       threshold: 100
+
     errcheck:
       check-type-assertions: true
       check-blank: true
+
     funlen:
       lines: 500
       statements: 50
+
     goconst:
       min-len: 3
       min-occurrences: 3
+
     gocritic:
       disabled-checks:
         - whyNoLint
@@ -68,26 +90,32 @@ linters:
         - opinionated
         - performance
         - style
+
     gocyclo:
       min-complexity: 25
+
     govet:
       disable:
         - fieldalignment
         - shadow  # too strict for idiomatic Go err handling patterns
       enable-all: true
+
     lll:
       line-length: 140
+
     revive:
       rules:
         - name: unused-parameter
           disabled: true
+
     staticcheck:
       checks: ["all", "-SA1019", "-SA4006"]
+
   exclusions:
-    generated: lax
     presets:
       - comments
       - std-error-handling
+
     rules:
       - linters:
           - revive
@@ -132,21 +160,6 @@ linters:
           - errcheck
         text: "Error return value is not checked"
         source: "defer func\\(\\) \\{ _ ="
-
-formatters:
-  enable:
-    - gofmt
-    - gofumpt
-    - goimports
-    - golines
-  settings:
-    goimports:
-      local-prefixes:
-        - github.com/tinovyatkin/tally
-    golines:
-      max-len: 120
-  exclusions:
-    generated: lax
 
 issues:
   max-issues-per-linter: 0
