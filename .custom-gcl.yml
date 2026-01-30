@@ -1,0 +1,10 @@
+# yaml-language-server: $schema=https://golangci-lint.run/jsonschema/custom-gcl.jsonschema.json
+
+version: v2.8.0
+
+destination: ./bin
+
+plugins:
+  - module: 'github.com/tinovyatkin/tally/_tools'
+    import: 'github.com/tinovyatkin/tally/_tools/customlint'
+    path: ./_tools

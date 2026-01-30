@@ -8,9 +8,12 @@ run:
 
 linters:
   default: all
+  enable:
+    # - customlint  # TODO: blocked by golangci-lint 2.8.0 unqueryvet checksum issue
   disable:
     - cyclop          # complexity metrics - covered by gocyclo
     - depguard        # import restrictions - using forbidigo instead
+    - unqueryvet      # checksum mismatch issue with v1.4.0
     - dupword         # duplicate words - too noisy
     - err113          # dynamic errors - too strict for CLI tool
     - exhaustruct     # requires all struct fields - too strict
@@ -40,9 +43,11 @@ linters:
     - wsl_v5          # whitespace linter v5 - too strict
 
   settings:
-    custom:
-      customlint:
-        type: module
+    # custom:  # TODO: Enable when golangci-lint checksum issue is resolved
+    #   customlint:
+    #     type: module
+    #     description: tally-specific linting rules
+    #     original-url: github.com/tinovyatkin/tally/_tools/customlint
 
     forbidigo:
       analyze-types: true
