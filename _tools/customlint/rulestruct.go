@@ -43,7 +43,7 @@ func runRuleStruct(pass *analysis.Pass) (any, error) {
 			}
 
 			// Check if it's a struct
-			structType, ok := typeSpec.Type.(*ast.StructType)
+			_, ok = typeSpec.Type.(*ast.StructType)
 			if !ok {
 				continue
 			}
@@ -52,15 +52,6 @@ func runRuleStruct(pass *analysis.Pass) (any, error) {
 			name := typeSpec.Name.Name
 			if !ast.IsExported(name) || !strings.HasSuffix(name, "Rule") {
 				continue
-			}
-
-			// Check if struct has fields
-			if len(structType.Fields.List) == 0 {
-				pass.Reportf(
-					typeSpec.Pos(),
-					"rule struct %s should have configuration fields or use an empty struct marker",
-					name,
-				)
 			}
 
 			// Check if there's documentation

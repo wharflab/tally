@@ -9,7 +9,7 @@ run:
 linters:
   default: all
   enable:
-    # - customlint  # TODO: blocked by golangci-lint 2.8.0 unqueryvet checksum issue
+    - customlint  # Custom tally-specific rules
   disable:
     - cyclop          # complexity metrics - covered by gocyclo
     - depguard        # import restrictions - using forbidigo instead
@@ -32,6 +32,7 @@ linters:
     - noctx           # context in http - not applicable
     - noinlineerr     # inline errors - too strict
     - paralleltest    # parallel tests - not needed
+    - prealloc        # pre-allocation suggestions - too noisy
     - tagliatelle     # struct tag naming - not needed
     - testpackage     # separate test packages - not needed
     - tparallel       # t.Parallel() - not needed
@@ -43,11 +44,9 @@ linters:
     - wsl_v5          # whitespace linter v5 - too strict
 
   settings:
-    # custom:  # TODO: Enable when golangci-lint checksum issue is resolved
-    #   customlint:
-    #     type: module
-    #     description: tally-specific linting rules
-    #     original-url: github.com/tinovyatkin/tally/_tools/customlint
+    custom:
+      customlint:
+        type: module
 
     forbidigo:
       analyze-types: true

@@ -80,10 +80,11 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: latest
+      - name: Build custom golangci-lint
+        run: make bin/custom-gcl
+
+      - name: Run linters
+        run: bin/custom-gcl run
 
   deadcode:
     name: Dead Code Detection

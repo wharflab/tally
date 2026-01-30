@@ -42,7 +42,7 @@ go.work.sum
 # GoReleaser
 dist/
 
-# Local binaries (golangci-lint, etc.)
+# Local binaries (golangci-lint, custom-gcl, etc.)
 /bin/
 
 # Build artifacts
