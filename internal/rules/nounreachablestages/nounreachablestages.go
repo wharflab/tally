@@ -57,7 +57,7 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	var violations []rules.Violation
+	violations := make([]rules.Violation, 0, len(unreachable))
 
 	for _, stageIdx := range unreachable {
 		info := sem.StageInfo(stageIdx)

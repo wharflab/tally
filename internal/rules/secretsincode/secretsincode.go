@@ -192,7 +192,7 @@ func (r *Rule) scanContent(
 		return nil
 	}
 
-	var violations []rules.Violation
+	violations := make([]rules.Violation, 0, len(findings))
 	for _, finding := range findings {
 		loc := rules.NewLocationFromRanges(file, location)
 

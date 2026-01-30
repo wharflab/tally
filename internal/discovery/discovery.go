@@ -165,7 +165,7 @@ func discoverDirectory(dir string, opts Options, seen map[string]bool) ([]Discov
 	var results []DiscoveredFile
 
 	// Build all patterns to check (recursive + direct)
-	var patterns []string
+	patterns := make([]string, 0, 2) // dockerfile + containerfile patterns
 	for _, pattern := range opts.Patterns {
 		patterns = append(patterns,
 			filepath.Join(absDir, "**", pattern), // Recursive
@@ -192,7 +192,7 @@ func globMatches(pattern string, opts Options, seen map[string]bool) ([]Discover
 		return nil, err
 	}
 
-	var results []DiscoveredFile
+	results := make([]DiscoveredFile, 0, len(matches))
 
 	for _, match := range matches {
 		absPath, err := filepath.Abs(match)
