@@ -1,14 +1,18 @@
-.PHONY: build test lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema
+.PHONY: build test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema
 
 build:
 	CGO_ENABLED=0 go build -ldflags "-s -w" -o tally
 
-test:
-	go test -race -count=1 -timeout=30s ./...
-
+GOTESTSUM_VERSION := v1.13.0
 GOLANGCI_LINT_VERSION := v2.8.0
 GORELEASER_VERSION := v2.13.3
 DEADCODE_VERSION := v0.41.0
+
+test: bin/gotestsum-$(GOTESTSUM_VERSION)
+	bin/gotestsum --format testname -- -race -count=1 -timeout=30s ./...
+
+test-verbose: bin/gotestsum-$(GOTESTSUM_VERSION)
+	bin/gotestsum --format standard-verbose -- -race -count=1 -timeout=30s ./...
 
 lint: bin/golangci-lint-$(GOLANGCI_LINT_VERSION)
 	bin/golangci-lint run
@@ -59,6 +63,11 @@ bin/goreleaser-$(GORELEASER_VERSION):
 bin/deadcode-$(DEADCODE_VERSION):
 	@rm -f bin/deadcode bin/deadcode-*
 	GOBIN=$(CURDIR)/bin go install golang.org/x/tools/cmd/deadcode@$(DEADCODE_VERSION)
+	@touch $@
+
+bin/gotestsum-$(GOTESTSUM_VERSION):
+	@rm -f bin/gotestsum bin/gotestsum-*
+	GOBIN=$(CURDIR)/bin go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION)
 	@touch $@
 
 jsonschema:

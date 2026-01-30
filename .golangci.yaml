@@ -11,7 +11,6 @@ linters:
     - dupword         # duplicate words - too noisy
     - err113          # dynamic errors - too strict for CLI tool
     - exhaustruct     # requires all struct fields - too strict
-    - forbidigo       # forbidden identifiers - not needed
     - forcetypeassert # force type assertions - handled by other linters
     - gochecknoglobals # global vars - CLI requires them
     - gochecknoinits  # init functions - CLI requires them
@@ -45,6 +44,21 @@ linters:
               desc: Use standard library log or slog
             - pkg: github.com/go-logr/logr
               desc: Use standard library log or slog
+    forbidigo:
+      analyze-types: true
+      forbid:
+        # Enforce buildkit usage for Dockerfile parsing (per CLAUDE.md philosophy)
+        - pattern: '.*'
+          msg: 'Use moby/buildkit/frontend/dockerfile/parser instead of docker/docker parser'
+          pkg: '^github\.com/docker/docker/builder/dockerfile/parser$'
+        # Enforce buildkit instruction types
+        - pattern: '.*'
+          msg: 'Use moby/buildkit/frontend/dockerfile/instructions instead'
+          pkg: '^github\.com/docker/docker/builder/dockerfile/instructions$'
+        # Prevent docker/docker API types
+        - pattern: '.*'
+          msg: 'Use moby/buildkit types or OCI image-spec types instead'
+          pkg: '^github\.com/docker/docker/api/types$'
     dupl:
       threshold: 100
     errcheck:
