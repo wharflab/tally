@@ -70,8 +70,10 @@ bin/deadcode-$(DEADCODE_VERSION):
 
 bin/gotestsum-$(GOTESTSUM_VERSION):
 	@rm -f bin/gotestsum bin/gotestsum-*
+	@mkdir -p bin
 	GOBIN=$(CURDIR)/bin go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION)
-	@touch $@
+	@mv bin/gotestsum bin/gotestsum-$(GOTESTSUM_VERSION)
+	@touch bin/gotestsum-$(GOTESTSUM_VERSION)
 
 jsonschema:
 	go run gen/jsonschema.go > schema.json
