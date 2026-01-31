@@ -807,6 +807,18 @@ func TestParseShellDirective(t *testing.T) {
 			shell:   "bash",
 			source:  SourceTally,
 		},
+		{
+			name:    "shell with dot extension",
+			content: "# hadolint shell=cmd.exe\nFROM windows",
+			shell:   "cmd.exe",
+			source:  SourceHadolint,
+		},
+		{
+			name:    "powershell",
+			content: "# hadolint shell=powershell\nFROM mcr.microsoft.com/windows/servercore",
+			shell:   "powershell",
+			source:  SourceHadolint,
+		},
 	}
 
 	for _, tt := range tests {

@@ -28,12 +28,14 @@ var (
 		`(?i)#\s*check\s*=\s*skip\s*=\s*([A-Za-z0-9_,\s/.-]+?)(?:;reason\s*=\s*(.*))?$`)
 
 	// # tally shell=<shell>
+	// Shell names can include dots for extensions (e.g., cmd.exe)
 	tallyShellPattern = regexp.MustCompile(
-		`(?i)#\s*tally\s+shell\s*=\s*([A-Za-z0-9_/-]+)\s*$`)
+		`(?i)#\s*tally\s+shell\s*=\s*([A-Za-z0-9_./-]+)\s*$`)
 
 	// # hadolint shell=<shell>
+	// Shell names can include dots for extensions (e.g., cmd.exe)
 	hadolintShellPattern = regexp.MustCompile(
-		`(?i)#\s*hadolint\s+shell\s*=\s*([A-Za-z0-9_/-]+)\s*$`)
+		`(?i)#\s*hadolint\s+shell\s*=\s*([A-Za-z0-9_./-]+)\s*$`)
 )
 
 // RuleValidator is a function that checks if a rule code is known.
