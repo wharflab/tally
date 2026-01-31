@@ -1,6 +1,30 @@
 {
   "files": [
     {
+      "file": "testdata/per-file-configs/lenient/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/per-file-configs/lenient/Dockerfile",
+            "start": {
+              "line": 2,
+              "column": 0
+            },
+            "end": {
+              "line": 2,
+              "column": 0
+            }
+          },
+          "rule": "hadolint/DL3006",
+          "message": "image \"alpine\" does not have an explicit tag; pin a specific version (e.g., alpine:22.04)",
+          "detail": "Untagged images default to :latest, which can change unexpectedly and break builds. Always specify an explicit tag for reproducibility.",
+          "severity": "warning",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3006",
+          "sourceCode": "FROM alpine AS Build"
+        }
+      ]
+    },
+    {
       "file": "testdata/per-file-configs/strict/Dockerfile",
       "violations": [
         {
@@ -20,19 +44,38 @@
           "detail": "Directive: # tally ignore=buildkit/StageNameCasing",
           "severity": "warning",
           "sourceCode": "# tally ignore=buildkit/StageNameCasing"
+        },
+        {
+          "location": {
+            "file": "testdata/per-file-configs/strict/Dockerfile",
+            "start": {
+              "line": 2,
+              "column": 0
+            },
+            "end": {
+              "line": 2,
+              "column": 0
+            }
+          },
+          "rule": "hadolint/DL3006",
+          "message": "image \"alpine\" does not have an explicit tag; pin a specific version (e.g., alpine:22.04)",
+          "detail": "Untagged images default to :latest, which can change unexpectedly and break builds. Always specify an explicit tag for reproducibility.",
+          "severity": "warning",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3006",
+          "sourceCode": "FROM alpine AS Build"
         }
       ]
     }
   ],
   "summary": {
-    "total": 1,
+    "total": 3,
     "errors": 0,
-    "warnings": 1,
+    "warnings": 3,
     "info": 0,
     "style": 0,
-    "files": 1
+    "files": 2
   },
   "files_scanned": 2,
-  "rules_enabled": 29
+  "rules_enabled": 35
 }
 

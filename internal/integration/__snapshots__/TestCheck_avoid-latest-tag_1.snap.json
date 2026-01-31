@@ -1,0 +1,39 @@
+{
+  "files": [
+    {
+      "file": "testdata/avoid-latest-tag/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/avoid-latest-tag/Dockerfile",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 0
+            }
+          },
+          "rule": "hadolint/DL3007",
+          "message": "using :latest tag for image \"ubuntu:latest\" is prone to errors; pin a specific version instead (e.g., ubuntu:22.04)",
+          "detail": "The :latest tag can change at any time, potentially breaking builds or introducing unexpected behavior. Use a specific version tag for reproducibility.",
+          "severity": "warning",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3007",
+          "sourceCode": "FROM ubuntu:latest"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 0,
+    "warnings": 1,
+    "info": 0,
+    "style": 0,
+    "files": 1
+  },
+  "files_scanned": 1,
+  "rules_enabled": 35
+}
+

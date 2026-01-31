@@ -145,10 +145,31 @@ func (d *Directive) SuppressesLine(line int) bool {
 	return d.AppliesTo.Contains(line)
 }
 
+// ShellDirective represents a shell override directive.
+// Supported formats:
+//   - # tally shell=bash
+//   - # hadolint shell=dash
+type ShellDirective struct {
+	// Shell is the shell name (e.g., "bash", "sh", "dash", "ash", "zsh").
+	Shell string
+
+	// Line is the 0-based line number where the directive appears.
+	Line int
+
+	// Source indicates which format the directive used.
+	Source DirectiveSource
+
+	// RawText is the original comment text.
+	RawText string
+}
+
 // ParseResult contains all directives parsed from a file plus any errors.
 type ParseResult struct {
-	// Directives contains successfully parsed directives.
+	// Directives contains successfully parsed ignore directives.
 	Directives []Directive
+
+	// ShellDirectives contains shell override directives.
+	ShellDirectives []ShellDirective
 
 	// Errors contains parse errors for malformed directives.
 	Errors []ParseError

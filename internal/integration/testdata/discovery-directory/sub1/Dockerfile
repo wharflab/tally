@@ -1,3 +1,3 @@
-# tally ignore=max-lines
+# tally ignore=max-lines,hadolint/DL3006
 FROM alpine
 RUN echo "sub1"

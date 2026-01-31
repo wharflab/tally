@@ -16,7 +16,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 |-----------|-------------|---------------------|-------|
 | tally | 3 | - | 3 |
 | buildkit | 4 + 15 captured | - | 19 |
-| hadolint | 2 | ~10 | 70+ |
+| hadolint | 8 | ~10 | 70+ |
 
 ---
 
@@ -120,11 +120,11 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | DL1001 | Avoid inline ignore pragmas | Ignore | ⏳ |
 | DL3000 | Use absolute WORKDIR paths | Error | 🔄 `buildkit/WorkdirRelativePath` |
 | DL3001 | Avoid running certain commands in containers (ssh, vim, etc.) | Info | ⏳ |
-| DL3002 | Last user should not be root | Warning | ⏳ |
+| DL3002 | Last user should not be root | Warning | ✅ `hadolint/DL3002` |
 | DL3003 | Use WORKDIR to switch directories | Warning | ⏳ |
-| DL3004 | Do not use sudo; use gosu instead | Error | ⏳ |
-| DL3006 | Always tag image versions explicitly | Warning | ⏳ |
-| DL3007 | Avoid using "latest" tag | Warning | ⏳ |
+| DL3004 | Do not use sudo; use gosu instead | Error | ✅ `hadolint/DL3004` |
+| DL3006 | Always tag image versions explicitly | Warning | ✅ `hadolint/DL3006` |
+| DL3007 | Avoid using "latest" tag | Warning | ✅ `hadolint/DL3007` |
 | DL3008 | Pin versions in apt-get install | Warning | ⏳ |
 | DL3009 | Delete apt-get lists after installing | Info | ⏳ |
 | DL3010 | Use ADD for extracting archives | Info | ⏳ |
@@ -136,7 +136,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | DL3016 | Pin versions in npm | Warning | ⏳ |
 | DL3018 | Pin versions in apk add | Warning | ⏳ |
 | DL3019 | Use --no-cache with apk | Info | ⏳ |
-| DL3020 | Use COPY instead of ADD for files/folders | Error | ⏳ |
+| DL3020 | Use COPY instead of ADD for files/folders | Error | ✅ `hadolint/DL3020` |
 | DL3021 | COPY with multiple args requires trailing / | Error | ⏳ |
 | DL3022 | COPY --from should reference defined FROM alias | Warning | ⏳ |
 | DL3023 | COPY --from cannot reference own FROM alias | Error | ⏳ |
@@ -178,7 +178,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | DL3061 | Invalid instruction order | Error | ⏳ |
 | DL3062 | Pin versions in go install | Warning | ⏳ |
 | DL4000 | MAINTAINER is deprecated | Error | 🔄 `buildkit/MaintainerDeprecated` |
-| DL4001 | Use either wget or curl, not both | Warning | ⏳ |
+| DL4001 | Use either wget or curl, not both | Warning | ✅ `hadolint/DL4001` |
 | DL4003 | Multiple CMD instructions | Warning | 🔄 `buildkit/MultipleInstructionsDisallowed` |
 | DL4004 | Multiple ENTRYPOINT instructions | Error | 🔄 `buildkit/MultipleInstructionsDisallowed` |
 | DL4005 | Use SHELL to change default shell | Warning | ⏳ |
@@ -215,6 +215,27 @@ FROM alpine AS Builder
 **Note:** Directives work with or without namespace prefixes. Both `ignore=DL3024` and `ignore=hadolint/DL3024` are valid.
 
 See [README.md](README.md#ignoring-violations) for full directive documentation.
+
+### Shell Directive for Non-POSIX Shells
+
+When using base images with non-POSIX shells (e.g., Windows images with PowerShell), use the `shell` directive to automatically disable shell-specific linting rules:
+
+```dockerfile
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+# hadolint shell=powershell
+RUN Get-Process notepad | Stop-Process
+```
+
+Supported non-POSIX shells:
+- `powershell` - Windows PowerShell
+- `pwsh` - PowerShell Core (cross-platform)
+- `cmd` / `cmd.exe` - Windows Command Prompt
+
+When a non-POSIX shell is specified, the following rule categories are automatically disabled:
+- Shell command analysis rules (e.g., DL3004 sudo detection, DL4001 wget/curl detection)
+- Future ShellCheck-based rules (SC* rules)
+
+Both `# hadolint shell=<shell>` and `# tally shell=<shell>` formats are supported.
 
 ---
 

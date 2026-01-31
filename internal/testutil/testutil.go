@@ -7,6 +7,7 @@ import (
 
 	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/tinovyatkin/tally/internal/semantic"
 )
 
 // ParseDockerfile parses a Dockerfile from a string using the full parsing pipeline.
@@ -53,6 +54,31 @@ func MakeLintInputWithConfig(tb testing.TB, file, content string, config any) ru
 	input := MakeLintInput(tb, file, content)
 	input.Config = config
 	return input
+}
+
+// MakeLintInputWithSemantic creates a LintInput with the semantic model.
+// This is needed for rules that use semantic analysis (package tracking, etc.).
+func MakeLintInputWithSemantic(tb testing.TB, file, content string) rules.LintInput {
+	tb.Helper()
+
+	result, err := dockerfile.Parse(strings.NewReader(content), nil)
+	if err != nil {
+		tb.Fatalf("failed to parse Dockerfile: %v", err)
+	}
+
+	// Build semantic model
+	sem := semantic.NewBuilder(result, nil, file).Build()
+
+	return rules.LintInput{
+		File:     file,
+		AST:      result.AST,
+		Stages:   result.Stages,
+		MetaArgs: result.MetaArgs,
+		Source:   result.Source,
+		Semantic: sem,
+		Context:  nil,
+		Config:   nil,
+	}
 }
 
 // RuleTestCase defines a test case for table-driven rule tests.

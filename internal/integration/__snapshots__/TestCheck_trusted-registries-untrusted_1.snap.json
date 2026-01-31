@@ -15,6 +15,25 @@
               "column": 0
             }
           },
+          "rule": "hadolint/DL3007",
+          "message": "using :latest tag for image \"quay.io/prometheus/node-exporter:latest\" is prone to errors; pin a specific version instead (e.g., quay.io/prometheus/node-exporter:22.04)",
+          "detail": "The :latest tag can change at any time, potentially breaking builds or introducing unexpected behavior. Use a specific version tag for reproducibility.",
+          "severity": "warning",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3007",
+          "sourceCode": "FROM quay.io/prometheus/node-exporter:latest"
+        },
+        {
+          "location": {
+            "file": "testdata/trusted-registries-untrusted/Dockerfile",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 0
+            }
+          },
           "rule": "hadolint/DL3026",
           "message": "image \"quay.io/prometheus/node-exporter:latest\" is from untrusted registry \"quay.io\" (allowed: docker.io)",
           "severity": "warning",
@@ -25,14 +44,14 @@
     }
   ],
   "summary": {
-    "total": 1,
+    "total": 2,
     "errors": 0,
-    "warnings": 1,
+    "warnings": 2,
     "info": 0,
     "style": 0,
     "files": 1
   },
   "files_scanned": 1,
-  "rules_enabled": 30
+  "rules_enabled": 36
 }
 

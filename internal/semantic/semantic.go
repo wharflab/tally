@@ -126,3 +126,18 @@ func (m *Model) MetaArgs() []instructions.ArgCommand {
 func (m *Model) Stages() []instructions.Stage {
 	return m.stages
 }
+
+// ExternalImageStages returns an iterator over stages that use external images
+// (not "scratch" and not referencing another stage in the Dockerfile).
+// This is useful for rules that need to check image tags/versions.
+func (m *Model) ExternalImageStages() func(yield func(*StageInfo) bool) {
+	return func(yield func(*StageInfo) bool) {
+		for _, info := range m.stageInfo {
+			if info != nil && info.IsExternalImage() {
+				if !yield(info) {
+					return
+				}
+			}
+		}
+	}
+}

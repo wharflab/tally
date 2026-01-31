@@ -1,4 +1,4 @@
-# tally global ignore=max-lines
+# tally global ignore=max-lines,hadolint/DL3006
 FROM alpine AS build
 RUN echo "line 1"
 RUN echo "line 2"

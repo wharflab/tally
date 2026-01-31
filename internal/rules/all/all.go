@@ -6,12 +6,18 @@ package all
 
 import (
 	// Import all rule packages to trigger their init() registration
+	_ "github.com/tinovyatkin/tally/internal/rules/avoidlatesttag"
 	_ "github.com/tinovyatkin/tally/internal/rules/copyignoredfile"
+	_ "github.com/tinovyatkin/tally/internal/rules/lastusershouldnotberoot"
 	_ "github.com/tinovyatkin/tally/internal/rules/maxlines"
+	_ "github.com/tinovyatkin/tally/internal/rules/nosudo"
 	_ "github.com/tinovyatkin/tally/internal/rules/nounreachablestages"
+	_ "github.com/tinovyatkin/tally/internal/rules/pinimageversions"
 	_ "github.com/tinovyatkin/tally/internal/rules/redundanttargetplatform"
 	_ "github.com/tinovyatkin/tally/internal/rules/secretsinargorenv"
 	_ "github.com/tinovyatkin/tally/internal/rules/secretsincode"
 	_ "github.com/tinovyatkin/tally/internal/rules/trustedbaseimage"
+	_ "github.com/tinovyatkin/tally/internal/rules/usecopynotadd"
+	_ "github.com/tinovyatkin/tally/internal/rules/wgetorcurl"
 	_ "github.com/tinovyatkin/tally/internal/rules/workdirrelativepath"
 )

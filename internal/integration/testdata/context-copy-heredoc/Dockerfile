@@ -1,4 +1,4 @@
-# tally ignore=max-lines
+# tally ignore=max-lines,hadolint/DL3006
 FROM alpine
 COPY <<EOF /app/script.sh
 #!/bin/sh

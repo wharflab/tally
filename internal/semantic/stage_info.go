@@ -1,12 +1,56 @@
 package semantic
 
 import (
+	"slices"
+
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
+
+	"github.com/tinovyatkin/tally/internal/shell"
 )
 
 // DefaultShell is the default shell used by Docker for RUN instructions.
 var DefaultShell = []string{"/bin/sh", "-c"}
+
+// PackageInstall represents a package installation in a RUN command.
+type PackageInstall struct {
+	// Manager is the package manager used.
+	Manager shell.PackageManager
+
+	// Packages is the list of packages being installed.
+	Packages []string
+
+	// Line is the 1-based line number of the RUN instruction.
+	Line int
+}
+
+// ShellSource indicates where the shell setting came from.
+type ShellSource int
+
+const (
+	// ShellSourceDefault indicates the default shell is being used.
+	ShellSourceDefault ShellSource = iota
+	// ShellSourceInstruction indicates the shell was set via SHELL instruction.
+	ShellSourceInstruction
+	// ShellSourceDirective indicates the shell was set via a comment directive.
+	ShellSourceDirective
+)
+
+// ShellSetting represents the active shell configuration for a stage.
+type ShellSetting struct {
+	// Shell is the shell command array (e.g., ["/bin/bash", "-c"]).
+	Shell []string
+
+	// Variant is the parsed shell variant for use with the shell parser.
+	Variant shell.Variant
+
+	// Source indicates where this shell setting came from.
+	Source ShellSource
+
+	// Line is the 0-based line number where the shell was set (for directives/instructions).
+	// -1 for default shell.
+	Line int
+}
 
 // StageInfo contains enhanced information about a build stage.
 // It augments BuildKit's instructions.Stage with semantic analysis data.
@@ -19,7 +63,12 @@ type StageInfo struct {
 
 	// Shell is the active shell for this stage (from SHELL instruction).
 	// Defaults to ["/bin/sh", "-c"] if no SHELL instruction is present.
+	//
+	// Deprecated: Use ShellSetting instead for more detailed information.
 	Shell []string
+
+	// ShellSetting contains the active shell configuration including variant and source.
+	ShellSetting ShellSetting
 
 	// BaseImage contains information about the FROM image reference.
 	BaseImage *BaseImageRef
@@ -34,8 +83,53 @@ type StageInfo struct {
 	// These are triggered when the image is used as a base for another build.
 	OnbuildCopyFromRefs []CopyFromRef
 
+	// InstalledPackages contains packages installed via system package managers.
+	// Tracked from RUN commands that use apt-get, apk, yum, dnf, etc.
+	InstalledPackages []PackageInstall
+
 	// IsLastStage is true if this is the final stage in the Dockerfile.
 	IsLastStage bool
+}
+
+// HasPackage checks if a package was installed in this stage.
+func (s *StageInfo) HasPackage(pkg string) bool {
+	for _, install := range s.InstalledPackages {
+		if slices.Contains(install.Packages, pkg) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsExternalImage returns true if this stage's base image is an external image
+// (not "scratch" and not a reference to another stage in the Dockerfile).
+// This is useful for rules that need to check image tags/versions.
+func (s *StageInfo) IsExternalImage() bool {
+	if s.Stage == nil {
+		return false
+	}
+	// scratch is a special "no base" image
+	if s.Stage.BaseName == "scratch" {
+		return false
+	}
+	// Check if it references another stage
+	if s.BaseImage != nil && s.BaseImage.IsStageRef {
+		return false
+	}
+	return true
+}
+
+// PackageManagers returns the set of package managers used in this stage.
+func (s *StageInfo) PackageManagers() []shell.PackageManager {
+	seen := make(map[shell.PackageManager]bool)
+	var managers []shell.PackageManager
+	for _, install := range s.InstalledPackages {
+		if !seen[install.Manager] {
+			seen[install.Manager] = true
+			managers = append(managers, install.Manager)
+		}
+	}
+	return managers
 }
 
 // BaseImageRef contains information about a stage's base image.
@@ -77,13 +171,19 @@ type CopyFromRef struct {
 // newStageInfo creates a new StageInfo with default values.
 func newStageInfo(index int, stage *instructions.Stage, isLast bool) *StageInfo {
 	// Copy default shell to avoid mutation
-	shell := make([]string, len(DefaultShell))
-	copy(shell, DefaultShell)
+	defaultShell := make([]string, len(DefaultShell))
+	copy(defaultShell, DefaultShell)
 
 	return &StageInfo{
-		Index:       index,
-		Stage:       stage,
-		Shell:       shell,
+		Index: index,
+		Stage: stage,
+		Shell: defaultShell,
+		ShellSetting: ShellSetting{
+			Shell:   defaultShell,
+			Variant: shell.VariantFromShellCmd(defaultShell),
+			Source:  ShellSourceDefault,
+			Line:    -1,
+		},
 		IsLastStage: isLast,
 	}
 }
