@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/tinovyatkin/tally/internal/shell"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
@@ -158,6 +159,8 @@ RUN apt-get update \
 	}
 }
 
+// TestContainsSudo verifies that shell.ContainsCommand correctly detects sudo.
+// This test ensures our integration with the shell package works as expected.
 func TestContainsSudo(t *testing.T) {
 	tests := []struct {
 		cmd  string
@@ -176,40 +179,9 @@ func TestContainsSudo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.cmd, func(t *testing.T) {
-			got := containsSudo(tt.cmd)
+			got := shell.ContainsCommand(tt.cmd, "sudo")
 			if got != tt.want {
-				t.Errorf("containsSudo(%q) = %v, want %v", tt.cmd, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestTokenizeShellCommand(t *testing.T) {
-	tests := []struct {
-		cmd  string
-		want []string
-	}{
-		{"apt-get update", []string{"apt-get"}},
-		{"sudo apt-get update", []string{"sudo"}}, // sudo is the command, apt-get is its argument
-		{"FOO=bar apt-get update", []string{"apt-get"}},
-		{"apt-get update && apt-get install curl", []string{"apt-get", "apt-get"}},
-		{"apt-get update; echo done", []string{"apt-get", "echo"}},
-		{"(apt-get update)", []string{"apt-get"}},
-		{"echo hello | sudo tee /etc/file", []string{"echo", "sudo"}},
-		{"apt-get update && sudo apt-get install", []string{"apt-get", "sudo"}},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.cmd, func(t *testing.T) {
-			got := tokenizeShellCommand(tt.cmd)
-			if len(got) != len(tt.want) {
-				t.Errorf("tokenizeShellCommand(%q) = %v, want %v", tt.cmd, got, tt.want)
-				return
-			}
-			for i, g := range got {
-				if g != tt.want[i] {
-					t.Errorf("tokenizeShellCommand(%q)[%d] = %q, want %q", tt.cmd, i, g, tt.want[i])
-				}
+				t.Errorf("shell.ContainsCommand(%q, \"sudo\") = %v, want %v", tt.cmd, got, tt.want)
 			}
 		})
 	}

@@ -4,13 +4,13 @@
 package nosudo
 
 import (
-	"slices"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/semantic"
+	"github.com/tinovyatkin/tally/internal/shell"
 )
 
 // Rule implements the DL3004 linting rule.
@@ -42,11 +42,14 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 	}
 
 	for stageIdx, stage := range input.Stages {
-		// Check if stage uses a non-POSIX shell
+		// Get shell variant for this stage
+		shellVariant := shell.VariantBash
 		if sem != nil {
 			if info := sem.StageInfo(stageIdx); info != nil {
-				if info.ShellSetting.Variant.IsNonPOSIX() {
-					continue // Skip shell analysis for non-POSIX shells
+				shellVariant = info.ShellSetting.Variant
+				// Skip shell analysis for non-POSIX shells
+				if shellVariant.IsNonPOSIX() {
+					continue
 				}
 			}
 		}
@@ -57,9 +60,9 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 				continue
 			}
 
-			// Check if the command contains sudo
+			// Check if the command contains sudo using the shell package
 			cmdStr := getRunCommandString(run)
-			if containsSudo(cmdStr) {
+			if shell.ContainsCommandWithVariant(cmdStr, "sudo", shellVariant) {
 				loc := rules.NewLocationFromRanges(input.File, run.Location())
 				violations = append(violations, rules.NewViolation(
 					loc,
@@ -83,70 +86,6 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 func getRunCommandString(run *instructions.RunCommand) string {
 	// CmdLine contains the command parts for both shell and exec forms
 	return strings.Join(run.CmdLine, " ")
-}
-
-// containsSudo checks if a command string contains a sudo invocation.
-// We look for sudo as a command (not just as a substring).
-func containsSudo(cmd string) bool {
-	// Normalize the command
-	cmd = strings.TrimSpace(cmd)
-	if cmd == "" {
-		return false
-	}
-
-	// Check various patterns for sudo usage
-	tokens := tokenizeShellCommand(cmd)
-	return slices.Contains(tokens, "sudo")
-}
-
-// tokenizeShellCommand does basic shell tokenization to find command names.
-// This handles common patterns like: sudo apt-get, apt-get && sudo something.
-// It uses a simple heuristic: find tokens that appear in "command position"
-// (first token in a sequence separated by shell operators).
-func tokenizeShellCommand(cmd string) []string {
-	var tokens []string
-
-	// Replace common shell operators with a marker to split on
-	// This is a simplification but catches most cases
-	const marker = "\x00"
-	for _, sep := range []string{"&&", "||", ";", "|", "`", "$("} {
-		cmd = strings.ReplaceAll(cmd, sep, marker)
-	}
-	// Handle parentheses - they start new command contexts
-	cmd = strings.ReplaceAll(cmd, "(", marker)
-	cmd = strings.ReplaceAll(cmd, ")", " ")
-
-	// Handle line continuations
-	cmd = strings.ReplaceAll(cmd, "\\\n", " ")
-	cmd = strings.ReplaceAll(cmd, "\n", marker)
-
-	// Split by the marker to get individual command sequences
-	sequences := strings.SplitSeq(cmd, marker)
-
-	for seq := range sequences {
-		seq = strings.TrimSpace(seq)
-		if seq == "" {
-			continue
-		}
-
-		// Get the first non-assignment, non-flag token as the command
-		parts := strings.FieldsSeq(seq)
-		for part := range parts {
-			// Skip environment variable assignments (FOO=bar)
-			if strings.Contains(part, "=") && !strings.HasPrefix(part, "-") {
-				continue
-			}
-			// Skip flags
-			if strings.HasPrefix(part, "-") {
-				continue
-			}
-			// This is the command name
-			tokens = append(tokens, part)
-			break
-		}
-	}
-
-	return tokens
 }
 
 // New creates a new DL3004 rule instance.
