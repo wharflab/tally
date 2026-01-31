@@ -478,12 +478,12 @@ RUN echo "bash shell"
 
 	// After SHELL instruction, shell should be updated
 	expectedShell := []string{"/bin/bash", "-c"}
-	if len(info.Shell) != len(expectedShell) {
-		t.Fatalf("expected shell %v, got %v", expectedShell, info.Shell)
+	if len(info.ShellSetting.Shell) != len(expectedShell) {
+		t.Fatalf("expected shell %v, got %v", expectedShell, info.ShellSetting.Shell)
 	}
 	for i, s := range expectedShell {
-		if info.Shell[i] != s {
-			t.Errorf("expected shell[%d]=%q, got %q", i, s, info.Shell[i])
+		if info.ShellSetting.Shell[i] != s {
+			t.Errorf("expected shell[%d]=%q, got %q", i, s, info.ShellSetting.Shell[i])
 		}
 	}
 }
@@ -498,12 +498,12 @@ RUN echo "hello"
 	info := model.StageInfo(0)
 
 	expectedShell := []string{"/bin/sh", "-c"}
-	if len(info.Shell) != len(expectedShell) {
-		t.Fatalf("expected default shell %v, got %v", expectedShell, info.Shell)
+	if len(info.ShellSetting.Shell) != len(expectedShell) {
+		t.Fatalf("expected default shell %v, got %v", expectedShell, info.ShellSetting.Shell)
 	}
 	for i, s := range expectedShell {
-		if info.Shell[i] != s {
-			t.Errorf("expected shell[%d]=%q, got %q", i, s, info.Shell[i])
+		if info.ShellSetting.Shell[i] != s {
+			t.Errorf("expected shell[%d]=%q, got %q", i, s, info.ShellSetting.Shell[i])
 		}
 	}
 }

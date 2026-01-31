@@ -127,19 +127,16 @@ func (b *Builder) applyShellDirectives(stage *instructions.Stage, info *StageInf
 	var activeDirective *directive.ShellDirective
 	for i := range b.shellDirectives {
 		sd := &b.shellDirectives[i]
-		if sd.Line < fromLine {
+		if sd.Line < fromLine && (activeDirective == nil || sd.Line > activeDirective.Line) {
 			activeDirective = sd
 		}
 	}
 
 	if activeDirective != nil {
-		// Apply the directive
-		info.ShellSetting = ShellSetting{
-			Shell:   info.Shell, // Keep the shell command array (directive only hints at variant)
-			Variant: shell.VariantFromShell(activeDirective.Shell),
-			Source:  ShellSourceDirective,
-			Line:    activeDirective.Line,
-		}
+		// Apply the directive (it only hints at shell variant for linting).
+		info.ShellSetting.Variant = shell.VariantFromShell(activeDirective.Shell)
+		info.ShellSetting.Source = ShellSourceDirective
+		info.ShellSetting.Line = activeDirective.Line
 	}
 }
 
@@ -184,7 +181,7 @@ func (b *Builder) processBaseImage(stage *instructions.Stage, stageIndex int, gr
 		ref.StageIndex = idx
 		// FROM another stage creates a base dependency - track it in the graph
 		// This is important for reachability analysis
-		graph.addEdge(idx, stageIndex)
+		graph.addDependency(idx, stageIndex)
 	} else {
 		ref.StageIndex = -1
 	}
@@ -224,18 +221,18 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 			}
 
 		case *instructions.ShellCommand:
-			// Update active shell for this stage
-			info.Shell = make([]string, len(c.Shell))
-			copy(info.Shell, c.Shell)
+			// Update active shell for this stage.
+			shellCmd := make([]string, len(c.Shell))
+			copy(shellCmd, c.Shell)
 
-			// Also update ShellSetting
+			// Also update ShellSetting.
 			shellLine := -1
 			if len(c.Location()) > 0 {
 				shellLine = c.Location()[0].Start.Line - 1 // Convert 1-based to 0-based
 			}
 			info.ShellSetting = ShellSetting{
-				Shell:   info.Shell,
-				Variant: shell.VariantFromShellCmd(c.Shell),
+				Shell:   shellCmd,
+				Variant: shell.VariantFromShellCmd(shellCmd),
 				Source:  ShellSourceInstruction,
 				Line:    shellLine,
 			}
@@ -265,21 +262,6 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 			}
 
 		case *instructions.OnbuildCommand:
-			// DL3043: ONBUILD must not trigger ONBUILD/FROM/MAINTAINER.
-			if isForbiddenOnbuildExpr(c.Expression) {
-				var loc parser.Range
-				if ranges := c.Location(); len(ranges) > 0 {
-					loc = ranges[0]
-				}
-				b.issues = append(b.issues, newIssue(
-					b.file,
-					loc,
-					rules.HadolintRulePrefix+"DL3043",
-					"`ONBUILD`, `FROM` or `MAINTAINER` triggered from within `ONBUILD` instruction.",
-					"https://github.com/hadolint/hadolint/wiki/DL3043",
-				))
-			}
-
 			// Parse ONBUILD expression to extract COPY --from references
 			// Note: ONBUILD instructions execute when image is used as a base for another build,
 			// not in the current build, so we don't add edges to the graph here.
@@ -306,7 +288,7 @@ func (b *Builder) processCopyFrom(cmd *instructions.CopyCommand, stageIndex int,
 		if idx >= 0 && idx < graph.stageCount && idx < stageIndex {
 			ref.IsStageRef = true
 			ref.StageIndex = idx
-			graph.addEdge(idx, stageIndex)
+			graph.addDependency(idx, stageIndex)
 		} else {
 			// Invalid numeric reference - will be caught by other rules
 			ref.StageIndex = -1
@@ -317,7 +299,7 @@ func (b *Builder) processCopyFrom(cmd *instructions.CopyCommand, stageIndex int,
 		if idx, found := b.stagesByName[normalized]; found && idx < stageIndex {
 			ref.IsStageRef = true
 			ref.StageIndex = idx
-			graph.addEdge(idx, stageIndex)
+			graph.addDependency(idx, stageIndex)
 		} else if _, found := b.stagesByName[normalized]; found {
 			// Forward reference to a later stage - invalid but not external
 			ref.StageIndex = -1
@@ -482,24 +464,6 @@ func topLevelInstructionNodes(root *parser.Node) []*parser.Node {
 	})
 
 	return nodes
-}
-
-func isForbiddenOnbuildExpr(expr string) bool {
-	keyword := firstInstructionKeyword(expr)
-	if keyword == "" {
-		return false
-	}
-	return strings.EqualFold(keyword, "ONBUILD") ||
-		strings.EqualFold(keyword, "FROM") ||
-		strings.EqualFold(keyword, "MAINTAINER")
-}
-
-func firstInstructionKeyword(expr string) string {
-	parts := strings.Fields(expr)
-	if len(parts) == 0 {
-		return ""
-	}
-	return parts[0]
 }
 
 func onbuildTriggerKeyword(node *parser.Node) string {

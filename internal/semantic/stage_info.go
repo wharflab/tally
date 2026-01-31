@@ -38,13 +38,15 @@ const (
 
 // ShellSetting represents the active shell configuration for a stage.
 type ShellSetting struct {
-	// Shell is the shell command array (e.g., ["/bin/bash", "-c"]).
+	// Shell is the shell command array used to execute RUN instructions
+	// (Docker semantics), e.g., ["/bin/bash", "-c"].
 	Shell []string
 
-	// Variant is the parsed shell variant for use with the shell parser.
+	// Variant is the shell variant used for lint parsing (may be influenced
+	// by inline directives like "# hadolint shell=bash").
 	Variant shell.Variant
 
-	// Source indicates where this shell setting came from.
+	// Source indicates where Variant came from.
 	Source ShellSource
 
 	// Line is the 0-based line number where the shell was set (for directives/instructions).
@@ -60,12 +62,6 @@ type StageInfo struct {
 
 	// Stage is a reference to the BuildKit stage.
 	Stage *instructions.Stage
-
-	// Shell is the active shell for this stage (from SHELL instruction).
-	// Defaults to ["/bin/sh", "-c"] if no SHELL instruction is present.
-	//
-	// Deprecated: Use ShellSetting instead for more detailed information.
-	Shell []string
 
 	// ShellSetting contains the active shell configuration including variant and source.
 	ShellSetting ShellSetting
@@ -177,7 +173,6 @@ func newStageInfo(index int, stage *instructions.Stage, isLast bool) *StageInfo 
 	return &StageInfo{
 		Index: index,
 		Stage: stage,
-		Shell: defaultShell,
 		ShellSetting: ShellSetting{
 			Shell:   defaultShell,
 			Variant: shell.VariantFromShellCmd(defaultShell),

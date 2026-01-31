@@ -1,12 +1,13 @@
 package semantic
 
 // StageGraph represents the dependency graph between stages.
-// It tracks COPY --from relationships to enable reachability analysis.
+// It tracks cross-stage relationships (COPY --from and FROM stage refs)
+// to enable reachability analysis.
 type StageGraph struct {
-	// edges maps stage index -> list of stages it copies from.
+	// dependencies maps stage index -> list of stages it depends on.
 	edges map[int][]int
 
-	// reverseEdges maps stage index -> list of stages that copy from it.
+	// reverseEdges maps stage index -> list of stages that depend on it.
 	reverseEdges map[int][]int
 
 	// externalRefs maps stage index -> list of external image refs.
@@ -17,8 +18,8 @@ type StageGraph struct {
 }
 
 // DependsOn returns true if stageA depends on stageB (directly or transitively).
-// A stage depends on another if it copies from it (COPY --from) or if any
-// stage it depends on copies from it.
+// A stage depends on another if it copies from it (COPY --from) or uses it
+// as a base image (FROM <stage>).
 func (g *StageGraph) DependsOn(stageA, stageB int) bool {
 	// BFS to find if stageB is reachable from stageA's dependencies
 	visited := make(map[int]bool)
@@ -101,12 +102,13 @@ func (g *StageGraph) UnreachableStages() []int {
 	return unreachable
 }
 
-// DirectDependencies returns the stages that stageIndex directly copies from.
+// DirectDependencies returns the stages that stageIndex directly depends on
+// (via COPY --from or FROM stage refs).
 func (g *StageGraph) DirectDependencies(stageIndex int) []int {
 	return g.edges[stageIndex]
 }
 
-// DirectDependents returns the stages that directly copy from stageIndex.
+// DirectDependents returns the stages that directly depend on stageIndex.
 func (g *StageGraph) DirectDependents(stageIndex int) []int {
 	return g.reverseEdges[stageIndex]
 }
@@ -131,13 +133,14 @@ func newStageGraph(stageCount int) *StageGraph {
 	}
 }
 
-// addEdge adds a dependency from fromStage to toStage (toStage copies from fromStage).
-func (g *StageGraph) addEdge(fromStage, toStage int) {
-	// edges: which stages does toStage copy from?
-	g.edges[toStage] = append(g.edges[toStage], fromStage)
+// addDependency records that stageIndex depends on depStage.
+// The dependency can originate from either COPY --from or FROM <stage>.
+func (g *StageGraph) addDependency(depStage, stageIndex int) {
+	// edges: which stages does stageIndex depend on?
+	g.edges[stageIndex] = append(g.edges[stageIndex], depStage)
 
-	// reverseEdges: which stages copy from fromStage?
-	g.reverseEdges[fromStage] = append(g.reverseEdges[fromStage], toStage)
+	// reverseEdges: which stages depend on depStage?
+	g.reverseEdges[depStage] = append(g.reverseEdges[depStage], stageIndex)
 }
 
 // addExternalRef records an external image reference in a stage.
