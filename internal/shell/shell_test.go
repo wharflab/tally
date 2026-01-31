@@ -142,3 +142,78 @@ func TestContainsCommand(t *testing.T) {
 		})
 	}
 }
+
+func TestVariantFromShell(t *testing.T) {
+	tests := []struct {
+		shell string
+		want  Variant
+	}{
+		{"bash", VariantBash},
+		{"Bash", VariantBash},
+		{"/bin/bash", VariantBash},
+		{"/usr/bin/bash", VariantBash},
+		{"sh", VariantPOSIX},
+		{"/bin/sh", VariantPOSIX},
+		{"dash", VariantPOSIX},
+		{"/bin/dash", VariantPOSIX},
+		{"ash", VariantPOSIX},
+		{"/bin/ash", VariantPOSIX},
+		{"mksh", VariantMksh},
+		{"/bin/mksh", VariantMksh},
+		{"ksh", VariantMksh},
+		{"/bin/ksh", VariantMksh},
+		{"zsh", VariantBash}, // zsh treated as bash-like
+		{"/bin/zsh", VariantBash},
+		{"unknown", VariantBash}, // unknown defaults to bash
+		{"", VariantBash},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			got := VariantFromShell(tt.shell)
+			if got != tt.want {
+				t.Errorf("VariantFromShell(%q) = %v, want %v", tt.shell, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestVariantFromShellCmd(t *testing.T) {
+	tests := []struct {
+		name     string
+		shellCmd []string
+		want     Variant
+	}{
+		{"default bash", []string{"/bin/bash", "-c"}, VariantBash},
+		{"default sh", []string{"/bin/sh", "-c"}, VariantPOSIX},
+		{"powershell", []string{"powershell", "-Command"}, VariantBash}, // unknown -> bash
+		{"empty", []string{}, VariantBash},
+		{"nil", nil, VariantBash},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := VariantFromShellCmd(tt.shellCmd)
+			if got != tt.want {
+				t.Errorf("VariantFromShellCmd(%v) = %v, want %v", tt.shellCmd, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCommandNamesWithVariant(t *testing.T) {
+	// Test that different variants parse correctly
+	// Bash-specific syntax like [[ ]] should work with VariantBash
+	bashScript := "[[ -f /etc/foo ]] && echo exists"
+	bashCmds := CommandNamesWithVariant(bashScript, VariantBash)
+	if len(bashCmds) != 1 || bashCmds[0] != "echo" {
+		t.Errorf("Bash variant parsing failed: got %v, want [echo]", bashCmds)
+	}
+
+	// POSIX script should work with VariantPOSIX
+	posixScript := "[ -f /etc/foo ] && echo exists"
+	posixCmds := CommandNamesWithVariant(posixScript, VariantPOSIX)
+	if len(posixCmds) != 2 || posixCmds[0] != "[" || posixCmds[1] != "echo" {
+		t.Errorf("POSIX variant parsing failed: got %v, want [[ echo]", posixCmds)
+	}
+}

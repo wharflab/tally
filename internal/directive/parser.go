@@ -26,6 +26,14 @@ var (
 	// Note: ;reason= is a tally extension, BuildKit silently ignores it
 	buildxPattern = regexp.MustCompile(
 		`(?i)#\s*check\s*=\s*skip\s*=\s*([A-Za-z0-9_,\s/.-]+?)(?:;reason\s*=\s*(.*))?$`)
+
+	// # tally shell=<shell>
+	tallyShellPattern = regexp.MustCompile(
+		`(?i)#\s*tally\s+shell\s*=\s*([A-Za-z0-9_/-]+)\s*$`)
+
+	// # hadolint shell=<shell>
+	hadolintShellPattern = regexp.MustCompile(
+		`(?i)#\s*hadolint\s+shell\s*=\s*([A-Za-z0-9_/-]+)\s*$`)
 )
 
 // RuleValidator is a function that checks if a rule code is known.
@@ -43,7 +51,7 @@ func Parse(sm *sourcemap.SourceMap, validator RuleValidator) *ParseResult {
 			continue
 		}
 
-		// Try each pattern in order
+		// Try ignore directive patterns first
 		if d, err := parseTally(comment, sm); d != nil || err != nil {
 			if err != nil {
 				result.Errors = append(result.Errors, *err)
@@ -71,6 +79,17 @@ func Parse(sm *sourcemap.SourceMap, validator RuleValidator) *ParseResult {
 			if d != nil {
 				validateDirective(d, validator, result)
 			}
+			continue
+		}
+
+		// Try shell directive patterns
+		if sd := parseTallyShell(comment); sd != nil {
+			result.ShellDirectives = append(result.ShellDirectives, *sd)
+			continue
+		}
+
+		if sd := parseHadolintShell(comment); sd != nil {
+			result.ShellDirectives = append(result.ShellDirectives, *sd)
 			continue
 		}
 	}
@@ -247,4 +266,34 @@ func nextNonCommentLineRange(directiveLine int, sm *sourcemap.SourceMap) LineRan
 	// No non-comment line found after the directive
 	// Return a range that won't match anything
 	return LineRange{Start: -1, End: -1}
+}
+
+// parseTallyShell attempts to parse a tally shell directive.
+func parseTallyShell(comment sourcemap.Comment) *ShellDirective {
+	matches := tallyShellPattern.FindStringSubmatch(comment.Text)
+	if matches == nil {
+		return nil
+	}
+
+	return &ShellDirective{
+		Shell:   strings.ToLower(matches[1]),
+		Line:    comment.Line,
+		Source:  SourceTally,
+		RawText: comment.Text,
+	}
+}
+
+// parseHadolintShell attempts to parse a hadolint shell directive.
+func parseHadolintShell(comment sourcemap.Comment) *ShellDirective {
+	matches := hadolintShellPattern.FindStringSubmatch(comment.Text)
+	if matches == nil {
+		return nil
+	}
+
+	return &ShellDirective{
+		Shell:   strings.ToLower(matches[1]),
+		Line:    comment.Line,
+		Source:  SourceHadolint,
+		RawText: comment.Text,
+	}
 }

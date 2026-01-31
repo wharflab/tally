@@ -9,6 +9,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/tinovyatkin/tally/internal/semantic"
 	"github.com/tinovyatkin/tally/internal/shell"
 )
 
@@ -34,7 +35,21 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 	var wgetLocs []rules.Location
 	var curlLocs []rules.Location
 
-	for _, stage := range input.Stages {
+	// Get the semantic model for shell variant information
+	sem, ok := input.Semantic.(*semantic.Model)
+	if !ok {
+		sem = nil
+	}
+
+	for stageIdx, stage := range input.Stages {
+		// Get the shell variant for this stage from semantic model
+		shellVariant := shell.VariantBash // default
+		if sem != nil {
+			if info := sem.StageInfo(stageIdx); info != nil {
+				shellVariant = info.ShellSetting.Variant
+			}
+		}
+
 		for _, cmd := range stage.Commands {
 			run, ok := cmd.(*instructions.RunCommand)
 			if !ok {
@@ -52,11 +67,11 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 
 			loc := rules.NewLocationFromRanges(input.File, run.Location())
 
-			// Use proper shell parsing to find command names
-			if shell.ContainsCommand(cmdStr, "wget") {
+			// Use proper shell parsing with the correct variant
+			if shell.ContainsCommandWithVariant(cmdStr, "wget", shellVariant) {
 				wgetLocs = append(wgetLocs, loc)
 			}
-			if shell.ContainsCommand(cmdStr, "curl") {
+			if shell.ContainsCommandWithVariant(cmdStr, "curl", shellVariant) {
 				curlLocs = append(curlLocs, loc)
 			}
 		}

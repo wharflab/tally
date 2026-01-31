@@ -8,16 +8,19 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/tinovyatkin/tally/internal/directive"
 	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/tinovyatkin/tally/internal/shell"
 )
 
 // Builder constructs a semantic model from a parse result.
 // It performs single-pass analysis and accumulates violations.
 type Builder struct {
-	parseResult *dockerfile.ParseResult
-	buildArgs   map[string]string
-	file        string
+	parseResult     *dockerfile.ParseResult
+	buildArgs       map[string]string
+	file            string
+	shellDirectives []directive.ShellDirective
 
 	// Accumulated during build
 	issues       []Issue
@@ -34,6 +37,12 @@ func NewBuilder(pr *dockerfile.ParseResult, buildArgs map[string]string, file st
 		globalScope:  NewGlobalScope(),
 		stagesByName: make(map[string]int),
 	}
+}
+
+// WithShellDirectives sets the shell directives to be applied during build.
+func (b *Builder) WithShellDirectives(directives []directive.ShellDirective) *Builder {
+	b.shellDirectives = directives
+	return b
 }
 
 // Build constructs the semantic model.
@@ -74,6 +83,9 @@ func (b *Builder) Build() *Model {
 		// Process base image
 		info.BaseImage = b.processBaseImage(stage, i, graph)
 
+		// Apply shell directives that appear before this stage's FROM instruction
+		b.applyShellDirectives(stage, info)
+
 		// Process commands in the stage
 		b.processStageCommands(stage, info, graph)
 
@@ -89,6 +101,39 @@ func (b *Builder) Build() *Model {
 		buildArgs:    b.buildArgs,
 		file:         b.file,
 		issues:       b.issues,
+	}
+}
+
+// applyShellDirectives applies shell directives that appear before the stage's FROM.
+// The most recent directive before FROM wins.
+func (b *Builder) applyShellDirectives(stage *instructions.Stage, info *StageInfo) {
+	if len(b.shellDirectives) == 0 {
+		return
+	}
+
+	// Get the line number of this stage's FROM instruction (0-based)
+	var fromLine int
+	if len(stage.Location) > 0 {
+		fromLine = stage.Location[0].Start.Line - 1 // Convert 1-based to 0-based
+	}
+
+	// Find the most recent shell directive before FROM
+	var activeDirective *directive.ShellDirective
+	for i := range b.shellDirectives {
+		sd := &b.shellDirectives[i]
+		if sd.Line < fromLine {
+			activeDirective = sd
+		}
+	}
+
+	if activeDirective != nil {
+		// Apply the directive
+		info.ShellSetting = ShellSetting{
+			Shell:   info.Shell, // Keep the shell command array (directive only hints at variant)
+			Variant: shell.VariantFromShell(activeDirective.Shell),
+			Source:  ShellSourceDirective,
+			Line:    activeDirective.Line,
+		}
 	}
 }
 
@@ -155,6 +200,18 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 			// Update active shell for this stage
 			info.Shell = make([]string, len(c.Shell))
 			copy(info.Shell, c.Shell)
+
+			// Also update ShellSetting
+			shellLine := -1
+			if len(c.Location()) > 0 {
+				shellLine = c.Location()[0].Start.Line - 1 // Convert 1-based to 0-based
+			}
+			info.ShellSetting = ShellSetting{
+				Shell:   info.Shell,
+				Variant: shell.VariantFromShellCmd(c.Shell),
+				Source:  ShellSourceInstruction,
+				Line:    shellLine,
+			}
 
 		case *instructions.CopyCommand:
 			if c.From != "" {

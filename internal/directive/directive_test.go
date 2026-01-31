@@ -769,3 +769,92 @@ FROM ubuntu`,
 		})
 	}
 }
+
+func TestParseShellDirective(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		shell   string
+		source  DirectiveSource
+	}{
+		{
+			name:    "tally shell bash",
+			content: "# tally shell=bash\nFROM ubuntu",
+			shell:   "bash",
+			source:  SourceTally,
+		},
+		{
+			name:    "hadolint shell dash",
+			content: "# hadolint shell=dash\nFROM alpine",
+			shell:   "dash",
+			source:  SourceHadolint,
+		},
+		{
+			name:    "tally shell with path",
+			content: "# tally shell=/bin/sh\nFROM ubuntu",
+			shell:   "/bin/sh",
+			source:  SourceTally,
+		},
+		{
+			name:    "case insensitive",
+			content: "# TALLY SHELL=bash\nFROM ubuntu",
+			shell:   "bash",
+			source:  SourceTally,
+		},
+		{
+			name:    "with extra spaces",
+			content: "#  tally   shell = bash\nFROM ubuntu",
+			shell:   "bash",
+			source:  SourceTally,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sm := sourcemap.New([]byte(tt.content))
+			result := Parse(sm, nil)
+
+			if len(result.ShellDirectives) != 1 {
+				t.Fatalf("expected 1 shell directive, got %d", len(result.ShellDirectives))
+			}
+			sd := result.ShellDirectives[0]
+			if sd.Shell != tt.shell {
+				t.Errorf("shell = %q, want %q", sd.Shell, tt.shell)
+			}
+			if sd.Source != tt.source {
+				t.Errorf("source = %v, want %v", sd.Source, tt.source)
+			}
+		})
+	}
+}
+
+func TestParseShellDirectiveNoMatch(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{
+			name:    "ignore directive not shell",
+			content: "# tally ignore=DL3006\nFROM ubuntu",
+		},
+		{
+			name:    "regular comment with shell word",
+			content: "# The shell used here is bash\nFROM ubuntu",
+		},
+		{
+			name:    "incomplete directive",
+			content: "# tally shell\nFROM ubuntu",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sm := sourcemap.New([]byte(tt.content))
+			result := Parse(sm, nil)
+
+			if len(result.ShellDirectives) != 0 {
+				t.Errorf("expected 0 shell directives, got %d", len(result.ShellDirectives))
+			}
+		})
+	}
+}

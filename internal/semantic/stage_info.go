@@ -3,10 +3,40 @@ package semantic
 import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
+
+	"github.com/tinovyatkin/tally/internal/shell"
 )
 
 // DefaultShell is the default shell used by Docker for RUN instructions.
 var DefaultShell = []string{"/bin/sh", "-c"}
+
+// ShellSource indicates where the shell setting came from.
+type ShellSource int
+
+const (
+	// ShellSourceDefault indicates the default shell is being used.
+	ShellSourceDefault ShellSource = iota
+	// ShellSourceInstruction indicates the shell was set via SHELL instruction.
+	ShellSourceInstruction
+	// ShellSourceDirective indicates the shell was set via a comment directive.
+	ShellSourceDirective
+)
+
+// ShellSetting represents the active shell configuration for a stage.
+type ShellSetting struct {
+	// Shell is the shell command array (e.g., ["/bin/bash", "-c"]).
+	Shell []string
+
+	// Variant is the parsed shell variant for use with the shell parser.
+	Variant shell.Variant
+
+	// Source indicates where this shell setting came from.
+	Source ShellSource
+
+	// Line is the 0-based line number where the shell was set (for directives/instructions).
+	// -1 for default shell.
+	Line int
+}
 
 // StageInfo contains enhanced information about a build stage.
 // It augments BuildKit's instructions.Stage with semantic analysis data.
@@ -19,7 +49,12 @@ type StageInfo struct {
 
 	// Shell is the active shell for this stage (from SHELL instruction).
 	// Defaults to ["/bin/sh", "-c"] if no SHELL instruction is present.
+	//
+	// Deprecated: Use ShellSetting instead for more detailed information.
 	Shell []string
+
+	// ShellSetting contains the active shell configuration including variant and source.
+	ShellSetting ShellSetting
 
 	// BaseImage contains information about the FROM image reference.
 	BaseImage *BaseImageRef
@@ -77,13 +112,19 @@ type CopyFromRef struct {
 // newStageInfo creates a new StageInfo with default values.
 func newStageInfo(index int, stage *instructions.Stage, isLast bool) *StageInfo {
 	// Copy default shell to avoid mutation
-	shell := make([]string, len(DefaultShell))
-	copy(shell, DefaultShell)
+	defaultShell := make([]string, len(DefaultShell))
+	copy(defaultShell, DefaultShell)
 
 	return &StageInfo{
-		Index:       index,
-		Stage:       stage,
-		Shell:       shell,
+		Index: index,
+		Stage: stage,
+		Shell: defaultShell,
+		ShellSetting: ShellSetting{
+			Shell:   defaultShell,
+			Variant: shell.VariantFromShellCmd(DefaultShell),
+			Source:  ShellSourceDefault,
+			Line:    -1,
+		},
 		IsLastStage: isLast,
 	}
 }

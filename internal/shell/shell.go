@@ -11,15 +11,83 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
+// Variant represents a shell variant for parsing.
+type Variant int
+
+const (
+	// VariantBash is the GNU Bash shell (default for Docker).
+	VariantBash Variant = iota
+	// VariantPOSIX is the POSIX-compliant shell (sh, dash, ash).
+	VariantPOSIX
+	// VariantMksh is the MirBSD Korn Shell.
+	VariantMksh
+)
+
+// VariantFromShell returns the appropriate Variant for a shell name.
+// Common shell mappings:
+//   - bash -> VariantBash
+//   - sh, dash, ash -> VariantPOSIX
+//   - mksh, ksh -> VariantMksh
+//   - zsh -> VariantBash (closest approximation)
+//   - unknown -> VariantBash (safe default)
+func VariantFromShell(shell string) Variant {
+	// Normalize: extract basename and lowercase
+	shell = strings.ToLower(path.Base(shell))
+
+	switch shell {
+	case "bash":
+		return VariantBash
+	case "sh", "dash", "ash":
+		return VariantPOSIX
+	case "mksh", "ksh":
+		return VariantMksh
+	case "zsh":
+		// zsh is mostly bash-compatible for our purposes
+		return VariantBash
+	default:
+		// Default to bash for unknown shells
+		return VariantBash
+	}
+}
+
+// VariantFromShellCmd returns the appropriate Variant from a SHELL command array.
+// The first element is typically the shell path (e.g., ["/bin/bash", "-c"]).
+func VariantFromShellCmd(shellCmd []string) Variant {
+	if len(shellCmd) == 0 {
+		return VariantBash
+	}
+	return VariantFromShell(shellCmd[0])
+}
+
+// toLangVariant converts our Variant to mvdan.cc/sh's LangVariant.
+func (v Variant) toLangVariant() syntax.LangVariant {
+	switch v {
+	case VariantBash:
+		return syntax.LangBash
+	case VariantPOSIX:
+		return syntax.LangPOSIX
+	case VariantMksh:
+		return syntax.LangMirBSDKorn
+	}
+	return syntax.LangBash
+}
+
 // CommandNames extracts all command names from a shell script.
+// Uses VariantBash by default. Use CommandNamesWithVariant for other shells.
+func CommandNames(script string) []string {
+	return CommandNamesWithVariant(script, VariantBash)
+}
+
+// CommandNamesWithVariant extracts all command names from a shell script
+// using the specified shell variant for parsing.
+//
 // It parses the script and walks the AST to find all CallExpr nodes,
 // returning the first word of each (the command name).
 //
 // This matches hadolint's behavior using ShellCheck.findCommandNames.
-func CommandNames(script string) []string {
-	// Parse the script
+func CommandNamesWithVariant(script string, variant Variant) []string {
 	parser := syntax.NewParser(
-		syntax.Variant(syntax.LangBash), // Dockerfile RUN uses bash by default
+		syntax.Variant(variant.toLangVariant()),
 		syntax.KeepComments(false),
 	)
 
@@ -46,8 +114,15 @@ func CommandNames(script string) []string {
 }
 
 // ContainsCommand checks if a shell script contains a specific command.
+// Uses VariantBash by default.
 func ContainsCommand(script, command string) bool {
 	return slices.Contains(CommandNames(script), command)
+}
+
+// ContainsCommandWithVariant checks if a shell script contains a specific command
+// using the specified shell variant for parsing.
+func ContainsCommandWithVariant(script, command string, variant Variant) bool {
+	return slices.Contains(CommandNamesWithVariant(script, variant), command)
 }
 
 // simpleCommandNames is a fallback when parsing fails.

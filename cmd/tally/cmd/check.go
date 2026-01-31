@@ -9,6 +9,7 @@ import (
 
 	"github.com/tinovyatkin/tally/internal/config"
 	"github.com/tinovyatkin/tally/internal/context"
+	"github.com/tinovyatkin/tally/internal/directive"
 	"github.com/tinovyatkin/tally/internal/discovery"
 	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/processor"
@@ -17,6 +18,7 @@ import (
 	_ "github.com/tinovyatkin/tally/internal/rules/all" // Register all rules
 	"github.com/tinovyatkin/tally/internal/rules/buildkit"
 	"github.com/tinovyatkin/tally/internal/semantic"
+	"github.com/tinovyatkin/tally/internal/sourcemap"
 	"github.com/tinovyatkin/tally/internal/version"
 )
 
@@ -171,10 +173,16 @@ func checkCommand() *cli.Command {
 				// Store source for later use in text output
 				fileSources[file] = parseResult.Source
 
+				// Parse directives early to extract shell directives for the semantic model
+				sm := sourcemap.New(parseResult.Source)
+				directiveResult := directive.Parse(sm, nil)
+
 				// Build semantic model for cross-instruction analysis
 				// Note: buildArgs will be populated when --build-arg flag is implemented
 				var buildArgs map[string]string
-				sem := semantic.NewModel(parseResult, buildArgs, file)
+				sem := semantic.NewBuilder(parseResult, buildArgs, file).
+					WithShellDirectives(directiveResult.ShellDirectives).
+					Build()
 
 				// Create build context if context directory is specified
 				var buildCtx rules.BuildContext
