@@ -2,6 +2,7 @@ package semantic
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -55,6 +56,11 @@ func (b *Builder) Build() *Model {
 			graph:        newStageGraph(0),
 		}
 	}
+
+	// Construction-time semantic issues (based on AST, not just parsed instructions).
+	// Note: This must run even if instruction parsing was sanitized to continue.
+	b.checkDL3061InstructionOrder()
+	b.checkDL3043ForbiddenOnbuildTriggers()
 
 	stages := b.parseResult.Stages
 	metaArgs := b.parseResult.MetaArgs
@@ -188,6 +194,9 @@ func (b *Builder) processBaseImage(stage *instructions.Stage, stageIndex int, gr
 
 // processStageCommands analyzes commands within a stage.
 func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInfo, graph *StageGraph) {
+	seenHealthcheck := false
+	normalizedStageName := normalizeStageRef(stage.Name)
+
 	for _, cmd := range stage.Commands {
 		switch c := cmd.(type) {
 		case *instructions.ArgCommand:
@@ -195,6 +204,24 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 
 		case *instructions.EnvCommand:
 			info.Variables.AddEnvCommand(c)
+
+		case *instructions.HealthCheckCommand:
+			// DL3012: Multiple HEALTHCHECK instructions in a single stage.
+			if seenHealthcheck {
+				var loc parser.Range
+				if ranges := c.Location(); len(ranges) > 0 {
+					loc = ranges[0]
+				}
+				b.issues = append(b.issues, newIssue(
+					b.file,
+					loc,
+					rules.HadolintRulePrefix+"DL3012",
+					"Multiple `HEALTHCHECK` instructions",
+					"https://github.com/hadolint/hadolint/wiki/DL3012",
+				))
+			} else {
+				seenHealthcheck = true
+			}
 
 		case *instructions.ShellCommand:
 			// Update active shell for this stage
@@ -219,11 +246,40 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 
 		case *instructions.CopyCommand:
 			if c.From != "" {
+				// DL3023: COPY --from cannot reference its own FROM alias.
+				if stage.Name != "" && normalizeStageRef(c.From) == normalizedStageName {
+					var loc parser.Range
+					if ranges := c.Location(); len(ranges) > 0 {
+						loc = ranges[0]
+					}
+					b.issues = append(b.issues, newIssue(
+						b.file,
+						loc,
+						rules.HadolintRulePrefix+"DL3023",
+						"`COPY --from` cannot reference its own `FROM` alias",
+						"https://github.com/hadolint/hadolint/wiki/DL3023",
+					))
+				}
 				copyRef := b.processCopyFrom(c, info.Index, graph)
 				info.CopyFromRefs = append(info.CopyFromRefs, copyRef)
 			}
 
 		case *instructions.OnbuildCommand:
+			// DL3043: ONBUILD must not trigger ONBUILD/FROM/MAINTAINER.
+			if isForbiddenOnbuildExpr(c.Expression) {
+				var loc parser.Range
+				if ranges := c.Location(); len(ranges) > 0 {
+					loc = ranges[0]
+				}
+				b.issues = append(b.issues, newIssue(
+					b.file,
+					loc,
+					rules.HadolintRulePrefix+"DL3043",
+					"`ONBUILD`, `FROM` or `MAINTAINER` triggered from within `ONBUILD` instruction.",
+					"https://github.com/hadolint/hadolint/wiki/DL3043",
+				))
+			}
+
 			// Parse ONBUILD expression to extract COPY --from references
 			// Note: ONBUILD instructions execute when image is used as a base for another build,
 			// not in the current build, so we don't add edges to the graph here.
@@ -331,6 +387,127 @@ func (b *Builder) parseOnbuildCopy(expr string) *instructions.CopyCommand {
 	}
 
 	return nil
+}
+
+// checkDL3061InstructionOrder detects DL3061: Invalid instruction order.
+// Dockerfile must begin with FROM, ARG, or comment.
+//
+// We detect this from the raw AST because BuildKit's instruction parser may
+// reject invalid order and prevent downstream linting.
+func (b *Builder) checkDL3061InstructionOrder() {
+	if b.parseResult == nil || b.parseResult.AST == nil || b.parseResult.AST.AST == nil {
+		return
+	}
+
+	nodes := topLevelInstructionNodes(b.parseResult.AST.AST)
+	for _, node := range nodes {
+		if node == nil {
+			continue
+		}
+		if strings.EqualFold(node.Value, "FROM") {
+			return
+		}
+		if strings.EqualFold(node.Value, "ARG") {
+			continue
+		}
+
+		var loc parser.Range
+		if ranges := node.Location(); len(ranges) > 0 {
+			loc = ranges[0]
+		}
+		b.issues = append(b.issues, newIssue(
+			b.file,
+			loc,
+			rules.HadolintRulePrefix+"DL3061",
+			"Invalid instruction order. Dockerfile must begin with `FROM`, `ARG` or comment.",
+			"https://github.com/hadolint/hadolint/wiki/DL3061",
+		))
+	}
+}
+
+// checkDL3043ForbiddenOnbuildTriggers detects DL3043: ONBUILD must not trigger
+// ONBUILD/FROM/MAINTAINER.
+//
+// We detect this from the raw AST because BuildKit's instruction parser rejects
+// these constructs, which would otherwise prevent semantic model construction.
+func (b *Builder) checkDL3043ForbiddenOnbuildTriggers() {
+	if b.parseResult == nil || b.parseResult.AST == nil || b.parseResult.AST.AST == nil {
+		return
+	}
+
+	nodes := topLevelInstructionNodes(b.parseResult.AST.AST)
+	for _, node := range nodes {
+		if node == nil || !strings.EqualFold(node.Value, "ONBUILD") {
+			continue
+		}
+
+		trigger := onbuildTriggerKeyword(node)
+		if trigger == "" {
+			continue
+		}
+
+		if strings.EqualFold(trigger, "ONBUILD") ||
+			strings.EqualFold(trigger, "FROM") ||
+			strings.EqualFold(trigger, "MAINTAINER") {
+			var loc parser.Range
+			if ranges := node.Location(); len(ranges) > 0 {
+				loc = ranges[0]
+			}
+			b.issues = append(b.issues, newIssue(
+				b.file,
+				loc,
+				rules.HadolintRulePrefix+"DL3043",
+				"`ONBUILD`, `FROM` or `MAINTAINER` triggered from within `ONBUILD` instruction.",
+				"https://github.com/hadolint/hadolint/wiki/DL3043",
+			))
+		}
+	}
+}
+
+func topLevelInstructionNodes(root *parser.Node) []*parser.Node {
+	if root == nil {
+		return nil
+	}
+
+	// BuildKit parser stores Dockerfile instructions under root.Children.
+	nodes := make([]*parser.Node, 0, len(root.Children))
+	for _, child := range root.Children {
+		if child != nil {
+			nodes = append(nodes, child)
+		}
+	}
+
+	sort.Slice(nodes, func(i, j int) bool {
+		return nodes[i].StartLine < nodes[j].StartLine
+	})
+
+	return nodes
+}
+
+func isForbiddenOnbuildExpr(expr string) bool {
+	keyword := firstInstructionKeyword(expr)
+	if keyword == "" {
+		return false
+	}
+	return strings.EqualFold(keyword, "ONBUILD") ||
+		strings.EqualFold(keyword, "FROM") ||
+		strings.EqualFold(keyword, "MAINTAINER")
+}
+
+func firstInstructionKeyword(expr string) string {
+	parts := strings.Fields(expr)
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
+}
+
+func onbuildTriggerKeyword(node *parser.Node) string {
+	// BuildKit parser represents ONBUILD like: (ONBUILD (TRIGGER ...))
+	if node == nil || node.Next == nil || len(node.Next.Children) == 0 || node.Next.Children[0] == nil {
+		return ""
+	}
+	return node.Next.Children[0].Value
 }
 
 // normalizeStageRef normalizes a stage reference for comparison.

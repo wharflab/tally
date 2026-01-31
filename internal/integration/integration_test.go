@@ -115,6 +115,10 @@ func TestCheck(t *testing.T) {
 
 		// Semantic model construction-time violations
 		{name: "duplicate-stage-name", dir: "duplicate-stage-name", args: []string{"--format", "json"}, wantExit: 1},
+		{name: "multiple-healthcheck", dir: "multiple-healthcheck", args: []string{"--format", "json"}, wantExit: 1},
+		{name: "copy-from-own-alias", dir: "copy-from-own-alias", args: []string{"--format", "json"}, wantExit: 1},
+		{name: "onbuild-forbidden", dir: "onbuild-forbidden", args: []string{"--format", "json"}, wantExit: 1},
+		{name: "invalid-instruction-order", dir: "invalid-instruction-order", args: []string{"--format", "json"}, wantExit: 1},
 
 		// Unreachable stage detection
 		{name: "unreachable-stage", dir: "unreachable-stage", args: []string{"--format", "json"}, wantExit: 1},

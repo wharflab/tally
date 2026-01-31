@@ -8,9 +8,9 @@ tally integrates rules from multiple sources:
 
 | Source | Rules | Description |
 |--------|-------|-------------|
-| **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 15+ rules | Docker's official Dockerfile checks (automatically captured) |
+| **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 22 rules | Docker's official Dockerfile checks (automatically captured) |
 | **tally** | 3 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
-| **[Hadolint](https://github.com/hadolint/hadolint)** | 2 rules | Shell best practices (expanding) |
+| **[Hadolint](https://github.com/hadolint/hadolint)** | 12 rules | Hadolint-compatible Dockerfile rules (expanding) |
 
 **See [RULES.md](RULES.md) for the complete rules reference.**
 
@@ -364,7 +364,7 @@ The JSON output includes:
             "file": "Dockerfile",
             "start": { "line": 2, "column": 0 }
           },
-          "rule": "StageNameCasing",
+          "rule": "buildkit/StageNameCasing",
           "message": "Stage name 'Builder' should be lowercase",
           "severity": "warning",
           "docUrl": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/"
@@ -381,7 +381,7 @@ The JSON output includes:
     "files": 1
   },
   "files_scanned": 1,
-  "rules_enabled": 7
+  "rules_enabled": 35
 }
 ```
 

@@ -129,7 +129,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | DL3009 | Delete apt-get lists after installing | Info | ⏳ |
 | DL3010 | Use ADD for extracting archives | Info | ⏳ |
 | DL3011 | Valid UNIX ports range 0-65535 | Error | ⏳ |
-| DL3012 | Multiple HEALTHCHECK not allowed | Error | ⏳ |
+| DL3012 | Multiple HEALTHCHECK not allowed | Error | ✅ `hadolint/DL3012` |
 | DL3013 | Pin versions in pip | Warning | ⏳ |
 | DL3014 | Use -y switch with apt-get | Warning | ⏳ |
 | DL3015 | Use --no-install-recommends with apt-get | Info | ⏳ |
@@ -139,7 +139,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | DL3020 | Use COPY instead of ADD for files/folders | Error | ✅ `hadolint/DL3020` |
 | DL3021 | COPY with multiple args requires trailing / | Error | ⏳ |
 | DL3022 | COPY --from should reference defined FROM alias | Warning | ⏳ |
-| DL3023 | COPY --from cannot reference own FROM alias | Error | ⏳ |
+| DL3023 | COPY --from cannot reference own FROM alias | Error | ✅ `hadolint/DL3023` |
 | DL3024 | FROM stage names must be unique | Error | ✅ `hadolint/DL3024` |
 | DL3025 | Use JSON notation for CMD/ENTRYPOINT | Warning | 🔄 `buildkit/JSONArgsRecommended` |
 | DL3026 | Use only allowed registries | Off (enable via config) | ✅ `hadolint/DL3026` |
@@ -157,7 +157,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | DL3040 | Missing dnf clean all | Warning | ⏳ |
 | DL3041 | Specify version with dnf install | Warning | ⏳ |
 | DL3042 | Use pip install --no-cache-dir | Warning | ⏳ |
-| DL3043 | ONBUILD/FROM/MAINTAINER in ONBUILD not allowed | Error | ⏳ |
+| DL3043 | ONBUILD/FROM/MAINTAINER in ONBUILD not allowed | Error | ✅ `hadolint/DL3043` |
 | DL3044 | Do not refer to env vars in same ENV statement | Error | 🔄 `buildkit/UndefinedVar` |
 | DL3045 | COPY to relative dest without WORKDIR | Warning | 🔄 `buildkit/WorkdirRelativePath` |
 | DL3046 | useradd without -l and high UID creates large images | Warning | ⏳ |
@@ -175,7 +175,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | DL3058 | Label is not valid email (RFC5322) | Warning | ⏳ |
 | DL3059 | Multiple consecutive RUN; consider consolidation | Info | ⏳ |
 | DL3060 | Missing yarn cache clean | Info | ⏳ |
-| DL3061 | Invalid instruction order | Error | ⏳ |
+| DL3061 | Invalid instruction order | Error | ✅ `hadolint/DL3061` |
 | DL3062 | Pin versions in go install | Warning | ⏳ |
 | DL4000 | MAINTAINER is deprecated | Error | 🔄 `buildkit/MaintainerDeprecated` |
 | DL4001 | Use either wget or curl, not both | Warning | ✅ `hadolint/DL4001` |

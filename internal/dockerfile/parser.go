@@ -102,8 +102,15 @@ func Parse(r io.Reader, cfg *config.Config) (*ParseResult, error) {
 	// Create BuildKit linter to capture warnings during instruction parsing
 	lint := linter.New(lintCfg)
 
+	// BuildKit's instructions.Parse hard-fails when it encounters an instruction
+	// before the first FROM (other than ARG). Hadolint reports this as DL3061 and
+	// still continues linting the rest of the file. We follow that behavior by
+	// sanitizing the AST we pass to instructions.Parse, while keeping the
+	// original AST for semantic checks and output.
+	astForInstructions := sanitizeASTForInstructionParse(ast.AST)
+
 	// Parse into typed instructions (stages and meta args)
-	stages, metaArgs, err := instructions.Parse(ast.AST, lint)
+	stages, metaArgs, err := instructions.Parse(astForInstructions, lint)
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +122,84 @@ func Parse(r io.Reader, cfg *config.Config) (*ParseResult, error) {
 		Source:   content,
 		Warnings: warnings,
 	}, nil
+}
+
+// sanitizePreFromInstructions returns an AST root suitable for BuildKit's
+// instructions.Parse.
+//
+// It removes any non-ARG instructions that appear before the first FROM, which
+// allows us to still parse the remaining stages and run linting, while semantic
+// model construction can report DL3061 against the original AST.
+func sanitizeASTForInstructionParse(root *parser.Node) *parser.Node {
+	if root == nil || len(root.Children) == 0 {
+		return root
+	}
+
+	// Find the first FROM.
+	firstFromIdx := -1
+	for i, child := range root.Children {
+		if child != nil && strings.EqualFold(child.Value, "FROM") {
+			firstFromIdx = i
+			break
+		}
+	}
+	if firstFromIdx == -1 {
+		return root
+	}
+
+	// If nothing invalid appears before the first FROM, keep as-is.
+	hasInvalid := false
+	for i := range firstFromIdx {
+		child := root.Children[i]
+		if child == nil {
+			continue
+		}
+		if strings.EqualFold(child.Value, "ARG") {
+			continue
+		}
+		hasInvalid = true
+		break
+	}
+
+	// BuildKit also hard-fails on forbidden ONBUILD triggers (DL3043). We
+	// remove those nodes to allow parsing to continue.
+	hasForbiddenOnbuild := slices.ContainsFunc(root.Children, isForbiddenOnbuildTriggerNode)
+
+	if !hasInvalid && !hasForbiddenOnbuild {
+		return root
+	}
+
+	// Shallow-copy root node and filter children.
+	sanitized := *root
+	filtered := make([]*parser.Node, 0, len(root.Children))
+	for i, child := range root.Children {
+		if child == nil {
+			continue
+		}
+		if hasInvalid && i < firstFromIdx && !strings.EqualFold(child.Value, "ARG") {
+			continue
+		}
+		if hasForbiddenOnbuild && isForbiddenOnbuildTriggerNode(child) {
+			continue
+		}
+		filtered = append(filtered, child)
+	}
+	sanitized.Children = filtered
+	return &sanitized
+}
+
+func isForbiddenOnbuildTriggerNode(node *parser.Node) bool {
+	if node == nil || !strings.EqualFold(node.Value, "ONBUILD") {
+		return false
+	}
+	if node.Next == nil || len(node.Next.Children) == 0 || node.Next.Children[0] == nil {
+		return false
+	}
+
+	trigger := node.Next.Children[0].Value
+	return strings.EqualFold(trigger, "ONBUILD") ||
+		strings.EqualFold(trigger, "FROM") ||
+		strings.EqualFold(trigger, "MAINTAINER")
 }
 
 // buildLinterConfig creates a BuildKit linter.Config from our config.

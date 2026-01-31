@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "testdata/onbuild-forbidden/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/onbuild-forbidden/Dockerfile",
+            "start": {
+              "line": 2,
+              "column": 0
+            },
+            "end": {
+              "line": 2,
+              "column": 0
+            }
+          },
+          "rule": "hadolint/DL3043",
+          "message": "`ONBUILD`, `FROM` or `MAINTAINER` triggered from within `ONBUILD` instruction.",
+          "severity": "error",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3043",
+          "sourceCode": "ONBUILD FROM debian:buster"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 1,
+    "warnings": 0,
+    "info": 0,
+    "style": 0,
+    "files": 1
+  },
+  "files_scanned": 1,
+  "rules_enabled": 35
+}
+
