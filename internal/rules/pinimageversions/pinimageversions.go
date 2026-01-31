@@ -72,10 +72,6 @@ func hasExplicitTag(image string) bool {
 	}
 
 	// Check if it has a tag or digest using interface assertions
-	// NamedTagged is more specific than Tagged, so check order matters
-	if _, ok := named.(reference.NamedTagged); ok {
-		return true
-	}
 	if _, ok := named.(reference.Tagged); ok {
 		return true
 	}
