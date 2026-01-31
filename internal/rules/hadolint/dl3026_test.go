@@ -203,3 +203,133 @@ func TestDL3026Rule_ConfigFromMap(t *testing.T) {
 		t.Errorf("expected 0 violations with map config, got %d", len(violations))
 	}
 }
+
+// Tests adapted from hadolint/hadolint test/Hadolint/Rule/DL3026Spec.hs
+
+func TestDL3026Rule_WildcardAny(t *testing.T) {
+	// "does not warn on * registry" - from hadolint
+	r := NewDL3026Rule()
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", `FROM ubuntu:18.04 AS builder1
+FROM zemanlx/ubuntu:18.04 AS builder2
+FROM docker.io/zemanlx/ubuntu:18.04 AS builder3
+`, DL3026Config{TrustedRegistries: []string{"*"}})
+
+	violations := r.Check(input)
+	if len(violations) != 0 {
+		t.Errorf("expected 0 violations with * wildcard, got %d", len(violations))
+		for _, v := range violations {
+			t.Logf("  violation: %s", v.Message)
+		}
+	}
+}
+
+func TestDL3026Rule_WildcardSuffix(t *testing.T) {
+	// "does not warn on allowed wildcard registries" - from hadolint
+	r := NewDL3026Rule()
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", `FROM foo.random.com/debian
+RUN echo hello
+`, DL3026Config{TrustedRegistries: []string{"x.com", "*.random.com"}})
+
+	violations := r.Check(input)
+	if len(violations) != 0 {
+		t.Errorf("expected 0 violations with *.random.com wildcard, got %d", len(violations))
+	}
+}
+
+func TestDL3026Rule_WildcardSuffixNoMatch(t *testing.T) {
+	// "warn on non-allowed wildcard registry" - from hadolint
+	r := NewDL3026Rule()
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", `FROM x.com/debian
+RUN echo hello
+`, DL3026Config{TrustedRegistries: []string{"*.random.com"}})
+
+	violations := r.Check(input)
+	if len(violations) != 1 {
+		t.Errorf("expected 1 violation when wildcard doesn't match, got %d", len(violations))
+	}
+}
+
+func TestDL3026Rule_AllDockerHubForms(t *testing.T) {
+	// "allows both all forms of docker.io" - from hadolint
+	// Tests that bare image names, user/image, and explicit docker.io all work
+	r := NewDL3026Rule()
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", `FROM ubuntu:18.04 AS builder1
+FROM zemanlx/ubuntu:18.04 AS builder2
+FROM docker.io/zemanlx/ubuntu:18.04 AS builder3
+`, DL3026Config{TrustedRegistries: []string{"docker.io"}})
+
+	violations := r.Check(input)
+	if len(violations) != 0 {
+		t.Errorf("expected 0 violations for all docker.io forms, got %d", len(violations))
+		for _, v := range violations {
+			t.Logf("  violation: %s", v.Message)
+		}
+	}
+}
+
+func TestDL3026Rule_StageReferenceFromUntrusted(t *testing.T) {
+	// "allows using previous stages" - from hadolint
+	// Even if first stage is from trusted registry, referencing it by name should work
+	r := NewDL3026Rule()
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", `FROM random.com/foo AS builder1
+FROM builder1 AS builder2
+`, DL3026Config{TrustedRegistries: []string{"random.com"}})
+
+	violations := r.Check(input)
+	if len(violations) != 0 {
+		t.Errorf("expected 0 violations when using stage reference, got %d", len(violations))
+	}
+}
+
+func TestDL3026Rule_MultipleAllowedRegistries(t *testing.T) {
+	// "does not warn on allowed registries" - from hadolint
+	r := NewDL3026Rule()
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", `FROM random.com/debian
+RUN echo hello
+`, DL3026Config{TrustedRegistries: []string{"x.com", "random.com"}})
+
+	violations := r.Check(input)
+	if len(violations) != 0 {
+		t.Errorf("expected 0 violations for image from one of multiple allowed registries, got %d", len(violations))
+	}
+}
+
+func TestDL3026Rule_MatchRegistry(t *testing.T) {
+	tests := []struct {
+		pattern  string
+		registry string
+		want     bool
+	}{
+		// Exact matches
+		{"docker.io", "docker.io", true},
+		{"gcr.io", "gcr.io", true},
+		{"gcr.io", "docker.io", false},
+
+		// Wildcard any
+		{"*", "docker.io", true},
+		{"*", "gcr.io", true},
+		{"*", "anything.example.com", true},
+
+		// Suffix wildcard
+		{"*.example.com", "foo.example.com", true},
+		{"*.example.com", "bar.example.com", true},
+		{"*.example.com", "sub.foo.example.com", true},
+		{"*.example.com", "example.com", false}, // No subdomain
+		{"*.example.com", "notexample.com", false},
+		{"*.example.com", "docker.io", false},
+
+		// Prefix wildcard
+		{"gcr*", "gcr.io", true},
+		{"gcr*", "gcr.example.com", true},
+		{"gcr*", "docker.io", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.pattern+"_"+tt.registry, func(t *testing.T) {
+			got := matchRegistry(tt.pattern, tt.registry)
+			if got != tt.want {
+				t.Errorf("matchRegistry(%q, %q) = %v, want %v", tt.pattern, tt.registry, got, tt.want)
+			}
+		})
+	}
+}

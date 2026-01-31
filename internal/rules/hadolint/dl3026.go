@@ -124,15 +124,43 @@ func (r *DL3026Rule) Check(input rules.LintInput) []rules.Violation {
 
 // isRegistryTrusted checks if a registry is in the trusted list.
 // Handles docker.io aliases (docker.io, index.docker.io, registry-1.docker.io).
+// Supports wildcard patterns:
+//   - "*" matches any registry
+//   - "*.example.com" matches any subdomain of example.com (suffix match)
+//   - "prefix*" matches any registry starting with prefix (prefix match)
 func isRegistryTrusted(registry string, trusted []string) bool {
 	normalizedRegistry := normalizeRegistry(registry)
 
 	for _, t := range trusted {
-		if normalizeRegistry(t) == normalizedRegistry {
+		if matchRegistry(normalizeRegistry(t), normalizedRegistry) {
 			return true
 		}
 	}
 	return false
+}
+
+// matchRegistry checks if a registry matches a pattern.
+// Supports exact match, "*" (any), "*.suffix" (suffix match), and "prefix*" (prefix match).
+func matchRegistry(pattern, registry string) bool {
+	// Exact wildcard matches everything
+	if pattern == "*" {
+		return true
+	}
+
+	// Suffix wildcard: *.example.com matches foo.example.com
+	if strings.HasPrefix(pattern, "*.") {
+		suffix := pattern[1:] // Keep the dot: ".example.com"
+		return strings.HasSuffix(registry, suffix)
+	}
+
+	// Prefix wildcard: prefix* matches prefix.anything
+	if strings.HasSuffix(pattern, "*") {
+		prefix := pattern[:len(pattern)-1]
+		return strings.HasPrefix(registry, prefix)
+	}
+
+	// Exact match
+	return pattern == registry
 }
 
 // normalizeRegistry normalizes registry names for comparison.
