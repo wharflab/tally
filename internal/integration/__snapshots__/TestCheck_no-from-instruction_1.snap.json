@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "testdata/no-from-instruction/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/no-from-instruction/Dockerfile",
+            "start": {
+              "line": 1,
+              "column": 0
+            },
+            "end": {
+              "line": 1,
+              "column": 0
+            }
+          },
+          "rule": "hadolint/DL3061",
+          "message": "Invalid instruction order. Dockerfile must begin with `FROM`, `ARG` or comment.",
+          "severity": "error",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3061",
+          "sourceCode": "RUN echo \"hello\""
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 1,
+    "warnings": 0,
+    "info": 0,
+    "style": 0,
+    "files": 1
+  },
+  "files_scanned": 1,
+  "rules_enabled": 35
+}
+

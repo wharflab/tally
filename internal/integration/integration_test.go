@@ -119,6 +119,7 @@ func TestCheck(t *testing.T) {
 		{name: "copy-from-own-alias", dir: "copy-from-own-alias", args: []string{"--format", "json"}, wantExit: 1},
 		{name: "onbuild-forbidden", dir: "onbuild-forbidden", args: []string{"--format", "json"}, wantExit: 1},
 		{name: "invalid-instruction-order", dir: "invalid-instruction-order", args: []string{"--format", "json"}, wantExit: 1},
+		{name: "no-from-instruction", dir: "no-from-instruction", args: []string{"--format", "json"}, wantExit: 1},
 
 		// Unreachable stage detection
 		{name: "unreachable-stage", dir: "unreachable-stage", args: []string{"--format", "json"}, wantExit: 1},

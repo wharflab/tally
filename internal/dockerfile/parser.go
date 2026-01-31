@@ -130,6 +130,10 @@ func Parse(r io.Reader, cfg *config.Config) (*ParseResult, error) {
 // It removes any non-ARG instructions that appear before the first FROM, which
 // allows us to still parse the remaining stages and run linting, while semantic
 // model construction can report DL3061 against the original AST.
+//
+// If no FROM exists at all, synthesizes a minimal AST with a dummy FROM so
+// instructions.Parse can succeed, allowing the semantic builder to run and
+// emit DL3061.
 func sanitizeASTForInstructionParse(root *parser.Node) *parser.Node {
 	if root == nil || len(root.Children) == 0 {
 		return root
@@ -144,7 +148,21 @@ func sanitizeASTForInstructionParse(root *parser.Node) *parser.Node {
 		}
 	}
 	if firstFromIdx == -1 {
-		return root
+		// No FROM at all. Synthesize a minimal valid AST with only ARG
+		// instructions (if any) and a dummy FROM so instructions.Parse
+		// succeeds. The semantic builder will report DL3061 from the
+		// original AST.
+		sanitized := *root
+		filtered := make([]*parser.Node, 0, len(root.Children)+1)
+		for _, child := range root.Children {
+			if child != nil && strings.EqualFold(child.Value, "ARG") {
+				filtered = append(filtered, child)
+			}
+		}
+		// Append a synthetic FROM scratch
+		filtered = append(filtered, &parser.Node{Value: "from", Next: &parser.Node{Value: "scratch"}})
+		sanitized.Children = filtered
+		return &sanitized
 	}
 
 	// If nothing invalid appears before the first FROM, keep as-is.
