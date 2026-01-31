@@ -10,6 +10,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/tinovyatkin/tally/internal/semantic"
 )
 
 // Rule implements the DL3004 linting rule.
@@ -30,10 +31,26 @@ func (r *Rule) Metadata() rules.RuleMetadata {
 
 // Check runs the DL3004 rule.
 // It warns when any RUN instruction contains a sudo command.
+// Skips analysis for stages using non-POSIX shells (e.g., PowerShell).
 func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 	var violations []rules.Violation
 
-	for _, stage := range input.Stages {
+	// Get semantic model for shell variant info
+	sem, ok := input.Semantic.(*semantic.Model)
+	if !ok {
+		sem = nil
+	}
+
+	for stageIdx, stage := range input.Stages {
+		// Check if stage uses a non-POSIX shell
+		if sem != nil {
+			if info := sem.StageInfo(stageIdx); info != nil {
+				if info.ShellSetting.Variant.IsNonPOSIX() {
+					continue // Skip shell analysis for non-POSIX shells
+				}
+			}
+		}
+
 		for _, cmd := range stage.Commands {
 			run, ok := cmd.(*instructions.RunCommand)
 			if !ok {

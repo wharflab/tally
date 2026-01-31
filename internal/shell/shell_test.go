@@ -166,6 +166,10 @@ func TestVariantFromShell(t *testing.T) {
 		{"/bin/ksh", VariantMksh},
 		{"zsh", VariantBash}, // zsh treated as bash-like
 		{"/bin/zsh", VariantBash},
+		{"powershell", VariantNonPOSIX}, // Non-POSIX shells
+		{"pwsh", VariantNonPOSIX},
+		{"cmd", VariantNonPOSIX},
+		{"cmd.exe", VariantNonPOSIX},
 		{"unknown", VariantBash}, // unknown defaults to bash
 		{"", VariantBash},
 	}
@@ -188,7 +192,7 @@ func TestVariantFromShellCmd(t *testing.T) {
 	}{
 		{"default bash", []string{"/bin/bash", "-c"}, VariantBash},
 		{"default sh", []string{"/bin/sh", "-c"}, VariantPOSIX},
-		{"powershell", []string{"powershell", "-Command"}, VariantBash}, // unknown -> bash
+		{"powershell", []string{"powershell", "-Command"}, VariantNonPOSIX}, // non-POSIX shell
 		{"empty", []string{}, VariantBash},
 		{"nil", nil, VariantBash},
 	}
@@ -339,13 +343,33 @@ func TestToLangVariant(t *testing.T) {
 		{VariantBash, syntax.LangBash},
 		{VariantPOSIX, syntax.LangPOSIX},
 		{VariantMksh, syntax.LangMirBSDKorn},
-		{Variant(99), syntax.LangBash}, // Unknown variant defaults to Bash
+		{VariantNonPOSIX, syntax.LangBash}, // NonPOSIX falls back to Bash for parsing
+		{Variant(99), syntax.LangBash},     // Unknown variant defaults to Bash
 	}
 
 	for _, tt := range tests {
 		got := tt.variant.toLangVariant()
 		if got != tt.want {
 			t.Errorf("Variant(%d).toLangVariant() = %v, want %v", tt.variant, got, tt.want)
+		}
+	}
+}
+
+func TestIsNonPOSIX(t *testing.T) {
+	tests := []struct {
+		variant Variant
+		want    bool
+	}{
+		{VariantBash, false},
+		{VariantPOSIX, false},
+		{VariantMksh, false},
+		{VariantNonPOSIX, true},
+	}
+
+	for _, tt := range tests {
+		got := tt.variant.IsNonPOSIX()
+		if got != tt.want {
+			t.Errorf("Variant(%d).IsNonPOSIX() = %v, want %v", tt.variant, got, tt.want)
 		}
 	}
 }

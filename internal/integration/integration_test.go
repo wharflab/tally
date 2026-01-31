@@ -238,6 +238,12 @@ func TestCheck(t *testing.T) {
 			args:     []string{"--format", "json"},
 			wantExit: 1,
 		},
+		{
+			name:     "non-posix-shell",
+			dir:      "non-posix-shell",
+			args:     []string{"--format", "json"},
+			wantExit: 0, // Should pass - shell rules disabled for PowerShell
+		},
 	}
 
 	for _, tc := range testCases {

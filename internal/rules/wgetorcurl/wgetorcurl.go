@@ -132,6 +132,8 @@ func (r *Rule) buildCommandString(run *instructions.RunCommand) string {
 }
 
 // recordToolUsage checks for wget/curl usage and records it.
+// Skips analysis for non-POSIX shells (e.g., PowerShell) since shell
+// command parsing doesn't apply to them.
 func (r *Rule) recordToolUsage(
 	cmdStr string,
 	shellVariant shell.Variant,
@@ -140,6 +142,11 @@ func (r *Rule) recordToolUsage(
 	wgetInstalled, curlInstalled bool,
 	wgetUsage, curlUsage usageMap,
 ) {
+	// Skip shell command analysis for non-POSIX shells
+	if shellVariant.IsNonPOSIX() {
+		return
+	}
+
 	if shell.ContainsCommandWithVariant(cmdStr, "wget", shellVariant) {
 		if wgetUsage[stageIdx] == nil {
 			wgetUsage[stageIdx] = &toolUsage{installed: wgetInstalled}

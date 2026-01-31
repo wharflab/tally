@@ -21,6 +21,10 @@ const (
 	VariantPOSIX
 	// VariantMksh is the MirBSD Korn Shell.
 	VariantMksh
+	// VariantNonPOSIX represents shells that are not POSIX-compatible.
+	// When this variant is active, shell-specific linting rules are disabled.
+	// Examples: powershell, cmd, pwsh
+	VariantNonPOSIX
 )
 
 // VariantFromShell returns the appropriate Variant for a shell name.
@@ -29,6 +33,7 @@ const (
 //   - sh, dash, ash -> VariantPOSIX
 //   - mksh, ksh -> VariantMksh
 //   - zsh -> VariantBash (closest approximation)
+//   - powershell, pwsh, cmd -> VariantNonPOSIX (disables shell linting)
 //   - unknown -> VariantBash (safe default)
 func VariantFromShell(shell string) Variant {
 	// Normalize: extract basename and lowercase
@@ -44,6 +49,9 @@ func VariantFromShell(shell string) Variant {
 	case "zsh":
 		// zsh is mostly bash-compatible for our purposes
 		return VariantBash
+	case "powershell", "pwsh", "cmd", "cmd.exe":
+		// Non-POSIX shells - disable shell-specific linting
+		return VariantNonPOSIX
 	default:
 		// Default to bash for unknown shells
 		return VariantBash
@@ -59,6 +67,13 @@ func VariantFromShellCmd(shellCmd []string) Variant {
 	return VariantFromShell(shellCmd[0])
 }
 
+// IsNonPOSIX returns true if this variant represents a non-POSIX shell.
+// When true, shell-specific linting rules should be disabled because
+// the shell syntax is incompatible with POSIX/Bash parsing.
+func (v Variant) IsNonPOSIX() bool {
+	return v == VariantNonPOSIX
+}
+
 // toLangVariant converts our Variant to mvdan.cc/sh's LangVariant.
 func (v Variant) toLangVariant() syntax.LangVariant {
 	switch v {
@@ -68,6 +83,10 @@ func (v Variant) toLangVariant() syntax.LangVariant {
 		return syntax.LangPOSIX
 	case VariantMksh:
 		return syntax.LangMirBSDKorn
+	case VariantNonPOSIX:
+		// Non-POSIX shells can't be parsed, but we need a fallback
+		// This should rarely be called since IsNonPOSIX() should be checked first
+		return syntax.LangBash
 	}
 	return syntax.LangBash
 }

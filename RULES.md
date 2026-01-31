@@ -216,6 +216,27 @@ FROM alpine AS Builder
 
 See [README.md](README.md#ignoring-violations) for full directive documentation.
 
+### Shell Directive for Non-POSIX Shells
+
+When using base images with non-POSIX shells (e.g., Windows images with PowerShell), use the `shell` directive to automatically disable shell-specific linting rules:
+
+```dockerfile
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+# hadolint shell=powershell
+RUN Get-Process notepad | Stop-Process
+```
+
+Supported non-POSIX shells:
+- `powershell` - Windows PowerShell
+- `pwsh` - PowerShell Core (cross-platform)
+- `cmd` / `cmd.exe` - Windows Command Prompt
+
+When a non-POSIX shell is specified, the following rule categories are automatically disabled:
+- Shell command analysis rules (e.g., DL3004 sudo detection, DL4001 wget/curl detection)
+- Future ShellCheck-based rules (SC* rules)
+
+Both `# hadolint shell=<shell>` and `# tally shell=<shell>` formats are supported.
+
 ---
 
 ## Configuration
