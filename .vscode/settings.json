@@ -18,5 +18,6 @@
     "editor.defaultFormatter": "golang.go"
   },
   "makefile.configureOnOpen": false,
-  "cSpell.enabled": false
+  "cSpell.enabled": false,
+  "codeQL.githubDatabase.update": "never"
 }
