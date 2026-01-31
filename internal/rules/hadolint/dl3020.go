@@ -126,6 +126,7 @@ func isTarArchiveDL3020(src string) bool {
 
 // isHeredocDL3020 checks if a source is a heredoc marker.
 func isHeredocDL3020(src string) bool {
+	src = strings.TrimSpace(stripQuotes(src))
 	return strings.HasPrefix(src, "<<")
 }
 
