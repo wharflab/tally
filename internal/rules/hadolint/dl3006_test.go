@@ -35,6 +35,13 @@ func TestDL3006Rule_Check(t *testing.T) {
 			wantCount:  1,
 			wantCode:   rules.HadolintRulePrefix + "DL3006",
 		},
+		// Test from hadolint: "no untagged with name"
+		{
+			name:       "untagged image with AS name",
+			dockerfile: "FROM debian AS builder\n",
+			wantCount:  1,
+			wantCode:   rules.HadolintRulePrefix + "DL3006",
+		},
 		{
 			name:       "tagged with version",
 			dockerfile: "FROM ubuntu:22.04\n",

@@ -87,7 +87,7 @@ func (r *DL3020Rule) Check(input rules.LintInput) []rules.Violation {
 
 // isURLDL3020 checks if a source path is a URL.
 func isURLDL3020(src string) bool {
-	src = strings.ToLower(src)
+	src = stripQuotes(strings.ToLower(src))
 	return strings.HasPrefix(src, "http://") ||
 		strings.HasPrefix(src, "https://") ||
 		strings.HasPrefix(src, "ftp://") ||
@@ -95,9 +95,19 @@ func isURLDL3020(src string) bool {
 		strings.HasPrefix(src, "git@")
 }
 
+// stripQuotes removes surrounding double or single quotes from a string.
+func stripQuotes(s string) string {
+	if len(s) >= 2 {
+		if (s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
+}
+
 // isTarArchiveDL3020 checks if a source path is a tar archive that ADD would extract.
 func isTarArchiveDL3020(src string) bool {
-	src = strings.ToLower(src)
+	src = stripQuotes(strings.ToLower(src))
 	tarExtensions := []string{
 		".tar",
 		".tar.gz", ".tgz",

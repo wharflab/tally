@@ -103,6 +103,28 @@ FROM ${BASE_IMAGE}
 `,
 			wantCount: 0, // Can't resolve the ARG value
 		},
+		// Tests from hadolint/hadolint test/Hadolint/Rule/DL3007Spec.hs
+		{
+			name:       "explicit latest with name",
+			dockerfile: "FROM debian:latest AS builder\n",
+			wantCount:  1,
+			wantCode:   rules.HadolintRulePrefix + "DL3007",
+		},
+		{
+			name:       "explicit tagged with name",
+			dockerfile: "FROM debian:jessie AS builder\n",
+			wantCount:  0,
+		},
+		{
+			name:       "explicit SHA pins the image",
+			dockerfile: "FROM hub.docker.io/debian@sha256:7959ed6f7e35f8b1aaa06d1d8259d4ee25aa85a086d5c125480c333183f9deeb\n",
+			wantCount:  0,
+		},
+		{
+			name:       "tag and SHA - digest pins even with latest tag",
+			dockerfile: "FROM hub.docker.io/debian:latest@sha256:7959ed6f7e35f8b1aaa06d1d8259d4ee25aa85a086d5c125480c333183f9deeb\n",
+			wantCount:  0, // Digest pins the image, :latest is ignored
+		},
 	}
 
 	for _, tt := range tests {

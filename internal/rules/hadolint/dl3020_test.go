@@ -147,6 +147,28 @@ ADD file1.txt file2.txt /app/
 `,
 			wantCount: 1, // Only one violation per ADD instruction
 		},
+		// Tests from hadolint/hadolint test/Hadolint/Rule/DL3020Spec.hs
+		{
+			name: "ADD for tgz with quotes",
+			dockerfile: `FROM ubuntu:22.04
+ADD "file.tgz" /usr/src/app/
+`,
+			wantCount: 0, // tar archives are fine
+		},
+		{
+			name: "ADD for URL with quotes",
+			dockerfile: `FROM ubuntu:22.04
+ADD "http://file.com" /usr/src/app/
+`,
+			wantCount: 0, // URLs are fine
+		},
+		{
+			name: "ADD for zip with quotes - should warn",
+			dockerfile: `FROM ubuntu:22.04
+ADD "file.zip" /usr/src/app/
+`,
+			wantCount: 1, // zip is not auto-extracted by ADD
+		},
 	}
 
 	for _, tt := range tests {
@@ -193,6 +215,33 @@ func TestIsURLDL3020(t *testing.T) {
 			got := isURLDL3020(tt.src)
 			if got != tt.want {
 				t.Errorf("isURLDL3020(%q) = %v, want %v", tt.src, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestStripQuotes(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{`"file.txt"`, "file.txt"},
+		{`'file.txt'`, "file.txt"},
+		{`file.txt`, "file.txt"},
+		{`"http://example.com"`, "http://example.com"},
+		{`""`, ""},
+		{`"a"`, "a"},
+		{``, ""},
+		{`"`, `"`},
+		{`'`, `'`},
+		{`"mismatched'`, `"mismatched'`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := stripQuotes(tt.input)
+			if got != tt.want {
+				t.Errorf("stripQuotes(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}

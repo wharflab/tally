@@ -137,6 +137,34 @@ USER root
 `,
 			wantCount: 1, // Final stage ends with root
 		},
+		// Tests from hadolint/hadolint test/Hadolint/Rule/DL3002Spec.hs
+		// Note: Hadolint warns on ALL stages ending with root, we only check final stage
+		{
+			name: "first stage ends with root but final stage has non-root",
+			dockerfile: `FROM debian as base
+USER root
+RUN something
+USER foo
+
+FROM scratch
+RUN something else
+`,
+			wantCount: 0, // First stage switches to foo, final stage has no USER (inherits from base? no - scratch)
+		},
+		{
+			name: "intermediate stage root - we only check final stage",
+			dockerfile: `FROM debian as base
+USER root
+RUN something
+
+FROM scratch
+USER foo
+RUN something else
+`,
+			// Note: Hadolint would warn on the first stage. We don't because
+			// only the final stage matters for the shipped image.
+			wantCount: 0, // Final stage ends with foo
+		},
 	}
 
 	for _, tt := range tests {

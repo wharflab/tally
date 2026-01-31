@@ -105,6 +105,20 @@ RUN curl https://example.com/file3
 `,
 			wantCount: 2, // Both curl usages are flagged
 		},
+		// Tests from hadolint/hadolint test/Hadolint/Rule/DL4001Spec.hs
+		{
+			name: "different tools in different stages - hadolint allows this",
+			dockerfile: `FROM node as foo
+RUN wget my.xyz
+
+FROM scratch
+RUN curl localhost
+`,
+			// Note: Hadolint says this should NOT warn (different stages)
+			// Our implementation is stricter - we warn because it's still
+			// inconsistent across the build. Uncomment wantCount: 0 to match hadolint.
+			wantCount: 1, // We flag curl (stricter than hadolint)
+		},
 	}
 
 	for _, tt := range tests {

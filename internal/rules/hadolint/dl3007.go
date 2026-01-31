@@ -40,7 +40,8 @@ func (r *DL3007Rule) Check(input rules.LintInput) []rules.Violation {
 	for info := range sem.ExternalImageStages() {
 		ref := parseImageRef(info.Stage.BaseName)
 		// Can't parse or doesn't use :latest - skip
-		if ref == nil || !ref.IsLatestTag() {
+		// If the image has a digest, it's pinned regardless of tag
+		if ref == nil || !ref.IsLatestTag() || ref.HasDigest() {
 			continue
 		}
 
