@@ -262,6 +262,7 @@ func (f *Fixer) resolveAsyncFixes(ctx context.Context, fixes []*rules.SuggestedF
 }
 
 // applyFixesToFile applies non-conflicting fixes to a single file.
+// Fixes are atomic: either all edits of a fix are applied, or none are.
 func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 	// Collect all edits with their source info
 	type editWithSource struct {
@@ -270,7 +271,9 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 	}
 
 	var allEdits []editWithSource
+	candidateEdits := make(map[*fixCandidate][]rules.TextEdit, len(candidates))
 	for _, c := range candidates {
+		candidateEdits[c] = c.fix.Edits
 		for _, edit := range c.fix.Edits {
 			allEdits = append(allEdits, editWithSource{
 				edit:      edit,
@@ -288,50 +291,59 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 	// Track which candidates have been applied or skipped
 	applied := make(map[*fixCandidate]bool)
 	skipped := make(map[*fixCandidate]bool)
+	checked := make(map[*fixCandidate]bool)
 
-	// Apply edits, checking for conflicts
+	// hasCandidateConflict checks if any of a candidate's edits overlap with applied edits
+	hasCandidateConflict := func(edits []rules.TextEdit, appliedEdits []editWithSource) bool {
+		for _, e := range edits {
+			for _, ae := range appliedEdits {
+				if editsOverlap(e, ae.edit) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	// Apply edits, checking for conflicts at the fix level (atomic)
 	content := fc.ModifiedContent
 	appliedEdits := make([]editWithSource, 0, len(allEdits))
 
 	for _, ews := range allEdits {
-		// Check if this edit conflicts with any already applied
-		hasConflict := false
-		for _, ae := range appliedEdits {
-			if editsOverlap(ews.edit, ae.edit) {
-				hasConflict = true
-				break
-			}
+		// Skip if this candidate was already determined to be skipped
+		if skipped[ews.candidate] {
+			continue
 		}
 
-		if hasConflict {
-			if !skipped[ews.candidate] {
+		// Check all edits for this candidate on first encounter
+		if !checked[ews.candidate] {
+			checked[ews.candidate] = true
+			if hasCandidateConflict(candidateEdits[ews.candidate], appliedEdits) {
 				skipped[ews.candidate] = true
 				fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
 					RuleCode: ews.candidate.violation.RuleCode,
 					Reason:   SkipConflict,
 					Location: ews.candidate.violation.Location,
 				})
+				continue
 			}
-			continue
+			applied[ews.candidate] = true
 		}
 
 		// Apply the edit
 		content = applyEdit(content, ews.edit)
 		appliedEdits = append(appliedEdits, ews)
-		applied[ews.candidate] = true
 	}
 
 	fc.ModifiedContent = content
 
 	// Record applied fixes
 	for c := range applied {
-		if !skipped[c] {
-			fc.FixesApplied = append(fc.FixesApplied, AppliedFix{
-				RuleCode:    c.violation.RuleCode,
-				Description: c.fix.Description,
-				Location:    c.violation.Location,
-			})
-		}
+		fc.FixesApplied = append(fc.FixesApplied, AppliedFix{
+			RuleCode:    c.violation.RuleCode,
+			Description: c.fix.Description,
+			Location:    c.violation.Location,
+		})
 	}
 }
 
