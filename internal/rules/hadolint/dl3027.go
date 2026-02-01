@@ -85,8 +85,21 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 				overallSafety = safety
 			}
 
-			// Only add edits for shell form RUN commands
+			// Only add edits for shell form RUN commands on a single line
+			// Multi-line RUN commands (with backslash continuations) have their content
+			// collapsed by BuildKit, losing line information. We skip generating edits
+			// for these to avoid applying fixes to incorrect positions.
 			if run.PrependShell {
+				// Check if RUN spans multiple lines
+				lastRange := runLoc[len(runLoc)-1]
+				isMultiLine := lastRange.End.Line > runLoc[0].Start.Line
+
+				if isMultiLine {
+					// Skip edit generation for multi-line RUN commands
+					// The position calculation would be incorrect since line info is lost
+					continue
+				}
+
 				// Calculate edit position for shell form
 				// BuildKit uses 1-based lines and 0-based columns
 				// The command content starts after "RUN " (4 characters)

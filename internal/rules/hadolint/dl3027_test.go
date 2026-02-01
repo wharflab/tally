@@ -305,3 +305,36 @@ func TestDL3027_FixLocationConsistency(t *testing.T) {
 		t.Errorf("expected violation on line 2 (1-based), got %d", violationLine)
 	}
 }
+
+// TestDL3027_MultiLineRUN verifies that multi-line RUN commands are detected
+// but auto-fix is skipped because line position information is lost when
+// BuildKit collapses backslash continuations.
+func TestDL3027_MultiLineRUN(t *testing.T) {
+	// Multi-line RUN with backslash continuation - apt on different physical lines
+	dockerfile := `FROM ubuntu
+RUN apt-get update && \
+    apt install python`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", dockerfile)
+	r := NewDL3027Rule()
+	violations := r.Check(input)
+
+	// Should still detect the violation
+	if len(violations) == 0 {
+		t.Fatal("expected violation for multi-line RUN with apt")
+	}
+
+	v := violations[0]
+
+	// Violation should be reported
+	if v.RuleCode != "hadolint/DL3027" {
+		t.Errorf("expected rule code hadolint/DL3027, got %s", v.RuleCode)
+	}
+
+	// Auto-fix should NOT be generated for multi-line RUN
+	// because the line position calculation would be incorrect
+	if v.SuggestedFix != nil && len(v.SuggestedFix.Edits) > 0 {
+		t.Errorf("expected no edits for multi-line RUN, got %d edits (positions would be incorrect)",
+			len(v.SuggestedFix.Edits))
+	}
+}
