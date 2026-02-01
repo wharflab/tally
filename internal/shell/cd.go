@@ -18,6 +18,10 @@ type CdCommand struct {
 	// e.g., "cd /foo && make" has cd at start, "make && cd /foo" does not.
 	IsAtStart bool
 
+	// PrecedingCommands contains the commands before cd if it's not at the start.
+	// e.g., for "mkdir /tmp && cd /tmp && make", this would be "mkdir /tmp".
+	PrecedingCommands string
+
 	// RemainingCommands contains the commands after "cd /foo &&" if IsAtStart is true.
 	// Empty if IsStandalone is true or cd is not at start.
 	RemainingCommands string
@@ -87,8 +91,29 @@ func analyzeCdInStatement(stmt *syntax.Stmt, script string) []CdCommand {
 }
 
 // analyzeBinaryCmd recursively analyzes a binary command for cd.
+// precedingText accumulates commands seen to the left of the current binary expression.
 func analyzeBinaryCmd(bin *syntax.BinaryCmd, script string, isLeftmost bool) []CdCommand {
+	return analyzeBinaryCmdWithContext(bin, script, isLeftmost, "", "")
+}
+
+// analyzeBinaryCmdWithContext is the internal recursive function that tracks context.
+// precedingText: commands accumulated to the left
+// followingText: commands that come after (from outer context)
+func analyzeBinaryCmdWithContext(bin *syntax.BinaryCmd, script string, isLeftmost bool, precedingText, followingText string) []CdCommand {
 	var results []CdCommand
+
+	// Calculate what comes after the left side (bin.Y plus outer following)
+	var leftFollowing string
+	if bin.Y != nil {
+		rightText := extractRemainingScript(bin.Y, script)
+		if followingText != "" {
+			leftFollowing = rightText + " && " + followingText
+		} else {
+			leftFollowing = rightText
+		}
+	} else {
+		leftFollowing = followingText
+	}
 
 	// Check left side
 	if bin.X != nil && bin.X.Cmd != nil {
@@ -97,18 +122,30 @@ func analyzeBinaryCmd(bin *syntax.BinaryCmd, script string, isLeftmost bool) []C
 			if isCdCall(left) {
 				cd := extractCdInfo(left)
 				cd.IsStandalone = false
-				cd.IsAtStart = isLeftmost
+				cd.IsAtStart = isLeftmost && precedingText == ""
 
-				// Extract everything to the right as remaining commands
-				if bin.Y != nil {
-					cd.RemainingCommands = extractRemainingScript(bin.Y, script)
-				}
+				// Preceding commands from outer context
+				cd.PrecedingCommands = precedingText
+
+				// Everything to the right (bin.Y) plus outer following
+				cd.RemainingCommands = leftFollowing
 				results = append(results, cd)
 			}
 
 		case *syntax.BinaryCmd:
-			// Nested binary command on left - recurse but it's still leftmost
-			results = append(results, analyzeBinaryCmd(left, script, isLeftmost)...)
+			// Nested binary command on left - recurse, passing context
+			results = append(results, analyzeBinaryCmdWithContext(left, script, isLeftmost, precedingText, leftFollowing)...)
+		}
+	}
+
+	// Build the new preceding text for right-side analysis
+	var newPrecedingText string
+	if bin.X != nil {
+		leftText := extractRemainingScript(bin.X, script)
+		if precedingText != "" {
+			newPrecedingText = precedingText + " && " + leftText
+		} else {
+			newPrecedingText = leftText
 		}
 	}
 
@@ -120,12 +157,17 @@ func analyzeBinaryCmd(bin *syntax.BinaryCmd, script string, isLeftmost bool) []C
 				cd := extractCdInfo(right)
 				cd.IsStandalone = false
 				cd.IsAtStart = false // Right side is never at start
+
+				// Set preceding commands
+				cd.PrecedingCommands = newPrecedingText
+				// Following comes from outer context
+				cd.RemainingCommands = followingText
 				results = append(results, cd)
 			}
 
 		case *syntax.BinaryCmd:
-			// Nested binary command on right - recurse, not leftmost
-			results = append(results, analyzeBinaryCmd(right, script, false)...)
+			// Nested binary command on right - recurse with context
+			results = append(results, analyzeBinaryCmdWithContext(right, script, false, newPrecedingText, followingText)...)
 		}
 	}
 

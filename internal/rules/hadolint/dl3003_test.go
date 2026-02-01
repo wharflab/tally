@@ -109,14 +109,27 @@ func TestDL3003Rule_AutoFix(t *testing.T) {
 			wantFixContains: "WORKDIR /app",
 		},
 		{
-			name:       "cd at end of chain - no fix",
-			dockerfile: "FROM ubuntu\nRUN make build && cd /app",
-			wantFix:    false,
+			name:            "cd at end of chain - gets split fix",
+			dockerfile:      "FROM ubuntu\nRUN make build && cd /app",
+			wantFix:         true,
+			wantFixContains: "RUN make build",
 		},
 		{
 			name:       "cd with variable - no fix (can't determine path)",
 			dockerfile: "FROM ubuntu\nRUN cd $HOME",
 			wantFix:    false,
+		},
+		{
+			name:            "multiple cd commands - fixes first cd at start",
+			dockerfile:      "FROM ubuntu\nRUN cd /tmp && git clone repo && cd repo && make",
+			wantFix:         true,
+			wantFixContains: "WORKDIR /tmp",
+		},
+		{
+			name:            "multiple cd commands - first not at start - fixes first cd",
+			dockerfile:      "FROM ubuntu\nRUN echo hello && cd /tmp && cd /app",
+			wantFix:         true,
+			wantFixContains: "RUN echo hello",
 		},
 	}
 

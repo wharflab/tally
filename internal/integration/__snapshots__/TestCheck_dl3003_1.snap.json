@@ -22,7 +22,7 @@
           "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3003",
           "sourceCode": "RUN cd /opt \u0026\u0026 echo \"hello\"",
           "suggestedFix": {
-            "description": "Split into WORKDIR /opt and RUN echo \"hello\"",
+            "description": "Convert cd commands to WORKDIR instructions",
             "edits": [
               {
                 "location": {

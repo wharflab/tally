@@ -39,9 +39,34 @@ func TestFindCdCommands(t *testing.T) {
 			script:    "make build && cd /app",
 			wantCount: 1,
 			wantFirst: &CdCommand{
-				TargetDir:    "/app",
-				IsStandalone: false,
-				IsAtStart:    false,
+				TargetDir:         "/app",
+				IsStandalone:      false,
+				IsAtStart:         false,
+				PrecedingCommands: "make build",
+			},
+		},
+		{
+			name:      "cd in middle of chain",
+			script:    "mkdir /tmp && cd /tmp && make build",
+			wantCount: 1,
+			wantFirst: &CdCommand{
+				TargetDir:         "/tmp",
+				IsStandalone:      false,
+				IsAtStart:         false,
+				PrecedingCommands: "mkdir /tmp",
+				RemainingCommands: "make build",
+			},
+		},
+		{
+			name:      "cd in middle of longer chain",
+			script:    "git clone repo && cd repo && make && make install",
+			wantCount: 1,
+			wantFirst: &CdCommand{
+				TargetDir:         "repo",
+				IsStandalone:      false,
+				IsAtStart:         false,
+				PrecedingCommands: "git clone repo",
+				RemainingCommands: "make && make install",
 			},
 		},
 		{
@@ -77,7 +102,7 @@ func TestFindCdCommands(t *testing.T) {
 				TargetDir:         "/app",
 				IsStandalone:      false,
 				IsAtStart:         true,
-				RemainingCommands: "make", // Only immediate next command, not full chain
+				RemainingCommands: "make && make install", // Full chain after cd
 			},
 		},
 		{
@@ -112,6 +137,7 @@ func TestFindCdCommands(t *testing.T) {
 				assert.Equal(t, tt.wantFirst.TargetDir, got.TargetDir, "TargetDir")
 				assert.Equal(t, tt.wantFirst.IsStandalone, got.IsStandalone, "IsStandalone")
 				assert.Equal(t, tt.wantFirst.IsAtStart, got.IsAtStart, "IsAtStart")
+				assert.Equal(t, tt.wantFirst.PrecedingCommands, got.PrecedingCommands, "PrecedingCommands")
 				assert.Equal(t, tt.wantFirst.RemainingCommands, got.RemainingCommands, "RemainingCommands")
 			}
 		})

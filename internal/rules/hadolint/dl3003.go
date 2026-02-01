@@ -1,6 +1,8 @@
 package hadolint
 
 import (
+	"strings"
+
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/tinovyatkin/tally/internal/rules"
@@ -67,24 +69,24 @@ func (r *DL3003Rule) Check(input rules.LintInput) []rules.Violation {
 }
 
 // generateFix attempts to generate an auto-fix for cd usage.
-// Only handles simple cases:
-// 1. Standalone "cd /path" -> Replace with "WORKDIR /path"
-// 2. "cd /path && cmd" at start of chain -> Insert "WORKDIR /path" before, modify RUN
+// Handles all cd commands in a chain by converting each to WORKDIR.
+// Example: "RUN cd /tmp && git clone ... && cd repo && make"
+// becomes: "WORKDIR /tmp\nRUN git clone ...\nWORKDIR repo\nRUN make"
 func (r *DL3003Rule) generateFix(run *instructions.RunCommand, cdCommands []shell.CdCommand, file string) *rules.SuggestedFix {
 	// Only handle shell form RUN commands
 	if !run.PrependShell {
 		return nil
 	}
 
-	// Only handle single cd command cases for now
-	if len(cdCommands) != 1 {
-		return nil
+	// Filter cd commands with valid target directories
+	var validCds []shell.CdCommand
+	for _, cd := range cdCommands {
+		if cd.TargetDir != "" {
+			validCds = append(validCds, cd)
+		}
 	}
 
-	cd := cdCommands[0]
-
-	// Must have a target directory we can extract
-	if cd.TargetDir == "" {
+	if len(validCds) == 0 {
 		return nil
 	}
 
@@ -93,63 +95,185 @@ func (r *DL3003Rule) generateFix(run *instructions.RunCommand, cdCommands []shel
 		return nil
 	}
 
-	// Calculate the actual end position for the edit.
-	// BuildKit's Location often returns a point (End = Start), but we need
-	// to replace the entire instruction. Use the last range's End, or calculate
-	// from the instruction content if End.Character is 0.
+	// Calculate the actual end position for the edit
 	lastRange := runLoc[len(runLoc)-1]
 	endLine := lastRange.End.Line
 	endCol := lastRange.End.Character
 
-	// If End equals Start (point location), calculate proper end from instruction
 	if endLine == runLoc[0].Start.Line && endCol == runLoc[0].Start.Character {
-		// For shell form, the instruction is "RUN " + cmdStr
-		// Calculate end based on the full instruction length
 		cmdStr := GetRunCommandString(run)
 		fullInstr := "RUN " + cmdStr
 		endCol = runLoc[0].Start.Character + len(fullInstr)
 	}
 
-	// Case 1: Standalone cd - replace entire RUN with WORKDIR
-	// Safety is FixSuggestion because behavior differs: WORKDIR creates the directory
-	// if it doesn't exist, while RUN cd fails if the directory is missing.
-	if cd.IsStandalone {
-		return &rules.SuggestedFix{
-			Description: "Replace RUN cd with WORKDIR " + cd.TargetDir,
-			Safety:      rules.FixSuggestion,
-			Edits: []rules.TextEdit{{
-				Location: rules.NewRangeLocation(
-					file,
-					runLoc[0].Start.Line, // 1-based (BuildKit convention)
-					runLoc[0].Start.Character,
-					endLine,
-					endCol,
-				),
-				NewText: "WORKDIR " + cd.TargetDir,
-			}},
+	// Build the replacement text by processing all cd commands
+	newText := buildMultiCdFix(validCds)
+	if newText == "" {
+		return nil
+	}
+
+	return &rules.SuggestedFix{
+		Description: "Convert cd commands to WORKDIR instructions",
+		Safety:      rules.FixSuggestion,
+		Edits: []rules.TextEdit{{
+			Location: rules.NewRangeLocation(
+				file,
+				runLoc[0].Start.Line,
+				runLoc[0].Start.Character,
+				endLine,
+				endCol,
+			),
+			NewText: newText,
+		}},
+	}
+}
+
+// buildMultiCdFix builds a replacement string for a RUN command with multiple cd commands.
+// Each cd becomes a WORKDIR, and commands between cds become RUN instructions.
+// Redundant mkdir commands (mkdir <target> before cd <target>) are removed since WORKDIR creates dirs.
+func buildMultiCdFix(cds []shell.CdCommand) string {
+	if len(cds) == 0 {
+		return ""
+	}
+
+	var parts []string
+
+	// Handle the first cd
+	first := cds[0]
+
+	// If there are commands before the first cd, emit them as RUN
+	// Remove redundant mkdir that matches the cd target
+	if first.PrecedingCommands != "" {
+		preceding := removeRedundantMkdir(first.PrecedingCommands, first.TargetDir)
+		if preceding != "" {
+			parts = append(parts, "RUN "+preceding)
 		}
 	}
 
-	// Case 2: cd at start with chained commands
-	// "RUN cd /path && cmd" -> "WORKDIR /path\nRUN cmd"
-	if cd.IsAtStart && cd.RemainingCommands != "" {
-		return &rules.SuggestedFix{
-			Description: "Split into WORKDIR " + cd.TargetDir + " and RUN " + cd.RemainingCommands,
-			Safety:      rules.FixSuggestion, // May change behavior if cd was intentional
-			Edits: []rules.TextEdit{{
-				Location: rules.NewRangeLocation(
-					file,
-					runLoc[0].Start.Line, // 1-based (BuildKit convention)
-					runLoc[0].Start.Character,
-					endLine,
-					endCol,
-				),
-				NewText: "WORKDIR " + cd.TargetDir + "\nRUN " + cd.RemainingCommands,
-			}},
+	// Emit WORKDIR for the first cd
+	parts = append(parts, "WORKDIR "+first.TargetDir)
+
+	// For each subsequent cd, we need to figure out what commands are between them
+	// The RemainingCommands of cd[i] contains everything after it, including cd[i+1]
+	// We need to extract just the commands between cd[i] and cd[i+1]
+
+	for i := range cds {
+		cd := cds[i]
+
+		if i == 0 {
+			// Already handled first cd above, but need to handle commands after it
+			if len(cds) == 1 {
+				// Only one cd - emit remaining commands if any
+				if cd.RemainingCommands != "" {
+					parts = append(parts, "RUN "+cd.RemainingCommands)
+				}
+			} else {
+				// Multiple cds - extract commands between first and second cd
+				nextCd := cds[1]
+				cmdsBetween := extractCommandsBefore(cd.RemainingCommands, nextCd)
+				// Remove redundant mkdir for next cd's target
+				cmdsBetween = removeRedundantMkdir(cmdsBetween, nextCd.TargetDir)
+				if cmdsBetween != "" {
+					parts = append(parts, "RUN "+cmdsBetween)
+				}
+			}
+		} else {
+			// For subsequent cds, emit WORKDIR
+			parts = append(parts, "WORKDIR "+cd.TargetDir)
+
+			if i == len(cds)-1 {
+				// Last cd - emit remaining commands if any
+				if cd.RemainingCommands != "" {
+					parts = append(parts, "RUN "+cd.RemainingCommands)
+				}
+			} else {
+				// Not last - extract commands between this cd and the next
+				nextCd := cds[i+1]
+				cmdsBetween := extractCommandsBefore(cd.RemainingCommands, nextCd)
+				// Remove redundant mkdir for next cd's target
+				cmdsBetween = removeRedundantMkdir(cmdsBetween, nextCd.TargetDir)
+				if cmdsBetween != "" {
+					parts = append(parts, "RUN "+cmdsBetween)
+				}
+			}
 		}
 	}
 
-	return nil
+	return strings.Join(parts, "\n")
+}
+
+// removeRedundantMkdir removes "mkdir <target>" from commands since WORKDIR creates the directory.
+// Handles patterns like "mkdir /tmp/foo" or "mkdir -p /tmp/foo" at start, middle, or end of chain.
+func removeRedundantMkdir(commands, target string) string {
+	if commands == "" || target == "" {
+		return commands
+	}
+
+	// Patterns to remove: "mkdir <target>", "mkdir -p <target>", etc.
+	patterns := []string{
+		"mkdir -p " + target,
+		"mkdir " + target,
+	}
+
+	result := commands
+	for _, pattern := range patterns {
+		// Check if pattern is the entire command
+		if result == pattern {
+			return ""
+		}
+
+		// Check if pattern is at the start: "mkdir /tmp && ..."
+		if after, ok := strings.CutPrefix(result, pattern+" && "); ok {
+			result = after
+			continue
+		}
+		if after, ok := strings.CutPrefix(result, pattern+" &&"); ok {
+			result = after
+			result = strings.TrimSpace(result)
+			continue
+		}
+
+		// Check if pattern is in the middle: "... && mkdir /tmp && ..."
+		if strings.Contains(result, " && "+pattern+" && ") {
+			result = strings.Replace(result, " && "+pattern+" && ", " && ", 1)
+			continue
+		}
+
+		// Check if pattern is at the end: "... && mkdir /tmp"
+		if before, ok := strings.CutSuffix(result, " && "+pattern); ok {
+			result = before
+			continue
+		}
+	}
+
+	return strings.TrimSpace(result)
+}
+
+// extractCommandsBefore extracts the commands from 'remaining' that come before 'nextCd'.
+// This is done by removing the "cd <target> && <rest>" portion from remaining.
+func extractCommandsBefore(remaining string, nextCd shell.CdCommand) string {
+	if remaining == "" || nextCd.TargetDir == "" {
+		return remaining
+	}
+
+	// Find where the next cd starts in the remaining string
+	// Pattern: "... && cd <target>" or "cd <target> && ..." at start
+	cdPattern := "cd " + nextCd.TargetDir
+
+	idx := strings.Index(remaining, cdPattern)
+	if idx == -1 {
+		return remaining
+	}
+
+	// Extract everything before "cd <target>"
+	before := strings.TrimSpace(remaining[:idx])
+
+	// Remove trailing "&&" or ";" if present
+	before = strings.TrimSuffix(before, "&&")
+	before = strings.TrimSuffix(before, ";")
+	before = strings.TrimSpace(before)
+
+	return before
 }
 
 // init registers the rule with the default registry.

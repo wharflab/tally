@@ -522,7 +522,7 @@ func TestFixRealWorld(t *testing.T) {
 
 	// Verify the output mentions the expected fixes
 	outputStr := string(output)
-	if !strings.Contains(outputStr, "Fixed 4 issues") {
-		t.Errorf("expected 'Fixed 4 issues' in output, got: %s", outputStr)
+	if !strings.Contains(outputStr, "Fixed 14 issues") {
+		t.Errorf("expected 'Fixed 14 issues' in output, got: %s", outputStr)
 	}
 }

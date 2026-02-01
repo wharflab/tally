@@ -145,16 +145,30 @@ ARG CUBLAS_VERSION=11.10.3.66
 RUN apt-get update  && apt-get -y upgrade --only-upgrade systemd  && apt-get install -y --allow-change-held-packages --no-install-recommends     build-essential     ca-certificates     cmake     cuda-command-line-tools-11-7     cuda-cudart-11-7     cuda-libraries-11-7     curl     emacs     git     hwloc     jq     libcublas-11-7=${CUBLAS_VERSION}-1     libcublas-dev-11-7=${CUBLAS_VERSION}-1     libcudnn8=$CUDNN_VERSION-1+cuda11.7     libcufft-dev-11-7     libcurand-dev-11-7     libcurl4-openssl-dev     libcusolver-dev-11-7     libcusparse-dev-11-7     libglib2.0-0     libgl1-mesa-glx     libsm6     libxext6     libxrender-dev     libgomp1     libibverbs-dev     libhwloc-dev     libnuma1     libnuma-dev     libssl3     libssl-dev     libtool     openssl     python3-dev     unzip     vim     wget     zlib1g-dev     pkg-config     check     libsubunit0     libsubunit-dev  && rm -rf /var/lib/apt/lists/*  && apt-get clean
 
 
-RUN cd /tmp  && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION}-1  && cd nccl  && make -j $(nproc) src.build BUILDDIR=/usr/local  && rm -rf /tmp/nccl
+WORKDIR /tmp
+RUN git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION}-1
+WORKDIR nccl
+RUN make -j $(nproc) src.build BUILDDIR=/usr/local && rm -rf /tmp/nccl
 
-RUN mkdir /tmp/efa  && cd /tmp/efa  && curl -O https://efa-installer.amazonaws.com/aws-efa-installer-${EFA_VERSION}.tar.gz  && tar -xf aws-efa-installer-${EFA_VERSION}.tar.gz  && cd aws-efa-installer  && apt-get update  && ./efa_installer.sh -y --skip-kmod -g  && rm -rf $OPEN_MPI_PATH  && rm -rf /tmp/efa  && rm -rf /tmp/aws-efa-installer-${EFA_VERSION}.tar.gz  && rm -rf /var/lib/apt/lists/*  && apt-get clean
+WORKDIR /tmp/efa
+RUN curl -O https://efa-installer.amazonaws.com/aws-efa-installer-${EFA_VERSION}.tar.gz && tar -xf aws-efa-installer-${EFA_VERSION}.tar.gz
+WORKDIR aws-efa-installer
+RUN apt-get update && ./efa_installer.sh -y --skip-kmod -g && rm -rf $OPEN_MPI_PATH && rm -rf /tmp/efa && rm -rf /tmp/aws-efa-installer-${EFA_VERSION}.tar.gz && rm -rf /var/lib/apt/lists/* && apt-get clean
 
-RUN mkdir /tmp/openmpi  && cd /tmp/openmpi  && wget --quiet https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-${OMPI_VERSION}.tar.gz  && tar zxf openmpi-${OMPI_VERSION}.tar.gz  && cd openmpi-${OMPI_VERSION}  && ./configure --enable-orterun-prefix-by-default --prefix=$OPEN_MPI_PATH --with-cuda  && make -j $(nproc) all  && make install  && ldconfig  && cd /  && rm -rf /tmp/openmpi
+WORKDIR /tmp/openmpi
+RUN wget --quiet https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-${OMPI_VERSION}.tar.gz && tar zxf openmpi-${OMPI_VERSION}.tar.gz
+WORKDIR openmpi-
+RUN ./configure --enable-orterun-prefix-by-default --prefix=$OPEN_MPI_PATH --with-cuda && make -j $(nproc) all && make install && ldconfig
+WORKDIR /
+RUN rm -rf /tmp/openmpi
 
  ENV PATH="${PATH}:/opt/amazon/openmpi/bin:/opt/amazon/efa/bin:/opt/conda/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
  ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}/opt/amazon/openmpi/lib/:/opt/amazon/efa/lib/"
 
-RUN cd /tmp  && git clone https://github.com/NVIDIA/gdrcopy.git -b v${GDRCOPY_VERSION}  && cd gdrcopy  && sed -ie '12s@$@ -L /usr/local/cuda/lib64/stubs/@' tests/Makefile  && make install  && rm -rf /tmp/gdrcopy
+WORKDIR /tmp
+RUN git clone https://github.com/NVIDIA/gdrcopy.git -b v${GDRCOPY_VERSION}
+WORKDIR gdrcopy
+RUN sed -ie '12s@$@ -L /usr/local/cuda/lib64/stubs/@' tests/Makefile && make install && rm -rf /tmp/gdrcopy
 
 ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
@@ -229,11 +243,16 @@ RUN echo $LD_LIBRARY_PATH
 
 RUN pip install -U --force-reinstall --no-cache-dir wheel==0.43.0 setuptools==70.1.0
 RUN pip install --force-reinstall --no-cache-dir setuptools==69.5.1
-RUN git clone https://github.com/NVIDIA/apex &&     cd apex &&     git checkout aa756ce &&     pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+RUN git clone https://github.com/NVIDIA/apex
+WORKDIR apex
+RUN git checkout aa756ce && pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 
 RUN mv $OPEN_MPI_PATH/bin/mpirun $OPEN_MPI_PATH/bin/mpirun.real  && echo '#!/bin/bash' > $OPEN_MPI_PATH/bin/mpirun  && echo "${OPEN_MPI_PATH}/bin/mpirun.real --allow-run-as-root \"\$@\"" >> $OPEN_MPI_PATH/bin/mpirun  && chmod a+x $OPEN_MPI_PATH/bin/mpirun  && echo "hwloc_base_binding_policy = none" >> $OPEN_MPI_PATH/etc/openmpi-mca-params.conf  && echo "rmaps_base_mapping_policy = slot" >> $OPEN_MPI_PATH/etc/openmpi-mca-params.conf  && echo NCCL_DEBUG=INFO >> /etc/nccl.conf  && echo NCCL_SOCKET_IFNAME=^docker0 >> /etc/nccl.conf
 
-RUN mkdir /tmp/efa-ofi-nccl  && cd /tmp/efa-ofi-nccl  && git clone https://github.com/aws/aws-ofi-nccl.git -b v${BRANCH_OFI}  && cd aws-ofi-nccl  && ./autogen.sh  && ./configure --with-libfabric=/opt/amazon/efa   --with-mpi=/opt/amazon/openmpi   --with-cuda=/usr/local/cuda   --with-nccl=/usr/local --prefix=/usr/local  && make  && make install  && rm -rf /tmp/efa-ofi-nccl  && rm -rf /var/lib/apt/lists/*  && apt-get clean
+WORKDIR /tmp/efa-ofi-nccl
+RUN git clone https://github.com/aws/aws-ofi-nccl.git -b v${BRANCH_OFI}
+WORKDIR aws-ofi-nccl
+RUN ./autogen.sh && ./configure --with-libfabric=/opt/amazon/efa   --with-mpi=/opt/amazon/openmpi   --with-cuda=/usr/local/cuda   --with-nccl=/usr/local --prefix=/usr/local && make && make install && rm -rf /tmp/efa-ofi-nccl && rm -rf /var/lib/apt/lists/* && apt-get clean
 
 RUN apt-get update  && apt-get install -y  --allow-downgrades --allow-change-held-packages --no-install-recommends  && apt-get install -y --no-install-recommends openssh-client openssh-server  && mkdir -p /var/run/sshd  && cat /etc/ssh/ssh_config | grep -v StrictHostKeyChecking > /etc/ssh/ssh_config.new  && echo "    StrictHostKeyChecking no" >> /etc/ssh/ssh_config.new  && mv /etc/ssh/ssh_config.new /etc/ssh/ssh_config  && rm -rf /var/lib/apt/lists/*  && apt-get clean
 
@@ -249,7 +268,12 @@ RUN conda install -y -c conda-forge     scikit-learn     pandas
 
 WORKDIR /
 
-RUN wget https://sourceforge.net/projects/boost/files/boost/1.73.0/boost_1_73_0.tar.gz/download -O boost_1_73_0.tar.gz  && tar -xzf boost_1_73_0.tar.gz  && cd boost_1_73_0  && ./bootstrap.sh  && ./b2 threading=multi --prefix=/opt/conda -j 64 cxxflags=-fPIC cflags=-fPIC install || true  && cd ..  && rm -rf boost_1_73_0.tar.gz  && rm -rf boost_1_73_0  && cd /opt/conda/include/boost
+RUN wget https://sourceforge.net/projects/boost/files/boost/1.73.0/boost_1_73_0.tar.gz/download -O boost_1_73_0.tar.gz  && tar -xzf boost_1_73_0.tar.gz
+WORKDIR boost_1_73_0
+RUN ./bootstrap.sh && ./b2 threading=multi --prefix=/opt/conda -j 64 cxxflags=-fPIC cflags=-fPIC install && true
+WORKDIR ..
+RUN rm -rf boost_1_73_0.tar.gz && rm -rf boost_1_73_0
+WORKDIR /opt/conda/include/boost
 
 WORKDIR /opt/
 
@@ -261,12 +285,27 @@ WORKDIR /root
 
 
 ARG SMDEBUG_VERSION=1.0.34
-RUN cd /tmp   && git clone https://github.com/awslabs/sagemaker-debugger --branch ${SMDEBUG_VERSION} --depth 1 --single-branch   && cd sagemaker-debugger   && pip install .   && rm -rf /tmp/*
+WORKDIR /tmp
+RUN git clone https://github.com/awslabs/sagemaker-debugger --branch ${SMDEBUG_VERSION} --depth 1 --single-branch
+WORKDIR sagemaker-debugger
+RUN pip install . && rm -rf /tmp/*
 
-RUN rm /etc/apt/sources.list.d/*  && git clone https://github.com/KarypisLab/GKlib  && cd GKlib  && make config  && make  && make install  && cd ..  && git clone https://github.com/KarypisLab/METIS.git  && cd METIS  && make config shared=1 cc=gcc prefix=/root/local  && make install  && cd ..  && rm -rf METIS GKlib  && rm -rf /var/lib/apt/lists/*  && apt-get clean
+RUN rm /etc/apt/sources.list.d/*  && git clone https://github.com/KarypisLab/GKlib
+WORKDIR GKlib
+RUN make config && make && make install
+WORKDIR ..
+RUN git clone https://github.com/KarypisLab/METIS.git
+WORKDIR METIS
+RUN make config shared=1 cc=gcc prefix=/root/local && make install
+WORKDIR ..
+RUN rm -rf METIS GKlib && rm -rf /var/lib/apt/lists/* && apt-get clean
 
 ARG RMM_VERSION=0.15.0
-RUN wget -nv https://github.com/rapidsai/rmm/archive/v${RMM_VERSION}.tar.gz  && tar -xvf v${RMM_VERSION}.tar.gz  && cd rmm-${RMM_VERSION}  && INSTALL_PREFIX=/usr/local ./build.sh librmm  && cd ..  && rm -rf v${RMM_VERSION}.tar*  && rm -rf rmm-${RMM_VERSION}
+RUN wget -nv https://github.com/rapidsai/rmm/archive/v${RMM_VERSION}.tar.gz  && tar -xvf v${RMM_VERSION}.tar.gz
+WORKDIR rmm-
+RUN INSTALL_PREFIX=/usr/local ./build.sh librmm
+WORKDIR ..
+RUN rm -rf v${RMM_VERSION}.tar* && rm -rf rmm-${RMM_VERSION}
 
 
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/conda/lib/python3.9/site-packages/smdistributed/dataparallel/lib"
