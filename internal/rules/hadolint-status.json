@@ -12,7 +12,8 @@
     },
     "DL3003": {
       "status": "implemented",
-      "tally_rule": "hadolint/DL3003"
+      "tally_rule": "hadolint/DL3003",
+      "fixable": true
     },
     "DL3004": {
       "status": "implemented",
