@@ -327,7 +327,14 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 // applyEdit applies a single text edit to content.
 // The edit replaces the range [Start, End) with NewText.
 func applyEdit(content []byte, edit rules.TextEdit) []byte {
-	lines := bytes.Split(content, []byte("\n"))
+	// Detect line ending style (CRLF on Windows, LF on Unix)
+	lineEnding := []byte("\n")
+	if bytes.Contains(content, []byte("\r\n")) {
+		lineEnding = []byte("\r\n")
+	}
+
+	// Split by the detected line ending
+	lines := bytes.Split(content, lineEnding)
 
 	startLine := edit.Location.Start.Line
 	startCol := edit.Location.Start.Column
@@ -363,7 +370,7 @@ func applyEdit(content []byte, edit rules.TextEdit) []byte {
 	// Lines before the edit
 	for i := range startLine {
 		result.Write(lines[i])
-		result.WriteByte('\n')
+		result.Write(lineEnding)
 	}
 
 	// Start line up to the edit start
@@ -377,7 +384,7 @@ func applyEdit(content []byte, edit rules.TextEdit) []byte {
 
 	// Lines after the edit
 	for i := endLine + 1; i < len(lines); i++ {
-		result.WriteByte('\n')
+		result.Write(lineEnding)
 		result.Write(lines[i])
 	}
 

@@ -10,8 +10,15 @@ import (
 
 // getLine extracts a single line from source (0-based line index).
 // Returns empty slice if line is out of bounds.
+// Handles both LF and CRLF line endings.
 func getLine(source []byte, lineIndex int) []byte {
-	lines := bytes.Split(source, []byte("\n"))
+	// Detect line ending style
+	lineEnding := []byte("\n")
+	if bytes.Contains(source, []byte("\r\n")) {
+		lineEnding = []byte("\r\n")
+	}
+
+	lines := bytes.Split(source, lineEnding)
 	if lineIndex < 0 || lineIndex >= len(lines) {
 		return nil
 	}
