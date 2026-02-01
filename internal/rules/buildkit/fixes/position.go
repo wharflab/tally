@@ -137,7 +137,7 @@ func findFROMBaseName(line []byte) (int, int) {
 	}
 
 	// Skip --platform=... if present
-	if start < len(line)-11 && strings.HasPrefix(lineUpper[start:], "--PLATFORM=") {
+	if start+11 <= len(line) && strings.HasPrefix(lineUpper[start:], "--PLATFORM=") {
 		// Find end of platform value
 		start += 11
 		for start < len(line) && !unicode.IsSpace(rune(line[start])) {
