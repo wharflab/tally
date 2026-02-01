@@ -116,6 +116,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 ### DL Rules (Dockerfile Lint)
 
 <!-- BEGIN HADOLINT_DL_RULES -->
+
 | Rule | Description | Severity | Status |
 |------|-------------|----------|--------|
 | [DL1001](https://github.com/hadolint/hadolint/wiki/DL1001) | Please refrain from using inline ignore pragmas `# hadolint ignore=DLxxxx`. | Ignore | ⏳ |
@@ -184,6 +185,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL4004](https://github.com/hadolint/hadolint/wiki/DL4004) | Multiple `ENTRYPOINT` instructions found. | Error | 🔄 `buildkit/MultipleInstructionsDisallowed` |
 | [DL4005](https://github.com/hadolint/hadolint/wiki/DL4005) | Use `SHELL` to change the default shell. | Warning | ⏳ |
 | [DL4006](https://github.com/hadolint/hadolint/wiki/DL4006) | Set the `SHELL` option -o pipefail before `RUN` with a pipe in it | Warning | ⏳ |
+
 <!-- END HADOLINT_DL_RULES -->
 
 ### SC Rules (ShellCheck)
@@ -220,7 +222,8 @@ See [README.md](README.md#ignoring-violations) for full directive documentation.
 
 ### Shell Directive for Non-POSIX Shells
 
-When using base images with non-POSIX shells (e.g., Windows images with PowerShell), use the `shell` directive to automatically disable shell-specific linting rules:
+When using base images with non-POSIX shells (e.g., Windows images with PowerShell), use the `shell` directive to automatically disable shell-specific
+linting rules:
 
 ```dockerfile
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
@@ -229,11 +232,13 @@ RUN Get-Process notepad | Stop-Process
 ```
 
 Supported non-POSIX shells:
+
 - `powershell` - Windows PowerShell
 - `pwsh` - PowerShell Core (cross-platform)
 - `cmd` / `cmd.exe` - Windows Command Prompt
 
 When a non-POSIX shell is specified, the following rule categories are automatically disabled:
+
 - Shell command analysis rules (e.g., DL3004 sudo detection, DL4001 wget/curl detection)
 - Future ShellCheck-based rules (SC* rules)
 
@@ -265,7 +270,9 @@ trusted-registries = ["docker.io", "ghcr.io"]
 # To use a different severity, set it explicitly: severity = "error"
 ```
 
-**Severity-based enabling:** Rules with `DefaultSeverity: "off"` (like DL3026) are automatically enabled with `severity: "warning"` when you provide configuration options for them, without needing to explicitly set `enabled = true` or `severity = "warning"`. To use a different severity, set the `severity` field explicitly in the rule's configuration block.
+**Severity-based enabling:** Rules with `DefaultSeverity: "off"` (like DL3026) are automatically enabled with `severity: "warning"` when you provide
+configuration options for them, without needing to explicitly set `enabled = true` or `severity = "warning"`. To use a different severity, set the
+`severity` field explicitly in the rule's configuration block.
 
 ---
 
