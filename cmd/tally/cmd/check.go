@@ -292,6 +292,9 @@ func checkCommand() *cli.Command {
 			}
 
 			// Apply fixes if --fix flag is set
+			if cmd.Bool("fix-unsafe") && !cmd.Bool("fix") {
+				fmt.Fprintf(os.Stderr, "Warning: --fix-unsafe has no effect without --fix\n")
+			}
 			if cmd.Bool("fix") {
 				fixResult, fixErr := applyFixes(ctx, cmd, allViolations, fileSources, firstCfg)
 				if fixErr != nil {
