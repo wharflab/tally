@@ -27,8 +27,7 @@ jobs:
         run: npm install --global @ast-grep/cli
 
       - name: Install rumdl
-        run: |
-          curl -LsSf https://github.com/rvben/rumdl/releases/latest/download/rumdl-linux-x86_64.tar.gz | tar xzf - -C /usr/local/bin
+        run: pip install rumdl
 
       - name: Extract hadolint rules
         run: ./scripts/extract-hadolint-rules.sh hadolint --only-dl > internal/rules/hadolint-rules.json
