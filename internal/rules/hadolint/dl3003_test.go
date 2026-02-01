@@ -142,15 +142,11 @@ func TestDL3003Rule_AutoFix(t *testing.T) {
 					t.Error("fix has no edits")
 				} else {
 					newText := v.SuggestedFix.Edits[0].NewText
-					if tt.wantFixContains != "" && !contains(newText, tt.wantFixContains) {
+					if tt.wantFixContains != "" && !strings.Contains(newText, tt.wantFixContains) {
 						t.Errorf("fix NewText = %q, want to contain %q", newText, tt.wantFixContains)
 					}
 				}
 			}
 		})
 	}
-}
-
-func contains(s, substr string) bool {
-	return strings.Contains(s, substr)
 }
