@@ -386,6 +386,25 @@ func TestFix(t *testing.T) {
 			args:        []string{"--fix", "--fix-unsafe"},
 			wantApplied: 1,
 		},
+		// Multiple fixes with line shift: DL3003 splits one line into two,
+		// then DL3027 fix on a later line must still apply correctly.
+		// The fixer applies edits from end to start to handle position drift.
+		{
+			name: "multi-fix-line-shift",
+			input: `FROM ubuntu:22.04
+RUN cd /app && make build
+RUN apt install curl
+`,
+			// DL3003 splits "RUN cd /app && make build" into "WORKDIR /app\nRUN make build"
+			// DL3027 changes "apt install" to "apt-get install"
+			want: `FROM ubuntu:22.04
+WORKDIR /app
+RUN make build
+RUN apt-get install curl
+`,
+			args:        []string{"--fix", "--fix-unsafe"},
+			wantApplied: 2, // DL3003 + DL3027
+		},
 	}
 
 	for _, tc := range testCases {
