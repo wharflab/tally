@@ -19,7 +19,7 @@ reviews:
     ruff:
       enabled: false
     markdownlint:
-      enabled: true
+      enabled: false
     github-checks:
       enabled: true
       timeout_ms: 90000
@@ -36,6 +36,11 @@ reviews:
     actionlint:
       enabled: true
   path_instructions:
+    - path: "**/*.go"
+      instructions: |
+        This project targets Go 1.25.4 (see go.mod)
+        When reviewing Go code, insist on usage of newest, modern Go features, not older versions.
+
     - path: '**/internal/integration/testdata/**'
       instructions: |
         These are test fixture files that contain intentional code patterns for testing purposes.
