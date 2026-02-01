@@ -82,6 +82,26 @@ func TestFindCdCommands(t *testing.T) {
 				// This is sufficient for our fix detection purposes.
 			},
 		},
+		{
+			name:      "semicolon-separated commands",
+			script:    "cd /app; make",
+			wantCount: 1,
+			wantFirst: &CdCommand{
+				TargetDir:    "/app",
+				IsStandalone: false, // Not standalone - make follows
+				IsAtStart:    true,
+			},
+		},
+		{
+			name:      "cd after semicolon",
+			script:    "echo hello; cd /app",
+			wantCount: 1,
+			wantFirst: &CdCommand{
+				TargetDir:    "/app",
+				IsStandalone: false, // Not standalone - echo precedes
+				IsAtStart:    false, // Not at start - it's the second statement
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -111,6 +131,7 @@ func TestHasStandaloneCd(t *testing.T) {
 		{"cd /app && make", false},
 		{"make && cd /app", false},
 		{"echo hello", false},
+		{"cd /app; make", false}, // semicolon-separated is not standalone
 	}
 
 	for _, tt := range tests {

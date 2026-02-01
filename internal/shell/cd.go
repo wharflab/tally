@@ -44,8 +44,19 @@ func FindCdCommands(script string, variant Variant) []CdCommand {
 	var results []CdCommand
 
 	// Process each statement at the top level
-	for _, stmt := range prog.Stmts {
-		results = append(results, analyzeCdInStatement(stmt, script)...)
+	for i, stmt := range prog.Stmts {
+		cmds := analyzeCdInStatement(stmt, script)
+		// When there are multiple top-level statements (e.g., "cd /app; make"),
+		// a cd is not standalone and only the first statement is "at start"
+		if len(prog.Stmts) > 1 {
+			for j := range cmds {
+				cmds[j].IsStandalone = false
+				if i > 0 {
+					cmds[j].IsAtStart = false
+				}
+			}
+		}
+		results = append(results, cmds...)
 	}
 
 	return results
