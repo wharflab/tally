@@ -272,3 +272,36 @@ func TestDL3027Rule_Metadata(t *testing.T) {
 		t.Errorf("got category %q, want %q", meta.Category, "style")
 	}
 }
+
+// TestDL3027_FixLocationConsistency is a regression test ensuring that
+// fix edit locations use the same line numbering as violation locations.
+// Previously, violations used 1-based lines (BuildKit) while edits used 0-based.
+func TestDL3027_FixLocationConsistency(t *testing.T) {
+	input := testutil.MakeLintInput(t, "Dockerfile", "FROM ubuntu\nRUN apt install curl")
+	r := NewDL3027Rule()
+	violations := r.Check(input)
+
+	if len(violations) == 0 {
+		t.Fatal("expected at least one violation")
+	}
+
+	v := violations[0]
+	if v.SuggestedFix == nil || len(v.SuggestedFix.Edits) == 0 {
+		t.Fatal("expected SuggestedFix with edits")
+	}
+
+	// The violation is on line 2 (1-based: "RUN apt install curl")
+	// The fix edit should also be on line 2
+	violationLine := v.Location.Start.Line
+	editLine := v.SuggestedFix.Edits[0].Location.Start.Line
+
+	if violationLine != editLine {
+		t.Errorf("line number mismatch: violation on line %d, edit on line %d (should be equal)",
+			violationLine, editLine)
+	}
+
+	// Both should be 1-based (line 2, not line 1)
+	if violationLine != 2 {
+		t.Errorf("expected violation on line 2 (1-based), got %d", violationLine)
+	}
+}

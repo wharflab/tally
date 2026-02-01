@@ -367,6 +367,22 @@ func TestFix(t *testing.T) {
 			args:  []string{"--fix"},
 			wantApplied: 2, // Both FromAsCasing and StageNameCasing
 		},
+		// DL3027: apt -> apt-get (regression test for line number consistency)
+		{
+			name:        "dl3027-apt-to-apt-get",
+			input:       "FROM ubuntu:22.04\nRUN apt update && apt install -y curl\n",
+			want:        "FROM ubuntu:22.04\nRUN apt-get update && apt-get install -y curl\n",
+			args:        []string{"--fix"},
+			wantApplied: 1, // Single violation with multiple edits
+		},
+		// DL3003: cd -> WORKDIR (regression test for line number consistency)
+		{
+			name:        "dl3003-cd-to-workdir",
+			input:       "FROM ubuntu:22.04\nRUN cd /app\n",
+			want:        "FROM ubuntu:22.04\nWORKDIR /app\n",
+			args:        []string{"--fix"},
+			wantApplied: 1,
+		},
 	}
 
 	for _, tc := range testCases {

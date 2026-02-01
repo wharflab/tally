@@ -93,6 +93,23 @@ func (r *DL3003Rule) generateFix(run *instructions.RunCommand, cdCommands []shel
 		return nil
 	}
 
+	// Calculate the actual end position for the edit.
+	// BuildKit's Location often returns a point (End = Start), but we need
+	// to replace the entire instruction. Use the last range's End, or calculate
+	// from the instruction content if End.Character is 0.
+	lastRange := runLoc[len(runLoc)-1]
+	endLine := lastRange.End.Line
+	endCol := lastRange.End.Character
+
+	// If End equals Start (point location), calculate proper end from instruction
+	if endLine == runLoc[0].Start.Line && endCol == runLoc[0].Start.Character {
+		// For shell form, the instruction is "RUN " + cmdStr
+		// Calculate end based on the full instruction length
+		cmdStr := GetRunCommandString(run)
+		fullInstr := "RUN " + cmdStr
+		endCol = runLoc[0].Start.Character + len(fullInstr)
+	}
+
 	// Case 1: Standalone cd - replace entire RUN with WORKDIR
 	if cd.IsStandalone {
 		return &rules.SuggestedFix{
@@ -103,8 +120,8 @@ func (r *DL3003Rule) generateFix(run *instructions.RunCommand, cdCommands []shel
 					file,
 					runLoc[0].Start.Line, // 1-based (BuildKit convention)
 					runLoc[0].Start.Character,
-					runLoc[0].End.Line,
-					runLoc[0].End.Character,
+					endLine,
+					endCol,
 				),
 				NewText: "WORKDIR " + cd.TargetDir,
 			}},
@@ -122,8 +139,8 @@ func (r *DL3003Rule) generateFix(run *instructions.RunCommand, cdCommands []shel
 					file,
 					runLoc[0].Start.Line, // 1-based (BuildKit convention)
 					runLoc[0].Start.Character,
-					runLoc[0].End.Line,
-					runLoc[0].End.Character,
+					endLine,
+					endCol,
 				),
 				NewText: "WORKDIR " + cd.TargetDir + "\nRUN " + cd.RemainingCommands,
 			}},
