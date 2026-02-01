@@ -391,7 +391,10 @@ func TestFix(t *testing.T) {
 			cmd.Env = append(os.Environ(),
 				"GOCOVERDIR="+coverageDir,
 			)
-			output, _ := cmd.CombinedOutput() //nolint:errcheck // Exit code is checked by inspecting output
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("check --fix failed: %v\noutput:\n%s", err, output)
+			}
 
 			// Read the fixed Dockerfile
 			fixed, err := os.ReadFile(dockerfilePath)
