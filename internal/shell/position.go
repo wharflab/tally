@@ -84,7 +84,7 @@ func FindCommandOccurrences(script string, variant Variant) []CommandOccurrence 
 
 		// Handle command wrappers - extract wrapped command positions
 		if commandWrappers[baseName] {
-			wrapped := extractWrappedOccurrences(call.Args[1:], variant)
+			wrapped := extractWrappedOccurrences(call.Args[1:], variant, baseName)
 			occurrences = append(occurrences, wrapped...)
 		}
 
@@ -100,10 +100,52 @@ func FindCommandOccurrences(script string, variant Variant) []CommandOccurrence 
 	return occurrences
 }
 
+// wrapperOptionsWithValues maps wrapper commands to their flags that consume the next argument.
+// These flags take a value as a separate argument (not with =), so we need to skip that value.
+var wrapperOptionsWithValues = map[string]map[string]bool{
+	"sudo": {
+		"-u": true, "--user": true,
+		"-g": true, "--group": true,
+		"-h": true, "--host": true,
+		"-p": true, "--prompt": true,
+		"-r": true, "--role": true,
+		"-t": true, "--type": true,
+		"-U": true, "--other-user": true,
+		"-C": true, "--close-from": true,
+		"-D": true, "--chdir": true,
+		"-R": true, "--chroot": true,
+		"-T": true, "--command-timeout": true,
+	},
+	"env": {
+		"-u": true, "--unset": true,
+		"-C": true, "--chdir": true,
+		"-S": true, "--split-string": true,
+	},
+	"nice": {
+		"-n": true, "--adjustment": true,
+	},
+	"ionice": {
+		"-c": true, "--class": true,
+		"-n": true, "--classdata": true,
+		"-p": true, "--pid": true,
+		"-P": true, "--pgid": true,
+		"-u": true, "--uid": true,
+	},
+	"timeout": {
+		"-k": true, "--kill-after": true,
+		"-s": true, "--signal": true,
+	},
+}
+
 // extractWrappedOccurrences extracts command positions from wrapper arguments.
-func extractWrappedOccurrences(args []*syntax.Word, variant Variant) []CommandOccurrence {
+// wrapperName is the name of the wrapper command (e.g., "sudo", "env") to handle
+// wrapper-specific options that consume the next argument.
+func extractWrappedOccurrences(args []*syntax.Word, variant Variant, wrapperName string) []CommandOccurrence {
 	occurrences := make([]CommandOccurrence, 0, 2) // Most wrappers have 1-2 commands
 	skipNext := false
+
+	// Get the options that consume values for this wrapper
+	optionsWithValues := wrapperOptionsWithValues[wrapperName]
 
 	for i, arg := range args {
 		lit := arg.Lit()
@@ -115,7 +157,14 @@ func extractWrappedOccurrences(args []*syntax.Word, variant Variant) []CommandOc
 			continue
 		}
 		if strings.HasPrefix(lit, "-") {
-			skipNext = len(lit) == 2 && lit != "--"
+			// Check if this flag consumes the next argument
+			if optionsWithValues != nil && optionsWithValues[lit] {
+				skipNext = true
+			} else if len(lit) == 2 && lit != "--" {
+				// Short flags without known mapping - assume they might take a value
+				// This is a heuristic: single-char flags like -n often take values
+				skipNext = true
+			}
 			continue
 		}
 		if strings.Contains(lit, "=") || isNumeric(lit) {
@@ -149,7 +198,7 @@ func extractWrappedOccurrences(args []*syntax.Word, variant Variant) []CommandOc
 
 		// Recurse for nested wrappers
 		if commandWrappers[name] {
-			occurrences = append(occurrences, extractWrappedOccurrences(remainingArgs, variant)...)
+			occurrences = append(occurrences, extractWrappedOccurrences(remainingArgs, variant, name)...)
 		}
 		if shellWrappers[name] {
 			occurrences = append(occurrences, extractNestedShellOccurrences(remainingArgs, variant, arg.Pos())...)

@@ -182,3 +182,98 @@ func TestFindCommandOccurrences_ParseError(t *testing.T) {
 		t.Errorf("expected empty for invalid syntax, got %d occurrences", len(occurrences))
 	}
 }
+
+// TestFindCommandOccurrences_EnvWithUnsetFlag tests that env wrapper correctly
+// skips the value of --unset flag and finds the wrapped command.
+func TestFindCommandOccurrences_EnvWithUnsetFlag(t *testing.T) {
+	// The --unset/-u flag takes a value, so "VAR" should NOT be treated as a command
+	script := "env --unset VAR apt install curl"
+	occurrences := FindCommandOccurrences(script, VariantBash)
+
+	names := make([]string, len(occurrences))
+	for i, occ := range occurrences {
+		names[i] = occ.Name
+	}
+
+	// Verify apt is found (not just env)
+	var aptOcc *CommandOccurrence
+	for i := range occurrences {
+		if occurrences[i].Name == "apt" {
+			aptOcc = &occurrences[i]
+			break
+		}
+	}
+	if aptOcc == nil {
+		t.Fatalf("apt not found in occurrences: %v", names)
+	}
+	if aptOcc.Subcommand != "install" {
+		t.Errorf("apt Subcommand = %q, want %q", aptOcc.Subcommand, "install")
+	}
+
+	// Verify VAR is NOT treated as a command
+	for _, occ := range occurrences {
+		if occ.Name == "VAR" {
+			t.Errorf("'VAR' should not be identified as a command, found: %+v", occ)
+		}
+	}
+}
+
+func TestFindCommandOccurrences_EnvWithShortUnsetFlag(t *testing.T) {
+	// The -u flag takes a value, so "PATH" should NOT be treated as a command
+	script := "env -u PATH apt install curl"
+	occurrences := FindCommandOccurrences(script, VariantBash)
+
+	names := make([]string, len(occurrences))
+	for i, occ := range occurrences {
+		names[i] = occ.Name
+	}
+
+	// Verify apt is found
+	var aptOcc *CommandOccurrence
+	for i := range occurrences {
+		if occurrences[i].Name == "apt" {
+			aptOcc = &occurrences[i]
+			break
+		}
+	}
+	if aptOcc == nil {
+		t.Fatalf("apt not found in occurrences: %v", names)
+	}
+
+	// Verify PATH is NOT treated as a command
+	for _, occ := range occurrences {
+		if occ.Name == "PATH" {
+			t.Errorf("'PATH' should not be identified as a command, found: %+v", occ)
+		}
+	}
+}
+
+func TestFindCommandOccurrences_NiceWithAdjustment(t *testing.T) {
+	// The -n/--adjustment flag takes a value
+	script := "nice -n 10 apt install curl"
+	occurrences := FindCommandOccurrences(script, VariantBash)
+
+	names := make([]string, len(occurrences))
+	for i, occ := range occurrences {
+		names[i] = occ.Name
+	}
+
+	// Verify apt is found (not just nice, and "10" is not a command)
+	var aptOcc *CommandOccurrence
+	for i := range occurrences {
+		if occurrences[i].Name == "apt" {
+			aptOcc = &occurrences[i]
+			break
+		}
+	}
+	if aptOcc == nil {
+		t.Fatalf("apt not found in occurrences: %v", names)
+	}
+
+	// Verify "10" is NOT treated as a command
+	for _, occ := range occurrences {
+		if occ.Name == "10" {
+			t.Errorf("'10' should not be identified as a command, found: %+v", occ)
+		}
+	}
+}
