@@ -692,10 +692,11 @@ func buildFixModes(cfg *config.Config) map[string]fix.FixMode {
 
 // filterFixedViolations removes violations that were fixed from the list.
 func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) []rules.Violation {
-	// Build set of fixed locations
+	// Build set of fixed locations (include column to handle multiple violations on same line)
 	type locKey struct {
 		file string
 		line int
+		col  int
 		code string
 	}
 	fixed := make(map[locKey]bool)
@@ -704,6 +705,7 @@ func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) 
 			fixed[locKey{
 				file: fc.Path,
 				line: af.Location.Start.Line,
+				col:  af.Location.Start.Column,
 				code: af.RuleCode,
 			}] = true
 		}
@@ -715,6 +717,7 @@ func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) 
 		key := locKey{
 			file: v.File(),
 			line: v.Line(),
+			col:  v.Location.Start.Column,
 			code: v.RuleCode,
 		}
 		if !fixed[key] {
