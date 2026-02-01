@@ -110,6 +110,20 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 				editStartCol := baseCol + occ.StartCol
 				editEndCol := baseCol + occ.EndCol
 
+				// Validate the calculated range actually points to "apt" in source.
+				// cmdStr is normalized via strings.Join, but the original RUN line may
+				// have extra whitespace/tabs causing column drift. Skip if mismatch.
+				sm := input.SourceMap()
+				lineIdx := editLine - 1 // Convert 1-based to 0-based for SourceMap
+				if lineIdx < 0 || lineIdx >= sm.LineCount() {
+					continue
+				}
+				sourceLine := sm.Line(lineIdx)
+				if editStartCol < 0 || editEndCol > len(sourceLine) ||
+					sourceLine[editStartCol:editEndCol] != "apt" {
+					continue
+				}
+
 				edits = append(edits, rules.TextEdit{
 					Location: rules.NewRangeLocation(file, editLine, editStartCol, editLine, editEndCol),
 					NewText:  replacement,

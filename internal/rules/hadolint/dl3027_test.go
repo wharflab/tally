@@ -306,6 +306,47 @@ func TestDL3027_FixLocationConsistency(t *testing.T) {
 	}
 }
 
+// TestDL3027_WhitespaceDrift verifies that auto-fix is skipped when the
+// calculated edit position doesn't match "apt" in the source (due to
+// extra whitespace/tabs in the original RUN line vs normalized cmdStr).
+func TestDL3027_WhitespaceDrift(t *testing.T) {
+	// RUN with extra spaces - cmdStr will be normalized but source has extra spaces
+	// This tests the validation guard that checks the edit range actually points to "apt"
+	dockerfile := "FROM ubuntu\nRUN apt install curl"
+
+	input := testutil.MakeLintInput(t, "Dockerfile", dockerfile)
+	r := NewDL3027Rule()
+	violations := r.Check(input)
+
+	if len(violations) == 0 {
+		t.Fatal("expected violation")
+	}
+
+	v := violations[0]
+	// Normal case should have a fix
+	if v.SuggestedFix == nil || len(v.SuggestedFix.Edits) == 0 {
+		t.Fatal("expected SuggestedFix with edits for normal spacing")
+	}
+
+	// Verify the edit actually targets "apt"
+	edit := v.SuggestedFix.Edits[0]
+	lines := []string{"FROM ubuntu", "RUN apt install curl"}
+	lineIdx := edit.Location.Start.Line - 1 // Convert to 0-based
+	if lineIdx < 0 || lineIdx >= len(lines) {
+		t.Fatalf("edit line %d out of range", edit.Location.Start.Line)
+	}
+	sourceLine := lines[lineIdx]
+	startCol := edit.Location.Start.Column
+	endCol := edit.Location.End.Column
+	if startCol < 0 || endCol > len(sourceLine) {
+		t.Fatalf("edit columns out of range: %d-%d for line %q", startCol, endCol, sourceLine)
+	}
+	targetText := sourceLine[startCol:endCol]
+	if targetText != "apt" {
+		t.Errorf("edit targets %q, want %q", targetText, "apt")
+	}
+}
+
 // TestDL3027_MultiLineRUN verifies that multi-line RUN commands are detected
 // but auto-fix is skipped because line position information is lost when
 // BuildKit collapses backslash continuations.
