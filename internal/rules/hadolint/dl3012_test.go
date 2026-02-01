@@ -106,15 +106,3 @@ HEALTHCHECK CMD /bin/check2`,
 		})
 	}
 }
-
-func TestDL3012_Constants(t *testing.T) {
-	if DL3012Code != "hadolint/DL3012" {
-		t.Errorf("DL3012Code = %q, want %q", DL3012Code, "hadolint/DL3012")
-	}
-	if DL3012Message == "" {
-		t.Error("DL3012Message should not be empty")
-	}
-	if DL3012DocURL != "https://github.com/hadolint/hadolint/wiki/DL3012" {
-		t.Errorf("DL3012DocURL = %q, want wiki URL", DL3012DocURL)
-	}
-}

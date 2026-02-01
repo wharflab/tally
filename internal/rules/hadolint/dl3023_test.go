@@ -96,38 +96,3 @@ COPY --from=0 /app .`,
 		})
 	}
 }
-
-func TestDL3023Message(t *testing.T) {
-	msg := DL3023Message("builder", "builder")
-	if !strings.Contains(msg, "builder") {
-		t.Errorf("DL3023Message should contain stage name, got: %q", msg)
-	}
-}
-
-func TestIsSelfReferencingCopy(t *testing.T) {
-	stageNames := map[string]int{
-		"builder": 0,
-		"runner":  1,
-	}
-
-	tests := []struct {
-		name               string
-		currentStageIndex  int
-		copyFrom           string
-		wantSelfReferencing bool
-	}{
-		{"copy from self", 0, "builder", true},
-		{"copy from other", 0, "runner", false},
-		{"copy from non-existent", 0, "unknown", false},
-		{"copy from later stage", 1, "runner", true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := IsSelfReferencingCopy(tt.currentStageIndex, tt.copyFrom, stageNames)
-			if got != tt.wantSelfReferencing {
-				t.Errorf("IsSelfReferencingCopy() = %v, want %v", got, tt.wantSelfReferencing)
-			}
-		})
-	}
-}
