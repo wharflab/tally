@@ -97,11 +97,39 @@ func CommandNames(script string) []string {
 	return CommandNamesWithVariant(script, VariantBash)
 }
 
+// commandWrappers are commands that execute another command passed as arguments.
+// When we see these commands, we look at their arguments to find the wrapped command.
+var commandWrappers = map[string]bool{
+	"env":     true, // env [-i] [NAME=VALUE]... COMMAND [ARG]...
+	"nice":    true, // nice [-n ADJUSTMENT] COMMAND [ARG]...
+	"nohup":   true, // nohup COMMAND [ARG]...
+	"ionice":  true, // ionice [-c CLASS] [-n LEVEL] COMMAND [ARG]...
+	"strace":  true, // strace [OPTIONS] COMMAND [ARG]...
+	"timeout": true, // timeout DURATION COMMAND [ARG]...
+	"watch":   true, // watch [-n INTERVAL] COMMAND [ARG]...
+	"xargs":   true, // xargs [OPTIONS] COMMAND [ARG]...
+	"exec":    true, // exec COMMAND [ARG]...
+	"builtin": true, // builtin COMMAND [ARG]...
+	"command": true, // command COMMAND [ARG]...
+}
+
+// shellWrappers are commands that execute shell code passed as a string argument.
+// When we see "bash -c 'code'" or "sh -c 'code'", we parse the string as shell code.
+var shellWrappers = map[string]bool{
+	"sh":   true,
+	"bash": true,
+	"dash": true,
+	"ash":  true,
+	"zsh":  true,
+	"ksh":  true,
+}
+
 // CommandNamesWithVariant extracts all command names from a shell script
 // using the specified shell variant for parsing.
 //
 // It parses the script and walks the AST to find all CallExpr nodes,
-// returning the first word of each (the command name).
+// returning the first word of each (the command name). It also handles
+// command wrappers (env, nice, xargs, etc.) and shell wrappers (sh -c, bash -c).
 //
 // This matches hadolint's behavior using ShellCheck.findCommandNames.
 func CommandNamesWithVariant(script string, variant Variant) []string {
@@ -124,11 +152,142 @@ func CommandNamesWithVariant(script string, variant Variant) []string {
 				// Strip path prefix (e.g., /usr/bin/wget -> wget)
 				name = path.Base(name)
 				names = append(names, name)
+
+				// Handle command wrappers (env, nice, xargs, etc.)
+				if commandWrappers[name] {
+					wrappedNames := extractWrappedCommands(call.Args[1:], variant)
+					names = append(names, wrappedNames...)
+				}
+
+				// Handle shell wrappers (sh -c, bash -c, etc.)
+				if shellWrappers[name] {
+					nestedNames := extractShellWrapperCommands(call.Args[1:], variant)
+					names = append(names, nestedNames...)
+				}
 			}
 		}
 		return true
 	})
 
+	return names
+}
+
+// extractWrappedCommands extracts command names from wrapper arguments.
+// It skips flags and environment assignments to find the actual wrapped command.
+func extractWrappedCommands(args []*syntax.Word, variant Variant) []string {
+	names := make([]string, 0, 2) // typically 0-2 wrapped commands
+	skipNext := false
+	for i, arg := range args {
+		lit := arg.Lit()
+		if lit == "" {
+			continue
+		}
+		// Skip arguments to previous flag (e.g., 10 in "-n 10")
+		if skipNext {
+			skipNext = false
+			continue
+		}
+		// Skip flags, and mark that the next arg might be a flag value
+		if strings.HasPrefix(lit, "-") {
+			// Flags like -n, -c, -p often take a value argument
+			skipNext = len(lit) == 2 && lit != "--"
+			continue
+		}
+		// Skip environment assignments (FOO=bar)
+		if strings.Contains(lit, "=") {
+			continue
+		}
+		// Skip pure numeric arguments (likely a value for a flag like timeout)
+		if isNumeric(lit) {
+			continue
+		}
+		// Found a command name
+		name := path.Base(lit)
+		names = append(names, name)
+
+		// If this wrapped command is also a wrapper, recurse
+		remainingArgs := args[i+1:]
+		if commandWrappers[name] {
+			names = append(names, extractWrappedCommands(remainingArgs, variant)...)
+		}
+		if shellWrappers[name] {
+			names = append(names, extractShellWrapperCommands(remainingArgs, variant)...)
+		}
+		break // Only look for first command
+	}
+	return names
+}
+
+// isNumeric returns true if the string contains only digits (and optional leading sign).
+func isNumeric(s string) bool {
+	if s == "" {
+		return false
+	}
+	start := 0
+	if s[0] == '-' || s[0] == '+' {
+		start = 1
+	}
+	for i := start; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return start < len(s)
+}
+
+// extractQuotedContent extracts the string content from a shell word,
+// handling single quotes, double quotes, and unquoted literals.
+func extractQuotedContent(word *syntax.Word) string {
+	// First try the simple literal case
+	if lit := word.Lit(); lit != "" {
+		return lit
+	}
+
+	// Otherwise, extract from quoted parts
+	var sb strings.Builder
+	for _, part := range word.Parts {
+		switch p := part.(type) {
+		case *syntax.SglQuoted:
+			sb.WriteString(p.Value)
+		case *syntax.DblQuoted:
+			// For double quotes, extract literal parts
+			for _, dpart := range p.Parts {
+				if lit, ok := dpart.(*syntax.Lit); ok {
+					sb.WriteString(lit.Value)
+				}
+			}
+		case *syntax.Lit:
+			sb.WriteString(p.Value)
+		}
+	}
+	return sb.String()
+}
+
+// extractShellWrapperCommands extracts commands from "sh -c 'code'" patterns.
+// It looks for -c flag followed by a string argument containing shell code.
+func extractShellWrapperCommands(args []*syntax.Word, variant Variant) []string {
+	var names []string
+	foundDashC := false
+	for _, arg := range args {
+		lit := arg.Lit()
+		if lit == "-c" {
+			foundDashC = true
+			continue
+		}
+		// Also handle -c combined with other flags (e.g., -ec, -xc)
+		if strings.HasPrefix(lit, "-") && strings.Contains(lit, "c") {
+			foundDashC = true
+			continue
+		}
+		if foundDashC {
+			// Try to get shell code from the argument
+			code := extractQuotedContent(arg)
+			if code != "" {
+				names = append(names, CommandNamesWithVariant(code, variant)...)
+			}
+			break
+		}
+	}
 	return names
 }
 

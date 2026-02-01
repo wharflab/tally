@@ -120,6 +120,127 @@ func TestCommandNames(t *testing.T) {
 	}
 }
 
+func TestCommandWrappers(t *testing.T) {
+	tests := []struct {
+		name   string
+		script string
+		want   []string
+	}{
+		{
+			name:   "env wrapper",
+			script: "env sudo apt-get update",
+			want:   []string{"env", "sudo"},
+		},
+		{
+			name:   "env with assignments",
+			script: "env FOO=bar BAZ=qux sudo apt-get",
+			want:   []string{"env", "sudo"},
+		},
+		{
+			name:   "env -i wrapper",
+			script: "env -i PATH=/bin sudo apt-get",
+			want:   []string{"env", "sudo"},
+		},
+		{
+			name:   "nice wrapper",
+			script: "nice sudo apt-get update",
+			want:   []string{"nice", "sudo"},
+		},
+		{
+			name:   "nice with -n flag",
+			script: "nice -n 10 sudo apt-get",
+			want:   []string{"nice", "sudo"},
+		},
+		{
+			name:   "nohup wrapper",
+			script: "nohup sudo apt-get &",
+			want:   []string{"nohup", "sudo"},
+		},
+		{
+			name:   "timeout wrapper",
+			script: "timeout 60 sudo apt-get",
+			want:   []string{"timeout", "sudo"},
+		},
+		{
+			name:   "xargs wrapper",
+			script: "xargs sudo rm",
+			want:   []string{"xargs", "sudo"},
+		},
+		{
+			name:   "nested wrappers",
+			script: "env nice sudo apt-get",
+			want:   []string{"env", "nice", "sudo"},
+		},
+		{
+			name:   "command builtin",
+			script: "command sudo apt-get",
+			want:   []string{"command", "sudo"},
+		},
+		{
+			name:   "exec builtin",
+			script: "exec sudo apt-get",
+			want:   []string{"exec", "sudo"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CommandNames(tt.script)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("CommandNames(%q) = %v, want %v", tt.script, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestShellWrappers(t *testing.T) {
+	tests := []struct {
+		name   string
+		script string
+		want   []string
+	}{
+		{
+			name:   "sh -c wrapper",
+			script: "sh -c 'sudo apt-get update'",
+			want:   []string{"sh", "sudo"},
+		},
+		{
+			name:   "bash -c wrapper",
+			script: "bash -c 'sudo apt-get update'",
+			want:   []string{"bash", "sudo"},
+		},
+		{
+			name:   "sh -c with double quotes",
+			script: `sh -c "sudo apt-get update"`,
+			want:   []string{"sh", "sudo"},
+		},
+		{
+			name:   "bash -ec (combined flags)",
+			script: "bash -ec 'sudo apt-get'",
+			want:   []string{"bash", "sudo"},
+		},
+		{
+			name:   "nested shell in env",
+			script: "env sh -c 'sudo apt-get'",
+			want:   []string{"env", "sh", "sudo"},
+		},
+		{
+			name:   "sh -c with multiple commands",
+			script: "sh -c 'apt-get update && sudo apt-get install'",
+			want:   []string{"sh", "apt-get", "sudo"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CommandNames(tt.script)
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("CommandNames(%q) = %v, want %v", tt.script, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestContainsCommand(t *testing.T) {
 	tests := []struct {
 		script  string
@@ -133,6 +254,12 @@ func TestContainsCommand(t *testing.T) {
 		{"/usr/bin/wget file", "wget", true},
 		{"DEBIAN_FRONTEND=noninteractive apt-get install", "apt-get", true},
 		{"", "wget", false},
+		// Command wrapper tests
+		{"env sudo apt-get", "sudo", true},
+		{"nice sudo apt-get", "sudo", true},
+		{"sh -c 'sudo apt-get'", "sudo", true},
+		{"bash -c 'sudo apt-get'", "sudo", true},
+		{"timeout 60 sudo apt-get", "sudo", true},
 	}
 
 	for _, tt := range tests {

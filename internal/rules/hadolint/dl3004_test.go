@@ -134,6 +134,49 @@ RUN apt-get update \
 `,
 			wantCount: 1,
 		},
+		// Command wrapper tests - ensure sudo is detected through wrappers
+		{
+			name: "sudo via env wrapper",
+			dockerfile: `FROM ubuntu:22.04
+RUN env sudo apt-get update
+`,
+			wantCount: 1,
+		},
+		{
+			name: "sudo via nice wrapper",
+			dockerfile: `FROM ubuntu:22.04
+RUN nice -n 10 sudo apt-get update
+`,
+			wantCount: 1,
+		},
+		{
+			name: "sudo via timeout wrapper",
+			dockerfile: `FROM ubuntu:22.04
+RUN timeout 60 sudo apt-get update
+`,
+			wantCount: 1,
+		},
+		{
+			name: "sudo via sh -c wrapper",
+			dockerfile: `FROM ubuntu:22.04
+RUN sh -c 'sudo apt-get update'
+`,
+			wantCount: 1,
+		},
+		{
+			name: "sudo via bash -c wrapper",
+			dockerfile: `FROM ubuntu:22.04
+RUN bash -c "sudo apt-get update"
+`,
+			wantCount: 1,
+		},
+		{
+			name: "sudo via nested wrappers",
+			dockerfile: `FROM ubuntu:22.04
+RUN env nice sudo apt-get update
+`,
+			wantCount: 1,
+		},
 	}
 
 	for _, tt := range tests {
@@ -175,6 +218,14 @@ func TestContainsSudo(t *testing.T) {
 		{"DEBIAN_FRONTEND=noninteractive sudo apt", true},
 		{"", false},
 		{"  sudo  ", true},
+		// Command wrapper tests
+		{"env sudo apt-get", true},
+		{"nice sudo apt-get", true},
+		{"nice -n 10 sudo apt-get", true},
+		{"timeout 60 sudo apt-get", true},
+		{"sh -c 'sudo apt-get'", true},
+		{"bash -c 'sudo apt-get'", true},
+		{"env nice sudo apt-get", true},
 	}
 
 	for _, tt := range tests {
