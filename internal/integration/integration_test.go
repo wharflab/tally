@@ -377,8 +377,14 @@ func TestFix(t *testing.T) {
 				t.Fatalf("failed to write Dockerfile: %v", err)
 			}
 
+			// Create an empty config file to prevent discovery of repo configs
+			configPath := filepath.Join(tmpDir, ".tally.toml")
+			if err := os.WriteFile(configPath, []byte(""), 0o644); err != nil {
+				t.Fatalf("failed to write config: %v", err)
+			}
+
 			// Run tally check --fix
-			args := append([]string{"check"}, tc.args...)
+			args := append([]string{"check", "--config", configPath}, tc.args...)
 			args = append(args, dockerfilePath)
 			cmd := exec.Command(binaryPath, args...)
 			cmd.Env = append(os.Environ(),
