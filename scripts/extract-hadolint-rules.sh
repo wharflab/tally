@@ -132,7 +132,7 @@ extract_from_source() {
         ($sev | map(
             (.file | capture("/(?<code>DL[0-9]{4})\\.hs$").code) as $code |
             (.metaVariables.single.SEV.text) as $sev_raw |
-            {key: $code, value: $sev_map[$sev_raw] // "Unknown"}
+            {key: $code, value: ($sev_map[$sev_raw] | if . then . else "Unknown" end)}
         ) | from_entries) as $severities |
 
         # Build message map: code -> message (cleaned)
@@ -155,7 +155,7 @@ extract_from_source() {
             key: $code,
             value: {
                 severity: $severities[$code],
-                message: $messages[$code] // ""
+                message: ($messages[$code] | if . then . else "" end)
             }
         }) | from_entries
     '
