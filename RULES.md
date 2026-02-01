@@ -123,7 +123,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL3000](https://github.com/hadolint/hadolint/wiki/DL3000) | Use absolute WORKDIR. | Error | 🔄 `buildkit/WorkdirRelativePath` |
 | [DL3001](https://github.com/hadolint/hadolint/wiki/DL3001) | For some bash commands it makes no sense running them in a Docker container like ssh, vim, shutdown, service, ps, free, top, kill, mount, ifconfig. | Info | ⏳ |
 | [DL3002](https://github.com/hadolint/hadolint/wiki/DL3002) | Last user should not be root. | Warning | ✅ `hadolint/DL3002` |
-| [DL3003](https://github.com/hadolint/hadolint/wiki/DL3003) | Use WORKDIR to switch to a directory. | Warning | ⏳ |
+| [DL3003](https://github.com/hadolint/hadolint/wiki/DL3003) | Use WORKDIR to switch to a directory. | Warning | ✅ `hadolint/DL3003` |
 | [DL3004](https://github.com/hadolint/hadolint/wiki/DL3004) | Do not use sudo as it leads to unpredictable behavior. Use a tool like gosu to enforce root. | Error | ✅ `hadolint/DL3004` |
 | [DL3006](https://github.com/hadolint/hadolint/wiki/DL3006) | Always tag the version of an image explicitly. | Warning | ✅ `hadolint/DL3006` |
 | [DL3007](https://github.com/hadolint/hadolint/wiki/DL3007) | Using latest is prone to errors if the image will ever update. Pin the version explicitly to a release tag. | Warning | ✅ `hadolint/DL3007` |

@@ -1,0 +1,59 @@
+{
+  "files": [
+    {
+      "file": "testdata/dl3003/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/dl3003/Dockerfile",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 0
+            }
+          },
+          "rule": "hadolint/DL3003",
+          "message": "use WORKDIR to switch to a directory",
+          "detail": "The cd command in a RUN instruction only affects that single instruction. Use WORKDIR to set the working directory persistently for subsequent instructions. Alternatively, use absolute paths in your commands.",
+          "severity": "warning",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3003",
+          "sourceCode": "RUN cd /opt \u0026\u0026 echo \"hello\"",
+          "suggestedFix": {
+            "description": "Split into WORKDIR /opt and RUN echo \"hello\"",
+            "edits": [
+              {
+                "location": {
+                  "file": "testdata/dl3003/Dockerfile",
+                  "start": {
+                    "line": 3,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 3,
+                    "column": 0
+                  }
+                },
+                "newText": "WORKDIR /opt\nRUN echo \"hello\""
+              }
+            ],
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 0,
+    "warnings": 1,
+    "info": 0,
+    "style": 0,
+    "files": 1
+  },
+  "files_scanned": 1,
+  "rules_enabled": 37
+}
+

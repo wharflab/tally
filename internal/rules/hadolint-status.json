@@ -10,6 +10,10 @@
       "status": "implemented",
       "tally_rule": "hadolint/DL3002"
     },
+    "DL3003": {
+      "status": "implemented",
+      "tally_rule": "hadolint/DL3003"
+    },
     "DL3004": {
       "status": "implemented",
       "tally_rule": "hadolint/DL3004"
