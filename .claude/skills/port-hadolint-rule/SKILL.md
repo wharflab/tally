@@ -237,9 +237,9 @@ go test ./internal/rules/hadolint/... -run $ARGUMENTS -v
 
 Ensure ALL original Hadolint test cases pass.
 
-## Step 8: Add Integration Test (Optional)
+## Step 8: Add Integration Test
 
-If the rule has notable behavior, add integration test case:
+Add an integration test case for the new rule:
 
 1. Create directory `internal/integration/testdata/$ARGUMENTS/`
 2. Add a `Dockerfile` that triggers the rule
@@ -288,7 +288,7 @@ After implementation is complete, update the tracking files:
 - [ ] `init()` function registers the rule
 - [ ] Unit tests cover ALL original test cases
 - [ ] Tests pass: `go test ./internal/rules/hadolint/... -run $ARGUMENTS -v`
-- [ ] Integration test added (if appropriate)
+- [ ] Integration test added with testdata directory and snapshot
 - [ ] `hadolint-status.json` updated with new rule
 - [ ] Documentation regenerated with `generate-hadolint-table.sh --update`
 - [ ] All integration snapshots updated
