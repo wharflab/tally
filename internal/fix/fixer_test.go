@@ -420,8 +420,10 @@ func TestFixer_Apply_FixModeNever(t *testing.T) {
 
 	fixer := &Fixer{
 		SafetyThreshold: FixSafe,
-		FixModes: map[string]FixMode{
-			"hadolint/DL3027": FixModeNever,
+		FixModes: map[string]map[string]FixMode{
+			"Dockerfile": {
+				"hadolint/DL3027": FixModeNever,
+			},
 		},
 	}
 	result, err := fixer.Apply(context.Background(), violations, sources)
@@ -468,8 +470,10 @@ func TestFixer_Apply_FixModeExplicit(t *testing.T) {
 	// FixModeExplicit without RuleFilter should skip
 	fixer := &Fixer{
 		SafetyThreshold: FixSafe,
-		FixModes: map[string]FixMode{
-			"hadolint/DL3027": FixModeExplicit,
+		FixModes: map[string]map[string]FixMode{
+			"Dockerfile": {
+				"hadolint/DL3027": FixModeExplicit,
+			},
 		},
 	}
 	result, err := fixer.Apply(context.Background(), violations, sources)
@@ -519,8 +523,10 @@ func TestFixer_Apply_FixModeUnsafeOnly(t *testing.T) {
 	// FixModeUnsafeOnly with SafetyThreshold < FixUnsafe should skip
 	fixer := &Fixer{
 		SafetyThreshold: FixSafe,
-		FixModes: map[string]FixMode{
-			"hadolint/DL3027": FixModeUnsafeOnly,
+		FixModes: map[string]map[string]FixMode{
+			"Dockerfile": {
+				"hadolint/DL3027": FixModeUnsafeOnly,
+			},
 		},
 	}
 	result, err := fixer.Apply(context.Background(), violations, sources)
@@ -570,8 +576,10 @@ func TestFixer_Apply_UnknownFixMode(t *testing.T) {
 	// Unknown fix mode should be treated as always
 	fixer := &Fixer{
 		SafetyThreshold: FixSafe,
-		FixModes: map[string]FixMode{
-			"hadolint/DL3027": FixMode("unknown-mode"),
+		FixModes: map[string]map[string]FixMode{
+			"Dockerfile": {
+				"hadolint/DL3027": FixMode("unknown-mode"),
+			},
 		},
 	}
 	result, err := fixer.Apply(context.Background(), violations, sources)
@@ -581,6 +589,89 @@ func TestFixer_Apply_UnknownFixMode(t *testing.T) {
 
 	if result.TotalApplied() != 1 {
 		t.Errorf("TotalApplied() = %d, want 1 (unknown mode treated as always)", result.TotalApplied())
+	}
+}
+
+func TestFixer_Apply_PerFileFixModes(t *testing.T) {
+	// Two files with the same violation type but different fix modes
+	sources := map[string][]byte{
+		"file1.Dockerfile": []byte("RUN apt install curl"),
+		"file2.Dockerfile": []byte("RUN apt install wget"),
+	}
+	violations := []rules.Violation{
+		{
+			RuleCode: "hadolint/DL3027",
+			Message:  "Do not use apt",
+			Location: rules.NewRangeLocation("file1.Dockerfile", 1, 4, 1, 7),
+			SuggestedFix: &rules.SuggestedFix{
+				Description: "Replace apt with apt-get",
+				Safety:      rules.FixSafe,
+				Edits: []rules.TextEdit{
+					{
+						Location: rules.NewRangeLocation("file1.Dockerfile", 1, 4, 1, 7),
+						NewText:  "apt-get",
+					},
+				},
+			},
+		},
+		{
+			RuleCode: "hadolint/DL3027",
+			Message:  "Do not use apt",
+			Location: rules.NewRangeLocation("file2.Dockerfile", 1, 4, 1, 7),
+			SuggestedFix: &rules.SuggestedFix{
+				Description: "Replace apt with apt-get",
+				Safety:      rules.FixSafe,
+				Edits: []rules.TextEdit{
+					{
+						Location: rules.NewRangeLocation("file2.Dockerfile", 1, 4, 1, 7),
+						NewText:  "apt-get",
+					},
+				},
+			},
+		},
+	}
+
+	// file1 allows fixes, file2 has fix=never
+	fixer := &Fixer{
+		SafetyThreshold: FixSafe,
+		FixModes: map[string]map[string]FixMode{
+			"file1.Dockerfile": {
+				"hadolint/DL3027": FixModeAlways,
+			},
+			"file2.Dockerfile": {
+				"hadolint/DL3027": FixModeNever,
+			},
+		},
+	}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("Apply error: %v", err)
+	}
+
+	// Only file1 should have the fix applied
+	if result.TotalApplied() != 1 {
+		t.Errorf("TotalApplied() = %d, want 1 (only file1 should be fixed)", result.TotalApplied())
+	}
+	if result.TotalSkipped() != 1 {
+		t.Errorf("TotalSkipped() = %d, want 1 (file2 should be skipped)", result.TotalSkipped())
+	}
+
+	// Verify file1 was modified
+	fc1 := result.Changes["file1.Dockerfile"]
+	if fc1 == nil || !fc1.HasChanges() {
+		t.Error("file1.Dockerfile should have changes")
+	}
+
+	// Verify file2 was NOT modified
+	fc2 := result.Changes["file2.Dockerfile"]
+	if fc2 == nil {
+		t.Fatal("file2.Dockerfile should exist in changes")
+	}
+	if fc2.HasChanges() {
+		t.Error("file2.Dockerfile should NOT have changes (fix mode is never)")
+	}
+	if len(fc2.FixesSkipped) != 1 {
+		t.Errorf("file2.Dockerfile FixesSkipped = %d, want 1", len(fc2.FixesSkipped))
 	}
 }
 

@@ -30,10 +30,11 @@ type Fixer struct {
 	// If empty, all rules are eligible.
 	RuleFilter []string
 
-	// FixModes maps rule codes to their configured fix modes.
+	// FixModes maps file paths to their per-rule fix modes.
+	// Outer key is the normalized file path, inner key is the rule code.
 	// Uses config.FixMode constants (FixModeAlways, FixModeNever, etc.).
-	// If nil or a rule is not present, FixModeAlways is assumed.
-	FixModes map[string]FixMode
+	// If nil or a file/rule is not present, FixModeAlways is assumed.
+	FixModes map[string]map[string]FixMode
 
 	// Concurrency sets the number of parallel async resolutions.
 	// Defaults to 4 if not set.
@@ -115,8 +116,8 @@ func (f *Fixer) Apply(ctx context.Context, violations []rules.Violation, sources
 			continue
 		}
 
-		// Check fix mode config
-		if !f.fixModeAllowed(v.RuleCode) {
+		// Check fix mode config (per-file)
+		if !f.fixModeAllowed(v.File(), v.RuleCode) {
 			recordSkipped(result.Changes, v, SkipFixMode, "")
 			continue
 		}
@@ -196,13 +197,16 @@ func (f *Fixer) ruleAllowed(ruleCode string) bool {
 	return slices.Contains(f.RuleFilter, ruleCode)
 }
 
-// fixModeAllowed checks if a fix is allowed based on the rule's fix mode config.
+// fixModeAllowed checks if a fix is allowed based on the file's per-rule fix mode config.
 // Returns true if the fix should be applied.
-func (f *Fixer) fixModeAllowed(ruleCode string) bool {
+func (f *Fixer) fixModeAllowed(filePath, ruleCode string) bool {
 	mode := config.FixModeAlways // default
 	if f.FixModes != nil {
-		if m, ok := f.FixModes[ruleCode]; ok {
-			mode = m
+		normalizedPath := normalizePath(filePath)
+		if fileModes, ok := f.FixModes[normalizedPath]; ok {
+			if m, ok := fileModes[ruleCode]; ok {
+				mode = m
+			}
 		}
 	}
 

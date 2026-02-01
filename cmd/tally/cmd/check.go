@@ -296,7 +296,7 @@ func checkCommand() *cli.Command {
 				fmt.Fprintf(os.Stderr, "Warning: --fix-unsafe has no effect without --fix\n")
 			}
 			if cmd.Bool("fix") {
-				fixResult, fixErr := applyFixes(ctx, cmd, allViolations, fileSources, firstCfg)
+				fixResult, fixErr := applyFixes(ctx, cmd, allViolations, fileSources, fileConfigs)
 				if fixErr != nil {
 					fmt.Fprintf(os.Stderr, "Error: failed to apply fixes: %v\n", fixErr)
 					return cli.Exit("", ExitConfigError)
@@ -619,12 +619,13 @@ func extractHeredocFiles(parseResult *dockerfile.ParseResult) map[string]bool {
 }
 
 // applyFixes applies automatic fixes to violations that have suggested fixes.
+// fileConfigs maps file paths to their per-file configs (for per-file fix modes).
 func applyFixes(
 	ctx stdcontext.Context,
 	cmd *cli.Command,
 	violations []rules.Violation,
 	sources map[string][]byte,
-	cfg *config.Config,
+	fileConfigs map[string]*config.Config,
 ) (*fix.Result, error) {
 	// Determine safety threshold
 	safetyThreshold := fix.FixSafe
@@ -635,11 +636,8 @@ func applyFixes(
 	// Get rule filter
 	ruleFilter := cmd.StringSlice("fix-rule")
 
-	// Build fix modes from config
-	var fixModes map[string]fix.FixMode
-	if cfg != nil {
-		fixModes = buildFixModes(cfg)
-	}
+	// Build per-file fix modes from fileConfigs
+	fixModes := buildPerFileFixModes(fileConfigs)
 
 	fixer := &fix.Fixer{
 		SafetyThreshold: safetyThreshold,
@@ -670,7 +668,23 @@ func applyFixes(
 	return result, nil
 }
 
-// buildFixModes extracts fix mode configuration for all rules.
+// buildPerFileFixModes builds a per-file map of fix modes from fileConfigs.
+// Returns map[filePath]map[ruleCode]FixMode.
+func buildPerFileFixModes(fileConfigs map[string]*config.Config) map[string]map[string]fix.FixMode {
+	result := make(map[string]map[string]fix.FixMode)
+	for filePath, cfg := range fileConfigs {
+		if cfg == nil {
+			continue
+		}
+		modes := buildFixModes(cfg)
+		if len(modes) > 0 {
+			result[filePath] = modes
+		}
+	}
+	return result
+}
+
+// buildFixModes extracts fix mode configuration for all rules from a single config.
 func buildFixModes(cfg *config.Config) map[string]fix.FixMode {
 	modes := make(map[string]fix.FixMode)
 
