@@ -7,6 +7,7 @@ import (
 )
 
 func TestDL3027Rule_Check(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		dockerfile string
@@ -124,6 +125,7 @@ ONBUILD RUN apt install python`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 			r := NewDL3027Rule()
 			violations := r.Check(input)
@@ -184,6 +186,7 @@ func TestDL3027_MultipleApt(t *testing.T) {
 }
 
 func TestDL3027Rule_SuggestedFix(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name            string
 		dockerfile      string
@@ -222,6 +225,7 @@ RUN apt show curl`,
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 			r := NewDL3027Rule()
 			violations := r.Check(input)
