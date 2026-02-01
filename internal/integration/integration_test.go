@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"os/exec"
@@ -347,24 +348,24 @@ func TestFix(t *testing.T) {
 		wantApplied int // Expected number of fixes applied
 	}{
 		{
-			name:  "stage-name-casing",
-			input: "FROM alpine:3.18 AS Builder\nRUN echo hello\nFROM alpine:3.18\nCOPY --from=Builder /app /app\n",
-			want:  "FROM alpine:3.18 AS builder\nRUN echo hello\nFROM alpine:3.18\nCOPY --from=builder /app /app\n",
-			args:  []string{"--fix"},
+			name:        "stage-name-casing",
+			input:       "FROM alpine:3.18 AS Builder\nRUN echo hello\nFROM alpine:3.18\nCOPY --from=Builder /app /app\n",
+			want:        "FROM alpine:3.18 AS builder\nRUN echo hello\nFROM alpine:3.18\nCOPY --from=builder /app /app\n",
+			args:        []string{"--fix"},
 			wantApplied: 1,
 		},
 		{
-			name:  "from-as-casing",
-			input: "FROM alpine:3.18 as builder\nRUN echo hello\n",
-			want:  "FROM alpine:3.18 AS builder\nRUN echo hello\n",
-			args:  []string{"--fix"},
+			name:        "from-as-casing",
+			input:       "FROM alpine:3.18 as builder\nRUN echo hello\n",
+			want:        "FROM alpine:3.18 AS builder\nRUN echo hello\n",
+			args:        []string{"--fix"},
 			wantApplied: 1,
 		},
 		{
-			name:  "combined-stage-and-as-casing",
-			input: "FROM alpine:3.18 as Builder\nRUN echo hello\n",
-			want:  "FROM alpine:3.18 AS builder\nRUN echo hello\n",
-			args:  []string{"--fix"},
+			name:        "combined-stage-and-as-casing",
+			input:       "FROM alpine:3.18 as Builder\nRUN echo hello\n",
+			want:        "FROM alpine:3.18 AS builder\nRUN echo hello\n",
+			args:        []string{"--fix"},
 			wantApplied: 2, // Both FromAsCasing and StageNameCasing
 		},
 		// DL3027: apt -> apt-get (regression test for line number consistency)
@@ -450,5 +451,78 @@ RUN apt-get install curl
 				t.Errorf("expected 'Fixed' in output, got: %s", outputStr)
 			}
 		})
+	}
+}
+
+// TestFixRealWorld tests the auto-fix functionality on a real-world Dockerfile
+// from a public repository, verifying that multiple fixes apply correctly.
+// Source: https://github.com/tle211212/deepspeed_distributed_sagemaker_sample
+func TestFixRealWorld(t *testing.T) {
+	testdataDir := filepath.Join("testdata", "benchmark-real-world-fix")
+
+	// Read the original Dockerfile
+	originalContent, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read original Dockerfile: %v", err)
+	}
+
+	// Read the expected fixed output
+	expectedContent, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile.expected"))
+	if err != nil {
+		t.Fatalf("failed to read expected Dockerfile: %v", err)
+	}
+
+	// Create a temp directory and copy the Dockerfile
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, originalContent, 0o644); err != nil {
+		t.Fatalf("failed to write Dockerfile: %v", err)
+	}
+
+	// Copy the config file to disable max-lines
+	configContent, err := os.ReadFile(filepath.Join(testdataDir, ".tally.toml"))
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	if err := os.WriteFile(configPath, configContent, 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// Run tally check --fix --fix-unsafe
+	args := []string{"check", "--config", configPath, "--fix", "--fix-unsafe", dockerfilePath}
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(os.Environ(),
+		"GOCOVERDIR="+coverageDir,
+	)
+	output, err := cmd.CombinedOutput()
+	// Exit code 1 is expected due to remaining unfixable violations
+	// Just verify the command ran (output captured regardless of exit code)
+	if err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			t.Fatalf("command failed to run: %v", err)
+		}
+		// Exit code 1 is expected, other exit codes indicate real failures
+		if exitErr.ExitCode() != 1 {
+			t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
+		}
+	}
+
+	// Read the fixed Dockerfile
+	fixedContent, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read fixed Dockerfile: %v", err)
+	}
+
+	// Compare with expected
+	if !bytes.Equal(fixedContent, expectedContent) {
+		t.Errorf("fixed content does not match expected\noutput:\n%s", output)
+	}
+
+	// Verify the output mentions the expected fixes
+	outputStr := string(output)
+	if !strings.Contains(outputStr, "Fixed 3 issues") {
+		t.Errorf("expected 'Fixed 3 issues' in output, got: %s", outputStr)
 	}
 }

@@ -1,0 +1,3 @@
+# Disable max-lines for this benchmark test
+[rules.max-lines]
+max = 0
