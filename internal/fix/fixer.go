@@ -30,6 +30,7 @@ type Fixer struct {
 	RuleFilter []string
 
 	// FixModes maps rule codes to their configured fix modes.
+	// Uses config.FixMode constants (FixModeAlways, FixModeNever, etc.).
 	// If nil or a rule is not present, FixModeAlways is assumed.
 	FixModes map[string]FixMode
 
