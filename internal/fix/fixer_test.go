@@ -854,7 +854,11 @@ func TestFixer_Apply_ViolationForUnknownFile(t *testing.T) {
 		"Dockerfile": []byte("FROM alpine"),
 	}
 
-	// Violation for a file not in sources
+	// Violation for a file not in sources.
+	// The fixer intentionally ignores violations for files not provided in sources:
+	// - Only files in the sources map get FileChange entries in result.Changes
+	// - Fixes targeting unknown files are silently skipped (not recorded as skipped)
+	// - This is by design: the fixer only operates on files the caller provides
 	violations := []rules.Violation{
 		{
 			Location: rules.NewLineLocation("other.Dockerfile", 1),
@@ -884,10 +888,21 @@ func TestFixer_Apply_ViolationForUnknownFile(t *testing.T) {
 		t.Errorf("TotalApplied() = %d, want 0", result.TotalApplied())
 	}
 
+	// Unknown file violations are silently ignored (not tracked as skipped)
+	// because there's no FileChange entry for unknown files
+	if result.TotalSkipped() != 0 {
+		t.Errorf("TotalSkipped() = %d, want 0 (unknown files are silently ignored)", result.TotalSkipped())
+	}
+
 	// Original Dockerfile should be unchanged
 	fc := result.Changes["Dockerfile"]
 	if !bytes.Equal(fc.ModifiedContent, fc.OriginalContent) {
 		t.Error("Dockerfile should be unchanged")
+	}
+
+	// Verify that unknown file has no FileChange entry
+	if _, exists := result.Changes["other.Dockerfile"]; exists {
+		t.Error("Unknown file should not have a FileChange entry")
 	}
 }
 
