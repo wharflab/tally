@@ -240,6 +240,22 @@ func TestFindASKeyword(t *testing.T) {
 			wantNameStart: -1,
 			wantNameEnd:  -1,
 		},
+		{
+			name:          "stage name with dot",
+			line:          "FROM alpine AS builder.v1",
+			wantASStart:   12,
+			wantASEnd:     14,
+			wantNameStart: 15,
+			wantNameEnd:   25, // "builder.v1" is 10 chars
+		},
+		{
+			name:          "stage name with underscore and dot",
+			line:          "FROM alpine AS my_stage.test",
+			wantASStart:   12,
+			wantASEnd:     14,
+			wantNameStart: 15,
+			wantNameEnd:   28, // "my_stage.test" is 13 chars
+		},
 	}
 
 	for _, tt := range tests {

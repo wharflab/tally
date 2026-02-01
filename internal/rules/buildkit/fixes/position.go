@@ -26,8 +26,9 @@ func getLine(source []byte, lineIndex int) []byte {
 }
 
 // isIdentChar returns true if ch is a valid identifier character.
+// Docker stage names allow: [a-z][a-z0-9-_.]* per BuildKit validation.
 func isIdentChar(ch byte) bool {
-	return ch == '_' || ch == '-' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')
+	return ch == '_' || ch == '-' || ch == '.' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')
 }
 
 // findASKeyword locates the AS keyword in a FROM line.
