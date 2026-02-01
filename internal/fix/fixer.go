@@ -3,6 +3,7 @@ package fix
 import (
 	"bytes"
 	"context"
+	"path/filepath"
 	"slices"
 	"sort"
 
@@ -11,6 +12,12 @@ import (
 	"github.com/tinovyatkin/tally/internal/config"
 	"github.com/tinovyatkin/tally/internal/rules"
 )
+
+// normalizePath ensures consistent path format for map lookups.
+// This handles Windows vs Unix path separator differences.
+func normalizePath(path string) string {
+	return filepath.Clean(path)
+}
 
 // Fixer applies suggested fixes to source files.
 type Fixer struct {
@@ -74,9 +81,11 @@ func (f *Fixer) Apply(ctx context.Context, violations []rules.Violation, sources
 	}
 
 	// Initialize FileChange for each source file
+	// Use normalized paths as keys for consistent cross-platform lookups
 	for path, content := range sources {
-		result.Changes[path] = &FileChange{
-			Path:            path,
+		normalizedPath := normalizePath(path)
+		result.Changes[normalizedPath] = &FileChange{
+			Path:            path, // Keep original path for file operations
 			OriginalContent: content,
 			ModifiedContent: bytes.Clone(content),
 		}
@@ -140,7 +149,8 @@ func (f *Fixer) Apply(ctx context.Context, violations []rules.Violation, sources
 			recordSkipped(result.Changes, fc.violation, SkipNoEdits, "")
 			continue
 		}
-		fixesByFile[fc.violation.File()] = append(fixesByFile[fc.violation.File()], fc)
+		normalizedFile := normalizePath(fc.violation.File())
+		fixesByFile[normalizedFile] = append(fixesByFile[normalizedFile], fc)
 	}
 
 	// Apply fixes to each file
@@ -163,7 +173,7 @@ type fixCandidate struct {
 
 // recordSkipped adds a skipped fix entry for a file if the file exists in changes.
 func recordSkipped(changes map[string]*FileChange, v *rules.Violation, reason SkipReason, errMsg string) {
-	if fc := changes[v.File()]; fc != nil {
+	if fc := changes[normalizePath(v.File())]; fc != nil {
 		skipped := SkippedFix{
 			RuleCode: v.RuleCode,
 			Reason:   reason,
