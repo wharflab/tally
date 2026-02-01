@@ -4,6 +4,7 @@ import (
 	stdcontext "context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/urfave/cli/v3"
 
@@ -707,7 +708,9 @@ func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) 
 	for _, fc := range fixResult.Changes {
 		for _, af := range fc.FixesApplied {
 			fixed[locKey{
-				file: fc.Path,
+				// Use ToSlash for consistent cross-platform path matching
+				// Violations use forward slashes (PathNormalization processor)
+				file: filepath.ToSlash(fc.Path),
 				line: af.Location.Start.Line,
 				col:  af.Location.Start.Column,
 				code: af.RuleCode,
@@ -719,7 +722,7 @@ func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) 
 	var remaining []rules.Violation
 	for _, v := range violations {
 		key := locKey{
-			file: v.File(),
+			file: filepath.ToSlash(v.File()),
 			line: v.Line(),
 			col:  v.Location.Start.Column,
 			code: v.RuleCode,
