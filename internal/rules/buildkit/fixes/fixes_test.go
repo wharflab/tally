@@ -311,6 +311,76 @@ func TestFindCopyFromValue(t *testing.T) {
 	}
 }
 
+func TestNoEmptyContinuationFix(t *testing.T) {
+	tests := []struct {
+		name           string
+		source         string
+		violationLine  int // 1-based line from BuildKit
+		wantFix        bool
+		wantEditCount  int
+		wantRemovedLines []int // 1-based line numbers
+	}{
+		{
+			name:           "single empty continuation line",
+			source:         "FROM alpine:3.18\nRUN apk update && \\\n\n    apk add curl",
+			violationLine:  4,
+			wantFix:        true,
+			wantEditCount:  1,
+			wantRemovedLines: []int{3},
+		},
+		{
+			name:           "multiple empty continuation lines",
+			source:         "FROM alpine:3.18\nRUN apk update && \\\n\n    apk add \\\n\n    curl",
+			violationLine:  6,
+			wantFix:        true,
+			wantEditCount:  2,
+			wantRemovedLines: []int{3, 5},
+		},
+		{
+			name:           "no empty continuation lines",
+			source:         "FROM alpine:3.18\nRUN apk update && \\\n    apk add curl",
+			violationLine:  3,
+			wantFix:        false,
+		},
+		{
+			name:           "empty line not in continuation",
+			source:         "FROM alpine:3.18\n\nRUN echo hello",
+			violationLine:  3,
+			wantFix:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source := []byte(tt.source)
+			v := rules.Violation{
+				Location: rules.NewRangeLocation("test.Dockerfile", tt.violationLine, 0, tt.violationLine, 0),
+				RuleCode: rules.BuildKitRulePrefix + "NoEmptyContinuation",
+				Message:  "Empty continuation line found in: RUN ...",
+			}
+
+			enrichNoEmptyContinuationFix(&v, source)
+
+			if tt.wantFix {
+				require.NotNil(t, v.SuggestedFix, "expected a fix")
+				assert.Len(t, v.SuggestedFix.Edits, tt.wantEditCount, "edit count mismatch")
+				assert.Equal(t, rules.FixSafe, v.SuggestedFix.Safety)
+				assert.True(t, v.SuggestedFix.IsPreferred)
+
+				// Verify each edit removes the correct line
+				for i, edit := range v.SuggestedFix.Edits {
+					assert.Empty(t, edit.NewText, "edit %d should have empty NewText", i)
+					if i < len(tt.wantRemovedLines) {
+						assert.Equal(t, tt.wantRemovedLines[i], edit.Location.Start.Line, "edit %d wrong line", i)
+					}
+				}
+			} else {
+				assert.Nil(t, v.SuggestedFix, "expected no fix")
+			}
+		})
+	}
+}
+
 func TestFindFROMBaseName(t *testing.T) {
 	tests := []struct {
 		name      string

@@ -1,0 +1,59 @@
+{
+  "files": [
+    {
+      "file": "testdata/empty-continuation/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/empty-continuation/Dockerfile",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 0
+            }
+          },
+          "rule": "buildkit/NoEmptyContinuation",
+          "message": "Empty continuation line found in: RUN apk update \u0026\u0026     apk add curl",
+          "detail": "Empty continuation lines will become errors in a future release",
+          "severity": "warning",
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/no-empty-continuation/",
+          "sourceCode": "    apk add curl",
+          "suggestedFix": {
+            "description": "Remove empty continuation line(s)",
+            "edits": [
+              {
+                "location": {
+                  "file": "testdata/empty-continuation/Dockerfile",
+                  "start": {
+                    "line": 3,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 4,
+                    "column": 0
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 0,
+    "warnings": 1,
+    "info": 0,
+    "style": 0,
+    "files": 1
+  },
+  "files_scanned": 1,
+  "rules_enabled": 37
+}
+

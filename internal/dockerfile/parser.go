@@ -85,7 +85,8 @@ func Parse(r io.Reader, cfg *config.Config) (*ParseResult, error) {
 	}
 
 	// Collect warnings from BuildKit's linter
-	var warnings []LintWarning
+	// Pre-allocate with capacity for common case (a few warnings + parser warnings)
+	warnings := make([]LintWarning, 0, len(ast.Warnings)+4)
 	warnFunc := func(rulename, description, url, fmtmsg string, location []parser.Range) {
 		warnings = append(warnings, LintWarning{
 			RuleName:    rulename,
@@ -115,6 +116,31 @@ func Parse(r io.Reader, cfg *config.Config) (*ParseResult, error) {
 		return nil, err
 	}
 
+	// Convert parser-level warnings to LintWarning format.
+	// Parser warnings (like NoEmptyContinuation) have different structure from linter warnings.
+	// They use Short/Detail/URL/Location instead of RuleName/Description/URL/Message/Location.
+	for _, pw := range ast.Warnings {
+		// Extract rule name from URL (e.g., "no-empty-continuation" from URL ending with that)
+		ruleName := extractRuleNameFromURL(pw.URL)
+		// Use first Detail line as description if available
+		var description string
+		if len(pw.Detail) > 0 {
+			description = string(pw.Detail[0])
+		}
+		// Convert single *Range to []Range for consistency
+		var location []parser.Range
+		if pw.Location != nil {
+			location = []parser.Range{*pw.Location}
+		}
+		warnings = append(warnings, LintWarning{
+			RuleName:    ruleName,
+			Description: description,
+			URL:         pw.URL,
+			Message:     pw.Short,
+			Location:    location,
+		})
+	}
+
 	return &ParseResult{
 		AST:      ast,
 		Stages:   stages,
@@ -122,6 +148,40 @@ func Parse(r io.Reader, cfg *config.Config) (*ParseResult, error) {
 		Source:   content,
 		Warnings: warnings,
 	}, nil
+}
+
+// extractRuleNameFromURL extracts rule name from Docker documentation URL.
+// Example: "https://docs.docker.com/go/dockerfile/rule/no-empty-continuation/"
+// returns "NoEmptyContinuation" (converted to PascalCase to match BuildKit rule names).
+func extractRuleNameFromURL(url string) string {
+	// URL format: https://docs.docker.com/go/dockerfile/rule/<rule-name>/
+	const prefix = "https://docs.docker.com/go/dockerfile/rule/"
+	if !strings.HasPrefix(url, prefix) {
+		return ""
+	}
+	suffix := strings.TrimPrefix(url, prefix)
+	suffix = strings.TrimSuffix(suffix, "/")
+	if suffix == "" {
+		return ""
+	}
+	// Convert kebab-case to PascalCase (no-empty-continuation -> NoEmptyContinuation)
+	return kebabToPascalCase(suffix)
+}
+
+// kebabToPascalCase converts kebab-case to PascalCase.
+// Example: "no-empty-continuation" -> "NoEmptyContinuation"
+func kebabToPascalCase(s string) string {
+	parts := strings.Split(s, "-")
+	var result strings.Builder
+	for _, part := range parts {
+		if part != "" {
+			result.WriteString(strings.ToUpper(part[:1]))
+			if len(part) > 1 {
+				result.WriteString(part[1:])
+			}
+		}
+	}
+	return result.String()
 }
 
 // sanitizePreFromInstructions returns an AST root suitable for BuildKit's

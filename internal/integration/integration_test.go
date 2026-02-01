@@ -113,6 +113,7 @@ func TestCheck(t *testing.T) {
 
 		// BuildKit linter warnings tests
 		{name: "buildkit-warnings", dir: "buildkit-warnings", args: []string{"--format", "json"}, wantExit: 1},
+		{name: "empty-continuation", dir: "empty-continuation", args: []string{"--format", "json"}, wantExit: 1},
 
 		// Semantic model construction-time violations
 		{name: "duplicate-stage-name", dir: "duplicate-stage-name", args: []string{"--format", "json"}, wantExit: 1},
@@ -386,6 +387,21 @@ func TestFix(t *testing.T) {
 			want:        "FROM ubuntu:22.04\nWORKDIR /app\n",
 			args:        []string{"--fix", "--fix-unsafe"},
 			wantApplied: 1,
+		},
+		// NoEmptyContinuation: Remove empty lines in continuations
+		{
+			name:        "no-empty-continuation-single",
+			input:       "FROM alpine:3.18\nRUN apk update && \\\n\n    apk add curl\n",
+			want:        "FROM alpine:3.18\nRUN apk update && \\\n    apk add curl\n",
+			args:        []string{"--fix"},
+			wantApplied: 1,
+		},
+		{
+			name:        "no-empty-continuation-multiple",
+			input:       "FROM alpine:3.18\nRUN apk update && \\\n\n    apk add \\\n\n    curl\n",
+			want:        "FROM alpine:3.18\nRUN apk update && \\\n    apk add \\\n    curl\n",
+			args:        []string{"--fix"},
+			wantApplied: 1, // Single violation covers all empty lines
 		},
 		// Multiple fixes with line shift: DL3003 splits one line into two,
 		// then DL3027 fix on a later line must still apply correctly.

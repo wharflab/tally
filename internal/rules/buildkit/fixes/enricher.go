@@ -34,6 +34,8 @@ func EnrichBuildKitFixes(violations []rules.Violation, sem *semantic.Model, sour
 			enrichStageNameCasingFix(v, sem, source)
 		case "FromAsCasing":
 			enrichFromAsCasingFix(v, source)
+		case "NoEmptyContinuation":
+			enrichNoEmptyContinuationFix(v, source)
 		}
 	}
 }
