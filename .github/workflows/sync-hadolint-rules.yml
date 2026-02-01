@@ -27,10 +27,11 @@ jobs:
 
       - name: Install jq
         run: |
+          sudo rm -f /usr/bin/jq
           wget -q https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64 -O /tmp/jq
           chmod +x /tmp/jq
-          sudo mv /tmp/jq /usr/local/bin/jq
-          jq --version
+          sudo mv /tmp/jq /usr/bin/jq
+          which jq && jq --version
 
       - name: Install ast-grep
         run: npm install --global @ast-grep/cli
