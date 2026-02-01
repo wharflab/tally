@@ -35,12 +35,24 @@ func getRunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (
 		return "", 0
 	}
 
-	// Replace "RUN " prefix with spaces to preserve column positions
-	// The shell parser will skip the whitespace but positions remain aligned
+	// Replace the "RUN" keyword plus following whitespace with spaces to preserve column positions.
+	// The shell parser will skip the whitespace but positions remain aligned.
+	// This handles both "RUN " and "RUN\t" patterns.
 	firstLine := lines[0]
-	if idx := strings.Index(strings.ToUpper(firstLine), "RUN "); idx >= 0 {
-		// Replace "RUN " (4 chars) with 4 spaces
-		lines[0] = firstLine[:idx] + "    " + firstLine[idx+4:]
+	upper := strings.ToUpper(firstLine)
+	if idx := strings.Index(upper, "RUN"); idx >= 0 {
+		// Check that RUN is followed by whitespace (space or tab)
+		afterRun := idx + 3
+		if afterRun < len(firstLine) && (firstLine[afterRun] == ' ' || firstLine[afterRun] == '\t') {
+			// Count contiguous whitespace after RUN
+			wsEnd := afterRun
+			for wsEnd < len(firstLine) && (firstLine[wsEnd] == ' ' || firstLine[wsEnd] == '\t') {
+				wsEnd++
+			}
+			// Replace "RUN" + whitespace with equivalent spaces
+			replaceLen := wsEnd - idx
+			lines[0] = firstLine[:idx] + strings.Repeat(" ", replaceLen) + firstLine[wsEnd:]
+		}
 	}
 
 	return strings.Join(lines, "\n"), startLine
