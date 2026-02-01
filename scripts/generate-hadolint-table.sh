@@ -314,7 +314,7 @@ main() {
     if [[ "$do_update" == true ]]; then
         local table count
         table=$(echo "$merged" | format_markdown)
-        count=$(echo "$merged" | jq '[.[] | select(.impl_status == "implemented")] | length')
+        count=$(echo "$merged" | jq '[.[] | select(.impl_status == "implemented" or .impl_status == "covered_by_buildkit")] | length')
         update_rules_md "$table"
         update_readme_md "$count"
         echo "$merged" | format_summary
