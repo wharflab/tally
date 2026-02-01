@@ -94,40 +94,19 @@ func (f *Fixer) Apply(ctx context.Context, violations []rules.Violation, sources
 
 		// Check rule filter
 		if !f.ruleAllowed(v.RuleCode) {
-			fc := result.Changes[v.File()]
-			if fc != nil {
-				fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
-					RuleCode: v.RuleCode,
-					Reason:   SkipRuleFilter,
-					Location: v.Location,
-				})
-			}
+			recordSkipped(result.Changes, v, SkipRuleFilter, "")
 			continue
 		}
 
 		// Check safety threshold
 		if v.SuggestedFix.Safety > f.SafetyThreshold {
-			fc := result.Changes[v.File()]
-			if fc != nil {
-				fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
-					RuleCode: v.RuleCode,
-					Reason:   SkipSafety,
-					Location: v.Location,
-				})
-			}
+			recordSkipped(result.Changes, v, SkipSafety, "")
 			continue
 		}
 
 		// Check fix mode config
 		if !f.fixModeAllowed(v.RuleCode) {
-			fc := result.Changes[v.File()]
-			if fc != nil {
-				fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
-					RuleCode: v.RuleCode,
-					Reason:   SkipFixMode,
-					Location: v.Location,
-				})
-			}
+			recordSkipped(result.Changes, v, SkipFixMode, "")
 			continue
 		}
 
@@ -151,25 +130,17 @@ func (f *Fixer) Apply(ctx context.Context, violations []rules.Violation, sources
 	// Group fixes by file
 	fixesByFile := make(map[string][]*fixCandidate)
 	for _, fc := range syncFixes {
-		// Skip fixes that still need resolution (resolver failed)
+		// Skip fixes that still need resolution (resolver failed or resolver missing)
 		if fc.fix.NeedsResolve {
+			recordSkipped(result.Changes, fc.violation, SkipResolveError, "resolver failed or missing")
 			continue
 		}
 		// Skip fixes with no edits
 		if len(fc.fix.Edits) == 0 {
-			file := fc.violation.File()
-			fileChange := result.Changes[file]
-			if fileChange != nil {
-				fileChange.FixesSkipped = append(fileChange.FixesSkipped, SkippedFix{
-					RuleCode: fc.violation.RuleCode,
-					Reason:   SkipNoEdits,
-					Location: fc.violation.Location,
-				})
-			}
+			recordSkipped(result.Changes, fc.violation, SkipNoEdits, "")
 			continue
 		}
-		file := fc.violation.File()
-		fixesByFile[file] = append(fixesByFile[file], fc)
+		fixesByFile[fc.violation.File()] = append(fixesByFile[fc.violation.File()], fc)
 	}
 
 	// Apply fixes to each file
@@ -188,6 +159,21 @@ func (f *Fixer) Apply(ctx context.Context, violations []rules.Violation, sources
 type fixCandidate struct {
 	violation *rules.Violation
 	fix       *rules.SuggestedFix
+}
+
+// recordSkipped adds a skipped fix entry for a file if the file exists in changes.
+func recordSkipped(changes map[string]*FileChange, v *rules.Violation, reason SkipReason, errMsg string) {
+	if fc := changes[v.File()]; fc != nil {
+		skipped := SkippedFix{
+			RuleCode: v.RuleCode,
+			Reason:   reason,
+			Location: v.Location,
+		}
+		if errMsg != "" {
+			skipped.Error = errMsg
+		}
+		fc.FixesSkipped = append(fc.FixesSkipped, skipped)
+	}
 }
 
 // ruleAllowed checks if a rule passes the filter.
