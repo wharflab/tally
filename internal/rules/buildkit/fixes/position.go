@@ -164,8 +164,7 @@ func findFROMBaseName(line []byte) (int, int) {
 
 // createEditLocation creates a Location for an edit within a specific line.
 // lineNum is 1-based (BuildKit convention), startCol and endCol are 0-based byte offsets.
-// Note: applyEdit in fixer.go expects 0-based line numbers, so we convert here.
+// The returned Location uses 1-based line numbers consistent with BuildKit and our schema.
 func createEditLocation(file string, lineNum, startCol, endCol int) rules.Location {
-	// Convert from 1-based (BuildKit) to 0-based (applyEdit expects this)
-	return rules.NewRangeLocation(file, lineNum-1, startCol, lineNum-1, endCol)
+	return rules.NewRangeLocation(file, lineNum, startCol, lineNum, endCol)
 }

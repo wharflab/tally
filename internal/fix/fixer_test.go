@@ -11,9 +11,9 @@ import (
 func TestApplyEdit_SingleLine(t *testing.T) {
 	content := []byte("FROM alpine\nRUN apt install curl")
 
-	// Replace "apt" with "apt-get" on line 1 (0-indexed), columns 4-7
+	// Replace "apt" with "apt-get" on line 2 (1-based), columns 4-7
 	edit := rules.TextEdit{
-		Location: rules.NewRangeLocation("Dockerfile", 1, 4, 1, 7),
+		Location: rules.NewRangeLocation("Dockerfile", 2, 4, 2, 7),
 		NewText:  "apt-get",
 	}
 
@@ -28,9 +28,9 @@ func TestApplyEdit_SingleLine(t *testing.T) {
 func TestApplyEdit_MultiLine(t *testing.T) {
 	content := []byte("FROM alpine\nRUN apt install \\\n    curl")
 
-	// Replace entire RUN command
+	// Replace entire RUN command (lines 2-3, 1-based)
 	edit := rules.TextEdit{
-		Location: rules.NewRangeLocation("Dockerfile", 1, 0, 2, 8),
+		Location: rules.NewRangeLocation("Dockerfile", 2, 0, 3, 8),
 		NewText:  "RUN apt-get install curl",
 	}
 
@@ -49,7 +49,7 @@ func TestFixer_Apply_SingleFix(t *testing.T) {
 
 	violations := []rules.Violation{
 		{
-			Location: rules.NewLineLocation("Dockerfile", 1),
+			Location: rules.NewLineLocation("Dockerfile", 2), // 1-based line numbers
 			RuleCode: "hadolint/DL3027",
 			Message:  "Use apt-get",
 			SuggestedFix: &rules.SuggestedFix{
@@ -57,7 +57,7 @@ func TestFixer_Apply_SingleFix(t *testing.T) {
 				Safety:      rules.FixSafe,
 				Edits: []rules.TextEdit{
 					{
-						Location: rules.NewRangeLocation("Dockerfile", 1, 4, 1, 7),
+						Location: rules.NewRangeLocation("Dockerfile", 2, 4, 2, 7), // 1-based
 						NewText:  "apt-get",
 					},
 				},
@@ -93,7 +93,7 @@ func TestFixer_Apply_SafetyFilter(t *testing.T) {
 
 	violations := []rules.Violation{
 		{
-			Location: rules.NewLineLocation("Dockerfile", 0),
+			Location: rules.NewLineLocation("Dockerfile", 1), // 1-based line numbers
 			RuleCode: "hadolint/DL3027",
 			Message:  "Use apt-cache",
 			SuggestedFix: &rules.SuggestedFix{
@@ -101,7 +101,7 @@ func TestFixer_Apply_SafetyFilter(t *testing.T) {
 				Safety:      rules.FixSuggestion, // Not safe
 				Edits: []rules.TextEdit{
 					{
-						Location: rules.NewRangeLocation("Dockerfile", 0, 4, 0, 7),
+						Location: rules.NewRangeLocation("Dockerfile", 1, 4, 1, 7), // 1-based
 						NewText:  "apt-cache",
 					},
 				},
@@ -139,7 +139,7 @@ func TestFixer_Apply_RuleFilter(t *testing.T) {
 
 	violations := []rules.Violation{
 		{
-			Location: rules.NewLineLocation("Dockerfile", 0),
+			Location: rules.NewLineLocation("Dockerfile", 1), // 1-based line numbers
 			RuleCode: "hadolint/DL3027",
 			Message:  "Use apt-get",
 			SuggestedFix: &rules.SuggestedFix{
@@ -147,7 +147,7 @@ func TestFixer_Apply_RuleFilter(t *testing.T) {
 				Safety:      rules.FixSafe,
 				Edits: []rules.TextEdit{
 					{
-						Location: rules.NewRangeLocation("Dockerfile", 0, 4, 0, 7),
+						Location: rules.NewRangeLocation("Dockerfile", 1, 4, 1, 7), // 1-based
 						NewText:  "apt-get",
 					},
 				},
@@ -186,7 +186,7 @@ func TestFixer_Apply_ConflictingFixes(t *testing.T) {
 	// Two fixes that overlap
 	violations := []rules.Violation{
 		{
-			Location: rules.NewLineLocation("Dockerfile", 0),
+			Location: rules.NewLineLocation("Dockerfile", 1), // 1-based line numbers
 			RuleCode: "rule1",
 			Message:  "Fix 1",
 			SuggestedFix: &rules.SuggestedFix{
@@ -194,14 +194,14 @@ func TestFixer_Apply_ConflictingFixes(t *testing.T) {
 				Safety:      rules.FixSafe,
 				Edits: []rules.TextEdit{
 					{
-						Location: rules.NewRangeLocation("Dockerfile", 0, 4, 0, 15),
+						Location: rules.NewRangeLocation("Dockerfile", 1, 4, 1, 15), // 1-based
 						NewText:  "apt-get install",
 					},
 				},
 			},
 		},
 		{
-			Location: rules.NewLineLocation("Dockerfile", 0),
+			Location: rules.NewLineLocation("Dockerfile", 1), // 1-based line numbers
 			RuleCode: "rule2",
 			Message:  "Fix 2",
 			SuggestedFix: &rules.SuggestedFix{
@@ -210,7 +210,7 @@ func TestFixer_Apply_ConflictingFixes(t *testing.T) {
 				Edits: []rules.TextEdit{
 					{
 						// Overlaps with fix 1
-						Location: rules.NewRangeLocation("Dockerfile", 0, 4, 0, 7),
+						Location: rules.NewRangeLocation("Dockerfile", 1, 4, 1, 7), // 1-based
 						NewText:  "apt-get",
 					},
 				},
@@ -252,7 +252,7 @@ func TestFixer_Apply_MultipleFixes(t *testing.T) {
 
 	violations := []rules.Violation{
 		{
-			Location: rules.NewLineLocation("Dockerfile", 1),
+			Location: rules.NewLineLocation("Dockerfile", 2), // 1-based: line 2 is "RUN apt install curl"
 			RuleCode: "hadolint/DL3027",
 			Message:  "Use apt-get",
 			SuggestedFix: &rules.SuggestedFix{
@@ -260,14 +260,14 @@ func TestFixer_Apply_MultipleFixes(t *testing.T) {
 				Safety:      rules.FixSafe,
 				Edits: []rules.TextEdit{
 					{
-						Location: rules.NewRangeLocation("Dockerfile", 1, 4, 1, 7),
+						Location: rules.NewRangeLocation("Dockerfile", 2, 4, 2, 7), // 1-based
 						NewText:  "apt-get",
 					},
 				},
 			},
 		},
 		{
-			Location: rules.NewLineLocation("Dockerfile", 2),
+			Location: rules.NewLineLocation("Dockerfile", 3), // 1-based: line 3 is "RUN apt update"
 			RuleCode: "hadolint/DL3027",
 			Message:  "Use apt-get",
 			SuggestedFix: &rules.SuggestedFix{
@@ -275,7 +275,7 @@ func TestFixer_Apply_MultipleFixes(t *testing.T) {
 				Safety:      rules.FixSafe,
 				Edits: []rules.TextEdit{
 					{
-						Location: rules.NewRangeLocation("Dockerfile", 2, 4, 2, 7),
+						Location: rules.NewRangeLocation("Dockerfile", 3, 4, 3, 7), // 1-based
 						NewText:  "apt-get",
 					},
 				},

@@ -28,11 +28,11 @@
                 "location": {
                   "file": "testdata/inline-directives-disabled/Dockerfile",
                   "start": {
-                    "line": 1,
+                    "line": 2,
                     "column": 15
                   },
                   "end": {
-                    "line": 1,
+                    "line": 2,
                     "column": 20
                   }
                 },

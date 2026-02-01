@@ -349,6 +349,7 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 
 // applyEdit applies a single text edit to content.
 // The edit replaces the range [Start, End) with NewText.
+// Location uses 1-based line numbers (BuildKit convention); we convert to 0-based for array indexing.
 func applyEdit(content []byte, edit rules.TextEdit) []byte {
 	// Detect line ending style (CRLF on Windows, LF on Unix)
 	lineEnding := []byte("\n")
@@ -359,13 +360,13 @@ func applyEdit(content []byte, edit rules.TextEdit) []byte {
 	// Split by the detected line ending
 	lines := bytes.Split(content, lineEnding)
 
-	startLine := edit.Location.Start.Line
+	// Convert from 1-based (Location) to 0-based (array indexing)
+	startLine := edit.Location.Start.Line - 1
 	startCol := edit.Location.Start.Column
-	endLine := edit.Location.End.Line
+	endLine := edit.Location.End.Line - 1
 	endCol := edit.Location.End.Column
 
-	// Handle 0-based vs 1-based line numbers
-	// Our Location uses 0-based line numbers
+	// Validate line indices (now 0-based)
 	if startLine < 0 || startLine >= len(lines) {
 		return content
 	}

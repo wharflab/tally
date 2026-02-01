@@ -28,11 +28,11 @@
                 "location": {
                   "file": "testdata/dl3003/Dockerfile",
                   "start": {
-                    "line": 3,
+                    "line": 4,
                     "column": 0
                   },
                   "end": {
-                    "line": 3,
+                    "line": 4,
                     "column": 0
                   }
                 },

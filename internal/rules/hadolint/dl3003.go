@@ -101,9 +101,9 @@ func (r *DL3003Rule) generateFix(run *instructions.RunCommand, cdCommands []shel
 			Edits: []rules.TextEdit{{
 				Location: rules.NewRangeLocation(
 					file,
-					runLoc[0].Start.Line-1, // 0-based
+					runLoc[0].Start.Line, // 1-based (BuildKit convention)
 					runLoc[0].Start.Character,
-					runLoc[0].End.Line-1,
+					runLoc[0].End.Line,
 					runLoc[0].End.Character,
 				),
 				NewText: "WORKDIR " + cd.TargetDir,
@@ -120,9 +120,9 @@ func (r *DL3003Rule) generateFix(run *instructions.RunCommand, cdCommands []shel
 			Edits: []rules.TextEdit{{
 				Location: rules.NewRangeLocation(
 					file,
-					runLoc[0].Start.Line-1,
+					runLoc[0].Start.Line, // 1-based (BuildKit convention)
 					runLoc[0].Start.Character,
-					runLoc[0].End.Line-1,
+					runLoc[0].End.Line,
 					runLoc[0].End.Character,
 				),
 				NewText: "WORKDIR " + cd.TargetDir + "\nRUN " + cd.RemainingCommands,

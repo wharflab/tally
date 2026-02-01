@@ -92,7 +92,8 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 				// The command content starts after "RUN " (4 characters)
 				const runPrefixLen = 4 // len("RUN ")
 				baseCol := runLoc[0].Start.Character + runPrefixLen
-				editLine := runLoc[0].Start.Line - 1 + occ.Line // Convert line to 0-based
+				// occ.Line is 0-based offset from RUN start, runLoc[0].Start.Line is 1-based
+				editLine := runLoc[0].Start.Line + occ.Line
 				editStartCol := baseCol + occ.StartCol
 				editEndCol := baseCol + occ.EndCol
 
