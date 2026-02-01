@@ -71,13 +71,13 @@ extract_rules() {
         exit 1
     fi
 
-    local script="$repo/scripts/extract-rules.sh"
+    local script="$SCRIPT_DIR/extract-hadolint-rules.sh"
     if [[ ! -x "$script" ]]; then
         echo "Error: $script not found or not executable" >&2
         exit 1
     fi
 
-    "$script" --only-dl
+    "$script" "$repo" --only-dl
 }
 
 # Merge rules with status
