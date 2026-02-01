@@ -51,15 +51,6 @@ init_paths() {
     fi
 }
 
-# Severity mapping
-declare -A SEVERITY_MAP=(
-    [DLErrorC]="Error"
-    [DLWarningC]="Warning"
-    [DLInfoC]="Info"
-    [DLStyleC]="Style"
-    [DLIgnoreC]="Ignore"
-)
-
 show_help() {
     cat << 'EOF'
 Usage: ./scripts/extract-hadolint-rules.sh [HADOLINT_REPO] [OPTIONS]
