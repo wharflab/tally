@@ -1,6 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:best-practices", ":gitSignOff", ":semanticCommits"],
+  "extends": [
+    "config:best-practices",
+    ":gitSignOff",
+    ":semanticCommits"
+  ],
   "dependencyDashboard": false,
   "automerge": true,
   "platformAutomerge": true,
@@ -8,9 +12,15 @@
     "enabled": true,
     "automerge": true
   },
-  "schedule": ["after 9am and before 5pm every weekday", "every weekend"],
+  "schedule": [
+    "after 9am and before 5pm every weekday",
+    "every weekend"
+  ],
   "timezone": "UTC",
-  "labels": ["dependencies", "renovate"],
+  "labels": [
+    "dependencies",
+    "renovate"
+  ],
   "commitMessagePrefix": "chore(deps):",
   "semanticCommits": "enabled",
   "rebaseWhen": "conflicted",
@@ -18,7 +28,10 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["^Makefile$", "^\\.github/workflows/ci\\.yaml$"],
+      "managerFilePatterns": [
+        "/^Makefile$/",
+        "/^\\.github/workflows/ci\\.yaml$/"
+      ],
       "matchStrings": [
         "PMD_VERSION\\s*[:=]\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)",
         "pmd-bin-(?<currentValue>\\d+\\.\\d+\\.\\d+)"
@@ -29,47 +42,75 @@
     },
     {
       "customType": "regex",
-      "fileMatch": ["^Makefile$"],
-      "matchStrings": ["DEADCODE_VERSION\\s*[:=]\\s*(?<currentValue>v\\S+)"],
+      "managerFilePatterns": [
+        "/^Makefile$/"
+      ],
+      "matchStrings": [
+        "DEADCODE_VERSION\\s*[:=]\\s*(?<currentValue>v\\S+)"
+      ],
       "depNameTemplate": "golang.org/x/tools",
       "datasourceTemplate": "go",
       "versioningTemplate": "go"
     },
     {
       "customType": "regex",
-      "fileMatch": ["^\\.lefthook\\.yml$"],
-      "matchStrings": ["uv tool run (?<depName>[a-z0-9_-]+)==(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "managerFilePatterns": [
+        "/^\\.lefthook\\.yml$/"
+      ],
+      "matchStrings": [
+        "uv tool run (?<depName>[a-z0-9_-]+)==(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
       "datasourceTemplate": "pypi",
       "versioningTemplate": "pep440"
     }
   ],
   "packageRules": [
     {
-      "matchDepTypes": ["dependencies"],
+      "matchDepTypes": [
+        "dependencies"
+      ],
       "bumpVersion": "patch"
     },
     {
-      "matchManagers": ["dockerfile"],
-      "matchFileNames": ["internal/integration/testdata/**"],
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "matchFileNames": [
+        "internal/integration/testdata/**"
+      ],
       "enabled": false
     },
     {
-      "matchFileNames": ["packaging/**"],
+      "matchFileNames": [
+        "packaging/**"
+      ],
       "enabled": false
     },
     {
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "pinDigests": false
     },
     {
-      "matchManagers": ["pep621"],
-      "matchFileNames": ["packaging/pypi/pyproject.toml"],
-      "matchDepNames": ["python"],
+      "matchManagers": [
+        "pep621"
+      ],
+      "matchFileNames": [
+        "packaging/pypi/pyproject.toml"
+      ],
+      "matchDepNames": [
+        "python"
+      ],
       "enabled": false
     },
     {
-      "matchDatasources": ["github-releases"],
-      "matchDepNames": ["pmd/pmd"],
+      "matchDatasources": [
+        "github-releases"
+      ],
+      "matchDepNames": [
+        "pmd/pmd"
+      ],
       "automerge": true,
       "groupName": "PMD"
     }
