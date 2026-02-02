@@ -136,6 +136,7 @@ func TestCheck(t *testing.T) {
 
 		// Hadolint rule tests
 		{name: "dl3003", dir: "dl3003", args: []string{"--format", "json"}, wantExit: 1},
+		{name: "dl3021", dir: "dl3021", args: []string{"--format", "json"}, wantExit: 1},
 		{name: "dl3027", dir: "dl3027", args: []string{"--format", "json"}, wantExit: 1},
 		{name: "inline-ignore-multiple-max-lines", dir: "inline-ignore-multiple", args: []string{"--format", "json"}},
 		{

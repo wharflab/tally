@@ -144,7 +144,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL3018](https://github.com/hadolint/hadolint/wiki/DL3018) | Pin versions in apk add. Instead of `apk add <package>` use `apk add <package>=<version>`. | Warning | ⏳ |
 | [DL3019](https://github.com/hadolint/hadolint/wiki/DL3019) | Use the `--no-cache` switch to avoid the need to use `--update` and remove `/var/cache/apk/*` when done installing packages. | Info | ⏳ |
 | [DL3020](https://github.com/hadolint/hadolint/wiki/DL3020) | Use `COPY` instead of `ADD` for files and folders. | Error | ✅ `hadolint/DL3020` |
-| [DL3021](https://github.com/hadolint/hadolint/wiki/DL3021) | `COPY` with more than 2 arguments requires the last argument to end with `/` | Error | ⏳ |
+| [DL3021](https://github.com/hadolint/hadolint/wiki/DL3021) | `COPY` with more than 2 arguments requires the last argument to end with `/` | Error | ✅ `hadolint/DL3021` |
 | [DL3022](https://github.com/hadolint/hadolint/wiki/DL3022) | `COPY --from` should reference a previously defined `FROM` alias | Warning | ⏳ |
 | [DL3023](https://github.com/hadolint/hadolint/wiki/DL3023) | `COPY --from` cannot reference its own `FROM` alias | Error | ✅ `hadolint/DL3023` |
 | [DL3024](https://github.com/hadolint/hadolint/wiki/DL3024) | `FROM` aliases (stage names) must be unique | Error | ✅ `hadolint/DL3024` |

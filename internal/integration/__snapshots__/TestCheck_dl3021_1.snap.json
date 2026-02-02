@@ -1,0 +1,39 @@
+{
+  "files": [
+    {
+      "file": "testdata/dl3021/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/dl3021/Dockerfile",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 0
+            }
+          },
+          "rule": "hadolint/DL3021",
+          "message": "COPY with more than 2 arguments requires the last argument to end with /",
+          "detail": "When copying multiple source files, the destination must be a directory (indicated by a trailing /). Without it, the build will fail.",
+          "severity": "error",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3021",
+          "sourceCode": "COPY foo bar baz"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 1,
+    "warnings": 0,
+    "info": 0,
+    "style": 0,
+    "files": 1
+  },
+  "files_scanned": 1,
+  "rules_enabled": 39
+}
+
