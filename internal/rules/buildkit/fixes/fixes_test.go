@@ -379,13 +379,13 @@ func TestNoEmptyContinuationFix(t *testing.T) {
 		},
 		{
 			// Empty line is the last line of the file (no content after it)
-			// This tests the special case where we can't span to the next line
+			// The edit spans from end of previous line to start of empty line to remove the newline
 			name:             "empty continuation as last line",
 			source:           "FROM alpine:3.18\nRUN echo \\\n\n",
 			violationLine:    3,
 			wantFix:          true,
 			wantEditCount:    1,
-			wantRemovedLines: []int{3},
+			wantRemovedLines: []int{2}, // Edit starts at line 2 (prev line end)
 		},
 		{
 			name:          "content line in middle of multiline command",

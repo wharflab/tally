@@ -52,11 +52,14 @@ func enrichNoEmptyContinuationFix(v *rules.Violation, source []byte) {
 		// Line numbers in Location are 1-based
 		lineNum := lineIdx + 1
 		nextLineNum := lineNum + 1
-		// If this is the last line, span to end of this line only
+		// If this is the last line, delete the newline from the previous line
 		if lineIdx >= len(lines)-1 {
-			lineContent := lines[lineIdx]
+			if lineIdx == 0 {
+				continue
+			}
+			prevLineLen := len(lines[lineIdx-1])
 			edits = append(edits, rules.TextEdit{
-				Location: rules.NewRangeLocation(v.Location.File, lineNum, 0, lineNum, len(lineContent)),
+				Location: rules.NewRangeLocation(v.Location.File, lineNum-1, prevLineLen, lineNum, 0),
 				NewText:  "",
 			})
 		} else {
