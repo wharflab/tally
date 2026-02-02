@@ -76,13 +76,24 @@ func enrichNoEmptyContinuationFix(v *rules.Violation, source []byte) {
 }
 
 // splitLines splits source into lines preserving line content without newlines.
+// Handles mixed line endings (LF and CRLF) robustly by splitting after each newline
+// and trimming the line ending suffix from each chunk.
 func splitLines(source []byte) [][]byte {
-	// Handle both LF and CRLF
-	lineEnding := []byte("\n")
-	if bytes.Contains(source, []byte("\r\n")) {
-		lineEnding = []byte("\r\n")
+	// Split after each newline - this keeps \r\n together for CRLF lines
+	chunks := bytes.SplitAfter(source, []byte("\n"))
+
+	lines := make([][]byte, 0, len(chunks))
+	for _, chunk := range chunks {
+		// Skip empty trailing chunk (SplitAfter creates one if source ends with \n)
+		if len(chunk) == 0 {
+			continue
+		}
+		// Trim the line ending suffix (\r\n or \n)
+		line := bytes.TrimSuffix(chunk, []byte("\r\n"))
+		line = bytes.TrimSuffix(line, []byte("\n"))
+		lines = append(lines, line)
 	}
-	return bytes.Split(source, lineEnding)
+	return lines
 }
 
 // findEmptyContinuationLines finds empty lines within a multi-line command.
