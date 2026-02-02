@@ -14,7 +14,7 @@ require (
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/providers/structs v0.1.0
 	github.com/knadh/koanf/v2 v2.3.2
-	github.com/moby/buildkit v0.27.0
+	github.com/moby/buildkit v0.27.1
 	github.com/moby/patternmatcher v0.6.0
 	github.com/muesli/termenv v0.16.0
 	github.com/owenrumney/go-sarif/v2 v2.3.3
@@ -62,7 +62,7 @@ require (
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
-	github.com/klauspost/compress v1.18.2 // indirect
+	github.com/klauspost/compress v1.18.3 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
