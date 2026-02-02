@@ -65,16 +65,21 @@ Detects stages that are defined but never used (not referenced by `--target` or 
 
 Rules from Docker's official BuildKit linter. tally captures these automatically during parsing.
 
+**Legend:**
+
+- ✅ Captured from BuildKit linter
+- 🔧 Auto-fixable with `tally check --fix`
+
 ### Implemented by tally
 
 These rules are implemented by tally to provide enhanced functionality:
 
 | Rule | Description | Severity | Category | Default |
 |------|-------------|----------|----------|---------|
-| `buildkit/SecretsUsedInArgOrEnv` | Warns when ARG/ENV variable names suggest secrets | Warning | Security | Enabled |
-| `buildkit/CopyIgnoredFile` | Warns when COPY/ADD sources match .dockerignore | Warning | Correctness | Enabled |
-| `buildkit/WorkdirRelativePath` | Warns about relative WORKDIR without absolute base | Warning | Correctness | Enabled |
-| `buildkit/RedundantTargetPlatform` | Warns when FROM --platform=$TARGETPLATFORM is redundant | Warning | Best Practice | Enabled |
+| [`buildkit/SecretsUsedInArgOrEnv`](https://docs.docker.com/reference/build-checks/secrets-used-in-arg-or-env/) | Warns when ARG/ENV variable names suggest secrets | Warning | Security | Enabled |
+| [`buildkit/CopyIgnoredFile`](https://docs.docker.com/reference/build-checks/copy-ignored-file/) | Warns when COPY/ADD sources match .dockerignore | Warning | Correctness | Enabled |
+| [`buildkit/WorkdirRelativePath`](https://docs.docker.com/reference/build-checks/workdir-relative-path/) | Warns about relative WORKDIR without absolute base | Warning | Correctness | Enabled |
+| [`buildkit/RedundantTargetPlatform`](https://docs.docker.com/reference/build-checks/redundant-target-platform/) | Warns when FROM --platform=$TARGETPLATFORM is redundant | Warning | Best Practice | Enabled |
 
 ### Captured from BuildKit Linter
 
@@ -82,21 +87,21 @@ These rules are automatically captured from BuildKit during Dockerfile parsing:
 
 | Rule | Description | Severity | Status |
 |------|-------------|----------|--------|
-| `buildkit/StageNameCasing` | Stage names should be lowercase | Warning | ✅🔧 Captured |
-| `buildkit/FromAsCasing` | The 'as' keyword should match 'from' casing | Warning | ✅🔧 Captured |
-| `buildkit/NoEmptyContinuation` | Empty continuation lines will become errors | Warning | ✅🔧 Captured |
-| `buildkit/ConsistentInstructionCasing` | Instructions should use consistent casing | Warning | ✅ Captured |
-| `buildkit/DuplicateStageName` | Stage names should be unique | Warning | ✅ Captured |
-| `buildkit/ReservedStageName` | Reserved words should not be stage names | Warning | ✅ Captured |
-| `buildkit/JSONArgsRecommended` | JSON args recommended for ENTRYPOINT/CMD | Warning | ✅ Captured |
-| `buildkit/MaintainerDeprecated` | MAINTAINER is deprecated; use LABEL | Warning | ✅🔧 Captured |
-| `buildkit/UndefinedArgInFrom` | FROM must use declared ARGs | Warning | ✅ Captured |
-| `buildkit/UndefinedVar` | Variables should be defined before use | Warning | ✅ Captured |
-| `buildkit/MultipleInstructionsDisallowed` | Avoid repeating instructions in a stage | Warning | ✅ Captured |
-| `buildkit/LegacyKeyValueFormat` | Legacy key/value format should not be used | Warning | ✅ Captured |
-| `buildkit/InvalidDefaultArgInFrom` | Default ARG values must produce valid images | Warning | ✅ Captured |
-| `buildkit/FromPlatformFlagConstDisallowed` | FROM --platform should not use constants | Warning | ✅ Captured |
-| `buildkit/InvalidDefinitionDescription` | Stage/arg comments must follow format | Warning | ✅ Captured |
+| [`buildkit/StageNameCasing`](https://docs.docker.com/reference/build-checks/stage-name-casing/) | Stage names should be lowercase | Warning | ✅🔧 Captured |
+| [`buildkit/FromAsCasing`](https://docs.docker.com/reference/build-checks/from-as-casing/) | The 'as' keyword should match 'from' casing | Warning | ✅🔧 Captured |
+| [`buildkit/NoEmptyContinuation`](https://docs.docker.com/reference/build-checks/no-empty-continuation/) | Empty continuation lines will become errors | Warning | ✅🔧 Captured |
+| [`buildkit/ConsistentInstructionCasing`](https://docs.docker.com/reference/build-checks/consistent-instruction-casing/) | Instructions should use consistent casing | Warning | ✅ Captured |
+| [`buildkit/DuplicateStageName`](https://docs.docker.com/reference/build-checks/duplicate-stage-name/) | Stage names should be unique | Warning | ✅ Captured |
+| [`buildkit/ReservedStageName`](https://docs.docker.com/reference/build-checks/reserved-stage-name/) | Reserved words should not be stage names | Warning | ✅ Captured |
+| [`buildkit/JSONArgsRecommended`](https://docs.docker.com/reference/build-checks/json-args-recommended/) | JSON args recommended for ENTRYPOINT/CMD | Warning | ✅ Captured |
+| [`buildkit/MaintainerDeprecated`](https://docs.docker.com/reference/build-checks/maintainer-deprecated/) | MAINTAINER is deprecated; use LABEL | Warning | ✅🔧 Captured |
+| [`buildkit/UndefinedArgInFrom`](https://docs.docker.com/reference/build-checks/undefined-arg-in-from/) | FROM must use declared ARGs | Warning | ✅ Captured |
+| [`buildkit/UndefinedVar`](https://docs.docker.com/reference/build-checks/undefined-var/) | Variables should be defined before use | Warning | ✅ Captured |
+| [`buildkit/MultipleInstructionsDisallowed`](https://docs.docker.com/reference/build-checks/multiple-instructions-disallowed/) | Avoid repeating instructions in a stage | Warning | ✅ Captured |
+| [`buildkit/LegacyKeyValueFormat`](https://docs.docker.com/reference/build-checks/legacy-key-value-format/) | Legacy key/value format should not be used | Warning | ✅ Captured |
+| [`buildkit/InvalidDefaultArgInFrom`](https://docs.docker.com/reference/build-checks/invalid-default-arg-in-from/) | Default ARG values must produce valid images | Warning | ✅ Captured |
+| [`buildkit/FromPlatformFlagConstDisallowed`](https://docs.docker.com/reference/build-checks/from-platform-flag-const-disallowed/) | FROM --platform should not use constants | Warning | ✅ Captured |
+| [`buildkit/InvalidDefinitionDescription`](https://docs.docker.com/reference/build-checks/invalid-definition-description/) | Stage/arg comments must follow format | Warning | ✅ Captured |
 
 See [Docker Build Checks](https://docs.docker.com/reference/build-checks/) for detailed documentation.
 
