@@ -15,6 +15,25 @@
               "column": 0
             }
           },
+          "rule": "buildkit/InvalidDefinitionDescription",
+          "message": "Comment for FROM should follow the format: `# builder \u003cdescription\u003e`",
+          "detail": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment.",
+          "severity": "warning",
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/invalid-definition-description/",
+          "sourceCode": "FROM alpine:3.18 AS Builder"
+        },
+        {
+          "location": {
+            "file": "testdata/buildkit-warnings/Dockerfile",
+            "start": {
+              "line": 2,
+              "column": 0
+            },
+            "end": {
+              "line": 2,
+              "column": 0
+            }
+          },
           "rule": "buildkit/StageNameCasing",
           "message": "Stage name 'Builder' should be lowercase",
           "detail": "Stage names should be lowercase",
@@ -85,14 +104,14 @@
     }
   ],
   "summary": {
-    "total": 2,
+    "total": 3,
     "errors": 0,
-    "warnings": 2,
+    "warnings": 3,
     "info": 0,
     "style": 0,
     "files": 1
   },
   "files_scanned": 1,
-  "rules_enabled": 39
+  "rules_enabled": 27
 }
 

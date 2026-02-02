@@ -20,76 +20,19 @@
           "detail": "Directive: # tally ignore=buildkit/StageNameCasing",
           "severity": "warning",
           "sourceCode": "# tally ignore=buildkit/StageNameCasing"
-        },
-        {
-          "location": {
-            "file": "testdata/inline-require-reason/Dockerfile",
-            "start": {
-              "line": 2,
-              "column": 0
-            },
-            "end": {
-              "line": 2,
-              "column": 0
-            }
-          },
-          "rule": "hadolint/DL3006",
-          "message": "image \"alpine\" does not have an explicit tag; pin a specific version (e.g., alpine:22.04)",
-          "detail": "Untagged images default to :latest, which can change unexpectedly and break builds. Always specify an explicit tag for reproducibility.",
-          "severity": "warning",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3006",
-          "sourceCode": "FROM alpine AS Build"
-        },
-        {
-          "location": {
-            "file": "testdata/inline-require-reason/Dockerfile",
-            "start": {
-              "line": 2,
-              "column": 0
-            },
-            "end": {
-              "line": 2,
-              "column": 0
-            }
-          },
-          "rule": "tally/no-unreachable-stages",
-          "message": "stage \"build\" (index 0) is not reachable from the final stage and does not contribute to the final image",
-          "detail": "Consider removing this stage or using COPY --from to include its artifacts in the final image",
-          "severity": "warning",
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/no-unreachable-stages.md",
-          "sourceCode": "FROM alpine AS Build"
-        },
-        {
-          "location": {
-            "file": "testdata/inline-require-reason/Dockerfile",
-            "start": {
-              "line": 5,
-              "column": 0
-            },
-            "end": {
-              "line": 5,
-              "column": 0
-            }
-          },
-          "rule": "hadolint/DL3006",
-          "message": "image \"ubuntu\" does not have an explicit tag; pin a specific version (e.g., ubuntu:22.04)",
-          "detail": "Untagged images default to :latest, which can change unexpectedly and break builds. Always specify an explicit tag for reproducibility.",
-          "severity": "warning",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3006",
-          "sourceCode": "FROM ubuntu AS runtime"
         }
       ]
     }
   ],
   "summary": {
-    "total": 4,
+    "total": 1,
     "errors": 0,
-    "warnings": 4,
+    "warnings": 1,
     "info": 0,
     "style": 0,
     "files": 1
   },
   "files_scanned": 1,
-  "rules_enabled": 39
+  "rules_enabled": 2
 }
 

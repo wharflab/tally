@@ -67,6 +67,16 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+// selectRules returns args to disable all rules except the specified ones.
+// This isolates tests from global rule count changes.
+func selectRules(rules ...string) []string {
+	args := []string{"--ignore", "*"}
+	for _, r := range rules {
+		args = append(args, "--select", r)
+	}
+	return args
+}
+
 func TestCheck(t *testing.T) {
 	testCases := []struct {
 		name       string
@@ -78,184 +88,291 @@ func TestCheck(t *testing.T) {
 		isDir      bool   // If true, pass the directory instead of Dockerfile
 		useContext bool   // If true, add --context flag for context-aware tests
 	}{
-		// Basic tests
-		{name: "simple", dir: "simple", args: []string{"--format", "json"}},
+		// Total rules enabled test - validates rule count (no --ignore/--select)
+		{name: "total-rules-enabled", dir: "total-rules-enabled", args: []string{"--format", "json"}},
+
+		// Basic tests (isolated to max-lines rule)
+		{name: "simple", dir: "simple", args: append([]string{"--format", "json"}, selectRules("tally/max-lines")...)},
 		{
 			name: "simple-max-lines-pass",
 			dir:  "simple",
-			args: []string{"--max-lines", "100", "--format", "json"},
+			args: append([]string{"--max-lines", "100", "--format", "json"}, selectRules("tally/max-lines")...),
 		},
 		{
 			name:     "simple-max-lines-fail",
 			dir:      "simple",
-			args:     []string{"--max-lines", "2", "--format", "json"},
+			args:     append([]string{"--max-lines", "2", "--format", "json"}, selectRules("tally/max-lines")...),
 			wantExit: 1,
 		},
 
-		// Config file discovery tests
-		{name: "config-file-discovery", dir: "with-config", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "config-cascading-discovery", dir: "nested/subdir", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "config-skip-options", dir: "with-blanks-and-comments", args: []string{"--format", "json"}},
+		// Config file discovery tests (isolated to max-lines rule)
+		{
+			name:     "config-file-discovery",
+			dir:      "with-config",
+			args:     append([]string{"--format", "json"}, selectRules("tally/max-lines")...),
+			wantExit: 1,
+		},
+		{
+			name:     "config-cascading-discovery",
+			dir:      "nested/subdir",
+			args:     append([]string{"--format", "json"}, selectRules("tally/max-lines")...),
+			wantExit: 1,
+		},
+		{
+			name: "config-skip-options",
+			dir:  "with-blanks-and-comments",
+			args: append([]string{"--format", "json"}, selectRules("tally/max-lines")...),
+		},
 		{
 			name: "cli-overrides-config",
 			dir:  "with-config",
-			args: []string{"--max-lines", "100", "--format", "json"},
+			args: append([]string{"--max-lines", "100", "--format", "json"}, selectRules("tally/max-lines")...),
 		},
 
-		// Environment variable tests
+		// Environment variable tests (isolated to max-lines rule)
 		{
 			name:     "env-var-override",
 			dir:      "simple",
-			args:     []string{"--format", "json"},
+			args:     append([]string{"--format", "json"}, selectRules("tally/max-lines")...),
 			env:      []string{"TALLY_RULES_MAX_LINES_MAX=2"},
 			wantExit: 1,
 		},
 
-		// BuildKit linter warnings tests
-		{name: "buildkit-warnings", dir: "buildkit-warnings", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "empty-continuation", dir: "empty-continuation", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "maintainer-deprecated", dir: "maintainer-deprecated", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "consistent-instruction-casing", dir: "consistent-instruction-casing", args: []string{"--format", "json"}, wantExit: 1},
+		// BuildKit linter warnings tests (isolated to buildkit rules)
+		{
+			name:     "buildkit-warnings",
+			dir:      "buildkit-warnings",
+			args:     append([]string{"--format", "json"}, selectRules("buildkit/*")...),
+			wantExit: 1,
+		},
+		{
+			name:     "empty-continuation",
+			dir:      "empty-continuation",
+			args:     append([]string{"--format", "json"}, selectRules("buildkit/NoEmptyContinuation")...),
+			wantExit: 1,
+		},
+		{
+			name:     "maintainer-deprecated",
+			dir:      "maintainer-deprecated",
+			args:     append([]string{"--format", "json"}, selectRules("buildkit/MaintainerDeprecated")...),
+			wantExit: 1,
+		},
+		{
+			name:     "consistent-instruction-casing",
+			dir:      "consistent-instruction-casing",
+			args:     append([]string{"--format", "json"}, selectRules("buildkit/ConsistentInstructionCasing")...),
+			wantExit: 1,
+		},
 
-		// Semantic model construction-time violations
-		{name: "duplicate-stage-name", dir: "duplicate-stage-name", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "multiple-healthcheck", dir: "multiple-healthcheck", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "copy-from-own-alias", dir: "copy-from-own-alias", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "onbuild-forbidden", dir: "onbuild-forbidden", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "invalid-instruction-order", dir: "invalid-instruction-order", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "no-from-instruction", dir: "no-from-instruction", args: []string{"--format", "json"}, wantExit: 1},
+		// Semantic model construction-time violations (isolated to specific rules)
+		{
+			name:     "duplicate-stage-name",
+			dir:      "duplicate-stage-name",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3024", "tally/no-unreachable-stages")...),
+			wantExit: 1,
+		},
+		{
+			name:     "multiple-healthcheck",
+			dir:      "multiple-healthcheck",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3012")...),
+			wantExit: 1,
+		},
+		{
+			name:     "copy-from-own-alias",
+			dir:      "copy-from-own-alias",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3023")...),
+			wantExit: 1,
+		},
+		{
+			name:     "onbuild-forbidden",
+			dir:      "onbuild-forbidden",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3043")...),
+			wantExit: 1,
+		},
+		{
+			name:     "invalid-instruction-order",
+			dir:      "invalid-instruction-order",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3061")...),
+			wantExit: 1,
+		},
+		{
+			name:     "no-from-instruction",
+			dir:      "no-from-instruction",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3061")...),
+			wantExit: 1,
+		},
 
 		// Unreachable stage detection
-		{name: "unreachable-stage", dir: "unreachable-stage", args: []string{"--format", "json"}, wantExit: 1},
+		{
+			name:     "unreachable-stage",
+			dir:      "unreachable-stage",
+			args:     append([]string{"--format", "json"}, selectRules("tally/no-unreachable-stages")...),
+			wantExit: 1,
+		},
 
-		// Inline directive tests
-		{name: "inline-ignore-single", dir: "inline-ignore-single", args: []string{"--format", "json"}},
-		{name: "inline-ignore-global", dir: "inline-ignore-global", args: []string{"--format", "json"}},
-		{name: "inline-hadolint-compat", dir: "inline-hadolint-compat", args: []string{"--format", "json"}},
-		{name: "inline-buildx-compat", dir: "inline-buildx-compat", args: []string{"--format", "json"}},
+		// Inline directive tests (need specific rules to test against)
+		{
+			name: "inline-ignore-single",
+			dir:  "inline-ignore-single",
+			args: append([]string{"--format", "json"}, selectRules("buildkit/StageNameCasing", "hadolint/DL3006")...),
+		},
+		{
+			name: "inline-ignore-global",
+			dir:  "inline-ignore-global",
+			args: append([]string{"--format", "json"}, selectRules("buildkit/StageNameCasing", "hadolint/DL3006")...),
+		},
+		{
+			name: "inline-hadolint-compat",
+			dir:  "inline-hadolint-compat",
+			args: append([]string{"--format", "json"}, selectRules("buildkit/StageNameCasing", "hadolint/DL3006")...),
+		},
+		{
+			name: "inline-buildx-compat",
+			dir:  "inline-buildx-compat",
+			args: append([]string{"--format", "json"}, selectRules("buildkit/StageNameCasing", "hadolint/DL3006")...),
+		},
 
-		// Hadolint rule tests
-		{name: "dl3003", dir: "dl3003", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "dl3021", dir: "dl3021", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "dl3027", dir: "dl3027", args: []string{"--format", "json"}, wantExit: 1},
-		{name: "inline-ignore-multiple-max-lines", dir: "inline-ignore-multiple", args: []string{"--format", "json"}},
+		// Hadolint rule tests (isolated to specific rules)
+		{
+			name:     "dl3003",
+			dir:      "dl3003",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3003")...),
+			wantExit: 1,
+		},
+		{
+			name:     "dl3021",
+			dir:      "dl3021",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3021")...),
+			wantExit: 1,
+		},
+		{
+			name:     "dl3027",
+			dir:      "dl3027",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3027")...),
+			wantExit: 1,
+		},
+		{
+			name: "inline-ignore-multiple-max-lines",
+			dir:  "inline-ignore-multiple",
+			args: append([]string{"--format", "json"}, selectRules("tally/max-lines", "hadolint/DL3006")...),
+		},
 		{
 			name:     "inline-unused-directive",
 			dir:      "inline-unused-directive",
-			args:     []string{"--format", "json", "--warn-unused-directives"},
+			args:     append([]string{"--format", "json", "--warn-unused-directives"}, selectRules("hadolint/DL3006")...),
 			wantExit: 1,
 		},
 		{
 			name:     "inline-directives-disabled",
 			dir:      "inline-directives-disabled",
-			args:     []string{"--format", "json", "--no-inline-directives"},
+			args:     append([]string{"--format", "json", "--no-inline-directives"}, selectRules("buildkit/StageNameCasing")...),
 			wantExit: 1,
 		},
 		{
 			name:     "inline-require-reason",
 			dir:      "inline-require-reason",
-			args:     []string{"--format", "json", "--require-reason"},
+			args:     append([]string{"--format", "json", "--require-reason"}, selectRules("buildkit/StageNameCasing", "tally/max-lines")...),
 			wantExit: 1,
 		},
 
-		// Output format tests
-		{name: "format-sarif", dir: "buildkit-warnings", args: []string{"--format", "sarif"}, wantExit: 1},
+		// Output format tests (isolated to buildkit rules)
+		{name: "format-sarif", dir: "buildkit-warnings", args: append([]string{"--format", "sarif"}, selectRules("buildkit/*")...), wantExit: 1},
 		{
 			name:     "format-github-actions",
 			dir:      "buildkit-warnings",
-			args:     []string{"--format", "github-actions"},
+			args:     append([]string{"--format", "github-actions"}, selectRules("buildkit/*")...),
 			wantExit: 1,
 			snapExt:  ".txt",
 		},
 		{
 			name:     "format-markdown",
 			dir:      "buildkit-warnings",
-			args:     []string{"--format", "markdown"},
+			args:     append([]string{"--format", "markdown"}, selectRules("buildkit/*")...),
 			wantExit: 1,
 			snapExt:  ".md",
 		},
 
-		// Fail-level tests
+		// Fail-level tests (isolated to buildkit rules)
 		{
 			name: "fail-level-none",
 			dir:  "buildkit-warnings",
-			args: []string{"--format", "json", "--fail-level", "none"},
+			args: append([]string{"--format", "json", "--fail-level", "none"}, selectRules("buildkit/*")...),
 		},
 		{
 			name: "fail-level-error",
 			dir:  "buildkit-warnings",
-			args: []string{"--format", "json", "--fail-level", "error"},
+			args: append([]string{"--format", "json", "--fail-level", "error"}, selectRules("buildkit/*")...),
 		},
 		{
 			name:     "fail-level-warning",
 			dir:      "buildkit-warnings",
-			args:     []string{"--format", "json", "--fail-level", "warning"},
+			args:     append([]string{"--format", "json", "--fail-level", "warning"}, selectRules("buildkit/*")...),
 			wantExit: 1,
 		},
 
-		// Context-aware rule tests
+		// Context-aware rule tests (isolated to CopyIgnoredFile rule)
 		{
 			name:       "context-copy-ignored",
 			dir:        "context-copy-ignored",
-			args:       []string{"--format", "json"},
+			args:       append([]string{"--format", "json"}, selectRules("buildkit/CopyIgnoredFile")...),
 			wantExit:   1,
 			useContext: true,
 		},
 		{
 			name:       "context-copy-heredoc",
 			dir:        "context-copy-heredoc",
-			args:       []string{"--format", "json"},
+			args:       append([]string{"--format", "json"}, selectRules("buildkit/CopyIgnoredFile")...),
 			useContext: true,
 		},
 		{
 			name: "context-no-context-flag",
 			dir:  "context-copy-ignored",
-			args: []string{"--format", "json"},
+			args: append([]string{"--format", "json"}, selectRules("buildkit/CopyIgnoredFile")...),
 		},
 
-		// Discovery tests
+		// Discovery tests (isolated to max-lines rule)
 		{
 			name:  "discovery-directory",
 			dir:   "discovery-directory",
-			args:  []string{"--format", "json"},
+			args:  append([]string{"--format", "json"}, selectRules("tally/max-lines")...),
 			isDir: true,
 		},
 		{
 			name:  "discovery-exclude",
 			dir:   "discovery-exclude",
-			args:  []string{"--format", "json", "--exclude", "test/*", "--exclude", "vendor/*"},
+			args:  append([]string{"--format", "json", "--exclude", "test/*", "--exclude", "vendor/*"}, selectRules("tally/max-lines")...),
 			isDir: true,
 		},
 		{
 			name:     "per-file-configs",
 			dir:      "per-file-configs",
-			args:     []string{"--format", "json"},
+			args:     append([]string{"--format", "json"}, selectRules("tally/max-lines")...),
 			isDir:    true,
 			wantExit: 1,
 		},
 
-		// Rule-specific tests
+		// Rule-specific tests (isolated to specific rules)
 		{
 			name: "trusted-registries-allowed",
 			dir:  "trusted-registries-allowed",
-			args: []string{"--format", "json"},
+			args: append([]string{"--format", "json"}, selectRules("hadolint/DL3026")...),
 		},
 		{
 			name:     "trusted-registries-untrusted",
 			dir:      "trusted-registries-untrusted",
-			args:     []string{"--format", "json"},
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3026")...),
 			wantExit: 1,
 		},
 		{
 			name:     "avoid-latest-tag",
 			dir:      "avoid-latest-tag",
-			args:     []string{"--format", "json"},
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3007")...),
 			wantExit: 1,
 		},
 		{
 			name:     "non-posix-shell",
 			dir:      "non-posix-shell",
-			args:     []string{"--format", "json"},
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3027")...),
 			wantExit: 0, // Should pass - shell rules disabled for PowerShell
 		},
 	}

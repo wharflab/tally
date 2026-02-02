@@ -112,6 +112,16 @@ func checkCommand() *cli.Command {
 				Usage:   "Glob pattern to exclude files (can be repeated)",
 				Sources: cli.EnvVars("TALLY_EXCLUDE"),
 			},
+			&cli.StringSliceFlag{
+				Name:    "select",
+				Usage:   "Enable specific rules (pattern: rule-code, namespace/*, *)",
+				Sources: cli.EnvVars("TALLY_RULES_SELECT"),
+			},
+			&cli.StringSliceFlag{
+				Name:    "ignore",
+				Usage:   "Disable specific rules (pattern: rule-code, namespace/*, *)",
+				Sources: cli.EnvVars("TALLY_RULES_IGNORE"),
+			},
 			&cli.StringFlag{
 				Name:    "context",
 				Usage:   "Build context directory for context-aware rules",
@@ -432,6 +442,14 @@ func loadConfigForFile(cmd *cli.Command, targetPath string) (*config.Config, err
 		} else {
 			cfg.Rules.Set("tally/max-lines", config.RuleConfig{Options: opts})
 		}
+	}
+
+	// Apply rule selection overrides from CLI flags
+	if cmd.IsSet("select") {
+		cfg.Rules.Include = append(cfg.Rules.Include, cmd.StringSlice("select")...)
+	}
+	if cmd.IsSet("ignore") {
+		cfg.Rules.Exclude = append(cfg.Rules.Exclude, cmd.StringSlice("ignore")...)
 	}
 
 	// Output settings are handled in getOutputConfig to avoid duplication

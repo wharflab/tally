@@ -273,7 +273,7 @@ func TestEnvKeyTransform(t *testing.T) {
 func TestRulesConfigIncludeExclude(t *testing.T) {
 	rc := &RulesConfig{
 		Include: []string{"buildkit/*", "tally/*", "hadolint/DL3026"},
-		Exclude: []string{"buildkit/MaintainerDeprecated"},
+		Exclude: []string{"hadolint/DL3008"},
 		Buildkit: map[string]RuleConfig{
 			"StageNameCasing": {
 				Severity: "warning",
@@ -301,10 +301,15 @@ func TestRulesConfigIncludeExclude(t *testing.T) {
 		t.Error("buildkit/StageNameCasing should be enabled via include")
 	}
 
-	// Exclude takes precedence over include
-	enabled = rc.IsEnabled("buildkit/MaintainerDeprecated")
-	if enabled == nil || *enabled != false {
-		t.Error("buildkit/MaintainerDeprecated should be disabled via exclude")
+	// Include takes precedence over exclude (Ruff-style semantics)
+	// If both include and exclude match, include wins
+	rc2 := &RulesConfig{
+		Include: []string{"buildkit/*"},
+		Exclude: []string{"buildkit/*"}, // Even with wildcard exclude, include wins
+	}
+	enabled = rc2.IsEnabled("buildkit/MaintainerDeprecated")
+	if enabled == nil || *enabled != true {
+		t.Error("buildkit/MaintainerDeprecated should be enabled - include takes precedence")
 	}
 
 	// Tally rules via namespace wildcard
@@ -328,16 +333,31 @@ func TestRulesConfigIncludeExclude(t *testing.T) {
 		t.Error("hadolint/DL3026 should be enabled via include")
 	}
 
-	// Unconfigured rule returns nil (not in include or exclude)
+	// Exclude disables rules not in include
 	enabled = rc.IsEnabled("hadolint/DL3008")
+	if enabled == nil || *enabled != false {
+		t.Error("hadolint/DL3008 should be disabled via exclude")
+	}
+
+	// Unconfigured rule returns nil (not in include or exclude)
+	enabled = rc.IsEnabled("hadolint/DL3009")
 	if enabled != nil {
 		t.Errorf("unconfigured rule should return nil, got %v", *enabled)
 	}
 
-	// Dynamic exclude via append
-	rc.Exclude = append(rc.Exclude, "hadolint/DL3026")
-	enabled = rc.IsEnabled("hadolint/DL3026")
+	// Universal wildcard "*" matches all rules
+	rc3 := &RulesConfig{
+		Include: []string{"hadolint/DL3003"},
+		Exclude: []string{"*"},
+	}
+	// Include still takes precedence even with "*" exclude
+	enabled = rc3.IsEnabled("hadolint/DL3003")
+	if enabled == nil || *enabled != true {
+		t.Error("hadolint/DL3003 should be enabled - include takes precedence over * exclude")
+	}
+	// Other rules are disabled by "*"
+	enabled = rc3.IsEnabled("hadolint/DL3008")
 	if enabled == nil || *enabled != false {
-		t.Error("hadolint/DL3026 should be disabled after adding to exclude")
+		t.Error("hadolint/DL3008 should be disabled via * exclude")
 	}
 }

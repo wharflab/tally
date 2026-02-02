@@ -9,6 +9,13 @@
           "name": "tally",
           "rules": [
             {
+              "id": "buildkit/InvalidDefinitionDescription",
+              "shortDescription": {
+                "text": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment."
+              },
+              "helpUri": "https://docs.docker.com/go/dockerfile/rule/invalid-definition-description/"
+            },
+            {
               "id": "buildkit/MaintainerDeprecated",
               "shortDescription": {
                 "text": "The MAINTAINER instruction is deprecated, use a label instead to define an image author"
@@ -36,8 +43,32 @@
       ],
       "results": [
         {
+          "ruleId": "buildkit/InvalidDefinitionDescription",
+          "ruleIndex": 0,
+          "level": "warning",
+          "message": {
+            "text": "Comment for FROM should follow the format: `# builder \u003cdescription\u003e`"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "testdata/buildkit-warnings/Dockerfile"
+                },
+                "region": {
+                  "startLine": 2,
+                  "startColumn": 1,
+                  "snippet": {
+                    "text": "FROM alpine:3.18 AS Builder"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
           "ruleId": "buildkit/StageNameCasing",
-          "ruleIndex": 1,
+          "ruleIndex": 2,
           "level": "warning",
           "message": {
             "text": "Stage name 'Builder' should be lowercase"
@@ -61,7 +92,7 @@
         },
         {
           "ruleId": "buildkit/MaintainerDeprecated",
-          "ruleIndex": 0,
+          "ruleIndex": 1,
           "level": "warning",
           "message": {
             "text": "Maintainer instruction is deprecated in favor of using label"

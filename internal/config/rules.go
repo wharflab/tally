@@ -72,8 +72,8 @@ type RulesConfig struct {
 	// Include explicitly enables rules.
 	Include []string `json:"include,omitempty" jsonschema:"description=Enable rules by pattern (e.g. buildkit/*)" koanf:"include"`
 
-	// Exclude explicitly disables rules. Takes precedence over Include.
-	Exclude []string `json:"exclude,omitempty" jsonschema:"description=Disable rules by pattern (takes precedence)" koanf:"exclude"`
+	// Exclude explicitly disables rules.
+	Exclude []string `json:"exclude,omitempty" jsonschema:"description=Disable rules by pattern" koanf:"exclude"`
 
 	// Tally contains configuration for tally/* rules.
 	Tally map[string]RuleConfig `json:"tally,omitempty" jsonschema:"description=Configuration for tally/* rules" koanf:"tally"`
@@ -115,20 +115,20 @@ func parseRuleCode(ruleCode string) (string, string) {
 
 // IsEnabled checks if a rule is enabled based on Include/Exclude patterns.
 // Returns nil if no configuration specifies enabled/disabled (use rule default).
-// Exclude takes precedence over Include.
+// Include takes precedence over Exclude (Ruff-style semantics).
 func (rc *RulesConfig) IsEnabled(ruleCode string) *bool {
 	if rc == nil {
 		return nil
 	}
 
-	// Check Exclude first (takes precedence)
-	if matchesAnyPattern(ruleCode, rc.Exclude) {
-		return boolPtr(false)
-	}
-
-	// Check Include
+	// Check Include first (takes precedence)
 	if matchesAnyPattern(ruleCode, rc.Include) {
 		return boolPtr(true)
+	}
+
+	// Check Exclude
+	if matchesAnyPattern(ruleCode, rc.Exclude) {
+		return boolPtr(false)
 	}
 
 	// No explicit config - use rule default
@@ -150,6 +150,11 @@ func matchesAnyPattern(ruleCode string, patterns []string) bool {
 
 // matchesPattern checks if ruleCode matches a single pattern.
 func matchesPattern(ruleCode, pattern string) bool {
+	// Universal wildcard matches everything
+	if pattern == "*" {
+		return true
+	}
+
 	// Exact match
 	if ruleCode == pattern {
 		return true
