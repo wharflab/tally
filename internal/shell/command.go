@@ -277,7 +277,7 @@ func findNestedShellCommands(args []*syntax.Word, variant Variant, nameSet map[s
 			foundDashC = true
 			continue
 		}
-		if strings.HasPrefix(lit, "-") && strings.Contains(lit, "c") {
+		if strings.HasPrefix(lit, "-") && !strings.HasPrefix(lit, "--") && strings.ContainsRune(lit[1:], 'c') {
 			foundDashC = true
 			continue
 		}
