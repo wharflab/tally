@@ -1,4 +1,5 @@
 {
+  "prettier.enable": false,
   // https://golangci-lint.run/docs/welcome/integrations/#visual-studio-code
   "go.lintTool": "golangci-lint",
   "go.lintFlags": ["--path-mode=abs", "--fast-only"],
@@ -19,5 +20,22 @@
   },
   "makefile.configureOnOpen": false,
   "cSpell.enabled": false,
-  "codeQL.githubDatabase.update": "never"
+  "codeQL.githubDatabase.update": "never",
+  "files.exclude": {
+    ".rumdl_cache": true
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "rvben.rumdl",
+    "editor.formatOnSave": true,
+    "editor.wordWrap": "on",
+    "editor.quickSuggestions": {
+      "comments": "off",
+      "strings": "off",
+      "other": "off"
+    },
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "files.insertFinalNewline": true
+  }
 }

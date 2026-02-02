@@ -69,3 +69,5 @@ __pycache__/
 packaging/rubygems/libexec/
 packaging/rubygems/pkg/
 *.gem
+
+.rumdl_cache/

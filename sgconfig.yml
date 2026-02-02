@@ -1,0 +1,27 @@
+language: go
+ruleDirs:
+  - .sg/rules
+
+testConfigs:
+  - testDir: .sg/tests
+
+utilDirs:
+  - .sg/utils
+
+# Exclude common directories and files from scanning
+ignoreFiles:
+  # Version control and git worktrees
+  - .git/**/*
+  - .worktrees/**/*
+
+  # IDE and editor files
+  - .idea/**/*
+  - .vscode/**/*
+  - .cursor/**/*
+  - .windsurf/**/*
+  - "*.swp"
+
+  # Miscellaneous
+  - .DS_Store
+  - "*.log"
+  - CLAUDE.local.md

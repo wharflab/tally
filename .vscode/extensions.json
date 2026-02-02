@@ -7,6 +7,8 @@
     "ms-vscode.makefile-tools",
     "joshbolduc.commitlint",
     "docker.docker",
-    "codecov.codecov"
+    "codecov.codecov",
+    "ast-grep.ast-grep-vscode",
+    "redhat.vscode-yaml"
   ]
 }
