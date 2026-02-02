@@ -35,7 +35,7 @@
     },
   },
   "[yaml]": {
-    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.defaultFormatter": "JasonHeld.yamllint-ts",
     "files.insertFinalNewline": true
   }
 }

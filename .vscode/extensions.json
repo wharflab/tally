@@ -9,6 +9,7 @@
     "docker.docker",
     "codecov.codecov",
     "ast-grep.ast-grep-vscode",
-    "redhat.vscode-yaml"
+    "redhat.vscode-yaml",
+    "jasonheld.yamllint-ts"
   ]
 }

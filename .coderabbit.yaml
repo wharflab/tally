@@ -12,11 +12,13 @@ reviews:
     enabled: true
     drafts: false
     labels:
-      - '!autorelease: tagged' # release-please
+      - '!autorelease: tagged'  # release-please
   tools:
     ast-grep:
-      rule_dirs: .sg/rules
-      util_dirs: .sg/utils
+      rule_dirs:
+        - ".sg/rules"
+      util_dirs:
+        - ".sg/utils"
     golangci-lint:
       enabled: true
     shellcheck:
