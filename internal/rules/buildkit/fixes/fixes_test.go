@@ -616,6 +616,24 @@ func TestMaintainerDeprecatedFix(t *testing.T) {
 			source:  "MAINTAINER   ",
 			wantFix: false,
 		},
+		{
+			name:     "maintainer with embedded quotes",
+			source:   `MAINTAINER John "The Dev" Doe <john@example.com>`,
+			wantFix:  true,
+			wantText: `LABEL org.opencontainers.image.authors="John \"The Dev\" Doe <john@example.com>"`,
+		},
+		{
+			name:     "maintainer with backslash",
+			source:   `MAINTAINER John\Doe <john@example.com>`,
+			wantFix:  true,
+			wantText: `LABEL org.opencontainers.image.authors="John\\Doe <john@example.com>"`,
+		},
+		{
+			name:     "maintainer with both quotes and backslash",
+			source:   `MAINTAINER "John \"Dev\" Doe\Developer" <john@example.com>`,
+			wantFix:  true,
+			wantText: `LABEL org.opencontainers.image.authors="John \\\"Dev\\\" Doe\\Developer\" <john@example.com>"`,
+		},
 	}
 
 	for _, tt := range tests {

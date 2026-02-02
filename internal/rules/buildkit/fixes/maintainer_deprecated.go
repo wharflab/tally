@@ -2,6 +2,7 @@ package fixes
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/tinovyatkin/tally/internal/rules"
@@ -47,8 +48,9 @@ func enrichMaintainerDeprecatedFix(v *rules.Violation, source []byte) {
 	// Remove surrounding quotes if present (they'll be re-added in the label)
 	maintainerValue = strings.Trim(maintainerValue, `"'`)
 
-	// Create the replacement LABEL instruction
-	newText := `LABEL org.opencontainers.image.authors="` + maintainerValue + `"`
+	// Create the replacement LABEL instruction (properly escaped)
+	quoted := strconv.Quote(maintainerValue)
+	newText := `LABEL org.opencontainers.image.authors=` + quoted
 
 	v.SuggestedFix = &rules.SuggestedFix{
 		Description: "Replace MAINTAINER with org.opencontainers.image.authors label",
