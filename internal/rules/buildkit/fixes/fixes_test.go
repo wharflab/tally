@@ -568,6 +568,80 @@ func TestHasContinuationBefore(t *testing.T) {
 }
 
 
+func TestMaintainerDeprecatedFix(t *testing.T) {
+	tests := []struct {
+		name      string
+		source    string
+		wantFix   bool
+		wantText  string
+	}{
+		{
+			name:     "simple maintainer with email",
+			source:   "MAINTAINER john@example.com",
+			wantFix:  true,
+			wantText: `LABEL org.opencontainers.image.authors="john@example.com"`,
+		},
+		{
+			name:     "maintainer with name and email",
+			source:   "MAINTAINER John Doe <john@example.com>",
+			wantFix:  true,
+			wantText: `LABEL org.opencontainers.image.authors="John Doe <john@example.com>"`,
+		},
+		{
+			name:     "maintainer with double quotes",
+			source:   `MAINTAINER "John Doe <john@example.com>"`,
+			wantFix:  true,
+			wantText: `LABEL org.opencontainers.image.authors="John Doe <john@example.com>"`,
+		},
+		{
+			name:     "maintainer with single quotes",
+			source:   `MAINTAINER 'John Doe <john@example.com>'`,
+			wantFix:  true,
+			wantText: `LABEL org.opencontainers.image.authors="John Doe <john@example.com>"`,
+		},
+		{
+			name:     "maintainer with extra whitespace",
+			source:   "MAINTAINER   john@example.com  ",
+			wantFix:  true,
+			wantText: `LABEL org.opencontainers.image.authors="john@example.com"`,
+		},
+		{
+			name:     "lowercase maintainer",
+			source:   "maintainer john@example.com",
+			wantFix:  true,
+			wantText: `LABEL org.opencontainers.image.authors="john@example.com"`,
+		},
+		{
+			name:    "empty maintainer value",
+			source:  "MAINTAINER   ",
+			wantFix: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source := []byte(tt.source)
+			v := rules.Violation{
+				Location: rules.NewRangeLocation("test.Dockerfile", 1, 0, 1, len(tt.source)),
+				RuleCode: rules.BuildKitRulePrefix + "MaintainerDeprecated",
+				Message:  "Maintainer instruction is deprecated in favor of using label",
+			}
+
+			enrichMaintainerDeprecatedFix(&v, source)
+
+			if tt.wantFix {
+				require.NotNil(t, v.SuggestedFix, "expected a fix")
+				assert.Len(t, v.SuggestedFix.Edits, 1)
+				assert.Equal(t, tt.wantText, v.SuggestedFix.Edits[0].NewText)
+				assert.Equal(t, rules.FixSafe, v.SuggestedFix.Safety)
+				assert.True(t, v.SuggestedFix.IsPreferred)
+			} else {
+				assert.Nil(t, v.SuggestedFix, "expected no fix")
+			}
+		})
+	}
+}
+
 func TestFindFROMBaseName(t *testing.T) {
 	tests := []struct {
 		name      string

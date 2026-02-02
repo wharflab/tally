@@ -36,6 +36,8 @@ func EnrichBuildKitFixes(violations []rules.Violation, sem *semantic.Model, sour
 			enrichFromAsCasingFix(v, source)
 		case "NoEmptyContinuation":
 			enrichNoEmptyContinuationFix(v, source)
+		case "MaintainerDeprecated":
+			enrichMaintainerDeprecatedFix(v, source)
 		}
 	}
 }

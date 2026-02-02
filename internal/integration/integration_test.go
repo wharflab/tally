@@ -114,6 +114,7 @@ func TestCheck(t *testing.T) {
 		// BuildKit linter warnings tests
 		{name: "buildkit-warnings", dir: "buildkit-warnings", args: []string{"--format", "json"}, wantExit: 1},
 		{name: "empty-continuation", dir: "empty-continuation", args: []string{"--format", "json"}, wantExit: 1},
+		{name: "maintainer-deprecated", dir: "maintainer-deprecated", args: []string{"--format", "json"}, wantExit: 1},
 
 		// Semantic model construction-time violations
 		{name: "duplicate-stage-name", dir: "duplicate-stage-name", args: []string{"--format", "json"}, wantExit: 1},
@@ -421,6 +422,14 @@ RUN apt-get install curl
 `,
 			args:        []string{"--fix", "--fix-unsafe"},
 			wantApplied: 2, // DL3003 + DL3027
+		},
+		// MaintainerDeprecated: Replace MAINTAINER with LABEL
+		{
+			name:        "maintainer-deprecated",
+			input:       "FROM alpine:3.18\nMAINTAINER John Doe <john@example.com>\nRUN echo hello\n",
+			want:        "FROM alpine:3.18\nLABEL org.opencontainers.image.authors=\"John Doe <john@example.com>\"\nRUN echo hello\n",
+			args:        []string{"--fix"},
+			wantApplied: 1,
 		},
 	}
 

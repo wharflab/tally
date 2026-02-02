@@ -1,0 +1,59 @@
+{
+  "files": [
+    {
+      "file": "testdata/maintainer-deprecated/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/maintainer-deprecated/Dockerfile",
+            "start": {
+              "line": 2,
+              "column": 0
+            },
+            "end": {
+              "line": 2,
+              "column": 0
+            }
+          },
+          "rule": "buildkit/MaintainerDeprecated",
+          "message": "Maintainer instruction is deprecated in favor of using label",
+          "detail": "The MAINTAINER instruction is deprecated, use a label instead to define an image author",
+          "severity": "warning",
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/maintainer-deprecated/",
+          "sourceCode": "MAINTAINER John Doe \u003cjohn@example.com\u003e",
+          "suggestedFix": {
+            "description": "Replace MAINTAINER with org.opencontainers.image.authors label",
+            "edits": [
+              {
+                "location": {
+                  "file": "testdata/maintainer-deprecated/Dockerfile",
+                  "start": {
+                    "line": 2,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 2,
+                    "column": 38
+                  }
+                },
+                "newText": "LABEL org.opencontainers.image.authors=\"John Doe \u003cjohn@example.com\u003e\""
+              }
+            ],
+            "isPreferred": true
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "errors": 0,
+    "warnings": 1,
+    "info": 0,
+    "style": 0,
+    "files": 1
+  },
+  "files_scanned": 1,
+  "rules_enabled": 37
+}
+

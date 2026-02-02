@@ -89,7 +89,7 @@ These rules are automatically captured from BuildKit during Dockerfile parsing:
 | `buildkit/DuplicateStageName` | Stage names should be unique | Warning | ✅ Captured |
 | `buildkit/ReservedStageName` | Reserved words should not be stage names | Warning | ✅ Captured |
 | `buildkit/JSONArgsRecommended` | JSON args recommended for ENTRYPOINT/CMD | Warning | ✅ Captured |
-| `buildkit/MaintainerDeprecated` | MAINTAINER is deprecated; use LABEL | Warning | ✅ Captured |
+| `buildkit/MaintainerDeprecated` | MAINTAINER is deprecated; use LABEL | Warning | ✅🔧 Captured |
 | `buildkit/UndefinedArgInFrom` | FROM must use declared ARGs | Warning | ✅ Captured |
 | `buildkit/UndefinedVar` | Variables should be defined before use | Warning | ✅ Captured |
 | `buildkit/MultipleInstructionsDisallowed` | Avoid repeating instructions in a stage | Warning | ✅ Captured |
