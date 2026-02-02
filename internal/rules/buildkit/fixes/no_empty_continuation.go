@@ -104,6 +104,14 @@ func splitLines(source []byte) [][]byte {
 func findEmptyContinuationLines(lines [][]byte, endLineIdx int) []int {
 	var emptyIndices []int
 
+	// Check if the end line itself is empty (happens when empty line is at EOF)
+	if endLineIdx < len(lines) {
+		trimmed := bytes.TrimSpace(lines[endLineIdx])
+		if len(trimmed) == 0 && endLineIdx > 0 && hasContinuationBefore(lines, endLineIdx) {
+			emptyIndices = append(emptyIndices, endLineIdx)
+		}
+	}
+
 	// Scan backward from the end line
 	// Look for the pattern: content ending with '\', followed by empty line(s)
 scanLoop:
