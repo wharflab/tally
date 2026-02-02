@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"github.com/knadh/koanf/parsers/toml/v2"
-	"github.com/knadh/koanf/providers/env"
+	"github.com/knadh/koanf/providers/env/v2"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/providers/structs"
 	"github.com/knadh/koanf/v2"
@@ -136,7 +136,10 @@ func loadWithConfigPath(configPath string) (*Config, error) {
 
 	// 3. Load environment variables (TALLY_* prefix)
 	// TALLY_RULES_MAX_LINES_MAX -> rules.max-lines.max
-	if err := k.Load(env.Provider(EnvPrefix, ".", envKeyTransform), nil); err != nil {
+	if err := k.Load(env.Provider(".", env.Opt{
+		Prefix:        EnvPrefix,
+		TransformFunc: envKeyTransform,
+	}), nil); err != nil {
 		return nil, err
 	}
 
@@ -167,9 +170,9 @@ var knownHyphenatedKeys = map[string]string{
 // envKeyTransform converts environment variable names to config keys.
 // TALLY_FORMAT -> format
 // TALLY_RULES_MAX_LINES_MAX -> rules.max-lines.max
-func envKeyTransform(s string) string {
-	// Remove TALLY_ prefix
-	s = strings.TrimPrefix(s, EnvPrefix)
+func envKeyTransform(k, v string) (string, any) {
+	// Remove TALLY_ prefix (already stripped by Prefix option, but keeping for safety)
+	s := strings.TrimPrefix(k, EnvPrefix)
 	// Convert to lowercase and replace _ with . for nesting
 	s = strings.ToLower(s)
 	// Handle the special case of max-lines (underscores in key names)
@@ -180,7 +183,7 @@ func envKeyTransform(s string) string {
 	for pattern, replacement := range knownHyphenatedKeys {
 		s = strings.ReplaceAll(s, pattern, replacement)
 	}
-	return s
+	return s, v
 }
 
 // Discover finds the closest config file for a target file path.

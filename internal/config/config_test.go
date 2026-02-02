@@ -263,7 +263,7 @@ func TestEnvKeyTransform(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		got := envKeyTransform(tt.input)
+		got, _ := envKeyTransform(tt.input, "test-value")
 		if got != tt.want {
 			t.Errorf("envKeyTransform(%q) = %q, want %q", tt.input, got, tt.want)
 		}

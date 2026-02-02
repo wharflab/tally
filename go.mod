@@ -10,7 +10,6 @@ require (
 	github.com/gkampitakis/go-snaps v0.5.19
 	github.com/knadh/koanf/parsers/toml/v2 v2.2.0
 	github.com/knadh/koanf/providers/confmap v1.0.0
-	github.com/knadh/koanf/providers/env v1.1.0
 	github.com/knadh/koanf/providers/env/v2 v2.0.0
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/providers/structs v1.0.0
@@ -19,7 +18,6 @@ require (
 	github.com/moby/patternmatcher v0.6.0
 	github.com/muesli/termenv v0.16.0
 	github.com/owenrumney/go-sarif/v2 v2.3.3
-	github.com/owenrumney/go-sarif/v3 v3.3.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v3 v3.6.2
