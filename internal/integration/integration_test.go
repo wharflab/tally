@@ -164,41 +164,44 @@ func TestCheck(t *testing.T) {
 			wantExit: 1,
 		},
 
-		// Semantic model construction-time violations (isolated to specific rules)
+		// Semantic model construction-time violations
+		// Note: These violations come from semantic analysis, not the rule registry.
+		// We don't filter rules here because semantic violations would be filtered out.
+		// These 6 tests use full rule count and will need updating when new rules are added.
 		{
 			name:     "duplicate-stage-name",
 			dir:      "duplicate-stage-name",
-			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3024", "tally/no-unreachable-stages")...),
+			args:     []string{"--format", "json"},
 			wantExit: 1,
 		},
 		{
 			name:     "multiple-healthcheck",
 			dir:      "multiple-healthcheck",
-			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3012")...),
+			args:     []string{"--format", "json"},
 			wantExit: 1,
 		},
 		{
 			name:     "copy-from-own-alias",
 			dir:      "copy-from-own-alias",
-			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3023")...),
+			args:     []string{"--format", "json"},
 			wantExit: 1,
 		},
 		{
 			name:     "onbuild-forbidden",
 			dir:      "onbuild-forbidden",
-			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3043")...),
+			args:     []string{"--format", "json"},
 			wantExit: 1,
 		},
 		{
 			name:     "invalid-instruction-order",
 			dir:      "invalid-instruction-order",
-			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3061")...),
+			args:     []string{"--format", "json"},
 			wantExit: 1,
 		},
 		{
 			name:     "no-from-instruction",
 			dir:      "no-from-instruction",
-			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3061")...),
+			args:     []string{"--format", "json"},
 			wantExit: 1,
 		},
 
