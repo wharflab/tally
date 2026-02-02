@@ -38,19 +38,10 @@ func IterateWrapperArgs(args []*syntax.Word, wrapperName string, callback func(W
 			continue
 		}
 		if strings.HasPrefix(lit, "-") {
-			// Check if this flag consumes the next argument
+			// Only skip the next argument when the flag is known to consume a value.
+			// Unknown short flags (like -k, -i) are assumed to be boolean.
 			if optionsWithValues != nil && optionsWithValues[lit] {
 				skipNext = true
-			} else if len(lit) == 2 && lit != "--" {
-				// Only skip if the next token doesn't look like a command/wrapper.
-				// This avoids incorrectly skipping commands after boolean flags like -i or -k.
-				if i+1 < len(args) {
-					nextLit := args[i+1].Lit()
-					nextName := pathBase(nextLit)
-					if nextLit != "" && !commandWrappers[nextName] && !shellWrappers[nextName] {
-						skipNext = true
-					}
-				}
 			}
 			continue
 		}
