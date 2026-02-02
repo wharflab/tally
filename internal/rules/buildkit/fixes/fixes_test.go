@@ -632,7 +632,19 @@ func TestMaintainerDeprecatedFix(t *testing.T) {
 			name:     "maintainer with both quotes and backslash",
 			source:   `MAINTAINER "John \"Dev\" Doe\Developer" <john@example.com>`,
 			wantFix:  true,
-			wantText: `LABEL org.opencontainers.image.authors="John \\\"Dev\\\" Doe\\Developer\" <john@example.com>"`,
+			wantText: `LABEL org.opencontainers.image.authors="\"John \\\"Dev\\\" Doe\\Developer\" <john@example.com>"`,
+		},
+		{
+			name:     "maintainer with unmatched leading quote",
+			source:   `MAINTAINER "John Doe <john@example.com>`,
+			wantFix:  true,
+			wantText: `LABEL org.opencontainers.image.authors="\"John Doe <john@example.com>"`,
+		},
+		{
+			name:     "maintainer with unmatched trailing quote",
+			source:   `MAINTAINER John Doe" <john@example.com>`,
+			wantFix:  true,
+			wantText: `LABEL org.opencontainers.image.authors="John Doe\" <john@example.com>"`,
 		},
 	}
 

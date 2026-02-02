@@ -45,8 +45,13 @@ func enrichMaintainerDeprecatedFix(v *rules.Violation, source []byte) {
 		return
 	}
 
-	// Remove surrounding quotes if present (they'll be re-added in the label)
-	maintainerValue = strings.Trim(maintainerValue, `"'`)
+	// Remove surrounding quotes only when they wrap the full value
+	if len(maintainerValue) >= 2 {
+		if (maintainerValue[0] == '"' && maintainerValue[len(maintainerValue)-1] == '"') ||
+			(maintainerValue[0] == '\'' && maintainerValue[len(maintainerValue)-1] == '\'') {
+			maintainerValue = maintainerValue[1 : len(maintainerValue)-1]
+		}
+	}
 
 	// Create the replacement LABEL instruction (properly escaped)
 	quoted := strconv.Quote(maintainerValue)
