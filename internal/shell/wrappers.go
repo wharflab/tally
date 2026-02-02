@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"path"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
@@ -53,7 +54,7 @@ func IterateWrapperArgs(args []*syntax.Word, wrapperName string, callback func(W
 		wa := WrapperArg{
 			Arg:           arg,
 			Index:         i,
-			Name:          pathBase(lit),
+			Name:          path.Base(lit),
 			RemainingArgs: args[i+1:],
 		}
 
@@ -61,19 +62,4 @@ func IterateWrapperArgs(args []*syntax.Word, wrapperName string, callback func(W
 			break
 		}
 	}
-}
-
-// pathBase returns the base name from a path, handling empty strings.
-// Equivalent to path.Base but avoids import for simple case.
-func pathBase(p string) string {
-	if p == "" {
-		return ""
-	}
-	// Find last slash
-	for i := len(p) - 1; i >= 0; i-- {
-		if p[i] == '/' {
-			return p[i+1:]
-		}
-	}
-	return p
 }
