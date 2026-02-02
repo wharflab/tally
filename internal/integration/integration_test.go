@@ -70,7 +70,11 @@ func TestMain(m *testing.M) {
 // selectRules returns args to disable all rules except the specified ones.
 // This isolates tests from global rule count changes.
 func selectRules(rules ...string) []string {
-	args := []string{"--ignore", "*"}
+	if len(rules) == 0 {
+		panic("selectRules requires at least one rule")
+	}
+	args := make([]string, 0, 2+2*len(rules))
+	args = append(args, "--ignore", "*")
 	for _, r := range rules {
 		args = append(args, "--select", r)
 	}
