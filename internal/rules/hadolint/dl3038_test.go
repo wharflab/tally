@@ -173,3 +173,62 @@ func TestDL3038Rule_Metadata(t *testing.T) {
 		t.Errorf("got doc URL %q, want %q", meta.DocURL, "https://github.com/hadolint/hadolint/wiki/DL3038")
 	}
 }
+
+// TestDL3038_AutoFix verifies that DL3038 provides auto-fix suggestions.
+func TestDL3038_AutoFix(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		dockerfile    string
+		wantFix       bool
+		wantInsertCol int
+		wantNewText   string
+	}{
+		{
+			name: "simple dnf install",
+			dockerfile: `FROM fedora
+RUN dnf install httpd`,
+			wantFix:       true,
+			wantInsertCol: 15, // After "install"
+			wantNewText:   " -y",
+		},
+		{
+			name: "microdnf install with package",
+			dockerfile: `FROM fedora
+RUN microdnf install curl wget`,
+			wantFix:       true,
+			wantInsertCol: 20, // After "install" (RUN=0-2, space=3, microdnf=4-11, space=12, install=13-19, end=20)
+			wantNewText:   " -y",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
+			r := NewDL3038Rule()
+			violations := r.Check(input)
+
+			if len(violations) == 0 {
+				t.Fatal("expected at least one violation")
+			}
+
+			v := violations[0]
+			if tt.wantFix {
+				if v.SuggestedFix == nil {
+					t.Fatal("expected SuggestedFix")
+				}
+				if len(v.SuggestedFix.Edits) == 0 {
+					t.Fatal("expected at least one edit")
+				}
+				edit := v.SuggestedFix.Edits[0]
+				if edit.Location.Start.Column != tt.wantInsertCol {
+					t.Errorf("insert column = %d, want %d", edit.Location.Start.Column, tt.wantInsertCol)
+				}
+				if edit.NewText != tt.wantNewText {
+					t.Errorf("NewText = %q, want %q", edit.NewText, tt.wantNewText)
+				}
+			}
+		})
+	}
+}
