@@ -133,7 +133,7 @@ scanLoop:
 		default:
 			// Found a non-continuation, non-empty line
 			// If it's not part of the same multi-line command, stop
-			if !isPartOfMultilineCommand(lines, i) {
+			if !hasContinuationBefore(lines, i) {
 				break scanLoop
 			}
 		}
@@ -148,32 +148,14 @@ scanLoop:
 }
 
 // hasContinuationBefore checks if any preceding non-empty line ends with '\'.
-func hasContinuationBefore(lines [][]byte, emptyIdx int) bool {
-	for i := emptyIdx - 1; i >= 0; i-- {
+// startIdx is exclusive - scanning starts from startIdx-1.
+func hasContinuationBefore(lines [][]byte, startIdx int) bool {
+	for i := startIdx - 1; i >= 0; i-- {
 		trimmed := bytes.TrimSpace(lines[i])
 		if len(trimmed) == 0 {
-			// Skip empty lines
 			continue
 		}
-		// Found a non-empty line - check if it ends with '\'
 		return bytes.HasSuffix(trimmed, []byte("\\"))
-	}
-	return false
-}
-
-// isPartOfMultilineCommand checks if a line is part of a multi-line command.
-// A line is part of a multi-line command if a preceding line ends with '\'.
-func isPartOfMultilineCommand(lines [][]byte, lineIdx int) bool {
-	for i := lineIdx - 1; i >= 0; i-- {
-		trimmed := bytes.TrimSpace(lines[i])
-		if len(trimmed) == 0 {
-			continue
-		}
-		if bytes.HasSuffix(trimmed, []byte("\\")) {
-			return true
-		}
-		// Found a line that doesn't continue - not part of multi-line
-		return false
 	}
 	return false
 }

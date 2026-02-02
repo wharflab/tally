@@ -522,6 +522,37 @@ func TestHasContinuationBefore(t *testing.T) {
 			emptyIdx: 1,
 			want:     true,
 		},
+		// Additional cases (from isPartOfMultilineCommand consolidation)
+		{
+			name:     "line after continuation",
+			lines:    []string{"RUN echo \\", "done"},
+			emptyIdx: 1,
+			want:     true,
+		},
+		{
+			name:     "line not after continuation",
+			lines:    []string{"RUN echo", "done"},
+			emptyIdx: 1,
+			want:     false,
+		},
+		{
+			name:     "first line",
+			lines:    []string{"RUN echo"},
+			emptyIdx: 0,
+			want:     false,
+		},
+		{
+			name:     "line after empty line after continuation",
+			lines:    []string{"RUN echo \\", "", "done"},
+			emptyIdx: 2,
+			want:     true,
+		},
+		{
+			name:     "line after multiple empty lines no continuation",
+			lines:    []string{"RUN echo", "", "", "done"},
+			emptyIdx: 3,
+			want:     false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -536,56 +567,6 @@ func TestHasContinuationBefore(t *testing.T) {
 	}
 }
 
-func TestIsPartOfMultilineCommand(t *testing.T) {
-	tests := []struct {
-		name    string
-		lines   []string
-		lineIdx int
-		want    bool
-	}{
-		{
-			name:    "line after continuation",
-			lines:   []string{"RUN echo \\", "done"},
-			lineIdx: 1,
-			want:    true,
-		},
-		{
-			name:    "line not after continuation",
-			lines:   []string{"RUN echo", "done"},
-			lineIdx: 1,
-			want:    false,
-		},
-		{
-			name:    "first line",
-			lines:   []string{"RUN echo"},
-			lineIdx: 0,
-			want:    false,
-		},
-		{
-			name:    "line after empty line after continuation",
-			lines:   []string{"RUN echo \\", "", "done"},
-			lineIdx: 2,
-			want:    true,
-		},
-		{
-			name:    "line after multiple empty lines no continuation",
-			lines:   []string{"RUN echo", "", "", "done"},
-			lineIdx: 3,
-			want:    false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			lines := make([][]byte, len(tt.lines))
-			for i, s := range tt.lines {
-				lines[i] = []byte(s)
-			}
-			got := isPartOfMultilineCommand(lines, tt.lineIdx)
-			assert.Equal(t, tt.want, got)
-		})
-	}
-}
 
 func TestFindFROMBaseName(t *testing.T) {
 	tests := []struct {
