@@ -28,7 +28,7 @@ func (r *DL3030Rule) Metadata() rules.RuleMetadata {
 }
 
 // yumInstallSubcommands are the yum subcommands that require -y flag.
-var yumInstallSubcommands = []string{"install", "groupinstall", "localinstall"}
+var yumInstallSubcommands = []string{"install", "groupinstall", "localinstall", "reinstall"}
 
 // Check runs the DL3030 rule.
 func (r *DL3030Rule) Check(input rules.LintInput) []rules.Violation {

@@ -73,6 +73,18 @@ RUN yum localinstall -y package.rpm`,
 			wantCount: 0,
 		},
 		{
+			name: "yum reinstall without -y",
+			dockerfile: `FROM centos
+RUN yum reinstall httpd`,
+			wantCount: 1,
+		},
+		{
+			name: "yum reinstall -y",
+			dockerfile: `FROM centos
+RUN yum reinstall -y httpd`,
+			wantCount: 0,
+		},
+		{
 			name: "yum update (no violation)",
 			dockerfile: `FROM centos
 RUN yum update`,
