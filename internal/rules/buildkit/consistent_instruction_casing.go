@@ -42,6 +42,18 @@ func (r *ConsistentInstructionCasingRule) Check(input rules.LintInput) []rules.V
 	// First pass: count upper vs lower case instructions
 	var lowerCount, upperCount int
 
+	// Check MetaArgs (ARG instructions before first FROM)
+	for _, arg := range input.MetaArgs {
+		cmdName := arg.Name()
+		if isSelfConsistentCasing(cmdName) {
+			if strings.ToLower(cmdName) == cmdName {
+				lowerCount++
+			} else {
+				upperCount++
+			}
+		}
+	}
+
 	for _, stage := range input.Stages {
 		// Check FROM instruction casing
 		if isSelfConsistentCasing(stage.OrigCmd) {
@@ -71,6 +83,13 @@ func (r *ConsistentInstructionCasingRule) Check(input rules.LintInput) []rules.V
 
 	// Second pass: report violations
 	var violations []rules.Violation
+
+	// Check MetaArgs for violations
+	for _, arg := range input.MetaArgs {
+		if v := r.checkCasing(arg.Name(), isMajorityLower, arg.Location(), input.File); v != nil {
+			violations = append(violations, *v)
+		}
+	}
 
 	for _, stage := range input.Stages {
 		if v := r.checkCasing(stage.OrigCmd, isMajorityLower, stage.Location, input.File); v != nil {
