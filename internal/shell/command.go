@@ -79,7 +79,7 @@ func (c *CommandInfo) HasAnyFlag(flags ...string) bool {
 // Useful for checking flags like -q -q (equivalent to -qq).
 func (c *CommandInfo) CountFlag(flag string) int {
 	normalizedFlag := strings.TrimLeft(flag, "-")
-	isLong := strings.HasPrefix(flag, "--") || len(normalizedFlag) > 1
+	isLong := strings.HasPrefix(flag, "--")
 	count := 0
 
 	for _, arg := range c.Args {
@@ -92,8 +92,8 @@ func (c *CommandInfo) CountFlag(flag string) int {
 			if arg == "--"+normalizedFlag {
 				count++
 			}
-		} else {
-			// Short flag
+		} else if len(normalizedFlag) == 1 {
+			// Short flag: only count single-char flags in combined args
 			if strings.HasPrefix(arg, "--") {
 				continue
 			}
