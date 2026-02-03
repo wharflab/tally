@@ -58,9 +58,12 @@ type hadolintStatusFile struct {
 }
 
 func main() {
-	targets := parseTargets()
-	if !targets.updateReadme && !targets.updateSummary && !targets.updateBuildkit {
-		fmt.Fprintln(os.Stderr, "Nothing to do: use --update, --update-readme, --update-summary, or --update-buildkit")
+	targets, err := parseTargets()
+	if err != nil {
+		fatalf("%v", err)
+	}
+	if !targets.readme && !targets.summary && !targets.buildkit {
+		fmt.Fprintln(os.Stderr, "Nothing to do: use --update/--check or their per-file variants")
 		os.Exit(2)
 	}
 
@@ -69,30 +72,55 @@ func main() {
 	}
 }
 
+type runMode int
+
+const (
+	modeUpdate runMode = iota
+	modeCheck
+)
+
 type targets struct {
-	updateReadme   bool
-	updateSummary  bool
-	updateBuildkit bool
+	mode     runMode
+	readme   bool
+	summary  bool
+	buildkit bool
 }
 
-func parseTargets() targets {
+func parseTargets() (targets, error) {
 	update := flag.Bool("update", false, "Update RULES.md and README.md in place")
 	updateReadme := flag.Bool("update-readme", false, "Update README.md in place")
 	updateSummary := flag.Bool("update-summary", false, "Update RULES.md summary table in place")
 	updateBuildkt := flag.Bool("update-buildkit", false, "Update BuildKit section in RULES.md in place")
+
+	check := flag.Bool("check", false, "Verify README.md / RULES.md are up to date (no changes)")
+	checkReadme := flag.Bool("check-readme", false, "Verify README.md is up to date (no changes)")
+	checkSummary := flag.Bool("check-summary", false, "Verify RULES.md summary table is up to date (no changes)")
+	checkBuildkt := flag.Bool("check-buildkit", false, "Verify BuildKit section in RULES.md is up to date (no changes)")
 	flag.Parse()
 
-	if *update {
+	checkRequested := *check || *checkReadme || *checkSummary || *checkBuildkt
+	updateRequested := *update || *updateReadme || *updateSummary || *updateBuildkt
+	if checkRequested && updateRequested {
+		return targets{}, errors.New("cannot combine --update* and --check* flags")
+	}
+
+	mode := modeUpdate
+	if checkRequested {
+		mode = modeCheck
+	}
+
+	if *update || *check {
 		*updateReadme = true
 		*updateSummary = true
 		*updateBuildkt = true
 	}
 
 	return targets{
-		updateReadme:   *updateReadme,
-		updateSummary:  *updateSummary,
-		updateBuildkit: *updateBuildkt,
-	}
+		mode:     mode,
+		readme:   *updateReadme || *checkReadme,
+		summary:  *updateSummary || *checkSummary,
+		buildkit: *updateBuildkt || *checkBuildkt,
+	}, nil
 }
 
 func run(targets targets) error {
@@ -140,14 +168,21 @@ func run(targets targets) error {
 		)
 	}
 
-	if targets.updateReadme {
+	if targets.readme {
 		readmeBlock := renderReadmeRulesTable(buildkitSupported, buildkitTotal, tallyCount, hadolintSupported)
-		if err := replaceBetweenMarkers(readmePath, readmeBeginMarker, readmeEndMarker, readmeBlock); err != nil {
-			return fmt.Errorf("failed to update %s: %w", readmePath, err)
+		if err := applyOrCheck(
+			targets.mode,
+			readmePath,
+			readmeBeginMarker,
+			readmeEndMarker,
+			readmeBlock,
+			"go run ./scripts/sync-buildkit-rules --update-readme",
+		); err != nil {
+			return err
 		}
 	}
 
-	if targets.updateSummary {
+	if targets.summary {
 		summaryBlock := renderRulesSummaryTable(
 			tallyCount,
 			len(implementedRows),
@@ -157,12 +192,19 @@ func run(targets targets) error {
 			hadolintCovered,
 			hadolintTotal,
 		)
-		if err := replaceBetweenMarkers(rulesPath, rulesSummaryBeginMarker, rulesSummaryEndMarker, summaryBlock); err != nil {
-			return fmt.Errorf("failed to update %s summary: %w", rulesPath, err)
+		if err := applyOrCheck(
+			targets.mode,
+			rulesPath,
+			rulesSummaryBeginMarker,
+			rulesSummaryEndMarker,
+			summaryBlock,
+			"go run ./scripts/sync-buildkit-rules --update-summary",
+		); err != nil {
+			return err
 		}
 	}
 
-	if targets.updateBuildkit {
+	if targets.buildkit {
 		buildkitBlock := renderRulesBuildkitSection(
 			buildkitSupported,
 			buildkitTotal,
@@ -175,12 +217,36 @@ func run(targets targets) error {
 			implBuildkitMeta,
 			fixable,
 		)
-		if err := replaceBetweenMarkers(rulesPath, buildkitBeginMarker, buildkitEndMarker, buildkitBlock); err != nil {
-			return fmt.Errorf("failed to update %s: %w", rulesPath, err)
+		if err := applyOrCheck(
+			targets.mode,
+			rulesPath,
+			buildkitBeginMarker,
+			buildkitEndMarker,
+			buildkitBlock,
+			"go run ./scripts/sync-buildkit-rules --update-buildkit",
+		); err != nil {
+			return err
 		}
 	}
 
 	return nil
+}
+
+func applyOrCheck(mode runMode, path, beginMarker, endMarker, newContent, fixCmd string) error {
+	switch mode {
+	case modeUpdate:
+		if err := replaceBetweenMarkers(path, beginMarker, endMarker, newContent); err != nil {
+			return fmt.Errorf("failed to update %s: %w", path, err)
+		}
+		return nil
+	case modeCheck:
+		if err := checkBetweenMarkers(path, beginMarker, endMarker, newContent); err != nil {
+			return fmt.Errorf("%s out of date: %w\nFix: %s", path, err, fixCmd)
+		}
+		return nil
+	default:
+		return errors.New("unknown mode")
+	}
 }
 
 func classifyBuildkitRules(
@@ -823,6 +889,44 @@ func replaceBetweenMarkers(path, beginMarker, endMarker, newContent string) erro
 		mode = info.Mode().Perm()
 	}
 	return os.WriteFile(path, out.Bytes(), mode)
+}
+
+func checkBetweenMarkers(path, beginMarker, endMarker, newContent string) error {
+	orig, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	begin := bytes.Index(orig, []byte(beginMarker))
+	if begin == -1 {
+		return fmt.Errorf("begin marker not found: %s", beginMarker)
+	}
+	searchFrom := begin + len(beginMarker)
+	endRel := bytes.Index(orig[searchFrom:], []byte(endMarker))
+	if endRel == -1 {
+		return fmt.Errorf("end marker not found: %s", endMarker)
+	}
+	end := searchFrom + endRel
+	if end < begin {
+		return errors.New("end marker occurs before begin marker")
+	}
+
+	beginEnd := begin + len(beginMarker)
+	existing := string(orig[beginEnd:end])
+
+	normalize := func(s string) string {
+		s = strings.ReplaceAll(s, "\r\n", "\n")
+		s = strings.TrimPrefix(s, "\n")
+		s = strings.TrimSuffix(s, "\n")
+		s = strings.TrimSuffix(s, "\n")
+		return s
+	}
+
+	want := normalize(strings.TrimRight(newContent, "\n"))
+	got := normalize(existing)
+	if got != want {
+		return errors.New("generated content differs")
+	}
+	return nil
 }
 
 func makeStringSet(items []string) map[string]bool {

@@ -63,3 +63,5 @@ pre-push:
       run: make test
     - name: validate-hadolint-status
       run: ./scripts/validate-hadolint-status.sh
+    - name: validate-buildkit-rules
+      run: ./scripts/validate-buildkit-rules.sh
