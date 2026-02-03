@@ -424,20 +424,17 @@ func (r *PreferHeredocRule) generateChainedAsyncFix(
 }
 
 // generateHeredocAsyncFix is the common implementation for async heredoc fixes.
+// The resolver uses re-parsing to find fixes rather than fingerprint matching,
+// which is more robust when content changes due to sync fixes applied first.
 func (r *PreferHeredocRule) generateHeredocAsyncFix(
 	fixType rules.HeredocFixType,
 	description string,
 	stageIdx int,
 	shellVariant shell.Variant,
-	commands []string,
+	_ []string, // commands - unused, resolver re-parses to find candidates
 	minCommands int,
 	meta rules.RuleMetadata,
 ) *rules.SuggestedFix {
-	fingerprint := ""
-	if len(commands) > 0 {
-		fingerprint = strings.TrimSpace(commands[0])
-	}
-
 	return &rules.SuggestedFix{
 		Description:  description,
 		Safety:       rules.FixSuggestion,
@@ -445,12 +442,10 @@ func (r *PreferHeredocRule) generateHeredocAsyncFix(
 		NeedsResolve: true,
 		ResolverID:   rules.HeredocResolverID,
 		ResolverData: &rules.HeredocResolveData{
-			Type:             fixType,
-			StageIndex:       stageIdx,
-			Fingerprint:      fingerprint,
-			ShellVariant:     shellVariant,
-			OriginalCommands: commands,
-			MinCommands:      minCommands,
+			Type:         fixType,
+			StageIndex:   stageIdx,
+			ShellVariant: shellVariant,
+			MinCommands:  minCommands,
 		},
 	}
 }

@@ -16,6 +16,10 @@ const HeredocDefaultMinCommands = 3
 
 // HeredocResolveData contains the data needed to resolve a heredoc fix.
 // This is stored in SuggestedFix.ResolverData.
+//
+// The resolver uses re-parsing to find fixes rather than fingerprint matching.
+// This approach is more robust because content may have changed due to sync fixes
+// (apt → apt-get, cd → WORKDIR, etc.) applied before the heredoc resolver runs.
 type HeredocResolveData struct {
 	// Type indicates whether this is for consecutive RUNs or chained commands.
 	Type HeredocFixType
@@ -23,17 +27,8 @@ type HeredocResolveData struct {
 	// StageIndex is the 0-based index of the stage containing the RUN(s).
 	StageIndex int
 
-	// Fingerprint identifies the target RUN instruction(s).
-	// For consecutive RUNs: the first command of the first RUN.
-	// For chained commands: the first command in the chain.
-	Fingerprint string
-
 	// ShellVariant is the shell variant for parsing.
 	ShellVariant shell.Variant
-
-	// OriginalCommands is the list of commands that should be combined.
-	// Used as a secondary fingerprint for matching.
-	OriginalCommands []string
 
 	// MinCommands is the minimum number of commands to trigger heredoc conversion.
 	MinCommands int
