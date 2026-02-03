@@ -162,10 +162,10 @@ RUN apt-get update && apt-get install -y vim && apt-get clean
 	}
 
 	// Check that the edit converts to heredoc
-	if !contains(edits[0].NewText, "<<EOF") {
+	if !strings.Contains(edits[0].NewText, "<<EOF") {
 		t.Errorf("expected heredoc syntax in edit, got: %s", edits[0].NewText)
 	}
-	if !contains(edits[0].NewText, "set -e") {
+	if !strings.Contains(edits[0].NewText, "set -e") {
 		t.Errorf("expected 'set -e' in heredoc, got: %s", edits[0].NewText)
 	}
 }
@@ -204,7 +204,7 @@ RUN apt-get clean
 	}
 
 	// Check that the edit converts to heredoc
-	if !contains(edits[0].NewText, "<<EOF") {
+	if !strings.Contains(edits[0].NewText, "<<EOF") {
 		t.Errorf("expected heredoc syntax in edit, got: %s", edits[0].NewText)
 	}
 }
@@ -344,7 +344,7 @@ func TestHeredocResolver_Resolve_WithIndentation(t *testing.T) {
 	}
 
 	// Check that indentation is preserved
-	if !contains(edits[0].NewText, "    RUN") {
+	if !strings.Contains(edits[0].NewText, "    RUN") {
 		t.Errorf("expected indentation to be preserved, got: %s", edits[0].NewText)
 	}
 }
@@ -763,7 +763,7 @@ EOF
 	if script == "" {
 		t.Error("expected non-empty script for heredoc RUN")
 	}
-	if !contains(script, "apt-get update") {
+	if !strings.Contains(script, "apt-get update") {
 		t.Errorf("expected script to contain 'apt-get update', got: %s", script)
 	}
 }
@@ -825,10 +825,6 @@ RUN apt-get clean
 }
 
 // Helper functions
-
-func contains(s, substr string) bool {
-	return strings.Contains(s, substr)
-}
 
 func parseFirstRun(t *testing.T, dockerfile string) *instructions.RunCommand {
 	t.Helper()
