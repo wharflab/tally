@@ -229,16 +229,16 @@ func TestIsSimpleScript(t *testing.T) {
 			want:    false,
 		},
 		{
-			name:    "or chain is not simple",
+			name:    "or chain is simple",
 			script:  "test -f file || touch file",
 			variant: VariantBash,
-			want:    false, // || chains can't be converted to heredocs (set -e changes semantics)
+			want:    true, // || chains stay as single line, set -e doesn't exit on || parts
 		},
 		{
-			name:    "mixed and-or chain is not simple",
+			name:    "mixed and-or chain is simple",
 			script:  "cmd1 && cmd2 || cmd3",
 			variant: VariantBash,
-			want:    false, // Contains ||, can't be converted
+			want:    true, // || chains stay as single line in heredoc
 		},
 	}
 

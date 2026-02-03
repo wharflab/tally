@@ -172,15 +172,12 @@ func isSimpleStatement(stmt *syntax.Stmt) bool {
 		}
 		return true
 	case *syntax.BinaryCmd:
-		// Only && chains are simple - || chains have different semantics with set -e
-		// and cannot be safely converted to heredocs (the fallback commands would
-		// never run because set -e exits on the first failure)
-		if cmd.Op == syntax.AndStmt {
+		// && and || chains are simple if both sides are simple.
+		// Since we only split at && (not ||), || chains stay as single lines
+		// in the heredoc. Per POSIX, set -e doesn't exit when a command fails
+		// as part of a || list, so "cmd || fallback" works correctly with set -e.
+		if cmd.Op == syntax.AndStmt || cmd.Op == syntax.OrStmt {
 			return isSimpleStatement(cmd.X) && isSimpleStatement(cmd.Y)
-		}
-		// || chains are NOT simple - they can't be converted to heredocs
-		if cmd.Op == syntax.OrStmt {
-			return false
 		}
 		// Pipes are simple
 		if cmd.Op == syntax.Pipe || cmd.Op == syntax.PipeAll {
