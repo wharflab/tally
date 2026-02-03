@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/owenrumney/go-sarif/v2/sarif"
+	"github.com/owenrumney/go-sarif/v3/pkg/report/v210/sarif"
 
 	"github.com/tinovyatkin/tally/internal/rules"
 )
@@ -47,10 +47,7 @@ func NewSARIFReporter(w io.Writer, toolName, toolVersion, toolURI string) *SARIF
 // Report implements Reporter.
 func (r *SARIFReporter) Report(violations []rules.Violation, _ map[string][]byte, _ ReportMetadata) error {
 	// Create a new SARIF report (v2.1.0 for maximum compatibility)
-	report, err := sarif.New(sarif.Version210)
-	if err != nil {
-		return err
-	}
+	report := sarif.NewReport()
 
 	// Create a run with tool information
 	run := sarif.NewRunWithInformationURI(r.toolName, r.toolURI)
@@ -82,7 +79,7 @@ func (r *SARIFReporter) Report(violations []rules.Violation, _ map[string][]byte
 		v := ruleSet[code]
 		rule := run.AddRule(code)
 		if v.Detail != "" {
-			rule.WithShortDescription(sarif.NewMultiformatMessageString(v.Detail))
+			rule.WithShortDescription(sarif.NewMultiformatMessageString().WithText(v.Detail))
 		}
 		if v.DocURL != "" {
 			rule.WithHelpURI(v.DocURL)

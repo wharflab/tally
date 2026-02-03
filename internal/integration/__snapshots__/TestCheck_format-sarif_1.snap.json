@@ -1,120 +1,210 @@
 {
-  "version": "2.1.0",
   "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+  "version": "2.1.0",
   "runs": [
     {
-      "tool": {
-        "driver": {
-          "informationUri": "https://github.com/tinovyatkin/tally",
-          "name": "tally",
-          "rules": [
-            {
-              "id": "buildkit/InvalidDefinitionDescription",
-              "shortDescription": {
-                "text": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment."
-              },
-              "helpUri": "https://docs.docker.com/go/dockerfile/rule/invalid-definition-description/"
-            },
-            {
-              "id": "buildkit/MaintainerDeprecated",
-              "shortDescription": {
-                "text": "The MAINTAINER instruction is deprecated, use a label instead to define an image author"
-              },
-              "helpUri": "https://docs.docker.com/go/dockerfile/rule/maintainer-deprecated/"
-            },
-            {
-              "id": "buildkit/StageNameCasing",
-              "shortDescription": {
-                "text": "Stage names should be lowercase"
-              },
-              "helpUri": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/"
-            }
-          ],
-          "version": "dev (buildkit v0.27.1)"
-        }
-      },
+      "addresses": [],
       "artifacts": [
         {
+          "length": -1,
           "location": {
+            "index": -1,
             "uri": "testdata/buildkit-warnings/Dockerfile"
           },
-          "length": -1
+          "parentIndex": -1,
+          "roles": []
         }
       ],
+      "graphs": [],
+      "invocations": [],
+      "language": "en-US",
+      "logicalLocations": [],
+      "newlineSequences": [
+        "\r\n",
+        "\n"
+      ],
+      "policies": [],
+      "redactionTokens": [],
       "results": [
         {
-          "ruleId": "buildkit/InvalidDefinitionDescription",
-          "ruleIndex": 0,
+          "attachments": [],
+          "codeFlows": [],
+          "fixes": [],
+          "graphTraversals": [],
+          "graphs": [],
+          "kind": "fail",
           "level": "warning",
+          "locations": [
+            {
+              "annotations": [],
+              "id": -1,
+              "logicalLocations": [],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": -1,
+                  "uri": "testdata/buildkit-warnings/Dockerfile"
+                },
+                "region": {
+                  "byteOffset": -1,
+                  "charOffset": -1,
+                  "snippet": {
+                    "text": "FROM alpine:3.18 AS Builder"
+                  },
+                  "startColumn": 1,
+                  "startLine": 2
+                }
+              },
+              "relationships": []
+            }
+          ],
           "message": {
+            "arguments": [],
             "text": "Comment for FROM should follow the format: `# builder \u003cdescription\u003e`"
           },
+          "rank": -1,
+          "relatedLocations": [],
+          "ruleId": "buildkit/InvalidDefinitionDescription",
+          "ruleIndex": -1,
+          "stacks": [],
+          "taxa": []
+        },
+        {
+          "attachments": [],
+          "codeFlows": [],
+          "fixes": [],
+          "graphTraversals": [],
+          "graphs": [],
+          "kind": "fail",
+          "level": "warning",
           "locations": [
             {
+              "annotations": [],
+              "id": -1,
+              "logicalLocations": [],
               "physicalLocation": {
                 "artifactLocation": {
+                  "index": -1,
                   "uri": "testdata/buildkit-warnings/Dockerfile"
                 },
                 "region": {
-                  "startLine": 2,
-                  "startColumn": 1,
+                  "byteOffset": -1,
+                  "charOffset": -1,
                   "snippet": {
                     "text": "FROM alpine:3.18 AS Builder"
-                  }
+                  },
+                  "startColumn": 1,
+                  "startLine": 2
                 }
-              }
+              },
+              "relationships": []
             }
-          ]
-        },
-        {
-          "ruleId": "buildkit/StageNameCasing",
-          "ruleIndex": 2,
-          "level": "warning",
+          ],
           "message": {
+            "arguments": [],
             "text": "Stage name 'Builder' should be lowercase"
           },
-          "locations": [
-            {
-              "physicalLocation": {
-                "artifactLocation": {
-                  "uri": "testdata/buildkit-warnings/Dockerfile"
-                },
-                "region": {
-                  "startLine": 2,
-                  "startColumn": 1,
-                  "snippet": {
-                    "text": "FROM alpine:3.18 AS Builder"
-                  }
-                }
-              }
-            }
-          ]
+          "rank": -1,
+          "relatedLocations": [],
+          "ruleId": "buildkit/StageNameCasing",
+          "ruleIndex": -1,
+          "stacks": [],
+          "taxa": []
         },
         {
-          "ruleId": "buildkit/MaintainerDeprecated",
-          "ruleIndex": 1,
+          "attachments": [],
+          "codeFlows": [],
+          "fixes": [],
+          "graphTraversals": [],
+          "graphs": [],
+          "kind": "fail",
           "level": "warning",
-          "message": {
-            "text": "Maintainer instruction is deprecated in favor of using label"
-          },
           "locations": [
             {
+              "annotations": [],
+              "id": -1,
+              "logicalLocations": [],
               "physicalLocation": {
                 "artifactLocation": {
+                  "index": -1,
                   "uri": "testdata/buildkit-warnings/Dockerfile"
                 },
                 "region": {
-                  "startLine": 3,
-                  "startColumn": 1,
+                  "byteOffset": -1,
+                  "charOffset": -1,
                   "snippet": {
                     "text": "MAINTAINER test@example.com"
-                  }
+                  },
+                  "startColumn": 1,
+                  "startLine": 3
                 }
+              },
+              "relationships": []
+            }
+          ],
+          "message": {
+            "arguments": [],
+            "text": "Maintainer instruction is deprecated in favor of using label"
+          },
+          "rank": -1,
+          "relatedLocations": [],
+          "ruleId": "buildkit/MaintainerDeprecated",
+          "ruleIndex": -1,
+          "stacks": [],
+          "taxa": []
+        }
+      ],
+      "runAggregates": [],
+      "taxonomies": [],
+      "threadFlowLocations": [],
+      "tool": {
+        "driver": {
+          "contents": [
+            "localizedData",
+            "nonLocalizedData"
+          ],
+          "informationUri": "https://github.com/tinovyatkin/tally",
+          "isComprehensive": false,
+          "language": "en-US",
+          "locations": [],
+          "name": "tally",
+          "notifications": [],
+          "rules": [
+            {
+              "helpUri": "https://docs.docker.com/go/dockerfile/rule/invalid-definition-description/",
+              "id": "buildkit/InvalidDefinitionDescription",
+              "relationships": [],
+              "shortDescription": {
+                "text": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment."
+              }
+            },
+            {
+              "helpUri": "https://docs.docker.com/go/dockerfile/rule/maintainer-deprecated/",
+              "id": "buildkit/MaintainerDeprecated",
+              "relationships": [],
+              "shortDescription": {
+                "text": "The MAINTAINER instruction is deprecated, use a label instead to define an image author"
+              }
+            },
+            {
+              "helpUri": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/",
+              "id": "buildkit/StageNameCasing",
+              "relationships": [],
+              "shortDescription": {
+                "text": "Stage names should be lowercase"
               }
             }
-          ]
-        }
-      ]
+          ],
+          "supportedTaxonomies": [],
+          "taxa": [],
+          "version": "dev (buildkit v0.27.1)"
+        },
+        "extensions": []
+      },
+      "translations": [],
+      "versionControlProvenance": [],
+      "webRequests": [],
+      "webResponses": []
     }
-  ]
+  ],
+  "properties": {}
 }
