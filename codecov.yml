@@ -1,7 +1,7 @@
 # Codecov configuration
 # https://docs.codecov.com/docs/codecovyml-reference
 # yaml-language-server: $schema=https://json.schemastore.org/codecov.json
-
+---
 coverage:
   status:
     project:
@@ -11,16 +11,14 @@ coverage:
     patch:
       default:
         target: 80%
-
 ignore:
   - "internal/testutil/**"
   - "internal/integration/testdata/**"
-
+  - "scripts/**"
 # Test analytics configuration
 # https://docs.codecov.com/docs/test-analytics
 test_analytics:
   enabled: true
-
 # Comment configuration
 comment:
   behavior: default
@@ -28,10 +26,8 @@ comment:
   require_base: true
   require_head: true
   show_critical_paths: true
-
   # Test results in PR comments
   show_test_results: true
-
 # Parsers configuration
 parsers:
   junit:
@@ -40,15 +36,10 @@ parsers:
       loop: true
       method: false
       macro: false
-
 # GitHub integration
 github_checks:
   annotations: true
-
 # Status checks configuration
 status_checks:
   default_rules:
     flag_coverage_not_uploaded_behavior: include
-
-
-
