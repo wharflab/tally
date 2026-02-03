@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -180,7 +181,7 @@ func goListModuleDir(module string) (string, error) {
 	}
 	dir := strings.TrimSpace(string(out))
 	if dir == "" {
-		return "", fmt.Errorf("empty module dir")
+		return "", errors.New("empty module dir")
 	}
 	return dir, nil
 }
@@ -733,7 +734,7 @@ func replaceBetweenMarkers(path, beginMarker, endMarker, newContent string) erro
 		return fmt.Errorf("end marker not found: %s", endMarker)
 	}
 	if end < begin {
-		return fmt.Errorf("end marker occurs before begin marker")
+		return errors.New("end marker occurs before begin marker")
 	}
 
 	beginEnd := begin + len(beginMarker)
