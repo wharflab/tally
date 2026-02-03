@@ -5,6 +5,7 @@ import (
 )
 
 func TestCountChainedCommands(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		script  string
@@ -87,6 +88,7 @@ func TestCountChainedCommands(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := CountChainedCommands(tt.script, tt.variant)
 			if got != tt.want {
 				t.Errorf("CountChainedCommands() = %d, want %d", got, tt.want)
@@ -96,6 +98,7 @@ func TestCountChainedCommands(t *testing.T) {
 }
 
 func TestExtractChainedCommands(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		script  string
@@ -136,6 +139,7 @@ func TestExtractChainedCommands(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := ExtractChainedCommands(tt.script, tt.variant)
 			if len(got) != len(tt.want) {
 				t.Errorf("ExtractChainedCommands() returned %d commands, want %d\ngot: %v", len(got), len(tt.want), got)
@@ -151,6 +155,7 @@ func TestExtractChainedCommands(t *testing.T) {
 }
 
 func TestIsSimpleScript(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		script  string
@@ -239,6 +244,7 @@ func TestIsSimpleScript(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := IsSimpleScript(tt.script, tt.variant)
 			if got != tt.want {
 				t.Errorf("IsSimpleScript() = %v, want %v", got, tt.want)
@@ -248,6 +254,7 @@ func TestIsSimpleScript(t *testing.T) {
 }
 
 func TestHasExitCommand(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		script  string
@@ -288,6 +295,7 @@ func TestHasExitCommand(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := HasExitCommand(tt.script, tt.variant)
 			if got != tt.want {
 				t.Errorf("HasExitCommand() = %v, want %v", got, tt.want)
@@ -297,6 +305,7 @@ func TestHasExitCommand(t *testing.T) {
 }
 
 func TestIsHeredocCandidate(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name        string
 		script      string
@@ -350,6 +359,7 @@ func TestIsHeredocCandidate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := IsHeredocCandidate(tt.script, tt.variant, tt.minCommands)
 			if got != tt.want {
 				t.Errorf("IsHeredocCandidate() = %v, want %v", got, tt.want)

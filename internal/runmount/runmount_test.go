@@ -32,6 +32,7 @@ func parseRun(t *testing.T, dockerfile string) *instructions.RunCommand {
 }
 
 func TestGetMounts_CacheMount(t *testing.T) {
+	t.Parallel()
 	dockerfile := `FROM ubuntu:22.04
 RUN --mount=type=cache,target=/var/cache/apt apt-get update
 `
@@ -52,6 +53,7 @@ RUN --mount=type=cache,target=/var/cache/apt apt-get update
 }
 
 func TestGetMounts_BindMount(t *testing.T) {
+	t.Parallel()
 	dockerfile := `FROM ubuntu:22.04
 RUN --mount=type=bind,source=./src,target=/app echo hello
 `
@@ -75,6 +77,7 @@ RUN --mount=type=bind,source=./src,target=/app echo hello
 }
 
 func TestGetMounts_MultipleMounts(t *testing.T) {
+	t.Parallel()
 	dockerfile := `FROM ubuntu:22.04
 RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/root/.cache apt-get update
 `
@@ -103,6 +106,7 @@ RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/root/.ca
 }
 
 func TestGetMounts_NoMount(t *testing.T) {
+	t.Parallel()
 	dockerfile := `FROM ubuntu:22.04
 RUN apt-get update
 `
@@ -115,6 +119,7 @@ RUN apt-get update
 }
 
 func TestGetMounts_SecretMount(t *testing.T) {
+	t.Parallel()
 	dockerfile := `FROM ubuntu:22.04
 RUN --mount=type=secret,id=mysecret,target=/run/secrets/mysecret cat /run/secrets/mysecret
 `
@@ -138,6 +143,7 @@ RUN --mount=type=secret,id=mysecret,target=/run/secrets/mysecret cat /run/secret
 }
 
 func TestGetMounts_CacheWithSharing(t *testing.T) {
+	t.Parallel()
 	dockerfile := `FROM ubuntu:22.04
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked apt-get update
 `
@@ -155,6 +161,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked apt-get update
 }
 
 func TestMountsEqual(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name string
 		a    []*instructions.Mount
@@ -242,6 +249,7 @@ func TestMountsEqual(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := MountsEqual(tt.a, tt.b)
 			if got != tt.want {
 				t.Errorf("MountsEqual() = %v, want %v", got, tt.want)
@@ -251,6 +259,7 @@ func TestMountsEqual(t *testing.T) {
 }
 
 func TestFormatMount(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		mount *instructions.Mount
@@ -332,6 +341,7 @@ func TestFormatMount(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := FormatMount(tt.mount)
 			if got != tt.want {
 				t.Errorf("FormatMount() = %q, want %q", got, tt.want)
@@ -341,6 +351,7 @@ func TestFormatMount(t *testing.T) {
 }
 
 func TestFormatMounts(t *testing.T) {
+	t.Parallel()
 	mounts := []*instructions.Mount{
 		{Type: instructions.MountTypeCache, Target: "/var/cache/apt"},
 		{Type: instructions.MountTypeCache, Target: "/root/.cache"},
@@ -355,6 +366,7 @@ func TestFormatMounts(t *testing.T) {
 }
 
 func TestFormatMounts_Empty(t *testing.T) {
+	t.Parallel()
 	got := FormatMounts(nil)
 	if got != "" {
 		t.Errorf("FormatMounts(nil) = %q, want empty string", got)
@@ -367,6 +379,7 @@ func TestFormatMounts_Empty(t *testing.T) {
 }
 
 func TestFormatMount_WithUIDGIDMode(t *testing.T) {
+	t.Parallel()
 	uid := uint64(1000)
 	gid := uint64(1000)
 	mode := uint64(0o755)
@@ -449,6 +462,7 @@ func TestFormatMount_WithUIDGIDMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := FormatMount(tt.mount)
 			if got != tt.want {
 				t.Errorf("FormatMount() = %q, want %q", got, tt.want)
@@ -458,6 +472,7 @@ func TestFormatMount_WithUIDGIDMode(t *testing.T) {
 }
 
 func TestMountEqual_AllFields(t *testing.T) {
+	t.Parallel()
 	uid1 := uint64(1000)
 	uid2 := uint64(2000)
 	uid1Copy := uint64(1000) // Same value, different pointer
@@ -532,6 +547,7 @@ func TestMountEqual_AllFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := mountEqual(tt.a, tt.b)
 			if got != tt.want {
 				t.Errorf("mountEqual() = %v, want %v", got, tt.want)
@@ -541,6 +557,7 @@ func TestMountEqual_AllFields(t *testing.T) {
 }
 
 func TestMountsEqual_SecretSSHKeys(t *testing.T) {
+	t.Parallel()
 	// Test that secret/ssh mounts use CacheID as key instead of Target
 	tests := []struct {
 		name string
@@ -570,6 +587,7 @@ func TestMountsEqual_SecretSSHKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := MountsEqual(tt.a, tt.b)
 			if got != tt.want {
 				t.Errorf("MountsEqual() = %v, want %v", got, tt.want)
@@ -579,6 +597,7 @@ func TestMountsEqual_SecretSSHKeys(t *testing.T) {
 }
 
 func TestUint64PtrEqual(t *testing.T) {
+	t.Parallel()
 	val1 := uint64(100)
 	val2 := uint64(200)
 	val1Copy := uint64(100)
@@ -598,6 +617,7 @@ func TestUint64PtrEqual(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := uint64PtrEqual(tt.a, tt.b)
 			if got != tt.want {
 				t.Errorf("uint64PtrEqual() = %v, want %v", got, tt.want)
@@ -607,6 +627,7 @@ func TestUint64PtrEqual(t *testing.T) {
 }
 
 func TestFormatOctal(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input uint64
 		want  string
@@ -623,6 +644,7 @@ func TestFormatOctal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
+			t.Parallel()
 			got := formatOctal(tt.input)
 			if got != tt.want {
 				t.Errorf("formatOctal(%d) = %q, want %q", tt.input, got, tt.want)
@@ -632,6 +654,7 @@ func TestFormatOctal(t *testing.T) {
 }
 
 func TestFormatUint64(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input uint64
 		want  string
@@ -644,6 +667,7 @@ func TestFormatUint64(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
+			t.Parallel()
 			got := formatUint64(tt.input)
 			if got != tt.want {
 				t.Errorf("formatUint64(%d) = %q, want %q", tt.input, got, tt.want)
@@ -653,6 +677,7 @@ func TestFormatUint64(t *testing.T) {
 }
 
 func TestMountsPopulated(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		mounts []*instructions.Mount
@@ -687,6 +712,7 @@ func TestMountsPopulated(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := mountsPopulated(tt.mounts)
 			if got != tt.want {
 				t.Errorf("mountsPopulated() = %v, want %v", got, tt.want)

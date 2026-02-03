@@ -14,6 +14,7 @@ import (
 )
 
 func TestHeredocResolver_ID(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 	if got := r.ID(); got != rules.HeredocResolverID {
 		t.Errorf("ID() = %q, want %q", got, rules.HeredocResolverID)
@@ -21,6 +22,7 @@ func TestHeredocResolver_ID(t *testing.T) {
 }
 
 func TestHeredocResolver_Resolve_InvalidData(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// Test with wrong type of resolver data
@@ -44,6 +46,7 @@ func TestHeredocResolver_Resolve_InvalidData(t *testing.T) {
 }
 
 func TestHeredocResolver_Resolve_InvalidDockerfile(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	fix := &rules.SuggestedFix{
@@ -72,6 +75,7 @@ func TestHeredocResolver_Resolve_InvalidDockerfile(t *testing.T) {
 }
 
 func TestHeredocResolver_Resolve_StageIndexOutOfBounds(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	fix := &rules.SuggestedFix{
@@ -99,6 +103,7 @@ func TestHeredocResolver_Resolve_StageIndexOutOfBounds(t *testing.T) {
 }
 
 func TestHeredocResolver_Resolve_UnknownFixType(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	fix := &rules.SuggestedFix{
@@ -126,6 +131,7 @@ func TestHeredocResolver_Resolve_UnknownFixType(t *testing.T) {
 }
 
 func TestHeredocResolver_Resolve_ChainedCommands(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	dockerfile := `FROM ubuntu
@@ -165,6 +171,7 @@ RUN apt-get update && apt-get install -y vim && apt-get clean
 }
 
 func TestHeredocResolver_Resolve_ConsecutiveRuns(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	dockerfile := `FROM ubuntu
@@ -203,6 +210,7 @@ RUN apt-get clean
 }
 
 func TestHeredocResolver_Resolve_ChainedBelowThreshold(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// Only 2 commands - below threshold of 3
@@ -235,6 +243,7 @@ RUN apt-get update && apt-get install -y vim
 }
 
 func TestHeredocResolver_Resolve_ConsecutiveBelowThreshold(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// Only 2 RUNs - below threshold of 3
@@ -268,6 +277,7 @@ RUN apt-get install -y vim
 }
 
 func TestHeredocResolver_Resolve_ExecFormRun(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// Exec form RUN - should not be converted
@@ -302,6 +312,7 @@ RUN ["apt-get", "clean"]
 }
 
 func TestHeredocResolver_Resolve_WithIndentation(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// Indented Dockerfile (common in multi-stage)
@@ -339,6 +350,7 @@ func TestHeredocResolver_Resolve_WithIndentation(t *testing.T) {
 }
 
 func TestExtractIndent(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name    string
 		content string
@@ -391,6 +403,7 @@ func TestExtractIndent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			sm := sourcemap.New([]byte(tt.content))
 			got := extractIndent(sm, tt.line)
 			if got != tt.want {
@@ -401,6 +414,7 @@ func TestExtractIndent(t *testing.T) {
 }
 
 func TestApplyIndent(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name       string
 		heredoc    string
@@ -435,6 +449,7 @@ func TestApplyIndent(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			got := applyIndent(tt.heredoc, tt.indent)
 			if got != tt.want {
 				t.Errorf("applyIndent() = %q, want %q", got, tt.want)
@@ -444,6 +459,7 @@ func TestApplyIndent(t *testing.T) {
 }
 
 func TestHeredocResolver_GetRunScript(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	tests := []struct {
@@ -465,6 +481,7 @@ func TestHeredocResolver_GetRunScript(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			run := parseFirstRun(t, tt.dockerfile)
 			if run == nil {
 				t.Fatal("no RUN command found")
@@ -478,6 +495,7 @@ func TestHeredocResolver_GetRunScript(t *testing.T) {
 }
 
 func TestHeredocResolver_ExtractCommands(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	tests := []struct {
@@ -499,6 +517,7 @@ func TestHeredocResolver_ExtractCommands(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			run := parseFirstRun(t, tt.dockerfile)
 			if run == nil {
 				t.Fatal("no RUN command found")
@@ -512,6 +531,7 @@ func TestHeredocResolver_ExtractCommands(t *testing.T) {
 }
 
 func TestHeredocResolver_Resolve_ComplexScript(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// Complex script with control flow - should not be converted
@@ -545,6 +565,7 @@ RUN if [ -f /etc/os-release ]; then cat /etc/os-release; fi && echo done && echo
 }
 
 func TestHeredocResolver_Resolve_InterruptedSequence(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// Sequence interrupted by non-RUN command
@@ -582,6 +603,7 @@ RUN apt-get clean
 }
 
 func TestHeredocResolver_Resolve_ExitCommand(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// RUN with exit command should break the sequence
@@ -618,6 +640,7 @@ RUN apt-get install -y vim
 }
 
 func TestHeredocResolver_Resolve_AlreadyHeredoc(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// Already a heredoc - should be skipped
@@ -654,6 +677,7 @@ EOF
 }
 
 func TestHeredocResolver_ExtractCommands_Heredoc(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// Test with heredoc RUN
@@ -677,6 +701,7 @@ EOF
 }
 
 func TestHeredocResolver_ExtractCommands_EmptyHeredoc(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// Test with empty heredoc - manually construct a RunCommand with empty Files
@@ -696,6 +721,7 @@ func TestHeredocResolver_ExtractCommands_EmptyHeredoc(t *testing.T) {
 }
 
 func TestHeredocResolver_ExtractCommands_ComplexHeredoc(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// Test with complex heredoc (control flow)
@@ -719,6 +745,7 @@ EOF
 }
 
 func TestHeredocResolver_GetRunScript_Heredoc(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	dockerfile := `FROM ubuntu
@@ -742,6 +769,7 @@ EOF
 }
 
 func TestHeredocResolver_GetRunScript_EmptyRun(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// Empty RUN command
@@ -759,6 +787,7 @@ func TestHeredocResolver_GetRunScript_EmptyRun(t *testing.T) {
 }
 
 func TestHeredocResolver_Resolve_DifferentMounts(t *testing.T) {
+	t.Parallel()
 	r := &heredocResolver{}
 
 	// RUNs with different mounts should not be merged
