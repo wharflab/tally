@@ -331,11 +331,14 @@ func formatHeredocWithMounts(commands []string, mounts []*instructions.Mount, va
 	// See function doc comment for why set -e is required
 	sb.WriteString("set -e\n")
 	for _, cmd := range commands {
-		// Skip commands that enable -e since we already added one.
-		// Uses shell AST to properly detect any flag combination containing 'e'
-		// (e.g., "set -e", "set -ex", "set -euo pipefail").
+		// Skip only bare "set -e" since we already added one.
+		// Preserve commands like "set -ex" or "set -euo pipefail" to retain
+		// additional flags (-x for trace, -u for undefined vars, -o pipefail).
 		if setsErrorFlag(cmd, variant) {
-			continue
+			trimmed := strings.TrimSpace(cmd)
+			if trimmed == "set -e" {
+				continue
+			}
 		}
 		sb.WriteString(cmd)
 		sb.WriteString("\n")
