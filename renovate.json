@@ -28,9 +28,9 @@
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^Makefile$/",
-        "/^\\.github/workflows/ci\\.yaml$/"
+      "fileMatch": [
+        "^Makefile$",
+        "^\\.github/workflows/ci\\.yaml$"
       ],
       "matchStrings": [
         "PMD_VERSION\\s*[:=]\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)",
@@ -42,8 +42,8 @@
     },
     {
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^Makefile$/"
+      "fileMatch": [
+        "^Makefile$"
       ],
       "matchStrings": [
         "DEADCODE_VERSION\\s*[:=]\\s*(?<currentValue>v\\S+)"
@@ -54,8 +54,8 @@
     },
     {
       "customType": "regex",
-      "managerFilePatterns": [
-        "/^\\.lefthook\\.yml$/"
+      "fileMatch": [
+        "^\\.lefthook\\.yml$"
       ],
       "matchStrings": [
         "uv tool run (?<depName>[a-z0-9_-]+)==(?<currentValue>\\d+\\.\\d+\\.\\d+)"
@@ -113,6 +113,23 @@
       ],
       "automerge": true,
       "groupName": "PMD"
+    },
+    {
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": false,
+      "labels": [
+        "dependencies",
+        "renovate",
+        "go-major-update"
+      ],
+      "postUpdateOptions": [
+        "gomodTidy"
+      ]
     }
   ]
 }
