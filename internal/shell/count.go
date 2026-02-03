@@ -7,6 +7,9 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
+// cmdExit is the shell exit command name, used in multiple checks.
+const cmdExit = "exit"
+
 // CountChainedCommands counts the number of commands in && chains within a shell script.
 // Pipelines (|) count as a single logical command. Top-level statements separated by
 // semicolons or newlines are counted individually.
@@ -159,7 +162,7 @@ func isSimpleStatement(stmt *syntax.Stmt) bool {
 		if len(cmd.Args) > 0 {
 			if name := cmd.Args[0].Lit(); name != "" {
 				switch name {
-				case "exit", "return", "break", "continue":
+				case cmdExit, "return", "break", "continue":
 					return false
 				}
 			}
@@ -190,28 +193,79 @@ func isSimpleStatement(stmt *syntax.Stmt) bool {
 //   - It has at least minCommands commands (from && chains or separate statements)
 //   - It's a simple script (no complex control flow like if/for/while)
 //   - It doesn't contain exit commands
+//
+// This function parses the script once and reuses the AST for all checks.
 func IsHeredocCandidate(script string, variant Variant, minCommands int) bool {
 	if variant.IsNonPOSIX() {
 		return false
 	}
 
+	// Parse once and reuse for all checks
+	prog, err := parseScript(script, variant)
+	if err != nil {
+		return false
+	}
+
 	// Must have enough commands to warrant heredoc conversion
-	count := CountChainedCommands(script, variant)
+	count := countChainedCommandsFromAST(prog)
 	if count < minCommands {
 		return false
 	}
 
 	// Must be simple enough to convert
-	if !IsSimpleScript(script, variant) {
+	if !isSimpleScriptFromAST(prog) {
 		return false
 	}
 
 	// Exit commands break heredoc merging semantics
-	if HasExitCommand(script, variant) {
+	if hasExitCommandFromAST(prog) {
 		return false
 	}
 
 	return true
+}
+
+// parseScript parses a shell script into an AST.
+func parseScript(script string, variant Variant) (*syntax.File, error) {
+	parser := syntax.NewParser(
+		syntax.Variant(variant.toLangVariant()),
+		syntax.KeepComments(false),
+	)
+	return parser.Parse(strings.NewReader(script), "")
+}
+
+// countChainedCommandsFromAST counts commands from a pre-parsed AST.
+func countChainedCommandsFromAST(prog *syntax.File) int {
+	count := 0
+	for _, stmt := range prog.Stmts {
+		count += countInStatement(stmt)
+	}
+	return count
+}
+
+// isSimpleScriptFromAST checks if a pre-parsed AST contains only simple commands.
+func isSimpleScriptFromAST(prog *syntax.File) bool {
+	for _, stmt := range prog.Stmts {
+		if !isSimpleStatement(stmt) {
+			return false
+		}
+	}
+	return true
+}
+
+// hasExitCommandFromAST checks if a pre-parsed AST contains exit commands.
+func hasExitCommandFromAST(prog *syntax.File) bool {
+	hasExit := false
+	syntax.Walk(prog, func(node syntax.Node) bool {
+		if call, ok := node.(*syntax.CallExpr); ok && len(call.Args) > 0 {
+			if name := call.Args[0].Lit(); name == cmdExit {
+				hasExit = true
+				return false // Stop walking
+			}
+		}
+		return true
+	})
+	return hasExit
 }
 
 // HasExitCommand checks if a script contains exit commands that would change
@@ -234,7 +288,7 @@ func HasExitCommand(script string, variant Variant) bool {
 	hasExit := false
 	syntax.Walk(prog, func(node syntax.Node) bool {
 		if call, ok := node.(*syntax.CallExpr); ok && len(call.Args) > 0 {
-			if name := call.Args[0].Lit(); name == "exit" {
+			if name := call.Args[0].Lit(); name == cmdExit {
 				hasExit = true
 				return false // Stop walking
 			}
