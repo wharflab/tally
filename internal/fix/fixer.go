@@ -8,8 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/tinovyatkin/tally/internal/config"
 	"github.com/tinovyatkin/tally/internal/rules"
 )
@@ -78,25 +76,59 @@ func (r *Result) FilesModified() int {
 
 // Apply processes violations and applies their suggested fixes.
 // sources maps file paths to their original content.
+//
+// Fix application follows a two-phase approach to avoid position drift:
+//  1. Apply sync fixes first (NeedsResolve=false) - these have pre-computed edits
+//  2. Resolve and apply async fixes (NeedsResolve=true) - resolvers see the modified content
+//
+// This ensures structural transforms (like prefer-run-heredoc) operate on content
+// that has already been modified by content fixes (like apt → apt-get).
 func (f *Fixer) Apply(ctx context.Context, violations []rules.Violation, sources map[string][]byte) (*Result, error) {
 	result := &Result{
 		Changes: make(map[string]*FileChange),
 	}
 
 	// Initialize FileChange for each source file
-	// Use normalized paths as keys for consistent cross-platform lookups
+	f.initializeChanges(result, sources)
+
+	// Classify violations into sync and async candidates
+	syncCandidates, asyncCandidates := f.classifyViolations(violations, result.Changes)
+
+	// Phase 1: Apply sync fixes (content fixes with pre-computed edits)
+	f.applyCandidatesToFiles(result.Changes, syncCandidates, false)
+
+	// Phase 2: Resolve and apply async fixes (each is applied immediately after resolution)
+	if len(asyncCandidates) > 0 {
+		if err := f.resolveAsyncFixes(ctx, result.Changes, asyncCandidates); err != nil {
+			return nil, err
+		}
+		// Record skipped fixes for any that still need resolution (resolver failed)
+		for _, fc := range asyncCandidates {
+			if fc.fix.NeedsResolve {
+				recordSkipped(result.Changes, fc.violation, SkipResolveError, "resolver failed or missing")
+			}
+		}
+	}
+
+	return result, nil
+}
+
+// initializeChanges populates the result with FileChange entries for each source file.
+func (f *Fixer) initializeChanges(result *Result, sources map[string][]byte) {
 	for path, content := range sources {
 		normalizedPath := normalizePath(path)
 		result.Changes[normalizedPath] = &FileChange{
-			Path:            path, // Keep original path for file operations
+			Path:            path,
 			OriginalContent: content,
 			ModifiedContent: bytes.Clone(content),
 		}
 	}
+}
 
-	// Collect fixes that need resolution and those that don't
-	var asyncFixes []*rules.SuggestedFix
-	syncFixes := make([]*fixCandidate, 0, len(violations)) // Pre-allocate for common case
+// classifyViolations separates violations into sync and async fix candidates.
+func (f *Fixer) classifyViolations(violations []rules.Violation, changes map[string]*FileChange) ([]*fixCandidate, []*fixCandidate) {
+	syncCandidates := make([]*fixCandidate, 0, len(violations))
+	var asyncCandidates []*fixCandidate
 
 	for i := range violations {
 		v := &violations[i]
@@ -104,68 +136,54 @@ func (f *Fixer) Apply(ctx context.Context, violations []rules.Violation, sources
 			continue
 		}
 
-		// Check rule filter
 		if !f.ruleAllowed(v.RuleCode) {
-			recordSkipped(result.Changes, v, SkipRuleFilter, "")
+			recordSkipped(changes, v, SkipRuleFilter, "")
 			continue
 		}
-
-		// Check safety threshold
 		if v.SuggestedFix.Safety > f.SafetyThreshold {
-			recordSkipped(result.Changes, v, SkipSafety, "")
+			recordSkipped(changes, v, SkipSafety, "")
 			continue
 		}
-
-		// Check fix mode config (per-file)
 		if !f.fixModeAllowed(v.File(), v.RuleCode) {
-			recordSkipped(result.Changes, v, SkipFixMode, "")
+			recordSkipped(changes, v, SkipFixMode, "")
 			continue
 		}
 
+		candidate := &fixCandidate{violation: v, fix: v.SuggestedFix}
 		if v.SuggestedFix.NeedsResolve {
-			asyncFixes = append(asyncFixes, v.SuggestedFix)
-		}
-
-		syncFixes = append(syncFixes, &fixCandidate{
-			violation: v,
-			fix:       v.SuggestedFix,
-		})
-	}
-
-	// Resolve async fixes
-	if len(asyncFixes) > 0 {
-		if err := f.resolveAsyncFixes(ctx, asyncFixes); err != nil {
-			return nil, err
+			asyncCandidates = append(asyncCandidates, candidate)
+		} else {
+			syncCandidates = append(syncCandidates, candidate)
 		}
 	}
 
-	// Group fixes by file
-	fixesByFile := make(map[string][]*fixCandidate)
-	for _, fc := range syncFixes {
-		// Skip fixes that still need resolution (resolver failed or resolver missing)
-		if fc.fix.NeedsResolve {
-			recordSkipped(result.Changes, fc.violation, SkipResolveError, "resolver failed or missing")
+	return syncCandidates, asyncCandidates
+}
+
+// applyCandidatesToFiles groups candidates by file and applies them.
+// If checkResolved is true, skips candidates that still need resolution.
+func (f *Fixer) applyCandidatesToFiles(changes map[string]*FileChange, candidates []*fixCandidate, checkResolved bool) {
+	byFile := make(map[string][]*fixCandidate)
+	for _, fc := range candidates {
+		if checkResolved && fc.fix.NeedsResolve {
+			recordSkipped(changes, fc.violation, SkipResolveError, "resolver failed or missing")
 			continue
 		}
-		// Skip fixes with no edits
 		if len(fc.fix.Edits) == 0 {
-			recordSkipped(result.Changes, fc.violation, SkipNoEdits, "")
+			recordSkipped(changes, fc.violation, SkipNoEdits, "")
 			continue
 		}
 		normalizedFile := normalizePath(fc.violation.File())
-		fixesByFile[normalizedFile] = append(fixesByFile[normalizedFile], fc)
+		byFile[normalizedFile] = append(byFile[normalizedFile], fc)
 	}
 
-	// Apply fixes to each file
-	for file, candidates := range fixesByFile {
-		fc := result.Changes[file]
+	for file, fileCandidates := range byFile {
+		fc := changes[file]
 		if fc == nil {
 			continue
 		}
-		f.applyFixesToFile(fc, candidates)
+		f.applyFixesToFile(fc, fileCandidates)
 	}
-
-	return result, nil
 }
 
 // fixCandidate pairs a violation with its suggested fix for processing.
@@ -230,16 +248,15 @@ func (f *Fixer) fixModeAllowed(filePath, ruleCode string) bool {
 }
 
 // resolveAsyncFixes runs resolvers for fixes that need external data.
-func (f *Fixer) resolveAsyncFixes(ctx context.Context, fixes []*rules.SuggestedFix) error {
-	concurrency := f.Concurrency
-	if concurrency <= 0 {
-		concurrency = 4
-	}
-
-	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(concurrency)
-
-	for _, fix := range fixes {
+// This is called AFTER sync fixes have been applied, so resolvers receive
+// the modified content and can compute correct positions.
+//
+// IMPORTANT: Async fixes are resolved and applied ONE AT A TIME, sequentially.
+// This ensures each resolver sees the content after previous async fixes were applied,
+// avoiding position drift between async fixes.
+func (f *Fixer) resolveAsyncFixes(ctx context.Context, changes map[string]*FileChange, candidates []*fixCandidate) error {
+	for _, candidate := range candidates {
+		fix := candidate.fix
 		if !fix.NeedsResolve {
 			continue
 		}
@@ -250,21 +267,34 @@ func (f *Fixer) resolveAsyncFixes(ctx context.Context, fixes []*rules.SuggestedF
 			continue
 		}
 
-		// Capture loop variable for goroutine
-		g.Go(func() error {
-			edits, err := resolver.Resolve(ctx, fix)
-			if err != nil {
-				// Mark as failed but don't fail the whole operation
-				// The fix will be skipped with SkipResolveError
-				return nil //nolint:nilerr // Intentionally swallowing error
-			}
-			fix.Edits = edits
-			fix.NeedsResolve = false
-			return nil
-		})
+		// Get the CURRENT content (may have been modified by previous async fixes)
+		normalizedFile := normalizePath(candidate.violation.File())
+		fc := changes[normalizedFile]
+		if fc == nil {
+			continue
+		}
+
+		resolveCtx := ResolveContext{
+			FilePath: fc.Path,
+			Content:  fc.ModifiedContent,
+		}
+
+		// Resolve synchronously (sequential to avoid position drift between async fixes)
+		edits, err := resolver.Resolve(ctx, resolveCtx, fix)
+		if err != nil {
+			// Mark as failed but continue with other fixes
+			continue
+		}
+		fix.Edits = edits
+		fix.NeedsResolve = false
+
+		// Apply this fix immediately so the next resolver sees updated content
+		if len(fix.Edits) > 0 {
+			f.applyFixesToFile(fc, []*fixCandidate{candidate})
+		}
 	}
 
-	return g.Wait()
+	return nil
 }
 
 // applyFixesToFile applies non-conflicting fixes to a single file.
@@ -288,9 +318,16 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 		}
 	}
 
-	// Sort edits by position (descending - apply from end to start)
+	// Sort edits by priority first (lower = earlier), then by position (descending).
+	// This ensures content fixes (priority 0) run before structural transforms (priority 100+),
+	// and within the same priority, later positions are processed first to handle position drift.
 	sort.Slice(allEdits, func(i, j int) bool {
-		// Reverse order: later positions first
+		iPriority := allEdits[i].candidate.fix.Priority
+		jPriority := allEdits[j].candidate.fix.Priority
+		if iPriority != jPriority {
+			return iPriority < jPriority
+		}
+		// Within same priority, later positions first (existing behavior)
 		return !compareEdits(allEdits[i].edit, allEdits[j].edit)
 	})
 

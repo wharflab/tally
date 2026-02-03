@@ -240,3 +240,57 @@ func TestDL3003_FixLocationConsistency(t *testing.T) {
 		t.Errorf("expected violation on line 2 (1-based), got %d", violationLine)
 	}
 }
+
+// TestDL3003_HeredocCoordination verifies that DL3003 skips generating a fix
+// when prefer-run-heredoc is enabled and the command is a heredoc candidate.
+// This prevents DL3003 from splitting a RUN that would be better converted to heredoc.
+func TestDL3003_HeredocCoordination(t *testing.T) {
+	// Command with 3+ chained commands - a heredoc candidate
+	dockerfile := "FROM ubuntu\nRUN cd /app && make && make install"
+
+	t.Run("without heredoc rule - generates fix", func(t *testing.T) {
+		input := testutil.MakeLintInput(t, "Dockerfile", dockerfile)
+		// EnabledRules is nil (backward compatible) - should generate fix
+		r := NewDL3003Rule()
+		violations := r.Check(input)
+
+		if len(violations) == 0 {
+			t.Fatal("expected violation")
+		}
+		if violations[0].SuggestedFix == nil {
+			t.Error("expected fix when heredoc rule is not enabled")
+		}
+	})
+
+	t.Run("with heredoc rule enabled - skips fix for heredoc candidate", func(t *testing.T) {
+		input := testutil.MakeLintInput(t, "Dockerfile", dockerfile)
+		input.EnabledRules = []string{"tally/prefer-run-heredoc"}
+		r := NewDL3003Rule()
+		violations := r.Check(input)
+
+		if len(violations) == 0 {
+			t.Fatal("expected violation")
+		}
+		// Should NOT generate fix because heredoc rule will handle this better
+		if violations[0].SuggestedFix != nil {
+			t.Error("expected NO fix when heredoc rule is enabled and command is heredoc candidate")
+		}
+	})
+
+	t.Run("with heredoc rule enabled - still fixes non-candidate", func(t *testing.T) {
+		// Only 2 commands - not a heredoc candidate (default minCommands is 3)
+		shortCmd := "FROM ubuntu\nRUN cd /app && make"
+		input := testutil.MakeLintInput(t, "Dockerfile", shortCmd)
+		input.EnabledRules = []string{"tally/prefer-run-heredoc"}
+		r := NewDL3003Rule()
+		violations := r.Check(input)
+
+		if len(violations) == 0 {
+			t.Fatal("expected violation")
+		}
+		// Should generate fix because 2 commands is below heredoc threshold
+		if violations[0].SuggestedFix == nil {
+			t.Error("expected fix for non-heredoc-candidate even when heredoc rule is enabled")
+		}
+	})
+}

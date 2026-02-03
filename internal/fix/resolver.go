@@ -7,12 +7,28 @@ import (
 	"github.com/tinovyatkin/tally/internal/rules"
 )
 
-// FixResolver computes fix edits that require external data.
-// Resolvers are called asynchronously and may perform network I/O.
+// ResolveContext provides context for fix resolution.
+// This includes the current file content after sync fixes have been applied,
+// allowing resolvers to compute edits based on the modified state.
+type ResolveContext struct {
+	// FilePath is the path to the file being fixed.
+	FilePath string
+
+	// Content is the current file content after sync fixes have been applied.
+	// Resolvers should parse this to compute correct positions.
+	Content []byte
+}
+
+// FixResolver computes fix edits that require external data or operate
+// on content after other fixes have been applied.
+//
+// Resolvers are called AFTER sync fixes have been applied to the file.
+// This allows structural transforms to operate on already-modified content,
+// avoiding position drift issues.
 //
 // Examples:
 //   - Image digest resolver: fetches digests from container registries
-//   - Checksum resolver: computes file checksums for ADD --checksum
+//   - Heredoc resolver: transforms RUN instructions after content fixes
 type FixResolver interface {
 	// ID returns the unique identifier for this resolver.
 	// This matches the ResolverID field in SuggestedFix.
@@ -20,10 +36,11 @@ type FixResolver interface {
 
 	// Resolve computes the actual edits for a fix.
 	// The fix.ResolverData contains resolver-specific data needed for resolution.
+	// The resolveCtx provides the current file content after sync fixes.
 	// Returns the edits to apply, or an error if resolution fails.
 	//
 	// Implementations should respect context cancellation and timeouts.
-	Resolve(ctx context.Context, fix *rules.SuggestedFix) ([]rules.TextEdit, error)
+	Resolve(ctx context.Context, resolveCtx ResolveContext, fix *rules.SuggestedFix) ([]rules.TextEdit, error)
 }
 
 // resolverRegistry holds all registered fix resolvers.

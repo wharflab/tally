@@ -224,15 +224,19 @@ func checkCommand() *cli.Command {
 					}
 				}
 
+				// Compute list of enabled rules for cross-rule coordination
+				enabledRules := computeEnabledRules(cfg)
+
 				// Build base LintInput (without rule-specific config)
 				baseInput := rules.LintInput{
-					File:     file,
-					AST:      parseResult.AST,
-					Stages:   parseResult.Stages,
-					MetaArgs: parseResult.MetaArgs,
-					Source:   parseResult.Source,
-					Semantic: sem,
-					Context:  buildCtx,
+					File:         file,
+					AST:          parseResult.AST,
+					Stages:       parseResult.Stages,
+					MetaArgs:     parseResult.MetaArgs,
+					Source:       parseResult.Source,
+					Semantic:     sem,
+					Context:      buildCtx,
+					EnabledRules: enabledRules,
 				}
 
 				// Collect construction-time violations from semantic analysis
@@ -574,6 +578,31 @@ func getRuleConfig(ruleCode string, cfg *config.Config) any {
 	// Return the rule's options map from config
 	// The rule's resolveConfig method handles converting map to typed config
 	return cfg.Rules.GetOptions(ruleCode)
+}
+
+// computeEnabledRules returns a list of all rule codes that are enabled in the current run.
+// This allows rules to check if other rules are active and coordinate behavior.
+// For example, DL3003 can skip its fix if prefer-run-heredoc is enabled.
+func computeEnabledRules(cfg *config.Config) []string {
+	var enabled []string
+
+	// Collect registered rules (tally/*, hadolint/*, and implemented buildkit/* rules)
+	registry := rules.DefaultRegistry()
+	for _, rule := range registry.All() {
+		if isRuleEnabled(rule.Metadata().Code, rule.Metadata().DefaultSeverity, cfg) {
+			enabled = append(enabled, rule.Metadata().Code)
+		}
+	}
+
+	// Collect BuildKit parser rules (captured warnings like StageNameCasing, etc.)
+	for _, info := range buildkit.All() {
+		ruleCode := rules.BuildKitRulePrefix + info.Name
+		if isRuleEnabled(ruleCode, info.DefaultSeverity, cfg) {
+			enabled = append(enabled, ruleCode)
+		}
+	}
+
+	return enabled
 }
 
 // countEffectivelyEnabledRules returns the number of rules that are actually enabled

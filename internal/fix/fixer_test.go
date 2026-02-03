@@ -827,14 +827,14 @@ func TestApplyEdit_NegativeEndColumn(t *testing.T) {
 // testResolver is a flexible test resolver for fixer tests.
 type testResolver struct {
 	id          string
-	resolveFunc func(ctx context.Context, fix *rules.SuggestedFix) ([]rules.TextEdit, error)
+	resolveFunc func(ctx context.Context, resolveCtx ResolveContext, fix *rules.SuggestedFix) ([]rules.TextEdit, error)
 }
 
 func (r *testResolver) ID() string { return r.id }
 
-func (r *testResolver) Resolve(ctx context.Context, fix *rules.SuggestedFix) ([]rules.TextEdit, error) {
+func (r *testResolver) Resolve(ctx context.Context, resolveCtx ResolveContext, fix *rules.SuggestedFix) ([]rules.TextEdit, error) {
 	if r.resolveFunc != nil {
-		return r.resolveFunc(ctx, fix)
+		return r.resolveFunc(ctx, resolveCtx, fix)
 	}
 	return nil, nil
 }
@@ -851,7 +851,7 @@ func TestFixer_Apply_AsyncFix_WithResolver(t *testing.T) {
 	testResolverID := "test-resolver"
 	RegisterResolver(&testResolver{
 		id: testResolverID,
-		resolveFunc: func(ctx context.Context, fix *rules.SuggestedFix) ([]rules.TextEdit, error) {
+		resolveFunc: func(_ context.Context, _ ResolveContext, _ *rules.SuggestedFix) ([]rules.TextEdit, error) {
 			return []rules.TextEdit{
 				{
 					Location: rules.NewRangeLocation("Dockerfile", 1, 5, 1, 11),
@@ -904,7 +904,7 @@ func TestFixer_Apply_AsyncFix_ResolverError(t *testing.T) {
 	testResolverID := "test-error-resolver"
 	RegisterResolver(&testResolver{
 		id: testResolverID,
-		resolveFunc: func(ctx context.Context, fix *rules.SuggestedFix) ([]rules.TextEdit, error) {
+		resolveFunc: func(_ context.Context, _ ResolveContext, _ *rules.SuggestedFix) ([]rules.TextEdit, error) {
 			return nil, context.DeadlineExceeded
 		},
 	})
@@ -1048,7 +1048,7 @@ func TestFixer_Apply_DefaultConcurrency(t *testing.T) {
 	testResolverID := "test-concurrency-resolver"
 	RegisterResolver(&testResolver{
 		id: testResolverID,
-		resolveFunc: func(ctx context.Context, fix *rules.SuggestedFix) ([]rules.TextEdit, error) {
+		resolveFunc: func(_ context.Context, _ ResolveContext, _ *rules.SuggestedFix) ([]rules.TextEdit, error) {
 			return []rules.TextEdit{
 				{
 					Location: rules.NewRangeLocation("Dockerfile", 1, 5, 1, 11),

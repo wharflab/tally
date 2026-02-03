@@ -1,0 +1,322 @@
+package tally
+
+import (
+	"testing"
+
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
+	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/tinovyatkin/tally/internal/testutil"
+)
+
+func TestPreferHeredocRule_Metadata(t *testing.T) {
+	rule := NewPreferHeredocRule()
+	meta := rule.Metadata()
+
+	if meta.Code != "tally/prefer-run-heredoc" {
+		t.Errorf("Code = %q, want %q", meta.Code, "tally/prefer-run-heredoc")
+	}
+	if meta.DefaultSeverity != rules.SeverityStyle {
+		t.Errorf("DefaultSeverity = %v, want %v", meta.DefaultSeverity, rules.SeverityStyle)
+	}
+	if meta.Category != "style" {
+		t.Errorf("Category = %q, want %q", meta.Category, "style")
+	}
+	if meta.FixPriority != 100 {
+		t.Errorf("FixPriority = %d, want %d", meta.FixPriority, 100)
+	}
+}
+
+func TestPreferHeredocRule_DefaultConfig(t *testing.T) {
+	rule := NewPreferHeredocRule()
+	cfg, ok := rule.DefaultConfig().(PreferHeredocConfig)
+	if !ok {
+		t.Fatal("DefaultConfig did not return PreferHeredocConfig")
+	}
+
+	if cfg.MinCommands == nil || *cfg.MinCommands != 3 {
+		t.Errorf("MinCommands = %v, want 3", cfg.MinCommands)
+	}
+	if cfg.CheckConsecutiveRuns == nil || !*cfg.CheckConsecutiveRuns {
+		t.Errorf("CheckConsecutiveRuns = %v, want true", cfg.CheckConsecutiveRuns)
+	}
+	if cfg.CheckChainedCommands == nil || !*cfg.CheckChainedCommands {
+		t.Errorf("CheckChainedCommands = %v, want true", cfg.CheckChainedCommands)
+	}
+}
+
+func TestPreferHeredocRule_Check(t *testing.T) {
+	testutil.RunRuleTests(t, NewPreferHeredocRule(), []testutil.RuleTestCase{
+		{
+			Name: "three consecutive RUNs",
+			Content: `FROM alpine
+RUN echo 1
+RUN echo 2
+RUN echo 3
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "two consecutive RUNs - no violation",
+			Content: `FROM alpine
+RUN echo 1
+RUN echo 2
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "three chained commands",
+			Content: `FROM alpine
+RUN apt-get update && apt-get upgrade -y && apt-get install -y vim
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "two chained commands - no violation",
+			Content: `FROM alpine
+RUN apt-get update && apt-get install -y vim
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "exec form breaks sequence",
+			Content: `FROM alpine
+RUN echo 1
+RUN ["echo", "2"]
+RUN echo 3
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "non-RUN breaks sequence",
+			Content: `FROM alpine
+RUN echo 1
+WORKDIR /app
+RUN echo 2
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "heredoc already used - no chained violation",
+			Content: `FROM alpine
+RUN <<EOF
+echo 1
+echo 2
+EOF
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "disable consecutive check",
+			Content: `FROM alpine
+RUN echo 1
+RUN echo 2
+RUN echo 3
+`,
+			Config: map[string]any{
+				"check-consecutive-runs": false,
+			},
+			WantViolations: 0,
+		},
+		{
+			Name: "disable chained check",
+			Content: `FROM alpine
+RUN apt-get update && apt-get upgrade -y && apt-get install -y vim
+`,
+			Config: map[string]any{
+				"check-chained-commands": false,
+			},
+			WantViolations: 0,
+		},
+		{
+			Name: "custom min-commands threshold",
+			Content: `FROM alpine
+RUN echo 1
+RUN echo 2
+RUN echo 3
+RUN echo 4
+`,
+			Config: map[string]any{
+				"min-commands": 5,
+			},
+			WantViolations: 0, // Only 4 commands, need 5
+		},
+		{
+			Name: "custom min-commands met",
+			Content: `FROM alpine
+RUN echo 1
+RUN echo 2
+RUN echo 3
+RUN echo 4
+RUN echo 5
+`,
+			Config: map[string]any{
+				"min-commands": 5,
+			},
+			WantViolations: 1,
+		},
+	})
+}
+
+func TestPreferHeredocRule_CheckWithFixes(t *testing.T) {
+	rule := NewPreferHeredocRule()
+
+	tests := []struct {
+		name       string
+		content    string
+		wantHasFix bool
+	}{
+		{
+			name: "simple consecutive has fix",
+			content: `FROM alpine
+RUN echo 1
+RUN echo 2
+RUN echo 3
+`,
+			wantHasFix: true,
+		},
+		{
+			name: "simple chained has fix",
+			content: `FROM alpine
+RUN apt-get update && apt-get upgrade -y && apt-get install -y vim
+`,
+			wantHasFix: true,
+		},
+		{
+			name: "complex commands no fix",
+			content: `FROM alpine
+RUN if true; then echo yes; fi
+RUN echo 2
+RUN echo 3
+`,
+			wantHasFix: false, // Complex command prevents fix
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := testutil.MakeLintInputWithConfig(t, "Dockerfile", tt.content, nil)
+			violations := rule.Check(input)
+
+			if len(violations) == 0 {
+				t.Fatal("expected at least one violation")
+			}
+
+			v := violations[0]
+			hasFix := v.SuggestedFix != nil
+			if hasFix != tt.wantHasFix {
+				t.Errorf("violation has fix = %v, want %v", hasFix, tt.wantHasFix)
+			}
+			if hasFix && v.SuggestedFix.Priority != 100 {
+				t.Errorf("fix priority = %d, want 100", v.SuggestedFix.Priority)
+			}
+		})
+	}
+}
+
+func TestPreferHeredocRule_ValidateConfig(t *testing.T) {
+	rule := NewPreferHeredocRule()
+
+	tests := []struct {
+		name    string
+		config  any
+		wantErr bool
+	}{
+		{
+			name:    "nil config",
+			config:  nil,
+			wantErr: false,
+		},
+		{
+			name: "valid config",
+			config: map[string]any{
+				"min-commands":           4,
+				"check-consecutive-runs": false,
+				"check-chained-commands": true,
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid min-commands below minimum",
+			config: map[string]any{
+				"min-commands": 1,
+			},
+			wantErr: true,
+		},
+		{
+			name: "invalid additional property",
+			config: map[string]any{
+				"unknown-field": true,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := rule.ValidateConfig(tt.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateConfig() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestFormatHeredocWithMounts(t *testing.T) {
+	commands := []string{"apt-get update", "apt-get install -y vim", "apt-get clean"}
+
+	t.Run("without mounts", func(t *testing.T) {
+		result := formatHeredocWithMounts(commands, nil)
+
+		expected := `RUN <<EOF
+set -e
+apt-get update
+apt-get install -y vim
+apt-get clean
+EOF`
+
+		if result != expected {
+			t.Errorf("formatHeredocWithMounts() =\n%s\nwant:\n%s", result, expected)
+		}
+	})
+
+	t.Run("with cache mount", func(t *testing.T) {
+		mounts := []*instructions.Mount{{
+			Type:   instructions.MountTypeCache,
+			Target: "/var/cache/apt",
+		}}
+		result := formatHeredocWithMounts(commands, mounts)
+
+		expected := `RUN --mount=type=cache,target=/var/cache/apt <<EOF
+set -e
+apt-get update
+apt-get install -y vim
+apt-get clean
+EOF`
+
+		if result != expected {
+			t.Errorf("formatHeredocWithMounts() =\n%s\nwant:\n%s", result, expected)
+		}
+	})
+
+	t.Run("with multiple mounts", func(t *testing.T) {
+		mounts := []*instructions.Mount{
+			{Type: instructions.MountTypeCache, Target: "/var/cache/apt"},
+			{Type: instructions.MountTypeCache, Target: "/root/.cache"},
+		}
+		result := formatHeredocWithMounts(commands, mounts)
+
+		expected := `RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/root/.cache <<EOF
+set -e
+apt-get update
+apt-get install -y vim
+apt-get clean
+EOF`
+
+		if result != expected {
+			t.Errorf("formatHeredocWithMounts() =\n%s\nwant:\n%s", result, expected)
+		}
+	})
+}
+
+// Note: MountsEqual is now tested in the runmount package
