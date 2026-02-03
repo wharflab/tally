@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -13,7 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -274,9 +275,9 @@ func classifyBuildkitRules(
 		unsupportedRows = append(unsupportedRows, d)
 	}
 
-	sort.Slice(implementedRows, func(i, j int) bool { return implementedRows[i].Name < implementedRows[j].Name })
-	sort.Slice(capturedRows, func(i, j int) bool { return capturedRows[i].Name < capturedRows[j].Name })
-	sort.Slice(unsupportedRows, func(i, j int) bool { return unsupportedRows[i].Name < unsupportedRows[j].Name })
+	slices.SortFunc(implementedRows, func(a, b buildkitRuleDef) int { return cmp.Compare(a.Name, b.Name) })
+	slices.SortFunc(capturedRows, func(a, b buildkitRuleDef) int { return cmp.Compare(a.Name, b.Name) })
+	slices.SortFunc(unsupportedRows, func(a, b buildkitRuleDef) int { return cmp.Compare(a.Name, b.Name) })
 
 	return implementedRows, capturedRows, unsupportedRows
 }
@@ -327,7 +328,7 @@ func parseBuildkitRuleDefinitions(linterDir string) ([]buildkitRuleDef, error) {
 		}
 		result = append(result, d)
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	slices.SortFunc(result, func(a, b buildkitRuleDef) int { return cmp.Compare(a.Name, b.Name) })
 	return result, nil
 }
 
