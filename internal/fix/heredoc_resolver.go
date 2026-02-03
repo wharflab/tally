@@ -188,13 +188,7 @@ func (r *heredocResolver) createSequenceEdit(
 
 	// Calculate and apply indentation
 	indent := extractIndent(sm, startLine)
-	heredocLines := strings.Split(heredoc, "\n")
-	for i := 1; i < len(heredocLines); i++ {
-		if heredocLines[i] != "" {
-			heredocLines[i] = indent + heredocLines[i]
-		}
-	}
-	heredoc = strings.Join(heredocLines, "\n")
+	heredoc = applyIndent(heredoc, indent)
 
 	return &rules.TextEdit{
 		Location: rules.NewRangeLocation(file, startLine, 0, endLine, len(sm.Line(endLine-1))),
@@ -247,13 +241,7 @@ func (r *heredocResolver) detectAndFixChained(
 		heredoc := formatHeredocWithMounts(commands, mounts, data.ShellVariant)
 
 		indent := extractIndent(sm, startLine)
-		heredocLines := strings.Split(heredoc, "\n")
-		for i := 1; i < len(heredocLines); i++ {
-			if heredocLines[i] != "" {
-				heredocLines[i] = indent + heredocLines[i]
-			}
-		}
-		heredoc = strings.Join(heredocLines, "\n")
+		heredoc = applyIndent(heredoc, indent)
 
 		return []rules.TextEdit{{
 			Location: rules.NewRangeLocation(file, startLine, 0, endLine, len(sm.Line(endLine-1))),
@@ -371,6 +359,19 @@ func extractIndent(sm *sourcemap.SourceMap, line int) string {
 		}
 	}
 	return indent.String()
+}
+
+// applyIndent applies leading indentation to all lines except the first.
+// This preserves the visual hierarchy when Dockerfiles use indentation
+// for multi-stage builds or readability.
+func applyIndent(heredoc, indent string) string {
+	lines := strings.Split(heredoc, "\n")
+	for i := 1; i < len(lines); i++ {
+		if lines[i] != "" {
+			lines[i] = indent + lines[i]
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // init registers the heredoc resolver.
