@@ -9,6 +9,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/tinovyatkin/tally/internal/heredoc"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/runmount"
 	"github.com/tinovyatkin/tally/internal/shell"
@@ -184,15 +185,15 @@ func (r *heredocResolver) createSequenceEdit(
 	mounts := runmount.GetMounts(firstRun)
 
 	// Build heredoc
-	heredoc := formatHeredocWithMounts(seq.commands, mounts, data.ShellVariant)
+	heredocText := heredoc.FormatWithMounts(seq.commands, mounts, data.ShellVariant)
 
 	// Calculate and apply indentation
 	indent := extractIndent(sm, startLine)
-	heredoc = applyIndent(heredoc, indent)
+	heredocText = applyIndent(heredocText, indent)
 
 	return &rules.TextEdit{
 		Location: rules.NewRangeLocation(file, startLine, 0, endLine, len(sm.Line(endLine-1))),
-		NewText:  indent + heredoc,
+		NewText:  indent + heredocText,
 	}
 }
 
@@ -238,14 +239,14 @@ func (r *heredocResolver) detectAndFixChained(
 		endLine := runLoc[len(runLoc)-1].End.Line
 
 		mounts := runmount.GetMounts(run)
-		heredoc := formatHeredocWithMounts(commands, mounts, data.ShellVariant)
+		heredocText := heredoc.FormatWithMounts(commands, mounts, data.ShellVariant)
 
 		indent := extractIndent(sm, startLine)
-		heredoc = applyIndent(heredoc, indent)
+		heredocText = applyIndent(heredocText, indent)
 
 		return []rules.TextEdit{{
 			Location: rules.NewRangeLocation(file, startLine, 0, endLine, len(sm.Line(endLine-1))),
-			NewText:  indent + heredoc,
+			NewText:  indent + heredocText,
 		}}
 	}
 
@@ -292,48 +293,6 @@ func (r *heredocResolver) getRunScript(run *instructions.RunCommand) string {
 	return ""
 }
 
-// formatHeredocWithMounts formats commands as a heredoc RUN instruction.
-//
-// We always prepend "set -e" to preserve the fail-fast semantics of && chains.
-// Without it, heredocs only fail if the LAST command fails - intermediate failures
-// are silently ignored. This is different from && chains where any failure stops execution.
-//
-// Example without set -e:
-//
-//	RUN <<EOF
-//	apt-get update      # fails silently
-//	apt-get install foo # runs anyway, may succeed
-//	EOF                 # build succeeds despite update failure
-//
-// See: https://github.com/moby/buildkit/issues/2722
-// See: https://github.com/moby/buildkit/issues/4195
-func formatHeredocWithMounts(commands []string, mounts []*instructions.Mount, variant shell.Variant) string {
-	var sb strings.Builder
-	sb.WriteString("RUN ")
-	if len(mounts) > 0 {
-		sb.WriteString(runmount.FormatMounts(mounts))
-		sb.WriteString(" ")
-	}
-	sb.WriteString("<<EOF\n")
-	// See function doc comment for why set -e is required
-	sb.WriteString("set -e\n")
-	for _, cmd := range commands {
-		// Skip only bare "set -e" since we already added one.
-		// Preserve commands like "set -ex" or "set -euo pipefail" to retain
-		// additional flags (-x for trace, -u for undefined vars, -o pipefail).
-		if shell.SetsErrorFlag(cmd, variant) {
-			trimmed := strings.TrimSpace(cmd)
-			if trimmed == "set -e" {
-				continue
-			}
-		}
-		sb.WriteString(cmd)
-		sb.WriteString("\n")
-	}
-	sb.WriteString("EOF")
-	return sb.String()
-}
-
 // extractIndent extracts leading whitespace from a line.
 func extractIndent(sm *sourcemap.SourceMap, line int) string {
 	if line <= 0 || line > sm.LineCount() {
@@ -354,8 +313,8 @@ func extractIndent(sm *sourcemap.SourceMap, line int) string {
 // applyIndent applies leading indentation to all lines except the first.
 // This preserves the visual hierarchy when Dockerfiles use indentation
 // for multi-stage builds or readability.
-func applyIndent(heredoc, indent string) string {
-	lines := strings.Split(heredoc, "\n")
+func applyIndent(heredocText, indent string) string {
+	lines := strings.Split(heredocText, "\n")
 	for i := 1; i < len(lines); i++ {
 		if lines[i] != "" {
 			lines[i] = indent + lines[i]

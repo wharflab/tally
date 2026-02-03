@@ -463,43 +463,6 @@ func (r *PreferHeredocRule) resolveConfig(config any) PreferHeredocConfig {
 	return DefaultPreferHeredocConfig()
 }
 
-// formatHeredocWithMounts formats commands as a heredoc RUN instruction.
-// If mounts are provided, they are included in the RUN instruction.
-//
-// We always prepend "set -e" to preserve the fail-fast semantics of && chains.
-// Without it, heredocs only fail if the LAST command fails - intermediate failures
-// are silently ignored. This is different from && chains where any failure stops execution.
-//
-// See: https://github.com/moby/buildkit/issues/2722
-// See: https://github.com/moby/buildkit/issues/4195
-//
-// Note: This is used by tests. The production implementation is in heredoc_resolver.go.
-func formatHeredocWithMounts(commands []string, mounts []*instructions.Mount, variant shell.Variant) string {
-	var sb strings.Builder
-	sb.WriteString("RUN ")
-	if len(mounts) > 0 {
-		sb.WriteString(runmount.FormatMounts(mounts))
-		sb.WriteString(" ")
-	}
-	sb.WriteString("<<EOF\n")
-	sb.WriteString("set -e\n")
-	for _, cmd := range commands {
-		// Skip only bare "set -e" since we already added one.
-		// Preserve commands like "set -ex" or "set -euo pipefail" to retain
-		// additional flags (-x for trace, -u for undefined vars, -o pipefail).
-		if shell.SetsErrorFlag(cmd, variant) {
-			trimmed := strings.TrimSpace(cmd)
-			if trimmed == "set -e" {
-				continue
-			}
-		}
-		sb.WriteString(cmd)
-		sb.WriteString("\n")
-	}
-	sb.WriteString("EOF")
-	return sb.String()
-}
-
 // getRunScriptFromCmd extracts the shell script from a RUN instruction.
 // For heredoc RUNs, returns the heredoc content. For regular RUNs, returns CmdLine.
 // This is important for detecting exit commands that would break merging semantics.

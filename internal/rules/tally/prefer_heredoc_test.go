@@ -5,6 +5,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
+	"github.com/tinovyatkin/tally/internal/heredoc"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/shell"
 	"github.com/tinovyatkin/tally/internal/testutil"
@@ -293,7 +294,7 @@ func TestFormatHeredocWithMounts(t *testing.T) {
 	commands := []string{"apt-get update", "apt-get install -y vim", "apt-get clean"}
 
 	t.Run("without mounts", func(t *testing.T) {
-		result := formatHeredocWithMounts(commands, nil, shell.VariantBash)
+		result := heredoc.FormatWithMounts(commands, nil, shell.VariantBash)
 
 		expected := `RUN <<EOF
 set -e
@@ -303,7 +304,7 @@ apt-get clean
 EOF`
 
 		if result != expected {
-			t.Errorf("formatHeredocWithMounts() =\n%s\nwant:\n%s", result, expected)
+			t.Errorf("heredoc.FormatWithMounts() =\n%s\nwant:\n%s", result, expected)
 		}
 	})
 
@@ -312,7 +313,7 @@ EOF`
 			Type:   instructions.MountTypeCache,
 			Target: "/var/cache/apt",
 		}}
-		result := formatHeredocWithMounts(commands, mounts, shell.VariantBash)
+		result := heredoc.FormatWithMounts(commands, mounts, shell.VariantBash)
 
 		expected := `RUN --mount=type=cache,target=/var/cache/apt <<EOF
 set -e
@@ -322,7 +323,7 @@ apt-get clean
 EOF`
 
 		if result != expected {
-			t.Errorf("formatHeredocWithMounts() =\n%s\nwant:\n%s", result, expected)
+			t.Errorf("heredoc.FormatWithMounts() =\n%s\nwant:\n%s", result, expected)
 		}
 	})
 
@@ -331,7 +332,7 @@ EOF`
 			{Type: instructions.MountTypeCache, Target: "/var/cache/apt"},
 			{Type: instructions.MountTypeCache, Target: "/root/.cache"},
 		}
-		result := formatHeredocWithMounts(commands, mounts, shell.VariantBash)
+		result := heredoc.FormatWithMounts(commands, mounts, shell.VariantBash)
 
 		expected := `RUN --mount=type=cache,target=/var/cache/apt --mount=type=cache,target=/root/.cache <<EOF
 set -e
@@ -341,7 +342,7 @@ apt-get clean
 EOF`
 
 		if result != expected {
-			t.Errorf("formatHeredocWithMounts() =\n%s\nwant:\n%s", result, expected)
+			t.Errorf("heredoc.FormatWithMounts() =\n%s\nwant:\n%s", result, expected)
 		}
 	})
 }
