@@ -460,6 +460,7 @@ func TestFormatMount_WithUIDGIDMode(t *testing.T) {
 func TestMountEqual_AllFields(t *testing.T) {
 	uid1 := uint64(1000)
 	uid2 := uint64(2000)
+	uid1Copy := uint64(1000) // Same value, different pointer
 
 	tests := []struct {
 		name string
@@ -512,7 +513,7 @@ func TestMountEqual_AllFields(t *testing.T) {
 		{
 			name: "same UID",
 			a:    &instructions.Mount{Type: instructions.MountTypeCache, Target: "/cache", UID: &uid1},
-			b:    &instructions.Mount{Type: instructions.MountTypeCache, Target: "/cache", UID: &uid1},
+			b:    &instructions.Mount{Type: instructions.MountTypeCache, Target: "/cache", UID: &uid1Copy},
 			want: true,
 		},
 		{
