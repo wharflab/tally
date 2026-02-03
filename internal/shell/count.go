@@ -275,25 +275,10 @@ func HasExitCommand(script string, variant Variant) bool {
 		return false
 	}
 
-	parser := syntax.NewParser(
-		syntax.Variant(variant.toLangVariant()),
-		syntax.KeepComments(false),
-	)
-
-	prog, err := parser.Parse(strings.NewReader(script), "")
+	prog, err := parseScript(script, variant)
 	if err != nil {
 		return false
 	}
 
-	hasExit := false
-	syntax.Walk(prog, func(node syntax.Node) bool {
-		if call, ok := node.(*syntax.CallExpr); ok && len(call.Args) > 0 {
-			if name := call.Args[0].Lit(); name == cmdExit {
-				hasExit = true
-				return false // Stop walking
-			}
-		}
-		return true
-	})
-	return hasExit
+	return hasExitCommandFromAST(prog)
 }
