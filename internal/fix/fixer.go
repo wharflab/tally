@@ -332,11 +332,11 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 	skipped := make(map[*fixCandidate]bool)
 	checked := make(map[*fixCandidate]bool)
 
-	// hasCandidateConflict checks if any of a candidate's edits overlap with applied edits
-	hasCandidateConflict := func(edits []rules.TextEdit, appliedEdits []editWithSource) bool {
+	// hasCandidateConflict checks if any of a candidate's edits overlap with reserved edits
+	hasCandidateConflict := func(edits []rules.TextEdit, reservedEdits []editWithSource) bool {
 		for _, e := range edits {
-			for _, ae := range appliedEdits {
-				if editsOverlap(e, ae.edit) {
+			for _, re := range reservedEdits {
+				if editsOverlap(e, re.edit) {
 					return true
 				}
 			}
@@ -345,8 +345,11 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 	}
 
 	// Apply edits, checking for conflicts at the fix level (atomic)
+	// reservedEdits tracks ALL edits from approved candidates (for conflict detection)
+	// This ensures that when candidate A is approved, all of A's edits are reserved
+	// before checking candidate B, even if some of A's edits haven't been applied yet.
 	content := fc.ModifiedContent
-	appliedEdits := make([]editWithSource, 0, len(allEdits))
+	reservedEdits := make([]editWithSource, 0, len(allEdits))
 
 	for _, ews := range allEdits {
 		// Skip if this candidate was already determined to be skipped
@@ -357,7 +360,7 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 		// Check all edits for this candidate on first encounter
 		if !checked[ews.candidate] {
 			checked[ews.candidate] = true
-			if hasCandidateConflict(candidateEdits[ews.candidate], appliedEdits) {
+			if hasCandidateConflict(candidateEdits[ews.candidate], reservedEdits) {
 				skipped[ews.candidate] = true
 				fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
 					RuleCode: ews.candidate.violation.RuleCode,
@@ -366,12 +369,19 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 				})
 				continue
 			}
+			// Reserve ALL edits from this candidate immediately to prevent
+			// interleaving conflicts with candidates checked later
+			for _, edit := range candidateEdits[ews.candidate] {
+				reservedEdits = append(reservedEdits, editWithSource{
+					edit:      edit,
+					candidate: ews.candidate,
+				})
+			}
 			applied[ews.candidate] = true
 		}
 
 		// Apply the edit
 		content = applyEdit(content, ews.edit)
-		appliedEdits = append(appliedEdits, ews)
 	}
 
 	fc.ModifiedContent = content

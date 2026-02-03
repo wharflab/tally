@@ -245,6 +245,118 @@ func TestFixer_Apply_ConflictingFixes(t *testing.T) {
 	}
 }
 
+func TestFixer_Apply_InterleavingConflict(t *testing.T) {
+	// Test that multi-edit fixes properly reserve all their edits to prevent
+	// interleaving conflicts. Without proper reservation, a candidate B could
+	// be approved between when candidate A is checked and when A's later edit
+	// is applied, even if B overlaps with A's later edit.
+	//
+	// Scenario:
+	// - Candidate A has edits on lines 1 and 5
+	// - Candidate B has edits on lines 3 and 1 (line 1 overlaps with A)
+	// - Sorted descending: A@line5, B@line3, A@line1, B@line1
+	// - When A@line5 is first processed, we must reserve BOTH A's edits
+	//   so that when B is checked, we detect the overlap on line 1
+
+	sources := map[string][]byte{
+		"Dockerfile": []byte("RUN apt one\nRUN two\nRUN apt three\nRUN four\nRUN apt five"),
+	}
+
+	violations := []rules.Violation{
+		{
+			Location: rules.NewLineLocation("Dockerfile", 1),
+			RuleCode: "ruleA",
+			Message:  "Fix A",
+			SuggestedFix: &rules.SuggestedFix{
+				Description: "Multi-edit fix A",
+				Safety:      rules.FixSafe,
+				Edits: []rules.TextEdit{
+					// Edit on line 1 (cols 4-7)
+					{
+						Location: rules.NewRangeLocation("Dockerfile", 1, 4, 1, 7),
+						NewText:  "apt-get",
+					},
+					// Edit on line 5 (cols 4-7)
+					{
+						Location: rules.NewRangeLocation("Dockerfile", 5, 4, 5, 7),
+						NewText:  "apt-get",
+					},
+				},
+			},
+		},
+		{
+			Location: rules.NewLineLocation("Dockerfile", 3),
+			RuleCode: "ruleB",
+			Message:  "Fix B",
+			SuggestedFix: &rules.SuggestedFix{
+				Description: "Multi-edit fix B",
+				Safety:      rules.FixSafe,
+				Edits: []rules.TextEdit{
+					// Edit on line 3 (cols 4-7) - no overlap
+					{
+						Location: rules.NewRangeLocation("Dockerfile", 3, 4, 3, 7),
+						NewText:  "apt-get",
+					},
+					// Edit on line 1 (cols 4-7) - OVERLAPS with A's line 1 edit!
+					{
+						Location: rules.NewRangeLocation("Dockerfile", 1, 4, 1, 7),
+						NewText:  "APT-GET",
+					},
+				},
+			},
+		},
+	}
+
+	fixer := &Fixer{SafetyThreshold: FixSafe}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("Apply error: %v", err)
+	}
+
+	// A should be applied (checked first due to line 5 edit being sorted first)
+	// B should be skipped due to conflict with A on line 1
+	if result.TotalApplied() != 1 {
+		t.Errorf("TotalApplied() = %d, want 1", result.TotalApplied())
+	}
+	if result.TotalSkipped() != 1 {
+		t.Errorf("TotalSkipped() = %d, want 1", result.TotalSkipped())
+	}
+
+	fc := result.Changes["Dockerfile"]
+
+	// Verify A was applied
+	appliedA := false
+	for _, fix := range fc.FixesApplied {
+		if fix.RuleCode == "ruleA" {
+			appliedA = true
+			break
+		}
+	}
+	if !appliedA {
+		t.Error("Expected ruleA to be applied")
+	}
+
+	// Verify B was skipped due to conflict
+	skippedB := false
+	for _, skip := range fc.FixesSkipped {
+		if skip.RuleCode == "ruleB" && skip.Reason == SkipConflict {
+			skippedB = true
+			break
+		}
+	}
+	if !skippedB {
+		t.Error("Expected ruleB to be skipped with SkipConflict reason")
+	}
+
+	// Verify the content has A's changes (apt-get) not B's (APT-GET)
+	if bytes.Contains(fc.ModifiedContent, []byte("APT-GET")) {
+		t.Error("Content should not contain APT-GET (B's change), only apt-get (A's change)")
+	}
+	if !bytes.Contains(fc.ModifiedContent, []byte("apt-get")) {
+		t.Error("Content should contain apt-get (A's change)")
+	}
+}
+
 func TestFixer_Apply_MultipleFixes(t *testing.T) {
 	sources := map[string][]byte{
 		"Dockerfile": []byte("FROM alpine\nRUN apt install curl\nRUN apt update"),
