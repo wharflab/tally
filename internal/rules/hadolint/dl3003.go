@@ -93,7 +93,7 @@ func (r *DL3003Rule) generateFix(
 	// to splitting the RUN into multiple instructions.
 	if input.IsRuleEnabled(rules.HeredocRuleCode) {
 		cmdStr := GetRunCommandString(run)
-		if shell.IsHeredocCandidate(cmdStr, shellVariant, rules.HeredocDefaultMinCommands) {
+		if shell.IsHeredocCandidate(cmdStr, shellVariant, input.GetHeredocMinCommands()) {
 			return nil
 		}
 	}

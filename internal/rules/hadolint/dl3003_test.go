@@ -293,4 +293,23 @@ func TestDL3003_HeredocCoordination(t *testing.T) {
 			t.Error("expected fix for non-heredoc-candidate even when heredoc rule is enabled")
 		}
 	})
+
+	t.Run("with custom min-commands - respects configured threshold", func(t *testing.T) {
+		// 3 commands - a heredoc candidate with default (3), but not with min-commands=5
+		threeCmd := "FROM ubuntu\nRUN cd /app && make build && make install"
+		input := testutil.MakeLintInput(t, "Dockerfile", threeCmd)
+		input.EnabledRules = []string{"tally/prefer-run-heredoc"}
+		input.HeredocMinCommands = 5 // Set higher threshold
+
+		r := NewDL3003Rule()
+		violations := r.Check(input)
+
+		if len(violations) == 0 {
+			t.Fatal("expected violation")
+		}
+		// Should generate fix because 3 commands is below custom threshold of 5
+		if violations[0].SuggestedFix == nil {
+			t.Error("expected fix when command count is below custom min-commands threshold")
+		}
+	})
 }

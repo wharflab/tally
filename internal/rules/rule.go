@@ -74,6 +74,11 @@ type LintInput struct {
 	// if prefer-run-heredoc is enabled and would handle the command better.
 	// May be nil if not computed (for backward compatibility in tests).
 	EnabledRules []string
+
+	// HeredocMinCommands is the configured min-commands for the prefer-run-heredoc rule.
+	// Rules that coordinate with heredoc (like DL3003) should use this value.
+	// Zero means use the default (HeredocDefaultMinCommands).
+	HeredocMinCommands int
 }
 
 // SourceMap creates a SourceMap for snippet extraction and line-based operations.
@@ -96,6 +101,16 @@ func (input LintInput) IsRuleEnabled(ruleCode string) bool {
 		return false
 	}
 	return slices.Contains(input.EnabledRules, ruleCode)
+}
+
+// GetHeredocMinCommands returns the configured min-commands for heredoc conversion.
+// Returns the configured value if set, otherwise returns HeredocDefaultMinCommands.
+// Used by rules coordinating with prefer-run-heredoc (e.g., DL3003).
+func (input LintInput) GetHeredocMinCommands() int {
+	if input.HeredocMinCommands > 0 {
+		return input.HeredocMinCommands
+	}
+	return HeredocDefaultMinCommands
 }
 
 // SnippetForLocation extracts the source code at a location.

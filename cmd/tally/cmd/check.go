@@ -229,14 +229,15 @@ func checkCommand() *cli.Command {
 
 				// Build base LintInput (without rule-specific config)
 				baseInput := rules.LintInput{
-					File:         file,
-					AST:          parseResult.AST,
-					Stages:       parseResult.Stages,
-					MetaArgs:     parseResult.MetaArgs,
-					Source:       parseResult.Source,
-					Semantic:     sem,
-					Context:      buildCtx,
-					EnabledRules: enabledRules,
+					File:               file,
+					AST:                parseResult.AST,
+					Stages:             parseResult.Stages,
+					MetaArgs:           parseResult.MetaArgs,
+					Source:             parseResult.Source,
+					Semantic:           sem,
+					Context:            buildCtx,
+					EnabledRules:       enabledRules,
+					HeredocMinCommands: getHeredocMinCommands(cfg),
 				}
 
 				// Collect construction-time violations from semantic analysis
@@ -578,6 +579,27 @@ func getRuleConfig(ruleCode string, cfg *config.Config) any {
 	// Return the rule's options map from config
 	// The rule's resolveConfig method handles converting map to typed config
 	return cfg.Rules.GetOptions(ruleCode)
+}
+
+// getHeredocMinCommands extracts the min-commands setting from the prefer-run-heredoc config.
+// Returns 0 if not configured (the LintInput will use the default).
+func getHeredocMinCommands(cfg *config.Config) int {
+	if cfg == nil {
+		return 0
+	}
+	opts := cfg.Rules.GetOptions(rules.HeredocRuleCode)
+	if len(opts) == 0 {
+		return 0
+	}
+	if minCmds, ok := opts["min-commands"]; ok {
+		switch v := minCmds.(type) {
+		case int:
+			return v
+		case float64:
+			return int(v)
+		}
+	}
+	return 0
 }
 
 // computeEnabledRules returns a list of all rule codes that are enabled in the current run.
