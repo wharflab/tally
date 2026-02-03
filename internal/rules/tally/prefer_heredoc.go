@@ -195,7 +195,7 @@ func (r *PreferHeredocRule) checkConsecutiveRuns(
 		}
 
 		// Extract commands from this RUN
-		commands, isSimple := r.extractRunCommands(run, sm, shellVariant)
+		commands, isSimple := r.extractRunCommands(run, shellVariant)
 		if len(commands) == 0 {
 			flushSequence()
 			sequenceMounts = nil
@@ -203,7 +203,7 @@ func (r *PreferHeredocRule) checkConsecutiveRuns(
 		}
 
 		// Check if any command has exit (breaks sequence)
-		script := getRunScript(run, sm)
+		script := getRunScriptFromCmd(run)
 		if shell.HasExitCommand(script, shellVariant) {
 			flushSequence()
 			sequenceMounts = nil
@@ -359,7 +359,6 @@ func (r *PreferHeredocRule) checkChainedCommands(
 // containing the whole script to allow counting for sequence detection.
 func (r *PreferHeredocRule) extractRunCommands(
 	run *instructions.RunCommand,
-	sm *sourcemap.SourceMap,
 	shellVariant shell.Variant,
 ) ([]string, bool) {
 	if len(run.Files) > 0 {
@@ -377,7 +376,7 @@ func (r *PreferHeredocRule) extractRunCommands(
 	}
 
 	// Regular RUN - parse command line
-	script := getRunScript(run, sm)
+	script := getRunScriptFromCmd(run)
 	if script == "" {
 		return nil, false
 	}
@@ -525,14 +524,6 @@ func getRunScriptFromCmd(run *instructions.RunCommand) string {
 		return strings.Join(run.CmdLine, " ")
 	}
 	return ""
-}
-
-// getRunScript extracts the shell script from a RUN instruction.
-// Uses the parsed CmdLine which excludes mount options and other flags.
-//
-// Deprecated: Use getRunScriptFromCmd instead.
-func getRunScript(run *instructions.RunCommand, _ *sourcemap.SourceMap) string {
-	return getRunScriptFromCmd(run)
 }
 
 // init registers the rule with the default registry.
