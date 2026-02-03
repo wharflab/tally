@@ -49,8 +49,8 @@
       "tally_rule": "hadolint/DL3023"
     },
     "DL3024": {
-      "status": "implemented",
-      "tally_rule": "hadolint/DL3024"
+      "status": "covered_by_buildkit",
+      "buildkit_rule": "DuplicateStageName"
     },
     "DL3025": {
       "status": "covered_by_buildkit",

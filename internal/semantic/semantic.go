@@ -3,8 +3,8 @@
 // and COPY --from validation.
 //
 // The semantic model is built in a single pass from a ParseResult and is
-// immutable after construction. Construction-time violations (e.g., DL3024
-// for duplicate stage names) are accumulated and returned with the model.
+// immutable after construction. Construction-time violations are accumulated
+// and returned with the model.
 package semantic
 
 import (
@@ -42,7 +42,7 @@ type Model struct {
 	// file is the path to the Dockerfile (for violation locations).
 	file string
 
-	// issues accumulated during construction (e.g., DL3024).
+	// issues accumulated during construction.
 	issues []Issue
 }
 
@@ -111,7 +111,6 @@ func (m *Model) Graph() *StageGraph {
 }
 
 // ConstructionIssues returns issues detected during model construction.
-// These include semantic errors like duplicate stage names (DL3024).
 // The caller should convert these to rules.Violation for output.
 func (m *Model) ConstructionIssues() []Issue {
 	return m.issues

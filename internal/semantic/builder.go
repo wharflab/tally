@@ -1,7 +1,6 @@
 package semantic
 
 import (
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -48,7 +47,7 @@ func (b *Builder) WithShellDirectives(directives []directive.ShellDirective) *Bu
 
 // Build constructs the semantic model.
 // This performs single-pass analysis of the Dockerfile, detecting
-// construction-time violations like DL3024 (duplicate stage names).
+// construction-time violations (e.g., instruction order issues).
 func (b *Builder) Build() *Model {
 	if b.parseResult == nil {
 		return &Model{
@@ -140,7 +139,7 @@ func (b *Builder) applyShellDirectives(stage *instructions.Stage, info *StageInf
 	}
 }
 
-// processStageNaming registers stage names and detects DL3024 (duplicate names).
+// processStageNaming registers stage names for stage reference resolution.
 func (b *Builder) processStageNaming(stage *instructions.Stage, index int) {
 	if stage.Name == "" {
 		return
@@ -148,20 +147,7 @@ func (b *Builder) processStageNaming(stage *instructions.Stage, index int) {
 
 	normalized := normalizeStageRef(stage.Name)
 
-	if existingIdx, exists := b.stagesByName[normalized]; exists {
-		// DL3024: Duplicate stage name
-		var loc parser.Range
-		if len(stage.Location) > 0 {
-			loc = stage.Location[0]
-		}
-		b.issues = append(b.issues, newIssue(
-			b.file,
-			loc,
-			rules.HadolintRulePrefix+"DL3024",
-			fmt.Sprintf("Stage name %q is already used on stage %d", stage.Name, existingIdx),
-			"https://github.com/hadolint/hadolint/wiki/DL3024",
-		))
-	} else {
+	if _, exists := b.stagesByName[normalized]; !exists {
 		b.stagesByName[normalized] = index
 	}
 }

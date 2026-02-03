@@ -146,52 +146,6 @@ RUN echo "third"
 	}
 }
 
-func TestDL3024DuplicateStageName(t *testing.T) {
-	content := `FROM alpine:3.18 AS builder
-RUN echo "first"
-
-FROM ubuntu:22.04 AS builder
-RUN echo "second"
-`
-	pr := parseDockerfile(t, content)
-	model := NewModel(pr, nil, "test.Dockerfile")
-
-	violations := model.ConstructionIssues()
-	if len(violations) != 1 {
-		t.Fatalf("expected 1 violation, got %d", len(violations))
-	}
-
-	v := violations[0]
-	if v.Code != "hadolint/DL3024" {
-		t.Errorf("expected rule code 'hadolint/DL3024', got %q", v.Code)
-	}
-	if !strings.Contains(v.Message, "builder") {
-		t.Errorf("message should mention 'builder', got %q", v.Message)
-	}
-	if v.File != "test.Dockerfile" {
-		t.Errorf("expected file 'test.Dockerfile', got %q", v.File)
-	}
-}
-
-func TestDL3024CaseInsensitive(t *testing.T) {
-	content := `FROM alpine:3.18 AS Builder
-RUN echo "first"
-
-FROM ubuntu:22.04 AS BUILDER
-RUN echo "second"
-`
-	pr := parseDockerfile(t, content)
-	model := NewModel(pr, nil, "Dockerfile")
-
-	violations := model.ConstructionIssues()
-	if len(violations) != 1 {
-		t.Fatalf("expected 1 violation for case-insensitive duplicate, got %d", len(violations))
-	}
-	if violations[0].Code != "hadolint/DL3024" {
-		t.Errorf("expected hadolint/DL3024, got %q", violations[0].Code)
-	}
-}
-
 func TestDL3012MultipleHealthcheck(t *testing.T) {
 	content := `FROM alpine:3.18
 HEALTHCHECK CMD echo ok

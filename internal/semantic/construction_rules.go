@@ -10,7 +10,6 @@ func ConstructionRuleCodes() []string {
 	return []string{
 		rules.HadolintRulePrefix + "DL3012",
 		rules.HadolintRulePrefix + "DL3023",
-		rules.HadolintRulePrefix + "DL3024",
 		rules.HadolintRulePrefix + "DL3043",
 		rules.HadolintRulePrefix + "DL3061",
 	}

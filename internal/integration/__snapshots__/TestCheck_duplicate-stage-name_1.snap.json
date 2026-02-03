@@ -34,10 +34,10 @@
               "column": 0
             }
           },
-          "rule": "hadolint/DL3024",
+          "rule": "buildkit/DuplicateStageName",
           "message": "Stage name \"builder\" is already used on stage 0",
           "severity": "error",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3024",
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/duplicate-stage-name/",
           "sourceCode": "FROM ubuntu:22.04 AS builder"
         }
       ]

@@ -194,39 +194,39 @@ func TestSnippetAttachment(t *testing.T) {
 	}
 }
 
-func TestEnableFilter_HadolintRules(t *testing.T) {
+func TestEnableFilter_BuildKitRules(t *testing.T) {
 	violations := []rules.Violation{
 		rules.NewViolation(
-			rules.NewLineLocation("Dockerfile", 1), "hadolint/DL3024", "msg", rules.SeverityError),
+			rules.NewLineLocation("Dockerfile", 1), "buildkit/DuplicateStageName", "msg", rules.SeverityError),
 		rules.NewViolation(
 			rules.NewLineLocation("Dockerfile", 2), "tally/max-lines", "msg", rules.SeverityWarning),
 	}
 
 	cfg := config.Default()
-	// Disable hadolint/DL3024 via exclude
-	cfg.Rules.Exclude = append(cfg.Rules.Exclude, "hadolint/DL3024")
+	// Disable buildkit/DuplicateStageName via exclude
+	cfg.Rules.Exclude = append(cfg.Rules.Exclude, "buildkit/DuplicateStageName")
 
 	p := NewEnableFilter()
 	ctx := NewContext(nil, cfg, nil)
 
 	result := p.Process(violations, ctx)
 	if len(result) != 1 {
-		t.Fatalf("expected 1 violation (hadolint rule disabled), got %d", len(result))
+		t.Fatalf("expected 1 violation (buildkit rule disabled), got %d", len(result))
 	}
 	if result[0].RuleCode != "tally/max-lines" {
 		t.Errorf("expected tally/max-lines, got %s", result[0].RuleCode)
 	}
 }
 
-func TestSeverityOverride_HadolintRules(t *testing.T) {
+func TestSeverityOverride_BuildKitRules(t *testing.T) {
 	violations := []rules.Violation{
 		rules.NewViolation(
-			rules.NewLineLocation("Dockerfile", 1), "hadolint/DL3024", "msg", rules.SeverityError),
+			rules.NewLineLocation("Dockerfile", 1), "buildkit/DuplicateStageName", "msg", rules.SeverityError),
 	}
 
 	cfg := config.Default()
-	// Change hadolint/DL3024 severity to warning
-	cfg.Rules.Set("hadolint/DL3024", config.RuleConfig{Severity: "warning"})
+	// Change buildkit/DuplicateStageName severity to warning
+	cfg.Rules.Set("buildkit/DuplicateStageName", config.RuleConfig{Severity: "warning"})
 
 	p := NewSeverityOverride()
 	ctx := NewContext(nil, cfg, nil)
