@@ -45,7 +45,7 @@ func GetMounts(run *instructions.RunCommand) []*instructions.Mount {
 // hasMountFlags checks if the RUN command has any mount flags.
 func hasMountFlags(run *instructions.RunCommand) bool {
 	for _, flag := range run.FlagsUsed {
-		if len(flag) >= 5 && flag[:5] == "mount" {
+		if strings.HasPrefix(flag, "mount") {
 			return true
 		}
 	}
