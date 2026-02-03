@@ -474,6 +474,8 @@ func (r *PreferHeredocRule) resolveConfig(config any) PreferHeredocConfig {
 //
 // See: https://github.com/moby/buildkit/issues/2722
 // See: https://github.com/moby/buildkit/issues/4195
+//
+// Note: This is used by tests. The production implementation is in heredoc_resolver.go.
 func formatHeredocWithMounts(commands []string, mounts []*instructions.Mount) string {
 	var sb strings.Builder
 	sb.WriteString("RUN ")
@@ -484,11 +486,30 @@ func formatHeredocWithMounts(commands []string, mounts []*instructions.Mount) st
 	sb.WriteString("<<EOF\n")
 	sb.WriteString("set -e\n")
 	for _, cmd := range commands {
+		// Skip commands that enable -e since we already added one.
+		// Uses shell AST to properly detect any flag combination containing 'e'
+		// (e.g., "set -e", "set -ex", "set -euo pipefail").
+		if setsErrorFlag(cmd) {
+			continue
+		}
 		sb.WriteString(cmd)
 		sb.WriteString("\n")
 	}
 	sb.WriteString("EOF")
 	return sb.String()
+}
+
+// setsErrorFlag checks if a command is a "set" builtin that enables the -e flag.
+// Uses shell AST to properly detect any flag combination containing 'e'
+// (e.g., "set -e", "set -ex", "set -euo pipefail").
+func setsErrorFlag(cmd string) bool {
+	setCmds := shell.FindCommands(cmd, shell.VariantBash, "set")
+	for _, setCmd := range setCmds {
+		if setCmd.HasFlag("e") {
+			return true
+		}
+	}
+	return false
 }
 
 // getRunScriptFromCmd extracts the shell script from a RUN instruction.
