@@ -475,7 +475,7 @@ func (r *PreferHeredocRule) resolveConfig(config any) PreferHeredocConfig {
 // See: https://github.com/moby/buildkit/issues/4195
 //
 // Note: This is used by tests. The production implementation is in heredoc_resolver.go.
-func formatHeredocWithMounts(commands []string, mounts []*instructions.Mount) string {
+func formatHeredocWithMounts(commands []string, mounts []*instructions.Mount, variant shell.Variant) string {
 	var sb strings.Builder
 	sb.WriteString("RUN ")
 	if len(mounts) > 0 {
@@ -488,7 +488,7 @@ func formatHeredocWithMounts(commands []string, mounts []*instructions.Mount) st
 		// Skip commands that enable -e since we already added one.
 		// Uses shell AST to properly detect any flag combination containing 'e'
 		// (e.g., "set -e", "set -ex", "set -euo pipefail").
-		if setsErrorFlag(cmd) {
+		if setsErrorFlag(cmd, variant) {
 			continue
 		}
 		sb.WriteString(cmd)
@@ -501,8 +501,8 @@ func formatHeredocWithMounts(commands []string, mounts []*instructions.Mount) st
 // setsErrorFlag checks if a command is a "set" builtin that enables the -e flag.
 // Uses shell AST to properly detect any flag combination containing 'e'
 // (e.g., "set -e", "set -ex", "set -euo pipefail").
-func setsErrorFlag(cmd string) bool {
-	setCmds := shell.FindCommands(cmd, shell.VariantBash, "set")
+func setsErrorFlag(cmd string, variant shell.Variant) bool {
+	setCmds := shell.FindCommands(cmd, variant, "set")
 	for _, setCmd := range setCmds {
 		if setCmd.HasFlag("e") {
 			return true
