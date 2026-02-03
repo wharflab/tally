@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"slices"
+
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
@@ -66,6 +68,17 @@ type LintInput struct {
 
 	// Config is the rule-specific configuration (type depends on rule).
 	Config any
+
+	// EnabledRules contains the codes of all rules that are enabled in this run.
+	// Rules can check this to coordinate behavior, e.g., DL3003 can skip its fix
+	// if prefer-run-heredoc is enabled and would handle the command better.
+	// May be nil if not computed (for backward compatibility in tests).
+	EnabledRules []string
+
+	// HeredocMinCommands is the configured min-commands for the prefer-run-heredoc rule.
+	// Rules that coordinate with heredoc (like DL3003) should use this value.
+	// Zero means use the default (HeredocDefaultMinCommands).
+	HeredocMinCommands int
 }
 
 // SourceMap creates a SourceMap for snippet extraction and line-based operations.
@@ -79,6 +92,25 @@ func (input LintInput) SourceMap() *sourcemap.SourceMap {
 // This is a convenience wrapper around SourceMap().Snippet().
 func (input LintInput) Snippet(startLine, endLine int) string {
 	return input.SourceMap().Snippet(startLine, endLine)
+}
+
+// IsRuleEnabled checks if a specific rule is enabled in the current run.
+// Returns false if EnabledRules is nil (for backward compatibility in tests).
+func (input LintInput) IsRuleEnabled(ruleCode string) bool {
+	if input.EnabledRules == nil {
+		return false
+	}
+	return slices.Contains(input.EnabledRules, ruleCode)
+}
+
+// GetHeredocMinCommands returns the configured min-commands for heredoc conversion.
+// Returns the configured value if set, otherwise returns HeredocDefaultMinCommands.
+// Used by rules coordinating with prefer-run-heredoc (e.g., DL3003).
+func (input LintInput) GetHeredocMinCommands() int {
+	if input.HeredocMinCommands > 0 {
+		return input.HeredocMinCommands
+	}
+	return HeredocDefaultMinCommands
 }
 
 // SnippetForLocation extracts the source code at a location.
@@ -135,6 +167,12 @@ type RuleMetadata struct {
 
 	// IsExperimental marks rules that may change or be removed.
 	IsExperimental bool
+
+	// FixPriority determines the order in which fixes are applied.
+	// Lower values = earlier application (content fixes like DL3027: apt → apt-get).
+	// Higher values = later application (structural transforms like prefer-run-heredoc).
+	// Default 0 is for content fixes. Use 100+ for structural transformations.
+	FixPriority int
 }
 
 // Rule is the interface that all linting rules must implement.

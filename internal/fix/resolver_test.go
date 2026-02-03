@@ -16,7 +16,7 @@ type mockResolver struct {
 
 func (m *mockResolver) ID() string { return m.id }
 
-func (m *mockResolver) Resolve(_ context.Context, _ *rules.SuggestedFix) ([]rules.TextEdit, error) {
+func (m *mockResolver) Resolve(_ context.Context, _ ResolveContext, _ *rules.SuggestedFix) ([]rules.TextEdit, error) {
 	return m.edits, m.err
 }
 
@@ -83,7 +83,7 @@ func TestMockResolver_Resolve(t *testing.T) {
 		ResolverID:   "test",
 	}
 
-	got, err := r.Resolve(context.Background(), fix)
+	got, err := r.Resolve(context.Background(), ResolveContext{}, fix)
 	if err != nil {
 		t.Fatalf("Resolve error: %v", err)
 	}

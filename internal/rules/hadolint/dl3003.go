@@ -60,7 +60,7 @@ func (r *DL3003Rule) Check(input rules.LintInput) []rules.Violation {
 		// Try to generate auto-fix for simple cases
 		// Use FindCdCommands for detailed analysis (may not find cd in complex structures)
 		cdCommands := shell.FindCdCommands(cmdStr, shellVariant)
-		if fix := r.generateFix(run, cdCommands, file, shellVariant); fix != nil {
+		if fix := r.generateFix(input, run, cdCommands, file, shellVariant); fix != nil {
 			v = v.WithSuggestedFix(fix)
 		}
 
@@ -72,7 +72,12 @@ func (r *DL3003Rule) Check(input rules.LintInput) []rules.Violation {
 // Handles all cd commands in a chain by converting each to WORKDIR.
 // Example: "RUN cd /tmp && git clone ... && cd repo && make"
 // becomes: "WORKDIR /tmp\nRUN git clone ...\nWORKDIR repo\nRUN make"
+//
+// If prefer-run-heredoc is enabled and this command is a heredoc candidate,
+// we skip generating a fix because splitting would interfere with heredoc conversion.
+// The cd inside a heredoc works correctly (affects subsequent commands in same RUN).
 func (r *DL3003Rule) generateFix(
+	input rules.LintInput,
 	run *instructions.RunCommand,
 	cdCommands []shell.CdCommand,
 	file string,
@@ -81,6 +86,16 @@ func (r *DL3003Rule) generateFix(
 	// Only handle shell form RUN commands
 	if !run.PrependShell {
 		return nil
+	}
+
+	// If prefer-run-heredoc is enabled and this command is a heredoc candidate,
+	// skip the fix - heredoc conversion handles cd correctly and is preferable
+	// to splitting the RUN into multiple instructions.
+	if input.IsRuleEnabled(rules.HeredocRuleCode) {
+		cmdStr := GetRunCommandString(run)
+		if shell.IsHeredocCandidate(cmdStr, shellVariant, input.GetHeredocMinCommands()) {
+			return nil
+		}
 	}
 
 	// Filter cd commands with valid target directories

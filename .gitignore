@@ -71,3 +71,4 @@ packaging/rubygems/pkg/
 *.gem
 
 .rumdl_cache/
+cover.html

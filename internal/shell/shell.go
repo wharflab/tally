@@ -343,3 +343,16 @@ func simpleCommandNames(script string) []string {
 
 	return names
 }
+
+// SetsErrorFlag checks if a command is a "set" builtin that enables the -e flag.
+// Uses shell AST to properly detect any flag combination containing 'e'
+// (e.g., "set -e", "set -ex", "set -euo pipefail").
+func SetsErrorFlag(cmd string, variant Variant) bool {
+	setCmds := FindCommands(cmd, variant, "set")
+	for _, setCmd := range setCmds {
+		if setCmd.HasFlag("e") {
+			return true
+		}
+	}
+	return false
+}

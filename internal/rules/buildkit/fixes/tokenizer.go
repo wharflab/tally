@@ -69,14 +69,12 @@ func (t *Tokenizer) peek() byte {
 	return t.input[t.pos]
 }
 
-// advance moves forward and returns the current byte.
-func (t *Tokenizer) advance() byte {
+// advance moves forward by one byte.
+func (t *Tokenizer) advance() {
 	if t.atEnd() {
-		return 0
+		return
 	}
-	ch := t.input[t.pos]
 	t.pos++
-	return ch
 }
 
 // nextToken extracts the next token from input.

@@ -65,6 +65,11 @@ type SuggestedFix struct {
 	// ResolverData contains opaque data for the resolver.
 	// Not serialized to JSON; used internally during fix application.
 	ResolverData any `json:"-"`
+
+	// Priority determines application order when multiple fixes exist.
+	// Copied from rule's FixPriority. Lower = applied first.
+	// Content fixes (priority 0) run before structural transforms (priority 100+).
+	Priority int `json:"priority,omitempty"`
 }
 
 // TextEdit represents a single text replacement in a file.

@@ -1,0 +1,72 @@
+{
+  "files": [
+    {
+      "file": "testdata/prefer-run-heredoc/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/prefer-run-heredoc/Dockerfile",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 0
+            }
+          },
+          "rule": "tally/prefer-run-heredoc",
+          "message": "consecutive RUN instructions can be combined using heredoc syntax",
+          "detail": "3 consecutive RUN instructions with 3 total commands can be combined into a single heredoc RUN",
+          "severity": "style",
+          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+          "sourceCode": "RUN apt-get update",
+          "suggestedFix": {
+            "description": "Combine 3 commands into heredoc",
+            "safety": 1,
+            "needsResolve": true,
+            "resolverId": "prefer-run-heredoc",
+            "priority": 100
+          }
+        },
+        {
+          "location": {
+            "file": "testdata/prefer-run-heredoc/Dockerfile",
+            "start": {
+              "line": 12,
+              "column": 0
+            },
+            "end": {
+              "line": 12,
+              "column": 0
+            }
+          },
+          "rule": "tally/prefer-run-heredoc",
+          "message": "RUN instruction with chained commands can use heredoc syntax",
+          "detail": "RUN has 3 chained commands; consider using heredoc syntax for better readability",
+          "severity": "style",
+          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+          "sourceCode": "RUN echo step1 \u0026\u0026 echo step2 \u0026\u0026 echo step3",
+          "suggestedFix": {
+            "description": "Convert chained commands to heredoc (3 commands)",
+            "safety": 1,
+            "needsResolve": true,
+            "resolverId": "prefer-run-heredoc",
+            "priority": 100
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 2,
+    "errors": 0,
+    "warnings": 0,
+    "info": 0,
+    "style": 2,
+    "files": 1
+  },
+  "files_scanned": 1,
+  "rules_enabled": 1
+}
+

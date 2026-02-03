@@ -224,15 +224,20 @@ func checkCommand() *cli.Command {
 					}
 				}
 
+				// Compute list of enabled rules for cross-rule coordination
+				enabledRules := computeEnabledRules(cfg)
+
 				// Build base LintInput (without rule-specific config)
 				baseInput := rules.LintInput{
-					File:     file,
-					AST:      parseResult.AST,
-					Stages:   parseResult.Stages,
-					MetaArgs: parseResult.MetaArgs,
-					Source:   parseResult.Source,
-					Semantic: sem,
-					Context:  buildCtx,
+					File:               file,
+					AST:                parseResult.AST,
+					Stages:             parseResult.Stages,
+					MetaArgs:           parseResult.MetaArgs,
+					Source:             parseResult.Source,
+					Semantic:           sem,
+					Context:            buildCtx,
+					EnabledRules:       enabledRules,
+					HeredocMinCommands: getHeredocMinCommands(cfg),
 				}
 
 				// Collect construction-time violations from semantic analysis
@@ -576,30 +581,56 @@ func getRuleConfig(ruleCode string, cfg *config.Config) any {
 	return cfg.Rules.GetOptions(ruleCode)
 }
 
-// countEffectivelyEnabledRules returns the number of rules that are actually enabled
-// after applying config overrides (include/exclude patterns and severity overrides).
-// Counts both registered rules and BuildKit parser rules.
-func countEffectivelyEnabledRules(cfg *config.Config) int {
-	count := 0
+// getHeredocMinCommands extracts the min-commands setting from the prefer-run-heredoc config.
+// Returns 0 if not configured (the LintInput will use the default).
+func getHeredocMinCommands(cfg *config.Config) int {
+	if cfg == nil {
+		return 0
+	}
+	opts := cfg.Rules.GetOptions(rules.HeredocRuleCode)
+	if len(opts) == 0 {
+		return 0
+	}
+	if minCmds, ok := opts["min-commands"]; ok {
+		switch v := minCmds.(type) {
+		case int:
+			return v
+		case float64:
+			return int(v)
+		}
+	}
+	return 0
+}
 
-	// Count registered rules (tally/*, hadolint/*, and implemented buildkit/* rules)
+// computeEnabledRules returns a list of all rule codes that are enabled in the current run.
+// This allows rules to check if other rules are active and coordinate behavior.
+// For example, DL3003 can skip its fix if prefer-run-heredoc is enabled.
+func computeEnabledRules(cfg *config.Config) []string {
+	var enabled []string
+
+	// Collect registered rules (tally/*, hadolint/*, and implemented buildkit/* rules)
 	registry := rules.DefaultRegistry()
 	for _, rule := range registry.All() {
 		if isRuleEnabled(rule.Metadata().Code, rule.Metadata().DefaultSeverity, cfg) {
-			count++
+			enabled = append(enabled, rule.Metadata().Code)
 		}
 	}
 
-	// Count BuildKit parser rules (captured warnings like StageNameCasing, etc.)
-	// These are always enabled unless explicitly disabled via config
+	// Collect BuildKit parser rules (captured warnings like StageNameCasing, etc.)
 	for _, info := range buildkit.All() {
 		ruleCode := rules.BuildKitRulePrefix + info.Name
 		if isRuleEnabled(ruleCode, info.DefaultSeverity, cfg) {
-			count++
+			enabled = append(enabled, ruleCode)
 		}
 	}
 
-	return count
+	return enabled
+}
+
+// countEffectivelyEnabledRules returns the number of rules that are actually enabled
+// after applying config overrides (include/exclude patterns and severity overrides).
+func countEffectivelyEnabledRules(cfg *config.Config) int {
+	return len(computeEnabledRules(cfg))
 }
 
 // isRuleEnabled checks if a rule is effectively enabled based on config.

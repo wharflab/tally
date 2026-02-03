@@ -14,7 +14,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 3 | - | 3 |
+| tally | 4 | - | 4 |
 | buildkit | 5 + 14 captured | - | 19 |
 | hadolint | 8 | ~10 | 70+ |
 
@@ -29,6 +29,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | `tally/secrets-in-code` | Detects hardcoded secrets, API keys, and credentials using [gitleaks](https://github.com/gitleaks/gitleaks) patterns | Error | Security | Enabled |
 | `tally/max-lines` | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
 | `tally/no-unreachable-stages` | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
+| `tally/prefer-run-heredoc` | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Off (experimental) |
 
 ### tally/secrets-in-code
 
@@ -58,6 +59,42 @@ Limits Dockerfile size to encourage modular builds. Enabled by default with a 50
 ### tally/no-unreachable-stages
 
 Detects stages that are defined but never used (not referenced by `--target` or `COPY --from`).
+
+### tally/prefer-run-heredoc
+
+Suggests converting multi-command RUN instructions to heredoc syntax for better readability. **Experimental** - disabled by default.
+
+Detects two patterns:
+
+1. **Multiple consecutive RUN instructions** that could be combined
+2. **Single RUN with chained commands** via `&&` (3+ commands by default)
+
+**Example transformation:**
+
+```dockerfile
+# Before (violation)
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y vim
+
+# After (fixed with --fix)
+RUN <<EOF
+set -e
+apt-get update
+apt-get upgrade -y
+apt-get install -y vim
+EOF
+```
+
+**Why `set -e`?** Heredocs don't stop on error by default - only the exit code of the last command matters. Adding `set -e` preserves the fail-fast behavior of `&&` chains. See [moby/buildkit#2722](https://github.com/moby/buildkit/issues/2722).
+
+**Options:**
+
+- `min-commands`: Minimum commands to trigger (default: 3, since heredocs add 2 lines overhead)
+- `check-consecutive-runs`: Check for consecutive RUN instructions (default: true)
+- `check-chained-commands`: Check for `&&` chains in single RUN (default: true)
+
+**Rule coordination:** When this rule is enabled, `hadolint/DL3003` (cd → WORKDIR) will skip generating fixes for commands that are heredoc candidates, allowing heredoc conversion to handle `cd` correctly within the script.
 
 ---
 
