@@ -20,7 +20,7 @@ import (
 // run LLB conversion, only parse-time checks are "captured".
 //
 // Note: This is intentionally a small, explicit set that reflects tally's current pipeline.
-// When upgrading BuildKit, verify whether new parse-time rules were added.
+// It is enforced by tests to stay in sync with upstream BuildKit parse-time checks.
 var CapturedRuleNames = []string{
 	"StageNameCasing",
 	"FromAsCasing",
