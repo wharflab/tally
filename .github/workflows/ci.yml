@@ -1,36 +1,32 @@
+---
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
 permissions:
   contents: read
   id-token: write
-
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
       - name: Build
         run: go build ./...
-
       - name: Run unit tests with coverage
         run: |
           GOTESTSUM_BIN=$(make -s print-gotestsum-bin)
           make "$GOTESTSUM_BIN"
+          # Exclude scripts/* from coverage collection (they are tooling, not product code).
+          COVERPKG=$(go list ./... | grep -v '/scripts/' | paste -sd, -)
           "$GOTESTSUM_BIN" --format testname --junitfile junit.xml -- \
-            -race -coverprofile=coverage.out -covermode=atomic -coverpkg=./... ./...
-
+            -race -coverprofile=coverage.out -covermode=atomic -coverpkg="$COVERPKG" ./...
       - name: Run integration tests with coverage
         run: |
           # Integration tests use -cover build and write binary coverage data
@@ -38,14 +34,12 @@ jobs:
           "$GOTESTSUM_BIN" --format testname --junitfile junit-integration.xml -- ./internal/integration/...
           # Convert binary coverage data to text format
           go tool covdata textfmt -i=coverage -o=coverage-integration.txt
-
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
           files: coverage.out,coverage-integration.txt
           fail_ci_if_error: true
-
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
         uses: codecov/codecov-action@v5
@@ -54,57 +48,44 @@ jobs:
           use_oidc: true
           files: junit.xml,junit-integration.xml
           fail_ci_if_error: true
-
   test-windows:
     name: Test (Windows)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
-
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
       - name: Build
         run: go build ./...
-
       - name: Run tests
         run: go test ./... -v -race
-
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
       - name: Build custom golangci-lint
         run: make bin/custom-gcl
-
       - name: Run linters
         run: bin/custom-gcl run
-
   deadcode:
     name: Dead Code Detection
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
       - name: Add deadcode problem matcher
         run: echo "::add-matcher::.github/matchers/deadcode-matcher.json"
-
       - name: Run deadcode
         run: make deadcode
-
   cpd:
     name: Copy/Paste Detection
     runs-on: ubuntu-latest
@@ -112,13 +93,11 @@ jobs:
       PMD_VERSION: 7.20.0
     steps:
       - uses: actions/checkout@v6
-
       - name: Setup PMD
         run: |
           curl -fL "https://github.com/pmd/pmd/releases/download/pmd_releases%2F${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip" -o pmd.zip
           unzip -q pmd.zip
           rm pmd.zip
-
       - name: Run CPD
         run: |
           # Create exclusion list (tests, generated files, and fixtures)
