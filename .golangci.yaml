@@ -15,7 +15,6 @@ linters:
   disable:
     - cyclop          # complexity metrics - covered by gocyclo
     - depguard        # import restrictions - using forbidigo instead
-    - unqueryvet      # checksum mismatch issue with v1.4.0
     - dupword         # duplicate words - too noisy
     - err113          # dynamic errors - too strict for CLI tool
     - exhaustruct     # requires all struct fields - too strict
@@ -37,7 +36,6 @@ linters:
     - tagliatelle     # struct tag naming - not needed
     - testpackage     # separate test packages - not needed
     - tparallel       # t.Parallel() - not needed
-    - unparam         # unused params - too strict
     - varnamelen      # variable name length - too strict
     - wastedassign    # wasted assignments - too noisy
     - wrapcheck       # wrap all errors - too strict for internal packages
@@ -111,7 +109,7 @@ linters:
           disabled: true
 
     staticcheck:
-      checks: ["all", "-SA4006"]
+      checks: ["all"]
 
   exclusions:
     presets:
