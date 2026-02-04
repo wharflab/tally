@@ -18,7 +18,7 @@ pre-commit:
     rumdl:
       glob: "**/*.md"
       exclude: "**/__snapshots__/**"
-      run: uv tool run rumdl==0.1.11 check --fix --config .rumdl.toml --output-format concise {staged_files}
+      run: uv tool run rumdl==0.1.12 check --fix --config .rumdl.toml --output-format concise {staged_files}
       stage_fixed: true
     yamllint:
       glob: "*.{yml,yaml}"
