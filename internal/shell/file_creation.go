@@ -31,8 +31,9 @@ type FileCreationInfo struct {
 	// ChmodMode is the octal chmod mode (e.g., 0o755, 0o644), or 0 if no chmod.
 	ChmodMode uint16
 
-	// IsAppend is true if using >> (append) mode for the first write.
+	// IsAppend is true if ALL writes in the chain use >> (append) mode.
 	// If true, converting to COPY would lose existing file content.
+	// A later > (overwrite) clears this flag since content no longer depends on existing data.
 	IsAppend bool
 
 	// HasUnsafeVariables is true if the script uses variables that cannot be
@@ -239,11 +240,16 @@ func analyzeFileCreation(prog *syntax.File, knownVars func(name string) bool) *F
 		}
 	}
 
-	// Merge content from all creations
+	// Merge content from all creations.
+	// Track if all writes are append-only (no overwrite clears content).
 	var content strings.Builder
+	allAppend := true
 	for i, c := range creations {
 		if i > 0 && !c.isAppend {
 			content.Reset()
+		}
+		if !c.isAppend {
+			allAppend = false
 		}
 		content.WriteString(c.content)
 	}
@@ -265,7 +271,7 @@ func analyzeFileCreation(prog *syntax.File, knownVars func(name string) bool) *F
 		TargetPath:         targetPath,
 		Content:            content.String(),
 		ChmodMode:          chmodMode,
-		IsAppend:           creations[0].isAppend,
+		IsAppend:           allAppend,
 		HasUnsafeVariables: hasUnsafeVars,
 		PrecedingCommands:  strings.Join(preceding, " && "),
 		RemainingCommands:  strings.Join(remaining, " && "),
