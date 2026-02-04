@@ -99,15 +99,54 @@
             ],
             "isPreferred": true
           }
+        },
+        {
+          "location": {
+            "file": "testdata/buildkit-warnings/Dockerfile",
+            "start": {
+              "line": 5,
+              "column": 0
+            },
+            "end": {
+              "line": 5,
+              "column": 0
+            }
+          },
+          "rule": "buildkit/JSONArgsRecommended",
+          "message": "JSON arguments recommended for CMD to prevent unintended behavior related to OS signals",
+          "severity": "info",
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/json-args-recommended/",
+          "sourceCode": "CMD echo hello",
+          "suggestedFix": {
+            "description": "Convert CMD to exec form JSON array",
+            "edits": [
+              {
+                "location": {
+                  "file": "testdata/buildkit-warnings/Dockerfile",
+                  "start": {
+                    "line": 5,
+                    "column": 4
+                  },
+                  "end": {
+                    "line": 5,
+                    "column": 14
+                  }
+                },
+                "newText": "[\"echo\",\"hello\"]"
+              }
+            ],
+            "safety": 1,
+            "isPreferred": true
+          }
         }
       ]
     }
   ],
   "summary": {
-    "total": 3,
+    "total": 4,
     "errors": 0,
     "warnings": 3,
-    "info": 0,
+    "info": 1,
     "style": 0,
     "files": 1
   },

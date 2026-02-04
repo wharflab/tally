@@ -151,6 +151,48 @@
           "ruleIndex": -1,
           "stacks": [],
           "taxa": []
+        },
+        {
+          "attachments": [],
+          "codeFlows": [],
+          "fixes": [],
+          "graphTraversals": [],
+          "graphs": [],
+          "kind": "fail",
+          "level": "note",
+          "locations": [
+            {
+              "annotations": [],
+              "id": -1,
+              "logicalLocations": [],
+              "physicalLocation": {
+                "artifactLocation": {
+                  "index": -1,
+                  "uri": "testdata/buildkit-warnings/Dockerfile"
+                },
+                "region": {
+                  "byteOffset": -1,
+                  "charOffset": -1,
+                  "snippet": {
+                    "text": "CMD echo hello"
+                  },
+                  "startColumn": 1,
+                  "startLine": 5
+                }
+              },
+              "relationships": []
+            }
+          ],
+          "message": {
+            "arguments": [],
+            "text": "JSON arguments recommended for CMD to prevent unintended behavior related to OS signals"
+          },
+          "rank": -1,
+          "relatedLocations": [],
+          "ruleId": "buildkit/JSONArgsRecommended",
+          "ruleIndex": -1,
+          "stacks": [],
+          "taxa": []
         }
       ],
       "runAggregates": [],
@@ -176,6 +218,11 @@
               "shortDescription": {
                 "text": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment."
               }
+            },
+            {
+              "helpUri": "https://docs.docker.com/go/dockerfile/rule/json-args-recommended/",
+              "id": "buildkit/JSONArgsRecommended",
+              "relationships": []
             },
             {
               "helpUri": "https://docs.docker.com/go/dockerfile/rule/maintainer-deprecated/",

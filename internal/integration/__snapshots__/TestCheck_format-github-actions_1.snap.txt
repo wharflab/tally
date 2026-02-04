@@ -1,4 +1,5 @@
 ::warning file=testdata/buildkit-warnings/Dockerfile,line=2,col=1,title=buildkit/InvalidDefinitionDescription::Comment for FROM should follow the format: `# builder <description>`
 ::warning file=testdata/buildkit-warnings/Dockerfile,line=2,col=1,title=buildkit/StageNameCasing::Stage name 'Builder' should be lowercase
 ::warning file=testdata/buildkit-warnings/Dockerfile,line=3,col=1,title=buildkit/MaintainerDeprecated::Maintainer instruction is deprecated in favor of using label
+::notice file=testdata/buildkit-warnings/Dockerfile,line=5,col=1,title=buildkit/JSONArgsRecommended::JSON arguments recommended for CMD to prevent unintended behavior related to OS signals
 
