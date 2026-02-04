@@ -413,7 +413,18 @@ func (r *PreferCopyHeredocRule) generateFix(
 	if endLine == runLoc[0].Start.Line && endCol == runLoc[0].Start.Character {
 		cmdStr := getRunScriptFromCmd(run)
 		fullInstr := "RUN " + cmdStr
-		endCol = runLoc[0].Start.Character + len(fullInstr)
+
+		// For multi-line instructions, count lines and find last line length
+		lines := strings.Split(fullInstr, "\n")
+		if len(lines) > 1 {
+			// Multi-line: endLine is start + number of additional lines
+			// endCol is the length of the last line
+			endLine = runLoc[0].Start.Line + len(lines) - 1
+			endCol = len(lines[len(lines)-1])
+		} else {
+			// Single line: endCol is start + instruction length
+			endCol = runLoc[0].Start.Character + len(fullInstr)
+		}
 	}
 
 	description := "Replace RUN with COPY <<EOF to " + info.TargetPath

@@ -165,6 +165,15 @@ RUN echo "script" > /app/run.sh && chmod 755 /app/run.sh
 			wantHasFix:     true,
 			wantFixContain: "--chmod=0755",
 		},
+		{
+			name: "multi-line RUN with continuation",
+			content: `FROM alpine
+RUN echo "hello" \
+  > /app/config
+`,
+			wantHasFix:     true,
+			wantFixContain: "COPY <<EOF /app/config",
+		},
 	}
 
 	for _, tt := range tests {
