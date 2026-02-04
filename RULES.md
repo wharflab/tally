@@ -186,7 +186,7 @@ tally supports **12/22** BuildKit checks:
 - **5** captured during parsing
 - **7** reimplemented by tally (BuildKit normally runs these during LLB conversion)
 - **10** not currently supported (LLB conversion only)
-- **6** with auto-fixes (🔧)
+- **7** with auto-fixes (🔧)
 
 ### Implemented by tally
 
@@ -209,7 +209,7 @@ These checks are emitted by BuildKit during Dockerfile parsing and are captured 
 | Rule | Description | Severity | Default | Status |
 |------|-------------|----------|---------|--------|
 | [`buildkit/FromAsCasing`](https://docs.docker.com/reference/build-checks/from-as-casing/) 🔧 | The 'as' keyword should match the case of the 'from' keyword | Warning | Enabled | ✅🔧 |
-| [`buildkit/InvalidDefinitionDescription`](https://docs.docker.com/reference/build-checks/invalid-definition-description/) | Comment for build stage or argument should follow the format: `# <arg/stage name> <description>`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment. | Warning | Off (experimental) | ✅ |
+| [`buildkit/InvalidDefinitionDescription`](https://docs.docker.com/reference/build-checks/invalid-definition-description/) 🔧 | Comment for build stage or argument should follow the format: `# <arg/stage name> <description>`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment. | Warning | Off (experimental) | ✅🔧 |
 | [`buildkit/MaintainerDeprecated`](https://docs.docker.com/reference/build-checks/maintainer-deprecated/) 🔧 | The MAINTAINER instruction is deprecated, use a label instead to define an image author | Warning | Enabled | ✅🔧 |
 | [`buildkit/NoEmptyContinuation`](https://docs.docker.com/reference/build-checks/no-empty-continuation/) 🔧 | Empty continuation lines will become errors in a future release | Warning | Enabled | ✅🔧 |
 | [`buildkit/StageNameCasing`](https://docs.docker.com/reference/build-checks/stage-name-casing/) 🔧 | Stage names should be lowercase | Warning | Enabled | ✅🔧 |

@@ -807,3 +807,111 @@ func TestFindFROMBaseName(t *testing.T) {
 		})
 	}
 }
+
+func TestInvalidDefinitionDescriptionFix(t *testing.T) {
+	tests := []struct {
+		name           string
+		source         string
+		violationLine  int // 1-based line where BuildKit reports the violation (the FROM/ARG line)
+		wantFix        bool
+		wantEditLine   int    // 1-based line number where edit should be applied
+		wantEditCol    int    // Column where edit should be applied
+		wantNewText    string // Expected newline to insert
+	}{
+		{
+			name:          "comment before FROM with stage name",
+			source:        "# Test comment\nFROM alpine AS builder",
+			violationLine: 2,
+			wantFix:       true,
+			wantEditLine:  1,
+			wantEditCol:   14, // End of "# Test comment"
+			wantNewText:   "\n",
+		},
+		{
+			name:          "comment before ARG",
+			source:        "# Build argument\nARG VERSION=1.0",
+			violationLine: 2,
+			wantFix:       true,
+			wantEditLine:  1,
+			wantEditCol:   16, // End of "# Build argument"
+			wantNewText:   "\n",
+		},
+		{
+			name:          "CRLF line endings",
+			source:        "# Test comment\r\nFROM alpine AS builder",
+			violationLine: 2,
+			wantFix:       true,
+			wantEditLine:  1,
+			wantEditCol:   14,
+			wantNewText:   "\r\n",
+		},
+		{
+			name:          "violation on first line - no fix possible",
+			source:        "FROM alpine AS builder",
+			violationLine: 1,
+			wantFix:       false,
+		},
+		{
+			name:          "previous line is not a comment",
+			source:        "RUN echo hello\nFROM alpine AS builder",
+			violationLine: 2,
+			wantFix:       false,
+		},
+		{
+			name:          "previous line is empty",
+			source:        "\nFROM alpine AS builder",
+			violationLine: 2,
+			wantFix:       false,
+		},
+		{
+			name:          "comment with trailing whitespace",
+			source:        "# Comment with spaces   \nFROM alpine AS builder",
+			violationLine: 2,
+			wantFix:       true,
+			wantEditLine:  1,
+			wantEditCol:   24, // End of "# Comment with spaces   "
+			wantNewText:   "\n",
+		},
+		{
+			name: "multiple violations in multiline file",
+			source: `# check=experimental=InvalidDefinitionDescription
+# bar this is the bar
+ARG foo=bar
+# BasE this is the BasE image
+FROM scratch AS base`,
+			violationLine: 3, // ARG foo=bar
+			wantFix:       true,
+			wantEditLine:  2,
+			wantEditCol:   21, // End of "# bar this is the bar"
+			wantNewText:   "\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			source := []byte(tt.source)
+			v := rules.Violation{
+				Location: rules.NewRangeLocation("test.Dockerfile", tt.violationLine, 0, tt.violationLine, 0),
+				RuleCode: rules.BuildKitRulePrefix + "InvalidDefinitionDescription",
+				Message:  "Comment for FROM should follow the format: `# builder <description>`",
+			}
+
+			enrichInvalidDefinitionDescriptionFix(&v, source)
+
+			if tt.wantFix {
+				require.NotNil(t, v.SuggestedFix, "expected a fix")
+				assert.Len(t, v.SuggestedFix.Edits, 1)
+				assert.Equal(t, rules.FixSafe, v.SuggestedFix.Safety)
+				assert.True(t, v.SuggestedFix.IsPreferred)
+
+				edit := v.SuggestedFix.Edits[0]
+				assert.Equal(t, tt.wantEditLine, edit.Location.Start.Line, "edit line")
+				assert.Equal(t, tt.wantEditCol, edit.Location.Start.Column, "edit start column")
+				assert.Equal(t, tt.wantEditCol, edit.Location.End.Column, "edit end column")
+				assert.Equal(t, tt.wantNewText, edit.NewText, "newText")
+			} else {
+				assert.Nil(t, v.SuggestedFix, "expected no fix")
+			}
+		})
+	}
+}
