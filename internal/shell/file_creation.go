@@ -766,6 +766,9 @@ func extractPrintfContent(call *syntax.CallExpr, knownVars func(name string) boo
 	}
 
 	if format == "%s" && len(call.Args) >= 3 {
+		if len(call.Args) != 3 {
+			return "", true // extra args repeat format; unsafe
+		}
 		// Simple %s with argument
 		content, unsafe := extractWordContent(call.Args[2], knownVars)
 		// printf doesn't add trailing newline; mark unsafe unless content has one
@@ -778,6 +781,9 @@ func extractPrintfContent(call *syntax.CallExpr, knownVars func(name string) boo
 	// Literal string (escape sequences would need processing)
 	if strings.ContainsAny(format, "\\") {
 		return "", true // Has escape sequences - complex
+	}
+	if len(call.Args) != 2 {
+		return "", true // extra args repeat format; unsafe
 	}
 
 	// printf doesn't add trailing newline; mark unsafe unless content has one
