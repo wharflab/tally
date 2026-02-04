@@ -174,6 +174,17 @@ RUN chmod 755 /app/config
 			WantViolations: 1, // First RUN reported as single violation; chmod alone can't convert
 		},
 		{
+			Name: "disable consecutive check - consecutive overwrites still flagged",
+			Content: `FROM alpine
+RUN echo "a" > /app/config
+RUN echo "b" > /app/config
+`,
+			Config: map[string]any{
+				"check-consecutive-runs": false,
+			},
+			WantViolations: 2, // Each overwrite reported as single violation
+		},
+		{
 			Name: "mixed commands with file creation",
 			Content: `FROM alpine
 RUN apt-get update && echo "done" > /app/log
