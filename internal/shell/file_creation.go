@@ -806,6 +806,7 @@ func extractPrintfContent(call *syntax.CallExpr, knownVars func(name string) boo
 
 // NormalizeOctalMode normalizes a chmod mode to 4-digit octal format.
 // E.g., "755" -> "0755", "0755" -> "0755"
+// Other inputs (empty, 2-digit, 5+ digit) are returned unchanged.
 func NormalizeOctalMode(mode string) string {
 	if len(mode) == 3 {
 		return "0" + mode
