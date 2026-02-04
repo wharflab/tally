@@ -143,6 +143,57 @@ type fileCreationRun struct {
 	info *shell.FileCreationInfo
 }
 
+// identifySequenceRuns identifies which RUN instructions are part of consecutive sequences.
+// These will be handled by checkConsecutiveRuns, so they should be skipped in checkSingleRuns.
+// A sequence is: multiple file creations to same file, or file creation + chmod.
+func identifySequenceRuns(
+	stage instructions.Stage,
+	shellVariant shell.Variant,
+	knownVars func(string) bool,
+) map[*instructions.RunCommand]bool {
+	inSequence := make(map[*instructions.RunCommand]bool)
+	var prevInfo *shell.FileCreationInfo
+	var prevRun *instructions.RunCommand
+
+	for _, cmd := range stage.Commands {
+		run, ok := cmd.(*instructions.RunCommand)
+		if !ok || !run.PrependShell {
+			prevInfo, prevRun = nil, nil
+			continue
+		}
+
+		script := getRunCmdLine(run)
+		if script == "" {
+			prevInfo, prevRun = nil, nil
+			continue
+		}
+
+		// Check for file creation
+		info := shell.DetectFileCreation(script, shellVariant, knownVars)
+		if info != nil && !info.HasUnsafeVariables {
+			if prevInfo != nil && prevRun != nil && info.TargetPath == prevInfo.TargetPath {
+				inSequence[prevRun] = true
+				inSequence[run] = true
+			}
+			prevInfo, prevRun = info, run
+			continue
+		}
+
+		// Check for standalone chmod that continues the sequence
+		if prevInfo != nil && prevRun != nil {
+			chmodInfo := shell.DetectStandaloneChmod(script, shellVariant)
+			if chmodInfo != nil && chmodInfo.Target == prevInfo.TargetPath {
+				inSequence[prevRun] = true
+				inSequence[run] = true
+				continue
+			}
+		}
+
+		prevInfo, prevRun = nil, nil
+	}
+	return inSequence
+}
+
 // checkSingleRuns checks individual RUN instructions for file creation patterns.
 func (r *PreferCopyHeredocRule) checkSingleRuns(
 	stage instructions.Stage,
@@ -153,46 +204,9 @@ func (r *PreferCopyHeredocRule) checkSingleRuns(
 	meta rules.RuleMetadata,
 ) []rules.Violation {
 	var violations []rules.Violation //nolint:prealloc // Size unknown until iteration completes
+	inSequence := identifySequenceRuns(stage, shellVariant, knownVars)
 
-	// First pass: identify which RUNs are part of consecutive sequences
-	// These will be handled by checkConsecutiveRuns, so skip them here
-	inSequence := make(map[*instructions.RunCommand]bool)
-	var prevInfo *shell.FileCreationInfo
-	var prevRun *instructions.RunCommand
-
-	for _, cmd := range stage.Commands {
-		run, ok := cmd.(*instructions.RunCommand)
-		if !ok || !run.PrependShell {
-			prevInfo = nil
-			prevRun = nil
-			continue
-		}
-
-		script := getRunCmdLine(run)
-		if script == "" {
-			prevInfo = nil
-			prevRun = nil
-			continue
-		}
-
-		info := shell.DetectFileCreation(script, shellVariant, knownVars)
-		if info == nil || info.HasUnsafeVariables {
-			prevInfo = nil
-			prevRun = nil
-			continue
-		}
-
-		// Check if this continues a sequence (same target file)
-		if prevInfo != nil && prevRun != nil && info.TargetPath == prevInfo.TargetPath {
-			inSequence[prevRun] = true
-			inSequence[run] = true
-		}
-
-		prevInfo = info
-		prevRun = run
-	}
-
-	// Second pass: report violations for standalone file creations
+	// Report violations for standalone file creations
 	for _, cmd := range stage.Commands {
 		run, ok := cmd.(*instructions.RunCommand)
 		if !ok {
@@ -265,13 +279,17 @@ func (r *PreferCopyHeredocRule) checkConsecutiveRuns(
 	var violations []rules.Violation
 	var sequence []fileCreationRun
 	var targetPath string
+	var sequenceChmodMode string       // chmod mode from trailing RUN chmod
+	var sequenceChmodRun *instructions.RunCommand // the RUN chmod instruction
 
 	flushSequence := func() {
-		if v := r.createSequenceViolation(sequence, targetPath, file, sm, meta); v != nil {
+		if v := r.createSequenceViolation(sequence, targetPath, sequenceChmodMode, sequenceChmodRun, file, sm, meta); v != nil {
 			violations = append(violations, *v)
 		}
 		sequence = nil
 		targetPath = ""
+		sequenceChmodMode = ""
+		sequenceChmodRun = nil
 	}
 
 	for _, cmd := range stage.Commands {
@@ -295,32 +313,42 @@ func (r *PreferCopyHeredocRule) checkConsecutiveRuns(
 
 		// Detect file creation pattern
 		info := shell.DetectFileCreation(script, shellVariant, knownVars)
-		if info == nil {
-			flushSequence()
+		if info != nil && !info.HasUnsafeVariables {
+			// Clear any pending chmod when we see a new file creation
+			sequenceChmodMode = ""
+			sequenceChmodRun = nil
+
+			// Check if this continues the sequence
+			switch {
+			case len(sequence) == 0:
+				// Start new sequence
+				sequence = append(sequence, fileCreationRun{run: run, info: info})
+				targetPath = info.TargetPath
+			case info.TargetPath == targetPath:
+				// Continue sequence (must be append or overwrites)
+				sequence = append(sequence, fileCreationRun{run: run, info: info})
+			default:
+				// Different file - flush and start new sequence
+				flushSequence()
+				sequence = append(sequence, fileCreationRun{run: run, info: info})
+				targetPath = info.TargetPath
+			}
 			continue
 		}
 
-		// Skip if uses unsafe variables
-		if info.HasUnsafeVariables {
-			flushSequence()
-			continue
+		// Check for standalone chmod that can extend the sequence
+		if len(sequence) > 0 && sequenceChmodMode == "" {
+			chmodInfo := shell.DetectStandaloneChmod(script, shellVariant)
+			if chmodInfo != nil && chmodInfo.Target == targetPath {
+				// This chmod targets our sequence's file - absorb it
+				sequenceChmodMode = chmodInfo.Mode
+				sequenceChmodRun = run
+				continue
+			}
 		}
 
-		// Check if this continues the sequence
-		switch {
-		case len(sequence) == 0:
-			// Start new sequence
-			sequence = append(sequence, fileCreationRun{run: run, info: info})
-			targetPath = info.TargetPath
-		case info.TargetPath == targetPath:
-			// Continue sequence (must be append or overwrites)
-			sequence = append(sequence, fileCreationRun{run: run, info: info})
-		default:
-			// Different file - flush and start new sequence
-			flushSequence()
-			sequence = append(sequence, fileCreationRun{run: run, info: info})
-			targetPath = info.TargetPath
-		}
+		// Neither file creation nor matching chmod - flush
+		flushSequence()
 	}
 
 	flushSequence()
@@ -331,17 +359,27 @@ func (r *PreferCopyHeredocRule) checkConsecutiveRuns(
 func (r *PreferCopyHeredocRule) createSequenceViolation(
 	sequence []fileCreationRun,
 	targetPath string,
+	chmodMode string,
+	chmodRun *instructions.RunCommand,
 	file string,
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
 ) *rules.Violation {
-	// Need at least 2 RUNs to be a sequence
-	if len(sequence) < 2 {
+	// Need at least 2 RUNs to be a sequence, or 1 RUN + chmod
+	if len(sequence) < 2 && chmodRun == nil {
+		return nil
+	}
+	if len(sequence) == 0 {
 		return nil
 	}
 
 	firstRun := sequence[0].run
 	loc := rules.NewLocationFromRanges(file, firstRun.Location())
+
+	runCount := len(sequence)
+	if chmodRun != nil {
+		runCount++
+	}
 
 	v := rules.NewViolation(
 		loc,
@@ -349,11 +387,11 @@ func (r *PreferCopyHeredocRule) createSequenceViolation(
 		"consecutive RUN file creations can use a single COPY heredoc",
 		meta.DefaultSeverity,
 	).WithDocURL(meta.DocURL).WithDetail(
-		fmt.Sprintf("%d consecutive RUN instructions write to %s; combine into single COPY <<EOF", len(sequence), targetPath),
+		fmt.Sprintf("%d consecutive RUN instructions write to %s; combine into single COPY <<EOF", runCount, targetPath),
 	)
 
 	// Generate fix for the sequence
-	if fix := r.generateSequenceFix(sequence, targetPath, file, sm, meta); fix != nil {
+	if fix := r.generateSequenceFix(sequence, targetPath, chmodMode, chmodRun, file, sm, meta); fix != nil {
 		v = v.WithSuggestedFix(fix)
 	}
 
@@ -442,6 +480,8 @@ func (r *PreferCopyHeredocRule) generateFix(
 func (r *PreferCopyHeredocRule) generateSequenceFix(
 	sequence []fileCreationRun,
 	targetPath string,
+	trailingChmodMode string,
+	trailingChmodRun *instructions.RunCommand,
 	file string,
 	_ *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
@@ -461,20 +501,36 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 		}
 		content.WriteString(fcr.info.Content)
 
-		// Use last chmod mode
+		// Use last chmod mode from file creation commands
 		if fcr.info.ChmodMode != "" {
 			chmodMode = fcr.info.ChmodMode
 		}
 	}
 
+	// Trailing RUN chmod overrides any inline chmod
+	if trailingChmodMode != "" {
+		chmodMode = trailingChmodMode
+	}
+
 	// Build COPY heredoc
 	copyCmd := buildCopyHeredoc(targetPath, content.String(), chmodMode)
 
-	// Calculate edit range - from first RUN to last RUN
+	// Calculate edit range - from first RUN to last RUN (or trailing chmod)
 	firstLoc := sequence[0].run.Location()
-	lastLoc := sequence[len(sequence)-1].run.Location()
+	if len(firstLoc) == 0 {
+		return nil
+	}
 
-	if len(firstLoc) == 0 || len(lastLoc) == 0 {
+	// Determine the last RUN instruction (could be trailing chmod)
+	var lastRun *instructions.RunCommand
+	if trailingChmodRun != nil {
+		lastRun = trailingChmodRun
+	} else {
+		lastRun = sequence[len(sequence)-1].run
+	}
+
+	lastLoc := lastRun.Location()
+	if len(lastLoc) == 0 {
 		return nil
 	}
 
@@ -483,7 +539,6 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 	endCol := lastRange.End.Character
 
 	// When end position equals start position (invalid), calculate from command length
-	lastRun := sequence[len(sequence)-1].run
 	lastRunLoc := lastRun.Location()
 	if len(lastRunLoc) > 0 &&
 		endLine == lastRunLoc[0].Start.Line && endCol == lastRunLoc[0].Start.Character {
@@ -492,8 +547,13 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 		endCol = lastRunLoc[0].Start.Character + len(fullInstr)
 	}
 
+	runCount := len(sequence)
+	if trailingChmodRun != nil {
+		runCount++
+	}
+
 	return &rules.SuggestedFix{
-		Description: fmt.Sprintf("Combine %d RUNs into single COPY <<EOF to %s", len(sequence), targetPath),
+		Description: fmt.Sprintf("Combine %d RUNs into single COPY <<EOF to %s", runCount, targetPath),
 		Safety:      rules.FixSuggestion,
 		Priority:    meta.FixPriority,
 		Edits: []rules.TextEdit{{

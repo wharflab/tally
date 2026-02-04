@@ -85,6 +85,55 @@ func DetectFileCreation(script string, variant Variant, knownVars func(name stri
 	return analyzeFileCreation(prog, knownVars)
 }
 
+// ChmodInfo describes a standalone chmod command.
+type ChmodInfo struct {
+	// Mode is the octal mode (e.g., "755", "0644").
+	Mode string
+	// Target is the file path being chmod'd.
+	Target string
+}
+
+// DetectStandaloneChmod checks if a shell script is a standalone chmod command.
+// Returns nil if it's not a pure chmod or if the chmod cannot be converted
+// (e.g., symbolic mode, recursive chmod, multiple commands).
+func DetectStandaloneChmod(script string, variant Variant) *ChmodInfo {
+	if variant.IsNonPOSIX() {
+		return nil
+	}
+
+	prog, err := parseScript(script, variant)
+	if err != nil {
+		return nil
+	}
+
+	// Must be exactly one statement
+	if len(prog.Stmts) != 1 {
+		return nil
+	}
+
+	stmt := prog.Stmts[0]
+	if stmt.Cmd == nil {
+		return nil
+	}
+
+	call, ok := stmt.Cmd.(*syntax.CallExpr)
+	if !ok || len(call.Args) == 0 {
+		return nil
+	}
+
+	// Must be chmod command
+	if call.Args[0].Lit() != cmdChmod {
+		return nil
+	}
+
+	mode, target := parseChmod(call)
+	if mode == "" || target == "" {
+		return nil
+	}
+
+	return &ChmodInfo{Mode: mode, Target: target}
+}
+
 // IsPureFileCreation checks if a shell script is PURELY for creating files.
 // Returns true only if every command in the script is for file creation (echo/cat/printf > file)
 // or chmod on the created file. Returns false if there are any other commands mixed in.
@@ -270,7 +319,7 @@ func analyzeCallExpr(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(na
 			continue
 		}
 
-		content, unsafe := extractFileContent(call, redir, knownVars)
+		content, unsafe := extractFileContent(stmt, call, knownVars)
 
 		return analyzedCmd{
 			cmdType: cmdTypeFileCreation,
@@ -418,18 +467,31 @@ func extractRedirectTarget(redir *syntax.Redirect) string {
 
 // extractFileContent extracts the content from a file creation command.
 // Returns the content and whether unsafe variables were found.
-func extractFileContent(call *syntax.CallExpr, redir *syntax.Redirect, knownVars func(name string) bool) (string, bool) {
+func extractFileContent(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(name string) bool) (string, bool) {
 	cmdName := call.Args[0].Lit()
 
 	switch cmdName {
 	case cmdEcho:
 		return extractEchoContent(call, knownVars)
 	case cmdCat:
-		return extractCatHeredocContent(redir)
+		// For cat, find the heredoc redirect (separate from the output redirect)
+		return extractCatHeredocContentFromStmt(stmt)
 	case cmdPrintf:
 		return extractPrintfContent(call, knownVars)
 	}
 
+	return "", false
+}
+
+// extractCatHeredocContentFromStmt finds and extracts heredoc content from a cat statement.
+func extractCatHeredocContentFromStmt(stmt *syntax.Stmt) (string, bool) {
+	// Find the heredoc redirect
+	for _, redir := range stmt.Redirs {
+		if redir.Op == syntax.Hdoc || redir.Op == syntax.DashHdoc {
+			return extractCatHeredocContent(redir)
+		}
+	}
+	// No heredoc found - cat without heredoc creates empty file
 	return "", false
 }
 

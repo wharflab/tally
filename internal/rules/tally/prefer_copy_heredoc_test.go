@@ -183,6 +183,18 @@ RUN echo "hello" \
 			wantHasFix:     true,
 			wantFixContain: "COPY <<EOF /app/config",
 		},
+		{
+			name: "cat heredoc followed by separate chmod",
+			content: `FROM alpine
+RUN cat <<EOF > /app/script.sh
+#!/bin/bash
+echo hello
+EOF
+RUN chmod 755 /app/script.sh
+`,
+			wantHasFix:     true,
+			wantFixContain: "--chmod=0755",
+		},
 	}
 
 	for _, tt := range tests {
