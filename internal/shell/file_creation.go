@@ -16,6 +16,7 @@ const (
 	cmdCat    = "cat"
 	cmdPrintf = "printf"
 	cmdChmod  = "chmod"
+	cmdUmask  = "umask"
 )
 
 // FileCreationInfo describes a detected file creation pattern in a shell script.
@@ -159,6 +160,7 @@ const (
 	cmdTypeOther cmdType = iota
 	cmdTypeFileCreation
 	cmdTypeChmod
+	cmdTypeUmask
 )
 
 // analyzedCmd represents a command with its type and original text.
@@ -168,6 +170,7 @@ type analyzedCmd struct {
 	creation    *fileCreationCmd // non-nil for cmdTypeFileCreation
 	chmodMode   uint16           // non-zero for cmdTypeChmod
 	chmodTarget string           // non-empty for cmdTypeChmod
+	umaskValue  uint16           // non-zero for cmdTypeUmask (the mask value, e.g., 0o077)
 	hasUnsafe   bool
 }
 
@@ -195,6 +198,16 @@ func analyzeFileCreation(prog *syntax.File, knownVars func(name string) bool) *F
 		return nil
 	}
 
+	// Track most recent umask before file creation block
+	var activeUmask uint16
+	hasUmask := false
+	for i := range startIdx {
+		if commands[i].cmdType == cmdTypeUmask {
+			activeUmask = commands[i].umaskValue
+			hasUmask = true
+		}
+	}
+
 	// Extract file creation commands and merge content
 	var creations []fileCreationCmd
 	var chmodMode uint16
@@ -214,6 +227,16 @@ func analyzeFileCreation(prog *syntax.File, knownVars func(name string) bool) *F
 
 	if len(creations) == 0 {
 		return nil
+	}
+
+	// If no explicit chmod but umask was set, calculate effective mode
+	// Default file creation mode is 0o666, umask masks off bits
+	// Default umask is 0o022, giving 0o644
+	if chmodMode == 0 && hasUmask && activeUmask != defaultUmask {
+		effectiveMode := uint16(0o666) & ^activeUmask
+		if effectiveMode != defaultFileMode {
+			chmodMode = effectiveMode
+		}
 	}
 
 	// Merge content from all creations
@@ -293,6 +316,20 @@ func analyzeCallExpr(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(na
 
 	cmdName := call.Args[0].Lit()
 	text := stmtToString(stmt)
+
+	// Check for umask
+	if cmdName == cmdUmask {
+		mask, ok := parseUmask(call)
+		if ok {
+			return analyzedCmd{
+				cmdType:    cmdTypeUmask,
+				text:       text,
+				umaskValue: mask,
+			}
+		}
+		// Unrecognized umask (symbolic mode, etc.) - treat as other
+		return analyzedCmd{cmdType: cmdTypeOther, text: text}
+	}
 
 	// Check for chmod
 	if cmdName == cmdChmod {
@@ -395,8 +432,9 @@ func findFileCreationBlock(commands []analyzedCmd) (int, int, string) {
 			} else {
 				return startIdx, endIdx, targetPath // Different target, stop
 			}
-		case cmdTypeOther:
-			return startIdx, endIdx, targetPath // Other command, stop
+		case cmdTypeOther, cmdTypeUmask:
+			// Other commands or umask after file creation don't affect the file
+			return startIdx, endIdx, targetPath
 		}
 	}
 
@@ -474,6 +512,24 @@ func parseChmod(call *syntax.CallExpr) (uint16, string) {
 	return mode, target
 }
 
+// parseUmask extracts the umask value from a umask command.
+// Returns (value, true) if successful, (0, false) if not parseable.
+// Only supports octal umask values (e.g., "umask 077", "umask 0077").
+func parseUmask(call *syntax.CallExpr) (uint16, bool) {
+	// umask [mask]
+	// We only support octal masks, not symbolic modes
+	if len(call.Args) != 2 {
+		return 0, false // "umask" alone (print current) or too many args
+	}
+
+	maskStr := call.Args[1].Lit()
+	if maskStr == "" || !isOctalMode(maskStr) {
+		return 0, false // Symbolic mode or variable
+	}
+
+	return ParseOctalMode(maskStr), true
+}
+
 // octalModeRegex matches octal chmod modes (3 or 4 digits).
 // Supports standard modes (755, 0755) and special modes (1755 sticky, 2755 setgid, 4755 setuid).
 var octalModeRegex = regexp.MustCompile(`^[0-7]{3,4}$`)
@@ -488,6 +544,9 @@ var symbolicModeRegex = regexp.MustCompile(`^[ugoa]*[\-+=][rwxXst]+$`)
 
 // defaultFileMode is the typical mode for newly created files (0666 & ~0022 umask).
 const defaultFileMode = 0o644
+
+// defaultUmask is the typical umask value (0o022).
+const defaultUmask = 0o022
 
 // symbolicToOctal converts a symbolic chmod mode to octal, given a base mode.
 // Returns 0 if the mode cannot be converted.

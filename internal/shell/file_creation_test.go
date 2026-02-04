@@ -1,7 +1,10 @@
 package shell
 
 import (
+	"strings"
 	"testing"
+
+	"mvdan.cc/sh/v3/syntax"
 )
 
 func TestDetectFileCreation(t *testing.T) {
@@ -676,6 +679,128 @@ func TestDetectFileCreationEchoEdgeCases(t *testing.T) {
 			}
 			if result.HasUnsafeVariables != tt.wantUnsafe {
 				t.Errorf("HasUnsafeVariables = %v, want %v", result.HasUnsafeVariables, tt.wantUnsafe)
+			}
+		})
+	}
+}
+
+func TestDetectFileCreationWithUmask(t *testing.T) {
+	tests := []struct {
+		name      string
+		script    string
+		wantNil   bool
+		wantPath  string
+		wantChmod uint16
+	}{
+		{
+			name:      "umask 077 before file creation",
+			script:    `umask 077 && echo "secret" > /app/config`,
+			wantPath:  "/app/config",
+			wantChmod: 0o600, // effective mode from umask
+		},
+		{
+			name:      "umask 0077 (4-digit) before file creation",
+			script:    `umask 0077 && echo "secret" > /app/config`,
+			wantPath:  "/app/config",
+			wantChmod: 0o600,
+		},
+		{
+			name:      "umask 027 before file creation",
+			script:    `umask 027 && echo "data" > /app/file`,
+			wantPath:  "/app/file",
+			wantChmod: 0o640, // effective mode from umask
+		},
+		{
+			name:      "umask 022 (default) - no chmod needed",
+			script:    `umask 022 && echo "data" > /app/file`,
+			wantPath:  "/app/file",
+			wantChmod: 0, // default umask, no chmod needed
+		},
+		{
+			name:      "umask 000 - all permissions",
+			script:    `umask 000 && echo "data" > /app/file`,
+			wantPath:  "/app/file",
+			wantChmod: 0o666, // no masking, full permissions
+		},
+		{
+			name:      "explicit chmod overrides umask",
+			script:    `umask 077 && echo "x" > /app/file && chmod 755 /app/file`,
+			wantPath:  "/app/file",
+			wantChmod: 0o755, // explicit chmod takes precedence
+		},
+		{
+			name:     "no umask - no chmod",
+			script:   `echo "data" > /app/file`,
+			wantPath: "/app/file",
+			// No umask, no chmod - default permissions apply
+		},
+		{
+			name:      "umask with other commands before file creation",
+			script:    `umask 077 && mkdir -p /app && echo "secret" > /app/config`,
+			wantPath:  "/app/config",
+			wantChmod: 0o600,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DetectFileCreation(tt.script, VariantBash, nil)
+			if tt.wantNil {
+				if result != nil {
+					t.Errorf("expected nil, got %+v", result)
+				}
+				return
+			}
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
+			if result.TargetPath != tt.wantPath {
+				t.Errorf("TargetPath = %q, want %q", result.TargetPath, tt.wantPath)
+			}
+			if result.ChmodMode != tt.wantChmod {
+				t.Errorf("ChmodMode = %04o, want %04o", result.ChmodMode, tt.wantChmod)
+			}
+		})
+	}
+}
+
+func TestParseUmask(t *testing.T) {
+	tests := []struct {
+		name   string
+		args   []string
+		want   uint16
+		wantOk bool
+	}{
+		{"simple 077", []string{"umask", "077"}, 0o077, true},
+		{"4-digit 0077", []string{"umask", "0077"}, 0o077, true},
+		{"022", []string{"umask", "022"}, 0o022, true},
+		{"000", []string{"umask", "000"}, 0o000, true},
+		{"no args (print)", []string{"umask"}, 0, false},
+		{"symbolic mode", []string{"umask", "u=rwx,go="}, 0, false}, // Not supported
+		{"too many args", []string{"umask", "077", "extra"}, 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Build a minimal CallExpr for testing
+			script := strings.Join(tt.args, " ")
+			prog, err := parseScript(script, VariantBash)
+			if err != nil {
+				t.Fatalf("parseScript failed: %v", err)
+			}
+			if len(prog.Stmts) == 0 {
+				t.Fatal("no statements parsed")
+			}
+			call, ok := prog.Stmts[0].Cmd.(*syntax.CallExpr)
+			if !ok {
+				t.Fatal("expected CallExpr")
+			}
+			got, gotOk := parseUmask(call)
+			if gotOk != tt.wantOk {
+				t.Errorf("parseUmask() ok = %v, want %v", gotOk, tt.wantOk)
+			}
+			if gotOk && got != tt.want {
+				t.Errorf("parseUmask() = %04o, want %04o", got, tt.want)
 			}
 		})
 	}
