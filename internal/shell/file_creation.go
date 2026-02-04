@@ -311,6 +311,10 @@ func analyzeCallExpr(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(na
 		if redir.Op != syntax.RdrOut && redir.Op != syntax.AppOut {
 			continue
 		}
+		// Only process stdout redirects; skip stderr (2>), etc.
+		if redir.N != nil && redir.N.Value != "1" {
+			continue
+		}
 
 		targetPath := extractRedirectTarget(redir)
 		if targetPath == "" || !path.IsAbs(targetPath) {

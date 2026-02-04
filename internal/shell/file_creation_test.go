@@ -54,6 +54,18 @@ func TestDetectFileCreation(t *testing.T) {
 			wantNil: true,
 		},
 		{
+			name:    "stderr redirect (2>) - skip",
+			script:  `echo "error" 2> /app/error.log`,
+			variant: VariantBash,
+			wantNil: true, // 2> is stderr, not file creation
+		},
+		{
+			name:     "explicit stdout (1>) - detect",
+			script:   `echo "data" 1> /app/file`,
+			variant:  VariantBash,
+			wantPath: "/app/file", // 1> is explicit stdout, same as >
+		},
+		{
 			name:      "symbolic chmod +x converts to 0755",
 			script:    `echo "x" > /app/file && chmod +x /app/file`,
 			variant:   VariantBash,
