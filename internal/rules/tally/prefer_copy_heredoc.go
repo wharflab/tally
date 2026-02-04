@@ -3,6 +3,7 @@ package tally
 
 import (
 	"fmt"
+	pathpkg "path"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -774,6 +775,8 @@ func shouldSkipForMounts(run *instructions.RunCommand, fileTarget string) bool {
 
 // isPathUnder checks if path is under or equal to base directory.
 func isPathUnder(path, base string) bool {
+	path = pathpkg.Clean(path)
+	base = pathpkg.Clean(base)
 	// Normalize: ensure base ends with / for proper prefix matching
 	if !strings.HasSuffix(base, "/") {
 		base += "/"
