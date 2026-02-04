@@ -685,6 +685,29 @@ func extractEchoContent(call *syntax.CallExpr, knownVars func(name string) bool)
 	return result, hasUnsafe
 }
 
+// isComplexExpansion checks if a ParamExp uses complex expansion features
+// (e.g., ${#VAR}, ${VAR:-default}, ${VAR:0:5}, etc.)
+func isComplexExpansion(p *syntax.ParamExp) bool {
+	return p.Excl || p.Length || p.Width || p.Index != nil ||
+		p.Slice != nil || p.Repl != nil || p.Exp != nil
+}
+
+// extractParamExpContent handles parameter expansion, writing to content and returning unsafe status.
+func extractParamExpContent(p *syntax.ParamExp, content *strings.Builder, knownVars func(name string) bool) bool {
+	varName := p.Param.Value
+	if knownVars != nil && knownVars(varName) {
+		// Known ARG/ENV - can be preserved in COPY heredoc
+		// Always brace to avoid $VARsuffix ambiguity
+		content.WriteString("${")
+		content.WriteString(varName)
+		content.WriteString("}")
+		return isComplexExpansion(p)
+	}
+	content.WriteString("$")
+	content.WriteString(varName)
+	return true
+}
+
 // extractWordContent extracts the literal content from a word.
 func extractWordContent(word *syntax.Word, knownVars func(name string) bool) (string, bool) {
 	var content strings.Builder
@@ -702,23 +725,8 @@ func extractWordContent(word *syntax.Word, knownVars func(name string) bool) (st
 				case *syntax.Lit:
 					content.WriteString(dp.Value)
 				case *syntax.ParamExp:
-					// Variable expansion
-					varName := dp.Param.Value
-					if knownVars != nil && knownVars(varName) {
-						// Known ARG/ENV - can be preserved in COPY heredoc
-						// Always brace to avoid $VARsuffix ambiguity
-						content.WriteString("${")
-						content.WriteString(varName)
-						content.WriteString("}")
-						if dp.Excl || dp.Length || dp.Width || dp.Index != nil ||
-							dp.Slice != nil || dp.Repl != nil || dp.Exp != nil {
-							// Complex expansion - mark unsafe
-							hasUnsafe = true
-						}
-					} else {
+					if extractParamExpContent(dp, &content, knownVars) {
 						hasUnsafe = true
-						content.WriteString("$")
-						content.WriteString(varName)
 					}
 				default:
 					// Command substitution, arithmetic, etc.
@@ -726,17 +734,8 @@ func extractWordContent(word *syntax.Word, knownVars func(name string) bool) (st
 				}
 			}
 		case *syntax.ParamExp:
-			// Unquoted variable - check if known
-			varName := p.Param.Value
-			if knownVars != nil && knownVars(varName) {
-				// Always brace to avoid $VARsuffix ambiguity
-				content.WriteString("${")
-				content.WriteString(varName)
-				content.WriteString("}")
-			} else {
+			if extractParamExpContent(p, &content, knownVars) {
 				hasUnsafe = true
-				content.WriteString("$")
-				content.WriteString(varName)
 			}
 		default:
 			// Command substitution, arithmetic, etc.

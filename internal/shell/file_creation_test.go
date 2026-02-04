@@ -438,6 +438,16 @@ func TestDetectFileCreationWithKnownVars(t *testing.T) {
 			script:     `echo "hello world" > /app/config`,
 			wantUnsafe: false,
 		},
+		{
+			name:       "complex expansion - length",
+			script:     `echo "${#APP_CONFIG}" > /app/config`,
+			wantUnsafe: true, // ${#VAR} is complex expansion
+		},
+		{
+			name:       "complex expansion - default",
+			script:     `echo "${APP_CONFIG:-default}" > /app/config`,
+			wantUnsafe: true, // ${VAR:-default} is complex expansion
+		},
 	}
 
 	for _, tt := range tests {
