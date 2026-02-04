@@ -597,11 +597,19 @@ func extractFileContent(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func
 
 // extractCatHeredocContentFromStmt finds and extracts heredoc content from a cat statement.
 func extractCatHeredocContentFromStmt(stmt *syntax.Stmt) (string, bool) {
-	// Find the heredoc redirect
+	// Find the heredoc redirect - reject multiple heredocs as ambiguous
+	// (bash uses the last input redirect when multiple are present)
+	var hdoc *syntax.Redirect
 	for _, redir := range stmt.Redirs {
 		if redir.Op == syntax.Hdoc || redir.Op == syntax.DashHdoc {
-			return extractCatHeredocContent(redir)
+			if hdoc != nil {
+				return "", true // multiple heredocs are ambiguous
+			}
+			hdoc = redir
 		}
+	}
+	if hdoc != nil {
+		return extractCatHeredocContent(hdoc)
 	}
 	// No heredoc found - cat without heredoc creates empty file
 	return "", false
