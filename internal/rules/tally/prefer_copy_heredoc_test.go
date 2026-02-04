@@ -404,6 +404,14 @@ EOF`,
 Some EOF text
 CONTENT`,
 		},
+		{
+			name:       "empty content creates 0-byte file",
+			targetPath: "/app/empty",
+			content:    "",
+			chmodMode:  "",
+			want: `COPY <<EOF /app/empty
+EOF`,
+		},
 	}
 
 	for _, tt := range tests {

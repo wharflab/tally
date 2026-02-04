@@ -656,6 +656,11 @@ func buildCopyHeredoc(targetPath, content, chmodMode string) string {
 	sb.WriteString("\n")
 
 	// Write content (ensure no trailing newline duplication)
+	if content == "" {
+		// Empty file: delimiter immediately after header newline (0-byte file)
+		sb.WriteString(delimiter)
+		return sb.String()
+	}
 	contentStr := strings.TrimSuffix(content, "\n")
 	sb.WriteString(contentStr)
 	sb.WriteString("\n")
