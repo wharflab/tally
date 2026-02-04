@@ -332,6 +332,19 @@ func (r *PreferCopyHeredocRule) checkConsecutiveRuns(
 				continue
 			}
 
+			// Mixed commands can't be safely combined into a single COPY heredoc
+			// (would drop PrecedingCommands or RemainingCommands)
+			if info.PrecedingCommands != "" || info.RemainingCommands != "" {
+				flushSequence()
+				continue
+			}
+
+			// Do not start a sequence with append-only writes (unknown base content)
+			if len(sequence) == 0 && info.IsAppend {
+				flushSequence()
+				continue
+			}
+
 			// Update sequence with this file creation
 			sequence, targetPath = updateFileCreationSequence(
 				sequence, targetPath, run, info, flushSequence,
