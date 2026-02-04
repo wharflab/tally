@@ -190,7 +190,7 @@ func TestDetectFileCreation(t *testing.T) {
 			}
 
 			if result.ChmodMode != tt.wantChmod {
-				t.Errorf("ChmodMode = %q, want %q", result.ChmodMode, tt.wantChmod)
+				t.Errorf("ChmodMode = %04o, want %04o", result.ChmodMode, tt.wantChmod)
 			}
 
 			if result.HasUnsafeVariables != tt.wantUnsafe {
