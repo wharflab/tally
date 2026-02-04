@@ -163,6 +163,17 @@ RUN echo "hello" > /app/config
 			WantViolations: 1,
 		},
 		{
+			Name: "disable consecutive check - sequence RUNs reported individually",
+			Content: `FROM alpine
+RUN echo "line1" > /app/config
+RUN chmod 755 /app/config
+`,
+			Config: map[string]any{
+				"check-consecutive-runs": false,
+			},
+			WantViolations: 1, // First RUN reported as single violation; chmod alone can't convert
+		},
+		{
 			Name: "mixed commands with file creation",
 			Content: `FROM alpine
 RUN apt-get update && echo "done" > /app/log

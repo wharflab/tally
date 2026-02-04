@@ -116,7 +116,7 @@ func (r *PreferCopyHeredocRule) Check(input rules.LintInput) []rules.Violation {
 
 		if checkSingle {
 			violations = append(violations,
-				r.checkSingleRuns(stage, shellVariant, knownVars, input.File, sm, meta)...)
+				r.checkSingleRuns(stage, shellVariant, knownVars, input.File, sm, meta, checkConsecutive)...)
 		}
 
 		if checkConsecutive {
@@ -213,6 +213,8 @@ func identifySequenceRuns(
 }
 
 // checkSingleRuns checks individual RUN instructions for file creation patterns.
+// skipSequences controls whether to skip RUNs that are part of consecutive sequences
+// (should be true when checkConsecutive is enabled, false otherwise).
 func (r *PreferCopyHeredocRule) checkSingleRuns(
 	stage instructions.Stage,
 	shellVariant shell.Variant,
@@ -220,9 +222,13 @@ func (r *PreferCopyHeredocRule) checkSingleRuns(
 	file string,
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
+	skipSequences bool,
 ) []rules.Violation {
 	var violations []rules.Violation //nolint:prealloc // Size unknown until iteration completes
-	inSequence := identifySequenceRuns(stage, shellVariant, knownVars)
+	var inSequence map[*instructions.RunCommand]bool
+	if skipSequences {
+		inSequence = identifySequenceRuns(stage, shellVariant, knownVars)
+	}
 
 	// Report violations for standalone file creations
 	for _, cmd := range stage.Commands {
