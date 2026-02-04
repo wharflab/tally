@@ -43,6 +43,12 @@ func TestFindDockerfileInlineCommentStart(t *testing.T) {
 			wantIdx:   len(`CMD echo "# not a comment"`),
 			wantFound: false,
 		},
+		{
+			name:      "escaped-quote-in-double-quotes",
+			line:      `CMD echo "a\\\"b" # comment`,
+			wantIdx:   len(`CMD echo "a\\\"b" `),
+			wantFound: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -74,5 +80,68 @@ func TestEnrichJSONArgsRecommendedFix_SkipsComplexShell(t *testing.T) {
 	enrichJSONArgsRecommendedFix(&v, source)
 	if v.SuggestedFix != nil {
 		t.Fatalf("expected no fix for globbing shell command, got %+v", v.SuggestedFix)
+	}
+}
+
+func TestEnrichJSONArgsRecommendedFix_EarlyReturns(t *testing.T) {
+	t.Run("line-number-missing", func(t *testing.T) {
+		source := []byte("FROM alpine\nCMD echo hi\n")
+		v := rules.NewViolation(rules.NewFileLocation("Dockerfile"), "buildkit/JSONArgsRecommended", "msg", rules.SeverityInfo)
+		v.Location = rules.NewRangeLocation("Dockerfile", 0, 0, 0, 0)
+
+		enrichJSONArgsRecommendedFix(&v, source)
+		if v.SuggestedFix != nil {
+			t.Fatalf("expected no fix, got %+v", v.SuggestedFix)
+		}
+	})
+
+	t.Run("line-out-of-bounds", func(t *testing.T) {
+		source := []byte("FROM alpine\nCMD echo hi\n")
+		v := rules.NewViolation(rules.NewFileLocation("Dockerfile"), "buildkit/JSONArgsRecommended", "msg", rules.SeverityInfo)
+		v.Location = rules.NewRangeLocation("Dockerfile", 99, 0, 99, 0)
+
+		enrichJSONArgsRecommendedFix(&v, source)
+		if v.SuggestedFix != nil {
+			t.Fatalf("expected no fix, got %+v", v.SuggestedFix)
+		}
+	})
+
+	t.Run("not-a-cmd-or-entrypoint", func(t *testing.T) {
+		source := []byte("FROM alpine\nRUN echo hi\n")
+		v := rules.NewViolation(rules.NewFileLocation("Dockerfile"), "buildkit/JSONArgsRecommended", "msg", rules.SeverityInfo)
+		v.Location = rules.NewRangeLocation("Dockerfile", 2, 0, 2, len("RUN echo hi"))
+
+		enrichJSONArgsRecommendedFix(&v, source)
+		if v.SuggestedFix != nil {
+			t.Fatalf("expected no fix, got %+v", v.SuggestedFix)
+		}
+	})
+
+	t.Run("missing-args", func(t *testing.T) {
+		source := []byte("FROM alpine\nCMD\n")
+		v := rules.NewViolation(rules.NewFileLocation("Dockerfile"), "buildkit/JSONArgsRecommended", "msg", rules.SeverityInfo)
+		v.Location = rules.NewRangeLocation("Dockerfile", 2, 0, 2, len("CMD"))
+
+		enrichJSONArgsRecommendedFix(&v, source)
+		if v.SuggestedFix != nil {
+			t.Fatalf("expected no fix, got %+v", v.SuggestedFix)
+		}
+	})
+}
+
+func TestEnrichJSONArgsRecommendedFix_Success(t *testing.T) {
+	source := []byte("FROM alpine\nCMD echo hi # comment\n")
+	v := rules.NewViolation(rules.NewFileLocation("Dockerfile"), "buildkit/JSONArgsRecommended", "msg", rules.SeverityInfo)
+	v.Location = rules.NewRangeLocation("Dockerfile", 2, 0, 2, len("CMD echo hi # comment"))
+
+	enrichJSONArgsRecommendedFix(&v, source)
+	if v.SuggestedFix == nil {
+		t.Fatalf("expected fix, got nil")
+	}
+	if len(v.SuggestedFix.Edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(v.SuggestedFix.Edits))
+	}
+	if got := v.SuggestedFix.Edits[0].NewText; got != "[\"echo\",\"hi\"] " {
+		t.Fatalf("NewText = %q, want %q", got, "[\"echo\",\"hi\"] ")
 	}
 }

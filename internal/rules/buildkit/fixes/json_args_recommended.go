@@ -40,20 +40,16 @@ func enrichJSONArgsRecommendedFix(v *rules.Violation, source []byte) {
 	}
 
 	raw := strings.TrimSpace(string(line[firstArg.Start:codeEnd]))
-	if raw == "" {
-		return
-	}
-
 	args, ok := shell.SplitSimpleCommand(raw, shell.VariantBash)
-	if !ok || len(args) == 0 {
+	if !ok {
 		return
 	}
 
 	j, err := json.Marshal(args)
 	if err != nil {
+		// Should be impossible for []string, but keep this for linter satisfaction.
 		return
 	}
-
 	newText := string(j)
 	if hasComment {
 		// We replace up to the comment marker (excluding it), so keep a single space

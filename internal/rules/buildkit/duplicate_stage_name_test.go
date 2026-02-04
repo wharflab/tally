@@ -56,3 +56,20 @@ func TestDuplicateStageNameRule_Check_CaseInsensitive(t *testing.T) {
 		t.Fatalf("expected 1 violation, got %d", len(violations))
 	}
 }
+
+func TestDuplicateStageNameRule_Check_EmptyNameIgnored(t *testing.T) {
+	r := NewDuplicateStageNameRule()
+
+	input := rules.LintInput{
+		File: "Dockerfile",
+		Stages: []instructions.Stage{
+			{Name: ""},
+			{Name: "final"},
+		},
+	}
+
+	violations := r.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected 0 violations, got %d", len(violations))
+	}
+}

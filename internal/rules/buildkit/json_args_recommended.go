@@ -23,18 +23,7 @@ func NewJSONArgsRecommendedRule() *JSONArgsRecommendedRule {
 func (r *JSONArgsRecommendedRule) Metadata() rules.RuleMetadata {
 	// Keep metadata aligned with internal BuildKit registry for docs.
 	const name = "JSONArgsRecommended"
-	if meta := GetMetadata(name); meta != nil {
-		return *meta
-	}
-
-	return rules.RuleMetadata{
-		Code:            rules.BuildKitRulePrefix + name,
-		Name:            "JSON args recommended",
-		Description:     linter.RuleJSONArgsRecommended.Description,
-		DocURL:          linter.RuleJSONArgsRecommended.URL,
-		DefaultSeverity: rules.SeverityInfo,
-		Category:        "best-practice",
-	}
+	return *GetMetadata(name)
 }
 
 func (r *JSONArgsRecommendedRule) Check(input rules.LintInput) []rules.Violation {

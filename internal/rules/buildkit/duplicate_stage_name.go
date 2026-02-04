@@ -20,18 +20,7 @@ func NewDuplicateStageNameRule() *DuplicateStageNameRule {
 func (r *DuplicateStageNameRule) Metadata() rules.RuleMetadata {
 	// Keep metadata aligned with internal BuildKit registry for docs.
 	const name = "DuplicateStageName"
-	if meta := GetMetadata(name); meta != nil {
-		return *meta
-	}
-
-	return rules.RuleMetadata{
-		Code:            rules.BuildKitRulePrefix + name,
-		Name:            "Duplicate stage name",
-		Description:     "Stage name is used more than once",
-		DocURL:          "https://docs.docker.com/go/dockerfile/rule/duplicate-stage-name/",
-		DefaultSeverity: rules.SeverityError,
-		Category:        "correctness",
-	}
+	return *GetMetadata(name)
 }
 
 func (r *DuplicateStageNameRule) Check(input rules.LintInput) []rules.Violation {
