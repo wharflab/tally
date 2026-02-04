@@ -431,3 +431,181 @@ func TestDetectFileCreationWithKnownVars(t *testing.T) {
 		})
 	}
 }
+
+func TestDetectStandaloneChmod(t *testing.T) {
+	tests := []struct {
+		name     string
+		script   string
+		variant  Variant
+		wantNil  bool
+		wantMode string
+		wantPath string
+	}{
+		{
+			name:     "simple chmod 755",
+			script:   `chmod 755 /app/script.sh`,
+			variant:  VariantBash,
+			wantMode: "755",
+			wantPath: "/app/script.sh",
+		},
+		{
+			name:     "chmod 0644",
+			script:   `chmod 0644 /app/config`,
+			variant:  VariantBash,
+			wantMode: "0644",
+			wantPath: "/app/config",
+		},
+		{
+			name:     "chmod +x (converted to octal)",
+			script:   `chmod +x /app/run.sh`,
+			variant:  VariantBash,
+			wantMode: "0755", // +x on base 0644 = 0755
+			wantPath: "/app/run.sh",
+		},
+		{
+			name:    "not chmod command",
+			script:  `echo "test"`,
+			variant: VariantBash,
+			wantNil: true,
+		},
+		{
+			name:    "chmod with chained command",
+			script:  `chmod 755 /app/file && echo done`,
+			variant: VariantBash,
+			wantNil: true, // Not standalone
+		},
+		{
+			name:    "chmod with multiple targets",
+			script:  `chmod 755 /app/file1 /app/file2`,
+			variant: VariantBash,
+			wantNil: true, // Multiple targets not supported
+		},
+		{
+			name:    "non-POSIX shell",
+			script:  `chmod 755 /app/file`,
+			variant: VariantNonPOSIX,
+			wantNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DetectStandaloneChmod(tt.script, tt.variant)
+			if tt.wantNil {
+				if result != nil {
+					t.Errorf("expected nil, got %+v", result)
+				}
+				return
+			}
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
+			if result.Mode != tt.wantMode {
+				t.Errorf("Mode = %q, want %q", result.Mode, tt.wantMode)
+			}
+			if result.Target != tt.wantPath {
+				t.Errorf("Target = %q, want %q", result.Target, tt.wantPath)
+			}
+		})
+	}
+}
+
+func TestDetectFileCreationCatHeredoc(t *testing.T) {
+	tests := []struct {
+		name        string
+		script      string
+		wantNil     bool
+		wantPath    string
+		wantContent string
+	}{
+		{
+			name:        "cat heredoc simple",
+			script:      "cat <<EOF > /app/config\nhello world\nEOF",
+			wantPath:    "/app/config",
+			wantContent: "hello world\n",
+		},
+		{
+			name:        "cat heredoc with dash (tab stripping)",
+			script:      "cat <<-EOF > /app/config\n\thello\n\tworld\nEOF",
+			wantPath:    "/app/config",
+			wantContent: "hello\nworld\n",
+		},
+		{
+			name:     "cat heredoc with variable - unsafe",
+			script:   "cat <<EOF > /app/config\nhello $USER\nEOF",
+			wantPath: "/app/config",
+			// HasUnsafeVariables should be true
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DetectFileCreation(tt.script, VariantBash, nil)
+			if tt.wantNil {
+				if result != nil {
+					t.Errorf("expected nil, got %+v", result)
+				}
+				return
+			}
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
+			if result.TargetPath != tt.wantPath {
+				t.Errorf("TargetPath = %q, want %q", result.TargetPath, tt.wantPath)
+			}
+			if tt.wantContent != "" && result.Content != tt.wantContent {
+				t.Errorf("Content = %q, want %q", result.Content, tt.wantContent)
+			}
+		})
+	}
+}
+
+func TestDetectFileCreationEchoEdgeCases(t *testing.T) {
+	tests := []struct {
+		name        string
+		script      string
+		wantNil     bool
+		wantPath    string
+		wantContent string
+	}{
+		{
+			name:        "echo with no arguments",
+			script:      `echo > /app/file`,
+			wantPath:    "/app/file",
+			wantContent: "\n",
+		},
+		{
+			name:     "echo -e with escape",
+			script:   `echo -e "hello\tworld" > /app/file`,
+			wantPath: "/app/file",
+			// HasUnsafeVariables should be true due to -e
+		},
+		{
+			name:        "echo with single quotes",
+			script:      `echo 'literal $VAR' > /app/file`,
+			wantPath:    "/app/file",
+			wantContent: "literal $VAR\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DetectFileCreation(tt.script, VariantBash, nil)
+			if tt.wantNil {
+				if result != nil {
+					t.Errorf("expected nil, got %+v", result)
+				}
+				return
+			}
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
+			if result.TargetPath != tt.wantPath {
+				t.Errorf("TargetPath = %q, want %q", result.TargetPath, tt.wantPath)
+			}
+			if tt.wantContent != "" && result.Content != tt.wantContent {
+				t.Errorf("Content = %q, want %q", result.Content, tt.wantContent)
+			}
+		})
+	}
+}
