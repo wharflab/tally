@@ -144,7 +144,7 @@ type fileCreationRun struct {
 }
 
 // checkSingleRuns checks individual RUN instructions for file creation patterns.
-func (r *PreferCopyHeredocRule) checkSingleRuns( //nolint:funlen // Slightly over limit due to two-pass algorithm
+func (r *PreferCopyHeredocRule) checkSingleRuns(
 	stage instructions.Stage,
 	shellVariant shell.Variant,
 	knownVars func(string) bool,
@@ -162,13 +162,13 @@ func (r *PreferCopyHeredocRule) checkSingleRuns( //nolint:funlen // Slightly ove
 
 	for _, cmd := range stage.Commands {
 		run, ok := cmd.(*instructions.RunCommand)
-		if !ok || !run.PrependShell || len(run.Files) > 0 {
+		if !ok || !run.PrependShell {
 			prevInfo = nil
 			prevRun = nil
 			continue
 		}
 
-		script := getRunScriptFromCmd(run)
+		script := getRunCmdLine(run)
 		if script == "" {
 			prevInfo = nil
 			prevRun = nil
@@ -209,12 +209,7 @@ func (r *PreferCopyHeredocRule) checkSingleRuns( //nolint:funlen // Slightly ove
 			continue
 		}
 
-		// Skip heredoc RUNs (already using heredoc)
-		if len(run.Files) > 0 {
-			continue
-		}
-
-		script := getRunScriptFromCmd(run)
+		script := getRunCmdLine(run)
 		if script == "" {
 			continue
 		}
@@ -292,13 +287,7 @@ func (r *PreferCopyHeredocRule) checkConsecutiveRuns(
 			continue
 		}
 
-		// Skip heredoc RUNs
-		if len(run.Files) > 0 {
-			flushSequence()
-			continue
-		}
-
-		script := getRunScriptFromCmd(run)
+		script := getRunCmdLine(run)
 		if script == "" {
 			flushSequence()
 			continue
@@ -591,6 +580,32 @@ func makeKnownVarsChecker(scope *semantic.VariableScope) func(string) bool {
 	return func(name string) bool {
 		return scope.HasArg(name) || scope.GetEnv(name) != nil
 	}
+}
+
+// getRunCmdLine extracts the command line from a RUN instruction for shell parsing.
+// Unlike getRunScriptFromCmd (which returns heredoc content), this reconstructs the
+// full shell script including heredoc content, which is needed to detect redirects
+// in commands like "cat <<EOF > /file".
+func getRunCmdLine(run *instructions.RunCommand) string {
+	if len(run.CmdLine) == 0 {
+		return ""
+	}
+
+	cmdLine := strings.Join(run.CmdLine, " ")
+
+	// If there are heredocs, reconstruct the full script
+	if len(run.Files) > 0 {
+		var sb strings.Builder
+		sb.WriteString(cmdLine)
+		for _, f := range run.Files {
+			sb.WriteString("\n")
+			sb.WriteString(f.Data)
+			sb.WriteString(f.Name)
+		}
+		return sb.String()
+	}
+
+	return cmdLine
 }
 
 // init registers the rule with the default registry.

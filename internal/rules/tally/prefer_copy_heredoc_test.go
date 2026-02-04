@@ -111,13 +111,13 @@ EOF
 			WantViolations: 0,
 		},
 		{
-			Name: "cat heredoc to file - already uses heredoc",
+			Name: "cat heredoc to file",
 			Content: `FROM alpine
 RUN cat <<EOF > /app/config.txt
 hello world
 EOF
 `,
-			WantViolations: 0, // BuildKit parses cat <<EOF as heredoc, so no suggestion needed
+			WantViolations: 1, // cat <<EOF > file should be converted to COPY <<EOF
 		},
 		{
 			Name: "disable single run check",
