@@ -30,6 +30,9 @@ func TestSplitSimpleCommand(t *testing.T) {
 		{name: "param-expansion-double-quoted", cmd: `echo "$HOME"`, wantOK: false},
 		{name: "unquoted-glob", cmd: "echo *.txt", wantOK: false},
 		{name: "quoted-glob", cmd: `echo "*.txt"`, wantOK: true, wantArg: []string{"echo", "*.txt"}},
+
+		{name: "tilde", cmd: "echo ~/bin", wantOK: false},
+		{name: "tilde-user", cmd: "echo ~root", wantOK: false},
 	}
 
 	for _, tt := range tests {

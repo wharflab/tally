@@ -76,6 +76,11 @@ func simpleLiteralWord(w *syntax.Word) (string, bool) {
 	if len(w.Parts) == 0 {
 		return "", false
 	}
+	// Reject leading-tilde words (e.g. "~", "~/bin", "~user/bin") since shell form
+	// would expand them but exec-form JSON won't.
+	if first, ok := w.Parts[0].(*syntax.Lit); ok && strings.HasPrefix(first.Value, "~") {
+		return "", false
+	}
 
 	var b strings.Builder
 	for _, part := range w.Parts {
