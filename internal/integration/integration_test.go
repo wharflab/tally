@@ -166,6 +166,12 @@ func TestCheck(t *testing.T) {
 			args:     append([]string{"--format", "json"}, selectRules("buildkit/ConsistentInstructionCasing")...),
 			wantExit: 1,
 		},
+		{
+			name:     "invalid-definition-description",
+			dir:      "invalid-definition-description",
+			args:     append([]string{"--format", "json"}, selectRules("buildkit/InvalidDefinitionDescription")...),
+			wantExit: 1,
+		},
 
 		// Semantic model construction-time violations
 		// Note: These violations come from semantic analysis, not the rule registry.
@@ -504,7 +510,8 @@ func TestFix(t *testing.T) {
 		input       string // Input Dockerfile content
 		want        string // Expected fixed content
 		args        []string
-		wantApplied int // Expected number of fixes applied
+		wantApplied int    // Expected number of fixes applied
+		config      string // Optional config file content (empty string uses default empty config)
 	}{
 		{
 			name:        "stage-name-casing",
@@ -610,6 +617,59 @@ RUN apt-get install curl
 			args:        []string{"--fix", "--fix-unsafe"},
 			wantApplied: 1,
 		},
+		// InvalidDefinitionDescription: Add empty line between non-description comment and instruction
+		// Multiple violations to verify fixes apply correctly with line shifts
+		{
+			name: "invalid-definition-description-multiple",
+			input: `# check=experimental=InvalidDefinitionDescription
+# bar this is the bar
+ARG foo=bar
+# BasE this is the BasE image
+FROM scratch AS base
+# definitely a bad comment
+ARG version=latest
+# definitely a bad comment
+ARG baz=quux
+`,
+			want: `# check=experimental=InvalidDefinitionDescription
+# bar this is the bar
+
+ARG foo=bar
+# BasE this is the BasE image
+
+FROM scratch AS base
+# definitely a bad comment
+
+ARG version=latest
+# definitely a bad comment
+
+ARG baz=quux
+`,
+			args:        []string{"--fix", "--select", "buildkit/InvalidDefinitionDescription"},
+			wantApplied: 4, // Four violations: lines 3, 5, 7, 9
+		},
+		// InvalidDefinitionDescription enabled via config file instead of Dockerfile directive
+		// Verifies that experimental rules can be enabled by setting severity in tally.toml
+		{
+			name: "invalid-definition-description-via-config",
+			input: `# This comment doesn't match the ARG name
+ARG foo=bar
+# Another mismatched comment
+FROM scratch AS base
+`,
+			want: `# This comment doesn't match the ARG name
+
+ARG foo=bar
+# Another mismatched comment
+
+FROM scratch AS base
+`,
+			args:        []string{"--fix"},
+			wantApplied: 2,
+			config: `[rules.buildkit.InvalidDefinitionDescription]
+severity = "error"
+`,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -621,9 +681,9 @@ RUN apt-get install curl
 				t.Fatalf("failed to write Dockerfile: %v", err)
 			}
 
-			// Create an empty config file to prevent discovery of repo configs
+			// Create config file (custom content or empty to prevent discovery of repo configs)
 			configPath := filepath.Join(tmpDir, ".tally.toml")
-			if err := os.WriteFile(configPath, []byte(""), 0o644); err != nil {
+			if err := os.WriteFile(configPath, []byte(tc.config), 0o644); err != nil {
 				t.Fatalf("failed to write config: %v", err)
 			}
 

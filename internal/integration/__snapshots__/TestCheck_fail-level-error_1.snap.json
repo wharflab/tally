@@ -20,7 +20,27 @@
           "detail": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment.",
           "severity": "warning",
           "docUrl": "https://docs.docker.com/go/dockerfile/rule/invalid-definition-description/",
-          "sourceCode": "FROM alpine:3.18 AS Builder"
+          "sourceCode": "FROM alpine:3.18 AS Builder",
+          "suggestedFix": {
+            "description": "Add empty line between comment and instruction",
+            "edits": [
+              {
+                "location": {
+                  "file": "testdata/buildkit-warnings/Dockerfile",
+                  "start": {
+                    "line": 1,
+                    "column": 40
+                  },
+                  "end": {
+                    "line": 1,
+                    "column": 40
+                  }
+                },
+                "newText": "\n"
+              }
+            ],
+            "isPreferred": true
+          }
         },
         {
           "location": {

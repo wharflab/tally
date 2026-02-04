@@ -323,6 +323,15 @@ func buildLinterConfig(cfg *config.Config, warnFunc linter.LintWarnFunc) *linter
 		}
 	}
 
+	// Also check for buildkit rules with explicit severity settings.
+	// Setting severity = "error" (or any non-"off" value) implicitly enables the rule,
+	// including experimental rules.
+	for name, ruleCfg := range cfg.Rules.Buildkit {
+		if ruleCfg.Severity != "" && ruleCfg.Severity != "off" {
+			lintCfg.ExperimentalRules = append(lintCfg.ExperimentalRules, name)
+		}
+	}
+
 	return lintCfg
 }
 

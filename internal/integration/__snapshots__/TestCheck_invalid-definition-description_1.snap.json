@@ -1,0 +1,176 @@
+{
+  "files": [
+    {
+      "file": "testdata/invalid-definition-description/Dockerfile",
+      "violations": [
+        {
+          "location": {
+            "file": "testdata/invalid-definition-description/Dockerfile",
+            "start": {
+              "line": 4,
+              "column": 0
+            },
+            "end": {
+              "line": 4,
+              "column": 0
+            }
+          },
+          "rule": "buildkit/InvalidDefinitionDescription",
+          "message": "Comment for ARG should follow the format: `# foo \u003cdescription\u003e`",
+          "detail": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment.",
+          "severity": "warning",
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/invalid-definition-description/",
+          "sourceCode": "ARG foo=bar",
+          "suggestedFix": {
+            "description": "Add empty line between comment and instruction",
+            "edits": [
+              {
+                "location": {
+                  "file": "testdata/invalid-definition-description/Dockerfile",
+                  "start": {
+                    "line": 3,
+                    "column": 21
+                  },
+                  "end": {
+                    "line": 3,
+                    "column": 21
+                  }
+                },
+                "newText": "\n"
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "location": {
+            "file": "testdata/invalid-definition-description/Dockerfile",
+            "start": {
+              "line": 6,
+              "column": 0
+            },
+            "end": {
+              "line": 6,
+              "column": 0
+            }
+          },
+          "rule": "buildkit/InvalidDefinitionDescription",
+          "message": "Comment for FROM should follow the format: `# base \u003cdescription\u003e`",
+          "detail": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment.",
+          "severity": "warning",
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/invalid-definition-description/",
+          "sourceCode": "FROM scratch AS base",
+          "suggestedFix": {
+            "description": "Add empty line between comment and instruction",
+            "edits": [
+              {
+                "location": {
+                  "file": "testdata/invalid-definition-description/Dockerfile",
+                  "start": {
+                    "line": 5,
+                    "column": 29
+                  },
+                  "end": {
+                    "line": 5,
+                    "column": 29
+                  }
+                },
+                "newText": "\n"
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "location": {
+            "file": "testdata/invalid-definition-description/Dockerfile",
+            "start": {
+              "line": 8,
+              "column": 0
+            },
+            "end": {
+              "line": 8,
+              "column": 0
+            }
+          },
+          "rule": "buildkit/InvalidDefinitionDescription",
+          "message": "Comment for ARG should follow the format: `# version \u003cdescription\u003e`",
+          "detail": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment.",
+          "severity": "warning",
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/invalid-definition-description/",
+          "sourceCode": "ARG version=latest",
+          "suggestedFix": {
+            "description": "Add empty line between comment and instruction",
+            "edits": [
+              {
+                "location": {
+                  "file": "testdata/invalid-definition-description/Dockerfile",
+                  "start": {
+                    "line": 7,
+                    "column": 26
+                  },
+                  "end": {
+                    "line": 7,
+                    "column": 26
+                  }
+                },
+                "newText": "\n"
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "location": {
+            "file": "testdata/invalid-definition-description/Dockerfile",
+            "start": {
+              "line": 10,
+              "column": 0
+            },
+            "end": {
+              "line": 10,
+              "column": 0
+            }
+          },
+          "rule": "buildkit/InvalidDefinitionDescription",
+          "message": "Comment for ARG should follow the format: `# baz \u003cdescription\u003e`",
+          "detail": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment.",
+          "severity": "warning",
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/invalid-definition-description/",
+          "sourceCode": "ARG baz=quux",
+          "suggestedFix": {
+            "description": "Add empty line between comment and instruction",
+            "edits": [
+              {
+                "location": {
+                  "file": "testdata/invalid-definition-description/Dockerfile",
+                  "start": {
+                    "line": 9,
+                    "column": 26
+                  },
+                  "end": {
+                    "line": 9,
+                    "column": 26
+                  }
+                },
+                "newText": "\n"
+              }
+            ],
+            "isPreferred": true
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 4,
+    "errors": 0,
+    "warnings": 4,
+    "info": 0,
+    "style": 0,
+    "files": 1
+  },
+  "files_scanned": 1,
+  "rules_enabled": 1
+}
+
