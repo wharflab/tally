@@ -185,7 +185,8 @@ func identifySequenceRuns(
 			}
 
 			// Don't start sequence with append-only (unknown base content)
-			if prevInfo == nil && info.IsAppend {
+			if info.IsAppend && (prevInfo == nil || info.TargetPath != prevInfo.TargetPath) {
+				prevInfo, prevRun = nil, nil
 				continue
 			}
 
