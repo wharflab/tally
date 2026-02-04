@@ -557,7 +557,12 @@ func extractFileContent(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func
 	case cmdEcho:
 		return extractEchoContent(call, knownVars)
 	case cmdCat:
-		// For cat, find the heredoc redirect (separate from the output redirect)
+		// Only heredoc-only cat is safe (e.g., "cat <<EOF > /file")
+		// cat with extra args (e.g., "cat /etc/hosts > /file" or "cat -n <<EOF") is unsafe
+		// since we can't determine the content at lint time
+		if len(call.Args) > 1 {
+			return "", true // Mark as unsafe
+		}
 		return extractCatHeredocContentFromStmt(stmt)
 	case cmdPrintf:
 		return extractPrintfContent(call, knownVars)

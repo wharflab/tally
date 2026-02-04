@@ -73,6 +73,20 @@ func TestDetectFileCreation(t *testing.T) {
 			wantPath: "/app/config.txt",
 		},
 		{
+			name:       "cat with file arg - unsafe",
+			script:     `cat /etc/hosts > /app/file`,
+			variant:    VariantBash,
+			wantPath:   "/app/file",
+			wantUnsafe: true, // Content comes from file, not heredoc
+		},
+		{
+			name:       "cat with flag - unsafe",
+			script:     "cat -n <<EOF > /app/file\ndata\nEOF",
+			variant:    VariantBash,
+			wantPath:   "/app/file",
+			wantUnsafe: true, // -n flag modifies content
+		},
+		{
 			name:     "single quoted content",
 			script:   `echo 'no $expansion' > /app/file`,
 			variant:  VariantBash,
