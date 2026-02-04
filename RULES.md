@@ -101,7 +101,14 @@ RUN apt-get clean
 - Skips append operations (`>>`) since COPY would change semantics
 - Skips relative paths (only absolute paths like `/etc/file`)
 - Skips commands with shell variables not defined as ARG/ENV
-- Only supports octal chmod modes (not symbolic like `+x`)
+
+**Chmod support:**
+
+Converts both octal and symbolic chmod modes to `COPY --chmod`:
+- Octal: `chmod 755` → `--chmod=0755`
+- Symbolic: `chmod +x` → `--chmod=0755`, `chmod u+x` → `--chmod=0744`
+
+Symbolic modes are converted based on a 0644 base (default for newly created files).
 
 **Options:**
 
