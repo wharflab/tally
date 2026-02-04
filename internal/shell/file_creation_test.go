@@ -54,11 +54,11 @@ func TestDetectFileCreation(t *testing.T) {
 			wantNil: true,
 		},
 		{
-			name:    "symbolic chmod - skip",
-			script:  `echo "x" > /app/file && chmod +x /app/file`,
-			variant: VariantBash,
-			wantPath: "/app/file",
-			wantChmod: "", // Symbolic mode not supported
+			name:      "symbolic chmod +x converts to 0755",
+			script:    `echo "x" > /app/file && chmod +x /app/file`,
+			variant:   VariantBash,
+			wantPath:  "/app/file",
+			wantChmod: "0755", // +x on 0o644 base = 0755
 		},
 		{
 			name:     "cat with redirect creates empty file",
@@ -258,6 +258,62 @@ func TestIsSymbolicMode(t *testing.T) {
 			got := isSymbolicMode(tt.input)
 			if got != tt.want {
 				t.Errorf("isSymbolicMode(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSymbolicToOctal(t *testing.T) {
+	// Base mode 0o644 (default for newly created files)
+	tests := []struct {
+		symbolic string
+		base     int
+		want     string
+	}{
+		// Add execute
+		{"+x", 0o644, "0755"},
+		{"a+x", 0o644, "0755"},
+		{"u+x", 0o644, "0744"},
+		{"g+x", 0o644, "0654"},
+		{"o+x", 0o644, "0645"},
+		{"ug+x", 0o644, "0754"},
+
+		// Add read (already has it for user)
+		{"+r", 0o644, "0644"},
+		{"o+r", 0o644, "0644"}, // other already has read
+
+		// Add write
+		{"+w", 0o644, "0666"},
+		{"g+w", 0o644, "0664"},
+		{"o+w", 0o644, "0646"},
+
+		// Combined permissions
+		{"+rwx", 0o644, "0777"},
+		{"u+rwx", 0o644, "0744"}, // user already has rw, adds x
+		{"go+rx", 0o644, "0655"},
+
+		// Remove permissions
+		{"-x", 0o644, "0644"},  // no execute to remove
+		{"-w", 0o644, "0444"},  // removes write from user
+		{"o-r", 0o644, "0640"}, // removes read from other
+
+		// Set exactly
+		{"=rwx", 0o644, "0777"},  // sets all to rwx
+		{"u=rwx", 0o644, "0744"}, // sets user to rwx exactly
+		{"go=rx", 0o644, "0655"}, // sets group/other to rx exactly
+
+		// Unsupported modes (return empty)
+		{"+X", 0o644, ""},
+		{"+s", 0o644, ""},
+		{"+t", 0o644, ""},
+		{"", 0o644, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.symbolic, func(t *testing.T) {
+			got := symbolicToOctal(tt.symbolic, tt.base)
+			if got != tt.want {
+				t.Errorf("symbolicToOctal(%q, %04o) = %q, want %q", tt.symbolic, tt.base, got, tt.want)
 			}
 		})
 	}

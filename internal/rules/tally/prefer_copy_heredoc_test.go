@@ -58,6 +58,13 @@ RUN echo "#!/bin/bash\necho hello" > /app/script.sh && chmod 755 /app/script.sh
 			WantViolations: 1,
 		},
 		{
+			Name: "echo with symbolic chmod +x",
+			Content: `FROM alpine
+RUN echo "#!/bin/bash" > /app/script.sh && chmod +x /app/script.sh
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "relative path - no violation",
 			Content: `FROM alpine
 RUN echo "data" > config.txt
@@ -194,6 +201,22 @@ RUN chmod 755 /app/script.sh
 `,
 			wantHasFix:     true,
 			wantFixContain: "--chmod=0755",
+		},
+		{
+			name: "symbolic chmod +x converts to 0755",
+			content: `FROM alpine
+RUN echo "#!/bin/bash" > /app/script.sh && chmod +x /app/script.sh
+`,
+			wantHasFix:     true,
+			wantFixContain: "--chmod=0755",
+		},
+		{
+			name: "symbolic chmod u+x converts to 0744",
+			content: `FROM alpine
+RUN echo "data" > /app/file && chmod u+x /app/file
+`,
+			wantHasFix:     true,
+			wantFixContain: "--chmod=0744",
 		},
 	}
 

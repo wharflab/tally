@@ -2,6 +2,7 @@
 package shell
 
 import (
+	"fmt"
 	"path"
 	"regexp"
 	"strings"
@@ -87,7 +88,7 @@ func DetectFileCreation(script string, variant Variant, knownVars func(name stri
 
 // ChmodInfo describes a standalone chmod command.
 type ChmodInfo struct {
-	// Mode is the octal mode (e.g., "755", "0644").
+	// Mode is the octal mode (e.g., "755", "0o644").
 	Mode string
 	// Target is the file path being chmod'd.
 	Target string
@@ -425,8 +426,14 @@ func parseChmod(call *syntax.CallExpr) (string, string) {
 
 		// Check if this is symbolic mode (e.g., +x, u+rwx)
 		if isSymbolicMode(lit) {
-			// Cannot convert symbolic modes to --chmod
-			return "", ""
+			// Convert symbolic to octal (assuming default file mode 0o644)
+			converted := symbolicToOctal(lit, defaultFileMode)
+			if converted == "" {
+				// Unsupported symbolic mode (e.g., +X, +s, +t)
+				return "", ""
+			}
+			mode = converted
+			continue
 		}
 
 		// Must be the target
@@ -449,6 +456,79 @@ func isOctalMode(s string) bool {
 
 // symbolicModeRegex matches symbolic chmod modes.
 var symbolicModeRegex = regexp.MustCompile(`^[ugoa]*[\-+=][rwxXst]+$`)
+
+// defaultFileMode is the typical mode for newly created files (0666 & ~0022 umask).
+const defaultFileMode = 0o644
+
+// symbolicToOctal converts a symbolic chmod mode to octal, given a base mode.
+// Returns empty string if the mode cannot be converted.
+// Supports: [ugoa]*[+-=][rwx]+ (not X, s, t which are complex/rare).
+func symbolicToOctal(symbolic string, baseMode int) string {
+	if len(symbolic) < 2 {
+		return ""
+	}
+
+	// Find the operator position
+	opIdx := strings.IndexAny(symbolic, "+-=")
+	if opIdx == -1 {
+		return ""
+	}
+
+	who := symbolic[:opIdx]
+	op := symbolic[opIdx]
+	perms := symbolic[opIdx+1:]
+
+	// Parse who (empty = all)
+	var whoMask int
+	if who == "" || strings.Contains(who, "a") {
+		whoMask = 0o777 // all
+	} else {
+		if strings.Contains(who, "u") {
+			whoMask |= 0o700
+		}
+		if strings.Contains(who, "g") {
+			whoMask |= 0o070
+		}
+		if strings.Contains(who, "o") {
+			whoMask |= 0o007
+		}
+	}
+
+	// Parse permissions
+	var permBits int
+	for _, c := range perms {
+		switch c {
+		case 'r':
+			permBits |= 0o444
+		case 'w':
+			permBits |= 0o222
+		case 'x':
+			permBits |= 0o111
+		case 'X', 's', 't':
+			// Not supported - these have complex semantics
+			return ""
+		}
+	}
+
+	// Apply to the who mask
+	permBits &= whoMask
+
+	// Apply the operator
+	var result int
+	switch op {
+	case '+':
+		result = baseMode | permBits
+	case '-':
+		result = baseMode &^ permBits
+	case '=':
+		// Clear the who bits first, then set
+		result = (baseMode &^ whoMask) | permBits
+	default:
+		return ""
+	}
+
+	return fmt.Sprintf("%04o", result)
+}
 
 // isSymbolicMode checks if a string is a symbolic chmod mode.
 func isSymbolicMode(s string) bool {
