@@ -87,6 +87,22 @@ RUN echo "line2" >> /app/config
 			WantViolations: 1,
 		},
 		{
+			Name: "consecutive append-only runs - no violation",
+			Content: `FROM alpine
+RUN echo "line1" >> /app/log.txt
+RUN echo "line2" >> /app/log.txt
+`,
+			WantViolations: 0, // Can't fold append-only into sequence (unknown base content)
+		},
+		{
+			Name: "mixed-command run not folded into sequence",
+			Content: `FROM alpine
+RUN apt-get update && echo "a" > /app/log
+RUN echo "b" >> /app/log
+`,
+			WantViolations: 1, // Only the mixed-command single RUN, not a sequence
+		},
+		{
 			Name: "consecutive to different files - two violations",
 			Content: `FROM alpine
 RUN echo "a" > /app/file1

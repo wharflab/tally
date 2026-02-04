@@ -178,6 +178,17 @@ func identifySequenceRuns(
 				continue
 			}
 
+			// Mixed commands can't be part of a sequence (handled by checkSingleRuns)
+			if info.PrecedingCommands != "" || info.RemainingCommands != "" {
+				prevInfo, prevRun = nil, nil
+				continue
+			}
+
+			// Don't start sequence with append-only (unknown base content)
+			if prevInfo == nil && info.IsAppend {
+				continue
+			}
+
 			if prevInfo != nil && prevRun != nil && info.TargetPath == prevInfo.TargetPath {
 				inSequence[prevRun] = true
 				inSequence[run] = true
