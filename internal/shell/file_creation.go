@@ -473,8 +473,9 @@ func parseChmod(call *syntax.CallExpr) (string, string) {
 	return mode, target
 }
 
-// octalModeRegex matches octal chmod modes (3-4 digits).
-var octalModeRegex = regexp.MustCompile(`^0?[0-7]{3}$`)
+// octalModeRegex matches octal chmod modes (3 or 4 digits).
+// Supports standard modes (755, 0755) and special modes (1755 sticky, 2755 setgid, 4755 setuid).
+var octalModeRegex = regexp.MustCompile(`^[0-7]{3,4}$`)
 
 // isOctalMode checks if a string is a valid octal chmod mode.
 func isOctalMode(s string) bool {

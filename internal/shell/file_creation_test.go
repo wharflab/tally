@@ -281,13 +281,17 @@ func TestIsOctalMode(t *testing.T) {
 		{"0644", true},
 		{"777", true},
 		{"0777", true},
+		{"1755", true},  // sticky bit
+		{"2755", true},  // setgid
+		{"4755", true},  // setuid
+		{"4777", true},  // setuid + all perms
 		{"+x", false},
 		{"u+rwx", false},
 		{"a+r", false},
 		{"", false},
-		{"888", false}, // Invalid octal
-		{"75", false},  // Too short
-		{"07555", false}, // Too long
+		{"888", false},   // Invalid octal
+		{"75", false},    // Too short
+		{"07555", false}, // Too long (5 digits)
 	}
 
 	for _, tt := range tests {
