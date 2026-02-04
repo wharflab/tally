@@ -630,15 +630,27 @@ func extractEchoContent(call *syntax.CallExpr, knownVars func(name string) bool)
 
 	for i := 1; i < len(call.Args); i++ {
 		lit := call.Args[i].Lit()
-		if !strings.HasPrefix(lit, "-") {
+		// Not an option: no dash prefix or bare "-" (often represents stdin/stdout)
+		if !strings.HasPrefix(lit, "-") || lit == "-" {
 			startIdx = i
 			break
 		}
-		if strings.Contains(lit, "n") {
-			hasNoNewline = true
+		// "--" ends option parsing
+		if lit == "--" {
+			startIdx = i + 1
+			break
 		}
-		if strings.Contains(lit, "e") || strings.Contains(lit, "E") {
-			hasEscape = true
+		// Parse known echo options, reject unknown flags
+		for _, r := range strings.TrimPrefix(lit, "-") {
+			switch r {
+			case 'n':
+				hasNoNewline = true
+			case 'e', 'E':
+				hasEscape = true
+			default:
+				// Unknown option letter (e.g., -x) - mark unsafe
+				return "", true
+			}
 		}
 		startIdx = i + 1
 	}

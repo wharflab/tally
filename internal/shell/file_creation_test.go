@@ -119,6 +119,27 @@ func TestDetectFileCreation(t *testing.T) {
 			wantUnsafe: true, // COPY heredoc always adds newline
 		},
 		{
+			name:       "echo with unknown flag -x - unsafe",
+			script:     `echo -x "data" > /app/file`,
+			variant:    VariantBash,
+			wantPath:   "/app/file",
+			wantUnsafe: true, // Unknown option letter
+		},
+		{
+			name:     "echo with -- ends options",
+			script:   `echo -- -n > /app/file`,
+			variant:  VariantBash,
+			wantPath: "/app/file",
+			// -n after -- is content, not a flag
+		},
+		{
+			name:     "echo with bare dash is content",
+			script:   `echo - > /app/file`,
+			variant:  VariantBash,
+			wantPath: "/app/file",
+			// bare "-" is content, not an option
+		},
+		{
 			name:       "printf without newline - unsafe",
 			script:     `printf "data" > /app/file`,
 			variant:    VariantBash,
