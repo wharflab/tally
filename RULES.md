@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 4 | - | 4 |
+| tally | 5 | - | 5 |
 | buildkit | 7 + 5 captured | - | 22 |
 | hadolint | 18 | 9 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -31,6 +31,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | `tally/secrets-in-code` | Detects hardcoded secrets, API keys, and credentials using [gitleaks](https://github.com/gitleaks/gitleaks) patterns | Error | Security | Enabled |
 | `tally/max-lines` | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
 | `tally/no-unreachable-stages` | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
+| `tally/prefer-copy-heredoc` | Suggests using COPY heredoc for file creation instead of RUN echo/cat | Style | Style | Off (experimental) |
 | `tally/prefer-run-heredoc` | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Off (experimental) |
 
 ### tally/secrets-in-code
@@ -61,6 +62,74 @@ Limits Dockerfile size to encourage modular builds. Enabled by default with a 50
 ### tally/no-unreachable-stages
 
 Detects stages that are defined but never used (not referenced by `--target` or `COPY --from`).
+
+### tally/prefer-copy-heredoc
+
+Suggests replacing `RUN echo/cat/printf > file` patterns with `COPY <<EOF` syntax for better performance and readability. **Experimental** - disabled by default.
+
+This rule detects file creation patterns in RUN instructions and extracts them into COPY heredocs, even when mixed with other commands.
+
+**Example transformation:**
+
+```dockerfile
+# Before (violation)
+RUN apt-get update && echo "content" > /etc/config && apt-get clean
+
+# After (fixed with --fix --fix-unsafe)
+RUN apt-get update
+COPY <<EOF /etc/config
+content
+EOF
+RUN apt-get clean
+```
+
+**Why COPY heredoc?**
+
+- **Performance**: `COPY` doesn't spawn a shell container, making it faster
+- **Atomicity**: `COPY --chmod` sets permissions in a single layer
+- **Readability**: Heredocs are cleaner than escaped echo statements
+
+**Detected patterns:**
+
+1. **Simple file creation**: `echo "content" > /path/to/file`
+2. **File creation with chmod**: `echo "x" > /file && chmod 0755 /file`
+3. **Consecutive RUN instructions** writing to the same file
+4. **Mixed commands** with file creation in the middle (extracts just the file creation)
+
+**Limitations:**
+
+- Skips append operations (`>>`) since COPY would change semantics
+- Skips relative paths (only absolute paths like `/etc/file`)
+- Skips commands with shell variables not defined as ARG/ENV
+
+**Mount handling:**
+
+Since `COPY` doesn't support `--mount` flags, the rule handles RUN mounts carefully:
+
+| Mount Type | Behavior |
+|------------|----------|
+| `bind` | Skip - content might depend on bound files |
+| `cache` | Safe if file target is outside cache path |
+| `tmpfs` | Safe if file target is outside tmpfs path |
+| `secret` | Safe if file target is outside secret path |
+| `ssh` | Safe - no content dependency |
+
+When extracting file creation from mixed commands, mounts are preserved on the remaining RUN instructions.
+
+**Chmod support:**
+
+Converts both octal and symbolic chmod modes to `COPY --chmod`:
+- Octal: `chmod 755` → `--chmod=0755`
+- Symbolic: `chmod +x` → `--chmod=0755`, `chmod u+x` → `--chmod=0744`
+
+Symbolic modes are converted based on a 0644 base (default for newly created files).
+
+**Options:**
+
+- `check-single-run`: Check for single RUN instructions with file creation (default: true)
+- `check-consecutive-runs`: Check for consecutive RUN instructions to same file (default: true)
+
+**Rule coordination:** This rule takes priority over `prefer-run-heredoc` for pure file creation patterns. When both rules detect a pattern, `prefer-copy-heredoc` handles it.
 
 ### tally/prefer-run-heredoc
 
