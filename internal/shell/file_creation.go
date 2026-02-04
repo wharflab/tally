@@ -744,7 +744,16 @@ func extractCatHeredocContent(redir *syntax.Redirect) (string, bool) {
 		}
 	}
 
-	return content.String(), false
+	result := content.String()
+	// <<- (DashHdoc) strips leading tabs from each line
+	if redir.Op == syntax.DashHdoc {
+		lines := strings.Split(result, "\n")
+		for i, line := range lines {
+			lines[i] = strings.TrimLeft(line, "\t")
+		}
+		result = strings.Join(lines, "\n")
+	}
+	return result, false
 }
 
 // extractPrintfContent extracts content from a printf command.
