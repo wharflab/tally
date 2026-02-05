@@ -72,3 +72,7 @@ packaging/rubygems/pkg/
 
 .rumdl_cache/
 cover.html
+
+# Docs (Zensical)
+site/
+.venv/

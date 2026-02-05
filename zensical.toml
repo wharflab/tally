@@ -1,0 +1,40 @@
+[project]
+site_name = "tally"
+site_url = "https://tinovyatkin.github.io/tally/"
+site_description = "Fast, modern Dockerfile linter with auto-fixes"
+docs_dir = "docs"
+site_dir = "site"
+
+repo_url = "https://github.com/tinovyatkin/tally"
+repo_name = "tinovyatkin/tally"
+
+[theme]
+name = "zensical"
+features = [
+  "navigation.instant",
+  "navigation.sections",
+  "navigation.expand",
+  "search.highlight",
+  "content.code.copy",
+  "content.code.annotate",
+]
+
+[theme.icon]
+repo = "fontawesome/brands/github"
+
+[[nav]]
+name = "Home"
+path = "index.md"
+
+[[nav]]
+name = "Guide"
+items = [
+  { name = "Configuration", path = "guide/configuration.md" },
+]
+
+[[nav]]
+name = "Rules"
+items = [
+  { name = "Overview", path = "rules/index.md" },
+  { name = "tally Rules", path = "rules/tally/index.md" },
+]
