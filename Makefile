@@ -1,7 +1,7 @@
 .PHONY: build test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema print-gotestsum-bin
 
 build:
-	CGO_ENABLED=0 go build -ldflags "-s -w" -o tally
+	GOSUMDB=sum.golang.org CGO_ENABLED=0 go build -ldflags "-s -w" -o tally
 
 GOTESTSUM_VERSION := v1.13.0
 GOLANGCI_LINT_VERSION := v2.7.2
