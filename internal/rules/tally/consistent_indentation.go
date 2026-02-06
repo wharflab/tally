@@ -219,6 +219,7 @@ func (r *ConsistentIndentationRule) removeIndentEdits(
 // for continuations.
 func resolveEndLine(sm *sourcemap.SourceMap, location []parser.Range) int {
 	endLine := location[0].End.Line
+	endLine = min(endLine, sm.LineCount())
 	for l := endLine; l <= sm.LineCount(); l++ {
 		line := sm.Line(l - 1) // l is 1-based, sm.Line is 0-based
 		if !strings.HasSuffix(strings.TrimRight(line, " \t"), `\`) {
