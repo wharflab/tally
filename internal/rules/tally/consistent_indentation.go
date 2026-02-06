@@ -96,6 +96,7 @@ func (r *ConsistentIndentationRule) Check(input rules.LintInput) []rules.Violati
 }
 
 // checkNodeNoIndent checks that an instruction's lines have no leading whitespace.
+// Checks all lines including backslash continuations.
 func (r *ConsistentIndentationRule) checkNodeNoIndent(
 	file string,
 	sm *sourcemap.SourceMap,
@@ -106,15 +107,25 @@ func (r *ConsistentIndentationRule) checkNodeNoIndent(
 		return nil
 	}
 
-	startLine := location[0].Start.Line // 1-based
-	line := sm.Line(startLine - 1)      // 0-based
+	startLine := location[0].Start.Line
+	endLine := resolveEndLine(sm, location)
 
-	indent := leadingWhitespace(line)
-	if indent == "" {
+	// Check all lines — flag if any line has indentation
+	var firstBadLine int
+	var firstBadIndent string
+	for lineNum := startLine; lineNum <= endLine; lineNum++ {
+		indent := leadingWhitespace(sm.Line(lineNum - 1))
+		if indent != "" {
+			firstBadLine = lineNum
+			firstBadIndent = indent
+			break
+		}
+	}
+	if firstBadLine == 0 {
 		return nil
 	}
 
-	loc := rules.NewRangeLocation(file, startLine, 0, startLine, len(indent))
+	loc := rules.NewRangeLocation(file, firstBadLine, 0, firstBadLine, len(firstBadIndent))
 	v := rules.NewViolation(
 		loc,
 		meta.Code,
@@ -132,6 +143,7 @@ func (r *ConsistentIndentationRule) checkNodeNoIndent(
 }
 
 // checkCommandIndented checks that a command's lines are indented with the expected indent (1 tab).
+// Checks all lines including backslash continuations.
 func (r *ConsistentIndentationRule) checkCommandIndented(
 	file string,
 	sm *sourcemap.SourceMap,
@@ -142,27 +154,36 @@ func (r *ConsistentIndentationRule) checkCommandIndented(
 		return nil
 	}
 
-	startLine := location[0].Start.Line // 1-based
-	line := sm.Line(startLine - 1)      // 0-based
+	startLine := location[0].Start.Line
+	endLine := resolveEndLine(sm, location)
 
-	currentIndent := leadingWhitespace(line)
-
-	if currentIndent == expectedIndent {
+	// Check all lines — flag if any line has wrong indentation
+	var firstBadLine int
+	var firstBadIndent string
+	for lineNum := startLine; lineNum <= endLine; lineNum++ {
+		indent := leadingWhitespace(sm.Line(lineNum - 1))
+		if indent != expectedIndent {
+			firstBadLine = lineNum
+			firstBadIndent = indent
+			break
+		}
+	}
+	if firstBadLine == 0 {
 		return nil
 	}
 
-	// Determine the issue
+	// Determine the issue based on the first misindented line
 	var message string
 	switch {
-	case currentIndent == "":
+	case firstBadIndent == "":
 		message = "missing indentation; expected 1 tab"
-	case consistsOf(currentIndent, "\t"):
-		message = "wrong indentation width; expected 1 tab, got " + describeIndent(currentIndent)
+	case consistsOf(firstBadIndent, "\t"):
+		message = "wrong indentation width; expected 1 tab, got " + describeIndent(firstBadIndent)
 	default:
-		message = "wrong indentation style; expected 1 tab, got " + describeIndent(currentIndent)
+		message = "wrong indentation style; expected 1 tab, got " + describeIndent(firstBadIndent)
 	}
 
-	loc := rules.NewRangeLocation(file, startLine, 0, startLine, len(currentIndent))
+	loc := rules.NewRangeLocation(file, firstBadLine, 0, firstBadLine, len(firstBadIndent))
 	v := rules.NewViolation(
 		loc,
 		meta.Code,
@@ -192,6 +213,22 @@ func (r *ConsistentIndentationRule) removeIndentEdits(
 	return r.setIndentEdits(file, sm, location, "")
 }
 
+// resolveEndLine returns the last line number of an instruction, including
+// backslash continuation lines. BuildKit's parser may report End.Line ==
+// Start.Line for multi-line instructions joined by \, so we scan the source
+// for continuations.
+func resolveEndLine(sm *sourcemap.SourceMap, location []parser.Range) int {
+	endLine := location[0].End.Line
+	for l := endLine; l <= sm.LineCount(); l++ {
+		line := sm.Line(l - 1) // l is 1-based, sm.Line is 0-based
+		if !strings.HasSuffix(strings.TrimRight(line, " \t"), `\`) {
+			return l
+		}
+		endLine = min(l+1, sm.LineCount()) // clamp to last line
+	}
+	return endLine
+}
+
 // setIndentEdits generates TextEdits to set indentation on all lines of a node.
 func (r *ConsistentIndentationRule) setIndentEdits(
 	file string,
@@ -204,19 +241,7 @@ func (r *ConsistentIndentationRule) setIndentEdits(
 	}
 
 	startLine := location[0].Start.Line
-	endLine := location[0].End.Line
-
-	// Extend endLine for backslash continuation lines.
-	// BuildKit's parser may report End.Line == Start.Line for multi-line
-	// instructions joined by \, so we scan the source for continuations.
-	for l := endLine; l <= sm.LineCount(); l++ {
-		line := sm.Line(l - 1) // l is 1-based, sm.Line is 0-based
-		if !strings.HasSuffix(strings.TrimRight(line, " \t"), `\`) {
-			endLine = l
-			break
-		}
-		endLine = min(l+1, sm.LineCount()) // next line is a continuation; clamp to last line
-	}
+	endLine := resolveEndLine(sm, location)
 
 	var edits []rules.TextEdit
 	for lineNum := startLine; lineNum <= endLine; lineNum++ {

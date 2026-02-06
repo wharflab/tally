@@ -261,10 +261,10 @@ func TestResolve_TrustedRegistries(t *testing.T) {
 
 func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 	tests := []struct {
-		name       string
-		schema     map[string]any
-		config     map[string]any
-		wantSubstr string // expected substring in error message
+		name        string
+		schema      map[string]any
+		config      map[string]any
+		wantSubstrs []string // all must appear in error message
 	}{
 		{
 			name: "additional properties",
@@ -272,8 +272,8 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 				"type":                 "object",
 				"additionalProperties": false,
 			},
-			config:     map[string]any{"indent": "tab", "indent-width": 1},
-			wantSubstr: "additional properties", // property order is non-deterministic
+			config:      map[string]any{"indent": "tab", "indent-width": 1},
+			wantSubstrs: []string{"additional properties"}, // property order is non-deterministic
 		},
 		{
 			name: "wrong type",
@@ -284,8 +284,8 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 				},
 				"additionalProperties": false,
 			},
-			config:     map[string]any{"max": "not-a-number"},
-			wantSubstr: "got string, want integer",
+			config:      map[string]any{"max": "not-a-number"},
+			wantSubstrs: []string{"got string, want integer"},
 		},
 		{
 			name: "multiple errors",
@@ -296,8 +296,8 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 				},
 				"additionalProperties": false,
 			},
-			config:     map[string]any{"max": "bad", "extra": true},
-			wantSubstr: "not allowed",
+			config:      map[string]any{"max": "bad", "extra": true},
+			wantSubstrs: []string{"not allowed", "got string, want integer"},
 		},
 		{
 			name: "minimum violation",
@@ -307,8 +307,8 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 					"max": map[string]any{"type": "integer", "minimum": 0},
 				},
 			},
-			config:     map[string]any{"max": -1},
-			wantSubstr: "minimum",
+			config:      map[string]any{"max": -1},
+			wantSubstrs: []string{"minimum"},
 		},
 	}
 
@@ -326,9 +326,11 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 			if strings.Contains(msg, "file://") {
 				t.Errorf("error message should not contain file:// path, got: %s", msg)
 			}
-			// Must contain the expected human-readable detail
-			if !strings.Contains(msg, tt.wantSubstr) {
-				t.Errorf("error message should contain %q, got: %s", tt.wantSubstr, msg)
+			// Must contain all expected human-readable details
+			for _, want := range tt.wantSubstrs {
+				if !strings.Contains(msg, want) {
+					t.Errorf("error message should contain %q, got: %s", want, msg)
+				}
 			}
 		})
 	}

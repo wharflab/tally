@@ -110,6 +110,22 @@ func TestConsistentIndentationCheck(t *testing.T) {
 			WantViolations: 1,
 			WantMessages:   []string{"unexpected indentation"},
 		},
+
+		// === Continuation line coverage ===
+		{
+			Name: "multi-stage continuation lines missing indent",
+			Content: "FROM alpine AS builder\n\tRUN --mount=type=secret \\\n" +
+				"--mount=type=cache \\\npip install\n" +
+				"FROM scratch\n\tCOPY --from=builder /app /app\n",
+			WantViolations: 1,
+			WantMessages:   []string{"missing indentation"},
+		},
+		{
+			Name:           "single stage continuation lines with indent",
+			Content:        "FROM alpine\nRUN echo hello \\\n\techo world\n",
+			WantViolations: 1,
+			WantMessages:   []string{"unexpected indentation"},
+		},
 	})
 }
 
