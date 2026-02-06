@@ -199,7 +199,7 @@ func (r *ConsistentIndentationRule) checkCommandIndented(
 	switch {
 	case currentIndent == "":
 		message = "missing indentation; expected " + expectedDesc
-	case currentIndent != expectedIndent && consistsOf(currentIndent, indentChar):
+	case consistsOf(currentIndent, indentChar):
 		message = "wrong indentation width; expected " + expectedDesc + ", got " + describeIndent(currentIndent)
 	default:
 		message = "wrong indentation style; expected " + expectedDesc + ", got " + describeIndent(currentIndent)
