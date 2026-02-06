@@ -774,6 +774,10 @@ func getRunCmdLine(run *instructions.RunCommand) string {
 // resolveEndPosition, with a fallback for point locations (End == Start) where
 // the end is computed from the command text.
 func resolveRunEndPosition(loc []parser.Range, sm *sourcemap.SourceMap, run *instructions.RunCommand) (int, int) {
+	if len(loc) == 0 {
+		return 0, 0
+	}
+
 	endLine, endCol := resolveEndPosition(loc, sm)
 
 	// Fallback: when end position equals start (point location), compute from command text
