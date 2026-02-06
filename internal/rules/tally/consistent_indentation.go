@@ -286,6 +286,11 @@ func heredocDashEdit(file string, lineNum int, line string) *rules.TextEdit {
 	if idx < 0 {
 		return nil
 	}
+	// Heredoc operator must be preceded by whitespace or start-of-line,
+	// otherwise it could be inside a quoted string (e.g., RUN echo "<<EOF").
+	if idx > 0 && line[idx-1] != ' ' && line[idx-1] != '\t' {
+		return nil
+	}
 	// Already <<-
 	if idx+2 < len(line) && line[idx+2] == '-' {
 		return nil
