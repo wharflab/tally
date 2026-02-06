@@ -29,7 +29,7 @@ pre-commit:
       stage_fixed: true
     typos:
       glob: "*.{py,js,ts,tsx,toml,yaml,yml,json,html,css,md,txt,rst,tex}"
-      run: uv tool run typos==1.43.1 --force-exclude {staged_files}
+      run: uv tool run typos==1.43.2 --force-exclude {staged_files}
     codecov:
       glob: ".codecov.yml"
       run: curl --fail --data-binary @.codecov.yml https://codecov.io/validate
@@ -47,7 +47,7 @@ commit-msg:
     "lint commit message":
       run: npx -y -q commitlint --edit {1}
     "check spelling":
-      run: uv tool run typos==1.43.1 {1}
+      run: uv tool run typos==1.43.2 {1}
 post-merge:
   files: "git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD"
   commands:
