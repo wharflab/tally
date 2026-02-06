@@ -249,6 +249,18 @@ func (r *ConsistentIndentationRule) setIndentEdits(
 	startLine := location[0].Start.Line
 	endLine := location[0].End.Line
 
+	// Extend endLine for backslash continuation lines.
+	// BuildKit's parser may report End.Line == Start.Line for multi-line
+	// instructions joined by \, so we scan the source for continuations.
+	for l := endLine; l <= sm.LineCount(); l++ {
+		line := sm.Line(l - 1) // l is 1-based, sm.Line is 0-based
+		if !strings.HasSuffix(strings.TrimRight(line, " \t"), `\`) {
+			endLine = l
+			break
+		}
+		endLine = l + 1 // next line is a continuation
+	}
+
 	tabIndent := strings.Contains(indent, "\t")
 
 	var edits []rules.TextEdit

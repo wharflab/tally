@@ -698,6 +698,35 @@ severity = "style"
 severity = "style"
 `,
 		},
+		// Consistent indentation: multi-line continuation lines get aligned to 1 tab
+		{
+			name: "consistent-indentation-multi-line-continuation",
+			input: "FROM ubuntu:22.04 AS builder\n" +
+				"RUN --mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf \\\n" +
+				"         --mount=type=cache,target=/root/.cache/pip \\\n" +
+				"--mount=type=secret,id=uvtoml,target=/root/.config/uv/uv.toml \\\n" +
+				"--mount=type=bind,source=requirements.txt,target=${LAMBDA_TASK_ROOT}/requirements.txt \\\n" +
+				"     --mount=type=cache,target=/root/.cache/uv \\\n" +
+				"  pip install uv==0.9.24 && \\\n" +
+				"      uv pip install --system -r requirements.txt\n" +
+				"FROM scratch\n" +
+				"COPY --from=builder /app /app\n",
+			want: "FROM ubuntu:22.04 AS builder\n" +
+				"\tRUN --mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf \\\n" +
+				"\t--mount=type=cache,target=/root/.cache/pip \\\n" +
+				"\t--mount=type=secret,id=uvtoml,target=/root/.config/uv/uv.toml \\\n" +
+				"\t--mount=type=bind,source=requirements.txt,target=${LAMBDA_TASK_ROOT}/requirements.txt \\\n" +
+				"\t--mount=type=cache,target=/root/.cache/uv \\\n" +
+				"\tpip install uv==0.9.24 && \\\n" +
+				"\tuv pip install --system -r requirements.txt\n" +
+				"FROM scratch\n" +
+				"\tCOPY --from=builder /app /app\n",
+			args:        []string{"--fix", "--select", "tally/consistent-indentation"},
+			wantApplied: 2, // RUN (multi-line) + COPY
+			config: `[rules.tally.consistent-indentation]
+severity = "style"
+`,
+		},
 		// Consistent indentation + ConsistentInstructionCasing: both fix the same line
 		// Indentation adds a tab, casing fixes "run" -> "RUN" on the same line
 		{

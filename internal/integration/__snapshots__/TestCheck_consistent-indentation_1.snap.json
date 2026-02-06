@@ -253,7 +253,7 @@
           "message": "missing indentation; expected 1 tab",
           "severity": "style",
           "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
-          "sourceCode": "USER nobody:nobody",
+          "sourceCode": "RUN --mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf \\",
           "suggestedFix": {
             "description": "Fix indentation to 1 tab",
             "edits": [
@@ -270,6 +270,90 @@
                   }
                 },
                 "newText": "\t"
+              },
+              {
+                "location": {
+                  "file": "testdata/consistent-indentation/Dockerfile",
+                  "start": {
+                    "line": 12,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 12,
+                    "column": 9
+                  }
+                },
+                "newText": "\t"
+              },
+              {
+                "location": {
+                  "file": "testdata/consistent-indentation/Dockerfile",
+                  "start": {
+                    "line": 13,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 13,
+                    "column": 0
+                  }
+                },
+                "newText": "\t"
+              },
+              {
+                "location": {
+                  "file": "testdata/consistent-indentation/Dockerfile",
+                  "start": {
+                    "line": 14,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 14,
+                    "column": 0
+                  }
+                },
+                "newText": "\t"
+              },
+              {
+                "location": {
+                  "file": "testdata/consistent-indentation/Dockerfile",
+                  "start": {
+                    "line": 15,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 15,
+                    "column": 5
+                  }
+                },
+                "newText": "\t"
+              },
+              {
+                "location": {
+                  "file": "testdata/consistent-indentation/Dockerfile",
+                  "start": {
+                    "line": 16,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 16,
+                    "column": 2
+                  }
+                },
+                "newText": "\t"
+              },
+              {
+                "location": {
+                  "file": "testdata/consistent-indentation/Dockerfile",
+                  "start": {
+                    "line": 17,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 17,
+                    "column": 6
+                  }
+                },
+                "newText": "\t"
               }
             ],
             "isPreferred": true,
@@ -280,11 +364,50 @@
           "location": {
             "file": "testdata/consistent-indentation/Dockerfile",
             "start": {
-              "line": 14,
+              "line": 18,
               "column": 0
             },
             "end": {
-              "line": 14,
+              "line": 18,
+              "column": 0
+            }
+          },
+          "rule": "tally/consistent-indentation",
+          "message": "missing indentation; expected 1 tab",
+          "severity": "style",
+          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+          "sourceCode": "USER nobody:nobody",
+          "suggestedFix": {
+            "description": "Fix indentation to 1 tab",
+            "edits": [
+              {
+                "location": {
+                  "file": "testdata/consistent-indentation/Dockerfile",
+                  "start": {
+                    "line": 18,
+                    "column": 0
+                  },
+                  "end": {
+                    "line": 18,
+                    "column": 0
+                  }
+                },
+                "newText": "\t"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 50
+          }
+        },
+        {
+          "location": {
+            "file": "testdata/consistent-indentation/Dockerfile",
+            "start": {
+              "line": 21,
+              "column": 0
+            },
+            "end": {
+              "line": 21,
               "column": 0
             }
           },
@@ -300,11 +423,11 @@
                 "location": {
                   "file": "testdata/consistent-indentation/Dockerfile",
                   "start": {
-                    "line": 14,
+                    "line": 21,
                     "column": 0
                   },
                   "end": {
-                    "line": 14,
+                    "line": 21,
                     "column": 0
                   }
                 },
@@ -319,11 +442,11 @@
           "location": {
             "file": "testdata/consistent-indentation/Dockerfile",
             "start": {
-              "line": 15,
+              "line": 22,
               "column": 0
             },
             "end": {
-              "line": 15,
+              "line": 22,
               "column": 0
             }
           },
@@ -339,11 +462,11 @@
                 "location": {
                   "file": "testdata/consistent-indentation/Dockerfile",
                   "start": {
-                    "line": 15,
+                    "line": 22,
                     "column": 0
                   },
                   "end": {
-                    "line": 15,
+                    "line": 22,
                     "column": 0
                   }
                 },
@@ -358,11 +481,11 @@
           "location": {
             "file": "testdata/consistent-indentation/Dockerfile",
             "start": {
-              "line": 16,
+              "line": 23,
               "column": 0
             },
             "end": {
-              "line": 16,
+              "line": 23,
               "column": 0
             }
           },
@@ -378,11 +501,11 @@
                 "location": {
                   "file": "testdata/consistent-indentation/Dockerfile",
                   "start": {
-                    "line": 16,
+                    "line": 23,
                     "column": 0
                   },
                   "end": {
-                    "line": 16,
+                    "line": 23,
                     "column": 0
                   }
                 },
@@ -397,11 +520,11 @@
     }
   ],
   "summary": {
-    "total": 10,
+    "total": 11,
     "errors": 0,
     "warnings": 0,
     "info": 0,
-    "style": 10,
+    "style": 11,
     "files": 1
   },
   "files_scanned": 1,
