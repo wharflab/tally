@@ -11,7 +11,17 @@ Implement a **new custom tally rule** (not BuildKit, not Hadolint) in the `tally
 
 Input is `$ARGUMENTS`: a natural-language description of rule intent.
 
-## Step 0: Derive Rule Name From Description
+## Step 0: Enter Plan Mode
+
+**Always start in plan mode**, even if the rule sounds simple. Explore the codebase first to understand:
+
+- How existing rules handle similar constructs (heredocs, continuations, multi-stage builds)
+- Cross-rule interactions and fix priority gaps
+- BuildKit parser quirks (e.g., `End.Line == Start.Line` for multi-line `\` continuations)
+
+Present the plan for approval before writing code.
+
+## Step 0.5: Derive Rule Name From Description
 
 Derive a concise kebab-case slug from `$ARGUMENTS` and use it consistently as `<rule_slug>`.
 
@@ -33,10 +43,9 @@ Pick and lock these before coding:
 4. Default behavior:
    - Enabled by default (`DefaultSeverity != off`) or
    - Off by default (`IsExperimental: true` and enabled via config)
-5. Fix strategy:
-   - No fix
-   - Sync fix (`SuggestedFix.Edits`)
-   - Async fix (`NeedsResolve: true`)
+5. Fix strategy (**assume auto-fix is required** — most tally rules should be fixable, even if partially):
+   - Sync fix (`SuggestedFix.Edits`) — default choice
+   - Async fix (`NeedsResolve: true`) — only when sync cannot be reliable
 6. Coordination strategy:
    - Decide precedence if this rule overlaps with existing rules
    - Decide whether to suppress this rule, suppress only its fix, or defer by priority
@@ -115,6 +124,19 @@ Use these mechanisms:
    - Narrow one rule to patterns it owns (for example, pure file-creation vs general chained RUN transformation).
 
 Add regression tests for overlap behavior in both involved rule test files when practical.
+
+## Step 3.7: Handle Heredocs and Multi-Line Instructions
+
+Dockerfile instructions can span multiple lines via `\` continuations and heredocs (`<<EOF`, `<<-EOF`). Both detection and fix logic **must** account
+for these:
+
+1. **Continuation lines**: BuildKit's parser may report `End.Line == Start.Line` for `\`-continued instructions. Use `sourcemap.SourceMap` to scan for
+   actual end lines (see `resolveEndLine` pattern).
+2. **Heredoc body lines**: `RUN` and `COPY` can use heredocs. Body lines between `<<EOF` and `EOF` belong to the instruction but have their own
+   indentation rules.
+3. **`<<` vs `<<-`**: The `<<-` variant strips leading tabs from body lines. When a fix adds tab indentation to a heredoc instruction, it must also
+   convert `<<` to `<<-` to avoid breaking the heredoc content.
+4. **Test coverage**: Include explicit test cases for continuation lines and heredoc variants (both `<<` and `<<-`).
 
 ## Step 4: Use Existing Analysis Primitives
 
@@ -262,8 +284,10 @@ Confirm:
 
 - [ ] Rule implemented in `internal/rules/tally/`
 - [ ] `init()` registration added
+- [ ] Auto-fix implemented (sync preferred; at minimum cover the common case)
 - [ ] Config schema/default/validation implemented (if configurable)
 - [ ] Unit tests added for rule behavior and config
+- [ ] Heredoc and `\`-continuation edge cases tested (detection + fix)
 - [ ] Helper tests added for extracted utilities
 - [ ] New rule/helper files are covered at >=85%
 - [ ] Integration fixture + `TestCheck` case added
