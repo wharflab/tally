@@ -199,7 +199,7 @@ func (r *ConsistentIndentationRule) checkCommandIndented(
 	switch {
 	case currentIndent == "":
 		message = "missing indentation; expected " + expectedDesc
-	case currentIndent != expectedIndent && containsChar(currentIndent, indentChar):
+	case currentIndent != expectedIndent && consistsOf(currentIndent, indentChar):
 		message = "wrong indentation width; expected " + expectedDesc + ", got " + describeIndent(currentIndent)
 	default:
 		message = "wrong indentation style; expected " + expectedDesc + ", got " + describeIndent(currentIndent)
@@ -316,13 +316,13 @@ func leadingWhitespace(line string) string {
 	return line[:len(line)-len(trimmed)]
 }
 
-// containsChar checks if s contains only the given character (or characters from it).
-func containsChar(s, char string) bool {
-	if char == "" || s == "" {
+// consistsOf checks whether every character in s is found in chars.
+func consistsOf(s, chars string) bool {
+	if chars == "" || s == "" {
 		return false
 	}
 	for _, c := range s {
-		if !strings.ContainsRune(char, c) {
+		if !strings.ContainsRune(chars, c) {
 			return false
 		}
 	}
