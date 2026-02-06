@@ -257,12 +257,15 @@ func (r *ConsistentIndentationRule) setIndentEdits(
 		}
 	}
 
-	// Convert << to <<- on the first line so that BuildKit strips
-	// leading tabs from heredoc body lines.
+	// Convert << to <<- on all lines so that BuildKit strips
+	// leading tabs from heredoc body lines. Heredocs may appear
+	// on any line, including backslash continuations.
 	if indent != "" {
-		firstLine := sm.Line(startLine - 1)
-		if edit := heredocDashEdit(file, startLine, firstLine); edit != nil {
-			edits = append(edits, *edit)
+		for lineNum := startLine; lineNum <= endLine; lineNum++ {
+			ln := sm.Line(lineNum - 1)
+			if edit := heredocDashEdit(file, lineNum, ln); edit != nil {
+				edits = append(edits, *edit)
+			}
 		}
 	}
 

@@ -180,6 +180,12 @@ func TestConsistentIndentationCheckWithFixes(t *testing.T) {
 				"echo hello\nEOF\nFROM scratch\n",
 			wantEdits: 2, // 1 indent edit + 1 <<- conversion edit
 		},
+		{
+			name: "heredoc on continuation line converts to <<-",
+			content: "FROM alpine AS builder\nRUN cmd && \\\n" +
+				"cat <<EOF\nhello\nEOF\nFROM scratch\n",
+			wantEdits: 3, // 2 indent edits (lines 2-3) + 1 <<- conversion
+		},
 	}
 
 	for _, tt := range tests {
