@@ -135,7 +135,7 @@ func (r *ConsistentIndentationRule) checkNodeNoIndent(
 		Description: "Remove indentation",
 		Safety:      rules.FixSafe,
 		Priority:    meta.FixPriority,
-		Edits:       r.removeIndentEdits(file, sm, location),
+		Edits:       r.removeIndentEdits(file, sm, location, endLine),
 		IsPreferred: true,
 	})
 
@@ -193,7 +193,7 @@ func (r *ConsistentIndentationRule) checkCommandIndented(
 		Description: "Fix indentation to 1 tab",
 		Safety:      rules.FixSafe,
 		Priority:    meta.FixPriority,
-		Edits:       r.setIndentEdits(file, sm, location, expectedIndent),
+		Edits:       r.setIndentEdits(file, sm, location, endLine, expectedIndent),
 		IsPreferred: true,
 	})
 
@@ -205,12 +205,13 @@ func (r *ConsistentIndentationRule) removeIndentEdits(
 	file string,
 	sm *sourcemap.SourceMap,
 	location []parser.Range,
+	endLine int,
 ) []rules.TextEdit {
 	if len(location) == 0 {
 		return nil
 	}
 
-	return r.setIndentEdits(file, sm, location, "")
+	return r.setIndentEdits(file, sm, location, endLine, "")
 }
 
 // resolveEndLine returns the last line number of an instruction, including
@@ -231,10 +232,12 @@ func resolveEndLine(sm *sourcemap.SourceMap, location []parser.Range) int {
 }
 
 // setIndentEdits generates TextEdits to set indentation on all lines of a node.
+// endLine is the precomputed last line number (from resolveEndLine).
 func (r *ConsistentIndentationRule) setIndentEdits(
 	file string,
 	sm *sourcemap.SourceMap,
 	location []parser.Range,
+	endLine int,
 	indent string,
 ) []rules.TextEdit {
 	if len(location) == 0 {
@@ -242,7 +245,6 @@ func (r *ConsistentIndentationRule) setIndentEdits(
 	}
 
 	startLine := location[0].Start.Line
-	endLine := resolveEndLine(sm, location)
 
 	var edits []rules.TextEdit
 	for lineNum := startLine; lineNum <= endLine; lineNum++ {
