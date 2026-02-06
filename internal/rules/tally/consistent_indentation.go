@@ -7,6 +7,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/tinovyatkin/tally/internal/rules/configutil"
 	"github.com/tinovyatkin/tally/internal/sourcemap"
 )
 
@@ -56,7 +57,7 @@ func (r *ConsistentIndentationRule) DefaultConfig() any {
 
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *ConsistentIndentationRule) ValidateConfig(config any) error {
-	return nil
+	return configutil.ValidateWithSchema(config, r.Schema())
 }
 
 // Check runs the consistent-indentation rule.

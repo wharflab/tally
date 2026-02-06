@@ -185,6 +185,9 @@ func checkCommand() *cli.Command {
 					os.Exit(ExitConfigError)
 				}
 
+				// Validate rule-specific configs against JSON schemas
+				validateRuleConfigs(cfg, file)
+
 				// Store per-file config for processor chain
 				fileConfigs[file] = cfg
 
@@ -571,6 +574,26 @@ func parseFailLevel(level string) (rules.Severity, error) {
 		return rules.SeverityStyle, nil
 	default:
 		return rules.ParseSeverity(level)
+	}
+}
+
+// validateRuleConfigs validates rule-specific options against each rule's JSON Schema.
+// Prints warnings to stderr for invalid configs but does not abort — this allows
+// existing configs with unknown keys to continue working while alerting the user.
+func validateRuleConfigs(cfg *config.Config, file string) {
+	for _, rule := range rules.All() {
+		cr, ok := rule.(rules.ConfigurableRule)
+		if !ok {
+			continue
+		}
+		opts := cfg.Rules.GetOptions(rule.Metadata().Code)
+		if opts == nil {
+			continue
+		}
+		if err := cr.ValidateConfig(opts); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: invalid config for rule %s (%s): %v\n",
+				rule.Metadata().Code, file, err)
+		}
 	}
 }
 
