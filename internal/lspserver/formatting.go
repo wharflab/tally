@@ -2,6 +2,7 @@ package lspserver
 
 import (
 	"context"
+	"path/filepath"
 
 	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
 
@@ -47,7 +48,7 @@ func (s *Server) handleFormatting(params *protocol.DocumentFormattingParams) (an
 	// 3. Collect original edits from applied fixes and convert to LSP TextEdits.
 	// The fixer records the original (pre-adjustment) edits in AppliedFix,
 	// which reference positions in the original document — exactly what LSP needs.
-	change := fixResult.Changes[input.FilePath]
+	change := fixResult.Changes[filepath.Clean(input.FilePath)]
 	if change == nil || !change.HasChanges() {
 		return nil, nil //nolint:nilnil // no changes
 	}
