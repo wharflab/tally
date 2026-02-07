@@ -1,4 +1,4 @@
-.PHONY: build test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema print-gotestsum-bin
+.PHONY: build test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema lsp-protocol print-gotestsum-bin
 
 build:
 	GOSUMDB=sum.golang.org CGO_ENABLED=0 go build -ldflags "-s -w" -o tally
@@ -80,6 +80,10 @@ print-gotestsum-bin:
 
 jsonschema:
 	go run gen/jsonschema.go > schema.json
+
+lsp-protocol:
+	bun run tools/lspgen/fetchModel.mts
+	bun run tools/lspgen/generate.mts
 
 clean:
 	rm -f tally

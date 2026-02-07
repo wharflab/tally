@@ -14,3 +14,6 @@
 # Windows batch files always CRLF
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# Generated files
+internal/lsp/protocol/lsp_generated.go linguist-generated=true
