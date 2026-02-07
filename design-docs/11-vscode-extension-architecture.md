@@ -274,7 +274,7 @@ cmd/tally/cmd/lsp.go # CLI entrypoint: `tally lsp --stdio`
 
 ### 5.3 Extension toolchain pattern (adapted from `amazon-bedrock-copilot-chat`)
 
-Use the same Bun-based pattern already proven in `/Users/vyatkin/workplace/GitHub/tinovyatkin/amazon-bedrock-copilot-chat`:
+Use the same Bun-based pattern already proven in `https://github.com/tinovyatkin/amazon-bedrock-copilot-chat`:
 
 - `extensions/vscode-tally/package.json`:
   - `packageManager: "bun"`
@@ -834,7 +834,7 @@ These tests intentionally cover VS Code behavior, not generic LSP correctness.
 
 ## 13. `vscode-containers` integration and conflict analysis
 
-Repository analyzed: `/Users/vyatkin/workplace/GitHub/microsoft/vscode-containers`
+Repository analyzed: `https://github.com/microsoft/vscode-containers`
 
 ### 13.1 Relevant behaviors observed
 
@@ -889,7 +889,7 @@ Repository analyzed: `/Users/vyatkin/workplace/GitHub/microsoft/vscode-container
 
 ## 14. `docker/vscode-extension` (Docker DX) integration and conflict analysis
 
-Repository analyzed: `/Users/vyatkin/workplace/GitHub/docker/vscode-extension`
+Repository analyzed: `https://github.com/docker/vscode-extension`
 
 ### 14.1 Relevant behaviors observed
 
@@ -962,7 +962,7 @@ Repository analyzed: `/Users/vyatkin/workplace/GitHub/docker/vscode-extension`
 
 ## 15. `vscode-hadolint` coexistence analysis and integration design
 
-Repository analyzed: `/Users/vyatkin/workplace/GitHub/michaellzc/vscode-hadolint`
+Repository analyzed: `https://github.com/michaellzc/vscode-hadolint`
 
 ### 15.1 What this extension does (relevant to overlap)
 
