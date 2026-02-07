@@ -395,12 +395,13 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 
 	fc.ModifiedContent = content
 
-	// Record applied fixes
+	// Record applied fixes with their original edits.
 	for c := range applied {
 		fc.FixesApplied = append(fc.FixesApplied, AppliedFix{
 			RuleCode:    c.violation.RuleCode,
 			Description: c.fix.Description,
 			Location:    c.violation.Location,
+			Edits:       c.fix.Edits,
 		})
 	}
 }

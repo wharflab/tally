@@ -49,6 +49,11 @@ type AppliedFix struct {
 
 	// Location is where the fix was applied.
 	Location rules.Location
+
+	// Edits are the original (pre-adjustment) text edits of this fix.
+	// Positions reference the original document content, making them
+	// suitable for direct conversion to LSP TextEdits.
+	Edits []rules.TextEdit
 }
 
 // SkipReason explains why a fix was skipped.

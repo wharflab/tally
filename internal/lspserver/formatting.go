@@ -1,7 +1,6 @@
 package lspserver
 
 import (
-	"bytes"
 	"context"
 
 	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
@@ -10,6 +9,7 @@ import (
 	"github.com/tinovyatkin/tally/internal/fix"
 	"github.com/tinovyatkin/tally/internal/linter"
 	"github.com/tinovyatkin/tally/internal/processor"
+	"github.com/tinovyatkin/tally/internal/rules"
 )
 
 // handleFormatting handles textDocument/formatting by applying safe auto-fixes.
@@ -37,40 +37,24 @@ func (s *Server) handleFormatting(params *protocol.DocumentFormattingParams) (an
 	violations := chain.Process(result.Violations, procCtx)
 
 	// 2. Apply style-safe fixes via existing fix infrastructure.
+	// The fixer handles conflict resolution and ordering.
 	fixer := &fix.Fixer{SafetyThreshold: fix.FixSafe}
 	fixResult, err := fixer.Apply(context.Background(), violations, map[string][]byte{input.FilePath: content})
 	if err != nil {
 		return nil, nil //nolint:nilnil,nilerr // gracefully return no edits on fix error
 	}
 
-	// 3. Convert to LSP text edits.
+	// 3. Collect original edits from applied fixes and convert to LSP TextEdits.
+	// The fixer records the original (pre-adjustment) edits in AppliedFix,
+	// which reference positions in the original document — exactly what LSP needs.
 	change := fixResult.Changes[input.FilePath]
-	if change == nil || !change.HasChanges() || bytes.Equal(change.OriginalContent, change.ModifiedContent) {
+	if change == nil || !change.HasChanges() {
 		return nil, nil //nolint:nilnil // no changes
 	}
-	return computeTextEdits(string(change.OriginalContent), string(change.ModifiedContent)), nil
-}
 
-// computeTextEdits produces a single whole-document replacement edit.
-// A minimal-diff implementation can be added later for smaller edits.
-func computeTextEdits(original, modified string) []*protocol.TextEdit {
-	// Count lines in original to build the replacement range.
-	lines := uint32(0)
-	lastLineLen := uint32(0)
-	for i := range len(original) {
-		if original[i] == '\n' {
-			lines++
-			lastLineLen = 0
-		} else {
-			lastLineLen++
-		}
+	var allEdits []rules.TextEdit
+	for _, af := range change.FixesApplied {
+		allEdits = append(allEdits, af.Edits...)
 	}
-
-	return []*protocol.TextEdit{{
-		Range: protocol.Range{
-			Start: protocol.Position{Line: 0, Character: 0},
-			End:   protocol.Position{Line: lines, Character: lastLineLen},
-		},
-		NewText: modified,
-	}}
+	return convertTextEdits(allEdits), nil
 }
