@@ -285,9 +285,15 @@ func uriToPath(docURI string) string {
 		return strings.TrimPrefix(docURI, "file://")
 	}
 	path := parsed.Path
-	// On Windows, file URIs look like file:///C:/path, so Path is /C:/path.
-	if runtime.GOOS == "windows" && len(path) > 2 && path[0] == '/' && path[2] == ':' {
-		path = path[1:]
+	if runtime.GOOS == "windows" {
+		// UNC paths: file://server/share/path → \\server\share\path
+		if parsed.Host != "" {
+			path = `//` + parsed.Host + path
+		}
+		// Drive-letter paths: file:///C:/path → Path is /C:/path, strip leading /.
+		if len(path) > 2 && path[0] == '/' && path[2] == ':' {
+			path = path[1:]
+		}
 	}
 	return filepath.FromSlash(path)
 }
