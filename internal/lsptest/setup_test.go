@@ -12,9 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sourcegraph/jsonrpc2"
 	"github.com/stretchr/testify/require"
-	"go.lsp.dev/jsonrpc2"
-	"go.lsp.dev/protocol"
 )
 
 var (
@@ -67,7 +66,7 @@ func TestMain(m *testing.M) {
 }
 
 // processIO wraps subprocess stdin/stdout as an io.ReadWriteCloser
-// for use with jsonrpc2.NewStream.
+// for use with jsonrpc2.NewBufferedStream.
 type processIO struct {
 	reader io.ReadCloser
 	writer io.WriteCloser
@@ -77,13 +76,28 @@ func (p *processIO) Read(data []byte) (int, error)  { return p.reader.Read(data)
 func (p *processIO) Write(data []byte) (int, error) { return p.writer.Write(data) }
 func (p *processIO) Close() error                   { return p.writer.Close() }
 
+// diagnosticsHandler routes server-to-client notifications and captures diagnostics.
+type diagnosticsHandler struct {
+	diagnosticsCh chan *publishDiagnosticsParams
+}
+
+func (h *diagnosticsHandler) Handle(_ context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
+	if req.Method == "textDocument/publishDiagnostics" && req.Params != nil {
+		var params publishDiagnosticsParams
+		if err := json.Unmarshal(*req.Params, &params); err == nil {
+			h.diagnosticsCh <- &params
+		}
+	}
+	// Notifications don't need a reply.
+}
+
 // testServer manages a tally lsp --stdio subprocess for black-box testing.
 type testServer struct {
 	cmd    *exec.Cmd
-	conn   jsonrpc2.Conn
+	conn   *jsonrpc2.Conn
 	stderr *bytes.Buffer
 
-	diagnosticsCh chan *protocol.PublishDiagnosticsParams
+	diagnosticsCh chan *publishDiagnosticsParams
 }
 
 // startTestServer launches tally lsp --stdio as a subprocess with
@@ -104,26 +118,15 @@ func startTestServer(t *testing.T) *testServer {
 
 	require.NoError(t, cmd.Start())
 
-	stream := jsonrpc2.NewStream(&processIO{reader: stdout, writer: stdin})
-	conn := jsonrpc2.NewConn(stream)
-
 	ts := &testServer{
 		cmd:           cmd,
-		conn:          conn,
 		stderr:        &stderr,
-		diagnosticsCh: make(chan *protocol.PublishDiagnosticsParams, 10),
+		diagnosticsCh: make(chan *publishDiagnosticsParams, 10),
 	}
 
-	// Route server-to-client notifications.
-	conn.Go(context.Background(), func(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
-		if req.Method() == protocol.MethodTextDocumentPublishDiagnostics {
-			var params protocol.PublishDiagnosticsParams
-			if err := json.Unmarshal(req.Params(), &params); err == nil {
-				ts.diagnosticsCh <- &params
-			}
-		}
-		return reply(ctx, nil, nil)
-	})
+	stream := jsonrpc2.NewBufferedStream(&processIO{reader: stdout, writer: stdin}, jsonrpc2.VSCodeObjectCodec{})
+	conn := jsonrpc2.NewConn(context.Background(), stream, &diagnosticsHandler{diagnosticsCh: ts.diagnosticsCh})
+	ts.conn = conn
 
 	t.Cleanup(func() {
 		if t.Failed() {
@@ -149,21 +152,24 @@ func startTestServer(t *testing.T) *testServer {
 }
 
 // initialize sends initialize + initialized and returns the server capabilities.
-func (ts *testServer) initialize(t *testing.T) protocol.InitializeResult {
+func (ts *testServer) initialize(t *testing.T) initializeResult {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var result protocol.InitializeResult
-	_, err := ts.conn.Call(ctx, protocol.MethodInitialize, &protocol.InitializeParams{
-		ClientInfo: &protocol.ClientInfo{
+	var result initializeResult
+	err := ts.conn.Call(ctx, "initialize", &initializeParams{
+		ProcessID:    nil,
+		RootURI:      nil,
+		Capabilities: json.RawMessage(`{}`),
+		ClientInfo: &clientInfo{
 			Name:    "tally-lsptest",
 			Version: "1.0.0",
 		},
 	}, &result)
 	require.NoError(t, err)
 
-	require.NoError(t, ts.conn.Notify(ctx, protocol.MethodInitialized, &protocol.InitializedParams{}))
+	require.NoError(t, ts.conn.Notify(ctx, "initialized", struct{}{}))
 
 	return result
 }
@@ -171,7 +177,7 @@ func (ts *testServer) initialize(t *testing.T) protocol.InitializeResult {
 const diagTimeout = 10 * time.Second
 
 // waitDiagnostics blocks until a publishDiagnostics notification arrives or timeout.
-func (ts *testServer) waitDiagnostics(t *testing.T) *protocol.PublishDiagnosticsParams {
+func (ts *testServer) waitDiagnostics(t *testing.T) *publishDiagnosticsParams {
 	t.Helper()
 	select {
 	case d := <-ts.diagnosticsCh:
@@ -188,20 +194,20 @@ func (ts *testServer) shutdown(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := ts.conn.Call(ctx, protocol.MethodShutdown, nil, nil)
+	err := ts.conn.Call(ctx, "shutdown", nil, nil)
 	require.NoError(t, err)
 
-	require.NoError(t, ts.conn.Notify(ctx, protocol.MethodExit, nil))
+	require.NoError(t, ts.conn.Notify(ctx, "exit", nil))
 }
 
 // openDocument sends textDocument/didOpen.
-func (ts *testServer) openDocument(t *testing.T, uri protocol.DocumentURI, content string) {
+func (ts *testServer) openDocument(t *testing.T, uri, content string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	require.NoError(t, ts.conn.Notify(ctx, protocol.MethodTextDocumentDidOpen, &protocol.DidOpenTextDocumentParams{
-		TextDocument: protocol.TextDocumentItem{
+	require.NoError(t, ts.conn.Notify(ctx, "textDocument/didOpen", &didOpenTextDocumentParams{
+		TextDocument: textDocumentItem{
 			URI:        uri,
 			LanguageID: "dockerfile",
 			Version:    1,
@@ -211,41 +217,178 @@ func (ts *testServer) openDocument(t *testing.T, uri protocol.DocumentURI, conte
 }
 
 // changeDocument sends textDocument/didChange with full sync.
-func (ts *testServer) changeDocument(t *testing.T, uri protocol.DocumentURI, version int32, content string) {
+func (ts *testServer) changeDocument(t *testing.T, uri string, version int32, content string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	require.NoError(t, ts.conn.Notify(ctx, protocol.MethodTextDocumentDidChange, &protocol.DidChangeTextDocumentParams{
-		TextDocument: protocol.VersionedTextDocumentIdentifier{
-			TextDocumentIdentifier: protocol.TextDocumentIdentifier{URI: uri},
-			Version:                version,
+	require.NoError(t, ts.conn.Notify(ctx, "textDocument/didChange", &didChangeTextDocumentParams{
+		TextDocument: versionedTextDocumentIdentifier{
+			URI:     uri,
+			Version: version,
 		},
-		ContentChanges: []protocol.TextDocumentContentChangeEvent{
+		ContentChanges: []textDocumentContentChangeEvent{
 			{Text: content},
 		},
 	}))
 }
 
 // closeDocument sends textDocument/didClose.
-func (ts *testServer) closeDocument(t *testing.T, uri protocol.DocumentURI) {
+func (ts *testServer) closeDocument(t *testing.T, uri string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	require.NoError(t, ts.conn.Notify(ctx, protocol.MethodTextDocumentDidClose, &protocol.DidCloseTextDocumentParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	require.NoError(t, ts.conn.Notify(ctx, "textDocument/didClose", &didCloseTextDocumentParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
 	}))
 }
 
 // saveDocument sends textDocument/didSave with text included.
-func (ts *testServer) saveDocument(t *testing.T, uri protocol.DocumentURI, content string) {
+func (ts *testServer) saveDocument(t *testing.T, uri, content string) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	require.NoError(t, ts.conn.Notify(ctx, protocol.MethodTextDocumentDidSave, &protocol.DidSaveTextDocumentParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	require.NoError(t, ts.conn.Notify(ctx, "textDocument/didSave", &didSaveTextDocumentParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
 		Text:         content,
 	}))
+}
+
+// LSP types for the test client.
+// We define minimal types here rather than importing go.lsp.dev/protocol,
+// using field types that match the JSON wire format.
+
+type initializeParams struct {
+	ProcessID    *int            `json:"processId"`
+	RootURI      *string         `json:"rootUri"`
+	Capabilities json.RawMessage `json:"capabilities"`
+	ClientInfo   *clientInfo     `json:"clientInfo,omitempty"`
+}
+
+type clientInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"`
+}
+
+type initializeResult struct {
+	Capabilities json.RawMessage      `json:"capabilities"`
+	ServerInfo   *initializeServerInfo `json:"serverInfo,omitempty"`
+}
+
+type initializeServerInfo struct {
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"`
+}
+
+type publishDiagnosticsParams struct {
+	URI         string       `json:"uri"`
+	Diagnostics []diagnostic `json:"diagnostics"`
+}
+
+type diagnostic struct {
+	Range           lspRange         `json:"range"`
+	Severity        int              `json:"severity,omitempty"`
+	Code            string           `json:"code,omitempty"`
+	CodeDescription *codeDescription `json:"codeDescription,omitempty"`
+	Source          string           `json:"source,omitempty"`
+	Message         string           `json:"message"`
+}
+
+type codeDescription struct {
+	HRef string `json:"href"`
+}
+
+type lspRange struct {
+	Start position `json:"start"`
+	End   position `json:"end"`
+}
+
+type position struct {
+	Line      uint32 `json:"line"`
+	Character uint32 `json:"character"`
+}
+
+type textDocumentItem struct {
+	URI        string `json:"uri"`
+	LanguageID string `json:"languageId"`
+	Version    int32  `json:"version"`
+	Text       string `json:"text"`
+}
+
+type textDocumentIdentifier struct {
+	URI string `json:"uri"`
+}
+
+type versionedTextDocumentIdentifier struct {
+	URI     string `json:"uri"`
+	Version int32  `json:"version"`
+}
+
+type didOpenTextDocumentParams struct {
+	TextDocument textDocumentItem `json:"textDocument"`
+}
+
+type didChangeTextDocumentParams struct {
+	TextDocument   versionedTextDocumentIdentifier    `json:"textDocument"`
+	ContentChanges []textDocumentContentChangeEvent `json:"contentChanges"`
+}
+
+type textDocumentContentChangeEvent struct {
+	Text string `json:"text"`
+}
+
+type didCloseTextDocumentParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+}
+
+type didSaveTextDocumentParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Text         string                 `json:"text,omitempty"`
+}
+
+type codeActionParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Range        lspRange               `json:"range"`
+	Context      codeActionContext       `json:"context"`
+}
+
+type codeActionContext struct {
+	Diagnostics []diagnostic `json:"diagnostics"`
+}
+
+type codeAction struct {
+	Title       string         `json:"title"`
+	Kind        string         `json:"kind,omitempty"`
+	IsPreferred bool           `json:"isPreferred,omitempty"`
+	Diagnostics []diagnostic   `json:"diagnostics,omitempty"`
+	Edit        *workspaceEdit `json:"edit,omitempty"`
+}
+
+type workspaceEdit struct {
+	Changes map[string][]textEdit `json:"changes,omitempty"`
+}
+
+type textEdit struct {
+	Range   lspRange `json:"range"`
+	NewText string   `json:"newText"`
+}
+
+// Pull diagnostics types (textDocument/diagnostic).
+
+type documentDiagnosticParams struct {
+	TextDocument     textDocumentIdentifier `json:"textDocument"`
+	PreviousResultID string                 `json:"previousResultId,omitempty"`
+}
+
+type fullDocumentDiagnosticReport struct {
+	Kind     string       `json:"kind"`
+	ResultID string       `json:"resultId,omitempty"`
+	Items    []diagnostic `json:"items"`
+}
+
+type unchangedDocumentDiagnosticReport struct {
+	Kind     string `json:"kind"`
+	ResultID string `json:"resultId"`
 }

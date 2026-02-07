@@ -6,6 +6,11 @@
     "source.fixAll.tally"
    ]
   },
+  "diagnosticProvider": {
+   "identifier": "tally",
+   "interFileDependencies": false,
+   "workspaceDiagnostics": false
+  },
   "textDocumentSync": {
    "change": 1,
    "openClose": true,

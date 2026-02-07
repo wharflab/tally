@@ -8,6 +8,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/distribution/reference v0.6.0
 	github.com/gkampitakis/go-snaps v0.5.19
+	github.com/go-json-experiment/json v0.0.0-20251027170946-4849db3c2f7e
 	github.com/knadh/koanf/parsers/toml/v2 v2.2.0
 	github.com/knadh/koanf/providers/confmap v1.0.0
 	github.com/knadh/koanf/providers/env/v2 v2.0.0
@@ -21,7 +22,6 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/sourcegraph/jsonrpc2 v0.2.1
 	github.com/stretchr/testify v1.11.1
-	github.com/tliron/glsp v0.2.2
 	github.com/urfave/cli/v3 v3.6.2
 	github.com/zricethezav/gitleaks/v8 v8.30.0
 	mvdan.cc/sh/v3 v3.12.0
@@ -54,11 +54,11 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/gitleaks/go-gitdiff v0.9.1 // indirect
 	github.com/gkampitakis/ciinfo v0.3.2 // indirect
-	github.com/go-json-experiment/json v0.0.0-20251027170946-4849db3c2f7e // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect

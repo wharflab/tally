@@ -4,19 +4,21 @@
 // and document formatting through the LSP protocol. It reuses the same lint
 // pipeline as the CLI (dockerfile.Parse, semantic model, rules, processors).
 //
-// Transport: stdio only (--stdio) for v1.
-// Protocol: LSP 3.16 types via go.lsp.dev/protocol, JSON-RPC via go.lsp.dev/jsonrpc2.
+// Transport: stdio only (--stdio).
+// Protocol: LSP 3.17 types via internal/lsp/protocol, JSON-RPC via sourcegraph/jsonrpc2.
 package lspserver
 
 import (
 	"context"
-	"encoding/json"
+	stdjson "encoding/json"
 	"log"
 	"os"
+	"strconv"
 
-	"go.lsp.dev/jsonrpc2"
-	"go.lsp.dev/protocol"
+	expjson "github.com/go-json-experiment/json"
+	"github.com/sourcegraph/jsonrpc2"
 
+	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
 	"github.com/tinovyatkin/tally/internal/version"
 )
 
@@ -24,210 +26,234 @@ const serverName = "tally"
 
 // Server is the tally LSP server.
 type Server struct {
-	conn      jsonrpc2.Conn
 	documents *DocumentStore
 }
 
 // New creates a new LSP server.
 func New() *Server {
-	return &Server{
-		documents: NewDocumentStore(),
-	}
+	return &Server{documents: NewDocumentStore()}
 }
 
 // RunStdio starts the LSP server on stdin/stdout.
 // It blocks until the connection is closed or the context is cancelled.
 func (s *Server) RunStdio(ctx context.Context) error {
-	stream := jsonrpc2.NewStream(stdioReadWriteCloser{})
-	conn := jsonrpc2.NewConn(stream)
-	s.conn = conn
-
-	conn.Go(ctx, jsonrpc2.AsyncHandler(jsonrpc2.ReplyHandler(s.handle)))
-
+	stream := jsonrpc2.NewBufferedStream(stdioReadWriteCloser{}, jsonrpc2.VSCodeObjectCodec{})
+	conn := jsonrpc2.NewConn(ctx, stream, jsonrpc2.HandlerWithError(s.handle))
 	select {
 	case <-ctx.Done():
 		return conn.Close()
-	case <-conn.Done():
-		return conn.Err()
+	case <-conn.DisconnectNotify():
+		return nil
 	}
 }
 
 // handle dispatches incoming JSON-RPC messages to the appropriate handler.
-func (s *Server) handle(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
-	switch req.Method() {
+func (s *Server) handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) (any, error) {
+	switch req.Method {
 	// Lifecycle
-	case protocol.MethodInitialize:
-		return s.handleInitialize(ctx, reply, req)
-	case protocol.MethodInitialized:
-		return reply(ctx, nil, nil)
-	case protocol.MethodShutdown:
-		return reply(ctx, nil, nil)
-	case protocol.MethodExit:
-		return s.conn.Close()
-	case protocol.MethodSetTrace:
-		return reply(ctx, nil, nil)
+	case "initialize":
+		return unmarshalAndCall(req, s.handleInitialize)
+	case "initialized", "$/setTrace":
+		return nil, nil //nolint:nilnil // LSP: notifications have no result
+	case "shutdown":
+		return nil, nil //nolint:nilnil // LSP: shutdown returns null
+	case "exit":
+		return nil, conn.Close()
 
 	// Document sync
-	case protocol.MethodTextDocumentDidOpen:
-		return s.handleDidOpen(ctx, reply, req)
-	case protocol.MethodTextDocumentDidChange:
-		return s.handleDidChange(ctx, reply, req)
-	case protocol.MethodTextDocumentDidSave:
-		return s.handleDidSave(ctx, reply, req)
-	case protocol.MethodTextDocumentDidClose:
-		return s.handleDidClose(ctx, reply, req)
+	case "textDocument/didOpen":
+		return nil, unmarshalAndNotify(req, func(p *protocol.DidOpenTextDocumentParams) {
+			s.handleDidOpen(ctx, conn, p)
+		})
+	case "textDocument/didChange":
+		return nil, unmarshalAndNotify(req, func(p *protocol.DidChangeTextDocumentParams) {
+			s.handleDidChange(ctx, conn, p)
+		})
+	case "textDocument/didSave":
+		return nil, unmarshalAndNotify(req, func(p *protocol.DidSaveTextDocumentParams) {
+			s.handleDidSave(ctx, conn, p)
+		})
+	case "textDocument/didClose":
+		return nil, unmarshalAndNotify(req, func(p *protocol.DidCloseTextDocumentParams) {
+			s.handleDidClose(ctx, conn, p)
+		})
 
 	// Language features
-	case protocol.MethodTextDocumentCodeAction:
-		return s.handleCodeAction(ctx, reply, req)
+	case "textDocument/codeAction":
+		return unmarshalAndCall(req, s.handleCodeAction)
+	case string(protocol.MethodTextDocumentDiagnostic):
+		return unmarshalAndCall(req, s.handleDiagnostic)
 
 	// Workspace
-	case protocol.MethodWorkspaceDidChangeConfiguration:
-		return reply(ctx, nil, nil)
+	case "workspace/didChangeConfiguration":
+		return nil, nil //nolint:nilnil // LSP: notification has no result
 
 	default:
-		return jsonrpc2.MethodNotFoundHandler(ctx, reply, req)
+		return nil, &jsonrpc2.Error{
+			Code:    jsonrpc2.CodeMethodNotFound,
+			Message: "method not supported: " + req.Method,
+		}
 	}
 }
 
-// handleInitialize responds to the initialize request with server capabilities.
-func (s *Server) handleInitialize(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
-	var params protocol.InitializeParams
-	if err := json.Unmarshal(req.Params(), &params); err != nil {
-		return replyParseError(ctx, reply, err)
+// unmarshalAndCall unmarshals request params into T using experimental json
+// and calls fn. The result is pre-marshaled with experimental json so that
+// union types with MarshalJSONTo serialize correctly through the stdlib-based
+// jsonrpc2 transport.
+func unmarshalAndCall[T any](req *jsonrpc2.Request, fn func(*T) (any, error)) (any, error) {
+	var params T
+	if req.Params != nil {
+		if err := expjson.Unmarshal([]byte(*req.Params), &params); err != nil {
+			return nil, &jsonrpc2.Error{Code: jsonrpc2.CodeInvalidParams, Message: err.Error()}
+		}
 	}
+	result, err := fn(&params)
+	if err != nil || result == nil {
+		return result, err
+	}
+	// Pre-marshal with experimental json so union types serialize correctly.
+	raw, merr := expjson.Marshal(result)
+	if merr != nil {
+		return nil, merr
+	}
+	return stdjson.RawMessage(raw), nil
+}
 
-	log.Printf("lsp: initialize from %s", clientInfoString(params.ClientInfo))
+// unmarshalAndNotify unmarshals request params into T using experimental json
+// and calls fn (for notifications that have no return).
+func unmarshalAndNotify[T any](req *jsonrpc2.Request, fn func(*T)) error {
+	var params T
+	if req.Params != nil {
+		if err := expjson.Unmarshal([]byte(*req.Params), &params); err != nil {
+			return &jsonrpc2.Error{Code: jsonrpc2.CodeInvalidParams, Message: err.Error()}
+		}
+	}
+	fn(&params)
+	return nil
+}
 
-	syncKind := protocol.TextDocumentSyncKindFull
+// lspNotify pre-marshals params with experimental json and sends via conn.Notify.
+func lspNotify(ctx context.Context, conn *jsonrpc2.Conn, method string, params any) error {
+	raw, err := expjson.Marshal(params)
+	if err != nil {
+		return err
+	}
+	return conn.Notify(ctx, method, stdjson.RawMessage(raw))
+}
+
+// handleInitialize responds to the initialize request with server capabilities.
+func (s *Server) handleInitialize(params *protocol.InitializeParams) (any, error) {
+	log.Printf("lsp: initialize from %s", clientInfoString(params))
+
 	ver := version.RawVersion()
 
-	result := protocol.InitializeResult{
-		Capabilities: protocol.ServerCapabilities{
-			TextDocumentSync: protocol.TextDocumentSyncOptions{
-				OpenClose: true,
-				Change:    syncKind,
-				Save: &protocol.SaveOptions{
-					IncludeText: true,
+	return &protocol.InitializeResult{
+		Capabilities: &protocol.ServerCapabilities{
+			TextDocumentSync: &protocol.TextDocumentSyncOptionsOrKind{
+				Options: &protocol.TextDocumentSyncOptions{
+					OpenClose: ptrTo(true),
+					Change:    ptrTo(protocol.TextDocumentSyncKindFull),
+					Save: &protocol.BooleanOrSaveOptions{
+						SaveOptions: &protocol.SaveOptions{IncludeText: ptrTo(true)},
+					},
 				},
 			},
-			CodeActionProvider: &protocol.CodeActionOptions{
-				CodeActionKinds: []protocol.CodeActionKind{
-					protocol.QuickFix,
-					"source.fixAll.tally",
+			CodeActionProvider: &protocol.BooleanOrCodeActionOptions{
+				CodeActionOptions: &protocol.CodeActionOptions{
+					CodeActionKinds: ptrTo([]protocol.CodeActionKind{
+						protocol.CodeActionKindQuickFix,
+						"source.fixAll.tally",
+					}),
+				},
+			},
+			DiagnosticProvider: &protocol.DiagnosticOptionsOrRegistrationOptions{
+				Options: &protocol.DiagnosticOptions{
+					Identifier: ptrTo("tally"),
 				},
 			},
 		},
 		ServerInfo: &protocol.ServerInfo{
 			Name:    serverName,
-			Version: ver,
+			Version: &ver,
 		},
-	}
-
-	return reply(ctx, result, nil)
+	}, nil
 }
 
-// handleDidOpen handles textDocument/didOpen by linting the opened document.
-func (s *Server) handleDidOpen(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
-	var params protocol.DidOpenTextDocumentParams
-	if err := json.Unmarshal(req.Params(), &params); err != nil {
-		return replyParseError(ctx, reply, err)
-	}
-
-	uri := string(params.TextDocument.URI)
-	s.documents.Open(uri, string(params.TextDocument.LanguageID), params.TextDocument.Version, params.TextDocument.Text)
+// handleDidOpen lints the opened document and publishes diagnostics.
+func (s *Server) handleDidOpen(ctx context.Context, conn *jsonrpc2.Conn, params *protocol.DidOpenTextDocumentParams) {
+	uri := string(params.TextDocument.Uri)
+	s.documents.Open(uri, string(params.TextDocument.LanguageId), params.TextDocument.Version, params.TextDocument.Text)
 
 	if doc := s.documents.Get(uri); doc != nil {
-		s.publishDiagnostics(ctx, doc)
+		s.publishDiagnostics(ctx, conn, doc)
 	}
-	return reply(ctx, nil, nil)
 }
 
-// handleDidChange handles textDocument/didChange by updating the document and re-linting.
-func (s *Server) handleDidChange(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
-	var params protocol.DidChangeTextDocumentParams
-	if err := json.Unmarshal(req.Params(), &params); err != nil {
-		return replyParseError(ctx, reply, err)
-	}
-
-	uri := string(params.TextDocument.URI)
+// handleDidChange updates the document and re-lints.
+func (s *Server) handleDidChange(ctx context.Context, conn *jsonrpc2.Conn, params *protocol.DidChangeTextDocumentParams) {
+	uri := string(params.TextDocument.Uri)
 
 	// With full sync, there's exactly one content change containing the full text.
 	for _, change := range params.ContentChanges {
-		s.documents.Update(uri, params.TextDocument.Version, change.Text)
+		switch {
+		case change.WholeDocument != nil:
+			s.documents.Update(uri, params.TextDocument.Version, change.WholeDocument.Text)
+		case change.Partial != nil:
+			s.documents.Update(uri, params.TextDocument.Version, change.Partial.Text)
+		}
 	}
 
 	if doc := s.documents.Get(uri); doc != nil {
-		s.publishDiagnostics(ctx, doc)
+		s.publishDiagnostics(ctx, conn, doc)
 	}
-	return reply(ctx, nil, nil)
 }
 
-// handleDidSave handles textDocument/didSave by re-linting.
-func (s *Server) handleDidSave(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
-	var params protocol.DidSaveTextDocumentParams
-	if err := json.Unmarshal(req.Params(), &params); err != nil {
-		return replyParseError(ctx, reply, err)
-	}
-
-	uri := string(params.TextDocument.URI)
-	if params.Text != "" {
-		s.documents.Update(uri, 0, params.Text)
+// handleDidSave re-lints on save.
+func (s *Server) handleDidSave(ctx context.Context, conn *jsonrpc2.Conn, params *protocol.DidSaveTextDocumentParams) {
+	uri := string(params.TextDocument.Uri)
+	if params.Text != nil && *params.Text != "" {
+		s.documents.Update(uri, 0, *params.Text)
 	}
 
 	if doc := s.documents.Get(uri); doc != nil {
-		s.publishDiagnostics(ctx, doc)
+		s.publishDiagnostics(ctx, conn, doc)
 	}
-	return reply(ctx, nil, nil)
 }
 
-// handleDidClose handles textDocument/didClose by clearing diagnostics and removing the document.
-func (s *Server) handleDidClose(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
-	var params protocol.DidCloseTextDocumentParams
-	if err := json.Unmarshal(req.Params(), &params); err != nil {
-		return replyParseError(ctx, reply, err)
-	}
-
-	uri := string(params.TextDocument.URI)
+// handleDidClose clears diagnostics and removes the document.
+func (s *Server) handleDidClose(ctx context.Context, conn *jsonrpc2.Conn, params *protocol.DidCloseTextDocumentParams) {
+	uri := string(params.TextDocument.Uri)
 	s.documents.Close(uri)
-	s.clearDiagnostics(ctx, uri)
-	return reply(ctx, nil, nil)
+	clearDiagnostics(ctx, conn, uri)
 }
 
-// handleCodeAction handles textDocument/codeAction by returning quick-fix actions.
-func (s *Server) handleCodeAction(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
-	var params protocol.CodeActionParams
-	if err := json.Unmarshal(req.Params(), &params); err != nil {
-		return replyParseError(ctx, reply, err)
-	}
-
-	uri := string(params.TextDocument.URI)
-	doc := s.documents.Get(uri)
+// handleCodeAction returns quick-fix code actions.
+func (s *Server) handleCodeAction(params *protocol.CodeActionParams) (any, error) {
+	doc := s.documents.Get(string(params.TextDocument.Uri))
 	if doc == nil {
-		return reply(ctx, nil, nil)
+		return nil, nil //nolint:nilnil // LSP: null result is valid for "no actions"
 	}
 
-	actions := s.codeActionsForDocument(doc, &params)
+	actions := s.codeActionsForDocument(doc, params)
 	if len(actions) == 0 {
-		return reply(ctx, nil, nil)
+		return nil, nil //nolint:nilnil // LSP: null result is valid for "no actions"
 	}
-	return reply(ctx, actions, nil)
-}
-
-// replyParseError sends a JSON-RPC parse error.
-func replyParseError(ctx context.Context, reply jsonrpc2.Replier, err error) error {
-	return reply(ctx, nil, jsonrpc2.Errorf(jsonrpc2.ParseError, "invalid params: %v", err))
+	return actions, nil
 }
 
 // clientInfoString formats client info for logging.
-func clientInfoString(info *protocol.ClientInfo) string {
-	if info == nil {
+func clientInfoString(params *protocol.InitializeParams) string {
+	if params == nil {
 		return "unknown"
 	}
-	if info.Version != "" {
-		return info.Name + " " + info.Version
+	if params.ProcessId.Integer != nil {
+		return "pid " + strconv.FormatInt(int64(*params.ProcessId.Integer), 10)
 	}
-	return info.Name
+	return "unknown"
+}
+
+func ptrTo[T any](v T) *T {
+	return &v
 }
 
 // stdioReadWriteCloser wraps stdin/stdout as an io.ReadWriteCloser for JSON-RPC.

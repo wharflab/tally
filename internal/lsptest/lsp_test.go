@@ -7,6 +7,7 @@ package lsptest
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.lsp.dev/protocol"
 )
 
 func TestLSP_Initialize(t *testing.T) {
@@ -51,7 +51,7 @@ func TestLSP_DiagnosticsOnDidOpen(t *testing.T) {
 	ts := startTestServer(t)
 	ts.initialize(t)
 
-	uri := protocol.DocumentURI("file:///tmp/test-didopen/Dockerfile")
+	uri := "file:///tmp/test-didopen/Dockerfile"
 	ts.openDocument(t, uri, "FROM alpine:3.18\nMAINTAINER test@example.com\n")
 
 	diag := ts.waitDiagnostics(t)
@@ -65,16 +65,16 @@ func TestLSP_DiagnosticsUpdatedOnDidChange(t *testing.T) {
 	ts := startTestServer(t)
 	ts.initialize(t)
 
-	uri := protocol.DocumentURI("file:///tmp/test-didchange/Dockerfile")
+	uri := "file:///tmp/test-didchange/Dockerfile"
 
 	// Open with MAINTAINER → expect diagnostics.
 	ts.openDocument(t, uri, "FROM alpine:3.18\nMAINTAINER test@example.com\n")
 	diag1 := ts.waitDiagnostics(t)
 	require.NotEmpty(t, diag1.Diagnostics)
 
-	hasMaintainer := func(diags []protocol.Diagnostic) bool {
+	hasMaintainer := func(diags []diagnostic) bool {
 		for _, d := range diags {
-			if code, ok := d.Code.(string); ok && code == "buildkit/MaintainerDeprecated" {
+			if d.Code == "buildkit/MaintainerDeprecated" {
 				return true
 			}
 		}
@@ -93,7 +93,7 @@ func TestLSP_DiagnosticsClearedOnClose(t *testing.T) {
 	ts := startTestServer(t)
 	ts.initialize(t)
 
-	uri := protocol.DocumentURI("file:///tmp/test-didclose/Dockerfile")
+	uri := "file:///tmp/test-didclose/Dockerfile"
 
 	ts.openDocument(t, uri, "FROM alpine:3.18\nMAINTAINER test@example.com\n")
 	diag1 := ts.waitDiagnostics(t)
@@ -111,15 +111,15 @@ func TestLSP_DiagnosticsOnDidSave(t *testing.T) {
 	ts := startTestServer(t)
 	ts.initialize(t)
 
-	uri := protocol.DocumentURI("file:///tmp/test-didsave/Dockerfile")
+	uri := "file:///tmp/test-didsave/Dockerfile"
 
 	// Open a clean file.
 	ts.openDocument(t, uri, "FROM alpine:3.18\nRUN echo hello\n")
 	diag1 := ts.waitDiagnostics(t)
 
-	hasMaintainer := func(diags []protocol.Diagnostic) bool {
+	hasMaintainer := func(diags []diagnostic) bool {
 		for _, d := range diags {
-			if code, ok := d.Code.(string); ok && code == "buildkit/MaintainerDeprecated" {
+			if d.Code == "buildkit/MaintainerDeprecated" {
 				return true
 			}
 		}
@@ -138,16 +138,16 @@ func TestLSP_CodeAction(t *testing.T) {
 	ts := startTestServer(t)
 	ts.initialize(t)
 
-	uri := protocol.DocumentURI("file:///tmp/test-codeaction/Dockerfile")
+	uri := "file:///tmp/test-codeaction/Dockerfile"
 	ts.openDocument(t, uri, "FROM alpine:3.18\nMAINTAINER test@example.com\n")
 
 	diag := ts.waitDiagnostics(t)
 	require.NotEmpty(t, diag.Diagnostics)
 
 	// Find the MaintainerDeprecated diagnostic.
-	var maintainerDiag *protocol.Diagnostic
+	var maintainerDiag *diagnostic
 	for i, d := range diag.Diagnostics {
-		if code, ok := d.Code.(string); ok && code == "buildkit/MaintainerDeprecated" {
+		if d.Code == "buildkit/MaintainerDeprecated" {
 			maintainerDiag = &diag.Diagnostics[i]
 			break
 		}
@@ -158,18 +158,117 @@ func TestLSP_CodeAction(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
 	defer cancel()
 
-	var actions []protocol.CodeAction
-	_, err := ts.conn.Call(ctx, protocol.MethodTextDocumentCodeAction, &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+	var actions []codeAction
+	err := ts.conn.Call(ctx, "textDocument/codeAction", &codeActionParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
 		Range:        maintainerDiag.Range,
-		Context: protocol.CodeActionContext{
-			Diagnostics: []protocol.Diagnostic{*maintainerDiag},
+		Context: codeActionContext{
+			Diagnostics: []diagnostic{*maintainerDiag},
 		},
 	}, &actions)
 	require.NoError(t, err)
 
 	// Snapshot the full code actions response.
 	snaps.MatchStandaloneJSON(t, actions)
+}
+
+func TestLSP_PullDiagnosticsForOpenDocument(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	uri := "file:///tmp/test-pull-open/Dockerfile"
+	ts.openDocument(t, uri, "FROM alpine:3.18\nMAINTAINER test@example.com\n")
+
+	// Drain push diagnostics from didOpen.
+	ts.waitDiagnostics(t)
+
+	// Request pull diagnostics.
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var report fullDocumentDiagnosticReport
+	err := ts.conn.Call(ctx, "textDocument/diagnostic", &documentDiagnosticParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+	}, &report)
+	require.NoError(t, err)
+
+	assert.Equal(t, "full", report.Kind)
+	assert.NotEmpty(t, report.ResultID)
+	assert.NotEmpty(t, report.Items, "expected diagnostics for Dockerfile with MAINTAINER")
+
+	hasMaintainer := false
+	for _, d := range report.Items {
+		if d.Code == "buildkit/MaintainerDeprecated" {
+			hasMaintainer = true
+			break
+		}
+	}
+	assert.True(t, hasMaintainer, "expected MaintainerDeprecated in pull diagnostics")
+}
+
+func TestLSP_PullDiagnosticsFromDisk(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	// Write a Dockerfile to a temp directory so the server can read it from disk.
+	tmpDir := t.TempDir()
+	dockerfilePath := tmpDir + "/Dockerfile"
+	require.NoError(t, os.WriteFile(dockerfilePath, []byte("FROM alpine:3.18\nMAINTAINER test@example.com\n"), 0o644))
+
+	uri := "file://" + dockerfilePath
+
+	// Request pull diagnostics without opening the document.
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var report fullDocumentDiagnosticReport
+	err := ts.conn.Call(ctx, "textDocument/diagnostic", &documentDiagnosticParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+	}, &report)
+	require.NoError(t, err)
+
+	assert.Equal(t, "full", report.Kind)
+	assert.NotEmpty(t, report.ResultID)
+	assert.NotEmpty(t, report.Items, "expected diagnostics for Dockerfile on disk")
+}
+
+func TestLSP_PullDiagnosticsCacheUnchanged(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	uri := "file:///tmp/test-pull-cache/Dockerfile"
+	ts.openDocument(t, uri, "FROM alpine:3.18\nMAINTAINER test@example.com\n")
+
+	// Drain push diagnostics from didOpen.
+	ts.waitDiagnostics(t)
+
+	// First pull: get full report with resultId.
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var report1 fullDocumentDiagnosticReport
+	err := ts.conn.Call(ctx, "textDocument/diagnostic", &documentDiagnosticParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+	}, &report1)
+	require.NoError(t, err)
+	require.Equal(t, "full", report1.Kind)
+	require.NotEmpty(t, report1.ResultID)
+
+	// Second pull with previousResultId: should get unchanged.
+	ctx2, cancel2 := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel2()
+
+	var report2 unchangedDocumentDiagnosticReport
+	err = ts.conn.Call(ctx2, "textDocument/diagnostic", &documentDiagnosticParams{
+		TextDocument:     textDocumentIdentifier{URI: uri},
+		PreviousResultID: report1.ResultID,
+	}, &report2)
+	require.NoError(t, err)
+	assert.Equal(t, "unchanged", report2.Kind)
+	assert.Equal(t, report1.ResultID, report2.ResultID)
 }
 
 func TestLSP_MethodNotFound(t *testing.T) {
@@ -180,6 +279,6 @@ func TestLSP_MethodNotFound(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err := ts.conn.Call(ctx, "custom/nonExistentMethod", nil, nil)
+	err := ts.conn.Call(ctx, "custom/nonExistentMethod", nil, nil)
 	assert.Error(t, err, "unknown method should return an error")
 }

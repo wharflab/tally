@@ -3,14 +3,19 @@ package lspserver
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 
-	"go.lsp.dev/protocol"
-	"go.lsp.dev/uri"
+	"github.com/sourcegraph/jsonrpc2"
+
+	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
 
 	"github.com/tinovyatkin/tally/internal/config"
 	"github.com/tinovyatkin/tally/internal/directive"
@@ -24,29 +29,100 @@ import (
 )
 
 // publishDiagnostics lints a document and publishes diagnostics to the client.
-func (s *Server) publishDiagnostics(ctx context.Context, doc *Document) {
+func (s *Server) publishDiagnostics(ctx context.Context, conn *jsonrpc2.Conn, doc *Document) {
 	docURI := doc.URI
 	content := doc.Content
 
 	violations := s.lintContent(docURI, []byte(content))
 	diagnostics := convertDiagnostics(violations)
 
-	if err := s.conn.Notify(ctx, protocol.MethodTextDocumentPublishDiagnostics, &protocol.PublishDiagnosticsParams{
-		URI:         protocol.DocumentURI(docURI),
+	if err := lspNotify(ctx, conn, string(protocol.MethodTextDocumentPublishDiagnostics), &protocol.PublishDiagnosticsParams{
+		Uri:         protocol.DocumentUri(docURI),
 		Diagnostics: diagnostics,
 	}); err != nil {
-		log.Printf("lsp: failed to publish diagnostics: %v", err)
+		log.Printf("lsp: failed to publish diagnostics for %s: %v", docURI, err)
 	}
 }
 
 // clearDiagnostics sends an empty diagnostics array to clear issues for a URI.
-func (s *Server) clearDiagnostics(ctx context.Context, docURI string) {
-	if err := s.conn.Notify(ctx, protocol.MethodTextDocumentPublishDiagnostics, &protocol.PublishDiagnosticsParams{
-		URI:         protocol.DocumentURI(docURI),
-		Diagnostics: []protocol.Diagnostic{},
+func clearDiagnostics(ctx context.Context, conn *jsonrpc2.Conn, docURI string) {
+	if err := lspNotify(ctx, conn, string(protocol.MethodTextDocumentPublishDiagnostics), &protocol.PublishDiagnosticsParams{
+		Uri:         protocol.DocumentUri(docURI),
+		Diagnostics: []*protocol.Diagnostic{},
 	}); err != nil {
-		log.Printf("lsp: failed to clear diagnostics: %v", err)
+		log.Printf("lsp: failed to clear diagnostics for %s: %v", docURI, err)
 	}
+}
+
+// handleDiagnostic handles textDocument/diagnostic (pull diagnostics).
+func (s *Server) handleDiagnostic(params *protocol.DocumentDiagnosticParams) (any, error) {
+	uri := string(params.TextDocument.Uri)
+
+	// Check if the document is open in the editor.
+	if doc := s.documents.Get(uri); doc != nil {
+		resultID := fmt.Sprintf("v%d", doc.Version)
+		if params.PreviousResultId != nil && *params.PreviousResultId == resultID {
+			return &protocol.DocumentDiagnosticResponse{
+				UnchangedDocumentDiagnosticReport: &protocol.RelatedUnchangedDocumentDiagnosticReport{
+					ResultId: resultID,
+				},
+			}, nil
+		}
+
+		violations := s.lintContent(uri, []byte(doc.Content))
+		diagnostics := convertDiagnostics(violations)
+
+		return &protocol.DocumentDiagnosticResponse{
+			FullDocumentDiagnosticReport: &protocol.RelatedFullDocumentDiagnosticReport{
+				ResultId: &resultID,
+				Items:    diagnostics,
+			},
+		}, nil
+	}
+
+	// Document not open — read from disk.
+	filePath := uriToPath(uri)
+	return s.pullDiagnosticsFromDisk(filePath, params.PreviousResultId)
+}
+
+// pullDiagnosticsFromDisk reads content from disk and returns a diagnostic report.
+//
+//nolint:nilerr // gracefully returns empty diagnostics for unreadable files
+func (s *Server) pullDiagnosticsFromDisk(filePath string, previousResultID *string) (any, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		// Return empty full report if file cannot be read.
+		return &protocol.DocumentDiagnosticResponse{
+			FullDocumentDiagnosticReport: &protocol.RelatedFullDocumentDiagnosticReport{
+				Items: []*protocol.Diagnostic{},
+			},
+		}, nil
+	}
+
+	resultID := contentHash(content)
+	if previousResultID != nil && *previousResultID == resultID {
+		return &protocol.DocumentDiagnosticResponse{
+			UnchangedDocumentDiagnosticReport: &protocol.RelatedUnchangedDocumentDiagnosticReport{
+				ResultId: resultID,
+			},
+		}, nil
+	}
+
+	violations := lintFile(filePath, content)
+	diagnostics := convertDiagnostics(violations)
+
+	return &protocol.DocumentDiagnosticResponse{
+		FullDocumentDiagnosticReport: &protocol.RelatedFullDocumentDiagnosticReport{
+			ResultId: &resultID,
+			Items:    diagnostics,
+		},
+	}, nil
+}
+
+// contentHash returns a truncated SHA-256 hex digest of content (16 hex chars).
+func contentHash(content []byte) string {
+	h := sha256.Sum256(content)
+	return hex.EncodeToString(h[:8])
 }
 
 // lintContent runs the full tally lint pipeline on in-memory content.
@@ -127,20 +203,19 @@ func lintFile(filePath string, content []byte) []rules.Violation {
 }
 
 // convertDiagnostics converts tally violations to LSP diagnostics.
-func convertDiagnostics(violations []rules.Violation) []protocol.Diagnostic {
-	diagnostics := make([]protocol.Diagnostic, 0, len(violations))
-	source := "tally"
+func convertDiagnostics(violations []rules.Violation) []*protocol.Diagnostic {
+	diagnostics := make([]*protocol.Diagnostic, 0, len(violations))
 	for _, v := range violations {
-		d := protocol.Diagnostic{
+		d := &protocol.Diagnostic{
 			Range:    violationRange(v),
-			Severity: severityToLSP(v.Severity),
-			Source:   source,
-			Code:     v.RuleCode,
+			Severity: ptrTo(severityToLSP(v.Severity)),
+			Source:   ptrTo("tally"),
+			Code:     &protocol.IntegerOrString{String: ptrTo(v.RuleCode)},
 			Message:  v.Message,
 		}
 		if v.DocURL != "" {
 			d.CodeDescription = &protocol.CodeDescription{
-				Href: uri.URI(v.DocURL),
+				Href: protocol.URI(v.DocURL),
 			}
 		}
 		diagnostics = append(diagnostics, d)

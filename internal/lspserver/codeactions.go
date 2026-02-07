@@ -1,7 +1,7 @@
 package lspserver
 
 import (
-	"go.lsp.dev/protocol"
+	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
 
 	"github.com/tinovyatkin/tally/internal/rules"
 )
@@ -36,17 +36,17 @@ func (s *Server) codeActionsForDocument(
 			continue
 		}
 
-		kind := protocol.QuickFix
 		isPreferred := v.SuggestedFix.IsPreferred || v.SuggestedFix.Safety == rules.FixSafe
+		matchedDiags := matchingDiagnostics(v, params.Context.Diagnostics)
 		action := protocol.CodeAction{
 			Title:       v.SuggestedFix.Description,
-			Kind:        kind,
-			IsPreferred: isPreferred,
-			Diagnostics: matchingDiagnostics(v, params.Context.Diagnostics),
+			Kind:        ptrTo(protocol.CodeActionKindQuickFix),
+			IsPreferred: ptrTo(isPreferred),
+			Diagnostics: &matchedDiags,
 			Edit: &protocol.WorkspaceEdit{
-				Changes: map[protocol.DocumentURI][]protocol.TextEdit{
-					params.TextDocument.URI: edits,
-				},
+				Changes: ptrTo(map[protocol.DocumentUri][]*protocol.TextEdit{
+					params.TextDocument.Uri: edits,
+				}),
 			},
 		}
 		actions = append(actions, action)
@@ -56,8 +56,8 @@ func (s *Server) codeActionsForDocument(
 }
 
 // convertTextEdits converts tally TextEdits to LSP TextEdits.
-func convertTextEdits(edits []rules.TextEdit) []protocol.TextEdit {
-	result := make([]protocol.TextEdit, 0, len(edits))
+func convertTextEdits(edits []rules.TextEdit) []*protocol.TextEdit {
+	result := make([]*protocol.TextEdit, 0, len(edits))
 	for _, e := range edits {
 		loc := e.Location
 		if loc.IsFileLevel() {
@@ -74,7 +74,7 @@ func convertTextEdits(edits []rules.TextEdit) []protocol.TextEdit {
 			endChar = clampUint32(loc.End.Column)
 		}
 
-		result = append(result, protocol.TextEdit{
+		result = append(result, &protocol.TextEdit{
 			Range: protocol.Range{
 				Start: protocol.Position{Line: startLine, Character: startChar},
 				End:   protocol.Position{Line: endLine, Character: endChar},
@@ -96,15 +96,13 @@ func rangesOverlap(a, b protocol.Range) bool {
 	return true
 }
 
-// matchingDiagnostics finds diagnostics that match a violation by line and code.
-func matchingDiagnostics(v rules.Violation, diagnostics []protocol.Diagnostic) []protocol.Diagnostic {
+// matchingDiagnostics finds diagnostics that match a violation by message and range.
+func matchingDiagnostics(v rules.Violation, diagnostics []*protocol.Diagnostic) []*protocol.Diagnostic {
 	vRange := violationRange(v)
-	var matched []protocol.Diagnostic
+	var matched []*protocol.Diagnostic
 	for _, d := range diagnostics {
-		if d.Range.Start.Line == vRange.Start.Line {
-			if code, ok := d.Code.(string); ok && code == v.RuleCode {
-				matched = append(matched, d)
-			}
+		if d.Range.Start.Line == vRange.Start.Line && d.Message == v.Message {
+			matched = append(matched, d)
 		}
 	}
 	return matched
