@@ -361,3 +361,34 @@ func TestRulesConfigIncludeExclude(t *testing.T) {
 		t.Error("hadolint/DL3008 should be disabled via * exclude")
 	}
 }
+
+func TestRulesConfigGetOptionsTyped(t *testing.T) {
+	type opts struct {
+		MinCommands *int  `koanf:"min-commands"`
+		Enabled     *bool `koanf:"enabled"`
+	}
+
+	minValue := int64(5)
+	rc := &RulesConfig{
+		Tally: map[string]RuleConfig{
+			"prefer-run-heredoc": {
+				Options: map[string]any{
+					"min-commands": minValue,
+				},
+			},
+		},
+	}
+
+	decoded := DecodeRuleOptions(rc, "tally/prefer-run-heredoc", opts{})
+	if decoded.MinCommands == nil || *decoded.MinCommands != 5 {
+		t.Fatalf("MinCommands = %v, want 5", decoded.MinCommands)
+	}
+
+	// Missing options should return defaults.
+	defEnabled := true
+	defaults := opts{Enabled: &defEnabled}
+	decoded = DecodeRuleOptions(rc, "tally/missing", defaults)
+	if decoded.Enabled == nil || *decoded.Enabled != true {
+		t.Fatalf("Enabled = %v, want true", decoded.Enabled)
+	}
+}

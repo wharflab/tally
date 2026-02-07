@@ -3,6 +3,8 @@ package config
 import (
 	"maps"
 	"strings"
+
+	"github.com/tinovyatkin/tally/internal/rules/configutil"
 )
 
 // FixMode controls when auto-fixes are applied for a rule.
@@ -225,6 +227,15 @@ func (rc *RulesConfig) GetOptions(ruleCode string) map[string]any {
 		return out
 	}
 	return nil
+}
+
+// GetOptionsTyped returns typed rule options merged over defaults.
+// Returns defaults if the rule has no options or decoding fails.
+func DecodeRuleOptions[T any](rc *RulesConfig, ruleCode string, defaults T) T {
+	if rc == nil {
+		return defaults
+	}
+	return configutil.Resolve(rc.GetOptions(ruleCode), defaults)
 }
 
 // Set stores configuration for a rule.

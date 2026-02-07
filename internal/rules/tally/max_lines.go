@@ -277,12 +277,6 @@ func (r *MaxLinesRule) ValidateConfig(config any) error {
 // Supports integer shorthand (just max value) or full object config.
 func (r *MaxLinesRule) resolveConfig(config any) MaxLinesConfig {
 	switch v := config.(type) {
-	case MaxLinesConfig:
-		return v
-	case *MaxLinesConfig:
-		if v != nil {
-			return *v
-		}
 	case int:
 		// Integer shorthand: just the max value with default booleans
 		defaults := DefaultMaxLinesConfig()
@@ -294,10 +288,8 @@ func (r *MaxLinesRule) resolveConfig(config any) MaxLinesConfig {
 		defaults := DefaultMaxLinesConfig()
 		defaults.Max = &maxVal
 		return defaults
-	case map[string]any:
-		return configutil.Resolve(v, DefaultMaxLinesConfig())
 	}
-	return DefaultMaxLinesConfig()
+	return configutil.Coerce(config, DefaultMaxLinesConfig())
 }
 
 // init registers the rule with the default registry.

@@ -311,7 +311,7 @@ func (r *PreferCopyHeredocRule) checkConsecutiveRuns(
 	var violations []rules.Violation
 	var sequence []fileCreationRun
 	var targetPath string
-	var sequenceChmodMode uint16                   // chmod mode from trailing RUN chmod
+	var sequenceChmodMode uint16                  // chmod mode from trailing RUN chmod
 	var sequenceChmodRun *instructions.RunCommand // the RUN chmod instruction
 
 	flushSequence := func() {
@@ -664,17 +664,7 @@ func chooseDelimiter(content string) string {
 
 // resolveConfig extracts the PreferCopyHeredocConfig from input.
 func (r *PreferCopyHeredocRule) resolveConfig(config any) PreferCopyHeredocConfig {
-	switch v := config.(type) {
-	case PreferCopyHeredocConfig:
-		return v
-	case *PreferCopyHeredocConfig:
-		if v != nil {
-			return *v
-		}
-	case map[string]any:
-		return configutil.Resolve(v, DefaultPreferCopyHeredocConfig())
-	}
-	return DefaultPreferCopyHeredocConfig()
+	return configutil.Coerce(config, DefaultPreferCopyHeredocConfig())
 }
 
 // makeKnownVarsChecker creates a function that checks if a variable is a known ARG/ENV.

@@ -9,6 +9,10 @@ import (
 	"github.com/tinovyatkin/tally/internal/semantic"
 )
 
+type heredocRuleOptions struct {
+	MinCommands *int `koanf:"min-commands"`
+}
+
 // EnabledRuleCodes returns the set of rule codes that are active for the given config.
 // Includes registered rules, BuildKit captured rules, and semantic construction rules.
 func EnabledRuleCodes(cfg *config.Config) []string {
@@ -78,17 +82,9 @@ func heredocMinCommands(cfg *config.Config) int {
 	if cfg == nil {
 		return 0
 	}
-	opts := cfg.Rules.GetOptions(rules.HeredocRuleCode)
-	if len(opts) == 0 {
+	opts := config.DecodeRuleOptions(&cfg.Rules, rules.HeredocRuleCode, heredocRuleOptions{})
+	if opts.MinCommands == nil {
 		return 0
 	}
-	if minCmds, ok := opts["min-commands"]; ok {
-		switch v := minCmds.(type) {
-		case int:
-			return v
-		case float64:
-			return int(v)
-		}
-	}
-	return 0
+	return *opts.MinCommands
 }

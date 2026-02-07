@@ -187,17 +187,7 @@ func (r *DL3026Rule) ValidateConfig(config any) error {
 
 // resolveConfig extracts the DL3026Config from input, falling back to defaults.
 func (r *DL3026Rule) resolveConfig(config any) DL3026Config {
-	switch v := config.(type) {
-	case DL3026Config:
-		return v
-	case *DL3026Config:
-		if v != nil {
-			return *v
-		}
-	case map[string]any:
-		return configutil.Resolve(v, DefaultDL3026Config())
-	}
-	return DefaultDL3026Config()
+	return configutil.Coerce(config, DefaultDL3026Config())
 }
 
 // init registers the rule with the default registry.

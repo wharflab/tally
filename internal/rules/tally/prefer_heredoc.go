@@ -449,17 +449,7 @@ func (r *PreferHeredocRule) generateHeredocAsyncFix(
 
 // resolveConfig extracts the PreferHeredocConfig from input, falling back to defaults.
 func (r *PreferHeredocRule) resolveConfig(config any) PreferHeredocConfig {
-	switch v := config.(type) {
-	case PreferHeredocConfig:
-		return v
-	case *PreferHeredocConfig:
-		if v != nil {
-			return *v
-		}
-	case map[string]any:
-		return configutil.Resolve(v, DefaultPreferHeredocConfig())
-	}
-	return DefaultPreferHeredocConfig()
+	return configutil.Coerce(config, DefaultPreferHeredocConfig())
 }
 
 // getRunScriptFromCmd extracts the shell script from a RUN instruction.

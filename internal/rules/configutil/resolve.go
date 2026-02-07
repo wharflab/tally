@@ -38,6 +38,27 @@ func Resolve[T any](opts map[string]any, defaults T) T {
 	return mergeDefaults(result, defaults)
 }
 
+// Coerce converts a dynamic rule config value to a typed config with defaults.
+// Supported inputs:
+//   - T
+//   - *T
+//   - map[string]any (decoded via Resolve)
+//
+// Any unsupported value falls back to defaults.
+func Coerce[T any](config any, defaults T) T {
+	switch v := config.(type) {
+	case *T:
+		if v != nil {
+			return *v
+		}
+	case map[string]any:
+		return Resolve(v, defaults)
+	case T:
+		return v
+	}
+	return defaults
+}
+
 // mergeDefaults fills zero-valued fields in result with values from defaults.
 func mergeDefaults[T any](result, defaults T) T {
 	resultVal := reflect.ValueOf(&result).Elem()
