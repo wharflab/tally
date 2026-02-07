@@ -46,7 +46,7 @@ func TestLSP_ShutdownExit(t *testing.T) {
 
 	// After exit notification, the subprocess should terminate.
 	exited := make(chan error, 1)
-	go func() { exited <- ts.cmd.Wait() }()
+	go func() { exited <- ts.wait() }()
 
 	select {
 	case <-exited:

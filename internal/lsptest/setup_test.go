@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -108,6 +109,15 @@ type testServer struct {
 	stderr *bytes.Buffer
 
 	diagnosticsCh chan *publishDiagnosticsParams
+
+	waitOnce sync.Once
+	waitErr  error
+}
+
+// wait calls cmd.Wait exactly once, returning the cached result on subsequent calls.
+func (ts *testServer) wait() error {
+	ts.waitOnce.Do(func() { ts.waitErr = ts.cmd.Wait() })
+	return ts.waitErr
 }
 
 // startTestServer launches tally lsp --stdio as a subprocess with
@@ -143,8 +153,10 @@ func startTestServer(t *testing.T) *testServer {
 			t.Logf("lsp conn close: %v", err)
 		}
 		// Wait for process with timeout; kill if it doesn't exit.
+		// Uses ts.wait() so cmd.Wait is only called once even if the
+		// test already waited (e.g., TestLSP_ShutdownExit).
 		done := make(chan error, 1)
-		go func() { done <- cmd.Wait() }()
+		go func() { done <- ts.wait() }()
 		select {
 		case <-done:
 		case <-time.After(5 * time.Second):
