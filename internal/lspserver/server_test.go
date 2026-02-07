@@ -1,6 +1,7 @@
 package lspserver
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
@@ -62,5 +63,5 @@ func TestSeverityConversion(t *testing.T) {
 
 func TestURIToPath(t *testing.T) {
 	path := uriToPath("file:///tmp/Dockerfile")
-	assert.Equal(t, "/tmp/Dockerfile", path)
+	assert.Equal(t, filepath.FromSlash("/tmp/Dockerfile"), path)
 }
