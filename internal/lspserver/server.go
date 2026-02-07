@@ -186,6 +186,9 @@ func (s *Server) handleInitialize(params *protocol.InitializeParams) (any, error
 
 // handleDidOpen lints the opened document and publishes diagnostics.
 func (s *Server) handleDidOpen(ctx context.Context, conn *jsonrpc2.Conn, params *protocol.DidOpenTextDocumentParams) {
+	if params.TextDocument == nil {
+		return
+	}
 	uri := string(params.TextDocument.Uri)
 	s.documents.Open(uri, string(params.TextDocument.LanguageId), params.TextDocument.Version, params.TextDocument.Text)
 
