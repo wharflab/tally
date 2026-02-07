@@ -27,6 +27,12 @@ common mistakes.
 - `make cpd`: runs PMD Copy/Paste Detector to find duplicate code (100 token threshold, excludes tests)
 - `make clean`: removes the built binary and deletes `bin/` + `dist/`
 
+## JSON v2 Notice
+
+- This repo uses Go JSON v2 experiment: `GOEXPERIMENT=jsonv2` must be set for Go commands.
+- Prefer `encoding/json/v2` (and `encoding/json/jsontext`) for all JSON code.
+- Avoid `encoding/json` except explicit compatibility boundaries (for example APIs that require v1 types).
+
 Local usage examples:
 
 - `go run . check --help`

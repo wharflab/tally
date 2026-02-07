@@ -17,6 +17,12 @@ Before inventing types/logic, check these first:
 
 Rule of thumb: if an existing type/pattern fits ~80%, wrap/extend it instead of re-creating it.
 
+### JSON v2 requirement
+
+- The repo is on JSON v2 experiment; run Go commands with `GOEXPERIMENT=jsonv2`.
+- Use `encoding/json/v2` and `encoding/json/jsontext` for JSON work.
+- Do not add new `encoding/json` usage unless required for external compatibility.
+
 ### 2) Prefer modern idiomatic Go (Go 1.25)
 
 - Use higher-level stdlib helpers instead of manual loops/parsing:
