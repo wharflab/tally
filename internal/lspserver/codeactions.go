@@ -11,9 +11,11 @@ func (s *Server) codeActionsForDocument(
 	doc *Document,
 	params *protocol.CodeActionParams,
 ) []protocol.CodeAction {
-	content := []byte(doc.Content)
-
-	violations := s.lintContent(doc.URI, content)
+	// Use cached lint results from publishDiagnostics when the version matches.
+	violations, ok := s.lintCache.get(doc.URI, doc.Version)
+	if !ok {
+		violations = s.lintContent(doc.URI, []byte(doc.Content))
+	}
 
 	actions := make([]protocol.CodeAction, 0, len(violations))
 

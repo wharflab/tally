@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/sourcegraph/jsonrpc2"
 
@@ -22,12 +23,51 @@ import (
 	"github.com/tinovyatkin/tally/internal/rules"
 )
 
+// lintResultCache caches lint results keyed by document URI + version
+// to avoid redundant linting between publishDiagnostics and codeAction requests.
+type lintResultCache struct {
+	mu      sync.Mutex
+	entries map[string]lintCacheEntry
+}
+
+type lintCacheEntry struct {
+	version    int32
+	violations []rules.Violation
+}
+
+func newLintResultCache() *lintResultCache {
+	return &lintResultCache{entries: make(map[string]lintCacheEntry)}
+}
+
+func (c *lintResultCache) get(uri string, version int32) ([]rules.Violation, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	entry, ok := c.entries[uri]
+	if !ok || entry.version != version {
+		return nil, false
+	}
+	return entry.violations, true
+}
+
+func (c *lintResultCache) set(uri string, version int32, violations []rules.Violation) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[uri] = lintCacheEntry{version: version, violations: violations}
+}
+
+func (c *lintResultCache) delete(uri string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.entries, uri)
+}
+
 // publishDiagnostics lints a document and publishes diagnostics to the client.
 func (s *Server) publishDiagnostics(ctx context.Context, conn *jsonrpc2.Conn, doc *Document) {
 	docURI := doc.URI
 	content := doc.Content
 
 	violations := s.lintContent(docURI, []byte(content))
+	s.lintCache.set(docURI, doc.Version, violations)
 	diagnostics := convertDiagnostics(violations)
 
 	if err := lspNotify(ctx, conn, string(protocol.MethodTextDocumentPublishDiagnostics), &protocol.PublishDiagnosticsParams{

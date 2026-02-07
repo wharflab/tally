@@ -27,11 +27,15 @@ const serverName = "tally"
 // Server is the tally LSP server.
 type Server struct {
 	documents *DocumentStore
+	lintCache *lintResultCache
 }
 
 // New creates a new LSP server.
 func New() *Server {
-	return &Server{documents: NewDocumentStore()}
+	return &Server{
+		documents: NewDocumentStore(),
+		lintCache: newLintResultCache(),
+	}
 }
 
 // RunStdio starts the LSP server on stdin/stdout.
@@ -232,6 +236,7 @@ func (s *Server) handleDidSave(ctx context.Context, conn *jsonrpc2.Conn, params 
 func (s *Server) handleDidClose(ctx context.Context, conn *jsonrpc2.Conn, params *protocol.DidCloseTextDocumentParams) {
 	uri := string(params.TextDocument.Uri)
 	s.documents.Close(uri)
+	s.lintCache.delete(uri)
 	clearDiagnostics(ctx, conn, uri)
 }
 
