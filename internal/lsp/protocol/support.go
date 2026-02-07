@@ -8,6 +8,8 @@ import (
 	"encoding/json/v2"
 )
 
+const jsonNullLiteral = "null"
+
 // DocumentUri is an LSP document URI.
 //
 //nolint:staticcheck // Keep LSP spec naming for generated compatibility.
@@ -65,10 +67,11 @@ func unmarshalAny(data []byte) (any, error) {
 }
 
 func unmarshalEmpty(data []byte) (any, error) {
-	if strings.TrimSpace(string(data)) != "" {
-		return nil, fmt.Errorf("expected empty, got: %s", string(data))
+	trimmed := strings.TrimSpace(string(data))
+	if trimmed == "" || trimmed == jsonNullLiteral {
+		return struct{}{}, nil
 	}
-	return struct{}{}, nil
+	return nil, fmt.Errorf("expected empty or null, got: %s", trimmed)
 }
 
 func assertOnlyOne(message string, values ...bool) {
@@ -136,8 +139,6 @@ type NotificationInfo[Params any] struct {
 type Null struct{}
 
 func (Null) UnmarshalJSONFrom(dec *jsontext.Decoder) error {
-	const jsonNullLiteral = "null"
-
 	data, err := dec.ReadValue()
 	if err != nil {
 		return err
