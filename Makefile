@@ -23,9 +23,10 @@ bin/custom-gcl: bin/golangci-lint-$(GOLANGCI_LINT_VERSION) .custom-gcl.yml _tool
 lint-fix: bin/golangci-lint-$(GOLANGCI_LINT_VERSION) bin/custom-gcl
 	bin/custom-gcl run --fix
 
-# NOTE: deadcode may panic due to golang.org/x/tools/go/ssa bug with go-json-experiment types.
-# The panic is in the tool itself, not in our code. We detect it and treat as non-fatal.
-# Remove this workaround when golang.org/x/tools fixes the SSA builder.
+# NOTE: deadcode may panic due to go/types bug with go-json-experiment types.
+# The panic is in go/types.NewSignatureType (Go stdlib), not in our code.
+# Tracking issue: https://github.com/golang/go/issues/73871 (fixed in Go 1.26).
+# Remove this workaround when building with Go 1.26+.
 deadcode: bin/deadcode-$(DEADCODE_VERSION)
 	@tmp=$$(mktemp); \
 	bin/deadcode -test ./... >"$$tmp" 2>&1 || true; \
