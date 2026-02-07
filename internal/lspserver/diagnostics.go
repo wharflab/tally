@@ -70,8 +70,10 @@ func (s *Server) publishDiagnostics(ctx context.Context, conn *jsonrpc2.Conn, do
 	s.lintCache.set(docURI, doc.Version, violations)
 	diagnostics := convertDiagnostics(violations)
 
+	version := doc.Version
 	if err := lspNotify(ctx, conn, string(protocol.MethodTextDocumentPublishDiagnostics), &protocol.PublishDiagnosticsParams{
 		Uri:         protocol.DocumentUri(docURI),
+		Version:     &version,
 		Diagnostics: diagnostics,
 	}); err != nil {
 		log.Printf("lsp: failed to publish diagnostics for %s: %v", docURI, err)
@@ -79,9 +81,11 @@ func (s *Server) publishDiagnostics(ctx context.Context, conn *jsonrpc2.Conn, do
 }
 
 // clearDiagnostics sends an empty diagnostics array to clear issues for a URI.
-func clearDiagnostics(ctx context.Context, conn *jsonrpc2.Conn, docURI string) {
+// version is the last known document version (nil if unknown).
+func clearDiagnostics(ctx context.Context, conn *jsonrpc2.Conn, docURI string, version *int32) {
 	if err := lspNotify(ctx, conn, string(protocol.MethodTextDocumentPublishDiagnostics), &protocol.PublishDiagnosticsParams{
 		Uri:         protocol.DocumentUri(docURI),
+		Version:     version,
 		Diagnostics: []*protocol.Diagnostic{},
 	}); err != nil {
 		log.Printf("lsp: failed to clear diagnostics for %s: %v", docURI, err)

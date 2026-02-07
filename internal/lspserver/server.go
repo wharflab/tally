@@ -235,9 +235,14 @@ func (s *Server) handleDidSave(ctx context.Context, conn *jsonrpc2.Conn, params 
 // handleDidClose clears diagnostics and removes the document.
 func (s *Server) handleDidClose(ctx context.Context, conn *jsonrpc2.Conn, params *protocol.DidCloseTextDocumentParams) {
 	uri := string(params.TextDocument.Uri)
+	// Capture version before closing so clearDiagnostics can include it.
+	var docVersion *int32
+	if doc := s.documents.Get(uri); doc != nil {
+		docVersion = &doc.Version
+	}
 	s.documents.Close(uri)
 	s.lintCache.delete(uri)
-	clearDiagnostics(ctx, conn, uri)
+	clearDiagnostics(ctx, conn, uri, docVersion)
 }
 
 // handleCodeAction returns quick-fix code actions.
