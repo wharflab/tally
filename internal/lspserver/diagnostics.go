@@ -76,13 +76,13 @@ func (s *Server) handleDiagnostic(params *protocol.DocumentDiagnosticParams) (an
 
 	// Document not open — read from disk.
 	filePath := uriToPath(uri)
-	return s.pullDiagnosticsFromDisk(filePath, params.PreviousResultId)
+	return s.pullDiagnosticsFromDisk(uri, filePath, params.PreviousResultId)
 }
 
 // pullDiagnosticsFromDisk reads content from disk and returns a diagnostic report.
 //
 //nolint:nilerr // gracefully returns empty diagnostics for unreadable files
-func (s *Server) pullDiagnosticsFromDisk(filePath string, previousResultID *string) (any, error) {
+func (s *Server) pullDiagnosticsFromDisk(docURI, filePath string, previousResultID *string) (any, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		// Return empty full report if file cannot be read.
@@ -102,7 +102,7 @@ func (s *Server) pullDiagnosticsFromDisk(filePath string, previousResultID *stri
 		}, nil
 	}
 
-	violations := s.lintContent("file://"+filePath, content)
+	violations := s.lintContent(docURI, content)
 	diagnostics := convertDiagnostics(violations)
 
 	return &protocol.DocumentDiagnosticResponse{
