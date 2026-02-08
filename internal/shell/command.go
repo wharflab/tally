@@ -186,9 +186,9 @@ func FindCommands(script string, variant Variant, names ...string) []CommandInfo
 
 		info := CommandInfo{
 			Name:     baseName,
-			Line:     int(pos.Line()) - 1,    //nolint:gosec // shell positions won't overflow
-			StartCol: int(pos.Col()) - 1,     //nolint:gosec
-			EndCol:   int(endPos.Col()) - 1,  //nolint:gosec
+			Line:     int(pos.Line()) - 1,   //nolint:gosec // shell positions won't overflow
+			StartCol: int(pos.Col()) - 1,    //nolint:gosec
+			EndCol:   int(endPos.Col()) - 1, //nolint:gosec
 		}
 
 		// Extract all arguments and find subcommand with position

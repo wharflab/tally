@@ -34,26 +34,29 @@ func (r *DL3004Rule) Metadata() rules.RuleMetadata {
 func (r *DL3004Rule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 
-	return ScanRunCommandsWithPOSIXShell(input, func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
-		// Check if the command contains sudo using the shell package
-		cmdStr := GetRunCommandString(run)
-		if shell.ContainsCommandWithVariant(cmdStr, "sudo", shellVariant) {
-			loc := rules.NewLocationFromRanges(file, run.Location())
-			return []rules.Violation{
-				rules.NewViolation(
-					loc,
-					meta.Code,
-					"do not use sudo in RUN commands; it has unpredictable TTY and signal handling",
-					meta.DefaultSeverity,
-				).WithDocURL(meta.DocURL).WithDetail(
-					"sudo is designed for interactive use and doesn't work reliably in containers. "+
-						"Instead, use the USER instruction to switch users, or run specific commands "+
-						"as a different user with 'su -c' if necessary.",
-				),
+	return ScanRunCommandsWithPOSIXShell(
+		input,
+		func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
+			// Check if the command contains sudo using the shell package
+			cmdStr := GetRunCommandString(run)
+			if shell.ContainsCommandWithVariant(cmdStr, "sudo", shellVariant) {
+				loc := rules.NewLocationFromRanges(file, run.Location())
+				return []rules.Violation{
+					rules.NewViolation(
+						loc,
+						meta.Code,
+						"do not use sudo in RUN commands; it has unpredictable TTY and signal handling",
+						meta.DefaultSeverity,
+					).WithDocURL(meta.DocURL).WithDetail(
+						"sudo is designed for interactive use and doesn't work reliably in containers. " +
+							"Instead, use the USER instruction to switch users, or run specific commands " +
+							"as a different user with 'su -c' if necessary.",
+					),
+				}
 			}
-		}
-		return nil
-	})
+			return nil
+		},
+	)
 }
 
 // init registers the rule with the default registry.

@@ -301,4 +301,3 @@ func uriToPath(docURI string) string {
 	}
 	return filepath.FromSlash(path)
 }
-

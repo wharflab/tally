@@ -172,6 +172,15 @@ linters:
       - linters:
           - depguard
         path: "internal/lspserver/server\\.go"
+formatters:
+  enable:
+    - golines
+  settings:
+    golines:
+      max-len: 140
+      tab-len: 4
+      reformat-tags: true
+      chain-split-dots: true
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

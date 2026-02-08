@@ -535,7 +535,6 @@ func validateRuleConfigs(cfg *config.Config, file string) {
 	}
 }
 
-
 // extractHeredocFiles extracts virtual file paths from heredoc COPY/ADD commands.
 // These are inline files created by heredoc syntax that should not be checked
 // against .dockerignore.

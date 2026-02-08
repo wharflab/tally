@@ -107,98 +107,101 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
 
-	return ScanRunCommandsWithPOSIXShell(input, func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
-		runLoc := run.Location()
-		loc := rules.NewLocationFromRanges(file, runLoc)
+	return ScanRunCommandsWithPOSIXShell(
+		input,
+		func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
+			runLoc := run.Location()
+			loc := rules.NewLocationFromRanges(file, runLoc)
 
-		var occurrences []shell.CommandOccurrence
-		var runStartLine int
+			var occurrences []shell.CommandOccurrence
+			var runStartLine int
 
-		if run.PrependShell {
-			// Shell form: parse original source with "RUN " replaced by spaces
-			// This preserves column positions for accurate edits on multi-line commands
-			script, startLine := getRunSourceScript(run, sm)
-			if script == "" {
+			if run.PrependShell {
+				// Shell form: parse original source with "RUN " replaced by spaces
+				// This preserves column positions for accurate edits on multi-line commands
+				script, startLine := getRunSourceScript(run, sm)
+				if script == "" {
+					return nil
+				}
+				runStartLine = startLine
+				occurrences = shell.FindAllCommandOccurrences(script, "apt", shellVariant)
+			} else {
+				// Exec form: use collapsed command string (JSON array becomes shell-parseable)
+				cmdStr := GetRunCommandString(run)
+				occurrences = shell.FindAllCommandOccurrences(cmdStr, "apt", shellVariant)
+				// No edits for exec form - positions don't map to source
+			}
+
+			if len(occurrences) == 0 {
 				return nil
 			}
-			runStartLine = startLine
-			occurrences = shell.FindAllCommandOccurrences(script, "apt", shellVariant)
-		} else {
-			// Exec form: use collapsed command string (JSON array becomes shell-parseable)
-			cmdStr := GetRunCommandString(run)
-			occurrences = shell.FindAllCommandOccurrences(cmdStr, "apt", shellVariant)
-			// No edits for exec form - positions don't map to source
-		}
 
-		if len(occurrences) == 0 {
-			return nil
-		}
+			// Consolidate all apt occurrences into a single violation with multiple edits
+			var edits []rules.TextEdit
+			overallSafety := rules.FixSafe // Start with safest, downgrade if needed
 
-		// Consolidate all apt occurrences into a single violation with multiple edits
-		var edits []rules.TextEdit
-		overallSafety := rules.FixSafe // Start with safest, downgrade if needed
-
-		for _, occ := range occurrences {
-			// Determine replacement based on subcommand
-			replacement := "apt-get"
-			safety := rules.FixSuggestion // Default for unknown subcommands
-			if mapping, ok := aptCommandMapping[occ.Subcommand]; ok {
-				replacement = mapping.replacement
-				safety = mapping.safety
-			}
-
-			// Track overall safety level (use least safe)
-			if safety > overallSafety {
-				overallSafety = safety
-			}
-
-			// Only add edits for shell form RUN commands
-			if run.PrependShell {
-				// Shell parser positions are relative to script which has "RUN " replaced with spaces
-				// occ.Line is 0-based line within script, runStartLine is 1-based
-				editLine := runStartLine + occ.Line
-				editStartCol := occ.StartCol
-				editEndCol := occ.EndCol
-
-				// Validate the calculated range actually points to "apt" in source
-				lineIdx := editLine - 1 // Convert 1-based to 0-based for SourceMap
-				if lineIdx < 0 || lineIdx >= sm.LineCount() {
-					continue
-				}
-				sourceLine := sm.Line(lineIdx)
-				if editStartCol < 0 || editEndCol > len(sourceLine) ||
-					sourceLine[editStartCol:editEndCol] != "apt" {
-					continue
+			for _, occ := range occurrences {
+				// Determine replacement based on subcommand
+				replacement := "apt-get"
+				safety := rules.FixSuggestion // Default for unknown subcommands
+				if mapping, ok := aptCommandMapping[occ.Subcommand]; ok {
+					replacement = mapping.replacement
+					safety = mapping.safety
 				}
 
-				edits = append(edits, rules.TextEdit{
-					Location: rules.NewRangeLocation(file, editLine, editStartCol, editLine, editEndCol),
-					NewText:  replacement,
+				// Track overall safety level (use least safe)
+				if safety > overallSafety {
+					overallSafety = safety
+				}
+
+				// Only add edits for shell form RUN commands
+				if run.PrependShell {
+					// Shell parser positions are relative to script which has "RUN " replaced with spaces
+					// occ.Line is 0-based line within script, runStartLine is 1-based
+					editLine := runStartLine + occ.Line
+					editStartCol := occ.StartCol
+					editEndCol := occ.EndCol
+
+					// Validate the calculated range actually points to "apt" in source
+					lineIdx := editLine - 1 // Convert 1-based to 0-based for SourceMap
+					if lineIdx < 0 || lineIdx >= sm.LineCount() {
+						continue
+					}
+					sourceLine := sm.Line(lineIdx)
+					if editStartCol < 0 || editEndCol > len(sourceLine) ||
+						sourceLine[editStartCol:editEndCol] != "apt" {
+						continue
+					}
+
+					edits = append(edits, rules.TextEdit{
+						Location: rules.NewRangeLocation(file, editLine, editStartCol, editLine, editEndCol),
+						NewText:  replacement,
+					})
+				}
+			}
+
+			v := rules.NewViolation(
+				loc,
+				meta.Code,
+				"do not use apt as it is meant to be an end-user tool, use apt-get or apt-cache instead",
+				meta.DefaultSeverity,
+			).WithDocURL(meta.DocURL).WithDetail(
+				"The apt command is designed for interactive use and has an unstable command-line interface. " +
+					"For scripting and automation (like Dockerfiles), use apt-get for package management " +
+					"or apt-cache for querying package information.",
+			)
+
+			if len(edits) > 0 {
+				v = v.WithSuggestedFix(&rules.SuggestedFix{
+					Description: "Replace 'apt' with 'apt-get' or 'apt-cache'",
+					Safety:      overallSafety,
+					Edits:       edits,
 				})
 			}
-		}
 
-		v := rules.NewViolation(
-			loc,
-			meta.Code,
-			"do not use apt as it is meant to be an end-user tool, use apt-get or apt-cache instead",
-			meta.DefaultSeverity,
-		).WithDocURL(meta.DocURL).WithDetail(
-			"The apt command is designed for interactive use and has an unstable command-line interface. "+
-				"For scripting and automation (like Dockerfiles), use apt-get for package management "+
-				"or apt-cache for querying package information.",
-		)
-
-		if len(edits) > 0 {
-			v = v.WithSuggestedFix(&rules.SuggestedFix{
-				Description: "Replace 'apt' with 'apt-get' or 'apt-cache'",
-				Safety:      overallSafety,
-				Edits:       edits,
-			})
-		}
-
-		return []rules.Violation{v}
-	})
+			return []rules.Violation{v}
+		},
+	)
 }
 
 // init registers the rule with the default registry.

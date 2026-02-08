@@ -86,63 +86,66 @@ type PackageManagerRuleConfig struct {
 func CheckPackageManagerFlag(input rules.LintInput, meta rules.RuleMetadata, config PackageManagerRuleConfig) []rules.Violation {
 	sm := input.SourceMap()
 
-	return ScanRunCommandsWithPOSIXShell(input, func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
-		var cmds []shell.CommandInfo
-		var runStartLine int
+	return ScanRunCommandsWithPOSIXShell(
+		input,
+		func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
+			var cmds []shell.CommandInfo
+			var runStartLine int
 
-		if run.PrependShell {
-			script, startLine := getRunSourceScript(run, sm)
-			if script == "" {
-				return nil
-			}
-			runStartLine = startLine
-			cmds = shell.FindCommands(script, shellVariant, config.CommandNames...)
-		} else {
-			cmdStr := GetRunCommandString(run)
-			cmds = shell.FindCommands(cmdStr, shellVariant, config.CommandNames...)
-		}
-
-		var violations []rules.Violation
-		for _, cmd := range cmds {
-			// Check if this is a subcommand that requires the flag
-			if !cmd.HasAnyArg(config.Subcommands...) {
-				continue
+			if run.PrependShell {
+				script, startLine := getRunSourceScript(run, sm)
+				if script == "" {
+					return nil
+				}
+				runStartLine = startLine
+				cmds = shell.FindCommands(script, shellVariant, config.CommandNames...)
+			} else {
+				cmdStr := GetRunCommandString(run)
+				cmds = shell.FindCommands(cmdStr, shellVariant, config.CommandNames...)
 			}
 
-			// Check if the command has the required flag
-			if config.HasRequiredFlag(&cmd) {
-				continue
-			}
+			var violations []rules.Violation
+			for _, cmd := range cmds {
+				// Check if this is a subcommand that requires the flag
+				if !cmd.HasAnyArg(config.Subcommands...) {
+					continue
+				}
 
-			loc := rules.NewLocationFromRanges(file, run.Location())
-			v := rules.NewViolation(loc, meta.Code, meta.Description, meta.DefaultSeverity).
-				WithDocURL(meta.DocURL).
-				WithDetail(config.Detail)
+				// Check if the command has the required flag
+				if config.HasRequiredFlag(&cmd) {
+					continue
+				}
 
-			// Add auto-fix for shell form RUN commands
-			if run.PrependShell && cmd.Subcommand != "" {
-				editLine := runStartLine + cmd.SubcommandLine
-				insertCol := cmd.SubcommandEndCol
+				loc := rules.NewLocationFromRanges(file, run.Location())
+				v := rules.NewViolation(loc, meta.Code, meta.Description, meta.DefaultSeverity).
+					WithDocURL(meta.DocURL).
+					WithDetail(config.Detail)
 
-				lineIdx := editLine - 1
-				if lineIdx >= 0 && lineIdx < sm.LineCount() {
-					sourceLine := sm.Line(lineIdx)
-					if insertCol >= 0 && insertCol <= len(sourceLine) {
-						v = v.WithSuggestedFix(&rules.SuggestedFix{
-							Description: config.FixDescription,
-							Safety:      rules.FixSafe,
-							Edits: []rules.TextEdit{{
-								Location: rules.NewRangeLocation(file, editLine, insertCol, editLine, insertCol),
-								NewText:  config.FixFlag,
-							}},
-						})
+				// Add auto-fix for shell form RUN commands
+				if run.PrependShell && cmd.Subcommand != "" {
+					editLine := runStartLine + cmd.SubcommandLine
+					insertCol := cmd.SubcommandEndCol
+
+					lineIdx := editLine - 1
+					if lineIdx >= 0 && lineIdx < sm.LineCount() {
+						sourceLine := sm.Line(lineIdx)
+						if insertCol >= 0 && insertCol <= len(sourceLine) {
+							v = v.WithSuggestedFix(&rules.SuggestedFix{
+								Description: config.FixDescription,
+								Safety:      rules.FixSafe,
+								Edits: []rules.TextEdit{{
+									Location: rules.NewRangeLocation(file, editLine, insertCol, editLine, insertCol),
+									NewText:  config.FixFlag,
+								}},
+							})
+						}
 					}
 				}
+
+				violations = append(violations, v)
 			}
 
-			violations = append(violations, v)
-		}
-
-		return violations
-	})
+			return violations
+		},
+	)
 }

@@ -63,7 +63,7 @@ func FindCommandOccurrences(script string, variant Variant) []CommandOccurrence 
 
 		occ := CommandOccurrence{
 			Name:     baseName,
-			StartCol: int(pos.Col()) - 1,   //nolint:gosec // G115: shell scripts won't have int-overflowing positions
+			StartCol: int(pos.Col()) - 1,    //nolint:gosec // G115: shell scripts won't have int-overflowing positions
 			EndCol:   int(endPos.Col()) - 1, //nolint:gosec // G115: shell scripts won't have int-overflowing positions
 			Line:     int(pos.Line()) - 1,   //nolint:gosec // G115: shell scripts won't have int-overflowing positions
 		}

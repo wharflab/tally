@@ -115,19 +115,22 @@ RUN Write-Host "hello"`,
 			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 
 			callCount := 0
-			ScanRunCommandsWithPOSIXShell(input, func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
-				callCount++
+			ScanRunCommandsWithPOSIXShell(
+				input,
+				func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
+					callCount++
 
-				// Verify the callback receives valid arguments
-				if run == nil {
-					t.Error("callback received nil RUN command")
-				}
-				if file == "" {
-					t.Error("callback received empty file path")
-				}
+					// Verify the callback receives valid arguments
+					if run == nil {
+						t.Error("callback received nil RUN command")
+					}
+					if file == "" {
+						t.Error("callback received empty file path")
+					}
 
-				return nil
-			})
+					return nil
+				},
+			)
 
 			if callCount != tt.wantCallCount {
 				t.Errorf("callback called %d times, want %d", callCount, tt.wantCallCount)
@@ -172,12 +175,15 @@ RUN echo hello`,
 			t.Parallel()
 			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 
-			ScanRunCommandsWithPOSIXShell(input, func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
-				if shellVariant != tt.wantVariant {
-					t.Errorf("got shell variant %v, want %v", shellVariant, tt.wantVariant)
-				}
-				return nil
-			})
+			ScanRunCommandsWithPOSIXShell(
+				input,
+				func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
+					if shellVariant != tt.wantVariant {
+						t.Errorf("got shell variant %v, want %v", shellVariant, tt.wantVariant)
+					}
+					return nil
+				},
+			)
 		})
 	}
 }

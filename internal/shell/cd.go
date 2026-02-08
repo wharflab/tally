@@ -203,7 +203,7 @@ func isCdCall(call *syntax.CallExpr) bool {
 // extractCdInfo extracts information about a cd command.
 func extractCdInfo(call *syntax.CallExpr) CdCommand {
 	cd := CdCommand{
-		StartCol: int(call.Pos().Col()) - 1, //nolint:gosec // safe: column numbers are small
+		StartCol: int(call.Pos().Col()) - 1,  //nolint:gosec // safe: column numbers are small
 		Line:     int(call.Pos().Line()) - 1, //nolint:gosec // safe: line numbers are small
 	}
 

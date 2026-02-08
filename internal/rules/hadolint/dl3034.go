@@ -34,11 +34,13 @@ var zypperSubcommands = []string{"install", "in", "remove", "rm", "patch", "sour
 // Check runs the DL3034 rule.
 func (r *DL3034Rule) Check(input rules.LintInput) []rules.Violation {
 	return CheckPackageManagerFlag(input, r.Metadata(), PackageManagerRuleConfig{
-		CommandNames:    []string{"zypper"},
-		Subcommands:     zypperSubcommands,
-		HasRequiredFlag: func(cmd *shell.CommandInfo) bool { return cmd.HasAnyFlag("-n", "--non-interactive", "-y", "--no-confirm") },
-		FixFlag:         " -n",
-		FixDescription:  "Add -n flag to zypper command",
+		CommandNames: []string{"zypper"},
+		Subcommands:  zypperSubcommands,
+		HasRequiredFlag: func(cmd *shell.CommandInfo) bool {
+			return cmd.HasAnyFlag("-n", "--non-interactive", "-y", "--no-confirm")
+		},
+		FixFlag:        " -n",
+		FixDescription: "Add -n flag to zypper command",
 		Detail: "Running zypper install without -n will cause the command to wait for " +
 			"user confirmation, which will hang in Docker builds. Use -n, " +
 			"--non-interactive, -y, or --no-confirm to automatically confirm.",

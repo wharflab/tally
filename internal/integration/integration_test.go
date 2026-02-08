@@ -315,9 +315,11 @@ func TestCheck(t *testing.T) {
 			wantExit: 1,
 		},
 		{
-			name:     "inline-require-reason",
-			dir:      "inline-require-reason",
-			args:     append([]string{"--format", "json", "--require-reason"}, selectRules("buildkit/StageNameCasing", "tally/max-lines")...),
+			name: "inline-require-reason",
+			dir:  "inline-require-reason",
+			args: append(
+				[]string{"--format", "json", "--require-reason"},
+				selectRules("buildkit/StageNameCasing", "tally/max-lines")...),
 			wantExit: 1,
 		},
 

@@ -132,8 +132,8 @@ func (r *PreferAddUnpackRule) Check(input rules.LintInput) []rules.Violation {
 					"use `ADD --unpack <url> <dest>` instead of downloading and extracting in `RUN`",
 					meta.DefaultSeverity,
 				).WithDetail(
-					"Instead of using curl/wget to download an archive and extracting it in a `RUN` command, "+
-						"use `ADD --unpack <url> <dest>` which downloads and extracts in a single layer. "+
+					"Instead of using curl/wget to download an archive and extracting it in a `RUN` command, " +
+						"use `ADD --unpack <url> <dest>` which downloads and extracts in a single layer. " +
 						"This reduces image size and build complexity. Requires BuildKit.",
 				)
 
