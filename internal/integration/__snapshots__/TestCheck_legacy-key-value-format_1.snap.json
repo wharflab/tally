@@ -1,0 +1,133 @@
+{
+  "files": [
+    {
+      "file": "testdata/legacy-key-value-format/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/legacy-key-value-format/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "testdata/legacy-key-value-format/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "\"ENV key=value\" should be used instead of legacy \"ENV key value\" format",
+          "rule": "buildkit/LegacyKeyValueFormat",
+          "severity": "warning",
+          "sourceCode": "ENV MY_APP myapp",
+          "suggestedFix": {
+            "description": "Replace legacy \"ENV MY_APP myapp\" with \"ENV MY_APP=myapp\"",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 16,
+                    "line": 2
+                  },
+                  "file": "testdata/legacy-key-value-format/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 2
+                  }
+                },
+                "newText": "MY_APP=myapp"
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/legacy-key-value-format/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/legacy-key-value-format/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "\"ENV key=value\" should be used instead of legacy \"ENV key value\" format",
+          "rule": "buildkit/LegacyKeyValueFormat",
+          "severity": "warning",
+          "sourceCode": "ENV VERSION 1.0",
+          "suggestedFix": {
+            "description": "Replace legacy \"ENV VERSION 1.0\" with \"ENV VERSION=1.0\"",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 15,
+                    "line": 3
+                  },
+                  "file": "testdata/legacy-key-value-format/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 3
+                  }
+                },
+                "newText": "VERSION=1.0"
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/legacy-key-value-format/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/legacy-key-value-format/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "\"LABEL key=value\" should be used instead of legacy \"LABEL key value\" format",
+          "rule": "buildkit/LegacyKeyValueFormat",
+          "severity": "warning",
+          "sourceCode": "LABEL maintainer John Doe",
+          "suggestedFix": {
+            "description": "Replace legacy \"LABEL maintainer John Doe\" with \"LABEL maintainer=\"John Doe\"\"",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 25,
+                    "line": 4
+                  },
+                  "file": "testdata/legacy-key-value-format/Dockerfile",
+                  "start": {
+                    "column": 6,
+                    "line": 4
+                  }
+                },
+                "newText": "maintainer=\"John Doe\""
+              }
+            ],
+            "isPreferred": true
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 3,
+    "warnings": 3
+  }
+}

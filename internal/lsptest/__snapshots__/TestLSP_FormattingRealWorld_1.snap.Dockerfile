@@ -15,7 +15,7 @@ RUN /opt/conda/bin/conda config --set auto_activate_base false && /opt/conda/bin
 && echo "\nconda activate default" >> ~/.bashrc \
 && /opt/conda/bin/conda clean -a
 
-ENV BASH_ENV ~/.bashrc
+ENV BASH_ENV=~/.bashrc
 ENV PATH="${PATH}:/opt/conda/envs/default/bin"
 
 RUN ln -s /opt/conda/envs/default/bin/pip /usr/local/bin/pip && ln -s /opt/conda/envs/default/bin/python /usr/local/bin/python && /opt/conda/bin/conda config --set ssl_verify False  && pip install --no-cache-dir --upgrade pip --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org
@@ -176,7 +176,7 @@ RUN /opt/conda/bin/conda config --set auto_activate_base false && /opt/conda/bin
 && echo "\nconda activate default" >> ~/.bashrc \
 && /opt/conda/bin/conda clean -a
 
-ENV BASH_ENV ~/.bashrc
+ENV BASH_ENV=~/.bashrc
 ENV PATH="${PATH}:/opt/conda/envs/default/bin"
 
 #RUN conda config --set auto_activate_base false && conda create --name default python={PYHON_VERSION} && echo "source activate default" >> ~/.bashrc

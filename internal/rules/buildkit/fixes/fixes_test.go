@@ -828,6 +828,84 @@ func TestFindFROMBaseName(t *testing.T) {
 	}
 }
 
+func TestLegacyKeyValueFormatFix(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		source   string
+		message  string
+		wantFix  bool
+		wantText string
+	}{
+		{
+			name:     "simple ENV key value",
+			source:   "ENV foo bar",
+			message:  `"ENV key=value" should be used instead of legacy "ENV key value" format`,
+			wantFix:  true,
+			wantText: "foo=bar",
+		},
+		{
+			name:     "ENV with multi-word value",
+			source:   "ENV MY_VAR hello world",
+			message:  `"ENV key=value" should be used instead of legacy "ENV key value" format`,
+			wantFix:  true,
+			wantText: `MY_VAR="hello world"`,
+		},
+		{
+			name:     "LABEL with multi-word value",
+			source:   "LABEL maintainer John Doe",
+			message:  `"LABEL key=value" should be used instead of legacy "LABEL key value" format`,
+			wantFix:  true,
+			wantText: `maintainer="John Doe"`,
+		},
+		{
+			name:     "LABEL simple",
+			source:   "LABEL version 1.0",
+			message:  `"LABEL key=value" should be used instead of legacy "LABEL key value" format`,
+			wantFix:  true,
+			wantText: "version=1.0",
+		},
+		{
+			name:     "ENV with extra whitespace",
+			source:   "ENV   foo   bar",
+			message:  `"ENV key=value" should be used instead of legacy "ENV key value" format`,
+			wantFix:  true,
+			wantText: "foo=bar",
+		},
+		{
+			name:     "lowercase env",
+			source:   "env foo bar",
+			message:  `"ENV key=value" should be used instead of legacy "ENV key value" format`,
+			wantFix:  true,
+			wantText: "foo=bar",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			source := []byte(tt.source)
+			v := rules.Violation{
+				Location: rules.NewRangeLocation("test.Dockerfile", 1, 0, 1, len(tt.source)),
+				RuleCode: rules.BuildKitRulePrefix + "LegacyKeyValueFormat",
+				Message:  tt.message,
+			}
+
+			enrichLegacyKeyValueFormatFix(&v, source)
+
+			if tt.wantFix {
+				require.NotNil(t, v.SuggestedFix, "expected a fix")
+				assert.Len(t, v.SuggestedFix.Edits, 1)
+				assert.Equal(t, tt.wantText, v.SuggestedFix.Edits[0].NewText)
+				assert.Equal(t, rules.FixSafe, v.SuggestedFix.Safety)
+				assert.True(t, v.SuggestedFix.IsPreferred)
+			} else {
+				assert.Nil(t, v.SuggestedFix, "expected no fix")
+			}
+		})
+	}
+}
+
 func TestInvalidDefinitionDescriptionFix(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
