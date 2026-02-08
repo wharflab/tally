@@ -5,12 +5,13 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
+	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/shell"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
-func TestGetRunCommandString(t *testing.T) {
+func TestRunCommandString(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name       string
@@ -51,9 +52,9 @@ RUN apt-get update && \
 				t.Fatal("expected RUN command")
 			}
 
-			got := GetRunCommandString(run)
+			got := dockerfile.RunCommandString(run)
 			if got != tt.want {
-				t.Errorf("GetRunCommandString() = %q, want %q", got, tt.want)
+				t.Errorf("dockerfile.RunCommandString() = %q, want %q", got, tt.want)
 			}
 		})
 	}

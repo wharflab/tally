@@ -6,6 +6,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
+	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/semantic"
 	"github.com/tinovyatkin/tally/internal/shell"
@@ -77,7 +78,7 @@ func (r *DL3010Rule) Check(input rules.LintInput) []rules.Violation {
 					continue
 				}
 
-				cmdStr := GetRunCommandString(c)
+				cmdStr := dockerfile.RunCommandString(c)
 				for _, arch := range findExtractedArchives(archives, cmdStr, shellVariant) {
 					loc := rules.NewLineLocation(input.File, arch.line)
 					violations = append(violations, rules.NewViolation(

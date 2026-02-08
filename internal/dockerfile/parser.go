@@ -360,6 +360,12 @@ func ExtractHeredocFiles(stages []instructions.Stage) map[string]bool {
 	return heredocFiles
 }
 
+// RunCommandString extracts the command string from a RUN instruction.
+// Handles both shell form (RUN cmd) and exec form (RUN ["cmd", "arg"]).
+func RunCommandString(run *instructions.RunCommand) string {
+	return strings.Join(run.CmdLine, " ")
+}
+
 // CollectHeredocPaths extracts heredoc paths from a single COPY/ADD command's
 // SourceContents into the provided map. This is useful for per-command filtering.
 func CollectHeredocPaths(sourceContents []instructions.SourceContent) map[string]bool {

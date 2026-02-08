@@ -5,6 +5,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
+	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/shell"
 	"github.com/tinovyatkin/tally/internal/sourcemap"
@@ -127,7 +128,7 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 				occurrences = shell.FindAllCommandOccurrences(script, "apt", shellVariant)
 			} else {
 				// Exec form: use collapsed command string (JSON array becomes shell-parseable)
-				cmdStr := GetRunCommandString(run)
+				cmdStr := dockerfile.RunCommandString(run)
 				occurrences = shell.FindAllCommandOccurrences(cmdStr, "apt", shellVariant)
 				// No edits for exec form - positions don't map to source
 			}

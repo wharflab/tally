@@ -5,6 +5,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
+	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/shell"
 )
@@ -39,7 +40,7 @@ func (r *DL3003Rule) Check(input rules.LintInput) []rules.Violation {
 	return ScanRunCommandsWithPOSIXShell(
 		input,
 		func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
-			cmdStr := GetRunCommandString(run)
+			cmdStr := dockerfile.RunCommandString(run)
 
 			// Check if the command contains cd (handles subshells, etc.)
 			if !shell.ContainsCommandWithVariant(cmdStr, "cd", shellVariant) {
@@ -95,7 +96,7 @@ func (r *DL3003Rule) generateFix(
 	// skip the fix - heredoc conversion handles cd correctly and is preferable
 	// to splitting the RUN into multiple instructions.
 	if input.IsRuleEnabled(rules.HeredocRuleCode) {
-		cmdStr := GetRunCommandString(run)
+		cmdStr := dockerfile.RunCommandString(run)
 		if shell.IsHeredocCandidate(cmdStr, shellVariant, input.GetHeredocMinCommands()) {
 			return nil
 		}
@@ -124,7 +125,7 @@ func (r *DL3003Rule) generateFix(
 	endCol := lastRange.End.Character
 
 	if endLine == runLoc[0].Start.Line && endCol == runLoc[0].Start.Character {
-		cmdStr := GetRunCommandString(run)
+		cmdStr := dockerfile.RunCommandString(run)
 		fullInstr := "RUN " + cmdStr
 		endCol = runLoc[0].Start.Character + len(fullInstr)
 	}

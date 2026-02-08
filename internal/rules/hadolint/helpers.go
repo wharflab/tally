@@ -1,10 +1,9 @@
 package hadolint
 
 import (
-	"strings"
-
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
+	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/semantic"
 	"github.com/tinovyatkin/tally/internal/shell"
@@ -56,13 +55,6 @@ func ScanRunCommandsWithPOSIXShell(input rules.LintInput, callback RunCommandCal
 	return violations
 }
 
-// GetRunCommandString extracts the command string from a RUN instruction.
-// Handles both shell form (RUN cmd) and exec form (RUN ["cmd", "arg"]).
-func GetRunCommandString(run *instructions.RunCommand) string {
-	// CmdLine contains the command parts for both shell and exec forms
-	return strings.Join(run.CmdLine, " ")
-}
-
 // PackageManagerRuleConfig defines configuration for package manager flag rules.
 // These rules check that install commands include non-interactive flags.
 type PackageManagerRuleConfig struct {
@@ -100,7 +92,7 @@ func CheckPackageManagerFlag(input rules.LintInput, meta rules.RuleMetadata, con
 				runStartLine = startLine
 				cmds = shell.FindCommands(script, shellVariant, config.CommandNames...)
 			} else {
-				cmdStr := GetRunCommandString(run)
+				cmdStr := dockerfile.RunCommandString(run)
 				cmds = shell.FindCommands(cmdStr, shellVariant, config.CommandNames...)
 			}
 

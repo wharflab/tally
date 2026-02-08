@@ -3,6 +3,7 @@ package hadolint
 import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
+	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/shell"
 )
@@ -38,7 +39,7 @@ func (r *DL3004Rule) Check(input rules.LintInput) []rules.Violation {
 		input,
 		func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
 			// Check if the command contains sudo using the shell package
-			cmdStr := GetRunCommandString(run)
+			cmdStr := dockerfile.RunCommandString(run)
 			if shell.ContainsCommandWithVariant(cmdStr, "sudo", shellVariant) {
 				loc := rules.NewLocationFromRanges(file, run.Location())
 				return []rules.Violation{
