@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "tally/consistent-indentation",
+ "DefaultSeverity": "off",
+ "Description": "Enforces consistent indentation for Dockerfile build stages",
+ "DocURL": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+ "FixPriority": 50,
+ "IsExperimental": true,
+ "Name": "Consistent Indentation"
+}

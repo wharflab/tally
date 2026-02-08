@@ -1,0 +1,10 @@
+{
+ "Category": "best-practice",
+ "Code": "hadolint/DL3020",
+ "DefaultSeverity": "error",
+ "Description": "Use COPY instead of ADD for local files; ADD has unexpected features",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3020",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Use COPY instead of ADD"
+}

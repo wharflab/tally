@@ -3,27 +3,14 @@ package tally
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
 func TestPreferAddUnpackRule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewPreferAddUnpackRule()
-	meta := r.Metadata()
-
-	if meta.Code != rules.TallyRulePrefix+"prefer-add-unpack" {
-		t.Errorf("Code = %q, want %q", meta.Code, rules.TallyRulePrefix+"prefer-add-unpack")
-	}
-	if meta.DefaultSeverity != rules.SeverityInfo {
-		t.Errorf("DefaultSeverity = %v, want %v", meta.DefaultSeverity, rules.SeverityInfo)
-	}
-	if meta.Category != "performance" {
-		t.Errorf("Category = %q, want %q", meta.Category, "performance")
-	}
-	if meta.FixPriority != 95 {
-		t.Errorf("FixPriority = %d, want %d", meta.FixPriority, 95)
-	}
+	snaps.MatchStandaloneJSON(t, NewPreferAddUnpackRule().Metadata())
 }
 
 func TestPreferAddUnpackRule_Check(t *testing.T) {

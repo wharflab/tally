@@ -3,6 +3,7 @@ package buildkit
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/tinovyatkin/tally/internal/rules"
@@ -10,14 +11,7 @@ import (
 
 func TestDuplicateStageNameRule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewDuplicateStageNameRule()
-	meta := r.Metadata()
-	if meta.Code != "buildkit/DuplicateStageName" {
-		t.Fatalf("expected code %q, got %q", "buildkit/DuplicateStageName", meta.Code)
-	}
-	if meta.DefaultSeverity != rules.SeverityError {
-		t.Fatalf("expected severity %v, got %v", rules.SeverityError, meta.DefaultSeverity)
-	}
+	snaps.MatchStandaloneJSON(t, NewDuplicateStageNameRule().Metadata())
 }
 
 func TestDuplicateStageNameRule_Check(t *testing.T) {

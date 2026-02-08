@@ -1,0 +1,10 @@
+{
+ "Category": "best-practice",
+ "Code": "hadolint/DL3014",
+ "DefaultSeverity": "warning",
+ "Description": "Use the -y switch to avoid manual input `apt-get -y install \u003cpackage\u003e`",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3014",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Use -y with apt-get install"
+}

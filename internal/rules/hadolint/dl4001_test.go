@@ -4,24 +4,14 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
 func TestDL4001Rule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewDL4001Rule()
-	meta := r.Metadata()
-
-	if meta.Code != rules.HadolintRulePrefix+"DL4001" {
-		t.Errorf("Code = %q, want %q", meta.Code, rules.HadolintRulePrefix+"DL4001")
-	}
-	if meta.DefaultSeverity != rules.SeverityWarning {
-		t.Errorf("DefaultSeverity = %v, want %v", meta.DefaultSeverity, rules.SeverityWarning)
-	}
-	if meta.Category != "maintainability" {
-		t.Errorf("Category = %q, want %q", meta.Category, "maintainability")
-	}
+	snaps.MatchStandaloneJSON(t, NewDL4001Rule().Metadata())
 }
 
 func TestDL4001Rule_Check(t *testing.T) {

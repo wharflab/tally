@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "hadolint/DL3027",
+ "DefaultSeverity": "warning",
+ "Description": "Do not use apt as it is meant to be an end-user tool, use apt-get or apt-cache instead",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3027",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Do not use apt"
+}

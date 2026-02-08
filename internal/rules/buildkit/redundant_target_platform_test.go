@@ -3,6 +3,7 @@ package buildkit
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/tinovyatkin/tally/internal/rules"
@@ -10,16 +11,7 @@ import (
 
 func TestRedundantTargetPlatformRule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewRedundantTargetPlatformRule()
-	meta := r.Metadata()
-
-	if meta.Code != "buildkit/RedundantTargetPlatform" {
-		t.Errorf("expected code %q, got %q", "buildkit/RedundantTargetPlatform", meta.Code)
-	}
-
-	if meta.Category != "best-practices" {
-		t.Errorf("expected category %q, got %q", "best-practices", meta.Category)
-	}
+	snaps.MatchStandaloneJSON(t, NewRedundantTargetPlatformRule().Metadata())
 }
 
 func TestRedundantTargetPlatformRule_Check_RedundantTargetPlatform(t *testing.T) {

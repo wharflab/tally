@@ -1,0 +1,10 @@
+{
+ "Category": "best-practice",
+ "Code": "hadolint/DL3030",
+ "DefaultSeverity": "warning",
+ "Description": "Use the -y switch to avoid manual input `yum install -y \u003cpackage\u003e`",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3030",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Use -y with yum install"
+}

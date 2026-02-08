@@ -4,27 +4,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
 func TestPreferCopyHeredocRule_Metadata(t *testing.T) {
 	t.Parallel()
-	rule := NewPreferCopyHeredocRule()
-	meta := rule.Metadata()
-
-	if meta.Code != "tally/prefer-copy-heredoc" {
-		t.Errorf("Code = %q, want %q", meta.Code, "tally/prefer-copy-heredoc")
-	}
-	if meta.DefaultSeverity != rules.SeverityStyle {
-		t.Errorf("DefaultSeverity = %v, want %v", meta.DefaultSeverity, rules.SeverityStyle)
-	}
-	if meta.Category != "style" {
-		t.Errorf("Category = %q, want %q", meta.Category, "style")
-	}
-	if meta.FixPriority != 99 {
-		t.Errorf("FixPriority = %d, want %d", meta.FixPriority, 99)
-	}
+	snaps.MatchStandaloneJSON(t, NewPreferCopyHeredocRule().Metadata())
 }
 
 func TestPreferCopyHeredocRule_DefaultConfig(t *testing.T) {

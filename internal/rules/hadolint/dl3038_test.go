@@ -3,6 +3,7 @@ package hadolint
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
@@ -164,15 +165,7 @@ RUN microdnf -y install httpd`,
 
 func TestDL3038Rule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewDL3038Rule()
-	meta := r.Metadata()
-
-	if meta.Code != "hadolint/DL3038" {
-		t.Errorf("got code %q, want %q", meta.Code, "hadolint/DL3038")
-	}
-	if meta.DocURL != "https://github.com/hadolint/hadolint/wiki/DL3038" {
-		t.Errorf("got doc URL %q, want %q", meta.DocURL, "https://github.com/hadolint/hadolint/wiki/DL3038")
-	}
+	snaps.MatchStandaloneJSON(t, NewDL3038Rule().Metadata())
 }
 
 // TestDL3038_AutoFix verifies that DL3038 provides auto-fix suggestions.

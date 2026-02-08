@@ -1,0 +1,10 @@
+{
+ "Category": "best-practices",
+ "Code": "buildkit/RedundantTargetPlatform",
+ "DefaultSeverity": "warning",
+ "Description": "Setting platform to $TARGETPLATFORM is redundant as this is the default behavior",
+ "DocURL": "https://docs.docker.com/go/dockerfile/rule/redundant-target-platform/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Redundant TARGETPLATFORM"
+}

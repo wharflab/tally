@@ -1,0 +1,10 @@
+{
+ "Category": "performance",
+ "Code": "tally/prefer-add-unpack",
+ "DefaultSeverity": "info",
+ "Description": "Use `ADD --unpack` instead of downloading and extracting remote archives in `RUN`",
+ "DocURL": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/prefer-add-unpack.md",
+ "FixPriority": 95,
+ "IsExperimental": false,
+ "Name": "Prefer ADD --unpack for remote archives"
+}

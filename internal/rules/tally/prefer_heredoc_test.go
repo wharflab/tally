@@ -3,31 +3,17 @@ package tally
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/tinovyatkin/tally/internal/heredoc"
-	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/shell"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
 func TestPreferHeredocRule_Metadata(t *testing.T) {
 	t.Parallel()
-	rule := NewPreferHeredocRule()
-	meta := rule.Metadata()
-
-	if meta.Code != "tally/prefer-run-heredoc" {
-		t.Errorf("Code = %q, want %q", meta.Code, "tally/prefer-run-heredoc")
-	}
-	if meta.DefaultSeverity != rules.SeverityStyle {
-		t.Errorf("DefaultSeverity = %v, want %v", meta.DefaultSeverity, rules.SeverityStyle)
-	}
-	if meta.Category != "style" {
-		t.Errorf("Category = %q, want %q", meta.Category, "style")
-	}
-	if meta.FixPriority != 100 {
-		t.Errorf("FixPriority = %d, want %d", meta.FixPriority, 100)
-	}
+	snaps.MatchStandaloneJSON(t, NewPreferHeredocRule().Metadata())
 }
 
 func TestPreferHeredocRule_DefaultConfig(t *testing.T) {

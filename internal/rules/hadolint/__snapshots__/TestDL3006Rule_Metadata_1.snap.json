@@ -1,0 +1,10 @@
+{
+ "Category": "reproducibility",
+ "Code": "hadolint/DL3006",
+ "DefaultSeverity": "warning",
+ "Description": "Always tag the version of an image explicitly to ensure reproducible builds",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3006",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Pin base image versions"
+}

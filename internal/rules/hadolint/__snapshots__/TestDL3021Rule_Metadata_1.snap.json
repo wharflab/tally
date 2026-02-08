@@ -1,0 +1,10 @@
+{
+ "Category": "correctness",
+ "Code": "hadolint/DL3021",
+ "DefaultSeverity": "error",
+ "Description": "COPY with more than 2 arguments requires the last argument to end with /",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3021",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "COPY destination must end with /"
+}

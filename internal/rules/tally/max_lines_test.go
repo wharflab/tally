@@ -3,6 +3,7 @@ package tally
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
@@ -15,13 +16,7 @@ func boolFalse() *bool     { return boolPtr(false) }
 
 func TestMaxLinesRule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewMaxLinesRule()
-	meta := r.Metadata()
-
-	if meta.Code != "tally/max-lines" {
-		t.Errorf("Code = %q, want %q", meta.Code, "tally/max-lines")
-	}
-	// Enabled by default with sensible defaults (50 lines, skip blanks/comments)
+	snaps.MatchStandaloneJSON(t, NewMaxLinesRule().Metadata())
 }
 
 func TestMaxLinesRule_Check(t *testing.T) {

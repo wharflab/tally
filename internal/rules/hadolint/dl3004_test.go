@@ -3,6 +3,7 @@ package hadolint
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/shell"
 	"github.com/tinovyatkin/tally/internal/testutil"
@@ -10,18 +11,7 @@ import (
 
 func TestDL3004Rule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewDL3004Rule()
-	meta := r.Metadata()
-
-	if meta.Code != rules.HadolintRulePrefix+"DL3004" {
-		t.Errorf("Code = %q, want %q", meta.Code, rules.HadolintRulePrefix+"DL3004")
-	}
-	if meta.DefaultSeverity != rules.SeverityError {
-		t.Errorf("DefaultSeverity = %v, want %v", meta.DefaultSeverity, rules.SeverityError)
-	}
-	if meta.Category != "security" {
-		t.Errorf("Category = %q, want %q", meta.Category, "security")
-	}
+	snaps.MatchStandaloneJSON(t, NewDL3004Rule().Metadata())
 }
 
 func TestDL3004Rule_Check(t *testing.T) {

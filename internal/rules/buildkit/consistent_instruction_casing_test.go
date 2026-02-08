@@ -3,6 +3,7 @@ package buildkit
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 	"github.com/stretchr/testify/assert"
@@ -14,12 +15,7 @@ import (
 
 func TestConsistentInstructionCasingRule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewConsistentInstructionCasingRule()
-	meta := r.Metadata()
-
-	assert.Equal(t, "buildkit/ConsistentInstructionCasing", meta.Code)
-	assert.Equal(t, "style", meta.Category)
-	assert.Equal(t, rules.SeverityWarning, meta.DefaultSeverity)
+	snaps.MatchStandaloneJSON(t, NewConsistentInstructionCasingRule().Metadata())
 }
 
 func TestConsistentInstructionCasingRule_Check_MajorityUppercase(t *testing.T) {

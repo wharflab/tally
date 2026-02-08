@@ -1,0 +1,10 @@
+{
+ "Category": "security",
+ "Code": "hadolint/DL3002",
+ "DefaultSeverity": "warning",
+ "Description": "Last USER should not be root to follow security best practices",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3002",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Last USER should not be root"
+}

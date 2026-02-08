@@ -1,0 +1,10 @@
+{
+ "Category": "security",
+ "Code": "hadolint/DL3004",
+ "DefaultSeverity": "error",
+ "Description": "Do not use sudo as it has unpredictable behavior in containers",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3004",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Do not use sudo"
+}

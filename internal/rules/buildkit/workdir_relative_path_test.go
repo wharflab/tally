@@ -3,6 +3,7 @@ package buildkit
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/tinovyatkin/tally/internal/rules"
@@ -10,16 +11,7 @@ import (
 
 func TestWorkdirRelativePathRule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewWorkdirRelativePathRule()
-	meta := r.Metadata()
-
-	if meta.Code != "buildkit/WorkdirRelativePath" {
-		t.Errorf("expected code %q, got %q", "buildkit/WorkdirRelativePath", meta.Code)
-	}
-
-	if meta.Category != "correctness" {
-		t.Errorf("expected category %q, got %q", "correctness", meta.Category)
-	}
+	snaps.MatchStandaloneJSON(t, NewWorkdirRelativePathRule().Metadata())
 }
 
 func TestWorkdirRelativePathRule_Check_RelativeWithoutAbsolute(t *testing.T) {

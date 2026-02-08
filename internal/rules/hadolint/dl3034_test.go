@@ -3,6 +3,7 @@ package hadolint
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
@@ -158,13 +159,5 @@ RUN zypper -n install httpd`,
 
 func TestDL3034Rule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewDL3034Rule()
-	meta := r.Metadata()
-
-	if meta.Code != "hadolint/DL3034" {
-		t.Errorf("got code %q, want %q", meta.Code, "hadolint/DL3034")
-	}
-	if meta.DocURL != "https://github.com/hadolint/hadolint/wiki/DL3034" {
-		t.Errorf("got doc URL %q, want %q", meta.DocURL, "https://github.com/hadolint/hadolint/wiki/DL3034")
-	}
+	snaps.MatchStandaloneJSON(t, NewDL3034Rule().Metadata())
 }

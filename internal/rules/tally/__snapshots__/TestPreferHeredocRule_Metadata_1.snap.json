@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "tally/prefer-run-heredoc",
+ "DefaultSeverity": "style",
+ "Description": "Use heredoc syntax for multi-command RUN instructions",
+ "DocURL": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+ "FixPriority": 100,
+ "IsExperimental": true,
+ "Name": "Prefer RUN heredoc syntax"
+}

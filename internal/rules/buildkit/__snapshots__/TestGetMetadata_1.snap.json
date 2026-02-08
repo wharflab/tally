@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "buildkit/StageNameCasing",
+ "DefaultSeverity": "warning",
+ "Description": "Stage names should be lowercase",
+ "DocURL": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "StageNameCasing"
+}

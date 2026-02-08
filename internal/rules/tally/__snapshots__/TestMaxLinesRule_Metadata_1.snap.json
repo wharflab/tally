@@ -1,0 +1,10 @@
+{
+ "Category": "maintainability",
+ "Code": "tally/max-lines",
+ "DefaultSeverity": "error",
+ "Description": "Limits the maximum number of lines in a Dockerfile",
+ "DocURL": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/max-lines.md",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Maximum Lines"
+}

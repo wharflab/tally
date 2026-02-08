@@ -3,6 +3,7 @@ package hadolint
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
@@ -368,22 +369,5 @@ RUN apt install -y python`,
 
 func TestDL3014Rule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewDL3014Rule()
-	meta := r.Metadata()
-
-	if meta.Code != "hadolint/DL3014" {
-		t.Errorf("got code %q, want %q", meta.Code, "hadolint/DL3014")
-	}
-	if meta.Name == "" {
-		t.Error("name is empty")
-	}
-	if meta.Description == "" {
-		t.Error("description is empty")
-	}
-	if meta.DocURL != "https://github.com/hadolint/hadolint/wiki/DL3014" {
-		t.Errorf("got doc URL %q, want %q", meta.DocURL, "https://github.com/hadolint/hadolint/wiki/DL3014")
-	}
-	if meta.Category != "best-practice" {
-		t.Errorf("got category %q, want %q", meta.Category, "best-practice")
-	}
+	snaps.MatchStandaloneJSON(t, NewDL3014Rule().Metadata())
 }

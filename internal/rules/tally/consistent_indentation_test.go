@@ -3,30 +3,14 @@ package tally
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
 func TestConsistentIndentationMetadata(t *testing.T) {
 	t.Parallel()
-	r := NewConsistentIndentationRule()
-	meta := r.Metadata()
-
-	if meta.Code != "tally/consistent-indentation" {
-		t.Errorf("Code = %q, want %q", meta.Code, "tally/consistent-indentation")
-	}
-	if meta.Category != "style" {
-		t.Errorf("Category = %q, want %q", meta.Category, "style")
-	}
-	if meta.DefaultSeverity != rules.SeverityOff {
-		t.Errorf("DefaultSeverity = %v, want %v (off by default, opt-in via config)", meta.DefaultSeverity, rules.SeverityOff)
-	}
-	if !meta.IsExperimental {
-		t.Error("IsExperimental = false, want true")
-	}
-	if meta.FixPriority != 50 {
-		t.Errorf("FixPriority = %d, want 50", meta.FixPriority)
-	}
+	snaps.MatchStandaloneJSON(t, NewConsistentIndentationRule().Metadata())
 }
 
 func TestConsistentIndentationCheck(t *testing.T) {

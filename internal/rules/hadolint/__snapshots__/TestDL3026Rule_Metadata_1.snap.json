@@ -1,0 +1,10 @@
+{
+ "Category": "security",
+ "Code": "hadolint/DL3026",
+ "DefaultSeverity": "off",
+ "Description": "Use only an allowed registry in the FROM image",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3026",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Use only trusted base images"
+}

@@ -3,6 +3,7 @@ package buildkit
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/tinovyatkin/tally/internal/rules"
@@ -10,16 +11,7 @@ import (
 
 func TestSecretsInArgOrEnvRule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewSecretsInArgOrEnvRule()
-	meta := r.Metadata()
-
-	if meta.Code != "buildkit/SecretsUsedInArgOrEnv" {
-		t.Errorf("expected code %q, got %q", "buildkit/SecretsUsedInArgOrEnv", meta.Code)
-	}
-
-	if meta.Category != "security" {
-		t.Errorf("expected category %q, got %q", "security", meta.Category)
-	}
+	snaps.MatchStandaloneJSON(t, NewSecretsInArgOrEnvRule().Metadata())
 }
 
 func TestSecretsInArgOrEnvRule_Check_ARGWithSecret(t *testing.T) {

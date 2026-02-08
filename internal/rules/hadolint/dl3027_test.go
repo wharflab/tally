@@ -3,6 +3,7 @@ package hadolint
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
@@ -259,24 +260,7 @@ RUN apt show curl`,
 
 func TestDL3027Rule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewDL3027Rule()
-	meta := r.Metadata()
-
-	if meta.Code != "hadolint/DL3027" {
-		t.Errorf("got code %q, want %q", meta.Code, "hadolint/DL3027")
-	}
-	if meta.Name == "" {
-		t.Error("name is empty")
-	}
-	if meta.Description == "" {
-		t.Error("description is empty")
-	}
-	if meta.DocURL != "https://github.com/hadolint/hadolint/wiki/DL3027" {
-		t.Errorf("got doc URL %q, want %q", meta.DocURL, "https://github.com/hadolint/hadolint/wiki/DL3027")
-	}
-	if meta.Category != "style" {
-		t.Errorf("got category %q, want %q", meta.Category, "style")
-	}
+	snaps.MatchStandaloneJSON(t, NewDL3027Rule().Metadata())
 }
 
 // TestDL3027_FixLocationConsistency is a regression test ensuring that

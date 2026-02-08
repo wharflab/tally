@@ -1,0 +1,10 @@
+{
+ "Category": "correctness",
+ "Code": "buildkit/DuplicateStageName",
+ "DefaultSeverity": "error",
+ "Description": "Stage names should be unique",
+ "DocURL": "https://docs.docker.com/go/dockerfile/rule/duplicate-stage-name/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "DuplicateStageName"
+}

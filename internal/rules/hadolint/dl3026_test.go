@@ -3,22 +3,13 @@ package hadolint
 import (
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
 func TestDL3026Rule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewDL3026Rule()
-	meta := r.Metadata()
-
-	if meta.Code != "hadolint/DL3026" {
-		t.Errorf("expected code hadolint/DL3026, got %s", meta.Code)
-	}
-	// Off by default, auto-enabled when trusted-registries configured
-	if meta.DefaultSeverity != rules.SeverityOff {
-		t.Errorf("expected DefaultSeverity=off, got %v", meta.DefaultSeverity)
-	}
+	snaps.MatchStandaloneJSON(t, NewDL3026Rule().Metadata())
 }
 
 func TestDL3026Rule_NoConfigDisablesRule(t *testing.T) {

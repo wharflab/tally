@@ -1,0 +1,10 @@
+{
+ "Category": "best-practice",
+ "Code": "hadolint/DL3038",
+ "DefaultSeverity": "warning",
+ "Description": "Use the -y switch to avoid manual input `dnf install -y \u003cpackage\u003e`",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3038",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Use -y with dnf install"
+}

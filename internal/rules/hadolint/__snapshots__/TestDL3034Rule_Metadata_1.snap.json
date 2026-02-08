@@ -1,0 +1,10 @@
+{
+ "Category": "best-practice",
+ "Code": "hadolint/DL3034",
+ "DefaultSeverity": "warning",
+ "Description": "Non-interactive switch missing from `zypper` command: `zypper install -y`",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3034",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Use non-interactive with zypper"
+}

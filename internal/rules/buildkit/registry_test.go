@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/gkampitakis/go-snaps/snaps"
 )
 
 func TestRegistryHas22Rules(t *testing.T) {
@@ -39,18 +39,7 @@ func TestGetMetadata(t *testing.T) {
 	if meta == nil {
 		t.Fatal("GetMetadata(StageNameCasing) returned nil")
 	}
-
-	if meta.Code != "buildkit/StageNameCasing" {
-		t.Errorf("Code = %q, want %q", meta.Code, "buildkit/StageNameCasing")
-	}
-
-	if meta.DefaultSeverity != rules.SeverityWarning {
-		t.Errorf("DefaultSeverity = %v, want %v", meta.DefaultSeverity, rules.SeverityWarning)
-	}
-
-	if meta.Category != "style" {
-		t.Errorf("Category = %q, want %q", meta.Category, "style")
-	}
+	snaps.MatchStandaloneJSON(t, meta)
 }
 
 func TestByCategory(t *testing.T) {

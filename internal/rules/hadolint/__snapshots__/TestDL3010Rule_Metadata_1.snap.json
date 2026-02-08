@@ -1,0 +1,10 @@
+{
+ "Category": "performance",
+ "Code": "hadolint/DL3010",
+ "DefaultSeverity": "info",
+ "Description": "Use `ADD` for extracting archives into an image instead of `COPY` + `RUN tar/unzip`",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3010",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Use ADD for extracting archives into an image"
+}

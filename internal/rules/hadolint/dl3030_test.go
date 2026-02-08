@@ -3,6 +3,7 @@ package hadolint
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/testutil"
 )
 
@@ -140,13 +141,5 @@ RUN yum -y install httpd`,
 
 func TestDL3030Rule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewDL3030Rule()
-	meta := r.Metadata()
-
-	if meta.Code != "hadolint/DL3030" {
-		t.Errorf("got code %q, want %q", meta.Code, "hadolint/DL3030")
-	}
-	if meta.DocURL != "https://github.com/hadolint/hadolint/wiki/DL3030" {
-		t.Errorf("got doc URL %q, want %q", meta.DocURL, "https://github.com/hadolint/hadolint/wiki/DL3030")
-	}
+	snaps.MatchStandaloneJSON(t, NewDL3030Rule().Metadata())
 }

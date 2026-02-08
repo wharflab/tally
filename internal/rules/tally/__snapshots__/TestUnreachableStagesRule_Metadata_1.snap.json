@@ -1,0 +1,10 @@
+{
+ "Category": "best-practices",
+ "Code": "tally/no-unreachable-stages",
+ "DefaultSeverity": "warning",
+ "Description": "Disallows build stages that don't contribute to the final image",
+ "DocURL": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/no-unreachable-stages.md",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "No Unreachable Stages"
+}

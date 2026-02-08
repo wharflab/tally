@@ -1,0 +1,10 @@
+{
+ "Category": "correctness",
+ "Code": "buildkit/WorkdirRelativePath",
+ "DefaultSeverity": "warning",
+ "Description": "Relative WORKDIR path used without a base absolute path",
+ "DocURL": "https://docs.docker.com/go/dockerfile/rule/workdir-relative-path/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Relative WORKDIR Path"
+}

@@ -84,7 +84,8 @@ func TestCheck(t *testing.T) {
 		args       []string
 		env        []string
 		wantExit   int
-		snapExt    string // Snapshot file extension (default: ".json")
+		snapExt    string // Snapshot file extension override (e.g. ".sarif", ".txt", ".md")
+		snapRaw    bool   // If true, use MatchStandaloneSnapshot (plain text) instead of MatchStandaloneJSON
 		isDir      bool   // If true, pass the directory instead of Dockerfile
 		useContext bool   // If true, add --context flag for context-aware tests
 	}{
@@ -321,13 +322,20 @@ func TestCheck(t *testing.T) {
 		},
 
 		// Output format tests (isolated to buildkit rules)
-		{name: "format-sarif", dir: "buildkit-warnings", args: append([]string{"--format", "sarif"}, selectRules("buildkit/*")...), wantExit: 1},
+		{
+			name:     "format-sarif",
+			dir:      "buildkit-warnings",
+			args:     append([]string{"--format", "sarif"}, selectRules("buildkit/*")...),
+			wantExit: 1,
+			snapExt:  ".sarif",
+		},
 		{
 			name:     "format-github-actions",
 			dir:      "buildkit-warnings",
 			args:     append([]string{"--format", "github-actions"}, selectRules("buildkit/*")...),
 			wantExit: 1,
 			snapExt:  ".txt",
+			snapRaw:  true,
 		},
 		{
 			name:     "format-markdown",
@@ -335,6 +343,7 @@ func TestCheck(t *testing.T) {
 			args:     append([]string{"--format", "markdown"}, selectRules("buildkit/*")...),
 			wantExit: 1,
 			snapExt:  ".md",
+			snapRaw:  true,
 		},
 
 		// Fail-level tests (isolated to buildkit rules)
@@ -506,12 +515,6 @@ func TestCheck(t *testing.T) {
 				t.Errorf("expected exit code %d, got %d\noutput: %s", tc.wantExit, exitCode, output)
 			}
 
-			// Use appropriate snapshot extension based on output format
-			ext := tc.snapExt
-			if ext == "" {
-				ext = ".json"
-			}
-
 			// Normalize output for cross-platform snapshot comparison
 			outputStr := string(output)
 			// Normalize line endings (Windows CRLF -> LF) for consistent snapshots
@@ -526,16 +529,22 @@ func TestCheck(t *testing.T) {
 				}
 			}
 
-			if ext == ".json" {
-				snaps.WithConfig(
-					snaps.Ext(ext),
+			if tc.snapRaw {
+				// Non-JSON formats (e.g. github-actions .txt, markdown .md)
+				snaps.WithConfig(snaps.Ext(tc.snapExt)).MatchStandaloneSnapshot(t, outputStr)
+			} else {
+				// JSON output — MatchStandaloneJSON validates JSON and
+				// defaults to .snap.json; Ext overrides for variants like .sarif.
+				opts := []func(*snaps.Config){
 					snaps.JSON(snaps.JSONConfig{
 						SortKeys: true,
 						Indent:   "  ",
 					}),
-				).MatchStandaloneJSON(t, outputStr)
-			} else {
-				snaps.WithConfig(snaps.Ext(ext)).MatchStandaloneSnapshot(t, outputStr)
+				}
+				if tc.snapExt != "" {
+					opts = append(opts, snaps.Ext(tc.snapExt))
+				}
+				snaps.WithConfig(opts...).MatchStandaloneJSON(t, outputStr)
 			}
 		})
 	}

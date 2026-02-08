@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "tally/prefer-copy-heredoc",
+ "DefaultSeverity": "style",
+ "Description": "Use COPY \u003c\u003cEOF syntax instead of RUN echo/cat for creating files",
+ "DocURL": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/prefer-copy-heredoc.md",
+ "FixPriority": 99,
+ "IsExperimental": true,
+ "Name": "Prefer COPY heredoc for file creation"
+}

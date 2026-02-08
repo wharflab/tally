@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/tinovyatkin/tally/internal/dockerfile"
 	"github.com/tinovyatkin/tally/internal/rules"
 	"github.com/tinovyatkin/tally/internal/semantic"
@@ -29,15 +30,7 @@ func makeLintInput(t *testing.T, content string) rules.LintInput {
 
 func TestUnreachableStagesRule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewUnreachableStagesRule()
-	meta := r.Metadata()
-
-	if meta.Code != "tally/no-unreachable-stages" {
-		t.Errorf("expected code 'tally/no-unreachable-stages', got %q", meta.Code)
-	}
-	if meta.DefaultSeverity != rules.SeverityWarning {
-		t.Errorf("expected warning severity, got %v", meta.DefaultSeverity)
-	}
+	snaps.MatchStandaloneJSON(t, NewUnreachableStagesRule().Metadata())
 }
 
 func TestUnreachableStagesRule_SingleStage_NoViolation(t *testing.T) {

@@ -3,6 +3,7 @@ package buildkit
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
@@ -34,16 +35,7 @@ func (m *mockBuildContext) HasIgnoreFile() bool {
 
 func TestCopyIgnoredFileRule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewCopyIgnoredFileRule()
-	meta := r.Metadata()
-
-	if meta.Code != "buildkit/CopyIgnoredFile" {
-		t.Errorf("expected code %q, got %q", "buildkit/CopyIgnoredFile", meta.Code)
-	}
-
-	if meta.Category != "correctness" {
-		t.Errorf("expected category %q, got %q", "correctness", meta.Category)
-	}
+	snaps.MatchStandaloneJSON(t, NewCopyIgnoredFileRule().Metadata())
 }
 
 func TestCopyIgnoredFileRule_Check_NoContext(t *testing.T) {

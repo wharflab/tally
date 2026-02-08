@@ -3,6 +3,7 @@ package tally
 import (
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/tinovyatkin/tally/internal/rules"
@@ -10,20 +11,7 @@ import (
 
 func TestSecretsInCodeRule_Metadata(t *testing.T) {
 	t.Parallel()
-	r := NewSecretsInCodeRule()
-	meta := r.Metadata()
-
-	if meta.Code != "tally/secrets-in-code" {
-		t.Errorf("expected code %q, got %q", "tally/secrets-in-code", meta.Code)
-	}
-
-	if meta.Category != "security" {
-		t.Errorf("expected category %q, got %q", "security", meta.Category)
-	}
-
-	if meta.DefaultSeverity != rules.SeverityError {
-		t.Errorf("expected severity %v, got %v", rules.SeverityError, meta.DefaultSeverity)
-	}
+	snaps.MatchStandaloneJSON(t, NewSecretsInCodeRule().Metadata())
 }
 
 func TestSecretsInCodeRule_Check_AWSKeyInHeredoc(t *testing.T) {
