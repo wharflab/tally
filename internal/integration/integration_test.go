@@ -169,6 +169,12 @@ func TestCheck(t *testing.T) {
 			args:     append([]string{"--format", "json"}, selectRules("buildkit/InvalidDefinitionDescription")...),
 			wantExit: 1,
 		},
+		{
+			name:     "legacy-key-value-format",
+			dir:      "legacy-key-value-format",
+			args:     append([]string{"--format", "json"}, selectRules("buildkit/LegacyKeyValueFormat")...),
+			wantExit: 1,
+		},
 
 		// Semantic model construction-time violations
 		// Note: These violations come from semantic analysis, not the rule registry.
@@ -628,6 +634,35 @@ RUN apt-get install curl
 `,
 			args:        []string{"--fix", "--fix-unsafe", "--ignore", "tally/prefer-run-heredoc"},
 			wantApplied: 2, // DL3003 + DL3027
+		},
+		// LegacyKeyValueFormat: Replace legacy "ENV key value" with "ENV key=value"
+		{
+			name:        "legacy-key-value-format-simple",
+			input:       "FROM alpine:3.18\nENV foo bar\n",
+			want:        "FROM alpine:3.18\nENV foo=bar\n",
+			args:        []string{"--fix"},
+			wantApplied: 1,
+		},
+		{
+			name:        "legacy-key-value-format-multi-word",
+			input:       "FROM alpine:3.18\nENV MY_VAR hello world\n",
+			want:        "FROM alpine:3.18\nENV MY_VAR=\"hello world\"\n",
+			args:        []string{"--fix"},
+			wantApplied: 1,
+		},
+		{
+			name:        "legacy-key-value-format-label",
+			input:       "FROM alpine:3.18\nLABEL maintainer John Doe\n",
+			want:        "FROM alpine:3.18\nLABEL maintainer=\"John Doe\"\n",
+			args:        []string{"--fix"},
+			wantApplied: 1,
+		},
+		{
+			name:        "legacy-key-value-format-multiple",
+			input:       "FROM alpine:3.18\nENV foo bar\nLABEL version 1.0\n",
+			want:        "FROM alpine:3.18\nENV foo=bar\nLABEL version=1.0\n",
+			args:        []string{"--fix"},
+			wantApplied: 2,
 		},
 		// MaintainerDeprecated: Replace MAINTAINER with LABEL
 		{

@@ -31,7 +31,7 @@ echo "\nconda activate default" >>~/.bashrc
 /opt/conda/bin/conda clean -a
 EOF
 
-ENV BASH_ENV ~/.bashrc
+ENV BASH_ENV=~/.bashrc
 ENV PATH="${PATH}:/opt/conda/envs/default/bin"
 
 RUN <<EOF
@@ -284,7 +284,7 @@ echo "\nconda activate default" >>~/.bashrc
 /opt/conda/bin/conda clean -a
 EOF
 
-ENV BASH_ENV ~/.bashrc
+ENV BASH_ENV=~/.bashrc
 ENV PATH="${PATH}:/opt/conda/envs/default/bin"
 
 #RUN conda config --set auto_activate_base false && conda create --name default python={PYHON_VERSION} && echo "source activate default" >> ~/.bashrc
