@@ -193,7 +193,7 @@ func FindCommands(script string, variant Variant, names ...string) []CommandInfo
 
 		// Extract all arguments and find subcommand with position
 		for _, arg := range call.Args[1:] {
-			lit := arg.Lit()
+			lit := extractQuotedContent(arg)
 			if lit == "" {
 				continue
 			}
@@ -235,7 +235,7 @@ func findWrappedCommands(args []*syntax.Word, variant Variant, wrapperName strin
 
 			// Extract remaining args and find subcommand with position
 			for _, ra := range wa.RemainingArgs {
-				raLit := ra.Lit()
+				raLit := extractQuotedContent(ra)
 				if raLit == "" {
 					continue
 				}

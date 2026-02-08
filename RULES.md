@@ -16,10 +16,9 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 6 | - | 6 |
+| tally | 7 | - | 7 |
 | buildkit | 8 + 5 captured | - | 22 |
-| hadolint | 18 | 9 | 66 |
-
+| hadolint | 19 | 9 | 66 |
 <!-- END RULES_SUMMARY -->
 
 ---
@@ -33,6 +32,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | `tally/secrets-in-code` | Detects hardcoded secrets, API keys, and credentials using [gitleaks](https://github.com/gitleaks/gitleaks) patterns | Error | Security | Enabled |
 | `tally/max-lines` | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
 | `tally/no-unreachable-stages` | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
+| `tally/prefer-add-unpack` | Suggests `ADD --unpack` instead of downloading and extracting remote archives in `RUN` | Info | Performance | Enabled |
 | `tally/prefer-copy-heredoc` | Suggests using COPY heredoc for file creation instead of RUN echo/cat | Style | Style | Off (experimental) |
 | `tally/prefer-run-heredoc` | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Off (experimental) |
 | `tally/consistent-indentation` | Enforces consistent indentation for Dockerfile build stages | Style | Style | Off (experimental) |
@@ -65,6 +65,25 @@ Limits Dockerfile size to encourage modular builds. Enabled by default with a 50
 ### tally/no-unreachable-stages
 
 Detects stages that are defined but never used (not referenced by `--target` or `COPY --from`).
+
+### tally/prefer-add-unpack
+
+Detects `RUN` instructions that download a remote archive via `curl`/`wget` and extract it with `tar` or other tools, suggesting `ADD --unpack <url> <dest>` instead.
+
+`ADD --unpack` is a BuildKit feature that downloads and extracts a remote archive in a single layer, reducing image size and build complexity.
+
+**Detected patterns:**
+
+- **Pipe:** `curl -fsSL <url> | tar -xz -C /opt/`
+- **Download-then-extract:** `curl -o /tmp/app.tar.gz <url> && tar -xf /tmp/app.tar.gz`
+- **wget variants:** `wget -qO- <url> | tar -xz`
+- **Other extractors:** `gunzip`, `bunzip2`, `unxz`, `unzip`, etc.
+
+Recognized archive extensions: `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, `.tar`, `.gz`, `.bz2`, `.xz`, and more.
+
+**Options:**
+
+- `enabled`: Enable or disable the rule (default: true)
 
 ### tally/prefer-copy-heredoc
 
@@ -284,7 +303,6 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 ### DL Rules (Dockerfile Lint)
 
 <!-- BEGIN HADOLINT_DL_RULES -->
-
 | Rule | Description | Severity | Status |
 |------|-------------|----------|--------|
 | [DL1001](https://github.com/hadolint/hadolint/wiki/DL1001) | Please refrain from using inline ignore pragmas `# hadolint ignore=DLxxxx`. | Ignore | ⏳ |
@@ -297,7 +315,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL3007](https://github.com/hadolint/hadolint/wiki/DL3007) | Using latest is prone to errors if the image will ever update. Pin the version explicitly to a release tag. | Warning | ✅ `hadolint/DL3007` |
 | [DL3008](https://github.com/hadolint/hadolint/wiki/DL3008) | Pin versions in apt-get install. | Warning | ⏳ |
 | [DL3009](https://github.com/hadolint/hadolint/wiki/DL3009) | Delete the apt-get lists after installing something. | Info | ⏳ |
-| [DL3010](https://github.com/hadolint/hadolint/wiki/DL3010) | Use ADD for extracting archives into an image. | Info | ⏳ |
+| [DL3010](https://github.com/hadolint/hadolint/wiki/DL3010) | Use ADD for extracting archives into an image. | Info | ✅ `hadolint/DL3010` |
 | [DL3011](https://github.com/hadolint/hadolint/wiki/DL3011) | Valid UNIX ports range from 0 to 65535. | Error | ⏳ |
 | [DL3012](https://github.com/hadolint/hadolint/wiki/DL3012) | Multiple `HEALTHCHECK` instructions. | Error | ✅ `hadolint/DL3012` |
 | [DL3013](https://github.com/hadolint/hadolint/wiki/DL3013) | Pin versions in pip. | Warning | ⏳ |
@@ -353,7 +371,6 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL4004](https://github.com/hadolint/hadolint/wiki/DL4004) | Multiple `ENTRYPOINT` instructions found. | Error | 🔄 `buildkit/MultipleInstructionsDisallowed` |
 | [DL4005](https://github.com/hadolint/hadolint/wiki/DL4005) | Use `SHELL` to change the default shell. | Warning | ⏳ |
 | [DL4006](https://github.com/hadolint/hadolint/wiki/DL4006) | Set the `SHELL` option -o pipefail before `RUN` with a pipe in it | Warning | ⏳ |
-
 <!-- END HADOLINT_DL_RULES -->
 
 ### SC Rules (ShellCheck)

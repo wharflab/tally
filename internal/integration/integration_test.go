@@ -255,6 +255,12 @@ func TestCheck(t *testing.T) {
 			wantExit: 1,
 		},
 		{
+			name:     "dl3010",
+			dir:      "dl3010",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3010")...),
+			wantExit: 1,
+		},
+		{
 			name:     "dl3021",
 			dir:      "dl3021",
 			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3021")...),
@@ -420,6 +426,22 @@ func TestCheck(t *testing.T) {
 			name:     "prefer-run-heredoc",
 			dir:      "prefer-run-heredoc",
 			args:     append([]string{"--format", "json"}, selectRules("tally/prefer-run-heredoc")...),
+			wantExit: 1,
+		},
+
+		{
+			name:     "prefer-add-unpack",
+			dir:      "prefer-add-unpack",
+			args:     append([]string{"--format", "json"}, selectRules("tally/prefer-add-unpack")...),
+			wantExit: 1,
+		},
+
+		// Combined: prefer-add-unpack with prefer-run-heredoc (both should fire)
+		{
+			name: "prefer-add-unpack-heredoc",
+			dir:  "prefer-add-unpack-heredoc",
+			args: append([]string{"--format", "json"},
+				selectRules("tally/prefer-add-unpack", "tally/prefer-run-heredoc")...),
 			wantExit: 1,
 		},
 
@@ -1176,5 +1198,68 @@ func TestFixConsistentIndentation(t *testing.T) {
 
 	if !strings.Contains(string(output), "Fixed") {
 		t.Errorf("expected 'Fixed' in output, got: %s", output)
+	}
+}
+
+// TestFixPreferAddUnpackBeatsHeredoc verifies that prefer-add-unpack (sync fix, priority 95)
+// takes priority over prefer-run-heredoc (async fix, priority 100) when both rules target the
+// same consecutive RUN instructions. After fixing, all RUNs become ADD --unpack.
+// The prefer-run-heredoc violation still reports (exit code 1) since its fix was superseded.
+func TestFixPreferAddUnpackBeatsHeredoc(t *testing.T) {
+	t.Parallel()
+
+	input := "FROM ubuntu:22.04\n" +
+		"RUN curl -fsSL https://go.dev/dl/go1.22.0.linux-amd64.tar.gz | tar -xz -C /usr/local\n" +
+		"RUN curl -fsSL https://nodejs.org/dist/v20.11.0/node-v20.11.0-linux-x64.tar.xz | tar -xJ -C /usr/local\n" +
+		"RUN curl -fsSL https://example.com/app.tar.gz | tar -xz -C /opt\n"
+
+	want := "FROM ubuntu:22.04\n" +
+		"ADD --unpack https://go.dev/dl/go1.22.0.linux-amd64.tar.gz /usr/local\n" +
+		"ADD --unpack https://nodejs.org/dist/v20.11.0/node-v20.11.0-linux-x64.tar.xz /usr/local\n" +
+		"ADD --unpack https://example.com/app.tar.gz /opt\n"
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte(input), 0o644); err != nil {
+		t.Fatalf("failed to write Dockerfile: %v", err)
+	}
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	if err := os.WriteFile(configPath, []byte(""), 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	args := []string{
+		"check", "--config", configPath,
+		"--fix-unsafe", "--fix",
+		"--select", "tally/prefer-add-unpack",
+		"--select", "tally/prefer-run-heredoc",
+		dockerfilePath,
+	}
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	output, err := cmd.CombinedOutput()
+	// Exit code 1 expected: prefer-run-heredoc violation remains (fix superseded)
+	if err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			t.Fatalf("command failed to run: %v", err)
+		}
+		if exitErr.ExitCode() != 1 {
+			t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
+		}
+	}
+
+	fixed, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read fixed Dockerfile: %v", err)
+	}
+
+	if string(fixed) != want {
+		t.Errorf("fixed content mismatch:\ngot:\n%s\nwant:\n%s\noutput:\n%s", fixed, want, output)
+	}
+
+	outputStr := string(output)
+	if !strings.Contains(outputStr, "Fixed") {
+		t.Errorf("expected 'Fixed' in output, got: %s", outputStr)
 	}
 }

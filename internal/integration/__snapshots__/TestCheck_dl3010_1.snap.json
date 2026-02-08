@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "testdata/dl3010/Dockerfile",
+      "violations": [
+        {
+          "detail": "When copying an archive that is immediately extracted, use `ADD` instead of `COPY` + `RUN tar/unzip`. `ADD` automatically extracts recognized archive formats during the build.",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3010",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "testdata/dl3010/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "use `ADD` for extracting archives into an image",
+          "rule": "hadolint/DL3010",
+          "severity": "info",
+          "sourceCode": "COPY packaged-app.tar /usr/src/app"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

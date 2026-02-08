@@ -1,0 +1,58 @@
+{
+  "files": [
+    {
+      "file": "testdata/prefer-add-unpack/Dockerfile",
+      "violations": [
+        {
+          "detail": "Instead of using curl/wget to download an archive and extracting it in a `RUN` command, use `ADD --unpack \u003curl\u003e \u003cdest\u003e` which downloads and extracts in a single layer. This reduces image size and build complexity. Requires BuildKit.",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "testdata/prefer-add-unpack/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "use `ADD --unpack \u003curl\u003e \u003cdest\u003e` instead of downloading and extracting in `RUN`",
+          "rule": "tally/prefer-add-unpack",
+          "severity": "info",
+          "sourceCode": "RUN curl -fsSL https://go.dev/dl/go1.22.0.linux-amd64.tar.gz | tar -xz -C /usr/local",
+          "suggestedFix": {
+            "description": "Replace with ADD --unpack https://go.dev/dl/go1.22.0.linux-amd64.tar.gz /usr/local",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 84,
+                    "line": 2
+                  },
+                  "file": "testdata/prefer-add-unpack/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 2
+                  }
+                },
+                "newText": "ADD --unpack https://go.dev/dl/go1.22.0.linux-amd64.tar.gz /usr/local"
+              }
+            ],
+            "priority": 95,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

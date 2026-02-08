@@ -1,0 +1,63 @@
+{
+  "files": [
+    {
+      "file": "testdata/prefer-add-unpack-heredoc/Dockerfile",
+      "violations": [
+        {
+          "detail": "Instead of using curl/wget to download an archive and extracting it in a `RUN` command, use `ADD --unpack \u003curl\u003e \u003cdest\u003e` which downloads and extracts in a single layer. This reduces image size and build complexity. Requires BuildKit.",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "testdata/prefer-add-unpack-heredoc/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "use `ADD --unpack \u003curl\u003e \u003cdest\u003e` instead of downloading and extracting in `RUN`",
+          "rule": "tally/prefer-add-unpack",
+          "severity": "info",
+          "sourceCode": "RUN apt-get update \u0026\u0026 \\"
+        },
+        {
+          "detail": "RUN has 4 chained commands; consider using heredoc syntax for better readability",
+          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "testdata/prefer-add-unpack-heredoc/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "RUN instruction with chained commands can use heredoc syntax",
+          "rule": "tally/prefer-run-heredoc",
+          "severity": "style",
+          "sourceCode": "RUN apt-get update \u0026\u0026 \\",
+          "suggestedFix": {
+            "description": "Convert chained commands to heredoc (4 commands)",
+            "needsResolve": true,
+            "priority": 100,
+            "resolverId": "prefer-run-heredoc",
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 2,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 1,
+    "total": 2,
+    "warnings": 0
+  }
+}
