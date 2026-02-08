@@ -178,7 +178,7 @@ func runCheck(ctx stdcontext.Context, cmd *cli.Command) error {
 	res, err := lintFiles(ctx, discovered, cmd)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(ExitConfigError)
+		return cli.Exit("", ExitConfigError)
 	}
 
 	// Build processor chain for violation processing.
