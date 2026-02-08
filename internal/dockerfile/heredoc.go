@@ -1,6 +1,8 @@
 package dockerfile
 
 import (
+	"slices"
+
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 )
 
@@ -118,12 +120,9 @@ func HasHeredocs(result *ParseResult) bool {
 		return false
 	}
 
-	for _, node := range result.AST.AST.Children {
-		if len(node.Heredocs) > 0 {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(result.AST.AST.Children, func(node *parser.Node) bool {
+		return len(node.Heredocs) > 0
+	})
 }
 
 // IsInlineSource returns true if the heredoc is inline content (COPY/ADD).

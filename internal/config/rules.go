@@ -2,6 +2,7 @@ package config
 
 import (
 	"maps"
+	"slices"
 	"strings"
 
 	"github.com/tinovyatkin/tally/internal/rules/configutil"
@@ -142,12 +143,9 @@ func (rc *RulesConfig) IsEnabled(ruleCode string) *bool {
 // - Exact match: "buildkit/StageNameCasing"
 // - Namespace wildcard: "buildkit/*"
 func matchesAnyPattern(ruleCode string, patterns []string) bool {
-	for _, pattern := range patterns {
-		if matchesPattern(ruleCode, pattern) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(patterns, func(pattern string) bool {
+		return matchesPattern(ruleCode, pattern)
+	})
 }
 
 // matchesPattern checks if ruleCode matches a single pattern.

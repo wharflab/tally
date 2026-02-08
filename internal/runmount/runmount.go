@@ -6,6 +6,7 @@
 package runmount
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -44,12 +45,9 @@ func GetMounts(run *instructions.RunCommand) []*instructions.Mount {
 
 // hasMountFlags checks if the RUN command has any mount flags.
 func hasMountFlags(run *instructions.RunCommand) bool {
-	for _, flag := range run.FlagsUsed {
-		if strings.HasPrefix(flag, "mount") {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(run.FlagsUsed, func(flag string) bool {
+		return strings.HasPrefix(flag, "mount")
+	})
 }
 
 // mountsPopulated checks if mounts have been properly parsed (not just defaults).

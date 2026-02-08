@@ -7,6 +7,7 @@ package sourcemap
 
 import (
 	"bytes"
+	"slices"
 	"strings"
 )
 
@@ -181,12 +182,9 @@ func isDirectiveComment(text string) bool {
 		"parser-dialect=", // Parser directive (BuildKit)
 	}
 
-	for _, directive := range directives {
-		if strings.HasPrefix(lower, directive) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(directives, func(directive string) bool {
+		return strings.HasPrefix(lower, directive)
+	})
 }
 
 // CommentsForLine returns all comments that appear immediately before a line.
