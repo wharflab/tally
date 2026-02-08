@@ -67,18 +67,18 @@ Detects stages that are defined but never used (not referenced by `--target` or 
 
 ### tally/prefer-add-unpack
 
-Detects `RUN` instructions that download a remote archive via `curl`/`wget` and extract it with `tar` or other tools, suggesting `ADD --unpack <url> <dest>` instead.
+Detects `RUN` instructions that download a remote archive via `curl`/`wget` and extract it. Tar-based archives can be replaced with `ADD --unpack <url> <dest>`; single-file decompressors are reported without a fix.
 
-`ADD --unpack` is a BuildKit feature that downloads and extracts a remote archive in a single layer, reducing image size and build complexity.
+`ADD --unpack` is a BuildKit feature that downloads and extracts a remote tar archive in a single layer, reducing image size and build complexity.
 
 **Detected patterns:**
 
 - **Pipe:** `curl -fsSL <url> | tar -xz -C /opt/`
 - **Download-then-extract:** `curl -o /tmp/app.tar.gz <url> && tar -xf /tmp/app.tar.gz`
 - **wget variants:** `wget -qO- <url> | tar -xz`
-- **Other extractors:** `gunzip`, `bunzip2`, `unxz`, `unzip`, etc.
+- **Other extractors:** `gunzip`, `bunzip2`, `unxz`, `unzip`, etc. (flagged but not auto-fixed)
 
-Recognized archive extensions: `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, `.tar`, `.gz`, `.bz2`, `.xz`, and more.
+Recognized archive extensions include tar variants (`.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, `.tar`) and single-file compressions (`.gz`, `.bz2`, `.xz`).
 
 **Options:**
 
