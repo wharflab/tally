@@ -253,11 +253,11 @@ RUN curl https://foo.com/latest -o setup.sh && chmod +x setup.sh
 func TestPreferAddUnpackRule_Fix(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name     string
+		name       string
 		dockerfile string
-		wantFix  bool   // whether a SuggestedFix should be attached
-		wantURL  string // expected URL in fix (empty if wantFix==false)
-		wantDest string // expected dest in fix
+		wantFix    bool   // whether a SuggestedFix should be attached
+		wantURL    string // expected URL in fix (empty if wantFix==false)
+		wantDest   string // expected dest in fix
 	}{
 		{
 			name: "simple pipe: curl | tar -C /usr/local",
@@ -423,5 +423,3 @@ RUN wget https://foo.com/latest -O /tmp/app.tar.gz && tar -xf /tmp/app.tar.gz -C
 		})
 	}
 }
-
-
