@@ -1,3 +1,4 @@
+---
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: 'en-US'
 early_access: true
@@ -12,7 +13,7 @@ reviews:
     enabled: true
     drafts: false
     labels:
-      - '!autorelease: tagged'  # release-please
+      - '!autorelease: tagged' # release-please
   tools:
     ast-grep:
       rule_dirs:
@@ -49,7 +50,37 @@ reviews:
       instructions: |
         This project targets Go 1.25.6 (see go.mod)
         When reviewing Go code, insist on usage of newest, modern Go features, not older versions.
-
+    - path: 'internal/rules/**/*.go'
+      instructions: |
+        When reviewing changes or additions to linting rules, prioritize cross-rule interaction analysis:
+        1. Could this rule break or conflict with another existing rule?
+        2. Could this rule compete with another rule for the same Dockerfile instruction or pattern?
+        3. Could the auto-fix produced by this rule be flagged as a violation by another rule?
+        Flag any PR that introduces or modifies a rule but is missing:
+        - Documentation of known cross-rule interactions (in code comments or RULES.md)
+        - Test cases that cover overlapping scenarios with related rules
+        These cross-rule concerns should take special priority in the review.
+    - path: 'internal/rules/tally/**/*.go'
+      instructions: |
+        Every new tally rule must be accompanied by a corresponding documentation page under docs/rules/tally/.
+        Flag the PR if a new rule file is added here but there is no matching documentation file in docs/rules/tally/.
+    - path: 'internal/rules/hadolint/**/*.go'
+      instructions: |
+        Ported Hadolint rules must match the exact behavior of the original Haskell implementation in the hadolint/hadolint repository.
+        When reviewing a new or modified hadolint rule:
+        1. Verify that ALL test cases from the original Hadolint spec (both ruleCatches and ruleCatchesNot) are present in the Go test file.
+        2. Flag any behavioral deviation from the original rule unless explicitly documented and justified.
+        3. Ensure shell command parsing uses the internal/shell package — never regex or string splitting.
+        4. Confirm hadolint-status.json is updated for any newly implemented rule.
+    - path: 'internal/rules/buildkit/**/*.go'
+      instructions: |
+        BuildKit rules wrap checks originating from the BuildKit/Dockerfile frontend. They must match the exact behavior of the upstream BuildKit linter.
+        When reviewing a new or modified BuildKit rule:
+        1. Verify the rule's detection matches the upstream BuildKit check (see https://docs.docker.com/reference/build-checks/).
+        2. If auto-fix support is added, confirm the fix enricher is registered in internal/rules/buildkit/fixes/enricher.go.
+        3. Ensure fix safety level (FixSafe, FixSuggestion, FixUnsafe) is appropriate for the transformation.
+        4. Flag any PR adding a fix without corresponding unit tests in fixes_test.go and an integration test fixture in testdata/.
+        5. Verify that position helpers (getLine, createEditLocation) are used correctly — getLine is 0-based, createEditLocation is 1-based.
     - path: '**/internal/integration/testdata/**'
       instructions: |
         These are test fixture files that contain intentional code patterns for testing purposes.
