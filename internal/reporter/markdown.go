@@ -43,72 +43,74 @@ func (r *MarkdownReporter) Report(violations []rules.Violation, _ map[string][]b
 	}
 	fileCount := len(fileSet)
 
-	// Write summary
+	// Write summary and table
 	if fileCount == 1 {
-		// Single file - get the filename
 		var filename string
 		for f := range fileSet {
 			filename = f
 		}
-		if _, err := fmt.Fprintf(r.writer, "**%d %s** in `%s`\n\n",
-			len(sorted), pluralize(len(sorted), "issue", "issues"), filename); err != nil {
-			return err
-		}
+		return r.writeSingleFileTable(sorted, filename)
+	}
 
-		// Single file table (no File column)
-		if _, err := fmt.Fprintln(r.writer, "| Line | Issue |"); err != nil {
-			return err
-		}
-		if _, err := fmt.Fprintln(r.writer, "|------|-------|"); err != nil {
-			return err
-		}
+	return r.writeMultiFileTable(sorted, fileCount)
+}
 
-		for _, v := range sorted {
-			line := v.Location.Start.Line
-			if v.Location.IsFileLevel() {
-				line = 0
-			}
-			lineStr := "-"
-			if line > 0 {
-				lineStr = strconv.Itoa(line)
-			}
-			if _, err := fmt.Fprintf(r.writer, "| %s | %s %s |\n",
-				lineStr, severityEmoji(v.Severity), escapeMarkdown(v.Message)); err != nil {
-				return err
-			}
-		}
-	} else {
-		// Multiple files
-		if _, err := fmt.Fprintf(r.writer, "**%d %s** across %d files\n\n",
-			len(sorted), pluralize(len(sorted), "issue", "issues"), fileCount); err != nil {
-			return err
-		}
+// writeSingleFileTable writes a markdown table for violations in a single file.
+func (r *MarkdownReporter) writeSingleFileTable(sorted []rules.Violation, filename string) error {
+	if _, err := fmt.Fprintf(r.writer, "**%d %s** in `%s`\n\n",
+		len(sorted), pluralize(len(sorted), "issue", "issues"), filename); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(r.writer, "| Line | Issue |"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(r.writer, "|------|-------|"); err != nil {
+		return err
+	}
 
-		// Multi-file table
-		if _, err := fmt.Fprintln(r.writer, "| File | Line | Issue |"); err != nil {
+	for _, v := range sorted {
+		if _, err := fmt.Fprintf(r.writer, "| %s | %s %s |\n",
+			formatLineNumber(v), severityEmoji(v.Severity), escapeMarkdown(v.Message)); err != nil {
 			return err
-		}
-		if _, err := fmt.Fprintln(r.writer, "|------|------|-------|"); err != nil {
-			return err
-		}
-
-		for _, v := range sorted {
-			line := v.Location.Start.Line
-			if v.Location.IsFileLevel() {
-				line = 0
-			}
-			lineStr := "-"
-			if line > 0 {
-				lineStr = strconv.Itoa(line)
-			}
-			if _, err := fmt.Fprintf(r.writer, "| %s | %s | %s %s |\n",
-				v.Location.File, lineStr, severityEmoji(v.Severity), escapeMarkdown(v.Message)); err != nil {
-				return err
-			}
 		}
 	}
 
 	return nil
+}
+
+// writeMultiFileTable writes a markdown table for violations across multiple files.
+func (r *MarkdownReporter) writeMultiFileTable(sorted []rules.Violation, fileCount int) error {
+	if _, err := fmt.Fprintf(r.writer, "**%d %s** across %d files\n\n",
+		len(sorted), pluralize(len(sorted), "issue", "issues"), fileCount); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(r.writer, "| File | Line | Issue |"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(r.writer, "|------|------|-------|"); err != nil {
+		return err
+	}
+
+	for _, v := range sorted {
+		if _, err := fmt.Fprintf(r.writer, "| %s | %s | %s %s |\n",
+			v.Location.File, formatLineNumber(v), severityEmoji(v.Severity), escapeMarkdown(v.Message)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// formatLineNumber returns the display string for a violation's line number.
+func formatLineNumber(v rules.Violation) string {
+	line := v.Location.Start.Line
+	if v.Location.IsFileLevel() {
+		line = 0
+	}
+	if line > 0 {
+		return strconv.Itoa(line)
+	}
+	return "-"
 }
 
 // SortViolationsBySeverity sorts violations by severity (errors first), then by file and line.

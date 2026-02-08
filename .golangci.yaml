@@ -18,11 +18,8 @@ linters:
     - gochecknoinits # init functions - CLI requires them
     - godoclint # doc lint - too strict
     - godot # dots at end of comments - too strict
-    - gomoddirectives # module directives - not needed
     - ireturn # return interfaces - too strict for this codebase
-    - maintidx # maintainability index - not needed
     - mnd # magic numbers - too noisy
-    - nestif # nested ifs - too strict
     - nlreturn # newlines before returns - too opinionated
     - noctx # context in http - not applicable
     - noinlineerr # inline errors - too strict
@@ -42,6 +39,8 @@ linters:
       min-complexity: 43
     cyclop:
       max-complexity: 26
+    nestif:
+      min-complexity: 13
     custom:
       customlint:
         type: module
@@ -120,6 +119,10 @@ linters:
       - linters:
           - gosec
         text: "G304"
+      - linters:
+          - maintidx
+          - mnd
+        path: ".*_test\\.go"
       # gosec: allow subprocess with variables in tests and CLI
       - linters:
           - gosec

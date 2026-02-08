@@ -177,49 +177,36 @@ func buildMultiCdFix(cds []shell.CdCommand, variant shell.Variant) string {
 	// The RemainingCommands of cd[i] contains everything after it, including cd[i+1]
 	// We need to extract just the commands between cd[i] and cd[i+1]
 
-	for i := range cds {
+	// Handle first cd's remaining commands (WORKDIR already emitted above)
+	if len(cds) > 1 {
+		if between := commandsBetweenCds(first, cds[1], variant); between != "" {
+			parts = append(parts, "RUN "+between)
+		}
+	} else if first.RemainingCommands != "" {
+		parts = append(parts, "RUN "+first.RemainingCommands)
+	}
+
+	// Handle subsequent cds
+	for i := 1; i < len(cds); i++ {
 		cd := cds[i]
+		parts = append(parts, "WORKDIR "+cd.TargetDir)
 
-		if i == 0 {
-			// Already handled first cd above, but need to handle commands after it
-			if len(cds) == 1 {
-				// Only one cd - emit remaining commands if any
-				if cd.RemainingCommands != "" {
-					parts = append(parts, "RUN "+cd.RemainingCommands)
-				}
-			} else {
-				// Multiple cds - extract commands between first and second cd using shell parser
-				nextCd := cds[1]
-				cmdsBetween := shell.ExtractCommandsBetweenCds(cd.RemainingCommands, variant)
-				// Remove redundant mkdir for next cd's target
-				cmdsBetween = removeRedundantMkdir(cmdsBetween, nextCd.TargetDir)
-				if cmdsBetween != "" {
-					parts = append(parts, "RUN "+cmdsBetween)
-				}
+		if i < len(cds)-1 {
+			if between := commandsBetweenCds(cd, cds[i+1], variant); between != "" {
+				parts = append(parts, "RUN "+between)
 			}
-		} else {
-			// For subsequent cds, emit WORKDIR
-			parts = append(parts, "WORKDIR "+cd.TargetDir)
-
-			if i == len(cds)-1 {
-				// Last cd - emit remaining commands if any
-				if cd.RemainingCommands != "" {
-					parts = append(parts, "RUN "+cd.RemainingCommands)
-				}
-			} else {
-				// Not last - extract commands between this cd and the next using shell parser
-				nextCd := cds[i+1]
-				cmdsBetween := shell.ExtractCommandsBetweenCds(cd.RemainingCommands, variant)
-				// Remove redundant mkdir for next cd's target
-				cmdsBetween = removeRedundantMkdir(cmdsBetween, nextCd.TargetDir)
-				if cmdsBetween != "" {
-					parts = append(parts, "RUN "+cmdsBetween)
-				}
-			}
+		} else if cd.RemainingCommands != "" {
+			parts = append(parts, "RUN "+cd.RemainingCommands)
 		}
 	}
 
 	return strings.Join(parts, "\n")
+}
+
+// commandsBetweenCds extracts and cleans commands between two consecutive cd commands.
+func commandsBetweenCds(current, next shell.CdCommand, variant shell.Variant) string {
+	cmdsBetween := shell.ExtractCommandsBetweenCds(current.RemainingCommands, variant)
+	return removeRedundantMkdir(cmdsBetween, next.TargetDir)
 }
 
 // removeRedundantMkdir removes "mkdir <target>" from commands since WORKDIR creates the directory.
