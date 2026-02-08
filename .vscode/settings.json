@@ -55,5 +55,6 @@
     "GOEXPERIMENT": "jsonv2",
     "GOSUMDB": "sum.golang.org",
     "CGO_ENABLED": 0
-  }
+  },
+  "sarif-viewer.connectToGithubCodeScanning": "off"
 }

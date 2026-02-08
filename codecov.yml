@@ -12,10 +12,10 @@ coverage:
       default:
         target: 80%
 ignore:
-  - "internal/testutil/**"
-  - "internal/integration/testdata/**"
+  - "**/internal/testutil/**"
+  - "**/internal/integration/testdata/**"
   # Generated LSP protocol types.
-  - "internal/lsp/protocol/*_generated.go"
+  - "**/*_generated.go" # Ignore Generated Code
   - "scripts/**"
   # Go coverage profiles can use module-prefixed paths.
   - "github.com/tinovyatkin/tally/internal/lsp/protocol/*_generated.go"
