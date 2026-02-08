@@ -141,6 +141,11 @@ linters:
           - tparallel
         path: "internal/config/config_test\\.go"
         text: "TestDiscover|TestLoad"
+      # paralleltest: tests mutate global resolver registry
+      - linters:
+          - paralleltest
+        path: "internal/fix/(resolver|fixer)_test\\.go"
+        text: "TestResolverRegistry|TestRegisterResolver_Duplicate|TestFixer_Apply_AsyncFix|TestFixer_Apply_DefaultConcurrency"
       # dupl: allow duplicate code in tests (table-driven test patterns)
       - linters:
           - dupl

@@ -1126,7 +1126,7 @@ func (r *testResolver) Resolve(ctx context.Context, resolveCtx ResolveContext, f
 }
 
 func TestFixer_Apply_AsyncFix_WithResolver(t *testing.T) {
-	t.Parallel()
+	// Not parallel: mutates global resolver registry.
 	ClearResolvers()
 	defer ClearResolvers()
 
@@ -1180,7 +1180,7 @@ func TestFixer_Apply_AsyncFix_WithResolver(t *testing.T) {
 }
 
 func TestFixer_Apply_AsyncFix_ResolverError(t *testing.T) {
-	t.Parallel()
+	// Not parallel: mutates global resolver registry.
 	ClearResolvers()
 	defer ClearResolvers()
 
@@ -1232,7 +1232,7 @@ func TestFixer_Apply_AsyncFix_ResolverError(t *testing.T) {
 }
 
 func TestFixer_Apply_AsyncFix_UnknownResolver(t *testing.T) {
-	t.Parallel()
+	// Not parallel: mutates global resolver registry.
 	ClearResolvers()
 	defer ClearResolvers()
 
@@ -1328,7 +1328,7 @@ func TestFixer_Apply_ViolationForUnknownFile(t *testing.T) {
 }
 
 func TestFixer_Apply_DefaultConcurrency(t *testing.T) {
-	t.Parallel()
+	// Not parallel: mutates global resolver registry.
 	ClearResolvers()
 	defer ClearResolvers()
 

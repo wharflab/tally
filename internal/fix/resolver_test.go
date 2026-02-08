@@ -21,7 +21,7 @@ func (m *mockResolver) Resolve(_ context.Context, _ ResolveContext, _ *rules.Sug
 }
 
 func TestResolverRegistry(t *testing.T) {
-	t.Parallel()
+	// Not parallel: mutates global resolver registry.
 	// Clear registry before test
 	ClearResolvers()
 	defer ClearResolvers()
@@ -52,7 +52,7 @@ func TestResolverRegistry(t *testing.T) {
 }
 
 func TestRegisterResolver_Duplicate(t *testing.T) {
-	t.Parallel()
+	// Not parallel: mutates global resolver registry.
 	ClearResolvers()
 	defer ClearResolvers()
 
