@@ -27,7 +27,6 @@ const (
 	ExitConfigError = 2 // Parse or config error
 )
 
-//nolint:gocyclo // CLI command with many flags inherently has high cyclomatic complexity
 func checkCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "check",
@@ -138,199 +137,204 @@ func checkCommand() *cli.Command {
 				Sources: cli.EnvVars("TALLY_FIX_UNSAFE"),
 			},
 		},
-		Action: func(ctx stdcontext.Context, cmd *cli.Command) error {
-			inputs := cmd.Args().Slice()
-
-			if len(inputs) == 0 {
-				// Default to current directory
-				inputs = []string{"."}
-			}
-
-			// Discover files using the discovery package
-			discoveryOpts := discovery.Options{
-				Patterns:        discovery.DefaultPatterns(),
-				ExcludePatterns: cmd.StringSlice("exclude"),
-				ContextDir:      cmd.String("context"),
-			}
-
-			discovered, err := discovery.Discover(inputs, discoveryOpts)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: failed to discover files: %v\n", err)
-				return cli.Exit("", ExitConfigError)
-			}
-
-			if len(discovered) == 0 {
-				fmt.Fprintf(os.Stderr, "Error: no Dockerfiles found\n")
-				return cli.Exit("", ExitConfigError)
-			}
-
-			var allViolations []rules.Violation
-			fileSources := make(map[string][]byte)
-			fileConfigs := make(map[string]*config.Config) // Per-file configs
-			var firstCfg *config.Config                    // Store first file's config for output settings
-
-			for _, df := range discovered {
-				file := df.Path
-
-				// Load config for this specific file (cascading discovery)
-				cfg, err := loadConfigForFile(cmd, file)
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error: failed to load config for %s: %v\n", file, err)
-					os.Exit(ExitConfigError)
-				}
-
-				// Validate rule-specific configs against JSON schemas
-				validateRuleConfigs(cfg, file)
-
-				// Store per-file config for processor chain
-				fileConfigs[file] = cfg
-
-				// Store first config for output settings
-				if firstCfg == nil {
-					firstCfg = cfg
-				}
-
-				// Build context for context-aware rules (e.g. .dockerignore checks).
-				// This requires parsing the Dockerfile first to extract heredoc files.
-				var buildCtx rules.BuildContext
-				if df.ContextDir != "" {
-					parseResult, parseErr := dockerfile.ParseFile(ctx, file, cfg)
-					if parseErr == nil {
-						buildCtx, err = context.New(df.ContextDir, file,
-							context.WithHeredocFiles(extractHeredocFiles(parseResult)))
-						if err != nil {
-							fmt.Fprintf(os.Stderr, "Warning: failed to create build context: %v\n", err)
-						}
-					}
-				}
-
-				// Run the shared lint pipeline.
-				result, err := linter.LintFile(linter.Input{
-					FilePath:     file,
-					Config:       cfg,
-					BuildContext: buildCtx,
-				})
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Error: failed to lint %s: %v\n", file, err)
-					os.Exit(ExitConfigError)
-				}
-
-				fileSources[file] = result.ParseResult.Source
-				allViolations = append(allViolations, result.Violations...)
-			}
-
-			// Build processor chain for violation processing.
-			chain, inlineFilter := linter.CLIProcessors()
-
-			// Process all violations through the chain
-			// Each file gets its own config for rule enable/disable, severity, etc.
-			procCtx := processor.NewContext(fileConfigs, firstCfg, fileSources)
-			allViolations = chain.Process(allViolations, procCtx)
-
-			// Add any additional violations from the inline directive filter
-			// (parse errors, unused directives, missing reasons)
-			additionalViolations := inlineFilter.AdditionalViolations()
-			if len(additionalViolations) > 0 {
-				// Apply PathNormalization for consistent path formats with main violations
-				additionalViolations = processor.NewPathNormalization().Process(additionalViolations, procCtx)
-				additionalViolations = processor.NewSnippetAttachment().Process(additionalViolations, procCtx)
-				allViolations = append(allViolations, additionalViolations...)
-				// Re-sort after adding directive warnings
-				allViolations = reporter.SortViolations(allViolations)
-			}
-
-			// Apply fixes if --fix flag is set
-			if cmd.Bool("fix-unsafe") && !cmd.Bool("fix") {
-				fmt.Fprintf(os.Stderr, "Warning: --fix-unsafe has no effect without --fix\n")
-			}
-			if cmd.Bool("fix") {
-				fixResult, fixErr := applyFixes(ctx, cmd, allViolations, fileSources, fileConfigs)
-				if fixErr != nil {
-					fmt.Fprintf(os.Stderr, "Error: failed to apply fixes: %v\n", fixErr)
-					return cli.Exit("", ExitConfigError)
-				}
-
-				// Report fix results
-				if fixResult.TotalApplied() > 0 {
-					fmt.Fprintf(os.Stderr, "Fixed %d issues in %d files\n",
-						fixResult.TotalApplied(), fixResult.FilesModified())
-				}
-				if fixResult.TotalSkipped() > 0 {
-					fmt.Fprintf(os.Stderr, "Skipped %d fixes\n", fixResult.TotalSkipped())
-				}
-
-				// Update violations to exclude fixed ones
-				allViolations = filterFixedViolations(allViolations, fixResult)
-			}
-
-			// Get output configuration
-			outCfg := getOutputConfig(cmd, firstCfg)
-
-			// Parse format
-			formatType, err := reporter.ParseFormat(outCfg.format)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				return cli.Exit("", ExitConfigError)
-			}
-
-			// Get output writer
-			writer, closeWriter, err := reporter.GetWriter(outCfg.path)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-				return cli.Exit("", ExitConfigError)
-			}
-			defer func() {
-				if err := closeWriter(); err != nil {
-					fmt.Fprintf(os.Stderr, "Warning: failed to close output: %v\n", err)
-				}
-			}()
-
-			// Build reporter options
-			opts := reporter.Options{
-				Format:      formatType,
-				Writer:      writer,
-				ShowSource:  outCfg.showSource,
-				ToolName:    "tally",
-				ToolVersion: version.Version(),
-				ToolURI:     "https://github.com/tinovyatkin/tally",
-			}
-
-			// Handle color flag
-			if cmd.IsSet("no-color") && cmd.Bool("no-color") {
-				noColor := false
-				opts.Color = &noColor
-			}
-
-			// Create reporter
-			rep, err := reporter.New(opts)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error: failed to create reporter: %v\n", err)
-				return cli.Exit("", ExitConfigError)
-			}
-
-			// Calculate metadata for report
-			// Count rules that are effectively enabled based on config
-			rulesEnabled := len(linter.EnabledRuleCodes(firstCfg))
-			metadata := reporter.ReportMetadata{
-				FilesScanned: len(discovered),
-				RulesEnabled: rulesEnabled,
-			}
-
-			// Report violations
-			if err := rep.Report(allViolations, fileSources, metadata); err != nil {
-				fmt.Fprintf(os.Stderr, "Error: failed to write output: %v\n", err)
-				return cli.Exit("", ExitConfigError)
-			}
-
-			// Determine exit code based on fail-level
-			exitCode := determineExitCode(allViolations, outCfg.failLevel)
-			if exitCode != ExitSuccess {
-				return cli.Exit("", exitCode)
-			}
-
-			return nil
-		},
+		Action: runCheck,
 	}
+}
+
+// lintResults holds the aggregated results of linting all discovered files.
+type lintResults struct {
+	violations  []rules.Violation
+	fileSources map[string][]byte
+	fileConfigs map[string]*config.Config
+	firstCfg    *config.Config
+}
+
+// runCheck is the action handler for the check command.
+func runCheck(ctx stdcontext.Context, cmd *cli.Command) error {
+	inputs := cmd.Args().Slice()
+	if len(inputs) == 0 {
+		inputs = []string{"."}
+	}
+
+	// Discover files using the discovery package
+	discoveryOpts := discovery.Options{
+		Patterns:        discovery.DefaultPatterns(),
+		ExcludePatterns: cmd.StringSlice("exclude"),
+		ContextDir:      cmd.String("context"),
+	}
+
+	discovered, err := discovery.Discover(inputs, discoveryOpts)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to discover files: %v\n", err)
+		return cli.Exit("", ExitConfigError)
+	}
+
+	if len(discovered) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: no Dockerfiles found\n")
+		return cli.Exit("", ExitConfigError)
+	}
+
+	// Lint all discovered files
+	res, err := lintFiles(ctx, discovered, cmd)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(ExitConfigError)
+	}
+
+	// Build processor chain for violation processing.
+	// Each file gets its own config for rule enable/disable, severity, etc.
+	chain, inlineFilter := linter.CLIProcessors()
+	procCtx := processor.NewContext(res.fileConfigs, res.firstCfg, res.fileSources)
+	allViolations := chain.Process(res.violations, procCtx)
+
+	// Add any additional violations from the inline directive filter
+	// (parse errors, unused directives, missing reasons)
+	additionalViolations := inlineFilter.AdditionalViolations()
+	if len(additionalViolations) > 0 {
+		additionalViolations = processor.NewPathNormalization().Process(additionalViolations, procCtx)
+		additionalViolations = processor.NewSnippetAttachment().Process(additionalViolations, procCtx)
+		allViolations = append(allViolations, additionalViolations...)
+		allViolations = reporter.SortViolations(allViolations)
+	}
+
+	// Apply fixes if --fix flag is set
+	if cmd.Bool("fix-unsafe") && !cmd.Bool("fix") {
+		fmt.Fprintf(os.Stderr, "Warning: --fix-unsafe has no effect without --fix\n")
+	}
+	if cmd.Bool("fix") {
+		fixResult, fixErr := applyFixes(ctx, cmd, allViolations, res.fileSources, res.fileConfigs)
+		if fixErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to apply fixes: %v\n", fixErr)
+			return cli.Exit("", ExitConfigError)
+		}
+
+		if fixResult.TotalApplied() > 0 {
+			fmt.Fprintf(os.Stderr, "Fixed %d issues in %d files\n",
+				fixResult.TotalApplied(), fixResult.FilesModified())
+		}
+		if fixResult.TotalSkipped() > 0 {
+			fmt.Fprintf(os.Stderr, "Skipped %d fixes\n", fixResult.TotalSkipped())
+		}
+
+		allViolations = filterFixedViolations(allViolations, fixResult)
+	}
+
+	return writeReport(cmd, res.firstCfg, allViolations, res.fileSources, len(discovered))
+}
+
+// lintFiles runs the lint pipeline on each discovered file and aggregates results.
+func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, cmd *cli.Command) (*lintResults, error) {
+	res := &lintResults{
+		fileSources: make(map[string][]byte),
+		fileConfigs: make(map[string]*config.Config),
+	}
+
+	for _, df := range discovered {
+		file := df.Path
+
+		cfg, err := loadConfigForFile(cmd, file)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load config for %s: %w", file, err)
+		}
+
+		validateRuleConfigs(cfg, file)
+		res.fileConfigs[file] = cfg
+
+		if res.firstCfg == nil {
+			res.firstCfg = cfg
+		}
+
+		// Build context for context-aware rules (e.g. .dockerignore checks).
+		// This requires parsing the Dockerfile first to extract heredoc files.
+		var buildCtx rules.BuildContext
+		if df.ContextDir != "" {
+			parseResult, parseErr := dockerfile.ParseFile(ctx, file, cfg)
+			if parseErr == nil {
+				buildCtx, err = context.New(df.ContextDir, file,
+					context.WithHeredocFiles(extractHeredocFiles(parseResult)))
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: failed to create build context: %v\n", err)
+				}
+			}
+		}
+
+		result, err := linter.LintFile(linter.Input{
+			FilePath:     file,
+			Config:       cfg,
+			BuildContext: buildCtx,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to lint %s: %w", file, err)
+		}
+
+		res.fileSources[file] = result.ParseResult.Source
+		res.violations = append(res.violations, result.Violations...)
+	}
+
+	return res, nil
+}
+
+// writeReport formats and writes the violation report.
+func writeReport(
+	cmd *cli.Command, cfg *config.Config, violations []rules.Violation,
+	fileSources map[string][]byte, filesScanned int,
+) error {
+	outCfg := getOutputConfig(cmd, cfg)
+
+	formatType, err := reporter.ParseFormat(outCfg.format)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return cli.Exit("", ExitConfigError)
+	}
+
+	writer, closeWriter, err := reporter.GetWriter(outCfg.path)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return cli.Exit("", ExitConfigError)
+	}
+	defer func() {
+		if err := closeWriter(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to close output: %v\n", err)
+		}
+	}()
+
+	opts := reporter.Options{
+		Format:      formatType,
+		Writer:      writer,
+		ShowSource:  outCfg.showSource,
+		ToolName:    "tally",
+		ToolVersion: version.Version(),
+		ToolURI:     "https://github.com/tinovyatkin/tally",
+	}
+
+	if cmd.IsSet("no-color") && cmd.Bool("no-color") {
+		noColor := false
+		opts.Color = &noColor
+	}
+
+	rep, err := reporter.New(opts)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to create reporter: %v\n", err)
+		return cli.Exit("", ExitConfigError)
+	}
+
+	rulesEnabled := len(linter.EnabledRuleCodes(cfg))
+	metadata := reporter.ReportMetadata{
+		FilesScanned: filesScanned,
+		RulesEnabled: rulesEnabled,
+	}
+
+	if err := rep.Report(violations, fileSources, metadata); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to write output: %v\n", err)
+		return cli.Exit("", ExitConfigError)
+	}
+
+	exitCode := determineExitCode(violations, outCfg.failLevel)
+	if exitCode != ExitSuccess {
+		return cli.Exit("", exitCode)
+	}
+
+	return nil
 }
 
 // loadConfigForFile loads configuration for a target file, applying CLI overrides.

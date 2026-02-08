@@ -11,14 +11,11 @@ linters:
   enable:
     - customlint # Custom tally-specific rules
   disable:
-    # - cyclop # complexity metrics - covered by gocyclo
     - dupword # duplicate words - too noisy
     - err113 # dynamic errors - too strict for CLI tool
     - exhaustruct # requires all struct fields - too strict
-    - forcetypeassert # force type assertions - handled by other linters
     - gochecknoglobals # global vars - CLI requires them
     - gochecknoinits # init functions - CLI requires them
-    - gocognit # cognitive complexity - covered by gocyclo
     - godoclint # doc lint - too strict
     - godot # dots at end of comments - too strict
     - gomoddirectives # module directives - not needed
@@ -39,6 +36,10 @@ linters:
     - wsl # whitespace linter - too strict
     - wsl_v5 # whitespace linter v5 - too strict
   settings:
+    gocognit:
+      # Minimal code complexity to report.
+      # Default: 30
+      min-complexity: 43
     cyclop:
       max-complexity: 26
     custom:
