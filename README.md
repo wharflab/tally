@@ -39,11 +39,13 @@ uv/bun, line-length and layer optimizations).
 tally integrates rules from multiple sources:
 
 <!-- BEGIN RULES_TABLE -->
+
 | Source | Rules | Description |
 |--------|-------|-------------|
 | **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 12/22 rules | Docker's official Dockerfile checks (captured + reimplemented) |
 | **tally** | 6 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
 | **[Hadolint](https://github.com/hadolint/hadolint)** | 27 rules | Hadolint-compatible Dockerfile rules (expanding) |
+
 <!-- END RULES_TABLE -->
 
 **See [RULES.md](RULES.md) for the complete rules reference.**

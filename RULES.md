@@ -13,11 +13,13 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 ## Summary
 
 <!-- BEGIN RULES_SUMMARY -->
+
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
 | tally | 6 | - | 6 |
 | buildkit | 7 + 5 captured | - | 22 |
 | hadolint | 18 | 9 | 66 |
+
 <!-- END RULES_SUMMARY -->
 
 ---
@@ -66,7 +68,8 @@ Detects stages that are defined but never used (not referenced by `--target` or 
 
 ### tally/prefer-copy-heredoc
 
-Suggests replacing `RUN echo/cat/printf > file` patterns with `COPY <<EOF` syntax for better performance and readability. **Experimental** - disabled by default.
+Suggests replacing `RUN echo/cat/printf > file` patterns with `COPY <<EOF` syntax for better performance and readability. **Experimental** - disabled
+by default.
 
 This rule detects file creation patterns in RUN instructions and extracts them into COPY heredocs, even when mixed with other commands.
 
@@ -120,6 +123,7 @@ When extracting file creation from mixed commands, mounts are preserved on the r
 **Chmod support:**
 
 Converts both octal and symbolic chmod modes to `COPY --chmod`:
+
 - Octal: `chmod 755` → `--chmod=0755`
 - Symbolic: `chmod +x` → `--chmod=0755`, `chmod u+x` → `--chmod=0744`
 
@@ -130,7 +134,8 @@ Symbolic modes are converted based on a 0644 base (default for newly created fil
 - `check-single-run`: Check for single RUN instructions with file creation (default: true)
 - `check-consecutive-runs`: Check for consecutive RUN instructions to same file (default: true)
 
-**Rule coordination:** This rule takes priority over `prefer-run-heredoc` for pure file creation patterns. When both rules detect a pattern, `prefer-copy-heredoc` handles it.
+**Rule coordination:** This rule takes priority over `prefer-run-heredoc` for pure file creation patterns. When both rules detect a pattern,
+`prefer-copy-heredoc` handles it.
 
 ### tally/prefer-run-heredoc
 
@@ -158,7 +163,8 @@ apt-get install -y vim
 EOF
 ```
 
-**Why `set -e`?** Heredocs don't stop on error by default - only the exit code of the last command matters. Adding `set -e` preserves the fail-fast behavior of `&&` chains. See [moby/buildkit#2722](https://github.com/moby/buildkit/issues/2722).
+**Why `set -e`?** Heredocs don't stop on error by default - only the exit code of the last command matters. Adding `set -e` preserves the fail-fast
+behavior of `&&` chains. See [moby/buildkit#2722](https://github.com/moby/buildkit/issues/2722).
 
 **Options:**
 
@@ -166,7 +172,8 @@ EOF
 - `check-consecutive-runs`: Check for consecutive RUN instructions (default: true)
 - `check-chained-commands`: Check for `&&` chains in single RUN (default: true)
 
-**Rule coordination:** When this rule is enabled, `hadolint/DL3003` (cd → WORKDIR) will skip generating fixes for commands that are heredoc candidates, allowing heredoc conversion to handle `cd` correctly within the script.
+**Rule coordination:** When this rule is enabled, `hadolint/DL3003` (cd → WORKDIR) will skip generating fixes for commands that are heredoc
+candidates, allowing heredoc conversion to handle `cd` correctly within the script.
 
 ### tally/consistent-indentation
 
@@ -175,7 +182,8 @@ Enforces consistent indentation for Dockerfile build stages. **Experimental** - 
 - **Multi-stage Dockerfiles**: Commands within each stage should be indented; FROM lines stay at column 0
 - **Single-stage Dockerfiles**: No indentation (flat style)
 
-This rule always uses **tabs** because heredoc `<<-` strips leading tabs — spaces have no equivalent shell whitespace treatment, so using them would corrupt heredoc content.
+This rule always uses **tabs** because heredoc `<<-` strips leading tabs — spaces have no equivalent shell whitespace treatment, so using them would
+corrupt heredoc content.
 
 **Example (multi-stage with tabs):**
 
@@ -195,7 +203,8 @@ FROM alpine:3.20
 
 ## BuildKit Rules
 
-Rules from Docker's official BuildKit linter. tally captures parsing-time checks directly and reimplements some build-time (LLB conversion) checks as static rules.
+Rules from Docker's official BuildKit linter. tally captures parsing-time checks directly and reimplements some build-time (LLB conversion) checks as
+static rules.
 
 **Legend:**
 
@@ -275,6 +284,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 ### DL Rules (Dockerfile Lint)
 
 <!-- BEGIN HADOLINT_DL_RULES -->
+
 | Rule | Description | Severity | Status |
 |------|-------------|----------|--------|
 | [DL1001](https://github.com/hadolint/hadolint/wiki/DL1001) | Please refrain from using inline ignore pragmas `# hadolint ignore=DLxxxx`. | Ignore | ⏳ |
@@ -300,7 +310,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL3021](https://github.com/hadolint/hadolint/wiki/DL3021) | `COPY` with more than 2 arguments requires the last argument to end with `/` | Error | ✅ `hadolint/DL3021` |
 | [DL3022](https://github.com/hadolint/hadolint/wiki/DL3022) | `COPY --from` should reference a previously defined `FROM` alias | Warning | ⏳ |
 | [DL3023](https://github.com/hadolint/hadolint/wiki/DL3023) | `COPY --from` cannot reference its own `FROM` alias | Error | ✅ `hadolint/DL3023` |
-| [DL3024](https://github.com/hadolint/hadolint/wiki/DL3024) | `FROM` aliases (stage names) must be unique | Error | ✅ `hadolint/DL3024` |
+| [DL3024](https://github.com/hadolint/hadolint/wiki/DL3024) | `FROM` aliases (stage names) must be unique | Error | 🔄 `buildkit/DuplicateStageName` |
 | [DL3025](https://github.com/hadolint/hadolint/wiki/DL3025) | Use arguments JSON notation for CMD and ENTRYPOINT arguments | Warning | 🔄 `buildkit/JSONArgsRecommended` |
 | [DL3026](https://github.com/hadolint/hadolint/wiki/DL3026) | Use only an allowed registry in the FROM image | Error | ✅ `hadolint/DL3026` |
 | [DL3027](https://github.com/hadolint/hadolint/wiki/DL3027) | Do not use `apt` as it is meant to be an end-user tool, use `apt-get` or `apt-cache` instead | Warning | ✅🔧 `hadolint/DL3027` |
@@ -343,6 +353,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL4004](https://github.com/hadolint/hadolint/wiki/DL4004) | Multiple `ENTRYPOINT` instructions found. | Error | 🔄 `buildkit/MultipleInstructionsDisallowed` |
 | [DL4005](https://github.com/hadolint/hadolint/wiki/DL4005) | Use `SHELL` to change the default shell. | Warning | ⏳ |
 | [DL4006](https://github.com/hadolint/hadolint/wiki/DL4006) | Set the `SHELL` option -o pipefail before `RUN` with a pipe in it | Warning | ⏳ |
+
 <!-- END HADOLINT_DL_RULES -->
 
 ### SC Rules (ShellCheck)
