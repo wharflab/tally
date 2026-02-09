@@ -161,6 +161,12 @@ enforcement
 
 ---
 
+### 13. [AI AutoFix via ACP](13-ai-autofix-acp.md)
+
+**Covers:** Opt-in AI-powered fixes using Agent Client Protocol (ACP), configuration, safety model, prompt contract, and a demo multi-stage build rule
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
