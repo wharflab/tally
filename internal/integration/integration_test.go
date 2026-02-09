@@ -183,6 +183,12 @@ func TestCheck(t *testing.T) {
 			args:     append([]string{"--format", "json"}, selectRules("buildkit/MultipleInstructionsDisallowed")...),
 			wantExit: 1,
 		},
+		{
+			name:     "expose-proto-casing",
+			dir:      "expose-proto-casing",
+			args:     append([]string{"--format", "json"}, selectRules("buildkit/ExposeProtoCasing")...),
+			wantExit: 1,
+		},
 
 		// Semantic model construction-time violations
 		// Note: These violations come from semantic analysis, not the rule registry.
@@ -723,6 +729,19 @@ RUN apt install curl
 			input:       "FROM alpine:3.18\nENV foo bar\nLABEL version 1.0\n",
 			args:        []string{"--fix"},
 			wantApplied: 2,
+		},
+		// ExposeProtoCasing: Lowercase protocol in EXPOSE
+		{
+			name:        "expose-proto-casing-single",
+			input:       "FROM alpine:3.18\nEXPOSE 8080/TCP\n",
+			args:        []string{"--fix"},
+			wantApplied: 1,
+		},
+		{
+			name:        "expose-proto-casing-multiple-ports",
+			input:       "FROM alpine:3.18\nEXPOSE 80/TCP 443/UDP\n",
+			args:        []string{"--fix"},
+			wantApplied: 1, // One EXPOSE instruction = one violation with multiple edits
 		},
 		// MaintainerDeprecated: Replace MAINTAINER with LABEL
 		{

@@ -1,0 +1,95 @@
+{
+  "files": [
+    {
+      "file": "testdata/expose-proto-casing/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/expose-proto-casing/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/expose-proto-casing/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "Defined protocol '8080/TCP' in EXPOSE instruction should be lowercase",
+          "rule": "buildkit/ExposeProtoCasing",
+          "severity": "warning",
+          "sourceCode": "EXPOSE 8080/TCP",
+          "suggestedFix": {
+            "description": "Change protocol to lowercase",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 15,
+                    "line": 3
+                  },
+                  "file": "testdata/expose-proto-casing/Dockerfile",
+                  "start": {
+                    "column": 12,
+                    "line": 3
+                  }
+                },
+                "newText": "tcp"
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/expose-proto-casing/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/expose-proto-casing/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "Defined protocol '53/UDP' in EXPOSE instruction should be lowercase",
+          "rule": "buildkit/ExposeProtoCasing",
+          "severity": "warning",
+          "sourceCode": "EXPOSE 53/UDP 80/tcp",
+          "suggestedFix": {
+            "description": "Change protocol to lowercase",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 13,
+                    "line": 4
+                  },
+                  "file": "testdata/expose-proto-casing/Dockerfile",
+                  "start": {
+                    "column": 10,
+                    "line": 4
+                  }
+                },
+                "newText": "udp"
+              }
+            ],
+            "isPreferred": true
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}

@@ -1016,6 +1016,105 @@ FROM scratch AS base`,
 	}
 }
 
+func TestExposeProtoCasingFix(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name      string
+		source    string
+		message   string
+		wantFix   bool
+		wantEdits int
+		wantTexts []string
+	}{
+		{
+			name:      "uppercase TCP",
+			source:    "EXPOSE 8080/TCP",
+			message:   "Defined protocol '8080/TCP' in EXPOSE instruction should be lowercase",
+			wantFix:   true,
+			wantEdits: 1,
+			wantTexts: []string{"tcp"},
+		},
+		{
+			name:      "uppercase UDP",
+			source:    "EXPOSE 53/UDP",
+			message:   "Defined protocol '53/UDP' in EXPOSE instruction should be lowercase",
+			wantFix:   true,
+			wantEdits: 1,
+			wantTexts: []string{"udp"},
+		},
+		{
+			name:      "mixed case Tcp",
+			source:    "EXPOSE 8080/Tcp",
+			message:   "Defined protocol '8080/Tcp' in EXPOSE instruction should be lowercase",
+			wantFix:   true,
+			wantEdits: 1,
+			wantTexts: []string{"tcp"},
+		},
+		{
+			name:      "multiple ports with uppercase protocols",
+			source:    "EXPOSE 80/TCP 443/UDP",
+			message:   "Defined protocol '80/TCP' in EXPOSE instruction should be lowercase",
+			wantFix:   true,
+			wantEdits: 2,
+			wantTexts: []string{"tcp", "udp"},
+		},
+		{
+			name:      "port range with uppercase protocol",
+			source:    "EXPOSE 8080-8090/TCP",
+			message:   "Defined protocol '8080-8090/TCP' in EXPOSE instruction should be lowercase",
+			wantFix:   true,
+			wantEdits: 1,
+			wantTexts: []string{"tcp"},
+		},
+		{
+			name:    "already lowercase",
+			source:  "EXPOSE 8080/tcp",
+			message: "Defined protocol '8080/tcp' in EXPOSE instruction should be lowercase",
+			wantFix: false,
+		},
+		{
+			name:    "no protocol",
+			source:  "EXPOSE 8080",
+			message: "Defined protocol '8080' in EXPOSE instruction should be lowercase",
+			wantFix: false,
+		},
+		{
+			name:      "only one port has uppercase",
+			source:    "EXPOSE 80/tcp 443/UDP",
+			message:   "Defined protocol '443/UDP' in EXPOSE instruction should be lowercase",
+			wantFix:   true,
+			wantEdits: 1,
+			wantTexts: []string{"udp"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			source := []byte(tt.source)
+			v := rules.Violation{
+				Location: rules.NewRangeLocation("test.Dockerfile", 1, 0, 1, len(tt.source)),
+				RuleCode: rules.BuildKitRulePrefix + "ExposeProtoCasing",
+				Message:  tt.message,
+			}
+
+			enrichExposeProtoCasingFix(&v, source)
+
+			if tt.wantFix {
+				require.NotNil(t, v.SuggestedFix, "expected a fix")
+				assert.Len(t, v.SuggestedFix.Edits, tt.wantEdits)
+				assert.Equal(t, rules.FixSafe, v.SuggestedFix.Safety)
+				assert.True(t, v.SuggestedFix.IsPreferred)
+				for i, wantText := range tt.wantTexts {
+					assert.Equal(t, wantText, v.SuggestedFix.Edits[i].NewText)
+				}
+			} else {
+				assert.Nil(t, v.SuggestedFix, "expected no fix")
+			}
+		})
+	}
+}
+
 func TestMultipleInstructionsDisallowedFix(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

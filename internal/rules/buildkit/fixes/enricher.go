@@ -20,6 +20,7 @@ var fixableRuleNames = []string{
 	"InvalidDefinitionDescription",
 	"LegacyKeyValueFormat",
 	"MultipleInstructionsDisallowed",
+	"ExposeProtoCasing",
 }
 
 // FixableRuleNames returns the BuildKit rule names for which tally can generate auto-fixes.
@@ -66,6 +67,8 @@ func EnrichBuildKitFixes(violations []rules.Violation, sem *semantic.Model, sour
 			enrichLegacyKeyValueFormatFix(v, source)
 		case "MultipleInstructionsDisallowed":
 			enrichMultipleInstructionsDisallowedFix(v, source)
+		case "ExposeProtoCasing":
+			enrichExposeProtoCasingFix(v, source)
 		}
 	}
 }
