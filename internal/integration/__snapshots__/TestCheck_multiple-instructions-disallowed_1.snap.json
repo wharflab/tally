@@ -1,0 +1,95 @@
+{
+  "files": [
+    {
+      "file": "testdata/multiple-instructions-disallowed/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/multiple-instructions-disallowed/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "testdata/multiple-instructions-disallowed/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "Multiple CMD instructions should not be used in the same stage because only the last one will be used",
+          "rule": "buildkit/MultipleInstructionsDisallowed",
+          "severity": "warning",
+          "sourceCode": "CMD echo \"build\"",
+          "suggestedFix": {
+            "description": "Comment out duplicate CMD instruction (only the last one takes effect)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 16,
+                    "line": 2
+                  },
+                  "file": "testdata/multiple-instructions-disallowed/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 2
+                  }
+                },
+                "newText": "# [commented out by tally - Docker will ignore all but last CMD]: CMD echo \"build\""
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/multiple-instructions-disallowed/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "testdata/multiple-instructions-disallowed/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "Multiple ENTRYPOINT instructions should not be used in the same stage because only the last one will be used",
+          "rule": "buildkit/MultipleInstructionsDisallowed",
+          "severity": "warning",
+          "sourceCode": "ENTRYPOINT [\"/bin/bash\"]",
+          "suggestedFix": {
+            "description": "Comment out duplicate ENTRYPOINT instruction (only the last one takes effect)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 24,
+                    "line": 6
+                  },
+                  "file": "testdata/multiple-instructions-disallowed/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 6
+                  }
+                },
+                "newText": "# [commented out by tally - Docker will ignore all but last ENTRYPOINT]: ENTRYPOINT [\"/bin/bash\"]"
+              }
+            ],
+            "isPreferred": true
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}

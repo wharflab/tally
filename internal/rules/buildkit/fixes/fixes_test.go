@@ -1015,3 +1015,80 @@ FROM scratch AS base`,
 		})
 	}
 }
+
+func TestMultipleInstructionsDisallowedFix(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		source   string
+		message  string
+		wantFix  bool
+		wantText string
+	}{
+		{
+			name:     "CMD shell form",
+			source:   `CMD echo "hello"`,
+			message:  "Multiple CMD instructions should not be used in the same stage because only the last one will be used",
+			wantFix:  true,
+			wantText: `# [commented out by tally - Docker will ignore all but last CMD]: CMD echo "hello"`,
+		},
+		{
+			name:     "CMD exec form",
+			source:   `CMD ["echo", "hello"]`,
+			message:  "Multiple CMD instructions should not be used in the same stage because only the last one will be used",
+			wantFix:  true,
+			wantText: `# [commented out by tally - Docker will ignore all but last CMD]: CMD ["echo", "hello"]`,
+		},
+		{
+			name:     "ENTRYPOINT shell form",
+			source:   `ENTRYPOINT /bin/bash`,
+			message:  "Multiple ENTRYPOINT instructions should not be used in the same stage because only the last one will be used",
+			wantFix:  true,
+			wantText: `# [commented out by tally - Docker will ignore all but last ENTRYPOINT]: ENTRYPOINT /bin/bash`,
+		},
+		{
+			name:     "ENTRYPOINT exec form",
+			source:   `ENTRYPOINT ["/bin/sh", "-c"]`,
+			message:  "Multiple ENTRYPOINT instructions should not be used in the same stage because only the last one will be used",
+			wantFix:  true,
+			wantText: `# [commented out by tally - Docker will ignore all but last ENTRYPOINT]: ENTRYPOINT ["/bin/sh", "-c"]`,
+		},
+		{
+			name:    "unrecognized message format",
+			source:  `CMD echo hello`,
+			message: "Some other message",
+			wantFix: false,
+		},
+		{
+			name:     "CMD with leading whitespace",
+			source:   `  CMD echo hello`,
+			message:  "Multiple CMD instructions should not be used in the same stage because only the last one will be used",
+			wantFix:  true,
+			wantText: `# [commented out by tally - Docker will ignore all but last CMD]:   CMD echo hello`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			source := []byte(tt.source)
+			v := rules.Violation{
+				Location: rules.NewRangeLocation("test.Dockerfile", 1, 0, 1, len(tt.source)),
+				RuleCode: rules.BuildKitRulePrefix + "MultipleInstructionsDisallowed",
+				Message:  tt.message,
+			}
+
+			enrichMultipleInstructionsDisallowedFix(&v, source)
+
+			if tt.wantFix {
+				require.NotNil(t, v.SuggestedFix, "expected a fix")
+				assert.Len(t, v.SuggestedFix.Edits, 1)
+				assert.Equal(t, tt.wantText, v.SuggestedFix.Edits[0].NewText)
+				assert.Equal(t, rules.FixSafe, v.SuggestedFix.Safety)
+				assert.True(t, v.SuggestedFix.IsPreferred)
+			} else {
+				assert.Nil(t, v.SuggestedFix, "expected no fix")
+			}
+		})
+	}
+}

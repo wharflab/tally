@@ -123,11 +123,13 @@
     },
     "DL4003": {
       "status": "covered_by_buildkit",
-      "buildkit_rule": "MultipleInstructionsDisallowed"
+      "buildkit_rule": "MultipleInstructionsDisallowed",
+      "fixable": true
     },
     "DL4004": {
       "status": "covered_by_buildkit",
-      "buildkit_rule": "MultipleInstructionsDisallowed"
+      "buildkit_rule": "MultipleInstructionsDisallowed",
+      "fixable": true
     }
   }
 }

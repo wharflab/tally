@@ -127,7 +127,7 @@ func LintFile(input Input) (*Result, error) {
 	for _, issue := range sem.ConstructionIssues() {
 		violations = append(violations, rules.NewViolation(
 			rules.NewLocationFromRange(issue.File, issue.Location),
-			issue.Code, issue.Message, rules.SeverityError,
+			issue.Code, issue.Message, issue.Severity,
 		).WithDocURL(issue.DocURL))
 	}
 

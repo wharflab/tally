@@ -1,6 +1,10 @@
 package semantic
 
-import "github.com/moby/buildkit/frontend/dockerfile/parser"
+import (
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
+
+	"github.com/tinovyatkin/tally/internal/rules"
+)
 
 // Issue represents a semantic problem detected during model construction.
 // This is similar to rules.Violation but without the dependency on the rules
@@ -21,6 +25,10 @@ type Issue struct {
 
 	// DocURL links to documentation about this issue.
 	DocURL string
+
+	// Severity overrides the default severity for this issue.
+	// Zero value (SeverityError) is the default for backward compatibility.
+	Severity rules.Severity
 }
 
 // newIssue creates a new semantic issue.

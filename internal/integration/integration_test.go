@@ -177,6 +177,13 @@ func TestCheck(t *testing.T) {
 			wantExit: 1,
 		},
 
+		{
+			name:     "multiple-instructions-disallowed",
+			dir:      "multiple-instructions-disallowed",
+			args:     append([]string{"--format", "json"}, selectRules("buildkit/MultipleInstructionsDisallowed")...),
+			wantExit: 1,
+		},
+
 		// Semantic model construction-time violations
 		// Note: These violations come from semantic analysis, not the rule registry.
 		// We don't filter rules here because semantic violations would be filtered out.
@@ -825,6 +832,38 @@ FROM scratch AS base
 			config: `[rules.buildkit.InvalidDefinitionDescription]
 severity = "error"
 `,
+		},
+
+		// MultipleInstructionsDisallowed: Comment out duplicate CMD/ENTRYPOINT
+		{
+			name:  "multiple-cmd-fix",
+			input: "FROM alpine:3.21\nCMD echo \"first\"\nRUN echo hello\nCMD echo \"second\"\n",
+			args: []string{
+				"--fix",
+				"--ignore", "*",
+				"--select", "buildkit/MultipleInstructionsDisallowed",
+			},
+			wantApplied: 1,
+		},
+		{
+			name:  "multiple-entrypoint-fix",
+			input: "FROM alpine:3.21\nENTRYPOINT [\"/bin/bash\"]\nENTRYPOINT [\"/bin/sh\"]\n",
+			args: []string{
+				"--fix",
+				"--ignore", "*",
+				"--select", "buildkit/MultipleInstructionsDisallowed",
+			},
+			wantApplied: 1,
+		},
+		{
+			name:  "multiple-cmd-three",
+			input: "FROM alpine:3.21\nCMD echo first\nCMD echo second\nCMD echo third\n",
+			args: []string{
+				"--fix",
+				"--ignore", "*",
+				"--select", "buildkit/MultipleInstructionsDisallowed",
+			},
+			wantApplied: 2,
 		},
 
 		// === Heredoc fix tests ===
