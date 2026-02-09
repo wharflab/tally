@@ -689,6 +689,28 @@ Test approach:
 
 If CLI output changes (e.g., adds “Skipped fixes” messages), update integration snapshots under `internal/integration/__snapshots__/`.
 
+### 13.4 Optional smoke tests against real agents (opt-in)
+
+Deterministic tests should always use the fake agent (§13.2). However, it is valuable to have an optional smoke-test lane that validates the ACP
+runner against a real, external agent implementation to catch protocol drift early.
+
+Recommendation:
+
+- Keep these tests skipped by default (so CI stays green without credentials).
+- Enable explicitly via an environment variable, following the convention used by the ACP Python SDK’s Gemini example tests:
+  - `ACP_ENABLE_GEMINI_TESTS=1`
+
+Suggested environment variables (match the upstream convention):
+
+- `ACP_ENABLE_GEMINI_TESTS=1`: opt-in to run Gemini ACP smoke tests.
+- `ACP_GEMINI_BIN`: override the Gemini CLI path (default: `PATH` lookup).
+- `ACP_GEMINI_TEST_ARGS`: extra flags forwarded to the Gemini CLI during the smoke test (e.g., model selection / sandbox mode).
+
+Behavior:
+
+- If the Gemini CLI is missing or authentication is not configured, treat the test as a skip rather than a failure.
+- Do not run these tests in default CI; only run in a dedicated workflow/job that injects credentials securely.
+
 ## 14. Implementation Roadmap (Phased)
 
 ### Phase 1: MVP (end-to-end)
