@@ -238,6 +238,7 @@ func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, cm
 		}
 
 		validateRuleConfigs(cfg, file)
+		validateAIConfig(cfg, file)
 		res.fileConfigs[file] = cfg
 
 		if res.firstCfg == nil {
@@ -532,6 +533,22 @@ func validateRuleConfigs(cfg *config.Config, file string) {
 			fmt.Fprintf(os.Stderr, "Warning: invalid config for rule %s (%s): %v\n",
 				rule.Metadata().Code, source, err)
 		}
+	}
+}
+
+// validateAIConfig validates top-level AI configuration.
+// Prints warnings to stderr but does not abort.
+func validateAIConfig(cfg *config.Config, file string) {
+	if cfg == nil || !cfg.AI.Enabled {
+		return
+	}
+
+	if len(cfg.AI.Command) == 0 {
+		source := file
+		if cfg.ConfigFile != "" {
+			source = cfg.ConfigFile
+		}
+		fmt.Fprintf(os.Stderr, "Warning: ai.enabled=true but ai.command is empty (%s)\n", source)
 	}
 }
 

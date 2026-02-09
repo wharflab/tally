@@ -18,6 +18,23 @@ func TestDefault(t *testing.T) {
 	if cfg.Rules.Tally != nil {
 		t.Error("Default Rules.Tally should be nil (defaults come from rules)")
 	}
+
+	// AI is opt-in and disabled by default.
+	if cfg.AI.Enabled {
+		t.Error("Default AI.Enabled should be false")
+	}
+	if cfg.AI.Timeout != "90s" {
+		t.Errorf("Default AI.Timeout = %q, want %q", cfg.AI.Timeout, "90s")
+	}
+	if cfg.AI.MaxInputBytes != 256*1024 {
+		t.Errorf("Default AI.MaxInputBytes = %d, want %d", cfg.AI.MaxInputBytes, 256*1024)
+	}
+	if !cfg.AI.RedactSecrets {
+		t.Error("Default AI.RedactSecrets should be true")
+	}
+	if len(cfg.AI.Command) != 0 {
+		t.Error("Default AI.Command should be empty")
+	}
 }
 
 func TestDiscover(t *testing.T) {
@@ -112,34 +129,43 @@ func TestDiscover(t *testing.T) {
 	})
 }
 
-func TestLoad(t *testing.T) {
-	t.Parallel()
-	tmpDir := t.TempDir()
+func setupTempProject(t *testing.T) (string, string) {
+	t.Helper()
 
+	tmpDir := t.TempDir()
 	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
 	if err := os.WriteFile(dockerfilePath, []byte("FROM alpine"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
-	t.Run("loads defaults when no config", func(t *testing.T) {
-		cfg, err := Load(dockerfilePath)
-		if err != nil {
-			t.Fatalf("Load() error = %v", err)
-		}
+	return tmpDir, dockerfilePath
+}
 
-		if cfg.Output.Format != "text" {
-			t.Errorf("Format = %q, want %q", cfg.Output.Format, "text")
-		}
+func TestLoad_DefaultsWhenNoConfig(t *testing.T) {
+	t.Parallel()
+	_, dockerfilePath := setupTempProject(t)
 
-		if cfg.ConfigFile != "" {
-			t.Errorf("ConfigFile = %q, want empty", cfg.ConfigFile)
-		}
-	})
+	cfg, err := Load(dockerfilePath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
-	t.Run("loads config file with nested format", func(t *testing.T) {
-		configPath := filepath.Join(tmpDir, ".tally.toml")
-		// Nested config format with namespaced rules
-		configContent := `
+	if cfg.Output.Format != "text" {
+		t.Errorf("Format = %q, want %q", cfg.Output.Format, "text")
+	}
+
+	if cfg.ConfigFile != "" {
+		t.Errorf("ConfigFile = %q, want empty", cfg.ConfigFile)
+	}
+}
+
+func TestLoad_ConfigFileWithNestedFormat(t *testing.T) {
+	t.Parallel()
+	tmpDir, dockerfilePath := setupTempProject(t)
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	// Nested config format with namespaced rules
+	configContent := `
 [output]
 format = "json"
 
@@ -148,37 +174,78 @@ max = 500
 skip-blank-lines = true
 skip-comments = true
 `
-		if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Remove(configPath)
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
-		cfg, err := Load(dockerfilePath)
-		if err != nil {
-			t.Fatalf("Load() error = %v", err)
-		}
+	cfg, err := Load(dockerfilePath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
-		if cfg.Output.Format != "json" {
-			t.Errorf("Format = %q, want %q", cfg.Output.Format, "json")
-		}
+	if cfg.Output.Format != "json" {
+		t.Errorf("Format = %q, want %q", cfg.Output.Format, "json")
+	}
 
-		// Verify rule options are loaded via GetOptions (generic config access)
-		opts := cfg.Rules.GetOptions("tally/max-lines")
-		if opts == nil {
-			t.Fatal("max-lines options should be loaded from config")
-		}
-		if maxVal, ok := opts["max"].(int64); !ok || maxVal != 500 {
-			t.Errorf("max-lines max = %v, want 500", opts["max"])
-		}
+	// Verify rule options are loaded via GetOptions (generic config access)
+	opts := cfg.Rules.GetOptions("tally/max-lines")
+	if opts == nil {
+		t.Fatal("max-lines options should be loaded from config")
+	}
+	if maxVal, ok := opts["max"].(int64); !ok || maxVal != 500 {
+		t.Errorf("max-lines max = %v, want 500", opts["max"])
+	}
 
-		if cfg.ConfigFile != configPath {
-			t.Errorf("ConfigFile = %q, want %q", cfg.ConfigFile, configPath)
-		}
-	})
+	if cfg.ConfigFile != configPath {
+		t.Errorf("ConfigFile = %q, want %q", cfg.ConfigFile, configPath)
+	}
+}
 
-	t.Run("rule include/exclude", func(t *testing.T) {
-		configPath := filepath.Join(tmpDir, ".tally.toml")
-		configContent := `
+func TestLoad_AIConfig(t *testing.T) {
+	t.Parallel()
+	tmpDir, dockerfilePath := setupTempProject(t)
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := `
+[ai]
+enabled = true
+timeout = "45s"
+max-input-bytes = 1234
+redact-secrets = false
+command = ["fake-agent", "--acp"]
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dockerfilePath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if !cfg.AI.Enabled {
+		t.Error("AI.Enabled should be true")
+	}
+	if cfg.AI.Timeout != "45s" {
+		t.Errorf("AI.Timeout = %q, want %q", cfg.AI.Timeout, "45s")
+	}
+	if cfg.AI.MaxInputBytes != 1234 {
+		t.Errorf("AI.MaxInputBytes = %d, want %d", cfg.AI.MaxInputBytes, 1234)
+	}
+	if cfg.AI.RedactSecrets {
+		t.Error("AI.RedactSecrets should be false")
+	}
+	if len(cfg.AI.Command) != 2 || cfg.AI.Command[0] != "fake-agent" || cfg.AI.Command[1] != "--acp" {
+		t.Errorf("AI.Command = %v, want [fake-agent --acp]", cfg.AI.Command)
+	}
+}
+
+func TestLoad_RuleIncludeExclude(t *testing.T) {
+	t.Parallel()
+	tmpDir, dockerfilePath := setupTempProject(t)
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := `
 [rules]
 include = ["tally/*"]
 exclude = ["buildkit/MaintainerDeprecated"]
@@ -187,38 +254,40 @@ exclude = ["buildkit/MaintainerDeprecated"]
 severity = "error"
 max = 100
 `
-		if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Remove(configPath)
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
-		cfg, err := Load(dockerfilePath)
-		if err != nil {
-			t.Fatalf("Load() error = %v", err)
-		}
+	cfg, err := Load(dockerfilePath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
-		// Check buildkit rule is disabled via exclude
-		enabled := cfg.Rules.IsEnabled("buildkit/MaintainerDeprecated")
-		if enabled == nil || *enabled != false {
-			t.Error("buildkit/MaintainerDeprecated should be disabled via exclude")
-		}
+	// Check buildkit rule is disabled via exclude
+	enabled := cfg.Rules.IsEnabled("buildkit/MaintainerDeprecated")
+	if enabled == nil || *enabled != false {
+		t.Error("buildkit/MaintainerDeprecated should be disabled via exclude")
+	}
 
-		// Check tally rule is enabled via include
-		enabled = cfg.Rules.IsEnabled("tally/max-lines")
-		if enabled == nil || *enabled != true {
-			t.Error("tally/max-lines should be enabled via include")
-		}
+	// Check tally rule is enabled via include
+	enabled = cfg.Rules.IsEnabled("tally/max-lines")
+	if enabled == nil || *enabled != true {
+		t.Error("tally/max-lines should be enabled via include")
+	}
 
-		// Check unconfigured rule returns nil (use default)
-		enabled = cfg.Rules.IsEnabled("buildkit/StageNameCasing")
-		if enabled != nil {
-			t.Errorf("unconfigured rule should return nil, got %v", *enabled)
-		}
-	})
+	// Check unconfigured rule returns nil (use default)
+	enabled = cfg.Rules.IsEnabled("buildkit/StageNameCasing")
+	if enabled != nil {
+		t.Errorf("unconfigured rule should return nil, got %v", *enabled)
+	}
+}
 
-	t.Run("severity override", func(t *testing.T) {
-		configPath := filepath.Join(tmpDir, ".tally.toml")
-		configContent := `
+func TestLoad_SeverityOverride(t *testing.T) {
+	t.Parallel()
+	tmpDir, dockerfilePath := setupTempProject(t)
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := `
 [rules.buildkit.StageNameCasing]
 severity = "info"
 
@@ -226,32 +295,30 @@ severity = "info"
 severity = "error"
 max = 100
 `
-		if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Remove(configPath)
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
 
-		cfg, err := Load(dockerfilePath)
-		if err != nil {
-			t.Fatalf("Load() error = %v", err)
-		}
+	cfg, err := Load(dockerfilePath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
 
-		sev := cfg.Rules.GetSeverity("buildkit/StageNameCasing")
-		if sev != "info" {
-			t.Errorf("GetSeverity(buildkit/StageNameCasing) = %q, want %q", sev, "info")
-		}
+	sev := cfg.Rules.GetSeverity("buildkit/StageNameCasing")
+	if sev != "info" {
+		t.Errorf("GetSeverity(buildkit/StageNameCasing) = %q, want %q", sev, "info")
+	}
 
-		sev = cfg.Rules.GetSeverity("tally/max-lines")
-		if sev != "error" {
-			t.Errorf("GetSeverity(tally/max-lines) = %q, want %q", sev, "error")
-		}
+	sev = cfg.Rules.GetSeverity("tally/max-lines")
+	if sev != "error" {
+		t.Errorf("GetSeverity(tally/max-lines) = %q, want %q", sev, "error")
+	}
 
-		// Unconfigured rule returns empty string
-		sev = cfg.Rules.GetSeverity("buildkit/MaintainerDeprecated")
-		if sev != "" {
-			t.Errorf("GetSeverity(unconfigured) = %q, want empty", sev)
-		}
-	})
+	// Unconfigured rule returns empty string
+	sev = cfg.Rules.GetSeverity("buildkit/MaintainerDeprecated")
+	if sev != "" {
+		t.Errorf("GetSeverity(unconfigured) = %q, want empty", sev)
+	}
 }
 
 func TestEnvKeyTransform(t *testing.T) {
@@ -264,6 +331,10 @@ func TestEnvKeyTransform(t *testing.T) {
 		{"TALLY_RULES_MAX_LINES_MAX", "rules.max-lines.max"},
 		{"TALLY_RULES_MAX_LINES_SKIP_BLANK_LINES", "rules.max-lines.skip-blank-lines"},
 		{"TALLY_RULES_MAX_LINES_SKIP_COMMENTS", "rules.max-lines.skip-comments"},
+		{"TALLY_AI_ENABLED", "ai.enabled"},
+		{"TALLY_AI_TIMEOUT", "ai.timeout"},
+		{"TALLY_AI_MAX_INPUT_BYTES", "ai.max-input-bytes"},
+		{"TALLY_AI_REDACT_SECRETS", "ai.redact-secrets"},
 	}
 
 	for _, tt := range tests {

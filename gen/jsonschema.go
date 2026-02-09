@@ -38,6 +38,9 @@ func main() {
 	// Enhance OutputConfig with enums/defaults (too long for struct tags)
 	enhanceOutputConfigSchema(schema)
 
+	// Enhance AIConfig with descriptions (kept short in struct tags for lll).
+	enhanceAIConfigSchema(schema)
+
 	// Fix required fields - all config fields should be optional
 	fixRequiredFields(schema)
 
@@ -130,6 +133,11 @@ func fixRequiredFields(schema *jsonschema.Schema) {
 			requireReason.Description = "Require reason= on all ignore directives"
 		}
 	}
+
+	// AIConfig fields should be optional (AI is opt-in).
+	if aiDef, ok := schema.Definitions["AIConfig"]; ok {
+		aiDef.Required = nil
+	}
 }
 
 // enhanceOutputConfigSchema adds enum/default/description to OutputConfig fields.
@@ -164,5 +172,21 @@ func enhanceOutputConfigSchema(schema *jsonschema.Schema) {
 		failLevel.Enum = []any{"error", "warning", "info", "style", "none"}
 		failLevel.Default = "style"
 		failLevel.Description = "Minimum severity for non-zero exit code"
+	}
+}
+
+// enhanceAIConfigSchema adds descriptions to AIConfig fields.
+// This is done programmatically to avoid long struct tag lines.
+func enhanceAIConfigSchema(schema *jsonschema.Schema) {
+	aiDef, ok := schema.Definitions["AIConfig"]
+	if !ok || aiDef == nil {
+		return
+	}
+
+	if maxInputBytes, ok := aiDef.Properties.Get("max-input-bytes"); ok && maxInputBytes.Description == "" {
+		maxInputBytes.Description = "Maximum input bytes sent to agent"
+	}
+	if redactSecrets, ok := aiDef.Properties.Get("redact-secrets"); ok && redactSecrets.Description == "" {
+		redactSecrets.Description = "Redact secrets before sending content to agent"
 	}
 }

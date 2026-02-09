@@ -2,16 +2,48 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://json.schemastore.org/tally.json",
   "$defs": {
+    "AIConfig": {
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable AI features (opt-in)",
+          "default": false
+        },
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "description": "ACP agent command argv (stdio)"
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Per-fix timeout (e.g. 90s)",
+          "default": "90s"
+        },
+        "max-input-bytes": {
+          "type": "integer",
+          "description": "Maximum input bytes sent to agent",
+          "default": 262144
+        },
+        "redact-secrets": {
+          "type": "boolean",
+          "description": "Redact secrets before sending content to agent",
+          "default": true
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "DL3026Config": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "https://github.com/tinovyatkin/tally/internal/rules/trustedbaseimage/config",
+      "$id": "https://github.com/tinovyatkin/tally/internal/rules/hadolint/dl3026-config",
       "properties": {
         "trusted-registries": {
           "items": {
             "type": "string"
           },
-          "type": "array",
-          "description": "Allowed registries. If empty rule is disabled."
+          "type": "array"
         }
       },
       "additionalProperties": false,
@@ -102,12 +134,22 @@
         "severity": {
           "type": "string",
           "enum": [
+            "off",
             "error",
             "warning",
             "info",
             "style"
           ],
           "description": "Override the rule's default severity"
+        },
+        "fix": {
+          "type": "string",
+          "enum": [
+            "never",
+            "explicit",
+            "always",
+            "unsafe-only"
+          ]
         },
         "exclude": {
           "$ref": "#/$defs/ExcludeConfig",
@@ -131,7 +173,7 @@
             "type": "string"
           },
           "type": "array",
-          "description": "Disable rules by pattern (takes precedence)"
+          "description": "Disable rules by pattern"
         },
         "tally": {
           "additionalProperties": {
@@ -160,7 +202,7 @@
     },
     "max-linesConfig": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "https://github.com/tinovyatkin/tally/internal/rules/maxlines/config",
+      "$id": "https://github.com/tinovyatkin/tally/internal/rules/tally/max-lines-config",
       "properties": {
         "max": {
           "type": "integer",
@@ -182,9 +224,54 @@
       "additionalProperties": false,
       "type": "object",
       "description": "Configuration for max-lines rule"
+    },
+    "prefer-add-unpackConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/tinovyatkin/tally/internal/rules/tally/prefer-add-unpack-config",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Configuration for prefer-add-unpack rule"
+    },
+    "prefer-copy-heredocConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/tinovyatkin/tally/internal/rules/tally/prefer-copy-heredoc-config",
+      "properties": {
+        "check-single-run": {
+          "type": "boolean"
+        },
+        "check-consecutive-runs": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Configuration for prefer-copy-heredoc rule"
+    },
+    "prefer-run-heredocConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/tinovyatkin/tally/internal/rules/tally/prefer-heredoc-config",
+      "properties": {
+        "min-commands": {
+          "type": "integer"
+        },
+        "check-consecutive-runs": {
+          "type": "boolean"
+        },
+        "check-chained-commands": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Configuration for prefer-run-heredoc rule"
     }
   },
-  "$comment": "Auto-generated on 2026-01-29. Do not edit manually.",
+  "$comment": "Auto-generated on 2026-02-09. Do not edit manually.",
   "properties": {
     "rules": {
       "$ref": "#/$defs/RulesConfig",
@@ -196,6 +283,9 @@
     },
     "inline-directives": {
       "$ref": "#/$defs/InlineDirectivesConfig"
+    },
+    "ai": {
+      "$ref": "#/$defs/AIConfig"
     }
   },
   "additionalProperties": false,
