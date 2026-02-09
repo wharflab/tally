@@ -454,20 +454,25 @@ Pattern:
 
 This avoids re-discovering config during fix application and respects explicit `--config` usage.
 
-### 9.3 Secret redaction (best-effort)
+### 9.3 Secret redaction (prompt egress guard)
 
-If `ai.redact-secrets=true`, sanitize the Dockerfile content embedded into the prompt:
+Tally already has a dedicated lint rule for secret detection (`tally/secrets-in-code`, gitleaks-backed). That rule is about **reporting** secrets, and
+it can be configured/disabled. It does not, by itself, prevent accidental secret transmission when we send content to an external agent.
 
-- Prefer reusing tally’s existing secret detection engine (gitleaks, used by `tally/secrets-in-code`) to find candidate secret substrings and replace
-  them with `REDACTED`.
-- If gitleaks-based redaction is too heavy for this path, fall back to a conservative name-based redactor:
-  - Only redact values for a narrow denylist of variable names (case-insensitive), e.g. `*_TOKEN`, `*_SECRET`, `*_PASSWORD`, `*_API_KEY`,
-    `*_ACCESS_KEY`, `*_SECRET_KEY`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `GITHUB_TOKEN`, `NPM_TOKEN`.
-  - Avoid a broad `*KEY*` substring rule (it over-redacts benign config like `CACHE_KEY_PREFIX`).
-- Redact both `ARG KEY=value` and `ENV KEY=value`.
-- Do not redact key names, only values.
+Therefore AI AutoFix includes an independent prompt sanitation step controlled by `ai.redact-secrets` (default: `true`).
 
-This is not perfect, but it reduces accidental leakage for common cases.
+MVP behavior:
+
+- Use the same gitleaks detector/rules as `tally/secrets-in-code` to scan the exact payload we send to ACP (Dockerfile text and any embedded
+  context).
+- Replace each detected secret substring with the literal token `REDACTED` in the prompt payload.
+- Do not log prompt content. Log only sizes and counts (e.g., number of redactions) to avoid accidental leakage in stderr/CI logs.
+
+Failure mode:
+
+- If `ai.redact-secrets=true` but the gitleaks detector cannot be initialized, skip AI AutoFix (fail closed).
+- If `ai.redact-secrets=false`, do not perform sanitation. This is risky; strongly recommend keeping `tally/secrets-in-code` enabled at
+  severity `error` and only disabling redaction when the agent is fully local and the user explicitly accepts the egress risk.
 
 ### 9.4 Response parsing
 
