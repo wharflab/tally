@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -28,9 +29,13 @@ func buildTestAgent() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("mkdtemp: %w", err)
 	}
-	out := filepath.Join(tmp, "acp-testagent")
+	binName := "acp-testagent"
+	if runtime.GOOS == "windows" {
+		binName += ".exe"
+	}
+	out := filepath.Join(tmp, binName)
 
-	cmd := exec.Command("go", "build", "-trimpath", "-o", out, "./testagent")
+	cmd := exec.Command("go", "build", "-trimpath", "-o", out, "./testdata/testagent")
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	if err := cmd.Run(); err != nil {
