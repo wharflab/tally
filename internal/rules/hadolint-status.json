@@ -48,6 +48,10 @@
       "status": "implemented",
       "tally_rule": "hadolint/DL3021"
     },
+    "DL3022": {
+      "status": "implemented",
+      "tally_rule": "hadolint/DL3022"
+    },
     "DL3023": {
       "status": "implemented",
       "tally_rule": "hadolint/DL3023"

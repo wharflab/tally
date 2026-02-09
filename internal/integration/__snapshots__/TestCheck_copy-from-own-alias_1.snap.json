@@ -4,6 +4,24 @@
       "file": "testdata/copy-from-own-alias/Dockerfile",
       "violations": [
         {
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3022",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "testdata/copy-from-own-alias/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "`COPY --from` should reference a previously defined `FROM` alias",
+          "rule": "hadolint/DL3022",
+          "severity": "error",
+          "sourceCode": "COPY --from=foo bar ."
+        },
+        {
           "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3023",
           "location": {
             "end": {
@@ -27,11 +45,11 @@
   "files_scanned": 1,
   "rules_enabled": 37,
   "summary": {
-    "errors": 1,
+    "errors": 2,
     "files": 1,
     "info": 0,
     "style": 0,
-    "total": 1,
+    "total": 2,
     "warnings": 0
   }
 }

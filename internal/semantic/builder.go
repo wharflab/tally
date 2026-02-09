@@ -245,6 +245,23 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 				}
 				copyRef := b.processCopyFrom(c, info.Index, graph)
 				info.CopyFromRefs = append(info.CopyFromRefs, copyRef)
+
+				// DL3022: COPY --from should reference a previously defined FROM alias.
+				// If the reference didn't resolve to a stage and doesn't look like
+				// an external image (contains ":"), it's an undefined reference.
+				if !copyRef.IsStageRef && !strings.Contains(c.From, ":") {
+					var loc parser.Range
+					if ranges := c.Location(); len(ranges) > 0 {
+						loc = ranges[0]
+					}
+					b.issues = append(b.issues, newIssue(
+						b.file,
+						loc,
+						rules.HadolintRulePrefix+"DL3022",
+						"`COPY --from` should reference a previously defined `FROM` alias",
+						"https://github.com/hadolint/hadolint/wiki/DL3022",
+					))
+				}
 			}
 
 		case *instructions.OnbuildCommand:

@@ -268,6 +268,12 @@ func TestCheck(t *testing.T) {
 			wantExit: 1,
 		},
 		{
+			name:     "dl3022",
+			dir:      "dl3022",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3022")...),
+			wantExit: 1,
+		},
+		{
 			name:     "dl3027",
 			dir:      "dl3027",
 			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3027")...),

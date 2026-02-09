@@ -197,14 +197,21 @@ COPY --from=foo bar .
 	model := NewModel(pr, nil, "Dockerfile")
 
 	violations := model.ConstructionIssues()
-	if len(violations) != 1 {
-		t.Fatalf("expected 1 violation, got %d", len(violations))
+	if len(violations) != 2 {
+		t.Fatalf("expected 2 violations, got %d", len(violations))
 	}
+	// DL3023 fires first (checked before processCopyFrom), then DL3022
 	if violations[0].Code != "hadolint/DL3023" {
 		t.Errorf("expected hadolint/DL3023, got %q", violations[0].Code)
 	}
-	if violations[0].Location.Start.Line != 2 {
-		t.Errorf("expected violation on line 2, got %d", violations[0].Location.Start.Line)
+	// DL3022: COPY --from references undefined alias (self-reference is not "previously defined")
+	if violations[1].Code != "hadolint/DL3022" {
+		t.Errorf("expected hadolint/DL3022, got %q", violations[1].Code)
+	}
+	for _, v := range violations {
+		if v.Location.Start.Line != 2 {
+			t.Errorf("expected %s violation on line 2, got %d", v.Code, v.Location.Start.Line)
+		}
 	}
 }
 
