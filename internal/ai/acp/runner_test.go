@@ -93,10 +93,10 @@ func TestRunner_StderrTailIncludedInError(t *testing.T) {
 		t.Fatalf("Run() expected error, got nil")
 	}
 	msg := err.Error()
-	if !strings.Contains(msg, "END_STDER") {
+	if !strings.Contains(msg, "END_STDERR") {
 		t.Fatalf("error missing stderr tail marker: %q", msg)
 	}
-	if strings.Contains(msg, "BEGIN_STDER") {
+	if strings.Contains(msg, "BEGIN_STDERR") {
 		t.Fatalf("error unexpectedly contains full stderr (expected tail only): %q", msg)
 	}
 }

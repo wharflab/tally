@@ -43,8 +43,8 @@ func main() {
 		if *stderrBytes > 0 {
 			writeStderrPayload(*stderrBytes)
 		} else {
-			fmt.Fprintln(os.Stderr, "BEGIN_STDER")
-			fmt.Fprintln(os.Stderr, "END_STDER")
+			fmt.Fprintln(os.Stderr, "BEGIN_STDERR")
+			fmt.Fprintln(os.Stderr, "END_STDERR")
 		}
 		os.Exit(42)
 	case "malformed":
@@ -63,7 +63,7 @@ func main() {
 }
 
 func writeStderrPayload(n int) {
-	if _, err := os.Stderr.WriteString("BEGIN_STDER\n"); err != nil {
+	if _, err := os.Stderr.WriteString("BEGIN_STDERR\n"); err != nil {
 		return
 	}
 	if n > 0 {
@@ -78,7 +78,7 @@ func writeStderrPayload(n int) {
 			return
 		}
 	}
-	if _, err := os.Stderr.WriteString("END_STDER\n"); err != nil {
+	if _, err := os.Stderr.WriteString("END_STDERR\n"); err != nil {
 		return
 	}
 }
