@@ -17,7 +17,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 |-----------|-------------|---------------------|-------|
 | tally | 8 | - | 8 |
 | buildkit | 9 + 5 captured | - | 22 |
-| hadolint | 20 | 10 | 66 |
+| hadolint | 20 | 11 | 66 |
 <!-- END RULES_SUMMARY -->
 
 ---
@@ -117,7 +117,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 
 - ✅ Implemented by tally
 - 🔧 Auto-fixable with `tally check --fix`
-- 🔄 Covered by BuildKit rule (use that instead)
+- 🔄 Covered by BuildKit or tally rule (use that instead)
 - ⏳ Not yet implemented
 
 ### DL Rules (Dockerfile Lint)
@@ -181,7 +181,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL3056](https://github.com/hadolint/hadolint/wiki/DL3056) | Label `<label>` does not conform to semantic versioning. | Warning | ⏳ |
 | [DL3057](https://github.com/hadolint/hadolint/wiki/DL3057) | `HEALTHCHECK` instruction missing. | Ignore | ⏳ |
 | [DL3058](https://github.com/hadolint/hadolint/wiki/DL3058) | Label `<label>` is not a valid email format - must conform to RFC5322. | Warning | ⏳ |
-| [DL3059](https://github.com/hadolint/hadolint/wiki/DL3059) | Multiple consecutive `RUN` instructions. Consider consolidation. | Info | ⏳ |
+| [DL3059](https://github.com/hadolint/hadolint/wiki/DL3059) | Multiple consecutive `RUN` instructions. Consider consolidation. | Info | 🔄 [`tally/prefer-run-heredoc`](docs/rules/tally/prefer-run-heredoc.md) |
 | [DL3060](https://github.com/hadolint/hadolint/wiki/DL3060) | `yarn cache clean` missing after `yarn install` was run. | Info | ⏳ |
 | [DL3061](https://github.com/hadolint/hadolint/wiki/DL3061) | Invalid instruction order. Dockerfile must begin with `FROM`, `ARG` or comment. | Error | ✅ `hadolint/DL3061` |
 | [DL3062](https://github.com/hadolint/hadolint/wiki/DL3062) | Pin versions in go install. Instead of `go install <package>` use `go install <package>@<version>` | Warning | ⏳ |

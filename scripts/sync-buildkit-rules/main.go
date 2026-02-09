@@ -600,7 +600,7 @@ func hadolintCounts(path string) (int, int, int, error) {
 		case "implemented":
 			supported++
 			implemented++
-		case "covered_by_buildkit":
+		case "covered_by_buildkit", "covered_by_tally":
 			supported++
 			covered++
 		}

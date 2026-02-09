@@ -117,6 +117,9 @@ format_markdown() {
                 end
             elif .impl_status == "covered_by_buildkit" then
                 "🔄 `buildkit/\(.buildkit_rule)`"
+            elif .impl_status == "covered_by_tally" then
+                (.tally_rule | split("/") | .[1]) as $slug |
+                "🔄 [`\(.tally_rule)`](docs/rules/tally/\($slug).md)"
             else
                 "⏳"
             end) as $status_str |
@@ -182,13 +185,16 @@ format_summary() {
     jq -r '
         (length) as $total |
         ([.[] | select(.impl_status == "implemented")] | length) as $implemented |
-        ([.[] | select(.impl_status == "covered_by_buildkit")] | length) as $covered |
+        ([.[] | select(.impl_status == "covered_by_buildkit")] | length) as $covered_bk |
+        ([.[] | select(.impl_status == "covered_by_tally")] | length) as $covered_tally |
+        ($covered_bk + $covered_tally) as $covered |
         ($total - $implemented - $covered) as $pending |
 
         "Hadolint DL Rules Status:",
         "  Total: \($total)",
         "  Implemented by tally: \($implemented)",
-        "  Covered by BuildKit: \($covered)",
+        "  Covered by BuildKit: \($covered_bk)",
+        "  Covered by tally rule: \($covered_tally)",
         "  Not yet implemented: \($pending)",
         "",
         "Coverage: \((($implemented + $covered) * 100 / $total) | floor)%"
