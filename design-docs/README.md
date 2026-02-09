@@ -167,6 +167,20 @@ enforcement
 
 ---
 
+### 14. [Prefer VEX Attestation (OpenVEX)](14-prefer-vex-attestation.md)
+
+**Covers:** New tally rule to discourage embedding `*.vex.json` files into images, plus a roadmap for context-aware VEX/attestation linting
+
+**Key Topics:**
+
+- MVP detection of `COPY *.vex.json`
+- Recommendation: attach VEX as an OCI attestation (in-toto predicate)
+- Future: stage-aware checks, registry-attestation discovery, trust policy, VEX-aware vulnerability reporting
+
+**Based on:** OpenVEX, OCI referrers/attestations, Sigstore/cosign ecosystem
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation

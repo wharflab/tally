@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "testdata/prefer-vex-attestation/Dockerfile",
+      "violations": [
+        {
+          "detail": "VEX documents are supply-chain metadata. Embedding them in the runtime image requires rebuilding to update statements and makes discovery less consistent. Attach OpenVEX as an OCI attestation (in-toto predicate) instead.",
+          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/prefer-vex-attestation.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "testdata/prefer-vex-attestation/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "prefer attaching VEX as an OCI attestation instead of copying \"*.vex.json\" into the image",
+          "rule": "tally/prefer-vex-attestation",
+          "severity": "info",
+          "sourceCode": "COPY *.vex.json /usr/share/vex/"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

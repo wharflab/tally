@@ -1,0 +1,10 @@
+{
+ "Category": "security",
+ "Code": "tally/prefer-vex-attestation",
+ "DefaultSeverity": "info",
+ "Description": "Prefer attaching OpenVEX as an OCI attestation instead of copying VEX JSON into the image",
+ "DocURL": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/prefer-vex-attestation.md",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Prefer VEX attestation"
+}

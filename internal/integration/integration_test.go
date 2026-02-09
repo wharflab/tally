@@ -480,6 +480,13 @@ func TestCheck(t *testing.T) {
 			wantExit: 1,
 		},
 
+		{
+			name:     "prefer-vex-attestation",
+			dir:      "prefer-vex-attestation",
+			args:     append([]string{"--format", "json"}, selectRules("tally/prefer-vex-attestation")...),
+			wantExit: 1,
+		},
+
 		// Combined: prefer-add-unpack with prefer-run-heredoc (both should fire)
 		{
 			name: "prefer-add-unpack-heredoc",

@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 7 | - | 7 |
+| tally | 8 | - | 8 |
 | buildkit | 9 + 5 captured | - | 22 |
 | hadolint | 20 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -29,6 +29,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | Rule | Description | Severity | Category | Default |
 |------|-------------|----------|----------|---------|
 | `tally/secrets-in-code` | Detects hardcoded secrets, API keys, and credentials using [gitleaks](https://github.com/gitleaks/gitleaks) patterns | Error | Security | Enabled |
+| `tally/prefer-vex-attestation` | Recommends attaching OpenVEX as an OCI attestation instead of copying `*.vex.json` into the image | Info | Security | Enabled |
 | `tally/max-lines` | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
 | `tally/no-unreachable-stages` | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
 | `tally/prefer-add-unpack` | Suggests `ADD --unpack` instead of downloading and extracting remote archives in `RUN` | Info | Performance | Enabled |
@@ -50,6 +51,13 @@ Uses gitleaks' curated database of 222+ secret patterns including AWS keys, GitH
 
 **Complements `buildkit/SecretsUsedInArgOrEnv`**: BuildKit's rule checks variable *names* (e.g., `GITHUB_TOKEN`), while this rule detects actual
 secret *values*.
+
+### tally/prefer-vex-attestation
+
+Discourages embedding VEX (OpenVEX) documents into the runtime image filesystem (for example, `COPY *.vex.json ...`).
+
+VEX is supply-chain metadata; prefer attaching it as an OCI attestation (in-toto predicate) to the image digest in CI/CD so it can be updated and
+discovered without changing the runtime image contents.
 
 ### tally/max-lines
 
