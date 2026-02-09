@@ -5,6 +5,7 @@ go 1.25.7
 require (
 	github.com/TypeFox/go-lsp v0.0.1
 	github.com/alecthomas/chroma/v2 v2.23.1
+	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/coder/acp-go-sdk v0.6.3
