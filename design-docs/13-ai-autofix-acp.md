@@ -179,7 +179,12 @@ Enforce:
 - Per-fix timeout (`context.WithTimeout`)
 - Maximum prompt size (`ai.max-input-bytes`)
 - Maximum accepted agent output (hardcoded sanity limit; e.g. 2 MiB)
-- Process group cleanup: always terminate the agent process on completion or timeout.
+- Process cleanup: when tally spawns the ACP agent process (stdio transport), always terminate the agent (and its process group) on completion or
+  timeout.
+
+Note: ACP does not manage OS process lifecycle. It only defines the wire protocol. In MVP we use ACP-over-stdio, so tally is responsible for
+starting and stopping the agent process safely. If we later support a long-lived/externally managed agent connection, lifecycle management shifts
+to session cancellation and closing the connection rather than killing a process.
 
 ### 5.4 Data handling and privacy
 
