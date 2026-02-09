@@ -107,9 +107,18 @@ func startAgentProcess(absCwd string, command []string, stderrTailBytes int, gra
 	}
 	p.stdout, err = p.cmd.StdoutPipe()
 	if err != nil {
+		if p.stdin != nil {
+			_ = p.stdin.Close()
+		}
 		return nil, fmt.Errorf("stdout pipe: %w", err)
 	}
 	if err := p.cmd.Start(); err != nil {
+		if p.stdin != nil {
+			_ = p.stdin.Close()
+		}
+		if p.stdout != nil {
+			_ = p.stdout.Close()
+		}
 		return nil, err
 	}
 	return p, nil
