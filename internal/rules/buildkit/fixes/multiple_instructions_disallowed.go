@@ -49,6 +49,9 @@ func enrichMultipleInstructionsDisallowedFix(v *rules.Violation, source []byte) 
 	v.SuggestedFix = &rules.SuggestedFix{
 		Description: "Comment out duplicate " + instrName + " instruction (only the last one takes effect)",
 		Safety:      rules.FixSafe,
+		// Priority -1: must apply before cosmetic fixes (casing at 0, JSON form at 0) on the same line.
+		// Commenting out a dead instruction makes other fixes on that line moot.
+		Priority: -1,
 		Edits: []rules.TextEdit{{
 			Location: createEditLocation(v.Location.File, v.Location.Start.Line, 0, len(line)),
 			NewText:  commentedLine,

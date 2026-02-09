@@ -38,7 +38,8 @@
                 "newText": "# [commented out by tally - Docker will ignore all but last CMD]: CMD echo \"build\""
               }
             ],
-            "isPreferred": true
+            "isPreferred": true,
+            "priority": -1
           }
         },
         {
@@ -76,7 +77,8 @@
                 "newText": "# [commented out by tally - Docker will ignore all but last ENTRYPOINT]: ENTRYPOINT [\"/bin/bash\"]"
               }
             ],
-            "isPreferred": true
+            "isPreferred": true,
+            "priority": -1
           }
         }
       ]

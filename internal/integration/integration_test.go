@@ -865,6 +865,29 @@ severity = "error"
 			},
 			wantApplied: 2,
 		},
+		// Cross-rule interaction: MultipleInstructionsDisallowed + ConsistentInstructionCasing + JSONArgsRecommended
+		// all fire on the same duplicate CMD line. MultipleInstructionsDisallowed has priority -1 (applied
+		// before cosmetic fixes at priority 0), so it comments out the earlier cmd on line 2 first.
+		// Casing and JSON fixes on line 2 are then skipped (conflict with the whole-line edit).
+		// Remaining non-conflicting fixes still apply on other lines.
+		//   Line 2: commented out by MultipleInstructionsDisallowed (priority -1)
+		//   Line 3: JSON fix (echo second→["echo","second"])
+		//   Line 4: casing fix (entrypoint→ENTRYPOINT)
+		//   Skipped: ConsistentInstructionCasing + JSONArgsRecommended on line 2 (conflict)
+		{
+			name: "multiple-instructions-cross-rules",
+			input: "FROM alpine:3.21\n" +
+				"cmd echo first\n" +
+				"CMD echo second\n" +
+				"entrypoint [\"/bin/sh\"]\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				selectRules(
+					"buildkit/MultipleInstructionsDisallowed",
+					"buildkit/ConsistentInstructionCasing",
+					"buildkit/JSONArgsRecommended",
+				)...),
+			wantApplied: 3, // comment-out line 2 + JSON line 3 + casing line 4
+		},
 
 		// === Heredoc fix tests ===
 
