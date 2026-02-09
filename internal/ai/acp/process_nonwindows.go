@@ -9,9 +9,11 @@ import (
 )
 
 func configureProcessGroup(cmd *exec.Cmd) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		return
 	}
+	cmd.SysProcAttr.Setpgid = true
 }
 
 func killProcessGroup(pid int, sig syscall.Signal) error {
