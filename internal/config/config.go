@@ -41,6 +41,9 @@ type Config struct {
 	// InlineDirectives controls inline suppression directives.
 	InlineDirectives InlineDirectivesConfig `json:"inline-directives" koanf:"inline-directives"`
 
+	// AI configures opt-in AI features (e.g., AI AutoFix).
+	AI AIConfig `json:"ai" koanf:"ai"`
+
 	// ConfigFile is the path to the config file that was loaded (if any).
 	// This is metadata, not loaded from config.
 	ConfigFile string `json:"-" koanf:"-"`
@@ -85,6 +88,27 @@ type InlineDirectivesConfig struct {
 	RequireReason bool `json:"require-reason,omitempty" jsonschema:"default=false" koanf:"require-reason"`
 }
 
+// AIConfig configures opt-in AI features.
+//
+// This is intentionally minimal for MVP. Expand cautiously: AI behavior must remain opt-in.
+type AIConfig struct {
+	// Enabled toggles all AI features in tally. Disabled by default.
+	Enabled bool `json:"enabled,omitempty" jsonschema:"default=false,description=Enable AI features (opt-in)" koanf:"enabled"`
+
+	// Command is the ACP-capable agent program argv (stdio).
+	// Example: ["acp-agent", "--model", "foo"].
+	Command []string `json:"command,omitempty" jsonschema:"description=ACP agent command argv (stdio)" koanf:"command"`
+
+	// Timeout is the per-fix timeout (e.g. "90s"). Parsed with time.ParseDuration at runtime.
+	Timeout string `json:"timeout,omitempty" jsonschema:"default=90s,description=Per-fix timeout (e.g. 90s)" koanf:"timeout"`
+
+	// MaxInputBytes limits how much content tally will send to the agent (guards cost/latency).
+	MaxInputBytes int `json:"max-input-bytes,omitempty" jsonschema:"default=262144" koanf:"max-input-bytes"`
+
+	// RedactSecrets redacts obvious secrets before sending content to the agent.
+	RedactSecrets bool `json:"redact-secrets,omitempty" jsonschema:"default=true" koanf:"redact-secrets"`
+}
+
 // Default returns the default configuration.
 // Rule-specific defaults are owned by each rule via ConfigurableRule.DefaultConfig().
 func Default() *Config {
@@ -101,6 +125,12 @@ func Default() *Config {
 			WarnUnused:    false, // Don't warn about unused directives by default
 			ValidateRules: false, // Don't validate rule codes (allows BuildKit/hadolint rules)
 			RequireReason: false, // Don't require reason= by default
+		},
+		AI: AIConfig{
+			Enabled:       false,
+			Timeout:       "90s",
+			MaxInputBytes: 256 * 1024,
+			RedactSecrets: true,
 		},
 	}
 }
@@ -165,6 +195,8 @@ var knownHyphenatedKeys = map[string]string{
 	"require.reason":    "require-reason",
 	"show.source":       "show-source",
 	"fail.level":        "fail-level",
+	"max.input.bytes":   "max-input-bytes",
+	"redact.secrets":    "redact-secrets",
 }
 
 // envKeyTransform converts environment variable names to config keys.
