@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "buildkit/ExposeProtoCasing",
+ "DefaultSeverity": "warning",
+ "Description": "Protocol in EXPOSE instruction should be lowercase",
+ "DocURL": "https://docs.docker.com/go/dockerfile/rule/expose-proto-casing/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Expose Proto Casing"
+}
