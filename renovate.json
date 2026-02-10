@@ -72,6 +72,15 @@
       "bumpVersion": "patch"
     },
     {
+      "matchFileNames": [
+        "extensions/vscode-tally/package.json"
+      ],
+      "matchDepNames": [
+        "vscode"
+      ],
+      "enabled": false
+    },
+    {
       "matchManagers": [
         "dockerfile"
       ],
