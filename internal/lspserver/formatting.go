@@ -92,26 +92,33 @@ func minimalReplacement(original, modified []byte) (int, int, []byte, bool) {
 
 	prefix := 0
 	for prefix < len(original) && prefix < len(modified) {
-		if original[prefix] != modified[prefix] {
+		r1, size1 := utf8.DecodeRune(original[prefix:])
+		r2, size2 := utf8.DecodeRune(modified[prefix:])
+		if r1 != r2 || size1 != size2 || !bytes.Equal(original[prefix:prefix+size1], modified[prefix:prefix+size2]) {
 			break
 		}
-		prefix++
+		prefix += size1
 	}
 
-	suffix := 0
-	for suffix < len(original)-prefix && suffix < len(modified)-prefix {
-		origIdx := len(original) - 1 - suffix
-		modIdx := len(modified) - 1 - suffix
-		if original[origIdx] != modified[modIdx] {
+	origEnd := len(original)
+	modEnd := len(modified)
+	for origEnd > prefix && modEnd > prefix {
+		r1, size1 := utf8.DecodeLastRune(original[:origEnd])
+		r2, size2 := utf8.DecodeLastRune(modified[:modEnd])
+		if origEnd-size1 < prefix || modEnd-size2 < prefix {
 			break
 		}
-		suffix++
+		if r1 != r2 || size1 != size2 || !bytes.Equal(original[origEnd-size1:origEnd], modified[modEnd-size2:modEnd]) {
+			break
+		}
+		origEnd -= size1
+		modEnd -= size2
 	}
 
 	start := prefix
-	end := len(original) - suffix
+	end := origEnd
 	replStart := prefix
-	replEnd := len(modified) - suffix
+	replEnd := modEnd
 	replacement := modified[replStart:replEnd]
 	return start, end, replacement, true
 }
