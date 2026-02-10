@@ -176,6 +176,7 @@ func TestLSP_CodeAction(t *testing.T) {
 		Range:        maintainerDiag.Range,
 		Context: codeActionContext{
 			Diagnostics: []diagnostic{*maintainerDiag},
+			Only:        []string{"quickfix"},
 		},
 	}, &actions)
 	require.NoError(t, err)
@@ -187,6 +188,38 @@ func TestLSP_CodeAction(t *testing.T) {
 			Indent:   " ",
 		}),
 	).MatchStandaloneJSON(t, actions)
+}
+
+func TestLSP_CodeAction_DefaultIncludesFixAll(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	uri := "file:///tmp/test-codeaction-default-fixall/Dockerfile"
+	ts.openDocument(t, uri, "FROM alpine:3.18\nMAINTAINER test@example.com\n")
+
+	// Drain push diagnostics from didOpen.
+	ts.waitDiagnostics(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var actions []codeAction
+	err := ts.conn.Call(ctx, "textDocument/codeAction", &codeActionParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+		Range: lspRange{
+			Start: position{Line: 0, Character: 0},
+			End:   position{Line: 0, Character: 0},
+		},
+		Context: codeActionContext{
+			Diagnostics: nil,
+		},
+	}, &actions)
+	require.NoError(t, err)
+
+	assert.True(t, slices.ContainsFunc(actions, func(a codeAction) bool {
+		return a.Kind == "source.fixAll.tally"
+	}), "expected fix-all code action when only is omitted")
 }
 
 func TestLSP_CodeActionFixAll(t *testing.T) {

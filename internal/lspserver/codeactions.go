@@ -14,7 +14,7 @@ func (s *Server) codeActionsForDocument(
 	params *protocol.CodeActionParams,
 ) []protocol.CodeAction {
 	includeQuickFix := true
-	includeFixAll := false
+	includeFixAll := true
 	if params.Context.Only != nil {
 		includeQuickFix = kindRequested(params.Context.Only, protocol.CodeActionKindQuickFix)
 		includeFixAll = kindRequested(params.Context.Only, fixAllCodeActionKind)
