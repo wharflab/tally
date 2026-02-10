@@ -43,7 +43,14 @@ test(
     const binDir = await fs.mkdtemp(path.join(os.tmpdir(), 'tally-vscode-bin-'));
     const binaryName = process.platform === 'win32' ? 'tally.exe' : 'tally';
     const binaryPath = path.join(binDir, binaryName);
-    runOrThrow(['go', 'build', '-o', binaryPath, 'github.com/tinovyatkin/tally'], {
+
+    const goBuildArgs = ['go', 'build'];
+    if (process.env.GOCOVERDIR) {
+      goBuildArgs.push('-cover');
+    }
+    goBuildArgs.push('-o', binaryPath, 'github.com/tinovyatkin/tally');
+
+    runOrThrow(goBuildArgs, {
       cwd: repoRoot,
       env: { GOEXPERIMENT: 'jsonv2' },
     });
@@ -87,4 +94,3 @@ test(
     });
   },
 );
-
