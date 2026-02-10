@@ -32,6 +32,13 @@ type folderSettings struct {
 	ConfigurationOverrides  map[string]any
 }
 
+func applyDefaultPreference(pref config.ConfigurationPreference) config.ConfigurationPreference {
+	if pref == "" {
+		return config.ConfigurationPreferenceEditorFirst
+	}
+	return pref
+}
+
 func defaultClientSettings() clientSettings {
 	return clientSettings{
 		Global: folderSettings{
@@ -146,7 +153,7 @@ func parseClientSettings(settings any) (clientSettings, bool) {
 
 	out := clientSettings{
 		Global: folderSettings{
-			ConfigurationPreference: wire.Global.ConfigurationPreference,
+			ConfigurationPreference: applyDefaultPreference(wire.Global.ConfigurationPreference),
 			ConfigurationOverrides:  toOverridesMap(wire.Global.Configuration),
 		},
 	}
@@ -155,7 +162,7 @@ func parseClientSettings(settings any) (clientSettings, bool) {
 		out.Workspaces = append(out.Workspaces, workspaceFolderSettings{
 			Root: uriToPath(ws.URI),
 			Settings: folderSettings{
-				ConfigurationPreference: ws.Settings.ConfigurationPreference,
+				ConfigurationPreference: applyDefaultPreference(ws.Settings.ConfigurationPreference),
 				ConfigurationOverrides:  toOverridesMap(ws.Settings.Configuration),
 			},
 		})
