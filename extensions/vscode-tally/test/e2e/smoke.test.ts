@@ -77,9 +77,18 @@ test(
       'TestLSP_FormattingRealWorld_1.snap.Dockerfile',
     );
 
+    const vscodeVersion = process.env.VSCODE_TEST_VERSION;
+    const vscodeDownloadTimeoutMsRaw = process.env.VSCODE_TEST_DOWNLOAD_TIMEOUT_MS;
+    const vscodeDownloadTimeoutMsParsed = Number.parseInt(vscodeDownloadTimeoutMsRaw ?? '120000', 10);
+    const vscodeDownloadTimeoutMs = Number.isFinite(vscodeDownloadTimeoutMsParsed)
+      ? vscodeDownloadTimeoutMsParsed
+      : 120_000;
+
     await runTests({
       extensionDevelopmentPath: extensionRoot,
       extensionTestsPath: path.join(extensionRoot, 'test', 'suite', 'index.js'),
+      ...(vscodeVersion ? { version: vscodeVersion } : {}),
+      timeout: vscodeDownloadTimeoutMs,
       launchArgs: [
         repoRoot,
         '--disable-extensions',
