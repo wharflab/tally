@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"path/filepath"
+	"unicode/utf8"
 
 	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
 
@@ -124,14 +125,33 @@ func positionAtOffset(content []byte, offset int) protocol.Position {
 	}
 
 	line := uint32(0)
-	lineStart := 0
-	for i := range offset {
-		if content[i] == '\n' {
-			line++
-			lineStart = i + 1
+	utf16Char := 0
+
+	for i := 0; i < offset; {
+		r, size := utf8.DecodeRune(content[i:])
+		next := i + size
+		// offset is a byte offset; don't decode past it.
+		if next > offset {
+			break
 		}
+
+		if r == '\n' {
+			line++
+			utf16Char = 0
+			i = next
+			continue
+		}
+
+		switch {
+		case r == utf8.RuneError && size == 1:
+			utf16Char += 1
+		case r > 0xFFFF:
+			utf16Char += 2 // surrogate pair in UTF-16
+		default:
+			utf16Char += 1
+		}
+		i = next
 	}
 
-	character := clampUint32(offset - lineStart)
-	return protocol.Position{Line: line, Character: character}
+	return protocol.Position{Line: line, Character: clampUint32(utf16Char)}
 }
