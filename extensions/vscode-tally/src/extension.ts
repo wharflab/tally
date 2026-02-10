@@ -78,15 +78,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       const editor = vscode.workspace.getConfiguration('editor', { languageId: 'dockerfile' });
 
-      await editor.update('defaultFormatter', 'wharflab.tally', target, true);
-      await editor.update('formatOnSave', true, target, true);
-      await editor.update('formatOnSaveMode', 'file', target, true);
+      const languageValueForTarget = <T>(
+        result: { globalLanguageValue?: T; workspaceLanguageValue?: T } | undefined,
+      ): T | undefined => {
+        if (!result) {
+          return undefined;
+        }
+        return target === vscode.ConfigurationTarget.Global
+          ? result.globalLanguageValue
+          : result.workspaceLanguageValue;
+      };
 
+      const defaultFormatterInspected = editor.inspect<string>('defaultFormatter');
+      const formatOnSaveInspected = editor.inspect<boolean>('formatOnSave');
+      const formatOnSaveModeInspected = editor.inspect<string>('formatOnSaveMode');
       const inspected = editor.inspect<unknown>('codeActionsOnSave');
+
+      const originalDefaultFormatter = languageValueForTarget(defaultFormatterInspected);
+      const originalFormatOnSave = languageValueForTarget(formatOnSaveInspected);
+      const originalFormatOnSaveMode = languageValueForTarget(formatOnSaveModeInspected);
       const existing =
-        target === vscode.ConfigurationTarget.Global
-          ? inspected?.globalLanguageValue
-          : inspected?.workspaceLanguageValue;
+        languageValueForTarget(inspected);
       const next: Record<string, unknown> =
         existing && typeof existing === 'object' && !Array.isArray(existing)
           ? { ...(existing as Record<string, unknown>) }
@@ -96,7 +108,30 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         next['source.fixAll.tally'] = 'explicit';
       }
 
-      await editor.update('codeActionsOnSave', next, target, true);
+      try {
+        await editor.update('defaultFormatter', 'wharflab.tally', target, true);
+        await editor.update('formatOnSave', true, target, true);
+        await editor.update('formatOnSaveMode', 'file', target, true);
+        await editor.update('codeActionsOnSave', next, target, true);
+      } catch (err) {
+        try {
+          await editor.update('defaultFormatter', originalDefaultFormatter, target, true);
+          await editor.update('formatOnSave', originalFormatOnSave, target, true);
+          await editor.update('formatOnSaveMode', originalFormatOnSaveMode, target, true);
+          await editor.update('codeActionsOnSave', existing, target, true);
+        } catch (restoreErr) {
+          output.appendLine(
+            `[tally] failed to restore editor settings after an error: ${String(restoreErr)}`,
+          );
+        }
+
+        const msg = err instanceof Error ? err.message : String(err);
+        output.appendLine(`[tally] failed to configure default Dockerfile formatter: ${msg}`);
+        void vscode.window.showErrorMessage(
+          `Tally: failed to configure default Dockerfile formatter: ${msg}`,
+        );
+        throw err;
+      }
 
       const message =
         target === vscode.ConfigurationTarget.Global
