@@ -34,7 +34,7 @@ jobs:
           VERSION=$(curl -fsSL "https://update.code.visualstudio.com/api/releases/stable?released=true" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0])')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Cache VS Code test install
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: extensions/vscode-tally/.vscode-test
           key: vscode-test-${{ runner.os }}-${{ steps.vscode.outputs.version }}
