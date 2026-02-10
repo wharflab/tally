@@ -82,7 +82,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await editor.update('formatOnSave', true, target, true);
       await editor.update('formatOnSaveMode', 'file', target, true);
 
-      const existing = editor.get<unknown>('codeActionsOnSave');
+      const inspected = editor.inspect<unknown>('codeActionsOnSave');
+      const existing =
+        target === vscode.ConfigurationTarget.Global
+          ? inspected?.globalLanguageValue
+          : inspected?.workspaceLanguageValue;
       const next: Record<string, unknown> =
         existing && typeof existing === 'object' && !Array.isArray(existing)
           ? { ...(existing as Record<string, unknown>) }
