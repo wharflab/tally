@@ -144,11 +144,11 @@ func positionAtOffset(content []byte, offset int) protocol.Position {
 
 		switch {
 		case r == utf8.RuneError && size == 1:
-			utf16Char += 1
+			utf16Char++
 		case r > 0xFFFF:
 			utf16Char += 2 // surrogate pair in UTF-16
 		default:
-			utf16Char += 1
+			utf16Char++
 		}
 		i = next
 	}
