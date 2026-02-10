@@ -86,6 +86,26 @@ type agentProcess struct {
 	termErr  error
 }
 
+type readGate struct {
+	r     io.Reader
+	once  sync.Once
+	ready chan struct{}
+}
+
+func newReadGate(r io.Reader) *readGate {
+	return &readGate{
+		r:     r,
+		ready: make(chan struct{}),
+	}
+}
+
+func (g *readGate) Open() { g.once.Do(func() { close(g.ready) }) }
+
+func (g *readGate) Read(p []byte) (int, error) {
+	<-g.ready
+	return g.r.Read(p)
+}
+
 func startAgentProcess(absCwd string, command []string, stderrTailBytes int, grace time.Duration) (*agentProcess, error) {
 	if len(command) == 0 {
 		return nil, errors.New("agent command is empty")
@@ -165,8 +185,12 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 	}()
 
 	client := newRunClient(cancelCause, r.maxOutputBytes)
-	conn := acpsdk.NewClientSideConnection(client, proc.stdin, proc.stdout)
+	stdoutGate := newReadGate(proc.stdout)
+	defer stdoutGate.Open()
+
+	conn := acpsdk.NewClientSideConnection(client, proc.stdin, stdoutGate)
 	conn.SetLogger(slog.New(slog.DiscardHandler))
+	stdoutGate.Open()
 
 	if _, err := conn.Initialize(runCtx, acpsdk.InitializeRequest{
 		ProtocolVersion: acpsdk.ProtocolVersionNumber,

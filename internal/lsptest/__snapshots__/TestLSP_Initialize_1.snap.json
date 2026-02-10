@@ -12,6 +12,11 @@
    "workspaceDiagnostics": false
   },
   "documentFormattingProvider": true,
+  "executeCommandProvider": {
+   "commands": [
+    "tally.applyAllFixes"
+   ]
+  },
   "textDocumentSync": {
    "change": 1,
    "openClose": true,

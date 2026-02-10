@@ -617,40 +617,12 @@ func buildPerFileFixModes(fileConfigs map[string]*config.Config) map[string]map[
 		if cfg == nil {
 			continue
 		}
-		modes := buildFixModes(cfg)
+		modes := fix.BuildFixModes(cfg)
 		if len(modes) > 0 {
 			result[filePath] = modes
 		}
 	}
 	return result
-}
-
-// buildFixModes extracts fix mode configuration for all rules from a single config.
-func buildFixModes(cfg *config.Config) map[string]fix.FixMode {
-	modes := make(map[string]fix.FixMode)
-
-	// Helper to add modes from a namespace map
-	addFromNamespace := func(namespace string, ruleConfigs map[string]config.RuleConfig) {
-		for name, ruleCfg := range ruleConfigs {
-			if ruleCfg.Fix != "" {
-				ruleCode := namespace + "/" + name
-				modes[ruleCode] = ruleCfg.Fix
-			}
-		}
-	}
-
-	// Process each namespace
-	if cfg.Rules.Tally != nil {
-		addFromNamespace("tally", cfg.Rules.Tally)
-	}
-	if cfg.Rules.Buildkit != nil {
-		addFromNamespace("buildkit", cfg.Rules.Buildkit)
-	}
-	if cfg.Rules.Hadolint != nil {
-		addFromNamespace("hadolint", cfg.Rules.Hadolint)
-	}
-
-	return modes
 }
 
 // filterFixedViolations removes violations that were fixed from the list.

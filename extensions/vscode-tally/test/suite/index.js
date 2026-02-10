@@ -136,6 +136,12 @@ async function runSmoke() {
 
   assert.strictEqual(formatted, expected, 'formatted output mismatch');
 
+  // Verify command-based "fix all" path too (workspace/executeCommand).
+  await vscode.commands.executeCommand('tally.applyAllFixes');
+
+  const fixedViaCommand = normalizeNewlines(doc.getText());
+  assert.strictEqual(fixedViaCommand, expected, 'fix-all command output mismatch');
+
   // Keep the workspace clean for future tests.
   await vscode.commands.executeCommand('workbench.action.files.revert');
 }

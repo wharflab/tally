@@ -5,6 +5,7 @@
   "description": "Dockerfile and Containerfile linter/formatter powered by tally",
   "version": "0.0.0",
   "license": "MIT",
+  "icon": "assets/logo.png",
   "repository": {
     "type": "git",
     "url": "https://github.com/tinovyatkin/tally"
@@ -17,7 +18,10 @@
     "Formatters"
   ],
   "activationEvents": [
-    "onLanguage:dockerfile"
+    "onLanguage:dockerfile",
+    "onCommand:tally.restartServer",
+    "onCommand:tally.applyAllFixes",
+    "onCommand:tally.configureDefaultFormatterForDockerfile"
   ],
   "main": "./dist/extension.cjs",
   "contributes": {
@@ -25,6 +29,14 @@
       {
         "command": "tally.restartServer",
         "title": "Tally: Restart server"
+      },
+      {
+        "command": "tally.applyAllFixes",
+        "title": "Tally: Fix all auto-fixable issues"
+      },
+      {
+        "command": "tally.configureDefaultFormatterForDockerfile",
+        "title": "Tally: Configure as default formatter for Dockerfile"
       }
     ],
     "configuration": {
@@ -69,6 +81,11 @@
             "editorOnly"
           ],
           "description": "How to merge VS Code settings with `.tally.toml` / `tally.toml`."
+        },
+        "tally.fixUnsafe": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow manual 'Fix all' command to apply unsafe fixes."
         }
       }
     }

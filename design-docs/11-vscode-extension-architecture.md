@@ -517,7 +517,6 @@ Expose both workspace and global config to server in initialization options and 
   "tally.lint.run": "onType",
   "tally.fixAll": true,
   "tally.fixUnsafe": false,
-  "tally.format.enable": true,
   "tally.format.mode": "style",
   "tally.format.requireParseable": true,
   "tally.trace.server": "off"
@@ -1085,7 +1084,8 @@ Repository analyzed: `https://github.com/michaellzc/vscode-hadolint`
 - Capability advertisement:
   - `documentFormattingProvider: true`
   - `documentRangeFormattingProvider: false` initially
-- When formatting is disabled via settings, server should stop advertising formatting capability (or restart client after config change).
+- Formatting capability is always advertised; users opt-in by selecting `wharflab.tally` as the default formatter and enabling
+  `editor.formatOnSave`.
 
 ### 16.3 Formatting scope and safety contract
 
@@ -1108,14 +1108,13 @@ Repository analyzed: `https://github.com/michaellzc/vscode-hadolint`
 
 ### 16.5 Recommended settings model additions
 
-- `tally.format.enable` (boolean, default `true`)
 - `tally.format.mode` (string, default `style`)
 - `tally.format.requireParseable` (boolean, default `true`)
 
 Proposed interaction with existing settings:
 
 - `tally.fixAll` controls code actions/fix-all registration.
-- `tally.format.enable` controls formatter capability registration.
+- Formatting is controlled by VS Code settings like `editor.defaultFormatter` / `editor.formatOnSave`, not by a `tally`-specific toggle.
 - `tally.fixUnsafe` does not affect formatter path in v1.
 
 ### 16.6 Recommended user configuration snippet

@@ -375,6 +375,7 @@ type codeActionParams struct {
 
 type codeActionContext struct {
 	Diagnostics []diagnostic `json:"diagnostics"`
+	Only        []string     `json:"only,omitempty"`
 }
 
 type codeAction struct {
@@ -445,4 +446,11 @@ type formattingOptions struct {
 	TrimTrailingWhitespace bool   `json:"trimTrailingWhitespace,omitempty"`
 	InsertFinalNewline     bool   `json:"insertFinalNewline,omitempty"`
 	TrimFinalNewlines      bool   `json:"trimFinalNewlines,omitempty"`
+}
+
+// Execute command types (workspace/executeCommand).
+
+type executeCommandParams struct {
+	Command   string `json:"command"`
+	Arguments []any  `json:"arguments,omitempty"`
 }

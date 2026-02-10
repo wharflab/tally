@@ -9,6 +9,7 @@ export interface TallySettings {
   importStrategy: ImportStrategy;
   configuration: unknown | null;
   configurationPreference: ConfigurationPreference;
+  fixUnsafe: boolean;
 }
 
 export interface BinaryResolutionSettings {
@@ -22,6 +23,7 @@ const DEFAULTS: TallySettings = {
   importStrategy: 'fromEnvironment',
   configuration: null,
   configurationPreference: 'editorFirst',
+  fixUnsafe: false,
 };
 
 export function readEffectiveSettings(scope?: vscode.ConfigurationScope): TallySettings {
@@ -35,6 +37,7 @@ export function readEffectiveSettings(scope?: vscode.ConfigurationScope): TallyS
       'configurationPreference',
       DEFAULTS.configurationPreference,
     ),
+    fixUnsafe: cfg.get<boolean>('fixUnsafe', DEFAULTS.fixUnsafe),
   };
 }
 
@@ -49,4 +52,3 @@ export function readUserBinarySettings(): BinaryResolutionSettings {
       importInspect?.globalValue ?? importInspect?.defaultValue ?? DEFAULTS.importStrategy,
   };
 }
-

@@ -176,6 +176,7 @@ func TestLSP_CodeAction(t *testing.T) {
 		Range:        maintainerDiag.Range,
 		Context: codeActionContext{
 			Diagnostics: []diagnostic{*maintainerDiag},
+			Only:        []string{"quickfix"},
 		},
 	}, &actions)
 	require.NoError(t, err)
@@ -187,6 +188,105 @@ func TestLSP_CodeAction(t *testing.T) {
 			Indent:   " ",
 		}),
 	).MatchStandaloneJSON(t, actions)
+}
+
+func TestLSP_CodeAction_DefaultIncludesFixAll(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	uri := "file:///tmp/test-codeaction-default-fixall/Dockerfile"
+	ts.openDocument(t, uri, "FROM alpine:3.18\nMAINTAINER test@example.com\n")
+
+	// Drain push diagnostics from didOpen.
+	ts.waitDiagnostics(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var actions []codeAction
+	err := ts.conn.Call(ctx, "textDocument/codeAction", &codeActionParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+		Range: lspRange{
+			Start: position{Line: 0, Character: 0},
+			End:   position{Line: 0, Character: 0},
+		},
+		Context: codeActionContext{
+			Diagnostics: nil,
+		},
+	}, &actions)
+	require.NoError(t, err)
+
+	assert.True(t, slices.ContainsFunc(actions, func(a codeAction) bool {
+		return a.Kind == "source.fixAll.tally"
+	}), "expected fix-all code action when only is omitted")
+}
+
+func TestLSP_CodeActionFixAll(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	uri := "file:///tmp/test-codeaction-fixall/Dockerfile"
+	original := "FROM alpine:3.18\nMAINTAINER test@example.com\n"
+	ts.openDocument(t, uri, original)
+
+	// Drain push diagnostics from didOpen.
+	ts.waitDiagnostics(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var actions []codeAction
+	err := ts.conn.Call(ctx, "textDocument/codeAction", &codeActionParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+		Range: lspRange{
+			Start: position{Line: 0, Character: 0},
+			End:   position{Line: 0, Character: 0},
+		},
+		Context: codeActionContext{
+			Diagnostics: nil,
+			Only:        []string{"source.fixAll.tally"},
+		},
+	}, &actions)
+	require.NoError(t, err)
+	require.Len(t, actions, 1, "expected one fix-all code action")
+
+	require.NotNil(t, actions[0].Edit)
+	edits := actions[0].Edit.Changes[uri]
+	require.NotEmpty(t, edits, "expected fix-all edits")
+
+	fixed := applyEdits(t, uri, original, edits)
+	snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, fixed)
+}
+
+func TestLSP_ExecuteCommandApplyAllFixes(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	uri := "file:///tmp/test-executecommand-fixall/Dockerfile"
+	original := "FROM alpine:3.18\nMAINTAINER test@example.com\n"
+	ts.openDocument(t, uri, original)
+
+	// Drain push diagnostics from didOpen.
+	ts.waitDiagnostics(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var edit workspaceEdit
+	err := ts.conn.Call(ctx, "workspace/executeCommand", &executeCommandParams{
+		Command:   "tally.applyAllFixes",
+		Arguments: []any{uri},
+	}, &edit)
+	require.NoError(t, err)
+
+	edits := edit.Changes[uri]
+	require.NotEmpty(t, edits, "expected executeCommand to return edits")
+
+	fixed := applyEdits(t, uri, original, edits)
+	snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, fixed)
 }
 
 func TestLSP_NoPushDiagnosticsWhenClientSupportsPull(t *testing.T) {

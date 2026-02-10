@@ -1,6 +1,8 @@
 package lspserver
 
 import (
+	"strings"
+
 	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
 
 	"github.com/tinovyatkin/tally/internal/rules"
@@ -11,49 +13,79 @@ func (s *Server) codeActionsForDocument(
 	doc *Document,
 	params *protocol.CodeActionParams,
 ) []protocol.CodeAction {
+	includeQuickFix := true
+	includeFixAll := true
+	if params.Context.Only != nil {
+		includeQuickFix = kindRequested(params.Context.Only, protocol.CodeActionKindQuickFix)
+		includeFixAll = kindRequested(params.Context.Only, fixAllCodeActionKind)
+	}
+
 	// Use cached lint results from publishDiagnostics when the version matches.
 	violations, ok := s.lintCache.get(doc.URI, doc.Version)
 	if !ok {
 		violations = s.lintContent(doc.URI, []byte(doc.Content))
 	}
 
-	actions := make([]protocol.CodeAction, 0, len(violations))
+	actions := make([]protocol.CodeAction, 0, len(violations)+1)
 
-	for _, v := range violations {
-		if v.SuggestedFix == nil || v.SuggestedFix.NeedsResolve {
-			continue
-		}
-		if len(v.SuggestedFix.Edits) == 0 {
-			continue
-		}
+	if includeQuickFix {
+		for _, v := range violations {
+			if v.SuggestedFix == nil || v.SuggestedFix.NeedsResolve {
+				continue
+			}
+			if len(v.SuggestedFix.Edits) == 0 {
+				continue
+			}
 
-		vRange := violationRange(v)
-		if !rangesOverlap(vRange, params.Range) {
-			continue
-		}
+			vRange := violationRange(v)
+			if !rangesOverlap(vRange, params.Range) {
+				continue
+			}
 
-		edits := convertTextEdits(v.SuggestedFix.Edits)
-		if len(edits) == 0 {
-			continue
-		}
+			edits := convertTextEdits(v.SuggestedFix.Edits)
+			if len(edits) == 0 {
+				continue
+			}
 
-		isPreferred := v.SuggestedFix.IsPreferred || v.SuggestedFix.Safety == rules.FixSafe
-		matchedDiags := matchingDiagnostics(v, params.Context.Diagnostics)
-		action := protocol.CodeAction{
-			Title:       v.SuggestedFix.Description,
-			Kind:        ptrTo(protocol.CodeActionKindQuickFix),
-			IsPreferred: ptrTo(isPreferred),
-			Diagnostics: &matchedDiags,
-			Edit: &protocol.WorkspaceEdit{
-				Changes: ptrTo(map[protocol.DocumentUri][]*protocol.TextEdit{
-					params.TextDocument.Uri: edits,
-				}),
-			},
+			isPreferred := v.SuggestedFix.IsPreferred || v.SuggestedFix.Safety == rules.FixSafe
+			matchedDiags := matchingDiagnostics(v, params.Context.Diagnostics)
+			action := protocol.CodeAction{
+				Title:       v.SuggestedFix.Description,
+				Kind:        ptrTo(protocol.CodeActionKindQuickFix),
+				IsPreferred: ptrTo(isPreferred),
+				Diagnostics: &matchedDiags,
+				Edit: &protocol.WorkspaceEdit{
+					Changes: ptrTo(map[protocol.DocumentUri][]*protocol.TextEdit{
+						params.TextDocument.Uri: edits,
+					}),
+				},
+			}
+			actions = append(actions, action)
 		}
-		actions = append(actions, action)
+	}
+
+	if includeFixAll {
+		if action := s.fixAllCodeAction(doc); action != nil {
+			actions = append(actions, *action)
+		}
 	}
 
 	return actions
+}
+
+func kindRequested(only *[]protocol.CodeActionKind, kind protocol.CodeActionKind) bool {
+	if only == nil {
+		return true
+	}
+	for _, requested := range *only {
+		if requested == kind {
+			return true
+		}
+		if requested != "" && strings.HasPrefix(string(kind), string(requested)+".") {
+			return true
+		}
+	}
+	return false
 }
 
 // convertTextEdits converts tally TextEdits to LSP TextEdits.

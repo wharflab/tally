@@ -108,6 +108,8 @@ func (s *Server) handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.
 		return nil, unmarshalAndNotify(req, func(p *protocol.DidChangeConfigurationParams) {
 			s.handleDidChangeConfiguration(ctx, conn, p)
 		})
+	case string(protocol.MethodWorkspaceExecuteCommand):
+		return unmarshalAndCall(req, s.handleExecuteCommand)
 
 	default:
 		return nil, &jsonrpc2.Error{
@@ -195,6 +197,11 @@ func (s *Server) handleInitialize(params *protocol.InitializeParams) (any, error
 			DiagnosticProvider: &protocol.DiagnosticOptionsOrRegistrationOptions{
 				Options: &protocol.DiagnosticOptions{
 					Identifier: ptrTo("tally"),
+				},
+			},
+			ExecuteCommandProvider: &protocol.ExecuteCommandOptions{
+				Commands: []string{
+					applyAllFixesCommand,
 				},
 			},
 		},
