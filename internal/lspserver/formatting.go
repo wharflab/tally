@@ -25,6 +25,7 @@ func (s *Server) handleFormatting(params *protocol.DocumentFormattingParams) (an
 
 	content := []byte(doc.Content)
 	input := s.lintInput(doc.URI, content)
+	fileKey := filepath.Clean(input.FilePath)
 
 	// 1. Lint + filter: reuse shared pipeline.
 	result, err := linter.LintFile(input)
@@ -34,23 +35,22 @@ func (s *Server) handleFormatting(params *protocol.DocumentFormattingParams) (an
 
 	chain := linter.LSPProcessors()
 	procCtx := processor.NewContext(
-		map[string]*config.Config{input.FilePath: result.Config},
+		map[string]*config.Config{fileKey: result.Config},
 		result.Config,
-		map[string][]byte{input.FilePath: content},
+		map[string][]byte{fileKey: content},
 	)
 	violations := chain.Process(result.Violations, procCtx)
 
 	// 2. Apply style-safe fixes via existing fix infrastructure.
 	// The fixer handles conflict resolution and ordering and respects per-rule fix modes.
 	fixModes := fix.BuildFixModes(result.Config)
-	fileKey := filepath.Clean(input.FilePath)
 	fixer := &fix.Fixer{
 		SafetyThreshold: fix.FixSafe,
 		FixModes: map[string]map[string]fix.FixMode{
 			fileKey: fixModes,
 		},
 	}
-	fixResult, err := fixer.Apply(context.Background(), violations, map[string][]byte{input.FilePath: content})
+	fixResult, err := fixer.Apply(context.Background(), violations, map[string][]byte{fileKey: content})
 	if err != nil {
 		return nil, nil //nolint:nilnil,nilerr // gracefully return no edits on fix error
 	}
