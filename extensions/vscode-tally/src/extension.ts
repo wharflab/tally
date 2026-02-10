@@ -98,8 +98,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       await editor.update('codeActionsOnSave', next, target, true);
 
+      const message =
+        target === vscode.ConfigurationTarget.Global
+          ? 'Tally configured as the default Dockerfile formatter in User settings.'
+          : 'Tally configured as the default Dockerfile formatter for this workspace.';
       void vscode.window.showInformationMessage(
-        'Tally configured as the default Dockerfile formatter for this workspace.',
+        message,
       );
     }),
   );
