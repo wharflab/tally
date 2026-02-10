@@ -77,9 +77,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     await client?.sendConfiguration(configService.lspSettings());
   });
 
-  vscode.workspace.onDidGrantWorkspaceTrust(() => {
-    void startOrRestart('workspace trusted');
-  });
+  context.subscriptions.push(
+    vscode.workspace.onDidGrantWorkspaceTrust(() => {
+      void startOrRestart('workspace trusted');
+    }),
+  );
 
   await startOrRestart('activation');
 }
@@ -88,4 +90,3 @@ export async function deactivate(): Promise<void> {
   await client?.stop();
   client = undefined;
 }
-
