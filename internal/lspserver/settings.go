@@ -1,6 +1,7 @@
 package lspserver
 
 import (
+	"cmp"
 	"context"
 	"log"
 	"path/filepath"
@@ -162,13 +163,7 @@ func parseClientSettings(settings any) (clientSettings, bool) {
 
 	slices.SortFunc(out.Workspaces, func(a, b workspaceFolderSettings) int {
 		// Prefer longer roots first so nested workspaces win.
-		if len(a.Root) == len(b.Root) {
-			return 0
-		}
-		if len(a.Root) > len(b.Root) {
-			return -1
-		}
-		return 1
+		return cmp.Compare(len(b.Root), len(a.Root))
 	})
 
 	return out, true
