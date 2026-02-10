@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -160,8 +160,15 @@ func parseClientSettings(settings any) (clientSettings, bool) {
 		})
 	}
 
-	sort.Slice(out.Workspaces, func(i, j int) bool {
-		return len(out.Workspaces[i].Root) > len(out.Workspaces[j].Root)
+	slices.SortFunc(out.Workspaces, func(a, b workspaceFolderSettings) int {
+		// Prefer longer roots first so nested workspaces win.
+		if len(a.Root) == len(b.Root) {
+			return 0
+		}
+		if len(a.Root) > len(b.Root) {
+			return -1
+		}
+		return 1
 	})
 
 	return out, true
