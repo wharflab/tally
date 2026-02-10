@@ -15,7 +15,8 @@ import (
 
 const fixAllCodeActionKind = protocol.CodeActionKind("source.fixAll.tally")
 
-func (s *Server) fixAllCodeAction(doc *Document, uri protocol.DocumentUri) *protocol.CodeAction {
+func (s *Server) fixAllCodeAction(doc *Document) *protocol.CodeAction {
+	docURI := protocol.DocumentUri(doc.URI)
 	edits := s.computeFixEdits(doc.URI, []byte(doc.Content), fix.FixSafe)
 	if len(edits) == 0 {
 		return nil
@@ -27,7 +28,7 @@ func (s *Server) fixAllCodeAction(doc *Document, uri protocol.DocumentUri) *prot
 		IsPreferred: ptrTo(true),
 		Edit: &protocol.WorkspaceEdit{
 			Changes: ptrTo(map[protocol.DocumentUri][]*protocol.TextEdit{
-				uri: edits,
+				docURI: edits,
 			}),
 		},
 	}

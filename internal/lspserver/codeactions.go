@@ -65,7 +65,7 @@ func (s *Server) codeActionsForDocument(
 	}
 
 	if includeFixAll {
-		if action := s.fixAllCodeAction(doc, params.TextDocument.Uri); action != nil {
+		if action := s.fixAllCodeAction(doc); action != nil {
 			actions = append(actions, *action)
 		}
 	}
