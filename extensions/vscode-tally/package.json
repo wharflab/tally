@@ -84,10 +84,10 @@
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
-    "@types/node": "^22.13.0",
-    "@types/vscode": "^1.96.0",
-    "@typescript/native-preview": "^7.0.0-dev.20260209.1",
-    "@vscode/test-electron": "^2.5.1",
-    "@vscode/vsce": "^3.7.1"
+    "@types/node": "22.19.10",
+    "@types/vscode": "1.109.0",
+    "@typescript/native-preview": "7.0.0-dev.20260210.1",
+    "@vscode/test-electron": "2.5.2",
+    "@vscode/vsce": "3.7.1"
   }
 }
