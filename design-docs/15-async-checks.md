@@ -125,8 +125,12 @@ Use three pools to reflect the user-provided slow operation taxonomy:
 
 Provide:
 
-- Global timeout for all async work per file/run (e.g., 10s/30s/60s).
-- Per-request timeout override (e.g., registry resolve 5s).
+- Global timeout for all async work per file/run (e.g., 10s/30s/60s): **wall-clock** budget (includes queue wait + execution) by default. Controlled
+  by `slow-checks.timeout-mode = "include-queue" | "execution-only"`. Example: with `slow-checks.timeout=30s` and `slow-checks.network.concurrency=4`,
+  ~12 network requests that each take ~10s can complete (3 waves); additional queued requests are skipped/canceled when the 30s deadline is reached.
+- Per-request timeout override (e.g., registry resolve 5s): uses the same `slow-checks.timeout-mode` semantics. With `include-queue`, the per-request
+  timeout starts when the request is enqueued (so requests that cannot start in time are skipped without running). With `execution-only`, the
+  per-request timeout starts when the worker begins executing the resolver.
 
 ## 6. Configuration & UX
 
@@ -138,6 +142,7 @@ Add a top-level section to `tally.toml`:
 [slow-checks]
 mode = "auto"  # auto|on|off
 fail-fast = true # skip/cancel async checks when fast checks already have SeverityError
+timeout-mode = "include-queue" # include-queue|execution-only (queue wait semantics for timeouts)
 timeout = "20s"
 
 [slow-checks.network]
