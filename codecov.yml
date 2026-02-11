@@ -21,7 +21,7 @@ ignore:
   # Generated LSP protocol types.
   - "internal/lsp/protocol/lsp_generated.go"
   - "github.com/tinovyatkin/tally/internal/lsp/protocol/lsp_generated.go"
-  - "**/*_generated.go" # Ignore Generated Code
+  - "*_generated.go"
   - "scripts/**"
   # Go coverage profiles can use module-prefixed paths.
   - "github.com/tinovyatkin/tally/internal/lsp/protocol/*_generated.go"
