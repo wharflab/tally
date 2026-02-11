@@ -180,6 +180,52 @@ Add (in verbose mode, or JSON metadata later):
 
 This provides observability without making CI brittle.
 
+### 6.5 LSP / Editor integration (on/off + progress)
+
+The LSP server should keep diagnostics **responsive** while still allowing async checks when appropriate.
+
+#### Control: enabling/disabling from the editor
+
+The LSP server already supports **workspace configuration overrides** (via `workspace/didChangeConfiguration`) and merges them with discovered
+`.tally.toml` / `tally.toml`.
+
+We should expose the slow-checks knobs to the editor settings UI and pass them as configuration overrides:
+
+- `slow-checks.mode=auto|on|off`
+- per-category toggles (initially: network on/off)
+- timeouts (optionally a shorter “editor default” timeout)
+
+This allows:
+
+- enabling slow checks locally while keeping CI defaults unchanged (CI auto-disable still applies when `mode=auto`)
+- per-workspace control (some repos want registry checks, others do not)
+
+#### When to run slow checks in LSP
+
+Running network-backed checks on every keystroke is undesirable. A simple MVP strategy:
+
+- **On change** (`didChange`, pull-diagnostics requests): run **fast checks only**.
+- **On save** (`didSave`): if slow checks are enabled, run async checks with a budget (timeouts + concurrency), then refresh diagnostics.
+
+If we later want “background while idle”, we can add a debounce (e.g., start after 1–2s of no edits) and cancel on the next edit.
+
+#### Progress + cancellation
+
+When async checks run (typically on save), the LSP server should:
+
+1. create a work-done progress token (if the client supports it)
+2. send progress updates (planned / running / completed counts)
+3. respect request cancellation:
+   - if a new save happens or the document version changes, cancel the in-flight async run
+   - network/file operations should receive the same `context.Context`
+
+Diagnostics update behavior depends on diagnostic mode:
+
+- **Push** mode: publish fast diagnostics immediately; publish an updated set when async checks complete.
+- **Pull** mode: return fast diagnostics; when async checks complete, trigger `workspace/diagnostic/refresh` so the client re-pulls.
+
+This gives the user quick feedback plus richer results when the slow work finishes, without blocking typing.
+
 ## 7. Registry Integration (Network Category)
 
 ### 7.1 Why `github.com/containers/image/v5`
