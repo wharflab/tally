@@ -181,6 +181,20 @@ enforcement
 
 ---
 
+### 15. [Async Checks (Slow Operations)](15-async-checks.md)
+
+**Covers:** Optional slow/async checks infrastructure (network, filesystem, console I/O), budgets, CI auto-disable, and registry-backed BuildKit
+parity rules
+
+**Key Topics:**
+
+- Async check requests + resolvers + worker pools
+- Slow-checks configuration (`auto|on|off`) and CI detection
+- Registry-backed checks using `containers/image/v5`
+- Deterministic tests with `go-containerregistry` mock registry
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
