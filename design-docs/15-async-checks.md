@@ -61,6 +61,9 @@ MVP pipeline (single file, simplified):
 6. Merge async violations into the final list
 7. Report results
 
+Fail-fast (default): if fast rules already produce any `SeverityError` violations for a file (after config overrides), skip/cancel async checks for
+that file and report results immediately. This can be disabled to always run slow checks.
+
 Key constraint: **planning must not perform I/O**. All I/O happens in step 5 under budget control.
 
 ### 5.2 Async checks API (proposed)
@@ -105,7 +108,7 @@ Add a runtime that:
 - applies per-request and global timeouts
 - collects:
   - `[]rules.Violation` results
-  - `[]async.Skipped` (disabled, timeout, auth, resolver error)
+  - `[]async.Skipped` (disabled, timeout, auth, resolver error, fail-fast)
 
 This runtime should be usable later by **async fixes** too (shared budgets and caches), but MVP can be check-only.
 
@@ -131,6 +134,7 @@ Add a top-level section to `tally.toml`:
 ```toml
 [slow-checks]
 mode = "auto"  # auto|on|off
+fail-fast = true # skip/cancel async checks when fast checks already have SeverityError
 timeout = "20s"
 
 [slow-checks.network]
@@ -159,11 +163,12 @@ Notes:
 Add CLI flags to override config:
 
 - `--slow-checks=auto|on|off`
+- `--slow-checks-fail-fast=on|off`
 - `--slow-checks-timeout=20s`
 - `--slow-checks-network=on|off`
 - (later) `--slow-checks-concurrency-network=4` etc.
 
-MVP can start with only `--slow-checks` and `--slow-checks-timeout`.
+MVP can start with only `--slow-checks`, `--slow-checks-fail-fast`, and `--slow-checks-timeout`.
 
 ### 6.3 CI auto-disable
 
@@ -186,7 +191,7 @@ MVP: do not fail the run if async checks are skipped.
 Add (in verbose mode, or JSON metadata later):
 
 - number of async requests planned/executed
-- number skipped by reason: disabled / timeout / auth / resolver error
+- number skipped by reason: disabled / timeout / auth / resolver error / fail-fast
 
 This provides observability without making CI brittle.
 
@@ -227,6 +232,7 @@ When async checks run (typically on save), the LSP server should:
 2. send progress updates (planned / running / completed counts)
 3. respect request cancellation:
    - if a new save happens or the document version changes, cancel the in-flight async run
+   - if fail-fast triggers (fast diagnostics include `SeverityError`), cancel the in-flight async run and publish fast diagnostics immediately
    - network/file operations should receive the same `context.Context`
 
 Diagnostics update behavior depends on diagnostic mode:
