@@ -75,13 +75,23 @@ type AsyncRule interface {
 }
 ```
 
+Note: the async pipeline will **reuse BuildKit-native types** instead of creating parallel ones (ranges, positions, AST nodes, lint outputs).
+Concretely, `PlanAsync` / `CheckRequest` / resolvers / `OnSuccess` should produce and consume types from `github.com/moby/buildkit` where applicable,
+such as:
+
+- `parser.Range` / `parser.Position` (`github.com/moby/buildkit/frontend/dockerfile/parser`)
+- `instructions.Stage` / `instructions.Command` (`github.com/moby/buildkit/frontend/dockerfile/instructions`)
+- `lint.Warning` / `lint.LintResults` (`github.com/moby/buildkit/frontend/subrequests/lint`)
+
+`[]rules.Violation` remains the reporting boundary; conversion to it should happen only once (not via duplicated “Range/Stage/Command/etc.” types).
+
 `PlanAsync` returns one or more `CheckRequest` objects. Each request declares:
 
 - **Category**: `network | filesystem | console`
 - **Key**: stable cache key (dedupe within the run)
 - **Timeout / cost**: per-request budget hints
 - **ResolverID + data**: routes to a resolver implementation
-- **OnSuccess**: converts resolved data into `[]rules.Violation`
+- **OnSuccess**: converts resolved BuildKit-native structs (e.g., `lint.Warning`/`lint.LintResults` + `[]parser.Range`) into `[]rules.Violation`
 
 MVP keeps this minimal: a request maps to “run resolver → return violations”.
 
