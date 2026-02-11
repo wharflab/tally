@@ -312,8 +312,10 @@ type ImageConfig struct {
 
 The `platform` input should be normalized (`linux/amd64[/variant]`). In MVP we can:
 
-- use stage’s `FROM --platform` if present and resolvable
-- else use host default target platform
+- use stage’s `FROM --platform` (after ARG expansion) if present and resolvable
+- if stage `FROM --platform` is absent or unresolvable, tally will default to `runtime.GOOS/runtime.GOARCH` of the running `tally` process unless a
+  user-configurable `TARGETPLATFORM` override is set; this aligns with BuildKit’s `TARGETPLATFORM` semantics by treating the configured
+  `TARGETPLATFORM` as the canonical override and falling back to the tool’s host platform
 
 Callers of `ResolveConfig` (i.e., the network resolver that services async `CheckRequest`s) must classify these error categories to drive behavior:
 
@@ -360,7 +362,8 @@ Async-only rule:
 
 1. Determine expected platform for each stage:
    - from `FROM --platform=...` after ARG expansion, or
-   - default target platform (host), consistent with BuildKit defaults
+   - if absent/unresolvable: default to `runtime.GOOS/runtime.GOARCH` of the running `tally` process unless a user-configurable `TARGETPLATFORM`
+     override is set (treat the configured `TARGETPLATFORM` as canonical, host platform as fallback)
 2. Resolve base image platform from registry:
    - for a manifest list, select the matching platform entry
    - for a single manifest, read config.OS/Arch/Variant
