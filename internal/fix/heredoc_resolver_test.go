@@ -908,13 +908,18 @@ RUN Write-Output "hello" ; Write-Output "world" ; Write-Output "!"
 		},
 	}
 
-	_, err := r.Resolve(context.Background(), ResolveContext{
+	edits, err := r.Resolve(context.Background(), ResolveContext{
 		Content:  []byte(dockerfile),
 		FilePath: "Dockerfile",
 	}, fix)
 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Non-POSIX shells should not produce heredoc edits
+	if edits != nil {
+		t.Errorf("expected nil edits for non-POSIX shell, got %d edits", len(edits))
 	}
 
 	// Verify the variant was updated to NonPOSIX
