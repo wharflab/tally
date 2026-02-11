@@ -42,11 +42,14 @@ jobs:
           GOCOVERDIR="$(pwd)/coverage" "$GOTESTSUM_BIN" --format testname --junitfile junit-lsptest.xml -- ./internal/lsptest/...
           # Convert all binary coverage data (integration + LSP) to text format
           go tool covdata textfmt -i=coverage -o=coverage-integration.txt
+          # Drop generated code from coverage to avoid skewing project totals.
+          bash scripts/filter-go-coverprofile.sh coverage.out coverage.filtered.out
+          bash scripts/filter-go-coverprofile.sh coverage-integration.txt coverage-integration.filtered.txt
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
-          files: coverage.out,coverage-integration.txt
+          files: coverage.filtered.out,coverage-integration.filtered.txt
           fail_ci_if_error: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}

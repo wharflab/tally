@@ -52,10 +52,13 @@ jobs:
           VSCODE_TEST_DOWNLOAD_TIMEOUT_MS: "120000"
         run: xvfb-run -a bun run test:e2e
       - name: Convert coverage
-        run: go tool covdata textfmt -i="$GOCOVERDIR" -o=coverage-vscode-smoke.txt
+        run: |
+          go tool covdata textfmt -i="$GOCOVERDIR" -o=coverage-vscode-smoke.txt
+          # Drop generated code from coverage to avoid skewing project totals.
+          bash scripts/filter-go-coverprofile.sh coverage-vscode-smoke.txt coverage-vscode-smoke.filtered.txt
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
-          files: coverage-vscode-smoke.txt
+          files: coverage-vscode-smoke.filtered.txt
           fail_ci_if_error: true
