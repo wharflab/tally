@@ -34,6 +34,7 @@ func (r *ReservedStageNameRule) Metadata() rules.RuleMetadata {
 
 func (r *ReservedStageNameRule) Check(input rules.LintInput) []rules.Violation {
 	var out []rules.Violation
+	meta := r.Metadata()
 
 	for _, stage := range input.Stages {
 		if stage.Name == "" {
@@ -43,10 +44,10 @@ func (r *ReservedStageNameRule) Check(input rules.LintInput) []rules.Violation {
 			loc := rules.NewLocationFromRanges(input.File, stage.Location)
 			out = append(out, rules.NewViolation(
 				loc,
-				r.Metadata().Code,
+				meta.Code,
 				fmt.Sprintf("Stage name should not use the same name as reserved stage %q", stage.Name),
-				r.Metadata().DefaultSeverity,
-			).WithDocURL(r.Metadata().DocURL))
+				meta.DefaultSeverity,
+			).WithDocURL(meta.DocURL))
 		}
 	}
 
