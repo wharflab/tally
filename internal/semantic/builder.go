@@ -93,8 +93,25 @@ func (b *Builder) Build() *Model {
 		// Apply shell directives that appear before this stage's FROM instruction
 		b.applyShellDirectives(stage, info)
 
+		// Seed the environment used for undefined-var analysis.
+		var stageEnv *fromEnv
+		switch {
+		case stage.BaseName == "scratch":
+			stageEnv = newFromEnv(nil)
+		case info.BaseImage != nil && info.BaseImage.IsStageRef:
+			base := stageInfo[info.BaseImage.StageIndex]
+			if base != nil && base.EffectiveEnv != nil {
+				stageEnv = newFromEnv(base.EffectiveEnv)
+			} else {
+				stageEnv = newFromEnv(nil)
+			}
+		default:
+			stageEnv = newFromEnv(defaultExternalImageEnv())
+		}
+
 		// Process commands in the stage
-		b.processStageCommands(stage, info, graph)
+		b.processStageCommands(stage, info, graph, stageEnv, fromEval.shlex)
+		info.EffectiveEnv = stageEnv.vars
 
 		stageInfo[i] = info
 	}
@@ -371,16 +388,31 @@ func (b *Builder) checkDuplicateInstruction(prevLoc *parser.Range, cmd instructi
 }
 
 // processStageCommands analyzes commands within a stage.
-func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInfo, graph *StageGraph) {
+func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInfo, graph *StageGraph, env *fromEnv, shlex *dfshell.Lex) {
 	var lastCmdLoc, lastEntrypointLoc, lastHealthcheckLoc *parser.Range
 	normalizedStageName := normalizeStageRef(stage.Name)
 
+	declaredArgs := make(map[string]struct{})
+
 	for _, cmd := range stage.Commands {
+		// UndefinedVar analysis must observe the environment at the point of use,
+		// before this command mutates the environment.
+		switch c := cmd.(type) {
+		case *instructions.ArgCommand:
+			info.UndefinedVars = append(
+				info.UndefinedVars,
+				applyArgCommandToEnv(c, shlex, env, declaredArgs, b.buildArgs, b.globalScope)...,
+			)
+		default:
+			info.UndefinedVars = append(info.UndefinedVars, undefinedVarsInCommand(cmd, shlex, env, declaredArgs)...)
+		}
+
 		switch c := cmd.(type) {
 		case *instructions.ArgCommand:
 			info.Variables.AddArgCommand(c)
 
 		case *instructions.EnvCommand:
+			applyEnvCommandToEnv(c, shlex, env)
 			info.Variables.AddEnvCommand(c)
 
 		case *instructions.CmdCommand:

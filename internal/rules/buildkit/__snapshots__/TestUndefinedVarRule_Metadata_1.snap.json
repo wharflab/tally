@@ -1,0 +1,10 @@
+{
+ "Category": "correctness",
+ "Code": "buildkit/UndefinedVar",
+ "DefaultSeverity": "warning",
+ "Description": "Variables should be defined before their use",
+ "DocURL": "https://docs.docker.com/go/dockerfile/rule/undefined-var/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "UndefinedVar"
+}

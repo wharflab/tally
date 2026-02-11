@@ -561,6 +561,12 @@ func TestCheck(t *testing.T) {
 			args:     append([]string{"--format", "json"}, selectRules("buildkit/UndefinedArgInFrom")...),
 			wantExit: 1,
 		},
+		{
+			name:     "undefined-var",
+			dir:      "undefined-var",
+			args:     append([]string{"--format", "json"}, selectRules("buildkit/UndefinedVar")...),
+			wantExit: 1,
+		},
 
 		// Consistent indentation tests (isolated to consistent-indentation rule)
 		{
@@ -902,6 +908,7 @@ severity = "style"
 		{
 			name: "consistent-indentation-multi-line-continuation",
 			input: "FROM ubuntu:22.04 AS builder\n" +
+				"ARG LAMBDA_TASK_ROOT=/var/task\n" +
 				"RUN --mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf \\\n" +
 				"         --mount=type=cache,target=/root/.cache/pip \\\n" +
 				"--mount=type=secret,id=uvtoml,target=/root/.config/uv/uv.toml \\\n" +

@@ -76,6 +76,18 @@ type StageInfo struct {
 	// Variables contains the variable scope for this stage.
 	Variables *VariableScope
 
+	// EffectiveEnv is the approximate effective environment for this stage after
+	// evaluating ARG and ENV instructions (matching BuildKit's word expansion
+	// environment semantics for linting).
+	//
+	// It is used for UndefinedVar analysis and for inheriting environment keys
+	// when another stage uses this stage as its base.
+	EffectiveEnv map[string]string
+
+	// UndefinedVars contains variable references (e.g., $FOO) used in stage
+	// commands that are not defined at the point of use.
+	UndefinedVars []UndefinedVarRef
+
 	// CopyFromRefs contains all COPY --from references in this stage.
 	CopyFromRefs []CopyFromRef
 
