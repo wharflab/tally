@@ -337,6 +337,11 @@ In-run cache:
   - resolved platform
   - errors with short TTL (optional in MVP)
 
+Clarification for "errors with short TTL (optional in MVP)" in the in-run cache: cache entries (both successes and errors) may have a short TTL to
+avoid repeatedly hitting a flaky registry within a single run. When a cached error for a given `(ref, platform)` or resolved digest is encountered,
+the runtime should treat it as transient and perform **one retry that bypasses the cache**. If the retry succeeds, replace the cached error entry with
+the success entry; otherwise report the error (skip reason) and refresh the cached error with a new short TTL.
+
 This prevents N stages referencing the same base image from multiplying network calls.
 
 ## 8. First Async Checks (MVP Scope)
