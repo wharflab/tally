@@ -1,6 +1,7 @@
 package semantic
 
 import (
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -167,7 +168,7 @@ func (b *Builder) addAutoArgsToGlobalScope(autoArgs map[string]string) {
 	for k := range autoArgs {
 		autoKeys = append(autoKeys, k)
 	}
-	sort.Strings(autoKeys)
+	slices.Sort(autoKeys)
 	for _, k := range autoKeys {
 		v := autoArgs[k]
 		b.globalScope.AddArg(k, &v, nil)
