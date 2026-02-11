@@ -2,7 +2,7 @@ package semantic
 
 import (
 	"maps"
-	"sort"
+	"slices"
 
 	"github.com/containerd/platforms"
 	"github.com/distribution/reference"
@@ -34,7 +34,7 @@ func (e *fromEnv) Keys() []string {
 	for k := range e.vars {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	return keys
 }
 
@@ -89,7 +89,7 @@ func scopeArgKeys(scope *VariableScope) ([]string, map[string]struct{}) {
 		keys = append(keys, k)
 		set[k] = struct{}{}
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	return keys, set
 }
 
@@ -112,7 +112,7 @@ func undefinedFromArgs(word string, shlex *shell.Lex, env shell.EnvGetter, known
 	if len(undefined) == 0 {
 		return nil
 	}
-	sort.Strings(undefined)
+	slices.Sort(undefined)
 
 	out := make([]FromArgRef, 0, len(undefined))
 	for _, name := range undefined {
