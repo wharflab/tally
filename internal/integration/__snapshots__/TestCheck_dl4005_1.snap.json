@@ -27,7 +27,7 @@
               {
                 "location": {
                   "end": {
-                    "column": 0,
+                    "column": 29,
                     "line": 4
                   },
                   "file": "testdata/dl4005/Dockerfile",
@@ -66,7 +66,7 @@
               {
                 "location": {
                   "end": {
-                    "column": 0,
+                    "column": 46,
                     "line": 10
                   },
                   "file": "testdata/dl4005/Dockerfile",
