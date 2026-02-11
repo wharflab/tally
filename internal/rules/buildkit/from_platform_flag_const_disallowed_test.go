@@ -146,6 +146,9 @@ func TestFromPlatformFlagConstDisallowed_HadolintDL3029(t *testing.T) {
 		{"allows quoted ${BUILDPLATFORM:-}", "${BUILDPLATFORM:-}", 0},
 		// Hadolint case 8: $TARGETPLATFORM → no violation
 		{"allows $TARGETPLATFORM", "$TARGETPLATFORM", 0},
+		// Partial variable in platform string → no violation (contains $)
+		{"allows partial variable linux/$ARCH", "linux/$ARCH", 0},
+		{"allows partial variable $OS/amd64", "$OS/amd64", 0},
 	}
 
 	for _, tc := range tests {
@@ -317,11 +320,13 @@ func TestParsePlatformParts(t *testing.T) {
 		{"linux/arm/v7", "linux", "arm", true},
 		{"windows/amd64", "windows", "amd64", true},
 		{"darwin/arm64", "darwin", "arm64", true},
-		{"linux", "linux", "", true}, // Single component (Hadolint DL3029 case)
-		{"amd64", "amd64", "", true}, // Single component arch
-		{"", "", "", false},          // Empty
-		{"/amd64", "", "", false},    // Empty OS
-		{"linux/", "", "", false},    // Empty arch
+		{"linux", "linux", "", true},            // Single component (Hadolint DL3029 case)
+		{"amd64", "amd64", "", true},            // Single component arch
+		{"linux/$ARCH", "linux", "$ARCH", true}, // Partial variable (caught by $ check in rule)
+		{"$OS/amd64", "$OS", "amd64", true},     // Partial variable (caught by $ check in rule)
+		{"", "", "", false},                     // Empty
+		{"/amd64", "", "", false},               // Empty OS
+		{"linux/", "", "", false},               // Empty arch
 	}
 
 	for _, tc := range tests {
