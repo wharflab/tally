@@ -1,12 +1,12 @@
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 import {
   type Executable,
   LanguageClient,
   type LanguageClientOptions,
   type ServerOptions,
-} from 'vscode-languageclient/node';
+} from "vscode-languageclient/node";
 
-import { type ResolvedBinary } from '../binary/findBinary';
+import { type ResolvedBinary } from "../binary/findBinary";
 
 export interface TallyLanguageClientInit {
   output: vscode.OutputChannel;
@@ -30,8 +30,8 @@ export class TallyLanguageClient {
     const clientOptions: LanguageClientOptions = {
       outputChannel: init.output,
       documentSelector: [
-        { language: 'dockerfile', scheme: 'file' },
-        { language: 'dockerfile', scheme: 'untitled' },
+        { language: "dockerfile", scheme: "file" },
+        { language: "dockerfile", scheme: "untitled" },
       ],
       // VS Code supports the LSP 3.17 pull diagnostics model. Disable push
       // diagnostics to avoid duplicate diagnostics when both are enabled.
@@ -40,7 +40,7 @@ export class TallyLanguageClient {
       },
       middleware: {
         executeCommand: async (command, args, next) => {
-          if (command !== 'tally.applyAllFixes') {
+          if (command !== "tally.applyAllFixes") {
             return next(command, args);
           }
 
@@ -56,7 +56,7 @@ export class TallyLanguageClient {
       },
     };
 
-    this.client = new LanguageClient('tally', 'Tally', serverOptions, clientOptions);
+    this.client = new LanguageClient("tally", "Tally", serverOptions, clientOptions);
   }
 
   public serverKey(): string {
@@ -72,7 +72,7 @@ export class TallyLanguageClient {
   }
 
   public async sendConfiguration(settings: unknown): Promise<void> {
-    await this.client.sendNotification('workspace/didChangeConfiguration', { settings });
+    await this.client.sendNotification("workspace/didChangeConfiguration", { settings });
   }
 
   private resolveApplyAllFixesArgs(args: unknown[]): unknown[] {
@@ -82,14 +82,14 @@ export class TallyLanguageClient {
 
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-      void vscode.window.showErrorMessage('Tally: no active editor to fix.');
+      void vscode.window.showErrorMessage("Tally: no active editor to fix.");
       return [];
     }
 
     const uri = editor.document.uri.toString();
     const unsafe = vscode.workspace
-      .getConfiguration('tally', editor.document.uri)
-      .get<boolean>('fixUnsafe', false);
+      .getConfiguration("tally", editor.document.uri)
+      .get<boolean>("fixUnsafe", false);
 
     return [{ uri, unsafe }];
   }
@@ -107,17 +107,17 @@ async function applyWorkspaceEditResult(result: unknown): Promise<void> {
 
   const applied = await vscode.workspace.applyEdit(edit);
   if (!applied) {
-    void vscode.window.showErrorMessage('Tally: failed to apply fixes.');
+    void vscode.window.showErrorMessage("Tally: failed to apply fixes.");
   }
 }
 
 function toWorkspaceEdit(result: unknown): vscode.WorkspaceEdit | undefined {
-  if (!result || typeof result !== 'object') {
+  if (!result || typeof result !== "object") {
     return undefined;
   }
 
   const wire = result as WorkspaceEditWire;
-  if (!wire.changes || typeof wire.changes !== 'object') {
+  if (!wire.changes || typeof wire.changes !== "object") {
     return undefined;
   }
 
@@ -130,20 +130,20 @@ function toWorkspaceEdit(result: unknown): vscode.WorkspaceEdit | undefined {
     const uri = vscode.Uri.parse(uriString);
     const vscodeEdits: vscode.TextEdit[] = [];
     for (const e of edits) {
-      if (!e || typeof e !== 'object') {
+      if (!e || typeof e !== "object") {
         continue;
       }
       const range = (e as any).range;
       const newText = (e as any).newText;
       if (
         !range ||
-        typeof newText !== 'string' ||
+        typeof newText !== "string" ||
         !range.start ||
         !range.end ||
-        typeof range.start.line !== 'number' ||
-        typeof range.start.character !== 'number' ||
-        typeof range.end.line !== 'number' ||
-        typeof range.end.character !== 'number'
+        typeof range.start.line !== "number" ||
+        typeof range.start.character !== "number" ||
+        typeof range.end.line !== "number" ||
+        typeof range.end.character !== "number"
       ) {
         continue;
       }

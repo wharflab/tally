@@ -1,10 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": [
-    "typescript",
-    "unicorn",
-    "oxc"
-  ],
+  "plugins": ["typescript", "unicorn", "oxc"],
   "env": {
     "node": true
   },
@@ -66,9 +62,7 @@
   },
   "overrides": [
     {
-      "files": [
-        "**/__tests__/**"
-      ],
+      "files": ["**/__tests__/**"],
       "rules": {
         "typescript/no-empty-function": "off",
         "typescript/no-explicit-any": "off",
@@ -80,10 +74,5 @@
       }
     }
   ],
-  "ignorePatterns": [
-    "out",
-    "dist",
-    "node_modules",
-    "tests/fixtures/**"
-  ]
+  "ignorePatterns": ["out", "dist", "node_modules", "tests/fixtures/**"]
 }

@@ -10,8 +10,5 @@
     "ignoreCase": true,
     "newlinesBetween": true
   },
-  "ignorePatterns": [
-    "**/.vscode-test",
-    "dist/"
-  ]
+  "ignorePatterns": ["**/.vscode-test", "dist/"]
 }

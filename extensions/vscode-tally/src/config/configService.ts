@@ -1,11 +1,11 @@
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
 import {
   type BinaryResolutionSettings,
   type TallySettings,
   readEffectiveSettings,
   readUserBinarySettings,
-} from './vscodeConfig';
+} from "./vscodeConfig";
 
 export interface WorkspaceFolderSettings {
   uri: string;
@@ -45,7 +45,7 @@ export class ConfigService implements vscode.Disposable {
 
     this.disposables.push(
       vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration('tally')) {
+        if (e.affectsConfiguration("tally")) {
           this.refresh();
         }
       }),

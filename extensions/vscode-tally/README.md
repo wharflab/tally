@@ -18,9 +18,9 @@ Formatter setup (manual):
     "editor.formatOnSave": true,
     "editor.formatOnSaveMode": "file",
     "editor.codeActionsOnSave": {
-      "source.fixAll.tally": "explicit"
-    }
-  }
+      "source.fixAll.tally": "explicit",
+    },
+  },
 }
 ```
 

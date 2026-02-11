@@ -1,14 +1,14 @@
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
 
-import { findTallyBinary } from './binary/findBinary';
-import { ConfigService } from './config/configService';
-import { TallyLanguageClient } from './lsp/client';
+import { findTallyBinary } from "./binary/findBinary";
+import { ConfigService } from "./config/configService";
+import { TallyLanguageClient } from "./lsp/client";
 
 let client: TallyLanguageClient | undefined;
 let starting: Promise<void> | undefined;
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-  const output = vscode.window.createOutputChannel('Tally');
+  const output = vscode.window.createOutputChannel("Tally");
   const configService = new ConfigService();
   context.subscriptions.push(output, configService);
 
@@ -64,19 +64,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   }
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('tally.restartServer', async () => {
-      await startOrRestart('manual restart');
+    vscode.commands.registerCommand("tally.restartServer", async () => {
+      await startOrRestart("manual restart");
     }),
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('tally.configureDefaultFormatterForDockerfile', async () => {
+    vscode.commands.registerCommand("tally.configureDefaultFormatterForDockerfile", async () => {
       const target =
         (vscode.workspace.workspaceFolders?.length ?? 0) > 0
           ? vscode.ConfigurationTarget.Workspace
           : vscode.ConfigurationTarget.Global;
 
-      const editor = vscode.workspace.getConfiguration('editor', { languageId: 'dockerfile' });
+      const editor = vscode.workspace.getConfiguration("editor", { languageId: "dockerfile" });
 
       const languageValueForTarget = <T>(
         result: { globalLanguageValue?: T; workspaceLanguageValue?: T } | undefined,
@@ -89,36 +89,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           : result.workspaceLanguageValue;
       };
 
-      const defaultFormatterInspected = editor.inspect<string>('defaultFormatter');
-      const formatOnSaveInspected = editor.inspect<boolean>('formatOnSave');
-      const formatOnSaveModeInspected = editor.inspect<string>('formatOnSaveMode');
-      const inspected = editor.inspect<unknown>('codeActionsOnSave');
+      const defaultFormatterInspected = editor.inspect<string>("defaultFormatter");
+      const formatOnSaveInspected = editor.inspect<boolean>("formatOnSave");
+      const formatOnSaveModeInspected = editor.inspect<string>("formatOnSaveMode");
+      const inspected = editor.inspect<unknown>("codeActionsOnSave");
 
       const originalDefaultFormatter = languageValueForTarget(defaultFormatterInspected);
       const originalFormatOnSave = languageValueForTarget(formatOnSaveInspected);
       const originalFormatOnSaveMode = languageValueForTarget(formatOnSaveModeInspected);
-      const existing =
-        languageValueForTarget(inspected);
+      const existing = languageValueForTarget(inspected);
       const next: Record<string, unknown> =
-        existing && typeof existing === 'object' && !Array.isArray(existing)
+        existing && typeof existing === "object" && !Array.isArray(existing)
           ? { ...(existing as Record<string, unknown>) }
           : {};
 
-      if (next['source.fixAll.tally'] === undefined) {
-        next['source.fixAll.tally'] = 'explicit';
+      if (next["source.fixAll.tally"] === undefined) {
+        next["source.fixAll.tally"] = "explicit";
       }
 
       try {
-        await editor.update('defaultFormatter', 'wharflab.tally', target, true);
-        await editor.update('formatOnSave', true, target, true);
-        await editor.update('formatOnSaveMode', 'file', target, true);
-        await editor.update('codeActionsOnSave', next, target, true);
+        await editor.update("defaultFormatter", "wharflab.tally", target, true);
+        await editor.update("formatOnSave", true, target, true);
+        await editor.update("formatOnSaveMode", "file", target, true);
+        await editor.update("codeActionsOnSave", next, target, true);
       } catch (err) {
         try {
-          await editor.update('defaultFormatter', originalDefaultFormatter, target, true);
-          await editor.update('formatOnSave', originalFormatOnSave, target, true);
-          await editor.update('formatOnSaveMode', originalFormatOnSaveMode, target, true);
-          await editor.update('codeActionsOnSave', existing, target, true);
+          await editor.update("defaultFormatter", originalDefaultFormatter, target, true);
+          await editor.update("formatOnSave", originalFormatOnSave, target, true);
+          await editor.update("formatOnSaveMode", originalFormatOnSaveMode, target, true);
+          await editor.update("codeActionsOnSave", existing, target, true);
         } catch (restoreErr) {
           output.appendLine(
             `[tally] failed to restore editor settings after an error: ${String(restoreErr)}`,
@@ -135,17 +134,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       const message =
         target === vscode.ConfigurationTarget.Global
-          ? 'Tally configured as the default Dockerfile formatter in User settings.'
-          : 'Tally configured as the default Dockerfile formatter for this workspace.';
-      void vscode.window.showInformationMessage(
-        message,
-      );
+          ? "Tally configured as the default Dockerfile formatter in User settings."
+          : "Tally configured as the default Dockerfile formatter for this workspace.";
+      void vscode.window.showInformationMessage(message);
     }),
   );
 
   configService.onDidChange(async (change) => {
     if (change.requiresRestart) {
-      await startOrRestart('settings change');
+      await startOrRestart("settings change");
       return;
     }
     await client?.sendConfiguration(configService.lspSettings());
@@ -153,11 +150,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     vscode.workspace.onDidGrantWorkspaceTrust(() => {
-      void startOrRestart('workspace trusted');
+      void startOrRestart("workspace trusted");
     }),
   );
 
-  await startOrRestart('activation');
+  await startOrRestart("activation");
 }
 
 export async function deactivate(): Promise<void> {

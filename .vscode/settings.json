@@ -67,6 +67,10 @@
   ],
   // Enable oxc extension (linter and formatter)
   "oxc.enable": true,
+  "oxc.path.oxfmt": "./extensions/vscode-tally/node_modules/.bin/oxfmt",
+  "oxc.path.oxlint": "./extensions/vscode-tally/node_modules/.bin/oxlint",
+  "oxc.path.tsgolint": "./extensions/vscode-tally/node_modules/.bin/tsgolint",
+  "oxc.path.node": "bun",
   "oxc.configPath": "extensions/vscode-tally/.oxlintrc.json",
   "oxc.fmt.configPath": "extensions/vscode-tally/.oxfmtrc.json",
   "oxc.fixKind": "safe_fix_or_suggestion",
@@ -79,4 +83,5 @@
       "source.organizeImports": "explicit"
     }
   },
+  "python.languageServer": "None"
 }
