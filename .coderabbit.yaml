@@ -48,7 +48,7 @@ reviews:
   path_instructions:
     - path: "**/*.go"
       instructions: |
-        This project targets Go 1.25.6 (see go.mod)
+        This project targets Go 1.26.0 (see go.mod)
         When reviewing Go code, insist on usage of newest, modern Go features, not older versions.
     - path: 'internal/rules/**/*.go'
       instructions: |

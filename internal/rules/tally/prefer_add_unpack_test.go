@@ -137,7 +137,7 @@ RUN curl -o /tmp/app.tar.gz https://example.com/app.tar.gz && tar -cf /tmp/backu
 			dockerfile: `FROM ubuntu:22.04
 RUN curl -fsSL https://example.com/app.tar.gz | tar -xz -C /opt/
 `,
-			config:    PreferAddUnpackConfig{Enabled: boolPtr(false)},
+			config:    PreferAddUnpackConfig{Enabled: new(false)},
 			wantCount: 0,
 		},
 		// Config: explicitly enabled
@@ -146,7 +146,7 @@ RUN curl -fsSL https://example.com/app.tar.gz | tar -xz -C /opt/
 			dockerfile: `FROM ubuntu:22.04
 RUN curl -fsSL https://example.com/app.tar.gz | tar -xz -C /opt/
 `,
-			config:    PreferAddUnpackConfig{Enabled: boolPtr(true)},
+			config:    PreferAddUnpackConfig{Enabled: new(true)},
 			wantCount: 1,
 		},
 		// Multi-stage

@@ -384,7 +384,7 @@ Example:
   "version": "0.4.0",
   "buildkitVersion": "v0.27.1",
   "platform": { "os": "darwin", "arch": "arm64" },
-  "goVersion": "go1.25.0",
+  "goVersion": "go1.26.0",
   "gitCommit": "abc1234"
 }
 ```

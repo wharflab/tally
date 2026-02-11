@@ -97,7 +97,7 @@ func isZero(v reflect.Value) bool {
 		return v.String() == ""
 	case reflect.Slice, reflect.Map:
 		return v.IsNil()
-	case reflect.Ptr, reflect.Interface:
+	case reflect.Pointer, reflect.Interface:
 		return v.IsNil()
 	default:
 		return false
@@ -117,7 +117,7 @@ func ValidateWithSchema(config any, schema map[string]any) error {
 		return nil
 	}
 	rv := reflect.ValueOf(config)
-	if rv.Kind() == reflect.Ptr && rv.IsNil() {
+	if rv.Kind() == reflect.Pointer && rv.IsNil() {
 		return nil
 	}
 

@@ -7,7 +7,7 @@ common mistakes.
 
 ## Tech Stack
 
-- **Language**: Go 1.25.0
+- **Language**: Go 1.26.0
 - **CLI Framework**: `github.com/urfave/cli/v3`
 - **Configuration**: `github.com/knadh/koanf/v2` (supports TOML, env vars)
 - **Dockerfile Parsing**: `github.com/moby/buildkit/frontend/dockerfile/parser` (official parser)

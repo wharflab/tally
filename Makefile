@@ -7,7 +7,7 @@ build:
 	GOSUMDB=sum.golang.org CGO_ENABLED=0 go build -ldflags "-s -w" -o tally
 
 GOTESTSUM_VERSION := v1.13.0
-GOLANGCI_LINT_VERSION := v2.7.2
+GOLANGCI_LINT_VERSION := v2.9.0
 GORELEASER_VERSION := v2.13.3
 DEADCODE_VERSION := v0.41.0
 
@@ -26,16 +26,12 @@ bin/custom-gcl: bin/golangci-lint-$(GOLANGCI_LINT_VERSION) .custom-gcl.yml _tool
 lint-fix: bin/golangci-lint-$(GOLANGCI_LINT_VERSION) bin/custom-gcl
 	bin/custom-gcl run --fix
 
-# NOTE: deadcode may panic due to go/types bug with json/v2 types.
-# The panic is in go/types.NewSignatureType (Go stdlib), not in our code.
-# Tracking issue: https://github.com/golang/go/issues/73871 (fixed in Go 1.26).
-# Remove this workaround when building with Go 1.26+.
+# Filter out internal/lsp/protocol/ from deadcode: that package is generated
+# and only a subset of LSP methods are dispatched, so helpers backing unused
+# methods are expected to appear unreachable.
 deadcode: bin/deadcode-$(DEADCODE_VERSION)
 	@tmp=$$(mktemp); \
-	bin/deadcode -test ./... >"$$tmp" 2>&1 || true; \
-	if grep -q 'panic:' "$$tmp"; then \
-		echo "deadcode: skipped (known golang.org/x/tools/go/ssa panic)"; rm "$$tmp"; exit 0; \
-	fi; \
+	bin/deadcode -test ./... 2>&1 | grep -v 'internal/lsp/protocol/' >"$$tmp" || true; \
 	if [ -s "$$tmp" ]; then cat "$$tmp"; rm "$$tmp"; exit 1; fi; \
 	rm "$$tmp"
 

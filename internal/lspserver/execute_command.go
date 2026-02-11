@@ -41,7 +41,7 @@ func (s *Server) handleExecuteCommand(params *protocol.ExecuteCommandParams) (an
 	}
 
 	return &protocol.WorkspaceEdit{
-		Changes: ptrTo(map[protocol.DocumentUri][]*protocol.TextEdit{
+		Changes: new(map[protocol.DocumentUri][]*protocol.TextEdit{
 			protocol.DocumentUri(uri): edits,
 		}),
 	}, nil

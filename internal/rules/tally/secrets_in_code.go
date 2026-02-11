@@ -79,7 +79,7 @@ func (r *SecretsInCodeRule) checkMetaArgs(input rules.LintInput) []rules.Violati
 
 // checkStageCommands scans commands within a stage.
 func (r *SecretsInCodeRule) checkStageCommands(file string, commands []instructions.Command) []rules.Violation {
-	var violations []rules.Violation
+	violations := make([]rules.Violation, 0, len(commands))
 	for _, cmd := range commands {
 		violations = append(violations, r.checkCommand(file, cmd)...)
 	}
@@ -127,7 +127,7 @@ func (r *SecretsInCodeRule) checkRunCommand(file string, c *instructions.RunComm
 
 // checkCopyCommand scans COPY heredocs for secrets.
 func (r *SecretsInCodeRule) checkCopyCommand(file string, c *instructions.CopyCommand) []rules.Violation {
-	var violations []rules.Violation
+	violations := make([]rules.Violation, 0, len(c.SourceContents))
 	for _, content := range c.SourceContents {
 		violations = append(violations,
 			r.scanContent(content.Data, file, c.Location(), "COPY heredoc")...)
@@ -137,7 +137,7 @@ func (r *SecretsInCodeRule) checkCopyCommand(file string, c *instructions.CopyCo
 
 // checkAddCommand scans ADD heredocs for secrets.
 func (r *SecretsInCodeRule) checkAddCommand(file string, c *instructions.AddCommand) []rules.Violation {
-	var violations []rules.Violation
+	violations := make([]rules.Violation, 0, len(c.SourceContents))
 	for _, content := range c.SourceContents {
 		violations = append(violations,
 			r.scanContent(content.Data, file, c.Location(), "ADD heredoc")...)

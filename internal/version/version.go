@@ -33,12 +33,6 @@ func GoVersion() string {
 	return runtime.Version()
 }
 
-// GitCommit returns the VCS revision embedded at build time, if available.
-func GitCommit() string {
-	_, commit := readBuildInfo()
-	return commit
-}
-
 // readBuildInfo reads debug.ReadBuildInfo once and extracts both
 // the BuildKit dependency version and the VCS revision.
 func readBuildInfo() (string, string) {

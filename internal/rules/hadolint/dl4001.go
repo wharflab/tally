@@ -61,7 +61,7 @@ func (m usageMapDL4001) allLocations() []rules.Location {
 	}
 	sort.Ints(indices)
 
-	var locs []rules.Location
+	locs := make([]rules.Location, 0, len(indices))
 	for _, idx := range indices {
 		u := m[idx]
 		locs = append(locs, u.locations...)

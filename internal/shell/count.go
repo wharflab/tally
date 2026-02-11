@@ -96,7 +96,7 @@ func extractFromStatement(stmt *syntax.Stmt, variant Variant) []string {
 	case *syntax.BinaryCmd:
 		if cmd.Op == syntax.AndStmt {
 			// Flatten && chains only
-			var commands []string
+			commands := make([]string, 0, 2)
 			commands = append(commands, extractFromStatement(cmd.X, variant)...)
 			commands = append(commands, extractFromStatement(cmd.Y, variant)...)
 			return commands

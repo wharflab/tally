@@ -12,7 +12,7 @@ Do not depend on `github.com/go-json-experiment/json` in this repository.
 Reason:
 
 - The upstream module explicitly warns against depending on it in publicly available modules.
-- Go 1.25 already ships the stdlib v2 implementation behind `GOEXPERIMENT=jsonv2`.
+- Go 1.26 still ships the stdlib v2 implementation behind `GOEXPERIMENT=jsonv2`.
 
 ## 2. Environment Contract (Mandatory)
 
@@ -22,7 +22,7 @@ Reason:
 GOEXPERIMENT=jsonv2
 ```
 
-Local verification in this repo environment (`go1.25.7`) showed:
+Local verification in this repo environment (`go1.26.0`) showed:
 
 - without `GOEXPERIMENT=jsonv2`: importing `encoding/json/v2` fails
 - with `GOEXPERIMENT=jsonv2`: importing `encoding/json/v2` works

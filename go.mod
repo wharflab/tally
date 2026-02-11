@@ -1,6 +1,6 @@
 module github.com/tinovyatkin/tally
 
-go 1.25.7
+go 1.26.0
 
 require (
 	github.com/TypeFox/go-lsp v0.0.1

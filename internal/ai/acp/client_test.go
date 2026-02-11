@@ -149,7 +149,9 @@ func TestRunClient_SessionUpdate_AppendsAgentTextOnly(t *testing.T) {
 	}
 
 	// Non-agent updates should not affect output.
-	if err := c.SessionUpdate(context.Background(), acpsdk.SessionNotification{Update: acpsdk.UpdateUserMessageText("ignored")}); err != nil {
+	if err := c.SessionUpdate(context.Background(), acpsdk.SessionNotification{
+		Update: acpsdk.UpdateUserMessageText("ignored"),
+	}); err != nil {
 		t.Fatalf("SessionUpdate() error: %v", err)
 	}
 	if err := c.SessionUpdate(context.Background(), acpsdk.SessionNotification{

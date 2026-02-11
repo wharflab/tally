@@ -47,15 +47,14 @@ func (s *Server) codeActionsForDocument(
 				continue
 			}
 
-			isPreferred := v.SuggestedFix.IsPreferred || v.SuggestedFix.Safety == rules.FixSafe
 			matchedDiags := matchingDiagnostics(v, params.Context.Diagnostics)
 			action := protocol.CodeAction{
 				Title:       v.SuggestedFix.Description,
 				Kind:        ptrTo(protocol.CodeActionKindQuickFix),
-				IsPreferred: ptrTo(isPreferred),
+				IsPreferred: new(v.SuggestedFix.IsPreferred || v.SuggestedFix.Safety == rules.FixSafe),
 				Diagnostics: &matchedDiags,
 				Edit: &protocol.WorkspaceEdit{
-					Changes: ptrTo(map[protocol.DocumentUri][]*protocol.TextEdit{
+					Changes: new(map[protocol.DocumentUri][]*protocol.TextEdit{
 						params.TextDocument.Uri: edits,
 					}),
 				},

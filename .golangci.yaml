@@ -3,7 +3,7 @@
 version: '2'
 run:
   concurrency: 4
-  go: "1.25.6"
+  go: "1.26.0"
   modules-download-mode: readonly
   timeout: 5m
 linters:

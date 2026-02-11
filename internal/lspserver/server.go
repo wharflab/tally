@@ -176,27 +176,27 @@ func (s *Server) handleInitialize(params *protocol.InitializeParams) (any, error
 		Capabilities: &protocol.ServerCapabilities{
 			TextDocumentSync: &protocol.TextDocumentSyncOptionsOrKind{
 				Options: &protocol.TextDocumentSyncOptions{
-					OpenClose: ptrTo(true),
+					OpenClose: new(true),
 					Change:    ptrTo(protocol.TextDocumentSyncKindFull),
 					Save: &protocol.BooleanOrSaveOptions{
-						SaveOptions: &protocol.SaveOptions{IncludeText: ptrTo(true)},
+						SaveOptions: &protocol.SaveOptions{IncludeText: new(true)},
 					},
 				},
 			},
 			CodeActionProvider: &protocol.BooleanOrCodeActionOptions{
 				CodeActionOptions: &protocol.CodeActionOptions{
-					CodeActionKinds: ptrTo([]protocol.CodeActionKind{
+					CodeActionKinds: new([]protocol.CodeActionKind{
 						protocol.CodeActionKindQuickFix,
 						"source.fixAll.tally",
 					}),
 				},
 			},
 			DocumentFormattingProvider: &protocol.BooleanOrDocumentFormattingOptions{
-				Boolean: ptrTo(true),
+				Boolean: new(true),
 			},
 			DiagnosticProvider: &protocol.DiagnosticOptionsOrRegistrationOptions{
 				Options: &protocol.DiagnosticOptions{
-					Identifier: ptrTo("tally"),
+					Identifier: new("tally"),
 				},
 			},
 			ExecuteCommandProvider: &protocol.ExecuteCommandOptions{
@@ -297,7 +297,7 @@ func clientInfoString(params *protocol.InitializeParams) string {
 }
 
 func ptrTo[T any](v T) *T {
-	return &v
+	return new(v)
 }
 
 // stdioReadWriteCloser wraps stdin/stdout as an io.ReadWriteCloser for JSON-RPC.

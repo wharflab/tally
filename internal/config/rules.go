@@ -126,12 +126,12 @@ func (rc *RulesConfig) IsEnabled(ruleCode string) *bool {
 
 	// Check Include first (takes precedence)
 	if matchesAnyPattern(ruleCode, rc.Include) {
-		return boolPtr(true)
+		return new(true)
 	}
 
 	// Check Exclude
 	if matchesAnyPattern(ruleCode, rc.Exclude) {
-		return boolPtr(false)
+		return new(false)
 	}
 
 	// No explicit config - use rule default
@@ -277,9 +277,4 @@ func (rc *RulesConfig) namespaceMap(ns string) map[string]RuleConfig {
 	default:
 		return nil
 	}
-}
-
-// boolPtr returns a pointer to a bool value.
-func boolPtr(b bool) *bool {
-	return &b
 }

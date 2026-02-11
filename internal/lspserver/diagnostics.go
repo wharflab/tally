@@ -218,9 +218,9 @@ func convertDiagnostics(violations []rules.Violation) []*protocol.Diagnostic {
 	for _, v := range violations {
 		d := &protocol.Diagnostic{
 			Range:    violationRange(v),
-			Severity: ptrTo(severityToLSP(v.Severity)),
-			Source:   ptrTo("tally"),
-			Code:     &protocol.IntegerOrString{String: ptrTo(v.RuleCode)},
+			Severity: new(severityToLSP(v.Severity)),
+			Source:   new("tally"),
+			Code:     &protocol.IntegerOrString{String: new(v.RuleCode)},
 			Message:  v.Message,
 		}
 		if v.DocURL != "" {

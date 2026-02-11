@@ -16,7 +16,6 @@ import (
 const fixAllCodeActionKind = protocol.CodeActionKind("source.fixAll.tally")
 
 func (s *Server) fixAllCodeAction(doc *Document) *protocol.CodeAction {
-	docURI := protocol.DocumentUri(doc.URI)
 	edits := s.computeFixEdits(doc.URI, []byte(doc.Content), fix.FixSafe)
 	if len(edits) == 0 {
 		return nil
@@ -24,11 +23,11 @@ func (s *Server) fixAllCodeAction(doc *Document) *protocol.CodeAction {
 
 	return &protocol.CodeAction{
 		Title:       "Fix all auto-fixable issues",
-		Kind:        ptrTo(fixAllCodeActionKind),
-		IsPreferred: ptrTo(true),
+		Kind:        new(fixAllCodeActionKind),
+		IsPreferred: new(true),
 		Edit: &protocol.WorkspaceEdit{
-			Changes: ptrTo(map[protocol.DocumentUri][]*protocol.TextEdit{
-				docURI: edits,
+			Changes: new(map[protocol.DocumentUri][]*protocol.TextEdit{
+				protocol.DocumentUri(doc.URI): edits,
 			}),
 		},
 	}
