@@ -54,6 +54,11 @@ func (r *heredocResolver) Resolve(_ context.Context, resolveCtx ResolveContext, 
 	}
 	stage := stages[data.StageIndex]
 
+	// Re-detect shell variant from the re-parsed stage.
+	// Sync fixes (e.g., DL4005 replacing "ln /bin/sh" with SHELL) may have
+	// introduced new SHELL instructions that change the effective variant.
+	r.updateShellVariant(stage, data)
+
 	// Create sourcemap for position calculations
 	sm := sourcemap.New(resolveCtx.Content)
 
@@ -246,6 +251,22 @@ func (r *heredocResolver) detectAndFixChained(
 	}
 
 	return nil
+}
+
+// updateShellVariant scans the re-parsed stage for SHELL instructions and
+// updates data.ShellVariant to reflect the effective shell. This is necessary
+// because sync fixes applied before the resolver (e.g., DL4005 replacing
+// "ln -sf /bin/bash /bin/sh" with a SHELL instruction) may change the shell
+// variant from what was recorded in the original semantic model.
+func (r *heredocResolver) updateShellVariant(stage instructions.Stage, data *rules.HeredocResolveData) {
+	for _, cmd := range stage.Commands {
+		shellCmd, ok := cmd.(*instructions.ShellCommand)
+		if !ok {
+			continue
+		}
+		variant := shell.VariantFromShellCmd(shellCmd.Shell)
+		data.ShellVariant = variant
+	}
 }
 
 // extractCommands extracts commands from a RUN instruction.

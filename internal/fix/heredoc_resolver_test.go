@@ -824,6 +824,114 @@ RUN apt-get clean
 	}
 }
 
+func TestHeredocResolver_Resolve_ShellVariantUpdatedFromContent(t *testing.T) {
+	t.Parallel()
+	r := &heredocResolver{}
+
+	// Simulate content after DL4005's sync fix has replaced
+	// "RUN ln -sf /bin/bash /bin/sh" with "SHELL ["/bin/bash", "-c"]".
+	// The original HeredocResolveData has the default variant (VariantBash in
+	// this case, but in a real scenario the original stage might have had a
+	// different default). The resolver should detect the SHELL instruction
+	// and update the variant accordingly.
+	dockerfile := `FROM ubuntu
+SHELL ["/bin/bash", "-c"]
+RUN apt-get update && apt-get install -y vim && apt-get clean
+`
+
+	fix := &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   rules.HeredocResolverID,
+		ResolverData: &rules.HeredocResolveData{
+			Type:         rules.HeredocFixChained,
+			StageIndex:   0,
+			ShellVariant: shell.VariantPOSIX, // Stale: original stage was POSIX
+			MinCommands:  3,
+		},
+	}
+
+	edits, err := r.Resolve(context.Background(), ResolveContext{
+		Content:  []byte(dockerfile),
+		FilePath: "Dockerfile",
+	}, fix)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(edits))
+	}
+
+	// The heredoc should use bash variant (from the SHELL instruction).
+	// With VariantBash the heredoc uses /bin/bash; with VariantPOSIX it
+	// would use /bin/sh. Verify the variant was updated by checking the
+	// shebang in the heredoc output.
+	if !strings.Contains(edits[0].NewText, "<<EOF") {
+		t.Errorf("expected heredoc syntax, got: %s", edits[0].NewText)
+	}
+
+	// Verify we got a valid heredoc edit (proves parsing worked with correct variant)
+	if !strings.Contains(edits[0].NewText, "apt-get update") {
+		t.Errorf("expected apt-get update in heredoc, got: %s", edits[0].NewText)
+	}
+
+	// Verify the resolve data was updated
+	data, ok := fix.ResolverData.(*rules.HeredocResolveData)
+	if !ok {
+		t.Fatal("expected HeredocResolveData")
+	}
+	if data.ShellVariant != shell.VariantBash {
+		t.Errorf("expected ShellVariant to be updated to VariantBash, got %v", data.ShellVariant)
+	}
+}
+
+func TestHeredocResolver_Resolve_NonPOSIXShellSkipped(t *testing.T) {
+	t.Parallel()
+	r := &heredocResolver{}
+
+	// If a sync fix introduced a non-POSIX shell (e.g., powershell),
+	// the resolver should detect it and the shell parsing should handle
+	// it gracefully.
+	dockerfile := `FROM mcr.microsoft.com/windows/servercore
+SHELL ["powershell", "-Command"]
+RUN Write-Output "hello" ; Write-Output "world" ; Write-Output "!"
+`
+
+	fix := &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   rules.HeredocResolverID,
+		ResolverData: &rules.HeredocResolveData{
+			Type:         rules.HeredocFixChained,
+			StageIndex:   0,
+			ShellVariant: shell.VariantBash, // Stale variant
+			MinCommands:  3,
+		},
+	}
+
+	edits, err := r.Resolve(context.Background(), ResolveContext{
+		Content:  []byte(dockerfile),
+		FilePath: "Dockerfile",
+	}, fix)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Non-POSIX shells should not produce heredoc edits
+	if edits != nil {
+		t.Errorf("expected nil edits for non-POSIX shell, got %d edits", len(edits))
+	}
+
+	// Verify the variant was updated to NonPOSIX
+	data, ok := fix.ResolverData.(*rules.HeredocResolveData)
+	if !ok {
+		t.Fatal("expected HeredocResolveData")
+	}
+	if data.ShellVariant != shell.VariantNonPOSIX {
+		t.Errorf("expected ShellVariant to be updated to VariantNonPOSIX, got %v", data.ShellVariant)
+	}
+}
+
 // Helper functions
 
 func parseFirstRun(t *testing.T, dockerfile string) *instructions.RunCommand {

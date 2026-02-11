@@ -17,7 +17,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 |-----------|-------------|---------------------|-------|
 | tally | 8 | - | 8 |
 | buildkit | 9 + 5 captured | - | 22 |
-| hadolint | 20 | 11 | 66 |
+| hadolint | 21 | 11 | 66 |
 <!-- END RULES_SUMMARY -->
 
 ---
@@ -189,7 +189,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL4001](https://github.com/hadolint/hadolint/wiki/DL4001) | Either use Wget or Curl but not both. | Warning | ✅ `hadolint/DL4001` |
 | [DL4003](https://github.com/hadolint/hadolint/wiki/DL4003) | Multiple `CMD` instructions found. | Warning | 🔄 `buildkit/MultipleInstructionsDisallowed` |
 | [DL4004](https://github.com/hadolint/hadolint/wiki/DL4004) | Multiple `ENTRYPOINT` instructions found. | Error | 🔄 `buildkit/MultipleInstructionsDisallowed` |
-| [DL4005](https://github.com/hadolint/hadolint/wiki/DL4005) | Use `SHELL` to change the default shell. | Warning | ⏳ |
+| [DL4005](https://github.com/hadolint/hadolint/wiki/DL4005) | Use `SHELL` to change the default shell. | Warning | ✅🔧 `hadolint/DL4005` |
 | [DL4006](https://github.com/hadolint/hadolint/wiki/DL4006) | Set the `SHELL` option -o pipefail before `RUN` with a pipe in it | Warning | ⏳ |
 <!-- END HADOLINT_DL_RULES -->
 

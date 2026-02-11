@@ -1,0 +1,97 @@
+{
+  "files": [
+    {
+      "file": "testdata/dl4005/Dockerfile",
+      "violations": [
+        {
+          "detail": "Using ln to redirect /bin/sh is fragile and may break scripts that depend on the original shell. Use the SHELL instruction to change the default shell for subsequent RUN instructions, e.g., SHELL [\"/bin/bash\", \"-c\"].",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL4005",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/dl4005/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "use SHELL to change the default shell instead of ln to /bin/sh",
+          "rule": "hadolint/DL4005",
+          "severity": "warning",
+          "sourceCode": "RUN ln -sfv /bin/bash /bin/sh",
+          "suggestedFix": {
+            "description": "Replace ln /bin/sh with SHELL instruction",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 29,
+                    "line": 4
+                  },
+                  "file": "testdata/dl4005/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 4
+                  }
+                },
+                "newText": "SHELL [\"/bin/bash\", \"-c\"]"
+              }
+            ],
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Using ln to redirect /bin/sh is fragile and may break scripts that depend on the original shell. Use the SHELL instruction to change the default shell for subsequent RUN instructions, e.g., SHELL [\"/bin/bash\", \"-c\"].",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL4005",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "testdata/dl4005/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "use SHELL to change the default shell instead of ln to /bin/sh",
+          "rule": "hadolint/DL4005",
+          "severity": "warning",
+          "sourceCode": "RUN apt-get update \u0026\u0026 ln -sf /bin/bash /bin/sh",
+          "suggestedFix": {
+            "description": "Replace ln /bin/sh with SHELL instruction",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 46,
+                    "line": 10
+                  },
+                  "file": "testdata/dl4005/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 10
+                  }
+                },
+                "newText": "RUN apt-get update\nSHELL [\"/bin/bash\", \"-c\"]"
+              }
+            ],
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}

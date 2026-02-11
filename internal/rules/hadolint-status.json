@@ -135,6 +135,11 @@
       "status": "covered_by_buildkit",
       "buildkit_rule": "MultipleInstructionsDisallowed",
       "fixable": true
+    },
+    "DL4005": {
+      "status": "implemented",
+      "tally_rule": "hadolint/DL4005",
+      "fixable": true
     }
   }
 }

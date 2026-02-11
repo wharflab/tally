@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "hadolint/DL4005",
+ "DefaultSeverity": "warning",
+ "Description": "Use SHELL to change the default shell",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL4005",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Use SHELL to change the default shell"
+}
