@@ -11,6 +11,14 @@
     "ast-grep.ast-grep-vscode",
     "redhat.vscode-yaml",
     "jasonheld.yamllint-ts",
-    "ms-sarifvscode.sarif-viewer"
+    "ms-sarifvscode.sarif-viewer",
+    "oxc.oxc-vscode"
+  ],
+  "unwantedRecommendations": [
+    "dbaeumer.vscode-eslint",
+    "biomejs.biome",
+    "esbenp.prettier-vscode",
+    "DavidAnson.vscode-markdownlint",
+    "unifiedjs.vscode-remark"
   ]
 }

@@ -92,19 +92,25 @@
   },
   "scripts": {
     "compile": "bun build src/extension.ts --outfile=dist/extension.cjs --format=cjs --target=node --external=vscode --sourcemap=inline",
-    "typecheck": "tsgo -p tsconfig.json",
+    "typecheck": "tsgo",
+    "lint": "oxlint --type-aware ./src",
+    "format": "oxfmt --write .",
+    "format:check": "oxfmt --check .",
     "test:e2e": "bun test test/e2e/*.test.ts",
     "vsce:package": "bunx @vscode/vsce package --no-dependencies"
   },
-  "packageManager": "bun@1.3.9",
   "dependencies": {
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
+    "@types/bun": "^1.3.9",
     "@types/node": "25.2.1",
     "@types/vscode": "1.109.0",
     "@typescript/native-preview": "7.0.0-dev.20260210.1",
     "@vscode/test-electron": "2.5.2",
-    "@vscode/vsce": "3.7.1"
+    "@vscode/vsce": "3.7.1",
+    "oxfmt": "^0.31.0",
+    "oxlint": "^1.46.0",
+    "oxlint-tsgolint": "^0.11.5"
   }
 }

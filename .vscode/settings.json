@@ -58,5 +58,25 @@
   },
   "sarif-viewer.connectToGithubCodeScanning": "off",
   "typescript.native-preview.tsdk": "./extensions/vscode-tally/node_modules/@typescript/native-preview/bin",
-  "typescript.experimental.useTsgo": true
+  "typescript.experimental.useTsgo": true,
+  // Disable ESLint and Biome in favor of oxlint
+  "eslint.enable": false,
+  "biome.enabled": false,
+  "markdownlint.lintWorkspaceGlobs": [
+    "!**/*"
+  ],
+  // Enable oxc extension (linter and formatter)
+  "oxc.enable": true,
+  "oxc.configPath": "extensions/vscode-tally/.oxlintrc.json",
+  "oxc.fmt.configPath": "extensions/vscode-tally/.oxfmtrc.json",
+  "oxc.fixKind": "safe_fix_or_suggestion",
+  "oxc.typeAware": true,
+  // Use oxc as default formatter for JS/TS
+  "[typescript][javascript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.oxc": "explicit",
+      "source.organizeImports": "explicit"
+    }
+  },
 }

@@ -1,3 +1,4 @@
+import Bun from 'bun';
 import { test } from 'bun:test';
 
 import * as fs from 'node:fs/promises';
@@ -10,7 +11,7 @@ function runOrThrow(cmd: string[], opts: { cwd: string; env?: Record<string, str
   const proc = Bun.spawnSync({
     cmd,
     cwd: opts.cwd,
-    env: { ...process.env, ...(opts.env ?? {}) },
+    env: { ...process.env, ...opts.env },
     stdout: 'pipe',
     stderr: 'pipe',
   });
@@ -89,6 +90,7 @@ test(
       extensionTestsPath: path.join(extensionRoot, 'test', 'suite', 'index.js'),
       ...(vscodeVersion ? { version: vscodeVersion } : {}),
       timeout: vscodeDownloadTimeoutMs,
+      extractSync: true,
       launchArgs: [
         repoRoot,
         '--disable-extensions',

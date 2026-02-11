@@ -1,3 +1,4 @@
+# yaml-language-server: =https://json.schemastore.org/lefthook.json
 ---
 output:
   # - summary # Print summary block (successful and failed steps)
@@ -15,9 +16,23 @@ pre-commit:
       glob: "**/*.go"
       run: GOEXPERIMENT=jsonv2 make lint-fix
       stage_fixed: true
+    ts-typecheck:
+      glob: "extensions/vscode-tally/**/*.ts"
+      run: bunx @typescript/native-preview --noEmit
+      root: extensions/vscode-tally
+    ts-lint:
+      glob: "extensions/vscode-tally/**/*.{js,ts,cjs,mjs,d.cts,d.mts}"
+      run: bunx -y -q oxlint --type-aware --fix --fix-suggestions {staged_files}
+      stage_fixed: true
+      root: extensions/vscode-tally
+    ts-format:
+      glob: "*.{js,ts,cjs,mjs,mts,cts,jsx,tsx}"
+      run: bunx -y -q oxfmt --no-error-on-unmatched-pattern --write {staged_files}
+      stage_fixed: true
+      root: extensions/vscode-tally
     taplo:
       glob: "**/*.toml"
-      run: npx -y -q @taplo/cli format {staged_files}
+      run: bunx -y -q @taplo/cli format {staged_files}
       stage_fixed: true
     rumdl:
       glob: "**/*.md"
