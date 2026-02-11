@@ -310,30 +310,34 @@ func TestFromPlatformFlagConstDisallowed_PlatformWithVariant(t *testing.T) {
 func TestParsePlatformParts(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
+		name     string
 		platform string
 		wantOS   string
 		wantArch string
 		wantOK   bool
 	}{
-		{"linux/amd64", "linux", "amd64", true},
-		{"linux/arm64", "linux", "arm64", true},
-		{"linux/arm/v7", "linux", "arm", true},
-		{"windows/amd64", "windows", "amd64", true},
-		{"darwin/arm64", "darwin", "arm64", true},
-		{"linux", "linux", "", true},            // Single component (Hadolint DL3029 case)
-		{"amd64", "amd64", "", true},            // Single component arch
-		{"linux/$ARCH", "linux", "$ARCH", true}, // Partial variable (caught by $ check in rule)
-		{"$OS/amd64", "$OS", "amd64", true},     // Partial variable (caught by $ check in rule)
-		{"", "", "", false},                     // Empty
-		{"/amd64", "", "", false},               // Empty OS
-		{"linux/", "", "", false},               // Empty arch
+		{"standard linux/amd64", "linux/amd64", "linux", "amd64", true},
+		{"standard linux/arm64", "linux/arm64", "linux", "arm64", true},
+		{"with variant linux/arm/v7", "linux/arm/v7", "linux", "arm", true},
+		{"windows platform", "windows/amd64", "windows", "amd64", true},
+		{"darwin platform", "darwin/arm64", "darwin", "arm64", true},
+		{"single component OS", "linux", "linux", "", true},
+		{"single component arch", "amd64", "amd64", "", true},
+		{"partial variable in arch", "linux/$ARCH", "linux", "$ARCH", true},
+		{"partial variable in OS", "$OS/amd64", "$OS", "amd64", true},
+		{"empty string", "", "", "", false},
+		{"empty OS", "/amd64", "", "", false},
+		{"empty arch", "linux/", "", "", false},
 	}
 
 	for _, tc := range tests {
-		os, arch, ok := parsePlatformParts(tc.platform)
-		if os != tc.wantOS || arch != tc.wantArch || ok != tc.wantOK {
-			t.Errorf("parsePlatformParts(%q) = (%q, %q, %v), want (%q, %q, %v)",
-				tc.platform, os, arch, ok, tc.wantOS, tc.wantArch, tc.wantOK)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			os, arch, ok := parsePlatformParts(tc.platform)
+			if os != tc.wantOS || arch != tc.wantArch || ok != tc.wantOK {
+				t.Errorf("parsePlatformParts(%q) = (%q, %q, %v), want (%q, %q, %v)",
+					tc.platform, os, arch, ok, tc.wantOS, tc.wantArch, tc.wantOK)
+			}
+		})
 	}
 }
