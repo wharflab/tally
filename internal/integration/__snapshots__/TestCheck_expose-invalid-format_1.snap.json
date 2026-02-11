@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "testdata/expose-invalid-format/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/expose-invalid-format/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/expose-invalid-format/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "EXPOSE instruction should not define an IP address or host-port mapping, found '127.0.0.1:80:80'",
+          "rule": "buildkit/ExposeInvalidFormat",
+          "severity": "warning",
+          "sourceCode": "EXPOSE 127.0.0.1:80:80 [::1]:8080:8080 5000:5000 8000"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

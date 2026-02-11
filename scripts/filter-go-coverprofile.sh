@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# Filter a Go coverage profile (go tool cover / covdata textfmt format),
-# dropping entries for generated files to avoid skewing Codecov project
+# Normalize a Go coverage profile (go tool cover / covdata textfmt format),
+# forcing generated files to 100% coverage to avoid skewing Codecov project
 # coverage metrics.
 #
 # Usage:
@@ -17,13 +17,22 @@ fi
 IN="$1"
 OUT="$2"
 
-# Always keep the first "mode:" line. Filter the rest.
+# Always keep the first "mode:" line. Normalize the rest.
 awk '
 NR==1 { print; next }
-$0 !~ /_generated\.go:/ { print }
+{
+  # Go cover profiles are space-separated:
+  #   <file>:<range> <numStmts> <count>
+  #
+  # For generated files, force count to >0 so they show as 100% covered.
+  if ($0 ~ /_generated\.go:/) {
+    $NF = 1
+  }
+  print
+}
 ' "$IN" > "$OUT"
 
 if ! head -n 1 "$OUT" | grep -q '^mode:'; then
-  echo "filtered coverprofile is missing the \"mode:\" header line" >&2
+  echo "normalized coverprofile is missing the \"mode:\" header line" >&2
   exit 1
 fi

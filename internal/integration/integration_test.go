@@ -76,6 +76,7 @@ func selectRules(rules ...string) []string {
 	return args
 }
 
+//nolint:funlen // table-driven test grows with each new rule
 func TestCheck(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
@@ -187,6 +188,20 @@ func TestCheck(t *testing.T) {
 			name:     "expose-proto-casing",
 			dir:      "expose-proto-casing",
 			args:     append([]string{"--format", "json"}, selectRules("buildkit/ExposeProtoCasing")...),
+			wantExit: 1,
+		},
+		{
+			name:     "expose-invalid-format",
+			dir:      "expose-invalid-format",
+			args:     append([]string{"--format", "json"}, selectRules("buildkit/ExposeInvalidFormat")...),
+			wantExit: 1,
+		},
+		// Cross-rule: ExposeInvalidFormat + ExposeProtoCasing overlap on the same EXPOSE line
+		{
+			name: "expose-cross-rules",
+			dir:  "expose-cross-rules",
+			args: append([]string{"--format", "json"},
+				selectRules("buildkit/ExposeInvalidFormat", "buildkit/ExposeProtoCasing")...),
 			wantExit: 1,
 		},
 

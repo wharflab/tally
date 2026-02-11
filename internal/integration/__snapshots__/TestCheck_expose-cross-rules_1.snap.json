@@ -1,0 +1,75 @@
+{
+  "files": [
+    {
+      "file": "testdata/expose-cross-rules/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/expose-invalid-format/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/expose-cross-rules/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "EXPOSE instruction should not define an IP address or host-port mapping, found '127.0.0.1:80:80/TCP'",
+          "rule": "buildkit/ExposeInvalidFormat",
+          "severity": "warning",
+          "sourceCode": "EXPOSE 127.0.0.1:80:80/TCP"
+        },
+        {
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/expose-proto-casing/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/expose-cross-rules/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "Defined protocol '127.0.0.1:80:80/TCP' in EXPOSE instruction should be lowercase",
+          "rule": "buildkit/ExposeProtoCasing",
+          "severity": "warning",
+          "sourceCode": "EXPOSE 127.0.0.1:80:80/TCP",
+          "suggestedFix": {
+            "description": "Change protocol to lowercase",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 26,
+                    "line": 4
+                  },
+                  "file": "testdata/expose-cross-rules/Dockerfile",
+                  "start": {
+                    "column": 23,
+                    "line": 4
+                  }
+                },
+                "newText": "tcp"
+              }
+            ],
+            "isPreferred": true
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 2,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}
