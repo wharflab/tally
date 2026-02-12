@@ -60,23 +60,7 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 	}
 
 	// Deduplicate requests by (ResolverID, Key).
-	groups := make(map[dedupeKey]*pendingGroup)
-	var orderedKeys []dedupeKey
-
-	for _, req := range requests {
-		dk := dedupeKey{resolverID: req.ResolverID, key: req.Key}
-		if g, ok := groups[dk]; ok {
-			g.handlers = append(g.handlers, req.Handler)
-			g.requests = append(g.requests, req)
-		} else {
-			groups[dk] = &pendingGroup{
-				request:  req,
-				handlers: []ResultHandler{req.Handler},
-				requests: []CheckRequest{req},
-			}
-			orderedKeys = append(orderedKeys, dk)
-		}
-	}
+	groups, orderedKeys := deduplicateRequests(requests)
 
 	// In-run cache: stores resolution results keyed by dedupeKey.
 	cache := make(map[dedupeKey]*resolveResult)
@@ -165,6 +149,33 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 		Skipped:    allSkipped,
 		Completed:  allCompleted,
 	}
+}
+
+// deduplicateRequests groups requests by (ResolverID, Key). When multiple
+// requests share a key, the representative request uses the longest timeout
+// so no handler's per-file budget is cut short.
+func deduplicateRequests(requests []CheckRequest) (map[dedupeKey]*pendingGroup, []dedupeKey) {
+	groups := make(map[dedupeKey]*pendingGroup)
+	var orderedKeys []dedupeKey
+
+	for _, req := range requests {
+		dk := dedupeKey{resolverID: req.ResolverID, key: req.Key}
+		if g, ok := groups[dk]; ok {
+			g.handlers = append(g.handlers, req.Handler)
+			g.requests = append(g.requests, req)
+			if req.Timeout > g.request.Timeout {
+				g.request.Timeout = req.Timeout
+			}
+		} else {
+			groups[dk] = &pendingGroup{
+				request:  req,
+				handlers: []ResultHandler{req.Handler},
+				requests: []CheckRequest{req},
+			}
+			orderedKeys = append(orderedKeys, dk)
+		}
+	}
+	return groups, orderedKeys
 }
 
 // fanOutHandlers invokes each handler with the resolved value and separates
