@@ -12,7 +12,8 @@ require (
 	github.com/coder/acp-go-sdk v0.6.3
 	github.com/containerd/platforms v1.0.0-rc.2
 	github.com/distribution/reference v0.6.0
-	github.com/gkampitakis/ciinfo v0.3.2
+	github.com/docker/distribution v2.8.3+incompatible
+	github.com/gkampitakis/ciinfo v0.3.3
 	github.com/gkampitakis/go-snaps v0.5.19
 	github.com/google/go-containerregistry v0.20.7
 	github.com/knadh/koanf/parsers/toml/v2 v2.2.0
@@ -24,6 +25,7 @@ require (
 	github.com/moby/buildkit v0.27.1
 	github.com/moby/patternmatcher v0.6.0
 	github.com/muesli/termenv v0.16.0
+	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/owenrumney/go-sarif/v3 v3.3.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
@@ -62,7 +64,6 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/docker/cli v29.1.4+incompatible // indirect
-	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.5 // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
@@ -109,7 +110,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/nwaples/rardecode/v2 v2.2.0 // indirect
-	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/runtime-spec v1.3.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
