@@ -134,11 +134,9 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 			}
 
 			// Process result.
-			resultMu.Lock()
-			defer resultMu.Unlock()
-
 			if result.err != nil {
 				reason := classifyError(result.err)
+				resultMu.Lock()
 				for _, req := range group.requests {
 					allSkipped = append(allSkipped, Skipped{
 						Request: req,
@@ -146,13 +144,17 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 						Err:     result.err,
 					})
 				}
+				resultMu.Unlock()
 				return
 			}
 
 			// Fan out resolved result to all handlers sharing this key.
+			// Handlers run outside the lock to avoid serializing callbacks.
 			v, c := fanOutHandlers(group, result.value)
+			resultMu.Lock()
 			allViolations = append(allViolations, v...)
 			allCompleted = append(allCompleted, c...)
+			resultMu.Unlock()
 		}(dk, group)
 	}
 
