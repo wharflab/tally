@@ -16,6 +16,12 @@ const (
 // ResultHandler processes a resolved result and returns violations.
 // The return value is opaque to the runtime; the caller (check.go) casts it
 // to []rules.Violation. This avoids an import cycle between async and rules.
+//
+// Return semantics:
+//   - nil: handler could not process this value (e.g., wrong type); the
+//     runtime will NOT mark this handler's request as completed.
+//   - non-nil (including empty slice): handler processed the value; the
+//     runtime marks it as completed, replacing fast-path violations.
 type ResultHandler interface {
 	OnSuccess(resolved any) []any
 }

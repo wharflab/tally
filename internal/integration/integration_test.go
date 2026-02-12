@@ -94,6 +94,14 @@ func TestMain(m *testing.M) {
 		_ = os.RemoveAll(tmpDir)
 		panic("failed to set CONTAINERS_REGISTRIES_CONF: " + err.Error())
 	}
+	// Set default platform to match the mock registry's image platform (linux/arm64).
+	// Without this, defaultPlatform() returns the host OS (e.g., darwin/arm64 on macOS),
+	// causing PlatformMismatchError for Dockerfiles without explicit --platform.
+	if err := os.Setenv("DOCKER_DEFAULT_PLATFORM", "linux/arm64"); err != nil {
+		mockRegistry.Close()
+		_ = os.RemoveAll(tmpDir)
+		panic("failed to set DOCKER_DEFAULT_PLATFORM: " + err.Error())
+	}
 
 	code := m.Run()
 

@@ -1,6 +1,7 @@
 package buildkit
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
@@ -209,6 +210,41 @@ func TestPlatformCheckHandler_OnSuccess_Arm64DefaultVariant(t *testing.T) {
 
 	if len(violations) != 0 {
 		t.Errorf("expected 0 violations (arm64 default variant v8 matches), got %d", len(violations))
+	}
+}
+
+func TestPlatformCheckHandler_OnSuccess_PlatformMismatchError(t *testing.T) {
+	t.Parallel()
+	meta := NewInvalidBaseImagePlatformRule().Metadata()
+	h := &platformCheckHandler{
+		meta:     meta,
+		file:     "Dockerfile",
+		ref:      "myimage:latest",
+		expected: "linux/amd64",
+	}
+
+	// When the resolver returns PlatformMismatchError (no matching manifest),
+	// the handler should emit a violation listing available platforms.
+	violations := h.OnSuccess(&registry.PlatformMismatchError{
+		Ref:       "myimage:latest",
+		Requested: "linux/amd64",
+		Available: []string{"linux/arm64", "linux/arm/v7"},
+	})
+
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation for platform mismatch error, got %d", len(violations))
+	}
+
+	v, ok := violations[0].(rules.Violation)
+	if !ok {
+		t.Fatalf("expected rules.Violation, got %T", violations[0])
+	}
+	if v.RuleCode != meta.Code {
+		t.Errorf("expected code %q, got %q", meta.Code, v.RuleCode)
+	}
+	// The message should include the available platforms list.
+	if !strings.Contains(v.Message, "linux/arm64") {
+		t.Errorf("expected message to contain available platforms, got %q", v.Message)
 	}
 }
 

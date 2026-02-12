@@ -93,7 +93,8 @@ func (h *undefinedVarHandler) OnSuccess(resolved any) []any {
 	// transitively inherit from it, using actual base image env.
 	stageResults := h.semantic.RecheckUndefinedVars(h.stageIdx, cfg.Env)
 
-	var out []any
+	// Non-nil slice signals "completed" to the runtime (even if empty).
+	out := make([]any, 0)
 	for _, sr := range stageResults {
 		// Emit a CompletedCheck for each rechecked stage so the merge logic
 		// knows to replace fast violations for descendant stages, not just

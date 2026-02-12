@@ -168,17 +168,25 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 // fanOutHandlers invokes each handler with the resolved value and separates
 // violations from CompletedCheck markers. Handlers may emit CompletedCheck
 // for descendant stages rechecked via multi-stage inheritance.
+//
+// A handler returning nil means it could not process the resolved value
+// (e.g., wrong type) and should NOT be marked as completed. A handler
+// returning a non-nil slice (even empty) means it completed successfully.
 func fanOutHandlers(group *pendingGroup, value any) ([]any, []CompletedCheck) {
 	var violations []any
 	var completed []CompletedCheck
 	for i, handler := range group.handlers {
+		results := handler.OnSuccess(value)
+		if results == nil {
+			continue // handler couldn't process this value; don't mark as completed
+		}
 		req := group.requests[i]
 		completed = append(completed, CompletedCheck{
 			RuleCode:   req.RuleCode,
 			File:       req.File,
 			StageIndex: req.StageIndex,
 		})
-		for _, v := range handler.OnSuccess(value) {
+		for _, v := range results {
 			if cc, ok := v.(CompletedCheck); ok {
 				completed = append(completed, cc)
 			} else {

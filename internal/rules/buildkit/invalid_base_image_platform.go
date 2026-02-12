@@ -65,11 +65,29 @@ type platformCheckHandler struct {
 }
 
 func (h *platformCheckHandler) OnSuccess(resolved any) []any {
-	cfg, ok := resolved.(*registry.ImageConfig)
-	if !ok || cfg == nil {
+	switch v := resolved.(type) {
+	case *registry.ImageConfig:
+		if v == nil {
+			return nil
+		}
+		return h.checkPlatform(v)
+	case *registry.PlatformMismatchError:
+		return h.handleMismatchError(v)
+	default:
 		return nil
 	}
-	return h.checkPlatform(cfg)
+}
+
+func (h *platformCheckHandler) handleMismatchError(platErr *registry.PlatformMismatchError) []any {
+	actual := "unknown"
+	if len(platErr.Available) > 0 {
+		actual = fmt.Sprintf("[%s]", strings.Join(platErr.Available, ", "))
+	}
+	msg := linter.RuleInvalidBaseImagePlatform.Format(h.ref, h.expected, actual)
+	loc := rules.NewLocationFromRanges(h.file, h.location)
+	v := rules.NewViolation(loc, h.meta.Code, msg, h.meta.DefaultSeverity).WithDocURL(h.meta.DocURL)
+	v.StageIndex = h.stageIdx
+	return []any{v}
 }
 
 func (h *platformCheckHandler) checkPlatform(cfg *registry.ImageConfig) []any {
@@ -99,7 +117,8 @@ func (h *platformCheckHandler) checkPlatform(cfg *registry.ImageConfig) []any {
 		return h.emitViolation(actualPlatform)
 	}
 
-	return nil
+	// Non-nil empty slice signals "completed with 0 violations" to the runtime.
+	return []any{}
 }
 
 func (h *platformCheckHandler) emitViolation(actualPlatform string) []any {
