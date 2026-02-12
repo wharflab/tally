@@ -46,7 +46,9 @@ func (r *UndefinedVarRule) Check(input rules.LintInput) []rules.Violation {
 		for _, undef := range info.UndefinedVars {
 			loc := rules.NewLocationFromRanges(input.File, undef.Location)
 			msg := linter.RuleUndefinedVar.Format(undef.Name, undef.Suggest)
-			out = append(out, rules.NewViolation(loc, meta.Code, msg, meta.DefaultSeverity).WithDocURL(meta.DocURL))
+			v := rules.NewViolation(loc, meta.Code, msg, meta.DefaultSeverity).WithDocURL(meta.DocURL)
+			v.StageIndex = stageIdx
+			out = append(out, v)
 		}
 	}
 
@@ -118,10 +120,22 @@ func (h *undefinedVarHandler) OnSuccess(resolved any) []any {
 
 	var out []any
 	for _, sr := range stageResults {
+		// Emit a CompletedCheck for each rechecked stage so the merge logic
+		// knows to replace fast violations for descendant stages, not just
+		// the directly resolved stage.
+		if sr.StageIdx != h.stageIdx {
+			out = append(out, async.CompletedCheck{
+				RuleCode:   h.meta.Code,
+				File:       h.file,
+				StageIndex: sr.StageIdx,
+			})
+		}
 		for _, undef := range sr.Undefs {
 			loc := rules.NewLocationFromRanges(h.file, undef.Location)
 			msg := linter.RuleUndefinedVar.Format(undef.Name, undef.Suggest)
-			out = append(out, rules.NewViolation(loc, h.meta.Code, msg, h.meta.DefaultSeverity).WithDocURL(h.meta.DocURL))
+			v := rules.NewViolation(loc, h.meta.Code, msg, h.meta.DefaultSeverity).WithDocURL(h.meta.DocURL)
+			v.StageIndex = sr.StageIdx
+			out = append(out, v)
 		}
 	}
 

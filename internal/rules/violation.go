@@ -114,6 +114,10 @@ type Violation struct {
 	// SuggestedFix provides a structured fix hint (optional).
 	// Supports "auto-fix suggestion" without auto-applying.
 	SuggestedFix *SuggestedFix `json:"suggestedFix,omitempty"`
+
+	// StageIndex tracks which Dockerfile stage this violation belongs to.
+	// Used internally for merging async results; not serialized.
+	StageIndex int `json:"-"`
 }
 
 // NewViolation creates a new violation with the minimum required fields.

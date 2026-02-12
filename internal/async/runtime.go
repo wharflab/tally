@@ -28,6 +28,13 @@ type dedupeKey struct {
 	key        string
 }
 
+// pendingGroup collects handlers sharing the same dedupeKey.
+type pendingGroup struct {
+	request  CheckRequest // representative request (for resolver call)
+	handlers []ResultHandler
+	requests []CheckRequest // all original requests (for skip reporting)
+}
+
 // resolveResult stores a cached resolution outcome.
 type resolveResult struct {
 	value any
@@ -53,11 +60,6 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 	}
 
 	// Deduplicate requests by (ResolverID, Key).
-	type pendingGroup struct {
-		request  CheckRequest // representative request (for resolver call)
-		handlers []ResultHandler
-		requests []CheckRequest // all original requests (for skip reporting)
-	}
 	groups := make(map[dedupeKey]*pendingGroup)
 	var orderedKeys []dedupeKey
 
@@ -148,16 +150,9 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 			}
 
 			// Fan out resolved result to all handlers sharing this key.
-			for i, handler := range group.handlers {
-				violations := handler.OnSuccess(result.value)
-				allViolations = append(allViolations, violations...)
-				req := group.requests[i]
-				allCompleted = append(allCompleted, CompletedCheck{
-					RuleCode:   req.RuleCode,
-					File:       req.File,
-					StageIndex: req.StageIndex,
-				})
-			}
+			v, c := fanOutHandlers(group, result.value)
+			allViolations = append(allViolations, v...)
+			allCompleted = append(allCompleted, c...)
 		}(dk, group)
 	}
 
@@ -168,6 +163,30 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 		Skipped:    allSkipped,
 		Completed:  allCompleted,
 	}
+}
+
+// fanOutHandlers invokes each handler with the resolved value and separates
+// violations from CompletedCheck markers. Handlers may emit CompletedCheck
+// for descendant stages rechecked via multi-stage inheritance.
+func fanOutHandlers(group *pendingGroup, value any) ([]any, []CompletedCheck) {
+	var violations []any
+	var completed []CompletedCheck
+	for i, handler := range group.handlers {
+		req := group.requests[i]
+		completed = append(completed, CompletedCheck{
+			RuleCode:   req.RuleCode,
+			File:       req.File,
+			StageIndex: req.StageIndex,
+		})
+		for _, v := range handler.OnSuccess(value) {
+			if cc, ok := v.(CompletedCheck); ok {
+				completed = append(completed, cc)
+			} else {
+				violations = append(violations, v)
+			}
+		}
+	}
+	return violations, completed
 }
 
 // getResolver looks up a resolver by ID, checking the local map first,

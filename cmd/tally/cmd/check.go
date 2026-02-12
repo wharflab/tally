@@ -761,10 +761,10 @@ func filesWithErrors(violations []rules.Violation) map[string]bool {
 
 // mergeAsyncViolations merges async results into the fast violations.
 // For rules with async resolution (e.g. UndefinedVar), fast violations for
-// a (rule, file) pair are replaced by async results when the async check
-// completes — even when it produces zero violations (eliminating false
-// positives from the fast path).
-// Other async violations are appended.
+// a (rule, file, stage) triple are replaced by async results when the async
+// check completes — even when it produces zero violations (eliminating false
+// positives from the fast path). Stage-level granularity ensures that fast
+// violations from non-async stages in the same file are preserved.
 func mergeAsyncViolations(fast []rules.Violation, asyncResult *async.RunResult) []rules.Violation {
 	if asyncResult == nil {
 		return fast
@@ -782,21 +782,24 @@ func mergeAsyncViolations(fast []rules.Violation, asyncResult *async.RunResult) 
 		return fast
 	}
 
-	// Build set of (rule, file) pairs that completed async resolution.
-	// Fast violations for these pairs are replaced by async results.
-	type ruleFile struct {
-		ruleCode string
-		file     string
+	// Build set of (rule, file, stage) triples that completed async resolution.
+	// Fast violations for these triples are replaced by async results.
+	// Stage-level granularity ensures that fast violations from non-async stages
+	// in the same file are preserved.
+	type ruleFileStage struct {
+		ruleCode   string
+		file       string
+		stageIndex int
 	}
-	completedSet := make(map[ruleFile]bool)
+	completedSet := make(map[ruleFileStage]bool)
 	for _, c := range asyncResult.Completed {
-		completedSet[ruleFile{ruleCode: c.RuleCode, file: c.File}] = true
+		completedSet[ruleFileStage{ruleCode: c.RuleCode, file: c.File, stageIndex: c.StageIndex}] = true
 	}
 
 	// Filter out fast violations that were superseded by async results.
 	var merged []rules.Violation
 	for _, v := range fast {
-		if completedSet[ruleFile{ruleCode: v.RuleCode, file: v.File()}] {
+		if completedSet[ruleFileStage{ruleCode: v.RuleCode, file: v.File(), stageIndex: v.StageIndex}] {
 			continue // replaced by async result
 		}
 		merged = append(merged, v)

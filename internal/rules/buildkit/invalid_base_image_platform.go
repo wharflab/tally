@@ -74,6 +74,7 @@ func (r *InvalidBaseImagePlatformRule) PlanAsync(input rules.LintInput) []async.
 				ref:      ref,
 				expected: expectedPlatform,
 				location: loc,
+				stageIdx: info.Index,
 			},
 		})
 	}
@@ -88,6 +89,7 @@ type platformCheckHandler struct {
 	ref      string
 	expected string
 	location []parser.Range
+	stageIdx int
 }
 
 func (h *platformCheckHandler) OnSuccess(resolved any) []any {
@@ -118,9 +120,9 @@ func (h *platformCheckHandler) checkPlatform(cfg *registry.ImageConfig) []any {
 func (h *platformCheckHandler) emitViolation(actualPlatform string) []any {
 	msg := linter.RuleInvalidBaseImagePlatform.Format(h.ref, h.expected, actualPlatform)
 	loc := rules.NewLocationFromRanges(h.file, h.location)
-	return []any{
-		rules.NewViolation(loc, h.meta.Code, msg, h.meta.DefaultSeverity).WithDocURL(h.meta.DocURL),
-	}
+	v := rules.NewViolation(loc, h.meta.Code, msg, h.meta.DefaultSeverity).WithDocURL(h.meta.DocURL)
+	v.StageIndex = h.stageIdx
+	return []any{v}
 }
 
 // HandlePlatformMismatch converts a PlatformMismatchError from the resolver into
