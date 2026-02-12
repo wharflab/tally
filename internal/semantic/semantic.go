@@ -142,19 +142,48 @@ func (m *Model) ExternalImageStages() func(yield func(*StageInfo) bool) {
 	}
 }
 
+// StageUndefinedVars groups undefined variable results by stage index.
+type StageUndefinedVars struct {
+	StageIdx int
+	Undefs   []UndefinedVarRef
+}
+
 // RecheckUndefinedVars re-runs the undefined-var analysis for the specified stage
-// using the provided base image environment instead of the static approximation.
+// and all stages that transitively inherit from it (via FROM <stage>).
+// It uses the provided base image environment instead of the static approximation.
 // This is used by the async pipeline when base image env has been resolved from
 // the registry.
-func (m *Model) RecheckUndefinedVars(stageIdx int, resolvedEnv map[string]string) []UndefinedVarRef {
+func (m *Model) RecheckUndefinedVars(stageIdx int, resolvedEnv map[string]string) []StageUndefinedVars {
 	if stageIdx < 0 || stageIdx >= len(m.stageInfo) || stageIdx >= len(m.stages) {
 		return nil
 	}
 
+	var results []StageUndefinedVars
+	m.recheckStageChain(stageIdx, resolvedEnv, &results)
+	return results
+}
+
+// recheckStageChain rechecks a single stage and recursively processes stages
+// that inherit from it, propagating the effective env through the chain.
+func (m *Model) recheckStageChain(stageIdx int, baseEnv map[string]string, results *[]StageUndefinedVars) {
+	undefs, effectiveEnv := m.recheckSingleStage(stageIdx, baseEnv)
+	*results = append(*results, StageUndefinedVars{StageIdx: stageIdx, Undefs: undefs})
+
+	// Find stages that inherit from this one and recheck them too.
+	for i, info := range m.stageInfo {
+		if info != nil && info.BaseImage != nil && info.BaseImage.IsStageRef && info.BaseImage.StageIndex == stageIdx {
+			m.recheckStageChain(i, effectiveEnv, results)
+		}
+	}
+}
+
+// recheckSingleStage re-runs the undefined-var analysis for a single stage
+// and returns both the undefined vars and the effective env at stage end.
+func (m *Model) recheckSingleStage(stageIdx int, baseEnv map[string]string) ([]UndefinedVarRef, map[string]string) {
 	stage := &m.stages[stageIdx]
 
-	// Seed environment with resolved base image env.
-	env := newFromEnv(resolvedEnv)
+	// Seed environment with provided base env.
+	env := newFromEnv(baseEnv)
 
 	escapeToken := rune('\\')
 	shlex := dfshell.NewLex(escapeToken)
@@ -177,7 +206,7 @@ func (m *Model) RecheckUndefinedVars(stageIdx int, resolvedEnv map[string]string
 		}
 	}
 
-	return undefs
+	return undefs, env.vars
 }
 
 // globalScope returns the builder's global scope, reconstructed from metaArgs.

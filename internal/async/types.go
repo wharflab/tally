@@ -71,10 +71,21 @@ type Skipped struct {
 	Err     error
 }
 
+// CompletedCheck records a successfully completed async check (even if it
+// produced zero violations). Used by the merge logic to know which fast-path
+// violations should be replaced.
+type CompletedCheck struct {
+	RuleCode   string
+	File       string
+	StageIndex int
+}
+
 // RunResult contains the output of an async runtime execution.
 type RunResult struct {
 	// Violations is a flat list of opaque violation values.
 	// The caller casts these to rules.Violation.
 	Violations []any
 	Skipped    []Skipped
+	// Completed records every (rule, file, stage) that resolved successfully.
+	Completed []CompletedCheck
 }

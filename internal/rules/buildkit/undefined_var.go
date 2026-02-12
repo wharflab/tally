@@ -109,14 +109,17 @@ func (h *undefinedVarHandler) OnSuccess(resolved any) []any {
 		return nil
 	}
 
-	// Re-run undefined-var analysis for this stage using actual env.
-	refinedUndefs := h.semantic.RecheckUndefinedVars(h.stageIdx, cfg.Env)
+	// Re-run undefined-var analysis for this stage and all stages that
+	// transitively inherit from it, using actual base image env.
+	stageResults := h.semantic.RecheckUndefinedVars(h.stageIdx, cfg.Env)
 
 	var out []any
-	for _, undef := range refinedUndefs {
-		loc := rules.NewLocationFromRanges(h.file, undef.Location)
-		msg := linter.RuleUndefinedVar.Format(undef.Name, undef.Suggest)
-		out = append(out, rules.NewViolation(loc, h.meta.Code, msg, h.meta.DefaultSeverity).WithDocURL(h.meta.DocURL))
+	for _, sr := range stageResults {
+		for _, undef := range sr.Undefs {
+			loc := rules.NewLocationFromRanges(h.file, undef.Location)
+			msg := linter.RuleUndefinedVar.Format(undef.Name, undef.Suggest)
+			out = append(out, rules.NewViolation(loc, h.meta.Code, msg, h.meta.DefaultSeverity).WithDocURL(h.meta.DocURL))
+		}
 	}
 
 	return out

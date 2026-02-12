@@ -642,6 +642,24 @@ func TestCheck(t *testing.T) {
 			env: []string{"CONTAINERS_REGISTRIES_CONF=" + registryConf},
 		},
 		{
+			name: "slow-checks-undefined-var-still-caught",
+			dir:  "slow-checks-undefined-var-still-caught",
+			args: append(
+				[]string{"--format", "json", "--slow-checks=on"},
+				selectRules("buildkit/UndefinedVar")...),
+			env:      []string{"CONTAINERS_REGISTRIES_CONF=" + registryConf},
+			wantExit: 1,
+		},
+		{
+			name: "slow-checks-undefined-var-multi-stage",
+			dir:  "slow-checks-undefined-var-multi-stage",
+			args: append(
+				[]string{"--format", "json", "--slow-checks=on"},
+				selectRules("buildkit/UndefinedVar")...),
+			env:      []string{"CONTAINERS_REGISTRIES_CONF=" + registryConf},
+			wantExit: 1,
+		},
+		{
 			name: "slow-checks-off",
 			dir:  "slow-checks-off",
 			args: append(

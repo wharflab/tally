@@ -84,6 +84,7 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 	var (
 		allViolations []any
 		allSkipped    []Skipped
+		allCompleted  []CompletedCheck
 		resultMu      sync.Mutex
 	)
 
@@ -147,9 +148,15 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 			}
 
 			// Fan out resolved result to all handlers sharing this key.
-			for _, handler := range group.handlers {
+			for i, handler := range group.handlers {
 				violations := handler.OnSuccess(result.value)
 				allViolations = append(allViolations, violations...)
+				req := group.requests[i]
+				allCompleted = append(allCompleted, CompletedCheck{
+					RuleCode:   req.RuleCode,
+					File:       req.File,
+					StageIndex: req.StageIndex,
+				})
 			}
 		}(dk, group)
 	}
@@ -159,6 +166,7 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 	return &RunResult{
 		Violations: allViolations,
 		Skipped:    allSkipped,
+		Completed:  allCompleted,
 	}
 }
 

@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "testdata/slow-checks-undefined-var-multi-stage/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/undefined-var/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "testdata/slow-checks-undefined-var-multi-stage/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "Usage of undefined variable '$MISSING'",
+          "rule": "buildkit/UndefinedVar",
+          "severity": "warning",
+          "sourceCode": "COPY $MISSING /app/"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

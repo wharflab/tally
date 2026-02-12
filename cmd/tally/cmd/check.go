@@ -760,10 +760,13 @@ func filesWithErrors(violations []rules.Violation) map[string]bool {
 }
 
 // mergeAsyncViolations merges async results into the fast violations.
-// For UndefinedVar: async results for a stage replace fast violations for that stage.
+// For rules with async resolution (e.g. UndefinedVar), fast violations for
+// a (rule, file) pair are replaced by async results when the async check
+// completes — even when it produces zero violations (eliminating false
+// positives from the fast path).
 // Other async violations are appended.
 func mergeAsyncViolations(fast []rules.Violation, asyncResult *async.RunResult) []rules.Violation {
-	if asyncResult == nil || len(asyncResult.Violations) == 0 {
+	if asyncResult == nil {
 		return fast
 	}
 
@@ -775,23 +778,25 @@ func mergeAsyncViolations(fast []rules.Violation, asyncResult *async.RunResult) 
 		}
 	}
 
-	if len(asyncViolations) == 0 {
+	if len(asyncResult.Completed) == 0 && len(asyncViolations) == 0 {
 		return fast
 	}
 
-	// Identify files that got async UndefinedVar results.
-	// Async results for these files replace fast UndefinedVar violations.
-	asyncUndefinedVarFiles := make(map[string]bool)
-	for _, v := range asyncViolations {
-		if v.RuleCode == "buildkit/UndefinedVar" {
-			asyncUndefinedVarFiles[v.File()] = true
-		}
+	// Build set of (rule, file) pairs that completed async resolution.
+	// Fast violations for these pairs are replaced by async results.
+	type ruleFile struct {
+		ruleCode string
+		file     string
+	}
+	completedSet := make(map[ruleFile]bool)
+	for _, c := range asyncResult.Completed {
+		completedSet[ruleFile{ruleCode: c.RuleCode, file: c.File}] = true
 	}
 
-	// Filter out fast UndefinedVar violations for files that have async results.
+	// Filter out fast violations that were superseded by async results.
 	var merged []rules.Violation
 	for _, v := range fast {
-		if v.RuleCode == "buildkit/UndefinedVar" && asyncUndefinedVarFiles[v.File()] {
+		if completedSet[ruleFile{ruleCode: v.RuleCode, file: v.File()}] {
 			continue // replaced by async result
 		}
 		merged = append(merged, v)
