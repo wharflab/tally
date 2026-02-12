@@ -693,7 +693,13 @@ func runAsyncChecks(ctx stdcontext.Context, res *lintResults) *async.RunResult {
 // filterAsyncPlans applies per-file slow-checks policy to async plans.
 // Returns the filtered plans and the maximum timeout across all enabled files.
 func filterAsyncPlans(res *lintResults) ([]async.CheckRequest, time.Duration) {
-	errorFiles := filesWithErrors(res.violations)
+	// Pre-apply severity overrides and enable filter so fail-fast only considers
+	// violations from rules the user has actually enabled (respecting --select,
+	// --ignore, and severity overrides).
+	procCtx := processor.NewContext(res.fileConfigs, res.firstCfg, res.fileSources)
+	filtered := processor.NewSeverityOverride().Process(res.violations, procCtx)
+	filtered = processor.NewEnableFilter().Process(filtered, procCtx)
+	errorFiles := filesWithErrors(filtered)
 	maxTimeout := 20 * time.Second
 	var plans []async.CheckRequest
 	var skippedAuto int
