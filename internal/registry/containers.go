@@ -45,6 +45,9 @@ func NewContainersResolver() *ContainersResolver {
 
 // NewContainersResolverWithContext creates a resolver with a custom system context.
 func NewContainersResolverWithContext(sysCtx *types.SystemContext) *ContainersResolver {
+	if sysCtx == nil {
+		sysCtx = &types.SystemContext{}
+	}
 	return &ContainersResolver{sysCtx: sysCtx, blobCache: memory.New()}
 }
 
