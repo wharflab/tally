@@ -39,6 +39,7 @@ type ContainersResolver struct {
 func NewContainersResolver() *ContainersResolver {
 	sysCtx := &types.SystemContext{}
 	// Apply environment variable overrides for registries.conf discovery.
+	// Error is ignored: env var overrides are optional and missing vars are not fatal.
 	_ = environment.UpdateRegistriesConf(sysCtx)
 	return &ContainersResolver{sysCtx: sysCtx, blobCache: memory.New()}
 }
