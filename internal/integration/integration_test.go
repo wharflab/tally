@@ -694,6 +694,21 @@ func TestCheck(t *testing.T) {
 			wantExit: 1,
 		},
 		{
+			name: "slow-checks-platform-meta-arg",
+			dir:  "slow-checks-platform-meta-arg",
+			args: append(
+				[]string{"--format", "json", "--slow-checks=on"},
+				selectRules("buildkit/InvalidBaseImagePlatform")...),
+			wantExit: 1,
+		},
+		{
+			name: "slow-checks-platform-target-arg",
+			dir:  "slow-checks-platform-target-arg",
+			args: append(
+				[]string{"--format", "json", "--slow-checks=on"},
+				selectRules("buildkit/InvalidBaseImagePlatform")...),
+		},
+		{
 			name: "slow-checks-undefined-var-enhanced",
 			dir:  "slow-checks-undefined-var-enhanced",
 			args: append(

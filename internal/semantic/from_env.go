@@ -2,12 +2,14 @@ package semantic
 
 import (
 	"maps"
+	"os"
 	"slices"
 
 	"github.com/containerd/platforms"
 	"github.com/distribution/reference"
 	"github.com/moby/buildkit/frontend/dockerfile/shell"
 	"github.com/moby/buildkit/util/suggest"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
 const defaultTargetStageName = "default"
@@ -44,9 +46,11 @@ func (e *fromEnv) Set(key, value string) {
 
 // defaultFromArgs returns BuildKit-like automatic platform ARGs used for
 // expanding variables in FROM. Values can be overridden by build args.
+// TARGETPLATFORM respects DOCKER_DEFAULT_PLATFORM when set, matching BuildKit
+// behavior where --platform overrides the target platform.
 func defaultFromArgs(targetStage string, overrides map[string]string) map[string]string {
 	bp := platforms.DefaultSpec()
-	tp := platforms.DefaultSpec()
+	tp := targetPlatformSpec()
 	if targetStage == "" {
 		targetStage = defaultTargetStageName
 	}
@@ -77,6 +81,17 @@ func defaultFromArgs(targetStage string, overrides map[string]string) map[string
 		out[key] = val
 	}
 	return out
+}
+
+// targetPlatformSpec returns the target platform spec, checking
+// DOCKER_DEFAULT_PLATFORM first, then falling back to host platform.
+func targetPlatformSpec() ocispec.Platform {
+	if dp := os.Getenv("DOCKER_DEFAULT_PLATFORM"); dp != "" {
+		if p, err := platforms.Parse(dp); err == nil {
+			return p
+		}
+	}
+	return platforms.DefaultSpec()
 }
 
 func scopeArgKeys(scope *VariableScope) ([]string, map[string]struct{}) {
