@@ -70,7 +70,10 @@ func (r *UndefinedVarRule) PlanAsync(input rules.LintInput) []async.CheckRequest
 			continue
 		}
 
-		expectedPlatform, _ := semantic.ExpectedPlatform(info, sem)
+		expectedPlatform, unresolved := semantic.ExpectedPlatform(info, sem)
+		if len(unresolved) > 0 || expectedPlatform == "" {
+			continue // skip when platform has unresolved ARGs or is empty
+		}
 
 		ref := info.Stage.BaseName
 		key := ref + "|" + expectedPlatform
