@@ -27,6 +27,16 @@ func TestMockRegistry_AddImage(t *testing.T) {
 	if !mr.HasRequest("PUT") {
 		t.Error("expected PUT request to mock registry")
 	}
+
+	// Verify request tracking.
+	reqs := mr.Requests()
+	if len(reqs) == 0 {
+		t.Error("expected recorded requests")
+	}
+	mr.ResetRequests()
+	if len(mr.Requests()) != 0 {
+		t.Error("expected empty requests after reset")
+	}
 }
 
 func TestMockRegistry_AddIndex(t *testing.T) {

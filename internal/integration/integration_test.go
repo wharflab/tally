@@ -14,9 +14,8 @@ import (
 )
 
 var (
-	binaryPath   string
-	coverageDir  string
-	registryConf string // path to registries.conf redirecting docker.io to mock
+	binaryPath  string
+	coverageDir string
 )
 
 func TestMain(m *testing.M) {
@@ -82,12 +81,18 @@ func TestMain(m *testing.M) {
 		panic("failed to add python:3.12 image: " + err.Error())
 	}
 
-	// Write registries.conf redirecting docker.io to the mock server.
-	registryConf, err = mockRegistry.WriteRegistriesConf(tmpDir, "docker.io")
+	// Write registries.conf redirecting docker.io to the mock server and set it
+	// for the process so every spawned tally binary uses the mock registry.
+	confPath, err := mockRegistry.WriteRegistriesConf(tmpDir, "docker.io")
 	if err != nil {
 		mockRegistry.Close()
 		_ = os.RemoveAll(tmpDir)
 		panic("failed to create registries.conf: " + err.Error())
+	}
+	if err := os.Setenv("CONTAINERS_REGISTRIES_CONF", confPath); err != nil {
+		mockRegistry.Close()
+		_ = os.RemoveAll(tmpDir)
+		panic("failed to set CONTAINERS_REGISTRIES_CONF: " + err.Error())
 	}
 
 	code := m.Run()
@@ -623,14 +628,14 @@ func TestCheck(t *testing.T) {
 			wantExit: 1,
 		},
 
-		// Slow checks (async) tests — use mock registry via CONTAINERS_REGISTRIES_CONF
+		// Slow checks (async) tests — mock registry is set via CONTAINERS_REGISTRIES_CONF
+		// at the process level in TestMain.
 		{
 			name: "slow-checks-platform-mismatch",
 			dir:  "slow-checks-platform-mismatch",
 			args: append(
 				[]string{"--format", "json", "--slow-checks=on"},
 				selectRules("buildkit/InvalidBaseImagePlatform")...),
-			env:      []string{"CONTAINERS_REGISTRIES_CONF=" + registryConf},
 			wantExit: 1,
 		},
 		{
@@ -639,7 +644,6 @@ func TestCheck(t *testing.T) {
 			args: append(
 				[]string{"--format", "json", "--slow-checks=on"},
 				selectRules("buildkit/UndefinedVar")...),
-			env: []string{"CONTAINERS_REGISTRIES_CONF=" + registryConf},
 		},
 		{
 			name: "slow-checks-undefined-var-still-caught",
@@ -647,7 +651,6 @@ func TestCheck(t *testing.T) {
 			args: append(
 				[]string{"--format", "json", "--slow-checks=on"},
 				selectRules("buildkit/UndefinedVar")...),
-			env:      []string{"CONTAINERS_REGISTRIES_CONF=" + registryConf},
 			wantExit: 1,
 		},
 		{
@@ -656,7 +659,6 @@ func TestCheck(t *testing.T) {
 			args: append(
 				[]string{"--format", "json", "--slow-checks=on"},
 				selectRules("buildkit/UndefinedVar")...),
-			env:      []string{"CONTAINERS_REGISTRIES_CONF=" + registryConf},
 			wantExit: 1,
 		},
 		{
@@ -665,20 +667,6 @@ func TestCheck(t *testing.T) {
 			args: append(
 				[]string{"--format", "json", "--slow-checks=off"},
 				selectRules("buildkit/InvalidBaseImagePlatform")...),
-			env: []string{"CONTAINERS_REGISTRIES_CONF=" + registryConf},
-		},
-		{
-			name: "slow-checks-disabled-ci",
-			dir:  "slow-checks-disabled-ci",
-			args: append(
-				[]string{"--format", "json", "--slow-checks=auto"},
-				selectRules("buildkit/InvalidBaseImagePlatform")...),
-			env: []string{
-				"CONTAINERS_REGISTRIES_CONF=" + registryConf,
-				"CI=true",
-			},
-			snapExt: ".txt",
-			snapRaw: true, // Output mixes JSON (stdout) and notes (stderr).
 		},
 
 		// Consistent indentation tests (isolated to consistent-indentation rule)

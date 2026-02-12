@@ -33,10 +33,3 @@ func GetResolver(id string) Resolver {
 	defer resolverMu.RUnlock()
 	return resolvers[id]
 }
-
-// ResetResolvers clears the global resolver registry. For testing only.
-func ResetResolvers() {
-	resolverMu.Lock()
-	defer resolverMu.Unlock()
-	resolvers = make(map[string]Resolver)
-}

@@ -2,7 +2,6 @@ package semantic
 
 import (
 	"os"
-	"runtime"
 	"strings"
 
 	"github.com/containerd/platforms"
@@ -94,11 +93,6 @@ func defaultPlatform() string {
 		p += "/" + spec.Variant
 	}
 	return p
-}
-
-// HostPlatform returns the host OS/Arch as a platform string.
-func HostPlatform() string {
-	return runtime.GOOS + "/" + runtime.GOARCH
 }
 
 // ParsePlatform splits a platform string into OS, Arch, Variant.
