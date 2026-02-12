@@ -148,6 +148,9 @@ func (r *heredocResolver) detectAndFixConsecutive(
 }
 
 // createSequenceEdit creates an edit for a sequence of consecutive RUNs.
+// When the sequence has only 1 RUN (e.g., sync fixes broke the consecutive pattern
+// by injecting a SHELL instruction), falls back to chained conversion if the
+// single RUN has enough commands.
 func (r *heredocResolver) createSequenceEdit(
 	seq runSequence,
 	data *rules.HeredocResolveData,
@@ -155,6 +158,12 @@ func (r *heredocResolver) createSequenceEdit(
 	sm *sourcemap.SourceMap,
 ) *rules.TextEdit {
 	if len(seq.runs) < 2 || len(seq.commands) < data.MinCommands {
+		// Fallback: a single RUN with enough chained commands can still
+		// be converted. This handles sync fixes (e.g., DL4006 SHELL injection)
+		// that break the consecutive pattern by inserting non-RUN instructions.
+		if len(seq.runs) == 1 && len(seq.commands) >= data.MinCommands {
+			return r.createChainedEdit(seq.runs[0], seq.commands, data, file, sm)
+		}
 		return nil
 	}
 
@@ -184,10 +193,48 @@ func (r *heredocResolver) createSequenceEdit(
 	// Get mounts from first RUN
 	mounts := runmount.GetMounts(firstRun)
 
+	// Emit set -o pipefail when DL4006 is enabled and commands contain pipes
+	pipefail := data.PipefailEnabled && commandsHavePipes(seq.commands, data.ShellVariant)
+
 	// Build heredoc
-	heredocText := heredoc.FormatWithMounts(seq.commands, mounts, data.ShellVariant)
+	heredocText := heredoc.FormatWithMounts(seq.commands, mounts, data.ShellVariant, pipefail)
 
 	// Calculate and apply indentation
+	indent := extractIndent(sm, startLine)
+	heredocText = applyIndent(heredocText, indent)
+
+	return &rules.TextEdit{
+		Location: rules.NewRangeLocation(file, startLine, 0, endLine, len(sm.Line(endLine-1))),
+		NewText:  indent + heredocText,
+	}
+}
+
+// createChainedEdit creates an edit for a single RUN with chained commands.
+// This is used both as a fallback from createSequenceEdit and by detectAndFixChained.
+func (r *heredocResolver) createChainedEdit(
+	run *instructions.RunCommand,
+	commands []string,
+	data *rules.HeredocResolveData,
+	file string,
+	sm *sourcemap.SourceMap,
+) *rules.TextEdit {
+	script := r.getRunScript(run)
+	if !shell.IsSimpleScript(script, data.ShellVariant) {
+		return nil
+	}
+
+	runLoc := run.Location()
+	if len(runLoc) == 0 {
+		return nil
+	}
+
+	startLine := runLoc[0].Start.Line
+	endLine := runLoc[len(runLoc)-1].End.Line
+
+	mounts := runmount.GetMounts(run)
+	pipefail := data.PipefailEnabled && commandsHavePipes(commands, data.ShellVariant)
+	heredocText := heredoc.FormatWithMounts(commands, mounts, data.ShellVariant, pipefail)
+
 	indent := extractIndent(sm, startLine)
 	heredocText = applyIndent(heredocText, indent)
 
@@ -225,29 +272,9 @@ func (r *heredocResolver) detectAndFixChained(
 			continue
 		}
 
-		// Must be simple to convert
-		if !shell.IsSimpleScript(script, data.ShellVariant) {
-			continue
+		if edit := r.createChainedEdit(run, commands, data, file, sm); edit != nil {
+			return []rules.TextEdit{*edit}
 		}
-
-		runLoc := run.Location()
-		if len(runLoc) == 0 {
-			continue
-		}
-
-		startLine := runLoc[0].Start.Line
-		endLine := runLoc[len(runLoc)-1].End.Line
-
-		mounts := runmount.GetMounts(run)
-		heredocText := heredoc.FormatWithMounts(commands, mounts, data.ShellVariant)
-
-		indent := extractIndent(sm, startLine)
-		heredocText = applyIndent(heredocText, indent)
-
-		return []rules.TextEdit{{
-			Location: rules.NewRangeLocation(file, startLine, 0, endLine, len(sm.Line(endLine-1))),
-			NewText:  indent + heredocText,
-		}}
 	}
 
 	return nil
@@ -307,6 +334,17 @@ func (r *heredocResolver) getRunScript(run *instructions.RunCommand) string {
 		return strings.Join(run.CmdLine, " ")
 	}
 	return ""
+}
+
+// commandsHavePipes checks if any command in the list contains a pipe operator.
+// Used to decide whether to emit "set -o pipefail" in the heredoc body.
+func commandsHavePipes(commands []string, variant shell.Variant) bool {
+	for _, cmd := range commands {
+		if shell.HasPipes(cmd, variant) {
+			return true
+		}
+	}
+	return false
 }
 
 // extractIndent extracts leading whitespace from a line.

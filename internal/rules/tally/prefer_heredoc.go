@@ -109,6 +109,11 @@ func (r *PreferHeredocRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
 
+	// Check if DL4006 (pipefail) is enabled for cross-rule coordination.
+	// When enabled, heredoc conversion will add "set -o pipefail" inside the
+	// heredoc body for commands with pipes, avoiding a separate SHELL instruction.
+	pipefailEnabled := input.IsRuleEnabled(rules.PipefailRuleCode)
+
 	// Get semantic model for shell variant info (may be nil)
 	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Type assertion OK returns false for nil, sem is nil-checked below
 
@@ -127,13 +132,13 @@ func (r *PreferHeredocRule) Check(input rules.LintInput) []rules.Violation {
 		// Check consecutive RUNs
 		if checkConsecutive {
 			violations = append(violations,
-				r.checkConsecutiveRuns(stage, stageIdx, shellVariant, input.File, sm, minCommands, meta)...)
+				r.checkConsecutiveRuns(stage, stageIdx, shellVariant, input.File, sm, minCommands, pipefailEnabled, meta)...)
 		}
 
 		// Check chained commands within single RUN
 		if checkChained {
 			violations = append(violations,
-				r.checkChainedCommands(stage, stageIdx, shellVariant, input.File, sm, minCommands, meta)...)
+				r.checkChainedCommands(stage, stageIdx, shellVariant, input.File, sm, minCommands, pipefailEnabled, meta)...)
 		}
 	}
 
@@ -165,6 +170,7 @@ func (r *PreferHeredocRule) checkConsecutiveRuns(
 	file string,
 	sm *sourcemap.SourceMap,
 	minCommands int,
+	pipefailEnabled bool,
 	meta rules.RuleMetadata,
 ) []rules.Violation {
 	var violations []rules.Violation
@@ -172,7 +178,7 @@ func (r *PreferHeredocRule) checkConsecutiveRuns(
 	var sequenceMounts []*instructions.Mount
 
 	flushSequence := func() {
-		if v := r.createSequenceViolation(sequence, stageIdx, shellVariant, file, sm, minCommands, meta); v != nil {
+		if v := r.createSequenceViolation(sequence, stageIdx, shellVariant, file, sm, minCommands, pipefailEnabled, meta); v != nil {
 			violations = append(violations, *v)
 		}
 		sequence = sequence[:0]
@@ -234,6 +240,7 @@ func (r *PreferHeredocRule) createSequenceViolation(
 	file string,
 	_ *sourcemap.SourceMap,
 	minCommands int,
+	pipefailEnabled bool,
 	meta rules.RuleMetadata,
 ) *rules.Violation {
 	if len(sequence) < 2 {
@@ -282,7 +289,7 @@ func (r *PreferHeredocRule) createSequenceViolation(
 	// Generate async fix only if all commands are simple
 	// Uses async resolution to operate on content after sync fixes are applied
 	if allSimple && len(allCommands) > 0 {
-		fix := r.generateConsecutiveAsyncFix(stageIdx, shellVariant, allCommands, minCommands, meta)
+		fix := r.generateConsecutiveAsyncFix(stageIdx, shellVariant, allCommands, minCommands, pipefailEnabled, meta)
 		v = v.WithSuggestedFix(fix)
 	}
 
@@ -297,6 +304,7 @@ func (r *PreferHeredocRule) checkChainedCommands(
 	file string,
 	_ *sourcemap.SourceMap,
 	minCommands int,
+	pipefailEnabled bool,
 	meta rules.RuleMetadata,
 ) []rules.Violation {
 	var violations []rules.Violation
@@ -340,7 +348,7 @@ func (r *PreferHeredocRule) checkChainedCommands(
 			if shell.IsSimpleScript(script, shellVariant) {
 				commands := shell.ExtractChainedCommands(script, shellVariant)
 				if len(commands) > 0 {
-					fix := r.generateChainedAsyncFix(stageIdx, shellVariant, commands, minCommands, meta)
+					fix := r.generateChainedAsyncFix(stageIdx, shellVariant, commands, minCommands, pipefailEnabled, meta)
 					v = v.WithSuggestedFix(fix)
 				}
 			}
@@ -396,12 +404,13 @@ func (r *PreferHeredocRule) generateConsecutiveAsyncFix(
 	shellVariant shell.Variant,
 	commands []string,
 	minCommands int,
+	pipefailEnabled bool,
 	meta rules.RuleMetadata,
 ) *rules.SuggestedFix {
 	return r.generateHeredocAsyncFix(
 		rules.HeredocFixConsecutive,
 		fmt.Sprintf("Combine %d commands into heredoc", len(commands)),
-		stageIdx, shellVariant, minCommands, meta,
+		stageIdx, shellVariant, minCommands, pipefailEnabled, meta,
 	)
 }
 
@@ -412,12 +421,13 @@ func (r *PreferHeredocRule) generateChainedAsyncFix(
 	shellVariant shell.Variant,
 	commands []string,
 	minCommands int,
+	pipefailEnabled bool,
 	meta rules.RuleMetadata,
 ) *rules.SuggestedFix {
 	return r.generateHeredocAsyncFix(
 		rules.HeredocFixChained,
 		fmt.Sprintf("Convert chained commands to heredoc (%d commands)", len(commands)),
-		stageIdx, shellVariant, minCommands, meta,
+		stageIdx, shellVariant, minCommands, pipefailEnabled, meta,
 	)
 }
 
@@ -430,6 +440,7 @@ func (r *PreferHeredocRule) generateHeredocAsyncFix(
 	stageIdx int,
 	shellVariant shell.Variant,
 	minCommands int,
+	pipefailEnabled bool,
 	meta rules.RuleMetadata,
 ) *rules.SuggestedFix {
 	return &rules.SuggestedFix{
@@ -439,10 +450,11 @@ func (r *PreferHeredocRule) generateHeredocAsyncFix(
 		NeedsResolve: true,
 		ResolverID:   rules.HeredocResolverID,
 		ResolverData: &rules.HeredocResolveData{
-			Type:         fixType,
-			StageIndex:   stageIdx,
-			ShellVariant: shellVariant,
-			MinCommands:  minCommands,
+			Type:            fixType,
+			StageIndex:      stageIdx,
+			ShellVariant:    shellVariant,
+			MinCommands:     minCommands,
+			PipefailEnabled: pipefailEnabled,
 		},
 	}
 }

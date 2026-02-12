@@ -440,6 +440,13 @@ func TestCheck(t *testing.T) {
 			wantExit: 1,
 		},
 		{
+			name: "dl4006-cross-rules",
+			dir:  "dl4006-cross-rules",
+			args: append([]string{"--format", "json"},
+				selectRules("hadolint/DL4006", "tally/prefer-run-heredoc")...),
+			wantExit: 1,
+		},
+		{
 			name:     "dl3014",
 			dir:      "dl3014",
 			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3014")...),
@@ -1004,6 +1011,21 @@ func TestFix(t *testing.T) {
 				[]string{"--fix", "--fix-unsafe"},
 				selectRules("hadolint/DL4006")...),
 			wantApplied: 1,
+		},
+		// DL4006 + prefer-run-heredoc cross-rule interaction:
+		// The chained pipe RUN (heredoc candidate) gets converted to a heredoc
+		// with "set -o pipefail" inside the body, avoiding a SHELL instruction.
+		// The simple pipe RUN gets the standard DL4006 SHELL injection fix.
+		// --fail-level=none prevents unfixed DL4006 violations from failing.
+		{
+			name: "dl4006-cross-heredoc",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN apt-get update && apt-get install -y curl && curl -fsSL https://example.com/setup.sh | bash\n" +
+				"RUN wget -O - https://some.site | wc -l > /number\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				selectRules("hadolint/DL4006", "tally/prefer-run-heredoc")...),
+			wantApplied: 2, // SHELL injection + heredoc with pipefail
 		},
 		// NoEmptyContinuation: Remove empty lines in continuations
 		{

@@ -9,6 +9,10 @@ const HeredocResolverID = "prefer-run-heredoc"
 // Used by other rules (like DL3003) to check if heredoc conversion is enabled.
 const HeredocRuleCode = TallyRulePrefix + "prefer-run-heredoc"
 
+// PipefailRuleCode is the full rule code for the DL4006 pipefail rule.
+// Used by the heredoc formatter to determine whether to add set -o pipefail.
+const PipefailRuleCode = HadolintRulePrefix + "DL4006"
+
 // HeredocDefaultMinCommands is the default minimum number of commands
 // required to suggest heredoc conversion. Heredocs add 2 lines overhead
 // (<<EOF and EOF), so converting 2 commands saves no lines.
@@ -32,6 +36,12 @@ type HeredocResolveData struct {
 
 	// MinCommands is the minimum number of commands to trigger heredoc conversion.
 	MinCommands int
+
+	// PipefailEnabled indicates whether DL4006 (pipefail) is enabled.
+	// When true, the heredoc formatter will add "set -o pipefail" inside the
+	// heredoc body if any command contains a pipe, avoiding the need for a
+	// separate SHELL instruction.
+	PipefailEnabled bool
 }
 
 // HeredocFixType indicates the type of heredoc fix.

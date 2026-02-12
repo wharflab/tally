@@ -1,0 +1,103 @@
+{
+  "files": [
+    {
+      "file": "testdata/dl4006-cross-rules/Dockerfile",
+      "violations": [
+        {
+          "detail": "If you are using /bin/sh in an alpine image or if your shell is symlinked to busybox then consider explicitly setting your SHELL to /bin/ash, or disable this check. Use SHELL [\"/bin/bash\", \"-o\", \"pipefail\", \"-c\"] before the RUN instruction.",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL4006",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "testdata/dl4006-cross-rules/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "set the SHELL option -o pipefail before RUN with a pipe in it",
+          "rule": "hadolint/DL4006",
+          "severity": "warning",
+          "sourceCode": "RUN apt-get update \u0026\u0026 \\"
+        },
+        {
+          "detail": "2 consecutive RUN instructions with 4 total commands can be combined into a single heredoc RUN",
+          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "testdata/dl4006-cross-rules/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "consecutive RUN instructions can be combined using heredoc syntax",
+          "rule": "tally/prefer-run-heredoc",
+          "severity": "style",
+          "sourceCode": "RUN apt-get update \u0026\u0026 \\",
+          "suggestedFix": {
+            "description": "Combine 4 commands into heredoc",
+            "needsResolve": true,
+            "priority": 100,
+            "resolverId": "prefer-run-heredoc",
+            "safety": 1
+          }
+        },
+        {
+          "detail": "If you are using /bin/sh in an alpine image or if your shell is symlinked to busybox then consider explicitly setting your SHELL to /bin/ash, or disable this check. Use SHELL [\"/bin/bash\", \"-o\", \"pipefail\", \"-c\"] before the RUN instruction.",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL4006",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "testdata/dl4006-cross-rules/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "set the SHELL option -o pipefail before RUN with a pipe in it",
+          "rule": "hadolint/DL4006",
+          "severity": "warning",
+          "sourceCode": "RUN wget -O - https://some.site | wc -l \u003e /number",
+          "suggestedFix": {
+            "description": "Add SHELL with -o pipefail before RUN",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 10
+                  },
+                  "file": "testdata/dl4006-cross-rules/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 10
+                  }
+                },
+                "newText": "SHELL [\"/bin/bash\", \"-o\", \"pipefail\", \"-c\"]\n"
+              }
+            ],
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 2,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 1,
+    "total": 3,
+    "warnings": 2
+  }
+}
