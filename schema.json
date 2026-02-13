@@ -293,6 +293,21 @@
       "type": "object",
       "description": "Configuration for prefer-copy-heredoc rule"
     },
+    "prefer-multi-stage-buildConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/tinovyatkin/tally/internal/rules/tally/prefer-multi-stage-build-config",
+      "properties": {
+        "min-score": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Minimum score required to trigger",
+          "default": 4
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Configuration for prefer-multi-stage-build rule"
+    },
     "prefer-run-heredocConfig": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "$id": "https://github.com/tinovyatkin/tally/internal/rules/tally/prefer-heredoc-config",

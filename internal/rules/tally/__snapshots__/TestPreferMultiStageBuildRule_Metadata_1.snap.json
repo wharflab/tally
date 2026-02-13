@@ -1,0 +1,10 @@
+{
+ "Category": "performance",
+ "Code": "tally/prefer-multi-stage-build",
+ "DefaultSeverity": "info",
+ "Description": "Suggests converting single-stage builds into multi-stage builds to reduce final image size",
+ "DocURL": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/prefer-multi-stage-build.md",
+ "FixPriority": 150,
+ "IsExperimental": true,
+ "Name": "Prefer Multi-Stage Build"
+}

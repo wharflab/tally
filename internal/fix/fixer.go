@@ -248,42 +248,75 @@ func (f *Fixer) fixModeAllowed(filePath, ruleCode string) bool {
 // This ensures each resolver sees the content after previous async fixes were applied,
 // avoiding position drift between async fixes.
 func (f *Fixer) resolveAsyncFixes(ctx context.Context, changes map[string]*FileChange, candidates []*fixCandidate) {
+	byFile := make(map[string][]*fixCandidate)
 	for _, candidate := range candidates {
-		fix := candidate.fix
-		if !fix.NeedsResolve {
-			continue
+		if candidate.fix.NeedsResolve {
+			normalizedFile := normalizePath(candidate.violation.File())
+			byFile[normalizedFile] = append(byFile[normalizedFile], candidate)
 		}
+	}
 
-		resolver := GetResolver(fix.ResolverID)
-		if resolver == nil {
-			// Unknown resolver, will be skipped later
-			continue
-		}
+	files := make([]string, 0, len(byFile))
+	for file := range byFile {
+		files = append(files, file)
+	}
+	sort.Strings(files)
 
-		// Get the CURRENT content (may have been modified by previous async fixes)
-		normalizedFile := normalizePath(candidate.violation.File())
-		fc := changes[normalizedFile]
+	for _, file := range files {
+		fc := changes[file]
 		if fc == nil {
 			continue
 		}
 
-		resolveCtx := ResolveContext{
-			FilePath: fc.Path,
-			Content:  fc.ModifiedContent,
-		}
+		fileCandidates := byFile[file]
+		// Resolve in SuggestedFix.Priority order so whole-file rewrites (high priority)
+		// run after content/structural async transforms for the same file.
+		sort.SliceStable(fileCandidates, func(i, j int) bool {
+			pi := fileCandidates[i].fix.Priority
+			pj := fileCandidates[j].fix.Priority
+			if pi != pj {
+				return pi < pj
+			}
+			ri := fileCandidates[i].violation.RuleCode
+			rj := fileCandidates[j].violation.RuleCode
+			if ri != rj {
+				return ri < rj
+			}
+			li := fileCandidates[i].violation.Location.Start.Line
+			lj := fileCandidates[j].violation.Location.Start.Line
+			return li < lj
+		})
 
-		// Resolve synchronously (sequential to avoid position drift between async fixes)
-		edits, err := resolver.Resolve(ctx, resolveCtx, fix)
-		if err != nil {
-			// Mark as failed but continue with other fixes
-			continue
-		}
-		fix.Edits = edits
-		fix.NeedsResolve = false
+		for _, candidate := range fileCandidates {
+			fix := candidate.fix
+			if !fix.NeedsResolve {
+				continue
+			}
 
-		// Apply this fix immediately so the next resolver sees updated content
-		if len(fix.Edits) > 0 {
-			f.applyFixesToFile(fc, []*fixCandidate{candidate})
+			resolver := GetResolver(fix.ResolverID)
+			if resolver == nil {
+				// Unknown resolver, will be skipped later
+				continue
+			}
+
+			resolveCtx := ResolveContext{
+				FilePath: fc.Path,
+				Content:  fc.ModifiedContent,
+			}
+
+			// Resolve synchronously (sequential within a file to avoid position drift).
+			edits, err := resolver.Resolve(ctx, resolveCtx, fix)
+			if err != nil {
+				// Mark as failed but continue with other fixes.
+				continue
+			}
+			fix.Edits = edits
+			fix.NeedsResolve = false
+
+			// Apply this fix immediately so the next resolver sees updated content.
+			if len(fix.Edits) > 0 {
+				f.applyFixesToFile(fc, []*fixCandidate{candidate})
+			}
 		}
 	}
 }

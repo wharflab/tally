@@ -1,6 +1,9 @@
 package integration
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func fixCases(t *testing.T) []fixCase {
 	t.Helper()
@@ -493,6 +496,30 @@ severity = "style"
 				"--select", "tally/prefer-copy-heredoc",
 			},
 			wantApplied: 1,
+		},
+		{
+			name: "ai-autofix-prefer-multi-stage-build",
+			input: `FROM golang:1.22-alpine
+WORKDIR /src
+COPY . .
+RUN go build -o /out/app ./cmd/app
+CMD ["app"]
+`,
+			args: append([]string{
+				"--fix",
+				"--fix-unsafe",
+				"--fix-rule", "tally/prefer-multi-stage-build",
+			}, mustSelectRules("tally/prefer-multi-stage-build", "tally/no-unreachable-stages")...),
+			wantApplied: 1,
+			config: fmt.Sprintf(`[ai]
+enabled = true
+timeout = "10s"
+redact-secrets = false
+command = ['%s', '-mode=multistage']
+
+[rules.tally.prefer-multi-stage-build]
+fix = "explicit"
+`, acpAgentPath),
 		},
 	}
 }

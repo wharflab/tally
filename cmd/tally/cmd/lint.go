@@ -9,6 +9,8 @@ import (
 
 	"github.com/urfave/cli/v3"
 
+	"github.com/tinovyatkin/tally/internal/ai/autofix"
+	"github.com/tinovyatkin/tally/internal/ai/autofixdata"
 	"github.com/tinovyatkin/tally/internal/async"
 	"github.com/tinovyatkin/tally/internal/config"
 	"github.com/tinovyatkin/tally/internal/context"
@@ -631,6 +633,45 @@ func applyFixes(
 
 	// Build per-file fix modes from fileConfigs
 	fixModes := buildPerFileFixModes(fileConfigs)
+
+	// Register AI resolver only when AI is enabled for at least one file config.
+	aiEnabled := false
+	normalizedConfigs := make(map[string]*config.Config, len(fileConfigs))
+	for path, cfg := range fileConfigs {
+		normalizedConfigs[filepath.Clean(path)] = cfg
+		if cfg != nil && cfg.AI.Enabled {
+			aiEnabled = true
+		}
+	}
+	if aiEnabled {
+		autofix.Register()
+	}
+
+	// Enrich AI resolver requests with per-file config + outer fix context.
+	fixCtx := autofixdata.FixContext{
+		SafetyThreshold: safetyThreshold,
+		RuleFilter:      ruleFilter,
+		FixModes:        fixModes,
+	}
+	for i := range violations {
+		v := &violations[i]
+		if v.SuggestedFix == nil || !v.SuggestedFix.NeedsResolve {
+			continue
+		}
+		if v.SuggestedFix.ResolverID != autofixdata.ResolverID {
+			continue
+		}
+		req, ok := v.SuggestedFix.ResolverData.(interface {
+			SetConfig(cfg *config.Config)
+			SetFixContext(ctx autofixdata.FixContext)
+		})
+		if !ok {
+			continue
+		}
+		cfg := normalizedConfigs[filepath.Clean(v.File())]
+		req.SetConfig(cfg)
+		req.SetFixContext(fixCtx)
+	}
 
 	fixer := &fix.Fixer{
 		SafetyThreshold: safetyThreshold,

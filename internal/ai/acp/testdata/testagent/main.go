@@ -136,6 +136,28 @@ func (a *testAgent) Prompt(ctx context.Context, params acpsdk.PromptRequest) (ac
 		return acpsdk.PromptResponse{StopReason: acpsdk.StopReasonCancelled}, nil
 	}
 
+	if a.mode == "multistage" {
+		out := "```Dockerfile\n" +
+			"FROM golang:1.22-alpine AS builder\n" +
+			"WORKDIR /src\n" +
+			"COPY . .\n" +
+			"RUN go build -o /out/app ./cmd/app\n" +
+			"\n" +
+			"FROM alpine:3.20\n" +
+			"COPY --from=builder /out/app /usr/local/bin/app\n" +
+			"CMD [\"app\"]\n" +
+			"```\n"
+
+		if err := a.conn.SessionUpdate(ctx, acpsdk.SessionNotification{
+			SessionId: params.SessionId,
+			Update:    acpsdk.UpdateAgentMessageText(out),
+		}); err != nil {
+			return acpsdk.PromptResponse{}, err
+		}
+		time.Sleep(10 * time.Millisecond)
+		return acpsdk.PromptResponse{StopReason: acpsdk.StopReasonEndTurn}, nil
+	}
+
 	// happy
 	if err := a.conn.SessionUpdate(ctx, acpsdk.SessionNotification{
 		SessionId: params.SessionId,

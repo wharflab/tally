@@ -17,6 +17,7 @@ var (
 	binaryPath   string
 	coverageDir  string
 	mockRegistry *testutil.MockRegistry
+	acpAgentPath string
 )
 
 var errNoRulesSelected = errors.New("selectRules requires at least one rule")
@@ -41,6 +42,10 @@ func runIntegrationTestMain(m *testing.M) (int, error) {
 	}()
 
 	if err := buildIntegrationBinary(tmpDir); err != nil {
+		return 0, err
+	}
+
+	if err := buildIntegrationAcpAgent(tmpDir); err != nil {
 		return 0, err
 	}
 
@@ -87,6 +92,22 @@ func buildIntegrationBinary(tmpDir string) error {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("build integration binary: %w (output: %s)", err, out)
+	}
+	return nil
+}
+
+func buildIntegrationAcpAgent(tmpDir string) error {
+	binName := "tally-acp-testagent"
+	if runtime.GOOS == "windows" {
+		binName += ".exe"
+	}
+	acpAgentPath = filepath.Join(tmpDir, binName)
+
+	cmd := exec.Command("go", "build", "-trimpath", "-o", acpAgentPath, "github.com/tinovyatkin/tally/internal/ai/acp/testdata/testagent")
+	cmd.Env = append(os.Environ(), "GOEXPERIMENT=jsonv2")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("build ACP test agent: %w (output: %s)", err, out)
 	}
 	return nil
 }
