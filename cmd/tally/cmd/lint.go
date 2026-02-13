@@ -774,7 +774,7 @@ func buildPerFileFixModes(fileConfigs map[string]*config.Config) map[string]map[
 		}
 		modes := fix.BuildFixModes(cfg)
 		if len(modes) > 0 {
-			result[filePath] = modes
+			result[filepath.Clean(filePath)] = modes
 		}
 	}
 	return result
