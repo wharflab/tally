@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -49,17 +48,7 @@ func TestFixRealWorld(t *testing.T) {
 	)
 	output, err := cmd.CombinedOutput()
 	// Exit code 1 is expected due to remaining unfixable violations
-	if err == nil {
-		t.Fatalf("expected exit code 1 but command succeeded\noutput:\n%s", output)
-	}
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) {
-		t.Fatalf("command failed to run: %v", err)
-	}
-	// Exit code 1 is expected, other exit codes indicate real failures
-	if exitErr.ExitCode() != 1 {
-		t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
-	}
+	expectExitCode1(t, output, err)
 
 	// Read the fixed Dockerfile
 	fixedContent, err := os.ReadFile(dockerfilePath)
@@ -121,16 +110,7 @@ severity = "style"
 		"GOCOVERDIR="+coverageDir,
 	)
 	output, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("expected exit code 1 but command succeeded\noutput:\n%s", output)
-	}
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) {
-		t.Fatalf("command failed to run: %v", err)
-	}
-	if exitErr.ExitCode() != 1 {
-		t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
-	}
+	expectExitCode1(t, output, err)
 
 	// Read the fixed Dockerfile and snapshot it
 	fixedContent, err := os.ReadFile(dockerfilePath)
@@ -185,16 +165,7 @@ func TestFixConsistentIndentation(t *testing.T) {
 		"GOCOVERDIR="+coverageDir,
 	)
 	output, err := cmd.CombinedOutput()
-	if err == nil {
-		t.Fatalf("expected exit code 1 but command succeeded\noutput:\n%s", output)
-	}
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) {
-		t.Fatalf("command failed to run: %v", err)
-	}
-	if exitErr.ExitCode() != 1 {
-		t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
-	}
+	expectExitCode1(t, output, err)
 
 	fixedContent, err := os.ReadFile(dockerfilePath)
 	if err != nil {
@@ -243,16 +214,7 @@ func TestFixPreferAddUnpackBeatsHeredoc(t *testing.T) {
 	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
 	output, err := cmd.CombinedOutput()
 	// Exit code 1 expected: prefer-run-heredoc violation remains (fix superseded)
-	if err == nil {
-		t.Fatalf("expected exit code 1 but command succeeded\noutput:\n%s", output)
-	}
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) {
-		t.Fatalf("command failed to run: %v", err)
-	}
-	if exitErr.ExitCode() != 1 {
-		t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
-	}
+	expectExitCode1(t, output, err)
 
 	fixed, err := os.ReadFile(dockerfilePath)
 	if err != nil {

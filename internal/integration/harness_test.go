@@ -196,3 +196,20 @@ func parseFixedCount(output string) (int, bool, error) {
 	}
 	return count, true, nil
 }
+
+func expectExitCode1(t *testing.T, output []byte, err error) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatalf("expected exit code 1 but command succeeded\noutput:\n%s", output)
+	}
+
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("command failed to run: %v\noutput:\n%s", err, output)
+	}
+
+	if exitErr.ExitCode() != 1 {
+		t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
+	}
+}
