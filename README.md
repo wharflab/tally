@@ -42,7 +42,7 @@ tally integrates rules from multiple sources:
 | Source | Rules | Description |
 |--------|-------|-------------|
 | **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 22/22 rules | Docker's official Dockerfile checks (captured + reimplemented) |
-| **tally** | 8 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
+| **tally** | 9 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
 | **[Hadolint](https://github.com/hadolint/hadolint)** | 37 rules | Hadolint-compatible Dockerfile rules (expanding) |
 <!-- END RULES_TABLE -->
 
