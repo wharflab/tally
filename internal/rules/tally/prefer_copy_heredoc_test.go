@@ -400,35 +400,30 @@ func TestBuildCopyHeredoc(t *testing.T) {
 		targetPath string
 		content    string
 		chmodMode  uint16
-		want       string
 	}{
 		{
 			name:       "simple content",
 			targetPath: "/app/config",
 			content:    "hello world\n",
 			chmodMode:  0,
-			want:       "COPY <<EOF /app/config\nhello world\nEOF",
 		},
 		{
 			name:       "with chmod",
 			targetPath: "/app/script.sh",
 			content:    "#!/bin/bash\necho hello\n",
 			chmodMode:  0o755,
-			want:       "COPY --chmod=0755 <<EOF /app/script.sh\n#!/bin/bash\necho hello\nEOF",
 		},
 		{
 			name:       "content containing EOF",
 			targetPath: "/app/file",
 			content:    "Some EOF text\n",
 			chmodMode:  0,
-			want:       "COPY <<CONTENT /app/file\nSome EOF text\nCONTENT",
 		},
 		{
 			name:       "empty content creates 0-byte file",
 			targetPath: "/app/empty",
 			content:    "",
 			chmodMode:  0,
-			want:       "COPY <<EOF /app/empty\nEOF",
 		},
 	}
 
@@ -436,9 +431,7 @@ func TestBuildCopyHeredoc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := buildCopyHeredoc(tt.targetPath, tt.content, tt.chmodMode)
-			if got != tt.want {
-				t.Errorf("buildCopyHeredoc() =\n%s\nwant:\n%s", got, tt.want)
-			}
+			snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, got)
 		})
 	}
 }
