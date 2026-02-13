@@ -266,6 +266,7 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 		}
 		if fixResult.TotalSkipped() > 0 {
 			fmt.Fprintf(os.Stderr, "Skipped %d fixes\n", fixResult.TotalSkipped())
+			reportSkippedFixes(fixResult)
 		}
 
 		allViolations = filterFixedViolations(allViolations, fixResult)
@@ -897,6 +898,79 @@ func reportSkipped(result *async.RunResult) {
 	if n := counts[async.SkipResolverErr]; n > 0 {
 		fmt.Fprintf(os.Stderr, "note: %d slow check(s) skipped due to errors\n", n)
 	}
+}
+
+func reportSkippedFixes(result *fix.Result) {
+	if result == nil || result.TotalSkipped() == 0 {
+		return
+	}
+
+	type skippedFixInfo struct {
+		filePath string
+		ruleCode string
+		errorMsg string
+	}
+
+	var (
+		aiTimeouts int
+		aiErrors   int
+		otherErrs  int
+		samples    []skippedFixInfo
+	)
+
+	for _, fc := range result.Changes {
+		if fc == nil {
+			continue
+		}
+		for _, s := range fc.FixesSkipped {
+			if s.Reason != fix.SkipResolveError || s.Error == "" {
+				continue
+			}
+
+			isAI := strings.Contains(s.Error, "ai-autofix") || strings.Contains(s.Error, "acp ")
+			if isAI {
+				if strings.Contains(s.Error, stdcontext.DeadlineExceeded.Error()) {
+					aiTimeouts++
+				} else {
+					aiErrors++
+				}
+			} else {
+				otherErrs++
+			}
+
+			if len(samples) < 5 {
+				samples = append(samples, skippedFixInfo{
+					filePath: fc.Path,
+					ruleCode: s.RuleCode,
+					errorMsg: compactSingleLine(s.Error, 500),
+				})
+			}
+		}
+	}
+
+	if aiTimeouts > 0 {
+		fmt.Fprintf(os.Stderr, "note: %d AI fix(es) timed out (increase --ai-timeout or ai.timeout)\n", aiTimeouts)
+	}
+	if aiErrors > 0 {
+		fmt.Fprintf(os.Stderr, "note: %d AI fix(es) failed (see details below)\n", aiErrors)
+	}
+	if otherErrs > 0 {
+		fmt.Fprintf(os.Stderr, "note: %d fix(es) skipped due to resolver errors\n", otherErrs)
+	}
+
+	for _, s := range samples {
+		fmt.Fprintf(os.Stderr, "note: skipped fix %s (%s): %s\n", s.ruleCode, s.filePath, s.errorMsg)
+	}
+}
+
+func compactSingleLine(s string, maxLen int) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.ReplaceAll(s, "\n", "; ")
+	s = strings.TrimSpace(s)
+	if maxLen > 0 && len(s) > maxLen {
+		s = s[:maxLen] + "…"
+	}
+	return s
 }
 
 // filesWithErrors returns a set of files that have SeverityError violations.

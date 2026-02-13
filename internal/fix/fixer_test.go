@@ -3,6 +3,7 @@ package fix
 import (
 	"bytes"
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/tinovyatkin/tally/internal/rules"
@@ -1229,6 +1230,9 @@ func TestFixer_Apply_AsyncFix_ResolverError(t *testing.T) {
 	if len(fc.FixesSkipped) != 1 || fc.FixesSkipped[0].Reason != SkipResolveError {
 		t.Errorf("Expected SkipResolveError reason")
 	}
+	if got := fc.FixesSkipped[0].Error; got != context.DeadlineExceeded.Error() {
+		t.Errorf("SkippedFix.Error = %q, want %q", got, context.DeadlineExceeded.Error())
+	}
 }
 
 func TestFixer_Apply_AsyncFix_UnknownResolver(t *testing.T) {
@@ -1266,6 +1270,14 @@ func TestFixer_Apply_AsyncFix_UnknownResolver(t *testing.T) {
 	}
 	if result.TotalSkipped() != 1 {
 		t.Errorf("TotalSkipped() = %d, want 1", result.TotalSkipped())
+	}
+
+	fc := result.Changes["Dockerfile"]
+	if len(fc.FixesSkipped) != 1 || fc.FixesSkipped[0].Reason != SkipResolveError {
+		t.Errorf("Expected SkipResolveError reason")
+	}
+	if got := fc.FixesSkipped[0].Error; got == "" || !strings.Contains(got, "resolver not registered") {
+		t.Errorf("SkippedFix.Error = %q, want substring %q", got, "resolver not registered")
 	}
 }
 

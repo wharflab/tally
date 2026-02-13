@@ -295,7 +295,8 @@ func (f *Fixer) resolveAsyncFixes(ctx context.Context, changes map[string]*FileC
 
 			resolver := GetResolver(fix.ResolverID)
 			if resolver == nil {
-				// Unknown resolver, will be skipped later
+				recordSkipped(changes, candidate.violation, SkipResolveError, "resolver not registered: "+fix.ResolverID)
+				fix.NeedsResolve = false
 				continue
 			}
 
@@ -307,7 +308,8 @@ func (f *Fixer) resolveAsyncFixes(ctx context.Context, changes map[string]*FileC
 			// Resolve synchronously (sequential within a file to avoid position drift).
 			edits, err := resolver.Resolve(ctx, resolveCtx, fix)
 			if err != nil {
-				// Mark as failed but continue with other fixes.
+				recordSkipped(changes, candidate.violation, SkipResolveError, err.Error())
+				fix.NeedsResolve = false
 				continue
 			}
 			fix.Edits = edits
