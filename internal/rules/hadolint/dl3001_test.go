@@ -1,6 +1,7 @@
 package hadolint
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
@@ -138,6 +139,13 @@ RUN apt-get update && top
 RUN top && ps aux
 `,
 			wantCount: 1, // one violation per RUN instruction
+		},
+		{
+			name: "repeated invalid command is deduplicated in message",
+			dockerfile: `FROM ubuntu:22.04
+RUN top && ps aux && top
+`,
+			wantCount: 1,
 		},
 		{
 			name: "multi-stage no violation",
@@ -302,6 +310,24 @@ RUN ssh user@host
 				t.Errorf("expected no SuggestedFix, got %+v", v.SuggestedFix)
 			}
 		})
+	}
+}
+
+func TestDL3001Rule_DeduplicatesRepeatedCommands(t *testing.T) {
+	t.Parallel()
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM ubuntu:22.04
+RUN top && ps aux && top
+`)
+	r := NewDL3001Rule()
+	violations := r.Check(input)
+
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	// "top" appears twice in the RUN but should be listed only once in the message.
+	msg := violations[0].Message
+	if !strings.Contains(msg, "command ps, top") {
+		t.Errorf("expected deduplicated 'ps, top' in message, got: %s", msg)
 	}
 }
 

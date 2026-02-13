@@ -127,6 +127,7 @@ func (r *DL3001Rule) Check(input rules.LintInput) []rules.Violation {
 			}
 
 			slices.Sort(found)
+			found = slices.Compact(found)
 
 			loc := rules.NewLocationFromRanges(file, run.Location())
 			msg := fmt.Sprintf(
