@@ -195,6 +195,19 @@ parity rules
 
 ---
 
+### 16. [Integration Tests Refactor and Placement](16-integration-tests-refactor-and-placement.md)
+
+**Covers:** Step-by-step split of `internal/integration/integration_test.go` plus a placement decision tree for future tests
+
+**Key Topics:**
+
+- File-by-file refactor plan with zero-behavior-change constraints
+- Shared harness design for check/fix case runners
+- Canonical placement buckets for future `tally/*` rules
+- Decision tree for check vs fix vs context vs async vs cross-rule tests
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
@@ -210,6 +223,7 @@ parity rules
 - **JSON/SARIF output** → [05-reporters-and-output.md](05-reporters-and-output.md)
 - **Context-aware rules** → [07-context-aware-foundation.md](07-context-aware-foundation.md)
 - **Docker buildx compatibility** → [02-buildx-bake-check-analysis.md](02-buildx-bake-check-analysis.md)
+- **Integration test placement** → [16-integration-tests-refactor-and-placement.md](16-integration-tests-refactor-and-placement.md)
 
 ---
 
