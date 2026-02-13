@@ -28,74 +28,81 @@ async function writeUserSettings(userDataDir: string, settings: unknown): Promis
   await fs.writeFile(path.join(userDir, "settings.json"), JSON.stringify(settings, null, 2));
 }
 
-test("vscode smoke: diagnostics + formatting", { timeout: 10 * 60 * 1000 }, async () => {
-  const extensionRoot = path.resolve(import.meta.dir, "..", "..");
-  const repoRoot = path.resolve(extensionRoot, "..", "..");
+test(
+  "vscode smoke: diagnostics + formatting",
+  async () => {
+    const extensionRoot = path.resolve(import.meta.dir, "..", "..");
+    const repoRoot = path.resolve(extensionRoot, "..", "..");
 
-  // Build the VS Code extension bundle (dist/extension.cjs).
-  runOrThrow(["bun", "run", "compile"], { cwd: extensionRoot });
+    // Build the VS Code extension bundle (dist/extension.cjs).
+    runOrThrow(["bun", "run", "compile"], { cwd: extensionRoot });
 
-  // Build a tally binary for the language server.
-  const binDir = await fs.mkdtemp(path.join(os.tmpdir(), "tally-vscode-bin-"));
-  const binaryName = process.platform === "win32" ? "tally.exe" : "tally";
-  const binaryPath = path.join(binDir, binaryName);
+    // Build a tally binary for the language server.
+    const binDir = await fs.mkdtemp(path.join(os.tmpdir(), "tally-vscode-bin-"));
+    const binaryName = process.platform === "win32" ? "tally.exe" : "tally";
+    const binaryPath = path.join(binDir, binaryName);
 
-  const goBuildArgs = ["go", "build"];
-  if (process.env.GOCOVERDIR) {
-    goBuildArgs.push("-cover");
-  }
-  goBuildArgs.push("-o", binaryPath, "github.com/tinovyatkin/tally");
+    const goBuildArgs = ["go", "build"];
+    if (process.env.GOCOVERDIR) {
+      goBuildArgs.push("-cover");
+    }
+    goBuildArgs.push("-o", binaryPath, "github.com/tinovyatkin/tally");
 
-  runOrThrow(goBuildArgs, {
-    cwd: repoRoot,
-    env: { GOEXPERIMENT: "jsonv2" },
-  });
+    runOrThrow(goBuildArgs, {
+      cwd: repoRoot,
+      env: { GOEXPERIMENT: "jsonv2" },
+    });
 
-  // Isolated VS Code profile to avoid local settings/extensions interference.
-  const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "tally-vscode-userdata-"));
-  const extensionsDir = await fs.mkdtemp(path.join(os.tmpdir(), "tally-vscode-extensions-"));
+    // Isolated VS Code profile to avoid local settings/extensions interference.
+    const userDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "tally-vscode-userdata-"));
+    const extensionsDir = await fs.mkdtemp(path.join(os.tmpdir(), "tally-vscode-extensions-"));
 
-  await writeUserSettings(userDataDir, {
-    "tally.enable": true,
-    "tally.path": [binaryPath],
-    // Ensure VS Code uses the formatter from this extension if other providers exist.
-    "[dockerfile]": {
-      "editor.defaultFormatter": "wharflab.tally",
-    },
-  });
+    await writeUserSettings(userDataDir, {
+      "tally.enable": true,
+      "tally.path": [binaryPath],
+      // Ensure VS Code uses the formatter from this extension if other providers exist.
+      "[dockerfile]": {
+        "editor.defaultFormatter": "wharflab.tally",
+      },
+    });
 
-  process.env.TALLY_EXPECTED_DIAGNOSTICS = "68";
-  process.env.TALLY_EXPECTED_FORMAT_SNAPSHOT = path.join(
-    repoRoot,
-    "internal",
-    "lsptest",
-    "__snapshots__",
-    "TestLSP_FormattingRealWorld_1.snap.Dockerfile",
-  );
-
-  const vscodeVersion = process.env.VSCODE_TEST_VERSION;
-  const vscodeDownloadTimeoutMsRaw = process.env.VSCODE_TEST_DOWNLOAD_TIMEOUT_MS;
-  const vscodeDownloadTimeoutMsParsed = Number.parseInt(vscodeDownloadTimeoutMsRaw ?? "120000", 10);
-  const vscodeDownloadTimeoutMs = Number.isFinite(vscodeDownloadTimeoutMsParsed)
-    ? vscodeDownloadTimeoutMsParsed
-    : 120_000;
-
-  await runTests({
-    extensionDevelopmentPath: extensionRoot,
-    extensionTestsPath: path.join(extensionRoot, "test", "suite", "index.js"),
-    ...(vscodeVersion ? { version: vscodeVersion } : {}),
-    timeout: vscodeDownloadTimeoutMs,
-    extractSync: true,
-    launchArgs: [
+    process.env.TALLY_EXPECTED_DIAGNOSTICS = "71";
+    process.env.TALLY_EXPECTED_FORMAT_SNAPSHOT = path.join(
       repoRoot,
-      "--disable-extensions",
-      "--disable-workspace-trust",
-      "--skip-welcome",
-      "--skip-release-notes",
-      "--user-data-dir",
-      userDataDir,
-      "--extensions-dir",
-      extensionsDir,
-    ],
-  });
-});
+      "internal",
+      "lsptest",
+      "__snapshots__",
+      "TestLSP_FormattingRealWorld_1.snap.Dockerfile",
+    );
+
+    const vscodeVersion = process.env.VSCODE_TEST_VERSION;
+    const vscodeDownloadTimeoutMsRaw = process.env.VSCODE_TEST_DOWNLOAD_TIMEOUT_MS;
+    const vscodeDownloadTimeoutMsParsed = Number.parseInt(
+      vscodeDownloadTimeoutMsRaw ?? "120000",
+      10,
+    );
+    const vscodeDownloadTimeoutMs = Number.isFinite(vscodeDownloadTimeoutMsParsed)
+      ? vscodeDownloadTimeoutMsParsed
+      : 120_000;
+
+    await runTests({
+      extensionDevelopmentPath: extensionRoot,
+      extensionTestsPath: path.join(extensionRoot, "test", "suite", "index.js"),
+      ...(vscodeVersion ? { version: vscodeVersion } : {}),
+      timeout: vscodeDownloadTimeoutMs,
+      extractSync: true,
+      launchArgs: [
+        repoRoot,
+        "--disable-extensions",
+        "--disable-workspace-trust",
+        "--skip-welcome",
+        "--skip-release-notes",
+        "--user-data-dir",
+        userDataDir,
+        "--extensions-dir",
+        extensionsDir,
+      ],
+    });
+  },
+  { timeout: 10 * 60 * 1000 },
+);

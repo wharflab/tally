@@ -83,5 +83,13 @@
       "source.organizeImports": "explicit"
     }
   },
-  "python.languageServer": "None"
+  "python.languageServer": "None",
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/*.code-search": true,
+    "**/dist/": true,
+    "**/*.out": true,
+    "**/docs/site/": true,
+    "**/.vscode-test": true
+  },
 }
