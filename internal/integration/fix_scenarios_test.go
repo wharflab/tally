@@ -225,6 +225,8 @@ func TestFixPreferAddUnpackBeatsHeredoc(t *testing.T) {
 	if err := os.WriteFile(dockerfilePath, []byte(input), 0o644); err != nil {
 		t.Fatalf("failed to write Dockerfile: %v", err)
 	}
+	// Write an empty config in tmpDir to prevent parent-directory config discovery
+	// and keep this scenario isolated to only explicitly selected flags/rules.
 	configPath := filepath.Join(tmpDir, ".tally.toml")
 	if err := os.WriteFile(configPath, []byte(""), 0o644); err != nil {
 		t.Fatalf("failed to write config: %v", err)
