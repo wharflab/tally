@@ -7,6 +7,7 @@ import (
 	"github.com/tinovyatkin/tally/internal/async"
 	"github.com/tinovyatkin/tally/internal/registry"
 	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/tinovyatkin/tally/internal/rules/asyncutil"
 	"github.com/tinovyatkin/tally/internal/semantic"
 )
 
@@ -99,40 +100,19 @@ func (r *DL3057Rule) PlanAsync(input rules.LintInput) []async.CheckRequest {
 	}
 
 	meta := r.Metadata()
-	var requests []async.CheckRequest
-
-	for info := range sem.ExternalImageStages() {
-		if info.Stage == nil {
-			continue
+	return asyncutil.PlanExternalImageChecks(input, meta, func(
+		m rules.RuleMetadata,
+		info *semantic.StageInfo,
+		file, _ string,
+	) async.ResultHandler {
+		return &healthcheckHandler{
+			meta:     m,
+			file:     file,
+			stageIdx: info.Index,
+			semantic: sem,
+			stages:   input.Stages,
 		}
-
-		expectedPlatform, unresolved := semantic.ExpectedPlatform(info, sem)
-		if len(unresolved) > 0 || expectedPlatform == "" {
-			continue
-		}
-
-		ref := info.Stage.BaseName
-		key := ref + "|" + expectedPlatform
-
-		requests = append(requests, async.CheckRequest{
-			RuleCode:   meta.Code,
-			Category:   async.CategoryNetwork,
-			Key:        key,
-			ResolverID: registry.RegistryResolverID(),
-			Data:       &registry.ResolveRequest{Ref: ref, Platform: expectedPlatform},
-			File:       input.File,
-			StageIndex: info.Index,
-			Handler: &healthcheckHandler{
-				meta:     meta,
-				file:     input.File,
-				stageIdx: info.Index,
-				semantic: sem,
-				stages:   input.Stages,
-			},
-		})
-	}
-
-	return requests
+	})
 }
 
 // healthcheckHandler processes resolved image config for HEALTHCHECK detection.
