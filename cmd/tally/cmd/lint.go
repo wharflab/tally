@@ -151,6 +151,32 @@ func lintCommand() *cli.Command {
 				Usage:   "Also apply suggestion/unsafe fixes (requires --fix)",
 				Sources: cli.EnvVars("TALLY_FIX_UNSAFE"),
 			},
+			&cli.BoolFlag{
+				Name:    "ai",
+				Usage:   "Enable AI AutoFix (requires an ACP agent command)",
+				Sources: cli.EnvVars("TALLY_AI_ENABLED"),
+			},
+			&cli.StringSliceFlag{
+				Name:    "ai-command",
+				Usage:   "ACP agent command argv (repeatable, in order)",
+				Sources: cli.EnvVars("TALLY_AI_COMMAND"),
+			},
+			&cli.StringFlag{
+				Name:    "ai-timeout",
+				Usage:   "Per-fix AI timeout (e.g., 90s)",
+				Sources: cli.EnvVars("TALLY_AI_TIMEOUT"),
+			},
+			&cli.IntFlag{
+				Name:    "ai-max-input-bytes",
+				Usage:   "Maximum prompt size in bytes",
+				Sources: cli.EnvVars("TALLY_AI_MAX_INPUT_BYTES"),
+			},
+			&cli.BoolFlag{
+				Name:    "ai-redact-secrets",
+				Usage:   "Redact obvious secrets before sending content to the agent",
+				Value:   true,
+				Sources: cli.EnvVars("TALLY_AI_REDACT_SECRETS"),
+			},
 		},
 		Action: runLint,
 	}
@@ -442,6 +468,23 @@ func loadConfigForFile(cmd *cli.Command, targetPath string) (*config.Config, err
 	}
 	if cmd.IsSet("slow-checks-timeout") {
 		cfg.SlowChecks.Timeout = cmd.String("slow-checks-timeout")
+	}
+
+	// Apply AI CLI overrides
+	if cmd.IsSet("ai") {
+		cfg.AI.Enabled = cmd.Bool("ai")
+	}
+	if cmd.IsSet("ai-command") {
+		cfg.AI.Command = cmd.StringSlice("ai-command")
+	}
+	if cmd.IsSet("ai-timeout") {
+		cfg.AI.Timeout = cmd.String("ai-timeout")
+	}
+	if cmd.IsSet("ai-max-input-bytes") {
+		cfg.AI.MaxInputBytes = cmd.Int("ai-max-input-bytes")
+	}
+	if cmd.IsSet("ai-redact-secrets") {
+		cfg.AI.RedactSecrets = cmd.Bool("ai-redact-secrets")
 	}
 
 	return cfg, nil
