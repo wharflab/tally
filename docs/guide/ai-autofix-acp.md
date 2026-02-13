@@ -225,6 +225,39 @@ ACP has been primarily discussed in the context of editors and “agentic IDE”
 
 **turning linter guidance into high-leverage, validated refactors.**
 
+The core idea isn’t “ask an LLM to improve my Dockerfile”. It’s closer to:
+
+- the linter detects a very specific, high-signal situation,
+- it asks the agent to do **one narrow transformation** with a strict contract,
+- then it **verifies** the output before applying anything.
+
+That combination is what makes the result consistently better than a generic prompt like “Improve my Dockerfile”.
+
+### Prompts as a product
+
+Most people don’t get great results from an agent because they don’t know what to ask for. tally does.
+
+When a rule triggers, tally can send a prompt that is:
+
+- **concise**: no long conversations, just the task + the Dockerfile + minimal evidence
+- **precise**: “convert to multi-stage” (not “optimize everything”)
+- **bounded**: “don’t change unrelated parts unless required for the conversion”
+- **machine-checkable**: the agent must output either `NO_CHANGE` or one full Dockerfile in a fenced code block
+
+In other words, the prompt encodes the *best practice question* you would have asked if you were an expert at prompting and Dockerfiles.
+
+### Validation beats vibes
+
+Even a good model can produce plausible-but-wrong output. tally treats the agent’s response as an untrusted proposal and validates it:
+
+- Parse the returned Dockerfile (syntax must be valid).
+- Check invariants that matter for the transformation (e.g. “multi-stage” should actually produce multiple stages).
+- Re-lint the proposed output and feed back any blocking issues.
+- If the agent can’t produce a safe refactor, it must respond `NO_CHANGE` (tally skips the fix and continues linting).
+
+This “heuristics → focused prompt → validation loop” is the key: you get the speed of rules and the flexibility of an agent, without turning your
+lint run into a free-form AI chat session.
+
 This is one of the first steps toward a new class of tooling where:
 
 - linters don’t just point at problems — they can propose complete, reviewable changes,
