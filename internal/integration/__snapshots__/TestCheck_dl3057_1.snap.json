@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "testdata/dl3057/Dockerfile",
+      "violations": [
+        {
+          "detail": "Add a HEALTHCHECK instruction to enable container health monitoring. Use HEALTHCHECK CMD to define a check command, or HEALTHCHECK NONE to explicitly opt out. Note: HEALTHCHECK is inherited from base images at runtime, so this may be a false positive if your base image already defines one.",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3057",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "testdata/dl3057/Dockerfile",
+            "start": {
+              "column": -1,
+              "line": -1
+            }
+          },
+          "message": "`HEALTHCHECK` instruction missing",
+          "rule": "hadolint/DL3057",
+          "severity": "info"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

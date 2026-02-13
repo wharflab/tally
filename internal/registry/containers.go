@@ -183,11 +183,12 @@ func (r *ContainersResolver) resolveFromManifest(
 	manifestDigest := godigest.FromBytes(rawManifest)
 
 	imgCfg := ImageConfig{
-		Env:     parseEnvList(ociConfig.Config.Env),
-		OS:      ociConfig.OS,
-		Arch:    ociConfig.Architecture,
-		Variant: ociConfig.Variant,
-		Digest:  manifestDigest.String(),
+		Env:            parseEnvList(ociConfig.Config.Env),
+		OS:             ociConfig.OS,
+		Arch:           ociConfig.Architecture,
+		Variant:        ociConfig.Variant,
+		Digest:         manifestDigest.String(),
+		HasHealthcheck: extractHasHealthcheck(configBytes),
 	}
 
 	// Platform mismatch check for single-manifest images.

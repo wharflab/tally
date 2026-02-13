@@ -43,6 +43,10 @@ type ImageConfig struct {
 
 	// Digest is the resolved manifest digest.
 	Digest string
+
+	// HasHealthcheck is true if the image defines a HEALTHCHECK (CMD or CMD-SHELL).
+	// False if HEALTHCHECK is NONE or absent.
+	HasHealthcheck bool
 }
 
 // ResolveRequest is the typed input for the registry async resolver.

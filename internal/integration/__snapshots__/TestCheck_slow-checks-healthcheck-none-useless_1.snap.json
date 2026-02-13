@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "testdata/slow-checks-healthcheck-none-useless/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3057",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/slow-checks-healthcheck-none-useless/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "`HEALTHCHECK NONE` has no effect: base image has no health check to disable",
+          "rule": "hadolint/DL3057",
+          "severity": "info",
+          "sourceCode": "HEALTHCHECK NONE"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

@@ -14,6 +14,7 @@ Suggests using COPY heredoc for file creation instead of RUN echo/cat.
 Suggests replacing `RUN echo/cat/printf > file` patterns with `COPY <<EOF` syntax for better performance and readability.
 
 This rule detects file creation patterns in RUN instructions and extracts them into COPY heredocs, even when mixed with other commands.
+It relies on Dockerfile [here-documents](https://docs.docker.com/reference/dockerfile/#here-documents) support for `COPY`.
 
 ## Why COPY heredoc?
 
@@ -33,25 +34,49 @@ This rule detects file creation patterns in RUN instructions and extracts them i
 ### Before (violation)
 
 ```dockerfile
-RUN echo "server {" > /etc/nginx/nginx.conf && \
-    echo "    listen 80;" >> /etc/nginx/nginx.conf && \
-    echo "}" >> /etc/nginx/nginx.conf
+RUN cat > /etc/nginx/nginx.conf <<'EOF'
+worker_processes auto;
+events { worker_connections 1024; }
+http {
+    server {
+        listen 8080;
+        location /healthz { return 200 "ok"; }
+    }
+}
+EOF
 
-RUN apt-get update && echo "content" > /etc/config && apt-get clean
+RUN printf '#!/bin/sh\nexec nginx -g "daemon off;"\n' > /usr/local/bin/start-nginx && \
+    chmod 0755 /usr/local/bin/start-nginx
+
+RUN apt-get update && \
+    echo "APP_ENV=production" > /etc/myapp.env && \
+    echo "LOG_FORMAT=json" >> /etc/myapp.env && \
+    apt-get clean
 ```
 
 ### After (fixed with --fix --fix-unsafe)
 
 ```dockerfile
 COPY <<EOF /etc/nginx/nginx.conf
-server {
-    listen 80;
+worker_processes auto;
+events { worker_connections 1024; }
+http {
+    server {
+        listen 8080;
+        location /healthz { return 200 "ok"; }
+    }
 }
 EOF
 
+COPY --chmod=0755 <<EOF /usr/local/bin/start-nginx
+#!/bin/sh
+exec nginx -g "daemon off;"
+EOF
+
 RUN apt-get update
-COPY <<EOF /etc/config
-content
+COPY <<EOF /etc/myapp.env
+APP_ENV=production
+LOG_FORMAT=json
 EOF
 RUN apt-get clean
 ```
@@ -105,3 +130,7 @@ check-consecutive-runs = true
 
 This rule takes priority over `prefer-run-heredoc` for pure file creation patterns. When both rules detect a pattern, `prefer-copy-heredoc` handles
 it.
+
+## References
+
+- [Dockerfile here-documents](https://docs.docker.com/reference/dockerfile/#here-documents)

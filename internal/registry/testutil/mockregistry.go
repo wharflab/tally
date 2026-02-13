@@ -107,12 +107,13 @@ func (mr *MockRegistry) HasRequest(pattern string) bool {
 
 // ImageOpts configures a single-platform image pushed to the mock registry.
 type ImageOpts struct {
-	Repo    string            // e.g. "library/python"
-	Tag     string            // e.g. "3.12"
-	OS      string            // e.g. "linux"
-	Arch    string            // e.g. "amd64"
-	Variant string            // e.g. "v8" (optional)
-	Env     map[string]string // e.g. {"PATH": "/usr/bin", "PYTHON_VERSION": "3.12"}
+	Repo        string            // e.g. "library/python"
+	Tag         string            // e.g. "3.12"
+	OS          string            // e.g. "linux"
+	Arch        string            // e.g. "amd64"
+	Variant     string            // e.g. "v8" (optional)
+	Env         map[string]string // e.g. {"PATH": "/usr/bin", "PYTHON_VERSION": "3.12"}
+	Healthcheck []string          // e.g. {"CMD-SHELL", "curl -f http://localhost/ || exit 1"} (optional)
 }
 
 // AddImage pushes a single-platform image and returns its digest.
@@ -225,6 +226,13 @@ func buildImage(opts ImageOpts) (v1.Image, error) {
 		env = append(env, k+"="+v)
 	}
 	cfgFile.Config.Env = env
+
+	// Set healthcheck if provided.
+	if len(opts.Healthcheck) > 0 {
+		cfgFile.Config.Healthcheck = &v1.HealthConfig{
+			Test: opts.Healthcheck,
+		}
+	}
 
 	img, err = mutate.ConfigFile(img, cfgFile)
 	if err != nil {

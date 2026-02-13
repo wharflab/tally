@@ -1,0 +1,10 @@
+{
+ "Category": "best-practice",
+ "Code": "hadolint/DL3057",
+ "DefaultSeverity": "info",
+ "Description": "`HEALTHCHECK` instruction missing",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3057",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "HEALTHCHECK instruction missing"
+}

@@ -107,6 +107,20 @@ func setupMockRegistry(tmpDir string) {
 		panic("failed to add multiarch:latest index: " + err.Error())
 	}
 
+	// withhealthcheck:latest — image with HEALTHCHECK CMD. Used for DL3057 async tests.
+	if _, err := mockRegistry.AddImage(testutil.ImageOpts{
+		Repo:        "library/withhealthcheck",
+		Tag:         "latest",
+		OS:          "linux",
+		Arch:        "arm64",
+		Env:         map[string]string{"PATH": "/usr/local/bin:/usr/bin:/bin"},
+		Healthcheck: []string{"CMD-SHELL", "curl -f http://localhost/ || exit 1"},
+	}); err != nil {
+		mockRegistry.Close()
+		_ = os.RemoveAll(tmpDir)
+		panic("failed to add withhealthcheck:latest image: " + err.Error())
+	}
+
 	// Delayed images — each has a 30-second artificial delay.
 	// Separate repos prevent parallel tests from interfering with each other's
 	// request assertions (e.g. fail-fast asserting "no requests for this repo").
@@ -477,6 +491,12 @@ func TestCheck(t *testing.T) {
 			wantExit: 1,
 		},
 		{
+			name:     "dl3057",
+			dir:      "dl3057",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3057")...),
+			wantExit: 1,
+		},
+		{
 			name:     "dl3047",
 			dir:      "dl3047",
 			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3047")...),
@@ -798,6 +818,31 @@ func TestCheck(t *testing.T) {
 					t.Errorf("expected timeout note in stderr, got: %q", stderr)
 				}
 			},
+		},
+
+		// DL3057 async HEALTHCHECK tests — mock registry provides image metadata
+		{
+			name: "slow-checks-healthcheck-inherited",
+			dir:  "slow-checks-healthcheck-inherited",
+			args: append(
+				[]string{"--format", "json", "--slow-checks=on"},
+				selectRules("hadolint/DL3057")...),
+		},
+		{
+			name: "slow-checks-healthcheck-none-useless",
+			dir:  "slow-checks-healthcheck-none-useless",
+			args: append(
+				[]string{"--format", "json", "--slow-checks=on"},
+				selectRules("hadolint/DL3057")...),
+			wantExit: 1,
+		},
+		{
+			name: "slow-checks-healthcheck-missing-confirmed",
+			dir:  "slow-checks-healthcheck-missing-confirmed",
+			args: append(
+				[]string{"--format", "json", "--slow-checks=on"},
+				selectRules("hadolint/DL3057")...),
+			wantExit: 1,
 		},
 
 		// Consistent indentation tests (isolated to consistent-indentation rule)
@@ -1418,8 +1463,10 @@ severity = "style"
 				t.Fatalf("failed to write config: %v", err)
 			}
 
-			// Run tally check --fix (disable slow checks — fix tests don't need async)
-			args := append([]string{"check", "--config", configPath, "--slow-checks=off"}, tc.args...)
+			// Run tally check --fix (disable slow checks — fix tests don't need async).
+			// Ignore DL3057 (HEALTHCHECK missing) as it fires for nearly every fixture
+			// and has no auto-fix; it's irrelevant for testing other fixes.
+			args := append([]string{"check", "--config", configPath, "--slow-checks=off", "--ignore", "hadolint/DL3057"}, tc.args...)
 			args = append(args, dockerfilePath)
 			cmd := exec.Command(binaryPath, args...)
 			cmd.Env = append(os.Environ(),

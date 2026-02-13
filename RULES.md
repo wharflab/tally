@@ -17,7 +17,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 |-----------|-------------|---------------------|-------|
 | tally | 8 | - | 8 |
 | buildkit | 17 + 5 captured | - | 22 |
-| hadolint | 24 | 11 | 66 |
+| hadolint | 25 | 11 | 66 |
 <!-- END RULES_SUMMARY -->
 
 ---
@@ -171,7 +171,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL3054](https://github.com/hadolint/hadolint/wiki/DL3054) | Label `<label>` is not a valid SPDX license identifier. | Warning | ⏳ |
 | [DL3055](https://github.com/hadolint/hadolint/wiki/DL3055) | Label `<label>` is not a valid git hash. | Warning | ⏳ |
 | [DL3056](https://github.com/hadolint/hadolint/wiki/DL3056) | Label `<label>` does not conform to semantic versioning. | Warning | ⏳ |
-| [DL3057](https://github.com/hadolint/hadolint/wiki/DL3057) | `HEALTHCHECK` instruction missing. | Ignore | ⏳ |
+| [DL3057](https://github.com/hadolint/hadolint/wiki/DL3057) | `HEALTHCHECK` instruction missing. | Ignore | ✅ `hadolint/DL3057` |
 | [DL3058](https://github.com/hadolint/hadolint/wiki/DL3058) | Label `<label>` is not a valid email format - must conform to RFC5322. | Warning | ⏳ |
 | [DL3059](https://github.com/hadolint/hadolint/wiki/DL3059) | Multiple consecutive `RUN` instructions. Consider consolidation. | Info | 🔄 [`tally/prefer-run-heredoc`](docs/rules/tally/prefer-run-heredoc.md) |
 | [DL3060](https://github.com/hadolint/hadolint/wiki/DL3060) | `yarn cache clean` missing after `yarn install` was run. | Info | ⏳ |
@@ -184,6 +184,22 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL4005](https://github.com/hadolint/hadolint/wiki/DL4005) | Use `SHELL` to change the default shell. | Warning | ✅🔧 `hadolint/DL4005` |
 | [DL4006](https://github.com/hadolint/hadolint/wiki/DL4006) | Set the `SHELL` option -o pipefail before `RUN` with a pipe in it | Warning | ✅🔧 `hadolint/DL4006` |
 <!-- END HADOLINT_DL_RULES -->
+
+#### DL3057: HEALTHCHECK Instruction Missing (Enhanced)
+
+tally goes beyond Hadolint's static check by resolving base image metadata from the registry when `--slow-checks` is enabled.
+
+**Docker behavior:** `HEALTHCHECK` is inherited from base images at runtime. If a base image defines `HEALTHCHECK CMD ...`, child images inherit it automatically. `HEALTHCHECK NONE` explicitly disables any inherited health check.
+
+**Three violation scenarios:**
+
+| Scenario | Fast path (static) | With `--slow-checks` |
+|---|---|---|
+| No `HEALTHCHECK CMD` in Dockerfile, base has HC | Violation (false positive) | Suppressed (inherited from base) |
+| No `HEALTHCHECK CMD` in Dockerfile, base has no HC | Violation | Violation confirmed |
+| `HEALTHCHECK NONE` in Dockerfile, base has no HC | Violation (generic "missing") | Specific: "HEALTHCHECK NONE has no effect" |
+
+**Configuration:** The async behavior is controlled by `--slow-checks` (or `slow-checks` in config). When set to `off`, only the fast static check runs.
 
 ### SC Rules (ShellCheck)
 

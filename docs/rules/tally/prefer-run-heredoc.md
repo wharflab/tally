@@ -13,6 +13,9 @@ Suggests using heredoc syntax for multi-command RUN instructions.
 
 Suggests converting multi-command RUN instructions to heredoc syntax for better readability.
 
+This rule targets Dockerfile
+[here-documents](https://docs.docker.com/reference/dockerfile/#here-documents) with `RUN`, which are supported by BuildKit syntax.
+
 Detects two patterns:
 
 1. **Multiple consecutive RUN instructions** that could be combined
@@ -32,8 +35,8 @@ Heredoc syntax for RUN instructions offers:
 
 ```dockerfile
 RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y vim
+    apt-get install -y --no-install-recommends ca-certificates curl tzdata && \
+    rm -rf /var/lib/apt/lists/*
 ```
 
 ### After (fixed with --fix)
@@ -42,8 +45,27 @@ RUN apt-get update && \
 RUN <<EOF
 set -e
 apt-get update
-apt-get upgrade -y
-apt-get install -y vim
+apt-get install -y --no-install-recommends ca-certificates curl tzdata
+rm -rf /var/lib/apt/lists/*
+EOF
+```
+
+### Another real-life example
+
+```dockerfile
+RUN mkdir -p /app /var/log/myapp && \
+    addgroup -S app && \
+    adduser -S -G app app && \
+    chown -R app:app /app /var/log/myapp
+```
+
+```dockerfile
+RUN <<EOF
+set -e
+mkdir -p /app /var/log/myapp
+addgroup -S app
+adduser -S -G app app
+chown -R app:app /app /var/log/myapp
 EOF
 ```
 
@@ -76,3 +98,7 @@ check-chained-commands = true
 
 When this rule is enabled, `hadolint/DL3003` (cd → WORKDIR) will skip generating fixes for commands that are heredoc candidates, allowing heredoc
 conversion to handle `cd` correctly within the script.
+
+## References
+
+- [Dockerfile here-documents](https://docs.docker.com/reference/dockerfile/#here-documents)

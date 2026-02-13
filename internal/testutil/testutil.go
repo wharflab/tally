@@ -81,6 +81,17 @@ func MakeLintInputWithSemantic(tb testing.TB, file, content string) rules.LintIn
 	}
 }
 
+// GetSemantic extracts the *semantic.Model from a LintInput.
+// Fails the test if the Semantic field is nil or not a *semantic.Model.
+func GetSemantic(tb testing.TB, input rules.LintInput) *semantic.Model {
+	tb.Helper()
+	sem, ok := input.Semantic.(*semantic.Model)
+	if !ok || sem == nil {
+		tb.Fatal("LintInput.Semantic is not a *semantic.Model; use MakeLintInputWithSemantic")
+	}
+	return sem
+}
+
 // RuleTestCase defines a test case for table-driven rule tests.
 type RuleTestCase struct {
 	// Name is the test case name.

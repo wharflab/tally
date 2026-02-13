@@ -1,6 +1,25 @@
 {
  "diagnostics": [
   {
+   "code": "hadolint/DL3057",
+   "codeDescription": {
+    "href": "https://github.com/hadolint/hadolint/wiki/DL3057"
+   },
+   "message": "`HEALTHCHECK` instruction missing",
+   "range": {
+    "end": {
+     "character": 0,
+     "line": 0
+    },
+    "start": {
+     "character": 0,
+     "line": 0
+    }
+   },
+   "severity": 3,
+   "source": "tally"
+  },
+  {
    "code": "buildkit/MaintainerDeprecated",
    "codeDescription": {
     "href": "https://docs.docker.com/go/dockerfile/rule/maintainer-deprecated/"
