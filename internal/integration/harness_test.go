@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -32,6 +34,8 @@ type fixCase struct {
 	wantApplied int    // Expected number of fixes applied
 	config      string // Optional config file content (empty string uses default empty config)
 }
+
+var fixedSummaryRE = regexp.MustCompile(`(?m)^Fixed (\d+) issues? in \d+ files?$`)
 
 func runCheckCase(t *testing.T, tc checkCase) {
 	t.Helper()
@@ -157,7 +161,36 @@ func runFixCase(t *testing.T, tc fixCase) {
 
 	// Check that the output mentions the expected number of fixes
 	outputStr := string(output)
-	if tc.wantApplied > 0 && !strings.Contains(outputStr, "Fixed") {
-		t.Errorf("expected 'Fixed' in output, got: %s", outputStr)
+	gotApplied, ok, err := parseFixedCount(outputStr)
+	if tc.wantApplied > 0 {
+		if err != nil {
+			t.Fatalf("failed to parse fixed summary: %v\noutput:\n%s", err, outputStr)
+		}
+		if !ok {
+			t.Fatalf("expected fixed summary in output, got:\n%s", outputStr)
+		}
+		if gotApplied != tc.wantApplied {
+			t.Errorf("expected %d fixes applied, got %d\noutput:\n%s", tc.wantApplied, gotApplied, outputStr)
+		}
+		return
 	}
+
+	if err != nil {
+		t.Fatalf("failed to parse fixed summary: %v\noutput:\n%s", err, outputStr)
+	}
+	if ok && gotApplied != 0 {
+		t.Errorf("expected no fixes applied, got %d\noutput:\n%s", gotApplied, outputStr)
+	}
+}
+
+func parseFixedCount(output string) (int, bool, error) {
+	match := fixedSummaryRE.FindStringSubmatch(output)
+	if len(match) == 0 {
+		return 0, false, nil
+	}
+	count, err := strconv.Atoi(match[1])
+	if err != nil {
+		return 0, false, err
+	}
+	return count, true, nil
 }
