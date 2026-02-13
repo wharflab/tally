@@ -290,12 +290,7 @@ func TestFormatHeredocWithMounts(t *testing.T) {
 	t.Run("without mounts", func(t *testing.T) {
 		t.Parallel()
 		result := heredoc.FormatWithMounts(commands, nil, shell.VariantBash, false)
-
-		expected := "RUN <<EOF\nset -e\napt-get update\napt-get install -y vim\napt-get clean\nEOF"
-
-		if result != expected {
-			t.Errorf("heredoc.FormatWithMounts() =\n%s\nwant:\n%s", result, expected)
-		}
+		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
 	})
 
 	t.Run("with cache mount", func(t *testing.T) {
@@ -305,12 +300,7 @@ func TestFormatHeredocWithMounts(t *testing.T) {
 			Target: "/var/cache/apt",
 		}}
 		result := heredoc.FormatWithMounts(commands, mounts, shell.VariantBash, false)
-
-		expected := "RUN --mount=type=cache,target=/var/cache/apt <<EOF\nset -e\napt-get update\napt-get install -y vim\napt-get clean\nEOF"
-
-		if result != expected {
-			t.Errorf("heredoc.FormatWithMounts() =\n%s\nwant:\n%s", result, expected)
-		}
+		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
 	})
 
 	t.Run("with multiple mounts", func(t *testing.T) {
@@ -320,14 +310,7 @@ func TestFormatHeredocWithMounts(t *testing.T) {
 			{Type: instructions.MountTypeCache, Target: "/root/.cache"},
 		}
 		result := heredoc.FormatWithMounts(commands, mounts, shell.VariantBash, false)
-
-		expected := "RUN --mount=type=cache,target=/var/cache/apt " +
-			"--mount=type=cache,target=/root/.cache " +
-			"<<EOF\nset -e\napt-get update\napt-get install -y vim\napt-get clean\nEOF"
-
-		if result != expected {
-			t.Errorf("heredoc.FormatWithMounts() =\n%s\nwant:\n%s", result, expected)
-		}
+		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
 	})
 }
 
@@ -338,45 +321,28 @@ func TestFormatHeredocWithPipefail(t *testing.T) {
 		t.Parallel()
 		commands := []string{"apt-get update", "curl -s https://example.com | bash", "apt-get clean"}
 		result := heredoc.FormatWithMounts(commands, nil, shell.VariantBash, true)
-
-		expected := "RUN <<EOF\nset -e\nset -o pipefail\napt-get update\ncurl -s https://example.com | bash\napt-get clean\nEOF"
-		if result != expected {
-			t.Errorf("FormatWithMounts(pipefail=true) =\n%s\nwant:\n%s", result, expected)
-		}
+		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
 	})
 
 	t.Run("pipefail false omits set -o pipefail", func(t *testing.T) {
 		t.Parallel()
 		commands := []string{"apt-get update", "curl -s https://example.com | bash"}
 		result := heredoc.FormatWithMounts(commands, nil, shell.VariantBash, false)
-
-		expected := "RUN <<EOF\nset -e\napt-get update\ncurl -s https://example.com | bash\nEOF"
-		if result != expected {
-			t.Errorf("FormatWithMounts(pipefail=false) =\n%s\nwant:\n%s", result, expected)
-		}
+		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
 	})
 
 	t.Run("pipefail deduplicates bare set -o pipefail", func(t *testing.T) {
 		t.Parallel()
 		commands := []string{"set -o pipefail", "curl -s https://example.com | bash"}
 		result := heredoc.FormatWithMounts(commands, nil, shell.VariantBash, true)
-
-		expected := "RUN <<EOF\nset -e\nset -o pipefail\ncurl -s https://example.com | bash\nEOF"
-		if result != expected {
-			t.Errorf("FormatWithMounts(pipefail dedup) =\n%s\nwant:\n%s", result, expected)
-		}
+		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
 	})
 
 	t.Run("pipefail preserves set -euo pipefail", func(t *testing.T) {
 		t.Parallel()
 		commands := []string{"set -euo pipefail", "curl -s https://example.com | bash"}
 		result := heredoc.FormatWithMounts(commands, nil, shell.VariantBash, true)
-
-		// "set -euo pipefail" sets additional flags (-u), so it's preserved
-		expected := "RUN <<EOF\nset -e\nset -o pipefail\nset -euo pipefail\ncurl -s https://example.com | bash\nEOF"
-		if result != expected {
-			t.Errorf("FormatWithMounts(preserve -euo) =\n%s\nwant:\n%s", result, expected)
-		}
+		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
 	})
 }
 
