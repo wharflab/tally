@@ -1,6 +1,7 @@
 package semantic
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/tinovyatkin/tally/internal/directive"
@@ -194,6 +195,9 @@ func TestParseOnbuildExpressionValidExpressions(t *testing.T) {
 			cmd := parseOnbuildExpression(tt.expr, 0)
 			if cmd == nil {
 				t.Fatalf("expected non-nil command for %q", tt.expr)
+			}
+			if got := fmt.Sprintf("%T", cmd); got != tt.wantType {
+				t.Errorf("got type %s, want %s", got, tt.wantType)
 			}
 		})
 	}
