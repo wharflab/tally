@@ -281,6 +281,43 @@ ONBUILD RUN apt-get install python`)
 	}
 }
 
+// TestDL3014_OnbuildLocationNotSynthetic is a regression test ensuring that
+// ONBUILD violations report the real source line, not line 2 from the
+// synthetic wrapper Dockerfile used by parseOnbuildExpression.
+func TestDL3014_OnbuildLocationNotSynthetic(t *testing.T) {
+	t.Parallel()
+	// ONBUILD is on line 4 — if the location were still from the synthetic
+	// wrapper it would incorrectly report line 2.
+	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM ubuntu
+RUN echo setup
+RUN echo more
+ONBUILD RUN apt-get install python`)
+	r := NewDL3014Rule()
+	violations := r.Check(input)
+
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	v := violations[0]
+	if v.Location.Start.Line != 4 {
+		t.Errorf("violation line = %d, want 4 (ONBUILD source line)", v.Location.Start.Line)
+	}
+
+	// Auto-fix edit must also target the correct line
+	if v.SuggestedFix == nil || len(v.SuggestedFix.Edits) == 0 {
+		t.Fatal("expected SuggestedFix with edits")
+	}
+	edit := v.SuggestedFix.Edits[0]
+	if edit.Location.Start.Line != 4 {
+		t.Errorf("edit line = %d, want 4", edit.Location.Start.Line)
+	}
+	// "ONBUILD RUN apt-get install" — "install" ends at column 27
+	if edit.Location.Start.Column != 27 {
+		t.Errorf("edit column = %d, want 27", edit.Location.Start.Column)
+	}
+}
+
 // TestDL3014AndDL3027CombinedFixes verifies that DL3027 and DL3014 can both
 // provide fixes on the same RUN command when it contains both "apt" and "apt-get install".
 func TestDL3014AndDL3027CombinedFixes(t *testing.T) {
