@@ -4,14 +4,14 @@
 
 tally keeps Dockerfiles and Containerfiles clean, modern, and consistent — using BuildKit's own parser and checks (the same foundation behind
 `docker buildx`) plus safe auto-fixes. It runs fast, doesn't require Docker Desktop or a daemon, and fits neatly into CI. If that sounds like your
-workflow, try `tally check .`.
+workflow, try `tally lint .`.
 
 ```bash
 # Lint everything in the repo (recursive)
-tally check .
+tally lint .
 
 # Apply all safe fixes automatically
-tally check --fix Dockerfile
+tally lint --fix Dockerfile
 ```
 
 ## Why tally?
@@ -92,28 +92,28 @@ go build .
 
 ```bash
 # Check a Dockerfile
-tally check Dockerfile
+tally lint Dockerfile
 
 # Check all Dockerfiles in current directory (recursive)
-tally check .
+tally lint .
 
 # Check with glob patterns
-tally check "**/*.Dockerfile"
+tally lint "**/*.Dockerfile"
 
 # Exclude patterns
-tally check --exclude "vendor/*" --exclude "test/*" .
+tally lint --exclude "vendor/*" --exclude "test/*" .
 
 # Check with max lines limit
-tally check --max-lines 100 Dockerfile
+tally lint --max-lines 100 Dockerfile
 
 # Output as JSON
-tally check --format json Dockerfile
+tally lint --format json Dockerfile
 
 # Check multiple files
-tally check Dockerfile.dev Dockerfile.prod
+tally lint Dockerfile.dev Dockerfile.prod
 
 # Enable context-aware rules (e.g., copy-ignored-file)
-tally check --context . Dockerfile
+tally lint --context . Dockerfile
 ```
 
 ### File Discovery
@@ -131,10 +131,10 @@ Use `--exclude` to filter out unwanted files:
 
 ```bash
 # Exclude vendor and test directories
-tally check --exclude "vendor/*" --exclude "test/*" .
+tally lint --exclude "vendor/*" --exclude "test/*" .
 
 # Exclude all .bak files
-tally check --exclude "*.bak" .
+tally lint --exclude "*.bak" .
 ```
 
 ## Rules Overview
@@ -147,7 +147,7 @@ Some rules require build context awareness. Enable them with the `--context` fla
 
 ```bash
 # Enable context-aware rules
-tally check --context . Dockerfile
+tally lint --context . Dockerfile
 ```
 
 **copy-ignored-file**: Detects when `COPY` or `ADD` commands reference files that would be excluded by `.dockerignore`. This helps catch mistakes
@@ -211,7 +211,7 @@ tally supports multiple output formats for different use cases.
 Human-readable output with colors and source code snippets:
 
 ```bash
-tally check Dockerfile
+tally lint Dockerfile
 ```
 
 ```text
@@ -231,7 +231,7 @@ Dockerfile:2
 Machine-readable format with summary statistics and scan metadata:
 
 ```bash
-tally check --format json Dockerfile
+tally lint --format json Dockerfile
 ```
 
 The JSON output includes:
@@ -278,7 +278,7 @@ The JSON output includes:
 [Static Analysis Results Interchange Format](https://docs.oasis-open.org/sarif/sarif/v2.1.0/) for CI/CD integration with GitHub Code Scanning, Azure DevOps, and other tools:
 
 ```bash
-tally check --format sarif Dockerfile > results.sarif
+tally lint --format sarif Dockerfile > results.sarif
 ```
 
 ### GitHub Actions
@@ -286,7 +286,7 @@ tally check --format sarif Dockerfile > results.sarif
 Native GitHub Actions workflow command format for inline annotations:
 
 ```bash
-tally check --format github-actions Dockerfile
+tally lint --format github-actions Dockerfile
 ```
 
 ```text
@@ -298,7 +298,7 @@ tally check --format github-actions Dockerfile
 Concise Markdown tables optimized for AI agents and token efficiency:
 
 ```bash
-tally check --format markdown Dockerfile
+tally lint --format markdown Dockerfile
 ```
 
 ```markdown
@@ -342,13 +342,13 @@ Control which severity levels cause a non-zero exit code:
 
 ```bash
 # Fail only on errors (ignore warnings)
-tally check --fail-level error Dockerfile
+tally lint --fail-level error Dockerfile
 
 # Never fail (useful for CI reporting without blocking)
-tally check --fail-level none --format sarif Dockerfile > results.sarif
+tally lint --fail-level none --format sarif Dockerfile > results.sarif
 
 # Fail on any violation including style issues (default behavior)
-tally check --fail-level style Dockerfile
+tally lint --fail-level style Dockerfile
 ```
 
 Available levels (from most to least severe): `error`, `warning`, `info`, `style` (default), `none`

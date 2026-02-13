@@ -6,7 +6,7 @@ This repository is a Go CLI for linting Dockerfiles and Containerfiles. It check
 common mistakes.
 
 - `main.go`: application entrypoint
-- `cmd/tally/cmd/`: CLI commands (`root.go`, `check.go`, `version.go`)
+- `cmd/tally/cmd/`: CLI commands (`root.go`, `lint.go`, `version.go`)
 - `internal/`: implementation packages
   - `internal/config/`: configuration loading with cascading discovery (koanf)
   - `internal/dockerfile/`: Dockerfile parsing (buildkit)
@@ -35,10 +35,10 @@ common mistakes.
 
 Local usage examples:
 
-- `go run . check --help`
-- `go run . check Dockerfile`
-- `go run . check --max-lines 100 Dockerfile`
-- `go run . check --config .tally.toml Dockerfile`
+- `go run . lint --help`
+- `go run . lint Dockerfile`
+- `go run . lint --max-lines 100 Dockerfile`
+- `go run . lint --config .tally.toml Dockerfile`
 
 ## Configuration
 

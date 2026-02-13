@@ -40,8 +40,8 @@ func TestFixRealWorld(t *testing.T) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	// Run tally check --fix --fix-unsafe (all rules enabled, slow checks off)
-	args := []string{"check", "--config", configPath, "--slow-checks=off", "--fix", "--fix-unsafe", dockerfilePath}
+	// Run tally lint --fix --fix-unsafe (all rules enabled, slow checks off)
+	args := []string{"lint", "--config", configPath, "--slow-checks=off", "--fix", "--fix-unsafe", dockerfilePath}
 	cmd := exec.Command(binaryPath, args...)
 	cmd.Env = append(os.Environ(),
 		"GOCOVERDIR="+coverageDir,
@@ -97,7 +97,7 @@ severity = "style"
 
 	// Run with all three rules: consistent-indentation (50), prefer-copy-heredoc (99), prefer-run-heredoc (100)
 	args := []string{
-		"check", "--config", configPath, "--slow-checks=off",
+		"lint", "--config", configPath, "--slow-checks=off",
 		"--fix", "--fix-unsafe",
 		"--ignore", "*",
 		"--select", "tally/consistent-indentation",
@@ -155,7 +155,7 @@ func TestFixConsistentIndentation(t *testing.T) {
 	}
 
 	args := []string{
-		"check", "--config", configPath, "--slow-checks=off",
+		"lint", "--config", configPath, "--slow-checks=off",
 		"--fix",
 		"--select", "tally/consistent-indentation",
 		dockerfilePath,
@@ -204,7 +204,7 @@ func TestFixPreferAddUnpackBeatsHeredoc(t *testing.T) {
 	}
 
 	args := []string{
-		"check", "--config", configPath, "--slow-checks=off",
+		"lint", "--config", configPath, "--slow-checks=off",
 		"--fix-unsafe", "--fix",
 		"--select", "tally/prefer-add-unpack",
 		"--select", "tally/prefer-run-heredoc",

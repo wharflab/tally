@@ -595,7 +595,7 @@ path = "tally-report.sarif"
 ### CLI Flags
 
 ```go
-// cmd/tally/cmd/check.go
+// cmd/tally/cmd/lint.go
 &cli.StringFlag{
     Name:    "format",
     Aliases: []string{"f"},

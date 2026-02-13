@@ -31,7 +31,7 @@ For repo layout, commands, and config details, start with `AGENTS.md`.
 
 ## Rules & Fixes
 
-- Rule config: `internal/config/`. Rule logic: `internal/lint/`. Flags/env wiring: `cmd/tally/cmd/check.go`.
+- Rule config: `internal/config/`. Rule logic: `internal/lint/`. Flags/env wiring: `cmd/tally/cmd/lint.go`.
 - New behavior should come with an integration fixture under `internal/integration/testdata/<case>/`.
 - Fixes:
   - Use `Violation.WithSuggestedFix()` and pick the narrowest safety level.

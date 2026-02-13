@@ -47,13 +47,13 @@ Example:
 
 ```bash
 # Apply safe fixes only (AI fixes will NOT run because they are unsafe)
-tally check --fix Dockerfile
+tally lint --fix Dockerfile
 
 # Apply unsafe fixes too (AI fixes MAY run, but only if AI AutoFix is configured)
-tally check --fix --fix-unsafe Dockerfile
+tally lint --fix --fix-unsafe Dockerfile
 
 # Narrow scope to a single rule to reduce blast radius
-tally check --fix --fix-unsafe --fix-rule tally/prefer-multi-stage-build Dockerfile
+tally lint --fix --fix-unsafe --fix-rule tally/prefer-multi-stage-build Dockerfile
 ```
 
 Notes:
@@ -450,7 +450,7 @@ Important: the rule does not attempt to produce structural edits itself; it only
 
 To ensure the resolver uses the same configuration file and overrides as the lint run:
 
-- Enrich AI resolver data **before** calling `fixer.Apply` in `cmd/tally/cmd/check.go:applyFixes`.
+- Enrich AI resolver data **before** calling `fixer.Apply` in `cmd/tally/cmd/lint.go:applyFixes`.
 - `fileConfigs` is already available there.
 - For AI fixes, attach `*config.Config` into `fix.ResolverData`.
 - Also attach the outer fix application context so the resolver can respect CLI intent in the loop:
@@ -531,7 +531,7 @@ Per round workflow:
 4. Lint validation (the “agent loop”):
    - Re-run tally lint in-memory on the proposed Dockerfile content.
    - Use the same effective per-file config, but force AI disabled for the validation runs to avoid recursion and accidental additional agent calls.
-   - Run semantic construction checks plus the enabled rule set from the config (same selection as a normal `tally check` run).
+   - Run semantic construction checks plus the enabled rule set from the config (same selection as a normal `tally lint` run).
 5. Optional in-memory normalization with heuristic fixes:
    - Only if the outer CLI run is not restricted by `--fix-rule` (i.e., `RuleFilter` is empty), apply deterministic `FixSafe` sync fixes (
      `NeedsResolve=false`) to the proposed content in-memory.
@@ -702,7 +702,7 @@ Test approach:
 
 - Build/execute fake agent as a test helper binary or `go run` package.
 - Configure `ai.command = ["go", "run", "./internal/integration/testdata/fake-acp-agent"]` for tests (or build once).
-- Run `tally check --fix --fix-unsafe --fix-rule tally/prefer-multi-stage-build ...` and assert the output file content matches expected.
+- Run `tally lint --fix --fix-unsafe --fix-rule tally/prefer-multi-stage-build ...` and assert the output file content matches expected.
 
 ### 13.3 Snapshot tests (optional)
 
@@ -747,7 +747,7 @@ Implement the full golden path with tight guardrails. Suggested incremental PR s
    - `internal/ai/autofix` resolver (explicit registration; no `init()` side effects)
    - Agent loop (§9.6) + required semantic validation (§10.2)
    - `tally/prefer-multi-stage-build` rule emitting an unsafe async fix (`ResolverID="ai-autofix"`)
-   - In `cmd/tally/cmd/check.go:applyFixes`, enrich `ResolverData` with per-file config + fix context
+   - In `cmd/tally/cmd/lint.go:applyFixes`, enrich `ResolverData` with per-file config + fix context
    - Integration test driving the full path with the fake ACP agent
    - Ensure async fix ordering is well-defined (resolve async fixes per file in priority order so whole-file AI rewrites run last)
 
@@ -783,7 +783,7 @@ Motivation:
 Hallway:
 
 - Introduce an explicit AI analysis mode that can produce additional findings:
-  - A new command (`tally analyze --ai`) or an explicit flag (`tally check --ai-detect`) so it is never surprising or enabled in CI by default.
+  - A new command (`tally analyze --ai`) or an explicit flag (`tally lint --ai-detect`) so it is never surprising or enabled in CI by default.
   - Output is a set of extra `rules.Violation` entries with stable, configurable rule codes (so users can filter/ignore them like normal rules).
 - Implementation sketch:
   - Add `internal/ai/detect` with a small `Detector` interface that runs per file (and optionally per repo) and returns violations.

@@ -14,7 +14,7 @@ const (
 )
 
 // ResultHandler processes a resolved result and returns violations.
-// The return value is opaque to the runtime; the caller (check.go) casts it
+// The return value is opaque to the runtime; the caller (lint.go) casts it
 // to []rules.Violation. This avoids an import cycle between async and rules.
 //
 // Return semantics:

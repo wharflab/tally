@@ -46,7 +46,7 @@ See `max-lines` rule as reference:
 1. Add rule config struct in `internal/config/config.go`
 2. Add rule logic in `internal/lint/rules.go`
 3. Add unit tests in `internal/lint/rules_test.go`
-4. Add CLI flags in `cmd/tally/cmd/check.go`
+4. Add CLI flags in `cmd/tally/cmd/lint.go`
 5. Wire config loading in `loadConfigForFile()`
 6. Add integration test cases
 7. Update documentation

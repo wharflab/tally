@@ -2,12 +2,12 @@ package integration
 
 import "testing"
 
-func TestCheck(t *testing.T) {
+func TestLint(t *testing.T) {
 	t.Parallel()
-	for _, tc := range checkCases(t) {
+	for _, tc := range lintCases(t) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			runCheckCase(t, tc)
+			runLintCase(t, tc)
 		})
 	}
 }

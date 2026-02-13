@@ -60,7 +60,7 @@ func BenchmarkDiscovery(b *testing.B) {
 
 	b.ResetTimer()
 	for b.Loop() {
-		cmd := exec.Command(benchBinaryPath, "check", "--format", "json", absTestdataDir)
+		cmd := exec.Command(benchBinaryPath, "lint", "--format", "json", absTestdataDir)
 		// Suppress output, we only care about timing
 		cmd.Stdout = nil
 		cmd.Stderr = nil
@@ -86,7 +86,7 @@ func BenchmarkComplexAria(b *testing.B) {
 
 	b.ResetTimer()
 	for b.Loop() {
-		cmd := exec.Command(benchBinaryPath, "check", "--format", "json", absPath)
+		cmd := exec.Command(benchBinaryPath, "lint", "--format", "json", absPath)
 		cmd.Stdout = nil
 		cmd.Stderr = nil
 		_ = cmd.Run() //nolint:errcheck // intentionally ignoring exit code
@@ -110,7 +110,7 @@ func BenchmarkComplexNolus(b *testing.B) {
 
 	b.ResetTimer()
 	for b.Loop() {
-		cmd := exec.Command(benchBinaryPath, "check", "--format", "json", absPath)
+		cmd := exec.Command(benchBinaryPath, "lint", "--format", "json", absPath)
 		cmd.Stdout = nil
 		cmd.Stderr = nil
 		_ = cmd.Run() //nolint:errcheck // intentionally ignoring exit code
@@ -135,7 +135,7 @@ func BenchmarkRealWorldFix(b *testing.B) {
 
 	b.ResetTimer()
 	for b.Loop() {
-		cmd := exec.Command(benchBinaryPath, "check", "--format", "json", absPath)
+		cmd := exec.Command(benchBinaryPath, "lint", "--format", "json", absPath)
 		cmd.Stdout = nil
 		cmd.Stderr = nil
 		_ = cmd.Run() //nolint:errcheck // intentionally ignoring exit code

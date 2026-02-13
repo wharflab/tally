@@ -68,5 +68,5 @@ skip-comments = true
 ## CLI Flags
 
 ```bash
-tally check --max-lines 100 --skip-blank-lines --skip-comments Dockerfile
+tally lint --max-lines 100 --skip-blank-lines --skip-comments Dockerfile
 ```

@@ -441,11 +441,11 @@ func (l *Linter) LintFile(path string, ctx *context.BuildContext) ([]Violation, 
 
 ```bash
 # Basic linting (no context)
-tally check Dockerfile
+tally lint Dockerfile
 
 # Context-aware linting
-tally check --context . Dockerfile
-tally check --build-arg VERSION=1.0 --context . Dockerfile
+tally lint --context . Dockerfile
+tally lint --build-arg VERSION=1.0 --context . Dockerfile
 ```
 
 ### Phase 2: Default Context (v1.5)
@@ -506,7 +506,7 @@ Note: Context-aware rules like DL3060 (COPY ignored file) and DL3061 (COPY non-e
 ### CLI Flags
 
 ```go
-// cmd/tally/cmd/check.go
+// cmd/tally/cmd/lint.go
 &cli.StringFlag{
     Name:  "context",
     Usage: "Build context directory (enables context-aware rules)",

@@ -11,8 +11,8 @@ pip install tally-cli
 ## Usage
 
 ```bash
-tally check Dockerfile
-tally check --max-lines 100 Dockerfile
+tally lint Dockerfile
+tally lint --max-lines 100 Dockerfile
 ```
 
 ## Documentation

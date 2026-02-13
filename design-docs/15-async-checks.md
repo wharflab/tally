@@ -65,7 +65,7 @@ MVP pipeline (single file, simplified):
 Fail-fast (default): if fast rules already produce any `SeverityError` violations for a file (after config overrides), skip/cancel async checks for
 that file and report results immediately. This can be disabled to always run slow checks.
 
-Multi-file runs (CLI): when linting multiple Dockerfiles in a single `tally check` invocation, the async runtime should be scoped to the invocation:
+Multi-file runs (CLI): when linting multiple Dockerfiles in a single `tally lint` invocation, the async runtime should be scoped to the invocation:
 use a **shared in-run cache** across files, apply the slow-checks timeout budget **per invocation**, and apply fail-fast **per file** (errors in file
 A do not suppress async checks for file B).
 

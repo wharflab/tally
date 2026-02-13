@@ -21,11 +21,11 @@ It checks your container build files for best practices, security issues,
 and common mistakes.
 
 Examples:
-  tally check Dockerfile
-  tally check --max-lines 100 Dockerfile
-  tally check .`,
+  tally lint Dockerfile
+  tally lint --max-lines 100 Dockerfile
+  tally lint .`,
 		Commands: []*cli.Command{
-			checkCommand(),
+			lintCommand(),
 			lspCommand(),
 			versionCommand(),
 		},

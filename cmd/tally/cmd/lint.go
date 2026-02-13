@@ -30,10 +30,10 @@ const (
 	ExitConfigError = 2 // Parse or config error
 )
 
-func checkCommand() *cli.Command {
+func lintCommand() *cli.Command {
 	return &cli.Command{
-		Name:      "check",
-		Usage:     "Check Dockerfile(s) for issues",
+		Name:      "lint",
+		Usage:     "Lint Dockerfile(s) for issues",
 		ArgsUsage: "[DOCKERFILE...]",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -150,7 +150,7 @@ func checkCommand() *cli.Command {
 				Sources: cli.EnvVars("TALLY_FIX_UNSAFE"),
 			},
 		},
-		Action: runCheck,
+		Action: runLint,
 	}
 }
 
@@ -163,8 +163,8 @@ type lintResults struct {
 	firstCfg    *config.Config
 }
 
-// runCheck is the action handler for the check command.
-func runCheck(ctx stdcontext.Context, cmd *cli.Command) error {
+// runLint is the action handler for the lint command.
+func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 	inputs := cmd.Args().Slice()
 	if len(inputs) == 0 {
 		inputs = []string{"."}

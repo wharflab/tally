@@ -39,7 +39,7 @@ When completing a task (especially new features or bug fixes), ensure:
 - [ ] Config struct in `internal/config/config.go`
 - [ ] Rule logic in `internal/lint/rules.go`
 - [ ] Unit tests in `internal/lint/rules_test.go`
-- [ ] CLI flags in `cmd/tally/cmd/check.go`
+- [ ] CLI flags in `cmd/tally/cmd/lint.go`
 - [ ] Config loading wired in `loadConfigForFile()`
 - [ ] Integration tests added
 - [ ] Documentation updated

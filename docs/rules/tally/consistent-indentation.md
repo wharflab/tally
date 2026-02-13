@@ -115,5 +115,5 @@ This rule provides safe auto-fixes that adjust indentation:
   so that BuildKit strips the leading tabs from the heredoc body
 
 ```bash
-tally check --fix Dockerfile
+tally lint --fix Dockerfile
 ```

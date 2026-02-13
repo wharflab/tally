@@ -312,10 +312,10 @@ trusted-registries = [
 
 **Note:** When implementing new rules, follow the project's established patterns:
 
-1. **Add CLI flags** to `cmd/tally/cmd/check.go` with `TALLY_*` environment variable sources
+1. **Add CLI flags** to `cmd/tally/cmd/lint.go` with `TALLY_*` environment variable sources
 2. **Add rule configuration** to `internal/config/config.go` in the `RulesConfig` section
 3. **Follow the max-lines pattern** from `internal/lint/rules.go` for consistent rule implementation
-4. **Wire up config loading** in `loadConfigForFile()` in `check.go`
+4. **Wire up config loading** in `loadConfigForFile()` in `lint.go`
 
 See [CLAUDE.md](../CLAUDE.md) section "Adding New Linting Rules" for the complete checklist.
 

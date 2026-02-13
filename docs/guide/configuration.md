@@ -23,7 +23,7 @@ max = 100
 Then run:
 
 ```bash
-tally check .
+tally lint .
 ```
 
 ## Config File
@@ -61,7 +61,7 @@ monorepo/
 Override discovery with `--config`:
 
 ```bash
-tally check --config /path/to/.tally.toml Dockerfile
+tally lint --config /path/to/.tally.toml Dockerfile
 ```
 
 ## Priority Order

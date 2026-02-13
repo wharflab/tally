@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-//nolint:funlen // large table-driven check case catalog
-func checkCases(t *testing.T) []checkCase {
+//nolint:funlen // large table-driven lint case catalog
+func lintCases(t *testing.T) []lintCase {
 	t.Helper()
 
 	mustSelectRules := func(rules ...string) []string {
@@ -18,7 +18,7 @@ func checkCases(t *testing.T) []checkCase {
 		return args
 	}
 
-	return []checkCase{
+	return []lintCase{
 		// Total rules enabled test - validates rule count (no --ignore/--select)
 		{name: "total-rules-enabled", dir: "total-rules-enabled", args: []string{"--format", "json", "--slow-checks=off"}},
 
@@ -637,7 +637,7 @@ func checkCases(t *testing.T) []checkCase {
 				[]string{"--format", "json", "--slow-checks=on", "--slow-checks-timeout=2s"},
 				mustSelectRules("buildkit/DuplicateStageName", "buildkit/InvalidBaseImagePlatform")...),
 			wantExit: 1,
-			afterCheck: func(t *testing.T, _ string) {
+			afterLint: func(t *testing.T, _ string) {
 				t.Helper()
 				if mockRegistry.HasRequest("library/slowfailfast") {
 					t.Error("fail-fast should have prevented async check from fetching the slow image")
@@ -650,7 +650,7 @@ func checkCases(t *testing.T) []checkCase {
 			args: append(
 				[]string{"--format", "json", "--slow-checks=on", "--slow-checks-timeout=1s"},
 				mustSelectRules("buildkit/InvalidBaseImagePlatform")...),
-			afterCheck: func(t *testing.T, stderr string) {
+			afterLint: func(t *testing.T, stderr string) {
 				t.Helper()
 				if !strings.Contains(stderr, "timed out") {
 					t.Errorf("expected timeout note in stderr, got: %q", stderr)

@@ -14,7 +14,7 @@ import (
 	"github.com/gkampitakis/go-snaps/snaps"
 )
 
-type checkCase struct {
+type lintCase struct {
 	name       string
 	dir        string
 	args       []string
@@ -24,7 +24,7 @@ type checkCase struct {
 	snapRaw    bool   // If true, use MatchStandaloneSnapshot (plain text) instead of MatchStandaloneJSON
 	isDir      bool   // If true, pass the directory instead of Dockerfile
 	useContext bool   // If true, add --context flag for context-aware tests
-	afterCheck func(t *testing.T, stderr string)
+	afterLint  func(t *testing.T, stderr string)
 }
 
 type fixCase struct {
@@ -37,13 +37,13 @@ type fixCase struct {
 
 var fixedSummaryRE = regexp.MustCompile(`(?m)^Fixed (\d+) issues? in \d+ files?$`)
 
-func runCheckCase(t *testing.T, tc checkCase) {
+func runLintCase(t *testing.T, tc lintCase) {
 	t.Helper()
 
 	testdataDir := filepath.Join("testdata", tc.dir)
 
 	args := make([]string, 0, 1+len(tc.args)+4)
-	args = append(args, "check")
+	args = append(args, "lint")
 	args = append(args, tc.args...)
 
 	// Add context flag for context-aware tests
@@ -114,8 +114,8 @@ func runCheckCase(t *testing.T, tc checkCase) {
 		snaps.WithConfig(opts...).MatchStandaloneJSON(t, outputStr)
 	}
 
-	if tc.afterCheck != nil {
-		tc.afterCheck(t, stderrBuf.String())
+	if tc.afterLint != nil {
+		tc.afterLint(t, stderrBuf.String())
 	}
 }
 
@@ -135,10 +135,10 @@ func runFixCase(t *testing.T, tc fixCase) {
 		t.Fatalf("failed to write config: %v", err)
 	}
 
-	// Run tally check --fix (disable slow checks — fix tests don't need async).
+	// Run tally lint --fix (disable slow checks — fix tests don't need async).
 	// Ignore DL3057 (HEALTHCHECK missing) as it fires for nearly every fixture
 	// and has no auto-fix; it's irrelevant for testing other fixes.
-	args := append([]string{"check", "--config", configPath, "--slow-checks=off", "--ignore", "hadolint/DL3057"}, tc.args...)
+	args := append([]string{"lint", "--config", configPath, "--slow-checks=off", "--ignore", "hadolint/DL3057"}, tc.args...)
 	args = append(args, dockerfilePath)
 	cmd := exec.Command(binaryPath, args...)
 	cmd.Env = append(os.Environ(),
@@ -148,7 +148,7 @@ func runFixCase(t *testing.T, tc fixCase) {
 	if err != nil {
 		var exitErr *exec.ExitError
 		if !errors.As(err, &exitErr) {
-			t.Fatalf("check --fix command failed to run: %v\noutput:\n%s", err, output)
+			t.Fatalf("lint --fix command failed to run: %v\noutput:\n%s", err, output)
 		}
 		// Non-zero exits are valid for fix runs when unfixed violations remain.
 	}

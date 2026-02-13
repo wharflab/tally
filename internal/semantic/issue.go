@@ -8,7 +8,7 @@ import (
 
 // Issue represents a semantic problem detected during model construction.
 // This is similar to rules.Violation but without the dependency on the rules
-// package to avoid import cycles. The check.go command converts these to
+// package to avoid import cycles. The lint.go command converts these to
 // rules.Violation before output.
 type Issue struct {
 	// Location is where the issue occurred (first range).

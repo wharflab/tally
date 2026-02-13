@@ -17,10 +17,10 @@ pip install tally-cli
 gem install tally-cli
 
 # Lint everything in the repo
-tally check .
+tally lint .
 
 # Apply safe fixes automatically
-tally check --fix Dockerfile
+tally lint --fix Dockerfile
 ```
 
 ## Why tally?

@@ -5,7 +5,7 @@
 ├── main.go                           # Entry point
 ├── cmd/tally/cmd/                    # CLI commands (urfave/cli)
 │   ├── root.go                       # Root command setup
-│   ├── check.go                      # Check subcommand (linting)
+│   ├── lint.go                      # Lint subcommand (linting)
 │   └── version.go                    # Version subcommand
 ├── internal/
 │   ├── config/                       # Configuration loading (koanf)
@@ -37,7 +37,7 @@
 - `main.go` - Entry point
 - `internal/config/config.go` - Config system with cascading discovery
 - `internal/lint/rules.go` - Linting rule implementations
-- `cmd/tally/cmd/check.go` - Main check command with CLI flags
+- `cmd/tally/cmd/lint.go` - Main check command with CLI flags
 - `.lefthook.yml` - Git hooks configuration
 - `.golangci.yaml` - Go linter configuration
 - `.goreleaser.yml` - Multi-platform release configuration
