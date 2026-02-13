@@ -49,16 +49,16 @@ func TestFixRealWorld(t *testing.T) {
 	)
 	output, err := cmd.CombinedOutput()
 	// Exit code 1 is expected due to remaining unfixable violations
-	// Just verify the command ran (output captured regardless of exit code)
-	if err != nil {
-		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
-			t.Fatalf("command failed to run: %v", err)
-		}
-		// Exit code 1 is expected, other exit codes indicate real failures
-		if exitErr.ExitCode() != 1 {
-			t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
-		}
+	if err == nil {
+		t.Fatalf("expected exit code 1 but command succeeded\noutput:\n%s", output)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("command failed to run: %v", err)
+	}
+	// Exit code 1 is expected, other exit codes indicate real failures
+	if exitErr.ExitCode() != 1 {
+		t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
 	}
 
 	// Read the fixed Dockerfile
@@ -121,14 +121,15 @@ severity = "style"
 		"GOCOVERDIR="+coverageDir,
 	)
 	output, err := cmd.CombinedOutput()
-	if err != nil {
-		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
-			t.Fatalf("command failed to run: %v", err)
-		}
-		if exitErr.ExitCode() != 1 {
-			t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
-		}
+	if err == nil {
+		t.Fatalf("expected exit code 1 but command succeeded\noutput:\n%s", output)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("command failed to run: %v", err)
+	}
+	if exitErr.ExitCode() != 1 {
+		t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
 	}
 
 	// Read the fixed Dockerfile and snapshot it
@@ -184,14 +185,15 @@ func TestFixConsistentIndentation(t *testing.T) {
 		"GOCOVERDIR="+coverageDir,
 	)
 	output, err := cmd.CombinedOutput()
-	if err != nil {
-		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
-			t.Fatalf("command failed to run: %v", err)
-		}
-		if exitErr.ExitCode() != 1 {
-			t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
-		}
+	if err == nil {
+		t.Fatalf("expected exit code 1 but command succeeded\noutput:\n%s", output)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("command failed to run: %v", err)
+	}
+	if exitErr.ExitCode() != 1 {
+		t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
 	}
 
 	fixedContent, err := os.ReadFile(dockerfilePath)
@@ -239,14 +241,15 @@ func TestFixPreferAddUnpackBeatsHeredoc(t *testing.T) {
 	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
 	output, err := cmd.CombinedOutput()
 	// Exit code 1 expected: prefer-run-heredoc violation remains (fix superseded)
-	if err != nil {
-		var exitErr *exec.ExitError
-		if !errors.As(err, &exitErr) {
-			t.Fatalf("command failed to run: %v", err)
-		}
-		if exitErr.ExitCode() != 1 {
-			t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
-		}
+	if err == nil {
+		t.Fatalf("expected exit code 1 but command succeeded\noutput:\n%s", output)
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("command failed to run: %v", err)
+	}
+	if exitErr.ExitCode() != 1 {
+		t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
 	}
 
 	fixed, err := os.ReadFile(dockerfilePath)
