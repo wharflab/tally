@@ -22,6 +22,17 @@ import (
 // defines a HEALTHCHECK. If so, emits CompletedCheck to suppress the fast-path
 // violation. Additionally detects useless HEALTHCHECK NONE instructions when the
 // base image has no healthcheck to disable.
+//
+// Cross-rule interactions:
+//   - buildkit/MultipleInstructionsDisallowed: flags duplicate HEALTHCHECK
+//     instructions in a single stage. DL3057 honours Docker semantics by
+//     evaluating only the last HEALTHCHECK per stage, so both rules may
+//     fire together when duplicates exist.
+//   - ONBUILD HEALTHCHECK: BuildKit parses this as an OnbuildCommand wrapping
+//     a HealthCheckCommand. DL3057 does not inspect ONBUILD triggers, so
+//     ONBUILD HEALTHCHECK CMD does not satisfy the "has healthcheck" check.
+//     This is intentional — ONBUILD triggers execute in child images, not
+//     the current one.
 type DL3057Rule struct{}
 
 // NewDL3057Rule creates a new DL3057 rule instance.

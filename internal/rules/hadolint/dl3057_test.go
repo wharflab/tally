@@ -115,6 +115,13 @@ HEALTHCHECK CMD /bin/check
 `,
 			wantCount: 0, // Last HEALTHCHECK is CMD, so no violation
 		},
+		{
+			name: "ONBUILD HEALTHCHECK does not satisfy healthcheck requirement",
+			dockerfile: `FROM scratch
+ONBUILD HEALTHCHECK CMD /bin/check
+`,
+			wantCount: 1, // ONBUILD triggers in child images, not this one
+		},
 	}
 
 	for _, tt := range tests {
