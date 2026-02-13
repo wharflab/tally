@@ -25,7 +25,7 @@ RUN zypper install httpd=2.4.24 && zypper clean`,
 			name: "ONBUILD zypper install without non-interactive",
 			dockerfile: `FROM opensuse
 ONBUILD RUN zypper install httpd=2.4.24 && zypper clean`,
-			wantCount: 0, // ONBUILD not yet supported
+			wantCount: 1,
 		},
 
 		// Original Hadolint test cases - should NOT trigger (ruleCatchesNot)
@@ -132,7 +132,7 @@ RUN zypper -n install httpd`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
+			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.dockerfile)
 			r := NewDL3034Rule()
 			violations := r.Check(input)
 

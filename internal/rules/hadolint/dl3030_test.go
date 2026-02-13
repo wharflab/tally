@@ -25,7 +25,7 @@ RUN yum install httpd-2.4.24 && yum clean all`,
 			name: "ONBUILD yum install without -y",
 			dockerfile: `FROM centos
 ONBUILD RUN yum install httpd-2.4.24 && yum clean all`,
-			wantCount: 0, // ONBUILD not yet supported
+			wantCount: 1,
 		},
 
 		// Original Hadolint test cases - should NOT trigger (ruleCatchesNot)
@@ -114,7 +114,7 @@ RUN yum -y install httpd`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
+			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.dockerfile)
 			r := NewDL3030Rule()
 			violations := r.Check(input)
 

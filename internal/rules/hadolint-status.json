@@ -6,6 +6,10 @@
       "status": "covered_by_buildkit",
       "buildkit_rule": "WorkdirRelativePath"
     },
+    "DL3001": {
+      "status": "implemented",
+      "tally_rule": "hadolint/DL3001"
+    },
     "DL3002": {
       "status": "implemented",
       "tally_rule": "hadolint/DL3002"

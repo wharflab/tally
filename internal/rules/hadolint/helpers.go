@@ -63,6 +63,30 @@ func ScanRunCommandsWithPOSIXShell(input rules.LintInput, callback RunCommandCal
 			// Call the callback for each RUN command
 			violations = append(violations, callback(run, effectiveVariant, input.File)...)
 		}
+
+		// Also check ONBUILD RUN commands from the semantic model.
+		// The parsed commands have Location() patched to the original ONBUILD
+		// source line, so callbacks can use source-map lookup and generate
+		// auto-fix edits with correct positions.
+		if sem != nil {
+			for _, onbuild := range sem.OnbuildInstructions(stageIdx) {
+				run, ok := onbuild.Command.(*instructions.RunCommand)
+				if !ok {
+					continue
+				}
+
+				if isNonPOSIX && run.PrependShell {
+					continue
+				}
+
+				effectiveVariant := shellVariant
+				if isNonPOSIX {
+					effectiveVariant = shell.VariantBash
+				}
+
+				violations = append(violations, callback(run, effectiveVariant, input.File)...)
+			}
+		}
 	}
 
 	return violations

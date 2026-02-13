@@ -483,14 +483,34 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 			}
 
 		case *instructions.OnbuildCommand:
-			// Parse ONBUILD expression to extract COPY --from references
-			// Note: ONBUILD instructions execute when image is used as a base for another build,
-			// not in the current build, so we don't add edges to the graph here.
-			if copyCmd := b.parseOnbuildCopy(c.Expression); copyCmd != nil {
-				copyRef := b.processOnbuildCopyFrom(copyCmd, info.Index)
-				info.OnbuildCopyFromRefs = append(info.OnbuildCopyFromRefs, copyRef)
-			}
+			b.processOnbuildCommand(c, info)
 		}
+	}
+}
+
+// processOnbuildCommand parses an ONBUILD expression into a typed command and
+// stores it in the stage info. ONBUILD instructions execute when the image is
+// used as a base for another build, not in the current build.
+func (b *Builder) processOnbuildCommand(c *instructions.OnbuildCommand, info *StageInfo) {
+	sourceLine := 0
+	if loc := c.Location(); len(loc) > 0 {
+		sourceLine = loc[0].Start.Line
+	}
+
+	parsed := parseOnbuildExpression(c.Expression, sourceLine)
+	if parsed == nil {
+		return
+	}
+
+	info.OnbuildInstructions = append(info.OnbuildInstructions, OnbuildInstruction{
+		Command:    parsed,
+		SourceLine: sourceLine,
+	})
+
+	// Extract COPY --from references from parsed ONBUILD commands
+	if copyCmd, ok := parsed.(*instructions.CopyCommand); ok && copyCmd.From != "" {
+		copyRef := b.processOnbuildCopyFrom(copyCmd, info.Index)
+		info.OnbuildCopyFromRefs = append(info.OnbuildCopyFromRefs, copyRef)
 	}
 }
 
@@ -567,9 +587,12 @@ func (b *Builder) processOnbuildCopyFrom(cmd *instructions.CopyCommand, stageInd
 	return ref
 }
 
-// parseOnbuildCopy parses an ONBUILD expression to extract a COPY command.
-// Returns nil if the expression is not a COPY with --from.
-func (b *Builder) parseOnbuildCopy(expr string) *instructions.CopyCommand {
+// parseOnbuildExpression parses an ONBUILD expression string into a typed
+// instructions.Command by wrapping it in a minimal Dockerfile and parsing
+// with BuildKit. sourceLine is the 1-based line number of the original
+// ONBUILD instruction; the parsed command's Location() will report this line.
+// Returns nil if parsing fails or the expression is not a recognized instruction.
+func parseOnbuildExpression(expr string, sourceLine int) instructions.Command {
 	// Parse by wrapping in a minimal Dockerfile
 	dummyDockerfile := "FROM scratch\n" + expr + "\n"
 	result, err := parser.Parse(strings.NewReader(dummyDockerfile))
@@ -577,16 +600,23 @@ func (b *Builder) parseOnbuildCopy(expr string) *instructions.CopyCommand {
 		return nil
 	}
 
+	// Patch the AST node's location to the original ONBUILD line before
+	// instructions.Parse bakes it into the command. The expression node is
+	// the second child (index 1, after "FROM scratch").
+	if sourceLine > 0 && len(result.AST.Children) >= 2 {
+		node := result.AST.Children[1]
+		node.StartLine = sourceLine
+		node.EndLine = sourceLine
+	}
+
 	stages, _, err := instructions.Parse(result.AST, nil)
 	if err != nil || len(stages) == 0 {
 		return nil
 	}
 
-	// Extract the COPY command with --from
-	for _, cmd := range stages[0].Commands {
-		if copyCmd, ok := cmd.(*instructions.CopyCommand); ok && copyCmd.From != "" {
-			return copyCmd
-		}
+	// Return the first (and only) command from the parsed stage
+	if len(stages[0].Commands) > 0 {
+		return stages[0].Commands[0]
 	}
 
 	return nil

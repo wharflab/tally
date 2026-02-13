@@ -17,7 +17,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 |-----------|-------------|---------------------|-------|
 | tally | 8 | - | 8 |
 | buildkit | 17 + 5 captured | - | 22 |
-| hadolint | 25 | 11 | 66 |
+| hadolint | 26 | 11 | 66 |
 <!-- END RULES_SUMMARY -->
 
 ---
@@ -119,7 +119,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 |------|-------------|----------|--------|
 | [DL1001](https://github.com/hadolint/hadolint/wiki/DL1001) | Please refrain from using inline ignore pragmas `# hadolint ignore=DLxxxx`. | Ignore | ⏳ |
 | [DL3000](https://github.com/hadolint/hadolint/wiki/DL3000) | Use absolute WORKDIR. | Error | 🔄 `buildkit/WorkdirRelativePath` |
-| [DL3001](https://github.com/hadolint/hadolint/wiki/DL3001) | For some bash commands it makes no sense running them in a Docker container like ssh, vim, shutdown, service, ps, free, top, kill, mount, ifconfig. | Info | ⏳ |
+| [DL3001](https://github.com/hadolint/hadolint/wiki/DL3001) | For some bash commands it makes no sense running them in a Docker container like ssh, vim, shutdown, service, ps, free, top, kill, mount, ifconfig. | Info | ✅ `hadolint/DL3001` |
 | [DL3002](https://github.com/hadolint/hadolint/wiki/DL3002) | Last user should not be root. | Warning | ✅ `hadolint/DL3002` |
 | [DL3003](https://github.com/hadolint/hadolint/wiki/DL3003) | Use WORKDIR to switch to a directory. | Warning | ✅🔧 `hadolint/DL3003` |
 | [DL3004](https://github.com/hadolint/hadolint/wiki/DL3004) | Do not use sudo as it leads to unpredictable behavior. Use a tool like gosu to enforce root. | Error | ✅ `hadolint/DL3004` |

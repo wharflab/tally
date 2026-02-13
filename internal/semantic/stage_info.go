@@ -54,6 +54,16 @@ type ShellSetting struct {
 	Line int
 }
 
+// OnbuildInstruction represents a parsed ONBUILD trigger command.
+type OnbuildInstruction struct {
+	// Command is the parsed typed command (RunCommand, CopyCommand, etc.).
+	Command instructions.Command
+
+	// SourceLine is the original 1-based line number of the ONBUILD instruction
+	// in the Dockerfile.
+	SourceLine int
+}
+
 // StageInfo contains enhanced information about a build stage.
 // It augments BuildKit's instructions.Stage with semantic analysis data.
 type StageInfo struct {
@@ -94,6 +104,10 @@ type StageInfo struct {
 	// OnbuildCopyFromRefs contains COPY --from references in ONBUILD instructions.
 	// These are triggered when the image is used as a base for another build.
 	OnbuildCopyFromRefs []CopyFromRef
+
+	// OnbuildInstructions contains all parsed ONBUILD trigger commands for this stage.
+	// Each ONBUILD expression is parsed into a typed command using BuildKit's parser.
+	OnbuildInstructions []OnbuildInstruction
 
 	// InstalledPackages contains packages installed via system package managers.
 	// Tracked from RUN commands that use apt-get, apk, yum, dnf, etc.

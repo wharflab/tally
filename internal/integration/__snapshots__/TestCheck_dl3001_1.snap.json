@@ -1,0 +1,57 @@
+{
+  "files": [
+    {
+      "file": "testdata/dl3001/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3001",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/dl3001/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "command top has no purpose in a Docker container; avoid commands like free, kill, mount, ps, service, shutdown, ssh, top, vim",
+          "rule": "hadolint/DL3001",
+          "severity": "info",
+          "sourceCode": "RUN top",
+          "suggestedFix": {
+            "description": "Comment out RUN instruction that only runs container-irrelevant commands",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 7,
+                    "line": 4
+                  },
+                  "file": "testdata/dl3001/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 4
+                  }
+                },
+                "newText": "# [commented out by tally - command has no purpose in a container]: RUN top"
+              }
+            ],
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

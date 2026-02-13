@@ -120,14 +120,14 @@ RUN apk add python`,
 			name: "ONBUILD with apt",
 			dockerfile: `FROM ubuntu
 ONBUILD RUN apt install python`,
-			wantCount: 0, // ONBUILD not yet supported in our implementation
+			wantCount: 1,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
+			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.dockerfile)
 			r := NewDL3027Rule()
 			violations := r.Check(input)
 
@@ -364,5 +364,47 @@ RUN apt-get update && \
 	// apt is at column 4 (after "    ")
 	if edit.Location.Start.Column != 4 {
 		t.Errorf("edit startCol = %d, want 4", edit.Location.Start.Column)
+	}
+}
+
+// TestDL3027_OnbuildAutoFix verifies that DL3027 provides auto-fix for ONBUILD RUN commands.
+func TestDL3027_OnbuildAutoFix(t *testing.T) {
+	t.Parallel()
+	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM ubuntu
+ONBUILD RUN apt install python`)
+	r := NewDL3027Rule()
+	violations := r.Check(input)
+
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	v := violations[0]
+
+	// Violation should point to the ONBUILD line
+	if v.Location.Start.Line != 2 {
+		t.Errorf("violation line = %d, want 2", v.Location.Start.Line)
+	}
+
+	// Auto-fix should replace "apt" with "apt-get"
+	if v.SuggestedFix == nil {
+		t.Fatal("expected SuggestedFix for ONBUILD RUN")
+	}
+	if len(v.SuggestedFix.Edits) == 0 {
+		t.Fatal("expected at least one edit")
+	}
+	edit := v.SuggestedFix.Edits[0]
+	// "ONBUILD RUN apt install python" — "apt" starts at column 12
+	if edit.Location.Start.Column != 12 {
+		t.Errorf("edit startCol = %d, want 12", edit.Location.Start.Column)
+	}
+	if edit.Location.End.Column != 15 {
+		t.Errorf("edit endCol = %d, want 15", edit.Location.End.Column)
+	}
+	if edit.NewText != "apt-get" {
+		t.Errorf("NewText = %q, want %q", edit.NewText, "apt-get")
+	}
+	if edit.Location.Start.Line != 2 {
+		t.Errorf("edit line = %d, want 2", edit.Location.Start.Line)
 	}
 }

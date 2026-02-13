@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "hadolint/DL3001",
+ "DefaultSeverity": "info",
+ "Description": "For some commands it makes no sense running them in a Docker container like ssh, vim, shutdown, service, ps, free, top, kill, mount",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3001",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Invalid command in container"
+}

@@ -397,6 +397,12 @@ func TestCheck(t *testing.T) {
 
 		// Hadolint rule tests (isolated to specific rules)
 		{
+			name:     "dl3001",
+			dir:      "dl3001",
+			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3001")...),
+			wantExit: 1,
+		},
+		{
 			name:     "dl3003",
 			dir:      "dl3003",
 			args:     append([]string{"--format", "json"}, selectRules("hadolint/DL3003")...),

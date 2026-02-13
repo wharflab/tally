@@ -95,6 +95,16 @@ func (m *Model) StageInfo(index int) *StageInfo {
 	return m.stageInfo[index]
 }
 
+// OnbuildInstructions returns parsed ONBUILD commands for the given stage.
+// Returns nil if the index is out of bounds or the stage has no ONBUILD instructions.
+func (m *Model) OnbuildInstructions(stageIdx int) []OnbuildInstruction {
+	info := m.StageInfo(stageIdx)
+	if info == nil {
+		return nil
+	}
+	return info.OnbuildInstructions
+}
+
 // ResolveVariable resolves a variable name in the context of a stage.
 // Resolution precedence: BuildArgs > Stage ENV > Stage ARG > Global ARG.
 // Returns the value and true if found, or empty string and false if not.

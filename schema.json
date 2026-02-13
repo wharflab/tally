@@ -35,6 +35,21 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "DL3001Config": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/tinovyatkin/tally/internal/rules/hadolint/dl3001-config",
+      "properties": {
+        "invalid-commands": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Configuration for DL3001 rule"
+    },
     "DL3026Config": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "$id": "https://github.com/tinovyatkin/tally/internal/rules/hadolint/dl3026-config",
@@ -200,6 +215,32 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "SlowChecksConfig": {
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "on",
+            "off"
+          ],
+          "description": "When to run slow checks",
+          "default": "auto"
+        },
+        "fail-fast": {
+          "type": "boolean",
+          "description": "Skip slow checks when errors found",
+          "default": true
+        },
+        "timeout": {
+          "type": "string",
+          "description": "Timeout for slow checks (e.g. 20s)",
+          "default": "20s"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "max-linesConfig": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "$id": "https://github.com/tinovyatkin/tally/internal/rules/tally/max-lines-config",
@@ -271,7 +312,7 @@
       "description": "Configuration for prefer-run-heredoc rule"
     }
   },
-  "$comment": "Auto-generated on 2026-02-09. Do not edit manually.",
+  "$comment": "Auto-generated on 2026-02-13. Do not edit manually.",
   "properties": {
     "rules": {
       "$ref": "#/$defs/RulesConfig",
@@ -286,6 +327,10 @@
     },
     "ai": {
       "$ref": "#/$defs/AIConfig"
+    },
+    "slow-checks": {
+      "$ref": "#/$defs/SlowChecksConfig",
+      "description": "Slow checks configuration"
     }
   },
   "additionalProperties": false,

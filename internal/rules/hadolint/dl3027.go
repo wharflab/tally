@@ -36,9 +36,8 @@ func getRunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (
 		return "", 0
 	}
 
-	// Replace the "RUN" keyword plus following whitespace with spaces to preserve column positions.
-	// The shell parser will skip the whitespace but positions remain aligned.
-	// This handles both "RUN " and "RUN\t" patterns.
+	// Replace the instruction prefix with spaces to preserve column positions for
+	// shell parsing. Handles "RUN " and "ONBUILD RUN " patterns.
 	firstLine := lines[0]
 	upper := strings.ToUpper(firstLine)
 	if idx := strings.Index(upper, "RUN"); idx >= 0 {
@@ -50,9 +49,19 @@ func getRunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (
 			for wsEnd < len(firstLine) && (firstLine[wsEnd] == ' ' || firstLine[wsEnd] == '\t') {
 				wsEnd++
 			}
-			// Replace "RUN" + whitespace with equivalent spaces
-			replaceLen := wsEnd - idx
-			lines[0] = firstLine[:idx] + strings.Repeat(" ", replaceLen) + firstLine[wsEnd:]
+			// For ONBUILD RUN, also blank out the "ONBUILD" keyword and any
+			// leading content before "RUN" so the shell parser sees only the
+			// script. Column positions are preserved since we replace 1:1 with spaces.
+			replaceStart := idx
+			if idx > 0 {
+				// Check for ONBUILD prefix (possibly with leading whitespace)
+				prefix := strings.TrimSpace(upper[:idx])
+				if prefix == "ONBUILD" {
+					replaceStart = 0
+				}
+			}
+			replaceLen := wsEnd - replaceStart
+			lines[0] = firstLine[:replaceStart] + strings.Repeat(" ", replaceLen) + firstLine[wsEnd:]
 		}
 	}
 
@@ -80,20 +89,22 @@ func (r *DL3027Rule) Metadata() rules.RuleMetadata {
 	}
 }
 
+const aptGetReplacement = "apt-get"
+
 // aptCommandMapping maps apt subcommands to their replacement and safety level.
 var aptCommandMapping = map[string]struct {
 	replacement string
 	safety      rules.FixSafety
 }{
 	// Safe: identical behavior in apt-get
-	"install":    {"apt-get", rules.FixSafe},
-	"remove":     {"apt-get", rules.FixSafe},
-	"update":     {"apt-get", rules.FixSafe},
-	"upgrade":    {"apt-get", rules.FixSafe},
-	"autoremove": {"apt-get", rules.FixSafe},
-	"purge":      {"apt-get", rules.FixSafe},
-	"clean":      {"apt-get", rules.FixSafe},
-	"autoclean":  {"apt-get", rules.FixSafe},
+	"install":    {aptGetReplacement, rules.FixSafe},
+	"remove":     {aptGetReplacement, rules.FixSafe},
+	"update":     {aptGetReplacement, rules.FixSafe},
+	"upgrade":    {aptGetReplacement, rules.FixSafe},
+	"autoremove": {aptGetReplacement, rules.FixSafe},
+	"purge":      {aptGetReplacement, rules.FixSafe},
+	"clean":      {aptGetReplacement, rules.FixSafe},
+	"autoclean":  {aptGetReplacement, rules.FixSafe},
 
 	// Suggestion: different command family (apt-cache), output may differ
 	"search": {"apt-cache", rules.FixSuggestion},
@@ -143,7 +154,7 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 
 			for _, occ := range occurrences {
 				// Determine replacement based on subcommand
-				replacement := "apt-get"
+				replacement := aptGetReplacement
 				safety := rules.FixSuggestion // Default for unknown subcommands
 				if mapping, ok := aptCommandMapping[occ.Subcommand]; ok {
 					replacement = mapping.replacement
