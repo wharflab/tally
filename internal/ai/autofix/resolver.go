@@ -28,8 +28,12 @@ const (
 )
 
 type resolver struct {
-	runner          *acp.Runner
+	runner          agentRunner
 	gitleaksFactory func() (*detect.Detector, error)
+}
+
+type agentRunner interface {
+	Run(ctx context.Context, req acp.RunRequest) (acp.RunResponse, error)
 }
 
 func newResolver() *resolver {
@@ -176,6 +180,9 @@ func (r *resolver) runAndParseRound(
 
 	parsed, noChange, perr := parseAgentResponse(respText)
 	if perr == nil {
+		if noChange {
+			return "", true, nil
+		}
 		out, err := normalizeAgentDockerfile(parsed)
 		return out, noChange, err
 	}
@@ -191,6 +198,9 @@ func (r *resolver) runAndParseRound(
 		if perr != nil {
 			lastErr = perr
 			continue
+		}
+		if noChange {
+			return "", true, nil
 		}
 		out, err := normalizeAgentDockerfile(parsed)
 		return out, noChange, err
