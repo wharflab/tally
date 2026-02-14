@@ -3,9 +3,9 @@ package autofix
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -49,6 +49,10 @@ type stageRuntime struct {
 	entrypoint *instructions.EntrypointCommand
 	user       *instructions.UserCommand
 	expose     []string
+	workdir    *instructions.WorkdirCommand
+	env        instructions.KeyValuePairs
+	labels     instructions.KeyValuePairs
+	health     *instructions.HealthCheckCommand
 }
 
 func extractRuntime(stage instructions.Stage) stageRuntime {
@@ -63,9 +67,148 @@ func extractRuntime(stage instructions.Stage) stageRuntime {
 			rt.user = c
 		case *instructions.ExposeCommand:
 			rt.expose = append(rt.expose, c.Ports...)
+		case *instructions.WorkdirCommand:
+			rt.workdir = c
+		case *instructions.EnvCommand:
+			rt.env = append(rt.env, c.Env...)
+		case *instructions.LabelCommand:
+			rt.labels = append(rt.labels, c.Labels...)
+		case *instructions.HealthCheckCommand:
+			rt.health = c
 		}
 	}
 	return rt
+}
+
+func equalKeyValuePairs(a, b instructions.KeyValuePairs) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Key != b[i].Key || a[i].Value != b[i].Value {
+			return false
+		}
+	}
+	return true
+}
+
+func validateCmd(orig, proposed *instructions.CmdCommand) error {
+	if (orig == nil) != (proposed == nil) {
+		if orig == nil {
+			return errors.New("proposed Dockerfile added CMD to the final stage")
+		}
+		return errors.New("proposed Dockerfile dropped CMD from the final stage")
+	}
+	if orig == nil {
+		return nil
+	}
+	if orig.PrependShell != proposed.PrependShell || !slices.Equal(orig.CmdLine, proposed.CmdLine) {
+		return fmt.Errorf("proposed Dockerfile changed CMD in the final stage (want %q, got %q)", orig.String(), proposed.String())
+	}
+	return nil
+}
+
+func validateEntrypoint(orig, proposed *instructions.EntrypointCommand) error {
+	if (orig == nil) != (proposed == nil) {
+		if orig == nil {
+			return errors.New("proposed Dockerfile added ENTRYPOINT to the final stage")
+		}
+		return errors.New("proposed Dockerfile dropped ENTRYPOINT from the final stage")
+	}
+	if orig == nil {
+		return nil
+	}
+	if orig.PrependShell != proposed.PrependShell || !slices.Equal(orig.CmdLine, proposed.CmdLine) {
+		return fmt.Errorf(
+			"proposed Dockerfile changed ENTRYPOINT in the final stage (want %q, got %q)",
+			orig.String(),
+			proposed.String(),
+		)
+	}
+	return nil
+}
+
+func validateUser(orig, proposed *instructions.UserCommand) error {
+	if (orig == nil) != (proposed == nil) {
+		if orig == nil {
+			return errors.New("proposed Dockerfile added USER to the final stage")
+		}
+		return errors.New("proposed Dockerfile dropped USER from the final stage")
+	}
+	if orig == nil {
+		return nil
+	}
+	if strings.TrimSpace(orig.User) != strings.TrimSpace(proposed.User) {
+		return fmt.Errorf("proposed Dockerfile changed USER in the final stage (want %q, got %q)", orig.User, proposed.User)
+	}
+	return nil
+}
+
+func validateExpose(origPorts, proposedPorts []string) error {
+	if len(origPorts) == 0 && len(proposedPorts) > 0 {
+		return errors.New("proposed Dockerfile added EXPOSE to the final stage")
+	}
+	if len(origPorts) > 0 && len(proposedPorts) == 0 {
+		return errors.New("proposed Dockerfile dropped EXPOSE from the final stage")
+	}
+	if len(origPorts) == 0 {
+		return nil
+	}
+
+	oa := slices.Clone(origPorts)
+	pa := slices.Clone(proposedPorts)
+	slices.Sort(oa)
+	slices.Sort(pa)
+	if !slices.Equal(oa, pa) {
+		return fmt.Errorf("proposed Dockerfile changed EXPOSE in the final stage (want %v, got %v)", oa, pa)
+	}
+	return nil
+}
+
+func validateWorkdir(orig, proposed *instructions.WorkdirCommand) error {
+	if (orig == nil) != (proposed == nil) {
+		if orig == nil {
+			return errors.New("proposed Dockerfile added WORKDIR to the final stage")
+		}
+		return errors.New("proposed Dockerfile dropped WORKDIR from the final stage")
+	}
+	if orig == nil {
+		return nil
+	}
+	if strings.TrimSpace(orig.Path) != strings.TrimSpace(proposed.Path) {
+		return fmt.Errorf("proposed Dockerfile changed WORKDIR in the final stage (want %q, got %q)", orig.Path, proposed.Path)
+	}
+	return nil
+}
+
+func validateEnv(orig, proposed instructions.KeyValuePairs) error {
+	if equalKeyValuePairs(orig, proposed) {
+		return nil
+	}
+	return errors.New("proposed Dockerfile changed ENV in the final stage")
+}
+
+func validateLabels(orig, proposed instructions.KeyValuePairs) error {
+	if equalKeyValuePairs(orig, proposed) {
+		return nil
+	}
+	return errors.New("proposed Dockerfile changed LABEL in the final stage")
+}
+
+func validateHealthcheck(orig, proposed *instructions.HealthCheckCommand) error {
+	if (orig == nil) != (proposed == nil) {
+		if orig == nil {
+			return errors.New("proposed Dockerfile added HEALTHCHECK to the final stage")
+		}
+		return errors.New("proposed Dockerfile dropped HEALTHCHECK from the final stage")
+	}
+	if orig == nil {
+		return nil
+	}
+	if !reflect.DeepEqual(orig.Health, proposed.Health) {
+		return errors.New("proposed Dockerfile changed HEALTHCHECK in the final stage")
+	}
+	return nil
 }
 
 func validateRuntimeSettings(orig, proposed *dockerfile.ParseResult) error {
@@ -81,45 +224,29 @@ func validateRuntimeSettings(orig, proposed *dockerfile.ParseResult) error {
 	o := extractRuntime(origFinal)
 	p := extractRuntime(propFinal)
 
-	if o.cmd != nil {
-		if p.cmd == nil {
-			return errors.New("proposed Dockerfile dropped CMD from the final stage")
-		}
-		if o.cmd.PrependShell != p.cmd.PrependShell || !slices.Equal(o.cmd.CmdLine, p.cmd.CmdLine) {
-			return fmt.Errorf("proposed Dockerfile changed CMD in the final stage (want %q, got %q)", o.cmd.String(), p.cmd.String())
-		}
+	if err := validateCmd(o.cmd, p.cmd); err != nil {
+		return err
 	}
-	if o.entrypoint != nil {
-		if p.entrypoint == nil {
-			return errors.New("proposed Dockerfile dropped ENTRYPOINT from the final stage")
-		}
-		if o.entrypoint.PrependShell != p.entrypoint.PrependShell || !slices.Equal(o.entrypoint.CmdLine, p.entrypoint.CmdLine) {
-			return fmt.Errorf(
-				"proposed Dockerfile changed ENTRYPOINT in the final stage (want %q, got %q)",
-				o.entrypoint.String(),
-				p.entrypoint.String(),
-			)
-		}
+	if err := validateEntrypoint(o.entrypoint, p.entrypoint); err != nil {
+		return err
 	}
-	if o.user != nil {
-		if p.user == nil {
-			return errors.New("proposed Dockerfile dropped USER from the final stage")
-		}
-		if strings.TrimSpace(o.user.User) != strings.TrimSpace(p.user.User) {
-			return fmt.Errorf("proposed Dockerfile changed USER in the final stage (want %q, got %q)", o.user.User, p.user.User)
-		}
+	if err := validateUser(o.user, p.user); err != nil {
+		return err
 	}
-	if len(o.expose) > 0 {
-		if len(p.expose) == 0 {
-			return errors.New("proposed Dockerfile dropped EXPOSE from the final stage")
-		}
-		oa := slices.Clone(o.expose)
-		pa := slices.Clone(p.expose)
-		sort.Strings(oa)
-		sort.Strings(pa)
-		if !slices.Equal(oa, pa) {
-			return fmt.Errorf("proposed Dockerfile changed EXPOSE in the final stage (want %v, got %v)", oa, pa)
-		}
+	if err := validateExpose(o.expose, p.expose); err != nil {
+		return err
+	}
+	if err := validateWorkdir(o.workdir, p.workdir); err != nil {
+		return err
+	}
+	if err := validateEnv(o.env, p.env); err != nil {
+		return err
+	}
+	if err := validateLabels(o.labels, p.labels); err != nil {
+		return err
+	}
+	if err := validateHealthcheck(o.health, p.health); err != nil {
+		return err
 	}
 
 	return nil

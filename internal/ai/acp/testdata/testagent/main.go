@@ -144,6 +144,7 @@ func (a *testAgent) Prompt(ctx context.Context, params acpsdk.PromptRequest) (ac
 			"RUN go build -o /out/app ./cmd/app\n" +
 			"\n" +
 			"FROM alpine:3.20\n" +
+			"WORKDIR /src\n" +
 			"COPY --from=builder /out/app /usr/local/bin/app\n" +
 			"CMD [\"app\"]\n" +
 			"```\n"

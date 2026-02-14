@@ -34,9 +34,15 @@ func buildRound1Prompt(filePath string, dockerfile []byte, req *autofixdata.Mult
 	}
 
 	var b strings.Builder
-	b.WriteString("You are an automated refactoring tool. Your task: convert the Dockerfile below to an optimized multi-stage build.\n\n")
+	b.WriteString("You are an automated refactoring tool. Your task: convert the Dockerfile below to a correct multi-stage build ")
+	b.WriteString("(builder stage + final runtime stage).\n\n")
 	b.WriteString("Constraints:\n")
-	b.WriteString("- Preserve build behavior and runtime behavior (ENTRYPOINT, CMD, EXPOSE, USER, WORKDIR, ENV, LABEL, HEALTHCHECK).\n")
+	b.WriteString("- Only do the multi-stage conversion. Do not optimize or rewrite unrelated parts unless required for the conversion.\n")
+	b.WriteString("- Preserve build behavior.\n")
+	b.WriteString("- Preserve runtime settings in the final stage exactly: ENTRYPOINT, CMD, EXPOSE, USER, WORKDIR, ENV, LABEL, ")
+	b.WriteString("HEALTHCHECK.\n")
+	b.WriteString("  - If a setting exists in the input final stage, keep it unchanged.\n")
+	b.WriteString("  - If a setting does NOT exist in the input final stage, do NOT add it.\n")
 	b.WriteString("- Preserve comments when possible.\n")
 	b.WriteString("- Keep the final runtime stage minimal; move build-only deps/tools into a builder stage.\n")
 	b.WriteString("- Do not invent dependencies; if unsure, output NO_CHANGE.\n")
@@ -82,7 +88,10 @@ func buildRound2Prompt(filePath string, proposed []byte, issues []blockingIssue,
 
 	var b strings.Builder
 	b.WriteString("You previously produced a Dockerfile refactor, but tally found blocking issues.\n")
-	b.WriteString("Fix ONLY the issues listed below while preserving the multi-stage goal and runtime behavior.\n\n")
+	b.WriteString("Fix ONLY the issues listed below.\n")
+	b.WriteString("- Do not make any other changes.\n")
+	b.WriteString("- Preserve runtime settings in the final stage exactly: ENTRYPOINT, CMD, EXPOSE, USER, WORKDIR, ENV, LABEL, ")
+	b.WriteString("HEALTHCHECK.\n\n")
 
 	b.WriteString("Blocking issues (JSON):\n")
 	b.Write(issuesJSON)
@@ -108,6 +117,7 @@ func buildRound2Prompt(filePath string, proposed []byte, issues []blockingIssue,
 func buildSimplifiedPrompt(_ string, dockerfile []byte, _ *config.Config) string {
 	var b strings.Builder
 	b.WriteString("Convert the Dockerfile below to a correct multi-stage build.\n")
+	b.WriteString("Only do the multi-stage conversion; do not optimize or rewrite unrelated parts.\n")
 	b.WriteString("If you cannot do so safely, output exactly: NO_CHANGE.\n\n")
 	b.WriteString("Input Dockerfile:\n")
 	b.WriteString("```Dockerfile\n")
