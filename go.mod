@@ -8,6 +8,7 @@ require (
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/cenkalti/backoff/v5 v5.0.3
+	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/coder/acp-go-sdk v0.6.3
 	github.com/containerd/platforms v1.0.0-rc.2
@@ -22,6 +23,7 @@ require (
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/providers/structs v1.0.0
 	github.com/knadh/koanf/v2 v2.3.2
+	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/buildkit v0.27.1
 	github.com/moby/patternmatcher v0.6.0
 	github.com/muesli/termenv v0.16.0
@@ -30,11 +32,11 @@ require (
 	github.com/owenrumney/go-sarif/v3 v3.3.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/sirupsen/logrus v1.9.4
-	github.com/sourcegraph/jsonrpc2 v0.2.1
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v3 v3.6.2
 	github.com/zricethezav/gitleaks/v8 v8.30.0
 	go.podman.io/image/v5 v5.39.1
+	golang.org/x/exp/jsonrpc2 v0.0.0-20250718183923-645b1fa84792
 	mvdan.cc/sh/v3 v3.12.0
 )
 
@@ -49,12 +51,9 @@ require (
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
 	github.com/bodgit/sevenzip v1.6.1 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
-	github.com/buger/jsonparser v1.1.1 // indirect
-	github.com/charmbracelet/bubbles v1.0.0 // indirect
 	github.com/charmbracelet/bubbletea v1.3.10 // indirect
 	github.com/charmbracelet/colorprofile v0.4.1 // indirect
 	github.com/charmbracelet/x/ansi v0.11.6 // indirect
@@ -86,13 +85,11 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
-	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/h2non/filetype v1.1.3 // indirect
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
-	github.com/invopop/jsonschema v0.13.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.3 // indirect
 	github.com/klauspost/pgzip v1.2.6 // indirect
@@ -101,10 +98,8 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
 	github.com/magiconair/properties v1.8.9 // indirect
-	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/maruel/natural v1.1.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
 	github.com/mholt/archives v0.1.5 // indirect
@@ -153,7 +148,6 @@ require (
 	github.com/vbatts/tar-split v0.12.2 // indirect
 	github.com/wasilibs/go-re2 v1.9.0 // indirect
 	github.com/wasilibs/wazero-helpers v0.0.0-20240620070341-3dff1577cd52 // indirect
-	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
@@ -164,7 +158,6 @@ require (
 	golang.org/x/crypto v0.46.0 // indirect
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621 // indirect
 	golang.org/x/exp/event v0.0.0-20250620022241-b7579e27df2b // indirect
-	golang.org/x/exp/jsonrpc2 v0.0.0-20250718183923-645b1fa84792 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect
 	golang.org/x/text v0.32.0 // indirect

@@ -178,7 +178,7 @@ func TestLSP_CodeAction(t *testing.T) {
 			Diagnostics: []diagnostic{*maintainerDiag},
 			Only:        []string{"quickfix"},
 		},
-	}, &actions)
+	}).Await(ctx, &actions)
 	require.NoError(t, err)
 
 	// Snapshot the full code actions response.
@@ -214,7 +214,7 @@ func TestLSP_CodeAction_DefaultIncludesFixAll(t *testing.T) {
 		Context: codeActionContext{
 			Diagnostics: nil,
 		},
-	}, &actions)
+	}).Await(ctx, &actions)
 	require.NoError(t, err)
 
 	assert.True(t, slices.ContainsFunc(actions, func(a codeAction) bool {
@@ -248,7 +248,7 @@ func TestLSP_CodeActionFixAll(t *testing.T) {
 			Diagnostics: nil,
 			Only:        []string{"source.fixAll.tally"},
 		},
-	}, &actions)
+	}).Await(ctx, &actions)
 	require.NoError(t, err)
 	require.Len(t, actions, 1, "expected one fix-all code action")
 
@@ -279,7 +279,7 @@ func TestLSP_ExecuteCommandApplyAllFixes(t *testing.T) {
 	err := ts.conn.Call(ctx, "workspace/executeCommand", &executeCommandParams{
 		Command:   "tally.applyAllFixes",
 		Arguments: []any{uri},
-	}, &edit)
+	}).Await(ctx, &edit)
 	require.NoError(t, err)
 
 	edits := edit.Changes[uri]
@@ -306,7 +306,7 @@ func TestLSP_NoPushDiagnosticsWhenClientSupportsPull(t *testing.T) {
 			Name:    "tally-lsptest",
 			Version: "1.0.0",
 		},
-	}, &result)
+	}).Await(ctx, &result)
 	require.NoError(t, err)
 	require.NoError(t, ts.conn.Notify(ctx, "initialized", struct{}{}))
 
@@ -328,7 +328,7 @@ func TestLSP_NoPushDiagnosticsWhenClientSupportsPull(t *testing.T) {
 	var report fullDocumentDiagnosticReport
 	err = ts.conn.Call(ctx2, "textDocument/diagnostic", &documentDiagnosticParams{
 		TextDocument: textDocumentIdentifier{URI: uri},
-	}, &report)
+	}).Await(ctx2, &report)
 	require.NoError(t, err)
 
 	assert.Equal(t, "full", report.Kind)
@@ -356,7 +356,7 @@ func TestLSP_PullDiagnosticsForOpenDocument(t *testing.T) {
 	var report fullDocumentDiagnosticReport
 	err := ts.conn.Call(ctx, "textDocument/diagnostic", &documentDiagnosticParams{
 		TextDocument: textDocumentIdentifier{URI: uri},
-	}, &report)
+	}).Await(ctx, &report)
 	require.NoError(t, err)
 
 	assert.Equal(t, "full", report.Kind)
@@ -393,7 +393,7 @@ func TestLSP_PullDiagnosticsFromDisk(t *testing.T) {
 	var report fullDocumentDiagnosticReport
 	err := ts.conn.Call(ctx, "textDocument/diagnostic", &documentDiagnosticParams{
 		TextDocument: textDocumentIdentifier{URI: uri},
-	}, &report)
+	}).Await(ctx, &report)
 	require.NoError(t, err)
 
 	assert.Equal(t, "full", report.Kind)
@@ -419,7 +419,7 @@ func TestLSP_PullDiagnosticsCacheUnchanged(t *testing.T) {
 	var report1 fullDocumentDiagnosticReport
 	err := ts.conn.Call(ctx, "textDocument/diagnostic", &documentDiagnosticParams{
 		TextDocument: textDocumentIdentifier{URI: uri},
-	}, &report1)
+	}).Await(ctx, &report1)
 	require.NoError(t, err)
 	require.Equal(t, "full", report1.Kind)
 	require.NotEmpty(t, report1.ResultID)
@@ -432,7 +432,7 @@ func TestLSP_PullDiagnosticsCacheUnchanged(t *testing.T) {
 	err = ts.conn.Call(ctx2, "textDocument/diagnostic", &documentDiagnosticParams{
 		TextDocument:     textDocumentIdentifier{URI: uri},
 		PreviousResultID: report1.ResultID,
-	}, &report2)
+	}).Await(ctx2, &report2)
 	require.NoError(t, err)
 	assert.Equal(t, "unchanged", report2.Kind)
 	assert.Equal(t, report1.ResultID, report2.ResultID)
@@ -457,7 +457,7 @@ func TestLSP_Formatting(t *testing.T) {
 	err := ts.conn.Call(ctx, "textDocument/formatting", &documentFormattingParams{
 		TextDocument: textDocumentIdentifier{URI: uri},
 		Options:      formattingOptions{TabSize: 4, InsertSpaces: true},
-	}, &edits)
+	}).Await(ctx, &edits)
 	require.NoError(t, err)
 
 	// The MaintainerDeprecated fix is FixSafe, so formatting should replace
@@ -493,7 +493,7 @@ func TestLSP_FormattingConsistentCasing(t *testing.T) {
 	err := ts.conn.Call(ctx, "textDocument/formatting", &documentFormattingParams{
 		TextDocument: textDocumentIdentifier{URI: uri},
 		Options:      formattingOptions{TabSize: 4, InsertSpaces: true},
-	}, &edits)
+	}).Await(ctx, &edits)
 	require.NoError(t, err)
 	require.NotEmpty(t, edits, "expected formatting edits for inconsistent casing")
 
@@ -527,7 +527,7 @@ func TestLSP_FormattingRealWorld(t *testing.T) {
 	err = ts.conn.Call(ctx, "textDocument/formatting", &documentFormattingParams{
 		TextDocument: textDocumentIdentifier{URI: uri},
 		Options:      formattingOptions{TabSize: 4, InsertSpaces: true},
-	}, &edits)
+	}).Await(ctx, &edits)
 	require.NoError(t, err)
 	require.NotEmpty(t, edits, "expected formatting edits for real-world Dockerfile")
 
@@ -558,7 +558,7 @@ func TestLSP_FormattingNoChanges(t *testing.T) {
 	err := ts.conn.Call(ctx, "textDocument/formatting", &documentFormattingParams{
 		TextDocument: textDocumentIdentifier{URI: uri},
 		Options:      formattingOptions{TabSize: 4, InsertSpaces: true},
-	}, &raw)
+	}).Await(ctx, &raw)
 	require.NoError(t, err)
 
 	// When there are no changes, the server should return null.
@@ -573,6 +573,6 @@ func TestLSP_MethodNotFound(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := ts.conn.Call(ctx, "custom/nonExistentMethod", nil, nil)
+	err := ts.conn.Call(ctx, "custom/nonExistentMethod", nil).Await(ctx, nil)
 	assert.Error(t, err, "unknown method should return an error")
 }

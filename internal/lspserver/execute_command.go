@@ -3,7 +3,7 @@ package lspserver
 import (
 	"os"
 
-	"github.com/sourcegraph/jsonrpc2"
+	"golang.org/x/exp/jsonrpc2"
 
 	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
 
@@ -17,12 +17,12 @@ func (s *Server) handleExecuteCommand(params *protocol.ExecuteCommandParams) (an
 		return nil, nil //nolint:nilnil // LSP: null result is valid
 	}
 	if params.Command != applyAllFixesCommand {
-		return nil, &jsonrpc2.Error{Code: jsonrpc2.CodeInvalidParams, Message: "unknown command: " + params.Command}
+		return nil, jsonrpc2.NewError(int64(protocol.ErrorCodeInvalidParams), "unknown command: "+params.Command)
 	}
 
 	uri, unsafe, ok := parseApplyAllFixesArgs(params.Arguments)
 	if !ok {
-		return nil, &jsonrpc2.Error{Code: jsonrpc2.CodeInvalidParams, Message: "invalid command arguments"}
+		return nil, jsonrpc2.NewError(int64(protocol.ErrorCodeInvalidParams), "invalid command arguments")
 	}
 
 	content, err := s.contentForURI(uri)
