@@ -42,6 +42,10 @@ type MultiStageResolveData struct {
 	Score   int      `json:"score"`
 	Signals []Signal `json:"signals,omitempty"`
 
+	// RegistryInsights carries resolved registry metadata for base images (slow checks).
+	// It is attached by cmd/tally/cmd/lint.go when slow checks ran successfully.
+	RegistryInsights []RegistryInsight `json:"-"`
+
 	// Config is the effective per-file configuration for this fix run.
 	// It is attached by cmd/tally/cmd/lint.go:applyFixes.
 	Config *config.Config `json:"-"`
@@ -54,3 +58,7 @@ type MultiStageResolveData struct {
 func (d *MultiStageResolveData) SetConfig(cfg *config.Config) { d.Config = cfg }
 
 func (d *MultiStageResolveData) SetFixContext(ctx FixContext) { d.FixContext = ctx }
+
+func (d *MultiStageResolveData) SetRegistryInsights(insights []RegistryInsight) {
+	d.RegistryInsights = insights
+}

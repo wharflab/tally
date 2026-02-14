@@ -71,6 +71,7 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 		allViolations []any
 		allSkipped    []Skipped
 		allCompleted  []CompletedCheck
+		allResolved   = make(map[ResolutionKey]any)
 		resultMu      sync.Mutex
 	)
 
@@ -135,7 +136,9 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 			// Fan out resolved result to all handlers sharing this key.
 			// Handlers run outside the lock to avoid serializing callbacks.
 			v, c := fanOutHandlers(group, result.value)
+			rk := ResolutionKey{ResolverID: dk.resolverID, Key: dk.key}
 			resultMu.Lock()
+			allResolved[rk] = result.value
 			allViolations = append(allViolations, v...)
 			allCompleted = append(allCompleted, c...)
 			resultMu.Unlock()
@@ -148,6 +151,7 @@ func (rt *Runtime) Run(ctx context.Context, requests []CheckRequest) *RunResult 
 		Violations: allViolations,
 		Skipped:    allSkipped,
 		Completed:  allCompleted,
+		Resolved:   allResolved,
 	}
 }
 

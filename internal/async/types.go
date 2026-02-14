@@ -94,4 +94,16 @@ type RunResult struct {
 	Skipped    []Skipped
 	// Completed records every (rule, file, stage) that resolved successfully.
 	Completed []CompletedCheck
+
+	// Resolved stores successful resolution values keyed by (ResolverID, Key).
+	// This allows callers (e.g. AI AutoFix) to reuse resolved metadata even when
+	// handlers emit zero violations.
+	Resolved map[ResolutionKey]any
+}
+
+// ResolutionKey identifies a unique resolution unit in a runtime session.
+// It matches the runtime's internal (ResolverID, Key) dedupe key.
+type ResolutionKey struct {
+	ResolverID string
+	Key        string
 }

@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"cmp"
 	stdcontext "context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -193,6 +196,99 @@ type lintResults struct {
 	firstCfg    *config.Config
 }
 
+func collectRegistryInsights(
+	plans []async.CheckRequest,
+	result *async.RunResult,
+) map[string][]autofixdata.RegistryInsight {
+	if result == nil || len(result.Resolved) == 0 || len(plans) == 0 {
+		return nil
+	}
+
+	byFile := make(map[string]map[string]autofixdata.RegistryInsight)
+
+	for _, req := range plans {
+		if req.ResolverID != registry.RegistryResolverID() {
+			continue
+		}
+
+		data, ok := req.Data.(*registry.ResolveRequest)
+		if !ok || data == nil {
+			continue
+		}
+
+		resolved, ok := result.Resolved[async.ResolutionKey{ResolverID: req.ResolverID, Key: req.Key}]
+		if !ok {
+			continue
+		}
+
+		fileKey := filepath.ToSlash(req.File)
+		if fileKey == "" {
+			continue
+		}
+
+		stageKey := strconv.Itoa(req.StageIndex) + "|" + req.Key
+		insight := autofixdata.RegistryInsight{
+			StageIndex:         req.StageIndex,
+			Ref:                data.Ref,
+			RequestedPlatform:  data.Platform,
+			ResolvedPlatform:   "",
+			Digest:             "",
+			AvailablePlatforms: nil,
+		}
+
+		switch v := resolved.(type) {
+		case *registry.ImageConfig:
+			if v != nil {
+				insight.ResolvedPlatform = formatPlatformParts(v.OS, v.Arch, v.Variant)
+				insight.Digest = v.Digest
+			}
+		case *registry.PlatformMismatchError:
+			if v != nil && len(v.Available) > 0 {
+				insight.AvailablePlatforms = append([]string(nil), v.Available...)
+			}
+		}
+
+		m := byFile[fileKey]
+		if m == nil {
+			m = make(map[string]autofixdata.RegistryInsight)
+			byFile[fileKey] = m
+		}
+		m[stageKey] = insight
+	}
+
+	if len(byFile) == 0 {
+		return nil
+	}
+
+	out := make(map[string][]autofixdata.RegistryInsight, len(byFile))
+	for file, m := range byFile {
+		list := make([]autofixdata.RegistryInsight, 0, len(m))
+		for _, ins := range m {
+			list = append(list, ins)
+		}
+		slices.SortFunc(list, func(a, b autofixdata.RegistryInsight) int {
+			if d := cmp.Compare(a.StageIndex, b.StageIndex); d != 0 {
+				return d
+			}
+			if d := strings.Compare(a.Ref, b.Ref); d != 0 {
+				return d
+			}
+			return strings.Compare(a.RequestedPlatform, b.RequestedPlatform)
+		})
+		out[file] = list
+	}
+
+	return out
+}
+
+func formatPlatformParts(osName, arch, variant string) string {
+	s := osName + "/" + arch
+	if variant != "" {
+		s += "/" + variant
+	}
+	return s
+}
+
 // runLint is the action handler for the lint command.
 func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 	inputs := cmd.Args().Slice()
@@ -226,8 +322,12 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 	}
 
 	// Execute async checks if enabled and plans exist.
+	var (
+		asyncResult *async.RunResult
+		asyncPlans  []async.CheckRequest
+	)
 	if len(res.asyncPlans) > 0 {
-		asyncResult := runAsyncChecks(ctx, res)
+		asyncResult, asyncPlans = runAsyncChecks(ctx, res)
 		if asyncResult != nil {
 			res.violations = mergeAsyncViolations(res.violations, asyncResult)
 		}
@@ -254,7 +354,7 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 		fmt.Fprintf(os.Stderr, "Warning: --fix-unsafe has no effect without --fix\n")
 	}
 	if cmd.Bool("fix") {
-		fixResult, fixErr := applyFixes(ctx, cmd, allViolations, res.fileSources, res.fileConfigs)
+		fixResult, fixErr := applyFixes(ctx, cmd, allViolations, res.fileSources, res.fileConfigs, asyncPlans, asyncResult)
 		if fixErr != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to apply fixes: %v\n", fixErr)
 			return cli.Exit("", ExitConfigError)
@@ -787,6 +887,8 @@ func applyFixes(
 	violations []rules.Violation,
 	sources map[string][]byte,
 	fileConfigs map[string]*config.Config,
+	asyncPlans []async.CheckRequest,
+	asyncResult *async.RunResult,
 ) (*fix.Result, error) {
 	// Determine safety threshold
 	safetyThreshold := fix.FixSafe
@@ -813,6 +915,8 @@ func applyFixes(
 		autofix.Register()
 	}
 
+	registryInsightsByFile := collectRegistryInsights(asyncPlans, asyncResult)
+
 	// Enrich AI resolver requests with per-file config + outer fix context.
 	fixCtx := autofixdata.FixContext{
 		SafetyThreshold: safetyThreshold,
@@ -837,6 +941,12 @@ func applyFixes(
 		cfg := normalizedConfigs[filepath.ToSlash(v.File())]
 		req.SetConfig(cfg)
 		req.SetFixContext(fixCtx)
+
+		if setter, ok := v.SuggestedFix.ResolverData.(interface {
+			SetRegistryInsights(insights []autofixdata.RegistryInsight)
+		}); ok {
+			setter.SetRegistryInsights(registryInsightsByFile[filepath.ToSlash(v.File())])
+		}
 	}
 
 	aiFixes, maxAITimeout := planAcpFixSpinner(violations, safetyThreshold, ruleFilter, fixModes, normalizedConfigs)
@@ -891,20 +1001,20 @@ func buildPerFileFixModes(fileConfigs map[string]*config.Config) map[string]map[
 // runAsyncChecks executes async check plans if slow checks are enabled.
 // Returns nil if slow checks are disabled or no plans exist.
 // Respects per-file slow-checks configuration from res.fileConfigs.
-func runAsyncChecks(ctx stdcontext.Context, res *lintResults) *async.RunResult {
+func runAsyncChecks(ctx stdcontext.Context, res *lintResults) (*async.RunResult, []async.CheckRequest) {
 	if len(res.asyncPlans) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	plans, maxTimeout := filterAsyncPlans(res)
 	if len(plans) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Register the registry resolver (once per invocation).
 	if registry.NewDefaultResolver == nil {
 		fmt.Fprintf(os.Stderr, "note: slow checks not available (missing build tags)\n")
-		return nil
+		return nil, nil
 	}
 	imgResolver := registry.NewDefaultResolver()
 	asyncImgResolver := registry.NewAsyncImageResolver(imgResolver)
@@ -919,7 +1029,7 @@ func runAsyncChecks(ctx stdcontext.Context, res *lintResults) *async.RunResult {
 
 	result := rt.Run(ctx, plans)
 	reportSkipped(result)
-	return result
+	return result, plans
 }
 
 // filterAsyncPlans applies per-file slow-checks policy to async plans.

@@ -63,6 +63,9 @@ func TestRuntime_EmptyRequests(t *testing.T) {
 	if len(result.Skipped) != 0 {
 		t.Errorf("expected 0 skipped, got %d", len(result.Skipped))
 	}
+	if len(result.Resolved) != 0 {
+		t.Errorf("expected 0 resolved, got %d", len(result.Resolved))
+	}
 }
 
 func TestRuntime_SingleRequest(t *testing.T) {
@@ -110,6 +113,14 @@ func TestRuntime_SingleRequest(t *testing.T) {
 	}
 	if len(result.Skipped) != 0 {
 		t.Errorf("expected 0 skipped, got %d", len(result.Skipped))
+	}
+	if len(result.Resolved) != 1 {
+		t.Fatalf("expected 1 resolved entry, got %d", len(result.Resolved))
+	}
+	if got, ok := result.Resolved[ResolutionKey{ResolverID: "test", Key: "key1"}]; !ok {
+		t.Error("expected resolved entry for (test, key1)")
+	} else if got != "resolved:input1" {
+		t.Errorf("expected resolved:input1 in resolved map, got %v", got)
 	}
 }
 
@@ -162,6 +173,14 @@ func TestRuntime_Deduplication(t *testing.T) {
 	}
 	if len(result.Violations) != 2 {
 		t.Fatalf("expected 2 violations, got %d", len(result.Violations))
+	}
+	if len(result.Resolved) != 1 {
+		t.Fatalf("expected 1 resolved entry, got %d", len(result.Resolved))
+	}
+	if got, ok := result.Resolved[ResolutionKey{ResolverID: "test", Key: "same-key"}]; !ok {
+		t.Error("expected resolved entry for (test, same-key)")
+	} else if got != "resolved" {
+		t.Errorf("expected resolved in resolved map, got %v", got)
 	}
 }
 

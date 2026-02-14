@@ -38,34 +38,66 @@ func buildRound1Prompt(
 	lines := countLines(normalized)
 
 	var b strings.Builder
-	b.WriteString("You are a software engineer with deep knowledge of Dockerfile semantics.\n\n")
-	b.WriteString("Task: convert the Dockerfile below to a correct multi-stage build.\n")
-	b.WriteString("  - Use one or more builder/cache stages as needed.\n")
-	b.WriteString("  - Ensure there is a final runtime stage.\n")
-	b.WriteString("Goals:\n")
-	b.WriteString("- Reduce the final image size (primary).\n")
-	b.WriteString("- Improve build caching (secondary).\n\n")
-	b.WriteString("Rules (strict):\n")
-	b.WriteString("- Only do the multi-stage conversion. Do not optimize or rewrite unrelated parts unless required for the conversion.\n")
-	b.WriteString("- Keep all comments. If you move code lines, move any related comments with them (no orphaned comments).\n")
-	b.WriteString("- If you need to communicate an assumption, add a VERY concise comment inside the Dockerfile.\n")
-	b.WriteString("  - Do not output prose outside the Dockerfile code block.\n")
-	b.WriteString("- If clearly safe, you may choose a smaller runtime base image (e.g. scratch or distroless) to reduce final size.\n")
-	b.WriteString("  - If not clearly safe, keep the runtime base image unchanged.\n")
-	b.WriteString("- Final-stage runtime settings must remain identical (tally validates this):\n")
-	b.WriteString(runtimeSummary)
-	b.WriteString("- If you cannot satisfy these rules safely, output exactly: NO_CHANGE.\n\n")
+	writeRound1Preamble(&b, runtimeSummary)
+	writeRound1RegistryContext(&b, req.RegistryInsights)
+	writeRound1Signals(&b, req.Signals)
+	writeRound1InputDockerfile(&b, file, lines, normalized)
+	writeRound1OutputFormat(&b)
+	return b.String(), nil
+}
 
-	if len(req.Signals) > 0 {
-		b.WriteString("Signals (pointers):\n")
-		for _, s := range req.Signals {
-			b.WriteString("- ")
-			b.WriteString(formatSignal(s))
-			b.WriteString("\n")
-		}
+func writeRound1Preamble(b *strings.Builder, runtimeSummary string) {
+	b.WriteString(`You are a software engineer with deep knowledge of Dockerfile semantics.
+
+Task: convert the Dockerfile below to a correct multi-stage build.
+  - Use one or more builder/cache stages as needed.
+  - Ensure there is a final runtime stage.
+Goals:
+- Reduce the final image size (primary).
+- Improve build caching (secondary).
+
+Rules (strict):
+- Only do the multi-stage conversion. Do not optimize or rewrite unrelated parts unless required for the conversion.
+- Keep all comments. If you move code lines, move any related comments with them (no orphaned comments).
+- If you need to communicate an assumption, add a VERY concise comment inside the Dockerfile.
+  - Do not output prose outside the Dockerfile code block.
+- If clearly safe, you may choose a smaller runtime base image (e.g. scratch or distroless) to reduce final size.
+  - If not clearly safe, keep the runtime base image unchanged.
+- Final-stage runtime settings must remain identical (tally validates this):
+`)
+	b.WriteString(runtimeSummary)
+	b.WriteString(`- If you cannot satisfy these rules safely, output exactly: NO_CHANGE.
+
+`)
+}
+
+func writeRound1RegistryContext(b *strings.Builder, insights []autofixdata.RegistryInsight) {
+	if len(insights) == 0 {
+		return
+	}
+	b.WriteString("Registry context (slow checks):\n")
+	for _, ins := range insights {
+		b.WriteString("- ")
+		b.WriteString(formatRegistryInsight(ins))
 		b.WriteString("\n")
 	}
+	b.WriteString("\n")
+}
 
+func writeRound1Signals(b *strings.Builder, signals []autofixdata.Signal) {
+	if len(signals) == 0 {
+		return
+	}
+	b.WriteString("Signals (pointers):\n")
+	for _, s := range signals {
+		b.WriteString("- ")
+		b.WriteString(formatSignal(s))
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+}
+
+func writeRound1InputDockerfile(b *strings.Builder, file string, lines int, normalized string) {
 	b.WriteString("Input Dockerfile (")
 	b.WriteString(file)
 	b.WriteString(", ")
@@ -77,12 +109,13 @@ func buildRound1Prompt(
 		b.WriteString("\n")
 	}
 	b.WriteString("```\n\n")
+}
 
+func writeRound1OutputFormat(b *strings.Builder) {
 	b.WriteString("Output format:\n")
 	b.WriteString("- Either output exactly: NO_CHANGE\n")
 	b.WriteString("- Or output exactly one ```Dockerfile fenced code block with the full updated Dockerfile\n")
 	b.WriteString("- Any other text outside the code block will be discarded\n")
-	return b.String(), nil
 }
 
 func formatSignal(s autofixdata.Signal) string {
@@ -111,6 +144,41 @@ func formatSignal(s autofixdata.Signal) string {
 		b.WriteString(s.Evidence)
 	}
 	return b.String()
+}
+
+func formatRegistryInsight(ins autofixdata.RegistryInsight) string {
+	parts := make([]string, 0, 5)
+	if ins.Ref != "" {
+		parts = append(parts, "FROM "+ins.Ref)
+	}
+	if ins.RequestedPlatform != "" {
+		parts = append(parts, "requested "+ins.RequestedPlatform)
+	}
+	if ins.ResolvedPlatform != "" {
+		parts = append(parts, "resolved "+ins.ResolvedPlatform)
+	}
+	if ins.Digest != "" {
+		parts = append(parts, "digest "+shortDigest(ins.Digest))
+	}
+	if len(ins.AvailablePlatforms) > 0 {
+		parts = append(parts, "available "+strings.Join(ins.AvailablePlatforms, ", "))
+	}
+	if len(parts) == 0 {
+		return "stage " + strconv.Itoa(ins.StageIndex)
+	}
+	return "stage " + strconv.Itoa(ins.StageIndex) + ": " + strings.Join(parts, "; ")
+}
+
+func shortDigest(digest string) string {
+	digest = strings.TrimSpace(digest)
+	const prefix = "sha256:"
+	if strings.HasPrefix(digest, prefix) && len(digest) > len(prefix)+12 {
+		return prefix + digest[len(prefix):len(prefix)+12] + "…"
+	}
+	if len(digest) > 16 {
+		return digest[:16] + "…"
+	}
+	return digest
 }
 
 type finalStageRuntime struct {
