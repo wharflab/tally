@@ -1,7 +1,6 @@
 package tally
 
 import (
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -64,8 +63,6 @@ func (r *PreferMultiStageBuildRule) ValidateConfig(config any) error {
 	return configutil.ValidateWithSchema(config, r.Schema())
 }
 
-var fromLineRE = regexp.MustCompile(`(?im)^\s*FROM\b`)
-
 func (r *PreferMultiStageBuildRule) Check(input rules.LintInput) []rules.Violation {
 	cfg := r.resolveConfig(input.Config)
 	minScore := 4
@@ -77,11 +74,13 @@ func (r *PreferMultiStageBuildRule) Check(input rules.LintInput) []rules.Violati
 	}
 
 	// Trigger only on exactly one real FROM.
-	if len(fromLineRE.FindAllIndex(input.Source, -1)) != 1 {
-		return nil
-	}
 	if len(input.Stages) != 1 {
 		// Stages should be 1 for single-FROM, but keep a defensive check.
+		return nil
+	}
+	if strings.TrimSpace(input.Stages[0].SourceCode) == "" {
+		// Parse may synthesize a dummy stage (FROM scratch) to continue linting;
+		// require a real stage definition.
 		return nil
 	}
 

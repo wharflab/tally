@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"regexp"
 	"slices"
 	"strings"
 
@@ -15,29 +14,37 @@ import (
 	"github.com/tinovyatkin/tally/internal/sourcemap"
 )
 
-var fromLineRE = regexp.MustCompile(`(?im)^\s*FROM\b`)
+func countFromInstructions(pr *dockerfile.ParseResult) int {
+	if pr == nil {
+		return 0
+	}
 
-func hasFromInstruction(content []byte) bool {
-	return fromLineRE.FindIndex(content) != nil
-}
-
-func countFromInstructions(content []byte) int {
-	matches := fromLineRE.FindAllIndex(content, -1)
-	return len(matches)
+	count := 0
+	for _, stage := range pr.Stages {
+		if strings.TrimSpace(stage.SourceCode) == "" {
+			// Parse may synthesize a dummy stage (FROM scratch) to continue linting.
+			// Count only real stage definitions from source.
+			continue
+		}
+		count++
+	}
+	return count
 }
 
 func validateStageCount(orig, proposed *dockerfile.ParseResult) error {
 	if proposed == nil {
 		return errors.New("proposed parse result is nil")
 	}
-	if !hasFromInstruction(proposed.Source) {
+
+	proposedFrom := countFromInstructions(proposed)
+	if proposedFrom == 0 {
 		return errors.New("proposed Dockerfile has no FROM instruction")
 	}
 
 	// The prefer-multi-stage-build objective triggers only for single-stage inputs.
 	// Enforce 2+ stages in the proposal to avoid accepting a "no-op" rewrite.
-	if orig != nil && hasFromInstruction(orig.Source) && countFromInstructions(orig.Source) == 1 {
-		if countFromInstructions(proposed.Source) < 2 {
+	if orig != nil && countFromInstructions(orig) == 1 {
+		if proposedFrom < 2 {
 			return errors.New("proposed Dockerfile still has a single stage (expected 2+ stages)")
 		}
 	}

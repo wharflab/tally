@@ -32,6 +32,16 @@ func TestValidateStageCount_SingleStageInputRequiresMultiStageProposal(t *testin
 	}
 }
 
+func TestValidateStageCount_RejectsProposalWithoutFrom(t *testing.T) {
+	t.Parallel()
+
+	orig := mustParseDockerfile(t, "FROM alpine:3.20\nRUN echo hi\n")
+	proposed := mustParseDockerfile(t, "RUN echo hi\n")
+	if err := validateStageCount(orig, proposed); err == nil {
+		t.Fatalf("expected stage-count error, got nil")
+	}
+}
+
 func TestValidateRuntimeSettings_PreservesFinalStageSettings(t *testing.T) {
 	t.Parallel()
 
