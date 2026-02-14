@@ -11,12 +11,14 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 
-	tflsp "github.com/TypeFox/go-lsp/protocol"
 	"github.com/stretchr/testify/require"
+	"go.bug.st/lsp"
+	"go.bug.st/lsp/textedits"
 	"golang.org/x/exp/jsonrpc2"
 )
 
@@ -439,24 +441,40 @@ type unchangedDocumentDiagnosticReport struct {
 	ResultID string `json:"resultId"`
 }
 
-// applyEdits applies LSP TextEdits to content using the TypeFox go-lsp library.
+// applyEdits applies LSP TextEdits to content using the go.bug.st/lsp library.
 // Edits must be non-overlapping (LSP spec requirement).
-func applyEdits(t *testing.T, uri, content string, edits []textEdit) string {
+func applyEdits(t *testing.T, _ /* uri */, content string, edits []textEdit) string {
 	t.Helper()
-	m := tflsp.NewMapper(tflsp.DocumentURI(uri), []byte(content))
-	tfEdits := make([]tflsp.TextEdit, 0, len(edits))
+
+	// Convert to bugst/go-lsp types (int instead of uint32).
+	lspEdits := make([]lsp.TextEdit, 0, len(edits))
 	for _, e := range edits {
-		tfEdits = append(tfEdits, tflsp.TextEdit{
-			Range: tflsp.Range{
-				Start: tflsp.Position{Line: e.Range.Start.Line, Character: e.Range.Start.Character},
-				End:   tflsp.Position{Line: e.Range.End.Line, Character: e.Range.End.Character},
+		lspEdits = append(lspEdits, lsp.TextEdit{
+			Range: lsp.Range{
+				Start: lsp.Position{Line: int(e.Range.Start.Line), Character: int(e.Range.Start.Character)},
+				End:   lsp.Position{Line: int(e.Range.End.Line), Character: int(e.Range.End.Character)},
 			},
 			NewText: e.NewText,
 		})
 	}
-	out, _, err := tflsp.ApplyEdits(m, tfEdits)
-	require.NoError(t, err, "ApplyEdits failed — edits may be overlapping (LSP spec violation)")
-	return string(out)
+
+	// Apply edits one by one in reverse order (end to start) to avoid offset issues.
+	// Sort by descending position so later edits don't affect earlier positions.
+	slices.SortFunc(lspEdits, func(a, b lsp.TextEdit) int {
+		if a.Range.Start.Line != b.Range.Start.Line {
+			return b.Range.Start.Line - a.Range.Start.Line
+		}
+		return b.Range.Start.Character - a.Range.Start.Character
+	})
+
+	result := content
+	for _, edit := range lspEdits {
+		var err error
+		result, err = textedits.ApplyTextChange(result, edit.Range, edit.NewText)
+		require.NoError(t, err, "ApplyTextChange failed — edits may be overlapping (LSP spec violation)")
+	}
+
+	return result
 }
 
 // Formatting types (textDocument/formatting).

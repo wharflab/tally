@@ -3,7 +3,6 @@ module github.com/tinovyatkin/tally
 go 1.26.0
 
 require (
-	github.com/TypeFox/go-lsp v0.0.1
 	github.com/alecthomas/chroma/v2 v2.23.1
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 	github.com/bmatcuk/doublestar/v4 v4.10.0
@@ -35,6 +34,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v3 v3.6.2
 	github.com/zricethezav/gitleaks/v8 v8.30.0
+	go.bug.st/lsp v0.1.3
 	go.podman.io/image/v5 v5.39.1
 	golang.org/x/exp/jsonrpc2 v0.0.0-20250718183923-645b1fa84792
 	mvdan.cc/sh/v3 v3.12.0
@@ -50,6 +50,7 @@ require (
 	github.com/STARRY-S/zip v0.2.3 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/andybalholm/brotli v1.2.0 // indirect
+	github.com/arduino/go-paths-helper v1.6.1 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
 	github.com/bodgit/sevenzip v1.6.1 // indirect
@@ -152,6 +153,7 @@ require (
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
+	go.bug.st/json v1.15.6 // indirect
 	go.podman.io/storage v1.62.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
