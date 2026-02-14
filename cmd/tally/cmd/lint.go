@@ -697,7 +697,7 @@ func applyFixes(
 	aiEnabled := false
 	normalizedConfigs := make(map[string]*config.Config, len(fileConfigs))
 	for path, cfg := range fileConfigs {
-		normalizedConfigs[filepath.Clean(path)] = cfg
+		normalizedConfigs[filepath.ToSlash(path)] = cfg
 		if cfg != nil && cfg.AI.Enabled {
 			aiEnabled = true
 		}
@@ -727,7 +727,7 @@ func applyFixes(
 		if !ok {
 			continue
 		}
-		cfg := normalizedConfigs[filepath.Clean(v.File())]
+		cfg := normalizedConfigs[filepath.ToSlash(v.File())]
 		req.SetConfig(cfg)
 		req.SetFixContext(fixCtx)
 	}
