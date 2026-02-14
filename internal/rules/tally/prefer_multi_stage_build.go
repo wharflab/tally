@@ -107,7 +107,7 @@ func (r *PreferMultiStageBuildRule) Check(input rules.LintInput) []rules.Violati
 			NeedsResolve: true,
 			ResolverID:   autofixdata.ResolverID,
 			ResolverData: &autofixdata.MultiStageResolveData{
-				File:    "Dockerfile",
+				File:    input.File,
 				Score:   score,
 				Signals: signals,
 			},
