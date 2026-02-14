@@ -2,6 +2,7 @@ package lsptest
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
@@ -458,23 +459,45 @@ func applyEdits(t *testing.T, _ /* uri */, content string, edits []textEdit) str
 		})
 	}
 
-	// Apply edits one by one in reverse order (end to start) to avoid offset issues.
-	// Sort by descending position so later edits don't affect earlier positions.
+	// Sort edits by position (ascending) for deterministic processing and overlap detection.
 	slices.SortFunc(lspEdits, func(a, b lsp.TextEdit) int {
-		if a.Range.Start.Line != b.Range.Start.Line {
-			return b.Range.Start.Line - a.Range.Start.Line
+		if c := cmp.Compare(a.Range.Start.Line, b.Range.Start.Line); c != 0 {
+			return c
 		}
-		return b.Range.Start.Character - a.Range.Start.Character
+		return cmp.Compare(a.Range.Start.Character, b.Range.Start.Character)
 	})
 
-	result := content
-	for _, edit := range lspEdits {
+	// Validate that edits don't overlap (LSP spec requirement).
+	validateNonOverlapping(t, lspEdits)
+
+	// Apply edits in reverse order (end to start) to avoid position shifts.
+	for i := len(lspEdits) - 1; i >= 0; i-- {
+		edit := lspEdits[i]
 		var err error
-		result, err = textedits.ApplyTextChange(result, edit.Range, edit.NewText)
-		require.NoError(t, err, "ApplyTextChange failed — edits may be overlapping (LSP spec violation)")
+		content, err = textedits.ApplyTextChange(content, edit.Range, edit.NewText)
+		require.NoError(t, err, "ApplyTextChange failed")
 	}
 
-	return result
+	return content
+}
+
+// validateNonOverlapping checks that edits don't overlap (LSP spec requirement).
+// Assumes edits are sorted by ascending position.
+func validateNonOverlapping(t *testing.T, edits []lsp.TextEdit) {
+	t.Helper()
+	for i := range len(edits) - 1 {
+		curr := edits[i]
+		next := edits[i+1]
+
+		// Check if current edit's end is after next edit's start.
+		if curr.Range.End.Line > next.Range.Start.Line ||
+			(curr.Range.End.Line == next.Range.Start.Line && curr.Range.End.Character > next.Range.Start.Character) {
+			require.Failf(t, "overlapping edits",
+				"LSP spec violation: edit at line %d:%d overlaps with edit at line %d:%d",
+				curr.Range.Start.Line, curr.Range.Start.Character,
+				next.Range.Start.Line, next.Range.Start.Character)
+		}
+	}
 }
 
 // Formatting types (textDocument/formatting).
