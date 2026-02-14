@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/sourcegraph/jsonrpc2"
+	"golang.org/x/exp/jsonrpc2"
 
 	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
 
@@ -68,7 +68,7 @@ func (c *lintResultCache) clear() {
 }
 
 // publishDiagnostics lints a document and publishes diagnostics to the client.
-func (s *Server) publishDiagnostics(ctx context.Context, conn *jsonrpc2.Conn, doc *Document) {
+func (s *Server) publishDiagnostics(ctx context.Context, doc *Document) {
 	docURI := doc.URI
 	content := doc.Content
 
@@ -77,7 +77,7 @@ func (s *Server) publishDiagnostics(ctx context.Context, conn *jsonrpc2.Conn, do
 	diagnostics := convertDiagnostics(violations)
 
 	version := doc.Version
-	if err := lspNotify(ctx, conn, string(protocol.MethodTextDocumentPublishDiagnostics), &protocol.PublishDiagnosticsParams{
+	if err := lspNotify(ctx, s.conn, string(protocol.MethodTextDocumentPublishDiagnostics), &protocol.PublishDiagnosticsParams{
 		Uri:         protocol.DocumentUri(docURI),
 		Version:     &version,
 		Diagnostics: diagnostics,
@@ -88,7 +88,7 @@ func (s *Server) publishDiagnostics(ctx context.Context, conn *jsonrpc2.Conn, do
 
 // clearDiagnostics sends an empty diagnostics array to clear issues for a URI.
 // version is the last known document version (nil if unknown).
-func clearDiagnostics(ctx context.Context, conn *jsonrpc2.Conn, docURI string, version *int32) {
+func clearDiagnostics(ctx context.Context, conn *jsonrpc2.Connection, docURI string, version *int32) {
 	if err := lspNotify(ctx, conn, string(protocol.MethodTextDocumentPublishDiagnostics), &protocol.PublishDiagnosticsParams{
 		Uri:         protocol.DocumentUri(docURI),
 		Version:     version,

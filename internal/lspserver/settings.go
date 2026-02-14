@@ -10,7 +10,6 @@ import (
 	"time"
 
 	jsonv2 "encoding/json/v2"
-	"github.com/sourcegraph/jsonrpc2"
 
 	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
 
@@ -49,7 +48,6 @@ func defaultClientSettings() clientSettings {
 
 func (s *Server) handleDidChangeConfiguration(
 	ctx context.Context,
-	conn *jsonrpc2.Conn,
 	params *protocol.DidChangeConfigurationParams,
 ) {
 	next, ok := parseClientSettings(params.Settings)
@@ -68,7 +66,7 @@ func (s *Server) handleDidChangeConfiguration(
 	// Push model: recompute and publish diagnostics immediately.
 	if s.pushDiagnosticsEnabled() {
 		for _, doc := range s.documents.All() {
-			s.publishDiagnostics(ctx, conn, doc)
+			s.publishDiagnostics(ctx, doc)
 		}
 		return
 	}
@@ -77,7 +75,7 @@ func (s *Server) handleDidChangeConfiguration(
 	if s.diagnosticRefreshSupported() {
 		reqCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
-		if err := conn.Call(reqCtx, string(protocol.MethodWorkspaceDiagnosticRefresh), nil, nil); err != nil {
+		if err := s.conn.Call(reqCtx, string(protocol.MethodWorkspaceDiagnosticRefresh), nil).Await(reqCtx, nil); err != nil {
 			log.Printf("lsp: workspace/diagnostic/refresh failed: %v", err)
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -15,8 +16,8 @@ import (
 	"time"
 
 	tflsp "github.com/TypeFox/go-lsp/protocol"
-	"github.com/sourcegraph/jsonrpc2"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/jsonrpc2"
 )
 
 var (
@@ -66,7 +67,7 @@ func TestMain(m *testing.M) {
 }
 
 // processIO wraps subprocess stdin/stdout as an io.ReadWriteCloser
-// for use with jsonrpc2.NewBufferedStream.
+// for use with jsonrpc2.Dial.
 type processIO struct {
 	reader io.ReadCloser
 	writer io.WriteCloser
@@ -82,26 +83,49 @@ func (p *processIO) Close() error {
 	return p.writer.Close()
 }
 
+// processDialer implements jsonrpc2.Dialer for a subprocess's stdin/stdout.
+type processDialer struct {
+	reader io.ReadCloser
+	writer io.WriteCloser
+}
+
+func (d *processDialer) Dial(_ context.Context) (io.ReadWriteCloser, error) {
+	return &processIO{reader: d.reader, writer: d.writer}, nil
+}
+
 // diagnosticsHandler routes server-to-client notifications and captures diagnostics.
 type diagnosticsHandler struct {
 	diagnosticsCh chan *publishDiagnosticsParams
 }
 
-func (h *diagnosticsHandler) Handle(_ context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
-	if req.Method == "textDocument/publishDiagnostics" && req.Params != nil {
+func (h *diagnosticsHandler) Handle(_ context.Context, req *jsonrpc2.Request) (any, error) {
+	if req.Method == "textDocument/publishDiagnostics" && len(req.Params) > 0 {
 		var params publishDiagnosticsParams
-		if err := json.Unmarshal(*req.Params, &params); err != nil {
-			panic("diagnosticsHandler: unmarshal failed: " + err.Error())
+		if err := json.Unmarshal(req.Params, &params); err != nil {
+			return nil, fmt.Errorf("diagnosticsHandler: unmarshal failed: %w", err)
 		}
 		h.diagnosticsCh <- &params
 	}
 	// Notifications don't need a reply.
+	return nil, jsonrpc2.ErrNotHandled
+}
+
+// clientBinder binds a JSON-RPC connection to the test client handler.
+type clientBinder struct {
+	handler jsonrpc2.Handler
+}
+
+func (b *clientBinder) Bind(_ context.Context, _ *jsonrpc2.Connection) (jsonrpc2.ConnectionOptions, error) {
+	return jsonrpc2.ConnectionOptions{
+		Framer:  jsonrpc2.HeaderFramer(),
+		Handler: b.handler,
+	}, nil
 }
 
 // testServer manages a tally lsp --stdio subprocess for black-box testing.
 type testServer struct {
 	cmd    *exec.Cmd
-	conn   *jsonrpc2.Conn
+	conn   *jsonrpc2.Connection
 	stderr *bytes.Buffer
 
 	diagnosticsCh chan *publishDiagnosticsParams
@@ -140,8 +164,10 @@ func startTestServer(t *testing.T) *testServer {
 		diagnosticsCh: make(chan *publishDiagnosticsParams, 10),
 	}
 
-	stream := jsonrpc2.NewBufferedStream(&processIO{reader: stdout, writer: stdin}, jsonrpc2.VSCodeObjectCodec{})
-	conn := jsonrpc2.NewConn(context.Background(), stream, &diagnosticsHandler{diagnosticsCh: ts.diagnosticsCh})
+	dialer := &processDialer{reader: stdout, writer: stdin}
+	binder := &clientBinder{handler: &diagnosticsHandler{diagnosticsCh: ts.diagnosticsCh}}
+	conn, dialErr := jsonrpc2.Dial(context.Background(), dialer, binder)
+	require.NoError(t, dialErr)
 	ts.conn = conn
 
 	t.Cleanup(func() {
@@ -185,7 +211,7 @@ func (ts *testServer) initialize(t *testing.T) initializeResult {
 			Name:    "tally-lsptest",
 			Version: "1.0.0",
 		},
-	}, &result)
+	}).Await(ctx, &result)
 	require.NoError(t, err)
 
 	require.NoError(t, ts.conn.Notify(ctx, "initialized", struct{}{}))
@@ -213,7 +239,7 @@ func (ts *testServer) shutdown(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	err := ts.conn.Call(ctx, "shutdown", nil, nil)
+	err := ts.conn.Call(ctx, "shutdown", nil).Await(ctx, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, ts.conn.Notify(ctx, "exit", nil))

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sourcegraph/jsonrpc2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -170,11 +169,8 @@ func TestHandleExecuteCommand_UnknownCommand(t *testing.T) {
 	s := New()
 	result, err := s.handleExecuteCommand(&protocol.ExecuteCommandParams{Command: "unknown"})
 	assert.Nil(t, result)
-
-	var jerr *jsonrpc2.Error
-	require.ErrorAs(t, err, &jerr)
-	assert.EqualValues(t, jsonrpc2.CodeInvalidParams, jerr.Code)
-	assert.Contains(t, jerr.Message, "unknown command")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "unknown command")
 }
 
 func TestHandleExecuteCommand_InvalidArguments(t *testing.T) {
@@ -186,11 +182,8 @@ func TestHandleExecuteCommand_InvalidArguments(t *testing.T) {
 		Arguments: nil,
 	})
 	assert.Nil(t, result)
-
-	var jerr *jsonrpc2.Error
-	require.ErrorAs(t, err, &jerr)
-	assert.EqualValues(t, jsonrpc2.CodeInvalidParams, jerr.Code)
-	assert.Contains(t, jerr.Message, "invalid command arguments")
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "invalid command arguments")
 }
 
 func TestHandleExecuteCommand_GracefullyReturnsNoEditsWhenFileCantBeRead(t *testing.T) {
