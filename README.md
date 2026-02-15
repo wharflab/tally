@@ -39,11 +39,13 @@ uv/bun, line-length and layer optimizations).
 tally integrates rules from multiple sources:
 
 <!-- BEGIN RULES_TABLE -->
+
 | Source | Rules | Description |
 |--------|-------|-------------|
 | **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 22/22 rules | Docker's official Dockerfile checks (captured + reimplemented) |
 | **tally** | 9 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
 | **[Hadolint](https://github.com/hadolint/hadolint)** | 37 rules | Hadolint-compatible Dockerfile rules (expanding) |
+
 <!-- END RULES_TABLE -->
 
 **See [RULES.md](RULES.md) for the complete rules reference.**
@@ -275,7 +277,8 @@ The JSON output includes:
 
 ### SARIF
 
-[Static Analysis Results Interchange Format](https://docs.oasis-open.org/sarif/sarif/v2.1.0/) for CI/CD integration with GitHub Code Scanning, Azure DevOps, and other tools:
+[Static Analysis Results Interchange Format](https://docs.oasis-open.org/sarif/sarif/v2.1.0/) for CI/CD integration with GitHub Code Scanning, Azure
+DevOps, and other tools:
 
 ```bash
 tally lint --format sarif Dockerfile > results.sarif
