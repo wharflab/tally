@@ -33,8 +33,8 @@
     "@typescript/native-preview": "7.0.0-dev.20260212.1",
     "@vscode/test-electron": "2.5.2",
     "@vscode/vsce": "3.7.1",
-    "oxfmt": "0.31.0",
-    "oxlint": "1.46.0",
+    "oxfmt": "0.32.0",
+    "oxlint": "1.47.0",
     "oxlint-tsgolint": "0.12.0"
   },
   "contributes": {
