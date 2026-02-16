@@ -239,7 +239,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "$GITHUB_REF_NAME" \
+          # VERSION is tag name for push (v0.4.0) or bare version for workflow_dispatch (0.4.0)
+          TAG="v${VERSION#v}"
+          gh release upload "$TAG" \
             "extensions/vscode-tally/tally-${{ matrix.vscode_target }}.vsix" \
             --clobber
   publish-vscode-marketplace:
