@@ -111,6 +111,6 @@
   ],
   "icon": "assets/logo.png",
   "engines": {
-    "vscode": "^1.96.0"
+    "vscode": "^1.109.0"
   }
 }
