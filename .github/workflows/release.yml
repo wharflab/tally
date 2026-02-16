@@ -197,9 +197,21 @@ jobs:
         run: tar -xvf dist-signed.tar
       - name: Copy binary into extension bundle
         run: |
+          SRC_DIR="dist/${{ matrix.goreleaser_dir }}"
+          SRC="${SRC_DIR}/${{ matrix.binary_name }}"
+          if [ ! -d "$SRC_DIR" ]; then
+            echo "::error::GoReleaser output directory '$SRC_DIR' not found. If .goreleaser.yml goamd64/goarm64 settings changed, update the matrix goreleaser_dir values."
+            ls -la dist/
+            exit 1
+          fi
+          if [ ! -f "$SRC" ]; then
+            echo "::error::Binary '$SRC' not found in GoReleaser output."
+            ls -la "$SRC_DIR/"
+            exit 1
+          fi
           DEST="extensions/vscode-tally/bundled/bin/${{ matrix.bundled_platform }}/${{ matrix.bundled_arch }}"
           mkdir -p "$DEST"
-          cp "dist/${{ matrix.goreleaser_dir }}/${{ matrix.binary_name }}" "$DEST/${{ matrix.binary_name }}"
+          cp "$SRC" "$DEST/${{ matrix.binary_name }}"
           chmod +x "$DEST/${{ matrix.binary_name }}"
       - name: Set extension version from tag
         run: |
