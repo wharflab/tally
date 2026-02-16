@@ -1,8 +1,8 @@
 package processor
 
 import (
-	"github.com/tinovyatkin/tally/internal/reporter"
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/reporter"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // Sorting ensures stable, deterministic output ordering.

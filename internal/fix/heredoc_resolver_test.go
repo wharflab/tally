@@ -8,9 +8,9 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/shell"
-	"github.com/tinovyatkin/tally/internal/sourcemap"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/shell"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 func TestHeredocResolver_ID(t *testing.T) {

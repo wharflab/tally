@@ -3,7 +3,7 @@ package fix
 import (
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 func TestSkipReason_String(t *testing.T) {

@@ -7,12 +7,12 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/rules/configutil"
-	"github.com/tinovyatkin/tally/internal/runmount"
-	"github.com/tinovyatkin/tally/internal/semantic"
-	"github.com/tinovyatkin/tally/internal/shell"
-	"github.com/tinovyatkin/tally/internal/sourcemap"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules/configutil"
+	"github.com/wharflab/tally/internal/runmount"
+	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/shell"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // PreferHeredocConfig is the configuration for the prefer-run-heredoc rule.
@@ -54,7 +54,7 @@ func (r *PreferHeredocRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "prefer-run-heredoc",
 		Name:            "Prefer RUN heredoc syntax",
 		Description:     "Use heredoc syntax for multi-command RUN instructions",
-		DocURL:          "https://github.com/tinovyatkin/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-run-heredoc.md",
 		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
 		IsExperimental:  true,

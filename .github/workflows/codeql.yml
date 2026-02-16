@@ -17,7 +17,7 @@ defaults:
 jobs:
   analyze:
     runs-on: ubuntu-latest
-    if: github.repository == 'tinovyatkin/tally'
+    if: github.repository == 'wharflab/tally'
     permissions:
       actions: read
       contents: read

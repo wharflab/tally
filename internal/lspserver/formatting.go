@@ -6,12 +6,12 @@ import (
 	"path/filepath"
 	"unicode/utf8"
 
-	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
+	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/fix"
-	"github.com/tinovyatkin/tally/internal/linter"
-	"github.com/tinovyatkin/tally/internal/processor"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/fix"
+	"github.com/wharflab/tally/internal/linter"
+	"github.com/wharflab/tally/internal/processor"
 )
 
 // handleFormatting handles textDocument/formatting by applying safe auto-fixes.

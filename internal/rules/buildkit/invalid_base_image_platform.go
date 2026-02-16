@@ -10,10 +10,10 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 
-	"github.com/tinovyatkin/tally/internal/async"
-	"github.com/tinovyatkin/tally/internal/registry"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/async"
+	"github.com/wharflab/tally/internal/registry"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
 )
 
 // InvalidBaseImagePlatformRule implements BuildKit's InvalidBaseImagePlatform check.

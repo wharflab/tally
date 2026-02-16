@@ -3,7 +3,7 @@ package testutil
 import (
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 func TestParseDockerfile(t *testing.T) {

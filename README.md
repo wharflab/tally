@@ -1,6 +1,6 @@
 # tally
 
-[![codecov](https://codecov.io/gh/tinovyatkin/tally/graph/badge.svg?token=J3vK0hyLkf)](https://codecov.io/gh/tinovyatkin/tally)
+[![codecov](https://codecov.io/gh/wharflab/tally/graph/badge.svg?token=J3vK0hyLkf)](https://codecov.io/gh/wharflab/tally)
 
 tally keeps Dockerfiles and Containerfiles clean, modern, and consistent — using BuildKit's own parser and checks (the same foundation behind
 `docker buildx`) plus safe auto-fixes. It runs fast, doesn't require Docker Desktop or a daemon, and fits neatly into CI. If that sounds like your
@@ -53,7 +53,7 @@ tally integrates rules from multiple sources:
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew install tinovyatkin/tap/tally
+brew install wharflab/tap/tally
 ```
 
 ### NPM
@@ -77,13 +77,13 @@ gem install tally-cli
 ### Go
 
 ```bash
-go install github.com/tinovyatkin/tally@latest
+go install github.com/wharflab/tally@latest
 ```
 
 ### From Source
 
 ```bash
-git clone https://github.com/tinovyatkin/tally.git
+git clone https://github.com/wharflab/tally.git
 cd tally
 go build .
 ```

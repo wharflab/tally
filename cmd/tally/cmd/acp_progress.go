@@ -10,10 +10,10 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/mattn/go-isatty"
 
-	"github.com/tinovyatkin/tally/internal/ai/autofixdata"
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/fix"
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/ai/autofixdata"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/fix"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 func planAcpFixSpinner(

@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // normalizePath ensures consistent path format for map lookups.

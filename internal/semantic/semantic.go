@@ -11,7 +11,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	dfshell "github.com/moby/buildkit/frontend/dockerfile/shell"
 
-	"github.com/tinovyatkin/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/dockerfile"
 )
 
 // Model represents the semantic analysis of a Dockerfile.

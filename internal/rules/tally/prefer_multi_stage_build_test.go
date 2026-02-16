@@ -5,9 +5,9 @@ import (
 
 	"github.com/gkampitakis/go-snaps/snaps"
 
-	"github.com/tinovyatkin/tally/internal/ai/autofixdata"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/testutil"
+	"github.com/wharflab/tally/internal/ai/autofixdata"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestPreferMultiStageBuildRule_Metadata(t *testing.T) {

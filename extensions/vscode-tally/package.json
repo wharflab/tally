@@ -10,7 +10,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/tinovyatkin/tally"
+    "url": "https://github.com/wharflab/tally"
   },
   "publisher": "wharflab",
   "main": "./dist/extension.cjs",

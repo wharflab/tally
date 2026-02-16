@@ -11,14 +11,14 @@ import (
 
 	"github.com/zricethezav/gitleaks/v8/detect"
 
-	"github.com/tinovyatkin/tally/internal/ai/acp"
-	"github.com/tinovyatkin/tally/internal/ai/autofixdata"
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/dockerfile"
-	"github.com/tinovyatkin/tally/internal/fix"
-	"github.com/tinovyatkin/tally/internal/linter"
-	"github.com/tinovyatkin/tally/internal/processor"
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/ai/acp"
+	"github.com/wharflab/tally/internal/ai/autofixdata"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/fix"
+	"github.com/wharflab/tally/internal/linter"
+	"github.com/wharflab/tally/internal/processor"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 const (

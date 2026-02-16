@@ -3,8 +3,8 @@ package processor
 import (
 	"path/filepath"
 
-	"github.com/tinovyatkin/tally/internal/directive"
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/directive"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // InlineDirectiveFilter applies inline ignore directives.

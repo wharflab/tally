@@ -366,7 +366,7 @@ Tally implements rules that only exist in phase 2:
 package buildkit
 
 import (
-    "github.com/tinovyatkin/tally/internal/rules"
+    "github.com/wharflab/tally/internal/rules"
 )
 
 type MyNewRule struct{}

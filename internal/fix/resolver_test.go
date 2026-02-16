@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // mockResolver is a test resolver that returns predefined edits.

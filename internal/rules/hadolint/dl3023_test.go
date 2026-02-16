@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/dockerfile"
-	"github.com/tinovyatkin/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/semantic"
 )
 
 func TestDL3023_SelfReferencingCopy(t *testing.T) {

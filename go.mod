@@ -1,4 +1,4 @@
-module github.com/tinovyatkin/tally
+module github.com/wharflab/tally
 
 go 1.26.0
 

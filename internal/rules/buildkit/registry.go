@@ -10,7 +10,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/linter"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // CapturedRuleNames lists BuildKit rule names that can be captured by tally during parsing.

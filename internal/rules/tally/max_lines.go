@@ -6,8 +6,8 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/rules/configutil"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules/configutil"
 )
 
 // MaxLinesConfig is the configuration for the max-lines rule.
@@ -55,7 +55,7 @@ func (r *MaxLinesRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "max-lines",
 		Name:            "Maximum Lines",
 		Description:     "Limits the maximum number of lines in a Dockerfile",
-		DocURL:          "https://github.com/tinovyatkin/tally/blob/main/docs/rules/max-lines.md",
+		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/max-lines.md",
 		DefaultSeverity: rules.SeverityError,
 		Category:        "maintainability",
 		IsExperimental:  false,

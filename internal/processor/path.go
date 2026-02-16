@@ -3,7 +3,7 @@ package processor
 import (
 	"strings"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // PathNormalization converts file paths to forward slashes for cross-platform consistency.

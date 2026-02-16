@@ -7,7 +7,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/tinovyatkin/tally/internal/lspserver"
+	"github.com/wharflab/tally/internal/lspserver"
 )
 
 func lspCommand() *cli.Command {

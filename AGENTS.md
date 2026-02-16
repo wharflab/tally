@@ -59,7 +59,7 @@ skip-blank-lines = true
 
 ## Coding Style & Naming Conventions
 
-- Format: `gofmt` + `goimports` (configured via `.golangci.yaml`, with `github.com/tinovyatkin/tally` as the local import prefix).
+- Format: `gofmt` + `goimports` (configured via `.golangci.yaml`, with `github.com/wharflab/tally` as the local import prefix).
 - Prefer small, focused packages under `internal/`; keep CLI wiring in `cmd/`.
 - Tests use standard Go conventions: filenames end in `*_test.go`.
 

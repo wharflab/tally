@@ -20,8 +20,8 @@ import (
 	jsonv2 "encoding/json/v2"
 	"golang.org/x/exp/jsonrpc2"
 
-	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
-	"github.com/tinovyatkin/tally/internal/version"
+	protocol "github.com/wharflab/tally/internal/lsp/protocol"
+	"github.com/wharflab/tally/internal/version"
 )
 
 const serverName = "tally"

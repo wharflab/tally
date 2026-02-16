@@ -35,7 +35,7 @@ func ensureBinary(b *testing.B) {
 	}
 	benchBinaryPath = filepath.Join(tmpDir, binaryName)
 
-	cmd := exec.Command("go", "build", "-o", benchBinaryPath, "github.com/tinovyatkin/tally")
+	cmd := exec.Command("go", "build", "-o", benchBinaryPath, "github.com/wharflab/tally")
 	cmd.Env = append(os.Environ(), "GOEXPERIMENT=jsonv2")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		b.Fatalf("failed to build binary: %s", out)

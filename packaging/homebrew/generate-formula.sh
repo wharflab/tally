@@ -22,7 +22,7 @@ if [[ ! -f "$TEMPLATE_FILE" ]]; then
 fi
 
 # Fetch checksums from GitHub release if not provided via env vars
-BASE_URL="https://github.com/tinovyatkin/tally/releases/download/v${VERSION}"
+BASE_URL="https://github.com/wharflab/tally/releases/download/v${VERSION}"
 
 fetch_checksum() {
     local archive_name="$1"

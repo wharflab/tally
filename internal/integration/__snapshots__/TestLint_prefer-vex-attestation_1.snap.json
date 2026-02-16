@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "VEX documents are supply-chain metadata. Embedding them in the runtime image requires rebuilding to update statements and makes discovery less consistent. Attach OpenVEX as an OCI attestation (in-toto predicate) instead.",
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/prefer-vex-attestation.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-vex-attestation.md",
           "location": {
             "end": {
               "column": 0,

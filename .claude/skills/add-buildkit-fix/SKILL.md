@@ -57,7 +57,7 @@ Create `internal/rules/buildkit/fixes/$ARGUMENTS_snake_case.go`:
 package fixes
 
 import (
-    "github.com/tinovyatkin/tally/internal/rules"
+    "github.com/wharflab/tally/internal/rules"
 )
 
 // enrich${ARGUMENTS}Fix adds auto-fix for BuildKit's $ARGUMENTS rule.

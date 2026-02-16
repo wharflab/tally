@@ -3,7 +3,7 @@ package lspserver
 import (
 	"log"
 
-	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
+	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 )
 
 func (s *Server) configureDiagnosticsMode(params *protocol.InitializeParams) {

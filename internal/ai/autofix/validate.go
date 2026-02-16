@@ -9,9 +9,9 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-	"github.com/tinovyatkin/tally/internal/dockerfile"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/sourcemap"
+	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 func countFromInstructions(pr *dockerfile.ParseResult) int {

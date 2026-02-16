@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/dockerfile"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
 )
 
 // ParseDockerfile parses a Dockerfile from a string using the full parsing pipeline.

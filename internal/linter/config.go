@@ -3,10 +3,10 @@ package linter
 import (
 	"sort"
 
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/rules/buildkit"
-	"github.com/tinovyatkin/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules/buildkit"
+	"github.com/wharflab/tally/internal/semantic"
 )
 
 type heredocRuleOptions struct {

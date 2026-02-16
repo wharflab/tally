@@ -5,7 +5,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["tino@vtkn.io"]
 
   spec.summary       = "A fast, configurable linter for Dockerfiles and Containerfiles"
-  spec.homepage      = "https://github.com/tinovyatkin/tally"
+  spec.homepage      = "https://github.com/wharflab/tally"
   spec.post_install_message = "tally installed! Run 'tally --help' to see usage."
 
   spec.bindir        = "bin"

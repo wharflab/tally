@@ -37,7 +37,7 @@
     },
     "DL3001Config": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "https://github.com/tinovyatkin/tally/internal/rules/hadolint/dl3001-config",
+      "$id": "https://github.com/wharflab/tally/internal/rules/hadolint/dl3001-config",
       "properties": {
         "invalid-commands": {
           "items": {
@@ -52,7 +52,7 @@
     },
     "DL3026Config": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "https://github.com/tinovyatkin/tally/internal/rules/hadolint/dl3026-config",
+      "$id": "https://github.com/wharflab/tally/internal/rules/hadolint/dl3026-config",
       "properties": {
         "trusted-registries": {
           "items": {
@@ -243,7 +243,7 @@
     },
     "max-linesConfig": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "https://github.com/tinovyatkin/tally/internal/rules/tally/max-lines-config",
+      "$id": "https://github.com/wharflab/tally/internal/rules/tally/max-lines-config",
       "properties": {
         "max": {
           "type": "integer",
@@ -268,7 +268,7 @@
     },
     "prefer-add-unpackConfig": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "https://github.com/tinovyatkin/tally/internal/rules/tally/prefer-add-unpack-config",
+      "$id": "https://github.com/wharflab/tally/internal/rules/tally/prefer-add-unpack-config",
       "properties": {
         "enabled": {
           "type": "boolean"
@@ -280,7 +280,7 @@
     },
     "prefer-copy-heredocConfig": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "https://github.com/tinovyatkin/tally/internal/rules/tally/prefer-copy-heredoc-config",
+      "$id": "https://github.com/wharflab/tally/internal/rules/tally/prefer-copy-heredoc-config",
       "properties": {
         "check-single-run": {
           "type": "boolean"
@@ -295,7 +295,7 @@
     },
     "prefer-multi-stage-buildConfig": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "https://github.com/tinovyatkin/tally/internal/rules/tally/prefer-multi-stage-build-config",
+      "$id": "https://github.com/wharflab/tally/internal/rules/tally/prefer-multi-stage-build-config",
       "properties": {
         "min-score": {
           "type": "integer",
@@ -310,7 +310,7 @@
     },
     "prefer-run-heredocConfig": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "$id": "https://github.com/tinovyatkin/tally/internal/rules/tally/prefer-heredoc-config",
+      "$id": "https://github.com/wharflab/tally/internal/rules/tally/prefer-heredoc-config",
       "properties": {
         "min-commands": {
           "type": "integer"

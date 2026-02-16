@@ -46,7 +46,7 @@ test(
     if (process.env.GOCOVERDIR) {
       goBuildArgs.push("-cover");
     }
-    goBuildArgs.push("-o", binaryPath, "github.com/tinovyatkin/tally");
+    goBuildArgs.push("-o", binaryPath, "github.com/wharflab/tally");
 
     runOrThrow(goBuildArgs, {
       cwd: repoRoot,

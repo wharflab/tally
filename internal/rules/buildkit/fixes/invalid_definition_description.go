@@ -3,7 +3,7 @@ package fixes
 import (
 	"bytes"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // enrichInvalidDefinitionDescriptionFix adds auto-fix for BuildKit's InvalidDefinitionDescription rule.

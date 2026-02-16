@@ -7,13 +7,13 @@ import (
 
 	"github.com/owenrumney/go-sarif/v3/pkg/report/v210/sarif"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // Default SARIF tool information.
 const (
 	defaultToolName = "tally"
-	defaultToolURI  = "https://github.com/tinovyatkin/tally"
+	defaultToolURI  = "https://github.com/wharflab/tally"
 )
 
 // SARIFReporter formats violations as SARIF (Static Analysis Results Interchange Format).

@@ -12,7 +12,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/linter"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
-	"github.com/tinovyatkin/tally/internal/config"
+	"github.com/wharflab/tally/internal/config"
 )
 
 // LintWarning captures parameters from BuildKit's linter.LintWarnFunc callback.

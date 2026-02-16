@@ -1,12 +1,12 @@
 [project]
 site_name = "tally"
-site_url = "https://tinovyatkin.github.io/tally/"
+site_url = "https://wharflab.github.io/tally/"
 site_description = "Fast, modern Dockerfile linter with auto-fixes"
 docs_dir = "docs"
 site_dir = "site"
 
-repo_url = "https://github.com/tinovyatkin/tally"
-repo_name = "tinovyatkin/tally"
+repo_url = "https://github.com/wharflab/tally"
+repo_name = "wharflab/tally"
 
 [theme]
 name = "zensical"

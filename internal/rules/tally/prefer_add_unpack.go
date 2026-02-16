@@ -7,11 +7,11 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-	"github.com/tinovyatkin/tally/internal/dockerfile"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/rules/configutil"
-	"github.com/tinovyatkin/tally/internal/semantic"
-	"github.com/tinovyatkin/tally/internal/shell"
+	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules/configutil"
+	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 // PreferAddUnpackConfig is the configuration for the prefer-add-unpack rule.
@@ -45,7 +45,7 @@ func (r *PreferAddUnpackRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "prefer-add-unpack",
 		Name:            "Prefer ADD --unpack for remote archives",
 		Description:     "Use `ADD --unpack` instead of downloading and extracting remote archives in `RUN`",
-		DocURL:          "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/prefer-add-unpack.md",
+		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-add-unpack.md",
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "performance",
 		IsExperimental:  false,

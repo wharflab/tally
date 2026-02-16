@@ -3,8 +3,8 @@ package buildkit
 import (
 	"github.com/moby/buildkit/frontend/dockerfile/linter"
 
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
 )
 
 // InvalidDefaultArgInFromRule implements BuildKit's InvalidDefaultArgInFrom check.

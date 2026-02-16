@@ -340,9 +340,9 @@ func (r *Rule) Execute(ast *parser.AST, semantic *parser.SemanticModel, ctx *con
 package copy
 
 import (
-    "github.com/tinovyatkin/tally/internal/context"
-    "github.com/tinovyatkin/tally/internal/linter"
-    "github.com/tinovyatkin/tally/internal/parser"
+    "github.com/wharflab/tally/internal/context"
+    "github.com/wharflab/tally/internal/linter"
+    "github.com/wharflab/tally/internal/parser"
 )
 
 var CopyIgnoredFileRule = &linter.Rule{

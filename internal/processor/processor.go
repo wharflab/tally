@@ -18,9 +18,9 @@ package processor
 import (
 	"strings"
 
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/sourcemap"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // Processor transforms a slice of violations.

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // enrichLegacyKeyValueFormatFix adds auto-fix for BuildKit's LegacyKeyValueFormat rule.

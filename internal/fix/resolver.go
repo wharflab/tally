@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // ResolveContext provides context for fix resolution.

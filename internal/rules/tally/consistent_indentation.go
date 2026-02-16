@@ -6,9 +6,9 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/rules/configutil"
-	"github.com/tinovyatkin/tally/internal/sourcemap"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules/configutil"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // expectedIndent is the indentation string used by this rule: a single tab.
@@ -33,7 +33,7 @@ func (r *ConsistentIndentationRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "consistent-indentation",
 		Name:            "Consistent Indentation",
 		Description:     "Enforces consistent indentation for Dockerfile build stages",
-		DocURL:          "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
 		DefaultSeverity: rules.SeverityOff,
 		Category:        "style",
 		IsExperimental:  true,

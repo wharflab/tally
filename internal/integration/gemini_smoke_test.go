@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/dockerfile"
 )
 
 func TestGeminiSmoke_FixPreferMultiStageBuild(t *testing.T) {

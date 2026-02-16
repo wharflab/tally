@@ -18,10 +18,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tinovyatkin/tally/internal/rules"
-	_ "github.com/tinovyatkin/tally/internal/rules/all"
-	bkregistry "github.com/tinovyatkin/tally/internal/rules/buildkit"
-	buildkitfixes "github.com/tinovyatkin/tally/internal/rules/buildkit/fixes"
+	"github.com/wharflab/tally/internal/rules"
+	_ "github.com/wharflab/tally/internal/rules/all"
+	bkregistry "github.com/wharflab/tally/internal/rules/buildkit"
+	buildkitfixes "github.com/wharflab/tally/internal/rules/buildkit/fixes"
 )
 
 const (

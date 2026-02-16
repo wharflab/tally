@@ -1,6 +1,6 @@
 package buildkit
 
-import "github.com/tinovyatkin/tally/internal/rules"
+import "github.com/wharflab/tally/internal/rules"
 
 // MultipleInstructionsDisallowedRule registers BuildKit's MultipleInstructionsDisallowed check.
 //

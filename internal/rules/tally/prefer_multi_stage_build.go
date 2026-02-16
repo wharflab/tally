@@ -7,9 +7,9 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-	"github.com/tinovyatkin/tally/internal/ai/autofixdata"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/rules/configutil"
+	"github.com/wharflab/tally/internal/ai/autofixdata"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules/configutil"
 )
 
 // PreferMultiStageBuildConfig configures the prefer-multi-stage-build rule.
@@ -33,7 +33,7 @@ func (r *PreferMultiStageBuildRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "prefer-multi-stage-build",
 		Name:            "Prefer Multi-Stage Build",
 		Description:     "Suggests converting single-stage builds into multi-stage builds to reduce final image size",
-		DocURL:          "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/prefer-multi-stage-build.md",
+		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-multi-stage-build.md",
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "performance",
 		IsExperimental:  true,

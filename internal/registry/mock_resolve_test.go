@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tinovyatkin/tally/internal/registry/testutil"
+	"github.com/wharflab/tally/internal/registry/testutil"
 	"go.podman.io/image/v5/types"
 )
 

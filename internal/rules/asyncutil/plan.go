@@ -2,10 +2,10 @@
 package asyncutil
 
 import (
-	"github.com/tinovyatkin/tally/internal/async"
-	"github.com/tinovyatkin/tally/internal/registry"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/async"
+	"github.com/wharflab/tally/internal/registry"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
 )
 
 // HandlerFactory creates a ResultHandler for a specific stage and platform.

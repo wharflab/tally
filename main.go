@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/tinovyatkin/tally/cmd/tally/cmd"
+	"github.com/wharflab/tally/cmd/tally/cmd"
 )
 
 func main() {

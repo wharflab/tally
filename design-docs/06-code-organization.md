@@ -133,8 +133,8 @@ package base
 import (
     "strings"
 
-    "github.com/tinovyatkin/tally/internal/linter"
-    "github.com/tinovyatkin/tally/internal/parser"
+    "github.com/wharflab/tally/internal/linter"
+    "github.com/wharflab/tally/internal/parser"
 )
 
 // Metadata
@@ -190,7 +190,7 @@ package base
 import (
     "testing"
 
-    "github.com/tinovyatkin/tally/internal/testutil"
+    "github.com/wharflab/tally/internal/testutil"
 )
 
 func TestPinVersion(t *testing.T) {
@@ -243,13 +243,13 @@ FROM alpine:3.18
 // internal/rules/registry.go
 package rules
 
-import "github.com/tinovyatkin/tally/internal/linter"
+import "github.com/wharflab/tally/internal/linter"
 
 // Import all rule packages
 import (
-    _ "github.com/tinovyatkin/tally/internal/rules/base"
-    _ "github.com/tinovyatkin/tally/internal/rules/security"
-    _ "github.com/tinovyatkin/tally/internal/rules/stage"
+    _ "github.com/wharflab/tally/internal/rules/base"
+    _ "github.com/wharflab/tally/internal/rules/security"
+    _ "github.com/wharflab/tally/internal/rules/stage"
     // ...
 )
 
@@ -289,7 +289,7 @@ func GetRulesByCategory(category string) []*linter.Rule {
 // internal/rules/base/pin_version.go
 package base
 
-import "github.com/tinovyatkin/tally/internal/rules"
+import "github.com/wharflab/tally/internal/rules"
 
 func init() {
     rules.Register(PinVersionRule)
@@ -304,7 +304,7 @@ func init() {
 // internal/linter/rule.go
 package linter
 
-import "github.com/tinovyatkin/tally/internal/parser"
+import "github.com/wharflab/tally/internal/parser"
 
 // Rule represents a linting rule
 type Rule struct {
@@ -431,8 +431,8 @@ func TestCheck(t *testing.T) {
 package testutil
 
 import (
-    "github.com/tinovyatkin/tally/internal/linter"
-    "github.com/tinovyatkin/tally/internal/parser"
+    "github.com/wharflab/tally/internal/linter"
+    "github.com/wharflab/tally/internal/parser"
 )
 
 // LintString lints a Dockerfile string with given rules
@@ -473,7 +473,7 @@ import (
     "path/filepath"
     "text/template"
 
-    "github.com/tinovyatkin/tally/internal/rules"
+    "github.com/wharflab/tally/internal/rules"
 )
 
 const docTemplate = `# {{ .Code }}: {{ .Name }}
@@ -608,7 +608,7 @@ touch internal/rules/security/no_root_user.go
 ```go
 package security
 
-import "github.com/tinovyatkin/tally/internal/rules"
+import "github.com/wharflab/tally/internal/rules"
 
 const NoRootUserCode = "DL3002"
 

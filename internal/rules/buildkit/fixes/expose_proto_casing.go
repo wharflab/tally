@@ -3,7 +3,7 @@ package fixes
 import (
 	"strings"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // enrichExposeProtoCasingFix adds auto-fix for BuildKit's ExposeProtoCasing rule.

@@ -1,6 +1,6 @@
 package linter
 
-import "github.com/tinovyatkin/tally/internal/processor"
+import "github.com/wharflab/tally/internal/processor"
 
 // CLIProcessors returns the standard CLI processor chain and the inline directive
 // filter (the caller needs it for [processor.InlineDirectiveFilter.AdditionalViolations]).

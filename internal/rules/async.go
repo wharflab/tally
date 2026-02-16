@@ -1,6 +1,6 @@
 package rules
 
-import "github.com/tinovyatkin/tally/internal/async"
+import "github.com/wharflab/tally/internal/async"
 
 // AsyncRule is an optional interface for rules that require slow I/O (registry,
 // network, filesystem). Rules implementing this interface participate in the

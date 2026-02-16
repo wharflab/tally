@@ -10,7 +10,7 @@ This is intentional design, not a bug.
 We created the `internal/runmount` package that provides a proper API for working with mounts in static analysis:
 
 ```go
-import "github.com/tinovyatkin/tally/internal/runmount"
+import "github.com/wharflab/tally/internal/runmount"
 
 // Get properly parsed mounts from a RUN command
 mounts := runmount.GetMounts(run)
@@ -95,8 +95,10 @@ Formats multiple mounts for a RUN instruction.
 
 ## References
 
-- Source: [moby/buildkit/frontend/dockerfile/instructions/commands_runmount.go](https://github.com/moby/buildkit/blob/master/frontend/dockerfile/instructions/commands_runmount.go)
-- Mount expansion: [moby/buildkit/frontend/dockerfile/instructions/commands.go#RunCommand.Expand](https://github.com/moby/buildkit/blob/master/frontend/dockerfile/instructions/commands.go)
+- Source:
+  [moby/buildkit/frontend/dockerfile/instructions/commands_runmount.go](https://github.com/moby/buildkit/blob/master/frontend/dockerfile/instructions/commands_runmount.go)
+- Mount expansion:
+  [moby/buildkit/frontend/dockerfile/instructions/commands.go#RunCommand.Expand](https://github.com/moby/buildkit/blob/master/frontend/dockerfile/instructions/commands.go)
 
 ---
 

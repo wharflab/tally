@@ -5,7 +5,7 @@ import (
 	"encoding/json/v2"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 func TestSARIFReporter(t *testing.T) {
@@ -36,7 +36,7 @@ func TestSARIFReporter(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	reporter := NewSARIFReporter(&buf, "tally", "1.0.0", "https://github.com/tinovyatkin/tally")
+	reporter := NewSARIFReporter(&buf, "tally", "1.0.0", "https://github.com/wharflab/tally")
 
 	err := reporter.Report(violations, nil, ReportMetadata{})
 	if err != nil {

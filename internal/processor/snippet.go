@@ -1,7 +1,7 @@
 package processor
 
 import (
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // SnippetAttachment populates the SourceCode field of violations.

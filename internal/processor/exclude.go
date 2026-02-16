@@ -3,7 +3,7 @@ package processor
 import (
 	"github.com/bmatcuk/doublestar/v4"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // PathExclusionFilter removes violations based on per-rule path exclusions.

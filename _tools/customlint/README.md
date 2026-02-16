@@ -88,8 +88,8 @@ And `.custom-gcl.yml`:
 version: v2.8.0
 destination: ./bin
 plugins:
-  - module: 'github.com/tinovyatkin/tally/_tools'
-    import: 'github.com/tinovyatkin/tally/_tools/customlint'
+  - module: 'github.com/wharflab/tally/_tools'
+    import: 'github.com/wharflab/tally/_tools/customlint'
     path: ./_tools
 ```
 

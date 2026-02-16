@@ -1,6 +1,6 @@
 package fix
 
-import "github.com/tinovyatkin/tally/internal/config"
+import "github.com/wharflab/tally/internal/config"
 
 // BuildFixModes extracts per-rule fix mode settings from a config.
 // Returned keys use the canonical rule code format: "<namespace>/<ruleName>".

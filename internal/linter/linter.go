@@ -10,15 +10,15 @@ import (
 	"log"
 	"os"
 
-	"github.com/tinovyatkin/tally/internal/async"
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/directive"
-	"github.com/tinovyatkin/tally/internal/dockerfile"
-	"github.com/tinovyatkin/tally/internal/rules"
-	_ "github.com/tinovyatkin/tally/internal/rules/all" // Register all rules.
-	"github.com/tinovyatkin/tally/internal/rules/buildkit/fixes"
-	"github.com/tinovyatkin/tally/internal/semantic"
-	"github.com/tinovyatkin/tally/internal/sourcemap"
+	"github.com/wharflab/tally/internal/async"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/directive"
+	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/rules"
+	_ "github.com/wharflab/tally/internal/rules/all" // Register all rules.
+	"github.com/wharflab/tally/internal/rules/buildkit/fixes"
+	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // Level is a log level for the Channel interface.

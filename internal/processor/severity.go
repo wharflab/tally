@@ -1,7 +1,7 @@
 package processor
 
 import (
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // SeverityOverride applies severity overrides from configuration.

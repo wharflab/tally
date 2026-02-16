@@ -5,9 +5,9 @@ import (
 
 	"golang.org/x/exp/jsonrpc2"
 
-	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
+	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 
-	"github.com/tinovyatkin/tally/internal/fix"
+	"github.com/wharflab/tally/internal/fix"
 )
 
 const applyAllFixesCommand = "tally.applyAllFixes"

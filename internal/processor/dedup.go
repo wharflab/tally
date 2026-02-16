@@ -3,7 +3,7 @@ package processor
 import (
 	"path/filepath"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // violationKey uniquely identifies a violation for deduplication.

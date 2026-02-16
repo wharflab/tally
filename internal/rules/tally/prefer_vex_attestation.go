@@ -6,7 +6,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // PreferVEXAttestationRule flags COPY instructions that embed OpenVEX documents
@@ -25,7 +25,7 @@ func (r *PreferVEXAttestationRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "prefer-vex-attestation",
 		Name:            "Prefer VEX attestation",
 		Description:     "Prefer attaching OpenVEX as an OCI attestation instead of copying VEX JSON into the image",
-		DocURL:          "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/prefer-vex-attestation.md",
+		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-vex-attestation.md",
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "security",
 		IsExperimental:  false,

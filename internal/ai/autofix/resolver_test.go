@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tinovyatkin/tally/internal/ai/acp"
-	"github.com/tinovyatkin/tally/internal/config"
+	"github.com/wharflab/tally/internal/ai/acp"
+	"github.com/wharflab/tally/internal/config"
 )
 
 type stubAgentRunner struct {
