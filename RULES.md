@@ -13,11 +13,13 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 ## Summary
 
 <!-- BEGIN RULES_SUMMARY -->
+
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
 | tally | 9 | - | 9 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 26 | 11 | 66 |
+
 <!-- END RULES_SUMMARY -->
 
 ---
@@ -115,6 +117,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 ### DL Rules (Dockerfile Lint)
 
 <!-- BEGIN HADOLINT_DL_RULES -->
+
 | Rule | Description | Severity | Status |
 |------|-------------|----------|--------|
 | [DL1001](https://github.com/hadolint/hadolint/wiki/DL1001) | Please refrain from using inline ignore pragmas `# hadolint ignore=DLxxxx`. | Ignore | ⏳ |
@@ -183,13 +186,15 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL4004](https://github.com/hadolint/hadolint/wiki/DL4004) | Multiple `ENTRYPOINT` instructions found. | Error | 🔄 `buildkit/MultipleInstructionsDisallowed` |
 | [DL4005](https://github.com/hadolint/hadolint/wiki/DL4005) | Use `SHELL` to change the default shell. | Warning | ✅🔧 `hadolint/DL4005` |
 | [DL4006](https://github.com/hadolint/hadolint/wiki/DL4006) | Set the `SHELL` option -o pipefail before `RUN` with a pipe in it | Warning | ✅🔧 `hadolint/DL4006` |
+
 <!-- END HADOLINT_DL_RULES -->
 
 #### DL3057: HEALTHCHECK Instruction Missing (Enhanced)
 
 tally goes beyond Hadolint's static check by resolving base image metadata from the registry when `--slow-checks` is enabled.
 
-**Docker behavior:** `HEALTHCHECK` is inherited from base images at runtime. If a base image defines `HEALTHCHECK CMD ...`, child images inherit it automatically. `HEALTHCHECK NONE` explicitly disables any inherited health check.
+**Docker behavior:** `HEALTHCHECK` is inherited from base images at runtime. If a base image defines `HEALTHCHECK CMD ...`, child images inherit it
+automatically. `HEALTHCHECK NONE` explicitly disables any inherited health check.
 
 **Three violation scenarios:**
 
@@ -199,7 +204,8 @@ tally goes beyond Hadolint's static check by resolving base image metadata from 
 | No `HEALTHCHECK CMD` in Dockerfile, base has no HC | Violation | Violation confirmed |
 | `HEALTHCHECK NONE` in Dockerfile, base has no HC | Violation (generic "missing") | Specific: "HEALTHCHECK NONE has no effect" |
 
-**Configuration:** The async behavior is controlled by `--slow-checks` (or `slow-checks` in config). When set to `off`, only the fast static check runs.
+**Configuration:** The async behavior is controlled by `--slow-checks` (or `slow-checks` in config). When set to `off`, only the fast static check
+runs.
 
 ### SC Rules (ShellCheck)
 
