@@ -371,6 +371,20 @@ tally lint --fail-level style Dockerfile
 
 Available levels (from most to least severe): `error`, `warning`, `info`, `style` (default), `none`
 
+## IDE Integration
+
+### VS Code
+
+Install the official **[tally extension](https://marketplace.visualstudio.com/items?itemName=wharflab.tally)** from the Visual Studio Marketplace for real-time linting and diagnostics.
+
+### Other Editors
+
+Any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) can use tally's built-in LSP server over stdio:
+
+```bash
+npx -y tally-cli lsp --stdio
+```
+
 ## Development
 
 ### Running Tests
