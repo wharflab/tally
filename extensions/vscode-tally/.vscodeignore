@@ -4,3 +4,6 @@ bunfig.toml
 bun.lock
 node_modules/**
 test/**
+.oxfmtrc.json
+.oxlintrc.json
+bundled/bin/.gitkeep
