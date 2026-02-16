@@ -148,6 +148,132 @@ jobs:
         with:
           name: dist-signed
           path: dist-signed.tar
+  build-vscode-vsix:
+    needs: sign-macos
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version || github.ref_name }}
+    strategy:
+      matrix:
+        include:
+          - vscode_target: linux-x64
+            goreleaser_dir: tally_linux_amd64_v1
+            bundled_platform: linux
+            bundled_arch: x64
+            binary_name: tally
+          - vscode_target: linux-arm64
+            goreleaser_dir: tally_linux_arm64_v8.0
+            bundled_platform: linux
+            bundled_arch: arm64
+            binary_name: tally
+          - vscode_target: darwin-x64
+            goreleaser_dir: tally_darwin_amd64_v1
+            bundled_platform: darwin
+            bundled_arch: x64
+            binary_name: tally
+          - vscode_target: darwin-arm64
+            goreleaser_dir: tally_darwin_arm64_v8.0
+            bundled_platform: darwin
+            bundled_arch: arm64
+            binary_name: tally
+          - vscode_target: win32-x64
+            goreleaser_dir: tally_windows_amd64_v1
+            bundled_platform: windows
+            bundled_arch: x64
+            binary_name: tally.exe
+          - vscode_target: win32-arm64
+            goreleaser_dir: tally_windows_arm64_v8.0
+            bundled_platform: windows
+            bundled_arch: arm64
+            binary_name: tally.exe
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Download signed artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: dist-signed
+      - name: Extract artifacts
+        run: tar -xvf dist-signed.tar
+      - name: Copy binary into extension bundle
+        run: |
+          DEST="extensions/vscode-tally/bundled/bin/${{ matrix.bundled_platform }}/${{ matrix.bundled_arch }}"
+          mkdir -p "$DEST"
+          cp "dist/${{ matrix.goreleaser_dir }}/${{ matrix.binary_name }}" "$DEST/${{ matrix.binary_name }}"
+          chmod +x "$DEST/${{ matrix.binary_name }}"
+      - name: Set extension version from tag
+        run: |
+          CLEAN_VERSION="${VERSION#v}"
+          cd extensions/vscode-tally
+          jq --arg v "$CLEAN_VERSION" '.version = $v' package.json > package.json.tmp
+          mv package.json.tmp package.json
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+        working-directory: extensions/vscode-tally
+      - name: Compile extension
+        run: bun run compile
+        working-directory: extensions/vscode-tally
+      - name: Package platform-specific VSIX
+        run: bunx @vscode/vsce package --no-dependencies --target ${{ matrix.vscode_target }} -o tally-${{ matrix.vscode_target }}.vsix
+        working-directory: extensions/vscode-tally
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: vsix-${{ matrix.vscode_target }}
+          path: extensions/vscode-tally/tally-${{ matrix.vscode_target }}.vsix
+      - name: Upload VSIX to GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            "extensions/vscode-tally/tally-${{ matrix.vscode_target }}.vsix" \
+            --clobber
+  publish-vscode-marketplace:
+    needs: build-vscode-vsix
+    runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+    steps:
+      - name: Setup Bun
+        if: env.VSCE_PAT != ''
+        uses: oven-sh/setup-bun@v2
+      - name: Download all VSIX artifacts
+        if: env.VSCE_PAT != ''
+        uses: actions/download-artifact@v7
+        with:
+          pattern: vsix-*
+          merge-multiple: true
+      - name: Publish to VS Code Marketplace
+        if: env.VSCE_PAT != ''
+        run: |
+          for vsix in *.vsix; do
+            echo "Publishing $vsix"
+            bunx @vscode/vsce publish --pat "$VSCE_PAT" --packagePath "$vsix"
+          done
+  publish-openvsx:
+    needs: build-vscode-vsix
+    runs-on: ubuntu-latest
+    env:
+      OVSX_TOKEN: ${{ secrets.OVSX_TOKEN }}
+    steps:
+      - name: Setup Bun
+        if: env.OVSX_TOKEN != ''
+        uses: oven-sh/setup-bun@v2
+      - name: Download all VSIX artifacts
+        if: env.OVSX_TOKEN != ''
+        uses: actions/download-artifact@v7
+        with:
+          pattern: vsix-*
+          merge-multiple: true
+      - name: Publish to OpenVSX
+        if: env.OVSX_TOKEN != ''
+        run: |
+          for vsix in *.vsix; do
+            echo "Publishing $vsix"
+            bunx ovsx publish --pat "$OVSX_TOKEN" "$vsix"
+          done
   publish-homebrew:
     needs: sign-macos
     runs-on: ubuntu-latest
