@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Creating /etc/nginx/conf.d/default.conf with RUN can be replaced with COPY heredoc for better performance",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-copy-heredoc.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-copy-heredoc.md",
           "location": {
             "end": {
               "column": 0,
@@ -45,7 +45,7 @@
         },
         {
           "detail": "12 consecutive RUN instructions with 15 total commands can be combined into a single heredoc RUN",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-run-heredoc.md",
           "location": {
             "end": {
               "column": 0,
@@ -71,7 +71,7 @@
         },
         {
           "detail": "RUN has 3 chained commands; consider using heredoc syntax for better readability",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-run-heredoc.md",
           "location": {
             "end": {
               "column": 0,
@@ -97,7 +97,7 @@
         },
         {
           "detail": "2 consecutive RUN instructions write to /app/data.txt; combine into single COPY \u003c\u003cEOF",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-copy-heredoc.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-copy-heredoc.md",
           "location": {
             "end": {
               "column": 0,
@@ -137,7 +137,7 @@
         },
         {
           "detail": "Creating /etc/motd with RUN can be replaced with COPY heredoc for better performance",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-copy-heredoc.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-copy-heredoc.md",
           "location": {
             "end": {
               "column": 0,
@@ -177,7 +177,7 @@
         },
         {
           "detail": "Creating /entrypoint.sh with RUN can be replaced with COPY heredoc for better performance",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-copy-heredoc.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-copy-heredoc.md",
           "location": {
             "end": {
               "column": 0,
@@ -217,7 +217,7 @@
         },
         {
           "detail": "2 consecutive RUN instructions with 5 total commands can be combined into a single heredoc RUN",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-run-heredoc.md",
           "location": {
             "end": {
               "column": 0,
@@ -243,7 +243,7 @@
         },
         {
           "detail": "RUN has 3 chained commands; consider using heredoc syntax for better readability",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-run-heredoc.md",
           "location": {
             "end": {
               "column": 0,

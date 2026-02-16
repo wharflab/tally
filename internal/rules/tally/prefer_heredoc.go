@@ -54,7 +54,7 @@ func (r *PreferHeredocRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "prefer-run-heredoc",
 		Name:            "Prefer RUN heredoc syntax",
 		Description:     "Use heredoc syntax for multi-command RUN instructions",
-		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-run-heredoc.md",
 		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
 		IsExperimental:  true,

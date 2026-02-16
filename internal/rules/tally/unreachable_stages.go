@@ -23,7 +23,7 @@ func (r *UnreachableStagesRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "no-unreachable-stages",
 		Name:            "No Unreachable Stages",
 		Description:     "Disallows build stages that don't contribute to the final image",
-		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/no-unreachable-stages.md",
+		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/no-unreachable-stages.md",
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "best-practices",
 		IsExperimental:  false,
