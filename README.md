@@ -2,9 +2,10 @@
 
 [![codecov](https://codecov.io/gh/wharflab/tally/graph/badge.svg?token=J3vK0hyLkf)](https://codecov.io/gh/wharflab/tally)
 
-tally keeps Dockerfiles and Containerfiles clean, modern, and consistent — using BuildKit's own parser and checks (the same foundation behind
-`docker buildx`) plus safe auto-fixes. It runs fast, doesn't require Docker Desktop or a daemon, and fits neatly into CI. If that sounds like your
-workflow, try `tally lint .`.
+tally is a production-grade **Dockerfile/Containerfile linter + formatter** that keeps build files clean, modern, and consistent.
+
+It uses **BuildKit's official parser and checks** (the same foundation behind `docker buildx`) plus a **safe auto-fix** engine. It runs fast,
+doesn't require Docker Desktop or a daemon, and fits neatly into CI.
 
 ```bash
 # Lint everything in the repo (recursive)
@@ -14,7 +15,20 @@ tally lint .
 tally lint --fix Dockerfile
 ```
 
-## Why tally?
+## Why tally
+
+Modern Dockerfiles deserve modern tooling. tally is opinionated in the right places:
+
+- **BuildKit-native**: understands modern syntax like heredocs, `RUN --mount=...`, `COPY --link`, and `ADD --checksum=...`.
+- **Fixes, not just findings**: `--fix` applies safe, mechanical rewrites; `--fix-unsafe` unlocks opt-in risky fixes (including AI).
+- **Modernizes on purpose**: converts eligible `RUN`/`COPY` instructions to heredocs, prefers `ADD --extract`, and more.
+- **Broad rule coverage**: combines Docker's official BuildKit checks, Hadolint-compatible rules, and tally-specific rules.
+- **Registry-aware without Docker**: uses a Podman-compatible registry client for image metadata checks (no daemon required).
+- **Editor + CI friendly**: VS Code extension (`wharflab.tally`, powered by `tally lsp`) and outputs for JSON, SARIF, and GitHub Actions annotations.
+- **Easy to install anywhere**: Homebrew, Go, npm, pip, and RubyGems.
+- **Written in Go**: single fast binary, built on production-grade libraries.
+
+Quality bar: **92% code coverage on Codecov** and **2,900+ Go tests executed in CI**.
 
 Dockerfile linting usually means picking a compromise:
 
@@ -23,16 +37,19 @@ Dockerfile linting usually means picking a compromise:
 - **`docker buildx --check`** runs Docker's official BuildKit checks, but it requires the Docker/buildx toolchain and can be heavier than a pure
   static linter (and not always available if you're using Podman/Finch/other runtimes).
 
-tally exists to bring modern linter ergonomics to container builds:
+Roadmap: more auto-fixes, more Hadolint parity, richer registry-aware checks, and higher-level rules (cache & tmpfs mount recommendations,
+tooling-aware checks for uv/bun, line-length and layer optimizations).
 
-- **BuildKit-native parsing**: understands modern syntax like heredocs, `RUN --mount=...`, and `ADD --checksum=...`.
-- **Fixes, not just findings**: applies safe, mechanical fixes automatically (`--fix`), with per-rule control when you need it.
-- **Easy to install anywhere**: available via Homebrew, Go, npm, pip, and RubyGems — so it can flow through your existing artifact mirrors.
-- **Container ecosystem friendly**: supports Dockerfile/Containerfile conventions and `.dockerignore`/`.containerignore`.
-- **A growing ruleset**: combines official BuildKit checks, Hadolint-compatible rules, and tally-specific rules.
+## Optional: AI AutoFix via ACP
 
-Roadmap: editor integrations (VS Code, Zed), more auto-fixes, and higher-level rules (cache & tmpfs mount recommendations, tooling-aware checks for
-uv/bun, line-length and layer optimizations).
+tally supports **opt-in AI AutoFix** for the kinds of improvements that are hard to express as a deterministic rewrite.
+
+Instead of asking you for an API key, tally integrates with **ACP (Agent Client Protocol)** so you can use the agent you already trust (Gemini CLI,
+OpenCode, GitHub Copilot CLI, and more), while tally keeps linting fast and validates proposed changes before applying them.
+
+AI fixes are **rule-driven** (one narrow transformation at a time) and **verified** (re-parse + re-lint) before anything is applied.
+
+- Guide: [`docs/guide/ai-autofix-acp.md`](docs/guide/ai-autofix-acp.md)
 
 ## Supported Rules
 
@@ -41,9 +58,9 @@ tally integrates rules from multiple sources:
 <!-- BEGIN RULES_TABLE -->
 | Source | Rules | Description |
 |--------|-------|-------------|
-| **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 22/22 rules | Docker's official Dockerfile checks (captured + reimplemented) |
-| **tally** | 9 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
-| **[Hadolint](https://github.com/hadolint/hadolint)** | 37 rules | Hadolint-compatible Dockerfile rules (expanding) |
+| **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 22/22 rules | Docker's official Dockerfile checks, with auto-fix for many |
+| **tally** | 9 rules | Custom modernization rules + secret detection via [gitleaks](https://github.com/gitleaks/gitleaks) |
+| **[Hadolint](https://github.com/hadolint/hadolint)** | 37 rules | Hadolint-compatible Dockerfile rules, with auto-fix for many (intentionally excludes dependency pinning rules) |
 <!-- END RULES_TABLE -->
 
 **See [RULES.md](RULES.md) for the complete rules reference.**

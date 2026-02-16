@@ -2,7 +2,18 @@
   "name": "tally",
   "displayName": "Tally",
   "version": "0.0.0",
-  "description": "Dockerfile and Containerfile linter/formatter powered by tally",
+  "description": "BuildKit-native Dockerfile/Containerfile linter + formatter with auto-fix (powered by tally)",
+  "keywords": [
+    "Dockerfile",
+    "Containerfile",
+    "Docker",
+    "BuildKit",
+    "Podman",
+    "linter",
+    "formatter",
+    "autofix",
+    "security"
+  ],
   "categories": [
     "Formatters",
     "Linters"
