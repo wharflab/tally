@@ -1,5 +1,5 @@
 {
-  "name": "@contino/tally-linux-x64",
+  "name": "@wharflab/tally-linux-x64",
   "version": "0.1.0",
   "description": "tally binary for linux-x64",
   "repository": {

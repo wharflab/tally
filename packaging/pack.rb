@@ -49,7 +49,7 @@ module Pack
 
     # Update main NPM package optional dependencies
     replace_in_file("npm/tally/package.json",
-                   /"(@contino\/tally-.+)": "[\d.]+"/,
+                   /"(@wharflab\/tally-.+)": "[\d.]+"/,
                    %{"\\1": "#{VERSION}"})
 
     # Update PyPI version
@@ -128,7 +128,7 @@ module Pack
     Dir["tally*"].each do |package|
       puts "publishing #{package}"
       cd(File.join(__dir__, "npm", package))
-      system("npm publish --access public", exception: true)
+      system("npm publish --access public", exception: false)
       cd(File.join(__dir__, "npm"))
     end
   end

@@ -1,5 +1,5 @@
 {
-  "name": "@contino/tally-windows-arm64",
+  "name": "@wharflab/tally-windows-arm64",
   "version": "0.1.0",
   "description": "tally binary for windows-arm64",
   "repository": {

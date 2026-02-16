@@ -1,5 +1,5 @@
 {
-  "name": "@contino/tally-freebsd-x64",
+  "name": "@wharflab/tally-freebsd-x64",
   "version": "0.1.0",
   "description": "tally binary for freebsd-x64",
   "repository": {

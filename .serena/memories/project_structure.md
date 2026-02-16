@@ -26,7 +26,7 @@
 │   └── testutil/                     # Test utilities
 ├── packaging/
 │   ├── pack.rb                       # Packaging orchestration
-│   ├── npm/                          # npm package (@contino/tally)
+│   ├── npm/                          # npm package (@wharflab/tally)
 │   ├── pypi/                         # Python package (tally-cli)
 │   └── rubygems/                     # Ruby gem (tally-cli)
 └── README.md

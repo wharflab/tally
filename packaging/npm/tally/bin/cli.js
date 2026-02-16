@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-const { execFileSync } = require('child_process');
-const { existsSync } = require('fs');
+const { execFileSync } = require('node:child_process');
+const { existsSync } = require('node:fs');
 
 /**
  * Get the platform-specific package name for the current system
@@ -49,7 +49,7 @@ function getPlatformPackageName() {
     throw new Error(`FreeBSD only supports x64 architecture, not ${arch}`);
   }
 
-  return `@contino/tally-${pkgPlatform}-${pkgArch}`;
+  return `@wharflab/tally-${pkgPlatform}-${pkgArch}`;
 }
 
 /**
@@ -66,35 +66,35 @@ function main() {
     let binPath;
     try {
       binPath = require.resolve(`${pkgName}/bin/${binName}`);
-    } catch (resolveError) {
+    } catch  {
       // Platform package not found or binary missing
-      console.error(`Error: Could not find tally binary for your platform (${pkgName}).`);
-      console.error('');
-      console.error('This usually means:');
-      console.error('1. Optional dependencies were disabled during installation');
-      console.error('2. Your platform is not supported');
-      console.error('');
-      console.error('To fix this:');
-      console.error('1. Reinstall with optional dependencies enabled:');
-      console.error('   npm install tally-cli');
-      console.error('   # or');
-      console.error('   yarn add tally-cli');
-      console.error('   # or');
-      console.error('   bun add tally-cli');
-      console.error('');
-      console.error('2. If you disabled optional dependencies, re-enable them:');
-      console.error('   npm install --include=optional');
-      console.error('');
-      console.error(`Expected package: ${pkgName}`);
-      console.error(`Platform: ${process.platform} ${process.arch}`);
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
       process.exit(1);
     }
 
     // Verify the binary exists and is executable
     if (!existsSync(binPath)) {
-      console.error(`Error: Binary not found at ${binPath}`);
-      console.error('The platform package was installed but the binary is missing.');
-      console.error('Please try reinstalling tally-cli.');
+      
+      
+      
       process.exit(1);
     }
 
@@ -113,12 +113,12 @@ function main() {
         process.exit(execError.status);
       }
       // If there was an execution error (e.g., binary corrupted), report it
-      console.error(`Error executing tally binary: ${execError.message}`);
+      
       process.exit(1);
     }
 
-  } catch (error) {
-    console.error(`Error: ${error.message}`);
+  } catch  {
+    
     process.exit(1);
   }
 }

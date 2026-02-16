@@ -1,5 +1,5 @@
 {
-  "name": "@contino/tally-darwin-arm64",
+  "name": "@wharflab/tally-darwin-arm64",
   "version": "0.1.0",
   "description": "tally binary for darwin-arm64",
   "repository": {

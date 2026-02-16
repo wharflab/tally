@@ -31,13 +31,13 @@
     "node": ">=18.0.0"
   },
   "optionalDependencies": {
-    "@contino/tally-darwin-arm64": "0.1.0",
-    "@contino/tally-darwin-x64": "0.1.0",
-    "@contino/tally-linux-arm64": "0.1.0",
-    "@contino/tally-linux-x64": "0.1.0",
-    "@contino/tally-windows-arm64": "0.1.0",
-    "@contino/tally-windows-x64": "0.1.0",
-    "@contino/tally-freebsd-x64": "0.1.0"
+    "@wharflab/tally-darwin-arm64": "0.1.0",
+    "@wharflab/tally-darwin-x64": "0.1.0",
+    "@wharflab/tally-linux-arm64": "0.1.0",
+    "@wharflab/tally-linux-x64": "0.1.0",
+    "@wharflab/tally-windows-arm64": "0.1.0",
+    "@wharflab/tally-windows-x64": "0.1.0",
+    "@wharflab/tally-freebsd-x64": "0.1.0"
   },
   "publishConfig": {
     "access": "public"
