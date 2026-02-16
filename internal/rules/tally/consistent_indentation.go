@@ -17,6 +17,9 @@ import (
 // whitespace treatment, so using them would corrupt heredoc content.
 const expectedIndent = "\t"
 
+// ConsistentIndentationRuleCode is the full rule code for the consistent-indentation rule.
+const ConsistentIndentationRuleCode = rules.TallyRulePrefix + "consistent-indentation"
+
 // ConsistentIndentationRule implements the consistent-indentation linting rule.
 // For multi-stage Dockerfiles, it enforces indentation of commands within each stage.
 // For single-stage Dockerfiles, it enforces no indentation (flat style).
@@ -30,10 +33,10 @@ func NewConsistentIndentationRule() *ConsistentIndentationRule {
 // Metadata returns the rule metadata.
 func (r *ConsistentIndentationRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
-		Code:            rules.TallyRulePrefix + "consistent-indentation",
+		Code:            ConsistentIndentationRuleCode,
 		Name:            "Consistent Indentation",
 		Description:     "Enforces consistent indentation for Dockerfile build stages",
-		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+		DocURL:          rules.TallyDocURL(ConsistentIndentationRuleCode),
 		DefaultSeverity: rules.SeverityOff,
 		Category:        "style",
 		IsExperimental:  true,

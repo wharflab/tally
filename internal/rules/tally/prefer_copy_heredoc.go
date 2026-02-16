@@ -56,7 +56,7 @@ func (r *PreferCopyHeredocRule) Metadata() rules.RuleMetadata {
 		Code:            PreferCopyHeredocRuleCode,
 		Name:            "Prefer COPY heredoc for file creation",
 		Description:     "Use COPY <<EOF syntax instead of RUN echo/cat for creating files",
-		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-copy-heredoc.md",
+		DocURL:          rules.TallyDocURL(PreferCopyHeredocRuleCode),
 		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
 		IsExperimental:  true,

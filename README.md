@@ -58,9 +58,9 @@ tally integrates rules from multiple sources:
 <!-- BEGIN RULES_TABLE -->
 | Source | Rules | Description |
 |--------|-------|-------------|
-| **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 22/22 rules | Docker's official Dockerfile checks, with auto-fix for many |
-| **tally** | 9 rules | Custom modernization rules + secret detection via [gitleaks](https://github.com/gitleaks/gitleaks) |
-| **[Hadolint](https://github.com/hadolint/hadolint)** | 37 rules | Hadolint-compatible Dockerfile rules, with auto-fix for many (intentionally excludes dependency pinning rules) |
+| **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 22/22 rules | Docker's official Dockerfile checks (captured + reimplemented) |
+| **tally** | 9 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
+| **[Hadolint](https://github.com/hadolint/hadolint)** | 37 rules | Hadolint-compatible Dockerfile rules (expanding) |
 <!-- END RULES_TABLE -->
 
 **See [RULES.md](RULES.md) for the complete rules reference.**

@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Consider removing this stage or using COPY --from to include its artifacts in the final image",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/no-unreachable-stages.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/no-unreachable-stages.md",
           "location": {
             "end": {
               "column": 0,

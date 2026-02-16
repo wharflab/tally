@@ -7,6 +7,9 @@ import (
 	"github.com/wharflab/tally/internal/semantic"
 )
 
+// UnreachableStagesRuleCode is the full rule code for the no-unreachable-stages rule.
+const UnreachableStagesRuleCode = rules.TallyRulePrefix + "no-unreachable-stages"
+
 // UnreachableStagesRule implements the no-unreachable-stages linting rule.
 // It detects stages that are not reachable from the final stage
 // and therefore don't contribute to the final image.
@@ -20,10 +23,10 @@ func NewUnreachableStagesRule() *UnreachableStagesRule {
 // Metadata returns the rule metadata.
 func (r *UnreachableStagesRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
-		Code:            rules.TallyRulePrefix + "no-unreachable-stages",
+		Code:            UnreachableStagesRuleCode,
 		Name:            "No Unreachable Stages",
 		Description:     "Disallows build stages that don't contribute to the final image",
-		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/no-unreachable-stages.md",
+		DocURL:          rules.TallyDocURL(UnreachableStagesRuleCode),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "best-practices",
 		IsExperimental:  false,

@@ -14,6 +14,9 @@ import (
 	"github.com/wharflab/tally/internal/shell"
 )
 
+// PreferAddUnpackRuleCode is the full rule code for the prefer-add-unpack rule.
+const PreferAddUnpackRuleCode = rules.TallyRulePrefix + "prefer-add-unpack"
+
 // PreferAddUnpackConfig is the configuration for the prefer-add-unpack rule.
 type PreferAddUnpackConfig struct {
 	// Enabled controls whether the rule is active. True by default.
@@ -42,10 +45,10 @@ func NewPreferAddUnpackRule() *PreferAddUnpackRule {
 // Metadata returns the rule metadata.
 func (r *PreferAddUnpackRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
-		Code:            rules.TallyRulePrefix + "prefer-add-unpack",
+		Code:            PreferAddUnpackRuleCode,
 		Name:            "Prefer ADD --unpack for remote archives",
 		Description:     "Use `ADD --unpack` instead of downloading and extracting remote archives in `RUN`",
-		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-add-unpack.md",
+		DocURL:          rules.TallyDocURL(PreferAddUnpackRuleCode),
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "performance",
 		IsExperimental:  false,
