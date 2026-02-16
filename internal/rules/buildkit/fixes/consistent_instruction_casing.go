@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // casingMessageRegex extracts the instruction name and expected casing from BuildKit's message.

@@ -3,7 +3,7 @@ package buildkit
 import (
 	"strings"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // RedundantTargetPlatformRule implements the RedundantTargetPlatform linting rule.

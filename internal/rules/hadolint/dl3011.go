@@ -6,7 +6,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // DL3011Rule implements the DL3011 linting rule.

@@ -4,7 +4,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/tinovyatkin/tally/internal/sourcemap"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // Regex patterns for directive parsing.

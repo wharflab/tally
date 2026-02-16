@@ -7,8 +7,8 @@ import (
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/stretchr/testify/assert"
 
-	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
-	"github.com/tinovyatkin/tally/internal/rules"
+	protocol "github.com/wharflab/tally/internal/lsp/protocol"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 func TestViolationRangeConversion(t *testing.T) {

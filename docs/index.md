@@ -9,7 +9,7 @@ tally keeps Dockerfiles and Containerfiles clean, modern, and consistent — usi
 
 ```bash
 # Install via Homebrew
-brew install tinovyatkin/tap/tally
+brew install wharflab/tap/tally
 
 # Or via npm/pip/gem
 npm install -g tally-cli

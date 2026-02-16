@@ -6,9 +6,9 @@ import (
 
 	"github.com/gkampitakis/go-snaps/snaps"
 
-	"github.com/tinovyatkin/tally/internal/registry"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/testutil"
+	"github.com/wharflab/tally/internal/registry"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestInvalidBaseImagePlatformRule_Metadata(t *testing.T) {

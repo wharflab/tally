@@ -6,7 +6,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
-	"github.com/tinovyatkin/tally/internal/shell"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 // DefaultShell is the default shell used by Docker for RUN instructions.

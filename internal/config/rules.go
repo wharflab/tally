@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/tinovyatkin/tally/internal/rules/configutil"
+	"github.com/wharflab/tally/internal/rules/configutil"
 )
 
 // FixMode controls when auto-fixes are applied for a rule.

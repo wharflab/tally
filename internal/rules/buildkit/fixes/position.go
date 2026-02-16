@@ -5,7 +5,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // getLine extracts a single line from source (0-based line index).

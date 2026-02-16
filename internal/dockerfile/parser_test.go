@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/config"
+	"github.com/wharflab/tally/internal/config"
 )
 
 func TestParse_BasicParsing(t *testing.T) {

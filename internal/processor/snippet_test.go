@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 func TestSnippetAttachment_Name(t *testing.T) {

@@ -1,6 +1,6 @@
 package semantic
 
-import "github.com/tinovyatkin/tally/internal/rules"
+import "github.com/wharflab/tally/internal/rules"
 
 // ConstructionRuleCodes returns rule codes that can be emitted during semantic model construction.
 //

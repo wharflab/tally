@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/directive"
-	"github.com/tinovyatkin/tally/internal/shell"
+	"github.com/wharflab/tally/internal/directive"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 func TestBuilderWithShellDirectivesAppliesToFollowingStages(t *testing.T) {

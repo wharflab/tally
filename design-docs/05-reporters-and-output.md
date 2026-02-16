@@ -270,7 +270,7 @@ func (r *SARIFReporter) Report(violations []Violation) error {
     // Create run with tool driver that includes version
     driver := sarif.NewDriver("tally").
         WithVersion(r.toolVersion).
-        WithInformationURI("https://github.com/tinovyatkin/tally")
+        WithInformationURI("https://github.com/wharflab/tally")
 
     run := sarif.NewRun(*sarif.NewTool(driver))
 

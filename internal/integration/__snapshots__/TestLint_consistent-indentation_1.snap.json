@@ -4,7 +4,7 @@
       "file": "testdata/consistent-indentation/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
           "location": {
             "end": {
               "column": 0,
@@ -43,7 +43,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
           "location": {
             "end": {
               "column": 0,
@@ -82,7 +82,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
           "location": {
             "end": {
               "column": 0,
@@ -121,7 +121,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
           "location": {
             "end": {
               "column": 0,
@@ -160,7 +160,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
           "location": {
             "end": {
               "column": 0,
@@ -199,7 +199,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
           "location": {
             "end": {
               "column": 0,
@@ -238,7 +238,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
           "location": {
             "end": {
               "column": 0,
@@ -361,7 +361,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
           "location": {
             "end": {
               "column": 0,
@@ -400,7 +400,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
           "location": {
             "end": {
               "column": 0,
@@ -439,7 +439,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
           "location": {
             "end": {
               "column": 0,
@@ -478,7 +478,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
           "location": {
             "end": {
               "column": 0,

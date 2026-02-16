@@ -1,8 +1,8 @@
 package hadolint
 
 import (
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/shell"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 // DL3038Rule implements the DL3038 linting rule.

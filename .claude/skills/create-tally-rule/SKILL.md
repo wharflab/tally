@@ -70,7 +70,7 @@ Use this structure:
 package tally
 
 import (
-    "github.com/tinovyatkin/tally/internal/rules"
+    "github.com/wharflab/tally/internal/rules"
 )
 
 type MyRule struct{}
@@ -82,7 +82,7 @@ func (r *MyRule) Metadata() rules.RuleMetadata {
         Code:            rules.TallyRulePrefix + "<rule_slug>",
         Name:            "...",
         Description:     "...",
-        DocURL:          "https://github.com/tinovyatkin/tally/blob/main/docs/rules/tally/<rule_slug>.md",
+        DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/<rule_slug>.md",
         DefaultSeverity: rules.SeverityStyle,
         Category:        "style",
         IsExperimental:  false,

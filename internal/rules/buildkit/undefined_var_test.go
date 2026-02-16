@@ -5,7 +5,7 @@ import (
 
 	"github.com/gkampitakis/go-snaps/snaps"
 
-	"github.com/tinovyatkin/tally/internal/testutil"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestUndefinedVarRule_Metadata(t *testing.T) {

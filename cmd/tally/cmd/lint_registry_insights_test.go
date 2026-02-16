@@ -5,8 +5,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/tinovyatkin/tally/internal/async"
-	"github.com/tinovyatkin/tally/internal/registry"
+	"github.com/wharflab/tally/internal/async"
+	"github.com/wharflab/tally/internal/registry"
 )
 
 func TestCollectRegistryInsights_SortsAndDedupes(t *testing.T) {

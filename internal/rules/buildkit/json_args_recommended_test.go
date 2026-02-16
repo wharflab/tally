@@ -4,9 +4,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/dockerfile"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/rules/buildkit/fixes"
+	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules/buildkit/fixes"
 )
 
 func TestJSONArgsRecommendedRule_Check_AndFix(t *testing.T) {

@@ -1,6 +1,6 @@
 package fix
 
-import "github.com/tinovyatkin/tally/internal/rules"
+import "github.com/wharflab/tally/internal/rules"
 
 // editsOverlap checks if two edits overlap in their locations.
 // Overlapping edits cannot both be applied safely.

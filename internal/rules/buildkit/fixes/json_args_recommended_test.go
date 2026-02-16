@@ -3,7 +3,7 @@ package fixes
 import (
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 func TestFindDockerfileInlineCommentStart(t *testing.T) {

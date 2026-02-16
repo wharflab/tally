@@ -3,7 +3,7 @@ package buildkit
 import (
 	"fmt"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // reservedStageNames matches BuildKit's set exactly (case-sensitive).

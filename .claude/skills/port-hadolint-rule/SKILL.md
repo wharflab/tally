@@ -87,7 +87,7 @@ Decide where to implement based on rule nature:
 Always use the `internal/shell` package:
 
 ```go
-import "github.com/tinovyatkin/tally/internal/shell"
+import "github.com/wharflab/tally/internal/shell"
 
 // To check if a command contains a specific command name:
 if shell.ContainsCommandWithVariant(cmdStr, "sudo", shellVariant) {
@@ -145,9 +145,9 @@ package hadolint
 import (
     "github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-    "github.com/tinovyatkin/tally/internal/rules"
-    "github.com/tinovyatkin/tally/internal/semantic"
-    "github.com/tinovyatkin/tally/internal/shell"
+    "github.com/wharflab/tally/internal/rules"
+    "github.com/wharflab/tally/internal/semantic"
+    "github.com/wharflab/tally/internal/shell"
 )
 
 // $ARGUMENTSRule implements the $ARGUMENTS linting rule.

@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
 )
 
 var fixableRuleNames = []string{

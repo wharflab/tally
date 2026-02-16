@@ -6,7 +6,7 @@ import (
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 func TestWorkdirRelativePathRule_Metadata(t *testing.T) {

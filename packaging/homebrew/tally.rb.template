@@ -4,26 +4,26 @@
 # Homebrew formula for tally - auto-generated, do not edit manually
 class Tally < Formula
   desc "Fast, configurable linter for Dockerfiles and Containerfiles"
-  homepage "https://github.com/tinovyatkin/tally"
+  homepage "https://github.com/wharflab/tally"
   license "Apache-2.0"
   version "{{VERSION}}"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/tinovyatkin/tally/releases/download/v{{VERSION}}/tally_{{VERSION}}_MacOS_arm64.tar.gz"
+      url "https://github.com/wharflab/tally/releases/download/v{{VERSION}}/tally_{{VERSION}}_MacOS_arm64.tar.gz"
       sha256 "{{SHA256_DARWIN_ARM64}}"
     else
-      url "https://github.com/tinovyatkin/tally/releases/download/v{{VERSION}}/tally_{{VERSION}}_MacOS_x86_64.tar.gz"
+      url "https://github.com/wharflab/tally/releases/download/v{{VERSION}}/tally_{{VERSION}}_MacOS_x86_64.tar.gz"
       sha256 "{{SHA256_DARWIN_AMD64}}"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/tinovyatkin/tally/releases/download/v{{VERSION}}/tally_{{VERSION}}_Linux_arm64.tar.gz"
+      url "https://github.com/wharflab/tally/releases/download/v{{VERSION}}/tally_{{VERSION}}_Linux_arm64.tar.gz"
       sha256 "{{SHA256_LINUX_ARM64}}"
     else
-      url "https://github.com/tinovyatkin/tally/releases/download/v{{VERSION}}/tally_{{VERSION}}_Linux_x86_64.tar.gz"
+      url "https://github.com/wharflab/tally/releases/download/v{{VERSION}}/tally_{{VERSION}}_Linux_x86_64.tar.gz"
       sha256 "{{SHA256_LINUX_AMD64}}"
     end
   end

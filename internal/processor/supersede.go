@@ -3,7 +3,7 @@ package processor
 import (
 	"path/filepath"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // Supersession suppresses lower-severity violations when an error-level

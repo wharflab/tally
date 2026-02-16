@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/rules/configutil"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules/configutil"
 )
 
 // DL3026Config is the configuration for the trusted-base-image rule.

@@ -55,7 +55,7 @@ func TestMain(m *testing.M) {
 		}
 		buildArgs = append(buildArgs, "-cover")
 	}
-	buildArgs = append(buildArgs, "-o", binaryPath, "github.com/tinovyatkin/tally")
+	buildArgs = append(buildArgs, "-o", binaryPath, "github.com/wharflab/tally")
 
 	cmd := exec.Command("go", buildArgs...)
 	cmd.Env = append(os.Environ(), "GOEXPERIMENT=jsonv2")

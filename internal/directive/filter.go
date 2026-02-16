@@ -1,6 +1,6 @@
 package directive
 
-import "github.com/tinovyatkin/tally/internal/rules"
+import "github.com/wharflab/tally/internal/rules"
 
 // FilterResult contains the results of filtering violations through directives.
 type FilterResult struct {

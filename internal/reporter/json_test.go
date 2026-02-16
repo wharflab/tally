@@ -5,7 +5,7 @@ import (
 	"encoding/json/v2"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 func TestJSONReporter(t *testing.T) {

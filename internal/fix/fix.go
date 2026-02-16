@@ -3,8 +3,8 @@
 package fix
 
 import (
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // Re-export FixSafety from rules package for convenience.

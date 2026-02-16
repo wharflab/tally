@@ -3,8 +3,8 @@ package autofix
 import (
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/dockerfile"
 )
 
 func mustParseDockerfile(t *testing.T, content string) *dockerfile.ParseResult {

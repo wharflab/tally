@@ -5,9 +5,9 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-	"github.com/tinovyatkin/tally/internal/dockerfile"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/shell"
+	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 // DL3003Rule implements the DL3003 linting rule.

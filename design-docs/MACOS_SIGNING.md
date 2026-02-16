@@ -89,7 +89,7 @@ Notarization requires an app-specific password (not your Apple ID password).
 
 Add these secrets to your GitHub repository:
 
-Go to: <https://github.com/tinovyatkin/tally/settings/secrets/actions>
+Go to: <https://github.com/wharflab/tally/settings/secrets/actions>
 
 | Secret Name | Value | Description |
 |------------|-------|-------------|

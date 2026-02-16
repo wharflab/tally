@@ -544,8 +544,8 @@ func ternary(cond bool, a, b int) int {
 package main
 
 import (
-    "github.com/tinovyatkin/tally/internal/inline"
-    "github.com/tinovyatkin/tally/internal/lint"
+    "github.com/wharflab/tally/internal/inline"
+    "github.com/wharflab/tally/internal/lint"
 )
 
 func lintFile(path string, rules []lint.Rule) ([]lint.Violation, error) {

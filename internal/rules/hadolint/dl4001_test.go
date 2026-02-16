@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/testutil"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestDL4001Rule_Metadata(t *testing.T) {

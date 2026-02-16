@@ -6,7 +6,7 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/tinovyatkin/tally/internal/version"
+	"github.com/wharflab/tally/internal/version"
 )
 
 // NewApp creates the CLI application

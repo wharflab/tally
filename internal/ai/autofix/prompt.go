@@ -12,9 +12,9 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-	"github.com/tinovyatkin/tally/internal/ai/autofixdata"
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/ai/autofixdata"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/dockerfile"
 )
 
 func buildRound1Prompt(

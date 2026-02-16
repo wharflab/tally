@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"slices"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // enrichNoEmptyContinuationFix adds auto-fix for BuildKit's NoEmptyContinuation rule.

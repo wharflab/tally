@@ -6,8 +6,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/shell"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 func enrichJSONArgsRecommendedFix(v *rules.Violation, source []byte) {

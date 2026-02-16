@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/sourcemap"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 func TestParseTallyNextLine(t *testing.T) {

@@ -11,9 +11,9 @@ import (
 
 	jsonv2 "encoding/json/v2"
 
-	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
+	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 
-	"github.com/tinovyatkin/tally/internal/config"
+	"github.com/wharflab/tally/internal/config"
 )
 
 type clientSettings struct {

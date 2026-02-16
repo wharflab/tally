@@ -1,8 +1,8 @@
 package autofix
 
 import (
-	"github.com/tinovyatkin/tally/internal/ai/autofixdata"
-	"github.com/tinovyatkin/tally/internal/fix"
+	"github.com/wharflab/tally/internal/ai/autofixdata"
+	"github.com/wharflab/tally/internal/fix"
 )
 
 // Register registers the AI AutoFix resolver.

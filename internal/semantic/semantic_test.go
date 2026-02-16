@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tinovyatkin/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/dockerfile"
 )
 
 // parseDockerfile is a test helper that parses a Dockerfile string.

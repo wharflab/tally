@@ -9,11 +9,11 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
-	"github.com/tinovyatkin/tally/internal/heredoc"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/runmount"
-	"github.com/tinovyatkin/tally/internal/shell"
-	"github.com/tinovyatkin/tally/internal/sourcemap"
+	"github.com/wharflab/tally/internal/heredoc"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/runmount"
+	"github.com/wharflab/tally/internal/shell"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // heredocResolver implements FixResolver for prefer-run-heredoc fixes.

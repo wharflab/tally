@@ -6,9 +6,9 @@ import (
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tinovyatkin/tally/internal/ai/autofixdata"
-	tallyrules "github.com/tinovyatkin/tally/internal/rules/tally"
-	"github.com/tinovyatkin/tally/internal/testutil"
+	"github.com/wharflab/tally/internal/ai/autofixdata"
+	tallyrules "github.com/wharflab/tally/internal/rules/tally"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestBuildRound1Prompt_PreferMultiStageBuild_Snapshot(t *testing.T) {

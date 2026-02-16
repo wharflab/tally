@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
+	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 )
 
 func TestParseApplyAllFixesArgs(t *testing.T) {

@@ -3,9 +3,9 @@ package lspserver
 import (
 	"strings"
 
-	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
+	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // codeActionsForDocument returns quick-fix code actions for the given range.

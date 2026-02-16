@@ -14,7 +14,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // ReportMetadata contains contextual information about the lint run.
@@ -120,7 +120,7 @@ func DefaultOptions() Options {
 		Color:       nil, // auto-detect
 		ShowSource:  true,
 		ToolName:    "tally",
-		ToolURI:     "https://github.com/tinovyatkin/tally",
+		ToolURI:     "https://github.com/wharflab/tally",
 		ToolVersion: "dev",
 	}
 }

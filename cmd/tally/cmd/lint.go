@@ -14,20 +14,20 @@ import (
 
 	"github.com/urfave/cli/v3"
 
-	"github.com/tinovyatkin/tally/internal/ai/autofix"
-	"github.com/tinovyatkin/tally/internal/ai/autofixdata"
-	"github.com/tinovyatkin/tally/internal/async"
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/context"
-	"github.com/tinovyatkin/tally/internal/discovery"
-	"github.com/tinovyatkin/tally/internal/dockerfile"
-	"github.com/tinovyatkin/tally/internal/fix"
-	"github.com/tinovyatkin/tally/internal/linter"
-	"github.com/tinovyatkin/tally/internal/processor"
-	"github.com/tinovyatkin/tally/internal/registry"
-	"github.com/tinovyatkin/tally/internal/reporter"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/version"
+	"github.com/wharflab/tally/internal/ai/autofix"
+	"github.com/wharflab/tally/internal/ai/autofixdata"
+	"github.com/wharflab/tally/internal/async"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/context"
+	"github.com/wharflab/tally/internal/discovery"
+	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/fix"
+	"github.com/wharflab/tally/internal/linter"
+	"github.com/wharflab/tally/internal/processor"
+	"github.com/wharflab/tally/internal/registry"
+	"github.com/wharflab/tally/internal/reporter"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/version"
 )
 
 // Exit codes
@@ -460,7 +460,7 @@ func writeReport(
 		ShowSource:  outCfg.showSource,
 		ToolName:    "tally",
 		ToolVersion: version.Version(),
-		ToolURI:     "https://github.com/tinovyatkin/tally",
+		ToolURI:     "https://github.com/wharflab/tally",
 	}
 
 	if cmd.IsSet("no-color") && cmd.Bool("no-color") {

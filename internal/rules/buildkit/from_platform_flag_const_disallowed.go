@@ -5,7 +5,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/linter"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // FromPlatformFlagConstDisallowedRule implements BuildKit's FromPlatformFlagConstDisallowed check.

@@ -7,8 +7,8 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/shell"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 // DL3020Rule implements the DL3020 linting rule.

@@ -4,7 +4,7 @@
   "description": "A fast, configurable linter for Dockerfiles and Containerfiles",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tinovyatkin/tally.git"
+    "url": "git+https://github.com/wharflab/tally.git"
   },
   "bin": {
     "tally": "./bin/cli.js"
@@ -24,9 +24,9 @@
   "author": "tinovyatkin",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/tinovyatkin/tally/issues"
+    "url": "https://github.com/wharflab/tally/issues"
   },
-  "homepage": "https://github.com/tinovyatkin/tally#readme",
+  "homepage": "https://github.com/wharflab/tally#readme",
   "engines": {
     "node": ">=18.0.0"
   },

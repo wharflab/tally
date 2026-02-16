@@ -1,6 +1,6 @@
 package rules
 
-import "github.com/tinovyatkin/tally/internal/shell"
+import "github.com/wharflab/tally/internal/shell"
 
 // HeredocResolverID is the unique identifier for the heredoc fix resolver.
 const HeredocResolverID = "prefer-run-heredoc"

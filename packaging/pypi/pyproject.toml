@@ -16,7 +16,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/tinovyatkin/tally"
+Homepage = "https://github.com/wharflab/tally"
 
 [project.scripts]
 tally = "tally_cli.main:main"

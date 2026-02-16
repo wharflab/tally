@@ -6,9 +6,9 @@ import (
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-	"github.com/tinovyatkin/tally/internal/heredoc"
-	"github.com/tinovyatkin/tally/internal/shell"
-	"github.com/tinovyatkin/tally/internal/testutil"
+	"github.com/wharflab/tally/internal/heredoc"
+	"github.com/wharflab/tally/internal/shell"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestPreferHeredocRule_Metadata(t *testing.T) {

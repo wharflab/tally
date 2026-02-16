@@ -24,7 +24,7 @@
         },
         {
           "detail": "2 consecutive RUN instructions with 4 total commands can be combined into a single heredoc RUN",
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-run-heredoc.md",
           "location": {
             "end": {
               "column": 0,

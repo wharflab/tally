@@ -3,7 +3,7 @@ package semantic
 import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // Issue represents a semantic problem detected during model construction.

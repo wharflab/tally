@@ -202,7 +202,7 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
           # Clone the tap repository using SSH
-          git clone git@github.com-tap:tinovyatkin/homebrew-tap.git tap
+          git clone git@github.com-tap:wharflab/homebrew-tap.git tap
 
           # Ensure Formula directory exists and copy formula
           mkdir -p tap/Formula

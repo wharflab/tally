@@ -23,7 +23,7 @@
         },
         {
           "detail": "RUN has 4 chained commands; consider using heredoc syntax for better readability",
-          "docUrl": "https://github.com/tinovyatkin/tally/blob/main/docs/rules/prefer-run-heredoc.md",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/prefer-run-heredoc.md",
           "location": {
             "end": {
               "column": 0,

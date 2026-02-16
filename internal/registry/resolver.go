@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/tinovyatkin/tally/internal/async"
+	"github.com/wharflab/tally/internal/async"
 )
 
 const registryResolverID = "registry"

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
-	"github.com/tinovyatkin/tally/internal/testutil"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestDL3034Rule_Check(t *testing.T) {

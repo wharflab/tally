@@ -14,11 +14,11 @@ import (
 
 	"github.com/invopop/jsonschema"
 
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/rules"
 
 	// Import all rules to register them
-	_ "github.com/tinovyatkin/tally/internal/rules/all"
+	_ "github.com/wharflab/tally/internal/rules/all"
 )
 
 func main() {

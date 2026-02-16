@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tinovyatkin/tally/internal/registry/testutil"
+	"github.com/wharflab/tally/internal/registry/testutil"
 )
 
 var (
@@ -85,7 +85,7 @@ func buildIntegrationBinary(tmpDir string) error {
 	}
 	buildArgs = append(buildArgs,
 		"-tags", "containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub",
-		"-o", binaryPath, "github.com/tinovyatkin/tally")
+		"-o", binaryPath, "github.com/wharflab/tally")
 
 	cmd := exec.Command("go", buildArgs...)
 	cmd.Env = append(os.Environ(), "GOEXPERIMENT=jsonv2")
@@ -103,7 +103,7 @@ func buildIntegrationAcpAgent(tmpDir string) error {
 	}
 	acpAgentPath = filepath.Join(tmpDir, binName)
 
-	cmd := exec.Command("go", "build", "-trimpath", "-o", acpAgentPath, "github.com/tinovyatkin/tally/internal/ai/acp/testdata/testagent")
+	cmd := exec.Command("go", "build", "-trimpath", "-o", acpAgentPath, "github.com/wharflab/tally/internal/ai/acp/testdata/testagent")
 	cmd.Env = append(os.Environ(), "GOEXPERIMENT=jsonv2")
 	out, err := cmd.CombinedOutput()
 	if err != nil {

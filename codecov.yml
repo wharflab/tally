@@ -21,12 +21,12 @@ ignore:
   - "**/internal/integration/testdata/**"
   # Generated LSP protocol types.
   - "internal/lsp/protocol/lsp_generated.go"
-  - "github.com/tinovyatkin/tally/internal/lsp/protocol/lsp_generated.go"
+  - "github.com/wharflab/tally/internal/lsp/protocol/lsp_generated.go"
   - "*_generated.go"
   - "scripts/**"
   # Go coverage profiles can use module-prefixed paths.
-  - "github.com/tinovyatkin/tally/internal/lsp/protocol/*_generated.go"
-  - "github.com/tinovyatkin/tally/scripts/**"
+  - "github.com/wharflab/tally/internal/lsp/protocol/*_generated.go"
+  - "github.com/wharflab/tally/scripts/**"
 # Test analytics configuration
 # https://docs.codecov.com/docs/test-analytics
 test_analytics:

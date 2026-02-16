@@ -3,7 +3,7 @@ package fixes
 import (
 	"fmt"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // enrichFromAsCasingFix adds auto-fix for BuildKit's FromAsCasing rule.

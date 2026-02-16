@@ -6,7 +6,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/linter"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // ConsistentInstructionCasingRule implements the ConsistentInstructionCasing linting rule.

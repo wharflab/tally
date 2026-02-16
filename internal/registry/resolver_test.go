@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tinovyatkin/tally/internal/async"
+	"github.com/wharflab/tally/internal/async"
 )
 
 // mockImageResolver implements ImageResolver for testing.

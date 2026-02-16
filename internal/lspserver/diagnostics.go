@@ -15,12 +15,12 @@ import (
 
 	"golang.org/x/exp/jsonrpc2"
 
-	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
+	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 
-	"github.com/tinovyatkin/tally/internal/config"
-	"github.com/tinovyatkin/tally/internal/linter"
-	"github.com/tinovyatkin/tally/internal/processor"
-	"github.com/tinovyatkin/tally/internal/rules"
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/linter"
+	"github.com/wharflab/tally/internal/processor"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 // lintResultCache caches lint results keyed by document URI + version

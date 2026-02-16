@@ -10,10 +10,10 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 	dfshell "github.com/moby/buildkit/frontend/dockerfile/shell"
 
-	"github.com/tinovyatkin/tally/internal/directive"
-	"github.com/tinovyatkin/tally/internal/dockerfile"
-	"github.com/tinovyatkin/tally/internal/rules"
-	"github.com/tinovyatkin/tally/internal/shell"
+	"github.com/wharflab/tally/internal/directive"
+	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 // Builder constructs a semantic model from a parse result.

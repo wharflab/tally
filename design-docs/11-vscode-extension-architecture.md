@@ -274,7 +274,7 @@ cmd/tally/cmd/lsp.go # CLI entrypoint: `tally lsp --stdio`
 
 ### 5.3 Extension toolchain pattern (adapted from `amazon-bedrock-copilot-chat`)
 
-Use the same Bun-based pattern already proven in `https://github.com/tinovyatkin/amazon-bedrock-copilot-chat`:
+Use the same Bun-based pattern already proven in `https://github.com/wharflab/amazon-bedrock-copilot-chat`:
 
 - `extensions/vscode-tally/package.json`:
   - `packageManager: "bun"`

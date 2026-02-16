@@ -5,7 +5,7 @@ tally is a single binary you can install in whatever way best fits your environm
 ## Homebrew (macOS/Linux)
 
 ```bash
-brew install tinovyatkin/tap/tally
+brew install wharflab/tap/tally
 ```
 
 ## npm
@@ -29,13 +29,13 @@ gem install tally-cli
 ## Go
 
 ```bash
-go install github.com/tinovyatkin/tally@latest
+go install github.com/wharflab/tally@latest
 ```
 
 ## From source
 
 ```bash
-git clone https://github.com/tinovyatkin/tally.git
+git clone https://github.com/wharflab/tally.git
 cd tally
 go build .
 ```

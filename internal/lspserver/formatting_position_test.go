@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	protocol "github.com/tinovyatkin/tally/internal/lsp/protocol"
+	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 )
 
 func TestPositionAtOffset_UsesUTF16CodeUnits(t *testing.T) {
