@@ -33,7 +33,7 @@ func (r *ConsistentIndentationRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "consistent-indentation",
 		Name:            "Consistent Indentation",
 		Description:     "Enforces consistent indentation for Dockerfile build stages",
-		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+		DocURL:          rules.TallyDocURL(rules.TallyRulePrefix + "consistent-indentation"),
 		DefaultSeverity: rules.SeverityOff,
 		Category:        "style",
 		IsExperimental:  true,

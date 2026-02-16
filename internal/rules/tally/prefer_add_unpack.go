@@ -45,7 +45,7 @@ func (r *PreferAddUnpackRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "prefer-add-unpack",
 		Name:            "Prefer ADD --unpack for remote archives",
 		Description:     "Use `ADD --unpack` instead of downloading and extracting remote archives in `RUN`",
-		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-add-unpack.md",
+		DocURL:          rules.TallyDocURL(rules.TallyRulePrefix + "prefer-add-unpack"),
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "performance",
 		IsExperimental:  false,

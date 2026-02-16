@@ -30,7 +30,7 @@ func (r *SecretsInCodeRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "secrets-in-code",
 		Name:            "Secrets in Dockerfile Content",
 		Description:     "Detects hardcoded secrets, API keys, and credentials in Dockerfile content",
-		DocURL:          "https://github.com/wharflab/tally#secrets-in-code",
+		DocURL:          rules.TallyDocURL(rules.TallyRulePrefix + "secrets-in-code"),
 		DefaultSeverity: rules.SeverityError, // Secrets are serious
 		Category:        "security",
 		IsExperimental:  true, // New rule, mark as experimental initially

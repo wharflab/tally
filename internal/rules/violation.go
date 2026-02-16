@@ -140,6 +140,15 @@ const BuildKitRulePrefix = "buildkit/"
 // TallyRulePrefix is the namespace prefix for tally's own rules.
 const TallyRulePrefix = "tally/"
 
+// tallyDocURLBase is the base URL for tally rule documentation.
+const tallyDocURLBase = "https://github.com/wharflab/tally/blob/main/docs/rules/"
+
+// TallyDocURL returns the documentation URL for a tally rule code.
+// The ruleCode should include the "tally/" prefix (e.g. "tally/max-lines").
+func TallyDocURL(ruleCode string) string {
+	return tallyDocURLBase + ruleCode + ".md"
+}
+
 // HadolintRulePrefix is the namespace prefix for Hadolint-compatible rules.
 const HadolintRulePrefix = "hadolint/"
 

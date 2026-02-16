@@ -33,7 +33,7 @@ func (r *PreferMultiStageBuildRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "prefer-multi-stage-build",
 		Name:            "Prefer Multi-Stage Build",
 		Description:     "Suggests converting single-stage builds into multi-stage builds to reduce final image size",
-		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-multi-stage-build.md",
+		DocURL:          rules.TallyDocURL(rules.TallyRulePrefix + "prefer-multi-stage-build"),
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "performance",
 		IsExperimental:  true,

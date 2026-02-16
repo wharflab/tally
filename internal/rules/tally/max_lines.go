@@ -55,7 +55,7 @@ func (r *MaxLinesRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "max-lines",
 		Name:            "Maximum Lines",
 		Description:     "Limits the maximum number of lines in a Dockerfile",
-		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/max-lines.md",
+		DocURL:          rules.TallyDocURL(rules.TallyRulePrefix + "max-lines"),
 		DefaultSeverity: rules.SeverityError,
 		Category:        "maintainability",
 		IsExperimental:  false,

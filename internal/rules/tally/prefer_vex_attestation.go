@@ -25,7 +25,7 @@ func (r *PreferVEXAttestationRule) Metadata() rules.RuleMetadata {
 		Code:            rules.TallyRulePrefix + "prefer-vex-attestation",
 		Name:            "Prefer VEX attestation",
 		Description:     "Prefer attaching OpenVEX as an OCI attestation instead of copying VEX JSON into the image",
-		DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-vex-attestation.md",
+		DocURL:          rules.TallyDocURL(rules.TallyRulePrefix + "prefer-vex-attestation"),
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "security",
 		IsExperimental:  false,
