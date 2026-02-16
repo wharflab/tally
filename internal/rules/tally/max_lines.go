@@ -10,6 +10,9 @@ import (
 	"github.com/wharflab/tally/internal/rules/configutil"
 )
 
+// MaxLinesRuleCode is the full rule code for the max-lines rule.
+const MaxLinesRuleCode = rules.TallyRulePrefix + "max-lines"
+
 // MaxLinesConfig is the configuration for the max-lines rule.
 //
 // Default: 50 lines (excluding blanks and comments).
@@ -52,10 +55,10 @@ func NewMaxLinesRule() *MaxLinesRule {
 // Metadata returns the rule metadata.
 func (r *MaxLinesRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
-		Code:            rules.TallyRulePrefix + "max-lines",
+		Code:            MaxLinesRuleCode,
 		Name:            "Maximum Lines",
 		Description:     "Limits the maximum number of lines in a Dockerfile",
-		DocURL:          rules.TallyDocURL(rules.TallyRulePrefix + "max-lines"),
+		DocURL:          rules.TallyDocURL(MaxLinesRuleCode),
 		DefaultSeverity: rules.SeverityError,
 		Category:        "maintainability",
 		IsExperimental:  false,

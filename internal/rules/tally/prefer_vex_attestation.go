@@ -9,6 +9,9 @@ import (
 	"github.com/wharflab/tally/internal/rules"
 )
 
+// PreferVEXAttestationRuleCode is the full rule code for the prefer-vex-attestation rule.
+const PreferVEXAttestationRuleCode = rules.TallyRulePrefix + "prefer-vex-attestation"
+
 // PreferVEXAttestationRule flags COPY instructions that embed OpenVEX documents
 // (typically *.vex.json) into the image filesystem and recommends attaching VEX
 // as an OCI attestation instead.
@@ -22,10 +25,10 @@ func NewPreferVEXAttestationRule() *PreferVEXAttestationRule {
 // Metadata returns the rule metadata.
 func (r *PreferVEXAttestationRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
-		Code:            rules.TallyRulePrefix + "prefer-vex-attestation",
+		Code:            PreferVEXAttestationRuleCode,
 		Name:            "Prefer VEX attestation",
 		Description:     "Prefer attaching OpenVEX as an OCI attestation instead of copying VEX JSON into the image",
-		DocURL:          rules.TallyDocURL(rules.TallyRulePrefix + "prefer-vex-attestation"),
+		DocURL:          rules.TallyDocURL(PreferVEXAttestationRuleCode),
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "security",
 		IsExperimental:  false,

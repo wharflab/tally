@@ -51,10 +51,10 @@ func NewPreferHeredocRule() *PreferHeredocRule {
 // Metadata returns the rule metadata.
 func (r *PreferHeredocRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
-		Code:            rules.TallyRulePrefix + "prefer-run-heredoc",
+		Code:            rules.HeredocRuleCode,
 		Name:            "Prefer RUN heredoc syntax",
 		Description:     "Use heredoc syntax for multi-command RUN instructions",
-		DocURL:          rules.TallyDocURL(rules.TallyRulePrefix + "prefer-run-heredoc"),
+		DocURL:          rules.TallyDocURL(rules.HeredocRuleCode),
 		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
 		IsExperimental:  true,

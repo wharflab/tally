@@ -12,6 +12,9 @@ import (
 	"github.com/wharflab/tally/internal/rules/configutil"
 )
 
+// PreferMultiStageBuildRuleCode is the full rule code for the prefer-multi-stage-build rule.
+const PreferMultiStageBuildRuleCode = rules.TallyRulePrefix + "prefer-multi-stage-build"
+
 // PreferMultiStageBuildConfig configures the prefer-multi-stage-build rule.
 type PreferMultiStageBuildConfig struct {
 	// MinScore is the minimum heuristic score required to trigger the suggestion.
@@ -30,10 +33,10 @@ func NewPreferMultiStageBuildRule() *PreferMultiStageBuildRule { return &PreferM
 
 func (r *PreferMultiStageBuildRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
-		Code:            rules.TallyRulePrefix + "prefer-multi-stage-build",
+		Code:            PreferMultiStageBuildRuleCode,
 		Name:            "Prefer Multi-Stage Build",
 		Description:     "Suggests converting single-stage builds into multi-stage builds to reduce final image size",
-		DocURL:          rules.TallyDocURL(rules.TallyRulePrefix + "prefer-multi-stage-build"),
+		DocURL:          rules.TallyDocURL(PreferMultiStageBuildRuleCode),
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "performance",
 		IsExperimental:  true,

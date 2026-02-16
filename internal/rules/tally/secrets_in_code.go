@@ -16,6 +16,9 @@ var (
 	gitleaksDetector *detect.Detector
 )
 
+// SecretsInCodeRuleCode is the full rule code for the secrets-in-code rule.
+const SecretsInCodeRuleCode = rules.TallyRulePrefix + "secrets-in-code"
+
 // SecretsInCodeRule implements secret detection in Dockerfile content.
 type SecretsInCodeRule struct{}
 
@@ -27,10 +30,10 @@ func NewSecretsInCodeRule() *SecretsInCodeRule {
 // Metadata returns the rule metadata.
 func (r *SecretsInCodeRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
-		Code:            rules.TallyRulePrefix + "secrets-in-code",
+		Code:            SecretsInCodeRuleCode,
 		Name:            "Secrets in Dockerfile Content",
 		Description:     "Detects hardcoded secrets, API keys, and credentials in Dockerfile content",
-		DocURL:          rules.TallyDocURL(rules.TallyRulePrefix + "secrets-in-code"),
+		DocURL:          rules.TallyDocURL(SecretsInCodeRuleCode),
 		DefaultSeverity: rules.SeverityError, // Secrets are serious
 		Category:        "security",
 		IsExperimental:  true, // New rule, mark as experimental initially
