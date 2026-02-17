@@ -24,7 +24,7 @@ internal object TallyBinaryResolver {
         projectSdkHomePath: String?,
         isTrustedProject: Boolean,
     ): TallyCommand? {
-        if (settings.importStrategy == "useBundled") {
+        if (settings.importStrategy == TallySettings.IMPORT_STRATEGY_USE_BUNDLED) {
             resolveBundledBinary()?.let { return it }
             return null
         }

@@ -8,8 +8,8 @@ internal data class TallyRuntimeSettings(
 )
 
 internal object TallySettings {
-    private const val IMPORT_STRATEGY_FROM_ENVIRONMENT = "fromEnvironment"
-    private const val IMPORT_STRATEGY_USE_BUNDLED = "useBundled"
+    internal const val IMPORT_STRATEGY_FROM_ENVIRONMENT = "fromEnvironment"
+    internal const val IMPORT_STRATEGY_USE_BUNDLED = "useBundled"
 
     fun current(): TallyRuntimeSettings {
         val executablePaths = readExecutablePaths()
