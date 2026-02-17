@@ -377,6 +377,10 @@ Available levels (from most to least severe): `error`, `warning`, `info`, `style
 
 Install the official **[tally extension](https://marketplace.visualstudio.com/items?itemName=wharflab.tally)** from the Visual Studio Marketplace for real-time linting and diagnostics.
 
+### JetBrains IDEs
+
+Install the official **[Tally plugin](https://plugins.jetbrains.com/plugin/30255-tally)** from JetBrains Marketplace for IDE integration in IntelliJ-based editors.
+
 ### Other Editors
 
 Any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) can use tally's built-in LSP server over stdio:
