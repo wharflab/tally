@@ -147,8 +147,82 @@ async function runSmoke() {
   await vscode.commands.executeCommand("workbench.action.files.revert");
 }
 
+function installOutputChannelSpy() {
+  const captured = [];
+  const original = vscode.window.createOutputChannel;
+  vscode.window.createOutputChannel = function (name, ...rest) {
+    const channel = original.call(this, name, ...rest);
+    if (name !== "Tally") return channel;
+    const origAppend = channel.append.bind(channel);
+    const origAppendLine = channel.appendLine.bind(channel);
+    channel.append = (value) => {
+      captured.push(value);
+      return origAppend(value);
+    };
+    channel.appendLine = (value) => {
+      captured.push(value + "\n");
+      return origAppendLine(value);
+    };
+    return channel;
+  };
+  return {
+    captured,
+    restore() {
+      vscode.window.createOutputChannel = original;
+    },
+  };
+}
+
+function assertNoOutputChannelErrors(captured) {
+  const errorPatterns = [
+    /method not supported/i,
+    /method not found/i,
+    /panic:/,
+    /runtime error:/,
+    /fatal error:/,
+    /goroutine \d+/,
+  ];
+  const full = captured.join("");
+  const matches = [];
+  for (const pattern of errorPatterns) {
+    if (pattern.test(full)) {
+      matches.push(pattern.source);
+    }
+  }
+  if (matches.length > 0) {
+    const preview = full.length > 2000 ? full.slice(0, 2000) + "…" : full;
+    assert.fail(
+      `output channel contained error patterns: [${matches.join(", ")}]\n\n--- output preview ---\n${preview}`,
+    );
+  }
+}
+
 async function run() {
-  await runSmoke();
+  const spy = installOutputChannelSpy();
+  try {
+    const ext = vscode.extensions.getExtension("wharflab.tally");
+    const alreadyActive = ext?.isActive;
+    if (alreadyActive) {
+      
+    }
+
+    await runSmoke();
+
+    // Allow async stderr / logMessage writes to flush before checking output.
+    await scheduler.wait(1_000);
+
+    if (alreadyActive) {
+      // Spy missed channel creation; can't assert on output.
+    } else {
+      assert.ok(
+        spy.captured.length > 0,
+        "expected output channel spy to capture messages from the Tally language server",
+      );
+      assertNoOutputChannelErrors(spy.captured);
+    }
+  } finally {
+    spy.restore();
+  }
 }
 
 module.exports = { run };

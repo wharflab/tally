@@ -675,6 +675,29 @@ func TestLSP_FormattingNoChanges(t *testing.T) {
 	assert.True(t, raw == nil || string(raw) == "null", "expected null response for clean document, got: %s", string(raw))
 }
 
+func TestLSP_CancelRequestNotification(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Send $/cancelRequest for a non-existent ID. The server should silently
+	// accept it (no error response) instead of returning "method not supported".
+	type cancelParams struct {
+		ID int64 `json:"id"`
+	}
+	err := ts.conn.Notify(ctx, "$/cancelRequest", &cancelParams{ID: 99999})
+	require.NoError(t, err)
+
+	// Send a real request afterwards to verify the server is still healthy.
+	uri := "file:///tmp/test-cancel-request/Dockerfile"
+	ts.openDocument(t, uri, "FROM alpine:3.18\nMAINTAINER test@example.com\n")
+	diag := ts.waitDiagnostics(t)
+	assert.NotEmpty(t, diag.Diagnostics, "server should still work after $/cancelRequest")
+}
+
 func TestLSP_MethodNotFound(t *testing.T) {
 	t.Parallel()
 	ts := startTestServer(t)

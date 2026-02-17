@@ -72,12 +72,18 @@ func (s *Server) handleDidChangeConfiguration(
 	}
 
 	// Pull model: request a refresh so the client re-pulls diagnostics.
+	// Run asynchronously to avoid blocking the message delivery goroutine,
+	// which could deadlock if the client needs to send requests before
+	// responding to the refresh.
 	if s.diagnosticRefreshSupported() {
-		reqCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-		if err := s.conn.Call(reqCtx, string(protocol.MethodWorkspaceDiagnosticRefresh), nil).Await(reqCtx, nil); err != nil {
-			log.Printf("lsp: workspace/diagnostic/refresh failed: %v", err)
-		}
+		conn := s.conn
+		go func() { //nolint:contextcheck // intentionally detached; outlives the notification handler
+			refreshCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			if err := conn.Call(refreshCtx, string(protocol.MethodWorkspaceDiagnosticRefresh), nil).Await(refreshCtx, nil); err != nil {
+				log.Printf("lsp: workspace/diagnostic/refresh failed: %v", err)
+			}
+		}()
 	}
 }
 
