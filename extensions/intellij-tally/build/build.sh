@@ -120,18 +120,8 @@ extract_archive() {
 join_by() {
   local delimiter="$1"
   shift
-  local first=1
-  local out=""
-  local value
-  for value in "$@"; do
-    if [[ ${first} -eq 1 ]]; then
-      out="${value}"
-      first=0
-    else
-      out="${out}${delimiter}${value}"
-    fi
-  done
-  echo "${out}"
+  local IFS="${delimiter}"
+  echo "$*"
 }
 
 find_ide_home() {
