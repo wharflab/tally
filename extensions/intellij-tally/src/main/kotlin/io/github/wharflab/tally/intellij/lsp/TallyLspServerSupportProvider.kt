@@ -15,7 +15,7 @@ class TallyLspServerSupportProvider : LspServerSupportProvider {
         }
 
         val settings = TallySettings.current()
-        val command = TallyBinaryResolver.resolve(settings) ?: return
+        val command = TallyBinaryResolver.resolve(settings, project.basePath) ?: return
         serverStarter.ensureServerStarted(TallyLspServerDescriptor(project, command, settings))
     }
 }

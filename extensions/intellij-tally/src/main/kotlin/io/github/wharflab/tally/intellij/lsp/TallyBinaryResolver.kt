@@ -16,20 +16,20 @@ internal data class TallyCommand(
 internal object TallyBinaryResolver {
     private val SERVER_ARGS = listOf("lsp", "--stdio")
 
-    fun resolve(settings: TallyRuntimeSettings): TallyCommand? {
+    fun resolve(settings: TallyRuntimeSettings, projectBasePath: String?): TallyCommand? {
         if (settings.importStrategy == "useBundled") {
             resolveBundledBinary()?.let { return it }
             return null
         }
 
-        resolveExplicitPaths(settings.executablePaths)?.let { return it }
+        resolveExplicitPaths(settings.executablePaths, projectBasePath)?.let { return it }
         resolveFromPath()?.let { return it }
         return resolveBundledBinary()
     }
 
-    private fun resolveExplicitPaths(paths: List<String>): TallyCommand? {
+    private fun resolveExplicitPaths(paths: List<String>, projectBasePath: String?): TallyCommand? {
         for (raw in paths) {
-            val candidate = expandToPath(raw)
+            val candidate = expandToPath(raw, projectBasePath)
             if (!isUsableBinary(candidate)) {
                 continue
             }
@@ -73,7 +73,7 @@ internal object TallyBinaryResolver {
         )
     }
 
-    private fun expandToPath(raw: String): Path {
+    private fun expandToPath(raw: String, projectBasePath: String?): Path {
         val trimmed = raw.trim()
         if (trimmed == "~") {
             return Paths.get(System.getProperty("user.home")).toAbsolutePath()
@@ -86,6 +86,9 @@ internal object TallyBinaryResolver {
         val candidate = Paths.get(trimmed)
         if (candidate.isAbsolute) {
             return candidate
+        }
+        if (!projectBasePath.isNullOrBlank()) {
+            return Paths.get(projectBasePath).resolve(candidate).normalize().toAbsolutePath()
         }
         return candidate.toAbsolutePath()
     }
