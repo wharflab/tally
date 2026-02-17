@@ -7,7 +7,9 @@ plugin_until_build = "252.*"
 # We only need IDE jars for compilation/packaging; Linux archive works for all build hosts.
 # WebStorm is used as baseline because it bundles the platform LSP APIs.
 ide_archive_url = "https://download.jetbrains.com/webstorm/WebStorm-2025.2.3.tar.gz"
+ide_archive_sha256 = "00c82eded289fbd6fdb170314b4402d508175dffcbe1d7ffcc8370da6b400e71"
 kotlin_compiler_url = "https://github.com/JetBrains/kotlin/releases/download/v2.2.21/kotlin-compiler-2.2.21.zip"
+kotlin_compiler_sha256 = "a623871f1cd9c938946948b70ef9170879f0758043885bbd30c32f024e511714"
 jvm_target = "21"
 
 # Optional: configure JetBrains plugin verifier for `make intellij-plugin-verify`.

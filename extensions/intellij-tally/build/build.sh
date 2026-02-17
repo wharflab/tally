@@ -38,10 +38,40 @@ require_cmd() {
   fi
 }
 
+sha256_file() {
+  local file="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "${file}" | awk '{print $1}'
+    return 0
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "${file}" | awk '{print $1}'
+    return 0
+  fi
+  echo "required command not found: sha256sum or shasum" >&2
+  exit 1
+}
+
+verify_sha256() {
+  local file="$1"
+  local expected="$2"
+  if [[ -z "${expected}" ]]; then
+    return 0
+  fi
+  local actual
+  actual="$(sha256_file "${file}")"
+  if [[ "${actual}" != "${expected}" ]]; then
+    echo "checksum mismatch for ${file}: expected ${expected}, got ${actual}" >&2
+    return 1
+  fi
+}
+
 download_if_missing() {
   local url="$1"
   local out="$2"
+  local expected_sha256="${3:-}"
   if [[ -f "${out}" ]]; then
+    verify_sha256 "${out}" "${expected_sha256}"
     return 0
   fi
   local tmp="${out}.tmp.$$"
@@ -58,6 +88,10 @@ download_if_missing() {
     --max-time "${TALLY_INTELLIJ_CURL_MAX_TIME:-1800}" \
     "${url}" \
     -o "${tmp}"; then
+    rm -f "${tmp}"
+    return 1
+  fi
+  if ! verify_sha256 "${tmp}" "${expected_sha256}"; then
     rm -f "${tmp}"
     return 1
   fi
@@ -131,15 +165,17 @@ prepare_toolchains() {
   mkdir -p "${CACHE_DIR}" "${DIST_DIR}" "${OUT_DIR}"
 
   IDE_ARCHIVE_URL="$(read_version ide_archive_url)"
+  IDE_ARCHIVE_SHA256="$(read_optional_version ide_archive_sha256)"
   KOTLIN_COMPILER_URL="$(read_version kotlin_compiler_url)"
+  KOTLIN_COMPILER_SHA256="$(read_optional_version kotlin_compiler_sha256)"
 
   IDE_ARCHIVE="${CACHE_DIR}/$(basename "${IDE_ARCHIVE_URL}")"
   KOTLIN_ARCHIVE="${CACHE_DIR}/$(basename "${KOTLIN_COMPILER_URL}")"
   IDE_EXTRACT_DIR="${CACHE_DIR}/ide"
   KOTLIN_EXTRACT_DIR="${CACHE_DIR}/kotlin"
 
-  download_if_missing "${IDE_ARCHIVE_URL}" "${IDE_ARCHIVE}"
-  download_if_missing "${KOTLIN_COMPILER_URL}" "${KOTLIN_ARCHIVE}"
+  download_if_missing "${IDE_ARCHIVE_URL}" "${IDE_ARCHIVE}" "${IDE_ARCHIVE_SHA256}"
+  download_if_missing "${KOTLIN_COMPILER_URL}" "${KOTLIN_ARCHIVE}" "${KOTLIN_COMPILER_SHA256}"
 
   if [[ ! -f "${IDE_EXTRACT_DIR}/.source" ]] || [[ "$(cat "${IDE_EXTRACT_DIR}/.source")" != "${IDE_ARCHIVE}" ]]; then
     extract_archive "${IDE_ARCHIVE}" "${IDE_EXTRACT_DIR}"
