@@ -141,7 +141,7 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 	// Lifecycle
 	case "initialize":
 		return unmarshalAndCall(req, s.handleInitialize)
-	case "initialized", "$/setTrace", "$/cancelRequest", "$/progress":
+	case string(protocol.MethodInitialized), string(protocol.MethodSetTrace), string(protocol.MethodCancelRequest), string(protocol.MethodProgress):
 		return nil, nil //nolint:nilnil // LSP: notifications have no result
 	case "shutdown":
 		return jsonNull, nil
