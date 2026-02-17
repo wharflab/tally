@@ -31,7 +31,7 @@ download_if_missing() {
     return 0
   fi
   local tmp="${out}.tmp.$$"
-  echo "downloading ${url}"
+  echo "downloading ${url}" >&2
   rm -f "${tmp}"
   if ! curl \
     --fail \
@@ -79,7 +79,7 @@ ensure_plugin_zip() {
   plugin_version="$(read_version plugin_version)"
   plugin_zip="${EXT_DIR}/dist/tally-intellij-plugin-${plugin_version}.zip"
   if [[ ! -f "${plugin_zip}" ]]; then
-    bash "${SCRIPT_DIR}/build.sh" build
+    bash "${SCRIPT_DIR}/build.sh" build >&2
   fi
   echo "${plugin_zip}"
 }
