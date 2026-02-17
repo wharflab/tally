@@ -167,15 +167,22 @@ build_plugin() {
   rm -rf "${classes_dir}" "${package_root}" "${plugin_zip}"
   mkdir -p "${classes_dir}" "${plugin_dir}/lib"
 
-  local -a classpath_entries
-  mapfile -t classpath_entries < <(find "${IDE_HOME}/lib" -maxdepth 1 -type f -name '*.jar' | sort)
+  local -a classpath_entries=()
+  local jar_path
+  while IFS= read -r jar_path; do
+    classpath_entries+=("${jar_path}")
+  done < <(find "${IDE_HOME}/lib" -maxdepth 1 -type f -name '*.jar' | sort)
   if [[ -d "${IDE_HOME}/plugins/lsp/lib" ]]; then
-    local -a lsp_jars
-    mapfile -t lsp_jars < <(find "${IDE_HOME}/plugins/lsp/lib" -maxdepth 1 -type f -name '*.jar' | sort)
+    local -a lsp_jars=()
+    while IFS= read -r jar_path; do
+      lsp_jars+=("${jar_path}")
+    done < <(find "${IDE_HOME}/plugins/lsp/lib" -maxdepth 1 -type f -name '*.jar' | sort)
     classpath_entries+=("${lsp_jars[@]}")
   fi
   classpath_entries+=("${KOTLIN_HOME}/lib/kotlin-stdlib.jar")
-  classpath_entries+=("${KOTLIN_HOME}/lib/kotlin-stdlib-jdk8.jar")
+  if [[ -f "${KOTLIN_HOME}/lib/kotlin-stdlib-jdk8.jar" ]]; then
+    classpath_entries+=("${KOTLIN_HOME}/lib/kotlin-stdlib-jdk8.jar")
+  fi
 
   local classpath
   classpath="$(join_by ":" "${classpath_entries[@]}")"
