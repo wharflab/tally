@@ -24,28 +24,24 @@ internal object TallySettings {
         )
     }
 
-    fun initializationOptions(settings: TallyRuntimeSettings): Map<String, Any?> {
-        return mapOf("tally" to lspEnvelope(settings))
-    }
+    fun initializationOptions(settings: TallyRuntimeSettings): Map<String, Any?> = mapOf("tally" to lspEnvelope(settings))
 
-    fun workspaceConfiguration(settings: TallyRuntimeSettings): Map<String, Any?> {
-        return lspEnvelope(settings)
-    }
+    fun workspaceConfiguration(settings: TallyRuntimeSettings): Map<String, Any?> = lspEnvelope(settings)
 
-    private fun lspEnvelope(settings: TallyRuntimeSettings): Map<String, Any?> {
-        return mapOf(
+    private fun lspEnvelope(settings: TallyRuntimeSettings): Map<String, Any?> =
+        mapOf(
             "version" to 1,
-            "global" to mapOf(
-                "enable" to true,
-                "path" to settings.executablePaths,
-                "importStrategy" to settings.importStrategy,
-                "configuration" to settings.configurationOverride,
-                "configurationPreference" to "editorFirst",
-                "fixUnsafe" to settings.fixUnsafe,
-            ),
+            "global" to
+                mapOf(
+                    "enable" to true,
+                    "path" to settings.executablePaths,
+                    "importStrategy" to settings.importStrategy,
+                    "configuration" to settings.configurationOverride,
+                    "configurationPreference" to "editorFirst",
+                    "fixUnsafe" to settings.fixUnsafe,
+                ),
             "workspaces" to emptyList<Map<String, Any?>>(),
         )
-    }
 
     private fun readExecutablePaths(): List<String> {
         val explicitPaths = System.getProperty("tally.executablePaths")
@@ -66,17 +62,16 @@ internal object TallySettings {
         return emptyList()
     }
 
-    private fun splitList(raw: String): List<String> {
-        return raw.split(",")
+    private fun splitList(raw: String): List<String> =
+        raw
+            .split(",")
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-    }
 
-    private fun normalizeImportStrategy(raw: String?): String {
-        return if (raw == IMPORT_STRATEGY_USE_BUNDLED) {
+    private fun normalizeImportStrategy(raw: String?): String =
+        if (raw == IMPORT_STRATEGY_USE_BUNDLED) {
             IMPORT_STRATEGY_USE_BUNDLED
         } else {
             IMPORT_STRATEGY_FROM_ENVIRONMENT
         }
-    }
 }

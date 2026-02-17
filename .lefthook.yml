@@ -30,6 +30,13 @@ pre-commit:
       run: bunx -y -q oxfmt --no-error-on-unmatched-pattern --write {staged_files}
       stage_fixed: true
       root: extensions/vscode-tally
+    ktlint-format:
+      glob: "extensions/intellij-tally/src/main/kotlin/**/*.kt"
+      run: bash extensions/intellij-tally/build/ktlint.sh --format {staged_files}
+      stage_fixed: true
+    ktlint-lint:
+      glob: "extensions/intellij-tally/src/main/kotlin/**/*.kt"
+      run: bash extensions/intellij-tally/build/ktlint.sh {staged_files}
     taplo:
       glob: "**/*.toml"
       run: bunx -y -q @taplo/cli format {staged_files}

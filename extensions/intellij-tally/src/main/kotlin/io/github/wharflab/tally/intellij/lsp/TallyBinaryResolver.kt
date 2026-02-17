@@ -16,7 +16,10 @@ internal data class TallyCommand(
 internal object TallyBinaryResolver {
     private val SERVER_ARGS = listOf("lsp", "--stdio")
 
-    fun resolve(settings: TallyRuntimeSettings, projectBasePath: String?): TallyCommand? {
+    fun resolve(
+        settings: TallyRuntimeSettings,
+        projectBasePath: String?,
+    ): TallyCommand? {
         if (settings.importStrategy == "useBundled") {
             resolveBundledBinary()?.let { return it }
             return null
@@ -27,7 +30,10 @@ internal object TallyBinaryResolver {
         return resolveBundledBinary()
     }
 
-    private fun resolveExplicitPaths(paths: List<String>, projectBasePath: String?): TallyCommand? {
+    private fun resolveExplicitPaths(
+        paths: List<String>,
+        projectBasePath: String?,
+    ): TallyCommand? {
         for (raw in paths) {
             val candidate = expandToPath(raw, projectBasePath)
             if (!isUsableBinary(candidate)) {
@@ -44,15 +50,17 @@ internal object TallyBinaryResolver {
     }
 
     private fun resolveBundledBinary(): TallyCommand? {
-        val descriptor = PluginUtils.getPluginDescriptorOrPlatformByClassName(
-            TallyBinaryResolver::class.java.name,
-        ) ?: return null
+        val descriptor =
+            PluginUtils.getPluginDescriptorOrPlatformByClassName(
+                TallyBinaryResolver::class.java.name,
+            ) ?: return null
         val binaryName = if (SystemInfo.isWindows) "tally.exe" else "tally"
-        val candidate = descriptor.pluginPath
-            .resolve("bin")
-            .resolve(platformFolder())
-            .resolve(normalizeArch())
-            .resolve(binaryName)
+        val candidate =
+            descriptor.pluginPath
+                .resolve("bin")
+                .resolve(platformFolder())
+                .resolve(normalizeArch())
+                .resolve(binaryName)
         if (!isUsableBinary(candidate)) {
             return null
         }
@@ -66,14 +74,16 @@ internal object TallyBinaryResolver {
         return SystemInfo.isWindows || Files.isExecutable(path)
     }
 
-    private fun asCommand(path: Path): TallyCommand {
-        return TallyCommand(
+    private fun asCommand(path: Path): TallyCommand =
+        TallyCommand(
             executable = path.absolutePathString(),
             args = SERVER_ARGS,
         )
-    }
 
-    private fun expandToPath(raw: String, projectBasePath: String?): Path {
+    private fun expandToPath(
+        raw: String,
+        projectBasePath: String?,
+    ): Path {
         val trimmed = raw.trim()
         if (trimmed == "~") {
             return Paths.get(System.getProperty("user.home")).toAbsolutePath()
@@ -88,18 +98,21 @@ internal object TallyBinaryResolver {
             return candidate
         }
         if (!projectBasePath.isNullOrBlank()) {
-            return Paths.get(projectBasePath).resolve(candidate).normalize().toAbsolutePath()
+            return Paths
+                .get(projectBasePath)
+                .resolve(candidate)
+                .normalize()
+                .toAbsolutePath()
         }
         return candidate.toAbsolutePath()
     }
 
-    private fun platformFolder(): String {
-        return when {
+    private fun platformFolder(): String =
+        when {
             SystemInfo.isWindows -> "windows"
             SystemInfo.isMac -> "darwin"
             else -> "linux"
         }
-    }
 
     private fun normalizeArch(): String {
         val arch = System.getProperty("os.arch").lowercase()

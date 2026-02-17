@@ -131,7 +131,7 @@ patch_plugin_xml() {
   local since_build="$4"
   local until_build="$5"
   sed -i.bak \
-  sed -i.bak \
+    -e "s|@PLUGIN_ID@|${plugin_id}|g" \
     -e "s|@PLUGIN_VERSION@|${plugin_version}|g" \
     -e "s|@SINCE_BUILD@|${since_build}|g" \
     -e "s|@UNTIL_BUILD@|${until_build}|g" \

@@ -21,9 +21,7 @@ internal class TallyLspServerDescriptor(
         return commandLine
     }
 
-    override fun createInitializationOptions(): Any {
-        return TallySettings.initializationOptions(settings)
-    }
+    override fun createInitializationOptions(): Any = TallySettings.initializationOptions(settings)
 
     override fun getWorkspaceConfiguration(item: ConfigurationItem): Any? {
         if (item.section != null && item.section != "tally") {
@@ -35,9 +33,10 @@ internal class TallyLspServerDescriptor(
     override val clientCapabilities: ClientCapabilities
         get() {
             val capabilities = super.clientCapabilities
-            capabilities.workspace = (capabilities.workspace ?: WorkspaceClientCapabilities()).apply {
-                configuration = true
-            }
+            capabilities.workspace =
+                (capabilities.workspace ?: WorkspaceClientCapabilities()).apply {
+                    configuration = true
+                }
             return capabilities
         }
 }

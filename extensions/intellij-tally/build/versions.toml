@@ -13,6 +13,7 @@ ide_archive_sha256 = "00c82eded289fbd6fdb170314b4402d508175dffcbe1d7ffcc8370da6b
 kotlin_compiler_url = "https://github.com/JetBrains/kotlin/releases/download/v2.2.21/kotlin-compiler-2.2.21.zip"
 kotlin_compiler_sha256 = "a623871f1cd9c938946948b70ef9170879f0758043885bbd30c32f024e511714"
 jvm_target = "21"
+ktlint_version = "1.5.0"
 
 # Optional: configure JetBrains plugin verifier for `make intellij-plugin-verify`.
 # plugin_verifier_url = "https://github.com/JetBrains/intellij-plugin-verifier/releases/download/1.398/intellij-plugin-verifier-cli-1.398-all.jar"
