@@ -44,7 +44,9 @@ download_if_missing() {
   local out="$2"
   local expected_sha256="${3:-}"
   if [[ -f "${out}" ]]; then
-    verify_sha256 "${out}" "${expected_sha256}"
+    if ! verify_sha256 "${out}" "${expected_sha256}"; then
+      return 1
+    fi
     return 0
   fi
   local tmp="${out}.tmp.$$"
