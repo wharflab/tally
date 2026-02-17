@@ -137,10 +137,12 @@ main() {
   ide_home="$(prepare_idea_community "${ide_archive_url}")"
 
   rm -f "${LOG_FILE}"
+  local verifier_rc=0
   java -jar "${verifier_jar}" check-plugin \
     -verification-reports-dir "${REPORTS_DIR}" \
     "${plugin_zip}" \
-    "${ide_home}" > "${LOG_FILE}" 2>&1 || true
+    "${ide_home}" > "${LOG_FILE}" 2>&1 || verifier_rc=$?
+  echo "plugin verifier exited with code ${verifier_rc}" >> "${LOG_FILE}"
 
   if ! grep -q "Scheduled verifications (1):" "${LOG_FILE}"; then
     echo "smoke check failed: plugin verifier did not schedule a CE verification" >&2
@@ -158,6 +160,12 @@ main() {
     echo "smoke check failed: unexpected compatibility issues were reported" >&2
     tail -n 120 "${LOG_FILE}" >&2
     exit 1
+  fi
+
+  if [[ "${verifier_rc}" -ne 0 ]]; then
+    echo "smoke check failed: plugin verifier exited with code ${verifier_rc}" >&2
+    tail -n 120 "${LOG_FILE}" >&2
+    exit "${verifier_rc}"
   fi
 
   echo "smoke check passed against IntelliJ IDEA Community Edition"
