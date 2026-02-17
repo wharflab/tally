@@ -14,7 +14,7 @@ internal object TallySettings {
     fun current(): TallyRuntimeSettings {
         val executablePaths = readExecutablePaths()
         val importStrategy = normalizeImportStrategy(System.getProperty("tally.importStrategy"))
-        val fixUnsafe = System.getProperty("tally.fixUnsafe")?.toBooleanStrictOrNull() ?: false
+        val fixUnsafe = System.getProperty("tally.fixUnsafe")?.toBoolean() ?: false
         val configurationOverride = System.getProperty("tally.configurationOverride")?.ifBlank { null }
         return TallyRuntimeSettings(
             executablePaths = executablePaths,
