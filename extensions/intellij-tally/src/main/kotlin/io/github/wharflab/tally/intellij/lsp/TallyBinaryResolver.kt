@@ -177,7 +177,12 @@ internal object TallyBinaryResolver {
             return Paths.get(System.getProperty("user.home"), suffix).toAbsolutePath()
         }
 
-        val candidate = Paths.get(trimmed)
+        val candidate =
+            try {
+                Paths.get(trimmed)
+            } catch (_: InvalidPathException) {
+                return null
+            }
         if (candidate.isAbsolute) {
             return candidate
         }
