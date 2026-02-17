@@ -5,6 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VERSIONS_FILE="${SCRIPT_DIR}/versions.toml"
+LIB_FILE="${SCRIPT_DIR}/lib.sh"
 
 SMOKE_DIR="${EXT_DIR}/.cache/smoke"
 REPORTS_DIR="${SMOKE_DIR}/reports"
@@ -13,42 +14,12 @@ LOG_FILE="${SMOKE_DIR}/verifier-ic.log"
 DEFAULT_IDE_ARCHIVE_URL="https://download.jetbrains.com/idea/ideaIC-2025.2.3.tar.gz"
 DEFAULT_PLUGIN_VERIFIER_URL="https://github.com/JetBrains/intellij-plugin-verifier/releases/download/1.400/verifier-cli-1.400-all.jar"
 
-read_version() {
-  local key="$1"
-  local line
-  line="$(grep -E "^${key}[[:space:]]*=" "${VERSIONS_FILE}" | head -n 1 || true)"
-  if [[ -z "${line}" ]]; then
-    echo "missing required key in versions.toml: ${key}" >&2
-    exit 1
-  fi
-  echo "${line#*=}" | sed -E 's/^[[:space:]]*//; s/[[:space:]]*$//; s/^"//; s/"$//'
-}
-
-download_if_missing() {
-  local url="$1"
-  local out="$2"
-  if [[ -f "${out}" ]]; then
-    return 0
-  fi
-  local tmp="${out}.tmp.$$"
-  echo "downloading ${url}" >&2
-  rm -f "${tmp}"
-  if ! curl \
-    --fail \
-    --location \
-    --silent \
-    --show-error \
-    --retry 5 \
-    --retry-delay 2 \
-    --connect-timeout "${TALLY_INTELLIJ_CURL_CONNECT_TIMEOUT:-30}" \
-    --max-time "${TALLY_INTELLIJ_CURL_MAX_TIME:-1800}" \
-    "${url}" \
-    -o "${tmp}"; then
-    rm -f "${tmp}"
-    return 1
-  fi
-  mv "${tmp}" "${out}"
-}
+if [[ ! -f "${LIB_FILE}" ]]; then
+  echo "required helper script not found: ${LIB_FILE}" >&2
+  exit 1
+fi
+# shellcheck source=lib.sh
+source "${LIB_FILE}"
 
 ensure_valid_jar() {
   local jar_path="$1"
