@@ -1,6 +1,6 @@
 ---
 name: pr-comment
-description: handling GitHub PR comments with proper relies
+description: handling GitHub PR comments with proper replies
 argument-hint: comment link (e.g. https://github.com/wharflab/tally/pull/134#discussion_r2815672223)
 ---
 
