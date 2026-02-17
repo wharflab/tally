@@ -1,3 +1,9 @@
+---
+name: pr-comment
+description: handling GitHub PR comments with proper relies
+argument-hint: comment link (e.g. https://github.com/wharflab/tally/pull/134#discussion_r2815672223)
+---
+
 # PR Comment Handler
 
 You are handling a GitHub PR review comment. Follow this procedure exactly:
@@ -40,10 +46,11 @@ Display this information to the user.
 
 **CRITICAL RULES:**
 
-- Treat EVERY remark as mandatory, even "nitpicks"
-- Apply ALL suggestions immediately
-- NO TODOs, NO placeholders, NO deferred fixes
-- Read the relevant files and make the exact changes requested
+- Verify each finding against the current code and only fix it if confirmed by code.
+- Ideally, start with adding a regression test if comment is about a potential bug
+- If user is giving you a link to "nitpicks" comment that means it is MANDATORY to fix in this PR
+- NO TODOs, NO placeholders, NO deferred fixes, NO linting disabling comments
+- Read the relevant files and make the changes requested
 - If the comment references multiple issues, fix all of them
 - If unclear, make your best judgment and proceed
 
@@ -78,6 +85,9 @@ Replace:
 
 - `<short-sha>` with the 7-character commit hash
 - `<author>` with the comment author’s username
+
+IMPORTANT: the above API WORKS! If you are getting 404 or similar error - verify that you've
+built the URL correctly, don't fallback to post a generic comment on PR!
 
 ## Output Format
 
