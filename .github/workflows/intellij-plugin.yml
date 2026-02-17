@@ -35,6 +35,13 @@ jobs:
           java-version: "21"
       - name: Build tally
         run: make build
+      - name: Cache IntelliJ build toolchains
+        uses: actions/cache@v4
+        with:
+          path: extensions/intellij-tally/.cache
+          key: intellij-toolchain-${{ runner.os }}-${{ hashFiles('extensions/intellij-tally/build/versions.toml') }}
+          restore-keys: |
+            intellij-toolchain-${{ runner.os }}-
       - name: Build IntelliJ plugin
         run: make intellij-plugin
       - name: IntelliJ Community smoke check
