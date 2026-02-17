@@ -1,5 +1,6 @@
 package io.github.wharflab.tally.intellij.lsp
 
+import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.LspServerSupportProvider
@@ -15,7 +16,8 @@ class TallyLspServerSupportProvider : LspServerSupportProvider {
         }
 
         val settings = TallySettings.current()
-        val command = TallyBinaryResolver.resolve(settings, project.basePath) ?: return
+        val command =
+            TallyBinaryResolver.resolve(settings, project.basePath, TrustedProjects.isProjectTrusted(project)) ?: return
         serverStarter.ensureServerStarted(TallyLspServerDescriptor(project, command, settings))
     }
 }

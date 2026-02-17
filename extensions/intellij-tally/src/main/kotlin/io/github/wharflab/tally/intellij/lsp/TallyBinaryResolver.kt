@@ -19,23 +19,27 @@ internal object TallyBinaryResolver {
     fun resolve(
         settings: TallyRuntimeSettings,
         projectBasePath: String?,
+        isTrustedProject: Boolean,
     ): TallyCommand? {
         if (settings.importStrategy == "useBundled") {
             resolveBundledBinary()?.let { return it }
             return null
         }
 
-        resolveExplicitPaths(settings.executablePaths, projectBasePath)?.let { return it }
-        resolveFromPath()?.let { return it }
+        resolveExplicitPaths(settings.executablePaths, projectBasePath, isTrustedProject)?.let { return it }
+        if (isTrustedProject) {
+            resolveFromPath()?.let { return it }
+        }
         return resolveBundledBinary()
     }
 
     private fun resolveExplicitPaths(
         paths: List<String>,
         projectBasePath: String?,
+        isTrustedProject: Boolean,
     ): TallyCommand? {
         for (raw in paths) {
-            val candidate = expandToPath(raw, projectBasePath)
+            val candidate = expandToPath(raw, projectBasePath, isTrustedProject) ?: continue
             if (!isUsableBinary(candidate)) {
                 continue
             }
@@ -83,7 +87,8 @@ internal object TallyBinaryResolver {
     private fun expandToPath(
         raw: String,
         projectBasePath: String?,
-    ): Path {
+        isTrustedProject: Boolean,
+    ): Path? {
         val trimmed = raw.trim()
         if (trimmed == "~") {
             return Paths.get(System.getProperty("user.home")).toAbsolutePath()
@@ -96,6 +101,9 @@ internal object TallyBinaryResolver {
         val candidate = Paths.get(trimmed)
         if (candidate.isAbsolute) {
             return candidate
+        }
+        if (!isTrustedProject) {
+            return null
         }
         if (!projectBasePath.isNullOrBlank()) {
             return Paths
