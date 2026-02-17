@@ -1,0 +1,19 @@
+<idea-plugin>
+    <id>io.github.wharflab.tally.intellij</id>
+    <name>Tally</name>
+    <version>@PLUGIN_VERSION@</version>
+    <vendor email="opensource@wharflab.com" url="https://github.com/wharflab/tally">WharfLab</vendor>
+    <description><![CDATA[
+      IntelliJ Platform plugin for tally, powered by <code>tally lsp --stdio</code>.
+    ]]></description>
+
+    <idea-version since-build="@SINCE_BUILD@" until-build="@UNTIL_BUILD@"/>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.lsp</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <platform.lsp.serverSupportProvider
+                implementation="io.github.wharflab.tally.intellij.lsp.TallyLspServerSupportProvider"/>
+    </extensions>
+</idea-plugin>

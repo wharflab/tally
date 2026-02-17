@@ -1,4 +1,4 @@
-.PHONY: build test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema lsp-protocol print-gotestsum-bin
+.PHONY: build intellij-plugin intellij-plugin-verify test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema lsp-protocol print-gotestsum-bin
 
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
@@ -8,6 +8,12 @@ BUILDTAGS := containers_image_openpgp,containers_image_storage_stub,containers_i
 
 build:
 	GOSUMDB=sum.golang.org CGO_ENABLED=0 go build -tags '$(BUILDTAGS)' -ldflags "-s -w" -o tally
+
+intellij-plugin:
+	bash extensions/intellij-tally/build/build.sh build
+
+intellij-plugin-verify:
+	bash extensions/intellij-tally/build/build.sh verify
 
 GOTESTSUM_VERSION := v1.13.0
 GOLANGCI_LINT_VERSION := v2.9.0

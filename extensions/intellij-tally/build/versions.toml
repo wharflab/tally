@@ -1,0 +1,14 @@
+plugin_id = "io.github.wharflab.tally.intellij"
+plugin_name = "Tally"
+plugin_version = "0.1.0-dev"
+plugin_since_build = "252.25557"
+plugin_until_build = "252.*"
+
+# We only need IDE jars for compilation/packaging; Linux archive works for all build hosts.
+# WebStorm is used as baseline because it bundles the platform LSP APIs.
+ide_archive_url = "https://download.jetbrains.com/webstorm/WebStorm-2025.2.3.tar.gz"
+kotlin_compiler_url = "https://github.com/JetBrains/kotlin/releases/download/v2.2.21/kotlin-compiler-2.2.21.zip"
+jvm_target = "21"
+
+# Optional: configure JetBrains plugin verifier for `make intellij-plugin-verify`.
+# plugin_verifier_url = "https://github.com/JetBrains/intellij-plugin-verifier/releases/download/1.398/intellij-plugin-verifier-cli-1.398-all.jar"
