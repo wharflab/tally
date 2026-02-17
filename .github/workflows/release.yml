@@ -247,6 +247,7 @@ jobs:
   build-intellij-plugin:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       VERSION: ${{ inputs.version || github.ref_name }}
     steps:
