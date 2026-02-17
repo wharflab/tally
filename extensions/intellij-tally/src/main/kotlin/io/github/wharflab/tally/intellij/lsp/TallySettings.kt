@@ -43,24 +43,20 @@ internal object TallySettings {
             "workspaces" to emptyList<Map<String, Any?>>(),
         )
 
-    private fun readExecutablePaths(): List<String> {
-        val explicitPaths = System.getProperty("tally.executablePaths")
-        if (!explicitPaths.isNullOrBlank()) {
-            return splitList(explicitPaths)
-        }
-
-        val explicitSingle = System.getProperty("tally.path")
-        if (!explicitSingle.isNullOrBlank()) {
-            return listOf(explicitSingle.trim())
-        }
-
-        val envPaths = System.getenv("TALLY_EXECUTABLE_PATHS")
-        if (!envPaths.isNullOrBlank()) {
-            return splitList(envPaths)
-        }
-
-        return emptyList()
-    }
+    private fun readExecutablePaths(): List<String> =
+        System
+            .getProperty("tally.executablePaths")
+            ?.takeIf { it.isNotBlank() }
+            ?.let(::splitList)
+            ?: System
+                .getProperty("tally.path")
+                ?.takeIf { it.isNotBlank() }
+                ?.let { listOf(it.trim()) }
+            ?: System
+                .getenv("TALLY_EXECUTABLE_PATHS")
+                ?.takeIf { it.isNotBlank() }
+                ?.let(::splitList)
+            ?: emptyList()
 
     private fun splitList(raw: String): List<String> =
         raw
