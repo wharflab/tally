@@ -118,7 +118,7 @@ func (p *cancelPreempter) Preempt(_ context.Context, req *jsonrpc2.Request) (any
 	}
 
 	var params cancelRequestParams
-	if err := stdjson.Unmarshal(req.Params, &params); err != nil {
+	if err := jsonv2.Unmarshal(req.Params, &params); err != nil {
 		return nil, nil //nolint:nilerr,nilnil // malformed cancel — intentionally ignored
 	}
 
@@ -141,7 +141,10 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 	// Lifecycle
 	case "initialize":
 		return unmarshalAndCall(req, s.handleInitialize)
-	case string(protocol.MethodInitialized), string(protocol.MethodSetTrace), string(protocol.MethodCancelRequest), string(protocol.MethodProgress):
+	case string(protocol.MethodInitialized),
+		string(protocol.MethodSetTrace),
+		string(protocol.MethodCancelRequest),
+		string(protocol.MethodProgress):
 		return nil, nil //nolint:nilnil // LSP: notifications have no result
 	case "shutdown":
 		return jsonNull, nil
