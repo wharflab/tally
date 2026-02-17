@@ -338,6 +338,116 @@ func TestLSP_NoPushDiagnosticsWhenClientSupportsPull(t *testing.T) {
 	}), "expected JSONArgsRecommended in pull diagnostics")
 }
 
+func TestLSP_CodeActionInPullDiagnosticsMode(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+
+	// Initialize with pull-diagnostics capability (like VSCode extension with disablePushDiagnostics).
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var result initializeResult
+	err := ts.conn.Call(ctx, "initialize", &initializeParams{
+		ProcessID:    nil,
+		RootURI:      nil,
+		Capabilities: jsontext.Value(`{"textDocument":{"diagnostic":{}}}`),
+		ClientInfo: &clientInfo{
+			Name:    "tally-lsptest",
+			Version: "1.0.0",
+		},
+	}).Await(ctx, &result)
+	require.NoError(t, err)
+	require.NoError(t, ts.conn.Notify(ctx, "initialized", struct{}{}))
+
+	uri := "file:///tmp/test-pull-codeaction/Dockerfile"
+	ts.openDocument(t, uri, "FROM alpine:3.18\nMAINTAINER test@example.com\n")
+
+	// Verify no push diagnostics are sent.
+	select {
+	case d := <-ts.diagnosticsCh:
+		t.Fatalf("unexpected push diagnostics: %+v", d)
+	case <-time.After(500 * time.Millisecond):
+	}
+
+	// Pull diagnostics.
+	ctx2, cancel2 := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel2()
+
+	var report fullDocumentDiagnosticReport
+	err = ts.conn.Call(ctx2, "textDocument/diagnostic", &documentDiagnosticParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+	}).Await(ctx2, &report)
+	require.NoError(t, err)
+	require.Equal(t, "full", report.Kind)
+	require.NotEmpty(t, report.Items)
+
+	// Find the MaintainerDeprecated diagnostic from pull response.
+	idx := slices.IndexFunc(report.Items, func(d diagnostic) bool {
+		return d.Code == "buildkit/MaintainerDeprecated"
+	})
+	require.GreaterOrEqual(t, idx, 0, "expected MaintainerDeprecated in pull diagnostics")
+	maintainerDiag := &report.Items[idx]
+
+	// Request code actions with the pulled diagnostic (like VSCode does).
+	ctx3, cancel3 := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel3()
+
+	var actions []codeAction
+	err = ts.conn.Call(ctx3, "textDocument/codeAction", &codeActionParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+		Range:        maintainerDiag.Range,
+		Context: codeActionContext{
+			Diagnostics: []diagnostic{*maintainerDiag},
+			Only:        []string{"quickfix"},
+		},
+	}).Await(ctx3, &actions)
+	require.NoError(t, err)
+
+	require.NotEmpty(t, actions, "expected quick-fix code actions in pull diagnostics mode")
+	assert.Equal(t, "quickfix", actions[0].Kind)
+	assert.NotNil(t, actions[0].Edit, "code action should include an edit")
+}
+
+func TestLSP_CodeActionForAsyncFix(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	uri := "file:///tmp/test-codeaction-async/Dockerfile"
+	// Three consecutive RUN instructions trigger tally/prefer-run-heredoc (NeedsResolve fix).
+	ts.openDocument(t, uri, "FROM alpine:3.18\nRUN apk add curl\nRUN apk add git\nRUN apk add jq\n")
+
+	diag := ts.waitDiagnostics(t)
+	require.NotEmpty(t, diag.Diagnostics)
+
+	// Find the prefer-run-heredoc diagnostic.
+	idx := slices.IndexFunc(diag.Diagnostics, func(d diagnostic) bool {
+		return d.Code == "tally/prefer-run-heredoc"
+	})
+	require.GreaterOrEqual(t, idx, 0, "expected tally/prefer-run-heredoc diagnostic")
+	heredocDiag := &diag.Diagnostics[idx]
+
+	// Request code actions for the heredoc diagnostic.
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var actions []codeAction
+	err := ts.conn.Call(ctx, "textDocument/codeAction", &codeActionParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+		Range:        heredocDiag.Range,
+		Context: codeActionContext{
+			Diagnostics: []diagnostic{*heredocDiag},
+			Only:        []string{"quickfix"},
+		},
+	}).Await(ctx, &actions)
+	require.NoError(t, err)
+
+	require.NotEmpty(t, actions, "expected quick-fix code actions for NeedsResolve fix (prefer-run-heredoc)")
+	assert.Equal(t, "quickfix", actions[0].Kind)
+	assert.NotNil(t, actions[0].Edit, "code action should include an edit")
+	assert.Contains(t, actions[0].Title, "heredoc", "code action title should mention heredoc")
+}
+
 func TestLSP_PullDiagnosticsForOpenDocument(t *testing.T) {
 	t.Parallel()
 	ts := startTestServer(t)
