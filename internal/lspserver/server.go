@@ -113,7 +113,7 @@ type cancelRequestParams struct {
 }
 
 func (p *cancelPreempter) Preempt(_ context.Context, req *jsonrpc2.Request) (any, error) {
-	if req.Method != "$/cancelRequest" {
+	if req.Method != string(protocol.MethodCancelRequest) {
 		return nil, jsonrpc2.ErrNotHandled
 	}
 
