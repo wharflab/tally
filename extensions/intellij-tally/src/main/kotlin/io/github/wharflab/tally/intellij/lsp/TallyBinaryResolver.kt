@@ -3,7 +3,9 @@ package io.github.wharflab.tally.intellij.lsp
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
 import com.intellij.ide.plugins.PluginUtils
 import com.intellij.openapi.util.SystemInfo
+import java.io.IOException
 import java.nio.file.Files
+import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.io.path.absolutePathString
@@ -19,6 +21,7 @@ internal object TallyBinaryResolver {
     fun resolve(
         settings: TallyRuntimeSettings,
         projectBasePath: String?,
+        projectSdkHomePath: String?,
         isTrustedProject: Boolean,
     ): TallyCommand? {
         if (settings.importStrategy == "useBundled") {
@@ -29,6 +32,8 @@ internal object TallyBinaryResolver {
         resolveExplicitPaths(settings.executablePaths, projectBasePath, isTrustedProject)?.let { return it }
         if (isTrustedProject) {
             resolveFromPath()?.let { return it }
+            resolveFromInterpreterDirectory(projectSdkHomePath)?.let { return it }
+            resolveFromProjectVenv(projectBasePath)?.let { return it }
         }
         return resolveBundledBinary()
     }
@@ -51,6 +56,80 @@ internal object TallyBinaryResolver {
     private fun resolveFromPath(): TallyCommand? {
         val binary = PathEnvironmentVariableUtil.findInPath("tally") ?: return null
         return asCommand(binary.toPath())
+    }
+
+    private fun resolveFromInterpreterDirectory(projectSdkHomePath: String?): TallyCommand? {
+        if (projectSdkHomePath.isNullOrBlank()) {
+            return null
+        }
+        val interpreterPath =
+            try {
+                Paths.get(projectSdkHomePath)
+            } catch (_: InvalidPathException) {
+                return null
+            }
+        val interpreterDirectory = interpreterPath.parent ?: return null
+        val binary = findExecutableIgnoringExtension(interpreterDirectory, "tally") ?: return null
+        return asCommand(binary)
+    }
+
+    private fun resolveFromProjectVenv(projectBasePath: String?): TallyCommand? {
+        if (projectBasePath.isNullOrBlank()) {
+            return null
+        }
+        val projectRoot =
+            try {
+                Paths.get(projectBasePath)
+            } catch (_: InvalidPathException) {
+                return null
+            }
+        for (directory in venvBinaryDirectories(projectRoot)) {
+            val binary = findExecutableIgnoringExtension(directory, "tally") ?: continue
+            return asCommand(binary)
+        }
+        return null
+    }
+
+    private fun venvBinaryDirectories(projectRoot: Path): List<Path> =
+        if (SystemInfo.isWindows) {
+            listOf(
+                projectRoot.resolve(".venv").resolve("Scripts"),
+                projectRoot.resolve("venv").resolve("Scripts"),
+            )
+        } else {
+            listOf(
+                projectRoot.resolve(".venv").resolve("bin"),
+                projectRoot.resolve("venv").resolve("bin"),
+            )
+        }
+
+    private fun findExecutableIgnoringExtension(
+        directory: Path,
+        executableName: String,
+    ): Path? {
+        if (!Files.isDirectory(directory)) {
+            return null
+        }
+        try {
+            Files.newDirectoryStream(directory).use { entries ->
+                for (entry in entries) {
+                    if (!Files.isRegularFile(entry)) {
+                        continue
+                    }
+                    val fileName = entry.fileName.toString()
+                    val candidateName = fileName.substringBeforeLast('.', fileName)
+                    if (candidateName != executableName) {
+                        continue
+                    }
+                    if (isUsableBinary(entry)) {
+                        return entry
+                    }
+                }
+            }
+        } catch (_: IOException) {
+            return null
+        }
+        return null
     }
 
     private fun resolveBundledBinary(): TallyCommand? {

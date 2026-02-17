@@ -35,7 +35,8 @@ Until a dedicated IntelliJ settings UI is added, runtime options can be provided
 - `-Dtally.fixUnsafe=true|false`
 - `-Dtally.configurationOverride=<json-string>`
 
-The plugin always launches `tally lsp --stdio`.
+The plugin always launches `tally lsp --stdio`. For trusted projects, executable auto-resolution checks PATH first, then the project SDK interpreter
+directory, then project virtualenv locations (`.venv`/`venv`), then bundled fallback.
 
 ## Build inputs
 
