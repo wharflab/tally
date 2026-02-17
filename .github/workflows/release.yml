@@ -252,10 +252,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-      - name: Setup Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
       - name: Set up Java 21
         uses: actions/setup-java@v5
         with:
