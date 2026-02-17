@@ -118,7 +118,11 @@
     "onCommand:tally.applyAllFixes",
     "onCommand:tally.configureDefaultFormatterForDockerfile",
     "onCommand:tally.restartServer",
-    "onLanguage:dockerfile"
+    "onLanguage:dockerfile",
+    "workspaceContains:Dockerfile*",
+    "workspaceContains:Containerfile*",
+    "workspaceContains:.tally.toml",
+    "workspaceContains:tally.toml"
   ],
   "icon": "assets/logo.png",
   "engines": {

@@ -1,6 +1,7 @@
 package lspserver
 
 import (
+	"context"
 	"os"
 
 	"golang.org/x/exp/jsonrpc2"
@@ -12,7 +13,7 @@ import (
 
 const applyAllFixesCommand = "tally.applyAllFixes"
 
-func (s *Server) handleExecuteCommand(params *protocol.ExecuteCommandParams) (any, error) {
+func (s *Server) handleExecuteCommand(ctx context.Context, params *protocol.ExecuteCommandParams) (any, error) {
 	if params == nil {
 		return nil, nil //nolint:nilnil // LSP: null result is valid
 	}
@@ -35,7 +36,7 @@ func (s *Server) handleExecuteCommand(params *protocol.ExecuteCommandParams) (an
 		safety = fix.FixUnsafe
 	}
 
-	edits := s.computeFixEdits(uri, content, safety)
+	edits := s.computeFixEdits(ctx, uri, content, safety)
 	if len(edits) == 0 {
 		return nil, nil //nolint:nilnil // no changes
 	}

@@ -1,15 +1,19 @@
 package lspserver
 
 import (
+	"context"
+	"log"
 	"strings"
 
 	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 
+	"github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/rules"
 )
 
 // codeActionsForDocument returns quick-fix code actions for the given range.
 func (s *Server) codeActionsForDocument(
+	ctx context.Context,
 	doc *Document,
 	params *protocol.CodeActionParams,
 ) []protocol.CodeAction {
@@ -30,10 +34,21 @@ func (s *Server) codeActionsForDocument(
 
 	if includeQuickFix {
 		for _, v := range violations {
-			if v.SuggestedFix == nil || v.SuggestedFix.NeedsResolve {
+			if v.SuggestedFix == nil {
 				continue
 			}
-			if len(v.SuggestedFix.Edits) == 0 {
+
+			// Resolve async fixes (NeedsResolve) on-the-fly for code actions.
+			fixEdits := v.SuggestedFix.Edits
+			if v.SuggestedFix.NeedsResolve {
+				resolved := resolveFixEdits(ctx, doc, v.SuggestedFix)
+				if resolved == nil {
+					continue
+				}
+				fixEdits = resolved
+			}
+
+			if len(fixEdits) == 0 {
 				continue
 			}
 
@@ -42,7 +57,7 @@ func (s *Server) codeActionsForDocument(
 				continue
 			}
 
-			edits := convertTextEdits(v.SuggestedFix.Edits)
+			edits := convertTextEdits(fixEdits)
 			if len(edits) == 0 {
 				continue
 			}
@@ -64,12 +79,33 @@ func (s *Server) codeActionsForDocument(
 	}
 
 	if includeFixAll {
-		if action := s.fixAllCodeAction(doc); action != nil {
+		if action := s.fixAllCodeAction(ctx, doc); action != nil {
 			actions = append(actions, *action)
 		}
 	}
 
 	return actions
+}
+
+// resolveFixEdits resolves async fix edits on-the-fly using the registered resolver.
+// Returns nil if the resolver is not available or resolution fails.
+func resolveFixEdits(ctx context.Context, doc *Document, suggestedFix *rules.SuggestedFix) []rules.TextEdit {
+	resolver := fix.GetResolver(suggestedFix.ResolverID)
+	if resolver == nil {
+		return nil
+	}
+
+	resolveCtx := fix.ResolveContext{
+		FilePath: uriToPath(doc.URI),
+		Content:  []byte(doc.Content),
+	}
+
+	edits, err := resolver.Resolve(ctx, resolveCtx, suggestedFix)
+	if err != nil {
+		log.Printf("lsp: code action resolve failed for %s: %v", suggestedFix.ResolverID, err)
+		return nil
+	}
+	return edits
 }
 
 func kindRequested(only *[]protocol.CodeActionKind, kind protocol.CodeActionKind) bool {

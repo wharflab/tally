@@ -1,6 +1,7 @@
 package lspserver
 
 import (
+	"context"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -158,7 +159,7 @@ func TestHandleExecuteCommand_NilParams(t *testing.T) {
 	t.Parallel()
 
 	s := New()
-	result, err := s.handleExecuteCommand(nil)
+	result, err := s.handleExecuteCommand(context.Background(), nil)
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }
@@ -167,7 +168,7 @@ func TestHandleExecuteCommand_UnknownCommand(t *testing.T) {
 	t.Parallel()
 
 	s := New()
-	result, err := s.handleExecuteCommand(&protocol.ExecuteCommandParams{Command: "unknown"})
+	result, err := s.handleExecuteCommand(context.Background(), &protocol.ExecuteCommandParams{Command: "unknown"})
 	assert.Nil(t, result)
 	require.Error(t, err)
 	assert.ErrorContains(t, err, "unknown command")
@@ -177,7 +178,7 @@ func TestHandleExecuteCommand_InvalidArguments(t *testing.T) {
 	t.Parallel()
 
 	s := New()
-	result, err := s.handleExecuteCommand(&protocol.ExecuteCommandParams{
+	result, err := s.handleExecuteCommand(context.Background(), &protocol.ExecuteCommandParams{
 		Command:   applyAllFixesCommand,
 		Arguments: nil,
 	})
@@ -195,7 +196,7 @@ func TestHandleExecuteCommand_GracefullyReturnsNoEditsWhenFileCantBeRead(t *test
 	uri := fileURIFromPath(path)
 
 	args := []any{uri}
-	result, err := s.handleExecuteCommand(&protocol.ExecuteCommandParams{
+	result, err := s.handleExecuteCommand(context.Background(), &protocol.ExecuteCommandParams{
 		Command:   applyAllFixesCommand,
 		Arguments: &args,
 	})
@@ -213,7 +214,7 @@ func TestHandleExecuteCommand_NoEditsWhenNoFixableChanges(t *testing.T) {
 	s.documents.Open(uri, "dockerfile", 1, "FROM alpine:3.18\nRUN echo hello\n")
 
 	args := []any{uri}
-	result, err := s.handleExecuteCommand(&protocol.ExecuteCommandParams{
+	result, err := s.handleExecuteCommand(context.Background(), &protocol.ExecuteCommandParams{
 		Command:   applyAllFixesCommand,
 		Arguments: &args,
 	})
@@ -231,7 +232,7 @@ func TestHandleExecuteCommand_ReturnsWorkspaceEdit_Unsafe(t *testing.T) {
 	s.documents.Open(uri, "dockerfile", 1, "FROM alpine:3.18\nMAINTAINER test@example.com\n")
 
 	args := []any{uri, true}
-	result, err := s.handleExecuteCommand(&protocol.ExecuteCommandParams{
+	result, err := s.handleExecuteCommand(context.Background(), &protocol.ExecuteCommandParams{
 		Command:   applyAllFixesCommand,
 		Arguments: &args,
 	})

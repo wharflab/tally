@@ -99,7 +99,7 @@ func clearDiagnostics(ctx context.Context, conn *jsonrpc2.Connection, docURI str
 }
 
 // handleDiagnostic handles textDocument/diagnostic (pull diagnostics).
-func (s *Server) handleDiagnostic(params *protocol.DocumentDiagnosticParams) (any, error) {
+func (s *Server) handleDiagnostic(ctx context.Context, params *protocol.DocumentDiagnosticParams) (any, error) {
 	uri := string(params.TextDocument.Uri)
 
 	// Check if the document is open in the editor.
@@ -126,13 +126,18 @@ func (s *Server) handleDiagnostic(params *protocol.DocumentDiagnosticParams) (an
 
 	// Document not open — read from disk.
 	filePath := uriToPath(uri)
-	return s.pullDiagnosticsFromDisk(uri, filePath, params.PreviousResultId)
+	return s.pullDiagnosticsFromDisk(ctx, uri, filePath, params.PreviousResultId)
 }
 
 // pullDiagnosticsFromDisk reads content from disk and returns a diagnostic report.
 //
 //nolint:nilerr // gracefully returns empty diagnostics for unreadable files
-func (s *Server) pullDiagnosticsFromDisk(docURI, filePath string, previousResultID *string) (any, error) {
+func (s *Server) pullDiagnosticsFromDisk(ctx context.Context, docURI, filePath string, previousResultID *string) (any, error) {
+	// Bail out early if the request has been cancelled.
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		// Return empty full report if file cannot be read.
@@ -150,6 +155,11 @@ func (s *Server) pullDiagnosticsFromDisk(docURI, filePath string, previousResult
 				ResultId: resultID,
 			},
 		}, nil
+	}
+
+	// Check cancellation before the expensive lint pass.
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 
 	violations := s.lintContent(docURI, content)

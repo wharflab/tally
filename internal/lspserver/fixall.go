@@ -15,8 +15,8 @@ import (
 
 const fixAllCodeActionKind = protocol.CodeActionKind("source.fixAll.tally")
 
-func (s *Server) fixAllCodeAction(doc *Document) *protocol.CodeAction {
-	edits := s.computeFixEdits(doc.URI, []byte(doc.Content), fix.FixSafe)
+func (s *Server) fixAllCodeAction(ctx context.Context, doc *Document) *protocol.CodeAction {
+	edits := s.computeFixEdits(ctx, doc.URI, []byte(doc.Content), fix.FixSafe)
 	if len(edits) == 0 {
 		return nil
 	}
@@ -33,7 +33,7 @@ func (s *Server) fixAllCodeAction(doc *Document) *protocol.CodeAction {
 	}
 }
 
-func (s *Server) computeFixEdits(docURI string, content []byte, safety fix.FixSafety) []*protocol.TextEdit {
+func (s *Server) computeFixEdits(ctx context.Context, docURI string, content []byte, safety fix.FixSafety) []*protocol.TextEdit {
 	input := s.lintInput(docURI, content)
 
 	result, err := linter.LintFile(input)
@@ -57,7 +57,7 @@ func (s *Server) computeFixEdits(docURI string, content []byte, safety fix.FixSa
 			fileKey: fixModes,
 		},
 	}
-	fixResult, err := fixer.Apply(context.Background(), violations, map[string][]byte{input.FilePath: content})
+	fixResult, err := fixer.Apply(ctx, violations, map[string][]byte{input.FilePath: content})
 	if err != nil {
 		return nil
 	}

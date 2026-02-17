@@ -18,7 +18,7 @@ import (
 //
 // The response is computed by applying the fixes and then returning a minimal edit
 // that transforms the original document into the fixed output (ESLint-style).
-func (s *Server) handleFormatting(params *protocol.DocumentFormattingParams) (any, error) {
+func (s *Server) handleFormatting(ctx context.Context, params *protocol.DocumentFormattingParams) (any, error) {
 	doc := s.documents.Get(string(params.TextDocument.Uri))
 	if doc == nil {
 		return nil, nil //nolint:nilnil // LSP: null result is valid for "no edits"
@@ -51,7 +51,7 @@ func (s *Server) handleFormatting(params *protocol.DocumentFormattingParams) (an
 			fileKey: fixModes,
 		},
 	}
-	fixResult, err := fixer.Apply(context.Background(), violations, map[string][]byte{fileKey: content})
+	fixResult, err := fixer.Apply(ctx, violations, map[string][]byte{fileKey: content})
 	if err != nil {
 		return nil, nil //nolint:nilnil,nilerr // gracefully return no edits on fix error
 	}
