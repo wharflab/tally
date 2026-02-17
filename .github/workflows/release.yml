@@ -245,7 +245,7 @@ jobs:
             "extensions/vscode-tally/tally-${{ matrix.vscode_target }}.vsix" \
             --clobber
   build-intellij-plugin:
-    needs: build
+    needs: sign-macos
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -253,6 +253,47 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Download signed artifacts
+        uses: actions/download-artifact@v7
+        with:
+          name: dist-signed
+      - name: Extract signed artifacts
+        run: tar -xvf dist-signed.tar
+      - name: Copy binaries into IntelliJ plugin bundle
+        run: |
+          copy_binary() {
+            local src_dir_pattern="$1"
+            local platform="$2"
+            local arch="$3"
+            local binary_name="$4"
+            local src_dir
+            src_dir="$(find dist -maxdepth 1 -type d -name "${src_dir_pattern}" | head -n 1)"
+            if [ -z "${src_dir}" ]; then
+              echo "::error::GoReleaser output directory matching '${src_dir_pattern}' not found."
+              ls -la dist/
+              exit 1
+            fi
+
+            local src="${src_dir}/${binary_name}"
+            if [ ! -f "${src}" ]; then
+              echo "::error::Binary '${src}' not found in GoReleaser output."
+              ls -la "${src_dir}/"
+              exit 1
+            fi
+
+            local dest="extensions/intellij-tally/bundled/bin/${platform}/${arch}"
+            mkdir -p "${dest}"
+            cp "${src}" "${dest}/${binary_name}"
+            chmod +x "${dest}/${binary_name}" || true
+          }
+
+          rm -rf extensions/intellij-tally/bundled/bin
+          copy_binary "tally_linux_amd64*" "linux" "x64" "tally"
+          copy_binary "tally_linux_arm64*" "linux" "arm64" "tally"
+          copy_binary "tally_darwin_amd64*" "darwin" "x64" "tally"
+          copy_binary "tally_darwin_arm64*" "darwin" "arm64" "tally"
+          copy_binary "tally_windows_amd64*" "windows" "x64" "tally.exe"
+          copy_binary "tally_windows_arm64*" "windows" "arm64" "tally.exe"
       - name: Set up Java 21
         uses: actions/setup-java@v5
         with:
