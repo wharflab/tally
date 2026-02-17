@@ -3,6 +3,7 @@ package lspserver
 import (
 	"context"
 	"encoding/json/jsontext"
+	"io"
 	"path/filepath"
 	"testing"
 
@@ -111,6 +112,65 @@ func TestCancelPreempter_HandlesCancelRequest(t *testing.T) {
 	result, err = p.Preempt(context.Background(), req3)
 	assert.Nil(t, result)
 	require.NoError(t, err, "invalid JSON should be silently ignored")
+}
+
+func TestCancelPreempter_ValidID(t *testing.T) {
+	t.Parallel()
+
+	// Create a real jsonrpc2.Connection so conn.Cancel can be invoked.
+	conn := dialTestConnection(t)
+	p := &cancelPreempter{conn: conn}
+
+	// Numeric ID.
+	req := &jsonrpc2.Request{
+		Method: "$/cancelRequest",
+		Params: jsontext.Value(`{"id":42}`),
+	}
+	result, err := p.Preempt(context.Background(), req)
+	assert.Nil(t, result)
+	require.NoError(t, err)
+
+	// String ID.
+	req2 := &jsonrpc2.Request{
+		Method: "$/cancelRequest",
+		Params: jsontext.Value(`{"id":"req-1"}`),
+	}
+	result, err = p.Preempt(context.Background(), req2)
+	assert.Nil(t, result)
+	require.NoError(t, err)
+}
+
+// dialTestConnection creates a minimal jsonrpc2.Connection backed by an
+// io.Pipe. The remote end is immediately closed, but the connection object
+// is live enough for Cancel (which only touches internal bookkeeping).
+func dialTestConnection(t *testing.T) *jsonrpc2.Connection {
+	t.Helper()
+
+	pr, pw := io.Pipe()
+	rwc := struct {
+		io.Reader
+		io.Writer
+		io.Closer
+	}{pr, pw, pw}
+
+	dialer := pipeDialer{rwc: rwc}
+	conn, err := jsonrpc2.Dial(
+		context.Background(),
+		dialer,
+		jsonrpc2.ConnectionOptions{
+			Framer:  jsonrpc2.HeaderFramer(),
+			Handler: jsonrpc2.HandlerFunc(func(context.Context, *jsonrpc2.Request) (any, error) { return nil, nil }), //nolint:nilnil
+		},
+	)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	return conn
+}
+
+type pipeDialer struct{ rwc io.ReadWriteCloser }
+
+func (d pipeDialer) Dial(context.Context) (io.ReadWriteCloser, error) {
+	return d.rwc, nil
 }
 
 func TestCancelPreempter_PassesThroughOtherMethods(t *testing.T) {
