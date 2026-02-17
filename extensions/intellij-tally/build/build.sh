@@ -44,8 +44,24 @@ download_if_missing() {
   if [[ -f "${out}" ]]; then
     return 0
   fi
+  local tmp="${out}.tmp.$$"
   echo "downloading ${url}"
-  curl -fsSL "${url}" -o "${out}"
+  rm -f "${tmp}"
+  if ! curl \
+    --fail \
+    --location \
+    --silent \
+    --show-error \
+    --retry 5 \
+    --retry-delay 2 \
+    --connect-timeout "${TALLY_INTELLIJ_CURL_CONNECT_TIMEOUT:-30}" \
+    --max-time "${TALLY_INTELLIJ_CURL_MAX_TIME:-1800}" \
+    "${url}" \
+    -o "${tmp}"; then
+    rm -f "${tmp}"
+    return 1
+  fi
+  mv "${tmp}" "${out}"
 }
 
 extract_archive() {
@@ -147,10 +163,12 @@ prepare_toolchains() {
 
 patch_plugin_xml() {
   local plugin_xml="$1"
-  local plugin_version="$2"
-  local since_build="$3"
-  local until_build="$4"
+  local plugin_id="$2"
+  local plugin_version="$3"
+  local since_build="$4"
+  local until_build="$5"
   sed -i.bak \
+    -e "s/@PLUGIN_ID@/${plugin_id}/g" \
     -e "s/@PLUGIN_VERSION@/${plugin_version}/g" \
     -e "s/@SINCE_BUILD@/${since_build}/g" \
     -e "s/@UNTIL_BUILD@/${until_build}/g" \
@@ -168,7 +186,8 @@ build_plugin() {
 
   prepare_toolchains
 
-  local plugin_name plugin_version plugin_since_build plugin_until_build jvm_target
+  local plugin_id plugin_name plugin_version plugin_since_build plugin_until_build jvm_target
+  plugin_id="$(read_version plugin_id)"
   plugin_name="$(read_version plugin_name)"
   plugin_version="$(read_version plugin_version)"
   plugin_since_build="$(read_version plugin_since_build)"
@@ -211,6 +230,7 @@ build_plugin() {
 
   patch_plugin_xml \
     "${classes_dir}/META-INF/plugin.xml" \
+    "${plugin_id}" \
     "${plugin_version}" \
     "${plugin_since_build}" \
     "${plugin_until_build}"

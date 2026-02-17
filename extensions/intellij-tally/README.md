@@ -14,6 +14,17 @@ Output:
 
 - `extensions/intellij-tally/dist/tally-intellij-plugin-<version>.zip`
 
+## Smoke check (IntelliJ Community Edition)
+
+From repository root:
+
+```bash
+make intellij-plugin-smoke
+```
+
+This runs JetBrains Plugin Verifier against IntelliJ IDEA Community Edition.
+Current expected result is a known limitation (`com.intellij.modules.lsp` missing in IC for our LSP-first plugin baseline).
+
 ## Runtime settings (current MVP)
 
 Until a dedicated IntelliJ settings UI is added, runtime options can be provided via JVM system properties:

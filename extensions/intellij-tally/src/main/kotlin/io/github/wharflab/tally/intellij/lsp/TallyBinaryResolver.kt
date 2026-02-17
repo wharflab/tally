@@ -15,7 +15,7 @@ internal data class TallyCommand(
 )
 
 internal object TallyBinaryResolver {
-    private const val PLUGIN_ID = "io.github.wharflab.tally.intellij"
+    private const val PLUGIN_ID = "io.github.wharflab.tally"
     private val SERVER_ARGS = listOf("lsp", "--stdio")
 
     fun resolve(settings: TallyRuntimeSettings): TallyCommand? {

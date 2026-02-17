@@ -1,4 +1,4 @@
-.PHONY: build intellij-plugin intellij-plugin-verify test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema lsp-protocol print-gotestsum-bin
+.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema lsp-protocol print-gotestsum-bin
 
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
@@ -14,6 +14,9 @@ intellij-plugin:
 
 intellij-plugin-verify:
 	bash extensions/intellij-tally/build/build.sh verify
+
+intellij-plugin-smoke:
+	bash extensions/intellij-tally/build/smoke.sh
 
 GOTESTSUM_VERSION := v1.13.0
 GOLANGCI_LINT_VERSION := v2.9.0

@@ -1,4 +1,4 @@
-plugin_id = "io.github.wharflab.tally.intellij"
+plugin_id = "io.github.wharflab.tally"
 plugin_name = "Tally"
 plugin_version = "0.1.0-dev"
 plugin_since_build = "252.25557"
