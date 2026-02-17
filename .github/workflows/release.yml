@@ -244,6 +244,107 @@ jobs:
           gh release upload "$TAG" \
             "extensions/vscode-tally/tally-${{ matrix.vscode_target }}.vsix" \
             --clobber
+  build-intellij-plugin:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version || github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Set up Java 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Set IntelliJ plugin version from tag
+        run: |
+          CLEAN_VERSION="${VERSION#v}"
+          sed -i -E "s/^plugin_version = \".*\"/plugin_version = \"${CLEAN_VERSION}\"/" \
+            extensions/intellij-tally/build/versions.toml
+      - name: Build IntelliJ plugin
+        run: make intellij-plugin
+      - name: IntelliJ Community smoke check
+        run: make intellij-plugin-smoke
+      - name: Resolve IntelliJ plugin artifact
+        id: intellij_zip
+        run: |
+          CLEAN_VERSION="${VERSION#v}"
+          ZIP_PATH="extensions/intellij-tally/dist/tally-intellij-plugin-${CLEAN_VERSION}.zip"
+          if [ ! -f "$ZIP_PATH" ]; then
+            echo "::error::Expected IntelliJ plugin zip not found at $ZIP_PATH"
+            ls -la extensions/intellij-tally/dist || true
+            exit 1
+          fi
+          echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
+      - name: Upload IntelliJ plugin artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: intellij-plugin-zip
+          path: ${{ steps.intellij_zip.outputs.zip_path }}
+      - name: Upload IntelliJ plugin to GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${VERSION#v}"
+          gh release upload "$TAG" "${{ steps.intellij_zip.outputs.zip_path }}" --clobber
+  publish-intellij-marketplace:
+    needs: build-intellij-plugin
+    runs-on: ubuntu-latest
+    env:
+      JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
+      JETBRAINS_MARKETPLACE_CHANNEL: ${{ vars.JETBRAINS_MARKETPLACE_CHANNEL }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Download IntelliJ plugin artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: intellij-plugin-zip
+          path: intellij-plugin
+      - name: Publish to JetBrains Marketplace
+        run: |
+          if [ -z "${JETBRAINS_MARKETPLACE_TOKEN}" ]; then
+            echo "JETBRAINS_MARKETPLACE_TOKEN is not set; skipping JetBrains Marketplace publish."
+            exit 0
+          fi
+
+          ZIP_PATH="$(find intellij-plugin -maxdepth 1 -type f -name '*.zip' | head -n 1)"
+          if [ -z "${ZIP_PATH}" ]; then
+            echo "::error::No IntelliJ plugin zip found in artifact directory."
+            ls -la intellij-plugin || true
+            exit 1
+          fi
+
+          XML_ID="$(grep -E '^plugin_id[[:space:]]*=' extensions/intellij-tally/build/versions.toml | head -n 1 | sed -E 's/^[^=]*=[[:space:]]*\"([^\"]+)\".*/\1/')"
+          if [ -z "${XML_ID}" ]; then
+            echo "::error::Unable to resolve plugin_id from versions.toml."
+            exit 1
+          fi
+
+          CURL_ARGS=(
+            -F "xmlId=${XML_ID}"
+            -F "file=@${ZIP_PATH}"
+          )
+          if [ -n "${JETBRAINS_MARKETPLACE_CHANNEL}" ]; then
+            CURL_ARGS+=(-F "channel=${JETBRAINS_MARKETPLACE_CHANNEL}")
+          fi
+
+          curl \
+            --fail \
+            --show-error \
+            --location \
+            --retry 5 \
+            --retry-delay 2 \
+            --connect-timeout 30 \
+            --max-time 600 \
+            --header "Authorization: Bearer ${JETBRAINS_MARKETPLACE_TOKEN}" \
+            "${CURL_ARGS[@]}" \
+            https://plugins.jetbrains.com/api/updates/upload
   publish-vscode-marketplace:
     needs: build-vscode-vsix
     runs-on: ubuntu-latest
