@@ -23,7 +23,8 @@ make intellij-plugin-smoke
 ```
 
 This runs JetBrains Plugin Verifier against IntelliJ IDEA Community Edition.
-Current expected result is a known limitation (`com.intellij.modules.lsp` missing in IC for our LSP-first plugin baseline).
+Expected result: plugin is reported as **Compatible**. In CE, verifier may still list
+`com.intellij.modules.lsp` as an unavailable **optional** dependency.
 
 ## Runtime settings (current MVP)
 

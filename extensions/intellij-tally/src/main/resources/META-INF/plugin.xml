@@ -10,10 +10,5 @@
     <idea-version since-build="@SINCE_BUILD@" until-build="@UNTIL_BUILD@"/>
 
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.modules.lsp</depends>
-
-    <extensions defaultExtensionNs="com.intellij">
-        <platform.lsp.serverSupportProvider
-                implementation="io.github.wharflab.tally.intellij.lsp.TallyLspServerSupportProvider"/>
-    </extensions>
+    <depends optional="true" config-file="lsp.xml">com.intellij.modules.lsp</depends>
 </idea-plugin>

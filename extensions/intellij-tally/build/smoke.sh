@@ -154,12 +154,6 @@ main() {
     exit 1
   fi
 
-  if grep -q "com.intellij.modules.lsp (v1): Unavailable" "${LOG_FILE}"; then
-    echo "smoke check passed (known CE limitation): missing com.intellij.modules.lsp"
-    echo "details: ${LOG_FILE}"
-    exit 0
-  fi
-
   if grep -E -q "missing mandatory dependency|Compatibility problems \([1-9]" "${LOG_FILE}"; then
     echo "smoke check failed: unexpected compatibility issues were reported" >&2
     tail -n 120 "${LOG_FILE}" >&2
