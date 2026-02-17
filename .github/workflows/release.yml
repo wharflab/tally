@@ -260,8 +260,19 @@ jobs:
       - name: Set IntelliJ plugin version from tag
         run: |
           CLEAN_VERSION="${VERSION#v}"
+          VERSIONS_TOML="extensions/intellij-tally/build/versions.toml"
           sed -i -E "s/^plugin_version = \".*\"/plugin_version = \"${CLEAN_VERSION}\"/" \
-            extensions/intellij-tally/build/versions.toml
+            "${VERSIONS_TOML}"
+          if command -v taplo >/dev/null 2>&1; then
+            ACTUAL_VERSION="$(taplo get -f "${VERSIONS_TOML}" --strip-newline plugin_version || true)"
+            if [ "${ACTUAL_VERSION}" != "${CLEAN_VERSION}" ]; then
+              echo "::error::Failed to set plugin_version in versions.toml (expected=${CLEAN_VERSION}, actual=${ACTUAL_VERSION})"
+              exit 1
+            fi
+          else
+            grep -qE "^plugin_version = \"${CLEAN_VERSION}\"$" "${VERSIONS_TOML}" \
+              || { echo "::error::Failed to set plugin_version in versions.toml"; exit 1; }
+          fi
       - name: Build IntelliJ plugin
         run: make intellij-plugin
       - name: IntelliJ Community smoke check
