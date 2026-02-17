@@ -4,7 +4,13 @@
     <version>@PLUGIN_VERSION@</version>
     <vendor email="opensource@wharflab.com" url="https://github.com/wharflab/tally">WharfLab</vendor>
     <description><![CDATA[
-      IntelliJ Platform plugin for tally, powered by <code>tally lsp --stdio</code>.
+      <p><strong>Lint, format, and auto-fix Dockerfiles and Containerfiles in IntelliJ.</strong></p>
+      <ul>
+        <li>BuildKit-native diagnostics plus Hadolint-compatible and modernization rules.</li>
+        <li>Safe quick fixes and <em>Fix All</em> actions from the editor.</li>
+        <li>Config-aware behavior with <code>.tally.toml</code> / <code>tally.toml</code> discovery.</li>
+        <li>No Docker daemon required.</li>
+      </ul>
     ]]></description>
 
     <idea-version since-build="@SINCE_BUILD@" until-build="@UNTIL_BUILD@"/>
