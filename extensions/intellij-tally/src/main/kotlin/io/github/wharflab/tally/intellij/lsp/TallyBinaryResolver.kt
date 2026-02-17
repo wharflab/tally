@@ -102,10 +102,11 @@ internal object TallyBinaryResolver {
     }
 
     private fun normalizeArch(): String {
-        return when (System.getProperty("os.arch").lowercase()) {
+        val arch = System.getProperty("os.arch").lowercase()
+        return when (arch) {
             "x86_64", "amd64" -> "x64"
             "aarch64", "arm64" -> "arm64"
-            else -> System.getProperty("os.arch").lowercase()
+            else -> arch
         }
     }
 }
