@@ -32,11 +32,34 @@ internal class TallyLspServerDescriptor(
 
     override val clientCapabilities: ClientCapabilities
         get() {
-            val capabilities = super.clientCapabilities
-            capabilities.workspace =
-                (capabilities.workspace ?: WorkspaceClientCapabilities()).apply {
+            val base = super.clientCapabilities
+            val workspaceCapabilities =
+                WorkspaceClientCapabilities().apply {
+                    base.workspace?.let { workspace ->
+                        applyEdit = workspace.applyEdit
+                        workspaceEdit = workspace.workspaceEdit
+                        didChangeConfiguration = workspace.didChangeConfiguration
+                        didChangeWatchedFiles = workspace.didChangeWatchedFiles
+                        symbol = workspace.symbol
+                        executeCommand = workspace.executeCommand
+                        workspaceFolders = workspace.workspaceFolders
+                        semanticTokens = workspace.semanticTokens
+                        codeLens = workspace.codeLens
+                        fileOperations = workspace.fileOperations
+                        inlayHint = workspace.inlayHint
+                        inlineValue = workspace.inlineValue
+                        diagnostics = workspace.diagnostics
+                    }
                     configuration = true
                 }
-            return capabilities
+
+            return ClientCapabilities().apply {
+                workspace = workspaceCapabilities
+                textDocument = base.textDocument
+                notebookDocument = base.notebookDocument
+                window = base.window
+                general = base.general
+                experimental = base.experimental
+            }
         }
 }
