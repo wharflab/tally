@@ -248,4 +248,4 @@ main() {
   esac
 }
 
-main "${1:-build}"
+main "$@"
