@@ -143,7 +143,9 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 	case string(protocol.MethodTextDocumentDiagnostic):
 		return unmarshalAndCall(req, s.handleDiagnostic)
 	case string(protocol.MethodTextDocumentFormatting):
-		return unmarshalAndCall(req, s.handleFormatting)
+		return unmarshalAndCall(req, func(p *protocol.DocumentFormattingParams) (any, error) {
+			return s.handleFormatting(ctx, p)
+		})
 
 	// Workspace
 	case "workspace/didChangeConfiguration":
