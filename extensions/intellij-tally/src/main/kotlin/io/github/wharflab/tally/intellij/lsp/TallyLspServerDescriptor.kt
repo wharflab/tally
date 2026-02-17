@@ -26,6 +26,9 @@ internal class TallyLspServerDescriptor(
     }
 
     override fun getWorkspaceConfiguration(item: ConfigurationItem): Any? {
+        if (item.section != null && item.section != "tally") {
+            return null
+        }
         return TallySettings.workspaceConfiguration(settings)
     }
 
