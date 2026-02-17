@@ -9,6 +9,6 @@ internal object TallyFileMatcher {
         if (fileName.startsWith("Dockerfile") || fileName.startsWith("Containerfile")) {
             return true
         }
-        return fileName.endsWith(".Dockerfile")
+        return fileName.endsWith(".Dockerfile") || fileName.endsWith(".Containerfile")
     }
 }
