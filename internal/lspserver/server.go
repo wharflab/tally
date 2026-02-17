@@ -137,7 +137,9 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 
 	// Language features
 	case "textDocument/codeAction":
-		return unmarshalAndCall(req, s.handleCodeAction)
+		return unmarshalAndCall(req, func(p *protocol.CodeActionParams) (any, error) {
+			return s.handleCodeAction(ctx, p)
+		})
 	case string(protocol.MethodTextDocumentDiagnostic):
 		return unmarshalAndCall(req, s.handleDiagnostic)
 	case string(protocol.MethodTextDocumentFormatting):
@@ -149,7 +151,9 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 			s.handleDidChangeConfiguration(ctx, p)
 		})
 	case string(protocol.MethodWorkspaceExecuteCommand):
-		return unmarshalAndCall(req, s.handleExecuteCommand)
+		return unmarshalAndCall(req, func(p *protocol.ExecuteCommandParams) (any, error) {
+			return s.handleExecuteCommand(ctx, p)
+		})
 
 	default:
 		return nil, jsonrpc2.NewError(int64(protocol.ErrorCodeMethodNotFound), "method not supported: "+req.Method)
@@ -312,13 +316,13 @@ func (s *Server) handleDidClose(ctx context.Context, params *protocol.DidCloseTe
 }
 
 // handleCodeAction returns quick-fix code actions.
-func (s *Server) handleCodeAction(params *protocol.CodeActionParams) (any, error) {
+func (s *Server) handleCodeAction(ctx context.Context, params *protocol.CodeActionParams) (any, error) {
 	doc := s.documents.Get(string(params.TextDocument.Uri))
 	if doc == nil {
 		return nil, nil //nolint:nilnil // LSP: null result is valid for "no actions"
 	}
 
-	actions := s.codeActionsForDocument(doc, params)
+	actions := s.codeActionsForDocument(ctx, doc, params)
 	if len(actions) == 0 {
 		return nil, nil //nolint:nilnil // LSP: null result is valid for "no actions"
 	}
