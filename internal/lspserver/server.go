@@ -94,9 +94,45 @@ type serverBinder struct {
 func (b *serverBinder) Bind(_ context.Context, conn *jsonrpc2.Connection) (jsonrpc2.ConnectionOptions, error) {
 	b.server.conn = conn
 	return jsonrpc2.ConnectionOptions{
-		Framer:  jsonrpc2.HeaderFramer(),
-		Handler: jsonrpc2.HandlerFunc(b.server.handle),
+		Framer:    jsonrpc2.HeaderFramer(),
+		Preempter: &cancelPreempter{conn: conn},
+		Handler:   jsonrpc2.HandlerFunc(b.server.handle),
 	}, nil
+}
+
+// cancelPreempter handles $/cancelRequest notifications before they enter the
+// message queue. This prevents "method not supported" errors when the client
+// sends cancellation notifications.
+type cancelPreempter struct {
+	conn *jsonrpc2.Connection
+}
+
+// cancelRequestParams is the LSP CancelParams sent with $/cancelRequest.
+type cancelRequestParams struct {
+	ID any `json:"id"`
+}
+
+func (p *cancelPreempter) Preempt(_ context.Context, req *jsonrpc2.Request) (any, error) {
+	if req.Method != "$/cancelRequest" {
+		return nil, jsonrpc2.ErrNotHandled
+	}
+
+	var params cancelRequestParams
+	if err := stdjson.Unmarshal(req.Params, &params); err != nil {
+		return nil, nil //nolint:nilerr,nilnil // malformed cancel — intentionally ignored
+	}
+
+	var id jsonrpc2.ID
+	switch v := params.ID.(type) {
+	case float64:
+		id = jsonrpc2.Int64ID(int64(v))
+	case string:
+		id = jsonrpc2.StringID(v)
+	}
+	if id.IsValid() {
+		p.conn.Cancel(id)
+	}
+	return nil, nil //nolint:nilnil // notification — no response needed
 }
 
 // handle dispatches incoming JSON-RPC messages to the appropriate handler.
@@ -105,7 +141,7 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 	// Lifecycle
 	case "initialize":
 		return unmarshalAndCall(req, s.handleInitialize)
-	case "initialized", "$/setTrace":
+	case "initialized", "$/setTrace", "$/cancelRequest", "$/progress":
 		return nil, nil //nolint:nilnil // LSP: notifications have no result
 	case "shutdown":
 		return jsonNull, nil
