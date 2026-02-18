@@ -16,7 +16,12 @@ class TallyLspServerSupportProvider : LspServerSupportProvider {
             return
         }
 
-        val settings = TallySettings.current()
+        val service = TallySettingsService.getInstance(project)
+        if (!service.enabled) {
+            return
+        }
+
+        val settings = TallySettings.fromService(service)
         val sdkHomePath = ProjectRootManager.getInstance(project).projectSdk?.homePath
         val command =
             TallyBinaryResolver.resolve(

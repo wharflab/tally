@@ -11,16 +11,17 @@ internal object TallySettings {
     internal const val IMPORT_STRATEGY_FROM_ENVIRONMENT = "fromEnvironment"
     internal const val IMPORT_STRATEGY_USE_BUNDLED = "useBundled"
 
-    fun current(): TallyRuntimeSettings {
-        val executablePaths = readExecutablePaths()
-        val importStrategy = normalizeImportStrategy(System.getProperty("tally.importStrategy"))
-        val fixUnsafe = System.getProperty("tally.fixUnsafe")?.toBoolean() ?: false
-        val configurationOverride = System.getProperty("tally.configurationOverride")?.ifBlank { null }
+    fun fromService(service: TallySettingsService): TallyRuntimeSettings {
+        val executablePaths =
+            service.executablePath
+                ?.takeIf { it.isNotBlank() }
+                ?.let { listOf(it) }
+                ?: emptyList()
         return TallyRuntimeSettings(
             executablePaths = executablePaths,
-            importStrategy = importStrategy,
-            fixUnsafe = fixUnsafe,
-            configurationOverride = configurationOverride,
+            importStrategy = IMPORT_STRATEGY_FROM_ENVIRONMENT,
+            fixUnsafe = service.fixUnsafe,
+            configurationOverride = service.configurationPath?.takeIf { it.isNotBlank() },
         )
     }
 
@@ -42,32 +43,4 @@ internal object TallySettings {
                 ),
             "workspaces" to emptyList<Map<String, Any?>>(),
         )
-
-    private fun readExecutablePaths(): List<String> =
-        System
-            .getProperty("tally.executablePaths")
-            ?.takeIf { it.isNotBlank() }
-            ?.let(::splitList)
-            ?: System
-                .getProperty("tally.path")
-                ?.takeIf { it.isNotBlank() }
-                ?.let { listOf(it.trim()) }
-            ?: System
-                .getenv("TALLY_EXECUTABLE_PATHS")
-                ?.takeIf { it.isNotBlank() }
-                ?.let(::splitList)
-            ?: emptyList()
-
-    private fun splitList(raw: String): List<String> =
-        raw
-            .split(",")
-            .map { it.trim() }
-            .filter { it.isNotEmpty() }
-
-    private fun normalizeImportStrategy(raw: String?): String =
-        if (raw == IMPORT_STRATEGY_USE_BUNDLED) {
-            IMPORT_STRATEGY_USE_BUNDLED
-        } else {
-            IMPORT_STRATEGY_FROM_ENVIRONMENT
-        }
 }

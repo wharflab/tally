@@ -127,7 +127,16 @@ main() {
     exit 1
   fi
 
-  if grep -E -q "missing mandatory dependency|Compatibility problems \([1-9]" "${LOG_FILE}"; then
+  if grep -q "missing mandatory dependency" "${LOG_FILE}"; then
+    echo "smoke check failed: missing mandatory dependency" >&2
+    tail -n 120 "${LOG_FILE}" >&2
+    exit 1
+  fi
+
+  # Fail on compatibility problems that are NOT solely caused by missing optional dependencies.
+  # The verifier annotates optional-dependency issues with "absence of optional dependency" on the summary line.
+  if grep -E -q "Compatibility problems \([1-9]" "${LOG_FILE}" && \
+     ! grep -q "caused by absence of optional dependency" "${LOG_FILE}"; then
     echo "smoke check failed: unexpected compatibility issues were reported" >&2
     tail -n 120 "${LOG_FILE}" >&2
     exit 1

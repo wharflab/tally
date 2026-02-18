@@ -2,5 +2,15 @@
     <extensions defaultExtensionNs="com.intellij">
         <platform.lsp.serverSupportProvider
                 implementation="io.github.wharflab.tally.intellij.lsp.TallyLspServerSupportProvider"/>
+        <projectService
+                serviceImplementation="io.github.wharflab.tally.intellij.lsp.TallyServerService"/>
+        <actionOnSave
+                id="TallyFixAllOnSaveAction"
+                implementation="io.github.wharflab.tally.intellij.lsp.TallyFixAllOnSaveAction"
+                order="first, before FormatOnSaveAction"/>
+        <actionOnSaveInfoProvider
+                id="TallyOnSaveInfoProvider"
+                implementation="io.github.wharflab.tally.intellij.lsp.TallyOnSaveInfoProvider"
+                order="after FormatOnSaveInfoProvider"/>
     </extensions>
 </idea-plugin>
