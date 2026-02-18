@@ -78,13 +78,13 @@ Reply DIRECTLY to the specific comment (not a new review, not a top-level commen
 
 ```bash
 gh api repos/<owner>/<repo>/pulls/<PR_NUMBER>/comments/<COMMENT_ID>/replies \
-  -X POST -f body='✅ Addressed in <short-sha>. Thanks @<author>!' --jq '.in_reply_to_id'
+  -X POST -f body='✅ Addressed in <short-sha>. Thanks @<author>!' --jq '"✅ Replied to comment \(.in_reply_to_id)"'
 ```
 
 Replace:
 
 - `<short-sha>` with the 7-character commit hash
-- `<author>` with the comment author’s username
+- `<author>` with the comment author’s username, dropping `[bot]` suffix if any
 
 IMPORTANT: the above API WORKS! If you are getting 404 or similar error - verify that you've
 built the URL correctly, don't fallback to post a generic comment on PR!
