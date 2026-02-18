@@ -3,7 +3,7 @@ package io.github.wharflab.tally.intellij.lsp
 import com.intellij.ide.actionsOnSave.ActionOnSaveBackedByOwnConfigurable
 import com.intellij.ide.actionsOnSave.ActionOnSaveContext
 
-class TallyOnSaveFixAllActionInfo(
+internal class TallyOnSaveFixAllActionInfo(
     context: ActionOnSaveContext,
 ) : ActionOnSaveBackedByOwnConfigurable<TallyConfigurable>(context, "TallyConfigurable", TallyConfigurable::class.java) {
     override fun getActionOnSaveName(): String = "Fix all Tally issues"
