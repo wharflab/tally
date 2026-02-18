@@ -130,6 +130,15 @@ RUN cargo build --release
 			WantViolations: 1,
 		},
 		{
+			Name: "cargo build with unresolved workdir variable",
+			Content: `FROM rust:1.83
+ARG APP_DIR=/workspace
+WORKDIR ${APP_DIR}
+RUN cargo build --release
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "cargo test with build filter should not trigger",
 			Content: `FROM rust:1.83
 WORKDIR /app
@@ -300,6 +309,22 @@ RUN cargo build --release
 				"--mount=type=cache,target=/usr/local/cargo/registry",
 			},
 			wantNotContains: []string{"--mount=type=cache,target=/app/target"},
+		},
+		{
+			name: "cargo unresolved workdir skips target mount",
+			content: `FROM rust:1.83
+ARG APP_DIR=/workspace
+WORKDIR ${APP_DIR}
+RUN cargo build --release
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/usr/local/cargo/git/db",
+				"--mount=type=cache,target=/usr/local/cargo/registry",
+			},
+			wantNotContains: []string{
+				"--mount=type=cache,target=/${APP_DIR}/target",
+				"--mount=type=cache,target=/app/target",
+			},
 		},
 		{
 			name: "pip no-cache-dir and cleanup removed",

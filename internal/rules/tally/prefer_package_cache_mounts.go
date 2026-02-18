@@ -290,8 +290,11 @@ func addLanguagePackageManagerCacheMounts(
 		}
 	case "cargo":
 		if cmd.Subcommand == "build" {
-			cargoTarget = path.Clean(path.Join(workdir, "target"))
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: cargoTarget})
+			// Skip deriving target path when WORKDIR still has unresolved shell references.
+			if !hasUnresolvedWorkdirReference(workdir) {
+				cargoTarget = path.Clean(path.Join(workdir, "target"))
+				addRequiredMount(requiredByTarget, cacheMountSpec{Target: cargoTarget})
+			}
 			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/git/db"})
 			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/registry"})
 		}
@@ -372,6 +375,10 @@ func resolveWorkdir(currentWorkdir, nextPath string) string {
 		return path.Clean(nextPath)
 	}
 	return path.Clean(path.Join(currentWorkdir, nextPath))
+}
+
+func hasUnresolvedWorkdirReference(workdir string) bool {
+	return strings.Contains(workdir, "$")
 }
 
 func goUsesDependencyCache(cmd shell.CommandInfo) bool {
