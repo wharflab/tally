@@ -1,8 +1,7 @@
 package io.github.wharflab.tally.intellij.lsp
 
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
-import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.openapi.extensions.PluginId
+import com.intellij.ide.plugins.PluginManager
 import com.intellij.openapi.util.SystemInfo
 import java.io.IOException
 import java.nio.file.Files
@@ -17,7 +16,6 @@ internal data class TallyCommand(
 )
 
 internal object TallyBinaryResolver {
-    private const val PLUGIN_ID = "io.github.wharflab.tally"
     private val SERVER_ARGS = listOf("lsp", "--stdio")
 
     fun resolve(
@@ -136,9 +134,8 @@ internal object TallyBinaryResolver {
 
     private fun resolveBundledBinary(): TallyCommand? {
         val descriptor =
-            PluginManagerCore.getPlugin(
-                PluginId.getId(PLUGIN_ID),
-            ) ?: return null
+            PluginManager.getPluginByClass(TallyBinaryResolver::class.java)
+                ?: return null
         val binaryName = if (SystemInfo.isWindows) "tally.exe" else "tally"
         val candidate =
             descriptor.pluginPath
