@@ -2,6 +2,7 @@ package io.github.wharflab.tally.intellij.lsp
 
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
@@ -46,7 +47,8 @@ class TallyServerService(
                     server.sendRequestSync(TIMEOUT_MS) { languageServer ->
                         languageServer.textDocumentService.codeAction(params)
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    LOG.warn("Failed to get code actions from Tally server", e)
                     continue
                 } ?: continue
 
@@ -108,6 +110,7 @@ class TallyServerService(
     }
 
     companion object {
+        private val LOG = Logger.getInstance(TallyServerService::class.java)
         private const val TIMEOUT_MS = 5000
 
         fun getInstance(project: Project): TallyServerService = project.service()
