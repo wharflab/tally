@@ -1,0 +1,25 @@
+{
+  "lspServers": {
+    "typescript": {
+      "command": "./extensions/vscode-tally/node_modules/.bin/tsgo",
+      "args": ["--lsp", "--stdio"],
+      "fileExtensions": {
+        ".ts": "typescript"
+      }
+    },
+    "go": {
+      "command": "gopls",
+      "args": ["serve"],
+      "fileExtensions": {
+        ".go": "go"
+      }
+    },
+    "kotlin": {
+      "command": "kotlin-lsp",
+      "args": ["--stdio"],
+      "fileExtensions": {
+        ".kt": "kotlin"
+      }
+    }
+  }
+}

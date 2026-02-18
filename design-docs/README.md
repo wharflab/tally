@@ -208,6 +208,12 @@ parity rules
 
 ---
 
+### 17. [IntelliJ Plugin (Lean build, no Gradle)](17-intellij-plugin-lean-build.md)
+
+**Covers:** Plan for an IntelliJ Platform plugin under `extensions/` with a custom lean build pipeline that drives `kotlinc` directly (no Gradle).
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation

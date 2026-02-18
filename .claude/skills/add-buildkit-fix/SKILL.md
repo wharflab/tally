@@ -3,7 +3,6 @@ name: add-buildkit-fix
 description: Add auto-fix support to an existing BuildKit linter rule
 argument-hint: rule-name (e.g. StageNameCasing, FromAsCasing, NoEmptyContinuation)
 disable-model-invocation: true
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash(go *), Bash(git status), Bash(make lint), WebFetch
 ---
 
 # Add Auto-Fix to BuildKit Rule
@@ -133,12 +132,12 @@ The fixer applies edits from end to start, so line shifts are handled automatica
 
 ## Step 5: Line Number Conventions
 
-| Context | Convention |
-|---------|------------|
-| `v.Location.Start.Line` | 1-based (from BuildKit) |
-| `getLine(source, idx)` | 0-based index |
-| `createEditLocation(file, line, ...)` | 1-based line |
-| `rules.NewRangeLocation(file, line, ...)` | 1-based line |
+| Context                                   | Convention              |
+| ----------------------------------------- | ----------------------- |
+| `v.Location.Start.Line`                   | 1-based (from BuildKit) |
+| `getLine(source, idx)`                    | 0-based index           |
+| `createEditLocation(file, line, ...)`     | 1-based line            |
+| `rules.NewRangeLocation(file, line, ...)` | 1-based line            |
 
 **Common pattern:**
 
@@ -254,11 +253,11 @@ In `RULES.md`, add 🔧 emoji to the rule:
 
 ## Fix Safety Levels
 
-| Level | When to Use |
-|-------|-------------|
-| `rules.FixSafe` | Casing changes, removing whitespace, formatting |
-| `rules.FixSuggestion` | Semantic changes that are usually correct |
-| `rules.FixUnsafe` | Changes that might alter behavior |
+| Level                 | When to Use                                     |
+| --------------------- | ----------------------------------------------- |
+| `rules.FixSafe`       | Casing changes, removing whitespace, formatting |
+| `rules.FixSuggestion` | Semantic changes that are usually correct       |
+| `rules.FixUnsafe`     | Changes that might alter behavior               |
 
 ## Position Helpers Available
 
