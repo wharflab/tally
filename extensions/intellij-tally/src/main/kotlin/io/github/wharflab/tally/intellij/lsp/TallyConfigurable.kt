@@ -1,5 +1,6 @@
 package io.github.wharflab.tally.intellij.lsp
 
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.options.BoundSearchableConfigurable
 import com.intellij.openapi.project.Project
@@ -15,6 +16,10 @@ class TallyConfigurable(
     private val project: Project,
 ) : BoundSearchableConfigurable("Tally", "TallyConfigurable") {
     private val settings get() = TallySettingsService.getInstance(project)
+
+    private companion object {
+        private val LOG = Logger.getInstance(TallyConfigurable::class.java)
+    }
 
     internal lateinit var enabledCheckBox: Cell<JCheckBox>
     internal lateinit var fixAllOnSaveCheckBox: Cell<JCheckBox>
@@ -69,8 +74,8 @@ class TallyConfigurable(
         super.apply()
         try {
             TallyServerService.getInstance(project).restartServer()
-        } catch (_: Exception) {
-            // LSP module may not be available
+        } catch (e: Exception) {
+            LOG.warn("Failed to restart Tally server on settings apply", e)
         }
     }
 }
