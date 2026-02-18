@@ -109,6 +109,14 @@ RUN cargo build --release
 			WantViolations: 1,
 		},
 		{
+			Name: "cargo test with build filter should not trigger",
+			Content: `FROM rust:1.83
+WORKDIR /app
+RUN cargo test build
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "dotnet restore",
 			Content: `FROM mcr.microsoft.com/dotnet/sdk:9.0
 RUN dotnet restore

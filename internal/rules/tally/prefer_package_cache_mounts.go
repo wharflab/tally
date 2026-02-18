@@ -230,7 +230,7 @@ func detectRequiredCacheMounts(script string, variant shell.Variant, workdir str
 			}
 
 		case "cargo":
-			if cmd.HasAnyArg("build") {
+			if cmd.Subcommand == "build" {
 				cargoTarget = path.Clean(path.Join(workdir, "target"))
 				addRequiredMount(requiredByTarget, cacheMountSpec{Target: cargoTarget})
 				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/git/db"})
