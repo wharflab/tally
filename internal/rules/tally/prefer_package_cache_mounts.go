@@ -676,20 +676,24 @@ func isPackageCacheDirCleanup(command, cacheDir string) bool {
 		return false
 	}
 
-	hasRecursiveForce := false
+	hasRecursive := false
+	hasForce := false
 	paths := make([]string, 0, len(fields))
 
 	for _, field := range fields[1:] {
 		if strings.HasPrefix(field, "-") {
-			if strings.Contains(field, "r") && strings.Contains(field, "f") {
-				hasRecursiveForce = true
+			if strings.Contains(field, "r") {
+				hasRecursive = true
+			}
+			if strings.Contains(field, "f") {
+				hasForce = true
 			}
 			continue
 		}
 		paths = append(paths, field)
 	}
 
-	if !hasRecursiveForce || len(paths) == 0 {
+	if !hasRecursive || !hasForce || len(paths) == 0 {
 		return false
 	}
 

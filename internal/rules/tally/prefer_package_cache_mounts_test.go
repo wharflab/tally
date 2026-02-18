@@ -426,6 +426,12 @@ func TestIsPackageCacheDirCleanup(t *testing.T) {
 			want:     true,
 		},
 		{
+			name:     "separate recursive and force flags",
+			command:  "rm -r -f /var/cache/dnf",
+			cacheDir: "/var/cache/dnf",
+			want:     true,
+		},
+		{
 			name:     "different cache path",
 			command:  "rm -rf /var/cache/dnf /tmp/cache",
 			cacheDir: "/var/cache/dnf",
