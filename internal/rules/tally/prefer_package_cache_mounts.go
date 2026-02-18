@@ -335,7 +335,7 @@ func resolveWorkdir(currentWorkdir, nextPath string) string {
 }
 
 func goUsesDependencyCache(cmd shell.CommandInfo) bool {
-	if cmd.HasAnyArg("build") {
+	if cmd.Subcommand == "build" {
 		return true
 	}
 	if cmd.Subcommand != "mod" {

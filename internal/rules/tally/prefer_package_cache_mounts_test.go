@@ -322,6 +322,11 @@ func TestGoUsesDependencyCache(t *testing.T) {
 	}{
 		{name: "go build", cmd: shell.CommandInfo{Subcommand: "build", Args: []string{"build", "./..."}}, want: true},
 		{name: "go mod download", cmd: shell.CommandInfo{Subcommand: "mod", Args: []string{"mod", "download"}}, want: true},
+		{
+			name: "go generate with build arg",
+			cmd:  shell.CommandInfo{Subcommand: "generate", Args: []string{"generate", "-run", "build"}},
+			want: false,
+		},
 		{name: "go mod tidy", cmd: shell.CommandInfo{Subcommand: "mod", Args: []string{"mod", "tidy"}}, want: false},
 		{name: "go test", cmd: shell.CommandInfo{Subcommand: "test", Args: []string{"test", "./..."}}, want: false},
 	}
