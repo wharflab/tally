@@ -12,7 +12,11 @@ internal object TallySettings {
     internal const val IMPORT_STRATEGY_FROM_ENVIRONMENT = "fromEnvironment"
     internal const val IMPORT_STRATEGY_USE_BUNDLED = "useBundled"
 
-        val executablePaths = listOfNotNull(service.executablePath?.takeIf { it.isNotBlank() })
+    fun fromService(service: TallySettingsService): TallyRuntimeSettings {
+        val executablePaths =
+            service.executablePath
+                ?.takeIf { it.isNotBlank() }
+                ?.let { listOf(it) }
                 ?: emptyList()
         return TallyRuntimeSettings(
             enabled = service.enabled,

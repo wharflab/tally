@@ -69,14 +69,9 @@ class TallyServerService(
         val changes =
             edit.changes?.get(fileUri)
                 ?: edit.documentChanges
-                    ?.mapNotNull { change ->
-                        if (change.isLeft) {
-                            val textDocEdit = change.left
-                            if (textDocEdit.textDocument.uri == fileUri) textDocEdit.edits else null
-                        } else {
-                            null
-                        }
-                    }?.flatten()
+                    ?.mapNotNull { it.left }
+                    ?.find { it.textDocument.uri == fileUri }
+                    ?.edits
                 ?: return
 
         applyTextEdits(document, changes)
