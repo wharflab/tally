@@ -143,6 +143,9 @@ type cacheMountSpec struct {
 type cleanupKind string
 
 const (
+	cargoOrderPlaceholder = "__cargo_target_order__"
+	composerCacheTarget   = "/root/.cache/composer"
+
 	cleanupApt      cleanupKind = "apt"
 	cleanupDnf      cleanupKind = "dnf"
 	cleanupYum      cleanupKind = "yum"
@@ -165,11 +168,11 @@ var orderedCacheMounts = []cacheMountSpec{
 	{Target: "/var/cache/yum", Sharing: instructions.MountSharingLocked},
 	{Target: "/root/.cache/pip"},
 	{Target: "/root/.gem"},
-	{Target: "/app/target"},
+	{Target: cargoOrderPlaceholder},
 	{Target: "/usr/local/cargo/git/db"},
 	{Target: "/usr/local/cargo/registry"},
 	{Target: "/root/.nuget/packages"},
-	{Target: "/tmp/cache"},
+	{Target: composerCacheTarget},
 	{Target: "/root/.cache/uv"},
 	{Target: "/root/.bun/install/cache"},
 }
@@ -242,7 +245,7 @@ func detectRequiredCacheMounts(script string, variant shell.Variant, workdir str
 
 		case "composer":
 			if cmd.HasAnyArg("install") {
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/tmp/cache"})
+				addRequiredMount(requiredByTarget, cacheMountSpec{Target: composerCacheTarget})
 				cleaners[cleanupComposer] = true
 			}
 
@@ -264,13 +267,11 @@ func detectRequiredCacheMounts(script string, variant shell.Variant, workdir str
 }
 
 func orderedRequiredMounts(requiredByTarget map[string]cacheMountSpec, cargoTarget string) []cacheMountSpec {
-	const cargoTargetPlaceholder = "/app/target"
-
 	required := make([]cacheMountSpec, 0, len(requiredByTarget))
 	seen := make(map[string]bool, len(requiredByTarget))
 	for _, mount := range orderedCacheMounts {
 		target := mount.Target
-		if target == cargoTargetPlaceholder && cargoTarget != "" {
+		if target == cargoOrderPlaceholder && cargoTarget != "" {
 			target = cargoTarget
 		}
 		if req, ok := requiredByTarget[target]; ok {

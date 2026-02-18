@@ -233,6 +233,17 @@ RUN pip install --no-cache-dir -r requirements.txt && pip cache purge
 			wantNotContains: []string{"--no-cache-dir", "pip cache purge"},
 		},
 		{
+			name: "composer uses default cache path",
+			content: `FROM php:8.4
+RUN composer install --no-dev && composer clear-cache
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/composer",
+				"composer install --no-dev",
+			},
+			wantNotContains: []string{"composer clear-cache", "--mount=type=cache,target=/tmp/cache"},
+		},
+		{
 			name: "uv no-cache and cleanup removed",
 			content: `FROM python:3.13
 RUN uv sync --no-cache --frozen && uv cache clean

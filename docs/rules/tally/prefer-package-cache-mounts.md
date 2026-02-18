@@ -32,7 +32,7 @@ It also supports `uv` and `bun` package install flows.
 | `bundle install` | `/root/.gem` |
 | `cargo build` | `<WORKDIR>/target`, `/usr/local/cargo/git/db`, `/usr/local/cargo/registry` |
 | `dotnet restore` | `/root/.nuget/packages` |
-| `composer install` | `/tmp/cache` |
+| `composer install` | `/root/.cache/composer` |
 | `uv sync`, `uv pip install`, `uv tool install` | `/root/.cache/uv` |
 | `bun install` | `/root/.bun/install/cache` |
 

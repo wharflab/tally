@@ -364,7 +364,7 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /tmp/cache",
+          "detail": "Detected package install/build command; add cache mount(s): /root/.cache/composer",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
@@ -396,7 +396,7 @@
                     "line": 15
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/tmp/cache composer install --no-dev"
+                "newText": "RUN --mount=type=cache,target=/root/.cache/composer composer install --no-dev"
               }
             ],
             "priority": 90,
