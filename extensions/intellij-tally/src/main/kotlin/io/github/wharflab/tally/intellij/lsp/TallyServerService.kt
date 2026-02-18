@@ -113,7 +113,7 @@ class TallyServerService(
 
     companion object {
         private val LOG = Logger.getInstance(TallyServerService::class.java)
-        private const val TIMEOUT_MS = 5000
+        private const val TIMEOUT_MS = 30_000
 
         fun getInstance(project: Project): TallyServerService = project.service()
     }
