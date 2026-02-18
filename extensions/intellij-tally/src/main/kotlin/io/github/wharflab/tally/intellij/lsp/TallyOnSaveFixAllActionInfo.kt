@@ -8,7 +8,7 @@ internal class TallyOnSaveFixAllActionInfo(
 ) : ActionOnSaveBackedByOwnConfigurable<TallyConfigurable>(context, "TallyConfigurable", TallyConfigurable::class.java) {
     override fun getActionOnSaveName(): String = "Fix all Tally issues"
 
-    override fun isApplicableAccordingToStoredState(): Boolean = true
+    override fun isApplicableAccordingToStoredState(): Boolean = TallySettingsService.getInstance(project).enabled
 
     override fun isActionOnSaveEnabledAccordingToStoredState(): Boolean = TallySettingsService.getInstance(project).fixAllOnSave
 
