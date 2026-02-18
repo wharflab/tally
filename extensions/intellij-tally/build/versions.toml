@@ -16,4 +16,4 @@ jvm_target = "21"
 ktlint_version = "1.5.0"
 
 # Optional: configure JetBrains plugin verifier for `make intellij-plugin-verify`.
-# plugin_verifier_url = "https://github.com/JetBrains/intellij-plugin-verifier/releases/download/1.398/intellij-plugin-verifier-cli-1.398-all.jar"
+plugin_verifier_url = "https://github.com/JetBrains/intellij-plugin-verifier/releases/download/1.400/verifier-cli-1.400-all.jar"
