@@ -17,6 +17,7 @@ internal data class TallyCommand(
 )
 
 internal object TallyBinaryResolver {
+    private const val PLUGIN_ID = "io.github.wharflab.tally"
     private val SERVER_ARGS = listOf("lsp", "--stdio")
 
     fun resolve(
@@ -132,8 +133,6 @@ internal object TallyBinaryResolver {
         }
         return null
     }
-
-    private const val PLUGIN_ID = "io.github.wharflab.tally"
 
     private fun resolveBundledBinary(): TallyCommand? {
         val descriptor =
