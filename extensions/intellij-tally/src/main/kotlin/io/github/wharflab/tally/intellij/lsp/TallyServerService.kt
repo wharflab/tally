@@ -50,6 +50,7 @@ class TallyServerService(
                 } catch (e: java.util.concurrent.CancellationException) {
                     throw e
                 } catch (e: Exception) {
+                    if (e is com.intellij.openapi.diagnostic.ControlFlowException) throw e
                     LOG.warn("Failed to get code actions from Tally server", e)
                     continue
                 } ?: continue
