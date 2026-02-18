@@ -43,8 +43,8 @@ jobs:
           key: intellij-toolchain-${{ runner.os }}-${{ hashFiles('extensions/intellij-tally/build/versions.toml') }}
           restore-keys: |
             intellij-toolchain-${{ runner.os }}-
-      - name: Build IntelliJ plugin
-        run: make intellij-plugin
+      - name: Build and verify IntelliJ plugin
+        run: make intellij-plugin-verify
       - name: IntelliJ Community smoke check
         run: make intellij-plugin-smoke
       - name: Upload plugin artifact
