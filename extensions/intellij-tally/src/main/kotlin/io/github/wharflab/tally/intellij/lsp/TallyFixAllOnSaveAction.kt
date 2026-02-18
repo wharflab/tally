@@ -30,11 +30,11 @@ class TallyFixAllOnSaveAction : ActionsOnSaveFileDocumentManagerListener.ActionO
                 NotificationGroupManager
                     .getInstance()
                     .getNotificationGroup("Tally")
-                    .createNotification(
+                    ?.createNotification(
                         "Tally",
                         "Failed to apply fixes on save: ${e.message}",
                         NotificationType.WARNING,
-                    ).notify(project)
+                    )?.notify(project)
             }
         }
     }
