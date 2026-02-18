@@ -32,7 +32,8 @@
       "tally_rule": "hadolint/DL3007"
     },
     "DL3009": {
-      "status": "not_planned"
+      "status": "not_planned",
+      "tally_rule": "tally/prefer-package-cache-mounts"
     },
     "DL3010": {
       "status": "implemented",
@@ -53,7 +54,8 @@
       "fixable": true
     },
     "DL3019": {
-      "status": "not_planned"
+      "status": "not_planned",
+      "tally_rule": "tally/prefer-package-cache-mounts"
     },
     "DL3020": {
       "status": "implemented",
@@ -98,7 +100,8 @@
       "fixable": true
     },
     "DL3032": {
-      "status": "not_planned"
+      "status": "not_planned",
+      "tally_rule": "tally/prefer-package-cache-mounts"
     },
     "DL3034": {
       "status": "implemented",
@@ -106,7 +109,8 @@
       "fixable": true
     },
     "DL3036": {
-      "status": "not_planned"
+      "status": "not_planned",
+      "tally_rule": "tally/prefer-package-cache-mounts"
     },
     "DL3038": {
       "status": "implemented",
@@ -114,10 +118,12 @@
       "fixable": true
     },
     "DL3040": {
-      "status": "not_planned"
+      "status": "not_planned",
+      "tally_rule": "tally/prefer-package-cache-mounts"
     },
     "DL3042": {
-      "status": "not_planned"
+      "status": "not_planned",
+      "tally_rule": "tally/prefer-package-cache-mounts"
     },
     "DL3043": {
       "status": "implemented",
@@ -150,7 +156,8 @@
       "tally_rule": "tally/prefer-run-heredoc"
     },
     "DL3060": {
-      "status": "not_planned"
+      "status": "not_planned",
+      "tally_rule": "tally/prefer-package-cache-mounts"
     },
     "DL3061": {
       "status": "implemented",

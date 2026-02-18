@@ -121,7 +121,11 @@ format_markdown() {
                 (.tally_rule | split("/") | .[1]) as $slug |
                 "🔄 [`\(.tally_rule)`](docs/rules/tally/\($slug).md)"
             elif .impl_status == "not_planned" then
-                "⛔ Not planned"
+                if .tally_rule then
+                    "⛔ Not planned (`\(.tally_rule)`)"
+                else
+                    "⛔ Not planned"
+                end
             else
                 "⏳"
             end) as $status_str |
