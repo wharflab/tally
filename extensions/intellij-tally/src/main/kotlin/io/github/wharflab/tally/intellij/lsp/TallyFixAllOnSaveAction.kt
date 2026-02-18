@@ -8,7 +8,7 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 
-class TallyFixAllOnSaveAction : ActionsOnSaveFileDocumentManagerListener.ActionOnSave() {
+internal class TallyFixAllOnSaveAction : ActionsOnSaveFileDocumentManagerListener.ActionOnSave() {
     private companion object {
         private val LOG = Logger.getInstance(TallyFixAllOnSaveAction::class.java)
     }

@@ -12,7 +12,7 @@ import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
 import javax.swing.JCheckBox
 
-class TallyConfigurable(
+internal class TallyConfigurable(
     private val project: Project,
 ) : BoundSearchableConfigurable("Tally", "TallyConfigurable") {
     private val settings get() = TallySettingsService.getInstance(project)

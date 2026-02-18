@@ -14,7 +14,7 @@ import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.TextEdit
 import org.eclipse.lsp4j.WorkspaceEdit
 
-class TallyServerService(
+internal class TallyServerService(
     private val project: Project,
 ) {
     fun restartServer() {

@@ -9,7 +9,7 @@ import com.intellij.openapi.project.Project
 
 @Service(Service.Level.PROJECT)
 @State(name = "TallySettings", storages = [Storage("TallySettings.xml")])
-class TallySettingsService(
+internal class TallySettingsService(
     @Suppress("unused") private val project: Project,
 ) : SimplePersistentStateComponent<TallySettingsState>(TallySettingsState()) {
     val enabled: Boolean get() = state.enabled
