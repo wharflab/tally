@@ -20,20 +20,13 @@ internal class TallyLspServerDescriptor(
 ) : ProjectWideLspServerDescriptor(project, "Tally") {
     override fun isSupportedFile(file: VirtualFile): Boolean = TallyFileMatcher.isSupported(file)
 
-    override val lspCustomization: LspCustomization
-        get() =
-            object : LspCustomization() {
-                override val diagnosticsCustomizer: LspDiagnosticsCustomizer
-                    get() = TallyDiagnosticsSupport()
+    override val lspCustomization: LspCustomization =
+        object : LspCustomization() {
+            override val diagnosticsCustomizer: LspDiagnosticsCustomizer = TallyDiagnosticsSupport()
 
-                override val formattingCustomizer: LspFormattingCustomizer
-                    get() =
-                        if (formatOnReformat) {
-                            TallyFormattingSupport()
-                        } else {
-                            LspFormattingDisabled
-                        }
-            }
+            override val formattingCustomizer: LspFormattingCustomizer =
+                if (formatOnReformat) TallyFormattingSupport() else LspFormattingDisabled
+        }
 
     override fun createCommandLine(): GeneralCommandLine {
         val commandLine = GeneralCommandLine(command.executable, *command.args.toTypedArray())
