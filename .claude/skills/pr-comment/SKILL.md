@@ -78,7 +78,7 @@ Reply DIRECTLY to the specific comment (not a new review, not a top-level commen
 
 ```bash
 gh api repos/<owner>/<repo>/pulls/<PR_NUMBER>/comments/<COMMENT_ID>/replies \
-  -X POST -f body='✅ Addressed in <short-sha>. Thanks @<author>!' --jq '"✅ Replied to comment \(.in_reply_to_id)"'
+  -X POST -f body='✅ Addressed in <short-sha>. Thanks @<author>!' --jq '"💬 Replied to comment \(.in_reply_to_id)"'
 ```
 
 Replace:
