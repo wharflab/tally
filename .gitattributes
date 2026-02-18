@@ -3,7 +3,7 @@
 
 # Ensure snapshot files always have LF line endings (for cross-platform testing)
 **/testdata/** text eol=lf
-**/__snapshots__/** text eol=lf
+**/__snapshots__/** text eol=lf linguist-vendored
 *.snap.json text eol=lf
 *.snap.txt text eol=lf
 *.snap.md text eol=lf
@@ -17,3 +17,5 @@
 
 # Generated files
 internal/lsp/protocol/lsp_generated.go linguist-generated=true
+# exclude fixtures and snapshots from statistics
+internal/integration/testdata/* linguist-vendored
