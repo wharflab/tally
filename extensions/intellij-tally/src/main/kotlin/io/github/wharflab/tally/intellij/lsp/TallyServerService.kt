@@ -32,10 +32,12 @@ class TallyServerService(
         for (server in servers) {
             val textDocId = server.getDocumentIdentifier(file)
 
+            val lastLine = maxOf(document.lineCount - 1, 0)
+            val lastLineLength = document.getLineEndOffset(lastLine) - document.getLineStartOffset(lastLine)
             val params =
                 CodeActionParams(
                     textDocId,
-                    Range(Position(0, 0), Position(maxOf(document.lineCount - 1, 0), 0)),
+                    Range(Position(0, 0), Position(lastLine, lastLineLength)),
                     CodeActionContext(emptyList(), listOf("source.fixAll.tally")),
                 )
 
