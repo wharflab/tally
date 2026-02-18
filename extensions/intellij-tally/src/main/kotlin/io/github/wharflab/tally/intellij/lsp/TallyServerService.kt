@@ -47,6 +47,8 @@ class TallyServerService(
                     server.sendRequestSync(TIMEOUT_MS) { languageServer ->
                         languageServer.textDocumentService.codeAction(params)
                     }
+                } catch (e: java.util.concurrent.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     LOG.warn("Failed to get code actions from Tally server", e)
                     continue
