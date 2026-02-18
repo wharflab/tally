@@ -1,6 +1,7 @@
 package io.github.wharflab.tally.intellij.lsp
 
 internal data class TallyRuntimeSettings(
+    val enabled: Boolean,
     val executablePaths: List<String>,
     val importStrategy: String,
     val fixUnsafe: Boolean,
@@ -18,6 +19,7 @@ internal object TallySettings {
                 ?.let { listOf(it) }
                 ?: emptyList()
         return TallyRuntimeSettings(
+            enabled = service.enabled,
             executablePaths = executablePaths,
             importStrategy = IMPORT_STRATEGY_FROM_ENVIRONMENT,
             fixUnsafe = service.fixUnsafe,
@@ -34,7 +36,7 @@ internal object TallySettings {
             "version" to 1,
             "global" to
                 mapOf(
-                    "enable" to true,
+                    "enable" to settings.enabled,
                     "path" to settings.executablePaths,
                     "importStrategy" to settings.importStrategy,
                     "configuration" to settings.configurationOverride,
