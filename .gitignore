@@ -60,6 +60,7 @@ package-lock.json
 extensions/intellij-tally/.cache/
 extensions/intellij-tally/out/
 extensions/intellij-tally/dist/
+verification-*/
 packaging/npm/**/bin/tally*
 packaging/npm/**/README.md
 
