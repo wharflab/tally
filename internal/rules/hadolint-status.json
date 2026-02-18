@@ -1,6 +1,6 @@
 {
   "$schema": "./hadolint-status.schema.json",
-  "$comment": "Implementation status of Hadolint rules in tally. Rules not listed default to 'not_implemented'.",
+  "$comment": "Implementation status of Hadolint rules in tally. Rules not listed default to 'not_implemented'. Supported explicit statuses include 'not_planned'.",
   "rules": {
     "DL3000": {
       "status": "covered_by_buildkit",
@@ -31,6 +31,9 @@
       "status": "implemented",
       "tally_rule": "hadolint/DL3007"
     },
+    "DL3009": {
+      "status": "not_planned"
+    },
     "DL3010": {
       "status": "implemented",
       "tally_rule": "hadolint/DL3010"
@@ -48,6 +51,9 @@
       "status": "implemented",
       "tally_rule": "hadolint/DL3014",
       "fixable": true
+    },
+    "DL3019": {
+      "status": "not_planned"
     },
     "DL3020": {
       "status": "implemented",
@@ -91,15 +97,27 @@
       "tally_rule": "hadolint/DL3030",
       "fixable": true
     },
+    "DL3032": {
+      "status": "not_planned"
+    },
     "DL3034": {
       "status": "implemented",
       "tally_rule": "hadolint/DL3034",
       "fixable": true
     },
+    "DL3036": {
+      "status": "not_planned"
+    },
     "DL3038": {
       "status": "implemented",
       "tally_rule": "hadolint/DL3038",
       "fixable": true
+    },
+    "DL3040": {
+      "status": "not_planned"
+    },
+    "DL3042": {
+      "status": "not_planned"
     },
     "DL3043": {
       "status": "implemented",
@@ -130,6 +148,9 @@
     "DL3059": {
       "status": "covered_by_tally",
       "tally_rule": "tally/prefer-run-heredoc"
+    },
+    "DL3060": {
+      "status": "not_planned"
     },
     "DL3061": {
       "status": "implemented",

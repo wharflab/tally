@@ -32,7 +32,7 @@ Usage: ./scripts/generate-hadolint-table.sh [OPTIONS] [RULES_FILE]
 
 Generate Hadolint rules table for RULES.md by merging:
   - Hadolint rule definitions (code, description, severity)
-  - Tally implementation status (implemented, covered_by_buildkit, not_implemented)
+  - Tally implementation status (implemented, covered_by_buildkit, covered_by_tally, not_implemented, not_planned)
 
 Options:
   --extract     Extract fresh rules from HADOLINT_REPO (requires ast-grep)
@@ -120,6 +120,8 @@ format_markdown() {
             elif .impl_status == "covered_by_tally" then
                 (.tally_rule | split("/") | .[1]) as $slug |
                 "🔄 [`\(.tally_rule)`](docs/rules/tally/\($slug).md)"
+            elif .impl_status == "not_planned" then
+                "⛔ Not planned"
             else
                 "⏳"
             end) as $status_str |
@@ -187,14 +189,16 @@ format_summary() {
         ([.[] | select(.impl_status == "implemented")] | length) as $implemented |
         ([.[] | select(.impl_status == "covered_by_buildkit")] | length) as $covered_bk |
         ([.[] | select(.impl_status == "covered_by_tally")] | length) as $covered_tally |
+        ([.[] | select(.impl_status == "not_planned")] | length) as $not_planned |
         ($covered_bk + $covered_tally) as $covered |
-        ($total - $implemented - $covered) as $pending |
+        ($total - $implemented - $covered - $not_planned) as $pending |
 
         "Hadolint DL Rules Status:",
         "  Total: \($total)",
         "  Implemented by tally: \($implemented)",
         "  Covered by BuildKit: \($covered_bk)",
         "  Covered by tally rule: \($covered_tally)",
+        "  Not planned: \($not_planned)",
         "  Not yet implemented: \($pending)",
         "",
         "Coverage: \((($implemented + $covered) * 100 / $total) | floor)%"

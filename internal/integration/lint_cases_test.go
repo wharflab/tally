@@ -508,6 +508,12 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-run-heredoc")...),
 			wantExit: 1,
 		},
+		{
+			name:     "prefer-package-cache-mounts",
+			dir:      "prefer-package-cache-mounts",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-package-cache-mounts")...),
+			wantExit: 1,
+		},
 
 		{
 			name:     "prefer-add-unpack",
