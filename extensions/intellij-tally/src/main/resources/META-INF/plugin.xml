@@ -17,4 +17,8 @@
 
     <depends>com.intellij.modules.platform</depends>
     <depends optional="true" config-file="lsp.xml">com.intellij.modules.lsp</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <iconProvider implementation="io.github.wharflab.tally.intellij.lsp.TallyIconProvider"/>
+    </extensions>
 </idea-plugin>
