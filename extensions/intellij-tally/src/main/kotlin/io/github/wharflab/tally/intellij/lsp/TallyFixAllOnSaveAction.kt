@@ -3,11 +3,16 @@ package io.github.wharflab.tally.intellij.lsp
 import com.intellij.ide.actionsOnSave.impl.ActionsOnSaveFileDocumentManagerListener
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 
 class TallyFixAllOnSaveAction : ActionsOnSaveFileDocumentManagerListener.ActionOnSave() {
+    private companion object {
+        private val LOG = Logger.getInstance(TallyFixAllOnSaveAction::class.java)
+    }
+
     override fun isEnabledForProject(project: Project): Boolean = TallySettingsService.getInstance(project).fixAllOnSave
 
     override fun processDocuments(
@@ -21,6 +26,7 @@ class TallyFixAllOnSaveAction : ActionsOnSaveFileDocumentManagerListener.ActionO
             try {
                 service.fixAll(document)
             } catch (e: Exception) {
+                LOG.warn("Failed to apply fixes on save", e)
                 NotificationGroupManager
                     .getInstance()
                     .getNotificationGroup("Tally")
