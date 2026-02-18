@@ -209,6 +209,19 @@ RUN yum install -y make && yum clean all
 			wantNotContains: []string{"yum clean"},
 		},
 		{
+			name: "cargo target follows workdir",
+			content: `FROM rust:1.83
+WORKDIR /workspace
+RUN cargo build --release
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/workspace/target",
+				"--mount=type=cache,target=/usr/local/cargo/git/db",
+				"--mount=type=cache,target=/usr/local/cargo/registry",
+			},
+			wantNotContains: []string{"--mount=type=cache,target=/app/target"},
+		},
+		{
 			name: "pip no-cache-dir and cleanup removed",
 			content: `FROM python:3.13
 RUN pip install --no-cache-dir -r requirements.txt && pip cache purge

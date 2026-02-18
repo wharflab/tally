@@ -284,17 +284,17 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /app/target, /usr/local/cargo/git/db, /usr/local/cargo/registry",
+          "detail": "Detected package install/build command; add cache mount(s): /workspace/target, /usr/local/cargo/git/db, /usr/local/cargo/registry",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
               "column": 0,
-              "line": 12
+              "line": 13
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 12
+              "line": 13
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -308,15 +308,15 @@
                 "location": {
                   "end": {
                     "column": 25,
-                    "line": 12
+                    "line": 13
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 12
+                    "line": 13
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/app/target --mount=type=cache,target=/usr/local/cargo/git/db --mount=type=cache,target=/usr/local/cargo/registry cargo build --release"
+                "newText": "RUN --mount=type=cache,target=/workspace/target --mount=type=cache,target=/usr/local/cargo/git/db --mount=type=cache,target=/usr/local/cargo/registry cargo build --release"
               }
             ],
             "priority": 90,
@@ -329,12 +329,12 @@
           "location": {
             "end": {
               "column": 0,
-              "line": 13
+              "line": 14
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 13
+              "line": 14
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -348,12 +348,12 @@
                 "location": {
                   "end": {
                     "column": 53,
-                    "line": 13
+                    "line": 14
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 13
+                    "line": 14
                   }
                 },
                 "newText": "RUN --mount=type=cache,target=/root/.nuget/packages dotnet restore"
@@ -369,12 +369,12 @@
           "location": {
             "end": {
               "column": 0,
-              "line": 14
+              "line": 15
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 14
+              "line": 15
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -388,12 +388,12 @@
                 "location": {
                   "end": {
                     "column": 53,
-                    "line": 14
+                    "line": 15
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 14
+                    "line": 15
                   }
                 },
                 "newText": "RUN --mount=type=cache,target=/tmp/cache composer install --no-dev"
@@ -409,12 +409,12 @@
           "location": {
             "end": {
               "column": 0,
-              "line": 15
+              "line": 16
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 15
+              "line": 16
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -428,12 +428,12 @@
                 "location": {
                   "end": {
                     "column": 49,
-                    "line": 15
+                    "line": 16
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 15
+                    "line": 16
                   }
                 },
                 "newText": "RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen"
@@ -449,12 +449,12 @@
           "location": {
             "end": {
               "column": 0,
-              "line": 16
+              "line": 17
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 16
+              "line": 17
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -468,12 +468,12 @@
                 "location": {
                   "end": {
                     "column": 45,
-                    "line": 16
+                    "line": 17
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 16
+                    "line": 17
                   }
                 },
                 "newText": "RUN --mount=type=cache,target=/root/.bun/install/cache bun install"
@@ -489,12 +489,12 @@
           "location": {
             "end": {
               "column": 0,
-              "line": 17
+              "line": 18
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 17
+              "line": 18
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -508,12 +508,12 @@
                 "location": {
                   "end": {
                     "column": 3,
-                    "line": 20
+                    "line": 21
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 17
+                    "line": 18
                   }
                 },
                 "newText": "RUN --mount=type=cache,target=/root/.npm \u003c\u003cEOF\nnpm install\nEOF"

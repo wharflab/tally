@@ -9,6 +9,7 @@ RUN dnf install -y git && dnf clean all
 RUN yum install -y make && yum clean all
 RUN pip install --no-cache-dir -r requirements.txt && pip cache purge
 RUN bundle install && bundle clean
+WORKDIR /workspace
 RUN cargo build --release
 RUN dotnet restore && dotnet nuget locals all --clear
 RUN composer install --no-dev && composer clear-cache

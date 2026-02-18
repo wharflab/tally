@@ -2,6 +2,7 @@ package tally
 
 import (
 	"fmt"
+	"path"
 	"slices"
 	"strings"
 
@@ -58,7 +59,13 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 			}
 		}
 
+		workdir := "/"
 		for _, cmd := range stage.Commands {
+			if wd, ok := cmd.(*instructions.WorkdirCommand); ok {
+				workdir = resolveWorkdir(workdir, wd.Path)
+				continue
+			}
+
 			run, ok := cmd.(*instructions.RunCommand)
 			if !ok || !run.PrependShell {
 				continue
@@ -69,7 +76,7 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 				continue
 			}
 
-			required, cleaners := detectRequiredCacheMounts(script, shellVariant)
+			required, cleaners := detectRequiredCacheMounts(script, shellVariant, workdir)
 			if len(required) == 0 {
 				continue
 			}
@@ -167,9 +174,10 @@ var orderedCacheMounts = []cacheMountSpec{
 	{Target: "/root/.bun/install/cache"},
 }
 
-func detectRequiredCacheMounts(script string, variant shell.Variant) ([]cacheMountSpec, map[cleanupKind]bool) {
+func detectRequiredCacheMounts(script string, variant shell.Variant, workdir string) ([]cacheMountSpec, map[cleanupKind]bool) {
 	requiredByTarget := make(map[string]cacheMountSpec)
 	cleaners := make(map[cleanupKind]bool)
+	cargoTarget := ""
 
 	cmds := shell.FindCommands(
 		script,
@@ -220,7 +228,8 @@ func detectRequiredCacheMounts(script string, variant shell.Variant) ([]cacheMou
 
 		case "cargo":
 			if cmd.HasAnyArg("build") {
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/app/target"})
+				cargoTarget = path.Clean(path.Join(workdir, "target"))
+				addRequiredMount(requiredByTarget, cacheMountSpec{Target: cargoTarget})
 				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/git/db"})
 				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/registry"})
 			}
@@ -251,16 +260,36 @@ func detectRequiredCacheMounts(script string, variant shell.Variant) ([]cacheMou
 		}
 	}
 
-	return orderedRequiredMounts(requiredByTarget), cleaners
+	return orderedRequiredMounts(requiredByTarget, cargoTarget), cleaners
 }
 
-func orderedRequiredMounts(requiredByTarget map[string]cacheMountSpec) []cacheMountSpec {
+func orderedRequiredMounts(requiredByTarget map[string]cacheMountSpec, cargoTarget string) []cacheMountSpec {
+	const cargoTargetPlaceholder = "/app/target"
+
 	required := make([]cacheMountSpec, 0, len(requiredByTarget))
+	seen := make(map[string]bool, len(requiredByTarget))
 	for _, mount := range orderedCacheMounts {
-		if req, ok := requiredByTarget[mount.Target]; ok {
+		target := mount.Target
+		if target == cargoTargetPlaceholder && cargoTarget != "" {
+			target = cargoTarget
+		}
+		if req, ok := requiredByTarget[target]; ok {
 			required = append(required, req)
+			seen[target] = true
 		}
 	}
+
+	remainingTargets := make([]string, 0, len(requiredByTarget))
+	for target := range requiredByTarget {
+		if !seen[target] {
+			remainingTargets = append(remainingTargets, target)
+		}
+	}
+	slices.Sort(remainingTargets)
+	for _, target := range remainingTargets {
+		required = append(required, requiredByTarget[target])
+	}
+
 	return required
 }
 
@@ -292,6 +321,16 @@ func addOSPackageManagerCacheMounts(
 		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/yum", Sharing: instructions.MountSharingLocked})
 		cleaners[cleanupYum] = true
 	}
+}
+
+func resolveWorkdir(currentWorkdir, nextPath string) string {
+	if nextPath == "" {
+		return currentWorkdir
+	}
+	if path.IsAbs(nextPath) {
+		return path.Clean(nextPath)
+	}
+	return path.Clean(path.Join(currentWorkdir, nextPath))
 }
 
 func goUsesDependencyCache(cmd shell.CommandInfo) bool {

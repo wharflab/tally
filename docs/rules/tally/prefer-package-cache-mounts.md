@@ -30,7 +30,7 @@ It also supports `uv` and `bun` package install flows.
 | `yum` package operations | `/var/cache/yum` (`sharing=locked`) |
 | `pip install` | `/root/.cache/pip` |
 | `bundle install` | `/root/.gem` |
-| `cargo build` | `/app/target`, `/usr/local/cargo/git/db`, `/usr/local/cargo/registry` |
+| `cargo build` | `<WORKDIR>/target`, `/usr/local/cargo/git/db`, `/usr/local/cargo/registry` |
 | `dotnet restore` | `/root/.nuget/packages` |
 | `composer install` | `/tmp/cache` |
 | `uv sync`, `uv pip install`, `uv tool install` | `/root/.cache/uv` |
