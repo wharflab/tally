@@ -1,0 +1,2 @@
+[rules.tally.prefer-package-cache-mounts]
+severity = "info"

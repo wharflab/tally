@@ -154,6 +154,63 @@ func TestExtractChainedCommands(t *testing.T) {
 	}
 }
 
+func TestExtractChainSeparators(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name         string
+		script       string
+		variant      Variant
+		commandCount int
+		want         []string
+	}{
+		{
+			name:         "single-line separators",
+			script:       "apt-get update && apt-get install -y curl && apt-get clean",
+			variant:      VariantBash,
+			commandCount: 3,
+			want:         []string{" && ", " && "},
+		},
+		{
+			name: "continuation separators",
+			script: "apt-get update && \\\n" +
+				"    apt-get install -y curl && \\\n" +
+				"    apt-get clean",
+			variant:      VariantBash,
+			commandCount: 3,
+			want:         []string{" && \\\n    ", " && \\\n    "},
+		},
+		{
+			name:         "mismatched command count returns nil",
+			script:       "apt-get update && apt-get install -y curl",
+			variant:      VariantBash,
+			commandCount: 3,
+			want:         nil,
+		},
+		{
+			name:         "non-posix returns nil",
+			script:       "apt-get update && apt-get install -y curl",
+			variant:      VariantNonPOSIX,
+			commandCount: 2,
+			want:         nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := ExtractChainSeparators(tt.script, tt.variant, tt.commandCount)
+			if len(got) != len(tt.want) {
+				t.Fatalf("ExtractChainSeparators() returned %d separators, want %d: %v", len(got), len(tt.want), got)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("separator %d = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
 func TestIsSimpleScript(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

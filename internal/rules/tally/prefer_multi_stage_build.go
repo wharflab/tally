@@ -296,7 +296,7 @@ func extractPackagesAfter(lower, kw string) []string {
 			continue
 		}
 		// Common package-manager glue tokens.
-		if f == "\\" || f == "--no-cache" {
+		if f == "\\" || f == noCacheFlag {
 			continue
 		}
 		pkgs = append(pkgs, strings.TrimSpace(f))

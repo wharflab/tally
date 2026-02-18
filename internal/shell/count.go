@@ -84,6 +84,65 @@ func ExtractChainedCommands(script string, variant Variant) []string {
 	return commands
 }
 
+// ExtractChainSeparators returns the raw separator text between commands in an
+// && chain (for example " && " or " && \\\n    "). The result length is
+// commandCount-1 on success; otherwise nil.
+func ExtractChainSeparators(script string, variant Variant, commandCount int) []string {
+	if variant.IsNonPOSIX() || commandCount <= 1 {
+		return nil
+	}
+
+	parser := syntax.NewParser(
+		syntax.Variant(variant.toLangVariant()),
+		syntax.KeepComments(false),
+	)
+
+	prog, err := parser.Parse(strings.NewReader(script), "")
+	if err != nil {
+		return nil
+	}
+
+	boundaries := make([][2]uint, 0, commandCount-1)
+	for _, stmt := range prog.Stmts {
+		collectAndBoundaries(stmt, &boundaries)
+	}
+	if len(boundaries) != commandCount-1 {
+		return nil
+	}
+
+	separators := make([]string, 0, len(boundaries))
+	for _, boundary := range boundaries {
+		start, end := boundary[0], boundary[1]
+		if start > uint(len(script)) || end > uint(len(script)) || end < start {
+			return nil
+		}
+		separators = append(separators, script[start:end])
+	}
+
+	return separators
+}
+
+func collectAndBoundaries(stmt *syntax.Stmt, boundaries *[][2]uint) {
+	if stmt == nil || stmt.Cmd == nil {
+		return
+	}
+
+	binaryCmd, ok := stmt.Cmd.(*syntax.BinaryCmd)
+	if !ok || binaryCmd.Op != syntax.AndStmt {
+		return
+	}
+
+	collectAndBoundaries(binaryCmd.X, boundaries)
+
+	start := binaryCmd.X.End().Offset()
+	end := binaryCmd.Y.Pos().Offset()
+	if end >= start {
+		*boundaries = append(*boundaries, [2]uint{start, end})
+	}
+
+	collectAndBoundaries(binaryCmd.Y, boundaries)
+}
+
 // extractFromStatement extracts commands from a statement, flattening && chains.
 // Only && chains are flattened - || chains have different semantics with set -e
 // and are kept as single commands (which will fail the IsSimpleScript check).
