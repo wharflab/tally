@@ -101,6 +101,14 @@ RUN cargo build --release
 			WantViolations: 1,
 		},
 		{
+			Name: "cargo build with non-default workdir",
+			Content: `FROM rust:1.83
+WORKDIR /src
+RUN cargo build --release
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "dotnet restore",
 			Content: `FROM mcr.microsoft.com/dotnet/sdk:9.0
 RUN dotnet restore
