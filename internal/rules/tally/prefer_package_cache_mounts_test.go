@@ -231,6 +231,20 @@ RUN --mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf \
 			wantNotContains: []string{"apt-get clean"},
 		},
 		{
+			name: "multiline chain preserves continuation style",
+			content: `FROM ubuntu:24.04
+RUN apt-get update && \
+    apt-get install -y gcc && \
+    apt-get clean
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/var/cache/apt,sharing=locked",
+				"--mount=type=cache,target=/var/lib/apt,sharing=locked",
+				"apt-get update &&     apt-get install -y gcc",
+			},
+			wantNotContains: []string{"apt-get clean", "apt-get update && apt-get install -y gcc"},
+		},
+		{
 			name: "apk cleanup and no-cache flag removed",
 			content: `FROM alpine:3.21
 RUN apk add --no-cache curl && rm -rf /var/cache/apk/*

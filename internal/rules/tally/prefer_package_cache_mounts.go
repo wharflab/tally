@@ -477,10 +477,12 @@ func removeCacheCleanupFromChain(script string, variant shell.Variant, cleaners 
 	if len(commands) == 0 {
 		return script, false
 	}
+	separators := shell.ExtractChainSeparators(script, variant, len(commands))
 
 	filtered := make([]string, 0, len(commands))
+	keptIndexes := make([]int, 0, len(commands))
 	changed := false
-	for _, command := range commands {
+	for idx, command := range commands {
 		if isCacheCleanupCommand(command, cleaners) {
 			changed = true
 			continue
@@ -491,13 +493,45 @@ func removeCacheCleanupFromChain(script string, variant shell.Variant, cleaners 
 			changed = true
 		}
 		filtered = append(filtered, updated)
+		keptIndexes = append(keptIndexes, idx)
 	}
 
 	if !changed || len(filtered) == 0 {
 		return script, false
 	}
 
+	if joined, ok := joinWithOriginalSeparators(filtered, keptIndexes, separators); ok {
+		return joined, true
+	}
+
 	return strings.Join(filtered, " && "), true
+}
+
+func joinWithOriginalSeparators(filtered []string, keptIndexes []int, separators []string) (string, bool) {
+	if len(filtered) == 0 {
+		return "", false
+	}
+	if len(filtered) == 1 {
+		return filtered[0], true
+	}
+	if len(separators) == 0 {
+		return "", false
+	}
+
+	var sb strings.Builder
+	sb.WriteString(filtered[0])
+	for i := 1; i < len(filtered); i++ {
+		prev := keptIndexes[i-1]
+		curr := keptIndexes[i]
+		if curr == prev+1 && prev >= 0 && prev < len(separators) {
+			sb.WriteString(separators[prev])
+		} else {
+			sb.WriteString(" && ")
+		}
+		sb.WriteString(filtered[i])
+	}
+
+	return sb.String(), true
 }
 
 func removeCacheCleanupFromHeredoc(script string, variant shell.Variant, cleaners map[cleanupKind]bool) (string, bool) {
