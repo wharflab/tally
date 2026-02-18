@@ -21,8 +21,10 @@ class TallyConfigurable(
         private val LOG = Logger.getInstance(TallyConfigurable::class.java)
     }
 
-    internal lateinit var enabledCheckBox: Cell<JCheckBox>
-    internal lateinit var fixAllOnSaveCheckBox: Cell<JCheckBox>
+    internal var enabledCheckBox: Cell<JCheckBox>? = null
+        private set
+    internal var fixAllOnSaveCheckBox: Cell<JCheckBox>? = null
+        private set
 
     override fun createPanel() =
         panel {

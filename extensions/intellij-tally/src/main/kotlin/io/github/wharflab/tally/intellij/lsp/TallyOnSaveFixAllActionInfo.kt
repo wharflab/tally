@@ -16,6 +16,6 @@ internal class TallyOnSaveFixAllActionInfo(
         configurable: TallyConfigurable,
         enabled: Boolean,
     ) {
-        configurable.fixAllOnSaveCheckBox.component.isSelected = enabled
+        configurable.fixAllOnSaveCheckBox?.component?.isSelected = enabled
     }
 }
