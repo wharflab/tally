@@ -33,6 +33,13 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 			WantViolations: 0,
 		},
 		{
+			Name: "npm i alias without cache mount",
+			Content: `FROM node:20
+RUN npm i
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "go build without cache mounts",
 			Content: `FROM golang:1.24
 RUN go build ./...
