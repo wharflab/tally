@@ -4,6 +4,10 @@ import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.ProjectWideLspServerDescriptor
+import com.intellij.platform.lsp.api.customization.LspCustomization
+import com.intellij.platform.lsp.api.customization.LspDiagnosticsCustomizer
+import com.intellij.platform.lsp.api.customization.LspFormattingCustomizer
+import com.intellij.platform.lsp.api.customization.LspFormattingDisabled
 import org.eclipse.lsp4j.ClientCapabilities
 import org.eclipse.lsp4j.ConfigurationItem
 import org.eclipse.lsp4j.WorkspaceClientCapabilities
@@ -12,8 +16,24 @@ internal class TallyLspServerDescriptor(
     project: Project,
     private val command: TallyCommand,
     private val settings: TallyRuntimeSettings,
+    private val formatOnReformat: Boolean,
 ) : ProjectWideLspServerDescriptor(project, "Tally") {
     override fun isSupportedFile(file: VirtualFile): Boolean = TallyFileMatcher.isSupported(file)
+
+    override val lspCustomization: LspCustomization
+        get() =
+            object : LspCustomization() {
+                override val diagnosticsCustomizer: LspDiagnosticsCustomizer
+                    get() = TallyDiagnosticsSupport()
+
+                override val formattingCustomizer: LspFormattingCustomizer
+                    get() =
+                        if (formatOnReformat) {
+                            TallyFormattingSupport()
+                        } else {
+                            LspFormattingDisabled
+                        }
+            }
 
     override fun createCommandLine(): GeneralCommandLine {
         val commandLine = GeneralCommandLine(command.executable, *command.args.toTypedArray())

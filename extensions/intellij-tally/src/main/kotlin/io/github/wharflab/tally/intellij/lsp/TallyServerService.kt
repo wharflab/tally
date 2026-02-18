@@ -77,8 +77,15 @@ class TallyServerService(
                     }?.flatten()
                 ?: return
 
+        applyTextEdits(document, changes)
+    }
+
+    private fun applyTextEdits(
+        document: Document,
+        edits: List<TextEdit>,
+    ) {
         val sortedEdits =
-            changes.sortedWith(
+            edits.sortedWith(
                 compareByDescending<TextEdit> { it.range.end.line }
                     .thenByDescending { it.range.end.character },
             )

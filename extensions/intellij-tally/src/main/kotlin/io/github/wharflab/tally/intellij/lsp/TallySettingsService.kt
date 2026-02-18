@@ -16,6 +16,7 @@ class TallySettingsService(
     val executablePath: String? get() = state.executablePath
     val fixUnsafe: Boolean get() = state.fixUnsafe
     val fixAllOnSave: Boolean get() = state.fixAllOnSave
+    val formatOnReformat: Boolean get() = state.formatOnReformat
     val configurationPath: String? get() = state.configurationPath
 
     companion object {

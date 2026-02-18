@@ -53,6 +53,11 @@ class TallyConfigurable(
                     .bindSelected(settings.state::fixUnsafe)
             }
             row {
+                checkBox("Format on reformat")
+                    .bindSelected(settings.state::formatOnReformat)
+                comment("Use Tally to format Dockerfiles on Reformat Code.")
+            }
+            row {
                 fixAllOnSaveCheckBox =
                     checkBox("Fix all on save")
                         .bindSelected(settings.state::fixAllOnSave)

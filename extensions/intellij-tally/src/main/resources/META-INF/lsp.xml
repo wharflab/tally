@@ -12,5 +12,8 @@
                 id="TallyOnSaveInfoProvider"
                 implementation="io.github.wharflab.tally.intellij.lsp.TallyOnSaveInfoProvider"
                 order="after FormatOnSaveInfoProvider"/>
+        <codeInsight.linkHandler
+                prefix="#tally-rule/"
+                handlerClass="io.github.wharflab.tally.intellij.lsp.TallyRuleTooltipLinkHandler"/>
     </extensions>
 </idea-plugin>
