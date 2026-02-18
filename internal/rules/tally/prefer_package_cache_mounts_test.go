@@ -65,6 +65,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 			WantViolations: 0,
 		},
 		{
+			Name: "apk add",
+			Content: `FROM alpine:3.21
+RUN apk add --no-cache curl
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "dnf install",
 			Content: `FROM fedora:41
 RUN dnf install -y gcc
@@ -79,6 +86,13 @@ RUN yum install -y gcc
 			WantViolations: 1,
 		},
 		{
+			Name: "zypper install",
+			Content: `FROM opensuse/leap:15.6
+RUN zypper install -y git
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "pip install",
 			Content: `FROM python:3.13
 RUN pip install -r requirements.txt
@@ -89,6 +103,13 @@ RUN pip install -r requirements.txt
 			Name: "bundle install",
 			Content: `FROM ruby:3.4
 RUN bundle install
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "yarn install",
+			Content: `FROM node:20
+RUN yarn install
 `,
 			WantViolations: 1,
 		},
@@ -210,6 +231,17 @@ RUN --mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf \
 			wantNotContains: []string{"apt-get clean"},
 		},
 		{
+			name: "apk cleanup and no-cache flag removed",
+			content: `FROM alpine:3.21
+RUN apk add --no-cache curl && rm -rf /var/cache/apk/*
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/var/cache/apk,sharing=locked",
+				"apk add curl",
+			},
+			wantNotContains: []string{"--no-cache", "/var/cache/apk/*"},
+		},
+		{
 			name: "dnf cleanup removed",
 			content: `FROM fedora:41
 RUN dnf install -y git && dnf clean all
@@ -230,6 +262,17 @@ RUN yum install -y make && yum clean all
 				"yum install -y make",
 			},
 			wantNotContains: []string{"yum clean"},
+		},
+		{
+			name: "zypper cleanup removed",
+			content: `FROM opensuse/leap:15.6
+RUN zypper install -y git && zypper clean --all
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/var/cache/zypp,sharing=locked",
+				"zypper install -y git",
+			},
+			wantNotContains: []string{"zypper clean"},
 		},
 		{
 			name: "cargo target follows workdir",
@@ -254,6 +297,17 @@ RUN pip install --no-cache-dir -r requirements.txt && pip cache purge
 				"pip install -r requirements.txt",
 			},
 			wantNotContains: []string{"--no-cache-dir", "pip cache purge"},
+		},
+		{
+			name: "yarn cleanup removed",
+			content: `FROM node:20
+RUN yarn install && yarn cache clean
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/usr/local/share/.cache/yarn",
+				"yarn install",
+			},
+			wantNotContains: []string{"yarn cache clean"},
 		},
 		{
 			name: "composer uses default cache path",
@@ -446,6 +500,18 @@ func TestIsPackageCacheDirCleanup(t *testing.T) {
 			name:     "yum cache cleanup with wildcard",
 			command:  "rm -fr /var/cache/yum/*",
 			cacheDir: "/var/cache/yum",
+			want:     true,
+		},
+		{
+			name:     "apk cache cleanup with wildcard",
+			command:  "rm -rf /var/cache/apk/*",
+			cacheDir: "/var/cache/apk",
+			want:     true,
+		},
+		{
+			name:     "zypper cache cleanup",
+			command:  "rm -rf /var/cache/zypp/packages",
+			cacheDir: "/var/cache/zypp",
 			want:     true,
 		},
 		{

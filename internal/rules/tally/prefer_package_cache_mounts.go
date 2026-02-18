@@ -145,10 +145,15 @@ type cleanupKind string
 const (
 	cargoOrderPlaceholder = "__cargo_target_order__"
 	composerCacheTarget   = "/root/.cache/composer"
+	noCacheFlag           = "--no-cache"
+	noCacheDirFlag        = "--no-cache-dir"
 
 	cleanupApt      cleanupKind = "apt"
+	cleanupApk      cleanupKind = "apk"
 	cleanupDnf      cleanupKind = "dnf"
 	cleanupYum      cleanupKind = "yum"
+	cleanupZypper   cleanupKind = "zypper"
+	cleanupYarn     cleanupKind = "yarn"
 	cleanupNpm      cleanupKind = "npm"
 	cleanupPip      cleanupKind = "pip"
 	cleanupBundle   cleanupKind = "bundle"
@@ -164,8 +169,11 @@ var orderedCacheMounts = []cacheMountSpec{
 	{Target: "/root/.cache/go-build"},
 	{Target: "/var/cache/apt", Sharing: instructions.MountSharingLocked},
 	{Target: "/var/lib/apt", Sharing: instructions.MountSharingLocked},
+	{Target: "/var/cache/apk", Sharing: instructions.MountSharingLocked},
 	{Target: "/var/cache/dnf", Sharing: instructions.MountSharingLocked},
 	{Target: "/var/cache/yum", Sharing: instructions.MountSharingLocked},
+	{Target: "/var/cache/zypp", Sharing: instructions.MountSharingLocked},
+	{Target: "/usr/local/share/.cache/yarn"},
 	{Target: "/root/.cache/pip"},
 	{Target: "/root/.gem"},
 	{Target: cargoOrderPlaceholder},
@@ -189,8 +197,11 @@ func detectRequiredCacheMounts(script string, variant shell.Variant, workdir str
 		"go",
 		"apt",
 		"apt-get",
+		string(cleanupApk),
 		string(cleanupDnf),
 		string(cleanupYum),
+		string(cleanupZypper),
+		string(cleanupYarn),
 		string(cleanupPip),
 		"bundle",
 		"cargo",
@@ -201,66 +212,10 @@ func detectRequiredCacheMounts(script string, variant shell.Variant, workdir str
 	)
 
 	for _, cmd := range cmds {
-		switch cmd.Name {
-		case string(cleanupNpm):
-			if cmd.HasAnyArg("install", "ci", "i") {
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.npm"})
-				cleaners[cleanupNpm] = true
-			}
-
-		case "go":
-			if goUsesDependencyCache(cmd) {
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/go/pkg/mod"})
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.cache/go-build"})
-			}
-
-		case "apt", "apt-get", "dnf", "yum":
-			addOSPackageManagerCacheMounts(cmd, requiredByTarget, cleaners)
-
-		case string(cleanupPip):
-			if cmd.HasAnyArg("install") {
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.cache/pip"})
-				cleaners[cleanupPip] = true
-			}
-
-		case "bundle":
-			if cmd.HasAnyArg("install") {
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.gem"})
-				cleaners[cleanupBundle] = true
-			}
-
-		case "cargo":
-			if cmd.Subcommand == "build" {
-				cargoTarget = path.Clean(path.Join(workdir, "target"))
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: cargoTarget})
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/git/db"})
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/registry"})
-			}
-
-		case "dotnet":
-			if cmd.HasAnyArg("restore") {
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.nuget/packages"})
-				cleaners[cleanupDotnet] = true
-			}
-
-		case "composer":
-			if cmd.HasAnyArg("install") {
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: composerCacheTarget})
-				cleaners[cleanupComposer] = true
-			}
-
-		case string(cleanupUV):
-			if uvUsesCache(cmd) {
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.cache/uv"})
-				cleaners[cleanupUV] = true
-			}
-
-		case string(cleanupBun):
-			if cmd.HasAnyArg("install") {
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.bun/install/cache"})
-				cleaners[cleanupBun] = true
-			}
+		if addOSPackageManagerCacheMounts(cmd, requiredByTarget, cleaners) {
+			continue
 		}
+		cargoTarget = addLanguagePackageManagerCacheMounts(cmd, workdir, cargoTarget, requiredByTarget, cleaners)
 	}
 
 	return orderedRequiredMounts(requiredByTarget, cargoTarget), cleaners
@@ -301,27 +256,112 @@ func addRequiredMount(requiredByTarget map[string]cacheMountSpec, mount cacheMou
 	}
 }
 
+func addLanguagePackageManagerCacheMounts(
+	cmd shell.CommandInfo,
+	workdir, cargoTarget string,
+	requiredByTarget map[string]cacheMountSpec,
+	cleaners map[cleanupKind]bool,
+) string {
+	switch cmd.Name {
+	case string(cleanupNpm):
+		if cmd.HasAnyArg("install", "ci", "i") {
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.npm"})
+			cleaners[cleanupNpm] = true
+		}
+	case "go":
+		if goUsesDependencyCache(cmd) {
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/go/pkg/mod"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.cache/go-build"})
+		}
+	case string(cleanupPip):
+		if cmd.HasAnyArg("install") {
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.cache/pip"})
+			cleaners[cleanupPip] = true
+		}
+	case "bundle":
+		if cmd.HasAnyArg("install") {
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.gem"})
+			cleaners[cleanupBundle] = true
+		}
+	case string(cleanupYarn):
+		if cmd.HasAnyArg("install", "add") {
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/share/.cache/yarn"})
+			cleaners[cleanupYarn] = true
+		}
+	case "cargo":
+		if cmd.Subcommand == "build" {
+			cargoTarget = path.Clean(path.Join(workdir, "target"))
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: cargoTarget})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/git/db"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/registry"})
+		}
+	case "dotnet":
+		if cmd.HasAnyArg("restore") {
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.nuget/packages"})
+			cleaners[cleanupDotnet] = true
+		}
+	case "composer":
+		if cmd.HasAnyArg("install") {
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: composerCacheTarget})
+			cleaners[cleanupComposer] = true
+		}
+	case string(cleanupUV):
+		if uvUsesCache(cmd) {
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.cache/uv"})
+			cleaners[cleanupUV] = true
+		}
+	case string(cleanupBun):
+		if cmd.HasAnyArg("install") {
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.bun/install/cache"})
+			cleaners[cleanupBun] = true
+		}
+	}
+
+	return cargoTarget
+}
+
 func addOSPackageManagerCacheMounts(
 	cmd shell.CommandInfo,
 	requiredByTarget map[string]cacheMountSpec,
 	cleaners map[cleanupKind]bool,
-) {
-	if !cmd.HasAnyArg("install", "update", "upgrade", "dist-upgrade", "full-upgrade", "distro-sync") {
-		return
-	}
-
+) bool {
 	switch cmd.Name {
 	case "apt", "apt-get":
+		if !cmd.HasAnyArg("install", "update", "upgrade", "dist-upgrade", "full-upgrade", "distro-sync") {
+			return true
+		}
 		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/apt", Sharing: instructions.MountSharingLocked})
 		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/lib/apt", Sharing: instructions.MountSharingLocked})
 		cleaners[cleanupApt] = true
+	case "apk":
+		if !cmd.HasAnyArg("add", "update", "upgrade") {
+			return true
+		}
+		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/apk", Sharing: instructions.MountSharingLocked})
+		cleaners[cleanupApk] = true
 	case "dnf":
+		if !cmd.HasAnyArg("install", "update", "upgrade", "distro-sync") {
+			return true
+		}
 		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/dnf", Sharing: instructions.MountSharingLocked})
 		cleaners[cleanupDnf] = true
 	case "yum":
+		if !cmd.HasAnyArg("install", "update", "upgrade", "distro-sync") {
+			return true
+		}
 		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/yum", Sharing: instructions.MountSharingLocked})
 		cleaners[cleanupYum] = true
+	case "zypper":
+		if !cmd.HasAnyArg("install", "in", "update", "up", "patch", "dup", "dist-upgrade") {
+			return true
+		}
+		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/zypp", Sharing: instructions.MountSharingLocked})
+		cleaners[cleanupZypper] = true
+	default:
+		return false
 	}
+
+	return true
 }
 
 func resolveWorkdir(currentWorkdir, nextPath string) string {
@@ -518,42 +558,20 @@ func stripNoCacheFlags(command string, variant shell.Variant, cleaners map[clean
 		return command, false
 	}
 
-	cmds := shell.FindCommands(command, variant, string(cleanupPip), string(cleanupUV), string(cleanupBun))
+	cmds := shell.FindCommands(command, variant, string(cleanupApk), string(cleanupPip), string(cleanupUV), string(cleanupBun))
 	if len(cmds) == 0 {
 		return command, false
 	}
 
-	stripPipNoCacheDir := false
-	stripNoCache := false
-	for _, cmd := range cmds {
-		switch cmd.Name {
-		case string(cleanupPip):
-			if cleaners[cleanupPip] && cmd.HasAnyArg("install") {
-				stripPipNoCacheDir = true
-			}
-		case string(cleanupUV):
-			if cleaners[cleanupUV] && uvUsesCache(cmd) {
-				stripNoCache = true
-			}
-		case string(cleanupBun):
-			if cleaners[cleanupBun] && cmd.HasAnyArg("install") {
-				stripNoCache = true
-			}
-		}
-	}
-
-	if !stripPipNoCacheDir && !stripNoCache {
+	mode := detectStripNoCacheFlags(cmds, cleaners)
+	if mode.isEmpty() {
 		return command, false
 	}
 
 	filtered := make([]string, 0, len(fields))
 	removed := false
 	for _, field := range fields {
-		if stripPipNoCacheDir && (field == "--no-cache-dir" || strings.HasPrefix(field, "--no-cache-dir=")) {
-			removed = true
-			continue
-		}
-		if stripNoCache && (field == "--no-cache" || strings.HasPrefix(field, "--no-cache=")) {
+		if shouldStripNoCacheFlag(field, mode) {
 			removed = true
 			continue
 		}
@@ -567,47 +585,89 @@ func stripNoCacheFlags(command string, variant shell.Variant, cleaners map[clean
 	return strings.Join(filtered, " "), true
 }
 
+type stripNoCacheMode struct {
+	apkNoCache    bool
+	pipNoCacheDir bool
+	toolNoCache   bool
+}
+
+func (m stripNoCacheMode) isEmpty() bool {
+	return !m.apkNoCache && !m.pipNoCacheDir && !m.toolNoCache
+}
+
+func detectStripNoCacheFlags(cmds []shell.CommandInfo, cleaners map[cleanupKind]bool) stripNoCacheMode {
+	mode := stripNoCacheMode{}
+
+	for _, cmd := range cmds {
+		switch cmd.Name {
+		case string(cleanupApk):
+			if cleaners[cleanupApk] && cmd.HasAnyArg("add", "update", "upgrade") {
+				mode.apkNoCache = true
+			}
+		case string(cleanupPip):
+			if cleaners[cleanupPip] && cmd.HasAnyArg("install") {
+				mode.pipNoCacheDir = true
+			}
+		case string(cleanupUV):
+			if cleaners[cleanupUV] && uvUsesCache(cmd) {
+				mode.toolNoCache = true
+			}
+		case string(cleanupBun):
+			if cleaners[cleanupBun] && cmd.HasAnyArg("install") {
+				mode.toolNoCache = true
+			}
+		}
+	}
+
+	return mode
+}
+
+func shouldStripNoCacheFlag(field string, mode stripNoCacheMode) bool {
+	if mode.pipNoCacheDir && isNoCacheDirFlag(field) {
+		return true
+	}
+	if (mode.apkNoCache || mode.toolNoCache) && isNoCacheFlag(field) {
+		return true
+	}
+	return false
+}
+
+func isNoCacheDirFlag(field string) bool {
+	return field == noCacheDirFlag || strings.HasPrefix(field, noCacheDirFlag+"=")
+}
+
+func isNoCacheFlag(field string) bool {
+	return field == noCacheFlag || strings.HasPrefix(field, noCacheFlag+"=")
+}
+
+type cleanupMatcher struct {
+	kind cleanupKind
+	fn   func(string) bool
+}
+
+var cleanupMatchers = []cleanupMatcher{
+	{kind: cleanupApt, fn: isAptCleanupCommand},
+	{kind: cleanupApk, fn: isApkCleanupCommand},
+	{kind: cleanupDnf, fn: isDnfCleanupCommand},
+	{kind: cleanupYum, fn: isYumCleanupCommand},
+	{kind: cleanupZypper, fn: isZypperCleanupCommand},
+	{kind: cleanupNpm, fn: isNpmCleanupCommand},
+	{kind: cleanupPip, fn: isPipCleanupCommand},
+	{kind: cleanupBundle, fn: isBundleCleanupCommand},
+	{kind: cleanupYarn, fn: isYarnCleanupCommand},
+	{kind: cleanupDotnet, fn: isDotnetCleanupCommand},
+	{kind: cleanupComposer, fn: isComposerCleanupCommand},
+	{kind: cleanupUV, fn: isUVCleanupCommand},
+	{kind: cleanupBun, fn: isBunCleanupCommand},
+}
+
 func isCacheCleanupCommand(command string, cleaners map[cleanupKind]bool) bool {
 	normalized := normalizeCommand(command)
 
-	if cleaners[cleanupApt] && isAptCleanupCommand(normalized) {
-		return true
-	}
-
-	if cleaners[cleanupDnf] && isDnfCleanupCommand(normalized) {
-		return true
-	}
-
-	if cleaners[cleanupYum] && isYumCleanupCommand(normalized) {
-		return true
-	}
-
-	if cleaners[cleanupNpm] && isNpmCleanupCommand(normalized) {
-		return true
-	}
-
-	if cleaners[cleanupPip] && isPipCleanupCommand(normalized) {
-		return true
-	}
-
-	if cleaners[cleanupBundle] && isBundleCleanupCommand(normalized) {
-		return true
-	}
-
-	if cleaners[cleanupDotnet] && isDotnetCleanupCommand(normalized) {
-		return true
-	}
-
-	if cleaners[cleanupComposer] && isComposerCleanupCommand(normalized) {
-		return true
-	}
-
-	if cleaners[cleanupUV] && isUVCleanupCommand(normalized) {
-		return true
-	}
-
-	if cleaners[cleanupBun] && isBunCleanupCommand(normalized) {
-		return true
+	for _, matcher := range cleanupMatchers {
+		if cleaners[matcher.kind] && matcher.fn(normalized) {
+			return true
+		}
 	}
 
 	return false
@@ -627,6 +687,11 @@ func isAptCleanupCommand(command string) bool {
 		isAptListCleanup(command)
 }
 
+func isApkCleanupCommand(command string) bool {
+	return strings.HasPrefix(command, "apk cache clean") ||
+		isPackageCacheDirCleanup(command, "/var/cache/apk")
+}
+
 func isDnfCleanupCommand(command string) bool {
 	return strings.HasPrefix(command, "dnf clean") ||
 		isPackageCacheDirCleanup(command, "/var/cache/dnf")
@@ -635,6 +700,11 @@ func isDnfCleanupCommand(command string) bool {
 func isYumCleanupCommand(command string) bool {
 	return strings.HasPrefix(command, "yum clean") ||
 		isPackageCacheDirCleanup(command, "/var/cache/yum")
+}
+
+func isZypperCleanupCommand(command string) bool {
+	return strings.HasPrefix(command, "zypper clean") ||
+		isPackageCacheDirCleanup(command, "/var/cache/zypp")
 }
 
 func isNpmCleanupCommand(command string) bool {
@@ -648,6 +718,10 @@ func isPipCleanupCommand(command string) bool {
 
 func isBundleCleanupCommand(command string) bool {
 	return strings.HasPrefix(command, "bundle clean")
+}
+
+func isYarnCleanupCommand(command string) bool {
+	return strings.HasPrefix(command, "yarn cache clean")
 }
 
 func isDotnetCleanupCommand(command string) bool {

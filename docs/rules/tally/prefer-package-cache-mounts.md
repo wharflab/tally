@@ -26,10 +26,13 @@ It also supports `uv` and `bun` package install flows.
 | `npm install`, `npm ci`, `npm i` | `/root/.npm` |
 | `go build`, `go mod download` | `/go/pkg/mod`, `/root/.cache/go-build` |
 | `apt`/`apt-get` package operations | `/var/cache/apt` and `/var/lib/apt` (`sharing=locked`) |
+| `apk` package operations | `/var/cache/apk` (`sharing=locked`) |
 | `dnf` package operations | `/var/cache/dnf` (`sharing=locked`) |
 | `yum` package operations | `/var/cache/yum` (`sharing=locked`) |
+| `zypper` package operations | `/var/cache/zypp` (`sharing=locked`) |
 | `pip install` | `/root/.cache/pip` |
 | `bundle install` | `/root/.gem` |
+| `yarn install`, `yarn add` | `/usr/local/share/.cache/yarn` |
 | `cargo build` | `<WORKDIR>/target`, `/usr/local/cargo/git/db`, `/usr/local/cargo/registry` |
 | `dotnet restore` | `/root/.nuget/packages` |
 | `composer install` | `/root/.cache/composer` |
@@ -83,11 +86,14 @@ of cache mounts.
 ### Cache-cleaning commands removed
 
 - **apt/apt-get**: `apt-get clean`, `apt clean`, and `rm -rf /var/lib/apt/lists*`
+- **apk**: `apk cache clean ...` and `rm -rf /var/cache/apk*`
 - **dnf**: `dnf clean ...` and `rm -rf /var/cache/dnf*`
 - **yum**: `yum clean ...` and `rm -rf /var/cache/yum*`
+- **zypper**: `zypper clean ...` and `rm -rf /var/cache/zypp*`
 - **npm**: `npm cache clean ...`
 - **pip**: `pip cache purge`, `pip cache remove ...`
 - **bundle**: `bundle clean ...`
+- **yarn**: `yarn cache clean ...`
 - **dotnet**: `dotnet nuget locals ... --clear`
 - **composer**: `composer clear-cache`, `composer clearcache`
 - **uv**: `uv cache clean`, `uv cache prune`
@@ -95,6 +101,7 @@ of cache mounts.
 
 ### Cache-disabling flags removed
 
+- **apk**: `--no-cache`
 - **pip**: `--no-cache-dir`
 - **uv**: `--no-cache`
 - **bun**: `--no-cache`
