@@ -60,9 +60,15 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 		}
 
 		workdir := "/"
+		pnpmStorePath := defaultPnpmStorePath
 		for _, cmd := range stage.Commands {
 			if wd, ok := cmd.(*instructions.WorkdirCommand); ok {
 				workdir = resolveWorkdir(workdir, wd.Path)
+				continue
+			}
+
+			if env, ok := cmd.(*instructions.EnvCommand); ok {
+				pnpmStorePath = resolvePnpmStorePath(env, pnpmStorePath)
 				continue
 			}
 
@@ -76,7 +82,7 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 				continue
 			}
 
-			required, cleaners := detectRequiredCacheMounts(script, shellVariant, workdir)
+			required, cleaners := detectRequiredCacheMounts(script, shellVariant, workdir, pnpmStorePath)
 			if len(required) == 0 {
 				continue
 			}
@@ -137,6 +143,7 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 
 type cacheMountSpec struct {
 	Target  string
+	ID      string
 	Sharing instructions.ShareMode
 }
 
@@ -144,7 +151,9 @@ type cleanupKind string
 
 const (
 	cargoOrderPlaceholder = "__cargo_target_order__"
+	pnpmOrderPlaceholder  = "__pnpm_store_order__"
 	composerCacheTarget   = "/root/.cache/composer"
+	defaultPnpmStorePath  = "/root/.pnpm-store"
 	noCacheFlag           = "--no-cache"
 	noCacheDirFlag        = "--no-cache-dir"
 
@@ -155,6 +164,7 @@ const (
 	cleanupZypper   cleanupKind = "zypper"
 	cleanupYarn     cleanupKind = "yarn"
 	cleanupNpm      cleanupKind = "npm"
+	cleanupPnpm     cleanupKind = "pnpm"
 	cleanupPip      cleanupKind = "pip"
 	cleanupBundle   cleanupKind = "bundle"
 	cleanupDotnet   cleanupKind = "dotnet"
@@ -164,28 +174,31 @@ const (
 )
 
 var orderedCacheMounts = []cacheMountSpec{
-	{Target: "/root/.npm"},
-	{Target: "/go/pkg/mod"},
-	{Target: "/root/.cache/go-build"},
-	{Target: "/var/cache/apt", Sharing: instructions.MountSharingLocked},
-	{Target: "/var/lib/apt", Sharing: instructions.MountSharingLocked},
-	{Target: "/var/cache/apk", Sharing: instructions.MountSharingLocked},
-	{Target: "/var/cache/dnf", Sharing: instructions.MountSharingLocked},
-	{Target: "/var/cache/yum", Sharing: instructions.MountSharingLocked},
-	{Target: "/var/cache/zypp", Sharing: instructions.MountSharingLocked},
-	{Target: "/usr/local/share/.cache/yarn"},
-	{Target: "/root/.cache/pip"},
-	{Target: "/root/.gem"},
-	{Target: cargoOrderPlaceholder},
-	{Target: "/usr/local/cargo/git/db"},
-	{Target: "/usr/local/cargo/registry"},
-	{Target: "/root/.nuget/packages"},
-	{Target: composerCacheTarget},
-	{Target: "/root/.cache/uv"},
-	{Target: "/root/.bun/install/cache"},
+	{Target: "/root/.npm", ID: "npm"},
+	{Target: "/go/pkg/mod", ID: "gomod"},
+	{Target: "/root/.cache/go-build", ID: "gobuild"},
+	{Target: "/var/cache/apt", ID: "apt", Sharing: instructions.MountSharingLocked},
+	{Target: "/var/lib/apt", ID: "aptlib", Sharing: instructions.MountSharingLocked},
+	{Target: "/var/cache/apk", ID: "apk", Sharing: instructions.MountSharingLocked},
+	{Target: "/var/cache/dnf", ID: "dnf", Sharing: instructions.MountSharingLocked},
+	{Target: "/var/cache/yum", ID: "yum", Sharing: instructions.MountSharingLocked},
+	{Target: "/var/cache/zypp", ID: "zypper", Sharing: instructions.MountSharingLocked},
+	{Target: "/usr/local/share/.cache/yarn", ID: "yarn"},
+	{Target: pnpmOrderPlaceholder, ID: "pnpm"},
+	{Target: "/root/.cache/pip", ID: "pip"},
+	{Target: "/root/.gem", ID: "gem"},
+	{Target: cargoOrderPlaceholder, ID: "cargo-target"},
+	{Target: "/usr/local/cargo/git/db", ID: "cargo-git"},
+	{Target: "/usr/local/cargo/registry", ID: "cargo-registry"},
+	{Target: "/root/.nuget/packages", ID: "nuget"},
+	{Target: composerCacheTarget, ID: "composer"},
+	{Target: "/root/.cache/uv", ID: "uv"},
+	{Target: "/root/.bun/install/cache", ID: "bun"},
 }
 
-func detectRequiredCacheMounts(script string, variant shell.Variant, workdir string) ([]cacheMountSpec, map[cleanupKind]bool) {
+func detectRequiredCacheMounts(
+	script string, variant shell.Variant, workdir, pnpmStorePath string,
+) ([]cacheMountSpec, map[cleanupKind]bool) {
 	requiredByTarget := make(map[string]cacheMountSpec)
 	cleaners := make(map[cleanupKind]bool)
 	cargoTarget := ""
@@ -202,6 +215,7 @@ func detectRequiredCacheMounts(script string, variant shell.Variant, workdir str
 		string(cleanupYum),
 		string(cleanupZypper),
 		string(cleanupYarn),
+		string(cleanupPnpm),
 		string(cleanupPip),
 		"bundle",
 		"cargo",
@@ -215,19 +229,22 @@ func detectRequiredCacheMounts(script string, variant shell.Variant, workdir str
 		if addOSPackageManagerCacheMounts(cmd, requiredByTarget, cleaners) {
 			continue
 		}
-		cargoTarget = addLanguagePackageManagerCacheMounts(cmd, workdir, cargoTarget, requiredByTarget, cleaners)
+		cargoTarget = addLanguagePackageManagerCacheMounts(cmd, workdir, cargoTarget, pnpmStorePath, requiredByTarget, cleaners)
 	}
 
-	return orderedRequiredMounts(requiredByTarget, cargoTarget), cleaners
+	return orderedRequiredMounts(requiredByTarget, cargoTarget, pnpmStorePath), cleaners
 }
 
-func orderedRequiredMounts(requiredByTarget map[string]cacheMountSpec, cargoTarget string) []cacheMountSpec {
+func orderedRequiredMounts(requiredByTarget map[string]cacheMountSpec, cargoTarget, pnpmStorePath string) []cacheMountSpec {
 	required := make([]cacheMountSpec, 0, len(requiredByTarget))
 	seen := make(map[string]bool, len(requiredByTarget))
 	for _, mount := range orderedCacheMounts {
 		target := mount.Target
 		if target == cargoOrderPlaceholder && cargoTarget != "" {
 			target = cargoTarget
+		}
+		if target == pnpmOrderPlaceholder {
+			target = pnpmStorePath
 		}
 		if req, ok := requiredByTarget[target]; ok {
 			required = append(required, req)
@@ -258,64 +275,69 @@ func addRequiredMount(requiredByTarget map[string]cacheMountSpec, mount cacheMou
 
 func addLanguagePackageManagerCacheMounts(
 	cmd shell.CommandInfo,
-	workdir, cargoTarget string,
+	workdir, cargoTarget, pnpmStorePath string,
 	requiredByTarget map[string]cacheMountSpec,
 	cleaners map[cleanupKind]bool,
 ) string {
 	switch cmd.Name {
 	case string(cleanupNpm):
 		if cmd.HasAnyArg("install", "ci", "i") {
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.npm"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.npm", ID: "npm"})
 			cleaners[cleanupNpm] = true
 		}
 	case "go":
 		if goUsesDependencyCache(cmd) {
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/go/pkg/mod"})
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.cache/go-build"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/go/pkg/mod", ID: "gomod"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.cache/go-build", ID: "gobuild"})
 		}
 	case string(cleanupPip):
 		if cmd.HasAnyArg("install") {
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.cache/pip"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.cache/pip", ID: "pip"})
 			cleaners[cleanupPip] = true
 		}
 	case "bundle":
 		if cmd.HasAnyArg("install") {
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.gem"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.gem", ID: "gem"})
 			cleaners[cleanupBundle] = true
 		}
 	case string(cleanupYarn):
 		if cmd.HasAnyArg("install", "add") {
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/share/.cache/yarn"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/share/.cache/yarn", ID: "yarn"})
 			cleaners[cleanupYarn] = true
+		}
+	case string(cleanupPnpm):
+		if cmd.HasAnyArg("install", "add", "i") {
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: pnpmStorePath, ID: "pnpm"})
+			cleaners[cleanupPnpm] = true
 		}
 	case "cargo":
 		if cmd.Subcommand == "build" {
 			// Skip deriving target path when WORKDIR still has unresolved shell references.
 			if !hasUnresolvedWorkdirReference(workdir) {
 				cargoTarget = path.Clean(path.Join(workdir, "target"))
-				addRequiredMount(requiredByTarget, cacheMountSpec{Target: cargoTarget})
+				addRequiredMount(requiredByTarget, cacheMountSpec{Target: cargoTarget, ID: "cargo-target"})
 			}
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/git/db"})
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/registry"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/git/db", ID: "cargo-git"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/cargo/registry", ID: "cargo-registry"})
 		}
 	case "dotnet":
 		if cmd.HasAnyArg("restore") {
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.nuget/packages"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.nuget/packages", ID: "nuget"})
 			cleaners[cleanupDotnet] = true
 		}
 	case "composer":
 		if cmd.HasAnyArg("install") {
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: composerCacheTarget})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: composerCacheTarget, ID: "composer"})
 			cleaners[cleanupComposer] = true
 		}
 	case string(cleanupUV):
 		if uvUsesCache(cmd) {
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.cache/uv"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.cache/uv", ID: "uv"})
 			cleaners[cleanupUV] = true
 		}
 	case string(cleanupBun):
 		if cmd.HasAnyArg("install") {
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.bun/install/cache"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.bun/install/cache", ID: "bun"})
 			cleaners[cleanupBun] = true
 		}
 	}
@@ -333,32 +355,35 @@ func addOSPackageManagerCacheMounts(
 		if !cmd.HasAnyArg("install", "update", "upgrade", "dist-upgrade", "full-upgrade", "distro-sync") {
 			return true
 		}
-		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/apt", Sharing: instructions.MountSharingLocked})
-		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/lib/apt", Sharing: instructions.MountSharingLocked})
+		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/apt", ID: "apt", Sharing: instructions.MountSharingLocked})
+		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/lib/apt", ID: "aptlib", Sharing: instructions.MountSharingLocked})
 		cleaners[cleanupApt] = true
 	case "apk":
 		if !cmd.HasAnyArg("add", "update", "upgrade") {
 			return true
 		}
-		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/apk", Sharing: instructions.MountSharingLocked})
+		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/apk", ID: "apk", Sharing: instructions.MountSharingLocked})
 		cleaners[cleanupApk] = true
 	case "dnf":
 		if !cmd.HasAnyArg("install", "update", "upgrade", "distro-sync") {
 			return true
 		}
-		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/dnf", Sharing: instructions.MountSharingLocked})
+		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/dnf", ID: "dnf", Sharing: instructions.MountSharingLocked})
 		cleaners[cleanupDnf] = true
 	case "yum":
 		if !cmd.HasAnyArg("install", "update", "upgrade", "distro-sync") {
 			return true
 		}
-		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/yum", Sharing: instructions.MountSharingLocked})
+		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/yum", ID: "yum", Sharing: instructions.MountSharingLocked})
 		cleaners[cleanupYum] = true
 	case "zypper":
 		if !cmd.HasAnyArg("install", "in", "update", "up", "patch", "dup", "dist-upgrade") {
 			return true
 		}
-		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/zypp", Sharing: instructions.MountSharingLocked})
+		addRequiredMount(
+			requiredByTarget,
+			cacheMountSpec{Target: "/var/cache/zypp", ID: "zypper", Sharing: instructions.MountSharingLocked},
+		)
 		cleaners[cleanupZypper] = true
 	default:
 		return false
@@ -379,6 +404,27 @@ func resolveWorkdir(currentWorkdir, nextPath string) string {
 
 func hasUnresolvedWorkdirReference(workdir string) bool {
 	return strings.Contains(workdir, "$")
+}
+
+// resolvePnpmStorePath updates the pnpm store path if PNPM_HOME is set in the ENV instruction.
+func resolvePnpmStorePath(env *instructions.EnvCommand, current string) string {
+	for _, kv := range env.Env {
+		if kv.Key == "PNPM_HOME" {
+			val := unquote(kv.Value)
+			if !strings.Contains(val, "$") {
+				return path.Join(path.Clean(val), "store")
+			}
+		}
+	}
+	return current
+}
+
+// unquote strips a single layer of matching double or single quotes.
+func unquote(s string) string {
+	if len(s) >= 2 && ((s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'')) {
+		return s[1 : len(s)-1]
+	}
+	return s
 }
 
 func goUsesDependencyCache(cmd shell.CommandInfo) bool {
@@ -419,14 +465,19 @@ func mergeCacheMounts(existing []*instructions.Mount, required []cacheMountSpec)
 		if idx >= 0 {
 			if req.Sharing != "" && merged[idx].CacheSharing != req.Sharing {
 				merged[idx].CacheSharing = req.Sharing
+				// Also set ID when we're already modifying the mount.
+				if req.ID != "" && merged[idx].CacheID == "" {
+					merged[idx].CacheID = req.ID
+				}
 				changed = true
 			}
 			continue
 		}
 
 		mount := &instructions.Mount{
-			Type:   instructions.MountTypeCache,
-			Target: req.Target,
+			Type:    instructions.MountTypeCache,
+			Target:  req.Target,
+			CacheID: req.ID,
 		}
 		if req.Sharing != "" {
 			mount.CacheSharing = req.Sharing
@@ -697,6 +748,7 @@ var cleanupMatchers = []cleanupMatcher{
 	{kind: cleanupBundle, fn: isBundleCleanupCommand},
 	{kind: cleanupYarn, fn: isYarnCleanupCommand},
 	{kind: cleanupDotnet, fn: isDotnetCleanupCommand},
+	{kind: cleanupPnpm, fn: isPnpmCleanupCommand},
 	{kind: cleanupComposer, fn: isComposerCleanupCommand},
 	{kind: cleanupUV, fn: isUVCleanupCommand},
 	{kind: cleanupBun, fn: isBunCleanupCommand},
@@ -763,6 +815,10 @@ func isBundleCleanupCommand(command string) bool {
 
 func isYarnCleanupCommand(command string) bool {
 	return strings.HasPrefix(command, "yarn cache clean")
+}
+
+func isPnpmCleanupCommand(command string) bool {
+	return strings.HasPrefix(command, "pnpm store prune")
 }
 
 func isDotnetCleanupCommand(command string) bool {
@@ -881,11 +937,18 @@ func formatRunFlags(flagsUsed []string, mounts []*instructions.Mount) string {
 func describeMounts(mounts []cacheMountSpec) []string {
 	descriptions := make([]string, 0, len(mounts))
 	for _, mount := range mounts {
-		if mount.Sharing == "" {
-			descriptions = append(descriptions, mount.Target)
-			continue
+		var attrs []string
+		if mount.ID != "" {
+			attrs = append(attrs, "id="+mount.ID)
 		}
-		descriptions = append(descriptions, fmt.Sprintf("%s (sharing=%s)", mount.Target, mount.Sharing))
+		if mount.Sharing != "" {
+			attrs = append(attrs, "sharing="+string(mount.Sharing))
+		}
+		if len(attrs) == 0 {
+			descriptions = append(descriptions, mount.Target)
+		} else {
+			descriptions = append(descriptions, fmt.Sprintf("%s (%s)", mount.Target, strings.Join(attrs, ", ")))
+		}
 	}
 	return descriptions
 }
