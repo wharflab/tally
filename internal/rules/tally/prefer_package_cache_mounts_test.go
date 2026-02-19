@@ -182,6 +182,35 @@ RUN bun install
 			WantViolations: 1,
 		},
 		{
+			Name: "pnpm install",
+			Content: `FROM node:20
+RUN pnpm install
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "pnpm install with PNPM_HOME",
+			Content: `FROM node:20
+ENV PNPM_HOME="/pnpm"
+RUN pnpm install --frozen-lockfile
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "pnpm install with cache mount already present",
+			Content: `FROM node:20
+RUN --mount=type=cache,target=/root/.pnpm-store pnpm install
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "pnpm add",
+			Content: `FROM node:20
+RUN pnpm add express
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "non-package command",
 			Content: `FROM alpine
 RUN echo hello
@@ -222,7 +251,7 @@ func TestPreferPackageCacheMountsRule_CheckWithFixes(t *testing.T) {
 			content: `FROM node:20
 RUN npm ci && npm cache clean --force
 `,
-			wantFixContains: []string{"--mount=type=cache,target=/root/.npm", "RUN"},
+			wantFixContains: []string{"--mount=type=cache,target=/root/.npm,id=npm", "RUN"},
 			wantNotContains: []string{"npm cache clean"},
 		},
 		{
@@ -235,7 +264,7 @@ RUN --mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf \
 			wantFixContains: []string{
 				"--mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf",
 				"--mount=type=cache,target=/var/cache/apt,sharing=locked",
-				"--mount=type=cache,target=/var/lib/apt,sharing=locked",
+				"--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked",
 			},
 			wantNotContains: []string{"apt-get clean"},
 		},
@@ -247,8 +276,8 @@ RUN apt-get update && \
     apt-get clean
 `,
 			wantFixContains: []string{
-				"--mount=type=cache,target=/var/cache/apt,sharing=locked",
-				"--mount=type=cache,target=/var/lib/apt,sharing=locked",
+				"--mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked",
+				"--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked",
 				"apt-get update &&     apt-get install -y gcc",
 			},
 			wantNotContains: []string{"apt-get clean", "apt-get update && apt-get install -y gcc"},
@@ -259,7 +288,7 @@ RUN apt-get update && \
 RUN apk add --no-cache curl && rm -rf /var/cache/apk/*
 `,
 			wantFixContains: []string{
-				"--mount=type=cache,target=/var/cache/apk,sharing=locked",
+				"--mount=type=cache,target=/var/cache/apk,id=apk,sharing=locked",
 				"apk add curl",
 			},
 			wantNotContains: []string{"--no-cache", "/var/cache/apk/*"},
@@ -270,7 +299,7 @@ RUN apk add --no-cache curl && rm -rf /var/cache/apk/*
 RUN dnf install -y git && dnf clean all
 `,
 			wantFixContains: []string{
-				"--mount=type=cache,target=/var/cache/dnf,sharing=locked",
+				"--mount=type=cache,target=/var/cache/dnf,id=dnf,sharing=locked",
 				"dnf install -y git",
 			},
 			wantNotContains: []string{"dnf clean"},
@@ -281,7 +310,7 @@ RUN dnf install -y git && dnf clean all
 RUN yum install -y make && yum clean all
 `,
 			wantFixContains: []string{
-				"--mount=type=cache,target=/var/cache/yum,sharing=locked",
+				"--mount=type=cache,target=/var/cache/yum,id=yum,sharing=locked",
 				"yum install -y make",
 			},
 			wantNotContains: []string{"yum clean"},
@@ -292,7 +321,7 @@ RUN yum install -y make && yum clean all
 RUN zypper install -y git && zypper clean --all
 `,
 			wantFixContains: []string{
-				"--mount=type=cache,target=/var/cache/zypp,sharing=locked",
+				"--mount=type=cache,target=/var/cache/zypp,id=zypper,sharing=locked",
 				"zypper install -y git",
 			},
 			wantNotContains: []string{"zypper clean"},
@@ -304,9 +333,9 @@ WORKDIR /workspace
 RUN cargo build --release
 `,
 			wantFixContains: []string{
-				"--mount=type=cache,target=/workspace/target",
-				"--mount=type=cache,target=/usr/local/cargo/git/db",
-				"--mount=type=cache,target=/usr/local/cargo/registry",
+				"--mount=type=cache,target=/workspace/target,id=cargo-target",
+				"--mount=type=cache,target=/usr/local/cargo/git/db,id=cargo-git",
+				"--mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry",
 			},
 			wantNotContains: []string{"--mount=type=cache,target=/app/target"},
 		},
@@ -318,8 +347,8 @@ WORKDIR ${APP_DIR}
 RUN cargo build --release
 `,
 			wantFixContains: []string{
-				"--mount=type=cache,target=/usr/local/cargo/git/db",
-				"--mount=type=cache,target=/usr/local/cargo/registry",
+				"--mount=type=cache,target=/usr/local/cargo/git/db,id=cargo-git",
+				"--mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry",
 			},
 			wantNotContains: []string{
 				"--mount=type=cache,target=/${APP_DIR}/target",
@@ -332,7 +361,7 @@ RUN cargo build --release
 RUN pip install --no-cache-dir -r requirements.txt && pip cache purge
 `,
 			wantFixContains: []string{
-				"--mount=type=cache,target=/root/.cache/pip",
+				"--mount=type=cache,target=/root/.cache/pip,id=pip",
 				"pip install -r requirements.txt",
 			},
 			wantNotContains: []string{"--no-cache-dir", "pip cache purge"},
@@ -343,10 +372,32 @@ RUN pip install --no-cache-dir -r requirements.txt && pip cache purge
 RUN yarn install && yarn cache clean
 `,
 			wantFixContains: []string{
-				"--mount=type=cache,target=/usr/local/share/.cache/yarn",
+				"--mount=type=cache,target=/usr/local/share/.cache/yarn,id=yarn",
 				"yarn install",
 			},
 			wantNotContains: []string{"yarn cache clean"},
+		},
+		{
+			name: "pnpm cleanup removed with default store",
+			content: `FROM node:20
+RUN pnpm install --frozen-lockfile && pnpm store prune
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.pnpm-store,id=pnpm",
+				"pnpm install --frozen-lockfile",
+			},
+			wantNotContains: []string{"pnpm store prune"},
+		},
+		{
+			name: "pnpm with PNPM_HOME resolves store path",
+			content: `FROM node:20
+ENV PNPM_HOME="/pnpm"
+RUN pnpm install --frozen-lockfile
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/pnpm/store,id=pnpm",
+				"pnpm install --frozen-lockfile",
+			},
 		},
 		{
 			name: "composer uses default cache path",
@@ -354,7 +405,7 @@ RUN yarn install && yarn cache clean
 RUN composer install --no-dev && composer clear-cache
 `,
 			wantFixContains: []string{
-				"--mount=type=cache,target=/root/.cache/composer",
+				"--mount=type=cache,target=/root/.cache/composer,id=composer",
 				"composer install --no-dev",
 			},
 			wantNotContains: []string{"composer clear-cache", "--mount=type=cache,target=/tmp/cache"},
@@ -365,7 +416,7 @@ RUN composer install --no-dev && composer clear-cache
 RUN uv sync --no-cache --frozen && uv cache clean
 `,
 			wantFixContains: []string{
-				"--mount=type=cache,target=/root/.cache/uv",
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
 				"uv sync --frozen",
 			},
 			wantNotContains: []string{"--no-cache", "uv cache clean"},
@@ -378,7 +429,7 @@ npm install
 npm cache clean --force
 EOF
 `,
-			wantFixContains: []string{"RUN --mount=type=cache,target=/root/.npm <<EOF", "npm install"},
+			wantFixContains: []string{"RUN --mount=type=cache,target=/root/.npm,id=npm <<EOF", "npm install"},
 			wantNotContains: []string{"npm cache clean"},
 		},
 		{
@@ -386,7 +437,7 @@ EOF
 			content: `FROM oven/bun:1.2
 RUN bun install --no-cache && bun pm cache rm
 `,
-			wantFixContains: []string{"--mount=type=cache,target=/root/.bun/install/cache", "bun install"},
+			wantFixContains: []string{"--mount=type=cache,target=/root/.bun/install/cache,id=bun", "bun install"},
 			wantNotContains: []string{"--no-cache", "bun pm cache rm"},
 		},
 	}

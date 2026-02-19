@@ -10,6 +10,7 @@ RUN dnf install -y git && dnf clean all
 RUN yum install -y make && yum clean all
 RUN zypper install -y git && zypper clean --all
 RUN yarn install && yarn cache clean
+RUN pnpm install --frozen-lockfile && pnpm store prune
 RUN pip install --no-cache-dir -r requirements.txt && pip cache purge
 RUN bundle install && bundle clean
 WORKDIR /workspace

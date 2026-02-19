@@ -4,7 +4,7 @@
       "file": "testdata/prefer-package-cache-mounts/Dockerfile",
       "violations": [
         {
-          "detail": "Detected package install/build command; add cache mount(s): /root/.npm",
+          "detail": "Detected package install/build command; add cache mount(s): /root/.npm (id=npm)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
@@ -36,7 +36,7 @@
                     "line": 3
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.npm npm install"
+                "newText": "RUN --mount=type=cache,target=/root/.npm,id=npm npm install"
               }
             ],
             "priority": 90,
@@ -44,7 +44,7 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /go/pkg/mod, /root/.cache/go-build",
+          "detail": "Detected package install/build command; add cache mount(s): /go/pkg/mod (id=gomod), /root/.cache/go-build (id=gobuild)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
@@ -76,7 +76,7 @@
                     "line": 4
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build go build ./..."
+                "newText": "RUN --mount=type=cache,target=/go/pkg/mod,id=gomod --mount=type=cache,target=/root/.cache/go-build,id=gobuild go build ./..."
               }
             ],
             "priority": 90,
@@ -84,7 +84,7 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /var/cache/apt (sharing=locked), /var/lib/apt (sharing=locked)",
+          "detail": "Detected package install/build command; add cache mount(s): /var/cache/apt (id=apt, sharing=locked), /var/lib/apt (id=aptlib, sharing=locked)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
@@ -116,7 +116,7 @@
                     "line": 5
                   }
                 },
-                "newText": "RUN --mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf --mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,target=/var/lib/apt,sharing=locked apt-get update \u0026\u0026 apt-get install -y gcc"
+                "newText": "RUN --mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf --mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update \u0026\u0026 apt-get install -y gcc"
               }
             ],
             "priority": 90,
@@ -124,7 +124,7 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /var/cache/apk (sharing=locked)",
+          "detail": "Detected package install/build command; add cache mount(s): /var/cache/apk (id=apk, sharing=locked)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
@@ -156,7 +156,7 @@
                     "line": 8
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/var/cache/apk,sharing=locked apk add curl"
+                "newText": "RUN --mount=type=cache,target=/var/cache/apk,id=apk,sharing=locked apk add curl"
               }
             ],
             "priority": 90,
@@ -164,7 +164,7 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /var/cache/dnf (sharing=locked)",
+          "detail": "Detected package install/build command; add cache mount(s): /var/cache/dnf (id=dnf, sharing=locked)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
@@ -196,7 +196,7 @@
                     "line": 9
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/var/cache/dnf,sharing=locked dnf install -y git"
+                "newText": "RUN --mount=type=cache,target=/var/cache/dnf,id=dnf,sharing=locked dnf install -y git"
               }
             ],
             "priority": 90,
@@ -204,7 +204,7 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /var/cache/yum (sharing=locked)",
+          "detail": "Detected package install/build command; add cache mount(s): /var/cache/yum (id=yum, sharing=locked)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
@@ -236,7 +236,7 @@
                     "line": 10
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/var/cache/yum,sharing=locked yum install -y make"
+                "newText": "RUN --mount=type=cache,target=/var/cache/yum,id=yum,sharing=locked yum install -y make"
               }
             ],
             "priority": 90,
@@ -244,7 +244,7 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /var/cache/zypp (sharing=locked)",
+          "detail": "Detected package install/build command; add cache mount(s): /var/cache/zypp (id=zypper, sharing=locked)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
@@ -276,7 +276,7 @@
                     "line": 11
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/var/cache/zypp,sharing=locked zypper install -y git"
+                "newText": "RUN --mount=type=cache,target=/var/cache/zypp,id=zypper,sharing=locked zypper install -y git"
               }
             ],
             "priority": 90,
@@ -284,7 +284,7 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /usr/local/share/.cache/yarn",
+          "detail": "Detected package install/build command; add cache mount(s): /usr/local/share/.cache/yarn (id=yarn)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
@@ -316,7 +316,7 @@
                     "line": 12
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/usr/local/share/.cache/yarn yarn install"
+                "newText": "RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,id=yarn yarn install"
               }
             ],
             "priority": 90,
@@ -324,7 +324,7 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /root/.cache/pip",
+          "detail": "Detected package install/build command; add cache mount(s): /root/.pnpm-store (id=pnpm)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
@@ -335,6 +335,46 @@
             "start": {
               "column": 0,
               "line": 13
+            }
+          },
+          "message": "use cache mounts for package manager cache directories",
+          "rule": "tally/prefer-package-cache-mounts",
+          "severity": "info",
+          "sourceCode": "RUN pnpm install --frozen-lockfile \u0026\u0026 pnpm store prune",
+          "suggestedFix": {
+            "description": "Add package cache mount(s) and remove cache cleanup commands",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 54,
+                    "line": 13
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 13
+                  }
+                },
+                "newText": "RUN --mount=type=cache,target=/root/.pnpm-store,id=pnpm pnpm install --frozen-lockfile"
+              }
+            ],
+            "priority": 90,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Detected package install/build command; add cache mount(s): /root/.cache/pip (id=pip)",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 14
+            },
+            "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 14
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -348,15 +388,15 @@
                 "location": {
                   "end": {
                     "column": 69,
-                    "line": 13
+                    "line": 14
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 13
+                    "line": 14
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt"
+                "newText": "RUN --mount=type=cache,target=/root/.cache/pip,id=pip pip install -r requirements.txt"
               }
             ],
             "priority": 90,
@@ -364,17 +404,17 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /root/.gem",
+          "detail": "Detected package install/build command; add cache mount(s): /root/.gem (id=gem)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
               "column": 0,
-              "line": 14
+              "line": 15
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 14
+              "line": 15
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -388,15 +428,15 @@
                 "location": {
                   "end": {
                     "column": 34,
-                    "line": 14
+                    "line": 15
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 14
+                    "line": 15
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.gem bundle install"
+                "newText": "RUN --mount=type=cache,target=/root/.gem,id=gem bundle install"
               }
             ],
             "priority": 90,
@@ -404,17 +444,17 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /workspace/target, /usr/local/cargo/git/db, /usr/local/cargo/registry",
+          "detail": "Detected package install/build command; add cache mount(s): /workspace/target (id=cargo-target), /usr/local/cargo/git/db (id=cargo-git), /usr/local/cargo/registry (id=cargo-registry)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
               "column": 0,
-              "line": 16
+              "line": 17
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 16
+              "line": 17
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -428,15 +468,15 @@
                 "location": {
                   "end": {
                     "column": 25,
-                    "line": 16
+                    "line": 17
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 16
+                    "line": 17
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/workspace/target --mount=type=cache,target=/usr/local/cargo/git/db --mount=type=cache,target=/usr/local/cargo/registry cargo build --release"
+                "newText": "RUN --mount=type=cache,target=/workspace/target,id=cargo-target --mount=type=cache,target=/usr/local/cargo/git/db,id=cargo-git --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry cargo build --release"
               }
             ],
             "priority": 90,
@@ -444,17 +484,17 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /root/.nuget/packages",
+          "detail": "Detected package install/build command; add cache mount(s): /root/.nuget/packages (id=nuget)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
               "column": 0,
-              "line": 17
+              "line": 18
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 17
+              "line": 18
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -468,15 +508,15 @@
                 "location": {
                   "end": {
                     "column": 53,
-                    "line": 17
+                    "line": 18
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 17
+                    "line": 18
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.nuget/packages dotnet restore"
+                "newText": "RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget dotnet restore"
               }
             ],
             "priority": 90,
@@ -484,17 +524,17 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /root/.cache/composer",
+          "detail": "Detected package install/build command; add cache mount(s): /root/.cache/composer (id=composer)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
               "column": 0,
-              "line": 18
+              "line": 19
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 18
+              "line": 19
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -508,15 +548,15 @@
                 "location": {
                   "end": {
                     "column": 53,
-                    "line": 18
+                    "line": 19
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 18
+                    "line": 19
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.cache/composer composer install --no-dev"
+                "newText": "RUN --mount=type=cache,target=/root/.cache/composer,id=composer composer install --no-dev"
               }
             ],
             "priority": 90,
@@ -524,17 +564,17 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /root/.cache/uv",
+          "detail": "Detected package install/build command; add cache mount(s): /root/.cache/uv (id=uv)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
               "column": 0,
-              "line": 19
+              "line": 20
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 19
+              "line": 20
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -548,15 +588,15 @@
                 "location": {
                   "end": {
                     "column": 49,
-                    "line": 19
+                    "line": 20
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 19
+                    "line": 20
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen"
+                "newText": "RUN --mount=type=cache,target=/root/.cache/uv,id=uv uv sync --frozen"
               }
             ],
             "priority": 90,
@@ -564,17 +604,17 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /root/.bun/install/cache",
+          "detail": "Detected package install/build command; add cache mount(s): /root/.bun/install/cache (id=bun)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
               "column": 0,
-              "line": 20
+              "line": 21
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 20
+              "line": 21
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -588,15 +628,15 @@
                 "location": {
                   "end": {
                     "column": 45,
-                    "line": 20
+                    "line": 21
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 20
+                    "line": 21
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.bun/install/cache bun install"
+                "newText": "RUN --mount=type=cache,target=/root/.bun/install/cache,id=bun bun install"
               }
             ],
             "priority": 90,
@@ -604,17 +644,17 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /root/.npm",
+          "detail": "Detected package install/build command; add cache mount(s): /root/.npm (id=npm)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
               "column": 0,
-              "line": 21
+              "line": 22
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 21
+              "line": 22
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -628,15 +668,15 @@
                 "location": {
                   "end": {
                     "column": 3,
-                    "line": 24
+                    "line": 25
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 21
+                    "line": 22
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.npm \u003c\u003cEOF\nnpm install\nEOF"
+                "newText": "RUN --mount=type=cache,target=/root/.npm,id=npm \u003c\u003cEOF\nnpm install\nEOF"
               }
             ],
             "priority": 90,
@@ -651,9 +691,9 @@
   "summary": {
     "errors": 0,
     "files": 1,
-    "info": 16,
+    "info": 17,
     "style": 0,
-    "total": 16,
+    "total": 17,
     "warnings": 0
   }
 }

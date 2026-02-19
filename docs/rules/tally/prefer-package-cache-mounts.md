@@ -17,27 +17,36 @@ The rule follows Docker's official cache-mount guidance in the **Use cache mount
 
 - <https://docs.docker.com/build/cache/optimize/#use-cache-mounts>
 
-It also supports `uv` and `bun` package install flows.
+It also supports `pnpm`, `uv`, and `bun` package install flows.
+
+Each suggested mount includes an `id` for observability and reusability across build stages.
 
 ## Detected Commands and Cache Targets
 
 | Command pattern | Cache mount target(s) |
 |-----------------|-----------------------|
-| `npm install`, `npm ci`, `npm i` | `/root/.npm` |
-| `go build`, `go mod download` | `/go/pkg/mod`, `/root/.cache/go-build` |
-| `apt`/`apt-get` package operations | `/var/cache/apt` and `/var/lib/apt` (`sharing=locked`) |
-| `apk` package operations | `/var/cache/apk` (`sharing=locked`) |
-| `dnf` package operations | `/var/cache/dnf` (`sharing=locked`) |
-| `yum` package operations | `/var/cache/yum` (`sharing=locked`) |
-| `zypper` package operations | `/var/cache/zypp` (`sharing=locked`) |
-| `pip install` | `/root/.cache/pip` |
-| `bundle install` | `/root/.gem` |
-| `yarn install`, `yarn add` | `/usr/local/share/.cache/yarn` |
-| `cargo build` | `<WORKDIR>/target`, `/usr/local/cargo/git/db`, `/usr/local/cargo/registry` |
-| `dotnet restore` | `/root/.nuget/packages` |
-| `composer install` | `/root/.cache/composer` |
-| `uv sync`, `uv pip install`, `uv tool install` | `/root/.cache/uv` |
-| `bun install` | `/root/.bun/install/cache` |
+| `npm install`, `npm ci`, `npm i` | `/root/.npm` (`id=npm`) |
+| `go build`, `go mod download` | `/go/pkg/mod` (`id=gomod`), `/root/.cache/go-build` (`id=gobuild`) |
+| `apt`/`apt-get` package operations | `/var/cache/apt` (`id=apt`, `sharing=locked`) and `/var/lib/apt` (`id=aptlib`, `sharing=locked`) |
+| `apk` package operations | `/var/cache/apk` (`id=apk`, `sharing=locked`) |
+| `dnf` package operations | `/var/cache/dnf` (`id=dnf`, `sharing=locked`) |
+| `yum` package operations | `/var/cache/yum` (`id=yum`, `sharing=locked`) |
+| `zypper` package operations | `/var/cache/zypp` (`id=zypper`, `sharing=locked`) |
+| `pip install` | `/root/.cache/pip` (`id=pip`) |
+| `bundle install` | `/root/.gem` (`id=gem`) |
+| `yarn install`, `yarn add` | `/usr/local/share/.cache/yarn` (`id=yarn`) |
+| `pnpm install`, `pnpm add`, `pnpm i` | `$PNPM_HOME/store` or `/root/.pnpm-store` (`id=pnpm`) |
+| `cargo build` | `<WORKDIR>/target` (`id=cargo-target`), `/usr/local/cargo/git/db` (`id=cargo-git`), `/usr/local/cargo/registry` (`id=cargo-registry`) |
+| `dotnet restore` | `/root/.nuget/packages` (`id=nuget`) |
+| `composer install` | `/root/.cache/composer` (`id=composer`) |
+| `uv sync`, `uv pip install`, `uv tool install` | `/root/.cache/uv` (`id=uv`) |
+| `bun install` | `/root/.bun/install/cache` (`id=bun`) |
+
+### pnpm store path resolution
+
+The rule resolves the pnpm store path from the `PNPM_HOME` environment variable set in the Dockerfile.
+If `ENV PNPM_HOME="/pnpm"` is present, the cache mount targets `$PNPM_HOME/store` (e.g. `/pnpm/store`).
+If no `PNPM_HOME` is set, it defaults to `/root/.pnpm-store`.
 
 ## Examples
 
@@ -54,9 +63,25 @@ RUN --mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf \
 ```dockerfile
 FROM ubuntu:24.04
 RUN --mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf \
-    --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked \
     apt-get update && apt-get install -y gcc
+```
+
+### pnpm with PNPM_HOME
+
+```dockerfile
+FROM node:20-slim
+ENV PNPM_HOME="/pnpm"
+RUN pnpm install --frozen-lockfile && pnpm store prune
+```
+
+becomes:
+
+```dockerfile
+FROM node:20-slim
+ENV PNPM_HOME="/pnpm"
+RUN --mount=type=cache,target=/pnpm/store,id=pnpm pnpm install --frozen-lockfile
 ```
 
 ### Heredoc RUN support
@@ -71,7 +96,7 @@ EOF
 becomes:
 
 ```dockerfile
-RUN --mount=type=cache,target=/root/.npm <<EOF
+RUN --mount=type=cache,target=/root/.npm,id=npm <<EOF
 npm install
 EOF
 ```
@@ -91,6 +116,7 @@ of cache mounts.
 - **yum**: `yum clean ...` and `rm -rf /var/cache/yum*`
 - **zypper**: `zypper clean ...` and `rm -rf /var/cache/zypp*`
 - **npm**: `npm cache clean ...`
+- **pnpm**: `pnpm store prune`
 - **pip**: `pip cache purge`, `pip cache remove ...`
 - **bundle**: `bundle clean ...`
 - **yarn**: `yarn cache clean ...`
@@ -110,3 +136,4 @@ of cache mounts.
 
 - [Docker cache optimization: Use cache mounts](https://docs.docker.com/build/cache/optimize/#use-cache-mounts)
 - [Dockerfile `RUN --mount` reference](https://docs.docker.com/reference/dockerfile/#run---mount)
+- [Using pnpm with Docker](https://pnpm.io/docker)
