@@ -124,8 +124,39 @@ newline-between-instructions = "always"
 This rule provides safe auto-fixes:
 
 - **Insert blank line**: Adds a single blank line between instructions that need separation.
-- **Remove blank lines**: Removes all blank lines between instructions that should be adjacent.
+- **Remove blank lines**: Removes excess blank lines between instructions that should be adjacent.
+
+The auto-fix uses an async resolver that re-parses the file after other fixes have been applied,
+ensuring correct line positions even when earlier fixes (such as heredoc conversions) change the
+file structure.
 
 ```bash
 tally lint --fix Dockerfile
+```
+
+## Interaction with buildkit/InvalidDefinitionDescription
+
+When both rules are enabled, `buildkit/InvalidDefinitionDescription` may insert blank lines
+between comments and instructions (to indicate a comment is not a description). These blank
+lines are **not** affected by `newline-between-instructions` because the newline rule only
+measures gaps between instruction nodes, not between comments and their associated instructions.
+
+For example, with `never` mode and `InvalidDefinitionDescription` enabled:
+
+```dockerfile
+# This comment doesn't describe the ARG
+ARG foo=bar
+FROM scratch AS base
+RUN echo hello
+```
+
+After auto-fix, `InvalidDefinitionDescription` inserts a blank line between the comment and
+`ARG`, while `newline-between-instructions` keeps instructions adjacent:
+
+```dockerfile
+# This comment doesn't describe the ARG
+
+ARG foo=bar
+FROM scratch AS base
+RUN echo hello
 ```
