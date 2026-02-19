@@ -12,6 +12,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/runmount"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
 
@@ -287,17 +288,32 @@ func buildDependentsMap(stages []instructions.Stage) map[int][]int {
 			}
 		}
 
-		// Check COPY --from references.
+		// Check COPY --from and RUN --mount=from references.
 		for _, cmd := range stage.Commands {
-			cp, ok := cmd.(*instructions.CopyCommand)
-			if !ok || cp.From == "" {
-				continue
-			}
-			ref := strings.ToLower(cp.From)
-			if depIdx, ok := nameToIdx[ref]; ok {
-				dependents[depIdx] = append(dependents[depIdx], stageIdx)
-			} else if idx, err := strconv.Atoi(ref); err == nil && idx >= 0 && idx < len(stages) {
-				dependents[idx] = append(dependents[idx], stageIdx)
+			switch c := cmd.(type) {
+			case *instructions.CopyCommand:
+				if c.From == "" {
+					continue
+				}
+				ref := strings.ToLower(c.From)
+				if depIdx, ok := nameToIdx[ref]; ok {
+					dependents[depIdx] = append(dependents[depIdx], stageIdx)
+				} else if idx, err := strconv.Atoi(ref); err == nil && idx >= 0 && idx < len(stages) {
+					dependents[idx] = append(dependents[idx], stageIdx)
+				}
+
+			case *instructions.RunCommand:
+				for _, m := range runmount.GetMounts(c) {
+					if m.From == "" {
+						continue
+					}
+					ref := strings.ToLower(m.From)
+					if depIdx, ok := nameToIdx[ref]; ok {
+						dependents[depIdx] = append(dependents[depIdx], stageIdx)
+					} else if idx, err := strconv.Atoi(ref); err == nil && idx >= 0 && idx < len(stages) {
+						dependents[idx] = append(dependents[idx], stageIdx)
+					}
+				}
 			}
 		}
 	}

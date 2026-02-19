@@ -210,6 +210,20 @@ RUN echo world
 `,
 			wantViolations: 2,
 		},
+		{
+			name: "multi-stage - mount-from stage skipped",
+			content: `FROM alpine:3.20 AS deps
+RUN apk add --no-cache curl
+CMD ["serve"]
+RUN echo hello
+
+FROM alpine:3.20
+RUN --mount=type=bind,from=deps,source=/usr/bin/curl,target=/usr/bin/curl echo ok
+ENTRYPOINT ["/app"]
+CMD ["serve"]
+`,
+			wantViolations: 0,
+		},
 	}
 
 	for _, tt := range tests {
