@@ -610,5 +610,14 @@ mode = "always"
 mode = "never"
 `,
 		},
+
+		// No trailing spaces: remove trailing whitespace from multiple lines
+		{
+			name:  "no-trailing-spaces",
+			input: "FROM alpine:3.20   \nRUN echo hello  \n# comment \nCOPY . /app\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/no-trailing-spaces")...),
+			wantApplied: 3,
+		},
 	}
 }
