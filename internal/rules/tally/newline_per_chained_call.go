@@ -49,7 +49,10 @@ func (r *NewlinePerChainedCallRule) Metadata() rules.RuleMetadata {
 		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
 		IsExperimental:  false,
-		FixPriority:     20, // After content fixes (DL3027 at 0, no-trailing-spaces at 10); before consistent-indentation (50)
+		// Priority 97: must run after all same-line content fixes (DL3027/0,
+		// DL3014/10, DL3047/96) whose column shifts the fixer tracks. Our edits
+		// insert newlines which the fixer can't track, so we run last among syncs.
+		FixPriority: 97,
 	}
 }
 

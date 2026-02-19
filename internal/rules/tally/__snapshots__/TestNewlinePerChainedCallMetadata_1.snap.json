@@ -4,7 +4,7 @@
  "DefaultSeverity": "style",
  "Description": "Each chained element within an instruction should be on its own line",
  "DocURL": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-per-chained-call.md",
- "FixPriority": 20,
+ "FixPriority": 97,
  "IsExperimental": false,
  "Name": "Newline Per Chained Call"
 }

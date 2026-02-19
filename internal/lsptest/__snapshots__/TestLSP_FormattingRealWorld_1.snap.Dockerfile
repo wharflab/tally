@@ -220,14 +220,11 @@ ARG CUDA_HOME=/usr/local/cuda
 RUN pip uninstall -y horovod  && ldconfig /usr/local/cuda-11.7/targets/x86_64-linux/lib/stubs  && HOROVOD_GPU_ALLREDUCE=NCCL HOROVOD_CUDA_HOME=/usr/local/cuda-11.7 HOROVOD_WITH_PYTORCH=1 pip install --no-cache-dir horovod==${HOROVOD_VERSION}  && ldconfig
 RUN mkdir -p /etc/pki/tls/certs \
     && cp /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt
-
- --progress=dot:giga
-
 RUN conda install -y -c conda-forge     scikit-learn     pandas
 
 WORKDIR /
 
-RUN wget https://sourceforge.net/projects/boost/files/boost/1.73.0/boost_1_73_0.tar.gz/download -O boost_1_73_0.tar.gz  && tar -xzf boost_1_73_0.tar.gz  && cd boost_1_73_0  && ./bootstrap.sh  && ./b2 threading=multi --prefix=/opt/conda -j 64 cxxflags=-fPIC cflags=-fPIC install || true  && cd ..  && rm -rf boost_1_73_0.tar.gz  && rm -rf boost_1_73_0  && cd /opt/conda/include/boost
+RUN wget --progress=dot:giga https://sourceforge.net/projects/boost/files/boost/1.73.0/boost_1_73_0.tar.gz/download -O boost_1_73_0.tar.gz  && tar -xzf boost_1_73_0.tar.gz  && cd boost_1_73_0  && ./bootstrap.sh  && ./b2 threading=multi --prefix=/opt/conda -j 64 cxxflags=-fPIC cflags=-fPIC install || true  && cd ..  && rm -rf boost_1_73_0.tar.gz  && rm -rf boost_1_73_0  && cd /opt/conda/include/boost
 
 WORKDIR /opt/
 
@@ -258,12 +255,11 @@ WORKDIR /
 
 RUN HOME_DIR=/root  && curl -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip  && unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/  && cp ${HOME_DIR}/oss_compliance/test/testOSSCompliance /usr/local/bin/testOSSCompliance  && chmod +x /usr/local/bin/testOSSCompliance  && chmod +x ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh  && ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh ${HOME_DIR} ${PYTHON}  && rm -rf ${HOME_DIR}/oss_compliance*  && rm -rf /tmp/tmp*
 RUN rm -rf /root/.cache | true
-
-ENTRYPOINT ["bash", "-m", "start_with_right_hostname.sh"]
-
-CMD ["/bin/bash"]
-
 RUN apt-get update  && apt-get -y upgrade --only-upgrade systemd openssl cryptsetup  && apt-get install -y git-lfs  && apt-get clean  && rm -rf /var/lib/apt/lists/*
 RUN HOME_DIR=/root  && curl -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip  && unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/  && cp ${HOME_DIR}/oss_compliance/test/testOSSCompliance /usr/local/bin/testOSSCompliance  && chmod +x /usr/local/bin/testOSSCompliance  && chmod +x ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh  && ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh ${HOME_DIR} ${PYTHON}  && rm -rf ${HOME_DIR}/oss_compliance*
 
 COPY changehostname.c /changehostname.c
+
+ENTRYPOINT ["bash", "-m", "start_with_right_hostname.sh"]
+
+CMD ["/bin/bash"]

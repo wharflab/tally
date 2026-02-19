@@ -771,5 +771,18 @@ skip-blank-lines = true
 				mustSelectRules("tally/newline-per-chained-call", "hadolint/DL3027")...),
 			wantApplied: 2, // DL3027 + chain split
 		},
+		// Cross-rule: DL3047 (wget --progress) + chain split on same RUN
+		{
+			name: "newline-per-chained-call-cross-dl3047",
+			input: "FROM ubuntu:24.04\n" +
+				"RUN wget https://example.com/file.tar.gz " +
+				"&& tar -xzf file.tar.gz\n",
+			args: append([]string{"--fix"},
+				mustSelectRules(
+					"tally/newline-per-chained-call",
+					"hadolint/DL3047",
+				)...),
+			wantApplied: 2, // DL3047 + chain split
+		},
 	}
 }
