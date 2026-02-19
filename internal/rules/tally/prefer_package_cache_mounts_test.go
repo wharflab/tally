@@ -204,6 +204,13 @@ RUN --mount=type=cache,target=/root/.pnpm-store pnpm install
 			WantViolations: 0,
 		},
 		{
+			Name: "pnpm i alias without cache mount",
+			Content: `FROM node:20
+RUN pnpm i
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "pnpm add",
 			Content: `FROM node:20
 RUN pnpm add express
