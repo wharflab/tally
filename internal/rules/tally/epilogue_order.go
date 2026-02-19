@@ -51,8 +51,8 @@ func (r *EpilogueOrderRule) Metadata() rules.RuleMetadata {
 // Check runs the epilogue-order rule.
 func (r *EpilogueOrderRule) Check(input rules.LintInput) []rules.Violation {
 	// Semantic model is required for stage graph analysis.
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Safe assertion with nil fallback
-	if sem == nil {
+	sem, ok := input.Semantic.(*semantic.Model)
+	if !ok || sem == nil {
 		return nil
 	}
 
