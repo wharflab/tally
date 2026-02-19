@@ -252,30 +252,16 @@
               {
                 "location": {
                   "end": {
-                    "column": 43,
+                    "column": 116,
                     "line": 23
                   },
                   "file": "testdata/newline-per-chained-call/Dockerfile",
                   "start": {
-                    "column": 42,
+                    "column": 0,
                     "line": 23
                   }
                 },
-                "newText": " \\\n\t"
-              },
-              {
-                "location": {
-                  "end": {
-                    "column": 80,
-                    "line": 23
-                  },
-                  "file": "testdata/newline-per-chained-call/Dockerfile",
-                  "start": {
-                    "column": 79,
-                    "line": 23
-                  }
-                },
-                "newText": " \\\n\t"
+                "newText": "LABEL org.opencontainers.image.title=myapp \\\n\torg.opencontainers.image.version=1.0 \\\n\torg.opencontainers.image.vendor=acme"
               }
             ],
             "isPreferred": true,

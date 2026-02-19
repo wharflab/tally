@@ -471,69 +471,27 @@ func (r *NewlinePerChainedCallRule) checkLabel(
 
 	startLine := cmd.Location()[0].Start.Line
 	endLine := resolveEndLine(sm, cmd.Location())
+	numSourceLines := endLine - startLine + 1
 
-	instrLines := make([]string, 0, endLine-startLine+1)
-	for l := startLine; l <= endLine; l++ {
-		instrLines = append(instrLines, sm.Line(l-1))
-	}
-
-	instrIndent := leadingWhitespace(instrLines[0])
-
-	// Find positions of each key in the source text
-	var keyPositions []keyPos
-	for _, kv := range cmd.Labels {
-		pos := findKeyPosition(instrLines, startLine, kv.Key, keyPositions)
-		if pos.line > 0 {
-			keyPositions = append(keyPositions, pos)
-		}
-	}
-
-	if len(keyPositions) < 2 {
+	// Already formatted: first line has LABEL + first pair, each remaining pair
+	// gets its own continuation line → need at least len(labels) lines.
+	if numSourceLines >= len(cmd.Labels) {
 		return nil
 	}
 
-	// Check if multiple keys share a source line
-	hasSameLinePairs := false
-	for i := 1; i < len(keyPositions); i++ {
-		if keyPositions[i].line == keyPositions[i-1].line {
-			hasSameLinePairs = true
-			break
-		}
+	instrIndent := leadingWhitespace(sm.Line(startLine - 1))
+
+	// Pretty-print: replace entire instruction with one pair per line.
+	var b strings.Builder
+	b.WriteString(instrIndent + "LABEL " + cmd.Labels[0].String())
+	for _, kv := range cmd.Labels[1:] {
+		b.WriteString(" \\\n" + instrIndent + "\t" + kv.String())
 	}
 
-	if !hasSameLinePairs {
-		return nil
-	}
-
-	// Generate edits: find the gap between end of previous pair and start of next key
-	var edits []rules.TextEdit
-	for i := 1; i < len(keyPositions); i++ {
-		if keyPositions[i].line != keyPositions[i-1].line {
-			continue // already on different lines
-		}
-
-		// Find end of previous key=value pair by searching backwards from current key position
-		prevLine := keyPositions[i-1].line
-		lineText := instrLines[prevLine-startLine]
-		gapEnd := keyPositions[i].col
-
-		// Find where the previous value ends (search backwards from gapEnd for whitespace)
-		gapStart := gapEnd
-		for gapStart > 0 && (lineText[gapStart-1] == ' ' || lineText[gapStart-1] == '\t') {
-			gapStart--
-		}
-
-		if gapStart < gapEnd {
-			edits = append(edits, rules.TextEdit{
-				Location: rules.NewRangeLocation(file, prevLine, gapStart, prevLine, gapEnd),
-				NewText:  " \\\n" + instrIndent + "\t",
-			})
-		}
-	}
-
-	if len(edits) == 0 {
-		return nil
-	}
+	edits := []rules.TextEdit{{
+		Location: rules.NewRangeLocation(file, startLine, 0, endLine, len(sm.Line(endLine-1))),
+		NewText:  b.String(),
+	}}
 
 	loc := rules.NewLocationFromRanges(file, cmd.Location())
 	v := rules.NewViolation(loc, meta.Code, "split LABEL key=value pairs onto separate lines", meta.DefaultSeverity).
@@ -547,58 +505,6 @@ func (r *NewlinePerChainedCallRule) checkLabel(
 		})
 
 	return &v
-}
-
-// keyPos records the Dockerfile line and column of a LABEL key.
-type keyPos struct {
-	line int // 1-based Dockerfile line
-	col  int // 0-based column of key start
-}
-
-// findKeyPosition finds the position of a key in the instruction source lines,
-// skipping positions that have already been matched.
-func findKeyPosition(instrLines []string, startLine int, key string, alreadyFound []keyPos) keyPos {
-	for i, line := range instrLines {
-		docLine := startLine + i
-		searchFrom := 0
-		if i == 0 {
-			// Skip LABEL keyword on first line
-			upper := strings.ToUpper(strings.TrimLeft(line, " \t"))
-			if strings.HasPrefix(upper, "LABEL") {
-				searchFrom = strings.Index(strings.ToUpper(line), "LABEL") + 5
-				// Skip whitespace after LABEL
-				for searchFrom < len(line) && (line[searchFrom] == ' ' || line[searchFrom] == '\t') {
-					searchFrom++
-				}
-			}
-		}
-
-		for {
-			idx := strings.Index(line[searchFrom:], key)
-			if idx < 0 {
-				break
-			}
-			col := searchFrom + idx
-
-			// Verify this is a key position (followed by =)
-			afterKey := col + len(key)
-			if afterKey < len(line) && line[afterKey] == '=' {
-				// Check if already found
-				alreadyUsed := false
-				for _, af := range alreadyFound {
-					if af.line == docLine && af.col == col {
-						alreadyUsed = true
-						break
-					}
-				}
-				if !alreadyUsed {
-					return keyPos{line: docLine, col: col}
-				}
-			}
-			searchFrom = col + 1
-		}
-	}
-	return keyPos{}
 }
 
 // checkHealthcheck checks a HEALTHCHECK CMD instruction for chained commands.
