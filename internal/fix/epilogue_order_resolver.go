@@ -123,8 +123,9 @@ func (r *epilogueOrderResolver) fixStage(
 			continue
 		}
 
-		// The node index in stageNodes is offset by 1 (first node is FROM).
-		// stage.Commands doesn't include the FROM instruction.
+		// instructions.Parse produces one Command per AST child (excluding FROM),
+		// so stage.Commands[i] corresponds to stageNodes[i+1]. The bounds check
+		// below is a defensive fallback for malformed input.
 		nodeIdx := i + 1
 		if nodeIdx >= len(stageNodes) {
 			continue
