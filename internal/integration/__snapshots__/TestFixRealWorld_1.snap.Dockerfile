@@ -3,73 +3,39 @@ ARG RUNTIME_IMAGE=ubuntu:22.04
 
 FROM $BUILDER_IMAGE AS python_builder_1
 
-RUN <<EOF
-set -e
-apt-get update
-apt-get install -y --no-install-recommends curl ca-certificates wget
-apt-get clean
-rm -rf /var/lib/apt/lists/*
-EOF
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates wget && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ARG MAMBA_VERSION
 
-RUN <<EOF
-set -e
-curl -L -o ~/mambaforge.sh https://github.com/conda-forge/miniforge/releases/download/${MAMBA_VERSION}/Mambaforge-${MAMBA_VERSION}-Linux-x86_64.sh
-chmod +x ~/mambaforge.sh
-~/mambaforge.sh -b -p /opt/conda
-rm ~/mambaforge.sh
-EOF
+RUN curl -L -o ~/mambaforge.sh https://github.com/conda-forge/miniforge/releases/download/${MAMBA_VERSION}/Mambaforge-${MAMBA_VERSION}-Linux-x86_64.sh  && chmod +x ~/mambaforge.sh  && ~/mambaforge.sh -b -p /opt/conda  && rm ~/mambaforge.sh
 
 ARG PYTHON_VERSION
 
-RUN <<EOF
-set -e
-/opt/conda/bin/conda config --set auto_activate_base false
-/opt/conda/bin/conda create --name default python=${PYTHON_VERSION}
-echo "#! /bin/bash\n\n# script to activate the conda environment" >~/.bashrc
-echo "export PS1='Docker> '" >>~/.bashrc
-/opt/conda/bin/conda init bash
-echo "\nconda activate default" >>~/.bashrc
-/opt/conda/bin/conda clean -a
-EOF
+RUN /opt/conda/bin/conda config --set auto_activate_base false && /opt/conda/bin/conda create --name default python=${PYTHON_VERSION} \
+&& echo "#! /bin/bash\n\n# script to activate the conda environment" > ~/.bashrc \
+&& echo "export PS1='Docker> '" >> ~/.bashrc \
+&& /opt/conda/bin/conda init bash \
+&& echo "\nconda activate default" >> ~/.bashrc \
+&& /opt/conda/bin/conda clean -a
 
 ENV BASH_ENV=~/.bashrc
 ENV PATH="${PATH}:/opt/conda/envs/default/bin"
 
-RUN <<EOF
-set -e
-ln -s /opt/conda/envs/default/bin/pip /usr/local/bin/pip
-ln -s /opt/conda/envs/default/bin/python /usr/local/bin/python
-/opt/conda/bin/conda config --set ssl_verify False
-pip install --no-cache-dir --upgrade pip --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org
-pip install --no-cache-dir pyOpenSSL --upgrade
-EOF
+RUN ln -s /opt/conda/envs/default/bin/pip /usr/local/bin/pip && ln -s /opt/conda/envs/default/bin/python /usr/local/bin/python && /opt/conda/bin/conda config --set ssl_verify False  && pip install --no-cache-dir --upgrade pip --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org
+RUN pip install --no-cache-dir pyOpenSSL --upgrade
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-RUN <<EOF
-set -e
-apt-get update
-apt-get install -y libopenmpi-dev
-rm -rf /var/lib/apt/lists/*
-apt-get clean
-pip install --no-cache-dir -U "cython<3.0.0" wheel
-pip install pyyaml==5.4.1 --no-build-isolation
-pip install --no-cache-dir -U "awscli>1.27,<2" boto3 "click==8.1.2,<9" "cmake>=3.24.3,<3.25" "cryptography>41" ipython "mpi4py>=3.1.4,<3.2" "opencv-python>=4.6.0,<4.7" packaging Pillow "psutil>=5.9.4,<5.10" "pyyaml>=5.4,<5.5"
-EOF
+RUN apt-get update && apt-get install -y libopenmpi-dev && rm -rf /var/lib/apt/lists/*  && apt-get clean
+RUN pip install --no-cache-dir -U  "cython<3.0.0" wheel \
+    && pip install pyyaml==5.4.1 --no-build-isolation \
+    && pip install --no-cache-dir -U  "awscli>1.27,<2"     boto3     "click==8.1.2,<9"     "cmake>=3.24.3,<3.25"     "cryptography>41"     ipython     "mpi4py>=3.1.4,<3.2"     "opencv-python>=4.6.0,<4.7"     packaging     Pillow     "psutil>=5.9.4,<5.10"     "pyyaml>=5.4,<5.5"
 
 ARG TRITON_VERSION
 
-RUN <<EOF
-set -e
-pip install --no-cache-dir -U smclarify "sagemaker>=2,<3" sagemaker-experiments==0.* sagemaker-pytorch-training triton==${TRITON_VERSION}
-pip install --no-cache-dir -U "bokeh>=3.0.1,<4" "imageio>=2.22,<3" "opencv-python>=4.6,<5" "plotly>=5.11,<6" "seaborn>=0.12,<1" "numba>=0.56.4,<0.57" "shap>=0.41,<1"
-apt-get update
-apt-get install -y build-essential
-rm -rf /var/lib/apt/lists/*
-apt-get clean
-EOF
+RUN pip install --no-cache-dir -U     smclarify   "sagemaker>=2,<3"     sagemaker-experiments==0.*     sagemaker-pytorch-training     triton==${TRITON_VERSION}
+RUN pip install --no-cache-dir -U "bokeh>=3.0.1,<4" "imageio>=2.22,<3" "opencv-python>=4.6,<5" "plotly>=5.11,<6" "seaborn>=0.12,<1" "numba>=0.56.4,<0.57" "shap>=0.41,<1"
+RUN apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*  && apt-get clean
 
 ARG DATASETS_VERSION
 ARG DIFFUSERS_VERSION
@@ -138,25 +104,16 @@ ENV DLC_CONTAINER_TYPE=training
 LABEL org.opencontainers.image.ref.name=ubuntu
 LABEL org.opencontainers.image.version=22.04
 
-RUN <<EOF
-set -e
-apt-get update
-apt-get install -y wget build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev libbz2-dev liblzma-dev
-apt-get clean
-rm -rf /var/lib/apt/lists/*
-EOF
+RUN apt-get update \
+    && apt-get install -y wget build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev libbz2-dev liblzma-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 ENV NVARCH=x86_64
 
-RUN <<EOF
-set -e
-set -o pipefail
-apt-get update
-apt-get install -y --no-install-recommends gnupg2 curl ca-certificates
-curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH}/3bf863cc.pub | apt-key add -
-EOF
+RUN apt-get update && apt-get install -y --no-install-recommends gnupg2 curl ca-certificates && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH}/3bf863cc.pub | apt-key add -
 
 COPY <<EOF /etc/apt/sources.list.d/cuda.list
 deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH} /
@@ -167,134 +124,56 @@ RUN apt-get purge --autoremove -y curl && rm -rf /var/lib/apt/lists/*
 ENV NV_CUDA_COMPAT_PACKAGE=cuda-compat-11-7
 ENV NV_CUDA_CUDART_VERSION=11.7.99-1
 
-RUN <<EOF
-set -e
-apt-get update
-apt-get install -y --no-install-recommends cuda-cudart-11-7=${NV_CUDA_CUDART_VERSION} ${NV_CUDA_COMPAT_PACKAGE}
-rm -rf /var/lib/apt/lists/*
-echo "/usr/local/nvidia/lib" >>/etc/ld.so.conf.d/nvidia.conf
-echo "/usr/local/nvidia/lib64" >>/etc/ld.so.conf.d/nvidia.conf
-EOF
+RUN apt-get update && apt-get install -y --no-install-recommends     cuda-cudart-11-7=${NV_CUDA_CUDART_VERSION}     ${NV_CUDA_COMPAT_PACKAGE}     && rm -rf /var/lib/apt/lists/*
+RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf \
+    && echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV DEBIAN_FRONTEND=noninteractive LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/lib
 
-RUN <<EOF
-set -e
-apt-get update
-apt-get upgrade -y
-apt-get autoremove -y
-apt-get clean
-rm -rf /var/lib/apt/lists/*
-EOF
+RUN apt-get update  && apt-get upgrade -y  && apt-get autoremove -y  && apt-get clean  && rm -rf /var/lib/apt/lists/*
 
 ARG CUBLAS_VERSION=11.10.3.66
 
-RUN <<EOF
-set -e
-apt-get update
-apt-get -y upgrade --only-upgrade systemd
-apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7 libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libglib2.0-0 libgl1-mesa-glx libsm6 libxext6 libxrender-dev libgomp1 libibverbs-dev libhwloc-dev libnuma1 libnuma-dev libssl3 libssl-dev libtool openssl python3-dev unzip vim wget zlib1g-dev pkg-config check libsubunit0 libsubunit-dev
-rm -rf /var/lib/apt/lists/*
-apt-get clean
-cd /tmp
-git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION}-1
-cd nccl
-make -j $(nproc) src.build BUILDDIR=/usr/local
-rm -rf /tmp/nccl
-mkdir /tmp/efa
-cd /tmp/efa
-curl -O https://efa-installer.amazonaws.com/aws-efa-installer-${EFA_VERSION}.tar.gz
-tar -xf aws-efa-installer-${EFA_VERSION}.tar.gz
-cd aws-efa-installer
-apt-get update
-./efa_installer.sh -y --skip-kmod -g
-rm -rf $OPEN_MPI_PATH
-rm -rf /tmp/efa
-rm -rf /tmp/aws-efa-installer-${EFA_VERSION}.tar.gz
-rm -rf /var/lib/apt/lists/*
-apt-get clean
-mkdir /tmp/openmpi
-cd /tmp/openmpi
-wget --quiet https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-${OMPI_VERSION}.tar.gz
-tar zxf openmpi-${OMPI_VERSION}.tar.gz
-cd openmpi-${OMPI_VERSION}
-./configure --enable-orterun-prefix-by-default --prefix=$OPEN_MPI_PATH --with-cuda
-make -j $(nproc) all
-make install
-ldconfig
-cd /
-rm -rf /tmp/openmpi
-EOF
+RUN apt-get update  && apt-get -y upgrade --only-upgrade systemd  && apt-get install -y --allow-change-held-packages --no-install-recommends     build-essential     ca-certificates     cmake     cuda-command-line-tools-11-7     cuda-cudart-11-7     cuda-libraries-11-7     curl     emacs     git     hwloc     jq     libcublas-11-7=${CUBLAS_VERSION}-1     libcublas-dev-11-7=${CUBLAS_VERSION}-1     libcudnn8=$CUDNN_VERSION-1+cuda11.7     libcufft-dev-11-7     libcurand-dev-11-7     libcurl4-openssl-dev     libcusolver-dev-11-7     libcusparse-dev-11-7     libglib2.0-0     libgl1-mesa-glx     libsm6     libxext6     libxrender-dev     libgomp1     libibverbs-dev     libhwloc-dev     libnuma1     libnuma-dev     libssl3     libssl-dev     libtool     openssl     python3-dev     unzip     vim     wget     zlib1g-dev     pkg-config     check     libsubunit0     libsubunit-dev  && rm -rf /var/lib/apt/lists/*  && apt-get clean
+RUN cd /tmp  && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION}-1  && cd nccl  && make -j $(nproc) src.build BUILDDIR=/usr/local  && rm -rf /tmp/nccl
+RUN mkdir /tmp/efa  && cd /tmp/efa  && curl -O https://efa-installer.amazonaws.com/aws-efa-installer-${EFA_VERSION}.tar.gz  && tar -xf aws-efa-installer-${EFA_VERSION}.tar.gz  && cd aws-efa-installer  && apt-get update  && ./efa_installer.sh -y --skip-kmod -g  && rm -rf $OPEN_MPI_PATH  && rm -rf /tmp/efa  && rm -rf /tmp/aws-efa-installer-${EFA_VERSION}.tar.gz  && rm -rf /var/lib/apt/lists/*  && apt-get clean
+RUN mkdir /tmp/openmpi  && cd /tmp/openmpi  && wget --quiet https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-${OMPI_VERSION}.tar.gz  && tar zxf openmpi-${OMPI_VERSION}.tar.gz  && cd openmpi-${OMPI_VERSION}  && ./configure --enable-orterun-prefix-by-default --prefix=$OPEN_MPI_PATH --with-cuda  && make -j $(nproc) all  && make install  && ldconfig  && cd /  && rm -rf /tmp/openmpi
 
  ENV PATH="${PATH}:/opt/amazon/openmpi/bin:/opt/amazon/efa/bin:/opt/conda/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
  ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}/opt/amazon/openmpi/lib/:/opt/amazon/efa/lib/"
 
-RUN <<EOF
-set -e
-cd /tmp
-git clone https://github.com/NVIDIA/gdrcopy.git -b v${GDRCOPY_VERSION}
-cd gdrcopy
-sed -ie '12s@$@ -L /usr/local/cuda/lib64/stubs/@' tests/Makefile
-make install
-rm -rf /tmp/gdrcopy
-EOF
+RUN cd /tmp  && git clone https://github.com/NVIDIA/gdrcopy.git -b v${GDRCOPY_VERSION}  && cd gdrcopy  && sed -ie '12s@$@ -L /usr/local/cuda/lib64/stubs/@' tests/Makefile  && make install  && rm -rf /tmp/gdrcopy
 
 ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
-RUN <<EOF
-set -e
-apt-get update -q
-apt-get install -q -y --no-install-recommends bzip2 ca-certificates git libglib2.0-0 libsm6 libxext6 libxrender1 mercurial openssh-client procps subversion wget
-apt-get clean
-rm -rf /var/lib/apt/lists/*
-EOF
+RUN apt-get update -q &&     apt-get install -q -y --no-install-recommends         bzip2         ca-certificates         git         libglib2.0-0         libsm6         libxext6         libxrender1         mercurial         openssh-client         procps         subversion         wget     && apt-get clean     && rm -rf /var/lib/apt/lists/*
 
 ARG MAMBA_VERSION
 
-RUN <<EOF
-set -e
-curl -L -o ~/mambaforge.sh https://github.com/conda-forge/miniforge/releases/download/${MAMBA_VERSION}/Mambaforge-${MAMBA_VERSION}-Linux-x86_64.sh
-chmod +x ~/mambaforge.sh
-~/mambaforge.sh -b -p /opt/conda
-rm ~/mambaforge.sh
-/opt/conda/bin/conda install conda-libmamba-solver --solver classic
-/opt/conda/bin/conda config --set solver libmamba
-EOF
+RUN curl -L -o ~/mambaforge.sh https://github.com/conda-forge/miniforge/releases/download/${MAMBA_VERSION}/Mambaforge-${MAMBA_VERSION}-Linux-x86_64.sh  && chmod +x ~/mambaforge.sh  && ~/mambaforge.sh -b -p /opt/conda  && rm ~/mambaforge.sh
+RUN /opt/conda/bin/conda install conda-libmamba-solver --solver classic \
+    && /opt/conda/bin/conda config --set solver libmamba
 
 ARG PYTHON_VERSION
 
-RUN <<EOF
-set -e
-/opt/conda/bin/conda config --set auto_activate_base false
-/opt/conda/bin/conda create --name default python=${PYTHON_VERSION}
-echo "#! /bin/bash\n\n# script to activate the conda environment" >~/.bashrc
-echo "export PS1='Docker> '" >>~/.bashrc
-/opt/conda/bin/conda init bash
-echo "\nconda activate default" >>~/.bashrc
-/opt/conda/bin/conda clean -a
-EOF
+RUN /opt/conda/bin/conda config --set auto_activate_base false && /opt/conda/bin/conda create --name default python=${PYTHON_VERSION} \
+&& echo "#! /bin/bash\n\n# script to activate the conda environment" > ~/.bashrc \
+&& echo "export PS1='Docker> '" >> ~/.bashrc \
+&& /opt/conda/bin/conda init bash \
+&& echo "\nconda activate default" >> ~/.bashrc \
+&& /opt/conda/bin/conda clean -a
 
 ENV BASH_ENV=~/.bashrc
 ENV PATH="${PATH}:/opt/conda/envs/default/bin"
 
-RUN <<EOF
-set -e
-ln -s /opt/conda/envs/default/bin/pip /usr/local/bin/pip
-ln -s /opt/conda/envs/default/bin/python /usr/local/bin/python
-/opt/conda/bin/conda config --set ssl_verify False
-pip install --no-cache-dir --upgrade pip --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org
-pip install --no-cache-dir pyOpenSSL --upgrade
-/opt/conda/bin/conda install -y -c conda-forge cython mkl mkl-include parso typing h5py requests pyopenssl libgcc conda-content-trust charset-normalizer accelerate
-/opt/conda/bin/conda install -c dglteam -y dgl-cuda11.7=0.9.1
-/opt/conda/bin/conda install -c pytorch -y magma-cuda117
-/opt/conda/bin/conda install -c fastai fastai
-pip uninstall -y dataclasses
-/opt/conda/bin/conda clean -ya
-rm -rf /root/micromamba/
-rm -rf /opt/conda/lib/libtinfo.so
-EOF
+RUN ln -s /opt/conda/envs/default/bin/pip /usr/local/bin/pip && ln -s /opt/conda/envs/default/bin/python /usr/local/bin/python && /opt/conda/bin/conda config --set ssl_verify False  && pip install --no-cache-dir --upgrade pip --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org
+RUN pip install --no-cache-dir pyOpenSSL --upgrade
+RUN /opt/conda/bin/conda install -y -c conda-forge    cython     mkl     mkl-include     parso     typing     h5py     requests     pyopenssl     libgcc     conda-content-trust     charset-normalizer     accelerate  && /opt/conda/bin/conda install -c dglteam -y dgl-cuda11.7=0.9.1  && /opt/conda/bin/conda install -c pytorch -y magma-cuda117 \
+    && /opt/conda/bin/conda install -c fastai fastai  && pip uninstall -y dataclasses  && /opt/conda/bin/conda clean -ya
+RUN rm -rf /root/micromamba/
+RUN rm -rf /opt/conda/lib/libtinfo.so
 
 COPY --from=python_builder_1 /opt/conda /opt/conda
 
@@ -306,13 +185,7 @@ ARG TORCHAUDIO_VERSION
 ARG TORCHAUDIO_VERSION_SUFFIX
 ARG PYTORCH_DOWNLOAD_URL
 
-RUN <<EOF
-set -e
-apt-get update
-apt-get install -y git pdsh libaio1 libaio-dev pigz
-rm -rf /var/lib/apt/lists/*
-apt-get clean
-EOF
+RUN apt-get update && apt-get install -y git pdsh libaio1 libaio-dev pigz && rm -rf /var/lib/apt/lists/*  && apt-get clean
 
 ARG FLASH_ATTN_VERSION
 
@@ -322,93 +195,45 @@ RUN pip install --no-cache-dir --user flash-attn==${FLASH_ATTN_VERSION}
 
  COPY deep_learning_container.py /usr/local/bin/deep_learning_container.py
 
-RUN <<EOF
-set -e
-chmod +x /usr/local/bin/deep_learning_container.py
-curl -o /license.txt https://aws-dlc-licenses.s3.amazonaws.com/pytorch-1.13/license.txt
-rm -rf /root/.cache
-EOF
+RUN chmod +x /usr/local/bin/deep_learning_container.py
+RUN curl -o /license.txt https://aws-dlc-licenses.s3.amazonaws.com/pytorch-1.13/license.txt
+RUN rm -rf /root/.cache
 
 ARG PT_TORCHDATA_URL
 ARG PT_TORCHAUDIO_URL
 ARG PT_TORCHVISION_URL
 ARG PT_SM_TRAINING_URL
 
-RUN pip uninstall -y torch torchvision torchaudio torchdata  && pip install --no-cache-dir -U ${PT_SM_TRAINING_URL} ${PT_TORCHVISION_URL} ${PT_TORCHAUDIO_URL} ${PT_TORCHDATA_URL}
+RUN pip uninstall -y torch torchvision torchaudio torchdata \
+    && pip install --no-cache-dir -U ${PT_SM_TRAINING_URL} ${PT_TORCHVISION_URL} ${PT_TORCHAUDIO_URL} ${PT_TORCHDATA_URL}
 
 ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/lib:/opt/amazon/openmpi/lib/:/opt/amazon/efa/lib/"
 
-RUN <<EOF
-set -e
-set -o pipefail
-echo $PATH
-echo $LD_LIBRARY_PATH
-pip install -U --force-reinstall --no-cache-dir wheel==0.43.0 setuptools==70.1.0
-pip install --force-reinstall --no-cache-dir setuptools==69.5.1
-git clone https://github.com/NVIDIA/apex
-cd apex
-git checkout aa756ce
-pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
-mv $OPEN_MPI_PATH/bin/mpirun $OPEN_MPI_PATH/bin/mpirun.real
-echo '#!/bin/bash' >$OPEN_MPI_PATH/bin/mpirun
-echo "${OPEN_MPI_PATH}/bin/mpirun.real --allow-run-as-root \"\$@\"" >>$OPEN_MPI_PATH/bin/mpirun
-chmod a+x $OPEN_MPI_PATH/bin/mpirun
-echo "hwloc_base_binding_policy = none" >>$OPEN_MPI_PATH/etc/openmpi-mca-params.conf
-echo "rmaps_base_mapping_policy = slot" >>$OPEN_MPI_PATH/etc/openmpi-mca-params.conf
-echo NCCL_DEBUG=INFO >>/etc/nccl.conf
-echo NCCL_SOCKET_IFNAME=^docker0 >>/etc/nccl.conf
-mkdir /tmp/efa-ofi-nccl
-cd /tmp/efa-ofi-nccl
-git clone https://github.com/aws/aws-ofi-nccl.git -b v${BRANCH_OFI}
-cd aws-ofi-nccl
-./autogen.sh
-./configure --with-libfabric=/opt/amazon/efa --with-mpi=/opt/amazon/openmpi --with-cuda=/usr/local/cuda --with-nccl=/usr/local --prefix=/usr/local
-make
-make install
-rm -rf /tmp/efa-ofi-nccl
-rm -rf /var/lib/apt/lists/*
-apt-get clean
-apt-get update
-apt-get install -y --allow-downgrades --allow-change-held-packages --no-install-recommends
-apt-get install -y --no-install-recommends openssh-client openssh-server
-mkdir -p /var/run/sshd
-cat /etc/ssh/ssh_config | grep -v StrictHostKeyChecking >/etc/ssh/ssh_config.new
-echo "    StrictHostKeyChecking no" >>/etc/ssh/ssh_config.new
-mv /etc/ssh/ssh_config.new /etc/ssh/ssh_config
-rm -rf /var/lib/apt/lists/*
-apt-get clean
-mkdir -p /var/run/sshd
-sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
-rm -rf /root/.ssh/
-mkdir -p /root/.ssh/
-ssh-keygen -q -t rsa -N '' -f /root/.ssh/id_rsa
-cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys
-printf "Host *\n StrictHostKeyChecking no\n" >>/root/.ssh/config
-EOF
+RUN echo $PATH
+RUN echo $LD_LIBRARY_PATH
+RUN pip install -U --force-reinstall --no-cache-dir wheel==0.43.0 setuptools==70.1.0
+RUN pip install --force-reinstall --no-cache-dir setuptools==69.5.1
+RUN git clone https://github.com/NVIDIA/apex &&     cd apex &&     git checkout aa756ce &&     pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+RUN mv $OPEN_MPI_PATH/bin/mpirun $OPEN_MPI_PATH/bin/mpirun.real  && echo '#!/bin/bash' > $OPEN_MPI_PATH/bin/mpirun  && echo "${OPEN_MPI_PATH}/bin/mpirun.real --allow-run-as-root \"\$@\"" >> $OPEN_MPI_PATH/bin/mpirun  && chmod a+x $OPEN_MPI_PATH/bin/mpirun  && echo "hwloc_base_binding_policy = none" >> $OPEN_MPI_PATH/etc/openmpi-mca-params.conf  && echo "rmaps_base_mapping_policy = slot" >> $OPEN_MPI_PATH/etc/openmpi-mca-params.conf  && echo NCCL_DEBUG=INFO >> /etc/nccl.conf  && echo NCCL_SOCKET_IFNAME=^docker0 >> /etc/nccl.conf
+RUN mkdir /tmp/efa-ofi-nccl  && cd /tmp/efa-ofi-nccl  && git clone https://github.com/aws/aws-ofi-nccl.git -b v${BRANCH_OFI}  && cd aws-ofi-nccl  && ./autogen.sh  && ./configure --with-libfabric=/opt/amazon/efa   --with-mpi=/opt/amazon/openmpi   --with-cuda=/usr/local/cuda   --with-nccl=/usr/local --prefix=/usr/local  && make  && make install  && rm -rf /tmp/efa-ofi-nccl  && rm -rf /var/lib/apt/lists/*  && apt-get clean
+RUN apt-get update  && apt-get install -y  --allow-downgrades --allow-change-held-packages --no-install-recommends  && apt-get install -y --no-install-recommends openssh-client openssh-server  && mkdir -p /var/run/sshd  && cat /etc/ssh/ssh_config | grep -v StrictHostKeyChecking > /etc/ssh/ssh_config.new  && echo "    StrictHostKeyChecking no" >> /etc/ssh/ssh_config.new  && mv /etc/ssh/ssh_config.new /etc/ssh/ssh_config  && rm -rf /var/lib/apt/lists/*  && apt-get clean
+RUN mkdir -p /var/run/sshd \
+    && sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+RUN rm -rf /root/.ssh/ &&  mkdir -p /root/.ssh/ &&  ssh-keygen -q -t rsa -N '' -f /root/.ssh/id_rsa &&  cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys  && printf "Host *\n StrictHostKeyChecking no\n" >> /root/.ssh/config
 
 ARG CUDA_HOME=/usr/local/cuda
 
-RUN <<EOF
-set -e
-pip uninstall -y horovod
-ldconfig /usr/local/cuda-11.7/targets/x86_64-linux/lib/stubs
-HOROVOD_GPU_ALLREDUCE=NCCL HOROVOD_CUDA_HOME=/usr/local/cuda-11.7 HOROVOD_WITH_PYTORCH=1 pip install --no-cache-dir horovod==${HOROVOD_VERSION}
-ldconfig
-mkdir -p /etc/pki/tls/certs
-cp /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt
-conda install -y -c conda-forge scikit-learn pandas
-EOF
+RUN pip uninstall -y horovod  && ldconfig /usr/local/cuda-11.7/targets/x86_64-linux/lib/stubs  && HOROVOD_GPU_ALLREDUCE=NCCL HOROVOD_CUDA_HOME=/usr/local/cuda-11.7 HOROVOD_WITH_PYTORCH=1 pip install --no-cache-dir horovod==${HOROVOD_VERSION}  && ldconfig
+RUN mkdir -p /etc/pki/tls/certs \
+    && cp /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt
+
+ --progress=dot:giga
+
+RUN conda install -y -c conda-forge     scikit-learn     pandas
 
 WORKDIR /
 
-RUN <<EOF
-set -e
-wget --progress=dot:giga https://sourceforge.net/projects/boost/files/boost/1.73.0/boost_1_73_0.tar.gz/download -O boost_1_73_0.tar.gz && tar -xzf boost_1_73_0.tar.gz && cd boost_1_73_0 && ./bootstrap.sh && ./b2 threading=multi --prefix=/opt/conda -j 64 cxxflags=-fPIC cflags=-fPIC install || true
-cd ..
-rm -rf boost_1_73_0.tar.gz
-rm -rf boost_1_73_0
-cd /opt/conda/include/boost
-EOF
+RUN wget https://sourceforge.net/projects/boost/files/boost/1.73.0/boost_1_73_0.tar.gz/download -O boost_1_73_0.tar.gz  && tar -xzf boost_1_73_0.tar.gz  && cd boost_1_73_0  && ./bootstrap.sh  && ./b2 threading=multi --prefix=/opt/conda -j 64 cxxflags=-fPIC cflags=-fPIC install || true  && cd ..  && rm -rf boost_1_73_0.tar.gz  && rm -rf boost_1_73_0  && cd /opt/conda/include/boost
 
 WORKDIR /opt/
 
@@ -420,99 +245,34 @@ WORKDIR /root
 
 ARG SMDEBUG_VERSION=1.0.34
 
-RUN <<EOF
-set -e
-cd /tmp
-git clone https://github.com/awslabs/sagemaker-debugger --branch ${SMDEBUG_VERSION} --depth 1 --single-branch
-cd sagemaker-debugger
-pip install .
-rm -rf /tmp/*
-rm /etc/apt/sources.list.d/*
-git clone https://github.com/KarypisLab/GKlib
-cd GKlib
-make config
-make
-make install
-cd ..
-git clone https://github.com/KarypisLab/METIS.git
-cd METIS
-make config shared=1 cc=gcc prefix=/root/local
-make install
-cd ..
-rm -rf METIS GKlib
-rm -rf /var/lib/apt/lists/*
-apt-get clean
-EOF
+RUN cd /tmp   && git clone https://github.com/awslabs/sagemaker-debugger --branch ${SMDEBUG_VERSION} --depth 1 --single-branch   && cd sagemaker-debugger   && pip install .   && rm -rf /tmp/*
+RUN rm /etc/apt/sources.list.d/*  && git clone https://github.com/KarypisLab/GKlib  && cd GKlib  && make config  && make  && make install  && cd ..  && git clone https://github.com/KarypisLab/METIS.git  && cd METIS  && make config shared=1 cc=gcc prefix=/root/local  && make install  && cd ..  && rm -rf METIS GKlib  && rm -rf /var/lib/apt/lists/*  && apt-get clean
 
 ARG RMM_VERSION=0.15.0
 
-RUN <<EOF
-set -e
-wget -nv https://github.com/rapidsai/rmm/archive/v${RMM_VERSION}.tar.gz
-tar -xvf v${RMM_VERSION}.tar.gz
-cd rmm-${RMM_VERSION}
-INSTALL_PREFIX=/usr/local ./build.sh librmm
-cd ..
-rm -rf v${RMM_VERSION}.tar*
-rm -rf rmm-${RMM_VERSION}
-EOF
+RUN wget -nv https://github.com/rapidsai/rmm/archive/v${RMM_VERSION}.tar.gz  && tar -xvf v${RMM_VERSION}.tar.gz  && cd rmm-${RMM_VERSION}  && INSTALL_PREFIX=/usr/local ./build.sh librmm  && cd ..  && rm -rf v${RMM_VERSION}.tar*  && rm -rf rmm-${RMM_VERSION}
 
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/conda/lib/python3.9/site-packages/smdistributed/dataparallel/lib"
 
-RUN <<EOF
-set -e
-apt-get update
-apt-get install -y --allow-change-held-packages --no-install-recommends libunwind-dev
-rm -rf /var/lib/apt/lists/*
-apt-get clean
-EOF
+RUN apt-get update  && apt-get install -y --allow-change-held-packages --no-install-recommends     libunwind-dev  && rm -rf /var/lib/apt/lists/*  && apt-get clean
 
 ARG SMPPY_BINARY
 
-RUN <<EOF
-set -e
-wget -nv https://smppy.s3.amazonaws.com/pytorch/cu117/${SMPPY_BINARY}
-pip install ${SMPPY_BINARY}
-rm ${SMPPY_BINARY}
-EOF
+RUN wget -nv https://smppy.s3.amazonaws.com/pytorch/cu117/${SMPPY_BINARY} && pip install ${SMPPY_BINARY} && rm ${SMPPY_BINARY}
 
 WORKDIR /
 
-RUN <<EOF
-set -e
-HOME_DIR=/root
-curl -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip
-unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/
-cp ${HOME_DIR}/oss_compliance/test/testOSSCompliance /usr/local/bin/testOSSCompliance
-chmod +x /usr/local/bin/testOSSCompliance
-chmod +x ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh
-${HOME_DIR}/oss_compliance/generate_oss_compliance.sh ${HOME_DIR} ${PYTHON}
-rm -rf ${HOME_DIR}/oss_compliance*
-rm -rf /tmp/tmp*
-EOF
+RUN HOME_DIR=/root  && curl -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip  && unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/  && cp ${HOME_DIR}/oss_compliance/test/testOSSCompliance /usr/local/bin/testOSSCompliance  && chmod +x /usr/local/bin/testOSSCompliance  && chmod +x ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh  && ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh ${HOME_DIR} ${PYTHON}  && rm -rf ${HOME_DIR}/oss_compliance*  && rm -rf /tmp/tmp*
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN rm -rf /root/.cache | true
-RUN <<EOF
-set -e
-apt-get update
-apt-get -y upgrade --only-upgrade systemd openssl cryptsetup
-apt-get install -y git-lfs
-apt-get clean
-rm -rf /var/lib/apt/lists/*
-HOME_DIR=/root
-curl -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip
-unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/
-cp ${HOME_DIR}/oss_compliance/test/testOSSCompliance /usr/local/bin/testOSSCompliance
-chmod +x /usr/local/bin/testOSSCompliance
-chmod +x ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh
-${HOME_DIR}/oss_compliance/generate_oss_compliance.sh ${HOME_DIR} ${PYTHON}
-rm -rf ${HOME_DIR}/oss_compliance*
-EOF
-
-COPY changehostname.c /changehostname.c
 
 ENTRYPOINT ["bash", "-m", "start_with_right_hostname.sh"]
 
 CMD ["/bin/bash"]
+
+RUN apt-get update  && apt-get -y upgrade --only-upgrade systemd openssl cryptsetup  && apt-get install -y git-lfs  && apt-get clean  && rm -rf /var/lib/apt/lists/*
+RUN HOME_DIR=/root  && curl -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip  && unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/  && cp ${HOME_DIR}/oss_compliance/test/testOSSCompliance /usr/local/bin/testOSSCompliance  && chmod +x /usr/local/bin/testOSSCompliance  && chmod +x ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh  && ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh ${HOME_DIR} ${PYTHON}  && rm -rf ${HOME_DIR}/oss_compliance*
+
+COPY changehostname.c /changehostname.c

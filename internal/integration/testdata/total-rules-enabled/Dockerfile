@@ -4,4 +4,5 @@ FROM alpine:3.18
 
 RUN echo "hello"
 
-HEALTHCHECK CMD curl -f http://localhost/ || exit 1
+HEALTHCHECK CMD curl -f http://localhost/ \
+	|| exit 1

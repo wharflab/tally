@@ -720,5 +720,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/epilogue-order")...),
 			wantExit: 1,
 		},
+
+		// Newline per chained call tests (isolated to newline-per-chained-call rule)
+		{
+			name:     "newline-per-chained-call",
+			dir:      "newline-per-chained-call",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/newline-per-chained-call")...),
+			wantExit: 1,
+		},
 	}
 }
