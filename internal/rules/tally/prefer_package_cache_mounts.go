@@ -465,6 +465,10 @@ func mergeCacheMounts(existing []*instructions.Mount, required []cacheMountSpec)
 		if idx >= 0 {
 			if req.Sharing != "" && merged[idx].CacheSharing != req.Sharing {
 				merged[idx].CacheSharing = req.Sharing
+				// Also set ID when we're already modifying the mount.
+				if req.ID != "" && merged[idx].CacheID == "" {
+					merged[idx].CacheID = req.ID
+				}
 				changed = true
 			}
 			continue

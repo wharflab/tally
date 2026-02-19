@@ -116,7 +116,7 @@
                     "line": 5
                   }
                 },
-                "newText": "RUN --mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf --mount=type=cache,target=/var/cache/apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update \u0026\u0026 apt-get install -y gcc"
+                "newText": "RUN --mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update \u0026\u0026 apt-get install -y gcc"
               }
             ],
             "priority": 90,
