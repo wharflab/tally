@@ -191,14 +191,6 @@ STOPSIGNAL SIGTERM
 			wantViolations: 1,
 		},
 		{
-			name: "no semantic model - no violation",
-			content: `FROM alpine:3.20
-CMD ["serve"]
-RUN echo hello
-`,
-			wantViolations: -1, // skip count check - tested separately
-		},
-		{
 			name: "multi-stage - independent stages both checked",
 			content: `FROM alpine:3.20 AS app1
 CMD ["first"]
@@ -230,16 +222,11 @@ CMD ["serve"]
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var input rules.LintInput
-			if tt.name == "no semantic model - no violation" {
-				input = testutil.MakeLintInput(t, "Dockerfile", tt.content)
-			} else {
-				input = testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.content)
-			}
+			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.content)
 
 			violations := r.Check(input)
 
-			if tt.wantViolations >= 0 && len(violations) != tt.wantViolations {
+			if len(violations) != tt.wantViolations {
 				t.Errorf("got %d violations, want %d", len(violations), tt.wantViolations)
 				for i, v := range violations {
 					t.Logf("  [%d] %s: %s (line %d)", i, v.RuleCode, v.Message, v.Line())
