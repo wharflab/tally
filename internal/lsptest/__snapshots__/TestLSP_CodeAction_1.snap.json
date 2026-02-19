@@ -43,5 +43,29 @@
   "isPreferred": true,
   "kind": "quickfix",
   "title": "Replace MAINTAINER with org.opencontainers.image.authors label"
+ },
+ {
+  "edit": {
+   "changes": {
+    "file:///tmp/test-codeaction/Dockerfile": [
+     {
+      "newText": "\n",
+      "range": {
+       "end": {
+        "character": 0,
+        "line": 1
+       },
+       "start": {
+        "character": 0,
+        "line": 1
+       }
+      }
+     }
+    ]
+   }
+  },
+  "isPreferred": true,
+  "kind": "quickfix",
+  "title": "Fix blank lines between instructions"
  }
 ]

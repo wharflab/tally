@@ -211,7 +211,7 @@ func TestHandleExecuteCommand_NoEditsWhenNoFixableChanges(t *testing.T) {
 	tmpDir := t.TempDir()
 	path := filepath.Join(tmpDir, "Dockerfile")
 	uri := fileURIFromPath(path)
-	s.documents.Open(uri, "dockerfile", 1, "FROM alpine:3.18\nRUN echo hello\n")
+	s.documents.Open(uri, "dockerfile", 1, "FROM alpine:3.18\n\nRUN echo hello\n")
 
 	args := []any{uri}
 	result, err := s.handleExecuteCommand(context.Background(), &protocol.ExecuteCommandParams{

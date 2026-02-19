@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 10 | - | 10 |
+| tally | 11 | - | 11 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 26 | 11 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -39,6 +39,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/prefer-package-cache-mounts`](docs/rules/tally/prefer-package-cache-mounts.md) 🔧 | Suggests BuildKit cache mounts for package install/build commands and removes cache cleanup commands | Info | Performance | Off (experimental) |
 | [`tally/prefer-run-heredoc`](docs/rules/tally/prefer-run-heredoc.md) 🔧 | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Off (experimental) |
 | [`tally/consistent-indentation`](docs/rules/tally/consistent-indentation.md) 🔧 | Enforces consistent indentation for Dockerfile build stages | Style | Style | Off (experimental) |
+| [`tally/newline-between-instructions`](docs/rules/tally/newline-between-instructions.md) 🔧 | Controls blank lines between Dockerfile instructions | Style | Style | Enabled (grouped) |
 
 ---
 

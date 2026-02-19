@@ -1,5 +1,6 @@
 ARG BUILDER_IMAGE=ubuntu:22.04
 ARG RUNTIME_IMAGE=ubuntu:22.04
+
 FROM $BUILDER_IMAGE AS python_builder_1
 
 RUN <<EOF
@@ -11,6 +12,7 @@ rm -rf /var/lib/apt/lists/*
 EOF
 
 ARG MAMBA_VERSION
+
 RUN <<EOF
 set -e
 curl -L -o ~/mambaforge.sh https://github.com/conda-forge/miniforge/releases/download/${MAMBA_VERSION}/Mambaforge-${MAMBA_VERSION}-Linux-x86_64.sh
@@ -20,6 +22,7 @@ rm ~/mambaforge.sh
 EOF
 
 ARG PYTHON_VERSION
+
 RUN <<EOF
 set -e
 /opt/conda/bin/conda config --set auto_activate_base false
@@ -45,9 +48,6 @@ EOF
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-#ARG PYTHON_VERSION
-#RUN /opt/conda/bin/conda remove -y python=3.10 && /opt/conda/bin/conda install -y python=$PYTHON_VERSION && /opt/conda/bin/conda clean -ya
-
 RUN <<EOF
 set -e
 apt-get update
@@ -60,6 +60,7 @@ pip install --no-cache-dir -U "awscli>1.27,<2" boto3 "click==8.1.2,<9" "cmake>=3
 EOF
 
 ARG TRITON_VERSION
+
 RUN <<EOF
 set -e
 pip install --no-cache-dir -U smclarify "sagemaker>=2,<3" sagemaker-experiments==0.* sagemaker-pytorch-training triton==${TRITON_VERSION}
@@ -73,6 +74,7 @@ EOF
 ARG DATASETS_VERSION
 ARG DIFFUSERS_VERSION
 ARG TRANSFORMERS_VERSION
+
 RUN pip install --no-cache-dir kenlm==0.1 \
                                transformers[sklearn,sentencepiece,audio,vision]==${TRANSFORMERS_VERSION} \
                                datasets==${DATASETS_VERSION} \
@@ -87,43 +89,38 @@ RUN pip install --no-cache-dir kenlm==0.1 \
 RUN pip install --no-cache-dir setuptools==69.5.1
 
 COPY requirements1.txt .
+
 RUN pip install --no-cache-dir -r requirements1.txt
 
 ARG SMD_MODEL_PARALLEL_URL
+
 RUN pip install --no-cache-dir -U ${SMD_MODEL_PARALLEL_URL}
 
 ARG SMD_DATA_PARALLEL_URL
+
 RUN pip install --no-cache-dir ${SMD_DATA_PARALLEL_URL}
 
 FROM $RUNTIME_IMAGE AS runtime
 
 ARG TARGETARCH
-
 ARG EFA_PATH=/opt/amazon/efa
-
 ARG DEBIAN_FRONTEND=noninteractive
 
 ENV SAGEMAKER_TRAINING_MODULE=sagemaker_pytorch_container.training:main
+
 ARG PYTHON_SHORT_VERSION
 ARG PYTHON_VERSION
 ARG PYTHON
-
 ARG PYTHON
 ARG HOME_DIR
 
 ENV NVIDIA_REQUIRE_CUDA=cuda>=11.7 brand=tesla,driver>=450,driver<451 brand=tesla,driver>=470,driver<471 brand=unknown,driver>=470,driver<471 brand=nvidia,driver>=470,driver<471 brand=nvidiartx,driver>=470,driver<471 brand=geforce,driver>=470,driver<471 brand=geforcertx,driver>=470,driver<471 brand=quadro,driver>=470,driver<471 brand=quadrortx,driver>=470,driver<471 brand=titan,driver>=470,driver<471 brand=titanrtx,driver>=470,driver<471 brand=tesla,driver>=510,driver<511 brand=unknown,driver>=510,driver<511 brand=nvidia,driver>=510,driver<511 brand=nvidiartx,driver>=510,driver<511 brand=geforce,driver>=510,driver<511 brand=geforcertx,driver>=510,driver<511 brand=quadro,driver>=510,driver<511 brand=quadrortx,driver>=510,driver<511 brand=titan,driver>=510,driver<511 brand=titanrtx,driver>=510,driver<511
-
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-
 ENV LD_LIBRARY_PATH=/opt/conda/lib:/usr/local/lib:/usr/local/nvidia/lib:/usr/local/nvidia/lib64
-
 ENV PATH="${PATH}:/opt/conda/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-
 ENV TORCH_CUDA_ARCH_LIST="3.7 5.0 7.0+PTX 8.0"
-
 ENV TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
-
 ENV CUDNN_VERSION=8.5.0.96
 ENV NCCL_VERSION=2.14.3
 ENV HOROVOD_VERSION=0.26.1
@@ -131,7 +128,6 @@ ENV EFA_VERSION=1.19.0
 ENV OMPI_VERSION=4.1.1
 ENV BRANCH_OFI=1.4.0-aws
 ENV GDRCOPY_VERSION=2.3.1
-
 ENV CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
 ENV OPEN_MPI_PATH=/opt/amazon/openmpi
 ENV DGLBACKEND=pytorch
@@ -142,8 +138,6 @@ ENV DLC_CONTAINER_TYPE=training
 LABEL org.opencontainers.image.ref.name=ubuntu
 LABEL org.opencontainers.image.version=22.04
 
-#CMD ["/bin/bash"]
-
 RUN <<EOF
 set -e
 apt-get update
@@ -152,16 +146,10 @@ apt-get clean
 rm -rf /var/lib/apt/lists/*
 EOF
 
-#RUN cd /tmp \
-#    && wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz \
-#    && tar -xvf Python-${PYTHON_VERSION}.tgz \
-#    && cd Python-${PYTHON_VERSION} \
-#    && ./configure --enable-optimizations \
-#    && make -j8 && make install && cd .. && rm Python-${PYTHON_VERSION}.tgz && rm -r Python-${PYTHON_VERSION} && ln -s /usr/local/bin/python3 /usr/local/bin/python && ln -s /usr/local/bin/pip3 /usr/local/bin/pip && python -m pip install --upgrade pip && rm -r /root/.cache/pip
-
 WORKDIR /app
 
 ENV NVARCH=x86_64
+
 RUN <<EOF
 set -e
 set -o pipefail
@@ -169,13 +157,16 @@ apt-get update
 apt-get install -y --no-install-recommends gnupg2 curl ca-certificates
 curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH}/3bf863cc.pub | apt-key add -
 EOF
+
 COPY <<EOF /etc/apt/sources.list.d/cuda.list
 deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH} /
 EOF
+
 RUN apt-get purge --autoremove -y curl && rm -rf /var/lib/apt/lists/*
 
 ENV NV_CUDA_COMPAT_PACKAGE=cuda-compat-11-7
 ENV NV_CUDA_CUDART_VERSION=11.7.99-1
+
 RUN <<EOF
 set -e
 apt-get update
@@ -199,6 +190,7 @@ rm -rf /var/lib/apt/lists/*
 EOF
 
 ARG CUBLAS_VERSION=11.10.3.66
+
 RUN <<EOF
 set -e
 apt-get update
@@ -259,10 +251,8 @@ apt-get clean
 rm -rf /var/lib/apt/lists/*
 EOF
 
-#ARG CONDA_VERSION=py39_22.11.1-1
-#RUN set -x &&     UNAME_M="$(uname -m)" &&     if [ "${UNAME_M}" = "x86_64" ]; then         MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-${CONDA_VERSION}-Linux-x86_64.sh";         SHA256SUM="e685005710679914a909bfb9c52183b3ccc56ad7bb84acc861d596fcbe5d28bb";     elif [ "${UNAME_M}" = "s390x" ]; then         MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-${CONDA_VERSION}-Linux-s390x.sh";         SHA256SUM="a150511e7fd19d07b770f278fb5dd2df4bc24a8f55f06d6274774f209a36c766";     elif [ "${UNAME_M}" = "aarch64" ]; then         MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-${CONDA_VERSION}-Linux-aarch64.sh";         SHA256SUM="48a96df9ff56f7421b6dd7f9f71d548023847ba918c3826059918c08326c2017";     elif [ "${UNAME_M}" = "ppc64le" ]; then         MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-${CONDA_VERSION}-Linux-ppc64le.sh";         SHA256SUM="4c86c3383bb27b44f7059336c3a46c34922df42824577b93eadecefbf7423836";     fi &&     wget "${MINICONDA_URL}" -O miniconda.sh -q &&     echo "${SHA256SUM} miniconda.sh" > shasum &&     if [ "${CONDA_VERSION}" != "latest" ]; then sha256sum --check --status shasum; fi &&     mkdir -p /opt &&     bash miniconda.sh -b -p /opt/conda &&     rm miniconda.sh shasum &&     ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh &&     echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc &&     echo "conda activate base" >> ~/.bashrc &&     find /opt/conda/ -follow -type f -name '*.a' -delete &&     find /opt/conda/ -follow -type f -name '*.js.map' -delete &&     /opt/conda/bin/conda clean -afy
-
 ARG MAMBA_VERSION
+
 RUN <<EOF
 set -e
 curl -L -o ~/mambaforge.sh https://github.com/conda-forge/miniforge/releases/download/${MAMBA_VERSION}/Mambaforge-${MAMBA_VERSION}-Linux-x86_64.sh
@@ -274,6 +264,7 @@ rm ~/mambaforge.sh
 EOF
 
 ARG PYTHON_VERSION
+
 RUN <<EOF
 set -e
 /opt/conda/bin/conda config --set auto_activate_base false
@@ -287,9 +278,6 @@ EOF
 
 ENV BASH_ENV=~/.bashrc
 ENV PATH="${PATH}:/opt/conda/envs/default/bin"
-
-#RUN conda config --set auto_activate_base false && conda create --name default python={PYHON_VERSION} && echo "source activate default" >> ~/.bashrc
-#RUN "source activate default"
 
 RUN <<EOF
 set -e
@@ -310,7 +298,6 @@ EOF
 
 COPY --from=python_builder_1 /opt/conda /opt/conda
 
-
 ARG PYTORCH_VERSION
 ARG PYTORCH_VERSION_SUFFIX
 ARG TORCHVISION_VERSION
@@ -318,8 +305,6 @@ ARG TORCHVISION_VERSION_SUFFIX
 ARG TORCHAUDIO_VERSION
 ARG TORCHAUDIO_VERSION_SUFFIX
 ARG PYTORCH_DOWNLOAD_URL
-
-#RUN if [ ! $TORCHAUDIO_VERSION ];     then         TORCHAUDIO=;     else         TORCHAUDIO=torchaudio==${TORCHAUDIO_VERSION}${TORCHAUDIO_VERSION_SUFFIX};     fi &&     if [ ! $PYTORCH_DOWNLOAD_URL ];     then         pip install --no-cache-dir -U            torch==${PYTORCH_VERSION}${PYTORCH_VERSION_SUFFIX}             torchvision==${TORCHVISION_VERSION}${TORCHVISION_VERSION_SUFFIX}             ${TORCHAUDIO};     else         pip install --no-cache-dir -U             torch==${PYTORCH_VERSION}${PYTORCH_VERSION_SUFFIX}             torchvision==${TORCHVISION_VERSION}${TORCHVISION_VERSION_SUFFIX}             ${TORCHAUDIO}             -f ${PYTORCH_DOWNLOAD_URL};     fi &&     rm -r /root/.cache/pip
 
 RUN <<EOF
 set -e
@@ -330,11 +315,13 @@ apt-get clean
 EOF
 
 ARG FLASH_ATTN_VERSION
+
 RUN pip install --no-cache-dir --user flash-attn==${FLASH_ATTN_VERSION}
 
  WORKDIR /root
 
  COPY deep_learning_container.py /usr/local/bin/deep_learning_container.py
+
 RUN <<EOF
 set -e
 chmod +x /usr/local/bin/deep_learning_container.py
@@ -346,6 +333,7 @@ ARG PT_TORCHDATA_URL
 ARG PT_TORCHAUDIO_URL
 ARG PT_TORCHVISION_URL
 ARG PT_SM_TRAINING_URL
+
 RUN pip uninstall -y torch torchvision torchaudio torchdata  && pip install --no-cache-dir -U ${PT_SM_TRAINING_URL} ${PT_TORCHVISION_URL} ${PT_TORCHAUDIO_URL} ${PT_TORCHDATA_URL}
 
 ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/lib:/opt/amazon/openmpi/lib/:/opt/amazon/efa/lib/"
@@ -399,6 +387,7 @@ printf "Host *\n StrictHostKeyChecking no\n" >>/root/.ssh/config
 EOF
 
 ARG CUDA_HOME=/usr/local/cuda
+
 RUN <<EOF
 set -e
 pip uninstall -y horovod
@@ -429,8 +418,8 @@ RUN chmod +x /usr/local/bin/start_with_right_hostname.sh
 
 WORKDIR /root
 
-
 ARG SMDEBUG_VERSION=1.0.34
+
 RUN <<EOF
 set -e
 cd /tmp
@@ -456,6 +445,7 @@ apt-get clean
 EOF
 
 ARG RMM_VERSION=0.15.0
+
 RUN <<EOF
 set -e
 wget -nv https://github.com/rapidsai/rmm/archive/v${RMM_VERSION}.tar.gz
@@ -466,7 +456,6 @@ cd ..
 rm -rf v${RMM_VERSION}.tar*
 rm -rf rmm-${RMM_VERSION}
 EOF
-
 
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/conda/lib/python3.9/site-packages/smdistributed/dataparallel/lib"
 
@@ -503,12 +492,12 @@ rm -rf /tmp/tmp*
 EOF
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 RUN rm -rf /root/.cache | true
 
 ENTRYPOINT ["bash", "-m", "start_with_right_hostname.sh"]
 
 CMD ["/bin/bash"]
-
 
 RUN <<EOF
 set -e

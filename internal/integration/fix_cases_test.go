@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+//nolint:funlen // test table
 func fixCases(t *testing.T) []fixCase {
 	t.Helper()
 
@@ -567,6 +568,47 @@ command = ['%s', '-mode=multistage']
 [rules.tally.prefer-multi-stage-build]
 fix = "explicit"
 `, acpAgentPath),
+		},
+
+		// Newline between instructions: grouped mode (default) - insert blank lines.
+		// The async resolver generates all edits in one pass, so only 1 fix is recorded.
+		{
+			name:  "newline-between-instructions-grouped",
+			input: "FROM alpine:3.20\nRUN echo hello\nENV FOO=bar\nENV BAZ=qux\n\nCOPY . /app\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-between-instructions")...),
+			wantApplied: 1,
+		},
+		// Newline between instructions: grouped mode - excess blanks between different types
+		// Regression: resolver must trim to exactly 1 blank line, not remove all.
+		{
+			name:  "newline-between-instructions-grouped-excess-blanks",
+			input: "FROM alpine:3.20\n\n\n\nRUN echo hello\n\nENV FOO=bar\nENV BAZ=qux\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-between-instructions")...),
+			wantApplied: 1,
+		},
+		// Newline between instructions: always mode
+		{
+			name:  "newline-between-instructions-always",
+			input: "FROM alpine:3.20\nRUN echo hello\nENV FOO=bar\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-between-instructions")...),
+			wantApplied: 1,
+			config: `[rules.tally.newline-between-instructions]
+mode = "always"
+`,
+		},
+		// Newline between instructions: never mode
+		{
+			name:  "newline-between-instructions-never",
+			input: "FROM alpine:3.20\n\nRUN echo hello\n\nENV FOO=bar\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-between-instructions")...),
+			wantApplied: 1,
+			config: `[rules.tally.newline-between-instructions]
+mode = "never"
+`,
 		},
 	}
 }

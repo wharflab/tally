@@ -696,5 +696,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/consistent-indentation")...),
 			wantExit: 1,
 		},
+
+		// Newline between instructions tests (isolated to newline-between-instructions rule)
+		{
+			name:     "newline-between-instructions",
+			dir:      "newline-between-instructions",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/newline-between-instructions")...),
+			wantExit: 1,
+		},
 	}
 }

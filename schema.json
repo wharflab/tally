@@ -266,6 +266,18 @@
       "type": "object",
       "description": "Configuration for max-lines rule"
     },
+    "newline-between-instructionsConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/wharflab/tally/internal/rules/tally/newline-between-instructions-config",
+      "properties": {
+        "mode": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Configuration for newline-between-instructions rule"
+    },
     "prefer-add-unpackConfig": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "$id": "https://github.com/wharflab/tally/internal/rules/tally/prefer-add-unpack-config",
@@ -327,7 +339,7 @@
       "description": "Configuration for prefer-run-heredoc rule"
     }
   },
-  "$comment": "Auto-generated on 2026-02-13. Do not edit manually.",
+  "$comment": "Auto-generated on 2026-02-19. Do not edit manually.",
   "properties": {
     "rules": {
       "$ref": "#/$defs/RulesConfig",

@@ -1,0 +1,69 @@
+{
+  "files": [
+    {
+      "file": "testdata/newline-between-instructions/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-between-instructions.md",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "testdata/newline-between-instructions/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "expected blank line between FROM and RUN",
+          "rule": "tally/newline-between-instructions",
+          "severity": "style",
+          "sourceCode": "RUN echo hello",
+          "suggestedFix": {
+            "description": "Fix blank lines between instructions",
+            "isPreferred": true,
+            "needsResolve": true,
+            "priority": 200,
+            "resolverId": "newline-between-instructions"
+          }
+        },
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-between-instructions.md",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "testdata/newline-between-instructions/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "expected blank line between RUN and ENV",
+          "rule": "tally/newline-between-instructions",
+          "severity": "style",
+          "sourceCode": "ENV FOO=bar",
+          "suggestedFix": {
+            "description": "Fix blank lines between instructions",
+            "isPreferred": true,
+            "needsResolve": true,
+            "priority": 200,
+            "resolverId": "newline-between-instructions"
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 2,
+    "total": 2,
+    "warnings": 0
+  }
+}

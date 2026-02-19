@@ -214,19 +214,20 @@ func loadWithConfigPath(configPath string) (*Config, error) {
 // knownHyphenatedKeys maps dot-separated patterns to their hyphenated equivalents.
 // Add new entries here when adding rules with hyphenated names.
 var knownHyphenatedKeys = map[string]string{
-	"max.lines":         "max-lines",
-	"skip.blank.lines":  "skip-blank-lines",
-	"skip.comments":     "skip-comments",
-	"inline.directives": "inline-directives",
-	"warn.unused":       "warn-unused",
-	"validate.rules":    "validate-rules",
-	"require.reason":    "require-reason",
-	"show.source":       "show-source",
-	"fail.level":        "fail-level",
-	"max.input.bytes":   "max-input-bytes",
-	"redact.secrets":    "redact-secrets",
-	"slow.checks":       "slow-checks",
-	"fail.fast":         "fail-fast",
+	"max.lines":                    "max-lines",
+	"skip.blank.lines":             "skip-blank-lines",
+	"skip.comments":                "skip-comments",
+	"inline.directives":            "inline-directives",
+	"warn.unused":                  "warn-unused",
+	"validate.rules":               "validate-rules",
+	"require.reason":               "require-reason",
+	"show.source":                  "show-source",
+	"fail.level":                   "fail-level",
+	"max.input.bytes":              "max-input-bytes",
+	"redact.secrets":               "redact-secrets",
+	"slow.checks":                  "slow-checks",
+	"fail.fast":                    "fail-fast",
+	"newline.between.instructions": "newline-between-instructions",
 }
 
 // envKeyTransform converts environment variable names to config keys.

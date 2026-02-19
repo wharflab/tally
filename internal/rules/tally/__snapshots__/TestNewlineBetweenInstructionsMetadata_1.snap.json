@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "tally/newline-between-instructions",
+ "DefaultSeverity": "style",
+ "Description": "Controls blank lines between Dockerfile instructions",
+ "DocURL": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-between-instructions.md",
+ "FixPriority": 200,
+ "IsExperimental": false,
+ "Name": "Newline Between Instructions"
+}

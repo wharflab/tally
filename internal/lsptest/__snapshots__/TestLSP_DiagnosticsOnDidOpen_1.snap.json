@@ -37,6 +37,25 @@
    },
    "severity": 2,
    "source": "tally"
+  },
+  {
+   "code": "tally/newline-between-instructions",
+   "codeDescription": {
+    "href": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-between-instructions.md"
+   },
+   "message": "expected blank line between FROM and MAINTAINER",
+   "range": {
+    "end": {
+     "character": 1000,
+     "line": 1
+    },
+    "start": {
+     "character": 0,
+     "line": 1
+    }
+   },
+   "severity": 4,
+   "source": "tally"
   }
  ],
  "uri": "file:///tmp/test-didopen/Dockerfile"
