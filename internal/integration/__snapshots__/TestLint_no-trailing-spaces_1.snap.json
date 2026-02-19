@@ -1,0 +1,175 @@
+{
+  "files": [
+    {
+      "file": "testdata/no-trailing-spaces/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/no-trailing-spaces.md",
+          "location": {
+            "end": {
+              "column": 19,
+              "line": 1
+            },
+            "file": "testdata/no-trailing-spaces/Dockerfile",
+            "start": {
+              "column": 16,
+              "line": 1
+            }
+          },
+          "message": "trailing whitespace",
+          "rule": "tally/no-trailing-spaces",
+          "severity": "style",
+          "sourceCode": "FROM alpine:3.20   ",
+          "suggestedFix": {
+            "description": "Remove trailing whitespace",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 19,
+                    "line": 1
+                  },
+                  "file": "testdata/no-trailing-spaces/Dockerfile",
+                  "start": {
+                    "column": 16,
+                    "line": 1
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 10
+          }
+        },
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/no-trailing-spaces.md",
+          "location": {
+            "end": {
+              "column": 29,
+              "line": 3
+            },
+            "file": "testdata/no-trailing-spaces/Dockerfile",
+            "start": {
+              "column": 27,
+              "line": 3
+            }
+          },
+          "message": "trailing whitespace",
+          "rule": "tally/no-trailing-spaces",
+          "severity": "style",
+          "sourceCode": "RUN apk add --no-cache curl  ",
+          "suggestedFix": {
+            "description": "Remove trailing whitespace",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 29,
+                    "line": 3
+                  },
+                  "file": "testdata/no-trailing-spaces/Dockerfile",
+                  "start": {
+                    "column": 27,
+                    "line": 3
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 10
+          }
+        },
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/no-trailing-spaces.md",
+          "location": {
+            "end": {
+              "column": 16,
+              "line": 5
+            },
+            "file": "testdata/no-trailing-spaces/Dockerfile",
+            "start": {
+              "column": 13,
+              "line": 5
+            }
+          },
+          "message": "trailing whitespace",
+          "rule": "tally/no-trailing-spaces",
+          "severity": "style",
+          "sourceCode": "# Install app   ",
+          "suggestedFix": {
+            "description": "Remove trailing whitespace",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 16,
+                    "line": 5
+                  },
+                  "file": "testdata/no-trailing-spaces/Dockerfile",
+                  "start": {
+                    "column": 13,
+                    "line": 5
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 10
+          }
+        },
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/no-trailing-spaces.md",
+          "location": {
+            "end": {
+              "column": 12,
+              "line": 6
+            },
+            "file": "testdata/no-trailing-spaces/Dockerfile",
+            "start": {
+              "column": 11,
+              "line": 6
+            }
+          },
+          "message": "trailing whitespace",
+          "rule": "tally/no-trailing-spaces",
+          "severity": "style",
+          "sourceCode": "COPY . /app\t",
+          "suggestedFix": {
+            "description": "Remove trailing whitespace",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 12,
+                    "line": 6
+                  },
+                  "file": "testdata/no-trailing-spaces/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 6
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 10
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 4,
+    "total": 4,
+    "warnings": 0
+  }
+}

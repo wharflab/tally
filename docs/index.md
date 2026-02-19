@@ -35,9 +35,9 @@ tally lint --fix Dockerfile
 
 | Source | Rules | Description |
 |--------|-------|-------------|
-| [BuildKit](https://docs.docker.com/reference/build-checks/) | 12/22 | Docker's official Dockerfile checks |
-| tally | 9 | Custom rules including secret detection |
-| [Hadolint](https://github.com/hadolint/hadolint) | 27 | Hadolint-compatible rules |
+| [BuildKit](https://docs.docker.com/reference/build-checks/) | 22/22 | Docker's official Dockerfile checks |
+| tally | 12 | Custom rules including secret detection |
+| [Hadolint](https://github.com/hadolint/hadolint) | 37 | Hadolint-compatible rules |
 
 [View all rules →](rules/index.md)
 

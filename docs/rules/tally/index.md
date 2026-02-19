@@ -15,3 +15,4 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [prefer-run-heredoc](./prefer-run-heredoc.md) | Suggests using heredoc syntax for multi-command RUN | Style | Style | Off (experimental) |
 | [consistent-indentation](./consistent-indentation.md) | Enforces consistent indentation for build stages | Style | Style | Off (experimental) |
 | [newline-between-instructions](./newline-between-instructions.md) | Controls blank lines between Dockerfile instructions | Style | Style | Enabled (grouped) |
+| [no-trailing-spaces](./no-trailing-spaces.md) | Disallows trailing whitespace at the end of lines | Style | Style | Enabled |

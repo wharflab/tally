@@ -26,10 +26,10 @@ type MaxLinesConfig struct {
 	Max *int `json:"max,omitempty" jsonschema:"description=Maximum number of lines allowed (0 = disabled),default=50,minimum=0"`
 
 	// SkipBlankLines excludes blank lines from the count (nil = use default).
-	SkipBlankLines *bool `json:"skip-blank-lines,omitempty" jsonschema:"description=Exclude blank lines from the count,default=true"`
+	SkipBlankLines *bool `json:"skip-blank-lines,omitempty" jsonschema:"description=Exclude blank lines,default=true" koanf:"skip-blank-lines"`
 
 	// SkipComments excludes comment lines from the count (nil = use default).
-	SkipComments *bool `json:"skip-comments,omitempty" jsonschema:"description=Exclude comment lines from the count,default=true"`
+	SkipComments *bool `json:"skip-comments,omitempty" jsonschema:"description=Exclude comment lines,default=true" koanf:"skip-comments"`
 }
 
 // DefaultMaxLinesConfig returns the default configuration.

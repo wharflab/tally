@@ -253,12 +253,12 @@
         },
         "skip-blank-lines": {
           "type": "boolean",
-          "description": "Exclude blank lines from the count",
+          "description": "Exclude blank lines",
           "default": true
         },
         "skip-comments": {
           "type": "boolean",
-          "description": "Exclude comment lines from the count",
+          "description": "Exclude comment lines",
           "default": true
         }
       },
@@ -277,6 +277,21 @@
       "additionalProperties": false,
       "type": "object",
       "description": "Configuration for newline-between-instructions rule"
+    },
+    "no-trailing-spacesConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/wharflab/tally/internal/rules/tally/no-trailing-spaces-config",
+      "properties": {
+        "skip-blank-lines": {
+          "type": "boolean"
+        },
+        "ignore-comments": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "description": "Configuration for no-trailing-spaces rule"
     },
     "prefer-add-unpackConfig": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
