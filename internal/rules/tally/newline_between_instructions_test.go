@@ -166,6 +166,23 @@ func TestNewlineBetweenInstructionsCheck(t *testing.T) {
 			WantViolations: 0,
 		},
 		{
+			Name:           "grouped - same type with comment and blank lines",
+			Content:        "FROM alpine:3.20\n\nRUN echo foo\n\n# some comment\n\nRUN echo zoo\n",
+			WantViolations: 1,
+			WantMessages:   []string{"unexpected blank line between RUN and RUN"},
+		},
+		{
+			Name:           "grouped - different types with comment and blank lines",
+			Content:        "FROM alpine:3.20\n\n# some comment\n\nRUN echo hello\n",
+			WantViolations: 1,
+			WantMessages:   []string{"unexpected blank line between FROM and RUN"},
+		},
+		{
+			Name:           "grouped - same type with attached comment pass",
+			Content:        "FROM alpine:3.20\n\nRUN echo foo\n# some comment\nRUN echo zoo\n",
+			WantViolations: 0,
+		},
+		{
 			Name:           "multi-line continuation",
 			Content:        "FROM alpine:3.20\n\nRUN echo hello \\\n    && echo world\n\nCOPY . /app\n",
 			WantViolations: 0,

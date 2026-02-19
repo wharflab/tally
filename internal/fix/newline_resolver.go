@@ -81,7 +81,7 @@ func (r *newlineResolver) Resolve(_ context.Context, resolveCtx ResolveContext, 
 			})
 		} else {
 			edits = append(edits, rules.TextEdit{
-				Location: rules.NewRangeLocation(resolveCtx.FilePath, prevEndLine+1, 0, currEffectiveStart, 0),
+				Location: rules.NewRangeLocation(resolveCtx.FilePath, prevEndLine+1+wantGap, 0, currEffectiveStart, 0),
 				NewText:  "",
 			})
 		}
