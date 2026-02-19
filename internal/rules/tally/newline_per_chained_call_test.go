@@ -195,6 +195,26 @@ func TestNewlinePerChainedCallCheck(t *testing.T) {
 			WantViolations: 0,
 		},
 		{
+			Name: "LABEL many pairs already split - skip",
+			Content: "FROM alpine:3.20\n" +
+				"LABEL maintainer=\"\" \\\n" +
+				"      org.opencontainers.image.created=$BUILD_DATE \\\n" +
+				"      org.opencontainers.image.authors=\"httplock maintainers\" \\\n" +
+				"      org.opencontainers.image.url=" +
+				"\"https://github.com/httplock/httplock\" \\\n" +
+				"      org.opencontainers.image.documentation=" +
+				"\"https://github.com/httplock/httplock\" \\\n" +
+				"      org.opencontainers.image.source=" +
+				"\"https://github.com/httplock/httplock\" \\\n" +
+				"      org.opencontainers.image.version=\"latest\" \\\n" +
+				"      org.opencontainers.image.revision=$VCS_REF \\\n" +
+				"      org.opencontainers.image.vendor=\"\" \\\n" +
+				"      org.opencontainers.image.licenses=\"Apache 2.0\" \\\n" +
+				"      org.opencontainers.image.title=\"httplock\" \\\n" +
+				"      org.opencontainers.image.description=\"\"\n",
+			WantViolations: 0,
+		},
+		{
 			Name:           "LABEL legacy format - skip",
 			Content:        "FROM alpine:3.20\nLABEL maintainer John Doe\n",
 			WantViolations: 0,
