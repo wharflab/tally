@@ -15,6 +15,17 @@ const EpilogueOrderRuleCode = rules.TallyRulePrefix + "epilogue-order"
 // EpilogueOrderRule implements the epilogue-order linting rule.
 // It checks that runtime-configuration instructions (STOPSIGNAL, HEALTHCHECK,
 // ENTRYPOINT, CMD) appear at the end of each output stage in canonical order.
+//
+// Cross-rule interactions:
+//   - MultipleInstructionsDisallowed: removes duplicate CMD/ENTRYPOINT/HEALTHCHECK
+//     before this rule runs. checkStage skips the fix when duplicates remain.
+//   - DL3057 (HEALTHCHECK presence): may flag the same Dockerfile; no conflict
+//     since epilogue-order preserves instruction presence and only reorders.
+//   - JSONArgsRecommended: converts CMD/ENTRYPOINT to exec form (sync, priority 0);
+//     epilogue-order reorders independently of instruction form.
+//   - ONBUILD variants are intentionally skipped (not treated as epilogue).
+//   - newline-between-instructions (async, priority 200): runs after this rule's
+//     fix (NeedsResolve, FixPriority 175) and normalizes blank lines.
 type EpilogueOrderRule struct{}
 
 // NewEpilogueOrderRule creates a new epilogue-order rule instance.
