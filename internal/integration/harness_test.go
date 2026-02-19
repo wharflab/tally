@@ -150,8 +150,6 @@ func runFixCase(t *testing.T, tc fixCase) {
 			"hadolint/DL3057",
 			"--ignore",
 			"tally/newline-between-instructions",
-			"--ignore",
-			"tally/no-trailing-spaces",
 		},
 		tc.args...)
 	args = append(args, dockerfilePath)
