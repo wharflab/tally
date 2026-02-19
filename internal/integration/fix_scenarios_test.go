@@ -179,6 +179,64 @@ func TestFixConsistentIndentation(t *testing.T) {
 	}
 }
 
+// TestFixNewlineNeverWithInvalidDefinitionDescription tests cross-rule interaction between
+// buildkit/InvalidDefinitionDescription (sync fix, inserts blank lines between comments
+// and instructions) and tally/newline-between-instructions in "never" mode (async fix,
+// removes blank lines between instructions). The sync fix runs first; the async resolver
+// then re-parses the modified content and removes inter-instruction blank lines while
+// preserving the blank lines inserted between comments and instructions.
+func TestFixNewlineNeverWithInvalidDefinitionDescription(t *testing.T) {
+	t.Parallel()
+
+	// Dockerfile where:
+	// - "# bad comment" doesn't match ARG name "foo" → InvalidDefinitionDescription violation
+	// - blank lines between ARG→FROM and FROM→RUN → newline-between-instructions (never) violations
+	input := "# bad comment\nARG foo=bar\n\nFROM scratch AS base\n\nRUN echo hello\n"
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte(input), 0o644); err != nil {
+		t.Fatalf("failed to write Dockerfile: %v", err)
+	}
+
+	// Enable InvalidDefinitionDescription (experimental, off by default)
+	// and set newline-between-instructions to "never" mode.
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := `[rules.buildkit.InvalidDefinitionDescription]
+severity = "info"
+
+[rules.tally.newline-between-instructions]
+mode = "never"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	args := []string{
+		"lint", "--config", configPath, "--slow-checks=off",
+		"--fix",
+		"--ignore", "*",
+		"--select", "buildkit/InvalidDefinitionDescription",
+		"--select", "tally/newline-between-instructions",
+		dockerfilePath,
+	}
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	output, err := cmd.CombinedOutput()
+	expectExitCode1(t, output, err)
+
+	fixed, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read fixed Dockerfile: %v", err)
+	}
+
+	snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixed))
+
+	if !strings.Contains(string(output), "Fixed") {
+		t.Errorf("expected 'Fixed' in output, got: %s", output)
+	}
+}
+
 // TestFixPreferAddUnpackBeatsHeredoc verifies that prefer-add-unpack (sync fix, priority 95)
 // takes priority over prefer-run-heredoc (async fix, priority 100) when both rules target the
 // same consecutive RUN instructions. After fixing, all RUNs become ADD --unpack.
