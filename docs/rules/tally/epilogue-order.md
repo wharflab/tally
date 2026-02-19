@@ -77,3 +77,10 @@ The fix:
 
 When duplicate epilogue instructions of the same type exist (e.g., two CMD instructions), the fix is skipped for safety. The
 `MultipleInstructionsDisallowed` rule handles duplicate removal.
+
+## Cross-rule interactions
+
+| Rule | Interaction |
+|------|-------------|
+| `tally/newline-between-instructions` | Runs after this rule's fix (priority 200 vs 175). Normalizes blank lines between the reordered epilogue instructions. The combined result is stable. |
+| `buildkit/MultipleInstructionsDisallowed` | Runs before (sync fix). Removes duplicate CMD/ENTRYPOINT/HEALTHCHECK. If duplicates remain (rule disabled), this rule skips the fix for safety. |

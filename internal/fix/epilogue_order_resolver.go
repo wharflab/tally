@@ -20,6 +20,12 @@ import (
 // It re-parses the modified content, determines applicable stages, and
 // generates delete/insert edits to move epilogue instructions to the end
 // of each stage in canonical order.
+//
+// Cross-rule interaction: this resolver (priority 175) inserts epilogue
+// instructions adjacent to each other (no blank lines). The
+// newline-between-instructions resolver (priority 200) runs after and
+// normalizes blank lines between different instruction types. The
+// combined result is stable with no fix-loop.
 type epilogueOrderResolver struct{}
 
 // ID returns the resolver identifier.

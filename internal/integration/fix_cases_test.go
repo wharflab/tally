@@ -678,5 +678,19 @@ skip-blank-lines = true
 				mustSelectRules("tally/epilogue-order")...),
 			wantApplied: 1,
 		},
+		// Cross-rule: epilogue-order + newline-between-instructions compose correctly.
+		// epilogue-order (priority 175) moves instructions to end adjacent,
+		// then newline-between-instructions (priority 200) normalizes blank lines.
+		// Result is stable with no fix-loop.
+		{
+			name: "epilogue-order-with-newlines",
+			input: "FROM alpine:3.20\n" +
+				"CMD [\"serve\"]\n" +
+				"RUN echo hello\n" +
+				"ENTRYPOINT [\"/app\"]\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/epilogue-order", "tally/newline-between-instructions")...),
+			wantApplied: 2, // epilogue-order + newline-between-instructions
+		},
 	}
 }
