@@ -11,8 +11,12 @@ const EpilogueOrderResolverID = "epilogue-order"
 
 // EpilogueOrderResolveData carries resolver context.
 // The resolver is self-contained (re-parses and re-analyzes the file),
-// so no additional data is needed.
-type EpilogueOrderResolveData struct{}
+// so StageIndex is informational — it identifies the stage that triggered
+// the violation. The resolver processes all applicable stages in one pass.
+type EpilogueOrderResolveData struct {
+	// StageIndex is the 0-based index of the stage that triggered the violation.
+	StageIndex int
+}
 
 // EpilogueOrderRank maps lowercase epilogue instruction names to their canonical position.
 // This is the single source of truth for epilogue ordering, shared by the rule and resolver.

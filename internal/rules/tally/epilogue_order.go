@@ -75,7 +75,7 @@ func (r *EpilogueOrderRule) Check(input rules.LintInput) []rules.Violation {
 			continue
 		}
 
-		if v, ok := r.checkStage(input.File, stage, meta); ok {
+		if v, ok := r.checkStage(input.File, stage, stageIdx, meta); ok {
 			violations = append(violations, v)
 		}
 	}
@@ -93,6 +93,7 @@ type epilogueCmd struct {
 func (r *EpilogueOrderRule) checkStage(
 	file string,
 	stage instructions.Stage,
+	stageIdx int,
 	meta rules.RuleMetadata,
 ) (rules.Violation, bool) {
 	// Collect epilogue instructions, skipping ONBUILD variants.
@@ -142,7 +143,7 @@ func (r *EpilogueOrderRule) checkStage(
 			Priority:     meta.FixPriority,
 			NeedsResolve: true,
 			ResolverID:   rules.EpilogueOrderResolverID,
-			ResolverData: &rules.EpilogueOrderResolveData{},
+			ResolverData: &rules.EpilogueOrderResolveData{StageIndex: stageIdx},
 			IsPreferred:  true,
 		})
 	}
