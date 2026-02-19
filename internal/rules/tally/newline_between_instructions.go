@@ -134,16 +134,24 @@ func (r *NewlineBetweenInstructionsRule) Check(input rules.LintInput) []rules.Vi
 		}
 
 		// Build violation message.
+		prevName := strings.ToUpper(prev.Value)
+		currName := strings.ToUpper(curr.Value)
 		var message string
-		if gap < wantGap {
+		switch {
+		case gap < wantGap:
 			message = fmt.Sprintf(
 				"expected blank line between %s and %s",
-				strings.ToUpper(prev.Value), strings.ToUpper(curr.Value),
+				prevName, currName,
 			)
-		} else {
+		case wantGap == 0:
 			message = fmt.Sprintf(
 				"unexpected blank line between %s and %s",
-				strings.ToUpper(prev.Value), strings.ToUpper(curr.Value),
+				prevName, currName,
+			)
+		default:
+			message = fmt.Sprintf(
+				"expected %d blank line between %s and %s, found %d",
+				wantGap, prevName, currName, gap,
 			)
 		}
 

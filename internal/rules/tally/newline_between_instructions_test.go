@@ -94,7 +94,7 @@ func TestNewlineBetweenInstructionsCheck(t *testing.T) {
 			Name:           "grouped - excess blanks between different types",
 			Content:        "FROM alpine:3.20\n\n\n\nRUN echo hello\n",
 			WantViolations: 1,
-			WantMessages:   []string{"unexpected blank line between FROM and RUN"},
+			WantMessages:   []string{"expected 1 blank line between FROM and RUN, found 3"},
 		},
 
 		// === Always mode ===
@@ -175,7 +175,7 @@ func TestNewlineBetweenInstructionsCheck(t *testing.T) {
 			Name:           "grouped - different types with comment and blank lines",
 			Content:        "FROM alpine:3.20\n\n# some comment\n\nRUN echo hello\n",
 			WantViolations: 1,
-			WantMessages:   []string{"unexpected blank line between FROM and RUN"},
+			WantMessages:   []string{"expected 1 blank line between FROM and RUN, found 2"},
 		},
 		{
 			Name:           "grouped - same type with attached comment pass",
@@ -216,28 +216,39 @@ func TestNewlineBetweenInstructionsCheckWithFixes(t *testing.T) {
 		content        string
 		config         any
 		wantViolations int
+		wantMode       string
 	}{
 		{
 			name:           "insert blank line",
 			content:        "FROM alpine:3.20\nRUN echo hello\n",
 			wantViolations: 1,
+			wantMode:       "grouped",
 		},
 		{
 			name:           "remove blank line",
 			content:        "FROM alpine:3.20\n\nRUN echo hello\nENV FOO=bar\n\nENV BAZ=qux\n",
 			wantViolations: 2,
+			wantMode:       "grouped",
+		},
+		{
+			name:           "grouped - excess blanks reduced to one",
+			content:        "FROM alpine:3.20\n\n\n\nRUN echo hello\n",
+			wantViolations: 1,
+			wantMode:       "grouped",
 		},
 		{
 			name:           "remove multiple blank lines - never mode",
 			content:        "FROM alpine:3.20\n\n\n\nRUN echo hello\n",
 			config:         "never",
 			wantViolations: 1,
+			wantMode:       "never",
 		},
 		{
 			name:           "always mode insert",
 			content:        "FROM alpine:3.20\nRUN echo hello\nENV FOO=bar\n",
 			config:         "always",
 			wantViolations: 2,
+			wantMode:       "always",
 		},
 	}
 
@@ -265,8 +276,11 @@ func TestNewlineBetweenInstructionsCheckWithFixes(t *testing.T) {
 				if v.SuggestedFix.ResolverID != rules.NewlineResolverID {
 					t.Errorf("ResolverID = %q, want %q", v.SuggestedFix.ResolverID, rules.NewlineResolverID)
 				}
-				if v.SuggestedFix.ResolverData == nil {
-					t.Error("ResolverData should not be nil")
+				data, ok := v.SuggestedFix.ResolverData.(*rules.NewlineResolveData)
+				if !ok || data == nil {
+					t.Error("expected *rules.NewlineResolveData")
+				} else if data.Mode != tt.wantMode {
+					t.Errorf("ResolverData.Mode = %q, want %q", data.Mode, tt.wantMode)
 				}
 			}
 		})
