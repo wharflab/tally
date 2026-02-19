@@ -15,7 +15,8 @@ type NoTrailingSpacesConfig struct {
 	// SkipBlankLines skips lines that consist entirely of whitespace.
 	SkipBlankLines *bool `json:"skip-blank-lines,omitempty"`
 
-	// IgnoreComments skips comment lines (lines starting with #).
+	// IgnoreComments skips any line whose first non-whitespace character is #.
+	// This includes Dockerfile comments and # lines inside heredoc bodies.
 	IgnoreComments *bool `json:"ignore-comments,omitempty"`
 }
 
@@ -65,7 +66,7 @@ func (r *NoTrailingSpacesRule) Schema() map[string]any {
 			"ignore-comments": map[string]any{
 				"type":        "boolean",
 				"default":     false,
-				"description": "Skip comment lines (lines starting with #)",
+				"description": "Skip lines starting with # (Dockerfile comments and # lines in heredocs)",
 			},
 		},
 		"additionalProperties": false,
@@ -104,7 +105,7 @@ func (r *NoTrailingSpacesRule) Check(input rules.LintInput) []rules.Violation {
 			continue
 		}
 
-		// Skip comment lines (leading whitespace removed, starts with #).
+		// Skip any line starting with # (Dockerfile comments and # lines in heredocs).
 		if ignoreComments && strings.HasPrefix(strings.TrimLeft(trimmed, " \t"), "#") {
 			continue
 		}

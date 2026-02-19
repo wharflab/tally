@@ -180,6 +180,14 @@ func TestNoTrailingSpacesCheck(t *testing.T) {
 			Content:        "FROM alpine:3.20\nRUN <<EOF\necho hello   \nEOF\n",
 			WantViolations: 1,
 		},
+		{
+			Name:    "ignore-comments also skips hash lines inside heredoc bodies",
+			Content: "FROM alpine:3.20\nRUN <<EOF\n# shell comment   \necho hello\nEOF\n",
+			Config: NoTrailingSpacesConfig{
+				IgnoreComments: boolTrue(),
+			},
+			WantViolations: 0, // line-based check; # inside heredoc is also skipped
+		},
 
 		// === Both options combined ===
 		{

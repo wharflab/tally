@@ -69,7 +69,7 @@ ignore-comments = true
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `skip-blank-lines` | boolean | `false` | Skip lines that are entirely whitespace |
-| `ignore-comments` | boolean | `false` | Skip comment lines (lines starting with `#`) |
+| `ignore-comments` | boolean | `false` | Skip any line starting with `#` (Dockerfile comments and `#` lines inside heredoc bodies) |
 
 ## Auto-fix
 
