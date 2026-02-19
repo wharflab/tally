@@ -189,6 +189,28 @@ func TestNewlineBetweenInstructionsCheck(t *testing.T) {
 			WantViolations: 0,
 		},
 		{
+			Name:           "parser directive - correct spacing pass",
+			Content:        "# syntax=docker/dockerfile:1\nFROM alpine:3.20\n\nRUN echo hello\n",
+			WantViolations: 0,
+		},
+		{
+			Name:           "parser directives - missing blank",
+			Content:        "# syntax=docker/dockerfile:1\n# escape=`\nFROM alpine:3.20\nRUN echo hello\n",
+			WantViolations: 1,
+			WantMessages:   []string{"expected blank line between FROM and RUN"},
+		},
+		{
+			Name:           "inline disable with correct spacing pass",
+			Content:        "FROM alpine:3.20\n\n# tally ignore=tally/some-rule\nRUN echo hello\n\nCOPY . /app\n",
+			WantViolations: 0,
+		},
+		{
+			Name:           "inline disable - missing blank before comment",
+			Content:        "FROM alpine:3.20\n# tally ignore=tally/some-rule\nRUN echo hello\n",
+			WantViolations: 1,
+			WantMessages:   []string{"expected blank line between FROM and RUN"},
+		},
+		{
 			Name:           "multi-line continuation",
 			Content:        "FROM alpine:3.20\n\nRUN echo hello \\\n    && echo world\n\nCOPY . /app\n",
 			WantViolations: 0,
