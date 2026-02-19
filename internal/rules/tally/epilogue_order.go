@@ -12,19 +12,6 @@ import (
 // EpilogueOrderRuleCode is the full rule code for the epilogue-order rule.
 const EpilogueOrderRuleCode = rules.TallyRulePrefix + "epilogue-order"
 
-// epilogueInstructions defines the canonical order for epilogue instructions.
-// Instructions at the end of an output stage should appear in this order.
-var epilogueInstructions = []string{"stopsignal", "healthcheck", "entrypoint", "cmd"}
-
-// epilogueOrderRank maps instruction name (lowercase) to its canonical position.
-var epilogueOrderRank = func() map[string]int {
-	m := make(map[string]int, len(epilogueInstructions))
-	for i, name := range epilogueInstructions {
-		m[name] = i
-	}
-	return m
-}()
-
 // EpilogueOrderRule implements the epilogue-order linting rule.
 // It checks that runtime-configuration instructions (STOPSIGNAL, HEALTHCHECK,
 // ENTRYPOINT, CMD) appear at the end of each output stage in canonical order.
@@ -104,7 +91,7 @@ func (r *EpilogueOrderRule) checkStage(
 			continue
 		}
 		name := strings.ToLower(cmd.Name())
-		if _, ok := epilogueOrderRank[name]; ok {
+		if rules.IsEpilogueInstruction(name) {
 			epilogues = append(epilogues, epilogueCmd{name: name, index: i})
 		}
 	}
@@ -113,32 +100,27 @@ func (r *EpilogueOrderRule) checkStage(
 		return rules.Violation{}, false
 	}
 
-	// Check two conditions:
-	// 1. Position: all epilogue instructions must be at the end (no non-epilogue after first epilogue)
-	// 2. Order: epilogue instructions must appear in canonical order
-	positionOK := r.checkPosition(stage, epilogues)
-	orderOK := r.checkOrder(epilogues)
-
-	if positionOK && orderOK {
+	// Use shared check for combined position + order validation.
+	if rules.CheckEpilogueOrder(stage.Commands) {
 		return rules.Violation{}, false
 	}
 
 	// Find the first misplaced instruction for the violation location.
-	firstBad := epilogues[0]
-	if !positionOK {
-		firstBad = r.firstMisplacedByPosition(stage, epilogues)
-	} else {
-		firstBad = r.firstMisplacedByOrder(epilogues)
-	}
+	firstBad := r.firstMisplaced(stage, epilogues)
 
 	cmd := stage.Commands[firstBad.index]
 	loc := rules.NewLocationFromRanges(file, cmd.Location())
 
 	// Check for duplicate epilogue types — if present, report violation but skip fix.
-	hasDuplicates := r.hasDuplicateEpilogueTypes(epilogues)
+	names := make([]string, len(epilogues))
+	for i, ep := range epilogues {
+		names[i] = ep.name
+	}
+	hasDuplicates := rules.HasDuplicateEpilogueNames(names)
 
 	v := rules.NewViolation(loc, meta.Code,
-		"epilogue instructions should appear at the end of the stage in order: STOPSIGNAL, HEALTHCHECK, ENTRYPOINT, CMD",
+		"epilogue instructions should appear at the end of the stage in order: "+
+			"STOPSIGNAL, HEALTHCHECK, ENTRYPOINT, CMD",
 		meta.DefaultSeverity,
 	).WithDocURL(meta.DocURL)
 
@@ -157,87 +139,37 @@ func (r *EpilogueOrderRule) checkStage(
 	return v, true
 }
 
-// checkPosition returns true if all epilogue instructions are at the end of the stage.
-// No non-epilogue instruction should appear after the first epilogue instruction.
-func (r *EpilogueOrderRule) checkPosition(stage instructions.Stage, epilogues []epilogueCmd) bool {
-	if len(epilogues) == 0 {
-		return true
-	}
-
-	firstEpilogueIdx := epilogues[0].index
-	totalCmds := len(stage.Commands)
-
-	// Every instruction from firstEpilogueIdx to end must be an epilogue or ONBUILD.
-	for i := firstEpilogueIdx; i < totalCmds; i++ {
-		cmd := stage.Commands[i]
-		if _, isOnbuild := cmd.(*instructions.OnbuildCommand); isOnbuild {
-			continue
-		}
-		name := strings.ToLower(cmd.Name())
-		if _, ok := epilogueOrderRank[name]; !ok {
-			return false
-		}
-	}
-
-	return true
-}
-
-// checkOrder returns true if epilogue instructions are in canonical order.
-func (r *EpilogueOrderRule) checkOrder(epilogues []epilogueCmd) bool {
-	prevRank := -1
+// firstMisplaced returns the first epilogue instruction that violates position or order constraints.
+// It checks position violations first (non-epilogue after epilogue), then order violations.
+func (r *EpilogueOrderRule) firstMisplaced(
+	stage instructions.Stage,
+	epilogues []epilogueCmd,
+) epilogueCmd {
+	// Check position: find first epilogue with a non-epilogue instruction after it.
 	for _, ep := range epilogues {
-		rank := epilogueOrderRank[ep.name]
-		if rank < prevRank {
-			return false
-		}
-		prevRank = rank
-	}
-	return true
-}
-
-// firstMisplacedByPosition returns the first epilogue instruction that has
-// a non-epilogue instruction after it.
-func (r *EpilogueOrderRule) firstMisplacedByPosition(stage instructions.Stage, epilogues []epilogueCmd) epilogueCmd {
-	for _, ep := range epilogues {
-		// Check if there's any non-epilogue instruction after this one.
 		for j := ep.index + 1; j < len(stage.Commands); j++ {
 			cmd := stage.Commands[j]
 			if _, isOnbuild := cmd.(*instructions.OnbuildCommand); isOnbuild {
 				continue
 			}
 			name := strings.ToLower(cmd.Name())
-			if _, ok := epilogueOrderRank[name]; !ok {
-				return ep
+			if !rules.IsEpilogueInstruction(name) {
+				return ep // Position violation
 			}
 		}
 	}
-	// Fallback (shouldn't reach here if checkPosition failed).
-	return epilogues[0]
-}
 
-// firstMisplacedByOrder returns the first epilogue instruction that breaks canonical order.
-func (r *EpilogueOrderRule) firstMisplacedByOrder(epilogues []epilogueCmd) epilogueCmd {
+	// No position issue — must be an order violation.
 	prevRank := -1
 	for _, ep := range epilogues {
-		rank := epilogueOrderRank[ep.name]
+		rank := rules.EpilogueOrderRank[ep.name]
 		if rank < prevRank {
 			return ep
 		}
 		prevRank = rank
 	}
-	return epilogues[0]
-}
 
-// hasDuplicateEpilogueTypes checks if any epilogue instruction type appears more than once.
-func (r *EpilogueOrderRule) hasDuplicateEpilogueTypes(epilogues []epilogueCmd) bool {
-	seen := make(map[string]bool, len(epilogues))
-	for _, ep := range epilogues {
-		if seen[ep.name] {
-			return true
-		}
-		seen[ep.name] = true
-	}
-	return false
+	return epilogues[0] // Fallback
 }
 
 // init registers the rule with the default registry.

@@ -26,14 +26,6 @@ func (r *epilogueOrderResolver) ID() string {
 	return rules.EpilogueOrderResolverID
 }
 
-// epilogueRank maps lowercase instruction names to their canonical position.
-var epilogueRank = map[string]int{
-	"stopsignal":  0,
-	"healthcheck": 1,
-	"entrypoint":  2,
-	"cmd":         3,
-}
-
 // epilogueInstr tracks an epilogue instruction's location in the source.
 type epilogueInstr struct {
 	name      string // lowercase instruction name
@@ -52,7 +44,11 @@ type rankedText struct {
 // Because this resolver produces the complete set of edits for the whole file,
 // only the first invocation per file generates edits; subsequent calls find the
 // content already correct and return nil.
-func (r *epilogueOrderResolver) Resolve(_ context.Context, resolveCtx ResolveContext, fix *rules.SuggestedFix) ([]rules.TextEdit, error) {
+func (r *epilogueOrderResolver) Resolve(
+	_ context.Context,
+	resolveCtx ResolveContext,
+	fix *rules.SuggestedFix,
+) ([]rules.TextEdit, error) {
 	if _, ok := fix.ResolverData.(*rules.EpilogueOrderResolveData); !ok {
 		return nil, nil
 	}
@@ -115,7 +111,7 @@ func (r *epilogueOrderResolver) fixStage(
 			continue
 		}
 		name := strings.ToLower(cmd.Name())
-		rank, ok := epilogueRank[name]
+		rank, ok := rules.EpilogueOrderRank[name]
 		if !ok {
 			continue
 		}
@@ -144,12 +140,16 @@ func (r *epilogueOrderResolver) fixStage(
 	}
 
 	// Check for duplicate instruction types — skip fix for safety.
-	if hasDuplicateTypes(epilogues) {
+	names := make([]string, len(epilogues))
+	for i, ep := range epilogues {
+		names[i] = ep.name
+	}
+	if rules.HasDuplicateEpilogueNames(names) {
 		return nil
 	}
 
 	// Check if already correct: all at end and in order.
-	if r.isCorrect(stage, epilogues) {
+	if rules.CheckEpilogueOrder(stage.Commands) {
 		return nil
 	}
 
@@ -203,36 +203,6 @@ func (r *epilogueOrderResolver) fixStage(
 	return edits
 }
 
-// isCorrect checks if epilogue instructions are already at the end in correct order.
-func (r *epilogueOrderResolver) isCorrect(stage instructions.Stage, epilogues []epilogueInstr) bool {
-	// Check position: no non-epilogue after first epilogue.
-	firstEpilogueIdx := -1
-	for i, cmd := range stage.Commands {
-		if _, isOnbuild := cmd.(*instructions.OnbuildCommand); isOnbuild {
-			continue
-		}
-		name := strings.ToLower(cmd.Name())
-		if _, ok := epilogueRank[name]; ok {
-			if firstEpilogueIdx < 0 {
-				firstEpilogueIdx = i
-			}
-		} else if firstEpilogueIdx >= 0 {
-			return false // Non-epilogue after epilogue
-		}
-	}
-
-	// Check order.
-	prevRank := -1
-	for _, ep := range epilogues {
-		if ep.rank < prevRank {
-			return false
-		}
-		prevRank = ep.rank
-	}
-
-	return true
-}
-
 // lastNonEpilogueLine finds the end line of the last non-epilogue instruction in the stage.
 // Returns 0 if all instructions in the stage are epilogues.
 func (r *epilogueOrderResolver) lastNonEpilogueLine(
@@ -253,7 +223,7 @@ func (r *epilogueOrderResolver) lastNonEpilogueLine(
 			continue
 		}
 		name := strings.ToLower(cmd.Name())
-		if _, ok := epilogueRank[name]; ok {
+		if rules.IsEpilogueInstruction(name) {
 			continue
 		}
 		nodeIdx := i + 1
@@ -333,18 +303,6 @@ func buildDependentsMap(stages []instructions.Stage) map[int][]int {
 	}
 
 	return dependents
-}
-
-// hasDuplicateTypes returns true if any instruction type appears more than once.
-func hasDuplicateTypes(epilogues []epilogueInstr) bool {
-	seen := make(map[string]bool, len(epilogues))
-	for _, ep := range epilogues {
-		if seen[ep.name] {
-			return true
-		}
-		seen[ep.name] = true
-	}
-	return false
 }
 
 // init registers the epilogue-order resolver.
