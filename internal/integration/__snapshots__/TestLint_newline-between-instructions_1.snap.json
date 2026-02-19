@@ -22,24 +22,10 @@
           "sourceCode": "RUN echo hello",
           "suggestedFix": {
             "description": "Fix blank lines between instructions",
-            "edits": [
-              {
-                "location": {
-                  "end": {
-                    "column": 0,
-                    "line": 2
-                  },
-                  "file": "testdata/newline-between-instructions/Dockerfile",
-                  "start": {
-                    "column": 0,
-                    "line": 2
-                  }
-                },
-                "newText": "\n"
-              }
-            ],
             "isPreferred": true,
-            "priority": 55
+            "needsResolve": true,
+            "priority": 200,
+            "resolverId": "newline-between-instructions"
           }
         },
         {
@@ -61,24 +47,10 @@
           "sourceCode": "ENV FOO=bar",
           "suggestedFix": {
             "description": "Fix blank lines between instructions",
-            "edits": [
-              {
-                "location": {
-                  "end": {
-                    "column": 0,
-                    "line": 3
-                  },
-                  "file": "testdata/newline-between-instructions/Dockerfile",
-                  "start": {
-                    "column": 0,
-                    "line": 3
-                  }
-                },
-                "newText": "\n"
-              }
-            ],
             "isPreferred": true,
-            "priority": 55
+            "needsResolve": true,
+            "priority": 200,
+            "resolverId": "newline-between-instructions"
           }
         }
       ]

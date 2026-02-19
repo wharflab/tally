@@ -4,11 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/moby/buildkit/frontend/dockerfile/parser"
-
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
-	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // NewlineBetweenInstructionsRuleCode is the full rule code for the newline-between-instructions rule.
@@ -48,7 +45,7 @@ func (r *NewlineBetweenInstructionsRule) Metadata() rules.RuleMetadata {
 		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
 		IsExperimental:  false,
-		FixPriority:     55,
+		FixPriority:     200,
 	}
 }
 
@@ -106,9 +103,7 @@ func (r *NewlineBetweenInstructionsRule) Check(input rules.LintInput) []rules.Vi
 		curr := children[i]
 
 		// Compute end line of previous instruction (including heredocs and continuations).
-		// Node.EndLine includes heredoc body; resolveEndLine only uses Location().End.Line
-		// which excludes heredocs. Use Node.EndLine as the base and scan for continuations.
-		prevEndLine := resolveNodeEndLine(sm, prev)
+		prevEndLine := sm.ResolveEndLine(prev.EndLine)
 
 		// Compute start of current instruction accounting for attached comments.
 		// BuildKit stores preceding comments in PrevComment; those lines sit
@@ -138,41 +133,34 @@ func (r *NewlineBetweenInstructionsRule) Check(input rules.LintInput) []rules.Vi
 			continue
 		}
 
-		// Build violation message and fix.
+		// Build violation message.
 		var message string
-		var edits []rules.TextEdit
-
 		if gap < wantGap {
-			// Need to insert a blank line.
 			message = fmt.Sprintf(
 				"expected blank line between %s and %s",
 				strings.ToUpper(prev.Value), strings.ToUpper(curr.Value),
 			)
-			edits = []rules.TextEdit{{
-				Location: rules.NewRangeLocation(input.File, prevEndLine+1, 0, prevEndLine+1, 0),
-				NewText:  "\n",
-			}}
 		} else {
-			// Need to remove blank line(s).
 			message = fmt.Sprintf(
 				"unexpected blank line between %s and %s",
 				strings.ToUpper(prev.Value), strings.ToUpper(curr.Value),
 			)
-			edits = []rules.TextEdit{{
-				Location: rules.NewRangeLocation(input.File, prevEndLine+1, 0, currEffectiveStart, 0),
-				NewText:  "",
-			}}
 		}
 
+		// Fixes use an async resolver to avoid line-structure drift when
+		// other sync fixes (e.g. prefer-copy-heredoc) change the content.
+		// The resolver re-parses the modified file and generates fresh edits.
 		loc := rules.NewLineLocation(input.File, currEffectiveStart)
 		v := rules.NewViolation(loc, meta.Code, message, meta.DefaultSeverity).
 			WithDocURL(meta.DocURL).
 			WithSuggestedFix(&rules.SuggestedFix{
-				Description: "Fix blank lines between instructions",
-				Safety:      rules.FixSafe,
-				Priority:    meta.FixPriority,
-				Edits:       edits,
-				IsPreferred: true,
+				Description:  "Fix blank lines between instructions",
+				Safety:       rules.FixSafe,
+				Priority:     meta.FixPriority,
+				NeedsResolve: true,
+				ResolverID:   rules.NewlineResolverID,
+				ResolverData: &rules.NewlineResolveData{Mode: cfg.Mode},
+				IsPreferred:  true,
 			})
 		violations = append(violations, v)
 	}
@@ -187,23 +175,6 @@ func (r *NewlineBetweenInstructionsRule) resolveConfig(config any) NewlineBetwee
 		return NewlineBetweenInstructionsConfig{Mode: v}
 	}
 	return configutil.Coerce(config, DefaultNewlineBetweenInstructionsConfig())
-}
-
-// resolveNodeEndLine returns the last line of an instruction, including heredoc
-// bodies and backslash continuations. Node.EndLine includes heredocs but
-// resolveEndLine (which uses Location().End.Line) may not; this helper uses
-// Node.EndLine as the base and scans forward for continuations.
-func resolveNodeEndLine(sm *sourcemap.SourceMap, node *parser.Node) int {
-	endLine := node.EndLine
-	endLine = min(endLine, sm.LineCount())
-	for l := endLine; l <= sm.LineCount(); l++ {
-		line := sm.Line(l - 1) // l is 1-based, sm.Line is 0-based
-		if !strings.HasSuffix(strings.TrimRight(line, " \t"), `\`) {
-			return l
-		}
-		endLine = min(l+1, sm.LineCount())
-	}
-	return endLine
 }
 
 // init registers the rule with the default registry.

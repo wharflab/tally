@@ -176,6 +176,7 @@ RUN rm -rf /root/micromamba/
 RUN rm -rf /opt/conda/lib/libtinfo.so
 
 COPY --from=python_builder_1 /opt/conda /opt/conda
+
 ARG PYTORCH_VERSION
 ARG PYTORCH_VERSION_SUFFIX
 ARG TORCHVISION_VERSION
@@ -226,7 +227,7 @@ RUN conda install -y -c conda-forge     scikit-learn     pandas
 
 WORKDIR /
 
-RUN wget https://sourceforge.net/projects/boost/files/boost/1.73.0/boost_1_73_0.tar.gz/download -O boost_1_73_0.tar.gz  && tar -xzf boost_1_73_0.tar.gz  && cd boost_1_73_0  && ./bootstrap.sh  && ./b2 threading=multi --prefix=/opt/conda -j 64 cxxflags=-fPIC cflags=-fPIC install || true  && cd ..  && rm -rf boost_1_73_0.tar.gz  && rm -rf boost_1_73_0  && cd /opt/conda/include/boost
+RUN wget --progress=dot:giga https://sourceforge.net/projects/boost/files/boost/1.73.0/boost_1_73_0.tar.gz/download -O boost_1_73_0.tar.gz  && tar -xzf boost_1_73_0.tar.gz  && cd boost_1_73_0  && ./bootstrap.sh  && ./b2 threading=multi --prefix=/opt/conda -j 64 cxxflags=-fPIC cflags=-fPIC install || true  && cd ..  && rm -rf boost_1_73_0.tar.gz  && rm -rf boost_1_73_0  && cd /opt/conda/include/boost
 
 WORKDIR /opt/
 
@@ -235,6 +236,7 @@ COPY start_with_right_hostname.sh /usr/local/bin/start_with_right_hostname.sh
 RUN chmod +x /usr/local/bin/start_with_right_hostname.sh
 
 WORKDIR /root
+
 ARG SMDEBUG_VERSION=1.0.34
 
 RUN cd /tmp   && git clone https://github.com/awslabs/sagemaker-debugger --branch ${SMDEBUG_VERSION} --depth 1 --single-branch   && cd sagemaker-debugger   && pip install .   && rm -rf /tmp/*
@@ -243,13 +245,14 @@ RUN rm /etc/apt/sources.list.d/*  && git clone https://github.com/KarypisLab/GKl
 ARG RMM_VERSION=0.15.0
 
 RUN wget -nv https://github.com/rapidsai/rmm/archive/v${RMM_VERSION}.tar.gz  && tar -xvf v${RMM_VERSION}.tar.gz  && cd rmm-${RMM_VERSION}  && INSTALL_PREFIX=/usr/local ./build.sh librmm  && cd ..  && rm -rf v${RMM_VERSION}.tar*  && rm -rf rmm-${RMM_VERSION}
+
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/conda/lib/python3.9/site-packages/smdistributed/dataparallel/lib"
 
 RUN apt-get update  && apt-get install -y --allow-change-held-packages --no-install-recommends     libunwind-dev  && rm -rf /var/lib/apt/lists/*  && apt-get clean
 
 ARG SMPPY_BINARY
 
-RUN wget --progress=dot:giga -nv https://smppy.s3.amazonaws.com/pytorch/cu117/${SMPPY_BINARY} && pip install ${SMPPY_BINARY} && rm ${SMPPY_BINARY}
+RUN wget -nv https://smppy.s3.amazonaws.com/pytorch/cu117/${SMPPY_BINARY} && pip install ${SMPPY_BINARY} && rm ${SMPPY_BINARY}
 
 WORKDIR /
 
@@ -259,6 +262,7 @@ RUN rm -rf /root/.cache | true
 ENTRYPOINT ["bash", "-m", "start_with_right_hostname.sh"]
 
 CMD ["/bin/bash"]
+
 RUN apt-get update  && apt-get -y upgrade --only-upgrade systemd openssl cryptsetup  && apt-get install -y git-lfs  && apt-get clean  && rm -rf /var/lib/apt/lists/*
 RUN HOME_DIR=/root  && curl -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip  && unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/  && cp ${HOME_DIR}/oss_compliance/test/testOSSCompliance /usr/local/bin/testOSSCompliance  && chmod +x /usr/local/bin/testOSSCompliance  && chmod +x ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh  && ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh ${HOME_DIR} ${PYTHON}  && rm -rf ${HOME_DIR}/oss_compliance*
 

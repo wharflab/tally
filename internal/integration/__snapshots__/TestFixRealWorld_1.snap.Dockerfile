@@ -162,30 +162,27 @@ set -o pipefail
 apt-get update
 apt-get install -y --no-install-recommends gnupg2 curl ca-certificates
 curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH}/3bf863cc.pub | apt-key add -
-echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH} /" >/etc/apt/sources.list.d/cuda.list
-apt-get purge --autoremove -y curl
-rm -rf /var/lib/apt/lists/*
 EOF
+
+COPY <<EOF /etc/apt/sources.list.d/cuda.list
+deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH} /
+EOF
+
+RUN apt-get purge --autoremove -y curl && rm -rf /var/lib/apt/lists/*
 
 ENV NV_CUDA_COMPAT_PACKAGE=cuda-compat-11-7
 ENV NV_CUDA_CUDART_VERSION=11.7.99-1
 
 RUN <<EOF
 set -e
-set -o pipefail
 apt-get update
 apt-get install -y --no-install-recommends cuda-cudart-11-7=${NV_CUDA_CUDART_VERSION} ${NV_CUDA_COMPAT_PACKAGE}
 rm -rf /var/lib/apt/lists/*
 echo "/usr/local/nvidia/lib" >>/etc/ld.so.conf.d/nvidia.conf
 echo "/usr/local/nvidia/lib64" >>/etc/ld.so.conf.d/nvidia.conf
-apt-get update
-apt-get install -y --no-install-recommends gnupg2 curl ca-certificates
-curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH}/3bf863cc.pub | apt-key add -
 EOF
-COPY <<EOF /etc/apt/sources.list.d/cuda.list
-deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH} /
-EOF
-RUN apt-get purge --autoremove -y curl && rm -rf /var/lib/apt/lists/*
+
+ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 ENV DEBIAN_FRONTEND=noninteractive LD_LIBRARY_PATH=/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/lib
 
@@ -308,6 +305,7 @@ rm -rf /opt/conda/lib/libtinfo.so
 EOF
 
 COPY --from=python_builder_1 /opt/conda /opt/conda
+
 ARG PYTORCH_VERSION
 ARG PYTORCH_VERSION_SUFFIX
 ARG TORCHVISION_VERSION
@@ -413,7 +411,7 @@ WORKDIR /
 
 RUN <<EOF
 set -e
-wget https://sourceforge.net/projects/boost/files/boost/1.73.0/boost_1_73_0.tar.gz/download -O boost_1_73_0.tar.gz && tar -xzf boost_1_73_0.tar.gz && cd boost_1_73_0 && ./bootstrap.sh && ./b2 threading=multi --prefix=/opt/conda -j 64 cxxflags=-fPIC cflags=-fPIC install || true
+wget --progress=dot:giga https://sourceforge.net/projects/boost/files/boost/1.73.0/boost_1_73_0.tar.gz/download -O boost_1_73_0.tar.gz && tar -xzf boost_1_73_0.tar.gz && cd boost_1_73_0 && ./bootstrap.sh && ./b2 threading=multi --prefix=/opt/conda -j 64 cxxflags=-fPIC cflags=-fPIC install || true
 cd ..
 rm -rf boost_1_73_0.tar.gz
 rm -rf boost_1_73_0
@@ -427,6 +425,7 @@ COPY start_with_right_hostname.sh /usr/local/bin/start_with_right_hostname.sh
 RUN chmod +x /usr/local/bin/start_with_right_hostname.sh
 
 WORKDIR /root
+
 ARG SMDEBUG_VERSION=1.0.34
 
 RUN <<EOF
@@ -465,6 +464,7 @@ cd ..
 rm -rf v${RMM_VERSION}.tar*
 rm -rf rmm-${RMM_VERSION}
 EOF
+
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/conda/lib/python3.9/site-packages/smdistributed/dataparallel/lib"
 
 RUN <<EOF
@@ -479,7 +479,7 @@ ARG SMPPY_BINARY
 
 RUN <<EOF
 set -e
-wget --progress=dot:giga -nv https://smppy.s3.amazonaws.com/pytorch/cu117/${SMPPY_BINARY}
+wget -nv https://smppy.s3.amazonaws.com/pytorch/cu117/${SMPPY_BINARY}
 pip install ${SMPPY_BINARY}
 rm ${SMPPY_BINARY}
 EOF
@@ -498,15 +498,22 @@ ${HOME_DIR}/oss_compliance/generate_oss_compliance.sh ${HOME_DIR} ${PYTHON}
 rm -rf ${HOME_DIR}/oss_compliance*
 rm -rf /tmp/tmp*
 EOF
+
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 RUN rm -rf /root/.cache | true
 
 ENTRYPOINT ["bash", "-m", "start_with_right_hostname.sh"]
 
-
+CMD ["/bin/bash"]
 
 RUN <<EOF
 set -e
+apt-get update
+apt-get -y upgrade --only-upgrade systemd openssl cryptsetup
+apt-get install -y git-lfs
+apt-get clean
+rm -rf /var/lib/apt/lists/*
 HOME_DIR=/root
 curl -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip
 unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/

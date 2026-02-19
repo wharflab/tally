@@ -570,13 +570,14 @@ fix = "explicit"
 `, acpAgentPath),
 		},
 
-		// Newline between instructions: grouped mode (default) - insert blank lines
+		// Newline between instructions: grouped mode (default) - insert blank lines.
+		// The async resolver generates all edits in one pass, so only 1 fix is recorded.
 		{
 			name:  "newline-between-instructions-grouped",
 			input: "FROM alpine:3.20\nRUN echo hello\nENV FOO=bar\nENV BAZ=qux\n\nCOPY . /app\n",
 			args: append([]string{"--fix"},
 				mustSelectRules("tally/newline-between-instructions")...),
-			wantApplied: 2, // FROM→RUN and RUN→ENV need blank lines
+			wantApplied: 1,
 		},
 		// Newline between instructions: always mode
 		{
@@ -584,7 +585,7 @@ fix = "explicit"
 			input: "FROM alpine:3.20\nRUN echo hello\nENV FOO=bar\n",
 			args: append([]string{"--fix"},
 				mustSelectRules("tally/newline-between-instructions")...),
-			wantApplied: 2,
+			wantApplied: 1,
 			config: `[rules.tally.newline-between-instructions]
 mode = "always"
 `,
@@ -595,7 +596,7 @@ mode = "always"
 			input: "FROM alpine:3.20\n\nRUN echo hello\n\nENV FOO=bar\n",
 			args: append([]string{"--fix"},
 				mustSelectRules("tally/newline-between-instructions")...),
-			wantApplied: 2,
+			wantApplied: 1,
 			config: `[rules.tally.newline-between-instructions]
 mode = "never"
 `,

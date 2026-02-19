@@ -189,32 +189,32 @@ func TestNewlineBetweenInstructionsCheckWithFixes(t *testing.T) {
 	r := NewNewlineBetweenInstructionsRule()
 
 	tests := []struct {
-		name      string
-		content   string
-		config    any
-		wantEdits int
+		name           string
+		content        string
+		config         any
+		wantViolations int
 	}{
 		{
-			name:      "insert blank line",
-			content:   "FROM alpine:3.20\nRUN echo hello\n",
-			wantEdits: 1,
+			name:           "insert blank line",
+			content:        "FROM alpine:3.20\nRUN echo hello\n",
+			wantViolations: 1,
 		},
 		{
-			name:      "remove blank line",
-			content:   "FROM alpine:3.20\n\nRUN echo hello\nENV FOO=bar\n\nENV BAZ=qux\n",
-			wantEdits: 2,
+			name:           "remove blank line",
+			content:        "FROM alpine:3.20\n\nRUN echo hello\nENV FOO=bar\n\nENV BAZ=qux\n",
+			wantViolations: 2,
 		},
 		{
-			name:      "remove multiple blank lines - never mode",
-			content:   "FROM alpine:3.20\n\n\n\nRUN echo hello\n",
-			config:    "never",
-			wantEdits: 1,
+			name:           "remove multiple blank lines - never mode",
+			content:        "FROM alpine:3.20\n\n\n\nRUN echo hello\n",
+			config:         "never",
+			wantViolations: 1,
 		},
 		{
-			name:      "always mode insert",
-			content:   "FROM alpine:3.20\nRUN echo hello\nENV FOO=bar\n",
-			config:    "always",
-			wantEdits: 2,
+			name:           "always mode insert",
+			content:        "FROM alpine:3.20\nRUN echo hello\nENV FOO=bar\n",
+			config:         "always",
+			wantViolations: 2,
 		},
 	}
 
@@ -224,7 +224,10 @@ func TestNewlineBetweenInstructionsCheckWithFixes(t *testing.T) {
 			input := testutil.MakeLintInputWithConfig(t, "Dockerfile", tt.content, tt.config)
 			violations := r.Check(input)
 
-			totalEdits := 0
+			if len(violations) != tt.wantViolations {
+				t.Fatalf("violations = %d, want %d", len(violations), tt.wantViolations)
+			}
+
 			for _, v := range violations {
 				if v.SuggestedFix == nil {
 					t.Error("violation has no SuggestedFix")
@@ -233,11 +236,15 @@ func TestNewlineBetweenInstructionsCheckWithFixes(t *testing.T) {
 				if v.SuggestedFix.Safety != rules.FixSafe {
 					t.Errorf("fix safety = %v, want FixSafe", v.SuggestedFix.Safety)
 				}
-				totalEdits += len(v.SuggestedFix.Edits)
-			}
-
-			if totalEdits != tt.wantEdits {
-				t.Errorf("total edits = %d, want %d", totalEdits, tt.wantEdits)
+				if !v.SuggestedFix.NeedsResolve {
+					t.Error("expected NeedsResolve=true")
+				}
+				if v.SuggestedFix.ResolverID != rules.NewlineResolverID {
+					t.Errorf("ResolverID = %q, want %q", v.SuggestedFix.ResolverID, rules.NewlineResolverID)
+				}
+				if v.SuggestedFix.ResolverData == nil {
+					t.Error("ResolverData should not be nil")
+				}
 			}
 		})
 	}
