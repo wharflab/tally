@@ -415,7 +415,7 @@ func TestLSP_CodeActionForAsyncFix(t *testing.T) {
 
 	uri := "file:///tmp/test-codeaction-async/Dockerfile"
 	// Three consecutive RUN instructions trigger tally/prefer-run-heredoc (NeedsResolve fix).
-	ts.openDocument(t, uri, "FROM alpine:3.18\nRUN apk add curl\nRUN apk add git\nRUN apk add jq\n")
+	ts.openDocument(t, uri, "FROM alpine:3.18\n\nRUN apk add curl\nRUN apk add git\nRUN apk add jq\n")
 
 	diag := ts.waitDiagnostics(t)
 	require.NotEmpty(t, diag.Diagnostics)
@@ -655,7 +655,7 @@ func TestLSP_FormattingNoChanges(t *testing.T) {
 
 	uri := "file:///tmp/test-formatting-noop/Dockerfile"
 	// A clean Dockerfile with no fixable issues.
-	ts.openDocument(t, uri, "FROM alpine:3.18\nRUN echo hello\n")
+	ts.openDocument(t, uri, "FROM alpine:3.18\n\nRUN echo hello\n")
 
 	// Drain push diagnostics from didOpen.
 	ts.waitDiagnostics(t)

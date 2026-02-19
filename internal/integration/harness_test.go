@@ -138,7 +138,20 @@ func runFixCase(t *testing.T, tc fixCase) {
 	// Run tally lint --fix (disable slow checks — fix tests don't need async).
 	// Ignore DL3057 (HEALTHCHECK missing) as it fires for nearly every fixture
 	// and has no auto-fix; it's irrelevant for testing other fixes.
-	args := append([]string{"lint", "--config", configPath, "--slow-checks=off", "--ignore", "hadolint/DL3057"}, tc.args...)
+	// Ignore newline-between-instructions as it fires on most minimal fixtures
+	// and would inflate wantApplied counts for every existing fix test.
+	args := append(
+		[]string{
+			"lint",
+			"--config",
+			configPath,
+			"--slow-checks=off",
+			"--ignore",
+			"hadolint/DL3057",
+			"--ignore",
+			"tally/newline-between-instructions",
+		},
+		tc.args...)
 	args = append(args, dockerfilePath)
 	cmd := exec.Command(binaryPath, args...)
 	cmd.Env = append(os.Environ(),
