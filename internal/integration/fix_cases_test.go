@@ -678,6 +678,17 @@ skip-blank-lines = true
 				mustSelectRules("tally/epilogue-order")...),
 			wantApplied: 1,
 		},
+		// Epilogue order: all-epilogue stage with blank lines after FROM
+		{
+			name: "epilogue-order-all-epilogue",
+			input: "FROM alpine:3.20\n" +
+				"\n" +
+				"CMD [\"serve\"]\n" +
+				"ENTRYPOINT [\"/app\"]\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/epilogue-order")...),
+			wantApplied: 1,
+		},
 		// Cross-rule: epilogue-order + newline-between-instructions compose correctly.
 		// epilogue-order (priority 175) moves instructions to end adjacent,
 		// then newline-between-instructions (priority 200) normalizes blank lines.

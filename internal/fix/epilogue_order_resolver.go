@@ -166,7 +166,9 @@ func (r *epilogueOrderResolver) fixStage(
 	insertAfterLine := r.lastNonEpilogueLine(stage, stageNodes, sm)
 	if insertAfterLine == 0 {
 		// All instructions are epilogue — just need to reorder, no position change.
-		// Use the line before the first epilogue as the insert point.
+		// Use the line before the first epilogue as the insert point so that any
+		// blank lines between FROM and the epilogue block are preserved.
+		// Using FROM's endLine instead would collapse those blank lines.
 		insertAfterLine = epilogues[0].startLine - 1
 	}
 
