@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 12 | - | 12 |
+| tally | 13 | - | 13 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 26 | 11 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -41,6 +41,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/consistent-indentation`](docs/rules/tally/consistent-indentation.md) 🔧 | Enforces consistent indentation for Dockerfile build stages | Style | Style | Off (experimental) |
 | [`tally/newline-between-instructions`](docs/rules/tally/newline-between-instructions.md) 🔧 | Controls blank lines between Dockerfile instructions | Style | Style | Enabled (grouped) |
 | [`tally/no-trailing-spaces`](docs/rules/tally/no-trailing-spaces.md) 🔧 | Disallows trailing whitespace at the end of lines | Style | Style | Enabled |
+| [`tally/epilogue-order`](docs/rules/tally/epilogue-order.md) 🔧 | Enforces canonical order for epilogue instructions (STOPSIGNAL, HEALTHCHECK, ENTRYPOINT, CMD) | Style | Style | Enabled |
 
 ---
 

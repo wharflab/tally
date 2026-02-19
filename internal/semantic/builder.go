@@ -13,6 +13,7 @@ import (
 	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/runmount"
 	"github.com/wharflab/tally/internal/shell"
 )
 
@@ -445,6 +446,9 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 			// Extract package installations from RUN commands
 			b.extractPackageInstalls(c, info)
 
+			// Track mount-based stage dependencies (RUN --mount=from=...).
+			b.processMountDependencies(c, info.Index, graph)
+
 		case *instructions.CopyCommand:
 			if c.From != "" {
 				// DL3023: COPY --from cannot reference its own FROM alias.
@@ -552,6 +556,29 @@ func (b *Builder) processCopyFrom(cmd *instructions.CopyCommand, stageIndex int,
 	}
 
 	return ref
+}
+
+// processMountDependencies tracks stage dependencies from RUN --mount=from=... references.
+func (b *Builder) processMountDependencies(cmd *instructions.RunCommand, stageIndex int, graph *StageGraph) {
+	for _, m := range runmount.GetMounts(cmd) {
+		if m.From == "" {
+			continue
+		}
+
+		// Try to resolve as numeric index first.
+		if idx, err := strconv.Atoi(m.From); err == nil {
+			if idx >= 0 && idx < graph.stageCount && idx < stageIndex {
+				graph.addDependency(idx, stageIndex)
+			}
+			continue
+		}
+
+		// Named reference.
+		normalized := normalizeStageRef(m.From)
+		if idx, found := b.stagesByName[normalized]; found && idx < stageIndex {
+			graph.addDependency(idx, stageIndex)
+		}
+	}
 }
 
 // processOnbuildCopyFrom analyzes a COPY --from reference from an ONBUILD instruction.

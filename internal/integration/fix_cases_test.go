@@ -641,5 +641,67 @@ ignore-comments = true
 skip-blank-lines = true
 `,
 		},
+
+		// Epilogue order: reorder CMD and ENTRYPOINT
+		{
+			name: "epilogue-order-basic",
+			input: "FROM alpine:3.20\n" +
+				"RUN echo hello\n" +
+				"CMD [\"serve\"]\n" +
+				"ENTRYPOINT [\"/app\"]\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/epilogue-order")...),
+			wantApplied: 1,
+		},
+		// Epilogue order: scattered epilogue instructions
+		{
+			name: "epilogue-order-scattered",
+			input: "FROM alpine:3.20\n" +
+				"CMD [\"serve\"]\n" +
+				"RUN echo hello\n" +
+				"HEALTHCHECK CMD curl -f http://localhost/\n" +
+				"ENTRYPOINT [\"/app\"]\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/epilogue-order")...),
+			wantApplied: 1,
+		},
+		// Epilogue order: multi-stage, only final stage fixed
+		{
+			name: "epilogue-order-multi-stage",
+			input: "FROM golang:1.21 AS builder\n" +
+				"RUN go build -o /app\n" +
+				"FROM alpine:3.20\n" +
+				"COPY --from=builder /app /app\n" +
+				"CMD [\"serve\"]\n" +
+				"ENTRYPOINT [\"/app\"]\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/epilogue-order")...),
+			wantApplied: 1,
+		},
+		// Epilogue order: all-epilogue stage with blank lines after FROM
+		{
+			name: "epilogue-order-all-epilogue",
+			input: "FROM alpine:3.20\n" +
+				"\n" +
+				"CMD [\"serve\"]\n" +
+				"ENTRYPOINT [\"/app\"]\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/epilogue-order")...),
+			wantApplied: 1,
+		},
+		// Cross-rule: epilogue-order + newline-between-instructions compose correctly.
+		// epilogue-order (priority 175) moves instructions to end adjacent,
+		// then newline-between-instructions (priority 200) normalizes blank lines.
+		// Result is stable with no fix-loop.
+		{
+			name: "epilogue-order-with-newlines",
+			input: "FROM alpine:3.20\n" +
+				"CMD [\"serve\"]\n" +
+				"RUN echo hello\n" +
+				"ENTRYPOINT [\"/app\"]\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/epilogue-order", "tally/newline-between-instructions")...),
+			wantApplied: 2, // epilogue-order + newline-between-instructions
+		},
 	}
 }

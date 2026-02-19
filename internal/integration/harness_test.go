@@ -136,10 +136,14 @@ func runFixCase(t *testing.T, tc fixCase) {
 	}
 
 	// Run tally lint --fix (disable slow checks — fix tests don't need async).
-	// Ignore DL3057 (HEALTHCHECK missing) as it fires for nearly every fixture
-	// and has no auto-fix; it's irrelevant for testing other fixes.
-	// Ignore newline-between-instructions as it fires on most minimal fixtures
-	// and would inflate wantApplied counts for every existing fix test.
+	//
+	// Global ignores below are EXCEPTIONAL — only add a rule here when it is
+	// enabled by default AND intentionally fires on a broad set of existing
+	// fixtures, inflating wantApplied counts across many unrelated tests.
+	// Prefer mustSelectRules in individual test cases instead.
+	//
+	// - DL3057: HEALTHCHECK missing — fires on nearly every fixture, no auto-fix.
+	// - newline-between-instructions: fires on most minimal fixtures.
 	args := append(
 		[]string{
 			"lint",
