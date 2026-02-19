@@ -243,7 +243,7 @@ func orderedRequiredMounts(requiredByTarget map[string]cacheMountSpec, cargoTarg
 		if target == cargoOrderPlaceholder && cargoTarget != "" {
 			target = cargoTarget
 		}
-		if target == pnpmOrderPlaceholder && pnpmStorePath != "" {
+		if target == pnpmOrderPlaceholder {
 			target = pnpmStorePath
 		}
 		if req, ok := requiredByTarget[target]; ok {
