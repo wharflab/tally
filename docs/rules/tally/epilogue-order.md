@@ -21,8 +21,8 @@ This rule checks two conditions for each applicable stage:
 1. **Position**: All epilogue instructions must appear at the end of the stage (no build instructions like RUN, COPY, ENV after them)
 2. **Order**: Among the epilogue instructions, they must appear in canonical order
 
-**Applicable stages**: The final stage and any stage with no dependents (not referenced by `COPY --from` or `FROM`). Intermediate builder stages are
-skipped since they typically don't use epilogue instructions.
+**Applicable stages**: The final stage and any stage with no dependents (not referenced by `COPY --from`, `FROM`, or `RUN --mount=from`). Intermediate
+builder stages are skipped since they typically don't use epilogue instructions.
 
 ## Examples
 
