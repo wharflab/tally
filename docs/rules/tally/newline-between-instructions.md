@@ -126,10 +126,6 @@ This rule provides safe auto-fixes:
 - **Insert blank line**: Adds a single blank line between instructions that need separation.
 - **Remove blank lines**: Removes excess blank lines between instructions that should be adjacent.
 
-The auto-fix uses an async resolver that re-parses the file after other fixes have been applied,
-ensuring correct line positions even when earlier fixes (such as heredoc conversions) change the
-file structure.
-
 ```bash
 tally lint --fix Dockerfile
 ```
