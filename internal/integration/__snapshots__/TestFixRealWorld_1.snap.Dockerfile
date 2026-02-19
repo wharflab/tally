@@ -494,11 +494,6 @@ EOF
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN rm -rf /root/.cache | true
-
-ENTRYPOINT ["bash", "-m", "start_with_right_hostname.sh"]
-
-CMD ["/bin/bash"]
-
 RUN <<EOF
 set -e
 apt-get update
@@ -517,3 +512,7 @@ rm -rf ${HOME_DIR}/oss_compliance*
 EOF
 
 COPY changehostname.c /changehostname.c
+
+ENTRYPOINT ["bash", "-m", "start_with_right_hostname.sh"]
+
+CMD ["/bin/bash"]

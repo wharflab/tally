@@ -140,6 +140,8 @@ func runFixCase(t *testing.T, tc fixCase) {
 	// and has no auto-fix; it's irrelevant for testing other fixes.
 	// Ignore newline-between-instructions as it fires on most minimal fixtures
 	// and would inflate wantApplied counts for every existing fix test.
+	// Ignore epilogue-order as it fires on most minimal fixtures with CMD/ENTRYPOINT
+	// and would inflate wantApplied counts for every existing fix test.
 	args := append(
 		[]string{
 			"lint",
@@ -150,6 +152,8 @@ func runFixCase(t *testing.T, tc fixCase) {
 			"hadolint/DL3057",
 			"--ignore",
 			"tally/newline-between-instructions",
+			"--ignore",
+			"tally/epilogue-order",
 		},
 		tc.args...)
 	args = append(args, dockerfilePath)

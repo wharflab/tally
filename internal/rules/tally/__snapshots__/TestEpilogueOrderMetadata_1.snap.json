@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "tally/epilogue-order",
+ "DefaultSeverity": "style",
+ "Description": "Runtime-configuration instructions should appear at the end of each output stage in canonical order: STOPSIGNAL, HEALTHCHECK, ENTRYPOINT, CMD",
+ "DocURL": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/epilogue-order.md",
+ "FixPriority": 175,
+ "IsExperimental": false,
+ "Name": "Epilogue Order"
+}

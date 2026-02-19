@@ -1,0 +1,44 @@
+{
+  "files": [
+    {
+      "file": "testdata/epilogue-order/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/epilogue-order.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 8
+            },
+            "file": "testdata/epilogue-order/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 8
+            }
+          },
+          "message": "epilogue instructions should appear at the end of the stage in order: STOPSIGNAL, HEALTHCHECK, ENTRYPOINT, CMD",
+          "rule": "tally/epilogue-order",
+          "severity": "style",
+          "sourceCode": "HEALTHCHECK CMD curl -f http://localhost/",
+          "suggestedFix": {
+            "description": "Reorder epilogue instructions",
+            "isPreferred": true,
+            "needsResolve": true,
+            "priority": 175,
+            "resolverId": "epilogue-order"
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 1,
+    "total": 1,
+    "warnings": 0
+  }
+}

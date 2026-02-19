@@ -712,5 +712,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/no-trailing-spaces")...),
 			wantExit: 1,
 		},
+
+		// Epilogue order tests (isolated to epilogue-order rule)
+		{
+			name:     "epilogue-order",
+			dir:      "epilogue-order",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/epilogue-order")...),
+			wantExit: 1,
+		},
 	}
 }
