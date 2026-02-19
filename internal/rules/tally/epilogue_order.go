@@ -181,7 +181,9 @@ func (r *EpilogueOrderRule) firstMisplaced(
 		prevRank = rank
 	}
 
-	return epilogues[0] // Fallback
+	// Unreachable: CheckEpilogueOrder returns false iff a position or order
+	// violation exists, both of which are caught by the loops above.
+	return epilogues[0]
 }
 
 // init registers the rule with the default registry.
