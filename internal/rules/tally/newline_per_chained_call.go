@@ -337,21 +337,27 @@ func (r *NewlinePerChainedCallRule) checkRunChains(
 	// Find where the command starts in the first line (after RUN and flags)
 	cmdStartCol := findCmdStartCol(instrLines[0])
 
-	// Reconstruct the source text preserving line positions
-	sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol)
+	return r.collectSameLineChainEdits(instrLines, startLine, cmdStartCol, minCommands, shellVariant, instrIndent, file)
+}
 
-	// Check for inline heredocs in the script
+// collectSameLineChainEdits reconstructs source text and returns chain-split
+// edits for any same-line boundaries, or nil if none are needed.
+func (r *NewlinePerChainedCallRule) collectSameLineChainEdits(
+	instrLines []string,
+	startLine, cmdStartCol, minCommands int,
+	shellVariant shell.Variant,
+	instrIndent, file string,
+) []rules.TextEdit {
+	sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol)
 	if shell.ScriptHasInlineHeredoc(sourceText, shellVariant) {
 		return nil
 	}
 
-	// Collect chain boundaries from the source text
 	boundaries, totalCmds := shell.CollectChainBoundaries(sourceText, shellVariant)
 	if totalCmds < minCommands {
 		return nil
 	}
 
-	// Filter to same-line boundaries only
 	var sameLineBoundaries []shell.ChainBoundary
 	for _, b := range boundaries {
 		if b.SameLine {
@@ -363,7 +369,6 @@ func (r *NewlinePerChainedCallRule) checkRunChains(
 		return nil
 	}
 
-	// Generate edits for each same-line boundary
 	return r.generateChainEdits(sameLineBoundaries, startLine, cmdStartCol, instrIndent, file)
 }
 
@@ -634,29 +639,7 @@ func (r *NewlinePerChainedCallRule) checkHealthcheck(
 		return nil
 	}
 
-	sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol)
-
-	if shell.ScriptHasInlineHeredoc(sourceText, shellVariant) {
-		return nil
-	}
-
-	boundaries, totalCmds := shell.CollectChainBoundaries(sourceText, shellVariant)
-	if totalCmds < minCommands {
-		return nil
-	}
-
-	var sameLineBoundaries []shell.ChainBoundary
-	for _, b := range boundaries {
-		if b.SameLine {
-			sameLineBoundaries = append(sameLineBoundaries, b)
-		}
-	}
-
-	if len(sameLineBoundaries) == 0 {
-		return nil
-	}
-
-	edits := r.generateChainEdits(sameLineBoundaries, startLine, cmdStartCol, instrIndent, file)
+	edits := r.collectSameLineChainEdits(instrLines, startLine, cmdStartCol, minCommands, shellVariant, instrIndent, file)
 	if len(edits) == 0 {
 		return nil
 	}
