@@ -166,6 +166,12 @@ func TestNewlineBetweenInstructionsCheck(t *testing.T) {
 			WantViolations: 0,
 		},
 		{
+			Name:           "comments between instructions - missing blank before comment",
+			Content:        "FROM alpine:3.20\n# Install dependencies\nRUN echo hello\n",
+			WantViolations: 1,
+			WantMessages:   []string{"expected blank line between FROM and RUN"},
+		},
+		{
 			Name:           "grouped - same type with comment and blank lines",
 			Content:        "FROM alpine:3.20\n\nRUN echo foo\n\n# some comment\n\nRUN echo zoo\n",
 			WantViolations: 1,
