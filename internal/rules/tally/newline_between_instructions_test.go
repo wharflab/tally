@@ -90,6 +90,12 @@ func TestNewlineBetweenInstructionsCheck(t *testing.T) {
 			WantViolations: 1,
 			WantMessages:   []string{"unexpected blank line between FROM and FROM"},
 		},
+		{
+			Name:           "grouped - excess blanks between different types",
+			Content:        "FROM alpine:3.20\n\n\n\nRUN echo hello\n",
+			WantViolations: 1,
+			WantMessages:   []string{"unexpected blank line between FROM and RUN"},
+		},
 
 		// === Always mode ===
 		{
