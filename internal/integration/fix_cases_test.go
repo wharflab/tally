@@ -619,5 +619,27 @@ mode = "never"
 				mustSelectRules("tally/no-trailing-spaces")...),
 			wantApplied: 3,
 		},
+		// No trailing spaces: ignore-comments skips # lines
+		{
+			name:  "no-trailing-spaces-ignore-comments",
+			input: "FROM alpine:3.20   \nRUN echo hello  \n# comment \nCOPY . /app\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/no-trailing-spaces")...),
+			wantApplied: 2, // comment line skipped
+			config: `[rules.tally.no-trailing-spaces]
+ignore-comments = true
+`,
+		},
+		// No trailing spaces: skip-blank-lines skips whitespace-only lines
+		{
+			name:  "no-trailing-spaces-skip-blank-lines",
+			input: "FROM alpine:3.20   \n   \nRUN echo hello\nCOPY . /app\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/no-trailing-spaces")...),
+			wantApplied: 1, // blank line skipped, only FROM fixed
+			config: `[rules.tally.no-trailing-spaces]
+skip-blank-lines = true
+`,
+		},
 	}
 }

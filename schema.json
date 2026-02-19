@@ -253,12 +253,12 @@
         },
         "skip-blank-lines": {
           "type": "boolean",
-          "description": "Exclude blank lines from the count",
+          "description": "Exclude blank lines",
           "default": true
         },
         "skip-comments": {
           "type": "boolean",
-          "description": "Exclude comment lines from the count",
+          "description": "Exclude comment lines",
           "default": true
         }
       },

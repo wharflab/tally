@@ -13,11 +13,11 @@ const NoTrailingSpacesRuleCode = rules.TallyRulePrefix + "no-trailing-spaces"
 // NoTrailingSpacesConfig is the configuration for the no-trailing-spaces rule.
 type NoTrailingSpacesConfig struct {
 	// SkipBlankLines skips lines that consist entirely of whitespace.
-	SkipBlankLines *bool `json:"skip-blank-lines,omitempty"`
+	SkipBlankLines *bool `json:"skip-blank-lines,omitempty" koanf:"skip-blank-lines"`
 
 	// IgnoreComments skips any line whose first non-whitespace character is #.
 	// This includes Dockerfile comments and # lines inside heredoc bodies.
-	IgnoreComments *bool `json:"ignore-comments,omitempty"`
+	IgnoreComments *bool `json:"ignore-comments,omitempty" koanf:"ignore-comments"`
 }
 
 // DefaultNoTrailingSpacesConfig returns the default configuration.
