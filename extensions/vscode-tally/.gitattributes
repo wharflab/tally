@@ -1,0 +1,2 @@
+# Vendored upstream types copied by postinstall; collapse in PR diffs.
+src/vendor/pythonEnvsApi.d.ts linguist-generated=true
