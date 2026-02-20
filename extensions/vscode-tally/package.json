@@ -26,6 +26,7 @@
   "publisher": "wharflab",
   "main": "./dist/extension.cjs",
   "scripts": {
+    "postinstall": "cp node_modules/vscode-python-envs/src/api.ts src/vendor/pythonEnvsApi.d.ts",
     "compile": "bun build src/extension.ts --outfile=dist/extension.cjs --format=cjs --target=node --external=vscode --sourcemap=inline",
     "typecheck": "tsgo",
     "lint": "oxlint --type-aware ./src",
@@ -46,7 +47,8 @@
     "@vscode/vsce": "3.7.1",
     "oxfmt": "0.32.0",
     "oxlint": "1.47.0",
-    "oxlint-tsgolint": "0.12.1"
+    "oxlint-tsgolint": "0.12.1",
+    "vscode-python-envs": "github:microsoft/vscode-python-environments"
   },
   "contributes": {
     "commands": [

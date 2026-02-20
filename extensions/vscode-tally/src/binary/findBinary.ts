@@ -10,6 +10,7 @@ import { validateUserSuppliedPath } from "./pathValidator";
 export type BinarySource =
   | "explicitPath"
   | "workspaceNpm"
+  | "pythonEnvExt"
   | "workspaceVenv"
   | "envPath"
   | "bundled";
@@ -26,10 +27,11 @@ export interface FindTallyBinaryInput {
   isTrusted: boolean;
   settings: BinaryResolutionSettings;
   workspaceFolders: readonly vscode.WorkspaceFolder[];
+  pythonEnvResolver?: (folder: vscode.WorkspaceFolder) => Promise<string | undefined>;
 }
 
 export async function findTallyBinary(input: FindTallyBinaryInput): Promise<ResolvedBinary> {
-  const { extensionContext, isTrusted, settings, workspaceFolders } = input;
+  const { extensionContext, isTrusted, settings, workspaceFolders, pythonEnvResolver } = input;
 
   // 1) Explicit path(s)
   for (const raw of settings.path) {
@@ -78,7 +80,17 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
     }
   }
 
-  // 4) Python venv binaries
+  // 4) Python Environments extension
+  if (pythonEnvResolver) {
+    for (const folder of workspaceFolders) {
+      const candidate = await pythonEnvResolver(folder);
+      if (candidate && (await isExecutableFile(candidate))) {
+        return directBinary(candidate, "pythonEnvExt");
+      }
+    }
+  }
+
+  // 5) Python venv binaries
   for (const folder of workspaceFolders) {
     const candidates = venvCandidates(folder.uri.fsPath);
     for (const candidate of candidates) {
@@ -88,13 +100,13 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
     }
   }
 
-  // 5) PATH
+  // 6) PATH
   const onPath = await findOnPATH("tally");
   if (onPath) {
     return directBinary(onPath, "envPath");
   }
 
-  // 6) Bundled fallback
+  // 7) Bundled fallback
   const bundled = bundledBinaryPath(extensionContext);
   if (await isExecutableFile(bundled)) {
     return directBinary(bundled, "bundled");

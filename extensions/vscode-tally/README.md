@@ -36,6 +36,19 @@ Lint, format, and auto-fix **Dockerfiles** and **Containerfiles** in VS Code usi
 - `tally.configurationPreference`: how to merge editor settings with filesystem config (`editorFirst`, `filesystemFirst`, `editorOnly`).
 - `tally.fixUnsafe`: allow "Fix all" to apply unsafe fixes (includes AI AutoFix, if configured).
 
+## Python projects
+
+If you install `tally` into a Python virtual environment (via `pip install tally`), the
+extension can automatically discover the binary from the active environment. For the best
+experience, install the
+[Python Environments](https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-python-envs)
+extension by Microsoft. When installed, tally will be resolved from whichever environment
+you have selected for the current workspace, including custom-named venvs and conda
+environments.
+
+Without the Python Environments extension, the extension falls back to checking the
+hardcoded `.venv/` and `venv/` directories in each workspace folder.
+
 ## Recommended formatter setup (manual)
 
 ```jsonc
