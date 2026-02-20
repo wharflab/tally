@@ -1,0 +1,96 @@
+{
+  "files": [
+    {
+      "file": "testdata/dl3045-cross-rules/Dockerfile",
+      "violations": [
+        {
+          "detail": "When no WORKDIR is set, the working directory defaults to `/` but this is implicit and fragile. Either set WORKDIR before COPY or use an absolute destination path.",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3045",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 9
+            },
+            "file": "testdata/dl3045-cross-rules/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 9
+            }
+          },
+          "message": "`COPY` to a relative destination without `WORKDIR` set",
+          "rule": "hadolint/DL3045",
+          "severity": "warning",
+          "sourceCode": "COPY app.bin app.bin"
+        },
+        {
+          "detail": "Set an absolute WORKDIR before using relative paths, e.g., 'WORKDIR /app' before 'WORKDIR src'",
+          "docUrl": "https://docs.docker.com/go/dockerfile/rule/workdir-relative-path/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 12
+            },
+            "file": "testdata/dl3045-cross-rules/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 12
+            }
+          },
+          "message": "Relative workdir src can have unexpected results if the base image has a WORKDIR set",
+          "rule": "buildkit/WorkdirRelativePath",
+          "severity": "warning",
+          "sourceCode": "WORKDIR src"
+        },
+        {
+          "detail": "The cd command in a RUN instruction only affects that single instruction. Use WORKDIR to set the working directory persistently for subsequent instructions. Alternatively, use absolute paths in your commands.",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3003",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 15
+            },
+            "file": "testdata/dl3045-cross-rules/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 15
+            }
+          },
+          "message": "use WORKDIR to switch to a directory",
+          "rule": "hadolint/DL3003",
+          "severity": "warning",
+          "sourceCode": "RUN cd /opt \u0026\u0026 echo \"building\"",
+          "suggestedFix": {
+            "description": "Convert cd commands to WORKDIR instructions",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 30,
+                    "line": 15
+                  },
+                  "file": "testdata/dl3045-cross-rules/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 15
+                  }
+                },
+                "newText": "WORKDIR /opt\nRUN echo \"building\""
+              }
+            ],
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 3,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 3,
+    "warnings": 3
+  }
+}

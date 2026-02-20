@@ -326,6 +326,14 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3045")...),
 			wantExit: 1,
 		},
+		// Combined: WorkdirRelativePath + DL3003 + DL3045 (all fire on same Dockerfile)
+		{
+			name: "dl3045-cross-rules",
+			dir:  "dl3045-cross-rules",
+			args: append([]string{"--format", "json"},
+				mustSelectRules("buildkit/WorkdirRelativePath", "hadolint/DL3003", "hadolint/DL3045")...),
+			wantExit: 1,
+		},
 		{
 			name:     "dl3046",
 			dir:      "dl3046",
