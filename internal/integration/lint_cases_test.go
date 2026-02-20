@@ -321,6 +321,12 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 		{
+			name:     "dl3045",
+			dir:      "dl3045",
+			args:     append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3045")...),
+			wantExit: 1,
+		},
+		{
 			name:     "dl3046",
 			dir:      "dl3046",
 			args:     append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3046")...),

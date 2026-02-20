@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "testdata/dl3045/Dockerfile",
+      "violations": [
+        {
+          "detail": "When no WORKDIR is set, the working directory defaults to `/` but this is implicit and fragile. Either set WORKDIR before COPY or use an absolute destination path.",
+          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3045",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 8
+            },
+            "file": "testdata/dl3045/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 8
+            }
+          },
+          "message": "`COPY` to a relative destination without `WORKDIR` set",
+          "rule": "hadolint/DL3045",
+          "severity": "warning",
+          "sourceCode": "COPY app.bin app.bin"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}
