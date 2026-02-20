@@ -1,125 +1,824 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.tally.dev/root/tally-config.schema.json",
-  "title": "tally configuration",
-  "description": "Configuration schema for tally Dockerfile linter",
-  "type": "object",
-  "properties": {
-    "rules": {
-      "type": "object",
+  "$defs": {
+    "rule-config": {
+      "$defs": {
+        "exclude": {
+          "additionalProperties": false,
+          "description": "Exclude this rule for specific file paths.",
+          "examples": [
+            {
+              "paths": [
+                "test/**",
+                "**/vendor/**"
+              ]
+            }
+          ],
+          "properties": {
+            "paths": {
+              "description": "Glob patterns to exclude (e.g. \"test/**\").",
+              "examples": [
+                "test/**"
+              ],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "title": "Rule exclusions",
+          "type": "object"
+        },
+        "fix": {
+          "description": "Control when auto-fixes are applied for this rule.",
+          "enum": [
+            "never",
+            "explicit",
+            "always",
+            "unsafe-only"
+          ],
+          "examples": [
+            "explicit"
+          ],
+          "title": "Rule fix mode",
+          "type": "string"
+        },
+        "genericRuleConfig": {
+          "additionalProperties": false,
+          "description": "Generic per-rule configuration used for rules without rule-specific options.",
+          "examples": [
+            {
+              "severity": "warning"
+            },
+            {
+              "exclude": {
+                "paths": [
+                  "test/**"
+                ]
+              },
+              "fix": "explicit"
+            }
+          ],
+          "properties": {
+            "exclude": {
+              "$ref": "#/$defs/rule-config/$defs/exclude"
+            },
+            "fix": {
+              "$ref": "#/$defs/rule-config/$defs/fix"
+            },
+            "severity": {
+              "$ref": "#/$defs/rule-config/$defs/severity"
+            }
+          },
+          "title": "Generic rule configuration",
+          "type": "object"
+        },
+        "severity": {
+          "description": "Override the rule's default severity. Use \"off\" to disable the rule.",
+          "enum": [
+            "off",
+            "error",
+            "warning",
+            "info",
+            "style"
+          ],
+          "examples": [
+            "warning"
+          ],
+          "title": "Rule severity",
+          "type": "string"
+        }
+      },
+      "$id": "https://schemas.tally.dev/rules/rule-config.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "description": "Shared schema definitions for per-rule configuration across namespaces (tally/*, hadolint/*, buildkit/*).",
+      "title": "Common rule configuration"
+    },
+    "rule-hadolint-dl3001": {
+      "$id": "https://schemas.tally.dev/rules/hadolint/dl3001.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Configuration options for the hadolint/DL3001 rule.",
+      "examples": [
+        {
+          "invalid-commands": [
+            "ssh",
+            "vim"
+          ]
+        },
+        {
+          "invalid-commands": [
+            "shutdown"
+          ],
+          "severity": "info"
+        }
+      ],
       "properties": {
-        "include": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "invalid-commands": {
+          "default": [
+            "free",
+            "kill",
+            "mount",
+            "ps",
+            "service",
+            "shutdown",
+            "ssh",
+            "top",
+            "vim"
+          ],
+          "description": "Commands to flag as invalid inside a container.",
+          "examples": [
+            [
+              "ssh",
+              "vim"
+            ]
+          ],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
           "type": "array",
-          "items": { "type": "string" }
+          "uniqueItems": true
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "hadolint/DL3001 rule config",
+      "type": "object"
+    },
+    "rule-hadolint-dl3026": {
+      "$id": "https://schemas.tally.dev/rules/hadolint/dl3026.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Configuration options for the hadolint/DL3026 rule.",
+      "examples": [
+        {
+          "trusted-registries": [
+            "docker.io"
+          ]
+        },
+        {
+          "severity": "warning",
+          "trusted-registries": [
+            "*.gcr.io",
+            "ghcr.io"
+          ]
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        },
+        "trusted-registries": {
+          "default": [],
+          "description": "Allowed registries for base images in FROM (empty disables the rule). Supports \"*\", \"*.suffix\" and \"prefix*\" patterns.",
+          "examples": [
+            [
+              "docker.io",
+              "gcr.io"
+            ]
+          ],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "title": "hadolint/DL3026 rule config",
+      "type": "object"
+    },
+    "rule-tally-consistent-indentation": {
+      "$id": "https://schemas.tally.dev/rules/tally/consistent-indentation.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/consistent-indentation rule.",
+      "examples": [
+        {
+          "severity": "style"
+        },
+        {
+          "severity": "off"
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "tally/consistent-indentation rule config",
+      "type": "object"
+    },
+    "rule-tally-max-lines": {
+      "$id": "https://schemas.tally.dev/rules/tally/max-lines.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/max-lines rule.",
+      "examples": [
+        {
+          "max": 100
+        },
+        {
+          "max": 200,
+          "severity": "warning",
+          "skip-comments": false
+        },
+        {
+          "exclude": {
+            "paths": [
+              "test/**"
+            ]
+          },
+          "max": 120
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "max": {
+          "default": 50,
+          "description": "Maximum number of lines allowed (0 = disabled).",
+          "examples": [
+            100
+          ],
+          "minimum": 0,
+          "type": "integer"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        },
+        "skip-blank-lines": {
+          "default": true,
+          "description": "Exclude blank lines from the count.",
+          "examples": [
+            true
+          ],
+          "type": "boolean"
+        },
+        "skip-comments": {
+          "default": true,
+          "description": "Exclude comment lines from the count.",
+          "examples": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "title": "tally/max-lines rule config",
+      "type": "object"
+    },
+    "rule-tally-newline-between-instructions": {
+      "$id": "https://schemas.tally.dev/rules/tally/newline-between-instructions.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/newline-between-instructions rule.",
+      "examples": [
+        {
+          "mode": "grouped"
+        },
+        {
+          "mode": "always",
+          "severity": "style"
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "mode": {
+          "default": "grouped",
+          "description": "Controls blank-line behavior between instructions.",
+          "enum": [
+            "grouped",
+            "always",
+            "never"
+          ],
+          "examples": [
+            "grouped"
+          ],
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "tally/newline-between-instructions rule config",
+      "type": "object"
+    },
+    "rule-tally-newline-per-chained-call": {
+      "$id": "https://schemas.tally.dev/rules/tally/newline-per-chained-call.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/newline-per-chained-call rule.",
+      "examples": [
+        {
+          "min-commands": 2
+        },
+        {
+          "min-commands": 4,
+          "severity": "style"
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "min-commands": {
+          "default": 2,
+          "description": "Minimum number of chained commands required to trigger splitting.",
+          "examples": [
+            3
+          ],
+          "minimum": 2,
+          "type": "integer"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "tally/newline-per-chained-call rule config",
+      "type": "object"
+    },
+    "rule-tally-no-trailing-spaces": {
+      "$id": "https://schemas.tally.dev/rules/tally/no-trailing-spaces.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/no-trailing-spaces rule.",
+      "examples": [
+        {
+          "ignore-comments": true
+        },
+        {
+          "severity": "style",
+          "skip-blank-lines": true
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "ignore-comments": {
+          "default": false,
+          "description": "Skip any line whose first non-whitespace character is # (Dockerfile comments and # lines in heredocs).",
+          "examples": [
+            true
+          ],
+          "type": "boolean"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        },
+        "skip-blank-lines": {
+          "default": false,
+          "description": "Skip lines that consist entirely of whitespace.",
+          "examples": [
+            true
+          ],
+          "type": "boolean"
+        }
+      },
+      "title": "tally/no-trailing-spaces rule config",
+      "type": "object"
+    },
+    "rule-tally-prefer-add-unpack": {
+      "$id": "https://schemas.tally.dev/rules/tally/prefer-add-unpack.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/prefer-add-unpack rule.",
+      "examples": [
+        {
+          "enabled": false
+        },
+        {
+          "enabled": true,
+          "severity": "info"
+        }
+      ],
+      "properties": {
+        "enabled": {
+          "default": true,
+          "description": "Enable or disable this rule (independent of severity).",
+          "examples": [
+            true
+          ],
+          "type": "boolean"
         },
         "exclude": {
-          "type": "array",
-          "items": { "type": "string" }
+          "$ref": "#/$defs/rule-config/$defs/exclude"
         },
-        "tally": {
-          "$ref": "../../rules/tally/index.schema.json"
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
         },
-        "hadolint": {
-          "$ref": "../../rules/hadolint/index.schema.json"
-        },
-        "buildkit": {
-          "$ref": "../../rules/buildkit/index.schema.json"
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
         }
       },
-      "additionalProperties": false
+      "title": "tally/prefer-add-unpack rule config",
+      "type": "object"
     },
-    "output": {
-      "type": "object",
+    "rule-tally-prefer-copy-heredoc": {
+      "$id": "https://schemas.tally.dev/rules/tally/prefer-copy-heredoc.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/prefer-copy-heredoc rule.",
+      "examples": [
+        {
+          "check-consecutive-runs": true,
+          "check-single-run": true
+        },
+        {
+          "check-single-run": false,
+          "severity": "style"
+        }
+      ],
       "properties": {
-        "format": {
-          "type": "string",
-          "enum": ["text", "json", "sarif", "github-actions", "markdown"],
-          "default": "text"
+        "check-consecutive-runs": {
+          "default": true,
+          "description": "Detect sequences of consecutive RUN instructions that create/append to the same file.",
+          "examples": [
+            true
+          ],
+          "type": "boolean"
         },
-        "path": {
-          "type": "string",
-          "default": "stdout"
+        "check-single-run": {
+          "default": true,
+          "description": "Detect single RUN instructions that create files and suggest COPY heredoc.",
+          "examples": [
+            true
+          ],
+          "type": "boolean"
         },
-        "show-source": {
-          "type": "boolean",
-          "default": true
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
         },
-        "fail-level": {
-          "type": "string",
-          "enum": ["error", "warning", "info", "style", "none"],
-          "default": "style"
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
         }
       },
-      "additionalProperties": false
+      "title": "tally/prefer-copy-heredoc rule config",
+      "type": "object"
     },
-    "inline-directives": {
-      "type": "object",
+    "rule-tally-prefer-multi-stage-build": {
+      "$id": "https://schemas.tally.dev/rules/tally/prefer-multi-stage-build.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/prefer-multi-stage-build rule.",
+      "examples": [
+        {
+          "min-score": 4
+        },
+        {
+          "min-score": 6,
+          "severity": "info"
+        }
+      ],
       "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": true
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
         },
-        "warn-unused": {
-          "type": "boolean",
-          "default": false
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
         },
-        "validate-rules": {
-          "type": "boolean",
-          "default": false
+        "min-score": {
+          "default": 4,
+          "description": "Minimum heuristic score required to trigger the suggestion.",
+          "examples": [
+            4
+          ],
+          "minimum": 1,
+          "type": "integer"
         },
-        "require-reason": {
-          "type": "boolean",
-          "default": false
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
         }
       },
-      "additionalProperties": false
+      "title": "tally/prefer-multi-stage-build rule config",
+      "type": "object"
     },
-    "ai": {
-      "type": "object",
+    "rule-tally-prefer-run-heredoc": {
+      "$id": "https://schemas.tally.dev/rules/tally/prefer-run-heredoc.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/prefer-run-heredoc rule.",
+      "examples": [
+        {
+          "min-commands": 3
+        },
+        {
+          "check-chained-commands": false,
+          "min-commands": 4,
+          "severity": "style"
+        }
+      ],
       "properties": {
-        "enabled": {
-          "type": "boolean",
-          "default": false
+        "check-chained-commands": {
+          "default": true,
+          "description": "Enable detection of chained commands within a single RUN (via &&).",
+          "examples": [
+            true
+          ],
+          "type": "boolean"
         },
-        "command": {
-          "type": "array",
-          "items": { "type": "string" }
+        "check-consecutive-runs": {
+          "default": true,
+          "description": "Enable detection of multiple consecutive RUN instructions.",
+          "examples": [
+            true
+          ],
+          "type": "boolean"
         },
-        "timeout": {
-          "type": "string",
-          "default": "90s"
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
         },
-        "max-input-bytes": {
-          "type": "integer",
-          "default": 262144,
-          "minimum": 0
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
         },
-        "redact-secrets": {
-          "type": "boolean",
-          "default": true
+        "min-commands": {
+          "default": 3,
+          "description": "Minimum number of commands required to trigger heredoc conversion.",
+          "examples": [
+            3
+          ],
+          "minimum": 2,
+          "type": "integer"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
         }
       },
-      "additionalProperties": false
+      "title": "tally/prefer-run-heredoc rule config",
+      "type": "object"
     },
-    "slow-checks": {
-      "type": "object",
+    "rules-buildkit-index": {
+      "$comment": "Code generated by _tools/schema-gen. DO NOT EDIT.",
+      "$id": "https://schemas.tally.dev/rules/buildkit/index.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": {
+        "$ref": "#/$defs/rule-config/$defs/genericRuleConfig"
+      },
+      "description": "Schema for rules.buildkit configuration; keys are rule names within the buildkit namespace.",
+      "examples": [
+        {
+          "StageNameCasing": {
+            "severity": "warning"
+          }
+        }
+      ],
+      "title": "buildkit/* rule namespace config",
+      "type": "object"
+    },
+    "rules-hadolint-index": {
+      "$comment": "Code generated by _tools/schema-gen. DO NOT EDIT.",
+      "$id": "https://schemas.tally.dev/rules/hadolint/index.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": {
+        "$ref": "#/$defs/rule-config/$defs/genericRuleConfig"
+      },
+      "description": "Schema for rules.hadolint configuration; keys are rule names within the hadolint namespace.",
+      "examples": [
+        {
+          "DL3026": {
+            "severity": "warning"
+          }
+        }
+      ],
       "properties": {
-        "mode": {
-          "type": "string",
-          "enum": ["auto", "on", "off"],
-          "default": "auto"
+        "DL3001": {
+          "$ref": "#/$defs/rule-hadolint-dl3001"
         },
-        "fail-fast": {
-          "type": "boolean",
-          "default": true
-        },
-        "timeout": {
-          "type": "string",
-          "default": "20s"
+        "DL3026": {
+          "$ref": "#/$defs/rule-hadolint-dl3026"
         }
       },
-      "additionalProperties": false
+      "title": "hadolint/* rule namespace config",
+      "type": "object"
+    },
+    "rules-tally-index": {
+      "$comment": "Code generated by _tools/schema-gen. DO NOT EDIT.",
+      "$id": "https://schemas.tally.dev/rules/tally/index.schema.json",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": {
+        "$ref": "#/$defs/rule-config/$defs/genericRuleConfig"
+      },
+      "description": "Schema for rules.tally configuration; keys are rule names within the tally namespace.",
+      "examples": [
+        {
+          "max-lines": {
+            "severity": "warning"
+          }
+        }
+      ],
+      "properties": {
+        "consistent-indentation": {
+          "$ref": "#/$defs/rule-tally-consistent-indentation"
+        },
+        "max-lines": {
+          "$ref": "#/$defs/rule-tally-max-lines"
+        },
+        "newline-between-instructions": {
+          "$ref": "#/$defs/rule-tally-newline-between-instructions"
+        },
+        "newline-per-chained-call": {
+          "$ref": "#/$defs/rule-tally-newline-per-chained-call"
+        },
+        "no-trailing-spaces": {
+          "$ref": "#/$defs/rule-tally-no-trailing-spaces"
+        },
+        "prefer-add-unpack": {
+          "$ref": "#/$defs/rule-tally-prefer-add-unpack"
+        },
+        "prefer-copy-heredoc": {
+          "$ref": "#/$defs/rule-tally-prefer-copy-heredoc"
+        },
+        "prefer-multi-stage-build": {
+          "$ref": "#/$defs/rule-tally-prefer-multi-stage-build"
+        },
+        "prefer-run-heredoc": {
+          "$ref": "#/$defs/rule-tally-prefer-run-heredoc"
+        }
+      },
+      "title": "tally/* rule namespace config",
+      "type": "object"
     }
   },
-  "additionalProperties": false
+  "$id": "https://schemas.tally.dev/root/tally-config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration schema for tally Dockerfile linter",
+  "properties": {
+    "ai": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "enabled": {
+          "default": false,
+          "type": "boolean"
+        },
+        "max-input-bytes": {
+          "default": 262144,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "redact-secrets": {
+          "default": true,
+          "type": "boolean"
+        },
+        "timeout": {
+          "default": "90s",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "inline-directives": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "require-reason": {
+          "default": false,
+          "type": "boolean"
+        },
+        "validate-rules": {
+          "default": false,
+          "type": "boolean"
+        },
+        "warn-unused": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "fail-level": {
+          "default": "style",
+          "enum": [
+            "error",
+            "warning",
+            "info",
+            "style",
+            "none"
+          ],
+          "type": "string"
+        },
+        "format": {
+          "default": "text",
+          "enum": [
+            "text",
+            "json",
+            "sarif",
+            "github-actions",
+            "markdown"
+          ],
+          "type": "string"
+        },
+        "path": {
+          "default": "stdout",
+          "type": "string"
+        },
+        "show-source": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "rules": {
+      "additionalProperties": false,
+      "properties": {
+        "buildkit": {
+          "$ref": "#/$defs/rules-buildkit-index"
+        },
+        "exclude": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "hadolint": {
+          "$ref": "#/$defs/rules-hadolint-index"
+        },
+        "include": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tally": {
+          "$ref": "#/$defs/rules-tally-index"
+        }
+      },
+      "type": "object"
+    },
+    "slow-checks": {
+      "additionalProperties": false,
+      "properties": {
+        "fail-fast": {
+          "default": true,
+          "type": "boolean"
+        },
+        "mode": {
+          "default": "auto",
+          "enum": [
+            "auto",
+            "on",
+            "off"
+          ],
+          "type": "string"
+        },
+        "timeout": {
+          "default": "20s",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "title": "tally configuration",
+  "type": "object"
 }

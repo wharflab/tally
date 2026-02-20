@@ -98,11 +98,14 @@ print-gotestsum-bin:
 
 schema-gen:
 	cd _tools && go run ./schema-gen
-	cp internal/schemas/root/tally-config.schema.json schema.json
 
 schema-check: schema-gen
 	@if rg -n '"encoding/json"' internal/schemas/generated; then \
 		echo "generated schema models must not import encoding/json"; \
+		exit 1; \
+	fi
+	@if rg -n '"\\$$ref"[[:space:]]*:[[:space:]]*"(\\./|\\.\\./)' schema.json; then \
+		echo "published schema.json must not contain filesystem-relative $$ref paths"; \
 		exit 1; \
 	fi
 

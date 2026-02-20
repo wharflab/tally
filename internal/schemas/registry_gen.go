@@ -340,12 +340,6 @@ var schemaBytesByID = map[string][]byte{
   "description": "Schema for rules.tally configuration; keys are rule names within the tally namespace.",
   "type": "object",
   "properties": {
-    "newline-per-chained-call": {
-      "$ref": "./newline-per-chained-call.schema.json"
-    },
-    "no-trailing-spaces": {
-      "$ref": "./no-trailing-spaces.schema.json"
-    },
     "consistent-indentation": {
       "$ref": "./consistent-indentation.schema.json"
     },
@@ -354,6 +348,12 @@ var schemaBytesByID = map[string][]byte{
     },
     "newline-between-instructions": {
       "$ref": "./newline-between-instructions.schema.json"
+    },
+    "newline-per-chained-call": {
+      "$ref": "./newline-per-chained-call.schema.json"
+    },
+    "no-trailing-spaces": {
+      "$ref": "./no-trailing-spaces.schema.json"
     },
     "prefer-add-unpack": {
       "$ref": "./prefer-add-unpack.schema.json"
