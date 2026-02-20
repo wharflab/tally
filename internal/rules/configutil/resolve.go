@@ -108,17 +108,16 @@ func isZero(v reflect.Value) bool {
 }
 
 // RuleSchema returns the externalized JSON schema map for a rule.
-// Returns nil when no schema is registered.
-func RuleSchema(ruleCode string) map[string]any {
+func RuleSchema(ruleCode string) (map[string]any, error) {
 	v, err := schemavalidator.DefaultValidator()
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("failed to initialize schema validator: %w", err)
 	}
 	schema, err := v.RuleSchema(ruleCode)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("failed to load rule schema for %s: %w", ruleCode, err)
 	}
-	return schema
+	return schema, nil
 }
 
 // ValidateRuleOptions validates rule-specific options using the schema registry.

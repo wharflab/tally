@@ -47,7 +47,11 @@ func (r *DL3026Rule) Metadata() rules.RuleMetadata {
 // Schema returns the JSON Schema for this rule's configuration.
 // Follows ESLint's meta.schema pattern for rule options validation.
 func (r *DL3026Rule) Schema() map[string]any {
-	return configutil.RuleSchema(r.Metadata().Code)
+	schema, err := configutil.RuleSchema(r.Metadata().Code)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 // Check runs the DL3026 rule.

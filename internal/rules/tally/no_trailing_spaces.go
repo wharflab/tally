@@ -54,7 +54,11 @@ func (r *NoTrailingSpacesRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *NoTrailingSpacesRule) Schema() map[string]any {
-	return configutil.RuleSchema(NoTrailingSpacesRuleCode)
+	schema, err := configutil.RuleSchema(NoTrailingSpacesRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 // DefaultConfig returns the default configuration for this rule.

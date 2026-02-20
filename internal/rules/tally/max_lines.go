@@ -69,7 +69,11 @@ func (r *MaxLinesRule) Metadata() rules.RuleMetadata {
 // Follows ESLint's meta.schema pattern for rule options validation.
 // Supports either an integer shorthand (just max) or full object config.
 func (r *MaxLinesRule) Schema() map[string]any {
-	return configutil.RuleSchema(MaxLinesRuleCode)
+	schema, err := configutil.RuleSchema(MaxLinesRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 // Check runs the max-lines rule using the AST for accurate line counting.

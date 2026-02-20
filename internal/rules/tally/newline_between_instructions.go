@@ -52,7 +52,11 @@ func (r *NewlineBetweenInstructionsRule) Metadata() rules.RuleMetadata {
 // Schema returns the JSON Schema for this rule's configuration.
 // Supports string shorthand ("grouped", "always", "never") or full object config.
 func (r *NewlineBetweenInstructionsRule) Schema() map[string]any {
-	return configutil.RuleSchema(NewlineBetweenInstructionsRuleCode)
+	schema, err := configutil.RuleSchema(NewlineBetweenInstructionsRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 // DefaultConfig returns the default configuration for this rule.

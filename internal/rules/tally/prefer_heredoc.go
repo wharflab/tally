@@ -64,7 +64,11 @@ func (r *PreferHeredocRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *PreferHeredocRule) Schema() map[string]any {
-	return configutil.RuleSchema(rules.HeredocRuleCode)
+	schema, err := configutil.RuleSchema(rules.HeredocRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 // Check runs the prefer-run-heredoc rule.

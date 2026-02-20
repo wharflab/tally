@@ -46,7 +46,11 @@ func (r *ConsistentIndentationRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *ConsistentIndentationRule) Schema() map[string]any {
-	return configutil.RuleSchema(ConsistentIndentationRuleCode)
+	schema, err := configutil.RuleSchema(ConsistentIndentationRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 // DefaultConfig returns the default configuration for this rule.

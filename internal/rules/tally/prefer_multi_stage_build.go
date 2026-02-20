@@ -45,7 +45,11 @@ func (r *PreferMultiStageBuildRule) Metadata() rules.RuleMetadata {
 }
 
 func (r *PreferMultiStageBuildRule) Schema() map[string]any {
-	return configutil.RuleSchema(PreferMultiStageBuildRuleCode)
+	schema, err := configutil.RuleSchema(PreferMultiStageBuildRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 func (r *PreferMultiStageBuildRule) DefaultConfig() any { return defaultPreferMultiStageBuildConfig() }

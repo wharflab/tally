@@ -67,7 +67,11 @@ func (r *DL3001Rule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *DL3001Rule) Schema() map[string]any {
-	return configutil.RuleSchema(r.Metadata().Code)
+	schema, err := configutil.RuleSchema(r.Metadata().Code)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 // DefaultConfig returns the default configuration for this rule.

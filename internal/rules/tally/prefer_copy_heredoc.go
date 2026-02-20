@@ -66,7 +66,11 @@ func (r *PreferCopyHeredocRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *PreferCopyHeredocRule) Schema() map[string]any {
-	return configutil.RuleSchema(PreferCopyHeredocRuleCode)
+	schema, err := configutil.RuleSchema(PreferCopyHeredocRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 // Check runs the prefer-copy-heredoc rule.

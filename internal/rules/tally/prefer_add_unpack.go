@@ -58,7 +58,11 @@ func (r *PreferAddUnpackRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *PreferAddUnpackRule) Schema() map[string]any {
-	return configutil.RuleSchema(PreferAddUnpackRuleCode)
+	schema, err := configutil.RuleSchema(PreferAddUnpackRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 // DefaultConfig returns the default configuration.

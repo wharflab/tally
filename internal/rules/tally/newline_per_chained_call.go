@@ -61,7 +61,11 @@ func (r *NewlinePerChainedCallRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *NewlinePerChainedCallRule) Schema() map[string]any {
-	return configutil.RuleSchema(NewlinePerChainedCallRuleCode)
+	schema, err := configutil.RuleSchema(NewlinePerChainedCallRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 // DefaultConfig returns the default configuration for this rule.

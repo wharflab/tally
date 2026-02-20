@@ -410,3 +410,32 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 		})
 	}
 }
+
+func TestRuleSchema(t *testing.T) {
+	t.Parallel()
+
+	t.Run("known rule returns schema", func(t *testing.T) {
+		t.Parallel()
+
+		schema, err := RuleSchema("tally/max-lines")
+		if err != nil {
+			t.Fatalf("RuleSchema(tally/max-lines) error = %v", err)
+		}
+		if schema == nil {
+			t.Fatal("RuleSchema(tally/max-lines) = nil, want schema")
+		}
+	})
+
+	t.Run("unknown rule returns contextual error", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := RuleSchema("tally/does-not-exist")
+		if err == nil {
+			t.Fatal("RuleSchema(tally/does-not-exist) error = nil, want error")
+		}
+		msg := err.Error()
+		if !strings.Contains(msg, "failed to load rule schema for tally/does-not-exist") {
+			t.Fatalf("RuleSchema error missing context, got: %q", msg)
+		}
+	})
+}
