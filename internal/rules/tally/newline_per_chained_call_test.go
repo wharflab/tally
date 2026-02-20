@@ -309,6 +309,16 @@ func TestNewlinePerChainedCallCheckWithFixes(t *testing.T) {
 			wantEdits: 2,
 		},
 		{
+			name: "RUN mounts with quoted values - splits correctly",
+			content: "FROM alpine:3.20\n" +
+				`RUN --mount=type=bind,source="/path with spaces",target=/data --mount=type=cache,target=/var cmd` + "\n",
+			wantEdits: 2,
+			wantFixedContent: "FROM alpine:3.20\n" +
+				"RUN --mount=type=bind,source=\"/path with spaces\",target=/data \\\n" +
+				"\t--mount=type=cache,target=/var \\\n" +
+				"\tcmd\n",
+		},
+		{
 			name:      "LABEL two pairs - one edit",
 			content:   "FROM alpine:3.20\nLABEL a=1 b=2\n",
 			wantEdits: 1,

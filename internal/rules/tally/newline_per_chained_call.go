@@ -234,15 +234,8 @@ func findMountPositions(instrLines []string, startLine, cmdStartCol int) []mount
 				break
 			}
 			col := searchFrom + idx
-			// Find end of this mount value (next space or end of line/backslash)
-			endCol := col + 8 // skip "--mount="
-			for endCol < len(line) {
-				ch := line[endCol]
-				if ch == ' ' || ch == '\t' || ch == '\\' {
-					break
-				}
-				endCol++
-			}
+			// Find end of this mount value, handling quoted values.
+			endCol := skipFlagValue(line, col)
 			mounts = append(mounts, mountPos{line: dockerLine, col: col, end: endCol})
 			searchFrom = endCol
 		}
@@ -389,22 +382,37 @@ func findCmdStartCol(firstLine string) int {
 
 	// Skip any flags (--mount=..., --network=..., --security=...)
 	for strings.HasPrefix(firstLine[offset:], "--") {
-		// Find end of this flag value
-		flagEnd := offset + 2
-		for flagEnd < len(firstLine) {
-			ch := firstLine[flagEnd]
-			if ch == ' ' || ch == '\t' {
-				break
-			}
-			flagEnd++
-		}
-		offset = flagEnd
+		offset = skipFlagValue(firstLine, offset)
 		// Skip whitespace after flag
 		for offset < len(firstLine) && (firstLine[offset] == ' ' || firstLine[offset] == '\t') {
 			offset++
 		}
 	}
 
+	return offset
+}
+
+// skipFlagValue advances past a Dockerfile flag token (e.g., --mount=type=cache,target=/var)
+// starting at offset. Handles double-quoted values (e.g., source="/path with spaces").
+func skipFlagValue(line string, offset int) int {
+	for offset < len(line) {
+		ch := line[offset]
+		if ch == '"' {
+			// Skip to closing quote.
+			offset++
+			for offset < len(line) && line[offset] != '"' {
+				offset++
+			}
+			if offset < len(line) {
+				offset++ // skip closing quote
+			}
+			continue
+		}
+		if ch == ' ' || ch == '\t' || ch == '\\' {
+			break
+		}
+		offset++
+	}
 	return offset
 }
 
