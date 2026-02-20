@@ -784,5 +784,25 @@ skip-blank-lines = true
 				)...),
 			wantApplied: 2, // DL3047 + chain split
 		},
+		// Cross-rule: consistent-indentation + newline-per-chained-call on a
+		// multi-stage Dockerfile. consistent-indentation (priority 50) adds tab
+		// indent to second-stage instructions; newline-per-chained-call (priority 97)
+		// splits chains using instrIndent computed from the original (pre-fix) source.
+		{
+			name: "newline-per-chained-call-with-consistent-indentation",
+			input: "FROM alpine:3.20 AS builder\n" +
+				"RUN apt-get update && apt-get install -y curl\n" +
+				"FROM scratch\n" +
+				"COPY --from=builder /usr/bin/curl /usr/bin/curl\n",
+			args: append([]string{"--fix"},
+				mustSelectRules(
+					"tally/consistent-indentation",
+					"tally/newline-per-chained-call",
+				)...),
+			config: `[rules.tally.consistent-indentation]
+severity = "style"
+`,
+			wantApplied: 3, // 2 indentation (RUN in stage 1 + COPY in stage 2) + 1 chain split
+		},
 	}
 }
