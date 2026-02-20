@@ -1,0 +1,10 @@
+{
+ "Category": "best-practice",
+ "Code": "hadolint/DL3045",
+ "DefaultSeverity": "warning",
+ "Description": "`COPY` to a relative destination without `WORKDIR` set",
+ "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3045",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "COPY to relative destination without WORKDIR"
+}
