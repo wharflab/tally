@@ -214,14 +214,22 @@ type mountPos struct {
 	end  int // 0-based byte offset of end of this --mount=... token
 }
 
-// findMountPositions scans instruction source lines for --mount= tokens.
-func findMountPositions(instrLines []string, startLine int) []mountPos {
+// findMountPositions scans instruction source lines for --mount= tokens in the
+// flag area only (before the shell command starts). cmdStartCol is the byte
+// offset on the first line where the shell command begins; anything at or after
+// that offset is command text and must not be scanned.
+func findMountPositions(instrLines []string, startLine, cmdStartCol int) []mountPos {
 	var mounts []mountPos
 	for i, line := range instrLines {
 		dockerLine := startLine + i
+		// On the first line, only scan the flag area (before the command).
+		scanLimit := len(line)
+		if i == 0 && cmdStartCol < scanLimit {
+			scanLimit = cmdStartCol
+		}
 		searchFrom := 0
 		for {
-			idx := strings.Index(line[searchFrom:], "--mount=")
+			idx := strings.Index(line[searchFrom:scanLimit], "--mount=")
 			if idx < 0 {
 				break
 			}
@@ -258,7 +266,8 @@ func (r *NewlinePerChainedCallRule) checkRunMounts(
 		return nil
 	}
 
-	mounts := findMountPositions(instrLines, startLine)
+	cmdStartCol := findCmdStartCol(instrLines[0])
+	mounts := findMountPositions(instrLines, startLine, cmdStartCol)
 	if len(mounts) < 2 {
 		return nil
 	}

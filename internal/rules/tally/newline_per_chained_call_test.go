@@ -337,6 +337,19 @@ func TestNewlinePerChainedCallCheckWithFixes(t *testing.T) {
 			wantEdits:        1,
 			wantFixedContent: "FROM alpine:3.20\nLABEL maintainer=\"John Doe\" \\\n\tversion=1.0\n",
 		},
+		{
+			name: "RUN mount literal in shell command - only splits real mounts",
+			content: "FROM alpine:3.20\n" +
+				"RUN --mount=type=cache,target=/var/cache/apt " +
+				"--mount=type=bind,source=go.sum,target=go.sum " +
+				"echo \"--mount=fake\" && echo done\n",
+			wantEdits: 3, // 2 mount splits + 1 chain split
+			wantFixedContent: "FROM alpine:3.20\n" +
+				"RUN --mount=type=cache,target=/var/cache/apt \\\n" +
+				"\t--mount=type=bind,source=go.sum,target=go.sum \\\n" +
+				"\techo \"--mount=fake\" \\\n" +
+				"\t&& echo done\n",
+		},
 	}
 
 	for _, tt := range tests {
