@@ -11,6 +11,7 @@ import (
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/v2"
 
+	"github.com/wharflab/tally/internal/ruleconfig"
 	schemavalidator "github.com/wharflab/tally/internal/schemas/runtime"
 )
 
@@ -125,7 +126,7 @@ func ValidateRuleOptions(ruleCode string, config any) error {
 	if isNilConfig(config) {
 		return nil
 	}
-	config = canonicalizeRuleOptions(ruleCode, config)
+	config = ruleconfig.CanonicalizeRuleOptions(ruleCode, config)
 
 	v, err := schemavalidator.DefaultValidator()
 	if err != nil {
@@ -183,19 +184,4 @@ func isNilConfig(config any) bool {
 		return true
 	}
 	return false
-}
-
-func canonicalizeRuleOptions(ruleCode string, config any) any {
-	switch ruleCode {
-	case "tally/max-lines":
-		switch v := config.(type) {
-		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
-			return map[string]any{"max": v}
-		}
-	case "tally/newline-between-instructions":
-		if v, ok := config.(string); ok {
-			return map[string]any{"mode": v}
-		}
-	}
-	return config
 }

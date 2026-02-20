@@ -3,13 +3,13 @@ package config
 import (
 	"fmt"
 	"maps"
-	"math"
 	"slices"
 	"strings"
 
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/v2"
 
+	"github.com/wharflab/tally/internal/ruleconfig"
 	schemavalidator "github.com/wharflab/tally/internal/schemas/runtime"
 )
 
@@ -186,58 +186,5 @@ func normalizeRuleShorthand(raw map[string]any) {
 		return
 	}
 
-	tallyRaw, ok := rulesRaw["tally"].(map[string]any)
-	if !ok {
-		return
-	}
-
-	if value, ok := tallyRaw["max-lines"]; ok {
-		if _, isMap := value.(map[string]any); !isMap {
-			if _, ok := coerceInteger(value); ok {
-				tallyRaw["max-lines"] = map[string]any{"max": value}
-			}
-		}
-	}
-
-	if value, ok := tallyRaw["newline-between-instructions"]; ok {
-		if _, isMap := value.(map[string]any); !isMap {
-			if _, ok := value.(string); ok {
-				tallyRaw["newline-between-instructions"] = map[string]any{"mode": value}
-			}
-		}
-	}
-}
-
-func coerceInteger(value any) (int64, bool) {
-	switch typed := value.(type) {
-	case int:
-		return int64(typed), true
-	case int64:
-		return typed, true
-	case int32:
-		return int64(typed), true
-	case int16:
-		return int64(typed), true
-	case int8:
-		return int64(typed), true
-	case uint:
-		u := uint64(typed)
-		if u > math.MaxInt64 {
-			return 0, false
-		}
-		return int64(u), true
-	case uint64:
-		if typed > math.MaxInt64 {
-			return 0, false
-		}
-		return int64(typed), true
-	case uint32:
-		return int64(typed), true
-	case uint16:
-		return int64(typed), true
-	case uint8:
-		return int64(typed), true
-	default:
-		return 0, false
-	}
+	ruleconfig.CanonicalizeRulesMap(rulesRaw)
 }
