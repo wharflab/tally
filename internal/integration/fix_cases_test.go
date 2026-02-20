@@ -70,7 +70,7 @@ func fixCases(t *testing.T) []fixCase {
 				"RUN wget http://example.com/config.json -O /etc/app/config.json\n" +
 				"RUN curl -fsSL http://example.com/script.sh | sh\n",
 			args:        []string{"--fix", "--fix-unsafe", "--fail-level", "none"},
-			wantApplied: 4, // Current fixer reports four applied fixes for this combined scenario.
+			wantApplied: 3, // prefer-add-unpack + DL3047 --progress + single DL4006 SHELL insertion.
 		},
 		// DL3003: cd -> WORKDIR (regression test for line number consistency)
 		{

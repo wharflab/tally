@@ -320,6 +320,74 @@ RUN ["sh", "-c", "wget -O - https://some.site | wc -l"]
 	}
 }
 
+func TestDL4006Rule_SingleShellFixPerStage(t *testing.T) {
+	t.Parallel()
+
+	t.Run("only first piped RUN gets a SHELL fix", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM scratch
+RUN wget -O - https://some.site | wc -l
+RUN curl -s https://example.com | grep test
+`)
+		r := NewDL4006Rule()
+		violations := r.Check(input)
+
+		if len(violations) != 2 {
+			t.Fatalf("expected 2 violations, got %d", len(violations))
+		}
+		if violations[0].SuggestedFix == nil {
+			t.Error("first violation should have a fix")
+		}
+		if violations[1].SuggestedFix != nil {
+			t.Error("second violation should NOT have a fix (SHELL from first covers it)")
+		}
+	})
+
+	t.Run("SHELL reset allows new fix", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM scratch
+RUN wget -O - https://some.site | wc -l
+SHELL ["/bin/bash", "-c"]
+RUN curl -s https://example.com | grep test
+`)
+		r := NewDL4006Rule()
+		violations := r.Check(input)
+
+		if len(violations) != 2 {
+			t.Fatalf("expected 2 violations, got %d", len(violations))
+		}
+		// Both should have fixes since SHELL reset invalidated the first fix
+		if violations[0].SuggestedFix == nil {
+			t.Error("first violation should have a fix")
+		}
+		if violations[1].SuggestedFix == nil {
+			t.Error("second violation should have a fix after SHELL reset")
+		}
+	})
+
+	t.Run("new FROM resets fix tracking", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM scratch as build
+RUN wget -O - https://some.site | wc -l
+FROM scratch as build2
+RUN curl -s https://example.com | grep test
+`)
+		r := NewDL4006Rule()
+		violations := r.Check(input)
+
+		if len(violations) != 2 {
+			t.Fatalf("expected 2 violations, got %d", len(violations))
+		}
+		// Both should have fixes since FROM resets per-stage state
+		if violations[0].SuggestedFix == nil {
+			t.Error("first violation should have a fix")
+		}
+		if violations[1].SuggestedFix == nil {
+			t.Error("second violation should have a fix (new stage)")
+		}
+	})
+}
+
 func TestDL4006Rule_HeredocCoordination(t *testing.T) {
 	t.Parallel()
 

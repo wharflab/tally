@@ -84,6 +84,7 @@
                 "newText": "SHELL [\"/bin/bash\", \"-o\", \"pipefail\", \"-c\"]\n"
               }
             ],
+            "priority": 96,
             "safety": 1
           }
         }
