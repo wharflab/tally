@@ -19,7 +19,6 @@ func TestDL3045Rule_Check(t *testing.T) {
 		name       string
 		dockerfile string
 		wantCount  int
-		wantCode   string
 	}{
 		// --- Cases from Hadolint spec: ruleCatchesNot (expect 0 violations) ---
 		{
@@ -78,7 +77,6 @@ func TestDL3045Rule_Check(t *testing.T) {
 			name:       "not ok: COPY with relative destination and no WORKDIR set",
 			dockerfile: "FROM scratch\nCOPY bla.sh blubb.sh\n",
 			wantCount:  1,
-			wantCode:   rules.HadolintRulePrefix + "DL3045",
 		},
 		{
 			name:       "not ok: COPY with relative destination and no WORKDIR set with quotes",
@@ -212,9 +210,9 @@ COPY . .
 				}
 			}
 
-			if tt.wantCode != "" && len(violations) > 0 {
-				if violations[0].RuleCode != tt.wantCode {
-					t.Errorf("RuleCode = %q, want %q", violations[0].RuleCode, tt.wantCode)
+			for i, v := range violations {
+				if v.RuleCode != rules.HadolintRulePrefix+"DL3045" {
+					t.Errorf("violations[%d].RuleCode = %q, want %q", i, v.RuleCode, rules.HadolintRulePrefix+"DL3045")
 				}
 			}
 		})
