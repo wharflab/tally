@@ -286,3 +286,55 @@ func TestFixPreferAddUnpackBeatsHeredoc(t *testing.T) {
 		t.Errorf("expected 'Fixed' in output, got: %s", outputStr)
 	}
 }
+
+// TestFixNewlinePerChainedCall exercises the auto-fix path for
+// tally/newline-per-chained-call end-to-end through the CLI.
+// The rule is globally ignored in runFixCase (harness_test.go), so this test
+// uses --ignore "*" + --select to run it in isolation.
+func TestFixNewlinePerChainedCall(t *testing.T) {
+	t.Parallel()
+
+	input := "FROM alpine:3.20\n" +
+		"RUN --mount=type=cache,target=/var/cache/apt " +
+		"--mount=type=bind,source=go.sum,target=go.sum " +
+		"apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*\n" +
+		"LABEL org.opencontainers.image.title=myapp org.opencontainers.image.version=1.0\n" +
+		"HEALTHCHECK CMD curl -f http://localhost/ || exit 1\n"
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte(input), 0o644); err != nil {
+		t.Fatalf("failed to write Dockerfile: %v", err)
+	}
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	if err := os.WriteFile(configPath, []byte(""), 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	args := []string{
+		"lint", "--config", configPath, "--slow-checks=off",
+		"--fix",
+		"--ignore", "*",
+		"--select", "tally/newline-per-chained-call",
+		dockerfilePath,
+	}
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	output, err := cmd.CombinedOutput()
+	// All violations are fixable (FixSafe) → exit code 0
+	if err != nil {
+		t.Fatalf("expected exit code 0 (all violations fixable), got error: %v\noutput: %s", err, output)
+	}
+
+	fixed, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read fixed Dockerfile: %v", err)
+	}
+
+	testutil.MatchDockerfileSnapshot(t, string(fixed))
+
+	if !strings.Contains(string(output), "Fixed") {
+		t.Errorf("expected 'Fixed' in output, got: %s", output)
+	}
+}
