@@ -137,6 +137,11 @@ ONBUILD COPY foo bar
 `,
 			wantCount: 0,
 		},
+		{
+			name:       "not ok: ONBUILD COPY with relative destination and no WORKDIR",
+			dockerfile: "FROM debian:buster\nONBUILD COPY foo bar\n",
+			wantCount:  1,
+		},
 
 		// --- Regression from Hadolint spec ---
 		{
