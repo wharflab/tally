@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tally.dev/rules/hadolint/dl3026.schema.json",
+  "title": "hadolint/DL3026 rule config",
+  "description": "Configuration options for the hadolint/DL3026 rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" },
+    "trusted-registries": {
+      "type": "array",
+      "description": "Allowed registries for base images in FROM (empty disables the rule). Supports \"*\", \"*.suffix\" and \"prefix*\" patterns.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "default": [],
+      "examples": [["docker.io", "gcr.io"]]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "trusted-registries": ["docker.io"] },
+    { "severity": "warning", "trusted-registries": ["*.gcr.io", "ghcr.io"] }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tally.dev/rules/tally/prefer-add-unpack.schema.json",
+  "title": "tally/prefer-add-unpack rule config",
+  "description": "Configuration options for the tally/prefer-add-unpack rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable or disable this rule (independent of severity).",
+      "examples": [true]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "enabled": false },
+    { "severity": "info", "enabled": true }
+  ]
+}

@@ -3,32 +3,6 @@
   "$id": "https://schemas.tally.dev/root/tally-config.schema.json",
   "title": "tally configuration",
   "description": "Configuration schema for tally Dockerfile linter",
-  "$defs": {
-    "genericRuleConfig": {
-      "type": "object",
-      "properties": {
-        "severity": {
-          "type": "string",
-          "enum": ["off", "error", "warning", "info", "style"]
-        },
-        "fix": {
-          "type": "string",
-          "enum": ["never", "explicit", "always", "unsafe-only"]
-        },
-        "exclude": {
-          "type": "object",
-          "properties": {
-            "paths": {
-              "type": "array",
-              "items": { "type": "string" }
-            }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
-    }
-  },
   "type": "object",
   "properties": {
     "rules": {
@@ -43,31 +17,13 @@
           "items": { "type": "string" }
         },
         "tally": {
-          "type": "object",
-          "properties": {
-            "max-lines": { "$ref": "../rules/tally/max_lines.schema.json" },
-            "consistent-indentation": { "$ref": "../rules/tally/consistent_indentation.schema.json" },
-            "no-trailing-spaces": { "$ref": "../rules/tally/no_trailing_spaces.schema.json" },
-            "newline-between-instructions": { "$ref": "../rules/tally/newline_between_instructions.schema.json" },
-            "newline-per-chained-call": { "$ref": "../rules/tally/newline_per_chained_call.schema.json" },
-            "prefer-add-unpack": { "$ref": "../rules/tally/prefer_add_unpack.schema.json" },
-            "prefer-run-heredoc": { "$ref": "../rules/tally/prefer_run_heredoc.schema.json" },
-            "prefer-copy-heredoc": { "$ref": "../rules/tally/prefer_copy_heredoc.schema.json" },
-            "prefer-multi-stage-build": { "$ref": "../rules/tally/prefer_multi_stage_build.schema.json" }
-          },
-          "additionalProperties": { "$ref": "#/$defs/genericRuleConfig" }
+          "$ref": "../../rules/tally/index.schema.json"
         },
         "hadolint": {
-          "type": "object",
-          "properties": {
-            "DL3001": { "$ref": "../rules/hadolint/dl3001.schema.json" },
-            "DL3026": { "$ref": "../rules/hadolint/dl3026.schema.json" }
-          },
-          "additionalProperties": { "$ref": "#/$defs/genericRuleConfig" }
+          "$ref": "../../rules/hadolint/index.schema.json"
         },
         "buildkit": {
-          "type": "object",
-          "additionalProperties": { "$ref": "#/$defs/genericRuleConfig" }
+          "$ref": "../../rules/buildkit/index.schema.json"
         }
       },
       "additionalProperties": false

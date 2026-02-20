@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tally.dev/rules/rule-config.schema.json",
+  "title": "Common rule configuration",
+  "description": "Shared schema definitions for per-rule configuration across namespaces (tally/*, hadolint/*, buildkit/*).",
+  "$defs": {
+    "severity": {
+      "title": "Rule severity",
+      "type": "string",
+      "description": "Override the rule's default severity. Use \"off\" to disable the rule.",
+      "enum": ["off", "error", "warning", "info", "style"],
+      "examples": ["warning"]
+    },
+    "fix": {
+      "title": "Rule fix mode",
+      "type": "string",
+      "description": "Control when auto-fixes are applied for this rule.",
+      "enum": ["never", "explicit", "always", "unsafe-only"],
+      "examples": ["explicit"]
+    },
+    "exclude": {
+      "title": "Rule exclusions",
+      "type": "object",
+      "description": "Exclude this rule for specific file paths.",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "description": "Glob patterns to exclude (e.g. \"test/**\").",
+          "items": { "type": "string" },
+          "examples": ["test/**"]
+        }
+      },
+      "additionalProperties": false,
+      "examples": [
+        {
+          "paths": ["test/**", "**/vendor/**"]
+        }
+      ]
+    },
+    "genericRuleConfig": {
+      "title": "Generic rule configuration",
+      "type": "object",
+      "description": "Generic per-rule configuration used for rules without rule-specific options.",
+      "properties": {
+        "severity": { "$ref": "#/$defs/severity" },
+        "fix": { "$ref": "#/$defs/fix" },
+        "exclude": { "$ref": "#/$defs/exclude" }
+      },
+      "additionalProperties": false,
+      "examples": [
+        { "severity": "warning" },
+        { "fix": "explicit", "exclude": { "paths": ["test/**"] } }
+      ]
+    }
+  }
+}

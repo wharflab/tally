@@ -63,33 +63,40 @@ Problems:
 
 ```text
 internal/
+  rules/
+    rule-config.schema.json
+    tally/
+      max-lines.schema.json
+      consistent-indentation.schema.json
+      ...
+      index.schema.json                 # generated
+    hadolint/
+      dl3001.schema.json
+      dl3026.schema.json
+      ...
+      index.schema.json                 # generated
+    buildkit/
+      index.schema.json                 # generated
   schemas/
     root/
       tally-config.schema.json
-    rules/
-      tally/
-        max_lines.schema.json
-        consistent_indentation.schema.json
-      hadolint/
-        dl3001.schema.json
-        dl3026.schema.json
-      buildkit/
-        ...
     generated/
       config/
         tally_config.gen.go
       rules/
+        ruleschema/
+          rule_config.gen.go            # generated (shared types)
         tally/
           max_lines.gen.go
           consistent_indentation.gen.go
         hadolint/
           dl3001.gen.go
           dl3026.gen.go
-    embed/
-      schemas.go
+    registry_gen.go                     # generated (embedded schema bytes + ID maps)
+    schemas.go                          # thin API over registry_gen.go
     runtime/
-      loader.go
       validator.go
+      coerce.go
 ```
 
 ### 4.3 Runtime Validation Flow
@@ -112,11 +119,17 @@ Optional strict mode can keep per-rule subtree validation for more localized dia
 
 ### 4.5 Embedding and Schema Resolution
 
-Use `//go:embed` for all schema files and resolve `$ref` via custom loader:
+Embed schema documents in the binary and resolve `$ref` via custom loader:
 
 - deterministic in binaries
 - no runtime filesystem dependency
 - shared cache of resolved schemas
+
+Implementation note:
+
+- JSON schemas are authored in `internal/rules/**` (collocated next to rules) and `internal/schemas/root/**`.
+- Because `go:embed` cannot embed files outside the current package directory tree, the embedded bundle is produced as a generated Go registry file
+  (`internal/schemas/registry_gen.go`) by `_tools/schema-gen`.
 
 ---
 
@@ -142,9 +155,9 @@ Manifest example:
 {
   "schemas": [
     {
-      "input": "internal/schemas/rules/tally/max_lines.schema.json",
+      "input": "internal/rules/tally/max-lines.schema.json",
       "output": "internal/schemas/generated/rules/tally/max_lines.gen.go",
-      "package": "tallyschema"
+      "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     }
   ]
 }
