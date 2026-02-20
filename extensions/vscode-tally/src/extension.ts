@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 
 import { findTallyBinary } from "./binary/findBinary";
+import { findTallyViaPythonEnvs, getPythonEnvApi } from "./binary/pythonEnvs";
 import { ConfigService } from "./config/configService";
 import { TallyLanguageClient } from "./lsp/client";
 
@@ -31,6 +32,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         isTrusted: vscode.workspace.isTrusted,
         settings: binarySettings,
         workspaceFolders: vscode.workspace.workspaceFolders ?? [],
+        pythonEnvResolver: findTallyViaPythonEnvs,
       });
 
       const settingsEnvelope = configService.lspSettings();
@@ -153,6 +155,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       void startOrRestart("workspace trusted");
     }),
   );
+
+  const pythonEnvApi = await getPythonEnvApi();
+  if (pythonEnvApi) {
+    context.subscriptions.push(
+      pythonEnvApi.onDidChangeEnvironment(() => {
+        void startOrRestart("python environment changed");
+      }),
+    );
+  }
 
   await startOrRestart("activation");
 }
