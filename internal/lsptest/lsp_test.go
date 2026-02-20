@@ -20,6 +20,7 @@ import (
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestLSP_Initialize(t *testing.T) {
@@ -257,7 +258,7 @@ func TestLSP_CodeActionFixAll(t *testing.T) {
 	require.NotEmpty(t, edits, "expected fix-all edits")
 
 	fixed := applyEdits(t, uri, original, edits)
-	snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, fixed)
+	testutil.MatchDockerfileSnapshot(t, fixed)
 }
 
 func TestLSP_ExecuteCommandApplyAllFixes(t *testing.T) {
@@ -286,7 +287,7 @@ func TestLSP_ExecuteCommandApplyAllFixes(t *testing.T) {
 	require.NotEmpty(t, edits, "expected executeCommand to return edits")
 
 	fixed := applyEdits(t, uri, original, edits)
-	snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, fixed)
+	testutil.MatchDockerfileSnapshot(t, fixed)
 }
 
 func TestLSP_NoPushDiagnosticsWhenClientSupportsPull(t *testing.T) {
@@ -611,7 +612,7 @@ func TestLSP_FormattingConsistentCasing(t *testing.T) {
 	// ApplyEdits also validates that edits are non-overlapping (LSP spec requirement).
 	fixed := applyEdits(t, uri, original, edits)
 
-	snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, fixed)
+	testutil.MatchDockerfileSnapshot(t, fixed)
 }
 
 func TestLSP_FormattingRealWorld(t *testing.T) {
@@ -645,7 +646,7 @@ func TestLSP_FormattingRealWorld(t *testing.T) {
 	// ApplyEdits also validates that edits are non-overlapping (LSP spec requirement).
 	fixed := applyEdits(t, uri, string(original), edits)
 
-	snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, fixed)
+	testutil.MatchDockerfileSnapshot(t, fixed)
 }
 
 func TestLSP_FormattingNoChanges(t *testing.T) {

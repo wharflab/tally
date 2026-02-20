@@ -1,6 +1,7 @@
 package tally
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
@@ -316,6 +317,13 @@ func TestNewlinePerChainedCallCheckWithFixes(t *testing.T) {
 						e.Location.Start.Line, e.Location.Start.Column,
 						e.Location.End.Line, e.Location.End.Column,
 						e.NewText)
+				}
+			}
+
+			// Verify continuation lines use tab indentation (not spaces)
+			for i, e := range v.SuggestedFix.Edits {
+				if strings.Contains(e.NewText, "\n") && !strings.Contains(e.NewText, "\t") {
+					t.Errorf("edit[%d]: continuation line missing tab indent: %q", i, e.NewText)
 				}
 			}
 		})

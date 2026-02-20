@@ -120,7 +120,7 @@ ENV NV_CUDA_CUDART_VERSION=11.7.99-1
 
 RUN apt-get update && apt-get install -y --no-install-recommends     cuda-cudart-11-7=${NV_CUDA_CUDART_VERSION}     ${NV_CUDA_COMPAT_PACKAGE}     && rm -rf /var/lib/apt/lists/*
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf \
-    && echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
+	&& echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
@@ -148,7 +148,7 @@ ARG MAMBA_VERSION
 
 RUN curl -L -o ~/mambaforge.sh https://github.com/conda-forge/miniforge/releases/download/${MAMBA_VERSION}/Mambaforge-${MAMBA_VERSION}-Linux-x86_64.sh  && chmod +x ~/mambaforge.sh  && ~/mambaforge.sh -b -p /opt/conda  && rm ~/mambaforge.sh
 RUN /opt/conda/bin/conda install conda-libmamba-solver --solver classic \
-    && /opt/conda/bin/conda config --set solver libmamba
+	&& /opt/conda/bin/conda config --set solver libmamba
 
 ARG PYTHON_VERSION
 
@@ -199,7 +199,7 @@ ARG PT_TORCHVISION_URL
 ARG PT_SM_TRAINING_URL
 
 RUN pip uninstall -y torch torchvision torchaudio torchdata \
-    && pip install --no-cache-dir -U ${PT_SM_TRAINING_URL} ${PT_TORCHVISION_URL} ${PT_TORCHAUDIO_URL} ${PT_TORCHDATA_URL}
+	&& pip install --no-cache-dir -U ${PT_SM_TRAINING_URL} ${PT_TORCHVISION_URL} ${PT_TORCHAUDIO_URL} ${PT_TORCHDATA_URL}
 
 ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/lib:/opt/amazon/openmpi/lib/:/opt/amazon/efa/lib/"
 
@@ -212,14 +212,14 @@ RUN mv $OPEN_MPI_PATH/bin/mpirun $OPEN_MPI_PATH/bin/mpirun.real  && echo '#!/bin
 RUN mkdir /tmp/efa-ofi-nccl  && cd /tmp/efa-ofi-nccl  && git clone https://github.com/aws/aws-ofi-nccl.git -b v${BRANCH_OFI}  && cd aws-ofi-nccl  && ./autogen.sh  && ./configure --with-libfabric=/opt/amazon/efa   --with-mpi=/opt/amazon/openmpi   --with-cuda=/usr/local/cuda   --with-nccl=/usr/local --prefix=/usr/local  && make  && make install  && rm -rf /tmp/efa-ofi-nccl  && rm -rf /var/lib/apt/lists/*  && apt-get clean
 RUN apt-get update  && apt-get install -y  --allow-downgrades --allow-change-held-packages --no-install-recommends  && apt-get install -y --no-install-recommends openssh-client openssh-server  && mkdir -p /var/run/sshd  && cat /etc/ssh/ssh_config | grep -v StrictHostKeyChecking > /etc/ssh/ssh_config.new  && echo "    StrictHostKeyChecking no" >> /etc/ssh/ssh_config.new  && mv /etc/ssh/ssh_config.new /etc/ssh/ssh_config  && rm -rf /var/lib/apt/lists/*  && apt-get clean
 RUN mkdir -p /var/run/sshd \
-    && sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
+	&& sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
 RUN rm -rf /root/.ssh/ &&  mkdir -p /root/.ssh/ &&  ssh-keygen -q -t rsa -N '' -f /root/.ssh/id_rsa &&  cp /root/.ssh/id_rsa.pub /root/.ssh/authorized_keys  && printf "Host *\n StrictHostKeyChecking no\n" >> /root/.ssh/config
 
 ARG CUDA_HOME=/usr/local/cuda
 
 RUN pip uninstall -y horovod  && ldconfig /usr/local/cuda-11.7/targets/x86_64-linux/lib/stubs  && HOROVOD_GPU_ALLREDUCE=NCCL HOROVOD_CUDA_HOME=/usr/local/cuda-11.7 HOROVOD_WITH_PYTORCH=1 pip install --no-cache-dir horovod==${HOROVOD_VERSION}  && ldconfig
 RUN mkdir -p /etc/pki/tls/certs \
-    && cp /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt
+	&& cp /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt
 RUN conda install -y -c conda-forge     scikit-learn     pandas
 
 WORKDIR /

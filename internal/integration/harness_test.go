@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 type lintCase struct {
@@ -179,7 +180,7 @@ func runFixCase(t *testing.T, tc fixCase) {
 		t.Fatalf("failed to read fixed Dockerfile: %v", err)
 	}
 
-	snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixed))
+	testutil.MatchDockerfileSnapshot(t, string(fixed))
 
 	// Check that the output mentions the expected number of fixes
 	outputStr := string(output)

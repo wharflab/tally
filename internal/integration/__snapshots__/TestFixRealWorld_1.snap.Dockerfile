@@ -335,7 +335,7 @@ ARG PT_TORCHVISION_URL
 ARG PT_SM_TRAINING_URL
 
 RUN pip uninstall -y torch torchvision torchaudio torchdata \
-    && pip install --no-cache-dir -U ${PT_SM_TRAINING_URL} ${PT_TORCHVISION_URL} ${PT_TORCHAUDIO_URL} ${PT_TORCHDATA_URL}
+	&& pip install --no-cache-dir -U ${PT_SM_TRAINING_URL} ${PT_TORCHVISION_URL} ${PT_TORCHAUDIO_URL} ${PT_TORCHDATA_URL}
 
 ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/lib:/opt/amazon/openmpi/lib/:/opt/amazon/efa/lib/"
 

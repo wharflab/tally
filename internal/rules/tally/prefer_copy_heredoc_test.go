@@ -431,7 +431,7 @@ func TestBuildCopyHeredoc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := buildCopyHeredoc(tt.targetPath, tt.content, tt.chmodMode)
-			snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, got)
+			testutil.MatchDockerfileSnapshot(t, got)
 		})
 	}
 }
