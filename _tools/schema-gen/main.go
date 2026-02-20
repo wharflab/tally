@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	manifestPath = "internal/schemas/manifest.json"
-	filePerm     = 0o644
-	dirPerm      = 0o755
+	manifestPathRel = "internal/schemas/manifest.json"
+	filePerm        = 0o644
+	dirPerm         = 0o755
 )
 
 type manifest struct {
@@ -35,18 +35,46 @@ func main() {
 }
 
 func run() error {
+	repoRoot, err := findRepoRoot()
+	if err != nil {
+		return err
+	}
+
+	manifestPath := filepath.Join(repoRoot, filepath.FromSlash(manifestPathRel))
 	m, err := loadManifest(manifestPath)
 	if err != nil {
 		return err
 	}
 
 	for _, entry := range m.Schemas {
-		if err := generateOne(entry); err != nil {
+		if err := generateOne(repoRoot, entry); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func findRepoRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		candidate := filepath.Join(dir, filepath.FromSlash(manifestPathRel))
+		if _, err := os.Stat(candidate); err == nil {
+			return dir, nil
+		}
+
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+
+	return "", fmt.Errorf("could not find repo root containing %s", manifestPathRel)
 }
 
 func loadManifest(path string) (*manifest, error) {
@@ -64,10 +92,13 @@ func loadManifest(path string) (*manifest, error) {
 	return &m, nil
 }
 
-func generateOne(entry schemaEntry) error {
+func generateOne(repoRoot string, entry schemaEntry) error {
 	if entry.Input == "" || entry.Output == "" || entry.Package == "" {
 		return fmt.Errorf("invalid schema manifest entry: %+v", entry)
 	}
+
+	inputPath := filepath.Join(repoRoot, filepath.FromSlash(entry.Input))
+	outputPath := filepath.Join(repoRoot, filepath.FromSlash(entry.Output))
 
 	g, err := generator.New(generator.Config{
 		DefaultPackageName: entry.Package,
@@ -76,16 +107,16 @@ func generateOne(entry schemaEntry) error {
 		Tags:               []string{"json"},
 	})
 	if err != nil {
-		return fmt.Errorf("create generator for %s: %w", entry.Input, err)
+		return fmt.Errorf("create generator for %s: %w", inputPath, err)
 	}
 
-	if err := g.DoFile(entry.Input); err != nil {
-		return fmt.Errorf("generate %s: %w", entry.Input, err)
+	if err := g.DoFile(inputPath); err != nil {
+		return fmt.Errorf("generate %s: %w", inputPath, err)
 	}
 
 	sources, err := g.Sources()
 	if err != nil {
-		return fmt.Errorf("render sources for %s: %w", entry.Input, err)
+		return fmt.Errorf("render sources for %s: %w", inputPath, err)
 	}
 
 	source, ok := sources[entry.Output]
@@ -97,11 +128,11 @@ func generateOne(entry schemaEntry) error {
 		return fmt.Errorf("generated file %s imports encoding/json", entry.Output)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(entry.Output), dirPerm); err != nil {
-		return fmt.Errorf("create output dir for %s: %w", entry.Output, err)
+	if err := os.MkdirAll(filepath.Dir(outputPath), dirPerm); err != nil {
+		return fmt.Errorf("create output dir for %s: %w", outputPath, err)
 	}
-	if err := os.WriteFile(entry.Output, source, filePerm); err != nil {
-		return fmt.Errorf("write generated file %s: %w", entry.Output, err)
+	if err := os.WriteFile(outputPath, source, filePerm); err != nil {
+		return fmt.Errorf("write generated file %s: %w", outputPath, err)
 	}
 
 	return nil

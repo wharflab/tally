@@ -97,7 +97,7 @@ print-gotestsum-bin:
 	@echo bin/gotestsum-$(GOTESTSUM_VERSION)
 
 schema-gen:
-	go run -tags '$(BUILDTAGS)' ./tools/schema-gen
+	cd _tools && go run ./schema-gen
 	cp internal/schemas/root/tally-config.schema.json schema.json
 
 schema-check: schema-gen

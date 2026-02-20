@@ -127,7 +127,9 @@ Use `//go:embed` for all schema files and resolve `$ref` via custom loader:
 Provide one orchestrator command:
 
 ```bash
-go run ./tools/schema-gen
+make schema-gen
+# or:
+cd _tools && go run ./schema-gen
 ```
 
 This command reads a schema manifest and invokes the generator for all schema files.
@@ -174,11 +176,11 @@ Use generator output mode/template strategy that emits data model types without 
 
 Implementation requirement:
 
-- `tools/schema-gen` must fail if generated files import `encoding/json`.
+- `_tools/schema-gen` must fail if generated files import `encoding/json`.
 - CI gate must enforce this with a targeted check after generation.
 
-If upstream templates are insufficient, keep an in-repo template override/post-process step under `tools/schema-gen` so generated files remain JSON v2
-compliant.
+If upstream templates are insufficient, keep an in-repo template override/post-process step under `_tools/schema-gen` so generated files remain JSON
+v2 compliant.
 
 ### 6.3 CI Enforcement
 
