@@ -334,6 +334,9 @@ func TestMergeDefaults_UnexportedFields(t *testing.T) {
 
 func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 	t.Parallel()
+	// NOTE: jsonschema-go error text formatting can change between versions
+	// (currently pinned to github.com/google/jsonschema-go v0.4.2 in go.mod).
+	// Keep assertions token-based instead of exact phrase matching.
 	tests := []struct {
 		name        string
 		schema      map[string]any
@@ -359,7 +362,7 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 				"additionalProperties": false,
 			},
 			config:      map[string]any{"max": "not-a-number"},
-			wantSubstrs: []string{"has type \"string\", want \"integer\""},
+			wantSubstrs: []string{"type", "integer"},
 		},
 		{
 			name: "multiple errors",
@@ -371,7 +374,7 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 				"additionalProperties": false,
 			},
 			config:      map[string]any{"max": "bad", "extra": true},
-			wantSubstrs: []string{"has type \"string\", want \"integer\""},
+			wantSubstrs: []string{"type", "integer"},
 		},
 		{
 			name: "minimum violation",
