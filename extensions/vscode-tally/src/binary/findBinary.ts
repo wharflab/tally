@@ -84,9 +84,13 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
   // 4) Python Environments extension
   if (pythonEnvResolver) {
     for (const folder of workspaceFolders) {
-      const candidate = await pythonEnvResolver(folder);
-      if (candidate && (await isExecutableFile(candidate))) {
-        return directBinary(candidate, "pythonEnvExt");
+      try {
+        const candidate = await pythonEnvResolver(folder);
+        if (candidate && (await isExecutableFile(candidate))) {
+          return directBinary(candidate, "pythonEnvExt");
+        }
+      } catch {
+        // resolver failed for this folder; continue fallback chain
       }
     }
   }

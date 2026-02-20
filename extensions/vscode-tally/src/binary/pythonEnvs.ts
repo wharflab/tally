@@ -46,9 +46,8 @@ export async function findTallyViaPythonEnvs(
     return undefined;
   }
 
-  const envPath = env.environmentPath.fsPath;
-
   try {
+    const envPath = env.environmentPath.fsPath;
     const s = await fs.stat(envPath);
 
     if (s.isDirectory()) {
