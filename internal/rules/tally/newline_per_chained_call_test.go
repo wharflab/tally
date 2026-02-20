@@ -235,7 +235,7 @@ func TestNewlinePerChainedCallCheck(t *testing.T) {
 			Name:           "HEALTHCHECK CMD with chain - violation",
 			Content:        "FROM alpine:3.20\nHEALTHCHECK CMD curl -f http://localhost/ && wget -qO- http://localhost/health || exit 1\n",
 			WantViolations: 1,
-			WantMessages:   []string{"chained commands"},
+			WantMessages:   []string{"split HEALTHCHECK"},
 		},
 		{
 			Name:           "HEALTHCHECK CMD single command - skip",
@@ -258,6 +258,26 @@ func TestNewlinePerChainedCallCheck(t *testing.T) {
 				"HEALTHCHECK --interval=30s --timeout=10s CMD " +
 				"curl -f http://localhost/ && wget -qO- http://localhost/health\n",
 			WantViolations: 1,
+		},
+		{
+			Name: "HEALTHCHECK flags only no chain - violation",
+			Content: "FROM alpine:3.20\n" +
+				"HEALTHCHECK --interval=30s --timeout=10s CMD curl -f http://localhost/\n",
+			WantViolations: 1,
+		},
+		{
+			Name: "HEALTHCHECK single flag and CMD - violation",
+			Content: "FROM alpine:3.20\n" +
+				"HEALTHCHECK --interval=30s CMD curl -f http://localhost/\n",
+			WantViolations: 1,
+		},
+		{
+			Name: "HEALTHCHECK flags already split - skip",
+			Content: "FROM alpine:3.20\n" +
+				"HEALTHCHECK --interval=30s \\\n" +
+				"\t--timeout=10s \\\n" +
+				"\tCMD curl -f http://localhost/\n",
+			WantViolations: 0,
 		},
 	})
 }
@@ -294,9 +314,22 @@ func TestNewlinePerChainedCallCheckWithFixes(t *testing.T) {
 			wantEdits: 1,
 		},
 		{
-			name:      "HEALTHCHECK CMD with chain - one edit",
-			content:   "FROM alpine:3.20\nHEALTHCHECK CMD cmd1 && cmd2\n",
-			wantEdits: 1,
+			name:             "HEALTHCHECK CMD with chain - whole-instruction replacement",
+			content:          "FROM alpine:3.20\nHEALTHCHECK CMD cmd1 && cmd2\n",
+			wantEdits:        1,
+			wantFixedContent: "FROM alpine:3.20\nHEALTHCHECK CMD cmd1 \\\n\t&& cmd2\n",
+		},
+		{
+			name:             "HEALTHCHECK with flags and chain",
+			content:          "FROM alpine:3.20\nHEALTHCHECK --interval=30s --timeout=10s CMD cmd1 && cmd2\n",
+			wantEdits:        1,
+			wantFixedContent: "FROM alpine:3.20\nHEALTHCHECK --interval=30s \\\n\t--timeout=10s \\\n\tCMD cmd1 \\\n\t&& cmd2\n",
+		},
+		{
+			name:             "HEALTHCHECK with flags only - no chain",
+			content:          "FROM alpine:3.20\nHEALTHCHECK --interval=30s --timeout=10s CMD curl -f http://localhost/\n",
+			wantEdits:        1,
+			wantFixedContent: "FROM alpine:3.20\nHEALTHCHECK --interval=30s \\\n\t--timeout=10s \\\n\tCMD curl -f http://localhost/\n",
 		},
 		{
 			name:             "LABEL quoted value with spaces - fix preserves quoting",

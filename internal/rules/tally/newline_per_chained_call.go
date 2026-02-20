@@ -3,9 +3,12 @@ package tally
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
@@ -491,7 +494,9 @@ func (r *NewlinePerChainedCallRule) checkLabel(
 	return &v
 }
 
-// checkHealthcheck checks a HEALTHCHECK CMD instruction for chained commands.
+// checkHealthcheck checks a HEALTHCHECK instruction for flags and/or chained
+// commands that should be split onto separate continuation lines.
+// Uses whole-instruction replacement (like LABEL) instead of boundary edits.
 func (r *NewlinePerChainedCallRule) checkHealthcheck(
 	cmd *instructions.HealthCheckCommand,
 	shellVariant shell.Variant,
@@ -500,45 +505,99 @@ func (r *NewlinePerChainedCallRule) checkHealthcheck(
 	meta rules.RuleMetadata,
 	minCommands int,
 ) *rules.Violation {
-	if cmd.Health == nil || len(cmd.Health.Test) < 2 || cmd.Health.Test[0] != "CMD-SHELL" {
+	if cmd.Health == nil || len(cmd.Health.Test) == 0 || len(cmd.Location()) == 0 {
 		return nil
 	}
 
-	script := cmd.Health.Test[1]
-	if script == "" {
-		return nil
-	}
-
-	if len(cmd.Location()) == 0 {
+	testMode := cmd.Health.Test[0]
+	if testMode == "NONE" || testMode == "" {
 		return nil
 	}
 
 	startLine := cmd.Location()[0].Start.Line
 	endLine := resolveEndLine(sm, cmd.Location())
+	instrIndent := leadingWhitespace(sm.Line(startLine - 1))
 
-	instrLines := make([]string, 0, endLine-startLine+1)
-	for l := startLine; l <= endLine; l++ {
-		instrLines = append(instrLines, sm.Line(l-1))
-	}
+	// Collect flags from parsed Health config.
+	flags := healthcheckFlags(cmd.Health)
 
-	instrIndent := leadingWhitespace(instrLines[0])
+	// Format the CMD portion.
+	var cmdText string
+	numCmdLines := 1 // how many continuation lines the CMD portion occupies
 
-	// Find where CMD starts in the source text (after HEALTHCHECK [options] CMD)
-	cmdStartCol := findHealthcheckCmdStart(instrLines[0])
-	if cmdStartCol < 0 {
+	switch {
+	case testMode == "CMD-SHELL" && len(cmd.Health.Test) >= 2:
+		script := cmd.Health.Test[1]
+		if script == "" {
+			return nil
+		}
+		if !shell.ScriptHasInlineHeredoc(script, shellVariant) {
+			_, totalCmds := shell.CollectChainBoundaries(script, shellVariant)
+			if totalCmds >= minCommands {
+				cmdText = shell.FormatChainedScript(script, shellVariant)
+				numCmdLines = totalCmds
+			} else {
+				cmdText = strings.TrimSpace(script)
+			}
+		} else {
+			cmdText = strings.TrimSpace(script)
+		}
+	case testMode == "CMD" && len(cmd.Health.Test) >= 2:
+		// Exec form: reconstruct JSON array.
+		cmdText = formatExecArgs(cmd.Health.Test[1:])
+	default:
 		return nil
 	}
 
-	edits := r.collectSameLineChainEdits(instrLines, startLine, cmdStartCol, minCommands, shellVariant, instrIndent, file)
-	if len(edits) == 0 {
+	// Total elements: each flag + CMD lines.
+	numElements := len(flags) + numCmdLines
+	if numElements <= 1 {
 		return nil
 	}
 
+	numSourceLines := endLine - startLine + 1
+	if numSourceLines >= numElements {
+		return nil // already properly formatted
+	}
+
+	// Pretty-print: replace entire instruction.
+	sep := " \\\n" + instrIndent + "\t"
+
+	// Adjust printer's tab indentation to include instruction-level indent.
+	if instrIndent != "" {
+		cmdText = strings.ReplaceAll(cmdText, "\n\t", "\n"+instrIndent+"\t")
+	}
+
+	var b strings.Builder
+	b.WriteString(instrIndent + "HEALTHCHECK")
+
+	isFirst := true
+	for _, flag := range flags {
+		if isFirst {
+			b.WriteString(" " + flag)
+			isFirst = false
+		} else {
+			b.WriteString(sep + flag)
+		}
+	}
+
+	if isFirst {
+		b.WriteString(" CMD " + cmdText)
+	} else {
+		b.WriteString(sep + "CMD " + cmdText)
+	}
+
+	edits := []rules.TextEdit{{
+		Location: rules.NewRangeLocation(file, startLine, 0, endLine, len(sm.Line(endLine-1))),
+		NewText:  b.String(),
+	}}
+
+	msg := "split HEALTHCHECK onto separate continuation lines"
 	loc := rules.NewLocationFromRanges(file, cmd.Location())
-	v := rules.NewViolation(loc, meta.Code, "split chained commands onto separate lines", meta.DefaultSeverity).
+	v := rules.NewViolation(loc, meta.Code, msg, meta.DefaultSeverity).
 		WithDocURL(meta.DocURL).
 		WithSuggestedFix(&rules.SuggestedFix{
-			Description: "Split HEALTHCHECK CMD chains onto separate continuation lines",
+			Description: "Split HEALTHCHECK onto separate continuation lines",
 			Safety:      rules.FixSafe,
 			Priority:    meta.FixPriority,
 			Edits:       edits,
@@ -548,26 +607,49 @@ func (r *NewlinePerChainedCallRule) checkHealthcheck(
 	return &v
 }
 
-// findHealthcheckCmdStart finds the byte offset where the CMD argument starts
-// in a HEALTHCHECK line (after HEALTHCHECK [options] CMD).
-func findHealthcheckCmdStart(line string) int {
-	upper := strings.ToUpper(line)
-	// Find "CMD " after HEALTHCHECK
-	idx := strings.Index(upper, "HEALTHCHECK")
-	if idx < 0 {
-		return -1
+// healthcheckFlags returns the Dockerfile flag strings for non-zero HEALTHCHECK options.
+func healthcheckFlags(h *dockerspec.HealthcheckConfig) []string {
+	var flags []string
+	if h.Interval != 0 {
+		flags = append(flags, "--interval="+formatHealthcheckDuration(h.Interval))
 	}
-	rest := line[idx+11:] // skip "HEALTHCHECK"
-	cmdIdx := strings.Index(strings.ToUpper(rest), "CMD")
-	if cmdIdx < 0 {
-		return -1
+	if h.Timeout != 0 {
+		flags = append(flags, "--timeout="+formatHealthcheckDuration(h.Timeout))
 	}
-	// CMD keyword position + 3 for "CMD" + skip whitespace
-	pos := idx + 11 + cmdIdx + 3
-	for pos < len(line) && (line[pos] == ' ' || line[pos] == '\t') {
-		pos++
+	if h.StartPeriod != 0 {
+		flags = append(flags, "--start-period="+formatHealthcheckDuration(h.StartPeriod))
 	}
-	return pos
+	if h.StartInterval != 0 {
+		flags = append(flags, "--start-interval="+formatHealthcheckDuration(h.StartInterval))
+	}
+	if h.Retries != 0 {
+		flags = append(flags, fmt.Sprintf("--retries=%d", h.Retries))
+	}
+	return flags
+}
+
+// formatHealthcheckDuration formats a duration for Dockerfile HEALTHCHECK flags.
+// Produces clean output like "30s", "1m", "1h" instead of Go's "1m0s", "1h0m0s".
+func formatHealthcheckDuration(d time.Duration) string {
+	s := d.String()
+	// Only trim zero components: "m0s" means zero seconds after minutes,
+	// "h0m" means zero minutes after hours. Avoid trimming "30s" → "3".
+	if strings.HasSuffix(s, "m0s") {
+		s = s[:len(s)-2]
+	}
+	if strings.HasSuffix(s, "h0m") {
+		s = s[:len(s)-2]
+	}
+	return s
+}
+
+// formatExecArgs formats a CMD exec-form argument list as a JSON array string.
+func formatExecArgs(args []string) string {
+	quoted := make([]string, len(args))
+	for i, arg := range args {
+		quoted[i] = strconv.Quote(arg)
+	}
+	return "[" + strings.Join(quoted, ", ") + "]"
 }
 
 // resolveConfig extracts the config from input, falling back to defaults.

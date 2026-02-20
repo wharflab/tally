@@ -118,6 +118,78 @@ func ScriptHasInlineHeredoc(script string, variant Variant) bool {
 	return found
 }
 
+// FormatChainedScript formats a shell script so that each top-level &&/||
+// chain operator starts on its own line. Uses the mvdan.cc/sh/v3 printer with
+// BinaryNextLine for correct shell formatting. Returns the original script text
+// (trimmed) if parsing fails or there are no chain operators.
+//
+// The output uses tab indentation for continuation lines (Indent(0) = tabs).
+func FormatChainedScript(script string, variant Variant) string {
+	trimmed := strings.TrimSpace(script)
+	if variant.IsNonPOSIX() {
+		return trimmed
+	}
+
+	prog, err := parseScript(script, variant)
+	if err != nil {
+		return trimmed
+	}
+
+	if !forceChainNewlines(prog) {
+		return trimmed
+	}
+
+	var buf strings.Builder
+	printer := syntax.NewPrinter(syntax.BinaryNextLine(true), syntax.Indent(0))
+	if err := printer.Print(&buf, prog); err != nil {
+		return trimmed
+	}
+	return strings.TrimSpace(buf.String())
+}
+
+// forceChainNewlines modifies the AST so that every top-level &&/|| BinaryCmd
+// has its right-hand side on a subsequent line. This causes the printer to emit
+// multi-line output with BinaryNextLine(true). Returns true if any positions
+// were modified.
+func forceChainNewlines(prog *syntax.File) bool {
+	modified := false
+	line := uint(1)
+	for _, stmt := range prog.Stmts {
+		if stmt.Cmd != nil {
+			if forceChainNewlinesRec(stmt.Cmd, &line) {
+				modified = true
+			}
+		}
+	}
+	return modified
+}
+
+// forceChainNewlinesRec recursively assigns increasing line numbers to the
+// right-hand side of &&/|| BinaryCmd nodes (bottom-up).
+func forceChainNewlinesRec(cmd syntax.Command, nextLine *uint) bool {
+	bin, ok := cmd.(*syntax.BinaryCmd)
+	if !ok || (bin.Op != syntax.AndStmt && bin.Op != syntax.OrStmt) {
+		return false
+	}
+
+	// Process left subtree first (bottom-up for nested left-associative chains).
+	if bin.X.Cmd != nil {
+		forceChainNewlinesRec(bin.X.Cmd, nextLine)
+	}
+
+	// Force this boundary's right-hand side onto the next line.
+	*nextLine++
+	bin.OpPos = syntax.NewPos(0, *nextLine, 1)
+	bin.Y.Position = syntax.NewPos(0, *nextLine, 1)
+
+	// Process right subtree (for patterns like (a && b) || (c && d)).
+	if bin.Y.Cmd != nil {
+		forceChainNewlinesRec(bin.Y.Cmd, nextLine)
+	}
+
+	return true
+}
+
 // ReconstructSourceText reconstructs the shell command source text from
 // Dockerfile source lines. Backslash-newline continuations are kept intact
 // because the shell parser (mvdan.cc/sh) handles them natively. This

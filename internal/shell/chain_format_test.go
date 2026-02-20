@@ -183,6 +183,70 @@ func TestScriptHasInlineHeredoc(t *testing.T) {
 	}
 }
 
+func TestFormatChainedScript(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		script  string
+		variant Variant
+		want    string
+	}{
+		{
+			name:    "single command unchanged",
+			script:  "echo hello",
+			variant: VariantBash,
+			want:    "echo hello",
+		},
+		{
+			name:    "two commands",
+			script:  "apt-get update && apt-get install -y curl",
+			variant: VariantBash,
+			want:    "apt-get update \\\n\t&& apt-get install -y curl",
+		},
+		{
+			name:    "three commands mixed operators",
+			script:  "cmd1 && cmd2 || cmd3",
+			variant: VariantBash,
+			want:    "cmd1 \\\n\t&& cmd2 \\\n\t|| cmd3",
+		},
+		{
+			name:    "pipe preserved as single command",
+			script:  "cmd1 | cmd2 && cmd3",
+			variant: VariantBash,
+			want:    "cmd1 | cmd2 \\\n\t&& cmd3",
+		},
+		{
+			name:    "four chained commands",
+			script:  "a && b && c && d",
+			variant: VariantBash,
+			want:    "a \\\n\t&& b \\\n\t&& c \\\n\t&& d",
+		},
+		{
+			name:    "non-POSIX returns trimmed input",
+			script:  "cmd1 && cmd2",
+			variant: VariantNonPOSIX,
+			want:    "cmd1 && cmd2",
+		},
+		{
+			name:    "no chains returns trimmed input",
+			script:  "  echo hello  ",
+			variant: VariantBash,
+			want:    "echo hello",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := FormatChainedScript(tt.script, tt.variant)
+			if got != tt.want {
+				t.Errorf("FormatChainedScript():\n got: %q\nwant: %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestReconstructSourceText(t *testing.T) {
 	t.Parallel()
 
