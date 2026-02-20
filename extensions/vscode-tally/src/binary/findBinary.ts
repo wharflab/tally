@@ -1,8 +1,9 @@
+import type * as vscode from "vscode";
+
 import { constants as fsConstants } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import type * as vscode from "vscode";
 
 import { type BinaryResolutionSettings } from "../config/vscodeConfig";
 import { validateUserSuppliedPath } from "./pathValidator";
@@ -194,7 +195,7 @@ function venvCandidates(workspaceRoot: string): string[] {
   ];
 }
 
-async function isExecutableFile(p: string): Promise<boolean> {
+export async function isExecutableFile(p: string): Promise<boolean> {
   try {
     const stat = await fs.stat(p);
     if (!stat.isFile()) {

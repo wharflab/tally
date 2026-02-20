@@ -1,9 +1,9 @@
-import { constants as fsConstants } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as vscode from "vscode";
 
 import type { PythonEnvironment, PythonEnvironmentApi } from "../vendor/pythonEnvsApi";
+import { isExecutableFile } from "./findBinary";
 
 const EXT_ID = "ms-python.vscode-python-envs";
 
@@ -59,7 +59,7 @@ export async function findTallyViaPythonEnvs(
         process.platform === "win32"
           ? path.join(envPath, "Scripts", "tally.exe")
           : path.join(envPath, "bin", "tally");
-      if (await isExecutable(candidate)) {
+      if (await isExecutableFile(candidate)) {
         return candidate;
       }
     } else if (s.isFile()) {
@@ -67,7 +67,7 @@ export async function findTallyViaPythonEnvs(
       const dir = path.dirname(envPath);
       const candidate =
         process.platform === "win32" ? path.join(dir, "tally.exe") : path.join(dir, "tally");
-      if (await isExecutable(candidate)) {
+      if (await isExecutableFile(candidate)) {
         return candidate;
       }
     }
@@ -76,17 +76,4 @@ export async function findTallyViaPythonEnvs(
   }
 
   return undefined;
-}
-
-async function isExecutable(p: string): Promise<boolean> {
-  try {
-    const s = await fs.stat(p);
-    if (!s.isFile()) {
-      return false;
-    }
-    await fs.access(p, fsConstants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
 }
