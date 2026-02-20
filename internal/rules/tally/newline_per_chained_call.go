@@ -532,10 +532,10 @@ func (r *NewlinePerChainedCallRule) checkHealthcheck(
 			return nil
 		}
 		if !shell.ScriptHasInlineHeredoc(script, shellVariant) {
-			_, totalCmds := shell.CollectChainBoundaries(script, shellVariant)
-			if totalCmds >= minCommands {
+			_, maxChainCmds := shell.CollectChainBoundaries(script, shellVariant)
+			if maxChainCmds >= minCommands {
 				cmdText = shell.FormatChainedScript(script, shellVariant)
-				numCmdLines = totalCmds
+				numCmdLines = strings.Count(cmdText, "\n") + 1
 			} else {
 				cmdText = strings.TrimSpace(script)
 			}

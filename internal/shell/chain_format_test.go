@@ -80,7 +80,16 @@ func TestCollectChainBoundaries(t *testing.T) {
 			script:         "echo a; echo b",
 			variant:        VariantBash,
 			wantBoundaries: 0,
-			wantCmds:       2,
+			wantCmds:       1, // max per-chain, not total across semicolons
+		},
+		{
+			name:           "semicolon with chain does not inflate threshold",
+			script:         "cmd1; cmd2 && cmd3",
+			variant:        VariantBash,
+			wantBoundaries: 1,
+			wantCmds:       2, // max chain has 2 commands, not 3 total
+			wantSameLine:   []bool{true},
+			wantOps:        []string{"&&"},
 		},
 		{
 			name:           "non-POSIX shell",

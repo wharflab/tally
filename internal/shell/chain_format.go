@@ -24,7 +24,11 @@ type ChainBoundary struct {
 }
 
 // CollectChainBoundaries parses a shell script and returns all top-level
-// chain boundaries (&& and ||) along with the total command count.
+// chain boundaries (&& and ||) along with the maximum per-chain command count.
+// The per-chain count reflects the longest &&/|| chain in any single statement,
+// not the sum across semicolon-separated statements. This is the correct value
+// for comparing against a minCommands threshold.
+//
 // The script text should include backslash continuations exactly as they
 // appear in the Dockerfile source so that line/col positions map correctly.
 //
@@ -40,14 +44,16 @@ func CollectChainBoundaries(scriptText string, variant Variant) ([]ChainBoundary
 	}
 
 	var boundaries []ChainBoundary
-	totalCmds := 0
+	maxChainCmds := 0
 
 	for _, stmt := range prog.Stmts {
 		cmds := collectChainBoundariesFromStmt(stmt, &boundaries)
-		totalCmds += cmds
+		if cmds > maxChainCmds {
+			maxChainCmds = cmds
+		}
 	}
 
-	return boundaries, totalCmds
+	return boundaries, maxChainCmds
 }
 
 // collectChainBoundariesFromStmt recursively collects chain boundaries from a statement.
