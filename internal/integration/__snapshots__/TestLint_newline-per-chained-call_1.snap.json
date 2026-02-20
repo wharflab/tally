@@ -281,40 +281,26 @@
               "line": 30
             }
           },
-          "message": "split chained commands onto separate lines",
+          "message": "split HEALTHCHECK onto separate continuation lines",
           "rule": "tally/newline-per-chained-call",
           "severity": "style",
           "sourceCode": "HEALTHCHECK CMD curl -f http://localhost/ \u0026\u0026 wget -qO- http://localhost/health || exit 1",
           "suggestedFix": {
-            "description": "Split HEALTHCHECK CMD chains onto separate continuation lines",
+            "description": "Split HEALTHCHECK onto separate continuation lines",
             "edits": [
               {
                 "location": {
                   "end": {
-                    "column": 45,
+                    "column": 88,
                     "line": 30
                   },
                   "file": "testdata/newline-per-chained-call/Dockerfile",
                   "start": {
-                    "column": 41,
+                    "column": 0,
                     "line": 30
                   }
                 },
-                "newText": " \\\n\t\u0026\u0026 "
-              },
-              {
-                "location": {
-                  "end": {
-                    "column": 82,
-                    "line": 30
-                  },
-                  "file": "testdata/newline-per-chained-call/Dockerfile",
-                  "start": {
-                    "column": 78,
-                    "line": 30
-                  }
-                },
-                "newText": " \\\n\t|| "
+                "newText": "HEALTHCHECK CMD curl -f http://localhost/ \\\n\t\u0026\u0026 wget -qO- http://localhost/health \\\n\t|| exit 1"
               }
             ],
             "isPreferred": true,
@@ -334,26 +320,26 @@
               "line": 33
             }
           },
-          "message": "split chained commands onto separate lines",
+          "message": "split HEALTHCHECK onto separate continuation lines",
           "rule": "tally/newline-per-chained-call",
           "severity": "style",
           "sourceCode": "HEALTHCHECK --interval=30s --timeout=10s CMD curl -f http://localhost/ \u0026\u0026 wget -qO- http://localhost/health",
           "suggestedFix": {
-            "description": "Split HEALTHCHECK CMD chains onto separate continuation lines",
+            "description": "Split HEALTHCHECK onto separate continuation lines",
             "edits": [
               {
                 "location": {
                   "end": {
-                    "column": 74,
+                    "column": 107,
                     "line": 33
                   },
                   "file": "testdata/newline-per-chained-call/Dockerfile",
                   "start": {
-                    "column": 70,
+                    "column": 0,
                     "line": 33
                   }
                 },
-                "newText": " \\\n\t\u0026\u0026 "
+                "newText": "HEALTHCHECK --interval=30s \\\n\t--timeout=10s \\\n\tCMD curl -f http://localhost/ \\\n\t\u0026\u0026 wget -qO- http://localhost/health"
               }
             ],
             "isPreferred": true,
