@@ -82,3 +82,26 @@ func TestDecodeConfig_CoercesStringTypesUsingSchema(t *testing.T) {
 		t.Fatalf("max-lines opts[\"skip-comments\"] = %v, want false", skipComments)
 	}
 }
+
+func TestDecodeConfig_PreservesGenericRuleConfigs(t *testing.T) {
+	t.Parallel()
+
+	raw := map[string]any{
+		"rules": map[string]any{
+			"hadolint": map[string]any{
+				"DL4000": map[string]any{
+					"severity": "warning",
+				},
+			},
+		},
+	}
+
+	cfg, err := decodeConfig(raw)
+	if err != nil {
+		t.Fatalf("decodeConfig() error = %v", err)
+	}
+
+	if sev := cfg.Rules.GetSeverity("hadolint/DL4000"); sev != "warning" {
+		t.Fatalf("cfg.Rules.GetSeverity(hadolint/DL4000) = %q, want warning", sev)
+	}
+}

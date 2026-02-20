@@ -1,6 +1,7 @@
 package config
 
 import (
+	jsonv2 "encoding/json/v2"
 	"fmt"
 	"maps"
 	"slices"
@@ -10,6 +11,7 @@ import (
 	"github.com/knadh/koanf/v2"
 
 	"github.com/wharflab/tally/internal/ruleconfig"
+	generatedconfig "github.com/wharflab/tally/internal/schemas/generated/config"
 	schemavalidator "github.com/wharflab/tally/internal/schemas/runtime"
 )
 
@@ -18,16 +20,95 @@ func decodeConfig(raw map[string]any) (*Config, error) {
 		return nil, err
 	}
 
-	normalized := koanf.New(".")
-	if err := normalized.Load(confmap.Provider(raw, ""), nil); err != nil {
-		return nil, fmt.Errorf("load normalized config: %w", err)
-	}
-
-	cfg := &Config{}
-	if err := normalized.Unmarshal("", cfg); err != nil {
+	schemaCfg, err := decodeSchemaConfig(raw)
+	if err != nil {
 		return nil, err
 	}
+
+	rulesCfg, err := decodeRulesConfig(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg := configFromSchema(schemaCfg)
+	cfg.Rules = rulesCfg
 	return cfg, nil
+}
+
+func decodeSchemaConfig(raw map[string]any) (*generatedconfig.TallyConfigSchemaJson, error) {
+	data, err := jsonv2.Marshal(raw)
+	if err != nil {
+		return nil, fmt.Errorf("marshal normalized config: %w", err)
+	}
+
+	var schemaCfg generatedconfig.TallyConfigSchemaJson
+	if err := jsonv2.Unmarshal(data, &schemaCfg); err != nil {
+		return nil, fmt.Errorf("decode generated config: %w", err)
+	}
+	return &schemaCfg, nil
+}
+
+func decodeRulesConfig(raw map[string]any) (RulesConfig, error) {
+	rulesRaw, ok := raw["rules"].(map[string]any)
+	if !ok {
+		return RulesConfig{}, nil
+	}
+
+	normalized := koanf.New(".")
+	if err := normalized.Load(confmap.Provider(rulesRaw, ""), nil); err != nil {
+		return RulesConfig{}, fmt.Errorf("load normalized rule config: %w", err)
+	}
+
+	var rulesCfg RulesConfig
+	if err := normalized.Unmarshal("", &rulesCfg); err != nil {
+		return RulesConfig{}, fmt.Errorf("decode rule config: %w", err)
+	}
+	return rulesCfg, nil
+}
+
+func configFromSchema(schemaCfg *generatedconfig.TallyConfigSchemaJson) *Config {
+	cfg := &Config{}
+	if schemaCfg == nil {
+		return cfg
+	}
+
+	if output := schemaCfg.Output; output != nil {
+		cfg.Output = OutputConfig{
+			Format:     string(output.Format),
+			Path:       output.Path,
+			ShowSource: output.ShowSource,
+			FailLevel:  string(output.FailLevel),
+		}
+	}
+
+	if inline := schemaCfg.InlineDirectives; inline != nil {
+		cfg.InlineDirectives = InlineDirectivesConfig{
+			Enabled:       inline.Enabled,
+			WarnUnused:    inline.WarnUnused,
+			ValidateRules: inline.ValidateRules,
+			RequireReason: inline.RequireReason,
+		}
+	}
+
+	if ai := schemaCfg.Ai; ai != nil {
+		cfg.AI = AIConfig{
+			Enabled:       ai.Enabled,
+			Command:       slices.Clone(ai.Command),
+			Timeout:       ai.Timeout,
+			MaxInputBytes: ai.MaxInputBytes,
+			RedactSecrets: ai.RedactSecrets,
+		}
+	}
+
+	if slowChecks := schemaCfg.SlowChecks; slowChecks != nil {
+		cfg.SlowChecks = SlowChecksConfig{
+			Mode:     string(slowChecks.Mode),
+			FailFast: slowChecks.FailFast,
+			Timeout:  slowChecks.Timeout,
+		}
+	}
+
+	return cfg
 }
 
 func validateAndNormalize(raw map[string]any) error {
