@@ -4,6 +4,7 @@ package configutil
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	jsonv2 "encoding/json/v2"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/wharflab/tally/internal/ruleconfig"
 	schemavalidator "github.com/wharflab/tally/internal/schemas/runtime"
 )
+
+var resolvedSchemaCache sync.Map
 
 // Resolve merges user options over defaults and unmarshals to typed config.
 // If opts is nil or empty, returns defaults unchanged.
@@ -141,22 +144,37 @@ func ValidateWithSchema(config any, schema map[string]any) error {
 		return nil
 	}
 
-	schemaData, err := jsonv2.Marshal(schema)
+	schemaData, err := jsonv2.Marshal(schema, jsonv2.Deterministic(true))
 	if err != nil {
 		return fmt.Errorf("marshal schema: %w", err)
 	}
 
-	var parsedSchema gjsonschema.Schema
-	if err := jsonv2.Unmarshal(schemaData, &parsedSchema); err != nil {
-		return fmt.Errorf("parse schema: %w", err)
-	}
-
-	resolved, err := parsedSchema.Resolve(nil)
+	resolved, err := resolveSchema(schemaData)
 	if err != nil {
 		return err
 	}
 
 	return validateResolved(config, resolved)
+}
+
+func resolveSchema(schemaData []byte) (*gjsonschema.Resolved, error) {
+	if cached, ok := resolvedSchemaCache.Load(string(schemaData)); ok {
+		if resolved, ok := cached.(*gjsonschema.Resolved); ok {
+			return resolved, nil
+		}
+	}
+
+	var parsedSchema gjsonschema.Schema
+	if err := jsonv2.Unmarshal(schemaData, &parsedSchema); err != nil {
+		return nil, fmt.Errorf("parse schema: %w", err)
+	}
+
+	resolved, err := parsedSchema.Resolve(nil)
+	if err != nil {
+		return nil, err
+	}
+	resolvedSchemaCache.Store(string(schemaData), resolved)
+	return resolved, nil
 }
 
 func validateResolved(config any, resolved *gjsonschema.Resolved) error {
