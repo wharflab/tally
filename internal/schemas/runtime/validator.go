@@ -18,6 +18,7 @@ import (
 var ErrUnknownRuleSchema = errors.New("unknown rule schema")
 
 type Validator interface {
+	CoerceRootConfig(raw map[string]any) error
 	ValidateRootConfig(raw map[string]any) error
 	ValidateRuleOptions(ruleCode string, raw any) error
 	RuleSchema(ruleCode string) (map[string]any, error)
@@ -28,6 +29,7 @@ type validator struct {
 	rootResolved    *gjsonschema.Resolved
 	ruleResolved    map[string]*gjsonschema.Resolved
 	ruleSchemaAsMap map[string]map[string]any
+	rawSchemasByID  map[string]map[string]any
 }
 
 var (
@@ -48,6 +50,7 @@ func DefaultValidator() (Validator, error) {
 
 func newValidator() (*validator, error) {
 	parsedSchemas := make(map[string]*gjsonschema.Schema)
+	rawSchemas := make(map[string]map[string]any)
 
 	for _, schemaID := range schemasembed.AllSchemaIDs() {
 		schema, err := parseSchemaByID(schemaID)
@@ -55,6 +58,12 @@ func newValidator() (*validator, error) {
 			return nil, err
 		}
 		parsedSchemas[schemaID] = schema
+
+		rawSchema, rawErr := parseRawSchemaByID(schemaID)
+		if rawErr != nil {
+			return nil, rawErr
+		}
+		rawSchemas[schemaID] = rawSchema
 	}
 
 	loader := func(uri *url.URL) (*gjsonschema.Schema, error) {
@@ -97,10 +106,7 @@ func newValidator() (*validator, error) {
 		}
 		ruleResolved[ruleCode] = resolved
 
-		rawSchema, rawErr := parseRawSchemaByID(schemaID)
-		if rawErr != nil {
-			return nil, rawErr
-		}
+		rawSchema := rawSchemas[schemaID]
 		ruleSchemaAsMap[ruleCode] = rawSchema
 	}
 
@@ -108,7 +114,20 @@ func newValidator() (*validator, error) {
 		rootResolved:    rootResolved,
 		ruleResolved:    ruleResolved,
 		ruleSchemaAsMap: ruleSchemaAsMap,
+		rawSchemasByID:  rawSchemas,
 	}, nil
+}
+
+func (v *validator) CoerceRootConfig(raw map[string]any) error {
+	if raw == nil {
+		return nil
+	}
+	rootSchema := v.rawSchemasByID[schemasembed.RootConfigSchemaID]
+	if rootSchema == nil {
+		return fmt.Errorf("missing embedded root schema %q", schemasembed.RootConfigSchemaID)
+	}
+	_, err := v.coerceValue(schemasembed.RootConfigSchemaID, rootSchema, raw)
+	return err
 }
 
 func (v *validator) ValidateRootConfig(raw map[string]any) error {

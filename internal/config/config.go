@@ -15,7 +15,6 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/knadh/koanf/parsers/toml/v2"
@@ -247,58 +246,7 @@ func envKeyTransform(k, v string) (string, any) {
 	for pattern, replacement := range knownHyphenatedKeys {
 		s = strings.ReplaceAll(s, pattern, replacement)
 	}
-	return s, parseEnvValue(s, v)
-}
-
-func parseEnvValue(key, value string) any {
-	if shouldParseEnvBool(key) {
-		if b, err := strconv.ParseBool(value); err == nil {
-			return b
-		}
-	}
-	if shouldParseEnvInt(key) {
-		if i, err := strconv.ParseInt(value, 10, 64); err == nil {
-			return i
-		}
-	}
-	return value
-}
-
-func shouldParseEnvBool(key string) bool {
-	for _, suffix := range []string{
-		".enabled",
-		".show-source",
-		".warn-unused",
-		".validate-rules",
-		".require-reason",
-		".redact-secrets",
-		".fail-fast",
-		".skip-blank-lines",
-		".skip-comments",
-		".ignore-comments",
-		".check-consecutive-runs",
-		".check-chained-commands",
-		".check-single-run",
-	} {
-		if strings.HasSuffix(key, suffix) {
-			return true
-		}
-	}
-	return false
-}
-
-func shouldParseEnvInt(key string) bool {
-	for _, suffix := range []string{
-		".max",
-		".max-input-bytes",
-		".min-commands",
-		".min-score",
-	} {
-		if strings.HasSuffix(key, suffix) {
-			return true
-		}
-	}
-	return false
+	return s, v
 }
 
 // Discover finds the closest config file for a target file path.

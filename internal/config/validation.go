@@ -38,6 +38,9 @@ func validateAndNormalize(raw map[string]any) error {
 	if err != nil {
 		return err
 	}
+	if err := validator.CoerceRootConfig(raw); err != nil {
+		return err
+	}
 	if err := validator.ValidateRootConfig(raw); err != nil {
 		return err
 	}
