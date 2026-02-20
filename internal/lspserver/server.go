@@ -396,8 +396,9 @@ type stdioDialer struct{}
 func (stdioDialer) Dial(_ context.Context) (io.ReadWriteCloser, error) {
 	pr, pw := io.Pipe()
 	go func() {
-		_, _ = io.Copy(pw, os.Stdin) //nolint:errcheck // best-effort stdin relay
-		_ = pw.Close()               // propagate stdin EOF so jsonrpc2 readIncoming can exit
+		_, err := io.Copy(pw, os.Stdin)
+		// Propagate the exact error (or clean EOF) to unblock jsonrpc2 readIncoming.
+		_ = pw.CloseWithError(err)
 	}()
 	return &stdioRWC{pr: pr, pw: pw}, nil
 }
