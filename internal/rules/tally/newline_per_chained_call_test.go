@@ -1,12 +1,15 @@
 package tally
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
+	"go.bug.st/lsp"
+	"go.bug.st/lsp/textedits"
 )
 
 func TestNewlinePerChainedCallMetadata(t *testing.T) {
@@ -216,6 +219,12 @@ func TestNewlinePerChainedCallCheck(t *testing.T) {
 			WantViolations: 0,
 		},
 		{
+			Name:           "LABEL with quoted value containing spaces",
+			Content:        "FROM alpine:3.20\nLABEL maintainer=\"John Doe\" version=1.0\n",
+			WantViolations: 1,
+			WantMessages:   []string{"LABEL"},
+		},
+		{
 			Name:           "LABEL legacy format - skip",
 			Content:        "FROM alpine:3.20\nLABEL maintainer John Doe\n",
 			WantViolations: 0,
@@ -258,10 +267,11 @@ func TestNewlinePerChainedCallCheckWithFixes(t *testing.T) {
 	r := NewNewlinePerChainedCallRule()
 
 	tests := []struct {
-		name      string
-		content   string
-		config    any
-		wantEdits int
+		name             string
+		content          string
+		config           any
+		wantEdits        int
+		wantFixedContent string // if set, apply edits and compare full result
 	}{
 		{
 			name:      "RUN two commands - one boundary edit",
@@ -287,6 +297,12 @@ func TestNewlinePerChainedCallCheckWithFixes(t *testing.T) {
 			name:      "HEALTHCHECK CMD with chain - one edit",
 			content:   "FROM alpine:3.20\nHEALTHCHECK CMD cmd1 && cmd2\n",
 			wantEdits: 1,
+		},
+		{
+			name:             "LABEL quoted value with spaces - fix preserves quoting",
+			content:          "FROM alpine:3.20\nLABEL maintainer=\"John Doe\" version=1.0\n",
+			wantEdits:        1,
+			wantFixedContent: "FROM alpine:3.20\nLABEL maintainer=\"John Doe\" \\\n\tversion=1.0\n",
 		},
 	}
 
@@ -326,6 +342,41 @@ func TestNewlinePerChainedCallCheckWithFixes(t *testing.T) {
 					t.Errorf("edit[%d]: continuation line missing tab indent: %q", i, e.NewText)
 				}
 			}
+
+			// If wantFixedContent is set, apply edits and verify final content
+			if tt.wantFixedContent != "" {
+				got := applyFixEdits(t, tt.content, v.SuggestedFix.Edits)
+				if got != tt.wantFixedContent {
+					t.Errorf("fixed content mismatch:\n got: %q\nwant: %q", got, tt.wantFixedContent)
+				}
+			}
 		})
 	}
+}
+
+// applyFixEdits applies rules.TextEdits (1-based lines) to content using the
+// go.bug.st/lsp/textedits library. Edits are applied in reverse position order
+// to preserve offsets.
+func applyFixEdits(t *testing.T, content string, edits []rules.TextEdit) string {
+	t.Helper()
+	sorted := slices.Clone(edits)
+	slices.SortFunc(sorted, func(a, b rules.TextEdit) int {
+		if a.Location.Start.Line != b.Location.Start.Line {
+			return b.Location.Start.Line - a.Location.Start.Line
+		}
+		return b.Location.Start.Column - a.Location.Start.Column
+	})
+	for _, e := range sorted {
+		// Convert 1-based line to 0-based for LSP Range
+		r := lsp.Range{
+			Start: lsp.Position{Line: e.Location.Start.Line - 1, Character: e.Location.Start.Column},
+			End:   lsp.Position{Line: e.Location.End.Line - 1, Character: e.Location.End.Column},
+		}
+		var err error
+		content, err = textedits.ApplyTextChange(content, r, e.NewText)
+		if err != nil {
+			t.Fatalf("ApplyTextChange failed: %v", err)
+		}
+	}
+	return content
 }
