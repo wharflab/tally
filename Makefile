@@ -96,14 +96,20 @@ bin/gotestsum-$(GOTESTSUM_VERSION):
 print-gotestsum-bin:
 	@echo bin/gotestsum-$(GOTESTSUM_VERSION)
 
+# Schema pipeline:
+# - schema-gen: regenerate all JSON schemas, generated Go schema models, and published schema.json.
+# - schema-check: enforce schema-generation invariants used by CI.
+# - jsonschema: compatibility alias for schema-check.
 schema-gen:
 	cd _tools && go run ./schema-gen
 
 schema-check: schema-gen
+	# Generated schema models must stay JSON v2 compliant (no encoding/json imports).
 	@if rg -n '"encoding/json"' internal/schemas/generated; then \
 		echo "generated schema models must not import encoding/json"; \
 		exit 1; \
 	fi
+	# Published schema.json must be standalone for SchemaStore/IDE consumers.
 	@if rg -n '"\\$$ref"[[:space:]]*:[[:space:]]*"(\\./|\\.\\./)' schema.json; then \
 		echo "published schema.json must not contain filesystem-relative $$ref paths"; \
 		exit 1; \
