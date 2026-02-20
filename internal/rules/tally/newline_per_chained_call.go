@@ -358,12 +358,9 @@ func (r *NewlinePerChainedCallRule) collectSameLineChainEdits(
 		return nil
 	}
 
-	var sameLineBoundaries []shell.ChainBoundary
-	for _, b := range boundaries {
-		if b.SameLine {
-			sameLineBoundaries = append(sameLineBoundaries, b)
-		}
-	}
+	sameLineBoundaries := slices.DeleteFunc(boundaries, func(b shell.ChainBoundary) bool {
+		return !b.SameLine
+	})
 
 	if len(sameLineBoundaries) == 0 {
 		return nil
