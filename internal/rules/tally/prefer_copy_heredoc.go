@@ -66,23 +66,7 @@ func (r *PreferCopyHeredocRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *PreferCopyHeredocRule) Schema() map[string]any {
-	return map[string]any{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type":    "object",
-		"properties": map[string]any{
-			"check-single-run": map[string]any{
-				"type":        "boolean",
-				"default":     true,
-				"description": "Check for single RUN instructions with file creation",
-			},
-			"check-consecutive-runs": map[string]any{
-				"type":        "boolean",
-				"default":     true,
-				"description": "Check for consecutive RUN instructions creating/appending to same file",
-			},
-		},
-		"additionalProperties": false,
-	}
+	return configutil.RuleSchema(PreferCopyHeredocRuleCode)
 }
 
 // Check runs the prefer-copy-heredoc rule.
@@ -137,7 +121,7 @@ func (r *PreferCopyHeredocRule) DefaultConfig() any {
 
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *PreferCopyHeredocRule) ValidateConfig(config any) error {
-	return configutil.ValidateWithSchema(config, r.Schema())
+	return configutil.ValidateRuleOptions(PreferCopyHeredocRuleCode, config)
 }
 
 // fileCreationRun represents a RUN instruction that creates a file.

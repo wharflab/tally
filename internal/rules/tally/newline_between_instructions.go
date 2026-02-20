@@ -52,27 +52,7 @@ func (r *NewlineBetweenInstructionsRule) Metadata() rules.RuleMetadata {
 // Schema returns the JSON Schema for this rule's configuration.
 // Supports string shorthand ("grouped", "always", "never") or full object config.
 func (r *NewlineBetweenInstructionsRule) Schema() map[string]any {
-	return map[string]any{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"oneOf": []any{
-			map[string]any{
-				"type": "string",
-				"enum": []any{"grouped", "always", "never"},
-			},
-			map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"mode": map[string]any{
-						"type":        "string",
-						"enum":        []any{"grouped", "always", "never"},
-						"default":     "grouped",
-						"description": "Blank-line mode: grouped, always, or never",
-					},
-				},
-				"additionalProperties": false,
-			},
-		},
-	}
+	return configutil.RuleSchema(NewlineBetweenInstructionsRuleCode)
 }
 
 // DefaultConfig returns the default configuration for this rule.
@@ -82,7 +62,7 @@ func (r *NewlineBetweenInstructionsRule) DefaultConfig() any {
 
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *NewlineBetweenInstructionsRule) ValidateConfig(config any) error {
-	return configutil.ValidateWithSchema(config, r.Schema())
+	return configutil.ValidateRuleOptions(NewlineBetweenInstructionsRuleCode, config)
 }
 
 // Check runs the newline-between-instructions rule.

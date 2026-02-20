@@ -1,4 +1,4 @@
-.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema lsp-protocol print-gotestsum-bin
+.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin
 
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
@@ -96,8 +96,17 @@ bin/gotestsum-$(GOTESTSUM_VERSION):
 print-gotestsum-bin:
 	@echo bin/gotestsum-$(GOTESTSUM_VERSION)
 
-jsonschema:
-	go run -tags '$(BUILDTAGS)' gen/jsonschema.go > schema.json
+schema-gen:
+	go run -tags '$(BUILDTAGS)' ./tools/schema-gen
+	cp internal/schemas/root/tally-config.schema.json schema.json
+
+schema-check: schema-gen
+	@if rg -n '"encoding/json"' internal/schemas/generated; then \
+		echo "generated schema models must not import encoding/json"; \
+		exit 1; \
+	fi
+
+jsonschema: schema-check
 
 lsp-protocol:
 	bun run tools/lspgen/fetchModel.mts

@@ -1,0 +1,64 @@
+{
+  "schemas": [
+    {
+      "input": "internal/schemas/root/tally-config.schema.json",
+      "output": "internal/schemas/generated/config/tally_config.gen.go",
+      "package": "configschema"
+    },
+    {
+      "input": "internal/schemas/rules/tally/max_lines.schema.json",
+      "output": "internal/schemas/generated/rules/tally/max_lines.gen.go",
+      "package": "tallyschema"
+    },
+    {
+      "input": "internal/schemas/rules/tally/consistent_indentation.schema.json",
+      "output": "internal/schemas/generated/rules/tally/consistent_indentation.gen.go",
+      "package": "tallyschema"
+    },
+    {
+      "input": "internal/schemas/rules/tally/no_trailing_spaces.schema.json",
+      "output": "internal/schemas/generated/rules/tally/no_trailing_spaces.gen.go",
+      "package": "tallyschema"
+    },
+    {
+      "input": "internal/schemas/rules/tally/newline_between_instructions.schema.json",
+      "output": "internal/schemas/generated/rules/tally/newline_between_instructions.gen.go",
+      "package": "tallyschema"
+    },
+    {
+      "input": "internal/schemas/rules/tally/newline_per_chained_call.schema.json",
+      "output": "internal/schemas/generated/rules/tally/newline_per_chained_call.gen.go",
+      "package": "tallyschema"
+    },
+    {
+      "input": "internal/schemas/rules/tally/prefer_add_unpack.schema.json",
+      "output": "internal/schemas/generated/rules/tally/prefer_add_unpack.gen.go",
+      "package": "tallyschema"
+    },
+    {
+      "input": "internal/schemas/rules/tally/prefer_run_heredoc.schema.json",
+      "output": "internal/schemas/generated/rules/tally/prefer_run_heredoc.gen.go",
+      "package": "tallyschema"
+    },
+    {
+      "input": "internal/schemas/rules/tally/prefer_copy_heredoc.schema.json",
+      "output": "internal/schemas/generated/rules/tally/prefer_copy_heredoc.gen.go",
+      "package": "tallyschema"
+    },
+    {
+      "input": "internal/schemas/rules/tally/prefer_multi_stage_build.schema.json",
+      "output": "internal/schemas/generated/rules/tally/prefer_multi_stage_build.gen.go",
+      "package": "tallyschema"
+    },
+    {
+      "input": "internal/schemas/rules/hadolint/dl3001.schema.json",
+      "output": "internal/schemas/generated/rules/hadolint/dl3001.gen.go",
+      "package": "hadolintschema"
+    },
+    {
+      "input": "internal/schemas/rules/hadolint/dl3026.schema.json",
+      "output": "internal/schemas/generated/rules/hadolint/dl3026.gen.go",
+      "package": "hadolintschema"
+    }
+  ]
+}

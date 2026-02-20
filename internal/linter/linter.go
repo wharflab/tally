@@ -7,7 +7,6 @@ package linter
 
 import (
 	"bytes"
-	"log"
 	"os"
 
 	"github.com/wharflab/tally/internal/async"
@@ -91,8 +90,7 @@ func LintFile(input Input) (*Result, error) {
 		var err error
 		cfg, err = config.Load(input.FilePath)
 		if err != nil {
-			log.Printf("linter: config load error for %s: %v", input.FilePath, err)
-			cfg = config.Default()
+			return nil, err
 		}
 	}
 

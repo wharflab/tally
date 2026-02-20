@@ -102,9 +102,9 @@ func loadWithConfigPathAndOverrides(
 		}
 	}
 
-	// 3) Unmarshal into config struct
-	cfg := &Config{}
-	if err := k.Unmarshal("", cfg); err != nil {
+	// 3) Validate merged raw config and decode.
+	cfg, err := decodeConfig(k.Raw())
+	if err != nil {
 		return nil, err
 	}
 

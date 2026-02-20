@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tally.dev/rules/tally/max_lines.schema.json",
+  "title": "tally/max-lines rule config",
+  "type": "object",
+  "properties": {
+    "severity": {
+      "type": "string",
+      "enum": ["off", "error", "warning", "info", "style"]
+    },
+    "fix": {
+      "type": "string",
+      "enum": ["never", "explicit", "always", "unsafe-only"]
+    },
+    "exclude": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "max": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 50,
+      "description": "Maximum number of lines allowed (0 = disabled)"
+    },
+    "skip-blank-lines": {
+      "type": "boolean",
+      "default": true,
+      "description": "Exclude blank lines from the count"
+    },
+    "skip-comments": {
+      "type": "boolean",
+      "default": true,
+      "description": "Exclude comment lines from the count"
+    }
+  },
+  "additionalProperties": false
+}

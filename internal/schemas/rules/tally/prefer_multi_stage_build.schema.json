@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tally.dev/rules/tally/prefer_multi_stage_build.schema.json",
+  "title": "tally/prefer-multi-stage-build rule config",
+  "type": "object",
+  "properties": {
+    "severity": {
+      "type": "string",
+      "enum": ["off", "error", "warning", "info", "style"]
+    },
+    "fix": {
+      "type": "string",
+      "enum": ["never", "explicit", "always", "unsafe-only"]
+    },
+    "exclude": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "min-score": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 4
+    }
+  },
+  "additionalProperties": false
+}

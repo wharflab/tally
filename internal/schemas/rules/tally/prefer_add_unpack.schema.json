@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tally.dev/rules/tally/prefer_add_unpack.schema.json",
+  "title": "tally/prefer-add-unpack rule config",
+  "type": "object",
+  "properties": {
+    "severity": {
+      "type": "string",
+      "enum": ["off", "error", "warning", "info", "style"]
+    },
+    "fix": {
+      "type": "string",
+      "enum": ["never", "explicit", "always", "unsafe-only"]
+    },
+    "exclude": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "additionalProperties": false
+}

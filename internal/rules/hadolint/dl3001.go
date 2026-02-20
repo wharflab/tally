@@ -67,19 +67,7 @@ func (r *DL3001Rule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *DL3001Rule) Schema() map[string]any {
-	return map[string]any{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type":    "object",
-		"properties": map[string]any{
-			"invalid-commands": map[string]any{
-				"type":        "array",
-				"items":       map[string]any{"type": "string", "minLength": 1},
-				"uniqueItems": true,
-				"description": "Commands to flag as invalid inside a container (default: free, kill, mount, ps, service, shutdown, ssh, top, vim)",
-			},
-		},
-		"additionalProperties": false,
-	}
+	return configutil.RuleSchema(r.Metadata().Code)
 }
 
 // DefaultConfig returns the default configuration for this rule.
@@ -89,7 +77,7 @@ func (r *DL3001Rule) DefaultConfig() any {
 
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *DL3001Rule) ValidateConfig(config any) error {
-	return configutil.ValidateWithSchema(config, r.Schema())
+	return configutil.ValidateRuleOptions(r.Metadata().Code, config)
 }
 
 // Check runs the DL3001 rule.

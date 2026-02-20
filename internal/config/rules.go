@@ -37,11 +37,11 @@ const (
 type RuleConfig struct {
 	// Severity overrides the rule's default severity.
 	// Use "off" to disable the rule.
-	Severity string `json:"severity,omitempty" jsonschema:"enum=off,enum=error,enum=warning,enum=info,enum=style" koanf:"severity"`
+	Severity string `json:"severity,omitempty" koanf:"severity"`
 
 	// Fix controls when auto-fixes are applied for this rule.
 	// Values: never, explicit, always (default), unsafe-only.
-	Fix FixMode `json:"fix,omitempty" jsonschema:"enum=never,enum=explicit,enum=always,enum=unsafe-only" koanf:"fix"`
+	Fix FixMode `json:"fix,omitempty" koanf:"fix"`
 
 	// Exclude contains path patterns where this rule should not run.
 	Exclude ExcludeConfig `json:"exclude" koanf:"exclude"`
@@ -53,7 +53,7 @@ type RuleConfig struct {
 // ExcludeConfig defines file exclusion patterns for a rule.
 type ExcludeConfig struct {
 	// Paths contains glob patterns for files to exclude.
-	Paths []string `json:"paths,omitempty" jsonschema:"description=Glob patterns for files to exclude (e.g. test/**)" koanf:"paths"`
+	Paths []string `json:"paths,omitempty" koanf:"paths"`
 }
 
 // RulesConfig contains rule selection and per-rule configuration.
@@ -73,19 +73,19 @@ type ExcludeConfig struct {
 //	trusted-registries = ["docker.io", "gcr.io"]
 type RulesConfig struct {
 	// Include explicitly enables rules.
-	Include []string `json:"include,omitempty" jsonschema:"description=Enable rules by pattern (e.g. buildkit/*)" koanf:"include"`
+	Include []string `json:"include,omitempty" koanf:"include"`
 
 	// Exclude explicitly disables rules.
-	Exclude []string `json:"exclude,omitempty" jsonschema:"description=Disable rules by pattern" koanf:"exclude"`
+	Exclude []string `json:"exclude,omitempty" koanf:"exclude"`
 
 	// Tally contains configuration for tally/* rules.
-	Tally map[string]RuleConfig `json:"tally,omitempty" jsonschema:"description=Configuration for tally/* rules" koanf:"tally"`
+	Tally map[string]RuleConfig `json:"tally,omitempty" koanf:"tally"`
 
 	// Buildkit contains configuration for buildkit/* rules.
-	Buildkit map[string]RuleConfig `json:"buildkit,omitempty" jsonschema:"description=Configuration for buildkit/* rules" koanf:"buildkit"`
+	Buildkit map[string]RuleConfig `json:"buildkit,omitempty" koanf:"buildkit"`
 
 	// Hadolint contains configuration for hadolint/* rules.
-	Hadolint map[string]RuleConfig `json:"hadolint,omitempty" jsonschema:"description=Configuration for hadolint/* rules" koanf:"hadolint"`
+	Hadolint map[string]RuleConfig `json:"hadolint,omitempty" koanf:"hadolint"`
 }
 
 // Get returns the configuration for a specific rule.

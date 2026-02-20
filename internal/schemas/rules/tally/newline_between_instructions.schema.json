@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tally.dev/rules/tally/newline_between_instructions.schema.json",
+  "title": "tally/newline-between-instructions rule config",
+  "type": "object",
+  "properties": {
+    "severity": {
+      "type": "string",
+      "enum": ["off", "error", "warning", "info", "style"]
+    },
+    "fix": {
+      "type": "string",
+      "enum": ["never", "explicit", "always", "unsafe-only"]
+    },
+    "exclude": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["grouped", "always", "never"],
+      "default": "grouped"
+    }
+  },
+  "additionalProperties": false
+}

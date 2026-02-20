@@ -46,11 +46,7 @@ func (r *ConsistentIndentationRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *ConsistentIndentationRule) Schema() map[string]any {
-	return map[string]any{
-		"$schema":              "https://json-schema.org/draft/2020-12/schema",
-		"type":                 "object",
-		"additionalProperties": false,
-	}
+	return configutil.RuleSchema(ConsistentIndentationRuleCode)
 }
 
 // DefaultConfig returns the default configuration for this rule.
@@ -60,7 +56,7 @@ func (r *ConsistentIndentationRule) DefaultConfig() any {
 
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *ConsistentIndentationRule) ValidateConfig(config any) error {
-	return configutil.ValidateWithSchema(config, r.Schema())
+	return configutil.ValidateRuleOptions(ConsistentIndentationRuleCode, config)
 }
 
 // Check runs the consistent-indentation rule.

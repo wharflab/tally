@@ -359,7 +359,7 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 				"additionalProperties": false,
 			},
 			config:      map[string]any{"max": "not-a-number"},
-			wantSubstrs: []string{"got string, want integer"},
+			wantSubstrs: []string{"has type \"string\", want \"integer\""},
 		},
 		{
 			name: "multiple errors",
@@ -371,7 +371,7 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 				"additionalProperties": false,
 			},
 			config:      map[string]any{"max": "bad", "extra": true},
-			wantSubstrs: []string{"not allowed", "got string, want integer"},
+			wantSubstrs: []string{"has type \"string\", want \"integer\""},
 		},
 		{
 			name: "minimum violation",

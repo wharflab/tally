@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.tally.dev/rules/tally/newline_per_chained_call.schema.json",
+  "title": "tally/newline-per-chained-call rule config",
+  "type": "object",
+  "properties": {
+    "severity": {
+      "type": "string",
+      "enum": ["off", "error", "warning", "info", "style"]
+    },
+    "fix": {
+      "type": "string",
+      "enum": ["never", "explicit", "always", "unsafe-only"]
+    },
+    "exclude": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "min-commands": {
+      "type": "integer",
+      "minimum": 2,
+      "default": 2
+    }
+  },
+  "additionalProperties": false
+}

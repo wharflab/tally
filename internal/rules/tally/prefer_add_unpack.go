@@ -58,18 +58,7 @@ func (r *PreferAddUnpackRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *PreferAddUnpackRule) Schema() map[string]any {
-	return map[string]any{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type":    "object",
-		"properties": map[string]any{
-			"enabled": map[string]any{
-				"type":        "boolean",
-				"default":     true,
-				"description": "Enable or disable the rule",
-			},
-		},
-		"additionalProperties": false,
-	}
+	return configutil.RuleSchema(PreferAddUnpackRuleCode)
 }
 
 // DefaultConfig returns the default configuration.
@@ -79,7 +68,7 @@ func (r *PreferAddUnpackRule) DefaultConfig() any {
 
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *PreferAddUnpackRule) ValidateConfig(config any) error {
-	return configutil.ValidateWithSchema(config, r.Schema())
+	return configutil.ValidateRuleOptions(PreferAddUnpackRuleCode, config)
 }
 
 // Check runs the prefer-add-unpack rule.

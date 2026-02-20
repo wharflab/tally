@@ -15,6 +15,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/knadh/koanf/parsers/toml/v2"
@@ -33,10 +34,10 @@ const EnvPrefix = "TALLY_"
 // Config represents the complete tally configuration.
 type Config struct {
 	// Rules contains configuration for individual linting rules.
-	Rules RulesConfig `json:"rules" jsonschema:"description=Rule configuration" koanf:"rules"`
+	Rules RulesConfig `json:"rules" koanf:"rules"`
 
 	// Output configures output format and destination.
-	Output OutputConfig `json:"output" jsonschema:"description=Output settings" koanf:"output"`
+	Output OutputConfig `json:"output" koanf:"output"`
 
 	// InlineDirectives controls inline suppression directives.
 	InlineDirectives InlineDirectivesConfig `json:"inline-directives" koanf:"inline-directives"`
@@ -45,7 +46,7 @@ type Config struct {
 	AI AIConfig `json:"ai" koanf:"ai"`
 
 	// SlowChecks configures async checks that require network or other slow I/O.
-	SlowChecks SlowChecksConfig `json:"slow-checks" jsonschema:"description=Slow checks configuration" koanf:"slow-checks"`
+	SlowChecks SlowChecksConfig `json:"slow-checks" koanf:"slow-checks"`
 
 	// ConfigFile is the path to the config file that was loaded (if any).
 	// This is metadata, not loaded from config.
@@ -63,13 +64,13 @@ type Config struct {
 //	timeout = "20s"
 type SlowChecksConfig struct {
 	// Mode controls when slow checks run: auto (CI detection), on, off.
-	Mode string `json:"mode,omitempty" jsonschema:"default=auto,enum=auto,enum=on,enum=off,description=When to run slow checks" koanf:"mode"`
+	Mode string `json:"mode,omitempty" koanf:"mode"`
 
 	// FailFast skips async checks when fast checks already produce SeverityError violations.
-	FailFast bool `json:"fail-fast,omitempty" jsonschema:"default=true,description=Skip slow checks when errors found" koanf:"fail-fast"`
+	FailFast bool `json:"fail-fast,omitempty" koanf:"fail-fast"`
 
 	// Timeout is the wall-clock budget for all async checks per invocation.
-	Timeout string `json:"timeout,omitempty" jsonschema:"default=20s,description=Timeout for slow checks (e.g. 20s)" koanf:"timeout"`
+	Timeout string `json:"timeout,omitempty" koanf:"timeout"`
 }
 
 // OutputConfig configures output formatting and behavior.
@@ -99,16 +100,16 @@ type OutputConfig struct {
 //	require-reason = false
 type InlineDirectivesConfig struct {
 	// Enabled controls whether inline directives are processed.
-	Enabled bool `json:"enabled,omitempty" jsonschema:"default=true,description=Process inline ignore directives" koanf:"enabled"`
+	Enabled bool `json:"enabled,omitempty" koanf:"enabled"`
 
 	// WarnUnused reports warnings for directives that don't suppress any violations.
-	WarnUnused bool `json:"warn-unused,omitempty" jsonschema:"default=false,description=Warn about unused directives" koanf:"warn-unused"`
+	WarnUnused bool `json:"warn-unused,omitempty" koanf:"warn-unused"`
 
 	// ValidateRules reports warnings for unknown rule codes in directives.
-	ValidateRules bool `json:"validate-rules,omitempty" jsonschema:"default=false" koanf:"validate-rules"`
+	ValidateRules bool `json:"validate-rules,omitempty" koanf:"validate-rules"`
 
 	// RequireReason reports warnings for directives without a reason= explanation.
-	RequireReason bool `json:"require-reason,omitempty" jsonschema:"default=false" koanf:"require-reason"`
+	RequireReason bool `json:"require-reason,omitempty" koanf:"require-reason"`
 }
 
 // AIConfig configures opt-in AI features.
@@ -116,20 +117,20 @@ type InlineDirectivesConfig struct {
 // This is intentionally minimal for MVP. Expand cautiously: AI behavior must remain opt-in.
 type AIConfig struct {
 	// Enabled toggles all AI features in tally. Disabled by default.
-	Enabled bool `json:"enabled,omitempty" jsonschema:"default=false,description=Enable AI features (opt-in)" koanf:"enabled"`
+	Enabled bool `json:"enabled,omitempty" koanf:"enabled"`
 
 	// Command is the ACP-capable agent program argv (stdio).
 	// Example: ["acp-agent", "--model", "foo"].
-	Command []string `json:"command,omitempty" jsonschema:"description=ACP agent command argv (stdio)" koanf:"command"`
+	Command []string `json:"command,omitempty" koanf:"command"`
 
 	// Timeout is the per-fix timeout (e.g. "90s"). Parsed with time.ParseDuration at runtime.
-	Timeout string `json:"timeout,omitempty" jsonschema:"default=90s,description=Per-fix timeout (e.g. 90s)" koanf:"timeout"`
+	Timeout string `json:"timeout,omitempty" koanf:"timeout"`
 
 	// MaxInputBytes limits how much content tally will send to the agent (guards cost/latency).
-	MaxInputBytes int `json:"max-input-bytes,omitempty" jsonschema:"default=262144" koanf:"max-input-bytes"`
+	MaxInputBytes int `json:"max-input-bytes,omitempty" koanf:"max-input-bytes"`
 
 	// RedactSecrets redacts obvious secrets before sending content to the agent.
-	RedactSecrets bool `json:"redact-secrets,omitempty" jsonschema:"default=true" koanf:"redact-secrets"`
+	RedactSecrets bool `json:"redact-secrets,omitempty" koanf:"redact-secrets"`
 }
 
 // Default returns the default configuration.
@@ -201,9 +202,9 @@ func loadWithConfigPath(configPath string) (*Config, error) {
 		return nil, err
 	}
 
-	// 4. Unmarshal into config struct
-	cfg := &Config{}
-	if err := k.Unmarshal("", cfg); err != nil {
+	// 4. Validate merged raw config and decode.
+	cfg, err := decodeConfig(k.Raw())
+	if err != nil {
 		return nil, err
 	}
 
@@ -246,7 +247,58 @@ func envKeyTransform(k, v string) (string, any) {
 	for pattern, replacement := range knownHyphenatedKeys {
 		s = strings.ReplaceAll(s, pattern, replacement)
 	}
-	return s, v
+	return s, parseEnvValue(s, v)
+}
+
+func parseEnvValue(key, value string) any {
+	if shouldParseEnvBool(key) {
+		if b, err := strconv.ParseBool(value); err == nil {
+			return b
+		}
+	}
+	if shouldParseEnvInt(key) {
+		if i, err := strconv.ParseInt(value, 10, 64); err == nil {
+			return i
+		}
+	}
+	return value
+}
+
+func shouldParseEnvBool(key string) bool {
+	for _, suffix := range []string{
+		".enabled",
+		".show-source",
+		".warn-unused",
+		".validate-rules",
+		".require-reason",
+		".redact-secrets",
+		".fail-fast",
+		".skip-blank-lines",
+		".skip-comments",
+		".ignore-comments",
+		".check-consecutive-runs",
+		".check-chained-commands",
+		".check-single-run",
+	} {
+		if strings.HasSuffix(key, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+func shouldParseEnvInt(key string) bool {
+	for _, suffix := range []string{
+		".max",
+		".max-input-bytes",
+		".min-commands",
+		".min-score",
+	} {
+		if strings.HasSuffix(key, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 // Discover finds the closest config file for a target file path.
