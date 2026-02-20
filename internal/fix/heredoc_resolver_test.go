@@ -932,6 +932,101 @@ RUN Write-Output "hello" ; Write-Output "world" ; Write-Output "!"
 	}
 }
 
+func TestHeredocResolver_Resolve_ChainedWithContinuations(t *testing.T) {
+	t.Parallel()
+	r := &heredocResolver{}
+
+	// RUN split across multiple lines with backslash continuations
+	// (as produced by newline-per-chained-call sync fix)
+	dockerfile := "FROM ubuntu\n" +
+		"RUN apt-get update \\\n" +
+		"\t&& apt-get install -y vim \\\n" +
+		"\t&& apt-get clean\n"
+
+	fix := &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   rules.HeredocResolverID,
+		ResolverData: &rules.HeredocResolveData{
+			Type:         rules.HeredocFixChained,
+			StageIndex:   0,
+			ShellVariant: shell.VariantBash,
+			MinCommands:  3,
+		},
+	}
+
+	edits, err := r.Resolve(context.Background(), ResolveContext{
+		Content:  []byte(dockerfile),
+		FilePath: "Dockerfile",
+	}, fix)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(edits))
+	}
+
+	edit := edits[0]
+	if !strings.Contains(edit.NewText, "<<EOF") {
+		t.Errorf("expected heredoc syntax in edit, got: %s", edit.NewText)
+	}
+
+	// Must cover all continuation lines (lines 2 through 4)
+	if edit.Location.Start.Line != 2 {
+		t.Errorf("expected edit start line 2, got %d", edit.Location.Start.Line)
+	}
+	if edit.Location.End.Line != 4 {
+		t.Errorf("expected edit end line 4, got %d", edit.Location.End.Line)
+	}
+}
+
+func TestHeredocResolver_Resolve_ConsecutiveWithContinuations(t *testing.T) {
+	t.Parallel()
+	r := &heredocResolver{}
+
+	// Consecutive RUNs where the last one has backslash continuations
+	dockerfile := "FROM ubuntu\n" +
+		"RUN apt-get update\n" +
+		"RUN apt-get install -y vim \\\n" +
+		"\t&& apt-get clean\n"
+
+	fix := &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   rules.HeredocResolverID,
+		ResolverData: &rules.HeredocResolveData{
+			Type:         rules.HeredocFixConsecutive,
+			StageIndex:   0,
+			ShellVariant: shell.VariantBash,
+			MinCommands:  3,
+		},
+	}
+
+	edits, err := r.Resolve(context.Background(), ResolveContext{
+		Content:  []byte(dockerfile),
+		FilePath: "Dockerfile",
+	}, fix)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(edits))
+	}
+
+	edit := edits[0]
+	if !strings.Contains(edit.NewText, "<<EOF") {
+		t.Errorf("expected heredoc syntax in edit, got: %s", edit.NewText)
+	}
+
+	// Must cover from first RUN (line 2) through last continuation line (line 4)
+	if edit.Location.Start.Line != 2 {
+		t.Errorf("expected edit start line 2, got %d", edit.Location.Start.Line)
+	}
+	if edit.Location.End.Line != 4 {
+		t.Errorf("expected edit end line 4, got %d", edit.Location.End.Line)
+	}
+}
+
 // Helper functions
 
 func parseFirstRun(t *testing.T, dockerfile string) *instructions.RunCommand {

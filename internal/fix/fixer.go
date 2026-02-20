@@ -387,10 +387,12 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 	content := fc.ModifiedContent
 	reservedEdits := make([]editWithSource, 0, len(allEdits))
 
-	// Track column shifts caused by applied edits for cross-priority position adjustment.
-	// When edits from different priority groups modify the same line, earlier-priority edits
-	// change column positions. Without adjustment, later-priority edits use stale positions.
+	// Track position shifts caused by applied edits for cross-priority adjustment.
+	// When edits from different priority groups modify the same or nearby lines,
+	// earlier-priority edits change positions. Without adjustment, later-priority
+	// edits use stale positions.
 	var colShifts []columnShift
+	var lnShifts []lineShift
 
 	for _, ews := range allEdits {
 		// Skip if this candidate was already determined to be skipped
@@ -421,17 +423,19 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 			applied[ews.candidate] = true
 		}
 
-		// Adjust the edit's positions based on column shifts from prior edits
+		// Adjust the edit's positions based on shifts from prior edits.
+		// Column adjustment first (uses original line numbers for matching),
+		// then line adjustment (shifts lines for cross-priority edits).
 		edit := ews.edit
 		adjustEditColumns(&edit, colShifts)
+		adjustEditLines(&edit, lnShifts)
 
 		// Apply the adjusted edit
 		content = applyEdit(content, edit)
 
-		// Record column shift for single-line edits without newlines in replacement.
-		// Multi-line edits or edits producing newlines change line structure;
-		// those are handled by async resolvers which re-parse the content.
+		// Record shifts for cross-priority position adjustment.
 		recordColumnShift(&colShifts, ews.edit)
+		recordLineShift(&lnShifts, ews.edit)
 	}
 
 	fc.ModifiedContent = content
@@ -469,6 +473,54 @@ func adjustEditColumns(edit *rules.TextEdit, shifts []columnShift) {
 	}
 	edit.Location.Start.Column += startDelta
 	edit.Location.End.Column += endDelta
+}
+
+// lineShift records a line offset caused by an applied edit that changes line count.
+// When an edit inserts or removes lines, subsequent edits targeting lines after the
+// affected region need their line numbers adjusted.
+type lineShift struct {
+	afterLine int // 1-based: edits with original start line > afterLine get shifted
+	delta     int // number of lines shifted (positive = lines added, negative = lines removed)
+}
+
+// adjustEditLines adjusts an edit's start/end line numbers based on accumulated line shifts.
+// Uses the original (pre-adjustment) coordinate space.
+func adjustEditLines(edit *rules.TextEdit, shifts []lineShift) {
+	delta := 0
+	for _, s := range shifts {
+		if edit.Location.Start.Line > s.afterLine {
+			delta += s.delta
+		}
+	}
+	if delta != 0 {
+		edit.Location.Start.Line += delta
+		edit.Location.End.Line += delta
+	}
+}
+
+// recordLineShift records a line shift from an edit that changes line structure.
+// Uses the ORIGINAL (unadjusted) edit positions to keep all shifts in the same coordinate space.
+func recordLineShift(shifts *[]lineShift, edit rules.TextEdit) {
+	originalLines := edit.Location.End.Line - edit.Location.Start.Line
+	newLines := strings.Count(edit.NewText, "\n")
+	delta := newLines - originalLines
+	if delta == 0 {
+		return
+	}
+
+	afterLine := edit.Location.End.Line
+	// Zero-width insertion at column 0 (e.g., DL4006 SHELL insertion before a RUN):
+	// content AT the edit's line shifts down, so we use End.Line - 1 to ensure
+	// edits targeting the same line are also adjusted.
+	if edit.Location.Start.Line == edit.Location.End.Line &&
+		edit.Location.Start.Column == 0 && edit.Location.End.Column == 0 {
+		afterLine = edit.Location.End.Line - 1
+	}
+
+	*shifts = append(*shifts, lineShift{
+		afterLine: afterLine,
+		delta:     delta,
+	})
 }
 
 // recordColumnShift records a column shift from a single-line edit that doesn't introduce newlines.

@@ -97,10 +97,6 @@ func (r *NewlinePerChainedCallRule) Check(input rules.LintInput) []rules.Violati
 		minCommands = 2
 	}
 
-	// Check cross-rule coordination with prefer-run-heredoc
-	heredocEnabled := input.IsRuleEnabled(rules.HeredocRuleCode)
-	heredocMinCommands := input.GetHeredocMinCommands()
-
 	// Get semantic model for shell variant info (may be nil)
 	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Type assertion OK returns false for nil
 
@@ -120,7 +116,7 @@ func (r *NewlinePerChainedCallRule) Check(input rules.LintInput) []rules.Violati
 		for _, cmd := range stage.Commands {
 			switch c := cmd.(type) {
 			case *instructions.RunCommand:
-				if v := r.checkRun(c, shellVariant, input.File, sm, meta, minCommands, heredocEnabled, heredocMinCommands); v != nil {
+				if v := r.checkRun(c, shellVariant, input.File, sm, meta, minCommands); v != nil {
 					violations = append(violations, *v)
 				}
 			case *instructions.LabelCommand:
@@ -146,8 +142,6 @@ func (r *NewlinePerChainedCallRule) checkRun(
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
 	minCommands int,
-	heredocEnabled bool,
-	heredocMinCommands int,
 ) *rules.Violation {
 	if len(run.Location()) == 0 {
 		return nil
@@ -175,7 +169,7 @@ func (r *NewlinePerChainedCallRule) checkRun(
 	if !isHeredocRun && run.PrependShell {
 		chainEdits = r.checkRunChains(
 			run, shellVariant, instrLines, startLine,
-			instrIndent, file, minCommands, heredocEnabled, heredocMinCommands,
+			instrIndent, file, minCommands,
 		)
 	}
 
@@ -321,16 +315,9 @@ func (r *NewlinePerChainedCallRule) checkRunChains(
 	instrIndent string,
 	file string,
 	minCommands int,
-	heredocEnabled bool,
-	heredocMinCommands int,
 ) []rules.TextEdit {
 	script := getRunScriptFromCmd(run)
 	if script == "" {
-		return nil
-	}
-
-	// Skip if prefer-run-heredoc is enabled and this is a heredoc candidate
-	if heredocEnabled && shell.IsHeredocCandidate(script, shellVariant, heredocMinCommands) {
 		return nil
 	}
 
