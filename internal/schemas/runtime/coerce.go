@@ -38,21 +38,16 @@ func (v *validator) coerceValue(baseSchemaID string, schema map[string]any, valu
 	}
 }
 
-func (v *validator) coerceObject(baseSchemaID string, schema, obj map[string]any) (any, error) {
-	if obj == nil || schema == nil {
+func (v *validator) coerceObject(resolvedSchemaID string, resolvedSchema, obj map[string]any) (any, error) {
+	if obj == nil || resolvedSchema == nil {
 		return obj, nil
 	}
 
-	schemaID, resolved, err := v.resolveSchema(baseSchemaID, schema)
-	if err != nil {
-		return obj, err
-	}
-
-	properties, ok := resolved["properties"].(map[string]any)
+	properties, ok := resolvedSchema["properties"].(map[string]any)
 	if !ok {
 		properties = nil
 	}
-	additional := resolved["additionalProperties"]
+	additional := resolvedSchema["additionalProperties"]
 
 	for key, child := range obj {
 		childSchema := schemaForProperty(properties, additional, key)
@@ -60,7 +55,7 @@ func (v *validator) coerceObject(baseSchemaID string, schema, obj map[string]any
 			continue
 		}
 
-		coerced, err := v.coerceValue(schemaID, childSchema, child)
+		coerced, err := v.coerceValue(resolvedSchemaID, childSchema, child)
 		if err != nil {
 			return obj, err
 		}
@@ -70,17 +65,12 @@ func (v *validator) coerceObject(baseSchemaID string, schema, obj map[string]any
 	return obj, nil
 }
 
-func (v *validator) coerceArray(baseSchemaID string, schema map[string]any, arr []any) (any, error) {
-	if arr == nil || schema == nil {
+func (v *validator) coerceArray(resolvedSchemaID string, resolvedSchema map[string]any, arr []any) (any, error) {
+	if arr == nil || resolvedSchema == nil {
 		return arr, nil
 	}
 
-	schemaID, resolved, err := v.resolveSchema(baseSchemaID, schema)
-	if err != nil {
-		return arr, err
-	}
-
-	items, ok := resolved["items"].(map[string]any)
+	items, ok := resolvedSchema["items"].(map[string]any)
 	if !ok {
 		items = nil
 	}
@@ -89,7 +79,7 @@ func (v *validator) coerceArray(baseSchemaID string, schema map[string]any, arr 
 	}
 
 	for i, child := range arr {
-		coerced, err := v.coerceValue(schemaID, items, child)
+		coerced, err := v.coerceValue(resolvedSchemaID, items, child)
 		if err != nil {
 			return arr, err
 		}
@@ -99,13 +89,8 @@ func (v *validator) coerceArray(baseSchemaID string, schema map[string]any, arr 
 	return arr, nil
 }
 
-func (v *validator) coerceString(baseSchemaID string, schema map[string]any, value string) (any, error) {
-	schemaID, resolved, err := v.resolveSchema(baseSchemaID, schema)
-	if err != nil {
-		return value, err
-	}
-
-	types := schemaTypes(resolved)
+func (v *validator) coerceString(resolvedSchemaID string, resolvedSchema map[string]any, value string) (any, error) {
+	types := schemaTypes(resolvedSchema)
 	if len(types) == 0 {
 		return value, nil
 	}
@@ -133,7 +118,7 @@ func (v *validator) coerceString(baseSchemaID string, schema map[string]any, val
 		if strings.HasPrefix(trimmed, "{") {
 			var obj map[string]any
 			if err := jsonv2.Unmarshal([]byte(trimmed), &obj); err == nil {
-				return v.coerceObject(schemaID, resolved, obj)
+				return v.coerceObject(resolvedSchemaID, resolvedSchema, obj)
 			}
 		}
 	}
@@ -143,12 +128,12 @@ func (v *validator) coerceString(baseSchemaID string, schema map[string]any, val
 		if strings.HasPrefix(trimmed, "[") {
 			var arr []any
 			if err := jsonv2.Unmarshal([]byte(trimmed), &arr); err == nil {
-				return v.coerceArray(schemaID, resolved, arr)
+				return v.coerceArray(resolvedSchemaID, resolvedSchema, arr)
 			}
 		}
 
 		parts := splitEnvList(value)
-		items, ok := resolved["items"].(map[string]any)
+		items, ok := resolvedSchema["items"].(map[string]any)
 		if !ok {
 			items = nil
 		}
@@ -158,7 +143,7 @@ func (v *validator) coerceString(baseSchemaID string, schema map[string]any, val
 
 		coerced := make([]any, 0, len(parts))
 		for _, part := range parts {
-			item, err := v.coerceValue(schemaID, items, part)
+			item, err := v.coerceValue(resolvedSchemaID, items, part)
 			if err != nil {
 				return value, err
 			}
