@@ -1,0 +1,362 @@
+{
+  "files": [
+    {
+      "file": "testdata/newline-per-chained-call/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-per-chained-call.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/newline-per-chained-call/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "split chained commands onto separate lines",
+          "rule": "tally/newline-per-chained-call",
+          "severity": "style",
+          "sourceCode": "RUN apt-get update \u0026\u0026 apt-get install -y curl \u0026\u0026 rm -rf /var/lib/apt/lists/*",
+          "suggestedFix": {
+            "description": "Split onto separate continuation lines",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 22,
+                    "line": 4
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 18,
+                    "line": 4
+                  }
+                },
+                "newText": " \\\n\t\u0026\u0026 "
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 49,
+                    "line": 4
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 45,
+                    "line": 4
+                  }
+                },
+                "newText": " \\\n\t\u0026\u0026 "
+              }
+            ],
+            "isPreferred": true,
+            "priority": 97
+          }
+        },
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-per-chained-call.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 11
+            },
+            "file": "testdata/newline-per-chained-call/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 11
+            }
+          },
+          "message": "split mount flags onto separate lines",
+          "rule": "tally/newline-per-chained-call",
+          "severity": "style",
+          "sourceCode": "RUN --mount=type=cache,target=/var/cache/apt --mount=type=bind,source=go.sum,target=go.sum apt-get update",
+          "suggestedFix": {
+            "description": "Split onto separate continuation lines",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 45,
+                    "line": 11
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 44,
+                    "line": 11
+                  }
+                },
+                "newText": " \\\n\t"
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 91,
+                    "line": 11
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 90,
+                    "line": 11
+                  }
+                },
+                "newText": " \\\n\t"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 97
+          }
+        },
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-per-chained-call.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 14
+            },
+            "file": "testdata/newline-per-chained-call/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 14
+            }
+          },
+          "message": "split mount flags onto separate lines",
+          "rule": "tally/newline-per-chained-call",
+          "severity": "style",
+          "sourceCode": "RUN --mount=type=cache,target=/var/cache/apt --mount=type=bind,source=go.sum,target=go.sum \u003c\u003cEOF",
+          "suggestedFix": {
+            "description": "Split onto separate continuation lines",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 45,
+                    "line": 14
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 44,
+                    "line": 14
+                  }
+                },
+                "newText": " \\\n\t"
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 91,
+                    "line": 14
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 90,
+                    "line": 14
+                  }
+                },
+                "newText": " \\\n\t"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 97
+          }
+        },
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-per-chained-call.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 20
+            },
+            "file": "testdata/newline-per-chained-call/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 20
+            }
+          },
+          "message": "split mount flags and chained commands onto separate lines",
+          "rule": "tally/newline-per-chained-call",
+          "severity": "style",
+          "sourceCode": "RUN --mount=type=cache,target=/var/cache/apt --mount=type=bind,source=go.sum,target=go.sum apt-get update \u0026\u0026 apt-get install -y curl",
+          "suggestedFix": {
+            "description": "Split onto separate continuation lines",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 45,
+                    "line": 20
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 44,
+                    "line": 20
+                  }
+                },
+                "newText": " \\\n\t"
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 91,
+                    "line": 20
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 90,
+                    "line": 20
+                  }
+                },
+                "newText": " \\\n\t"
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 109,
+                    "line": 20
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 105,
+                    "line": 20
+                  }
+                },
+                "newText": " \\\n\t\u0026\u0026 "
+              }
+            ],
+            "isPreferred": true,
+            "priority": 97
+          }
+        },
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-per-chained-call.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 23
+            },
+            "file": "testdata/newline-per-chained-call/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 23
+            }
+          },
+          "message": "split LABEL key=value pairs onto separate lines",
+          "rule": "tally/newline-per-chained-call",
+          "severity": "style",
+          "sourceCode": "LABEL org.opencontainers.image.title=myapp org.opencontainers.image.version=1.0 org.opencontainers.image.vendor=acme",
+          "suggestedFix": {
+            "description": "Split LABEL pairs onto separate continuation lines",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 116,
+                    "line": 23
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 23
+                  }
+                },
+                "newText": "LABEL org.opencontainers.image.title=myapp \\\n\torg.opencontainers.image.version=1.0 \\\n\torg.opencontainers.image.vendor=acme"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 97
+          }
+        },
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-per-chained-call.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 30
+            },
+            "file": "testdata/newline-per-chained-call/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 30
+            }
+          },
+          "message": "split HEALTHCHECK onto separate continuation lines",
+          "rule": "tally/newline-per-chained-call",
+          "severity": "style",
+          "sourceCode": "HEALTHCHECK CMD curl -f http://localhost/ \u0026\u0026 wget -qO- http://localhost/health || exit 1",
+          "suggestedFix": {
+            "description": "Split HEALTHCHECK onto separate continuation lines",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 88,
+                    "line": 30
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 30
+                  }
+                },
+                "newText": "HEALTHCHECK CMD curl -f http://localhost/ \\\n\t\u0026\u0026 wget -qO- http://localhost/health \\\n\t|| exit 1"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 97
+          }
+        },
+        {
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-per-chained-call.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 33
+            },
+            "file": "testdata/newline-per-chained-call/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 33
+            }
+          },
+          "message": "split HEALTHCHECK onto separate continuation lines",
+          "rule": "tally/newline-per-chained-call",
+          "severity": "style",
+          "sourceCode": "HEALTHCHECK --interval=30s --timeout=10s CMD curl -f http://localhost/ \u0026\u0026 wget -qO- http://localhost/health",
+          "suggestedFix": {
+            "description": "Split HEALTHCHECK onto separate continuation lines",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 107,
+                    "line": 33
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 33
+                  }
+                },
+                "newText": "HEALTHCHECK --interval=30s \\\n\t--timeout=10s \\\n\tCMD curl -f http://localhost/ \\\n\t\u0026\u0026 wget -qO- http://localhost/health"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 97
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 7,
+    "total": 7,
+    "warnings": 0
+  }
+}

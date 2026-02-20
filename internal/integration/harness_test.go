@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 type lintCase struct {
@@ -144,6 +145,7 @@ func runFixCase(t *testing.T, tc fixCase) {
 	//
 	// - DL3057: HEALTHCHECK missing — fires on nearly every fixture, no auto-fix.
 	// - newline-between-instructions: fires on most minimal fixtures.
+	// - newline-per-chained-call: fires on any chained RUN, inflating counts broadly.
 	args := append(
 		[]string{
 			"lint",
@@ -154,6 +156,8 @@ func runFixCase(t *testing.T, tc fixCase) {
 			"hadolint/DL3057",
 			"--ignore",
 			"tally/newline-between-instructions",
+			"--ignore",
+			"tally/newline-per-chained-call",
 		},
 		tc.args...)
 	args = append(args, dockerfilePath)
@@ -176,7 +180,7 @@ func runFixCase(t *testing.T, tc fixCase) {
 		t.Fatalf("failed to read fixed Dockerfile: %v", err)
 	}
 
-	snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixed))
+	testutil.MatchDockerfileSnapshot(t, string(fixed))
 
 	// Check that the output mentions the expected number of fixes
 	outputStr := string(output)

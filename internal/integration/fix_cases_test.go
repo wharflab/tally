@@ -70,7 +70,7 @@ func fixCases(t *testing.T) []fixCase {
 				"RUN wget http://example.com/config.json -O /etc/app/config.json\n" +
 				"RUN curl -fsSL http://example.com/script.sh | sh\n",
 			args:        []string{"--fix", "--fix-unsafe", "--fail-level", "none"},
-			wantApplied: 4, // Current fixer reports four applied fixes for this combined scenario.
+			wantApplied: 3, // prefer-add-unpack + DL3047 --progress + single DL4006 SHELL insertion.
 		},
 		// DL3003: cd -> WORKDIR (regression test for line number consistency)
 		{
@@ -702,6 +702,107 @@ skip-blank-lines = true
 			args: append([]string{"--fix"},
 				mustSelectRules("tally/epilogue-order", "tally/newline-between-instructions")...),
 			wantApplied: 2, // epilogue-order + newline-between-instructions
+		},
+
+		// === Newline per chained call fix tests ===
+
+		// RUN chain splitting: two chained commands
+		{
+			name:  "newline-per-chained-call-run-chain",
+			input: "FROM alpine:3.20\nRUN apt-get update && apt-get install -y curl\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-per-chained-call")...),
+			wantApplied: 1,
+		},
+		// RUN chain splitting: three chained commands
+		{
+			name:  "newline-per-chained-call-run-chain-three",
+			input: "FROM alpine:3.20\nRUN cmd1 && cmd2 && cmd3\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-per-chained-call")...),
+			wantApplied: 1,
+		},
+		// RUN mount splitting: two mounts
+		{
+			name: "newline-per-chained-call-run-mounts",
+			input: "FROM alpine:3.20\n" +
+				"RUN --mount=type=cache,target=/var/cache/apt " +
+				"--mount=type=bind,source=go.sum,target=go.sum " +
+				"apt-get update\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-per-chained-call")...),
+			wantApplied: 1,
+		},
+		// RUN mount + chain combined
+		{
+			name: "newline-per-chained-call-run-mounts-and-chains",
+			input: "FROM alpine:3.20\n" +
+				"RUN --mount=type=cache,target=/var/cache/apt " +
+				"--mount=type=bind,source=go.sum,target=go.sum " +
+				"apt-get update && apt-get install -y curl\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-per-chained-call")...),
+			wantApplied: 1,
+		},
+		// LABEL pair splitting
+		{
+			name: "newline-per-chained-call-label",
+			input: "FROM alpine:3.20\n" +
+				"LABEL org.opencontainers.image.title=myapp " +
+				"org.opencontainers.image.version=1.0 " +
+				"org.opencontainers.image.vendor=acme\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-per-chained-call")...),
+			wantApplied: 1,
+		},
+		// HEALTHCHECK CMD chain splitting
+		{
+			name:  "newline-per-chained-call-healthcheck",
+			input: "FROM alpine:3.20\nHEALTHCHECK CMD curl -f http://localhost/ && wget -qO- http://localhost/health || exit 1\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-per-chained-call")...),
+			wantApplied: 1,
+		},
+		// Cross-rule: DL3027 (apt→apt-get) + chain split on same RUN
+		{
+			name:  "newline-per-chained-call-cross-dl3027",
+			input: "FROM ubuntu:24.04\nRUN apt update && apt install -y curl\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-per-chained-call", "hadolint/DL3027")...),
+			wantApplied: 2, // DL3027 + chain split
+		},
+		// Cross-rule: DL3047 (wget --progress) + chain split on same RUN
+		{
+			name: "newline-per-chained-call-cross-dl3047",
+			input: "FROM ubuntu:24.04\n" +
+				"RUN wget https://example.com/file.tar.gz " +
+				"&& tar -xzf file.tar.gz\n",
+			args: append([]string{"--fix"},
+				mustSelectRules(
+					"tally/newline-per-chained-call",
+					"hadolint/DL3047",
+				)...),
+			wantApplied: 2, // DL3047 + chain split
+		},
+		// Cross-rule: consistent-indentation + newline-per-chained-call on a
+		// multi-stage Dockerfile. consistent-indentation (priority 50) adds tab
+		// indent to second-stage instructions; newline-per-chained-call (priority 97)
+		// splits chains using instrIndent computed from the original (pre-fix) source.
+		{
+			name: "newline-per-chained-call-with-consistent-indentation",
+			input: "FROM alpine:3.20 AS builder\n" +
+				"RUN apt-get update && apt-get install -y curl\n" +
+				"FROM scratch\n" +
+				"COPY --from=builder /usr/bin/curl /usr/bin/curl\n",
+			args: append([]string{"--fix"},
+				mustSelectRules(
+					"tally/consistent-indentation",
+					"tally/newline-per-chained-call",
+				)...),
+			config: `[rules.tally.consistent-indentation]
+severity = "style"
+`,
+			wantApplied: 3, // 2 indentation (RUN in stage 1 + COPY in stage 2) + 1 chain split
 		},
 	}
 }

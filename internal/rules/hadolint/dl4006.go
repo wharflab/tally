@@ -30,6 +30,14 @@ func (r *DL4006Rule) Metadata() rules.RuleMetadata {
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "reliability",
 		IsExperimental:  false,
+		// FixPriority 96 ensures prefer-add-unpack (priority 95) applies first.
+		// When prefer-add-unpack replaces a piped RUN with ADD, the fixer detects
+		// the overlap and skips the now-redundant SHELL insertion.
+		//
+		// Additionally, only one SHELL fix is generated per stage (the first piped
+		// RUN). Since SHELL persists until the next FROM, a single insertion
+		// covers all subsequent piped RUNs in the same stage.
+		FixPriority: 96,
 	}
 }
 
@@ -49,6 +57,7 @@ type dl4006StageState struct {
 	pipefailSet  bool
 	isNonPOSIX   bool
 	shellVariant shell.Variant
+	generatedFix bool // true after a SHELL fix is emitted for this stage
 }
 
 // Check runs the DL4006 rule.
@@ -107,8 +116,10 @@ func (r *DL4006Rule) initStageState(sem *semantic.Model, stageIdx int) dl4006Sta
 }
 
 // updateFromShell updates the pipefail tracking state from a SHELL instruction.
+// A new SHELL resets generatedFix so a fresh SHELL fix can be emitted if needed.
 func (s *dl4006StageState) updateFromShell(shellCmd []string) {
 	s.shellVariant = shell.VariantFromShellCmd(shellCmd)
+	s.generatedFix = false
 	if isNonPOSIXShellCmd(shellCmd) {
 		s.isNonPOSIX = true
 		s.pipefailSet = false
@@ -148,8 +159,11 @@ func (r *DL4006Rule) checkRun(
 			`Use SHELL ["/bin/bash", "-o", "pipefail", "-c"] before the RUN instruction.`,
 	)
 
-	if fix := r.generateFix(input, run, stageIdx, state.shellVariant); fix != nil {
-		v = v.WithSuggestedFix(fix)
+	if !state.generatedFix {
+		if fix := r.generateFix(input, run, stageIdx, state.shellVariant); fix != nil {
+			v = v.WithSuggestedFix(fix)
+			state.generatedFix = true
+		}
 	}
 
 	return &v
@@ -237,6 +251,7 @@ func (r *DL4006Rule) generateFix(
 
 	fixShell := r.determineFixShell(input, stageIdx)
 
+	meta := r.Metadata()
 	shellLine := `SHELL ["` + fixShell + `", "-o", "pipefail", "-c"]` + "\n"
 	startLine := runLoc[0].Start.Line
 	startCol := runLoc[0].Start.Character
@@ -244,6 +259,7 @@ func (r *DL4006Rule) generateFix(
 	return &rules.SuggestedFix{
 		Description: "Add SHELL with -o pipefail before RUN",
 		Safety:      rules.FixSuggestion,
+		Priority:    meta.FixPriority,
 		Edits: []rules.TextEdit{{
 			Location: rules.NewRangeLocation(
 				input.File, startLine, startCol, startLine, startCol,

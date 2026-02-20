@@ -290,7 +290,7 @@ func TestFormatHeredocWithMounts(t *testing.T) {
 	t.Run("without mounts", func(t *testing.T) {
 		t.Parallel()
 		result := heredoc.FormatWithMounts(commands, nil, shell.VariantBash, false)
-		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
+		testutil.MatchDockerfileSnapshot(t, result)
 	})
 
 	t.Run("with cache mount", func(t *testing.T) {
@@ -300,7 +300,7 @@ func TestFormatHeredocWithMounts(t *testing.T) {
 			Target: "/var/cache/apt",
 		}}
 		result := heredoc.FormatWithMounts(commands, mounts, shell.VariantBash, false)
-		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
+		testutil.MatchDockerfileSnapshot(t, result)
 	})
 
 	t.Run("with multiple mounts", func(t *testing.T) {
@@ -310,7 +310,7 @@ func TestFormatHeredocWithMounts(t *testing.T) {
 			{Type: instructions.MountTypeCache, Target: "/root/.cache"},
 		}
 		result := heredoc.FormatWithMounts(commands, mounts, shell.VariantBash, false)
-		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
+		testutil.MatchDockerfileSnapshot(t, result)
 	})
 }
 
@@ -321,28 +321,28 @@ func TestFormatHeredocWithPipefail(t *testing.T) {
 		t.Parallel()
 		commands := []string{"apt-get update", "curl -s https://example.com | bash", "apt-get clean"}
 		result := heredoc.FormatWithMounts(commands, nil, shell.VariantBash, true)
-		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
+		testutil.MatchDockerfileSnapshot(t, result)
 	})
 
 	t.Run("pipefail false omits set -o pipefail", func(t *testing.T) {
 		t.Parallel()
 		commands := []string{"apt-get update", "curl -s https://example.com | bash"}
 		result := heredoc.FormatWithMounts(commands, nil, shell.VariantBash, false)
-		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
+		testutil.MatchDockerfileSnapshot(t, result)
 	})
 
 	t.Run("pipefail deduplicates bare set -o pipefail", func(t *testing.T) {
 		t.Parallel()
 		commands := []string{"set -o pipefail", "curl -s https://example.com | bash"}
 		result := heredoc.FormatWithMounts(commands, nil, shell.VariantBash, true)
-		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
+		testutil.MatchDockerfileSnapshot(t, result)
 	})
 
 	t.Run("pipefail preserves set -euo pipefail", func(t *testing.T) {
 		t.Parallel()
 		commands := []string{"set -euo pipefail", "curl -s https://example.com | bash"}
 		result := heredoc.FormatWithMounts(commands, nil, shell.VariantBash, true)
-		snaps.WithConfig(snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
+		testutil.MatchDockerfileSnapshot(t, result)
 	})
 }
 

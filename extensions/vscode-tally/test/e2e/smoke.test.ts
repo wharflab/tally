@@ -66,7 +66,7 @@ test(
       },
     });
 
-    process.env.TALLY_EXPECTED_DIAGNOSTICS = "132";
+    process.env.TALLY_EXPECTED_DIAGNOSTICS = "172";
     process.env.TALLY_EXPECTED_FORMAT_SNAPSHOT = path.join(
       repoRoot,
       "internal",

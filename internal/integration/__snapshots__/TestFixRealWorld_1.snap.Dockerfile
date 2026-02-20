@@ -156,13 +156,10 @@ set -o pipefail
 apt-get update
 apt-get install -y --no-install-recommends gnupg2 curl ca-certificates
 curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH}/3bf863cc.pub | apt-key add -
+echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH} /" >/etc/apt/sources.list.d/cuda.list
+apt-get purge --autoremove -y curl
+rm -rf /var/lib/apt/lists/*
 EOF
-
-COPY <<EOF /etc/apt/sources.list.d/cuda.list
-deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH} /
-EOF
-
-RUN apt-get purge --autoremove -y curl && rm -rf /var/lib/apt/lists/*
 
 ENV NV_CUDA_COMPAT_PACKAGE=cuda-compat-11-7
 ENV NV_CUDA_CUDART_VERSION=11.7.99-1
@@ -334,7 +331,8 @@ ARG PT_TORCHAUDIO_URL
 ARG PT_TORCHVISION_URL
 ARG PT_SM_TRAINING_URL
 
-RUN pip uninstall -y torch torchvision torchaudio torchdata  && pip install --no-cache-dir -U ${PT_SM_TRAINING_URL} ${PT_TORCHVISION_URL} ${PT_TORCHAUDIO_URL} ${PT_TORCHDATA_URL}
+RUN pip uninstall -y torch torchvision torchaudio torchdata \
+	&& pip install --no-cache-dir -U ${PT_SM_TRAINING_URL} ${PT_TORCHVISION_URL} ${PT_TORCHAUDIO_URL} ${PT_TORCHDATA_URL}
 
 ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/lib:/opt/amazon/openmpi/lib/:/opt/amazon/efa/lib/"
 
