@@ -45,39 +45,31 @@ func (r *DL3045Rule) Check(input rules.LintInput) []rules.Violation {
 		sem = nil
 	}
 
-	// Track whether WORKDIR has been set per stage key.
-	workdirSet := make(map[string]bool)
+	// Track whether WORKDIR has been set, indexed by stage position.
+	hasWorkdir := make([]bool, len(input.Stages))
 
 	for stageIdx, stage := range input.Stages {
-		stageKey := stageKeyFromStage(&stage)
-		workdirSet[stageKey] = inheritWorkdirStatus(sem, stageIdx, workdirSet)
+		hasWorkdir[stageIdx] = inheritedWorkdir(sem, stageIdx, hasWorkdir)
 
 		for _, cmd := range stage.Commands {
 			if _, ok := cmd.(*instructions.WorkdirCommand); ok {
-				workdirSet[stageKey] = true
+				hasWorkdir[stageIdx] = true
 			}
 
-			if v := checkCopyDest(cmd, workdirSet[stageKey], input.File, meta); v != nil {
+			if v := checkCopyDest(cmd, hasWorkdir[stageIdx], input.File, meta); v != nil {
 				violations = append(violations, *v)
 			}
 		}
 
-		violations = append(violations, checkOnbuildCopies(sem, stageIdx, workdirSet[stageKey], input.File, meta)...)
+		violations = append(violations, checkOnbuildCopies(sem, stageIdx, hasWorkdir[stageIdx], input.File, meta)...)
 	}
 
 	return violations
 }
 
-// stageKeyFromStage returns a lowercase key for the stage (alias if set, otherwise base name).
-func stageKeyFromStage(stage *instructions.Stage) string {
-	if stage.Name != "" {
-		return strings.ToLower(stage.Name)
-	}
-	return stage.BaseName
-}
-
-// inheritWorkdirStatus checks if the stage inherits WORKDIR from a parent stage.
-func inheritWorkdirStatus(sem *semantic.Model, stageIdx int, workdirSet map[string]bool) bool {
+// inheritedWorkdir returns true if the stage inherits a WORKDIR from a parent
+// stage (resolved via the semantic model's BaseImage.StageIndex).
+func inheritedWorkdir(sem *semantic.Model, stageIdx int, hasWorkdir []bool) bool {
 	if sem == nil {
 		return false
 	}
@@ -85,21 +77,21 @@ func inheritWorkdirStatus(sem *semantic.Model, stageIdx int, workdirSet map[stri
 	if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
 		return false
 	}
-	parentStage := sem.Stage(info.BaseImage.StageIndex)
-	if parentStage == nil {
+	parentIdx := info.BaseImage.StageIndex
+	if parentIdx < 0 || parentIdx >= len(hasWorkdir) {
 		return false
 	}
-	return workdirSet[stageKeyFromStage(parentStage)]
+	return hasWorkdir[parentIdx]
 }
 
 // checkCopyDest checks a single command; if it is a COPY with a relative
 // destination and WORKDIR is not set, it returns a violation.
-func checkCopyDest(cmd instructions.Command, hasWorkdir bool, file string, meta rules.RuleMetadata) *rules.Violation {
+func checkCopyDest(cmd instructions.Command, workdirSet bool, file string, meta rules.RuleMetadata) *rules.Violation {
 	copyCmd, ok := cmd.(*instructions.CopyCommand)
 	if !ok {
 		return nil
 	}
-	if hasWorkdir {
+	if workdirSet {
 		return nil
 	}
 	if isAbsoluteOrVariableDest(copyCmd.DestPath) {
@@ -110,13 +102,13 @@ func checkCopyDest(cmd instructions.Command, hasWorkdir bool, file string, meta 
 }
 
 // checkOnbuildCopies checks ONBUILD COPY instructions in a stage.
-func checkOnbuildCopies(sem *semantic.Model, stageIdx int, hasWorkdir bool, file string, meta rules.RuleMetadata) []rules.Violation {
+func checkOnbuildCopies(sem *semantic.Model, stageIdx int, workdirSet bool, file string, meta rules.RuleMetadata) []rules.Violation {
 	if sem == nil {
 		return nil
 	}
 
 	var violations []rules.Violation
-	onbuildHasWorkdir := hasWorkdir
+	onbuildHasWorkdir := workdirSet
 
 	for _, onbuild := range sem.OnbuildInstructions(stageIdx) {
 		if _, ok := onbuild.Command.(*instructions.WorkdirCommand); ok {
