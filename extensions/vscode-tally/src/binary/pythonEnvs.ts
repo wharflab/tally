@@ -7,16 +7,15 @@ import { isExecutableFile } from "./findBinary";
 
 const EXT_ID = "ms-python.vscode-python-envs";
 
-let cachedApi: PythonEnvironmentApi | null | undefined;
+let cachedApi: PythonEnvironmentApi | undefined;
 
 export async function getPythonEnvApi(): Promise<PythonEnvironmentApi | undefined> {
-  if (cachedApi !== undefined) {
-    return cachedApi ?? undefined;
+  if (cachedApi) {
+    return cachedApi;
   }
 
   const ext = vscode.extensions.getExtension<PythonEnvironmentApi>(EXT_ID);
   if (!ext) {
-    cachedApi = null;
     return undefined;
   }
 
@@ -25,7 +24,6 @@ export async function getPythonEnvApi(): Promise<PythonEnvironmentApi | undefine
     cachedApi = api;
     return api;
   } catch {
-    cachedApi = null;
     return undefined;
   }
 }
