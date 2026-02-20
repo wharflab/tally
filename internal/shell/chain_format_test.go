@@ -283,6 +283,24 @@ func TestReconstructSourceText(t *testing.T) {
 			cmdStartCol: 35,
 			want:        "apt-get update",
 		},
+		{
+			name:        "cmdStartCol at end of line",
+			lines:       []string{"RUN"},
+			cmdStartCol: 3,
+			want:        "",
+		},
+		{
+			name:        "cmdStartCol zero keeps full line",
+			lines:       []string{"echo hello"},
+			cmdStartCol: 0,
+			want:        "echo hello",
+		},
+		{
+			name:        "empty lines slice",
+			lines:       []string{},
+			cmdStartCol: 0,
+			want:        "",
+		},
 	}
 
 	for _, tt := range tests {
