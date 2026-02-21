@@ -335,6 +335,7 @@ func TestEnvKeyTransform(t *testing.T) {
 		{"TALLY_AI_TIMEOUT", "ai.timeout"},
 		{"TALLY_AI_MAX_INPUT_BYTES", "ai.max-input-bytes"},
 		{"TALLY_AI_REDACT_SECRETS", "ai.redact-secrets"},
+		{"TALLY_EXPECTED_DIAGNOSTICS", ""},
 	}
 
 	for _, tt := range tests {
@@ -342,6 +343,18 @@ func TestEnvKeyTransform(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("envKeyTransform(%q) = %q, want %q", tt.input, got, tt.want)
 		}
+	}
+}
+
+func TestLoad_IgnoresUnknownTallyEnvVars(t *testing.T) {
+	t.Setenv("TALLY_EXPECTED_DIAGNOSTICS", "172")
+
+	cfg, err := loadWithConfigPath("")
+	if err != nil {
+		t.Fatalf("loadWithConfigPath(\"\") error = %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("loadWithConfigPath(\"\") returned nil config")
 	}
 }
 

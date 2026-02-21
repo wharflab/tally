@@ -230,6 +230,19 @@ var knownHyphenatedKeys = map[string]string{
 	"newline.between.instructions": "newline-between-instructions",
 }
 
+var allowedEnvTopLevelKeys = map[string]struct{}{
+	"rules":             {},
+	"output":            {},
+	"inline-directives": {},
+	"ai":                {},
+	"slow-checks":       {},
+	// Compatibility aliases normalized in normalizeOutputAliases.
+	"format":      {},
+	"path":        {},
+	"show-source": {},
+	"fail-level":  {},
+}
+
 // envKeyTransform converts environment variable names to config keys.
 // TALLY_FORMAT -> format
 // TALLY_RULES_MAX_LINES_MAX -> rules.max-lines.max
@@ -246,6 +259,15 @@ func envKeyTransform(k, v string) (string, any) {
 	for pattern, replacement := range knownHyphenatedKeys {
 		s = strings.ReplaceAll(s, pattern, replacement)
 	}
+
+	topLevel := s
+	if before, _, ok := strings.Cut(s, "."); ok {
+		topLevel = before
+	}
+	if _, ok := allowedEnvTopLevelKeys[topLevel]; !ok {
+		return "", nil
+	}
+
 	return s, v
 }
 
