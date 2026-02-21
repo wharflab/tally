@@ -200,10 +200,14 @@ v2 compliant.
 Add to schema pipeline:
 
 ```bash
-make schema-gen
-rg -n '"encoding/json"' internal/schemas/generated && exit 1 || true
+make schema-check
 make lint
 ```
+
+Notes:
+
+- `schema-check` must run without any `|| true` bypass.
+- `_tools/schema-gen` must fail non-zero if any file under `internal/schemas/generated/` contains `"encoding/json"`.
 
 ---
 

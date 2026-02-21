@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"go/format"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -20,6 +21,7 @@ const (
 	manifestPathRel = "internal/schemas/manifest.json"
 	rootSchemaPath  = "internal/schemas/root/tally-config.schema.json"
 	ruleConfigPath  = "internal/rules/rule-config.schema.json"
+	generatedPath   = "internal/schemas/generated"
 	registryOutPath = "internal/schemas/registry_gen.go"
 	publishedSchema = "schema.json"
 	filePerm        = 0o644
@@ -84,6 +86,9 @@ func run() error {
 	}
 
 	if err := generateGoTypes(repoRoot, m); err != nil {
+		return err
+	}
+	if err := ensureGeneratedJSONV2Compliance(repoRoot); err != nil {
 		return err
 	}
 
@@ -211,10 +216,6 @@ func generateGoTypes(repoRoot string, m *manifest) error {
 	}
 
 	for outputName, source := range sources {
-		if bytes.Contains(source, []byte(`"encoding/json"`)) {
-			return fmt.Errorf("generated file %s imports encoding/json", outputName)
-		}
-
 		outputAbs := filepath.Join(repoRoot, filepath.FromSlash(outputName))
 		if err := os.MkdirAll(filepath.Dir(outputAbs), dirPerm); err != nil {
 			return fmt.Errorf("create output dir for %s: %w", outputName, err)
@@ -224,6 +225,43 @@ func generateGoTypes(repoRoot string, m *manifest) error {
 		}
 	}
 
+	return nil
+}
+
+func ensureGeneratedJSONV2Compliance(repoRoot string) error {
+	generatedAbs := filepath.Join(repoRoot, filepath.FromSlash(generatedPath))
+	offenders := make([]string, 0)
+
+	err := filepath.WalkDir(generatedAbs, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || filepath.Ext(path) != ".go" {
+			return nil
+		}
+
+		data, readErr := os.ReadFile(path)
+		if readErr != nil {
+			return fmt.Errorf("read generated file %s: %w", path, readErr)
+		}
+		if bytes.Contains(data, []byte(`"encoding/json"`)) {
+			rel, relErr := filepath.Rel(repoRoot, path)
+			if relErr != nil {
+				offenders = append(offenders, filepath.ToSlash(path))
+				return nil
+			}
+			offenders = append(offenders, filepath.ToSlash(rel))
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("scan %s for JSON v2 compliance: %w", generatedPath, err)
+	}
+
+	if len(offenders) > 0 {
+		sort.Strings(offenders)
+		return fmt.Errorf("generated files under %s import encoding/json: %s", generatedPath, strings.Join(offenders, ", "))
+	}
 	return nil
 }
 
