@@ -41,11 +41,17 @@ func DefaultPreferHeredocConfig() PreferHeredocConfig {
 }
 
 // PreferHeredocRule implements the prefer-run-heredoc linting rule.
-type PreferHeredocRule struct{}
+type PreferHeredocRule struct {
+	schema map[string]any
+}
 
 // NewPreferHeredocRule creates a new prefer-run-heredoc rule instance.
 func NewPreferHeredocRule() *PreferHeredocRule {
-	return &PreferHeredocRule{}
+	schema, err := configutil.RuleSchema(rules.HeredocRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &PreferHeredocRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -64,11 +70,7 @@ func (r *PreferHeredocRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *PreferHeredocRule) Schema() map[string]any {
-	schema, err := configutil.RuleSchema(rules.HeredocRuleCode)
-	if err != nil {
-		panic(err)
-	}
-	return schema
+	return r.schema
 }
 
 // Check runs the prefer-run-heredoc rule.

@@ -24,11 +24,17 @@ func DefaultDL3026Config() DL3026Config {
 }
 
 // DL3026Rule implements the DL3026 linting rule.
-type DL3026Rule struct{}
+type DL3026Rule struct {
+	schema map[string]any
+}
 
 // NewDL3026Rule creates a new DL3026 rule instance.
 func NewDL3026Rule() *DL3026Rule {
-	return &DL3026Rule{}
+	schema, err := configutil.RuleSchema(rules.HadolintRulePrefix + "DL3026")
+	if err != nil {
+		panic(err)
+	}
+	return &DL3026Rule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -47,11 +53,7 @@ func (r *DL3026Rule) Metadata() rules.RuleMetadata {
 // Schema returns the JSON Schema for this rule's configuration.
 // Follows ESLint's meta.schema pattern for rule options validation.
 func (r *DL3026Rule) Schema() map[string]any {
-	schema, err := configutil.RuleSchema(r.Metadata().Code)
-	if err != nil {
-		panic(err)
-	}
-	return schema
+	return r.schema
 }
 
 // Check runs the DL3026 rule.

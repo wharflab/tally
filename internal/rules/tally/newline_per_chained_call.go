@@ -35,11 +35,17 @@ func DefaultNewlinePerChainedCallConfig() NewlinePerChainedCallConfig {
 }
 
 // NewlinePerChainedCallRule implements the newline-per-chained-call linting rule.
-type NewlinePerChainedCallRule struct{}
+type NewlinePerChainedCallRule struct {
+	schema map[string]any
+}
 
 // NewNewlinePerChainedCallRule creates a new newline-per-chained-call rule instance.
 func NewNewlinePerChainedCallRule() *NewlinePerChainedCallRule {
-	return &NewlinePerChainedCallRule{}
+	schema, err := configutil.RuleSchema(NewlinePerChainedCallRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &NewlinePerChainedCallRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -61,11 +67,7 @@ func (r *NewlinePerChainedCallRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *NewlinePerChainedCallRule) Schema() map[string]any {
-	schema, err := configutil.RuleSchema(NewlinePerChainedCallRuleCode)
-	if err != nil {
-		panic(err)
-	}
-	return schema
+	return r.schema
 }
 
 // DefaultConfig returns the default configuration for this rule.

@@ -28,11 +28,17 @@ func DefaultNewlineBetweenInstructionsConfig() NewlineBetweenInstructionsConfig 
 }
 
 // NewlineBetweenInstructionsRule implements the newline-between-instructions linting rule.
-type NewlineBetweenInstructionsRule struct{}
+type NewlineBetweenInstructionsRule struct {
+	schema map[string]any
+}
 
 // NewNewlineBetweenInstructionsRule creates a new newline-between-instructions rule instance.
 func NewNewlineBetweenInstructionsRule() *NewlineBetweenInstructionsRule {
-	return &NewlineBetweenInstructionsRule{}
+	schema, err := configutil.RuleSchema(NewlineBetweenInstructionsRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &NewlineBetweenInstructionsRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -52,11 +58,7 @@ func (r *NewlineBetweenInstructionsRule) Metadata() rules.RuleMetadata {
 // Schema returns the JSON Schema for this rule's configuration.
 // Supports string shorthand ("grouped", "always", "never") or full object config.
 func (r *NewlineBetweenInstructionsRule) Schema() map[string]any {
-	schema, err := configutil.RuleSchema(NewlineBetweenInstructionsRuleCode)
-	if err != nil {
-		panic(err)
-	}
-	return schema
+	return r.schema
 }
 
 // DefaultConfig returns the default configuration for this rule.

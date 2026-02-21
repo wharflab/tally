@@ -35,11 +35,17 @@ func DefaultPreferAddUnpackConfig() PreferAddUnpackConfig {
 //
 // ADD --unpack is a BuildKit feature that downloads and extracts a remote
 // archive in a single layer, reducing image size and build complexity.
-type PreferAddUnpackRule struct{}
+type PreferAddUnpackRule struct {
+	schema map[string]any
+}
 
 // NewPreferAddUnpackRule creates a new rule instance.
 func NewPreferAddUnpackRule() *PreferAddUnpackRule {
-	return &PreferAddUnpackRule{}
+	schema, err := configutil.RuleSchema(PreferAddUnpackRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &PreferAddUnpackRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -58,11 +64,7 @@ func (r *PreferAddUnpackRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *PreferAddUnpackRule) Schema() map[string]any {
-	schema, err := configutil.RuleSchema(PreferAddUnpackRuleCode)
-	if err != nil {
-		panic(err)
-	}
-	return schema
+	return r.schema
 }
 
 // DefaultConfig returns the default configuration.

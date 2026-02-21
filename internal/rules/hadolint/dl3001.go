@@ -44,11 +44,17 @@ func DefaultDL3001Config() DL3001Config {
 // DL3001Rule implements the DL3001 linting rule.
 // It warns when RUN instructions contain commands that are meaningless
 // inside a Docker container (e.g., ssh, vim, shutdown, service, ps, free, top, kill, mount).
-type DL3001Rule struct{}
+type DL3001Rule struct {
+	schema map[string]any
+}
 
 // NewDL3001Rule creates a new DL3001 rule instance.
 func NewDL3001Rule() *DL3001Rule {
-	return &DL3001Rule{}
+	schema, err := configutil.RuleSchema(rules.HadolintRulePrefix + "DL3001")
+	if err != nil {
+		panic(err)
+	}
+	return &DL3001Rule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -67,11 +73,7 @@ func (r *DL3001Rule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *DL3001Rule) Schema() map[string]any {
-	schema, err := configutil.RuleSchema(r.Metadata().Code)
-	if err != nil {
-		panic(err)
-	}
-	return schema
+	return r.schema
 }
 
 // DefaultConfig returns the default configuration for this rule.

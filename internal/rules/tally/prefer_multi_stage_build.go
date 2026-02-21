@@ -27,9 +27,17 @@ func defaultPreferMultiStageBuildConfig() PreferMultiStageBuildConfig {
 }
 
 // PreferMultiStageBuildRule detects likely single-stage build+runtime Dockerfiles.
-type PreferMultiStageBuildRule struct{}
+type PreferMultiStageBuildRule struct {
+	schema map[string]any
+}
 
-func NewPreferMultiStageBuildRule() *PreferMultiStageBuildRule { return &PreferMultiStageBuildRule{} }
+func NewPreferMultiStageBuildRule() *PreferMultiStageBuildRule {
+	schema, err := configutil.RuleSchema(PreferMultiStageBuildRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &PreferMultiStageBuildRule{schema: schema}
+}
 
 func (r *PreferMultiStageBuildRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
@@ -45,11 +53,7 @@ func (r *PreferMultiStageBuildRule) Metadata() rules.RuleMetadata {
 }
 
 func (r *PreferMultiStageBuildRule) Schema() map[string]any {
-	schema, err := configutil.RuleSchema(PreferMultiStageBuildRuleCode)
-	if err != nil {
-		panic(err)
-	}
-	return schema
+	return r.schema
 }
 
 func (r *PreferMultiStageBuildRule) DefaultConfig() any { return defaultPreferMultiStageBuildConfig() }

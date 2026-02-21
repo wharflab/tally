@@ -43,11 +43,17 @@ func DefaultPreferCopyHeredocConfig() PreferCopyHeredocConfig {
 // PreferCopyHeredocRule implements the prefer-copy-heredoc linting rule.
 // It detects RUN instructions used for creating files and suggests using
 // COPY <<EOF syntax instead.
-type PreferCopyHeredocRule struct{}
+type PreferCopyHeredocRule struct {
+	schema map[string]any
+}
 
 // NewPreferCopyHeredocRule creates a new prefer-copy-heredoc rule instance.
 func NewPreferCopyHeredocRule() *PreferCopyHeredocRule {
-	return &PreferCopyHeredocRule{}
+	schema, err := configutil.RuleSchema(PreferCopyHeredocRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &PreferCopyHeredocRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -66,11 +72,7 @@ func (r *PreferCopyHeredocRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *PreferCopyHeredocRule) Schema() map[string]any {
-	schema, err := configutil.RuleSchema(PreferCopyHeredocRuleCode)
-	if err != nil {
-		panic(err)
-	}
-	return schema
+	return r.schema
 }
 
 // Check runs the prefer-copy-heredoc rule.

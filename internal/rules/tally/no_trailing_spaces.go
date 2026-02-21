@@ -31,11 +31,17 @@ func DefaultNoTrailingSpacesConfig() NoTrailingSpacesConfig {
 }
 
 // NoTrailingSpacesRule implements the no-trailing-spaces linting rule.
-type NoTrailingSpacesRule struct{}
+type NoTrailingSpacesRule struct {
+	schema map[string]any
+}
 
 // NewNoTrailingSpacesRule creates a new no-trailing-spaces rule instance.
 func NewNoTrailingSpacesRule() *NoTrailingSpacesRule {
-	return &NoTrailingSpacesRule{}
+	schema, err := configutil.RuleSchema(NoTrailingSpacesRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &NoTrailingSpacesRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -54,11 +60,7 @@ func (r *NoTrailingSpacesRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *NoTrailingSpacesRule) Schema() map[string]any {
-	schema, err := configutil.RuleSchema(NoTrailingSpacesRuleCode)
-	if err != nil {
-		panic(err)
-	}
-	return schema
+	return r.schema
 }
 
 // DefaultConfig returns the default configuration for this rule.

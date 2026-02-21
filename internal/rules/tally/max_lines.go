@@ -45,11 +45,17 @@ func DefaultMaxLinesConfig() MaxLinesConfig {
 }
 
 // MaxLinesRule implements the max-lines linting rule.
-type MaxLinesRule struct{}
+type MaxLinesRule struct {
+	schema map[string]any
+}
 
 // NewMaxLinesRule creates a new max-lines rule instance.
 func NewMaxLinesRule() *MaxLinesRule {
-	return &MaxLinesRule{}
+	schema, err := configutil.RuleSchema(MaxLinesRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &MaxLinesRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -69,11 +75,7 @@ func (r *MaxLinesRule) Metadata() rules.RuleMetadata {
 // Follows ESLint's meta.schema pattern for rule options validation.
 // Supports either an integer shorthand (just max) or full object config.
 func (r *MaxLinesRule) Schema() map[string]any {
-	schema, err := configutil.RuleSchema(MaxLinesRuleCode)
-	if err != nil {
-		panic(err)
-	}
-	return schema
+	return r.schema
 }
 
 // Check runs the max-lines rule using the AST for accurate line counting.

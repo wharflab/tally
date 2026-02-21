@@ -23,11 +23,17 @@ const ConsistentIndentationRuleCode = rules.TallyRulePrefix + "consistent-indent
 // ConsistentIndentationRule implements the consistent-indentation linting rule.
 // For multi-stage Dockerfiles, it enforces indentation of commands within each stage.
 // For single-stage Dockerfiles, it enforces no indentation (flat style).
-type ConsistentIndentationRule struct{}
+type ConsistentIndentationRule struct {
+	schema map[string]any
+}
 
 // NewConsistentIndentationRule creates a new consistent-indentation rule instance.
 func NewConsistentIndentationRule() *ConsistentIndentationRule {
-	return &ConsistentIndentationRule{}
+	schema, err := configutil.RuleSchema(ConsistentIndentationRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &ConsistentIndentationRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -46,11 +52,7 @@ func (r *ConsistentIndentationRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *ConsistentIndentationRule) Schema() map[string]any {
-	schema, err := configutil.RuleSchema(ConsistentIndentationRuleCode)
-	if err != nil {
-		panic(err)
-	}
-	return schema
+	return r.schema
 }
 
 // DefaultConfig returns the default configuration for this rule.
