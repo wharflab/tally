@@ -151,11 +151,7 @@ func validateRuleOptions(raw map[string]any, validator schemavalidator.Validator
 				if len(opts) == 0 {
 					continue
 				}
-				optKeys := make([]string, 0, len(opts))
-				for key := range opts {
-					optKeys = append(optKeys, key)
-				}
-				slices.Sort(optKeys)
+				optKeys := slices.Sorted(maps.Keys(opts))
 				return fmt.Errorf(
 					"rule %s does not support options (%s)",
 					ruleCode,
