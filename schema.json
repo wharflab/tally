@@ -656,6 +656,20 @@
     "ai": {
       "additionalProperties": false,
       "description": "Configure opt-in AI AutoFix features (requires an ACP-capable agent).",
+      "examples": [
+        {
+          "command": [
+            "gemini",
+            "--experimental-acp",
+            "--allowed-mcp-server-names=none",
+            "--model=gemini-3-flash-preview"
+          ],
+          "enabled": true,
+          "max-input-bytes": 262144,
+          "redact-secrets": true,
+          "timeout": "90s"
+        }
+      ],
       "if": {
         "properties": {
           "enabled": {
@@ -668,7 +682,23 @@
       },
       "properties": {
         "command": {
-          "description": "Argv to launch the ACP agent process over stdio (e.g. [\"my-agent\", \"--flag\"]).",
+          "description": "Argv to launch the ACP agent process over stdio.",
+          "examples": [
+            [
+              "gemini",
+              "--experimental-acp",
+              "--allowed-mcp-server-names=none",
+              "--model=gemini-3-flash-preview"
+            ],
+            [
+              "opencode",
+              "--acp"
+            ],
+            [
+              "kiro",
+              "--acp"
+            ]
+          ],
           "items": {
             "minLength": 1,
             "type": "string"

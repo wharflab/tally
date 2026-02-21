@@ -96,9 +96,14 @@
           "default": false
         },
         "command": {
-          "description": "Argv to launch the ACP agent process over stdio (e.g. [\"my-agent\", \"--flag\"]).",
+          "description": "Argv to launch the ACP agent process over stdio.",
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": { "type": "string", "minLength": 1 },
+          "examples": [
+            ["gemini", "--experimental-acp", "--allowed-mcp-server-names=none", "--model=gemini-3-flash-preview"],
+            ["opencode", "--acp"],
+            ["kiro", "--acp"]
+          ]
         },
         "timeout": {
           "description": "Per-fix execution timeout as a Go duration string (e.g. \"90s\", \"2m\").",
@@ -119,6 +124,15 @@
         }
       },
       "additionalProperties": false,
+      "examples": [
+        {
+          "enabled": true,
+          "command": ["gemini", "--experimental-acp", "--allowed-mcp-server-names=none", "--model=gemini-3-flash-preview"],
+          "timeout": "90s",
+          "max-input-bytes": 262144,
+          "redact-secrets": true
+        }
+      ],
       "if": {
         "properties": { "enabled": { "const": true } },
         "required": ["enabled"]
