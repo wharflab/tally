@@ -7,31 +7,31 @@
   "type": "object",
   "properties": {
     "consistent-indentation": {
-      "$ref": "./consistent-indentation.schema.json"
+      "$ref": "./consistent_indentation.schema.json"
     },
     "max-lines": {
-      "$ref": "./max-lines.schema.json"
+      "$ref": "./max_lines.schema.json"
     },
     "newline-between-instructions": {
-      "$ref": "./newline-between-instructions.schema.json"
+      "$ref": "./newline_between_instructions.schema.json"
     },
     "newline-per-chained-call": {
-      "$ref": "./newline-per-chained-call.schema.json"
+      "$ref": "./newline_per_chained_call.schema.json"
     },
     "no-trailing-spaces": {
-      "$ref": "./no-trailing-spaces.schema.json"
+      "$ref": "./no_trailing_spaces.schema.json"
     },
     "prefer-add-unpack": {
-      "$ref": "./prefer-add-unpack.schema.json"
+      "$ref": "./prefer_add_unpack.schema.json"
     },
     "prefer-copy-heredoc": {
-      "$ref": "./prefer-copy-heredoc.schema.json"
+      "$ref": "./prefer_copy_heredoc.schema.json"
     },
     "prefer-multi-stage-build": {
-      "$ref": "./prefer-multi-stage-build.schema.json"
+      "$ref": "./prefer_multi_stage_build.schema.json"
     },
     "prefer-run-heredoc": {
-      "$ref": "./prefer-run-heredoc.schema.json"
+      "$ref": "./prefer_run_heredoc.schema.json"
     }
   },
   "additionalProperties": {

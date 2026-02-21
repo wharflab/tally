@@ -584,7 +584,7 @@ func ruleNameFromSchemaFilename(namespace, filename string) string {
 	if namespace == "hadolint" {
 		return strings.ToUpper(base)
 	}
-	return base
+	return strings.ReplaceAll(base, "_", "-")
 }
 
 func ruleExampleKey(namespace string) string {

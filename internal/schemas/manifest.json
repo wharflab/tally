@@ -20,47 +20,47 @@
       "package": "github.com/wharflab/tally/internal/schemas/generated/config"
     },
     {
-      "input": "internal/rules/tally/max-lines.schema.json",
+      "input": "internal/rules/tally/max_lines.schema.json",
       "output": "internal/schemas/generated/rules/tally/max_lines.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
-      "input": "internal/rules/tally/consistent-indentation.schema.json",
+      "input": "internal/rules/tally/consistent_indentation.schema.json",
       "output": "internal/schemas/generated/rules/tally/consistent_indentation.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
-      "input": "internal/rules/tally/no-trailing-spaces.schema.json",
+      "input": "internal/rules/tally/no_trailing_spaces.schema.json",
       "output": "internal/schemas/generated/rules/tally/no_trailing_spaces.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
-      "input": "internal/rules/tally/newline-between-instructions.schema.json",
+      "input": "internal/rules/tally/newline_between_instructions.schema.json",
       "output": "internal/schemas/generated/rules/tally/newline_between_instructions.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
-      "input": "internal/rules/tally/newline-per-chained-call.schema.json",
+      "input": "internal/rules/tally/newline_per_chained_call.schema.json",
       "output": "internal/schemas/generated/rules/tally/newline_per_chained_call.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
-      "input": "internal/rules/tally/prefer-add-unpack.schema.json",
+      "input": "internal/rules/tally/prefer_add_unpack.schema.json",
       "output": "internal/schemas/generated/rules/tally/prefer_add_unpack.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
-      "input": "internal/rules/tally/prefer-run-heredoc.schema.json",
+      "input": "internal/rules/tally/prefer_run_heredoc.schema.json",
       "output": "internal/schemas/generated/rules/tally/prefer_run_heredoc.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
-      "input": "internal/rules/tally/prefer-copy-heredoc.schema.json",
+      "input": "internal/rules/tally/prefer_copy_heredoc.schema.json",
       "output": "internal/schemas/generated/rules/tally/prefer_copy_heredoc.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
-      "input": "internal/rules/tally/prefer-multi-stage-build.schema.json",
+      "input": "internal/rules/tally/prefer_multi_stage_build.schema.json",
       "output": "internal/schemas/generated/rules/tally/prefer_multi_stage_build.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },

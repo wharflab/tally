@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.tally.dev/rules/tally/prefer-copy-heredoc.schema.json",
+  "$id": "https://schemas.tally.dev/rules/tally/prefer_copy_heredoc.schema.json",
   "title": "tally/prefer-copy-heredoc rule config",
   "description": "Configuration options for the tally/prefer-copy-heredoc rule.",
   "type": "object",

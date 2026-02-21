@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.tally.dev/rules/tally/prefer-run-heredoc.schema.json",
+  "$id": "https://schemas.tally.dev/rules/tally/prefer_run_heredoc.schema.json",
   "title": "tally/prefer-run-heredoc rule config",
   "description": "Configuration options for the tally/prefer-run-heredoc rule.",
   "type": "object",

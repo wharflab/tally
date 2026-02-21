@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.tally.dev/rules/tally/newline-per-chained-call.schema.json",
+  "$id": "https://schemas.tally.dev/rules/tally/newline_per_chained_call.schema.json",
   "title": "tally/newline-per-chained-call rule config",
   "description": "Configuration options for the tally/newline-per-chained-call rule.",
   "type": "object",
