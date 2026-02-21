@@ -159,17 +159,15 @@ func TestConfigFromSchema_CoversAllFields(t *testing.T) {
 
 	typ := reflect.TypeFor[Config]()
 
-	var missing []string
+	// Build set of all exported, non-skipped field names.
+	structFields := make(map[string]bool)
 	for f := range typ.Fields() {
-		if skipped[f.Name] {
-			continue
+		if !skipped[f.Name] {
+			structFields[f.Name] = true
 		}
-		missing = append(missing, f.Name)
 	}
 
-	// Verify every non-skipped field has a corresponding branch in
-	// configFromSchema. The authoritative list is maintained here;
-	// update it when adding fields.
+	// Authoritative list of fields handled by configFromSchema.
 	handled := map[string]bool{
 		"Output":           true,
 		"InlineDirectives": true,
@@ -177,21 +175,16 @@ func TestConfigFromSchema_CoversAllFields(t *testing.T) {
 		"SlowChecks":       true,
 	}
 
-	for _, name := range missing {
+	// Forward: every struct field must be handled.
+	for name := range structFields {
 		if !handled[name] {
 			t.Errorf("Config field %q is not handled by configFromSchema and not in the skip list; "+
 				"update configFromSchema and this test", name)
 		}
 	}
+	// Reverse: every handled entry must still exist in Config.
 	for name := range handled {
-		found := false
-		for f := range typ.Fields() {
-			if f.Name == name {
-				found = true
-				break
-			}
-		}
-		if !found {
+		if !structFields[name] {
 			t.Errorf("handled field %q no longer exists in Config; remove it from this test", name)
 		}
 	}
