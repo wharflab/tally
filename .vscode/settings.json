@@ -35,7 +35,8 @@
   "cSpell.enabled": false,
   "codeQL.githubDatabase.update": "never",
   "files.exclude": {
-    ".rumdl_cache": true
+    ".rumdl_cache": true,
+    "index.schema.json": true
   },
   "[markdown]": {
     "editor.defaultFormatter": "rvben.rumdl",
@@ -92,4 +93,9 @@
     "**/docs/site/": true,
     "**/.vscode-test": true
   },
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "*.go": "${capture}.schema.json",
+    "package.json": "bun.lock"
+  }
 }
