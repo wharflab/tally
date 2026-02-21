@@ -1,6 +1,9 @@
 package ruleconfig
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func TestCanonicalizeRuleOptions(t *testing.T) {
 	t.Parallel()
@@ -55,13 +58,59 @@ func TestCanonicalizeRuleOptions(t *testing.T) {
 		}
 	})
 
-	t.Run("max-lines float is not shorthand", func(t *testing.T) {
+	t.Run("max-lines float64 whole number shorthand from JSON", func(t *testing.T) {
 		t.Parallel()
 
-		input := 120.0
+		got := CanonicalizeRuleOptions("tally/max-lines", float64(120))
+		opts, ok := got.(map[string]any)
+		if !ok {
+			t.Fatalf("got %T, want map[string]any", got)
+		}
+		if opts["max"] != float64(120) {
+			t.Fatalf("opts[max] = %v, want 120", opts["max"])
+		}
+	})
+
+	t.Run("max-lines float32 whole number shorthand", func(t *testing.T) {
+		t.Parallel()
+
+		got := CanonicalizeRuleOptions("tally/max-lines", float32(50))
+		opts, ok := got.(map[string]any)
+		if !ok {
+			t.Fatalf("got %T, want map[string]any", got)
+		}
+		if opts["max"] != float32(50) {
+			t.Fatalf("opts[max] = %v, want 50", opts["max"])
+		}
+	})
+
+	t.Run("max-lines fractional float is not shorthand", func(t *testing.T) {
+		t.Parallel()
+
+		input := 120.5
 		got := CanonicalizeRuleOptions("tally/max-lines", input)
 		if got != input {
-			t.Fatalf("expected float input unchanged, got %v", got)
+			t.Fatalf("expected fractional float unchanged, got %v", got)
+		}
+	})
+
+	t.Run("max-lines NaN is not shorthand", func(t *testing.T) {
+		t.Parallel()
+
+		input := math.NaN()
+		got := CanonicalizeRuleOptions("tally/max-lines", input)
+		if _, isMap := got.(map[string]any); isMap {
+			t.Fatal("NaN should not be treated as integer shorthand")
+		}
+	})
+
+	t.Run("max-lines Inf is not shorthand", func(t *testing.T) {
+		t.Parallel()
+
+		input := math.Inf(1)
+		got := CanonicalizeRuleOptions("tally/max-lines", input)
+		if _, isMap := got.(map[string]any); isMap {
+			t.Fatal("+Inf should not be treated as integer shorthand")
 		}
 	})
 

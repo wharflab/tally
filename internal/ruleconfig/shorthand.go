@@ -75,6 +75,11 @@ func isIntegerLike(value any) bool {
 		return typed <= math.MaxInt64
 	case uint8, uint16, uint32:
 		return true
+	case float32:
+		return typed == float32(int64(typed)) && !math.IsInf(float64(typed), 0)
+	case float64:
+		return typed == math.Trunc(typed) && !math.IsInf(typed, 0) && !math.IsNaN(typed) &&
+			typed >= math.MinInt64 && typed <= math.MaxInt64
 	case string:
 		_, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
 		return err == nil
