@@ -33,6 +33,7 @@ func RuleNamespaces() []string {
 		}
 	}
 	slices.Sort(namespaces)
+	namespaces = slices.Compact(namespaces)
 	return namespaces
 }
 
