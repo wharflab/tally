@@ -189,21 +189,16 @@ func normalizeOutputAliases(raw map[string]any) {
 		raw["output"] = outputRaw
 	}
 
-	aliases := map[string]string{
-		"format":      "format",
-		"path":        "path",
-		"show-source": "show-source",
-		"fail-level":  "fail-level",
-	}
-	for from, to := range aliases {
-		value, ok := raw[from]
+	outputKeys := []string{"format", "path", "show-source", "fail-level"}
+	for _, key := range outputKeys {
+		value, ok := raw[key]
 		if !ok {
 			continue
 		}
-		if _, exists := outputRaw[to]; !exists {
-			outputRaw[to] = value
+		if _, exists := outputRaw[key]; !exists {
+			outputRaw[key] = value
 		}
-		delete(raw, from)
+		delete(raw, key)
 	}
 }
 
