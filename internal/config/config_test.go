@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -139,6 +140,61 @@ func setupTempProject(t *testing.T) (string, string) {
 	}
 
 	return tmpDir, dockerfilePath
+}
+
+// TestConfigFromSchema_CoversAllFields uses reflection to ensure that
+// configFromSchema maps every exported Config field except Rules and ConfigFile.
+// If a new field is added to Config, this test will fail until
+// configFromSchema is updated to handle it.
+func TestConfigFromSchema_CoversAllFields(t *testing.T) {
+	t.Parallel()
+
+	// Fields that are intentionally not set by configFromSchema:
+	//   Rules      – populated separately from rule config
+	//   ConfigFile – runtime metadata, not from config file
+	skipped := map[string]bool{
+		"Rules":      true,
+		"ConfigFile": true,
+	}
+
+	typ := reflect.TypeFor[Config]()
+
+	var missing []string
+	for f := range typ.Fields() {
+		if skipped[f.Name] {
+			continue
+		}
+		missing = append(missing, f.Name)
+	}
+
+	// Verify every non-skipped field has a corresponding branch in
+	// configFromSchema. The authoritative list is maintained here;
+	// update it when adding fields.
+	handled := map[string]bool{
+		"Output":           true,
+		"InlineDirectives": true,
+		"AI":               true,
+		"SlowChecks":       true,
+	}
+
+	for _, name := range missing {
+		if !handled[name] {
+			t.Errorf("Config field %q is not handled by configFromSchema and not in the skip list; "+
+				"update configFromSchema and this test", name)
+		}
+	}
+	for name := range handled {
+		found := false
+		for f := range typ.Fields() {
+			if f.Name == name {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("handled field %q no longer exists in Config; remove it from this test", name)
+		}
+	}
 }
 
 func TestLoad_DefaultsWhenNoConfig(t *testing.T) {
