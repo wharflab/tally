@@ -284,12 +284,7 @@ func (v *validator) resolveRef(baseSchemaID, ref string) (string, map[string]any
 
 	node := target
 	if resolved.Fragment != "" {
-		ptr := "#" + resolved.Fragment
-		ptrURL, err := url.Parse(ptr)
-		if err != nil {
-			return "", nil, fmt.Errorf("parse ref fragment %q: %w", resolved.Fragment, err)
-		}
-		fragment := ptrURL.Fragment
+		fragment := resolved.Fragment
 		if fragment != "" {
 			node, err = resolvePointer(target, fragment)
 			if err != nil {
