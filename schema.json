@@ -655,6 +655,7 @@
   "properties": {
     "ai": {
       "additionalProperties": false,
+      "description": "Configure opt-in AI AutoFix features (requires an ACP-capable agent).",
       "if": {
         "properties": {
           "enabled": {
@@ -667,6 +668,7 @@
       },
       "properties": {
         "command": {
+          "description": "Argv to launch the ACP agent process over stdio (e.g. [\"my-agent\", \"--flag\"]).",
           "items": {
             "type": "string"
           },
@@ -674,19 +676,23 @@
         },
         "enabled": {
           "default": false,
+          "description": "Enable AI AutoFix. When false, AI fixes are never resolved.",
           "type": "boolean"
         },
         "max-input-bytes": {
           "default": 262144,
+          "description": "Maximum prompt payload size in bytes sent to the agent.",
           "minimum": 0,
           "type": "integer"
         },
         "redact-secrets": {
           "default": true,
+          "description": "Redact detected secrets in Dockerfile content before sending to the agent.",
           "type": "boolean"
         },
         "timeout": {
           "default": "90s",
+          "description": "Per-fix execution timeout as a Go duration string (e.g. \"90s\", \"2m\").",
           "type": "string"
         }
       },
@@ -704,21 +710,26 @@
     },
     "inline-directives": {
       "additionalProperties": false,
+      "description": "Control inline suppression directives (e.g. # tally-ignore).",
       "properties": {
         "enabled": {
           "default": true,
+          "description": "Allow inline directives to suppress violations.",
           "type": "boolean"
         },
         "require-reason": {
           "default": false,
+          "description": "Require a reason comment on every inline suppression directive.",
           "type": "boolean"
         },
         "validate-rules": {
           "default": false,
+          "description": "Warn when an inline directive references a rule that does not exist.",
           "type": "boolean"
         },
         "warn-unused": {
           "default": false,
+          "description": "Warn when an inline directive does not suppress any violation.",
           "type": "boolean"
         }
       },
@@ -726,9 +737,11 @@
     },
     "output": {
       "additionalProperties": false,
+      "description": "Configure output format and destination.",
       "properties": {
         "fail-level": {
           "default": "style",
+          "description": "Minimum severity that causes a non-zero exit code.",
           "enum": [
             "error",
             "warning",
@@ -740,6 +753,7 @@
         },
         "format": {
           "default": "text",
+          "description": "Output format for lint results.",
           "enum": [
             "text",
             "json",
@@ -751,10 +765,12 @@
         },
         "path": {
           "default": "stdout",
+          "description": "Write output to this path instead of stdout.",
           "type": "string"
         },
         "show-source": {
           "default": true,
+          "description": "Include source code snippets in output.",
           "type": "boolean"
         }
       },
@@ -767,6 +783,7 @@
           "$ref": "#/$defs/rules-buildkit-index"
         },
         "exclude": {
+          "description": "Glob patterns for rules to disable (e.g. \"buildkit/MaintainerDeprecated\").",
           "items": {
             "type": "string"
           },
@@ -776,6 +793,7 @@
           "$ref": "#/$defs/rules-hadolint-index"
         },
         "include": {
+          "description": "Glob patterns for rules to enable (e.g. \"tally/*\", \"hadolint/DL3026\").",
           "items": {
             "type": "string"
           },
@@ -789,13 +807,16 @@
     },
     "slow-checks": {
       "additionalProperties": false,
+      "description": "Configure async checks that require network or other slow I/O (e.g. registry lookups).",
       "properties": {
         "fail-fast": {
           "default": true,
+          "description": "Stop slow checks on first failure instead of collecting all results.",
           "type": "boolean"
         },
         "mode": {
           "default": "auto",
+          "description": "When to run slow checks: \"auto\" enables them in CI, \"on\" always, \"off\" never.",
           "enum": [
             "auto",
             "on",
@@ -805,6 +826,7 @@
         },
         "timeout": {
           "default": "20s",
+          "description": "Overall timeout for all slow checks as a Go duration string (e.g. \"20s\").",
           "type": "string"
         }
       },
