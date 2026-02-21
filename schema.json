@@ -670,6 +670,7 @@
         "command": {
           "description": "Argv to launch the ACP agent process over stdio (e.g. [\"my-agent\", \"--flag\"]).",
           "items": {
+            "minLength": 1,
             "type": "string"
           },
           "type": "array"

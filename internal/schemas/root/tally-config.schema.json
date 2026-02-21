@@ -98,7 +98,7 @@
         "command": {
           "description": "Argv to launch the ACP agent process over stdio (e.g. [\"my-agent\", \"--flag\"]).",
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string", "minLength": 1 }
         },
         "timeout": {
           "description": "Per-fix execution timeout as a Go duration string (e.g. \"90s\", \"2m\").",
