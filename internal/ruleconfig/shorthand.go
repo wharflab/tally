@@ -2,6 +2,8 @@ package ruleconfig
 
 import (
 	"math"
+	"strconv"
+	"strings"
 )
 
 type shorthandKind int
@@ -73,6 +75,9 @@ func isIntegerLike(value any) bool {
 		return typed <= math.MaxInt64
 	case uint8, uint16, uint32:
 		return true
+	case string:
+		_, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
+		return err == nil
 	default:
 		return false
 	}

@@ -32,6 +32,29 @@ func TestCanonicalizeRuleOptions(t *testing.T) {
 		}
 	})
 
+	t.Run("max-lines string integer shorthand from env var", func(t *testing.T) {
+		t.Parallel()
+
+		got := CanonicalizeRuleOptions("tally/max-lines", "100")
+		opts, ok := got.(map[string]any)
+		if !ok {
+			t.Fatalf("got %T, want map[string]any", got)
+		}
+		if opts["max"] != "100" {
+			t.Fatalf("opts[max] = %v, want \"100\"", opts["max"])
+		}
+	})
+
+	t.Run("max-lines non-numeric string is not shorthand", func(t *testing.T) {
+		t.Parallel()
+
+		input := "abc"
+		got := CanonicalizeRuleOptions("tally/max-lines", input)
+		if got != input {
+			t.Fatalf("expected non-numeric string unchanged, got %v", got)
+		}
+	})
+
 	t.Run("max-lines float is not shorthand", func(t *testing.T) {
 		t.Parallel()
 
