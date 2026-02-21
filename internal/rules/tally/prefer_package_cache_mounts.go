@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/runmount"
@@ -61,6 +62,7 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 
 		workdir := "/"
 		pnpmStorePath := defaultPnpmStorePath
+		var uvNoCacheTracker *uvNoCacheEnvInfo
 		for _, cmd := range stage.Commands {
 			if wd, ok := cmd.(*instructions.WorkdirCommand); ok {
 				workdir = resolveWorkdir(workdir, wd.Path)
@@ -69,6 +71,7 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 
 			if env, ok := cmd.(*instructions.EnvCommand); ok {
 				pnpmStorePath = resolvePnpmStorePath(env, pnpmStorePath)
+				uvNoCacheTracker = resolveUVNoCacheTracker(env, uvNoCacheTracker)
 				continue
 			}
 
@@ -105,40 +108,81 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 			}
 
 			endLine, endCol := resolveRunEndPosition(runLoc, sm, run)
-			fixDescription := "Add package cache mount(s)"
-			if cleaned {
-				fixDescription = "Add package cache mount(s) and remove cache cleanup commands"
+
+			edits, envCleaned := buildFixEdits(
+				input.File, runLoc, endLine, endCol, replacement,
+				cleaners, uvNoCacheTracker,
+			)
+			if envCleaned {
+				cleaned = true
+				uvNoCacheTracker = nil // consume: only the first uv RUN in the stage gets the edit
 			}
 
-			mountDescriptions := describeMounts(required)
-			v := rules.NewViolation(
-				rules.NewLocationFromRanges(input.File, runLoc),
-				meta.Code,
-				"use cache mounts for package manager cache directories",
-				meta.DefaultSeverity,
-			).WithDocURL(meta.DocURL).WithDetail(
-				"Detected package install/build command; add cache mount(s): " + strings.Join(mountDescriptions, ", "),
-			).WithSuggestedFix(&rules.SuggestedFix{
-				Description: fixDescription,
-				Safety:      rules.FixSuggestion,
-				Priority:    meta.FixPriority,
-				Edits: []rules.TextEdit{{
-					Location: rules.NewRangeLocation(
-						input.File,
-						runLoc[0].Start.Line,
-						runLoc[0].Start.Character,
-						endLine,
-						endCol,
-					),
-					NewText: replacement,
-				}},
-			})
-
+			v := buildViolation(meta, input.File, runLoc, required, cleaned, edits)
 			violations = append(violations, v)
 		}
 	}
 
 	return violations
+}
+
+func buildFixEdits(
+	file string,
+	runLoc []parser.Range,
+	endLine, endCol int,
+	replacement string,
+	cleaners map[cleanupKind]bool,
+	uvNoCacheTracker *uvNoCacheEnvInfo,
+) ([]rules.TextEdit, bool) {
+	edits := []rules.TextEdit{{
+		Location: rules.NewRangeLocation(
+			file,
+			runLoc[0].Start.Line,
+			runLoc[0].Start.Character,
+			endLine,
+			endCol,
+		),
+		NewText: replacement,
+	}}
+
+	envCleaned := false
+	if uvNoCacheTracker != nil && cleaners[cleanupUV] {
+		if envEdit := buildUVNoCacheRemovalEdit(file, uvNoCacheTracker); envEdit != nil {
+			edits = append(edits, *envEdit)
+			envCleaned = true
+		}
+	}
+
+	return edits, envCleaned
+}
+
+func buildViolation(
+	meta rules.RuleMetadata,
+	file string,
+	runLoc []parser.Range,
+	required []cacheMountSpec,
+	cleaned bool,
+	edits []rules.TextEdit,
+) rules.Violation {
+	fixDescription := "Add package cache mount(s)"
+	if cleaned {
+		fixDescription = "Add package cache mount(s) and remove cache cleanup commands"
+	}
+
+	mountDescriptions := describeMounts(required)
+	return rules.NewViolation(
+		rules.NewLocationFromRanges(file, runLoc),
+		meta.Code,
+		"use cache mounts for package manager cache directories",
+		meta.DefaultSeverity,
+	).WithDocURL(meta.DocURL).WithDetail(
+		"Detected package install/build command; add cache mount(s): " + strings.Join(mountDescriptions, ", "),
+	).WithSuggestedFix(&rules.SuggestedFix{
+		Description: fixDescription,
+		Safety:      rules.FixSuggestion,
+		Priority:    meta.FixPriority,
+		Edits:       edits,
+	})
 }
 
 type cacheMountSpec struct {
@@ -406,6 +450,71 @@ func hasUnresolvedWorkdirReference(workdir string) bool {
 	return strings.Contains(workdir, "$")
 }
 
+// uvNoCacheEnvInfo tracks an ENV instruction that sets UV_NO_CACHE for later removal.
+type uvNoCacheEnvInfo struct {
+	env     *instructions.EnvCommand
+	soleVar bool // true if UV_NO_CACHE is the only variable in this ENV
+}
+
+// resolveUVNoCacheTracker updates the tracker if the ENV instruction sets UV_NO_CACHE.
+func resolveUVNoCacheTracker(env *instructions.EnvCommand, current *uvNoCacheEnvInfo) *uvNoCacheEnvInfo {
+	if info := detectUVNoCacheEnv(env); info != nil {
+		return info
+	}
+	return current
+}
+
+// detectUVNoCacheEnv returns tracking info if the ENV instruction sets UV_NO_CACHE.
+func detectUVNoCacheEnv(env *instructions.EnvCommand) *uvNoCacheEnvInfo {
+	for _, kv := range env.Env {
+		if kv.Key == "UV_NO_CACHE" {
+			return &uvNoCacheEnvInfo{
+				env:     env,
+				soleVar: len(env.Env) == 1,
+			}
+		}
+	}
+	return nil
+}
+
+// buildUVNoCacheRemovalEdit constructs a TextEdit that removes UV_NO_CACHE from an ENV instruction.
+// For sole-variable ENV instructions, it removes the entire line.
+// For multi-variable ENV instructions, it reconstructs the line without UV_NO_CACHE.
+func buildUVNoCacheRemovalEdit(file string, info *uvNoCacheEnvInfo) *rules.TextEdit {
+	envLoc := info.env.Location()
+	if len(envLoc) == 0 {
+		return nil
+	}
+
+	startLine := envLoc[0].Start.Line
+	startCol := envLoc[0].Start.Character
+
+	if info.soleVar {
+		// Remove the entire line including its trailing newline by spanning to the next line.
+		return &rules.TextEdit{
+			Location: rules.NewRangeLocation(file, startLine, startCol, startLine+1, 0),
+			NewText:  "",
+		}
+	}
+
+	// Multi-variable ENV: reconstruct without UV_NO_CACHE.
+	var parts []string
+	for _, kv := range info.env.Env {
+		if kv.Key == "UV_NO_CACHE" {
+			continue
+		}
+		parts = append(parts, kv.Key+"="+kv.Value)
+	}
+
+	endLine := envLoc[len(envLoc)-1].End.Line
+	endCol := envLoc[len(envLoc)-1].End.Character
+
+	return &rules.TextEdit{
+		Location: rules.NewRangeLocation(file, startLine, startCol, endLine, endCol),
+		NewText:  "ENV " + strings.Join(parts, " "),
+	}
+}
+
 // resolvePnpmStorePath updates the pnpm store path if PNPM_HOME is set in the ENV instruction.
 func resolvePnpmStorePath(env *instructions.EnvCommand, current string) string {
 	for _, kv := range env.Env {
@@ -444,7 +553,7 @@ func uvUsesCache(cmd shell.CommandInfo) bool {
 	switch cmd.Subcommand {
 	case "sync":
 		return true
-	case "pip", "tool":
+	case "pip", "tool", "python":
 		if len(cmd.Args) < 2 {
 			return false
 		}

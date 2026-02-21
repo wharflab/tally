@@ -39,7 +39,7 @@ Each suggested mount includes an `id` for observability and reusability across b
 | `cargo build` | `<WORKDIR>/target` (`id=cargo-target`), `/usr/local/cargo/git/db` (`id=cargo-git`), `/usr/local/cargo/registry` (`id=cargo-registry`) |
 | `dotnet restore` | `/root/.nuget/packages` (`id=nuget`) |
 | `composer install` | `/root/.cache/composer` (`id=composer`) |
-| `uv sync`, `uv pip install`, `uv tool install` | `/root/.cache/uv` (`id=uv`) |
+| `uv sync`, `uv pip install`, `uv tool install`, `uv python install` | `/root/.cache/uv` (`id=uv`) |
 | `bun install` | `/root/.bun/install/cache` (`id=bun`) |
 
 ### pnpm store path resolution
@@ -132,8 +132,14 @@ of cache mounts.
 - **uv**: `--no-cache`
 - **bun**: `--no-cache`
 
+### Cache-disabling environment variables removed
+
+- **uv**: `ENV UV_NO_CACHE=...` (the entire `ENV` instruction is removed if it only sets `UV_NO_CACHE`; otherwise, only the `UV_NO_CACHE` variable is
+  removed)
+
 ## References
 
 - [Docker cache optimization: Use cache mounts](https://docs.docker.com/build/cache/optimize/#use-cache-mounts)
 - [Dockerfile `RUN --mount` reference](https://docs.docker.com/reference/dockerfile/#run---mount)
 - [Using pnpm with Docker](https://pnpm.io/docker)
+- [Using uv with Docker: Caching](https://docs.astral.sh/uv/guides/integration/docker/#caching)

@@ -175,6 +175,13 @@ RUN uv sync --frozen
 			WantViolations: 1,
 		},
 		{
+			Name: "uv python install",
+			Content: `FROM python:3.13
+RUN uv python install 3.12
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "bun install",
 			Content: `FROM oven/bun:1.2
 RUN bun install
@@ -252,6 +259,7 @@ func TestPreferPackageCacheMountsRule_CheckWithFixes(t *testing.T) {
 		content         string
 		wantFixContains []string
 		wantNotContains []string
+		wantEditCount   int // 0 means default (1)
 	}{
 		{
 			name: "npm install adds mount and removes cache clean",
@@ -429,6 +437,43 @@ RUN uv sync --no-cache --frozen && uv cache clean
 			wantNotContains: []string{"--no-cache", "uv cache clean"},
 		},
 		{
+			name: "uv python install adds cache mount",
+			content: `FROM python:3.13
+RUN uv python install 3.12
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
+				"uv python install 3.12",
+			},
+		},
+		{
+			name: "UV_NO_CACHE env removed (sole variable)",
+			content: `FROM python:3.13
+ENV UV_NO_CACHE=1
+RUN uv sync --frozen
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
+				"uv sync --frozen",
+			},
+			wantNotContains: []string{"UV_NO_CACHE"},
+			wantEditCount:   2,
+		},
+		{
+			name: "UV_NO_CACHE env removed (multi-variable)",
+			content: `FROM python:3.13
+ENV UV_NO_CACHE=1 UV_LINK_MODE=copy
+RUN uv sync --frozen
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
+				"uv sync --frozen",
+				"ENV UV_LINK_MODE=copy",
+			},
+			wantNotContains: []string{"UV_NO_CACHE"},
+			wantEditCount:   2,
+		},
+		{
 			name: "heredoc adds mount and removes cleanup line",
 			content: `FROM node:20
 RUN <<EOF
@@ -468,19 +513,30 @@ RUN bun install --no-cache && bun pm cache rm
 			if fix.Priority != 90 {
 				t.Fatalf("fix priority = %d, want 90", fix.Priority)
 			}
-			if len(fix.Edits) != 1 {
-				t.Fatalf("fix edits = %d, want 1", len(fix.Edits))
+
+			wantEdits := tt.wantEditCount
+			if wantEdits == 0 {
+				wantEdits = 1
+			}
+			if len(fix.Edits) != wantEdits {
+				t.Fatalf("fix edits = %d, want %d", len(fix.Edits), wantEdits)
 			}
 
-			newText := fix.Edits[0].NewText
+			// Concatenate all edit texts for contains/notContains checks.
+			var allNewText strings.Builder
+			for _, edit := range fix.Edits {
+				allNewText.WriteString(edit.NewText)
+				allNewText.WriteString("\n")
+			}
+			combined := allNewText.String()
 			for _, want := range tt.wantFixContains {
-				if !strings.Contains(newText, want) {
-					t.Fatalf("fix missing %q in:\n%s", want, newText)
+				if !strings.Contains(combined, want) {
+					t.Fatalf("fix missing %q in:\n%s", want, combined)
 				}
 			}
 			for _, notWant := range tt.wantNotContains {
-				if strings.Contains(newText, notWant) {
-					t.Fatalf("fix unexpectedly contains %q in:\n%s", notWant, newText)
+				if strings.Contains(combined, notWant) {
+					t.Fatalf("fix unexpectedly contains %q in:\n%s", notWant, combined)
 				}
 			}
 		})
@@ -537,6 +593,14 @@ func TestUVUsesCache(t *testing.T) {
 			cmd: shell.CommandInfo{
 				Subcommand: "tool",
 				Args:       []string{"tool", "install", "ruff"},
+			},
+			want: true,
+		},
+		{
+			name: "uv python install",
+			cmd: shell.CommandInfo{
+				Subcommand: "python",
+				Args:       []string{"python", "install", "3.13"},
 			},
 			want: true,
 		},
