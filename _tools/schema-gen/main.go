@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/format"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -510,23 +511,13 @@ func renderRegistryGo(rootSchemaID string, ruleSchemaIDs map[string]string, sche
 	b.WriteString("const RootConfigSchemaID = " + fmt.Sprintf("%q", rootSchemaID) + "\n\n")
 
 	b.WriteString("var ruleSchemaIDs = map[string]string{\n")
-	ruleCodes := make([]string, 0, len(ruleSchemaIDs))
-	for code := range ruleSchemaIDs {
-		ruleCodes = append(ruleCodes, code)
-	}
-	slices.Sort(ruleCodes)
-	for _, code := range ruleCodes {
+	for _, code := range slices.Sorted(maps.Keys(ruleSchemaIDs)) {
 		b.WriteString("\t" + fmt.Sprintf("%q: %q,", code, ruleSchemaIDs[code]) + "\n")
 	}
 	b.WriteString("}\n\n")
 
 	b.WriteString("var schemaBytesByID = map[string][]byte{\n")
-	schemaIDs := make([]string, 0, len(schemaBytesByID))
-	for id := range schemaBytesByID {
-		schemaIDs = append(schemaIDs, id)
-	}
-	slices.Sort(schemaIDs)
-	for _, id := range schemaIDs {
+	for _, id := range slices.Sorted(maps.Keys(schemaBytesByID)) {
 		b.WriteString("\t" + fmt.Sprintf("%q: []byte(%q),\n", id, string(schemaBytesByID[id])))
 	}
 	b.WriteString("}\n")
