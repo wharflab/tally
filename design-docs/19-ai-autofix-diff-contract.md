@@ -8,7 +8,8 @@ This document proposes an evolution of the AI AutoFix system described in:
 
 - `design-docs/13-ai-autofix-acp.md`
 
-Current behavior (implemented): the agent is prompted to return **a full Dockerfile** inside a single fenced ````Dockerfile` block. Tally then treats
+Current behavior (implemented): the agent is prompted to return **a full Dockerfile** inside a single fenced code block with info string `Dockerfile`.
+Tally then treats
 the response as a whole-file replacement and validates the resulting Dockerfile (BuildKit parse + invariants + lint + bounded retry loop).
 
 This proposal switches the agent output contract to: **return a git/unified diff patch against the provided Dockerfile**.
@@ -17,8 +18,10 @@ This proposal switches the agent output contract to: **return a git/unified diff
 
 Adopt a **patch-based ACP output contract** for AI AutoFix.
 
-- Default for AI AutoFix objectives should become: **patch output**.
-- Whole-file output remains a possible fallback/option (either as a compatibility mode or for objectives where patching is demonstrably worse).
+- Default for AI AutoFix objectives should become: **patch output** (a single-file unified diff).
+- Whole-file output remains a supported fallback/option for:
+  - objectives where patching is demonstrably worse (large rewrites, repeated apply conflicts)
+  - recovery when patch application fails after bounded “mechanical” retries
 
 Rationale: patches are easier to validate heuristically, can be rejected cheaply, and tend to encourage smaller, more targeted edits.
 
@@ -76,18 +79,26 @@ feasible.
 
 1. **Patch correctness is a new failure mode**
    - Model must emit a parseable diff.
-   - Patch application can fail due to malformed hunks or mismatched context.
+   - Patch application can fail even when the diff is well-formed (strict apply requires exact positions/content; there is no search step).
 
-2. **Secret redaction interacts poorly with patch application** (critical)
+2. **Strict apply is brittle (and MVP libraries are strict)**
+   - `github.com/bluekeyes/go-gitdiff/gitdiff` applies patches in strict mode only: hunk positions and content must match exactly (no fuzzy search).
+   - This improves determinism but increases “mechanical” failure rates; we need bounded retries and a whole-file fallback path.
+
+3. **Secret redaction interacts poorly with patch application** (critical)
    - Patch application requires the agent to see the exact base content it’s diffing against.
    - If we redact content inside the base Dockerfile block, the model will generate a patch against redacted text, which may not apply to the real
      file.
 
-3. **More complex prompt/parse pipeline**
+4. **More complex prompt/parse pipeline**
    - We add a patch parser + applier step before existing post-apply validation.
 
-4. **Not all objectives are a good fit**
+5. **Not all objectives are a good fit**
    - Some transformations are easiest expressed as an AST rewrite or whole-file regeneration.
+
+6. **Alternative approach exists**
+   - We can ask for a full Dockerfile and compute a diff ourselves for preview/audit, avoiding patch-apply fragility.
+   - The patch contract’s primary unique value is behavioral steering plus the ability to run patch-level heuristics pre-parse.
 
 ## 4. Proposal: Patch-based objective loop
 
@@ -120,30 +131,31 @@ current content.
 The agent MUST output exactly one of:
 
 1. `NO_CHANGE` (exact, trimmed)
-2. Exactly one fenced code block:
-
-```text
-```
+2. Exactly one fenced code block with info string `diff`:
 
 ```diff
-<git/unified diff patch>
+diff --git a/<fileName> b/<fileName>
+--- a/<fileName>
++++ b/<fileName>
+@@ -<oldStart>,<oldCount> +<newStart>,<newCount> @@
+...
 ```
-
-```text
 
 Constraints on the patch:
 
-- Patch must modify **exactly one file**.
+- Patch must modify **exactly one file** and include at least one hunk (`@@ ... @@`).
 - Patch must not create or delete the file (`/dev/null` is rejected).
-- Patch must be text-only (no git binary patches).
+- Patch must not copy or rename the file (reject `copy from/to` and `rename from/to`).
+- Patch must be line-oriented text-only (reject `GIT binary patch`).
 - Patch should be minimal and focused:
   - no unrelated whitespace-only churn unless required
   - preserve comments as part of the transformation
 
-Accepted header shapes (be liberal in what we accept; strict in what we apply):
+Accepted shapes (MVP strict, expand later based on real agent outputs):
 
-- `diff --git a/<name> b/<name>` style, with `---`/`+++` headers and hunks
-- plain unified diff with `---`/`+++` headers and hunks
+- Preferred (and what we prompt for): `diff --git a/<name> b/<name>` with `---`/`+++` headers and hunks.
+- Allowed for compatibility: plain unified diff with `---`/`+++` headers and hunks (as produced by `diff -u`), if it applies cleanly and file
+  identity matches.
 
 ### 5.3 File path matching
 
@@ -172,9 +184,11 @@ Use a pure-Go implementation; avoid spawning `git`.
 
 Recommended: `github.com/bluekeyes/go-gitdiff/gitdiff`.
 
-- Parses patches from `git diff`, `git show`, `git format-patch`.
-- Applies patches in Go (`gitdiff.Apply`).
-- Designed to match `git apply` semantics.
+- `gitdiff.Parse` parses patches from `git diff`, `git show`, `git format-patch`, and “traditional” unified diffs generated by tools like `diff -u`.
+- `gitdiff.Apply` applies a parsed `*gitdiff.File` to an `io.ReaderAt` source and writes the result to an `io.Writer`.
+- Apply is currently **strict only** (no fuzzy search): hunk positions and content must match exactly. Conflicts are surfaced as `*gitdiff.Conflict`
+  (wrapped in `*gitdiff.ApplyError`).
+- The parser aims to accept what `git apply` accepts, but is intentionally stricter for some malformed inputs (good for a strict contract).
 
 Alternatives:
 
@@ -192,26 +206,27 @@ Steps:
 
 1. Parse patch into file diffs.
 2. Enforce: exactly one file diff; file name matches (§5.3).
-3. Apply patch to `base` to obtain `proposed`.
-4. Re-apply trailing newline policy (match original file newline behavior).
+3. Enforce: not new/delete/rename/copy; not binary; contains at least one text fragment.
+4. Apply patch to `base` (as the exact prompt payload) to obtain `proposed`.
+5. Re-apply trailing newline policy (match original file newline behavior).
 
 If apply fails:
 
-- Convert error into a blocking issue `patch_apply_failed` with a short message.
-- Feed that into the next round prompt.
+- Treat it as a mechanical failure:
+  - Prefer consuming the simplified retry budget first (see §8.3).
+  - If failures persist, fall back to whole-file mode rather than burning semantic rounds.
 
 ### 6.3 Strict vs fuzzy apply
 
-Start strict.
+MVP is strict.
 
-Because tally provides the exact base content to the agent each round, strict apply should usually succeed; failures are mostly output-format issues.
+`go-gitdiff` applies patches in strict mode only. That’s compatible with our “exact base per round” approach, but it means the agent must produce
+correct hunk positions and exact old-line content. There is no built-in “search nearby” behavior.
 
-If strict apply causes too many failures in practice, introduce an explicit “fuzzy apply” mode later:
+If strict apply causes too many failures in practice, we have two realistic options:
 
-- tolerate nearby context shifts
-- tolerate whitespace-only differences in context lines
-
-…but only if bounded and testable.
+1. Implement a bounded fuzzy applier ourselves (search + whitespace tolerance), with tight tests.
+2. Prefer a whole-file contract for objectives where patching is unreliable, and compute the diff for preview/audit on the tally side.
 
 ## 7. Heuristic acceptance criteria
 
@@ -228,8 +243,6 @@ Patch-level validation exists to reject obviously-wrong changes early and provid
 ### 7.2 Patch-level validator interface (proposal)
 
 Add a small abstraction (names illustrative):
-
-```
 
 ```go
 // internal/ai/autofix/acceptance
@@ -317,6 +330,14 @@ This preserves the existing “bounded rounds” model while making each iterati
 
 Keep `maxMalformedRetries` but switch the simplified prompt to request a patch.
 
+Treat these as “mechanical” failures that should consume the simplified retry budget (not a full semantic round):
+
+- patch block extraction failures (no `diff` block; multiple blocks)
+- patch parse failures
+- patch apply conflicts / apply errors
+
+If mechanical failures persist after the retry budget, fall back to whole-file mode for the remaining rounds.
+
 ## 9. Secret handling: does `redact-secrets` help?
 
 ### 9.1 What problem we’re actually solving
@@ -397,7 +418,7 @@ Touch points:
   - update round 2 prompt accordingly
 
 - `internal/ai/autofix/parse.go`
-  - replace `parseAgentResponse` to accept `NO_CHANGE` or a single ````diff` block
+  - replace `parseAgentResponse` to accept `NO_CHANGE` or a single fenced code block with info string `diff`
 
 - `internal/ai/autofix/resolver.go`
   - after parsing: apply patch to the current round input to produce `proposed`
@@ -613,21 +634,18 @@ Because AI AutoFix is opt-in, we can change the contract with minimal ecosystem 
 ```text
 Output format:
 - Either output exactly: NO_CHANGE
-- Or output exactly one fenced block:
+- Or output exactly one fenced block with info string diff:
 ```
 
-  ```diff
-  diff --git a/Dockerfile b/Dockerfile
-  --- a/Dockerfile
-  +++ b/Dockerfile
-  @@ ...
-  ...
-  ```
-
-```text
+```diff
+diff --git a/Dockerfile b/Dockerfile
+--- a/Dockerfile
++++ b/Dockerfile
+@@ ...
+...
+```
 
 ### Appendix B: Example acceptance heuristic for prefer-multi-stage-build
 
-- Reject if patch contains no line starting with `+FROM `.
+- Reject if patch contains no line starting with `+FROM`.
 - Reject if patch touches more than X lines without increasing stage count (post-apply validation will also catch this).
-```
