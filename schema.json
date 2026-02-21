@@ -480,7 +480,7 @@
       "description": "Configuration options for the tally/prefer-multi-stage-build rule.",
       "examples": [
         {
-          "min-score": 4
+          "min-score": 6
         },
         {
           "min-score": 6,
@@ -498,7 +498,7 @@
           "default": 4,
           "description": "Minimum heuristic score required to trigger the suggestion.",
           "examples": [
-            4
+            6
           ],
           "minimum": 1,
           "type": "integer"
