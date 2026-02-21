@@ -491,7 +491,14 @@ func generatePublishedSchema(repoRoot string, m *manifest) error {
 	}
 	sort.Strings(defPaths)
 	for _, rel := range defPaths {
-		defs[defKeyByPath[rel]] = rewrittenByPath[rel]
+		def := rewrittenByPath[rel]
+		// Remove $id and $schema from inlined defs so they don't create
+		// separate resource boundaries in the bundled 2020-12 schema.
+		// Without this, fragment $refs like "#/$defs/rule-config/$defs/exclude"
+		// resolve against the def's own $id base URI instead of the document root.
+		delete(def, "$id")
+		delete(def, "$schema")
+		defs[defKeyByPath[rel]] = def
 	}
 
 	outPath := filepath.Join(repoRoot, filepath.FromSlash(publishedSchema))
