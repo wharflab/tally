@@ -11,6 +11,7 @@ import (
 	"github.com/knadh/koanf/v2"
 
 	"github.com/wharflab/tally/internal/ruleconfig"
+	schemasembed "github.com/wharflab/tally/internal/schemas"
 	generatedconfig "github.com/wharflab/tally/internal/schemas/generated/config"
 	schemavalidator "github.com/wharflab/tally/internal/schemas/runtime"
 )
@@ -137,8 +138,7 @@ func validateRuleOptions(raw map[string]any, validator schemavalidator.Validator
 		return nil
 	}
 
-	namespaces := []string{"tally", "hadolint", "buildkit"}
-	for _, ns := range namespaces {
+	for _, ns := range schemasembed.RuleNamespaces() {
 		namespaceRaw, ok := rulesRaw[ns].(map[string]any)
 		if !ok {
 			continue
@@ -223,11 +223,11 @@ func normalizeLegacyTallyRules(raw map[string]any) {
 	}
 
 	reserved := map[string]struct{}{
-		"include":  {},
-		"exclude":  {},
-		"tally":    {},
-		"hadolint": {},
-		"buildkit": {},
+		"include": {},
+		"exclude": {},
+	}
+	for _, ns := range schemasembed.RuleNamespaces() {
+		reserved[ns] = struct{}{}
 	}
 
 	for key, value := range rulesRaw {

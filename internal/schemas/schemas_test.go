@@ -1,6 +1,8 @@
 package schemas_test
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wharflab/tally/internal/rules"
@@ -47,5 +49,27 @@ func TestRuleSchemaMappingCoversConfigurableRules(t *testing.T) {
 		if _, ok := configurableRuleCodes[ruleCode]; !ok {
 			t.Errorf("schema mapping exists for non-configurable or unknown rule %q", ruleCode)
 		}
+	}
+}
+
+func TestRuleNamespacesMatchesRegisteredRules(t *testing.T) {
+	t.Parallel()
+
+	namespaces := schemas.RuleNamespaces()
+	if len(namespaces) == 0 {
+		t.Fatal("RuleNamespaces() returned no namespaces")
+	}
+
+	// Every namespace from RuleSchemaIDs must appear in RuleNamespaces.
+	for ruleCode := range schemas.RuleSchemaIDs() {
+		ns, _, _ := strings.Cut(ruleCode, "/")
+		if !slices.Contains(namespaces, ns) {
+			t.Errorf("namespace %q (from rule %q) not in RuleNamespaces()", ns, ruleCode)
+		}
+	}
+
+	// Verify the result is sorted (contract of the function).
+	if !slices.IsSorted(namespaces) {
+		t.Errorf("RuleNamespaces() not sorted: %v", namespaces)
 	}
 }
