@@ -14,7 +14,7 @@
     "fix": {
       "title": "Rule fix mode",
       "type": "string",
-      "description": "Control when auto-fixes are applied for this rule.",
+      "description": "Control when auto-fixes are applied for this rule. \"never\": disable all fixes. \"explicit\": only on --fix. \"always\": always apply safe fixes. \"unsafe-only\": apply only fixes flagged as unsafe.",
       "enum": ["never", "explicit", "always", "unsafe-only"],
       "examples": ["explicit"]
     },
