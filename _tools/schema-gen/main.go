@@ -30,12 +30,18 @@ const (
 
 type manifest struct {
 	Schemas []schemaEntry `json:"schemas"`
+	Indexes []indexEntry  `json:"indexes"`
 }
 
 type schemaEntry struct {
 	Input   string `json:"input"`
 	Output  string `json:"output"`
 	Package string `json:"package"`
+}
+
+type indexEntry struct {
+	Namespace string `json:"namespace"`
+	Output    string `json:"output"`
 }
 
 type schemaIDDoc struct {
@@ -132,6 +138,9 @@ func loadManifest(path string) (*manifest, error) {
 	}
 	if len(m.Schemas) == 0 {
 		return nil, fmt.Errorf("manifest %s has no schemas", path)
+	}
+	if len(m.Indexes) == 0 {
+		return nil, fmt.Errorf("manifest %s has no indexes", path)
 	}
 	return &m, nil
 }
@@ -266,9 +275,11 @@ func ensureGeneratedJSONV2Compliance(repoRoot string) error {
 }
 
 func generateNamespaceIndexes(repoRoot string, m *manifest) error {
-	namespaces := []string{"tally", "hadolint", "buildkit"}
+	if m == nil {
+		return fmt.Errorf("nil manifest")
+	}
 
-	filesByNamespace := make(map[string][]string, len(namespaces))
+	filesByNamespace := make(map[string][]string, len(m.Indexes))
 	for _, entry := range m.Schemas {
 		ns, filename, ok := parseRuleSchemaInput(entry.Input)
 		if !ok {
@@ -280,8 +291,18 @@ func generateNamespaceIndexes(repoRoot string, m *manifest) error {
 		sort.Strings(filesByNamespace[ns])
 	}
 
-	for _, ns := range namespaces {
-		outputRel := filepath.ToSlash(filepath.Join("internal/rules", ns, "index.schema.json"))
+	seenNamespaces := make(map[string]struct{}, len(m.Indexes))
+	for _, idxEntry := range m.Indexes {
+		ns := idxEntry.Namespace
+		outputRel := filepath.ToSlash(idxEntry.Output)
+		if ns == "" || outputRel == "" {
+			return fmt.Errorf("invalid index manifest entry: %+v", idxEntry)
+		}
+		if _, exists := seenNamespaces[ns]; exists {
+			return fmt.Errorf("duplicate index manifest namespace %q", ns)
+		}
+		seenNamespaces[ns] = struct{}{}
+
 		outputAbs := filepath.Join(repoRoot, filepath.FromSlash(outputRel))
 
 		props := make(map[string]refSchema)
@@ -324,12 +345,16 @@ func generateSchemaRegistry(repoRoot string, m *manifest) error {
 		return err
 	}
 
-	paths := []string{
-		rootSchemaPath,
-		ruleConfigPath,
-		filepath.ToSlash(filepath.Join("internal/rules/tally/index.schema.json")),
-		filepath.ToSlash(filepath.Join("internal/rules/hadolint/index.schema.json")),
-		filepath.ToSlash(filepath.Join("internal/rules/buildkit/index.schema.json")),
+	if m == nil {
+		return fmt.Errorf("nil manifest")
+	}
+
+	paths := []string{rootSchemaPath, ruleConfigPath}
+	for _, idxEntry := range m.Indexes {
+		if idxEntry.Output == "" {
+			return fmt.Errorf("invalid index manifest entry: %+v", idxEntry)
+		}
+		paths = append(paths, filepath.ToSlash(idxEntry.Output))
 	}
 
 	for _, entry := range m.Schemas {
@@ -403,17 +428,21 @@ func generatePublishedSchema(repoRoot string, m *manifest) error {
 		return fmt.Errorf("nil manifest")
 	}
 
-	indexPaths := []string{
-		filepath.ToSlash(filepath.Join("internal/rules/tally/index.schema.json")),
-		filepath.ToSlash(filepath.Join("internal/rules/hadolint/index.schema.json")),
-		filepath.ToSlash(filepath.Join("internal/rules/buildkit/index.schema.json")),
-	}
-
 	defKeyByPath := map[string]string{
 		ruleConfigPath: "rule-config",
-		indexPaths[0]:  "rules-tally-index",
-		indexPaths[1]:  "rules-hadolint-index",
-		indexPaths[2]:  "rules-buildkit-index",
+	}
+	seenNamespaces := make(map[string]struct{}, len(m.Indexes))
+	for _, idxEntry := range m.Indexes {
+		if idxEntry.Namespace == "" || idxEntry.Output == "" {
+			return fmt.Errorf("invalid index manifest entry: %+v", idxEntry)
+		}
+		if _, exists := seenNamespaces[idxEntry.Namespace]; exists {
+			return fmt.Errorf("duplicate index manifest namespace %q", idxEntry.Namespace)
+		}
+		seenNamespaces[idxEntry.Namespace] = struct{}{}
+
+		outputRel := filepath.ToSlash(idxEntry.Output)
+		defKeyByPath[outputRel] = "rules-" + sanitizeDefKey(idxEntry.Namespace) + "-index"
 	}
 	for _, entry := range m.Schemas {
 		ns, filename, ok := parseRuleSchemaInput(entry.Input)

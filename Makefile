@@ -104,6 +104,13 @@ schema-gen:
 	cd _tools && go run ./schema-gen
 
 schema-check: schema-gen
+	# Namespace index schemas are generated artifacts; fail if regeneration causes drift.
+	@if test -n "$$(git status --porcelain -- internal/rules/*/index.schema.json)"; then \
+		echo "namespace index schema drift detected; run make schema-gen and commit index.schema.json changes"; \
+		git --no-pager diff -- internal/rules/*/index.schema.json; \
+		git status --short -- internal/rules/*/index.schema.json; \
+		exit 1; \
+	fi
 	# Generated schema models must stay JSON v2 compliant (no encoding/json imports).
 	@if rg -n '"encoding/json"' internal/schemas/generated; then \
 		echo "generated schema models must not import encoding/json"; \

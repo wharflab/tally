@@ -1,4 +1,18 @@
 {
+  "indexes": [
+    {
+      "namespace": "tally",
+      "output": "internal/rules/tally/index.schema.json"
+    },
+    {
+      "namespace": "hadolint",
+      "output": "internal/rules/hadolint/index.schema.json"
+    },
+    {
+      "namespace": "buildkit",
+      "output": "internal/rules/buildkit/index.schema.json"
+    }
+  ],
   "schemas": [
     {
       "input": "internal/schemas/root/tally-config.schema.json",
