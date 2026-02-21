@@ -533,7 +533,7 @@ func renderRegistryGo(rootSchemaID string, ruleSchemaIDs map[string]string, sche
 	}
 	slices.Sort(schemaIDs)
 	for _, id := range schemaIDs {
-		b.WriteString("\t" + fmt.Sprintf("%q: %#v,\n", id, schemaBytesByID[id]))
+		b.WriteString("\t" + fmt.Sprintf("%q: []byte(%q),\n", id, string(schemaBytesByID[id])))
 	}
 	b.WriteString("}\n")
 
