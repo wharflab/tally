@@ -224,14 +224,29 @@ func schemaTypes(schema map[string]any) map[string]bool {
 }
 
 func (v *validator) resolveSchema(baseSchemaID string, schema map[string]any) (string, map[string]any, error) {
+	const maxRefDepth = 128
+
 	schemaID := baseSchemaID
 	current := schema
+	seenRefs := make(map[string]struct{})
+	depth := 0
 
 	for {
 		ref, ok := current["$ref"].(string)
 		if !ok || ref == "" {
 			return schemaID, current, nil
 		}
+
+		depth++
+		if depth > maxRefDepth {
+			return "", nil, fmt.Errorf("max $ref depth exceeded while resolving schema %q", baseSchemaID)
+		}
+
+		refKey := schemaID + "|" + ref
+		if _, seen := seenRefs[refKey]; seen {
+			return "", nil, fmt.Errorf("circular $ref detected while resolving schema %q at %q", baseSchemaID, refKey)
+		}
+		seenRefs[refKey] = struct{}{}
 
 		nextSchemaID, next, err := v.resolveRef(schemaID, ref)
 		if err != nil {
