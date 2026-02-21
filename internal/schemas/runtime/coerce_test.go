@@ -192,3 +192,31 @@ func TestCoerceString_AnyOfWithBooleanAndString(t *testing.T) {
 		t.Errorf("coerceValue() = %v (%T), want true", got, got)
 	}
 }
+
+func TestCoerceString_ArrayWithoutItemsReturnsSliceAny(t *testing.T) {
+	t.Parallel()
+
+	const schemaID = "https://example.test/root.schema.json"
+	schema := map[string]any{
+		"$id":  schemaID,
+		"type": "array",
+	}
+
+	v := &validator{
+		rawSchemasByID: map[string]map[string]any{
+			schemaID: schema,
+		},
+	}
+
+	got, err := v.coerceValue(schemaID, schema, "a,b,c")
+	if err != nil {
+		t.Fatalf("coerceValue() error = %v", err)
+	}
+	arr, ok := got.([]any)
+	if !ok {
+		t.Fatalf("coerceValue() returned %T, want []any", got)
+	}
+	if len(arr) != 3 || arr[0] != "a" || arr[1] != "b" || arr[2] != "c" {
+		t.Errorf("coerceValue() = %v, want [a b c]", arr)
+	}
+}

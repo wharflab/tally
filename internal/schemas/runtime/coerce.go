@@ -138,7 +138,11 @@ func (v *validator) coerceString(resolvedSchemaID string, resolvedSchema map[str
 			items = nil
 		}
 		if items == nil {
-			return parts, nil
+			result := make([]any, len(parts))
+			for i, p := range parts {
+				result[i] = p
+			}
+			return result, nil
 		}
 
 		coerced := make([]any, 0, len(parts))
