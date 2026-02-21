@@ -693,6 +693,7 @@
         "timeout": {
           "default": "90s",
           "description": "Per-fix execution timeout as a Go duration string (e.g. \"90s\", \"2m\").",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
           "type": "string"
         }
       },
@@ -827,6 +828,7 @@
         "timeout": {
           "default": "20s",
           "description": "Overall timeout for all slow checks as a Go duration string (e.g. \"20s\").",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$",
           "type": "string"
         }
       },

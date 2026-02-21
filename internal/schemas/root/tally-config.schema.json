@@ -103,7 +103,8 @@
         "timeout": {
           "description": "Per-fix execution timeout as a Go duration string (e.g. \"90s\", \"2m\").",
           "type": "string",
-          "default": "90s"
+          "default": "90s",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
         },
         "max-input-bytes": {
           "description": "Maximum prompt payload size in bytes sent to the agent.",
@@ -147,7 +148,8 @@
         "timeout": {
           "description": "Overall timeout for all slow checks as a Go duration string (e.g. \"20s\").",
           "type": "string",
-          "default": "20s"
+          "default": "20s",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
         }
       },
       "additionalProperties": false
