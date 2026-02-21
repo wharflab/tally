@@ -36,7 +36,7 @@
   "codeQL.githubDatabase.update": "never",
   "files.exclude": {
     ".rumdl_cache": true,
-    "index.schema.json": true
+    "**/index.schema.json": true
   },
   "[markdown]": {
     "editor.defaultFormatter": "rvben.rumdl",
