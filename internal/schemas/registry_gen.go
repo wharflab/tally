@@ -284,7 +284,7 @@ var schemaBytesByID = map[string][]byte{
           "type": "array",
           "description": "Glob patterns to exclude (e.g. \"test/**\").",
           "items": { "type": "string" },
-          "examples": ["test/**"]
+          "examples": [["test/**"]]
         }
       },
       "additionalProperties": false,

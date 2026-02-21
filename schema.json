@@ -17,7 +17,9 @@
             "paths": {
               "description": "Glob patterns to exclude (e.g. \"test/**\").",
               "examples": [
-                "test/**"
+                [
+                  "test/**"
+                ]
               ],
               "items": {
                 "type": "string"
