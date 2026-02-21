@@ -39,7 +39,10 @@
     ],
     "deny": []
   },
-  "hooks": {},
   "enableAllProjectMcpServers": true,
-  "alwaysThinkingEnabled": true
+  "hooks": {},
+  "alwaysThinkingEnabled": true,
+  "enabledPlugins": {
+    "coderabbit@claude-plugins-official": true
+  }
 }
