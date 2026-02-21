@@ -53,15 +53,20 @@ func newValidator() (*validator, error) {
 	rawSchemas := make(map[string]map[string]any)
 
 	for _, schemaID := range schemasembed.AllSchemaIDs() {
-		schema, err := parseSchemaByID(schemaID)
+		data, err := schemasembed.ReadSchemaByID(schemaID)
+		if err != nil {
+			return nil, fmt.Errorf("read schema %s: %w", schemaID, err)
+		}
+
+		schema, err := parseSchema(schemaID, data)
 		if err != nil {
 			return nil, err
 		}
 		parsedSchemas[schemaID] = schema
 
-		rawSchema, rawErr := parseRawSchemaByID(schemaID)
-		if rawErr != nil {
-			return nil, rawErr
+		rawSchema, err := parseRawSchema(schemaID, data)
+		if err != nil {
+			return nil, err
 		}
 		rawSchemas[schemaID] = rawSchema
 	}
@@ -177,12 +182,7 @@ func (v *validator) HasRuleSchema(ruleCode string) bool {
 	return ok
 }
 
-func parseSchemaByID(schemaID string) (*gjsonschema.Schema, error) {
-	data, err := schemasembed.ReadSchemaByID(schemaID)
-	if err != nil {
-		return nil, fmt.Errorf("read schema %s: %w", schemaID, err)
-	}
-
+func parseSchema(schemaID string, data []byte) (*gjsonschema.Schema, error) {
 	var schema gjsonschema.Schema
 	if err := jsonv2.Unmarshal(data, &schema); err != nil {
 		return nil, fmt.Errorf("parse schema %s: %w", schemaID, err)
@@ -190,11 +190,7 @@ func parseSchemaByID(schemaID string) (*gjsonschema.Schema, error) {
 	return &schema, nil
 }
 
-func parseRawSchemaByID(schemaID string) (map[string]any, error) {
-	data, err := schemasembed.ReadSchemaByID(schemaID)
-	if err != nil {
-		return nil, fmt.Errorf("read schema %s: %w", schemaID, err)
-	}
+func parseRawSchema(schemaID string, data []byte) (map[string]any, error) {
 	var schemaMap map[string]any
 	if err := jsonv2.Unmarshal(data, &schemaMap); err != nil {
 		return nil, fmt.Errorf("parse raw schema %s: %w", schemaID, err)
