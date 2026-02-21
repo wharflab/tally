@@ -54,6 +54,8 @@ cpd: bin/pmd-$(PMD_VERSION)
 		-name "*_test.go" \
 		-o -name "*.pb.go" \
 		-o -name "*_generated.go" \
+		-o -name "*.gen.go" \
+		-o -name "*_gen.go" \
 		-o -path "*/testdata/*" \
 		-o -path "*/__snapshots__/*" \
 		-o -path "*/packaging/*" \
