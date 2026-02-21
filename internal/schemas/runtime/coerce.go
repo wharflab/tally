@@ -216,6 +216,20 @@ func schemaTypes(schema map[string]any) map[string]bool {
 	if _, ok := schema["items"].(map[string]any); ok {
 		out["array"] = true
 	}
+
+	// Collect types from oneOf, anyOf, and allOf sub-schemas.
+	for _, keyword := range []string{"oneOf", "anyOf", "allOf"} {
+		if subSchemas, ok := schema[keyword].([]any); ok {
+			for _, sub := range subSchemas {
+				if subSchema, ok := sub.(map[string]any); ok {
+					for t := range schemaTypes(subSchema) {
+						out[t] = true
+					}
+				}
+			}
+		}
+	}
+
 	if len(out) > 0 {
 		return out
 	}
