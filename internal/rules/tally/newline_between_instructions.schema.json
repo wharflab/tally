@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/newline_between_instructions.schema.json",
+  "title": "tally/newline-between-instructions rule config",
+  "description": "Configuration options for the tally/newline-between-instructions rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" },
+    "mode": {
+      "type": "string",
+      "enum": ["grouped", "always", "never"],
+      "default": "grouped",
+      "description": "Controls blank-line behavior between instructions.",
+      "examples": ["grouped"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "mode": "grouped" },
+    { "severity": "style", "mode": "always" }
+  ]
+}

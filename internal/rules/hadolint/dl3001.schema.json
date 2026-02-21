@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/hadolint/dl3001.schema.json",
+  "title": "hadolint/DL3001 rule config",
+  "description": "Configuration options for the hadolint/DL3001 rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" },
+    "invalid-commands": {
+      "type": "array",
+      "description": "Commands to flag as invalid inside a container.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "default": ["free", "kill", "mount", "ps", "service", "shutdown", "ssh", "top", "vim"],
+      "examples": [["ssh", "vim"]]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "invalid-commands": ["ssh", "vim"] },
+    { "severity": "info", "invalid-commands": ["shutdown"] }
+  ]
+}

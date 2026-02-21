@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/root/tally-config.schema.json",
+  "title": "tally configuration",
+  "description": "Configuration schema for tally Dockerfile linter",
+  "type": "object",
+  "properties": {
+    "rules": {
+      "type": "object",
+      "properties": {
+        "include": {
+          "description": "Glob patterns for rules to enable (e.g. \"tally/*\", \"hadolint/DL3026\").",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "exclude": {
+          "description": "Glob patterns for rules to disable (e.g. \"buildkit/MaintainerDeprecated\").",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "tally": {
+          "$ref": "../../rules/tally/index.schema.json"
+        },
+        "hadolint": {
+          "$ref": "../../rules/hadolint/index.schema.json"
+        },
+        "buildkit": {
+          "$ref": "../../rules/buildkit/index.schema.json"
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "type": "object",
+      "description": "Configure output format and destination.",
+      "properties": {
+        "format": {
+          "description": "Output format for lint results.",
+          "type": "string",
+          "enum": ["text", "json", "sarif", "github-actions", "markdown"],
+          "default": "text"
+        },
+        "path": {
+          "description": "Write output to this path instead of stdout.",
+          "type": "string",
+          "default": "stdout"
+        },
+        "show-source": {
+          "description": "Include source code snippets in output.",
+          "type": "boolean",
+          "default": true
+        },
+        "fail-level": {
+          "description": "Minimum severity that causes a non-zero exit code.",
+          "type": "string",
+          "enum": ["error", "warning", "info", "style", "none"],
+          "default": "style"
+        }
+      },
+      "additionalProperties": false
+    },
+    "inline-directives": {
+      "type": "object",
+      "description": "Control inline suppression directives (e.g. # tally-ignore).",
+      "properties": {
+        "enabled": {
+          "description": "Allow inline directives to suppress violations.",
+          "type": "boolean",
+          "default": true
+        },
+        "warn-unused": {
+          "description": "Warn when an inline directive does not suppress any violation.",
+          "type": "boolean",
+          "default": false
+        },
+        "validate-rules": {
+          "description": "Warn when an inline directive references a rule that does not exist.",
+          "type": "boolean",
+          "default": false
+        },
+        "require-reason": {
+          "description": "Require a reason comment on every inline suppression directive.",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ai": {
+      "type": "object",
+      "description": "Configure opt-in AI AutoFix features (requires an ACP-capable agent).",
+      "properties": {
+        "enabled": {
+          "description": "Enable AI AutoFix. When false, AI fixes are never resolved.",
+          "type": "boolean",
+          "default": false
+        },
+        "command": {
+          "description": "Argv to launch the ACP agent process over stdio.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "examples": [
+            ["gemini", "--experimental-acp", "--allowed-mcp-server-names=none", "--model=gemini-3-flash-preview"],
+            ["opencode", "--acp"],
+            ["kiro", "--acp"]
+          ]
+        },
+        "timeout": {
+          "description": "Per-fix execution timeout as a Go duration string (e.g. \"90s\", \"2m\").",
+          "type": "string",
+          "default": "90s",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
+        },
+        "max-input-bytes": {
+          "description": "Maximum prompt payload size in bytes sent to the agent.",
+          "type": "integer",
+          "default": 262144,
+          "minimum": 0
+        },
+        "redact-secrets": {
+          "description": "Redact detected secrets in Dockerfile content before sending to the agent.",
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "additionalProperties": false,
+      "examples": [
+        {
+          "enabled": true,
+          "command": ["gemini", "--experimental-acp", "--allowed-mcp-server-names=none", "--model=gemini-3-flash-preview"],
+          "timeout": "90s",
+          "max-input-bytes": 262144,
+          "redact-secrets": true
+        }
+      ],
+      "if": {
+        "properties": { "enabled": { "const": true } },
+        "required": ["enabled"]
+      },
+      "then": {
+        "required": ["command"],
+        "properties": {
+          "command": { "minItems": 1 }
+        }
+      }
+    },
+    "slow-checks": {
+      "type": "object",
+      "description": "Configure async checks that require network or other slow I/O (e.g. registry lookups).",
+      "properties": {
+        "mode": {
+          "description": "When to run slow checks: \"auto\" enables them in CI, \"on\" always, \"off\" never.",
+          "type": "string",
+          "enum": ["auto", "on", "off"],
+          "default": "auto"
+        },
+        "fail-fast": {
+          "description": "Stop slow checks on first failure instead of collecting all results.",
+          "type": "boolean",
+          "default": true
+        },
+        "timeout": {
+          "description": "Overall timeout for all slow checks as a Go duration string (e.g. \"20s\").",
+          "type": "string",
+          "default": "20s",
+          "pattern": "^([0-9]+(\\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

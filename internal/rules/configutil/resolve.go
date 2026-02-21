@@ -2,15 +2,21 @@
 package configutil
 
 import (
-	"encoding/json/v2"
-	"errors"
+	"fmt"
 	"reflect"
-	"strings"
+	"sync"
 
+	jsonv2 "encoding/json/v2"
+
+	gjsonschema "github.com/google/jsonschema-go/jsonschema"
 	"github.com/knadh/koanf/providers/confmap"
 	"github.com/knadh/koanf/v2"
-	"github.com/santhosh-tekuri/jsonschema/v6"
+
+	"github.com/wharflab/tally/internal/ruleconfig"
+	schemavalidator "github.com/wharflab/tally/internal/schemas/runtime"
 )
+
+var resolvedSchemaCache sync.Map
 
 // Resolve merges user options over defaults and unmarshals to typed config.
 // If opts is nil or empty, returns defaults unchanged.
@@ -104,91 +110,95 @@ func isZero(v reflect.Value) bool {
 	}
 }
 
-// ValidateWithSchema validates config against a JSON Schema.
-// The schema parameter is the map[string]any returned by ConfigurableRule.Schema().
+// RuleSchema returns the externalized JSON schema map for a rule.
+func RuleSchema(ruleCode string) (map[string]any, error) {
+	v, err := schemavalidator.DefaultValidator()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize schema validator: %w", err)
+	}
+	schema, err := v.RuleSchema(ruleCode)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load rule schema for %s: %w", ruleCode, err)
+	}
+	return schema, nil
+}
+
+// ValidateRuleOptions validates rule-specific options using the schema registry.
+func ValidateRuleOptions(ruleCode string, config any) error {
+	if isNilConfig(config) {
+		return nil
+	}
+	config = ruleconfig.CanonicalizeRuleOptions(ruleCode, config)
+
+	v, err := schemavalidator.DefaultValidator()
+	if err != nil {
+		return err
+	}
+	return v.ValidateRuleOptions(ruleCode, config)
+}
+
+// ValidateWithSchema validates config against a JSON Schema map.
 // Returns nil if valid, or an error describing validation failures.
 func ValidateWithSchema(config any, schema map[string]any) error {
-	if schema == nil {
+	if schema == nil || isNilConfig(config) {
 		return nil
 	}
 
-	// Handle nil config (including typed nil pointers like (*Config)(nil))
-	if config == nil {
-		return nil
-	}
-	rv := reflect.ValueOf(config)
-	if rv.Kind() == reflect.Pointer && rv.IsNil() {
-		return nil
+	schemaData, err := jsonv2.Marshal(schema, jsonv2.Deterministic(true))
+	if err != nil {
+		return fmt.Errorf("marshal schema: %w", err)
 	}
 
-	// Use an absolute URI so the library doesn't resolve against cwd
-	// (which would leak the build machine's path into error messages).
-	const schemaURI = "urn:tally:rule-config"
-	compiler := jsonschema.NewCompiler()
-	if err := compiler.AddResource(schemaURI, schema); err != nil {
-		return err
-	}
-
-	sch, err := compiler.Compile(schemaURI)
+	resolved, err := resolveSchema(schemaData)
 	if err != nil {
 		return err
 	}
 
-	// Convert config to JSON-compatible format for validation.
-	// The jsonschema library validates against unmarshaled JSON values.
-	configJSON, err := json.Marshal(config)
-	if err != nil {
-		return err
-	}
-	var configValue any
-	if err := json.Unmarshal(configJSON, &configValue); err != nil {
-		return err
-	}
+	return validateResolved(config, resolved)
+}
 
-	if err := sch.Validate(configValue); err != nil {
-		// Use BasicOutput to get a flat list of validation errors,
-		// then extract clean messages without schema URIs.
-		var verr *jsonschema.ValidationError
-		if errors.As(err, &verr) {
-			if msg := formatBasicOutput(verr); msg != "" {
-				return errors.New(msg)
-			}
+func resolveSchema(schemaData []byte) (*gjsonschema.Resolved, error) {
+	if cached, ok := resolvedSchemaCache.Load(string(schemaData)); ok {
+		if resolved, ok := cached.(*gjsonschema.Resolved); ok {
+			return resolved, nil
 		}
+	}
+
+	var parsedSchema gjsonschema.Schema
+	if err := jsonv2.Unmarshal(schemaData, &parsedSchema); err != nil {
+		return nil, fmt.Errorf("parse schema: %w", err)
+	}
+
+	resolved, err := parsedSchema.Resolve(nil)
+	if err != nil {
+		return nil, err
+	}
+	resolvedSchemaCache.Store(string(schemaData), resolved)
+	return resolved, nil
+}
+
+func validateResolved(config any, resolved *gjsonschema.Resolved) error {
+	configData, err := jsonv2.Marshal(config)
+	if err != nil {
+		return err
+	}
+	var configJSON any
+	if err := jsonv2.Unmarshal(configData, &configJSON); err != nil {
+		return err
+	}
+	if err := resolved.Validate(configJSON); err != nil {
 		return err
 	}
 	return nil
 }
 
-// formatBasicOutput extracts clean error messages from a ValidationError
-// using the JSON Schema "Basic" output format (flat list of leaf errors).
-func formatBasicOutput(verr *jsonschema.ValidationError) string {
-	basic := verr.BasicOutput()
-	if basic == nil || len(basic.Errors) == 0 {
-		return ""
+func isNilConfig(config any) bool {
+	if config == nil {
+		return true
 	}
-
-	var msgs []string
-	for _, unit := range basic.Errors {
-		if unit.Error == nil {
-			continue
-		}
-		// Marshal the error to get the localized message string
-		b, err := unit.Error.MarshalJSON()
-		if err != nil {
-			continue
-		}
-		var detail string
-		if json.Unmarshal(b, &detail) != nil {
-			continue
-		}
-		if unit.InstanceLocation == "" || unit.InstanceLocation == "/" {
-			msgs = append(msgs, detail)
-		} else {
-			msgs = append(msgs, "at '"+unit.InstanceLocation+"': "+detail)
-		}
+	rv := reflect.ValueOf(config)
+	if rv.Kind() == reflect.Pointer && rv.IsNil() {
+		return true
 	}
-	if len(msgs) == 0 {
-		return ""
-	}
-	return strings.Join(msgs, "; ")
+	return false
 }

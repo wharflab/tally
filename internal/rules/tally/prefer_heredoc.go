@@ -41,11 +41,17 @@ func DefaultPreferHeredocConfig() PreferHeredocConfig {
 }
 
 // PreferHeredocRule implements the prefer-run-heredoc linting rule.
-type PreferHeredocRule struct{}
+type PreferHeredocRule struct {
+	schema map[string]any
+}
 
 // NewPreferHeredocRule creates a new prefer-run-heredoc rule instance.
 func NewPreferHeredocRule() *PreferHeredocRule {
-	return &PreferHeredocRule{}
+	schema, err := configutil.RuleSchema(rules.HeredocRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &PreferHeredocRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -64,29 +70,7 @@ func (r *PreferHeredocRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *PreferHeredocRule) Schema() map[string]any {
-	return map[string]any{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type":    "object",
-		"properties": map[string]any{
-			"min-commands": map[string]any{
-				"type":        "integer",
-				"minimum":     2,
-				"default":     3,
-				"description": "Minimum commands to suggest heredoc",
-			},
-			"check-consecutive-runs": map[string]any{
-				"type":        "boolean",
-				"default":     true,
-				"description": "Check for consecutive RUN instructions",
-			},
-			"check-chained-commands": map[string]any{
-				"type":        "boolean",
-				"default":     true,
-				"description": "Check for chained commands in single RUN",
-			},
-		},
-		"additionalProperties": false,
-	}
+	return r.schema
 }
 
 // Check runs the prefer-run-heredoc rule.
@@ -152,7 +136,7 @@ func (r *PreferHeredocRule) DefaultConfig() any {
 
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *PreferHeredocRule) ValidateConfig(config any) error {
-	return configutil.ValidateWithSchema(config, r.Schema())
+	return configutil.ValidateRuleOptions(rules.HeredocRuleCode, config)
 }
 
 // runSequenceItem represents a RUN instruction in a sequence with extracted commands.

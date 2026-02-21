@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/no_trailing_spaces.schema.json",
+  "title": "tally/no-trailing-spaces rule config",
+  "description": "Configuration options for the tally/no-trailing-spaces rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" },
+    "skip-blank-lines": {
+      "type": "boolean",
+      "default": false,
+      "description": "Skip lines that consist entirely of whitespace.",
+      "examples": [true]
+    },
+    "ignore-comments": {
+      "type": "boolean",
+      "default": false,
+      "description": "Skip any line whose first non-whitespace character is # (Dockerfile comments and # lines in heredocs).",
+      "examples": [true]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "ignore-comments": true },
+    { "severity": "style", "skip-blank-lines": true }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/prefer_run_heredoc.schema.json",
+  "title": "tally/prefer-run-heredoc rule config",
+  "description": "Configuration options for the tally/prefer-run-heredoc rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" },
+    "min-commands": {
+      "type": "integer",
+      "minimum": 2,
+      "default": 3,
+      "description": "Minimum number of commands required to trigger heredoc conversion.",
+      "examples": [3]
+    },
+    "check-consecutive-runs": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable detection of multiple consecutive RUN instructions.",
+      "examples": [true]
+    },
+    "check-chained-commands": {
+      "type": "boolean",
+      "default": true,
+      "description": "Enable detection of chained commands within a single RUN (via &&).",
+      "examples": [true]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "min-commands": 3 },
+    { "severity": "style", "min-commands": 4, "check-chained-commands": false }
+  ]
+}

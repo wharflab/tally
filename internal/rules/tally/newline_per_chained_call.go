@@ -35,11 +35,17 @@ func DefaultNewlinePerChainedCallConfig() NewlinePerChainedCallConfig {
 }
 
 // NewlinePerChainedCallRule implements the newline-per-chained-call linting rule.
-type NewlinePerChainedCallRule struct{}
+type NewlinePerChainedCallRule struct {
+	schema map[string]any
+}
 
 // NewNewlinePerChainedCallRule creates a new newline-per-chained-call rule instance.
 func NewNewlinePerChainedCallRule() *NewlinePerChainedCallRule {
-	return &NewlinePerChainedCallRule{}
+	schema, err := configutil.RuleSchema(NewlinePerChainedCallRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &NewlinePerChainedCallRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -61,19 +67,7 @@ func (r *NewlinePerChainedCallRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *NewlinePerChainedCallRule) Schema() map[string]any {
-	return map[string]any{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type":    "object",
-		"properties": map[string]any{
-			"min-commands": map[string]any{
-				"type":        "integer",
-				"minimum":     2,
-				"default":     2,
-				"description": "Minimum chained commands to trigger chain splitting",
-			},
-		},
-		"additionalProperties": false,
-	}
+	return r.schema
 }
 
 // DefaultConfig returns the default configuration for this rule.
@@ -83,7 +77,7 @@ func (r *NewlinePerChainedCallRule) DefaultConfig() any {
 
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *NewlinePerChainedCallRule) ValidateConfig(config any) error {
-	return configutil.ValidateWithSchema(config, r.Schema())
+	return configutil.ValidateRuleOptions(NewlinePerChainedCallRuleCode, config)
 }
 
 // Check runs the newline-per-chained-call rule.

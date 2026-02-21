@@ -18,7 +18,7 @@ const PreferMultiStageBuildRuleCode = rules.TallyRulePrefix + "prefer-multi-stag
 // PreferMultiStageBuildConfig configures the prefer-multi-stage-build rule.
 type PreferMultiStageBuildConfig struct {
 	// MinScore is the minimum heuristic score required to trigger the suggestion.
-	MinScore *int `json:"min-score,omitempty" jsonschema:"description=Minimum score required to trigger,default=4,minimum=1" koanf:"min-score"`
+	MinScore *int `json:"min-score,omitempty" koanf:"min-score"`
 }
 
 func defaultPreferMultiStageBuildConfig() PreferMultiStageBuildConfig {
@@ -27,9 +27,17 @@ func defaultPreferMultiStageBuildConfig() PreferMultiStageBuildConfig {
 }
 
 // PreferMultiStageBuildRule detects likely single-stage build+runtime Dockerfiles.
-type PreferMultiStageBuildRule struct{}
+type PreferMultiStageBuildRule struct {
+	schema map[string]any
+}
 
-func NewPreferMultiStageBuildRule() *PreferMultiStageBuildRule { return &PreferMultiStageBuildRule{} }
+func NewPreferMultiStageBuildRule() *PreferMultiStageBuildRule {
+	schema, err := configutil.RuleSchema(PreferMultiStageBuildRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &PreferMultiStageBuildRule{schema: schema}
+}
 
 func (r *PreferMultiStageBuildRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
@@ -45,25 +53,13 @@ func (r *PreferMultiStageBuildRule) Metadata() rules.RuleMetadata {
 }
 
 func (r *PreferMultiStageBuildRule) Schema() map[string]any {
-	return map[string]any{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type":    "object",
-		"properties": map[string]any{
-			"min-score": map[string]any{
-				"type":        "integer",
-				"minimum":     1,
-				"default":     4,
-				"description": "Minimum score required to trigger",
-			},
-		},
-		"additionalProperties": false,
-	}
+	return r.schema
 }
 
 func (r *PreferMultiStageBuildRule) DefaultConfig() any { return defaultPreferMultiStageBuildConfig() }
 
 func (r *PreferMultiStageBuildRule) ValidateConfig(config any) error {
-	return configutil.ValidateWithSchema(config, r.Schema())
+	return configutil.ValidateRuleOptions(PreferMultiStageBuildRuleCode, config)
 }
 
 func (r *PreferMultiStageBuildRule) Check(input rules.LintInput) []rules.Violation {

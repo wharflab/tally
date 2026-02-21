@@ -31,11 +31,17 @@ func DefaultNoTrailingSpacesConfig() NoTrailingSpacesConfig {
 }
 
 // NoTrailingSpacesRule implements the no-trailing-spaces linting rule.
-type NoTrailingSpacesRule struct{}
+type NoTrailingSpacesRule struct {
+	schema map[string]any
+}
 
 // NewNoTrailingSpacesRule creates a new no-trailing-spaces rule instance.
 func NewNoTrailingSpacesRule() *NoTrailingSpacesRule {
-	return &NoTrailingSpacesRule{}
+	schema, err := configutil.RuleSchema(NoTrailingSpacesRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &NoTrailingSpacesRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -54,23 +60,7 @@ func (r *NoTrailingSpacesRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *NoTrailingSpacesRule) Schema() map[string]any {
-	return map[string]any{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type":    "object",
-		"properties": map[string]any{
-			"skip-blank-lines": map[string]any{
-				"type":        "boolean",
-				"default":     false,
-				"description": "Skip lines that are entirely whitespace",
-			},
-			"ignore-comments": map[string]any{
-				"type":        "boolean",
-				"default":     false,
-				"description": "Skip lines starting with # (Dockerfile comments and # lines in heredocs)",
-			},
-		},
-		"additionalProperties": false,
-	}
+	return r.schema
 }
 
 // DefaultConfig returns the default configuration for this rule.
@@ -80,7 +70,7 @@ func (r *NoTrailingSpacesRule) DefaultConfig() any {
 
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *NoTrailingSpacesRule) ValidateConfig(config any) error {
-	return configutil.ValidateWithSchema(config, r.Schema())
+	return configutil.ValidateRuleOptions(NoTrailingSpacesRuleCode, config)
 }
 
 // Check runs the no-trailing-spaces rule.

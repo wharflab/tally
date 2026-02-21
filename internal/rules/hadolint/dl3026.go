@@ -24,11 +24,17 @@ func DefaultDL3026Config() DL3026Config {
 }
 
 // DL3026Rule implements the DL3026 linting rule.
-type DL3026Rule struct{}
+type DL3026Rule struct {
+	schema map[string]any
+}
 
 // NewDL3026Rule creates a new DL3026 rule instance.
 func NewDL3026Rule() *DL3026Rule {
-	return &DL3026Rule{}
+	schema, err := configutil.RuleSchema(rules.HadolintRulePrefix + "DL3026")
+	if err != nil {
+		panic(err)
+	}
+	return &DL3026Rule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -47,19 +53,7 @@ func (r *DL3026Rule) Metadata() rules.RuleMetadata {
 // Schema returns the JSON Schema for this rule's configuration.
 // Follows ESLint's meta.schema pattern for rule options validation.
 func (r *DL3026Rule) Schema() map[string]any {
-	return map[string]any{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type":    "object",
-		"properties": map[string]any{
-			"trusted-registries": map[string]any{
-				"type":        "array",
-				"items":       map[string]any{"type": "string", "minLength": 1},
-				"uniqueItems": true,
-				"description": "Allowed registries (empty or omitted disables the rule)",
-			},
-		},
-		"additionalProperties": false,
-	}
+	return r.schema
 }
 
 // Check runs the DL3026 rule.
@@ -182,7 +176,7 @@ func (r *DL3026Rule) DefaultConfig() any {
 
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *DL3026Rule) ValidateConfig(config any) error {
-	return configutil.ValidateWithSchema(config, r.Schema())
+	return configutil.ValidateRuleOptions(r.Metadata().Code, config)
 }
 
 // resolveConfig extracts the DL3026Config from input, falling back to defaults.

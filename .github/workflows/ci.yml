@@ -80,6 +80,8 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      - name: Verify schema generation invariants
+        run: make schema-check
       - name: Build custom golangci-lint
         run: make bin/custom-gcl
       - name: Run linters
@@ -116,6 +118,8 @@ jobs:
             -name "*_test.go" \
             -o -name "*.pb.go" \
             -o -name "*_generated.go" \
+            -o -name "*.gen.go" \
+            -o -name "*_gen.go" \
             -o -path "*/testdata/*" \
             -o -path "*/__snapshots__/*" \
             -o -path "*/packaging/*" \

@@ -60,14 +60,15 @@ test(
     await writeUserSettings(userDataDir, {
       "tally.enable": true,
       "tally.path": [binaryPath],
+      "tally.configurationPreference": "editorOnly",
       // Ensure VS Code uses the formatter from this extension if other providers exist.
       "[dockerfile]": {
         "editor.defaultFormatter": "wharflab.tally",
       },
     });
 
-    process.env.TALLY_EXPECTED_DIAGNOSTICS = "173";
-    process.env.TALLY_EXPECTED_FORMAT_SNAPSHOT = path.join(
+    process.env.VSCODE_SMOKE_EXPECTED_DIAGNOSTICS = "173";
+    process.env.VSCODE_SMOKE_EXPECTED_FORMAT_SNAPSHOT = path.join(
       repoRoot,
       "internal",
       "lsptest",

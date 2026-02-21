@@ -1,4 +1,4 @@
-.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema lsp-protocol print-gotestsum-bin
+.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin
 
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
@@ -54,6 +54,8 @@ cpd: bin/pmd-$(PMD_VERSION)
 		-name "*_test.go" \
 		-o -name "*.pb.go" \
 		-o -name "*_generated.go" \
+		-o -name "*.gen.go" \
+		-o -name "*_gen.go" \
 		-o -path "*/testdata/*" \
 		-o -path "*/__snapshots__/*" \
 		-o -path "*/packaging/*" \
@@ -96,8 +98,33 @@ bin/gotestsum-$(GOTESTSUM_VERSION):
 print-gotestsum-bin:
 	@echo bin/gotestsum-$(GOTESTSUM_VERSION)
 
-jsonschema:
-	go run -tags '$(BUILDTAGS)' gen/jsonschema.go > schema.json
+# Schema pipeline:
+# - schema-gen: regenerate all JSON schemas, generated Go schema models, and published schema.json.
+# - schema-check: enforce schema-generation invariants used by CI.
+# - jsonschema: compatibility alias for schema-check.
+schema-gen:
+	cd _tools && go run ./schema-gen
+
+schema-check: schema-gen
+	# Namespace index schemas are generated artifacts; fail if regeneration causes drift.
+	@if test -n "$$(git status --porcelain -- internal/rules/*/index.schema.json)"; then \
+		echo "namespace index schema drift detected; run make schema-gen and commit index.schema.json changes"; \
+		git --no-pager diff -- internal/rules/*/index.schema.json; \
+		git status --short -- internal/rules/*/index.schema.json; \
+		exit 1; \
+	fi
+	# Generated schema models must stay JSON v2 compliant (no encoding/json imports).
+	@if rg -n '"encoding/json"' internal/schemas/generated; then \
+		echo "generated schema models must not import encoding/json"; \
+		exit 1; \
+	fi
+	# Published schema.json must be standalone for SchemaStore/IDE consumers.
+	@if rg -n '"\\$$ref"[[:space:]]*:[[:space:]]*"(\\./|\\.\\./)' schema.json; then \
+		echo "published schema.json must not contain filesystem-relative $$ref paths"; \
+		exit 1; \
+	fi
+
+jsonschema: schema-check
 
 lsp-protocol:
 	bun run tools/lspgen/fetchModel.mts

@@ -23,13 +23,13 @@ const MaxLinesRuleCode = rules.TallyRulePrefix + "max-lines"
 // Pointer types are used for fields that need tri-state semantics (unset vs explicit-zero).
 type MaxLinesConfig struct {
 	// Max is the maximum number of lines allowed (0 = disabled, nil = use default).
-	Max *int `json:"max,omitempty" jsonschema:"description=Maximum number of lines allowed (0 = disabled),default=50,minimum=0"`
+	Max *int `json:"max,omitempty"`
 
 	// SkipBlankLines excludes blank lines from the count (nil = use default).
-	SkipBlankLines *bool `json:"skip-blank-lines,omitempty" jsonschema:"description=Exclude blank lines,default=true" koanf:"skip-blank-lines"`
+	SkipBlankLines *bool `json:"skip-blank-lines,omitempty" koanf:"skip-blank-lines"`
 
 	// SkipComments excludes comment lines from the count (nil = use default).
-	SkipComments *bool `json:"skip-comments,omitempty" jsonschema:"description=Exclude comment lines,default=true" koanf:"skip-comments"`
+	SkipComments *bool `json:"skip-comments,omitempty" koanf:"skip-comments"`
 }
 
 // DefaultMaxLinesConfig returns the default configuration.
@@ -45,11 +45,17 @@ func DefaultMaxLinesConfig() MaxLinesConfig {
 }
 
 // MaxLinesRule implements the max-lines linting rule.
-type MaxLinesRule struct{}
+type MaxLinesRule struct {
+	schema map[string]any
+}
 
 // NewMaxLinesRule creates a new max-lines rule instance.
 func NewMaxLinesRule() *MaxLinesRule {
-	return &MaxLinesRule{}
+	schema, err := configutil.RuleSchema(MaxLinesRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &MaxLinesRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -69,37 +75,7 @@ func (r *MaxLinesRule) Metadata() rules.RuleMetadata {
 // Follows ESLint's meta.schema pattern for rule options validation.
 // Supports either an integer shorthand (just max) or full object config.
 func (r *MaxLinesRule) Schema() map[string]any {
-	return map[string]any{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"oneOf": []any{
-			map[string]any{
-				"type":    "integer",
-				"minimum": 0,
-			},
-			map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"max": map[string]any{
-						"type":        "integer",
-						"minimum":     0,
-						"default":     50,
-						"description": "Maximum number of lines allowed (0 = disabled)",
-					},
-					"skip-blank-lines": map[string]any{
-						"type":        "boolean",
-						"default":     true,
-						"description": "Exclude blank lines from the count",
-					},
-					"skip-comments": map[string]any{
-						"type":        "boolean",
-						"default":     true,
-						"description": "Exclude comment lines from the count",
-					},
-				},
-				"additionalProperties": false,
-			},
-		},
-	}
+	return r.schema
 }
 
 // Check runs the max-lines rule using the AST for accurate line counting.
@@ -273,7 +249,7 @@ func (r *MaxLinesRule) DefaultConfig() any {
 
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *MaxLinesRule) ValidateConfig(config any) error {
-	return configutil.ValidateWithSchema(config, r.Schema())
+	return configutil.ValidateRuleOptions(MaxLinesRuleCode, config)
 }
 
 // resolveConfig extracts the MaxLinesConfig from input, falling back to defaults.

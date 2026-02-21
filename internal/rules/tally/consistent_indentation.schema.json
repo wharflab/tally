@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/consistent_indentation.schema.json",
+  "title": "tally/consistent-indentation rule config",
+  "description": "Configuration options for the tally/consistent-indentation rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "severity": "style" },
+    { "severity": "off" }
+  ]
+}

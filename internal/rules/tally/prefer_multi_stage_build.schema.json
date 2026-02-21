@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/prefer_multi_stage_build.schema.json",
+  "title": "tally/prefer-multi-stage-build rule config",
+  "description": "Configuration options for the tally/prefer-multi-stage-build rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" },
+    "min-score": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 4,
+      "description": "Minimum heuristic score required to trigger the suggestion.",
+      "examples": [6]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "min-score": 6 },
+    { "severity": "info", "min-score": 6 }
+  ]
+}

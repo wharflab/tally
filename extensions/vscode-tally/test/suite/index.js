@@ -70,7 +70,9 @@ async function waitForStableDiagnostics(uri, opts) {
 
 async function runSmoke() {
   const expectedDiagnostics = Number.parseInt(
-    process.env.TALLY_EXPECTED_DIAGNOSTICS ?? String(DEFAULT_EXPECTED_DIAGNOSTICS),
+    process.env.VSCODE_SMOKE_EXPECTED_DIAGNOSTICS ??
+      process.env.TALLY_EXPECTED_DIAGNOSTICS ??
+      String(DEFAULT_EXPECTED_DIAGNOSTICS),
     10,
   );
 
@@ -125,6 +127,7 @@ async function runSmoke() {
   const formatted = normalizeNewlines(doc.getText());
 
   const expectedPath =
+    process.env.VSCODE_SMOKE_EXPECTED_FORMAT_SNAPSHOT ??
     process.env.TALLY_EXPECTED_FORMAT_SNAPSHOT ??
     path.join(
       workspaceRoot,

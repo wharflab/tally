@@ -214,6 +214,13 @@ parity rules
 
 ---
 
+### 18. [JSON-Schema-First Config and Rule System](18-json-schema-first-config-and-rule-system.md)
+
+**Covers:** Migration to external JSON schema documents, schema-derived Go types via `omissis/go-jsonschema`, runtime validation with
+`google/jsonschema-go`, and removal of `invopop/jsonschema` + `santhosh-tekuri/jsonschema/v6`.
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
@@ -230,6 +237,7 @@ parity rules
 - **Context-aware rules** → [07-context-aware-foundation.md](07-context-aware-foundation.md)
 - **Docker buildx compatibility** → [02-buildx-bake-check-analysis.md](02-buildx-bake-check-analysis.md)
 - **Integration test placement** → [16-integration-tests-refactor-and-placement.md](16-integration-tests-refactor-and-placement.md)
+- **Schema-first config/rule migration** → [18-json-schema-first-config-and-rule-system.md](18-json-schema-first-config-and-rule-system.md)
 
 ---
 

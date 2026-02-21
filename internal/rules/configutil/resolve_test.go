@@ -334,6 +334,9 @@ func TestMergeDefaults_UnexportedFields(t *testing.T) {
 
 func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 	t.Parallel()
+	// NOTE: jsonschema-go error text formatting can change between versions
+	// (currently pinned to github.com/google/jsonschema-go v0.4.2 in go.mod).
+	// Keep assertions token-based instead of exact phrase matching.
 	tests := []struct {
 		name        string
 		schema      map[string]any
@@ -359,7 +362,7 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 				"additionalProperties": false,
 			},
 			config:      map[string]any{"max": "not-a-number"},
-			wantSubstrs: []string{"got string, want integer"},
+			wantSubstrs: []string{"type", "integer"},
 		},
 		{
 			name: "multiple errors",
@@ -371,7 +374,7 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 				"additionalProperties": false,
 			},
 			config:      map[string]any{"max": "bad", "extra": true},
-			wantSubstrs: []string{"not allowed", "got string, want integer"},
+			wantSubstrs: []string{"type", "integer"},
 		},
 		{
 			name: "minimum violation",
@@ -409,4 +412,33 @@ func TestValidateWithSchema_ErrorMessages(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRuleSchema(t *testing.T) {
+	t.Parallel()
+
+	t.Run("known rule returns schema", func(t *testing.T) {
+		t.Parallel()
+
+		schema, err := RuleSchema("tally/max-lines")
+		if err != nil {
+			t.Fatalf("RuleSchema(tally/max-lines) error = %v", err)
+		}
+		if schema == nil {
+			t.Fatal("RuleSchema(tally/max-lines) = nil, want schema")
+		}
+	})
+
+	t.Run("unknown rule returns contextual error", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := RuleSchema("tally/does-not-exist")
+		if err == nil {
+			t.Fatal("RuleSchema(tally/does-not-exist) error = nil, want error")
+		}
+		msg := err.Error()
+		if !strings.Contains(msg, "failed to load rule schema for tally/does-not-exist") {
+			t.Fatalf("RuleSchema error missing context, got: %q", msg)
+		}
+	})
 }

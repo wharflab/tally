@@ -35,11 +35,17 @@ func DefaultPreferAddUnpackConfig() PreferAddUnpackConfig {
 //
 // ADD --unpack is a BuildKit feature that downloads and extracts a remote
 // archive in a single layer, reducing image size and build complexity.
-type PreferAddUnpackRule struct{}
+type PreferAddUnpackRule struct {
+	schema map[string]any
+}
 
 // NewPreferAddUnpackRule creates a new rule instance.
 func NewPreferAddUnpackRule() *PreferAddUnpackRule {
-	return &PreferAddUnpackRule{}
+	schema, err := configutil.RuleSchema(PreferAddUnpackRuleCode)
+	if err != nil {
+		panic(err)
+	}
+	return &PreferAddUnpackRule{schema: schema}
 }
 
 // Metadata returns the rule metadata.
@@ -58,18 +64,7 @@ func (r *PreferAddUnpackRule) Metadata() rules.RuleMetadata {
 
 // Schema returns the JSON Schema for this rule's configuration.
 func (r *PreferAddUnpackRule) Schema() map[string]any {
-	return map[string]any{
-		"$schema": "https://json-schema.org/draft/2020-12/schema",
-		"type":    "object",
-		"properties": map[string]any{
-			"enabled": map[string]any{
-				"type":        "boolean",
-				"default":     true,
-				"description": "Enable or disable the rule",
-			},
-		},
-		"additionalProperties": false,
-	}
+	return r.schema
 }
 
 // DefaultConfig returns the default configuration.
@@ -79,7 +74,7 @@ func (r *PreferAddUnpackRule) DefaultConfig() any {
 
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *PreferAddUnpackRule) ValidateConfig(config any) error {
-	return configutil.ValidateWithSchema(config, r.Schema())
+	return configutil.ValidateRuleOptions(PreferAddUnpackRuleCode, config)
 }
 
 // Check runs the prefer-add-unpack rule.

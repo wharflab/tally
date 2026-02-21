@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -139,6 +140,54 @@ func setupTempProject(t *testing.T) (string, string) {
 	}
 
 	return tmpDir, dockerfilePath
+}
+
+// TestConfigFromSchema_CoversAllFields uses reflection to ensure that
+// configFromSchema maps every exported Config field except Rules and ConfigFile.
+// If a new field is added to Config, this test will fail until
+// configFromSchema is updated to handle it.
+func TestConfigFromSchema_CoversAllFields(t *testing.T) {
+	t.Parallel()
+
+	// Fields that are intentionally not set by configFromSchema:
+	//   Rules      – populated separately from rule config
+	//   ConfigFile – runtime metadata, not from config file
+	skipped := map[string]bool{
+		"Rules":      true,
+		"ConfigFile": true,
+	}
+
+	typ := reflect.TypeFor[Config]()
+
+	// Build set of all exported, non-skipped field names.
+	structFields := make(map[string]bool)
+	for f := range typ.Fields() {
+		if !skipped[f.Name] {
+			structFields[f.Name] = true
+		}
+	}
+
+	// Authoritative list of fields handled by configFromSchema.
+	handled := map[string]bool{
+		"Output":           true,
+		"InlineDirectives": true,
+		"AI":               true,
+		"SlowChecks":       true,
+	}
+
+	// Forward: every struct field must be handled.
+	for name := range structFields {
+		if !handled[name] {
+			t.Errorf("Config field %q is not handled by configFromSchema and not in the skip list; "+
+				"update configFromSchema and this test", name)
+		}
+	}
+	// Reverse: every handled entry must still exist in Config.
+	for name := range handled {
+		if !structFields[name] {
+			t.Errorf("handled field %q no longer exists in Config; remove it from this test", name)
+		}
+	}
 }
 
 func TestLoad_DefaultsWhenNoConfig(t *testing.T) {
@@ -335,6 +384,7 @@ func TestEnvKeyTransform(t *testing.T) {
 		{"TALLY_AI_TIMEOUT", "ai.timeout"},
 		{"TALLY_AI_MAX_INPUT_BYTES", "ai.max-input-bytes"},
 		{"TALLY_AI_REDACT_SECRETS", "ai.redact-secrets"},
+		{"TALLY_EXPECTED_DIAGNOSTICS", ""},
 	}
 
 	for _, tt := range tests {
@@ -342,6 +392,18 @@ func TestEnvKeyTransform(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("envKeyTransform(%q) = %q, want %q", tt.input, got, tt.want)
 		}
+	}
+}
+
+func TestLoad_IgnoresUnknownTallyEnvVars(t *testing.T) {
+	t.Setenv("TALLY_EXPECTED_DIAGNOSTICS", "172")
+
+	cfg, err := loadWithConfigPath("")
+	if err != nil {
+		t.Fatalf("loadWithConfigPath(\"\") error = %v", err)
+	}
+	if cfg == nil {
+		t.Fatal("loadWithConfigPath(\"\") returned nil config")
 	}
 }
 

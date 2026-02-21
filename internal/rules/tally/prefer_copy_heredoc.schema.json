@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/prefer_copy_heredoc.schema.json",
+  "title": "tally/prefer-copy-heredoc rule config",
+  "description": "Configuration options for the tally/prefer-copy-heredoc rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" },
+    "check-single-run": {
+      "type": "boolean",
+      "default": true,
+      "description": "Detect single RUN instructions that create files and suggest COPY heredoc.",
+      "examples": [true]
+    },
+    "check-consecutive-runs": {
+      "type": "boolean",
+      "default": true,
+      "description": "Detect sequences of consecutive RUN instructions that create/append to the same file.",
+      "examples": [true]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "check-single-run": true, "check-consecutive-runs": true },
+    { "severity": "style", "check-single-run": false }
+  ]
+}
