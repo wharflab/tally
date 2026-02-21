@@ -363,17 +363,11 @@ func generateSchemaRegistry(repoRoot string, m *manifest) error {
 		}
 	}
 
-	uniquePaths := make(map[string]struct{}, len(paths))
-	deduped := make([]string, 0, len(paths))
-	for _, p := range paths {
-		p = filepath.ToSlash(p)
-		if _, ok := uniquePaths[p]; ok {
-			continue
-		}
-		uniquePaths[p] = struct{}{}
-		deduped = append(deduped, p)
+	for i := range paths {
+		paths[i] = filepath.ToSlash(paths[i])
 	}
-	paths = deduped
+	slices.Sort(paths)
+	paths = slices.Compact(paths)
 
 	schemaBytesByID := make(map[string][]byte, len(paths))
 	for _, rel := range paths {
