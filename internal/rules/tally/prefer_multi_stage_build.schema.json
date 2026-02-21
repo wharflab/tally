@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.tally.dev/rules/tally/prefer_multi_stage_build.schema.json",
+  "$id": "https://tally.wharflab.com/rules/tally/prefer_multi_stage_build.schema.json",
   "title": "tally/prefer-multi-stage-build rule config",
   "description": "Configuration options for the tally/prefer-multi-stage-build rule.",
   "type": "object",

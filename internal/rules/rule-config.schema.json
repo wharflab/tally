@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.tally.dev/rules/rule-config.schema.json",
+  "$id": "https://tally.wharflab.com/rules/rule-config.schema.json",
   "title": "Common rule configuration",
   "description": "Shared schema definitions for per-rule configuration across namespaces (tally/*, hadolint/*, buildkit/*).",
   "$defs": {

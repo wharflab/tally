@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.tally.dev/root/tally-config.schema.json",
+  "$id": "https://tally.wharflab.com/root/tally-config.schema.json",
   "title": "tally configuration",
   "description": "Configuration schema for tally Dockerfile linter",
   "type": "object",

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.tally.dev/rules/hadolint/dl3001.schema.json",
+  "$id": "https://tally.wharflab.com/rules/hadolint/dl3001.schema.json",
   "title": "hadolint/DL3001 rule config",
   "description": "Configuration options for the hadolint/DL3001 rule.",
   "type": "object",

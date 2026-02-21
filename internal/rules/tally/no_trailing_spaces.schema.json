@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.tally.dev/rules/tally/no_trailing_spaces.schema.json",
+  "$id": "https://tally.wharflab.com/rules/tally/no_trailing_spaces.schema.json",
   "title": "tally/no-trailing-spaces rule config",
   "description": "Configuration options for the tally/no-trailing-spaces rule.",
   "type": "object",

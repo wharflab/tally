@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.tally.dev/rules/hadolint/dl3026.schema.json",
+  "$id": "https://tally.wharflab.com/rules/hadolint/dl3026.schema.json",
   "title": "hadolint/DL3026 rule config",
   "description": "Configuration options for the hadolint/DL3026 rule.",
   "type": "object",

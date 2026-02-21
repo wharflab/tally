@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.tally.dev/rules/tally/prefer_add_unpack.schema.json",
+  "$id": "https://tally.wharflab.com/rules/tally/prefer_add_unpack.schema.json",
   "title": "tally/prefer-add-unpack rule config",
   "description": "Configuration options for the tally/prefer-add-unpack rule.",
   "type": "object",
