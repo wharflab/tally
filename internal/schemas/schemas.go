@@ -3,6 +3,7 @@ package schemas
 import (
 	"fmt"
 	"maps"
+	"slices"
 )
 
 func RuleSchemaID(ruleCode string) (string, bool) {
@@ -17,11 +18,7 @@ func RuleSchemaIDs() map[string]string {
 }
 
 func AllSchemaIDs() []string {
-	ids := make([]string, 0, len(schemaBytesByID))
-	for schemaID := range schemaBytesByID {
-		ids = append(ids, schemaID)
-	}
-	return ids
+	return slices.Sorted(maps.Keys(schemaBytesByID))
 }
 
 func ReadSchemaByID(schemaID string) ([]byte, error) {
