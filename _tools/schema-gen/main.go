@@ -8,7 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"encoding/json/jsontext"
@@ -268,7 +268,7 @@ func ensureGeneratedJSONV2Compliance(repoRoot string) error {
 	}
 
 	if len(offenders) > 0 {
-		sort.Strings(offenders)
+		slices.Sort(offenders)
 		return fmt.Errorf("generated files under %s import encoding/json: %s", generatedPath, strings.Join(offenders, ", "))
 	}
 	return nil
@@ -288,7 +288,7 @@ func generateNamespaceIndexes(repoRoot string, m *manifest) error {
 		filesByNamespace[ns] = append(filesByNamespace[ns], filename)
 	}
 	for ns := range filesByNamespace {
-		sort.Strings(filesByNamespace[ns])
+		slices.Sort(filesByNamespace[ns])
 	}
 
 	seenNamespaces := make(map[string]struct{}, len(m.Indexes))
@@ -457,7 +457,7 @@ func generatePublishedSchema(repoRoot string, m *manifest) error {
 	for rel := range defKeyByPath {
 		paths = append(paths, rel)
 	}
-	sort.Strings(paths)
+	slices.Sort(paths)
 
 	docsByPath := make(map[string]map[string]any, len(paths))
 	for _, rel := range paths {
@@ -489,7 +489,7 @@ func generatePublishedSchema(repoRoot string, m *manifest) error {
 	for rel := range defKeyByPath {
 		defPaths = append(defPaths, rel)
 	}
-	sort.Strings(defPaths)
+	slices.Sort(defPaths)
 	for _, rel := range defPaths {
 		def := rewrittenByPath[rel]
 		// Remove $id and $schema from inlined defs so they don't create
@@ -520,7 +520,7 @@ func renderRegistryGo(rootSchemaID string, ruleSchemaIDs map[string]string, sche
 	for code := range ruleSchemaIDs {
 		ruleCodes = append(ruleCodes, code)
 	}
-	sort.Strings(ruleCodes)
+	slices.Sort(ruleCodes)
 	for _, code := range ruleCodes {
 		b.WriteString("\t" + fmt.Sprintf("%q: %q,", code, ruleSchemaIDs[code]) + "\n")
 	}
@@ -531,7 +531,7 @@ func renderRegistryGo(rootSchemaID string, ruleSchemaIDs map[string]string, sche
 	for id := range schemaBytesByID {
 		schemaIDs = append(schemaIDs, id)
 	}
-	sort.Strings(schemaIDs)
+	slices.Sort(schemaIDs)
 	for _, id := range schemaIDs {
 		b.WriteString("\t" + fmt.Sprintf("%q: %#v,\n", id, schemaBytesByID[id]))
 	}
