@@ -655,6 +655,16 @@
   "properties": {
     "ai": {
       "additionalProperties": false,
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          }
+        },
+        "required": [
+          "enabled"
+        ]
+      },
       "properties": {
         "command": {
           "items": {
@@ -679,6 +689,16 @@
           "default": "90s",
           "type": "string"
         }
+      },
+      "then": {
+        "properties": {
+          "command": {
+            "minItems": 1
+          }
+        },
+        "required": [
+          "command"
+        ]
       },
       "type": "object"
     },

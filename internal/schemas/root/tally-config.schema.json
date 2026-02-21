@@ -99,7 +99,17 @@
           "default": true
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "if": {
+        "properties": { "enabled": { "const": true } },
+        "required": ["enabled"]
+      },
+      "then": {
+        "required": ["command"],
+        "properties": {
+          "command": { "minItems": 1 }
+        }
+      }
     },
     "slow-checks": {
       "type": "object",
