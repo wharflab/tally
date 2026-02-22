@@ -13,7 +13,7 @@ import (
 )
 
 // TestLintErrors verifies tally's behavior with files that cannot be linted normally:
-// unparseable content, binary files, non-existent paths, and permission errors.
+// unparseable content, binary files, non-existent paths, permission errors, and syntax errors.
 func TestLintErrors(t *testing.T) {
 	t.Parallel()
 
@@ -26,6 +26,9 @@ func TestLintErrors(t *testing.T) {
 	t.Run("nonexistent-glob", testLintErrorNonexistentGlob)
 	t.Run("empty-directory", testLintErrorEmptyDirectory)
 	t.Run("permission-denied", testLintErrorPermissionDenied)
+	t.Run("unknown-instruction", testLintErrorUnknownInstruction)
+	t.Run("syntax-directive-typo", testLintErrorSyntaxDirectiveTypo)
+	t.Run("multiple-unknown-instructions", testLintErrorMultipleUnknownInstructions)
 }
 
 func testLintErrorUnparseableJSON(t *testing.T) {
@@ -37,16 +40,17 @@ func testLintErrorUnparseableJSON(t *testing.T) {
 	t.Logf("exit=%d\nstdout:\n%s\nstderr:\n%s", exitCode, stdout, stderr)
 
 	// BuildKit's parser is lenient — it accepts arbitrary text as AST nodes.
-	// A JSON file parses into garbled instructions without a real FROM,
-	// so the linter produces DL3061 violations for every line and exits 1.
-	if exitCode != 1 {
-		t.Errorf("expected exit code 1 (violations), got %d", exitCode)
+	// A JSON file parses into garbled instructions without a real FROM.
+	// The fail-fast syntax checks now catch this before the lint pipeline,
+	// reporting unknown instructions via stderr and returning exit code 4.
+	if exitCode != 4 {
+		t.Errorf("expected exit code 4 (syntax error), got %d", exitCode)
 	}
-	if !strings.Contains(stdout, "DL3061") {
-		t.Error("expected DL3061 violation for non-Dockerfile content")
+	if !strings.Contains(stderr, "unknown instruction") {
+		t.Error("expected 'unknown instruction' in stderr for non-Dockerfile content")
 	}
-	if !strings.Contains(stdout, "Invalid instruction order") {
-		t.Error("expected 'Invalid instruction order' message")
+	if stdout != "" {
+		t.Errorf("expected empty stdout for syntax error, got: %q", stdout)
 	}
 }
 
@@ -263,6 +267,93 @@ func testLintErrorPermissionDenied(t *testing.T) {
 	}
 	if stdout != "" {
 		t.Errorf("expected empty stdout for permission denied, got: %q", stdout)
+	}
+}
+
+func testLintErrorUnknownInstruction(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte("FORM alpine\nRUN echo hello\n"), 0o644); err != nil {
+		t.Fatalf("write dockerfile: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyLintRaw(t, dockerfilePath)
+
+	t.Logf("exit=%d\nstdout:\n%s\nstderr:\n%s", exitCode, stdout, stderr)
+
+	if exitCode != 4 {
+		t.Errorf("expected exit code 4 (syntax error), got %d", exitCode)
+	}
+	if !strings.Contains(stderr, `unknown instruction "FORM"`) {
+		t.Errorf("expected 'unknown instruction \"FORM\"' in stderr, got: %q", stderr)
+	}
+	if !strings.Contains(stderr, `did you mean "FROM"`) {
+		t.Errorf("expected 'did you mean \"FROM\"' in stderr, got: %q", stderr)
+	}
+	if stdout != "" {
+		t.Errorf("expected empty stdout for syntax error, got: %q", stdout)
+	}
+}
+
+func testLintErrorSyntaxDirectiveTypo(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	content := "# syntax=docker/dokcerfile:1.7\nFROM alpine\n"
+	if err := os.WriteFile(dockerfilePath, []byte(content), 0o644); err != nil {
+		t.Fatalf("write dockerfile: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyLintRaw(t, dockerfilePath)
+
+	t.Logf("exit=%d\nstdout:\n%s\nstderr:\n%s", exitCode, stdout, stderr)
+
+	if exitCode != 4 {
+		t.Errorf("expected exit code 4 (syntax error), got %d", exitCode)
+	}
+	if !strings.Contains(stderr, "syntax directive") {
+		t.Errorf("expected 'syntax directive' in stderr, got: %q", stderr)
+	}
+	if !strings.Contains(stderr, "did you mean") {
+		t.Errorf("expected 'did you mean' in stderr, got: %q", stderr)
+	}
+	if stdout != "" {
+		t.Errorf("expected empty stdout for syntax error, got: %q", stdout)
+	}
+}
+
+func testLintErrorMultipleUnknownInstructions(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	content := "FORM alpine\nCOPPY . /app\nRUNN echo hello\n"
+	if err := os.WriteFile(dockerfilePath, []byte(content), 0o644); err != nil {
+		t.Fatalf("write dockerfile: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyLintRaw(t, dockerfilePath)
+
+	t.Logf("exit=%d\nstdout:\n%s\nstderr:\n%s", exitCode, stdout, stderr)
+
+	if exitCode != 4 {
+		t.Errorf("expected exit code 4 (syntax error), got %d", exitCode)
+	}
+	// All three typos should be reported.
+	if !strings.Contains(stderr, "FORM") {
+		t.Errorf("expected 'FORM' in stderr, got: %q", stderr)
+	}
+	if !strings.Contains(stderr, "COPPY") {
+		t.Errorf("expected 'COPPY' in stderr, got: %q", stderr)
+	}
+	if !strings.Contains(stderr, "RUNN") {
+		t.Errorf("expected 'RUNN' in stderr, got: %q", stderr)
+	}
+	if stdout != "" {
+		t.Errorf("expected empty stdout for syntax error, got: %q", stdout)
 	}
 }
 

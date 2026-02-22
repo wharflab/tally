@@ -8,6 +8,7 @@ tally uses distinct exit codes so scripts and CI pipelines can react to differen
 | `1` | Violations | One or more violations at or above the configured `--fail-level` |
 | `2` | Error | Configuration, parse, or I/O error (e.g. invalid config file, permission denied) |
 | `3` | No files | No Dockerfiles to lint (missing file, empty glob, empty directory) |
+| `4` | Syntax error | Dockerfile has fatal syntax issues (unknown instructions, malformed directives) |
 
 ## Examples
 
@@ -26,6 +27,15 @@ if [ "$status" -eq 3 ]; then
   echo "No Dockerfiles found — skipping lint"
 elif [ "$status" -ne 0 ]; then
   exit "$status"
+fi
+```
+
+```bash
+# Detect syntax errors (typo instructions, bad directives)
+tally lint Dockerfile
+status=$?
+if [ "$status" -eq 4 ]; then
+  echo "Dockerfile has syntax errors — fix before linting"
 fi
 ```
 

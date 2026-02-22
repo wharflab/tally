@@ -49,6 +49,11 @@ type Input struct {
 	// Config is the resolved configuration. If nil, LintFile loads from FilePath.
 	Config *config.Config
 
+	// ParseResult is a pre-parsed Dockerfile result. If non-nil, LintFile
+	// reuses it instead of parsing again. This avoids double-parsing when
+	// the caller has already parsed for syntax checks.
+	ParseResult *dockerfile.ParseResult
+
 	// BuildContext provides context-aware checks (e.g. .dockerignore).
 	// If nil, context-aware checks are skipped.
 	BuildContext rules.BuildContext
@@ -94,12 +99,16 @@ func LintFile(input Input) (*Result, error) {
 		}
 	}
 
-	parseResult, err := dockerfile.Parse(bytes.NewReader(content), cfg)
-	if err != nil {
-		return nil, err
+	var parseResult *dockerfile.ParseResult
+	if input.ParseResult != nil {
+		parseResult = input.ParseResult
+	} else {
+		var parseErr error
+		parseResult, parseErr = dockerfile.Parse(bytes.NewReader(content), cfg)
+		if parseErr != nil {
+			return nil, parseErr
+		}
 	}
-	// Ensure Source is set (Parse reads from a reader, source is captured internally).
-	// If the caller passed Content, the parse result's Source should already match.
 
 	sm := sourcemap.New(content)
 	directiveResult := directive.Parse(sm, nil)
