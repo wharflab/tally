@@ -911,5 +911,12 @@ severity = "style"
 `,
 			wantApplied: 3, // 2 indentation (RUN in stage 1 + COPY in stage 2) + 1 chain split
 		},
+		// tally/invalid-onbuild-trigger: COPPY → COPY via FixSuggestion (requires --fix-unsafe)
+		{
+			name:        "invalid-onbuild-trigger",
+			input:       "FROM alpine:3.19 AS base\nONBUILD COPPY . /app\nONBUILD RUN echo hello\n",
+			args:        append([]string{"--fix", "--fix-unsafe"}, mustSelectRules("tally/invalid-onbuild-trigger")...),
+			wantApplied: 1,
+		},
 	}
 }
