@@ -4,7 +4,7 @@
       "file": "testdata/onbuild-forbidden/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3043",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3043/",
           "location": {
             "end": {
               "column": 0,

@@ -3,7 +3,7 @@
  "Code": "buildkit/CopyIgnoredFile",
  "DefaultSeverity": "warning",
  "Description": "Detects COPY/ADD sources that would be ignored by .dockerignore",
- "DocURL": "https://docs.docker.com/go/dockerfile/rule/copy-ignored-file/",
+ "DocURL": "https://wharflab.github.io/tally/rules/buildkit/CopyIgnoredFile/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "COPY/ADD Ignored File"

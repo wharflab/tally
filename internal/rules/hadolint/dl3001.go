@@ -64,7 +64,7 @@ func (r *DL3001Rule) Metadata() rules.RuleMetadata {
 		Name: "Invalid command in container",
 		Description: "For some commands it makes no sense running them in a Docker " +
 			"container like ssh, vim, shutdown, service, ps, free, top, kill, mount",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3001",
+		DocURL:          rules.HadolintDocURL("DL3001"),
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "style",
 		IsExperimental:  false,

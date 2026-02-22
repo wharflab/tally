@@ -4,7 +4,7 @@
       "file": "testdata/dl3001/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3001",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3001/",
           "location": {
             "end": {
               "column": 0,

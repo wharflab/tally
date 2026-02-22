@@ -140,17 +140,29 @@ const BuildKitRulePrefix = "buildkit/"
 // TallyRulePrefix is the namespace prefix for tally's own rules.
 const TallyRulePrefix = "tally/"
 
-// tallyDocURLBase is the base URL for tally rule documentation.
-const tallyDocURLBase = "https://github.com/wharflab/tally/blob/main/docs/rules/"
+// docURLBase is the base URL for tally rule documentation on GitHub Pages.
+const docURLBase = "https://wharflab.github.io/tally/rules/"
 
 // TallyDocURL returns the documentation URL for a tally rule code.
 // The ruleCode should include the "tally/" prefix (e.g. "tally/max-lines").
 func TallyDocURL(ruleCode string) string {
-	return tallyDocURLBase + ruleCode + ".md"
+	return docURLBase + ruleCode + "/"
+}
+
+// BuildKitDocURL returns the documentation URL for a BuildKit rule.
+// The ruleName should be the PascalCase name without prefix (e.g. "StageNameCasing").
+func BuildKitDocURL(ruleName string) string {
+	return docURLBase + BuildKitRulePrefix + ruleName + "/"
 }
 
 // HadolintRulePrefix is the namespace prefix for Hadolint-compatible rules.
 const HadolintRulePrefix = "hadolint/"
+
+// HadolintDocURL returns the documentation URL for a Hadolint rule.
+// The ruleCode should be the DL/SC code without prefix (e.g. "DL3001").
+func HadolintDocURL(ruleCode string) string {
+	return docURLBase + HadolintRulePrefix + ruleCode + "/"
+}
 
 // NewViolationFromBuildKitWarning converts BuildKit linter callback parameters
 // to our Violation type. This bridges BuildKit's linter.LintWarnFunc with our
@@ -180,7 +192,7 @@ func NewViolationFromBuildKitWarning(
 		Message:  message,
 		Detail:   description,
 		Severity: SeverityWarning, // BuildKit warnings map to our warning severity
-		DocURL:   url,
+		DocURL:   BuildKitDocURL(ruleName),
 	}
 }
 

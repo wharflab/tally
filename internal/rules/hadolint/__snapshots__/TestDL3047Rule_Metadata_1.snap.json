@@ -3,7 +3,7 @@
  "Code": "hadolint/DL3047",
  "DefaultSeverity": "info",
  "Description": "Avoid use of wget without progress bar. Use `wget --progress=dot:giga \u003curl\u003e` or consider using `-q` or `-nv`",
- "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3047",
+ "DocURL": "https://wharflab.github.io/tally/rules/hadolint/DL3047/",
  "FixPriority": 96,
  "IsExperimental": false,
  "Name": "Avoid wget without progress bar"

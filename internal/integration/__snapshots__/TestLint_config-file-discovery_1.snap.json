@@ -4,7 +4,7 @@
       "file": "testdata/with-config/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/max-lines.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/max-lines/",
           "location": {
             "end": {
               "column": -1,

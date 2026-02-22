@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Detected package install/build command; add cache mount(s): /root/.npm (id=npm)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -45,7 +45,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /go/pkg/mod (id=gomod), /root/.cache/go-build (id=gobuild)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -85,7 +85,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /var/cache/apt (id=apt, sharing=locked), /var/lib/apt (id=aptlib, sharing=locked)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -125,7 +125,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /var/cache/apk (id=apk, sharing=locked)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -165,7 +165,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /var/cache/dnf (id=dnf, sharing=locked)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -205,7 +205,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /var/cache/yum (id=yum, sharing=locked)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -245,7 +245,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /var/cache/zypp (id=zypper, sharing=locked)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -285,7 +285,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /usr/local/share/.cache/yarn (id=yarn)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -325,7 +325,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /root/.pnpm-store (id=pnpm)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -365,7 +365,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /root/.cache/pip (id=pip)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -405,7 +405,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /root/.gem (id=gem)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -445,7 +445,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /workspace/target (id=cargo-target), /usr/local/cargo/git/db (id=cargo-git), /usr/local/cargo/registry (id=cargo-registry)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -485,7 +485,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /root/.nuget/packages (id=nuget)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -525,7 +525,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /root/.cache/composer (id=composer)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -565,7 +565,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /root/.cache/uv (id=uv)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -605,7 +605,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /root/.cache/uv (id=uv)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -645,7 +645,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /root/.bun/install/cache (id=bun)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -685,7 +685,7 @@
         },
         {
           "detail": "Detected package install/build command; add cache mount(s): /root/.npm (id=npm)",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
           "location": {
             "end": {
               "column": 0,

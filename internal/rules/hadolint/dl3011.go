@@ -24,7 +24,7 @@ func (r *DL3011Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3011",
 		Name:            "Valid UNIX ports range from 0 to 65535",
 		Description:     "EXPOSE instruction specifies a port outside the valid UNIX range (0-65535)",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3011",
+		DocURL:          rules.HadolintDocURL("DL3011"),
 		DefaultSeverity: rules.SeverityError,
 		Category:        "correctness",
 		IsExperimental:  false,

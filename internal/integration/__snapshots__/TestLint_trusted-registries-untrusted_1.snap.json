@@ -4,7 +4,7 @@
       "file": "testdata/trusted-registries-untrusted/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3026",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3026/",
           "location": {
             "end": {
               "column": 0,

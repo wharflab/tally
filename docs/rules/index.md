@@ -7,14 +7,14 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 | Namespace | Source | Description |
 |-----------|--------|-------------|
 | [`tally/`](./tally/) | tally | Custom rules implemented by tally |
-| `buildkit/` | [BuildKit Linter](https://docs.docker.com/reference/build-checks/) | Docker's official Dockerfile checks |
-| `hadolint/` | [Hadolint](https://github.com/hadolint/hadolint) | Shell best practices (DL/SC rules) |
+| [`buildkit/`](./buildkit/) | [BuildKit Linter](https://docs.docker.com/reference/build-checks/) | Docker's official Dockerfile checks |
+| [`hadolint/`](./hadolint/) | [Hadolint](https://github.com/hadolint/hadolint) | Shell best practices (DL/SC rules) |
 
 ## Quick Links
 
 - [tally Rules](./tally/) - Custom rules for security, maintainability, and style
-- BuildKit Rules - Docker's official checks (coming soon)
-- Hadolint Rules - Shell best practices (coming soon)
+- [BuildKit Rules](./buildkit/) - Docker's official checks, reimplemented with auto-fix support
+- [Hadolint Rules](./hadolint/) - Shell best practices (DL/SC rules), with auto-fix and enhanced detection
 
 ## Configuration
 

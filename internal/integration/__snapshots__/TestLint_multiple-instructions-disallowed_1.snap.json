@@ -4,7 +4,7 @@
       "file": "testdata/multiple-instructions-disallowed/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/multiple-instructions-disallowed/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/MultipleInstructionsDisallowed/",
           "location": {
             "end": {
               "column": 0,
@@ -43,7 +43,7 @@
           }
         },
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/multiple-instructions-disallowed/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/MultipleInstructionsDisallowed/",
           "location": {
             "end": {
               "column": 0,
@@ -82,7 +82,7 @@
           }
         },
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/multiple-instructions-disallowed/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/MultipleInstructionsDisallowed/",
           "location": {
             "end": {
               "column": 0,

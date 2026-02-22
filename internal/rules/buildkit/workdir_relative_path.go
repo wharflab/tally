@@ -25,7 +25,7 @@ func (r *WorkdirRelativePathRule) Metadata() rules.RuleMetadata {
 		Code:            rules.BuildKitRulePrefix + "WorkdirRelativePath",
 		Name:            "Relative WORKDIR Path",
 		Description:     "Relative WORKDIR path used without a base absolute path",
-		DocURL:          "https://docs.docker.com/go/dockerfile/rule/workdir-relative-path/",
+		DocURL:          rules.BuildKitDocURL("WorkdirRelativePath"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "correctness",
 		IsExperimental:  false,

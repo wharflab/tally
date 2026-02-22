@@ -26,7 +26,7 @@ func (r *DL3045Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3045",
 		Name:            "COPY to relative destination without WORKDIR",
 		Description:     "`COPY` to a relative destination without `WORKDIR` set",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3045",
+		DocURL:          rules.HadolintDocURL("DL3045"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "best-practice",
 		IsExperimental:  false,

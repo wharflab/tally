@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Stage names should be lowercase",
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/StageNameCasing/",
           "location": {
             "end": {
               "column": 0,

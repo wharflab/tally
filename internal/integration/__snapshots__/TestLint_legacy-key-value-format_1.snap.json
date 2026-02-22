@@ -4,7 +4,7 @@
       "file": "testdata/legacy-key-value-format/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/legacy-key-value-format/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/LegacyKeyValueFormat/",
           "location": {
             "end": {
               "column": 0,
@@ -43,7 +43,7 @@
           }
         },
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/legacy-key-value-format/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/LegacyKeyValueFormat/",
           "location": {
             "end": {
               "column": 0,
@@ -82,7 +82,7 @@
           }
         },
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/legacy-key-value-format/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/LegacyKeyValueFormat/",
           "location": {
             "end": {
               "column": 0,

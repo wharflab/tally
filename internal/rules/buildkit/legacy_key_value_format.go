@@ -26,7 +26,7 @@ func (r *LegacyKeyValueFormatRule) Metadata() rules.RuleMetadata {
 		Code:            rules.BuildKitRulePrefix + "LegacyKeyValueFormat",
 		Name:            "Legacy Key/Value Format",
 		Description:     linter.RuleLegacyKeyValueFormat.Description,
-		DocURL:          linter.RuleLegacyKeyValueFormat.URL,
+		DocURL:          rules.BuildKitDocURL("LegacyKeyValueFormat"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "style",
 		IsExperimental:  false,

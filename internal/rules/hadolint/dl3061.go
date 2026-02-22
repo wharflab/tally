@@ -1,5 +1,7 @@
 package hadolint
 
+import "github.com/wharflab/tally/internal/rules"
+
 // DL3061: Invalid instruction order - Dockerfile must begin with FROM, ARG, or comment.
 //
 // A Dockerfile must start with either a FROM instruction (to specify the base image),
@@ -16,5 +18,6 @@ package hadolint
 const (
 	DL3061Code    = "hadolint/DL3061"
 	DL3061Message = "Dockerfile must begin with FROM or ARG"
-	DL3061DocURL  = "https://github.com/hadolint/hadolint/wiki/DL3061"
 )
+
+var DL3061DocURL = rules.HadolintDocURL("DL3061")

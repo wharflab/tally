@@ -4,7 +4,7 @@
       "file": "testdata/epilogue-order/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/epilogue-order.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/epilogue-order/",
           "location": {
             "end": {
               "column": 0,

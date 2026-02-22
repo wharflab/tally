@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "The MAINTAINER instruction is deprecated, use a label instead to define an image author",
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/maintainer-deprecated/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/MaintainerDeprecated/",
           "location": {
             "end": {
               "column": 0,

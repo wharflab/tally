@@ -4,7 +4,7 @@
       "file": "testdata/reserved-stage-name/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/reserved-stage-name/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/ReservedStageName/",
           "location": {
             "end": {
               "column": 0,
@@ -22,7 +22,7 @@
           "sourceCode": "FROM alpine:3.21 AS scratch"
         },
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/reserved-stage-name/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/ReservedStageName/",
           "location": {
             "end": {
               "column": 0,

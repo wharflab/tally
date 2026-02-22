@@ -4,7 +4,7 @@
       "file": "testdata/slow-checks-undefined-var-multi-stage/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/undefined-var/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/UndefinedVar/",
           "location": {
             "end": {
               "column": 0,

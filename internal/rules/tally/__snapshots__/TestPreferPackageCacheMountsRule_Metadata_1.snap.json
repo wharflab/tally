@@ -3,7 +3,7 @@
  "Code": "tally/prefer-package-cache-mounts",
  "DefaultSeverity": "off",
  "Description": "Use BuildKit cache mounts for package manager install/build commands",
- "DocURL": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/prefer-package-cache-mounts/",
  "FixPriority": 90,
  "IsExperimental": true,
  "Name": "Prefer package manager cache mounts"

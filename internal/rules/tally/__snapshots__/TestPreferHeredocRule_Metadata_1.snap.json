@@ -3,7 +3,7 @@
  "Code": "tally/prefer-run-heredoc",
  "DefaultSeverity": "style",
  "Description": "Use heredoc syntax for multi-command RUN instructions",
- "DocURL": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-run-heredoc.md",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/prefer-run-heredoc/",
  "FixPriority": 100,
  "IsExperimental": true,
  "Name": "Prefer RUN heredoc syntax"

@@ -22,7 +22,7 @@ func (r *RedundantTargetPlatformRule) Metadata() rules.RuleMetadata {
 		Code:            rules.BuildKitRulePrefix + "RedundantTargetPlatform",
 		Name:            "Redundant TARGETPLATFORM",
 		Description:     "Setting platform to $TARGETPLATFORM is redundant as this is the default behavior",
-		DocURL:          "https://docs.docker.com/go/dockerfile/rule/redundant-target-platform/",
+		DocURL:          rules.BuildKitDocURL("RedundantTargetPlatform"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "best-practices",
 		IsExperimental:  false,

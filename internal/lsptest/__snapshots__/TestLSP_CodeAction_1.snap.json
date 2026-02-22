@@ -4,7 +4,7 @@
    {
     "code": "buildkit/MaintainerDeprecated",
     "codeDescription": {
-     "href": "https://docs.docker.com/go/dockerfile/rule/maintainer-deprecated/"
+     "href": "https://wharflab.github.io/tally/rules/buildkit/MaintainerDeprecated/"
     },
     "message": "Maintainer instruction is deprecated in favor of using label",
     "range": {

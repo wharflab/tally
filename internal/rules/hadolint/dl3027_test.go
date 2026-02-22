@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -150,8 +151,8 @@ ONBUILD RUN apt install python`,
 				if v.Detail == "" {
 					t.Error("violation detail is empty")
 				}
-				if v.DocURL != "https://github.com/hadolint/hadolint/wiki/DL3027" {
-					t.Errorf("got doc URL %q, want %q", v.DocURL, "https://github.com/hadolint/hadolint/wiki/DL3027")
+				if v.DocURL != rules.HadolintDocURL("DL3027") {
+					t.Errorf("got doc URL %q, want %q", v.DocURL, rules.HadolintDocURL("DL3027"))
 				}
 			}
 		})

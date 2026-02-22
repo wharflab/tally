@@ -3,7 +3,7 @@
  "Code": "buildkit/RedundantTargetPlatform",
  "DefaultSeverity": "warning",
  "Description": "Setting platform to $TARGETPLATFORM is redundant as this is the default behavior",
- "DocURL": "https://docs.docker.com/go/dockerfile/rule/redundant-target-platform/",
+ "DocURL": "https://wharflab.github.io/tally/rules/buildkit/RedundantTargetPlatform/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "Redundant TARGETPLATFORM"

@@ -28,7 +28,7 @@ func (r *ExposeProtoCasingRule) Metadata() rules.RuleMetadata {
 		Code:            rules.BuildKitRulePrefix + "ExposeProtoCasing",
 		Name:            "Expose Proto Casing",
 		Description:     linter.RuleExposeProtoCasing.Description,
-		DocURL:          linter.RuleExposeProtoCasing.URL,
+		DocURL:          rules.BuildKitDocURL("ExposeProtoCasing"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "style",
 		IsExperimental:  false,

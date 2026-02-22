@@ -3,7 +3,7 @@
  "Code": "tally/max-lines",
  "DefaultSeverity": "error",
  "Description": "Limits the maximum number of lines in a Dockerfile",
- "DocURL": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/max-lines.md",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/max-lines/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "Maximum Lines"

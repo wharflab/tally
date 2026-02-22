@@ -3,7 +3,7 @@
  "Code": "buildkit/InvalidDefaultArgInFrom",
  "DefaultSeverity": "error",
  "Description": "Default value for global ARG results in an empty or invalid base image name",
- "DocURL": "https://docs.docker.com/go/dockerfile/rule/invalid-default-arg-in-from/",
+ "DocURL": "https://wharflab.github.io/tally/rules/buildkit/InvalidDefaultArgInFrom/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "InvalidDefaultArgInFrom"

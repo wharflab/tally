@@ -4,7 +4,7 @@
       "file": "testdata/dl3022/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3022",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3022/",
           "location": {
             "end": {
               "column": 0,

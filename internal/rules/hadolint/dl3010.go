@@ -29,7 +29,7 @@ func (r *DL3010Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3010",
 		Name:            "Use ADD for extracting archives into an image",
 		Description:     "Use `ADD` for extracting archives into an image instead of `COPY` + `RUN tar/unzip`",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3010",
+		DocURL:          rules.HadolintDocURL("DL3010"),
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "performance",
 		IsExperimental:  false,

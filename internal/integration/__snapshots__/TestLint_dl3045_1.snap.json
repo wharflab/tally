@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "When no WORKDIR is set, the working directory defaults to `/` but this is implicit and fragile. Either set WORKDIR before COPY or use an absolute destination path.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3045",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3045/",
           "location": {
             "end": {
               "column": 0,

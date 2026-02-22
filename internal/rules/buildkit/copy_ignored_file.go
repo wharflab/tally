@@ -26,7 +26,7 @@ func (r *CopyIgnoredFileRule) Metadata() rules.RuleMetadata {
 		Code:            rules.BuildKitRulePrefix + "CopyIgnoredFile",
 		Name:            "COPY/ADD Ignored File",
 		Description:     "Detects COPY/ADD sources that would be ignored by .dockerignore",
-		DocURL:          "https://docs.docker.com/go/dockerfile/rule/copy-ignored-file/",
+		DocURL:          rules.BuildKitDocURL("CopyIgnoredFile"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "correctness",
 		IsExperimental:  false,

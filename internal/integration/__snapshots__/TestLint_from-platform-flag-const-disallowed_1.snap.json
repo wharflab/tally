@@ -4,7 +4,7 @@
       "file": "testdata/from-platform-flag-const-disallowed/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/from-platform-flag-const-disallowed/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/FromPlatformFlagConstDisallowed/",
           "location": {
             "end": {
               "column": 0,
@@ -22,7 +22,7 @@
           "sourceCode": "FROM --platform=linux/amd64 scratch"
         },
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/from-platform-flag-const-disallowed/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/FromPlatformFlagConstDisallowed/",
           "location": {
             "end": {
               "column": 0,
@@ -40,7 +40,7 @@
           "sourceCode": "FROM --platform=linux/arm64 alpine:3.21"
         },
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/from-platform-flag-const-disallowed/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/FromPlatformFlagConstDisallowed/",
           "location": {
             "end": {
               "column": 0,
@@ -58,7 +58,7 @@
           "sourceCode": "FROM --platform=linux/arm/v7 debian:bookworm-slim"
         },
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/from-platform-flag-const-disallowed/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/FromPlatformFlagConstDisallowed/",
           "location": {
             "end": {
               "column": 0,

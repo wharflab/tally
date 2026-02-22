@@ -4,7 +4,7 @@
       "file": "testdata/copy-from-own-alias/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3022",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3022/",
           "location": {
             "end": {
               "column": 0,
@@ -22,7 +22,7 @@
           "sourceCode": "COPY --from=foo bar ."
         },
         {
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3023",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3023/",
           "location": {
             "end": {
               "column": 0,

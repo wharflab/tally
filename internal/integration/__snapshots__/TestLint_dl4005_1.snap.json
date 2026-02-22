@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Using ln to redirect /bin/sh is fragile and may break scripts that depend on the original shell. Use the SHELL instruction to change the default shell for subsequent RUN instructions, e.g., SHELL [\"/bin/bash\", \"-c\"].",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL4005",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL4005/",
           "location": {
             "end": {
               "column": 0,
@@ -44,7 +44,7 @@
         },
         {
           "detail": "Using ln to redirect /bin/sh is fragile and may break scripts that depend on the original shell. Use the SHELL instruction to change the default shell for subsequent RUN instructions, e.g., SHELL [\"/bin/bash\", \"-c\"].",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL4005",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL4005/",
           "location": {
             "end": {
               "column": 0,

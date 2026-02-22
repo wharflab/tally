@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "When useradd creates a user with a high UID (\u003e99999), it writes entries to /var/log/lastlog and /var/log/faillog. These files are sparse but can bloat the image layer. Use the -l (--no-log-init) flag to skip these log entries.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3046",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3046/",
           "location": {
             "end": {
               "column": 0,

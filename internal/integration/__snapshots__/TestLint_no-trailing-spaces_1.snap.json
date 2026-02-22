@@ -4,7 +4,7 @@
       "file": "testdata/no-trailing-spaces/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/no-trailing-spaces.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-trailing-spaces/",
           "location": {
             "end": {
               "column": 19,
@@ -43,7 +43,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/no-trailing-spaces.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-trailing-spaces/",
           "location": {
             "end": {
               "column": 29,
@@ -82,7 +82,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/no-trailing-spaces.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-trailing-spaces/",
           "location": {
             "end": {
               "column": 16,
@@ -121,7 +121,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/no-trailing-spaces.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-trailing-spaces/",
           "location": {
             "end": {
               "column": 12,

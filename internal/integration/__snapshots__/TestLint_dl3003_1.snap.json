@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "The cd command in a RUN instruction only affects that single instruction. Use WORKDIR to set the working directory persistently for subsequent instructions. Alternatively, use absolute paths in your commands.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3003",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3003/",
           "location": {
             "end": {
               "column": 0,

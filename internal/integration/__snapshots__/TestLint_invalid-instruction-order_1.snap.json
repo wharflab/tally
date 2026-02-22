@@ -4,7 +4,7 @@
       "file": "testdata/invalid-instruction-order/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3061",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3061/",
           "location": {
             "end": {
               "column": 0,

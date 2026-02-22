@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -102,7 +103,7 @@ func TestExposeInvalidFormatRule_Check_ViolationDetails(t *testing.T) {
 	v := violations[0]
 	assert.Equal(t, "buildkit/ExposeInvalidFormat", v.RuleCode)
 	assert.Contains(t, v.Message, "127.0.0.1:80:80")
-	assert.Equal(t, "https://docs.docker.com/go/dockerfile/rule/expose-invalid-format/", v.DocURL)
+	assert.Equal(t, rules.BuildKitDocURL("ExposeInvalidFormat"), v.DocURL)
 	assert.Equal(t, 2, v.Location.Start.Line)
 }
 

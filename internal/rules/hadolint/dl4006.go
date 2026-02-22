@@ -26,7 +26,7 @@ func (r *DL4006Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL4006",
 		Name:            "Set pipefail",
 		Description:     "Set the SHELL option -o pipefail before RUN with a pipe in it",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL4006",
+		DocURL:          rules.HadolintDocURL("DL4006"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "reliability",
 		IsExperimental:  false,

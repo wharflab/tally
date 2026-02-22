@@ -1,5 +1,7 @@
 package hadolint
 
+import "github.com/wharflab/tally/internal/rules"
+
 // DL3023: COPY --from should not reference the stage's own FROM alias.
 //
 // A COPY instruction with --from flag cannot reference the same stage it's in,
@@ -13,7 +15,6 @@ package hadolint
 //
 // See: https://github.com/hadolint/hadolint/wiki/DL3023
 
-const (
-	DL3023Code   = "hadolint/DL3023"
-	DL3023DocURL = "https://github.com/hadolint/hadolint/wiki/DL3023"
-)
+const DL3023Code = "hadolint/DL3023"
+
+var DL3023DocURL = rules.HadolintDocURL("DL3023")

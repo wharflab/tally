@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "When copying multiple source files, the destination must be a directory (indicated by a trailing /). Without it, the build will fail.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3021",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3021/",
           "location": {
             "end": {
               "column": 0,

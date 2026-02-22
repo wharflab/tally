@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -90,6 +91,6 @@ func TestExposeProtoCasingRule_Check_ViolationDetails(t *testing.T) {
 	v := violations[0]
 	assert.Equal(t, "buildkit/ExposeProtoCasing", v.RuleCode)
 	assert.Equal(t, "Defined protocol '8080/TCP' in EXPOSE instruction should be lowercase", v.Message)
-	assert.Equal(t, "https://docs.docker.com/go/dockerfile/rule/expose-proto-casing/", v.DocURL)
+	assert.Equal(t, rules.BuildKitDocURL("ExposeProtoCasing"), v.DocURL)
 	assert.Equal(t, 2, v.Location.Start.Line)
 }

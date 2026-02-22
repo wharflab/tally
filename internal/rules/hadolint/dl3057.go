@@ -46,7 +46,7 @@ func (r *DL3057Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3057",
 		Name:            "HEALTHCHECK instruction missing",
 		Description:     "`HEALTHCHECK` instruction missing",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3057",
+		DocURL:          rules.HadolintDocURL("DL3057"),
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "best-practice",
 		IsExperimental:  false,

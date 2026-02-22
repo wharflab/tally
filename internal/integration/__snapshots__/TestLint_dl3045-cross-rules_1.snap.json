@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "When no WORKDIR is set, the working directory defaults to `/` but this is implicit and fragile. Either set WORKDIR before COPY or use an absolute destination path.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3045",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3045/",
           "location": {
             "end": {
               "column": 0,
@@ -24,7 +24,7 @@
         },
         {
           "detail": "Set an absolute WORKDIR before using relative paths, e.g., 'WORKDIR /app' before 'WORKDIR src'",
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/workdir-relative-path/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/WorkdirRelativePath/",
           "location": {
             "end": {
               "column": 0,
@@ -43,7 +43,7 @@
         },
         {
           "detail": "The cd command in a RUN instruction only affects that single instruction. Use WORKDIR to set the working directory persistently for subsequent instructions. Alternatively, use absolute paths in your commands.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3003",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3003/",
           "location": {
             "end": {
               "column": 0,

@@ -3,7 +3,7 @@
  "Code": "buildkit/ReservedStageName",
  "DefaultSeverity": "error",
  "Description": "Reserved words should not be used as stage names",
- "DocURL": "https://docs.docker.com/go/dockerfile/rule/reserved-stage-name/",
+ "DocURL": "https://wharflab.github.io/tally/rules/buildkit/ReservedStageName/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "ReservedStageName"

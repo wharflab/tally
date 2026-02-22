@@ -25,7 +25,7 @@ func (r *DL4001Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL4001",
 		Name:            "Either wget or curl but not both",
 		Description:     "Either use wget or curl but not both to reduce image size",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL4001",
+		DocURL:          rules.HadolintDocURL("DL4001"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "maintainability",
 		IsExperimental:  false,

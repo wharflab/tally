@@ -20,7 +20,7 @@ func (r *DL3038Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3038",
 		Name:            "Use -y with dnf install",
 		Description:     "Use the -y switch to avoid manual input `dnf install -y <package>`",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3038",
+		DocURL:          rules.HadolintDocURL("DL3038"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "best-practice",
 		IsExperimental:  false,

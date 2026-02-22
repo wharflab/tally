@@ -25,7 +25,7 @@ func (r *DL3020Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3020",
 		Name:            "Use COPY instead of ADD",
 		Description:     "Use COPY instead of ADD for local files; ADD has unexpected features",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3020",
+		DocURL:          rules.HadolintDocURL("DL3020"),
 		DefaultSeverity: rules.SeverityError,
 		Category:        "best-practice",
 		IsExperimental:  false,

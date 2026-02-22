@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Running yum install without -y will cause the command to wait for user confirmation, which will hang in Docker builds. Use -y or --assumeyes to automatically confirm.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3030",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3030/",
           "location": {
             "end": {
               "column": 0,
@@ -43,7 +43,7 @@
         },
         {
           "detail": "Running yum install without -y will cause the command to wait for user confirmation, which will hang in Docker builds. Use -y or --assumeyes to automatically confirm.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3030",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3030/",
           "location": {
             "end": {
               "column": 0,
@@ -81,7 +81,7 @@
         },
         {
           "detail": "Running yum install without -y will cause the command to wait for user confirmation, which will hang in Docker builds. Use -y or --assumeyes to automatically confirm.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3030",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3030/",
           "location": {
             "end": {
               "column": 0,

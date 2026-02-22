@@ -212,7 +212,7 @@
           "notifications": [],
           "rules": [
             {
-              "helpUri": "https://docs.docker.com/go/dockerfile/rule/invalid-definition-description/",
+              "helpUri": "https://wharflab.github.io/tally/rules/buildkit/InvalidDefinitionDescription/",
               "id": "buildkit/InvalidDefinitionDescription",
               "relationships": [],
               "shortDescription": {
@@ -220,12 +220,12 @@
               }
             },
             {
-              "helpUri": "https://docs.docker.com/go/dockerfile/rule/json-args-recommended/",
+              "helpUri": "https://wharflab.github.io/tally/rules/buildkit/JSONArgsRecommended/",
               "id": "buildkit/JSONArgsRecommended",
               "relationships": []
             },
             {
-              "helpUri": "https://docs.docker.com/go/dockerfile/rule/maintainer-deprecated/",
+              "helpUri": "https://wharflab.github.io/tally/rules/buildkit/MaintainerDeprecated/",
               "id": "buildkit/MaintainerDeprecated",
               "relationships": [],
               "shortDescription": {
@@ -233,7 +233,7 @@
               }
             },
             {
-              "helpUri": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/",
+              "helpUri": "https://wharflab.github.io/tally/rules/buildkit/StageNameCasing/",
               "id": "buildkit/StageNameCasing",
               "relationships": [],
               "shortDescription": {
