@@ -70,7 +70,7 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 			}
 
 			if env, ok := cmd.(*instructions.EnvCommand); ok {
-				resolveCachePathOverrides(env, cachePathOverrides)
+				resolveCachePathOverrides(env, workdir, cachePathOverrides)
 				cacheEnvEntries = collectCacheDisablingEnvVars(env, cacheEnvEntries)
 				continue
 			}
@@ -590,7 +590,8 @@ var cacheLocationEnvVars = []cacheLocationEnvVar{
 }
 
 // resolveCachePathOverrides updates overrides if the ENV instruction sets any cache-location variables.
-func resolveCachePathOverrides(env *instructions.EnvCommand, overrides map[string]string) {
+// Relative paths are resolved against the current workdir (same logic as cargo target resolution).
+func resolveCachePathOverrides(env *instructions.EnvCommand, workdir string, overrides map[string]string) {
 	for _, kv := range env.Env {
 		for _, loc := range cacheLocationEnvVars {
 			match := kv.Key == loc.envKey
@@ -601,10 +602,13 @@ func resolveCachePathOverrides(env *instructions.EnvCommand, overrides map[strin
 				continue
 			}
 			val := unquote(kv.Value)
-			if strings.Contains(val, "$") {
+			if val == "" || strings.Contains(val, "$") {
 				continue
 			}
 			target := path.Clean(val)
+			if !path.IsAbs(target) {
+				target = path.Clean(path.Join(workdir, target))
+			}
 			if loc.suffix != "" {
 				target = path.Join(target, loc.suffix)
 			}

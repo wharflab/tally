@@ -593,6 +593,37 @@ RUN bun install
 				"bun install",
 			},
 		},
+		{
+			name: "npm_config_cache relative path resolved against WORKDIR",
+			content: `FROM node:20
+WORKDIR /app
+ENV npm_config_cache=.npm-cache
+RUN npm install
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/app/.npm-cache,id=npm",
+			},
+		},
+		{
+			name: "npm_config_cache relative path resolved against default workdir",
+			content: `FROM node:20
+ENV npm_config_cache=npm-cache
+RUN npm install
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/npm-cache,id=npm",
+			},
+		},
+		{
+			name: "npm_config_cache empty value uses default target",
+			content: `FROM node:20
+ENV npm_config_cache=
+RUN npm install
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.npm,id=npm",
+			},
+		},
 	}
 
 	for _, tt := range tests {
