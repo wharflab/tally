@@ -139,16 +139,16 @@ func (p *cancelPreempter) Preempt(_ context.Context, req *jsonrpc2.Request) (any
 func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error) {
 	switch req.Method {
 	// Lifecycle
-	case "initialize":
+	case string(protocol.MethodInitialize):
 		return unmarshalAndCall(req, s.handleInitialize)
 	case string(protocol.MethodInitialized),
 		string(protocol.MethodSetTrace),
 		string(protocol.MethodCancelRequest),
 		string(protocol.MethodProgress):
 		return nil, nil //nolint:nilnil // LSP: notifications have no result
-	case "shutdown":
+	case string(protocol.MethodShutdown):
 		return jsonNull, nil
-	case "exit":
+	case string(protocol.MethodExit):
 		select {
 		case <-s.exitCh:
 		default:
@@ -157,25 +157,25 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 		return nil, nil //nolint:nilnil // LSP: exit is a notification
 
 	// Document sync
-	case "textDocument/didOpen":
+	case string(protocol.MethodTextDocumentDidOpen):
 		return nil, unmarshalAndNotify(req, func(p *protocol.DidOpenTextDocumentParams) {
 			s.handleDidOpen(ctx, p)
 		})
-	case "textDocument/didChange":
+	case string(protocol.MethodTextDocumentDidChange):
 		return nil, unmarshalAndNotify(req, func(p *protocol.DidChangeTextDocumentParams) {
 			s.handleDidChange(ctx, p)
 		})
-	case "textDocument/didSave":
+	case string(protocol.MethodTextDocumentDidSave):
 		return nil, unmarshalAndNotify(req, func(p *protocol.DidSaveTextDocumentParams) {
 			s.handleDidSave(ctx, p)
 		})
-	case "textDocument/didClose":
+	case string(protocol.MethodTextDocumentDidClose):
 		return nil, unmarshalAndNotify(req, func(p *protocol.DidCloseTextDocumentParams) {
 			s.handleDidClose(ctx, p)
 		})
 
 	// Language features
-	case "textDocument/codeAction":
+	case string(protocol.MethodTextDocumentCodeAction):
 		return unmarshalAndCall(req, func(p *protocol.CodeActionParams) (any, error) {
 			return s.handleCodeAction(ctx, p)
 		})
@@ -189,7 +189,7 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 		})
 
 	// Workspace
-	case "workspace/didChangeConfiguration":
+	case string(protocol.MethodWorkspaceDidChangeConfiguration):
 		return nil, unmarshalAndNotify(req, func(p *protocol.DidChangeConfigurationParams) {
 			s.handleDidChangeConfiguration(ctx, p)
 		})
