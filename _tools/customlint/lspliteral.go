@@ -3,6 +3,7 @@ package customlint
 import (
 	"go/ast"
 	"go/token"
+	"strconv"
 	"strings"
 
 	"golang.org/x/tools/go/analysis"
@@ -62,21 +63,19 @@ func runLSPLiteral(pass *analysis.Pass) (any, error) {
 			return
 		}
 
-		// Strip quotes to get the raw string value.
-		val := lit.Value
-		if len(val) < 2 {
+		unquoted, err := strconv.Unquote(lit.Value)
+		if err != nil {
 			return
 		}
-		inner := val[1 : len(val)-1]
 
-		if !isLSPMethod(inner) {
+		if !isLSPMethod(unquoted) {
 			return
 		}
 
 		pass.Reportf(
 			lit.Pos(),
 			"use protocol.Method* constant instead of string literal %s for LSP method name",
-			val,
+			lit.Value,
 		)
 	})
 
