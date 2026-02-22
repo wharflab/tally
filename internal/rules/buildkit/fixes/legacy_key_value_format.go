@@ -86,7 +86,8 @@ func enrichLegacyKeyValueFormatFix(v *rules.Violation, source []byte) {
 		Description: fmt.Sprintf("Replace legacy \"%s %s %s\" with \"%s %s\"",
 			strings.ToUpper(kw.Value), key, value,
 			strings.ToUpper(kw.Value), newText),
-		Safety: rules.FixSafe,
+		Safety:   rules.FixSafe,
+		Priority: 91, // Match rule's FixPriority; yield to semantic ENV deletions (priority 90).
 		Edits: []rules.TextEdit{{
 			// Replace from key start to end of line content
 			Location: createEditLocation(v.Location.File, v.Location.Start.Line, keyStart, len(line)),

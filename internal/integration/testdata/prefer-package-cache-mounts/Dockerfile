@@ -18,6 +18,7 @@ RUN cargo build --release
 RUN dotnet restore && dotnet nuget locals all --clear
 RUN composer install --no-dev && composer clear-cache
 RUN uv sync --no-cache --frozen && uv cache clean
+RUN uv python install 3.12
 RUN bun install --no-cache && bun pm cache rm
 RUN <<EOF
 npm install

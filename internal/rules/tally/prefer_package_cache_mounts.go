@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/runmount"
@@ -60,7 +61,8 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 		}
 
 		workdir := "/"
-		pnpmStorePath := defaultPnpmStorePath
+		cachePathOverrides := map[string]string{}
+		var cacheEnvEntries []cacheEnvEntry
 		for _, cmd := range stage.Commands {
 			if wd, ok := cmd.(*instructions.WorkdirCommand); ok {
 				workdir = resolveWorkdir(workdir, wd.Path)
@@ -68,7 +70,8 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 			}
 
 			if env, ok := cmd.(*instructions.EnvCommand); ok {
-				pnpmStorePath = resolvePnpmStorePath(env, pnpmStorePath)
+				resolveCachePathOverrides(env, workdir, cachePathOverrides)
+				cacheEnvEntries = collectCacheDisablingEnvVars(env, cacheEnvEntries)
 				continue
 			}
 
@@ -82,7 +85,7 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 				continue
 			}
 
-			required, cleaners := detectRequiredCacheMounts(script, shellVariant, workdir, pnpmStorePath)
+			required, cleaners := detectRequiredCacheMounts(script, shellVariant, workdir, cachePathOverrides)
 			if len(required) == 0 {
 				continue
 			}
@@ -93,7 +96,7 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 				continue
 			}
 
-			updatedScript, cleaned := removeCacheCleanup(run, script, shellVariant, cleaners)
+			updatedScript, scriptCleaned := removeCacheCleanup(run, script, shellVariant, cleaners)
 			replacement := formatUpdatedRun(run, mergedMounts, updatedScript)
 			if replacement == "" {
 				continue
@@ -105,40 +108,79 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 			}
 
 			endLine, endCol := resolveRunEndPosition(runLoc, sm, run)
-			fixDescription := "Add package cache mount(s)"
-			if cleaned {
-				fixDescription = "Add package cache mount(s) and remove cache cleanup commands"
-			}
 
-			mountDescriptions := describeMounts(required)
-			v := rules.NewViolation(
-				rules.NewLocationFromRanges(input.File, runLoc),
-				meta.Code,
-				"use cache mounts for package manager cache directories",
-				meta.DefaultSeverity,
-			).WithDocURL(meta.DocURL).WithDetail(
-				"Detected package install/build command; add cache mount(s): " + strings.Join(mountDescriptions, ", "),
-			).WithSuggestedFix(&rules.SuggestedFix{
-				Description: fixDescription,
-				Safety:      rules.FixSuggestion,
-				Priority:    meta.FixPriority,
-				Edits: []rules.TextEdit{{
-					Location: rules.NewRangeLocation(
-						input.File,
-						runLoc[0].Start.Line,
-						runLoc[0].Start.Character,
-						endLine,
-						endCol,
-					),
-					NewText: replacement,
-				}},
-			})
+			edits, remaining, envCleaned := buildFixEdits(
+				input.File, runLoc, endLine, endCol, replacement,
+				cleaners, cacheEnvEntries,
+			)
+			cacheEnvEntries = remaining
 
+			v := buildViolation(meta, input.File, runLoc, required, scriptCleaned, envCleaned, edits)
 			violations = append(violations, v)
 		}
 	}
 
 	return violations
+}
+
+func buildFixEdits(
+	file string,
+	runLoc []parser.Range,
+	endLine, endCol int,
+	replacement string,
+	cleaners map[cleanupKind]bool,
+	cacheEnvEntries []cacheEnvEntry,
+) ([]rules.TextEdit, []cacheEnvEntry, bool) {
+	envEdits, remaining := consumeEnvRemovalEdits(file, cleaners, cacheEnvEntries)
+
+	edits := make([]rules.TextEdit, 1, 1+len(envEdits))
+	edits[0] = rules.TextEdit{
+		Location: rules.NewRangeLocation(
+			file,
+			runLoc[0].Start.Line,
+			runLoc[0].Start.Character,
+			endLine,
+			endCol,
+		),
+		NewText: replacement,
+	}
+	edits = append(edits, envEdits...)
+
+	return edits, remaining, len(envEdits) > 0
+}
+
+func buildViolation(
+	meta rules.RuleMetadata,
+	file string,
+	runLoc []parser.Range,
+	required []cacheMountSpec,
+	scriptCleaned, envCleaned bool,
+	edits []rules.TextEdit,
+) rules.Violation {
+	fixDescription := "Add package cache mount(s)"
+	switch {
+	case scriptCleaned && envCleaned:
+		fixDescription = "Add package cache mount(s), remove cache cleanup commands, and remove cache-disabling ENV vars"
+	case scriptCleaned:
+		fixDescription = "Add package cache mount(s) and remove cache cleanup commands"
+	case envCleaned:
+		fixDescription = "Add package cache mount(s) and remove cache-disabling ENV vars"
+	}
+
+	mountDescriptions := describeMounts(required)
+	return rules.NewViolation(
+		rules.NewLocationFromRanges(file, runLoc),
+		meta.Code,
+		"use cache mounts for package manager cache directories",
+		meta.DefaultSeverity,
+	).WithDocURL(meta.DocURL).WithDetail(
+		"Detected package install/build command; add cache mount(s): " + strings.Join(mountDescriptions, ", "),
+	).WithSuggestedFix(&rules.SuggestedFix{
+		Description: fixDescription,
+		Safety:      rules.FixSuggestion,
+		Priority:    meta.FixPriority,
+		Edits:       edits,
+	})
 }
 
 type cacheMountSpec struct {
@@ -151,9 +193,10 @@ type cleanupKind string
 
 const (
 	cargoOrderPlaceholder = "__cargo_target_order__"
-	pnpmOrderPlaceholder  = "__pnpm_store_order__"
 	composerCacheTarget   = "/root/.cache/composer"
+	defaultNpmCachePath   = "/root/.npm"
 	defaultPnpmStorePath  = "/root/.pnpm-store"
+	defaultBunCachePath   = "/root/.bun/install/cache"
 	noCacheFlag           = "--no-cache"
 	noCacheDirFlag        = "--no-cache-dir"
 
@@ -174,7 +217,7 @@ const (
 )
 
 var orderedCacheMounts = []cacheMountSpec{
-	{Target: "/root/.npm", ID: "npm"},
+	{Target: defaultNpmCachePath, ID: "npm"},
 	{Target: "/go/pkg/mod", ID: "gomod"},
 	{Target: "/root/.cache/go-build", ID: "gobuild"},
 	{Target: "/var/cache/apt", ID: "apt", Sharing: instructions.MountSharingLocked},
@@ -184,7 +227,7 @@ var orderedCacheMounts = []cacheMountSpec{
 	{Target: "/var/cache/yum", ID: "yum", Sharing: instructions.MountSharingLocked},
 	{Target: "/var/cache/zypp", ID: "zypper", Sharing: instructions.MountSharingLocked},
 	{Target: "/usr/local/share/.cache/yarn", ID: "yarn"},
-	{Target: pnpmOrderPlaceholder, ID: "pnpm"},
+	{Target: defaultPnpmStorePath, ID: "pnpm"},
 	{Target: "/root/.cache/pip", ID: "pip"},
 	{Target: "/root/.gem", ID: "gem"},
 	{Target: cargoOrderPlaceholder, ID: "cargo-target"},
@@ -193,11 +236,11 @@ var orderedCacheMounts = []cacheMountSpec{
 	{Target: "/root/.nuget/packages", ID: "nuget"},
 	{Target: composerCacheTarget, ID: "composer"},
 	{Target: "/root/.cache/uv", ID: "uv"},
-	{Target: "/root/.bun/install/cache", ID: "bun"},
+	{Target: defaultBunCachePath, ID: "bun"},
 }
 
 func detectRequiredCacheMounts(
-	script string, variant shell.Variant, workdir, pnpmStorePath string,
+	script string, variant shell.Variant, workdir string, cachePathOverrides map[string]string,
 ) ([]cacheMountSpec, map[cleanupKind]bool) {
 	requiredByTarget := make(map[string]cacheMountSpec)
 	cleaners := make(map[cleanupKind]bool)
@@ -229,13 +272,17 @@ func detectRequiredCacheMounts(
 		if addOSPackageManagerCacheMounts(cmd, requiredByTarget, cleaners) {
 			continue
 		}
-		cargoTarget = addLanguagePackageManagerCacheMounts(cmd, workdir, cargoTarget, pnpmStorePath, requiredByTarget, cleaners)
+		cargoTarget = addLanguagePackageManagerCacheMounts(cmd, workdir, cargoTarget, cachePathOverrides, requiredByTarget, cleaners)
 	}
 
-	return orderedRequiredMounts(requiredByTarget, cargoTarget, pnpmStorePath), cleaners
+	return orderedRequiredMounts(requiredByTarget, cargoTarget, cachePathOverrides), cleaners
 }
 
-func orderedRequiredMounts(requiredByTarget map[string]cacheMountSpec, cargoTarget, pnpmStorePath string) []cacheMountSpec {
+func orderedRequiredMounts(
+	requiredByTarget map[string]cacheMountSpec,
+	cargoTarget string,
+	cachePathOverrides map[string]string,
+) []cacheMountSpec {
 	required := make([]cacheMountSpec, 0, len(requiredByTarget))
 	seen := make(map[string]bool, len(requiredByTarget))
 	for _, mount := range orderedCacheMounts {
@@ -243,8 +290,8 @@ func orderedRequiredMounts(requiredByTarget map[string]cacheMountSpec, cargoTarg
 		if target == cargoOrderPlaceholder && cargoTarget != "" {
 			target = cargoTarget
 		}
-		if target == pnpmOrderPlaceholder {
-			target = pnpmStorePath
+		if override, ok := cachePathOverrides[mount.ID]; ok {
+			target = override
 		}
 		if req, ok := requiredByTarget[target]; ok {
 			required = append(required, req)
@@ -275,14 +322,17 @@ func addRequiredMount(requiredByTarget map[string]cacheMountSpec, mount cacheMou
 
 func addLanguagePackageManagerCacheMounts(
 	cmd shell.CommandInfo,
-	workdir, cargoTarget, pnpmStorePath string,
+	workdir, cargoTarget string,
+	cachePathOverrides map[string]string,
 	requiredByTarget map[string]cacheMountSpec,
 	cleaners map[cleanupKind]bool,
 ) string {
 	switch cmd.Name {
 	case string(cleanupNpm):
 		if cmd.HasAnyArg("install", "ci", "i") {
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.npm", ID: "npm"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{
+				Target: resolveCacheTarget(cachePathOverrides, "npm", defaultNpmCachePath), ID: "npm",
+			})
 			cleaners[cleanupNpm] = true
 		}
 	case "go":
@@ -307,7 +357,9 @@ func addLanguagePackageManagerCacheMounts(
 		}
 	case string(cleanupPnpm):
 		if cmd.HasAnyArg("install", "add", "i") {
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: pnpmStorePath, ID: "pnpm"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{
+				Target: resolveCacheTarget(cachePathOverrides, "pnpm", defaultPnpmStorePath), ID: "pnpm",
+			})
 			cleaners[cleanupPnpm] = true
 		}
 	case "cargo":
@@ -337,7 +389,9 @@ func addLanguagePackageManagerCacheMounts(
 		}
 	case string(cleanupBun):
 		if cmd.HasAnyArg("install") {
-			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/root/.bun/install/cache", ID: "bun"})
+			addRequiredMount(requiredByTarget, cacheMountSpec{
+				Target: resolveCacheTarget(cachePathOverrides, "bun", defaultBunCachePath), ID: "bun",
+			})
 			cleaners[cleanupBun] = true
 		}
 	}
@@ -406,17 +460,169 @@ func hasUnresolvedWorkdirReference(workdir string) bool {
 	return strings.Contains(workdir, "$")
 }
 
-// resolvePnpmStorePath updates the pnpm store path if PNPM_HOME is set in the ENV instruction.
-func resolvePnpmStorePath(env *instructions.EnvCommand, current string) string {
+// cacheDisablingEnvVars maps ENV variable names to the cleanupKind they disable caching for.
+//
+// Cross-rule interaction: when a Dockerfile uses the legacy format (e.g., "ENV UV_NO_CACHE 1"),
+// buildkit/LegacyKeyValueFormat (priority 91) yields to this rule's fix (priority 90), so the
+// ENV deletion runs first and the reformatting fix is harmlessly skipped.
+var cacheDisablingEnvVars = map[string]cleanupKind{
+	"UV_NO_CACHE":      cleanupUV,
+	"PIP_NO_CACHE_DIR": cleanupPip,
+}
+
+// cacheEnvEntry tracks a single cache-disabling ENV variable for later removal.
+type cacheEnvEntry struct {
+	env  *instructions.EnvCommand
+	key  string
+	kind cleanupKind
+}
+
+// collectCacheDisablingEnvVars appends any cache-disabling variables from env to entries.
+func collectCacheDisablingEnvVars(env *instructions.EnvCommand, entries []cacheEnvEntry) []cacheEnvEntry {
 	for _, kv := range env.Env {
-		if kv.Key == "PNPM_HOME" {
-			val := unquote(kv.Value)
-			if !strings.Contains(val, "$") {
-				return path.Join(path.Clean(val), "store")
-			}
+		if kind, ok := cacheDisablingEnvVars[kv.Key]; ok {
+			entries = append(entries, cacheEnvEntry{env: env, key: kv.Key, kind: kind})
 		}
 	}
-	return current
+	return entries
+}
+
+// consumeEnvRemovalEdits builds TextEdits for matching entries and returns the remaining (unconsumed) entries.
+func consumeEnvRemovalEdits(file string, cleaners map[cleanupKind]bool, entries []cacheEnvEntry) ([]rules.TextEdit, []cacheEnvEntry) {
+	// Partition entries into matched vs remaining.
+	var matched []cacheEnvEntry
+	var remaining []cacheEnvEntry
+	for _, e := range entries {
+		if cleaners[e.kind] {
+			matched = append(matched, e)
+		} else {
+			remaining = append(remaining, e)
+		}
+	}
+	if len(matched) == 0 {
+		return nil, entries
+	}
+
+	// Group matched entries by ENV instruction pointer.
+	type envGroup struct {
+		env  *instructions.EnvCommand
+		keys []string
+	}
+	var groups []envGroup
+	seen := make(map[*instructions.EnvCommand]int)
+	for _, e := range matched {
+		idx, ok := seen[e.env]
+		if !ok {
+			idx = len(groups)
+			seen[e.env] = idx
+			groups = append(groups, envGroup{env: e.env})
+		}
+		groups[idx].keys = append(groups[idx].keys, e.key)
+	}
+
+	var edits []rules.TextEdit
+	for _, g := range groups {
+		if edit := buildEnvKeyRemovalEdit(file, g.env, g.keys); edit != nil {
+			edits = append(edits, *edit)
+		}
+	}
+
+	return edits, remaining
+}
+
+// buildEnvKeyRemovalEdit constructs a TextEdit to remove specific keys from one ENV instruction.
+// All keys removed → delete entire line. Some remaining → reconstruct with fmt.Sprintf("%s=%q", ...).
+func buildEnvKeyRemovalEdit(file string, env *instructions.EnvCommand, keysToRemove []string) *rules.TextEdit {
+	envLoc := env.Location()
+	if len(envLoc) == 0 {
+		return nil
+	}
+
+	removeSet := make(map[string]bool, len(keysToRemove))
+	for _, k := range keysToRemove {
+		removeSet[k] = true
+	}
+
+	startLine := envLoc[0].Start.Line
+	startCol := envLoc[0].Start.Character
+
+	// Count remaining variables after removal.
+	var parts []string
+	for _, kv := range env.Env {
+		if removeSet[kv.Key] {
+			continue
+		}
+		parts = append(parts, kv.String())
+	}
+
+	if len(parts) == 0 {
+		// Remove the entire instruction including its trailing newline.
+		endLine := envLoc[len(envLoc)-1].End.Line
+		return &rules.TextEdit{
+			Location: rules.NewRangeLocation(file, startLine, startCol, endLine+1, 0),
+			NewText:  "",
+		}
+	}
+
+	// Multi-variable ENV: reconstruct without the removed keys.
+	endLine := envLoc[len(envLoc)-1].End.Line
+	endCol := envLoc[len(envLoc)-1].End.Character
+
+	return &rules.TextEdit{
+		Location: rules.NewRangeLocation(file, startLine, startCol, endLine, endCol),
+		NewText:  "ENV " + strings.Join(parts, " "),
+	}
+}
+
+// cacheLocationEnvVar defines an ENV variable that overrides a cache mount target.
+type cacheLocationEnvVar struct {
+	envKey          string
+	caseInsensitive bool
+	mountID         string
+	suffix          string // appended to the resolved value (e.g. "/store" for PNPM_HOME)
+}
+
+// cacheLocationEnvVars lists ENV variables that override default cache mount targets.
+var cacheLocationEnvVars = []cacheLocationEnvVar{
+	{envKey: "PNPM_HOME", mountID: "pnpm", suffix: "/store"},
+	{envKey: "npm_config_cache", caseInsensitive: true, mountID: "npm"},
+	{envKey: "BUN_INSTALL_CACHE_DIR", mountID: "bun"},
+}
+
+// resolveCachePathOverrides updates overrides if the ENV instruction sets any cache-location variables.
+// Relative paths are resolved against the current workdir (same logic as cargo target resolution).
+func resolveCachePathOverrides(env *instructions.EnvCommand, workdir string, overrides map[string]string) {
+	for _, kv := range env.Env {
+		for _, loc := range cacheLocationEnvVars {
+			match := kv.Key == loc.envKey
+			if loc.caseInsensitive {
+				match = strings.EqualFold(kv.Key, loc.envKey)
+			}
+			if !match {
+				continue
+			}
+			val := unquote(kv.Value)
+			if val == "" || strings.Contains(val, "$") {
+				continue
+			}
+			target := path.Clean(val)
+			if !path.IsAbs(target) {
+				target = path.Clean(path.Join(workdir, target))
+			}
+			if loc.suffix != "" {
+				target = path.Join(target, loc.suffix)
+			}
+			overrides[loc.mountID] = target
+		}
+	}
+}
+
+// resolveCacheTarget returns the overridden cache path for a mount ID, or the default.
+func resolveCacheTarget(overrides map[string]string, mountID, defaultTarget string) string {
+	if t, ok := overrides[mountID]; ok {
+		return t
+	}
+	return defaultTarget
 }
 
 // unquote strips a single layer of matching double or single quotes.
@@ -444,7 +650,7 @@ func uvUsesCache(cmd shell.CommandInfo) bool {
 	switch cmd.Subcommand {
 	case "sync":
 		return true
-	case "pip", "tool":
+	case "pip", "tool", "python":
 		if len(cmd.Args) < 2 {
 			return false
 		}

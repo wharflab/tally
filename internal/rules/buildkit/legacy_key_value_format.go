@@ -30,6 +30,9 @@ func (r *LegacyKeyValueFormatRule) Metadata() rules.RuleMetadata {
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "style",
 		IsExperimental:  false,
+		// FixPriority 91 ensures semantic rules like prefer-package-cache-mounts (priority 90)
+		// can delete an ENV instruction before this rule tries to reformat it.
+		FixPriority: 91,
 	}
 }
 

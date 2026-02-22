@@ -490,6 +490,113 @@ severity = "info"
 severity = "info"
 `,
 		},
+		{
+			name: "prefer-package-cache-mounts-uv-no-cache-env",
+			input: "FROM python:3.13\n" +
+				"ENV UV_NO_CACHE=1\n" +
+				"RUN uv sync --frozen\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+`,
+		},
+		{
+			name: "prefer-package-cache-mounts-uv-python-install",
+			input: "FROM python:3.13\n" +
+				"RUN uv python install 3.12\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+`,
+		},
+		{
+			name: "prefer-package-cache-mounts-pip-no-cache-dir-env",
+			input: "FROM python:3.13\n" +
+				"ENV PIP_NO_CACHE_DIR=1\n" +
+				"RUN pip install -r requirements.txt\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+`,
+		},
+		{
+			// Cross-rule interaction: prefer-package-cache-mounts (priority 90) deletes
+			// "ENV UV_NO_CACHE 1" and adds cache mount before LegacyKeyValueFormat (priority 91)
+			// tries to reformat it. The LegacyKeyValueFormat fix is then skipped (range deleted).
+			name:  "prefer-package-cache-mounts-uv-no-cache-legacy-with-legacy-key-value",
+			input: "FROM python:3.13\nENV UV_NO_CACHE 1\nRUN uv sync --frozen\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+				"--select", "buildkit/LegacyKeyValueFormat",
+			},
+			wantApplied: 1, // cache-mounts wins; LegacyKeyValueFormat skipped (ENV already deleted)
+			config: `[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+`,
+		},
+		{
+			name: "prefer-package-cache-mounts-multiline-env-removal",
+			input: "FROM python:3.13\n" +
+				"ENV \\\n" +
+				"    UV_NO_CACHE=1\n" +
+				"RUN uv sync --frozen\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+`,
+		},
+		{
+			name: "prefer-package-cache-mounts-npm-config-cache-env",
+			input: "FROM node:20\n" +
+				"ENV npm_config_cache=/tmp/npm-cache\n" +
+				"RUN npm install\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+`,
+		},
+		{
+			name: "prefer-package-cache-mounts-bun-install-cache-dir-env",
+			input: "FROM oven/bun:1.2\n" +
+				"ENV BUN_INSTALL_CACHE_DIR=/tmp/bun-cache\n" +
+				"RUN bun install\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+`,
+		},
 
 		// Both heredoc rules enabled together: prefer-copy-heredoc takes priority (99) over prefer-run-heredoc (100).
 		// The file-creation RUN is handled by prefer-copy-heredoc; the consecutive RUNs by prefer-run-heredoc.

@@ -604,7 +604,7 @@
           }
         },
         {
-          "detail": "Detected package install/build command; add cache mount(s): /root/.bun/install/cache (id=bun)",
+          "detail": "Detected package install/build command; add cache mount(s): /root/.cache/uv (id=uv)",
           "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
           "location": {
             "end": {
@@ -620,6 +620,46 @@
           "message": "use cache mounts for package manager cache directories",
           "rule": "tally/prefer-package-cache-mounts",
           "severity": "info",
+          "sourceCode": "RUN uv python install 3.12",
+          "suggestedFix": {
+            "description": "Add package cache mount(s)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 26,
+                    "line": 21
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 21
+                  }
+                },
+                "newText": "RUN --mount=type=cache,target=/root/.cache/uv,id=uv uv python install 3.12"
+              }
+            ],
+            "priority": 90,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Detected package install/build command; add cache mount(s): /root/.bun/install/cache (id=bun)",
+          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-package-cache-mounts.md",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 22
+            },
+            "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 22
+            }
+          },
+          "message": "use cache mounts for package manager cache directories",
+          "rule": "tally/prefer-package-cache-mounts",
+          "severity": "info",
           "sourceCode": "RUN bun install --no-cache \u0026\u0026 bun pm cache rm",
           "suggestedFix": {
             "description": "Add package cache mount(s) and remove cache cleanup commands",
@@ -628,12 +668,12 @@
                 "location": {
                   "end": {
                     "column": 45,
-                    "line": 21
+                    "line": 22
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 21
+                    "line": 22
                   }
                 },
                 "newText": "RUN --mount=type=cache,target=/root/.bun/install/cache,id=bun bun install"
@@ -649,12 +689,12 @@
           "location": {
             "end": {
               "column": 0,
-              "line": 22
+              "line": 23
             },
             "file": "testdata/prefer-package-cache-mounts/Dockerfile",
             "start": {
               "column": 0,
-              "line": 22
+              "line": 23
             }
           },
           "message": "use cache mounts for package manager cache directories",
@@ -668,12 +708,12 @@
                 "location": {
                   "end": {
                     "column": 3,
-                    "line": 25
+                    "line": 26
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 22
+                    "line": 23
                   }
                 },
                 "newText": "RUN --mount=type=cache,target=/root/.npm,id=npm \u003c\u003cEOF\nnpm install\nEOF"
@@ -691,9 +731,9 @@
   "summary": {
     "errors": 0,
     "files": 1,
-    "info": 17,
+    "info": 18,
     "style": 0,
-    "total": 17,
+    "total": 18,
     "warnings": 0
   }
 }

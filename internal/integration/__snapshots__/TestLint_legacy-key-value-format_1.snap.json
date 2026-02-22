@@ -38,7 +38,8 @@
                 "newText": "MY_APP=myapp"
               }
             ],
-            "isPreferred": true
+            "isPreferred": true,
+            "priority": 91
           }
         },
         {
@@ -76,7 +77,8 @@
                 "newText": "VERSION=1.0"
               }
             ],
-            "isPreferred": true
+            "isPreferred": true,
+            "priority": 91
           }
         },
         {
@@ -114,7 +116,8 @@
                 "newText": "maintainer=\"John Doe\""
               }
             ],
-            "isPreferred": true
+            "isPreferred": true,
+            "priority": 91
           }
         }
       ]

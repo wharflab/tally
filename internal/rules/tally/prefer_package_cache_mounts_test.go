@@ -175,6 +175,13 @@ RUN uv sync --frozen
 			WantViolations: 1,
 		},
 		{
+			Name: "uv python install",
+			Content: `FROM python:3.13
+RUN uv python install 3.12
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "bun install",
 			Content: `FROM oven/bun:1.2
 RUN bun install
@@ -240,6 +247,30 @@ EOF
 `,
 			WantViolations: 1,
 		},
+		{
+			Name: "pip install with PIP_NO_CACHE_DIR env",
+			Content: `FROM python:3.13
+ENV PIP_NO_CACHE_DIR=1
+RUN pip install -r requirements.txt
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "npm install with npm_config_cache env",
+			Content: `FROM node:20
+ENV npm_config_cache=/tmp/npm-cache
+RUN npm install
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "bun install with BUN_INSTALL_CACHE_DIR env",
+			Content: `FROM oven/bun:1.2
+ENV BUN_INSTALL_CACHE_DIR=/tmp/bun-cache
+RUN bun install
+`,
+			WantViolations: 1,
+		},
 	})
 }
 
@@ -252,6 +283,7 @@ func TestPreferPackageCacheMountsRule_CheckWithFixes(t *testing.T) {
 		content         string
 		wantFixContains []string
 		wantNotContains []string
+		wantEditCount   int // 0 means default (1)
 	}{
 		{
 			name: "npm install adds mount and removes cache clean",
@@ -429,6 +461,74 @@ RUN uv sync --no-cache --frozen && uv cache clean
 			wantNotContains: []string{"--no-cache", "uv cache clean"},
 		},
 		{
+			name: "uv python install adds cache mount",
+			content: `FROM python:3.13
+RUN uv python install 3.12
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
+				"uv python install 3.12",
+			},
+		},
+		{
+			name: "uv python install --no-cache flag stripped",
+			content: `FROM python:3.13
+RUN uv python install --no-cache 3.12
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
+				"uv python install 3.12",
+			},
+			wantNotContains: []string{"--no-cache"},
+		},
+		{
+			name: "UV_NO_CACHE env removed (sole variable)",
+			content: `FROM python:3.13
+ENV UV_NO_CACHE=1
+RUN uv sync --frozen
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
+				"uv sync --frozen",
+			},
+			wantNotContains: []string{"UV_NO_CACHE"},
+			wantEditCount:   2,
+		},
+		{
+			name: "UV_NO_CACHE env removed (multi-variable)",
+			content: `FROM python:3.13
+ENV UV_NO_CACHE=1 UV_LINK_MODE=copy
+RUN uv sync --frozen
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
+				"uv sync --frozen",
+				"ENV UV_LINK_MODE=copy",
+			},
+			wantNotContains: []string{"UV_NO_CACHE"},
+			wantEditCount:   2,
+		},
+		{
+			name:    "UV_NO_CACHE env removed (sole variable, multiline ENV)",
+			content: "FROM python:3.13\nENV \\\n    UV_NO_CACHE=1\nRUN uv sync --frozen\n",
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
+				"uv sync --frozen",
+			},
+			wantNotContains: []string{"UV_NO_CACHE"},
+			wantEditCount:   2,
+		},
+		{
+			name:    "UV_NO_CACHE env removed (multi-variable with spaces in value)",
+			content: "FROM python:3.13\nENV UV_NO_CACHE=1 MY_OPTS=\"-O2 -Wall\"\nRUN uv sync --frozen\n",
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
+				`ENV MY_OPTS="-O2 -Wall"`,
+			},
+			wantNotContains: []string{"UV_NO_CACHE"},
+			wantEditCount:   2,
+		},
+		{
 			name: "heredoc adds mount and removes cleanup line",
 			content: `FROM node:20
 RUN <<EOF
@@ -446,6 +546,94 @@ RUN bun install --no-cache && bun pm cache rm
 `,
 			wantFixContains: []string{"--mount=type=cache,target=/root/.bun/install/cache,id=bun", "bun install"},
 			wantNotContains: []string{"--no-cache", "bun pm cache rm"},
+		},
+		{
+			name: "PIP_NO_CACHE_DIR env removed (sole variable)",
+			content: `FROM python:3.13
+ENV PIP_NO_CACHE_DIR=1
+RUN pip install -r requirements.txt
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/pip,id=pip",
+				"pip install -r requirements.txt",
+			},
+			wantNotContains: []string{"PIP_NO_CACHE_DIR"},
+			wantEditCount:   2,
+		},
+		{
+			name:    "PIP_NO_CACHE_DIR env removed (multi-variable)",
+			content: "FROM python:3.13\nENV PIP_NO_CACHE_DIR=1 PIP_INDEX_URL=https://example.com/simple\nRUN pip install -r requirements.txt\n",
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/pip,id=pip",
+				"pip install -r requirements.txt",
+				"ENV PIP_INDEX_URL=https://example.com/simple",
+			},
+			wantNotContains: []string{"PIP_NO_CACHE_DIR"},
+			wantEditCount:   2,
+		},
+		{
+			name: "npm_config_cache resolves cache path",
+			content: `FROM node:20
+ENV npm_config_cache=/tmp/npm-cache
+RUN npm install
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/tmp/npm-cache,id=npm",
+				"npm install",
+			},
+		},
+		{
+			name: "npm_config_cache case insensitive (NPM_CONFIG_CACHE)",
+			content: `FROM node:20
+ENV NPM_CONFIG_CACHE=/opt/npm-cache
+RUN npm ci
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/opt/npm-cache,id=npm",
+				"npm ci",
+			},
+		},
+		{
+			name: "BUN_INSTALL_CACHE_DIR resolves cache path",
+			content: `FROM oven/bun:1.2
+ENV BUN_INSTALL_CACHE_DIR=/tmp/bun-cache
+RUN bun install
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/tmp/bun-cache,id=bun",
+				"bun install",
+			},
+		},
+		{
+			name: "npm_config_cache relative path resolved against WORKDIR",
+			content: `FROM node:20
+WORKDIR /app
+ENV npm_config_cache=.npm-cache
+RUN npm install
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/app/.npm-cache,id=npm",
+			},
+		},
+		{
+			name: "npm_config_cache relative path resolved against default workdir",
+			content: `FROM node:20
+ENV npm_config_cache=npm-cache
+RUN npm install
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/npm-cache,id=npm",
+			},
+		},
+		{
+			name: "npm_config_cache empty value uses default target",
+			content: `FROM node:20
+ENV npm_config_cache=
+RUN npm install
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.npm,id=npm",
+			},
 		},
 	}
 
@@ -468,19 +656,30 @@ RUN bun install --no-cache && bun pm cache rm
 			if fix.Priority != 90 {
 				t.Fatalf("fix priority = %d, want 90", fix.Priority)
 			}
-			if len(fix.Edits) != 1 {
-				t.Fatalf("fix edits = %d, want 1", len(fix.Edits))
+
+			wantEdits := tt.wantEditCount
+			if wantEdits == 0 {
+				wantEdits = 1
+			}
+			if len(fix.Edits) != wantEdits {
+				t.Fatalf("fix edits = %d, want %d", len(fix.Edits), wantEdits)
 			}
 
-			newText := fix.Edits[0].NewText
+			// Concatenate all edit texts for contains/notContains checks.
+			var allNewText strings.Builder
+			for _, edit := range fix.Edits {
+				allNewText.WriteString(edit.NewText)
+				allNewText.WriteString("\n")
+			}
+			combined := allNewText.String()
 			for _, want := range tt.wantFixContains {
-				if !strings.Contains(newText, want) {
-					t.Fatalf("fix missing %q in:\n%s", want, newText)
+				if !strings.Contains(combined, want) {
+					t.Fatalf("fix missing %q in:\n%s", want, combined)
 				}
 			}
 			for _, notWant := range tt.wantNotContains {
-				if strings.Contains(newText, notWant) {
-					t.Fatalf("fix unexpectedly contains %q in:\n%s", notWant, newText)
+				if strings.Contains(combined, notWant) {
+					t.Fatalf("fix unexpectedly contains %q in:\n%s", notWant, combined)
 				}
 			}
 		})
@@ -537,6 +736,14 @@ func TestUVUsesCache(t *testing.T) {
 			cmd: shell.CommandInfo{
 				Subcommand: "tool",
 				Args:       []string{"tool", "install", "ruff"},
+			},
+			want: true,
+		},
+		{
+			name: "uv python install",
+			cmd: shell.CommandInfo{
+				Subcommand: "python",
+				Args:       []string{"python", "install", "3.13"},
 			},
 			want: true,
 		},
