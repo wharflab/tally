@@ -134,6 +134,8 @@ of cache mounts.
 
 ### Cache-disabling environment variables removed
 
+- **pip**: `ENV PIP_NO_CACHE_DIR=...` (the entire `ENV` instruction is removed if it only sets `PIP_NO_CACHE_DIR`; otherwise, only the
+  `PIP_NO_CACHE_DIR` variable is removed)
 - **uv**: `ENV UV_NO_CACHE=...` (the entire `ENV` instruction is removed if it only sets `UV_NO_CACHE`; otherwise, only the `UV_NO_CACHE` variable is
   removed)
 

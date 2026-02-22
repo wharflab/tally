@@ -62,7 +62,7 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 
 		workdir := "/"
 		pnpmStorePath := defaultPnpmStorePath
-		var uvNoCacheTracker *uvNoCacheEnvInfo
+		var cacheEnvEntries []cacheEnvEntry
 		for _, cmd := range stage.Commands {
 			if wd, ok := cmd.(*instructions.WorkdirCommand); ok {
 				workdir = resolveWorkdir(workdir, wd.Path)
@@ -71,7 +71,7 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 
 			if env, ok := cmd.(*instructions.EnvCommand); ok {
 				pnpmStorePath = resolvePnpmStorePath(env, pnpmStorePath)
-				uvNoCacheTracker = resolveUVNoCacheTracker(env, uvNoCacheTracker)
+				cacheEnvEntries = collectCacheDisablingEnvVars(env, cacheEnvEntries)
 				continue
 			}
 
@@ -109,14 +109,12 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 
 			endLine, endCol := resolveRunEndPosition(runLoc, sm, run)
 
-			edits, envCleaned := buildFixEdits(
+			edits, remaining, envCleaned := buildFixEdits(
 				input.File, runLoc, endLine, endCol, replacement,
-				cleaners, uvNoCacheTracker,
+				cleaners, cacheEnvEntries,
 			)
-			if envCleaned {
-				cleaned = true
-				uvNoCacheTracker = nil // consume: only the first uv RUN in the stage gets the edit
-			}
+			cacheEnvEntries = remaining
+			cleaned = cleaned || envCleaned
 
 			v := buildViolation(meta, input.File, runLoc, required, cleaned, edits)
 			violations = append(violations, v)
@@ -132,9 +130,12 @@ func buildFixEdits(
 	endLine, endCol int,
 	replacement string,
 	cleaners map[cleanupKind]bool,
-	uvNoCacheTracker *uvNoCacheEnvInfo,
-) ([]rules.TextEdit, bool) {
-	edits := []rules.TextEdit{{
+	cacheEnvEntries []cacheEnvEntry,
+) ([]rules.TextEdit, []cacheEnvEntry, bool) {
+	envEdits, remaining := consumeEnvRemovalEdits(file, cleaners, cacheEnvEntries)
+
+	edits := make([]rules.TextEdit, 1, 1+len(envEdits))
+	edits[0] = rules.TextEdit{
 		Location: rules.NewRangeLocation(
 			file,
 			runLoc[0].Start.Line,
@@ -143,17 +144,10 @@ func buildFixEdits(
 			endCol,
 		),
 		NewText: replacement,
-	}}
-
-	envCleaned := false
-	if uvNoCacheTracker != nil && cleaners[cleanupUV] {
-		if envEdit := buildUVNoCacheRemovalEdit(file, uvNoCacheTracker); envEdit != nil {
-			edits = append(edits, *envEdit)
-			envCleaned = true
-		}
 	}
+	edits = append(edits, envEdits...)
 
-	return edits, envCleaned
+	return edits, remaining, len(envEdits) > 0
 }
 
 func buildViolation(
@@ -450,46 +444,98 @@ func hasUnresolvedWorkdirReference(workdir string) bool {
 	return strings.Contains(workdir, "$")
 }
 
-// uvNoCacheEnvInfo tracks an ENV instruction that sets UV_NO_CACHE for later removal.
-type uvNoCacheEnvInfo struct {
-	env     *instructions.EnvCommand
-	soleVar bool // true if UV_NO_CACHE is the only variable in this ENV
+// cacheDisablingEnvVars maps ENV variable names to the cleanupKind they disable caching for.
+var cacheDisablingEnvVars = map[string]cleanupKind{
+	"UV_NO_CACHE":      cleanupUV,
+	"PIP_NO_CACHE_DIR": cleanupPip,
 }
 
-// resolveUVNoCacheTracker updates the tracker if the ENV instruction sets UV_NO_CACHE.
-func resolveUVNoCacheTracker(env *instructions.EnvCommand, current *uvNoCacheEnvInfo) *uvNoCacheEnvInfo {
-	if info := detectUVNoCacheEnv(env); info != nil {
-		return info
-	}
-	return current
+// cacheEnvEntry tracks a single cache-disabling ENV variable for later removal.
+type cacheEnvEntry struct {
+	env  *instructions.EnvCommand
+	key  string
+	kind cleanupKind
 }
 
-// detectUVNoCacheEnv returns tracking info if the ENV instruction sets UV_NO_CACHE.
-func detectUVNoCacheEnv(env *instructions.EnvCommand) *uvNoCacheEnvInfo {
+// collectCacheDisablingEnvVars appends any cache-disabling variables from env to entries.
+func collectCacheDisablingEnvVars(env *instructions.EnvCommand, entries []cacheEnvEntry) []cacheEnvEntry {
 	for _, kv := range env.Env {
-		if kv.Key == "UV_NO_CACHE" {
-			return &uvNoCacheEnvInfo{
-				env:     env,
-				soleVar: len(env.Env) == 1,
-			}
+		if kind, ok := cacheDisablingEnvVars[kv.Key]; ok {
+			entries = append(entries, cacheEnvEntry{env: env, key: kv.Key, kind: kind})
 		}
 	}
-	return nil
+	return entries
 }
 
-// buildUVNoCacheRemovalEdit constructs a TextEdit that removes UV_NO_CACHE from an ENV instruction.
-// For sole-variable ENV instructions, it removes the entire line.
-// For multi-variable ENV instructions, it reconstructs the line without UV_NO_CACHE.
-func buildUVNoCacheRemovalEdit(file string, info *uvNoCacheEnvInfo) *rules.TextEdit {
-	envLoc := info.env.Location()
+// consumeEnvRemovalEdits builds TextEdits for matching entries and returns the remaining (unconsumed) entries.
+func consumeEnvRemovalEdits(file string, cleaners map[cleanupKind]bool, entries []cacheEnvEntry) ([]rules.TextEdit, []cacheEnvEntry) {
+	// Partition entries into matched vs remaining.
+	var matched []cacheEnvEntry
+	var remaining []cacheEnvEntry
+	for _, e := range entries {
+		if cleaners[e.kind] {
+			matched = append(matched, e)
+		} else {
+			remaining = append(remaining, e)
+		}
+	}
+	if len(matched) == 0 {
+		return nil, entries
+	}
+
+	// Group matched entries by ENV instruction pointer.
+	type envGroup struct {
+		env  *instructions.EnvCommand
+		keys []string
+	}
+	var groups []envGroup
+	seen := make(map[*instructions.EnvCommand]int)
+	for _, e := range matched {
+		idx, ok := seen[e.env]
+		if !ok {
+			idx = len(groups)
+			seen[e.env] = idx
+			groups = append(groups, envGroup{env: e.env})
+		}
+		groups[idx].keys = append(groups[idx].keys, e.key)
+	}
+
+	var edits []rules.TextEdit
+	for _, g := range groups {
+		if edit := buildEnvKeyRemovalEdit(file, g.env, g.keys); edit != nil {
+			edits = append(edits, *edit)
+		}
+	}
+
+	return edits, remaining
+}
+
+// buildEnvKeyRemovalEdit constructs a TextEdit to remove specific keys from one ENV instruction.
+// All keys removed → delete entire line. Some remaining → reconstruct with fmt.Sprintf("%s=%q", ...).
+func buildEnvKeyRemovalEdit(file string, env *instructions.EnvCommand, keysToRemove []string) *rules.TextEdit {
+	envLoc := env.Location()
 	if len(envLoc) == 0 {
 		return nil
+	}
+
+	removeSet := make(map[string]bool, len(keysToRemove))
+	for _, k := range keysToRemove {
+		removeSet[k] = true
 	}
 
 	startLine := envLoc[0].Start.Line
 	startCol := envLoc[0].Start.Character
 
-	if info.soleVar {
+	// Count remaining variables after removal.
+	var parts []string
+	for _, kv := range env.Env {
+		if removeSet[kv.Key] {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s=%q", kv.Key, unquote(kv.Value)))
+	}
+
+	if len(parts) == 0 {
 		// Remove the entire line including its trailing newline by spanning to the next line.
 		return &rules.TextEdit{
 			Location: rules.NewRangeLocation(file, startLine, startCol, startLine+1, 0),
@@ -497,15 +543,7 @@ func buildUVNoCacheRemovalEdit(file string, info *uvNoCacheEnvInfo) *rules.TextE
 		}
 	}
 
-	// Multi-variable ENV: reconstruct without UV_NO_CACHE.
-	var parts []string
-	for _, kv := range info.env.Env {
-		if kv.Key == "UV_NO_CACHE" {
-			continue
-		}
-		parts = append(parts, fmt.Sprintf("%s=%q", kv.Key, unquote(kv.Value)))
-	}
-
+	// Multi-variable ENV: reconstruct without the removed keys.
 	endLine := envLoc[len(envLoc)-1].End.Line
 	endCol := envLoc[len(envLoc)-1].End.Character
 

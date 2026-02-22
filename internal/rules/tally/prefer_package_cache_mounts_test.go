@@ -247,6 +247,14 @@ EOF
 `,
 			WantViolations: 1,
 		},
+		{
+			Name: "pip install with PIP_NO_CACHE_DIR env",
+			Content: `FROM python:3.13
+ENV PIP_NO_CACHE_DIR=1
+RUN pip install -r requirements.txt
+`,
+			WantViolations: 1,
+		},
 	})
 }
 
@@ -501,6 +509,30 @@ RUN bun install --no-cache && bun pm cache rm
 `,
 			wantFixContains: []string{"--mount=type=cache,target=/root/.bun/install/cache,id=bun", "bun install"},
 			wantNotContains: []string{"--no-cache", "bun pm cache rm"},
+		},
+		{
+			name: "PIP_NO_CACHE_DIR env removed (sole variable)",
+			content: `FROM python:3.13
+ENV PIP_NO_CACHE_DIR=1
+RUN pip install -r requirements.txt
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/pip,id=pip",
+				"pip install -r requirements.txt",
+			},
+			wantNotContains: []string{"PIP_NO_CACHE_DIR"},
+			wantEditCount:   2,
+		},
+		{
+			name:    "PIP_NO_CACHE_DIR env removed (multi-variable)",
+			content: "FROM python:3.13\nENV PIP_NO_CACHE_DIR=1 PIP_INDEX_URL=https://example.com/simple\nRUN pip install -r requirements.txt\n",
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/pip,id=pip",
+				"pip install -r requirements.txt",
+				`ENV PIP_INDEX_URL="https://example.com/simple"`,
+			},
+			wantNotContains: []string{"PIP_NO_CACHE_DIR"},
+			wantEditCount:   2,
 		},
 	}
 
