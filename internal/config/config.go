@@ -44,6 +44,9 @@ type Config struct {
 	// AI configures opt-in AI features (e.g., AI AutoFix).
 	AI AIConfig `json:"ai" koanf:"ai"`
 
+	// FileValidation configures pre-parse file validation checks.
+	FileValidation FileValidationConfig `json:"file-validation" koanf:"file-validation"`
+
 	// SlowChecks configures async checks that require network or other slow I/O.
 	SlowChecks SlowChecksConfig `json:"slow-checks" koanf:"slow-checks"`
 
@@ -70,6 +73,17 @@ type SlowChecksConfig struct {
 
 	// Timeout is the wall-clock budget for all async checks per invocation.
 	Timeout string `json:"timeout,omitempty" koanf:"timeout"`
+}
+
+// FileValidationConfig configures pre-parse file validation checks.
+//
+// Example TOML configuration:
+//
+//	[file-validation]
+//	max-file-size = 102400
+type FileValidationConfig struct {
+	// MaxFileSize is the maximum file size in bytes (0 = unlimited).
+	MaxFileSize int64 `json:"max-file-size,omitempty" koanf:"max-file-size"`
 }
 
 // OutputConfig configures output formatting and behavior.
@@ -155,6 +169,9 @@ func Default() *Config {
 			MaxInputBytes: 256 * 1024,
 			RedactSecrets: true,
 		},
+		FileValidation: FileValidationConfig{
+			MaxFileSize: 100 * 1024, // 100 KB
+		},
 		SlowChecks: SlowChecksConfig{
 			Mode:     "auto",
 			FailFast: true,
@@ -228,6 +245,8 @@ var knownHyphenatedKeys = map[string]string{
 	"slow.checks":                  "slow-checks",
 	"fail.fast":                    "fail-fast",
 	"newline.between.instructions": "newline-between-instructions",
+	"file.validation":              "file-validation",
+	"max.file.size":                "max-file-size",
 }
 
 var allowedEnvTopLevelKeys = map[string]struct{}{
@@ -236,6 +255,7 @@ var allowedEnvTopLevelKeys = map[string]struct{}{
 	"inline-directives": {},
 	"ai":                {},
 	"slow-checks":       {},
+	"file-validation":   {},
 	// Compatibility aliases normalized in normalizeOutputAliases.
 	"format":      {},
 	"path":        {},

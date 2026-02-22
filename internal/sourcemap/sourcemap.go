@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"slices"
 	"strings"
+	"unicode/utf8"
 )
 
 // SourceMap provides efficient access to source code by line.
@@ -39,7 +40,15 @@ func New(source []byte) *SourceMap {
 	for i, line := range rawLines {
 		lineOffsets[i] = offset
 		// Trim \r from line endings (for Windows CRLF)
-		lines[i] = strings.TrimSuffix(string(line), "\r")
+		s := strings.TrimSuffix(string(line), "\r")
+		// Replace invalid UTF-8 sequences with U+FFFD so downstream JSON
+		// marshaling (encoding/json/v2 is strict) never fails on source
+		// snippets. Pre-parse validation catches most cases, but this
+		// provides defense-in-depth for programmatic callers.
+		if !utf8.ValidString(s) {
+			s = strings.ToValidUTF8(s, "\ufffd")
+		}
+		lines[i] = s
 		// Next line starts after this line + newline character
 		offset += len(line) + 1
 	}

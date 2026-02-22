@@ -18,7 +18,10 @@ func TestLintErrors(t *testing.T) {
 	t.Parallel()
 
 	t.Run("unparseable-json-file", testLintErrorUnparseableJSON)
+	t.Run("too-small-file", testLintErrorTooSmallFile)
 	t.Run("binary-file", testLintErrorBinaryFile)
+	t.Run("large-file", testLintErrorLargeFile)
+	t.Run("executable-dockerfile", testLintErrorExecutableDockerfile)
 	t.Run("nonexistent-file", testLintErrorNonexistentFile)
 	t.Run("nonexistent-glob", testLintErrorNonexistentGlob)
 	t.Run("empty-directory", testLintErrorEmptyDirectory)
@@ -47,14 +50,39 @@ func testLintErrorUnparseableJSON(t *testing.T) {
 	}
 }
 
+func testLintErrorTooSmallFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	tinyFile := filepath.Join(tmpDir, "Dockerfile")
+	// 3 bytes — well below the 6-byte minimum ("FROM a").
+	if err := os.WriteFile(tinyFile, []byte("FR\n"), 0o644); err != nil {
+		t.Fatalf("write tiny file: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyLintRaw(t, tinyFile)
+
+	t.Logf("exit=%d\nstdout:\n%s\nstderr:\n%s", exitCode, stdout, stderr)
+
+	if exitCode != 2 {
+		t.Errorf("expected exit code 2 (config error from file validation), got %d", exitCode)
+	}
+	if !strings.Contains(stderr, "too small for a valid Dockerfile") {
+		t.Errorf("expected 'too small for a valid Dockerfile' in stderr, got: %q", stderr)
+	}
+	if stdout != "" {
+		t.Errorf("expected empty stdout for too-small file, got: %q", stdout)
+	}
+}
+
 func testLintErrorBinaryFile(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
 	binFile := filepath.Join(tmpDir, "Dockerfile")
 
-	// 256 KB of random binary content.
-	data := make([]byte, 256*1024)
+	// 50 KB of random binary content (below the default 100 KB size limit).
+	data := make([]byte, 50*1024)
 	if _, err := rand.Read(data); err != nil {
 		t.Fatalf("generate random data: %v", err)
 	}
@@ -66,13 +94,70 @@ func testLintErrorBinaryFile(t *testing.T) {
 
 	t.Logf("exit=%d\nstdout length=%d\nstderr:\n%s", exitCode, len(stdout), stderr)
 
-	// Binary content parses into garbled AST nodes, but the JSON reporter
-	// fails when serializing source snippets with invalid UTF-8.
+	// Pre-parse file validation now catches binary files before BuildKit parsing.
 	if exitCode != 2 {
-		t.Errorf("expected exit code 2 (config error from invalid UTF-8), got %d", exitCode)
+		t.Errorf("expected exit code 2 (config error from file validation), got %d", exitCode)
 	}
-	if !strings.Contains(stderr, "invalid UTF-8") {
-		t.Errorf("expected 'invalid UTF-8' in stderr, got: %q", stderr)
+	if !strings.Contains(stderr, "valid UTF-8") {
+		t.Errorf("expected 'valid UTF-8' in stderr, got: %q", stderr)
+	}
+}
+
+func testLintErrorLargeFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	largeFile := filepath.Join(tmpDir, "Dockerfile")
+
+	// 200 KB file — exceeds the default 100 KB limit.
+	data := make([]byte, 200*1024)
+	for i := range data {
+		data[i] = 'A'
+	}
+	if err := os.WriteFile(largeFile, data, 0o644); err != nil {
+		t.Fatalf("write large file: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyLintRaw(t, largeFile)
+
+	t.Logf("exit=%d\nstdout:\n%s\nstderr:\n%s", exitCode, stdout, stderr)
+
+	if exitCode != 2 {
+		t.Errorf("expected exit code 2 (config error from file validation), got %d", exitCode)
+	}
+	if !strings.Contains(stderr, "file too large") {
+		t.Errorf("expected 'file too large' in stderr, got: %q", stderr)
+	}
+	if stdout != "" {
+		t.Errorf("expected empty stdout for large file, got: %q", stdout)
+	}
+}
+
+func testLintErrorExecutableDockerfile(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "windows" {
+		t.Skip("executable-bit check not applicable on Windows")
+	}
+
+	tmpDir := t.TempDir()
+	execFile := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(execFile, []byte("FROM alpine\n"), 0o755); err != nil {
+		t.Fatalf("write executable file: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyLintRaw(t, execFile)
+
+	t.Logf("exit=%d\nstdout:\n%s\nstderr:\n%s", exitCode, stdout, stderr)
+
+	if exitCode != 2 {
+		t.Errorf("expected exit code 2 (config error from file validation), got %d", exitCode)
+	}
+	if !strings.Contains(stderr, "unexpected executable") {
+		t.Errorf("expected 'unexpected executable' in stderr, got: %q", stderr)
+	}
+	if stdout != "" {
+		t.Errorf("expected empty stdout for executable dockerfile, got: %q", stdout)
 	}
 }
 

@@ -21,6 +21,7 @@ import (
 	"github.com/wharflab/tally/internal/context"
 	"github.com/wharflab/tally/internal/discovery"
 	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/fileval"
 	"github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/linter"
 	"github.com/wharflab/tally/internal/processor"
@@ -399,6 +400,10 @@ func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, cm
 		validateAIConfig(cfg, file)
 		validateDurationConfigs(cfg, file)
 		res.fileConfigs[file] = cfg
+
+		if err := fileval.ValidateFile(file, cfg.FileValidation.MaxFileSize); err != nil {
+			return nil, fmt.Errorf("failed to lint %s: %w", file, err)
+		}
 
 		if res.firstCfg == nil {
 			res.firstCfg = cfg

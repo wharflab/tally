@@ -172,6 +172,7 @@ func TestConfigFromSchema_CoversAllFields(t *testing.T) {
 		"Output":           true,
 		"InlineDirectives": true,
 		"AI":               true,
+		"FileValidation":   true,
 		"SlowChecks":       true,
 	}
 

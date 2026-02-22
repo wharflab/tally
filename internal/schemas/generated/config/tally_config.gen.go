@@ -61,64 +61,77 @@ type IndexSchemaJson_2 struct {
 
 // Configuration schema for tally Dockerfile linter
 type TallyConfigSchemaJson struct {
-	// Ai corresponds to the JSON schema field "ai".
+	// Configure opt-in AI AutoFix features (requires an ACP-capable agent).
 	Ai *TallyConfigSchemaJsonAi `json:"ai,omitempty"`
 
-	// InlineDirectives corresponds to the JSON schema field "inline-directives".
+	// Pre-parse file validation checks.
+	FileValidation *TallyConfigSchemaJsonFileValidation `json:"file-validation,omitempty"`
+
+	// Control inline suppression directives (e.g. # tally-ignore).
 	InlineDirectives *TallyConfigSchemaJsonInlineDirectives `json:"inline-directives,omitempty"`
 
-	// Output corresponds to the JSON schema field "output".
+	// Configure output format and destination.
 	Output *TallyConfigSchemaJsonOutput `json:"output,omitempty"`
 
 	// Rules corresponds to the JSON schema field "rules".
 	Rules *TallyConfigSchemaJsonRules `json:"rules,omitempty"`
 
-	// SlowChecks corresponds to the JSON schema field "slow-checks".
+	// Configure async checks that require network or other slow I/O (e.g. registry
+	// lookups).
 	SlowChecks *TallyConfigSchemaJsonSlowChecks `json:"slow-checks,omitempty"`
 }
 
+// Configure opt-in AI AutoFix features (requires an ACP-capable agent).
 type TallyConfigSchemaJsonAi struct {
-	// Command corresponds to the JSON schema field "command".
+	// Argv to launch the ACP agent process over stdio.
 	Command []string `json:"command,omitempty"`
 
-	// Enabled corresponds to the JSON schema field "enabled".
+	// Enable AI AutoFix. When false, AI fixes are never resolved.
 	Enabled bool `json:"enabled,omitempty"`
 
-	// MaxInputBytes corresponds to the JSON schema field "max-input-bytes".
+	// Maximum prompt payload size in bytes sent to the agent.
 	MaxInputBytes int `json:"max-input-bytes,omitempty"`
 
-	// RedactSecrets corresponds to the JSON schema field "redact-secrets".
+	// Redact detected secrets in Dockerfile content before sending to the agent.
 	RedactSecrets bool `json:"redact-secrets,omitempty"`
 
-	// Timeout corresponds to the JSON schema field "timeout".
+	// Per-fix execution timeout as a Go duration string (e.g. "90s", "2m").
 	Timeout string `json:"timeout,omitempty"`
 }
 
+// Pre-parse file validation checks.
+type TallyConfigSchemaJsonFileValidation struct {
+	// Maximum file size in bytes (0 = unlimited).
+	MaxFileSize int `json:"max-file-size,omitempty"`
+}
+
+// Control inline suppression directives (e.g. # tally-ignore).
 type TallyConfigSchemaJsonInlineDirectives struct {
-	// Enabled corresponds to the JSON schema field "enabled".
+	// Allow inline directives to suppress violations.
 	Enabled bool `json:"enabled,omitempty"`
 
-	// RequireReason corresponds to the JSON schema field "require-reason".
+	// Require a reason comment on every inline suppression directive.
 	RequireReason bool `json:"require-reason,omitempty"`
 
-	// ValidateRules corresponds to the JSON schema field "validate-rules".
+	// Warn when an inline directive references a rule that does not exist.
 	ValidateRules bool `json:"validate-rules,omitempty"`
 
-	// WarnUnused corresponds to the JSON schema field "warn-unused".
+	// Warn when an inline directive does not suppress any violation.
 	WarnUnused bool `json:"warn-unused,omitempty"`
 }
 
+// Configure output format and destination.
 type TallyConfigSchemaJsonOutput struct {
-	// FailLevel corresponds to the JSON schema field "fail-level".
+	// Minimum severity that causes a non-zero exit code.
 	FailLevel TallyConfigSchemaJsonOutputFailLevel `json:"fail-level,omitempty"`
 
-	// Format corresponds to the JSON schema field "format".
+	// Output format for lint results.
 	Format TallyConfigSchemaJsonOutputFormat `json:"format,omitempty"`
 
-	// Path corresponds to the JSON schema field "path".
+	// Write output to this path instead of stdout.
 	Path string `json:"path,omitempty"`
 
-	// ShowSource corresponds to the JSON schema field "show-source".
+	// Include source code snippets in output.
 	ShowSource bool `json:"show-source,omitempty"`
 }
 
@@ -142,27 +155,29 @@ type TallyConfigSchemaJsonRules struct {
 	// Buildkit corresponds to the JSON schema field "buildkit".
 	Buildkit IndexSchemaJson `json:"buildkit,omitempty"`
 
-	// Exclude corresponds to the JSON schema field "exclude".
+	// Glob patterns for rules to disable (e.g. "buildkit/MaintainerDeprecated").
 	Exclude []string `json:"exclude,omitempty"`
 
 	// Hadolint corresponds to the JSON schema field "hadolint".
 	Hadolint *IndexSchemaJson_1 `json:"hadolint,omitempty"`
 
-	// Include corresponds to the JSON schema field "include".
+	// Glob patterns for rules to enable (e.g. "tally/*", "hadolint/DL3026").
 	Include []string `json:"include,omitempty"`
 
 	// Tally corresponds to the JSON schema field "tally".
 	Tally *IndexSchemaJson_2 `json:"tally,omitempty"`
 }
 
+// Configure async checks that require network or other slow I/O (e.g. registry
+// lookups).
 type TallyConfigSchemaJsonSlowChecks struct {
-	// FailFast corresponds to the JSON schema field "fail-fast".
+	// Stop slow checks on first failure instead of collecting all results.
 	FailFast bool `json:"fail-fast,omitempty"`
 
-	// Mode corresponds to the JSON schema field "mode".
+	// When to run slow checks: "auto" enables them in CI, "on" always, "off" never.
 	Mode TallyConfigSchemaJsonSlowChecksMode `json:"mode,omitempty"`
 
-	// Timeout corresponds to the JSON schema field "timeout".
+	// Overall timeout for all slow checks as a Go duration string (e.g. "20s").
 	Timeout string `json:"timeout,omitempty"`
 }
 
