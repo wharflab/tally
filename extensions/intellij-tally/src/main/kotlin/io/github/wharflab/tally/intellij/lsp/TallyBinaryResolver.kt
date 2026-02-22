@@ -35,7 +35,7 @@ internal object TallyBinaryResolver {
             return null
         }
 
-        compatibleOrNull(resolveExplicitPaths(settings.executablePaths, projectBasePath, isTrustedProject))
+        resolveExplicitPaths(settings.executablePaths, projectBasePath, isTrustedProject)
             ?.let { return it }
         if (isTrustedProject) {
             compatibleOrNull(resolveFromPath())?.let { return it }
