@@ -3,6 +3,7 @@ package discovery
 
 import (
 	"cmp"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -118,7 +119,7 @@ func discoverInput(input string, opts Options, seen map[string]bool) ([]Discover
 
 	// Non-glob literal path that doesn't exist — return a specific error
 	// so the caller can distinguish "file not found" from other failures.
-	if !os.IsNotExist(err) {
+	if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
 
