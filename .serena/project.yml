@@ -1,3 +1,4 @@
+---
 # list of languages for which language servers are started; choose from:
 #   al                  bash                clojure             cpp                 csharp
 #   csharp_omnisharp    dart                elixir              elm                 erlang
@@ -23,23 +24,18 @@
 # Note that when using the JetBrains backend, language servers are not used and this list is correspondingly ignored.
 languages:
   - go
-
 # the encoding used by text files in the project
 # For a list of possible encodings, see https://docs.python.org/3.11/library/codecs.html#standard-encodings
 encoding: "utf-8"
-
 # whether to use project's .gitignore files to ignore files
 ignore_all_files_in_gitignore: true
-
 # list of additional paths to ignore in all projects
 # same syntax as gitignore, so you can use * and **
 ignored_paths: []
-
 # whether the project is in read-only mode
 # If set to true, all editing tools will be disabled and attempts to use them will result in an error
 # Added on 2025-04-18
 read_only: false
-
 # list of tool names to exclude. We recommend not excluding any tools, see the readme for more details.
 # Below is the complete list of tools for convenience.
 # To make sure you have the latest list of tools, and to view their descriptions,
@@ -80,16 +76,13 @@ read_only: false
 #  * `think_about_whether_you_are_done`: Thinking tool for determining whether the task is truly completed.
 #  * `write_memory`: Writes a named memory (for future reference) to Serena's project-specific memory store.
 excluded_tools: []
-
 # initial prompt for the project. It will always be given to the LLM upon activating the project
 # (contrary to the memories, which are loaded on demand).
 initial_prompt: ""
 # the name by which the project can be referenced within Serena
 project_name: "tally"
-
 # list of tools to include that would otherwise be disabled (particularly optional tools that are disabled by default)
 included_optional_tools: []
-
 # list of mode names to that are always to be included in the set of active modes
 # The full set of modes to be activated is base_modes + default_modes.
 # If the setting is undefined, the base_modes from the global configuration (serena_config.yml) apply.
@@ -97,14 +90,15 @@ included_optional_tools: []
 # Set this to [] to disable base modes for this project.
 # Set this to a list of mode names to always include the respective modes for this project.
 base_modes:
-
 # list of mode names that are to be activated by default.
 # The full set of modes to be activated is base_modes + default_modes.
 # If the setting is undefined, the default_modes from the global configuration (serena_config.yml) apply.
 # Otherwise, this overrides the setting from the global configuration (serena_config.yml).
 # This setting can, in turn, be overridden by CLI parameters (--mode).
 default_modes:
-
 # fixed set of tools to use as the base tool set (if non-empty), replacing Serena's default set of tools.
 # This cannot be combined with non-empty excluded_tools or included_optional_tools.
 fixed_tools: []
+# override of the corresponding setting in serena_config.yml, see the documentation there.
+# If null or missing, the value from the global config is used.
+symbol_info_budget:

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="JAVA_MODULE" version="4">
+  <component name="Go" enabled="true">
+    <buildTags>
+      <option name="cgo" value="NO" />
+      <option name="customFlags">
+        <array>
+          <option value="containers_image_openpgp" />
+          <option value="containers_image_storage_stub" />
+          <option value="containers_image_docker_daemon_stub" />
+        </array>
+      </option>
+      <option name="experiments">
+        <array>
+          <option value="jsonv2" />
+        </array>
+      </option>
+    </buildTags>
+  </component>
+  <component name="NewModuleRootManager" inherit-compiler-output="true">
+    <exclude-output />
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/extensions/intellij-tally/.cache/smoke/idea-ic/idea-IC-252.26830.84/plugins/Groovy/lib" isTestSource="false" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>
