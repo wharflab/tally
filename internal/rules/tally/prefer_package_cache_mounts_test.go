@@ -468,7 +468,17 @@ RUN uv sync --frozen
 			wantFixContains: []string{
 				"--mount=type=cache,target=/root/.cache/uv,id=uv",
 				"uv sync --frozen",
-				"ENV UV_LINK_MODE=copy",
+				`ENV UV_LINK_MODE="copy"`,
+			},
+			wantNotContains: []string{"UV_NO_CACHE"},
+			wantEditCount:   2,
+		},
+		{
+			name:    "UV_NO_CACHE env removed (multi-variable with spaces in value)",
+			content: "FROM python:3.13\nENV UV_NO_CACHE=1 MY_OPTS=\"-O2 -Wall\"\nRUN uv sync --frozen\n",
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
+				`ENV MY_OPTS="-O2 -Wall"`,
 			},
 			wantNotContains: []string{"UV_NO_CACHE"},
 			wantEditCount:   2,

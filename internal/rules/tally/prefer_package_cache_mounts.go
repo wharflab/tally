@@ -503,7 +503,7 @@ func buildUVNoCacheRemovalEdit(file string, info *uvNoCacheEnvInfo) *rules.TextE
 		if kv.Key == "UV_NO_CACHE" {
 			continue
 		}
-		parts = append(parts, kv.Key+"="+kv.Value)
+		parts = append(parts, fmt.Sprintf("%s=%q", kv.Key, unquote(kv.Value)))
 	}
 
 	endLine := envLoc[len(envLoc)-1].End.Line
