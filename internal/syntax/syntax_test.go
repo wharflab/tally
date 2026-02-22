@@ -148,6 +148,15 @@ func TestCheckSyntaxDirective(t *testing.T) {
 			source:    "# syntax=mycompany/custom-frontend:latest\nFROM alpine\n",
 			wantCount: 0,
 		},
+		{
+			// parser.DetectSyntax splits on spaces (returning only the first
+			// token), so a tab is the whitespace character that actually
+			// reaches the ContainsAny check.
+			name:       "tab in directive value",
+			source:     "# syntax=docker/dockerfile\t1.7\nFROM alpine\n",
+			wantCount:  1,
+			wantSubstr: "contains whitespace",
+		},
 	}
 
 	for _, tt := range tests {
