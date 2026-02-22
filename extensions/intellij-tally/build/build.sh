@@ -134,8 +134,12 @@ patch_plugin_xml() {
     -e "s|@PLUGIN_ID@|${plugin_id}|g" \
     -e "s|@PLUGIN_VERSION@|${plugin_version}|g" \
     -e "s|@SINCE_BUILD@|${since_build}|g" \
-    -e "s|@UNTIL_BUILD@|${until_build}|g" \
     "${plugin_xml}"
+  if [[ -n "${until_build}" ]]; then
+    sed -i.bak -e "s|@UNTIL_BUILD@|${until_build}|g" "${plugin_xml}"
+  else
+    sed -i.bak -e 's| until-build="@UNTIL_BUILD@"||g' "${plugin_xml}"
+  fi
   rm -f "${plugin_xml}.bak"
 }
 
@@ -154,7 +158,7 @@ build_plugin() {
   plugin_name="$(read_version plugin_name)"
   plugin_version="$(read_version plugin_version)"
   plugin_since_build="$(read_version plugin_since_build)"
-  plugin_until_build="$(read_version plugin_until_build)"
+  plugin_until_build="$(read_optional_version plugin_until_build)"
   jvm_target="$(read_version jvm_target)"
 
   local classes_dir package_root plugin_dir plugin_jar plugin_zip

@@ -88,7 +88,7 @@ func TestCancelPreempter_HandlesCancelRequest(t *testing.T) {
 
 	// Missing "id" field — params.ID stays nil, id.IsValid() is false, Cancel skipped.
 	req := &jsonrpc2.Request{
-		Method: "$/cancelRequest",
+		Method: string(protocol.MethodCancelRequest),
 		Params: jsontext.Value(`{}`),
 	}
 	result, err := p.Preempt(context.Background(), req)
@@ -97,7 +97,7 @@ func TestCancelPreempter_HandlesCancelRequest(t *testing.T) {
 
 	// Unrecognized ID type (bool) — silently ignored.
 	req2 := &jsonrpc2.Request{
-		Method: "$/cancelRequest",
+		Method: string(protocol.MethodCancelRequest),
 		Params: jsontext.Value(`{"id":true}`),
 	}
 	result, err = p.Preempt(context.Background(), req2)
@@ -106,7 +106,7 @@ func TestCancelPreempter_HandlesCancelRequest(t *testing.T) {
 
 	// Unparseable JSON — silently ignored.
 	req3 := &jsonrpc2.Request{
-		Method: "$/cancelRequest",
+		Method: string(protocol.MethodCancelRequest),
 		Params: jsontext.Value(`not-json`),
 	}
 	result, err = p.Preempt(context.Background(), req3)
@@ -123,7 +123,7 @@ func TestCancelPreempter_ValidID(t *testing.T) {
 
 	// Numeric ID.
 	req := &jsonrpc2.Request{
-		Method: "$/cancelRequest",
+		Method: string(protocol.MethodCancelRequest),
 		Params: jsontext.Value(`{"id":42}`),
 	}
 	result, err := p.Preempt(context.Background(), req)
@@ -132,7 +132,7 @@ func TestCancelPreempter_ValidID(t *testing.T) {
 
 	// String ID.
 	req2 := &jsonrpc2.Request{
-		Method: "$/cancelRequest",
+		Method: string(protocol.MethodCancelRequest),
 		Params: jsontext.Value(`{"id":"req-1"}`),
 	}
 	result, err = p.Preempt(context.Background(), req2)
@@ -179,7 +179,7 @@ func TestCancelPreempter_PassesThroughOtherMethods(t *testing.T) {
 	p := &cancelPreempter{conn: nil}
 
 	req := &jsonrpc2.Request{
-		Method: "textDocument/didOpen",
+		Method: string(protocol.MethodTextDocumentDidOpen),
 		Params: jsontext.Value(`{}`),
 	}
 	result, err := p.Preempt(context.Background(), req)
