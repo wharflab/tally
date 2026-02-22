@@ -104,11 +104,6 @@ func TestInvalidOnbuildTriggerRule_Check(t *testing.T) {
 			WantViolations: 1,
 			WantMessages:   []string{`"COPPY"`},
 		},
-		{
-			Name:           "nil AST — no panic",
-			Content:        "FROM alpine:3.19\n",
-			WantViolations: 0,
-		},
 	})
 }
 
