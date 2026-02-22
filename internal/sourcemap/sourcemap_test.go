@@ -2,7 +2,9 @@ package sourcemap
 
 import (
 	"bytes"
+	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestNew(t *testing.T) {
@@ -278,6 +280,27 @@ CMD ["sh"]
 	comments = sm.CommentsForLine(0)
 	if len(comments) != 0 {
 		t.Errorf("CommentsForLine(0) = %d comments, want 0", len(comments))
+	}
+}
+
+func TestNew_InvalidUTF8Sanitized(t *testing.T) {
+	t.Parallel()
+
+	// Line with invalid UTF-8 bytes embedded between valid ASCII.
+	source := append([]byte("FROM alpine\nRUN echo "), 0xFF, 0xFE, '\n')
+
+	sm := New(source)
+
+	// All lines must be valid UTF-8 (safe for JSON marshaling).
+	for i, line := range sm.Lines() {
+		if !utf8.ValidString(line) {
+			t.Errorf("Line(%d) = %q contains invalid UTF-8", i, line)
+		}
+	}
+
+	// The invalid bytes should be replaced with U+FFFD.
+	if !strings.Contains(sm.Line(1), "\ufffd") {
+		t.Errorf("expected replacement character in Line(1), got %q", sm.Line(1))
 	}
 }
 

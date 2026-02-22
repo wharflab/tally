@@ -36,6 +36,7 @@ go.work.sum
 # .idea/
 # .vscode/
 .vscode-test/
+.DS_Store
 
 # Built binary
 /tally

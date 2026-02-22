@@ -144,6 +144,19 @@
         }
       }
     },
+    "file-validation": {
+      "type": "object",
+      "description": "Pre-parse file validation checks.",
+      "properties": {
+        "max-file-size": {
+          "description": "Maximum file size in bytes (0 = unlimited).",
+          "type": "integer",
+          "default": 102400,
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
     "slow-checks": {
       "type": "object",
       "description": "Configure async checks that require network or other slow I/O (e.g. registry lookups).",

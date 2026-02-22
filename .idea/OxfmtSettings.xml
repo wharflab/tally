@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="OxfmtSettings">
+    <option name="binaryPath" value="$PROJECT_DIR$/extensions/vscode-tally/node_modules/oxfmt/bin/oxfmt" />
+    <option name="configPath" value="$PROJECT_DIR$/extensions/vscode-tally/.oxfmtrc.json" />
+    <option name="configurationMode" value="MANUAL" />
+    <option name="fixAllOnSave" value="true" />
+  </component>
+</project>

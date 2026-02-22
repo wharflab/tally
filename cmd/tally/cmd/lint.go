@@ -21,12 +21,14 @@ import (
 	"github.com/wharflab/tally/internal/context"
 	"github.com/wharflab/tally/internal/discovery"
 	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/fileval"
 	"github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/linter"
 	"github.com/wharflab/tally/internal/processor"
 	"github.com/wharflab/tally/internal/registry"
 	"github.com/wharflab/tally/internal/reporter"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/syntax"
 	"github.com/wharflab/tally/internal/version"
 )
 
@@ -35,6 +37,8 @@ const (
 	ExitSuccess     = 0 // No violations (or below fail-level threshold)
 	ExitViolations  = 1 // Violations found at or above fail-level
 	ExitConfigError = 2 // Parse or config error
+	ExitNoFiles     = 3 // No Dockerfiles found (missing file, empty glob, empty directory)
+	ExitSyntaxError = 4 // Dockerfile has fatal syntax issues (unknown instructions, malformed directives)
 )
 
 func lintCommand() *cli.Command {
@@ -305,20 +309,24 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 
 	discovered, err := discovery.Discover(inputs, discoveryOpts)
 	if err != nil {
+		var notFound *discovery.FileNotFoundError
+		if errors.As(err, &notFound) {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", notFound)
+			return cli.Exit("", ExitNoFiles)
+		}
 		fmt.Fprintf(os.Stderr, "Error: failed to discover files: %v\n", err)
 		return cli.Exit("", ExitConfigError)
 	}
 
 	if len(discovered) == 0 {
-		fmt.Fprintf(os.Stderr, "Error: no Dockerfiles found\n")
-		return cli.Exit("", ExitConfigError)
+		reportNoFilesFound(inputs)
+		return cli.Exit("", ExitNoFiles)
 	}
 
 	// Lint all discovered files
 	res, err := lintFiles(ctx, discovered, cmd)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return cli.Exit("", ExitConfigError)
+		return handleLintError(err)
 	}
 
 	// Execute async checks if enabled and plans exist.
@@ -394,21 +402,32 @@ func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, cm
 		validateDurationConfigs(cfg, file)
 		res.fileConfigs[file] = cfg
 
+		if err := fileval.ValidateFile(file, cfg.FileValidation.MaxFileSize); err != nil {
+			return nil, fmt.Errorf("failed to lint %s: %w", file, err)
+		}
+
 		if res.firstCfg == nil {
 			res.firstCfg = cfg
 		}
 
+		// Parse once — reused for syntax checks, build context, and LintFile.
+		parseResult, err := dockerfile.ParseFile(ctx, file, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to lint %s: %w", file, err)
+		}
+
+		// Fail-fast syntax checks (unknown instructions, directive typos).
+		if syntaxErrors := syntax.Check(file, parseResult.AST, parseResult.Source); len(syntaxErrors) > 0 {
+			return nil, &syntax.CheckError{Errors: syntaxErrors}
+		}
+
 		// Build context for context-aware rules (e.g. .dockerignore checks).
-		// This requires parsing the Dockerfile first to extract heredoc files.
 		var buildCtx rules.BuildContext
 		if df.ContextDir != "" {
-			parseResult, parseErr := dockerfile.ParseFile(ctx, file, cfg)
-			if parseErr == nil {
-				buildCtx, err = context.New(df.ContextDir, file,
-					context.WithHeredocFiles(extractHeredocFiles(parseResult)))
-				if err != nil {
-					fmt.Fprintf(os.Stderr, "Warning: failed to create build context: %v\n", err)
-				}
+			buildCtx, err = context.New(df.ContextDir, file,
+				context.WithHeredocFiles(extractHeredocFiles(parseResult)))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to create build context: %v\n", err)
 			}
 		}
 
@@ -416,6 +435,7 @@ func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, cm
 			FilePath:     file,
 			Config:       cfg,
 			BuildContext: buildCtx,
+			ParseResult:  parseResult,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to lint %s: %w", file, err)
@@ -427,6 +447,21 @@ func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, cm
 	}
 
 	return res, nil
+}
+
+// handleLintError maps errors from lintFiles to the appropriate exit code.
+// Syntax errors (unknown instructions, directive typos) return ExitSyntaxError;
+// all other errors return ExitConfigError.
+func handleLintError(err error) error {
+	var syntaxErr *syntax.CheckError
+	if errors.As(err, &syntaxErr) {
+		for _, e := range syntaxErr.Errors {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", e.Error())
+		}
+		return cli.Exit("", ExitSyntaxError)
+	}
+	fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	return cli.Exit("", ExitConfigError)
 }
 
 // writeReport formats and writes the violation report.
@@ -1288,4 +1323,30 @@ func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) 
 		}
 	}
 	return remaining
+}
+
+// reportNoFilesFound prints a context-aware message when no Dockerfiles are found.
+func reportNoFilesFound(inputs []string) {
+	for _, input := range inputs {
+		if discovery.ContainsGlobChars(input) {
+			fmt.Fprintf(os.Stderr, "Error: no Dockerfiles matched pattern: %s\n", input)
+			return
+		}
+	}
+
+	// For directory inputs, resolve to absolute path so the user knows exactly
+	// which directory was scanned.
+	for _, input := range inputs {
+		abs, err := filepath.Abs(input)
+		if err != nil {
+			continue
+		}
+		info, err := os.Stat(abs)
+		if err == nil && info.IsDir() {
+			fmt.Fprintf(os.Stderr, "Error: no Dockerfile or Containerfile found in %s\n", abs)
+			return
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "Error: no Dockerfiles found\n")
 }

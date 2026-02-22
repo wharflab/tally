@@ -101,6 +101,12 @@ func configFromSchema(schemaCfg *generatedconfig.TallyConfigSchemaJson) *Config 
 		}
 	}
 
+	if fv := schemaCfg.FileValidation; fv != nil {
+		cfg.FileValidation = FileValidationConfig{
+			MaxFileSize: int64(fv.MaxFileSize),
+		}
+	}
+
 	if slowChecks := schemaCfg.SlowChecks; slowChecks != nil {
 		cfg.SlowChecks = SlowChecksConfig{
 			Mode:     string(slowChecks.Mode),

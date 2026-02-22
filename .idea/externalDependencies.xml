@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<project version="4">
+  <component name="ExternalDependencies">
+    <plugin id="Git4Idea" />
+    <plugin id="NodeJS" />
+    <plugin id="Docker" />
+    <plugin id="JavaScript" />
+    <plugin id="intellij.javascript.bun" />
+    <plugin id="org.jetbrains.plugins.go" />
+    <plugin id="org.jetbrains.kotlin" />
+    <plugin id="org.jetbrains.plugins.yaml" />
+    <plugin id="com.github.oxc.project.oxcintellijplugin" />
+    <plugin id="org.intellij.plugins.markdown" />
+    <plugin id="dev.rumdl" />
+    <plugin id="com.nbadal.ktlint" />
+  </component>
+</project>

@@ -740,6 +740,19 @@
       },
       "type": "object"
     },
+    "file-validation": {
+      "additionalProperties": false,
+      "description": "Pre-parse file validation checks.",
+      "properties": {
+        "max-file-size": {
+          "default": 102400,
+          "description": "Maximum file size in bytes (0 = unlimited).",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
     "inline-directives": {
       "additionalProperties": false,
       "description": "Control inline suppression directives (e.g. # tally-ignore).",

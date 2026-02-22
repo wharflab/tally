@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="OxcSettings">
+    <option name="binaryParameters">
+      <list>
+        <option value="--lsp" />
+      </list>
+    </option>
+    <option name="binaryPath" value="$PROJECT_DIR$/extensions/vscode-tally/node_modules/oxlint/bin/oxlint" />
+    <option name="configPath" value="$PROJECT_DIR$/extensions/vscode-tally/.oxlintrc.json" />
+    <option name="configurationMode" value="MANUAL" />
+    <option name="fixAllOnSave" value="true" />
+    <flags>
+      <entry key="disable_nested_config" value="true" />
+      <entry key="fix_kind" value="SAFE_FIX_OR_SUGGESTION" />
+    </flags>
+    <option name="runTrigger" value="ON_SAVE" />
+    <option name="typeAware" value="true" />
+    <option name="unusedDisableDirectives" value="WARN" />
+  </component>
+</project>
