@@ -534,6 +534,36 @@ severity = "info"
 severity = "info"
 `,
 		},
+		{
+			name: "prefer-package-cache-mounts-npm-config-cache-env",
+			input: "FROM node:20\n" +
+				"ENV npm_config_cache=/tmp/npm-cache\n" +
+				"RUN npm install\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+`,
+		},
+		{
+			name: "prefer-package-cache-mounts-bun-install-cache-dir-env",
+			input: "FROM oven/bun:1.2\n" +
+				"ENV BUN_INSTALL_CACHE_DIR=/tmp/bun-cache\n" +
+				"RUN bun install\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+`,
+		},
 
 		// Both heredoc rules enabled together: prefer-copy-heredoc takes priority (99) over prefer-run-heredoc (100).
 		// The file-creation RUN is handled by prefer-copy-heredoc; the consecutive RUNs by prefer-run-heredoc.

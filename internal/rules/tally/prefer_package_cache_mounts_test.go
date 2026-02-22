@@ -255,6 +255,22 @@ RUN pip install -r requirements.txt
 `,
 			WantViolations: 1,
 		},
+		{
+			Name: "npm install with npm_config_cache env",
+			Content: `FROM node:20
+ENV npm_config_cache=/tmp/npm-cache
+RUN npm install
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "bun install with BUN_INSTALL_CACHE_DIR env",
+			Content: `FROM oven/bun:1.2
+ENV BUN_INSTALL_CACHE_DIR=/tmp/bun-cache
+RUN bun install
+`,
+			WantViolations: 1,
+		},
 	})
 }
 
@@ -533,6 +549,39 @@ RUN pip install -r requirements.txt
 			},
 			wantNotContains: []string{"PIP_NO_CACHE_DIR"},
 			wantEditCount:   2,
+		},
+		{
+			name: "npm_config_cache resolves cache path",
+			content: `FROM node:20
+ENV npm_config_cache=/tmp/npm-cache
+RUN npm install
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/tmp/npm-cache,id=npm",
+				"npm install",
+			},
+		},
+		{
+			name: "npm_config_cache case insensitive (NPM_CONFIG_CACHE)",
+			content: `FROM node:20
+ENV NPM_CONFIG_CACHE=/opt/npm-cache
+RUN npm ci
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/opt/npm-cache,id=npm",
+				"npm ci",
+			},
+		},
+		{
+			name: "BUN_INSTALL_CACHE_DIR resolves cache path",
+			content: `FROM oven/bun:1.2
+ENV BUN_INSTALL_CACHE_DIR=/tmp/bun-cache
+RUN bun install
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/tmp/bun-cache,id=bun",
+				"bun install",
+			},
 		},
 	}
 

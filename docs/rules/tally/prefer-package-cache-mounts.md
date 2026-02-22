@@ -25,7 +25,7 @@ Each suggested mount includes an `id` for observability and reusability across b
 
 | Command pattern | Cache mount target(s) |
 |-----------------|-----------------------|
-| `npm install`, `npm ci`, `npm i` | `/root/.npm` (`id=npm`) |
+| `npm install`, `npm ci`, `npm i` | `$npm_config_cache` or `/root/.npm` (`id=npm`) |
 | `go build`, `go mod download` | `/go/pkg/mod` (`id=gomod`), `/root/.cache/go-build` (`id=gobuild`) |
 | `apt`/`apt-get` package operations | `/var/cache/apt` (`id=apt`, `sharing=locked`) and `/var/lib/apt` (`id=aptlib`, `sharing=locked`) |
 | `apk` package operations | `/var/cache/apk` (`id=apk`, `sharing=locked`) |
@@ -40,13 +40,19 @@ Each suggested mount includes an `id` for observability and reusability across b
 | `dotnet restore` | `/root/.nuget/packages` (`id=nuget`) |
 | `composer install` | `/root/.cache/composer` (`id=composer`) |
 | `uv sync`, `uv pip install`, `uv tool install`, `uv python install` | `/root/.cache/uv` (`id=uv`) |
-| `bun install` | `/root/.bun/install/cache` (`id=bun`) |
+| `bun install` | `$BUN_INSTALL_CACHE_DIR` or `/root/.bun/install/cache` (`id=bun`) |
 
-### pnpm store path resolution
+### Cache path resolution from environment variables
 
-The rule resolves the pnpm store path from the `PNPM_HOME` environment variable set in the Dockerfile.
-If `ENV PNPM_HOME="/pnpm"` is present, the cache mount targets `$PNPM_HOME/store` (e.g. `/pnpm/store`).
-If no `PNPM_HOME` is set, it defaults to `/root/.pnpm-store`.
+The rule resolves custom cache paths from `ENV` instructions in the Dockerfile:
+
+| ENV variable | Mount ID | Resolution |
+|---|---|---|
+| `npm_config_cache` (case insensitive) | `npm` | Uses value directly (default: `/root/.npm`) |
+| `PNPM_HOME` | `pnpm` | Appends `/store` to value (default: `/root/.pnpm-store`) |
+| `BUN_INSTALL_CACHE_DIR` | `bun` | Uses value directly (default: `/root/.bun/install/cache`) |
+
+If the variable value contains `$` (unresolved shell reference), the override is skipped.
 
 ## Examples
 
