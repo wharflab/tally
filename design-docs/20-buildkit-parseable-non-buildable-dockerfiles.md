@@ -36,17 +36,17 @@ This proposal extends that philosophy to a handful of additional high-value “p
 
 All rule codes below use the `tally/` namespace to avoid implying upstream parity with BuildKit/hadolint.
 
-| Rule code | Severity | Category | What it catches |
-|----------|----------|----------|-----------------|
-| `tally/missing-from` | Error | Correctness | Dockerfile contains no `FROM` at all |
-| `tally/unknown-instruction` | Error | Correctness | Likely-typo instruction keywords (`FORM`, `COPPY`, `WROKDIR`, …) |
-| `tally/invalid-from` | Error | Correctness | Malformed `FROM` lines that still parse into AST (missing base / bad `AS`) |
-| `tally/invalid-json-form` | Error | Correctness | JSON-form instructions with invalid JSON (e.g., `CMD [bash, -lc, "…"]`) |
-| `tally/copy-from-empty-scratch-stage` | Error | Correctness | `COPY --from=<stage>` where `<stage>` is `FROM scratch` and truly empty |
-| `tally/run-mount-from-unknown-stage` | Warning | Correctness | `RUN --mount=…from=<ref>…` where `<ref>` looks like a misspelled stage |
-| `tally/circular-stage-deps` | Error | Correctness | Stage dependency cycles across `FROM <stage>` / `COPY --from` / `RUN --mount from=` |
-| `tally/shell-run-in-scratch` | Warning | Correctness | Shell-form `RUN …` in a `FROM scratch` stage (almost always fails) |
-| `tally/syntax-directive-typo` | Warning | Correctness | `# syntax=…` that doesn’t look like a valid image ref or common typos |
+| Rule code | Severity | Category | What it catches | Status |
+|----------|----------|----------|-----------------|--------|
+| `tally/missing-from` | Error | Correctness | Dockerfile contains no `FROM` at all | |
+| `tally/unknown-instruction` | Error | Correctness | Likely-typo instruction keywords (`FORM`, `COPPY`, `WROKDIR`, …) | **Implemented** |
+| `tally/invalid-from` | Error | Correctness | Malformed `FROM` lines that still parse into AST (missing base / bad `AS`) | |
+| `tally/invalid-json-form` | Error | Correctness | JSON-form instructions with invalid JSON (e.g., `CMD [bash, -lc, "…"]`) | |
+| `tally/copy-from-empty-scratch-stage` | Error | Correctness | `COPY --from=<stage>` where `<stage>` is `FROM scratch` and truly empty | |
+| `tally/run-mount-from-unknown-stage` | Warning | Correctness | `RUN --mount=…from=<ref>…` where `<ref>` looks like a misspelled stage | |
+| `tally/circular-stage-deps` | Error | Correctness | Stage dependency cycles across `FROM <stage>` / `COPY --from` / `RUN --mount from=` | |
+| `tally/shell-run-in-scratch` | Warning | Correctness | Shell-form `RUN …` in a `FROM scratch` stage (almost always fails) | |
+| `tally/syntax-directive-typo` | Warning | Correctness | `# syntax=…` that doesn’t look like a valid image ref or common typos | **Implemented** |
 
 Notes:
 

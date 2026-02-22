@@ -14,5 +14,5 @@ extend-ignore-re = [
 PAHT = "PAHT"
 
 [files]
-extend-exclude = ["**/tests/fixtures/**", "**/testdata/**"]
+extend-exclude = ["**/tests/fixtures/**", "**/testdata/**", "design-docs/**"]
 ignore-vcs = true
