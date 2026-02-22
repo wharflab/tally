@@ -1,8 +1,13 @@
 package io.github.wharflab.tally.intellij.lsp
 
+import com.google.gson.JsonParser
+import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
+import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.ide.plugins.PluginManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.SystemInfo
+import com.intellij.util.text.VersionComparatorUtil
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.InvalidPathException
@@ -16,7 +21,9 @@ internal data class TallyCommand(
 )
 
 internal object TallyBinaryResolver {
+    private val LOG = Logger.getInstance(TallyBinaryResolver::class.java)
     private val SERVER_ARGS = listOf("lsp", "--stdio")
+    private const val VERSION_CHECK_TIMEOUT_MS = 2000L
 
     fun resolve(
         settings: TallyRuntimeSettings,
@@ -29,11 +36,12 @@ internal object TallyBinaryResolver {
             return null
         }
 
-        resolveExplicitPaths(settings.executablePaths, projectBasePath, isTrustedProject)?.let { return it }
+        resolveExplicitPaths(settings.executablePaths, projectBasePath, isTrustedProject)
+            ?.let { return it }
         if (isTrustedProject) {
-            resolveFromPath()?.let { return it }
-            resolveFromInterpreterDirectory(projectSdkHomePath)?.let { return it }
-            resolveFromProjectVenv(projectBasePath)?.let { return it }
+            compatibleOrNull(resolveFromPath())?.let { return it }
+            compatibleOrNull(resolveFromInterpreterDirectory(projectSdkHomePath))?.let { return it }
+            compatibleOrNull(resolveFromProjectVenv(projectBasePath))?.let { return it }
         }
         return resolveBundledBinary()
     }
@@ -161,6 +169,49 @@ internal object TallyBinaryResolver {
             executable = path.absolutePathString(),
             args = SERVER_ARGS,
         )
+
+    private fun compatibleOrNull(command: TallyCommand?): TallyCommand? = command?.takeIf { isCompatibleBinary(Paths.get(it.executable)) }
+
+    private fun getMinCompatibleVersion(): String? {
+        val descriptor =
+            PluginManager.getPluginByClass(TallyBinaryResolver::class.java)
+                ?: return null
+        val version = descriptor.version
+        if (version.isNullOrBlank() || version.contains("dev")) {
+            return null // dev build – skip version gating
+        }
+        return version
+    }
+
+    private fun isCompatibleBinary(path: Path): Boolean {
+        val minVersion = getMinCompatibleVersion() ?: return true
+        return try {
+            val commandLine = GeneralCommandLine(path.absolutePathString(), "version", "--json")
+            val output = CapturingProcessHandler(commandLine).runProcess(VERSION_CHECK_TIMEOUT_MS.toInt())
+            if (output.isTimeout) {
+                LOG.warn("Skipping $path: version check timed out")
+                return false
+            }
+            if (output.exitCode != 0) {
+                LOG.warn("Skipping $path: version check exited with ${output.exitCode}")
+                return false
+            }
+            val json = JsonParser.parseString(output.stdout).asJsonObject
+            val candidateVersion = json.get("version")?.asString
+            if (candidateVersion.isNullOrBlank()) {
+                LOG.warn("Skipping $path: no version in output")
+                return false
+            }
+            if (VersionComparatorUtil.compare(candidateVersion, minVersion) < 0) {
+                LOG.warn("Skipping $path: version $candidateVersion < required $minVersion")
+                return false
+            }
+            true
+        } catch (e: Exception) {
+            LOG.warn("Skipping $path: version check failed: ${e.message}")
+            false
+        }
+    }
 
     private fun expandToPath(
         raw: String,
