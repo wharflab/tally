@@ -18,7 +18,7 @@ type Error struct {
 	RuleCode string // e.g. "tally/unknown-instruction"
 }
 
-func (e *Error) Error() string {
+func (e Error) Error() string {
 	return e.File + ":" + strconv.Itoa(e.Line) + ": " + e.Message
 }
 
