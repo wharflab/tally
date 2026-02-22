@@ -183,6 +183,21 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 		{
+			name:     "invalid-onbuild-trigger",
+			dir:      "invalid-onbuild-trigger",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/invalid-onbuild-trigger")...),
+			wantExit: 1,
+		},
+		// Combined: DL3043 (forbidden trigger) + tally/invalid-onbuild-trigger (unknown trigger)
+		// fire on different ONBUILD lines in the same Dockerfile.
+		{
+			name: "invalid-onbuild-trigger-combined",
+			dir:  "invalid-onbuild-trigger-combined",
+			args: append([]string{"--format", "json"},
+				mustSelectRules("hadolint/DL3043", "tally/invalid-onbuild-trigger")...),
+			wantExit: 1,
+		},
+		{
 			name:     "invalid-instruction-order",
 			dir:      "invalid-instruction-order",
 			args:     append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3061")...),

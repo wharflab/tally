@@ -47,6 +47,13 @@ func Check(file string, ast *parser.Result, source []byte) []Error {
 	return errs
 }
 
+// ClosestInstruction returns the closest valid Dockerfile instruction to input
+// within Levenshtein distance 2, or "" if none is close enough. The comparison
+// is case-insensitive; the returned value is lowercase (matching command.Commands).
+func ClosestInstruction(input string) string {
+	return closestMatch(strings.ToLower(input), validInstructions, 2)
+}
+
 // closestMatch returns the closest string from candidates using Levenshtein
 // distance, or "" if no candidate is within maxDist.
 func closestMatch(input string, candidates []string, maxDist int) string {

@@ -261,3 +261,31 @@ func TestLevenshteinDistance(t *testing.T) {
 		})
 	}
 }
+
+func TestClosestInstruction(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		input string
+		want  string // expected lowercase suggestion, or ""
+	}{
+		{"COPPY", "copy"},
+		{"coppy", "copy"},
+		{"FORM", "from"},
+		{"RUNN", "run"},
+		{"WROKDIR", "workdir"},
+		{"FOOBAR", ""},   // no close match
+		{"COPY", "copy"}, // exact match — returns it (distance 0)
+		{"FROM", "from"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			t.Parallel()
+			got := ClosestInstruction(tt.input)
+			if got != tt.want {
+				t.Errorf("ClosestInstruction(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}

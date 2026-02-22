@@ -1,0 +1,58 @@
+{
+  "files": [
+    {
+      "file": "testdata/invalid-onbuild-trigger/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/invalid-onbuild-trigger/",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "testdata/invalid-onbuild-trigger/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "unknown instruction \"COPPY\" in ONBUILD trigger (did you mean \"COPY\"?)",
+          "rule": "tally/invalid-onbuild-trigger",
+          "severity": "error",
+          "sourceCode": "ONBUILD COPPY . /app",
+          "suggestedFix": {
+            "description": "Replace \"COPPY\" with \"COPY\"",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 13,
+                    "line": 2
+                  },
+                  "file": "testdata/invalid-onbuild-trigger/Dockerfile",
+                  "start": {
+                    "column": 8,
+                    "line": 2
+                  }
+                },
+                "newText": "COPY"
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 1,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

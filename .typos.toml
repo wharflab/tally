@@ -12,7 +12,10 @@ extend-ignore-re = [
 [default.extend-words]
 # Intentional typo example in docs/rules/buildkit/UndefinedVar.md
 PAHT = "PAHT"
+# Intentional typo examples in tally/invalid-onbuild-trigger rule docs and tests
+COPPY = "COPPY"
+RUNN = "RUNN"
 
 [files]
-extend-exclude = ["**/tests/fixtures/**", "**/testdata/**", "design-docs/**"]
+extend-exclude = ["**/tests/fixtures/**", "**/testdata/**", "design-docs/**", "**/__snapshots__/**"]
 ignore-vcs = true

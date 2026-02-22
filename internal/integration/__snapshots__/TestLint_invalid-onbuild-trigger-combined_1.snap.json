@@ -1,0 +1,76 @@
+{
+  "files": [
+    {
+      "file": "testdata/invalid-onbuild-trigger-combined/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3043/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/invalid-onbuild-trigger-combined/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "`ONBUILD`, `FROM` or `MAINTAINER` triggered from within `ONBUILD` instruction.",
+          "rule": "hadolint/DL3043",
+          "severity": "error",
+          "sourceCode": "ONBUILD FROM debian:bookworm"
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/invalid-onbuild-trigger/",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "testdata/invalid-onbuild-trigger-combined/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 7
+            }
+          },
+          "message": "unknown instruction \"COPPY\" in ONBUILD trigger (did you mean \"COPY\"?)",
+          "rule": "tally/invalid-onbuild-trigger",
+          "severity": "error",
+          "sourceCode": "ONBUILD COPPY . /app",
+          "suggestedFix": {
+            "description": "Replace \"COPPY\" with \"COPY\"",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 13,
+                    "line": 7
+                  },
+                  "file": "testdata/invalid-onbuild-trigger-combined/Dockerfile",
+                  "start": {
+                    "column": 8,
+                    "line": 7
+                  }
+                },
+                "newText": "COPY"
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 2,
+  "summary": {
+    "errors": 2,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 0
+  }
+}
