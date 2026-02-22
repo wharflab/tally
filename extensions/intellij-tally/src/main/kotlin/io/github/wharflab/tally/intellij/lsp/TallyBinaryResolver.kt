@@ -35,19 +35,12 @@ internal object TallyBinaryResolver {
             return null
         }
 
-        resolveExplicitPaths(settings.executablePaths, projectBasePath, isTrustedProject)
-            ?.takeIf { isCompatibleBinary(Paths.get(it.executable)) }
+        compatibleOrNull(resolveExplicitPaths(settings.executablePaths, projectBasePath, isTrustedProject))
             ?.let { return it }
         if (isTrustedProject) {
-            resolveFromPath()
-                ?.takeIf { isCompatibleBinary(Paths.get(it.executable)) }
-                ?.let { return it }
-            resolveFromInterpreterDirectory(projectSdkHomePath)
-                ?.takeIf { isCompatibleBinary(Paths.get(it.executable)) }
-                ?.let { return it }
-            resolveFromProjectVenv(projectBasePath)
-                ?.takeIf { isCompatibleBinary(Paths.get(it.executable)) }
-                ?.let { return it }
+            compatibleOrNull(resolveFromPath())?.let { return it }
+            compatibleOrNull(resolveFromInterpreterDirectory(projectSdkHomePath))?.let { return it }
+            compatibleOrNull(resolveFromProjectVenv(projectBasePath))?.let { return it }
         }
         return resolveBundledBinary()
     }
@@ -175,6 +168,8 @@ internal object TallyBinaryResolver {
             executable = path.absolutePathString(),
             args = SERVER_ARGS,
         )
+
+    private fun compatibleOrNull(command: TallyCommand?): TallyCommand? = command?.takeIf { isCompatibleBinary(Paths.get(it.executable)) }
 
     private fun getMinCompatibleVersion(): String? {
         val descriptor =
