@@ -461,6 +461,10 @@ func hasUnresolvedWorkdirReference(workdir string) bool {
 }
 
 // cacheDisablingEnvVars maps ENV variable names to the cleanupKind they disable caching for.
+//
+// Cross-rule interaction: when a Dockerfile uses the legacy format (e.g., "ENV UV_NO_CACHE 1"),
+// buildkit/LegacyKeyValueFormat (priority 91) yields to this rule's fix (priority 90), so the
+// ENV deletion runs first and the reformatting fix is harmlessly skipped.
 var cacheDisablingEnvVars = map[string]cleanupKind{
 	"UV_NO_CACHE":      cleanupUV,
 	"PIP_NO_CACHE_DIR": cleanupPip,

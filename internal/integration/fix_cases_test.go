@@ -535,6 +535,23 @@ severity = "info"
 `,
 		},
 		{
+			// Cross-rule interaction: prefer-package-cache-mounts (priority 90) deletes
+			// "ENV UV_NO_CACHE 1" and adds cache mount before LegacyKeyValueFormat (priority 91)
+			// tries to reformat it. The LegacyKeyValueFormat fix is then skipped (range deleted).
+			name:  "prefer-package-cache-mounts-uv-no-cache-legacy-with-legacy-key-value",
+			input: "FROM python:3.13\nENV UV_NO_CACHE 1\nRUN uv sync --frozen\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+				"--select", "buildkit/LegacyKeyValueFormat",
+			},
+			wantApplied: 1, // cache-mounts wins; LegacyKeyValueFormat skipped (ENV already deleted)
+			config: `[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+`,
+		},
+		{
 			name: "prefer-package-cache-mounts-multiline-env-removal",
 			input: "FROM python:3.13\n" +
 				"ENV \\\n" +
