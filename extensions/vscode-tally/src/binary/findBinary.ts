@@ -195,8 +195,8 @@ function getMinCompatibleVersion(context: vscode.ExtensionContext): string | und
     pkg && typeof pkg === "object" && "version" in pkg && typeof pkg.version === "string"
       ? pkg.version
       : undefined;
-  if (!version || !semver.valid(version)) {
-    return undefined; // dev build or invalid – skip version gating
+  if (!version || version === "0.0.0" || !semver.valid(version)) {
+    return undefined; // dev/unreleased build or invalid – skip version gating
   }
   return version;
 }
