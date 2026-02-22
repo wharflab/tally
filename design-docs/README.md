@@ -221,6 +221,19 @@ parity rules
 
 ---
 
+### 19. [AI AutoFix via ACP: Diff/Patch Output Contract](19-ai-autofix-diff-contract.md)
+
+**Covers:** Proposal to switch AI AutoFix output from “whole Dockerfile” to a unified diff/patch contract with patch-level heuristics.
+
+---
+
+### 20. [BuildKit-Parseable but Non-Buildable Dockerfiles (Heuristic Checks)](20-buildkit-parseable-non-buildable-dockerfiles.md)
+
+**Covers:** Proposed “preflight” rules for Dockerfiles that parse into a BuildKit AST but are likely to fail builds (typos, half-edits, stage-graph
+cycles).
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
