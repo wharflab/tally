@@ -1,7 +1,9 @@
 package io.github.wharflab.tally.intellij.lsp
 
 import com.google.gson.JsonParser
+import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.configurations.PathEnvironmentVariableUtil
+import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.ide.plugins.PluginManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.SystemInfo
@@ -11,7 +13,6 @@ import java.nio.file.Files
 import java.nio.file.InvalidPathException
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.concurrent.TimeUnit
 import kotlin.io.path.absolutePathString
 
 internal data class TallyCommand(
@@ -185,26 +186,17 @@ internal object TallyBinaryResolver {
     private fun isCompatibleBinary(path: Path): Boolean {
         val minVersion = getMinCompatibleVersion() ?: return true
         return try {
-            val process =
-                ProcessBuilder(path.absolutePathString(), "version", "--json")
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
-                    .start()
-            val stdoutFuture =
-                java.util.concurrent.CompletableFuture.supplyAsync {
-                    process.inputStream.bufferedReader().use { it.readText() }
-                }
-            val completed = process.waitFor(VERSION_CHECK_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            if (!completed) {
-                process.destroyForcibly()
+            val commandLine = GeneralCommandLine(path.absolutePathString(), "version", "--json")
+            val output = CapturingProcessHandler(commandLine).runProcess(VERSION_CHECK_TIMEOUT_MS.toInt())
+            if (output.isTimeout) {
                 LOG.warn("Skipping $path: version check timed out")
                 return false
             }
-            if (process.exitValue() != 0) {
-                LOG.warn("Skipping $path: version check exited with ${process.exitValue()}")
+            if (output.exitCode != 0) {
+                LOG.warn("Skipping $path: version check exited with ${output.exitCode}")
                 return false
             }
-            val stdout = stdoutFuture.get(VERSION_CHECK_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-            val json = JsonParser.parseString(stdout).asJsonObject
+            val json = JsonParser.parseString(output.stdout).asJsonObject
             val candidateVersion = json.get("version")?.asString
             if (candidateVersion.isNullOrBlank()) {
                 LOG.warn("Skipping $path: no version in output")
