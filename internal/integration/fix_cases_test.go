@@ -535,6 +535,22 @@ severity = "info"
 `,
 		},
 		{
+			name: "prefer-package-cache-mounts-multiline-env-removal",
+			input: "FROM python:3.13\n" +
+				"ENV \\\n" +
+				"    UV_NO_CACHE=1\n" +
+				"RUN uv sync --frozen\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+`,
+		},
+		{
 			name: "prefer-package-cache-mounts-npm-config-cache-env",
 			input: "FROM node:20\n" +
 				"ENV npm_config_cache=/tmp/npm-cache\n" +

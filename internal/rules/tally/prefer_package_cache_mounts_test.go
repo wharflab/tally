@@ -498,6 +498,16 @@ RUN uv sync --frozen
 			wantEditCount:   2,
 		},
 		{
+			name:    "UV_NO_CACHE env removed (sole variable, multiline ENV)",
+			content: "FROM python:3.13\nENV \\\n    UV_NO_CACHE=1\nRUN uv sync --frozen\n",
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
+				"uv sync --frozen",
+			},
+			wantNotContains: []string{"UV_NO_CACHE"},
+			wantEditCount:   2,
+		},
+		{
 			name:    "UV_NO_CACHE env removed (multi-variable with spaces in value)",
 			content: "FROM python:3.13\nENV UV_NO_CACHE=1 MY_OPTS=\"-O2 -Wall\"\nRUN uv sync --frozen\n",
 			wantFixContains: []string{

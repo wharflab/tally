@@ -548,9 +548,10 @@ func buildEnvKeyRemovalEdit(file string, env *instructions.EnvCommand, keysToRem
 	}
 
 	if len(parts) == 0 {
-		// Remove the entire line including its trailing newline by spanning to the next line.
+		// Remove the entire instruction including its trailing newline.
+		endLine := envLoc[len(envLoc)-1].End.Line
 		return &rules.TextEdit{
-			Location: rules.NewRangeLocation(file, startLine, startCol, startLine+1, 0),
+			Location: rules.NewRangeLocation(file, startLine, startCol, endLine+1, 0),
 			NewText:  "",
 		}
 	}
