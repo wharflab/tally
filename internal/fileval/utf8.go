@@ -9,23 +9,28 @@ import (
 const chunkSize = 32 * 1024 // 32 KB
 
 // LooksUTF8 checks whether the file at path appears to contain valid UTF-8 text.
-// It reads in 32 KB chunks, carrying up to 3 trailing bytes between reads to
-// handle code points split across chunk boundaries. It stops after maxBytes
-// (a heuristic "looks like UTF-8" threshold) and fails fast on the first
-// definitely-invalid chunk.
+// It opens the file and delegates to [LooksUTF8FromReader].
 func LooksUTF8(path string, maxBytes int64) (bool, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return false, err
 	}
 	defer f.Close()
+	return LooksUTF8FromReader(f, maxBytes)
+}
 
+// LooksUTF8FromReader checks whether r appears to contain valid UTF-8 text.
+// It reads in 32 KB chunks, carrying up to 3 trailing bytes between reads to
+// handle code points split across chunk boundaries. It stops after maxBytes
+// (a heuristic "looks like UTF-8" threshold) and fails fast on the first
+// definitely-invalid chunk. Pass maxBytes <= 0 to read until EOF.
+func LooksUTF8FromReader(r io.Reader, maxBytes int64) (bool, error) {
 	buf := make([]byte, chunkSize)
 	var carry []byte // up to 3 bytes from previous read
 	var totalRead int64
 
 	for maxBytes <= 0 || totalRead < maxBytes {
-		n, readErr := f.Read(buf)
+		n, readErr := r.Read(buf)
 		if n == 0 && readErr != nil {
 			if readErr == io.EOF {
 				// Check any remaining carry bytes.

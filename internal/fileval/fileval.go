@@ -62,8 +62,17 @@ func (e *NotUTF8Error) Error() string {
 //  2. Maximum size check (when maxSize > 0)
 //  3. Executable-bit check (Unix only)
 //  4. UTF-8 smoke check
+//
+// The file is opened once; all checks — including the UTF-8 read — operate on
+// the same file handle to avoid TOCTOU races between os.Stat and a second open.
 func ValidateFile(path string, maxSize int64) error {
-	info, err := os.Stat(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
 	if err != nil {
 		return err
 	}
@@ -83,13 +92,13 @@ func ValidateFile(path string, maxSize int64) error {
 		return err
 	}
 
-	// 4. UTF-8 smoke check.
+	// 4. UTF-8 smoke check — reuse the already-open handle.
 	// Use maxSize as the read limit when positive; otherwise read up to 1 MB.
 	readLimit := maxSize
 	if readLimit <= 0 {
 		readLimit = 1 << 20 // 1 MB
 	}
-	ok, err := LooksUTF8(path, readLimit)
+	ok, err := LooksUTF8FromReader(f, readLimit)
 	if err != nil {
 		return err
 	}
