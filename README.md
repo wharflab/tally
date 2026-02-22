@@ -56,11 +56,13 @@ AI fixes are **rule-driven** (one narrow transformation at a time) and **verifie
 tally integrates rules from multiple sources:
 
 <!-- BEGIN RULES_TABLE -->
+
 | Source | Rules | Description |
 |--------|-------|-------------|
 | **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 22/22 rules | Docker's official Dockerfile checks (captured + reimplemented) |
 | **tally** | 14 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
 | **[Hadolint](https://github.com/hadolint/hadolint)** | 37 rules | Hadolint-compatible Dockerfile rules (expanding) |
+
 <!-- END RULES_TABLE -->
 
 **See [RULES.md](RULES.md) for the complete rules reference.**
@@ -375,15 +377,18 @@ Available levels (from most to least severe): `error`, `warning`, `info`, `style
 
 ### VS Code
 
-Install the official **[tally extension](https://marketplace.visualstudio.com/items?itemName=wharflab.tally)** from the Visual Studio Marketplace for real-time linting and diagnostics.
+Install the official **[tally extension](https://marketplace.visualstudio.com/items?itemName=wharflab.tally)** from the Visual Studio Marketplace for
+real-time linting and diagnostics.
 
 ### JetBrains IDEs
 
-Install the official **[Tally plugin](https://plugins.jetbrains.com/plugin/30255-tally)** from JetBrains Marketplace for IDE integration in IntelliJ-based editors.
+Install the official **[Tally plugin](https://plugins.jetbrains.com/plugin/30255-tally)** from JetBrains Marketplace for IDE integration in
+IntelliJ-based editors.
 
 ### Other Editors
 
-Any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) can use tally's built-in LSP server over stdio:
+Any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) can use tally's built-in LSP server
+over stdio:
 
 ```bash
 npx -y tally-cli lsp --stdio
