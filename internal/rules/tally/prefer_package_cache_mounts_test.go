@@ -471,6 +471,17 @@ RUN uv python install 3.12
 			},
 		},
 		{
+			name: "uv python install --no-cache flag stripped",
+			content: `FROM python:3.13
+RUN uv python install --no-cache 3.12
+`,
+			wantFixContains: []string{
+				"--mount=type=cache,target=/root/.cache/uv,id=uv",
+				"uv python install 3.12",
+			},
+			wantNotContains: []string{"--no-cache"},
+		},
+		{
 			name: "UV_NO_CACHE env removed (sole variable)",
 			content: `FROM python:3.13
 ENV UV_NO_CACHE=1
