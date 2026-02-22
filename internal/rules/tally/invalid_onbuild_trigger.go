@@ -148,17 +148,29 @@ func buildTriggerFix(file string, source []byte, node *parser.Node, typo, sugges
 // triggerColumnRange finds the 0-based [start, end) column range of the trigger
 // keyword in a source line such as "ONBUILD COPPY . /app".
 // Returns (-1, -1) if not found.
+// triggerColumnRange finds the 0-based [start, end) column range of the trigger
+// keyword in a source line such as "ONBUILD COPPY . /app".
+// Returns (-1, -1) if not found.
+//
+// Note: BuildKit's parser does not populate column info on ONBUILD sub-nodes
+// (Location() returns zeros), so we derive the position from the source text.
+// The search is case-insensitive and handles indented ONBUILD instructions.
 func triggerColumnRange(line, trigger string) (int, int) {
 	upper := strings.ToUpper(line)
 	const prefix = "ONBUILD"
-	if !strings.HasPrefix(upper, prefix) {
+
+	// Find where ONBUILD starts (handles leading whitespace / indentation).
+	idx := strings.Index(upper, prefix)
+	if idx < 0 {
 		return -1, -1
 	}
+
 	// Scan past "ONBUILD" and any whitespace.
-	i := len(prefix)
+	i := idx + len(prefix)
 	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
 		i++
 	}
+
 	// The next word should be the trigger keyword.
 	upperTrigger := strings.ToUpper(trigger)
 	remaining := strings.ToUpper(line[i:])

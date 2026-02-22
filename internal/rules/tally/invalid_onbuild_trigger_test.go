@@ -192,9 +192,10 @@ func TestTriggerColumnRange(t *testing.T) {
 		wantEnd   int
 	}{
 		{"ONBUILD COPPY . /app", "COPPY", 8, 13},
-		{"ONBUILD  RUNN echo", "RUNN", 9, 13}, // double space
-		{"onbuild coppy . /app", "coppy", 8, 13},
-		{"WORKDIR /app", "WORKDIR", -1, -1}, // not an ONBUILD line
+		{"ONBUILD  RUNN echo", "RUNN", 9, 13},       // double space
+		{"onbuild coppy . /app", "coppy", 8, 13},    // lowercase
+		{"  ONBUILD COPPY . /app", "COPPY", 10, 15}, // indented instruction
+		{"WORKDIR /app", "WORKDIR", -1, -1},         // not an ONBUILD line
 	}
 
 	for _, tt := range tests {
