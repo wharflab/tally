@@ -264,3 +264,60 @@ func TestDiscoverNonexistent(t *testing.T) {
 		t.Errorf("expected 0 results, got %d", len(results))
 	}
 }
+
+func TestContainsGlobChars(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		path string
+		want bool
+	}{
+		{"Dockerfile", false},
+		{"path/to/Dockerfile", false},
+		{"*.Dockerfile", true},
+		{"Dockerfile?", true},
+		{"[Dd]ockerfile", true},
+		{"]strange]", true},
+		// Brace expansion supported by doublestar/v4.
+		{"{Dockerfile,Containerfile}", true},
+		{"path/{Dockerfile,Containerfile}", true},
+		{"only-open{brace", true},
+		{"only-close}brace", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			t.Parallel()
+			got := ContainsGlobChars(tt.path)
+			if got != tt.want {
+				t.Errorf("ContainsGlobChars(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestDiscoverBraceGlob verifies that brace-expansion patterns like
+// "{Dockerfile,Containerfile}" are treated as globs and expanded by
+// doublestar/v4 rather than passed to os.Stat (which would fail).
+func TestDiscoverBraceGlob(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	containerfilePath := filepath.Join(tmpDir, "Containerfile")
+	if err := os.WriteFile(dockerfilePath, []byte("FROM alpine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(containerfilePath, []byte("FROM alpine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	pattern := filepath.Join(tmpDir, "{Dockerfile,Containerfile}")
+	results, err := Discover([]string{pattern}, Options{})
+	if err != nil {
+		t.Fatalf("Discover() error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected 2 results for brace pattern, got %d", len(results))
+	}
+}

@@ -129,7 +129,7 @@ func discoverInput(input string, opts Options, seen map[string]bool) ([]Discover
 func ContainsGlobChars(path string) bool {
 	for _, c := range path {
 		switch c {
-		case '*', '?', '[', ']':
+		case '*', '?', '[', ']', '{', '}':
 			return true
 		}
 	}
