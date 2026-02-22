@@ -51,4 +51,4 @@ Output: `Usage of undefined variable '$PAHT' (did you mean $PATH?)`
 
 ## Reference
 
-- <https://docs.docker.com/reference/build-checks/undefined-var/>
+- [buildkit/UndefinedVar](https://docs.docker.com/reference/build-checks/undefined-var/)

@@ -66,4 +66,4 @@ CMD echo "second"
 
 ## Reference
 
-- <https://docs.docker.com/reference/build-checks/multiple-instructions-disallowed/>
+- [buildkit/MultipleInstructionsDisallowed](https://docs.docker.com/reference/build-checks/multiple-instructions-disallowed/)

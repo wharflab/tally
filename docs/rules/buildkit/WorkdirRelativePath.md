@@ -43,4 +43,4 @@ COPY public .
 
 ## Reference
 
-- <https://docs.docker.com/reference/build-checks/workdir-relative-path/>
+- [buildkit/WorkdirRelativePath](https://docs.docker.com/reference/build-checks/workdir-relative-path/)

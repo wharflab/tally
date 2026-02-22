@@ -62,4 +62,4 @@ FROM build_${TARGETARCH} AS build
 
 ## Reference
 
-- <https://docs.docker.com/reference/build-checks/from-platform-flag-const-disallowed/>
+- [buildkit/FromPlatformFlagConstDisallowed](https://docs.docker.com/reference/build-checks/from-platform-flag-const-disallowed/)

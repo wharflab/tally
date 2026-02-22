@@ -42,5 +42,5 @@ rule by detecting actual secret *values* (not just variable names).
 
 ## Reference
 
-- <https://docs.docker.com/reference/build-checks/secrets-used-in-arg-or-env/>
+- [buildkit/SecretsUsedInArgOrEnv](https://docs.docker.com/reference/build-checks/secrets-used-in-arg-or-env/)
 - [Build secrets](https://docs.docker.com/build/building/secrets/)

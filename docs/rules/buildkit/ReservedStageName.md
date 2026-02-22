@@ -33,4 +33,4 @@ FROM alpine AS builder
 
 ## Reference
 
-- <https://docs.docker.com/reference/build-checks/reserved-stage-name/>
+- [buildkit/ReservedStageName](https://docs.docker.com/reference/build-checks/reserved-stage-name/)

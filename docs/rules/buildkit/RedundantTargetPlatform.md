@@ -32,4 +32,4 @@ RUN apk add --no-cache git
 
 ## Reference
 
-- <https://docs.docker.com/reference/build-checks/redundant-target-platform/>
+- [buildkit/RedundantTargetPlatform](https://docs.docker.com/reference/build-checks/redundant-target-platform/)

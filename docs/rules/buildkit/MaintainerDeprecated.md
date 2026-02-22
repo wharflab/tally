@@ -48,4 +48,4 @@ LABEL org.opencontainers.image.authors="John Doe <john@example.com>"
 
 ## Reference
 
-- <https://docs.docker.com/reference/build-checks/maintainer-deprecated/>
+- [buildkit/MaintainerDeprecated](https://docs.docker.com/reference/build-checks/maintainer-deprecated/)

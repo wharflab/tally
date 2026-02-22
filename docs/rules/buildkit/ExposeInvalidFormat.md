@@ -50,4 +50,4 @@ EXPOSE 80
 
 ## Reference
 
-- <https://docs.docker.com/reference/build-checks/expose-invalid-format/>
+- [buildkit/ExposeInvalidFormat](https://docs.docker.com/reference/build-checks/expose-invalid-format/)

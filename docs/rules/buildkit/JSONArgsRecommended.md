@@ -84,4 +84,4 @@ CMD ["echo", "hello", "world"]
 
 ## Reference
 
-- <https://docs.docker.com/reference/build-checks/json-args-recommended/>
+- [buildkit/JSONArgsRecommended](https://docs.docker.com/reference/build-checks/json-args-recommended/)

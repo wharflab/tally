@@ -44,4 +44,4 @@ docker buildx build --build-arg ALPINE_VERSION=edge .
 
 ## Reference
 
-- <https://docs.docker.com/reference/build-checks/undefined-arg-in-from/>
+- [buildkit/UndefinedArgInFrom](https://docs.docker.com/reference/build-checks/undefined-arg-in-from/)

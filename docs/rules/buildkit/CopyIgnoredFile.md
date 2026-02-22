@@ -36,4 +36,4 @@ COPY ./forever/helloworld.txt /helloworld.txt
 
 ## Reference
 
-- <https://docs.docker.com/reference/build-checks/copy-ignored-file/>
+- [buildkit/CopyIgnoredFile](https://docs.docker.com/reference/build-checks/copy-ignored-file/)
