@@ -20,8 +20,8 @@ type FileTooSmallError struct {
 
 func (e *FileTooSmallError) Error() string {
 	return fmt.Sprintf(
-		"file is too small for a valid Dockerfile (%d bytes; minimum is %d)",
-		e.Size, minDockerfileSize,
+		"%s: file is too small for a valid Dockerfile (%d bytes; minimum is %d)",
+		e.Path, e.Size, minDockerfileSize,
 	)
 }
 
@@ -34,8 +34,8 @@ type FileTooLargeError struct {
 
 func (e *FileTooLargeError) Error() string {
 	return fmt.Sprintf(
-		"file too large (%d > %d bytes); increase [file-validation] max-file-size in .tally.toml to override",
-		e.Size, e.MaxSize,
+		"%s: file too large (%d > %d bytes); increase [file-validation] max-file-size in .tally.toml to override",
+		e.Path, e.Size, e.MaxSize,
 	)
 }
 
@@ -45,7 +45,7 @@ type ExecutableFileError struct {
 }
 
 func (e *ExecutableFileError) Error() string {
-	return "unexpected executable Dockerfile"
+	return e.Path + ": unexpected executable Dockerfile"
 }
 
 // NotUTF8Error is returned when a file does not appear to be valid UTF-8 text.
@@ -54,7 +54,7 @@ type NotUTF8Error struct {
 }
 
 func (e *NotUTF8Error) Error() string {
-	return "file does not appear to be valid UTF-8 text"
+	return e.Path + ": file does not appear to be valid UTF-8 text"
 }
 
 // ValidateFile runs pre-parse validation checks on a file:
