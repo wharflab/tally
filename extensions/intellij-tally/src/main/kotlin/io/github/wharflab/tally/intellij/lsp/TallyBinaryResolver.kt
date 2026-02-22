@@ -189,6 +189,7 @@ internal object TallyBinaryResolver {
                 ProcessBuilder(path.absolutePathString(), "version", "--json")
                     .redirectError(ProcessBuilder.Redirect.DISCARD)
                     .start()
+            val stdout = process.inputStream.bufferedReader().use { it.readText() }
             val completed = process.waitFor(VERSION_CHECK_TIMEOUT_MS, TimeUnit.MILLISECONDS)
             if (!completed) {
                 process.destroyForcibly()
@@ -199,7 +200,6 @@ internal object TallyBinaryResolver {
                 LOG.warn("Skipping $path: version check exited with ${process.exitValue()}")
                 return false
             }
-            val stdout = process.inputStream.bufferedReader().readText()
             val json = JsonParser.parseString(stdout).asJsonObject
             val candidateVersion = json.get("version")?.asString
             if (candidateVersion.isNullOrBlank()) {
