@@ -79,14 +79,14 @@ func levenshteinDistance(a, b string) int {
 		return la
 	}
 
-	// Use single-row optimisation.
+	// Two-row DP: allocate prev and cur once, swap each iteration.
 	prev := make([]int, lb+1)
+	cur := make([]int, lb+1)
 	for j := range prev {
 		prev[j] = j
 	}
 
 	for i := 1; i <= la; i++ {
-		cur := make([]int, lb+1)
 		cur[0] = i
 		for j := 1; j <= lb; j++ {
 			cost := 1
@@ -99,7 +99,7 @@ func levenshteinDistance(a, b string) int {
 				prev[j-1]+cost, // substitute
 			)
 		}
-		prev = cur
+		prev, cur = cur, prev
 	}
 	return prev[lb]
 }
