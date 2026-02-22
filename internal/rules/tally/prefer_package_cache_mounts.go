@@ -96,7 +96,7 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 				continue
 			}
 
-			updatedScript, cleaned := removeCacheCleanup(run, script, shellVariant, cleaners)
+			updatedScript, scriptCleaned := removeCacheCleanup(run, script, shellVariant, cleaners)
 			replacement := formatUpdatedRun(run, mergedMounts, updatedScript)
 			if replacement == "" {
 				continue
@@ -114,9 +114,8 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 				cleaners, cacheEnvEntries,
 			)
 			cacheEnvEntries = remaining
-			cleaned = cleaned || envCleaned
 
-			v := buildViolation(meta, input.File, runLoc, required, cleaned, edits)
+			v := buildViolation(meta, input.File, runLoc, required, scriptCleaned, envCleaned, edits)
 			violations = append(violations, v)
 		}
 	}
@@ -155,12 +154,17 @@ func buildViolation(
 	file string,
 	runLoc []parser.Range,
 	required []cacheMountSpec,
-	cleaned bool,
+	scriptCleaned, envCleaned bool,
 	edits []rules.TextEdit,
 ) rules.Violation {
 	fixDescription := "Add package cache mount(s)"
-	if cleaned {
+	switch {
+	case scriptCleaned && envCleaned:
+		fixDescription = "Add package cache mount(s), remove cache cleanup commands, and remove cache-disabling ENV vars"
+	case scriptCleaned:
 		fixDescription = "Add package cache mount(s) and remove cache cleanup commands"
+	case envCleaned:
+		fixDescription = "Add package cache mount(s) and remove cache-disabling ENV vars"
 	}
 
 	mountDescriptions := describeMounts(required)
