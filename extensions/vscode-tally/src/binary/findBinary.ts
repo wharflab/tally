@@ -224,8 +224,10 @@ async function isCompatibleBinary(
       return false;
     }
     return true;
-  } catch {
-    output?.appendLine(`[tally] skipping ${binaryPath}: version check failed`);
+  } catch (e: unknown) {
+    output?.appendLine(
+      `[tally] skipping ${binaryPath}: version check failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
     return false;
   }
 }
