@@ -37,7 +37,7 @@ export interface FindTallyBinaryInput {
   settings: BinaryResolutionSettings;
   workspaceFolders: readonly vscode.WorkspaceFolder[];
   pythonEnvResolver?: (folder: vscode.WorkspaceFolder) => Promise<string | undefined>;
-  output?: vscode.OutputChannel;
+  output: vscode.OutputChannel;
 }
 
 export async function findTallyBinary(input: FindTallyBinaryInput): Promise<ResolvedBinary> {
