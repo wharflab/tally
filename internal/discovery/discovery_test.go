@@ -1,6 +1,7 @@
 package discovery
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -262,6 +263,28 @@ func TestDiscoverNonexistent(t *testing.T) {
 
 	if len(results) != 0 {
 		t.Errorf("expected 0 results, got %d", len(results))
+	}
+}
+
+// TestDiscoverFileNotFound verifies that a literal (non-glob) path that does
+// not exist returns a *FileNotFoundError with the correct Path field.
+// This is distinct from TestDiscoverNonexistent, which covers the glob path
+// (empty results, no error).
+func TestDiscoverFileNotFound(t *testing.T) {
+	t.Parallel()
+
+	literal := filepath.Join(t.TempDir(), "nonexistent", "Dockerfile")
+	_, err := Discover([]string{literal}, Options{})
+	if err == nil {
+		t.Fatal("expected an error for a non-existent literal path, got nil")
+	}
+
+	var notFound *FileNotFoundError
+	if !errors.As(err, &notFound) {
+		t.Fatalf("expected *FileNotFoundError, got %T: %v", err, err)
+	}
+	if notFound.Path != literal {
+		t.Errorf("FileNotFoundError.Path = %q, want %q", notFound.Path, literal)
 	}
 }
 
