@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "testdata/circular-stage-deps/Dockerfile",
+      "violations": [
+        {
+          "detail": "Circular stage dependencies prevent the build from completing. Restructure stages so that dependencies flow in one direction",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/circular-stage-deps/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 1
+            },
+            "file": "testdata/circular-stage-deps/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 1
+            }
+          },
+          "message": "circular dependency between stages: \"builder\" → \"runtime\" → \"builder\"",
+          "rule": "tally/circular-stage-deps",
+          "severity": "error",
+          "sourceCode": "FROM golang:1.22-alpine AS builder"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 1,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

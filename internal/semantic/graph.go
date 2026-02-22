@@ -1,5 +1,7 @@
 package semantic
 
+import "strconv"
+
 // StageGraph represents the dependency graph between stages.
 // It tracks cross-stage relationships (COPY --from and FROM stage refs)
 // to enable reachability analysis.
@@ -123,6 +125,58 @@ func (g *StageGraph) StageCount() int {
 	return g.stageCount
 }
 
+// DetectCycles returns all cycles in the stage dependency graph.
+// Each cycle is a slice of stage indices forming a directed cycle
+// (e.g., [0, 2, 1] means stage 0 → stage 2 → stage 1 → stage 0).
+// Returns nil if the graph is acyclic.
+//
+// The algorithm uses DFS with 3-color marking. Cycles are returned in
+// canonical form: rotated so the smallest index is first, then deduplicated.
+func (g *StageGraph) DetectCycles() [][]int {
+	const (
+		white = 0 // unvisited
+		gray  = 1 // on current DFS path
+		black = 2 // fully processed
+	)
+
+	color := make([]int, g.stageCount)
+	path := make([]int, 0, g.stageCount)
+	var cycles [][]int
+	seen := make(map[string]bool) // canonical key → already recorded
+
+	var dfs func(node int)
+	dfs = func(node int) {
+		color[node] = gray
+		path = append(path, node)
+
+		for _, dep := range g.edges[node] {
+			switch color[dep] {
+			case gray:
+				// Back-edge: extract cycle from path.
+				cycle := extractCycle(path, dep)
+				key := canonicalCycleKey(cycle)
+				if !seen[key] {
+					seen[key] = true
+					cycles = append(cycles, cycle)
+				}
+			case white:
+				dfs(dep)
+			}
+		}
+
+		path = path[:len(path)-1]
+		color[node] = black
+	}
+
+	for i := range g.stageCount {
+		if color[i] == white {
+			dfs(i)
+		}
+	}
+
+	return cycles
+}
+
 // newStageGraph creates a new empty stage graph.
 func newStageGraph(stageCount int) *StageGraph {
 	return &StageGraph{
@@ -146,4 +200,45 @@ func (g *StageGraph) addDependency(depStage, stageIndex int) {
 // addExternalRef records an external image reference in a stage.
 func (g *StageGraph) addExternalRef(stageIndex int, ref string) {
 	g.externalRefs[stageIndex] = append(g.externalRefs[stageIndex], ref)
+}
+
+// extractCycle extracts the cycle portion from the DFS path.
+// target is the node where the back-edge points; path contains
+// the current DFS stack including target somewhere.
+func extractCycle(path []int, target int) []int {
+	for i, node := range path {
+		if node == target {
+			cycle := make([]int, len(path)-i)
+			copy(cycle, path[i:])
+			return cycle
+		}
+	}
+	return nil
+}
+
+// canonicalCycleKey produces a deterministic string key for a cycle
+// by rotating it so the smallest index is first.
+func canonicalCycleKey(cycle []int) string {
+	if len(cycle) == 0 {
+		return ""
+	}
+
+	// Find position of minimum element.
+	minIdx := 0
+	for i, v := range cycle {
+		if v < cycle[minIdx] {
+			minIdx = i
+		}
+	}
+
+	// Build key from rotated cycle.
+	n := len(cycle)
+	buf := make([]byte, 0, n*4)
+	for i := range n {
+		if i > 0 {
+			buf = append(buf, ',')
+		}
+		buf = strconv.AppendInt(buf, int64(cycle[(minIdx+i)%n]), 10)
+	}
+	return string(buf)
 }

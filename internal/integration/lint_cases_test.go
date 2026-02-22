@@ -218,6 +218,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// Circular stage dependency detection
+		{
+			name:     "circular-stage-deps",
+			dir:      "circular-stage-deps",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/circular-stage-deps")...),
+			wantExit: 1,
+		},
+
 		// Inline directive tests (need specific rules to test against)
 		{
 			name: "inline-ignore-single",

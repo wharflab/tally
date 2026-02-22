@@ -1,0 +1,10 @@
+{
+ "Category": "correctness",
+ "Code": "tally/circular-stage-deps",
+ "DefaultSeverity": "error",
+ "Description": "Detects circular dependencies between build stages",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/circular-stage-deps/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Circular Stage Dependencies"
+}

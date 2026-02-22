@@ -117,6 +117,13 @@ func (b *Builder) Build() *Model {
 		stageInfo[i] = info
 	}
 
+	// Resolve forward references now that all stage names are registered.
+	// The main loop only resolves backward references (idx < stageIndex)
+	// because stage names are registered sequentially. Forward references
+	// in COPY --from and RUN --mount from= are valid in BuildKit (resolved
+	// at LLB construction time), so we add them to the graph here.
+	b.resolveForwardRefs(stages, stageInfo, graph)
+
 	return &Model{
 		stages:       stages,
 		metaArgs:     metaArgs,
@@ -579,6 +586,85 @@ func (b *Builder) processMountDependencies(cmd *instructions.RunCommand, stageIn
 			graph.addDependency(idx, stageIndex)
 		}
 	}
+}
+
+// resolveForwardRefs resolves stage references that couldn't be resolved during
+// the main single-pass build because the referenced stage hadn't been registered yet.
+// This handles COPY --from=<later-stage> and RUN --mount from=<later-stage>,
+// which are valid in BuildKit (resolved at LLB construction time).
+func (b *Builder) resolveForwardRefs(stages []instructions.Stage, stageInfo []*StageInfo, graph *StageGraph) {
+	for i, info := range stageInfo {
+		if info == nil {
+			continue
+		}
+
+		// Resolve forward COPY --from references.
+		for j := range info.CopyFromRefs {
+			ref := &info.CopyFromRefs[j]
+			if ref.IsStageRef {
+				continue // already resolved
+			}
+			idx := b.resolveStageRef(ref.From, i)
+			if idx < 0 {
+				continue
+			}
+			ref.IsStageRef = true
+			ref.StageIndex = idx
+			graph.addDependency(idx, i)
+		}
+
+		// Resolve forward RUN --mount from= references.
+		for _, cmd := range stages[i].Commands {
+			run, ok := cmd.(*instructions.RunCommand)
+			if !ok {
+				continue
+			}
+			for _, m := range runmount.GetMounts(run) {
+				if m.From == "" {
+					continue
+				}
+				idx := b.resolveStageRef(m.From, i)
+				if idx < 0 || idx < i {
+					continue // already handled in first pass or not a stage
+				}
+				graph.addDependency(idx, i)
+			}
+		}
+
+		// Resolve forward FROM base references.
+		// FROM forward refs are invalid in Docker, but modeling them
+		// allows cycle detection to catch the error.
+		if info.BaseImage != nil && !info.BaseImage.IsStageRef {
+			idx := b.resolveStageRef(info.BaseImage.Raw, i)
+			if idx >= 0 && idx > i { // only forward; backward already handled
+				info.BaseImage.IsStageRef = true
+				info.BaseImage.StageIndex = idx
+				graph.addDependency(idx, i)
+			}
+		}
+	}
+}
+
+// resolveStageRef attempts to resolve a stage reference string to a stage index.
+// Returns the stage index, or -1 if not resolvable.
+// Excludes self-references (returns -1 if resolved index equals stageIndex).
+func (b *Builder) resolveStageRef(ref string, stageIndex int) int {
+	stageCount := len(b.parseResult.Stages)
+
+	// Try numeric index first.
+	if idx, err := strconv.Atoi(ref); err == nil {
+		if idx >= 0 && idx < stageCount && idx != stageIndex {
+			return idx
+		}
+		return -1
+	}
+
+	// Named reference.
+	normalized := normalizeStageRef(ref)
+	if idx, found := b.stagesByName[normalized]; found && idx != stageIndex {
+		return idx
+	}
+	return -1
 }
 
 // processOnbuildCopyFrom analyzes a COPY --from reference from an ONBUILD instruction.

@@ -894,3 +894,189 @@ RUN echo "hello"
 		t.Errorf("expected platform 'linux/amd64', got %q", info.BaseImage.Platform)
 	}
 }
+
+func TestForwardCopyFromResolution(t *testing.T) {
+	t.Parallel()
+	// Stage "a" has COPY --from=b (forward reference to stage "b").
+	// Stage "b" is defined after "a".
+	content := `FROM alpine:3.19 AS a
+COPY --from=b /x /x
+
+FROM alpine:3.19 AS b
+RUN echo "stage b"
+
+FROM alpine:3.19
+COPY --from=a /x /final
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+
+	// Stage "a" (index 0) should have its COPY --from=b resolved.
+	info := model.StageInfo(0)
+	if len(info.CopyFromRefs) != 1 {
+		t.Fatalf("expected 1 CopyFromRef, got %d", len(info.CopyFromRefs))
+	}
+	ref := info.CopyFromRefs[0]
+	if !ref.IsStageRef {
+		t.Error("forward COPY --from=b should be resolved as stage ref")
+	}
+	if ref.StageIndex != 1 {
+		t.Errorf("expected StageIndex=1, got %d", ref.StageIndex)
+	}
+
+	// Graph should reflect the forward dependency.
+	graph := model.Graph()
+	if !graph.DependsOn(0, 1) {
+		t.Error("stage 0 should depend on stage 1 (forward COPY --from)")
+	}
+}
+
+func TestForwardCopyFromCreatesDetectableCycle(t *testing.T) {
+	t.Parallel()
+	// Mutual dependency: a → b (forward) and b → a (backward) = cycle.
+	content := `FROM alpine:3.19 AS a
+COPY --from=b /x /x
+
+FROM alpine:3.19 AS b
+COPY --from=a /y /y
+
+FROM alpine:3.19
+COPY --from=a /x /x
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+
+	cycles := model.Graph().DetectCycles()
+	if len(cycles) != 1 {
+		t.Fatalf("expected 1 cycle, got %d: %v", len(cycles), cycles)
+	}
+	if len(cycles[0]) != 2 {
+		t.Errorf("expected cycle of length 2, got %v", cycles[0])
+	}
+}
+
+func TestForwardMountFromResolution(t *testing.T) {
+	t.Parallel()
+	content := `# syntax=docker/dockerfile:1
+FROM alpine:3.19 AS consumer
+RUN --mount=type=bind,from=producer,source=/out,target=/mnt echo "ok"
+
+FROM alpine:3.19 AS producer
+RUN echo "built" > /out/artifact
+
+FROM alpine:3.19
+COPY --from=consumer /app /app
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+
+	// Stage 0 (consumer) should depend on stage 1 (producer) via forward mount.
+	graph := model.Graph()
+	if !graph.DependsOn(0, 1) {
+		t.Error("stage 0 should depend on stage 1 (forward RUN --mount from=)")
+	}
+}
+
+func TestDetectCycles_NoCycle(t *testing.T) {
+	t.Parallel()
+	// Linear chain: 0 ← 1 ← 2
+	g := newStageGraph(3)
+	g.addDependency(0, 1)
+	g.addDependency(1, 2)
+
+	cycles := g.DetectCycles()
+	if len(cycles) != 0 {
+		t.Errorf("expected no cycles in linear chain, got %v", cycles)
+	}
+}
+
+func TestDetectCycles_SimpleTwoNodeCycle(t *testing.T) {
+	t.Parallel()
+	// 0 → 1 → 0
+	g := newStageGraph(2)
+	g.addDependency(1, 0) // stage 0 depends on stage 1
+	g.addDependency(0, 1) // stage 1 depends on stage 0
+
+	cycles := g.DetectCycles()
+	if len(cycles) != 1 {
+		t.Fatalf("expected 1 cycle, got %d: %v", len(cycles), cycles)
+	}
+	if len(cycles[0]) != 2 {
+		t.Errorf("expected cycle of length 2, got %v", cycles[0])
+	}
+}
+
+func TestDetectCycles_ThreeNodeCycle(t *testing.T) {
+	t.Parallel()
+	// 0 → 1 → 2 → 0
+	g := newStageGraph(3)
+	g.addDependency(1, 0) // stage 0 depends on stage 1
+	g.addDependency(2, 1) // stage 1 depends on stage 2
+	g.addDependency(0, 2) // stage 2 depends on stage 0
+
+	cycles := g.DetectCycles()
+	if len(cycles) != 1 {
+		t.Fatalf("expected 1 cycle, got %d: %v", len(cycles), cycles)
+	}
+	if len(cycles[0]) != 3 {
+		t.Errorf("expected cycle of length 3, got %v", cycles[0])
+	}
+}
+
+func TestDetectCycles_MultipleIndependentCycles(t *testing.T) {
+	t.Parallel()
+	// Two independent cycles: 0↔1 and 2↔3
+	g := newStageGraph(4)
+	g.addDependency(1, 0)
+	g.addDependency(0, 1)
+	g.addDependency(3, 2)
+	g.addDependency(2, 3)
+
+	cycles := g.DetectCycles()
+	if len(cycles) != 2 {
+		t.Fatalf("expected 2 cycles, got %d: %v", len(cycles), cycles)
+	}
+}
+
+func TestDetectCycles_SelfLoop(t *testing.T) {
+	t.Parallel()
+	// Stage 0 depends on itself
+	g := newStageGraph(1)
+	g.addDependency(0, 0)
+
+	cycles := g.DetectCycles()
+	if len(cycles) != 1 {
+		t.Fatalf("expected 1 cycle for self-loop, got %d: %v", len(cycles), cycles)
+	}
+	if len(cycles[0]) != 1 {
+		t.Errorf("expected cycle of length 1, got %v", cycles[0])
+	}
+}
+
+func TestDetectCycles_EmptyGraph(t *testing.T) {
+	t.Parallel()
+	g := newStageGraph(0)
+
+	cycles := g.DetectCycles()
+	if len(cycles) != 0 {
+		t.Errorf("expected no cycles in empty graph, got %v", cycles)
+	}
+}
+
+func TestDetectCycles_CycleWithTail(t *testing.T) {
+	t.Parallel()
+	// 0 → 1 → 2 → 1 (cycle is 1↔2, 0 is a tail)
+	g := newStageGraph(3)
+	g.addDependency(1, 0) // stage 0 depends on stage 1
+	g.addDependency(2, 1) // stage 1 depends on stage 2
+	g.addDependency(1, 2) // stage 2 depends on stage 1
+
+	cycles := g.DetectCycles()
+	if len(cycles) != 1 {
+		t.Fatalf("expected 1 cycle, got %d: %v", len(cycles), cycles)
+	}
+	// Cycle should be [1, 2] (canonical: smallest first)
+	if len(cycles[0]) != 2 {
+		t.Errorf("expected cycle of length 2, got %v", cycles[0])
+	}
+}
