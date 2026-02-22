@@ -35,6 +35,7 @@ const (
 	ExitSuccess     = 0 // No violations (or below fail-level threshold)
 	ExitViolations  = 1 // Violations found at or above fail-level
 	ExitConfigError = 2 // Parse or config error
+	ExitNoFiles     = 3 // No Dockerfiles found (missing file, empty glob, empty directory)
 )
 
 func lintCommand() *cli.Command {
@@ -305,13 +306,18 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 
 	discovered, err := discovery.Discover(inputs, discoveryOpts)
 	if err != nil {
+		var notFound *discovery.FileNotFoundError
+		if errors.As(err, &notFound) {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", notFound)
+			return cli.Exit("", ExitNoFiles)
+		}
 		fmt.Fprintf(os.Stderr, "Error: failed to discover files: %v\n", err)
 		return cli.Exit("", ExitConfigError)
 	}
 
 	if len(discovered) == 0 {
-		fmt.Fprintf(os.Stderr, "Error: no Dockerfiles found\n")
-		return cli.Exit("", ExitConfigError)
+		reportNoFilesFound(inputs)
+		return cli.Exit("", ExitNoFiles)
 	}
 
 	// Lint all discovered files
@@ -1288,4 +1294,30 @@ func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) 
 		}
 	}
 	return remaining
+}
+
+// reportNoFilesFound prints a context-aware message when no Dockerfiles are found.
+func reportNoFilesFound(inputs []string) {
+	for _, input := range inputs {
+		if discovery.ContainsGlobChars(input) {
+			fmt.Fprintf(os.Stderr, "Error: no Dockerfiles matched pattern: %s\n", input)
+			return
+		}
+	}
+
+	// For directory inputs, resolve to absolute path so the user knows exactly
+	// which directory was scanned.
+	for _, input := range inputs {
+		abs, err := filepath.Abs(input)
+		if err != nil {
+			continue
+		}
+		info, err := os.Stat(abs)
+		if err == nil && info.IsDir() {
+			fmt.Fprintf(os.Stderr, "Error: no Dockerfile or Containerfile found in %s\n", abs)
+			return
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "Error: no Dockerfiles found\n")
 }
