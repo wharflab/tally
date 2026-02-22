@@ -55,12 +55,15 @@ func ClosestInstruction(input string) string {
 }
 
 // closestMatch returns the closest string from candidates using Levenshtein
-// distance, or "" if no candidate is within maxDist.
+// distance, or "" if no candidate is within maxDist. The comparison is
+// case-insensitive: input is lowercased once here before any comparisons.
+// Candidates are expected to already be lowercase.
 func closestMatch(input string, candidates []string, maxDist int) string {
+	lower := strings.ToLower(input)
 	best := ""
 	bestDist := maxDist + 1
 	for _, c := range candidates {
-		d := levenshteinDistance(input, c)
+		d := levenshteinDistance(lower, c)
 		if d < bestDist {
 			bestDist = d
 			best = c
@@ -73,10 +76,11 @@ func closestMatch(input string, candidates []string, maxDist int) string {
 }
 
 // levenshteinDistance computes the Levenshtein edit distance between two strings.
+// Both inputs must already be lowercase; no case normalization is applied.
 // This is a simple O(mn) implementation sufficient for short instruction keywords.
 func levenshteinDistance(a, b string) int {
-	ra := []rune(strings.ToLower(a))
-	rb := []rune(strings.ToLower(b))
+	ra := []rune(a)
+	rb := []rune(b)
 	la, lb := len(ra), len(rb)
 
 	if la == 0 {
