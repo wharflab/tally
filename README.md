@@ -348,11 +348,7 @@ Features:
 
 ### Exit Codes
 
-| Code | Meaning                                           |
-| ---- | ------------------------------------------------- |
-| `0`  | No violations (or below `--fail-level` threshold) |
-| `1`  | Violations found at or above `--fail-level`       |
-| `2`  | Parse or configuration error                      |
+See [Exit Codes](docs/guide/exit-codes.md) for the full reference.
 
 ### Fail Level
 
