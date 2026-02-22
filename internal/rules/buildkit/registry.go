@@ -107,7 +107,7 @@ func buildRegistry() map[string]RuleInfo {
 		reg[name] = RuleInfo{
 			Name:            name,
 			Description:     getDescription(entry.rule),
-			DocURL:          getURL(entry.rule),
+			DocURL:          rules.BuildKitDocURL(name),
 			DefaultSeverity: entry.severity,
 			Category:        entry.category,
 			Experimental:    entry.rule.IsExperimental(),
@@ -131,23 +131,6 @@ func getDescription(rule linter.LinterRuleI) string {
 		return r.Description
 	case *linter.LinterRule[func() string]:
 		return r.Description
-	default:
-		// Unknown Format signature - return empty. Add new cases if BuildKit adds signatures.
-		return ""
-	}
-}
-
-// getURL extracts URL from a LinterRule.
-func getURL(rule linter.LinterRuleI) string {
-	switch r := rule.(type) {
-	case *linter.LinterRule[func(string) string]:
-		return r.URL
-	case *linter.LinterRule[func(string, string) string]:
-		return r.URL
-	case *linter.LinterRule[func(string, string, string) string]:
-		return r.URL
-	case *linter.LinterRule[func() string]:
-		return r.URL
 	default:
 		// Unknown Format signature - return empty. Add new cases if BuildKit adds signatures.
 		return ""

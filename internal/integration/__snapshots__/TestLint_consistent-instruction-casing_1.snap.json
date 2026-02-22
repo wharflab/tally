@@ -4,7 +4,7 @@
       "file": "testdata/consistent-instruction-casing/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/consistent-instruction-casing/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/ConsistentInstructionCasing/",
           "location": {
             "end": {
               "column": 0,
@@ -42,7 +42,7 @@
           }
         },
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/consistent-instruction-casing/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/ConsistentInstructionCasing/",
           "location": {
             "end": {
               "column": 0,

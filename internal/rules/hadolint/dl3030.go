@@ -20,7 +20,7 @@ func (r *DL3030Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3030",
 		Name:            "Use -y with yum install",
 		Description:     "Use the -y switch to avoid manual input `yum install -y <package>`",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3030",
+		DocURL:          rules.HadolintDocURL("DL3030"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "best-practice",
 		IsExperimental:  false,

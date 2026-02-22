@@ -20,7 +20,7 @@ func (r *DL3034Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3034",
 		Name:            "Use non-interactive with zypper",
 		Description:     "Non-interactive switch missing from `zypper` command: `zypper install -y`",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3034",
+		DocURL:          rules.HadolintDocURL("DL3034"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "best-practice",
 		IsExperimental:  false,

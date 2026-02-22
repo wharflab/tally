@@ -376,7 +376,7 @@ func (b *Builder) checkDuplicateInstruction(prevLoc *parser.Range, cmd instructi
 			*prevLoc,
 			rules.BuildKitRulePrefix+"MultipleInstructionsDisallowed",
 			"Multiple "+instrName+" instructions should not be used in the same stage because only the last one will be used",
-			"https://docs.docker.com/go/dockerfile/rule/multiple-instructions-disallowed/",
+			rules.BuildKitDocURL("MultipleInstructionsDisallowed"),
 		)
 		issue.Severity = rules.SeverityWarning
 		b.issues = append(b.issues, issue)
@@ -462,7 +462,7 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 						loc,
 						rules.HadolintRulePrefix+"DL3023",
 						"`COPY --from` cannot reference its own `FROM` alias",
-						"https://github.com/hadolint/hadolint/wiki/DL3023",
+						rules.HadolintDocURL("DL3023"),
 					))
 				}
 				copyRef := b.processCopyFrom(c, info.Index, graph)
@@ -481,7 +481,7 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 						loc,
 						rules.HadolintRulePrefix+"DL3022",
 						"`COPY --from` should reference a previously defined `FROM` alias",
-						"https://github.com/hadolint/hadolint/wiki/DL3022",
+						rules.HadolintDocURL("DL3022"),
 					))
 				}
 			}
@@ -680,7 +680,7 @@ func (b *Builder) checkDL3061InstructionOrder() {
 			loc,
 			rules.HadolintRulePrefix+"DL3061",
 			"Invalid instruction order. Dockerfile must begin with `FROM`, `ARG` or comment.",
-			"https://github.com/hadolint/hadolint/wiki/DL3061",
+			rules.HadolintDocURL("DL3061"),
 		))
 	}
 }
@@ -718,7 +718,7 @@ func (b *Builder) checkDL3043ForbiddenOnbuildTriggers() {
 				loc,
 				rules.HadolintRulePrefix+"DL3043",
 				"`ONBUILD`, `FROM` or `MAINTAINER` triggered from within `ONBUILD` instruction.",
-				"https://github.com/hadolint/hadolint/wiki/DL3043",
+				rules.HadolintDocURL("DL3043"),
 			))
 		}
 	}

@@ -82,7 +82,7 @@ func (r *DL3027Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3027",
 		Name:            "Do not use apt",
 		Description:     "Do not use apt as it is meant to be an end-user tool, use apt-get or apt-cache instead",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3027",
+		DocURL:          rules.HadolintDocURL("DL3027"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "style",
 		IsExperimental:  false,

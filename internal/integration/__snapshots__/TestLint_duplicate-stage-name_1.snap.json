@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Consider removing this stage or using COPY --from to include its artifacts in the final image",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/no-unreachable-stages.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-unreachable-stages/",
           "location": {
             "end": {
               "column": 0,
@@ -23,7 +23,7 @@
           "sourceCode": "FROM alpine:3.18 AS builder"
         },
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/duplicate-stage-name/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/DuplicateStageName/",
           "location": {
             "end": {
               "column": 0,

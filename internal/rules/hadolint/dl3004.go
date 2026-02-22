@@ -22,7 +22,7 @@ func (r *DL3004Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3004",
 		Name:            "Do not use sudo",
 		Description:     "Do not use sudo as it has unpredictable behavior in containers",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3004",
+		DocURL:          rules.HadolintDocURL("DL3004"),
 		DefaultSeverity: rules.SeverityError,
 		Category:        "security",
 		IsExperimental:  false,

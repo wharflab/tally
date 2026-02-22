@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "The :latest tag can change at any time, potentially breaking builds or introducing unexpected behavior. Use a specific version tag for reproducibility.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3007",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3007/",
           "location": {
             "end": {
               "column": 0,

@@ -3,7 +3,7 @@
  "Code": "hadolint/DL3007",
  "DefaultSeverity": "warning",
  "Description": "Using :latest is prone to errors if the image will ever update. Pin the version explicitly to a release tag.",
- "DocURL": "https://github.com/hadolint/hadolint/wiki/DL3007",
+ "DocURL": "https://wharflab.github.io/tally/rules/hadolint/DL3007/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "Avoid using :latest tag"

@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "When downloading large files, wget's default progress output produces excessive log lines in Docker builds. Use --progress=dot:giga for a compact progress indicator, or -q/--quiet/-nv/--no-verbose to suppress output entirely.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3047",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3047/",
           "location": {
             "end": {
               "column": 0,
@@ -83,7 +83,7 @@
         },
         {
           "detail": "When downloading large files, wget's default progress output produces excessive log lines in Docker builds. Use --progress=dot:giga for a compact progress indicator, or -q/--quiet/-nv/--no-verbose to suppress output entirely.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3047",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3047/",
           "location": {
             "end": {
               "column": 0,
@@ -122,7 +122,7 @@
         },
         {
           "detail": "Using both wget and curl increases image size and maintenance burden. Standardize on one tool. curl is generally preferred in containers due to better scripting support and broader protocol support.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL4001",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL4001/",
           "location": {
             "end": {
               "column": 0,

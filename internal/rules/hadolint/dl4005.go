@@ -26,7 +26,7 @@ func (r *DL4005Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL4005",
 		Name:            "Use SHELL to change the default shell",
 		Description:     "Use SHELL to change the default shell",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL4005",
+		DocURL:          rules.HadolintDocURL("DL4005"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "style",
 		IsExperimental:  false,

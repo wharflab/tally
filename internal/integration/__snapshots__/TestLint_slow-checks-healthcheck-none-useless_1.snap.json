@@ -4,7 +4,7 @@
       "file": "testdata/slow-checks-healthcheck-none-useless/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3057",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3057/",
           "location": {
             "end": {
               "column": 0,

@@ -4,6 +4,7 @@
       "file": "testdata/slow-checks-platform-mismatch/Dockerfile",
       "violations": [
         {
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/InvalidBaseImagePlatform/",
           "location": {
             "end": {
               "column": 0,

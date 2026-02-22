@@ -3,7 +3,7 @@
  "Code": "buildkit/UndefinedArgInFrom",
  "DefaultSeverity": "warning",
  "Description": "FROM command must use declared ARGs",
- "DocURL": "https://docs.docker.com/go/dockerfile/rule/undefined-arg-in-from/",
+ "DocURL": "https://wharflab.github.io/tally/rules/buildkit/UndefinedArgInFrom/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "UndefinedArgInFrom"

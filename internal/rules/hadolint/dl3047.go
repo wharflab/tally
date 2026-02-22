@@ -34,7 +34,7 @@ func (r *DL3047Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3047",
 		Name:            "Avoid wget without progress bar",
 		Description:     "Avoid use of wget without progress bar. Use `wget --progress=dot:giga <url>` or consider using `-q` or `-nv`",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3047",
+		DocURL:          rules.HadolintDocURL("DL3047"),
 		DefaultSeverity: rules.SeverityInfo,
 		Category:        "best-practice",
 		IsExperimental:  false,

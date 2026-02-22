@@ -25,7 +25,7 @@ func (r *SecretsInArgOrEnvRule) Metadata() rules.RuleMetadata {
 		Code:            rules.BuildKitRulePrefix + "SecretsUsedInArgOrEnv",
 		Name:            "Secrets in ARG or ENV",
 		Description:     "Sensitive data should not be used in build-time variables",
-		DocURL:          "https://docs.docker.com/go/dockerfile/rule/secrets-used-in-arg-or-env/",
+		DocURL:          rules.BuildKitDocURL("SecretsUsedInArgOrEnv"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "security",
 		IsExperimental:  false,

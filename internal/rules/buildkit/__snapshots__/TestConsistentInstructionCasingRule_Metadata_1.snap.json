@@ -3,7 +3,7 @@
  "Code": "buildkit/ConsistentInstructionCasing",
  "DefaultSeverity": "warning",
  "Description": "All commands within the Dockerfile should use the same casing (either upper or lower)",
- "DocURL": "https://docs.docker.com/go/dockerfile/rule/consistent-instruction-casing/",
+ "DocURL": "https://wharflab.github.io/tally/rules/buildkit/ConsistentInstructionCasing/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "Consistent Instruction Casing"

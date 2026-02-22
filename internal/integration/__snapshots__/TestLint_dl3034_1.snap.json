@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Running zypper install without -n will cause the command to wait for user confirmation, which will hang in Docker builds. Use -n, --non-interactive, -y, or --no-confirm to automatically confirm.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3034",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3034/",
           "location": {
             "end": {
               "column": 0,
@@ -43,7 +43,7 @@
         },
         {
           "detail": "Running zypper install without -n will cause the command to wait for user confirmation, which will hang in Docker builds. Use -n, --non-interactive, -y, or --no-confirm to automatically confirm.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3034",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3034/",
           "location": {
             "end": {
               "column": 0,
@@ -81,7 +81,7 @@
         },
         {
           "detail": "Running zypper install without -n will cause the command to wait for user confirmation, which will hang in Docker builds. Use -n, --non-interactive, -y, or --no-confirm to automatically confirm.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3034",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3034/",
           "location": {
             "end": {
               "column": 0,
@@ -119,7 +119,7 @@
         },
         {
           "detail": "Running zypper install without -n will cause the command to wait for user confirmation, which will hang in Docker builds. Use -n, --non-interactive, -y, or --no-confirm to automatically confirm.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3034",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3034/",
           "location": {
             "end": {
               "column": 0,

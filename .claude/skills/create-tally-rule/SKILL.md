@@ -82,7 +82,7 @@ func (r *MyRule) Metadata() rules.RuleMetadata {
         Code:            rules.TallyRulePrefix + "<rule_slug>",
         Name:            "...",
         Description:     "...",
-        DocURL:          "https://github.com/wharflab/tally/blob/main/docs/rules/tally/<rule_slug>.md",
+        DocURL:          rules.TallyDocURL(rules.TallyRulePrefix + "<rule_slug>"),
         DefaultSeverity: rules.SeverityStyle,
         Category:        "style",
         IsExperimental:  false,

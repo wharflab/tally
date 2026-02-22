@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Add a HEALTHCHECK instruction to enable container health monitoring. Use HEALTHCHECK CMD to define a check command, or HEALTHCHECK NONE to explicitly opt out. Note: HEALTHCHECK is inherited from base images at runtime, so this may be a false positive if your base image already defines one.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3057",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3057/",
           "location": {
             "end": {
               "column": -1,

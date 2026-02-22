@@ -4,7 +4,7 @@
       "file": "testdata/newline-between-instructions/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-between-instructions.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/newline-between-instructions/",
           "location": {
             "end": {
               "column": -1,
@@ -29,7 +29,7 @@
           }
         },
         {
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-between-instructions.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/newline-between-instructions/",
           "location": {
             "end": {
               "column": -1,

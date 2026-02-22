@@ -15,7 +15,7 @@ Flags `RUN` instructions that install dependencies or build artifacts with packa
 
 The rule follows Docker's official cache-mount guidance in the **Use cache mounts** section:
 
-- <https://docs.docker.com/build/cache/optimize/#use-cache-mounts>
+- [Docker cache optimization](https://docs.docker.com/build/cache/optimize/#use-cache-mounts)
 
 It also supports `pnpm`, `uv`, and `bun` package install flows.
 

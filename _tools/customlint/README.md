@@ -32,6 +32,19 @@ Checks that rule structs in `internal/rules/` follow tally's conventions:
 
 **Test**: `go test ./...` (all tests pass ✅)
 
+### docurl
+
+Checks that `DocURL` fields in `internal/rules/` and `internal/semantic/` use the centralized
+`rules.TallyDocURL`, `rules.BuildKitDocURL`, or `rules.HadolintDocURL` helpers instead of
+hardcoded URL strings. This prevents regressions after migrating all rule doc URLs to GitHub Pages.
+
+Detects:
+
+- `DocURL: "https://..."` in struct literals
+- `newIssue(..., "https://...", ...)` calls with a hardcoded 5th argument
+
+**Test**: `go test ./...` (all tests pass ✅)
+
 ## Structure
 
 ```text

@@ -245,11 +245,14 @@ go run . check --fix /tmp/test.dockerfile && cat /tmp/test.dockerfile
 
 ## Step 9: Update Documentation
 
-In `RULES.md`, add 🔧 emoji to the rule:
+1. In `RULES.md`, add 🔧 emoji to the rule:
 
-```markdown
-| `buildkit/$ARGUMENTS` | Description | Warning | ✅🔧 Captured |
-```
+   ```markdown
+   | `buildkit/$ARGUMENTS` | Description | Warning | ✅🔧 Captured |
+   ```
+
+2. Update `docs/rules/buildkit/$ARGUMENTS.md` — add an `## Auto-fix` section with a before/after example. Set the `Auto-fix` property row to
+   `Yes (\`--fix\`)` (or `Yes (\`--fix-unsafe\`)` for non-safe fixes). Follow the pattern in `docs/rules/buildkit/StageNameCasing.md`.
 
 ## Fix Safety Levels
 
@@ -280,3 +283,4 @@ In `RULES.md`, add 🔧 emoji to the rule:
 - [ ] `make lint` passes
 - [ ] Manual `--fix` verification works
 - [ ] RULES.md updated with 🔧 emoji
+- [ ] `docs/rules/buildkit/$ARGUMENTS.md` updated with Auto-fix section

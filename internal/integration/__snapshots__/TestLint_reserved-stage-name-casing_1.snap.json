@@ -4,7 +4,7 @@
       "file": "testdata/reserved-stage-name-casing/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/reserved-stage-name/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/ReservedStageName/",
           "location": {
             "end": {
               "column": 0,
@@ -22,7 +22,7 @@
           "sourceCode": "FROM alpine:3.21 AS Scratch"
         },
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/reserved-stage-name/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/ReservedStageName/",
           "location": {
             "end": {
               "column": 0,
@@ -41,7 +41,7 @@
         },
         {
           "detail": "Stage names should be lowercase",
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/StageNameCasing/",
           "location": {
             "end": {
               "column": 0,

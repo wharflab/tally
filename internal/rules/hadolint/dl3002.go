@@ -23,7 +23,7 @@ func (r *DL3002Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3002",
 		Name:            "Last USER should not be root",
 		Description:     "Last USER should not be root to follow security best practices",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3002",
+		DocURL:          rules.HadolintDocURL("DL3002"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "security",
 		IsExperimental:  false,

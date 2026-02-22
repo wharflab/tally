@@ -4,7 +4,7 @@
       "file": "testdata/expose-invalid-format/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/expose-invalid-format/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/ExposeInvalidFormat/",
           "location": {
             "end": {
               "column": 0,

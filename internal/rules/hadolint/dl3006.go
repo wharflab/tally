@@ -21,7 +21,7 @@ func (r *DL3006Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3006",
 		Name:            "Pin base image versions",
 		Description:     "Always tag the version of an image explicitly to ensure reproducible builds",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3006",
+		DocURL:          rules.HadolintDocURL("DL3006"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "reproducibility",
 		IsExperimental:  false,

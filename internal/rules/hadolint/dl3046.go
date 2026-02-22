@@ -24,7 +24,7 @@ func (r *DL3046Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3046",
 		Name:            "useradd without -l and high UID",
 		Description:     "`useradd` without flag `-l` and high UID will result in excessively large Image",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3046",
+		DocURL:          rules.HadolintDocURL("DL3046"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "performance",
 		IsExperimental:  false,

@@ -1,5 +1,7 @@
 package hadolint
 
+import "github.com/wharflab/tally/internal/rules"
+
 // DL3022: COPY --from should reference a previously defined FROM alias.
 //
 // The COPY --from flag should reference either a named stage alias defined
@@ -15,7 +17,6 @@ package hadolint
 //
 // See: https://github.com/hadolint/hadolint/wiki/DL3022
 
-const (
-	DL3022Code   = "hadolint/DL3022"
-	DL3022DocURL = "https://github.com/hadolint/hadolint/wiki/DL3022"
-)
+const DL3022Code = "hadolint/DL3022"
+
+var DL3022DocURL = rules.HadolintDocURL("DL3022")

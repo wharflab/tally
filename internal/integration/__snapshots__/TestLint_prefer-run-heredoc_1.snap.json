@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "3 consecutive RUN instructions with 3 total commands can be combined into a single heredoc RUN",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-run-heredoc.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-run-heredoc/",
           "location": {
             "end": {
               "column": 0,
@@ -31,7 +31,7 @@
         },
         {
           "detail": "RUN has 3 chained commands; consider using heredoc syntax for better readability",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-run-heredoc.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-run-heredoc/",
           "location": {
             "end": {
               "column": 0,

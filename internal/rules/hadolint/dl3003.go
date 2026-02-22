@@ -24,7 +24,7 @@ func (r *DL3003Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3003",
 		Name:            "Use WORKDIR to switch to a directory",
 		Description:     "Use WORKDIR to switch to a directory instead of using cd in RUN commands",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3003",
+		DocURL:          rules.HadolintDocURL("DL3003"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "style",
 		IsExperimental:  false,

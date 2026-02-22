@@ -20,7 +20,7 @@ func (r *DL3014Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3014",
 		Name:            "Use -y with apt-get install",
 		Description:     "Use the -y switch to avoid manual input `apt-get -y install <package>`",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3014",
+		DocURL:          rules.HadolintDocURL("DL3014"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "best-practice",
 		IsExperimental:  false,

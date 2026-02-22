@@ -10,6 +10,8 @@ extend-ignore-re = [
 ]
 
 [default.extend-words]
+# Intentional typo example in docs/rules/buildkit/UndefinedVar.md
+PAHT = "PAHT"
 
 [files]
 extend-exclude = ["**/tests/fixtures/**", "**/testdata/**"]

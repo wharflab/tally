@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Empty continuation lines will become errors in a future release",
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/no-empty-continuation/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/NoEmptyContinuation/",
           "location": {
             "end": {
               "column": 0,

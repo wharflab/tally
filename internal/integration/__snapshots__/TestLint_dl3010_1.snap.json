@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "When copying an archive that is immediately extracted, use `ADD` instead of `COPY` + `RUN tar/unzip`. `ADD` automatically extracts recognized archive formats during the build.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL3010",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3010/",
           "location": {
             "end": {
               "column": -1,

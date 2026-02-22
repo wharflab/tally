@@ -43,7 +43,7 @@ func (r *DL3026Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3026",
 		Name:            "Use only trusted base images",
 		Description:     "Use only an allowed registry in the FROM image",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3026",
+		DocURL:          rules.HadolintDocURL("DL3026"),
 		DefaultSeverity: rules.SeverityOff, // Off by default, enabled when trusted-registries configured
 		Category:        "security",
 		IsExperimental:  false,

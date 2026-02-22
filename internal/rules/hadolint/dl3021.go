@@ -24,7 +24,7 @@ func (r *DL3021Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3021",
 		Name:            "COPY destination must end with /",
 		Description:     "COPY with more than 2 arguments requires the last argument to end with /",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3021",
+		DocURL:          rules.HadolintDocURL("DL3021"),
 		DefaultSeverity: rules.SeverityError,
 		Category:        "correctness",
 		IsExperimental:  false,

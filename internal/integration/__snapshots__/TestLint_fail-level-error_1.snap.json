@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment.",
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/invalid-definition-description/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/InvalidDefinitionDescription/",
           "location": {
             "end": {
               "column": 0,
@@ -44,7 +44,7 @@
         },
         {
           "detail": "Stage names should be lowercase",
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/StageNameCasing/",
           "location": {
             "end": {
               "column": 0,
@@ -83,7 +83,7 @@
         },
         {
           "detail": "The MAINTAINER instruction is deprecated, use a label instead to define an image author",
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/maintainer-deprecated/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/MaintainerDeprecated/",
           "location": {
             "end": {
               "column": 0,
@@ -121,7 +121,7 @@
           }
         },
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/json-args-recommended/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/JSONArgsRecommended/",
           "location": {
             "end": {
               "column": 0,

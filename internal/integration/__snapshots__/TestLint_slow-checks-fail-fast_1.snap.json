@@ -4,7 +4,7 @@
       "file": "testdata/slow-checks-fail-fast/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/duplicate-stage-name/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/DuplicateStageName/",
           "location": {
             "end": {
               "column": 0,

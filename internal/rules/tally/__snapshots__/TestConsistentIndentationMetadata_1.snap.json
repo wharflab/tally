@@ -3,7 +3,7 @@
  "Code": "tally/consistent-indentation",
  "DefaultSeverity": "off",
  "Description": "Enforces consistent indentation for Dockerfile build stages",
- "DocURL": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/consistent-indentation.md",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/consistent-indentation/",
  "FixPriority": 50,
  "IsExperimental": true,
  "Name": "Consistent Indentation"

@@ -1,5 +1,7 @@
 package hadolint
 
+import "github.com/wharflab/tally/internal/rules"
+
 // DL3043: ONBUILD, FROM, or MAINTAINER triggered from within ONBUILD instruction.
 //
 // The ONBUILD instruction cannot trigger ONBUILD, FROM, or MAINTAINER instructions.
@@ -16,5 +18,6 @@ package hadolint
 const (
 	DL3043Code    = "hadolint/DL3043"
 	DL3043Message = "`ONBUILD`, `FROM` or `MAINTAINER` triggered from within `ONBUILD` instruction."
-	DL3043DocURL  = "https://github.com/hadolint/hadolint/wiki/DL3043"
 )
+
+var DL3043DocURL = rules.HadolintDocURL("DL3043")

@@ -164,7 +164,7 @@ func (r *$ARGUMENTSRule) Metadata() rules.RuleMetadata {
         Code:            rules.HadolintRulePrefix + "$ARGUMENTS",
         Name:            "...", // Short name from Hadolint wiki
         Description:     "...", // Description from Hadolint wiki
-        DocURL:          "https://github.com/hadolint/hadolint/wiki/$ARGUMENTS",
+        DocURL:          rules.HadolintDocURL("$ARGUMENTS"),
         DefaultSeverity: rules.SeverityWarning, // or SeverityError based on original
         Category:        "...", // security, performance, style, etc.
         IsExperimental:  false,
@@ -339,6 +339,19 @@ After implementation is complete, update the tracking files:
 
    This updates the `rules_enabled` count in all snapshots.
 
+## Step 11: Create Rule Documentation
+
+Create `docs/rules/hadolint/$ARGUMENTS.md` following the pattern in `docs/rules/hadolint/DL3004.md`:
+
+- Title: `# hadolint/$ARGUMENTS`
+- Properties table (Severity, Category, Default, Auto-fix)
+- Description from the Hadolint wiki
+- Examples (Problematic / Correct code)
+- `## Auto-fix` section with before/after example (if auto-fix is supported)
+- `## Reference` section with named link: `- [hadolint/$ARGUMENTS](https://github.com/hadolint/hadolint/wiki/$ARGUMENTS)`
+
+Add the rule to `docs/rules/hadolint/index.md` in the main table.
+
 ## Checklist Before Completion
 
 - [ ] Original Haskell implementation analyzed
@@ -353,4 +366,5 @@ After implementation is complete, update the tracking files:
 - [ ] `hadolint-status.json` updated with new rule
 - [ ] Documentation regenerated with `generate-hadolint-table.sh --update`
 - [ ] All integration snapshots updated
+- [ ] `docs/rules/hadolint/$ARGUMENTS.md` created and added to index
 - [ ] Code follows existing patterns in the codebase

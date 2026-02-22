@@ -3,7 +3,7 @@
  "Code": "tally/no-trailing-spaces",
  "DefaultSeverity": "style",
  "Description": "Disallows trailing whitespace at the end of lines",
- "DocURL": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/no-trailing-spaces.md",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/no-trailing-spaces/",
  "FixPriority": 10,
  "IsExperimental": false,
  "Name": "No Trailing Spaces"

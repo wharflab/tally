@@ -165,8 +165,8 @@ func TestNewViolationFromBuildKitWarning(t *testing.T) {
 	if v.Detail != "Stage names should be lowercase" {
 		t.Errorf("Detail = %q", v.Detail)
 	}
-	if v.DocURL != "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/" {
-		t.Errorf("DocURL = %q", v.DocURL)
+	if v.DocURL != BuildKitDocURL("StageNameCasing") {
+		t.Errorf("DocURL = %q, want %q", v.DocURL, BuildKitDocURL("StageNameCasing"))
 	}
 	if v.Severity != SeverityWarning {
 		t.Errorf("Severity = %v, want %v", v.Severity, SeverityWarning)

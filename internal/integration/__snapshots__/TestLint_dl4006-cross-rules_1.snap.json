@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "If you are using /bin/sh in an alpine image or if your shell is symlinked to busybox then consider explicitly setting your SHELL to /bin/ash, or disable this check. Use SHELL [\"/bin/bash\", \"-o\", \"pipefail\", \"-c\"] before the RUN instruction.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL4006",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL4006/",
           "location": {
             "end": {
               "column": 0,
@@ -24,7 +24,7 @@
         },
         {
           "detail": "2 consecutive RUN instructions with 4 total commands can be combined into a single heredoc RUN",
-          "docUrl": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/prefer-run-heredoc.md",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-run-heredoc/",
           "location": {
             "end": {
               "column": 0,
@@ -50,7 +50,7 @@
         },
         {
           "detail": "If you are using /bin/sh in an alpine image or if your shell is symlinked to busybox then consider explicitly setting your SHELL to /bin/ash, or disable this check. Use SHELL [\"/bin/bash\", \"-o\", \"pipefail\", \"-c\"] before the RUN instruction.",
-          "docUrl": "https://github.com/hadolint/hadolint/wiki/DL4006",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL4006/",
           "location": {
             "end": {
               "column": 0,

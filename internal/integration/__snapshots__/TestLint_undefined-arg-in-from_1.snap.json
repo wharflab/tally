@@ -4,7 +4,7 @@
       "file": "testdata/undefined-arg-in-from/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://docs.docker.com/go/dockerfile/rule/undefined-arg-in-from/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/UndefinedArgInFrom/",
           "location": {
             "end": {
               "column": 0,

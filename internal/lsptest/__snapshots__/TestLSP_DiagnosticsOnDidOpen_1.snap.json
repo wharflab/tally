@@ -3,7 +3,7 @@
   {
    "code": "hadolint/DL3057",
    "codeDescription": {
-    "href": "https://github.com/hadolint/hadolint/wiki/DL3057"
+    "href": "https://wharflab.github.io/tally/rules/hadolint/DL3057/"
    },
    "message": "`HEALTHCHECK` instruction missing",
    "range": {
@@ -22,7 +22,7 @@
   {
    "code": "buildkit/MaintainerDeprecated",
    "codeDescription": {
-    "href": "https://docs.docker.com/go/dockerfile/rule/maintainer-deprecated/"
+    "href": "https://wharflab.github.io/tally/rules/buildkit/MaintainerDeprecated/"
    },
    "message": "Maintainer instruction is deprecated in favor of using label",
    "range": {
@@ -41,7 +41,7 @@
   {
    "code": "tally/newline-between-instructions",
    "codeDescription": {
-    "href": "https://github.com/wharflab/tally/blob/main/docs/rules/tally/newline-between-instructions.md"
+    "href": "https://wharflab.github.io/tally/rules/tally/newline-between-instructions/"
    },
    "message": "expected blank line between FROM and MAINTAINER",
    "range": {

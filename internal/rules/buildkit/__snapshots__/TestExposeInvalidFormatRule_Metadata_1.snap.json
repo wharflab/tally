@@ -3,7 +3,7 @@
  "Code": "buildkit/ExposeInvalidFormat",
  "DefaultSeverity": "warning",
  "Description": "IP address and host-port mapping should not be used in EXPOSE instruction. This will become an error in a future release",
- "DocURL": "https://docs.docker.com/go/dockerfile/rule/expose-invalid-format/",
+ "DocURL": "https://wharflab.github.io/tally/rules/buildkit/ExposeInvalidFormat/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "ExposeInvalidFormat"

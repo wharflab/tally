@@ -28,7 +28,7 @@ func (r *ConsistentInstructionCasingRule) Metadata() rules.RuleMetadata {
 		Code:            rules.BuildKitRulePrefix + "ConsistentInstructionCasing",
 		Name:            "Consistent Instruction Casing",
 		Description:     linter.RuleConsistentInstructionCasing.Description,
-		DocURL:          linter.RuleConsistentInstructionCasing.URL,
+		DocURL:          rules.BuildKitDocURL("ConsistentInstructionCasing"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "style",
 		IsExperimental:  false,

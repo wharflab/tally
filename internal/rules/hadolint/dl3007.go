@@ -21,7 +21,7 @@ func (r *DL3007Rule) Metadata() rules.RuleMetadata {
 		Code:            rules.HadolintRulePrefix + "DL3007",
 		Name:            "Avoid using :latest tag",
 		Description:     "Using :latest is prone to errors if the image will ever update. Pin the version explicitly to a release tag.",
-		DocURL:          "https://github.com/hadolint/hadolint/wiki/DL3007",
+		DocURL:          rules.HadolintDocURL("DL3007"),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "reproducibility",
 		IsExperimental:  false,
