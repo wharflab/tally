@@ -492,7 +492,7 @@ RUN uv sync --frozen
 			wantFixContains: []string{
 				"--mount=type=cache,target=/root/.cache/uv,id=uv",
 				"uv sync --frozen",
-				`ENV UV_LINK_MODE="copy"`,
+				"ENV UV_LINK_MODE=copy",
 			},
 			wantNotContains: []string{"UV_NO_CACHE"},
 			wantEditCount:   2,
@@ -555,7 +555,7 @@ RUN pip install -r requirements.txt
 			wantFixContains: []string{
 				"--mount=type=cache,target=/root/.cache/pip,id=pip",
 				"pip install -r requirements.txt",
-				`ENV PIP_INDEX_URL="https://example.com/simple"`,
+				"ENV PIP_INDEX_URL=https://example.com/simple",
 			},
 			wantNotContains: []string{"PIP_NO_CACHE_DIR"},
 			wantEditCount:   2,

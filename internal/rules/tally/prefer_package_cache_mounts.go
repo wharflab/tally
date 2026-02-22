@@ -544,7 +544,7 @@ func buildEnvKeyRemovalEdit(file string, env *instructions.EnvCommand, keysToRem
 		if removeSet[kv.Key] {
 			continue
 		}
-		parts = append(parts, fmt.Sprintf("%s=%q", kv.Key, unquote(kv.Value)))
+		parts = append(parts, kv.String())
 	}
 
 	if len(parts) == 0 {
