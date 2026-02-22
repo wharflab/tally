@@ -78,12 +78,12 @@ func ValidateFile(path string, maxSize int64) error {
 		return &FileTooLargeError{Path: path, Size: info.Size(), MaxSize: maxSize}
 	}
 
-	// 2. Executable-bit check (platform-specific).
+	// 3. Executable-bit check (platform-specific).
 	if err := checkExecutable(info, path); err != nil {
 		return err
 	}
 
-	// 3. UTF-8 smoke check.
+	// 4. UTF-8 smoke check.
 	// Use maxSize as the read limit when positive; otherwise read up to 1 MB.
 	readLimit := maxSize
 	if readLimit <= 0 {
