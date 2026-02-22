@@ -1,12 +1,20 @@
 import type * as vscode from "vscode";
 
+import { execFile } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { promisify } from "node:util";
+
+import * as semver from "semver";
 
 import { type BinaryResolutionSettings } from "../config/vscodeConfig";
 import { validateUserSuppliedPath } from "./pathValidator";
+
+const execFileAsync = promisify(execFile);
+
+const VERSION_CHECK_TIMEOUT_MS = 2000;
 
 export type BinarySource =
   | "explicitPath"
@@ -29,10 +37,13 @@ export interface FindTallyBinaryInput {
   settings: BinaryResolutionSettings;
   workspaceFolders: readonly vscode.WorkspaceFolder[];
   pythonEnvResolver?: (folder: vscode.WorkspaceFolder) => Promise<string | undefined>;
+  output?: vscode.OutputChannel;
 }
 
 export async function findTallyBinary(input: FindTallyBinaryInput): Promise<ResolvedBinary> {
-  const { extensionContext, isTrusted, settings, workspaceFolders, pythonEnvResolver } = input;
+  const { extensionContext, isTrusted, settings, workspaceFolders, pythonEnvResolver, output } =
+    input;
+  const minVersion = getMinCompatibleVersion(extensionContext);
 
   // 1) Explicit path(s)
   for (const raw of settings.path) {
@@ -46,6 +57,9 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
       continue;
     }
     if (await isExecutableFile(candidate)) {
+      if (minVersion && !(await isCompatibleBinary(candidate, minVersion, output))) {
+        continue;
+      }
       return directBinary(candidate, "explicitPath");
     }
   }
@@ -73,6 +87,9 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
     const candidates = npmCandidates(folder.uri.fsPath);
     for (const candidate of candidates) {
       if (await isExecutableFile(candidate)) {
+        if (minVersion && !(await isCompatibleBinary(candidate, minVersion, output))) {
+          continue;
+        }
         const resolved = windowsCmdShimAwareBinary(candidate, "workspaceNpm");
         if (resolved) {
           return resolved;
@@ -87,6 +104,9 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
       try {
         const candidate = await pythonEnvResolver(folder);
         if (candidate && (await isExecutableFile(candidate))) {
+          if (minVersion && !(await isCompatibleBinary(candidate, minVersion, output))) {
+            continue;
+          }
           return directBinary(candidate, "pythonEnvExt");
         }
       } catch {
@@ -100,6 +120,9 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
     const candidates = venvCandidates(folder.uri.fsPath);
     for (const candidate of candidates) {
       if (await isExecutableFile(candidate)) {
+        if (minVersion && !(await isCompatibleBinary(candidate, minVersion, output))) {
+          continue;
+        }
         return directBinary(candidate, "workspaceVenv");
       }
     }
@@ -107,7 +130,7 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
 
   // 6) PATH
   const onPath = await findOnPATH("tally");
-  if (onPath) {
+  if (onPath && (!minVersion || (await isCompatibleBinary(onPath, minVersion, output)))) {
     return directBinary(onPath, "envPath");
   }
 
@@ -164,6 +187,61 @@ function quoteCmd(p: string): string {
   // Double-quote the path and escape embedded quotes defensively.
   const escaped = p.replaceAll('"', '\\"');
   return `"${escaped}"`;
+}
+
+function getMinCompatibleVersion(context: vscode.ExtensionContext): string | undefined {
+  const pkg: unknown = context.extension.packageJSON;
+  const version =
+    pkg && typeof pkg === "object" && "version" in pkg && typeof pkg.version === "string"
+      ? pkg.version
+      : undefined;
+  if (!version || !semver.valid(version)) {
+    return undefined; // dev build or invalid – skip version gating
+  }
+  return version;
+}
+
+async function isCompatibleBinary(
+  binaryPath: string,
+  minVersion: string,
+  output?: vscode.OutputChannel,
+): Promise<boolean> {
+  try {
+    const { stdout } = await execVersionCommand(binaryPath);
+    const info: unknown = JSON.parse(stdout);
+    const candidateVersion =
+      info && typeof info === "object" && "version" in info && typeof info.version === "string"
+        ? info.version
+        : undefined;
+    if (!candidateVersion || !semver.valid(candidateVersion)) {
+      output?.appendLine(`[tally] skipping ${binaryPath}: unable to determine version`);
+      return false;
+    }
+    if (!semver.gte(candidateVersion, minVersion)) {
+      output?.appendLine(
+        `[tally] skipping ${binaryPath}: version ${candidateVersion} < required ${minVersion}`,
+      );
+      return false;
+    }
+    return true;
+  } catch {
+    output?.appendLine(`[tally] skipping ${binaryPath}: version check failed`);
+    return false;
+  }
+}
+
+async function execVersionCommand(binaryPath: string): Promise<{ stdout: string }> {
+  const args = ["version", "--json"];
+  if (
+    process.platform === "win32" &&
+    (binaryPath.toLowerCase().endsWith(".cmd") || binaryPath.toLowerCase().endsWith(".bat"))
+  ) {
+    const commandLine = quoteCmd(binaryPath) + " version --json";
+    return execFileAsync("cmd.exe", ["/d", "/s", "/c", commandLine], {
+      timeout: VERSION_CHECK_TIMEOUT_MS,
+    });
+  }
+  return execFileAsync(binaryPath, args, { timeout: VERSION_CHECK_TIMEOUT_MS });
 }
 
 function bundledBinaryPath(context: vscode.ExtensionContext): string {

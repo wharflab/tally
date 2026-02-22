@@ -33,6 +33,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         settings: binarySettings,
         workspaceFolders: vscode.workspace.workspaceFolders ?? [],
         pythonEnvResolver: findTallyViaPythonEnvs,
+        output,
       });
 
       const settingsEnvelope = configService.lspSettings();
