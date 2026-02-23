@@ -35,6 +35,17 @@ func (e *CheckError) Error() string {
 	return fmt.Sprintf("%d syntax errors found", n)
 }
 
+// RuleCodes returns the rule codes for all syntax-level checks.
+// These checks are not registered in the rules.Registry since they run
+// before the lint pipeline, but they count toward the tally rule total.
+func RuleCodes() []string {
+	return []string{
+		"tally/unknown-instruction",
+		"tally/require-stages",
+		"tally/syntax-directive-typo",
+	}
+}
+
 // Check runs syntax checks on a parsed AST in priority order and returns
 // errors from the first check that fires. This is fail-fast: once a check
 // produces errors, later checks are skipped.

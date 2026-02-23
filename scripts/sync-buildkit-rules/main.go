@@ -22,6 +22,7 @@ import (
 	_ "github.com/wharflab/tally/internal/rules/all"
 	bkregistry "github.com/wharflab/tally/internal/rules/buildkit"
 	buildkitfixes "github.com/wharflab/tally/internal/rules/buildkit/fixes"
+	"github.com/wharflab/tally/internal/syntax"
 )
 
 const (
@@ -158,7 +159,7 @@ func run(targets targets) error {
 		return fmt.Errorf("failed to read Hadolint rules file: %w", err)
 	}
 
-	tallyCount := countRegisteredPrefix(rules.TallyRulePrefix)
+	tallyCount := countRegisteredPrefix(rules.TallyRulePrefix) + len(syntax.RuleCodes())
 	buildkitSupported := len(implementedRows) + len(capturedRows)
 	buildkitTotal := len(defs)
 	if got := len(bkregistry.All()); got != buildkitTotal {
