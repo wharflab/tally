@@ -117,6 +117,11 @@ type StageInfo struct {
 	IsLastStage bool
 }
 
+// IsScratch returns true if this stage uses FROM scratch as its base image.
+func (s *StageInfo) IsScratch() bool {
+	return s.Stage != nil && s.Stage.BaseName == "scratch"
+}
+
 // HasPackage checks if a package was installed in this stage.
 func (s *StageInfo) HasPackage(pkg string) bool {
 	for _, install := range s.InstalledPackages {
@@ -135,7 +140,7 @@ func (s *StageInfo) IsExternalImage() bool {
 		return false
 	}
 	// scratch is a special "no base" image
-	if s.Stage.BaseName == "scratch" {
+	if s.IsScratch() {
 		return false
 	}
 	// Check if it references another stage

@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "testdata/shell-run-in-scratch/Dockerfile",
+      "violations": [
+        {
+          "detail": "scratch images contain no shell. Use exec-form (RUN [\"/binary\", \"arg\"]), change the base image, or add a SHELL instruction if you've bootstrapped a shell",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/shell-run-in-scratch/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "testdata/shell-run-in-scratch/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "shell-form RUN in scratch stage stage 0 will fail because scratch has no /bin/sh",
+          "rule": "tally/shell-run-in-scratch",
+          "severity": "warning",
+          "sourceCode": "RUN echo \"this will fail\""
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

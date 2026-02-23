@@ -1,0 +1,10 @@
+{
+ "Category": "correctness",
+ "Code": "tally/copy-from-empty-scratch-stage",
+ "DefaultSeverity": "error",
+ "Description": "Detects COPY --from referencing a scratch stage with no file-producing instructions",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/copy-from-empty-scratch-stage/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Copy From Empty Scratch Stage"
+}
