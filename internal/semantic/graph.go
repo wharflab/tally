@@ -125,7 +125,9 @@ func (g *StageGraph) StageCount() int {
 	return g.stageCount
 }
 
-// DetectCycles returns all cycles in the stage dependency graph.
+// DetectCycles finds cycles in the stage dependency graph.
+// It returns at least one cycle per strongly connected component;
+// overlapping or shorter cycles within the same SCC may not all be reported.
 // Each cycle is a slice of stage indices forming a directed cycle
 // (e.g., [0, 2, 1] means stage 0 → stage 2 → stage 1 → stage 0).
 // Returns nil if the graph is acyclic.
