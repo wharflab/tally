@@ -43,7 +43,7 @@ func getRunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (
 	upper := strings.ToUpper(firstLine)
 	if idx := strings.Index(upper, strings.ToUpper(command.Run)); idx >= 0 {
 		// Check that RUN is followed by whitespace (space or tab)
-		afterRun := idx + 3
+		afterRun := idx + len(command.Run)
 		if afterRun < len(firstLine) && (firstLine[afterRun] == ' ' || firstLine[afterRun] == '\t') {
 			// Count contiguous whitespace after RUN
 			wsEnd := afterRun
