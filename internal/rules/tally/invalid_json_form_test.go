@@ -75,6 +75,11 @@ func TestInvalidJSONFormRule_Check(t *testing.T) {
 			WantViolations: 0,
 		},
 		{
+			Name:           "RUN with POSIX single-bracket test",
+			Content:        "FROM alpine:3.20\nRUN [ -f /etc/hosts ] && echo found\n",
+			WantViolations: 0,
+		},
+		{
 			Name:           "valid empty JSON array",
 			Content:        "FROM alpine:3.20\nCMD []\n",
 			WantViolations: 0,
@@ -144,6 +149,18 @@ func TestInvalidJSONFormRule_Check(t *testing.T) {
 			Content:        "FROM alpine:3.20\nVOLUME [/data, /logs]\n",
 			WantViolations: 1,
 			WantMessages:   []string{"VOLUME"},
+		},
+		{
+			Name:           "ADD unquoted",
+			Content:        "FROM alpine:3.20\nADD [src, dst]\n",
+			WantViolations: 1,
+			WantMessages:   []string{"ADD"},
+		},
+		{
+			Name:           "COPY unquoted",
+			Content:        "FROM alpine:3.20\nCOPY [src, dst]\n",
+			WantViolations: 1,
+			WantMessages:   []string{"COPY"},
 		},
 		{
 			Name: "multiple invalid instructions",

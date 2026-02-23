@@ -193,7 +193,7 @@ func (r *InvalidJSONFormRule) buildViolation(
 }
 
 // looksLikeInvalidJSON returns true if the argument text starts with `[` but
-// is not a bash [[ test construct and contains a closing `]`.
+// is not a shell test construct and contains a closing `]`.
 func looksLikeInvalidJSON(trimmed string) bool {
 	if !strings.HasPrefix(trimmed, "[") {
 		return false
@@ -203,7 +203,18 @@ func looksLikeInvalidJSON(trimmed string) bool {
 		return false
 	}
 	// Must contain a closing bracket to look like an array attempt.
-	return strings.Contains(trimmed, "]")
+	if !strings.Contains(trimmed, "]") {
+		return false
+	}
+	// POSIX single-bracket test: `[ expression ]`. These start with "[ "
+	// and have no commas between brackets (JSON arrays use commas).
+	if strings.HasPrefix(trimmed, "[ ") {
+		closingIdx := strings.Index(trimmed, "]")
+		if closingIdx > 0 && !strings.Contains(trimmed[1:closingIdx], ",") {
+			return false
+		}
+	}
+	return true
 }
 
 // extractArgsText strips the instruction keyword and flags from the original
