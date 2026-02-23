@@ -253,6 +253,20 @@ func TestCheckRequireStagesNilAST(t *testing.T) {
 	}
 }
 
+func TestCheckRequireStagesEmptyChildren(t *testing.T) {
+	t.Parallel()
+	// An AST with zero children (e.g. comment-only file that somehow
+	// reaches syntax checks) should still report the missing-stages error.
+	ast := &parser.Result{AST: &parser.Node{}}
+	errs := checkRequireStages("Dockerfile", ast)
+	if len(errs) != 1 {
+		t.Fatalf("expected 1 error for empty children, got %d: %v", len(errs), errs)
+	}
+	if errs[0].RuleCode != "tally/require-stages" {
+		t.Errorf("expected tally/require-stages, got %q", errs[0].RuleCode)
+	}
+}
+
 func TestCheck(t *testing.T) {
 	t.Parallel()
 

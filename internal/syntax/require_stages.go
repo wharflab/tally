@@ -11,7 +11,7 @@ import (
 // instruction (i.e., at least one build stage). A Dockerfile without any FROM
 // always fails with "dockerfile contains no stages to build" at build time.
 func checkRequireStages(file string, ast *parser.Result) []Error {
-	if ast == nil || ast.AST == nil || len(ast.AST.Children) == 0 {
+	if ast == nil || ast.AST == nil {
 		return nil
 	}
 
@@ -21,10 +21,12 @@ func checkRequireStages(file string, ast *parser.Result) []Error {
 		}
 	}
 
-	// Report on the first instruction line so the diagnostic is anchored.
+	// No FROM found (or empty instruction list). Report on line 1.
 	line := 1
-	if first := ast.AST.Children[0]; first != nil {
-		line = first.StartLine
+	if len(ast.AST.Children) > 0 {
+		if first := ast.AST.Children[0]; first != nil {
+			line = first.StartLine
+		}
 	}
 
 	return []Error{{
