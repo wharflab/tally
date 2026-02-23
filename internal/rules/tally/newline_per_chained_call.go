@@ -366,7 +366,7 @@ func findCmdStartCol(firstLine string) int {
 	// Skip "RUN" keyword
 	upper := strings.ToUpper(trimmed)
 	if strings.HasPrefix(upper, strings.ToUpper(command.Run)) {
-		offset += 3
+		offset += len(command.Run)
 	}
 
 	rest := firstLine[offset:]
