@@ -281,12 +281,18 @@ func extractOnbuildArgs(original, subKeyword string) string {
 	upper := strings.ToUpper(original)
 	subUpper := strings.ToUpper(subKeyword)
 
-	// Find the sub-instruction keyword after ONBUILD.
-	idx := strings.Index(upper, subUpper)
+	// Skip past "ONBUILD" before searching for the sub-instruction keyword.
+	onbuildEnd := strings.Index(upper, "ONBUILD")
+	if onbuildEnd < 0 {
+		return ""
+	}
+	onbuildEnd += len("ONBUILD")
+
+	idx := strings.Index(upper[onbuildEnd:], subUpper)
 	if idx < 0 {
 		return ""
 	}
-	rest := original[idx+len(subUpper):]
+	rest := original[onbuildEnd+idx+len(subUpper):]
 	rest = strings.TrimSpace(rest)
 
 	// Skip flags.
