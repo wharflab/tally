@@ -463,6 +463,24 @@ func TestTryRepairJSON(t *testing.T) {
 			wantOK: true,
 		},
 		{
+			name:   "single-quoted with internal double quotes",
+			input:  `['say "hello"']`,
+			want:   `["say \"hello\""]`,
+			wantOK: true,
+		},
+		{
+			name:   "unquoted with backslash",
+			input:  `[C:\path]`,
+			want:   `["C:\\path"]`,
+			wantOK: true,
+		},
+		{
+			name:   "empty string element preserved",
+			input:  `["", "b"]`,
+			want:   `["", "b"]`,
+			wantOK: true,
+		},
+		{
 			name:   "not brackets",
 			input:  `echo hello`,
 			wantOK: false,
@@ -532,6 +550,9 @@ func TestEnsureDoubleQuoted(t *testing.T) {
 		{`/bin/bash`, `"/bin/bash"`},
 		{`-c`, `"-c"`},
 		{``, ``},
+		{`'say "hello"'`, `"say \"hello\""`},
+		{`C:\path`, `"C:\\path"`},
+		{`""`, `""`},
 	}
 
 	for _, tt := range tests {
