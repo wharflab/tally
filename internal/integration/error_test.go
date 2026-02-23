@@ -29,6 +29,8 @@ func TestLintErrors(t *testing.T) {
 	t.Run("unknown-instruction", testLintErrorUnknownInstruction)
 	t.Run("syntax-directive-typo", testLintErrorSyntaxDirectiveTypo)
 	t.Run("multiple-unknown-instructions", testLintErrorMultipleUnknownInstructions)
+	t.Run("require-stages-arg-only", testLintErrorRequireStagesArgOnly)
+	t.Run("require-stages-no-from", testLintErrorRequireStagesNoFrom)
 }
 
 func testLintErrorUnparseableJSON(t *testing.T) {
@@ -351,6 +353,54 @@ func testLintErrorMultipleUnknownInstructions(t *testing.T) {
 	}
 	if !strings.Contains(stderr, "RUNN") {
 		t.Errorf("expected 'RUNN' in stderr, got: %q", stderr)
+	}
+	if stdout != "" {
+		t.Errorf("expected empty stdout for syntax error, got: %q", stdout)
+	}
+}
+
+func testLintErrorRequireStagesArgOnly(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte("ARG FOO=bar\nARG BAZ=qux\n"), 0o644); err != nil {
+		t.Fatalf("write dockerfile: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyLintRaw(t, dockerfilePath)
+
+	t.Logf("exit=%d\nstdout:\n%s\nstderr:\n%s", exitCode, stdout, stderr)
+
+	if exitCode != 4 {
+		t.Errorf("expected exit code 4 (syntax error), got %d", exitCode)
+	}
+	if !strings.Contains(stderr, "no stages to build") {
+		t.Errorf("expected 'no stages to build' in stderr, got: %q", stderr)
+	}
+	if stdout != "" {
+		t.Errorf("expected empty stdout for syntax error, got: %q", stdout)
+	}
+}
+
+func testLintErrorRequireStagesNoFrom(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte("RUN echo hello\n"), 0o644); err != nil {
+		t.Fatalf("write dockerfile: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyLintRaw(t, dockerfilePath)
+
+	t.Logf("exit=%d\nstdout:\n%s\nstderr:\n%s", exitCode, stdout, stderr)
+
+	if exitCode != 4 {
+		t.Errorf("expected exit code 4 (syntax error), got %d", exitCode)
+	}
+	if !strings.Contains(stderr, "no stages to build") {
+		t.Errorf("expected 'no stages to build' in stderr, got: %q", stderr)
 	}
 	if stdout != "" {
 		t.Errorf("expected empty stdout for syntax error, got: %q", stdout)

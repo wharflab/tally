@@ -4,6 +4,9 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 
 | Rule | Description | Severity | Category | Default |
 |------|-------------|----------|----------|---------|
+| [require-stages](./require-stages.md) | Dockerfile has no stages to build | Error | Correctness | Enabled |
+| [unknown-instruction](./unknown-instruction.md) | Detects misspelled or invalid Dockerfile instruction keywords | Error | Correctness | Enabled |
+| [syntax-directive-typo](./syntax-directive-typo.md) | Detects typos in `# syntax=` parser directives | Error | Correctness | Enabled |
 | [secrets-in-code](./secrets-in-code.md) | Detects hardcoded secrets, API keys, and credentials | Error | Security | Enabled |
 | [prefer-vex-attestation](./prefer-vex-attestation.md) | Prefer attaching OpenVEX as an OCI attestation instead of copying VEX JSON into the image | Info | Security | Enabled |
 | [max-lines](./max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |

@@ -35,16 +35,21 @@ func (e *CheckError) Error() string {
 	return fmt.Sprintf("%d syntax errors found", n)
 }
 
-// Check runs all syntax checks on a parsed AST.
+// Check runs syntax checks on a parsed AST in priority order and returns
+// errors from the first check that fires. This is fail-fast: once a check
+// produces errors, later checks are skipped.
 // Returns nil if no issues are found.
 func Check(file string, ast *parser.Result, source []byte) []Error {
-	errs := make([]Error, 0, 4) //nolint:mnd // small pre-alloc for typical case
-	errs = append(errs, checkUnknownInstructions(file, ast)...)
-	errs = append(errs, checkSyntaxDirective(file, source)...)
-	if len(errs) == 0 {
-		return nil
+	for _, errs := range [][]Error{
+		checkUnknownInstructions(file, ast),
+		checkRequireStages(file, ast),
+		checkSyntaxDirective(file, source),
+	} {
+		if len(errs) > 0 {
+			return errs
+		}
 	}
-	return errs
+	return nil
 }
 
 // ClosestInstruction returns the closest valid Dockerfile instruction to input

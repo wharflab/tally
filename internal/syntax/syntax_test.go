@@ -180,16 +180,120 @@ func TestCheckSyntaxDirective(t *testing.T) {
 	}
 }
 
+func TestCheckRequireStages(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		dockerfile string
+		wantCount  int
+		wantSubstr string
+	}{
+		{
+			name:       "no FROM at all",
+			dockerfile: "RUN echo hello\nCOPY . /app\n",
+			wantCount:  1,
+			wantSubstr: "no stages to build",
+		},
+		{
+			name:       "only ARGs no FROM",
+			dockerfile: "ARG FOO=bar\nARG BAZ=qux\n",
+			wantCount:  1,
+			wantSubstr: "no stages to build",
+		},
+		{
+			name:       "valid with FROM",
+			dockerfile: "FROM alpine\nRUN echo hello\n",
+			wantCount:  0,
+		},
+		{
+			name:       "FROM after ARGs",
+			dockerfile: "ARG VERSION=1.0\nFROM alpine:$VERSION\n",
+			wantCount:  0,
+		},
+		{
+			name:       "case insensitive from",
+			dockerfile: "from alpine\nrun echo hello\n",
+			wantCount:  0,
+		},
+		{
+			name:       "single FROM only",
+			dockerfile: "FROM scratch\n",
+			wantCount:  0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ast := mustParse(t, tt.dockerfile)
+			errs := checkRequireStages("Dockerfile", ast)
+			if len(errs) != tt.wantCount {
+				t.Errorf("got %d errors, want %d: %v", len(errs), tt.wantCount, errs)
+			}
+			if tt.wantSubstr != "" && len(errs) > 0 {
+				if !strings.Contains(errs[0].Message, tt.wantSubstr) {
+					t.Errorf("error message %q does not contain %q", errs[0].Message, tt.wantSubstr)
+				}
+			}
+			for _, e := range errs {
+				if e.RuleCode != "tally/require-stages" {
+					t.Errorf("expected rule code tally/require-stages, got %q", e.RuleCode)
+				}
+			}
+		})
+	}
+}
+
+func TestCheckRequireStagesNilAST(t *testing.T) {
+	t.Parallel()
+	errs := checkRequireStages("Dockerfile", nil)
+	if len(errs) != 0 {
+		t.Errorf("expected 0 errors for nil AST, got %d: %v", len(errs), errs)
+	}
+}
+
 func TestCheck(t *testing.T) {
 	t.Parallel()
 
-	t.Run("both checks fire", func(t *testing.T) {
+	t.Run("fail-fast stops at first check", func(t *testing.T) {
 		t.Parallel()
+		// FORM triggers unknown-instruction; require-stages and directive-typo are skipped.
 		source := "# syntax=docker/dokcerfile:1\nFORM alpine\n"
 		ast := mustParse(t, source)
 		errs := Check("Dockerfile", ast, []byte(source))
-		if len(errs) != 2 {
-			t.Errorf("expected 2 errors, got %d: %v", len(errs), errs)
+		if len(errs) != 1 {
+			t.Errorf("expected 1 error (fail-fast), got %d: %v", len(errs), errs)
+		}
+		if len(errs) > 0 && errs[0].RuleCode != "tally/unknown-instruction" {
+			t.Errorf("expected tally/unknown-instruction, got %q", errs[0].RuleCode)
+		}
+	})
+
+	t.Run("require-stages fires when no unknown instructions", func(t *testing.T) {
+		t.Parallel()
+		// Valid instructions but no FROM — require-stages fires, directive check skipped.
+		source := "# syntax=docker/dokcerfile:1\nRUN echo hello\n"
+		ast := mustParse(t, source)
+		errs := Check("Dockerfile", ast, []byte(source))
+		if len(errs) != 1 {
+			t.Errorf("expected 1 error, got %d: %v", len(errs), errs)
+		}
+		if len(errs) > 0 && errs[0].RuleCode != "tally/require-stages" {
+			t.Errorf("expected tally/require-stages, got %q", errs[0].RuleCode)
+		}
+	})
+
+	t.Run("directive-typo fires when instructions and stages ok", func(t *testing.T) {
+		t.Parallel()
+		source := "# syntax=docker/dokcerfile:1\nFROM alpine\n"
+		ast := mustParse(t, source)
+		errs := Check("Dockerfile", ast, []byte(source))
+		if len(errs) != 1 {
+			t.Errorf("expected 1 error, got %d: %v", len(errs), errs)
+		}
+		if len(errs) > 0 && errs[0].RuleCode != "tally/syntax-directive-typo" {
+			t.Errorf("expected tally/syntax-directive-typo, got %q", errs[0].RuleCode)
 		}
 	})
 

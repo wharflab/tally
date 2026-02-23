@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 17 | - | 17 |
+| tally | 20 | - | 20 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -29,6 +29,9 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 
 | Rule | Description | Severity | Category | Default |
 |------|-------------|----------|----------|---------|
+| [`tally/require-stages`](docs/rules/tally/require-stages.md) | Dockerfile has no stages to build (fail-fast syntax check) | Error | Correctness | Enabled |
+| [`tally/unknown-instruction`](docs/rules/tally/unknown-instruction.md) | Detects misspelled or invalid Dockerfile instruction keywords (fail-fast syntax check) | Error | Correctness | Enabled |
+| [`tally/syntax-directive-typo`](docs/rules/tally/syntax-directive-typo.md) | Detects typos in `# syntax=` parser directives (fail-fast syntax check) | Error | Correctness | Enabled |
 | [`tally/secrets-in-code`](docs/rules/tally/secrets-in-code.md) | Detects hardcoded secrets, API keys, and credentials using [gitleaks](https://github.com/gitleaks/gitleaks) patterns | Error | Security | Enabled |
 | [`tally/prefer-vex-attestation`](docs/rules/tally/prefer-vex-attestation.md) | Recommends attaching OpenVEX as an OCI attestation instead of copying `*.vex.json` into the image | Info | Security | Enabled |
 | [`tally/max-lines`](docs/rules/tally/max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |

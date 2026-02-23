@@ -768,6 +768,7 @@ func (b *Builder) checkDL3061InstructionOrder() {
 			"Invalid instruction order. Dockerfile must begin with `FROM`, `ARG` or comment.",
 			rules.HadolintDocURL("DL3061"),
 		))
+		return // Report only the first offending instruction.
 	}
 }
 

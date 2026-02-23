@@ -203,12 +203,7 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3061")...),
 			wantExit: 1,
 		},
-		{
-			name:     "no-from-instruction",
-			dir:      "no-from-instruction",
-			args:     append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3061")...),
-			wantExit: 1,
-		},
+		// NOTE: "no-from-instruction" moved to error_test.go (tally/require-stages fires as syntax error, exit 4).
 
 		// Unreachable stage detection
 		{

@@ -260,6 +260,28 @@ RUN echo "ok"
 	}
 }
 
+func TestDL3061ReportsOnlyFirstViolation(t *testing.T) {
+	t.Parallel()
+	content := `RUN echo "first"
+COPY . /app
+WORKDIR /app
+CMD ["echo", "hello"]
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+
+	violations := model.ConstructionIssues()
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	if violations[0].Code != "hadolint/DL3061" {
+		t.Errorf("expected hadolint/DL3061, got %q", violations[0].Code)
+	}
+	if violations[0].Location.Start.Line != 1 {
+		t.Errorf("expected violation on line 1, got %d", violations[0].Location.Start.Line)
+	}
+}
+
 func TestVariableResolutionBasic(t *testing.T) {
 	t.Parallel()
 	content := `ARG VERSION=1.0

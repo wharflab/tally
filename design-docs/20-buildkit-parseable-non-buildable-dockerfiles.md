@@ -38,7 +38,7 @@ All rule codes below use the `tally/` namespace to avoid implying upstream parit
 
 | Rule code | Severity | Category | What it catches | Status |
 |----------|----------|----------|-----------------|--------|
-| `tally/missing-from` | Error | Correctness | Dockerfile contains no `FROM` at all | Covered by DL3061 |
+| `tally/missing-from` | Error | Correctness | Dockerfile contains no `FROM` at all | **Implemented** (as `tally/require-stages`) |
 | `tally/unknown-instruction` | Error | Correctness | Likely-typo instruction keywords (`FORM`, `COPPY`, `WROKDIR`, …) | **Implemented** |
 | `tally/invalid-from` | Error | Correctness | Malformed `FROM` lines that still parse into AST (missing base / bad `AS`) | |
 | `tally/invalid-json-form` | Error | Correctness | JSON-form instructions with invalid JSON (e.g., `CMD [bash, -lc, "…"]`) | **Implemented** |
