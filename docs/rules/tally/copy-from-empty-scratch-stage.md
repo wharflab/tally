@@ -38,6 +38,9 @@ COPY --from=artifacts /out/app /usr/local/bin/app
 ### Good
 
 ```dockerfile
+FROM golang:1.22 AS builder
+RUN go build -o /out/app ./...
+
 # "artifacts" stage has a COPY that populates it
 FROM scratch AS artifacts
 COPY --from=builder /out/app /out/app
