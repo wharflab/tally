@@ -937,5 +937,17 @@ severity = "style"
 			args:        append([]string{"--fix", "--fix-unsafe"}, mustSelectRules("tally/invalid-json-form")...),
 			wantApplied: 1,
 		},
+		// Cross-rule fix: invalid-json-form fix satisfies both rules.
+		// JSONArgsRecommended can't fix this (SplitSimpleCommand fails on "[bash, ...]"),
+		// but invalid-json-form repairs the JSON, which resolves both violations.
+		{
+			name:  "invalid-json-form-cross-rules",
+			input: "FROM alpine:3.20\nCMD [bash, -lc, \"echo hello\"]\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/invalid-json-form", "buildkit/JSONArgsRecommended")...,
+			),
+			wantApplied: 1,
+		},
 	}
 }
