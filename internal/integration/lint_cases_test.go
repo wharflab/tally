@@ -226,6 +226,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// Invalid JSON exec-form detection
+		{
+			name:     "invalid-json-form",
+			dir:      "invalid-json-form",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/invalid-json-form")...),
+			wantExit: 1,
+		},
+
 		// Inline directive tests (need specific rules to test against)
 		{
 			name: "inline-ignore-single",

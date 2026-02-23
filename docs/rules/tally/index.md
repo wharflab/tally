@@ -10,6 +10,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [no-unreachable-stages](./no-unreachable-stages.md) | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
 | [invalid-onbuild-trigger](./invalid-onbuild-trigger.md) | ONBUILD trigger instruction is not a valid Dockerfile instruction | Error | Correctness | Enabled |
 | [circular-stage-deps](./circular-stage-deps.md) | Detects circular dependencies between build stages | Error | Correctness | Enabled |
+| [invalid-json-form](./invalid-json-form.md) | Arguments appear to use JSON exec-form but contain invalid JSON | Error | Correctness | Enabled |
 | [prefer-add-unpack](./prefer-add-unpack.md) | Prefer `ADD --unpack` for downloading and extracting remote archives | Info | Performance | Enabled |
 | [prefer-multi-stage-build](./prefer-multi-stage-build.md) | Suggests converting single-stage builds into multi-stage builds to reduce final image size | Info | Performance | Off (experimental) |
 | [prefer-copy-heredoc](./prefer-copy-heredoc.md) | Suggests using COPY heredoc for file creation | Style | Style | Off (experimental) |

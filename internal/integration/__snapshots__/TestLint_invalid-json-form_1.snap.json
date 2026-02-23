@@ -1,0 +1,136 @@
+{
+  "files": [
+    {
+      "file": "testdata/invalid-json-form/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/invalid-json-form/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/invalid-json-form/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "invalid JSON in exec-form arguments for CMD: [bash, -lc, \"echo hello\"]",
+          "rule": "tally/invalid-json-form",
+          "severity": "error",
+          "sourceCode": "CMD [bash, -lc, \"echo hello\"]",
+          "suggestedFix": {
+            "description": "Fix JSON exec-form syntax",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 29,
+                    "line": 4
+                  },
+                  "file": "testdata/invalid-json-form/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 4
+                  }
+                },
+                "newText": "[\"bash\", \"-lc\", \"echo hello\"]"
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/invalid-json-form/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 7
+            },
+            "file": "testdata/invalid-json-form/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 7
+            }
+          },
+          "message": "invalid JSON in exec-form arguments for ENTRYPOINT: ['/usr/bin/app', '--config', '/etc/app.conf']",
+          "rule": "tally/invalid-json-form",
+          "severity": "error",
+          "sourceCode": "ENTRYPOINT ['/usr/bin/app', '--config', '/etc/app.conf']",
+          "suggestedFix": {
+            "description": "Fix JSON exec-form syntax",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 56,
+                    "line": 7
+                  },
+                  "file": "testdata/invalid-json-form/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 7
+                  }
+                },
+                "newText": "[\"/usr/bin/app\", \"--config\", \"/etc/app.conf\"]"
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/invalid-json-form/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "testdata/invalid-json-form/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "invalid JSON in exec-form arguments for RUN: [\"echo\", \"hello\",]",
+          "rule": "tally/invalid-json-form",
+          "severity": "error",
+          "sourceCode": "RUN [\"echo\", \"hello\",]",
+          "suggestedFix": {
+            "description": "Fix JSON exec-form syntax",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 22,
+                    "line": 10
+                  },
+                  "file": "testdata/invalid-json-form/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 10
+                  }
+                },
+                "newText": "[\"echo\", \"hello\"]"
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 3,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 3,
+    "warnings": 0
+  }
+}

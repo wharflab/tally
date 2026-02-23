@@ -918,5 +918,24 @@ severity = "style"
 			args:        append([]string{"--fix", "--fix-unsafe"}, mustSelectRules("tally/invalid-onbuild-trigger")...),
 			wantApplied: 1,
 		},
+		// tally/invalid-json-form: unquoted → quoted via FixSuggestion (requires --fix-unsafe)
+		{
+			name:        "invalid-json-form-unquoted",
+			input:       "FROM alpine:3.20\nCMD [bash, -lc, \"echo hi\"]\n",
+			args:        append([]string{"--fix", "--fix-unsafe"}, mustSelectRules("tally/invalid-json-form")...),
+			wantApplied: 1,
+		},
+		{
+			name:        "invalid-json-form-single-quotes",
+			input:       "FROM alpine:3.20\nENTRYPOINT ['/app', '--serve']\n",
+			args:        append([]string{"--fix", "--fix-unsafe"}, mustSelectRules("tally/invalid-json-form")...),
+			wantApplied: 1,
+		},
+		{
+			name:        "invalid-json-form-trailing-comma",
+			input:       "FROM alpine:3.20\nRUN [\"echo\", \"hello\",]\n",
+			args:        append([]string{"--fix", "--fix-unsafe"}, mustSelectRules("tally/invalid-json-form")...),
+			wantApplied: 1,
+		},
 	}
 }
