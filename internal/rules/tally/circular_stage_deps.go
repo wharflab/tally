@@ -2,6 +2,7 @@ package tally
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/wharflab/tally/internal/rules"
@@ -64,12 +65,7 @@ func (r *CircularStageDepsRule) Check(input rules.LintInput) []rules.Violation {
 		message := formatCycleMessage(sem, cycle)
 
 		// Report at the FROM instruction of the lowest-indexed stage.
-		minIdx := cycle[0]
-		for _, idx := range cycle[1:] {
-			if idx < minIdx {
-				minIdx = idx
-			}
-		}
+		minIdx := slices.Min(cycle)
 
 		info := sem.StageInfo(minIdx)
 		var loc rules.Location
