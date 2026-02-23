@@ -98,6 +98,27 @@ COPY --from=builder /out /out
 	}
 }
 
+func TestCopyFromEmptyScratchStageRule_ScratchWithShellFormRUN(t *testing.T) {
+	t.Parallel()
+	// Shell-form RUN will fail at build time in scratch (no /bin/sh),
+	// but copy-from-empty-scratch-stage still does not fire because
+	// any RUN counts as a file-producing instruction.
+	// The shell-run-in-scratch rule covers this case instead.
+	content := `FROM scratch AS builder
+RUN echo "will fail"
+
+FROM alpine:3.19
+COPY --from=builder /out /out
+`
+	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	r := NewCopyFromEmptyScratchStageRule()
+	violations := r.Check(input)
+
+	if len(violations) != 0 {
+		t.Errorf("expected 0 violations (shell-form RUN is still counted as file-producing), got %d", len(violations))
+	}
+}
+
 func TestCopyFromEmptyScratchStageRule_ScratchWithCOPY(t *testing.T) {
 	t.Parallel()
 	content := `FROM scratch AS builder
