@@ -51,14 +51,14 @@ func RuleCodes() []string {
 // produces errors, later checks are skipped.
 // Returns nil if no issues are found.
 func Check(file string, ast *parser.Result, source []byte) []Error {
-	for _, errs := range [][]Error{
-		checkUnknownInstructions(file, ast),
-		checkRequireStages(file, ast),
-		checkSyntaxDirective(file, source),
-	} {
-		if len(errs) > 0 {
-			return errs
-		}
+	if errs := checkUnknownInstructions(file, ast); len(errs) > 0 {
+		return errs
+	}
+	if errs := checkRequireStages(file, ast); len(errs) > 0 {
+		return errs
+	}
+	if errs := checkSyntaxDirective(file, source); len(errs) > 0 {
+		return errs
 	}
 	return nil
 }
