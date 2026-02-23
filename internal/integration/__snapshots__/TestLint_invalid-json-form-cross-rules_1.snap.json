@@ -4,16 +4,34 @@
       "file": "testdata/invalid-json-form-cross-rules/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/invalid-json-form/",
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/JSONArgsRecommended/",
           "location": {
             "end": {
               "column": 0,
-              "line": 5
+              "line": 6
             },
             "file": "testdata/invalid-json-form-cross-rules/Dockerfile",
             "start": {
               "column": 0,
-              "line": 5
+              "line": 6
+            }
+          },
+          "message": "JSON arguments recommended for CMD to prevent unintended behavior related to OS signals",
+          "rule": "buildkit/JSONArgsRecommended",
+          "severity": "error",
+          "sourceCode": "CMD [bash, -lc, \"echo hello\"]"
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/invalid-json-form/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "testdata/invalid-json-form-cross-rules/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
             }
           },
           "message": "invalid JSON in exec-form arguments for CMD: [bash, -lc, \"echo hello\"]",
@@ -27,12 +45,12 @@
                 "location": {
                   "end": {
                     "column": 29,
-                    "line": 5
+                    "line": 6
                   },
                   "file": "testdata/invalid-json-form-cross-rules/Dockerfile",
                   "start": {
                     "column": 4,
-                    "line": 5
+                    "line": 6
                   }
                 },
                 "newText": "[\"bash\", \"-lc\", \"echo hello\"]"
@@ -48,11 +66,11 @@
   "files_scanned": 1,
   "rules_enabled": 2,
   "summary": {
-    "errors": 1,
+    "errors": 2,
     "files": 1,
     "info": 0,
     "style": 0,
-    "total": 1,
+    "total": 2,
     "warnings": 0
   }
 }
