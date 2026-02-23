@@ -77,18 +77,40 @@ COPY --from=a /x /final
 	}
 
 	v := violations[0]
-	if v.RuleCode != CircularStageDepsRuleCode {
-		t.Errorf("expected rule code %q, got %q", CircularStageDepsRuleCode, v.RuleCode)
-	}
-	if v.Severity != rules.SeverityError {
-		t.Errorf("expected error severity, got %v", v.Severity)
-	}
-	if !strings.Contains(v.Message, `"a"`) || !strings.Contains(v.Message, `"b"`) {
-		t.Errorf("message should mention stage names, got %q", v.Message)
-	}
-	if !strings.Contains(v.Message, "→") {
-		t.Errorf("message should contain arrow notation, got %q", v.Message)
-	}
+
+	t.Run("detection", func(t *testing.T) {
+		t.Parallel()
+		if v.RuleCode != CircularStageDepsRuleCode {
+			t.Errorf("expected rule code %q, got %q", CircularStageDepsRuleCode, v.RuleCode)
+		}
+		if v.Severity != rules.SeverityError {
+			t.Errorf("expected error severity, got %v", v.Severity)
+		}
+		if !strings.Contains(v.Message, `"a"`) || !strings.Contains(v.Message, `"b"`) {
+			t.Errorf("message should mention stage names, got %q", v.Message)
+		}
+		if !strings.Contains(v.Message, "→") {
+			t.Errorf("message should contain arrow notation, got %q", v.Message)
+		}
+	})
+
+	t.Run("location", func(t *testing.T) {
+		t.Parallel()
+		// Location should point to the FROM of the lowest-indexed stage (line 1).
+		if v.Location.Start.Line != 1 {
+			t.Errorf("expected location line 1, got %d", v.Location.Start.Line)
+		}
+	})
+
+	t.Run("metadata", func(t *testing.T) {
+		t.Parallel()
+		if v.Detail == "" {
+			t.Error("expected violation to have detail")
+		}
+		if v.DocURL == "" {
+			t.Error("expected violation to have DocURL")
+		}
+	})
 }
 
 func TestCircularStageDepsRule_ThreeStageCycle(t *testing.T) {
@@ -139,57 +161,6 @@ CMD ["/app"]
 
 	if len(violations) != 0 {
 		t.Errorf("expected 0 violations for chained deps, got %d", len(violations))
-	}
-}
-
-func TestCircularStageDepsRule_ViolationLocation(t *testing.T) {
-	t.Parallel()
-	content := `FROM alpine:3.19 AS a
-COPY --from=b /x /x
-
-FROM alpine:3.19 AS b
-COPY --from=a /y /y
-
-FROM alpine:3.19
-COPY --from=a /x /final
-`
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
-	r := NewCircularStageDepsRule()
-	violations := r.Check(input)
-
-	if len(violations) != 1 {
-		t.Fatalf("expected 1 violation, got %d", len(violations))
-	}
-
-	// Location should point to the FROM of the lowest-indexed stage (line 1).
-	if violations[0].Location.Start.Line != 1 {
-		t.Errorf("expected location line 1, got %d", violations[0].Location.Start.Line)
-	}
-}
-
-func TestCircularStageDepsRule_ViolationHasDetail(t *testing.T) {
-	t.Parallel()
-	content := `FROM alpine:3.19 AS a
-COPY --from=b /x /x
-
-FROM alpine:3.19 AS b
-COPY --from=a /y /y
-
-FROM alpine:3.19
-COPY --from=a /x /final
-`
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
-	r := NewCircularStageDepsRule()
-	violations := r.Check(input)
-
-	if len(violations) != 1 {
-		t.Fatalf("expected 1 violation, got %d", len(violations))
-	}
-	if violations[0].Detail == "" {
-		t.Error("expected violation to have detail")
-	}
-	if violations[0].DocURL == "" {
-		t.Error("expected violation to have DocURL")
 	}
 }
 
