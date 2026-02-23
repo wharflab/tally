@@ -29,13 +29,20 @@ produces unexpected behavior:
 The auto-fix rewrites the arguments as valid JSON. It is classified as `suggestion`
 because intent cannot be guaranteed -- review it before applying.
 
+## Related Rules
+
+- [`buildkit/JSONArgsRecommended`](../buildkit/JSONArgsRecommended.md) -- recommends JSON
+  exec-form for `CMD` and `ENTRYPOINT`. Because BuildKit falls back to shell-form when
+  JSON is invalid, `JSONArgsRecommended` (info severity) also fires on the same instruction.
+  tally's supersession processor automatically suppresses the lower-severity
+  `JSONArgsRecommended` violation when this rule (error severity) is present at the same
+  line — so users see only the more actionable `invalid-json-form` error.
+
 ## References
 
 - [Dockerfile reference -- CMD](https://docs.docker.com/reference/dockerfile/#cmd)
 - [Dockerfile reference -- ENTRYPOINT](https://docs.docker.com/reference/dockerfile/#entrypoint)
 - [Dockerfile reference -- SHELL](https://docs.docker.com/reference/dockerfile/#shell)
-- [`buildkit/JSONArgsRecommended`](../buildkit/JSONArgsRecommended.md) -- recommends JSON
-  form for `CMD` and `ENTRYPOINT`
 
 ## Examples
 

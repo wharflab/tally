@@ -78,6 +78,14 @@ After (with `--fix`):
 CMD ["echo", "hello", "world"]
 ```
 
+## Related Rules
+
+- [`tally/invalid-json-form`](../tally/invalid-json-form.md) -- detects instructions that
+  *attempt* JSON exec-form but have invalid JSON (e.g., unquoted strings, single quotes).
+  BuildKit silently falls back to shell-form for these, so both rules fire on the same
+  instruction. tally's supersession processor suppresses the lower-severity
+  `JSONArgsRecommended` (info) when `invalid-json-form` (error) is present at the same line.
+
 ## Supersedes
 
 - [hadolint/DL3025](../hadolint/DL3025.md)

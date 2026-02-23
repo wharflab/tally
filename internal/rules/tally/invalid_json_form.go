@@ -37,6 +37,12 @@ var jsonFormInstructions = map[string]bool{
 //
 // is treated as the shell command `[bash, -lc, "echo hi"]` rather than
 // exec-form `["bash", "-lc", "echo hi"]`.
+//
+// Cross-rule interaction with buildkit/JSONArgsRecommended: BuildKit falls
+// back to shell-form for invalid JSON, so JSONArgsRecommended (info) also
+// fires on the same instruction. The Supersession processor suppresses the
+// lower-severity JSONArgsRecommended violation when this rule (error) is
+// present at the same line. A cross-rule integration test documents this.
 type InvalidJSONFormRule struct{}
 
 // NewInvalidJSONFormRule creates a new invalid-json-form rule instance.
