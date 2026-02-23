@@ -240,7 +240,7 @@ func (t *Tokenizer) scanWord() *Token {
 // isDockerfileKeyword returns true if the word is a Dockerfile keyword.
 func isDockerfileKeyword(word string) bool {
 	_, ok := command.Commands[strings.ToLower(word)]
-	return ok || word == "AS"
+	return ok || strings.EqualFold(word, "as")
 }
 
 // InstructionTokens provides convenient access to parsed instruction tokens.
