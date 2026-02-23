@@ -90,6 +90,14 @@ func TestInvalidJSONFormRule_Check(t *testing.T) {
 			WantViolations: 0,
 		},
 		{
+			// Dockerfile syntax does NOT support inline comments. The # character
+			// within an instruction is a literal, not a comment delimiter. Valid
+			// JSON containing # should not be flagged.
+			Name:           "valid JSON with hash in argument",
+			Content:        "FROM alpine:3.20\nCMD [\"bash\", \"-c\", \"echo #hello\"]\n",
+			WantViolations: 0,
+		},
+		{
 			Name:           "valid ONBUILD CMD JSON form",
 			Content:        "FROM alpine:3.20\nONBUILD CMD [\"echo\", \"hello\"]\n",
 			WantViolations: 0,
