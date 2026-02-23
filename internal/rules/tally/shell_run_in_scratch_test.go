@@ -156,7 +156,27 @@ RUN echo "hello"
 	violations := r.Check(input)
 
 	if len(violations) != 0 {
-		t.Errorf("expected 0 violations when SHELL is explicitly set, got %d", len(violations))
+		t.Errorf("expected 0 violations when SHELL is explicitly set before RUN, got %d", len(violations))
+	}
+}
+
+func TestShellRunInScratchRule_ShellAfterRUN(t *testing.T) {
+	t.Parallel()
+	// RUN before SHELL should be flagged; RUN after SHELL should not.
+	content := `FROM scratch
+RUN echo "fail before shell"
+SHELL ["/busybox", "sh", "-c"]
+RUN echo "ok after shell"
+`
+	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	r := NewShellRunInScratchRule()
+	violations := r.Check(input)
+
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation for RUN before SHELL in scratch, got %d", len(violations))
+	}
+	if violations[0].Location.Start.Line != 2 {
+		t.Errorf("expected violation at line 2, got %d", violations[0].Location.Start.Line)
 	}
 }
 

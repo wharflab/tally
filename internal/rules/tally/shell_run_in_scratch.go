@@ -54,16 +54,21 @@ func (r *ShellRunInScratchRule) Check(input rules.LintInput) []rules.Violation {
 			continue
 		}
 
-		// If the user explicitly set SHELL, they likely bootstrapped a shell binary.
-		if info.ShellSetting.Source == semantic.ShellSourceInstruction {
-			continue
-		}
-
 		stageName := formatScratchRunStageName(info, i)
 
+		// Track whether a SHELL instruction has been seen. Only suppress
+		// shell-form RUN warnings that appear *after* an explicit SHELL,
+		// since earlier RUNs still execute with the default (missing) shell.
+		shellSeen := false
+
 		for _, cmd := range info.Stage.Commands {
+			if _, ok := cmd.(*instructions.ShellCommand); ok {
+				shellSeen = true
+				continue
+			}
+
 			run, ok := cmd.(*instructions.RunCommand)
-			if !ok || !run.PrependShell {
+			if !ok || !run.PrependShell || shellSeen {
 				continue
 			}
 
