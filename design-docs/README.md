@@ -234,6 +234,20 @@ cycles).
 
 ---
 
+### 21. [VS Code: AI CodeAction AutoFix for `tally/prefer-multi-stage-build` (Copilot / built-in assistant)](21-vscode-ai-codeaction-autofix-prefer-multi-stage-build.md)
+
+**Covers:** Proposal for a VS Code Quick Fix that leverages the in-IDE assistant (Copilot via VS Code Language Model API) while keeping tally as the
+source of truth for objective prompts and validation.
+
+---
+
+### 22. [Docker Desktop Extension: Tally as an in-product Dockerfile lint + fix marketing channel](22-docker-desktop-extension.md)
+
+**Covers:** MVP and roadmap for a Docker Desktop Extension that runs `tally` on local Dockerfiles/Containerfiles, supports fix preview/apply, and
+converts users into project-level adoption via `.tally.toml` + CI snippets.
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
