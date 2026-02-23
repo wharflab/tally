@@ -3,6 +3,7 @@ package buildkit
 import (
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/linter"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
@@ -34,11 +35,11 @@ func (r *JSONArgsRecommendedRule) Check(input rules.LintInput) []rules.Violation
 			switch c := cmd.(type) {
 			case *instructions.CmdCommand:
 				if c.PrependShell {
-					out = append(out, newJSONArgsRecommendedViolation(input.File, "CMD", c.Location(), r.Metadata())...)
+					out = append(out, newJSONArgsRecommendedViolation(input.File, command.Cmd, c.Location(), r.Metadata())...)
 				}
 			case *instructions.EntrypointCommand:
 				if c.PrependShell {
-					out = append(out, newJSONArgsRecommendedViolation(input.File, "ENTRYPOINT", c.Location(), r.Metadata())...)
+					out = append(out, newJSONArgsRecommendedViolation(input.File, command.Entrypoint, c.Location(), r.Metadata())...)
 				}
 			}
 		}

@@ -6,6 +6,8 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
+
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/shell"
 )
@@ -26,9 +28,9 @@ func enrichJSONArgsRecommendedFix(v *rules.Violation, source []byte) {
 	codeEnd, hasComment := findDockerfileInlineCommentStart(line)
 
 	it := ParseInstruction(line[:codeEnd])
-	kw := it.FindKeyword("CMD")
+	kw := it.FindKeyword(command.Cmd)
 	if kw == nil {
-		kw = it.FindKeyword("ENTRYPOINT")
+		kw = it.FindKeyword(command.Entrypoint)
 	}
 	if kw == nil {
 		return

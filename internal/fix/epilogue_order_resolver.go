@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
@@ -256,7 +257,7 @@ func stageASTChildren(stageIdx int, dockerfile *parser.Result) []*parser.Node {
 	fromCount := 0
 	startIdx := -1
 	for i, node := range children {
-		if strings.EqualFold(node.Value, "from") {
+		if strings.EqualFold(node.Value, command.From) {
 			if fromCount == stageIdx {
 				startIdx = i
 			}

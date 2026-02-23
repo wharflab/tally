@@ -3,6 +3,8 @@ package fixes
 import (
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
+
 	"github.com/wharflab/tally/internal/rules"
 )
 
@@ -23,7 +25,7 @@ func enrichExposeProtoCasingFix(v *rules.Violation, source []byte) {
 
 	// Parse the instruction to find port arguments
 	it := ParseInstruction(line)
-	exposeKw := it.FindKeyword("EXPOSE")
+	exposeKw := it.FindKeyword(command.Expose)
 	if exposeKw == nil {
 		return
 	}

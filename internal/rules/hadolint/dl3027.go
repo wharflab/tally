@@ -3,6 +3,7 @@ package hadolint
 import (
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/dockerfile"
@@ -40,7 +41,7 @@ func getRunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (
 	// shell parsing. Handles "RUN " and "ONBUILD RUN " patterns.
 	firstLine := lines[0]
 	upper := strings.ToUpper(firstLine)
-	if idx := strings.Index(upper, "RUN"); idx >= 0 {
+	if idx := strings.Index(upper, strings.ToUpper(command.Run)); idx >= 0 {
 		// Check that RUN is followed by whitespace (space or tab)
 		afterRun := idx + 3
 		if afterRun < len(firstLine) && (firstLine[afterRun] == ' ' || firstLine[afterRun] == '\t') {
@@ -56,7 +57,7 @@ func getRunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (
 			if idx > 0 {
 				// Check for ONBUILD prefix (possibly with leading whitespace)
 				prefix := strings.TrimSpace(upper[:idx])
-				if prefix == "ONBUILD" {
+				if strings.EqualFold(prefix, command.Onbuild) {
 					replaceStart = 0
 				}
 			}

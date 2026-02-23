@@ -106,6 +106,22 @@ plugins:
     path: ./_tools
 ```
 
+### cmdliteral
+
+Checks that Dockerfile instruction keywords use `command.*` constants from
+`github.com/moby/buildkit/frontend/dockerfile/command` instead of string literals.
+
+Detects:
+
+- `strings.EqualFold(node.Value, "FROM")` → should use `command.From`
+- `"onbuild"` as a map key → should use `command.Onbuild`
+- Any string literal that exactly matches a Dockerfile instruction name
+
+Excludes `internal/shell/` (shell analysis, not Dockerfile instructions) and
+test files.
+
+**Test**: `go test ./...` (all tests pass)
+
 ## Adding New Rules
 
 1. Create new analyzer file in this directory (e.g., `myrule.go`)

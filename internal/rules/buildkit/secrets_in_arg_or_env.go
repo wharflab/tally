@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/rules"
@@ -42,7 +43,7 @@ func (r *SecretsInArgOrEnvRule) Check(input rules.LintInput) []rules.Violation {
 		for _, kv := range arg.Args {
 			if isSecretKey(kv.Key) {
 				loc := rules.NewLocationFromRanges(input.File, arg.Location())
-				violations = append(violations, r.createViolation(loc, "ARG", kv.Key))
+				violations = append(violations, r.createViolation(loc, strings.ToUpper(command.Arg), kv.Key))
 			}
 		}
 	}
@@ -55,14 +56,14 @@ func (r *SecretsInArgOrEnvRule) Check(input rules.LintInput) []rules.Violation {
 				for _, kv := range c.Args {
 					if isSecretKey(kv.Key) {
 						loc := rules.NewLocationFromRanges(input.File, c.Location())
-						violations = append(violations, r.createViolation(loc, "ARG", kv.Key))
+						violations = append(violations, r.createViolation(loc, strings.ToUpper(command.Arg), kv.Key))
 					}
 				}
 			case *instructions.EnvCommand:
 				for _, kv := range c.Env {
 					if isSecretKey(kv.Key) {
 						loc := rules.NewLocationFromRanges(input.File, c.Location())
-						violations = append(violations, r.createViolation(loc, "ENV", kv.Key))
+						violations = append(violations, r.createViolation(loc, strings.ToUpper(command.Env), kv.Key))
 					}
 				}
 			}

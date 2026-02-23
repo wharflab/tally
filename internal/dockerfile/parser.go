@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/linter"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
@@ -202,7 +203,7 @@ func sanitizeASTForInstructionParse(root *parser.Node) *parser.Node {
 	// Find the first FROM.
 	firstFromIdx := -1
 	for i, child := range root.Children {
-		if child != nil && strings.EqualFold(child.Value, "FROM") {
+		if child != nil && strings.EqualFold(child.Value, command.From) {
 			firstFromIdx = i
 			break
 		}
@@ -215,12 +216,12 @@ func sanitizeASTForInstructionParse(root *parser.Node) *parser.Node {
 		sanitized := *root
 		filtered := make([]*parser.Node, 0, len(root.Children)+1)
 		for _, child := range root.Children {
-			if child != nil && strings.EqualFold(child.Value, "ARG") {
+			if child != nil && strings.EqualFold(child.Value, command.Arg) {
 				filtered = append(filtered, child)
 			}
 		}
 		// Append a synthetic FROM scratch
-		filtered = append(filtered, &parser.Node{Value: "from", Next: &parser.Node{Value: "scratch"}})
+		filtered = append(filtered, &parser.Node{Value: command.From, Next: &parser.Node{Value: "scratch"}})
 		sanitized.Children = filtered
 		return &sanitized
 	}
@@ -232,7 +233,7 @@ func sanitizeASTForInstructionParse(root *parser.Node) *parser.Node {
 		if child == nil {
 			continue
 		}
-		if strings.EqualFold(child.Value, "ARG") {
+		if strings.EqualFold(child.Value, command.Arg) {
 			continue
 		}
 		hasInvalid = true
@@ -254,7 +255,7 @@ func sanitizeASTForInstructionParse(root *parser.Node) *parser.Node {
 		if child == nil {
 			continue
 		}
-		if hasInvalid && i < firstFromIdx && !strings.EqualFold(child.Value, "ARG") {
+		if hasInvalid && i < firstFromIdx && !strings.EqualFold(child.Value, command.Arg) {
 			continue
 		}
 		if hasForbiddenOnbuild && isForbiddenOnbuildTriggerNode(child) {
@@ -267,7 +268,7 @@ func sanitizeASTForInstructionParse(root *parser.Node) *parser.Node {
 }
 
 func isForbiddenOnbuildTriggerNode(node *parser.Node) bool {
-	if node == nil || !strings.EqualFold(node.Value, "ONBUILD") {
+	if node == nil || !strings.EqualFold(node.Value, command.Onbuild) {
 		return false
 	}
 	if node.Next == nil || len(node.Next.Children) == 0 || node.Next.Children[0] == nil {
@@ -275,9 +276,9 @@ func isForbiddenOnbuildTriggerNode(node *parser.Node) bool {
 	}
 
 	trigger := node.Next.Children[0].Value
-	return strings.EqualFold(trigger, "ONBUILD") ||
-		strings.EqualFold(trigger, "FROM") ||
-		strings.EqualFold(trigger, "MAINTAINER")
+	return strings.EqualFold(trigger, command.Onbuild) ||
+		strings.EqualFold(trigger, command.From) ||
+		strings.EqualFold(trigger, command.Maintainer)
 }
 
 // buildLinterConfig creates a BuildKit linter.Config from our config.

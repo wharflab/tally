@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/ai/autofixdata"
@@ -233,16 +234,20 @@ func summarizeFinalStageRuntime(parsed *dockerfile.ParseResult, source []byte, c
 		lines = append(lines, b.String())
 	}
 
-	addLine("WORKDIR", "WORKDIR", len(rt.workdir), strings.Join(rt.workdir, " | "))
-	addLine("USER", "USER", len(rt.user), strings.Join(rt.user, " | "))
-	addLine("ENV", "ENV", rt.envCount, "keys="+formatList(rt.envKeys, 8))
-	addLine("LABEL", "LABEL", rt.labelCount, "keys="+formatList(rt.labelKeys, 8))
-	addLine("EXPOSE", "EXPOSE", rt.exposeCount, "ports="+formatList(rt.exposePorts, 12))
-	addLine("HEALTHCHECK", "HEALTHCHECK", len(rt.healthcheck), strings.Join(rt.healthcheck, " | "))
-	addLine("ENTRYPOINT", "ENTRYPOINT", len(rt.entrypoint), strings.Join(rt.entrypoint, " | "))
-	addLine("CMD", "CMD", len(rt.cmd), strings.Join(rt.cmd, " | "))
+	upper := strings.ToUpper
+	addLine(upper(command.Workdir), upper(command.Workdir), len(rt.workdir), strings.Join(rt.workdir, " | "))
+	addLine(upper(command.User), upper(command.User), len(rt.user), strings.Join(rt.user, " | "))
+	addLine(upper(command.Env), upper(command.Env), rt.envCount, "keys="+formatList(rt.envKeys, 8))
+	addLine(upper(command.Label), upper(command.Label), rt.labelCount, "keys="+formatList(rt.labelKeys, 8))
+	addLine(upper(command.Expose), upper(command.Expose), rt.exposeCount, "ports="+formatList(rt.exposePorts, 12))
+	addLine(upper(command.Healthcheck), upper(command.Healthcheck), len(rt.healthcheck), strings.Join(rt.healthcheck, " | "))
+	addLine(upper(command.Entrypoint), upper(command.Entrypoint), len(rt.entrypoint), strings.Join(rt.entrypoint, " | "))
+	addLine(upper(command.Cmd), upper(command.Cmd), len(rt.cmd), strings.Join(rt.cmd, " | "))
 
-	orderedKeys := []string{"WORKDIR", "USER", "ENV", "LABEL", "EXPOSE", "HEALTHCHECK", "ENTRYPOINT", "CMD"}
+	orderedKeys := []string{
+		upper(command.Workdir), upper(command.User), upper(command.Env), upper(command.Label),
+		upper(command.Expose), upper(command.Healthcheck), upper(command.Entrypoint), upper(command.Cmd),
+	}
 	missing := make([]string, 0, len(orderedKeys))
 	for _, k := range orderedKeys {
 		if !present[k] {

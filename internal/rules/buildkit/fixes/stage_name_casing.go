@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/rules"
@@ -169,7 +170,7 @@ func createCopyFromEdits(info *semantic.StageInfo, stageIdx int, stageName, lowe
 
 		// Use tokenizer to find --from flag value
 		it := ParseInstruction(line)
-		fromFlag := it.FindFlag("from")
+		fromFlag := it.FindFlag(command.From)
 		if fromFlag == nil {
 			continue
 		}

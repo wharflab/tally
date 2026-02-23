@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 
@@ -364,7 +365,7 @@ func findCmdStartCol(firstLine string) int {
 
 	// Skip "RUN" keyword
 	upper := strings.ToUpper(trimmed)
-	if strings.HasPrefix(upper, "RUN") {
+	if strings.HasPrefix(upper, strings.ToUpper(command.Run)) {
 		offset += 3
 	}
 
@@ -553,7 +554,7 @@ func (r *NewlinePerChainedCallRule) checkHealthcheck(
 		} else {
 			cmdText = strings.TrimSpace(script)
 		}
-	case testMode == "CMD" && len(cmd.Health.Test) >= 2:
+	case strings.EqualFold(testMode, command.Cmd) && len(cmd.Health.Test) >= 2:
 		// Exec form: reconstruct JSON array.
 		cmdText = formatExecArgs(cmd.Health.Test[1:])
 	default:
@@ -580,7 +581,7 @@ func (r *NewlinePerChainedCallRule) checkHealthcheck(
 	}
 
 	var b strings.Builder
-	b.WriteString(instrIndent + "HEALTHCHECK")
+	b.WriteString(instrIndent + strings.ToUpper(command.Healthcheck))
 
 	isFirst := true
 	for _, flag := range flags {

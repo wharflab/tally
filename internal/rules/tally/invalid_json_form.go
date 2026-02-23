@@ -7,6 +7,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/rules"
@@ -18,13 +19,13 @@ const InvalidJSONFormRuleCode = rules.TallyRulePrefix + "invalid-json-form"
 // jsonFormInstructions are instructions that accept JSON exec-form via
 // parseMaybeJSON or parseMaybeJSONToList in BuildKit's parser.
 var jsonFormInstructions = map[string]bool{
-	"cmd":        true,
-	"entrypoint": true,
-	"run":        true,
-	"shell":      true,
-	"add":        true,
-	"copy":       true,
-	"volume":     true,
+	command.Cmd:        true,
+	command.Entrypoint: true,
+	command.Run:        true,
+	command.Shell:      true,
+	command.Add:        true,
+	command.Copy:       true,
+	command.Volume:     true,
 }
 
 // InvalidJSONFormRule detects instructions that appear to use JSON exec-form
@@ -97,10 +98,10 @@ func (r *InvalidJSONFormRule) checkNode(
 	case jsonFormInstructions[keyword]:
 		return r.checkInstruction(node, keyword, input, meta)
 
-	case keyword == "healthcheck":
+	case keyword == command.Healthcheck:
 		return r.checkHealthcheck(node, input, meta)
 
-	case keyword == "onbuild":
+	case keyword == command.Onbuild:
 		return r.checkOnbuild(node, input, meta)
 	}
 
@@ -135,7 +136,7 @@ func (r *InvalidJSONFormRule) checkHealthcheck(
 	}
 
 	// HEALTHCHECK has "CMD" or "NONE" as the sub-type.
-	if node.Next == nil || !strings.EqualFold(node.Next.Value, "CMD") {
+	if node.Next == nil || !strings.EqualFold(node.Next.Value, command.Cmd) {
 		return nil
 	}
 
@@ -288,11 +289,12 @@ func extractOnbuildArgs(original, subKeyword string) string {
 	subUpper := strings.ToUpper(subKeyword)
 
 	// Skip past "ONBUILD" before searching for the sub-instruction keyword.
-	onbuildEnd := strings.Index(upper, "ONBUILD")
+	upperOnbuild := strings.ToUpper(command.Onbuild)
+	onbuildEnd := strings.Index(upper, upperOnbuild)
 	if onbuildEnd < 0 {
 		return ""
 	}
-	onbuildEnd += len("ONBUILD")
+	onbuildEnd += len(upperOnbuild)
 
 	idx := strings.Index(upper[onbuildEnd:], subUpper)
 	if idx < 0 {
@@ -323,7 +325,7 @@ func formatInvalidJSONMessage(keyword, argText string) string {
 		display = display[:57] + "..."
 	}
 
-	if strings.EqualFold(keyword, "shell") {
+	if strings.EqualFold(keyword, command.Shell) {
 		return fmt.Sprintf(
 			"%s requires valid JSON exec-form; %s is not valid JSON and will cause a build error",
 			upper, display,

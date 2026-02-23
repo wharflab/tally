@@ -3,6 +3,8 @@ package fixes
 
 import (
 	"strings"
+
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 )
 
 // TokenType identifies the kind of token.
@@ -237,13 +239,8 @@ func (t *Tokenizer) scanWord() *Token {
 
 // isDockerfileKeyword returns true if the word is a Dockerfile keyword.
 func isDockerfileKeyword(word string) bool {
-	switch word {
-	case "FROM", "AS", "RUN", "CMD", "LABEL", "MAINTAINER", "EXPOSE", "ENV",
-		"ADD", "COPY", "ENTRYPOINT", "VOLUME", "USER", "WORKDIR", "ARG",
-		"ONBUILD", "STOPSIGNAL", "HEALTHCHECK", "SHELL":
-		return true
-	}
-	return false
+	_, ok := command.Commands[strings.ToLower(word)]
+	return ok || word == "AS"
 }
 
 // InstructionTokens provides convenient access to parsed instruction tokens.

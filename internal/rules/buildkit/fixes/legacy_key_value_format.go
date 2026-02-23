@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
+
 	"github.com/wharflab/tally/internal/rules"
 )
 
@@ -25,7 +27,7 @@ func enrichLegacyKeyValueFormatFix(v *rules.Violation, source []byte) {
 
 	// Find the instruction keyword (ENV or LABEL)
 	var kw *Token
-	for _, keyword := range []string{"ENV", "LABEL"} {
+	for _, keyword := range []string{command.Env, command.Label} {
 		if t := it.FindKeyword(keyword); t != nil {
 			kw = t
 			break

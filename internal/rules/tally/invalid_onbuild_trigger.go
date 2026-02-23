@@ -17,9 +17,9 @@ const InvalidOnbuildTriggerRuleCode = rules.TallyRulePrefix + "invalid-onbuild-t
 
 // forbiddenOnbuildTriggers are already caught by hadolint/DL3043.
 var forbiddenOnbuildTriggers = map[string]bool{
-	"from":       true,
-	"onbuild":    true,
-	"maintainer": true,
+	command.From:       true,
+	command.Onbuild:    true,
+	command.Maintainer: true,
 }
 
 // InvalidOnbuildTriggerRule detects unknown or misspelled instruction keywords
@@ -58,7 +58,7 @@ func (r *InvalidOnbuildTriggerRule) Check(input rules.LintInput) []rules.Violati
 	var violations []rules.Violation
 
 	for _, node := range input.AST.AST.Children {
-		if node == nil || !strings.EqualFold(node.Value, "onbuild") {
+		if node == nil || !strings.EqualFold(node.Value, command.Onbuild) {
 			continue
 		}
 
@@ -157,7 +157,7 @@ func buildTriggerFix(file string, source []byte, node *parser.Node, typo, sugges
 // The search is case-insensitive and handles indented ONBUILD instructions.
 func triggerColumnRange(line, trigger string) (int, int) {
 	upper := strings.ToUpper(line)
-	const prefix = "ONBUILD"
+	prefix := strings.ToUpper(command.Onbuild)
 
 	// Find where ONBUILD starts (handles leading whitespace / indentation).
 	idx := strings.Index(upper, prefix)

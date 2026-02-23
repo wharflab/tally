@@ -3,6 +3,7 @@ package rules
 import (
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 )
 
@@ -21,10 +22,10 @@ type EpilogueOrderResolveData struct {
 // EpilogueOrderRank maps lowercase epilogue instruction names to their canonical position.
 // This is the single source of truth for epilogue ordering, shared by the rule and resolver.
 var EpilogueOrderRank = map[string]int{
-	"stopsignal":  0,
-	"healthcheck": 1,
-	"entrypoint":  2,
-	"cmd":         3,
+	command.StopSignal:  0,
+	command.Healthcheck: 1,
+	command.Entrypoint:  2,
+	command.Cmd:         3,
 }
 
 // IsEpilogueInstruction reports whether the lowercase instruction name is an epilogue instruction.

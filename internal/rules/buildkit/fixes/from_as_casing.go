@@ -2,6 +2,9 @@ package fixes
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 
 	"github.com/wharflab/tally/internal/rules"
 )
@@ -31,11 +34,11 @@ func enrichFromAsCasingFix(v *rules.Violation, source []byte) {
 	it := ParseInstruction(line)
 
 	// Find the FROM keyword to determine its casing
-	fromKeyword := it.FindKeyword("FROM")
+	fromKeyword := it.FindKeyword(command.From)
 	if fromKeyword == nil {
 		return
 	}
-	fromIsUpper := fromKeyword.Value == "FROM"
+	fromIsUpper := fromKeyword.Value == strings.ToUpper(fromKeyword.Value)
 
 	// Find the AS keyword
 	asKeyword := it.FindKeyword("AS")

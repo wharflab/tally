@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	dfcmd "github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
@@ -351,12 +352,12 @@ func addLanguagePackageManagerCacheMounts(
 			cleaners[cleanupBundle] = true
 		}
 	case string(cleanupYarn):
-		if cmd.HasAnyArg("install", "add") {
+		if cmd.HasAnyArg("install", "add") { //nolint:customlint // "add" is a package manager subcommand, not Dockerfile ADD
 			addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/usr/local/share/.cache/yarn", ID: "yarn"})
 			cleaners[cleanupYarn] = true
 		}
 	case string(cleanupPnpm):
-		if cmd.HasAnyArg("install", "add", "i") {
+		if cmd.HasAnyArg("install", "add", "i") { //nolint:customlint // "add" is a package manager subcommand, not Dockerfile ADD
 			addRequiredMount(requiredByTarget, cacheMountSpec{
 				Target: resolveCacheTarget(cachePathOverrides, "pnpm", defaultPnpmStorePath), ID: "pnpm",
 			})
@@ -413,7 +414,7 @@ func addOSPackageManagerCacheMounts(
 		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/lib/apt", ID: "aptlib", Sharing: instructions.MountSharingLocked})
 		cleaners[cleanupApt] = true
 	case "apk":
-		if !cmd.HasAnyArg("add", "update", "upgrade") {
+		if !cmd.HasAnyArg("add", "update", "upgrade") { //nolint:customlint // "add" is a package manager subcommand, not Dockerfile ADD
 			return true
 		}
 		addRequiredMount(requiredByTarget, cacheMountSpec{Target: "/var/cache/apk", ID: "apk", Sharing: instructions.MountSharingLocked})
@@ -899,6 +900,7 @@ func detectStripNoCacheFlags(cmds []shell.CommandInfo, cleaners map[cleanupKind]
 	for _, cmd := range cmds {
 		switch cmd.Name {
 		case string(cleanupApk):
+			//nolint:customlint // "add" is a package manager subcommand, not Dockerfile ADD
 			if cleaners[cleanupApk] && cmd.HasAnyArg("add", "update", "upgrade") {
 				mode.apkNoCache = true
 			}
@@ -1085,7 +1087,7 @@ func isPackageCacheDirCleanup(command, cacheDir string) bool {
 
 func formatUpdatedRun(run *instructions.RunCommand, mounts []*instructions.Mount, script string) string {
 	var sb strings.Builder
-	sb.WriteString("RUN")
+	sb.WriteString(strings.ToUpper(dfcmd.Run))
 
 	if flags := formatRunFlags(run.FlagsUsed, mounts); flags != "" {
 		sb.WriteString(" ")

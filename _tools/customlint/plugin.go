@@ -18,6 +18,7 @@ func (p *plugin) BuildAnalyzers() ([]*analysis.Analyzer, error) {
 		ruleStructAnalyzer,
 		lspLiteralAnalyzer,
 		docURLAnalyzer,
+		cmdLiteralAnalyzer,
 	}, nil
 }
 

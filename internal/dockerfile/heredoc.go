@@ -2,7 +2,9 @@ package dockerfile
 
 import (
 	"slices"
+	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 )
 
@@ -102,10 +104,10 @@ func ExtractHeredocs(result *ParseResult) []HeredocInfo {
 // Returns HeredocKindUnknown for unrecognized instructions, allowing callers
 // to detect and handle unclassified heredocs explicitly.
 func classifyHeredoc(instruction string) HeredocKind {
-	switch instruction {
-	case "RUN":
+	switch {
+	case strings.EqualFold(instruction, command.Run):
 		return HeredocKindScript
-	case "COPY", "ADD":
+	case strings.EqualFold(instruction, command.Copy), strings.EqualFold(instruction, command.Add):
 		return HeredocKindInlineSource
 	default:
 		// Return unknown for unrecognized instructions rather than guessing.
