@@ -177,3 +177,27 @@ RUN echo "fail"
 		t.Errorf("message should mention stage name, got %q", violations[0].Message)
 	}
 }
+
+func TestShellRunInScratch_CrossRule_WithCopyFrom(t *testing.T) {
+	t.Parallel()
+	// When a scratch stage has a shell-form RUN and is referenced by COPY --from,
+	// shell-run-in-scratch should fire (no shell) but copy-from-empty-scratch-stage
+	// should NOT fire (RUN counts as file-producing).
+	content := `FROM scratch AS builder
+RUN echo "will fail"
+
+FROM alpine:3.19
+COPY --from=builder /out /out
+`
+	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+
+	shellViolations := NewShellRunInScratchRule().Check(input)
+	copyViolations := NewCopyFromEmptyScratchStageRule().Check(input)
+
+	if len(shellViolations) != 1 {
+		t.Errorf("expected 1 shell-run-in-scratch violation, got %d", len(shellViolations))
+	}
+	if len(copyViolations) != 0 {
+		t.Errorf("expected 0 copy-from-empty-scratch-stage violations, got %d", len(copyViolations))
+	}
+}
