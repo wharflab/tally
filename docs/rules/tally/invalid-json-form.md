@@ -12,7 +12,7 @@ Arguments appear to use JSON exec-form but contain invalid JSON.
 ## Description
 
 Several Dockerfile instructions (`CMD`, `ENTRYPOINT`, `RUN`, `SHELL`, `COPY`, `ADD`,
-`VOLUME`, `HEALTHCHECK CMD`) accept JSON exec-form syntax:
+`VOLUME`, `HEALTHCHECK CMD`, `ONBUILD <instruction>`) accept JSON exec-form syntax:
 
 ```dockerfile
 CMD ["executable", "param1", "param2"]
