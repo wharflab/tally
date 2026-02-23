@@ -17,7 +17,7 @@
               "line": 2
             }
           },
-          "message": "shell-form RUN in scratch stage stage 0 will fail because scratch has no /bin/sh",
+          "message": "shell-form RUN in scratch stage 0 will fail because scratch has no /bin/sh",
           "rule": "tally/shell-run-in-scratch",
           "severity": "warning",
           "sourceCode": "RUN echo \"this will fail\""

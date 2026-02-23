@@ -72,7 +72,7 @@ func (r *ShellRunInScratchRule) Check(input rules.LintInput) []rules.Violation {
 			violations = append(violations, rules.NewViolation(
 				loc,
 				r.Metadata().Code,
-				fmt.Sprintf("shell-form RUN in scratch stage %s will fail because scratch has no /bin/sh", stageName),
+				fmt.Sprintf("shell-form RUN in scratch %s will fail because scratch has no /bin/sh", stageName),
 				r.Metadata().DefaultSeverity,
 			).WithDocURL(r.Metadata().DocURL).WithDetail(
 				"scratch images contain no shell. Use exec-form (RUN [\"/binary\", \"arg\"]), "+

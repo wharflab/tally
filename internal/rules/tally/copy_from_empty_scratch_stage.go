@@ -83,7 +83,7 @@ func (r *CopyFromEmptyScratchStageRule) Check(input rules.LintInput) []rules.Vio
 			violations = append(violations, rules.NewViolation(
 				loc,
 				r.Metadata().Code,
-				fmt.Sprintf("COPY --from references empty scratch stage %s which has no ADD, COPY, or RUN instructions", stageName),
+				fmt.Sprintf("COPY --from references empty scratch %s which has no ADD, COPY, or RUN instructions", stageName),
 				r.Metadata().DefaultSeverity,
 			).WithDocURL(r.Metadata().DocURL).WithDetail(
 				"The scratch stage has no file-producing instructions, so COPY --from will always fail. "+

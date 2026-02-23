@@ -17,7 +17,7 @@
               "line": 4
             }
           },
-          "message": "COPY --from references empty scratch stage \"empty\" (stage 0) which has no ADD, COPY, or RUN instructions",
+          "message": "COPY --from references empty scratch \"empty\" (stage 0) which has no ADD, COPY, or RUN instructions",
           "rule": "tally/copy-from-empty-scratch-stage",
           "severity": "error",
           "sourceCode": "COPY --from=empty /app /app"
