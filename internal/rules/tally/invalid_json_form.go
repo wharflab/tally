@@ -426,20 +426,22 @@ func tryRepairJSON(raw string) (string, bool) {
 
 // splitJSONElements splits a comma-separated list, respecting double and single
 // quoted strings so that commas inside quotes are not treated as delimiters.
+// Uses rune iteration for UTF-8 safety.
 func splitJSONElements(s string) []string {
 	var parts []string
 	var current strings.Builder
 	inQuote := false
-	quoteChar := byte(0)
+	var quoteChar rune
 
-	for i := 0; i < len(s); i++ {
-		ch := s[i]
+	runes := []rune(s)
+	for i := 0; i < len(runes); i++ {
+		ch := runes[i]
 
 		if inQuote {
-			current.WriteByte(ch)
-			if ch == '\\' && i+1 < len(s) {
+			current.WriteRune(ch)
+			if ch == '\\' && i+1 < len(runes) {
 				i++
-				current.WriteByte(s[i])
+				current.WriteRune(runes[i])
 				continue
 			}
 			if ch == quoteChar {
@@ -452,12 +454,12 @@ func splitJSONElements(s string) []string {
 		case '"', '\'':
 			inQuote = true
 			quoteChar = ch
-			current.WriteByte(ch)
+			current.WriteRune(ch)
 		case ',':
 			parts = append(parts, current.String())
 			current.Reset()
 		default:
-			current.WriteByte(ch)
+			current.WriteRune(ch)
 		}
 	}
 
