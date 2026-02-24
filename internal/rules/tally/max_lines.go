@@ -188,12 +188,10 @@ func countBlankLines(ast *parser.Result, sm *sourcemap.SourceMap) int {
 	// Track which lines are occupied (have code or comments)
 	occupied := make(map[int]bool)
 
-	// The root node spans the entire file - process its children only
-	// Root comments (file header comments)
-	numRootComments := len(ast.AST.PrevComment)
-	for i := range numRootComments {
-		occupied[1+i] = true // Root comments start at line 1
-	}
+	// The root node spans the entire file - process its children only.
+	// Note: root.PrevComment is always empty; BuildKit attaches file-header
+	// comments to the first child instruction's PrevComment instead.
+	// Those are handled by markOccupiedLines below.
 
 	// Process child instructions (the root node's Children contains instructions)
 	for _, child := range ast.AST.Children {
