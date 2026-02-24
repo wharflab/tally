@@ -7,12 +7,15 @@ import (
 	dfshell "github.com/moby/buildkit/frontend/dockerfile/shell"
 )
 
+// defaultOS is the fallback OS used when platform detection cannot determine the OS.
+const defaultOS = "linux"
+
 // ExpectedPlatform determines the expected platform for a stage.
 //
 // Resolution order:
 //  1. FROM --platform if present and resolvable via the semantic model's fromArgEval
 //  2. DOCKER_DEFAULT_PLATFORM environment variable
-//  3. runtime.GOOS/runtime.GOARCH (host platform)
+//  3. Default container platform (linux/<host-arch>)
 //
 // Returns the platform string (e.g., "linux/amd64") and any unresolved ARG names.
 func ExpectedPlatform(info *StageInfo, model *Model) (string, []string) {
@@ -77,12 +80,16 @@ func resolvePlatformExpr(expr string, model *Model) (string, []string) {
 }
 
 // defaultPlatform returns the default target platform.
-// Checks DOCKER_DEFAULT_PLATFORM first, then falls back to host platform.
+// Checks DOCKER_DEFAULT_PLATFORM first, then falls back to a Linux container platform
+// based on host architecture.
 func defaultPlatform() string {
 	if dp := os.Getenv("DOCKER_DEFAULT_PLATFORM"); dp != "" {
 		return dp
 	}
 	spec := platforms.DefaultSpec()
+	// Dockerfile builds typically target Linux containers even on non-Linux hosts
+	// (e.g., Docker Desktop on macOS/Windows runs a Linux builder VM).
+	spec.OS = defaultOS
 	p := spec.OS + "/" + spec.Architecture
 	if spec.Variant != "" {
 		p += "/" + spec.Variant

@@ -103,6 +103,8 @@ linters:
       rules:
         - name: unused-parameter
           disabled: true
+        - name: argument-limit
+          arguments: [7]
     staticcheck:
       checks: ["all"]
   exclusions:

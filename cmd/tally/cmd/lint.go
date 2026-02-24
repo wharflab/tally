@@ -428,7 +428,7 @@ func runLintStdin(ctx stdcontext.Context, cmd *cli.Command) error {
 
 	warnFixUnsafe(cmd)
 	if cmd.Bool("fix") {
-		return applyStdinFixes(ctx, cmd, content, allViolations, res.fileSources, res.fileConfigs, asyncPlans, asyncResult, cfg)
+		return applyStdinFixes(ctx, cmd, content, allViolations, res, asyncPlans, asyncResult)
 	}
 	return writeReport(cmd, cfg, allViolations, res.fileSources, 1)
 }
@@ -498,11 +498,9 @@ func processViolations(res *lintResults, cfg *config.Config) []rules.Violation {
 func applyStdinFixes(
 	ctx stdcontext.Context, cmd *cli.Command,
 	content []byte, allViolations []rules.Violation,
-	fileSources map[string][]byte, fileConfigs map[string]*config.Config,
-	asyncPlans []async.CheckRequest, asyncResult *async.RunResult,
-	cfg *config.Config,
+	res *lintResults, asyncPlans []async.CheckRequest, asyncResult *async.RunResult,
 ) error {
-	fixResult, fixErr := applyFixes(ctx, cmd, allViolations, fileSources, fileConfigs, asyncPlans, asyncResult)
+	fixResult, fixErr := applyFixes(ctx, cmd, allViolations, res.fileSources, res.fileConfigs, asyncPlans, asyncResult)
 	if fixErr != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to apply fixes: %v\n", fixErr)
 		return cli.Exit("", ExitConfigError)
@@ -531,6 +529,7 @@ func applyStdinFixes(
 	// With --fix and stdin, stdout carries the fixed Dockerfile content.
 	// Redirect the violation report to stderr unless the user explicitly
 	// chose a different output destination (--output or config).
+	cfg := res.firstCfg
 	outCfg := getOutputConfig(cmd, cfg)
 	reportPath := outCfg.path
 	if reportPath == "" || reportPath == "stdout" {
@@ -539,7 +538,7 @@ func applyStdinFixes(
 			fmt.Fprintf(os.Stderr, "note: --output overridden to stderr in stdin fix mode (stdout carries fixed content)\n")
 		}
 	}
-	return writeReportTo(cmd, cfg, allViolations, fileSources, 1, reportPath)
+	return writeReportTo(cmd, cfg, allViolations, res.fileSources, 1, reportPath)
 }
 
 // lintFiles runs the lint pipeline on each discovered file and aggregates results.

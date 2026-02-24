@@ -116,8 +116,17 @@ func (r *resolver) proposeMultiStageDockerfile(
 	var proposed []byte
 	var blocking []blockingIssue
 
+	rp := roundPromptParams{
+		filePath:  filePath,
+		req:       req,
+		cfg:       cfg,
+		origParse: origParse,
+	}
 	for round := 1; round <= maxAgentRounds; round++ {
-		prompt, err := buildRoundPrompt(round, filePath, roundInput, proposed, blocking, req, cfg, origParse)
+		rp.input = roundInput
+		rp.proposed = proposed
+		rp.blocking = blocking
+		prompt, err := buildRoundPrompt(round, rp)
 		if err != nil {
 			return nil, err
 		}
@@ -145,21 +154,23 @@ func (r *resolver) proposeMultiStageDockerfile(
 	return nil, errors.New("ai-autofix: blocking issues remain after max rounds")
 }
 
-func buildRoundPrompt(
-	round int,
-	filePath string,
-	roundInput []byte,
-	proposed []byte,
-	blocking []blockingIssue,
-	req *autofixdata.MultiStageResolveData,
-	cfg *config.Config,
-	origParse *dockerfile.ParseResult,
-) (string, error) {
+// roundPromptParams bundles the inputs for buildRoundPrompt across rounds.
+type roundPromptParams struct {
+	filePath  string
+	input     []byte // round 1: original content; round 2+: previous proposal
+	proposed  []byte // round 2+: proposed content for retry
+	blocking  []blockingIssue
+	req       *autofixdata.MultiStageResolveData
+	cfg       *config.Config
+	origParse *dockerfile.ParseResult
+}
+
+func buildRoundPrompt(round int, p roundPromptParams) (string, error) {
 	switch round {
 	case 1:
-		return buildRound1Prompt(filePath, roundInput, req, cfg, origParse)
+		return buildRound1Prompt(p.filePath, p.input, p.req, p.cfg, p.origParse)
 	case 2:
-		return buildRound2Prompt(filePath, proposed, blocking, cfg)
+		return buildRound2Prompt(p.filePath, p.proposed, p.blocking, p.cfg)
 	default:
 		return "", errors.New("ai-autofix: unexpected round")
 	}

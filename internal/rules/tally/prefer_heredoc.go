@@ -113,16 +113,24 @@ func (r *PreferHeredocRule) Check(input rules.LintInput) []rules.Violation {
 			}
 		}
 
+		p := heredocCheckParams{
+			stageIdx:        stageIdx,
+			shellVariant:    shellVariant,
+			file:            input.File,
+			sm:              sm,
+			minCommands:     minCommands,
+			pipefailEnabled: pipefailEnabled,
+			meta:            meta,
+		}
+
 		// Check consecutive RUNs
 		if checkConsecutive {
-			violations = append(violations,
-				r.checkConsecutiveRuns(stage, stageIdx, shellVariant, input.File, sm, minCommands, pipefailEnabled, meta)...)
+			violations = append(violations, r.checkConsecutiveRuns(stage, p)...)
 		}
 
 		// Check chained commands within single RUN
 		if checkChained {
-			violations = append(violations,
-				r.checkChainedCommands(stage, stageIdx, shellVariant, input.File, sm, minCommands, pipefailEnabled, meta)...)
+			violations = append(violations, r.checkChainedCommands(stage, p)...)
 		}
 	}
 
@@ -139,6 +147,17 @@ func (r *PreferHeredocRule) ValidateConfig(config any) error {
 	return configutil.ValidateRuleOptions(rules.HeredocRuleCode, config)
 }
 
+// heredocCheckParams bundles shared parameters for heredoc sequence/chain checks.
+type heredocCheckParams struct {
+	stageIdx        int
+	shellVariant    shell.Variant
+	file            string
+	sm              *sourcemap.SourceMap
+	minCommands     int
+	pipefailEnabled bool
+	meta            rules.RuleMetadata
+}
+
 // runSequenceItem represents a RUN instruction in a sequence with extracted commands.
 type runSequenceItem struct {
 	run      *instructions.RunCommand
@@ -149,20 +168,14 @@ type runSequenceItem struct {
 // checkConsecutiveRuns checks for sequences of consecutive RUN instructions.
 func (r *PreferHeredocRule) checkConsecutiveRuns(
 	stage instructions.Stage,
-	stageIdx int,
-	shellVariant shell.Variant,
-	file string,
-	sm *sourcemap.SourceMap,
-	minCommands int,
-	pipefailEnabled bool,
-	meta rules.RuleMetadata,
+	p heredocCheckParams,
 ) []rules.Violation {
 	var violations []rules.Violation
 	sequence := make([]runSequenceItem, 0, 8) //nolint:mnd // Pre-allocate for typical sequences
 	var sequenceMounts []*instructions.Mount
 
 	flushSequence := func() {
-		if v := r.createSequenceViolation(sequence, stageIdx, shellVariant, file, sm, minCommands, pipefailEnabled, meta); v != nil {
+		if v := r.createSequenceViolation(sequence, p); v != nil {
 			violations = append(violations, *v)
 		}
 		sequence = sequence[:0]
@@ -184,7 +197,7 @@ func (r *PreferHeredocRule) checkConsecutiveRuns(
 		}
 
 		// Extract commands from this RUN
-		commands, isSimple := r.extractRunCommands(run, shellVariant)
+		commands, isSimple := r.extractRunCommands(run, p.shellVariant)
 		if len(commands) == 0 {
 			flushSequence()
 			sequenceMounts = nil
@@ -193,7 +206,7 @@ func (r *PreferHeredocRule) checkConsecutiveRuns(
 
 		// Check if any command has exit (breaks sequence)
 		script := getRunScriptFromCmd(run)
-		if shell.HasExitCommand(script, shellVariant) {
+		if shell.HasExitCommand(script, p.shellVariant) {
 			flushSequence()
 			sequenceMounts = nil
 			continue
@@ -219,13 +232,7 @@ func (r *PreferHeredocRule) checkConsecutiveRuns(
 // Returns nil if the sequence doesn't warrant a violation.
 func (r *PreferHeredocRule) createSequenceViolation(
 	sequence []runSequenceItem,
-	stageIdx int,
-	shellVariant shell.Variant,
-	file string,
-	_ *sourcemap.SourceMap,
-	minCommands int,
-	pipefailEnabled bool,
-	meta rules.RuleMetadata,
+	p heredocCheckParams,
 ) *rules.Violation {
 	if len(sequence) < 2 {
 		return nil
@@ -243,12 +250,12 @@ func (r *PreferHeredocRule) createSequenceViolation(
 		}
 	}
 
-	if totalCommands < minCommands {
+	if totalCommands < p.minCommands {
 		return nil
 	}
 
 	firstRun := sequence[0].run
-	loc := rules.NewLocationFromRanges(file, firstRun.Location())
+	loc := rules.NewLocationFromRanges(p.file, firstRun.Location())
 
 	var detail string
 	if allSimple {
@@ -265,15 +272,15 @@ func (r *PreferHeredocRule) createSequenceViolation(
 
 	v := rules.NewViolation(
 		loc,
-		meta.Code,
+		p.meta.Code,
 		"consecutive RUN instructions can be combined using heredoc syntax",
-		meta.DefaultSeverity,
-	).WithDocURL(meta.DocURL).WithDetail(detail)
+		p.meta.DefaultSeverity,
+	).WithDocURL(p.meta.DocURL).WithDetail(detail)
 
 	// Generate async fix only if all commands are simple
 	// Uses async resolution to operate on content after sync fixes are applied
 	if allSimple && len(allCommands) > 0 {
-		fix := r.generateConsecutiveAsyncFix(stageIdx, shellVariant, allCommands, minCommands, pipefailEnabled, meta)
+		fix := r.generateConsecutiveAsyncFix(p.stageIdx, p.shellVariant, allCommands, p.minCommands, p.pipefailEnabled, p.meta)
 		v = v.WithSuggestedFix(fix)
 	}
 
@@ -283,13 +290,7 @@ func (r *PreferHeredocRule) createSequenceViolation(
 // checkChainedCommands checks for single RUN instructions with many chained commands.
 func (r *PreferHeredocRule) checkChainedCommands(
 	stage instructions.Stage,
-	stageIdx int,
-	shellVariant shell.Variant,
-	file string,
-	_ *sourcemap.SourceMap,
-	minCommands int,
-	pipefailEnabled bool,
-	meta rules.RuleMetadata,
+	p heredocCheckParams,
 ) []rules.Violation {
 	var violations []rules.Violation
 
@@ -314,25 +315,25 @@ func (r *PreferHeredocRule) checkChainedCommands(
 			continue
 		}
 
-		commandCount := shell.CountChainedCommands(script, shellVariant)
-		if commandCount >= minCommands {
-			loc := rules.NewLocationFromRanges(file, run.Location())
+		commandCount := shell.CountChainedCommands(script, p.shellVariant)
+		if commandCount >= p.minCommands {
+			loc := rules.NewLocationFromRanges(p.file, run.Location())
 
 			v := rules.NewViolation(
 				loc,
-				meta.Code,
+				p.meta.Code,
 				"RUN instruction with chained commands can use heredoc syntax",
-				meta.DefaultSeverity,
-			).WithDocURL(meta.DocURL).WithDetail(
+				p.meta.DefaultSeverity,
+			).WithDocURL(p.meta.DocURL).WithDetail(
 				fmt.Sprintf("RUN has %d chained commands; consider using heredoc syntax for better readability", commandCount),
 			)
 
 			// Generate async fix for simple scripts
 			// Uses async resolution to operate on content after sync fixes are applied
-			if shell.IsSimpleScript(script, shellVariant) {
-				commands := shell.ExtractChainedCommands(script, shellVariant)
+			if shell.IsSimpleScript(script, p.shellVariant) {
+				commands := shell.ExtractChainedCommands(script, p.shellVariant)
 				if len(commands) > 0 {
-					fix := r.generateChainedAsyncFix(stageIdx, shellVariant, commands, minCommands, pipefailEnabled, meta)
+					fix := r.generateChainedAsyncFix(p.stageIdx, p.shellVariant, commands, p.minCommands, p.pipefailEnabled, p.meta)
 					v = v.WithSuggestedFix(fix)
 				}
 			}

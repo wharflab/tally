@@ -49,7 +49,7 @@ func (e *fromEnv) Set(key, value string) {
 // TARGETPLATFORM respects DOCKER_DEFAULT_PLATFORM when set, matching BuildKit
 // behavior where --platform overrides the target platform.
 func defaultFromArgs(targetStage string, overrides map[string]string) map[string]string {
-	bp := platforms.DefaultSpec()
+	bp := buildPlatformSpec()
 	tp := targetPlatformSpec()
 	if targetStage == "" {
 		targetStage = defaultTargetStageName
@@ -83,15 +83,29 @@ func defaultFromArgs(targetStage string, overrides map[string]string) map[string
 	return out
 }
 
+// buildPlatformSpec returns the build platform spec.
+//
+// In BuildKit, BUILDPLATFORM reflects the platform of the builder node. For most
+// local development (including Docker Desktop), this is a Linux container
+// platform even when the host OS is macOS/Windows.
+func buildPlatformSpec() ocispec.Platform {
+	p := platforms.DefaultSpec()
+	p.OS = defaultOS
+	return p
+}
+
 // targetPlatformSpec returns the target platform spec, checking
-// DOCKER_DEFAULT_PLATFORM first, then falling back to host platform.
+// DOCKER_DEFAULT_PLATFORM first, then falling back to a Linux container platform
+// based on host architecture.
 func targetPlatformSpec() ocispec.Platform {
 	if dp := os.Getenv("DOCKER_DEFAULT_PLATFORM"); dp != "" {
 		if p, err := platforms.Parse(dp); err == nil {
 			return p
 		}
 	}
-	return platforms.DefaultSpec()
+	p := platforms.DefaultSpec()
+	p.OS = defaultOS
+	return p
 }
 
 func scopeArgKeys(scope *VariableScope) ([]string, map[string]struct{}) {

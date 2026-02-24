@@ -98,6 +98,12 @@ func (r *DL4001Rule) collectToolUsage(input rules.LintInput) (usageMapDL4001, us
 
 	for stageIdx, stage := range input.Stages {
 		shellVariant, wgetInstalled, curlInstalled := r.getStageInfo(sem, stageIdx)
+		tracking := &toolTrackingDL4001{
+			wgetInstalled: wgetInstalled,
+			curlInstalled: curlInstalled,
+			wgetUsage:     wgetUsage,
+			curlUsage:     curlUsage,
+		}
 
 		for _, cmd := range stage.Commands {
 			run, ok := cmd.(*instructions.RunCommand)
@@ -108,8 +114,7 @@ func (r *DL4001Rule) collectToolUsage(input rules.LintInput) (usageMapDL4001, us
 			cmdStr := r.buildCommandString(run)
 			loc := rules.NewLocationFromRanges(input.File, run.Location())
 
-			r.recordToolUsage(cmdStr, shellVariant, stageIdx, loc,
-				wgetInstalled, curlInstalled, wgetUsage, curlUsage)
+			r.recordToolUsage(cmdStr, shellVariant, stageIdx, loc, tracking)
 		}
 	}
 
@@ -143,6 +148,12 @@ func (r *DL4001Rule) buildCommandString(run *instructions.RunCommand) string {
 	return cmdBuilder.String()
 }
 
+// toolTrackingDL4001 bundles per-stage tool installation state and usage maps.
+type toolTrackingDL4001 struct {
+	wgetInstalled, curlInstalled bool
+	wgetUsage, curlUsage         usageMapDL4001
+}
+
 // recordToolUsage checks for wget/curl usage and records it.
 // Skips analysis for non-POSIX shells (e.g., PowerShell) since shell
 // command parsing doesn't apply to them.
@@ -151,8 +162,7 @@ func (r *DL4001Rule) recordToolUsage(
 	shellVariant shell.Variant,
 	stageIdx int,
 	loc rules.Location,
-	wgetInstalled, curlInstalled bool,
-	wgetUsage, curlUsage usageMapDL4001,
+	t *toolTrackingDL4001,
 ) {
 	// Skip shell command analysis for non-POSIX shells
 	if shellVariant.IsNonPOSIX() {
@@ -160,16 +170,16 @@ func (r *DL4001Rule) recordToolUsage(
 	}
 
 	if shell.ContainsCommandWithVariant(cmdStr, "wget", shellVariant) {
-		if wgetUsage[stageIdx] == nil {
-			wgetUsage[stageIdx] = &toolUsageDL4001{installed: wgetInstalled}
+		if t.wgetUsage[stageIdx] == nil {
+			t.wgetUsage[stageIdx] = &toolUsageDL4001{installed: t.wgetInstalled}
 		}
-		wgetUsage[stageIdx].locations = append(wgetUsage[stageIdx].locations, loc)
+		t.wgetUsage[stageIdx].locations = append(t.wgetUsage[stageIdx].locations, loc)
 	}
 	if shell.ContainsCommandWithVariant(cmdStr, "curl", shellVariant) {
-		if curlUsage[stageIdx] == nil {
-			curlUsage[stageIdx] = &toolUsageDL4001{installed: curlInstalled}
+		if t.curlUsage[stageIdx] == nil {
+			t.curlUsage[stageIdx] = &toolUsageDL4001{installed: t.curlInstalled}
 		}
-		curlUsage[stageIdx].locations = append(curlUsage[stageIdx].locations, loc)
+		t.curlUsage[stageIdx].locations = append(t.curlUsage[stageIdx].locations, loc)
 	}
 }
 
