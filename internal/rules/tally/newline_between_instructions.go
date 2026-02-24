@@ -92,9 +92,11 @@ func (r *NewlineBetweenInstructionsRule) Check(input rules.LintInput) []rules.Vi
 		prevEndLine := sm.ResolveEndLine(prev.EndLine)
 
 		// Compute start of current instruction accounting for attached comments.
-		// BuildKit stores preceding comments in PrevComment; those lines sit
-		// directly above StartLine.
-		currEffectiveStart := curr.StartLine - len(curr.PrevComment)
+		// BuildKit stores preceding comments in PrevComment but the simple
+		// formula (StartLine − len) breaks when blank lines separate
+		// comments from the instruction; scan the source to find the real
+		// position.
+		currEffectiveStart := sm.EffectiveStartLine(curr.StartLine, curr.PrevComment)
 
 		gap := currEffectiveStart - prevEndLine - 1
 

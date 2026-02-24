@@ -180,8 +180,7 @@ func TestNewlineBetweenInstructionsCheck(t *testing.T) {
 		{
 			Name:           "grouped - different types with comment and blank lines",
 			Content:        "FROM alpine:3.20\n\n# some comment\n\nRUN echo hello\n",
-			WantViolations: 1,
-			WantMessages:   []string{"expected 1 blank line between FROM and RUN, found 2"},
+			WantViolations: 0,
 		},
 		{
 			Name:           "grouped - same type with attached comment pass",

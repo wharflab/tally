@@ -3,11 +3,13 @@ package tally
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // MaxLinesRuleCode is the full rule code for the max-lines rule.
@@ -107,7 +109,7 @@ func (r *MaxLinesRule) Check(input rules.LintInput) []rules.Violation {
 	// nil defaults to true (skip blank lines)
 	skipBlankLines := cfg.SkipBlankLines == nil || *cfg.SkipBlankLines
 	if skipBlankLines {
-		count -= countBlankLines(input.AST)
+		count -= countBlankLines(input.AST, input.SourceMap())
 	} else if count <= maxLines {
 		// Trailing blanks only matter if not already over limit
 		count += countTrailingBlanks(input.Source)
@@ -177,7 +179,7 @@ func countCommentLines(node *parser.Node) int {
 // countBlankLines counts lines that have no AST node content.
 // A blank line is one that has neither code nor comments.
 // AST is guaranteed non-nil by the linter contract.
-func countBlankLines(ast *parser.Result) int {
+func countBlankLines(ast *parser.Result, sm *sourcemap.SourceMap) int {
 	totalLines := ast.AST.EndLine
 	if totalLines <= 0 {
 		return 0
@@ -195,12 +197,12 @@ func countBlankLines(ast *parser.Result) int {
 
 	// Process child instructions (the root node's Children contains instructions)
 	for _, child := range ast.AST.Children {
-		markOccupiedLines(child, occupied)
+		markOccupiedLines(child, sm, occupied)
 	}
 
 	// Process Next chain (alternative structure for instructions)
 	if ast.AST.Next != nil {
-		markOccupiedLines(ast.AST.Next, occupied)
+		markOccupiedLines(ast.AST.Next, sm, occupied)
 	}
 
 	// Count unoccupied lines
@@ -214,7 +216,7 @@ func countBlankLines(ast *parser.Result) int {
 }
 
 // markOccupiedLines recursively marks all lines that have AST content.
-func markOccupiedLines(node *parser.Node, occupied map[int]bool) {
+func markOccupiedLines(node *parser.Node, sm *sourcemap.SourceMap, occupied map[int]bool) {
 	if node == nil {
 		return
 	}
@@ -224,21 +226,25 @@ func markOccupiedLines(node *parser.Node, occupied map[int]bool) {
 		occupied[line] = true
 	}
 
-	// Mark lines for preceding comments
-	// Each PrevComment entry represents one comment line before StartLine
-	numComments := len(node.PrevComment)
-	for i := range numComments {
-		occupied[node.StartLine-numComments+i] = true
+	// Mark lines for preceding comments. Use EffectiveStartLine to find
+	// where the comment block actually begins (accounting for blank lines
+	// between comments and the instruction), then scan for real comment
+	// lines — blank lines within the block stay unoccupied.
+	effectiveStart := sm.EffectiveStartLine(node.StartLine, node.PrevComment)
+	for line := effectiveStart; line < node.StartLine; line++ {
+		if strings.HasPrefix(strings.TrimSpace(sm.Line(line-1)), "#") {
+			occupied[line] = true
+		}
 	}
 
 	// Recurse into children
 	for _, child := range node.Children {
-		markOccupiedLines(child, occupied)
+		markOccupiedLines(child, sm, occupied)
 	}
 
 	// Recurse into Next chain (sibling instructions)
 	if node.Next != nil {
-		markOccupiedLines(node.Next, occupied)
+		markOccupiedLines(node.Next, sm, occupied)
 	}
 }
 
