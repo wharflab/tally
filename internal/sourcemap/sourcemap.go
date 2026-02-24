@@ -237,10 +237,11 @@ func (sm *SourceMap) EffectiveStartLine(startLine int, prevComments []string) in
 
 	for lineIdx := startLine - 2; lineIdx >= 0 && commentIdx >= 0; lineIdx-- {
 		raw := sm.Line(lineIdx)
-		if strings.TrimSpace(raw) == "" {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" {
 			continue // skip blank lines between comments / instruction
 		}
-		if !strings.HasPrefix(strings.TrimSpace(raw), "#") {
+		if !strings.HasPrefix(trimmed, "#") {
 			break
 		}
 		// Reproduce BuildKit's PrevComment extraction: drop first byte, TrimSpace.
