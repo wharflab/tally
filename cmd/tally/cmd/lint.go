@@ -409,7 +409,7 @@ func runLintStdin(ctx stdcontext.Context, cmd *cli.Command) error {
 		return cli.Exit("", ExitNoFiles)
 	}
 
-	res, cfg, err := lintStdinContent(ctx, cmd, content)
+	res, cfg, err := lintStdinContent(cmd, content)
 	if err != nil {
 		return err
 	}
@@ -436,7 +436,7 @@ func runLintStdin(ctx stdcontext.Context, cmd *cli.Command) error {
 }
 
 // lintStdinContent parses and lints content read from stdin.
-func lintStdinContent(_ stdcontext.Context, cmd *cli.Command, content []byte) (*lintResults, *config.Config, error) {
+func lintStdinContent(cmd *cli.Command, content []byte) (*lintResults, *config.Config, error) {
 	// Load config from CWD (stdin has no file path for cascading discovery).
 	cfg, err := loadConfigForFile(cmd, ".")
 	if err != nil {
