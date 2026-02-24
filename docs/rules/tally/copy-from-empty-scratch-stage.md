@@ -49,6 +49,13 @@ FROM alpine:3.19
 COPY --from=artifacts /out/app /usr/local/bin/app
 ```
 
+## Related rules
+
+- [`tally/shell-run-in-scratch`](./shell-run-in-scratch.md) — a scratch stage with only a shell-form
+  `RUN` is not considered empty by this rule (any `RUN` counts as file-producing). The
+  `shell-run-in-scratch` rule warns about the failing `RUN` instead. If the user removes that `RUN`,
+  this rule will then fire on downstream `COPY --from` references.
+
 ## Configuration
 
 ```toml

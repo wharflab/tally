@@ -57,7 +57,7 @@ reviews:
         2. Could this rule compete with another rule for the same Dockerfile instruction or pattern?
         3. Could the auto-fix produced by this rule be flagged as a violation by another rule?
         Flag any PR that introduces or modifies a rule but is missing:
-        - Documentation of known cross-rule interactions (in code comments or RULES.md)
+        - Documentation of known cross-rule interactions (in code comments or a rule documentation at docs/)
         - Test cases that cover overlapping scenarios with related rules
         These cross-rule concerns should take special priority in the review.
     - path: 'internal/rules/tally/**/*.go'

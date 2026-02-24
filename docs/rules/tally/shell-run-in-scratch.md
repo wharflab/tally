@@ -54,6 +54,14 @@ FROM alpine:3.19
 RUN echo "hello"
 ```
 
+## Related rules
+
+- [`tally/copy-from-empty-scratch-stage`](./copy-from-empty-scratch-stage.md) — if a scratch stage
+  contains only a shell-form `RUN`, this rule fires but `copy-from-empty-scratch-stage` does not
+  (because any `RUN` counts as file-producing). If you remove the failing `RUN` in response to this
+  warning, the stage becomes truly empty and `copy-from-empty-scratch-stage` will then fire on any
+  downstream `COPY --from`.
+
 ## Configuration
 
 ```toml

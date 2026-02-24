@@ -36,6 +36,15 @@ func (r *ShellRunInScratchRule) Metadata() rules.RuleMetadata {
 }
 
 // Check runs the shell-run-in-scratch rule.
+//
+// Cross-rule interaction with copy-from-empty-scratch-stage:
+// A scratch stage containing only a shell-form RUN is treated as non-empty by
+// hasFileProducingCommands (any RUN counts), so copy-from-empty-scratch-stage
+// will not fire on downstream COPY --from references. In practice the shell-form
+// RUN will fail at build time (no /bin/sh), making the stage effectively empty.
+// If the user removes the RUN in response to this warning, they may then see a
+// copy-from-empty-scratch-stage error — this is the expected progressive-fix
+// sequence.
 func (r *ShellRunInScratchRule) Check(input rules.LintInput) []rules.Violation {
 	if input.Semantic == nil {
 		return nil
