@@ -459,7 +459,6 @@ func lintStdinContent(cmd *cli.Command, content []byte) (*lintResults, *config.C
 
 	result, err := linter.LintFile(linter.Input{
 		FilePath:    stdinPath,
-		Content:     content,
 		Config:      cfg,
 		ParseResult: parseResult,
 	})
