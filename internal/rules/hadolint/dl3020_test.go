@@ -215,6 +215,101 @@ func TestIsURLDL3020(t *testing.T) {
 	}
 }
 
+func TestDL3020Rule_Fix(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name       string
+		dockerfile string
+		wantFix    bool
+		wantText   string // expected NewText in the first edit
+	}{
+		{
+			name: "simple local file gets fix",
+			dockerfile: `FROM ubuntu:22.04
+ADD file.txt /app/
+`,
+			wantFix:  true,
+			wantText: "COPY",
+		},
+		{
+			name: "lowercase add gets lowercase fix",
+			dockerfile: `FROM ubuntu:22.04
+add file.txt /app/
+`,
+			wantFix:  true,
+			wantText: "copy",
+		},
+		{
+			name: "ADD with flags preserves flags",
+			dockerfile: `FROM ubuntu:22.04
+ADD --chown=app:app file.txt /app/
+`,
+			wantFix:  true,
+			wantText: "COPY",
+		},
+		{
+			name: "ADD with multiple local sources",
+			dockerfile: `FROM ubuntu:22.04
+ADD file1.txt file2.txt /app/
+`,
+			wantFix:  true,
+			wantText: "COPY",
+		},
+		{
+			name:       "URL - no fix",
+			dockerfile: "FROM ubuntu:22.04\nADD https://example.com/file.txt /app/\n",
+			wantFix:    false,
+		},
+		{
+			name:       "tar archive - no fix",
+			dockerfile: "FROM ubuntu:22.04\nADD archive.tar.gz /app/\n",
+			wantFix:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
+
+			r := NewDL3020Rule()
+			violations := r.Check(input)
+
+			if !tt.wantFix {
+				// No violation or no fix expected
+				for _, v := range violations {
+					if v.SuggestedFix != nil {
+						t.Errorf("unexpected fix on violation: %s", v.Message)
+					}
+				}
+				return
+			}
+
+			if len(violations) == 0 {
+				t.Fatal("expected at least one violation")
+			}
+
+			v := violations[0]
+			if v.SuggestedFix == nil {
+				t.Fatal("expected SuggestedFix, got nil")
+			}
+
+			fix := v.SuggestedFix
+			if fix.Safety != rules.FixSafe {
+				t.Errorf("Safety = %v, want FixSafe", fix.Safety)
+			}
+
+			if len(fix.Edits) != 1 {
+				t.Fatalf("got %d edits, want 1", len(fix.Edits))
+			}
+
+			if fix.Edits[0].NewText != tt.wantText {
+				t.Errorf("NewText = %q, want %q", fix.Edits[0].NewText, tt.wantText)
+			}
+		})
+	}
+}
+
 func TestIsTarArchiveDL3020(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

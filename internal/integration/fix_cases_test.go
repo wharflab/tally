@@ -37,6 +37,25 @@ func fixCases(t *testing.T) []fixCase {
 			args:        []string{"--fix"},
 			wantApplied: 2, // Both FromAsCasing and StageNameCasing
 		},
+		// DL3020: ADD -> COPY for local files
+		{
+			name:        "dl3020-add-to-copy",
+			input:       "FROM ubuntu:22.04\nADD file.txt /app/\n",
+			args:        []string{"--fix"},
+			wantApplied: 1,
+		},
+		{
+			name:        "dl3020-add-to-copy-multiple",
+			input:       "FROM ubuntu:22.04\nADD file1.txt /app/\nADD file2.txt /app/\n",
+			args:        []string{"--fix"},
+			wantApplied: 2,
+		},
+		{
+			name:        "dl3020-add-to-copy-with-flags",
+			input:       "FROM ubuntu:22.04\nADD --chown=app:app src/ /app/\n",
+			args:        []string{"--fix"},
+			wantApplied: 1,
+		},
 		// DL3027: apt -> apt-get (regression test for line number consistency)
 		{
 			name:        "dl3027-apt-to-apt-get",
