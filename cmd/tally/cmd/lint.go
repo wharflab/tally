@@ -407,6 +407,9 @@ func checkStdinInput(inputs []string) error {
 // runLintStdin handles the stdin code path: read from stdin, lint, and either
 // report diagnostics (no --fix) or write fixed content to stdout (--fix).
 func runLintStdin(ctx stdcontext.Context, cmd *cli.Command) error {
+	if stat, err := os.Stdin.Stat(); err == nil && (stat.Mode()&os.ModeCharDevice) != 0 {
+		fmt.Fprintf(os.Stderr, "Warning: reading from terminal; use Ctrl+D to end input or pipe a Dockerfile\n")
+	}
 	content, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to read stdin: %v\n", err)
