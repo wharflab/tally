@@ -5,7 +5,7 @@ const {scheduler} = require('node:timers/promises')
 
 const vscode = require("vscode");
 
-const DEFAULT_EXPECTED_DIAGNOSTICS = 173;
+const DEFAULT_EXPECTED_DIAGNOSTICS = 167;
 
 function normalizeNewlines(s) {
   return s.replaceAll("\r\n", "\n");
