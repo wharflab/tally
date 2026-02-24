@@ -1,0 +1,45 @@
+diff --git a/shellcheck.hs b/shellcheck.hs
+index 2a5d317..9181ab5 100644
+--- a/shellcheck.hs
++++ b/shellcheck.hs
+@@ -24,14 +24,8 @@ import           ShellCheck.Data
+ import           ShellCheck.Interface
+ import           ShellCheck.Regex
+ 
+-import qualified ShellCheck.Formatter.CheckStyle
+ import           ShellCheck.Formatter.Format
+-import qualified ShellCheck.Formatter.Diff
+-import qualified ShellCheck.Formatter.GCC
+-import qualified ShellCheck.Formatter.JSON
+ import qualified ShellCheck.Formatter.JSON1
+-import qualified ShellCheck.Formatter.TTY
+-import qualified ShellCheck.Formatter.Quiet
+ 
+ import           Control.Exception
+ import           Control.Monad
+@@ -150,14 +144,8 @@ parseArguments argv =
+             throwError SyntaxFailure
+ 
+ formats :: FormatterOptions -> Map.Map String (IO Formatter)
+-formats options = Map.fromList [
+-    ("checkstyle", ShellCheck.Formatter.CheckStyle.format),
+-    ("diff",  ShellCheck.Formatter.Diff.format options),
+-    ("gcc",  ShellCheck.Formatter.GCC.format),
+-    ("json", ShellCheck.Formatter.JSON.format),
+-    ("json1", ShellCheck.Formatter.JSON1.format),
+-    ("tty",  ShellCheck.Formatter.TTY.format options),
+-    ("quiet",  ShellCheck.Formatter.Quiet.format options)
++formats _ = Map.fromList [
++    ("json1", ShellCheck.Formatter.JSON1.format)
+     ]
+ 
+ formatList = intercalate ", " names
+@@ -210,7 +198,7 @@ process :: [Flag] -> [FilePath] -> ExceptT Status IO Status
+ process flags files = do
+     options <- foldM (flip parseOption) defaultOptions flags
+     verifyFiles files
+-    let format = fromMaybe "tty" $ getOption flags "format"
++    let format = fromMaybe "json1" $ getOption flags "format"
+     let formatters = formats $ formatterOptions options
+     formatter <-
+         case Map.lookup format formatters of

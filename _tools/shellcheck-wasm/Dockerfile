@@ -21,13 +21,19 @@ ADD "https://github.com/koalaman/shellcheck.git?ref=v${SHELLCHECK_VERSION}" /she
 
 WORKDIR /shellcheck
 
-RUN <<EOF
+RUN --mount=type=bind,source=patches,target=/patches,readonly <<EOF
 set -e
 ./striptests
+for p in /patches/*.patch; do
+	[ -e "$p" ] || continue
+	echo "Applying patch: $p"
+	git apply "$p"
+done
 . ~/.ghc-wasm/env
 wasm32-wasi-cabal update
 wasm32-wasi-cabal build --allow-newer shellcheck
 wasm-opt -o shellcheck.wasm --flatten --rereloop --converge -O3 dist-newstyle/build/wasm32-wasi/ghc-*/ShellCheck-*/x/shellcheck/build/shellcheck/shellcheck.wasm
+wc -c shellcheck.wasm
 EOF
 
 FROM scratch

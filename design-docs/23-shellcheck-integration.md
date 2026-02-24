@@ -368,6 +368,7 @@ We build `shellcheck.wasm` **in this repo** (not via `wasilibs/go-shellcheck`) a
 Suggested layout:
 
 - `_tools/shellcheck-wasm/Dockerfile` (builds `shellcheck.wasm`)
+- `_tools/shellcheck-wasm/patches/*.patch` (optional upstream feature-trim patches; applied during wasm build)
 - `Makefile` (pins upstream ShellCheck tag via `SHELLCHECK_VERSION`, e.g. `v0.11.0`)
 - `internal/shellcheck/wasm/shellcheck.wasm` (generated artifact; checked in for reproducible builds)
 - `internal/shellcheck/wasm/wasm.go` (`//go:embed shellcheck.wasm`)
@@ -388,11 +389,11 @@ docker run --rm -v "$PWD/internal/shellcheck/wasm:/out" tally-shellcheck-wasm
 
 Build steps (mirrors the proven `go-shellcheck` approach):
 
-- Base image: `debian:13-slim`
-- Install: `binaryen`, `build-essential`, `curl`, `git`, `jq`, `unzip`, `xz-utils`, `zstd`
-- Fetch and set up `ghc-wasm-meta` pinned commit `ada3b8fa0f763e4dccb2b1f6bbf2518bff2a7c6e` (comment in upstream build: “Use version
-  before tail call extension usage”)
-- Fetch ShellCheck source at the pinned tag (`SHELLCHECK_VERSION` in `Makefile`) and run `./striptests`
+- Base image: `dhi.io/debian-base:trixie-dev`
+- Install: `build-essential`, `curl`, `git`, `jq`, `unzip`, `xz-utils`, `zstd`
+- Fetch and set up `ghc-wasm-meta` pinned commit (`GHC_WASM_META_COMMIT` in `Makefile`, fetched via git `ADD`)
+- Fetch ShellCheck source at the pinned tag (`SHELLCHECK_VERSION` in `Makefile`, fetched via git `ADD`) and run `./striptests`
+- (Optional) Apply any patches in `_tools/shellcheck-wasm/patches/*.patch` (in lexical order) via `git apply`
 - Build: `. ~/.ghc-wasm/env && wasm32-wasi-cabal update && wasm32-wasi-cabal build --allow-newer shellcheck`
 - Optimize: `wasm-opt -O3 --flatten --rereloop --converge ... -o shellcheck.wasm`
 
@@ -419,7 +420,42 @@ However, we can likely get meaningful wins without maintaining a large patch:
 
 ##### Optional: “JSON1-only” ShellCheck build
 
-If we ever need to significantly reduce wasm size (at the expense of upgrade friction), we can build a “JSON1-only” ShellCheck:
+We can reduce wasm size (at the expense of upgrade friction) by patching upstream sources at build time. In this repo we keep patches as plain
+unified diffs (applied with `git apply`) under `_tools/shellcheck-wasm/patches/`.
+
+Current demo patches:
+
+- `_tools/shellcheck-wasm/patches/0001-json1-only.patch`: disable all output formats except JSON1 (unknown formats error)
+- `_tools/shellcheck-wasm/patches/0002-stdin-only.patch`: only accept stdin input (no files, or `-`)
+- `_tools/shellcheck-wasm/patches/0003-drop-sc2148.patch`: remove SC2148 emission (shebang-related rule) as a demonstration
+
+Size tracking (ShellCheck `v0.11.0`, same toolchain, measured on 2026-02-24):
+
+- Before patches: `7,460,925` bytes
+- After patches: `7,317,428` bytes (**-143,497 bytes / -1.92%**)
+
+Notes:
+
+- Disabling formats at the CLI level doesn’t necessarily stop Cabal from *compiling* formatter modules, because they are still listed in
+  `ShellCheck.cabal`’s `exposed-modules`. For larger size wins, patch `ShellCheck.cabal` as well (more invasive).
+- The wasm build prints `wc -c shellcheck.wasm` at the end; include that number in ShellCheck bump PR descriptions to track regressions.
+
+Maintaining patches across ShellCheck upgrades:
+
+1. Bump `SHELLCHECK_VERSION` in `Makefile`.
+2. Run `make update-shellcheck-wasm`.
+3. If the build fails during patch application:
+   - Clone the new ShellCheck tag locally, run `./striptests`, and manually re-apply the intent of the patch.
+   - Regenerate the patch with `git diff` (copy the full diff; don’t truncate hunks) and replace the corresponding file under
+     `_tools/shellcheck-wasm/patches/`.
+
+Tooling note:
+
+- We keep patches as unified diffs applied with `git apply` because they’re audit-friendly and don’t require extra tooling in the build image.
+- If patch churn becomes painful, consider switching specific patches to AST-based rewrites (e.g. `ast-grep` supports Haskell patterns) and
+  emitting diffs from the rewrite step — but this adds another tool to maintain in the build pipeline.
+
+If we ever need to significantly reduce wasm size further, we can make the “JSON1-only” trimming more aggressive:
 
 - Patch upstream `shellcheck.hs` to:
   - hardcode `-f json1` and remove `--format` option parsing

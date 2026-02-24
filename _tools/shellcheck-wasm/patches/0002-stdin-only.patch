@@ -1,0 +1,46 @@
+diff --git a/shellcheck.hs b/shellcheck.hs
+index 9181ab5..6eb2977 100644
+--- a/shellcheck.hs
++++ b/shellcheck.hs
+@@ -86,7 +86,7 @@ defaultOptions = Options {
+     rcfile = Nothing
+ }
+ 
+-usageHeader = "Usage: shellcheck [OPTIONS...] FILES..."
++usageHeader = "Usage: shellcheck [OPTIONS...]"
+ options = [
+     Option "a" ["check-sourced"]
+         (NoArg $ Flag "sourced" "false") "Include warnings from sourced files",
+@@ -198,6 +198,10 @@ process :: [Flag] -> [FilePath] -> ExceptT Status IO Status
+ process flags files = do
+     options <- foldM (flip parseOption) defaultOptions flags
+     verifyFiles files
++    let effectiveFiles =
++            if null files
++            then ["-"]
++            else files
+     let format = fromMaybe "json1" $ getOption flags "format"
+     let formatters = formats $ formatterOptions options
+     formatter <-
+@@ -209,8 +213,8 @@ process flags files = do
+                 throwError SupportFailure
+               where write s = "  " ++ s
+             Just f -> ExceptT $ fmap Right f
+-    sys <- lift $ ioInterface options files
+-    lift $ runFormatter sys formatter options files
++    sys <- lift $ ioInterface options effectiveFiles
++    lift $ runFormatter sys formatter options effectiveFiles
+ 
+ runFormatter :: SystemInterface IO -> Formatter -> Options -> [FilePath]
+             -> IO Status
+@@ -601,8 +605,8 @@ decodeString = decode
+ 
+ 
+ verifyFiles files =
+-    when (null files) $ do
+-        printErr "No files specified.\n"
++    unless (null files || files == ["-"]) $ do
++        printErr "Only stdin input is supported. Pass no files, or use '-'.\n"
+         printErr $ usageInfo usageHeader options
+         throwError SyntaxFailure
+ 
