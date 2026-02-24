@@ -50,6 +50,10 @@ reviews:
       instructions: |
         This project targets Go 1.26.0 (see go.mod)
         When reviewing Go code, insist on usage of newest, modern Go features, not older versions.
+        If you're about to comment on something enforceable by a linter
+        (e.g., too many function parameters), consult .golangci.yaml
+        and propose enabling or tuning the relevant linter/rule instead—always
+        prefer enforceable mechanisms over a later review catch.
     - path: 'internal/rules/**/*.go'
       instructions: |
         When reviewing changes or additions to linting rules, prioritize cross-rule interaction analysis:
