@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "testdata/copy-from-empty-scratch-stage/Dockerfile",
+      "violations": [
+        {
+          "detail": "The scratch stage has no file-producing instructions, so COPY --from will always fail. Add content to the source stage or change the --from reference",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/copy-from-empty-scratch-stage/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/copy-from-empty-scratch-stage/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "COPY --from references empty scratch \"empty\" (stage 0) which has no ADD, COPY, or RUN instructions",
+          "rule": "tally/copy-from-empty-scratch-stage",
+          "severity": "error",
+          "sourceCode": "COPY --from=empty /app /app"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 1,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

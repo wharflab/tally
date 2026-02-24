@@ -221,6 +221,22 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// COPY --from referencing empty scratch stage
+		{
+			name:     "copy-from-empty-scratch-stage",
+			dir:      "copy-from-empty-scratch-stage",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/copy-from-empty-scratch-stage")...),
+			wantExit: 1,
+		},
+
+		// Shell-form RUN in scratch stage
+		{
+			name:     "shell-run-in-scratch",
+			dir:      "shell-run-in-scratch",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/shell-run-in-scratch")...),
+			wantExit: 1,
+		},
+
 		// Invalid JSON exec-form detection
 		{
 			name:     "invalid-json-form",

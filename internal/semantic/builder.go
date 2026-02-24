@@ -98,7 +98,7 @@ func (b *Builder) Build() *Model {
 		// Seed the environment used for undefined-var analysis.
 		var stageEnv *fromEnv
 		switch {
-		case stage.BaseName == "scratch":
+		case info.IsScratch():
 			stageEnv = newFromEnv(nil)
 		case info.BaseImage != nil && info.BaseImage.IsStageRef:
 			base := stageInfo[info.BaseImage.StageIndex]

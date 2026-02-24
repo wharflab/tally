@@ -11,8 +11,10 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [prefer-vex-attestation](./prefer-vex-attestation.md) | Prefer attaching OpenVEX as an OCI attestation instead of copying VEX JSON into the image | Info | Security | Enabled |
 | [max-lines](./max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
 | [no-unreachable-stages](./no-unreachable-stages.md) | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
+| [shell-run-in-scratch](./shell-run-in-scratch.md) | Detects shell-form RUN in scratch stages where no shell exists | Warning | Correctness | Enabled |
 | [invalid-onbuild-trigger](./invalid-onbuild-trigger.md) | ONBUILD trigger instruction is not a valid Dockerfile instruction | Error | Correctness | Enabled |
 | [circular-stage-deps](./circular-stage-deps.md) | Detects circular dependencies between build stages | Error | Correctness | Enabled |
+| [copy-from-empty-scratch-stage](./copy-from-empty-scratch-stage.md) | Detects COPY --from referencing a scratch stage with no file-producing instructions | Error | Correctness | Enabled |
 | [invalid-json-form](./invalid-json-form.md) | Arguments appear to use JSON exec-form but contain invalid JSON | Error | Correctness | Enabled |
 | [prefer-add-unpack](./prefer-add-unpack.md) | Prefer `ADD --unpack` for downloading and extracting remote archives | Info | Performance | Enabled |
 | [prefer-multi-stage-build](./prefer-multi-stage-build.md) | Suggests converting single-stage builds into multi-stage builds to reduce final image size | Info | Performance | Off (experimental) |

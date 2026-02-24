@@ -65,6 +65,42 @@ RUN echo "hello"
 	if info.BaseImage.IsStageRef {
 		t.Error("base image should not be a stage ref")
 	}
+	if info.IsScratch() {
+		t.Error("alpine stage should not be scratch")
+	}
+}
+
+func TestIsScratch(t *testing.T) {
+	t.Parallel()
+	content := `FROM scratch AS empty
+
+FROM alpine:3.18
+COPY --from=empty /x /x
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+
+	if model.StageCount() != 2 {
+		t.Fatalf("expected 2 stages, got %d", model.StageCount())
+	}
+
+	// scratch stage
+	info0 := model.StageInfo(0)
+	if !info0.IsScratch() {
+		t.Error("scratch stage should return true for IsScratch()")
+	}
+	if info0.IsExternalImage() {
+		t.Error("scratch stage should not be external image")
+	}
+
+	// alpine stage
+	info1 := model.StageInfo(1)
+	if info1.IsScratch() {
+		t.Error("alpine stage should not be scratch")
+	}
+	if !info1.IsExternalImage() {
+		t.Error("alpine stage should be external image")
+	}
 }
 
 func TestMultipleStages(t *testing.T) {

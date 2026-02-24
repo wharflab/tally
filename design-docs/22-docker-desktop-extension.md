@@ -180,7 +180,10 @@ This maps well to Tally’s goals:
 
 **Backend (optional, not MVP)**
 
-- Only add if we implement persistence/trends or long-running background work.
+- Only add if we implement persistence/trends, long-running background work, or an in-extension editor experience.
+- Note: running a full LSP server is feasible in a backend container, but the Docker Extensions UI ↔ backend communication surface is primarily HTTP
+  request/response (via `ddClient.extension.vm.service.*`). LSP’s standard transports (stdio/TCP) are full-duplex, so you’d typically need an explicit
+  proxy (e.g., JSON-RPC over HTTP long-polling or a WS bridge) rather than “just run `tally lsp --stdio` and connect to it” from the UI.
 
 ### 6.2 Contracts between UI and host
 
@@ -322,6 +325,21 @@ Retention
    - Pros: trivial to publish.
    - Cons: weak value proposition; unlikely to drive adoption.
 
+4. **Run `tally` as an LSP server in the backend and lint via LSP**
+   - Pros:
+     - Reuses tally’s existing LSP server surface (diagnostics, code actions, etc.).
+     - Enables a richer “in-extension editor” (e.g., Monaco) with incremental diagnostics.
+   - Cons / feasibility constraints:
+     - Stdio-only LSP is fine *if* the client can open a full-duplex stdin/stdout pipe. Today, the Extensions SDK exec APIs expose stdout/stderr
+       streaming but `ExecProcess` only exposes `close()` (no writable stdin/write API; see docker/extensions-sdk#205), so you can’t just run
+       `tally lsp --stdio` and talk to it directly from the UI.
+     - UI ↔ backend is primarily HTTP request/response; making LSP work generally requires a proxy/bridge:
+       - Backend spawns `tally lsp --stdio` and speaks stdio to it.
+       - UI speaks a custom transport to the backend (e.g., JSON-RPC messages over HTTP long-polling).
+     - The existing VS Code extension logic is tightly coupled to VS Code APIs; what’s reusable is mainly the LSP *server* (tally) and protocol types,
+       not the client plumbing.
+     - Unless we embed an editor in the extension, LSP adds complexity without much UX benefit over `tally lint --format json`.
+
 ## 14. References
 
 - Docker Extensions SDK: architecture and components (UI/backend/host binaries)
@@ -340,6 +358,12 @@ Retention
   - <https://docs.docker.com/extensions/extensions-sdk/dev/api/dashboard-routes-navigation/>
 - Host binaries guide
   - <https://docs.docker.com/extensions/extensions-sdk/guides/invoke-host-binaries/>
+- Extensions SDK exec API reference
+  - <https://docs.docker.com/reference/api/extensions-sdk/Exec/>
+- ExecProcess API reference
+  - <https://docs.docker.com/reference/api/extensions-sdk/ExecProcess/>
+- Stdin support feature request (ExecProcess)
+  - <https://github.com/docker/extensions-sdk/issues/205>
 - Required extension labels
   - <https://docs.docker.com/extensions/extensions-sdk/extensions/labels/>
 - Marketplace overview (reviewed vs self-published)

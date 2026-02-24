@@ -42,10 +42,10 @@ All rule codes below use the `tally/` namespace to avoid implying upstream parit
 | `tally/unknown-instruction` | Error | Correctness | Likely-typo instruction keywords (`FORM`, `COPPY`, `WROKDIR`, …) | **Implemented** |
 | `tally/invalid-from` | Error | Correctness | Malformed `FROM` lines that still parse into AST (missing base / bad `AS`) | |
 | `tally/invalid-json-form` | Error | Correctness | JSON-form instructions with invalid JSON (e.g., `CMD [bash, -lc, "…"]`) | **Implemented** |
-| `tally/copy-from-empty-scratch-stage` | Error | Correctness | `COPY --from=<stage>` where `<stage>` is `FROM scratch` and truly empty | |
+| `tally/copy-from-empty-scratch-stage` | Error | Correctness | `COPY --from=<stage>` where `<stage>` is `FROM scratch` and truly empty | **Implemented** |
 | `tally/run-mount-from-unknown-stage` | Warning | Correctness | `RUN --mount=…from=<ref>…` where `<ref>` looks like a misspelled stage | Requies to know all --build-context |
 | `tally/circular-stage-deps` | Error | Correctness | Stage dependency cycles across `FROM <stage>` / `COPY --from` / `RUN --mount from=` | **Implemented** |
-| `tally/shell-run-in-scratch` | Warning | Correctness | Shell-form `RUN …` in a `FROM scratch` stage (almost always fails) | |
+| `tally/shell-run-in-scratch` | Warning | Correctness | Shell-form `RUN …` in a `FROM scratch` stage (almost always fails) | **Implemented** |
 | `tally/syntax-directive-typo` | Warning | Correctness | `# syntax=…` that doesn’t look like a valid image ref or common typos | **Implemented** |
 
 Notes:

@@ -2,11 +2,11 @@ package hadolint
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
+	"github.com/wharflab/tally/internal/semantic"
 )
 
 // DL3026Config is the configuration for the trusted-base-image rule.
@@ -65,31 +65,23 @@ func (r *DL3026Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	// Build a set of stage names for quick lookup
-	stageNames := make(map[string]bool)
-	for i, stage := range input.Stages {
-		if stage.Name != "" {
-			stageNames[strings.ToLower(stage.Name)] = true
-		}
-		// Numeric index is also valid
-		stageNames[strconv.Itoa(i)] = true
+	if input.Semantic == nil {
+		return nil
+	}
+
+	sem, ok := input.Semantic.(*semantic.Model)
+	if !ok || sem == nil {
+		return nil
 	}
 
 	var violations []rules.Violation
 
-	for _, stage := range input.Stages {
-		// Skip scratch - it's a special "no base" image
-		if stage.BaseName == "scratch" {
-			continue
-		}
-
-		// Skip stage references (FROM stagename)
-		if stageNames[strings.ToLower(stage.BaseName)] {
-			continue
-		}
+	// ExternalImageStages already skips scratch and inter-stage references.
+	for info := range sem.ExternalImageStages() {
+		imageName := info.Stage.BaseName
 
 		// Parse the image reference
-		ref := parseImageRef(stage.BaseName)
+		ref := parseImageRef(imageName)
 		if ref == nil {
 			// Can't parse - skip (BuildKit would have caught parse errors)
 			continue
@@ -98,13 +90,13 @@ func (r *DL3026Rule) Check(input rules.LintInput) []rules.Violation {
 		registry := ref.Domain()
 
 		if !isRegistryTrusted(registry, cfg.TrustedRegistries) {
-			loc := rules.NewLocationFromRanges(input.File, stage.Location)
+			loc := rules.NewLocationFromRanges(input.File, info.Stage.Location)
 			violations = append(violations, rules.NewViolation(
 				loc,
 				r.Metadata().Code,
 				fmt.Sprintf(
 					"image %q is from untrusted registry %q (allowed: %s)",
-					stage.BaseName,
+					imageName,
 					registry,
 					strings.Join(cfg.TrustedRegistries, ", "),
 				),
