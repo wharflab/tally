@@ -244,6 +244,9 @@ func (sm *SourceMap) EffectiveStartLine(startLine int, prevComments []string) in
 			break
 		}
 		// Reproduce BuildKit's PrevComment extraction: drop first byte, TrimSpace.
+		// A bare "#" (len 1) produces an empty string which makes BuildKit
+		// reset its comment accumulator to nil, so it acts as a block-breaker
+		// and can never appear between PrevComment entries — stop scanning.
 		if len(raw) > 1 {
 			extracted := strings.TrimSpace(raw[1:])
 			if extracted == prevComments[commentIdx] {

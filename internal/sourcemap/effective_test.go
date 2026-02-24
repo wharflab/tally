@@ -59,6 +59,36 @@ func TestEffectiveStartLine(t *testing.T) {
 			prevComments: []string{"first", "second"},
 			want:         2,
 		},
+		// Bare "#" edge cases: BuildKit resets its comment accumulator to nil
+		// when it encounters a bare "#" (empty comment), so bare "#" is a
+		// block-breaker — PrevComment never contains entries from above it.
+		{
+			name:   "bare hash above comment resets block",
+			source: "FROM alpine\n#\n# comment\nRUN echo hello\n",
+			// BuildKit: "#"[1:] → "" → resets; "# comment"[1:] → "comment"
+			// PrevComment = ["comment"] (only the line after the reset)
+			startLine:    4,
+			prevComments: []string{"comment"},
+			want:         3,
+		},
+		{
+			name:   "bare hash below comment resets block",
+			source: "FROM alpine\n# comment\n#\nRUN echo hello\n",
+			// BuildKit: "# comment" → ["comment"]; "#" → nil (reset!)
+			// PrevComment = [] (empty because bare # reset it)
+			startLine:    4,
+			prevComments: nil,
+			want:         4,
+		},
+		{
+			name:   "bare hash between comments resets block",
+			source: "FROM alpine\n# first\n#\n# second\nRUN echo hello\n",
+			// BuildKit: "# first" → ["first"]; "#" → nil; "# second" → ["second"]
+			// PrevComment = ["second"] (only after the reset)
+			startLine:    5,
+			prevComments: []string{"second"},
+			want:         4,
+		},
 	}
 
 	for _, tt := range tests {
