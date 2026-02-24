@@ -5,8 +5,6 @@ const {scheduler} = require('node:timers/promises')
 
 const vscode = require("vscode");
 
-const DEFAULT_EXPECTED_DIAGNOSTICS = 173;
-
 function normalizeNewlines(s) {
   return s.replaceAll("\r\n", "\n");
 }
@@ -69,12 +67,11 @@ async function waitForStableDiagnostics(uri, opts) {
 }
 
 async function runSmoke() {
-  const expectedDiagnostics = Number.parseInt(
+  const raw =
     process.env.VSCODE_SMOKE_EXPECTED_DIAGNOSTICS ??
-      process.env.TALLY_EXPECTED_DIAGNOSTICS ??
-      String(DEFAULT_EXPECTED_DIAGNOSTICS),
-    10,
-  );
+    process.env.TALLY_EXPECTED_DIAGNOSTICS;
+  assert.ok(raw, "VSCODE_SMOKE_EXPECTED_DIAGNOSTICS or TALLY_EXPECTED_DIAGNOSTICS must be set");
+  const expectedDiagnostics = Number.parseInt(raw, 10);
 
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   assert.ok(workspaceRoot, "expected VS Code to be launched with a workspace folder");

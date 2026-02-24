@@ -133,7 +133,7 @@ func (r *epilogueOrderResolver) fixStage(
 		}
 		node := stageNodes[nodeIdx]
 
-		startLine := node.StartLine - len(node.PrevComment)
+		startLine := sm.EffectiveStartLine(node.StartLine, node.PrevComment)
 		endLine := sm.ResolveEndLine(node.EndLine)
 
 		epilogues = append(epilogues, epilogueInstr{

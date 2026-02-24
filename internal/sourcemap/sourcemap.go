@@ -211,6 +211,57 @@ func isDirectiveComment(text string) bool {
 	})
 }
 
+// EffectiveStartLine returns the actual 1-based source line where an
+// instruction's associated comment block begins. BuildKit's PrevComment may
+// span blank lines that the simple formula (StartLine − len(PrevComment))
+// does not account for; this method scans the source to find the real
+// position of each PrevComment entry.
+//
+// startLine is the 1-based instruction start line (parser.Node.StartLine).
+// prevComments is the PrevComment slice from the AST node. BuildKit stores
+// each entry as TrimSpace(rawLine[1:]), which means the first byte of the
+// raw source line is dropped before trimming. This makes the stored text
+// format depend on the source indentation:
+//
+//	"# foo"       →  "foo"    (first byte is #)
+//	"    # foo"   →  "# foo"  (first byte is space)
+//
+// If prevComments is empty, returns startLine unchanged.
+func (sm *SourceMap) EffectiveStartLine(startLine int, prevComments []string) int {
+	if len(prevComments) == 0 {
+		return startLine
+	}
+
+	result := startLine
+	commentIdx := len(prevComments) - 1
+
+	for lineIdx := startLine - 2; lineIdx >= 0 && commentIdx >= 0; lineIdx-- {
+		raw := sm.Line(lineIdx)
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" {
+			continue // skip blank lines between comments / instruction
+		}
+		if !strings.HasPrefix(trimmed, "#") {
+			break
+		}
+		// Reproduce BuildKit's PrevComment extraction: drop first byte, TrimSpace.
+		// A bare "#" (len 1) produces an empty string which makes BuildKit
+		// reset its comment accumulator to nil, so it acts as a block-breaker
+		// and can never appear between PrevComment entries — stop scanning.
+		if len(raw) > 1 {
+			extracted := strings.TrimSpace(raw[1:])
+			if extracted == prevComments[commentIdx] {
+				result = lineIdx + 1 // convert 0-based index to 1-based line
+				commentIdx--
+				continue
+			}
+		}
+		break
+	}
+
+	return result
+}
+
 // CommentsForLine returns all comments that appear immediately before a line.
 // This matches BuildKit's PrevComment behavior where comments are associated
 // with the following instruction.

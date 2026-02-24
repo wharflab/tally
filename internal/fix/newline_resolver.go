@@ -50,7 +50,7 @@ func (r *newlineResolver) Resolve(_ context.Context, resolveCtx ResolveContext, 
 		curr := children[i]
 
 		prevEndLine := sm.ResolveEndLine(prev.EndLine)
-		currEffectiveStart := curr.StartLine - len(curr.PrevComment)
+		currEffectiveStart := sm.EffectiveStartLine(curr.StartLine, curr.PrevComment)
 		gap := currEffectiveStart - prevEndLine - 1
 
 		var wantGap int

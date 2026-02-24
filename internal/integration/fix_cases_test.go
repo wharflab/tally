@@ -717,6 +717,23 @@ mode = "always"
 mode = "never"
 `,
 		},
+		// Newline between instructions: grouped mode - indented comment between different-type
+		// instructions with correct spacing should not trigger a fix.
+		// Regression: the comment must not be deleted when the gap is already correct.
+		{
+			name: "newline-between-instructions-grouped-indented-comment",
+			input: "FROM dhi.io/debian-base:trixie-dev AS builder\n\n" +
+				"ENV DEBIAN_FRONTEND=noninteractive\n\n" +
+				"RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \\\n" +
+				"    --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked \\\n" +
+				"    apt-get update \\\n" +
+				"    && apt-get install -y build-essential curl git jq unzip xz-utils zstd\n\n" +
+				"    # Haskell dependencies\n\n" +
+				"ARG GHC_WASM_META_COMMIT\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-between-instructions")...),
+			wantApplied: 0,
+		},
 
 		// No trailing spaces: remove trailing whitespace from multiple lines
 		{

@@ -111,6 +111,23 @@ func TestMaxLinesRule_Check(t *testing.T) {
 			WantViolations: 1, // 4 lines - blanks within content span count
 			WantMessages:   []string{"file has 4 lines"},
 		},
+		// File-header comments: BuildKit attaches comments before the first
+		// instruction to that instruction's PrevComment (not the root node's).
+		// Verify blank lines + comments are counted correctly for headers.
+		{
+			Name:    "file-header comments with blank line before first instruction",
+			Content: "# header comment\n\nFROM alpine\nRUN echo hello\n",
+			Config:  MaxLinesConfig{Max: new(2), SkipBlankLines: boolTrue(), SkipComments: boolTrue()},
+			// 4 lines total, minus 1 comment, minus 1 blank = 2 code lines
+			WantViolations: 0,
+		},
+		{
+			Name:    "multiple file-header comments skip correctly",
+			Content: "# first\n# second\n\nFROM alpine\n",
+			Config:  MaxLinesConfig{Max: new(1), SkipBlankLines: boolTrue(), SkipComments: boolTrue()},
+			// 4 lines total, minus 2 comments, minus 1 blank = 1 code line
+			WantViolations: 0,
+		},
 	})
 }
 

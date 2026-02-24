@@ -67,7 +67,7 @@ test(
       },
     });
 
-    process.env.VSCODE_SMOKE_EXPECTED_DIAGNOSTICS = "173";
+    process.env.VSCODE_SMOKE_EXPECTED_DIAGNOSTICS = "167";
     process.env.VSCODE_SMOKE_EXPECTED_FORMAT_SNAPSHOT = path.join(
       repoRoot,
       "internal",
