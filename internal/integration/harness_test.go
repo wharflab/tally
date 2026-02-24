@@ -218,6 +218,32 @@ func parseFixedCount(output string) (int, bool, error) {
 	return count, true, nil
 }
 
+// runTallyStdin runs the tally binary with stdin as input, returning stdout,
+// stderr, and the exit code. The input is piped via cmd.Stdin.
+func runTallyStdin(t *testing.T, input string, args ...string) (string, string, int) {
+	t.Helper()
+
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Stdin = strings.NewReader(input)
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
+
+	exitCode := 0
+	if err := cmd.Run(); err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			exitCode = exitErr.ExitCode()
+		} else {
+			t.Fatalf("command failed to start: %v", err)
+		}
+	}
+
+	return stdoutBuf.String(), stderrBuf.String(), exitCode
+}
+
 func expectExitCode1(t *testing.T, output []byte, err error) {
 	t.Helper()
 

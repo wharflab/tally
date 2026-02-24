@@ -1,0 +1,10 @@
+
+WARNING: hadolint/DL3006 - https://wharflab.github.io/tally/rules/hadolint/DL3006/
+image "ubuntu" does not have an explicit tag; pin a specific version (e.g., ubuntu:22.04)
+
+<stdin>:1
+--------------------
+   1 | >>> FROM ubuntu
+   2 |     RUN apt-get update
+   3 |     
+--------------------

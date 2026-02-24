@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "\u003cstdin\u003e",
+      "violations": [
+        {
+          "detail": "Untagged images default to :latest, which can change unexpectedly and break builds. Always specify an explicit tag for reproducibility.",
+          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3006/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 1
+            },
+            "file": "\u003cstdin\u003e",
+            "start": {
+              "column": 0,
+              "line": 1
+            }
+          },
+          "message": "image \"ubuntu\" does not have an explicit tag; pin a specific version (e.g., ubuntu:22.04)",
+          "rule": "hadolint/DL3006",
+          "severity": "warning",
+          "sourceCode": "FROM ubuntu"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

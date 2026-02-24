@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"bytes"
 	"cmp"
 	stdcontext "context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -293,11 +295,22 @@ func formatPlatformParts(osName, arch, variant string) string {
 	return s
 }
 
+// stdinPath is the synthetic file path used for violations when reading from stdin.
+const stdinPath = "<stdin>"
+
 // runLint is the action handler for the lint command.
 func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 	inputs := cmd.Args().Slice()
 	if len(inputs) == 0 {
 		inputs = []string{"."}
+	}
+
+	// Detect stdin mode (- as input).
+	if err := checkStdinInput(inputs); err != nil {
+		return err
+	}
+	if slices.Contains(inputs, "-") {
+		return runLintStdin(ctx, cmd)
 	}
 
 	// Discover files using the discovery package
@@ -341,21 +354,7 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 		}
 	}
 
-	// Build processor chain for violation processing.
-	// Each file gets its own config for rule enable/disable, severity, etc.
-	chain, inlineFilter := linter.CLIProcessors()
-	procCtx := processor.NewContext(res.fileConfigs, res.firstCfg, res.fileSources)
-	allViolations := chain.Process(res.violations, procCtx)
-
-	// Add any additional violations from the inline directive filter
-	// (parse errors, unused directives, missing reasons)
-	additionalViolations := inlineFilter.AdditionalViolations()
-	if len(additionalViolations) > 0 {
-		additionalViolations = processor.NewPathNormalization().Process(additionalViolations, procCtx)
-		additionalViolations = processor.NewSnippetAttachment().Process(additionalViolations, procCtx)
-		allViolations = append(allViolations, additionalViolations...)
-		allViolations = reporter.SortViolations(allViolations)
-	}
+	allViolations := processViolations(res, res.firstCfg)
 
 	// Apply fixes if --fix flag is set
 	if cmd.Bool("fix-unsafe") && !cmd.Bool("fix") {
@@ -365,6 +364,11 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 		fixResult, fixErr := applyFixes(ctx, cmd, allViolations, res.fileSources, res.fileConfigs, asyncPlans, asyncResult)
 		if fixErr != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to apply fixes: %v\n", fixErr)
+			return cli.Exit("", ExitConfigError)
+		}
+
+		if err := writeFixedFiles(fixResult); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return cli.Exit("", ExitConfigError)
 		}
 
@@ -381,6 +385,165 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 	}
 
 	return writeReport(cmd, res.firstCfg, allViolations, res.fileSources, len(discovered))
+}
+
+// checkStdinInput returns an error if stdin (-) is mixed with other file arguments.
+func checkStdinInput(inputs []string) error {
+	if slices.Contains(inputs, "-") && len(inputs) > 1 {
+		fmt.Fprintf(os.Stderr, "Error: cannot mix stdin (-) with file arguments\n")
+		return cli.Exit("", ExitConfigError)
+	}
+	return nil
+}
+
+// runLintStdin handles the stdin code path: read from stdin, lint, and either
+// report diagnostics (no --fix) or write fixed content to stdout (--fix).
+func runLintStdin(ctx stdcontext.Context, cmd *cli.Command) error {
+	content, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to read stdin: %v\n", err)
+		return cli.Exit("", ExitConfigError)
+	}
+	if len(content) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: empty input from stdin\n")
+		return cli.Exit("", ExitNoFiles)
+	}
+
+	res, cfg, err := lintStdinContent(ctx, cmd, content)
+	if err != nil {
+		return err
+	}
+
+	// Execute async checks if enabled.
+	var asyncResult *async.RunResult
+	var asyncPlans []async.CheckRequest
+	if len(res.asyncPlans) > 0 {
+		asyncResult, asyncPlans = runAsyncChecks(ctx, res)
+		if asyncResult != nil {
+			res.violations = mergeAsyncViolations(res.violations, asyncResult)
+		}
+	}
+
+	allViolations := processViolations(res, cfg)
+
+	if cmd.Bool("fix-unsafe") && !cmd.Bool("fix") {
+		fmt.Fprintf(os.Stderr, "Warning: --fix-unsafe has no effect without --fix\n")
+	}
+	if cmd.Bool("fix") {
+		return applyStdinFixes(ctx, cmd, content, allViolations, res.fileSources, res.fileConfigs, asyncPlans, asyncResult, cfg)
+	}
+	return writeReport(cmd, cfg, allViolations, res.fileSources, 1)
+}
+
+// lintStdinContent parses and lints content read from stdin.
+func lintStdinContent(_ stdcontext.Context, cmd *cli.Command, content []byte) (*lintResults, *config.Config, error) {
+	// Load config from CWD (stdin has no file path for cascading discovery).
+	cfg, err := loadConfigForFile(cmd, ".")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to load config: %v\n", err)
+		return nil, nil, cli.Exit("", ExitConfigError)
+	}
+	validateAIConfig(cfg, stdinPath)
+	validateDurationConfigs(cfg, stdinPath)
+
+	parseResult, err := dockerfile.Parse(bytes.NewReader(content), cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to parse stdin: %v\n", err)
+		return nil, nil, cli.Exit("", ExitConfigError)
+	}
+
+	if syntaxErrors := syntax.Check(stdinPath, parseResult.AST, parseResult.Source); len(syntaxErrors) > 0 {
+		for _, e := range syntaxErrors {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", e.Error())
+		}
+		return nil, nil, cli.Exit("", ExitSyntaxError)
+	}
+
+	result, err := linter.LintFile(linter.Input{
+		FilePath:    stdinPath,
+		Content:     content,
+		Config:      cfg,
+		ParseResult: parseResult,
+	})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to lint stdin: %v\n", err)
+		return nil, nil, cli.Exit("", ExitConfigError)
+	}
+
+	res := &lintResults{
+		violations:  result.Violations,
+		asyncPlans:  result.AsyncPlan,
+		fileSources: map[string][]byte{stdinPath: result.ParseResult.Source},
+		fileConfigs: map[string]*config.Config{stdinPath: cfg},
+		firstCfg:    cfg,
+	}
+	return res, cfg, nil
+}
+
+// processViolations runs the processor chain on raw violations.
+func processViolations(res *lintResults, cfg *config.Config) []rules.Violation {
+	chain, inlineFilter := linter.CLIProcessors()
+	procCtx := processor.NewContext(res.fileConfigs, cfg, res.fileSources)
+	allViolations := chain.Process(res.violations, procCtx)
+
+	additionalViolations := inlineFilter.AdditionalViolations()
+	if len(additionalViolations) > 0 {
+		additionalViolations = processor.NewPathNormalization().Process(additionalViolations, procCtx)
+		additionalViolations = processor.NewSnippetAttachment().Process(additionalViolations, procCtx)
+		allViolations = append(allViolations, additionalViolations...)
+		allViolations = reporter.SortViolations(allViolations)
+	}
+	return allViolations
+}
+
+// applyStdinFixes applies fixes and writes the result to stdout.
+func applyStdinFixes(
+	ctx stdcontext.Context, cmd *cli.Command,
+	content []byte, allViolations []rules.Violation,
+	fileSources map[string][]byte, fileConfigs map[string]*config.Config,
+	asyncPlans []async.CheckRequest, asyncResult *async.RunResult,
+	cfg *config.Config,
+) error {
+	fixResult, fixErr := applyFixes(ctx, cmd, allViolations, fileSources, fileConfigs, asyncPlans, asyncResult)
+	if fixErr != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to apply fixes: %v\n", fixErr)
+		return cli.Exit("", ExitConfigError)
+	}
+
+	// Write fixed content (or original if unchanged) to stdout.
+	outputContent := content
+	normalizedKey := filepath.Clean(stdinPath)
+	if fc, ok := fixResult.Changes[normalizedKey]; ok {
+		if fc.HasChanges() {
+			outputContent = fc.ModifiedContent
+		} else {
+			outputContent = fc.OriginalContent
+		}
+	}
+	if _, err := os.Stdout.Write(outputContent); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: failed to write output: %v\n", err)
+		return cli.Exit("", ExitConfigError)
+	}
+
+	if fixResult.TotalApplied() > 0 {
+		fmt.Fprintf(os.Stderr, "Fixed %d issues\n", fixResult.TotalApplied())
+	}
+	if fixResult.TotalSkipped() > 0 {
+		fmt.Fprintf(os.Stderr, "Skipped %d fixes\n", fixResult.TotalSkipped())
+		reportSkippedFixes(fixResult)
+	}
+
+	allViolations = filterFixedViolations(allViolations, fixResult)
+
+	// With --fix and stdin, stdout carries the fixed Dockerfile content.
+	// Redirect the violation report to stderr unless the user explicitly
+	// chose a different output destination (--output or config).
+	outCfg := getOutputConfig(cmd, cfg)
+	reportPath := outCfg.path
+	if reportPath == "" || reportPath == "stdout" {
+		reportPath = "stderr"
+	}
+	return writeReportTo(cmd, cfg, allViolations, fileSources, 1, reportPath)
 }
 
 // lintFiles runs the lint pipeline on each discovered file and aggregates results.
@@ -464,12 +627,25 @@ func handleLintError(err error) error {
 	return cli.Exit("", ExitConfigError)
 }
 
-// writeReport formats and writes the violation report.
+// writeReport formats and writes the violation report using the configured output path.
 func writeReport(
 	cmd *cli.Command, cfg *config.Config, violations []rules.Violation,
 	fileSources map[string][]byte, filesScanned int,
 ) error {
+	return writeReportTo(cmd, cfg, violations, fileSources, filesScanned, "")
+}
+
+// writeReportTo formats and writes the violation report. If outputOverride is
+// non-empty, it overrides the configured output path (e.g. "stderr" to keep
+// stdout free for fixed content in stdin mode).
+func writeReportTo(
+	cmd *cli.Command, cfg *config.Config, violations []rules.Violation,
+	fileSources map[string][]byte, filesScanned int, outputOverride string,
+) error {
 	outCfg := getOutputConfig(cmd, cfg)
+	if outputOverride != "" {
+		outCfg.path = outputOverride
+	}
 
 	formatType, err := reporter.ParseFormat(outCfg.format)
 	if err != nil {
@@ -999,7 +1175,11 @@ func applyFixes(
 		return nil, err
 	}
 
-	// Write modified files (preserve original permissions)
+	return result, nil
+}
+
+// writeFixedFiles writes modified files back to disk, preserving original permissions.
+func writeFixedFiles(result *fix.Result) error {
 	for _, fc := range result.Changes {
 		if !fc.HasChanges() {
 			continue
@@ -1009,11 +1189,10 @@ func applyFixes(
 			mode = info.Mode().Perm()
 		}
 		if err := os.WriteFile(fc.Path, fc.ModifiedContent, mode); err != nil {
-			return nil, fmt.Errorf("failed to write %s: %w", fc.Path, err)
+			return fmt.Errorf("failed to write %s: %w", fc.Path, err)
 		}
 	}
-
-	return result, nil
+	return nil
 }
 
 // buildPerFileFixModes builds a per-file map of fix modes from fileConfigs.
