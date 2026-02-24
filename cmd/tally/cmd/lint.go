@@ -342,24 +342,11 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 		return handleLintError(err)
 	}
 
-	// Execute async checks if enabled and plans exist.
-	var (
-		asyncResult *async.RunResult
-		asyncPlans  []async.CheckRequest
-	)
-	if len(res.asyncPlans) > 0 {
-		asyncResult, asyncPlans = runAsyncChecks(ctx, res)
-		if asyncResult != nil {
-			res.violations = mergeAsyncViolations(res.violations, asyncResult)
-		}
-	}
+	asyncResult, asyncPlans := resolveAsyncChecks(ctx, res)
 
 	allViolations := processViolations(res, res.firstCfg)
 
-	// Apply fixes if --fix flag is set
-	if cmd.Bool("fix-unsafe") && !cmd.Bool("fix") {
-		fmt.Fprintf(os.Stderr, "Warning: --fix-unsafe has no effect without --fix\n")
-	}
+	warnFixUnsafe(cmd)
 	if cmd.Bool("fix") {
 		fixResult, fixErr := applyFixes(ctx, cmd, allViolations, res.fileSources, res.fileConfigs, asyncPlans, asyncResult)
 		if fixErr != nil {
@@ -385,6 +372,27 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 	}
 
 	return writeReport(cmd, res.firstCfg, allViolations, res.fileSources, len(discovered))
+}
+
+// resolveAsyncChecks executes async check plans if enabled and merges the
+// results into res.violations. Returns the async result and filtered plans
+// needed by the fix pipeline.
+func resolveAsyncChecks(ctx stdcontext.Context, res *lintResults) (*async.RunResult, []async.CheckRequest) {
+	if len(res.asyncPlans) == 0 {
+		return nil, nil
+	}
+	asyncResult, asyncPlans := runAsyncChecks(ctx, res)
+	if asyncResult != nil {
+		res.violations = mergeAsyncViolations(res.violations, asyncResult)
+	}
+	return asyncResult, asyncPlans
+}
+
+// warnFixUnsafe emits a warning when --fix-unsafe is set without --fix.
+func warnFixUnsafe(cmd *cli.Command) {
+	if cmd.Bool("fix-unsafe") && !cmd.Bool("fix") {
+		fmt.Fprintf(os.Stderr, "Warning: --fix-unsafe has no effect without --fix\n")
+	}
 }
 
 // checkStdinInput returns an error if stdin (-) is mixed with other file arguments.
@@ -414,21 +422,11 @@ func runLintStdin(ctx stdcontext.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	// Execute async checks if enabled.
-	var asyncResult *async.RunResult
-	var asyncPlans []async.CheckRequest
-	if len(res.asyncPlans) > 0 {
-		asyncResult, asyncPlans = runAsyncChecks(ctx, res)
-		if asyncResult != nil {
-			res.violations = mergeAsyncViolations(res.violations, asyncResult)
-		}
-	}
+	asyncResult, asyncPlans := resolveAsyncChecks(ctx, res)
 
 	allViolations := processViolations(res, cfg)
 
-	if cmd.Bool("fix-unsafe") && !cmd.Bool("fix") {
-		fmt.Fprintf(os.Stderr, "Warning: --fix-unsafe has no effect without --fix\n")
-	}
+	warnFixUnsafe(cmd)
 	if cmd.Bool("fix") {
 		return applyStdinFixes(ctx, cmd, content, allViolations, res.fileSources, res.fileConfigs, asyncPlans, asyncResult, cfg)
 	}
