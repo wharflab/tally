@@ -512,13 +512,8 @@ func applyStdinFixes(
 
 	// Write fixed content (or original if unchanged) to stdout.
 	outputContent := content
-	normalizedKey := filepath.Clean(stdinPath)
-	if fc, ok := fixResult.Changes[normalizedKey]; ok {
-		if fc.HasChanges() {
-			outputContent = fc.ModifiedContent
-		} else {
-			outputContent = fc.OriginalContent
-		}
+	if fc, ok := fixResult.Changes[filepath.Clean(stdinPath)]; ok && fc.HasChanges() {
+		outputContent = fc.ModifiedContent
 	}
 	if _, err := os.Stdout.Write(outputContent); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to write output: %v\n", err)
