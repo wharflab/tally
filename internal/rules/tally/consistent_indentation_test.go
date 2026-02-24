@@ -107,10 +107,14 @@ func TestConsistentIndentationCheck(t *testing.T) {
 			WantMessages:   []string{"missing indentation"},
 		},
 		{
+			Name:           "multi-stage continuation lines allow extra indent",
+			Content:        "FROM alpine AS builder\n\tRUN echo hello \\\n\t\t&& echo world\nFROM scratch\n\tCOPY --from=builder /app /app\n",
+			WantViolations: 0,
+		},
+		{
 			Name:           "single stage continuation lines with indent",
 			Content:        "FROM alpine\nRUN echo hello \\\n\techo world\n",
-			WantViolations: 1,
-			WantMessages:   []string{"unexpected indentation"},
+			WantViolations: 0,
 		},
 
 		// === Heredoc cases ===

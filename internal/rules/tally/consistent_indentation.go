@@ -119,6 +119,11 @@ func (r *ConsistentIndentationRule) checkNodeNoIndent(
 	var firstBadLine int
 	var firstBadIndent string
 	for lineNum := startLine; lineNum <= endLine; lineNum++ {
+		// Backslash continuation lines may be indented for readability (e.g., newline-per-chained-call).
+		// Only enforce "no indentation" on the instruction start line and on non-continuation lines.
+		if lineNum != startLine && isBackslashContinuationLine(sm, lineNum) {
+			continue
+		}
 		indent := leadingWhitespace(sm.Line(lineNum - 1))
 		if indent != "" {
 			firstBadLine = lineNum
@@ -167,6 +172,15 @@ func (r *ConsistentIndentationRule) checkCommandIndented(
 	var firstBadIndent string
 	for lineNum := startLine; lineNum <= endLine; lineNum++ {
 		indent := leadingWhitespace(sm.Line(lineNum - 1))
+		// Allow extra indentation on backslash continuation lines (e.g., "\t\t&& ..." in multi-stage).
+		if lineNum != startLine && isBackslashContinuationLine(sm, lineNum) {
+			if !strings.HasPrefix(indent, expectedIndent) {
+				firstBadLine = lineNum
+				firstBadIndent = indent
+				break
+			}
+			continue
+		}
 		if indent != expectedIndent {
 			firstBadLine = lineNum
 			firstBadIndent = indent
@@ -256,6 +270,18 @@ func (r *ConsistentIndentationRule) setIndentEdits(
 		line := sm.Line(lineNum - 1) // 0-based
 		currentIndent := leadingWhitespace(line)
 
+		// Indentation rules apply to the start of the instruction. Backslash continuation lines
+		// may contain additional indentation for readability; preserve it when it's already valid.
+		if indent == "" && lineNum != startLine && isBackslashContinuationLine(sm, lineNum) {
+			continue
+		}
+		if indent != "" && lineNum != startLine && isBackslashContinuationLine(sm, lineNum) {
+			// Continuation lines must still be indented for multi-stage, but may have extra tabs.
+			if strings.HasPrefix(currentIndent, indent) {
+				continue
+			}
+		}
+
 		if currentIndent != indent {
 			// Replace current indentation with expected
 			edits = append(edits, rules.TextEdit{
@@ -278,6 +304,14 @@ func (r *ConsistentIndentationRule) setIndentEdits(
 	}
 
 	return edits
+}
+
+func isBackslashContinuationLine(sm *sourcemap.SourceMap, lineNum int) bool {
+	if sm == nil || lineNum <= 1 || lineNum > sm.LineCount() {
+		return false
+	}
+	prev := sm.Line(lineNum - 2) // previous line, 0-based
+	return strings.HasSuffix(strings.TrimRight(prev, " \t"), `\`)
 }
 
 // heredocDashEdit returns a TextEdit to convert << to <<- on a line that

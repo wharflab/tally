@@ -1,4 +1,4 @@
-.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin
+.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin update-shellcheck-wasm update-shellcheck-wasm-host
 
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
@@ -129,6 +129,65 @@ jsonschema: schema-check
 lsp-protocol:
 	bun run tools/lspgen/fetchModel.mts
 	bun run tools/lspgen/generate.mts
+
+update-shellcheck-wasm:
+	mkdir -p internal/shellcheck/wasm
+	docker build \
+	    --progress=plain \
+		--build-arg GHC_WASM_META_COMMIT="$(GHC_WASM_META_COMMIT)" \
+		--build-arg SHELLCHECK_VERSION="$(patsubst v%,%,$(SHELLCHECK_VERSION))" \
+		-t tally-shellcheck-wasm -f _tools/shellcheck-wasm/Dockerfile _tools/shellcheck-wasm
+	# Extract the built shellcheck.wasm from the container and place it in internal/shellcheck/wasm
+	docker cp "$$(docker create --rm tally-shellcheck-wasm):/shellcheck.wasm" internal/shellcheck/wasm/shellcheck.wasm
+# 	docker run --rm -v "$(CURDIR)/internal/shellcheck/wasm:/out" tally-shellcheck-wasm
+
+SHELLCHECK_VERSION := v0.11.0
+GHC_WASM_META_COMMIT := 4e1f900e9933966634bc2e29dbeb81d09ce36727
+GHC_WASM_FLAVOUR ?= 9.12
+GHC_WASM_META_SRC_DIR := bin/ghc-wasm-meta-src-$(GHC_WASM_META_COMMIT)
+GHC_WASM_PREFIX := $(CURDIR)/bin/ghc-wasm-bin-$(GHC_WASM_META_COMMIT)-$(GHC_WASM_FLAVOUR)
+
+update-shellcheck-wasm-host: bin/ghc-wasm-$(GHC_WASM_META_COMMIT)-$(GHC_WASM_FLAVOUR)
+	mkdir -p internal/shellcheck/wasm
+	bash -euo pipefail -c '\
+		tmp=$$(mktemp -d); \
+		trap "rm -rf $$tmp" EXIT; \
+		sc_ver="$(SHELLCHECK_VERSION)"; \
+		curl -f -L --retry 5 "https://github.com/koalaman/shellcheck/archive/refs/tags/$$sc_ver.tar.gz" | tar -xz --strip-components 1 -C "$$tmp"; \
+		cd "$$tmp"; \
+		./striptests; \
+		source "$(GHC_WASM_PREFIX)/env"; \
+		wasm32-wasi-cabal update; \
+		wasm32-wasi-cabal build --allow-newer shellcheck; \
+		wasm-opt -o shellcheck.wasm --flatten --rereloop --converge -O3 dist-newstyle/build/wasm32-wasi/ghc-*/ShellCheck-*/x/shellcheck/build/shellcheck/shellcheck.wasm; \
+		cp shellcheck.wasm "$(CURDIR)/internal/shellcheck/wasm/shellcheck.wasm"; \
+	'
+
+bin/ghc-wasm-meta-$(GHC_WASM_META_COMMIT):
+	@mkdir -p bin
+	@rm -rf bin/ghc-wasm-meta-src-*
+	@mkdir -p "$(GHC_WASM_META_SRC_DIR)"
+	curl -f -L --retry 5 "https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta/-/archive/$(GHC_WASM_META_COMMIT)/ghc-wasm-meta-$(GHC_WASM_META_COMMIT).tar.gz" | tar xz --strip-components=1 -C "$(GHC_WASM_META_SRC_DIR)"
+	# macOS bsdtar doesn't support `--zstd` by default; use zstd to decompress instead.
+	@perl -pi -e 's/\Q| tar x --zstd\E/| zstd -dc | tar x/' "$(GHC_WASM_META_SRC_DIR)/setup.sh"
+	@touch $@
+
+bin/ghc-wasm-$(GHC_WASM_META_COMMIT)-$(GHC_WASM_FLAVOUR): bin/ghc-wasm-meta-$(GHC_WASM_META_COMMIT)
+	@if [ "$$(uname -s)" != "Darwin" ]; then \
+		echo "update-shellcheck-wasm-host only supports macOS; use make update-shellcheck-wasm for Docker builds"; \
+		exit 1; \
+	fi
+	@if [ "$$(uname -m)" != "arm64" ]; then \
+		echo "update-shellcheck-wasm-host requires Apple Silicon; ghc-wasm-meta does not provide x86_64 macOS bindists"; \
+		exit 1; \
+	fi
+	@command -v jq >/dev/null || { echo "jq is required (e.g. brew install jq)"; exit 1; }
+	@command -v unzip >/dev/null || { echo "unzip is required (missing from PATH)"; exit 1; }
+	@command -v zstd >/dev/null || { echo "zstd is required (e.g. brew install zstd)"; exit 1; }
+	@rm -rf bin/ghc-wasm-bin-*
+	@rm -f bin/ghc-wasm-[0-9a-f]*-*
+	PREFIX="$(GHC_WASM_PREFIX)" FLAVOUR="$(GHC_WASM_FLAVOUR)" bash "$(GHC_WASM_META_SRC_DIR)/setup.sh"
+	@touch $@
 
 clean:
 	rm -f tally

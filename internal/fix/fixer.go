@@ -326,16 +326,22 @@ func (f *Fixer) resolveAsyncFixes(ctx context.Context, changes map[string]*FileC
 // applyFixesToFile applies non-conflicting fixes to a single file.
 // Fixes are atomic: either all edits of a fix are applied, or none are.
 func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
-	// Collect all edits with their source info
+	// Pick a winning set of fixes first, then apply their edits.
+	//
+	// Why: multiple fixes can overlap on the same source ranges (common for RUN
+	// rewrites). We want "important" fixes (security/correctness/performance…)
+	// to win over stylistic ones when they conflict, while still applying edits
+	// in FixPriority+position order to avoid drift.
+	selected := selectNonConflictingCandidates(fc, candidates)
+
+	// Collect all edits with their source info (selected candidates only).
 	type editWithSource struct {
 		edit      rules.TextEdit
 		candidate *fixCandidate
 	}
 
 	var allEdits []editWithSource
-	candidateEdits := make(map[*fixCandidate][]rules.TextEdit, len(candidates))
-	for _, c := range candidates {
-		candidateEdits[c] = c.fix.Edits
+	for _, c := range selected {
 		for _, edit := range c.fix.Edits {
 			allEdits = append(allEdits, editWithSource{
 				edit:      edit,
@@ -348,44 +354,31 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 	// This ensures content fixes (priority 0) run before structural transforms (priority 100+),
 	// and within the same priority, later positions are processed first to handle position drift.
 	slices.SortFunc(allEdits, func(a, b editWithSource) int {
-		aPriority := a.candidate.fix.Priority
-		bPriority := b.candidate.fix.Priority
-		if aPriority != bPriority {
-			return cmp.Compare(aPriority, bPriority)
-		}
-
-		// Within same priority, later positions first (existing behavior).
 		aLine, aCol := editPosition(a.edit)
 		bLine, bCol := editPosition(b.edit)
+		if c := cmp.Compare(a.candidate.fix.Priority, b.candidate.fix.Priority); c != 0 {
+			return c
+		}
+		// Within same priority, later positions first (existing behavior).
 		if aLine != bLine {
 			return cmp.Compare(bLine, aLine)
 		}
-		return cmp.Compare(bCol, aCol)
-	})
-
-	// Track which candidates have been applied or skipped
-	applied := make(map[*fixCandidate]bool)
-	skipped := make(map[*fixCandidate]bool)
-	checked := make(map[*fixCandidate]bool)
-
-	// hasCandidateConflict checks if any of a candidate's edits overlap with reserved edits
-	hasCandidateConflict := func(edits []rules.TextEdit, reservedEdits []editWithSource) bool {
-		for _, e := range edits {
-			for _, re := range reservedEdits {
-				if editsOverlap(e, re.edit) {
-					return true
-				}
-			}
+		if aCol != bCol {
+			return cmp.Compare(bCol, aCol)
 		}
-		return false
-	}
+		// Same priority and start position: make ordering deterministic.
+		// This matters for multiple zero-width insertions at the same point.
+		if c := cmp.Compare(candidateImportanceRank(b.candidate), candidateImportanceRank(a.candidate)); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.candidate.violation.RuleCode, b.candidate.violation.RuleCode)
+	})
 
 	// Apply edits, checking for conflicts at the fix level (atomic)
 	// reservedEdits tracks ALL edits from approved candidates (for conflict detection)
 	// This ensures that when candidate A is approved, all of A's edits are reserved
 	// before checking candidate B, even if some of A's edits haven't been applied yet.
 	content := fc.ModifiedContent
-	reservedEdits := make([]editWithSource, 0, len(allEdits))
 
 	// Track position shifts caused by applied edits for cross-priority adjustment.
 	// When edits from different priority groups modify the same or nearby lines,
@@ -395,34 +388,6 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 	var lnShifts []lineShift
 
 	for _, ews := range allEdits {
-		// Skip if this candidate was already determined to be skipped
-		if skipped[ews.candidate] {
-			continue
-		}
-
-		// Check all edits for this candidate on first encounter
-		if !checked[ews.candidate] {
-			checked[ews.candidate] = true
-			if hasCandidateConflict(candidateEdits[ews.candidate], reservedEdits) {
-				skipped[ews.candidate] = true
-				fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
-					RuleCode: ews.candidate.violation.RuleCode,
-					Reason:   SkipConflict,
-					Location: ews.candidate.violation.Location,
-				})
-				continue
-			}
-			// Reserve ALL edits from this candidate immediately to prevent
-			// interleaving conflicts with candidates checked later
-			for _, edit := range candidateEdits[ews.candidate] {
-				reservedEdits = append(reservedEdits, editWithSource{
-					edit:      edit,
-					candidate: ews.candidate,
-				})
-			}
-			applied[ews.candidate] = true
-		}
-
 		// Adjust the edit's positions based on shifts from prior edits.
 		// Column adjustment first (uses original line numbers for matching),
 		// then line adjustment (shifts lines for cross-priority edits).
@@ -440,14 +405,118 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 
 	fc.ModifiedContent = content
 
-	// Record applied fixes with their original edits.
-	for c := range applied {
+	// Record applied fixes (in deterministic order).
+	for _, c := range selected {
 		fc.FixesApplied = append(fc.FixesApplied, AppliedFix{
 			RuleCode:    c.violation.RuleCode,
 			Description: c.fix.Description,
 			Location:    c.violation.Location,
 			Edits:       c.fix.Edits,
 		})
+	}
+}
+
+func selectNonConflictingCandidates(fc *FileChange, candidates []*fixCandidate) []*fixCandidate {
+	// Prefer "important" fixes over stylistic ones when overlapping.
+	// We consider all candidates atomically: if ANY edit overlaps, the entire fix is skipped.
+	ordered := slices.Clone(candidates)
+	slices.SortStableFunc(ordered, func(a, b *fixCandidate) int {
+		// Higher importance first (style last).
+		if c := cmp.Compare(candidateImportanceRank(b), candidateImportanceRank(a)); c != 0 {
+			return c
+		}
+		// Then more severe violations.
+		if c := cmp.Compare(a.violation.Severity, b.violation.Severity); c != 0 {
+			return c // lower enum value = more severe
+		}
+		// Then safer fixes.
+		if c := cmp.Compare(a.fix.Safety, b.fix.Safety); c != 0 {
+			return c // FixSafe < FixSuggestion < FixUnsafe
+		}
+		// Then FixPriority (content before structural).
+		if c := cmp.Compare(a.fix.Priority, b.fix.Priority); c != 0 {
+			return c
+		}
+		// Deterministic tie-breakers.
+		if c := cmp.Compare(a.violation.RuleCode, b.violation.RuleCode); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(a.violation.Location.Start.Line, b.violation.Location.Start.Line); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.violation.Location.Start.Column, b.violation.Location.Start.Column)
+	})
+
+	hasConflict := func(edits []rules.TextEdit, reserved []rules.TextEdit) bool {
+		for _, e := range edits {
+			for _, r := range reserved {
+				if editsOverlap(e, r) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	var selected []*fixCandidate
+	var reserved []rules.TextEdit
+	for _, c := range ordered {
+		if len(c.fix.Edits) == 0 {
+			// Should be filtered earlier, but keep behavior defensive.
+			fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
+				RuleCode: c.violation.RuleCode,
+				Reason:   SkipNoEdits,
+				Location: c.violation.Location,
+			})
+			continue
+		}
+
+		if hasConflict(c.fix.Edits, reserved) {
+			fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
+				RuleCode: c.violation.RuleCode,
+				Reason:   SkipConflict,
+				Location: c.violation.Location,
+			})
+			continue
+		}
+		selected = append(selected, c)
+		reserved = append(reserved, c.fix.Edits...)
+	}
+
+	return selected
+}
+
+func candidateImportanceRank(c *fixCandidate) int {
+	rule := rules.DefaultRegistry().Get(c.violation.RuleCode)
+	if rule == nil {
+		// Unknown rule: treat as non-style (middle importance). This keeps
+		// fixer usable in unit tests that use synthetic rule codes.
+		return 50
+	}
+	return categoryImportanceRank(rule.Metadata().Category)
+}
+
+func categoryImportanceRank(category string) int {
+	switch strings.ToLower(category) {
+	case "security":
+		return 90
+	case "correctness":
+		return 80
+	case "reliability":
+		return 75
+	case "reproducibility":
+		return 70
+	case "performance":
+		return 60
+	case "best-practice", "best-practices":
+		return 50
+	case "maintainability":
+		return 40
+	case "style":
+		return 10
+	default:
+		// Default to a non-style mid-tier.
+		return 50
 	}
 }
 

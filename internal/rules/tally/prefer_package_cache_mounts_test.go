@@ -65,6 +65,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 			WantViolations: 0,
 		},
 		{
+			Name: "apt install with escaped newline and leading &&",
+			Content: `FROM debian:13-slim
+
+RUN apt-get update \
+	&& apt-get install -y binaryen build-essential curl git jq unzip xz-utils zstd
+
+WORKDIR /ghc
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "apk add",
 			Content: `FROM alpine:3.21
 RUN apk add --no-cache curl

@@ -1,0 +1,37 @@
+FROM dhi.io/debian-base:trixie-dev AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
+	--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked \
+	apt-get update \
+	&& apt-get install -y build-essential curl git jq unzip xz-utils zstd
+
+ARG GHC_WASM_META_COMMIT
+
+ADD "https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta.git?ref=${GHC_WASM_META_COMMIT}" /ghc/
+
+WORKDIR /ghc
+
+RUN ./setup.sh
+
+ARG SHELLCHECK_VERSION
+
+ADD "https://github.com/koalaman/shellcheck.git?ref=v${SHELLCHECK_VERSION}" /shellcheck/
+
+WORKDIR /shellcheck
+
+RUN <<EOF
+set -e
+./striptests
+. ~/.ghc-wasm/env
+wasm32-wasi-cabal update
+wasm32-wasi-cabal build --allow-newer shellcheck
+wasm-opt -o shellcheck.wasm --flatten --rereloop --converge -O3 dist-newstyle/build/wasm32-wasi/ghc-*/ShellCheck-*/x/shellcheck/build/shellcheck/shellcheck.wasm
+EOF
+
+FROM scratch
+
+COPY --from=builder /shellcheck/shellcheck.wasm /shellcheck.wasm
+
+CMD ["noop"]

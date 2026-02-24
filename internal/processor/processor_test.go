@@ -315,6 +315,75 @@ func TestSeverityOverride_AutoEnableOffRules(t *testing.T) {
 	}
 }
 
+func TestSeverityOverride_EnableSelectedOffRules(t *testing.T) {
+	t.Parallel()
+	registry := rules.NewRegistry()
+	mockRule := &mockRuleWithMetadata{
+		code:            "tally/prefer-package-cache-mounts",
+		defaultSeverity: rules.SeverityOff,
+	}
+	registry.Register(mockRule)
+
+	violations := []rules.Violation{
+		rules.NewViolation(
+			rules.NewLineLocation("Dockerfile", 1),
+			"tally/prefer-package-cache-mounts",
+			"msg",
+			rules.SeverityOff,
+		),
+	}
+
+	t.Run("specific include", func(t *testing.T) {
+		t.Parallel()
+		cfg := config.Default()
+		cfg.Rules.Include = append(cfg.Rules.Include, "tally/prefer-package-cache-mounts")
+
+		p := NewSeverityOverrideWithRegistry(registry)
+		ctx := NewContext(nil, cfg, nil)
+
+		result := p.Process(violations, ctx)
+		if len(result) != 1 {
+			t.Fatalf("expected 1 violation, got %d", len(result))
+		}
+		if result[0].Severity != rules.SeverityWarning {
+			t.Errorf("expected severity=warning (selected), got %v", result[0].Severity)
+		}
+	})
+
+	t.Run("wildcard include", func(t *testing.T) {
+		t.Parallel()
+		cfg := config.Default()
+		cfg.Rules.Include = append(cfg.Rules.Include, "*")
+
+		p := NewSeverityOverrideWithRegistry(registry)
+		ctx := NewContext(nil, cfg, nil)
+
+		result := p.Process(violations, ctx)
+		if len(result) != 1 {
+			t.Fatalf("expected 1 violation, got %d", len(result))
+		}
+		if result[0].Severity != rules.SeverityWarning {
+			t.Errorf("expected severity=warning (selected via *), got %v", result[0].Severity)
+		}
+	})
+
+	t.Run("not selected", func(t *testing.T) {
+		t.Parallel()
+		cfg := config.Default()
+
+		p := NewSeverityOverrideWithRegistry(registry)
+		ctx := NewContext(nil, cfg, nil)
+
+		result := p.Process(violations, ctx)
+		if len(result) != 1 {
+			t.Fatalf("expected 1 violation, got %d", len(result))
+		}
+		if result[0].Severity != rules.SeverityOff {
+			t.Errorf("expected severity=off (not selected), got %v", result[0].Severity)
+		}
+	})
+}
+
 // mockRuleWithMetadata is a mock rule for testing
 type mockRuleWithMetadata struct {
 	code            string

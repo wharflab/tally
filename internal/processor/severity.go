@@ -53,6 +53,15 @@ func (p *SeverityOverride) Process(violations []rules.Violation, ctx *Context) [
 			return v
 		}
 
+		// Explicit selection: if the rule is enabled via include patterns (e.g. --select)
+		// and it would otherwise be "off", bump to warning so it is visible in output.
+		if v.Severity == rules.SeverityOff {
+			if enabled := cfg.Rules.IsEnabled(v.RuleCode); enabled != nil && *enabled {
+				v.Severity = rules.SeverityWarning
+				return v
+			}
+		}
+
 		// Auto-enable: If rule has DefaultSeverity="off" but config is provided (options),
 		// implicitly enable with "warning" severity
 		ruleConfig := cfg.Rules.Get(v.RuleCode)

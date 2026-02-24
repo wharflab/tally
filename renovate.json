@@ -62,6 +62,18 @@
       ],
       "datasourceTemplate": "pypi",
       "versioningTemplate": "pep440"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^Makefile$/"
+      ],
+      "matchStrings": [
+        "SHELLCHECK_VERSION\\s*[:=]\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+)"
+      ],
+      "depNameTemplate": "koalaman/shellcheck",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
     }
   ],
   "packageRules": [
@@ -123,6 +135,17 @@
       ],
       "automerge": true,
       "groupName": "PMD"
+    },
+    {
+      "matchDepNames": [
+        "koalaman/shellcheck"
+      ],
+      "automerge": false,
+      "labels": [
+        "dependencies",
+        "renovate",
+        "manual-artifact-update"
+      ]
     },
     {
       "matchManagers": [

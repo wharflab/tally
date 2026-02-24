@@ -248,6 +248,13 @@ converts users into project-level adoption via `.tally.toml` + CI snippets.
 
 ---
 
+### 23. [ShellCheck Integration — Design & Roadmap](23-shellcheck-integration.md)
+
+**Covers:** What Hadolint’s ShellCheck integration *actually* does, what ShellCheck can output (JSON1 + fixes), and a concrete plan to ship
+`shellcheck/SC####` rules in Tally by embedding `shellcheck.wasm` (WASI) and running it via `wazero` in a single GPLv3 binary.
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
