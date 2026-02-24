@@ -537,6 +537,9 @@ func applyStdinFixes(
 	reportPath := outCfg.path
 	if reportPath == "" || reportPath == "stdout" {
 		reportPath = "stderr"
+		if cmd.IsSet("output") {
+			fmt.Fprintf(os.Stderr, "note: --output overridden to stderr in stdin fix mode (stdout carries fixed content)\n")
+		}
 	}
 	return writeReportTo(cmd, cfg, allViolations, fileSources, 1, reportPath)
 }
