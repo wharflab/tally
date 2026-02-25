@@ -127,8 +127,8 @@ schema-check: schema-gen
 jsonschema: schema-check
 
 lsp-protocol:
-	bun run tools/lspgen/fetchModel.mts
-	bun run tools/lspgen/generate.mts
+	bun run _tools/lspgen/fetchModel.mts
+	bun run _tools/lspgen/generate.mts
 
 update-shellcheck-wasm:
 	mkdir -p internal/shellcheck/wasm

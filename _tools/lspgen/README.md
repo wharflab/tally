@@ -15,8 +15,8 @@ make lsp-protocol
 or directly:
 
 ```bash
-bun run tools/lspgen/fetchModel.mts
-bun run tools/lspgen/generate.mts
+bun run _tools/lspgen/fetchModel.mts
+bun run _tools/lspgen/generate.mts
 ```
 
 ## Notes
