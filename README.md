@@ -415,4 +415,4 @@ See [CLAUDE.md](CLAUDE.md) for development guidelines.
 
 ## License
 
-GPL-3.0-only
+GPL-3.0-only. See [LICENSE](LICENSE) for the full license text.
