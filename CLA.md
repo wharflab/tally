@@ -13,9 +13,10 @@ By making a contribution to this project, I certify that:
    project's LICENSE file; and
 
 3. I understand and agree that this project and the contribution are
-   public, and that a record of the contribution (including all personal
-   information I submit with it) is maintained indefinitely and may be
-   redistributed consistent with this project's license(s).
+   public, and that a minimal record of the contribution (such as GitHub
+   identity, contribution reference, and signature timestamp) may be
+   stored and redistributed as needed to administer this CLA and comply
+   with applicable law.
 
 4. I grant to the project maintainers a perpetual, worldwide,
    non-exclusive, no-charge, royalty-free, irrevocable license to
