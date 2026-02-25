@@ -68,7 +68,11 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
       continue;
     }
     if (await isExecutableFile(candidate)) {
-      return directBinary(candidate, "explicitPath", await readBinaryVersion(candidate));
+      const candidateVersion = await readBinaryVersion(candidate);
+      const resolved = windowsCmdShimAwareBinary(candidate, "explicitPath", candidateVersion);
+      if (resolved) {
+        return resolved;
+      }
     }
   }
 
@@ -142,7 +146,10 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
       ? await isCompatibleBinary(onPath, minVersion, output)
       : await readBinaryVersion(onPath);
     if (!minVersion || pathVersion) {
-      return directBinary(onPath, "envPath", pathVersion);
+      const resolved = windowsCmdShimAwareBinary(onPath, "envPath", pathVersion);
+      if (resolved) {
+        return resolved;
+      }
     }
   }
 
