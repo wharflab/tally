@@ -2,6 +2,8 @@
 
 High-signal notes for AI contributors working on `tally`.
 For repo layout, commands, and config details, start with `AGENTS.md`.
+The repo also includes an LSP server (`internal/lsp/`), IDE integrations (`_integrations/`),
+and a WASM-compiled shellcheck (`internal/shellcheck/`).
 
 ## Defaults
 
@@ -20,6 +22,9 @@ For repo layout, commands, and config details, start with `AGENTS.md`.
 - DO NOT write a custom Dockerfile parser.
   - Use BuildKit as the source of truth: `github.com/moby/buildkit/frontend/dockerfile/parser` and `.../instructions`.
 - Keep `cmd/` as wiring only; put implementation in `internal/`.
+- When running `go build`, `go test`, or `go run` directly, pass
+  `-tags 'containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub'`.
+  - `make` targets handle this automatically.
 
 ## Snapshots (Maintainer Preference)
 
@@ -42,11 +47,13 @@ For repo layout, commands, and config details, start with `AGENTS.md`.
 
 - If you add/change rules or defaults, update `RULES.md`.
 - If you change config schema, regenerate `schema.json` via `make jsonschema`.
+- `make schema-gen` regenerates all schemas and generated models; `make jsonschema` (alias `schema-check`) validates them.
 
 ## Hygiene
 
 - PREFER targeted `go test` first; run `make test` before finishing a larger change.
 - PREFER `make lint`/`make lint-fix` (custom wrapper) over running `golangci-lint` directly.
+  - Custom analyzers live in `_tools/customlint/`; `make lint` builds and runs them via `bin/custom-gcl`.
 - Avoid `panic`/`log.Fatal` outside `main`; return errors and keep error context (`%w`).
 - Avoid `//nolint` unless necessary; if used, scope it to a specific linter and add a brief reason.
 - Do not run `make release`/`make publish*` unless explicitly asked.
