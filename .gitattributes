@@ -17,6 +17,7 @@
 
 # Generated files
 internal/lsp/protocol/lsp_generated.go linguist-generated=true
+internal/lsp/protocol/doc.go linguist-generated=true
 internal/schemas/registry_gen.go linguist-generated=true
 internal/schemas/generated/**/*.gen.go linguist-generated=true
 internal/rules/*/index.schema.json linguist-generated=true
