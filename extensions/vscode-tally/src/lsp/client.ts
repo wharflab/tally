@@ -1,20 +1,21 @@
+import * as path from "node:path";
+
 import * as vscode from "vscode";
-import type {
-  State} from "vscode-languageclient/node";
 import {
   CloseAction,
   ErrorAction,
   type Executable,
+  type ErrorHandler,
   LanguageClient,
   type LanguageClientOptions,
   NotebookDocumentFilter,
+  type State,
   type ServerOptions,
   type StateChangeEvent,
   TextDocumentFilter,
-  type ErrorHandler,
 } from "vscode-languageclient/node";
 
-import { type ResolvedBinary } from "../binary/findBinary";
+import { type BinarySource, type ResolvedBinary } from "../binary/findBinary";
 
 export interface TallyLanguageClientInit {
   output: vscode.OutputChannel;
@@ -146,7 +147,7 @@ export class TallyLanguageClient {
     return this.server.key;
   }
 
-  public serverSource(): string {
+  public serverSource(): BinarySource {
     return this.server.source;
   }
 
@@ -203,11 +204,20 @@ function isLikelyDockerfileResource(resource: vscode.Uri): boolean {
     return false;
   }
 
+  const name = path.posix.basename(resource.path).toLowerCase();
+
   if (resource.scheme === "untitled") {
-    return true;
+    if (!name) {
+      return false;
+    }
+    return (
+      name === "dockerfile" ||
+      name === "containerfile" ||
+      name.startsWith("dockerfile.") ||
+      name.startsWith("containerfile.")
+    );
   }
 
-  const name = resource.path.split("/").pop()?.toLowerCase();
   if (!name) {
     return false;
   }

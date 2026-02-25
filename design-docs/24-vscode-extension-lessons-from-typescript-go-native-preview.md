@@ -114,8 +114,12 @@ What to do:
 
 - In `extensions/vscode-tally/src/extension.ts`, create two channels (both `{ log: true }`).
 - In `extensions/vscode-tally/src/lsp/client.ts`, pass `traceOutputChannel`.
+- Launch the language server via the explicit stdio contract: `tally lsp --stdio`.
+  - `stdin`: JSON-RPC/LSP request stream
+  - `stdout`: JSON-RPC/LSP response + notification stream
+  - `stderr`: human-readable logs only (not protocol payloads)
 - In `extensions/vscode-tally/package.json`, add:
-  - `tally.trace.server: off | messages | verbose` (same schema as TSGo).
+  - `tally.trace.server: off | messages | verbose` (same schema as TSGo), bound to this `tally lsp --stdio` invocation.
 
 Notes:
 
@@ -177,9 +181,9 @@ For `tally`, we can consider:
 
 ## Proposed implementation plan (follow-up work)
 
-1. Add output + trace channels, plus `tally.trace.server` setting.
-2. Add `tally.serverRunning` context key driven by `onDidChangeState`.
-3. Add status bar item + quick-pick command menu (restart, open logs, report issue).
-4. Add language status item for server version/source.
-5. Evaluate `diagnosticPullOptions` changes (onSave + optional onTabs with `match`).
+1. Introduce output + trace channels, plus `tally.trace.server` setting.
+2. Expose `tally.serverRunning` context key driven by `onDidChangeState`.
+3. Create status bar item + quick-pick command menu (restart, open logs, report issue).
+4. Show language status item for server version/source.
+5. Assess `diagnosticPullOptions` changes (onSave + optional onTabs with `match`).
 6. Add a “crash loop” toast flow when restarts stop (DoNotRestart).
