@@ -1,21 +1,33 @@
+import * as path from "node:path";
+
 import * as vscode from "vscode";
 import {
+  CloseAction,
+  ErrorAction,
   type Executable,
+  type ErrorHandler,
   LanguageClient,
   type LanguageClientOptions,
+  NotebookDocumentFilter,
+  type State,
   type ServerOptions,
+  type StateChangeEvent,
+  TextDocumentFilter,
 } from "vscode-languageclient/node";
 
-import { type ResolvedBinary } from "../binary/findBinary";
+import { type BinarySource, type ResolvedBinary } from "../binary/findBinary";
 
 export interface TallyLanguageClientInit {
   output: vscode.OutputChannel;
+  traceOutput: vscode.OutputChannel;
   server: ResolvedBinary;
 }
 
 export class TallyLanguageClient {
   private readonly client: LanguageClient;
   private readonly server: ResolvedBinary;
+  private readonly watchdogStopEmitter = new vscode.EventEmitter<string>();
+  public readonly onWatchdogStop = this.watchdogStopEmitter.event;
 
   public constructor(init: TallyLanguageClientInit) {
     this.server = init.server;
@@ -27,17 +39,89 @@ export class TallyLanguageClient {
 
     const serverOptions: ServerOptions = executable;
 
+    const watchdogMaxRestartCount = 4;
+    const watchdogWindowMs = 3 * 60 * 1000;
+    const restarts: number[] = [];
+
+    const errorHandler: ErrorHandler = {
+      error: (_error, _message, count) => {
+        if (count && count <= 3) {
+          return { action: ErrorAction.Continue };
+        }
+        return { action: ErrorAction.Shutdown };
+      },
+      closed: () => {
+        restarts.push(Date.now());
+        if (restarts.length <= watchdogMaxRestartCount) {
+          return { action: CloseAction.Restart };
+        }
+
+        const elapsedMs = restarts[restarts.length - 1] - restarts[0];
+        if (elapsedMs <= watchdogWindowMs) {
+          const message = `The Tally server crashed ${watchdogMaxRestartCount + 1} times in the last 3 minutes. The server will not be restarted.`;
+          this.watchdogStopEmitter.fire(message);
+          return { action: CloseAction.DoNotRestart, message };
+        }
+
+        restarts.shift();
+        return { action: CloseAction.Restart };
+      },
+    };
+
     const clientOptions: LanguageClientOptions = {
       outputChannel: init.output,
+      traceOutputChannel: init.traceOutput,
       documentSelector: [
         { language: "dockerfile", scheme: "file" },
         { language: "dockerfile", scheme: "untitled" },
       ],
+      connectionOptions: {
+        maxRestartCount: watchdogMaxRestartCount,
+      },
       // VS Code supports the LSP 3.17 pull diagnostics model. Disable push
       // diagnostics to avoid duplicate diagnostics when both are enabled.
       initializationOptions: {
         disablePushDiagnostics: true,
       },
+      diagnosticPullOptions: {
+        onChange: true,
+        onSave: true,
+        onTabs: true,
+        match(documentSelector, resource) {
+          if (!isLikelyDockerfileResource(resource)) {
+            return false;
+          }
+
+          for (const selector of documentSelector) {
+            if (typeof selector === "string") {
+              if (selector === "dockerfile") {
+                return true;
+              }
+              continue;
+            }
+
+            if (NotebookDocumentFilter.is(selector)) {
+              continue;
+            }
+
+            if (TextDocumentFilter.is(selector)) {
+              if (selector.language !== undefined && selector.language !== "dockerfile") {
+                continue;
+              }
+              if (selector.scheme !== undefined && selector.scheme !== resource.scheme) {
+                continue;
+              }
+              if (selector.pattern !== undefined) {
+                continue;
+              }
+              return true;
+            }
+          }
+
+          return false;
+        },
+      },
+      errorHandler,
       middleware: {
         executeCommand: async (command, args, next) => {
           if (command !== "tally.applyAllFixes") {
@@ -61,6 +145,26 @@ export class TallyLanguageClient {
 
   public serverKey(): string {
     return this.server.key;
+  }
+
+  public serverSource(): BinarySource {
+    return this.server.source;
+  }
+
+  public serverVersion(): string | undefined {
+    return this.server.version;
+  }
+
+  public executablePath(): string {
+    return this.server.executablePath;
+  }
+
+  public state(): State {
+    return this.client.state;
+  }
+
+  public onDidChangeState(listener: (event: StateChangeEvent) => void): vscode.Disposable {
+    return this.client.onDidChangeState(listener);
   }
 
   public async start(): Promise<void> {
@@ -93,6 +197,38 @@ export class TallyLanguageClient {
 
     return [{ uri, unsafe }];
   }
+}
+
+function isLikelyDockerfileResource(resource: vscode.Uri): boolean {
+  if (resource.scheme !== "file" && resource.scheme !== "untitled") {
+    return false;
+  }
+
+  const name = path.posix.basename(resource.path).toLowerCase();
+
+  if (resource.scheme === "untitled") {
+    if (!name) {
+      return false;
+    }
+    return (
+      name === "dockerfile" ||
+      name === "containerfile" ||
+      name.startsWith("dockerfile.") ||
+      name.startsWith("containerfile.")
+    );
+  }
+
+  if (!name) {
+    return false;
+  }
+
+  return (
+    name === "dockerfile" ||
+    name === "containerfile" ||
+    name.startsWith("dockerfile.") ||
+    name.startsWith("containerfile.") ||
+    name.endsWith(".dockerfile")
+  );
 }
 
 type WorkspaceEditWire = {

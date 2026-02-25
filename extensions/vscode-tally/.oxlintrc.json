@@ -72,6 +72,13 @@
         "typescript/strict-boolean-expressions": "off",
         "no-console": "off"
       }
+    },
+    {
+      "files": ["test/suite/**/*.js"],
+      "rules": {
+        "unicorn/prefer-module": "off",
+        "no-await-in-loop": "off"
+      }
     }
   ],
   "ignorePatterns": ["out", "dist", "node_modules", "tests/fixtures/**"]

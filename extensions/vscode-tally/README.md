@@ -26,6 +26,8 @@ Lint, format, and auto-fix **Dockerfiles** and **Containerfiles** in VS Code usi
 - `Tally: Configure as default formatter for Dockerfile` (`tally.configureDefaultFormatterForDockerfile`): writes workspace/user settings for
   Dockerfile formatting on save.
 - `Tally: Restart server` (`tally.restartServer`)
+- `Tally: Show output` (`tally.showOutput`)
+- `Tally: Show LSP trace` (`tally.showLspTrace`)
 
 ## Settings
 
@@ -35,6 +37,7 @@ Lint, format, and auto-fix **Dockerfiles** and **Containerfiles** in VS Code usi
 - `tally.configuration`: inline configuration override (merges with `.tally.toml` / `tally.toml`).
 - `tally.configurationPreference`: how to merge editor settings with filesystem config (`editorFirst`, `filesystemFirst`, `editorOnly`).
 - `tally.fixUnsafe`: allow "Fix all" to apply unsafe fixes (includes AI AutoFix, if configured).
+- `tally.trace.server`: LSP protocol trace level (`off`, `messages`, `verbose`).
 
 ## Python projects
 

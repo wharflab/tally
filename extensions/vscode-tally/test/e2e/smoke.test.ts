@@ -1,9 +1,10 @@
-import { runTests } from "@vscode/test-electron";
-import Bun from "bun";
 import { test } from "bun:test";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+
+import { runTests } from "@vscode/test-electron";
+import Bun from "bun";
 
 function runOrThrow(cmd: string[], opts: { cwd: string; env?: Record<string, string> }): void {
   const proc = Bun.spawnSync({

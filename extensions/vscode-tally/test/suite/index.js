@@ -1,7 +1,7 @@
 const assert = require("node:assert");
 const fs = require("node:fs/promises");
 const path = require("node:path");
-const {scheduler} = require('node:timers/promises')
+const { scheduler } = require("node:timers/promises");
 
 const vscode = require("vscode");
 
@@ -68,8 +68,7 @@ async function waitForStableDiagnostics(uri, opts) {
 
 async function runSmoke() {
   const raw =
-    process.env.VSCODE_SMOKE_EXPECTED_DIAGNOSTICS ??
-    process.env.TALLY_EXPECTED_DIAGNOSTICS;
+    process.env.VSCODE_SMOKE_EXPECTED_DIAGNOSTICS ?? process.env.TALLY_EXPECTED_DIAGNOSTICS;
   assert.ok(raw, "VSCODE_SMOKE_EXPECTED_DIAGNOSTICS or TALLY_EXPECTED_DIAGNOSTICS must be set");
   const expectedDiagnostics = Number.parseInt(raw, 10);
 
@@ -203,7 +202,6 @@ async function run() {
     const ext = vscode.extensions.getExtension("wharflab.tally");
     const alreadyActive = ext?.isActive;
     if (alreadyActive) {
-      
     }
 
     await runSmoke();

@@ -30,8 +30,8 @@
     "compile": "bun build src/extension.ts --outfile=dist/extension.cjs --format=cjs --target=node --external=vscode --sourcemap=inline",
     "typecheck": "tsgo",
     "lint": "oxlint --type-aware ./src",
-    "format": "oxfmt --write .",
-    "format:check": "oxfmt --check .",
+    "format": "oxfmt --write src test",
+    "format:check": "oxfmt --check src test",
     "test:e2e": "bun test test/e2e/*.test.ts",
     "vsce:package": "bunx @vscode/vsce package --no-dependencies"
   },
@@ -40,16 +40,16 @@
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
-    "@types/semver": "7.7.1",
     "@types/bun": "1.3.9",
     "@types/node": "25.2.3",
+    "@types/semver": "7.7.1",
     "@types/vscode": "1.109.0",
     "@typescript/native-preview": "7.0.0-dev.20260221.1",
     "@vscode/test-electron": "2.5.2",
     "@vscode/vsce": "3.7.1",
-    "oxfmt": "0.32.0",
-    "oxlint": "1.47.0",
-    "oxlint-tsgolint": "0.12.1",
+    "oxfmt": "0.35.0",
+    "oxlint": "1.50.0",
+    "oxlint-tsgolint": "0.15.0",
     "vscode-python-envs": "github:microsoft/vscode-python-environments#v1.20.0"
   },
   "contributes": {
@@ -57,6 +57,14 @@
       {
         "command": "tally.restartServer",
         "title": "Tally: Restart server"
+      },
+      {
+        "command": "tally.showOutput",
+        "title": "Tally: Show output"
+      },
+      {
+        "command": "tally.showLspTrace",
+        "title": "Tally: Show LSP trace"
       },
       {
         "command": "tally.applyAllFixes",
@@ -114,6 +122,16 @@
           "type": "boolean",
           "default": false,
           "description": "Allow manual 'Fix all' command to apply unsafe fixes."
+        },
+        "tally.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Trace communication between VS Code and the Tally language server."
         }
       }
     }
@@ -122,6 +140,8 @@
     "onCommand:tally.applyAllFixes",
     "onCommand:tally.configureDefaultFormatterForDockerfile",
     "onCommand:tally.restartServer",
+    "onCommand:tally.showOutput",
+    "onCommand:tally.showLspTrace",
     "onLanguage:dockerfile",
     "workspaceContains:Dockerfile*",
     "workspaceContains:Containerfile*",

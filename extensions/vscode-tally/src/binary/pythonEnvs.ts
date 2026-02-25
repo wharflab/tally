@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+
 import * as vscode from "vscode";
 
 import type { PythonEnvironment, PythonEnvironmentApi } from "../vendor/pythonEnvsApi";
