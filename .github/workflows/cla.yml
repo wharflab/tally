@@ -24,5 +24,5 @@ jobs:
         with:
           path-to-document: https://github.com/wharflab/tally/blob/main/CLA.md
           path-to-signatures: .github/cla-signatures.json
-          branch: main
+          branch: cla-signatures
           allowlist: tinovyatkin,dependabot[bot],renovate[bot]
