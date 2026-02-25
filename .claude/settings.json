@@ -40,7 +40,14 @@
     "deny": []
   },
   "enableAllProjectMcpServers": true,
-  "hooks": {},
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [{ "type": "command", "command": "bunx lefthook install", "async": true }]
+      }
+    ]
+  },
   "alwaysThinkingEnabled": true,
   "enabledPlugins": {
     "coderabbit@claude-plugins-official": true
