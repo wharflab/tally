@@ -300,8 +300,8 @@ remains ShellCheck.
 - New rule aggregator: `shellcheck/ShellCheck`
   - When enabled, it executes the embedded ShellCheck engine and emits violations with rule codes:
     - `shellcheck/SC####` (ShellCheck diagnostics live in their own namespace).
-- Default exclusions match Hadolint:
-  - `SC2187`, `SC1090`, `SC1091`
+- Embedded ShellCheck build patches out a small set of non-hermetic / noisy codes:
+  - `SC2148`, `SC2187`, `SC1090`, `SC1091`
 - Default shell dialect resolution:
   - determined per stage using semantic model (`SHELL [...]` + `# tally shell=` / `# hadolint shell=`)
   - non-POSIX shells skip
@@ -320,12 +320,14 @@ mode = "embedded"              # fixed in v1; reserve "external" for debug
 norc = true                    # default true (match Hadolint hermetic behavior)
 enable-optional = []            # default empty
 extended-analysis = "auto"      # auto|true|false
-exclude = ["SC2187", "SC1090", "SC1091"]
+exclude = []
 include = []                    # mutually exclusive with exclude when set
 ```
 
 Implementation note: this requires adding a `Shellcheck map[string]RuleConfig` to `internal/config.RulesConfig` (parallel to `Hadolint` and
 `Buildkit`), so that selection patterns like `shellcheck/*` and per-rule blocks like `[rules.shellcheck.SC2086]` work end-to-end.
+
+Note: the embedded wasm build is patched to never emit `SC2148`, `SC2187`, `SC1090`, `SC1091`, so these cannot be re-enabled via config.
 
 Per-code override still works with existing config plumbing:
 
@@ -368,7 +370,7 @@ We build `shellcheck.wasm` **in this repo** (not via `wasilibs/go-shellcheck`) a
 Suggested layout:
 
 - `_tools/shellcheck-wasm/Dockerfile` (builds `shellcheck.wasm`)
-- `_tools/shellcheck-wasm/patches/*.patch` (optional upstream feature-trim patches; applied during wasm build)
+- `_tools/shellcheck-wasm/rewrites/*.yml` (ast-grep rewrites applied during wasm build)
 - `Makefile` (pins upstream ShellCheck tag via `SHELLCHECK_VERSION`, e.g. `v0.11.0`)
 - `internal/shellcheck/wasm/shellcheck.wasm` (generated artifact; checked in for reproducible builds)
 - `internal/shellcheck/wasm/wasm.go` (`//go:embed shellcheck.wasm`)
@@ -393,7 +395,7 @@ Build steps (mirrors the proven `go-shellcheck` approach):
 - Install: `build-essential`, `curl`, `git`, `jq`, `unzip`, `xz-utils`, `zstd`
 - Fetch and set up `ghc-wasm-meta` pinned commit (`GHC_WASM_META_COMMIT` in `Makefile`, fetched via git `ADD`)
 - Fetch ShellCheck source at the pinned tag (`SHELLCHECK_VERSION` in `Makefile`, fetched via git `ADD`) and run `./striptests`
-- (Optional) Apply any patches in `_tools/shellcheck-wasm/patches/*.patch` (in lexical order) via `git apply`
+- Apply AST-based rewrites from `_tools/shellcheck-wasm/rewrites/*.yml` (ast-grep; in lexical order)
 - Build: `. ~/.ghc-wasm/env && wasm32-wasi-cabal update && wasm32-wasi-cabal build --allow-newer shellcheck`
 - Optimize: `wasm-opt -O3 --flatten --rereloop --converge ... -o shellcheck.wasm`
 
@@ -405,7 +407,7 @@ Notes:
 ##### Size optimization notes (beyond `striptests`)
 
 There are **no upstream Cabal flags** to “build only JSON1 output” (or otherwise exclude formatters) — ShellCheck’s main program
-(`shellcheck.hs`) imports all formatters directly. To actually drop unused output formats from the final wasm, we would need to **patch**
+(`shellcheck.hs`) imports all formatters directly. To actually drop unused output formats from the final wasm, we would need to **rewrite**
 upstream sources during the build (see below).
 
 However, we can likely get meaningful wins without maintaining a large patch:
@@ -418,21 +420,36 @@ However, we can likely get meaningful wins without maintaining a large patch:
 - **`wasm-opt` size mode:** `-Oz` may reduce size further, but is likely to hurt performance; our default should stay `-O3` unless we set an
   explicit size budget.
 
-##### Optional: “JSON1-only” ShellCheck build
+##### Build-time rewrites (ast-grep)
 
-We can reduce wasm size (at the expense of upgrade friction) by patching upstream sources at build time. In this repo we keep patches as plain
-unified diffs (applied with `git apply`) under `_tools/shellcheck-wasm/patches/`.
+We reduce wasm size and harden behavior by rewriting upstream ShellCheck sources at build time using `ast-grep` rule bundles in
+`_tools/shellcheck-wasm/rewrites/*.yml`.
 
-Current demo patches:
+**Guideline (rule exclusions):** if we decide a ShellCheck diagnostic is not useful or not hermetic in Dockerfile contexts, prefer a
+**structural rewrite** that removes the diagnostic emission (or the feature that produces it) over relying on runtime `shellcheck -e ...` flags
+or post-filtering. This keeps the embedded ShellCheck behavior deterministic and avoids “accidental re-enable” if args/options change.
 
-- `_tools/shellcheck-wasm/patches/0001-json1-only.patch`: disable all output formats except JSON1 (unknown formats error)
-- `_tools/shellcheck-wasm/patches/0002-stdin-only.patch`: only accept stdin input (no files, or `-`)
-- `_tools/shellcheck-wasm/patches/0003-drop-sc2148.patch`: remove SC2148 emission (shebang-related rule) as a demonstration
+How it’s applied (in `_tools/shellcheck-wasm/Dockerfile`):
 
-Size tracking (ShellCheck `v0.11.0`, same toolchain, measured on 2026-02-24):
+- Run `./striptests` first (it expects a clean tree and meaningfully reduces size).
+- Install `@ast-grep/cli@${AST_GREP_VERSION}` and apply each rewrite bundle in lexical order.
+- Each bundle enforces:
+  - preflight match counts (default: **exactly 1** match per `id:`; ids ending in `-multi` may match many)
+  - postflight idempotence (re-scanning after apply yields no matches)
 
-- Before patches: `7,460,925` bytes
-- After patches: `7,317,428` bytes (**-143,497 bytes / -1.92%**)
+Current rewrite bundles:
+
+- `_tools/shellcheck-wasm/rewrites/0001-json1-only.yml`: JSON1-only output (drop other formatter imports + map entries); default format json1.
+- `_tools/shellcheck-wasm/rewrites/0002-stdin-only.yml`: stdin-only input (no files, or `-`).
+- `_tools/shellcheck-wasm/rewrites/0003-drop-sc2148.yml`: drop SC2148 emission (demo).
+- `_tools/shellcheck-wasm/rewrites/0004-drop-sc2187.yml`: drop SC2187 emission (Hadolint parity).
+- `_tools/shellcheck-wasm/rewrites/0005-drop-sc1090.yml`: drop SC1090 emission (Hadolint parity).
+- `_tools/shellcheck-wasm/rewrites/0006-drop-sc1091.yml`: drop SC1091 emission (Hadolint parity).
+
+Size tracking (ShellCheck `v0.11.0`, same toolchain, measured on 2026-02-25):
+
+- Before rewrites: `7,460,925` bytes
+- After rewrites: `7,316,285` bytes (**-144,640 bytes / -1.94%**)
 
 Notes:
 
@@ -440,33 +457,26 @@ Notes:
   `ShellCheck.cabal`’s `exposed-modules`. For larger size wins, patch `ShellCheck.cabal` as well (more invasive).
 - The wasm build prints `wc -c shellcheck.wasm` at the end; include that number in ShellCheck bump PR descriptions to track regressions.
 
-Maintaining patches across ShellCheck upgrades:
+Maintaining rewrites across ShellCheck upgrades:
 
 1. Bump `SHELLCHECK_VERSION` in `Makefile`.
 2. Run `make update-shellcheck-wasm`.
-3. If the build fails during patch application:
-   - Clone the new ShellCheck tag locally, run `./striptests`, and manually re-apply the intent of the patch.
-   - Regenerate the patch with `git diff` (copy the full diff; don’t truncate hunks) and replace the corresponding file under
-     `_tools/shellcheck-wasm/patches/`.
+3. If the build fails during rewrite preflight/idempotence:
+   - Clone the new ShellCheck tag locally, run `./striptests`, and re-apply the rewrite intent to see what changed upstream.
+   - Update the corresponding `_tools/shellcheck-wasm/rewrites/*.yml` rules to match the new structure while preserving intent.
 
-Tooling note:
+If we ever need to significantly reduce wasm size further, we can make the trimming more aggressive with additional rewrites:
 
-- We keep patches as unified diffs applied with `git apply` because they’re audit-friendly and don’t require extra tooling in the build image.
-- If patch churn becomes painful, consider switching specific patches to AST-based rewrites (e.g. `ast-grep` supports Haskell patterns) and
-  emitting diffs from the rewrite step — but this adds another tool to maintain in the build pipeline.
-
-If we ever need to significantly reduce wasm size further, we can make the “JSON1-only” trimming more aggressive:
-
-- Patch upstream `shellcheck.hs` to:
+- Rewrite upstream `shellcheck.hs` to:
   - hardcode `-f json1` and remove `--format` option parsing
-  - remove imports of `ShellCheck.Formatter.*` except `JSON1`
-  - potentially remove CLI features we don’t use (`--list-optional`, `--version`, color, other output formats)
+  - remove unused CLI features we don’t expose (`--list-optional`, `--version`, color, other output formats)
 - Benefit: may drop some formatter-only dependencies (notably `Diff`) and a chunk of CLI code.
 - Cost: this is a real fork surface area; it may conflict on future ShellCheck upgrades and requires ongoing maintenance.
 
 Versioning facts (ShellCheck `0.11.0`, source-dive, reproducible count):
 
-- Distinct diagnostic codes emitted: **428** (110× `SC1xxx`, 318× `SC2xxx`)
+- Distinct diagnostic codes emitted (upstream): **428** (110× `SC1xxx`, 318× `SC2xxx`)
+- Distinct diagnostic codes emitted (this embedded build): **424** (108× `SC1xxx`, 316× `SC2xxx`)
 - Optional check groups (CLI `--list-optional`): **11**
 
 #### Runtime execution (wazero)
@@ -475,7 +485,7 @@ Run the embedded wasm as the ShellCheck CLI, but in-process:
 
 - Compile once per process: `rt.CompileModule(ctx, shellcheckwasm.Binary)`
 - For each snippet, instantiate with a fresh `ModuleConfig`:
-  - Args: `shellcheck -f json1 -s <dialect> --norc -e SC2187,SC1090,SC1091 -` (read from stdin; add `-i/-o/--extended-analysis` if configured)
+  - Args: `shellcheck -f json1 -s <dialect> --norc -` (read from stdin; add `-i/-o/--extended-analysis` if configured)
   - stdin: the constructed script (shebang + `export …` prelude + snippet)
   - stdout: capture JSON1
   - stderr: capture for debugging / error surfacing
@@ -492,7 +502,7 @@ Run the embedded wasm as the ShellCheck CLI, but in-process:
 
 Filesystem mounting:
 
-- For Hadolint parity (`check-sourced=false` and `SC1090/SC1091` excluded), run from stdin and do **not** require filesystem access.
+- For the default embedded mode, run from stdin and do **not** require filesystem access.
 - If we later support “external sources” / `source-path`, mount only the Dockerfile directory and make it explicitly opt-in.
 
 Library shape (what we need from our in-repo runner):
@@ -562,7 +572,7 @@ continued line once the ignore model matches user expectations.
   - `ONBUILD RUN` (shell form only)
 - Match Hadolint defaults:
   - dialect selection
-  - excluded codes `[SC2187, SC1090, SC1091]`
+  - avoid surfacing `SC2187`, `SC1090`, `SC1091` (done via embedded build patches)
   - env var injection via `export VAR=1`
 - Report locations at the `RUN` line (until directive range upgrade lands)
 

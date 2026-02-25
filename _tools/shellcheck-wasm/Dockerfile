@@ -21,15 +21,46 @@ ADD "https://github.com/koalaman/shellcheck.git?ref=v${SHELLCHECK_VERSION}" /she
 
 WORKDIR /shellcheck
 
-RUN --mount=type=bind,source=patches,target=/patches,readonly <<EOF
+ARG AST_GREP_VERSION=0.40.5
+
+RUN --mount=type=bind,source=rewrites,target=/rewrites,readonly <<EOF
 set -e
 ./striptests
-for p in /patches/*.patch; do
-	[ -e "$p" ] || continue
-	echo "Applying patch: $p"
-	git apply "$p"
-done
 . ~/.ghc-wasm/env
+npm install --global "@ast-grep/cli@${AST_GREP_VERSION}"
+for r in /rewrites/*.yml; do
+	[ -e "$r" ] || continue
+
+	echo "Preflight rewrite bundle: $r"
+	sg scan --rule "$r" --json=stream \
+		shellcheck.hs src/ShellCheck/Analytics.hs src/ShellCheck/Parser.hs \
+		> /tmp/sg-matches.jsonl
+	awk '/^id: /{print $2}' "$r" > /tmp/sg-expected-ids.txt
+	jq -r '.ruleId' /tmp/sg-matches.jsonl > /tmp/sg-found-ids.txt
+	while IFS= read -r rule_id; do
+		count="$(grep -cx "$rule_id" /tmp/sg-found-ids.txt || true)"
+		case "$rule_id" in
+			*-multi)
+				[ "$count" -ge 1 ] || { echo "Rewrite rule expected >=1 match, got $count: $rule_id" >&2; exit 1; }
+				;;
+			*)
+				[ "$count" -eq 1 ] || { echo "Rewrite rule expected exactly 1 match, got $count: $rule_id" >&2; exit 1; }
+				;;
+		esac
+	done < /tmp/sg-expected-ids.txt
+
+	echo "Apply rewrite bundle: $r"
+	sg scan --rule "$r" --update-all shellcheck.hs src/ShellCheck/Analytics.hs src/ShellCheck/Parser.hs
+
+	echo "Postflight rewrite bundle: $r"
+	sg scan --rule "$r" --json=stream \
+		shellcheck.hs src/ShellCheck/Analytics.hs src/ShellCheck/Parser.hs \
+		> /tmp/sg-remaining.jsonl
+	if [ -s /tmp/sg-remaining.jsonl ]; then
+		echo "Rewrite bundle was not idempotent: $r" >&2
+		exit 1
+	fi
+done
 wasm32-wasi-cabal update
 wasm32-wasi-cabal build --allow-newer shellcheck
 wasm-opt -o shellcheck.wasm --flatten --rereloop --converge -O3 dist-newstyle/build/wasm32-wasi/ghc-*/ShellCheck-*/x/shellcheck/build/shellcheck/shellcheck.wasm

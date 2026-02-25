@@ -1,0 +1,15 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
+id: shellcheck-drop-sc2148
+message: Remove SC2148 emission (demo rule removal)
+severity: info
+language: Haskell
+rule:
+  pattern:
+    context: |
+      module Test where
+      foo = do
+          when (null sb) $
+              err $ID 2148 $MSG
+    selector: exp
+fix: ''
