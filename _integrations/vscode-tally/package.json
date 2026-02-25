@@ -36,7 +36,7 @@
     "vsce:package": "bunx @vscode/vsce package --no-dependencies"
   },
   "dependencies": {
-    "semver": "^7.6.0",
+    "semver": "^7.7.4",
     "vscode-languageclient": "^9.0.1"
   },
   "devDependencies": {
