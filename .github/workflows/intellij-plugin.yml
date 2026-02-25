@@ -48,7 +48,7 @@ jobs:
       - name: IntelliJ Community smoke check
         run: make intellij-plugin-smoke
       - name: Upload plugin artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: tally-intellij-plugin
           path: _integrations/intellij-tally/dist/*.zip
