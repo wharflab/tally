@@ -45,6 +45,16 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
   const { extensionContext, isTrusted, settings, workspaceFolders, pythonEnvResolver, output } =
     input;
   const minVersion = getMinCompatibleVersion(extensionContext);
+  const bundled = bundledBinaryPath(extensionContext);
+
+  // Workspace trust gating: never execute user-supplied paths in untrusted workspaces.
+  // In this mode we only allow the extension-bundled binary.
+  if (!isTrusted) {
+    if (await isExecutableFile(bundled)) {
+      return directBinary(bundled, "bundled", await readBinaryVersion(bundled));
+    }
+    throw new Error("workspace is untrusted and no bundled tally binary is available");
+  }
 
   // 1) Explicit path(s)
   for (const raw of settings.path) {
@@ -64,20 +74,10 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
 
   // 2) Bundled import strategy
   if (settings.importStrategy === "useBundled") {
-    const bundled = bundledBinaryPath(extensionContext);
     if (await isExecutableFile(bundled)) {
       return directBinary(bundled, "bundled", await readBinaryVersion(bundled));
     }
     throw new Error("tally.importStrategy is useBundled, but bundled binary is missing");
-  }
-
-  // Workspace trust gating: skip workspace-local resolution and PATH in untrusted workspaces.
-  if (!isTrusted) {
-    const bundled = bundledBinaryPath(extensionContext);
-    if (await isExecutableFile(bundled)) {
-      return directBinary(bundled, "bundled", await readBinaryVersion(bundled));
-    }
-    throw new Error("workspace is untrusted and no bundled tally binary is available");
   }
 
   // 3) npm project-local binaries
@@ -137,7 +137,6 @@ export async function findTallyBinary(input: FindTallyBinaryInput): Promise<Reso
   }
 
   // 7) Bundled fallback
-  const bundled = bundledBinaryPath(extensionContext);
   if (await isExecutableFile(bundled)) {
     return directBinary(bundled, "bundled", await readBinaryVersion(bundled));
   }
@@ -372,7 +371,7 @@ function resolveMaybeRelative(
   isTrusted: boolean,
 ): string | undefined {
   if (path.isAbsolute(candidate)) {
-    return candidate;
+    return isTrusted ? candidate : undefined;
   }
   if (!isTrusted) {
     return undefined;
