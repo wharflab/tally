@@ -75,7 +75,8 @@ TypeScript-Go does not implement a custom watchdog in its extension; it relies o
 
 ### Default restart policy (important specifics)
 
-`vscode-languageclient` implements a `DefaultErrorHandler` with:
+`vscode-languageclient` (observed on `v9.0.1`, which is what `extensions/vscode-tally/package.json` currently tracks via `^9.0.1`) implements a
+`DefaultErrorHandler` with:
 
 - A **restart counter window** (timestamps of recent restarts).
 - A default `maxRestartCount` of **4** (configurable via `connectionOptions.maxRestartCount`).
@@ -83,6 +84,7 @@ TypeScript-Go does not implement a custom watchdog in its extension; it relies o
   - “The \<name\> server crashed 5 times in the last 3 minutes. The server will not be restarted…”
 
 This is the “watchdog pattern” we should explicitly lean on and integrate with `tally` UX.
+When upgrading `vscode-languageclient`, verify these defaults (`DefaultErrorHandler` and `connectionOptions.maxRestartCount`) still match.
 
 ### What we should do in `tally` (beyond relying on defaults)
 

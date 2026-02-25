@@ -8,6 +8,8 @@ import { TallyLanguageClient } from "./lsp/client";
 
 let client: TallyLanguageClient | undefined;
 let starting: Promise<void> | undefined;
+let pendingRestart = false;
+let shuttingDown = false;
 let expectedStopCount = 0;
 let detachObserversForDeactivate: (() => void) | undefined;
 
@@ -28,6 +30,8 @@ function isStopExpected(): boolean {
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  shuttingDown = false;
+  pendingRestart = false;
   await vscode.commands.executeCommand("setContext", "tally.serverRunning", false);
 
   const output = vscode.window.createOutputChannel("Tally", { log: true });
@@ -48,7 +52,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let stateSubscription: vscode.Disposable | undefined;
   let watchdogSubscription: vscode.Disposable | undefined;
   let unexpectedStopTimer: ReturnType<typeof setTimeout> | undefined;
-  let pendingRestart = false;
 
   function applyServerStateUi(state: "disabled" | "starting" | "running" | "stopped"): void {
     if (state === "disabled") {
@@ -196,11 +199,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   updateLanguageStatusForClient();
 
   async function startOrRestart(reason: string): Promise<void> {
+    if (shuttingDown) {
+      return;
+    }
+
     let runReason = reason;
     while (true) {
+      if (shuttingDown) {
+        return;
+      }
+
       if (starting) {
+        if (shuttingDown) {
+          return;
+        }
         pendingRestart = true;
         await starting;
+        if (shuttingDown) {
+          return;
+        }
         if (!pendingRestart) {
           return;
         }
@@ -210,6 +227,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
       pendingRestart = false;
       starting = (async () => {
+        if (shuttingDown) {
+          return;
+        }
+
         const cfg = configService.snapshot();
         if (!cfg.global.enable) {
           const release = beginExpectedStop();
@@ -238,6 +259,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
         const settingsEnvelope = configService.lspSettings();
 
+        if (shuttingDown) {
+          return;
+        }
+
         if (client && client.serverKey() === resolved.key) {
           await client.sendConfiguration(settingsEnvelope);
           updateLanguageStatusForClient(client);
@@ -249,6 +274,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           await client?.stop();
         } finally {
           release();
+        }
+
+        if (shuttingDown) {
+          return;
         }
 
         detachClientObservers();
@@ -265,7 +294,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         );
 
         try {
+          if (shuttingDown) {
+            return;
+          }
           await client.start();
+          if (shuttingDown) {
+            return;
+          }
           await client.sendConfiguration(settingsEnvelope);
         } catch (err) {
           const stopRelease = beginExpectedStop();
@@ -290,6 +325,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       });
 
       await starting;
+      if (shuttingDown) {
+        return;
+      }
       if (!pendingRestart) {
         return;
       }
@@ -410,6 +448,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 }
 
 export async function deactivate(): Promise<void> {
+  shuttingDown = true;
+  pendingRestart = false;
+  if (starting) {
+    try {
+      await starting;
+    } catch {
+      // ignore startup failures during deactivation cleanup
+    }
+  }
   detachObserversForDeactivate?.();
   detachObserversForDeactivate = undefined;
   const release = beginExpectedStop();
