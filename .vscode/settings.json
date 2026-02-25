@@ -58,7 +58,7 @@
     "CGO_ENABLED": 0
   },
   "sarif-viewer.connectToGithubCodeScanning": "off",
-  "typescript.native-preview.tsdk": "./extensions/vscode-tally/node_modules/@typescript/native-preview/bin",
+  "typescript.native-preview.tsdk": "./_integrations/vscode-tally/node_modules/@typescript/native-preview/bin",
   "typescript.experimental.useTsgo": true,
   // Disable ESLint and Biome in favor of oxlint
   "eslint.enable": false,
@@ -68,12 +68,12 @@
   ],
   // Enable oxc extension (linter and formatter)
   "oxc.enable": true,
-  "oxc.path.oxfmt": "./extensions/vscode-tally/node_modules/.bin/oxfmt",
-  "oxc.path.oxlint": "./extensions/vscode-tally/node_modules/.bin/oxlint",
-  "oxc.path.tsgolint": "./extensions/vscode-tally/node_modules/.bin/tsgolint",
+  "oxc.path.oxfmt": "./_integrations/vscode-tally/node_modules/.bin/oxfmt",
+  "oxc.path.oxlint": "./_integrations/vscode-tally/node_modules/.bin/oxlint",
+  "oxc.path.tsgolint": "./_integrations/vscode-tally/node_modules/.bin/tsgolint",
   "oxc.path.node": "bun",
-  "oxc.configPath": "extensions/vscode-tally/.oxlintrc.json",
-  "oxc.fmt.configPath": "extensions/vscode-tally/.oxfmtrc.json",
+  "oxc.configPath": "_integrations/vscode-tally/.oxlintrc.json",
+  "oxc.fmt.configPath": "_integrations/vscode-tally/.oxfmtrc.json",
   "oxc.fixKind": "safe_fix_or_suggestion",
   "oxc.typeAware": true,
   // Use oxc as default formatter for JS/TS

@@ -20,7 +20,7 @@
   <component name="NewModuleRootManager" inherit-compiler-output="true">
     <exclude-output />
     <content url="file://$MODULE_DIR$">
-      <sourceFolder url="file://$MODULE_DIR$/extensions/intellij-tally/.cache/smoke/idea-ic/idea-IC-252.26830.84/plugins/Groovy/lib" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/_integrations/intellij-tally/.cache/smoke/idea-ic/idea-IC-252.26830.84/plugins/Groovy/lib" isTestSource="false" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

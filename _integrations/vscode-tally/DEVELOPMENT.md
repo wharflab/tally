@@ -22,6 +22,6 @@ bunx @vscode/vsce package --no-dependencies
 
 Release builds copy a platform-specific `tally` binary into:
 
-`extensions/vscode-tally/bundled/bin/<platform>/<arch>/tally[.exe]`
+`_integrations/vscode-tally/bundled/bin/<platform>/<arch>/tally[.exe]`
 
 The extension can be configured to use that binary via `tally.importStrategy = "useBundled"`.

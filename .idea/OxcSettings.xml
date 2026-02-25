@@ -6,8 +6,8 @@
         <option value="--lsp" />
       </list>
     </option>
-    <option name="binaryPath" value="$PROJECT_DIR$/extensions/vscode-tally/node_modules/oxlint/bin/oxlint" />
-    <option name="configPath" value="$PROJECT_DIR$/extensions/vscode-tally/.oxlintrc.json" />
+    <option name="binaryPath" value="$PROJECT_DIR$/_integrations/vscode-tally/node_modules/oxlint/bin/oxlint" />
+    <option name="configPath" value="$PROJECT_DIR$/_integrations/vscode-tally/.oxlintrc.json" />
     <option name="configurationMode" value="MANUAL" />
     <option name="fixAllOnSave" value="true" />
     <flags>

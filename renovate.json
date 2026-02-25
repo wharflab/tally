@@ -85,7 +85,7 @@
     },
     {
       "matchFileNames": [
-        "extensions/vscode-tally/package.json"
+        "_integrations/vscode-tally/package.json"
       ],
       "matchDepNames": [
         "vscode"
