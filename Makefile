@@ -156,6 +156,37 @@ update-shellcheck-wasm-host: bin/ghc-wasm-$(GHC_WASM_META_COMMIT)-$(GHC_WASM_FLA
 		curl -f -L --retry 5 "https://github.com/koalaman/shellcheck/archive/refs/tags/$$sc_ver.tar.gz" | tar -xz --strip-components 1 -C "$$tmp"; \
 		cd "$$tmp"; \
 		./striptests; \
+		command -v sg >/dev/null || { echo "sg (ast-grep) is required; install with: npm install -g @ast-grep/cli"; exit 1; }; \
+		for r in "$(CURDIR)/_tools/shellcheck-wasm/rewrites/"*.yml; do \
+			[ -e "$$r" ] || continue; \
+			echo "Preflight rewrite bundle: $$r"; \
+			sg scan --rule "$$r" --json=stream \
+				shellcheck.hs src/ShellCheck/Analytics.hs src/ShellCheck/Parser.hs \
+				> sg-matches.jsonl; \
+			sed -n "s/^id: //p" "$$r" > sg-expected-ids.txt; \
+			jq -r ".ruleId" sg-matches.jsonl > sg-found-ids.txt; \
+			while IFS= read -r rule_id; do \
+				count="$$(grep -cx "$$rule_id" sg-found-ids.txt || true)"; \
+				case "$$rule_id" in \
+					*-multi) \
+						[ "$$count" -ge 1 ] || { echo "Rewrite rule expected >=1 match, got $$count: $$rule_id" >&2; exit 1; }; \
+						;; \
+					*) \
+						[ "$$count" -eq 1 ] || { echo "Rewrite rule expected exactly 1 match, got $$count: $$rule_id" >&2; exit 1; }; \
+						;; \
+				esac; \
+			done < sg-expected-ids.txt; \
+			echo "Apply rewrite bundle: $$r"; \
+			sg scan --rule "$$r" --update-all shellcheck.hs src/ShellCheck/Analytics.hs src/ShellCheck/Parser.hs; \
+			echo "Postflight rewrite bundle: $$r"; \
+			sg scan --rule "$$r" --json=stream \
+				shellcheck.hs src/ShellCheck/Analytics.hs src/ShellCheck/Parser.hs \
+				> sg-remaining.jsonl; \
+			if [ -s sg-remaining.jsonl ]; then \
+				echo "Rewrite bundle was not idempotent: $$r" >&2; \
+				exit 1; \
+			fi; \
+		done; \
 		source "$(GHC_WASM_PREFIX)/env"; \
 		wasm32-wasi-cabal update; \
 		wasm32-wasi-cabal build --allow-newer shellcheck; \

@@ -1,0 +1,42 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
+id: shellcheck-json1-only-drop-non-json1-formatter-imports-multi
+message: Remove unused formatter imports (json1-only build)
+severity: info
+language: Haskell
+rule:
+  all:
+    - kind: import
+    - regex: 'import qualified ShellCheck\.Formatter\.'
+    - not:
+        regex: 'ShellCheck\.Formatter\.JSON1\b'
+fix: ''
+---
+id: shellcheck-json1-only-formats-map
+message: Make ShellCheck executable only support json1 output
+severity: info
+language: Haskell
+rule:
+  pattern:
+    context: |
+      module Test where
+      formats $OPTIONS = Map.fromList [$FIRST, $SECOND, $$$REST]
+    selector: function
+fix: |
+  formats _ = Map.fromList [
+      ("json1", ShellCheck.Formatter.JSON1.format)
+      ]
+---
+id: shellcheck-json1-only-default-format
+message: Default the ShellCheck executable output format to json1
+severity: info
+language: Haskell
+rule:
+  pattern:
+    context: |
+      module Test where
+      foo = do
+          let format = fromMaybe "tty" $ getOption flags "format"
+    selector: let
+fix: |
+  let format = fromMaybe "json1" $ getOption flags "format"

@@ -1,0 +1,14 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
+id: shellcheck-drop-sc1091
+message: Remove SC1091 emission
+severity: info
+language: Haskell
+rule:
+  pattern:
+    context: |
+      module Test where
+      foo = do
+          parseNoteAtId $FILE_ID InfoC 1091 $ $MSG
+    selector: exp
+fix: ''

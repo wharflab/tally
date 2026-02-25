@@ -1,0 +1,63 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
+id: shellcheck-stdin-only-usage-header
+message: ShellCheck wasm build only supports stdin input
+severity: info
+language: Haskell
+rule:
+  all:
+    - pattern:
+        context: |
+          module Test where
+          usageHeader = $VAL
+        selector: bind
+    # Ensure idempotence: don't re-match our rewritten header.
+    - not:
+        regex: 'usageHeader = "Usage: shellcheck \[OPTIONS\.\.\.\]"$'
+fix: |
+  usageHeader = "Usage: shellcheck [OPTIONS...]"
+---
+id: shellcheck-stdin-only-iointerface-effective-files
+message: Treat no input as stdin (-) for ioInterface
+severity: info
+language: Haskell
+rule:
+  pattern: ioInterface $OPTS $FILES
+constraints:
+  FILES:
+    kind: variable
+fix: |
+  ioInterface $OPTS (if null $FILES then ["-"] else $FILES)
+---
+id: shellcheck-stdin-only-runformatter-effective-files
+message: Treat no input as stdin (-) for runFormatter
+severity: info
+language: Haskell
+rule:
+  pattern: runFormatter $SYS $FORMATTER $OPTS $FILES
+constraints:
+  FILES:
+    kind: variable
+fix: |
+  runFormatter $SYS $FORMATTER $OPTS (if null $FILES then ["-"] else $FILES)
+---
+id: shellcheck-stdin-only-verifyfiles
+message: Reject file inputs in the ShellCheck wasm build
+severity: info
+language: Haskell
+rule:
+  all:
+    - pattern:
+        context: |
+          module Test where
+          verifyFiles $FILES = $BODY
+        selector: function
+    # Ensure idempotence: don't re-match our rewritten implementation.
+    - not:
+        regex: 'Only stdin input is supported'
+fix: |
+  verifyFiles $FILES =
+      unless (null $FILES || $FILES == ["-"]) $ do
+          printErr "Only stdin input is supported. Pass no files, or use '-'.\n"
+          printErr $ usageInfo usageHeader options
+          throwError SyntaxFailure
