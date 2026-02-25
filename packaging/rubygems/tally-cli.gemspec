@@ -19,5 +19,5 @@ Gem::Specification.new do |spec|
     NOTICE
   ) + `find libexec/ -executable -type f -print0`.split("\x0")
 
-  spec.licenses = ['Apache-2.0']
+  spec.licenses = ['GPL-3.0-only']
 end

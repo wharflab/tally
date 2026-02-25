@@ -3,7 +3,7 @@ name = "tally-cli"
 version = "0.1.0"
 description = "A fast, configurable linter for Dockerfiles and Containerfiles"
 readme = "README.md"
-license = "Apache-2.0"
+license = "GPL-3.0-only"
 license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Konstantin Vyatkin", email = "tino@vtkn.io" }]
 requires-python = ">=3.9"
@@ -12,7 +12,7 @@ classifiers = [
   "Topic :: Software Development :: Quality Assurance",
   "Environment :: Console",
   "Intended Audience :: Developers",
-  "License :: OSI Approved :: Apache Software License",
+  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
 ]
 
 [project.urls]
