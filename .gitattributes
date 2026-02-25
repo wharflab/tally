@@ -15,6 +15,11 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 
+# WASM
+*.wasm linguist-detectable=true
+*.wasm linguist-documentation=false
+*.wasm linguist-language=WebAssembly
+
 # Generated files
 internal/lsp/protocol/lsp_generated.go linguist-generated=true
 internal/lsp/protocol/doc.go linguist-generated=true
