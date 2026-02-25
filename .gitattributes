@@ -16,6 +16,7 @@
 *.cmd text eol=crlf
 
 # WASM
+*.wasm filter=lfs diff=lfs merge=lfs -text
 *.wasm linguist-detectable=true
 *.wasm linguist-documentation=false
 *.wasm linguist-language=WebAssembly

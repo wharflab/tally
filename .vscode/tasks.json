@@ -5,10 +5,7 @@
       "label": "bun: compile (vscode-tally)",
       "type": "shell",
       "command": "bun",
-      "args": [
-        "run",
-        "compile"
-      ],
+      "args": ["run", "compile"],
       "options": {
         "cwd": "${workspaceFolder}/_integrations/vscode-tally"
       },
@@ -16,27 +13,28 @@
         "kind": "build",
         "isDefault": true
       },
-      "dependsOn": [
-        "bun: typecheck (vscode-tally)"
-      ],
+      "dependsOn": ["bun: typecheck (vscode-tally)"],
       "dependsOrder": "sequence"
     },
     {
       "label": "bun: typecheck (vscode-tally)",
       "type": "shell",
       "command": "bun",
-      "args": [
-        "run",
-        "typecheck"
-      ],
+      "args": ["run", "typecheck"],
       "options": {
         "cwd": "${workspaceFolder}/_integrations/vscode-tally"
       },
       "group": "build",
-      "problemMatcher": [
-        "$tsc"
-      ]
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Install lefthook",
+      "type": "shell",
+      "command": "bunx",
+      "args": ["lefthook", "install"],
+      "runOptions": {
+        "runOn": "folderOpen"
+      }
     }
   ]
 }
-
