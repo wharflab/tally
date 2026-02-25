@@ -30,283 +30,13 @@ if (!fs.existsSync(metaModelPath)) {
 const model: MetaModel = JSON.parse(fs.readFileSync(metaModelPath, "utf-8"));
 
 // Custom structures to add to the model
-const customStructures: Structure[] = [
-    {
-        name: "InitializationOptions",
-        properties: [
-            {
-                name: "disablePushDiagnostics",
-                type: { kind: "base", name: "boolean" },
-                optional: true,
-                documentation: "DisablePushDiagnostics disables automatic pushing of diagnostics to the client.",
-            },
-            {
-                name: "codeLensShowLocationsCommandName",
-                type: { kind: "base", name: "string" },
-                optional: true,
-                documentation: "The client-side command name that resolved references/implementations `CodeLens` should trigger. Arguments passed will be `(DocumentUri, Position, Location[])`.",
-            },
-        ],
-        documentation: "InitializationOptions contains user-provided initialization options.",
-    },
-    {
-        name: "AutoImportFix",
-        properties: [
-            {
-                name: "kind",
-                type: { kind: "reference", name: "AutoImportFixKind" },
-                omitzeroValue: true,
-            },
-            {
-                name: "name",
-                type: { kind: "base", name: "string" },
-                omitzeroValue: true,
-            },
-            {
-                name: "importKind",
-                type: { kind: "reference", name: "ImportKind" },
-            },
-            {
-                name: "useRequire",
-                type: { kind: "base", name: "boolean" },
-                omitzeroValue: true,
-            },
-            {
-                name: "addAsTypeOnly",
-                type: { kind: "reference", name: "AddAsTypeOnly" },
-            },
-            {
-                name: "moduleSpecifier",
-                type: { kind: "base", name: "string" },
-                documentation: "The module specifier for this auto-import.",
-                omitzeroValue: true,
-            },
-            {
-                name: "importIndex",
-                type: { kind: "base", name: "integer" },
-                documentation: "Index of the import to modify when adding to an existing import declaration.",
-            },
-            {
-                name: "usagePosition",
-                type: { kind: "reference", name: "Position" },
-                optional: true,
-            },
-            {
-                name: "namespacePrefix",
-                type: { kind: "base", name: "string" },
-                omitzeroValue: true,
-            },
-        ],
-        documentation: "AutoImportFix contains information about an auto-import suggestion.",
-    },
-    {
-        name: "CompletionItemData",
-        properties: [
-            {
-                name: "fileName",
-                type: { kind: "base", name: "string" },
-                documentation: "The file name where the completion was requested.",
-                omitzeroValue: true,
-            },
-            {
-                name: "position",
-                type: { kind: "base", name: "integer" },
-                documentation: "The position where the completion was requested.",
-                omitzeroValue: true,
-            },
-            {
-                name: "source",
-                type: { kind: "base", name: "string" },
-                documentation: "Special source value for disambiguation.",
-                omitzeroValue: true,
-            },
-            {
-                name: "name",
-                type: { kind: "base", name: "string" },
-                documentation: "The name of the completion item.",
-                omitzeroValue: true,
-            },
-            {
-                name: "autoImport",
-                type: { kind: "reference", name: "AutoImportFix" },
-                optional: true,
-                documentation: "Auto-import data for this completion item.",
-            },
-        ],
-        documentation: "CompletionItemData is preserved on a CompletionItem between CompletionRequest and CompletionResolveRequest.",
-    },
-    {
-        name: "CodeLensData",
-        properties: [
-            {
-                name: "kind",
-                type: { kind: "reference", name: "CodeLensKind" },
-                documentation: `The kind of the code lens ("references" or "implementations").`,
-            },
-            {
-                name: "uri",
-                type: { kind: "base", name: "DocumentUri" },
-                documentation: `The document in which the code lens and its range are located.`,
-            },
-        ],
-    },
-    {
-        // Longer-term, we may just want to use TextEdit.
-        name: "CustomClosingTagCompletion",
-        properties: [
-            {
-                name: "newText",
-                type: { kind: "base", name: "string" },
-                documentation: "The text to insert at the closing tag position.",
-            },
-        ],
-        documentation: "CustomClosingTagCompletion is the response for the custom/textDocument/closingTagCompletion request.",
-    },
-];
-
-const customEnumerations: Enumeration[] = [
-    {
-        name: "CodeLensKind",
-        type: {
-            kind: "base",
-            name: "string",
-        },
-        values: [
-            {
-                name: "References",
-                value: "references",
-            },
-            {
-                name: "Implementations",
-                value: "implementations",
-            },
-        ],
-    },
-    {
-        name: "AutoImportFixKind",
-        type: { kind: "base", name: "integer" },
-        values: [
-            { name: "UseNamespace", value: 0, documentation: "Augment an existing namespace import." },
-            { name: "JsdocTypeImport", value: 1, documentation: "Add a JSDoc-only type import." },
-            { name: "AddToExisting", value: 2, documentation: "Insert into an existing import declaration." },
-            { name: "AddNew", value: 3, documentation: "Create a fresh import statement." },
-            { name: "PromoteTypeOnly", value: 4, documentation: "Promote a type-only import when necessary." },
-        ],
-    },
-    {
-        name: "ImportKind",
-        type: { kind: "base", name: "integer" },
-        values: [
-            { name: "Named", value: 0, documentation: "Adds a named import." },
-            { name: "Default", value: 1, documentation: "Adds a default import." },
-            { name: "Namespace", value: 2, documentation: "Adds a namespace import." },
-            { name: "CommonJS", value: 3, documentation: "Adds a CommonJS import assignment." },
-        ],
-    },
-    {
-        name: "AddAsTypeOnly",
-        type: { kind: "base", name: "integer" },
-        values: [
-            { name: "Allowed", value: 1, documentation: "Import may be marked type-only if needed." },
-            { name: "Required", value: 2, documentation: "Import must be marked type-only." },
-            { name: "NotAllowed", value: 4, documentation: "Import cannot be marked type-only." },
-        ],
-    },
-];
-
-// Custom requests to add to the model (tsgo-specific)
-const customRequests: Request[] = [
-    {
-        method: "custom/textDocument/closingTagCompletion",
-        typeName: "CustomClosingTagCompletionRequest",
-        params: { kind: "reference", name: "TextDocumentPositionParams" },
-        result: {
-            kind: "or",
-            items: [
-                { kind: "reference", name: "CustomClosingTagCompletion" },
-                { kind: "base", name: "null" },
-            ],
-        },
-        messageDirection: "clientToServer",
-        documentation: "Request to get the closing tag completion at a given position.",
-    },
-    {
-        method: "custom/runGC",
-        typeName: "RunGCRequest",
-        messageDirection: "clientToServer",
-        result: { kind: "base", name: "null" },
-        documentation: "Triggers garbage collection in the language server.",
-    },
-    {
-        method: "custom/saveHeapProfile",
-        typeName: "SaveHeapProfileRequest",
-        params: { kind: "reference", name: "ProfileParams" },
-        messageDirection: "clientToServer",
-        result: { kind: "reference", name: "ProfileResult" },
-        documentation: "Saves a heap profile to the specified directory.",
-    },
-    {
-        method: "custom/saveAllocProfile",
-        typeName: "SaveAllocProfileRequest",
-        params: { kind: "reference", name: "ProfileParams" },
-        messageDirection: "clientToServer",
-        result: { kind: "reference", name: "ProfileResult" },
-        documentation: "Saves an allocation profile to the specified directory.",
-    },
-    {
-        method: "custom/startCPUProfile",
-        typeName: "StartCPUProfileRequest",
-        params: { kind: "reference", name: "ProfileParams" },
-        messageDirection: "clientToServer",
-        result: { kind: "base", name: "null" },
-        documentation: "Starts CPU profiling, writing to the specified directory when stopped.",
-    },
-    {
-        method: "custom/stopCPUProfile",
-        typeName: "StopCPUProfileRequest",
-        messageDirection: "clientToServer",
-        result: { kind: "reference", name: "ProfileResult" },
-        documentation: "Stops CPU profiling and saves the profile.",
-    },
-];
-
-// Custom structures for profiling requests/responses
-customStructures.push(
-    {
-        name: "ProfileParams",
-        properties: [
-            {
-                name: "dir",
-                type: { kind: "base", name: "string" },
-                documentation: "The directory path where the profile should be saved.",
-            },
-        ],
-        documentation: "Parameters for profiling requests.",
-    },
-    {
-        name: "ProfileResult",
-        properties: [
-            {
-                name: "file",
-                type: { kind: "base", name: "string" },
-                documentation: "The file path where the profile was saved.",
-            },
-        ],
-        documentation: "Result of a profiling request.",
-    },
-);
-
-// Track which custom Data structures were declared explicitly
-const explicitDataStructures = new Set(customStructures.map(s => s.name));
+const customStructures: Structure[] = [];
 
 // Global variable to track the RegisterOptions union type for special naming
 let registerOptionsUnionType: OrType | undefined;
 
 // Patch and preprocess the model
 function patchAndPreprocessModel() {
-    // Track which Data types we need to create as placeholders
-    const neededDataStructures = new Set<string>();
-
     // Collect all registration option types from requests and notifications
     const registrationOptionTypes: Type[] = [];
     for (const request of [...model.requests, ...model.notifications]) {
@@ -357,22 +87,6 @@ function patchAndPreprocessModel() {
 
     for (const structure of model.structures) {
         for (const prop of structure.properties) {
-            // Replace initializationOptions type with custom InitializationOptions
-            if (prop.name === "initializationOptions" && prop.type.kind === "reference" && prop.type.name === "LSPAny") {
-                prop.type = { kind: "reference", name: "InitializationOptions" };
-            }
-
-            // Replace Data *any fields with custom typed Data fields
-            if (prop.name === "data" && prop.type.kind === "reference" && prop.type.name === "LSPAny") {
-                const customDataType = `${structure.name}Data`;
-                prop.type = { kind: "reference", name: customDataType };
-
-                // If we haven't explicitly declared this Data structure, we'll need a placeholder
-                if (!explicitDataStructures.has(customDataType)) {
-                    neededDataStructures.add(customDataType);
-                }
-            }
-
             // Replace registerOptions type with a custom RegisterOptions type
             if (prop.name === "registerOptions" && prop.type.kind === "reference" && prop.type.name === "LSPAny") {
                 // Create a union type and save it for special naming
@@ -384,20 +98,8 @@ function patchAndPreprocessModel() {
         }
     }
 
-    // Create placeholder structures for Data types that weren't explicitly declared
-    for (const dataTypeName of neededDataStructures) {
-        const baseName = dataTypeName.replace(/Data$/, "");
-        customStructures.push({
-            name: dataTypeName,
-            properties: [],
-            documentation: `${dataTypeName} is a placeholder for custom data preserved on a ${baseName}.`,
-        });
-    }
-
-    // Add custom enumerations, custom structures, custom requests, and synthetic structures to the model
-    model.enumerations.push(...customEnumerations);
+    // Add custom structures and synthetic structures to the model
     model.structures.push(...customStructures, ...syntheticStructures);
-    model.requests.push(...customRequests);
 
     // Build structure map for preprocessing
     const structureMap = new Map<string, Structure>();
@@ -830,7 +532,6 @@ function collectTypeDefinitions() {
         "VersionedNotebookDocumentIdentifier",
         "VersionedTextDocumentIdentifier",
         "OptionalVersionedTextDocumentIdentifier",
-        "ExportInfoMapKey",
     ]);
 
     // Process all structures

@@ -3,8 +3,15 @@ package lspserver
 import (
 	"log"
 
+	"encoding/json/v2"
+
 	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 )
+
+// initOptions holds tally-specific initialization options sent by the client.
+type initOptions struct {
+	DisablePushDiagnostics bool `json:"disablePushDiagnostics"`
+}
 
 func (s *Server) configureDiagnosticsMode(params *protocol.InitializeParams) {
 	supportsPull := false
@@ -23,8 +30,9 @@ func (s *Server) configureDiagnosticsMode(params *protocol.InitializeParams) {
 	// Default: if the client supports pull diagnostics (LSP 3.17), prefer pull and
 	// disable publishDiagnostics to avoid duplicate diagnostics in editors like VS Code.
 	push := true
-	if params != nil && params.InitializationOptions != nil && params.InitializationOptions.DisablePushDiagnostics != nil {
-		push = !*params.InitializationOptions.DisablePushDiagnostics
+	opts := parseInitOptions(params)
+	if opts.DisablePushDiagnostics {
+		push = false
 	} else if supportsPull {
 		push = false
 	}
@@ -52,4 +60,21 @@ func (s *Server) diagnosticRefreshSupported() bool {
 	s.diagMu.RLock()
 	defer s.diagMu.RUnlock()
 	return s.supportsDiagnosticPullMode && s.supportsDiagnosticRefresh
+}
+
+// parseInitOptions extracts tally-specific initialization options from the
+// raw LSP initializationOptions field.
+func parseInitOptions(params *protocol.InitializeParams) initOptions {
+	var opts initOptions
+	if params == nil || params.InitializationOptions == nil {
+		return opts
+	}
+	raw, err := json.Marshal(*params.InitializationOptions)
+	if err != nil {
+		return opts
+	}
+	if err := json.Unmarshal(raw, &opts); err != nil {
+		return opts
+	}
+	return opts
 }
