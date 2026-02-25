@@ -1,21 +1,17 @@
+import assert from "node:assert/strict";
 import fs from "node:fs";
-import path from "node:path";
+import { pipeline } from 'node:stream/promises';
 import url from "node:url";
 
-const __filename = url.fileURLToPath(new URL(import.meta.url));
-const __dirname = path.dirname(__filename);
-
-const metaModelPath = path.join(__dirname, "metaModel.json");
-const metaModelSchemaPath = path.join(__dirname, "metaModelSchema.mts");
-
-const hash = "00392bf903f6b6de92ae6f722408d41c8b921637";
+const hash = "2c59270f26bff00cc3eef565bacc3f30650dec0c";
 
 const metaModelURL = `https://raw.githubusercontent.com/microsoft/vscode-languageserver-node/${hash}/protocol/metaModel.json`;
 const metaModelSchemaURL = `https://raw.githubusercontent.com/microsoft/vscode-languageserver-node/${hash}/tools/src/metaModel.ts`;
 
-const metaModelResponse = await fetch(metaModelURL);
-const metaModel = await metaModelResponse.text();
-fs.writeFileSync(metaModelPath, metaModel);
+await pipeline(
+    (await fetch(metaModelURL)).body!,
+    fs.createWriteStream(url.fileURLToPath(import.meta.resolve('./metaModel.json'))),
+)
 
 const metaModelSchemaResponse = await fetch(metaModelSchemaURL);
 let metaModelSchema = await metaModelSchemaResponse.text();
@@ -25,5 +21,6 @@ metaModelSchema = metaModelSchema.replace(
     /(\t \* Whether the property is deprecated or not\. If deprecated\n\t \* the property contains the deprecation message\.\n\t \*\/\n\tdeprecated\?: string;)\n}/m,
     `$1\n\n\t/**\n\t * Whether this property uses omitzero without being a pointer.\n\t * Custom extension for special value types.\n\t */\n\tomitzeroValue?: boolean;\n}`,
 );
+assert.ok(metaModelSchema.includes("omitzeroValue?: boolean;"), "Failed to patch metaModelSchema with omitzeroValue property");
 
-fs.writeFileSync(metaModelSchemaPath, metaModelSchema);
+fs.writeFileSync(url.fileURLToPath(import.meta.resolve("./metaModelSchema.mts")), metaModelSchema);
