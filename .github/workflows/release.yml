@@ -517,7 +517,7 @@ jobs:
       - run: tar -xvf dist-signed.tar
       - uses: actions/setup-node@v6
         with:
-          node-version: 24.13.1
+          node-version: 24.14.0
       - name: Update npm
         run: npm install -g npm@latest
       - name: Publish to NPM
