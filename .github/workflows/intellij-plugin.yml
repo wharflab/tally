@@ -5,13 +5,13 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/intellij-plugin.yml"
-      - "extensions/intellij-tally/**"
+      - "_integrations/intellij-tally/**"
       - "Makefile"
   push:
     branches: [main]
     paths:
       - ".github/workflows/intellij-plugin.yml"
-      - "extensions/intellij-tally/**"
+      - "_integrations/intellij-tally/**"
       - "Makefile"
   workflow_dispatch:
 permissions:
@@ -39,8 +39,8 @@ jobs:
       - name: Cache IntelliJ build toolchains
         uses: actions/cache@v4
         with:
-          path: extensions/intellij-tally/.cache
-          key: intellij-toolchain-${{ runner.os }}-${{ hashFiles('extensions/intellij-tally/build/versions.toml') }}
+          path: _integrations/intellij-tally/.cache
+          key: intellij-toolchain-${{ runner.os }}-${{ hashFiles('_integrations/intellij-tally/build/versions.toml') }}
           restore-keys: |
             intellij-toolchain-${{ runner.os }}-
       - name: Build and verify IntelliJ plugin
@@ -51,5 +51,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tally-intellij-plugin
-          path: extensions/intellij-tally/dist/*.zip
+          path: _integrations/intellij-tally/dist/*.zip
           if-no-files-found: error

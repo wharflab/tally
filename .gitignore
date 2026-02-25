@@ -58,9 +58,9 @@ exclude-files.txt
 node_modules/
 package-lock.json
 *.vsix
-extensions/intellij-tally/.cache/
-extensions/intellij-tally/out/
-extensions/intellij-tally/dist/
+_integrations/intellij-tally/.cache/
+_integrations/intellij-tally/out/
+_integrations/intellij-tally/dist/
 verification-*/
 packaging/npm/**/bin/tally*
 packaging/npm/**/README.md

@@ -10,13 +10,13 @@ build:
 	GOSUMDB=sum.golang.org CGO_ENABLED=0 go build -tags '$(BUILDTAGS)' -ldflags "-s -w" -o tally
 
 intellij-plugin:
-	bash extensions/intellij-tally/build/build.sh build
+	bash _integrations/intellij-tally/build/build.sh build
 
 intellij-plugin-verify:
-	bash extensions/intellij-tally/build/build.sh verify
+	bash _integrations/intellij-tally/build/build.sh verify
 
 intellij-plugin-smoke:
-	bash extensions/intellij-tally/build/smoke.sh
+	bash _integrations/intellij-tally/build/smoke.sh
 
 GOTESTSUM_VERSION := v1.13.0
 GOLANGCI_LINT_VERSION := v2.9.0

@@ -7,11 +7,11 @@
       "request": "launch",
       "args": [
         "--disable-extensions",
-        "--extensionDevelopmentPath=${workspaceFolder}/extensions/vscode-tally",
+        "--extensionDevelopmentPath=${workspaceFolder}/_integrations/vscode-tally",
         "${workspaceFolder}"
       ],
       "outFiles": [
-        "${workspaceFolder}/extensions/vscode-tally/dist/**/*"
+        "${workspaceFolder}/_integrations/vscode-tally/dist/**/*"
       ],
       "sourceMaps": true,
       "skipFiles": [
@@ -25,12 +25,12 @@
       "request": "launch",
       "args": [
         "--disable-extensions",
-        "--extensionDevelopmentPath=${workspaceFolder}/extensions/vscode-tally",
-        "--extensionTestsPath=${workspaceFolder}/extensions/vscode-tally/test/suite/index.js",
+        "--extensionDevelopmentPath=${workspaceFolder}/_integrations/vscode-tally",
+        "--extensionTestsPath=${workspaceFolder}/_integrations/vscode-tally/test/suite/index.js",
         "${workspaceFolder}"
       ],
       "outFiles": [
-        "${workspaceFolder}/extensions/vscode-tally/dist/**/*"
+        "${workspaceFolder}/_integrations/vscode-tally/dist/**/*"
       ],
       "sourceMaps": true,
       "skipFiles": [

@@ -10,7 +10,7 @@
         "compile"
       ],
       "options": {
-        "cwd": "${workspaceFolder}/extensions/vscode-tally"
+        "cwd": "${workspaceFolder}/_integrations/vscode-tally"
       },
       "group": {
         "kind": "build",
@@ -30,7 +30,7 @@
         "typecheck"
       ],
       "options": {
-        "cwd": "${workspaceFolder}/extensions/vscode-tally"
+        "cwd": "${workspaceFolder}/_integrations/vscode-tally"
       },
       "group": "build",
       "problemMatcher": [

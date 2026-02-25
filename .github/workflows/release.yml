@@ -209,32 +209,32 @@ jobs:
             ls -la "$SRC_DIR/"
             exit 1
           fi
-          DEST="extensions/vscode-tally/bundled/bin/${{ matrix.bundled_platform }}/${{ matrix.bundled_arch }}"
+          DEST="_integrations/vscode-tally/bundled/bin/${{ matrix.bundled_platform }}/${{ matrix.bundled_arch }}"
           mkdir -p "$DEST"
           cp "$SRC" "$DEST/${{ matrix.binary_name }}"
           chmod +x "$DEST/${{ matrix.binary_name }}"
       - name: Set extension version from tag
         run: |
           CLEAN_VERSION="${VERSION#v}"
-          cd extensions/vscode-tally
+          cd _integrations/vscode-tally
           jq --arg v "$CLEAN_VERSION" '.version = $v' package.json > package.json.tmp
           mv package.json.tmp package.json
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
       - name: Install dependencies
         run: bun install --frozen-lockfile
-        working-directory: extensions/vscode-tally
+        working-directory: _integrations/vscode-tally
       - name: Compile extension
         run: bun run compile
-        working-directory: extensions/vscode-tally
+        working-directory: _integrations/vscode-tally
       - name: Package platform-specific VSIX
         run: bunx @vscode/vsce package --no-dependencies --target ${{ matrix.vscode_target }} -o tally-${{ matrix.vscode_target }}.vsix
-        working-directory: extensions/vscode-tally
+        working-directory: _integrations/vscode-tally
       - name: Upload VSIX artifact
         uses: actions/upload-artifact@v6
         with:
           name: vsix-${{ matrix.vscode_target }}
-          path: extensions/vscode-tally/tally-${{ matrix.vscode_target }}.vsix
+          path: _integrations/vscode-tally/tally-${{ matrix.vscode_target }}.vsix
       - name: Upload VSIX to GitHub release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -242,7 +242,7 @@ jobs:
           # VERSION is tag name for push (v0.4.0) or bare version for workflow_dispatch (0.4.0)
           TAG="v${VERSION#v}"
           gh release upload "$TAG" \
-            "extensions/vscode-tally/tally-${{ matrix.vscode_target }}.vsix" \
+            "_integrations/vscode-tally/tally-${{ matrix.vscode_target }}.vsix" \
             --clobber
   build-intellij-plugin:
     needs: sign-macos
@@ -281,13 +281,13 @@ jobs:
               exit 1
             fi
 
-            local dest="extensions/intellij-tally/bundled/bin/${platform}/${arch}"
+            local dest="_integrations/intellij-tally/bundled/bin/${platform}/${arch}"
             mkdir -p "${dest}"
             cp "${src}" "${dest}/${binary_name}"
             chmod +x "${dest}/${binary_name}" || true
           }
 
-          rm -rf extensions/intellij-tally/bundled/bin
+          rm -rf _integrations/intellij-tally/bundled/bin
           copy_binary "tally_linux_amd64*" "linux" "x64" "tally"
           copy_binary "tally_linux_arm64*" "linux" "arm64" "tally"
           copy_binary "tally_darwin_amd64*" "darwin" "x64" "tally"
@@ -302,7 +302,7 @@ jobs:
       - name: Set IntelliJ plugin version from tag
         run: |
           CLEAN_VERSION="${VERSION#v}"
-          VERSIONS_TOML="extensions/intellij-tally/build/versions.toml"
+          VERSIONS_TOML="_integrations/intellij-tally/build/versions.toml"
           sed -i -E "s/^plugin_version = \".*\"/plugin_version = \"${CLEAN_VERSION}\"/" \
             "${VERSIONS_TOML}"
           if command -v taplo >/dev/null 2>&1; then
@@ -323,10 +323,10 @@ jobs:
         id: intellij_zip
         run: |
           CLEAN_VERSION="${VERSION#v}"
-          ZIP_PATH="extensions/intellij-tally/dist/tally-intellij-plugin-${CLEAN_VERSION}.zip"
+          ZIP_PATH="_integrations/intellij-tally/dist/tally-intellij-plugin-${CLEAN_VERSION}.zip"
           if [ ! -f "$ZIP_PATH" ]; then
             echo "::error::Expected IntelliJ plugin zip not found at $ZIP_PATH"
-            ls -la extensions/intellij-tally/dist || true
+            ls -la _integrations/intellij-tally/dist || true
             exit 1
           fi
           echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
@@ -369,7 +369,7 @@ jobs:
             exit 1
           fi
 
-          XML_ID="$(grep -E '^plugin_id[[:space:]]*=' extensions/intellij-tally/build/versions.toml | head -n 1 | sed -E 's/^[^=]*=[[:space:]]*\"([^\"]+)\".*/\1/')"
+          XML_ID="$(grep -E '^plugin_id[[:space:]]*=' _integrations/intellij-tally/build/versions.toml | head -n 1 | sed -E 's/^[^=]*=[[:space:]]*\"([^\"]+)\".*/\1/')"
           if [ -z "${XML_ID}" ]; then
             echo "::error::Unable to resolve plugin_id from versions.toml."
             exit 1

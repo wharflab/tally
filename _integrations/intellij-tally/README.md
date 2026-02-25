@@ -12,7 +12,7 @@ make intellij-plugin
 
 Output:
 
-- `extensions/intellij-tally/dist/tally-intellij-plugin-<version>.zip`
+- `_integrations/intellij-tally/dist/tally-intellij-plugin-<version>.zip`
 
 ## Smoke check (IntelliJ Community Edition)
 
@@ -42,4 +42,4 @@ directory, then project virtualenv locations (`.venv`/`venv`), then bundled fall
 
 Pinned versions and download URLs live in:
 
-- `extensions/intellij-tally/build/versions.toml`
+- `_integrations/intellij-tally/build/versions.toml`
