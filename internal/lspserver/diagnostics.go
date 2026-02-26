@@ -292,6 +292,9 @@ func (s *Server) handleDiagnostic(ctx context.Context, params *protocol.Document
 		}
 
 		violations := s.lintContent(uri, []byte(doc.Content))
+		if s.documentVersionCurrent(uri, doc.Version) {
+			s.lintCache.set(uri, doc.Version, violations)
+		}
 		diagnostics := convertDiagnostics(violations)
 
 		return &protocol.DocumentDiagnosticResponse{

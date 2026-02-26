@@ -361,7 +361,8 @@ func TestLSP_CodeActionInPullDiagnosticsMode(t *testing.T) {
 	require.NoError(t, ts.conn.Notify(ctx, "initialized", struct{}{}))
 
 	uri := "file:///tmp/test-pull-codeaction/Dockerfile"
-	ts.openDocument(t, uri, "FROM alpine:3.18\nMAINTAINER test@example.com\n")
+	original := "FROM alpine:3.18\nRUN echo $1\n"
+	ts.openDocument(t, uri, original)
 
 	// Verify no push diagnostics are sent.
 	select {
@@ -382,12 +383,12 @@ func TestLSP_CodeActionInPullDiagnosticsMode(t *testing.T) {
 	require.Equal(t, "full", report.Kind)
 	require.NotEmpty(t, report.Items)
 
-	// Find the MaintainerDeprecated diagnostic from pull response.
+	// Find the ShellCheck diagnostic from pull response.
 	idx := slices.IndexFunc(report.Items, func(d diagnostic) bool {
-		return d.Code == "buildkit/MaintainerDeprecated"
+		return d.Code == "shellcheck/SC2086"
 	})
-	require.GreaterOrEqual(t, idx, 0, "expected MaintainerDeprecated in pull diagnostics")
-	maintainerDiag := &report.Items[idx]
+	require.GreaterOrEqual(t, idx, 0, "expected shellcheck/SC2086 in pull diagnostics")
+	shellcheckDiag := &report.Items[idx]
 
 	// Request code actions with the pulled diagnostic (like VSCode does).
 	ctx3, cancel3 := context.WithTimeout(context.Background(), diagTimeout)
@@ -396,17 +397,28 @@ func TestLSP_CodeActionInPullDiagnosticsMode(t *testing.T) {
 	var actions []codeAction
 	err = ts.conn.Call(ctx3, "textDocument/codeAction", &codeActionParams{
 		TextDocument: textDocumentIdentifier{URI: uri},
-		Range:        maintainerDiag.Range,
+		Range:        shellcheckDiag.Range,
 		Context: codeActionContext{
-			Diagnostics: []diagnostic{*maintainerDiag},
+			Diagnostics: []diagnostic{*shellcheckDiag},
 			Only:        []string{"quickfix"},
 		},
 	}).Await(ctx3, &actions)
 	require.NoError(t, err)
 
-	require.NotEmpty(t, actions, "expected quick-fix code actions in pull diagnostics mode")
-	assert.Equal(t, "quickfix", actions[0].Kind)
-	assert.NotNil(t, actions[0].Edit, "code action should include an edit")
+	idxAction := slices.IndexFunc(actions, func(a codeAction) bool {
+		return strings.Contains(a.Title, "SC2086")
+	})
+	require.GreaterOrEqual(t, idxAction, 0, "expected ShellCheck SC2086 quick-fix code action")
+
+	action := actions[idxAction]
+	assert.Equal(t, "quickfix", action.Kind)
+	assert.NotNil(t, action.Edit, "code action should include an edit")
+
+	edits := action.Edit.Changes[uri]
+	require.NotEmpty(t, edits, "expected code action edits")
+
+	fixed := applyEdits(t, uri, original, edits)
+	assert.Contains(t, fixed, "RUN echo \"$1\"")
 }
 
 func TestLSP_CodeActionForAsyncFix(t *testing.T) {
