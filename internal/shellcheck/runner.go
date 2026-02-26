@@ -123,7 +123,7 @@ func (r *Runner) init(ctx context.Context) error {
 		// (per-worker compiler instances, atomic coordination) outweighs
 		// the parallelism benefit — especially under the race detector.
 		workers := 1
-		if n := runtime.GOMAXPROCS(0); n >= 4 {
+		if n := runtime.NumCPU(); n >= 4 {
 			workers = n
 		}
 		compileCtx := experimental.WithCompilationWorkers(initCtx, workers)
