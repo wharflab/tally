@@ -11,6 +11,10 @@
     {
       "namespace": "buildkit",
       "output": "internal/rules/buildkit/index.schema.json"
+    },
+    {
+      "namespace": "shellcheck",
+      "output": "internal/rules/shellcheck/index.schema.json"
     }
   ],
   "schemas": [

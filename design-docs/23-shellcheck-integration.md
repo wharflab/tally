@@ -298,6 +298,7 @@ remains ShellCheck.
 ### 5.1 User-facing behavior (v1)
 
 - New rule aggregator: `shellcheck/ShellCheck`
+  - Enabled by default (default severity: `warning`).
   - When enabled, it executes the embedded ShellCheck engine and emits violations with rule codes:
     - `shellcheck/SC####` (ShellCheck diagnostics live in their own namespace).
 - Embedded ShellCheck build patches out a small set of non-hermetic / noisy codes:
@@ -315,7 +316,7 @@ TOML (proposed; names intentionally mirror ShellCheck CLI):
 
 ```toml
 [rules.shellcheck.ShellCheck]
-severity = "warning" # or "off"
+severity = "warning" # default; set to "off" to disable
 mode = "embedded"              # fixed in v1; reserve "external" for debug
 norc = true                    # default true (match Hadolint hermetic behavior)
 enable-optional = []            # default empty
@@ -626,6 +627,7 @@ Keep this heuristic **opt-in** or gated behind a “best effort” mode since it
    - Start by supporting only non-overlapping replacements; drop fixes that overlap or share the same position.
 5. **Wasm runtime constraints + performance**:
    - Wazero module instantiation is not free; compile `shellcheck.wasm` once and reuse the compiled module.
+   - For large Dockerfiles, avoid “1 ShellCheck run per instruction, serially”: run checks in a bounded worker pool (keep output deterministic).
    - WASI preview1 doesn’t support everything a native process does (notably: `chdir`). Avoid passing `PWD` through, and keep FS access opt-in.
    - The GHC WASI toolchain is still “special”; keep it pinned (toolchain commit + ShellCheck tag) and treat upgrades as deliberate changes.
 6. **Environment determinism**:

@@ -164,6 +164,17 @@ func HadolintDocURL(ruleCode string) string {
 	return docURLBase + HadolintRulePrefix + ruleCode + "/"
 }
 
+// ShellcheckRulePrefix is the namespace prefix for ShellCheck-derived rules.
+const ShellcheckRulePrefix = "shellcheck/"
+
+// ShellcheckDocURL returns the documentation URL for a ShellCheck diagnostic code.
+// The ruleCode should be the SC code without prefix (e.g. "SC2086").
+//
+// We link to the upstream ShellCheck wiki, which has stable per-code pages.
+func ShellcheckDocURL(ruleCode string) string {
+	return "https://www.shellcheck.net/wiki/" + ruleCode
+}
+
 // NewViolationFromBuildKitWarning converts BuildKit linter callback parameters
 // to our Violation type. This bridges BuildKit's linter.LintWarnFunc with our
 // output schema.

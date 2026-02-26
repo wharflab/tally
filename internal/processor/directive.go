@@ -145,7 +145,8 @@ func (p *InlineDirectiveFilter) processFile(
 	}
 
 	// Parse directives
-	directiveResult := directive.Parse(sm, validator)
+	spanIndex := directive.NewInstructionSpanIndexFromSource(sm.Source(), sm)
+	directiveResult := directive.Parse(sm, validator, spanIndex)
 
 	// Report parse errors as warnings
 	for _, parseErr := range directiveResult.Errors {

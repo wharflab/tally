@@ -567,6 +567,12 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3027")...),
 			wantExit: 0, // Should pass - shell rules disabled for PowerShell
 		},
+		{
+			name:     "shellcheck-basic",
+			dir:      "shellcheck-basic",
+			args:     append([]string{"--format", "json"}, mustSelectRules("shellcheck/SC2086")...),
+			wantExit: 1,
+		},
 
 		// Prefer heredoc syntax tests (isolated to prefer-run-heredoc rule)
 		{

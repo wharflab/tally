@@ -146,6 +146,7 @@ func runFixCase(t *testing.T, tc fixCase) {
 	// - DL3057: HEALTHCHECK missing — fires on nearly every fixture, no auto-fix.
 	// - newline-between-instructions: fires on most minimal fixtures.
 	// - newline-per-chained-call: fires on any chained RUN, inflating counts broadly.
+	// - shellcheck/*: enabled by default; broad FixSuggestion autofixes affect many fixtures.
 	args := append(
 		[]string{
 			"lint",
@@ -158,6 +159,8 @@ func runFixCase(t *testing.T, tc fixCase) {
 			"tally/newline-between-instructions",
 			"--ignore",
 			"tally/newline-per-chained-call",
+			"--ignore",
+			"shellcheck/*",
 		},
 		tc.args...)
 	args = append(args, dockerfilePath)

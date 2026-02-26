@@ -63,6 +63,15 @@ func fixCases(t *testing.T) []fixCase {
 			args:        []string{"--fix"},
 			wantApplied: 1, // Single violation with multiple edits
 		},
+		// ShellCheck SC2086: echo $var -> echo "$var"
+		{
+			name:  "shellcheck-sc2086-quote",
+			input: "FROM alpine:3.20\nRUN echo $1\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("shellcheck/SC2086")...),
+			wantApplied: 1,
+		},
 		// DL3046: useradd with high UID -> useradd -l
 		{
 			name:        "dl3046-useradd-high-uid",
