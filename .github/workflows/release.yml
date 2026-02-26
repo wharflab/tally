@@ -630,6 +630,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ZED_EXTENSIONS_PAT: ${{ secrets.ZED_EXTENSIONS_PAT }}
         run: |
           CLEAN_VERSION="${VERSION#v}"
           BRANCH="tally-update"
@@ -709,11 +710,14 @@ jobs:
           git commit -m "tally: update to v${CLEAN_VERSION}"
           git push origin "${BRANCH}" --force
 
-          # Create or update PR against zed-industries/extensions.
-          # Use GITHUB_TOKEN (not the app token) since the app is only installed
-          # on wharflab/zed-extensions, not on the upstream zed-industries repo.
-          # Cross-fork PRs to public repos work with any authenticated user.
-          export GH_TOKEN="${GITHUB_TOKEN}"
+          # Create or update cross-fork PR against zed-industries/extensions.
+          # Requires ZED_EXTENSIONS_PAT (a PAT with public_repo scope) because
+          # GITHUB_TOKEN and app tokens are scoped to wharflab repos only.
+          if [ -z "${ZED_EXTENSIONS_PAT:-}" ]; then
+            echo "::error::ZED_EXTENSIONS_PAT secret is required to create cross-fork PRs to zed-industries/extensions"
+            exit 1
+          fi
+          export GH_TOKEN="${ZED_EXTENSIONS_PAT}"
 
           EXISTING_PR=$(gh pr list \
             --repo zed-industries/extensions \
