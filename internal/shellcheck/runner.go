@@ -119,9 +119,13 @@ func (r *Runner) init(ctx context.Context) error {
 		}
 
 		// Use 2/3 of available CPUs for concurrent WASM compilation,
-		// leaving headroom for the rest of the process. Workers ≤ 1
-		// keeps wazero on its simple serial path with zero overhead.
-		compileCtx := experimental.WithCompilationWorkers(initCtx, max(runtime.NumCPU()*2/3, 1))
+		// leaving headroom for the rest of the process.
+		// Skip entirely on Windows where the experimental concurrent
+		// compilation path has shown reliability issues.
+		compileCtx := initCtx
+		if runtime.GOOS != "windows" {
+			compileCtx = experimental.WithCompilationWorkers(compileCtx, max(runtime.NumCPU()*2/3, 1))
+		}
 		compiled, err := rt.CompileModule(compileCtx, wasm.Binary)
 		if err != nil {
 			_ = rt.Close(initCtx)
