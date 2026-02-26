@@ -118,7 +118,15 @@ func (r *Runner) init(ctx context.Context) error {
 			return
 		}
 
-		compileCtx := experimental.WithCompilationWorkers(initCtx, runtime.GOMAXPROCS(0))
+		// Use concurrent compilation when enough cores are available.
+		// On small machines (≤2 cores) the concurrent path's overhead
+		// (per-worker compiler instances, atomic coordination) outweighs
+		// the parallelism benefit — especially under the race detector.
+		workers := 1
+		if n := runtime.GOMAXPROCS(0); n >= 4 {
+			workers = n
+		}
+		compileCtx := experimental.WithCompilationWorkers(initCtx, workers)
 		compiled, err := rt.CompileModule(compileCtx, wasm.Binary)
 		if err != nil {
 			_ = rt.Close(initCtx)
