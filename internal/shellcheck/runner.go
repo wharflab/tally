@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
 
@@ -116,7 +118,15 @@ func (r *Runner) init(ctx context.Context) error {
 			return
 		}
 
-		compiled, err := rt.CompileModule(initCtx, wasm.Binary)
+		// Use 2/3 of available CPUs for concurrent WASM compilation,
+		// leaving headroom for the rest of the process.
+		// Skip entirely on Windows where the experimental concurrent
+		// compilation path has shown reliability issues.
+		compileCtx := initCtx
+		if runtime.GOOS != "windows" {
+			compileCtx = experimental.WithCompilationWorkers(compileCtx, max(runtime.NumCPU()*2/3, 1))
+		}
+		compiled, err := rt.CompileModule(compileCtx, wasm.Binary)
 		if err != nil {
 			_ = rt.Close(initCtx)
 			r.initErr = fmt.Errorf("compile shellcheck.wasm: %w", err)
