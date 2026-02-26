@@ -610,6 +610,11 @@ jobs:
           private-key: ${{ secrets.HARBOR_PILOT_PRIVATE_KEY }}
           owner: wharflab
           repositories: zed-extensions
+      - name: Install taplo
+        if: vars.HARBOR_PILOT_APP_ID != ''
+        uses: taiki-e/install-action@v2
+        with:
+          tool: taplo
       - name: Publish to Zed Extensions registry
         if: vars.HARBOR_PILOT_APP_ID != ''
         env:
@@ -641,9 +646,24 @@ jobs:
           # Set version in extension manifest to match the release tag.
           # This must be committed into the submodule so the SHA that
           # zed-extensions references contains the correct version.
-          sed -i "s/^version = .*/version = \"${CLEAN_VERSION}\"/" _integrations/zed-tally/extension.toml
-          sed -i "0,/^version = .*/s/^version = .*/version = \"${CLEAN_VERSION}\"/" _integrations/zed-tally/Cargo.toml
-          git add _integrations/zed-tally/extension.toml _integrations/zed-tally/Cargo.toml
+          EXT_TOML="_integrations/zed-tally/extension.toml"
+          CARGO_TOML="_integrations/zed-tally/Cargo.toml"
+
+          sed -i "s/^version = .*/version = \"${CLEAN_VERSION}\"/" "${EXT_TOML}"
+          ACTUAL="$(taplo get -f "${EXT_TOML}" --strip-newline version)"
+          if [ "${ACTUAL}" != "${CLEAN_VERSION}" ]; then
+            echo "::error::Failed to set version in extension.toml (expected=${CLEAN_VERSION}, actual=${ACTUAL})"
+            exit 1
+          fi
+
+          sed -i "0,/^version = .*/s/^version = .*/version = \"${CLEAN_VERSION}\"/" "${CARGO_TOML}"
+          ACTUAL="$(taplo get -f "${CARGO_TOML}" --strip-newline package.version)"
+          if [ "${ACTUAL}" != "${CLEAN_VERSION}" ]; then
+            echo "::error::Failed to set version in Cargo.toml (expected=${CLEAN_VERSION}, actual=${ACTUAL})"
+            exit 1
+          fi
+
+          git add "${EXT_TOML}" "${CARGO_TOML}"
           git commit -m "zed: set extension version to ${CLEAN_VERSION}"
 
           # Push the version-bump commit to tally so the SHA is resolvable
@@ -654,6 +674,11 @@ jobs:
 
           # Update version in extensions.toml
           sed -i "/^\[tally\]/,/^version = /s/^version = .*/version = \"${CLEAN_VERSION}\"/" extensions.toml
+          ACTUAL="$(taplo get -f extensions.toml --strip-newline tally.version)"
+          if [ "${ACTUAL}" != "${CLEAN_VERSION}" ]; then
+            echo "::error::Failed to set version in extensions.toml (expected=${CLEAN_VERSION}, actual=${ACTUAL})"
+            exit 1
+          fi
 
           git add extensions/tally extensions.toml
           if git diff --cached --quiet; then
