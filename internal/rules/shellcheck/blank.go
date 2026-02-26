@@ -1,6 +1,7 @@
 package shellcheck
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
@@ -14,7 +15,7 @@ func blankLeadingKeywordOnly(lines []string, keyword string) []string {
 	if !ok {
 		return lines
 	}
-	out := slicesClone(lines)
+	out := slices.Clone(lines)
 	out[0] = line0
 	return out
 }
@@ -27,7 +28,7 @@ func blankRunLeadingFlags(lines []string, escapeToken rune) []string {
 	if !ok {
 		return lines
 	}
-	out := slicesClone(lines)
+	out := slices.Clone(lines)
 	out[0] = line0
 	return blankDockerFlagsUntilNonFlag(out, 0, after, escapeToken)
 }
@@ -40,7 +41,7 @@ func blankOnbuildRunLeadingFlags(lines []string, escapeToken rune) []string {
 	if !ok {
 		return lines
 	}
-	out := slicesClone(lines)
+	out := slices.Clone(lines)
 	out[0] = line0
 
 	// Find and blank the next token, which should be RUN.
@@ -97,7 +98,7 @@ func blankHealthcheckCmdShellLeading(lines []string, escapeToken rune) ([]string
 	if !ok {
 		return nil, false
 	}
-	out := slicesClone(lines)
+	out := slices.Clone(lines)
 	out[0] = line0
 
 	out, stopWord, found := blankDockerFlagsUntilStopWord(out, 0, after, escapeToken, []string{command.Cmd, "NONE"}, true)
@@ -143,7 +144,7 @@ type tokenPos struct {
 }
 
 func blankDockerFlagsUntilFirstNonFlag(lines []string, startLineIdx, startCol int, escapeToken rune) ([]string, tokenPos, bool) {
-	out := slicesClone(lines)
+	out := slices.Clone(lines)
 
 	for li := startLineIdx; li < len(out); li++ {
 		line := out[li]
