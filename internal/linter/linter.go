@@ -128,7 +128,8 @@ func LintFile(input Input) (*Result, error) {
 	}
 
 	sm := sourcemap.New(content)
-	directiveResult := directive.Parse(sm, nil)
+	spanIndex := directive.NewInstructionSpanIndexFromAST(parseResult.AST, sm)
+	directiveResult := directive.Parse(sm, nil, spanIndex)
 
 	var buildArgs map[string]string
 	sem := semantic.NewBuilder(parseResult, buildArgs, input.FilePath).

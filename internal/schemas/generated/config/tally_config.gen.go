@@ -22,9 +22,20 @@ type IndexSchemaJson_1 struct {
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
+// Schema for rules.shellcheck configuration; keys are rule names within the
+// shellcheck namespace.
+type IndexSchemaJson_2 struct {
+	// ShellCheck corresponds to the JSON schema field "ShellCheck".
+	ShellCheck *ruleschema.GenericRuleConfig `json:"ShellCheck,omitempty"`
+
+	// ShellCheckInternalError corresponds to the JSON schema field
+	// "ShellCheckInternalError".
+	ShellCheckInternalError *ruleschema.GenericRuleConfig `json:"ShellCheckInternalError,omitempty"`
+}
+
 // Schema for rules.tally configuration; keys are rule names within the tally
 // namespace.
-type IndexSchemaJson_2 struct {
+type IndexSchemaJson_3 struct {
 	// ConsistentIndentation corresponds to the JSON schema field
 	// "consistent-indentation".
 	ConsistentIndentation *tally.ConsistentIndentationSchemaJson `json:"consistent-indentation,omitempty"`
@@ -164,8 +175,11 @@ type TallyConfigSchemaJsonRules struct {
 	// Glob patterns for rules to enable (e.g. "tally/*", "hadolint/DL3026").
 	Include []string `json:"include,omitempty"`
 
+	// Shellcheck corresponds to the JSON schema field "shellcheck".
+	Shellcheck *IndexSchemaJson_2 `json:"shellcheck,omitempty"`
+
 	// Tally corresponds to the JSON schema field "tally".
-	Tally *IndexSchemaJson_2 `json:"tally,omitempty"`
+	Tally *IndexSchemaJson_3 `json:"tally,omitempty"`
 }
 
 // Configure async checks that require network or other slow I/O (e.g. registry

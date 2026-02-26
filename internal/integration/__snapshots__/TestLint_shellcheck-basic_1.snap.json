@@ -1,0 +1,231 @@
+{
+  "files": [
+    {
+      "file": "testdata/shellcheck-basic/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://www.shellcheck.net/wiki/SC2086",
+          "location": {
+            "end": {
+              "column": 11,
+              "line": 7
+            },
+            "file": "testdata/shellcheck-basic/Dockerfile",
+            "start": {
+              "column": 9,
+              "line": 7
+            }
+          },
+          "message": "Double quote to prevent globbing and word splitting.",
+          "rule": "shellcheck/SC2086",
+          "severity": "info",
+          "sourceCode": "CMD echo $1",
+          "suggestedFix": {
+            "description": "Apply ShellCheck fix for SC2086",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 9,
+                    "line": 7
+                  },
+                  "file": "testdata/shellcheck-basic/Dockerfile",
+                  "start": {
+                    "column": 9,
+                    "line": 7
+                  }
+                },
+                "newText": "\""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 11,
+                    "line": 7
+                  },
+                  "file": "testdata/shellcheck-basic/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 7
+                  }
+                },
+                "newText": "\""
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        },
+        {
+          "docUrl": "https://www.shellcheck.net/wiki/SC2086",
+          "location": {
+            "end": {
+              "column": 18,
+              "line": 8
+            },
+            "file": "testdata/shellcheck-basic/Dockerfile",
+            "start": {
+              "column": 16,
+              "line": 8
+            }
+          },
+          "message": "Double quote to prevent globbing and word splitting.",
+          "rule": "shellcheck/SC2086",
+          "severity": "info",
+          "sourceCode": "ENTRYPOINT echo $1",
+          "suggestedFix": {
+            "description": "Apply ShellCheck fix for SC2086",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 16,
+                    "line": 8
+                  },
+                  "file": "testdata/shellcheck-basic/Dockerfile",
+                  "start": {
+                    "column": 16,
+                    "line": 8
+                  }
+                },
+                "newText": "\""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 18,
+                    "line": 8
+                  },
+                  "file": "testdata/shellcheck-basic/Dockerfile",
+                  "start": {
+                    "column": 18,
+                    "line": 8
+                  }
+                },
+                "newText": "\""
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        },
+        {
+          "docUrl": "https://www.shellcheck.net/wiki/SC2086",
+          "location": {
+            "end": {
+              "column": 23,
+              "line": 9
+            },
+            "file": "testdata/shellcheck-basic/Dockerfile",
+            "start": {
+              "column": 21,
+              "line": 9
+            }
+          },
+          "message": "Double quote to prevent globbing and word splitting.",
+          "rule": "shellcheck/SC2086",
+          "severity": "info",
+          "sourceCode": "HEALTHCHECK CMD echo $1",
+          "suggestedFix": {
+            "description": "Apply ShellCheck fix for SC2086",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 21,
+                    "line": 9
+                  },
+                  "file": "testdata/shellcheck-basic/Dockerfile",
+                  "start": {
+                    "column": 21,
+                    "line": 9
+                  }
+                },
+                "newText": "\""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 23,
+                    "line": 9
+                  },
+                  "file": "testdata/shellcheck-basic/Dockerfile",
+                  "start": {
+                    "column": 23,
+                    "line": 9
+                  }
+                },
+                "newText": "\""
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        },
+        {
+          "docUrl": "https://www.shellcheck.net/wiki/SC2086",
+          "location": {
+            "end": {
+              "column": 19,
+              "line": 11
+            },
+            "file": "testdata/shellcheck-basic/Dockerfile",
+            "start": {
+              "column": 17,
+              "line": 11
+            }
+          },
+          "message": "Double quote to prevent globbing and word splitting.",
+          "rule": "shellcheck/SC2086",
+          "severity": "info",
+          "sourceCode": "ONBUILD RUN echo $1",
+          "suggestedFix": {
+            "description": "Apply ShellCheck fix for SC2086",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 17,
+                    "line": 11
+                  },
+                  "file": "testdata/shellcheck-basic/Dockerfile",
+                  "start": {
+                    "column": 17,
+                    "line": 11
+                  }
+                },
+                "newText": "\""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 19,
+                    "line": 11
+                  },
+                  "file": "testdata/shellcheck-basic/Dockerfile",
+                  "start": {
+                    "column": 19,
+                    "line": 11
+                  }
+                },
+                "newText": "\""
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 4,
+    "style": 0,
+    "total": 4,
+    "warnings": 0
+  }
+}

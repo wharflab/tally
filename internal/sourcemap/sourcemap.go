@@ -134,10 +134,19 @@ func (sm *SourceMap) Source() []byte {
 // backslash continuations that extend beyond the parser-reported end line.
 // endLine is the 1-based line number (e.g., parser.Node.EndLine).
 func (sm *SourceMap) ResolveEndLine(endLine int) int {
+	return sm.ResolveEndLineWithEscape(endLine, '\\')
+}
+
+// ResolveEndLineWithEscape returns the actual end line of an instruction,
+// accounting for line continuations that extend beyond the parser-reported end
+// line. endLine is the 1-based line number (e.g., parser.Node.EndLine).
+func (sm *SourceMap) ResolveEndLineWithEscape(endLine int, escapeToken rune) int {
 	endLine = min(endLine, sm.LineCount())
+	escape := string(escapeToken)
 	for l := endLine; l <= sm.LineCount(); l++ {
 		line := sm.Line(l - 1) // l is 1-based, Line is 0-based
-		if !strings.HasSuffix(strings.TrimRight(line, " \t"), `\`) {
+		trimmed := strings.TrimRight(line, " \t")
+		if trimmed == "" || !strings.HasSuffix(trimmed, escape) {
 			return l
 		}
 		endLine = min(l+1, sm.LineCount())

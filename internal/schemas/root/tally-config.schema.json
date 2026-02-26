@@ -26,6 +26,9 @@
         },
         "buildkit": {
           "$ref": "../../rules/buildkit/index.schema.json"
+        },
+        "shellcheck": {
+          "$ref": "../../rules/shellcheck/index.schema.json"
         }
       },
       "additionalProperties": false

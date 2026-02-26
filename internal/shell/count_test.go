@@ -61,6 +61,12 @@ func TestCountChainedCommands(t *testing.T) {
 			want:    1, // Contains ||, so treated as single command
 		},
 		{
+			name:    "or-exit guard does not collapse chain",
+			script:  "cmd1 && cmd2 || exit",
+			variant: VariantBash,
+			want:    2,
+		},
+		{
 			name:    "empty script",
 			script:  "",
 			variant: VariantBash,
@@ -128,6 +134,12 @@ func TestExtractChainedCommands(t *testing.T) {
 			script:  "cat file | grep pattern | wc -l",
 			variant: VariantBash,
 			want:    []string{"cat file | grep pattern | wc -l"},
+		},
+		{
+			name:    "or-exit guard stays attached to last command",
+			script:  "cmd1 && cmd2 || exit",
+			variant: VariantBash,
+			want:    []string{"cmd1", "cmd2 || exit"},
 		},
 		{
 			name:    "non-POSIX shell returns nil",
@@ -256,10 +268,10 @@ func TestIsSimpleScript(t *testing.T) {
 			want:    false,
 		},
 		{
-			name:    "exit breaks simplicity",
+			name:    "exit is simple",
 			script:  "exit 0",
 			variant: VariantBash,
-			want:    false,
+			want:    true,
 		},
 		{
 			name:    "return breaks simplicity",
@@ -392,11 +404,11 @@ func TestIsHeredocCandidate(t *testing.T) {
 			want:        false,
 		},
 		{
-			name:        "script with exit - not candidate",
+			name:        "script with exit - candidate",
 			script:      "apt-get update && exit 0 && apt-get install vim",
 			variant:     VariantBash,
 			minCommands: 2,
-			want:        false,
+			want:        true,
 		},
 		{
 			name:        "non-POSIX shell - not candidate",

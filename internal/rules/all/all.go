@@ -8,5 +8,6 @@ import (
 	// Import all rule packages to trigger their init() registration
 	_ "github.com/wharflab/tally/internal/rules/buildkit"
 	_ "github.com/wharflab/tally/internal/rules/hadolint"
+	_ "github.com/wharflab/tally/internal/rules/shellcheck"
 	_ "github.com/wharflab/tally/internal/rules/tally"
 )

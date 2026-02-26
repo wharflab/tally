@@ -8,12 +8,18 @@ import (
 	"github.com/wharflab/tally/internal/sourcemap"
 )
 
+func parseDirectives(t *testing.T, content string) *ParseResult {
+	t.Helper()
+	sm := sourcemap.New([]byte(content))
+	spanIndex := NewInstructionSpanIndexFromSource([]byte(content), sm)
+	return Parse(sm, nil, spanIndex)
+}
+
 func TestParseTallyNextLine(t *testing.T) {
 	t.Parallel()
 	content := `# tally ignore=DL3006
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -37,8 +43,7 @@ func TestParseTallyMultipleRules(t *testing.T) {
 	t.Parallel()
 	content := `# tally ignore=DL3006,DL3008,max-lines
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -60,8 +65,7 @@ func TestParseTallyGlobal(t *testing.T) {
 	content := `# tally global ignore=max-lines
 FROM alpine
 RUN echo hello`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -79,8 +83,7 @@ func TestParseHadolint(t *testing.T) {
 	t.Parallel()
 	content := `# hadolint ignore=DL3006
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -98,8 +101,7 @@ func TestParseHadolintGlobal(t *testing.T) {
 	t.Parallel()
 	content := `# hadolint global ignore=DL3006,DL3008
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -117,8 +119,7 @@ func TestParseBuildx(t *testing.T) {
 	t.Parallel()
 	content := `# check=skip=DL3006,DL3008
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -136,8 +137,7 @@ func TestParseIgnoreAll(t *testing.T) {
 	t.Parallel()
 	content := `# tally ignore=all
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -152,8 +152,7 @@ func TestParseCaseInsensitive(t *testing.T) {
 	t.Parallel()
 	content := `# TALLY IGNORE=DL3006
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Errorf("expected 1 directive, got %d", len(result.Directives))
@@ -164,8 +163,7 @@ func TestParseWithSpaces(t *testing.T) {
 	t.Parallel()
 	content := `#  tally   ignore=DL3006,DL3008
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -180,8 +178,7 @@ func TestParseDirectiveAtEOF(t *testing.T) {
 	t.Parallel()
 	content := `FROM ubuntu
 # tally ignore=DL3006`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -200,8 +197,7 @@ func TestParseMultipleDirectives(t *testing.T) {
 FROM ubuntu
 # tally ignore=DL3008
 RUN echo hello`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 3 {
 		t.Errorf("expected 3 directives, got %d", len(result.Directives))
@@ -211,8 +207,7 @@ RUN echo hello`
 func TestParseRegularComment(t *testing.T) {
 	t.Parallel()
 	content := `# This is a regular comment`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 0 {
 		t.Errorf("expected 0 directives, got %d", len(result.Directives))
@@ -225,8 +220,7 @@ func TestParseSkipsBlankLinesAndComments(t *testing.T) {
 
 # another comment
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -243,8 +237,7 @@ func TestParseEmptyRuleList(t *testing.T) {
 	// Test tally format with empty rule list (only commas)
 	content := `# tally ignore=,
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Errors) != 1 {
 		t.Fatalf("expected 1 error, got %d", len(result.Errors))
@@ -259,8 +252,7 @@ func TestParseEmptyRuleListHadolint(t *testing.T) {
 	// Test hadolint format with empty rule list
 	content := `# hadolint ignore=,,
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Errors) != 1 {
 		t.Fatalf("expected 1 error, got %d", len(result.Errors))
@@ -275,8 +267,7 @@ func TestParseEmptyRuleListBuildx(t *testing.T) {
 	// Test buildx format with empty rule list
 	content := `# check=skip=,
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Errors) != 1 {
 		t.Fatalf("expected 1 error, got %d", len(result.Errors))
@@ -365,7 +356,8 @@ FROM ubuntu`,
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			sm := sourcemap.New([]byte(tt.content))
-			result := Parse(sm, validator)
+			spanIndex := NewInstructionSpanIndexFromSource([]byte(tt.content), sm)
+			result := Parse(sm, validator, spanIndex)
 
 			if len(result.Errors) != tt.wantErrors {
 				t.Errorf("expected %d errors, got %d: %v",
@@ -613,8 +605,7 @@ func TestParseTallyWithReason(t *testing.T) {
 	t.Parallel()
 	content := `# tally ignore=DL3006;reason=Legacy base image required
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -629,8 +620,7 @@ func TestParseTallyGlobalWithReason(t *testing.T) {
 	t.Parallel()
 	content := `# tally global ignore=max-lines;reason=Generated file, size is expected
 FROM alpine`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -648,8 +638,7 @@ func TestParseHadolintWithReason(t *testing.T) {
 	t.Parallel()
 	content := `# hadolint ignore=DL3006;reason=Using older ubuntu for compatibility
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -668,8 +657,7 @@ func TestParseBuildxWithReason(t *testing.T) {
 	// ;reason= is a tally extension for buildx format
 	content := `# check=skip=DL3006;reason=BuildKit silently ignores this
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -687,8 +675,7 @@ func TestParseBuildxWithoutReason(t *testing.T) {
 	t.Parallel()
 	content := `# check=skip=DL3006
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -703,8 +690,7 @@ func TestParseTallyWithoutReason(t *testing.T) {
 	t.Parallel()
 	content := `# tally ignore=DL3006
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -719,8 +705,7 @@ func TestParseReasonCaseInsensitive(t *testing.T) {
 	t.Parallel()
 	content := `# tally ignore=DL3006;REASON=Some reason here
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -735,8 +720,7 @@ func TestParseReasonWithSpecialChars(t *testing.T) {
 	t.Parallel()
 	content := `# tally ignore=DL3006;reason=This is a reason with: colons, commas, and (parentheses)!
 FROM ubuntu`
-	sm := sourcemap.New([]byte(content))
-	result := Parse(sm, nil)
+	result := parseDirectives(t, content)
 
 	if len(result.Directives) != 1 {
 		t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -790,8 +774,7 @@ FROM ubuntu`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			sm := sourcemap.New([]byte(tt.content))
-			result := Parse(sm, nil)
+			result := parseDirectives(t, tt.content)
 
 			if len(result.Directives) != 1 {
 				t.Fatalf("expected 1 directive, got %d", len(result.Directives))
@@ -865,8 +848,7 @@ func TestParseShellDirective(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			sm := sourcemap.New([]byte(tt.content))
-			result := Parse(sm, nil)
+			result := parseDirectives(t, tt.content)
 
 			if len(result.ShellDirectives) != 1 {
 				t.Fatalf("expected 1 shell directive, got %d", len(result.ShellDirectives))
@@ -905,8 +887,7 @@ func TestParseShellDirectiveNoMatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			sm := sourcemap.New([]byte(tt.content))
-			result := Parse(sm, nil)
+			result := parseDirectives(t, tt.content)
 
 			if len(result.ShellDirectives) != 0 {
 				t.Errorf("expected 0 shell directives, got %d", len(result.ShellDirectives))

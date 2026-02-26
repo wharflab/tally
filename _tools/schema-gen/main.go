@@ -61,7 +61,8 @@ type indexSchema struct {
 	Description          string               `json:"description,omitempty"`
 	Type                 string               `json:"type"`
 	Properties           map[string]refSchema `json:"properties,omitempty"`
-	AdditionalProperties refSchema            `json:"additionalProperties"`
+	PatternProperties    map[string]refSchema `json:"patternProperties,omitempty"`
+	AdditionalProperties any                  `json:"additionalProperties"`
 	Examples             []any                `json:"examples,omitempty"`
 }
 
@@ -312,6 +313,19 @@ func generateNamespaceIndexes(repoRoot string, m *manifest) error {
 			props[name] = refSchema{Ref: "./" + filename}
 		}
 
+		patternProps := map[string]refSchema(nil)
+		additionalProps := any(refSchema{Ref: "../rule-config.schema.json#/$defs/genericRuleConfig"})
+		if ns == "shellcheck" {
+			patternProps = map[string]refSchema{
+				`^SC[0-9]{4}$`: {Ref: "../rule-config.schema.json#/$defs/genericRuleConfig"},
+			}
+			props = map[string]refSchema{
+				"ShellCheck":              {Ref: "../rule-config.schema.json#/$defs/genericRuleConfig"},
+				"ShellCheckInternalError": {Ref: "../rule-config.schema.json#/$defs/genericRuleConfig"},
+			}
+			additionalProps = false
+		}
+
 		idx := indexSchema{
 			Schema:  "https://json-schema.org/draft/2020-12/schema",
 			ID:      "https://tally.wharflab.com/rules/" + ns + "/index.schema.json",
@@ -321,7 +335,8 @@ func generateNamespaceIndexes(repoRoot string, m *manifest) error {
 				ns + " namespace.",
 			Type:                 "object",
 			Properties:           props,
-			AdditionalProperties: refSchema{Ref: "../rule-config.schema.json#/$defs/genericRuleConfig"},
+			PatternProperties:    patternProps,
+			AdditionalProperties: additionalProps,
 			Examples: []any{
 				map[string]any{
 					ruleExampleKey(ns): map[string]any{
@@ -587,6 +602,8 @@ func ruleExampleKey(namespace string) string {
 		return "DL3026"
 	case "buildkit":
 		return "StageNameCasing"
+	case "shellcheck":
+		return "SC2086"
 	default:
 		return "example-rule"
 	}

@@ -1,8 +1,11 @@
 package directive
 
 import (
+	"bytes"
 	"regexp"
 	"strings"
+
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -42,9 +45,71 @@ var (
 // Returns true if the rule exists in the registry.
 type RuleValidator func(string) bool
 
+// InstructionSpan represents the (inclusive) span of a single Dockerfile instruction.
+// Line numbers are 0-based to match SourceMap conventions.
+type InstructionSpan struct {
+	StartLine int
+	EndLine   int
+}
+
+// InstructionSpanIndex enables efficient lookup of the next instruction span
+// after a given line.
+type InstructionSpanIndex struct {
+	Spans []InstructionSpan // Sorted by StartLine ascending.
+}
+
+// NewInstructionSpanIndexFromAST builds an index from a BuildKit parser result.
+func NewInstructionSpanIndexFromAST(ast *parser.Result, sm *sourcemap.SourceMap) *InstructionSpanIndex {
+	if ast == nil || ast.AST == nil || sm == nil {
+		return nil
+	}
+
+	spans := make([]InstructionSpan, 0, len(ast.AST.Children))
+	for _, node := range ast.AST.Children {
+		if node == nil {
+			continue
+		}
+		start := node.StartLine - 1 // 0-based
+		end := sm.ResolveEndLineWithEscape(node.EndLine, ast.EscapeToken) - 1
+		if start < 0 || end < start {
+			continue
+		}
+		spans = append(spans, InstructionSpan{StartLine: start, EndLine: end})
+	}
+
+	// Children are already in source order; StartLine is monotonic.
+	return &InstructionSpanIndex{Spans: spans}
+}
+
+// NewInstructionSpanIndexFromSource parses the Dockerfile source and builds a span index.
+// Returns nil if parsing fails.
+func NewInstructionSpanIndexFromSource(source []byte, sm *sourcemap.SourceMap) *InstructionSpanIndex {
+	if sm == nil {
+		return nil
+	}
+	res, err := parser.Parse(bytes.NewReader(source))
+	if err != nil {
+		return nil
+	}
+	return NewInstructionSpanIndexFromAST(res, sm)
+}
+
+func (idx *InstructionSpanIndex) nextInstructionSpan(afterLine int) (InstructionSpan, bool) {
+	if idx == nil || len(idx.Spans) == 0 {
+		return InstructionSpan{}, false
+	}
+	// Linear scan is fine: Dockerfiles are small. Keep this simple and robust.
+	for _, span := range idx.Spans {
+		if span.StartLine > afterLine {
+			return span, true
+		}
+	}
+	return InstructionSpan{}, false
+}
+
 // Parse extracts all inline directives from a SourceMap.
 // If validator is non-nil, unknown rule codes generate parse errors.
-func Parse(sm *sourcemap.SourceMap, validator RuleValidator) *ParseResult {
+func Parse(sm *sourcemap.SourceMap, validator RuleValidator, spanIndex *InstructionSpanIndex) *ParseResult {
 	result := &ParseResult{}
 	comments := sm.Comments()
 
@@ -54,7 +119,7 @@ func Parse(sm *sourcemap.SourceMap, validator RuleValidator) *ParseResult {
 		}
 
 		// Try ignore directive patterns first
-		if d, err := parseTally(comment, sm); d != nil || err != nil {
+		if d, err := parseTally(comment, sm, spanIndex); d != nil || err != nil {
 			if err != nil {
 				result.Errors = append(result.Errors, *err)
 			}
@@ -64,7 +129,7 @@ func Parse(sm *sourcemap.SourceMap, validator RuleValidator) *ParseResult {
 			continue
 		}
 
-		if d, err := parseHadolint(comment, sm); d != nil || err != nil {
+		if d, err := parseHadolint(comment, sm, spanIndex); d != nil || err != nil {
 			if err != nil {
 				result.Errors = append(result.Errors, *err)
 			}
@@ -126,6 +191,7 @@ func parseIgnoreDirective(
 	sm *sourcemap.SourceMap,
 	pattern *regexp.Regexp,
 	source DirectiveSource,
+	spanIndex *InstructionSpanIndex,
 ) (*Directive, *ParseError) {
 	matches := pattern.FindStringSubmatch(comment.Text)
 	if matches == nil {
@@ -163,20 +229,20 @@ func parseIgnoreDirective(
 		d.AppliesTo = GlobalRange()
 	} else {
 		d.Type = TypeNextLine
-		d.AppliesTo = nextNonCommentLineRange(comment.Line, sm)
+		d.AppliesTo = nextInstructionLineRange(comment.Line, sm, spanIndex)
 	}
 
 	return d, nil
 }
 
 // parseTally attempts to parse a tally-format directive.
-func parseTally(comment sourcemap.Comment, sm *sourcemap.SourceMap) (*Directive, *ParseError) {
-	return parseIgnoreDirective(comment, sm, tallyPattern, SourceTally)
+func parseTally(comment sourcemap.Comment, sm *sourcemap.SourceMap, spanIndex *InstructionSpanIndex) (*Directive, *ParseError) {
+	return parseIgnoreDirective(comment, sm, tallyPattern, SourceTally, spanIndex)
 }
 
 // parseHadolint attempts to parse a hadolint-format directive.
-func parseHadolint(comment sourcemap.Comment, sm *sourcemap.SourceMap) (*Directive, *ParseError) {
-	return parseIgnoreDirective(comment, sm, hadolintPattern, SourceHadolint)
+func parseHadolint(comment sourcemap.Comment, sm *sourcemap.SourceMap, spanIndex *InstructionSpanIndex) (*Directive, *ParseError) {
+	return parseIgnoreDirective(comment, sm, hadolintPattern, SourceHadolint, spanIndex)
 }
 
 // parseBuildx attempts to parse a buildx-format directive.

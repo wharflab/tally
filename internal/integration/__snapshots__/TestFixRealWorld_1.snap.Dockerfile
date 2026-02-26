@@ -82,7 +82,7 @@ RUN pip install --no-cache-dir kenlm==0.1 \
                                transformers[sklearn,sentencepiece,audio,vision]==${TRANSFORMERS_VERSION} \
                                datasets==${DATASETS_VERSION} \
                                diffusers==${DIFFUSERS_VERSION} \
-                               $PT_TORCHAUDIO_URL \
+                               "$PT_TORCHAUDIO_URL" \
                                multiprocess==0.70.14 \
                                dill==0.3.6 \
                                sagemaker==2.132.0 \
@@ -425,7 +425,7 @@ wget --progress=dot:giga https://sourceforge.net/projects/boost/files/boost/1.73
 cd ..
 rm -rf boost_1_73_0.tar.gz
 rm -rf boost_1_73_0
-cd /opt/conda/include/boost
+cd /opt/conda/include/boost || exit
 EOF
 
 WORKDIR /opt/

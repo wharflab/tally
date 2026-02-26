@@ -86,6 +86,9 @@ type RulesConfig struct {
 
 	// Hadolint contains configuration for hadolint/* rules.
 	Hadolint map[string]RuleConfig `json:"hadolint,omitempty" koanf:"hadolint"`
+
+	// Shellcheck contains configuration for shellcheck/* rules.
+	Shellcheck map[string]RuleConfig `json:"shellcheck,omitempty" koanf:"shellcheck"`
 }
 
 // Get returns the configuration for a specific rule.
@@ -164,6 +167,16 @@ func matchesPattern(ruleCode, pattern string) bool {
 	if prefix, ok := strings.CutSuffix(pattern, "/*"); ok {
 		ns, _ := parseRuleCode(ruleCode)
 		return ns == prefix
+	}
+
+	// ShellCheck integration: selecting the ShellCheck engine rule should enable
+	// all ShellCheck-derived findings, and selecting any specific SC rule should
+	// enable the engine rule so it can produce those findings.
+	if pattern == "shellcheck/ShellCheck" {
+		return strings.HasPrefix(ruleCode, "shellcheck/")
+	}
+	if ruleCode == "shellcheck/ShellCheck" {
+		return strings.HasPrefix(pattern, "shellcheck/SC")
 	}
 
 	return false
@@ -260,6 +273,12 @@ func (rc *RulesConfig) Set(ruleCode string, cfg RuleConfig) bool {
 		}
 		rc.Hadolint[name] = cfg
 		return true
+	case "shellcheck":
+		if rc.Shellcheck == nil {
+			rc.Shellcheck = make(map[string]RuleConfig)
+		}
+		rc.Shellcheck[name] = cfg
+		return true
 	default:
 		return false
 	}
@@ -274,6 +293,8 @@ func (rc *RulesConfig) namespaceMap(ns string) map[string]RuleConfig {
 		return rc.Buildkit
 	case "hadolint":
 		return rc.Hadolint
+	case "shellcheck":
+		return rc.Shellcheck
 	default:
 		return nil
 	}

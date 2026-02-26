@@ -51,12 +51,34 @@ func countInStatement(stmt *syntax.Stmt) int {
 		if cmd.Op == syntax.AndStmt {
 			return countInStatement(cmd.X) + countInStatement(cmd.Y)
 		}
+		// Special-case "cmd || exit" patterns: ShellCheck commonly suggests adding
+		// `|| exit` (SC2164) to guard directory changes. When this appears at the
+		// end of an && chain, it turns the whole statement into a top-level ||,
+		// which would otherwise collapse the command count to 1 and prevent
+		// prefer-run-heredoc conversion. Treat `|| exit` as an error handler that
+		// doesn't block splitting the left-hand side.
+		if cmd.Op == syntax.OrStmt && isExitStatement(cmd.Y) {
+			return countInStatement(cmd.X)
+		}
 		// || chains and pipes are single logical commands
 		return 1
 	default:
 		// Other compound commands (if, for, while, case, etc.) count as 1
 		return 1
 	}
+}
+
+func isExitStatement(stmt *syntax.Stmt) bool {
+	if stmt == nil || stmt.Cmd == nil {
+		return false
+	}
+
+	call, ok := stmt.Cmd.(*syntax.CallExpr)
+	if !ok || len(call.Args) == 0 {
+		return false
+	}
+
+	return call.Args[0].Lit() == cmdExit
 }
 
 // ExtractChainedCommands extracts individual command strings from && chains.
@@ -160,6 +182,20 @@ func extractFromStatement(stmt *syntax.Stmt, variant Variant) []string {
 			commands = append(commands, extractFromStatement(cmd.Y, variant)...)
 			return commands
 		}
+		if cmd.Op == syntax.OrStmt && isExitStatement(cmd.Y) {
+			// Preserve "|| exit" guards without turning the entire script into a
+			// single opaque command. We flatten the left side and attach the
+			// exit handler to the last extracted command.
+			commands := extractFromStatement(cmd.X, variant)
+			if len(commands) == 0 {
+				return nil
+			}
+			exitStmt := FormatStatement(cmd.Y, variant)
+			if exitStmt != "" {
+				commands[len(commands)-1] = strings.TrimSpace(commands[len(commands)-1] + " || " + exitStmt)
+			}
+			return commands
+		}
 		// || chains, pipes, or other binary - format as single command
 		return []string{FormatStatement(stmt, variant)}
 	default:
@@ -188,7 +224,9 @@ func FormatStatement(stmt *syntax.Stmt, variant Variant) string {
 
 // IsSimpleScript checks if a script contains only simple commands that can be
 // safely merged into a heredoc. Returns false for scripts with compound commands
-// (if, for, while, case), control flow (exit, return), functions, or subshells.
+// (if, for, while, case), control flow (return, break, continue, exec), functions,
+// or subshells. `exit` is allowed so that common guard patterns like
+// `cd dir || exit` (often suggested by ShellCheck) don't block heredoc conversion.
 func IsSimpleScript(script string, variant Variant) bool {
 	if variant.IsNonPOSIX() {
 		return false
@@ -220,11 +258,14 @@ func isSimpleStatement(stmt *syntax.Stmt) bool {
 
 	switch cmd := stmt.Cmd.(type) {
 	case *syntax.CallExpr:
-		// Check for control flow commands that break merging semantics
+		// Check for control flow commands that break heredoc conversion semantics.
+		//
+		// NOTE: We intentionally allow `exit` here so ShellCheck fixes like
+		// `cd dir || exit` don't block prefer-run-heredoc.
 		if len(cmd.Args) > 0 {
 			if name := cmd.Args[0].Lit(); name != "" {
 				switch name {
-				case cmdExit, "return", "break", "continue", "exec":
+				case "return", "break", "continue", "exec":
 					return false
 				}
 			}
@@ -257,7 +298,6 @@ func isSimpleStatement(stmt *syntax.Stmt) bool {
 //   - It uses a POSIX shell
 //   - It has at least minCommands commands (from && chains or separate statements)
 //   - It's a simple script (no complex control flow like if/for/while)
-//   - It doesn't contain exit commands
 //
 // This function parses the script once and reuses the AST for all checks.
 func IsHeredocCandidate(script string, variant Variant, minCommands int) bool {
@@ -279,11 +319,6 @@ func IsHeredocCandidate(script string, variant Variant, minCommands int) bool {
 
 	// Must be simple enough to convert
 	if !isSimpleScriptFromAST(prog) {
-		return false
-	}
-
-	// Exit commands break heredoc merging semantics
-	if hasExitCommandFromAST(prog) {
 		return false
 	}
 
