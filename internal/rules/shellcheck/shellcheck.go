@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -25,6 +26,9 @@ import (
 const (
 	// ShellCheckRuleCode enables embedded ShellCheck linting.
 	ShellCheckRuleCode = rules.ShellcheckRulePrefix + "ShellCheck"
+
+	// shellcheckRunTimeout bounds embedded shellcheck execution per snippet.
+	shellcheckRunTimeout = 10 * time.Second
 )
 
 var defaultProxyEnv = []string{
@@ -417,7 +421,7 @@ func (r *Rule) checkShellSnippet(
 	prelude, _ := buildPrelude(dialect, knownEnv)
 	script := prelude + snippet
 
-	out, _, err := r.runner.Run(context.Background(), script, intshellcheck.Options{
+	out, _, err := r.runShellcheck(script, intshellcheck.Options{
 		Dialect:  dialect,
 		Severity: "style",
 		Norc:     true,
@@ -479,7 +483,7 @@ func (r *Rule) checkShellMapping(
 	prelude, headerLines := buildPrelude(dialect, knownEnv)
 	script := prelude + mapping.Script
 
-	out, _, err := r.runner.Run(context.Background(), script, intshellcheck.Options{
+	out, _, err := r.runShellcheck(script, intshellcheck.Options{
 		Dialect:  dialect,
 		Severity: "style",
 		Norc:     true,
@@ -527,6 +531,16 @@ func (r *Rule) checkShellMapping(
 		violations = append(violations, v)
 	}
 	return violations
+}
+
+func shellcheckRunContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), shellcheckRunTimeout)
+}
+
+func (r *Rule) runShellcheck(script string, opts intshellcheck.Options) (intshellcheck.JSON1Output, string, error) {
+	ctx, cancel := shellcheckRunContext()
+	defer cancel()
+	return r.runner.Run(ctx, script, opts)
 }
 
 func buildShellcheckSuggestedFix(file string, mapping scriptMapping, headerLines int, c intshellcheck.Comment) *rules.SuggestedFix {
