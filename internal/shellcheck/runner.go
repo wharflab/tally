@@ -6,6 +6,8 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,6 +49,8 @@ type Runner struct {
 
 	rt       wazero.Runtime
 	compiled wazero.CompiledModule
+
+	cache wazero.CompilationCache
 }
 
 func NewRunner() *Runner {
@@ -96,7 +100,14 @@ func (r *Runner) Run(ctx context.Context, script string, opts Options) (JSON1Out
 
 func (r *Runner) init(ctx context.Context) error {
 	r.initOnce.Do(func() {
-		rt := wazero.NewRuntime(ctx)
+		rtCfg := wazero.NewRuntimeConfig().WithDebugInfoEnabled(false)
+		cache := newCompilationCache()
+		if cache != nil {
+			rtCfg = rtCfg.WithCompilationCache(cache)
+			r.cache = cache
+		}
+
+		rt := wazero.NewRuntimeWithConfig(ctx, rtCfg)
 
 		if _, err := wasi_snapshot_preview1.Instantiate(ctx, rt); err != nil {
 			_ = rt.Close(ctx)
@@ -115,6 +126,27 @@ func (r *Runner) init(ctx context.Context) error {
 		r.compiled = compiled
 	})
 	return r.initErr
+}
+
+func newCompilationCache() wazero.CompilationCache {
+	cacheDir := os.Getenv("TALLY_SHELLCHECK_WAZERO_CACHE_DIR")
+	if cacheDir == "" {
+		baseDir, err := os.UserCacheDir()
+		if err != nil {
+			return nil
+		}
+		cacheDir = filepath.Join(baseDir, "tally", "shellcheck-wazero-cache")
+	}
+
+	if err := os.MkdirAll(cacheDir, 0o750); err != nil {
+		return nil
+	}
+
+	cache, err := wazero.NewCompilationCacheWithDir(cacheDir)
+	if err != nil {
+		return nil
+	}
+	return cache
 }
 
 func buildArgs(opts Options) []string {
