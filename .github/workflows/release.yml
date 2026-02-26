@@ -610,17 +610,11 @@ jobs:
           private-key: ${{ secrets.HARBOR_PILOT_PRIVATE_KEY }}
           owner: wharflab
           repositories: zed-extensions
-      - name: Set Zed extension version from tag
-        if: vars.HARBOR_PILOT_APP_ID != ''
-        run: |
-          CLEAN_VERSION="${VERSION#v}"
-          cd _integrations/zed-tally
-          sed -i "s/^version = .*/version = \"${CLEAN_VERSION}\"/" extension.toml
-          sed -i "0,/^version = .*/s/^version = .*/version = \"${CLEAN_VERSION}\"/" Cargo.toml
       - name: Publish to Zed Extensions registry
         if: vars.HARBOR_PILOT_APP_ID != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           CLEAN_VERSION="${VERSION#v}"
           COMMIT_SHA="${GITHUB_SHA}"
@@ -643,6 +637,19 @@ jobs:
           cd extensions/tally
           git fetch origin "${COMMIT_SHA}"
           git checkout "${COMMIT_SHA}"
+
+          # Set version in extension manifest to match the release tag.
+          # This must be committed into the submodule so the SHA that
+          # zed-extensions references contains the correct version.
+          sed -i "s/^version = .*/version = \"${CLEAN_VERSION}\"/" _integrations/zed-tally/extension.toml
+          sed -i "0,/^version = .*/s/^version = .*/version = \"${CLEAN_VERSION}\"/" _integrations/zed-tally/Cargo.toml
+          git add _integrations/zed-tally/extension.toml _integrations/zed-tally/Cargo.toml
+          git commit -m "zed: set extension version to ${CLEAN_VERSION}"
+
+          # Push the version-bump commit to tally so the SHA is resolvable
+          # when zed-industries/extensions CI clones the submodule.
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/wharflab/tally.git" \
+            "HEAD:refs/heads/zed-release-v${CLEAN_VERSION}"
           cd ../..
 
           # Update version in extensions.toml
