@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
 	"github.com/tetratelabs/wazero/sys"
 
@@ -116,7 +118,8 @@ func (r *Runner) init(ctx context.Context) error {
 			return
 		}
 
-		compiled, err := rt.CompileModule(initCtx, wasm.Binary)
+		compileCtx := experimental.WithCompilationWorkers(initCtx, runtime.GOMAXPROCS(0))
+		compiled, err := rt.CompileModule(compileCtx, wasm.Binary)
 		if err != nil {
 			_ = rt.Close(initCtx)
 			r.initErr = fmt.Errorf("compile shellcheck.wasm: %w", err)
