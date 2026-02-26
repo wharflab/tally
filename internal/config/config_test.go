@@ -499,6 +499,24 @@ func TestRulesConfigIncludeExclude(t *testing.T) {
 	if enabled == nil || *enabled != false {
 		t.Error("hadolint/DL3008 should be disabled via * exclude")
 	}
+
+	// Excluding a specific SC rule should not disable the ShellCheck engine.
+	rc4 := &RulesConfig{
+		Exclude: []string{"shellcheck/SC2086"},
+	}
+	enabled = rc4.IsEnabled("shellcheck/ShellCheck")
+	if enabled != nil {
+		t.Errorf("shellcheck/ShellCheck should be nil when excluding only shellcheck/SC2086, got %v", *enabled)
+	}
+
+	// Include coupling for ShellCheck should still work.
+	rc5 := &RulesConfig{
+		Include: []string{"shellcheck/SC2086"},
+	}
+	enabled = rc5.IsEnabled("shellcheck/ShellCheck")
+	if enabled == nil || *enabled != true {
+		t.Error("shellcheck/ShellCheck should be enabled when shellcheck/SC2086 is included")
+	}
 }
 
 func TestRulesConfigGetOptionsTyped(t *testing.T) {
