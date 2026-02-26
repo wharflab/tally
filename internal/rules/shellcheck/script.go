@@ -1,6 +1,7 @@
 package shellcheck
 
 import (
+	"slices"
 	"strings"
 
 	dfparser "github.com/moby/buildkit/frontend/dockerfile/parser"
@@ -154,7 +155,7 @@ func normalizeContinuationToken(lines []string, escapeToken rune) []string {
 		return lines
 	}
 
-	out := slicesClone(lines)
+	out := slices.Clone(lines)
 	for i, line := range out {
 		trimmed := strings.TrimRight(line, " \t")
 		if trimmed == "" {
@@ -168,14 +169,5 @@ func normalizeContinuationToken(lines []string, escapeToken rune) []string {
 		b[lastIdx] = '\\'
 		out[i] = string(b)
 	}
-	return out
-}
-
-func slicesClone(in []string) []string {
-	if in == nil {
-		return nil
-	}
-	out := make([]string, len(in))
-	copy(out, in)
 	return out
 }
