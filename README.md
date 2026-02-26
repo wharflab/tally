@@ -22,7 +22,7 @@ Modern Dockerfiles deserve modern tooling. tally is opinionated in the right pla
 - **BuildKit-native**: understands modern syntax like heredocs, `RUN --mount=...`, `COPY --link`, and `ADD --checksum=...`.
 - **Fixes, not just findings**: `--fix` applies safe, mechanical rewrites; `--fix-unsafe` unlocks opt-in risky fixes (including AI).
 - **Modernizes on purpose**: converts eligible `RUN`/`COPY` instructions to heredocs, prefers `ADD --extract`, and more.
-- **Broad rule coverage**: combines Docker's official BuildKit checks, Hadolint-compatible rules, and tally-specific rules.
+- **Broad rule coverage**: combines Docker's official BuildKit checks, embedded ShellCheck for shell snippets, Hadolint-compatible rules, and tally-specific rules.
 - **Registry-aware without Docker**: uses a Podman-compatible registry client for image metadata checks (no daemon required).
 - **Editor + CI friendly**: VS Code extension (`wharflab.tally`, powered by `tally lsp`) and outputs for JSON, SARIF, and GitHub Actions annotations.
 - **Easy to install anywhere**: Homebrew, Go, npm, pip, and RubyGems.
@@ -62,6 +62,8 @@ tally integrates rules from multiple sources:
 | **tally** | 22 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
 | **[Hadolint](https://github.com/hadolint/hadolint)** | 37 rules | Hadolint-compatible Dockerfile rules (expanding) |
 <!-- END RULES_TABLE -->
+
+Shell linting is provided via embedded ShellCheck (rules under the `shellcheck/` namespace).
 
 **See [RULES.md](RULES.md) for the complete rules reference.**
 
