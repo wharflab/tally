@@ -656,6 +656,10 @@ jobs:
           sed -i "/^\[tally\]/,/^version = /s/^version = .*/version = \"${CLEAN_VERSION}\"/" extensions.toml
 
           git add extensions/tally extensions.toml
+          if git diff --cached --quiet; then
+            echo "No Zed marketplace changes detected; skipping PR sync."
+            exit 0
+          fi
           git commit -m "tally: update to v${CLEAN_VERSION}"
           git push origin "${BRANCH}" --force
 
