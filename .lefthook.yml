@@ -37,6 +37,13 @@ pre-commit:
     ktlint-lint:
       glob: "_integrations/intellij-tally/src/main/kotlin/**/*.kt"
       run: bash _integrations/intellij-tally/build/ktlint.sh {staged_files}
+    rust-fmt:
+      glob: "_integrations/zed-tally/**/*.rs"
+      run: cargo fmt --manifest-path _integrations/zed-tally/Cargo.toml -- {staged_files}
+      stage_fixed: true
+    rust-clippy:
+      glob: "_integrations/zed-tally/**/*.rs"
+      run: cargo clippy --manifest-path _integrations/zed-tally/Cargo.toml --target wasm32-wasip2 -- -D warnings
     taplo:
       glob: "**/*.toml"
       run: bunx -y -q @taplo/cli format {staged_files}

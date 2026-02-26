@@ -594,3 +594,121 @@ jobs:
           cd packaging/
           ruby pack.rb prepare
           ruby pack.rb publish_gem
+  publish-zed-marketplace:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v6
+        if: vars.HARBOR_PILOT_APP_ID != ''
+      - name: Generate GitHub App token
+        id: app-token
+        if: vars.HARBOR_PILOT_APP_ID != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.HARBOR_PILOT_APP_ID }}
+          private-key: ${{ secrets.HARBOR_PILOT_PRIVATE_KEY }}
+          owner: wharflab
+          repositories: zed-extensions
+      - name: Install taplo
+        if: vars.HARBOR_PILOT_APP_ID != ''
+        uses: taiki-e/install-action@v2
+        with:
+          tool: taplo
+      - name: Publish to Zed Extensions registry
+        if: vars.HARBOR_PILOT_APP_ID != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CLEAN_VERSION="${VERSION#v}"
+          COMMIT_SHA="${GITHUB_SHA}"
+          BRANCH="tally-update"
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Clone the fork (owned by wharflab org)
+          gh repo clone wharflab/zed-extensions /tmp/zed-extensions
+          cd /tmp/zed-extensions
+
+          # Ensure upstream remote and sync
+          git remote add upstream https://github.com/zed-industries/extensions.git 2>/dev/null || true
+          git fetch upstream main
+          git checkout -B "${BRANCH}" upstream/main
+
+          # Update the submodule to the tagged commit
+          git submodule update --init extensions/tally 2>/dev/null || git submodule add https://github.com/wharflab/tally.git extensions/tally
+          cd extensions/tally
+          git fetch origin "${COMMIT_SHA}"
+          git checkout "${COMMIT_SHA}"
+
+          # Set version in extension manifest to match the release tag.
+          # This must be committed into the submodule so the SHA that
+          # zed-extensions references contains the correct version.
+          EXT_TOML="_integrations/zed-tally/extension.toml"
+          CARGO_TOML="_integrations/zed-tally/Cargo.toml"
+
+          sed -i "s/^version = .*/version = \"${CLEAN_VERSION}\"/" "${EXT_TOML}"
+          ACTUAL="$(taplo get -f "${EXT_TOML}" --strip-newline version)"
+          if [ "${ACTUAL}" != "${CLEAN_VERSION}" ]; then
+            echo "::error::Failed to set version in extension.toml (expected=${CLEAN_VERSION}, actual=${ACTUAL})"
+            exit 1
+          fi
+
+          sed -i "0,/^version = .*/s/^version = .*/version = \"${CLEAN_VERSION}\"/" "${CARGO_TOML}"
+          ACTUAL="$(taplo get -f "${CARGO_TOML}" --strip-newline package.version)"
+          if [ "${ACTUAL}" != "${CLEAN_VERSION}" ]; then
+            echo "::error::Failed to set version in Cargo.toml (expected=${CLEAN_VERSION}, actual=${ACTUAL})"
+            exit 1
+          fi
+
+          git add "${EXT_TOML}" "${CARGO_TOML}"
+          git commit -m "zed: set extension version to ${CLEAN_VERSION}"
+
+          # Push the version-bump commit to tally so the SHA is resolvable
+          # when zed-industries/extensions CI clones the submodule.
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/wharflab/tally.git" \
+            "HEAD:refs/heads/zed-release-v${CLEAN_VERSION}"
+          cd ../..
+
+          # Update version in extensions.toml
+          sed -i "/^\[tally\]/,/^version = /s/^version = .*/version = \"${CLEAN_VERSION}\"/" extensions.toml
+          ACTUAL="$(taplo get -f extensions.toml --strip-newline tally.version)"
+          if [ "${ACTUAL}" != "${CLEAN_VERSION}" ]; then
+            echo "::error::Failed to set version in extensions.toml (expected=${CLEAN_VERSION}, actual=${ACTUAL})"
+            exit 1
+          fi
+
+          git add extensions/tally extensions.toml
+          if git diff --cached --quiet; then
+            echo "No Zed marketplace changes detected; skipping PR sync."
+            exit 0
+          fi
+          git commit -m "tally: update to v${CLEAN_VERSION}"
+          git push origin "${BRANCH}" --force
+
+          # Check if an open PR from wharflab already exists
+          EXISTING_PR=$(gh pr list \
+            --repo zed-industries/extensions \
+            --head "wharflab:${BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "${EXISTING_PR}" ]; then
+            # Update existing PR title and body
+            gh pr edit "${EXISTING_PR}" \
+              --repo zed-industries/extensions \
+              --title "tally: update to v${CLEAN_VERSION}" \
+              --body "Automated version bump for tally extension to v${CLEAN_VERSION}."
+            echo "Updated existing PR #${EXISTING_PR}"
+          else
+            # Create new PR
+            gh pr create \
+              --repo zed-industries/extensions \
+              --head "wharflab:${BRANCH}" \
+              --base main \
+              --title "tally: update to v${CLEAN_VERSION}" \
+              --body "Automated version bump for tally extension to v${CLEAN_VERSION}."
+          fi
