@@ -573,6 +573,12 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("shellcheck/SC2086")...),
 			wantExit: 1,
 		},
+		{
+			name:     "shellcheck-fallback-empty-heredoc",
+			dir:      "shellcheck-fallback-empty-heredoc",
+			args:     append([]string{"--format", "json"}, mustSelectRules("shellcheck/ShellCheck")...),
+			wantExit: 1,
+		},
 
 		// Prefer heredoc syntax tests (isolated to prefer-run-heredoc rule)
 		{

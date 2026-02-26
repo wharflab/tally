@@ -21,6 +21,7 @@ import (
 	"github.com/wharflab/tally/internal/sourcemap"
 
 	"github.com/wharflab/tally/internal/rules"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 const (
@@ -29,6 +30,9 @@ const (
 
 	// shellcheckRunTimeout bounds embedded shellcheck execution per snippet.
 	shellcheckRunTimeout = 2 * time.Minute
+
+	shellDialectBash = "bash"
+	shellDialectKsh  = "ksh"
 )
 
 var defaultProxyEnv = []string{
@@ -405,7 +409,7 @@ func (r *Rule) checkShellSnippet(
 	knownEnv []string,
 	snippet string,
 ) []rules.Violation {
-	if snippet == "" {
+	if strings.TrimSpace(snippet) == "" {
 		return nil
 	}
 
@@ -420,6 +424,14 @@ func (r *Rule) checkShellSnippet(
 
 	prelude, _ := buildPrelude(dialect, knownEnv)
 	script := prelude + snippet
+	if parseErr := preflightParseShellScript(script, dialect); parseErr != nil {
+		return []rules.Violation{rules.NewViolation(
+			rules.NewLocationFromRanges(file, location),
+			metaParseStatusRuleCode,
+			"unable to parse shell script",
+			rules.SeverityInfo,
+		).WithDetail(parseErr.Error())}
+	}
 
 	out, err := r.runShellcheck(script, intshellcheck.Options{
 		Dialect:  dialect,
@@ -459,6 +471,26 @@ func (r *Rule) checkShellSnippet(
 		).WithDocURL(rules.ShellcheckDocURL("SC"+fmt.Sprintf("%04d", c.Code))))
 	}
 	return violations
+}
+
+func preflightParseShellScript(script, dialect string) error {
+	shParser := syntax.NewParser(
+		syntax.Variant(shellSyntaxVariantForDialect(dialect)),
+		syntax.KeepComments(false),
+	)
+	_, err := shParser.Parse(strings.NewReader(script), "")
+	return err
+}
+
+func shellSyntaxVariantForDialect(dialect string) syntax.LangVariant {
+	switch dialect {
+	case shellDialectBash:
+		return syntax.LangBash
+	case shellDialectKsh:
+		return syntax.LangMirBSDKorn
+	default:
+		return syntax.LangPOSIX
+	}
 }
 
 func (r *Rule) checkShellMapping(
@@ -766,7 +798,7 @@ func shellcheckDialect(shellName string) string {
 
 	switch name {
 	case "bash", "zsh":
-		return "bash"
+		return shellDialectBash
 	case "sh":
 		return "sh"
 	case "dash":
@@ -774,7 +806,7 @@ func shellcheckDialect(shellName string) string {
 	case "ash":
 		return "busybox"
 	case "ksh", "mksh":
-		return "ksh"
+		return shellDialectKsh
 	default:
 		return "sh"
 	}
@@ -850,6 +882,7 @@ func mapLevel(level string) rules.Severity {
 }
 
 const metaFailureRuleCode = rules.ShellcheckRulePrefix + "ShellCheckInternalError"
+const metaParseStatusRuleCode = rules.ShellcheckRulePrefix + "ShellCheckPreflightParseError"
 
 func init() {
 	rules.Register(NewRule())
