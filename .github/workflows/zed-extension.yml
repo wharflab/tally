@@ -5,10 +5,12 @@ on:
     branches: [main]
     paths:
       - '_integrations/zed-tally/**'
+      - '.github/workflows/zed-extension.yml'
   push:
     branches: [main]
     paths:
       - '_integrations/zed-tally/**'
+      - '.github/workflows/zed-extension.yml'
   workflow_dispatch:
 permissions:
   contents: read
