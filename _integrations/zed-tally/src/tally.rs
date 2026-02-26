@@ -96,13 +96,14 @@ impl TallyExtension {
     /// Install or update via the npm platform-specific package (e.g.
     /// `@wharflab/tally-darwin-arm64`). Returns the path to the binary.
     fn ensure_installed_npm(&mut self, id: &LanguageServerId) -> Result<String> {
+        let (os, _) = zed::current_platform();
         let pkg = npm_package_name()?;
 
         let installed = zed::npm_package_installed_version(&pkg)?;
         let latest = zed::npm_package_latest_version(&pkg)?;
 
         if installed.as_deref() == Some(latest.as_str()) {
-            let path = npm_binary_path(&pkg);
+            let path = npm_binary_path(&pkg, &os);
             self.cached_binary_path = Some(path.clone());
             return Ok(path);
         }
@@ -114,7 +115,7 @@ impl TallyExtension {
 
         zed::npm_install_package(&pkg, &latest)?;
 
-        let path = npm_binary_path(&pkg);
+        let path = npm_binary_path(&pkg, &os);
         zed::make_file_executable(&path)?;
 
         zed::set_language_server_installation_status(id, &LanguageServerInstallationStatus::None);
@@ -150,7 +151,11 @@ impl TallyExtension {
             .ok_or_else(|| format!("no asset named {asset_name} in release {version}"))?;
 
         let version_dir = format!("tally-{}", release.version);
-        let binary_path = format!("{version_dir}/tally");
+        let binary_name = match platform {
+            Os::Windows => "tally.exe",
+            _ => "tally",
+        };
+        let binary_path = format!("{version_dir}/{binary_name}");
 
         if !std::fs::metadata(&binary_path).is_ok_and(|m| m.is_file()) {
             zed::download_file(&asset.download_url, &version_dir, file_type)?;
@@ -239,11 +244,11 @@ fn npm_package_name() -> Result<String> {
 }
 
 /// Build the path to the tally binary inside the npm platform-specific package.
-fn npm_binary_path(package_name: &str) -> String {
-    let binary_name = if cfg!(target_os = "windows") {
-        "tally.exe"
-    } else {
-        "tally"
+/// Uses runtime OS detection since this code compiles to WASM.
+fn npm_binary_path(package_name: &str, os: &Os) -> String {
+    let binary_name = match os {
+        Os::Windows => "tally.exe",
+        _ => "tally",
     };
     format!("node_modules/{package_name}/bin/{binary_name}")
 }
@@ -321,8 +326,20 @@ mod tests {
     }
 
     #[test]
-    fn test_npm_binary_path() {
-        let path = npm_binary_path("@wharflab/tally-darwin-arm64");
+    fn test_npm_binary_path_unix() {
+        let path = npm_binary_path("@wharflab/tally-darwin-arm64", &Os::Mac);
         assert_eq!(path, "node_modules/@wharflab/tally-darwin-arm64/bin/tally");
+
+        let path = npm_binary_path("@wharflab/tally-linux-x64", &Os::Linux);
+        assert_eq!(path, "node_modules/@wharflab/tally-linux-x64/bin/tally");
+    }
+
+    #[test]
+    fn test_npm_binary_path_windows() {
+        let path = npm_binary_path("@wharflab/tally-windows-x64", &Os::Windows);
+        assert_eq!(
+            path,
+            "node_modules/@wharflab/tally-windows-x64/bin/tally.exe"
+        );
     }
 }
