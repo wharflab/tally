@@ -43,6 +43,12 @@ type Server struct {
 	shellcheckDebounceMu sync.Mutex
 	shellcheckDebounce   map[string]*time.Timer
 
+	diagnosticsDispatchMu      sync.Mutex
+	diagnosticsInFlightByURI   map[string]bool
+	diagnosticsPendingByURI    map[string]diagnosticsTask
+	diagnosticsConcurrencyGate chan struct{}
+	diagnosticsRunFn           func(ctx context.Context, docURI string, version int32, content []byte)
+
 	settingsMu sync.RWMutex
 	settings   clientSettings
 
@@ -55,11 +61,17 @@ type Server struct {
 // New creates a new LSP server.
 func New() *Server {
 	return &Server{
-		exitCh:             make(chan struct{}),
-		documents:          NewDocumentStore(),
-		lintCache:          newLintResultCache(),
-		shellcheckDebounce: make(map[string]*time.Timer),
-		settings:           defaultClientSettings(),
+		exitCh:                   make(chan struct{}),
+		documents:                NewDocumentStore(),
+		lintCache:                newLintResultCache(),
+		shellcheckDebounce:       make(map[string]*time.Timer),
+		diagnosticsInFlightByURI: make(map[string]bool),
+		diagnosticsPendingByURI:  make(map[string]diagnosticsTask),
+		diagnosticsConcurrencyGate: make(
+			chan struct{},
+			maxConcurrentDiagnosticsPasses,
+		),
+		settings: defaultClientSettings(),
 		// Default to push diagnostics (publishDiagnostics). If the client supports
 		// the LSP 3.17 pull model, we switch to pull to avoid duplicate diagnostics.
 		pushDiagnostics: true,
@@ -357,6 +369,7 @@ func (s *Server) handleDidClose(ctx context.Context, params *protocol.DidCloseTe
 		docVersion = &doc.Version
 	}
 	s.cancelShellcheckDebounce(uri)
+	s.cancelPendingDiagnostics(uri)
 	s.documents.Close(uri)
 	s.lintCache.delete(uri)
 	if s.pushDiagnosticsEnabled() {

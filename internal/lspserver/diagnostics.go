@@ -32,7 +32,17 @@ const (
 	// so that push diagnostics remain responsive (and we avoid re-running ShellCheck
 	// on every keystroke).
 	shellcheckDiagnosticsDebounce = 500 * time.Millisecond
+
+	// maxConcurrentDiagnosticsPasses limits concurrent fast+full diagnostics
+	// workers across all documents.
+	maxConcurrentDiagnosticsPasses = 2
 )
+
+type diagnosticsTask struct {
+	docURI  string
+	version int32
+	content []byte
+}
 
 // lintResultCache caches lint results keyed by document URI + version
 // to avoid redundant linting between publishDiagnostics and codeAction requests.
@@ -80,16 +90,78 @@ func (c *lintResultCache) clear() {
 
 // publishDiagnostics lints a document and publishes diagnostics to the client.
 func (s *Server) publishDiagnostics(ctx context.Context, doc *Document) {
-	docURI := doc.URI
-	version := doc.Version
-	content := []byte(doc.Content)
-	ctx = context.WithoutCancel(ctx)
+	if doc == nil {
+		return
+	}
+	s.enqueueDiagnosticsTask(context.WithoutCancel(ctx), diagnosticsTask{
+		docURI:  doc.URI,
+		version: doc.Version,
+		content: []byte(doc.Content),
+	})
+}
+
+func (s *Server) enqueueDiagnosticsTask(ctx context.Context, task diagnosticsTask) {
+	s.diagnosticsDispatchMu.Lock()
+	if s.diagnosticsInFlightByURI[task.docURI] {
+		s.diagnosticsPendingByURI[task.docURI] = task
+		s.diagnosticsDispatchMu.Unlock()
+		return
+	}
+	s.diagnosticsInFlightByURI[task.docURI] = true
+	s.diagnosticsDispatchMu.Unlock()
 
 	// Run linting asynchronously so that expensive analyzers (ShellCheck) don't
 	// block the JSON-RPC message handling goroutine.
-	go func() {
-		s.publishDiagnosticsFastThenFull(ctx, docURI, version, content)
-	}()
+	go s.runDiagnosticsWorker(ctx, task)
+}
+
+func (s *Server) runDiagnosticsWorker(ctx context.Context, task diagnosticsTask) {
+	for {
+		s.acquireDiagnosticsSlot()
+		s.runDiagnosticsTask(ctx, task)
+		s.releaseDiagnosticsSlot()
+
+		var ok bool
+		task, ok = s.nextDiagnosticsTask(task.docURI)
+		if !ok {
+			return
+		}
+	}
+}
+
+func (s *Server) runDiagnosticsTask(ctx context.Context, task diagnosticsTask) {
+	if s.diagnosticsRunFn != nil {
+		s.diagnosticsRunFn(ctx, task.docURI, task.version, task.content)
+		return
+	}
+	s.publishDiagnosticsFastThenFull(ctx, task.docURI, task.version, task.content)
+}
+
+func (s *Server) acquireDiagnosticsSlot() {
+	s.diagnosticsConcurrencyGate <- struct{}{}
+}
+
+func (s *Server) releaseDiagnosticsSlot() {
+	<-s.diagnosticsConcurrencyGate
+}
+
+func (s *Server) nextDiagnosticsTask(docURI string) (diagnosticsTask, bool) {
+	s.diagnosticsDispatchMu.Lock()
+	defer s.diagnosticsDispatchMu.Unlock()
+
+	if next, ok := s.diagnosticsPendingByURI[docURI]; ok {
+		delete(s.diagnosticsPendingByURI, docURI)
+		return next, true
+	}
+
+	delete(s.diagnosticsInFlightByURI, docURI)
+	return diagnosticsTask{}, false
+}
+
+func (s *Server) cancelPendingDiagnostics(docURI string) {
+	s.diagnosticsDispatchMu.Lock()
+	delete(s.diagnosticsPendingByURI, docURI)
+	s.diagnosticsDispatchMu.Unlock()
 }
 
 func (s *Server) publishDiagnosticsFastThenFull(ctx context.Context, docURI string, version int32, content []byte) {
