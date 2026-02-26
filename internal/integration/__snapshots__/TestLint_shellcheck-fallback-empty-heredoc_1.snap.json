@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "testdata/shellcheck-fallback-empty-heredoc/Dockerfile",
+      "violations": [
+        {
+          "detail": "11:9: unclosed here-document 'EOT'",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "testdata/shellcheck-fallback-empty-heredoc/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "unable to parse shell script",
+          "rule": "shellcheck/ShellCheckPreflightParseError",
+          "severity": "info",
+          "sourceCode": "RUN echo $1 \u003c\u003cEOT"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}
