@@ -210,6 +210,11 @@ func (s *Server) scheduleFullPass(
 		if !s.isCurrentShellcheckDebounceTimer(docURI, timerID) || !s.documentVersionCurrent(docURI, version) {
 			return
 		}
+		s.acquireDiagnosticsSlot()
+		defer s.releaseDiagnosticsSlot()
+		if !s.isCurrentShellcheckDebounceTimer(docURI, timerID) || !s.documentVersionCurrent(docURI, version) {
+			return
+		}
 
 		fullViolations, _ := s.lintContentWithConfig(docURI, content, cfg, parseResult, nil)
 		if !s.documentVersionCurrent(docURI, version) {
