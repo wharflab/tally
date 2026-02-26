@@ -118,15 +118,10 @@ func (r *Runner) init(ctx context.Context) error {
 			return
 		}
 
-		// Use concurrent compilation when enough cores are available.
-		// On small machines (≤2 cores) the concurrent path's overhead
-		// (per-worker compiler instances, atomic coordination) outweighs
-		// the parallelism benefit — especially under the race detector.
-		workers := 1
-		if n := runtime.NumCPU(); n >= 4 {
-			workers = n
-		}
-		compileCtx := experimental.WithCompilationWorkers(initCtx, workers)
+		// Use 2/3 of available CPUs for concurrent WASM compilation,
+		// leaving headroom for the rest of the process. Workers ≤ 1
+		// keeps wazero on its simple serial path with zero overhead.
+		compileCtx := experimental.WithCompilationWorkers(initCtx, max(runtime.NumCPU()*2/3, 1))
 		compiled, err := rt.CompileModule(compileCtx, wasm.Binary)
 		if err != nil {
 			_ = rt.Close(initCtx)
