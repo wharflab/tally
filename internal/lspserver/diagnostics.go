@@ -10,18 +10,28 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.org/x/exp/jsonrpc2"
 
 	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 
 	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/linter"
 	"github.com/wharflab/tally/internal/processor"
 	"github.com/wharflab/tally/internal/rules"
+)
+
+const (
+	shellcheckEngineRuleCode = rules.ShellcheckRulePrefix + "ShellCheck"
+
+	// shellcheckDiagnosticsDebounce delays the expensive ShellCheck diagnostics pass
+	// so that push diagnostics remain responsive (and we avoid re-running ShellCheck
+	// on every keystroke).
+	shellcheckDiagnosticsDebounce = 500 * time.Millisecond
 )
 
 // lintResultCache caches lint results keyed by document URI + version
@@ -71,14 +81,54 @@ func (c *lintResultCache) clear() {
 // publishDiagnostics lints a document and publishes diagnostics to the client.
 func (s *Server) publishDiagnostics(ctx context.Context, doc *Document) {
 	docURI := doc.URI
-	content := doc.Content
+	version := doc.Version
+	content := []byte(doc.Content)
+	ctx = context.WithoutCancel(ctx)
 
-	violations := s.lintContent(docURI, []byte(content))
-	s.lintCache.set(docURI, doc.Version, violations)
+	// Run linting asynchronously so that expensive analyzers (ShellCheck) don't
+	// block the JSON-RPC message handling goroutine.
+	go func() {
+		s.publishDiagnosticsFastThenFull(ctx, docURI, version, content)
+	}()
+}
+
+func (s *Server) publishDiagnosticsFastThenFull(ctx context.Context, docURI string, version int32, content []byte) {
+	filePath := uriToPath(docURI)
+	cfg := s.resolveConfig(filePath)
+
+	// 1) Fast pass: skip ShellCheck to publish initial diagnostics quickly.
+	// This keeps editors responsive while the full analysis runs in the background.
+	fastViolations, parseResult := s.lintContentWithConfig(docURI, content, cfg, nil, []string{shellcheckEngineRuleCode})
+	if s.documentVersionCurrent(docURI, version) {
+		s.lintCache.set(docURI, version, fastViolations)
+		s.notifyDiagnostics(ctx, docURI, version, fastViolations)
+	}
+
+	// 2) Full pass: run all rules, including ShellCheck, after a debounce period.
+	time.Sleep(shellcheckDiagnosticsDebounce)
+	if !s.documentVersionCurrent(docURI, version) {
+		return
+	}
+
+	fullViolations, _ := s.lintContentWithConfig(docURI, content, cfg, parseResult, nil)
+	if s.documentVersionCurrent(docURI, version) {
+		s.lintCache.set(docURI, version, fullViolations)
+		s.notifyDiagnostics(ctx, docURI, version, fullViolations)
+	}
+}
+
+func (s *Server) documentVersionCurrent(docURI string, version int32) bool {
+	doc := s.documents.Get(docURI)
+	return doc != nil && doc.Version == version
+}
+
+func (s *Server) notifyDiagnostics(ctx context.Context, docURI string, version int32, violations []rules.Violation) {
 	diagnostics := convertDiagnostics(violations)
 
-	version := doc.Version
-	if err := lspNotify(ctx, s.conn, string(protocol.MethodTextDocumentPublishDiagnostics), &protocol.PublishDiagnosticsParams{
+	notifyCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	if err := lspNotify(notifyCtx, s.conn, string(protocol.MethodTextDocumentPublishDiagnostics), &protocol.PublishDiagnosticsParams{
 		Uri:         protocol.DocumentUri(docURI),
 		Version:     &version,
 		Diagnostics: diagnostics,
@@ -203,48 +253,52 @@ func (s *Server) resolveConfig(filePath string) *config.Config {
 		log.Printf("lsp: config load error for %s: %v", filePath, err)
 		return nil
 	}
-	applyLSPConfigDefaults(cfg)
 	return cfg
 }
 
 // lintContent runs the shared lint pipeline and applies LSP-specific processors.
 func (s *Server) lintContent(docURI string, content []byte) []rules.Violation {
-	input := s.lintInput(docURI, content)
+	filePath := uriToPath(docURI)
+	cfg := s.resolveConfig(filePath)
+	violations, _ := s.lintContentWithConfig(docURI, content, cfg, nil, nil)
+	return violations
+}
+
+func (s *Server) lintContentFast(docURI string, content []byte) []rules.Violation {
+	filePath := uriToPath(docURI)
+	cfg := s.resolveConfig(filePath)
+	violations, _ := s.lintContentWithConfig(docURI, content, cfg, nil, []string{shellcheckEngineRuleCode})
+	return violations
+}
+
+func (s *Server) lintContentWithConfig(
+	docURI string,
+	content []byte,
+	cfg *config.Config,
+	parseResult *dockerfile.ParseResult,
+	skipRules []string,
+) ([]rules.Violation, *dockerfile.ParseResult) {
+	filePath := uriToPath(docURI)
+	input := linter.Input{
+		FilePath:    filePath,
+		Content:     content,
+		Config:      cfg,
+		ParseResult: parseResult,
+		SkipRules:   skipRules,
+	}
+
 	result, err := linter.LintFile(input)
 	if err != nil {
 		log.Printf("lsp: lint error for %s: %v", input.FilePath, err)
-		return nil
+		return nil, nil
 	}
 	chain := linter.LSPProcessors()
-	ctx := processor.NewContext(
+	procCtx := processor.NewContext(
 		map[string]*config.Config{input.FilePath: result.Config},
 		result.Config,
 		map[string][]byte{input.FilePath: content},
 	)
-	return chain.Process(result.Violations, ctx)
-}
-
-func applyLSPConfigDefaults(cfg *config.Config) {
-	if cfg == nil {
-		return
-	}
-
-	// ShellCheck is significantly heavier than other rules (Wasm runtime, multiple
-	// invocations per Dockerfile). LSP diagnostics should stay responsive by default,
-	// so disable ShellCheck unless the user explicitly opted in via config.
-	shellcheckEngineCode := rules.ShellcheckRulePrefix + "ShellCheck"
-	explicitShellcheckConfig := cfg.Rules.IsEnabled(shellcheckEngineCode) != nil ||
-		cfg.Rules.GetSeverity(shellcheckEngineCode) != "" ||
-		len(cfg.Rules.Shellcheck) > 0
-	if explicitShellcheckConfig {
-		return
-	}
-
-	if slices.Contains(cfg.Rules.Exclude, shellcheckEngineCode) {
-		return
-	}
-
-	cfg.Rules.Exclude = append(cfg.Rules.Exclude, shellcheckEngineCode)
+	return chain.Process(result.Violations, procCtx), result.ParseResult
 }
 
 // convertDiagnostics converts tally violations to LSP diagnostics.

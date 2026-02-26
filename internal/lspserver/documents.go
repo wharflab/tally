@@ -68,7 +68,12 @@ func (s *DocumentStore) Close(uri string) {
 func (s *DocumentStore) Get(uri string) *Document {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.docs[uri]
+	doc, ok := s.docs[uri]
+	if !ok || doc == nil {
+		return nil
+	}
+	c := *doc
+	return &c
 }
 
 // All returns a snapshot slice of all currently open documents.
