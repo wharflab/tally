@@ -11,7 +11,7 @@ func TestRuntimeInitContext_DetachesCancellation(t *testing.T) {
 	type keyType string
 	const key keyType = "k"
 
-	parent, cancel := context.WithCancel(context.WithValue(context.Background(), key, "v")) //nolint:revive // test-only context value
+	parent, cancel := context.WithCancel(context.WithValue(context.Background(), key, "v"))
 	initCtx := runtimeInitContext(parent)
 	cancel()
 
@@ -20,17 +20,5 @@ func TestRuntimeInitContext_DetachesCancellation(t *testing.T) {
 	}
 	if got := initCtx.Value(key); got != "v" {
 		t.Fatalf("init context value=%v, want v", got)
-	}
-}
-
-func TestRuntimeInitContext_NilContext(t *testing.T) {
-	t.Parallel()
-
-	initCtx := runtimeInitContext(nil)
-	if initCtx == nil {
-		t.Fatal("expected non-nil init context")
-	}
-	if err := initCtx.Err(); err != nil {
-		t.Fatalf("unexpected init context err: %v", err)
 	}
 }

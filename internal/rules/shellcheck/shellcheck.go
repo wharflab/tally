@@ -421,7 +421,7 @@ func (r *Rule) checkShellSnippet(
 	prelude, _ := buildPrelude(dialect, knownEnv)
 	script := prelude + snippet
 
-	out, _, err := r.runShellcheck(script, intshellcheck.Options{
+	out, err := r.runShellcheck(script, intshellcheck.Options{
 		Dialect:  dialect,
 		Severity: "style",
 		Norc:     true,
@@ -483,7 +483,7 @@ func (r *Rule) checkShellMapping(
 	prelude, headerLines := buildPrelude(dialect, knownEnv)
 	script := prelude + mapping.Script
 
-	out, _, err := r.runShellcheck(script, intshellcheck.Options{
+	out, err := r.runShellcheck(script, intshellcheck.Options{
 		Dialect:  dialect,
 		Severity: "style",
 		Norc:     true,
@@ -537,10 +537,11 @@ func shellcheckRunContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), shellcheckRunTimeout)
 }
 
-func (r *Rule) runShellcheck(script string, opts intshellcheck.Options) (intshellcheck.JSON1Output, string, error) {
+func (r *Rule) runShellcheck(script string, opts intshellcheck.Options) (intshellcheck.JSON1Output, error) {
 	ctx, cancel := shellcheckRunContext()
 	defer cancel()
-	return r.runner.Run(ctx, script, opts)
+	out, _, err := r.runner.Run(ctx, script, opts)
+	return out, err
 }
 
 func buildShellcheckSuggestedFix(file string, mapping scriptMapping, headerLines int, c intshellcheck.Comment) *rules.SuggestedFix {
