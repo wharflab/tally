@@ -709,7 +709,12 @@ jobs:
           git commit -m "tally: update to v${CLEAN_VERSION}"
           git push origin "${BRANCH}" --force
 
-          # Check if an open PR from wharflab already exists
+          # Create or update PR against zed-industries/extensions.
+          # Use GITHUB_TOKEN (not the app token) since the app is only installed
+          # on wharflab/zed-extensions, not on the upstream zed-industries repo.
+          # Cross-fork PRs to public repos work with any authenticated user.
+          export GH_TOKEN="${GITHUB_TOKEN}"
+
           EXISTING_PR=$(gh pr list \
             --repo zed-industries/extensions \
             --head "wharflab:${BRANCH}" \
@@ -718,14 +723,12 @@ jobs:
             --jq '.[0].number // empty')
 
           if [ -n "${EXISTING_PR}" ]; then
-            # Update existing PR title and body
             gh pr edit "${EXISTING_PR}" \
               --repo zed-industries/extensions \
               --title "tally: update to v${CLEAN_VERSION}" \
               --body "Automated version bump for tally extension to v${CLEAN_VERSION}."
             echo "Updated existing PR #${EXISTING_PR}"
           else
-            # Create new PR
             gh pr create \
               --repo zed-industries/extensions \
               --head "wharflab:${BRANCH}" \
