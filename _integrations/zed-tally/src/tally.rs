@@ -25,7 +25,7 @@ impl TallyExtension {
         language_server_id: &LanguageServerId,
         worktree: &Worktree,
     ) -> Result<String> {
-        // 1. User-configured binary path
+        // 1. User-configured binary path (always re-check to pick up settings changes)
         if let Ok(lsp_settings) = LspSettings::for_worktree(SERVER_NAME, worktree) {
             if let Some(binary) = lsp_settings.binary {
                 if let Some(path) = binary.path {
@@ -51,7 +51,11 @@ impl TallyExtension {
             return Ok(path);
         }
 
-        // 5 & 6. Auto-install: npm platform package, then GitHub release fallback
+        // 5 & 6. Auto-install: return cached path from a previous install, or
+        // run the full install flow (npm platform package → GitHub release).
+        if let Some(ref path) = self.cached_binary_path {
+            return Ok(path.clone());
+        }
         self.ensure_installed(language_server_id)
     }
 
