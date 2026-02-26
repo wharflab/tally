@@ -8,13 +8,14 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
+	"charm.land/lipgloss/v2"
 	"github.com/alecthomas/chroma/v2"
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/alecthomas/chroma/v2/styles"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
 	"github.com/wharflab/tally/internal/rules"
@@ -134,7 +135,7 @@ func NewTextReporter(opts TextOptions) *TextReporter {
 		// Select style based on terminal background or user preference
 		styleName := opts.ChromaStyle
 		if styleName == "" {
-			if lipgloss.HasDarkBackground() {
+			if lipgloss.HasDarkBackground(os.Stdin, os.Stdout) {
 				styleName = "monokai"
 			} else {
 				styleName = "github"

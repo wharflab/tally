@@ -7,7 +7,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/charmbracelet/bubbles/spinner"
+	"charm.land/bubbles/v2/spinner"
 	"github.com/mattn/go-isatty"
 
 	"github.com/wharflab/tally/internal/ai/autofixdata"
