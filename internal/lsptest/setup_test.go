@@ -64,9 +64,40 @@ func TestMain(m *testing.M) {
 		panic("failed to build binary: " + string(out))
 	}
 
+	if err := warmShellCheckCache(tmpDir); err != nil {
+		_ = os.RemoveAll(tmpDir)
+		panic("failed to warm ShellCheck cache: " + err.Error())
+	}
+
 	code := m.Run()
 	_ = os.RemoveAll(tmpDir)
 	os.Exit(code)
+}
+
+func warmShellCheckCache(tmpDir string) error {
+	dfPath := filepath.Join(tmpDir, "Dockerfile.shellcheck-warmup")
+	if err := os.WriteFile(dfPath, []byte("FROM alpine:3.18\nRUN echo hello\n"), 0o644); err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, binaryPath,
+		"lint",
+		"--format", "json",
+		"--fail-level", "none",
+		"--slow-checks", "off",
+		"--ignore", "*",
+		"--select", "shellcheck/ShellCheck",
+		dfPath,
+	)
+	cmd.Env = append(os.Environ(), "GOEXPERIMENT=jsonv2")
+
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("%w: %s", err, out)
+	}
+	return nil
 }
 
 // processIO wraps subprocess stdin/stdout as an io.ReadWriteCloser
