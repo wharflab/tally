@@ -48,7 +48,7 @@ func extractRunLikeScript(
 	}
 
 	start := node.StartLine
-	end := resolveEndLine(sm, node.EndLine, escapeToken)
+	end := sm.ResolveEndLineWithEscape(node.EndLine, escapeToken)
 	end = max(end, start)
 
 	// Heredoc: lint heredoc body only (exclude the instruction line and terminator).
@@ -88,7 +88,7 @@ func extractShellFormScript(
 	}
 
 	start := node.StartLine
-	end := resolveEndLine(sm, node.EndLine, escapeToken)
+	end := sm.ResolveEndLineWithEscape(node.EndLine, escapeToken)
 	end = max(end, start)
 
 	lines := linesForSpan(sm, start, end)
@@ -112,7 +112,7 @@ func extractHealthcheckCmdShellScript(
 	}
 
 	start := node.StartLine
-	end := resolveEndLine(sm, node.EndLine, escapeToken)
+	end := sm.ResolveEndLineWithEscape(node.EndLine, escapeToken)
 	end = max(end, start)
 
 	lines := linesForSpan(sm, start, end)
@@ -144,23 +144,6 @@ func linesForSpan(sm *sourcemap.SourceMap, startLine, endLine int) []string {
 		out = append(out, sm.Line(l-1))
 	}
 	return out
-}
-
-func resolveEndLine(sm *sourcemap.SourceMap, endLine int, escapeToken rune) int {
-	if sm == nil {
-		return endLine
-	}
-
-	endLine = min(endLine, sm.LineCount())
-	for l := endLine; l <= sm.LineCount(); l++ {
-		line := sm.Line(l - 1) // l is 1-based, Line is 0-based
-		trimmed := strings.TrimRight(line, " \t")
-		if trimmed == "" || !strings.HasSuffix(trimmed, string(escapeToken)) {
-			return l
-		}
-		endLine = min(l+1, sm.LineCount())
-	}
-	return endLine
 }
 
 // normalizeContinuationToken rewrites Dockerfile line continuations that use a
