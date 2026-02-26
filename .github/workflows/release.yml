@@ -69,6 +69,12 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          ENTITLEMENTS_FILE=".github/macos-entitlements.plist"
+          if [ ! -f "$ENTITLEMENTS_FILE" ]; then
+            echo "Missing entitlements file: $ENTITLEMENTS_FILE"
+            exit 1
+          fi
+
           # Find and sign executable Mach-O binaries under darwin build dirs
           find dist -type f -perm -111 -path '*_darwin_*/*' -print0 | while IFS= read -r -d '' binary; do
             # Verify it's a Mach-O binary
@@ -77,7 +83,7 @@ jobs:
             fi
 
             echo "Signing $binary"
-            codesign --force --options runtime --sign "$APPLE_TEAM_ID" "$binary"
+            codesign --force --options runtime --entitlements "$ENTITLEMENTS_FILE" --sign "$APPLE_TEAM_ID" "$binary"
 
             # Verify signature
             codesign --verify --verbose "$binary"

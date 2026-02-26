@@ -61,11 +61,11 @@ The certificate needs to be converted to a format that GitHub Actions can use.
 
 11. Convert the certificate to base64:
 
-   ```bash
-   base64 -i certificate.p12 | pbcopy
-   ```
+    ```bash
+    base64 -i certificate.p12 | pbcopy
+    ```
 
-   This copies the base64-encoded certificate to your clipboard.
+    This copies the base64-encoded certificate to your clipboard.
 
 ### 4. Create App-Specific Password for Notarization
 
@@ -120,31 +120,29 @@ To implement:
 
 After adding the secrets and implementing the workflow:
 
-1. Create a test release:
+Create a test release:
 
-   ```bash
-   git tag v0.1.1-test
-   git push origin v0.1.1-test
-   ```
+```bash
+git tag v0.1.1-test
+git push origin v0.1.1-test
+```
 
-2. Wait for the GitHub Action to complete
+Wait for the GitHub Action to complete, then download the macOS binary from the release.
 
-3. Download the macOS binary from the release
+Verify the signature:
 
-4. Verify the signature:
+```bash
+codesign --verify --verbose tally-darwin-amd64
+```
 
-   ```bash
-   codesign --verify --verbose tally-darwin-amd64
-   ```
+Expected output:
 
-   Expected output:
+```text
+tally-darwin-amd64: valid on disk
+tally-darwin-amd64: satisfies its Designated Requirement
+```
 
-   ```text
-   tally-darwin-amd64: valid on disk
-   tally-darwin-amd64: satisfies its Designated Requirement
-   ```
-
-5. Run the binary - it should **not** show any Gatekeeper warnings
+Run the binary - it should **not** show any Gatekeeper warnings.
 
 ## Troubleshooting
 
@@ -173,6 +171,7 @@ After adding the secrets and implementing the workflow:
 - Check **Notary > History** for rejection details
 - Common issues:
   - Hardened runtime not enabled (`--options runtime` flag required)
+  - Missing entitlements file (`.github/macos-entitlements.plist`)
   - Binary architecture mismatch
   - Entitlements issues
 
