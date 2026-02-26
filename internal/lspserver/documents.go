@@ -82,6 +82,9 @@ func (s *DocumentStore) All() []*Document {
 	defer s.mu.RUnlock()
 	out := make([]*Document, 0, len(s.docs))
 	for _, doc := range s.docs {
+		if doc == nil {
+			continue
+		}
 		c := *doc
 		out = append(out, &c)
 	}
