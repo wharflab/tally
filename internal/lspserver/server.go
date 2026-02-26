@@ -55,11 +55,11 @@ type Server struct {
 // New creates a new LSP server.
 func New() *Server {
 	return &Server{
-		exitCh:    make(chan struct{}),
-		documents: NewDocumentStore(),
-		lintCache: newLintResultCache(),
+		exitCh:             make(chan struct{}),
+		documents:          NewDocumentStore(),
+		lintCache:          newLintResultCache(),
 		shellcheckDebounce: make(map[string]*time.Timer),
-		settings:  defaultClientSettings(),
+		settings:           defaultClientSettings(),
 		// Default to push diagnostics (publishDiagnostics). If the client supports
 		// the LSP 3.17 pull model, we switch to pull to avoid duplicate diagnostics.
 		pushDiagnostics: true,
