@@ -62,6 +62,7 @@ func (s *Server) handleDidChangeConfiguration(
 
 	// Settings affect lint results, so clear caches.
 	s.lintCache.clear()
+	s.cancelAllShellcheckDebounce()
 
 	// Push model: recompute and publish diagnostics immediately.
 	if s.pushDiagnosticsEnabled() {
