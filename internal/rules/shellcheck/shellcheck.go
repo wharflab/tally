@@ -28,7 +28,7 @@ const (
 	ShellCheckRuleCode = rules.ShellcheckRulePrefix + "ShellCheck"
 
 	// shellcheckRunTimeout bounds embedded shellcheck execution per snippet.
-	shellcheckRunTimeout = 10 * time.Second
+	shellcheckRunTimeout = 2 * time.Minute
 )
 
 var defaultProxyEnv = []string{
