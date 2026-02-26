@@ -196,6 +196,9 @@ func LintFile(input Input) (*Result, error) {
 			continue
 		}
 		code := rule.Metadata().Code
+		// baseInput.EnabledRules comes from EnabledRuleCodes(cfg) + skipSet, but
+		// current AsyncRule implementations don't universally gate on IsRuleEnabled.
+		// Keep explicit checks here to avoid planning disabled async work.
 		if isSkipped(code, skipSet) {
 			continue
 		}
