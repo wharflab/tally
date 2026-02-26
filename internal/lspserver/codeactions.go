@@ -27,7 +27,9 @@ func (s *Server) codeActionsForDocument(
 	// Use cached lint results from publishDiagnostics when the version matches.
 	violations, ok := s.lintCache.get(doc.URI, doc.Version)
 	if !ok {
-		violations = s.lintContent(doc.URI, []byte(doc.Content))
+		// Fall back to a fast lint pass to keep code actions responsive.
+		// ShellCheck results will be available once the full diagnostics pass completes.
+		violations = s.lintContentFast(doc.URI, []byte(doc.Content))
 	}
 
 	actions := make([]protocol.CodeAction, 0, len(violations)+1)
