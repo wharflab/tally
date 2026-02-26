@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 
@@ -202,6 +203,7 @@ func (s *Server) resolveConfig(filePath string) *config.Config {
 		log.Printf("lsp: config load error for %s: %v", filePath, err)
 		return nil
 	}
+	applyLSPConfigDefaults(cfg)
 	return cfg
 }
 
@@ -220,6 +222,29 @@ func (s *Server) lintContent(docURI string, content []byte) []rules.Violation {
 		map[string][]byte{input.FilePath: content},
 	)
 	return chain.Process(result.Violations, ctx)
+}
+
+func applyLSPConfigDefaults(cfg *config.Config) {
+	if cfg == nil {
+		return
+	}
+
+	// ShellCheck is significantly heavier than other rules (Wasm runtime, multiple
+	// invocations per Dockerfile). LSP diagnostics should stay responsive by default,
+	// so disable ShellCheck unless the user explicitly opted in via config.
+	shellcheckEngineCode := rules.ShellcheckRulePrefix + "ShellCheck"
+	explicitShellcheckConfig := cfg.Rules.IsEnabled(shellcheckEngineCode) != nil ||
+		cfg.Rules.GetSeverity(shellcheckEngineCode) != "" ||
+		len(cfg.Rules.Shellcheck) > 0
+	if explicitShellcheckConfig {
+		return
+	}
+
+	if slices.Contains(cfg.Rules.Exclude, shellcheckEngineCode) {
+		return
+	}
+
+	cfg.Rules.Exclude = append(cfg.Rules.Exclude, shellcheckEngineCode)
 }
 
 // convertDiagnostics converts tally violations to LSP diagnostics.
