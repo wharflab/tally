@@ -93,7 +93,7 @@ func extractShellFormScript(
 	end = max(end, start)
 
 	lines := linesForSpan(sm, start, end)
-	lines = blankLeadingKeywordOnly(lines, keyword)
+	lines = blankLeadingKeywordOnly(lines, keyword, escapeToken)
 	lines = normalizeContinuationToken(lines, escapeToken)
 
 	return scriptMapping{
