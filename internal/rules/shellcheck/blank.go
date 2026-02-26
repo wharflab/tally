@@ -7,11 +7,11 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 )
 
-func blankLeadingKeywordOnly(lines []string, keyword string) []string {
+func blankLeadingKeywordOnly(lines []string, keyword string, escapeToken rune) []string {
 	if len(lines) == 0 {
 		return lines
 	}
-	line0, _, ok := blankLeadingKeyword(lines[0], keyword)
+	line0, _, ok := blankLeadingKeyword(lines[0], keyword, escapeToken)
 	if !ok {
 		return lines
 	}
@@ -24,7 +24,7 @@ func blankRunLeadingFlags(lines []string, escapeToken rune) []string {
 	if len(lines) == 0 {
 		return lines
 	}
-	line0, after, ok := blankLeadingKeyword(lines[0], command.Run)
+	line0, after, ok := blankLeadingKeyword(lines[0], command.Run, escapeToken)
 	if !ok {
 		return lines
 	}
@@ -37,7 +37,7 @@ func blankOnbuildRunLeadingFlags(lines []string, escapeToken rune) []string {
 	if len(lines) == 0 {
 		return lines
 	}
-	line0, after, ok := blankLeadingKeyword(lines[0], command.Onbuild)
+	line0, after, ok := blankLeadingKeyword(lines[0], command.Onbuild, escapeToken)
 	if !ok {
 		return lines
 	}
@@ -94,7 +94,7 @@ func blankHealthcheckCmdShellLeading(lines []string, escapeToken rune) ([]string
 		return nil, false
 	}
 
-	line0, after, ok := blankLeadingKeyword(lines[0], command.Healthcheck)
+	line0, after, ok := blankLeadingKeyword(lines[0], command.Healthcheck, escapeToken)
 	if !ok {
 		return nil, false
 	}
@@ -111,7 +111,7 @@ func blankHealthcheckCmdShellLeading(lines []string, escapeToken rune) ([]string
 	return out, true
 }
 
-func blankLeadingKeyword(line, keyword string) (string, int, bool) {
+func blankLeadingKeyword(line, keyword string, escapeToken rune) (string, int, bool) {
 	i := firstNonSpaceTab(line)
 	if i < 0 {
 		return line, 0, false
@@ -126,7 +126,7 @@ func blankLeadingKeyword(line, keyword string) (string, int, bool) {
 		return line, 0, false
 	}
 
-	contIdx := continuationIndex(line, '\\') // keyword is never the continuation token
+	contIdx := continuationIndex(line, escapeToken) // keyword is never the continuation token
 	return blankRange(line, i, after, contIdx), after, true
 }
 

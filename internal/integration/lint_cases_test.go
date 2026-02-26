@@ -568,6 +568,11 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 0, // Should pass - shell rules disabled for PowerShell
 		},
 		{
+			name: "non-posix-shell-backtick-continuation",
+			dir:  "non-posix-shell-backtick-continuation",
+			args: append([]string{"--format", "json"}, mustSelectRules("shellcheck/ShellCheck")...),
+		},
+		{
 			name:     "shellcheck-basic",
 			dir:      "shellcheck-basic",
 			args:     append([]string{"--format", "json"}, mustSelectRules("shellcheck/SC2086")...),
