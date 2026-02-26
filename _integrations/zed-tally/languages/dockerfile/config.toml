@@ -1,0 +1,11 @@
+name = "Dockerfile"
+grammar = "dockerfile"
+path_suffixes = ["Dockerfile", "Containerfile", "dockerfile"]
+line_comments = ["# "]
+brackets = [
+  { start = "{", end = "}", close = true, newline = true },
+  { start = "[", end = "]", close = true, newline = true },
+  { start = "\"", end = "\"", close = true, newline = false, not_in = [
+    "string",
+  ] },
+]

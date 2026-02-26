@@ -594,3 +594,85 @@ jobs:
           cd packaging/
           ruby pack.rb prepare
           ruby pack.rb publish_gem
+  publish-zed-marketplace:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v6
+        if: vars.HARBOR_PILOT_APP_ID != ''
+      - name: Generate GitHub App token
+        id: app-token
+        if: vars.HARBOR_PILOT_APP_ID != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.HARBOR_PILOT_APP_ID }}
+          private-key: ${{ secrets.HARBOR_PILOT_PRIVATE_KEY }}
+          owner: wharflab
+          repositories: zed-extensions
+      - name: Set Zed extension version from tag
+        if: vars.HARBOR_PILOT_APP_ID != ''
+        run: |
+          CLEAN_VERSION="${VERSION#v}"
+          cd _integrations/zed-tally
+          sed -i "s/^version = .*/version = \"${CLEAN_VERSION}\"/" extension.toml
+          sed -i "0,/^version = .*/s/^version = .*/version = \"${CLEAN_VERSION}\"/" Cargo.toml
+      - name: Publish to Zed Extensions registry
+        if: vars.HARBOR_PILOT_APP_ID != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          CLEAN_VERSION="${VERSION#v}"
+          COMMIT_SHA="${GITHUB_SHA}"
+          BRANCH="tally-update"
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Clone the fork (owned by wharflab org)
+          gh repo clone wharflab/zed-extensions /tmp/zed-extensions
+          cd /tmp/zed-extensions
+
+          # Ensure upstream remote and sync
+          git remote add upstream https://github.com/zed-industries/extensions.git 2>/dev/null || true
+          git fetch upstream main
+          git checkout -B "${BRANCH}" upstream/main
+
+          # Update the submodule to the tagged commit
+          git submodule update --init extensions/tally 2>/dev/null || git submodule add https://github.com/wharflab/tally.git extensions/tally
+          cd extensions/tally
+          git fetch origin "${COMMIT_SHA}"
+          git checkout "${COMMIT_SHA}"
+          cd ../..
+
+          # Update version in extensions.toml
+          sed -i "/^\[tally\]/,/^version = /s/^version = .*/version = \"${CLEAN_VERSION}\"/" extensions.toml
+
+          git add extensions/tally extensions.toml
+          git commit -m "tally: update to v${CLEAN_VERSION}"
+          git push origin "${BRANCH}" --force
+
+          # Check if an open PR from wharflab already exists
+          EXISTING_PR=$(gh pr list \
+            --repo zed-industries/extensions \
+            --head "wharflab:${BRANCH}" \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -n "${EXISTING_PR}" ]; then
+            # Update existing PR title and body
+            gh pr edit "${EXISTING_PR}" \
+              --repo zed-industries/extensions \
+              --title "tally: update to v${CLEAN_VERSION}" \
+              --body "Automated version bump for tally extension to v${CLEAN_VERSION}."
+            echo "Updated existing PR #${EXISTING_PR}"
+          else
+            # Create new PR
+            gh pr create \
+              --repo zed-industries/extensions \
+              --head "wharflab:${BRANCH}" \
+              --base main \
+              --title "tally: update to v${CLEAN_VERSION}" \
+              --body "Automated version bump for tally extension to v${CLEAN_VERSION}."
+          fi

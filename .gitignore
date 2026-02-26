@@ -61,6 +61,7 @@ package-lock.json
 _integrations/intellij-tally/.cache/
 _integrations/intellij-tally/out/
 _integrations/intellij-tally/dist/
+_integrations/zed-tally/target/
 verification-*/
 packaging/npm/**/bin/tally*
 packaging/npm/**/README.md

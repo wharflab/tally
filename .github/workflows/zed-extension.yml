@@ -1,0 +1,36 @@
+---
+name: Zed Extension
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '_integrations/zed-tally/**'
+  push:
+    branches: [main]
+    paths:
+      - '_integrations/zed-tally/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    name: Zed Extension Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip2
+          components: clippy, rustfmt
+      - name: Unit tests
+        working-directory: _integrations/zed-tally
+        run: cargo test
+      - name: WASM check
+        working-directory: _integrations/zed-tally
+        run: cargo check --target wasm32-wasip2
+      - name: Clippy (WASM)
+        working-directory: _integrations/zed-tally
+        run: cargo clippy --target wasm32-wasip2 -- -D warnings
+      - name: Fmt check
+        working-directory: _integrations/zed-tally
+        run: cargo fmt --check
