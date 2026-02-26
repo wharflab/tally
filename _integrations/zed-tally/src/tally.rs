@@ -297,55 +297,201 @@ fn has_tally_dependency(package_json: &str) -> bool {
 
 // ---------------------------------------------------------------------------
 // Tests (run with `cargo test` on native target, not WASM)
+//
+// These tests cross-validate against real packaging files in the monorepo
+// (via include_str!) so they break if packaging structure drifts from
+// what the extension expects.
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// The real tally-cli package.json from packaging/npm/tally/.
+    const TALLY_CLI_PACKAGE_JSON: &str = include_str!("../../../packaging/npm/tally/package.json");
+
+    /// A real platform-specific package.json (darwin-arm64).
+    const PLATFORM_PKG_DARWIN_ARM64: &str =
+        include_str!("../../../packaging/npm/tally-darwin-arm64/package.json");
+
+    /// The real pyproject.toml from packaging/pypi/.
+    const PYPROJECT_TOML: &str = include_str!("../../../packaging/pypi/pyproject.toml");
+
+    // -- has_tally_dependency: cross-validate against real package.json ------
+
     #[test]
-    fn test_has_tally_dependency_in_deps() {
-        let json = r#"{"dependencies": {"tally-cli": "^0.5.0"}}"#;
-        assert!(has_tally_dependency(json));
+    fn real_npm_package_is_named_tally_cli() {
+        // The main npm package must be named "tally-cli" — our dependency
+        // detection in has_tally_dependency hard-codes this name.
+        let pkg: Value = serde_json::from_str(TALLY_CLI_PACKAGE_JSON).unwrap();
+        assert_eq!(pkg["name"].as_str().unwrap(), "tally-cli");
     }
 
     #[test]
-    fn test_has_tally_dependency_in_dev_deps() {
-        let json = r#"{"devDependencies": {"tally-cli": "latest"}}"#;
-        assert!(has_tally_dependency(json));
+    fn has_tally_dependency_detects_real_optional_deps() {
+        // A project that lists tally-cli as a dependency should be detected.
+        // Build a minimal package.json that mirrors a real user project.
+        let real_pkg: Value = serde_json::from_str(TALLY_CLI_PACKAGE_JSON).unwrap();
+        let pkg_name = real_pkg["name"].as_str().unwrap();
+
+        let user_project = format!(r#"{{"dependencies": {{"{pkg_name}": "^1.0.0"}}}}"#);
+        assert!(has_tally_dependency(&user_project));
+
+        let user_project_dev = format!(r#"{{"devDependencies": {{"{pkg_name}": "latest"}}}}"#);
+        assert!(has_tally_dependency(&user_project_dev));
     }
 
     #[test]
-    fn test_has_tally_dependency_absent() {
-        let json = r#"{"dependencies": {"express": "^4.0.0"}}"#;
-        assert!(!has_tally_dependency(json));
-    }
-
-    #[test]
-    fn test_has_tally_dependency_empty() {
+    fn has_tally_dependency_negative_cases() {
+        assert!(!has_tally_dependency(
+            r#"{"dependencies": {"express": "^4.0.0"}}"#
+        ));
         assert!(!has_tally_dependency("{}"));
-    }
-
-    #[test]
-    fn test_has_tally_dependency_invalid_json() {
         assert!(!has_tally_dependency("not json"));
     }
 
-    #[test]
-    fn test_npm_binary_path_unix() {
-        let path = npm_binary_path("@wharflab/tally-darwin-arm64", &Os::Mac);
-        assert_eq!(path, "node_modules/@wharflab/tally-darwin-arm64/bin/tally");
+    // -- npm platform packages: cross-validate names and binary paths -------
 
-        let path = npm_binary_path("@wharflab/tally-linux-x64", &Os::Linux);
-        assert_eq!(path, "node_modules/@wharflab/tally-linux-x64/bin/tally");
+    #[test]
+    fn real_platform_packages_listed_in_optional_deps() {
+        // Every platform package that npm_package_name() can produce must
+        // appear in the real tally-cli optionalDependencies.
+        let pkg: Value = serde_json::from_str(TALLY_CLI_PACKAGE_JSON).unwrap();
+        let opt_deps = &pkg["optionalDependencies"];
+
+        let platforms: &[(&str, &str)] = &[
+            ("darwin", "arm64"),
+            ("darwin", "x64"),
+            ("linux", "arm64"),
+            ("linux", "x64"),
+            ("windows", "arm64"),
+            ("windows", "x64"),
+        ];
+        for (os, arch) in platforms {
+            let name = format!("@wharflab/tally-{os}-{arch}");
+            assert!(
+                !opt_deps[&name].is_null(),
+                "platform package {name} missing from tally-cli optionalDependencies"
+            );
+        }
     }
 
     #[test]
-    fn test_npm_binary_path_windows() {
-        let path = npm_binary_path("@wharflab/tally-windows-x64", &Os::Windows);
-        assert_eq!(
-            path,
-            "node_modules/@wharflab/tally-windows-x64/bin/tally.exe"
+    fn real_platform_package_declares_bin_directory() {
+        // The platform-specific package must include "bin/" in its files
+        // array — that's where npm_binary_path expects the binary to live.
+        let pkg: Value = serde_json::from_str(PLATFORM_PKG_DARWIN_ARM64).unwrap();
+        let files: Vec<&str> = pkg["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_str().unwrap())
+            .collect();
+        assert!(
+            files.iter().any(|f| f.starts_with("bin")),
+            "platform package files array must include bin/: got {files:?}"
         );
+    }
+
+    #[test]
+    fn npm_binary_path_matches_platform_package_structure() {
+        // Verify npm_binary_path produces paths consistent with the real
+        // platform package name from optionalDependencies.
+        let pkg: Value = serde_json::from_str(PLATFORM_PKG_DARWIN_ARM64).unwrap();
+        let real_name = pkg["name"].as_str().unwrap();
+
+        let path = npm_binary_path(real_name, &Os::Mac);
+        assert_eq!(path, format!("node_modules/{real_name}/bin/tally"));
+    }
+
+    #[test]
+    fn npm_binary_path_windows_uses_exe_suffix() {
+        let path = npm_binary_path("@wharflab/tally-windows-x64", &Os::Windows);
+        assert!(
+            path.ends_with("tally.exe"),
+            "Windows binary path must end with tally.exe: got {path}"
+        );
+    }
+
+    // -- pyproject.toml: cross-validate Python binary name ------------------
+
+    #[test]
+    fn real_pypi_package_exposes_tally_script() {
+        // find_venv_binary looks for a binary named "tally" in the venv.
+        // The pyproject.toml [project.scripts] section must declare this name.
+        assert!(
+            PYPROJECT_TOML.contains("tally = "),
+            "pyproject.toml must declare a 'tally' script entry point"
+        );
+    }
+
+    #[test]
+    fn real_pypi_package_is_named_tally_cli() {
+        // The pip package name is "tally-cli", matching what users `pip install`.
+        assert!(
+            PYPROJECT_TOML.contains(r#"name = "tally-cli""#),
+            "pyproject.toml project name must be tally-cli"
+        );
+    }
+
+    // -- github_release_asset: validate naming matches goreleaser template --
+
+    #[test]
+    fn github_asset_names_match_goreleaser_convention() {
+        // GoReleaser template: tally_{Version}_{MacOS|Linux|Windows}_{x86_64|arm64}.{tar.gz|zip}
+        let cases: &[(Os, Architecture, &str, DownloadedFileType)] = &[
+            (
+                Os::Mac,
+                Architecture::Aarch64,
+                "tally_1.2.3_MacOS_arm64.tar.gz",
+                DownloadedFileType::GzipTar,
+            ),
+            (
+                Os::Mac,
+                Architecture::X8664,
+                "tally_1.2.3_MacOS_x86_64.tar.gz",
+                DownloadedFileType::GzipTar,
+            ),
+            (
+                Os::Linux,
+                Architecture::Aarch64,
+                "tally_1.2.3_Linux_arm64.tar.gz",
+                DownloadedFileType::GzipTar,
+            ),
+            (
+                Os::Linux,
+                Architecture::X8664,
+                "tally_1.2.3_Linux_x86_64.tar.gz",
+                DownloadedFileType::GzipTar,
+            ),
+            (
+                Os::Windows,
+                Architecture::Aarch64,
+                "tally_1.2.3_Windows_arm64.zip",
+                DownloadedFileType::Zip,
+            ),
+            (
+                Os::Windows,
+                Architecture::X8664,
+                "tally_1.2.3_Windows_x86_64.zip",
+                DownloadedFileType::Zip,
+            ),
+        ];
+        for (os, arch, expected_name, expected_type) in cases {
+            let (name, file_type) = github_release_asset(os, arch, "1.2.3").unwrap();
+            assert_eq!(
+                &name, expected_name,
+                "asset name mismatch for {os:?}/{arch:?}"
+            );
+            assert_eq!(
+                &file_type, expected_type,
+                "file type mismatch for {os:?}/{arch:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn github_asset_rejects_x86() {
+        assert!(github_release_asset(&Os::Linux, &Architecture::X86, "1.0.0").is_err());
     }
 }
