@@ -99,6 +99,7 @@ func (r *Runner) Run(ctx context.Context, script string, opts Options) (JSON1Out
 }
 
 func (r *Runner) init(ctx context.Context) error {
+	initCtx := runtimeInitContext(ctx)
 	r.initOnce.Do(func() {
 		rtCfg := wazero.NewRuntimeConfig().WithDebugInfoEnabled(false)
 		cache := newCompilationCache()
@@ -107,17 +108,17 @@ func (r *Runner) init(ctx context.Context) error {
 			r.cache = cache
 		}
 
-		rt := wazero.NewRuntimeWithConfig(ctx, rtCfg)
+		rt := wazero.NewRuntimeWithConfig(initCtx, rtCfg)
 
-		if _, err := wasi_snapshot_preview1.Instantiate(ctx, rt); err != nil {
-			_ = rt.Close(ctx)
+		if _, err := wasi_snapshot_preview1.Instantiate(initCtx, rt); err != nil {
+			_ = rt.Close(initCtx)
 			r.initErr = fmt.Errorf("instantiate WASI: %w", err)
 			return
 		}
 
-		compiled, err := rt.CompileModule(ctx, wasm.Binary)
+		compiled, err := rt.CompileModule(initCtx, wasm.Binary)
 		if err != nil {
-			_ = rt.Close(ctx)
+			_ = rt.Close(initCtx)
 			r.initErr = fmt.Errorf("compile shellcheck.wasm: %w", err)
 			return
 		}
@@ -126,6 +127,13 @@ func (r *Runner) init(ctx context.Context) error {
 		r.compiled = compiled
 	})
 	return r.initErr
+}
+
+func runtimeInitContext(ctx context.Context) context.Context {
+	if ctx == nil {
+		return context.Background()
+	}
+	return context.WithoutCancel(ctx)
 }
 
 func newCompilationCache() wazero.CompilationCache {
