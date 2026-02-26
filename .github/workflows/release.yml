@@ -599,8 +599,11 @@ jobs:
     env:
       VERSION: ${{ inputs.version || github.ref_name }}
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout tally
+        uses: actions/checkout@v6
         if: vars.HARBOR_PILOT_APP_ID != ''
+        with:
+          path: tally
       - name: Generate GitHub App token
         id: app-token
         if: vars.HARBOR_PILOT_APP_ID != ''
@@ -610,6 +613,13 @@ jobs:
           private-key: ${{ secrets.HARBOR_PILOT_PRIVATE_KEY }}
           owner: wharflab
           repositories: zed-extensions
+      - name: Checkout zed-extensions fork
+        uses: actions/checkout@v6
+        if: vars.HARBOR_PILOT_APP_ID != ''
+        with:
+          repository: wharflab/zed-extensions
+          token: ${{ steps.app-token.outputs.token }}
+          path: zed-extensions
       - name: Install taplo
         if: vars.HARBOR_PILOT_APP_ID != ''
         uses: taiki-e/install-action@v2
@@ -622,30 +632,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           CLEAN_VERSION="${VERSION#v}"
-          COMMIT_SHA="${GITHUB_SHA}"
           BRANCH="tally-update"
 
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Clone the fork (owned by wharflab org)
-          gh repo clone wharflab/zed-extensions /tmp/zed-extensions
-          cd /tmp/zed-extensions
-
-          # Ensure upstream remote and sync
-          git remote add upstream https://github.com/zed-industries/extensions.git 2>/dev/null || true
-          git fetch upstream main
-          git checkout -B "${BRANCH}" upstream/main
-
-          # Update the submodule to the tagged commit
-          git submodule update --init extensions/tally 2>/dev/null || git submodule add https://github.com/wharflab/tally.git extensions/tally
-          cd extensions/tally
-          git fetch origin "${COMMIT_SHA}"
-          git checkout "${COMMIT_SHA}"
+          # --- Prepare the tally submodule with version bump ---
+          cd tally
 
           # Set version in extension manifest to match the release tag.
-          # This must be committed into the submodule so the SHA that
-          # zed-extensions references contains the correct version.
           EXT_TOML="_integrations/zed-tally/extension.toml"
           CARGO_TOML="_integrations/zed-tally/Cargo.toml"
 
@@ -670,6 +665,22 @@ jobs:
           # when zed-industries/extensions CI clones the submodule.
           git push "https://x-access-token:${GITHUB_TOKEN}@github.com/wharflab/tally.git" \
             "HEAD:refs/heads/zed-release-v${CLEAN_VERSION}"
+          SUBMODULE_SHA="$(git rev-parse HEAD)"
+          cd ..
+
+          # --- Update the zed-extensions fork ---
+          cd zed-extensions
+
+          # Sync with upstream
+          git remote add upstream https://github.com/zed-industries/extensions.git 2>/dev/null || true
+          git fetch upstream main
+          git checkout -B "${BRANCH}" upstream/main
+
+          # Add or update the tally submodule
+          git submodule update --init extensions/tally 2>/dev/null || git submodule add https://github.com/wharflab/tally.git extensions/tally
+          cd extensions/tally
+          git fetch origin "${SUBMODULE_SHA}"
+          git checkout "${SUBMODULE_SHA}"
           cd ../..
 
           # Update or add [tally] entry in extensions.toml
@@ -678,13 +689,11 @@ jobs:
             sed -i "/^\[tally\]/,/^version = /s/^version = .*/version = \"${CLEAN_VERSION}\"/" extensions.toml
           else
             # Initial registration — append the entry
-            cat >> extensions.toml <<ENTRY
-
-          [tally]
-          submodule = "extensions/tally"
-          path = "_integrations/zed-tally"
-          version = "${CLEAN_VERSION}"
-          ENTRY
+            printf '\n%s\n%s\n%s\n%s\n' \
+              '[tally]' \
+              'submodule = "extensions/tally"' \
+              'path = "_integrations/zed-tally"' \
+              "version = \"${CLEAN_VERSION}\"" >> extensions.toml
           fi
           ACTUAL="$(taplo get -f extensions.toml --strip-newline tally.version)"
           if [ "${ACTUAL}" != "${CLEAN_VERSION}" ]; then
