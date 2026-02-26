@@ -16,6 +16,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	jsonv2 "encoding/json/v2"
 	"golang.org/x/exp/jsonrpc2"
@@ -39,6 +40,9 @@ type Server struct {
 	documents *DocumentStore
 	lintCache *lintResultCache
 
+	shellcheckDebounceMu sync.Mutex
+	shellcheckDebounce   map[string]*time.Timer
+
 	settingsMu sync.RWMutex
 	settings   clientSettings
 
@@ -54,6 +58,7 @@ func New() *Server {
 		exitCh:    make(chan struct{}),
 		documents: NewDocumentStore(),
 		lintCache: newLintResultCache(),
+		shellcheckDebounce: make(map[string]*time.Timer),
 		settings:  defaultClientSettings(),
 		// Default to push diagnostics (publishDiagnostics). If the client supports
 		// the LSP 3.17 pull model, we switch to pull to avoid duplicate diagnostics.
@@ -351,6 +356,7 @@ func (s *Server) handleDidClose(ctx context.Context, params *protocol.DidCloseTe
 	if doc := s.documents.Get(uri); doc != nil {
 		docVersion = &doc.Version
 	}
+	s.cancelShellcheckDebounce(uri)
 	s.documents.Close(uri)
 	s.lintCache.delete(uri)
 	if s.pushDiagnosticsEnabled() {
