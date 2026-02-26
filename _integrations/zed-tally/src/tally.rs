@@ -71,11 +71,17 @@ impl TallyExtension {
     }
 
     /// Check for a Python venv containing tally.
+    /// Uses runtime OS detection since this code compiles to WASM.
     fn find_venv_binary(&self, worktree: &Worktree, root: &str) -> Option<String> {
+        let (os, _) = zed::current_platform();
+        let (subdir, binary_name) = match os {
+            Os::Windows => ("Scripts", "tally.exe"),
+            _ => ("bin", "tally"),
+        };
         for venv_dir in [".venv", "venv"] {
             let cfg_path = format!("{venv_dir}/pyvenv.cfg");
             if worktree.read_text_file(&cfg_path).is_ok() {
-                return Some(format!("{root}/{venv_dir}/bin/tally"));
+                return Some(format!("{root}/{venv_dir}/{subdir}/{binary_name}"));
             }
         }
         None
