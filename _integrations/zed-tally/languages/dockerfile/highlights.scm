@@ -36,7 +36,9 @@
 
 (image_spec
 	(image_tag
-		":" @punctuation.special)
+		":" @punctuation.special))
+
+(image_spec
 	(image_digest
 		"@" @punctuation.special))
 
