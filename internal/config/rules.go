@@ -128,7 +128,7 @@ func (rc *RulesConfig) IsEnabled(ruleCode string) *bool {
 	}
 
 	// Check Include first (takes precedence)
-	if matchesAnyPattern(ruleCode, rc.Include) {
+	if matchesAnyIncludePattern(ruleCode, rc.Include) {
 		return new(true)
 	}
 
@@ -151,6 +151,24 @@ func matchesAnyPattern(ruleCode string, patterns []string) bool {
 	})
 }
 
+// matchesAnyIncludePattern checks if ruleCode matches any include pattern.
+// It also applies ShellCheck include coupling so selecting the engine enables
+// all derived findings, and selecting any specific SC rule enables the engine.
+func matchesAnyIncludePattern(ruleCode string, patterns []string) bool {
+	return slices.ContainsFunc(patterns, func(pattern string) bool {
+		if matchesPattern(ruleCode, pattern) {
+			return true
+		}
+		if pattern == "shellcheck/ShellCheck" {
+			return strings.HasPrefix(ruleCode, "shellcheck/")
+		}
+		if ruleCode == "shellcheck/ShellCheck" {
+			return strings.HasPrefix(pattern, "shellcheck/SC")
+		}
+		return false
+	})
+}
+
 // matchesPattern checks if ruleCode matches a single pattern.
 func matchesPattern(ruleCode, pattern string) bool {
 	// Universal wildcard matches everything
@@ -167,16 +185,6 @@ func matchesPattern(ruleCode, pattern string) bool {
 	if prefix, ok := strings.CutSuffix(pattern, "/*"); ok {
 		ns, _ := parseRuleCode(ruleCode)
 		return ns == prefix
-	}
-
-	// ShellCheck integration: selecting the ShellCheck engine rule should enable
-	// all ShellCheck-derived findings, and selecting any specific SC rule should
-	// enable the engine rule so it can produce those findings.
-	if pattern == "shellcheck/ShellCheck" {
-		return strings.HasPrefix(ruleCode, "shellcheck/")
-	}
-	if ruleCode == "shellcheck/ShellCheck" {
-		return strings.HasPrefix(pattern, "shellcheck/SC")
 	}
 
 	return false
