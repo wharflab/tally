@@ -44,6 +44,11 @@ type diagnosticsTask struct {
 	content []byte
 }
 
+type shellcheckDebounceEntry struct {
+	timer *time.Timer
+	id    uint64
+}
+
 // lintResultCache caches lint results keyed by document URI + version
 // to avoid redundant linting between publishDiagnostics and codeAction requests.
 type lintResultCache struct {
@@ -193,10 +198,16 @@ func (s *Server) scheduleFullPass(
 	cfg *config.Config,
 	parseResult *dockerfile.ParseResult,
 ) {
-	var timer *time.Timer
-	timer = time.AfterFunc(shellcheckDiagnosticsDebounce, func() {
-		defer s.clearShellcheckDebounceTimer(docURI, timer)
-		if !s.isCurrentShellcheckDebounceTimer(docURI, timer) || !s.documentVersionCurrent(docURI, version) {
+	s.shellcheckDebounceMu.Lock()
+	s.shellcheckDebounceID++
+	timerID := s.shellcheckDebounceID
+	if existing := s.shellcheckDebounce[docURI]; existing.timer != nil {
+		existing.timer.Stop()
+	}
+
+	timer := time.AfterFunc(shellcheckDiagnosticsDebounce, func() {
+		defer s.clearShellcheckDebounceTimer(docURI, timerID)
+		if !s.isCurrentShellcheckDebounceTimer(docURI, timerID) || !s.documentVersionCurrent(docURI, version) {
 			return
 		}
 
@@ -208,19 +219,17 @@ func (s *Server) scheduleFullPass(
 		s.lintCache.set(docURI, version, fullViolations)
 		s.notifyDiagnostics(ctx, docURI, version, fullViolations)
 	})
-
-	s.shellcheckDebounceMu.Lock()
-	if existing := s.shellcheckDebounce[docURI]; existing != nil {
-		existing.Stop()
+	s.shellcheckDebounce[docURI] = shellcheckDebounceEntry{
+		timer: timer,
+		id:    timerID,
 	}
-	s.shellcheckDebounce[docURI] = timer
 	s.shellcheckDebounceMu.Unlock()
 }
 
 func (s *Server) cancelShellcheckDebounce(docURI string) {
 	s.shellcheckDebounceMu.Lock()
-	if timer := s.shellcheckDebounce[docURI]; timer != nil {
-		timer.Stop()
+	if entry := s.shellcheckDebounce[docURI]; entry.timer != nil {
+		entry.timer.Stop()
 		delete(s.shellcheckDebounce, docURI)
 	}
 	s.shellcheckDebounceMu.Unlock()
@@ -228,25 +237,25 @@ func (s *Server) cancelShellcheckDebounce(docURI string) {
 
 func (s *Server) cancelAllShellcheckDebounce() {
 	s.shellcheckDebounceMu.Lock()
-	for docURI, timer := range s.shellcheckDebounce {
-		timer.Stop()
+	for docURI, entry := range s.shellcheckDebounce {
+		entry.timer.Stop()
 		delete(s.shellcheckDebounce, docURI)
 	}
 	s.shellcheckDebounceMu.Unlock()
 }
 
-func (s *Server) clearShellcheckDebounceTimer(docURI string, timer *time.Timer) {
+func (s *Server) clearShellcheckDebounceTimer(docURI string, timerID uint64) {
 	s.shellcheckDebounceMu.Lock()
-	if s.shellcheckDebounce[docURI] == timer {
+	if current := s.shellcheckDebounce[docURI]; current.id == timerID {
 		delete(s.shellcheckDebounce, docURI)
 	}
 	s.shellcheckDebounceMu.Unlock()
 }
 
-func (s *Server) isCurrentShellcheckDebounceTimer(docURI string, timer *time.Timer) bool {
+func (s *Server) isCurrentShellcheckDebounceTimer(docURI string, timerID uint64) bool {
 	s.shellcheckDebounceMu.Lock()
 	defer s.shellcheckDebounceMu.Unlock()
-	return s.shellcheckDebounce[docURI] == timer
+	return s.shellcheckDebounce[docURI].id == timerID
 }
 
 func (s *Server) notifyDiagnostics(ctx context.Context, docURI string, version int32, violations []rules.Violation) {

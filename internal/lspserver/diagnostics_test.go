@@ -22,15 +22,16 @@ func TestScheduleFullPass_ReplacesExistingTimer(t *testing.T) {
 	s.shellcheckDebounceMu.Lock()
 	first := s.shellcheckDebounce[uri]
 	s.shellcheckDebounceMu.Unlock()
-	require.NotNil(t, first)
+	require.NotNil(t, first.timer)
 
 	s.scheduleFullPass(context.Background(), uri, 2, nil, nil, nil)
 
 	s.shellcheckDebounceMu.Lock()
 	second := s.shellcheckDebounce[uri]
 	s.shellcheckDebounceMu.Unlock()
-	require.NotNil(t, second)
-	assert.NotSame(t, first, second)
+	require.NotNil(t, second.timer)
+	assert.NotSame(t, first.timer, second.timer)
+	assert.NotEqual(t, first.id, second.id)
 
 	s.cancelShellcheckDebounce(uri)
 }
@@ -48,7 +49,8 @@ func TestScheduleFullPass_CleansUpTimerAfterCallback(t *testing.T) {
 	require.Eventually(t, func() bool {
 		s.shellcheckDebounceMu.Lock()
 		defer s.shellcheckDebounceMu.Unlock()
-		return s.shellcheckDebounce[uri] == nil
+		_, ok := s.shellcheckDebounce[uri]
+		return !ok
 	}, 2*time.Second, 25*time.Millisecond)
 }
 

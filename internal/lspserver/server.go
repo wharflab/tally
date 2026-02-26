@@ -16,7 +16,6 @@ import (
 	"os"
 	"strconv"
 	"sync"
-	"time"
 
 	jsonv2 "encoding/json/v2"
 	"golang.org/x/exp/jsonrpc2"
@@ -41,7 +40,8 @@ type Server struct {
 	lintCache *lintResultCache
 
 	shellcheckDebounceMu sync.Mutex
-	shellcheckDebounce   map[string]*time.Timer
+	shellcheckDebounce   map[string]shellcheckDebounceEntry
+	shellcheckDebounceID uint64
 
 	diagnosticsDispatchMu      sync.Mutex
 	diagnosticsInFlightByURI   map[string]bool
@@ -64,7 +64,7 @@ func New() *Server {
 		exitCh:                   make(chan struct{}),
 		documents:                NewDocumentStore(),
 		lintCache:                newLintResultCache(),
-		shellcheckDebounce:       make(map[string]*time.Timer),
+		shellcheckDebounce:       make(map[string]shellcheckDebounceEntry),
 		diagnosticsInFlightByURI: make(map[string]bool),
 		diagnosticsPendingByURI:  make(map[string]diagnosticsTask),
 		diagnosticsConcurrencyGate: make(
