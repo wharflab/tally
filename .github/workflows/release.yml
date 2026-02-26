@@ -672,8 +672,20 @@ jobs:
             "HEAD:refs/heads/zed-release-v${CLEAN_VERSION}"
           cd ../..
 
-          # Update version in extensions.toml
-          sed -i "/^\[tally\]/,/^version = /s/^version = .*/version = \"${CLEAN_VERSION}\"/" extensions.toml
+          # Update or add [tally] entry in extensions.toml
+          if taplo get -f extensions.toml tally.version >/dev/null 2>&1; then
+            # Entry exists — update version in place
+            sed -i "/^\[tally\]/,/^version = /s/^version = .*/version = \"${CLEAN_VERSION}\"/" extensions.toml
+          else
+            # Initial registration — append the entry
+            cat >> extensions.toml <<ENTRY
+
+          [tally]
+          submodule = "extensions/tally"
+          path = "_integrations/zed-tally"
+          version = "${CLEAN_VERSION}"
+          ENTRY
+          fi
           ACTUAL="$(taplo get -f extensions.toml --strip-newline tally.version)"
           if [ "${ACTUAL}" != "${CLEAN_VERSION}" ]; then
             echo "::error::Failed to set version in extensions.toml (expected=${CLEAN_VERSION}, actual=${ACTUAL})"
