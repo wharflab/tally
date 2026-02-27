@@ -360,12 +360,12 @@ The prerequisite ([design-docs/26](26-windows-container-support.md)) adds a `Bas
 `StageInfo` in `internal/semantic/stage_info.go`:
 
 ```go
-type BaseImageOS string
+type BaseImageOS int
 
 const (
-    BaseImageOSLinux   BaseImageOS = "linux"
-    BaseImageOSWindows BaseImageOS = "windows"
-    BaseImageOSUnknown BaseImageOS = ""
+    BaseImageOSUnknown BaseImageOS = iota
+    BaseImageOSLinux
+    BaseImageOSWindows
 )
 
 type StageInfo struct {

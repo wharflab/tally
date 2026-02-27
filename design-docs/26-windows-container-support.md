@@ -138,12 +138,12 @@ Currently there is no per-stage OS signal.
 Add a field to the existing `StageInfo` struct:
 
 ```go
-type BaseImageOS string
+type BaseImageOS int
 
 const (
-    BaseImageOSLinux   BaseImageOS = "linux"
-    BaseImageOSWindows BaseImageOS = "windows"
-    BaseImageOSUnknown BaseImageOS = ""
+    BaseImageOSUnknown BaseImageOS = iota
+    BaseImageOSLinux
+    BaseImageOSWindows
 )
 ```
 
