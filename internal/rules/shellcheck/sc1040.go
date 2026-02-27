@@ -2,8 +2,11 @@ package shellcheck
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
+
+	"mvdan.cc/sh/v3/syntax"
 
 	"github.com/wharflab/tally/internal/rules"
 )
@@ -18,17 +21,39 @@ type shellcheckRuleSource uint8
 
 const (
 	shellcheckRuleSourceWASM shellcheckRuleSource = iota
-	shellcheckRuleSourceNative
+	shellcheckRuleSourceGo
 )
 
 type nativeShellcheckChecker func(file string, fallbackLoc rules.Location, mapping scriptMapping) []rules.Violation
 
 var shellcheckRuleOwnership = map[int]shellcheckRuleSource{
-	sc1040Code: shellcheckRuleSourceNative,
+	sc1040Code: shellcheckRuleSourceGo,
 }
 
 var nativeShellcheckCheckers = map[int]nativeShellcheckChecker{
 	sc1040Code: checkNativeSC1040,
+}
+
+type hereDocTerminator struct {
+	dashed bool
+	token  string
+}
+
+type parsedDashHereDoc struct {
+	token          string
+	bodyStartLine  int
+	terminatorLine int
+}
+
+type hereDocEndAnalysis struct {
+	terminated  bool
+	violationAt int
+	spaceRuns   []columnRange
+}
+
+type columnRange struct {
+	start int
+	end   int
 }
 
 func nativeOwnedShellcheckExcludeCodes() []string {
@@ -47,7 +72,7 @@ func nativeOwnedShellcheckExcludeCodes() []string {
 func nativeOwnedShellcheckCodes() []int {
 	codes := make([]int, 0, len(shellcheckRuleOwnership))
 	for code, source := range shellcheckRuleOwnership {
-		if source != shellcheckRuleSourceNative {
+		if source != shellcheckRuleSourceGo {
 			continue
 		}
 		if nativeShellcheckCheckers[code] == nil {
@@ -76,23 +101,48 @@ func runNativeShellcheckChecks(file string, fallbackLoc rules.Location, mapping 
 	return violations
 }
 
-type pendingHereDoc struct {
-	dashed bool
-	token  string
-}
-
-type hereDocEndAnalysis struct {
-	terminated  bool
-	violationAt int
-	fixEnd      int
-	fixText     string
-}
-
 func checkNativeSC1040(file string, fallbackLoc rules.Location, mapping scriptMapping) []rules.Violation {
 	if mapping.Script == "" {
 		return nil
 	}
 
+	parsedDocs, err := parseDashHereDocs(mapping.Script)
+	if err != nil {
+		// Parse errors are owned by parse-status handling; do not continue linting.
+		return nil
+	}
+	if len(parsedDocs) == 0 {
+		return nil
+	}
+
+	originLine := resolveOriginLine(mapping, fallbackLoc)
+	lines := strings.Split(mapping.Script, "\n")
+	violations := make([]rules.Violation, 0)
+
+	for _, doc := range parsedDocs {
+		lineStart := max(doc.bodyStartLine, 1)
+		lineEnd := min(doc.terminatorLine, len(lines))
+		if lineEnd < lineStart {
+			continue
+		}
+
+		for scriptLine := lineStart; scriptLine <= lineEnd; scriptLine++ {
+			analysis := analyzeHereDocEndLine(lines[scriptLine-1], hereDocTerminator{
+				dashed: true,
+				token:  doc.token,
+			})
+			if analysis.violationAt < 0 {
+				continue
+			}
+			dockerLine := originLine + scriptLine - 1
+			violations = append(violations, buildSC1040Violation(file, dockerLine, analysis))
+		}
+	}
+
+	return violations
+}
+
+func resolveOriginLine(mapping scriptMapping, fallbackLoc rules.Location) int {
 	originLine := mapping.OriginStartLine
 	if originLine <= 0 {
 		originLine = fallbackLoc.Start.Line
@@ -103,50 +153,175 @@ func checkNativeSC1040(file string, fallbackLoc rules.Location, mapping scriptMa
 	if originLine <= 0 {
 		originLine = 1
 	}
-
-	lines := strings.Split(mapping.Script, "\n")
-	pending := make([]pendingHereDoc, 0, 2)
-	violations := make([]rules.Violation, 0)
-
-	for idx, line := range lines {
-		if len(pending) > 0 {
-			analysis := analyzeHereDocEndLine(line, pending[0])
-			if analysis.violationAt >= 0 {
-				dockerLine := originLine + idx
-				loc := rules.NewRangeLocation(file, dockerLine, analysis.violationAt, dockerLine, analysis.violationAt)
-				v := rules.NewViolation(loc, sc1040RuleCode, sc1040Message, rules.SeverityError).
-					WithDocURL(rules.ShellcheckDocURL("SC1040"))
-				fix := &rules.SuggestedFix{
-					Description: "Normalize <<- heredoc terminator indentation (tabs only)",
-					Safety:      rules.FixSafe,
-					IsPreferred: true,
-					Edits: []rules.TextEdit{{
-						Location: rules.NewRangeLocation(file, dockerLine, analysis.violationAt, dockerLine, analysis.fixEnd),
-						NewText:  analysis.fixText,
-					}},
-				}
-				violations = append(violations, v.WithSuggestedFix(fix))
-			}
-
-			if analysis.terminated {
-				pending = pending[1:]
-			}
-			continue
-		}
-
-		pending = append(pending, parseHereDocStarts(line)...)
-	}
-
-	return violations
+	return originLine
 }
 
-func analyzeHereDocEndLine(line string, pending pendingHereDoc) hereDocEndAnalysis {
-	start, matched := matchHereDocTokenStart(line, pending.token)
+func buildSC1040Violation(file string, dockerLine int, analysis hereDocEndAnalysis) rules.Violation {
+	loc := rules.NewRangeLocation(file, dockerLine, analysis.violationAt, dockerLine, analysis.violationAt)
+	v := rules.NewViolation(loc, sc1040RuleCode, sc1040Message, rules.SeverityError).
+		WithDocURL(rules.TallyDocURL(sc1040RuleCode))
+
+	edits := make([]rules.TextEdit, 0, len(analysis.spaceRuns))
+	for _, run := range analysis.spaceRuns {
+		edits = append(edits, rules.TextEdit{
+			Location: rules.NewRangeLocation(file, dockerLine, run.start, dockerLine, run.end),
+			NewText:  "",
+		})
+	}
+
+	fix := &rules.SuggestedFix{
+		Description: "Normalize <<- heredoc terminator indentation (tabs only)",
+		Safety:      rules.FixSafe,
+		IsPreferred: true,
+		Edits:       edits,
+	}
+	return v.WithSuggestedFix(fix)
+}
+
+func parseDashHereDocs(script string) ([]parsedDashHereDoc, error) {
+	parser := syntax.NewParser(
+		syntax.Variant(syntax.LangBash),
+		syntax.KeepComments(false),
+	)
+	file, err := parser.Parse(strings.NewReader(script), "")
+	if err != nil {
+		return nil, err
+	}
+
+	docs := make([]parsedDashHereDoc, 0)
+	syntax.Walk(file, func(node syntax.Node) bool {
+		redir, ok := node.(*syntax.Redirect)
+		if !ok || redir.Op.String() != "<<-" || redir.Word == nil || redir.Hdoc == nil {
+			return true
+		}
+
+		token, ok := decodeHereDocWord(redir.Word)
+		if !ok || token == "" {
+			return true
+		}
+
+		startLine, ok := safeUintToInt(redir.Hdoc.Pos().Line())
+		if !ok {
+			return true
+		}
+		endLine, ok := safeUintToInt(redir.Hdoc.End().Line())
+		if !ok || startLine <= 0 || endLine < startLine {
+			return true
+		}
+
+		docs = append(docs, parsedDashHereDoc{
+			token:          token,
+			bodyStartLine:  startLine,
+			terminatorLine: endLine,
+		})
+		return true
+	})
+
+	return docs, nil
+}
+
+func decodeHereDocWord(word *syntax.Word) (string, bool) {
+	if word == nil {
+		return "", false
+	}
+
+	var b strings.Builder
+	for _, part := range word.Parts {
+		switch p := part.(type) {
+		case *syntax.Lit:
+			b.WriteString(unescapeUnquoted(p.Value))
+		case *syntax.SglQuoted:
+			b.WriteString(p.Value)
+		case *syntax.DblQuoted:
+			s, ok := decodeDoubleQuotedWordParts(p.Parts)
+			if !ok {
+				return "", false
+			}
+			b.WriteString(s)
+		default:
+			// Non-literal parts (e.g. ${x}) should not appear in heredoc words.
+			return "", false
+		}
+	}
+	return b.String(), true
+}
+
+func decodeDoubleQuotedWordParts(parts []syntax.WordPart) (string, bool) {
+	var b strings.Builder
+	for _, part := range parts {
+		switch p := part.(type) {
+		case *syntax.Lit:
+			b.WriteString(unescapeDoubleQuoted(p.Value))
+		default:
+			return "", false
+		}
+	}
+	return b.String(), true
+}
+
+func unescapeUnquoted(s string) string {
+	if !strings.Contains(s, "\\") {
+		return s
+	}
+
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\\' {
+			b.WriteByte(s[i])
+			continue
+		}
+		if i+1 >= len(s) {
+			continue
+		}
+		i++
+		// Outside quotes, backslash escapes the next byte.
+		if s[i] == '\n' {
+			continue
+		}
+		b.WriteByte(s[i])
+	}
+	return b.String()
+}
+
+func unescapeDoubleQuoted(s string) string {
+	if !strings.Contains(s, "\\") {
+		return s
+	}
+
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c != '\\' {
+			b.WriteByte(c)
+			continue
+		}
+		if i+1 >= len(s) {
+			b.WriteByte(c)
+			continue
+		}
+		n := s[i+1]
+		switch n {
+		case '$', '`', '"', '\\':
+			b.WriteByte(n)
+			i++
+		case '\n':
+			i++
+		default:
+			b.WriteByte('\\')
+			b.WriteByte(n)
+			i++
+		}
+	}
+	return b.String()
+}
+
+func analyzeHereDocEndLine(line string, term hereDocTerminator) hereDocEndAnalysis {
+	start, matched := matchHereDocTokenStart(line, term.token)
 	if !matched {
 		return hereDocEndAnalysis{violationAt: -1}
 	}
 
-	afterToken := start + len(pending.token)
+	afterToken := start + len(term.token)
 	trailingEnd := afterToken
 	for trailingEnd < len(line) && isLineWhitespace(line[trailingEnd]) {
 		trailingEnd++
@@ -159,25 +334,45 @@ func analyzeHereDocEndLine(line string, pending pendingHereDoc) hereDocEndAnalys
 	hasTrailingSpace := trailingSpace != ""
 	hasTrailer := trailer != ""
 	leadingTabsOnly := allTabs(leading)
-	leaderIsOk := leading == "" || (pending.dashed && leadingTabsOnly)
+	leaderIsOk := leading == "" || (term.dashed && leadingTabsOnly)
 
 	if leaderIsOk && !hasTrailingSpace && !hasTrailer {
 		return hereDocEndAnalysis{terminated: true, violationAt: -1}
 	}
-
 	if leaderIsOk && hasTrailingSpace && !hasTrailer {
 		return hereDocEndAnalysis{terminated: true, violationAt: -1}
 	}
 
-	if pending.dashed && !leadingTabsOnly {
+	if term.dashed && !leadingTabsOnly {
+		runs := leadingSpaceRuns(leading)
+		if len(runs) == 0 {
+			return hereDocEndAnalysis{violationAt: -1}
+		}
 		return hereDocEndAnalysis{
-			violationAt: 0,
-			fixEnd:      start,
-			fixText:     strings.ReplaceAll(leading, " ", ""),
+			violationAt: runs[0].start,
+			spaceRuns:   runs,
 		}
 	}
 
 	return hereDocEndAnalysis{violationAt: -1}
+}
+
+func leadingSpaceRuns(s string) []columnRange {
+	runs := make([]columnRange, 0, 2)
+	i := 0
+	for i < len(s) {
+		if s[i] != ' ' {
+			i++
+			continue
+		}
+		start := i
+		i++
+		for i < len(s) && s[i] == ' ' {
+			i++
+		}
+		runs = append(runs, columnRange{start: start, end: i})
+	}
+	return runs
 }
 
 func matchHereDocTokenStart(line, token string) (int, bool) {
@@ -197,150 +392,6 @@ func matchHereDocTokenStart(line, token string) (int, bool) {
 	return 0, false
 }
 
-func parseHereDocStarts(line string) []pendingHereDoc {
-	starts := make([]pendingHereDoc, 0, 1)
-
-	for i := 0; i+1 < len(line); {
-		switch line[i] {
-		case '\\':
-			if i+1 < len(line) {
-				i += 2
-				continue
-			}
-			i++
-			continue
-		case '\'', '"', '`':
-			i = skipQuoted(line, i)
-			continue
-		case '#':
-			return starts
-		}
-
-		if line[i] != '<' || line[i+1] != '<' {
-			i++
-			continue
-		}
-
-		j := i + 2
-		dashed := false
-		if j < len(line) && line[j] == '-' {
-			dashed = true
-			j++
-		}
-
-		for j < len(line) && isLineWhitespace(line[j]) {
-			j++
-		}
-
-		token, consumed := readHereDocToken(line[j:])
-		if consumed == 0 {
-			i += 2
-			continue
-		}
-		decoded := unquoteHereDocToken(token)
-		if decoded != "" {
-			starts = append(starts, pendingHereDoc{dashed: dashed, token: decoded})
-		}
-		i = j + consumed
-	}
-
-	return starts
-}
-
-func readHereDocToken(s string) (string, int) {
-	if s == "" {
-		return "", 0
-	}
-
-	var b strings.Builder
-	i := 0
-	for i < len(s) {
-		c := s[i]
-		if isHereDocTokenTerminator(c) {
-			break
-		}
-
-		if c == '\\' {
-			b.WriteByte(c)
-			i++
-			if i < len(s) {
-				b.WriteByte(s[i])
-				i++
-			}
-			continue
-		}
-
-		if c == '\'' || c == '"' {
-			quote := c
-			b.WriteByte(c)
-			i++
-			for i < len(s) {
-				d := s[i]
-				b.WriteByte(d)
-				i++
-				if quote == '"' && d == '\\' && i < len(s) {
-					b.WriteByte(s[i])
-					i++
-					continue
-				}
-				if d == quote {
-					break
-				}
-			}
-			continue
-		}
-
-		b.WriteByte(c)
-		i++
-	}
-
-	token := b.String()
-	if token == "" {
-		return "", 0
-	}
-	return token, i
-}
-
-func unquoteHereDocToken(token string) string {
-	if len(token) >= 2 {
-		if (token[0] == '\'' && token[len(token)-1] == '\'') || (token[0] == '"' && token[len(token)-1] == '"') {
-			return token[1 : len(token)-1]
-		}
-	}
-	if strings.Contains(token, "\\") {
-		return strings.ReplaceAll(token, "\\", "")
-	}
-	return token
-}
-
-func skipQuoted(line string, start int) int {
-	quote := line[start]
-	i := start + 1
-	for i < len(line) {
-		if quote == '"' && line[i] == '\\' {
-			i += 2
-			continue
-		}
-		if line[i] == quote {
-			return i + 1
-		}
-		i++
-	}
-	return len(line)
-}
-
-func isHereDocTokenTerminator(c byte) bool {
-	if isLineWhitespace(c) {
-		return true
-	}
-	switch c {
-	case ';', '|', '&', '<', '>', '(', ')':
-		return true
-	default:
-		return false
-	}
-}
-
 func isLineWhitespace(c byte) bool {
 	return c == ' ' || c == '\t'
 }
@@ -352,4 +403,11 @@ func allTabs(s string) bool {
 		}
 	}
 	return true
+}
+
+func safeUintToInt(v uint) (int, bool) {
+	if v > uint(math.MaxInt) {
+		return 0, false
+	}
+	return int(v), true
 }

@@ -11,8 +11,14 @@ type sc1040TestCase struct {
 	script    string
 	wantCount int
 	wantLine  int
-	wantEnd   int
-	wantText  string
+	wantCol   int
+	wantEdits []expectedEdit
+}
+
+type expectedEdit struct {
+	start   int
+	end     int
+	newText string
 }
 
 func TestNativeOwnedShellcheckExcludeCodes(t *testing.T) {
@@ -33,7 +39,7 @@ func TestSC1040UpstreamReadHereDocVectors(t *testing.T) {
 	origin := 20
 	tests := []sc1040TestCase{
 		{name: "prop_readHereDoc", script: "cat << foo\nlol\ncow\nfoo", wantCount: 0},
-		{name: "prop_readHereDoc2", script: "cat <<- EOF\n  cow\n  EOF", wantCount: 1, wantLine: origin + 2, wantEnd: 2, wantText: ""},
+		{name: "prop_readHereDoc2", script: "cat <<- EOF\n  cow\n  EOF", wantCount: 0},
 		{name: "prop_readHereDoc3", script: "cat << foo\n$\"\nfoo", wantCount: 0},
 		{name: "prop_readHereDoc4", script: "cat << foo\n`\nfoo", wantCount: 0},
 		{name: "prop_readHereDoc5", script: "cat <<- !foo\nbar\n!foo", wantCount: 0},
@@ -53,8 +59,8 @@ func TestSC1040UpstreamReadHereDocVectors(t *testing.T) {
 			script:    "cat <<- ' foo'\nbar\n  foo\n foo\n",
 			wantCount: 1,
 			wantLine:  origin + 2,
-			wantEnd:   1,
-			wantText:  "",
+			wantCol:   0,
+			wantEdits: []expectedEdit{{start: 0, end: 1, newText: ""}},
 		},
 		{name: "prop_readHereDoc18", script: "cat <<'\"foo'\nbar\n\"foo\n", wantCount: 0},
 		{name: "prop_readHereDoc20", script: "cat << foo\n  foo\n()\nfoo\n", wantCount: 0},
@@ -93,14 +99,49 @@ func TestSC1040FixPreservesTabsAndRemovesSpaces(t *testing.T) {
 	}
 
 	fix := violations[0].SuggestedFix
-	if fix == nil || len(fix.Edits) != 1 {
-		t.Fatalf("expected single fix edit, got %+v", fix)
+	if fix == nil {
+		t.Fatalf("expected fix, got %+v", fix)
 	}
-	if fix.Edits[0].NewText != "\t\t" {
-		t.Fatalf("fix text = %q, want %q", fix.Edits[0].NewText, "\t\t")
+	if len(fix.Edits) != 1 {
+		t.Fatalf("fix edits count = %d, want 1", len(fix.Edits))
 	}
-	if fix.Edits[0].Location.End.Column != 3 {
-		t.Fatalf("fix end column = %d, want 3", fix.Edits[0].Location.End.Column)
+	if fix.Edits[0].Location.Start.Column != 1 || fix.Edits[0].Location.End.Column != 2 {
+		t.Fatalf("fix columns = %d-%d, want 1-2", fix.Edits[0].Location.Start.Column, fix.Edits[0].Location.End.Column)
+	}
+	if fix.Edits[0].NewText != "" {
+		t.Fatalf("fix text = %q, want empty", fix.Edits[0].NewText)
+	}
+}
+
+func TestSC1040FixProducesSeparateEditsForSpaceRuns(t *testing.T) {
+	t.Parallel()
+
+	script := "cat <<-EOF\nbody\n\t  \t   EOF\nEOF\n"
+	origin := 40
+	violations := runNativeShellcheckChecks(
+		"Dockerfile",
+		rules.NewLineLocation("Dockerfile", origin),
+		scriptMapping{Script: script, OriginStartLine: origin, FallbackLine: origin},
+	)
+	if len(violations) != 1 {
+		t.Fatalf("violations count = %d, want 1", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatalf("expected fix, got %+v", fix)
+	}
+	if len(fix.Edits) != 2 {
+		t.Fatalf("fix edits count = %d, want 2", len(fix.Edits))
+	}
+
+	first := fix.Edits[0]
+	if first.Location.Start.Column != 1 || first.Location.End.Column != 3 || first.NewText != "" {
+		t.Fatalf("first edit = %+v, want columns 1-3 with empty replacement", first)
+	}
+	second := fix.Edits[1]
+	if second.Location.Start.Column != 4 || second.Location.End.Column != 7 || second.NewText != "" {
+		t.Fatalf("second edit = %+v, want columns 4-7 with empty replacement", second)
 	}
 }
 
@@ -129,11 +170,14 @@ func assertSC1040Violation(t *testing.T, v rules.Violation, tc sc1040TestCase) {
 	if v.Severity != rules.SeverityError {
 		t.Fatalf("severity = %q, want %q", v.Severity, rules.SeverityError)
 	}
+	if v.DocURL != rules.TallyDocURL(sc1040RuleCode) {
+		t.Fatalf("doc url = %q, want %q", v.DocURL, rules.TallyDocURL(sc1040RuleCode))
+	}
 	if v.Location.Start.Line != tc.wantLine {
 		t.Fatalf("line = %d, want %d", v.Location.Start.Line, tc.wantLine)
 	}
-	if v.Location.Start.Column != 0 {
-		t.Fatalf("start column = %d, want 0", v.Location.Start.Column)
+	if v.Location.Start.Column != tc.wantCol {
+		t.Fatalf("start column = %d, want %d", v.Location.Start.Column, tc.wantCol)
 	}
 	if v.SuggestedFix == nil {
 		t.Fatal("expected suggested fix")
@@ -144,18 +188,28 @@ func assertSC1040Violation(t *testing.T, v rules.Violation, tc sc1040TestCase) {
 	if !v.SuggestedFix.IsPreferred {
 		t.Fatal("expected preferred fix")
 	}
-	if len(v.SuggestedFix.Edits) != 1 {
-		t.Fatalf("fix edits count = %d, want 1", len(v.SuggestedFix.Edits))
+	if len(v.SuggestedFix.Edits) != len(tc.wantEdits) {
+		t.Fatalf("fix edits count = %d, want %d", len(v.SuggestedFix.Edits), len(tc.wantEdits))
 	}
 
-	edit := v.SuggestedFix.Edits[0]
-	if edit.Location.Start.Line != tc.wantLine || edit.Location.End.Line != tc.wantLine {
-		t.Fatalf("fix line range = %d-%d, want %d", edit.Location.Start.Line, edit.Location.End.Line, tc.wantLine)
-	}
-	if edit.Location.Start.Column != 0 || edit.Location.End.Column != tc.wantEnd {
-		t.Fatalf("fix columns = %d-%d, want 0-%d", edit.Location.Start.Column, edit.Location.End.Column, tc.wantEnd)
-	}
-	if edit.NewText != tc.wantText {
-		t.Fatalf("fix new text = %q, want %q", edit.NewText, tc.wantText)
+	for i := range v.SuggestedFix.Edits {
+		edit := v.SuggestedFix.Edits[i]
+		want := tc.wantEdits[i]
+		if edit.Location.Start.Line != tc.wantLine || edit.Location.End.Line != tc.wantLine {
+			t.Fatalf("fix line range = %d-%d, want %d", edit.Location.Start.Line, edit.Location.End.Line, tc.wantLine)
+		}
+		if edit.Location.Start.Column != want.start || edit.Location.End.Column != want.end {
+			t.Fatalf(
+				"fix[%d] columns = %d-%d, want %d-%d",
+				i,
+				edit.Location.Start.Column,
+				edit.Location.End.Column,
+				want.start,
+				want.end,
+			)
+		}
+		if edit.NewText != want.newText {
+			t.Fatalf("fix[%d] new text = %q, want %q", i, edit.NewText, want.newText)
+		}
 	}
 }

@@ -4,7 +4,7 @@
       "file": "testdata/shellcheck-sc1040/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://www.shellcheck.net/wiki/SC1040",
+          "docUrl": "https://wharflab.github.io/tally/rules/shellcheck/SC1040/",
           "location": {
             "end": {
               "column": 0,

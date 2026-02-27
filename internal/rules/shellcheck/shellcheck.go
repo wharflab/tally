@@ -432,19 +432,10 @@ func (r *Rule) checkShellSnippet(
 	}
 
 	baseLoc := rules.NewLocationFromRanges(file, location)
-	mapping := scriptMapping{
-		Script:          snippet,
-		OriginStartLine: baseLoc.Start.Line,
-		FallbackLine:    baseLoc.Start.Line,
-	}
-	nativeViolations := runNativeShellcheckChecks(file, baseLoc, mapping)
 
 	prelude, _ := buildPrelude(dialect, knownEnv)
 	script := prelude + snippet
 	if parseErr := preflightParseShellScript(script, dialect); parseErr != nil {
-		if len(nativeViolations) > 0 {
-			return nativeViolations
-		}
 		return []rules.Violation{rules.NewViolation(
 			baseLoc,
 			metaParseStatusRuleCode,
@@ -452,6 +443,13 @@ func (r *Rule) checkShellSnippet(
 			rules.SeverityInfo,
 		).WithDetail(parseErr.Error())}
 	}
+
+	mapping := scriptMapping{
+		Script:          snippet,
+		OriginStartLine: baseLoc.Start.Line,
+		FallbackLine:    baseLoc.Start.Line,
+	}
+	nativeViolations := runNativeShellcheckChecks(file, baseLoc, mapping)
 
 	out, err := r.runShellcheck(script, intshellcheck.Options{
 		Dialect:  dialect,

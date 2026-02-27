@@ -167,7 +167,7 @@ func TestCheckShellSnippetSkipsNonParseableSnippet(t *testing.T) {
 	}
 }
 
-func TestCheckShellSnippetReturnsNativeSC1040OnParseError(t *testing.T) {
+func TestCheckShellSnippetParseErrorOwnsDiagnostics(t *testing.T) {
 	t.Parallel()
 
 	r := &Rule{}
@@ -181,8 +181,8 @@ func TestCheckShellSnippetReturnsNativeSC1040OnParseError(t *testing.T) {
 	if len(violations) != 1 {
 		t.Fatalf("expected one violation, got %+v", violations)
 	}
-	if violations[0].RuleCode != sc1040RuleCode {
-		t.Fatalf("expected rule %q, got %q", sc1040RuleCode, violations[0].RuleCode)
+	if violations[0].RuleCode != metaParseStatusRuleCode {
+		t.Fatalf("expected rule %q, got %q", metaParseStatusRuleCode, violations[0].RuleCode)
 	}
 }
 
