@@ -222,7 +222,7 @@ CMD ["serve"]
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.content)
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.content)
 
 			violations := r.Check(input)
 
@@ -255,6 +255,7 @@ func TestEpilogueOrderCheckNoSemanticModel(t *testing.T) {
 CMD ["serve"]
 RUN echo hello
 `)
+	input.Semantic = nil // explicitly test nil-semantic fallback
 	violations := r.Check(input)
 	if len(violations) != 0 {
 		t.Errorf("expected 0 violations when semantic model is nil, got %d", len(violations))
@@ -306,7 +307,7 @@ CMD ["second"]
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.content)
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.content)
 			violations := r.Check(input)
 
 			if len(violations) != tt.wantViolations {

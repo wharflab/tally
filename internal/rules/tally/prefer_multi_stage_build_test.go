@@ -84,6 +84,33 @@ CMD ["app"]
 	}
 }
 
+func TestPreferMultiStageBuildRule_WindowsBuildTools_Triggers(t *testing.T) {
+	t.Parallel()
+	content := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN choco install microsoft-build-tools -y
+COPY . c:\build
+RUN nuget restore
+RUN C:\Windows\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe /p:Configuration=Release MyApp.sln
+ENTRYPOINT ["MyApp.exe"]
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	r := NewPreferMultiStageBuildRule()
+	violations := r.Check(input)
+
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	data, ok := violations[0].SuggestedFix.ResolverData.(*autofixdata.MultiStageResolveData)
+	if !ok {
+		t.Fatalf("expected MultiStageResolveData, got %T", violations[0].SuggestedFix.ResolverData)
+	}
+	// choco install (4) + build-tools bonus (2) + msbuild (4) + nuget restore (2) = 12
+	if data.Score < 8 {
+		t.Errorf("expected score >= 8 for Windows build, got %d", data.Score)
+	}
+	t.Logf("signals: %+v, score: %d", data.Signals, data.Score)
+}
+
 func TestPreferMultiStageBuildRule_MinScoreConfig_Disables(t *testing.T) {
 	t.Parallel()
 	content := `FROM golang:1.22-alpine

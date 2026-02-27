@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -16,6 +17,62 @@ import (
 func TestFixRealWorld(t *testing.T) {
 	t.Parallel()
 	testdataDir := filepath.Join("testdata", "benchmark-real-world-fix")
+
+	// Read the original Dockerfile
+	originalContent, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read original Dockerfile: %v", err)
+	}
+
+	// Create a temp directory and copy the Dockerfile
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, originalContent, 0o644); err != nil {
+		t.Fatalf("failed to write Dockerfile: %v", err)
+	}
+
+	// Copy the config file to disable max-lines
+	configContent, err := os.ReadFile(filepath.Join(testdataDir, ".tally.toml"))
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	if err := os.WriteFile(configPath, configContent, 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	// Run tally lint --fix --fix-unsafe (all rules enabled, slow checks off)
+	args := []string{"lint", "--config", configPath, "--slow-checks=off", "--fix", "--fix-unsafe", dockerfilePath}
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(os.Environ(),
+		"GOCOVERDIR="+coverageDir,
+	)
+	output, err := cmd.CombinedOutput()
+	// Exit code 1 is expected due to remaining unfixable violations
+	expectExitCode1(t, output, err)
+
+	// Read the fixed Dockerfile
+	fixedContent, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read fixed Dockerfile: %v", err)
+	}
+
+	// Use snapshot testing for easier maintenance
+	testutil.MatchDockerfileSnapshot(t, string(fixedContent))
+
+	// Verify that fixes were applied (check output contains "Fixed")
+	outputStr := string(output)
+	if !strings.Contains(outputStr, "Fixed") {
+		t.Errorf("expected 'Fixed' in output, got: %s", outputStr)
+	}
+}
+
+// TestFixRealWorldMetalama tests auto-fix on a Windows-based real-world Dockerfile
+// (PowerShell, escape=backtick, servercore base) with all rules enabled.
+// Source: https://github.com/metalama/Metalama/blob/097a2f048c1851e9fb17fff9faa3882b8dfd5a3b/Dockerfile
+func TestFixRealWorldMetalama(t *testing.T) {
+	t.Parallel()
+	testdataDir := filepath.Join("testdata", "real-world-fix-metalama")
 
 	// Read the original Dockerfile
 	originalContent, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile"))
@@ -285,6 +342,72 @@ func TestFixPreferAddUnpackBeatsHeredoc(t *testing.T) {
 	if !strings.Contains(outputStr, "Fixed") {
 		t.Errorf("expected 'Fixed' in output, got: %s", outputStr)
 	}
+}
+
+// TestFixWindowsContainer tests auto-fix on a real-world Windows container Dockerfile
+// (cmd.exe default shell, servercore/iis base, MSBuild, Chocolatey) via stdin with
+// all rules enabled and markdown report output. This exercises the full fix pipeline
+// and captures both the fixed Dockerfile (stdout) and the markdown violation report (stderr).
+// Source: github.com/microsoft/windows-containers-demos (ticket-desk/application/ticketDesk.Dockerfile)
+func TestFixWindowsContainer(t *testing.T) {
+	t.Parallel()
+
+	input, err := os.ReadFile(filepath.Join("testdata", "real-world-fix-ticketdesk", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyStdin(t, string(input),
+		"lint", "--format", "markdown", "--fix", "--fix-unsafe", "--slow-checks=on", "-",
+	)
+
+	t.Logf("exit=%d\nstdout length=%d\nstderr:\n%s", exitCode, len(stdout), stderr)
+
+	// Exit code 1: some violations remain unfixable.
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d\nstderr:\n%s", exitCode, stderr)
+	}
+
+	// Snapshot the fixed Dockerfile from stdout.
+	testutil.MatchDockerfileSnapshot(t, stdout)
+
+	// Snapshot the markdown report from stderr.
+	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, stderr)
+
+	// Sanity: fixes were applied.
+	if !strings.Contains(stderr, "Fixed") {
+		t.Errorf("expected 'Fixed' in stderr, got: %s", stderr)
+	}
+}
+
+// TestFixPowerShellAlpine tests auto-fix on a cross-platform Dockerfile that uses
+// a PowerShell base image on Alpine Linux. This exercises the OS vs shell distinction:
+// the base image is Linux (Alpine) but the default shell is PowerShell (pwsh).
+// Source: mcr.microsoft.com/powershell:6.2.1-alpine-3.8 based fixture
+func TestFixPowerShellAlpine(t *testing.T) {
+	t.Parallel()
+
+	input, err := os.ReadFile(filepath.Join("testdata", "real-world-fix-powershell-alpine", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyStdin(t, string(input),
+		"lint", "--format", "markdown", "--fix", "--fix-unsafe", "--slow-checks=on", "-",
+	)
+
+	t.Logf("exit=%d\nstdout length=%d\nstderr:\n%s", exitCode, len(stdout), stderr)
+
+	// Exit code 1: some violations remain unfixable.
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d\nstderr:\n%s", exitCode, stderr)
+	}
+
+	// Snapshot the fixed Dockerfile from stdout.
+	testutil.MatchDockerfileSnapshot(t, stdout)
+
+	// Snapshot the markdown report from stderr.
+	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, stderr)
 }
 
 // TestFixNewlinePerChainedCall exercises the auto-fix path for

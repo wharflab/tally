@@ -29,7 +29,7 @@ RUN echo "hello"
 
 func TestCircularStageDepsRule_SingleStage(t *testing.T) {
 	t.Parallel()
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM alpine:3.19
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine:3.19
 RUN echo "hello"
 `)
 	r := NewCircularStageDepsRule()
@@ -48,7 +48,7 @@ RUN go build -o /app
 FROM alpine:3.19
 COPY --from=builder /app /app
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCircularStageDepsRule()
 	violations := r.Check(input)
 
@@ -68,7 +68,7 @@ COPY --from=a /y /y
 FROM alpine:3.19
 COPY --from=a /x /final
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCircularStageDepsRule()
 	violations := r.Check(input)
 
@@ -127,7 +127,7 @@ COPY --from=b /y /y
 FROM alpine:3.19
 COPY --from=a /x /final
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCircularStageDepsRule()
 	violations := r.Check(input)
 
@@ -155,7 +155,7 @@ FROM alpine:3.19
 COPY --from=builder /app /app
 CMD ["/app"]
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCircularStageDepsRule()
 	violations := r.Check(input)
 
@@ -176,7 +176,7 @@ COPY --from=0 /y /y
 FROM alpine:3.19
 RUN echo "final"
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCircularStageDepsRule()
 	violations := r.Check(input)
 

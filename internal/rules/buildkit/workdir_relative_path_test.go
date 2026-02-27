@@ -7,6 +7,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestWorkdirRelativePathRule_Metadata(t *testing.T) {
@@ -133,33 +134,60 @@ func TestWorkdirRelativePathRule_Check_MultipleStages(t *testing.T) {
 	}
 }
 
+// TestWorkdirRelativePathRule_WindowsDriveLetter verifies that c:/build is
+// recognized as absolute on Windows stages via the semantic model.
+func TestWorkdirRelativePathRule_WindowsDriveLetter(t *testing.T) {
+	t.Parallel()
+	r := NewWorkdirRelativePathRule()
+
+	// With semantic model detecting Windows, c:/build is absolute → no violation
+	testutil.RunRuleTests(t, r, []testutil.RuleTestCase{
+		{
+			Name: "Windows drive letter is absolute",
+			Content: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+WORKDIR c:/build
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "Linux drive letter is relative",
+			Content: `FROM alpine:3.20
+WORKDIR c:/build
+`,
+			WantViolations: 1,
+		},
+	})
+}
+
 func TestIsAbsPath(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		path string
-		os   string
-		want bool
+		path      string
+		isWindows bool
+		want      bool
 	}{
 		// Linux paths
-		{"/app", "linux", true},
-		{"/", "linux", true},
-		{"app", "linux", false},
-		{"./app", "linux", false},
-		{"../app", "linux", false},
+		{"/app", false, true},
+		{"/", false, true},
+		{"app", false, false},
+		{"./app", false, false},
+		{"../app", false, false},
+		{"c:/build", false, false}, // drive letter is NOT absolute on Linux
 
 		// Windows paths
-		{"C:\\app", "windows", true},
-		{"C:/app", "windows", true},
-		{"/app", "windows", true},  // Forward slash is valid on Windows
-		{"\\app", "windows", true}, // Backslash is valid on Windows
-		{"app", "windows", false},
-		{".\\app", "windows", false},
+		{"C:\\app", true, true},
+		{"C:/app", true, true},
+		{"c:/build", true, true}, // drive letter IS absolute on Windows
+		{"/app", true, true},     // Forward slash is valid on Windows
+		{"\\app", true, true},    // Backslash is valid on Windows
+		{"app", true, false},
+		{".\\app", true, false},
 	}
 
 	for _, tc := range tests {
-		got := isAbsPath(tc.path, tc.os)
+		got := isAbsPath(tc.path, tc.isWindows)
 		if got != tc.want {
-			t.Errorf("isAbsPath(%q, %q) = %v, want %v", tc.path, tc.os, got, tc.want)
+			t.Errorf("isAbsPath(%q, isWindows=%v) = %v, want %v", tc.path, tc.isWindows, got, tc.want)
 		}
 	}
 }

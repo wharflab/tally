@@ -252,7 +252,7 @@ RUN Get-Variable PSVersionTable | Select-Object -ExpandProperty Value
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.dockerfile)
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 
 			r := NewDL4006Rule()
 			violations := r.Check(input)
@@ -299,7 +299,7 @@ RUN ["sh", "-c", "wget -O - https://some.site | wc -l"]
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.dockerfile)
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 
 			r := NewDL4006Rule()
 			violations := r.Check(input)
@@ -325,7 +325,7 @@ func TestDL4006Rule_SingleShellFixPerStage(t *testing.T) {
 
 	t.Run("only first piped RUN gets a SHELL fix", func(t *testing.T) {
 		t.Parallel()
-		input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM scratch
+		input := testutil.MakeLintInput(t, "Dockerfile", `FROM scratch
 RUN wget -O - https://some.site | wc -l
 RUN curl -s https://example.com | grep test
 `)
@@ -345,7 +345,7 @@ RUN curl -s https://example.com | grep test
 
 	t.Run("SHELL reset allows new fix", func(t *testing.T) {
 		t.Parallel()
-		input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM scratch
+		input := testutil.MakeLintInput(t, "Dockerfile", `FROM scratch
 RUN wget -O - https://some.site | wc -l
 SHELL ["/bin/bash", "-c"]
 RUN curl -s https://example.com | grep test
@@ -367,7 +367,7 @@ RUN curl -s https://example.com | grep test
 
 	t.Run("new FROM resets fix tracking", func(t *testing.T) {
 		t.Parallel()
-		input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM scratch as build
+		input := testutil.MakeLintInput(t, "Dockerfile", `FROM scratch as build
 RUN wget -O - https://some.site | wc -l
 FROM scratch as build2
 RUN curl -s https://example.com | grep test
@@ -394,7 +394,7 @@ func TestDL4006Rule_HeredocCoordination(t *testing.T) {
 	t.Run("skip fix when prefer-run-heredoc is enabled and command is heredoc candidate", func(t *testing.T) {
 		t.Parallel()
 		// A heredoc candidate has multiple chained commands
-		input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM scratch
+		input := testutil.MakeLintInput(t, "Dockerfile", `FROM scratch
 RUN apt-get update && apt-get install -y curl && curl -s https://some.site | wc -l
 `)
 		input.EnabledRules = []string{"tally/prefer-run-heredoc"}
@@ -414,7 +414,7 @@ RUN apt-get update && apt-get install -y curl && curl -s https://some.site | wc 
 	t.Run("keep fix when prefer-run-heredoc is enabled but command is not heredoc candidate", func(t *testing.T) {
 		t.Parallel()
 		// Simple pipe command is not a heredoc candidate (not enough chained commands)
-		input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM scratch
+		input := testutil.MakeLintInput(t, "Dockerfile", `FROM scratch
 RUN wget -O - https://some.site | wc -l
 `)
 		input.EnabledRules = []string{"tally/prefer-run-heredoc"}

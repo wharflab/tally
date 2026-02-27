@@ -198,11 +198,14 @@ func detectPackageInstall(script, evidence string, line int) (autofixdata.Signal
 		score int
 	}
 	managers := []mgr{
+		// Linux package managers
 		{name: "apt-get", kw: "apt-get install", score: 4},
 		{name: "apt", kw: "apt install", score: 3},
 		{name: "apk", kw: "apk add", score: 4},
 		{name: "dnf", kw: "dnf install", score: 4},
 		{name: "yum", kw: "yum install", score: 4},
+		// Windows package managers
+		{name: "choco", kw: "choco install", score: 4},
 	}
 
 	for _, m := range managers {
@@ -231,17 +234,22 @@ func detectBuildStep(script, evidence string, line int) (autofixdata.Signal, int
 		score int
 	}
 	tools := []tool{
+		// Linux/cross-platform build tools
 		{name: "go", kw: "go build", score: 4},
 		{name: "cargo", kw: "cargo build", score: 4},
 		{name: "npm", kw: "npm run build", score: 3},
 		{name: "yarn", kw: "yarn build", score: 3},
 		{name: "pnpm", kw: "pnpm build", score: 3},
 		{name: "dotnet", kw: "dotnet publish", score: 4},
+		{name: "dotnet", kw: "dotnet build", score: 4},
 		{name: "mvn", kw: "mvn package", score: 4},
 		{name: "gradle", kw: "gradle build", score: 4},
 		{name: "make", kw: "make ", score: 2},
 		{name: "cmake", kw: "cmake ", score: 2},
 		{name: "ninja", kw: "ninja ", score: 2},
+		// Windows build tools
+		{name: "msbuild", kw: "msbuild", score: 4},
+		{name: "nuget", kw: "nuget restore", score: 2},
 	}
 	for _, t := range tools {
 		if !strings.Contains(lower, t.kw) {
@@ -308,6 +316,7 @@ func buildToolBonus(pkgs []string) int {
 		return 0
 	}
 	buildish := map[string]struct{}{
+		// Linux build-time packages
 		"build-essential": {},
 		"gcc":             {},
 		"g++":             {},
@@ -318,6 +327,11 @@ func buildToolBonus(pkgs []string) int {
 		"pkg-config":      {},
 		"python3-dev":     {},
 		"openssl-dev":     {},
+		// Windows build-time packages (Chocolatey names)
+		"microsoft-build-tools":             {},
+		"visualstudio2022buildtools":        {},
+		"visualstudio2019buildtools":        {},
+		"visualstudio2022-workload-vctools": {},
 	}
 	bonus := 0
 	for _, p := range pkgs {

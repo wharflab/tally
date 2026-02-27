@@ -153,7 +153,7 @@ RUN apt install python`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.dockerfile)
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 			r := NewDL3014Rule()
 			violations := r.Check(input)
 
@@ -215,7 +215,7 @@ RUN apt-get install curl wget`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.dockerfile)
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 			r := NewDL3014Rule()
 			violations := r.Check(input)
 
@@ -246,7 +246,7 @@ RUN apt-get install curl wget`,
 // TestDL3014_OnbuildAutoFix verifies that DL3014 provides auto-fix for ONBUILD RUN commands.
 func TestDL3014_OnbuildAutoFix(t *testing.T) {
 	t.Parallel()
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM ubuntu
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM ubuntu
 ONBUILD RUN apt-get install python`)
 	r := NewDL3014Rule()
 	violations := r.Check(input)
@@ -289,7 +289,7 @@ func TestDL3014_OnbuildLocationNotSynthetic(t *testing.T) {
 	t.Parallel()
 	// ONBUILD is on line 4 — if the location were still from the synthetic
 	// wrapper it would incorrectly report line 2.
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM ubuntu
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM ubuntu
 RUN echo setup
 RUN echo more
 ONBUILD RUN apt-get install python`)

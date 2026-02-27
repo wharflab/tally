@@ -146,7 +146,10 @@ func (r *NewlineBetweenInstructionsRule) Check(input rules.LintInput) []rules.Vi
 		// Fixes use an async resolver to avoid line-structure drift when
 		// other sync fixes (e.g. prefer-copy-heredoc) change the content.
 		// The resolver re-parses the modified file and generates fresh edits.
-		loc := rules.NewLineLocation(input.File, currEffectiveStart)
+		// Point the violation at the actual instruction line (not a preceding
+		// comment) so the user sees an arrow on the instruction named in the
+		// message rather than on an unrelated comment line.
+		loc := rules.NewLineLocation(input.File, curr.StartLine)
 		v := rules.NewViolation(loc, meta.Code, message, meta.DefaultSeverity).
 			WithDocURL(meta.DocURL).
 			WithSuggestedFix(&rules.SuggestedFix{

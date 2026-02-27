@@ -89,6 +89,26 @@ func (b *Builder) Build() *Model {
 		// Process base image
 		info.BaseImage = b.processBaseImage(stage, i, graph)
 
+		// Detect base image OS from name and platform heuristics.
+		info.BaseImageOS = detectBaseImageOS(stage.BaseName, stage.Platform)
+		// Strengthen the signal with the escape directive: backtick is a strong
+		// Windows indicator when the image name alone is ambiguous.
+		if info.BaseImageOS == BaseImageOSUnknown && b.parseResult != nil &&
+			b.parseResult.AST != nil && b.parseResult.AST.EscapeToken == '`' {
+			info.BaseImageOS = BaseImageOSWindows
+		}
+
+		// Set OS-appropriate default shell before directives can override.
+		// Windows containers default to cmd.exe, not /bin/sh.
+		if info.BaseImageOS == BaseImageOSWindows && info.ShellSetting.Source == ShellSourceDefault {
+			info.ShellSetting = ShellSetting{
+				Shell:   DefaultWindowsShell(),
+				Variant: shell.VariantCmd,
+				Source:  ShellSourceDefault,
+				Line:    -1,
+			}
+		}
+
 		// FROM ARG analysis (UndefinedArgInFrom, InvalidDefaultArgInFrom).
 		b.applyFromArgAnalysis(info, stage, fromEval)
 
@@ -373,6 +393,32 @@ func (b *Builder) processBaseImage(stage *instructions.Stage, stageIndex int, gr
 	return ref
 }
 
+// processShellCommand updates the stage's shell setting from a SHELL instruction
+// and strengthens BaseImageOS when the shell is Windows-specific.
+func (b *Builder) processShellCommand(c *instructions.ShellCommand, info *StageInfo) {
+	shellCmd := make([]string, len(c.Shell))
+	copy(shellCmd, c.Shell)
+
+	shellLine := -1
+	if len(c.Location()) > 0 {
+		shellLine = c.Location()[0].Start.Line - 1 // Convert 1-based to 0-based
+	}
+	variant := shell.VariantFromShellCmd(shellCmd)
+	info.ShellSetting = ShellSetting{
+		Shell:   shellCmd,
+		Variant: variant,
+		Source:  ShellSourceInstruction,
+		Line:    shellLine,
+	}
+
+	// SHELL ["powershell"...] or SHELL ["cmd"...] is a Windows signal.
+	if info.BaseImageOS == BaseImageOSUnknown {
+		if variant == shell.VariantPowerShell || variant == shell.VariantCmd {
+			info.BaseImageOS = BaseImageOSWindows
+		}
+	}
+}
+
 // checkDuplicateInstruction reports a MultipleInstructionsDisallowed violation for the
 // previous location when a duplicate instruction is found. Returns the updated location.
 // Following BuildKit convention: the previous instruction is reported (the one Docker ignores).
@@ -434,21 +480,7 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 			lastHealthcheckLoc = b.checkDuplicateInstruction(lastHealthcheckLoc, c)
 
 		case *instructions.ShellCommand:
-			// Update active shell for this stage.
-			shellCmd := make([]string, len(c.Shell))
-			copy(shellCmd, c.Shell)
-
-			// Also update ShellSetting.
-			shellLine := -1
-			if len(c.Location()) > 0 {
-				shellLine = c.Location()[0].Start.Line - 1 // Convert 1-based to 0-based
-			}
-			info.ShellSetting = ShellSetting{
-				Shell:   shellCmd,
-				Variant: shell.VariantFromShellCmd(shellCmd),
-				Source:  ShellSourceInstruction,
-				Line:    shellLine,
-			}
+			b.processShellCommand(c, info)
 
 		case *instructions.RunCommand:
 			// Extract package installations from RUN commands

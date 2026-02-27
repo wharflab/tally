@@ -12,7 +12,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"sort"
+	"strings"
 
 	"github.com/wharflab/tally/internal/rules"
 )
@@ -68,23 +70,47 @@ const (
 	FormatMarkdown Format = "markdown"
 )
 
+// formatEntry maps input aliases to a canonical Format.
+type formatEntry struct {
+	canonical Format
+	aliases   []string // additional accepted names (e.g. "github" for "github-actions")
+}
+
+// formats is the single source of truth for all accepted output formats.
+// ParseFormat, ValidFormatsUsage, and the CLI help text all derive from this.
+var formats = []formatEntry{
+	{canonical: FormatText},
+	{canonical: FormatJSON},
+	{canonical: FormatSARIF},
+	{canonical: FormatGitHubActions, aliases: []string{"github"}},
+	{canonical: FormatMarkdown, aliases: []string{"md"}},
+}
+
+// ValidFormatsUsage returns a comma-separated list of canonical format names
+// suitable for CLI help text and error messages.
+func ValidFormatsUsage() string {
+	names := make([]string, len(formats))
+	for i, f := range formats {
+		names[i] = string(f.canonical)
+	}
+	return strings.Join(names, ", ")
+}
+
 // ParseFormat parses a format string into a Format type.
 // Returns an error if the format is unknown.
 func ParseFormat(s string) (Format, error) {
-	switch s {
-	case "text", "":
+	if s == "" {
 		return FormatText, nil
-	case "json":
-		return FormatJSON, nil
-	case "sarif":
-		return FormatSARIF, nil
-	case "github-actions", "github":
-		return FormatGitHubActions, nil
-	case "markdown", "md":
-		return FormatMarkdown, nil
-	default:
-		return "", fmt.Errorf("unknown format: %q (valid: text, json, sarif, github-actions, markdown)", s)
 	}
+	for _, f := range formats {
+		if s == string(f.canonical) {
+			return f.canonical, nil
+		}
+		if slices.Contains(f.aliases, s) {
+			return f.canonical, nil
+		}
+	}
+	return "", fmt.Errorf("unknown format: %q (valid: %s)", s, ValidFormatsUsage())
 }
 
 // Options configures reporter creation.

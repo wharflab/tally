@@ -19,7 +19,7 @@ func TestUnreachableStagesRule_SingleStage_NoViolation(t *testing.T) {
 	content := `FROM alpine:3.18
 RUN echo "hello"
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewUnreachableStagesRule()
 	violations := r.Check(input)
 
@@ -36,7 +36,7 @@ RUN go build -o /app
 FROM alpine:3.18
 COPY --from=builder /app /app
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewUnreachableStagesRule()
 	violations := r.Check(input)
 
@@ -56,7 +56,7 @@ RUN echo "this is never used"
 FROM alpine:3.18
 COPY --from=builder /app /app
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewUnreachableStagesRule()
 	violations := r.Check(input)
 
@@ -94,7 +94,7 @@ RUN echo "this is never used"
 FROM alpine:3.18
 COPY --from=builder /app /app
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewUnreachableStagesRule()
 	violations := r.Check(input)
 
@@ -127,7 +127,7 @@ RUN echo "second unused"
 FROM alpine:3.18
 COPY --from=builder /app /app
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewUnreachableStagesRule()
 	violations := r.Check(input)
 
@@ -156,7 +156,7 @@ RUN go build -o /app
 FROM alpine:3.18
 COPY --from=builder /app /app
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewUnreachableStagesRule()
 	violations := r.Check(input)
 
@@ -177,7 +177,7 @@ RUN go build -o /app
 FROM alpine:3.18
 RUN echo "final stage with no COPY --from"
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewUnreachableStagesRule()
 	violations := r.Check(input)
 
@@ -214,7 +214,7 @@ RUN echo "never used"
 FROM alpine:3.18
 RUN echo "final"
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewUnreachableStagesRule()
 	violations := r.Check(input)
 

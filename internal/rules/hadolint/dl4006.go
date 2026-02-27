@@ -106,9 +106,15 @@ func (r *DL4006Rule) initStageState(sem *semantic.Model, stageIdx int) dl4006Sta
 	}
 	if sem != nil {
 		if info := sem.StageInfo(stageIdx); info != nil {
-			if info.ShellSetting.Source == semantic.ShellSourceDirective {
-				state.isNonPOSIX = info.ShellSetting.Variant.IsNonPOSIX()
+			// Use the semantic model's shell setting only when it reflects
+			// the state before stage commands execute (OS-aware default or
+			// inline directive). A ShellSourceInstruction might appear later
+			// in the stage (e.g. SHELL ["pwsh"] after a /bin/sh RUN), so we
+			// must not skip the initial /bin/sh commands based on it —
+			// per-instruction tracking in the main loop handles SHELL changes.
+			if info.ShellSetting.Source != semantic.ShellSourceInstruction {
 				state.shellVariant = info.ShellSetting.Variant
+				state.isNonPOSIX = !info.ShellSetting.Variant.IsParseable()
 			}
 		}
 	}
@@ -174,7 +180,7 @@ func isNonPOSIXShellCmd(shellCmd []string) bool {
 	if len(shellCmd) == 0 {
 		return false
 	}
-	return shell.VariantFromShell(shellCmd[0]).IsNonPOSIX()
+	return !shell.VariantFromShell(shellCmd[0]).IsParseable()
 }
 
 // hasPipefailOption checks if a SHELL instruction array sets -o pipefail

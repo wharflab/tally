@@ -73,10 +73,12 @@ func (r *heredocResolver) Resolve(_ context.Context, resolveCtx ResolveContext, 
 	}
 }
 
-// runSequence holds a sequence of consecutive RUN instructions.
+// runSequence holds a sequence of consecutive RUN instructions
+// collected under the same effective shell variant.
 type runSequence struct {
-	runs     []*instructions.RunCommand
-	commands []string
+	runs         []*instructions.RunCommand
+	commands     []string
+	shellVariant shell.Variant // effective shell when this sequence was collected
 }
 
 // detectAndFixConsecutive finds all consecutive RUN sequences and returns edits for all of them.
@@ -92,7 +94,13 @@ func (r *heredocResolver) detectAndFixConsecutive(
 	var sequence runSequence
 	var sequenceMounts []*instructions.Mount
 
+	// Track per-instruction shell variant so we don't combine RUNs
+	// across a SHELL instruction boundary (e.g. pwsh → ash).
+	currentVariant := data.ShellVariant
+
 	flush := func() {
+		// Stamp the sequence with the variant that was active when it was collected.
+		sequence.shellVariant = currentVariant
 		if edit := r.createSequenceEdit(sequence, data, file, sm); edit != nil {
 			allEdits = append(allEdits, *edit)
 		}
@@ -100,6 +108,20 @@ func (r *heredocResolver) detectAndFixConsecutive(
 	}
 
 	for _, cmd := range stage.Commands {
+		if sc, ok := cmd.(*instructions.ShellCommand); ok {
+			flush()
+			currentVariant = shell.VariantFromShellCmd(sc.Shell)
+			sequenceMounts = nil
+			continue
+		}
+
+		// Skip RUNs where the effective shell doesn't support heredoc.
+		if !currentVariant.SupportsHeredoc() {
+			flush()
+			sequenceMounts = nil
+			continue
+		}
+
 		run, ok := cmd.(*instructions.RunCommand)
 		if !ok || !run.PrependShell {
 			flush()
@@ -114,8 +136,8 @@ func (r *heredocResolver) detectAndFixConsecutive(
 			sequenceMounts = nil
 		}
 
-		// Extract commands
-		commands := r.extractCommands(run, data.ShellVariant)
+		// Extract commands using the current (per-instruction) variant.
+		commands := r.extractCommands(run, currentVariant)
 		if len(commands) == 0 {
 			flush()
 			sequenceMounts = nil
@@ -124,7 +146,7 @@ func (r *heredocResolver) detectAndFixConsecutive(
 
 		// Check for exit command (breaks sequence)
 		script := r.getRunScript(run)
-		if shell.HasExitCommand(script, data.ShellVariant) {
+		if shell.HasExitCommand(script, currentVariant) {
 			flush()
 			sequenceMounts = nil
 			continue
@@ -167,13 +189,14 @@ func (r *heredocResolver) createSequenceEdit(
 		return nil
 	}
 
-	// Verify all commands are simple (can be merged)
+	// Verify all commands are simple (can be merged) using the
+	// shell variant that was active when this sequence was collected.
 	for _, run := range seq.runs {
 		script := r.getRunScript(run)
 		if len(run.Files) > 0 {
 			script = run.Files[0].Data
 		}
-		if !shell.IsSimpleScript(script, data.ShellVariant) {
+		if !shell.IsSimpleScript(script, seq.shellVariant) {
 			return nil
 		}
 	}
@@ -194,10 +217,10 @@ func (r *heredocResolver) createSequenceEdit(
 	mounts := runmount.GetMounts(firstRun)
 
 	// Emit set -o pipefail when DL4006 is enabled and commands contain pipes
-	pipefail := data.PipefailEnabled && commandsHavePipes(seq.commands, data.ShellVariant)
+	pipefail := data.PipefailEnabled && commandsHavePipes(seq.commands, seq.shellVariant)
 
-	// Build heredoc
-	heredocText := heredoc.FormatWithMounts(seq.commands, mounts, data.ShellVariant, pipefail)
+	// Build heredoc using the shell variant that was active for this sequence
+	heredocText := heredoc.FormatWithMounts(seq.commands, mounts, seq.shellVariant, pipefail)
 
 	// Calculate and apply indentation
 	indent := extractIndent(sm, startLine)
@@ -251,7 +274,19 @@ func (r *heredocResolver) detectAndFixChained(
 	file string,
 	sm *sourcemap.SourceMap,
 ) []rules.TextEdit {
+	currentVariant := data.ShellVariant
+
 	for _, cmd := range stage.Commands {
+		if sc, ok := cmd.(*instructions.ShellCommand); ok {
+			currentVariant = shell.VariantFromShellCmd(sc.Shell)
+			continue
+		}
+
+		// Skip instructions where the effective shell doesn't support heredoc.
+		if !currentVariant.SupportsHeredoc() {
+			continue
+		}
+
 		run, ok := cmd.(*instructions.RunCommand)
 		if !ok || !run.PrependShell {
 			continue
@@ -267,7 +302,7 @@ func (r *heredocResolver) detectAndFixChained(
 			continue
 		}
 
-		commands := shell.ExtractChainedCommands(script, data.ShellVariant)
+		commands := shell.ExtractChainedCommands(script, currentVariant)
 		if len(commands) < data.MinCommands {
 			continue
 		}

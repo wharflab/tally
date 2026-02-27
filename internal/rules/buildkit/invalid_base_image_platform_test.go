@@ -19,7 +19,7 @@ func TestInvalidBaseImagePlatformRule_Metadata(t *testing.T) {
 func TestInvalidBaseImagePlatformRule_Check_ReturnsNil(t *testing.T) {
 	t.Parallel()
 	r := NewInvalidBaseImagePlatformRule()
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", "FROM alpine\nRUN echo hi\n")
+	input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine\nRUN echo hi\n")
 	violations := r.Check(input)
 	if len(violations) != 0 {
 		t.Errorf("expected 0 violations (async-only rule), got %d", len(violations))
@@ -80,7 +80,7 @@ COPY --from=builder /app /app
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tc.content)
+			input := testutil.MakeLintInput(t, "Dockerfile", tc.content)
 			plans := r.PlanAsync(input)
 			if len(plans) != tc.wantCount {
 				t.Errorf("expected %d plans, got %d", tc.wantCount, len(plans))

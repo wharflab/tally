@@ -175,7 +175,16 @@ func (r *Rule) collectTasksForStage(
 
 	knownEnv := collectKnownEnv(stageInfo)
 
+	// Determine the initial shell name for this stage. Use the semantic model's
+	// OS-aware default (e.g. Windows → cmd) when available, then fall back to
+	// directive-based detection. Don't use ShellSourceInstruction as the initial
+	// shell — a SHELL instruction may appear after earlier RUNs.
 	stageShellName := initialShellNameForStage(stage, ctx.shellDirectives)
+	if stageInfo != nil &&
+		stageInfo.ShellSetting.Source == semantic.ShellSourceDefault &&
+		len(stageInfo.ShellSetting.Shell) > 0 {
+		stageShellName = stageInfo.ShellSetting.Shell[0]
+	}
 	shellName := stageShellName
 
 	// Track shell state at instruction start lines so ONBUILD triggers can
@@ -695,7 +704,7 @@ func textEditsOverlap(a, b rules.TextEdit) bool {
 
 func dialectForShellName(shellName string) (string, bool) {
 	variant := shell.VariantFromShell(shellName)
-	if variant.IsNonPOSIX() {
+	if !variant.IsShellCheckCompatible() {
 		return "", false
 	}
 	return shellcheckDialect(shellName), true

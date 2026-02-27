@@ -1,16 +1,41 @@
 package semantic
 
 import (
+	"path"
 	"slices"
+	"strings"
 
+	"github.com/distribution/reference"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/shell"
 )
 
-// DefaultShell is the default shell used by Docker for RUN instructions.
+// BaseImageOS represents the detected operating system of a stage's base image.
+type BaseImageOS int
+
+const (
+	// BaseImageOSUnknown means the OS could not be determined from static analysis.
+	BaseImageOSUnknown BaseImageOS = iota
+	// BaseImageOSLinux indicates a Linux-based base image.
+	BaseImageOSLinux
+	// BaseImageOSWindows indicates a Windows-based base image.
+	BaseImageOSWindows
+)
+
+// DefaultShell is the default shell used by Docker for Linux RUN instructions.
 var DefaultShell = []string{"/bin/sh", "-c"}
+
+// defaultWindowsShellExe is the Windows cmd.exe executable name used as the
+// default shell for Windows container RUN instructions.
+const defaultWindowsShellExe = "cmd" //nolint:customlint // not a Dockerfile CMD instruction
+
+// DefaultWindowsShell returns the default shell for Windows containers.
+// Returns a fresh copy to avoid mutation.
+func DefaultWindowsShell() []string {
+	return []string{defaultWindowsShellExe, "/S", "/C"}
+}
 
 // PackageInstall represents a package installation in a RUN command.
 type PackageInstall struct {
@@ -73,6 +98,10 @@ type StageInfo struct {
 	// Stage is a reference to the BuildKit stage.
 	Stage *instructions.Stage
 
+	// BaseImageOS is the detected operating system of the base image.
+	// Determined by heuristics (image name, platform, escape directive, SHELL instruction).
+	BaseImageOS BaseImageOS
+
 	// ShellSetting contains the active shell configuration including variant and source.
 	ShellSetting ShellSetting
 
@@ -117,9 +146,134 @@ type StageInfo struct {
 	IsLastStage bool
 }
 
+// IsWindows returns true if the base image was detected as Windows.
+func (s *StageInfo) IsWindows() bool {
+	return s.BaseImageOS == BaseImageOSWindows
+}
+
+// IsLinux returns true if the base image was detected as Linux.
+func (s *StageInfo) IsLinux() bool {
+	return s.BaseImageOS == BaseImageOSLinux
+}
+
 // IsScratch returns true if this stage uses FROM scratch as its base image.
 func (s *StageInfo) IsScratch() bool {
 	return s.Stage != nil && s.Stage.BaseName == "scratch"
+}
+
+// parseImageRef parses a Docker image reference into domain, repository path, and tag.
+// Uses github.com/distribution/reference for correct handling of registries, digests, etc.
+// Returns lowercased components. On parse failure, falls back to simple string splitting.
+func parseImageRef(raw string) (string, string, string) {
+	named, err := reference.ParseNormalizedNamed(raw)
+	if err != nil {
+		// Fallback for unparseable refs (e.g. stage names, empty strings).
+		// Simple split: everything before first ":" or "@" is the name.
+		name := raw
+		var tag string
+		if i := strings.IndexAny(name, ":@"); i >= 0 {
+			tag = name[i+1:]
+			name = name[:i]
+		}
+		return "", strings.ToLower(name), strings.ToLower(tag)
+	}
+
+	domain := strings.ToLower(reference.Domain(named))
+	repoPath := strings.ToLower(reference.Path(named))
+	var tag string
+	if tagged, ok := named.(reference.Tagged); ok {
+		tag = strings.ToLower(tagged.Tag())
+	}
+	return domain, repoPath, tag
+}
+
+// detectBaseImageOS determines the OS from the base image name and platform.
+// Uses a fast heuristic — no network calls.
+func detectBaseImageOS(baseName, platform string) BaseImageOS {
+	lower := strings.ToLower(baseName)
+
+	// Explicit --platform=windows/* is a strong signal.
+	if platform != "" {
+		lp := strings.ToLower(platform)
+		if strings.Contains(lp, "windows") {
+			return BaseImageOSWindows
+		}
+		if strings.Contains(lp, "linux") {
+			return BaseImageOSLinux
+		}
+	}
+
+	// Windows image name patterns.
+	if isWindowsImageName(lower) {
+		return BaseImageOSWindows
+	}
+
+	// Well-known Linux distros.
+	if isLinuxImageName(lower) {
+		return BaseImageOSLinux
+	}
+
+	return BaseImageOSUnknown
+}
+
+// isWindowsImageName returns true if the image name is a known Windows image.
+// Uses github.com/distribution/reference for correct parsing of registry prefixes,
+// tags, and digests.
+func isWindowsImageName(lower string) bool {
+	domain, repoPath, tag := parseImageRef(lower)
+
+	if domain != "mcr.microsoft.com" {
+		return false
+	}
+
+	// MCR Windows images: windows, windows/servercore, windows/nanoserver, etc.
+	if repoPath == "windows" || strings.HasPrefix(repoPath, "windows/") {
+		return true
+	}
+
+	// .NET or PowerShell images with Windows tag markers
+	if strings.HasPrefix(repoPath, "dotnet/") || strings.HasPrefix(repoPath, "powershell") {
+		if strings.Contains(tag, "nanoserver") || strings.Contains(tag, "windowsservercore") {
+			return true
+		}
+	}
+
+	return false
+}
+
+// isLinuxImageName returns true if the image name is a well-known Linux-based image.
+// Uses github.com/distribution/reference for correct parsing of registry prefixes,
+// tags, and digests.
+func isLinuxImageName(lower string) bool {
+	domain, repoPath, tag := parseImageRef(lower)
+
+	// Extract the short name (last path segment, e.g. "alpine" from "library/alpine")
+	name := path.Base(repoPath)
+
+	switch name {
+	case "alpine", "ubuntu", "debian", "fedora", "centos", "rockylinux",
+		"almalinux", "amazonlinux", "al2023", "al2",
+		"archlinux", "clearlinux", "oraclelinux",
+		"busybox", "distroless", "chainguard", "wolfi", "photon",
+		"opensuse", "sles", "gentoo":
+		return true
+	}
+
+	// Images under well-known Linux org prefixes (e.g. kalilinux/kali-rolling)
+	if strings.HasPrefix(repoPath, "kalilinux/") {
+		return true
+	}
+
+	// MCR Linux images (dotnet on Linux, powershell on Linux)
+	if domain == "mcr.microsoft.com" {
+		if strings.HasPrefix(repoPath, "dotnet/") || strings.HasPrefix(repoPath, "powershell") {
+			if !strings.Contains(tag, "nanoserver") && !strings.Contains(tag, "windowsservercore") {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // HasPackage checks if a package was installed in this stage.

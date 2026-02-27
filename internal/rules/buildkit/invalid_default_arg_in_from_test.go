@@ -86,7 +86,7 @@ FROM ${BASE}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tc.content)
+			input := testutil.MakeLintInput(t, "Dockerfile", tc.content)
 			violations := r.Check(input)
 			if len(violations) != tc.wantCount {
 				t.Fatalf("got %d violations, want %d", len(violations), tc.wantCount)
