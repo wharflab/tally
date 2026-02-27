@@ -73,8 +73,12 @@ func lintCommand() *cli.Command {
 			&cli.StringFlag{
 				Name:    "format",
 				Aliases: []string{"f"},
-				Usage:   "Output format: text, json, sarif, github-actions",
+				Usage:   "Output format: " + reporter.ValidFormatsUsage(),
 				Sources: cli.EnvVars("TALLY_FORMAT", "TALLY_OUTPUT_FORMAT"),
+				Validator: func(s string) error {
+					_, err := reporter.ParseFormat(s)
+					return err
+				},
 			},
 			&cli.StringFlag{
 				Name:    "output",

@@ -1,0 +1,3 @@
+# Disable max-lines for this real-world fix test
+[rules.max-lines]
+max = 0
