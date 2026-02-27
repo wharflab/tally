@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"mvdan.cc/sh/v3/fileutil"
 	"mvdan.cc/sh/v3/syntax"
 )
 
@@ -89,6 +90,38 @@ func VariantFromShell(shell string) Variant {
 	default:
 		return VariantUnknown
 	}
+}
+
+// ShellFromShebang extracts the shell name from a shebang line.
+// It delegates to [fileutil.Shebang] for the common cases (sh, bash, mksh,
+// bats, zsh) and adds ksh support for Dockerfile compatibility.
+//
+// Returns the normalized shell name (e.g., "bash", "sh", "ksh") and true
+// if a known shell shebang was found. The returned name can be passed
+// directly to [VariantFromShell].
+func ShellFromShebang(line string) (string, bool) {
+	if s := fileutil.Shebang([]byte(line)); s != "" {
+		return s, true
+	}
+	// fileutil.Shebang covers sh/bash/mksh/bats/zsh but not plain ksh.
+	// Handle #!/bin/ksh and #!/usr/bin/env ksh for Dockerfile heredoc support.
+	if !strings.HasPrefix(line, "#!") {
+		return "", false
+	}
+	rest := strings.TrimSpace(line[2:])
+	parts := strings.Fields(rest)
+	if len(parts) == 0 {
+		return "", false
+	}
+	name := parts[0]
+	if len(parts) >= 2 && path.Base(parts[0]) == "env" {
+		name = parts[1]
+	}
+	const kshName = "ksh"
+	if path.Base(name) == kshName {
+		return kshName, true
+	}
+	return "", false
 }
 
 // VariantFromShellCmd returns the appropriate Variant from a SHELL command array.

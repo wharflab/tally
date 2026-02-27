@@ -102,6 +102,46 @@ EOF
 	}
 }
 
+func TestBuilderHeredocShellOverride(t *testing.T) {
+	t.Parallel()
+	content := `FROM alpine:3.18
+RUN <<EOF
+#!/bin/bash
+set -e
+echo hello
+EOF
+RUN echo "no heredoc shebang"
+RUN <<SCRIPT
+#!/bin/sh
+echo world
+SCRIPT
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+
+	info := model.StageInfo(0)
+	if len(info.HeredocShellOverrides) != 2 {
+		t.Fatalf("expected 2 heredoc shell overrides, got %d", len(info.HeredocShellOverrides))
+	}
+
+	if info.HeredocShellOverrides[0].Shell != "bash" {
+		t.Errorf("override[0].Shell = %q, want %q", info.HeredocShellOverrides[0].Shell, "bash")
+	}
+	if info.HeredocShellOverrides[0].Variant != shell.VariantBash {
+		t.Errorf("override[0].Variant = %v, want VariantBash", info.HeredocShellOverrides[0].Variant)
+	}
+	if info.HeredocShellOverrides[0].Line != 2 {
+		t.Errorf("override[0].Line = %d, want 2", info.HeredocShellOverrides[0].Line)
+	}
+
+	if info.HeredocShellOverrides[1].Shell != "sh" {
+		t.Errorf("override[1].Shell = %q, want %q", info.HeredocShellOverrides[1].Shell, "sh")
+	}
+	if info.HeredocShellOverrides[1].Variant != shell.VariantPOSIX {
+		t.Errorf("override[1].Variant = %v, want VariantPOSIX", info.HeredocShellOverrides[1].Variant)
+	}
+}
+
 func TestBuilderCopyFromInvalidNumericDoesNotCreateDependency(t *testing.T) {
 	t.Parallel()
 	content := `FROM alpine:3.18 AS s0

@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -536,5 +537,39 @@ func TestVariantCapabilities(t *testing.T) {
 		if got := tt.variant.IsPowerShell(); got != tt.isPowerShell {
 			t.Errorf("Variant(%d).IsPowerShell() = %v, want %v", tt.variant, got, tt.isPowerShell)
 		}
+	}
+}
+
+func TestShellFromShebang(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		line     string
+		wantName string
+		wantOK   bool
+	}{
+		{"#!/bin/bash", "bash", true},
+		{"#!/bin/sh", "sh", true},
+		{"#!/usr/bin/env bash", "bash", true},
+		{"#!/usr/bin/env sh", "sh", true},
+		{"#!/bin/zsh", "zsh", true},
+		{"#!/usr/bin/env zsh", "zsh", true},
+		{"#!/bin/mksh", "mksh", true},
+		{"#!/bin/ksh", "ksh", true},
+		{"#!/usr/bin/env ksh", "ksh", true},
+		{"#!/usr/bin/python3", "", false},
+		{"#!/usr/bin/env python3", "", false},
+		{"echo hello", "", false},
+		{"", "", false},
+		{"#!", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%q", tt.line), func(t *testing.T) {
+			t.Parallel()
+			name, ok := ShellFromShebang(tt.line)
+			if name != tt.wantName || ok != tt.wantOK {
+				t.Errorf("ShellFromShebang(%q) = (%q, %v), want (%q, %v)",
+					tt.line, name, ok, tt.wantName, tt.wantOK)
+			}
+		})
 	}
 }

@@ -18,6 +18,11 @@ type scriptMapping struct {
 
 	// FallbackLine is the 1-based Dockerfile line to use when mapping fails.
 	FallbackLine int
+
+	// IsHeredoc is true when this mapping was extracted from a BuildKit heredoc
+	// body. When true, the Script may begin with a shebang line that should
+	// override the stage's default shell for dialect selection.
+	IsHeredoc bool
 }
 
 type blankLeadingFlagsFunc func(lines []string, escapeToken rune) []string
@@ -64,6 +69,7 @@ func extractRunLikeScript(
 			Script:          strings.Join(lines, "\n"),
 			OriginStartLine: bodyStart,
 			FallbackLine:    start,
+			IsHeredoc:       true,
 		}, true
 	}
 

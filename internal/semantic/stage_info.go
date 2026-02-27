@@ -79,6 +79,20 @@ type ShellSetting struct {
 	Line int
 }
 
+// HeredocShellOverride records a per-instruction shell override from a
+// BuildKit heredoc shebang line (e.g., #!/bin/bash in a RUN <<EOF body).
+// Docker respects these shebangs and uses the specified interpreter.
+type HeredocShellOverride struct {
+	// Line is the 1-based Dockerfile line of the RUN instruction.
+	Line int
+
+	// Shell is the shell name from the shebang (e.g., "bash", "sh", "ksh").
+	Shell string
+
+	// Variant is the shell variant derived from Shell.
+	Variant shell.Variant
+}
+
 // OnbuildInstruction represents a parsed ONBUILD trigger command.
 type OnbuildInstruction struct {
 	// Command is the parsed typed command (RunCommand, CopyCommand, etc.).
@@ -137,6 +151,11 @@ type StageInfo struct {
 	// OnbuildInstructions contains all parsed ONBUILD trigger commands for this stage.
 	// Each ONBUILD expression is parsed into a typed command using BuildKit's parser.
 	OnbuildInstructions []OnbuildInstruction
+
+	// HeredocShellOverrides contains per-instruction shell overrides detected
+	// from heredoc shebang lines. Rules can use this to determine the effective
+	// shell for a specific RUN instruction instead of the stage-level shell.
+	HeredocShellOverrides []HeredocShellOverride
 
 	// InstalledPackages contains packages installed via system package managers.
 	// Tracked from RUN commands that use apt-get, apk, yum, dnf, etc.
