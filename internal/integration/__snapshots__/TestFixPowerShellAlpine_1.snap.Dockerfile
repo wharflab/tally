@@ -4,14 +4,11 @@ SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference
 
 WORKDIR /app
 
-RUN <<EOF
-set -e
-apk add --update nodejs nodejs-npm
-Install-Module -Name Az -AllowClobber -Force
-Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-Install-Module Configuration -RequiredVersion 1.3.1 -Repository PSGallery -Scope AllUsers -Verbose
-Install-Module PSSlack -RequiredVersion 1.0.2 -Repository PSGallery -Scope AllUsers -Verbose
-EOF
+RUN apk add --update nodejs nodejs-npm
+RUN Install-Module -Name Az -AllowClobber -Force
+RUN Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; \
+    Install-Module Configuration -RequiredVersion 1.3.1 -Repository PSGallery -Scope AllUsers -Verbose; \
+    Install-Module PSSlack -RequiredVersion 1.0.2 -Repository PSGallery -Scope AllUsers -Verbose;
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 

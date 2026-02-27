@@ -102,20 +102,24 @@ func (r *PreferHeredocRule) Check(input rules.LintInput) []rules.Violation {
 	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Type assertion OK returns false for nil, sem is nil-checked below
 
 	for stageIdx, stage := range input.Stages {
-		// Get shell variant for this stage
-		shellVariant := shell.VariantBash
+		// Get initial shell variant for this stage.
+		initialVariant := shell.VariantBash
 		if sem != nil {
 			if info := sem.StageInfo(stageIdx); info != nil {
-				shellVariant = info.ShellSetting.Variant
-				if !shellVariant.SupportsHeredoc() {
-					continue
-				}
+				initialVariant = info.ShellSetting.Variant
 			}
 		}
 
+		// Build a per-instruction shell variant map by tracking SHELL
+		// instruction changes through the stage, so heredoc suggestions
+		// are only emitted for instructions running under a heredoc-
+		// compatible shell.
+		shellAtCmd := buildShellVariantMap(stage, initialVariant)
+
 		p := heredocCheckParams{
 			stageIdx:        stageIdx,
-			shellVariant:    shellVariant,
+			shellVariant:    initialVariant,
+			shellAtCmd:      shellAtCmd,
 			file:            input.File,
 			sm:              sm,
 			minCommands:     minCommands,
@@ -150,12 +154,29 @@ func (r *PreferHeredocRule) ValidateConfig(config any) error {
 // heredocCheckParams bundles shared parameters for heredoc sequence/chain checks.
 type heredocCheckParams struct {
 	stageIdx        int
-	shellVariant    shell.Variant
+	shellVariant    shell.Variant         // initial shell variant for the stage
+	shellAtCmd      map[int]shell.Variant // per-command-index shell variant (tracks SHELL changes)
 	file            string
 	sm              *sourcemap.SourceMap
 	minCommands     int
 	pipefailEnabled bool
 	meta            rules.RuleMetadata
+}
+
+// buildShellVariantMap tracks SHELL instruction changes through a stage and
+// returns a map from command index to the effective shell.Variant at that point.
+func buildShellVariantMap(
+	stage instructions.Stage, initial shell.Variant,
+) map[int]shell.Variant {
+	m := make(map[int]shell.Variant, len(stage.Commands))
+	current := initial
+	for i, cmd := range stage.Commands {
+		if sc, ok := cmd.(*instructions.ShellCommand); ok {
+			current = shell.VariantFromShellCmd(sc.Shell)
+		}
+		m[i] = current
+	}
+	return m
 }
 
 // runSequenceItem represents a RUN instruction in a sequence with extracted commands.
@@ -181,7 +202,14 @@ func (r *PreferHeredocRule) checkConsecutiveRuns(
 		sequence = sequence[:0]
 	}
 
-	for _, cmd := range stage.Commands {
+	for cmdIdx, cmd := range stage.Commands {
+		// Break sequence on non-RUN or shell change to non-heredoc-compatible.
+		if v, ok := p.shellAtCmd[cmdIdx]; ok && !v.SupportsHeredoc() {
+			flushSequence()
+			sequenceMounts = nil
+			continue
+		}
+
 		run, ok := cmd.(*instructions.RunCommand)
 		if !ok || !run.PrependShell {
 			flushSequence()
@@ -294,7 +322,12 @@ func (r *PreferHeredocRule) checkChainedCommands(
 ) []rules.Violation {
 	var violations []rules.Violation
 
-	for _, cmd := range stage.Commands {
+	for cmdIdx, cmd := range stage.Commands {
+		// Skip instructions where the effective shell doesn't support heredoc.
+		if v, ok := p.shellAtCmd[cmdIdx]; ok && !v.SupportsHeredoc() {
+			continue
+		}
+
 		run, ok := cmd.(*instructions.RunCommand)
 		if !ok {
 			continue
@@ -315,7 +348,12 @@ func (r *PreferHeredocRule) checkChainedCommands(
 			continue
 		}
 
-		commandCount := shell.CountChainedCommands(script, p.shellVariant)
+		// Use the per-instruction shell variant for command counting.
+		variant := p.shellVariant
+		if v, ok := p.shellAtCmd[cmdIdx]; ok {
+			variant = v
+		}
+		commandCount := shell.CountChainedCommands(script, variant)
 		if commandCount >= p.minCommands {
 			loc := rules.NewLocationFromRanges(p.file, run.Location())
 

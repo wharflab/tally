@@ -99,7 +99,25 @@ func (r *heredocResolver) detectAndFixConsecutive(
 		sequence = runSequence{}
 	}
 
+	// Track per-instruction shell variant so we don't combine RUNs
+	// across a SHELL instruction boundary (e.g. pwsh → ash).
+	currentVariant := data.ShellVariant
+
 	for _, cmd := range stage.Commands {
+		if sc, ok := cmd.(*instructions.ShellCommand); ok {
+			currentVariant = shell.VariantFromShellCmd(sc.Shell)
+			flush()
+			sequenceMounts = nil
+			continue
+		}
+
+		// Skip RUNs where the effective shell doesn't support heredoc.
+		if !currentVariant.SupportsHeredoc() {
+			flush()
+			sequenceMounts = nil
+			continue
+		}
+
 		run, ok := cmd.(*instructions.RunCommand)
 		if !ok || !run.PrependShell {
 			flush()
@@ -251,7 +269,19 @@ func (r *heredocResolver) detectAndFixChained(
 	file string,
 	sm *sourcemap.SourceMap,
 ) []rules.TextEdit {
+	currentVariant := data.ShellVariant
+
 	for _, cmd := range stage.Commands {
+		if sc, ok := cmd.(*instructions.ShellCommand); ok {
+			currentVariant = shell.VariantFromShellCmd(sc.Shell)
+			continue
+		}
+
+		// Skip instructions where the effective shell doesn't support heredoc.
+		if !currentVariant.SupportsHeredoc() {
+			continue
+		}
+
 		run, ok := cmd.(*instructions.RunCommand)
 		if !ok || !run.PrependShell {
 			continue
@@ -267,7 +297,7 @@ func (r *heredocResolver) detectAndFixChained(
 			continue
 		}
 
-		commands := shell.ExtractChainedCommands(script, data.ShellVariant)
+		commands := shell.ExtractChainedCommands(script, currentVariant)
 		if len(commands) < data.MinCommands {
 			continue
 		}
