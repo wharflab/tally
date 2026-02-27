@@ -927,8 +927,8 @@ RUN Write-Output "hello" ; Write-Output "world" ; Write-Output "!"
 	if !ok {
 		t.Fatal("expected HeredocResolveData")
 	}
-	if data.ShellVariant != shell.VariantNonPOSIX {
-		t.Errorf("expected ShellVariant to be updated to VariantNonPOSIX, got %v", data.ShellVariant)
+	if data.ShellVariant != shell.VariantPowerShell {
+		t.Errorf("expected ShellVariant to be updated to VariantPowerShell, got %v", data.ShellVariant)
 	}
 }
 

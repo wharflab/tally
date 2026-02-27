@@ -159,7 +159,7 @@ func TestDetectFileCreation(t *testing.T) {
 		{
 			name:    "non-POSIX shell",
 			script:  `echo "data" > /app/file`,
-			variant: VariantNonPOSIX,
+			variant: VariantPowerShell,
 			wantNil: true,
 		},
 		{
@@ -243,7 +243,7 @@ func TestIsPureFileCreation(t *testing.T) {
 		{
 			name:    "non-POSIX",
 			script:  `echo "hello" > /app/file`,
-			variant: VariantNonPOSIX,
+			variant: VariantPowerShell,
 			want:    false,
 		},
 		{
@@ -566,7 +566,7 @@ func TestDetectStandaloneChmod(t *testing.T) {
 		{
 			name:    "non-POSIX shell",
 			script:  `chmod 755 /app/file`,
-			variant: VariantNonPOSIX,
+			variant: VariantPowerShell,
 			wantNil: true,
 		},
 	}

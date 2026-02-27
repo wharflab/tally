@@ -302,16 +302,16 @@ func TestVariantFromShell(t *testing.T) {
 		{"/bin/ksh", VariantMksh},
 		{"zsh", VariantBash}, // zsh treated as bash-like
 		{"/bin/zsh", VariantBash},
-		{"powershell", VariantNonPOSIX}, // Non-POSIX shells
-		{"pwsh", VariantNonPOSIX},
-		{"cmd", VariantNonPOSIX},
-		{"cmd.exe", VariantNonPOSIX},
-		{"unknown", VariantBash}, // unknown defaults to bash
-		{"", VariantBash},
+		{"powershell", VariantPowerShell},
+		{"pwsh", VariantPowerShell},
+		{"cmd", VariantCmd},
+		{"cmd.exe", VariantCmd},
+		{"unknown", VariantUnknown},
+		{"", VariantUnknown},
 		// Windows backslash paths
-		{`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`, VariantNonPOSIX},
-		{`C:\Program Files\PowerShell\7\pwsh.exe`, VariantNonPOSIX},
-		{`C:\Windows\System32\cmd.exe`, VariantNonPOSIX},
+		{`C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`, VariantPowerShell},
+		{`C:\Program Files\PowerShell\7\pwsh.exe`, VariantPowerShell},
+		{`C:\Windows\System32\cmd.exe`, VariantCmd},
 	}
 
 	for _, tt := range tests {
@@ -334,7 +334,7 @@ func TestVariantFromShellCmd(t *testing.T) {
 	}{
 		{"default bash", []string{"/bin/bash", "-c"}, VariantBash},
 		{"default sh", []string{"/bin/sh", "-c"}, VariantPOSIX},
-		{"powershell", []string{"powershell", "-Command"}, VariantNonPOSIX}, // non-POSIX shell
+		{"powershell", []string{"powershell", "-Command"}, VariantPowerShell},
 		{"empty", []string{}, VariantBash},
 		{"nil", nil, VariantBash},
 	}
@@ -492,8 +492,10 @@ func TestToLangVariant(t *testing.T) {
 		{VariantBash, syntax.LangBash},
 		{VariantPOSIX, syntax.LangPOSIX},
 		{VariantMksh, syntax.LangMirBSDKorn},
-		{VariantNonPOSIX, syntax.LangBash}, // NonPOSIX falls back to Bash for parsing
-		{Variant(99), syntax.LangBash},     // Unknown variant defaults to Bash
+		{VariantPowerShell, syntax.LangBash}, // PowerShell falls back to Bash
+		{VariantCmd, syntax.LangBash},        // Cmd falls back to Bash
+		{VariantUnknown, syntax.LangBash},    // Unknown falls back to Bash
+		{Variant(99), syntax.LangBash},       // Out-of-range defaults to Bash
 	}
 
 	for _, tt := range tests {
@@ -504,22 +506,35 @@ func TestToLangVariant(t *testing.T) {
 	}
 }
 
-func TestIsNonPOSIX(t *testing.T) {
+func TestVariantCapabilities(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		variant Variant
-		want    bool
+		variant              Variant
+		parseable            bool
+		shellCheckCompatible bool
+		supportsHeredoc      bool
+		isPowerShell         bool
 	}{
-		{VariantBash, false},
-		{VariantPOSIX, false},
-		{VariantMksh, false},
-		{VariantNonPOSIX, true},
+		{VariantBash, true, true, true, false},
+		{VariantPOSIX, true, true, true, false},
+		{VariantMksh, true, true, true, false},
+		{VariantPowerShell, false, false, false, true},
+		{VariantCmd, false, false, false, false},
+		{VariantUnknown, false, false, false, false},
 	}
 
 	for _, tt := range tests {
-		got := tt.variant.IsNonPOSIX()
-		if got != tt.want {
-			t.Errorf("Variant(%d).IsNonPOSIX() = %v, want %v", tt.variant, got, tt.want)
+		if got := tt.variant.IsParseable(); got != tt.parseable {
+			t.Errorf("Variant(%d).IsParseable() = %v, want %v", tt.variant, got, tt.parseable)
+		}
+		if got := tt.variant.IsShellCheckCompatible(); got != tt.shellCheckCompatible {
+			t.Errorf("Variant(%d).IsShellCheckCompatible() = %v, want %v", tt.variant, got, tt.shellCheckCompatible)
+		}
+		if got := tt.variant.SupportsHeredoc(); got != tt.supportsHeredoc {
+			t.Errorf("Variant(%d).SupportsHeredoc() = %v, want %v", tt.variant, got, tt.supportsHeredoc)
+		}
+		if got := tt.variant.IsPowerShell(); got != tt.isPowerShell {
+			t.Errorf("Variant(%d).IsPowerShell() = %v, want %v", tt.variant, got, tt.isPowerShell)
 		}
 	}
 }

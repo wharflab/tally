@@ -96,7 +96,7 @@ func (r *PreferCopyHeredocRule) Check(input rules.LintInput) []rules.Violation {
 		if sem != nil {
 			if info := sem.StageInfo(stageIdx); info != nil {
 				shellVariant = info.ShellSetting.Variant
-				if shellVariant.IsNonPOSIX() {
+				if !shellVariant.SupportsHeredoc() {
 					continue
 				}
 				varScope = info.Variables

@@ -11,30 +11,59 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
-// Variant represents a shell variant for parsing.
+// Variant represents a shell variant for parsing and rule gating.
+// Each variant expresses what the shell can do, enabling rules to query
+// capabilities via intent-based methods rather than negation tests.
 type Variant int
 
 const (
-	// VariantBash is the GNU Bash shell (default for Docker).
+	// VariantBash is the GNU Bash shell (default for Docker Linux containers).
 	VariantBash Variant = iota
 	// VariantPOSIX is the POSIX-compliant shell (sh, dash, ash).
 	VariantPOSIX
 	// VariantMksh is the MirBSD Korn Shell.
 	VariantMksh
-	// VariantNonPOSIX represents shells that are not POSIX-compatible.
-	// When this variant is active, shell-specific linting rules are disabled.
-	// Examples: powershell, cmd, pwsh
-	VariantNonPOSIX
+	// VariantPowerShell is PowerShell (cross-platform: powershell on Windows, pwsh on Linux/macOS).
+	VariantPowerShell
+	// VariantCmd is the Windows cmd.exe command interpreter.
+	VariantCmd
+	// VariantUnknown is an unrecognized shell. Treated conservatively: not parseable,
+	// not ShellCheck-compatible, not PowerShell.
+	VariantUnknown
 )
+
+// IsParseable returns true for shells whose scripts can be parsed by mvdan.cc/sh.
+// Use this to guard shell AST analysis, command extraction, and chained-command counting.
+func (v Variant) IsParseable() bool {
+	return v == VariantBash || v == VariantPOSIX || v == VariantMksh
+}
+
+// IsShellCheckCompatible returns true for shells that ShellCheck can analyze.
+// Use this to guard ShellCheck WASM invocation.
+func (v Variant) IsShellCheckCompatible() bool {
+	return v == VariantBash || v == VariantPOSIX || v == VariantMksh
+}
+
+// SupportsHeredoc returns true for shells compatible with BuildKit heredoc syntax (RUN <<EOF).
+// Use this to guard heredoc suggestions and fixes.
+func (v Variant) SupportsHeredoc() bool {
+	return v == VariantBash || v == VariantPOSIX || v == VariantMksh
+}
+
+// IsPowerShell returns true for PowerShell variants (powershell, pwsh).
+// Use this to gate PowerShell-specific lint rules (tally/powershell/*).
+func (v Variant) IsPowerShell() bool {
+	return v == VariantPowerShell
+}
 
 // VariantFromShell returns the appropriate Variant for a shell name.
 // Common shell mappings:
-//   - bash -> VariantBash
+//   - bash, zsh -> VariantBash
 //   - sh, dash, ash -> VariantPOSIX
 //   - mksh, ksh -> VariantMksh
-//   - zsh -> VariantBash (closest approximation)
-//   - powershell, pwsh, cmd -> VariantNonPOSIX (disables shell linting)
-//   - unknown -> VariantBash (safe default)
+//   - powershell, pwsh -> VariantPowerShell
+//   - cmd -> VariantCmd
+//   - unknown -> VariantUnknown
 func VariantFromShell(shell string) Variant {
 	// Normalize: extract basename, lowercase, strip .exe suffix (for Windows shells).
 	// Replace backslashes before path.Base so Windows paths like
@@ -53,12 +82,12 @@ func VariantFromShell(shell string) Variant {
 	case "zsh":
 		// zsh is mostly bash-compatible for our purposes
 		return VariantBash
-	case "powershell", "pwsh", "cmd":
-		// Non-POSIX shells - disable shell-specific linting
-		return VariantNonPOSIX
+	case "powershell", "pwsh":
+		return VariantPowerShell
+	case "cmd":
+		return VariantCmd
 	default:
-		// Default to bash for unknown shells
-		return VariantBash
+		return VariantUnknown
 	}
 }
 
@@ -71,14 +100,8 @@ func VariantFromShellCmd(shellCmd []string) Variant {
 	return VariantFromShell(shellCmd[0])
 }
 
-// IsNonPOSIX returns true if this variant represents a non-POSIX shell.
-// When true, shell-specific linting rules should be disabled because
-// the shell syntax is incompatible with POSIX/Bash parsing.
-func (v Variant) IsNonPOSIX() bool {
-	return v == VariantNonPOSIX
-}
-
 // toLangVariant converts our Variant to mvdan.cc/sh's LangVariant.
+// Only meaningful for parseable variants; callers should check IsParseable() first.
 func (v Variant) toLangVariant() syntax.LangVariant {
 	switch v {
 	case VariantBash:
@@ -87,9 +110,9 @@ func (v Variant) toLangVariant() syntax.LangVariant {
 		return syntax.LangPOSIX
 	case VariantMksh:
 		return syntax.LangMirBSDKorn
-	case VariantNonPOSIX:
-		// Non-POSIX shells can't be parsed, but we need a fallback
-		// This should rarely be called since IsNonPOSIX() should be checked first
+	case VariantPowerShell, VariantCmd, VariantUnknown:
+		// Can't be parsed by mvdan.cc/sh. Fallback to Bash —
+		// callers should have checked IsParseable() first.
 		return syntax.LangBash
 	}
 	return syntax.LangBash

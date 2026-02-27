@@ -70,7 +70,7 @@ type fileCreationCmd struct {
 // The knownVars function is called to check if a variable is a known ARG/ENV.
 // If nil, all variables are considered unsafe.
 func DetectFileCreation(script string, variant Variant, knownVars func(name string) bool) *FileCreationInfo {
-	if variant.IsNonPOSIX() {
+	if !variant.IsParseable() {
 		return nil
 	}
 
@@ -100,7 +100,7 @@ type ChmodInfo struct {
 // Returns nil if it's not a pure chmod or if the chmod cannot be converted
 // (e.g., symbolic mode, recursive chmod, multiple commands).
 func DetectStandaloneChmod(script string, variant Variant) *ChmodInfo {
-	if variant.IsNonPOSIX() {
+	if !variant.IsParseable() {
 		return nil
 	}
 
@@ -142,7 +142,7 @@ func DetectStandaloneChmod(script string, variant Variant) *ChmodInfo {
 // or chmod on the created file. Returns false if there are any other commands mixed in.
 // This is used by prefer-run-heredoc to yield to prefer-copy-heredoc.
 func IsPureFileCreation(script string, variant Variant) bool {
-	if variant.IsNonPOSIX() {
+	if !variant.IsParseable() {
 		return false
 	}
 

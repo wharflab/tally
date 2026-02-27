@@ -74,7 +74,7 @@ func (r *DL3010Rule) Check(input rules.LintInput) []rules.Violation {
 				archives = collectCopiedArchives(c, archives)
 
 			case *instructions.RunCommand:
-				if len(archives) == 0 || shellVariant.IsNonPOSIX() {
+				if len(archives) == 0 || !shellVariant.IsParseable() {
 					continue
 				}
 

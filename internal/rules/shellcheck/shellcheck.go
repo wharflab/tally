@@ -695,7 +695,7 @@ func textEditsOverlap(a, b rules.TextEdit) bool {
 
 func dialectForShellName(shellName string) (string, bool) {
 	variant := shell.VariantFromShell(shellName)
-	if variant.IsNonPOSIX() {
+	if !variant.IsShellCheckCompatible() {
 		return "", false
 	}
 	return shellcheckDialect(shellName), true

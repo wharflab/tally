@@ -75,7 +75,7 @@ func TestCountChainedCommands(t *testing.T) {
 		{
 			name:    "non-POSIX shell",
 			script:  "echo hello",
-			variant: VariantNonPOSIX,
+			variant: VariantPowerShell,
 			want:    0,
 		},
 		{
@@ -144,7 +144,7 @@ func TestExtractChainedCommands(t *testing.T) {
 		{
 			name:    "non-POSIX shell returns nil",
 			script:  "echo hello",
-			variant: VariantNonPOSIX,
+			variant: VariantPowerShell,
 			want:    nil,
 		},
 	}
@@ -201,7 +201,7 @@ func TestExtractChainSeparators(t *testing.T) {
 		{
 			name:         "non-posix returns nil",
 			script:       "apt-get update && apt-get install -y curl",
-			variant:      VariantNonPOSIX,
+			variant:      VariantPowerShell,
 			commandCount: 2,
 			want:         nil,
 		},
@@ -294,7 +294,7 @@ func TestIsSimpleScript(t *testing.T) {
 		{
 			name:    "non-POSIX returns false",
 			script:  "echo hello",
-			variant: VariantNonPOSIX,
+			variant: VariantPowerShell,
 			want:    false,
 		},
 		{
@@ -357,7 +357,7 @@ func TestHasExitCommand(t *testing.T) {
 		{
 			name:    "non-POSIX returns false",
 			script:  "exit 0",
-			variant: VariantNonPOSIX,
+			variant: VariantPowerShell,
 			want:    false,
 		},
 	}
@@ -413,7 +413,7 @@ func TestIsHeredocCandidate(t *testing.T) {
 		{
 			name:        "non-POSIX shell - not candidate",
 			script:      "apt-get update && apt-get install vim && apt-get clean",
-			variant:     VariantNonPOSIX,
+			variant:     VariantPowerShell,
 			minCommands: 3,
 			want:        false,
 		},

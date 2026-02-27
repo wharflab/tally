@@ -34,7 +34,7 @@ type ChainBoundary struct {
 //
 // Returns nil, 0 if parsing fails or for non-POSIX shells.
 func CollectChainBoundaries(scriptText string, variant Variant) ([]ChainBoundary, int) {
-	if variant.IsNonPOSIX() {
+	if !variant.IsParseable() {
 		return nil, 0
 	}
 
@@ -98,7 +98,7 @@ func collectChainBoundariesFromStmt(stmt *syntax.Stmt, boundaries *[]ChainBounda
 // (e.g., cat <<EOF ... EOF && other_cmd). Such scripts should not have their
 // chain boundaries reformatted because the heredoc body positions would break.
 func ScriptHasInlineHeredoc(script string, variant Variant) bool {
-	if variant.IsNonPOSIX() {
+	if !variant.IsParseable() {
 		return false
 	}
 
@@ -132,7 +132,7 @@ func ScriptHasInlineHeredoc(script string, variant Variant) bool {
 // The output uses tab indentation for continuation lines (Indent(0) = tabs).
 func FormatChainedScript(script string, variant Variant) string {
 	trimmed := strings.TrimSpace(script)
-	if variant.IsNonPOSIX() {
+	if !variant.IsParseable() {
 		return trimmed
 	}
 

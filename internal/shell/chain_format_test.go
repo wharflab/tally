@@ -94,7 +94,7 @@ func TestCollectChainBoundaries(t *testing.T) {
 		{
 			name:           "non-POSIX shell",
 			script:         "cmd1 && cmd2",
-			variant:        VariantNonPOSIX,
+			variant:        VariantPowerShell,
 			wantBoundaries: 0,
 			wantCmds:       0,
 		},
@@ -170,7 +170,7 @@ func TestScriptHasInlineHeredoc(t *testing.T) {
 		{
 			name:    "non-POSIX",
 			script:  "cat <<EOF\nhello\nEOF",
-			variant: VariantNonPOSIX,
+			variant: VariantPowerShell,
 			want:    false,
 		},
 		{
@@ -234,7 +234,7 @@ func TestFormatChainedScript(t *testing.T) {
 		{
 			name:    "non-POSIX returns trimmed input",
 			script:  "cmd1 && cmd2",
-			variant: VariantNonPOSIX,
+			variant: VariantPowerShell,
 			want:    "cmd1 && cmd2",
 		},
 		{

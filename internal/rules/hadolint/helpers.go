@@ -36,7 +36,7 @@ func ScanRunCommandsWithPOSIXShell(input rules.LintInput, callback RunCommandCal
 		if sem != nil {
 			if info := sem.StageInfo(stageIdx); info != nil {
 				shellVariant = info.ShellSetting.Variant
-				isNonPOSIX = shellVariant.IsNonPOSIX()
+				isNonPOSIX = !shellVariant.IsParseable()
 			}
 		}
 

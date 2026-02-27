@@ -165,7 +165,7 @@ func (r *DL4001Rule) recordToolUsage(
 	t *toolTrackingDL4001,
 ) {
 	// Skip shell command analysis for non-POSIX shells
-	if shellVariant.IsNonPOSIX() {
+	if !shellVariant.IsParseable() {
 		return
 	}
 

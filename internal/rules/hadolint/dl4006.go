@@ -107,7 +107,7 @@ func (r *DL4006Rule) initStageState(sem *semantic.Model, stageIdx int) dl4006Sta
 	if sem != nil {
 		if info := sem.StageInfo(stageIdx); info != nil {
 			if info.ShellSetting.Source == semantic.ShellSourceDirective {
-				state.isNonPOSIX = info.ShellSetting.Variant.IsNonPOSIX()
+				state.isNonPOSIX = !info.ShellSetting.Variant.IsParseable()
 				state.shellVariant = info.ShellSetting.Variant
 			}
 		}
@@ -174,7 +174,7 @@ func isNonPOSIXShellCmd(shellCmd []string) bool {
 	if len(shellCmd) == 0 {
 		return false
 	}
-	return shell.VariantFromShell(shellCmd[0]).IsNonPOSIX()
+	return !shell.VariantFromShell(shellCmd[0]).IsParseable()
 }
 
 // hasPipefailOption checks if a SHELL instruction array sets -o pipefail
