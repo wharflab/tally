@@ -224,7 +224,8 @@ func isLinuxImageName(lower string) bool {
 
 	switch name {
 	case "alpine", "ubuntu", "debian", "fedora", "centos", "rockylinux",
-		"almalinux", "amazonlinux", "archlinux", "clearlinux", "oraclelinux",
+		"almalinux", "amazonlinux", "al2023", "al2",
+		"archlinux", "clearlinux", "oraclelinux",
 		"busybox", "distroless", "chainguard", "wolfi", "photon":
 		return true
 	}
