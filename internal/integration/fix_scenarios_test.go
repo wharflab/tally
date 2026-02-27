@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
-	"github.com/wharflab/tally/internal/testutil"
 )
 
 // TestFixRealWorld tests the auto-fix functionality on a real-world Dockerfile
@@ -58,7 +57,7 @@ func TestFixRealWorld(t *testing.T) {
 	}
 
 	// Use snapshot testing for easier maintenance
-	testutil.MatchDockerfileSnapshot(t, string(fixedContent))
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
 
 	// Verify that fixes were applied (check output contains "Fixed")
 	outputStr := string(output)
@@ -114,7 +113,7 @@ func TestFixRealWorldMetalama(t *testing.T) {
 	}
 
 	// Use snapshot testing for easier maintenance
-	testutil.MatchDockerfileSnapshot(t, string(fixedContent))
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
 
 	// Verify that fixes were applied (check output contains "Fixed")
 	outputStr := string(output)
@@ -175,7 +174,7 @@ severity = "style"
 		t.Fatalf("failed to read fixed Dockerfile: %v", err)
 	}
 
-	testutil.MatchDockerfileSnapshot(t, string(fixedContent))
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
 
 	// Verify fixes were applied
 	if !strings.Contains(string(output), "Fixed") {
@@ -229,7 +228,7 @@ func TestFixConsistentIndentation(t *testing.T) {
 		t.Fatalf("failed to read fixed Dockerfile: %v", err)
 	}
 
-	testutil.MatchDockerfileSnapshot(t, string(fixedContent))
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
 
 	if !strings.Contains(string(output), "Fixed") {
 		t.Errorf("expected 'Fixed' in output, got: %s", output)
@@ -287,7 +286,7 @@ mode = "never"
 		t.Fatalf("failed to read fixed Dockerfile: %v", err)
 	}
 
-	testutil.MatchDockerfileSnapshot(t, string(fixed))
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixed))
 
 	if !strings.Contains(string(output), "Fixed") {
 		t.Errorf("expected 'Fixed' in output, got: %s", output)
@@ -336,7 +335,7 @@ func TestFixPreferAddUnpackBeatsHeredoc(t *testing.T) {
 		t.Fatalf("failed to read fixed Dockerfile: %v", err)
 	}
 
-	testutil.MatchDockerfileSnapshot(t, string(fixed))
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixed))
 
 	outputStr := string(output)
 	if !strings.Contains(outputStr, "Fixed") {
@@ -369,7 +368,7 @@ func TestFixWindowsContainer(t *testing.T) {
 	}
 
 	// Snapshot the fixed Dockerfile from stdout.
-	testutil.MatchDockerfileSnapshot(t, stdout)
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, stdout)
 
 	// Snapshot the markdown report from stderr.
 	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, stderr)
@@ -404,7 +403,7 @@ func TestFixPowerShellAlpine(t *testing.T) {
 	}
 
 	// Snapshot the fixed Dockerfile from stdout.
-	testutil.MatchDockerfileSnapshot(t, stdout)
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, stdout)
 
 	// Snapshot the markdown report from stderr.
 	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, stderr)
@@ -455,7 +454,7 @@ func TestFixNewlinePerChainedCall(t *testing.T) {
 		t.Fatalf("failed to read fixed Dockerfile: %v", err)
 	}
 
-	testutil.MatchDockerfileSnapshot(t, string(fixed))
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixed))
 
 	if !strings.Contains(string(output), "Fixed") {
 		t.Errorf("expected 'Fixed' in output, got: %s", output)
