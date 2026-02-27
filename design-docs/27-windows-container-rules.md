@@ -37,8 +37,8 @@ RUN Install-Module PSReadLine -Force
 RUN Invoke-WebRequest https://example.com/file.zip -OutFile /tmp/file.zip
 ```
 
-This is a **Linux** container with a **PowerShell** shell. The current `VariantNonPOSIX` enum
-lumps `cmd.exe` and `powershell` together, but they're very different:
+This is a **Linux** container with a **PowerShell** shell. The old `VariantNonPOSIX` enum
+lumped `cmd.exe` and `powershell` together, but they're very different:
 
 | | cmd.exe | PowerShell | sh/bash |
 |---|---------|-----------|---------|
@@ -90,9 +90,10 @@ A Linux PowerShell stage (e.g. `mcr.microsoft.com/powershell:ubuntu-22.04`) gets
 
 ### Refining `shell.Variant`
 
-The current `VariantNonPOSIX` must be split. Currently in `internal/shell/shell.go`:
+`VariantNonPOSIX` has been split (implemented). Previously in `internal/shell/shell.go`:
 
 ```go
+// BEFORE (removed):
 const (
     VariantBash     Variant = iota  // bash, zsh
     VariantPOSIX                     // sh, dash, ash
@@ -500,7 +501,7 @@ semantic/builder.go
   1. Detect BaseImageOS from FROM instruction (heuristic)
   2. If BaseImageOS == Windows && no SHELL instruction:
        ShellSetting.Shell = ["cmd", "/S", "/C"]
-       ShellSetting.Variant = VariantNonPOSIX
+       ShellSetting.Variant = VariantCmd
      else:
        (existing logic — default /bin/sh or explicit SHELL)
   3. Store both on StageInfo

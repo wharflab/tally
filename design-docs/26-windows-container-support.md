@@ -33,12 +33,12 @@ The codebase already has some Windows awareness:
 **Shell variant detection** (`internal/shell/shell.go`):
 
 - `VariantFromShell()` normalizes paths, strips `.exe`, and classifies shells
-- `powershell`, `pwsh`, `cmd` → `VariantNonPOSIX`
+- `powershell`, `pwsh` → `VariantPowerShell`; `cmd` → `VariantCmd`
 - Handles Windows backslash paths in shell commands
 
 **ShellCheck gating** (`internal/rules/shellcheck/shellcheck.go`):
 
-- When shell variant is `VariantNonPOSIX`, ShellCheck is skipped entirely
+- When shell variant is not `IsShellCheckCompatible()`, ShellCheck is skipped entirely
 - This works for stages with an explicit `SHELL ["powershell", ...]` instruction
 
 **Escape token** (`internal/semantic/builder.go`):
@@ -215,7 +215,7 @@ func (m *Model) ShellVariantAt(stageIdx int, line int) shell.Variant
 This returns the effective shell variant for a RUN/CMD/HEALTHCHECK at the given line, accounting
 for:
 
-1. Base image OS (Windows → `VariantNonPOSIX` default)
+1. Base image OS (Windows → `VariantCmd` default)
 2. `SHELL` instructions that appear before the given line
 3. Inline shell directives (`# hadolint shell=bash`)
 
@@ -336,8 +336,8 @@ to **suppress the entire rule** for Windows stages rather than add Windows cache
 
 ShellCheck gating works correctly when the shell variant is known:
 
-- `VariantNonPOSIX` (powershell, cmd) → ShellCheck skipped
-- `VariantBash`, `VariantPOSIX` → ShellCheck runs with appropriate dialect
+- `VariantPowerShell`, `VariantCmd` → ShellCheck skipped (`!IsShellCheckCompatible()`)
+- `VariantBash`, `VariantPOSIX`, `VariantMksh` → ShellCheck runs with appropriate dialect
 
 ### The Gap
 
