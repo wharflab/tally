@@ -426,14 +426,23 @@ func (r *Rule) checkShellSnippet(
 		return nil
 	}
 
-	dialect, ok := dialectForShellName(shellName)
+	// Detect shebang in snippet (e.g., heredoc fallback path) to override
+	// dialect and avoid synthetic #!/bin/sh conflict, same as checkShellMapping.
+	effectiveShellName := shellName
+	scriptHasShebang := false
+	if sn, ok := heredocShebangShell(snippet); ok {
+		effectiveShellName = sn
+		scriptHasShebang = true
+	}
+
+	dialect, ok := dialectForShellName(effectiveShellName)
 	if !ok {
 		return nil
 	}
 
 	baseLoc := rules.NewLocationFromRanges(file, location)
 
-	prelude, _ := buildPrelude(dialect, knownEnv, false)
+	prelude, _ := buildPrelude(dialect, knownEnv, scriptHasShebang)
 	script := prelude + snippet
 	if parseErr := preflightParseShellScript(script, dialect); parseErr != nil {
 		return []rules.Violation{rules.NewViolation(
@@ -451,11 +460,16 @@ func (r *Rule) checkShellSnippet(
 	}
 	nativeViolations := runNativeShellcheckChecks(file, baseLoc, mapping)
 
+	exclude := nativeOwnedShellcheckExcludeCodes()
+	if scriptHasShebang {
+		exclude = append(exclude, "SC1128")
+	}
+
 	out, err := r.runShellcheck(script, intshellcheck.Options{
 		Dialect:  dialect,
 		Severity: "style",
 		Norc:     true,
-		Exclude:  nativeOwnedShellcheckExcludeCodes(),
+		Exclude:  exclude,
 	})
 	if err != nil {
 		return shellcheckRunFailureWithNative(nativeViolations, baseLoc, err)
