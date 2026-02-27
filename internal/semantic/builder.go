@@ -489,6 +489,22 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 			// Track mount-based stage dependencies (RUN --mount=from=...).
 			b.processMountDependencies(c, info.Index, graph)
 
+			// Detect heredoc shebang for per-instruction shell override.
+			if len(c.Files) > 0 && c.Files[0].Data != "" {
+				firstLine, _, _ := strings.Cut(c.Files[0].Data, "\n")
+				if shellName, ok := shell.ShellFromShebang(firstLine); ok {
+					line := 0
+					if locs := c.Location(); len(locs) > 0 {
+						line = locs[0].Start.Line
+					}
+					info.HeredocShellOverrides = append(info.HeredocShellOverrides, HeredocShellOverride{
+						Line:    line,
+						Shell:   shellName,
+						Variant: shell.VariantFromShell(shellName),
+					})
+				}
+			}
+
 		case *instructions.CopyCommand:
 			if c.From != "" {
 				// DL3023: COPY --from cannot reference its own FROM alias.

@@ -433,7 +433,7 @@ func (r *Rule) checkShellSnippet(
 
 	baseLoc := rules.NewLocationFromRanges(file, location)
 
-	prelude, _ := buildPrelude(dialect, knownEnv)
+	prelude, _ := buildPrelude(dialect, knownEnv, false)
 	script := prelude + snippet
 	if parseErr := preflightParseShellScript(script, dialect); parseErr != nil {
 		return []rules.Violation{rules.NewViolation(
@@ -513,20 +513,40 @@ func (r *Rule) checkShellMapping(
 		return nil
 	}
 
-	dialect, ok := dialectForShellName(shellName)
+	// For heredoc scripts with a shebang, use the shebang's shell for dialect
+	// selection instead of the stage shell. Docker/BuildKit respects heredoc
+	// shebangs, so #!/bin/bash means bash regardless of the stage's SHELL.
+	effectiveShellName := shellName
+	hasHeredocShebang := false
+	if mapping.IsHeredoc {
+		if sn, ok := heredocShebangShell(mapping.Script); ok {
+			effectiveShellName = sn
+			hasHeredocShebang = true
+		}
+	}
+
+	dialect, ok := dialectForShellName(effectiveShellName)
 	if !ok {
 		return nil
 	}
 
-	prelude, headerLines := buildPrelude(dialect, knownEnv)
+	prelude, headerLines := buildPrelude(dialect, knownEnv, hasHeredocShebang)
 	script := prelude + mapping.Script
 	nativeViolations := runNativeShellcheckChecks(file, fallbackLoc, mapping)
+
+	exclude := nativeOwnedShellcheckExcludeCodes()
+	if hasHeredocShebang {
+		// The prelude's export lines push the script's shebang past line 1,
+		// which would trigger SC1128 ("The shebang must be on the first line").
+		// Suppress it since the shebang is intentional heredoc content.
+		exclude = append(exclude, "SC1128")
+	}
 
 	out, err := r.runShellcheck(script, intshellcheck.Options{
 		Dialect:  dialect,
 		Severity: "style",
 		Norc:     true,
-		Exclude:  nativeOwnedShellcheckExcludeCodes(),
+		Exclude:  exclude,
 	})
 	if err != nil {
 		return shellcheckRunFailureWithNative(nativeViolations, fallbackLoc, err)
@@ -726,6 +746,22 @@ func dialectForShellName(shellName string) (string, bool) {
 	return shellcheckDialect(shellName), true
 }
 
+// heredocShebangShell extracts the shell name from a heredoc script's shebang
+// line. Returns the shell name suitable for dialectForShellName and true if a
+// shell-compatible shebang was found. Returns false for non-shell shebangs
+// (e.g., #!/usr/bin/python3) or scripts without a shebang.
+func heredocShebangShell(script string) (string, bool) {
+	firstLine, _, _ := strings.Cut(script, "\n")
+	name, ok := shell.ShellFromShebang(firstLine)
+	if !ok {
+		return "", false
+	}
+	if !shell.VariantFromShell(name).IsShellCheckCompatible() {
+		return "", false
+	}
+	return name, true
+}
+
 func initialShellNameForStage(stage instructions.Stage, directives []directive.ShellDirective) string {
 	shellName := semantic.DefaultShell[0]
 
@@ -785,12 +821,17 @@ func collectKnownEnv(info *semantic.StageInfo) []string {
 	return out
 }
 
-func buildPrelude(dialect string, envKeys []string) (string, int) {
+func buildPrelude(dialect string, envKeys []string, scriptHasShebang bool) (string, int) {
 	var sb strings.Builder
+	lineCount := 0
 
-	// Keep a deterministic shebang even though we always pass -s.
-	sb.WriteString("#!/bin/sh\n")
-	lineCount := 1
+	// Only prepend a synthetic shebang when the script does not already have
+	// one. Heredoc scripts with #!/bin/bash carry their own shebang —
+	// prepending #!/bin/sh would create a conflicting double-shebang.
+	if !scriptHasShebang {
+		sb.WriteString("#!/bin/sh\n")
+		lineCount++
+	}
 
 	for _, k := range envKeys {
 		sb.WriteString("export ")

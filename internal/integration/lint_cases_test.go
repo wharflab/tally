@@ -590,6 +590,12 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("shellcheck/ShellCheck")...),
 			wantExit: 1,
 		},
+		{
+			name:     "shellcheck-heredoc-shebang",
+			dir:      "shellcheck-heredoc-shebang",
+			args:     append([]string{"--format", "json"}, mustSelectRules("shellcheck/ShellCheck")...),
+			wantExit: 0, // Valid bash in #!/bin/bash heredoc must not produce SC3xxx false positives
+		},
 
 		// Prefer heredoc syntax tests (isolated to prefer-run-heredoc rule)
 		{
