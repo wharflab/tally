@@ -619,7 +619,7 @@ func (r *PreferHeredocRule) Check(input rules.LintInput) []rules.Violation {
         if sem != nil {
             if info := sem.StageInfo(i); info != nil {
                 if info.BaseImageOS == semantic.BaseImageOSWindows ||
-                    !info.ShellSetting.Variant.IsShellCheckCompatible() {
+                    !info.ShellSetting.Variant.SupportsHeredoc() {
                     continue
                 }
             }
@@ -629,8 +629,8 @@ func (r *PreferHeredocRule) Check(input rules.LintInput) []rules.Violation {
 }
 ```
 
-Note: the gate uses `IsShellCheckCompatible()` (not `IsNonPOSIX()`) because heredoc requires
-a POSIX shell — PowerShell on Linux also can't use heredocs.
+Note: the gate uses `SupportsHeredoc()` (not `IsShellCheckCompatible()`) because heredoc
+requires a POSIX-compatible shell — PowerShell on Linux also can't use heredocs.
 
 If selected `SC` codes are later implemented natively in Go, they should keep the same
 `shellcheck/SC*` rule IDs and use this same shell-compatibility gate so behavior remains
