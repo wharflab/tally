@@ -306,6 +306,22 @@ Windows container Dockerfiles (cmd.exe, PowerShell, servercore/nanoserver base i
 
 ---
 
+### 28. [ShellCheck Go Reimplementation Bridge + SC1040 Pilot](28-shellcheck-go-reimplementation-bridge-sc1040.md)
+
+**Covers:** Incremental migration of `shellcheck/SC####` checks from embedded ShellCheck WASM to native Go while preserving rule IDs, config,
+directives, reporting, and fixes.
+
+**Key Topics:**
+
+- Rule ownership bridge (`wasm` vs `native`) under one stable `shellcheck/*` namespace
+- SC1040 pilot implementation strategy and compatibility constraints
+- Upstream ShellCheck source/test discovery protocol for future ports
+- Required “port all upstream-relevant test vectors” policy
+- Native SC autofix integration model and rollout checklist
+- Alignment with Windows shell-gating behavior from doc 27
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation

@@ -1,0 +1,161 @@
+package shellcheck
+
+import (
+	"testing"
+
+	"github.com/wharflab/tally/internal/rules"
+)
+
+type sc1040TestCase struct {
+	name      string
+	script    string
+	wantCount int
+	wantLine  int
+	wantEnd   int
+	wantText  string
+}
+
+func TestNativeOwnedShellcheckExcludeCodes(t *testing.T) {
+	t.Parallel()
+
+	exclude := nativeOwnedShellcheckExcludeCodes()
+	if len(exclude) != 1 {
+		t.Fatalf("exclude codes count = %d, want 1 (%v)", len(exclude), exclude)
+	}
+	if exclude[0] != "SC1040" {
+		t.Fatalf("exclude[0] = %q, want %q", exclude[0], "SC1040")
+	}
+}
+
+func TestSC1040UpstreamReadHereDocVectors(t *testing.T) {
+	t.Parallel()
+
+	origin := 20
+	tests := []sc1040TestCase{
+		{name: "prop_readHereDoc", script: "cat << foo\nlol\ncow\nfoo", wantCount: 0},
+		{name: "prop_readHereDoc2", script: "cat <<- EOF\n  cow\n  EOF", wantCount: 1, wantLine: origin + 2, wantEnd: 2, wantText: ""},
+		{name: "prop_readHereDoc3", script: "cat << foo\n$\"\nfoo", wantCount: 0},
+		{name: "prop_readHereDoc4", script: "cat << foo\n`\nfoo", wantCount: 0},
+		{name: "prop_readHereDoc5", script: "cat <<- !foo\nbar\n!foo", wantCount: 0},
+		{name: "prop_readHereDoc6", script: "cat << foo\\ bar\ncow\nfoo bar", wantCount: 0},
+		{name: "prop_readHereDoc7", script: "cat << foo\n\\$(f ())\nfoo", wantCount: 0},
+		{name: "prop_readHereDoc8", script: "cat <<foo>>bar\netc\nfoo", wantCount: 0},
+		{name: "prop_readHereDoc9", script: "if true; then cat << foo; fi\nbar\nfoo\n", wantCount: 0},
+		{name: "prop_readHereDoc10", script: "if true; then cat << foo << bar; fi\nfoo\nbar\n", wantCount: 0},
+		{name: "prop_readHereDoc11", script: "cat << foo $(\nfoo\n)lol\nfoo\n", wantCount: 0},
+		{name: "prop_readHereDoc12", script: "cat << foo|cat\nbar\nfoo", wantCount: 0},
+		{name: "prop_readHereDoc13", script: "cat <<'#!'\nHello World\n#!\necho Done", wantCount: 0},
+		{name: "prop_readHereDoc14", script: "cat << foo\nbar\nfoo \n", wantCount: 0},
+		{name: "prop_readHereDoc15", script: "cat <<foo\nbar\nfoo bar\nfoo", wantCount: 0},
+		{name: "prop_readHereDoc16", script: "cat <<- ' foo'\nbar\n foo\n", wantCount: 0},
+		{
+			name:      "prop_readHereDoc17",
+			script:    "cat <<- ' foo'\nbar\n  foo\n foo\n",
+			wantCount: 1,
+			wantLine:  origin + 2,
+			wantEnd:   1,
+			wantText:  "",
+		},
+		{name: "prop_readHereDoc18", script: "cat <<'\"foo'\nbar\n\"foo\n", wantCount: 0},
+		{name: "prop_readHereDoc20", script: "cat << foo\n  foo\n()\nfoo\n", wantCount: 0},
+		{name: "prop_readHereDoc21", script: "# shellcheck disable=SC1039\ncat << foo\n  foo\n()\nfoo\n", wantCount: 0},
+		{name: "prop_readHereDoc22", script: "cat << foo\r\ncow\r\nfoo\r\n", wantCount: 0},
+		{name: "prop_readHereDoc23", script: "cat << foo \r\ncow\r\nfoo\r\n", wantCount: 0},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := runNativeShellcheckChecks(
+				"Dockerfile",
+				rules.NewLineLocation("Dockerfile", origin),
+				scriptMapping{Script: tc.script, OriginStartLine: origin, FallbackLine: origin},
+			)
+			assertSC1040Case(t, got, tc)
+		})
+	}
+}
+
+func TestSC1040FixPreservesTabsAndRemovesSpaces(t *testing.T) {
+	t.Parallel()
+
+	script := "cat <<-EOF\nbody\n\t \tEOF\nEOF\n"
+	origin := 30
+	violations := runNativeShellcheckChecks(
+		"Dockerfile",
+		rules.NewLineLocation("Dockerfile", origin),
+		scriptMapping{Script: script, OriginStartLine: origin, FallbackLine: origin},
+	)
+	if len(violations) != 1 {
+		t.Fatalf("violations count = %d, want 1", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil || len(fix.Edits) != 1 {
+		t.Fatalf("expected single fix edit, got %+v", fix)
+	}
+	if fix.Edits[0].NewText != "\t\t" {
+		t.Fatalf("fix text = %q, want %q", fix.Edits[0].NewText, "\t\t")
+	}
+	if fix.Edits[0].Location.End.Column != 3 {
+		t.Fatalf("fix end column = %d, want 3", fix.Edits[0].Location.End.Column)
+	}
+}
+
+func assertSC1040Case(t *testing.T, got []rules.Violation, tc sc1040TestCase) {
+	t.Helper()
+
+	if len(got) != tc.wantCount {
+		t.Fatalf("violations count = %d, want %d: %+v", len(got), tc.wantCount, got)
+	}
+	if tc.wantCount == 0 {
+		return
+	}
+
+	assertSC1040Violation(t, got[0], tc)
+}
+
+func assertSC1040Violation(t *testing.T, v rules.Violation, tc sc1040TestCase) {
+	t.Helper()
+
+	if v.RuleCode != sc1040RuleCode {
+		t.Fatalf("rule = %q, want %q", v.RuleCode, sc1040RuleCode)
+	}
+	if v.Message != sc1040Message {
+		t.Fatalf("message = %q, want %q", v.Message, sc1040Message)
+	}
+	if v.Severity != rules.SeverityError {
+		t.Fatalf("severity = %q, want %q", v.Severity, rules.SeverityError)
+	}
+	if v.Location.Start.Line != tc.wantLine {
+		t.Fatalf("line = %d, want %d", v.Location.Start.Line, tc.wantLine)
+	}
+	if v.Location.Start.Column != 0 {
+		t.Fatalf("start column = %d, want 0", v.Location.Start.Column)
+	}
+	if v.SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+	if v.SuggestedFix.Safety != rules.FixSafe {
+		t.Fatalf("fix safety = %v, want %v", v.SuggestedFix.Safety, rules.FixSafe)
+	}
+	if !v.SuggestedFix.IsPreferred {
+		t.Fatal("expected preferred fix")
+	}
+	if len(v.SuggestedFix.Edits) != 1 {
+		t.Fatalf("fix edits count = %d, want 1", len(v.SuggestedFix.Edits))
+	}
+
+	edit := v.SuggestedFix.Edits[0]
+	if edit.Location.Start.Line != tc.wantLine || edit.Location.End.Line != tc.wantLine {
+		t.Fatalf("fix line range = %d-%d, want %d", edit.Location.Start.Line, edit.Location.End.Line, tc.wantLine)
+	}
+	if edit.Location.Start.Column != 0 || edit.Location.End.Column != tc.wantEnd {
+		t.Fatalf("fix columns = %d-%d, want 0-%d", edit.Location.Start.Column, edit.Location.End.Column, tc.wantEnd)
+	}
+	if edit.NewText != tc.wantText {
+		t.Fatalf("fix new text = %q, want %q", edit.NewText, tc.wantText)
+	}
+}

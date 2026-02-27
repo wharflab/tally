@@ -431,11 +431,22 @@ func (r *Rule) checkShellSnippet(
 		return nil
 	}
 
+	baseLoc := rules.NewLocationFromRanges(file, location)
+	mapping := scriptMapping{
+		Script:          snippet,
+		OriginStartLine: baseLoc.Start.Line,
+		FallbackLine:    baseLoc.Start.Line,
+	}
+	nativeViolations := runNativeShellcheckChecks(file, baseLoc, mapping)
+
 	prelude, _ := buildPrelude(dialect, knownEnv)
 	script := prelude + snippet
 	if parseErr := preflightParseShellScript(script, dialect); parseErr != nil {
+		if len(nativeViolations) > 0 {
+			return nativeViolations
+		}
 		return []rules.Violation{rules.NewViolation(
-			rules.NewLocationFromRanges(file, location),
+			baseLoc,
 			metaParseStatusRuleCode,
 			"unable to parse shell script",
 			rules.SeverityInfo,
@@ -446,6 +457,7 @@ func (r *Rule) checkShellSnippet(
 		Dialect:  dialect,
 		Severity: "style",
 		Norc:     true,
+		Exclude:  nativeOwnedShellcheckExcludeCodes(),
 	})
 	if err != nil {
 		// Tool failures should not hard-fail linting; surface as a single violation
@@ -454,17 +466,20 @@ func (r *Rule) checkShellSnippet(
 		if strings.TrimSpace(err.Error()) != "" {
 			msg += ": " + err.Error()
 		}
-		loc := rules.NewLocationFromRanges(file, location)
-		return []rules.Violation{rules.NewViolation(
-			loc,
+		v := rules.NewViolation(
+			baseLoc,
 			metaFailureRuleCode,
 			msg,
 			rules.SeverityWarning,
-		)}
+		)
+		if len(nativeViolations) == 0 {
+			return []rules.Violation{v}
+		}
+		return append(nativeViolations, v)
 	}
 
-	violations := make([]rules.Violation, 0, len(out.Comments))
-	baseLoc := rules.NewLocationFromRanges(file, location)
+	violations := make([]rules.Violation, 0, len(out.Comments)+len(nativeViolations))
+	violations = append(violations, nativeViolations...)
 	for _, c := range out.Comments {
 		if _, excluded := hadolintExcludedCodes[c.Code]; excluded {
 			continue
@@ -523,26 +538,33 @@ func (r *Rule) checkShellMapping(
 
 	prelude, headerLines := buildPrelude(dialect, knownEnv)
 	script := prelude + mapping.Script
+	nativeViolations := runNativeShellcheckChecks(file, fallbackLoc, mapping)
 
 	out, err := r.runShellcheck(script, intshellcheck.Options{
 		Dialect:  dialect,
 		Severity: "style",
 		Norc:     true,
+		Exclude:  nativeOwnedShellcheckExcludeCodes(),
 	})
 	if err != nil {
 		msg := "failed to run embedded ShellCheck"
 		if strings.TrimSpace(err.Error()) != "" {
 			msg += ": " + err.Error()
 		}
-		return []rules.Violation{rules.NewViolation(
+		v := rules.NewViolation(
 			fallbackLoc,
 			metaFailureRuleCode,
 			msg,
 			rules.SeverityWarning,
-		)}
+		)
+		if len(nativeViolations) == 0 {
+			return []rules.Violation{v}
+		}
+		return append(nativeViolations, v)
 	}
 
-	violations := make([]rules.Violation, 0, len(out.Comments))
+	violations := make([]rules.Violation, 0, len(out.Comments)+len(nativeViolations))
+	violations = append(violations, nativeViolations...)
 	for _, c := range out.Comments {
 		if _, excluded := hadolintExcludedCodes[c.Code]; excluded {
 			continue

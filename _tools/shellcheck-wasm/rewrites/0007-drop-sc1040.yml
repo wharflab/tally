@@ -1,0 +1,14 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rule.json
+id: shellcheck-drop-sc1040
+message: Remove SC1040 emission
+severity: info
+language: Haskell
+rule:
+  pattern:
+    context: |
+      module Test where
+      foo = do
+          parseProblemAt $POS ErrorC 1040 $MSG
+    selector: exp
+fix: ''

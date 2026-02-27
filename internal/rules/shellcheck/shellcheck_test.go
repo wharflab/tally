@@ -167,6 +167,25 @@ func TestCheckShellSnippetSkipsNonParseableSnippet(t *testing.T) {
 	}
 }
 
+func TestCheckShellSnippetReturnsNativeSC1040OnParseError(t *testing.T) {
+	t.Parallel()
+
+	r := &Rule{}
+	violations := r.checkShellSnippet(
+		"Dockerfile",
+		[]parser.Range{{Start: parser.Position{Line: 10, Character: 0}}},
+		"/bin/sh",
+		nil,
+		"cat <<-EOF\nhello\n  EOF",
+	)
+	if len(violations) != 1 {
+		t.Fatalf("expected one violation, got %+v", violations)
+	}
+	if violations[0].RuleCode != sc1040RuleCode {
+		t.Fatalf("expected rule %q, got %q", sc1040RuleCode, violations[0].RuleCode)
+	}
+}
+
 func TestCheckShellSnippetSkipsBlankSnippet(t *testing.T) {
 	t.Parallel()
 
