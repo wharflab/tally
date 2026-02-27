@@ -720,24 +720,25 @@ jobs:
           fi
           export GH_TOKEN="${CROSS_FORK_PR_PAT}"
 
-          EXISTING_PR=$(gh pr list \
+          # Try to create the PR; if it already exists, extract the URL and update it.
+          PR_URL=$(gh pr create \
             --repo zed-industries/extensions \
             --head "wharflab:${BRANCH}" \
-            --state open \
-            --json number \
-            --jq '.[0].number // empty')
-
-          if [ -n "${EXISTING_PR}" ]; then
-            gh pr edit "${EXISTING_PR}" \
-              --repo zed-industries/extensions \
-              --title "tally: update to v${CLEAN_VERSION}" \
-              --body "Automated version bump for tally extension to v${CLEAN_VERSION}."
-            echo "Updated existing PR #${EXISTING_PR}"
-          else
-            gh pr create \
-              --repo zed-industries/extensions \
-              --head "wharflab:${BRANCH}" \
-              --base main \
-              --title "tally: update to v${CLEAN_VERSION}" \
-              --body "Automated version bump for tally extension to v${CLEAN_VERSION}."
-          fi
+            --base main \
+            --title "tally: update to v${CLEAN_VERSION}" \
+            --body "Automated version bump for tally extension to v${CLEAN_VERSION}." 2>&1) \
+          || {
+            # gh pr create prints the existing PR URL on failure — extract the PR number
+            EXISTING_PR=$(echo "${PR_URL}" | grep -oP 'pull/\K[0-9]+' | head -1)
+            if [ -n "${EXISTING_PR}" ]; then
+              gh pr edit "${EXISTING_PR}" \
+                --repo zed-industries/extensions \
+                --title "tally: update to v${CLEAN_VERSION}" \
+                --body "Automated version bump for tally extension to v${CLEAN_VERSION}."
+              echo "Updated existing PR: https://github.com/zed-industries/extensions/pull/${EXISTING_PR}"
+            else
+              echo "::error::Failed to create or update PR: ${PR_URL}"
+              exit 1
+            fi
+          }
+          echo "PR: ${PR_URL}"
