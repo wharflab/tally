@@ -39,6 +39,8 @@ func TestDetectBaseImageOS(t *testing.T) {
 		{"debian", "debian:bookworm-slim", "", BaseImageOSLinux},
 		{"fedora", "fedora:39", "", BaseImageOSLinux},
 		{"busybox", "busybox:latest", "", BaseImageOSLinux},
+		{"wolfi", "wolfi:latest", "", BaseImageOSLinux},
+		{"photon", "photon:5.0", "", BaseImageOSLinux},
 		{"registry prefixed alpine", "docker.io/library/alpine:3.20", "", BaseImageOSLinux},
 
 		// Unknown
