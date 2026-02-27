@@ -226,7 +226,13 @@ func isLinuxImageName(lower string) bool {
 	case "alpine", "ubuntu", "debian", "fedora", "centos", "rockylinux",
 		"almalinux", "amazonlinux", "al2023", "al2",
 		"archlinux", "clearlinux", "oraclelinux",
-		"busybox", "distroless", "chainguard", "wolfi", "photon":
+		"busybox", "distroless", "chainguard", "wolfi", "photon",
+		"opensuse", "sles", "gentoo":
+		return true
+	}
+
+	// Images under well-known Linux org prefixes (e.g. kalilinux/kali-rolling)
+	if strings.HasPrefix(lower, "kalilinux/") {
 		return true
 	}
 

@@ -43,6 +43,9 @@ func TestDetectBaseImageOS(t *testing.T) {
 		{"al2", "al2:latest", "", BaseImageOSLinux},
 		{"wolfi", "wolfi:latest", "", BaseImageOSLinux},
 		{"photon", "photon:5.0", "", BaseImageOSLinux},
+		{"opensuse", "opensuse:leap", "", BaseImageOSLinux},
+		{"kali-rolling", "kalilinux/kali-rolling:latest", "", BaseImageOSLinux},
+		{"kali-last-release", "kalilinux/kali-last-release:latest", "", BaseImageOSLinux},
 		{"registry prefixed alpine", "docker.io/library/alpine:3.20", "", BaseImageOSLinux},
 
 		// Unknown
