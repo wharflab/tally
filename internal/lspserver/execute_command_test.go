@@ -141,6 +141,27 @@ func TestContentForURI_ReturnsOpenDocumentContent(t *testing.T) {
 	assert.Equal(t, "FROM alpine:3.18\n", string(content))
 }
 
+func TestContentForURI_ReturnsOpenUntitledDocumentContent(t *testing.T) {
+	t.Parallel()
+
+	s := New()
+	uri := "untitled:Untitled-1"
+	s.documents.Open(uri, "dockerfile", 1, "FROM alpine:3.18\n")
+
+	content, err := s.contentForURI(uri)
+	require.NoError(t, err)
+	assert.Equal(t, "FROM alpine:3.18\n", string(content))
+}
+
+func TestContentForURI_UntitledURI_ClosedDocument(t *testing.T) {
+	t.Parallel()
+
+	s := New()
+	// Don't open the document — untitled URIs have no backing file.
+	_, err := s.contentForURI("untitled:Untitled-1")
+	require.ErrorIs(t, err, os.ErrNotExist)
+}
+
 func TestContentForURI_ReadsFromDiskWhenNotOpen(t *testing.T) {
 	t.Parallel()
 

@@ -320,6 +320,14 @@ func (s *Server) handleDiagnostic(ctx context.Context, params *protocol.Document
 	}
 
 	// Document not open — read from disk.
+	// Untitled documents have no backing file; return empty diagnostics.
+	if isVirtualURI(uri) {
+		return &protocol.DocumentDiagnosticResponse{
+			FullDocumentDiagnosticReport: &protocol.RelatedFullDocumentDiagnosticReport{
+				Items: []*protocol.Diagnostic{},
+			},
+		}, nil
+	}
 	filePath := uriToPath(uri)
 	return s.pullDiagnosticsFromDisk(ctx, uri, filePath, params.PreviousResultId)
 }
@@ -527,12 +535,46 @@ func clampUint32(v int) uint32 {
 	return uint32(v) //nolint:gosec // line/column numbers are well within uint32 range
 }
 
-// uriToPath converts a file:// URI to a local file path.
+// isVirtualURI reports whether docURI refers to a virtual document that doesn't
+// have a backing file on disk (e.g. untitled:, vscode-notebook-cell:).
+func isVirtualURI(docURI string) bool {
+	// Fast path for the most common case.
+	if strings.HasPrefix(docURI, "file:") {
+		return false
+	}
+	parsed, err := url.Parse(docURI)
+	if err != nil {
+		// If parsing fails, it's unlikely to be a URI with a scheme.
+		// Treat as a file path.
+		return false
+	}
+	return parsed.Scheme != "" && parsed.Scheme != "file"
+}
+
+// uriToPath converts a document URI to a local file path for linting purposes.
+//
+// For file:// URIs this returns the real filesystem path.
+// For non-file URIs (e.g. untitled://) this returns a synthetic path anchored
+// at the working directory so that config discovery finds the project-level
+// .tally.toml. The synthetic name is always "Dockerfile" because tally only
+// lints Dockerfiles.
 func uriToPath(docURI string) string {
 	parsed, err := url.Parse(docURI)
 	if err != nil {
 		return strings.TrimPrefix(docURI, "file://")
 	}
+
+	// Non-file URIs (e.g. untitled://) represent unsaved documents with no
+	// on-disk path. Return a synthetic path so config discovery and settings
+	// matching work relative to the project root.
+	if parsed.Scheme != "" && parsed.Scheme != "file" {
+		wd, err := os.Getwd()
+		if err != nil {
+			return "Dockerfile"
+		}
+		return filepath.Join(wd, "Dockerfile")
+	}
+
 	path := parsed.Path
 	if runtime.GOOS == "windows" {
 		// UNC paths: file://server/share/path → \\server\share\path

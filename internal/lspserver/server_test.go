@@ -76,8 +76,48 @@ func TestSeverityConversion(t *testing.T) {
 
 func TestURIToPath(t *testing.T) {
 	t.Parallel()
-	path := uriToPath("file:///tmp/Dockerfile")
-	assert.Equal(t, filepath.FromSlash("/tmp/Dockerfile"), path)
+
+	t.Run("file URI", func(t *testing.T) {
+		t.Parallel()
+		path := uriToPath("file:///tmp/Dockerfile")
+		assert.Equal(t, filepath.FromSlash("/tmp/Dockerfile"), path)
+	})
+
+	t.Run("untitled URI returns synthetic path", func(t *testing.T) {
+		t.Parallel()
+		path := uriToPath("untitled:Untitled-1")
+		assert.True(t, filepath.IsAbs(path), "untitled URI should resolve to an absolute path")
+		assert.Equal(t, "Dockerfile", filepath.Base(path))
+	})
+
+	t.Run("vscode-notebook URI returns synthetic path", func(t *testing.T) {
+		t.Parallel()
+		path := uriToPath("vscode-notebook-cell://authority/path")
+		assert.True(t, filepath.IsAbs(path))
+		assert.Equal(t, "Dockerfile", filepath.Base(path))
+	})
+}
+
+func TestIsVirtualURI(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		uri  string
+		want bool
+	}{
+		{"untitled:Untitled-1", true},
+		{"untitled://Untitled-1", true},
+		{"vscode-notebook-cell://authority/path", true},
+		{"file:///tmp/Dockerfile", false},
+		{"/tmp/Dockerfile", false},
+		{"", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.uri, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isVirtualURI(tt.uri), "isVirtualURI(%q)", tt.uri)
+		})
+	}
 }
 
 func TestCancelPreempter_HandlesCancelRequest(t *testing.T) {
