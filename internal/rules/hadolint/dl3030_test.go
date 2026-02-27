@@ -114,7 +114,7 @@ RUN yum -y install httpd`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.dockerfile)
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 			r := NewDL3030Rule()
 			violations := r.Check(input)
 

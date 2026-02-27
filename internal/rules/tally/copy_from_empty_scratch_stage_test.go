@@ -37,7 +37,7 @@ func TestCopyFromEmptyScratchStageRule_EmptyScratchWithCopyFrom(t *testing.T) {
 FROM alpine:3.19
 COPY --from=empty /app /app
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCopyFromEmptyScratchStageRule()
 	violations := r.Check(input)
 
@@ -90,7 +90,7 @@ RUN ["echo", "hello"]
 FROM alpine:3.19
 COPY --from=builder /out /out
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCopyFromEmptyScratchStageRule()
 	violations := r.Check(input)
 
@@ -111,7 +111,7 @@ RUN echo "will fail"
 FROM alpine:3.19
 COPY --from=builder /out /out
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCopyFromEmptyScratchStageRule()
 	violations := r.Check(input)
 
@@ -128,7 +128,7 @@ COPY app /app
 FROM alpine:3.19
 COPY --from=builder /app /app
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCopyFromEmptyScratchStageRule()
 	violations := r.Check(input)
 
@@ -145,7 +145,7 @@ ADD archive.tar.gz /
 FROM alpine:3.19
 COPY --from=builder /out /out
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCopyFromEmptyScratchStageRule()
 	violations := r.Check(input)
 
@@ -162,7 +162,7 @@ RUN go build -o /app
 FROM alpine:3.19
 COPY --from=builder /app /app
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCopyFromEmptyScratchStageRule()
 	violations := r.Check(input)
 
@@ -178,7 +178,7 @@ func TestCopyFromEmptyScratchStageRule_NumericFromRef(t *testing.T) {
 FROM alpine:3.19
 COPY --from=0 /app /app
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCopyFromEmptyScratchStageRule()
 	violations := r.Check(input)
 
@@ -200,7 +200,7 @@ LABEL maintainer="test"
 FROM alpine:3.19
 COPY --from=config /app /app
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCopyFromEmptyScratchStageRule()
 	violations := r.Check(input)
 
@@ -217,7 +217,7 @@ FROM alpine:3.19
 COPY --from=empty /app /app
 COPY --from=empty /config /config
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCopyFromEmptyScratchStageRule()
 	violations := r.Check(input)
 
@@ -233,7 +233,7 @@ func TestCopyFromEmptyScratchStageRule_EmptyScratchNotReferenced(t *testing.T) {
 FROM alpine:3.19
 RUN echo "hello"
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCopyFromEmptyScratchStageRule()
 	violations := r.Check(input)
 
@@ -250,7 +250,7 @@ func TestCopyFromEmptyScratchStageRule_NonScratchDerivedImage(t *testing.T) {
 FROM alpine:3.19
 COPY --from=empty /app /app
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewCopyFromEmptyScratchStageRule()
 	violations := r.Check(input)
 

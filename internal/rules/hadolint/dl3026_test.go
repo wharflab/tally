@@ -11,7 +11,7 @@ import (
 // makeDL3026Input creates a LintInput with both semantic model and config.
 func makeDL3026Input(t *testing.T, content string, config any) rules.LintInput {
 	t.Helper()
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	input.Config = config
 	return input
 }

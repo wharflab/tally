@@ -128,7 +128,7 @@ ONBUILD RUN apt install python`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.dockerfile)
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 			r := NewDL3027Rule()
 			violations := r.Check(input)
 
@@ -371,7 +371,7 @@ RUN apt-get update && \
 // TestDL3027_OnbuildAutoFix verifies that DL3027 provides auto-fix for ONBUILD RUN commands.
 func TestDL3027_OnbuildAutoFix(t *testing.T) {
 	t.Parallel()
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", `FROM ubuntu
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM ubuntu
 ONBUILD RUN apt install python`)
 	r := NewDL3027Rule()
 	violations := r.Check(input)

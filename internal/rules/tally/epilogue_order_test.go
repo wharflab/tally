@@ -222,7 +222,7 @@ CMD ["serve"]
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.content)
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.content)
 
 			violations := r.Check(input)
 
@@ -307,7 +307,7 @@ CMD ["second"]
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.content)
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.content)
 			violations := r.Check(input)
 
 			if len(violations) != tt.wantViolations {

@@ -59,38 +59,13 @@ func MakeLintInputWithConfig(tb testing.TB, file, content string, config any) ru
 	return input
 }
 
-// MakeLintInputWithSemantic creates a LintInput with the semantic model.
-// This is needed for rules that use semantic analysis (package tracking, etc.).
-func MakeLintInputWithSemantic(tb testing.TB, file, content string) rules.LintInput {
-	tb.Helper()
-
-	result, err := dockerfile.Parse(strings.NewReader(content), nil)
-	if err != nil {
-		tb.Fatalf("failed to parse Dockerfile: %v", err)
-	}
-
-	// Build semantic model
-	sem := semantic.NewBuilder(result, nil, file).Build()
-
-	return rules.LintInput{
-		File:     file,
-		AST:      result.AST,
-		Stages:   result.Stages,
-		MetaArgs: result.MetaArgs,
-		Source:   result.Source,
-		Semantic: sem,
-		Context:  nil,
-		Config:   nil,
-	}
-}
-
 // GetSemantic extracts the *semantic.Model from a LintInput.
 // Fails the test if the Semantic field is nil or not a *semantic.Model.
 func GetSemantic(tb testing.TB, input rules.LintInput) *semantic.Model {
 	tb.Helper()
 	sem, ok := input.Semantic.(*semantic.Model)
 	if !ok || sem == nil {
-		tb.Fatal("LintInput.Semantic is not a *semantic.Model; use MakeLintInputWithSemantic")
+		tb.Fatal("LintInput.Semantic is not a *semantic.Model; use MakeLintInput")
 	}
 	return sem
 }

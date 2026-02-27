@@ -195,10 +195,10 @@ func detectBaseImageOS(baseName, platform string) BaseImageOS {
 	// Explicit --platform=windows/* is a strong signal.
 	if platform != "" {
 		lp := strings.ToLower(platform)
-		if strings.HasPrefix(lp, "windows") || strings.Contains(lp, "windows") {
+		if strings.Contains(lp, "windows") {
 			return BaseImageOSWindows
 		}
-		if strings.HasPrefix(lp, "linux") {
+		if strings.Contains(lp, "linux") {
 			return BaseImageOSLinux
 		}
 	}

@@ -127,7 +127,7 @@ ONBUILD HEALTHCHECK CMD /bin/check
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", tt.dockerfile)
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 
 			r := NewDL3057Rule()
 			violations := r.Check(input)
@@ -175,7 +175,7 @@ func TestDL3057Rule_PlanAsync(t *testing.T) {
 
 	t.Run("plans checks for external images", func(t *testing.T) {
 		t.Parallel()
-		input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", "FROM alpine:3.18\nRUN echo hello\n")
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nRUN echo hello\n")
 		r := NewDL3057Rule()
 		requests := r.PlanAsync(input)
 		if len(requests) == 0 {
@@ -188,7 +188,7 @@ func TestDL3057Rule_PlanAsync(t *testing.T) {
 
 	t.Run("no plans when HEALTHCHECK CMD present", func(t *testing.T) {
 		t.Parallel()
-		input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", "FROM alpine:3.18\nHEALTHCHECK CMD curl -f http://localhost/\n")
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nHEALTHCHECK CMD curl -f http://localhost/\n")
 		r := NewDL3057Rule()
 		requests := r.PlanAsync(input)
 		if len(requests) != 0 {
@@ -200,7 +200,7 @@ func TestDL3057Rule_PlanAsync(t *testing.T) {
 func makeHandler(t *testing.T, dockerfile string) *healthcheckHandler {
 	t.Helper()
 	r := NewDL3057Rule()
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", dockerfile)
+	input := testutil.MakeLintInput(t, "Dockerfile", dockerfile)
 	return &healthcheckHandler{
 		meta:     r.Metadata(),
 		file:     input.File,

@@ -33,7 +33,7 @@ func TestShellRunInScratchRule_ShellFormRUN(t *testing.T) {
 	content := `FROM scratch
 RUN echo "hello"
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewShellRunInScratchRule()
 	violations := r.Check(input)
 
@@ -83,7 +83,7 @@ func TestShellRunInScratchRule_ExecFormRUN(t *testing.T) {
 	content := `FROM scratch
 RUN ["echo", "hello"]
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewShellRunInScratchRule()
 	violations := r.Check(input)
 
@@ -97,7 +97,7 @@ func TestShellRunInScratchRule_NonScratchStage(t *testing.T) {
 	content := `FROM alpine:3.19
 RUN echo "hello"
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewShellRunInScratchRule()
 	violations := r.Check(input)
 
@@ -117,7 +117,7 @@ RUN echo "second"
 FROM alpine:3.19
 RUN echo "ok"
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewShellRunInScratchRule()
 	violations := r.Check(input)
 
@@ -132,7 +132,7 @@ func TestShellRunInScratchRule_MixedRunForms(t *testing.T) {
 RUN echo "shell form"
 RUN ["echo", "exec form"]
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewShellRunInScratchRule()
 	violations := r.Check(input)
 
@@ -152,7 +152,7 @@ func TestShellRunInScratchRule_WithExplicitSHELL(t *testing.T) {
 SHELL ["/busybox", "sh", "-c"]
 RUN echo "hello"
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewShellRunInScratchRule()
 	violations := r.Check(input)
 
@@ -169,7 +169,7 @@ RUN echo "fail before shell"
 SHELL ["/busybox", "sh", "-c"]
 RUN echo "ok after shell"
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewShellRunInScratchRule()
 	violations := r.Check(input)
 
@@ -186,7 +186,7 @@ func TestShellRunInScratchRule_NamedScratchStage(t *testing.T) {
 	content := `FROM scratch AS minimal
 RUN echo "fail"
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	r := NewShellRunInScratchRule()
 	violations := r.Check(input)
 
@@ -210,7 +210,7 @@ RUN echo "will fail"
 FROM alpine:3.19
 COPY --from=builder /out /out
 `
-	input := testutil.MakeLintInputWithSemantic(t, "Dockerfile", content)
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 
 	shellViolations := NewShellRunInScratchRule().Check(input)
 	copyViolations := NewCopyFromEmptyScratchStageRule().Check(input)
