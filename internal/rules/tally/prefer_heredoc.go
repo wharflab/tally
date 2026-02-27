@@ -224,8 +224,14 @@ func (r *PreferHeredocRule) checkConsecutiveRuns(
 			sequenceMounts = nil
 		}
 
+		// Use the per-command shell variant for extraction and exit detection.
+		cmdVariant := p.shellVariant
+		if v, ok := p.shellAtCmd[cmdIdx]; ok {
+			cmdVariant = v
+		}
+
 		// Extract commands from this RUN
-		commands, isSimple := r.extractRunCommands(run, p.shellVariant)
+		commands, isSimple := r.extractRunCommands(run, cmdVariant)
 		if len(commands) == 0 {
 			flushSequence()
 			sequenceMounts = nil
@@ -234,7 +240,7 @@ func (r *PreferHeredocRule) checkConsecutiveRuns(
 
 		// Check if any command has exit (breaks sequence)
 		script := getRunScriptFromCmd(run)
-		if shell.HasExitCommand(script, p.shellVariant) {
+		if shell.HasExitCommand(script, cmdVariant) {
 			flushSequence()
 			sequenceMounts = nil
 			continue
