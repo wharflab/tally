@@ -2,11 +2,24 @@ package semantic
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/shell"
+)
+
+// BaseImageOS represents the detected operating system of a stage's base image.
+type BaseImageOS int
+
+const (
+	// BaseImageOSUnknown means the OS could not be determined from static analysis.
+	BaseImageOSUnknown BaseImageOS = iota
+	// BaseImageOSLinux indicates a Linux-based base image.
+	BaseImageOSLinux
+	// BaseImageOSWindows indicates a Windows-based base image.
+	BaseImageOSWindows
 )
 
 // DefaultShell is the default shell used by Docker for RUN instructions.
@@ -73,6 +86,10 @@ type StageInfo struct {
 	// Stage is a reference to the BuildKit stage.
 	Stage *instructions.Stage
 
+	// BaseImageOS is the detected operating system of the base image.
+	// Determined by heuristics (image name, platform, escape directive, SHELL instruction).
+	BaseImageOS BaseImageOS
+
 	// ShellSetting contains the active shell configuration including variant and source.
 	ShellSetting ShellSetting
 
@@ -117,9 +134,104 @@ type StageInfo struct {
 	IsLastStage bool
 }
 
+// IsWindows returns true if the base image was detected as Windows.
+func (s *StageInfo) IsWindows() bool {
+	return s.BaseImageOS == BaseImageOSWindows
+}
+
+// IsLinux returns true if the base image was detected as Linux.
+func (s *StageInfo) IsLinux() bool {
+	return s.BaseImageOS == BaseImageOSLinux
+}
+
 // IsScratch returns true if this stage uses FROM scratch as its base image.
 func (s *StageInfo) IsScratch() bool {
 	return s.Stage != nil && s.Stage.BaseName == "scratch"
+}
+
+// detectBaseImageOS determines the OS from the base image name and platform.
+// Uses a fast heuristic — no network calls.
+func detectBaseImageOS(baseName, platform string) BaseImageOS {
+	lower := strings.ToLower(baseName)
+
+	// Explicit --platform=windows/* is a strong signal.
+	if platform != "" {
+		lp := strings.ToLower(platform)
+		if strings.HasPrefix(lp, "windows") || strings.Contains(lp, "windows") {
+			return BaseImageOSWindows
+		}
+		if strings.HasPrefix(lp, "linux") {
+			return BaseImageOSLinux
+		}
+	}
+
+	// Windows image name patterns.
+	if isWindowsImageName(lower) {
+		return BaseImageOSWindows
+	}
+
+	// Well-known Linux distros.
+	if isLinuxImageName(lower) {
+		return BaseImageOSLinux
+	}
+
+	return BaseImageOSUnknown
+}
+
+// isWindowsImageName returns true if the image name is a known Windows image.
+func isWindowsImageName(lower string) bool {
+	// MCR Windows images: mcr.microsoft.com/windows, mcr.microsoft.com/windows/servercore, etc.
+	if strings.HasPrefix(lower, "mcr.microsoft.com/windows:") ||
+		strings.HasPrefix(lower, "mcr.microsoft.com/windows/") {
+		return true // servercore, nanoserver, windows, iotcore
+	}
+	// .NET images with Windows tags
+	if strings.HasPrefix(lower, "mcr.microsoft.com/dotnet/") {
+		if strings.Contains(lower, "nanoserver") || strings.Contains(lower, "windowsservercore") {
+			return true
+		}
+	}
+	// PowerShell images with Windows tags
+	if strings.HasPrefix(lower, "mcr.microsoft.com/powershell") {
+		if strings.Contains(lower, "nanoserver") || strings.Contains(lower, "windowsservercore") {
+			return true
+		}
+	}
+	return false
+}
+
+// isLinuxImageName returns true if the image name is a well-known Linux-based image.
+func isLinuxImageName(lower string) bool {
+	// Strip registry prefix for matching (e.g. "docker.io/library/alpine" → "alpine")
+	name := lower
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		name = name[i+1:]
+	}
+	// Strip tag
+	if i := strings.Index(name, ":"); i >= 0 {
+		name = name[:i]
+	}
+
+	switch name {
+	case "alpine", "ubuntu", "debian", "fedora", "centos", "rockylinux",
+		"almalinux", "amazonlinux", "archlinux", "clearlinux", "oraclelinux",
+		"busybox", "distroless", "chainguard":
+		return true
+	}
+
+	// MCR Linux images (dotnet on Linux, powershell on Linux)
+	if strings.HasPrefix(lower, "mcr.microsoft.com/dotnet/") && !strings.Contains(lower, "nanoserver") &&
+		!strings.Contains(lower, "windowsservercore") {
+		// dotnet images without Windows tag markers default to Linux
+		return true
+	}
+	if strings.HasPrefix(lower, "mcr.microsoft.com/powershell") && !strings.Contains(lower, "nanoserver") &&
+		!strings.Contains(lower, "windowsservercore") {
+		// e.g. mcr.microsoft.com/powershell:ubuntu-22.04
+		return true
+	}
+
+	return false
 }
 
 // HasPackage checks if a package was installed in this stage.
