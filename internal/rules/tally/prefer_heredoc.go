@@ -374,10 +374,10 @@ func (r *PreferHeredocRule) checkChainedCommands(
 
 			// Generate async fix for simple scripts
 			// Uses async resolution to operate on content after sync fixes are applied
-			if shell.IsSimpleScript(script, p.shellVariant) {
-				commands := shell.ExtractChainedCommands(script, p.shellVariant)
+			if shell.IsSimpleScript(script, variant) {
+				commands := shell.ExtractChainedCommands(script, variant)
 				if len(commands) > 0 {
-					fix := r.generateChainedAsyncFix(p.stageIdx, p.shellVariant, commands, p.minCommands, p.pipefailEnabled, p.meta)
+					fix := r.generateChainedAsyncFix(p.stageIdx, variant, commands, p.minCommands, p.pipefailEnabled, p.meta)
 					v = v.WithSuggestedFix(fix)
 				}
 			}
