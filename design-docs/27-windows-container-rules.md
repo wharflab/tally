@@ -484,14 +484,16 @@ func (r *ErrorActionPreferenceRule) Check(input rules.LintInput) []rules.Violati
 The user asks: isn't this the same gate as shell detection? Yes — `BaseImageOS` and shell variant
 are two facets of the same signal. They should be computed together and exposed together.
 
-Currently, shell variant resolution happens in two separate places:
+Currently, shell variant resolution responsibilities are split across two layers:
 
 1. **Semantic model** (`internal/semantic/builder.go`): Computes `StageInfo.ShellSetting` from
-   `SHELL` instructions and `# hadolint shell=` directives. Always defaults to `/bin/sh`.
+   `SHELL` instructions and `# hadolint shell=` directives, and provides the stage-level default
+   shell variant via `StageInfo`.
 
 2. **ShellCheck rule** (`internal/rules/shellcheck/shellcheck.go:704`): Calls
-   `initialShellNameForStage()` which starts from `semantic.DefaultShell[0]` = `/bin/sh`,
-   then overrides from directives. Gates via `dialectForShellName()` → `variant.IsNonPOSIX()`.
+   `initialShellNameForStage()` for fallback/default behavior, then tracks `SHELL` transitions
+   during stage traversal for per-instruction dialect selection. Gating uses
+   `variant.IsShellCheckCompatible()` (via `dialectForShellName()`).
 
 The fix is to make the semantic model the **single source of truth** for both OS and shell:
 
@@ -511,17 +513,16 @@ Then consumers just read from `StageInfo`:
 
 | Consumer | What it reads | Current source | After refactor |
 |----------|--------------|----------------|----------------|
-| ShellCheck rule | Shell variant per instruction | Own `initialShellNameForStage()` | `sem.StageInfo(i).ShellSetting.Variant` |
+| ShellCheck rule | Shell variant per instruction | StageInfo for initial shell + local in-rule tracking for mid-stage `SHELL` changes | `sem.StageInfo(i).ShellSetting.Variant` + shared helper for per-instruction updates |
 | `tally/windows/*` rules | Is this Windows? | (doesn't exist) | `sem.StageInfo(i).BaseImageOS` |
 | `prefer-run-heredoc` | Should suggest heredoc? | Always yes | Skip if `BaseImageOS == Windows` |
 | `prefer-package-cache-mounts` | Should suggest cache mount? | Always yes | Skip if `BaseImageOS == Windows` |
 | `buildkit/WorkdirRelativePath` | Is `c:/path` absolute? | Hardcoded `/` check | Check `BaseImageOS` for drive-letter paths |
 
-**The ShellCheck rule's `initialShellNameForStage()` function should be refactored** to read
-from `StageInfo.ShellSetting` instead of computing its own parallel shell state. The
-`collectTasksForStage()` method already tracks `SHELL` instruction changes mid-stage — that
-per-instruction tracking stays, but the *initial* value comes from the semantic model (which
-now accounts for `BaseImageOS`).
+**The ShellCheck rule's `initialShellNameForStage()` function can be simplified** to read
+from `StageInfo.ShellSetting` first and treat directive fallback as a legacy-only path. The
+`collectTasksForStage()` method should keep per-instruction `SHELL` tracking so dialect selection
+remains correct after mid-stage shell changes.
 
 ### Package and Directory Structure
 
@@ -605,7 +606,7 @@ gate — existing rules adding early returns for incompatible stages:
 | `tally/prefer-run-heredoc` | OS=Windows OR shell=PowerShell/Cmd | Heredoc doesn't work | `prefer_heredoc.go` per-stage loop |
 | `tally/prefer-copy-heredoc` | OS=Windows OR shell=PowerShell/Cmd | Same | `prefer_copy_heredoc.go` per-stage loop |
 | `tally/prefer-package-cache-mounts` | OS=Windows | `--mount=type=cache` unsupported | `prefer_package_cache_mounts.go` per-stage loop |
-| `shellcheck/SC*` | shell=PowerShell or Cmd | Already gated via `IsNonPOSIX()` | Works today (no change needed) |
+| `shellcheck/SC*` | shell=PowerShell or Cmd | Gated via `!IsShellCheckCompatible()` in the ShellCheck rule path | Works today (no change needed) |
 | `hadolint/DL4006` (pipefail) | shell=PowerShell or Cmd | POSIX-only concept | `dl4006.go` (already gated) |
 
 The gate is a per-stage `continue` in the iteration loop:
@@ -631,6 +632,10 @@ func (r *PreferHeredocRule) Check(input rules.LintInput) []rules.Violation {
 Note: the gate uses `IsShellCheckCompatible()` (not `IsNonPOSIX()`) because heredoc requires
 a POSIX shell — PowerShell on Linux also can't use heredocs.
 
+If selected `SC` codes are later implemented natively in Go, they should keep the same
+`shellcheck/SC*` rule IDs and use this same shell-compatibility gate so behavior remains
+source-agnostic (`WASM` vs native).
+
 ### Summary: Gate Architecture
 
 ```text
@@ -646,7 +651,7 @@ a POSIX shell — PowerShell on Linux also can't use heredocs.
      ┌────────┴──────┐  ┌───┴──────────────────────────────┐
      │               │  │              │                    │
      ▼               ▼  ▼              ▼                    ▼
-  tally/windows/*  Linux rule    tally/powershell/*    ShellCheck
+  tally/windows/*  Linux rule    tally/powershell/*    shellcheck/SC*
   (OS==Windows)    suppression   (IsPowerShell())      (IsShellCheck
                    (OS==Windows                         Compatible())
                     or !POSIX)
