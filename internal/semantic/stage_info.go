@@ -22,8 +22,18 @@ const (
 	BaseImageOSWindows
 )
 
-// DefaultShell is the default shell used by Docker for RUN instructions.
+// DefaultShell is the default shell used by Docker for Linux RUN instructions.
 var DefaultShell = []string{"/bin/sh", "-c"}
+
+// defaultWindowsShellExe is the Windows cmd.exe executable name used as the
+// default shell for Windows container RUN instructions.
+const defaultWindowsShellExe = "cmd" //nolint:customlint // not a Dockerfile CMD instruction
+
+// DefaultWindowsShell returns the default shell for Windows containers.
+// Returns a fresh copy to avoid mutation.
+func DefaultWindowsShell() []string {
+	return []string{defaultWindowsShellExe, "/S", "/C"}
+}
 
 // PackageInstall represents a package installation in a RUN command.
 type PackageInstall struct {

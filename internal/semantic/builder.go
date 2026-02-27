@@ -98,6 +98,17 @@ func (b *Builder) Build() *Model {
 			info.BaseImageOS = BaseImageOSWindows
 		}
 
+		// Set OS-appropriate default shell before directives can override.
+		// Windows containers default to cmd.exe, not /bin/sh.
+		if info.BaseImageOS == BaseImageOSWindows && info.ShellSetting.Source == ShellSourceDefault {
+			info.ShellSetting = ShellSetting{
+				Shell:   DefaultWindowsShell(),
+				Variant: shell.VariantCmd,
+				Source:  ShellSourceDefault,
+				Line:    -1,
+			}
+		}
+
 		// FROM ARG analysis (UndefinedArgInFrom, InvalidDefaultArgInFrom).
 		b.applyFromArgAnalysis(info, stage, fromEval)
 

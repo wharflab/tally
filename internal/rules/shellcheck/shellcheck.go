@@ -175,7 +175,15 @@ func (r *Rule) collectTasksForStage(
 
 	knownEnv := collectKnownEnv(stageInfo)
 
-	stageShellName := initialShellNameForStage(stage, ctx.shellDirectives)
+	// Use the semantic model's shell setting as the initial shell name when
+	// available — it accounts for BaseImageOS (Windows → cmd) and shell
+	// directives. Fall back to the legacy computation only without a semantic model.
+	var stageShellName string
+	if stageInfo != nil && stageInfo.ShellSetting.Shell != nil {
+		stageShellName = stageInfo.ShellSetting.Shell[0]
+	} else {
+		stageShellName = initialShellNameForStage(stage, ctx.shellDirectives)
+	}
 	shellName := stageShellName
 
 	// Track shell state at instruction start lines so ONBUILD triggers can
