@@ -631,6 +631,12 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CROSS_FORK_PR_PAT: ${{ secrets.CROSS_FORK_PR_PAT }}
+          PR_BODY: |
+            Publishing version ${{ inputs.version || github.ref_name }} of the [tally](https://github.com/wharflab/tally) extension.
+
+            Tally is a Dockerfile linter and formatter written in Go, promoting modern container syntax and helping avoid common pitfalls.
+
+            [Changelog](https://github.com/wharflab/tally/releases/tag/${{ inputs.version || github.ref_name }})
         run: |
           CLEAN_VERSION="${VERSION#v}"
           BRANCH="tally-update"
@@ -721,20 +727,22 @@ jobs:
           export GH_TOKEN="${CROSS_FORK_PR_PAT}"
 
           # Try to create the PR; if it already exists, extract the URL and update it.
+          PR_TITLE="tally: v${CLEAN_VERSION}"
+
           PR_URL=$(gh pr create \
             --repo zed-industries/extensions \
             --head "wharflab:${BRANCH}" \
             --base main \
-            --title "tally: update to v${CLEAN_VERSION}" \
-            --body "Automated version bump for tally extension to v${CLEAN_VERSION}." 2>&1) \
+            --title "${PR_TITLE}" \
+            --body "${PR_BODY}" 2>&1) \
           || {
             # gh pr create prints the existing PR URL on failure — extract the PR number
             EXISTING_PR=$(echo "${PR_URL}" | grep -oP 'pull/\K[0-9]+' | head -1)
             if [ -n "${EXISTING_PR}" ]; then
               gh pr edit "${EXISTING_PR}" \
                 --repo zed-industries/extensions \
-                --title "tally: update to v${CLEAN_VERSION}" \
-                --body "Automated version bump for tally extension to v${CLEAN_VERSION}."
+                --title "${PR_TITLE}" \
+                --body "${PR_BODY}"
               echo "Updated existing PR: https://github.com/zed-industries/extensions/pull/${EXISTING_PR}"
             else
               echo "::error::Failed to create or update PR: ${PR_URL}"
