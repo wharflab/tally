@@ -217,10 +217,10 @@ func (r *heredocResolver) createSequenceEdit(
 	mounts := runmount.GetMounts(firstRun)
 
 	// Emit set -o pipefail when DL4006 is enabled and commands contain pipes
-	pipefail := data.PipefailEnabled && commandsHavePipes(seq.commands, data.ShellVariant)
+	pipefail := data.PipefailEnabled && commandsHavePipes(seq.commands, seq.shellVariant)
 
-	// Build heredoc
-	heredocText := heredoc.FormatWithMounts(seq.commands, mounts, data.ShellVariant, pipefail)
+	// Build heredoc using the shell variant that was active for this sequence
+	heredocText := heredoc.FormatWithMounts(seq.commands, mounts, seq.shellVariant, pipefail)
 
 	// Calculate and apply indentation
 	indent := extractIndent(sm, startLine)
