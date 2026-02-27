@@ -255,6 +255,7 @@ func TestEpilogueOrderCheckNoSemanticModel(t *testing.T) {
 CMD ["serve"]
 RUN echo hello
 `)
+	input.Semantic = nil // explicitly test nil-semantic fallback
 	violations := r.Check(input)
 	if len(violations) != 0 {
 		t.Errorf("expected 0 violations when semantic model is nil, got %d", len(violations))

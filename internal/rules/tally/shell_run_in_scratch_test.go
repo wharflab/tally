@@ -19,6 +19,7 @@ func TestShellRunInScratchRule_NoSemantic(t *testing.T) {
 	input := testutil.MakeLintInput(t, "Dockerfile", `FROM scratch
 RUN echo "hello"
 `)
+	input.Semantic = nil // explicitly test nil-semantic fallback
 	r := NewShellRunInScratchRule()
 	violations := r.Check(input)
 

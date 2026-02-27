@@ -27,7 +27,7 @@ func ParseDockerfile(tb testing.TB, content string) *dockerfile.ParseResult {
 
 // MakeLintInput creates a LintInput for testing a rule.
 // Parses the Dockerfile content and constructs the input struct with full
-// BuildKit instruction parsing including Stages and MetaArgs.
+// BuildKit instruction parsing including Stages, MetaArgs, and semantic model.
 func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 	tb.Helper()
 
@@ -36,12 +36,15 @@ func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 		tb.Fatalf("failed to parse Dockerfile: %v", err)
 	}
 
+	sem := semantic.NewBuilder(result, nil, file).Build()
+
 	return rules.LintInput{
 		File:     file,
 		AST:      result.AST,
 		Stages:   result.Stages,
 		MetaArgs: result.MetaArgs,
 		Source:   result.Source,
+		Semantic: sem,
 		Context:  nil, // v1.0 doesn't require context
 		Config:   nil, // Set by individual tests if needed
 	}

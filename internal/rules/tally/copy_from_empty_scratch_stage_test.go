@@ -21,6 +21,7 @@ func TestCopyFromEmptyScratchStageRule_NoSemantic(t *testing.T) {
 FROM alpine:3.19
 COPY --from=empty /app /app
 `)
+	input.Semantic = nil // explicitly test nil-semantic fallback
 	r := NewCopyFromEmptyScratchStageRule()
 	violations := r.Check(input)
 

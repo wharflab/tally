@@ -103,10 +103,7 @@ RUN echo stage2`,
 			dockerfile: `FROM mcr.microsoft.com/windows/servercore
 SHELL ["powershell", "-Command"]
 RUN Write-Host "hello"`,
-			// Note: testutil.MakeLintInput doesn't include semantic model,
-			// so shell variant detection won't work. This test would need
-			// a full semantic model to work correctly.
-			wantCallCount: 1, // Without semantic model, doesn't skip
+			wantCallCount: 0, // PowerShell RUN is skipped (non-parseable shell)
 		},
 	}
 

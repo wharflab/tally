@@ -162,6 +162,7 @@ func TestDL3057Rule_RequiresSemantic(t *testing.T) {
 	t.Parallel()
 	// Without semantic model, the rule should return no violations
 	input := testutil.MakeLintInput(t, "Dockerfile", "FROM scratch\n")
+	input.Semantic = nil // explicitly test nil-semantic fallback
 	r := NewDL3057Rule()
 	violations := r.Check(input)
 	if len(violations) != 0 {
