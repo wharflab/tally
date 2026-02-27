@@ -635,8 +635,9 @@ jobs:
           CLEAN_VERSION="${VERSION#v}"
           BRANCH="tally-update"
 
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          # Use real identity for commits so the Zed CLA bot recognizes the contributor.
+          git config --global user.name "tinovyatkin"
+          git config --global user.email "tino@vtkn.io"
 
           # --- Prepare the tally submodule with version bump ---
           cd tally
