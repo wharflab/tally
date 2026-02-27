@@ -40,7 +40,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Preserve artifacts permissions with tar
         run: tar -cvf dist.tar dist/
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist.tar
@@ -53,7 +53,7 @@ jobs:
         with:
           lfs: true
       - name: Download artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: dist
       - name: Extract artifacts
@@ -153,7 +153,7 @@ jobs:
       - name: Re-package signed artifacts
         run: tar -cvf dist-signed.tar dist/
       - name: Upload signed artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-signed
           path: dist-signed.tar
@@ -201,7 +201,7 @@ jobs:
         with:
           lfs: true
       - name: Download signed artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: dist-signed
       - name: Extract artifacts
@@ -242,7 +242,7 @@ jobs:
         run: bunx @vscode/vsce package --no-dependencies --target ${{ matrix.vscode_target }} -o tally-${{ matrix.vscode_target }}.vsix
         working-directory: _integrations/vscode-tally
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: vsix-${{ matrix.vscode_target }}
           path: _integrations/vscode-tally/tally-${{ matrix.vscode_target }}.vsix
@@ -267,7 +267,7 @@ jobs:
         with:
           lfs: true
       - name: Download signed artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: dist-signed
       - name: Extract signed artifacts
@@ -344,7 +344,7 @@ jobs:
           fi
           echo "zip_path=$ZIP_PATH" >> "$GITHUB_OUTPUT"
       - name: Upload IntelliJ plugin artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: intellij-plugin-zip
           path: ${{ steps.intellij_zip.outputs.zip_path }}
@@ -366,7 +366,7 @@ jobs:
         with:
           lfs: true
       - name: Download IntelliJ plugin artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: intellij-plugin-zip
           path: intellij-plugin
@@ -420,7 +420,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
       - name: Download all VSIX artifacts
         if: env.VSCE_PAT != ''
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: vsix-*
           merge-multiple: true
@@ -442,7 +442,7 @@ jobs:
         uses: oven-sh/setup-bun@v2
       - name: Download all VSIX artifacts
         if: env.OVSX_TOKEN != ''
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: vsix-*
           merge-multiple: true
@@ -529,7 +529,7 @@ jobs:
           fetch-depth: 0
           lfs: true
       - run: git fetch --force --tags
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: dist-signed
       - run: tar -xvf dist-signed.tar
@@ -554,7 +554,7 @@ jobs:
           fetch-depth: 0
           lfs: true
       - run: git fetch --force --tags
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: dist-signed
       - run: tar -xvf dist-signed.tar
@@ -583,7 +583,7 @@ jobs:
           fetch-depth: 0
           lfs: true
       - run: git fetch --force --tags
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@v8
         with:
           name: dist-signed
       - run: tar -xvf dist-signed.tar
