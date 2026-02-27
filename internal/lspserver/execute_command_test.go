@@ -159,7 +159,7 @@ func TestContentForURI_UntitledURI_ClosedDocument(t *testing.T) {
 	s := New()
 	// Don't open the document — untitled URIs have no backing file.
 	_, err := s.contentForURI("untitled:Untitled-1")
-	require.Error(t, err)
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestContentForURI_ReadsFromDiskWhenNotOpen(t *testing.T) {

@@ -98,7 +98,7 @@ func TestURIToPath(t *testing.T) {
 	})
 }
 
-func TestIsUntitledURI(t *testing.T) {
+func TestIsVirtualURI(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -107,11 +107,16 @@ func TestIsUntitledURI(t *testing.T) {
 	}{
 		{"untitled:Untitled-1", true},
 		{"untitled://Untitled-1", true},
+		{"vscode-notebook-cell://authority/path", true},
 		{"file:///tmp/Dockerfile", false},
+		{"/tmp/Dockerfile", false},
 		{"", false},
 	}
 	for _, tt := range tests {
-		assert.Equal(t, tt.want, isUntitledURI(tt.uri), "isUntitledURI(%q)", tt.uri)
+		t.Run(tt.uri, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, isVirtualURI(tt.uri), "isVirtualURI(%q)", tt.uri)
+		})
 	}
 }
 

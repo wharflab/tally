@@ -321,7 +321,7 @@ func (s *Server) handleDiagnostic(ctx context.Context, params *protocol.Document
 
 	// Document not open — read from disk.
 	// Untitled documents have no backing file; return empty diagnostics.
-	if isUntitledURI(uri) {
+	if isVirtualURI(uri) {
 		return &protocol.DocumentDiagnosticResponse{
 			FullDocumentDiagnosticReport: &protocol.RelatedFullDocumentDiagnosticReport{
 				Items: []*protocol.Diagnostic{},
@@ -535,10 +535,20 @@ func clampUint32(v int) uint32 {
 	return uint32(v) //nolint:gosec // line/column numbers are well within uint32 range
 }
 
-// isUntitledURI reports whether docURI uses the untitled: scheme,
-// which editors assign to unsaved documents that have no file on disk.
-func isUntitledURI(docURI string) bool {
-	return strings.HasPrefix(docURI, "untitled:")
+// isVirtualURI reports whether docURI refers to a virtual document that doesn't
+// have a backing file on disk (e.g. untitled:, vscode-notebook-cell:).
+func isVirtualURI(docURI string) bool {
+	// Fast path for the most common case.
+	if strings.HasPrefix(docURI, "file:") {
+		return false
+	}
+	parsed, err := url.Parse(docURI)
+	if err != nil {
+		// If parsing fails, it's unlikely to be a URI with a scheme.
+		// Treat as a file path.
+		return false
+	}
+	return parsed.Scheme != "" && parsed.Scheme != "file"
 }
 
 // uriToPath converts a document URI to a local file path for linting purposes.
