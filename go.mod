@@ -14,7 +14,7 @@ require (
 	github.com/distribution/reference v0.6.0
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/gkampitakis/ciinfo v0.3.3
-	github.com/gkampitakis/go-snaps v0.5.19
+	github.com/gkampitakis/go-snaps v0.5.20
 	github.com/google/go-containerregistry v0.21.1
 	github.com/google/jsonschema-go v0.4.2
 	github.com/knadh/koanf/parsers/toml/v2 v2.2.0
