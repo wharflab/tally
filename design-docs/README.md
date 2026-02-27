@@ -255,6 +255,57 @@ converts users into project-level adoption via `.tally.toml` + CI snippets.
 
 ---
 
+### 25. [CLI-Config Integration Refactor](25-cli-config-integration-refactor.md)
+
+**Covers:** Replacing hand-written CLI-to-config glue code with idiomatic urfave/cli v3 patterns (`Validator`, `Destination`, `Sources`)
+
+**Key Topics:**
+
+- Problem: ~100 lines of `cmd.IsSet`/`cmd.String` glue that grows with every flag
+- Option A: `urfave/cli-altsrc` for unified TOML+env+CLI source chain
+- Option B: `urfave/sflags` for struct-driven flag generation
+- Option C: Koanf CLI provider adapter (minimal change, recommended first step)
+- `Validator` field for enum flags (`--format`, `--slow-checks`, `--fail-level`)
+- Phased migration plan
+
+---
+
+### 26. [Windows Container Support](26-windows-container-support.md)
+
+**Covers:** Comprehensive plan to fix false positives, broken fixes, and missing detection for
+Windows container Dockerfiles (cmd.exe, PowerShell, servercore/nanoserver base images)
+
+**Key Topics:**
+
+- `tally/platform-mismatch` redesign: validate `--platform` against registry, not host
+- Semantic model: `BaseImageOS` detection per stage (heuristic + optional registry)
+- Semantic model: effective shell per instruction (Windows default = `cmd /S /C`)
+- ShellCheck gating for Windows stages (suppress WASM invocation entirely)
+- BuildKit WCOW feature matrix (heredoc, `--mount`, `--chown` all unsupported)
+- `prefer-multi-stage-build`: Windows build tool recognition (MSBuild, choco, nuget)
+- `WorkdirRelativePath`: Windows absolute path recognition (`C:\`, `c:/`)
+- Escape character audit across all rules
+- 5-phase implementation plan
+
+---
+
+### 27. [Windows Container Rules (`tally/windows/*`)](27-windows-container-rules.md)
+
+**Covers:** Dedicated lint rules for Windows container Dockerfiles, treating them as first-class citizens
+
+**Key Topics:**
+
+- `tally/windows/prefer-powershell-as-shell`: detect `RUN powershell` anti-pattern, recommend `SHELL` instruction
+- `tally/windows/group-run-layers`: combine consecutive RUNs (layer sizes are ~100x larger on Windows)
+- `tally/windows/cleanup-in-same-layer`: file deletion in a different RUN doesn't reduce image size
+- `tally/windows/prefer-nanoserver`: suggest NanoServer runtime stage (300 MB vs 5 GB ServerCore)
+- `tally/windows/progress-preference`: suppress PowerShell progress bars in builds
+- `tally/windows/error-action-preference`: set `$ErrorActionPreference = 'Stop'` (Windows `set -e`)
+
+**Depends on:** [26. Windows Container Support](26-windows-container-support.md) for `BaseImageOS` detection
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
