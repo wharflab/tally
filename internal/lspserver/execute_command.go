@@ -88,5 +88,9 @@ func (s *Server) contentForURI(uri string) ([]byte, error) {
 	if doc := s.documents.Get(uri); doc != nil {
 		return []byte(doc.Content), nil
 	}
+	// Untitled documents have no backing file on disk.
+	if isUntitledURI(uri) {
+		return nil, os.ErrNotExist
+	}
 	return os.ReadFile(uriToPath(uri))
 }
