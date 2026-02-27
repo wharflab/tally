@@ -579,6 +579,12 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 		{
+			name:     "shellcheck-sc1040",
+			dir:      "shellcheck-sc1040",
+			args:     append([]string{"--format", "json"}, mustSelectRules("shellcheck/SC1040")...),
+			wantExit: 1,
+		},
+		{
 			name:     "shellcheck-fallback-empty-heredoc",
 			dir:      "shellcheck-fallback-empty-heredoc",
 			args:     append([]string{"--format", "json"}, mustSelectRules("shellcheck/ShellCheck")...),

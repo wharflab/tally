@@ -72,6 +72,21 @@ func fixCases(t *testing.T) []fixCase {
 				mustSelectRules("shellcheck/SC2086")...),
 			wantApplied: 1,
 		},
+		{
+			name: "shellcheck-sc1040-tabs-only-terminator",
+			input: "FROM alpine:3.20\n" +
+				"\n" +
+				"RUN <<SCRIPT\n" +
+				"cat <<-EOF\n" +
+				"hello\n" +
+				"  EOF\n" +
+				"EOF\n" +
+				"SCRIPT\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("shellcheck/SC1040")...),
+			wantApplied: 1,
+		},
 		// DL3046: useradd with high UID -> useradd -l
 		{
 			name:        "dl3046-useradd-high-uid",

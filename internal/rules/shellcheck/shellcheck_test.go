@@ -167,6 +167,25 @@ func TestCheckShellSnippetSkipsNonParseableSnippet(t *testing.T) {
 	}
 }
 
+func TestCheckShellSnippetParseErrorOwnsDiagnostics(t *testing.T) {
+	t.Parallel()
+
+	r := &Rule{}
+	violations := r.checkShellSnippet(
+		"Dockerfile",
+		[]parser.Range{{Start: parser.Position{Line: 10, Character: 0}}},
+		"/bin/sh",
+		nil,
+		"cat <<-EOF\nhello\n  EOF",
+	)
+	if len(violations) != 1 {
+		t.Fatalf("expected one violation, got %+v", violations)
+	}
+	if violations[0].RuleCode != metaParseStatusRuleCode {
+		t.Fatalf("expected rule %q, got %q", metaParseStatusRuleCode, violations[0].RuleCode)
+	}
+}
+
 func TestCheckShellSnippetSkipsBlankSnippet(t *testing.T) {
 	t.Parallel()
 

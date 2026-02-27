@@ -1,0 +1,57 @@
+{
+  "files": [
+    {
+      "file": "testdata/shellcheck-sc1040/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/shellcheck/SC1040/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "testdata/shellcheck-sc1040/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "When using \u003c\u003c-, you can only indent with tabs.",
+          "rule": "shellcheck/SC1040",
+          "severity": "error",
+          "sourceCode": "  EOF",
+          "suggestedFix": {
+            "description": "Normalize \u003c\u003c- heredoc terminator indentation (tabs only)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 2,
+                    "line": 6
+                  },
+                  "file": "testdata/shellcheck-sc1040/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 6
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 1,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}
