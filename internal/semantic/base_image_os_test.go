@@ -47,6 +47,15 @@ func TestDetectBaseImageOS(t *testing.T) {
 		{"kali-rolling", "kalilinux/kali-rolling:latest", "", BaseImageOSLinux},
 		{"kali-last-release", "kalilinux/kali-last-release:latest", "", BaseImageOSLinux},
 		{"registry prefixed alpine", "docker.io/library/alpine:3.20", "", BaseImageOSLinux},
+		// Digest-pinned refs
+		{"alpine digest", "alpine@sha256:abcdef1234567890", "", BaseImageOSLinux},
+		{"ubuntu digest", "ubuntu@sha256:abcdef1234567890", "", BaseImageOSLinux},
+		// Registry-prefixed with digest
+		{"ghcr alpine", "ghcr.io/library/alpine:3.20", "", BaseImageOSLinux},
+		// Registry-prefixed kali
+		{"registry kali", "docker.io/kalilinux/kali-rolling:latest", "", BaseImageOSLinux},
+		// Registry-prefixed Windows
+		{"registry servercore", "mcr.microsoft.com/windows/servercore:ltsc2022", "", BaseImageOSWindows},
 
 		// Unknown
 		{"scratch", "scratch", "", BaseImageOSUnknown},

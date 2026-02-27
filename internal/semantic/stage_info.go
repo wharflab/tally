@@ -1,9 +1,11 @@
 package semantic
 
 import (
+	"path"
 	"slices"
 	"strings"
 
+	"github.com/distribution/reference"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
@@ -159,6 +161,32 @@ func (s *StageInfo) IsScratch() bool {
 	return s.Stage != nil && s.Stage.BaseName == "scratch"
 }
 
+// parseImageRef parses a Docker image reference into domain, repository path, and tag.
+// Uses github.com/distribution/reference for correct handling of registries, digests, etc.
+// Returns lowercased components. On parse failure, falls back to simple string splitting.
+func parseImageRef(raw string) (string, string, string) {
+	named, err := reference.ParseNormalizedNamed(raw)
+	if err != nil {
+		// Fallback for unparseable refs (e.g. stage names, empty strings).
+		// Simple split: everything before first ":" or "@" is the name.
+		name := raw
+		var tag string
+		if i := strings.IndexAny(name, ":@"); i >= 0 {
+			tag = name[i+1:]
+			name = name[:i]
+		}
+		return "", strings.ToLower(name), strings.ToLower(tag)
+	}
+
+	domain := strings.ToLower(reference.Domain(named))
+	repoPath := strings.ToLower(reference.Path(named))
+	var tag string
+	if tagged, ok := named.(reference.Tagged); ok {
+		tag = strings.ToLower(tagged.Tag())
+	}
+	return domain, repoPath, tag
+}
+
 // detectBaseImageOS determines the OS from the base image name and platform.
 // Uses a fast heuristic — no network calls.
 func detectBaseImageOS(baseName, platform string) BaseImageOS {
@@ -189,38 +217,38 @@ func detectBaseImageOS(baseName, platform string) BaseImageOS {
 }
 
 // isWindowsImageName returns true if the image name is a known Windows image.
+// Uses github.com/distribution/reference for correct parsing of registry prefixes,
+// tags, and digests.
 func isWindowsImageName(lower string) bool {
-	// MCR Windows images: mcr.microsoft.com/windows, mcr.microsoft.com/windows/servercore, etc.
-	if strings.HasPrefix(lower, "mcr.microsoft.com/windows:") ||
-		strings.HasPrefix(lower, "mcr.microsoft.com/windows/") {
-		return true // servercore, nanoserver, windows, iotcore
+	domain, repoPath, tag := parseImageRef(lower)
+
+	if domain != "mcr.microsoft.com" {
+		return false
 	}
-	// .NET images with Windows tags
-	if strings.HasPrefix(lower, "mcr.microsoft.com/dotnet/") {
-		if strings.Contains(lower, "nanoserver") || strings.Contains(lower, "windowsservercore") {
+
+	// MCR Windows images: windows, windows/servercore, windows/nanoserver, etc.
+	if repoPath == "windows" || strings.HasPrefix(repoPath, "windows/") {
+		return true
+	}
+
+	// .NET or PowerShell images with Windows tag markers
+	if strings.HasPrefix(repoPath, "dotnet/") || strings.HasPrefix(repoPath, "powershell") {
+		if strings.Contains(tag, "nanoserver") || strings.Contains(tag, "windowsservercore") {
 			return true
 		}
 	}
-	// PowerShell images with Windows tags
-	if strings.HasPrefix(lower, "mcr.microsoft.com/powershell") {
-		if strings.Contains(lower, "nanoserver") || strings.Contains(lower, "windowsservercore") {
-			return true
-		}
-	}
+
 	return false
 }
 
 // isLinuxImageName returns true if the image name is a well-known Linux-based image.
+// Uses github.com/distribution/reference for correct parsing of registry prefixes,
+// tags, and digests.
 func isLinuxImageName(lower string) bool {
-	// Strip registry prefix for matching (e.g. "docker.io/library/alpine" → "alpine")
-	name := lower
-	if i := strings.LastIndex(name, "/"); i >= 0 {
-		name = name[i+1:]
-	}
-	// Strip tag
-	if i := strings.Index(name, ":"); i >= 0 {
-		name = name[:i]
-	}
+	domain, repoPath, tag := parseImageRef(lower)
+
+	// Extract the short name (last path segment, e.g. "alpine" from "library/alpine")
+	name := path.Base(repoPath)
 
 	switch name {
 	case "alpine", "ubuntu", "debian", "fedora", "centos", "rockylinux",
@@ -232,20 +260,17 @@ func isLinuxImageName(lower string) bool {
 	}
 
 	// Images under well-known Linux org prefixes (e.g. kalilinux/kali-rolling)
-	if strings.HasPrefix(lower, "kalilinux/") {
+	if strings.HasPrefix(repoPath, "kalilinux/") {
 		return true
 	}
 
 	// MCR Linux images (dotnet on Linux, powershell on Linux)
-	if strings.HasPrefix(lower, "mcr.microsoft.com/dotnet/") && !strings.Contains(lower, "nanoserver") &&
-		!strings.Contains(lower, "windowsservercore") {
-		// dotnet images without Windows tag markers default to Linux
-		return true
-	}
-	if strings.HasPrefix(lower, "mcr.microsoft.com/powershell") && !strings.Contains(lower, "nanoserver") &&
-		!strings.Contains(lower, "windowsservercore") {
-		// e.g. mcr.microsoft.com/powershell:ubuntu-22.04
-		return true
+	if domain == "mcr.microsoft.com" {
+		if strings.HasPrefix(repoPath, "dotnet/") || strings.HasPrefix(repoPath, "powershell") {
+			if !strings.Contains(tag, "nanoserver") && !strings.Contains(tag, "windowsservercore") {
+				return true
+			}
+		}
 	}
 
 	return false
