@@ -380,6 +380,36 @@ func TestFixWindowsContainer(t *testing.T) {
 	}
 }
 
+// TestFixPowerShellAlpine tests auto-fix on a cross-platform Dockerfile that uses
+// a PowerShell base image on Alpine Linux. This exercises the OS vs shell distinction:
+// the base image is Linux (Alpine) but the default shell is PowerShell (pwsh).
+// Source: mcr.microsoft.com/powershell:6.2.1-alpine-3.8 based fixture
+func TestFixPowerShellAlpine(t *testing.T) {
+	t.Parallel()
+
+	input, err := os.ReadFile(filepath.Join("testdata", "real-world-fix-powershell-alpine", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyStdin(t, string(input),
+		"lint", "--format", "markdown", "--fix", "--fix-unsafe", "--slow-checks=on", "-",
+	)
+
+	t.Logf("exit=%d\nstdout length=%d\nstderr:\n%s", exitCode, len(stdout), stderr)
+
+	// Exit code 1: some violations remain unfixable.
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d\nstderr:\n%s", exitCode, stderr)
+	}
+
+	// Snapshot the fixed Dockerfile from stdout.
+	testutil.MatchDockerfileSnapshot(t, stdout)
+
+	// Snapshot the markdown report from stderr.
+	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, stderr)
+}
+
 // TestFixNewlinePerChainedCall exercises the auto-fix path for
 // tally/newline-per-chained-call end-to-end through the CLI.
 // The rule is globally ignored in runFixCase (harness_test.go), so this test

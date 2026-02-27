@@ -1,0 +1,25 @@
+FROM mcr.microsoft.com/powershell:6.2.1-alpine-3.8
+
+SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+WORKDIR /app
+
+RUN <<EOF
+set -e
+apk add --update nodejs nodejs-npm
+Install-Module -Name Az -AllowClobber -Force
+Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+Install-Module Configuration -RequiredVersion 1.3.1 -Repository PSGallery -Scope AllUsers -Verbose
+Install-Module PSSlack -RequiredVersion 1.0.2 -Repository PSGallery -Scope AllUsers -Verbose
+EOF
+
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
+
+RUN <<EOF
+set -e
+set -o pipefail
+apk add --no-cache bind-tools gnupg git tini
+(curl -Ls https://cli.doppler.com/install.sh || wget -qO- https://cli.doppler.com/install.sh) | sh
+npm clean-install --only=production --silent --no-audit
+mv node_modules ../
+EOF
