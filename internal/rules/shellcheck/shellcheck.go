@@ -413,7 +413,7 @@ func (r *Rule) checkShellSnippet(
 
 	baseLoc := rules.NewLocationFromRanges(file, location)
 
-	prelude, _ := buildPrelude(dialect, knownEnv, scriptHasShebang)
+	prelude, _ := buildPrelude(dialect, knownEnv, scriptHasShebang, snippet)
 	script := prelude + snippet
 	if parseErr := preflightParseShellScript(script, dialect); parseErr != nil {
 		return []rules.Violation{rules.NewViolation(
@@ -515,7 +515,7 @@ func (r *Rule) checkShellMapping(
 		return nil
 	}
 
-	prelude, headerLines := buildPrelude(dialect, knownEnv, hasHeredocShebang)
+	prelude, headerLines := buildPrelude(dialect, knownEnv, hasHeredocShebang, mapping.Script)
 	script := prelude + mapping.Script
 	nativeViolations := runNativeShellcheckChecks(file, fallbackLoc, mapping)
 
@@ -806,7 +806,7 @@ func collectKnownEnv(info *semantic.StageInfo) []string {
 	return out
 }
 
-func buildPrelude(dialect string, envKeys []string, scriptHasShebang bool) (string, int) {
+func buildPrelude(dialect string, envKeys []string, scriptHasShebang bool, script string) (string, int) {
 	var sb strings.Builder
 	lineCount := 0
 
@@ -818,23 +818,56 @@ func buildPrelude(dialect string, envKeys []string, scriptHasShebang bool) (stri
 		lineCount++
 	}
 
-	// Declare all known environment variables in a single export statement.
-	// Using one line instead of one-per-line avoids creating 72+ separate CFG
-	// nodes in ShellCheck's analysis, which scales super-linearly (~2.6x faster
-	// with 72 vars).
-	if len(envKeys) > 0 {
-		sb.WriteString("export")
-		for _, k := range envKeys {
-			sb.WriteByte(' ')
-			sb.WriteString(k)
-			sb.WriteString("=1")
+	// Declare only the environment variables that the script actually references.
+	// Parsing the script with mvdan.cc/sh and collecting ParamExp nodes gives an
+	// exact set, avoiding ShellCheck CFG overhead for unused declarations while
+	// still suppressing false SC2154 ("referenced but not assigned") warnings.
+	// On parse failure, fall back to including all envKeys (safe).
+	refs := referencedVars(script)
+	needsExport := false
+	for _, k := range envKeys {
+		if refs != nil {
+			if _, ok := refs[k]; !ok {
+				continue
+			}
 		}
+		if !needsExport {
+			sb.WriteString("export")
+			needsExport = true
+		}
+		sb.WriteByte(' ')
+		sb.WriteString(k)
+		sb.WriteString("=1")
+	}
+	if needsExport {
 		sb.WriteByte('\n')
 		lineCount++
 	}
 
 	_ = dialect // reserved for future: shell-specific prelude
 	return sb.String(), lineCount
+}
+
+// referencedVars parses script as a shell script and returns the set of
+// variable names that appear in parameter expansions ($VAR, ${VAR}, ${VAR:-...}).
+// On parse failure it returns nil, causing buildPrelude to include all envKeys
+// (safe fallback).
+func referencedVars(script string) map[string]struct{} {
+	shParser := syntax.NewParser(syntax.KeepComments(false), syntax.Variant(syntax.LangPOSIX))
+	prog, err := shParser.Parse(strings.NewReader(script), "")
+	if err != nil {
+		return nil
+	}
+
+	vars := make(map[string]struct{})
+	syntax.Walk(prog, func(node syntax.Node) bool {
+		pe, ok := node.(*syntax.ParamExp)
+		if ok && pe.Param != nil && pe.Param.Value != "" {
+			vars[pe.Param.Value] = struct{}{}
+		}
+		return true
+	})
+	return vars
 }
 
 func getShellFormScript(run *instructions.RunCommand) string {
