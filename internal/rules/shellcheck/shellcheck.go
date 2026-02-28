@@ -818,10 +818,18 @@ func buildPrelude(dialect string, envKeys []string, scriptHasShebang bool) (stri
 		lineCount++
 	}
 
-	for _, k := range envKeys {
-		sb.WriteString("export ")
-		sb.WriteString(k)
-		sb.WriteString("=1\n")
+	// Declare all known environment variables in a single export statement.
+	// Using one line instead of one-per-line avoids creating 72+ separate CFG
+	// nodes in ShellCheck's analysis, which scales super-linearly (~2.6x faster
+	// with 72 vars).
+	if len(envKeys) > 0 {
+		sb.WriteString("export")
+		for _, k := range envKeys {
+			sb.WriteByte(' ')
+			sb.WriteString(k)
+			sb.WriteString("=1")
+		}
+		sb.WriteByte('\n')
 		lineCount++
 	}
 

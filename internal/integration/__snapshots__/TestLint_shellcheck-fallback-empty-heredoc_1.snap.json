@@ -4,7 +4,7 @@
       "file": "testdata/shellcheck-fallback-empty-heredoc/Dockerfile",
       "violations": [
         {
-          "detail": "11:9: unclosed here-document 'EOT'",
+          "detail": "3:9: unclosed here-document 'EOT'",
           "location": {
             "end": {
               "column": 0,
