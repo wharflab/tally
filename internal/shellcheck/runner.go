@@ -122,6 +122,21 @@ func (r *Runner) init(ctx context.Context) error {
 			compileCtx = experimental.WithCompilationWorkers(compileCtx, max(runtime.NumCPU()*2/3, 1))
 		}
 		compiled, err := rt.CompileModule(compileCtx, wasm.Binary)
+		if err != nil && cache != nil {
+			// On Windows, concurrent processes racing on the compilation
+			// cache can fail with "Access is denied" during the atomic
+			// rename. Retry without the cache — the compiled module is
+			// identical, just not persisted to disk.
+			_ = rt.Close(initCtx)
+			rtCfg = wazero.NewRuntimeConfig().WithDebugInfoEnabled(false)
+			rt = wazero.NewRuntimeWithConfig(initCtx, rtCfg)
+			if _, wasiErr := wasi_snapshot_preview1.Instantiate(initCtx, rt); wasiErr != nil {
+				_ = rt.Close(initCtx)
+				r.initErr = fmt.Errorf("instantiate WASI (retry): %w", wasiErr)
+				return
+			}
+			compiled, err = rt.CompileModule(compileCtx, wasm.Binary)
+		}
 		if err != nil {
 			_ = rt.Close(initCtx)
 			r.initErr = fmt.Errorf("compile shellcheck.wasm: %w", err)
