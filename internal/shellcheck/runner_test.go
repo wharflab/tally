@@ -370,3 +370,43 @@ func TestBuildOpts(t *testing.T) {
 		})
 	}
 }
+
+// TestReactorSingleInstanceDifferentScripts ensures the reactor can be reused across
+// varied inputs without re-instantiation. This is the core property we need to
+// make embedded ShellCheck fast enough for many snippets.
+func TestReactorSingleInstanceDifferentScripts(t *testing.T) {
+	t.Parallel()
+
+	r := NewRunner()
+	ctx := context.Background()
+
+	prelude := "#!/bin/sh\n" +
+		"export FTP_PROXY=1\nexport HTTPS_PROXY=1\nexport HTTP_PROXY=1\n" +
+		"export NO_PROXY=1\nexport PATH=1\nexport ftp_proxy=1\n" +
+		"export http_proxy=1\nexport https_proxy=1\nexport no_proxy=1\n"
+
+	scripts := []string{
+		prelude + "           echo $1",              // 198 bytes
+		prelude + "    echo foo \\\n    && echo $1", // 209 bytes
+		prelude + "            echo $1",             // 199 bytes
+		prelude + "    echo $1",                     // 191 bytes
+		prelude + "                echo $1",         // 203 bytes
+	}
+
+	opts := Options{
+		Dialect:  "sh",
+		Severity: "style",
+		Norc:     true,
+		Exclude:  []string{"1040"},
+	}
+
+	for i, s := range scripts {
+		out, _, err := r.Run(ctx, s, opts)
+		if err != nil {
+			t.Fatalf("call %d (len=%d): Run() error: %v", i, len(s), err)
+		}
+		if len(out.Comments) == 0 {
+			t.Fatalf("call %d: expected at least one comment (len=%d)", i, len(s))
+		}
+	}
+}

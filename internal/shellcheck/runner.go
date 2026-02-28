@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
@@ -49,20 +48,29 @@ type Options struct {
 // Runner executes ShellCheck via a WASM reactor module.
 //
 // The WASM binary is compiled once (expensive, cached on disk by wazero).
-// Each call instantiates a fresh reactor module, calls hs_init + sc_check,
-// then closes the instance. This avoids GHC RTS state accumulation across
-// calls (a known issue with the GHC WASM backend's STG evaluator) while
-// keeping the reactor's advantages over the command module: no CLI arg
-// parsing, no stdin/stdout buffering, no format dispatch, and direct FFI.
+// A single reactor module instance is instantiated and initialized once
+// (_initialize + hs_init). Each subsequent call uses sc_alloc/sc_check/sc_free
+// with WASM linear memory buffers to avoid per-call instantiation overhead.
+//
+// Note: WASI reactor modules export _initialize and require the host to call it
+// exactly once after instantiation.
 type Runner struct {
 	initOnce sync.Once
 	initErr  error
 
 	rt       wazero.Runtime
 	compiled wazero.CompiledModule
-	instSeq  atomic.Uint64
 
 	cache wazero.CompilationCache
+
+	// Single long-lived reactor instance and cached exports.
+	mod     api.Module
+	mem     api.Memory
+	scAlloc api.Function
+	scCheck api.Function
+	scFree  api.Function
+
+	mu sync.Mutex // serialize calls into the single module instance
 }
 
 func NewRunner() *Runner {
@@ -120,73 +128,120 @@ func (r *Runner) init(ctx context.Context) error {
 			return
 		}
 
+		// Instantiate a single reactor module instance and keep it for reuse.
+		modCfg := wazero.NewModuleConfig().
+			WithName("shellcheck-reactor").
+			WithStdin(io.Reader(strings.NewReader(""))).
+			WithStdout(io.Discard).
+			WithStderr(io.Discard)
+
+		mod, err := rt.InstantiateModule(initCtx, compiled, modCfg)
+		if err != nil {
+			_ = compiled.Close(initCtx)
+			_ = rt.Close(initCtx)
+			r.initErr = fmt.Errorf("instantiate reactor: %w", err)
+			return
+		}
+
+		// WASI reactor modules export _initialize and require the host to call it once.
+		initFn := mod.ExportedFunction("_initialize")
+		if initFn == nil {
+			_ = mod.Close(initCtx)
+			_ = compiled.Close(initCtx)
+			_ = rt.Close(initCtx)
+			r.initErr = errors.New("_initialize not exported")
+			return
+		}
+		if _, err := initFn.Call(initCtx); err != nil {
+			_ = mod.Close(initCtx)
+			_ = compiled.Close(initCtx)
+			_ = rt.Close(initCtx)
+			r.initErr = fmt.Errorf("_initialize: %w", err)
+			return
+		}
+
+		// Initialize the GHC RTS (once per module instance).
+		hsInit := mod.ExportedFunction("hs_init")
+		if hsInit == nil {
+			_ = mod.Close(initCtx)
+			_ = compiled.Close(initCtx)
+			_ = rt.Close(initCtx)
+			r.initErr = errors.New("hs_init not exported")
+			return
+		}
+		if _, err := hsInit.Call(initCtx, 0, 0); err != nil {
+			_ = mod.Close(initCtx)
+			_ = compiled.Close(initCtx)
+			_ = rt.Close(initCtx)
+			r.initErr = fmt.Errorf("hs_init: %w", err)
+			return
+		}
+
+		scAlloc := mod.ExportedFunction("sc_alloc")
+		scCheck := mod.ExportedFunction("sc_check")
+		scFree := mod.ExportedFunction("sc_free")
+		if scAlloc == nil || scCheck == nil || scFree == nil {
+			_ = mod.Close(initCtx)
+			_ = compiled.Close(initCtx)
+			_ = rt.Close(initCtx)
+			r.initErr = errors.New("missing exports: need sc_alloc, sc_check, sc_free")
+			return
+		}
+
 		r.rt = rt
 		r.compiled = compiled
+		r.mod = mod
+		r.mem = mod.Memory()
+		r.scAlloc = scAlloc
+		r.scCheck = scCheck
+		r.scFree = scFree
 	})
 	return r.initErr
 }
 
-// callReactor instantiates a fresh reactor module, runs sc_check, and tears it down.
+// callReactor runs sc_check against the single instantiated reactor module.
 func (r *Runner) callReactor(ctx context.Context, script string, opts Options) ([]byte, error) {
-	// Each wazero module instance requires a unique name within the runtime.
-	seq := r.instSeq.Add(1)
-	cfg := wazero.NewModuleConfig().
-		WithName(fmt.Sprintf("shellcheck-%d", seq)).
-		WithStdin(io.Reader(strings.NewReader(""))).
-		WithStdout(io.Discard).
-		WithStderr(io.Discard)
-
-	mod, err := r.rt.InstantiateModule(ctx, r.compiled, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("instantiate reactor: %w", err)
+	if ctx == nil {
+		return nil, errors.New("nil context")
 	}
-	defer mod.Close(ctx)
-
-	// Initialize the GHC RTS.
-	hsInit := mod.ExportedFunction("hs_init")
-	if hsInit == nil {
-		return nil, errors.New("hs_init not exported")
-	}
-	if _, err := hsInit.Call(ctx, 0, 0); err != nil {
-		return nil, fmt.Errorf("hs_init: %w", err)
+	if r.mod == nil {
+		return nil, errors.New("shellcheck reactor not initialized")
 	}
 
-	scAlloc := mod.ExportedFunction("sc_alloc")
-	scCheck := mod.ExportedFunction("sc_check")
-	scFree := mod.ExportedFunction("sc_free")
-	if scAlloc == nil || scCheck == nil || scFree == nil {
-		return nil, errors.New("missing exports: need sc_alloc, sc_check, sc_free")
-	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	mem := mod.Memory()
 	optsStr := buildOpts(opts)
 
 	// Allocate and write script into WASM linear memory.
-	scriptPtr, err := wasmAlloc(ctx, scAlloc, len(script))
+	scriptPtr, err := wasmAlloc(ctx, r.scAlloc, len(script))
 	if err != nil {
 		return nil, err
 	}
-	if !mem.Write(scriptPtr, []byte(script)) {
+	defer r.freePtr(ctx, scriptPtr)
+	if !r.mem.Write(scriptPtr, []byte(script)) {
 		return nil, errors.New("failed to write script to WASM memory")
 	}
 
 	// Allocate and write options.
-	optsPtr, err := wasmAlloc(ctx, scAlloc, len(optsStr))
+	optsPtr, err := wasmAlloc(ctx, r.scAlloc, len(optsStr))
 	if err != nil {
 		return nil, err
 	}
-	if !mem.Write(optsPtr, []byte(optsStr)) {
+	defer r.freePtr(ctx, optsPtr)
+	if !r.mem.Write(optsPtr, []byte(optsStr)) {
 		return nil, errors.New("failed to write opts to WASM memory")
 	}
 
 	// Allocate space for the output length (4 bytes for CInt).
-	outLenPtr, err := wasmAlloc(ctx, scAlloc, 4)
+	outLenPtr, err := wasmAlloc(ctx, r.scAlloc, 4)
 	if err != nil {
 		return nil, err
 	}
+	defer r.freePtr(ctx, outLenPtr)
 
 	// Call sc_check(scriptPtr, scriptLen, optsPtr, optsLen, outLenPtr) → resultPtr.
-	results, err := scCheck.Call(ctx,
+	results, err := r.scCheck.Call(ctx,
 		uint64(scriptPtr), uint64(len(script)),
 		uint64(optsPtr), uint64(len(optsStr)),
 		uint64(outLenPtr),
@@ -195,24 +250,34 @@ func (r *Runner) callReactor(ctx context.Context, script string, opts Options) (
 		return nil, fmt.Errorf("sc_check: %w", err)
 	}
 	resultPtr := uint32(results[0]) //nolint:gosec // WASM32 pointer fits uint32
+	defer r.freePtr(ctx, resultPtr)
 
 	// Read output length.
-	outLenBytes, ok := mem.Read(outLenPtr, 4)
+	outLenBytes, ok := r.mem.Read(outLenPtr, 4)
 	if !ok {
 		return nil, errors.New("failed to read output length from WASM memory")
 	}
 	outLen := binary.LittleEndian.Uint32(outLenBytes)
 
-	// Read JSON result — copy before Close() invalidates memory.
-	jsonView, ok := mem.Read(resultPtr, outLen)
+	// Read JSON result — copy before freeing the buffer.
+	jsonView, ok := r.mem.Read(resultPtr, outLen)
 	if !ok {
 		return nil, fmt.Errorf("failed to read %d bytes of JSON from WASM memory at ptr %d", outLen, resultPtr)
 	}
 	result := make([]byte, len(jsonView))
 	copy(result, jsonView)
 
-	// No need to sc_free — mod.Close() releases all WASM memory.
 	return result, nil
+}
+
+func (r *Runner) freePtr(ctx context.Context, ptr uint32) {
+	if r.scFree == nil || ptr == 0 {
+		return
+	}
+	if _, err := r.scFree.Call(ctx, uint64(ptr)); err != nil {
+		// Best-effort: failures can happen after a trap closes the module.
+		return
+	}
 }
 
 // wasmAlloc calls sc_alloc to allocate n bytes in WASM linear memory.

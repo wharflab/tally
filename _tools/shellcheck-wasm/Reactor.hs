@@ -6,17 +6,17 @@
 -- dispatch, arg parsing, and stdin/stdout buffering overhead per check.
 --
 -- The host compiles the module once (expensive, disk-cached by wazero) and
--- instantiates a fresh instance per call. Per-call instantiation is necessary
--- because the GHC WASM RTS accumulates state in the STG evaluator that
--- corrupts after repeated varied calls to the same instance.
+-- instantiates a single long-lived reactor instance, reusing it for all checks.
 --
--- Per-call protocol:
---   1. Host instantiates the reactor module and calls hs_init(0, 0).
---   2. Host calls sc_alloc(n) to allocate input buffers in WASM linear memory.
---   3. Host calls sc_check(scriptPtr, scriptLen, optsPtr, optsLen, outLenPtr)
---      which returns a pointer to JSON output.
---   4. Host reads outLen bytes from the returned pointer.
---   5. Host closes the module instance (no need to sc_free; close releases all).
+-- Per-instance protocol:
+--   1. Host instantiates the reactor module and calls _initialize (once).
+--   2. Host calls hs_init(0, 0) (once).
+--   3. For each check:
+--      - Host calls sc_alloc(n) to allocate input/output buffers.
+--      - Host calls sc_check(scriptPtr, scriptLen, optsPtr, optsLen, outLenPtr)
+--        which returns a pointer to JSON output.
+--      - Host reads outLen bytes from the returned pointer.
+--      - Host calls sc_free on all allocated pointers (script/opts/outLen/result).
 --
 -- The JSON output matches ShellCheck's json1 format but is hand-serialized
 -- (no aeson dependency).
