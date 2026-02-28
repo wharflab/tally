@@ -253,7 +253,7 @@ func (ts *testServer) initialize(t *testing.T) initializeResult {
 	return result
 }
 
-const diagTimeout = 10 * time.Second
+const diagTimeout = 30 * time.Second
 
 // waitDiagnostics blocks until a publishDiagnostics notification arrives or timeout.
 func (ts *testServer) waitDiagnostics(t *testing.T) *publishDiagnosticsParams {

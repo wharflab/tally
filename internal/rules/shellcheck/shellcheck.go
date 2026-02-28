@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"runtime"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
@@ -49,8 +47,7 @@ var hadolintExcludedCodes = map[int]struct{}{
 }
 
 type task struct {
-	idx int
-	fn  func() []rules.Violation
+	fn func() []rules.Violation
 }
 
 type taskAppender struct {
@@ -58,7 +55,7 @@ type taskAppender struct {
 }
 
 func (a *taskAppender) add(fn func() []rules.Violation) {
-	a.tasks = append(a.tasks, task{idx: len(a.tasks), fn: fn})
+	a.tasks = append(a.tasks, task{fn: fn})
 }
 
 type collectTasksContext struct {
@@ -378,35 +375,9 @@ func (r *Rule) addShellMappingTask(
 }
 
 func runTasks(tasks []task) []rules.Violation {
-	workers := min(max(runtime.GOMAXPROCS(0), 1), 4)
-
-	results := make([][]rules.Violation, len(tasks))
-	ch := make(chan task)
-	var wg sync.WaitGroup
-	wg.Add(len(tasks))
-
-	for range workers {
-		go func() {
-			for t := range ch {
-				results[t.idx] = t.fn()
-				wg.Done()
-			}
-		}()
-	}
-
+	violations := make([]rules.Violation, 0, len(tasks))
 	for _, t := range tasks {
-		ch <- t
-	}
-	close(ch)
-	wg.Wait()
-
-	total := 0
-	for _, vs := range results {
-		total += len(vs)
-	}
-	violations := make([]rules.Violation, 0, total)
-	for _, vs := range results {
-		violations = append(violations, vs...)
+		violations = append(violations, t.fn()...)
 	}
 	return violations
 }
