@@ -21,6 +21,8 @@ ADD "https://github.com/koalaman/shellcheck.git?ref=v${SHELLCHECK_VERSION}" /she
 
 WORKDIR /shellcheck
 
+COPY Reactor.hs /shellcheck/Reactor.hs
+
 ARG AST_GREP_VERSION=0.40.5
 
 RUN --mount=type=bind,source=rewrites,target=/rewrites,readonly <<EOF
@@ -61,9 +63,34 @@ for r in /rewrites/*.yml; do
 		exit 1
 	fi
 done
+
+# Append reactor executable stanza to the cabal file.
+cat >> ShellCheck.cabal <<'CABALEOF'
+
+executable shellcheck-reactor
+  main-is:          Reactor.hs
+  build-depends:
+      base >= 4.0 && < 5.0,
+      ShellCheck
+  default-language: Haskell2010
+  ghc-options:
+      -no-hs-main
+      -optl-mexec-model=reactor
+      "-optl-Wl,--export=hs_init,--export=sc_alloc,--export=sc_free,--export=sc_check"
+CABALEOF
+
 wasm32-wasi-cabal update
-wasm32-wasi-cabal build --allow-newer shellcheck
-wasm-opt -o shellcheck.wasm --flatten --rereloop --converge -O3 dist-newstyle/build/wasm32-wasi/ghc-*/ShellCheck-*/x/shellcheck/build/shellcheck/shellcheck.wasm
+wasm32-wasi-cabal build --allow-newer shellcheck-reactor
+
+# Find the built reactor binary and optimize it.
+REACTOR_WASM=$(find dist-newstyle -name 'shellcheck-reactor.wasm' -path '*/build/shellcheck-reactor/*' | head -1)
+if [ -z "$REACTOR_WASM" ]; then
+    echo "ERROR: shellcheck-reactor binary not found" >&2
+    find dist-newstyle -name 'shellcheck-reactor*' >&2
+    exit 1
+fi
+
+wasm-opt -o shellcheck.wasm --flatten --rereloop --converge -O3 "$REACTOR_WASM"
 wc -c shellcheck.wasm
 EOF
 

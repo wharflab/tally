@@ -1,22 +1,23 @@
 package shellcheck
 
 import (
-	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/experimental"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-	"github.com/tetratelabs/wazero/sys"
 
 	"github.com/wharflab/tally/internal/shellcheck/wasm"
 )
@@ -45,12 +46,21 @@ type Options struct {
 	Exclude []string
 }
 
+// Runner executes ShellCheck via a WASM reactor module.
+//
+// The WASM binary is compiled once (expensive, cached on disk by wazero).
+// Each call instantiates a fresh reactor module, calls hs_init + sc_check,
+// then closes the instance. This avoids GHC RTS state accumulation across
+// calls (a known issue with the GHC WASM backend's STG evaluator) while
+// keeping the reactor's advantages over the command module: no CLI arg
+// parsing, no stdin/stdout buffering, no format dispatch, and direct FFI.
 type Runner struct {
 	initOnce sync.Once
 	initErr  error
 
 	rt       wazero.Runtime
 	compiled wazero.CompiledModule
+	instSeq  atomic.Uint64
 
 	cache wazero.CompilationCache
 }
@@ -64,40 +74,17 @@ func (r *Runner) Run(ctx context.Context, script string, opts Options) (JSON1Out
 		return JSON1Output{}, "", err
 	}
 
-	args := buildArgs(opts)
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	cfg := wazero.NewModuleConfig().
-		WithArgs(args...).
-		WithStdin(strings.NewReader(script)).
-		WithStdout(&stdout).
-		WithStderr(&stderr)
-
-	mod, err := r.rt.InstantiateModule(ctx, r.compiled, cfg)
-
-	// Ensure module resources are released even when _start calls proc_exit.
-	if mod != nil {
-		_ = mod.Close(ctx)
-	}
-
-	exitCode, exitErr := exitCodeFromErr(err)
-	if exitErr != nil {
-		return JSON1Output{}, stderr.String(), exitErr
-	}
-
-	// ShellCheck returns exit code 1 when findings exist; treat as success.
-	if exitCode != 0 && exitCode != 1 {
-		return JSON1Output{}, stderr.String(), fmt.Errorf("shellcheck failed (exit %d): %s", exitCode, strings.TrimSpace(stderr.String()))
+	result, err := r.callReactor(ctx, script, opts)
+	if err != nil {
+		return JSON1Output{}, "", err
 	}
 
 	var out JSON1Output
-	if unmarshalErr := json.Unmarshal(stdout.Bytes(), &out); unmarshalErr != nil {
-		return JSON1Output{}, stderr.String(), fmt.Errorf("parse shellcheck json1: %w", unmarshalErr)
+	if unmarshalErr := json.Unmarshal(result, &out); unmarshalErr != nil {
+		return JSON1Output{}, "", fmt.Errorf("parse shellcheck json1: %w", unmarshalErr)
 	}
 
-	return out, stderr.String(), nil
+	return out, "", nil
 }
 
 func (r *Runner) init(ctx context.Context) error {
@@ -139,6 +126,143 @@ func (r *Runner) init(ctx context.Context) error {
 	return r.initErr
 }
 
+// callReactor instantiates a fresh reactor module, runs sc_check, and tears it down.
+func (r *Runner) callReactor(ctx context.Context, script string, opts Options) ([]byte, error) {
+	// Each wazero module instance requires a unique name within the runtime.
+	seq := r.instSeq.Add(1)
+	cfg := wazero.NewModuleConfig().
+		WithName(fmt.Sprintf("shellcheck-%d", seq)).
+		WithStdin(io.Reader(strings.NewReader(""))).
+		WithStdout(io.Discard).
+		WithStderr(io.Discard)
+
+	mod, err := r.rt.InstantiateModule(ctx, r.compiled, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("instantiate reactor: %w", err)
+	}
+	defer mod.Close(ctx)
+
+	// Initialize the GHC RTS.
+	hsInit := mod.ExportedFunction("hs_init")
+	if hsInit == nil {
+		return nil, errors.New("hs_init not exported")
+	}
+	if _, err := hsInit.Call(ctx, 0, 0); err != nil {
+		return nil, fmt.Errorf("hs_init: %w", err)
+	}
+
+	scAlloc := mod.ExportedFunction("sc_alloc")
+	scCheck := mod.ExportedFunction("sc_check")
+	scFree := mod.ExportedFunction("sc_free")
+	if scAlloc == nil || scCheck == nil || scFree == nil {
+		return nil, errors.New("missing exports: need sc_alloc, sc_check, sc_free")
+	}
+
+	mem := mod.Memory()
+	optsStr := buildOpts(opts)
+
+	// Allocate and write script into WASM linear memory.
+	scriptPtr, err := wasmAlloc(ctx, scAlloc, len(script))
+	if err != nil {
+		return nil, err
+	}
+	if !mem.Write(scriptPtr, []byte(script)) {
+		return nil, errors.New("failed to write script to WASM memory")
+	}
+
+	// Allocate and write options.
+	optsPtr, err := wasmAlloc(ctx, scAlloc, len(optsStr))
+	if err != nil {
+		return nil, err
+	}
+	if !mem.Write(optsPtr, []byte(optsStr)) {
+		return nil, errors.New("failed to write opts to WASM memory")
+	}
+
+	// Allocate space for the output length (4 bytes for CInt).
+	outLenPtr, err := wasmAlloc(ctx, scAlloc, 4)
+	if err != nil {
+		return nil, err
+	}
+
+	// Call sc_check(scriptPtr, scriptLen, optsPtr, optsLen, outLenPtr) → resultPtr.
+	results, err := scCheck.Call(ctx,
+		uint64(scriptPtr), uint64(len(script)),
+		uint64(optsPtr), uint64(len(optsStr)),
+		uint64(outLenPtr),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("sc_check: %w", err)
+	}
+	resultPtr := uint32(results[0]) //nolint:gosec // WASM32 pointer fits uint32
+
+	// Read output length.
+	outLenBytes, ok := mem.Read(outLenPtr, 4)
+	if !ok {
+		return nil, errors.New("failed to read output length from WASM memory")
+	}
+	outLen := binary.LittleEndian.Uint32(outLenBytes)
+
+	// Read JSON result — copy before Close() invalidates memory.
+	jsonView, ok := mem.Read(resultPtr, outLen)
+	if !ok {
+		return nil, fmt.Errorf("failed to read %d bytes of JSON from WASM memory at ptr %d", outLen, resultPtr)
+	}
+	result := make([]byte, len(jsonView))
+	copy(result, jsonView)
+
+	// No need to sc_free — mod.Close() releases all WASM memory.
+	return result, nil
+}
+
+// wasmAlloc calls sc_alloc to allocate n bytes in WASM linear memory.
+func wasmAlloc(ctx context.Context, scAlloc api.Function, size int) (uint32, error) {
+	results, err := scAlloc.Call(ctx, uint64(size)) //nolint:gosec // int→uint64 safe for allocation sizes
+	if err != nil {
+		return 0, fmt.Errorf("sc_alloc(%d): %w", size, err)
+	}
+	return uint32(results[0]), nil //nolint:gosec // WASM32 pointer fits uint32
+}
+
+// buildOpts generates the line-protocol string consumed by the Reactor.hs options parser.
+func buildOpts(opts Options) string {
+	var b strings.Builder
+
+	if opts.Dialect != "" {
+		b.WriteString("dialect ")
+		b.WriteString(opts.Dialect)
+		b.WriteByte('\n')
+	}
+	if opts.Severity != "" {
+		b.WriteString("severity ")
+		b.WriteString(opts.Severity)
+		b.WriteByte('\n')
+	}
+	if opts.Norc {
+		b.WriteString("norc\n")
+	}
+	if opts.ExtendedAnalysis != nil && *opts.ExtendedAnalysis {
+		b.WriteString("extended-analysis\n")
+	}
+	for _, name := range opts.EnableOptional {
+		b.WriteString("enable ")
+		b.WriteString(name)
+		b.WriteByte('\n')
+	}
+	for _, code := range opts.Include {
+		b.WriteString("include ")
+		b.WriteString(strings.TrimPrefix(code, "SC"))
+		b.WriteByte('\n')
+	}
+	for _, code := range opts.Exclude {
+		b.WriteString("exclude ")
+		b.WriteString(strings.TrimPrefix(code, "SC"))
+		b.WriteByte('\n')
+	}
+
+	return b.String()
+}
+
 func runtimeInitContext(ctx context.Context) context.Context {
 	if ctx == nil {
 		return context.Background()
@@ -165,47 +289,4 @@ func newCompilationCache() wazero.CompilationCache {
 		return nil
 	}
 	return cache
-}
-
-func buildArgs(opts Options) []string {
-	args := []string{"shellcheck", "-f", "json1"}
-
-	if opts.Dialect != "" {
-		args = append(args, "-s", opts.Dialect)
-	}
-	if opts.Severity != "" {
-		args = append(args, "-S", opts.Severity)
-	}
-	if opts.Norc {
-		args = append(args, "--norc")
-	}
-	if opts.ExtendedAnalysis != nil {
-		args = append(args, "--extended-analysis="+strconv.FormatBool(*opts.ExtendedAnalysis))
-	}
-	if len(opts.EnableOptional) > 0 {
-		args = append(args, "--enable="+strings.Join(opts.EnableOptional, ","))
-	}
-	if len(opts.Include) > 0 {
-		args = append(args, "--include="+strings.Join(opts.Include, ","))
-	}
-	if len(opts.Exclude) > 0 {
-		args = append(args, "--exclude="+strings.Join(opts.Exclude, ","))
-	}
-
-	// Read from stdin. Our embedded build is patched to support stdin-only.
-	args = append(args, "-")
-	return args
-}
-
-func exitCodeFromErr(err error) (int, error) {
-	if err == nil {
-		return 0, nil
-	}
-
-	var exitErr *sys.ExitError
-	if errors.As(err, &exitErr) {
-		return int(exitErr.ExitCode()), nil
-	}
-
-	return 0, fmt.Errorf("shellcheck runtime error: %w", err)
 }
