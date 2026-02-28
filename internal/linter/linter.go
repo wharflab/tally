@@ -60,11 +60,6 @@ type Input struct {
 
 	// Channel receives progress and diagnostic output. Nil means silent.
 	Channel Channel
-
-	// SkipRules forces specific rules to be skipped even if enabled by config.
-	// This is useful for "fast pass" linting modes (e.g., LSP diagnostics)
-	// where expensive analyzers can be deferred without changing user config.
-	SkipRules []string
 }
 
 // Result contains the output of [LintFile].
@@ -141,8 +136,7 @@ func LintFile(input Input) (*Result, error) {
 		WithShellDirectives(directiveResult.ShellDirectives).
 		Build()
 
-	skipSet := newSkipSet(input.SkipRules)
-	enabledRules := filterRuleCodes(EnabledRuleCodes(cfg), skipSet)
+	enabledRules := EnabledRuleCodes(cfg)
 
 	baseInput := rules.LintInput{
 		File:               input.FilePath,
@@ -169,9 +163,6 @@ func LintFile(input Input) (*Result, error) {
 
 	// Run all registered rules.
 	for _, rule := range rules.All() {
-		if isSkipped(rule.Metadata().Code, skipSet) {
-			continue
-		}
 		ruleInput := baseInput
 		ruleInput.Config = cfg.Rules.GetOptions(rule.Metadata().Code)
 		violations = append(violations, rule.Check(ruleInput)...)
@@ -196,12 +187,6 @@ func LintFile(input Input) (*Result, error) {
 			continue
 		}
 		code := rule.Metadata().Code
-		// baseInput.EnabledRules comes from EnabledRuleCodes(cfg) + skipSet, but
-		// current AsyncRule implementations don't universally gate on IsRuleEnabled.
-		// Keep explicit checks here to avoid planning disabled async work.
-		if isSkipped(code, skipSet) {
-			continue
-		}
 		// Skip rules disabled by Include/Exclude patterns.
 		if enabled := cfg.Rules.IsEnabled(code); enabled != nil && !*enabled {
 			continue

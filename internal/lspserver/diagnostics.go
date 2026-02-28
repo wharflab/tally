@@ -26,15 +26,8 @@ import (
 )
 
 const (
-	shellcheckEngineRuleCode = rules.ShellcheckRulePrefix + "ShellCheck"
-
-	// shellcheckDiagnosticsDebounce delays the expensive ShellCheck diagnostics pass
-	// so that push diagnostics remain responsive (and we avoid re-running ShellCheck
-	// on every keystroke).
-	shellcheckDiagnosticsDebounce = 500 * time.Millisecond
-
-	// maxConcurrentDiagnosticsPasses limits concurrent fast+full diagnostics
-	// workers across all documents.
+	// maxConcurrentDiagnosticsPasses limits concurrent diagnostics workers
+	// across all documents.
 	maxConcurrentDiagnosticsPasses = 2
 )
 
@@ -42,11 +35,6 @@ type diagnosticsTask struct {
 	docURI  string
 	version int32
 	content []byte
-}
-
-type shellcheckDebounceEntry struct {
-	timer *time.Timer
-	id    uint64
 }
 
 // lintResultCache caches lint results keyed by document URI + version
@@ -139,7 +127,7 @@ func (s *Server) runDiagnosticsTask(ctx context.Context, task diagnosticsTask) {
 		s.diagnosticsRunFn(ctx, task.docURI, task.version, task.content)
 		return
 	}
-	s.publishDiagnosticsFastThenFull(ctx, task.docURI, task.version, task.content)
+	s.publishDiagnosticsForDocument(ctx, task.docURI, task.version, task.content)
 }
 
 func (s *Server) acquireDiagnosticsSlot() {
@@ -169,98 +157,17 @@ func (s *Server) cancelPendingDiagnostics(docURI string) {
 	s.diagnosticsDispatchMu.Unlock()
 }
 
-func (s *Server) publishDiagnosticsFastThenFull(ctx context.Context, docURI string, version int32, content []byte) {
-	filePath := uriToPath(docURI)
-	cfg := s.resolveConfig(filePath)
-
-	// 1) Fast pass: skip ShellCheck to publish initial diagnostics quickly.
-	// This keeps editors responsive while the full analysis runs in the background.
-	fastViolations, parseResult := s.lintContentWithConfig(docURI, content, cfg, nil, []string{shellcheckEngineRuleCode})
+func (s *Server) publishDiagnosticsForDocument(ctx context.Context, docURI string, version int32, content []byte) {
+	violations := s.lintContent(docURI, content)
 	if s.documentVersionCurrent(docURI, version) {
-		s.lintCache.set(docURI, version, fastViolations)
-		s.notifyDiagnostics(ctx, docURI, version, fastViolations)
+		s.lintCache.set(docURI, version, violations)
+		s.notifyDiagnostics(ctx, docURI, version, violations)
 	}
-
-	// 2) Full pass: run all rules, including ShellCheck, with per-document debounce.
-	s.scheduleFullPass(ctx, docURI, version, content, cfg, parseResult)
 }
 
 func (s *Server) documentVersionCurrent(docURI string, version int32) bool {
 	doc := s.documents.Get(docURI)
 	return doc != nil && doc.Version == version
-}
-
-func (s *Server) scheduleFullPass(
-	ctx context.Context,
-	docURI string,
-	version int32,
-	content []byte,
-	cfg *config.Config,
-	parseResult *dockerfile.ParseResult,
-) {
-	s.shellcheckDebounceMu.Lock()
-	s.shellcheckDebounceID++
-	timerID := s.shellcheckDebounceID
-	if existing := s.shellcheckDebounce[docURI]; existing.timer != nil {
-		existing.timer.Stop()
-	}
-
-	timer := time.AfterFunc(shellcheckDiagnosticsDebounce, func() {
-		defer s.clearShellcheckDebounceTimer(docURI, timerID)
-		if !s.isCurrentShellcheckDebounceTimer(docURI, timerID) || !s.documentVersionCurrent(docURI, version) {
-			return
-		}
-		s.acquireDiagnosticsSlot()
-		defer s.releaseDiagnosticsSlot()
-		if !s.isCurrentShellcheckDebounceTimer(docURI, timerID) || !s.documentVersionCurrent(docURI, version) {
-			return
-		}
-
-		fullViolations, _ := s.lintContentWithConfig(docURI, content, cfg, parseResult, nil)
-		if !s.documentVersionCurrent(docURI, version) {
-			return
-		}
-
-		s.lintCache.set(docURI, version, fullViolations)
-		s.notifyDiagnostics(ctx, docURI, version, fullViolations)
-	})
-	s.shellcheckDebounce[docURI] = shellcheckDebounceEntry{
-		timer: timer,
-		id:    timerID,
-	}
-	s.shellcheckDebounceMu.Unlock()
-}
-
-func (s *Server) cancelShellcheckDebounce(docURI string) {
-	s.shellcheckDebounceMu.Lock()
-	if entry := s.shellcheckDebounce[docURI]; entry.timer != nil {
-		entry.timer.Stop()
-		delete(s.shellcheckDebounce, docURI)
-	}
-	s.shellcheckDebounceMu.Unlock()
-}
-
-func (s *Server) cancelAllShellcheckDebounce() {
-	s.shellcheckDebounceMu.Lock()
-	for docURI, entry := range s.shellcheckDebounce {
-		entry.timer.Stop()
-		delete(s.shellcheckDebounce, docURI)
-	}
-	s.shellcheckDebounceMu.Unlock()
-}
-
-func (s *Server) clearShellcheckDebounceTimer(docURI string, timerID uint64) {
-	s.shellcheckDebounceMu.Lock()
-	if current := s.shellcheckDebounce[docURI]; current.id == timerID {
-		delete(s.shellcheckDebounce, docURI)
-	}
-	s.shellcheckDebounceMu.Unlock()
-}
-
-func (s *Server) isCurrentShellcheckDebounceTimer(docURI string, timerID uint64) bool {
-	s.shellcheckDebounceMu.Lock()
-	defer s.shellcheckDebounceMu.Unlock()
-	return s.shellcheckDebounce[docURI].id == timerID
 }
 
 func (s *Server) notifyDiagnostics(ctx context.Context, docURI string, version int32, violations []rules.Violation) {
@@ -412,14 +319,7 @@ func (s *Server) resolveConfig(filePath string) *config.Config {
 func (s *Server) lintContent(docURI string, content []byte) []rules.Violation {
 	filePath := uriToPath(docURI)
 	cfg := s.resolveConfig(filePath)
-	violations, _ := s.lintContentWithConfig(docURI, content, cfg, nil, nil)
-	return violations
-}
-
-func (s *Server) lintContentFast(docURI string, content []byte) []rules.Violation {
-	filePath := uriToPath(docURI)
-	cfg := s.resolveConfig(filePath)
-	violations, _ := s.lintContentWithConfig(docURI, content, cfg, nil, []string{shellcheckEngineRuleCode})
+	violations, _ := s.lintContentWithConfig(docURI, content, cfg, nil)
 	return violations
 }
 
@@ -428,7 +328,6 @@ func (s *Server) lintContentWithConfig(
 	content []byte,
 	cfg *config.Config,
 	parseResult *dockerfile.ParseResult,
-	skipRules []string,
 ) ([]rules.Violation, *dockerfile.ParseResult) {
 	filePath := uriToPath(docURI)
 	input := linter.Input{
@@ -436,7 +335,6 @@ func (s *Server) lintContentWithConfig(
 		Content:     content,
 		Config:      cfg,
 		ParseResult: parseResult,
-		SkipRules:   skipRules,
 	}
 
 	result, err := linter.LintFile(input)

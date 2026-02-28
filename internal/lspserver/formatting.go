@@ -26,9 +26,6 @@ func (s *Server) handleFormatting(ctx context.Context, params *protocol.Document
 
 	content := []byte(doc.Content)
 	input := s.lintInput(doc.URI, content)
-	// Formatting only applies style-safe fixes. ShellCheck fixes are currently
-	// categorized as suggestions, so running ShellCheck here only adds latency.
-	input.SkipRules = []string{shellcheckEngineRuleCode}
 	fileKey := filepath.Clean(input.FilePath)
 
 	// 1. Lint + filter: reuse shared pipeline.
