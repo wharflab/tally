@@ -256,40 +256,32 @@ This could be:
 - An interaction between the two that does not manifest with identical inputs
   (which produce identical heap layouts each time)
 
-## Current Workaround
+## Resolution
 
-Per-call instantiation: compile the module once (disk-cached by wazero),
-instantiate a fresh reactor module for each `sc_check` call, then close it.
-This avoids RTS state accumulation while keeping the reactor's advantages:
+Single-instance reuse works correctly after calling `_initialize`. The
+previous "per-call instantiation" workaround was replaced by the current
+approach in `internal/shellcheck/runner.go`:
+
+```text
+compile module (once, disk-cached by wazero)
+  → instantiate (once)
+    → _initialize (once)
+    → hs_init (once)
+      → for each script (mutex-serialized):
+          sc_alloc inputs → write inputs → sc_check → read result → sc_free all
+```
+
+Advantages over the old command module:
 
 - No CLI arg parsing or format dispatch
 - No stdin/stdout buffering
 - Hand-serialized JSON (no aeson in hot path)
 - Smaller binary (6.6 MB vs 7.0 MB)
-- Compilation cache means instantiation is fast (~2ms)
+- Zero per-call instantiation overhead
 
-## Potential Paths to Single-Instance Reuse
+This is fast enough that the LSP server no longer needs the two-pass
+diagnostics workaround (fast pass without ShellCheck + debounced full pass).
+All diagnostics now run in a single inline pass.
 
-For anyone wanting to revisit single-instance reuse:
-
-1. **Test with a newer GHC WASM backend.** The GHC WASM backend is under active
-   development. Newer versions of ghc-wasm-meta may fix the `StgRun` issue.
-
-2. **Test with wazero interpreter mode.** Run with `wazero.NewRuntimeConfig().
-   WithCompilationCache(nil)` or interpreter mode to rule out wazero's native
-   code compiler as the culprit.
-
-3. **Add `hs_perform_gc()` export.** Export the GHC RTS's `hs_perform_gc`
-   function and call it from Go after each `sc_check` to force a full GC
-   between calls. This might prevent the state accumulation that triggers
-   the crash.
-
-4. **Trace WASM memory growth.** Instrument `memory.grow` calls to track whether
-   the crash correlates with memory expansion. If so, the issue may be in how
-   wazero or the GHC RTS handles the buffer relocation.
-
-5. **Use `wasm-tools validate --features=all`** on the reactor binary to check
-   for malformed function table entries in the binary itself.
-
-6. **Binary bisect on ghc-wasm-meta commits** to find whether a specific GHC
-   change introduced the regression.
+Validated by `TestReactorSingleInstanceDifferentScripts` which runs 5 varied
+scripts on a single runner instance — the exact scenario that previously crashed.
