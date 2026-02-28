@@ -823,7 +823,7 @@ func buildPrelude(dialect string, envKeys []string, scriptHasShebang bool, scrip
 	// exact set, avoiding ShellCheck CFG overhead for unused declarations while
 	// still suppressing false SC2154 ("referenced but not assigned") warnings.
 	// On parse failure, fall back to including all envKeys (safe).
-	refs := referencedVars(script)
+	refs := referencedVars(script, dialect)
 	needsExport := false
 	for _, k := range envKeys {
 		if refs != nil {
@@ -852,8 +852,8 @@ func buildPrelude(dialect string, envKeys []string, scriptHasShebang bool, scrip
 // variable names that appear in parameter expansions ($VAR, ${VAR}, ${VAR:-...}).
 // On parse failure it returns nil, causing buildPrelude to include all envKeys
 // (safe fallback).
-func referencedVars(script string) map[string]struct{} {
-	shParser := syntax.NewParser(syntax.KeepComments(false), syntax.Variant(syntax.LangPOSIX))
+func referencedVars(script, dialect string) map[string]struct{} {
+	shParser := syntax.NewParser(syntax.KeepComments(false), syntax.Variant(shellSyntaxVariantForDialect(dialect)))
 	prog, err := shParser.Parse(strings.NewReader(script), "")
 	if err != nil {
 		return nil
