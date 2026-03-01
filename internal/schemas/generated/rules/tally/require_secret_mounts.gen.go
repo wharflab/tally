@@ -6,7 +6,8 @@ import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ru
 
 // Configuration options for the tally/require-secret-mounts rule.
 type RequireSecretMountsSchemaJson struct {
-	// Map of command names to required secret mount specifications.
+	// Map of command names to required secret mount specifications. Each entry
+	// specifies either a file target or an environment variable.
 	Commands RequireSecretMountsSchemaJsonCommands `json:"commands,omitempty"`
 
 	// Exclude corresponds to the JSON schema field "exclude".
@@ -19,11 +20,16 @@ type RequireSecretMountsSchemaJson struct {
 	Severity *ruleschema.Severity `json:"severity,omitempty"`
 }
 
-// Map of command names to required secret mount specifications.
+// Map of command names to required secret mount specifications. Each entry
+// specifies either a file target or an environment variable.
 type RequireSecretMountsSchemaJsonCommands map[string]struct {
+	// Environment variable name to expose the secret as (mutually exclusive with
+	// target).
+	Env *string `json:"env,omitempty"`
+
 	// Required secret ID for the --mount flag.
 	Id string `json:"id"`
 
-	// Required target path where the secret is mounted.
-	Target string `json:"target"`
+	// Target path where the secret file is mounted (mutually exclusive with env).
+	Target *string `json:"target,omitempty"`
 }

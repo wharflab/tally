@@ -2,6 +2,7 @@ package tally
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
@@ -17,9 +18,11 @@ import (
 const RequireSecretMountsRuleCode = rules.TallyRulePrefix + "require-secret-mounts"
 
 // SecretMountSpec defines the required secret mount for a command.
+// Either Target (file mount) or Env (environment variable) should be set, not both.
 type SecretMountSpec struct {
 	ID     string `json:"id" koanf:"id"`
-	Target string `json:"target" koanf:"target"`
+	Target string `json:"target,omitempty" koanf:"target"`
+	Env    string `json:"env,omitempty" koanf:"env"`
 }
 
 // RequireSecretMountsConfig defines the configuration for the require-secret-mounts rule.
@@ -162,7 +165,7 @@ func (r *RequireSecretMountsRule) checkMounts(
 		if !ok {
 			continue
 		}
-		dedup := spec.ID + ":" + spec.Target
+		dedup := spec.ID + ":" + spec.Target + ":" + spec.Env
 		if seen[dedup] {
 			continue
 		}
@@ -185,13 +188,11 @@ func (r *RequireSecretMountsRule) checkMounts(
 	// Build a combined message listing all missing secrets.
 	msg := checkSecretMount(existing, missingSpecs[0], missingCmds[0])
 
-	var detail string
+	var detailParts []string
 	for i, spec := range missingSpecs {
-		if i > 0 {
-			detail += "; "
-		}
-		detail += fmt.Sprintf("--mount=type=secret,id=%s,target=%s for '%s'", spec.ID, spec.Target, missingCmds[i])
+		detailParts = append(detailParts, fmt.Sprintf("--mount=type=secret,%s for '%s'", formatSpecDesc(spec), missingCmds[i]))
 	}
+	detail := strings.Join(detailParts, "; ")
 
 	v := rules.NewViolation(
 		rules.NewLocationFromRanges(file, runLoc),
@@ -212,21 +213,33 @@ func (r *RequireSecretMountsRule) checkMounts(
 
 // checkSecretMount checks whether existing mounts satisfy a required secret spec.
 // Returns an empty string if satisfied, or a violation message.
-// Matching requires both id AND target to match exactly — the same secret id
-// can be mounted at different targets for different commands.
+// For file mounts: requires matching id + target.
+// For env mounts: requires matching id + env name.
 func checkSecretMount(existing []*instructions.Mount, spec SecretMountSpec, cmdName string) string {
 	for _, m := range existing {
-		if m.Type != instructions.MountTypeSecret {
+		if m.Type != instructions.MountTypeSecret || m.CacheID != spec.ID {
 			continue
 		}
-		if m.CacheID == spec.ID && m.Target == spec.Target {
-			return "" // Exact match — satisfied
+		if spec.Env != "" {
+			if m.Env != nil && *m.Env == spec.Env {
+				return ""
+			}
+		} else if m.Target == spec.Target {
+			return ""
 		}
 	}
 	return fmt.Sprintf(
-		"missing required secret mount for '%s' (id=%s, target=%s)",
-		cmdName, spec.ID, spec.Target,
+		"missing required secret mount for '%s' (%s)",
+		cmdName, formatSpecDesc(spec),
 	)
+}
+
+// formatSpecDesc returns a human-readable description of a secret mount spec.
+func formatSpecDesc(spec SecretMountSpec) string {
+	if spec.Env != "" {
+		return fmt.Sprintf("id=%s, env=%s", spec.ID, spec.Env)
+	}
+	return fmt.Sprintf("id=%s, target=%s", spec.ID, spec.Target)
 }
 
 // buildSecretMountInsertEdit creates a zero-length insertion right after "RUN "
@@ -235,15 +248,20 @@ func checkSecretMount(existing []*instructions.Mount, spec SecretMountSpec, cmdN
 // cache mount insertion from prefer-package-cache-mounts) or with fixes deeper
 // in the command text (e.g., -y insertion, apt→apt-get).
 func buildSecretMountInsertEdit(file string, runLoc []parser.Range, specs []SecretMountSpec) []rules.TextEdit {
-	var insertText string
+	var sb strings.Builder
 	for _, spec := range specs {
 		mount := &instructions.Mount{
 			Type:    instructions.MountTypeSecret,
 			CacheID: spec.ID,
 			Target:  spec.Target,
 		}
-		insertText += runmount.FormatMount(mount) + " "
+		if spec.Env != "" {
+			mount.Env = &spec.Env
+		}
+		sb.WriteString(runmount.FormatMount(mount))
+		sb.WriteByte(' ')
 	}
+	insertText := sb.String()
 
 	// Insert right after "RUN " (keyword is always 3 chars + 1 space).
 	insertLine := runLoc[0].Start.Line

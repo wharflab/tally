@@ -568,9 +568,9 @@
       "examples": [
         {
           "commands": {
-            "npm": {
-              "id": "npmrc",
-              "target": "/root/.npmrc"
+            "aws": {
+              "id": "aws",
+              "target": "/root/.aws/credentials"
             },
             "pip": {
               "id": "pipconf",
@@ -578,29 +578,52 @@
             }
           },
           "severity": "warning"
+        },
+        {
+          "commands": {
+            "gh": {
+              "env": "GH_TOKEN",
+              "id": "gh-token"
+            }
+          }
         }
       ],
       "properties": {
         "commands": {
           "additionalProperties": {
             "additionalProperties": false,
+            "oneOf": [
+              {
+                "required": [
+                  "target"
+                ]
+              },
+              {
+                "required": [
+                  "env"
+                ]
+              }
+            ],
             "properties": {
+              "env": {
+                "description": "Environment variable name to expose the secret as (mutually exclusive with target).",
+                "type": "string"
+              },
               "id": {
                 "description": "Required secret ID for the --mount flag.",
                 "type": "string"
               },
               "target": {
-                "description": "Required target path where the secret is mounted.",
+                "description": "Target path where the secret file is mounted (mutually exclusive with env).",
                 "type": "string"
               }
             },
             "required": [
-              "id",
-              "target"
+              "id"
             ],
             "type": "object"
           },
-          "description": "Map of command names to required secret mount specifications.",
+          "description": "Map of command names to required secret mount specifications. Each entry specifies either a file target or an environment variable.",
           "type": "object"
         },
         "exclude": {

@@ -253,6 +253,43 @@ RUN pip install flask && pip install django
 			Config:         pipConfig(),
 			WantViolations: 1,
 		},
+		{
+			Name: "env mount - missing",
+			Content: `FROM alpine:3.21
+RUN gh auth login
+`,
+			Config: RequireSecretMountsConfig{
+				Commands: map[string]SecretMountSpec{
+					"gh": {ID: "gh-token", Env: "GH_TOKEN"},
+				},
+			},
+			WantViolations: 1,
+			WantMessages:   []string{"missing required secret mount for 'gh' (id=gh-token, env=GH_TOKEN)"},
+		},
+		{
+			Name: "env mount - present",
+			Content: `FROM alpine:3.21
+RUN --mount=type=secret,id=gh-token,env=GH_TOKEN gh auth login
+`,
+			Config: RequireSecretMountsConfig{
+				Commands: map[string]SecretMountSpec{
+					"gh": {ID: "gh-token", Env: "GH_TOKEN"},
+				},
+			},
+			WantViolations: 0,
+		},
+		{
+			Name: "multiple env mounts for same command - aws credentials",
+			Content: `FROM amazon/aws-cli:latest
+RUN aws s3 cp s3://bucket/file .
+`,
+			Config: RequireSecretMountsConfig{
+				Commands: map[string]SecretMountSpec{
+					"aws": {ID: "aws-creds", Target: "/root/.aws/credentials"},
+				},
+			},
+			WantViolations: 1,
+		},
 	})
 }
 
@@ -280,6 +317,18 @@ RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 `,
 			config:  pipConfig(),
 			wantFix: "--mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf",
+		},
+		{
+			name: "env mount fix",
+			content: `FROM alpine:3.21
+RUN gh auth login
+`,
+			config: RequireSecretMountsConfig{
+				Commands: map[string]SecretMountSpec{
+					"gh": {ID: "gh-token", Env: "GH_TOKEN"},
+				},
+			},
+			wantFix: "--mount=type=secret,id=gh-token,env=GH_TOKEN",
 		},
 	}
 

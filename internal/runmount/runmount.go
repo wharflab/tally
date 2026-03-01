@@ -128,6 +128,9 @@ func mountEqual(a, b *instructions.Mount) bool {
 	if a.CacheSharing != b.CacheSharing {
 		return false
 	}
+	if !stringPtrEqual(a.Env, b.Env) {
+		return false
+	}
 	// Compare optional fields
 	if !uint64PtrEqual(a.UID, b.UID) {
 		return false
@@ -139,6 +142,16 @@ func mountEqual(a, b *instructions.Mount) bool {
 		return false
 	}
 	return true
+}
+
+func stringPtrEqual(a, b *string) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
 
 func uint64PtrEqual(a, b *uint64) bool {
@@ -224,6 +237,9 @@ func formatSecretSSHMount(parts []string, m *instructions.Mount) []string {
 	}
 	if m.Target != "" {
 		parts = append(parts, "target="+m.Target)
+	}
+	if m.Env != nil && *m.Env != "" {
+		parts = append(parts, "env="+*m.Env)
 	}
 	if m.Required {
 		parts = append(parts, "required")

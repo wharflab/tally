@@ -1,6 +1,6 @@
 # tally/require-secret-mounts
 
-Enforces `--mount=type=secret` for commands that access private registries or authenticated package sources.
+Enforces `--mount=type=secret` on RUN instructions that execute commands requiring access to secrets — private registry credentials, API keys, cloud provider tokens, and similar sensitive data.
 
 | Property | Value |
 |----------|-------|
@@ -11,64 +11,53 @@ Enforces `--mount=type=secret` for commands that access private registries or au
 
 ## Description
 
-Users who consume packages from private registries (e.g., AWS CodeArtifact, private npm, internal PyPI) need to mount secret configuration files into
-their `RUN` instructions. Without enforcement, it is easy to forget the `--mount=type=secret` flag, causing builds to fail or fall back to public
-registries silently.
+BuildKit secret mounts (`--mount=type=secret`) are the recommended way to pass sensitive data into build steps without baking it into the image layer. Without enforcement it is easy to forget the mount flag, causing builds to fail or — worse — fall back to unauthenticated access silently.
 
-This rule enforces that specific commands always have a matching `--mount=type=secret` with the correct `id` and `target`. It is
-**disabled by default** and requires explicit user configuration mapping commands to secrets.
+This rule lets you declare which commands need which secrets and enforces the declaration at lint time. Secrets can be mounted as **files** (via `target`) or as **environment variables** (via `env`).
+
+The rule is **disabled by default** and requires explicit user configuration mapping command names to secret mount specifications.
 
 ## Configuration
 
-Map each command name to a `{id, target}` secret mount specification:
+Map each command name to a secret mount specification containing `id` and either `target` (file path) or `env` (environment variable name):
 
 ```toml
 [rules.tally.require-secret-mounts]
 severity = "warning"
 
+# File-based secret (mounted as a file inside the container)
 [rules.tally.require-secret-mounts.commands.pip]
 id = "pipconf"
 target = "/root/.config/pip/pip.conf"
 
-[rules.tally.require-secret-mounts.commands.npm]
-id = "npmrc"
-target = "/root/.npmrc"
+# Environment-variable secret (exposed as an env var)
+[rules.tally.require-secret-mounts.commands.gh]
+id = "gh-token"
+env = "GH_TOKEN"
 ```
-
-The `id` value must match the `--mount=type=secret,id=...` argument, and the `target` must match the path where the secret file is mounted inside the
-container.
 
 ## Examples
 
-### Before (violation)
+### Private package registry (pip + AWS CodeArtifact)
+
+```toml
+[rules.tally.require-secret-mounts.commands.pip]
+id = "pipconf"
+target = "/root/.config/pip/pip.conf"
+```
+
+Before:
 
 ```dockerfile
 FROM python:3.12-slim
 RUN pip install -r requirements.txt
 ```
 
-### After (fixed with --fix)
+After `--fix`:
 
 ```dockerfile
 FROM python:3.12-slim
 RUN --mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf pip install -r requirements.txt
-```
-
-### AWS CodeArtifact Example
-
-For teams using AWS CodeArtifact as a private PyPI mirror:
-
-```toml
-[rules.tally.require-secret-mounts]
-severity = "warning"
-
-[rules.tally.require-secret-mounts.commands.pip]
-id = "pipconf"
-target = "/root/.config/pip/pip.conf"
-
-[rules.tally.require-secret-mounts.commands.uv]
-id = "pipconf"
-target = "/root/.config/pip/pip.conf"
 ```
 
 Build command:
@@ -77,20 +66,72 @@ Build command:
 docker build --secret id=pipconf,src=$HOME/.config/pip/pip.conf .
 ```
 
-### Existing Mounts Are Preserved
+### AWS CLI with credentials file
 
-If a `RUN` already has other mounts (e.g., cache mounts), the fix preserves them:
+```toml
+[rules.tally.require-secret-mounts.commands.aws]
+id = "aws"
+target = "/root/.aws/credentials"
+```
+
+Before:
+
+```dockerfile
+FROM amazon/aws-cli:latest
+RUN aws s3 cp s3://my-bucket/data.tar.gz /app/
+```
+
+After `--fix`:
+
+```dockerfile
+FROM amazon/aws-cli:latest
+RUN --mount=type=secret,id=aws,target=/root/.aws/credentials aws s3 cp s3://my-bucket/data.tar.gz /app/
+```
+
+### GitHub CLI with token via environment variable
+
+```toml
+[rules.tally.require-secret-mounts.commands.gh]
+id = "gh-token"
+env = "GH_TOKEN"
+```
+
+Before:
+
+```dockerfile
+FROM alpine:3.21
+RUN gh auth login && gh extension install github/gh-copilot
+```
+
+After `--fix`:
+
+```dockerfile
+FROM alpine:3.21
+RUN --mount=type=secret,id=gh-token,env=GH_TOKEN gh auth login && gh extension install github/gh-copilot
+```
+
+Build command:
+
+```bash
+docker build --secret id=gh-token,env=GH_TOKEN .
+```
+
+### Existing mounts are preserved
+
+If a `RUN` already has other mounts (e.g., cache mounts), the fix inserts secret mounts without touching the rest of the instruction:
 
 ```dockerfile
 # Before
 RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 
 # After --fix
-RUN --mount=type=cache,target=/root/.cache/pip --mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf pip install -r requirements.txt
+RUN --mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 ```
 
 ## Cross-Rule Interaction
 
-This rule works alongside `tally/prefer-package-cache-mounts`. Both rules can fire on the same `RUN` instruction. When running `--fix`, the secret
-mount fix (priority 85) applies before the cache mount fix (priority 90). On the next pass, the cache mount rule fires again and adds cache mounts
-while preserving the existing secret mount.
+This rule works alongside `tally/prefer-package-cache-mounts`. Both rules can fire on the same `RUN` instruction. Both use zero-length insertions right after `RUN` for their mount flags, so they compose in a single `--fix` pass without conflicting.
+
+## References
+
+- [Docker Build Secrets](https://docs.docker.com/build/building/secrets/) — official Docker documentation on using secret mounts
