@@ -610,6 +610,12 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-package-cache-mounts")...),
 			wantExit: 1,
 		},
+		{
+			name:     "require-secret-mounts",
+			dir:      "require-secret-mounts",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/require-secret-mounts")...),
+			wantExit: 1,
+		},
 
 		{
 			name:     "prefer-add-unpack",

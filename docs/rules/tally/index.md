@@ -9,6 +9,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [syntax-directive-typo](./syntax-directive-typo.md) | Detects typos in `# syntax=` parser directives | Error | Correctness | Enabled |
 | [secrets-in-code](./secrets-in-code.md) | Detects hardcoded secrets, API keys, and credentials | Error | Security | Enabled |
 | [prefer-vex-attestation](./prefer-vex-attestation.md) | Prefer attaching OpenVEX as an OCI attestation instead of copying VEX JSON into the image | Info | Security | Enabled |
+| [require-secret-mounts](./require-secret-mounts.md) | Enforces --mount=type=secret for commands accessing private registries | Warning | Security | Off (requires config) |
 | [max-lines](./max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
 | [no-unreachable-stages](./no-unreachable-stages.md) | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
 | [shell-run-in-scratch](./shell-run-in-scratch.md) | Detects shell-form RUN in scratch stages where no shell exists | Warning | Correctness | Enabled |

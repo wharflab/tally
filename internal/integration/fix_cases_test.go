@@ -1009,5 +1009,67 @@ severity = "style"
 			),
 			wantApplied: 1,
 		},
+		// tally/require-secret-mounts: add missing secret mount
+		{
+			name: "require-secret-mounts",
+			input: "FROM python:3.12-slim\n" +
+				"RUN pip install -r requirements.txt\n",
+			args: []string{
+				"--fix",
+				"--select", "tally/require-secret-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.require-secret-mounts]
+severity = "warning"
+
+[rules.tally.require-secret-mounts.commands.pip]
+id = "pipconf"
+target = "/root/.config/pip/pip.conf"
+`,
+		},
+		// tally/require-secret-mounts: preserves existing cache mount
+		{
+			name: "require-secret-mounts-with-cache-mount",
+			input: "FROM python:3.12-slim\n" +
+				"RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt\n",
+			args: []string{
+				"--fix",
+				"--select", "tally/require-secret-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.require-secret-mounts]
+severity = "warning"
+
+[rules.tally.require-secret-mounts.commands.pip]
+id = "pipconf"
+target = "/root/.config/pip/pip.conf"
+`,
+		},
+		// Combined: require-secret-mounts + prefer-package-cache-mounts on same RUN.
+		// The secret mount fix (security, priority 85) wins conflict resolution and
+		// its rewrite includes both the secret mount AND cache mounts, so a single
+		// --fix produces the fully-mounted RUN.
+		{
+			name: "require-secret-mounts-with-cache-mounts-combined",
+			input: "FROM python:3.12-slim\n" +
+				"RUN pip install -r requirements.txt\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/require-secret-mounts",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 1, // secret mount fix includes cache mounts; cache mount fix skipped
+			config: `[rules.tally.require-secret-mounts]
+severity = "error"
+
+[rules.tally.require-secret-mounts.commands.pip]
+id = "pipconf"
+target = "/root/.config/pip/pip.conf"
+
+[rules.tally.prefer-package-cache-mounts]
+severity = "error"
+`,
+		},
 	}
 }
