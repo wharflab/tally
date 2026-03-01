@@ -19,7 +19,7 @@ intellij-plugin-smoke:
 	bash _integrations/intellij-tally/build/smoke.sh
 
 GOTESTSUM_VERSION := v1.13.0
-GOLANGCI_LINT_VERSION := v2.9.0
+GOLANGCI_LINT_VERSION := $(shell cat .golangci-lint-version | tr -d '[:space:]')
 GORELEASER_VERSION := v2.13.3
 DEADCODE_VERSION := v0.41.0
 
