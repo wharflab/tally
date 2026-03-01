@@ -24,6 +24,10 @@ func (s *Server) codeActionsForDocument(
 		includeFixAll = kindRequested(params.Context.Only, fixAllCodeActionKind)
 	}
 
+	if !includeQuickFix && !includeFixAll {
+		return nil
+	}
+
 	// Use cached lint results from publishDiagnostics when the version matches.
 	violations, ok := s.lintCache.get(doc.URI, doc.Version)
 	if !ok {
