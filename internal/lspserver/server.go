@@ -39,10 +39,6 @@ type Server struct {
 	documents *DocumentStore
 	lintCache *lintResultCache
 
-	shellcheckDebounceMu sync.Mutex
-	shellcheckDebounce   map[string]shellcheckDebounceEntry
-	shellcheckDebounceID uint64
-
 	diagnosticsDispatchMu      sync.Mutex
 	diagnosticsInFlightByURI   map[string]bool
 	diagnosticsPendingByURI    map[string]diagnosticsTask
@@ -64,7 +60,6 @@ func New() *Server {
 		exitCh:                   make(chan struct{}),
 		documents:                NewDocumentStore(),
 		lintCache:                newLintResultCache(),
-		shellcheckDebounce:       make(map[string]shellcheckDebounceEntry),
 		diagnosticsInFlightByURI: make(map[string]bool),
 		diagnosticsPendingByURI:  make(map[string]diagnosticsTask),
 		diagnosticsConcurrencyGate: make(
@@ -368,7 +363,6 @@ func (s *Server) handleDidClose(ctx context.Context, params *protocol.DidCloseTe
 	if doc := s.documents.Get(uri); doc != nil {
 		docVersion = &doc.Version
 	}
-	s.cancelShellcheckDebounce(uri)
 	s.cancelPendingDiagnostics(uri)
 	s.documents.Close(uri)
 	s.lintCache.delete(uri)

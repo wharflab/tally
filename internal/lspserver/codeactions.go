@@ -24,20 +24,16 @@ func (s *Server) codeActionsForDocument(
 		includeFixAll = kindRequested(params.Context.Only, fixAllCodeActionKind)
 	}
 
+	if !includeQuickFix && !includeFixAll {
+		return nil
+	}
+
 	// Use cached lint results from publishDiagnostics when the version matches.
 	violations, ok := s.lintCache.get(doc.URI, doc.Version)
 	if !ok {
-		if s.pushDiagnosticsEnabled() {
-			// Push diagnostics mode: fall back to a fast lint pass to keep code actions responsive.
-			// ShellCheck results will be available once the full diagnostics pass completes.
-			violations = s.lintContentFast(doc.URI, []byte(doc.Content))
-		} else {
-			// Pull diagnostics mode: there is no publishDiagnostics background pass to populate
-			// the cache, so run a full lint to include ShellCheck quick-fixes.
-			violations = s.lintContent(doc.URI, []byte(doc.Content))
-			if s.documentVersionCurrent(doc.URI, doc.Version) {
-				s.lintCache.set(doc.URI, doc.Version, violations)
-			}
+		violations = s.lintContent(doc.URI, []byte(doc.Content))
+		if s.documentVersionCurrent(doc.URI, doc.Version) {
+			s.lintCache.set(doc.URI, doc.Version, violations)
 		}
 	}
 

@@ -44,12 +44,19 @@
     "SessionStart": [
       {
         "matcher": "*",
-        "hooks": [{ "type": "command", "command": "bunx lefthook install", "async": true }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bunx lefthook install",
+            "async": true
+          }
+        ]
       }
     ]
   },
-  "alwaysThinkingEnabled": true,
   "enabledPlugins": {
-    "coderabbit@claude-plugins-official": true
-  }
+    "coderabbit@claude-plugins-official": true,
+    "ast-grep@ast-grep-marketplace": true
+  },
+  "alwaysThinkingEnabled": true
 }
