@@ -34,7 +34,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.11.0
-	github.com/urfave/cli/v3 v3.6.2
+	github.com/urfave/cli/v3 v3.7.0
 	github.com/zricethezav/gitleaks/v8 v8.30.0
 	go.bug.st/lsp v0.1.3
 	go.podman.io/image/v5 v5.39.1
