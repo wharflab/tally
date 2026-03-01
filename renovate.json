@@ -78,14 +78,16 @@
     {
       "customType": "regex",
       "managerFilePatterns": [
-        "/^\\.golangci-lint-version$/"
+        "/^\\.golangci-lint-version$/",
+        "/^\\.custom-gcl\\.yml$/"
       ],
       "matchStrings": [
-        "(?<currentValue>v\\d+\\.\\d+\\.\\d+)"
+        "(?<currentValue>\\d+\\.\\d+\\.\\d+)"
       ],
       "depNameTemplate": "golangci/golangci-lint",
       "datasourceTemplate": "github-releases",
-      "versioningTemplate": "semver"
+      "versioningTemplate": "semver",
+      "extractVersionTemplate": "^v(?<version>.+)$"
     }
   ],
   "packageRules": [

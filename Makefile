@@ -75,7 +75,7 @@ bin/pmd-$(PMD_VERSION):
 
 bin/golangci-lint-$(GOLANGCI_LINT_VERSION):
 	@rm -f bin/golangci-lint bin/golangci-lint-*
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_VERSION)/install.sh | sh -s -- -b bin/ $(GOLANGCI_LINT_VERSION)
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v$(GOLANGCI_LINT_VERSION)/install.sh | sh -s -- -b bin/ v$(GOLANGCI_LINT_VERSION)
 	@touch $@
 
 bin/goreleaser-$(GORELEASER_VERSION):
