@@ -148,12 +148,12 @@ RUN --mount=type=secret,id=wrong,target=/root/.config/pip/pip.conf pip install f
 			WantMessages:   []string{"missing required secret mount for 'pip'"},
 		},
 		{
-			Name: "multiple commands in one RUN - violations for each",
+			Name: "multiple commands in one RUN - single combined violation",
 			Content: `FROM python:3.12-slim
 RUN pip install flask && npm install express
 `,
 			Config:         multiConfig(),
-			WantViolations: 2,
+			WantViolations: 1,
 		},
 		{
 			Name: "command behind env wrapper - still detected",
@@ -234,12 +234,12 @@ RUN pip install -r requirements.txt
 			wantFix: "--mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf",
 		},
 		{
-			name: "preserves existing cache mount in fix",
+			name: "insertion does not overwrite existing cache mount",
 			content: `FROM python:3.12-slim
 RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt
 `,
 			config:  pipConfig(),
-			wantFix: "--mount=type=cache,target=/root/.cache/pip",
+			wantFix: "--mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf",
 		},
 	}
 

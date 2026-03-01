@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	dfcmd "github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/wharflab/tally/internal/runmount"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // PreferPackageCacheMountsRuleCode is the full rule code for prefer-package-cache-mounts.
@@ -98,21 +98,19 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 			}
 
 			updatedScript, scriptCleaned := removeCacheCleanup(run, script, shellVariant, cleaners)
-			replacement := formatUpdatedRun(run, mergedMounts, updatedScript)
-			if replacement == "" {
-				continue
-			}
 
 			runLoc := run.Location()
 			if len(runLoc) == 0 {
 				continue
 			}
 
-			endLine, endCol := resolveRunEndPosition(runLoc, sm, run)
-
-			edits, remaining, envCleaned := buildFixEdits(
-				input.File, runLoc, endLine, endCol, replacement,
-				cleaners, cacheEnvEntries,
+			// Build targeted edits: mount insertion + optional script cleanup + optional ENV removal.
+			// Mount flags are added as zero-length insertions right after "RUN " so they
+			// compose with other rules' mount insertions (e.g., require-secret-mounts)
+			// without conflicting.
+			edits, remaining, envCleaned := buildCacheMountEdits(
+				input.File, run, runLoc, sm, existing, mergedMounts,
+				updatedScript, scriptCleaned, cleaners, cacheEnvEntries,
 			)
 			cacheEnvEntries = remaining
 
@@ -124,30 +122,85 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 	return violations
 }
 
-func buildFixEdits(
+// buildCacheMountEdits produces targeted, non-overlapping edits:
+//  1. Zero-length insertion right after "RUN " for new --mount=type=cache flags.
+//  2. When script cleanup is needed: a replacement from right after "RUN " to end-of-RUN
+//     containing existing flags + cleaned script (new mounts come from the insertion).
+//  3. ENV removal edits (already at separate line ranges).
+//
+// The insertion-based approach lets cache mount additions compose with other rules'
+// mount insertions at the same point (e.g., require-secret-mounts) without conflicting.
+func buildCacheMountEdits(
 	file string,
+	run *instructions.RunCommand,
 	runLoc []parser.Range,
-	endLine, endCol int,
-	replacement string,
+	sm *sourcemap.SourceMap,
+	existing, merged []*instructions.Mount,
+	cleanedScript string,
+	scriptCleaned bool,
 	cleaners map[cleanupKind]bool,
 	cacheEnvEntries []cacheEnvEntry,
 ) ([]rules.TextEdit, []cacheEnvEntry, bool) {
 	envEdits, remaining := consumeEnvRemovalEdits(file, cleaners, cacheEnvEntries)
 
-	edits := make([]rules.TextEdit, 1, 1+len(envEdits))
-	edits[0] = rules.TextEdit{
-		Location: rules.NewRangeLocation(
-			file,
-			runLoc[0].Start.Line,
-			runLoc[0].Start.Character,
-			endLine,
-			endCol,
-		),
-		NewText: replacement,
-	}
-	edits = append(edits, envEdits...)
+	// Collect only the NEW mounts (not already in existing).
+	newMounts := collectNewMounts(existing, merged)
 
+	var edits []rules.TextEdit
+
+	// Edit 1: zero-length insertion for new mount flags right after "RUN ".
+	if len(newMounts) > 0 {
+		insertLine := runLoc[0].Start.Line
+		insertCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
+
+		mountText := runmount.FormatMounts(newMounts) + " "
+		edits = append(edits, rules.TextEdit{
+			Location: rules.NewRangeLocation(file, insertLine, insertCol, insertLine, insertCol),
+			NewText:  mountText,
+		})
+	}
+
+	// Edit 2: when script cleanup is needed, replace everything after "RUN " with
+	// existing flags + cleaned script. New mounts come from the insertion above.
+	if scriptCleaned {
+		startLine := runLoc[0].Start.Line
+		startCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
+		endLine, endCol := resolveRunEndPosition(runLoc, sm, run)
+
+		var tailText string
+		if flags := formatRunFlags(run.FlagsUsed, existing); flags != "" {
+			tailText = flags + " " + cleanedScript
+		} else {
+			tailText = cleanedScript
+		}
+		edits = append(edits, rules.TextEdit{
+			Location: rules.NewRangeLocation(file, startLine, startCol, endLine, endCol),
+			NewText:  tailText,
+		})
+	}
+
+	edits = append(edits, envEdits...)
 	return edits, remaining, len(envEdits) > 0
+}
+
+// collectNewMounts returns mounts in merged that are not present in existing.
+func collectNewMounts(existing, merged []*instructions.Mount) []*instructions.Mount {
+	isExisting := func(m *instructions.Mount) bool {
+		for _, e := range existing {
+			if e.Type == m.Type && e.Target == m.Target && e.CacheID == m.CacheID {
+				return true
+			}
+		}
+		return false
+	}
+
+	var newMounts []*instructions.Mount
+	for _, m := range merged {
+		if !isExisting(m) {
+			newMounts = append(newMounts, m)
+		}
+	}
+	return newMounts
 }
 
 func buildViolation(
@@ -1083,46 +1136,6 @@ func isPackageCacheDirCleanup(command, cacheDir string) bool {
 	}
 
 	return true
-}
-
-func formatUpdatedRun(run *instructions.RunCommand, mounts []*instructions.Mount, script string) string {
-	var sb strings.Builder
-	sb.WriteString(strings.ToUpper(dfcmd.Run))
-
-	if flags := formatRunFlags(run.FlagsUsed, mounts); flags != "" {
-		sb.WriteString(" ")
-		sb.WriteString(flags)
-	}
-
-	if len(run.Files) > 0 {
-		cmdLine := strings.Join(run.CmdLine, " ")
-		if cmdLine != "" {
-			sb.WriteString(" ")
-			sb.WriteString(cmdLine)
-		}
-
-		for i, file := range run.Files {
-			sb.WriteString("\n")
-			content := file.Data
-			if i == 0 {
-				content = script
-			}
-			sb.WriteString(content)
-			if !strings.HasSuffix(content, "\n") {
-				sb.WriteString("\n")
-			}
-			sb.WriteString(file.Name)
-		}
-
-		return sb.String()
-	}
-
-	if script != "" {
-		sb.WriteString(" ")
-		sb.WriteString(script)
-	}
-
-	return sb.String()
 }
 
 func formatRunFlags(flagsUsed []string, mounts []*instructions.Mount) string {

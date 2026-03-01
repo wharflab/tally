@@ -1059,9 +1059,38 @@ target = "/root/.config/pip/pip.conf"
 				"--select", "tally/require-secret-mounts",
 				"--select", "tally/prefer-package-cache-mounts",
 			},
-			wantApplied: 1, // secret mount fix includes cache mounts; cache mount fix skipped
+			wantApplied: 2, // both mount insertions compose (zero-length edits don't conflict)
 			config: `[rules.tally.require-secret-mounts]
 severity = "error"
+
+[rules.tally.require-secret-mounts.commands.pip]
+id = "pipconf"
+target = "/root/.config/pip/pip.conf"
+
+[rules.tally.prefer-package-cache-mounts]
+severity = "error"
+`,
+		},
+		// Full composition: two secret mounts (insertion) + two cache mounts
+		// (insertion) + cleanup removal (npm cache clean, --no-cache-dir)
+		// on the same RUN in a single --fix pass.
+		{
+			name: "require-secret-mounts-multi-command",
+			input: "FROM node:20\n" +
+				"RUN npm install && npm cache clean --force && pip install --no-cache-dir pandas\n",
+			args: []string{
+				"--fix",
+				"--fix-unsafe",
+				"--select", "tally/require-secret-mounts",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 2, // secret mount insertion + cache mount insertion (with cleanup)
+			config: `[rules.tally.require-secret-mounts]
+severity = "error"
+
+[rules.tally.require-secret-mounts.commands.npm]
+id = "npmrc"
+target = "/root/.npmrc"
 
 [rules.tally.require-secret-mounts.commands.pip]
 id = "pipconf"
