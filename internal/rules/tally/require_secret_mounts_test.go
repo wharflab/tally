@@ -70,7 +70,7 @@ func TestRequireSecretMountsValidateConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid config - missing target", func(t *testing.T) {
+	t.Run("invalid config - neither target nor env", func(t *testing.T) {
 		cfg := map[string]any{
 			"commands": map[string]any{
 				"pip": map[string]any{
@@ -79,7 +79,36 @@ func TestRequireSecretMountsValidateConfig(t *testing.T) {
 			},
 		}
 		if err := rule.ValidateConfig(cfg); err == nil {
-			t.Fatal("expected error for missing target")
+			t.Fatal("expected error when neither target nor env is set")
+		}
+	})
+
+	t.Run("valid config - env instead of target", func(t *testing.T) {
+		cfg := map[string]any{
+			"commands": map[string]any{
+				"gh": map[string]any{
+					"id":  "gh-token",
+					"env": "GH_TOKEN",
+				},
+			},
+		}
+		if err := rule.ValidateConfig(cfg); err != nil {
+			t.Fatalf("expected no error for env config, got: %v", err)
+		}
+	})
+
+	t.Run("invalid config - both target and env", func(t *testing.T) {
+		cfg := map[string]any{
+			"commands": map[string]any{
+				"pip": map[string]any{
+					"id":     "pipconf",
+					"target": "/root/.config/pip/pip.conf",
+					"env":    "PIP_CONFIG",
+				},
+			},
+		}
+		if err := rule.ValidateConfig(cfg); err == nil {
+			t.Fatal("expected error when both target and env are set")
 		}
 	})
 }
