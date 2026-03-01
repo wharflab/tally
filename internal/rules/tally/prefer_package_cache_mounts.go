@@ -108,10 +108,18 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 			// Mount flags are added as zero-length insertions right after "RUN " so they
 			// compose with other rules' mount insertions (e.g., require-secret-mounts)
 			// without conflicting.
-			edits, remaining, envCleaned := buildCacheMountEdits(
-				input.File, run, runLoc, sm, existing, mergedMounts,
-				updatedScript, scriptCleaned, cleaners, cacheEnvEntries,
-			)
+			edits, remaining, envCleaned := buildCacheMountEdits(cacheMountEditParams{
+				file:            input.File,
+				run:             run,
+				runLoc:          runLoc,
+				sm:              sm,
+				existing:        existing,
+				merged:          mergedMounts,
+				cleanedScript:   updatedScript,
+				scriptCleaned:   scriptCleaned,
+				cleaners:        cleaners,
+				cacheEnvEntries: cacheEnvEntries,
+			})
 			cacheEnvEntries = remaining
 
 			v := buildViolation(meta, input.File, runLoc, required, scriptCleaned, envCleaned, edits)
@@ -128,20 +136,28 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 //     containing existing flags + cleaned script (new mounts come from the insertion).
 //  3. ENV removal edits (already at separate line ranges).
 //
+type cacheMountEditParams struct {
+	file            string
+	run             *instructions.RunCommand
+	runLoc          []parser.Range
+	sm              *sourcemap.SourceMap
+	existing        []*instructions.Mount
+	merged          []*instructions.Mount
+	cleanedScript   string
+	scriptCleaned   bool
+	cleaners        map[cleanupKind]bool
+	cacheEnvEntries []cacheEnvEntry
+}
+
 // The insertion-based approach lets cache mount additions compose with other rules'
 // mount insertions at the same point (e.g., require-secret-mounts) without conflicting.
-func buildCacheMountEdits(
-	file string,
-	run *instructions.RunCommand,
-	runLoc []parser.Range,
-	sm *sourcemap.SourceMap,
-	existing, merged []*instructions.Mount,
-	cleanedScript string,
-	scriptCleaned bool,
-	cleaners map[cleanupKind]bool,
-	cacheEnvEntries []cacheEnvEntry,
-) ([]rules.TextEdit, []cacheEnvEntry, bool) {
-	envEdits, remaining := consumeEnvRemovalEdits(file, cleaners, cacheEnvEntries)
+func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvEntry, bool) {
+	envEdits, remaining := consumeEnvRemovalEdits(p.file, p.cleaners, p.cacheEnvEntries)
+
+	existing := p.existing
+	merged := p.merged
+	run := p.run
+	runLoc := p.runLoc
 
 	// Collect only the NEW mounts (not already in existing).
 	newMounts := collectNewMounts(existing, merged)
@@ -155,26 +171,26 @@ func buildCacheMountEdits(
 
 		mountText := runmount.FormatMounts(newMounts) + " "
 		edits = append(edits, rules.TextEdit{
-			Location: rules.NewRangeLocation(file, insertLine, insertCol, insertLine, insertCol),
+			Location: rules.NewRangeLocation(p.file, insertLine, insertCol, insertLine, insertCol),
 			NewText:  mountText,
 		})
 	}
 
 	// Edit 2: when script cleanup is needed, replace everything after "RUN " with
 	// existing flags + cleaned script. New mounts come from the insertion above.
-	if scriptCleaned {
+	if p.scriptCleaned {
 		startLine := runLoc[0].Start.Line
 		startCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
-		endLine, endCol := resolveRunEndPosition(runLoc, sm, run)
+		endLine, endCol := resolveRunEndPosition(runLoc, p.sm, run)
 
 		var tailText string
 		if flags := formatRunFlags(run.FlagsUsed, existing); flags != "" {
-			tailText = flags + " " + cleanedScript
+			tailText = flags + " " + p.cleanedScript
 		} else {
-			tailText = cleanedScript
+			tailText = p.cleanedScript
 		}
 		edits = append(edits, rules.TextEdit{
-			Location: rules.NewRangeLocation(file, startLine, startCol, endLine, endCol),
+			Location: rules.NewRangeLocation(p.file, startLine, startCol, endLine, endCol),
 			NewText:  tailText,
 		})
 	}

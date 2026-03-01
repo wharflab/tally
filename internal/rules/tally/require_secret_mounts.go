@@ -20,9 +20,9 @@ const RequireSecretMountsRuleCode = rules.TallyRulePrefix + "require-secret-moun
 // SecretMountSpec defines the required secret mount for a command.
 // Either Target (file mount) or Env (environment variable) should be set, not both.
 type SecretMountSpec struct {
-	ID     string `json:"id" koanf:"id"`
+	ID     string `json:"id"               koanf:"id"`
 	Target string `json:"target,omitempty" koanf:"target"`
-	Env    string `json:"env,omitempty" koanf:"env"`
+	Env    string `json:"env,omitempty"    koanf:"env"`
 }
 
 // RequireSecretMountsConfig defines the configuration for the require-secret-mounts rule.
@@ -80,11 +80,6 @@ func (r *RequireSecretMountsRule) ValidateConfig(config any) error {
 	return configutil.ValidateRuleOptions(RequireSecretMountsRuleCode, config)
 }
 
-// resolveConfig extracts the RequireSecretMountsConfig from input, falling back to defaults.
-func (r *RequireSecretMountsRule) resolveConfig(config any) RequireSecretMountsConfig {
-	return configutil.Coerce(config, DefaultRequireSecretMountsConfig())
-}
-
 // Check runs the rule.
 func (r *RequireSecretMountsRule) Check(input rules.LintInput) []rules.Violation {
 	cfg := r.resolveConfig(input.Config)
@@ -137,6 +132,11 @@ func (r *RequireSecretMountsRule) Check(input rules.LintInput) []rules.Violation
 	}
 
 	return violations
+}
+
+// resolveConfig extracts the RequireSecretMountsConfig from input, falling back to defaults.
+func (r *RequireSecretMountsRule) resolveConfig(config any) RequireSecretMountsConfig {
+	return configutil.Coerce(config, DefaultRequireSecretMountsConfig())
 }
 
 // checkMounts checks whether existing mounts satisfy the required secrets for found commands.

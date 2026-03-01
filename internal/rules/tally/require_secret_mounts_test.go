@@ -29,6 +29,7 @@ func TestRequireSecretMountsValidateConfig(t *testing.T) {
 	rule := NewRequireSecretMountsRule()
 
 	t.Run("valid config", func(t *testing.T) {
+		t.Parallel()
 		cfg := map[string]any{
 			"commands": map[string]any{
 				"pip": map[string]any{
@@ -43,12 +44,14 @@ func TestRequireSecretMountsValidateConfig(t *testing.T) {
 	})
 
 	t.Run("nil config", func(t *testing.T) {
+		t.Parallel()
 		if err := rule.ValidateConfig(nil); err != nil {
 			t.Fatalf("expected no error for nil config, got: %v", err)
 		}
 	})
 
 	t.Run("invalid config - extra property", func(t *testing.T) {
+		t.Parallel()
 		cfg := map[string]any{
 			"not-a-field": true,
 		}
@@ -58,6 +61,7 @@ func TestRequireSecretMountsValidateConfig(t *testing.T) {
 	})
 
 	t.Run("invalid config - missing id", func(t *testing.T) {
+		t.Parallel()
 		cfg := map[string]any{
 			"commands": map[string]any{
 				"pip": map[string]any{
@@ -71,6 +75,7 @@ func TestRequireSecretMountsValidateConfig(t *testing.T) {
 	})
 
 	t.Run("invalid config - neither target nor env", func(t *testing.T) {
+		t.Parallel()
 		cfg := map[string]any{
 			"commands": map[string]any{
 				"pip": map[string]any{
@@ -84,6 +89,7 @@ func TestRequireSecretMountsValidateConfig(t *testing.T) {
 	})
 
 	t.Run("valid config - env instead of target", func(t *testing.T) {
+		t.Parallel()
 		cfg := map[string]any{
 			"commands": map[string]any{
 				"gh": map[string]any{
@@ -98,6 +104,7 @@ func TestRequireSecretMountsValidateConfig(t *testing.T) {
 	})
 
 	t.Run("invalid config - both target and env", func(t *testing.T) {
+		t.Parallel()
 		cfg := map[string]any{
 			"commands": map[string]any{
 				"pip": map[string]any{
@@ -205,9 +212,10 @@ RUN --mount=type=secret,id=env,target=/root/.npmrc pip install flask && npm inst
 		},
 		{
 			Name: "same id different targets - both present",
-			Content: `FROM python:3.12-slim
-RUN --mount=type=secret,id=env,target=/root/.config/pip/pip.conf --mount=type=secret,id=env,target=/root/.npmrc pip install flask && npm install express
-`,
+			Content: "FROM python:3.12-slim\n" +
+				"RUN --mount=type=secret,id=env,target=/root/.config/pip/pip.conf " +
+				"--mount=type=secret,id=env,target=/root/.npmrc " +
+				"pip install flask && npm install express\n",
 			Config: RequireSecretMountsConfig{
 				Commands: map[string]SecretMountSpec{
 					"pip": {ID: "env", Target: "/root/.config/pip/pip.conf"},
@@ -363,6 +371,7 @@ RUN gh auth login
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			input := testutil.MakeLintInputWithConfig(t, "Dockerfile", tt.content, tt.config)
 			violations := NewRequireSecretMountsRule().Check(input)
 			if len(violations) == 0 {
