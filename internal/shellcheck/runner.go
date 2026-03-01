@@ -226,6 +226,10 @@ func (r *Runner) callReactor(ctx context.Context, script string, opts Options) (
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// Use a non-cancelable context for deferred sc_free calls so that WASM
+	// memory is freed even if the request context is cancelled mid-flight.
+	cleanupCtx := context.WithoutCancel(ctx)
+
 	optsStr := buildOpts(opts)
 
 	// Allocate and write script into WASM linear memory.
@@ -233,7 +237,7 @@ func (r *Runner) callReactor(ctx context.Context, script string, opts Options) (
 	if err != nil {
 		return nil, err
 	}
-	defer r.freePtr(ctx, scriptPtr)
+	defer r.freePtr(cleanupCtx, scriptPtr)
 	if !r.mem.Write(scriptPtr, []byte(script)) {
 		return nil, errors.New("failed to write script to WASM memory")
 	}
@@ -243,7 +247,7 @@ func (r *Runner) callReactor(ctx context.Context, script string, opts Options) (
 	if err != nil {
 		return nil, err
 	}
-	defer r.freePtr(ctx, optsPtr)
+	defer r.freePtr(cleanupCtx, optsPtr)
 	if !r.mem.Write(optsPtr, []byte(optsStr)) {
 		return nil, errors.New("failed to write opts to WASM memory")
 	}
@@ -253,7 +257,7 @@ func (r *Runner) callReactor(ctx context.Context, script string, opts Options) (
 	if err != nil {
 		return nil, err
 	}
-	defer r.freePtr(ctx, outLenPtr)
+	defer r.freePtr(cleanupCtx, outLenPtr)
 
 	// Call sc_check(scriptPtr, scriptLen, optsPtr, optsLen, outLenPtr) → resultPtr.
 	results, err := r.scCheck.Call(ctx,
@@ -265,7 +269,7 @@ func (r *Runner) callReactor(ctx context.Context, script string, opts Options) (
 		return nil, fmt.Errorf("sc_check: %w", err)
 	}
 	resultPtr := uint32(results[0]) //nolint:gosec // WASM32 pointer fits uint32
-	defer r.freePtr(ctx, resultPtr)
+	defer r.freePtr(cleanupCtx, resultPtr)
 
 	// Read output length.
 	outLenBytes, ok := r.mem.Read(outLenPtr, 4)
