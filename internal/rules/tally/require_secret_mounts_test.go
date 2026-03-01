@@ -130,13 +130,13 @@ RUN --mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf pip install
 			WantViolations: 0,
 		},
 		{
-			Name: "correct id wrong target - violation",
+			Name: "correct id wrong target - still missing",
 			Content: `FROM python:3.12-slim
 RUN --mount=type=secret,id=pipconf,target=/wrong/path pip install flask
 `,
 			Config:         pipConfig(),
 			WantViolations: 1,
-			WantMessages:   []string{"secret mount id=pipconf has target '/wrong/path', expected '/root/.config/pip/pip.conf'"},
+			WantMessages:   []string{"missing required secret mount for 'pip'"},
 		},
 		{
 			Name: "wrong id correct target - violation",
@@ -146,6 +146,46 @@ RUN --mount=type=secret,id=wrong,target=/root/.config/pip/pip.conf pip install f
 			Config:         pipConfig(),
 			WantViolations: 1,
 			WantMessages:   []string{"missing required secret mount for 'pip'"},
+		},
+		{
+			Name: "same id different targets across commands - both needed",
+			Content: `FROM python:3.12-slim
+RUN pip install flask && npm install express
+`,
+			Config: RequireSecretMountsConfig{
+				Commands: map[string]SecretMountSpec{
+					"pip": {ID: "env", Target: "/root/.config/pip/pip.conf"},
+					"npm": {ID: "env", Target: "/root/.npmrc"},
+				},
+			},
+			WantViolations: 1,
+		},
+		{
+			Name: "same id different targets - one present one missing",
+			Content: `FROM python:3.12-slim
+RUN --mount=type=secret,id=env,target=/root/.npmrc pip install flask && npm install express
+`,
+			Config: RequireSecretMountsConfig{
+				Commands: map[string]SecretMountSpec{
+					"pip": {ID: "env", Target: "/root/.config/pip/pip.conf"},
+					"npm": {ID: "env", Target: "/root/.npmrc"},
+				},
+			},
+			WantViolations: 1,
+			WantMessages:   []string{"missing required secret mount for 'pip'"},
+		},
+		{
+			Name: "same id different targets - both present",
+			Content: `FROM python:3.12-slim
+RUN --mount=type=secret,id=env,target=/root/.config/pip/pip.conf --mount=type=secret,id=env,target=/root/.npmrc pip install flask && npm install express
+`,
+			Config: RequireSecretMountsConfig{
+				Commands: map[string]SecretMountSpec{
+					"pip": {ID: "env", Target: "/root/.config/pip/pip.conf"},
+					"npm": {ID: "env", Target: "/root/.npmrc"},
+				},
+			},
+			WantViolations: 0,
 		},
 		{
 			Name: "multiple commands in one RUN - single combined violation",

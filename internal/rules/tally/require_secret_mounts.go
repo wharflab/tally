@@ -162,10 +162,11 @@ func (r *RequireSecretMountsRule) checkMounts(
 		if !ok {
 			continue
 		}
-		if seen[spec.ID] {
+		dedup := spec.ID + ":" + spec.Target
+		if seen[dedup] {
 			continue
 		}
-		seen[spec.ID] = true
+		seen[dedup] = true
 
 		if checkSecretMount(existing, spec, cmd.Name) == "" {
 			continue
@@ -211,19 +212,15 @@ func (r *RequireSecretMountsRule) checkMounts(
 
 // checkSecretMount checks whether existing mounts satisfy a required secret spec.
 // Returns an empty string if satisfied, or a violation message.
+// Matching requires both id AND target to match exactly — the same secret id
+// can be mounted at different targets for different commands.
 func checkSecretMount(existing []*instructions.Mount, spec SecretMountSpec, cmdName string) string {
 	for _, m := range existing {
 		if m.Type != instructions.MountTypeSecret {
 			continue
 		}
 		if m.CacheID == spec.ID && m.Target == spec.Target {
-			return "" // Satisfied
-		}
-		if m.CacheID == spec.ID && m.Target != spec.Target {
-			return fmt.Sprintf(
-				"secret mount id=%s has target '%s', expected '%s' for '%s'",
-				spec.ID, m.Target, spec.Target, cmdName,
-			)
+			return "" // Exact match — satisfied
 		}
 	}
 	return fmt.Sprintf(
