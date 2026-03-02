@@ -206,7 +206,24 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 		// No mount mutation — use targeted cleanup deletions so other rules'
 		// edits on the same RUN (e.g., DL3030 -y insertion) don't conflict.
 		cleanupEdits := computeCleanupEdits(p.file, run, runLoc, p.sm, p.shellVariant, p.cleaners)
-		edits = append(edits, cleanupEdits...)
+		if len(cleanupEdits) > 0 {
+			edits = append(edits, cleanupEdits...)
+		} else {
+			// Fallback (e.g., heredoc RUNs): targeted cleanup not supported,
+			// rewrite the tail with the cleaned script.
+			startLine := runLoc[0].Start.Line
+			startCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
+			endLine, endCol := resolveRunEndPosition(runLoc, p.sm, run)
+
+			tailText := p.cleanedScript
+			if flags := formatRunFlags(run.FlagsUsed, existing); flags != "" {
+				tailText = flags + " " + p.cleanedScript
+			}
+			edits = append(edits, rules.TextEdit{
+				Location: rules.NewRangeLocation(p.file, startLine, startCol, endLine, endCol),
+				NewText:  tailText,
+			})
+		}
 	}
 
 	edits = append(edits, envEdits...)
