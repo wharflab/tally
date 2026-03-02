@@ -955,6 +955,20 @@
                   }
                 },
                 "newText": "--mount=type=cache,target=/root/.npm,id=npm "
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 3,
+                    "line": 26
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 23
+                  }
+                },
+                "newText": "npm install\n"
               }
             ],
             "priority": 90,
