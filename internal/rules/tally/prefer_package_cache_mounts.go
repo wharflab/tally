@@ -235,7 +235,7 @@ func computeCleanupEdits(
 	}
 
 	startLine := runLoc[0].Start.Line // 1-based
-	lineIdx := startLine - 1         // 0-based for SourceMap
+	lineIdx := startLine - 1 // 0-based for SourceMap
 
 	// Get the full source text of the RUN instruction.
 	endLine := runLoc[len(runLoc)-1].End.Line
@@ -301,17 +301,18 @@ func computeCleanupEdits(
 		if isCleanup {
 			// Delete the cleanup command and its adjacent separator.
 			var delStart, delEnd int
-			if i > 0 && i-1 < len(separators) {
+			switch {
+			case i > 0 && i-1 < len(separators):
 				// Delete preceding separator + command
 				sepStart := spans[i-1].end
 				delStart = scriptIdx + sepStart
 				delEnd = scriptIdx + spans[i].end
-			} else if i < len(separators) {
+			case i < len(separators):
 				// First command: delete command + following separator
 				delStart = scriptIdx + spans[i].start
 				nextCmdStart := spans[i+1].start
 				delEnd = scriptIdx + nextCmdStart
-			} else {
+			default:
 				continue
 			}
 			edit := sourceRangeEdit(file, sourceFull, startLine, delStart, delEnd, "")
