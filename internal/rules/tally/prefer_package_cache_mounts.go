@@ -113,6 +113,7 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 				run:             run,
 				runLoc:          runLoc,
 				sm:              sm,
+				shellVariant:    shellVariant,
 				existing:        existing,
 				merged:          mergedMounts,
 				cleanedScript:   updatedScript,
@@ -140,6 +141,7 @@ type cacheMountEditParams struct {
 	run             *instructions.RunCommand
 	runLoc          []parser.Range
 	sm              *sourcemap.SourceMap
+	shellVariant    shell.Variant
 	existing        []*instructions.Mount
 	merged          []*instructions.Mount
 	cleanedScript   string
@@ -203,7 +205,7 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 	} else if p.scriptCleaned {
 		// No mount mutation — use targeted cleanup deletions so other rules'
 		// edits on the same RUN (e.g., DL3030 -y insertion) don't conflict.
-		cleanupEdits := computeCleanupEdits(p.file, run, runLoc, p.sm, p.cleaners)
+		cleanupEdits := computeCleanupEdits(p.file, run, runLoc, p.sm, p.shellVariant, p.cleaners)
 		edits = append(edits, cleanupEdits...)
 	}
 
@@ -220,6 +222,7 @@ func computeCleanupEdits(
 	run *instructions.RunCommand,
 	runLoc []parser.Range,
 	sm *sourcemap.SourceMap,
+	variant shell.Variant,
 	cleaners map[cleanupKind]bool,
 ) []rules.TextEdit {
 	if len(cleaners) == 0 || len(runLoc) == 0 {
@@ -260,7 +263,6 @@ func computeCleanupEdits(
 	}
 
 	// Use ExtractChainedCommands to get individual commands and their positions.
-	variant := shell.VariantBash
 	commands := shell.ExtractChainedCommands(script, variant)
 	if len(commands) == 0 {
 		return nil
