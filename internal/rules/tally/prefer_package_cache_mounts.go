@@ -225,113 +225,123 @@ func computeCleanupEdits(
 	variant shell.Variant,
 	cleaners map[cleanupKind]bool,
 ) []rules.TextEdit {
-	if len(cleaners) == 0 || len(runLoc) == 0 {
+	if len(cleaners) == 0 || len(runLoc) == 0 || len(run.Files) > 0 {
 		return nil
 	}
 
-	// For heredoc RUNs, fall back to full script replacement (different structure).
-	if len(run.Files) > 0 {
-		return nil // Heredoc cleanup handled separately
-	}
-
-	startLine := runLoc[0].Start.Line // 1-based
-	lineIdx := startLine - 1 // 0-based for SourceMap
-
-	// Get the full source text of the RUN instruction.
-	endLine := runLoc[len(runLoc)-1].End.Line
-	var sourceLines []string
-	for i := lineIdx; i < endLine && i < sm.LineCount(); i++ {
-		sourceLines = append(sourceLines, sm.Line(i))
-	}
-	if len(sourceLines) == 0 {
-		return nil
-	}
-
-	// Join source lines (replace continuation `\` with spaces to get the flat script)
-	// and find the script portion (after "RUN " and any flags).
-	sourceFull := strings.Join(sourceLines, "\n")
-	script := getRunScriptFromCmd(run)
-	if script == "" {
-		return nil
-	}
-
-	// Find where the script text starts in the source.
-	scriptIdx := strings.Index(sourceFull, script)
+	startLine := runLoc[0].Start.Line
+	sourceFull, script, scriptIdx := resolveCleanupSource(run, runLoc, sm)
 	if scriptIdx < 0 {
-		// Script was reformatted by parser; can't map positions — skip.
 		return nil
 	}
 
-	// Use ExtractChainedCommands to get individual commands and their positions.
 	commands := shell.ExtractChainedCommands(script, variant)
 	if len(commands) == 0 {
 		return nil
 	}
 	separators := shell.ExtractChainSeparators(script, variant, len(commands))
-
-	// Compute byte offset of each command within the script.
-	// commands[0] starts at offset 0, then separator[0], then commands[1], etc.
-	type cmdSpan struct {
-		start int // byte offset in script
-		end   int // byte offset in script (exclusive)
+	spans := computeCommandSpans(script, commands)
+	if spans == nil {
+		return nil
 	}
+
+	var edits []rules.TextEdit
+	for i, cmd := range commands {
+		if e := buildCleanupEdit(
+			file, sourceFull, startLine, scriptIdx,
+			i, cmd, spans, separators, variant, cleaners,
+		); e != nil {
+			edits = append(edits, *e)
+		}
+	}
+	return edits
+}
+
+// resolveCleanupSource extracts the source text and script for a RUN instruction.
+// Returns the joined source, the script text, and the byte index of the script
+// within the source (-1 if resolution fails).
+func resolveCleanupSource(
+	run *instructions.RunCommand,
+	runLoc []parser.Range,
+	sm *sourcemap.SourceMap,
+) (string, string, int) {
+	lineIdx := runLoc[0].Start.Line - 1
+	endLine := runLoc[len(runLoc)-1].End.Line
+
+	var sourceLines []string
+	for i := lineIdx; i < endLine && i < sm.LineCount(); i++ {
+		sourceLines = append(sourceLines, sm.Line(i))
+	}
+	if len(sourceLines) == 0 {
+		return "", "", -1
+	}
+
+	sourceFull := strings.Join(sourceLines, "\n")
+	script := getRunScriptFromCmd(run)
+	if script == "" {
+		return "", "", -1
+	}
+
+	scriptIdx := strings.Index(sourceFull, script)
+	return sourceFull, script, scriptIdx
+}
+
+type cmdSpan struct {
+	start int // byte offset in script
+	end   int // byte offset in script (exclusive)
+}
+
+func computeCommandSpans(script string, commands []string) []cmdSpan {
 	spans := make([]cmdSpan, len(commands))
 	offset := 0
 	for i, cmd := range commands {
 		idx := strings.Index(script[offset:], cmd)
 		if idx < 0 {
-			return nil // Can't find command in script
+			return nil
 		}
 		spans[i].start = offset + idx
 		spans[i].end = spans[i].start + len(cmd)
 		offset = spans[i].end
 	}
+	return spans
+}
 
-	// For each cleanup command, compute the byte range to delete in the source
-	// (including the preceding or following separator).
-	var edits []rules.TextEdit
-	for i, cmd := range commands {
-		isCleanup := isCacheCleanupCommand(cmd, cleaners)
-		_, stripped := stripNoCacheFlags(cmd, variant, cleaners)
+func buildCleanupEdit(
+	file, sourceFull string,
+	startLine, scriptIdx, i int,
+	cmd string,
+	spans []cmdSpan,
+	separators []string,
+	variant shell.Variant,
+	cleaners map[cleanupKind]bool,
+) *rules.TextEdit {
+	isCleanup := isCacheCleanupCommand(cmd, cleaners)
+	_, stripped := stripNoCacheFlags(cmd, variant, cleaners)
 
-		if !isCleanup && !stripped {
-			continue
-		}
-
-		if isCleanup {
-			// Delete the cleanup command and its adjacent separator.
-			var delStart, delEnd int
-			switch {
-			case i > 0 && i-1 < len(separators):
-				// Delete preceding separator + command
-				sepStart := spans[i-1].end
-				delStart = scriptIdx + sepStart
-				delEnd = scriptIdx + spans[i].end
-			case i < len(separators):
-				// First command: delete command + following separator
-				delStart = scriptIdx + spans[i].start
-				nextCmdStart := spans[i+1].start
-				delEnd = scriptIdx + nextCmdStart
-			default:
-				continue
-			}
-			edit := sourceRangeEdit(file, sourceFull, startLine, delStart, delEnd, "")
-			if edit != nil {
-				edits = append(edits, *edit)
-			}
-		} else if stripped {
-			// Strip --no-cache flags: find the flag in the source and delete it.
-			cleaned, _ := stripNoCacheFlags(cmd, variant, cleaners)
-			cmdSourceStart := scriptIdx + spans[i].start
-			cmdSourceEnd := scriptIdx + spans[i].end
-			edit := sourceRangeEdit(file, sourceFull, startLine, cmdSourceStart, cmdSourceEnd, cleaned)
-			if edit != nil {
-				edits = append(edits, *edit)
-			}
-		}
+	if !isCleanup && !stripped {
+		return nil
 	}
 
-	return edits
+	if isCleanup {
+		var delStart, delEnd int
+		switch {
+		case i > 0 && i <= len(separators):
+			delStart = scriptIdx + spans[i-1].end
+			delEnd = scriptIdx + spans[i].end
+		case i < len(separators):
+			delStart = scriptIdx + spans[i].start
+			delEnd = scriptIdx + spans[i+1].start
+		default:
+			return nil
+		}
+		return sourceRangeEdit(file, sourceFull, startLine, delStart, delEnd, "")
+	}
+
+	cleaned, _ := stripNoCacheFlags(cmd, variant, cleaners)
+	return sourceRangeEdit(
+		file, sourceFull, startLine,
+		scriptIdx+spans[i].start, scriptIdx+spans[i].end, cleaned,
+	)
 }
 
 // sourceRangeEdit creates a TextEdit from byte offsets within a multi-line source string.
