@@ -175,18 +175,25 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 		})
 	}
 
-	// Edit 2: when script cleanup is needed, replace everything after "RUN " with
-	// existing flags + cleaned script. New mounts come from the insertion above.
-	if p.scriptCleaned {
+	// Edit 2: replace everything after "RUN " when the script was cleaned or
+	// existing mounts were mutated (e.g., sharing mode changed). Uses merged
+	// mounts (not existing) so updated attributes are written correctly.
+	mutated := mountsMutated(existing, merged)
+	if p.scriptCleaned || mutated {
 		startLine := runLoc[0].Start.Line
 		startCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
 		endLine, endCol := resolveRunEndPosition(runLoc, p.sm, run)
 
+		// Use merged mounts so in-place updates (sharing, id) are reflected.
+		script := p.cleanedScript
+		if !p.scriptCleaned {
+			script = getRunScriptFromCmd(run)
+		}
 		var tailText string
-		if flags := formatRunFlags(run.FlagsUsed, existing); flags != "" {
-			tailText = flags + " " + p.cleanedScript
+		if flags := formatRunFlags(run.FlagsUsed, merged); flags != "" {
+			tailText = flags + " " + script
 		} else {
-			tailText = p.cleanedScript
+			tailText = script
 		}
 		edits = append(edits, rules.TextEdit{
 			Location: rules.NewRangeLocation(p.file, startLine, startCol, endLine, endCol),
@@ -198,11 +205,14 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 	return edits, remaining, len(envEdits) > 0
 }
 
-// collectNewMounts returns mounts in merged that are not present in existing.
+// collectNewMounts returns mounts in merged that are entirely new (no existing
+// mount shares the same type+target). Mounts whose attributes were updated
+// in-place (e.g., sharing mode changed) are NOT returned here — they are
+// handled by the rewrite path which uses the merged slice.
 func collectNewMounts(existing, merged []*instructions.Mount) []*instructions.Mount {
-	isExisting := func(m *instructions.Mount) bool {
+	hasSameTarget := func(m *instructions.Mount) bool {
 		for _, e := range existing {
-			if e.Type == m.Type && e.Target == m.Target && e.CacheID == m.CacheID {
+			if e.Type == m.Type && e.Target == m.Target {
 				return true
 			}
 		}
@@ -211,11 +221,26 @@ func collectNewMounts(existing, merged []*instructions.Mount) []*instructions.Mo
 
 	var newMounts []*instructions.Mount
 	for _, m := range merged {
-		if !isExisting(m) {
+		if !hasSameTarget(m) {
 			newMounts = append(newMounts, m)
 		}
 	}
 	return newMounts
+}
+
+// mountsMutated returns true if any existing mount was modified in-place by
+// mergeCacheMounts (e.g., sharing mode or id changed for the same target).
+func mountsMutated(existing, merged []*instructions.Mount) bool {
+	for _, e := range existing {
+		for _, m := range merged {
+			if e.Type == m.Type && e.Target == m.Target {
+				if e.CacheSharing != m.CacheSharing || e.CacheID != m.CacheID {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func buildViolation(
