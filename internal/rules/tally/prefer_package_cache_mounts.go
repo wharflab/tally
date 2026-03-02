@@ -245,12 +245,20 @@ func computeCleanupEdits(
 		return nil
 	}
 
+	ctx := cleanupEditContext{
+		file:       file,
+		sourceFull: sourceFull,
+		startLine:  startLine,
+		scriptIdx:  scriptIdx,
+		spans:      spans,
+		separators: separators,
+		variant:    variant,
+		cleaners:   cleaners,
+	}
+
 	var edits []rules.TextEdit
 	for i, cmd := range commands {
-		if e := buildCleanupEdit(
-			file, sourceFull, startLine, scriptIdx,
-			i, cmd, spans, separators, variant, cleaners,
-		); e != nil {
+		if e := buildCleanupEdit(ctx, i, cmd); e != nil {
 			edits = append(edits, *e)
 		}
 	}
@@ -306,17 +314,20 @@ func computeCommandSpans(script string, commands []string) []cmdSpan {
 	return spans
 }
 
-func buildCleanupEdit(
-	file, sourceFull string,
-	startLine, scriptIdx, i int,
-	cmd string,
-	spans []cmdSpan,
-	separators []string,
-	variant shell.Variant,
-	cleaners map[cleanupKind]bool,
-) *rules.TextEdit {
-	isCleanup := isCacheCleanupCommand(cmd, cleaners)
-	_, stripped := stripNoCacheFlags(cmd, variant, cleaners)
+type cleanupEditContext struct {
+	file       string
+	sourceFull string
+	startLine  int
+	scriptIdx  int
+	spans      []cmdSpan
+	separators []string
+	variant    shell.Variant
+	cleaners   map[cleanupKind]bool
+}
+
+func buildCleanupEdit(ctx cleanupEditContext, i int, cmd string) *rules.TextEdit {
+	isCleanup := isCacheCleanupCommand(cmd, ctx.cleaners)
+	_, stripped := stripNoCacheFlags(cmd, ctx.variant, ctx.cleaners)
 
 	if !isCleanup && !stripped {
 		return nil
@@ -325,22 +336,22 @@ func buildCleanupEdit(
 	if isCleanup {
 		var delStart, delEnd int
 		switch {
-		case i > 0 && i <= len(separators):
-			delStart = scriptIdx + spans[i-1].end
-			delEnd = scriptIdx + spans[i].end
-		case i < len(separators):
-			delStart = scriptIdx + spans[i].start
-			delEnd = scriptIdx + spans[i+1].start
+		case i > 0 && i <= len(ctx.separators):
+			delStart = ctx.scriptIdx + ctx.spans[i-1].end
+			delEnd = ctx.scriptIdx + ctx.spans[i].end
+		case i < len(ctx.separators):
+			delStart = ctx.scriptIdx + ctx.spans[i].start
+			delEnd = ctx.scriptIdx + ctx.spans[i+1].start
 		default:
 			return nil
 		}
-		return sourceRangeEdit(file, sourceFull, startLine, delStart, delEnd, "")
+		return sourceRangeEdit(ctx.file, ctx.sourceFull, ctx.startLine, delStart, delEnd, "")
 	}
 
-	cleaned, _ := stripNoCacheFlags(cmd, variant, cleaners)
+	cleaned, _ := stripNoCacheFlags(cmd, ctx.variant, ctx.cleaners)
 	return sourceRangeEdit(
-		file, sourceFull, startLine,
-		scriptIdx+spans[i].start, scriptIdx+spans[i].end, cleaned,
+		ctx.file, ctx.sourceFull, ctx.startLine,
+		ctx.scriptIdx+ctx.spans[i].start, ctx.scriptIdx+ctx.spans[i].end, cleaned,
 	)
 }
 
