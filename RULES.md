@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 22 | - | 22 |
+| tally | 23 | - | 23 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -34,6 +34,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/syntax-directive-typo`](docs/rules/tally/syntax-directive-typo.md) | Detects typos in `# syntax=` parser directives (fail-fast syntax check) | Error | Correctness | Enabled |
 | [`tally/secrets-in-code`](docs/rules/tally/secrets-in-code.md) | Detects hardcoded secrets, API keys, and credentials using [gitleaks](https://github.com/gitleaks/gitleaks) patterns | Error | Security | Enabled |
 | [`tally/prefer-vex-attestation`](docs/rules/tally/prefer-vex-attestation.md) | Recommends attaching OpenVEX as an OCI attestation instead of copying `*.vex.json` into the image | Info | Security | Enabled |
+| [`tally/require-secret-mounts`](docs/rules/tally/require-secret-mounts.md) 🔧 | Enforces `--mount=type=secret` for commands accessing private registries | Warning | Security | Off (requires config) |
 | [`tally/max-lines`](docs/rules/tally/max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
 | [`tally/no-unreachable-stages`](docs/rules/tally/no-unreachable-stages.md) | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
 | [`tally/shell-run-in-scratch`](docs/rules/tally/shell-run-in-scratch.md) | Detects shell-form RUN in scratch stages where no shell exists | Warning | Correctness | Enabled |

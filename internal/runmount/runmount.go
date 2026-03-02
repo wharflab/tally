@@ -96,11 +96,16 @@ func MountsEqual(a, b []*instructions.Mount) bool {
 	return true
 }
 
-// mountKey generates a unique key for a mount based on type and target.
+// mountKey generates a unique key for a mount based on type and identity fields.
 func mountKey(m *instructions.Mount) string {
-	// For secret/ssh mounts, use ID as key; for others use target
+	// For secret/ssh mounts, the same ID can be mounted at different targets
+	// or exposed as different env vars, so include all identity fields.
 	if m.Type == instructions.MountTypeSecret || m.Type == instructions.MountTypeSSH {
-		return string(m.Type) + ":" + m.CacheID
+		env := ""
+		if m.Env != nil {
+			env = *m.Env
+		}
+		return string(m.Type) + ":" + m.CacheID + ":" + m.Target + ":" + env
 	}
 	return string(m.Type) + ":" + m.Target
 }
@@ -128,6 +133,9 @@ func mountEqual(a, b *instructions.Mount) bool {
 	if a.CacheSharing != b.CacheSharing {
 		return false
 	}
+	if !stringPtrEqual(a.Env, b.Env) {
+		return false
+	}
 	// Compare optional fields
 	if !uint64PtrEqual(a.UID, b.UID) {
 		return false
@@ -139,6 +147,16 @@ func mountEqual(a, b *instructions.Mount) bool {
 		return false
 	}
 	return true
+}
+
+func stringPtrEqual(a, b *string) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	return *a == *b
 }
 
 func uint64PtrEqual(a, b *uint64) bool {
@@ -224,6 +242,9 @@ func formatSecretSSHMount(parts []string, m *instructions.Mount) []string {
 	}
 	if m.Target != "" {
 		parts = append(parts, "target="+m.Target)
+	}
+	if m.Env != nil && *m.Env != "" {
+		parts = append(parts, "env="+*m.Env)
 	}
 	if m.Required {
 		parts = append(parts, "required")

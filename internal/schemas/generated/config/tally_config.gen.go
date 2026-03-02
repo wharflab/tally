@@ -67,6 +67,10 @@ type IndexSchemaJson_3 struct {
 	// PreferRunHeredoc corresponds to the JSON schema field "prefer-run-heredoc".
 	PreferRunHeredoc *tally.PreferRunHeredocSchemaJson `json:"prefer-run-heredoc,omitempty"`
 
+	// RequireSecretMounts corresponds to the JSON schema field
+	// "require-secret-mounts".
+	RequireSecretMounts *tally.RequireSecretMountsSchemaJson `json:"require-secret-mounts,omitempty"`
+
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 

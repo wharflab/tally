@@ -27,16 +27,30 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 3
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 3
+                  }
+                },
+                "newText": "--mount=type=cache,target=/root/.npm,id=npm "
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 42,
                     "line": 3
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 15,
                     "line": 3
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.npm,id=npm npm install"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -67,16 +81,16 @@
               {
                 "location": {
                   "end": {
-                    "column": 18,
+                    "column": 4,
                     "line": 4
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 4,
                     "line": 4
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/go/pkg/mod,id=gomod --mount=type=cache,target=/root/.cache/go-build,id=gobuild go build ./..."
+                "newText": "--mount=type=cache,target=/go/pkg/mod,id=gomod --mount=type=cache,target=/root/.cache/go-build,id=gobuild "
               }
             ],
             "priority": 90,
@@ -112,11 +126,11 @@
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 4,
                     "line": 5
                   }
                 },
-                "newText": "RUN --mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update \u0026\u0026 apt-get install -y gcc"
+                "newText": "--mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update \u0026\u0026 apt-get install -y gcc"
               }
             ],
             "priority": 90,
@@ -147,16 +161,44 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 8
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 8
+                  }
+                },
+                "newText": "--mount=type=cache,target=/var/cache/apk,id=apk,sharing=locked "
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 27,
+                    "line": 8
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 8
+                  }
+                },
+                "newText": "apk add curl"
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 54,
                     "line": 8
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 27,
                     "line": 8
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/var/cache/apk,id=apk,sharing=locked apk add curl"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -187,16 +229,30 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 9
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 9
+                  }
+                },
+                "newText": "--mount=type=cache,target=/var/cache/dnf,id=dnf,sharing=locked "
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 39,
                     "line": 9
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 22,
                     "line": 9
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/var/cache/dnf,id=dnf,sharing=locked dnf install -y git"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -227,16 +283,30 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 10
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 10
+                  }
+                },
+                "newText": "--mount=type=cache,target=/var/cache/yum,id=yum,sharing=locked "
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 40,
                     "line": 10
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 23,
                     "line": 10
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/var/cache/yum,id=yum,sharing=locked yum install -y make"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -267,16 +337,30 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 11
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 11
+                  }
+                },
+                "newText": "--mount=type=cache,target=/var/cache/zypp,id=zypper,sharing=locked "
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 47,
                     "line": 11
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 25,
                     "line": 11
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/var/cache/zypp,id=zypper,sharing=locked zypper install -y git"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -307,16 +391,30 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 12
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 12
+                  }
+                },
+                "newText": "--mount=type=cache,target=/usr/local/share/.cache/yarn,id=yarn "
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 36,
                     "line": 12
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 16,
                     "line": 12
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/usr/local/share/.cache/yarn,id=yarn yarn install"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -347,16 +445,30 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 13
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 13
+                  }
+                },
+                "newText": "--mount=type=cache,target=/root/.pnpm-store,id=pnpm "
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 54,
                     "line": 13
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 34,
                     "line": 13
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.pnpm-store,id=pnpm pnpm install --frozen-lockfile"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -387,16 +499,44 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 14
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 14
+                  }
+                },
+                "newText": "--mount=type=cache,target=/root/.cache/pip,id=pip "
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 50,
+                    "line": 14
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 14
+                  }
+                },
+                "newText": "pip install -r requirements.txt"
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 69,
                     "line": 14
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 50,
                     "line": 14
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.cache/pip,id=pip pip install -r requirements.txt"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -427,16 +567,30 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 15
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 15
+                  }
+                },
+                "newText": "--mount=type=cache,target=/root/.gem,id=gem "
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 34,
                     "line": 15
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 18,
                     "line": 15
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.gem,id=gem bundle install"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -467,16 +621,16 @@
               {
                 "location": {
                   "end": {
-                    "column": 25,
+                    "column": 4,
                     "line": 17
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 4,
                     "line": 17
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/workspace/target,id=cargo-target --mount=type=cache,target=/usr/local/cargo/git/db,id=cargo-git --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry cargo build --release"
+                "newText": "--mount=type=cache,target=/workspace/target,id=cargo-target --mount=type=cache,target=/usr/local/cargo/git/db,id=cargo-git --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry "
               }
             ],
             "priority": 90,
@@ -507,16 +661,30 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 18
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 18
+                  }
+                },
+                "newText": "--mount=type=cache,target=/root/.nuget/packages,id=nuget "
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 53,
                     "line": 18
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 18,
                     "line": 18
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.nuget/packages,id=nuget dotnet restore"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -547,16 +715,30 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 19
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 19
+                  }
+                },
+                "newText": "--mount=type=cache,target=/root/.cache/composer,id=composer "
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 53,
                     "line": 19
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 29,
                     "line": 19
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.cache/composer,id=composer composer install --no-dev"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -587,16 +769,44 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 20
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 20
+                  }
+                },
+                "newText": "--mount=type=cache,target=/root/.cache/uv,id=uv "
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 31,
+                    "line": 20
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 20
+                  }
+                },
+                "newText": "uv sync --frozen"
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 49,
                     "line": 20
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 31,
                     "line": 20
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.cache/uv,id=uv uv sync --frozen"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -627,16 +837,16 @@
               {
                 "location": {
                   "end": {
-                    "column": 26,
+                    "column": 4,
                     "line": 21
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 4,
                     "line": 21
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.cache/uv,id=uv uv python install 3.12"
+                "newText": "--mount=type=cache,target=/root/.cache/uv,id=uv "
               }
             ],
             "priority": 90,
@@ -667,16 +877,44 @@
               {
                 "location": {
                   "end": {
+                    "column": 4,
+                    "line": 22
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 22
+                  }
+                },
+                "newText": "--mount=type=cache,target=/root/.bun/install/cache,id=bun "
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 26,
+                    "line": 22
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 22
+                  }
+                },
+                "newText": "bun install"
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 45,
                     "line": 22
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 26,
                     "line": 22
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.bun/install/cache,id=bun bun install"
+                "newText": ""
               }
             ],
             "priority": 90,
@@ -712,11 +950,11 @@
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 4,
                     "line": 23
                   }
                 },
-                "newText": "RUN --mount=type=cache,target=/root/.npm,id=npm \u003c\u003cEOF\nnpm install\nEOF"
+                "newText": "--mount=type=cache,target=/root/.npm,id=npm npm install\n"
               }
             ],
             "priority": 90,

@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 
-	dfcmd "github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/wharflab/tally/internal/runmount"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // PreferPackageCacheMountsRuleCode is the full rule code for prefer-package-cache-mounts.
@@ -98,22 +98,29 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 			}
 
 			updatedScript, scriptCleaned := removeCacheCleanup(run, script, shellVariant, cleaners)
-			replacement := formatUpdatedRun(run, mergedMounts, updatedScript)
-			if replacement == "" {
-				continue
-			}
 
 			runLoc := run.Location()
 			if len(runLoc) == 0 {
 				continue
 			}
 
-			endLine, endCol := resolveRunEndPosition(runLoc, sm, run)
-
-			edits, remaining, envCleaned := buildFixEdits(
-				input.File, runLoc, endLine, endCol, replacement,
-				cleaners, cacheEnvEntries,
-			)
+			// Build targeted edits: mount insertion + optional script cleanup + optional ENV removal.
+			// Mount flags are added as zero-length insertions right after "RUN " so they
+			// compose with other rules' mount insertions (e.g., require-secret-mounts)
+			// without conflicting.
+			edits, remaining, envCleaned := buildCacheMountEdits(cacheMountEditParams{
+				file:            input.File,
+				run:             run,
+				runLoc:          runLoc,
+				sm:              sm,
+				shellVariant:    shellVariant,
+				existing:        existing,
+				merged:          mergedMounts,
+				cleanedScript:   updatedScript,
+				scriptCleaned:   scriptCleaned,
+				cleaners:        cleaners,
+				cacheEnvEntries: cacheEnvEntries,
+			})
 			cacheEnvEntries = remaining
 
 			v := buildViolation(meta, input.File, runLoc, required, scriptCleaned, envCleaned, edits)
@@ -124,30 +131,319 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 	return violations
 }
 
-func buildFixEdits(
-	file string,
-	runLoc []parser.Range,
-	endLine, endCol int,
-	replacement string,
-	cleaners map[cleanupKind]bool,
-	cacheEnvEntries []cacheEnvEntry,
-) ([]rules.TextEdit, []cacheEnvEntry, bool) {
-	envEdits, remaining := consumeEnvRemovalEdits(file, cleaners, cacheEnvEntries)
+// buildCacheMountEdits produces targeted, non-overlapping edits:
+//  1. Zero-length insertion right after "RUN " for new --mount=type=cache flags.
+//  2. When script cleanup is needed: a replacement from right after "RUN " to end-of-RUN
+//     containing existing flags + cleaned script (new mounts come from the insertion).
+//  3. ENV removal edits (already at separate line ranges).
+type cacheMountEditParams struct {
+	file            string
+	run             *instructions.RunCommand
+	runLoc          []parser.Range
+	sm              *sourcemap.SourceMap
+	shellVariant    shell.Variant
+	existing        []*instructions.Mount
+	merged          []*instructions.Mount
+	cleanedScript   string
+	scriptCleaned   bool
+	cleaners        map[cleanupKind]bool
+	cacheEnvEntries []cacheEnvEntry
+}
 
-	edits := make([]rules.TextEdit, 1, 1+len(envEdits))
-	edits[0] = rules.TextEdit{
-		Location: rules.NewRangeLocation(
-			file,
-			runLoc[0].Start.Line,
-			runLoc[0].Start.Character,
-			endLine,
-			endCol,
-		),
-		NewText: replacement,
+// The insertion-based approach lets cache mount additions compose with other rules'
+// mount insertions at the same point (e.g., require-secret-mounts) without conflicting.
+func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvEntry, bool) {
+	envEdits, remaining := consumeEnvRemovalEdits(p.file, p.cleaners, p.cacheEnvEntries)
+
+	existing := p.existing
+	merged := p.merged
+	run := p.run
+	runLoc := p.runLoc
+
+	// Collect only the NEW mounts (not already in existing).
+	newMounts := collectNewMounts(existing, merged)
+
+	var edits []rules.TextEdit
+
+	mutated := mountsMutated(existing, merged)
+
+	// Pre-compute cleanup edits for the non-mutated path.
+	var cleanupEdits []rules.TextEdit
+	if !mutated && p.scriptCleaned {
+		cleanupEdits = computeCleanupEdits(p.file, run, runLoc, p.sm, p.shellVariant, p.cleaners)
 	}
-	edits = append(edits, envEdits...)
 
+	// Will a tail rewrite be emitted? If so, the mount insertion must be skipped
+	// (the tail rewrite includes mounts via formatRunFlags). Tail rewrites happen
+	// when mounts are mutated OR when cleanup falls back to a full rewrite
+	// (e.g., heredoc RUNs where targeted cleanup edits are not available).
+	needsTailRewrite := mutated || (p.scriptCleaned && len(cleanupEdits) == 0)
+
+	// Edit 1: zero-length insertion for new mount flags right after "RUN ".
+	// Skipped when a tail rewrite will handle mounts to avoid overlapping edits.
+	if !needsTailRewrite && len(newMounts) > 0 {
+		insertLine := runLoc[0].Start.Line
+		insertCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
+
+		mountText := runmount.FormatMounts(newMounts) + " "
+		edits = append(edits, rules.TextEdit{
+			Location: rules.NewRangeLocation(p.file, insertLine, insertCol, insertLine, insertCol),
+			NewText:  mountText,
+		})
+	}
+
+	// Edit 2+: cleanup and/or mount rewrite.
+	switch {
+	case mutated:
+		// Mount flags modified: full tail rewrite with merged mounts + cleaned script.
+		edits = append(edits, buildTailRewrite(p, merged)...)
+
+	case len(cleanupEdits) > 0:
+		// Targeted cleanup deletions (non-heredoc): compose with other rules' edits.
+		edits = append(edits, cleanupEdits...)
+
+	case p.scriptCleaned:
+		// Fallback (e.g., heredoc): targeted cleanup unavailable, tail rewrite
+		// with merged mounts (includes new) + cleaned script.
+		edits = append(edits, buildTailRewrite(p, merged)...)
+	}
+
+	edits = append(edits, envEdits...)
 	return edits, remaining, len(envEdits) > 0
+}
+
+// buildTailRewrite produces a single edit replacing everything after "RUN "
+// with formatted mounts + script. Used when targeted edits aren't possible
+// (mount mutation, heredoc cleanup fallback).
+func buildTailRewrite(p cacheMountEditParams, mounts []*instructions.Mount) []rules.TextEdit {
+	startLine := p.runLoc[0].Start.Line
+	startCol := p.runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
+	endLine, endCol := resolveRunEndPosition(p.runLoc, p.sm, p.run)
+
+	script := getRunScriptFromCmd(p.run)
+	if p.scriptCleaned {
+		script = p.cleanedScript
+	}
+	var tailText string
+	if flags := formatRunFlags(p.run.FlagsUsed, mounts); flags != "" {
+		tailText = flags + " " + script
+	} else {
+		tailText = script
+	}
+	return []rules.TextEdit{{
+		Location: rules.NewRangeLocation(p.file, startLine, startCol, endLine, endCol),
+		NewText:  tailText,
+	}}
+}
+
+// computeCleanupEdits produces targeted deletion edits for cache cleanup
+// commands within a RUN instruction. Instead of replacing the entire script,
+// each cleanup command (and its separator) is deleted individually, so
+// edits from other rules (e.g., DL3030 -y insertion) don't conflict.
+func computeCleanupEdits(
+	file string,
+	run *instructions.RunCommand,
+	runLoc []parser.Range,
+	sm *sourcemap.SourceMap,
+	variant shell.Variant,
+	cleaners map[cleanupKind]bool,
+) []rules.TextEdit {
+	if len(cleaners) == 0 || len(runLoc) == 0 || len(run.Files) > 0 {
+		return nil
+	}
+
+	startLine := runLoc[0].Start.Line
+	sourceFull, script, scriptIdx := resolveCleanupSource(run, runLoc, sm)
+	if scriptIdx < 0 {
+		return nil
+	}
+
+	commands := shell.ExtractChainedCommands(script, variant)
+	if len(commands) == 0 {
+		return nil
+	}
+	separators := shell.ExtractChainSeparators(script, variant, len(commands))
+	spans := computeCommandSpans(script, commands)
+	if spans == nil {
+		return nil
+	}
+
+	ctx := cleanupEditContext{
+		file:       file,
+		sourceFull: sourceFull,
+		startLine:  startLine,
+		scriptIdx:  scriptIdx,
+		spans:      spans,
+		separators: separators,
+		variant:    variant,
+		cleaners:   cleaners,
+	}
+
+	var edits []rules.TextEdit
+	for i, cmd := range commands {
+		if e := buildCleanupEdit(ctx, i, cmd); e != nil {
+			edits = append(edits, *e)
+		}
+	}
+	return edits
+}
+
+// resolveCleanupSource extracts the source text and script for a RUN instruction.
+// Returns the joined source, the script text, and the byte index of the script
+// within the source (-1 if resolution fails).
+func resolveCleanupSource(
+	run *instructions.RunCommand,
+	runLoc []parser.Range,
+	sm *sourcemap.SourceMap,
+) (string, string, int) {
+	lineIdx := runLoc[0].Start.Line - 1
+	endLine := runLoc[len(runLoc)-1].End.Line
+
+	var sourceLines []string
+	for i := lineIdx; i < endLine && i < sm.LineCount(); i++ {
+		sourceLines = append(sourceLines, sm.Line(i))
+	}
+	if len(sourceLines) == 0 {
+		return "", "", -1
+	}
+
+	sourceFull := strings.Join(sourceLines, "\n")
+	script := getRunScriptFromCmd(run)
+	if script == "" {
+		return "", "", -1
+	}
+
+	scriptIdx := strings.Index(sourceFull, script)
+	return sourceFull, script, scriptIdx
+}
+
+type cmdSpan struct {
+	start int // byte offset in script
+	end   int // byte offset in script (exclusive)
+}
+
+func computeCommandSpans(script string, commands []string) []cmdSpan {
+	spans := make([]cmdSpan, len(commands))
+	offset := 0
+	for i, cmd := range commands {
+		idx := strings.Index(script[offset:], cmd)
+		if idx < 0 {
+			return nil
+		}
+		spans[i].start = offset + idx
+		spans[i].end = spans[i].start + len(cmd)
+		offset = spans[i].end
+	}
+	return spans
+}
+
+type cleanupEditContext struct {
+	file       string
+	sourceFull string
+	startLine  int
+	scriptIdx  int
+	spans      []cmdSpan
+	separators []string
+	variant    shell.Variant
+	cleaners   map[cleanupKind]bool
+}
+
+func buildCleanupEdit(ctx cleanupEditContext, i int, cmd string) *rules.TextEdit {
+	isCleanup := isCacheCleanupCommand(cmd, ctx.cleaners)
+	_, stripped := stripNoCacheFlags(cmd, ctx.variant, ctx.cleaners)
+
+	if !isCleanup && !stripped {
+		return nil
+	}
+
+	if isCleanup {
+		var delStart, delEnd int
+		switch {
+		case i > 0 && i <= len(ctx.separators):
+			delStart = ctx.scriptIdx + ctx.spans[i-1].end
+			delEnd = ctx.scriptIdx + ctx.spans[i].end
+		case i < len(ctx.separators):
+			delStart = ctx.scriptIdx + ctx.spans[i].start
+			delEnd = ctx.scriptIdx + ctx.spans[i+1].start
+		default:
+			return nil
+		}
+		return sourceRangeEdit(ctx.file, ctx.sourceFull, ctx.startLine, delStart, delEnd, "")
+	}
+
+	cleaned, _ := stripNoCacheFlags(cmd, ctx.variant, ctx.cleaners)
+	return sourceRangeEdit(
+		ctx.file, ctx.sourceFull, ctx.startLine,
+		ctx.scriptIdx+ctx.spans[i].start, ctx.scriptIdx+ctx.spans[i].end, cleaned,
+	)
+}
+
+// sourceRangeEdit creates a TextEdit from byte offsets within a multi-line source string.
+// startLine is the 1-based line number of the first line in sourceFull.
+func sourceRangeEdit(file, sourceFull string, startLine, byteStart, byteEnd int, newText string) *rules.TextEdit {
+	if byteStart < 0 || byteEnd > len(sourceFull) || byteStart >= byteEnd {
+		return nil
+	}
+
+	// Convert byte offsets to line:col positions.
+	sLine, sCol := byteToLineCol(sourceFull, byteStart)
+	eLine, eCol := byteToLineCol(sourceFull, byteEnd)
+
+	return &rules.TextEdit{
+		Location: rules.NewRangeLocation(file, startLine+sLine, sCol, startLine+eLine, eCol),
+		NewText:  newText,
+	}
+}
+
+// byteToLineCol converts a byte offset in a string to (line, col) where line is 0-based.
+func byteToLineCol(s string, offset int) (int, int) {
+	line := 0
+	lineStart := 0
+	for i := range offset {
+		if s[i] == '\n' {
+			line++
+			lineStart = i + 1
+		}
+	}
+	return line, offset - lineStart
+}
+
+// collectNewMounts returns mounts in merged that are entirely new (no existing
+// mount shares the same type+target). Mounts whose attributes were updated
+// in-place (e.g., sharing mode changed) are NOT returned here — they are
+// handled by the rewrite path which uses the merged slice.
+func collectNewMounts(existing, merged []*instructions.Mount) []*instructions.Mount {
+	hasSameTarget := func(m *instructions.Mount) bool {
+		for _, e := range existing {
+			if e.Type == m.Type && e.Target == m.Target {
+				return true
+			}
+		}
+		return false
+	}
+
+	var newMounts []*instructions.Mount
+	for _, m := range merged {
+		if !hasSameTarget(m) {
+			newMounts = append(newMounts, m)
+		}
+	}
+	return newMounts
+}
+
+// mountsMutated returns true if any existing mount was modified in-place by
+// mergeCacheMounts (e.g., sharing mode or id changed for the same target).
+func mountsMutated(existing, merged []*instructions.Mount) bool {
+	for _, e := range existing {
+		for _, m := range merged {
+			if e.Type == m.Type && e.Target == m.Target {
+				if e.CacheSharing != m.CacheSharing || e.CacheID != m.CacheID {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func buildViolation(
@@ -1083,46 +1379,6 @@ func isPackageCacheDirCleanup(command, cacheDir string) bool {
 	}
 
 	return true
-}
-
-func formatUpdatedRun(run *instructions.RunCommand, mounts []*instructions.Mount, script string) string {
-	var sb strings.Builder
-	sb.WriteString(strings.ToUpper(dfcmd.Run))
-
-	if flags := formatRunFlags(run.FlagsUsed, mounts); flags != "" {
-		sb.WriteString(" ")
-		sb.WriteString(flags)
-	}
-
-	if len(run.Files) > 0 {
-		cmdLine := strings.Join(run.CmdLine, " ")
-		if cmdLine != "" {
-			sb.WriteString(" ")
-			sb.WriteString(cmdLine)
-		}
-
-		for i, file := range run.Files {
-			sb.WriteString("\n")
-			content := file.Data
-			if i == 0 {
-				content = script
-			}
-			sb.WriteString(content)
-			if !strings.HasSuffix(content, "\n") {
-				sb.WriteString("\n")
-			}
-			sb.WriteString(file.Name)
-		}
-
-		return sb.String()
-	}
-
-	if script != "" {
-		sb.WriteString(" ")
-		sb.WriteString(script)
-	}
-
-	return sb.String()
 }
 
 func formatRunFlags(flagsUsed []string, mounts []*instructions.Mount) string {

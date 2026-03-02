@@ -69,6 +69,11 @@
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
+      "input": "internal/rules/tally/require_secret_mounts.schema.json",
+      "output": "internal/schemas/generated/rules/tally/require_secret_mounts.gen.go",
+      "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
+    },
+    {
       "input": "internal/rules/hadolint/dl3001.schema.json",
       "output": "internal/schemas/generated/rules/hadolint/dl3001.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/hadolint"

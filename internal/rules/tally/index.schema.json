@@ -32,6 +32,9 @@
     },
     "prefer-run-heredoc": {
       "$ref": "./prefer_run_heredoc.schema.json"
+    },
+    "require-secret-mounts": {
+      "$ref": "./require_secret_mounts.schema.json"
     }
   },
   "additionalProperties": {

@@ -1009,5 +1009,126 @@ severity = "style"
 			),
 			wantApplied: 1,
 		},
+		// tally/require-secret-mounts: add missing secret mount
+		{
+			name: "require-secret-mounts",
+			input: "FROM python:3.12-slim\n" +
+				"RUN pip install -r requirements.txt\n",
+			args: []string{
+				"--fix",
+				"--select", "tally/require-secret-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.require-secret-mounts]
+severity = "warning"
+
+[rules.tally.require-secret-mounts.commands.pip]
+id = "pipconf"
+target = "/root/.config/pip/pip.conf"
+`,
+		},
+		// tally/require-secret-mounts: preserves existing cache mount
+		{
+			name: "require-secret-mounts-with-cache-mount",
+			input: "FROM python:3.12-slim\n" +
+				"RUN --mount=type=cache,target=/root/.cache/pip pip install -r requirements.txt\n",
+			args: []string{
+				"--fix",
+				"--select", "tally/require-secret-mounts",
+			},
+			wantApplied: 1,
+			config: `[rules.tally.require-secret-mounts]
+severity = "warning"
+
+[rules.tally.require-secret-mounts.commands.pip]
+id = "pipconf"
+target = "/root/.config/pip/pip.conf"
+`,
+		},
+		// Combined: require-secret-mounts + prefer-package-cache-mounts on same RUN.
+		// The secret mount fix (security, priority 85) wins conflict resolution and
+		// its rewrite includes both the secret mount AND cache mounts, so a single
+		// --fix produces the fully-mounted RUN.
+		{
+			name: "require-secret-mounts-with-cache-mounts-combined",
+			input: "FROM python:3.12-slim\n" +
+				"RUN pip install -r requirements.txt\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/require-secret-mounts",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 2, // both mount insertions compose (zero-length edits don't conflict)
+			config: `[rules.tally.require-secret-mounts]
+severity = "error"
+
+[rules.tally.require-secret-mounts.commands.pip]
+id = "pipconf"
+target = "/root/.config/pip/pip.conf"
+
+[rules.tally.prefer-package-cache-mounts]
+severity = "error"
+`,
+		},
+		// Full composition: two secret mounts (insertion) + two cache mounts
+		// (insertion) + cleanup removal (npm cache clean, --no-cache-dir)
+		// on the same RUN in a single --fix pass.
+		{
+			name: "require-secret-mounts-multi-command",
+			input: "FROM node:20\n" +
+				"RUN npm install && npm cache clean --force && pip install --no-cache-dir pandas\n",
+			args: []string{
+				"--fix",
+				"--fix-unsafe",
+				"--select", "tally/require-secret-mounts",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 2, // secret mount insertion + cache mount insertion (with cleanup)
+			config: `[rules.tally.require-secret-mounts]
+severity = "error"
+
+[rules.tally.require-secret-mounts.commands.npm]
+id = "npmrc"
+target = "/root/.npmrc"
+
+[rules.tally.require-secret-mounts.commands.pip]
+id = "pipconf"
+target = "/root/.config/pip/pip.conf"
+
+[rules.tally.prefer-package-cache-mounts]
+severity = "error"
+`,
+		},
+		// Three rules on the same RUN: secret mount insertion + cache mount
+		// insertion + DL3030 (-y flag insertion) + cache cleanup deletion.
+		// All edits are targeted and non-overlapping.
+		{
+			name: "three-rules-same-line",
+			input: "FROM centos:7\n" +
+				"RUN yum update && yum install curl && yum clean all && curl http://127.0.0.1:8080\n",
+			args: []string{
+				"--fix",
+				"--fix-unsafe",
+				"--ignore", "tally/prefer-run-heredoc",
+				"--select", "tally/require-secret-mounts",
+				"--select", "hadolint/DL3030",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 3, // secret mount + cache mount (with cleanup) + DL3030 -y
+			config: `[rules.tally.require-secret-mounts]
+severity = "warning"
+
+[rules.tally.require-secret-mounts.commands.yum]
+id = "YUM_CONF"
+target = "/etc/yum.conf"
+
+[rules.tally.prefer-package-cache-mounts]
+severity = "warning"
+
+[rules.hadolint.DL3030]
+severity = "warning"
+`,
+		},
 	}
 }
