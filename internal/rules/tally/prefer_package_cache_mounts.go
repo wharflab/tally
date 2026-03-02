@@ -175,19 +175,18 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 		})
 	}
 
-	// Edit 2: replace everything after "RUN " when the script was cleaned or
-	// existing mounts were mutated (e.g., sharing mode changed). Uses merged
-	// mounts (not existing) so updated attributes are written correctly.
 	mutated := mountsMutated(existing, merged)
-	if p.scriptCleaned || mutated {
+
+	if mutated {
+		// Mount flags were modified (sharing/id changed): full tail rewrite needed
+		// to reformat flag text. Use cleaned script when cleanup also occurred.
 		startLine := runLoc[0].Start.Line
 		startCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
 		endLine, endCol := resolveRunEndPosition(runLoc, p.sm, run)
 
-		// Use merged mounts so in-place updates (sharing, id) are reflected.
-		script := p.cleanedScript
-		if !p.scriptCleaned {
-			script = getRunScriptFromCmd(run)
+		script := getRunScriptFromCmd(run)
+		if p.scriptCleaned {
+			script = p.cleanedScript
 		}
 		var tailText string
 		if flags := formatRunFlags(run.FlagsUsed, merged); flags != "" {
@@ -199,10 +198,165 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 			Location: rules.NewRangeLocation(p.file, startLine, startCol, endLine, endCol),
 			NewText:  tailText,
 		})
+	} else if p.scriptCleaned {
+		// No mount mutation — use targeted cleanup deletions so other rules'
+		// edits on the same RUN (e.g., DL3030 -y insertion) don't conflict.
+		cleanupEdits := computeCleanupEdits(p.file, run, runLoc, p.sm, p.cleaners)
+		edits = append(edits, cleanupEdits...)
 	}
 
 	edits = append(edits, envEdits...)
 	return edits, remaining, len(envEdits) > 0
+}
+
+// computeCleanupEdits produces targeted deletion edits for cache cleanup
+// commands within a RUN instruction. Instead of replacing the entire script,
+// each cleanup command (and its separator) is deleted individually, so
+// edits from other rules (e.g., DL3030 -y insertion) don't conflict.
+func computeCleanupEdits(
+	file string,
+	run *instructions.RunCommand,
+	runLoc []parser.Range,
+	sm *sourcemap.SourceMap,
+	cleaners map[cleanupKind]bool,
+) []rules.TextEdit {
+	if len(cleaners) == 0 || len(runLoc) == 0 {
+		return nil
+	}
+
+	// For heredoc RUNs, fall back to full script replacement (different structure).
+	if len(run.Files) > 0 {
+		return nil // Heredoc cleanup handled separately
+	}
+
+	startLine := runLoc[0].Start.Line // 1-based
+	lineIdx := startLine - 1         // 0-based for SourceMap
+
+	// Get the full source text of the RUN instruction.
+	endLine := runLoc[len(runLoc)-1].End.Line
+	var sourceLines []string
+	for i := lineIdx; i < endLine && i < sm.LineCount(); i++ {
+		sourceLines = append(sourceLines, sm.Line(i))
+	}
+	if len(sourceLines) == 0 {
+		return nil
+	}
+
+	// Join source lines (replace continuation `\` with spaces to get the flat script)
+	// and find the script portion (after "RUN " and any flags).
+	sourceFull := strings.Join(sourceLines, "\n")
+	script := getRunScriptFromCmd(run)
+	if script == "" {
+		return nil
+	}
+
+	// Find where the script text starts in the source.
+	scriptIdx := strings.Index(sourceFull, script)
+	if scriptIdx < 0 {
+		// Script was reformatted by parser; can't map positions — skip.
+		return nil
+	}
+
+	// Use ExtractChainedCommands to get individual commands and their positions.
+	variant := shell.VariantBash
+	commands := shell.ExtractChainedCommands(script, variant)
+	if len(commands) == 0 {
+		return nil
+	}
+	separators := shell.ExtractChainSeparators(script, variant, len(commands))
+
+	// Compute byte offset of each command within the script.
+	// commands[0] starts at offset 0, then separator[0], then commands[1], etc.
+	type cmdSpan struct {
+		start int // byte offset in script
+		end   int // byte offset in script (exclusive)
+	}
+	spans := make([]cmdSpan, len(commands))
+	offset := 0
+	for i, cmd := range commands {
+		idx := strings.Index(script[offset:], cmd)
+		if idx < 0 {
+			return nil // Can't find command in script
+		}
+		spans[i].start = offset + idx
+		spans[i].end = spans[i].start + len(cmd)
+		offset = spans[i].end
+	}
+
+	// For each cleanup command, compute the byte range to delete in the source
+	// (including the preceding or following separator).
+	var edits []rules.TextEdit
+	for i, cmd := range commands {
+		isCleanup := isCacheCleanupCommand(cmd, cleaners)
+		_, stripped := stripNoCacheFlags(cmd, variant, cleaners)
+
+		if !isCleanup && !stripped {
+			continue
+		}
+
+		if isCleanup {
+			// Delete the cleanup command and its adjacent separator.
+			var delStart, delEnd int
+			if i > 0 && i-1 < len(separators) {
+				// Delete preceding separator + command
+				sepStart := spans[i-1].end
+				delStart = scriptIdx + sepStart
+				delEnd = scriptIdx + spans[i].end
+			} else if i < len(separators) {
+				// First command: delete command + following separator
+				delStart = scriptIdx + spans[i].start
+				nextCmdStart := spans[i+1].start
+				delEnd = scriptIdx + nextCmdStart
+			} else {
+				continue
+			}
+			edit := sourceRangeEdit(file, sourceFull, startLine, delStart, delEnd, "")
+			if edit != nil {
+				edits = append(edits, *edit)
+			}
+		} else if stripped {
+			// Strip --no-cache flags: find the flag in the source and delete it.
+			cleaned, _ := stripNoCacheFlags(cmd, variant, cleaners)
+			cmdSourceStart := scriptIdx + spans[i].start
+			cmdSourceEnd := scriptIdx + spans[i].end
+			edit := sourceRangeEdit(file, sourceFull, startLine, cmdSourceStart, cmdSourceEnd, cleaned)
+			if edit != nil {
+				edits = append(edits, *edit)
+			}
+		}
+	}
+
+	return edits
+}
+
+// sourceRangeEdit creates a TextEdit from byte offsets within a multi-line source string.
+// startLine is the 1-based line number of the first line in sourceFull.
+func sourceRangeEdit(file, sourceFull string, startLine, byteStart, byteEnd int, newText string) *rules.TextEdit {
+	if byteStart < 0 || byteEnd > len(sourceFull) || byteStart >= byteEnd {
+		return nil
+	}
+
+	// Convert byte offsets to line:col positions.
+	sLine, sCol := byteToLineCol(sourceFull, byteStart)
+	eLine, eCol := byteToLineCol(sourceFull, byteEnd)
+
+	return &rules.TextEdit{
+		Location: rules.NewRangeLocation(file, startLine+sLine, sCol, startLine+eLine, eCol),
+		NewText:  newText,
+	}
+}
+
+// byteToLineCol converts a byte offset in a string to (line, col) where line is 0-based.
+func byteToLineCol(s string, offset int) (int, int) {
+	line := 0
+	lineStart := 0
+	for i := range offset {
+		if s[i] == '\n' {
+			line++
+			lineStart = i + 1
+		}
+	}
+	return line, offset - lineStart
 }
 
 // collectNewMounts returns mounts in merged that are entirely new (no existing

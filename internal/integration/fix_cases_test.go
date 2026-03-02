@@ -1100,5 +1100,35 @@ target = "/root/.config/pip/pip.conf"
 severity = "error"
 `,
 		},
+		// Three rules on the same RUN: secret mount insertion + cache mount
+		// insertion + DL3030 (-y flag insertion) + cache cleanup deletion.
+		// All edits are targeted and non-overlapping.
+		{
+			name: "three-rules-same-line",
+			input: "FROM centos:7\n" +
+				"RUN yum update && yum install curl && yum clean all && curl http://127.0.0.1:8080\n",
+			args: []string{
+				"--fix",
+				"--fix-unsafe",
+				"--ignore", "tally/prefer-run-heredoc",
+				"--select", "tally/require-secret-mounts",
+				"--select", "hadolint/DL3030",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 3, // secret mount + cache mount (with cleanup) + DL3030 -y
+			config: `[rules.tally.require-secret-mounts]
+severity = "warning"
+
+[rules.tally.require-secret-mounts.commands.yum]
+id = "YUM_CONF"
+target = "/etc/yum.conf"
+
+[rules.tally.prefer-package-cache-mounts]
+severity = "warning"
+
+[rules.hadolint.DL3030]
+severity = "warning"
+`,
+		},
 	}
 }
