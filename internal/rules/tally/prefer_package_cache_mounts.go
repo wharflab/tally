@@ -135,7 +135,6 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 //  2. When script cleanup is needed: a replacement from right after "RUN " to end-of-RUN
 //     containing existing flags + cleaned script (new mounts come from the insertion).
 //  3. ENV removal edits (already at separate line ranges).
-//
 type cacheMountEditParams struct {
 	file            string
 	run             *instructions.RunCommand
