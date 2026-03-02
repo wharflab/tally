@@ -21,9 +21,10 @@ const RequireSecretMountsRuleCode = rules.TallyRulePrefix + "require-secret-moun
 // At least one of Target or Env must be set. Both can be set together
 // (Docker supports mounting a secret as both a file and an env var).
 type SecretMountSpec struct {
-	ID     string `json:"id"               koanf:"id"`
-	Target string `json:"target,omitempty" koanf:"target"`
-	Env    string `json:"env,omitempty"    koanf:"env"`
+	ID       string `json:"id"                        koanf:"id"`
+	Target   string `json:"target,omitempty"          koanf:"target"`
+	Env      string `json:"env,omitempty"             koanf:"env"`
+	Required bool   `json:"required,omitempty"        koanf:"required"`
 }
 
 // RequireSecretMountsConfig defines the configuration for the require-secret-mounts rule.
@@ -256,9 +257,10 @@ func buildSecretMountInsertEdit(file string, runLoc []parser.Range, specs []Secr
 	var sb strings.Builder
 	for _, spec := range specs {
 		mount := &instructions.Mount{
-			Type:    instructions.MountTypeSecret,
-			CacheID: spec.ID,
-			Target:  spec.Target,
+			Type:     instructions.MountTypeSecret,
+			CacheID:  spec.ID,
+			Target:   spec.Target,
+			Required: spec.Required,
 		}
 		if spec.Env != "" {
 			mount.Env = &spec.Env

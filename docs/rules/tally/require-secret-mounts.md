@@ -19,7 +19,16 @@ The rule is **disabled by default** and requires explicit user configuration map
 
 ## Configuration
 
-Map each command name to a secret mount specification containing `id` and either `target` (file path) or `env` (environment variable name):
+Map each command name to a secret mount specification:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | **Required.** Secret ID for the `--mount` flag. |
+| `target` | string | File path where the secret is mounted inside the container. |
+| `env` | string | Environment variable name to expose the secret as. |
+| `required` | bool | Fail the build if the secret is not provided (default: `false`). |
+
+At least one of `target` or `env` must be set. Both can be used together — Docker supports mounting a secret as both a file and an environment variable simultaneously.
 
 ```toml
 [rules.tally.require-secret-mounts]
@@ -29,11 +38,19 @@ severity = "warning"
 [rules.tally.require-secret-mounts.commands.pip]
 id = "pipconf"
 target = "/root/.config/pip/pip.conf"
+required = true
 
 # Environment-variable secret (exposed as an env var)
 [rules.tally.require-secret-mounts.commands.gh]
 id = "gh-token"
 env = "GH_TOKEN"
+
+# Both file and env var (Docker supports this)
+[rules.tally.require-secret-mounts.commands.aws]
+id = "aws-creds"
+target = "/root/.aws/credentials"
+env = "AWS_SHARED_CREDENTIALS_FILE"
+required = true
 ```
 
 ## Examples

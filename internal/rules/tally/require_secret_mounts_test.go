@@ -420,6 +420,22 @@ RUN gh auth login
 			},
 			wantFix: "--mount=type=secret,id=gh-token,env=GH_TOKEN",
 		},
+		{
+			name: "required flag emitted in fix",
+			content: `FROM python:3.12-slim
+RUN pip install -r requirements.txt
+`,
+			config: RequireSecretMountsConfig{
+				Commands: map[string]SecretMountSpec{
+					"pip": {
+						ID:       "pipconf",
+						Target:   "/root/.config/pip/pip.conf",
+						Required: true,
+					},
+				},
+			},
+			wantFix: "--mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf,required",
+		},
 	}
 
 	for _, tt := range tests {
