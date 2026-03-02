@@ -96,11 +96,16 @@ func MountsEqual(a, b []*instructions.Mount) bool {
 	return true
 }
 
-// mountKey generates a unique key for a mount based on type and target.
+// mountKey generates a unique key for a mount based on type and identity fields.
 func mountKey(m *instructions.Mount) string {
-	// For secret/ssh mounts, use ID as key; for others use target
+	// For secret/ssh mounts, the same ID can be mounted at different targets
+	// or exposed as different env vars, so include all identity fields.
 	if m.Type == instructions.MountTypeSecret || m.Type == instructions.MountTypeSSH {
-		return string(m.Type) + ":" + m.CacheID
+		env := ""
+		if m.Env != nil {
+			env = *m.Env
+		}
+		return string(m.Type) + ":" + m.CacheID + ":" + m.Target + ":" + env
 	}
 	return string(m.Type) + ":" + m.Target
 }
