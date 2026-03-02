@@ -167,10 +167,21 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 
 	mutated := mountsMutated(existing, merged)
 
+	// Pre-compute cleanup edits for the non-mutated path.
+	var cleanupEdits []rules.TextEdit
+	if !mutated && p.scriptCleaned {
+		cleanupEdits = computeCleanupEdits(p.file, run, runLoc, p.sm, p.shellVariant, p.cleaners)
+	}
+
+	// Will a tail rewrite be emitted? If so, the mount insertion must be skipped
+	// (the tail rewrite includes mounts via formatRunFlags). Tail rewrites happen
+	// when mounts are mutated OR when cleanup falls back to a full rewrite
+	// (e.g., heredoc RUNs where targeted cleanup edits are not available).
+	needsTailRewrite := mutated || (p.scriptCleaned && len(cleanupEdits) == 0)
+
 	// Edit 1: zero-length insertion for new mount flags right after "RUN ".
-	// Skipped when mounts are mutated — the tail rewrite (below) includes
-	// all mounts via formatRunFlags(merged) so a separate insertion would duplicate.
-	if !mutated && len(newMounts) > 0 {
+	// Skipped when a tail rewrite will handle mounts to avoid overlapping edits.
+	if !needsTailRewrite && len(newMounts) > 0 {
 		insertLine := runLoc[0].Start.Line
 		insertCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
 
@@ -181,53 +192,48 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 		})
 	}
 
-	if mutated {
-		// Mount flags were modified (sharing/id changed): full tail rewrite needed
-		// to reformat flag text. Use cleaned script when cleanup also occurred.
-		startLine := runLoc[0].Start.Line
-		startCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
-		endLine, endCol := resolveRunEndPosition(runLoc, p.sm, run)
+	// Edit 2+: cleanup and/or mount rewrite.
+	switch {
+	case mutated:
+		// Mount flags modified: full tail rewrite with merged mounts + cleaned script.
+		edits = append(edits, buildTailRewrite(p, merged)...)
 
-		script := getRunScriptFromCmd(run)
-		if p.scriptCleaned {
-			script = p.cleanedScript
-		}
-		var tailText string
-		if flags := formatRunFlags(run.FlagsUsed, merged); flags != "" {
-			tailText = flags + " " + script
-		} else {
-			tailText = script
-		}
-		edits = append(edits, rules.TextEdit{
-			Location: rules.NewRangeLocation(p.file, startLine, startCol, endLine, endCol),
-			NewText:  tailText,
-		})
-	} else if p.scriptCleaned {
-		// No mount mutation — use targeted cleanup deletions so other rules'
-		// edits on the same RUN (e.g., DL3030 -y insertion) don't conflict.
-		cleanupEdits := computeCleanupEdits(p.file, run, runLoc, p.sm, p.shellVariant, p.cleaners)
-		if len(cleanupEdits) > 0 {
-			edits = append(edits, cleanupEdits...)
-		} else {
-			// Fallback (e.g., heredoc RUNs): targeted cleanup not supported,
-			// rewrite the tail with the cleaned script.
-			startLine := runLoc[0].Start.Line
-			startCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
-			endLine, endCol := resolveRunEndPosition(runLoc, p.sm, run)
+	case len(cleanupEdits) > 0:
+		// Targeted cleanup deletions (non-heredoc): compose with other rules' edits.
+		edits = append(edits, cleanupEdits...)
 
-			tailText := p.cleanedScript
-			if flags := formatRunFlags(run.FlagsUsed, existing); flags != "" {
-				tailText = flags + " " + p.cleanedScript
-			}
-			edits = append(edits, rules.TextEdit{
-				Location: rules.NewRangeLocation(p.file, startLine, startCol, endLine, endCol),
-				NewText:  tailText,
-			})
-		}
+	case p.scriptCleaned:
+		// Fallback (e.g., heredoc): targeted cleanup unavailable, tail rewrite
+		// with merged mounts (includes new) + cleaned script.
+		edits = append(edits, buildTailRewrite(p, merged)...)
 	}
 
 	edits = append(edits, envEdits...)
 	return edits, remaining, len(envEdits) > 0
+}
+
+// buildTailRewrite produces a single edit replacing everything after "RUN "
+// with formatted mounts + script. Used when targeted edits aren't possible
+// (mount mutation, heredoc cleanup fallback).
+func buildTailRewrite(p cacheMountEditParams, mounts []*instructions.Mount) []rules.TextEdit {
+	startLine := p.runLoc[0].Start.Line
+	startCol := p.runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
+	endLine, endCol := resolveRunEndPosition(p.runLoc, p.sm, p.run)
+
+	script := getRunScriptFromCmd(p.run)
+	if p.scriptCleaned {
+		script = p.cleanedScript
+	}
+	var tailText string
+	if flags := formatRunFlags(p.run.FlagsUsed, mounts); flags != "" {
+		tailText = flags + " " + script
+	} else {
+		tailText = script
+	}
+	return []rules.TextEdit{{
+		Location: rules.NewRangeLocation(p.file, startLine, startCol, endLine, endCol),
+		NewText:  tailText,
+	}}
 }
 
 // computeCleanupEdits produces targeted deletion edits for cache cleanup
