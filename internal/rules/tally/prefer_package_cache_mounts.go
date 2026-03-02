@@ -163,8 +163,12 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 
 	var edits []rules.TextEdit
 
+	mutated := mountsMutated(existing, merged)
+
 	// Edit 1: zero-length insertion for new mount flags right after "RUN ".
-	if len(newMounts) > 0 {
+	// Skipped when mounts are mutated — the tail rewrite (below) includes
+	// all mounts via formatRunFlags(merged) so a separate insertion would duplicate.
+	if !mutated && len(newMounts) > 0 {
 		insertLine := runLoc[0].Start.Line
 		insertCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
 
@@ -174,8 +178,6 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 			NewText:  mountText,
 		})
 	}
-
-	mutated := mountsMutated(existing, merged)
 
 	if mutated {
 		// Mount flags were modified (sharing/id changed): full tail rewrite needed
