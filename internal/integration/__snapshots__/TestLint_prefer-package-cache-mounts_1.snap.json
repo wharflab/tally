@@ -50,7 +50,7 @@
                     "line": 3
                   }
                 },
-                "newText": "npm install"
+                "newText": "--mount=type=cache,target=/root/.npm,id=npm npm install"
               }
             ],
             "priority": 90,
@@ -130,7 +130,7 @@
                     "line": 5
                   }
                 },
-                "newText": "--mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked "
+                "newText": "--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked "
               },
               {
                 "location": {
@@ -144,7 +144,7 @@
                     "line": 5
                   }
                 },
-                "newText": "--mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf --mount=type=cache,target=/var/cache/apt apt-get update \u0026\u0026 apt-get install -y gcc"
+                "newText": "--mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update \u0026\u0026 apt-get install -y gcc"
               }
             ],
             "priority": 90,
@@ -198,7 +198,7 @@
                     "line": 8
                   }
                 },
-                "newText": "apk add curl"
+                "newText": "--mount=type=cache,target=/var/cache/apk,id=apk,sharing=locked apk add curl"
               }
             ],
             "priority": 90,
@@ -252,7 +252,7 @@
                     "line": 9
                   }
                 },
-                "newText": "dnf install -y git"
+                "newText": "--mount=type=cache,target=/var/cache/dnf,id=dnf,sharing=locked dnf install -y git"
               }
             ],
             "priority": 90,
@@ -306,7 +306,7 @@
                     "line": 10
                   }
                 },
-                "newText": "yum install -y make"
+                "newText": "--mount=type=cache,target=/var/cache/yum,id=yum,sharing=locked yum install -y make"
               }
             ],
             "priority": 90,
@@ -360,7 +360,7 @@
                     "line": 11
                   }
                 },
-                "newText": "zypper install -y git"
+                "newText": "--mount=type=cache,target=/var/cache/zypp,id=zypper,sharing=locked zypper install -y git"
               }
             ],
             "priority": 90,
@@ -414,7 +414,7 @@
                     "line": 12
                   }
                 },
-                "newText": "yarn install"
+                "newText": "--mount=type=cache,target=/usr/local/share/.cache/yarn,id=yarn yarn install"
               }
             ],
             "priority": 90,
@@ -468,7 +468,7 @@
                     "line": 13
                   }
                 },
-                "newText": "pnpm install --frozen-lockfile"
+                "newText": "--mount=type=cache,target=/root/.pnpm-store,id=pnpm pnpm install --frozen-lockfile"
               }
             ],
             "priority": 90,
@@ -522,7 +522,7 @@
                     "line": 14
                   }
                 },
-                "newText": "pip install -r requirements.txt"
+                "newText": "--mount=type=cache,target=/root/.cache/pip,id=pip pip install -r requirements.txt"
               }
             ],
             "priority": 90,
@@ -576,7 +576,7 @@
                     "line": 15
                   }
                 },
-                "newText": "bundle install"
+                "newText": "--mount=type=cache,target=/root/.gem,id=gem bundle install"
               }
             ],
             "priority": 90,
@@ -670,7 +670,7 @@
                     "line": 18
                   }
                 },
-                "newText": "dotnet restore"
+                "newText": "--mount=type=cache,target=/root/.nuget/packages,id=nuget dotnet restore"
               }
             ],
             "priority": 90,
@@ -724,7 +724,7 @@
                     "line": 19
                   }
                 },
-                "newText": "composer install --no-dev"
+                "newText": "--mount=type=cache,target=/root/.cache/composer,id=composer composer install --no-dev"
               }
             ],
             "priority": 90,
@@ -778,7 +778,7 @@
                     "line": 20
                   }
                 },
-                "newText": "uv sync --frozen"
+                "newText": "--mount=type=cache,target=/root/.cache/uv,id=uv uv sync --frozen"
               }
             ],
             "priority": 90,
@@ -872,7 +872,7 @@
                     "line": 22
                   }
                 },
-                "newText": "bun install"
+                "newText": "--mount=type=cache,target=/root/.bun/install/cache,id=bun bun install"
               }
             ],
             "priority": 90,
@@ -926,7 +926,7 @@
                     "line": 23
                   }
                 },
-                "newText": "npm install\n"
+                "newText": "--mount=type=cache,target=/root/.npm,id=npm npm install\n"
               }
             ],
             "priority": 90,

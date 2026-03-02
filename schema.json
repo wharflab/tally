@@ -586,13 +586,22 @@
               "id": "gh-token"
             }
           }
+        },
+        {
+          "commands": {
+            "aws": {
+              "env": "AWS_SHARED_CREDENTIALS_FILE",
+              "id": "aws-creds",
+              "target": "/root/.aws/credentials"
+            }
+          }
         }
       ],
       "properties": {
         "commands": {
           "additionalProperties": {
             "additionalProperties": false,
-            "oneOf": [
+            "anyOf": [
               {
                 "required": [
                   "target"
@@ -606,7 +615,7 @@
             ],
             "properties": {
               "env": {
-                "description": "Environment variable name to expose the secret as (mutually exclusive with target).",
+                "description": "Environment variable name to expose the secret as.",
                 "minLength": 1,
                 "type": "string"
               },
@@ -616,7 +625,7 @@
                 "type": "string"
               },
               "target": {
-                "description": "Target path where the secret file is mounted (mutually exclusive with env).",
+                "description": "Target path where the secret file is mounted.",
                 "minLength": 1,
                 "type": "string"
               }
@@ -626,7 +635,7 @@
             ],
             "type": "object"
           },
-          "description": "Map of command names to required secret mount specifications. Each entry specifies either a file target or an environment variable.",
+          "description": "Map of command names to required secret mount specifications. Each entry specifies a file target, an environment variable, or both.",
           "type": "object"
         },
         "exclude": {

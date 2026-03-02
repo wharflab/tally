@@ -18,7 +18,8 @@ import (
 const RequireSecretMountsRuleCode = rules.TallyRulePrefix + "require-secret-mounts"
 
 // SecretMountSpec defines the required secret mount for a command.
-// Either Target (file mount) or Env (environment variable) should be set, not both.
+// At least one of Target or Env must be set. Both can be set together
+// (Docker supports mounting a secret as both a file and an env var).
 type SecretMountSpec struct {
 	ID     string `json:"id"               koanf:"id"`
 	Target string `json:"target,omitempty" koanf:"target"`
@@ -213,20 +214,20 @@ func (r *RequireSecretMountsRule) checkMounts(
 
 // checkSecretMount checks whether existing mounts satisfy a required secret spec.
 // Returns an empty string if satisfied, or a violation message.
-// For file mounts: requires matching id + target.
-// For env mounts: requires matching id + env name.
+// All non-empty fields in the spec (id, target, env) must match.
+// Docker supports target and env together on the same mount.
 func checkSecretMount(existing []*instructions.Mount, spec SecretMountSpec, cmdName string) string {
 	for _, m := range existing {
 		if m.Type != instructions.MountTypeSecret || m.CacheID != spec.ID {
 			continue
 		}
-		if spec.Env != "" {
-			if m.Env != nil && *m.Env == spec.Env {
-				return ""
-			}
-		} else if m.Target == spec.Target {
-			return ""
+		if spec.Target != "" && m.Target != spec.Target {
+			continue
 		}
+		if spec.Env != "" && (m.Env == nil || *m.Env != spec.Env) {
+			continue
+		}
+		return "" // All specified fields match
 	}
 	return fmt.Sprintf(
 		"missing required secret mount for '%s' (%s)",
@@ -236,10 +237,14 @@ func checkSecretMount(existing []*instructions.Mount, spec SecretMountSpec, cmdN
 
 // formatSpecDesc returns a human-readable description of a secret mount spec.
 func formatSpecDesc(spec SecretMountSpec) string {
-	if spec.Env != "" {
-		return fmt.Sprintf("id=%s, env=%s", spec.ID, spec.Env)
+	parts := []string{"id=" + spec.ID}
+	if spec.Target != "" {
+		parts = append(parts, "target="+spec.Target)
 	}
-	return fmt.Sprintf("id=%s, target=%s", spec.ID, spec.Target)
+	if spec.Env != "" {
+		parts = append(parts, "env="+spec.Env)
+	}
+	return strings.Join(parts, ", ")
 }
 
 // buildSecretMountInsertEdit creates a zero-length insertion right after "RUN "

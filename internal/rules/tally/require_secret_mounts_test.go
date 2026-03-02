@@ -103,19 +103,19 @@ func TestRequireSecretMountsValidateConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid config - both target and env", func(t *testing.T) {
+	t.Run("valid config - both target and env", func(t *testing.T) {
 		t.Parallel()
 		cfg := map[string]any{
 			"commands": map[string]any{
-				"pip": map[string]any{
-					"id":     "pipconf",
-					"target": "/root/.config/pip/pip.conf",
-					"env":    "PIP_CONFIG",
+				"aws": map[string]any{
+					"id":     "aws-creds",
+					"target": "/root/.aws/credentials",
+					"env":    "AWS_SHARED_CREDENTIALS_FILE",
 				},
 			},
 		}
-		if err := rule.ValidateConfig(cfg); err == nil {
-			t.Fatal("expected error when both target and env are set")
+		if err := rule.ValidateConfig(cfg); err != nil {
+			t.Fatalf("expected no error for both target+env, got: %v", err)
 		}
 	})
 }
@@ -323,6 +323,59 @@ RUN aws s3 cp s3://bucket/file .
 			Config: RequireSecretMountsConfig{
 				Commands: map[string]SecretMountSpec{
 					"aws": {ID: "aws-creds", Target: "/root/.aws/credentials"},
+				},
+			},
+			WantViolations: 1,
+		},
+		{
+			Name: "both target and env - missing",
+			Content: `FROM amazon/aws-cli:latest
+RUN aws s3 cp s3://bucket/file .
+`,
+			Config: RequireSecretMountsConfig{
+				Commands: map[string]SecretMountSpec{
+					"aws": {
+						ID:     "aws-creds",
+						Target: "/root/.aws/credentials",
+						Env:    "AWS_SHARED_CREDENTIALS_FILE",
+					},
+				},
+			},
+			WantViolations: 1,
+			WantMessages: []string{
+				"id=aws-creds, target=/root/.aws/credentials, env=AWS_SHARED_CREDENTIALS_FILE",
+			},
+		},
+		{
+			Name: "both target and env - present",
+			Content: "FROM amazon/aws-cli:latest\n" +
+				"RUN --mount=type=secret,id=aws-creds," +
+				"target=/root/.aws/credentials," +
+				"env=AWS_SHARED_CREDENTIALS_FILE " +
+				"aws s3 cp s3://bucket/file .\n",
+			Config: RequireSecretMountsConfig{
+				Commands: map[string]SecretMountSpec{
+					"aws": {
+						ID:     "aws-creds",
+						Target: "/root/.aws/credentials",
+						Env:    "AWS_SHARED_CREDENTIALS_FILE",
+					},
+				},
+			},
+			WantViolations: 0,
+		},
+		{
+			Name: "both target and env - only target present",
+			Content: `FROM amazon/aws-cli:latest
+RUN --mount=type=secret,id=aws-creds,target=/root/.aws/credentials aws s3 cp s3://bucket/file .
+`,
+			Config: RequireSecretMountsConfig{
+				Commands: map[string]SecretMountSpec{
+					"aws": {
+						ID:     "aws-creds",
+						Target: "/root/.aws/credentials",
+						Env:    "AWS_SHARED_CREDENTIALS_FILE",
+					},
 				},
 			},
 			WantViolations: 1,
