@@ -121,20 +121,6 @@
               {
                 "location": {
                   "end": {
-                    "column": 4,
-                    "line": 5
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 4,
-                    "line": 5
-                  }
-                },
-                "newText": "--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked "
-              },
-              {
-                "location": {
-                  "end": {
                     "column": 61,
                     "line": 7
                   },
