@@ -236,7 +236,7 @@ jobs:
         run: bun install --frozen-lockfile
         working-directory: _integrations/vscode-tally
       - name: Compile extension
-        run: bun run compile
+        run: bun run prevsce:package
         working-directory: _integrations/vscode-tally
       - name: Package platform-specific VSIX
         run: bunx @vscode/vsce package --no-dependencies --target ${{ matrix.vscode_target }} -o tally-${{ matrix.vscode_target }}.vsix

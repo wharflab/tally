@@ -3,20 +3,20 @@
   "displayName": "Tally",
   "version": "0.0.0",
   "description": "BuildKit-native Dockerfile/Containerfile linter + formatter with auto-fix (powered by tally)",
-  "keywords": [
-    "Dockerfile",
-    "Containerfile",
-    "Docker",
-    "BuildKit",
-    "Podman",
-    "linter",
-    "formatter",
-    "autofix",
-    "security"
-  ],
   "categories": [
     "Formatters",
     "Linters"
+  ],
+  "keywords": [
+    "BuildKit",
+    "Containerfile",
+    "Docker",
+    "Dockerfile",
+    "Podman",
+    "autofix",
+    "formatter",
+    "linter",
+    "security"
   ],
   "license": "GPL-3.0-only",
   "repository": {
@@ -33,6 +33,7 @@
     "format": "oxfmt --write src test",
     "format:check": "oxfmt --check src test",
     "test:e2e": "bun test test/e2e/*.test.ts",
+    "prevsce:package": "cp ../../LICENSE . && bun run compile",
     "vsce:package": "bunx @vscode/vsce package --no-dependencies"
   },
   "dependencies": {
@@ -137,15 +138,10 @@
     }
   },
   "activationEvents": [
-    "onCommand:tally.applyAllFixes",
-    "onCommand:tally.configureDefaultFormatterForDockerfile",
-    "onCommand:tally.restartServer",
-    "onCommand:tally.showOutput",
-    "onCommand:tally.showLspTrace",
     "onLanguage:dockerfile",
-    "workspaceContains:Dockerfile*",
-    "workspaceContains:Containerfile*",
     "workspaceContains:.tally.toml",
+    "workspaceContains:Containerfile*",
+    "workspaceContains:Dockerfile*",
     "workspaceContains:tally.toml"
   ],
   "icon": "assets/logo.png",
