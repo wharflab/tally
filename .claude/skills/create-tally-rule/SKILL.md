@@ -2,7 +2,6 @@
 name: create-tally-rule
 description: Implement a new custom `tally/*` Dockerfile lint rule end-to-end (rule code, detection logic, tests, realistic fixtures, snapshots, and docs). Use when a user describes desired behavior for a new tally-specific rule.
 argument-hint: plain-language description of what the rule should detect/enforce
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash(go *), Bash(make *), Bash(git status), mcp__github__search_code, mcp__github__get_file_contents
 ---
 
 # Create a New `tally/*` Rule
@@ -239,8 +238,7 @@ Two edits on the same line overlap iff neither is completely before the other:
 Always add a `TestFix*` scenario that enables **all interacting rules simultaneously** and snapshots the
 result. This catches regressions in edit width, priority ordering, and conflict resolution. See
 `TestFixCrossRuleMultiSpacesIndentationChain` for a 3-rule example (`no-multi-spaces` + `consistent-indentation`
-
-- `newline-per-chained-call`).
+and `newline-per-chained-call`).
 
 ## Step 5: Add Unit Tests
 
