@@ -43,13 +43,13 @@ RUN apt-get update \
 	&& apt-get install -y libopenmpi-dev \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& apt-get clean
-RUN pip install --no-cache-dir -U  "cython<3.0.0" wheel \
+RUN pip install --no-cache-dir -U "cython<3.0.0" wheel \
     && pip install pyyaml==5.4.1 --no-build-isolation \
-    && pip install --no-cache-dir -U  "awscli>1.27,<2"     boto3     "click==8.1.2,<9"     "cmake>=3.24.3,<3.25"     "cryptography>41"     ipython     "mpi4py>=3.1.4,<3.2"     "opencv-python>=4.6.0,<4.7"     packaging     Pillow     "psutil>=5.9.4,<5.10"     "pyyaml>=5.4,<5.5"
+    && pip install --no-cache-dir -U "awscli>1.27,<2" boto3 "click==8.1.2,<9" "cmake>=3.24.3,<3.25" "cryptography>41" ipython "mpi4py>=3.1.4,<3.2" "opencv-python>=4.6.0,<4.7" packaging Pillow "psutil>=5.9.4,<5.10" "pyyaml>=5.4,<5.5"
 
 ARG TRITON_VERSION
 
-RUN pip install --no-cache-dir -U     smclarify   "sagemaker>=2,<3"     sagemaker-experiments==0.*     sagemaker-pytorch-training     triton==${TRITON_VERSION}
+RUN pip install --no-cache-dir -U smclarify "sagemaker>=2,<3" sagemaker-experiments==0.* sagemaker-pytorch-training triton==${TRITON_VERSION}
 RUN pip install --no-cache-dir -U "bokeh>=3.0.1,<4" "imageio>=2.22,<3" "opencv-python>=4.6,<5" "plotly>=5.11,<6" "seaborn>=0.12,<1" "numba>=0.56.4,<0.57" "shap>=0.41,<1"
 RUN apt-get update \
 	&& apt-get install -y build-essential \
@@ -142,7 +142,7 @@ WORKDIR /app
 ENV NVARCH=x86_64
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends     gnupg2 curl ca-certificates \
+	&& apt-get install -y --no-install-recommends gnupg2 curl ca-certificates \
 	&& curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH}/3bf863cc.pub | apt-key add - \
 	&& echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH} /" > /etc/apt/sources.list.d/cuda.list \
 	&& apt-get purge --autoremove -y curl \
@@ -152,7 +152,7 @@ ENV NV_CUDA_COMPAT_PACKAGE=cuda-compat-11-7
 ENV NV_CUDA_CUDART_VERSION=11.7.99-1
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends     cuda-cudart-11-7=${NV_CUDA_CUDART_VERSION}     ${NV_CUDA_COMPAT_PACKAGE} \
+	&& apt-get install -y --no-install-recommends cuda-cudart-11-7=${NV_CUDA_CUDART_VERSION} ${NV_CUDA_COMPAT_PACKAGE} \
 	&& rm -rf /var/lib/apt/lists/*
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf \
 	&& echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
@@ -171,7 +171,7 @@ ARG CUBLAS_VERSION=11.10.3.66
 
 RUN apt-get update \
 	&& apt-get -y upgrade --only-upgrade systemd \
-	&& apt-get install -y --allow-change-held-packages --no-install-recommends     build-essential     ca-certificates     cmake     cuda-command-line-tools-11-7     cuda-cudart-11-7     cuda-libraries-11-7     curl     emacs     git     hwloc     jq     libcublas-11-7=${CUBLAS_VERSION}-1     libcublas-dev-11-7=${CUBLAS_VERSION}-1     libcudnn8=$CUDNN_VERSION-1+cuda11.7     libcufft-dev-11-7     libcurand-dev-11-7     libcurl4-openssl-dev     libcusolver-dev-11-7     libcusparse-dev-11-7     libglib2.0-0     libgl1-mesa-glx     libsm6     libxext6     libxrender-dev     libgomp1     libibverbs-dev     libhwloc-dev     libnuma1     libnuma-dev     libssl3     libssl-dev     libtool     openssl     python3-dev     unzip     vim     wget     zlib1g-dev     pkg-config     check     libsubunit0     libsubunit-dev \
+	&& apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7 libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libglib2.0-0 libgl1-mesa-glx libsm6 libxext6 libxrender-dev libgomp1 libibverbs-dev libhwloc-dev libnuma1 libnuma-dev libssl3 libssl-dev libtool openssl python3-dev unzip vim wget zlib1g-dev pkg-config check libsubunit0 libsubunit-dev \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& apt-get clean
 RUN cd /tmp \
@@ -216,7 +216,7 @@ RUN cd /tmp \
 ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
 RUN apt-get update -q \
-	&& apt-get install -q -y --no-install-recommends         bzip2         ca-certificates         git         libglib2.0-0         libsm6         libxext6         libxrender1         mercurial         openssh-client         procps         subversion         wget \
+	&& apt-get install -q -y --no-install-recommends bzip2 ca-certificates git libglib2.0-0 libsm6 libxext6 libxrender1 mercurial openssh-client procps subversion wget \
 	&& apt-get clean \
 	&& rm -rf /var/lib/apt/lists/*
 
@@ -253,7 +253,7 @@ RUN ln -s /opt/conda/envs/default/bin/pip /usr/local/bin/pip \
 	&& /opt/conda/bin/conda config --set ssl_verify False \
 	&& pip install --no-cache-dir --upgrade pip --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org
 RUN pip install --no-cache-dir pyOpenSSL --upgrade
-RUN /opt/conda/bin/conda install -y -c conda-forge    cython     mkl     mkl-include     parso     typing     h5py     requests     pyopenssl     libgcc     conda-content-trust     charset-normalizer     accelerate \
+RUN /opt/conda/bin/conda install -y -c conda-forge cython mkl mkl-include parso typing h5py requests pyopenssl libgcc conda-content-trust charset-normalizer accelerate \
 	&& /opt/conda/bin/conda install -c dglteam -y dgl-cuda11.7=0.9.1 \
 	&& /opt/conda/bin/conda install -c pytorch -y magma-cuda117 \
     && /opt/conda/bin/conda install -c fastai fastai \
@@ -322,14 +322,14 @@ RUN mkdir /tmp/efa-ofi-nccl \
 	&& git clone https://github.com/aws/aws-ofi-nccl.git -b v${BRANCH_OFI} \
 	&& cd aws-ofi-nccl \
 	&& ./autogen.sh \
-	&& ./configure --with-libfabric=/opt/amazon/efa   --with-mpi=/opt/amazon/openmpi   --with-cuda=/usr/local/cuda   --with-nccl=/usr/local --prefix=/usr/local \
+	&& ./configure --with-libfabric=/opt/amazon/efa --with-mpi=/opt/amazon/openmpi --with-cuda=/usr/local/cuda --with-nccl=/usr/local --prefix=/usr/local \
 	&& make \
 	&& make install \
 	&& rm -rf /tmp/efa-ofi-nccl \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& apt-get clean
 RUN apt-get update \
-	&& apt-get install -y  --allow-downgrades --allow-change-held-packages --no-install-recommends \
+	&& apt-get install -y --allow-downgrades --allow-change-held-packages --no-install-recommends \
 	&& apt-get install -y --no-install-recommends openssh-client openssh-server \
 	&& mkdir -p /var/run/sshd \
 	&& cat /etc/ssh/ssh_config | grep -v StrictHostKeyChecking > /etc/ssh/ssh_config.new \
@@ -353,7 +353,7 @@ RUN pip uninstall -y horovod \
 	&& ldconfig
 RUN mkdir -p /etc/pki/tls/certs \
 	&& cp /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt
-RUN conda install -y -c conda-forge     scikit-learn     pandas
+RUN conda install -y -c conda-forge scikit-learn pandas
 
 WORKDIR /
 
@@ -412,7 +412,7 @@ RUN wget -nv https://github.com/rapidsai/rmm/archive/v${RMM_VERSION}.tar.gz \
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/conda/lib/python3.9/site-packages/smdistributed/dataparallel/lib"
 
 RUN apt-get update \
-	&& apt-get install -y --allow-change-held-packages --no-install-recommends     libunwind-dev \
+	&& apt-get install -y --allow-change-held-packages --no-install-recommends libunwind-dev \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& apt-get clean
 

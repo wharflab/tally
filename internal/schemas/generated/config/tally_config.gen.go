@@ -51,6 +51,9 @@ type IndexSchemaJson_3 struct {
 	// "newline-per-chained-call".
 	NewlinePerChainedCall *tally.NewlinePerChainedCallSchemaJson `json:"newline-per-chained-call,omitempty"`
 
+	// NoMultiSpaces corresponds to the JSON schema field "no-multi-spaces".
+	NoMultiSpaces *tally.NoMultiSpacesSchemaJson `json:"no-multi-spaces,omitempty"`
+
 	// NoTrailingSpaces corresponds to the JSON schema field "no-trailing-spaces".
 	NoTrailingSpaces *tally.NoTrailingSpacesSchemaJson `json:"no-trailing-spaces,omitempty"`
 

@@ -809,6 +809,33 @@ skip-blank-lines = true
 `,
 		},
 
+		// No multi spaces: replace runs of multiple spaces with single space
+		{
+			name:  "no-multi-spaces",
+			input: "FROM  alpine:3.20\nRUN  echo  hello\nCOPY  . /app\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/no-multi-spaces")...),
+			wantApplied: 3,
+		},
+		{
+			name:  "no-multi-spaces-heredoc-skipped",
+			input: "FROM alpine:3.20\nRUN <<EOF\necho   hello\nEOF\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/no-multi-spaces")...),
+			wantApplied: 0,
+		},
+		// No multi spaces: backslash continuations preserved, only extra spaces removed
+		{
+			name: "no-multi-spaces-continuation-lines",
+			input: "FROM alpine:3.20\n" +
+				"RUN apt-get  update \\\n" +
+				"    &&  apt-get install -y  curl \\\n" +
+				"    && rm -rf  /var/lib/apt/lists/*\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/no-multi-spaces")...),
+			wantApplied: 3, // one violation per line (L2, L3, L4)
+		},
+
 		// Epilogue order: reorder CMD and ENTRYPOINT
 		{
 			name: "epilogue-order-basic",
