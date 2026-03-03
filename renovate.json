@@ -18,7 +18,7 @@
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^Makefile$/", "/^\\.github/workflows/ci\\.yaml$/"],
+      "managerFilePatterns": ["/^Makefile$/", "/^\\.github/workflows/ci\\.yml$/"],
       "matchStrings": [
         "PMD_VERSION\\s*[:=]\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)",
         "pmd-bin-(?<currentValue>\\d+\\.\\d+\\.\\d+)"
@@ -37,7 +37,7 @@
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^\\.lefthook\\.yml$/", "/^\\.github/workflows/ci\\.yaml$/"],
+      "managerFilePatterns": ["/^\\.lefthook\\.yml$/", "/^\\.github/workflows/ci\\.yml$/"],
       "matchStrings": ["uv tool run (?<depName>[a-z0-9_-]+)==(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
       "datasourceTemplate": "pypi",
       "versioningTemplate": "pep440"
