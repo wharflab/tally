@@ -85,63 +85,10 @@ func (r *NoMultiSpacesRule) Check(input rules.LintInput) []rules.Violation {
 			continue
 		}
 
-		// Determine end of leading indentation.
 		indentEnd := len(line) - len(trimmed)
 		lineNum := i + 1 // SourceMap is 0-based, locations are 1-based
 
-		// Scan for runs of 2+ consecutive spaces after indentation,
-		// skipping content inside single or double quotes.
-		var edits []rules.TextEdit
-		var firstLoc rules.Location
-		totalExtra := 0
-
-		pos := indentEnd
-		var inQuote byte // 0 = not in quote, '\'' or '"' = inside that quote
-		for pos < len(line) {
-			ch := line[pos]
-
-			// Track quote state (simple shell-level quoting).
-			if inQuote != 0 {
-				if ch == inQuote && (pos == 0 || line[pos-1] != '\\') {
-					inQuote = 0
-				}
-				pos++
-				continue
-			}
-			if ch == '\'' || ch == '"' {
-				inQuote = ch
-				pos++
-				continue
-			}
-
-			if ch != ' ' {
-				pos++
-				continue
-			}
-
-			runStart := pos
-			for pos < len(line) && line[pos] == ' ' {
-				pos++
-			}
-
-			runLen := pos - runStart
-			if runLen < 2 {
-				continue
-			}
-
-			// Keep the first space; delete the extras (runStart+1 .. pos).
-			violLoc := rules.NewRangeLocation(input.File, lineNum, runStart, lineNum, pos)
-			editLoc := rules.NewRangeLocation(input.File, lineNum, runStart+1, lineNum, pos)
-			if len(edits) == 0 {
-				firstLoc = violLoc
-			}
-			edits = append(edits, rules.TextEdit{
-				Location: editLoc,
-				NewText:  "",
-			})
-			totalExtra += runLen - 1
-		}
-
+		edits, firstLoc, totalExtra := scanExtraSpaceRuns(input.File, lineNum, line, indentEnd)
 		if len(edits) == 0 {
 			continue
 		}
@@ -160,6 +107,65 @@ func (r *NoMultiSpacesRule) Check(input rules.LintInput) []rules.Violation {
 	}
 
 	return violations
+}
+
+// scanExtraSpaceRuns scans a line for runs of 2+ consecutive spaces after
+// indentEnd, skipping content inside single or double quotes. For each run it
+// returns a delete-only TextEdit covering the surplus characters (keeping one
+// space). firstLoc is the violation location of the first run; totalExtra is
+// the total number of excess space characters across all runs.
+func scanExtraSpaceRuns(file string, lineNum int, line string, indentEnd int) (
+	edits []rules.TextEdit, firstLoc rules.Location, totalExtra int,
+) {
+	pos := indentEnd
+	var inQuote byte // 0 = not in quote, '\'' or '"' = inside that quote
+
+	for pos < len(line) {
+		ch := line[pos]
+
+		// Track quote state (simple shell-level quoting).
+		if inQuote != 0 {
+			if ch == inQuote && (pos == 0 || line[pos-1] != '\\') {
+				inQuote = 0
+			}
+			pos++
+			continue
+		}
+		if ch == '\'' || ch == '"' {
+			inQuote = ch
+			pos++
+			continue
+		}
+
+		if ch != ' ' {
+			pos++
+			continue
+		}
+
+		runStart := pos
+		for pos < len(line) && line[pos] == ' ' {
+			pos++
+		}
+
+		runLen := pos - runStart
+		if runLen < 2 {
+			continue
+		}
+
+		// Keep the first space; delete the extras (runStart+1 .. pos).
+		violLoc := rules.NewRangeLocation(file, lineNum, runStart, lineNum, pos)
+		editLoc := rules.NewRangeLocation(file, lineNum, runStart+1, lineNum, pos)
+		if len(edits) == 0 {
+			firstLoc = violLoc
+		}
+		edits = append(edits, rules.TextEdit{
+			Location: editLoc,
+			NewText:  "",
+		})
+		totalExtra += runLen - 1
+	}
+
+	return edits, firstLoc, totalExtra
 }
 
 // buildHeredocBodyLines returns a set of 0-based line indices that are inside
