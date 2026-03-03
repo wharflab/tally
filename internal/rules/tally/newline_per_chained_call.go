@@ -457,7 +457,7 @@ func (r *NewlinePerChainedCallRule) generateChainEdits(
 		// the command we skip the deletion.
 		if leftDocCol < opDocCol {
 			edits = append(edits, rules.TextEdit{
-				Location: rules.NewRangeLocation(file, leftDocLine, leftDocCol, opDocLine, leftDocCol+1),
+				Location: rules.NewRangeLocation(file, leftDocLine, leftDocCol, leftDocLine, leftDocCol+1),
 				NewText:  "",
 			})
 		}
