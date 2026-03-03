@@ -14,11 +14,35 @@ Windows container Dockerfiles differ from Linux ones in fundamental ways:
 - **Path separators** are `\` (also the default escape character — hence the backtick convention)
 - **No POSIX toolchain** — no `apt-get`, `sh`, `bash`, `tar`, `curl` in base images
 - **Layer sizes** are much larger (ServerCore base is ~5 GB vs ~80 MB for Alpine)
-- **BuildKit features** like `--mount=type=cache`, heredocs, and `COPY --chown` are unsupported
+- **BuildKit features** like `COPY --chown` are unsupported; `RUN --mount` passes through the
+  entire BuildKit pipeline but fails at the containerd/HCS runtime (see source-confirmed details
+  below); heredocs are partial (work with PowerShell shell, not with `cmd.exe`)
 - **Package managers** are Chocolatey, NuGet, and direct PowerShell downloads — not apt/apk/dnf
 
 These differences mean many Linux-oriented best practices don't apply, and Windows containers have
-their own set of anti-patterns and optimization opportunities. The `tally/windows/*` namespace
+their own set of anti-patterns and optimization opportunities.
+
+**BuildKit source-confirmed details:**
+
+- **Default shell** is defined in `frontend/dockerfile/dockerfile2llb/defaultshell.go`:
+  `defaultShell("windows")` returns `["cmd", "/S", "/C"]`, while all other OS values return
+  `["/bin/sh", "-c"]`. This is called from `withShell()` (`convert.go:2172`) which wraps
+  shell-form RUN/CMD/ENTRYPOINT. A custom `SHELL` instruction takes priority over the default.
+- **`STOPSIGNAL` is silently accepted** on Windows — BuildKit's `StopSignalCommand` implements
+  `CheckPlatform()` to reject it on Windows, but this method is **never called** in the dispatch
+  path (dead code since at least the BuildKit fork from classic Docker). The instruction is written
+  to the image config but has no effect at runtime since Windows containers don't support POSIX
+  signals.
+- **`RUN --mount` is not blocked by BuildKit** — `dispatchRunMounts()` in
+  `convert_runmount.go:64-149` processes all mount types (cache, secret, ssh, bind, tmpfs) with
+  zero OS/platform checks. Mounts pass through the entire Dockerfile frontend, LLB layer, and OCI
+  spec generation without any Windows guard. The failures tracked in moby/buildkit#5678 (cache),
+
+  #5273 (secret), #4837 (ssh) are **runtime errors** at the containerd/HCS layer — the build
+  starts but errors during the RUN step execution. This makes it an ideal lint target: we can
+  catch a guaranteed build failure before the user waits for image pulls and prior layers.
+
+The `tally/windows/*` namespace
 makes it clear that these rules only fire on Windows stages (detected via the `BaseImageOS`
 semantic model field from [design-docs/26](26-windows-container-support.md)).
 
@@ -47,8 +71,17 @@ lumped `cmd.exe` and `powershell` together, but they're very different:
 | **Progress bars** | N/A | `$ProgressPreference` | N/A |
 | **Command chaining** | `&&`, `&` | `;`, pipeline | `&&`, `;`, pipeline |
 | **ShellCheck applicable** | No | No | Yes |
-| **Heredoc applicable** | No | No | Yes (BuildKit) |
+| **Heredoc applicable** | No | Partial (see note) | Yes (BuildKit) |
 | **Script parsing** | No parser available | Could parse (future) | mvdan.cc/sh |
+
+**Note on PowerShell heredoc:** BuildKit's Dockerfile heredoc (`RUN <<EOF`) can work with PowerShell
+as the active shell. For a single heredoc without a shebang, BuildKit passes the heredoc content
+(with newlines preserved) as the last argument to the configured shell — so `pwsh -Command` receives
+a multi-line script. This was **tested and confirmed** to work, including PowerShell here-strings
+(`@"..."@`) which require their delimiters on separate lines. However, `cmd.exe` cannot handle
+multi-line heredoc content, and the shebang path (`/dev/pipes/`) is explicitly disabled for Windows
+in BuildKit source (`convert.go:1251`). For now, we suppress heredoc suggestions on all Windows
+stages and revisit per-shell gating later.
 
 This means rules split into two namespaces:
 
@@ -57,7 +90,9 @@ This means rules split into two namespaces:
 Fire only on Windows stages. About container platform limitations:
 
 - Layer size optimization (NTFS layers are ~100x larger)
-- BuildKit feature support (`--mount`, `--chown`, heredoc all unsupported)
+- BuildKit feature support (`--chown` unsupported; heredoc partial — see note above)
+- `RUN --mount` passes BuildKit validation but fails at containerd/HCS runtime (new `no-run-mounts` rule)
+- `STOPSIGNAL` is silently accepted but has no effect (new `no-stopsignal` rule)
 - Base image choices (ServerCore vs NanoServer)
 - Path validation (drive letters, backslash separators)
 - Windows-only anti-patterns
@@ -224,6 +259,104 @@ SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference
 
 ## Rules: `tally/windows/*` (OS-Gated, Remaining)
 
+### `tally/windows/no-stopsignal`
+
+**Severity:** warning
+**Trigger:** `STOPSIGNAL` instruction in a Windows stage
+
+**Problem:**
+
+Windows containers do not support POSIX signals. BuildKit defines a `PlatformSpecific` interface
+(`frontend/dockerfile/instructions/commands.go:109-112`) with `StopSignalCommand.CheckPlatform()`
+returning an error for `"windows"`:
+
+```go
+func (c *StopSignalCommand) CheckPlatform(platform string) error {
+    if platform == "windows" {
+        return errors.New("The daemon on this platform does not support the command stopsignal")
+    }
+    return nil
+}
+```
+
+However, this `CheckPlatform()` is **never called** — `dispatchStopSignal()` (`convert.go:1858`)
+directly sets the signal without any platform guard. The build succeeds silently, but `STOPSIGNAL`
+has no effect on Windows containers at runtime. This is a latent bug in BuildKit (the check exists
+but is dead code), and a good lint opportunity — warn the user that the instruction is meaningless.
+
+```dockerfile
+# Anti-pattern: STOPSIGNAL has no effect on Windows
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+STOPSIGNAL SIGTERM
+```
+
+**Detection:**
+
+- Check for `STOPSIGNAL` instruction in a stage where `BaseImageOS == Windows`
+- Simple single-instruction pattern match, no command parsing needed
+
+---
+
+### `tally/windows/no-run-mounts`
+
+**Severity:** error
+**Trigger:** `RUN --mount=type=*` in a Windows stage
+
+**Problem:**
+
+All `RUN --mount` types (`cache`, `secret`, `ssh`, `bind`) fail at runtime on Windows containers.
+BuildKit's Dockerfile frontend has **no platform guard** — `dispatchRunMounts()`
+(`convert_runmount.go:64-149`) processes every mount type identically regardless of OS. Mounts
+pass through the full pipeline (Dockerfile frontend → LLB → OCI spec generation → executor) and
+only fail at the containerd/HCS layer when the container runtime attempts to set them up.
+
+This means a Dockerfile like:
+
+```dockerfile
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN --mount=type=cache,target=C:\Users\ContainerUser\.nuget\packages \
+    dotnet restore
+```
+
+will successfully parse, pull the base image, and begin building — only to fail with a runtime
+error at the `RUN` step. On large Windows images (5+ GB base layers), the user may wait minutes
+before hitting the error. A lint rule catches this immediately.
+
+**Source-verified behavior:**
+
+- `convert_runmount.go:64` — no `if windows` / `if d.image.OS == "windows"` check anywhere
+- `executor/oci/spec.go:213-218` — mounts are added to OCI spec with `normalizeMountType()`
+  which returns `""` on Windows (avoids `"bind"` type that HCS doesn't understand), but this
+  only affects the root filesystem mount, not `--mount` mounts
+- `executor/containerdexecutor/executor_windows.go:88` — `mounts` passed directly to
+  `oci.GenerateSpec` without filtering
+
+**All mount types affected:**
+
+| Mount type | Issue | Runtime behavior |
+|------------|-------|------------------|
+| `--mount=type=cache` | moby/buildkit#5678 | HCS error setting up cache volume |
+| `--mount=type=secret` | moby/buildkit#5273 | tmpfs-based secrets not supported on Windows |
+| `--mount=type=ssh` | moby/buildkit#4837 | Unix socket forwarding not available on Windows |
+| `--mount=type=bind` | — | Bind mount semantics differ on HCS |
+| `--mount=type=tmpfs` | — | tmpfs not a Windows concept |
+
+**Detection:**
+
+- Check for `RUN` instructions with any `--mount` flag in a stage where `BaseImageOS == Windows`
+- Parse the mount flag to extract the type for the violation message
+- Severity is `error` (not `warning`) because the build **will** fail — this is not a style
+  issue but a guaranteed build break
+
+```dockerfile
+# All of these will fail at runtime on Windows:
+RUN --mount=type=cache,target=C:\cache dotnet restore
+RUN --mount=type=secret,id=my_secret cmd /C type C:\run\secrets\my_secret
+RUN --mount=type=ssh git clone git@github.com:org/repo.git
+```
+
+---
+
 ### `tally/windows/group-run-layers`
 
 **Severity:** info
@@ -337,9 +470,8 @@ size difference between ServerCore and NanoServer is dramatic (~17x).
   supported on Windows and will be silently ignored.
 - **`tally/windows/escape-directive`**: Suggest `# escape=` `` ` `` at the top of Windows
   Dockerfiles to avoid backslash conflicts with Windows paths.
-- **`tally/windows/no-unsupported-mount`**: Warn when `RUN --mount=type=cache` (or secret/ssh/bind)
-  is used in a Windows stage, since BuildKit WCOW doesn't support mounts
-  (moby/buildkit#5678).
+- ~~**`tally/windows/no-unsupported-mount`**~~: Promoted to fully designed rule as
+  `tally/windows/no-run-mounts` (see above).
 
 ---
 
@@ -530,6 +662,8 @@ remains correct after mid-stage shell changes.
 internal/rules/tally/
 ├── windows/                     # NEW: Windows OS-gated rules
 │   ├── gate.go                  # windowsStages() helper
+│   ├── no_stopsignal.go
+│   ├── no_run_mounts.go
 │   ├── group_run_layers.go
 │   ├── cleanup_in_same_layer.go
 │   └── prefer_nanoserver.go
@@ -560,6 +694,12 @@ import (
 ### Rule Code Convention
 
 ```go
+// internal/rules/tally/windows/no_stopsignal.go
+const NoStopSignalCode = rules.TallyRulePrefix + "windows/no-stopsignal"
+
+// internal/rules/tally/windows/no_run_mounts.go
+const NoRunMountsCode = rules.TallyRulePrefix + "windows/no-run-mounts"
+
 // internal/rules/tally/windows/group_run_layers.go
 const GroupRunLayersCode = rules.TallyRulePrefix + "windows/group-run-layers"
 
@@ -605,7 +745,7 @@ gate — existing rules adding early returns for incompatible stages:
 |------|--------------|--------|-------------------|
 | `tally/prefer-run-heredoc` | OS=Windows OR shell=PowerShell/Cmd | Heredoc doesn't work | `prefer_heredoc.go` per-stage loop |
 | `tally/prefer-copy-heredoc` | OS=Windows OR shell=PowerShell/Cmd | Same | `prefer_copy_heredoc.go` per-stage loop |
-| `tally/prefer-package-cache-mounts` | OS=Windows | `--mount=type=cache` unsupported | `prefer_package_cache_mounts.go` per-stage loop |
+| `tally/prefer-package-cache-mounts` | OS=Windows | `--mount=type=cache` fails at runtime (complemented by `no-run-mounts`) | `prefer_package_cache_mounts.go` per-stage loop |
 | `shellcheck/SC*` | shell=PowerShell or Cmd | Gated via `!IsShellCheckCompatible()` in the ShellCheck rule path | Works today (no change needed) |
 | `hadolint/DL4006` (pipefail) | shell=PowerShell or Cmd | POSIX-only concept | `dl4006.go` (already gated) |
 

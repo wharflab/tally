@@ -173,13 +173,27 @@ This integrates with the existing `AsyncImageResolver` infrastructure.
 When `BaseImageOS` is `Windows` and no `SHELL` instruction is present, the effective default shell
 should be `["cmd", "/S", "/C"]` instead of `["/bin/sh", "-c"]`.
 
-Current default in `semantic.go`:
+**BuildKit source confirmation** (`frontend/dockerfile/dockerfile2llb/defaultshell.go`):
+
+```go
+func defaultShell(os string) []string {
+    if os == "windows" {
+        return []string{"cmd", "/S", "/C"}
+    }
+    return []string{"/bin/sh", "-c"}
+}
+```
+
+This is called from `withShell()` (`convert.go:2172-2179`) which wraps every shell-form RUN/CMD/ENTRYPOINT.
+When the image has a custom `SHELL` set, that takes priority; otherwise `defaultShell(img.OS)` is used.
+
+Current default in tally's `semantic.go`:
 
 ```go
 var DefaultShell = []string{"/bin/sh", "-c"}
 ```
 
-This should become stage-aware:
+This should become stage-aware, mirroring BuildKit's logic:
 
 ```go
 func DefaultShellForOS(os BaseImageOS) []string {
@@ -292,16 +306,121 @@ As of v0.22.0, it remains experimental:
 | `FROM` | Yes | Yes | Yes |
 | `FROM scratch` | Yes | **No** (moby/buildkit#5264) | No |
 | `RUN` (shell/exec form) | Yes | Yes | Yes |
-| `RUN --mount=type=cache` | Yes | **No** (moby/buildkit#5678) | No |
-| `RUN --mount=type=secret` | Yes | **No** (moby/buildkit#5273) | No |
-| `RUN --mount=type=ssh` | Yes | **No** (moby/buildkit#4837) | No |
-| `RUN --mount=type=bind` | Yes | **No** | No |
-| Heredoc (`RUN <<EOF`) | Yes | **Unreliable** | No |
+| `RUN --mount=type=cache` | Yes | **Runtime failure** (moby/buildkit#5678) | No |
+| `RUN --mount=type=secret` | Yes | **Runtime failure** (moby/buildkit#5273) | No |
+| `RUN --mount=type=ssh` | Yes | **Runtime failure** (moby/buildkit#4837) | No |
+| `RUN --mount=type=bind` | Yes | **Runtime failure** | No |
+| Heredoc (`RUN <<EOF`) | Yes | **Partial** (see below) | No |
 | Multi-stage builds | Yes | Yes | Yes |
 | `SHELL` instruction | Yes | Yes | Yes |
 | `COPY --chown` | Yes | **No** | No |
 | `# syntax=` directive | Yes | Yes | No |
+| `STOPSIGNAL` | Yes | **Silently ignored** (see below) | **Silently ignored** |
 | `# escape=` directive | Yes | Yes | Yes |
+
+### Heredoc on Windows: What Works, What Doesn't
+
+**Source-verified** from `frontend/dockerfile/dockerfile2llb/convert.go:1245-1296`:
+
+BuildKit handles a single heredoc without a shebang as a "fake heredoc" — the heredoc content is
+extracted and passed as a single string argument to `withShell()`. This means the content (with
+preserved newlines) becomes the last argument to the shell. For the default Windows shell, the
+final exec args would be: `["cmd", "/S", "/C", "<heredoc content>"]`.
+
+For the shebang case (`#!`), BuildKit writes the heredoc to a file at `/dev/pipes/` and executes
+it — but this path is explicitly **skipped on Windows** (`convert.go:1251`):
+
+```go
+if d.image.OS != "windows" && strings.HasPrefix(data, "#!") {
+```
+
+For multi-heredoc (complex) cases, BuildKit reconstitutes the full heredoc text and passes it to
+the shell (`convert.go:1280-1289`), relying on the shell itself to handle heredoc syntax — this
+requires a POSIX-compatible shell and won't work with `cmd.exe`.
+
+**PowerShell here-strings via Dockerfile heredoc:**
+
+A key finding: PowerShell here-strings (`@"..."@`) require their delimiters on separate lines.
+Regular `RUN` commands can't preserve this because the Dockerfile parser strips newlines during
+line-continuation joining. However, Dockerfile heredoc syntax **does** preserve newlines:
+
+```dockerfile
+SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop';"]
+RUN <<'EOF'
+$text = @"
+Hello World
+Multi-line content
+"@
+Write-Output $text
+EOF
+```
+
+This was **tested and confirmed** to work with BuildKit (Docker Desktop). The heredoc content
+is passed intact with newlines to `pwsh -Command`, which correctly parses the here-string.
+
+| RUN syntax | PowerShell here-string works? | Why |
+|---|---|---|
+| Regular `RUN` with `\` continuation | **No** | Parser strips newlines; `@"` and `"@` end up on same line |
+| Regular `RUN` with `` ` `` continuation (`# escape=`` ` ``) | **No** | Same problem + `` ` `` conflicts with PowerShell escape |
+| `RUN <<EOF` (Dockerfile heredoc) + `SHELL ["pwsh"...]` | **Yes** | Newlines preserved in content passed to `pwsh -Command` |
+| `RUN ["pwsh", "-Command", "..."]` (exec form) | **No** | Single JSON string, no newlines |
+
+**Implication for tally:** `tally/prefer-run-heredoc` should still be suppressed for Windows stages
+in general (since `cmd.exe` can't handle it), but the heredoc mechanism does work when PowerShell
+is the active shell. This is an edge case we can revisit — for now, suppression is the safe default.
+
+### STOPSIGNAL on Windows
+
+BuildKit defines a `PlatformSpecific` interface (`frontend/dockerfile/instructions/commands.go:109-112`)
+with `StopSignalCommand` as its only implementor:
+
+```go
+func (c *StopSignalCommand) CheckPlatform(platform string) error {
+    if platform == "windows" {
+        return errors.New("The daemon on this platform does not support the command stopsignal")
+    }
+    return nil
+}
+```
+
+**However:** this `CheckPlatform()` method is **never called** anywhere in BuildKit's dispatch
+path. `dispatchStopSignal()` (`convert.go:1858-1864`) directly sets the signal on the image config
+without any platform check. This means BuildKit silently accepts `STOPSIGNAL` in Windows Dockerfiles
+at build time — it won't error during `docker build`, but the signal will be meaningless at runtime
+since Windows containers don't support POSIX signals.
+
+This is a candidate for a `tally/windows/no-stopsignal` lint rule: warn on `STOPSIGNAL` in Windows
+stages since the instruction has no effect. Unlike a BuildKit build error (which doesn't happen),
+a lint warning catches the likely mistake early.
+
+### `RUN --mount` on Windows
+
+**Source-verified** from `frontend/dockerfile/dockerfile2llb/convert_runmount.go:64-149` and
+`executor/oci/spec.go:176-220`:
+
+BuildKit does **not** strip, block, or reject `--mount` flags on Windows at any level of the
+pipeline. The entire mount dispatch chain is OS-agnostic:
+
+- `dispatchRunMounts()` (`convert_runmount.go:64`) processes all mount types (`cache`, `secret`,
+  `ssh`, `bind`, `tmpfs`) with **zero platform checks**
+- The LLB layer (`client/llb/`) has no platform-based mount restrictions
+- `executor/oci/spec.go:176-220` converts mounts to OCI spec entries without OS filtering — it
+  even has Windows-aware helpers (`normalizeMountType` returns `""` on Windows, `subMount` always
+  processes on Windows), indicating mounts are **expected** to reach this layer
+- `executor/containerdexecutor/executor_windows.go:72-95` passes mounts through to `GenerateSpec`
+  without filtering
+
+The failures reported in moby/buildkit#5678 (cache), #5273 (secret), #4837 (ssh) are **runtime
+errors** — the mount instructions pass through the entire Dockerfile frontend and LLB pipeline
+successfully, but fail at the containerd/HCS layer when the Windows container runtime attempts to
+set them up. The build **starts** but errors during the RUN step execution.
+
+This has two implications:
+
+1. A lint rule can catch this **before** the user wastes time waiting for a build that will fail
+2. The heredoc syntax (`RUN --mount=type=cache <<EOF`) does not change mount behavior — mounts
+   and heredocs are orthogonal features processed independently in `dispatchRun()`
+   (`convert.go:1240-1310`)
 
 ### Implications for Tally Rules
 
@@ -309,8 +428,10 @@ As of v0.22.0, it remains experimental:
 |------|--------|
 | `tally/prefer-run-heredoc` | **Must suppress** for Windows stages |
 | `tally/prefer-copy-heredoc` | **Must suppress** for Windows stages |
-| `tally/prefer-package-cache-mounts` | **Must suppress** for Windows stages (no `--mount` support) |
+| `tally/prefer-package-cache-mounts` | **Must suppress** for Windows stages (`--mount=type=cache` fails at runtime) |
 | `tally/prefer-add-unpack` | Needs investigation — does `ADD --checksum` work on Windows? |
+| `tally/windows/no-stopsignal` | **New rule** — warn on `STOPSIGNAL` in Windows stages (no-op at runtime) |
+| `tally/windows/no-run-mounts` | **New rule** — warn on `RUN --mount=type=*` in Windows stages (runtime failure) |
 | `hadolint/DL3020` (ADD→COPY) | Still valid on Windows |
 | `tally/newline-between-instructions` | Still valid on Windows |
 
@@ -325,8 +446,11 @@ As of v0.22.0, it remains experimental:
 | Direct download (PowerShell) | Always | Very common |
 
 `tally/prefer-package-cache-mounts` currently recognizes `dotnet` → `/root/.nuget/packages` but
-not `choco`. However, since `--mount=type=cache` doesn't work on Windows, the correct action is
-to **suppress the entire rule** for Windows stages rather than add Windows cache paths.
+not `choco`. However, since `--mount=type=cache` fails at runtime on Windows (BuildKit passes the
+mount through all pipeline stages but the containerd/HCS layer rejects it — see "RUN --mount on
+Windows" above), the correct action is to **suppress the entire rule** for Windows stages rather
+than add Windows cache paths. The new `tally/windows/no-run-mounts` rule covers the inverse
+case — warning when mounts are explicitly used.
 
 ---
 
