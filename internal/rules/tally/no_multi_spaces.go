@@ -114,11 +114,14 @@ func (r *NoMultiSpacesRule) Check(input rules.LintInput) []rules.Violation {
 // returns a delete-only TextEdit covering the surplus characters (keeping one
 // space). firstLoc is the violation location of the first run; totalExtra is
 // the total number of excess space characters across all runs.
-func scanExtraSpaceRuns(file string, lineNum int, line string, indentEnd int) (
-	edits []rules.TextEdit, firstLoc rules.Location, totalExtra int,
-) {
+func scanExtraSpaceRuns(file string, lineNum int, line string, indentEnd int) ([]rules.TextEdit, rules.Location, int) {
+	var (
+		edits      []rules.TextEdit
+		firstLoc   rules.Location
+		totalExtra int
+		inQuote    byte // 0 = not in quote, '\'' or '"' = inside that quote
+	)
 	pos := indentEnd
-	var inQuote byte // 0 = not in quote, '\'' or '"' = inside that quote
 
 	for pos < len(line) {
 		ch := line[pos]
