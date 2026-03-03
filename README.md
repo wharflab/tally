@@ -57,13 +57,11 @@ AI fixes are **rule-driven** (one narrow transformation at a time) and **verifie
 tally integrates rules from multiple sources:
 
 <!-- BEGIN RULES_TABLE -->
-
 | Source | Rules | Description |
 |--------|-------|-------------|
 | **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 22/22 rules | Docker's official Dockerfile checks (captured + reimplemented) |
 | **tally** | 24 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
 | **[Hadolint](https://github.com/hadolint/hadolint)** | 37 rules | Hadolint-compatible Dockerfile rules (expanding) |
-
 <!-- END RULES_TABLE -->
 
 Shell linting is provided via embedded ShellCheck (rules under the `shellcheck/` namespace).
