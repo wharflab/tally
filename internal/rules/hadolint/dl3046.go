@@ -58,7 +58,7 @@ func (r *DL3046Rule) checkUseraddCommands(
 		return nil
 	}
 
-	var results []rules.Violation
+	results := make([]rules.Violation, 0, len(useraddCmds))
 	for i := range useraddCmds {
 		if !isHighUIDWithoutNoLogInit(&useraddCmds[i]) {
 			continue

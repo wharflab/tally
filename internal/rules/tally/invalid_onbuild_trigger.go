@@ -55,7 +55,7 @@ func (r *InvalidOnbuildTriggerRule) Check(input rules.LintInput) []rules.Violati
 	}
 
 	meta := r.Metadata()
-	var violations []rules.Violation
+	violations := make([]rules.Violation, 0, len(input.AST.AST.Children))
 
 	for _, node := range input.AST.AST.Children {
 		if node == nil || !strings.EqualFold(node.Value, command.Onbuild) {

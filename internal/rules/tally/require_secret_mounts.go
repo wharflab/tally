@@ -159,8 +159,8 @@ func (r *RequireSecretMountsRule) checkMounts(
 	}
 
 	// Collect all missing specs for this RUN.
-	var missingSpecs []SecretMountSpec
-	var missingCmds []string
+	missingSpecs := make([]SecretMountSpec, 0, len(found))
+	missingCmds := make([]string, 0, len(found))
 
 	for _, cmd := range found {
 		spec, ok := commands[cmd.Name]
@@ -190,7 +190,7 @@ func (r *RequireSecretMountsRule) checkMounts(
 	// Build a combined message listing all missing secrets.
 	msg := checkSecretMount(existing, missingSpecs[0], missingCmds[0])
 
-	var detailParts []string
+	detailParts := make([]string, 0, len(missingSpecs))
 	for i, spec := range missingSpecs {
 		detailParts = append(detailParts, fmt.Sprintf("--mount=type=secret,%s for '%s'", formatSpecDesc(spec), missingCmds[i]))
 	}

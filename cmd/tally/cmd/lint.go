@@ -1257,7 +1257,7 @@ func filterAsyncPlans(res *lintResults) ([]async.CheckRequest, time.Duration) {
 	filtered = processor.NewEnableFilter().Process(filtered, procCtx)
 	errorFiles := filesWithErrors(filtered)
 	maxTimeout := 20 * time.Second
-	var plans []async.CheckRequest
+	plans := make([]async.CheckRequest, 0, len(res.asyncPlans))
 	var skippedAuto int
 
 	for _, req := range res.asyncPlans {
@@ -1453,7 +1453,7 @@ func mergeAsyncViolations(fast []rules.Violation, asyncResult *async.RunResult) 
 	}
 
 	// Filter out fast violations that were superseded by async results.
-	var merged []rules.Violation
+	merged := make([]rules.Violation, 0, len(fast)+len(asyncViolations))
 	for _, v := range fast {
 		if completedSet[ruleFileStage{ruleCode: v.RuleCode, file: v.File(), stageIndex: v.StageIndex}] {
 			continue // replaced by async result

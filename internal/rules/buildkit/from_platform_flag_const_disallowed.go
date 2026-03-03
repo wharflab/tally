@@ -35,8 +35,8 @@ func (r *FromPlatformFlagConstDisallowedRule) Metadata() rules.RuleMetadata {
 // It examines FROM instructions for hardcoded --platform values that prevent
 // multi-platform builds.
 func (r *FromPlatformFlagConstDisallowedRule) Check(input rules.LintInput) []rules.Violation {
-	var violations []rules.Violation
 	meta := r.Metadata()
+	violations := make([]rules.Violation, 0, len(input.Stages))
 
 	for _, stage := range input.Stages {
 		platform := stage.Platform

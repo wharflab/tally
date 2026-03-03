@@ -71,7 +71,7 @@ func resolvePlatformExpr(expr string, model *Model) (string, []string) {
 		return expr, nil
 	}
 
-	var unresolved []string
+	unresolved := make([]string, 0, len(res.Unmatched))
 	for name := range res.Unmatched {
 		unresolved = append(unresolved, name)
 	}

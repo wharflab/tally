@@ -844,7 +844,7 @@ func buildEnvKeyRemovalEdit(file string, env *instructions.EnvCommand, keysToRem
 	startCol := envLoc[0].Start.Character
 
 	// Count remaining variables after removal.
-	var parts []string
+	parts := make([]string, 0, len(env.Env))
 	for _, kv := range env.Env {
 		if removeSet[kv.Key] {
 			continue

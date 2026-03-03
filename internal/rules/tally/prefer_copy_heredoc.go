@@ -217,7 +217,7 @@ func (r *PreferCopyHeredocRule) checkSingleRuns(
 	meta rules.RuleMetadata,
 	skipSequences bool,
 ) []rules.Violation {
-	var violations []rules.Violation
+	violations := make([]rules.Violation, 0, len(stage.Commands))
 	var inSequence map[*instructions.RunCommand]bool
 	if skipSequences {
 		inSequence = identifySequenceRuns(stage, shellVariant, knownVars)

@@ -107,10 +107,11 @@ func checkOnbuildCopies(sem *semantic.Model, stageIdx int, workdirSet bool, file
 		return nil
 	}
 
-	var violations []rules.Violation
 	onbuildHasWorkdir := workdirSet
+	onbuilds := sem.OnbuildInstructions(stageIdx)
+	violations := make([]rules.Violation, 0, len(onbuilds))
 
-	for _, onbuild := range sem.OnbuildInstructions(stageIdx) {
+	for _, onbuild := range onbuilds {
 		if _, ok := onbuild.Command.(*instructions.WorkdirCommand); ok {
 			onbuildHasWorkdir = true
 		}

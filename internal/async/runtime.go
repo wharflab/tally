@@ -191,7 +191,7 @@ func deduplicateRequests(requests []CheckRequest) (map[dedupeKey]*pendingGroup, 
 // returning a non-nil slice (even empty) means it completed successfully.
 func fanOutHandlers(group *pendingGroup, value any) ([]any, []CompletedCheck) {
 	var violations []any
-	var completed []CompletedCheck
+	completed := make([]CompletedCheck, 0, len(group.handlers))
 	for i, handler := range group.handlers {
 		results := handler.OnSuccess(value)
 		if results == nil {

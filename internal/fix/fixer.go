@@ -458,7 +458,7 @@ func selectNonConflictingCandidates(fc *FileChange, candidates []*fixCandidate) 
 		return false
 	}
 
-	var selected []*fixCandidate
+	selected := make([]*fixCandidate, 0, len(ordered))
 	var reserved []rules.TextEdit
 	for _, c := range ordered {
 		if len(c.fix.Edits) == 0 {

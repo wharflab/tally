@@ -142,7 +142,7 @@ func (mr *MockRegistry) AddImage(opts ImageOpts) (string, error) {
 // AddIndex pushes a multi-arch image index (manifest list) and returns the index digest.
 // Each entry in manifests is pushed as a child image under the same repo.
 func (mr *MockRegistry) AddIndex(repo, tag string, manifests []ImageOpts) (string, error) {
-	var adds []mutate.IndexAddendum
+	adds := make([]mutate.IndexAddendum, 0, len(manifests))
 	for _, m := range manifests {
 		img, err := buildImage(m)
 		if err != nil {

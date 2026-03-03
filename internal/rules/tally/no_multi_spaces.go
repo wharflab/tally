@@ -65,10 +65,10 @@ func (r *NoMultiSpacesRule) Check(input rules.LintInput) []rules.Violation {
 	sm := input.SourceMap()
 
 	heredocBody := buildHeredocBodyLines(input)
+	lines := sm.Lines()
+	violations := make([]rules.Violation, 0, len(lines))
 
-	var violations []rules.Violation
-
-	for i, line := range sm.Lines() {
+	for i, line := range lines {
 		// Skip heredoc body lines.
 		if heredocBody[i] {
 			continue

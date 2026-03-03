@@ -113,7 +113,7 @@ func (r *epilogueOrderResolver) fixStage(
 	}
 
 	// Collect epilogue instructions with their source locations.
-	var epilogues []epilogueInstr
+	epilogues := make([]epilogueInstr, 0, len(stage.Commands))
 	for i, cmd := range stage.Commands {
 		if _, isOnbuild := cmd.(*instructions.OnbuildCommand); isOnbuild {
 			continue
@@ -195,7 +195,7 @@ func (r *epilogueOrderResolver) fixStage(
 	insertText := insertBuf.String()
 
 	// Generate edits: delete originals, then insert at end.
-	var edits []rules.TextEdit
+	edits := make([]rules.TextEdit, 0, len(epilogues)+1)
 
 	// Delete each epilogue instruction from its original position.
 	for _, ep := range epilogues {

@@ -28,7 +28,7 @@ func PlanExternalImageChecks(
 		return nil
 	}
 
-	var requests []async.CheckRequest
+	requests := make([]async.CheckRequest, 0, sem.StageCount())
 	for info := range sem.ExternalImageStages() {
 		if info.Stage == nil {
 			continue

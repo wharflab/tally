@@ -139,7 +139,6 @@ RUN Write-Host "hello"`,
 
 func TestScanRunCommandsWithPOSIXShell_ShellVariant(t *testing.T) {
 	t.Parallel()
-	t.Skip("Shell variant detection requires semantic model which testutil.MakeLintInput doesn't provide")
 
 	tests := []struct {
 		name        string
@@ -147,10 +146,10 @@ func TestScanRunCommandsWithPOSIXShell_ShellVariant(t *testing.T) {
 		wantVariant shell.Variant
 	}{
 		{
-			name: "default bash",
+			name: "default sh (posix)",
 			dockerfile: `FROM alpine
 RUN echo hello`,
-			wantVariant: shell.VariantBash,
+			wantVariant: shell.VariantPOSIX,
 		},
 		{
 			name: "explicit sh",
