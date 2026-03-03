@@ -2,18 +2,12 @@
   "prettier.enable": false,
   // https://golangci-lint.run/docs/welcome/integrations/#visual-studio-code
   "go.lintTool": "golangci-lint",
-  "go.lintFlags": [
-    "--path-mode=abs",
-    "--fast-only"
-  ],
+  "go.lintFlags": ["--path-mode=abs", "--fast-only"],
   "go.formatTool": "custom",
   "go.alternateTools": {
     "customFormatter": "golangci-lint"
   },
-  "go.formatFlags": [
-    "fmt",
-    "--stdin"
-  ],
+  "go.formatFlags": ["fmt", "--stdin"],
   "go.testTags": "testing",
   "go.testEnvVars": {
     "GOEXPERIMENT": "jsonv2",
@@ -47,6 +41,9 @@
       "strings": "off",
       "other": "off"
     },
+    "editor.codeActionsOnSave": {
+      "source.fixAll.rumdl": "explicit"
+    }
   },
   "[yaml]": {
     "editor.defaultFormatter": "JasonHeld.yamllint-ts",
@@ -63,9 +60,7 @@
   // Disable ESLint and Biome in favor of oxlint
   "eslint.enable": false,
   "biome.enabled": false,
-  "markdownlint.lintWorkspaceGlobs": [
-    "!**/*"
-  ],
+  "markdownlint.lintWorkspaceGlobs": ["!**/*"],
   // Enable oxc extension (linter and formatter)
   "oxc.enable": true,
   "oxc.path.oxfmt": "./_integrations/vscode-tally/node_modules/.bin/oxfmt",
