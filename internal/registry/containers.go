@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 
 	"github.com/docker/distribution/registry/api/errcode"
@@ -318,10 +319,10 @@ func classifyContainersError(ref string, err error) error {
 	// Typed error: UnexpectedHTTPStatusError carries the HTTP status code directly.
 	var httpErr docker.UnexpectedHTTPStatusError
 	if errors.As(err, &httpErr) {
-		switch {
-		case httpErr.StatusCode == 401 || httpErr.StatusCode == 403:
+		switch httpErr.StatusCode {
+		case http.StatusUnauthorized, http.StatusForbidden:
 			return &AuthError{Err: err}
-		case httpErr.StatusCode == 404:
+		case http.StatusNotFound:
 			return &NotFoundError{Ref: ref, Err: err}
 		default:
 			return &NetworkError{Err: err}

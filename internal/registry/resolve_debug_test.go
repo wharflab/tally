@@ -23,7 +23,7 @@ func TestDebugHTTP(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, "GET", "https://registry-1.docker.io/v2/", nil)
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://registry-1.docker.io/v2/", http.NoBody)
 	start := time.Now()
 	resp, err := http.DefaultClient.Do(req)
 	t.Logf("HTTP elapsed: %s, err=%v", time.Since(start), err)
