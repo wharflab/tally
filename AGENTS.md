@@ -67,7 +67,8 @@ skip-blank-lines = true
 
 - Unit tests live alongside packages in `internal/**`.
 - Integration tests (`internal/integration`) build the binary once and run it against test fixtures.
-- Integration test placement decision tree: [`design-docs/16-integration-tests-refactor-and-placement.md` §8](design-docs/16-integration-tests-refactor-and-placement.md#8-decision-tree-where-should-this-test-go)
+- Integration test placement decision tree:
+  [`design-docs/16-integration-tests-refactor-and-placement.md` §8](design-docs/16-integration-tests-refactor-and-placement.md#8-decision-tree-where-should-this-test-go)
 - Update snapshots when intentional output changes:
   - `UPDATE_SNAPS=true go test ./internal/integration/...`
 

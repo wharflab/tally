@@ -13,11 +13,13 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 ## Summary
 
 <!-- BEGIN RULES_SUMMARY -->
+
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
 | tally | 24 | - | 24 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
+
 <!-- END RULES_SUMMARY -->
 
 ---
@@ -132,6 +134,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 ### DL Rules (Dockerfile Lint)
 
 <!-- BEGIN HADOLINT_DL_RULES -->
+
 | Rule | Description | Severity | Status |
 |------|-------------|----------|--------|
 | [DL1001](https://github.com/hadolint/hadolint/wiki/DL1001) | Please refrain from using inline ignore pragmas `# hadolint ignore=DLxxxx`. | Ignore | ⏳ |
@@ -200,6 +203,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL4004](https://github.com/hadolint/hadolint/wiki/DL4004) | Multiple `ENTRYPOINT` instructions found. | Error | 🔄 `buildkit/MultipleInstructionsDisallowed` |
 | [DL4005](https://github.com/hadolint/hadolint/wiki/DL4005) | Use `SHELL` to change the default shell. | Warning | ✅🔧 `hadolint/DL4005` |
 | [DL4006](https://github.com/hadolint/hadolint/wiki/DL4006) | Set the `SHELL` option -o pipefail before `RUN` with a pipe in it | Warning | ✅🔧 `hadolint/DL4006` |
+
 <!-- END HADOLINT_DL_RULES -->
 
 #### Cache-cleanup Hadolint rules marked as not planned
@@ -312,9 +316,3 @@ trusted-registries = ["docker.io", "ghcr.io"]
 **Severity-based enabling:** Rules with `DefaultSeverity: "off"` (like DL3026) are automatically enabled with `severity: "warning"` when you provide
 configuration options for them, without needing to explicitly set `enabled = true` or `severity = "warning"`. To use a different severity, set the
 `severity` field explicitly in the rule's configuration block.
-
----
-
-## Adding New Rules
-
-See [CLAUDE.md](CLAUDE.md#adding-new-linting-rules) for development guidelines.

@@ -22,7 +22,8 @@ Modern Dockerfiles deserve modern tooling. tally is opinionated in the right pla
 - **BuildKit-native**: understands modern syntax like heredocs, `RUN --mount=...`, `COPY --link`, and `ADD --checksum=...`.
 - **Fixes, not just findings**: `--fix` applies safe, mechanical rewrites; `--fix-unsafe` unlocks opt-in risky fixes (including AI).
 - **Modernizes on purpose**: converts eligible `RUN`/`COPY` instructions to heredocs, prefers `ADD --extract`, and more.
-- **Broad rule coverage**: combines Docker's official BuildKit checks, embedded ShellCheck for shell snippets, Hadolint-compatible rules, and tally-specific rules.
+- **Broad rule coverage**: combines Docker's official BuildKit checks, embedded ShellCheck for shell snippets, Hadolint-compatible rules, and
+  tally-specific rules.
 - **Registry-aware without Docker**: uses a Podman-compatible registry client for image metadata checks (no daemon required).
 - **Editor + CI friendly**: VS Code extension (`wharflab.tally`, powered by `tally lsp`) and outputs for JSON, SARIF, and GitHub Actions annotations.
 - **Easy to install anywhere**: Homebrew, Go, npm, pip, and RubyGems.
@@ -56,11 +57,13 @@ AI fixes are **rule-driven** (one narrow transformation at a time) and **verifie
 tally integrates rules from multiple sources:
 
 <!-- BEGIN RULES_TABLE -->
+
 | Source | Rules | Description |
 |--------|-------|-------------|
 | **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 22/22 rules | Docker's official Dockerfile checks (captured + reimplemented) |
 | **tally** | 24 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
 | **[Hadolint](https://github.com/hadolint/hadolint)** | 37 rules | Hadolint-compatible Dockerfile rules (expanding) |
+
 <!-- END RULES_TABLE -->
 
 Shell linting is provided via embedded ShellCheck (rules under the `shellcheck/` namespace).
@@ -373,15 +376,18 @@ Available levels (from most to least severe): `error`, `warning`, `info`, `style
 
 ### VS Code
 
-Install the official **[tally extension](https://marketplace.visualstudio.com/items?itemName=wharflab.tally)** from the Visual Studio Marketplace for real-time linting and diagnostics.
+Install the official **[tally extension](https://marketplace.visualstudio.com/items?itemName=wharflab.tally)** from the Visual Studio Marketplace for
+real-time linting and diagnostics.
 
 ### JetBrains IDEs
 
-Install the official **[Tally plugin](https://plugins.jetbrains.com/plugin/30255-tally)** from JetBrains Marketplace for IDE integration in IntelliJ-based editors.
+Install the official **[Tally plugin](https://plugins.jetbrains.com/plugin/30255-tally)** from JetBrains Marketplace for IDE integration in
+IntelliJ-based editors.
 
 ### Other Editors
 
-Any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) can use tally's built-in LSP server over stdio:
+Any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) can use tally's built-in LSP server
+over stdio:
 
 ```bash
 npx -y tally-cli lsp --stdio
