@@ -24,7 +24,7 @@ func checkUnknownInstructions(file string, ast *parser.Result) []Error {
 		return nil
 	}
 
-	var errs []Error
+	errs := make([]Error, 0, len(ast.AST.Children))
 	for _, node := range ast.AST.Children {
 		if node == nil {
 			continue

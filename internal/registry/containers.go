@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 
 	"github.com/docker/distribution/registry/api/errcode"
@@ -43,7 +44,7 @@ func NewContainersResolver() *ContainersResolver {
 	sysCtx := &types.SystemContext{}
 	// Apply environment variable overrides for registries.conf discovery.
 	// Error is ignored: env var overrides are optional and missing vars are not fatal.
-	_ = environment.UpdateRegistriesConf(sysCtx)
+	_ = environment.UpdateRegistriesConf(sysCtx) //nolint:errcheck // optional env var override; non-fatal
 	return &ContainersResolver{sysCtx: sysCtx, blobCache: memory.New()}
 }
 
@@ -56,7 +57,7 @@ func NewContainersResolverWithContext(sysCtx *types.SystemContext) *ContainersRe
 }
 
 // ResolveConfig resolves image config from the registry.
-func (r *ContainersResolver) ResolveConfig(ctx context.Context, ref string, platform string) (ImageConfig, error) {
+func (r *ContainersResolver) ResolveConfig(ctx context.Context, ref, platform string) (ImageConfig, error) {
 	// Parse the image reference.
 	named, err := reference.ParseNormalizedNamed(ref)
 	if err != nil {
@@ -208,8 +209,9 @@ func (r *ContainersResolver) resolveFromManifest(
 
 // collectAvailablePlatforms extracts available platforms from a manifest list.
 func collectAvailablePlatforms(list manifest.List) []string {
-	var platforms []string
-	for _, d := range list.Instances() {
+	instances := list.Instances()
+	platforms := make([]string, 0, len(instances))
+	for _, d := range instances {
 		inst, err := list.Instance(d)
 		if err != nil || inst.ReadOnly.Platform == nil {
 			continue
@@ -247,10 +249,11 @@ func formatPlatformParts(os, arch, variant string) string {
 	return s
 }
 
-func parsePlatformString(platform string) (os, arch, variant string) {
+func parsePlatformString(platform string) (string, string, string) {
+	var osStr, arch, variant string
 	parts := strings.SplitN(platform, "/", 3)
 	if len(parts) >= 1 {
-		os = parts[0]
+		osStr = parts[0]
 	}
 	if len(parts) >= 2 {
 		arch = parts[1]
@@ -258,7 +261,7 @@ func parsePlatformString(platform string) (os, arch, variant string) {
 	if len(parts) >= 3 {
 		variant = parts[2]
 	}
-	return
+	return osStr, arch, variant
 }
 
 // parseEnvList converts OCI config env ([]string of "KEY=VALUE") to a map.
@@ -318,10 +321,10 @@ func classifyContainersError(ref string, err error) error {
 	// Typed error: UnexpectedHTTPStatusError carries the HTTP status code directly.
 	var httpErr docker.UnexpectedHTTPStatusError
 	if errors.As(err, &httpErr) {
-		switch {
-		case httpErr.StatusCode == 401 || httpErr.StatusCode == 403:
+		switch httpErr.StatusCode {
+		case http.StatusUnauthorized, http.StatusForbidden:
 			return &AuthError{Err: err}
-		case httpErr.StatusCode == 404:
+		case http.StatusNotFound:
 			return &NotFoundError{Ref: ref, Err: err}
 		default:
 			return &NetworkError{Err: err}

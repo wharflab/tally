@@ -13,6 +13,10 @@ type ChainBoundary struct {
 	LeftEndLine int
 	// LeftEndCol is the 1-based column where the left command ends.
 	LeftEndCol int
+	// OpLine is the 1-based line where the operator (&&/||) starts.
+	OpLine int
+	// OpCol is the 1-based column where the operator (&&/||) starts.
+	OpCol int
 	// RightStartLine is the 1-based line where the right command starts.
 	RightStartLine int
 	// RightStartCol is the 1-based column where the right command starts.
@@ -75,6 +79,7 @@ func collectChainBoundariesFromStmt(stmt *syntax.Stmt, boundaries *[]ChainBounda
 	leftCount := collectChainBoundariesFromStmt(bin.X, boundaries)
 
 	leftEnd := bin.X.End()
+	opPos := bin.OpPos
 	rightStart := bin.Y.Pos()
 	op := binOpText(bin.Op)
 
@@ -82,6 +87,8 @@ func collectChainBoundariesFromStmt(stmt *syntax.Stmt, boundaries *[]ChainBounda
 	b := ChainBoundary{
 		LeftEndLine:    int(leftEnd.Line()),
 		LeftEndCol:     int(leftEnd.Col()),
+		OpLine:         int(opPos.Line()),
+		OpCol:          int(opPos.Col()),
 		RightStartLine: int(rightStart.Line()),
 		RightStartCol:  int(rightStart.Col()),
 		Op:             op,

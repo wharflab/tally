@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -455,6 +456,78 @@ func TestFixNewlinePerChainedCall(t *testing.T) {
 	}
 
 	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixed))
+
+	if !strings.Contains(string(output), "Fixed") {
+		t.Errorf("expected 'Fixed' in output, got: %s", output)
+	}
+}
+
+// TestFixCrossRuleMultiSpacesIndentationChain verifies that three rules targeting
+// the same RUN instruction cooperate correctly:
+//
+//   - tally/no-multi-spaces        (priority 10) — removes extra spaces
+//   - tally/consistent-indentation (priority 50) — adds tab indentation for non-first stages
+//   - tally/newline-per-chained-call (priority 97) — splits chained commands onto separate lines
+//
+// The fixture is a multi-stage Dockerfile where the second stage has a single-line
+// RUN with chained commands AND multiple consecutive spaces.  All three rules must
+// apply their fixes without corrupting backslash continuations, indentation, or
+// quoted strings.
+func TestFixCrossRuleMultiSpacesIndentationChain(t *testing.T) {
+	t.Parallel()
+
+	// Second-stage RUN deliberately has:
+	//  - double spaces after "apt-get" and around flags  → no-multi-spaces
+	//  - chained "&&" on one line                        → newline-per-chained-call
+	//  - no tab indentation                              → consistent-indentation
+	//  - a quoted string with significant inner spaces   → must NOT be touched
+	input := "FROM golang:1.23 AS build\n" +
+		"\tRUN go build -o /app ./...\n" +
+		"\n" +
+		"FROM debian:bookworm-slim\n" +
+		"COPY --from=build /app /usr/local/bin/app\n" +
+		"RUN apt-get  update &&  apt-get install -y  --no-install-recommends  ca-certificates && rm -rf  /var/lib/apt/lists/*\n" +
+		"RUN echo \"    keepspaces\" > /etc/motd\n" +
+		"CMD [\"app\"]\n"
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte(input), 0o644); err != nil {
+		t.Fatalf("failed to write Dockerfile: %v", err)
+	}
+
+	// Enable consistent-indentation (experimental, off by default).
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := "[rules.tally.consistent-indentation]\nseverity = \"style\"\n"
+	if err := os.WriteFile(configPath, []byte(configContent), 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	args := []string{
+		"lint", "--config", configPath, "--slow-checks=off",
+		"--fix",
+		"--ignore", "*",
+		"--select", "tally/no-multi-spaces",
+		"--select", "tally/consistent-indentation",
+		"--select", "tally/newline-per-chained-call",
+		dockerfilePath,
+	}
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			t.Fatalf("command failed to run: %v\noutput:\n%s", err, output)
+		}
+	}
+
+	fixedContent, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read fixed Dockerfile: %v", err)
+	}
+
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
 
 	if !strings.Contains(string(output), "Fixed") {
 		t.Errorf("expected 'Fixed' in output, got: %s", output)

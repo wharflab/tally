@@ -30,7 +30,7 @@ func (r *InvalidDefaultArgInFromRule) Check(input rules.LintInput) []rules.Viola
 	}
 
 	meta := r.Metadata()
-	var out []rules.Violation
+	out := make([]rules.Violation, 0, len(input.Stages))
 
 	for stageIdx, stage := range input.Stages {
 		info := sem.StageInfo(stageIdx)

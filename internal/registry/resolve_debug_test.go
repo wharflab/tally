@@ -18,12 +18,16 @@ import (
 // They're useful for debugging registry connectivity but should not run in CI.
 
 func TestDebugHTTP(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("TALLY_TEST_REGISTRY") == "" {
 		t.Skip("set TALLY_TEST_REGISTRY=1 to run real registry tests")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, "GET", "https://registry-1.docker.io/v2/", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://registry-1.docker.io/v2/", http.NoBody)
+	if err != nil {
+		t.Fatal(err)
+	}
 	start := time.Now()
 	resp, err := http.DefaultClient.Do(req)
 	t.Logf("HTTP elapsed: %s, err=%v", time.Since(start), err)
@@ -35,6 +39,7 @@ func TestDebugHTTP(t *testing.T) {
 }
 
 func TestDebugResolveECR(t *testing.T) {
+	t.Parallel()
 	logrus.SetLevel(logrus.DebugLevel)
 	logrus.SetOutput(os.Stderr)
 
@@ -61,6 +66,7 @@ func TestDebugResolveECR(t *testing.T) {
 }
 
 func TestDebugResolveDockerHub(t *testing.T) {
+	t.Parallel()
 	if os.Getenv("TALLY_TEST_REGISTRY") == "" {
 		t.Skip("set TALLY_TEST_REGISTRY=1 to run Docker Hub tests (may be rate-limited)")
 	}

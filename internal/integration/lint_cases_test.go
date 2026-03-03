@@ -815,6 +815,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// No multi spaces tests (isolated to no-multi-spaces rule)
+		{
+			name:     "no-multi-spaces",
+			dir:      "no-multi-spaces",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/no-multi-spaces")...),
+			wantExit: 1,
+		},
+
 		// Epilogue order tests (isolated to epilogue-order rule)
 		{
 			name:     "epilogue-order",

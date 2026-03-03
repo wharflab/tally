@@ -81,5 +81,5 @@
       }
     }
   ],
-  "ignorePatterns": ["out", "dist", "node_modules", "tests/fixtures/**"]
+  "ignorePatterns": ["out", "dist", "node_modules", "tests/fixtures/**", "src/vendor/**"]
 }

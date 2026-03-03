@@ -1,0 +1,189 @@
+{
+  "files": [
+    {
+      "file": "testdata/no-multi-spaces/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-multi-spaces/",
+          "location": {
+            "end": {
+              "column": 6,
+              "line": 1
+            },
+            "file": "testdata/no-multi-spaces/Dockerfile",
+            "start": {
+              "column": 4,
+              "line": 1
+            }
+          },
+          "message": "multiple consecutive spaces (1 extra)",
+          "rule": "tally/no-multi-spaces",
+          "severity": "style",
+          "sourceCode": "FROM  alpine:3.20",
+          "suggestedFix": {
+            "description": "Remove extra spaces",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 6,
+                    "line": 1
+                  },
+                  "file": "testdata/no-multi-spaces/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 1
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 10
+          }
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-multi-spaces/",
+          "location": {
+            "end": {
+              "column": 13,
+              "line": 3
+            },
+            "file": "testdata/no-multi-spaces/Dockerfile",
+            "start": {
+              "column": 11,
+              "line": 3
+            }
+          },
+          "message": "multiple consecutive spaces (2 extra)",
+          "rule": "tally/no-multi-spaces",
+          "severity": "style",
+          "sourceCode": "RUN apk add  --no-cache  curl",
+          "suggestedFix": {
+            "description": "Remove extra spaces",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 13,
+                    "line": 3
+                  },
+                  "file": "testdata/no-multi-spaces/Dockerfile",
+                  "start": {
+                    "column": 12,
+                    "line": 3
+                  }
+                },
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 25,
+                    "line": 3
+                  },
+                  "file": "testdata/no-multi-spaces/Dockerfile",
+                  "start": {
+                    "column": 24,
+                    "line": 3
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 10
+          }
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-multi-spaces/",
+          "location": {
+            "end": {
+              "column": 6,
+              "line": 6
+            },
+            "file": "testdata/no-multi-spaces/Dockerfile",
+            "start": {
+              "column": 4,
+              "line": 6
+            }
+          },
+          "message": "multiple consecutive spaces (1 extra)",
+          "rule": "tally/no-multi-spaces",
+          "severity": "style",
+          "sourceCode": "COPY  . /app",
+          "suggestedFix": {
+            "description": "Remove extra spaces",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 6,
+                    "line": 6
+                  },
+                  "file": "testdata/no-multi-spaces/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 6
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 10
+          }
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-multi-spaces/",
+          "location": {
+            "end": {
+              "column": 5,
+              "line": 12
+            },
+            "file": "testdata/no-multi-spaces/Dockerfile",
+            "start": {
+              "column": 3,
+              "line": 12
+            }
+          },
+          "message": "multiple consecutive spaces (1 extra)",
+          "rule": "tally/no-multi-spaces",
+          "severity": "style",
+          "sourceCode": "CMD  [\"sh\"]",
+          "suggestedFix": {
+            "description": "Remove extra spaces",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 5,
+                    "line": 12
+                  },
+                  "file": "testdata/no-multi-spaces/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 12
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 10
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 4,
+    "total": 4,
+    "warnings": 0
+  }
+}

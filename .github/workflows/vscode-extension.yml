@@ -1,5 +1,5 @@
 ---
-name: VS Code Smoke
+name: VS Code Extension
 on:
   pull_request:
     branches: [main]
@@ -28,11 +28,26 @@ jobs:
           go-version-file: go.mod
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
+      - name: Install extension dependencies
+        working-directory: _integrations/vscode-tally
+        run: bun install --frozen-lockfile
+      - name: Typescript check
+        working-directory: _integrations/vscode-tally
+        run: bun run typecheck
+      - name: Lint
+        working-directory: _integrations/vscode-tally
+        run: bun run lint
+      - name: Formatting check
+        working-directory: _integrations/vscode-tally
+        run: bun run format:check
+      - name: Test packaging
+        working-directory: _integrations/vscode-tally
+        run: bun run vsce:package
       - name: Resolve VS Code version
         id: vscode
         run: |
           set -euo pipefail
-          VERSION=$(curl -fsSL "https://update.code.visualstudio.com/api/releases/stable?released=true" | python3 -c 'import json,sys; print(json.load(sys.stdin)[0])')
+          VERSION=$(curl -fsSL "https://update.code.visualstudio.com/api/releases/stable?released=true" | jq -r '.[0]')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Cache VS Code test install
         uses: actions/cache@v5
@@ -41,13 +56,10 @@ jobs:
           key: vscode-test-${{ runner.os }}-${{ steps.vscode.outputs.version }}
           restore-keys: |
             vscode-test-${{ runner.os }}-
-      - name: Install Xvfb
-        run: sudo apt-get update && sudo apt-get install -y xvfb
       - name: Prepare coverage dir
         run: mkdir -p "$GOCOVERDIR"
-      - name: Install extension dependencies
-        working-directory: _integrations/vscode-tally
-        run: bun install --frozen-lockfile
+      - name: Install Xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
       - name: Run smoke test
         working-directory: _integrations/vscode-tally
         env:

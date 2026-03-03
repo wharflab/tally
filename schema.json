@@ -356,6 +356,28 @@
       "title": "tally/newline-per-chained-call rule config",
       "type": "object"
     },
+    "rule-tally-no-multi-spaces": {
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/no-multi-spaces rule.",
+      "examples": [
+        {
+          "severity": "style"
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "tally/no-multi-spaces rule config",
+      "type": "object"
+    },
     "rule-tally-no-trailing-spaces": {
       "additionalProperties": false,
       "description": "Configuration options for the tally/no-trailing-spaces rule.",
@@ -748,6 +770,9 @@
         },
         "newline-per-chained-call": {
           "$ref": "#/$defs/rule-tally-newline-per-chained-call"
+        },
+        "no-multi-spaces": {
+          "$ref": "#/$defs/rule-tally-no-multi-spaces"
         },
         "no-trailing-spaces": {
           "$ref": "#/$defs/rule-tally-no-trailing-spaces"

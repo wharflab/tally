@@ -2,7 +2,6 @@
 name: create-tally-rule
 description: Implement a new custom `tally/*` Dockerfile lint rule end-to-end (rule code, detection logic, tests, realistic fixtures, snapshots, and docs). Use when a user describes desired behavior for a new tally-specific rule.
 argument-hint: plain-language description of what the rule should detect/enforce
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash(go *), Bash(make *), Bash(git status), mcp__github__search_code, mcp__github__get_file_contents
 ---
 
 # Create a New `tally/*` Rule
@@ -171,6 +170,75 @@ If async is required:
 2. Implement/register resolver under `internal/fix/`.
 3. Ensure resolver computes edits from current modified content.
 4. Keep async scope minimal; avoid async when a sync edit can cover the case safely.
+
+## Step 4.7: Design Narrow, Non-Overlapping Fix Edits
+
+The fixer applies fixes from multiple rules to the same file. A `SuggestedFix` is **atomic**: if ANY of its
+`TextEdit` ranges overlap with an already-reserved edit from a higher-priority rule, the ENTIRE fix is skipped.
+Conflict detection uses **original positions** (before any edits are applied). Design every edit to be the
+narrowest range that achieves the goal.
+
+### Core principles
+
+1. **Delete only excess characters, never replace-and-reinsert.**
+   Bad: replace a run of N spaces with `" "` (touches the entire run).
+   Good: keep the first space, delete only the N−1 extras → `NewText: ""`, range covers only the surplus.
+   This keeps the edit range small so it doesn't collide with adjacent edits from other rules.
+
+2. **Prefer zero-width insertions over range replacements.**
+   A zero-width edit (`Start == End`) inserts text at a point without consuming source characters.
+   By the overlap formula (`aEnd.Column <= bStart.Column` → no overlap), a zero-width insertion at column C
+   never conflicts with a deletion or replacement that **ends** at C or **starts** at C.
+   Use this for structural transforms that add content (continuation `\`, newlines, indentation).
+
+3. **Split wide replacements into deletion + insertion pairs.**
+   Bad: replace `" && "` (space-operator-space) with `" \\\n\t&& "` — one wide edit that conflicts with any
+   space-cleanup edit in the same region.
+   Good: emit two edits —
+   - Deletion: remove exactly 1 space before the operator (narrow range, adjacent to but not overlapping
+     with space-cleanup edits from other rules).
+   - Insertion: zero-width at the operator position, inserting `\\\n\t` (the continuation line break).
+   The operator itself (`&&`) stays in place and is never part of any edit range.
+
+4. **Never include existing source tokens in `NewText` when they can stay in place.**
+   If `&&` is already in the document, don't replace it — insert/delete around it. This keeps the edit
+   zero-width at the token boundary and avoids claiming the token's column range.
+
+5. **One violation per line for line-scoped rules.**
+   The post-processing pipeline deduplicates violations by `(file, line, rule)`. If a rule can produce
+   multiple findings on the same line, group them into a **single `Violation`** whose `SuggestedFix` contains
+   **multiple `TextEdit` entries** (one per finding). Each edit is still narrow and independent.
+
+### Verifying non-overlap
+
+When a new rule's fixes may touch the same instruction as an existing rule, dump all edit ranges to confirm
+no pair overlaps:
+
+```bash
+tally lint --format json --ignore '*' \
+  --select 'tally/new-rule' --select 'tally/other-rule' \
+  Dockerfile | python3 -c "
+import json, sys
+for f in json.load(sys.stdin)['files']:
+  for v in f['violations']:
+    fix = v.get('suggestedFix')
+    if fix:
+      for i, e in enumerate(fix['edits']):
+        el = e['location']
+        print(f'{v[\"rule\"]:40s} edit[{i}]: L{el[\"start\"][\"line\"]}:{el[\"start\"][\"column\"]:>3d}'
+              f'-L{el[\"end\"][\"line\"]}:{el[\"end\"][\"column\"]:>3d}  -> {e[\"newText\"]!r}')
+"
+```
+
+Two edits on the same line overlap iff neither is completely before the other:
+`NOT (aEnd ≤ bStart OR bEnd ≤ aStart)`. Adjacency (aEnd == bStart) is **not** overlap.
+
+### Integration test for cross-rule fixes
+
+Always add a `TestFix*` scenario that enables **all interacting rules simultaneously** and snapshots the
+result. This catches regressions in edit width, priority ordering, and conflict resolution. See
+`TestFixCrossRuleMultiSpacesIndentationChain` for a 3-rule example (`no-multi-spaces` + `consistent-indentation`
+and `newline-per-chained-call`).
 
 ## Step 5: Add Unit Tests
 

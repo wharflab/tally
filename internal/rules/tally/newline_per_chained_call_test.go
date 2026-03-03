@@ -296,12 +296,12 @@ func TestNewlinePerChainedCallCheckWithFixes(t *testing.T) {
 		{
 			name:      "RUN two commands - one boundary edit",
 			content:   "FROM alpine:3.20\nRUN apt-get update && apt-get install -y curl\n",
-			wantEdits: 1,
+			wantEdits: 2, // 1 deletion + 1 insertion per boundary
 		},
 		{
 			name:      "RUN three commands - two boundary edits",
 			content:   "FROM alpine:3.20\nRUN cmd1 && cmd2 && cmd3\n",
-			wantEdits: 2,
+			wantEdits: 4, // 2 boundaries × 2 edits each
 		},
 		{
 			name:      "RUN two mounts - two edits (between mounts + mount-to-cmd)",
@@ -353,7 +353,7 @@ func TestNewlinePerChainedCallCheckWithFixes(t *testing.T) {
 				"RUN --mount=type=cache,target=/var/cache/apt " +
 				"--mount=type=bind,source=go.sum,target=go.sum " +
 				"echo \"--mount=fake\" && echo done\n",
-			wantEdits: 3, // 2 mount splits + 1 chain split
+			wantEdits: 4, // 2 mount splits + 1 chain split (2 edits: delete + insert)
 			wantFixedContent: "FROM alpine:3.20\n" +
 				"RUN --mount=type=cache,target=/var/cache/apt \\\n" +
 				"\t--mount=type=bind,source=go.sum,target=go.sum \\\n" +

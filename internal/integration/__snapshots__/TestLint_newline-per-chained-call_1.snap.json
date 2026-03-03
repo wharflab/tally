@@ -26,7 +26,7 @@
               {
                 "location": {
                   "end": {
-                    "column": 22,
+                    "column": 19,
                     "line": 4
                   },
                   "file": "testdata/newline-per-chained-call/Dockerfile",
@@ -35,12 +35,26 @@
                     "line": 4
                   }
                 },
-                "newText": " \\\n\t\u0026\u0026 "
+                "newText": ""
               },
               {
                 "location": {
                   "end": {
-                    "column": 49,
+                    "column": 19,
+                    "line": 4
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 19,
+                    "line": 4
+                  }
+                },
+                "newText": " \\\n\t"
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 46,
                     "line": 4
                   },
                   "file": "testdata/newline-per-chained-call/Dockerfile",
@@ -49,7 +63,21 @@
                     "line": 4
                   }
                 },
-                "newText": " \\\n\t\u0026\u0026 "
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 46,
+                    "line": 4
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 46,
+                    "line": 4
+                  }
+                },
+                "newText": " \\\n\t"
               }
             ],
             "isPreferred": true,
@@ -213,7 +241,7 @@
               {
                 "location": {
                   "end": {
-                    "column": 109,
+                    "column": 106,
                     "line": 20
                   },
                   "file": "testdata/newline-per-chained-call/Dockerfile",
@@ -222,7 +250,21 @@
                     "line": 20
                   }
                 },
-                "newText": " \\\n\t\u0026\u0026 "
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 106,
+                    "line": 20
+                  },
+                  "file": "testdata/newline-per-chained-call/Dockerfile",
+                  "start": {
+                    "column": 106,
+                    "line": 20
+                  }
+                },
+                "newText": " \\\n\t"
               }
             ],
             "isPreferred": true,

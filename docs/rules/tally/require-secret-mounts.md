@@ -1,6 +1,7 @@
 # tally/require-secret-mounts
 
-Enforces `--mount=type=secret` on RUN instructions that execute commands requiring access to secrets — private registry credentials, API keys, cloud provider tokens, and similar sensitive data.
+Enforces `--mount=type=secret` on RUN instructions that execute commands requiring access to secrets — private registry credentials, API keys, cloud
+provider tokens, and similar sensitive data.
 
 | Property | Value |
 |----------|-------|
@@ -11,9 +12,11 @@ Enforces `--mount=type=secret` on RUN instructions that execute commands requiri
 
 ## Description
 
-BuildKit secret mounts (`--mount=type=secret`) are the recommended way to pass sensitive data into build steps without baking it into the image layer. Without enforcement it is easy to forget the mount flag, causing builds to fail or — worse — fall back to unauthenticated access silently.
+BuildKit secret mounts (`--mount=type=secret`) are the recommended way to pass sensitive data into build steps without baking it into the image layer.
+Without enforcement it is easy to forget the mount flag, causing builds to fail or — worse — fall back to unauthenticated access silently.
 
-This rule lets you declare which commands need which secrets and enforces the declaration at lint time. Secrets can be mounted as **files** (via `target`) or as **environment variables** (via `env`).
+This rule lets you declare which commands need which secrets and enforces the declaration at lint time. Secrets can be mounted as **files** (via
+`target`) or as **environment variables** (via `env`).
 
 The rule is **disabled by default** and requires explicit user configuration mapping command names to secret mount specifications.
 
@@ -28,7 +31,8 @@ Map each command name to a secret mount specification:
 | `env` | string | Environment variable name to expose the secret as. |
 | `required` | bool | Fail the build if the secret is not provided (default: `false`). |
 
-At least one of `target` or `env` must be set. Both can be used together — Docker supports mounting a secret as both a file and an environment variable simultaneously.
+At least one of `target` or `env` must be set. Both can be used together — Docker supports mounting a secret as both a file and an environment
+variable simultaneously.
 
 ```toml
 [rules.tally.require-secret-mounts]
@@ -147,7 +151,8 @@ RUN --mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf --mount=typ
 
 ## Cross-Rule Interaction
 
-This rule works alongside `tally/prefer-package-cache-mounts`. Both rules can fire on the same `RUN` instruction. Both use zero-length insertions right after `RUN` for their mount flags, so they compose in a single `--fix` pass without conflicting.
+This rule works alongside `tally/prefer-package-cache-mounts`. Both rules can fire on the same `RUN` instruction. Both use zero-length insertions
+right after `RUN` for their mount flags, so they compose in a single `--fix` pass without conflicting.
 
 ## References
 

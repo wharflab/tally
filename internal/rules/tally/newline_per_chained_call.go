@@ -413,6 +413,16 @@ func skipFlagValue(line string, offset int) int {
 
 // generateChainEdits creates TextEdits for chain boundary splits.
 // Source text positions from the shell parser need mapping to Dockerfile coordinates.
+//
+// Each boundary produces up to two narrow edits that preserve the existing
+// operator (&&/||) in place:
+//  1. Delete exactly one space before the operator (if present) — this space is
+//     subsumed by the continuation line's " \" suffix.
+//  2. Insert " \\\n{indent}\t" at the operator position (zero-width) — pushes
+//     the operator onto an indented continuation line.
+//
+// Surrounding extra spaces (if any) are left to no-multi-spaces / no-trailing-spaces,
+// whose edits don't overlap with these narrow ranges.
 func (r *NewlinePerChainedCallRule) generateChainEdits(
 	boundaries []shell.ChainBoundary,
 	startLine int,
@@ -420,13 +430,13 @@ func (r *NewlinePerChainedCallRule) generateChainEdits(
 	instrIndent string,
 	file string,
 ) []rules.TextEdit {
-	edits := make([]rules.TextEdit, 0, len(boundaries))
+	edits := make([]rules.TextEdit, 0, len(boundaries)*2)
 
 	for _, b := range boundaries {
 		// Map source text lines to Dockerfile lines.
 		// Line 1 in source text = startLine in Dockerfile.
 		leftDocLine := startLine + b.LeftEndLine - 1
-		rightDocLine := startLine + b.RightStartLine - 1
+		opDocLine := startLine + b.OpLine - 1
 
 		// Column mapping: line 1 of source text starts at cmdStartCol;
 		// continuation lines start at column 0 (after leading whitespace is
@@ -435,15 +445,28 @@ func (r *NewlinePerChainedCallRule) generateChainEdits(
 		if b.LeftEndLine == 1 {
 			leftDocCol += cmdStartCol
 		}
-		rightDocCol := b.RightStartCol - 1 // 1-based to 0-based
-		if b.RightStartLine == 1 {
-			rightDocCol += cmdStartCol
+		opDocCol := b.OpCol - 1 // 1-based to 0-based
+		if b.OpLine == 1 {
+			opDocCol += cmdStartCol
 		}
 
-		newText := " \\\n" + instrIndent + "\t" + b.Op + " "
+		// Edit 1 (deletion): remove exactly one space before the operator.
+		// The space is no longer needed because the insertion below starts
+		// with " \" which supplies the separator.  We only delete when there
+		// IS a gap (leftDocCol < opDocCol); if the operator is flush against
+		// the command we skip the deletion.
+		if leftDocCol < opDocCol {
+			edits = append(edits, rules.TextEdit{
+				Location: rules.NewRangeLocation(file, leftDocLine, leftDocCol, leftDocLine, leftDocCol+1),
+				NewText:  "",
+			})
+		}
+
+		// Edit 2 (insertion): zero-width at the operator position.
+		// The operator itself (&&/||) and any trailing space remain in place.
 		edits = append(edits, rules.TextEdit{
-			Location: rules.NewRangeLocation(file, leftDocLine, leftDocCol, rightDocLine, rightDocCol),
-			NewText:  newText,
+			Location: rules.NewRangeLocation(file, opDocLine, opDocCol, opDocLine, opDocCol),
+			NewText:  " \\\n" + instrIndent + "\t",
 		})
 	}
 

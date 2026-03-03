@@ -248,4 +248,4 @@ func TestClassifyContainersError_UnknownError_DefaultsToNetwork(t *testing.T) {
 }
 
 // Verify that net.Error interface is properly satisfied by fakeNetError.
-var _ net.Error = (*fakeNetError)(nil)
+var _ net.Error = (*fakeNetError)(nil) //nolint:errcheck // compile-time interface assertion, not an error return

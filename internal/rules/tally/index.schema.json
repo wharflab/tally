@@ -18,6 +18,9 @@
     "newline-per-chained-call": {
       "$ref": "./newline_per_chained_call.schema.json"
     },
+    "no-multi-spaces": {
+      "$ref": "./no_multi_spaces.schema.json"
+    },
     "no-trailing-spaces": {
       "$ref": "./no_trailing_spaces.schema.json"
     },

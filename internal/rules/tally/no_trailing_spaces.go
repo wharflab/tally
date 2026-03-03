@@ -82,9 +82,10 @@ func (r *NoTrailingSpacesRule) Check(input rules.LintInput) []rules.Violation {
 	skipBlankLines := cfg.SkipBlankLines != nil && *cfg.SkipBlankLines
 	ignoreComments := cfg.IgnoreComments != nil && *cfg.IgnoreComments
 
-	var violations []rules.Violation
+	lines := sm.Lines()
+	violations := make([]rules.Violation, 0, len(lines))
 
-	for i, line := range sm.Lines() {
+	for i, line := range lines {
 		trimmed := strings.TrimRight(line, " \t")
 		if trimmed == line {
 			continue // no trailing whitespace
