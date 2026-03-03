@@ -1,6 +1,6 @@
 [global]
 exclude = ["**/__snapshots__/*.snap.md", "_integrations/zed-tally/grammars/*"]
-disable = ["MD036"]
+disable = ["MD036", "MD058"]
 
 [MD013]
 line_length = 150
