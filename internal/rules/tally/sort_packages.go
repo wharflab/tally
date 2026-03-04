@@ -148,17 +148,17 @@ func (r *SortPackagesRule) checkInstallCommand(
 		return nil
 	}
 
-	// Sort literals by case-insensitive sort key
+	// Sort literals by case-insensitive sort key (using Normalized for comparison)
 	sorted := make([]shell.PackageArg, len(literals))
 	copy(sorted, literals)
 	slices.SortStableFunc(sorted, func(a, b shell.PackageArg) int {
-		return strings.Compare(sortKey(a.Value), sortKey(b.Value))
+		return strings.Compare(sortKey(a.Normalized), sortKey(b.Normalized))
 	})
 
-	// Check if already sorted (literals in order, then variables in original order)
+	// Check if already sorted
 	alreadySorted := true
 	for i, lit := range literals {
-		if lit.Value != sorted[i].Value {
+		if lit.Normalized != sorted[i].Normalized {
 			alreadySorted = false
 			break
 		}
@@ -197,7 +197,7 @@ func (r *SortPackagesRule) buildSlotEdits(
 	edits := make([]rules.TextEdit, 0, len(originals))
 
 	for i, orig := range originals {
-		if orig.Value == sorted[i].Value {
+		if orig.Normalized == sorted[i].Normalized {
 			continue // Already in correct position
 		}
 

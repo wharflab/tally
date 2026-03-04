@@ -10,11 +10,16 @@ import (
 
 // PackageArg represents a single package argument with its position in the source text.
 type PackageArg struct {
-	Value    string // literal text (e.g., "curl", "flask==2.0", "${PKG}")
-	Line     int    // 0-based line within the source text
-	StartCol int    // 0-based start column (byte offset)
-	EndCol   int    // 0-based end column (byte offset, exclusive)
-	IsVar    bool   // true if the argument contains a variable reference ($)
+	// Value is the raw source token text (including any quotes), used for
+	// round-trip safe edits. The edit span (StartCol..EndCol) covers exactly
+	// these bytes.
+	Value string
+	// Normalized is the unquoted/decoded text used for sorting and comparison.
+	Normalized string
+	Line       int  // 0-based line within the source text
+	StartCol   int  // 0-based start column (byte offset)
+	EndCol     int  // 0-based end column (byte offset, exclusive)
+	IsVar      bool // true if the argument contains a variable reference ($)
 }
 
 // InstallCommand represents a detected package install command with per-argument positions.
@@ -77,6 +82,9 @@ func FindInstallPackages(script string, variant Variant) []InstallCommand {
 		return nil
 	}
 
+	// Split source into lines for raw token extraction.
+	srcLines := strings.Split(script, "\n")
+
 	var commands []InstallCommand
 
 	syntax.Walk(prog, func(node syntax.Node) bool {
@@ -96,12 +104,13 @@ func FindInstallPackages(script string, variant Variant) []InstallCommand {
 		if !found {
 			// Check wrapped commands (env, nice, etc.)
 			if commandWrappers[cmdName] {
-				commands = append(commands, findWrappedInstallPackages(call.Args[1:], variant, cmdName)...)
+				commands = append(commands,
+					findWrappedInstallPackages(call.Args[1:], variant, cmdName, srcLines)...)
 			}
 			return true
 		}
 
-		cmd := extractInstallCommand(cmdName, mgr, call.Args[1:])
+		cmd := extractInstallCommand(cmdName, mgr, call.Args[1:], srcLines)
 		if cmd != nil {
 			commands = append(commands, *cmd)
 		}
@@ -113,7 +122,10 @@ func FindInstallPackages(script string, variant Variant) []InstallCommand {
 }
 
 // extractInstallCommand extracts package arguments with positions from a call expression.
-func extractInstallCommand(cmdName string, mgr installManagerInfo, args []*syntax.Word) *InstallCommand {
+// srcLines are the source text lines used to extract raw token text for round-trip safe edits.
+func extractInstallCommand(
+	cmdName string, mgr installManagerInfo, args []*syntax.Word, srcLines []string,
+) *InstallCommand {
 	// Find the install subcommand
 	installIdx := -1
 	for i, arg := range args {
@@ -157,16 +169,16 @@ func extractInstallCommand(cmdName string, mgr installManagerInfo, args []*synta
 			continue
 		}
 
-		// Get the text representation of the argument
-		argText := wordText(arg)
-		if argText == "" {
+		// Get the normalized (unquoted) text for comparison and flag detection
+		normalized := wordText(arg)
+		if normalized == "" {
 			continue
 		}
 
 		// Skip flags
-		if strings.HasPrefix(argText, "-") {
+		if strings.HasPrefix(normalized, "-") {
 			// Some flags take a following argument
-			if isFlagWithValue(argText) {
+			if isFlagWithValue(normalized) {
 				skipNext = true
 			}
 			continue
@@ -174,13 +186,20 @@ func extractInstallCommand(cmdName string, mgr installManagerInfo, args []*synta
 
 		pos := arg.Pos()
 		endPos := arg.End()
+		line := int(pos.Line()) - 1     //nolint:gosec // shell positions won't overflow
+		startCol := int(pos.Col()) - 1  //nolint:gosec
+		endCol := int(endPos.Col()) - 1 //nolint:gosec
+
+		// Extract raw source token for round-trip safe edits
+		raw := extractRawToken(srcLines, line, startCol, endCol)
 
 		packages = append(packages, PackageArg{
-			Value:    argText,
-			Line:     int(pos.Line()) - 1,   //nolint:gosec // shell positions won't overflow
-			StartCol: int(pos.Col()) - 1,    //nolint:gosec
-			EndCol:   int(endPos.Col()) - 1, //nolint:gosec
-			IsVar:    strings.Contains(argText, "$"),
+			Value:      raw,
+			Normalized: normalized,
+			Line:       line,
+			StartCol:   startCol,
+			EndCol:     endCol,
+			IsVar:      strings.Contains(normalized, "$"),
 		})
 	}
 
@@ -194,17 +213,35 @@ func extractInstallCommand(cmdName string, mgr installManagerInfo, args []*synta
 	}
 }
 
+// extractRawToken extracts the raw source text for a token at the given position.
+// This preserves quoting (e.g., "flask==2.0" stays as "flask==2.0") for round-trip safe edits.
+func extractRawToken(srcLines []string, line, startCol, endCol int) string {
+	if line < 0 || line >= len(srcLines) {
+		return ""
+	}
+	l := srcLines[line]
+	if startCol < 0 {
+		startCol = 0
+	}
+	if endCol > len(l) {
+		endCol = len(l)
+	}
+	if startCol >= endCol {
+		return ""
+	}
+	return l[startCol:endCol]
+}
+
 // findWrappedInstallPackages finds install commands within wrapper arguments.
-func findWrappedInstallPackages(args []*syntax.Word, variant Variant, wrapperName string) []InstallCommand {
+func findWrappedInstallPackages(
+	args []*syntax.Word, variant Variant, wrapperName string, srcLines []string,
+) []InstallCommand {
 	var commands []InstallCommand
 
 	IterateWrapperArgs(args, wrapperName, func(wa WrapperArg) bool {
 		mgr, found := installManagers[wa.Name]
 		if found {
-			allArgs := append([]*syntax.Word{wa.Arg}, wa.RemainingArgs...)
-			// The first element is the command name itself, skip it
-			cmd := extractInstallCommand(wa.Name, mgr, wa.RemainingArgs)
-			_ = allArgs // suppress unused
+			cmd := extractInstallCommand(wa.Name, mgr, wa.RemainingArgs, srcLines)
 			if cmd != nil {
 				commands = append(commands, *cmd)
 			}
@@ -212,7 +249,8 @@ func findWrappedInstallPackages(args []*syntax.Word, variant Variant, wrapperNam
 
 		// Recurse for nested wrappers
 		if commandWrappers[wa.Name] {
-			commands = append(commands, findWrappedInstallPackages(wa.RemainingArgs, variant, wa.Name)...)
+			commands = append(commands,
+				findWrappedInstallPackages(wa.RemainingArgs, variant, wa.Name, srcLines)...)
 		}
 		return true
 	})

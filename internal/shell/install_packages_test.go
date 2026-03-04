@@ -306,6 +306,40 @@ func TestFindInstallPackagesIsVar(t *testing.T) {
 	}
 }
 
+func TestFindInstallPackagesQuotedPreservesRaw(t *testing.T) {
+	t.Parallel()
+
+	// Quoted packages should preserve raw text (including quotes) in Value
+	// and have unquoted text in Normalized for round-trip safe edits.
+	script := `pip install "flask==2.0" 'django==4.0'`
+	commands := FindInstallPackages(script, VariantBash)
+
+	if len(commands) != 1 {
+		t.Fatalf("got %d commands, want 1", len(commands))
+	}
+
+	pkgs := commands[0].Packages
+	if len(pkgs) != 2 {
+		t.Fatalf("got %d packages, want 2", len(pkgs))
+	}
+
+	// Value should be the raw token including quotes
+	if pkgs[0].Value != `"flask==2.0"` {
+		t.Errorf("packages[0].Value = %q, want %q", pkgs[0].Value, `"flask==2.0"`)
+	}
+	if pkgs[1].Value != `'django==4.0'` {
+		t.Errorf("packages[1].Value = %q, want %q", pkgs[1].Value, `'django==4.0'`)
+	}
+
+	// Normalized should be unquoted
+	if pkgs[0].Normalized != "flask==2.0" {
+		t.Errorf("packages[0].Normalized = %q, want %q", pkgs[0].Normalized, "flask==2.0")
+	}
+	if pkgs[1].Normalized != "django==4.0" {
+		t.Errorf("packages[1].Normalized = %q, want %q", pkgs[1].Normalized, "django==4.0")
+	}
+}
+
 func TestFindInstallPackagesMultiLine(t *testing.T) {
 	t.Parallel()
 
