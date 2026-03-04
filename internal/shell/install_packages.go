@@ -24,8 +24,9 @@ type PackageArg struct {
 
 // InstallCommand represents a detected package install command with per-argument positions.
 type InstallCommand struct {
-	Manager  string       // e.g., "apt-get", "npm", "pip"
-	Packages []PackageArg // non-flag args after subcommand, with positions
+	Manager    string       // e.g., "apt-get", "npm", "pip"
+	Subcommand string       // e.g., "install", "add", "require"
+	Packages   []PackageArg // non-flag args after subcommand, with positions
 }
 
 // installManagerInfo describes how to parse a package manager command for sorting.
@@ -150,6 +151,7 @@ func extractInstallCommand(
 ) *InstallCommand {
 	// Find the install subcommand
 	installIdx := -1
+	var subcommand string
 	for i, arg := range args {
 		lit := arg.Lit()
 		if lit == "" {
@@ -157,6 +159,7 @@ func extractInstallCommand(
 		}
 		if slices.Contains(mgr.installCommands, lit) {
 			installIdx = i
+			subcommand = lit
 			break
 		}
 	}
@@ -230,8 +233,9 @@ func extractInstallCommand(
 	}
 
 	return &InstallCommand{
-		Manager:  cmdName,
-		Packages: packages,
+		Manager:    cmdName,
+		Subcommand: subcommand,
+		Packages:   packages,
 	}
 }
 

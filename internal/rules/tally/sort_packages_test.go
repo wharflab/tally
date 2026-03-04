@@ -80,7 +80,7 @@ func TestSortPackagesCheck(t *testing.T) {
 			Name:           "unsorted apk",
 			Content:        "FROM alpine:3.20\nRUN apk add --no-cache wget curl\n",
 			WantViolations: 1,
-			WantMessages:   []string{"packages in apk install are not sorted"},
+			WantMessages:   []string{"packages in apk add are not sorted"},
 		},
 		{
 			Name:           "unsorted npm",
@@ -104,7 +104,7 @@ func TestSortPackagesCheck(t *testing.T) {
 			Name:           "unsorted yarn",
 			Content:        "FROM node:20\nRUN yarn add react axios\n",
 			WantViolations: 1,
-			WantMessages:   []string{"packages in yarn install are not sorted"},
+			WantMessages:   []string{"packages in yarn add are not sorted"},
 		},
 		{
 			Name:           "multi-line unsorted",

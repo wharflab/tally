@@ -170,7 +170,7 @@ func (r *SortPackagesRule) checkInstallCommand(
 	// Build slot-based replacement edits
 	edits := r.buildSlotEdits(literals, sorted, startLine, cmdStartCol, file)
 
-	msg := fmt.Sprintf("packages in %s install are not sorted alphabetically", ic.Manager)
+	msg := fmt.Sprintf("packages in %s %s are not sorted alphabetically", ic.Manager, ic.Subcommand)
 
 	v := rules.NewViolation(loc, meta.Code, msg, meta.DefaultSeverity).
 		WithDocURL(meta.DocURL).
