@@ -268,27 +268,20 @@ func wordText(w *syntax.Word) string {
 
 // isFlagWithValue returns true for flags that consume the next argument as a value.
 func isFlagWithValue(flag string) bool {
-	// Common flags with values across package managers
-	switch flag {
-	case "-o", "-t", "--option", "--target-release",
-		"--root", "--installroot",
-		"--prefix", "--target",
-		"--save-dev", "--save-peer", "--save-optional":
-		return false // These are standalone flags
-	}
-
-	// Long flags with = are self-contained
+	// Long flags with = are self-contained and don't consume the next argument.
 	if strings.Contains(flag, "=") {
 		return false
 	}
 
-	// Short single-letter flags that take values
-	if len(flag) == 2 && flag[0] == '-' {
-		switch flag[1] {
-		case 't', 'o':
-			return true
-		}
+	// Common flags that take a value from the next argument.
+	switch flag {
+	case "-o", "--option",
+		"-t", "--target-release",
+		"--root", "--installroot",
+		"--prefix", "--target":
+		return true
 	}
 
+	// By default, assume other flags are standalone (e.g., -y, --no-cache, --save-dev).
 	return false
 }

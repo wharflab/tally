@@ -170,6 +170,27 @@ func TestFindInstallPackages(t *testing.T) {
 			wantCmds: 1,
 			wantPkgs: [][]string{{"curl"}},
 		},
+		{
+			name:     "flag with value not treated as package",
+			script:   "apt-get install -y -t stable curl wget",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"curl", "wget"}},
+		},
+		{
+			name:     "long flag with value not treated as package",
+			script:   "npm install --prefix /app express lodash",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"express", "lodash"}},
+		},
+		{
+			name:     "flag with = is self-contained",
+			script:   "apt-get install -y --option=Dpkg::Options::=--force-confdef curl",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"curl"}},
+		},
 	}
 
 	for _, tt := range tests {
