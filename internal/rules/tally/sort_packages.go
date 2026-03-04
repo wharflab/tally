@@ -225,6 +225,7 @@ func (r *SortPackagesRule) buildSlotEdits(
 // version specifiers. Examples:
 //   - "flask==2.0" → "flask"
 //   - "curl=7.88.1" → "curl"
+//   - "react@18.2.0" → "react" (npm unscoped: strip version after @)
 //   - "@eslint/js" → "@eslint/js"
 //   - "@eslint/js@8.0.0" → "@eslint/js" (npm scoped: strip version after last @)
 func sortKey(pkg string) string {
@@ -232,12 +233,19 @@ func sortKey(pkg string) string {
 
 	// Handle npm scoped packages: @scope/name@version → @scope/name
 	if strings.HasPrefix(key, "@") {
-		// Find the last @ which separates the version
 		lastAt := strings.LastIndex(key, "@")
 		if lastAt > 0 { // Must be > 0 to skip the leading @
 			key = key[:lastAt]
 		}
 		return strings.ToLower(key)
+	}
+
+	// Handle unscoped npm packages: name@version → name
+	// Guard against URLs (git+ssh://git@host/repo) and path-like specs.
+	if at := strings.LastIndex(key, "@"); at > 0 &&
+		!strings.Contains(key, "://") &&
+		!strings.Contains(key[:at], "/") {
+		key = key[:at]
 	}
 
 	// Strip version specifiers: first occurrence of =, >=, <=, ~=, !=, <, >

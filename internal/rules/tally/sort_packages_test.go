@@ -229,6 +229,8 @@ func TestSortKey(t *testing.T) {
 		{"curl=7.88.1-10+deb12u5", "curl"},
 		{"@eslint/js", "@eslint/js"},
 		{"@eslint/js@8.0.0", "@eslint/js"},
+		{"react@18.2.0", "react"},
+		{"lodash@4", "lodash"},
 		{"CamelCase", "camelcase"},
 		{"Zlib", "zlib"},
 	}
