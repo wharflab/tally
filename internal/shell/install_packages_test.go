@@ -191,6 +191,20 @@ func TestFindInstallPackages(t *testing.T) {
 			wantCmds: 1,
 			wantPkgs: [][]string{{"curl"}},
 		},
+		{
+			name:     "-o option consumes next argument",
+			script:   "apt-get install -o Dpkg::Use-Pty=0 curl wget",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"curl", "wget"}},
+		},
+		{
+			name:     "--target-release consumes next argument",
+			script:   "apt-get install --target-release bookworm curl wget",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"curl", "wget"}},
+		},
 	}
 
 	for _, tt := range tests {
