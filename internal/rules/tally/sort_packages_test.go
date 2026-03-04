@@ -64,8 +64,14 @@ func TestSortPackagesCheck(t *testing.T) {
 			WantViolations: 0,
 		},
 		{
-			Name:           "heredoc RUN skipped",
+			Name:           "heredoc RUN sorted",
 			Content:        "FROM alpine:3.20\nRUN <<EOF\napt-get install -y zoo foo\nEOF\n",
+			WantViolations: 1,
+			WantMessages:   []string{"packages in apt-get install are not sorted"},
+		},
+		{
+			Name:           "heredoc RUN already sorted",
+			Content:        "FROM alpine:3.20\nRUN <<EOF\napt-get install -y curl git wget\nEOF\n",
 			WantViolations: 0,
 		},
 

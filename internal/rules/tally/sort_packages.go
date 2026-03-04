@@ -87,42 +87,48 @@ func (r *SortPackagesRule) checkRun(
 		return nil
 	}
 
-	// Skip heredoc-form RUN
-	if len(run.Files) > 0 {
-		return nil
-	}
-
+	isHeredoc := len(run.Files) > 0
 	script := getRunScriptFromCmd(run)
 	if script == "" {
 		return nil
 	}
 
 	startLine := run.Location()[0].Start.Line
-	endLine := resolveEndLine(sm, run.Location())
+	loc := rules.NewLocationFromRanges(file, run.Location())
 
-	// Get instruction source lines for position mapping
+	if isHeredoc {
+		// Heredoc body starts on the next line; no column offset.
+		installCmds := shell.FindInstallPackages(script, shellVariant)
+		return r.collectViolations(installCmds, startLine+1, 0, file, loc, meta)
+	}
+
+	// Shell-form: reconstruct source text from source map lines.
+	endLine := resolveEndLine(sm, run.Location())
 	instrLines := make([]string, 0, endLine-startLine+1)
 	for l := startLine; l <= endLine; l++ {
 		instrLines = append(instrLines, sm.Line(l-1))
 	}
-
 	cmdStartCol := findCmdStartCol(instrLines[0])
-
-	// Reconstruct the source text that the shell parser will see
 	sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol)
-
-	// Find install commands with per-argument positions
 	installCmds := shell.FindInstallPackages(sourceText, shellVariant)
+	return r.collectViolations(installCmds, startLine, cmdStartCol, file, loc, meta)
+}
 
+// collectViolations checks each install command and returns any violations.
+func (r *SortPackagesRule) collectViolations(
+	installCmds []shell.InstallCommand,
+	startLine int,
+	cmdStartCol int,
+	file string,
+	loc rules.Location,
+	meta rules.RuleMetadata,
+) []rules.Violation {
 	var violations []rules.Violation
-	loc := rules.NewLocationFromRanges(file, run.Location())
-
 	for _, ic := range installCmds {
 		if v := r.checkInstallCommand(ic, startLine, cmdStartCol, file, loc, meta); v != nil {
 			violations = append(violations, *v)
 		}
 	}
-
 	return violations
 }
 
