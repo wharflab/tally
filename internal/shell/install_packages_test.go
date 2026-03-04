@@ -229,11 +229,12 @@ func TestFindInstallPackages(t *testing.T) {
 			if len(commands) != tt.wantCmds {
 				t.Fatalf("got %d commands, want %d", len(commands), tt.wantCmds)
 			}
+			if len(tt.wantPkgs) != tt.wantCmds {
+				t.Fatalf("invalid test case: wantPkgs rows (%d) must match wantCmds (%d)",
+					len(tt.wantPkgs), tt.wantCmds)
+			}
 
 			for i, cmd := range commands {
-				if i >= len(tt.wantPkgs) {
-					break
-				}
 				var got []string
 				for _, p := range cmd.Packages {
 					got = append(got, p.Value)
