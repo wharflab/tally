@@ -55,7 +55,6 @@ No violation is emitted when:
 - File-based install: `pip install -r requirements.txt`, `pip install -e .`
 - All arguments are variables
 - Exec-form RUN: `RUN ["apt-get", "install", "curl"]`
-- Heredoc RUN
 - Packages are already sorted
 
 ## Examples
