@@ -1127,6 +1127,39 @@ target = "/root/.config/pip/pip.conf"
 severity = "error"
 `,
 		},
+		// Sort packages: single-line unsorted
+		{
+			name:  "sort-packages-single-line",
+			input: "FROM alpine:3.20\nRUN apt-get install -y wget curl\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages")...),
+			wantApplied: 1,
+		},
+		// Sort packages: multi-line unsorted
+		{
+			name:  "sort-packages-multi-line",
+			input: "FROM alpine:3.20\nRUN apt-get install -y \\\n    zip \\\n    curl \\\n    git\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages")...),
+			wantApplied: 1,
+		},
+		// Sort packages: npm
+		{
+			name:  "sort-packages-npm",
+			input: "FROM node:20\nRUN npm install express axios\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages")...),
+			wantApplied: 1,
+		},
+		// Sort packages: pip with versions
+		{
+			name:  "sort-packages-pip",
+			input: "FROM python:3.12\nRUN pip install flask==2.0 django==4.0\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages")...),
+			wantApplied: 1,
+		},
+
 		// Three rules on the same RUN: secret mount insertion + cache mount
 		// insertion + DL3030 (-y flag insertion) + cache cleanup deletion.
 		// All edits are targeted and non-overlapping.

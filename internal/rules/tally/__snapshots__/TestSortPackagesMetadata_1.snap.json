@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "tally/sort-packages",
+ "DefaultSeverity": "off",
+ "Description": "Package lists in install commands should be sorted alphabetically",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/sort-packages/",
+ "FixPriority": 15,
+ "IsExperimental": true,
+ "Name": "Sort Packages"
+}

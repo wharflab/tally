@@ -1,0 +1,98 @@
+# tally/sort-packages
+
+Package lists in install commands should be sorted alphabetically.
+
+| Property | Value |
+|----------|-------|
+| Severity | Style |
+| Category | Style |
+| Default | Off (experimental) |
+| Auto-fix | Yes (safe) |
+
+## Description
+
+Unsorted package lists in Dockerfile install commands cause unnecessary merge conflicts and hurt readability. This rule enforces alphabetical sorting
+of packages in common package manager install commands.
+
+### Supported Package Managers
+
+| Manager | Install subcommands |
+|---------|-------------------|
+| apt-get, apt | `install` |
+| apk | `add` |
+| dnf, yum | `install` |
+| zypper | `install`, `in` |
+| npm | `install`, `i`, `add` |
+| yarn | `add` |
+| pnpm | `add`, `install`, `i` |
+| pip, pip3 | `install` |
+| bun | `add`, `install`, `i` |
+| composer | `require` |
+
+### Sort key extraction
+
+Version specifiers are stripped for comparison:
+
+- `flask==2.0` sorts as `flask`
+- `curl=7.88.1-10+deb12u5` sorts as `curl`
+- `@eslint/js@8.0.0` sorts as `@eslint/js` (npm scoped package)
+
+Sorting is case-insensitive.
+
+### Variable arguments
+
+When install commands mix literal packages and variable references (`$PKG`, `${PKG}`), only the literal packages are sorted. Variables are kept at the
+end in their original relative order.
+
+### Skipped cases
+
+No violation is emitted when:
+
+- Fewer than 2 literal packages (nothing to sort)
+- File-based install: `pip install -r requirements.txt`, `pip install -e .`
+- All arguments are variables
+- Exec-form RUN: `RUN ["apt-get", "install", "curl"]`
+- Heredoc RUN
+- Packages are already sorted
+
+## Examples
+
+### Bad
+
+```dockerfile
+RUN apt-get install -y \
+    wget \
+    curl \
+    git
+
+RUN npm install express axios
+```
+
+### Good
+
+```dockerfile
+RUN apt-get install -y \
+    curl \
+    git \
+    wget
+
+RUN npm install axios express
+```
+
+## Auto-fix
+
+This rule provides a safe auto-fix that sorts packages in-place. Only the package name text is replaced; whitespace, continuation backslashes, and
+newlines are preserved.
+
+```bash
+tally lint --fix Dockerfile
+```
+
+## Configuration
+
+No custom configuration options. Enable the rule by setting severity:
+
+```toml
+[rules.tally.sort-packages]
+severity = "style"
+```

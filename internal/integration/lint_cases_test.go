@@ -838,5 +838,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/newline-per-chained-call")...),
 			wantExit: 1,
 		},
+
+		// Sort packages tests (isolated to sort-packages rule)
+		{
+			name:     "sort-packages",
+			dir:      "sort-packages",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/sort-packages")...),
+			wantExit: 1,
+		},
 	}
 }
