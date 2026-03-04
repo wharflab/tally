@@ -11,8 +11,11 @@ Package lists in install commands should be sorted alphabetically.
 
 ## Description
 
-Unsorted package lists in Dockerfile install commands cause unnecessary merge conflicts and hurt readability. This rule enforces alphabetical sorting
-of packages in common package manager install commands.
+Whenever possible, multi-line arguments should be sorted alphanumerically to make maintenance easier. This helps to avoid duplication of packages and
+makes the list much easier to update. This also makes PRs a lot easier to read and review.
+
+This rule enforces the [official Docker best practice](https://docs.docker.com/build/building/best-practices/#sort-multi-line-arguments) for sorting
+package lists across common package manager install commands.
 
 ### Supported Package Managers
 
@@ -60,10 +63,12 @@ No violation is emitted when:
 ### Bad
 
 ```dockerfile
-RUN apt-get install -y \
+RUN apt-get update && apt-get install -y \
     wget \
     curl \
-    git
+    git \
+    mercurial \
+    subversion
 
 RUN npm install express axios
 ```
@@ -71,9 +76,11 @@ RUN npm install express axios
 ### Good
 
 ```dockerfile
-RUN apt-get install -y \
+RUN apt-get update && apt-get install -y \
     curl \
     git \
+    mercurial \
+    subversion \
     wget
 
 RUN npm install axios express
@@ -97,3 +104,7 @@ No custom configuration options. The rule is enabled by default with severity "s
 [rules.tally.sort-packages]
 severity = "off"
 ```
+
+## References
+
+- [Docker official best practices: Sort multi-line arguments](https://docs.docker.com/build/building/best-practices/#sort-multi-line-arguments)
