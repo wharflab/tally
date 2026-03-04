@@ -56,6 +56,7 @@ var (
 	}
 	npmFlags      = []string{"--prefix", "--registry", "--save-prefix"}
 	composerFlags = []string{"--working-dir", "-d"}
+	chocoFlags    = []string{"--source", "-s", "--params", "--package-parameters", "--installargs", "--install-arguments", "--version"}
 )
 
 // installManagers maps command names to their install subcommands and flags.
@@ -73,6 +74,7 @@ var installManagers = map[string]installManagerInfo{
 	"pip3":     {installCommands: []string{"install"}, flagsWithValue: pipFlags},
 	"bun":      {installCommands: []string{"add", "install", "i"}},
 	"composer": {installCommands: []string{"require"}, flagsWithValue: composerFlags},
+	"choco":    {installCommands: []string{"install"}, flagsWithValue: chocoFlags},
 }
 
 // pipFileArgs are pip arguments that indicate file-based install (skip sorting).

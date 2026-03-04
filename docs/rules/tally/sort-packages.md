@@ -31,6 +31,7 @@ package lists across common package manager install commands.
 | pip, pip3 | `install` |
 | bun | `add`, `install`, `i` |
 | composer | `require` |
+| choco | `install` |
 
 ### Sort key extraction
 

@@ -47,8 +47,11 @@ func (r *SortPackagesRule) Check(input rules.LintInput) []rules.Violation {
 	var violations []rules.Violation
 	for stageIdx, stage := range input.Stages {
 		variant := resolveShellVariant(sem, stageIdx)
+		// For sort-packages, attempt bash parsing even on cmd/PowerShell stages.
+		// Simple install commands (choco install -y pkg1 pkg2) are syntactically
+		// valid bash. FindInstallPackages returns nil if the parser fails.
 		if !variant.IsParseable() {
-			continue
+			variant = shell.VariantBash
 		}
 		for _, cmd := range stage.Commands {
 			if run, ok := cmd.(*instructions.RunCommand); ok {

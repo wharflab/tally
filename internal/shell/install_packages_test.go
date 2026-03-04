@@ -131,6 +131,20 @@ func TestFindInstallPackages(t *testing.T) {
 			wantPkgs: [][]string{{"curl", "wget"}},
 		},
 		{
+			name:     "choco install",
+			script:   "choco install -y git nodejs python3",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"git", "nodejs", "python3"}},
+		},
+		{
+			name:     "choco install with --source flag",
+			script:   "choco install -y --source https://chocolatey.org/api/v2/ git nodejs",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"git", "nodejs"}},
+		},
+		{
 			name:     "not an install command",
 			script:   "apt-get update",
 			variant:  VariantBash,
