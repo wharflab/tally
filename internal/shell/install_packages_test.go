@@ -205,6 +205,20 @@ func TestFindInstallPackages(t *testing.T) {
 			wantCmds: 1,
 			wantPkgs: [][]string{{"curl", "wget"}},
 		},
+		{
+			name:     "pip --trusted-host consumes next argument",
+			script:   "pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org flask",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"flask"}},
+		},
+		{
+			name:     "pip --upgrade with packages",
+			script:   "pip install --upgrade pip setuptools wheel",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"pip", "setuptools", "wheel"}},
+		},
 	}
 
 	for _, tt := range tests {

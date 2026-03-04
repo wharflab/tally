@@ -31,9 +31,9 @@ func (r *SortPackagesRule) Metadata() rules.RuleMetadata {
 		Name:            "Sort Packages",
 		Description:     "Package lists in install commands should be sorted alphabetically",
 		DocURL:          rules.TallyDocURL(SortPackagesRuleCode),
-		DefaultSeverity: rules.SeverityOff,
+		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
-		IsExperimental:  true,
+		IsExperimental:  false,
 		FixPriority:     15,
 	}
 }

@@ -18,7 +18,7 @@
           },
           "message": "packages in apt-get install are not sorted alphabetically",
           "rule": "tally/sort-packages",
-          "severity": "warning",
+          "severity": "style",
           "sourceCode": "RUN apt-get update \u0026\u0026 apt-get install -y wget curl git",
           "suggestedFix": {
             "description": "Sort packages alphabetically",
@@ -85,7 +85,7 @@
           },
           "message": "packages in apt-get install are not sorted alphabetically",
           "rule": "tally/sort-packages",
-          "severity": "warning",
+          "severity": "style",
           "sourceCode": "RUN apt-get install -y \\",
           "suggestedFix": {
             "description": "Sort packages alphabetically",
@@ -152,7 +152,7 @@
           },
           "message": "packages in npm install are not sorted alphabetically",
           "rule": "tally/sort-packages",
-          "severity": "warning",
+          "severity": "style",
           "sourceCode": "RUN npm install express axios @eslint/js",
           "suggestedFix": {
             "description": "Sort packages alphabetically",
@@ -199,8 +199,8 @@
     "errors": 0,
     "files": 1,
     "info": 0,
-    "style": 0,
+    "style": 3,
     "total": 3,
-    "warnings": 3
+    "warnings": 0
   }
 }

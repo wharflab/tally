@@ -29,27 +29,49 @@ type InstallCommand struct {
 }
 
 // installManagerInfo describes how to parse a package manager command for sorting.
-// This extends the set from packages.go with npm/pip/etc. language managers.
 type installManagerInfo struct {
 	installCommands []string
+	// flagsWithValue lists flags that consume the next argument as a value.
+	// Long flags with "=" are always self-contained and handled separately.
+	flagsWithValue []string
 }
 
-// installManagers maps command names to their install subcommands.
-// Reuses the set from prefer-package-cache-mounts + packages.go.
+// Per-manager flag lists for flags that consume the next token.
+var (
+	aptFlags    = []string{"-o", "--option", "-t", "--target-release"}
+	dnfYumFlags = []string{"--root", "--installroot", "--releasever", "--repo"}
+	pipFlags    = []string{
+		"--trusted-host",
+		"--index-url",
+		"--extra-index-url",
+		"--find-links",
+		"--prefix",
+		"--target",
+		"--progress-bar",
+		"--root-user-action",
+		"-i",
+		"--global-option",
+		"--config-settings",
+	}
+	npmFlags      = []string{"--prefix", "--registry", "--save-prefix"}
+	composerFlags = []string{"--working-dir", "-d"}
+)
+
+// installManagers maps command names to their install subcommands and flags.
 var installManagers = map[string]installManagerInfo{
-	"apt-get":  {installCommands: []string{"install"}},
-	"apt":      {installCommands: []string{"install"}},
+	"apt-get":  {installCommands: []string{"install"}, flagsWithValue: aptFlags},
+	"apt":      {installCommands: []string{"install"}, flagsWithValue: aptFlags},
 	"apk":      {installCommands: []string{"add"}},
-	"dnf":      {installCommands: []string{"install"}},
-	"yum":      {installCommands: []string{"install"}},
+	"dnf":      {installCommands: []string{"install"}, flagsWithValue: dnfYumFlags},
+	"yum":      {installCommands: []string{"install"}, flagsWithValue: dnfYumFlags},
 	"zypper":   {installCommands: []string{"install", "in"}},
-	"npm":      {installCommands: []string{"install", "i", "add"}},
+	"npm":      {installCommands: []string{"install", "i", "add"}, flagsWithValue: npmFlags},
 	"yarn":     {installCommands: []string{"add"}},
-	"pnpm":     {installCommands: []string{"add", "install", "i"}},
-	"pip":      {installCommands: []string{"install"}},
-	"pip3":     {installCommands: []string{"install"}},
+	"pnpm":     {installCommands: []string{"add", "install", "i"}, flagsWithValue: npmFlags},
+	"pip":      {installCommands: []string{"install"}, flagsWithValue: pipFlags},
+	"pip3":     {installCommands: []string{"install"}, flagsWithValue: pipFlags},
 	"bun":      {installCommands: []string{"add", "install", "i"}},
-	"composer": {installCommands: []string{"require"}},
+	"composer": {installCommands: []string{"require"}, flagsWithValue: composerFlags},
 }
 
 // pipFileArgs are pip arguments that indicate file-based install (skip sorting).
@@ -178,7 +200,7 @@ func extractInstallCommand(
 		// Skip flags
 		if strings.HasPrefix(normalized, "-") {
 			// Some flags take a following argument
-			if isFlagWithValue(normalized) {
+			if flagConsumesValue(normalized, mgr.flagsWithValue) {
 				skipNext = true
 			}
 			continue
@@ -304,22 +326,11 @@ func wordText(w *syntax.Word) string {
 	return sb.String()
 }
 
-// isFlagWithValue returns true for flags that consume the next argument as a value.
-func isFlagWithValue(flag string) bool {
-	// Long flags with = are self-contained and don't consume the next argument.
+// flagConsumesValue returns true if flag consumes the next argument as its value.
+// Long flags containing "=" are always self-contained.
+func flagConsumesValue(flag string, managerFlags []string) bool {
 	if strings.Contains(flag, "=") {
 		return false
 	}
-
-	// Common flags that take a value from the next argument.
-	switch flag {
-	case "-o", "--option",
-		"-t", "--target-release",
-		"--root", "--installroot",
-		"--prefix", "--target":
-		return true
-	}
-
-	// By default, assume other flags are standalone (e.g., -y, --no-cache, --save-dev).
-	return false
+	return slices.Contains(managerFlags, flag)
 }

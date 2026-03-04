@@ -6,7 +6,7 @@ Package lists in install commands should be sorted alphabetically.
 |----------|-------|
 | Severity | Style |
 | Category | Style |
-| Default | Off (experimental) |
+| Default | Enabled |
 | Auto-fix | Yes (safe) |
 
 ## Description
@@ -90,9 +90,10 @@ tally lint --fix Dockerfile
 
 ## Configuration
 
-No custom configuration options. Enable the rule by setting severity:
+No custom configuration options. The rule is enabled by default with severity "style".
 
 ```toml
+# Disable the rule
 [rules.tally.sort-packages]
-severity = "style"
+severity = "off"
 ```
