@@ -20,6 +20,7 @@ builds:
     ignore:
       - goos: freebsd
         goarch: arm64
+    # Keep build flags in sync with .github/workflows/binary-size.yml (tags, ldflags, trimpath).
     tags:
       - containers_image_openpgp
       - containers_image_storage_stub

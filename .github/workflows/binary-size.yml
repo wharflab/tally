@@ -1,0 +1,50 @@
+---
+name: Binary Size
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: write
+  pull-requests: write
+env:
+  GOEXPERIMENT: jsonv2
+jobs:
+  track-size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          lfs: true
+      - uses: capnspacehook/go-size-tracker@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          build-environment: |
+            GOEXPERIMENT=jsonv2
+            CGO_ENABLED=0
+            GOSUMDB=sum.golang.org
+          # Keep build flags in sync with .goreleaser.yml (tags, ldflags, trimpath).
+          build-arguments: >-
+            -tags 'containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub' -ldflags="-s -w" -trimpath -o out
+      - name: Post size comment on PR
+        if: github.event_name == 'pull_request' && hashFiles('comment.txt') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          MARKER="<!-- go-size-tracker -->"
+          BODY="$MARKER"$'\n'"$(cat comment.txt)"
+
+          # Find an existing comment with our marker.
+          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --paginate -q ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -1)
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh api "repos/${{ github.repository }}/issues/comments/${COMMENT_ID}" \
+              -X PATCH -f body="$BODY"
+          else
+            gh pr comment "$PR_NUMBER" --body "$BODY"
+          fi
