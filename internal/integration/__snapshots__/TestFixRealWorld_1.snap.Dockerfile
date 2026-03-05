@@ -66,7 +66,7 @@ ARG TRITON_VERSION
 
 RUN <<EOF
 set -e
-pip install --no-cache-dir -U "sagemaker>=2,<3" sagemaker-experiments==0.* sagemaker-pytorch-training smclarify triton==${TRITON_VERSION}
+pip install --no-cache-dir -U smclarify "sagemaker>=2,<3" sagemaker-experiments==0.* sagemaker-pytorch-training triton==${TRITON_VERSION}
 pip install --no-cache-dir -U "bokeh>=3.0.1,<4" "imageio>=2.22,<3" "numba>=0.56.4,<0.57" "opencv-python>=4.6,<5" "plotly>=5.11,<6" "seaborn>=0.12,<1" "shap>=0.41,<1"
 apt-get update
 apt-get install -y build-essential
@@ -79,16 +79,16 @@ ARG DIFFUSERS_VERSION
 ARG TRANSFORMERS_VERSION
 
 RUN pip install --no-cache-dir dill==0.3.6 \
-                               evaluate \
-                               gevent~=23.9.0 \
-                               kenlm==0.1 \
-                               "multiprocess==0.70.14 \
-                               pyarrow~=14.0.1 \
-                               sagemaker==2.132.0 \
                                transformers[sklearn,sentencepiece,audio,vision]==${TRANSFORMERS_VERSION} \
                                datasets==${DATASETS_VERSION} \
                                diffusers==${DIFFUSERS_VERSION} \
-                               $PT_TORCHAUDIO_URL
+                               "$PT_TORCHAUDIO_URL" \
+                               evaluate \
+                               gevent~=23.9.0 \
+                               kenlm==0.1 \
+                               multiprocess==0.70.14 \
+                               pyarrow~=14.0.1 \
+                               sagemaker==2.132.0
 RUN pip install --no-cache-dir setuptools==69.5.1
 
 COPY requirements1.txt .
@@ -204,7 +204,7 @@ RUN <<EOF
 set -e
 apt-get update
 apt-get -y upgrade --only-upgrade systemd
-apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates check cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libgl1-mesa-glx libglib2.0-0 libgomp1 libhwloc-dev libibverbs-dev libnuma-dev libnuma1 libsm6 libssl-dev libssl3 libsubunit-dev libsubunit0 libtool libxext6 libxrender-dev openssl pkg-config python3-dev unzip vim wget zlib1g-dev libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7
+apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7 libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libglib2.0-0 libgl1-mesa-glx libsm6 libxext6 libxrender-dev libgomp1 libibverbs-dev libhwloc-dev libnuma1 libnuma-dev libssl3 libssl-dev libtool openssl python3-dev unzip vim wget zlib1g-dev pkg-config check libsubunit0 libsubunit-dev
 rm -rf /var/lib/apt/lists/*
 apt-get clean
 cd /tmp

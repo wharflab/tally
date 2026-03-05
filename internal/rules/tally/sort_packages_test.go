@@ -144,15 +144,25 @@ func TestSortPackagesMixedLiteralsAndVariables(t *testing.T) {
 		t.Fatalf("got %d violations, want 1", len(violations))
 	}
 
-	// Should sort literals only: foo, zoo (variables stay at tail in original order)
 	fix := violations[0].SuggestedFix
 	if fix == nil {
 		t.Fatal("violation has no SuggestedFix")
 	}
 
-	// There should be 2 edits (swapping zoo and foo)
-	if len(fix.Edits) != 2 {
-		t.Fatalf("got %d edits, want 2", len(fix.Edits))
+	// Insert+delete strategy: 1 insertion (sorted literals block) + 2 deletions
+	if len(fix.Edits) != 3 {
+		t.Fatalf("got %d edits, want 3", len(fix.Edits))
+	}
+
+	// First edit: insertion of sorted literals before first package
+	if fix.Edits[0].NewText != "foo zoo " {
+		t.Errorf("insertion text = %q, want %q", fix.Edits[0].NewText, "foo zoo ")
+	}
+	// Remaining edits: deletions of literals from original positions
+	for _, edit := range fix.Edits[1:] {
+		if edit.NewText != "" {
+			t.Errorf("deletion edit has NewText = %q, want empty", edit.NewText)
+		}
 	}
 }
 
