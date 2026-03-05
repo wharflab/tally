@@ -7,6 +7,7 @@ Relative workdir can have unexpected results if the base image changes.
 | Severity  | Warning       |
 | Category  | Best Practice |
 | Default   | Enabled       |
+| Auto-fix  | Yes (suggestion `--fix-unsafe`; safe with `--slow-checks`) |
 
 ## Description
 
@@ -35,6 +36,28 @@ Good:
 FROM nginx AS web
 WORKDIR /usr/share/nginx/html
 COPY public .
+```
+
+## Auto-fix
+
+Replaces the relative `WORKDIR` with an absolute path.
+
+- **Fast path** (no registry access): resolves against `/` as a default (`FixSuggestion`, requires `--fix-unsafe`).
+- **With `--slow-checks`**: resolves against the base image's actual `WORKDIR` from the registry (`FixSafe`, applied with `--fix`). Chained relative
+  WORKDIRs are resolved cumulatively.
+
+```dockerfile
+# Before
+FROM nginx AS web
+WORKDIR usr/share/nginx/html
+
+# After (with --fix-unsafe, fast path — assumes base WORKDIR is /)
+FROM nginx AS web
+WORKDIR /usr/share/nginx/html
+
+# After (with --fix --slow-checks, base image has WORKDIR /etc/nginx)
+FROM nginx AS web
+WORKDIR /etc/nginx/usr/share/nginx/html
 ```
 
 ## Supersedes

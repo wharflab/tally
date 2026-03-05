@@ -74,7 +74,7 @@ tally supports **22/22** BuildKit checks:
 
 - **5** captured during parsing
 - **17** reimplemented by tally (BuildKit normally runs these during LLB conversion)
-- **10** with auto-fixes (🔧)
+- **11** with auto-fixes (🔧)
 
 ### Implemented by tally
 
@@ -98,7 +98,7 @@ These BuildKit checks run during LLB conversion in Docker/BuildKit. tally reimpl
 | [`buildkit/SecretsUsedInArgOrEnv`](https://docs.docker.com/reference/build-checks/secrets-used-in-arg-or-env/) | Sensitive data should not be used in the ARG or ENV commands | Warning | Security | Enabled |
 | [`buildkit/UndefinedArgInFrom`](https://docs.docker.com/reference/build-checks/undefined-arg-in-from/) | FROM command must use declared ARGs | Warning | Correctness | Enabled |
 | [`buildkit/UndefinedVar`](https://docs.docker.com/reference/build-checks/undefined-var/) | Variables should be defined before their use | Warning | Correctness | Enabled |
-| [`buildkit/WorkdirRelativePath`](https://docs.docker.com/reference/build-checks/workdir-relative-path/) | Relative workdir without an absolute workdir declared within the build can have unexpected results if the base image changes | Warning | Correctness | Enabled |
+| [`buildkit/WorkdirRelativePath`](https://docs.docker.com/reference/build-checks/workdir-relative-path/) 🔧 | Relative workdir without an absolute workdir declared within the build can have unexpected results if the base image changes | Warning | Correctness | Enabled |
 
 ### Captured from BuildKit linter
 
@@ -137,7 +137,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | Rule | Description | Severity | Status |
 |------|-------------|----------|--------|
 | [DL1001](https://github.com/hadolint/hadolint/wiki/DL1001) | Please refrain from using inline ignore pragmas `# hadolint ignore=DLxxxx`. | Ignore | ⏳ |
-| [DL3000](https://github.com/hadolint/hadolint/wiki/DL3000) | Use absolute WORKDIR. | Error | 🔄 `buildkit/WorkdirRelativePath` |
+| [DL3000](https://github.com/hadolint/hadolint/wiki/DL3000) | Use absolute WORKDIR. | Error | 🔄🔧 `buildkit/WorkdirRelativePath` |
 | [DL3001](https://github.com/hadolint/hadolint/wiki/DL3001) | For some bash commands it makes no sense running them in a Docker container like ssh, vim, shutdown, service, ps, free, top, kill, mount, ifconfig. | Info | ✅ `hadolint/DL3001` |
 | [DL3002](https://github.com/hadolint/hadolint/wiki/DL3002) | Last user should not be root. | Warning | ✅ `hadolint/DL3002` |
 | [DL3003](https://github.com/hadolint/hadolint/wiki/DL3003) | Use WORKDIR to switch to a directory. | Warning | ✅🔧 `hadolint/DL3003` |
@@ -178,7 +178,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL3042](https://github.com/hadolint/hadolint/wiki/DL3042) | Avoid cache directory with `pip install --no-cache-dir <package>`. | Warning | ⛔ Not planned (`tally/prefer-package-cache-mounts`) |
 | [DL3043](https://github.com/hadolint/hadolint/wiki/DL3043) | `ONBUILD`, `FROM` or `MAINTAINER` triggered from within `ONBUILD` instruction. | Error | ✅ `hadolint/DL3043` |
 | [DL3044](https://github.com/hadolint/hadolint/wiki/DL3044) | Do not refer to an environment variable within the same `ENV` statement where it is defined. | Error | 🔄 `buildkit/UndefinedVar` |
-| [DL3045](https://github.com/hadolint/hadolint/wiki/DL3045) | `COPY` to a relative destination without `WORKDIR` set. | Warning | ✅ `hadolint/DL3045` |
+| [DL3045](https://github.com/hadolint/hadolint/wiki/DL3045) | `COPY` to a relative destination without `WORKDIR` set. | Warning | ✅🔧 `hadolint/DL3045` |
 | [DL3046](https://github.com/hadolint/hadolint/wiki/DL3046) |  `useradd` without flag `-l` and high UID will result in excessively large Image. | Warning | ✅🔧 `hadolint/DL3046` |
 | [DL3047](https://github.com/hadolint/hadolint/wiki/DL3047) | `wget` without flag `--progress` will result in excessively bloated build logs when downloading larger files. | Info | ✅🔧 `hadolint/DL3047` |
 | [DL3048](https://github.com/hadolint/hadolint/wiki/DL3048) | Invalid Label Key | Style | ⏳ |

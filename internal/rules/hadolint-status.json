@@ -4,7 +4,8 @@
   "rules": {
     "DL3000": {
       "status": "covered_by_buildkit",
-      "buildkit_rule": "WorkdirRelativePath"
+      "buildkit_rule": "WorkdirRelativePath",
+      "fixable": true
     },
     "DL3001": {
       "status": "implemented",
@@ -149,7 +150,8 @@
     },
     "DL3045": {
       "status": "implemented",
-      "tally_rule": "hadolint/DL3045"
+      "tally_rule": "hadolint/DL3045",
+      "fixable": true
     },
     "DL3059": {
       "status": "covered_by_tally",

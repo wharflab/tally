@@ -6,6 +6,8 @@ import (
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
+	"github.com/wharflab/tally/internal/async"
+	"github.com/wharflab/tally/internal/registry"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
 )
@@ -100,9 +102,10 @@ func TestWorkdirRelativePathRule_Check_MultipleRelativeBeforeAbsolute(t *testing
 	}
 
 	violations := r.Check(input)
-	// Both should trigger since neither has an absolute WORKDIR before it
-	if len(violations) != 2 {
-		t.Errorf("expected 2 violations, got %d", len(violations))
+	// Upstream BuildKit only warns on the first relative WORKDIR per stage;
+	// once workdirSet is flipped, subsequent relative WORKDIRs are silent.
+	if len(violations) != 1 {
+		t.Errorf("expected 1 violation (first relative only), got %d", len(violations))
 	}
 }
 
@@ -159,35 +162,238 @@ WORKDIR c:/build
 	})
 }
 
-func TestIsAbsPath(t *testing.T) {
+func TestWorkdirRelativePathRule_Check_InheritedFromParentStage(t *testing.T) {
 	t.Parallel()
-	tests := []struct {
-		path      string
-		isWindows bool
-		want      bool
-	}{
-		// Linux paths
-		{"/app", false, true},
-		{"/", false, true},
-		{"app", false, false},
-		{"./app", false, false},
-		{"../app", false, false},
-		{"c:/build", false, false}, // drive letter is NOT absolute on Linux
 
-		// Windows paths
-		{"C:\\app", true, true},
-		{"C:/app", true, true},
-		{"c:/build", true, true}, // drive letter IS absolute on Windows
-		{"/app", true, true},     // Forward slash is valid on Windows
-		{"\\app", true, true},    // Backslash is valid on Windows
-		{"app", true, false},
-		{".\\app", true, false},
+	// Parent stage sets absolute WORKDIR; child inherits it via FROM.
+	// No violation should fire in the child stage for a relative WORKDIR.
+	testutil.RunRuleTests(t, NewWorkdirRelativePathRule(), []testutil.RuleTestCase{
+		{
+			Name: "child inherits workdirSet from parent",
+			Content: `FROM debian:bookworm AS base
+WORKDIR /app
+FROM base
+WORKDIR src
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "deep inheritance chain",
+			Content: `FROM debian:bookworm AS base
+WORKDIR /app
+FROM base AS middle
+RUN echo hi
+FROM middle
+WORKDIR sub
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "parent has relative WORKDIR only — child still warns",
+			Content: `FROM debian:bookworm AS base
+WORKDIR app
+FROM base
+WORKDIR sub
+`,
+			// base triggers on "app"; child inherits workdirSet=true so no violation.
+			WantViolations: 1,
+		},
+		{
+			Name: "sibling stage does not inherit",
+			Content: `FROM debian:bookworm AS base
+WORKDIR /app
+FROM debian:bookworm
+WORKDIR src
+`,
+			// Second stage is FROM external image, not FROM base — no inheritance.
+			WantViolations: 1,
+		},
+	})
+}
+
+func TestWorkdirRelativePathRule_Check_FixSuggestion(t *testing.T) {
+	t.Parallel()
+
+	input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nWORKDIR app\n")
+	r := NewWorkdirRelativePathRule()
+	violations := r.Check(input)
+
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
 	}
 
-	for _, tc := range tests {
-		got := isAbsPath(tc.path, tc.isWindows)
-		if got != tc.want {
-			t.Errorf("isAbsPath(%q, isWindows=%v) = %v, want %v", tc.path, tc.isWindows, got, tc.want)
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix, got nil")
+	}
+	if fix.Safety != rules.FixSuggestion {
+		t.Errorf("Safety = %v, want FixSuggestion", fix.Safety)
+	}
+	if len(fix.Edits) != 1 {
+		t.Fatalf("got %d edits, want 1", len(fix.Edits))
+	}
+	// Without registry data, resolves against "/" → "/app"
+	if want := "WORKDIR /app"; fix.Edits[0].NewText != want {
+		t.Errorf("NewText = %q, want %q", fix.Edits[0].NewText, want)
+	}
+}
+
+func TestWorkdirRelativePathRule_PlanAsync(t *testing.T) {
+	t.Parallel()
+
+	t.Run("plans checks for stages with violations", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nWORKDIR app\n")
+		r := NewWorkdirRelativePathRule()
+		requests := r.PlanAsync(input)
+		if len(requests) == 0 {
+			t.Fatal("expected at least one async request")
 		}
+		if requests[0].RuleCode != rules.BuildKitRulePrefix+"WorkdirRelativePath" {
+			t.Errorf("RuleCode = %q, want buildkit/WorkdirRelativePath", requests[0].RuleCode)
+		}
+	})
+
+	t.Run("no plans when no violations", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nWORKDIR /app\n")
+		r := NewWorkdirRelativePathRule()
+		requests := r.PlanAsync(input)
+		if len(requests) != 0 {
+			t.Errorf("expected no async requests, got %d", len(requests))
+		}
+	})
+}
+
+func TestWorkdirRelativePathRule_Handler_BaseHasWorkingDir(t *testing.T) {
+	t.Parallel()
+
+	h := makeWorkdirHandler(t, "FROM alpine:3.18\nWORKDIR app\n")
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: "/opt"})
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	var hasCompleted, hasViolation bool
+	for _, r := range result {
+		switch v := r.(type) {
+		case async.CompletedCheck:
+			if v.StageIndex == 0 {
+				hasCompleted = true
+			}
+		case rules.Violation:
+			hasViolation = true
+			if v.SuggestedFix == nil {
+				t.Fatal("refined violation has no SuggestedFix")
+			}
+			if v.SuggestedFix.Safety != rules.FixSafe {
+				t.Errorf("Safety = %v, want FixSafe", v.SuggestedFix.Safety)
+			}
+			// "app" resolved against "/opt" → "/opt/app"
+			if want := "WORKDIR /opt/app"; v.SuggestedFix.Edits[0].NewText != want {
+				t.Errorf("NewText = %q, want %q", v.SuggestedFix.Edits[0].NewText, want)
+			}
+		}
+	}
+	if !hasCompleted {
+		t.Error("expected CompletedCheck for stage 0")
+	}
+	if !hasViolation {
+		t.Error("expected refined violation")
+	}
+}
+
+func TestWorkdirRelativePathRule_Handler_BaseWorkingDirWithNewline(t *testing.T) {
+	t.Parallel()
+
+	h := makeWorkdirHandler(t, "FROM alpine:3.18\nWORKDIR app\n")
+	// Malicious WorkingDir with newline — handler should bail entirely.
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: "/opt\nRUN malicious"})
+	if result != nil {
+		t.Errorf("expected nil result for path with newline injection, got %d items", len(result))
+	}
+}
+
+func TestWorkdirRelativePathRule_Handler_BaseNoWorkingDir(t *testing.T) {
+	t.Parallel()
+
+	h := makeWorkdirHandler(t, "FROM alpine:3.18\nWORKDIR app\n")
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: ""})
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	// Even with no base WORKDIR, the handler resolves against "/" and
+	// upgrades the fix to FixSafe (registry confirmed).
+	var hasViolation bool
+	for _, r := range result {
+		if v, ok := r.(rules.Violation); ok {
+			hasViolation = true
+			if v.SuggestedFix == nil || len(v.SuggestedFix.Edits) == 0 {
+				t.Fatal("missing fix edits")
+			}
+			// "app" resolved against "/" → "/app"
+			if want := "WORKDIR /app"; v.SuggestedFix.Edits[0].NewText != want {
+				t.Errorf("NewText = %q, want %q", v.SuggestedFix.Edits[0].NewText, want)
+			}
+			if v.SuggestedFix.Safety != rules.FixSafe {
+				t.Errorf("Safety = %v, want FixSafe", v.SuggestedFix.Safety)
+			}
+		}
+	}
+	if !hasViolation {
+		t.Error("expected refined violation")
+	}
+}
+
+func TestWorkdirRelativePathRule_Handler_ChainedRelative(t *testing.T) {
+	t.Parallel()
+
+	// Two chained relative WORKDIRs: app then src.
+	// Upstream BuildKit only warns on the first relative WORKDIR per stage,
+	// so the handler should emit only one refined violation.
+	h := makeWorkdirHandler(t, "FROM alpine:3.18\nWORKDIR app\nWORKDIR src\n")
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: "/opt"})
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	var edits []string
+	for _, r := range result {
+		if v, ok := r.(rules.Violation); ok {
+			if v.SuggestedFix != nil && len(v.SuggestedFix.Edits) > 0 {
+				edits = append(edits, v.SuggestedFix.Edits[0].NewText)
+			}
+		}
+	}
+	// Only the first relative WORKDIR ("app" against "/opt") triggers.
+	if len(edits) != 1 {
+		t.Fatalf("got %d edits, want 1; edits: %v", len(edits), edits)
+	}
+	if edits[0] != "WORKDIR /opt/app" {
+		t.Errorf("edit[0] = %q, want %q", edits[0], "WORKDIR /opt/app")
+	}
+}
+
+func makeWorkdirHandler(t *testing.T, dockerfile string) *workdirRelPathHandler {
+	t.Helper()
+	r := NewWorkdirRelativePathRule()
+	input := testutil.MakeLintInput(t, "Dockerfile", dockerfile)
+	meta := r.Metadata()
+	sem := testutil.GetSemantic(t, input)
+
+	violations := findRelativeWorkdirViolations(sem, input.Stages, input.File, meta)
+	stagesWithViolations := make(map[int]bool, len(violations))
+	for _, v := range violations {
+		stagesWithViolations[v.StageIndex] = true
+	}
+
+	return &workdirRelPathHandler{
+		meta:                 meta,
+		file:                 input.File,
+		stageIdx:             0,
+		semantic:             sem,
+		stages:               input.Stages,
+		stagesWithViolations: stagesWithViolations,
 	}
 }

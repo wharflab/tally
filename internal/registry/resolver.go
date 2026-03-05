@@ -47,6 +47,10 @@ type ImageConfig struct {
 	// HasHealthcheck is true if the image defines a HEALTHCHECK (CMD or CMD-SHELL).
 	// False if HEALTHCHECK is NONE or absent.
 	HasHealthcheck bool
+
+	// WorkingDir is the image's configured working directory (from WORKDIR).
+	// Empty string means no explicit WORKDIR was set (default is /).
+	WorkingDir string
 }
 
 // ResolveRequest is the typed input for the registry async resolver.
