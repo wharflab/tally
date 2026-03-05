@@ -144,6 +144,22 @@ func TestCheckSyntaxDirective(t *testing.T) {
 			wantCount: 0,
 		},
 		{
+			name:      "valid docker/dockerfile-upstream with labs tag",
+			source:    "# syntax=docker.io/docker/dockerfile-upstream:1.22.0-rc2-labs\nFROM alpine\n",
+			wantCount: 0,
+		},
+		{
+			name:      "valid docker/dockerfile-upstream latest",
+			source:    "# syntax=docker/dockerfile-upstream:master-labs\nFROM alpine\n",
+			wantCount: 0,
+		},
+		{
+			name:       "misspelled dockerfile-upstream",
+			source:     "# syntax=docker/dockefile-upstream:1.7\nFROM alpine\n",
+			wantCount:  1,
+			wantSubstr: `did you mean "docker/dockerfile-upstream:1.7"`,
+		},
+		{
 			name:      "custom frontend no match",
 			source:    "# syntax=mycompany/custom-frontend:latest\nFROM alpine\n",
 			wantCount: 0,
