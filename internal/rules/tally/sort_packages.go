@@ -2,6 +2,7 @@ package tally
 
 import (
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -368,7 +369,8 @@ func cleanupAfterDeletions(
 	}
 
 	edits := make([]rules.TextEdit, 0, len(deletedOnLine))
-	for shellLine, nDeleted := range deletedOnLine {
+	for _, shellLine := range slices.Sorted(maps.Keys(deletedOnLine)) {
+		nDeleted := deletedOnLine[shellLine]
 		if shellLine == insertLine || nDeleted < pkgsPerLine[shellLine] {
 			continue
 		}
