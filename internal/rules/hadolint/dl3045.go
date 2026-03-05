@@ -347,8 +347,10 @@ func dl3045FixResolved(file string, loc []parser.Range, baseDir string) *rules.S
 	if len(loc) == 0 {
 		return nil
 	}
-	// Clean the path (e.g. "/usr/src/app/" → "/usr/src/app").
 	dir := path.Clean(baseDir)
+	if !isSafePath(dir) {
+		return nil // don't generate a fix from untrusted data with control chars
+	}
 	insertLine := loc[0].Start.Line
 	return &rules.SuggestedFix{
 		Description: fmt.Sprintf("Add `WORKDIR %s` before COPY (inherited from base image)", dir),
@@ -358,6 +360,13 @@ func dl3045FixResolved(file string, loc []parser.Range, baseDir string) *rules.S
 			NewText:  "WORKDIR " + dir + "\n",
 		}},
 	}
+}
+
+// isSafePath returns false if p contains characters that could inject
+// Dockerfile instructions when interpolated into a fix. Dockerfile syntax
+// is line-oriented, so the injection vectors are \n, \r, and \0.
+func isSafePath(p string) bool {
+	return !strings.ContainsAny(p, "\n\r\x00")
 }
 
 // isAbsoluteOrVariableDest checks if a COPY destination is absolute, a Windows

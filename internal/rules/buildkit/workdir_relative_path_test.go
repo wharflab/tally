@@ -253,6 +253,17 @@ func TestWorkdirRelativePathRule_Handler_BaseHasWorkingDir(t *testing.T) {
 	}
 }
 
+func TestWorkdirRelativePathRule_Handler_BaseWorkingDirWithNewline(t *testing.T) {
+	t.Parallel()
+
+	h := makeWorkdirHandler(t, "FROM alpine:3.18\nWORKDIR app\n")
+	// Malicious WorkingDir with newline — handler should bail entirely.
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: "/opt\nRUN malicious"})
+	if result != nil {
+		t.Errorf("expected nil result for path with newline injection, got %d items", len(result))
+	}
+}
+
 func TestWorkdirRelativePathRule_Handler_BaseNoWorkingDir(t *testing.T) {
 	t.Parallel()
 

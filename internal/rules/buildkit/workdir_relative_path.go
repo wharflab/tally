@@ -3,6 +3,7 @@ package buildkit
 import (
 	"fmt"
 	"path"
+	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
@@ -165,6 +166,11 @@ func (h *workdirRelPathHandler) OnSuccess(resolved any) []any {
 	baseDir := cfg.WorkingDir
 	if baseDir == "" {
 		baseDir = "/"
+	}
+
+	// Reject paths with characters that could inject Dockerfile instructions.
+	if strings.ContainsAny(baseDir, "\n\r\x00") {
+		return nil
 	}
 
 	out := make([]any, 0)
