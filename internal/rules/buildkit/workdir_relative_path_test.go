@@ -348,36 +348,3 @@ func makeWorkdirHandler(t *testing.T, dockerfile string) *workdirRelPathHandler 
 		stagesWithViolations: stagesWithViolations,
 	}
 }
-
-func TestIsAbsPath(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		path      string
-		isWindows bool
-		want      bool
-	}{
-		// Linux paths
-		{"/app", false, true},
-		{"/", false, true},
-		{"app", false, false},
-		{"./app", false, false},
-		{"../app", false, false},
-		{"c:/build", false, false}, // drive letter is NOT absolute on Linux
-
-		// Windows paths
-		{"C:\\app", true, true},
-		{"C:/app", true, true},
-		{"c:/build", true, true}, // drive letter IS absolute on Windows
-		{"/app", true, true},     // Forward slash is valid on Windows
-		{"\\app", true, true},    // Backslash is valid on Windows
-		{"app", true, false},
-		{".\\app", true, false},
-	}
-
-	for _, tc := range tests {
-		got := isAbsPath(tc.path, tc.isWindows)
-		if got != tc.want {
-			t.Errorf("isAbsPath(%q, isWindows=%v) = %v, want %v", tc.path, tc.isWindows, got, tc.want)
-		}
-	}
-}

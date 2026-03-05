@@ -322,15 +322,6 @@ func workdirRelativePathFixResolved(
 	}
 }
 
-// isAbsPath checks if a path is absolute, accounting for Windows drive-letter paths
-// when isWindows is true. This matches BuildKit's system.IsAbs logic.
-func isAbsPath(p string, isWindows bool) bool {
-	if isWindows {
-		return system.IsAbs(p, "windows")
-	}
-	return system.IsAbs(p, "")
-}
-
 // init registers the rule with the default registry.
 func init() {
 	rules.Register(NewWorkdirRelativePathRule())

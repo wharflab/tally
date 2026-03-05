@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"path"
 	"strings"
-	"unicode"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
+	"github.com/moby/buildkit/util/system"
 
 	"github.com/wharflab/tally/internal/async"
 	"github.com/wharflab/tally/internal/registry"
@@ -375,32 +375,34 @@ func isSafePath(p string) bool {
 	return !strings.ContainsAny(p, "\n\r\x00")
 }
 
-// isAbsoluteOrVariableDest checks if a COPY destination is absolute, a Windows
-// absolute path, or an environment variable reference. Surrounding quotes are
+// isAbsoluteOrVariableDest checks if a COPY destination is absolute (on any
+// platform) or an environment variable reference. Surrounding quotes are
 // stripped before checking.
+//
+// Note: system.IsAbs intentionally ignores drive letters (WORKDIR context),
+// but Docker COPY does honour them as absolute on Windows containers. We
+// check both system.IsAbs and the drive-letter form to avoid false positives.
 func isAbsoluteOrVariableDest(dest string) bool {
 	dest = shell.DropQuotes(dest)
 
-	// Absolute Unix path.
-	if strings.HasPrefix(dest, "/") {
-		return true
-	}
-
-	// Environment variable reference.
+	// Environment variable reference — not a path, skip.
 	if strings.HasPrefix(dest, "$") {
 		return true
 	}
 
-	// Windows absolute path (e.g., "c:\..." or "C:/...").
-	return isWindowsAbsolute(dest)
-}
-
-// isWindowsAbsolute checks if a path is a Windows absolute path (e.g., "c:\..." or "D:/...").
-func isWindowsAbsolute(p string) bool {
-	if len(p) < 2 {
-		return false
+	// Absolute on Linux or Windows (delegates to BuildKit's system.IsAbs).
+	if system.IsAbs(dest, "") || system.IsAbs(dest, "windows") {
+		return true
 	}
-	return unicode.IsLetter(rune(p[0])) && p[1] == ':'
+
+	// Windows drive-letter paths (e.g. "C:\..." or "D:/...") are absolute
+	// for COPY destinations even though system.IsAbs strips the drive letter.
+	if len(dest) >= 2 && dest[1] == ':' &&
+		((dest[0] >= 'A' && dest[0] <= 'Z') || (dest[0] >= 'a' && dest[0] <= 'z')) {
+		return true
+	}
+
+	return false
 }
 
 // init registers the rule with the default registry.
