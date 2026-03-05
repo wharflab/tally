@@ -1181,6 +1181,18 @@ severity = "error"
 				mustSelectRules("tally/sort-packages")...),
 			wantApplied: 1,
 		},
+		// Cross-rule: sort-packages (priority 15) + newline-per-chained-call (priority 97)
+		// on a chained RUN with unsorted packages. sort-packages rewrites package names
+		// within the install command; newline-per-chained-call splits the && boundary.
+		// Edits target different regions and should compose without conflict.
+		{
+			name: "sort-packages-cross-newline-per-chained-call",
+			input: "FROM alpine:3.20\n" +
+				"RUN apt-get update && apt-get install -y wget curl git\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages", "tally/newline-per-chained-call")...),
+			wantApplied: 2, // sort-packages + newline-per-chained-call
+		},
 
 		// Three rules on the same RUN: secret mount insertion + cache mount
 		// insertion + DL3030 (-y flag insertion) + cache cleanup deletion.
