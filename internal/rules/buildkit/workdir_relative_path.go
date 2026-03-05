@@ -56,18 +56,20 @@ func findRelativeWorkdirViolations(
 	meta rules.RuleMetadata,
 ) []rules.Violation {
 	var violations []rules.Violation
+	// Track per-stage workdirSet for inheritance.
+	hasWorkdir := make([]bool, len(stages))
 
 	for stageIdx, stage := range stages {
 		platformOS := stageOS(sem, stageIdx)
+		hasWorkdir[stageIdx] = inheritedWorkdirSet(sem, stageIdx, hasWorkdir)
 
-		workdirSet := false
 		for _, cmd := range stage.Commands {
 			workdir, ok := cmd.(*instructions.WorkdirCommand)
 			if !ok {
 				continue
 			}
 
-			if !workdirSet && !system.IsAbs(workdir.Path, platformOS) {
+			if !hasWorkdir[stageIdx] && !system.IsAbs(workdir.Path, platformOS) {
 				loc := rules.NewLocationFromRanges(file, workdir.Location())
 				v := rules.NewViolation(
 					loc,
@@ -84,11 +86,29 @@ func findRelativeWorkdirViolations(
 			}
 			// Upstream BuildKit sets workdirSet = true for ANY WORKDIR
 			// (absolute or relative), so only the first relative triggers.
-			workdirSet = true
+			hasWorkdir[stageIdx] = true
 		}
 	}
 
 	return violations
+}
+
+// inheritedWorkdirSet returns true if the stage inherits workdirSet from a
+// parent stage referenced via FROM <stage>. Matches upstream BuildKit's
+// ds.workdirSet = ds.base.workdirSet inheritance.
+func inheritedWorkdirSet(sem *semantic.Model, stageIdx int, hasWorkdir []bool) bool {
+	if sem == nil {
+		return false
+	}
+	info := sem.StageInfo(stageIdx)
+	if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
+		return false
+	}
+	parentIdx := info.BaseImage.StageIndex
+	if parentIdx < 0 || parentIdx >= len(hasWorkdir) {
+		return false
+	}
+	return hasWorkdir[parentIdx]
 }
 
 // PlanAsync creates check requests to resolve base image config for external
@@ -190,6 +210,10 @@ func (h *workdirRelPathHandler) refineStageViolations(stageIdx int, baseDir stri
 	platformOS := stageOS(h.semantic, stageIdx)
 
 	out := make([]any, 0)
+	// refineStageViolations is only called for stages that had violations,
+	// meaning workdirSet was false at the point of the first relative WORKDIR.
+	// We don't need inheritance here — it's already accounted for by the
+	// caller (stagesWithViolations was derived from findRelativeWorkdirViolations).
 	workdirSet := false
 
 	for _, cmd := range h.stages[stageIdx].Commands {

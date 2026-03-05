@@ -162,6 +162,55 @@ WORKDIR c:/build
 	})
 }
 
+func TestWorkdirRelativePathRule_Check_InheritedFromParentStage(t *testing.T) {
+	t.Parallel()
+
+	// Parent stage sets absolute WORKDIR; child inherits it via FROM.
+	// No violation should fire in the child stage for a relative WORKDIR.
+	testutil.RunRuleTests(t, NewWorkdirRelativePathRule(), []testutil.RuleTestCase{
+		{
+			Name: "child inherits workdirSet from parent",
+			Content: `FROM debian:bookworm AS base
+WORKDIR /app
+FROM base
+WORKDIR src
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "deep inheritance chain",
+			Content: `FROM debian:bookworm AS base
+WORKDIR /app
+FROM base AS middle
+RUN echo hi
+FROM middle
+WORKDIR sub
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "parent has relative WORKDIR only — child still warns",
+			Content: `FROM debian:bookworm AS base
+WORKDIR app
+FROM base
+WORKDIR sub
+`,
+			// base triggers on "app"; child inherits workdirSet=true so no violation.
+			WantViolations: 1,
+		},
+		{
+			Name: "sibling stage does not inherit",
+			Content: `FROM debian:bookworm AS base
+WORKDIR /app
+FROM debian:bookworm
+WORKDIR src
+`,
+			// Second stage is FROM external image, not FROM base — no inheritance.
+			WantViolations: 1,
+		},
+	})
+}
+
 func TestWorkdirRelativePathRule_Check_FixSuggestion(t *testing.T) {
 	t.Parallel()
 
