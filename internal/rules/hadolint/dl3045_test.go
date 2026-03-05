@@ -367,17 +367,11 @@ func TestDL3045Rule_Handler_Descendants(t *testing.T) {
 	r := NewDL3045Rule()
 	meta := r.Metadata()
 
-	// Build hasWorkdir + violations map.
-	hasWorkdir := make([]bool, len(input.Stages))
 	sem := testutil.GetSemantic(t, input)
-	stagesWithViolations := make(map[int]bool)
-	for stageIdx, stage := range input.Stages {
-		hasWorkdir[stageIdx] = inheritedWorkdir(sem, stageIdx, hasWorkdir)
-		for _, cmd := range stage.Commands {
-			if v := checkCopyDest(cmd, hasWorkdir[stageIdx], stageIdx, input.File, meta); v != nil {
-				stagesWithViolations[stageIdx] = true
-			}
-		}
+	violations, _ := findCopyViolations(sem, input.Stages, input.File, meta)
+	stagesWithViolations := make(map[int]bool, len(violations))
+	for _, v := range violations {
+		stagesWithViolations[v.StageIndex] = true
 	}
 
 	h := &dl3045Handler{
@@ -434,15 +428,10 @@ func makeDL3045Handler(t *testing.T, dockerfile string) *dl3045Handler {
 	meta := r.Metadata()
 	sem := testutil.GetSemantic(t, input)
 
-	hasWorkdir := make([]bool, len(input.Stages))
-	stagesWithViolations := make(map[int]bool)
-	for stageIdx, stage := range input.Stages {
-		hasWorkdir[stageIdx] = inheritedWorkdir(sem, stageIdx, hasWorkdir)
-		for _, cmd := range stage.Commands {
-			if v := checkCopyDest(cmd, hasWorkdir[stageIdx], stageIdx, input.File, meta); v != nil {
-				stagesWithViolations[stageIdx] = true
-			}
-		}
+	violations, _ := findCopyViolations(sem, input.Stages, input.File, meta)
+	stagesWithViolations := make(map[int]bool, len(violations))
+	for _, v := range violations {
+		stagesWithViolations[v.StageIndex] = true
 	}
 
 	return &dl3045Handler{

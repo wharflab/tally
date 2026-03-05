@@ -44,11 +44,20 @@ func (r *WorkdirRelativePathRule) Check(input rules.LintInput) []rules.Violation
 	if !ok {
 		sem = nil
 	}
-	meta := r.Metadata()
+	return findRelativeWorkdirViolations(sem, input.Stages, input.File, r.Metadata())
+}
+
+// findRelativeWorkdirViolations iterates all stages and returns violations for
+// relative WORKDIR instructions that appear before any absolute WORKDIR.
+func findRelativeWorkdirViolations(
+	sem *semantic.Model,
+	stages []instructions.Stage,
+	file string,
+	meta rules.RuleMetadata,
+) []rules.Violation {
 	var violations []rules.Violation
 
-	for stageIdx, stage := range input.Stages {
-		// Determine OS for path checking using the semantic model.
+	for stageIdx, stage := range stages {
 		isWindows := false
 		if sem != nil {
 			if info := sem.StageInfo(stageIdx); info != nil {
@@ -56,11 +65,7 @@ func (r *WorkdirRelativePathRule) Check(input rules.LintInput) []rules.Violation
 			}
 		}
 
-		// Track if an absolute WORKDIR has been set in this stage.
-		// A stage inherits the WORKDIR from its base image, but we can't
-		// know that value statically, so we only track within the stage.
 		workdirSet := false
-
 		for _, cmd := range stage.Commands {
 			workdir, ok := cmd.(*instructions.WorkdirCommand)
 			if !ok {
@@ -70,8 +75,7 @@ func (r *WorkdirRelativePathRule) Check(input rules.LintInput) []rules.Violation
 			if isAbsPath(workdir.Path, isWindows) {
 				workdirSet = true
 			} else if !workdirSet {
-				// Relative WORKDIR without prior absolute WORKDIR.
-				loc := rules.NewLocationFromRanges(input.File, workdir.Location())
+				loc := rules.NewLocationFromRanges(file, workdir.Location())
 				v := rules.NewViolation(
 					loc,
 					meta.Code,
@@ -81,12 +85,10 @@ func (r *WorkdirRelativePathRule) Check(input rules.LintInput) []rules.Violation
 				).WithDocURL(meta.DocURL).WithDetail(
 					"Set an absolute WORKDIR before using relative paths, " +
 						"e.g., 'WORKDIR /app' before 'WORKDIR " + workdir.Path + "'",
-				).WithSuggestedFix(workdirRelativePathFix(input.File, workdir))
+				).WithSuggestedFix(workdirRelativePathFix(file, workdir))
 				v.StageIndex = stageIdx
 				violations = append(violations, v)
 			}
-			// If workdirSet is already true, relative paths are fine
-			// (they're relative to the known absolute path)
 		}
 	}
 
@@ -104,25 +106,10 @@ func (r *WorkdirRelativePathRule) PlanAsync(input rules.LintInput) []async.Check
 
 	meta := r.Metadata()
 
-	// Only plan async checks for stages that have violations.
-	stagesWithViolations := make(map[int]bool)
-	for stageIdx, stage := range input.Stages {
-		isWindows := false
-		if info := sem.StageInfo(stageIdx); info != nil {
-			isWindows = info.IsWindows()
-		}
-		workdirSet := false
-		for _, cmd := range stage.Commands {
-			workdir, ok := cmd.(*instructions.WorkdirCommand)
-			if !ok {
-				continue
-			}
-			if isAbsPath(workdir.Path, isWindows) {
-				workdirSet = true
-			} else if !workdirSet {
-				stagesWithViolations[stageIdx] = true
-			}
-		}
+	violations := findRelativeWorkdirViolations(sem, input.Stages, input.File, meta)
+	stagesWithViolations := make(map[int]bool, len(violations))
+	for _, v := range violations {
+		stagesWithViolations[v.StageIndex] = true
 	}
 
 	if len(stagesWithViolations) == 0 {

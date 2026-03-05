@@ -334,24 +334,10 @@ func makeWorkdirHandler(t *testing.T, dockerfile string) *workdirRelPathHandler 
 	meta := r.Metadata()
 	sem := testutil.GetSemantic(t, input)
 
-	stagesWithViolations := make(map[int]bool)
-	for stageIdx, stage := range input.Stages {
-		isWindows := false
-		if info := sem.StageInfo(stageIdx); info != nil {
-			isWindows = info.IsWindows()
-		}
-		workdirSet := false
-		for _, cmd := range stage.Commands {
-			workdir, ok := cmd.(*instructions.WorkdirCommand)
-			if !ok {
-				continue
-			}
-			if isAbsPath(workdir.Path, isWindows) {
-				workdirSet = true
-			} else if !workdirSet {
-				stagesWithViolations[stageIdx] = true
-			}
-		}
+	violations := findRelativeWorkdirViolations(sem, input.Stages, input.File, meta)
+	stagesWithViolations := make(map[int]bool, len(violations))
+	for _, v := range violations {
+		stagesWithViolations[v.StageIndex] = true
 	}
 
 	return &workdirRelPathHandler{

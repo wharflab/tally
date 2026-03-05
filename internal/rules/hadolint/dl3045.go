@@ -42,7 +42,6 @@ func (r *DL3045Rule) Metadata() rules.RuleMetadata {
 // It warns when a COPY instruction uses a relative destination path without
 // a WORKDIR having been set in the current stage (or inherited from a parent stage).
 func (r *DL3045Rule) Check(input rules.LintInput) []rules.Violation {
-	var violations []rules.Violation
 	meta := r.Metadata()
 
 	sem, ok := input.Semantic.(*semantic.Model)
@@ -50,23 +49,12 @@ func (r *DL3045Rule) Check(input rules.LintInput) []rules.Violation {
 		sem = nil
 	}
 
-	// Track whether WORKDIR has been set, indexed by stage position.
-	hasWorkdir := make([]bool, len(input.Stages))
+	violations, hasWorkdir := findCopyViolations(sem, input.Stages, input.File, meta)
 
-	for stageIdx, stage := range input.Stages {
-		hasWorkdir[stageIdx] = inheritedWorkdir(sem, stageIdx, hasWorkdir)
-
-		for _, cmd := range stage.Commands {
-			if _, ok := cmd.(*instructions.WorkdirCommand); ok {
-				hasWorkdir[stageIdx] = true
-			}
-
-			if v := checkCopyDest(cmd, hasWorkdir[stageIdx], stageIdx, input.File, meta); v != nil {
-				violations = append(violations, *v)
-			}
-		}
-
-		violations = append(violations, checkOnbuildCopies(sem, stageIdx, hasWorkdir[stageIdx], input.File, meta)...)
+	// Also check ONBUILD COPY instructions.
+	for stageIdx := range input.Stages {
+		violations = append(violations,
+			checkOnbuildCopies(sem, stageIdx, hasWorkdir[stageIdx], input.File, meta)...)
 	}
 
 	return violations
@@ -83,21 +71,10 @@ func (r *DL3045Rule) PlanAsync(input rules.LintInput) []async.CheckRequest {
 
 	meta := r.Metadata()
 
-	// Only plan async checks for stages that actually have violations.
-	// Build the hasWorkdir map first (same as Check).
-	hasWorkdir := make([]bool, len(input.Stages))
-	stagesWithViolations := make(map[int]bool)
-
-	for stageIdx, stage := range input.Stages {
-		hasWorkdir[stageIdx] = inheritedWorkdir(sem, stageIdx, hasWorkdir)
-		for _, cmd := range stage.Commands {
-			if _, ok := cmd.(*instructions.WorkdirCommand); ok {
-				hasWorkdir[stageIdx] = true
-			}
-			if v := checkCopyDest(cmd, hasWorkdir[stageIdx], stageIdx, input.File, meta); v != nil {
-				stagesWithViolations[stageIdx] = true
-			}
-		}
+	violations, _ := findCopyViolations(sem, input.Stages, input.File, meta)
+	stagesWithViolations := make(map[int]bool, len(violations))
+	for _, v := range violations {
+		stagesWithViolations[v.StageIndex] = true
 	}
 
 	if len(stagesWithViolations) == 0 {
@@ -241,6 +218,35 @@ func stageHasExplicitWorkdir(stage *instructions.Stage) bool {
 		}
 	}
 	return false
+}
+
+// findCopyViolations iterates all stages and returns violations for COPY
+// instructions with relative destinations that lack an explicit WORKDIR.
+// It also returns the per-stage hasWorkdir state for ONBUILD checking.
+func findCopyViolations(
+	sem *semantic.Model,
+	stages []instructions.Stage,
+	file string,
+	meta rules.RuleMetadata,
+) ([]rules.Violation, []bool) {
+	hasWorkdir := make([]bool, len(stages))
+	var violations []rules.Violation
+
+	for stageIdx, stage := range stages {
+		hasWorkdir[stageIdx] = inheritedWorkdir(sem, stageIdx, hasWorkdir)
+
+		for _, cmd := range stage.Commands {
+			if _, ok := cmd.(*instructions.WorkdirCommand); ok {
+				hasWorkdir[stageIdx] = true
+			}
+
+			if v := checkCopyDest(cmd, hasWorkdir[stageIdx], stageIdx, file, meta); v != nil {
+				violations = append(violations, *v)
+			}
+		}
+	}
+
+	return violations, hasWorkdir
 }
 
 // inheritedWorkdir returns true if the stage inherits a WORKDIR from a parent
