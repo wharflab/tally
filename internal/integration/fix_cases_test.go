@@ -1203,6 +1203,20 @@ severity = "error"
 			wantApplied: 2, // sort-packages + newline-per-chained-call
 		},
 
+		// Cross-rule: sort-packages (priority 15) + shellcheck SC2086 (quotes vars)
+		// on a single-line RUN with interleaved variables. sort-packages moves
+		// literals to the front via insert+delete (never touching variable tokens),
+		// SC2086 wraps $EXTRA_PKGS in quotes. Both compose without conflict.
+		{
+			name: "sort-packages-cross-shellcheck-sc2086",
+			input: "FROM alpine:3.20\n" +
+				"RUN apk add --no-cache zoo foo $EXTRA_PKGS bar\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/sort-packages", "shellcheck/SC2086")...),
+			wantApplied: 2, // sort-packages + SC2086
+		},
+
 		// Three rules on the same RUN: secret mount insertion + cache mount
 		// insertion + DL3030 (-y flag insertion) + cache cleanup deletion.
 		// All edits are targeted and non-overlapping.
