@@ -24,6 +24,13 @@ func NewSortPackagesRule() *SortPackagesRule {
 	return &SortPackagesRule{}
 }
 
+// sourceContext bundles source-level information needed for edit generation.
+type sourceContext struct {
+	file        string
+	instrLines  []string // raw Dockerfile lines; nil for heredoc
+	escapeToken rune
+}
+
 // Metadata returns the rule metadata.
 func (r *SortPackagesRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
@@ -109,7 +116,8 @@ func (r *SortPackagesRule) checkRun(
 	if isHeredoc {
 		// Heredoc body starts on the next line; no column offset.
 		installCmds := shell.FindInstallPackages(script, shellVariant)
-		return r.collectViolations(installCmds, startLine+1, 0, file, loc, nil, meta)
+		src := sourceContext{file: file, escapeToken: escapeToken}
+		return r.collectViolations(installCmds, startLine+1, 0, src, loc, meta)
 	}
 
 	// Shell-form: reconstruct source text from source map lines.
@@ -121,7 +129,8 @@ func (r *SortPackagesRule) checkRun(
 	cmdStartCol := findCmdStartCol(instrLines[0])
 	sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol, escapeToken)
 	installCmds := shell.FindInstallPackages(sourceText, shellVariant)
-	return r.collectViolations(installCmds, startLine, cmdStartCol, file, loc, instrLines, meta)
+	src := sourceContext{file: file, instrLines: instrLines, escapeToken: escapeToken}
+	return r.collectViolations(installCmds, startLine, cmdStartCol, src, loc, meta)
 }
 
 // collectViolations checks each install command and returns any violations.
@@ -129,14 +138,13 @@ func (r *SortPackagesRule) collectViolations(
 	installCmds []shell.InstallCommand,
 	startLine int,
 	cmdStartCol int,
-	file string,
+	src sourceContext,
 	loc rules.Location,
-	instrLines []string, // nil for heredoc
 	meta rules.RuleMetadata,
 ) []rules.Violation {
 	var violations []rules.Violation
 	for _, ic := range installCmds {
-		if v := r.checkInstallCommand(ic, startLine, cmdStartCol, file, loc, instrLines, meta); v != nil {
+		if v := r.checkInstallCommand(ic, startLine, cmdStartCol, src, loc, meta); v != nil {
 			violations = append(violations, *v)
 		}
 	}
@@ -164,9 +172,8 @@ func (r *SortPackagesRule) checkInstallCommand(
 	ic shell.InstallCommand,
 	startLine int,
 	cmdStartCol int,
-	file string,
+	src sourceContext,
 	loc rules.Location,
-	instrLines []string,
 	meta rules.RuleMetadata,
 ) *rules.Violation {
 	// Collect literals in their original order (ignoring variables).
@@ -211,7 +218,7 @@ func (r *SortPackagesRule) checkInstallCommand(
 	// touched, avoiding conflicts with rules like SC2086.
 	// For multi-line, each sorted literal is placed at the corresponding
 	// literal's original line position to preserve continuation formatting.
-	edits := r.buildEdits(ic.Packages, fullSorted, startLine, cmdStartCol, file, instrLines)
+	edits := r.buildEdits(ic.Packages, fullSorted, startLine, cmdStartCol, src)
 
 	msg := fmt.Sprintf("packages in %s %s are not sorted alphabetically", ic.Manager, ic.Subcommand)
 
@@ -242,8 +249,7 @@ func (r *SortPackagesRule) buildEdits(
 	sorted []shell.PackageArg,
 	startLine int,
 	cmdStartCol int,
-	file string,
-	instrLines []string, // raw Dockerfile lines for cleanup; nil for heredoc
+	src sourceContext,
 ) []rules.TextEdit {
 	nLiterals := 0
 	for _, pkg := range original {
@@ -276,7 +282,7 @@ func (r *SortPackagesRule) buildEdits(
 			insertCol += cmdStartCol
 		}
 		edits = append(edits, rules.TextEdit{
-			Location: rules.NewRangeLocation(file, docLine, insertCol, docLine, insertCol),
+			Location: rules.NewRangeLocation(src.file, docLine, insertCol, docLine, insertCol),
 			NewText:  insertText + " ",
 		})
 		insertLine = first.Line
@@ -296,7 +302,7 @@ func (r *SortPackagesRule) buildEdits(
 				docStartCol--
 			}
 			edits = append(edits, rules.TextEdit{
-				Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
+				Location: rules.NewRangeLocation(src.file, docLine, docStartCol, docLine, docEndCol),
 				NewText:  "",
 			})
 			deletedOnLine[pkg.Line]++
@@ -317,7 +323,7 @@ func (r *SortPackagesRule) buildEdits(
 			}
 			if !firstLitDone {
 				edits = append(edits, rules.TextEdit{
-					Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
+					Location: rules.NewRangeLocation(src.file, docLine, docStartCol, docLine, docEndCol),
 					NewText:  insertText,
 				})
 				insertLine = pkg.Line
@@ -327,7 +333,7 @@ func (r *SortPackagesRule) buildEdits(
 					docStartCol--
 				}
 				edits = append(edits, rules.TextEdit{
-					Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
+					Location: rules.NewRangeLocation(src.file, docLine, docStartCol, docLine, docEndCol),
 					NewText:  "",
 				})
 				deletedOnLine[pkg.Line]++
@@ -336,7 +342,7 @@ func (r *SortPackagesRule) buildEdits(
 	}
 
 	edits = append(edits, cleanupAfterDeletions(
-		original, deletedOnLine, insertLine, startLine, file, instrLines,
+		original, deletedOnLine, insertLine, startLine, src,
 	)...)
 	return edits
 }
@@ -350,10 +356,9 @@ func cleanupAfterDeletions(
 	deletedOnLine map[int]int,
 	insertLine int,
 	startLine int,
-	file string,
-	instrLines []string,
+	src sourceContext,
 ) []rules.TextEdit {
-	if len(deletedOnLine) == 0 || instrLines == nil {
+	if len(deletedOnLine) == 0 || src.instrLines == nil {
 		return nil
 	}
 
@@ -368,20 +373,20 @@ func cleanupAfterDeletions(
 			continue
 		}
 		prevIdx := shellLine - 1
-		if prevIdx < 0 || prevIdx >= len(instrLines) || shellLine >= len(instrLines) {
+		if prevIdx < 0 || prevIdx >= len(src.instrLines) || shellLine >= len(src.instrLines) {
 			continue
 		}
-		prevLine := instrLines[prevIdx]
+		prevLine := src.instrLines[prevIdx]
 		trimmed := strings.TrimRight(prevLine, " \t")
-		if trimmed == "" || trimmed[len(trimmed)-1] != '\\' {
-			continue
+		if trimmed == "" || trimmed[len(trimmed)-1] != byte(src.escapeToken) {
+			continue // no continuation character
 		}
 		bsCol := len(strings.TrimRight(trimmed[:len(trimmed)-1], " \t"))
 		edits = append(edits, rules.TextEdit{
 			Location: rules.NewRangeLocation(
-				file,
+				src.file,
 				startLine+prevIdx, bsCol,
-				startLine+shellLine, len(instrLines[shellLine]),
+				startLine+shellLine, len(src.instrLines[shellLine]),
 			),
 			NewText: "",
 		})
