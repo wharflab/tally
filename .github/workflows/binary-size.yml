@@ -23,6 +23,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           build-environment: |
+            GOTOOLCHAIN=auto
             GOEXPERIMENT=jsonv2
             CGO_ENABLED=0
             GOSUMDB=sum.golang.org
