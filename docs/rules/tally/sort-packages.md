@@ -46,7 +46,8 @@ Sorting is case-insensitive.
 
 ### Variable arguments
 
-When install commands mix literal packages and variable references (`$PKG`, `${PKG}`), only the literal packages are sorted. Variables are kept at the end in their original relative order. Variable tokens are never touched by edits, avoiding conflicts with other rules like ShellCheck quoting.
+When install commands mix literal packages and variable references (`$PKG`, `${PKG}`), only the literal packages are sorted. Variables are kept at the
+end in their original relative order. Variable tokens are never touched by edits, avoiding conflicts with other rules like ShellCheck quoting.
 
 ### Skipped cases
 
