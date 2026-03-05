@@ -31,10 +31,20 @@ jobs:
             -tags 'containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub' -ldflags="-s -w" -trimpath -o out
       - name: Post size comment on PR
         if: github.event_name == 'pull_request' && hashFiles('comment.txt') != ''
-        run: |
-          gh pr comment "${{ github.event.pull_request.number }}" \
-            --body-file comment.txt --edit-last || \
-          gh pr comment "${{ github.event.pull_request.number }}" \
-            --body-file comment.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          MARKER="<!-- go-size-tracker -->"
+          BODY="$MARKER"$'\n'"$(cat comment.txt)"
+
+          # Find an existing comment with our marker.
+          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            --paginate -q ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -1)
+
+          if [ -n "$COMMENT_ID" ]; then
+            gh api "repos/${{ github.repository }}/issues/comments/${COMMENT_ID}" \
+              -X PATCH -f body="$BODY"
+          else
+            gh pr comment "$PR_NUMBER" --body "$BODY"
+          fi
