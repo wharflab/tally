@@ -169,26 +169,25 @@ func (r *SortPackagesRule) checkInstallCommand(
 	instrLines []string,
 	meta rules.RuleMetadata,
 ) *rules.Violation {
-	// Need at least 2 literal packages to have anything to sort.
-	nLiterals := 0
+	// Collect literals in their original order (ignoring variables).
+	var literals []shell.PackageArg
 	for _, pkg := range ic.Packages {
 		if !pkg.IsVar {
-			nLiterals++
+			literals = append(literals, pkg)
 		}
 	}
-	if nLiterals < 2 {
+	if len(literals) < 2 {
 		return nil
 	}
 
-	// Sort: literals alphabetically first, variables at tail in original order.
-	sorted := make([]shell.PackageArg, len(ic.Packages))
-	copy(sorted, ic.Packages)
+	// Check if literals are already sorted (ignoring interleaved variables).
+	sorted := make([]shell.PackageArg, len(literals))
+	copy(sorted, literals)
 	slices.SortStableFunc(sorted, packageSortOrder)
 
-	// Check if already in desired order.
 	alreadySorted := true
-	for i := range ic.Packages {
-		if ic.Packages[i].Value != sorted[i].Value {
+	for i := range literals {
+		if literals[i].Value != sorted[i].Value {
 			alreadySorted = false
 			break
 		}
@@ -197,12 +196,22 @@ func (r *SortPackagesRule) checkInstallCommand(
 		return nil
 	}
 
+	// Build the full desired order for edits: sorted literals first, then
+	// variables in original relative order.
+	fullSorted := make([]shell.PackageArg, 0, len(ic.Packages))
+	fullSorted = append(fullSorted, sorted...)
+	for _, pkg := range ic.Packages {
+		if pkg.IsVar {
+			fullSorted = append(fullSorted, pkg)
+		}
+	}
+
 	// Build edits using insert+delete: replace the first literal with the
 	// sorted block, delete remaining literals. Variable tokens are never
 	// touched, avoiding conflicts with rules like SC2086.
 	// For multi-line, each sorted literal is placed at the corresponding
 	// literal's original line position to preserve continuation formatting.
-	edits := r.buildEdits(ic.Packages, sorted, startLine, cmdStartCol, file, instrLines)
+	edits := r.buildEdits(ic.Packages, fullSorted, startLine, cmdStartCol, file, instrLines)
 
 	msg := fmt.Sprintf("packages in %s %s are not sorted alphabetically", ic.Manager, ic.Subcommand)
 

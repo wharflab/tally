@@ -135,20 +135,6 @@
               {
                 "location": {
                   "end": {
-                    "column": 7,
-                    "line": 10
-                  },
-                  "file": "testdata/sort-packages/Dockerfile",
-                  "start": {
-                    "column": 8,
-                    "line": 9
-                  }
-                },
-                "newText": ""
-              },
-              {
-                "location": {
-                  "end": {
                     "column": 10,
                     "line": 9
                   },
@@ -156,6 +142,20 @@
                   "start": {
                     "column": 7,
                     "line": 8
+                  }
+                },
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 7,
+                    "line": 10
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 8,
+                    "line": 9
                   }
                 },
                 "newText": ""

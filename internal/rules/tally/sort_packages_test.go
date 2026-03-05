@@ -65,6 +65,11 @@ func TestSortPackagesCheck(t *testing.T) {
 			WantViolations: 0,
 		},
 		{
+			Name:           "sorted literals interleaved with variables - no violation",
+			Content:        "FROM alpine:3.20\nRUN npm install \\\n    anything \\\n    boo \\\n    $FOO \\\n    zoo\n",
+			WantViolations: 0,
+		},
+		{
 			Name:           "heredoc RUN sorted",
 			Content:        "FROM alpine:3.20\nRUN <<EOF\napt-get install -y zoo foo\nEOF\n",
 			WantViolations: 1,
