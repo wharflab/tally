@@ -160,6 +160,13 @@ func TestFindInstallPackages(t *testing.T) {
 			wantPkgs: [][]string{{"microsoft-build-tools"}},
 		},
 		{
+			name:     "pnpm install with add as package name",
+			script:   "pnpm install add-package foo",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"add-package", "foo"}},
+		},
+		{
 			name:     "uv add",
 			script:   "uv add flask django",
 			variant:  VariantBash,

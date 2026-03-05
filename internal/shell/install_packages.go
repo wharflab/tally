@@ -323,6 +323,9 @@ func findInstallSubcommand(args []*syntax.Word, installCommands []string) (int, 
 		}
 	}
 
+	bestStart := -1 // earliest token start position
+	bestEndIdx := -1
+	bestCmd := ""
 	for _, cmd := range installCommands {
 		parts := strings.Split(cmd, " ")
 		for j := range lits {
@@ -337,12 +340,17 @@ func findInstallSubcommand(args []*syntax.Word, installCommands []string) (int, 
 				}
 			}
 			if match {
-				return lits[j+len(parts)-1].idx, cmd
+				if bestStart < 0 || lits[j].idx < bestStart {
+					bestStart = lits[j].idx
+					bestEndIdx = lits[j+len(parts)-1].idx
+					bestCmd = cmd
+				}
+				break // first positional match for this command
 			}
 		}
 	}
 
-	return -1, ""
+	return bestEndIdx, bestCmd
 }
 
 // wordText extracts the full text representation of a shell word,
