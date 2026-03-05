@@ -861,6 +861,27 @@ skip-blank-lines = true
 			wantApplied: 1,
 		},
 
+		// Cross-rule: no-multiple-empty-lines fix makes max-lines violation stale.
+		// The input has 8 lines (with skip-blank-lines=false). After fixing the
+		// excess blank lines (3→1 between instructions), the file drops to 6 lines,
+		// below the max of 7. The max-lines violation should be suppressed via
+		// PostFixRevalidator rather than reported as stale.
+		{
+			name: "no-multiple-empty-lines-revalidate-max-lines",
+			input: "FROM alpine:3.20\n" +
+				"RUN echo hello\n" +
+				"\n\n\n" + // 3 blank lines (2 excess)
+				"COPY . /app\n" +
+				"CMD [\"./app\"]\n",
+			args: append([]string{"--fix"},
+				mustSelectRules(
+					"tally/no-multiple-empty-lines",
+					"tally/max-lines",
+				)...),
+			config:      "[rules.tally.max-lines]\nmax = 7\nskip-blank-lines = false\n",
+			wantApplied: 1, // only no-multiple-empty-lines fix; max-lines has no fix
+		},
+
 		// Epilogue order: reorder CMD and ENTRYPOINT
 		{
 			name: "epilogue-order-basic",
