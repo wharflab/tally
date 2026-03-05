@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -253,14 +254,8 @@ func TestFindInstallPackages(t *testing.T) {
 				for _, p := range cmd.Packages {
 					got = append(got, p.Value)
 				}
-				if len(got) != len(tt.wantPkgs[i]) {
+				if !slices.Equal(got, tt.wantPkgs[i]) {
 					t.Errorf("command[%d] packages = %v, want %v", i, got, tt.wantPkgs[i])
-					continue
-				}
-				for j, pkg := range got {
-					if pkg != tt.wantPkgs[i][j] {
-						t.Errorf("command[%d].packages[%d] = %q, want %q", i, j, pkg, tt.wantPkgs[i][j])
-					}
 				}
 			}
 		})
