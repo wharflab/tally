@@ -83,6 +83,13 @@ func TestFindInstallPackages(t *testing.T) {
 			wantCmds: 0,
 		},
 		{
+			name:     "pip install -c constraint still extracts packages",
+			script:   "pip install -c constraints.txt flask django",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"flask", "django"}},
+		},
+		{
 			name:     "yarn add",
 			script:   "yarn add react react-dom",
 			variant:  VariantBash,

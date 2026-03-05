@@ -42,6 +42,8 @@ var (
 	aptFlags    = []string{"-o", "--option", "-t", "--target-release"}
 	dnfYumFlags = []string{"--root", "--installroot", "--releasever", "--repo"}
 	pipFlags    = []string{
+		"-c",
+		"--constraint",
 		"--trusted-host",
 		"--index-url",
 		"--extra-index-url",
@@ -118,8 +120,6 @@ var pipFileArgs = map[string]bool{
 	"--requirement": true,
 	"-e":            true,
 	"--editable":    true,
-	"-c":            true,
-	"--constraint":  true,
 	".":             true,
 	"./":            true,
 }
