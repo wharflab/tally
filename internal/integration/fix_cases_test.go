@@ -1181,6 +1181,15 @@ severity = "error"
 				mustSelectRules("tally/sort-packages")...),
 			wantApplied: 1,
 		},
+		// Sort packages: mixed literals and variables — literals sorted first, variables at tail
+		{
+			name: "sort-packages-mixed-vars",
+			input: "FROM python:3.12\n" +
+				"RUN uv pip install $CDK_DEPS otel aws-otel $RUNTIME_DEPS polars==1.2.3\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages")...),
+			wantApplied: 1,
+		},
 		// Cross-rule: sort-packages (priority 15) + newline-per-chained-call (priority 97)
 		// on a chained RUN with unsorted packages. sort-packages rewrites package names
 		// within the install command; newline-per-chained-call splits the && boundary.

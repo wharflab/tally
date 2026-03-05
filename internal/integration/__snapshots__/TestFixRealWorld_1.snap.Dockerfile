@@ -79,16 +79,16 @@ ARG DIFFUSERS_VERSION
 ARG TRANSFORMERS_VERSION
 
 RUN pip install --no-cache-dir dill==0.3.6 \
-                               transformers[sklearn,sentencepiece,audio,vision]==${TRANSFORMERS_VERSION} \
-                               datasets==${DATASETS_VERSION} \
-                               diffusers==${DIFFUSERS_VERSION} \
-                               "$PT_TORCHAUDIO_URL" \
                                evaluate \
                                gevent~=23.9.0 \
                                kenlm==0.1 \
-                               multiprocess==0.70.14 \
+                               "multiprocess==0.70.14 \
                                pyarrow~=14.0.1 \
-                               sagemaker==2.132.0
+                               sagemaker==2.132.0 \
+                               transformers[sklearn,sentencepiece,audio,vision]==${TRANSFORMERS_VERSION} \
+                               datasets==${DATASETS_VERSION} \
+                               diffusers==${DIFFUSERS_VERSION} \
+                               $PT_TORCHAUDIO_URL
 RUN pip install --no-cache-dir setuptools==69.5.1
 
 COPY requirements1.txt .
@@ -204,7 +204,7 @@ RUN <<EOF
 set -e
 apt-get update
 apt-get -y upgrade --only-upgrade systemd
-apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates check cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7 jq libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libgl1-mesa-glx libglib2.0-0 libgomp1 libhwloc-dev libibverbs-dev libnuma-dev libnuma1 libsm6 libssl-dev libssl3 libsubunit-dev libsubunit0 libtool libxext6 libxrender-dev openssl pkg-config python3-dev unzip vim wget zlib1g-dev
+apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates check cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libgl1-mesa-glx libglib2.0-0 libgomp1 libhwloc-dev libibverbs-dev libnuma-dev libnuma1 libsm6 libssl-dev libssl3 libsubunit-dev libsubunit0 libtool libxext6 libxrender-dev openssl pkg-config python3-dev unzip vim wget zlib1g-dev libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7
 rm -rf /var/lib/apt/lists/*
 apt-get clean
 cd /tmp
