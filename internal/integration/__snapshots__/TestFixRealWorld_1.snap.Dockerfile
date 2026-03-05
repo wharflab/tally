@@ -78,17 +78,11 @@ ARG DATASETS_VERSION
 ARG DIFFUSERS_VERSION
 ARG TRANSFORMERS_VERSION
 
-RUN pip install --no-cache-dir dill==0.3.6 \
+RUN pip install --no-cache-dir dill==0.3.6 evaluate gevent~=23.9.0 kenlm==0.1 multiprocess==0.70.14 pyarrow~=14.0.1 sagemaker==2.132.0 \
                                transformers[sklearn,sentencepiece,audio,vision]==${TRANSFORMERS_VERSION} \
                                datasets==${DATASETS_VERSION} \
                                diffusers==${DIFFUSERS_VERSION} \
-                               "$PT_TORCHAUDIO_URL" \
-                               evaluate \
-                               gevent~=23.9.0 \
-                               kenlm==0.1 \
-                               multiprocess==0.70.14 \
-                               pyarrow~=14.0.1 \
-                               sagemaker==2.132.0
+                               "$PT_TORCHAUDIO_URL"
 RUN pip install --no-cache-dir setuptools==69.5.1
 
 COPY requirements1.txt .

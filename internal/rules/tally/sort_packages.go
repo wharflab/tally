@@ -109,7 +109,7 @@ func (r *SortPackagesRule) checkRun(
 	if isHeredoc {
 		// Heredoc body starts on the next line; no column offset.
 		installCmds := shell.FindInstallPackages(script, shellVariant)
-		return r.collectViolations(installCmds, startLine+1, 0, file, loc, meta)
+		return r.collectViolations(installCmds, startLine+1, 0, file, loc, nil, meta)
 	}
 
 	// Shell-form: reconstruct source text from source map lines.
@@ -121,7 +121,7 @@ func (r *SortPackagesRule) checkRun(
 	cmdStartCol := findCmdStartCol(instrLines[0])
 	sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol, escapeToken)
 	installCmds := shell.FindInstallPackages(sourceText, shellVariant)
-	return r.collectViolations(installCmds, startLine, cmdStartCol, file, loc, meta)
+	return r.collectViolations(installCmds, startLine, cmdStartCol, file, loc, instrLines, meta)
 }
 
 // collectViolations checks each install command and returns any violations.
@@ -131,11 +131,12 @@ func (r *SortPackagesRule) collectViolations(
 	cmdStartCol int,
 	file string,
 	loc rules.Location,
+	instrLines []string, // nil for heredoc
 	meta rules.RuleMetadata,
 ) []rules.Violation {
 	var violations []rules.Violation
 	for _, ic := range installCmds {
-		if v := r.checkInstallCommand(ic, startLine, cmdStartCol, file, loc, meta); v != nil {
+		if v := r.checkInstallCommand(ic, startLine, cmdStartCol, file, loc, instrLines, meta); v != nil {
 			violations = append(violations, *v)
 		}
 	}
@@ -165,6 +166,7 @@ func (r *SortPackagesRule) checkInstallCommand(
 	cmdStartCol int,
 	file string,
 	loc rules.Location,
+	instrLines []string,
 	meta rules.RuleMetadata,
 ) *rules.Violation {
 	// Need at least 2 literal packages to have anything to sort.
@@ -200,7 +202,7 @@ func (r *SortPackagesRule) checkInstallCommand(
 	// touched, avoiding conflicts with rules like SC2086.
 	// For multi-line, each sorted literal is placed at the corresponding
 	// literal's original line position to preserve continuation formatting.
-	edits := r.buildEdits(ic.Packages, sorted, nLiterals, startLine, cmdStartCol, file)
+	edits := r.buildEdits(ic.Packages, sorted, startLine, cmdStartCol, file, instrLines)
 
 	msg := fmt.Sprintf("packages in %s %s are not sorted alphabetically", ic.Manager, ic.Subcommand)
 
@@ -217,54 +219,29 @@ func (r *SortPackagesRule) checkInstallCommand(
 	return &v
 }
 
-// buildEdits generates edits to sort packages. Variable tokens are never
-// directly edited.
-//
-// For single-line: replaces the first literal with the sorted block, deletes
-// remaining literals. Variables naturally end up at the tail.
-//
-// For multi-line: replaces each literal at its own line position with the
-// corresponding sorted literal, preserving continuation line formatting.
-// Variables stay in their original positions.
-func (r *SortPackagesRule) buildEdits(
-	original []shell.PackageArg,
-	sorted []shell.PackageArg,
-	_ int, // nLiterals — unused, derived from sorted order
-	startLine int,
-	cmdStartCol int,
-	file string,
-) []rules.TextEdit {
-	// Collect literal positions for multi-line fallback.
-	var litPositions []shell.PackageArg
-	for _, pkg := range original {
-		if !pkg.IsVar {
-			litPositions = append(litPositions, pkg)
-		}
-	}
-
-	multiLine := len(litPositions) > 1 &&
-		litPositions[0].Line != litPositions[len(litPositions)-1].Line
-
-	if multiLine {
-		return r.buildMultiLineEdits(litPositions, sorted, startLine, cmdStartCol, file)
-	}
-	return r.buildSingleLineEdits(original, sorted, litPositions, startLine, cmdStartCol, file)
-}
-
-// buildSingleLineEdits replaces the first literal with the sorted block, then
-// deletes remaining literals. Variables end up at the tail without being touched.
+// buildEdits generates insert+delete edits to sort packages. Replaces the first
+// literal with the sorted block, deletes remaining literals. Variable tokens are
+// never edited — they naturally end up at the tail.
 //
 // When the first package is a variable, a zero-width insert before it is used
 // instead (no overlap with literal deletes at different positions).
-func (r *SortPackagesRule) buildSingleLineEdits(
+//
+// For multi-line commands, also emits cleanup edits to remove continuation lines
+// left empty after literal deletions.
+func (r *SortPackagesRule) buildEdits(
 	original []shell.PackageArg,
 	sorted []shell.PackageArg,
-	litPositions []shell.PackageArg,
 	startLine int,
 	cmdStartCol int,
 	file string,
+	instrLines []string, // raw Dockerfile lines for cleanup; nil for heredoc
 ) []rules.TextEdit {
-	nLiterals := len(litPositions)
+	nLiterals := 0
+	for _, pkg := range original {
+		if !pkg.IsVar {
+			nLiterals++
+		}
+	}
 	edits := make([]rules.TextEdit, 0, nLiterals+1)
 
 	// Build sorted literal text.
@@ -277,19 +254,24 @@ func (r *SortPackagesRule) buildSingleLineEdits(
 	}
 	insertText := sb.String()
 
+	// Track which shell-lines have a literal deleted (for cleanup).
+	deletedOnLine := make(map[int]int) // shell line → count of deletions
+	insertLine := -1                   // shell line receiving the sorted block
+
 	if original[0].IsVar {
 		// Zero-width insert before the first package (a variable).
 		first := original[0]
-		insertLine := startLine + first.Line
+		docLine := startLine + first.Line
 		insertCol := first.StartCol
 		if first.Line == 0 {
 			insertCol += cmdStartCol
 		}
 		edits = append(edits, rules.TextEdit{
-			Location: rules.NewRangeLocation(file, insertLine, insertCol, insertLine, insertCol),
+			Location: rules.NewRangeLocation(file, docLine, insertCol, docLine, insertCol),
 			NewText:  insertText + " ",
 		})
-		// Delete ALL literals (each with preceding space).
+		insertLine = first.Line
+		// Delete ALL literals.
 		for _, pkg := range original {
 			if pkg.IsVar {
 				continue
@@ -308,6 +290,7 @@ func (r *SortPackagesRule) buildSingleLineEdits(
 				Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
 				NewText:  "",
 			})
+			deletedOnLine[pkg.Line]++
 		}
 	} else {
 		// First package is a literal — replace it with sorted block, delete rest.
@@ -328,6 +311,7 @@ func (r *SortPackagesRule) buildSingleLineEdits(
 					Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
 					NewText:  insertText,
 				})
+				insertLine = pkg.Line
 				firstLitDone = true
 			} else {
 				if docStartCol > 0 {
@@ -337,37 +321,59 @@ func (r *SortPackagesRule) buildSingleLineEdits(
 					Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
 					NewText:  "",
 				})
+				deletedOnLine[pkg.Line]++
 			}
 		}
 	}
+
+	edits = append(edits, cleanupEmptyLines(
+		original, deletedOnLine, insertLine, startLine, file, instrLines,
+	)...)
 	return edits
 }
 
-// buildMultiLineEdits replaces each literal at its original line position with
-// the corresponding sorted literal. Variables stay in their original positions.
-// Only emits edits where the value changed.
-func (r *SortPackagesRule) buildMultiLineEdits(
-	litPositions []shell.PackageArg,
-	sorted []shell.PackageArg,
+// cleanupEmptyLines emits edits to remove continuation lines left empty after
+// literal deletions. For each empty line, removes the trailing backslash +
+// whitespace from the previous line through the end of the empty line.
+func cleanupEmptyLines(
+	original []shell.PackageArg,
+	deletedOnLine map[int]int,
+	insertLine int,
 	startLine int,
-	cmdStartCol int,
 	file string,
+	instrLines []string,
 ) []rules.TextEdit {
-	edits := make([]rules.TextEdit, 0, len(litPositions))
-	for i, orig := range litPositions {
-		if orig.Value == sorted[i].Value {
+	if len(deletedOnLine) == 0 || instrLines == nil {
+		return nil
+	}
+
+	pkgsPerLine := make(map[int]int)
+	for _, pkg := range original {
+		pkgsPerLine[pkg.Line]++
+	}
+
+	edits := make([]rules.TextEdit, 0, len(deletedOnLine))
+	for shellLine, nDeleted := range deletedOnLine {
+		if shellLine == insertLine || nDeleted < pkgsPerLine[shellLine] {
 			continue
 		}
-		docLine := startLine + orig.Line
-		docStartCol := orig.StartCol
-		docEndCol := orig.EndCol
-		if orig.Line == 0 {
-			docStartCol += cmdStartCol
-			docEndCol += cmdStartCol
+		prevIdx := shellLine - 1
+		if prevIdx < 0 || prevIdx >= len(instrLines) || shellLine >= len(instrLines) {
+			continue
 		}
+		prevLine := instrLines[prevIdx]
+		trimmed := strings.TrimRight(prevLine, " \t")
+		if trimmed == "" || trimmed[len(trimmed)-1] != '\\' {
+			continue
+		}
+		bsCol := len(strings.TrimRight(trimmed[:len(trimmed)-1], " \t"))
 		edits = append(edits, rules.TextEdit{
-			Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
-			NewText:  sorted[i].Value,
+			Location: rules.NewRangeLocation(
+				file,
+				startLine+prevIdx, bsCol,
+				startLine+shellLine, len(instrLines[shellLine]),
+			),
+			NewText: "",
 		})
 	}
 	return edits

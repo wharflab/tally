@@ -156,7 +156,7 @@ func TestSortPackagesFix(t *testing.T) {
 		{
 			name:    "multi-line",
 			content: "FROM alpine:3.20\nRUN apt-get install -y \\\n    zoo \\\n    foo\n",
-			want:    "FROM alpine:3.20\nRUN apt-get install -y \\\n    foo \\\n    zoo\n",
+			want:    "FROM alpine:3.20\nRUN apt-get install -y \\\n    foo zoo\n",
 		},
 		{
 			name:    "mixed literals and variables - vars at tail",
@@ -169,17 +169,16 @@ func TestSortPackagesFix(t *testing.T) {
 			want:    "FROM python:3.12\nRUN uv pip install aws-otel otel polars==1.2.3 $CDK_DEPS $RUNTIME_DEPS\n",
 		},
 		{
-			name: "multi-line mixed - literals sorted, vars stay in place",
+			name: "multi-line mixed - sorted literals then vars",
 			content: "FROM python:3.12\nRUN pip install \\\n" +
 				"  foo zoo \\\n" +
 				"  boo abbr $TADA oops \\\n" +
 				"  $END \\\n" +
 				"  almost there\n",
 			want: "FROM python:3.12\nRUN pip install \\\n" +
-				"  abbr almost \\\n" +
-				"  boo foo $TADA oops \\\n" +
-				"  $END \\\n" +
-				"  there zoo\n",
+				"  abbr almost boo foo oops there zoo \\\n" +
+				"  $TADA \\\n" +
+				"  $END\n",
 		},
 	}
 

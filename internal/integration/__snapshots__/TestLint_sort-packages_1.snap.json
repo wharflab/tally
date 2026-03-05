@@ -102,7 +102,7 @@
                     "line": 8
                   }
                 },
-                "newText": "curl"
+                "newText": "curl git zip"
               },
               {
                 "location": {
@@ -112,11 +112,11 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 4,
+                    "column": 3,
                     "line": 9
                   }
                 },
-                "newText": "git"
+                "newText": ""
               },
               {
                 "location": {
@@ -126,11 +126,39 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 4,
+                    "column": 3,
                     "line": 10
                   }
                 },
-                "newText": "zip"
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 10,
+                    "line": 9
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 7,
+                    "line": 8
+                  }
+                },
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 7,
+                    "line": 10
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 8,
+                    "line": 9
+                  }
+                },
+                "newText": ""
               }
             ],
             "isPreferred": true,
