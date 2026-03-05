@@ -372,7 +372,7 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 			reportSkippedFixes(fixResult)
 		}
 
-		allViolations = filterFixedViolations(allViolations, fixResult)
+		allViolations = filterFixedViolations(allViolations, fixResult, res.fileConfigs)
 	}
 
 	return writeReport(cmd, res.firstCfg, allViolations, res.fileSources, len(discovered))
@@ -530,7 +530,7 @@ func applyStdinFixes(
 		reportSkippedFixes(fixResult)
 	}
 
-	allViolations = filterFixedViolations(allViolations, fixResult)
+	allViolations = filterFixedViolations(allViolations, fixResult, res.fileConfigs)
 
 	// With --fix and stdin, stdout carries the fixed Dockerfile content.
 	// Redirect the violation report to stderr unless the user explicitly
@@ -1469,7 +1469,11 @@ func mergeAsyncViolations(fast []rules.Violation, asyncResult *async.RunResult) 
 // filterFixedViolations removes violations that were fixed from the list.
 // It also re-checks violations from rules implementing PostFixRevalidator
 // against the modified file content, suppressing stale violations.
-func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) []rules.Violation {
+func filterFixedViolations(
+	violations []rules.Violation,
+	fixResult *fix.Result,
+	fileConfigs map[string]*config.Config,
+) []rules.Violation {
 	// Build set of fixed locations (include column to handle multiple violations on same line)
 	type locKey struct {
 		file string
@@ -1515,7 +1519,11 @@ func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) 
 		if content, ok := modifiedContent[filepath.ToSlash(v.File())]; ok {
 			if rule := rules.DefaultRegistry().Get(v.RuleCode); rule != nil {
 				if revalidator, ok := rule.(rules.PostFixRevalidator); ok {
-					if !revalidator.RevalidateAfterFix(v, content, nil) {
+					var ruleCfg any
+					if fileCfg := fileConfigs[filepath.ToSlash(v.File())]; fileCfg != nil {
+						ruleCfg = fileCfg.Rules.GetOptions(v.RuleCode)
+					}
+					if !revalidator.RevalidateAfterFix(v, content, ruleCfg) {
 						continue
 					}
 				}
