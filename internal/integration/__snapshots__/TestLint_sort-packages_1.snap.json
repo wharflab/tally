@@ -35,7 +35,7 @@
                     "line": 4
                   }
                 },
-                "newText": "curl"
+                "newText": "curl git wget"
               },
               {
                 "location": {
@@ -45,11 +45,11 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 46,
+                    "column": 45,
                     "line": 4
                   }
                 },
-                "newText": "git"
+                "newText": ""
               },
               {
                 "location": {
@@ -59,11 +59,11 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 51,
+                    "column": 50,
                     "line": 4
                   }
                 },
-                "newText": "wget"
+                "newText": ""
               }
             ],
             "isPreferred": true,
@@ -169,7 +169,21 @@
                     "line": 16
                   }
                 },
-                "newText": "@eslint/js"
+                "newText": "@eslint/js axios express"
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 29,
+                    "line": 16
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 23,
+                    "line": 16
+                  }
+                },
+                "newText": ""
               },
               {
                 "location": {
@@ -179,11 +193,11 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 30,
+                    "column": 29,
                     "line": 16
                   }
                 },
-                "newText": "express"
+                "newText": ""
               }
             ],
             "isPreferred": true,

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	fixpkg "github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
 )
@@ -132,68 +133,53 @@ func TestSortPackagesCheck(t *testing.T) {
 	})
 }
 
-func TestSortPackagesMixedLiteralsAndVariables(t *testing.T) {
-	t.Parallel()
-
-	r := NewSortPackagesRule()
-	input := testutil.MakeLintInputWithConfig(t, "Dockerfile",
-		"FROM alpine:3.20\nRUN npm install zoo foo $NPM_PKG ${OTHER}\n", nil)
-	violations := r.Check(input)
-
-	if len(violations) != 1 {
-		t.Fatalf("got %d violations, want 1", len(violations))
-	}
-
-	fix := violations[0].SuggestedFix
-	if fix == nil {
-		t.Fatal("violation has no SuggestedFix")
-	}
-
-	// Insert+delete strategy: 1 insertion (sorted literals block) + 2 deletions
-	if len(fix.Edits) != 3 {
-		t.Fatalf("got %d edits, want 3", len(fix.Edits))
-	}
-
-	// First edit: insertion of sorted literals before first package
-	if fix.Edits[0].NewText != "foo zoo " {
-		t.Errorf("insertion text = %q, want %q", fix.Edits[0].NewText, "foo zoo ")
-	}
-	// Remaining edits: deletions of literals from original positions
-	for _, edit := range fix.Edits[1:] {
-		if edit.NewText != "" {
-			t.Errorf("deletion edit has NewText = %q, want empty", edit.NewText)
-		}
-	}
-}
-
-func TestSortPackagesFixEdits(t *testing.T) {
+func TestSortPackagesFix(t *testing.T) {
 	t.Parallel()
 
 	r := NewSortPackagesRule()
 
 	tests := []struct {
-		name         string
-		content      string
-		wantEdits    int
-		wantNewTexts []string
+		name    string
+		content string
+		want    string
 	}{
 		{
-			name:         "simple swap - two packages",
-			content:      "FROM alpine:3.20\nRUN apt-get install -y wget curl\n",
-			wantEdits:    2,
-			wantNewTexts: []string{"curl", "wget"},
+			name:    "simple swap",
+			content: "FROM alpine:3.20\nRUN apt-get install -y wget curl\n",
+			want:    "FROM alpine:3.20\nRUN apt-get install -y curl wget\n",
 		},
 		{
-			name:         "three packages reverse order",
-			content:      "FROM alpine:3.20\nRUN apt-get install -y zoo foo bar\n",
-			wantEdits:    2, // bar and zoo swap, foo stays
-			wantNewTexts: []string{"bar", "zoo"},
+			name:    "three packages reverse order",
+			content: "FROM alpine:3.20\nRUN apt-get install -y zoo foo bar\n",
+			want:    "FROM alpine:3.20\nRUN apt-get install -y bar foo zoo\n",
 		},
 		{
-			name:         "multi-line swap",
-			content:      "FROM alpine:3.20\nRUN apt-get install -y \\\n    zoo \\\n    foo\n",
-			wantEdits:    2,
-			wantNewTexts: []string{"foo", "zoo"},
+			name:    "multi-line",
+			content: "FROM alpine:3.20\nRUN apt-get install -y \\\n    zoo \\\n    foo\n",
+			want:    "FROM alpine:3.20\nRUN apt-get install -y \\\n    foo \\\n    zoo\n",
+		},
+		{
+			name:    "mixed literals and variables - vars at tail",
+			content: "FROM alpine:3.20\nRUN npm install zoo foo $NPM_PKG ${OTHER}\n",
+			want:    "FROM alpine:3.20\nRUN npm install foo zoo $NPM_PKG ${OTHER}\n",
+		},
+		{
+			name:    "interleaved vars - literals sorted, vars at tail",
+			content: "FROM python:3.12\nRUN uv pip install $CDK_DEPS otel aws-otel $RUNTIME_DEPS polars==1.2.3\n",
+			want:    "FROM python:3.12\nRUN uv pip install aws-otel otel polars==1.2.3 $CDK_DEPS $RUNTIME_DEPS\n",
+		},
+		{
+			name: "multi-line mixed - literals sorted, vars stay in place",
+			content: "FROM python:3.12\nRUN pip install \\\n" +
+				"  foo zoo \\\n" +
+				"  boo abbr $TADA oops \\\n" +
+				"  $END \\\n" +
+				"  almost there\n",
+			want: "FROM python:3.12\nRUN pip install \\\n" +
+				"  abbr almost \\\n" +
+				"  boo foo $TADA oops \\\n" +
+				"  $END \\\n" +
+				"  there zoo\n",
 		},
 	}
 
@@ -211,23 +197,17 @@ func TestSortPackagesFixEdits(t *testing.T) {
 			if fix == nil {
 				t.Fatal("violation has no SuggestedFix")
 			}
-
 			if fix.Safety != rules.FixSafe {
 				t.Errorf("fix safety = %v, want FixSafe", fix.Safety)
 			}
 
-			if fix.Priority != 15 {
-				t.Errorf("fix priority = %d, want 15", fix.Priority)
+			// Apply edits back-to-front using the production fix engine.
+			got := []byte(tt.content)
+			for i := len(fix.Edits) - 1; i >= 0; i-- {
+				got = fixpkg.ApplyEdit(got, fix.Edits[i])
 			}
-
-			if len(fix.Edits) != tt.wantEdits {
-				t.Fatalf("got %d edits, want %d", len(fix.Edits), tt.wantEdits)
-			}
-
-			for i, edit := range fix.Edits {
-				if i < len(tt.wantNewTexts) && edit.NewText != tt.wantNewTexts[i] {
-					t.Errorf("edit[%d].NewText = %q, want %q", i, edit.NewText, tt.wantNewTexts[i])
-				}
+			if string(got) != tt.want {
+				t.Errorf("after fix:\ngot:  %q\nwant: %q", got, tt.want)
 			}
 		})
 	}

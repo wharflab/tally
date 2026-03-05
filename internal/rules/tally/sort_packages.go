@@ -142,6 +142,22 @@ func (r *SortPackagesRule) collectViolations(
 	return violations
 }
 
+// packageSortOrder compares two packages for sorting: literals rank above
+// variables, literals are compared by case-insensitive sort key, and any two
+// variables are treated as equal so stable sort preserves their relative order.
+func packageSortOrder(a, b shell.PackageArg) int {
+	if a.IsVar != b.IsVar {
+		if a.IsVar {
+			return 1 // variables sort after literals
+		}
+		return -1
+	}
+	if a.IsVar { // both variables — keep original order
+		return 0
+	}
+	return strings.Compare(sortKey(a.Normalized), sortKey(b.Normalized))
+}
+
 // checkInstallCommand checks a single install command for unsorted packages.
 func (r *SortPackagesRule) checkInstallCommand(
 	ic shell.InstallCommand,
@@ -151,30 +167,26 @@ func (r *SortPackagesRule) checkInstallCommand(
 	loc rules.Location,
 	meta rules.RuleMetadata,
 ) *rules.Violation {
-	// Collect literals only — variables are never touched by edits.
-	literals := make([]shell.PackageArg, 0, len(ic.Packages))
+	// Need at least 2 literal packages to have anything to sort.
+	nLiterals := 0
 	for _, pkg := range ic.Packages {
 		if !pkg.IsVar {
-			literals = append(literals, pkg)
+			nLiterals++
 		}
 	}
-
-	// Need at least 2 literal packages to sort
-	if len(literals) < 2 {
+	if nLiterals < 2 {
 		return nil
 	}
 
-	// Sort literals by case-insensitive sort key (using Normalized for comparison)
-	sorted := make([]shell.PackageArg, len(literals))
-	copy(sorted, literals)
-	slices.SortStableFunc(sorted, func(a, b shell.PackageArg) int {
-		return strings.Compare(sortKey(a.Normalized), sortKey(b.Normalized))
-	})
+	// Sort: literals alphabetically first, variables at tail in original order.
+	sorted := make([]shell.PackageArg, len(ic.Packages))
+	copy(sorted, ic.Packages)
+	slices.SortStableFunc(sorted, packageSortOrder)
 
-	// Check if literals are already sorted
+	// Check if already in desired order.
 	alreadySorted := true
-	for i, lit := range literals {
-		if lit.Normalized != sorted[i].Normalized {
+	for i := range ic.Packages {
+		if ic.Packages[i].Value != sorted[i].Value {
 			alreadySorted = false
 			break
 		}
@@ -183,23 +195,12 @@ func (r *SortPackagesRule) checkInstallCommand(
 		return nil
 	}
 
-	// Choose edit strategy based on whether variables are present.
-	// When variables exist, we use insert+delete: insert sorted literals as a
-	// block before the first package, then delete each literal from its
-	// original position. This moves literals to the front (variables end up at
-	// the tail) without ever emitting an edit on a variable token — avoiding
-	// conflicts with rules like SC2086 that quote variable references.
-	hasVars := len(literals) < len(ic.Packages)
-	// Use insert+delete for single-line mixed commands (variables end up at
-	// tail without editing variable tokens). For multi-line or literal-only
-	// commands, use slot-based swaps among literal positions.
-	singleLine := ic.Packages[0].Line == ic.Packages[len(ic.Packages)-1].Line
-	var edits []rules.TextEdit
-	if hasVars && singleLine {
-		edits = r.buildInsertDeleteEdits(ic.Packages, literals, sorted, startLine, cmdStartCol, file)
-	} else {
-		edits = r.buildSlotEdits(literals, sorted, startLine, cmdStartCol, file)
-	}
+	// Build edits using insert+delete: replace the first literal with the
+	// sorted block, delete remaining literals. Variable tokens are never
+	// touched, avoiding conflicts with rules like SC2086.
+	// For multi-line, each sorted literal is placed at the corresponding
+	// literal's original line position to preserve continuation formatting.
+	edits := r.buildEdits(ic.Packages, sorted, nLiterals, startLine, cmdStartCol, file)
 
 	msg := fmt.Sprintf("packages in %s %s are not sorted alphabetically", ic.Manager, ic.Subcommand)
 
@@ -216,25 +217,147 @@ func (r *SortPackagesRule) checkInstallCommand(
 	return &v
 }
 
-// buildSlotEdits generates narrow per-slot TextEdits for each position where
-// the current package differs from the sorted order.
-func (r *SortPackagesRule) buildSlotEdits(
-	originals []shell.PackageArg,
+// buildEdits generates edits to sort packages. Variable tokens are never
+// directly edited.
+//
+// For single-line: replaces the first literal with the sorted block, deletes
+// remaining literals. Variables naturally end up at the tail.
+//
+// For multi-line: replaces each literal at its own line position with the
+// corresponding sorted literal, preserving continuation line formatting.
+// Variables stay in their original positions.
+func (r *SortPackagesRule) buildEdits(
+	original []shell.PackageArg,
+	sorted []shell.PackageArg,
+	_ int, // nLiterals — unused, derived from sorted order
+	startLine int,
+	cmdStartCol int,
+	file string,
+) []rules.TextEdit {
+	// Collect literal positions for multi-line fallback.
+	var litPositions []shell.PackageArg
+	for _, pkg := range original {
+		if !pkg.IsVar {
+			litPositions = append(litPositions, pkg)
+		}
+	}
+
+	multiLine := len(litPositions) > 1 &&
+		litPositions[0].Line != litPositions[len(litPositions)-1].Line
+
+	if multiLine {
+		return r.buildMultiLineEdits(litPositions, sorted, startLine, cmdStartCol, file)
+	}
+	return r.buildSingleLineEdits(original, sorted, litPositions, startLine, cmdStartCol, file)
+}
+
+// buildSingleLineEdits replaces the first literal with the sorted block, then
+// deletes remaining literals. Variables end up at the tail without being touched.
+//
+// When the first package is a variable, a zero-width insert before it is used
+// instead (no overlap with literal deletes at different positions).
+func (r *SortPackagesRule) buildSingleLineEdits(
+	original []shell.PackageArg,
+	sorted []shell.PackageArg,
+	litPositions []shell.PackageArg,
+	startLine int,
+	cmdStartCol int,
+	file string,
+) []rules.TextEdit {
+	nLiterals := len(litPositions)
+	edits := make([]rules.TextEdit, 0, nLiterals+1)
+
+	// Build sorted literal text.
+	var sb strings.Builder
+	for i := range nLiterals {
+		if i > 0 {
+			sb.WriteByte(' ')
+		}
+		sb.WriteString(sorted[i].Value)
+	}
+	insertText := sb.String()
+
+	if original[0].IsVar {
+		// Zero-width insert before the first package (a variable).
+		first := original[0]
+		insertLine := startLine + first.Line
+		insertCol := first.StartCol
+		if first.Line == 0 {
+			insertCol += cmdStartCol
+		}
+		edits = append(edits, rules.TextEdit{
+			Location: rules.NewRangeLocation(file, insertLine, insertCol, insertLine, insertCol),
+			NewText:  insertText + " ",
+		})
+		// Delete ALL literals (each with preceding space).
+		for _, pkg := range original {
+			if pkg.IsVar {
+				continue
+			}
+			docLine := startLine + pkg.Line
+			docStartCol := pkg.StartCol
+			docEndCol := pkg.EndCol
+			if pkg.Line == 0 {
+				docStartCol += cmdStartCol
+				docEndCol += cmdStartCol
+			}
+			if docStartCol > 0 {
+				docStartCol--
+			}
+			edits = append(edits, rules.TextEdit{
+				Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
+				NewText:  "",
+			})
+		}
+	} else {
+		// First package is a literal — replace it with sorted block, delete rest.
+		firstLitDone := false
+		for _, pkg := range original {
+			if pkg.IsVar {
+				continue
+			}
+			docLine := startLine + pkg.Line
+			docStartCol := pkg.StartCol
+			docEndCol := pkg.EndCol
+			if pkg.Line == 0 {
+				docStartCol += cmdStartCol
+				docEndCol += cmdStartCol
+			}
+			if !firstLitDone {
+				edits = append(edits, rules.TextEdit{
+					Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
+					NewText:  insertText,
+				})
+				firstLitDone = true
+			} else {
+				if docStartCol > 0 {
+					docStartCol--
+				}
+				edits = append(edits, rules.TextEdit{
+					Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
+					NewText:  "",
+				})
+			}
+		}
+	}
+	return edits
+}
+
+// buildMultiLineEdits replaces each literal at its original line position with
+// the corresponding sorted literal. Variables stay in their original positions.
+// Only emits edits where the value changed.
+func (r *SortPackagesRule) buildMultiLineEdits(
+	litPositions []shell.PackageArg,
 	sorted []shell.PackageArg,
 	startLine int,
 	cmdStartCol int,
 	file string,
 ) []rules.TextEdit {
-	edits := make([]rules.TextEdit, 0, len(originals))
-
-	for i, orig := range originals {
-		if orig.Normalized == sorted[i].Normalized {
-			continue // Already in correct position
+	edits := make([]rules.TextEdit, 0, len(litPositions))
+	for i, orig := range litPositions {
+		if orig.Value == sorted[i].Value {
+			continue
 		}
-
-		// Map source text position to Dockerfile position
-		// Shell source line 0 → Dockerfile startLine, with cmdStartCol offset
-		// Shell source line N>0 → Dockerfile startLine+N, no offset
 		docLine := startLine + orig.Line
 		docStartCol := orig.StartCol
 		docEndCol := orig.EndCol
@@ -242,75 +365,11 @@ func (r *SortPackagesRule) buildSlotEdits(
 			docStartCol += cmdStartCol
 			docEndCol += cmdStartCol
 		}
-
 		edits = append(edits, rules.TextEdit{
 			Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
 			NewText:  sorted[i].Value,
 		})
 	}
-
-	return edits
-}
-
-// buildInsertDeleteEdits handles mixed literal+variable commands.
-// It inserts sorted literals as a block before the first package, then deletes
-// each literal from its original position. Variables are never touched.
-// The fix engine applies edits back-to-front, so deletions (later positions)
-// apply first, then insertions (earlier positions).
-func (r *SortPackagesRule) buildInsertDeleteEdits(
-	allPkgs []shell.PackageArg,
-	literals []shell.PackageArg,
-	sorted []shell.PackageArg,
-	startLine int,
-	cmdStartCol int,
-	file string,
-) []rules.TextEdit {
-	edits := make([]rules.TextEdit, 0, len(literals)*2)
-
-	// Insertion point: right before the first package argument (literal or variable).
-	first := allPkgs[0]
-	insertLine := startLine + first.Line
-	insertCol := first.StartCol
-	if first.Line == 0 {
-		insertCol += cmdStartCol
-	}
-	insertLoc := rules.NewRangeLocation(file, insertLine, insertCol, insertLine, insertCol)
-
-	// Build the insertion text: space-separated sorted literals with a
-	// trailing space to separate from the remaining variable arguments.
-	var sb strings.Builder
-	for i, lit := range sorted {
-		if i > 0 {
-			sb.WriteByte(' ')
-		}
-		sb.WriteString(lit.Value)
-	}
-	sb.WriteByte(' ')
-	edits = append(edits, rules.TextEdit{
-		Location: insertLoc,
-		NewText:  sb.String(),
-	})
-
-	// Delete each literal from its original position. Include the preceding
-	// space in the deletion span so no extra whitespace is left behind.
-	for _, lit := range literals {
-		docLine := startLine + lit.Line
-		docStartCol := lit.StartCol
-		docEndCol := lit.EndCol
-		if lit.Line == 0 {
-			docStartCol += cmdStartCol
-			docEndCol += cmdStartCol
-		}
-		// Extend deletion to include one preceding space.
-		if docStartCol > 0 {
-			docStartCol--
-		}
-		edits = append(edits, rules.TextEdit{
-			Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
-			NewText:  "",
-		})
-	}
-
 	return edits
 }
 

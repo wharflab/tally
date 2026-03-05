@@ -19,11 +19,11 @@ func TestApplyEdit_SingleLine(t *testing.T) {
 		NewText:  "apt-get",
 	}
 
-	result := applyEdit(content, edit)
+	result := ApplyEdit(content, edit)
 	expected := []byte("FROM alpine\nRUN apt-get install curl")
 
 	if !bytes.Equal(result, expected) {
-		t.Errorf("applyEdit() =\n%q\nwant:\n%q", result, expected)
+		t.Errorf("ApplyEdit() =\n%q\nwant:\n%q", result, expected)
 	}
 }
 
@@ -37,11 +37,11 @@ func TestApplyEdit_MultiLine(t *testing.T) {
 		NewText:  "RUN apt-get install curl",
 	}
 
-	result := applyEdit(content, edit)
+	result := ApplyEdit(content, edit)
 	expected := []byte("FROM alpine\nRUN apt-get install curl")
 
 	if !bytes.Equal(result, expected) {
-		t.Errorf("applyEdit() =\n%q\nwant:\n%q", result, expected)
+		t.Errorf("ApplyEdit() =\n%q\nwant:\n%q", result, expected)
 	}
 }
 
@@ -964,11 +964,11 @@ func TestApplyEdit_CRLF(t *testing.T) {
 		NewText:  "apt-get",
 	}
 
-	result := applyEdit(content, edit)
+	result := ApplyEdit(content, edit)
 	expected := []byte("FROM alpine\r\nRUN apt-get install curl\r\n")
 
 	if !bytes.Equal(result, expected) {
-		t.Errorf("applyEdit() with CRLF =\n%q\nwant:\n%q", result, expected)
+		t.Errorf("ApplyEdit() with CRLF =\n%q\nwant:\n%q", result, expected)
 	}
 }
 
@@ -985,12 +985,12 @@ func TestApplyEdit_CRLF_ReplacementWithNewlines(t *testing.T) {
 		NewText:  "WORKDIR /app\nRUN make", // LF-only newlines
 	}
 
-	result := applyEdit(content, edit)
+	result := ApplyEdit(content, edit)
 	// Expected: replacement newlines should be converted to CRLF
 	expected := []byte("FROM alpine\r\nWORKDIR /app\r\nRUN make\r\n")
 
 	if !bytes.Equal(result, expected) {
-		t.Errorf("applyEdit() should normalize replacement newlines to CRLF\ngot:\n%q\nwant:\n%q", result, expected)
+		t.Errorf("ApplyEdit() should normalize replacement newlines to CRLF\ngot:\n%q\nwant:\n%q", result, expected)
 	}
 }
 
@@ -1005,12 +1005,12 @@ func TestApplyEdit_CRLF_ReplacementWithMixedNewlines(t *testing.T) {
 		NewText:  "RUN echo one\r\nRUN echo two\nRUN echo three", // Mixed line endings
 	}
 
-	result := applyEdit(content, edit)
+	result := ApplyEdit(content, edit)
 	// Expected: all newlines should be normalized to CRLF
 	expected := []byte("FROM alpine\r\nRUN echo one\r\nRUN echo two\r\nRUN echo three\r\n")
 
 	if !bytes.Equal(result, expected) {
-		t.Errorf("applyEdit() should normalize mixed newlines to CRLF\ngot:\n%q\nwant:\n%q", result, expected)
+		t.Errorf("ApplyEdit() should normalize mixed newlines to CRLF\ngot:\n%q\nwant:\n%q", result, expected)
 	}
 }
 
@@ -1024,10 +1024,10 @@ func TestApplyEdit_InvalidStartLine(t *testing.T) {
 		NewText:  "replaced",
 	}
 
-	result := applyEdit(content, edit)
+	result := ApplyEdit(content, edit)
 	// Should return original content unchanged
 	if !bytes.Equal(result, content) {
-		t.Errorf("applyEdit() with invalid start line should return original content")
+		t.Errorf("ApplyEdit() with invalid start line should return original content")
 	}
 }
 
@@ -1041,10 +1041,10 @@ func TestApplyEdit_InvalidEndLine(t *testing.T) {
 		NewText:  "replaced",
 	}
 
-	result := applyEdit(content, edit)
+	result := ApplyEdit(content, edit)
 	// Should return original content unchanged
 	if !bytes.Equal(result, content) {
-		t.Errorf("applyEdit() with invalid end line should return original content")
+		t.Errorf("ApplyEdit() with invalid end line should return original content")
 	}
 }
 
@@ -1062,11 +1062,11 @@ func TestApplyEdit_NegativeColumn(t *testing.T) {
 		NewText: "COPY",
 	}
 
-	result := applyEdit(content, edit)
+	result := ApplyEdit(content, edit)
 	expected := []byte("COPY alpine")
 
 	if !bytes.Equal(result, expected) {
-		t.Errorf("applyEdit() with negative column =\n%q\nwant:\n%q", result, expected)
+		t.Errorf("ApplyEdit() with negative column =\n%q\nwant:\n%q", result, expected)
 	}
 }
 
@@ -1080,11 +1080,11 @@ func TestApplyEdit_ColumnBeyondLineLength(t *testing.T) {
 		NewText:  "ubuntu",
 	}
 
-	result := applyEdit(content, edit)
+	result := ApplyEdit(content, edit)
 	expected := []byte("FROM ubuntu")
 
 	if !bytes.Equal(result, expected) {
-		t.Errorf("applyEdit() with column beyond line =\n%q\nwant:\n%q", result, expected)
+		t.Errorf("ApplyEdit() with column beyond line =\n%q\nwant:\n%q", result, expected)
 	}
 }
 
@@ -1102,12 +1102,12 @@ func TestApplyEdit_NegativeEndColumn(t *testing.T) {
 		NewText: "COPY",
 	}
 
-	result := applyEdit(content, edit)
+	result := ApplyEdit(content, edit)
 	// Start=0, End clamped to 0, so nothing is replaced, just "COPY" inserted at position 0
 	expected := []byte("COPYFROM alpine")
 
 	if !bytes.Equal(result, expected) {
-		t.Errorf("applyEdit() with negative end column =\n%q\nwant:\n%q", result, expected)
+		t.Errorf("ApplyEdit() with negative end column =\n%q\nwant:\n%q", result, expected)
 	}
 }
 
