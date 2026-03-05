@@ -15,7 +15,7 @@ SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 RUN <<EOF
 set -e
 set -o pipefail
-apk add --no-cache bind-tools gnupg git tini
+apk add --no-cache bind-tools git gnupg tini
 (curl -Ls https://cli.doppler.com/install.sh || wget -qO- https://cli.doppler.com/install.sh) | sh
 npm clean-install --only=production --silent --no-audit
 mv node_modules ../

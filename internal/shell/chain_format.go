@@ -210,8 +210,17 @@ func forceChainNewlinesRec(cmd syntax.Command, nextLine *uint) bool {
 //
 // cmdStartCol is the byte offset in the first line where the command starts
 // (after RUN + flags). Continuation lines are included in full.
-func ReconstructSourceText(lines []string, cmdStartCol int) string {
+// ReconstructSourceText joins Dockerfile instruction lines into a single
+// string for the shell parser, respecting the Dockerfile escape token.
+//
+// When the escape token is not backslash (e.g. backtick for Windows Dockerfiles),
+// trailing escape characters on continuation lines are replaced with backslash
+// so the bash shell parser handles line continuations correctly.
+func ReconstructSourceText(lines []string, cmdStartCol int, escapeToken rune) string {
 	var sb strings.Builder
+	escByte := byte(escapeToken)
+	needsRewrite := escapeToken != '\\' && escapeToken != 0
+
 	for i, line := range lines {
 		if i == 0 {
 			// First line: take only the command portion (after RUN + flags)
@@ -219,6 +228,15 @@ func ReconstructSourceText(lines []string, cmdStartCol int) string {
 				line = line[cmdStartCol:]
 			} else {
 				line = ""
+			}
+		}
+
+		// Replace non-standard escape at end of continuation lines with
+		// backslash so the bash parser sees valid line continuation.
+		if needsRewrite && i < len(lines)-1 {
+			trimmed := strings.TrimRight(line, " \t")
+			if trimmed != "" && trimmed[len(trimmed)-1] == escByte {
+				line = trimmed[:len(trimmed)-1] + `\`
 			}
 		}
 

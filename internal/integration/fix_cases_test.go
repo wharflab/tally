@@ -1127,6 +1127,109 @@ target = "/root/.config/pip/pip.conf"
 severity = "error"
 `,
 		},
+		// Sort packages: single-line unsorted
+		{
+			name:  "sort-packages-single-line",
+			input: "FROM alpine:3.20\nRUN apt-get install -y wget curl\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages")...),
+			wantApplied: 1,
+		},
+		// Sort packages: multi-line unsorted
+		{
+			name:  "sort-packages-multi-line",
+			input: "FROM alpine:3.20\nRUN apt-get install -y \\\n    zip \\\n    curl \\\n    git\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages")...),
+			wantApplied: 1,
+		},
+		// Sort packages: npm
+		{
+			name:  "sort-packages-npm",
+			input: "FROM node:20\nRUN npm install express axios\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages")...),
+			wantApplied: 1,
+		},
+		// Sort packages: choco install on Windows base image
+		{
+			name: "sort-packages-choco",
+			input: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"RUN choco install -y python3 nodejs git\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages")...),
+			wantApplied: 1,
+		},
+		// Sort packages: choco install with backtick escape, multi-line
+		{
+			name: "sort-packages-choco-backtick-escape",
+			input: "# escape=`\n" +
+				"FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"RUN choco install -y `\n" +
+				"    python3 `\n" +
+				"    nodejs `\n" +
+				"    git\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages")...),
+			wantApplied: 1,
+		},
+		// Sort packages: pip with versions
+		{
+			name:  "sort-packages-pip",
+			input: "FROM python:3.12\nRUN pip install flask==2.0 django==4.0\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages")...),
+			wantApplied: 1,
+		},
+		// Sort packages: mixed literals and variables — literals sorted first, variables at tail
+		{
+			name: "sort-packages-mixed-vars",
+			input: "FROM python:3.12\n" +
+				"RUN uv pip install $CDK_DEPS otel aws-otel $RUNTIME_DEPS polars==1.2.3\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages")...),
+			wantApplied: 1,
+		},
+		// Cross-rule: sort-packages (priority 15) + newline-per-chained-call (priority 97)
+		// on a chained RUN with unsorted packages. sort-packages rewrites package names
+		// within the install command; newline-per-chained-call splits the && boundary.
+		// Edits target different regions and should compose without conflict.
+		{
+			name: "sort-packages-cross-newline-per-chained-call",
+			input: "FROM alpine:3.20\n" +
+				"RUN apt-get update && apt-get install -y wget curl git\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages", "tally/newline-per-chained-call")...),
+			wantApplied: 2, // sort-packages + newline-per-chained-call
+		},
+
+		// Cross-rule: sort-packages + no-multi-spaces on the same line.
+		// sort-packages (priority 9) wins over no-multi-spaces (priority 10)
+		// when their edits overlap on double-space positions.
+		// sort-packages produces clean output on its own.
+		{
+			name: "sort-packages-cross-no-multi-spaces",
+			input: "FROM alpine:3.20\n" +
+				"RUN apt-get install -y  zoo  foo  bar\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages", "tally/no-multi-spaces")...),
+			wantApplied: 1, // sort-packages wins; no-multi-spaces skipped due to overlap
+		},
+
+		// Cross-rule: sort-packages (priority 15) + shellcheck SC2086 (quotes vars)
+		// on a single-line RUN with interleaved variables. sort-packages moves
+		// literals to the front via insert+delete (never touching variable tokens),
+		// SC2086 wraps $EXTRA_PKGS in quotes. Both compose without conflict.
+		{
+			name: "sort-packages-cross-shellcheck-sc2086",
+			input: "FROM alpine:3.20\n" +
+				"RUN apk add --no-cache zoo foo $EXTRA_PKGS bar\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/sort-packages", "shellcheck/SC2086")...),
+			wantApplied: 2, // sort-packages + SC2086
+		},
+
 		// Three rules on the same RUN: secret mount insertion + cache mount
 		// insertion + DL3030 (-y flag insertion) + cache cleanup deletion.
 		// All edits are targeted and non-overlapping.

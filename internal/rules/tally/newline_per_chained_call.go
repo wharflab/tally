@@ -98,6 +98,11 @@ func (r *NewlinePerChainedCallRule) Check(input rules.LintInput) []rules.Violati
 	// Get semantic model for shell variant info (may be nil)
 	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Type assertion OK returns false for nil
 
+	escapeToken := rune('\\')
+	if input.AST != nil {
+		escapeToken = input.AST.EscapeToken
+	}
+
 	var violations []rules.Violation
 
 	for stageIdx, stage := range input.Stages {
@@ -114,15 +119,15 @@ func (r *NewlinePerChainedCallRule) Check(input rules.LintInput) []rules.Violati
 		for _, cmd := range stage.Commands {
 			switch c := cmd.(type) {
 			case *instructions.RunCommand:
-				if v := r.checkRun(c, shellVariant, input.File, sm, meta, minCommands); v != nil {
+				if v := r.checkRun(c, shellVariant, input.File, sm, meta, minCommands, escapeToken); v != nil {
 					violations = append(violations, *v)
 				}
 			case *instructions.LabelCommand:
-				if v := r.checkLabel(c, input.File, sm, meta); v != nil {
+				if v := r.checkLabel(c, input.File, sm, meta, escapeToken); v != nil {
 					violations = append(violations, *v)
 				}
 			case *instructions.HealthCheckCommand:
-				if v := r.checkHealthcheck(c, shellVariant, input.File, sm, meta, minCommands); v != nil {
+				if v := r.checkHealthcheck(c, shellVariant, input.File, sm, meta, minCommands, escapeToken); v != nil {
 					violations = append(violations, *v)
 				}
 			}
@@ -140,13 +145,14 @@ func (r *NewlinePerChainedCallRule) checkRun(
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
 	minCommands int,
+	escapeToken rune,
 ) *rules.Violation {
 	if len(run.Location()) == 0 {
 		return nil
 	}
 
 	startLine := run.Location()[0].Start.Line
-	endLine := resolveEndLine(sm, run.Location())
+	endLine := sm.ResolveEndLineWithEscape(run.Location()[0].End.Line, escapeToken)
 
 	// Get instruction source lines
 	instrLines := make([]string, 0, endLine-startLine+1)
@@ -165,10 +171,14 @@ func (r *NewlinePerChainedCallRule) checkRun(
 	// --- Chain splitting ---
 	isHeredocRun := len(run.Files) > 0
 	if !isHeredocRun && run.PrependShell {
-		chainEdits = r.checkRunChains(
-			run, shellVariant, instrLines, startLine,
-			instrIndent, file, minCommands,
-		)
+		if script := getRunScriptFromCmd(run); script != "" {
+			cmdStartCol := findCmdStartCol(instrLines[0])
+			sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol, escapeToken)
+			chainEdits = r.collectSameLineChainEdits(
+				sourceText, startLine, cmdStartCol, minCommands,
+				shellVariant, instrIndent, file,
+			)
+		}
 	}
 
 	if len(chainEdits) == 0 && len(mountEdits) == 0 {
@@ -306,36 +316,14 @@ func (r *NewlinePerChainedCallRule) checkRunMounts(
 	return edits
 }
 
-// checkRunChains checks for chained commands (&&/||) on the same line.
-func (r *NewlinePerChainedCallRule) checkRunChains(
-	run *instructions.RunCommand,
-	shellVariant shell.Variant,
-	instrLines []string,
-	startLine int,
-	instrIndent string,
-	file string,
-	minCommands int,
-) []rules.TextEdit {
-	script := getRunScriptFromCmd(run)
-	if script == "" {
-		return nil
-	}
-
-	// Find where the command starts in the first line (after RUN and flags)
-	cmdStartCol := findCmdStartCol(instrLines[0])
-
-	return r.collectSameLineChainEdits(instrLines, startLine, cmdStartCol, minCommands, shellVariant, instrIndent, file)
-}
-
-// collectSameLineChainEdits reconstructs source text and returns chain-split
-// edits for any same-line boundaries, or nil if none are needed.
+// collectSameLineChainEdits returns chain-split edits for any same-line
+// boundaries in the given source text, or nil if none are needed.
 func (r *NewlinePerChainedCallRule) collectSameLineChainEdits(
-	instrLines []string,
+	sourceText string,
 	startLine, cmdStartCol, minCommands int,
 	shellVariant shell.Variant,
 	instrIndent, file string,
 ) []rules.TextEdit {
-	sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol)
 	if shell.ScriptHasInlineHeredoc(sourceText, shellVariant) {
 		return nil
 	}
@@ -479,6 +467,7 @@ func (r *NewlinePerChainedCallRule) checkLabel(
 	file string,
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
+	escapeToken rune,
 ) *rules.Violation {
 	if len(cmd.Labels) <= 1 || len(cmd.Location()) == 0 {
 		return nil
@@ -492,7 +481,7 @@ func (r *NewlinePerChainedCallRule) checkLabel(
 	}
 
 	startLine := cmd.Location()[0].Start.Line
-	endLine := resolveEndLine(sm, cmd.Location())
+	endLine := sm.ResolveEndLineWithEscape(cmd.Location()[0].End.Line, escapeToken)
 	numSourceLines := endLine - startLine + 1
 
 	// Already formatted: first line has LABEL + first pair, each remaining pair
@@ -539,6 +528,7 @@ func (r *NewlinePerChainedCallRule) checkHealthcheck(
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
 	minCommands int,
+	escapeToken rune,
 ) *rules.Violation {
 	if cmd.Health == nil || len(cmd.Health.Test) == 0 || len(cmd.Location()) == 0 {
 		return nil
@@ -550,7 +540,7 @@ func (r *NewlinePerChainedCallRule) checkHealthcheck(
 	}
 
 	startLine := cmd.Location()[0].Start.Line
-	endLine := resolveEndLine(sm, cmd.Location())
+	endLine := sm.ResolveEndLineWithEscape(cmd.Location()[0].End.Line, escapeToken)
 	instrIndent := leadingWhitespace(sm.Line(startLine - 1))
 
 	// Collect flags from parsed Health config.

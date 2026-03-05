@@ -136,7 +136,11 @@ async function runSmoke() {
 
   assert.strictEqual(formatted, expected, "formatted output mismatch");
 
-  // Verify command-based "fix all" path too (workspace/executeCommand).
+  // Verify command-based "fix all" path: revert to original content first so
+  // applyAllFixes runs on the same input as formatting (single pass, not a
+  // second pass on already-formatted content which may clean leftover spaces).
+  await vscode.commands.executeCommand("workbench.action.files.revert");
+  await scheduler.wait(500);
   await vscode.commands.executeCommand("tally.applyAllFixes");
 
   const fixedViaCommand = normalizeNewlines(doc.getText());

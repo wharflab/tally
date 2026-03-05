@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	fixpkg "github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
 )
@@ -203,40 +204,34 @@ func TestNoMultiSpacesCheckWithFixes(t *testing.T) {
 	r := NewNoMultiSpacesRule()
 
 	tests := []struct {
-		name           string
-		content        string
-		wantViolations int
-		wantEdits      int
+		name    string
+		content string
+		want    string
 	}{
 		{
-			name:           "single run of double spaces",
-			content:        "FROM  alpine:3.20\n",
-			wantViolations: 1,
-			wantEdits:      1,
+			name:    "single run of double spaces",
+			content: "FROM  alpine:3.20\n",
+			want:    "FROM alpine:3.20\n",
 		},
 		{
-			name:           "single run of five spaces",
-			content:        "FROM     alpine:3.20\n",
-			wantViolations: 1,
-			wantEdits:      1,
+			name:    "single run of five spaces",
+			content: "FROM     alpine:3.20\n",
+			want:    "FROM alpine:3.20\n",
 		},
 		{
-			name:           "two runs on one line - one violation two edits",
-			content:        "FROM alpine:3.20\nRUN echo  hello   world\n",
-			wantViolations: 1,
-			wantEdits:      2,
+			name:    "two runs on one line",
+			content: "FROM alpine:3.20\nRUN echo  hello   world\n",
+			want:    "FROM alpine:3.20\nRUN echo hello world\n",
 		},
 		{
-			name:           "multiple lines - one violation per line",
-			content:        "FROM  alpine:3.20\nRUN  echo hello\nCOPY  . /app\n",
-			wantViolations: 3,
-			wantEdits:      3,
+			name:    "multiple lines",
+			content: "FROM  alpine:3.20\nRUN  echo hello\nCOPY  . /app\n",
+			want:    "FROM alpine:3.20\nRUN echo hello\nCOPY . /app\n",
 		},
 		{
-			name:           "heredoc body not fixed",
-			content:        "FROM alpine:3.20\nRUN <<EOF\necho   hello\nEOF\n",
-			wantViolations: 0,
-			wantEdits:      0,
+			name:    "heredoc body not fixed",
+			content: "FROM alpine:3.20\nRUN <<EOF\necho   hello\nEOF\n",
+			want:    "FROM alpine:3.20\nRUN <<EOF\necho   hello\nEOF\n",
 		},
 	}
 
@@ -246,32 +241,21 @@ func TestNoMultiSpacesCheckWithFixes(t *testing.T) {
 			input := testutil.MakeLintInputWithConfig(t, "Dockerfile", tt.content, nil)
 			violations := r.Check(input)
 
-			if len(violations) != tt.wantViolations {
-				t.Errorf("violations = %d, want %d", len(violations), tt.wantViolations)
-			}
-
-			totalEdits := 0
+			got := []byte(tt.content)
 			for _, v := range violations {
 				if v.SuggestedFix == nil {
-					t.Error("violation has no SuggestedFix")
-					continue
+					t.Fatal("violation has no SuggestedFix")
 				}
 				if v.SuggestedFix.Safety != rules.FixSafe {
 					t.Errorf("fix safety = %v, want FixSafe", v.SuggestedFix.Safety)
 				}
-				if v.SuggestedFix.NeedsResolve {
-					t.Error("expected NeedsResolve=false for sync fix")
+				for i := len(v.SuggestedFix.Edits) - 1; i >= 0; i-- {
+					got = fixpkg.ApplyEdit(got, v.SuggestedFix.Edits[i])
 				}
-				for _, edit := range v.SuggestedFix.Edits {
-					if edit.NewText != "" {
-						t.Errorf("edit NewText = %q, want empty (delete)", edit.NewText)
-					}
-				}
-				totalEdits += len(v.SuggestedFix.Edits)
 			}
 
-			if totalEdits != tt.wantEdits {
-				t.Errorf("total edits = %d, want %d", totalEdits, tt.wantEdits)
+			if string(got) != tt.want {
+				t.Errorf("after fix:\ngot:  %q\nwant: %q", got, tt.want)
 			}
 		})
 	}

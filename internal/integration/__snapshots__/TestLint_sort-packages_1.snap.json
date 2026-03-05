@@ -1,0 +1,248 @@
+{
+  "files": [
+    {
+      "file": "testdata/sort-packages/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/sort-packages/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/sort-packages/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "packages in apt-get install are not sorted alphabetically",
+          "rule": "tally/sort-packages",
+          "severity": "style",
+          "sourceCode": "RUN apt-get update \u0026\u0026 apt-get install -y wget curl git",
+          "suggestedFix": {
+            "description": "Sort packages alphabetically",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 45,
+                    "line": 4
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 41,
+                    "line": 4
+                  }
+                },
+                "newText": "curl git wget"
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 50,
+                    "line": 4
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 45,
+                    "line": 4
+                  }
+                },
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 54,
+                    "line": 4
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 50,
+                    "line": 4
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 9
+          }
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/sort-packages/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 7
+            },
+            "file": "testdata/sort-packages/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 7
+            }
+          },
+          "message": "packages in apt-get install are not sorted alphabetically",
+          "rule": "tally/sort-packages",
+          "severity": "style",
+          "sourceCode": "RUN apt-get install -y \\",
+          "suggestedFix": {
+            "description": "Sort packages alphabetically",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 7,
+                    "line": 8
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 8
+                  }
+                },
+                "newText": "curl git zip"
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 8,
+                    "line": 9
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 3,
+                    "line": 9
+                  }
+                },
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 7,
+                    "line": 10
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 3,
+                    "line": 10
+                  }
+                },
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 10,
+                    "line": 9
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 7,
+                    "line": 8
+                  }
+                },
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 7,
+                    "line": 10
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 8,
+                    "line": 9
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 9
+          }
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/sort-packages/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 16
+            },
+            "file": "testdata/sort-packages/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 16
+            }
+          },
+          "message": "packages in npm install are not sorted alphabetically",
+          "rule": "tally/sort-packages",
+          "severity": "style",
+          "sourceCode": "RUN npm install express axios @eslint/js",
+          "suggestedFix": {
+            "description": "Sort packages alphabetically",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 23,
+                    "line": 16
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 16,
+                    "line": 16
+                  }
+                },
+                "newText": "@eslint/js axios express"
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 29,
+                    "line": 16
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 23,
+                    "line": 16
+                  }
+                },
+                "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 40,
+                    "line": 16
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 29,
+                    "line": 16
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 9
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 3,
+    "total": 3,
+    "warnings": 0
+  }
+}

@@ -263,50 +263,85 @@ func TestReconstructSourceText(t *testing.T) {
 		name        string
 		lines       []string
 		cmdStartCol int
+		escapeToken rune
 		want        string
 	}{
 		{
 			name:        "single line",
 			lines:       []string{"RUN echo hello"},
 			cmdStartCol: 4,
+			escapeToken: '\\',
 			want:        "echo hello",
 		},
 		{
 			name:        "multi-line with continuation",
 			lines:       []string{`RUN echo hello \`, `    && echo world`},
 			cmdStartCol: 4,
+			escapeToken: '\\',
 			want:        "echo hello \\\n    && echo world",
 		},
 		{
 			name:        "with mount prefix",
 			lines:       []string{"RUN --mount=type=cache,target=/var apt-get update"},
 			cmdStartCol: 35,
+			escapeToken: '\\',
 			want:        "apt-get update",
 		},
 		{
 			name:        "cmdStartCol at end of line",
 			lines:       []string{"RUN"},
 			cmdStartCol: 3,
+			escapeToken: '\\',
 			want:        "",
 		},
 		{
 			name:        "cmdStartCol zero keeps full line",
 			lines:       []string{"echo hello"},
 			cmdStartCol: 0,
+			escapeToken: '\\',
 			want:        "echo hello",
 		},
 		{
 			name:        "empty lines slice",
 			lines:       []string{},
 			cmdStartCol: 0,
+			escapeToken: '\\',
 			want:        "",
+		},
+		{
+			name:        "backtick escape rewritten to backslash",
+			lines:       []string{"RUN choco install -y `", "    python3 `", "    git"},
+			cmdStartCol: 4,
+			escapeToken: '`',
+			want:        "choco install -y \\\n    python3 \\\n    git",
+		},
+		{
+			name:        "backtick with trailing spaces",
+			lines:       []string{"RUN choco install `  ", "    python3"},
+			cmdStartCol: 4,
+			escapeToken: '`',
+			want:        "choco install \\\n    python3",
+		},
+		{
+			name:        "single line no continuation",
+			lines:       []string{"RUN choco install -y git"},
+			cmdStartCol: 4,
+			escapeToken: '`',
+			want:        "choco install -y git",
+		},
+		{
+			name:        "zero escape token treated as backslash",
+			lines:       []string{`RUN echo hello \`, `    && echo world`},
+			cmdStartCol: 4,
+			escapeToken: 0,
+			want:        "echo hello \\\n    && echo world",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := ReconstructSourceText(tt.lines, tt.cmdStartCol)
+			got := ReconstructSourceText(tt.lines, tt.cmdStartCol, tt.escapeToken)
 			if got != tt.want {
 				t.Errorf("ReconstructSourceText():\ngot:  %q\nwant: %q", got, tt.want)
 			}

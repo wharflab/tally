@@ -4,7 +4,7 @@ ARG RUNTIME_IMAGE=ubuntu:22.04
 FROM $BUILDER_IMAGE AS python_builder_1
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends curl ca-certificates wget \
+	&& apt-get install -y --no-install-recommends ca-certificates curl wget \
 	&& apt-get clean \
 	&& rm -rf /var/lib/apt/lists/*
 
@@ -49,8 +49,8 @@ RUN pip install --no-cache-dir -U "cython<3.0.0" wheel \
 
 ARG TRITON_VERSION
 
-RUN pip install --no-cache-dir -U smclarify "sagemaker>=2,<3" sagemaker-experiments==0.* sagemaker-pytorch-training triton==${TRITON_VERSION}
-RUN pip install --no-cache-dir -U "bokeh>=3.0.1,<4" "imageio>=2.22,<3" "opencv-python>=4.6,<5" "plotly>=5.11,<6" "seaborn>=0.12,<1" "numba>=0.56.4,<0.57" "shap>=0.41,<1"
+RUN pip install --no-cache-dir -U     "sagemaker>=2,<3" sagemaker-experiments==0.* sagemaker-pytorch-training smclarify               triton==${TRITON_VERSION}
+RUN pip install --no-cache-dir -U "bokeh>=3.0.1,<4" "imageio>=2.22,<3" "numba>=0.56.4,<0.57" "opencv-python>=4.6,<5" "plotly>=5.11,<6" "seaborn>=0.12,<1" "shap>=0.41,<1"
 RUN apt-get update \
 	&& apt-get install -y build-essential \
 	&& rm -rf /var/lib/apt/lists/* \
@@ -60,17 +60,11 @@ ARG DATASETS_VERSION
 ARG DIFFUSERS_VERSION
 ARG TRANSFORMERS_VERSION
 
-RUN pip install --no-cache-dir kenlm==0.1 \
+RUN pip install --no-cache-dir dill==0.3.6 evaluate gevent~=23.9.0 kenlm==0.1 multiprocess==0.70.14 pyarrow~=14.0.1 sagemaker==2.132.0 \
                                transformers[sklearn,sentencepiece,audio,vision]==${TRANSFORMERS_VERSION} \
                                datasets==${DATASETS_VERSION} \
                                diffusers==${DIFFUSERS_VERSION} \
-                               $PT_TORCHAUDIO_URL \
-                               multiprocess==0.70.14 \
-                               dill==0.3.6 \
-                               sagemaker==2.132.0 \
-                               evaluate \
-                               gevent~=23.9.0 \
-                               pyarrow~=14.0.1
+                               $PT_TORCHAUDIO_URL
 RUN pip install --no-cache-dir setuptools==69.5.1
 
 COPY requirements1.txt .
@@ -126,7 +120,7 @@ LABEL org.opencontainers.image.version=22.04
 #CMD ["/bin/bash"]
 
 RUN apt-get update \
-    && apt-get install -y wget build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev libbz2-dev liblzma-dev \
+    && apt-get install -y build-essential libbz2-dev libffi-dev libgdbm-dev liblzma-dev libncurses5-dev libnss3-dev libreadline-dev libsqlite3-dev libssl-dev wget zlib1g-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -142,7 +136,7 @@ WORKDIR /app
 ENV NVARCH=x86_64
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends gnupg2 curl ca-certificates \
+	&& apt-get install -y --no-install-recommends ca-certificates curl gnupg2 \
 	&& curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH}/3bf863cc.pub | apt-key add - \
 	&& echo "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/${NVARCH} /" > /etc/apt/sources.list.d/cuda.list \
 	&& apt-get purge --autoremove -y curl \
@@ -169,10 +163,10 @@ RUN apt-get update \
 
 ARG CUBLAS_VERSION=11.10.3.66
 
-RUN apt-get update \
-	&& apt-get -y upgrade --only-upgrade systemd \
-	&& apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7 libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libglib2.0-0 libgl1-mesa-glx libsm6 libxext6 libxrender-dev libgomp1 libibverbs-dev libhwloc-dev libnuma1 libnuma-dev libssl3 libssl-dev libtool openssl python3-dev unzip vim wget zlib1g-dev pkg-config check libsubunit0 libsubunit-dev \
-	&& rm -rf /var/lib/apt/lists/* \
+RUN apt-get update  \
+	&& apt-get -y upgrade --only-upgrade systemd  \
+	&& apt-get install -y --allow-change-held-packages --no-install-recommends     build-essential ca-certificates check cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libgl1-mesa-glx libglib2.0-0 libgomp1 libhwloc-dev libibverbs-dev libnuma-dev libnuma1 libsm6 libssl-dev libssl3 libsubunit-dev libsubunit0 libtool libxext6 libxrender-dev openssl pkg-config python3-dev unzip vim wget zlib1g-dev                                             libcublas-11-7=${CUBLAS_VERSION}-1     libcublas-dev-11-7=${CUBLAS_VERSION}-1     libcudnn8=$CUDNN_VERSION-1+cuda11.7                                                                                                                  \
+	&& rm -rf /var/lib/apt/lists/*  \
 	&& apt-get clean
 RUN cd /tmp \
 	&& git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION}-1 \
@@ -275,7 +269,7 @@ ARG PYTORCH_DOWNLOAD_URL
 #RUN if [ ! $TORCHAUDIO_VERSION ];     then         TORCHAUDIO=;     else         TORCHAUDIO=torchaudio==${TORCHAUDIO_VERSION}${TORCHAUDIO_VERSION_SUFFIX};     fi &&     if [ ! $PYTORCH_DOWNLOAD_URL ];     then         pip install --no-cache-dir -U            torch==${PYTORCH_VERSION}${PYTORCH_VERSION_SUFFIX}             torchvision==${TORCHVISION_VERSION}${TORCHVISION_VERSION_SUFFIX}             ${TORCHAUDIO};     else         pip install --no-cache-dir -U             torch==${PYTORCH_VERSION}${PYTORCH_VERSION_SUFFIX}             torchvision==${TORCHVISION_VERSION}${TORCHVISION_VERSION_SUFFIX}             ${TORCHAUDIO}             -f ${PYTORCH_DOWNLOAD_URL};     fi &&     rm -r /root/.cache/pip
 
 RUN apt-get update \
-	&& apt-get install -y git pdsh libaio1 libaio-dev pigz \
+	&& apt-get install -y git libaio-dev libaio1 pdsh pigz \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& apt-get clean
 
@@ -303,7 +297,7 @@ ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/li
 
 RUN echo $PATH
 RUN echo $LD_LIBRARY_PATH
-RUN pip install -U --force-reinstall --no-cache-dir wheel==0.43.0 setuptools==70.1.0
+RUN pip install -U --force-reinstall --no-cache-dir setuptools==70.1.0 wheel==0.43.0
 RUN pip install --force-reinstall --no-cache-dir setuptools==69.5.1
 RUN git clone https://github.com/NVIDIA/apex \
 	&& cd apex \

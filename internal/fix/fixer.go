@@ -396,7 +396,7 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 		adjustEditLines(&edit, lnShifts)
 
 		// Apply the adjusted edit
-		content = applyEdit(content, edit)
+		content = ApplyEdit(content, edit)
 
 		// Record shifts for cross-priority position adjustment.
 		recordColumnShift(&colShifts, ews.edit)
@@ -616,10 +616,10 @@ func recordColumnShift(shifts *[]columnShift, edit rules.TextEdit) {
 	})
 }
 
-// applyEdit applies a single text edit to content.
+// ApplyEdit applies a single text edit to content.
 // The edit replaces the range [Start, End) with NewText.
 // Location uses 1-based line numbers (BuildKit convention); we convert to 0-based for array indexing.
-func applyEdit(content []byte, edit rules.TextEdit) []byte {
+func ApplyEdit(content []byte, edit rules.TextEdit) []byte {
 	// Detect line ending style (CRLF on Windows, LF on Unix)
 	lineEnding := []byte("\n")
 	if bytes.Contains(content, []byte("\r\n")) {
