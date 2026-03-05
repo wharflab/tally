@@ -1520,7 +1520,13 @@ func filterFixedViolations(
 			if rule := rules.DefaultRegistry().Get(v.RuleCode); rule != nil {
 				if revalidator, ok := rule.(rules.PostFixRevalidator); ok {
 					var ruleCfg any
-					if fileCfg := fileConfigs[filepath.ToSlash(v.File())]; fileCfg != nil {
+					filePath := filepath.ToSlash(v.File())
+					fileCfg := fileConfigs[filePath]
+					if fileCfg == nil {
+						// Fallback: fileConfigs may use platform-specific paths (Windows).
+						fileCfg = fileConfigs[v.File()]
+					}
+					if fileCfg != nil {
 						ruleCfg = fileCfg.Rules.GetOptions(v.RuleCode)
 					}
 					if !revalidator.RevalidateAfterFix(v, content, ruleCfg) {
