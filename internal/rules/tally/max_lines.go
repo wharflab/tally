@@ -2,6 +2,7 @@
 package tally
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
@@ -254,6 +255,41 @@ func (r *MaxLinesRule) DefaultConfig() any {
 // ValidateConfig validates the configuration against the rule's JSON Schema.
 func (r *MaxLinesRule) ValidateConfig(config any) error {
 	return configutil.ValidateRuleOptions(MaxLinesRuleCode, config)
+}
+
+// RevalidateAfterFix re-checks whether a max-lines violation still holds
+// after other rules' fixes have been applied. This prevents stale violations
+// when fixes (like no-multiple-empty-lines) reduce the file's line count
+// below the configured maximum.
+func (r *MaxLinesRule) RevalidateAfterFix(violation rules.Violation, modifiedContent []byte, config any) bool {
+	cfg := r.resolveConfig(config)
+	if cfg.Max == nil || *cfg.Max <= 0 {
+		return false
+	}
+
+	result, err := parser.Parse(bytes.NewReader(modifiedContent))
+	if err != nil {
+		// If we can't parse, conservatively keep the violation.
+		return true
+	}
+
+	sm := sourcemap.New(modifiedContent)
+	totalLines := result.AST.EndLine
+	count := totalLines
+
+	skipComments := cfg.SkipComments == nil || *cfg.SkipComments
+	if skipComments {
+		count -= countCommentLines(result.AST)
+	}
+
+	skipBlankLines := cfg.SkipBlankLines == nil || *cfg.SkipBlankLines
+	if skipBlankLines {
+		count -= countBlankLines(result, sm)
+	} else if count <= *cfg.Max {
+		count += countTrailingBlanks(modifiedContent)
+	}
+
+	return count > *cfg.Max
 }
 
 // resolveConfig extracts the MaxLinesConfig from input, falling back to defaults.

@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 25 | - | 25 |
+| tally | 26 | - | 26 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -50,6 +50,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/consistent-indentation`](docs/rules/tally/consistent-indentation.md) 🔧 | Enforces consistent indentation for Dockerfile build stages | Style | Style | Off (experimental) |
 | [`tally/newline-between-instructions`](docs/rules/tally/newline-between-instructions.md) 🔧 | Controls blank lines between Dockerfile instructions | Style | Style | Enabled (grouped) |
 | [`tally/no-multi-spaces`](docs/rules/tally/no-multi-spaces.md) 🔧 | Disallows multiple consecutive spaces within instructions | Style | Style | Enabled |
+| [`tally/no-multiple-empty-lines`](docs/rules/tally/no-multiple-empty-lines.md) 🔧 | Disallows multiple consecutive empty lines | Style | Style | Enabled |
 | [`tally/no-trailing-spaces`](docs/rules/tally/no-trailing-spaces.md) 🔧 | Disallows trailing whitespace at the end of lines | Style | Style | Enabled |
 | [`tally/epilogue-order`](docs/rules/tally/epilogue-order.md) 🔧 | Enforces canonical order for epilogue instructions (STOPSIGNAL, HEALTHCHECK, ENTRYPOINT, CMD) | Style | Style | Enabled |
 | [`tally/sort-packages`](docs/rules/tally/sort-packages.md) 🔧 | Package lists in install commands should be sorted alphabetically | Style | Style | Enabled |

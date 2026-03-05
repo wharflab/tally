@@ -54,6 +54,10 @@ type IndexSchemaJson_3 struct {
 	// NoMultiSpaces corresponds to the JSON schema field "no-multi-spaces".
 	NoMultiSpaces *tally.NoMultiSpacesSchemaJson `json:"no-multi-spaces,omitempty"`
 
+	// NoMultipleEmptyLines corresponds to the JSON schema field
+	// "no-multiple-empty-lines".
+	NoMultipleEmptyLines *tally.NoMultipleEmptyLinesSchemaJson `json:"no-multiple-empty-lines,omitempty"`
+
 	// NoTrailingSpaces corresponds to the JSON schema field "no-trailing-spaces".
 	NoTrailingSpaces *tally.NoTrailingSpacesSchemaJson `json:"no-trailing-spaces,omitempty"`
 

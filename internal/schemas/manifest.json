@@ -44,6 +44,11 @@
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
+      "input": "internal/rules/tally/no_multiple_empty_lines.schema.json",
+      "output": "internal/schemas/generated/rules/tally/no_multiple_empty_lines.gen.go",
+      "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
+    },
+    {
       "input": "internal/rules/tally/newline_between_instructions.schema.json",
       "output": "internal/schemas/generated/rules/tally/newline_between_instructions.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"

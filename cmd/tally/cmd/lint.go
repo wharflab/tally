@@ -1467,6 +1467,8 @@ func mergeAsyncViolations(fast []rules.Violation, asyncResult *async.RunResult) 
 }
 
 // filterFixedViolations removes violations that were fixed from the list.
+// It also re-checks violations from rules implementing PostFixRevalidator
+// against the modified file content, suppressing stale violations.
 func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) []rules.Violation {
 	// Build set of fixed locations (include column to handle multiple violations on same line)
 	type locKey struct {
@@ -1476,6 +1478,9 @@ func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) 
 		code string
 	}
 	fixed := make(map[locKey]bool)
+
+	// Build map of modified file contents for PostFixRevalidator checks.
+	modifiedContent := make(map[string][]byte)
 	for _, fc := range fixResult.Changes {
 		for _, af := range fc.FixesApplied {
 			fixed[locKey{
@@ -1487,10 +1492,13 @@ func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) 
 				code: af.RuleCode,
 			}] = true
 		}
+		if fc.ModifiedContent != nil {
+			modifiedContent[filepath.ToSlash(fc.Path)] = fc.ModifiedContent
+		}
 	}
 
 	// Filter violations
-	var remaining []rules.Violation
+	remaining := make([]rules.Violation, 0, len(violations))
 	for _, v := range violations {
 		key := locKey{
 			file: filepath.ToSlash(v.File()),
@@ -1498,9 +1506,23 @@ func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) 
 			col:  v.Location.Start.Column,
 			code: v.RuleCode,
 		}
-		if !fixed[key] {
-			remaining = append(remaining, v)
+		if fixed[key] {
+			continue
 		}
+
+		// For rules implementing PostFixRevalidator, re-check against
+		// modified content to suppress violations resolved by other fixes.
+		if content, ok := modifiedContent[filepath.ToSlash(v.File())]; ok {
+			if rule := rules.DefaultRegistry().Get(v.RuleCode); rule != nil {
+				if revalidator, ok := rule.(rules.PostFixRevalidator); ok {
+					if !revalidator.RevalidateAfterFix(v, content, nil) {
+						continue
+					}
+				}
+			}
+		}
+
+		remaining = append(remaining, v)
 	}
 	return remaining
 }

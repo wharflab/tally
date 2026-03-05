@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "tally/no-multiple-empty-lines",
+ "DefaultSeverity": "style",
+ "Description": "Disallows multiple consecutive empty lines in Dockerfiles",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/no-multiple-empty-lines/",
+ "FixPriority": 15,
+ "IsExperimental": false,
+ "Name": "No Multiple Empty Lines"
+}

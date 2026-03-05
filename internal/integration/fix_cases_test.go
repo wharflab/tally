@@ -836,6 +836,31 @@ skip-blank-lines = true
 			wantApplied: 3, // one violation per line (L2, L3, L4)
 		},
 
+		// No multiple empty lines: remove excess blank lines
+		{
+			name:  "no-multiple-empty-lines",
+			input: "FROM alpine:3.20\n\n\nRUN echo hello\n\n\n\nCOPY . /app\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/no-multiple-empty-lines")...),
+			wantApplied: 2, // two groups of excess blank lines
+		},
+		// No multiple empty lines: remove blank lines at BOF
+		{
+			name:  "no-multiple-empty-lines-bof",
+			input: "\n\nFROM alpine:3.20\nRUN echo hello\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/no-multiple-empty-lines")...),
+			wantApplied: 1,
+		},
+		// No multiple empty lines: remove blank lines at EOF
+		{
+			name:  "no-multiple-empty-lines-eof",
+			input: "FROM alpine:3.20\nRUN echo hello\n\n\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/no-multiple-empty-lines")...),
+			wantApplied: 1,
+		},
+
 		// Epilogue order: reorder CMD and ENTRYPOINT
 		{
 			name: "epilogue-order-basic",

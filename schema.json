@@ -378,6 +378,63 @@
       "title": "tally/no-multi-spaces rule config",
       "type": "object"
     },
+    "rule-tally-no-multiple-empty-lines": {
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/no-multiple-empty-lines rule.",
+      "examples": [
+        {
+          "max": 2
+        },
+        {
+          "max": 1,
+          "max-bof": 0,
+          "max-eof": 0
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "max": {
+          "default": 1,
+          "description": "Maximum number of consecutive empty lines allowed anywhere in the file.",
+          "examples": [
+            1,
+            2
+          ],
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max-bof": {
+          "default": 0,
+          "description": "Maximum number of consecutive empty lines allowed at the beginning of the file.",
+          "examples": [
+            0,
+            1
+          ],
+          "minimum": 0,
+          "type": "integer"
+        },
+        "max-eof": {
+          "default": 0,
+          "description": "Maximum number of consecutive empty lines allowed at the end of the file.",
+          "examples": [
+            0,
+            1
+          ],
+          "minimum": 0,
+          "type": "integer"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "tally/no-multiple-empty-lines rule config",
+      "type": "object"
+    },
     "rule-tally-no-trailing-spaces": {
       "additionalProperties": false,
       "description": "Configuration options for the tally/no-trailing-spaces rule.",
@@ -773,6 +830,9 @@
         },
         "no-multi-spaces": {
           "$ref": "#/$defs/rule-tally-no-multi-spaces"
+        },
+        "no-multiple-empty-lines": {
+          "$ref": "#/$defs/rule-tally-no-multiple-empty-lines"
         },
         "no-trailing-spaces": {
           "$ref": "#/$defs/rule-tally-no-trailing-spaces"
