@@ -57,6 +57,31 @@ var (
 	npmFlags      = []string{"--prefix", "--registry", "--save-prefix"}
 	composerFlags = []string{"--working-dir", "-d"}
 	chocoFlags    = []string{"--source", "-s", "--params", "--package-parameters", "--installargs", "--install-arguments", "--version"}
+	uvFlags       = []string{
+		// uv add
+		"-r", "--requirements", "-c", "--constraints", "-m", "--marker",
+		"--optional", "--group", "--bounds", "--rev", "--tag", "--branch",
+		"--extra", "--package", "--script", "--no-install-package",
+		// uv pip install (superset of uv add)
+		"-e", "--editable", "-b", "--build-constraints",
+		"--overrides", "--excludes",
+		"-t", "--target", "--prefix",
+		"--no-binary", "--only-binary", "--no-build-package", "--no-binary-package",
+		"--python-version", "--python-platform", "--torch-backend",
+		// shared: index, resolver, installer, build, cache, python, global
+		"--index", "--default-index", "-i", "--index-url",
+		"--extra-index-url", "-f", "--find-links",
+		"--index-strategy", "--keyring-provider",
+		"-P", "--upgrade-package", "--resolution", "--prerelease",
+		"--fork-strategy", "--exclude-newer", "--exclude-newer-package",
+		"--no-sources-package",
+		"--reinstall-package", "--link-mode",
+		"-C", "--config-setting", "--config-settings-package",
+		"--no-build-isolation-package",
+		"--cache-dir", "--refresh-package",
+		"-p", "--python", "--color",
+		"--allow-insecure-host", "--directory", "--project", "--config-file",
+	}
 )
 
 // installManagers maps command names to their install subcommands and flags.
@@ -74,6 +99,7 @@ var installManagers = map[string]installManagerInfo{
 	"pip3":     {installCommands: []string{"install"}, flagsWithValue: pipFlags},
 	"bun":      {installCommands: []string{"add", "install", "i"}},
 	"composer": {installCommands: []string{"require"}, flagsWithValue: composerFlags},
+	"uv":       {installCommands: []string{"add", "pip install"}, flagsWithValue: uvFlags},
 	"choco":    {installCommands: []string{"install"}, flagsWithValue: chocoFlags},
 }
 
@@ -147,26 +173,15 @@ func FindInstallPackages(script string, variant Variant) []InstallCommand {
 func extractInstallCommand(
 	cmdName string, mgr installManagerInfo, args []*syntax.Word, srcLines []string,
 ) *InstallCommand {
-	// Find the install subcommand
-	installIdx := -1
-	var subcommand string
-	for i, arg := range args {
-		lit := arg.Lit()
-		if lit == "" {
-			continue
-		}
-		if slices.Contains(mgr.installCommands, lit) {
-			installIdx = i
-			subcommand = lit
-			break
-		}
-	}
+	// Find the install subcommand. Supports compound subcommands like
+	// "pip install" (space-separated) by matching consecutive tokens.
+	installIdx, subcommand := findInstallSubcommand(args, mgr.installCommands)
 	if installIdx < 0 {
 		return nil
 	}
 
-	// Check for pip file-based installs
-	isPip := cmdName == "pip" || cmdName == "pip3"
+	// Check for pip file-based installs (also covers "uv pip install")
+	isPip := cmdName == "pip" || cmdName == "pip3" || strings.HasPrefix(subcommand, "pip")
 	if isPip {
 		for _, arg := range args[installIdx+1:] {
 			lit := arg.Lit()
@@ -280,6 +295,45 @@ func findWrappedInstallPackages(
 	})
 
 	return commands
+}
+
+// findInstallSubcommand locates the install subcommand in args.
+// Supports compound subcommands (e.g., "pip install") by matching consecutive
+// literal tokens. Returns the index of the last matched token and the full
+// subcommand string, or (-1, "") if not found.
+func findInstallSubcommand(args []*syntax.Word, installCommands []string) (int, string) {
+	// Build a list of literal tokens for matching.
+	type litToken struct {
+		text string
+		idx  int
+	}
+	lits := make([]litToken, 0, len(args))
+	for i, arg := range args {
+		if lit := arg.Lit(); lit != "" {
+			lits = append(lits, litToken{text: lit, idx: i})
+		}
+	}
+
+	for _, cmd := range installCommands {
+		parts := strings.Split(cmd, " ")
+		for j := range lits {
+			if j+len(parts) > len(lits) {
+				break
+			}
+			match := true
+			for k, part := range parts {
+				if lits[j+k].text != part {
+					match = false
+					break
+				}
+			}
+			if match {
+				return lits[j+len(parts)-1].idx, cmd
+			}
+		}
+	}
+
+	return -1, ""
 }
 
 // wordText extracts the full text representation of a shell word,
