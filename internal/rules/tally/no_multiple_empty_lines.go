@@ -85,7 +85,7 @@ func (r *NoMultipleEmptyLinesRule) Metadata() rules.RuleMetadata {
 		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
 		IsExperimental:  false,
-		FixPriority:     15,
+		FixPriority:     98, // After newline-per-chained-call (97) to avoid line-shift conflicts
 	}
 }
 

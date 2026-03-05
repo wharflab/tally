@@ -168,13 +168,11 @@ RUN apt-get update  \
 	&& apt-get install -y --allow-change-held-packages --no-install-recommends     build-essential ca-certificates check cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libgl1-mesa-glx libglib2.0-0 libgomp1 libhwloc-dev libibverbs-dev libnuma-dev libnuma1 libsm6 libssl-dev libssl3 libsubunit-dev libsubunit0 libtool libxext6 libxrender-dev openssl pkg-config python3-dev unzip vim wget zlib1g-dev                                             libcublas-11-7=${CUBLAS_VERSION}-1     libcublas-dev-11-7=${CUBLAS_VERSION}-1     libcudnn8=$CUDNN_VERSION-1+cuda11.7                                                                                                                  \
 	&& rm -rf /var/lib/apt/lists/*  \
 	&& apt-get clean
-RUN cd /tmp && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION}-1 && cd nccl && make -j $(nproc) src.build BUILDDIR=/usr/local && rm -rf /tmp/nccl
-
- \ \ \ \
-	
-	
-	
-	
+RUN cd /tmp \
+	&& git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION}-1 \
+	&& cd nccl \
+	&& make -j $(nproc) src.build BUILDDIR=/usr/local \
+	&& rm -rf /tmp/nccl
 RUN mkdir /tmp/efa \
 	&& cd /tmp/efa \
 	&& curl -O https://efa-installer.amazonaws.com/aws-efa-installer-${EFA_VERSION}.tar.gz \
@@ -187,7 +185,6 @@ RUN mkdir /tmp/efa \
 	&& rm -rf /tmp/aws-efa-installer-${EFA_VERSION}.tar.gz \
 	&& rm -rf /var/lib/apt/lists/* \
 	&& apt-get clean
-
 RUN mkdir /tmp/openmpi \
 	&& cd /tmp/openmpi \
 	&& wget --quiet https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-${OMPI_VERSION}.tar.gz \
@@ -431,18 +428,11 @@ RUN HOME_DIR=/root \
 	&& rm -rf ${HOME_DIR}/oss_compliance* \
 	&& rm -rf /tmp/tmp*
 RUN rm -rf /root/.cache | true
-
-ENTRYPOINT ["bash", "-m", "start_with_right_hostname.sh"]
-
-CMD ["/bin/bash"]
-
-RUN apt-get update && apt-get -y upgrade --only-upgrade systemd openssl cryptsetup && apt-get install -y git-lfs && apt-get clean && rm -rf /var/lib/apt/lists/*
-
- \ \ \ \
-	
-	
-	
-	
+RUN apt-get update \
+	&& apt-get -y upgrade --only-upgrade systemd openssl cryptsetup \
+	&& apt-get install -y git-lfs \
+	&& apt-get clean \
+	&& rm -rf /var/lib/apt/lists/*
 RUN HOME_DIR=/root \
 	&& curl -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip \
 	&& unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/ \
@@ -453,3 +443,7 @@ RUN HOME_DIR=/root \
 	&& rm -rf ${HOME_DIR}/oss_compliance*
 
 COPY changehostname.c /changehostname.c
+
+ENTRYPOINT ["bash", "-m", "start_with_right_hostname.sh"]
+
+CMD ["/bin/bash"]
