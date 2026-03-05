@@ -77,20 +77,16 @@ var installManagers = map[string]installManagerInfo{
 	"choco":    {installCommands: []string{"install"}, flagsWithValue: chocoFlags},
 }
 
-// pipFileArgs are pip arguments that indicate file-based install (skip sorting).
+// pipFileArgs are pip arguments that indicate file-based or local install (skip sorting).
 var pipFileArgs = map[string]bool{
-	"-r":                true,
-	"--requirement":     true,
-	"-e":                true,
-	"--editable":        true,
-	"-c":                true,
-	"--constraint":      true,
-	"--no-deps":         false, // not a file arg, just listed for clarity
-	".":                 true,
-	"./":                true,
-	"--find-links":      true,
-	"--index-url":       true,
-	"--extra-index-url": true,
+	"-r":            true,
+	"--requirement": true,
+	"-e":            true,
+	"--editable":    true,
+	"-c":            true,
+	"--constraint":  true,
+	".":             true,
+	"./":            true,
 }
 
 // FindInstallPackages parses a shell script and extracts install commands with
