@@ -155,16 +155,19 @@ func scanExtraSpaceRuns(file string, lineNum int, line string, indentEnd int) ([
 			continue
 		}
 
-		// Keep the first space; delete the extras (runStart+1 .. pos).
+		// Keep the first space; delete extras one per space character.
+		// Granular edits avoid conflicts with other rules (e.g., sort-packages)
+		// that may target tokens adjacent to the extra spaces.
 		violLoc := rules.NewRangeLocation(file, lineNum, runStart, lineNum, pos)
-		editLoc := rules.NewRangeLocation(file, lineNum, runStart+1, lineNum, pos)
 		if len(edits) == 0 {
 			firstLoc = violLoc
 		}
-		edits = append(edits, rules.TextEdit{
-			Location: editLoc,
-			NewText:  "",
-		})
+		for col := runStart + 1; col < pos; col++ {
+			edits = append(edits, rules.TextEdit{
+				Location: rules.NewRangeLocation(file, lineNum, col, lineNum, col+1),
+				NewText:  "",
+			})
+		}
 		totalExtra += runLen - 1
 	}
 

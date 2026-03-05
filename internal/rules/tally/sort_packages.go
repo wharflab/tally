@@ -34,7 +34,7 @@ func (r *SortPackagesRule) Metadata() rules.RuleMetadata {
 		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
 		IsExperimental:  false,
-		FixPriority:     15,
+		FixPriority:     9, // Before no-multi-spaces (10) to avoid edit conflicts
 	}
 }
 
@@ -271,7 +271,8 @@ func (r *SortPackagesRule) buildEdits(
 			NewText:  insertText + " ",
 		})
 		insertLine = first.Line
-		// Delete ALL literals.
+		// Delete ALL literals (token text only — no preceding space, to avoid
+		// overlapping with no-multi-spaces edits on adjacent whitespace).
 		for _, pkg := range original {
 			if pkg.IsVar {
 				continue
@@ -282,9 +283,6 @@ func (r *SortPackagesRule) buildEdits(
 			if pkg.Line == 0 {
 				docStartCol += cmdStartCol
 				docEndCol += cmdStartCol
-			}
-			if docStartCol > 0 {
-				docStartCol--
 			}
 			edits = append(edits, rules.TextEdit{
 				Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
@@ -314,9 +312,7 @@ func (r *SortPackagesRule) buildEdits(
 				insertLine = pkg.Line
 				firstLitDone = true
 			} else {
-				if docStartCol > 0 {
-					docStartCol--
-				}
+				// Delete token text only — no preceding space.
 				edits = append(edits, rules.TextEdit{
 					Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
 					NewText:  "",

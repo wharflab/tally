@@ -4,7 +4,7 @@
  "DefaultSeverity": "style",
  "Description": "Package lists in install commands should be sorted alphabetically",
  "DocURL": "https://wharflab.github.io/tally/rules/tally/sort-packages/",
- "FixPriority": 15,
+ "FixPriority": 9,
  "IsExperimental": false,
  "Name": "Sort Packages"
 }

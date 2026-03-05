@@ -45,7 +45,7 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 45,
+                    "column": 46,
                     "line": 4
                   }
                 },
@@ -59,7 +59,7 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 50,
+                    "column": 51,
                     "line": 4
                   }
                 },
@@ -67,7 +67,7 @@
               }
             ],
             "isPreferred": true,
-            "priority": 15
+            "priority": 9
           }
         },
         {
@@ -112,7 +112,7 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 3,
+                    "column": 4,
                     "line": 9
                   }
                 },
@@ -126,22 +126,8 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 3,
+                    "column": 4,
                     "line": 10
-                  }
-                },
-                "newText": ""
-              },
-              {
-                "location": {
-                  "end": {
-                    "column": 10,
-                    "line": 9
-                  },
-                  "file": "testdata/sort-packages/Dockerfile",
-                  "start": {
-                    "column": 7,
-                    "line": 8
                   }
                 },
                 "newText": ""
@@ -159,10 +145,24 @@
                   }
                 },
                 "newText": ""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 10,
+                    "line": 9
+                  },
+                  "file": "testdata/sort-packages/Dockerfile",
+                  "start": {
+                    "column": 7,
+                    "line": 8
+                  }
+                },
+                "newText": ""
               }
             ],
             "isPreferred": true,
-            "priority": 15
+            "priority": 9
           }
         },
         {
@@ -207,7 +207,7 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 23,
+                    "column": 24,
                     "line": 16
                   }
                 },
@@ -221,7 +221,7 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 29,
+                    "column": 30,
                     "line": 16
                   }
                 },
@@ -229,7 +229,7 @@
               }
             ],
             "isPreferred": true,
-            "priority": 15
+            "priority": 9
           }
         }
       ]

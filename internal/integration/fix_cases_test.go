@@ -1203,6 +1203,18 @@ severity = "error"
 			wantApplied: 2, // sort-packages + newline-per-chained-call
 		},
 
+		// Cross-rule: sort-packages + no-multi-spaces on the same line.
+		// Both rules target the same line: no-multi-spaces removes extra spaces,
+		// sort-packages reorders packages. Both are FixSafe.
+		{
+			name: "sort-packages-cross-no-multi-spaces",
+			input: "FROM alpine:3.20\n" +
+				"RUN apt-get install -y  zoo  foo  bar\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/sort-packages", "tally/no-multi-spaces")...),
+			wantApplied: 2, // sort-packages + no-multi-spaces
+		},
+
 		// Cross-rule: sort-packages (priority 15) + shellcheck SC2086 (quotes vars)
 		// on a single-line RUN with interleaved variables. sort-packages moves
 		// literals to the front via insert+delete (never touching variable tokens),
