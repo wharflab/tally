@@ -173,8 +173,12 @@ func TestIsSecretKey(t *testing.T) {
 		{"VERSION", false},
 		{"PORT", false},
 		{"NAME", false},
-		{"PUBLIC_KEY", false}, // "public" overrides "key"
-		{"KEYBOARD", false},   // No word boundary before "key" (BuildKit behavior)
+		{"PUBLIC_KEY", false},             // "public" overrides "key"
+		{"KEYBOARD", false},               // No word boundary before "key" (BuildKit behavior)
+		{"SECRET_PASSPHRASE_FILE", false}, // "_FILE" suffix indicates a path, not a secret value
+		{"password_file", false},          // "_file" suffix (case-insensitive)
+		{"secret_File", false},            // mixed case "_File"
+		{"AUTH_MODULE_VERSION", false},    // "_VERSION" suffix indicates a version, not a secret
 
 		// Edge cases
 		{"", false},

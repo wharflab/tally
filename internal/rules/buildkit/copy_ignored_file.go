@@ -46,6 +46,14 @@ func (r *CopyIgnoredFileRule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
+	// Skip when negated patterns (exclusions) exist — static analysis cannot
+	// reliably determine whether a path is truly excluded when negations
+	// re-include files inside excluded directories.
+	// See: https://github.com/moby/buildkit/pull/6534
+	if input.Context.HasIgnoreExclusions() {
+		return nil
+	}
+
 	var violations []rules.Violation
 
 	for _, stage := range input.Stages {

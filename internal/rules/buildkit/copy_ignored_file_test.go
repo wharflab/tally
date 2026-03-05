@@ -12,9 +12,10 @@ import (
 
 // mockBuildContext implements rules.BuildContext for testing.
 type mockBuildContext struct {
-	ignoredPaths map[string]bool
-	heredocPaths map[string]bool
-	hasIgnore    bool
+	ignoredPaths  map[string]bool
+	heredocPaths  map[string]bool
+	hasIgnore     bool
+	hasExclusions bool
 }
 
 func (m *mockBuildContext) IsIgnored(path string) (bool, error) {
@@ -31,6 +32,10 @@ func (m *mockBuildContext) IsHeredocFile(path string) bool {
 
 func (m *mockBuildContext) HasIgnoreFile() bool {
 	return m.hasIgnore
+}
+
+func (m *mockBuildContext) HasIgnoreExclusions() bool {
+	return m.hasExclusions
 }
 
 func TestCopyIgnoredFileRule_Metadata(t *testing.T) {
@@ -80,6 +85,38 @@ func TestCopyIgnoredFileRule_Check_NoIgnoreFile(t *testing.T) {
 	violations := r.Check(input)
 	if len(violations) != 0 {
 		t.Errorf("expected no violations without .dockerignore, got %d", len(violations))
+	}
+}
+
+func TestCopyIgnoredFileRule_Check_SkippedWithExclusions(t *testing.T) {
+	t.Parallel()
+	r := NewCopyIgnoredFileRule()
+
+	ctx := &mockBuildContext{
+		hasIgnore:     true,
+		hasExclusions: true,
+		ignoredPaths:  map[string]bool{"ignored.txt": true},
+	}
+
+	input := rules.LintInput{
+		File:    "Dockerfile",
+		Context: ctx,
+		Stages: []instructions.Stage{
+			{
+				Commands: []instructions.Command{
+					&instructions.CopyCommand{
+						SourcesAndDest: instructions.SourcesAndDest{
+							SourcePaths: []string{"ignored.txt"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	violations := r.Check(input)
+	if len(violations) != 0 {
+		t.Errorf("expected no violations when .dockerignore has exclusions, got %d", len(violations))
 	}
 }
 

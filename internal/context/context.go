@@ -154,6 +154,22 @@ func (ctx *BuildContext) HasIgnoreFile() bool {
 	return len(ctx.patterns) > 0
 }
 
+// HasIgnoreExclusions returns true if .dockerignore contains negated patterns (lines starting with !).
+// When exclusions exist, static copy-source validation is unreliable because
+// a directory may be excluded but a file inside it re-included.
+func (ctx *BuildContext) HasIgnoreExclusions() bool {
+	if err := ctx.ensureInitialized(); err != nil {
+		return false
+	}
+
+	ctx.mu.RLock()
+	defer ctx.mu.RUnlock()
+	if ctx.patternMatcher == nil {
+		return false
+	}
+	return ctx.patternMatcher.Exclusions()
+}
+
 // ensureInitialized lazily loads .dockerignore patterns.
 func (ctx *BuildContext) ensureInitialized() error {
 	ctx.mu.Lock()

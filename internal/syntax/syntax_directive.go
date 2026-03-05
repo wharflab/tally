@@ -11,6 +11,8 @@ import (
 var knownFrontends = []string{
 	"docker/dockerfile",
 	"docker.io/docker/dockerfile",
+	"docker/dockerfile-upstream",
+	"docker.io/docker/dockerfile-upstream",
 }
 
 // checkSyntaxDirective detects typos in `# syntax=` parser directives.

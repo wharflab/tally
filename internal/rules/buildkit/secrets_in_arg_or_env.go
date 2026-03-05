@@ -119,6 +119,8 @@ func initSecretsRegexp() {
 	// Tokens that indicate NOT a secret (e.g., PUBLIC_KEY is fine)
 	allowTokens := []string{
 		"public",
+		"file",
+		"version",
 	}
 	allowPattern := `(?i)(?:_|^)(?:` + strings.Join(allowTokens, "|") + `)(?:_|$)`
 	allowRegexp = regexp.MustCompile(allowPattern)
