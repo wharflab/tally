@@ -29,7 +29,7 @@ jobs:
             GOSUMDB=sum.golang.org
           # Keep build flags in sync with .goreleaser.yml (tags, ldflags, trimpath).
           build-arguments: >-
-            -tags 'containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub' -ldflags="-s -w" -trimpath -o out
+            -tags containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub -ldflags "-s -w" -trimpath -o out
       - name: Post size comment on PR
         if: github.event_name == 'pull_request' && hashFiles('comment.txt') != ''
         env:
