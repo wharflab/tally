@@ -10,6 +10,9 @@ permissions:
   pull-requests: write
 env:
   GOEXPERIMENT: jsonv2
+  # Keep build flags in sync with .goreleaser.yml (tags, ldflags, trimpath).
+  BUILD_TAGS: containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
+  NOTES_REF: refs/notes/binary-size
 jobs:
   track-size:
     runs-on: ubuntu-latest
@@ -18,30 +21,110 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
-      - uses: capnspacehook/go-size-tracker@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Go
+        uses: actions/setup-go@v6
         with:
-          build-environment: |
-            GOTOOLCHAIN=auto
-            GOEXPERIMENT=jsonv2
-            CGO_ENABLED=0
-            GOSUMDB=sum.golang.org
-          # Keep build flags in sync with .goreleaser.yml (tags, ldflags, trimpath).
-          build-arguments: >-
-            -tags containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub -ldflags "-s -w" -trimpath -o out
+          go-version-file: go.mod
+      - name: Build binary
+        run: |
+          CGO_ENABLED=0 go build -tags "$BUILD_TAGS" -trimpath -ldflags="-s -w" -o tally-bin .
+          SIZE=$(stat --format='%s' tally-bin)
+          echo "SIZE=$SIZE" >> "$GITHUB_ENV"
+          echo "Binary size: $SIZE bytes ($(numfmt --to=iec-i --suffix=B "$SIZE"))"
+      - name: Fetch size notes
+        run: git fetch origin "$NOTES_REF":"$NOTES_REF" 2>/dev/null || true
+      - name: Record size (push to main)
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git notes --ref=binary-size add -f -m "$SIZE" "$GITHUB_SHA"
+          git push origin "$NOTES_REF" 2>/dev/null || git push origin "$NOTES_REF" --force
       - name: Post size comment on PR
-        if: github.event_name == 'pull_request' && hashFiles('comment.txt') != ''
+        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+        shell: bash
         run: |
-          MARKER="<!-- go-size-tracker -->"
-          BODY="$MARKER"$'\n'"$(cat comment.txt)"
+          # --- Collect history from git notes (chronological, oldest first) ---
+          # Walk main branch commits and check which have size notes attached.
+          declare -a SIZES=()
+          declare -a LABELS=()
 
-          # Find an existing comment with our marker.
+          while IFS= read -r sha; do
+            blob=$(git notes --ref=binary-size list "$sha" 2>/dev/null) || continue
+            note=$(git cat-file -p "$blob")
+            subject=$(git log --format='%s' -1 "$sha" 2>/dev/null | cut -c1-30)
+            # Prepend (git log is newest-first, we reverse later).
+            SIZES=("$note" "${SIZES[@]}")
+            LABELS=("$subject" "${LABELS[@]}")
+          done < <(git log --format='%H' origin/main -- 2>/dev/null | head -20)
+
+          # --- Determine baseline (most recent recorded size on main) ---
+          BASE_SIZE=""
+          if [ ${#SIZES[@]} -gt 0 ]; then
+            BASE_SIZE="${SIZES[-1]}"
+          fi
+
+          # --- Build comparison table ---
+          PR_HUMAN=$(numfmt --to=iec-i --suffix=B "$SIZE")
+          if [ -n "$BASE_SIZE" ] && [ "$BASE_SIZE" -gt 0 ] 2>/dev/null; then
+            BASE_HUMAN=$(numfmt --to=iec-i --suffix=B "$BASE_SIZE")
+            DIFF=$((SIZE - BASE_SIZE))
+            if [ "$DIFF" -ge 0 ]; then DIFF_SIGN="+"; else DIFF_SIGN=""; fi
+            DIFF_HUMAN=$(numfmt --to=iec-i --suffix=B -- "$DIFF")
+            PCT=$(awk "BEGIN {printf \"%.2f\", ($DIFF / $BASE_SIZE) * 100}")
+            read -r -d '' TABLE <<TABLEEOF || true
+          | main | **${BASE_HUMAN}** |
+          | This PR | **${PR_HUMAN}** |
+          | Delta | ${DIFF_SIGN}${DIFF_HUMAN} (${DIFF_SIGN}${PCT}%) |
+          TABLEEOF
+          else
+            read -r -d '' TABLE <<TABLEEOF || true
+          | This PR | **${PR_HUMAN}** |
+          | main | _no baseline yet_ |
+          TABLEEOF
+          fi
+
+          # --- Build Mermaid xychart data ---
+          X_LABELS=""
+          Y_DATA=""
+          SEP=""
+          for i in "${!SIZES[@]}"; do
+            safe="${LABELS[$i]//\"/\\\"}"
+            X_LABELS="${X_LABELS}${SEP}\"${safe}\""
+            Y_DATA="${Y_DATA}${SEP}${SIZES[$i]}"
+            SEP=", "
+          done
+          X_LABELS="${X_LABELS}${SEP}\"This PR\""
+          Y_DATA="${Y_DATA}${SEP}${SIZE}"
+
+          # --- Assemble and post comment ---
+          MARKER="<!-- binary-size-tracker -->"
+          read -r -d '' BODY <<BODYEOF || true
+          ${MARKER}
+          ## Binary Size Report
+
+          | | Size |
+          |---|---|
+          ${TABLE}
+          <details>
+          <summary>Size history</summary>
+
+          \`\`\`mermaid
+          xychart-beta
+            title "Binary size (bytes)"
+            x-axis [${X_LABELS}]
+            y-axis "Bytes"
+            bar [${Y_DATA}]
+          \`\`\`
+
+          </details>
+          BODYEOF
+
           COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
-            --paginate -q ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -1)
+            --paginate -q ".[] | select(.body | startswith(\"${MARKER}\")) | .id" | head -1)
 
           if [ -n "$COMMENT_ID" ]; then
             gh api "repos/${{ github.repository }}/issues/comments/${COMMENT_ID}" \
