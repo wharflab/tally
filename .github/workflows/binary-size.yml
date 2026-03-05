@@ -1,0 +1,31 @@
+---
+name: Binary Size
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: write
+  pull-requests: write
+env:
+  GOEXPERIMENT: jsonv2
+jobs:
+  track-size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          lfs: true
+      - uses: capnspacehook/go-size-tracker@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          build-environment: |
+            GOEXPERIMENT=jsonv2
+            CGO_ENABLED=0
+            GOSUMDB=sum.golang.org
+          # Keep build flags in sync with .goreleaser.yml (tags, ldflags, trimpath).
+          build-arguments: >-
+            -tags 'containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub' -ldflags="-s -w" -trimpath -o out
