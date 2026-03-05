@@ -24,6 +24,10 @@ type BuildContext interface {
 
 	// HasIgnoreFile returns true if a .dockerignore file exists.
 	HasIgnoreFile() bool
+
+	// HasIgnoreExclusions returns true if .dockerignore contains negated patterns.
+	// When exclusions exist, static copy-source validation is unreliable.
+	HasIgnoreExclusions() bool
 }
 
 // LintInput contains all the information a rule needs to check a Dockerfile.

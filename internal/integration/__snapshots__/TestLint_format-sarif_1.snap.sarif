@@ -243,7 +243,7 @@
           ],
           "supportedTaxonomies": [],
           "taxa": [],
-          "version": "dev (buildkit v0.27.1)"
+          "version": "dev (buildkit v0.0.0)"
         },
         "extensions": []
       },

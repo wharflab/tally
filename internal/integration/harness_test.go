@@ -37,6 +37,10 @@ type fixCase struct {
 
 var fixedSummaryRE = regexp.MustCompile(`(?m)^Fixed (\d+) issues? in \d+ files?$`)
 
+// buildkitVersionRE normalises the dynamic BuildKit version embedded in output
+// (e.g. SARIF "version" field) so snapshots don't break on dependency bumps.
+var buildkitVersionRE = regexp.MustCompile(`(buildkit v)\d+\.\d+\.\d+`)
+
 func runLintCase(t *testing.T, tc lintCase) {
 	t.Helper()
 
@@ -95,6 +99,9 @@ func runLintCase(t *testing.T, tc lintCase) {
 		wdSlash := filepath.ToSlash(wd) + "/"
 		outputStr = strings.ReplaceAll(outputStr, wdSlash, "")
 	}
+
+	// Normalise the BuildKit version so dependency bumps don't break snapshots.
+	outputStr = buildkitVersionRE.ReplaceAllString(outputStr, "${1}0.0.0")
 
 	if tc.snapRaw {
 		// Non-JSON formats (e.g. github-actions .txt, markdown .md)
