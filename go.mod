@@ -22,7 +22,7 @@ require (
 	github.com/knadh/koanf/providers/env/v2 v2.0.0
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/providers/structs v1.0.0
-	github.com/knadh/koanf/v2 v2.3.2
+	github.com/knadh/koanf/v2 v2.3.3
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/buildkit v0.27.1
 	github.com/moby/docker-image-spec v1.3.1
