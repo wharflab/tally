@@ -1474,71 +1474,7 @@ func filterFixedViolations(
 	fixResult *fix.Result,
 	fileConfigs map[string]*config.Config,
 ) []rules.Violation {
-	// Build set of fixed locations (include column to handle multiple violations on same line)
-	type locKey struct {
-		file string
-		line int
-		col  int
-		code string
-	}
-	fixed := make(map[locKey]bool)
-
-	// Build map of modified file contents for PostFixRevalidator checks.
-	modifiedContent := make(map[string][]byte)
-	for _, fc := range fixResult.Changes {
-		for _, af := range fc.FixesApplied {
-			fixed[locKey{
-				// Use ToSlash for consistent cross-platform path matching
-				// Violations use forward slashes (PathNormalization processor)
-				file: filepath.ToSlash(fc.Path),
-				line: af.Location.Start.Line,
-				col:  af.Location.Start.Column,
-				code: af.RuleCode,
-			}] = true
-		}
-		if fc.ModifiedContent != nil {
-			modifiedContent[filepath.ToSlash(fc.Path)] = fc.ModifiedContent
-		}
-	}
-
-	// Filter violations
-	remaining := make([]rules.Violation, 0, len(violations))
-	for _, v := range violations {
-		key := locKey{
-			file: filepath.ToSlash(v.File()),
-			line: v.Line(),
-			col:  v.Location.Start.Column,
-			code: v.RuleCode,
-		}
-		if fixed[key] {
-			continue
-		}
-
-		// For rules implementing PostFixRevalidator, re-check against
-		// modified content to suppress violations resolved by other fixes.
-		if content, ok := modifiedContent[filepath.ToSlash(v.File())]; ok {
-			if rule := rules.DefaultRegistry().Get(v.RuleCode); rule != nil {
-				if revalidator, ok := rule.(rules.PostFixRevalidator); ok {
-					var ruleCfg any
-					filePath := filepath.ToSlash(v.File())
-					fileCfg := fileConfigs[filePath]
-					if fileCfg == nil {
-						// Fallback: fileConfigs may use platform-specific paths (Windows).
-						fileCfg = fileConfigs[v.File()]
-					}
-					if fileCfg != nil {
-						ruleCfg = fileCfg.Rules.GetOptions(v.RuleCode)
-					}
-					if !revalidator.RevalidateAfterFix(v, content, ruleCfg) {
-						continue
-					}
-				}
-			}
-		}
-
-		remaining = append(remaining, v)
-	}
-	return remaining
+	return fix.FilterFixedViolations(violations, fixResult, fileConfigs)
 }
 
 // reportNoFilesFound prints a context-aware message when no Dockerfiles are found.
