@@ -361,7 +361,7 @@ is passed intact with newlines to `pwsh -Command`, which correctly parses the he
 | RUN syntax | PowerShell here-string works? | Why |
 |---|---|---|
 | Regular `RUN` with `\` continuation | **No** | Parser strips newlines; `@"` and `"@` end up on same line |
-| Regular `RUN` with `` ` `` continuation (`# escape=`` ` ``) | **No** | Same problem + `` ` `` conflicts with PowerShell escape |
+| Regular `RUN` with `` ` `` continuation (`# escape=`` ` ``) \| **No** \| Same problem +`` ` `` conflicts with PowerShell escape |  |  |
 | `RUN <<EOF` (Dockerfile heredoc) + `SHELL ["pwsh"...]` | **Yes** | Newlines preserved in content passed to `pwsh -Command` |
 | `RUN ["pwsh", "-Command", "..."]` (exec form) | **No** | Single JSON string, no newlines |
 
