@@ -190,6 +190,7 @@ func (r *ContainersResolver) resolveFromManifest(
 		Variant:        ociConfig.Variant,
 		Digest:         manifestDigest.String(),
 		HasHealthcheck: extractHasHealthcheck(configBytes),
+		WorkingDir:     ociConfig.Config.WorkingDir,
 	}
 
 	// Platform mismatch check for single-manifest images.

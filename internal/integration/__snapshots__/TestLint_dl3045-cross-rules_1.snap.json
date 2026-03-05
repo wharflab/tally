@@ -20,7 +20,27 @@
           "message": "`COPY` to a relative destination without `WORKDIR` set",
           "rule": "hadolint/DL3045",
           "severity": "warning",
-          "sourceCode": "COPY app.bin app.bin"
+          "sourceCode": "COPY app.bin app.bin",
+          "suggestedFix": {
+            "description": "Add `WORKDIR /app` before COPY",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 9
+                  },
+                  "file": "testdata/dl3045-cross-rules/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 9
+                  }
+                },
+                "newText": "WORKDIR /app\n"
+              }
+            ],
+            "safety": 1
+          }
         },
         {
           "detail": "Set an absolute WORKDIR before using relative paths, e.g., 'WORKDIR /app' before 'WORKDIR src'",
@@ -39,7 +59,27 @@
           "message": "Relative workdir src can have unexpected results if the base image has a WORKDIR set",
           "rule": "buildkit/WorkdirRelativePath",
           "severity": "warning",
-          "sourceCode": "WORKDIR src"
+          "sourceCode": "WORKDIR src",
+          "suggestedFix": {
+            "description": "Replace with absolute path `WORKDIR /src`",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 12
+                  },
+                  "file": "testdata/dl3045-cross-rules/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 12
+                  }
+                },
+                "newText": "WORKDIR /src"
+              }
+            ],
+            "safety": 1
+          }
         },
         {
           "detail": "The cd command in a RUN instruction only affects that single instruction. Use WORKDIR to set the working directory persistently for subsequent instructions. Alternatively, use absolute paths in your commands.",

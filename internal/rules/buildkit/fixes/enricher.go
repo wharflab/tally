@@ -21,6 +21,7 @@ var fixableRuleNames = []string{
 	"LegacyKeyValueFormat",
 	"MultipleInstructionsDisallowed",
 	"ExposeProtoCasing",
+	"WorkdirRelativePath",
 }
 
 // FixableRuleNames returns the BuildKit rule names for which tally can generate auto-fixes.

@@ -85,6 +85,8 @@ RUN pip install --no-cache-dir dill==0.3.6 evaluate gevent~=23.9.0 kenlm==0.1 mu
                                "$PT_TORCHAUDIO_URL"
 RUN pip install --no-cache-dir setuptools==69.5.1
 
+WORKDIR /app
+
 COPY requirements1.txt .
 
 RUN pip install --no-cache-dir -r requirements1.txt

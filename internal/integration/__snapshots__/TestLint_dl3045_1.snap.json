@@ -20,7 +20,27 @@
           "message": "`COPY` to a relative destination without `WORKDIR` set",
           "rule": "hadolint/DL3045",
           "severity": "warning",
-          "sourceCode": "COPY app.bin app.bin"
+          "sourceCode": "COPY app.bin app.bin",
+          "suggestedFix": {
+            "description": "Add `WORKDIR /app` before COPY",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 8
+                  },
+                  "file": "testdata/dl3045/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 8
+                  }
+                },
+                "newText": "WORKDIR /app\n"
+              }
+            ],
+            "safety": 1
+          }
         }
       ]
     }

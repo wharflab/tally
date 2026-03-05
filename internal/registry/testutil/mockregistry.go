@@ -114,6 +114,7 @@ type ImageOpts struct {
 	Variant     string            // e.g. "v8" (optional)
 	Env         map[string]string // e.g. {"PATH": "/usr/bin", "PYTHON_VERSION": "3.12"}
 	Healthcheck []string          // e.g. {"CMD-SHELL", "curl -f http://localhost/ || exit 1"} (optional)
+	WorkingDir  string            // e.g. "/app" (optional)
 }
 
 // AddImage pushes a single-platform image and returns its digest.
@@ -226,6 +227,11 @@ func buildImage(opts ImageOpts) (v1.Image, error) {
 		env = append(env, k+"="+v)
 	}
 	cfgFile.Config.Env = env
+
+	// Set working directory if provided.
+	if opts.WorkingDir != "" {
+		cfgFile.Config.WorkingDir = opts.WorkingDir
+	}
 
 	// Set healthcheck if provided.
 	if len(opts.Healthcheck) > 0 {

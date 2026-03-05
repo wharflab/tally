@@ -6,6 +6,8 @@ import (
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
+	"github.com/wharflab/tally/internal/async"
+	"github.com/wharflab/tally/internal/registry"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
 )
@@ -157,6 +159,198 @@ WORKDIR c:/build
 			WantViolations: 1,
 		},
 	})
+}
+
+func TestWorkdirRelativePathRule_Check_FixSuggestion(t *testing.T) {
+	t.Parallel()
+
+	input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nWORKDIR app\n")
+	r := NewWorkdirRelativePathRule()
+	violations := r.Check(input)
+
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix, got nil")
+	}
+	if fix.Safety != rules.FixSuggestion {
+		t.Errorf("Safety = %v, want FixSuggestion", fix.Safety)
+	}
+	if len(fix.Edits) != 1 {
+		t.Fatalf("got %d edits, want 1", len(fix.Edits))
+	}
+	// Without registry data, resolves against "/" → "/app"
+	if want := "WORKDIR /app"; fix.Edits[0].NewText != want {
+		t.Errorf("NewText = %q, want %q", fix.Edits[0].NewText, want)
+	}
+}
+
+func TestWorkdirRelativePathRule_PlanAsync(t *testing.T) {
+	t.Parallel()
+
+	t.Run("plans checks for stages with violations", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nWORKDIR app\n")
+		r := NewWorkdirRelativePathRule()
+		requests := r.PlanAsync(input)
+		if len(requests) == 0 {
+			t.Fatal("expected at least one async request")
+		}
+		if requests[0].RuleCode != rules.BuildKitRulePrefix+"WorkdirRelativePath" {
+			t.Errorf("RuleCode = %q, want buildkit/WorkdirRelativePath", requests[0].RuleCode)
+		}
+	})
+
+	t.Run("no plans when no violations", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nWORKDIR /app\n")
+		r := NewWorkdirRelativePathRule()
+		requests := r.PlanAsync(input)
+		if len(requests) != 0 {
+			t.Errorf("expected no async requests, got %d", len(requests))
+		}
+	})
+}
+
+func TestWorkdirRelativePathRule_Handler_BaseHasWorkingDir(t *testing.T) {
+	t.Parallel()
+
+	h := makeWorkdirHandler(t, "FROM alpine:3.18\nWORKDIR app\n")
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: "/opt"})
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	var hasCompleted, hasViolation bool
+	for _, r := range result {
+		switch v := r.(type) {
+		case async.CompletedCheck:
+			if v.StageIndex == 0 {
+				hasCompleted = true
+			}
+		case rules.Violation:
+			hasViolation = true
+			if v.SuggestedFix == nil {
+				t.Fatal("refined violation has no SuggestedFix")
+			}
+			if v.SuggestedFix.Safety != rules.FixSafe {
+				t.Errorf("Safety = %v, want FixSafe", v.SuggestedFix.Safety)
+			}
+			// "app" resolved against "/opt" → "/opt/app"
+			if want := "WORKDIR /opt/app"; v.SuggestedFix.Edits[0].NewText != want {
+				t.Errorf("NewText = %q, want %q", v.SuggestedFix.Edits[0].NewText, want)
+			}
+		}
+	}
+	if !hasCompleted {
+		t.Error("expected CompletedCheck for stage 0")
+	}
+	if !hasViolation {
+		t.Error("expected refined violation")
+	}
+}
+
+func TestWorkdirRelativePathRule_Handler_BaseNoWorkingDir(t *testing.T) {
+	t.Parallel()
+
+	h := makeWorkdirHandler(t, "FROM alpine:3.18\nWORKDIR app\n")
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: ""})
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	// Even with no base WORKDIR, the handler resolves against "/" and
+	// upgrades the fix to FixSafe (registry confirmed).
+	var hasViolation bool
+	for _, r := range result {
+		if v, ok := r.(rules.Violation); ok {
+			hasViolation = true
+			if v.SuggestedFix == nil || len(v.SuggestedFix.Edits) == 0 {
+				t.Fatal("missing fix edits")
+			}
+			// "app" resolved against "/" → "/app"
+			if want := "WORKDIR /app"; v.SuggestedFix.Edits[0].NewText != want {
+				t.Errorf("NewText = %q, want %q", v.SuggestedFix.Edits[0].NewText, want)
+			}
+			if v.SuggestedFix.Safety != rules.FixSafe {
+				t.Errorf("Safety = %v, want FixSafe", v.SuggestedFix.Safety)
+			}
+		}
+	}
+	if !hasViolation {
+		t.Error("expected refined violation")
+	}
+}
+
+func TestWorkdirRelativePathRule_Handler_ChainedRelative(t *testing.T) {
+	t.Parallel()
+
+	// Two chained relative WORKDIRs: app then src
+	h := makeWorkdirHandler(t, "FROM alpine:3.18\nWORKDIR app\nWORKDIR src\n")
+	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: "/opt"})
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	var edits []string
+	for _, r := range result {
+		if v, ok := r.(rules.Violation); ok {
+			if v.SuggestedFix != nil && len(v.SuggestedFix.Edits) > 0 {
+				edits = append(edits, v.SuggestedFix.Edits[0].NewText)
+			}
+		}
+	}
+	// First: "app" against "/opt" → "/opt/app"
+	// Second: "src" against "/opt/app" → "/opt/app/src"
+	if len(edits) != 2 {
+		t.Fatalf("got %d edits, want 2; edits: %v", len(edits), edits)
+	}
+	if edits[0] != "WORKDIR /opt/app" {
+		t.Errorf("edit[0] = %q, want %q", edits[0], "WORKDIR /opt/app")
+	}
+	if edits[1] != "WORKDIR /opt/app/src" {
+		t.Errorf("edit[1] = %q, want %q", edits[1], "WORKDIR /opt/app/src")
+	}
+}
+
+func makeWorkdirHandler(t *testing.T, dockerfile string) *workdirRelPathHandler {
+	t.Helper()
+	r := NewWorkdirRelativePathRule()
+	input := testutil.MakeLintInput(t, "Dockerfile", dockerfile)
+	meta := r.Metadata()
+	sem := testutil.GetSemantic(t, input)
+
+	stagesWithViolations := make(map[int]bool)
+	for stageIdx, stage := range input.Stages {
+		isWindows := false
+		if info := sem.StageInfo(stageIdx); info != nil {
+			isWindows = info.IsWindows()
+		}
+		workdirSet := false
+		for _, cmd := range stage.Commands {
+			workdir, ok := cmd.(*instructions.WorkdirCommand)
+			if !ok {
+				continue
+			}
+			if isAbsPath(workdir.Path, isWindows) {
+				workdirSet = true
+			} else if !workdirSet {
+				stagesWithViolations[stageIdx] = true
+			}
+		}
+	}
+
+	return &workdirRelPathHandler{
+		meta:                 meta,
+		file:                 input.File,
+		stageIdx:             0,
+		semantic:             sem,
+		stages:               input.Stages,
+		stagesWithViolations: stagesWithViolations,
+	}
 }
 
 func TestIsAbsPath(t *testing.T) {
