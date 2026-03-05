@@ -56,8 +56,17 @@ var (
 	}
 	npmFlags      = []string{"--prefix", "--registry", "--save-prefix"}
 	composerFlags = []string{"--working-dir", "-d"}
-	chocoFlags    = []string{"--source", "-s", "--params", "--package-parameters", "--installargs", "--install-arguments", "--version"}
-	uvFlags       = []string{
+	chocoFlags    = []string{
+		"--source",
+		"-s",
+		"--params",
+		"--package-parameters",
+		"--installargs",
+		"--install-arguments",
+		"--version",
+		"-version",
+	}
+	uvFlags = []string{
 		// uv add
 		"-r", "--requirements", "-c", "--constraints", "-m", "--marker",
 		"--optional", "--group", "--bounds", "--rev", "--tag", "--branch",

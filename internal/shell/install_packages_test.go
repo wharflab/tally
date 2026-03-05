@@ -146,6 +146,13 @@ func TestFindInstallPackages(t *testing.T) {
 			wantPkgs: [][]string{{"git", "nodejs"}},
 		},
 		{
+			name:     "choco -version flag consumes next argument",
+			script:   "choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"microsoft-build-tools"}},
+		},
+		{
 			name:     "uv add",
 			script:   "uv add flask django",
 			variant:  VariantBash,
