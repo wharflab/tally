@@ -102,9 +102,10 @@ func TestWorkdirRelativePathRule_Check_MultipleRelativeBeforeAbsolute(t *testing
 	}
 
 	violations := r.Check(input)
-	// Both should trigger since neither has an absolute WORKDIR before it
-	if len(violations) != 2 {
-		t.Errorf("expected 2 violations, got %d", len(violations))
+	// Upstream BuildKit only warns on the first relative WORKDIR per stage;
+	// once workdirSet is flipped, subsequent relative WORKDIRs are silent.
+	if len(violations) != 1 {
+		t.Errorf("expected 1 violation (first relative only), got %d", len(violations))
 	}
 }
 
@@ -299,7 +300,9 @@ func TestWorkdirRelativePathRule_Handler_BaseNoWorkingDir(t *testing.T) {
 func TestWorkdirRelativePathRule_Handler_ChainedRelative(t *testing.T) {
 	t.Parallel()
 
-	// Two chained relative WORKDIRs: app then src
+	// Two chained relative WORKDIRs: app then src.
+	// Upstream BuildKit only warns on the first relative WORKDIR per stage,
+	// so the handler should emit only one refined violation.
 	h := makeWorkdirHandler(t, "FROM alpine:3.18\nWORKDIR app\nWORKDIR src\n")
 	result := h.OnSuccess(&registry.ImageConfig{WorkingDir: "/opt"})
 	if result == nil {
@@ -314,16 +317,12 @@ func TestWorkdirRelativePathRule_Handler_ChainedRelative(t *testing.T) {
 			}
 		}
 	}
-	// First: "app" against "/opt" → "/opt/app"
-	// Second: "src" against "/opt/app" → "/opt/app/src"
-	if len(edits) != 2 {
-		t.Fatalf("got %d edits, want 2; edits: %v", len(edits), edits)
+	// Only the first relative WORKDIR ("app" against "/opt") triggers.
+	if len(edits) != 1 {
+		t.Fatalf("got %d edits, want 1; edits: %v", len(edits), edits)
 	}
 	if edits[0] != "WORKDIR /opt/app" {
 		t.Errorf("edit[0] = %q, want %q", edits[0], "WORKDIR /opt/app")
-	}
-	if edits[1] != "WORKDIR /opt/app/src" {
-		t.Errorf("edit[1] = %q, want %q", edits[1], "WORKDIR /opt/app/src")
 	}
 }
 

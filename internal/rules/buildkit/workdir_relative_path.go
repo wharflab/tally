@@ -2,10 +2,10 @@ package buildkit
 
 import (
 	"fmt"
-	"path"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/util/system"
 
 	"github.com/wharflab/tally/internal/async"
 	"github.com/wharflab/tally/internal/registry"
@@ -14,8 +14,8 @@ import (
 )
 
 // WorkdirRelativePathRule implements the WorkdirRelativePath linting rule.
-// It detects relative WORKDIR instructions that appear before any absolute
-// WORKDIR has been set in the stage.
+// It detects the first relative WORKDIR instruction in a stage when no
+// absolute WORKDIR has been set yet (matching upstream BuildKit semantics).
 type WorkdirRelativePathRule struct{}
 
 // NewWorkdirRelativePathRule creates a new WorkdirRelativePath rule instance.
@@ -37,8 +37,6 @@ func (r *WorkdirRelativePathRule) Metadata() rules.RuleMetadata {
 }
 
 // Check runs the WorkdirRelativePath rule.
-// It tracks whether an absolute WORKDIR has been set for each stage and
-// warns if a relative WORKDIR is used before any absolute path is set.
 func (r *WorkdirRelativePathRule) Check(input rules.LintInput) []rules.Violation {
 	sem, ok := input.Semantic.(*semantic.Model)
 	if !ok {
@@ -47,8 +45,10 @@ func (r *WorkdirRelativePathRule) Check(input rules.LintInput) []rules.Violation
 	return findRelativeWorkdirViolations(sem, input.Stages, input.File, r.Metadata())
 }
 
-// findRelativeWorkdirViolations iterates all stages and returns violations for
-// relative WORKDIR instructions that appear before any absolute WORKDIR.
+// findRelativeWorkdirViolations iterates all stages and returns a violation
+// for the first relative WORKDIR in each stage that lacks a prior absolute
+// WORKDIR. Matches upstream BuildKit semantics: workdirSet is flipped to true
+// on any WORKDIR (absolute or relative), so only the first relative triggers.
 func findRelativeWorkdirViolations(
 	sem *semantic.Model,
 	stages []instructions.Stage,
@@ -58,12 +58,7 @@ func findRelativeWorkdirViolations(
 	var violations []rules.Violation
 
 	for stageIdx, stage := range stages {
-		isWindows := false
-		if sem != nil {
-			if info := sem.StageInfo(stageIdx); info != nil {
-				isWindows = info.IsWindows()
-			}
-		}
+		platformOS := stageOS(sem, stageIdx)
 
 		workdirSet := false
 		for _, cmd := range stage.Commands {
@@ -72,9 +67,7 @@ func findRelativeWorkdirViolations(
 				continue
 			}
 
-			if isAbsPath(workdir.Path, isWindows) {
-				workdirSet = true
-			} else if !workdirSet {
+			if !workdirSet && !system.IsAbs(workdir.Path, platformOS) {
 				loc := rules.NewLocationFromRanges(file, workdir.Location())
 				v := rules.NewViolation(
 					loc,
@@ -85,10 +78,13 @@ func findRelativeWorkdirViolations(
 				).WithDocURL(meta.DocURL).WithDetail(
 					"Set an absolute WORKDIR before using relative paths, " +
 						"e.g., 'WORKDIR /app' before 'WORKDIR " + workdir.Path + "'",
-				).WithSuggestedFix(workdirRelativePathFix(file, workdir))
+				).WithSuggestedFix(workdirRelativePathFix(file, workdir, platformOS))
 				v.StageIndex = stageIdx
 				violations = append(violations, v)
 			}
+			// Upstream BuildKit sets workdirSet = true for ANY WORKDIR
+			// (absolute or relative), so only the first relative triggers.
+			workdirSet = true
 		}
 	}
 
@@ -184,25 +180,17 @@ func (h *workdirRelPathHandler) OnSuccess(resolved any) []any {
 	return out
 }
 
-// refineStageViolations re-derives violations for a stage and attaches
-// fixes that resolve relative WORKDIRs to absolute paths.
+// refineStageViolations re-derives the violation for the first relative
+// WORKDIR in the stage and attaches a fix using the resolved base path.
 func (h *workdirRelPathHandler) refineStageViolations(stageIdx int, baseDir string) []any {
 	if stageIdx >= len(h.stages) {
 		return nil
 	}
 
-	isWindows := false
-	if h.semantic != nil {
-		if info := h.semantic.StageInfo(stageIdx); info != nil {
-			isWindows = info.IsWindows()
-		}
-	}
+	platformOS := stageOS(h.semantic, stageIdx)
 
 	out := make([]any, 0)
 	workdirSet := false
-	// Track cumulative path to resolve chained relative WORKDIRs.
-	// e.g. WORKDIR foo / WORKDIR bar → /base/foo, /base/foo/bar
-	currentDir := baseDir
 
 	for _, cmd := range h.stages[stageIdx].Commands {
 		workdir, ok := cmd.(*instructions.WorkdirCommand)
@@ -210,54 +198,50 @@ func (h *workdirRelPathHandler) refineStageViolations(stageIdx int, baseDir stri
 			continue
 		}
 
-		if isAbsPath(workdir.Path, isWindows) {
-			workdirSet = true
-			currentDir = workdir.Path
-			continue
+		if !workdirSet && !system.IsAbs(workdir.Path, platformOS) {
+			resolvedPath, err := system.NormalizeWorkdir(baseDir, workdir.Path, platformOS)
+			if err != nil {
+				break // can't resolve — skip the fix
+			}
+
+			loc := rules.NewLocationFromRanges(h.file, workdir.Location())
+
+			var detail string
+			if baseDir != "/" {
+				detail = fmt.Sprintf(
+					"Base image sets WORKDIR to %q. Resolving relative path %q gives %q.",
+					baseDir, workdir.Path, resolvedPath,
+				)
+			} else {
+				detail = fmt.Sprintf(
+					"Base image has no WORKDIR (defaults to /). "+
+						"Resolving relative path %q gives %q.",
+					workdir.Path, resolvedPath,
+				)
+			}
+
+			v := rules.NewViolation(
+				loc,
+				h.meta.Code,
+				"Relative workdir "+workdir.Path+
+					" can have unexpected results if the base image has a WORKDIR set",
+				h.meta.DefaultSeverity,
+			).WithDocURL(h.meta.DocURL).WithDetail(detail).
+				WithSuggestedFix(
+					workdirRelativePathFixResolved(h.file, workdir, resolvedPath),
+				)
+			v.StageIndex = stageIdx
+			out = append(out, v)
 		}
-
-		if workdirSet {
-			// Relative after an explicit absolute — Docker resolves it; no violation.
-			currentDir = path.Join(currentDir, workdir.Path)
-			continue
-		}
-
-		// Violation: relative WORKDIR without prior absolute.
-		resolvedPath := path.Clean(path.Join(currentDir, workdir.Path))
-		currentDir = resolvedPath
-
-		loc := rules.NewLocationFromRanges(h.file, workdir.Location())
-
-		var detail string
-		if cfg := baseDir; cfg != "/" {
-			detail = fmt.Sprintf(
-				"Base image sets WORKDIR to %q. Resolving relative path %q gives %q.",
-				baseDir, workdir.Path, resolvedPath,
-			)
-		} else {
-			detail = fmt.Sprintf(
-				"Base image has no WORKDIR (defaults to /). Resolving relative path %q gives %q.",
-				workdir.Path, resolvedPath,
-			)
-		}
-
-		v := rules.NewViolation(
-			loc,
-			h.meta.Code,
-			"Relative workdir "+workdir.Path+
-				" can have unexpected results if the base image has a WORKDIR set",
-			h.meta.DefaultSeverity,
-		).WithDocURL(h.meta.DocURL).WithDetail(detail).
-			WithSuggestedFix(workdirRelativePathFixResolved(h.file, workdir, resolvedPath))
-		v.StageIndex = stageIdx
-		out = append(out, v)
+		// Match upstream: workdirSet = true for any WORKDIR.
+		workdirSet = true
 	}
 
 	return out
 }
 
 // findWorkdirDescendants returns descendant stage indices that transitively
-// inherit from the given stage without setting their own absolute WORKDIR.
+// inherit from the given stage.
 func findWorkdirDescendants(sem *semantic.Model, stageIdx int) []int {
 	result := make([]int, 0)
 	for i := range sem.StageCount() {
@@ -274,15 +258,38 @@ func findWorkdirDescendants(sem *semantic.Model, stageIdx int) []int {
 	return result
 }
 
+// stageOS returns the platform OS string for a stage ("windows" or "linux").
+// Defaults to empty string (interpreted as Linux by system.NormalizeWorkdir).
+func stageOS(sem *semantic.Model, stageIdx int) string {
+	if sem == nil {
+		return ""
+	}
+	info := sem.StageInfo(stageIdx)
+	if info == nil {
+		return ""
+	}
+	if info.IsWindows() {
+		return "windows"
+	}
+	return ""
+}
+
 // workdirRelativePathFix creates a fast-path fix that replaces the relative
-// WORKDIR with an absolute guess. Since we don't know the base image's WORKDIR,
-// we resolve against "/" as a reasonable default.
-func workdirRelativePathFix(file string, workdir *instructions.WorkdirCommand) *rules.SuggestedFix {
+// WORKDIR with an absolute path resolved against "/" (the default when no
+// base image WORKDIR is known).
+func workdirRelativePathFix(
+	file string,
+	workdir *instructions.WorkdirCommand,
+	platformOS string,
+) *rules.SuggestedFix {
 	loc := workdir.Location()
 	if len(loc) == 0 {
 		return nil
 	}
-	resolvedPath := path.Clean("/" + workdir.Path)
+	resolvedPath, err := system.NormalizeWorkdir("/", workdir.Path, platformOS)
+	if err != nil {
+		return nil
+	}
 	return &rules.SuggestedFix{
 		Description: fmt.Sprintf("Replace with absolute path `WORKDIR %s`", resolvedPath),
 		Safety:      rules.FixSuggestion,
@@ -296,7 +303,11 @@ func workdirRelativePathFix(file string, workdir *instructions.WorkdirCommand) *
 // workdirRelativePathFixResolved creates a registry-backed fix that replaces
 // the relative WORKDIR with the resolved absolute path. Since the path is
 // computed from the actual base image WORKDIR, the fix is safe to apply.
-func workdirRelativePathFixResolved(file string, workdir *instructions.WorkdirCommand, resolvedPath string) *rules.SuggestedFix {
+func workdirRelativePathFixResolved(
+	file string,
+	workdir *instructions.WorkdirCommand,
+	resolvedPath string,
+) *rules.SuggestedFix {
 	loc := workdir.Location()
 	if len(loc) == 0 {
 		return nil
@@ -315,18 +326,9 @@ func workdirRelativePathFixResolved(file string, workdir *instructions.WorkdirCo
 // when isWindows is true. This matches BuildKit's system.IsAbs logic.
 func isAbsPath(p string, isWindows bool) bool {
 	if isWindows {
-		// Windows paths: C:\, C:/, \\server\share, or / (forward slash is valid on Windows too)
-		if len(p) >= 1 && (p[0] == '/' || p[0] == '\\') {
-			return true
-		}
-		// Drive letter: C:\ or C:/
-		if len(p) >= 3 && p[1] == ':' && (p[2] == '/' || p[2] == '\\') {
-			return true
-		}
-		return false
+		return system.IsAbs(p, "windows")
 	}
-	// Unix/Linux: starts with /
-	return path.IsAbs(p)
+	return system.IsAbs(p, "")
 }
 
 // init registers the rule with the default registry.
