@@ -280,8 +280,7 @@ func (r *SortPackagesRule) buildEdits(
 			NewText:  insertText + " ",
 		})
 		insertLine = first.Line
-		// Delete ALL literals (token text only — no preceding space, to avoid
-		// overlapping with no-multi-spaces edits on adjacent whitespace).
+		// Delete ALL literals including the preceding space.
 		for _, pkg := range original {
 			if pkg.IsVar {
 				continue
@@ -292,6 +291,9 @@ func (r *SortPackagesRule) buildEdits(
 			if pkg.Line == 0 {
 				docStartCol += cmdStartCol
 				docEndCol += cmdStartCol
+			}
+			if docStartCol > 0 {
+				docStartCol--
 			}
 			edits = append(edits, rules.TextEdit{
 				Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
@@ -321,7 +323,9 @@ func (r *SortPackagesRule) buildEdits(
 				insertLine = pkg.Line
 				firstLitDone = true
 			} else {
-				// Delete token text only — no preceding space.
+				if docStartCol > 0 {
+					docStartCol--
+				}
 				edits = append(edits, rules.TextEdit{
 					Location: rules.NewRangeLocation(file, docLine, docStartCol, docLine, docEndCol),
 					NewText:  "",
@@ -331,16 +335,17 @@ func (r *SortPackagesRule) buildEdits(
 		}
 	}
 
-	edits = append(edits, cleanupEmptyLines(
+	edits = append(edits, cleanupAfterDeletions(
 		original, deletedOnLine, insertLine, startLine, file, instrLines,
 	)...)
 	return edits
 }
 
-// cleanupEmptyLines emits edits to remove continuation lines left empty after
-// literal deletions. For each empty line, removes the trailing backslash +
-// whitespace from the previous line through the end of the empty line.
-func cleanupEmptyLines(
+// cleanupAfterDeletions emits edits to remove continuation lines left
+// completely empty after literal deletions. For each empty line, removes
+// the trailing backslash + whitespace from the previous line through the
+// end of the empty line.
+func cleanupAfterDeletions(
 	original []shell.PackageArg,
 	deletedOnLine map[int]int,
 	insertLine int,

@@ -1204,15 +1204,16 @@ severity = "error"
 		},
 
 		// Cross-rule: sort-packages + no-multi-spaces on the same line.
-		// Both rules target the same line: no-multi-spaces removes extra spaces,
-		// sort-packages reorders packages. Both are FixSafe.
+		// sort-packages (priority 9) wins over no-multi-spaces (priority 10)
+		// when their edits overlap on double-space positions.
+		// sort-packages produces clean output on its own.
 		{
 			name: "sort-packages-cross-no-multi-spaces",
 			input: "FROM alpine:3.20\n" +
 				"RUN apt-get install -y  zoo  foo  bar\n",
 			args: append([]string{"--fix"},
 				mustSelectRules("tally/sort-packages", "tally/no-multi-spaces")...),
-			wantApplied: 2, // sort-packages + no-multi-spaces
+			wantApplied: 1, // sort-packages wins; no-multi-spaces skipped due to overlap
 		},
 
 		// Cross-rule: sort-packages (priority 15) + shellcheck SC2086 (quotes vars)

@@ -45,7 +45,7 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 46,
+                    "column": 45,
                     "line": 4
                   }
                 },
@@ -59,7 +59,7 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 51,
+                    "column": 50,
                     "line": 4
                   }
                 },
@@ -112,7 +112,7 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 4,
+                    "column": 3,
                     "line": 9
                   }
                 },
@@ -126,7 +126,7 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 4,
+                    "column": 3,
                     "line": 10
                   }
                 },
@@ -207,7 +207,7 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 24,
+                    "column": 23,
                     "line": 16
                   }
                 },
@@ -221,7 +221,7 @@
                   },
                   "file": "testdata/sort-packages/Dockerfile",
                   "start": {
-                    "column": 30,
+                    "column": 29,
                     "line": 16
                   }
                 },

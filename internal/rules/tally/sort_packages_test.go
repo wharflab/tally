@@ -151,14 +151,12 @@ func TestSortPackagesFix(t *testing.T) {
 		{
 			name:    "simple swap",
 			content: "FROM alpine:3.20\nRUN apt-get install -y wget curl\n",
-			// Trailing space where 'curl' was deleted; no-multi-spaces cleans it.
-			want: "FROM alpine:3.20\nRUN apt-get install -y curl wget \n",
+			want:    "FROM alpine:3.20\nRUN apt-get install -y curl wget\n",
 		},
 		{
 			name:    "three packages reverse order",
 			content: "FROM alpine:3.20\nRUN apt-get install -y zoo foo bar\n",
-			// Trailing spaces from deleted tokens; cleaned by no-multi-spaces.
-			want: "FROM alpine:3.20\nRUN apt-get install -y bar foo zoo  \n",
+			want:    "FROM alpine:3.20\nRUN apt-get install -y bar foo zoo\n",
 		},
 		{
 			name:    "multi-line",
@@ -168,14 +166,12 @@ func TestSortPackagesFix(t *testing.T) {
 		{
 			name:    "mixed literals and variables - vars at tail",
 			content: "FROM alpine:3.20\nRUN npm install zoo foo $NPM_PKG ${OTHER}\n",
-			// Extra space between sorted block and vars; cleaned by no-multi-spaces.
-			want: "FROM alpine:3.20\nRUN npm install foo zoo  $NPM_PKG ${OTHER}\n",
+			want:    "FROM alpine:3.20\nRUN npm install foo zoo $NPM_PKG ${OTHER}\n",
 		},
 		{
 			name:    "interleaved vars - literals sorted, vars at tail",
 			content: "FROM python:3.12\nRUN uv pip install $CDK_DEPS otel aws-otel $RUNTIME_DEPS polars==1.2.3\n",
-			// Extra spaces from deleted tokens; cleaned by no-multi-spaces.
-			want: "FROM python:3.12\nRUN uv pip install aws-otel otel polars==1.2.3 $CDK_DEPS   $RUNTIME_DEPS \n",
+			want:    "FROM python:3.12\nRUN uv pip install aws-otel otel polars==1.2.3 $CDK_DEPS $RUNTIME_DEPS\n",
 		},
 		{
 			name: "multi-line mixed - sorted literals then vars",
@@ -184,10 +180,9 @@ func TestSortPackagesFix(t *testing.T) {
 				"  boo abbr $TADA oops \\\n" +
 				"  $END \\\n" +
 				"  almost there\n",
-			// Extra spaces from deleted tokens; cleaned by no-multi-spaces.
 			want: "FROM python:3.12\nRUN pip install \\\n" +
-				"  abbr almost boo foo oops there zoo  \\\n" +
-				"    $TADA  \\\n" +
+				"  abbr almost boo foo oops there zoo \\\n" +
+				"  $TADA \\\n" +
 				"  $END\n",
 		},
 	}
