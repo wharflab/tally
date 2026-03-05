@@ -44,6 +44,11 @@ func (r *SortPackagesRule) Check(input rules.LintInput) []rules.Violation {
 	sm := input.SourceMap()
 	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Type assertion OK returns false for nil
 
+	escapeToken := rune('\\')
+	if input.AST != nil {
+		escapeToken = input.AST.EscapeToken
+	}
+
 	var violations []rules.Violation
 	for stageIdx, stage := range input.Stages {
 		variant := resolveShellVariant(sem, stageIdx)
@@ -55,7 +60,8 @@ func (r *SortPackagesRule) Check(input rules.LintInput) []rules.Violation {
 		}
 		for _, cmd := range stage.Commands {
 			if run, ok := cmd.(*instructions.RunCommand); ok {
-				violations = append(violations, r.checkRun(run, variant, input.File, sm, meta)...)
+				violations = append(violations,
+					r.checkRun(run, variant, input.File, sm, escapeToken, meta)...)
 			}
 		}
 	}
@@ -79,6 +85,7 @@ func (r *SortPackagesRule) checkRun(
 	shellVariant shell.Variant,
 	file string,
 	sm *sourcemap.SourceMap,
+	escapeToken rune,
 	meta rules.RuleMetadata,
 ) []rules.Violation {
 	if len(run.Location()) == 0 {
@@ -106,13 +113,13 @@ func (r *SortPackagesRule) checkRun(
 	}
 
 	// Shell-form: reconstruct source text from source map lines.
-	endLine := resolveEndLine(sm, run.Location())
+	endLine := sm.ResolveEndLineWithEscape(run.Location()[0].End.Line, escapeToken)
 	instrLines := make([]string, 0, endLine-startLine+1)
 	for l := startLine; l <= endLine; l++ {
 		instrLines = append(instrLines, sm.Line(l-1))
 	}
 	cmdStartCol := findCmdStartCol(instrLines[0])
-	sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol)
+	sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol, escapeToken)
 	installCmds := shell.FindInstallPackages(sourceText, shellVariant)
 	return r.collectViolations(installCmds, startLine, cmdStartCol, file, loc, meta)
 }

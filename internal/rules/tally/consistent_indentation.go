@@ -71,28 +71,33 @@ func (r *ConsistentIndentationRule) Check(input rules.LintInput) []rules.Violati
 	sm := input.SourceMap()
 	meta := r.Metadata()
 
+	escapeToken := rune('\\')
+	if input.AST != nil {
+		escapeToken = input.AST.EscapeToken
+	}
+
 	var violations []rules.Violation
 
 	// Global ARGs before first FROM should never be indented
 	for _, arg := range input.MetaArgs {
 		violations = append(violations,
-			r.checkNodeNoIndent(input.File, sm, arg.Location(), meta)...)
+			r.checkNodeNoIndent(input.File, sm, arg.Location(), escapeToken, meta)...)
 	}
 
 	for _, stage := range input.Stages {
 		// FROM lines should never be indented
 		violations = append(violations,
-			r.checkNodeNoIndent(input.File, sm, stage.Location, meta)...)
+			r.checkNodeNoIndent(input.File, sm, stage.Location, escapeToken, meta)...)
 
 		for _, cmd := range stage.Commands {
 			if isMultiStage {
 				// Multi-stage: commands within each stage should be indented
 				violations = append(violations,
-					r.checkCommandIndented(input.File, sm, cmd.Location(), meta)...)
+					r.checkCommandIndented(input.File, sm, cmd.Location(), escapeToken, meta)...)
 			} else {
 				// Single-stage: no indentation expected
 				violations = append(violations,
-					r.checkNodeNoIndent(input.File, sm, cmd.Location(), meta)...)
+					r.checkNodeNoIndent(input.File, sm, cmd.Location(), escapeToken, meta)...)
 			}
 		}
 	}
@@ -106,6 +111,7 @@ func (r *ConsistentIndentationRule) checkNodeNoIndent(
 	file string,
 	sm *sourcemap.SourceMap,
 	location []parser.Range,
+	escapeToken rune,
 	meta rules.RuleMetadata,
 ) []rules.Violation {
 	if len(location) == 0 {
@@ -113,7 +119,7 @@ func (r *ConsistentIndentationRule) checkNodeNoIndent(
 	}
 
 	startLine := location[0].Start.Line
-	endLine := resolveEndLine(sm, location)
+	endLine := sm.ResolveEndLineWithEscape(location[0].End.Line, escapeToken)
 
 	// Check all lines — flag if any line has indentation
 	var firstBadLine int
@@ -158,6 +164,7 @@ func (r *ConsistentIndentationRule) checkCommandIndented(
 	file string,
 	sm *sourcemap.SourceMap,
 	location []parser.Range,
+	escapeToken rune,
 	meta rules.RuleMetadata,
 ) []rules.Violation {
 	if len(location) == 0 {
@@ -165,7 +172,7 @@ func (r *ConsistentIndentationRule) checkCommandIndented(
 	}
 
 	startLine := location[0].Start.Line
-	endLine := resolveEndLine(sm, location)
+	endLine := sm.ResolveEndLineWithEscape(location[0].End.Line, escapeToken)
 
 	// Check all lines — flag if any line has wrong indentation
 	var firstBadLine int
@@ -233,25 +240,8 @@ func (r *ConsistentIndentationRule) removeIndentEdits(
 	return r.setIndentEdits(file, sm, location, endLine, "")
 }
 
-// resolveEndLine returns the last line number of an instruction, including
-// backslash continuation lines. BuildKit's parser may report End.Line ==
-// Start.Line for multi-line instructions joined by \, so we scan the source
-// for continuations.
-func resolveEndLine(sm *sourcemap.SourceMap, location []parser.Range) int {
-	endLine := location[0].End.Line
-	endLine = min(endLine, sm.LineCount())
-	for l := endLine; l <= sm.LineCount(); l++ {
-		line := sm.Line(l - 1) // l is 1-based, sm.Line is 0-based
-		if !strings.HasSuffix(strings.TrimRight(line, " \t"), `\`) {
-			return l
-		}
-		endLine = min(l+1, sm.LineCount()) // clamp to last line
-	}
-	return endLine
-}
-
 // setIndentEdits generates TextEdits to set indentation on all lines of a node.
-// endLine is the precomputed last line number (from resolveEndLine).
+// endLine is the precomputed last line number (from ResolveEndLineWithEscape).
 func (r *ConsistentIndentationRule) setIndentEdits(
 	file string,
 	sm *sourcemap.SourceMap,

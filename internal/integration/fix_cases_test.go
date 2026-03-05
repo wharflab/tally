@@ -1160,12 +1160,15 @@ severity = "error"
 				mustSelectRules("tally/sort-packages")...),
 			wantApplied: 1,
 		},
-		// Sort packages: choco install with backtick escape directive (single-line)
+		// Sort packages: choco install with backtick escape, multi-line
 		{
 			name: "sort-packages-choco-backtick-escape",
 			input: "# escape=`\n" +
 				"FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
-				"RUN choco install -y python3 nodejs git\n",
+				"RUN choco install -y `\n" +
+				"    python3 `\n" +
+				"    nodejs `\n" +
+				"    git\n",
 			args: append([]string{"--fix"},
 				mustSelectRules("tally/sort-packages")...),
 			wantApplied: 1,
