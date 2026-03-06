@@ -1,6 +1,7 @@
 # AST-Aware Semantic Highlighting for CLI Snippets and LSP
 
-> Status: proposal
+> Status: implemented for Dockerfile, POSIX shell, CLI rendering, and LSP `semanticTokens/full|range`; PowerShell parser-backed highlighting remains
+> follow-up work
 >
 > Scope: replace Chroma in CLI snippet rendering, add a shared semantic token engine, and expose semantic tokens from the existing LSP server
 
@@ -472,22 +473,186 @@ Until those answers are clear, grammar de-bundling should remain out of scope fo
 
 ## 15. Future PowerShell Support
 
+The base integration points now exist in code. A follow-up engineer should treat this as an extension of the current shared highlighting pipeline, not
+as a new parallel implementation.
+
 This design should remain compatible with the Windows-container direction in `design-docs/26-windows-container-support.md`.
 
-For v1:
+What is already implemented:
 
-- use `internal/shell.Variant` as the dispatch boundary
-- keep `powershell` and `cmd` on lexical fallback
-- do not introduce cgo or runtime PowerShell-process dependencies
+- `internal/highlight/highlight.go`
+  - central document analysis entrypoint used by both CLI and LSP
+  - already resolves embedded shell snippets through `extract.Mapping` and `internal/shell.Variant`
+- `internal/highlight/extract/script.go`
+  - already extracts shell-form `RUN`, `CMD`, `ENTRYPOINT`, `HEALTHCHECK CMD-SHELL`, and heredoc bodies
+  - already preserves Dockerfile-to-script line alignment for remapping tokens back into the parent file
+- `internal/highlight/shell/tokenize.go`
+  - current dispatch boundary for embedded shell tokenization
+  - currently uses `mvdan` for parseable POSIX-like shells and lexical fallback for `powershell`, `cmd`, and `unknown`
+- `internal/highlight/core/token.go`
+  - shared token model, normalization, overlap resolution, and range filtering
+- `internal/highlight/renderansi` and `internal/highlight/lspencode`
+  - already consume normalized `[]core.Token`; they should not need dialect-specific logic
 
-Future parser-backed PowerShell support should satisfy:
+### 15.1 Where to pick up
 
-1. stable token-level ranges
-2. deterministic mapping to the shared token model
-3. acceptable latency for `full`, `range`, and later `delta`
-4. graceful fallback when the parser is unavailable
+The correct implementation seam is `internal/highlight/shell/tokenize.go`.
 
-That follow-up work deserves its own design doc once the base highlighter ships.
+Do not add PowerShell parsing logic directly in:
+
+- `internal/reporter/text.go`
+- `internal/lspserver/semantic_tokens.go`
+- `internal/highlight/highlight.go`
+
+Those layers already consume the shared document/token model correctly. PowerShell support should appear as a better `[]core.Token` producer behind
+the existing shell dispatch boundary.
+
+Recommended work plan:
+
+1. Add a new package, for example `internal/highlight/powershell`.
+2. Put the tree-sitter integration and PowerShell AST-to-`core.Token` mapping there.
+3. Change `internal/highlight/shell/tokenize.go` so `VariantPowerShell` dispatches to that package instead of lexical fallback.
+4. Keep `VariantCmd` and `VariantUnknown` on lexical fallback.
+5. Leave `internal/highlight/highlight.go`, `renderansi`, and `lspencode` unchanged unless the shared token model truly needs to expand.
+
+### 15.2 Dependency and packaging guidance
+
+If PowerShell support is implemented with tree-sitter:
+
+- keep it pure Go from the repo's point of view; do not introduce cgo
+- vendor or pin the grammar in a way that is deterministic in CI
+- keep the grammar-specific code isolated under the new PowerShell highlighter package so the rest of the repo stays unaware of tree-sitter details
+
+The rest of the highlight stack should continue to depend only on:
+
+- `core.Token`
+- `sourcemap.SourceMap`
+- `extract.Mapping`
+- `shell.Variant`
+
+### 15.3 Concrete integration points
+
+The intended call flow after the follow-up is:
+
+1. `highlight.Analyze(...)` builds a Dockerfile `SourceMap` and semantic stage model.
+2. `shellTokens(...)` in `internal/highlight/highlight.go` determines the effective shell for each instruction.
+3. `extract.ExtractRunScript(...)` or a sibling extractor produces an `extract.Mapping`.
+4. `remapShellTokens(...)` calls `highlightshell.Tokenize(mapping.Script, variant)`.
+5. `highlightshell.Tokenize(...)` dispatches:
+   - POSIX-like shells -> existing `mvdan` path
+   - PowerShell -> new tree-sitter tokenizer
+   - `cmd`/unknown -> existing lexical fallback
+6. `core.Normalize(...)` resolves overlaps and clips tokens.
+7. CLI and LSP consume the resulting normalized tokens unchanged.
+
+That means the PowerShell implementation only needs to solve two problems well:
+
+1. generate accurate single-line `core.Token` spans for the extracted script text
+2. preserve the current remapping contract so token lines still line up with the Dockerfile after `OriginStartLine` adjustment
+
+### 15.4 Token and position invariants
+
+The current highlight pipeline assumes all emitted tokens satisfy these rules:
+
+1. Columns are rune-based, not byte-based.
+2. Lines are 0-based within the extracted script before remapping.
+3. Each token is single-line.
+4. `EndCol` is exclusive.
+5. Invalid or zero-width spans should be dropped before returning.
+
+These invariants matter because:
+
+- `core.Normalize(...)` is line-oriented
+- `renderansi.RenderLine(...)` slices by rune columns
+- `lspencode.Encode(...)` emits LSP deltas from rune-based columns
+
+Tree-sitter node positions are often byte-based. Convert them to rune columns against the exact source line before emitting tokens. Do not mix byte
+and rune units in the same token.
+
+If a tree-sitter node spans multiple lines, split it into one token per line or skip it. Do not emit multiline tokens into `core.Normalize(...)`.
+
+### 15.5 Scope of the PowerShell tokenizer
+
+The first parser-backed PowerShell pass does not need to model every grammar node. It should focus on visibly valuable and stable categories:
+
+- keywords
+- comments
+- strings
+- numbers
+- operators
+- variables
+- function/command names
+- property/member access when the grammar makes it reliable
+
+Do not invent dense token output for ambiguous grammar regions just because tree-sitter exposes many node kinds. Preserve the same conservative bias
+used by the current lexical fallback.
+
+### 15.6 Dockerfile-specific cases to preserve
+
+The new PowerShell path must continue to respect existing Dockerfile extraction rules:
+
+- `SHELL ["powershell", "-Command"]` and Windows full-path shells must resolve to `VariantPowerShell` through `internal/shell`
+- heredoc body extraction must still work through `extract.heredocBodyScriptMode(...)`
+- heredoc shebang override should continue to win when a heredoc explicitly targets another shell
+- do not assume POSIX-style `RUN <<EOF command ...` stdin-payload forms exist for PowerShell; empirical Docker testing with
+  `SHELL ["pwsh", "-Command", ...]` showed that bare `RUN <<EOF ... EOF` script bodies work, but `RUN <<EOF cat > file`, `RUN <<EOF /bin/cat > file`,
+  and `RUN <<EOF $input | ...` are rejected by PowerShell with `The '<' operator is reserved for future use`
+- therefore, if future extraction logic ever handles stdin-payload heredocs generically, keep those cases distinct from PowerShell script-body
+  heredocs
+
+In other words: the follow-up should improve tokenization only after extraction has already decided "this snippet is PowerShell".
+
+### 15.7 Files that likely need changes
+
+Primary code changes:
+
+- `internal/highlight/shell/tokenize.go`
+- new files under `internal/highlight/powershell/`
+- `go.mod`
+- `go.sum`
+
+Likely tests to add or update:
+
+- `internal/highlight/shell/tokenize_test.go`
+  - add dispatch tests proving `VariantPowerShell` uses the parser-backed path
+- new `internal/highlight/powershell/*_test.go`
+  - token-level tests for strings, variables, commands, comments, numbers, and member/property access
+- `internal/highlight/extract/script_test.go`
+  - only if PowerShell-specific heredoc/extraction cases reveal gaps
+- `internal/lsptest/lsp_test.go`
+  - add at least one PowerShell-backed `semanticTokens/full` or `range` black-box case once token output is stable
+- reporter snapshot or targeted reporter tests
+  - only if a PowerShell fixture materially changes visible snippet rendering
+
+Useful existing fixtures to reuse or extend:
+
+- `internal/integration/testdata/real-world-fix-metalama/Dockerfile`
+- `internal/integration/testdata/real-world-fix-ticketdesk/Dockerfile`
+- `internal/integration/testdata/non-posix-shell/Dockerfile`
+- `internal/integration/testdata/non-posix-shell-backtick-continuation/Dockerfile`
+
+### 15.8 What should not change
+
+Unless the implementation reveals a real gap, avoid changing:
+
+- `core.Token` type names
+- LSP legend ordering in `internal/highlight/lspencode/encode.go`
+- ANSI renderer overlay behavior
+- semantic token cache behavior in `internal/lspserver`
+- ShellCheck extraction semantics
+
+PowerShell support should look like a tokenizer upgrade, not a second semantic-highlighting architecture.
+
+### 15.9 Definition of done for the PowerShell follow-up
+
+Treat the work as complete when all of these are true:
+
+1. `VariantPowerShell` no longer falls back to the generic lexical tokenizer.
+2. PowerShell tokens are emitted through the same `highlight.Analyze(...)` pipeline used by CLI and LSP.
+3. Token positions remain rune-based and normalized correctly.
+4. Existing Windows-container fixtures render more usefully in CLI snippets.
+5. LSP semantic tokens for PowerShell-backed Dockerfile snippets become more specific without changing diagnostics behavior.
+6. If the parser fails or is unavailable, the code still degrades cleanly to the current lexical fallback behavior.
 
 ---
 
