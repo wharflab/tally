@@ -27,7 +27,7 @@ func TestRegexTokenizers_UseRuneColumns(t *testing.T) {
 	line := "RUN echo ü --mount=type=cache,target=/tmp --label='välüe' $HOME 123 <<EOF"
 
 	assertTokenText(t, line, flagTokens(line, 0)[0], "--mount")
-	assertTokenText(t, line, quotedTokens(line, 0)[0], "'välüe'")
+	assertTokenText(t, line, quotedTokens(line, 0, '\\')[0], "'välüe'")
 	assertTokenText(t, line, variableTokens(line, 0)[0], "$HOME")
 	assertTokenText(t, line, numberTokens(line, 0)[0], "123")
 
@@ -52,6 +52,51 @@ func TestKVValueTokens_UseRuneColumns(t *testing.T) {
 	assertTokenText(t, line, tokens[1], "cache")
 	assertTokenText(t, line, tokens[2], "target")
 	assertTokenText(t, line, tokens[3], "/tmp")
+}
+
+func TestQuotedTokens_RespectEscapeDirective(t *testing.T) {
+	t.Parallel()
+
+	line := "ENV NAME=\"say `\"hello`\"\""
+	tokens := quotedTokens(line, 0, '`')
+	if len(tokens) != 1 {
+		t.Fatalf("expected 1 quoted token, got %d", len(tokens))
+	}
+	assertTokenText(t, line, tokens[0], "\"say `\"hello`\"\"")
+}
+
+func TestTokenize_WindowsPaths(t *testing.T) {
+	t.Parallel()
+
+	source := []byte(strings.Join([]string{
+		"# escape=`",
+		"ENV TEMP=C:\\Temp",
+		"ENV PATH=\"C:\\Program Files\\dotnet;${PATH}\"",
+		"SHELL [\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\", \"-Command\"]",
+		"RUN .\\PortableGit.exe",
+		"RUN C:\\app\\tada.exe",
+		"",
+	}, "\n"))
+	sm := sourcemap.New(source)
+	result, err := parser.Parse(bytes.NewReader(source))
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	tokens := Tokenize(sm, result.AST, '`')
+
+	assertHasTokenText(t, string(source), tokens, core.TokenString, "C:\\Temp")
+	assertHasTokenText(t, string(source), tokens, core.TokenString, "\"C:\\Program Files\\dotnet;${PATH}\"")
+	assertHasTokenText(t, string(source), tokens, core.TokenVariable, "${PATH}")
+	assertHasTokenText(
+		t,
+		string(source),
+		tokens,
+		core.TokenString,
+		"\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\"",
+	)
+	assertHasTokenText(t, string(source), tokens, core.TokenString, ".\\PortableGit.exe")
+	assertHasTokenText(t, string(source), tokens, core.TokenString, "C:\\app\\tada.exe")
 }
 
 func TestTokenize_FallbackIncludesNumberTokens(t *testing.T) {

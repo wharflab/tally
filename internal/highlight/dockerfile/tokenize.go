@@ -15,7 +15,6 @@ import (
 var (
 	flagPattern        = regexp.MustCompile(`--[a-zA-Z][a-zA-Z0-9-]*`)
 	varPattern         = regexp.MustCompile(`\$(\w+|\{[^}]+\})`)
-	stringPattern      = regexp.MustCompile(`"([^"\\]|\\.)*"|'([^'\\]|\\.)*'`)
 	numberPattern      = regexp.MustCompile(`\b\d+\b`)
 	heredocPattern     = regexp.MustCompile(`<<-?\s*([A-Za-z0-9_'"-]+)`)
 	fromAliasPattern   = regexp.MustCompile(`(?i)\bAS\b\s+([A-Za-z0-9._-]+)`)
@@ -30,7 +29,7 @@ func Tokenize(sm *sourcemap.SourceMap, root *parser.Node, escapeToken rune) []co
 	excludedLines := heredocBodyLines(sm, root, escapeToken)
 	tokens := commentTokens(sm, excludedLines)
 	if root == nil {
-		return append(tokens, fallbackLineTokens(sm, excludedLines)...)
+		return append(tokens, fallbackLineTokens(sm, excludedLines, escapeToken)...)
 	}
 
 	for _, node := range root.Children {
@@ -70,7 +69,9 @@ func tokenizeNode(
 		}
 
 		tokens = append(tokens, flagTokens(text, lineIdx)...)
-		tokens = append(tokens, quotedTokens(text, lineIdx)...)
+		quoted := quotedTokens(text, lineIdx, escapeToken)
+		tokens = append(tokens, quoted...)
+		tokens = append(tokens, windowsPathTokens(text, lineIdx, quoted)...)
 		tokens = append(tokens, variableTokens(text, lineIdx)...)
 		tokens = append(tokens, numberTokens(text, lineIdx)...)
 		tokens = append(tokens, heredocTokens(text, lineIdx)...)
@@ -224,11 +225,11 @@ func kvValueTokens(line, value string, lineNum, baseByte int) []core.Token {
 	return out
 }
 
-func quotedTokens(line string, lineNum int) []core.Token {
-	matches := stringPattern.FindAllStringIndex(line, -1)
-	out := make([]core.Token, 0, len(matches))
-	for _, idx := range matches {
-		startCol, endCol := runeColsForByteRange(line, idx[0], idx[1])
+func quotedTokens(line string, lineNum int, escapeToken rune) []core.Token {
+	ranges := quotedRanges(line, escapeToken)
+	out := make([]core.Token, 0, len(ranges))
+	for _, rng := range ranges {
+		startCol, endCol := runeColsForByteRange(line, rng[0], rng[1])
 		out = append(out, core.Token{
 			Line:     lineNum,
 			StartCol: startCol,
@@ -238,6 +239,38 @@ func quotedTokens(line string, lineNum int) []core.Token {
 		})
 	}
 	return out
+}
+
+func quotedRanges(line string, escapeToken rune) [][2]int {
+	out := make([][2]int, 0, 2)
+	for i := 0; i < len(line); i++ {
+		quote := line[i]
+		if quote != '"' && quote != '\'' {
+			continue
+		}
+
+		start := i
+		i++
+		for i < len(line) {
+			if line[i] == quote && !isEscapedBy(line, i, byte(escapeToken)) {
+				out = append(out, [2]int{start, i + 1})
+				break
+			}
+			i++
+		}
+	}
+	return out
+}
+
+func isEscapedBy(line string, idx int, escape byte) bool {
+	if escape == 0 || idx <= 0 {
+		return false
+	}
+	count := 0
+	for i := idx - 1; i >= 0 && line[i] == escape; i-- {
+		count++
+	}
+	return count%2 == 1
 }
 
 func variableTokens(line string, lineNum int) []core.Token {
@@ -254,6 +287,91 @@ func variableTokens(line string, lineNum int) []core.Token {
 		})
 	}
 	return out
+}
+
+func windowsPathTokens(line string, lineNum int, quoted []core.Token) []core.Token {
+	out := make([]core.Token, 0, 2)
+	for i := 0; i < len(line); i++ {
+		start, ok := windowsPathStart(line, i)
+		if !ok || start != i {
+			continue
+		}
+		if inQuotedToken(quoted, line, start) {
+			continue
+		}
+
+		end := windowsPathEnd(line, start)
+		if end <= start {
+			continue
+		}
+		startCol, endCol := runeColsForByteRange(line, start, end)
+		out = append(out, core.Token{
+			Line:     lineNum,
+			StartCol: startCol,
+			EndCol:   endCol,
+			Type:     core.TokenString,
+			Priority: 28,
+		})
+		i = end - 1
+	}
+	return out
+}
+
+func windowsPathStart(line string, idx int) (int, bool) {
+	if idx < 0 || idx >= len(line) {
+		return 0, false
+	}
+	if idx > 0 && !isWindowsPathBoundary(line[idx-1]) {
+		return 0, false
+	}
+
+	if idx+2 < len(line) && isAlpha(line[idx]) && line[idx+1] == ':' && line[idx+2] == '\\' {
+		return idx, true
+	}
+	if idx+1 < len(line) && line[idx] == '.' && line[idx+1] == '\\' {
+		return idx, true
+	}
+	if idx+2 < len(line) && line[idx] == '.' && line[idx+1] == '.' && line[idx+2] == '\\' {
+		return idx, true
+	}
+	return 0, false
+}
+
+func windowsPathEnd(line string, start int) int {
+	end := start
+	for end < len(line) {
+		switch line[end] {
+		case ' ', '\t', ',', ';', '"', '\'', '[', ']', '(', ')', '{', '}':
+			return end
+		}
+		end++
+	}
+	return end
+}
+
+func inQuotedToken(tokens []core.Token, line string, startByte int) bool {
+	if len(tokens) == 0 {
+		return false
+	}
+	startCol, _ := runeColsForByteRange(line, startByte, startByte)
+	for _, tok := range tokens {
+		if tok.Type == core.TokenString && tok.StartCol < startCol && tok.EndCol > startCol {
+			return true
+		}
+	}
+	return false
+}
+
+func isWindowsPathBoundary(b byte) bool {
+	switch b {
+	case ' ', '\t', '=', ',', ';', '"', '\'', '[', ']', '(', ')', '{', '}':
+		return true
+	}
+	return false
+}
+
+func isAlpha(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
 
 func numberTokens(line string, lineNum int) []core.Token {
@@ -344,7 +462,7 @@ func clampByteIndex(line string, idx int) int {
 	return idx
 }
 
-func fallbackLineTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []core.Token {
+func fallbackLineTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool, escapeToken rune) []core.Token {
 	out := make([]core.Token, 0, sm.LineCount()*2)
 	for i, line := range sm.Lines() {
 		if excludedLines[i] {
@@ -354,7 +472,9 @@ func fallbackLineTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []c
 			out = append(out, tok)
 		}
 		out = append(out, flagTokens(line, i)...)
-		out = append(out, quotedTokens(line, i)...)
+		quoted := quotedTokens(line, i, escapeToken)
+		out = append(out, quoted...)
+		out = append(out, windowsPathTokens(line, i, quoted)...)
 		out = append(out, variableTokens(line, i)...)
 		out = append(out, numberTokens(line, i)...)
 		out = append(out, heredocTokens(line, i)...)
