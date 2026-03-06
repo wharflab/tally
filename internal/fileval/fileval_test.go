@@ -1,6 +1,7 @@
 package fileval
 
 import (
+	"bytes"
 	"crypto/rand"
 	"errors"
 	"os"
