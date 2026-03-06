@@ -14,6 +14,7 @@ import (
 	"github.com/wharflab/tally/internal/highlight/renderansi"
 	"github.com/wharflab/tally/internal/highlight/theme"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // Styles for different parts of the output
@@ -390,7 +391,13 @@ func (r *TextReporter) highlightDocument(file string, source []byte) *highlight.
 	if doc, ok := r.docCache[file]; ok {
 		return doc
 	}
-	doc := highlight.Analyze(file, source)
+	doc := &highlight.Document{
+		File:      file,
+		SourceMap: sourcemap.New(source),
+	}
+	if r.colorEnabled && r.opts.SyntaxHighlight {
+		doc = highlight.Analyze(file, source)
+	}
 	r.docCache[file] = doc
 	return doc
 }

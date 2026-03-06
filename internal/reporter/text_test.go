@@ -615,6 +615,31 @@ func TestPrintTextPlain_OutOfBoundsLine(t *testing.T) {
 	}
 }
 
+func TestTextReporter_HighlightDocument_PlainModeUsesSourceMapOnly(t *testing.T) {
+	t.Parallel()
+
+	colorOff := false
+	r := NewTextReporter(TextOptions{
+		Color:           &colorOff,
+		SyntaxHighlight: false,
+		ShowSource:      true,
+	})
+
+	doc := r.highlightDocument("Dockerfile", []byte("FROM alpine\nRUN echo hello\n"))
+	if doc == nil {
+		t.Fatal("highlightDocument returned nil")
+	}
+	if doc.SourceMap == nil {
+		t.Fatal("highlightDocument returned nil SourceMap")
+	}
+	if got := doc.SourceMap.Line(1); got != "RUN echo hello" {
+		t.Fatalf("SourceMap.Line(1) = %q, want %q", got, "RUN echo hello")
+	}
+	if doc.Tokens != nil {
+		t.Fatalf("expected plain-mode document to skip analysis tokens, got %+v", doc.Tokens)
+	}
+}
+
 func TestNewTextReporter_InvalidThemeFallsBack(t *testing.T) {
 	t.Parallel()
 	colorOn := true
