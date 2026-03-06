@@ -4,8 +4,6 @@ import (
 	"slices"
 	"strings"
 
-	"charm.land/lipgloss/v2"
-
 	"github.com/wharflab/tally/internal/highlight/core"
 	"github.com/wharflab/tally/internal/highlight/theme"
 )
@@ -72,8 +70,4 @@ func coveringToken(tokens []core.Token, start, end int) (core.Token, bool) {
 		}
 	}
 	return core.Token{}, false
-}
-
-func Inherit(a, b lipgloss.Style) lipgloss.Style {
-	return a.Inherit(b)
 }

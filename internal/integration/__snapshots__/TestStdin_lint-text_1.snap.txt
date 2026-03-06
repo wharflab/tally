@@ -6,5 +6,5 @@ image "ubuntu" does not have an explicit tag; pin a specific version (e.g., ubun
 --------------------
    1 | >>> FROM ubuntu
    2 |     RUN apt-get update
-   3 |     
+   3 |     <blank>
 --------------------
