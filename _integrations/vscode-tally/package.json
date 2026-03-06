@@ -76,6 +76,11 @@
         "title": "Tally: Configure as default formatter for Dockerfile"
       }
     ],
+    "configurationDefaults": {
+      "[dockerfile]": {
+        "editor.semanticHighlighting.enabled": true
+      }
+    },
     "configuration": {
       "title": "Tally",
       "properties": {
@@ -135,7 +140,68 @@
           "description": "Trace communication between VS Code and the Tally language server."
         }
       }
-    }
+    },
+    "semanticTokenScopes": [
+      {
+        "language": "dockerfile",
+        "scopes": {
+          "keyword": [
+            "keyword.control.dockerfile",
+            "keyword.control"
+          ],
+          "comment.documentation": [
+            "comment.line.number-sign.dockerfile",
+            "comment.line.number-sign",
+            "comment"
+          ],
+          "comment": [
+            "comment.line.number-sign.dockerfile",
+            "comment.line.number-sign",
+            "comment"
+          ],
+          "string": [
+            "string.quoted.double.dockerfile",
+            "string.quoted.single.dockerfile",
+            "string"
+          ],
+          "number": [
+            "constant.numeric.dockerfile",
+            "constant.numeric"
+          ],
+          "operator": [
+            "keyword.operator.dockerfile",
+            "keyword.operator"
+          ],
+          "variable": [
+            "variable.other.readwrite.dockerfile",
+            "variable.other.readwrite",
+            "variable"
+          ],
+          "variable.declaration": [
+            "variable.other.constant.dockerfile",
+            "variable.other.constant",
+            "variable"
+          ],
+          "parameter": [
+            "variable.parameter.dockerfile",
+            "variable.parameter"
+          ],
+          "property": [
+            "variable.other.property.dockerfile",
+            "variable.other.property"
+          ],
+          "property.readonly": [
+            "variable.other.constant.property.dockerfile",
+            "variable.other.constant.property"
+          ],
+          "function": [
+            "entity.name.function.dockerfile",
+            "entity.name.function",
+            "support.function"
+          ]
+        }
+      }
+    ]
   },
   "activationEvents": [
     "onLanguage:dockerfile",

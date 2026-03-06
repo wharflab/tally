@@ -9,6 +9,7 @@ Lint, format, and auto-fix **Dockerfiles** and **Containerfiles** in VS Code usi
 - **Production-grade**: 92% code coverage and 2,900+ Go tests executed in CI.
 - **Quick Fixes** and a one-shot **Fix All** command to apply auto-fixable improvements.
 - **Formatter support** (format on save) using the same engine as `tally lint --fix`.
+- **Semantic highlighting** for Dockerfile structure and embedded shell snippets via the tally LSP server.
 - **Config-aware**: respects `.tally.toml` / `tally.toml` discovery in your repo.
 - **No daemon**: runs locally without Docker Desktop or a Docker daemon.
 - **Zero setup**: Marketplace builds bundle the `tally` binary for your platform (you can also bring your own).
@@ -38,6 +39,9 @@ Lint, format, and auto-fix **Dockerfiles** and **Containerfiles** in VS Code usi
 - `tally.configurationPreference`: how to merge editor settings with filesystem config (`editorFirst`, `filesystemFirst`, `editorOnly`).
 - `tally.fixUnsafe`: allow "Fix all" to apply unsafe fixes (includes AI AutoFix, if configured).
 - `tally.trace.server`: LSP protocol trace level (`off`, `messages`, `verbose`).
+
+The extension enables `editor.semanticHighlighting.enabled` by default for the `dockerfile` language so the server-provided semantic tokens are shown
+consistently across themes.
 
 ## Python projects
 
