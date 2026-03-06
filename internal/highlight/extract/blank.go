@@ -1,4 +1,4 @@
-package shellcheck
+package extract
 
 import (
 	"slices"
@@ -44,7 +44,6 @@ func blankOnbuildRunLeadingFlags(lines []string, escapeToken rune) []string {
 	out := slices.Clone(lines)
 	out[0] = line0
 
-	// Find and blank the next token, which should be RUN.
 	var runLineIdx, runStart, runEnd int
 	found := false
 	for li := range out {
@@ -66,14 +65,12 @@ func blankOnbuildRunLeadingFlags(lines []string, escapeToken rune) []string {
 			end := i
 			tok := line[start:end]
 			if start == contIdx && tok == string(escapeToken) {
-				// Only a continuation marker on this line; continue searching.
 				break
 			}
 			if strings.EqualFold(tok, command.Run) {
 				runLineIdx, runStart, runEnd = li, start, end
 				found = true
 			}
-			// Stop at the first real token.
 			break
 		}
 		if found {
@@ -121,12 +118,11 @@ func blankLeadingKeyword(line, keyword string, escapeToken rune) (string, int, b
 		return line, 0, false
 	}
 	after := i + len(keyword)
-	// Require a boundary (whitespace or end).
 	if after < len(line) && !isSpace(line[after]) {
 		return line, 0, false
 	}
 
-	contIdx := continuationIndex(line, escapeToken) // keyword is never the continuation token
+	contIdx := continuationIndex(line, escapeToken)
 	return blankRange(line, i, after, contIdx), after, true
 }
 
@@ -166,7 +162,6 @@ func blankDockerFlagsUntilFirstNonFlag(lines []string, startLineIdx, startCol in
 			end := i
 			tok := line[start:end]
 
-			// Ignore a bare continuation marker (e.g. "RUN \\").
 			if start == contIdx && tok == string(escapeToken) {
 				break
 			}
@@ -177,7 +172,6 @@ func blankDockerFlagsUntilFirstNonFlag(lines []string, startLineIdx, startCol in
 				continue
 			}
 
-			// First non-flag token: script begins here.
 			return out, tokenPos{
 				lineIdx: li,
 				start:   start,
@@ -212,7 +206,6 @@ func blankDockerFlagsUntilStopWord(
 		}
 	}
 
-	// Unexpected token before stop word.
 	return out, "", false
 }
 

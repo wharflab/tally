@@ -1,24 +1,20 @@
 // Package reporter provides output formatters for lint results.
-//
-// The text formatter is adapted from BuildKit's linter output format
-// with enhancements using Lip Gloss for styling and Chroma for syntax highlighting.
 package reporter
 
 import (
-	"bytes"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/alecthomas/chroma/v2"
-	"github.com/alecthomas/chroma/v2/formatters"
-	"github.com/alecthomas/chroma/v2/lexers"
-	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/muesli/termenv"
 
+	"github.com/wharflab/tally/internal/highlight"
+	highlightcore "github.com/wharflab/tally/internal/highlight/core"
+	"github.com/wharflab/tally/internal/highlight/renderansi"
+	"github.com/wharflab/tally/internal/highlight/theme"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // Styles for different parts of the output
@@ -63,6 +59,11 @@ var (
 			Bold(true).
 			Foreground(lipgloss.Color("196")) // Red
 
+	// Placeholder style for empty or whitespace-only source lines.
+	blankLineStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Italic(true)
+
 	// Severity styles
 	severityStyles = map[rules.Severity]lipgloss.Style{
 		rules.SeverityError: lipgloss.NewStyle().
@@ -85,15 +86,14 @@ type TextOptions struct {
 	// Color enables/disables colored output. Default: auto-detect.
 	Color *bool
 
-	// SyntaxHighlight enables Dockerfile syntax highlighting in snippets.
+	// SyntaxHighlight enables semantic snippet highlighting.
 	SyntaxHighlight bool
 
 	// ShowSource shows source code snippets. Default: true.
 	ShowSource bool
 
-	// ChromaStyle is the Chroma style name for syntax highlighting.
-	// Default: "monokai" for dark terminals, "github" for light.
-	ChromaStyle string
+	// Theme controls color palette selection for snippets: auto, dark, or light.
+	Theme string
 }
 
 // DefaultTextOptions returns sensible defaults for text output.
@@ -102,7 +102,7 @@ func DefaultTextOptions() TextOptions {
 		Color:           nil, // auto-detect
 		SyntaxHighlight: true,
 		ShowSource:      true,
-		ChromaStyle:     "", // auto-detect
+		Theme:           string(theme.ModeAuto),
 	}
 }
 
@@ -110,53 +110,30 @@ func DefaultTextOptions() TextOptions {
 type TextReporter struct {
 	opts         TextOptions
 	colorEnabled bool
-	lexer        chroma.Lexer
-	formatter    chroma.Formatter
-	style        *chroma.Style
+	palette      theme.Palette
+	docCache     map[string]*highlight.Document
 }
 
 // NewTextReporter creates a new text reporter with the given options.
 func NewTextReporter(opts TextOptions) *TextReporter {
-	r := &TextReporter{opts: opts}
+	r := &TextReporter{
+		opts:     opts,
+		docCache: make(map[string]*highlight.Document),
+	}
 
 	// Determine if colors should be used
 	r.colorEnabled = useColors
 	if opts.Color != nil {
 		r.colorEnabled = *opts.Color
 	}
-
-	if r.colorEnabled && opts.SyntaxHighlight {
-		r.lexer = lexers.Get("docker")
-		if r.lexer == nil {
-			r.lexer = lexers.Fallback
-		}
-		r.lexer = chroma.Coalesce(r.lexer)
-
-		// Select style based on terminal background or user preference
-		styleName := opts.ChromaStyle
-		if styleName == "" {
-			if lipgloss.HasDarkBackground(os.Stdin, os.Stdout) {
-				styleName = "monokai"
-			} else {
-				styleName = "github"
-			}
-		}
-		r.style = styles.Get(styleName)
-		if r.style == nil {
-			r.style = styles.Fallback
-		}
-
-		r.formatter = formatters.Get("terminal256")
-		if r.formatter == nil {
-			r.formatter = formatters.Fallback
-		}
-	}
+	r.palette = theme.Resolve(r.colorEnabled && opts.SyntaxHighlight, opts.Theme)
 
 	return r
 }
 
 // Print writes violations to the writer.
 func (r *TextReporter) Print(w io.Writer, violations []rules.Violation, sources map[string][]byte) error {
+	r.docCache = make(map[string]*highlight.Document, len(sources))
 	sorted := SortViolations(violations)
 
 	for _, v := range sorted {
@@ -218,7 +195,8 @@ func (r *TextReporter) printViolation(w io.Writer, v rules.Violation, source []b
 
 // printSource renders the source code snippet with optional syntax highlighting.
 func (r *TextReporter) printSource(w io.Writer, loc rules.Location, source []byte) error {
-	lines := strings.Split(string(source), "\n")
+	doc := r.highlightDocument(loc.File, source)
+	lines := doc.SourceMap.Lines()
 
 	// Get start/end lines (BuildKit uses 1-based line numbers)
 	start := loc.Start.Line
@@ -253,7 +231,14 @@ func (r *TextReporter) printSource(w io.Writer, loc rules.Location, source []byt
 
 	// Print lines with optional syntax highlighting
 	for i := start; i <= end; i++ {
-		if err := r.writeSourceLine(w, i, lines[i-1], lineInRange(i, loc.Start.Line, markerEnd)); err != nil {
+		if err := r.writeSourceLine(
+			w,
+			i,
+			lines[i-1],
+			doc.LineTokens(i-1),
+			r.overlayForLine(loc, i, lines[i-1]),
+			lineInRange(i, loc.Start.Line, markerEnd),
+		); err != nil {
 			return err
 		}
 	}
@@ -318,13 +303,20 @@ func (r *TextReporter) writeSeparator(w io.Writer) error {
 }
 
 // writeSourceLine writes a single source line with line number and marker.
-func (r *TextReporter) writeSourceLine(w io.Writer, lineNum int, lineContent string, isAffected bool) error {
+func (r *TextReporter) writeSourceLine(
+	w io.Writer,
+	lineNum int,
+	lineContent string,
+	lineTokens []highlightcore.Token,
+	overlay *renderansi.Overlay,
+	isAffected bool,
+) error {
 	lineContent = strings.TrimSuffix(lineContent, "\r") // Trim CRLF to avoid artifacts
 
 	// Format components
 	numStr := r.formatLineNumber(lineNum)
 	marker := r.formatMarker(isAffected)
-	content := r.formatLineContent(lineContent)
+	content := r.formatLineContent(lineContent, lineTokens, overlay)
 
 	_, err := fmt.Fprintf(w, "%s %s %s\n", numStr, marker, content)
 	return err
@@ -350,28 +342,22 @@ func (r *TextReporter) formatMarker(isAffected bool) string {
 }
 
 // formatLineContent formats line content with optional syntax highlighting.
-func (r *TextReporter) formatLineContent(content string) string {
-	if r.colorEnabled && r.lexer != nil && r.style != nil && r.formatter != nil {
-		return r.highlightLine(content)
+func (r *TextReporter) formatLineContent(
+	content string,
+	lineTokens []highlightcore.Token,
+	overlay *renderansi.Overlay,
+) string {
+	placeholder, ok := r.placeholderForLine(content)
+	if ok {
+		if r.colorEnabled {
+			return blankLineStyle.Render(placeholder)
+		}
+		return placeholder
+	}
+	if r.colorEnabled && r.opts.SyntaxHighlight {
+		return renderansi.RenderLine(content, lineTokens, r.palette, overlay)
 	}
 	return content
-}
-
-// highlightLine applies syntax highlighting to a single line.
-func (r *TextReporter) highlightLine(line string) string {
-	iterator, err := r.lexer.Tokenise(nil, line)
-	if err != nil {
-		return line
-	}
-
-	var buf bytes.Buffer
-	err = r.formatter.Format(&buf, r.style, iterator)
-	if err != nil {
-		return line
-	}
-
-	// Trim trailing newline that formatter might add
-	return strings.TrimSuffix(buf.String(), "\n")
 }
 
 // PrintText is a convenience function that uses default options.
@@ -399,4 +385,73 @@ func lineInRange(line, start, end int) bool {
 		end = start
 	}
 	return line >= start && line <= end
+}
+
+func (r *TextReporter) highlightDocument(file string, source []byte) *highlight.Document {
+	if doc, ok := r.docCache[file]; ok {
+		return doc
+	}
+	doc := &highlight.Document{
+		File:      file,
+		SourceMap: sourcemap.New(source),
+	}
+	if r.colorEnabled && r.opts.SyntaxHighlight {
+		doc = highlight.Analyze(file, source)
+	}
+	r.docCache[file] = doc
+	return doc
+}
+
+func (r *TextReporter) overlayForLine(loc rules.Location, lineNum int, line string) *renderansi.Overlay {
+	if !r.colorEnabled || !r.opts.SyntaxHighlight {
+		return nil
+	}
+	if loc.IsFileLevel() || loc.End.Line < 0 {
+		return nil
+	}
+
+	startCol := 0
+	endCol := len([]rune(line))
+	switch {
+	case loc.IsPointLocation():
+		if lineNum != loc.Start.Line {
+			return nil
+		}
+		startCol = max(loc.Start.Column, 0)
+		endCol = startCol + 1
+	case lineNum == loc.Start.Line:
+		startCol = max(loc.Start.Column, 0)
+		if lineNum == loc.End.Line {
+			endCol = loc.End.Column
+		}
+	case lineNum == loc.End.Line:
+		endCol = loc.End.Column
+	default:
+	}
+
+	lineLen := len([]rune(line))
+	if startCol < 0 {
+		startCol = 0
+	}
+	if startCol > lineLen {
+		startCol = lineLen
+	}
+	if endCol > lineLen {
+		endCol = lineLen
+	}
+	if endCol <= startCol {
+		return nil
+	}
+	return &renderansi.Overlay{StartCol: startCol, EndCol: endCol}
+}
+
+func (r *TextReporter) placeholderForLine(content string) (string, bool) {
+	switch {
+	case content == "":
+		return "<blank>", true
+	case strings.Trim(content, " \t") == "":
+		return "<whitespace>", true
+	default:
+		return "", false
+	}
 }

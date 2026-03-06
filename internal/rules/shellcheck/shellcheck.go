@@ -503,7 +503,9 @@ func (r *Rule) checkShellMapping(
 	// shebangs, so #!/bin/bash means bash regardless of the stage's SHELL.
 	effectiveShellName := shellName
 	hasHeredocShebang := false
-	if mapping.IsHeredoc {
+	if mapping.ShellNameOverride != "" {
+		effectiveShellName = mapping.ShellNameOverride
+	} else if mapping.IsHeredoc {
 		if sn, ok := heredocShebangShell(mapping.Script); ok {
 			effectiveShellName = sn
 			hasHeredocShebang = true

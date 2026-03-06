@@ -1,6 +1,7 @@
 package fileval
 
 import (
+	"bytes"
 	"crypto/rand"
 	"errors"
 	"os"
@@ -138,6 +139,41 @@ func TestValidateFile_UTF8Check(t *testing.T) {
 	var utf8Err *NotUTF8Error
 	if !errors.As(err, &utf8Err) {
 		t.Fatalf("expected NotUTF8Error for binary file, got %v", err)
+	}
+}
+
+func TestReadValidatedFile_ReturnsContent(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "Dockerfile")
+	want := []byte("FROM alpine\nRUN echo hello\n")
+	if err := os.WriteFile(filePath, want, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := ReadValidatedFile(filePath, 0)
+	if err != nil {
+		t.Fatalf("ReadValidatedFile() error = %v", err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("ReadValidatedFile() = %q, want %q", got, want)
+	}
+}
+
+func TestReadValidatedFile_PreservesValidationErrors(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "Dockerfile")
+	if err := os.WriteFile(filePath, []byte("FROM a\n\xff"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := ReadValidatedFile(filePath, 0)
+	var utf8Err *NotUTF8Error
+	if !errors.As(err, &utf8Err) {
+		t.Fatalf("expected NotUTF8Error, got %v", err)
 	}
 }
 

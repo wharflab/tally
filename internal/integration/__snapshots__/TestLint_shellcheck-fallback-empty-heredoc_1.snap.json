@@ -4,22 +4,75 @@
       "file": "testdata/shellcheck-fallback-empty-heredoc/Dockerfile",
       "violations": [
         {
-          "detail": "3:9: unclosed here-document 'EOT'",
+          "docUrl": "https://www.shellcheck.net/wiki/SC2217",
           "location": {
             "end": {
-              "column": 0,
+              "column": 17,
               "line": 2
             },
             "file": "testdata/shellcheck-fallback-empty-heredoc/Dockerfile",
             "start": {
-              "column": 0,
+              "column": 4,
               "line": 2
             }
           },
-          "message": "unable to parse shell script",
-          "rule": "shellcheck/ShellCheckPreflightParseError",
-          "severity": "info",
+          "message": "Redirecting to 'echo', a command that doesn't read stdin. Did you want 'cat' instead?",
+          "rule": "shellcheck/SC2217",
+          "severity": "warning",
           "sourceCode": "RUN echo $1 \u003c\u003cEOT"
+        },
+        {
+          "docUrl": "https://www.shellcheck.net/wiki/SC2086",
+          "location": {
+            "end": {
+              "column": 11,
+              "line": 2
+            },
+            "file": "testdata/shellcheck-fallback-empty-heredoc/Dockerfile",
+            "start": {
+              "column": 9,
+              "line": 2
+            }
+          },
+          "message": "Double quote to prevent globbing and word splitting.",
+          "rule": "shellcheck/SC2086",
+          "severity": "info",
+          "sourceCode": "RUN echo $1 \u003c\u003cEOT",
+          "suggestedFix": {
+            "description": "Apply ShellCheck fix for SC2086",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 9,
+                    "line": 2
+                  },
+                  "file": "testdata/shellcheck-fallback-empty-heredoc/Dockerfile",
+                  "start": {
+                    "column": 9,
+                    "line": 2
+                  }
+                },
+                "newText": "\""
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 11,
+                    "line": 2
+                  },
+                  "file": "testdata/shellcheck-fallback-empty-heredoc/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 2
+                  }
+                },
+                "newText": "\""
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
         }
       ]
     }
@@ -31,7 +84,7 @@
     "files": 1,
     "info": 1,
     "style": 0,
-    "total": 1,
-    "warnings": 0
+    "total": 2,
+    "warnings": 1
   }
 }

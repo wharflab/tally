@@ -38,6 +38,7 @@ type Server struct {
 
 	documents *DocumentStore
 	lintCache *lintResultCache
+	semCache  *semanticDocCache
 
 	diagnosticsDispatchMu      sync.Mutex
 	diagnosticsInFlightByURI   map[string]bool
@@ -60,6 +61,7 @@ func New() *Server {
 		exitCh:                   make(chan struct{}),
 		documents:                NewDocumentStore(),
 		lintCache:                newLintResultCache(),
+		semCache:                 newSemanticDocCache(),
 		diagnosticsInFlightByURI: make(map[string]bool),
 		diagnosticsPendingByURI:  make(map[string]diagnosticsTask),
 		diagnosticsConcurrencyGate: make(
@@ -199,6 +201,14 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 		return unmarshalAndCall(req, func(p *protocol.DocumentFormattingParams) (any, error) {
 			return s.handleFormatting(ctx, p)
 		})
+	case string(protocol.MethodTextDocumentSemanticTokensFull):
+		return unmarshalAndCall(req, func(p *protocol.SemanticTokensParams) (any, error) {
+			return s.handleSemanticTokensFull(ctx, p)
+		})
+	case string(protocol.MethodTextDocumentSemanticTokensRange):
+		return unmarshalAndCall(req, func(p *protocol.SemanticTokensRangeParams) (any, error) {
+			return s.handleSemanticTokensRange(ctx, p)
+		})
 
 	// Workspace
 	case string(protocol.MethodWorkspaceDidChangeConfiguration):
@@ -293,6 +303,16 @@ func (s *Server) handleInitialize(params *protocol.InitializeParams) (any, error
 			DocumentFormattingProvider: &protocol.BooleanOrDocumentFormattingOptions{
 				Boolean: new(true),
 			},
+			SemanticTokensProvider: &protocol.SemanticTokensOptionsOrRegistrationOptions{
+				Options: &protocol.SemanticTokensOptions{
+					Legend: &protocol.SemanticTokensLegend{
+						TokenTypes:     lspSemanticTokenTypes(),
+						TokenModifiers: lspSemanticTokenModifiers(),
+					},
+					Range: &protocol.BooleanOrEmptyObject{Boolean: new(true)},
+					Full:  &protocol.BooleanOrSemanticTokensFullDelta{Boolean: new(true)},
+				},
+			},
 			DiagnosticProvider: &protocol.DiagnosticOptionsOrRegistrationOptions{
 				Options: &protocol.DiagnosticOptions{
 					Identifier: new("tally"),
@@ -366,6 +386,7 @@ func (s *Server) handleDidClose(ctx context.Context, params *protocol.DidCloseTe
 	s.cancelPendingDiagnostics(uri)
 	s.documents.Close(uri)
 	s.lintCache.delete(uri)
+	s.semCache.delete(uri)
 	if s.pushDiagnosticsEnabled() {
 		clearDiagnostics(ctx, s.conn, uri, docVersion)
 	}

@@ -5,7 +5,6 @@ go 1.26.0
 require (
 	charm.land/bubbles/v2 v2.0.0
 	charm.land/lipgloss/v2 v2.0.0
-	github.com/alecthomas/chroma/v2 v2.23.1
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/cenkalti/backoff/v5 v5.0.3
@@ -74,7 +73,6 @@ require (
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 // indirect
 	github.com/containers/ocicrypt v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/docker/cli v29.2.1+incompatible // indirect
 	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.5 // indirect

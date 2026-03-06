@@ -6,6 +6,7 @@ package fileval
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -72,6 +73,28 @@ func ValidateFile(path string, maxSize int64) error {
 	}
 	defer f.Close()
 
+	return validateOpenFile(f, path, maxSize)
+}
+
+// ReadValidatedFile opens a file, validates it, then reads and returns its
+// content from the same file descriptor to avoid TOCTOU races.
+func ReadValidatedFile(path string, maxSize int64) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	if err := validateOpenFile(f, path, maxSize); err != nil {
+		return nil, err
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return nil, err
+	}
+	return io.ReadAll(f)
+}
+
+func validateOpenFile(f *os.File, path string, maxSize int64) error {
 	info, err := f.Stat()
 	if err != nil {
 		return err
