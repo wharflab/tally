@@ -3,6 +3,7 @@ package shell
 import (
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/wharflab/tally/internal/highlight/core"
 	myshell "github.com/wharflab/tally/internal/shell"
@@ -31,10 +32,11 @@ func Tokenize(script string, variant myshell.Variant) []core.Token {
 	if err != nil {
 		return lexicalTokens(script)
 	}
+	lines := strings.Split(script, "\n")
 
 	var tokens []core.Token
 	addNodeToken := func(pos, end shsyntax.Pos, typ core.TokenType, mods uint32) {
-		tok, ok := tokenFromPositions(pos, end, typ, mods)
+		tok, ok := tokenFromPositions(lines, pos, end, typ, mods)
 		if !ok {
 			return
 		}
@@ -54,7 +56,7 @@ func Tokenize(script string, variant myshell.Variant) []core.Token {
 			}
 		case *shsyntax.CallExpr:
 			if len(n.Args) > 0 && len(n.Args[0].Parts) > 0 {
-				addWordPartToken(n.Args[0].Parts[0], core.TokenFunction, 0, &tokens)
+				addWordPartToken(lines, n.Args[0].Parts[0], core.TokenFunction, 0, &tokens)
 			}
 		case *shsyntax.Assign:
 			if n.Name != nil {
@@ -75,11 +77,11 @@ func Tokenize(script string, variant myshell.Variant) []core.Token {
 	return append(tokens, lexicalTokens(script)...)
 }
 
-func addWordPartToken(part shsyntax.WordPart, typ core.TokenType, mods uint32, tokens *[]core.Token) {
+func addWordPartToken(lines []string, part shsyntax.WordPart, typ core.TokenType, mods uint32, tokens *[]core.Token) {
 	if part == nil {
 		return
 	}
-	tok, ok := tokenFromPositions(part.Pos(), part.End(), typ, mods)
+	tok, ok := tokenFromPositions(lines, part.Pos(), part.End(), typ, mods)
 	if !ok {
 		return
 	}
@@ -87,7 +89,7 @@ func addWordPartToken(part shsyntax.WordPart, typ core.TokenType, mods uint32, t
 	*tokens = append(*tokens, tok)
 }
 
-func tokenFromPositions(pos, end shsyntax.Pos, typ core.TokenType, mods uint32) (core.Token, bool) {
+func tokenFromPositions(lines []string, pos, end shsyntax.Pos, typ core.TokenType, mods uint32) (core.Token, bool) {
 	if !pos.IsValid() || !end.IsValid() {
 		return core.Token{}, false
 	}
@@ -104,8 +106,12 @@ func tokenFromPositions(pos, end shsyntax.Pos, typ core.TokenType, mods uint32) 
 		return core.Token{}, false
 	}
 	line--
-	start--
-	finish--
+	lineContent, ok := lineContentAt(lines, line)
+	if !ok {
+		return core.Token{}, false
+	}
+	start = byteColumnToRuneColumn(lineContent, start-1)
+	finish = byteColumnToRuneColumn(lineContent, finish-1)
 	if finish <= start {
 		finish = start + 1
 	}
@@ -141,13 +147,44 @@ func uintToInt(v uint) (int, bool) {
 	return int(v), true
 }
 
+func lineContentAt(lines []string, line int) (string, bool) {
+	if line < 0 {
+		return "", false
+	}
+	if len(lines) == 0 {
+		return "", true
+	}
+	if line >= len(lines) {
+		return "", false
+	}
+	return lines[line], true
+}
+
+func byteColumnToRuneColumn(line string, byteCol int) int {
+	byteCol = clampByteIndex(line, byteCol)
+	return utf8.RuneCountInString(line[:byteCol])
+}
+
+func clampByteIndex(line string, idx int) int {
+	if idx <= 0 {
+		return 0
+	}
+	if idx >= len(line) {
+		return len(line)
+	}
+	for idx < len(line) && !utf8.RuneStart(line[idx]) {
+		idx--
+	}
+	return idx
+}
+
 func lexicalTokens(script string) []core.Token {
 	lines := strings.Split(script, "\n")
 	tokens := make([]core.Token, 0, len(lines)*2)
 	for lineNum, line := range lines {
 		trimmed := strings.TrimLeft(line, " \t")
 		if strings.HasPrefix(trimmed, "#") {
-			start := len(line) - len(trimmed)
+			start := utf8.RuneCountInString(line[:len(line)-len(trimmed)])
 			tokens = append(tokens, core.Token{
 				Line:     lineNum,
 				StartCol: start,
@@ -159,19 +196,21 @@ func lexicalTokens(script string) []core.Token {
 		}
 
 		for _, idx := range shellStringPattern.FindAllStringIndex(line, -1) {
+			startCol, endCol := runeColsForByteRange(line, idx[0], idx[1])
 			tokens = append(tokens, core.Token{
 				Line:     lineNum,
-				StartCol: idx[0],
-				EndCol:   idx[1],
+				StartCol: startCol,
+				EndCol:   endCol,
 				Type:     core.TokenString,
 				Priority: 25,
 			})
 		}
 		for _, idx := range shellVarPattern.FindAllStringIndex(line, -1) {
+			startCol, endCol := runeColsForByteRange(line, idx[0], idx[1])
 			tokens = append(tokens, core.Token{
 				Line:     lineNum,
-				StartCol: idx[0],
-				EndCol:   idx[1],
+				StartCol: startCol,
+				EndCol:   endCol,
 				Type:     core.TokenVariable,
 				Priority: 26,
 			})
@@ -186,14 +225,24 @@ func lexicalTokens(script string) []core.Token {
 			continue
 		}
 		if idx := strings.Index(line, first); idx >= 0 {
+			startCol, endCol := runeColsForByteRange(line, idx, idx+len(first))
 			tokens = append(tokens, core.Token{
 				Line:     lineNum,
-				StartCol: idx,
-				EndCol:   idx + len(first),
+				StartCol: startCol,
+				EndCol:   endCol,
 				Type:     core.TokenFunction,
 				Priority: 24,
 			})
 		}
 	}
 	return tokens
+}
+
+func runeColsForByteRange(line string, startByte, endByte int) (int, int) {
+	startByte = clampByteIndex(line, startByte)
+	endByte = max(clampByteIndex(line, endByte), startByte)
+
+	startCol := utf8.RuneCountInString(line[:startByte])
+	endCol := startCol + utf8.RuneCountInString(line[startByte:endByte])
+	return startCol, endCol
 }
