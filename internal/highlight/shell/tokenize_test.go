@@ -27,6 +27,19 @@ func TestTokenize_LexicalFallbackUsesRuneColumns(t *testing.T) {
 	assertHasToken(t, script, tokens, highlightcore.TokenVariable, 26, "$HOME")
 }
 
+func TestTokenize_ASTRejectsMultilineQuotedStringToken(t *testing.T) {
+	t.Parallel()
+
+	script := "echo \"hello\nworld\"\n"
+	tokens := Tokenize(script, myshell.VariantBash)
+
+	for _, tok := range tokens {
+		if tok.Type == highlightcore.TokenString && tok.Priority == 30 {
+			t.Fatalf("unexpected multiline AST string token: %+v", tok)
+		}
+	}
+}
+
 func assertHasToken(
 	t *testing.T,
 	script string,

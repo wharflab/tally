@@ -90,7 +90,7 @@ func addWordPartToken(lines []string, part shsyntax.WordPart, typ core.TokenType
 }
 
 func tokenFromPositions(lines []string, pos, end shsyntax.Pos, typ core.TokenType, mods uint32) (core.Token, bool) {
-	if !pos.IsValid() || !end.IsValid() {
+	if !pos.IsValid() || !end.IsValid() || pos.Line() != end.Line() {
 		return core.Token{}, false
 	}
 	line, ok := uintToInt(pos.Line())
