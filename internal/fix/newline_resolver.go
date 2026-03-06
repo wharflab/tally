@@ -63,7 +63,13 @@ func (r *newlineResolver) Resolve(_ context.Context, resolveCtx ResolveContext, 
 		case "never":
 			wantGap = 0
 		default: // "grouped"
-			if strings.EqualFold(prev.Value, curr.Value) {
+			sameType := strings.EqualFold(prev.Value, curr.Value)
+			if sameType && len(curr.PrevComment) > 0 {
+				// A comment between same-type instructions is an
+				// intentional separator; accept any spacing.
+				continue
+			}
+			if sameType {
 				wantGap = 0
 			} else {
 				wantGap = 1
