@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wharflab/tally/internal/highlight/core"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 func TestInstructionKeywordToken_UsesRuneColumns(t *testing.T) {
@@ -50,10 +51,41 @@ func TestKVValueTokens_UseRuneColumns(t *testing.T) {
 	assertTokenText(t, line, tokens[3], "/tmp")
 }
 
+func TestTokenize_FallbackIncludesNumberTokens(t *testing.T) {
+	t.Parallel()
+
+	source := []byte("RUN echo 123\n")
+	sm := sourcemap.New(source)
+
+	tokens := Tokenize(sm, nil, '\\')
+
+	assertHasTokenText(t, string(source), tokens, core.TokenNumber, "123")
+}
+
 func assertTokenText(t *testing.T, line string, tok core.Token, want string) {
 	t.Helper()
 	got := string([]rune(line)[tok.StartCol:tok.EndCol])
 	if got != want {
 		t.Fatalf("token text = %q, want %q (cols %d:%d)", got, want, tok.StartCol, tok.EndCol)
 	}
+}
+
+func assertHasTokenText(t *testing.T, source string, tokens []core.Token, wantType core.TokenType, want string) {
+	t.Helper()
+
+	lines := strings.Split(source, "\n")
+	for _, tok := range tokens {
+		if tok.Type != wantType || tok.Line < 0 || tok.Line >= len(lines) {
+			continue
+		}
+		line := lines[tok.Line]
+		if tok.StartCol < 0 || tok.EndCol < tok.StartCol || tok.EndCol > len([]rune(line)) {
+			continue
+		}
+		if got := string([]rune(line)[tok.StartCol:tok.EndCol]); got == want {
+			return
+		}
+	}
+
+	t.Fatalf("missing token type=%s text=%q in %+v", wantType, want, tokens)
 }

@@ -345,6 +345,7 @@ func fallbackLineTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []c
 		out = append(out, flagTokens(line, i)...)
 		out = append(out, quotedTokens(line, i)...)
 		out = append(out, variableTokens(line, i)...)
+		out = append(out, numberTokens(line, i)...)
 		out = append(out, heredocTokens(line, i)...)
 	}
 	return out
