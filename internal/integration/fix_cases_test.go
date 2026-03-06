@@ -778,6 +778,19 @@ mode = "never"
 			wantApplied: 0,
 		},
 
+		// Newline between instructions: grouped mode - same-type instructions
+		// separated by a comment should not trigger a fix.
+		// Regression: the resolver must skip same-type pairs with PrevComment.
+		{
+			name: "newline-between-instructions-grouped-comment-separator",
+			input: "FROM alpine:3.20\n\n# Add Julia to PATH\nENV PATH=/usr/local/julia/bin:$PATH \\\n" +
+				"    LD_LIBRARY_PATH=/usr/local/julia/lib/julia\n\n" +
+				"# Target x86_64\nENV JULIA_CPU_TARGET=\"haswell\"\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/newline-between-instructions")...),
+			wantApplied: 0,
+		},
+
 		// No trailing spaces: remove trailing whitespace from multiple lines
 		{
 			name:  "no-trailing-spaces",

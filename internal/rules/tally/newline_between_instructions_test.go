@@ -174,8 +174,7 @@ func TestNewlineBetweenInstructionsCheck(t *testing.T) {
 		{
 			Name:           "grouped - same type with comment and blank lines",
 			Content:        "FROM alpine:3.20\n\nRUN echo foo\n\n# some comment\n\nRUN echo zoo\n",
-			WantViolations: 1,
-			WantMessages:   []string{"unexpected blank line between RUN and RUN"},
+			WantViolations: 0,
 		},
 		{
 			Name:           "grouped - different types with comment and blank lines",
@@ -185,6 +184,13 @@ func TestNewlineBetweenInstructionsCheck(t *testing.T) {
 		{
 			Name:           "grouped - same type with attached comment pass",
 			Content:        "FROM alpine:3.20\n\nRUN echo foo\n# some comment\nRUN echo zoo\n",
+			WantViolations: 0,
+		},
+		{
+			Name: "grouped - same type ENV with comment separator and continuation",
+			Content: "FROM alpine:3.20\n\n# Add Julia to PATH\nENV PATH=/usr/local/julia/bin:$PATH \\\n" +
+				"    LD_LIBRARY_PATH=/usr/local/julia/lib/julia\n\n" +
+				"# Target x86_64\nENV JULIA_CPU_TARGET=\"haswell\"\n",
 			WantViolations: 0,
 		},
 		{
