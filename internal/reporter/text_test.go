@@ -408,6 +408,45 @@ func TestTextReporter_Print(t *testing.T) {
 	}
 }
 
+func TestTextReporter_Print_ClearsDocCacheBetweenCalls(t *testing.T) {
+	t.Parallel()
+
+	violations := []rules.Violation{
+		{
+			Location: rules.NewLineLocation("Dockerfile", 2),
+			RuleCode: "TestRule",
+			Message:  "Test message",
+			Severity: rules.SeverityError,
+		},
+	}
+
+	r := NewTextReporter(DefaultTextOptions())
+
+	var first bytes.Buffer
+	err := r.Print(&first, violations, map[string][]byte{
+		"Dockerfile": []byte("FROM alpine\nRUN echo old\n"),
+	})
+	if err != nil {
+		t.Fatalf("first Print failed: %v", err)
+	}
+
+	var second bytes.Buffer
+	err = r.Print(&second, violations, map[string][]byte{
+		"Dockerfile": []byte("FROM alpine\nRUN echo new\n"),
+	})
+	if err != nil {
+		t.Fatalf("second Print failed: %v", err)
+	}
+
+	output := second.String()
+	if !strings.Contains(output, "RUN echo new") {
+		t.Fatalf("expected updated source snippet in second print, got:\n%s", output)
+	}
+	if strings.Contains(output, "RUN echo old") {
+		t.Fatalf("found stale cached source snippet in second print:\n%s", output)
+	}
+}
+
 func TestPrintText(t *testing.T) {
 	t.Parallel()
 	// Test the PrintText convenience function

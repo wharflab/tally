@@ -132,6 +132,7 @@ func NewTextReporter(opts TextOptions) *TextReporter {
 
 // Print writes violations to the writer.
 func (r *TextReporter) Print(w io.Writer, violations []rules.Violation, sources map[string][]byte) error {
+	r.docCache = make(map[string]*highlight.Document, len(sources))
 	sorted := SortViolations(violations)
 
 	for _, v := range sorted {
