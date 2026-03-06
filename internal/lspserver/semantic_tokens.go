@@ -3,7 +3,6 @@ package lspserver
 import (
 	"context"
 
-	"github.com/wharflab/tally/internal/highlight"
 	"github.com/wharflab/tally/internal/highlight/core"
 	"github.com/wharflab/tally/internal/highlight/lspencode"
 	protocol "github.com/wharflab/tally/internal/lsp/protocol"
@@ -18,17 +17,21 @@ func lspSemanticTokenModifiers() []string {
 }
 
 func (s *Server) handleSemanticTokensFull(
-	_ context.Context,
+	ctx context.Context,
 	params *protocol.SemanticTokensParams,
 ) (any, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	uri := string(params.TextDocument.Uri)
-	content, ok := s.semanticTokenContent(uri)
+	doc, resultID, ok := s.getOrAnalyzeSemanticDocument(ctx, uri)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if !ok {
 		return &protocol.SemanticTokensOrNull{}, nil
 	}
-
-	doc := highlight.Analyze(uriToPath(uri), content)
-	resultID := contentHash(content)
 	return &protocol.SemanticTokensOrNull{
 		SemanticTokens: &protocol.SemanticTokens{
 			ResultId: &resultID,
@@ -38,16 +41,21 @@ func (s *Server) handleSemanticTokensFull(
 }
 
 func (s *Server) handleSemanticTokensRange(
-	_ context.Context,
+	ctx context.Context,
 	params *protocol.SemanticTokensRangeParams,
 ) (any, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	uri := string(params.TextDocument.Uri)
-	content, ok := s.semanticTokenContent(uri)
+	doc, _, ok := s.getOrAnalyzeSemanticDocument(ctx, uri)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if !ok {
 		return &protocol.SemanticTokensOrNull{}, nil
 	}
-
-	doc := highlight.Analyze(uriToPath(uri), content)
 	startLine := int(params.Range.Start.Line)
 	startCol := int(params.Range.Start.Character)
 	endLine := int(params.Range.End.Line)
@@ -59,6 +67,9 @@ func (s *Server) handleSemanticTokensRange(
 	}
 
 	filtered := core.FilterRange(doc.Tokens, startLine, startCol, endLine, endCol)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return &protocol.SemanticTokensOrNull{
 		SemanticTokens: &protocol.SemanticTokens{
 			Data: lspencode.Encode(filtered),

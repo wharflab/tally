@@ -38,6 +38,7 @@ type Server struct {
 
 	documents *DocumentStore
 	lintCache *lintResultCache
+	semCache  *semanticDocCache
 
 	diagnosticsDispatchMu      sync.Mutex
 	diagnosticsInFlightByURI   map[string]bool
@@ -60,6 +61,7 @@ func New() *Server {
 		exitCh:                   make(chan struct{}),
 		documents:                NewDocumentStore(),
 		lintCache:                newLintResultCache(),
+		semCache:                 newSemanticDocCache(),
 		diagnosticsInFlightByURI: make(map[string]bool),
 		diagnosticsPendingByURI:  make(map[string]diagnosticsTask),
 		diagnosticsConcurrencyGate: make(
@@ -384,6 +386,7 @@ func (s *Server) handleDidClose(ctx context.Context, params *protocol.DidCloseTe
 	s.cancelPendingDiagnostics(uri)
 	s.documents.Close(uri)
 	s.lintCache.delete(uri)
+	s.semCache.delete(uri)
 	if s.pushDiagnosticsEnabled() {
 		clearDiagnostics(ctx, s.conn, uri, docVersion)
 	}
