@@ -1,8 +1,11 @@
 package dockerfile
 
 import (
+	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/highlight/core"
 	"github.com/wharflab/tally/internal/sourcemap"
@@ -62,6 +65,24 @@ func TestTokenize_FallbackIncludesNumberTokens(t *testing.T) {
 	assertHasTokenText(t, string(source), tokens, core.TokenNumber, "123")
 }
 
+func TestTokenize_OnlyHighlightsStageAliasOnFrom(t *testing.T) {
+	t.Parallel()
+
+	source := []byte("FROM alpine AS build\nRUN echo AS value\n")
+	sm := sourcemap.New(source)
+	result, err := parser.Parse(bytes.NewReader(source))
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	tokens := Tokenize(sm, result.AST, '\\')
+
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "FROM")
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "AS")
+	assertHasTokenText(t, string(source), tokens, core.TokenVariable, "build")
+	assertNoTokenText(t, string(source), tokens, core.TokenVariable, "value")
+}
+
 func assertTokenText(t *testing.T, line string, tok core.Token, want string) {
 	t.Helper()
 	got := string([]rune(line)[tok.StartCol:tok.EndCol])
@@ -88,4 +109,22 @@ func assertHasTokenText(t *testing.T, source string, tokens []core.Token, wantTy
 	}
 
 	t.Fatalf("missing token type=%s text=%q in %+v", wantType, want, tokens)
+}
+
+func assertNoTokenText(t *testing.T, source string, tokens []core.Token, wantType core.TokenType, want string) {
+	t.Helper()
+
+	lines := strings.Split(source, "\n")
+	for _, tok := range tokens {
+		if tok.Type != wantType || tok.Line < 0 || tok.Line >= len(lines) {
+			continue
+		}
+		line := lines[tok.Line]
+		if tok.StartCol < 0 || tok.EndCol < tok.StartCol || tok.EndCol > len([]rune(line)) {
+			continue
+		}
+		if got := string([]rune(line)[tok.StartCol:tok.EndCol]); got == want {
+			t.Fatalf("unexpected token type=%s text=%q in %+v", wantType, want, tokens)
+		}
+	}
 }

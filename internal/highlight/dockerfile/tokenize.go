@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/highlight/core"
@@ -62,8 +63,10 @@ func tokenizeNode(
 		if line == startLine {
 			if tok, ok := instructionKeywordToken(text, lineIdx); ok {
 				tokens = append(tokens, tok)
+				if strings.EqualFold(tokenText(text, tok), command.From) {
+					tokens = append(tokens, fromAliasTokens(text, lineIdx)...)
+				}
 			}
-			tokens = append(tokens, fromAliasTokens(text, lineIdx)...)
 		}
 
 		tokens = append(tokens, flagTokens(text, lineIdx)...)
@@ -73,6 +76,14 @@ func tokenizeNode(
 		tokens = append(tokens, heredocTokens(text, lineIdx)...)
 	}
 	return tokens
+}
+
+func tokenText(line string, tok core.Token) string {
+	runes := []rune(line)
+	if tok.StartCol < 0 || tok.EndCol < tok.StartCol || tok.EndCol > len(runes) {
+		return ""
+	}
+	return string(runes[tok.StartCol:tok.EndCol])
 }
 
 func instructionKeywordToken(line string, lineNum int) (core.Token, bool) {
