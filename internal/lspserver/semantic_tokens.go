@@ -2,7 +2,6 @@ package lspserver
 
 import (
 	"context"
-	"os"
 
 	"github.com/wharflab/tally/internal/highlight"
 	"github.com/wharflab/tally/internal/highlight/core"
@@ -74,9 +73,5 @@ func (s *Server) semanticTokenContent(uri string) ([]byte, bool) {
 	if isVirtualURI(uri) {
 		return nil, false
 	}
-	content, err := os.ReadFile(uriToPath(uri))
-	if err != nil {
-		return nil, false
-	}
-	return content, true
+	return s.readValidatedFileContent(uriToPath(uri))
 }

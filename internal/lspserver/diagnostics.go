@@ -241,15 +241,15 @@ func (s *Server) handleDiagnostic(ctx context.Context, params *protocol.Document
 
 // pullDiagnosticsFromDisk reads content from disk and returns a diagnostic report.
 //
-//nolint:nilerr // gracefully returns empty diagnostics for unreadable files
+
 func (s *Server) pullDiagnosticsFromDisk(ctx context.Context, docURI, filePath string, previousResultID *string) (any, error) {
 	// Bail out early if the request has been cancelled.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
-	content, err := os.ReadFile(filePath)
-	if err != nil {
+	content, ok := s.readValidatedFileContent(filePath)
+	if !ok {
 		// Return empty full report if file cannot be read.
 		return &protocol.DocumentDiagnosticResponse{
 			FullDocumentDiagnosticReport: &protocol.RelatedFullDocumentDiagnosticReport{
