@@ -102,13 +102,13 @@ func TestLSP_SemanticTokensRange(t *testing.T) {
 		},
 	}).Await(ctx, &result)
 	require.NoError(t, err)
-	require.NotEmpty(t, result.Data)
-
-	line := uint32(0)
-	for idx := 0; idx < len(result.Data); idx += 5 {
-		line += result.Data[idx]
-		require.Equal(t, uint32(1), line, "range-encoded token should stay on requested line")
-	}
+	require.Equal(t, []uint32{
+		1, 0, 3, 0, 0,
+		0, 4, 4, 8, 0,
+		0, 5, 1, 2, 0,
+		0, 1, 5, 5, 0,
+		0, 5, 1, 2, 0,
+	}, result.Data)
 }
 
 func TestLSP_ShutdownExit(t *testing.T) {
