@@ -1,14 +1,17 @@
 package extract
 
 import (
+	"path"
 	"slices"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	dfparser "github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
 
@@ -25,6 +28,10 @@ type Mapping struct {
 
 	// IsHeredoc reports whether the script came from a heredoc body.
 	IsHeredoc bool
+
+	// ShellNameOverride overrides the stage shell when the heredoc is explicitly
+	// fed to another shell, for example `RUN <<EOF bash`.
+	ShellNameOverride string
 }
 
 func ExtractRunScript(sm *sourcemap.SourceMap, node *dfparser.Node, escapeToken rune) (Mapping, bool) {
@@ -139,18 +146,25 @@ func extractRunLikeScript(
 	end = max(end, start)
 
 	if len(node.Heredocs) > 0 {
-		bodyStart := start + 1
-		bodyEnd := end - 1
-		if bodyEnd < bodyStart {
-			return Mapping{}, false
+		if overrideShell, bodyOnly := heredocBodyScriptMode(
+			linesForSpan(sm, start, end),
+			escapeToken,
+			blankLeadingFlags,
+		); bodyOnly {
+			bodyStart := start + 1
+			bodyEnd := end - 1
+			if bodyEnd < bodyStart {
+				return Mapping{}, false
+			}
+			lines := linesForSpan(sm, bodyStart, bodyEnd)
+			return Mapping{
+				Script:            strings.Join(lines, "\n"),
+				OriginStartLine:   bodyStart,
+				FallbackLine:      start,
+				IsHeredoc:         true,
+				ShellNameOverride: overrideShell,
+			}, true
 		}
-		lines := linesForSpan(sm, bodyStart, bodyEnd)
-		return Mapping{
-			Script:          strings.Join(lines, "\n"),
-			OriginStartLine: bodyStart,
-			FallbackLine:    start,
-			IsHeredoc:       true,
-		}, true
 	}
 
 	lines := linesForSpan(sm, start, end)
@@ -162,6 +176,92 @@ func extractRunLikeScript(
 		OriginStartLine: start,
 		FallbackLine:    start,
 	}, true
+}
+
+func heredocBodyScriptMode(
+	lines []string,
+	escapeToken rune,
+	blankLeadingFlags func(lines []string, escapeToken rune) []string,
+) (string, bool) {
+	if len(lines) == 0 {
+		return "", false
+	}
+
+	blanked := blankLeadingFlags(lines, escapeToken)
+	header := firstNonEmptyLine(blanked)
+	if header == "" {
+		return "", false
+	}
+
+	rest, ok := heredocCommandRemainder(header)
+	if !ok {
+		return "", false
+	}
+	if rest == "" {
+		return "", true
+	}
+
+	shellName, ok := heredocShellOverride(rest)
+	if !ok {
+		return "", false
+	}
+	return shellName, true
+}
+
+func firstNonEmptyLine(lines []string) string {
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			return line
+		}
+	}
+	return ""
+}
+
+func heredocCommandRemainder(line string) (string, bool) {
+	line = strings.TrimSpace(line)
+	if !strings.HasPrefix(line, "<<") {
+		return "", false
+	}
+
+	i := 2
+	if i < len(line) && line[i] == '-' {
+		i++
+	}
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+	start := i
+	for i < len(line) && line[i] != ' ' && line[i] != '\t' {
+		i++
+	}
+	if i == start {
+		return "", false
+	}
+	return strings.TrimSpace(line[i:]), true
+}
+
+func heredocShellOverride(commandText string) (string, bool) {
+	fields := strings.Fields(commandText)
+	if len(fields) == 0 {
+		return "", false
+	}
+
+	name := fields[0]
+	base := path.Base(strings.ReplaceAll(name, `\`, "/"))
+	if strings.EqualFold(base, command.Env) {
+		for _, field := range fields[1:] {
+			if strings.HasPrefix(field, "-") || strings.Contains(field, "=") {
+				continue
+			}
+			name = field
+			break
+		}
+	}
+
+	if shell.VariantFromShell(name) == shell.VariantUnknown {
+		return "", false
+	}
+	return name, true
 }
 
 func linesForSpan(sm *sourcemap.SourceMap, startLine, endLine int) []string {

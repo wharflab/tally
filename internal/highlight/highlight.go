@@ -159,6 +159,9 @@ func nodeIndex(root *parser.Node) map[int]*parser.Node {
 }
 
 func effectiveShellVariant(shellName string, mapping extract.Mapping) shell.Variant {
+	if mapping.ShellNameOverride != "" {
+		return shell.VariantFromShell(mapping.ShellNameOverride)
+	}
 	if mapping.IsHeredoc {
 		firstLine, _, _ := strings.Cut(mapping.Script, "\n")
 		if name, ok := shell.ShellFromShebang(firstLine); ok {

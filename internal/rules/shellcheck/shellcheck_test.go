@@ -8,6 +8,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestShellcheckRunContextHasDeadline(t *testing.T) {
@@ -199,6 +200,22 @@ func TestCheckShellSnippetSkipsBlankSnippet(t *testing.T) {
 	)
 	if len(violations) != 0 {
 		t.Fatalf("expected no violations for blank snippet, got %+v", violations)
+	}
+}
+
+func TestRule_DoesNotLintRunHeredocFilePayloadAsShellScript(t *testing.T) {
+	t.Parallel()
+
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN <<EOF cat > /etc/app.conf
+enable-rpc=true
+rpc-listen-all=true
+EOF
+`)
+
+	violations := NewRule().Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no ShellCheck violations for config-file heredoc payload, got %+v", violations)
 	}
 }
 
