@@ -13,11 +13,13 @@ ENV POWERSHELL_UPDATECHECK=Off
 ENV TEMP=C:\Temp
 ENV TMP=C:\Temp
 ENV RUNNING_IN_DOCKER=TRUE
+
 # Add Windows PowerShell to PATH (pwsh added later by PowershellComponent)
 ENV PATH="C:\Windows\System32\WindowsPowerShell\v1.0;${PATH}"
 
 # Enable long path support
 RUN Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -Value 1
+
 # Install Git
 RUN Invoke-WebRequest -Uri https://github.com/git-for-windows/git/releases/download/v2.50.0.windows.1/PortableGit-2.50.0-64-bit.7z.exe -OutFile PortableGit.exe; `
     Start-Process -FilePath .\PortableGit.exe -ArgumentList '-o"C:\git"', '-y' -Wait; `
@@ -55,8 +57,10 @@ ENV PATH="C:\Program Files\dotnet;${PATH}"
 
 # Install .NET Sdk 8.0.414
 RUN & .\dotnet-install.ps1 -Version 8.0.414 -InstallDir 'C:\Program Files\dotnet'
+
 # Install .NET DotNetRuntime 9.0.9
 RUN & .\dotnet-install.ps1 -Version 9.0.9 -Runtime dotnet -InstallDir 'C:\Program Files\dotnet'
+
 # Install .NET Sdk 10.0.100
 RUN & .\dotnet-install.ps1 -Version 10.0.100 -InstallDir 'C:\Program Files\dotnet'
 
@@ -80,6 +84,7 @@ ENV VSINSTALLDIR=C:\BuildTools
 
 RUN New-Item -ItemType Directory -Path 'C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages' -Force | Out-Null"; `
     New-Item -ItemType Directory -Path 'C:\Program Files\dotnet\sdk\NuGetFallbackFolder' -Force | Out-Null
+
 # Epilogue
 # Create docker-context directory for build scripts
 RUN New-Item -ItemType Directory -Path c:\docker-context -Force | Out-Null
