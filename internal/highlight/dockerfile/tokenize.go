@@ -3,6 +3,7 @@ package dockerfile
 import (
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
@@ -79,10 +80,11 @@ func instructionKeywordToken(line string, lineNum int) (core.Token, bool) {
 	if m == nil {
 		return core.Token{}, false
 	}
+	startCol, endCol := runeColsForByteRange(line, m[2], m[3])
 	return core.Token{
 		Line:     lineNum,
-		StartCol: m[2],
-		EndCol:   m[3],
+		StartCol: startCol,
+		EndCol:   endCol,
 		Type:     core.TokenKeyword,
 		Priority: 20,
 	}, true
@@ -102,18 +104,20 @@ func fromAliasTokens(line string, lineNum int) []core.Token {
 		if asOffset < 0 {
 			continue
 		}
+		asStartCol, asEndCol := runeColsForByteRange(line, matchStart+asOffset, matchStart+asOffset+2)
+		aliasStartCol, aliasEndCol := runeColsForByteRange(line, aliasStart, aliasEnd)
 		out = append(out,
 			core.Token{
 				Line:     lineNum,
-				StartCol: matchStart + asOffset,
-				EndCol:   matchStart + asOffset + 2,
+				StartCol: asStartCol,
+				EndCol:   asEndCol,
 				Type:     core.TokenKeyword,
 				Priority: 21,
 			},
 			core.Token{
 				Line:      lineNum,
-				StartCol:  aliasStart,
-				EndCol:    aliasEnd,
+				StartCol:  aliasStartCol,
+				EndCol:    aliasEndCol,
 				Type:      core.TokenVariable,
 				Modifiers: core.ModDeclaration,
 				Priority:  22,
@@ -127,32 +131,34 @@ func flagTokens(line string, lineNum int) []core.Token {
 	matches := flagPattern.FindAllStringIndex(line, -1)
 	out := make([]core.Token, 0, len(matches)*3)
 	for _, idx := range matches {
-		start, end := idx[0], idx[1]
+		startByte, endByte := idx[0], idx[1]
+		startCol, endCol := runeColsForByteRange(line, startByte, endByte)
 		out = append(out, core.Token{
 			Line:     lineNum,
-			StartCol: start,
-			EndCol:   end,
+			StartCol: startCol,
+			EndCol:   endCol,
 			Type:     core.TokenParameter,
 			Priority: 22,
 		})
 
-		if end >= len(line) || line[end] != '=' {
+		if endByte >= len(line) || line[endByte] != '=' {
 			continue
 		}
-		valueStart := end + 1
-		valueEnd := valueStart
-		for valueEnd < len(line) && line[valueEnd] != ' ' && line[valueEnd] != '\t' {
-			valueEnd++
+		valueStartByte := endByte + 1
+		valueEndByte := valueStartByte
+		for valueEndByte < len(line) && line[valueEndByte] != ' ' && line[valueEndByte] != '\t' {
+			valueEndByte++
 		}
-		value := line[valueStart:valueEnd]
+		value := line[valueStartByte:valueEndByte]
 		if strings.Contains(value, "=") && strings.Contains(value, ",") {
-			out = append(out, kvValueTokens(value, lineNum, valueStart)...)
+			out = append(out, kvValueTokens(line, value, lineNum, valueStartByte)...)
 			continue
 		}
+		valueStartCol, valueEndCol := runeColsForByteRange(line, valueStartByte, valueEndByte)
 		out = append(out, core.Token{
 			Line:     lineNum,
-			StartCol: valueStart,
-			EndCol:   valueEnd,
+			StartCol: valueStartCol,
+			EndCol:   valueEndCol,
 			Type:     core.TokenString,
 			Priority: 21,
 		})
@@ -160,42 +166,49 @@ func flagTokens(line string, lineNum int) []core.Token {
 	return out
 }
 
-func kvValueTokens(value string, lineNum, baseCol int) []core.Token {
+func kvValueTokens(line, value string, lineNum, baseByte int) []core.Token {
 	parts := strings.Split(value, ",")
 	out := make([]core.Token, 0, len(parts)*2)
-	offset := 0
+	offsetBytes := 0
 	for _, part := range parts {
 		if part == "" {
-			offset++
+			offsetBytes++
 			continue
 		}
 		if eq := strings.Index(part, "="); eq >= 0 {
+			propStartCol, propEndCol := runeColsForByteRange(line, baseByte+offsetBytes, baseByte+offsetBytes+eq)
+			valStartCol, valEndCol := runeColsForByteRange(
+				line,
+				baseByte+offsetBytes+eq+1,
+				baseByte+offsetBytes+len(part),
+			)
 			out = append(out,
 				core.Token{
 					Line:     lineNum,
-					StartCol: baseCol + offset,
-					EndCol:   baseCol + offset + eq,
+					StartCol: propStartCol,
+					EndCol:   propEndCol,
 					Type:     core.TokenProperty,
 					Priority: 22,
 				},
 				core.Token{
 					Line:     lineNum,
-					StartCol: baseCol + offset + eq + 1,
-					EndCol:   baseCol + offset + len(part),
+					StartCol: valStartCol,
+					EndCol:   valEndCol,
 					Type:     core.TokenString,
 					Priority: 21,
 				},
 			)
 		} else {
+			startCol, endCol := runeColsForByteRange(line, baseByte+offsetBytes, baseByte+offsetBytes+len(part))
 			out = append(out, core.Token{
 				Line:     lineNum,
-				StartCol: baseCol + offset,
-				EndCol:   baseCol + offset + len(part),
+				StartCol: startCol,
+				EndCol:   endCol,
 				Type:     core.TokenString,
 				Priority: 21,
 			})
 		}
-		offset += len(part) + 1
+		offsetBytes += len(part) + 1
 	}
 	return out
 }
@@ -204,10 +217,11 @@ func quotedTokens(line string, lineNum int) []core.Token {
 	matches := stringPattern.FindAllStringIndex(line, -1)
 	out := make([]core.Token, 0, len(matches))
 	for _, idx := range matches {
+		startCol, endCol := runeColsForByteRange(line, idx[0], idx[1])
 		out = append(out, core.Token{
 			Line:     lineNum,
-			StartCol: idx[0],
-			EndCol:   idx[1],
+			StartCol: startCol,
+			EndCol:   endCol,
 			Type:     core.TokenString,
 			Priority: 18,
 		})
@@ -219,10 +233,11 @@ func variableTokens(line string, lineNum int) []core.Token {
 	matches := varPattern.FindAllStringIndex(line, -1)
 	out := make([]core.Token, 0, len(matches))
 	for _, idx := range matches {
+		startCol, endCol := runeColsForByteRange(line, idx[0], idx[1])
 		out = append(out, core.Token{
 			Line:     lineNum,
-			StartCol: idx[0],
-			EndCol:   idx[1],
+			StartCol: startCol,
+			EndCol:   endCol,
 			Type:     core.TokenVariable,
 			Priority: 23,
 		})
@@ -234,10 +249,11 @@ func numberTokens(line string, lineNum int) []core.Token {
 	matches := numberPattern.FindAllStringIndex(line, -1)
 	out := make([]core.Token, 0, len(matches))
 	for _, idx := range matches {
+		startCol, endCol := runeColsForByteRange(line, idx[0], idx[1])
 		out = append(out, core.Token{
 			Line:     lineNum,
-			StartCol: idx[0],
-			EndCol:   idx[1],
+			StartCol: startCol,
+			EndCol:   endCol,
 			Type:     core.TokenNumber,
 			Priority: 17,
 		})
@@ -250,18 +266,20 @@ func heredocTokens(line string, lineNum int) []core.Token {
 	out := make([]core.Token, 0, len(matches)*2)
 	for _, m := range matches {
 		nameStart, nameEnd := m[2], m[3]
+		opStartCol, opEndCol := runeColsForByteRange(line, m[0], nameStart)
+		nameStartCol, nameEndCol := runeColsForByteRange(line, nameStart, nameEnd)
 		out = append(out,
 			core.Token{
 				Line:     lineNum,
-				StartCol: m[0],
-				EndCol:   nameStart,
+				StartCol: opStartCol,
+				EndCol:   opEndCol,
 				Type:     core.TokenOperator,
 				Priority: 24,
 			},
 			core.Token{
 				Line:     lineNum,
-				StartCol: nameStart,
-				EndCol:   nameEnd,
+				StartCol: nameStartCol,
+				EndCol:   nameEndCol,
 				Type:     core.TokenString,
 				Priority: 24,
 			},
@@ -280,7 +298,7 @@ func commentTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []core.T
 		if !strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		start := len(line) - len(trimmed)
+		start := utf8.RuneCountInString(line[:len(line)-len(trimmed)])
 		out = append(out, core.Token{
 			Line:      i,
 			StartCol:  start,
@@ -291,6 +309,28 @@ func commentTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []core.T
 		})
 	}
 	return out
+}
+
+func runeColsForByteRange(line string, startByte, endByte int) (int, int) {
+	startByte = clampByteIndex(line, startByte)
+	endByte = max(clampByteIndex(line, endByte), startByte)
+
+	startCol := utf8.RuneCountInString(line[:startByte])
+	endCol := startCol + utf8.RuneCountInString(line[startByte:endByte])
+	return startCol, endCol
+}
+
+func clampByteIndex(line string, idx int) int {
+	if idx <= 0 {
+		return 0
+	}
+	if idx >= len(line) {
+		return len(line)
+	}
+	for idx < len(line) && !utf8.RuneStart(line[idx]) {
+		idx--
+	}
+	return idx
 }
 
 func fallbackLineTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []core.Token {
