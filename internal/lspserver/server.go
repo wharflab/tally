@@ -199,6 +199,14 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 		return unmarshalAndCall(req, func(p *protocol.DocumentFormattingParams) (any, error) {
 			return s.handleFormatting(ctx, p)
 		})
+	case string(protocol.MethodTextDocumentSemanticTokensFull):
+		return unmarshalAndCall(req, func(p *protocol.SemanticTokensParams) (any, error) {
+			return s.handleSemanticTokensFull(ctx, p)
+		})
+	case string(protocol.MethodTextDocumentSemanticTokensRange):
+		return unmarshalAndCall(req, func(p *protocol.SemanticTokensRangeParams) (any, error) {
+			return s.handleSemanticTokensRange(ctx, p)
+		})
 
 	// Workspace
 	case string(protocol.MethodWorkspaceDidChangeConfiguration):
@@ -292,6 +300,16 @@ func (s *Server) handleInitialize(params *protocol.InitializeParams) (any, error
 			},
 			DocumentFormattingProvider: &protocol.BooleanOrDocumentFormattingOptions{
 				Boolean: new(true),
+			},
+			SemanticTokensProvider: &protocol.SemanticTokensOptionsOrRegistrationOptions{
+				Options: &protocol.SemanticTokensOptions{
+					Legend: &protocol.SemanticTokensLegend{
+						TokenTypes:     lspSemanticTokenTypes(),
+						TokenModifiers: lspSemanticTokenModifiers(),
+					},
+					Range: &protocol.BooleanOrEmptyObject{Boolean: new(true)},
+					Full:  &protocol.BooleanOrSemanticTokensFullDelta{Boolean: new(true)},
+				},
 			},
 			DiagnosticProvider: &protocol.DiagnosticOptionsOrRegistrationOptions{
 				Options: &protocol.DiagnosticOptions{

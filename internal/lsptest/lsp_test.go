@@ -22,6 +22,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type semanticTokensParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+}
+
+type semanticTokensRangeParams struct {
+	TextDocument textDocumentIdentifier `json:"textDocument"`
+	Range        lspRange               `json:"range"`
+}
+
+type semanticTokensResult struct {
+	ResultID string   `json:"resultId"`
+	Data     []uint32 `json:"data"`
+}
+
 func TestLSP_Initialize(t *testing.T) {
 	t.Parallel()
 	ts := startTestServer(t)
@@ -34,6 +48,67 @@ func TestLSP_Initialize(t *testing.T) {
 			Indent:   " ",
 		}),
 	).MatchStandaloneJSON(t, result, match.Any("serverInfo.version"))
+}
+
+func TestLSP_SemanticTokensFull(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	uri := "file:///tmp/test-semantic-tokens-full/Dockerfile"
+	ts.openDocument(t, uri, "FROM alpine AS builder\nRUN --mount=type=cache,target=/root/.cache echo \"$HOME\"\n")
+
+	// Drain push diagnostics from didOpen.
+	ts.waitDiagnostics(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var result semanticTokensResult
+	err := ts.conn.Call(ctx, "textDocument/semanticTokens/full", &semanticTokensParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+	}).Await(ctx, &result)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Data)
+
+	snaps.WithConfig(
+		snaps.JSON(snaps.JSONConfig{
+			SortKeys: true,
+			Indent:   " ",
+		}),
+	).MatchStandaloneJSON(t, result)
+}
+
+func TestLSP_SemanticTokensRange(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	uri := "file:///tmp/test-semantic-tokens-range/Dockerfile"
+	ts.openDocument(t, uri, "FROM alpine\nRUN echo \"$HOME\"\nCMD [\"sh\"]\n")
+
+	// Drain push diagnostics from didOpen.
+	ts.waitDiagnostics(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var result semanticTokensResult
+	err := ts.conn.Call(ctx, "textDocument/semanticTokens/range", &semanticTokensRangeParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+		Range: lspRange{
+			Start: position{Line: 1, Character: 0},
+			End:   position{Line: 1, Character: 100},
+		},
+	}).Await(ctx, &result)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Data)
+
+	line := uint32(0)
+	for idx := 0; idx < len(result.Data); idx += 5 {
+		line += result.Data[idx]
+		require.Equal(t, uint32(1), line, "range-encoded token should stay on requested line")
+	}
 }
 
 func TestLSP_ShutdownExit(t *testing.T) {

@@ -17,6 +17,28 @@
     "tally.applyAllFixes"
    ]
   },
+  "semanticTokensProvider": {
+   "full": true,
+   "legend": {
+    "tokenModifiers": [
+     "declaration",
+     "readonly",
+     "documentation"
+    ],
+    "tokenTypes": [
+     "keyword",
+     "comment",
+     "string",
+     "number",
+     "operator",
+     "variable",
+     "parameter",
+     "property",
+     "function"
+    ]
+   },
+   "range": true
+  },
   "textDocumentSync": {
    "change": 1,
    "openClose": true,

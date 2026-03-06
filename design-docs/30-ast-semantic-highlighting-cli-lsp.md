@@ -1,76 +1,176 @@
-# AST-Based Semantic Highlighting for CLI Snippets and LSP
+# AST-Aware Semantic Highlighting for CLI Snippets and LSP
 
 > Status: proposal
 >
-> Scope: drop Chroma, keep Lip Gloss, add shared semantic token engine for CLI + LSP
+> Scope: replace Chroma in CLI snippet rendering, add a shared semantic token engine, and expose semantic tokens from the existing LSP server
 
-## 1. Context and Motivation
+## Executive Summary
 
-`tally` currently uses `github.com/alecthomas/chroma/v2` for snippet highlighting in text output.
-That is generic lexer-based highlighting, but `tally` already has richer domain context:
+`tally` already has richer structure than a generic syntax highlighter:
 
-- Dockerfile AST from BuildKit parser and typed instructions
-- semantic stage/shell model (`internal/semantic`)
-- shell parsing with `mvdan.cc/sh/v3/syntax`
+- BuildKit Dockerfile AST and typed instructions
+- `internal/semantic` stage and shell model
+- `internal/shell` shell-variant detection and `mvdan.cc/sh/v3` parsing
+- `internal/sourcemap` line/offset mapping
+- shell script extraction logic already implemented in `internal/rules/shellcheck/script.go`
 
-Key limitations of current approach:
+Today the text reporter still highlights snippets with `github.com/alecthomas/chroma/v2`, one line at a time, with no Dockerfile-aware token model and
+no reuse for LSP. The proposal is to replace that with a shared, AST-aware highlighter that serves two consumers:
 
-1. Dockerfile grammar in Chroma is generic and misses modern/highly specialized syntax (`RUN --mount`, rich `ADD/COPY` flags, parsing directives).
-2. Heredoc script bodies are not highlighted with effective shell dialect awareness.
-3. Shell-form instructions (`RUN`, `CMD`, `ENTRYPOINT`, `HEALTHCHECK CMD-SHELL`) are not highlighted as shell semantics.
-4. Chroma adds broad functionality we do not need (many lexers and formatters), while we need deep Dockerfile/shell specialization.
-5. The existing AST model already contains enough information to produce better highlighting than tokenizing plain lines.
+1. CLI snippet rendering in `internal/reporter/text.go`
+2. LSP semantic token handlers in `internal/lspserver`
 
-This proposal replaces Chroma with an AST-aware semantic token pipeline that powers both terminal snippets and LSP semantic tokens.
+The important design constraint is pragmatism: v1 should stay pure Go, reuse existing repo primitives, and ship incrementally. In particular:
+
+- v1 should deliver shared tokenization plus `textDocument/semanticTokens/full` and `range`
+- `full/delta` should be phase 2, after token normalization and caching are proven stable
+- PowerShell and `cmd` should use conservative lexical fallback in v1
+- Zed grammar de-bundling should not be part of the initial delivery
 
 ---
 
-## 2. Goals
+## 1. Current State
+
+Relevant code that already exists:
+
+- `internal/reporter/text.go`
+  - uses Chroma for per-line Dockerfile highlighting
+  - applies line-level `>>>` markers, but not exact span overlays
+- `internal/lspserver/server.go`
+  - advertises diagnostics, formatting, code actions, and execute-command support
+  - already uses generated 3.17-era protocol types that include semantic token messages
+- `internal/sourcemap/sourcemap.go`
+  - provides line text, offsets, and end-line expansion for continuations
+- `internal/rules/shellcheck/script.go`
+  - already extracts shell-form scripts and heredoc bodies and maps them back to Dockerfile lines
+- `internal/shell/shell.go`
+  - already models shell variants (`bash`, `posix`, `mksh`, `powershell`, `cmd`, `unknown`)
+  - already exposes shebang detection and mvdan-backed parsing variants
+- `_integrations/zed-tally/`
+  - currently bundles Dockerfile language assets and grammar configuration
+
+This means the proposal does not need to invent new foundations. It mainly needs a shared token model, normalization rules, renderer, and LSP
+adapters.
+
+---
+
+## 2. Problems With the Current Approach
+
+1. Chroma is lexer-based and Dockerfile-generic. It does not understand stage aliases, directive comments, heredoc boundaries, or BuildKit-specific
+   flags with the same precision as our own parser stack.
+2. The reporter highlights whole lines independently, so multi-line instructions, embedded shell, and exact rule spans cannot be rendered precisely.
+3. `tally` already pays the cost of Dockerfile parsing and shell analysis, but the reporter discards that structure and re-lexes plain text.
+4. The LSP server has no semantic token support, so editor highlighting cannot reuse the same semantics as CLI snippets.
+5. The original draft bundled too many concerns into one release: reporter rewrite, LSP full/range/delta, Zed grammar changes, and phase-2 PowerShell
+   parser strategy. That is too much coupling for an initial implementation.
+
+---
+
+## 3. Goals
 
 1. Remove direct dependency on `github.com/alecthomas/chroma/v2`.
-2. Keep terminal rendering with `charm.land/lipgloss/v2`.
-3. Implement semantic tokenization from existing Dockerfile + shell AST/model.
-4. Support modern Dockerfile syntax including mounts, directive comments, and advanced flags.
-5. Support shell-aware highlighting inside heredocs and shell-form instructions, including shebang overrides.
-6. Improve console focus by emphasizing the exact violation span (not only line-level markers).
-7. Expose shared tokenization to LSP via:
-   - `textDocument/semanticTokens/full`
-   - `textDocument/semanticTokens/range`
-   - `textDocument/semanticTokens/full/delta`
+2. Keep Lip Gloss as the terminal rendering layer.
+3. Build one shared semantic token pipeline for Dockerfile and embedded shell snippets.
+4. Reuse existing `internal/sourcemap`, `internal/shell`, `internal/semantic`, and shell-script extraction logic.
+5. Improve CLI output by highlighting the exact violation span, not only the affected lines.
+6. Add LSP semantic tokens for full-document and range requests.
+7. Keep v1 pure Go and portable across current repo targets.
 
 ---
 
-## 3. Non-Goals (v1)
+## 4. Non-Goals (v1)
 
-1. Full PowerShell/CMD AST parser integration.
-2. New user-facing theme system beyond dark/light.
-3. Rewriting diagnostics model or rule engine.
+1. Full AST-backed PowerShell or `cmd.exe` parsing.
+2. User-configurable multi-theme system beyond `auto|dark|light`.
+3. Changing diagnostics, fixes, or rule semantics.
+4. Zed grammar de-bundling as part of the initial release.
+5. Mandatory support for `textDocument/semanticTokens/full/delta` in the first shipped version.
 
 ---
 
-## 4. High-Level Design
+## 5. Key Decisions
+
+### 5.1 One engine, two adapters
+
+The highlighter should produce a normalized token stream once, then hand it to:
+
+- an ANSI renderer for CLI snippets
+- an LSP encoder for semantic tokens
+
+The CLI and LSP paths must not each invent their own tokenization rules.
+
+### 5.2 Reuse repo primitives instead of duplicating them
+
+The token engine should build on:
+
+- `dockerfile.ParseResult`
+- `sourcemap.SourceMap`
+- `semantic.Model` when available
+- `shell.Variant`
+- extracted script mappings from the existing ShellCheck helper logic
+
+A design that re-parses raw source from scratch without using those inputs would be a regression.
+
+### 5.3 Normalize once, then render/encode
+
+LSP semantic tokens must be sorted and non-overlapping. CLI rendering also becomes much simpler if all overlaps are resolved before rendering. The
+design therefore needs an explicit normalization stage, not just ad hoc per-consumer cleanup.
+
+### 5.4 Keep v1 pure Go
+
+PowerShell tree-sitter or other cgo-backed parsers are plausible future work, but they should not block the initial replacement of Chroma.
+
+### 5.5 Phase the rollout
+
+Recommended phases:
+
+1. Shared token model + CLI renderer
+2. LSP `semanticTokens/full` and `range`
+3. LSP `full/delta` cache and delta computation
+4. Optional future dialect-specific parser expansion
+
+---
+
+## 6. Proposed Package Layout
 
 Introduce a new package family under `internal/highlight/`.
 
-### 4.1 Core model
+- `internal/highlight/core`
+  - token types, modifiers, ranges, normalization, sorting, clipping
+- `internal/highlight/dockerfile`
+  - Dockerfile tokenization using BuildKit AST, typed instructions, and source scanning
+- `internal/highlight/shell`
+  - shell tokenization entrypoints and provider dispatch by `shell.Variant`
+- `internal/highlight/extract`
+  - shared script extraction and source mapping moved out of shellcheck-specific code
+- `internal/highlight/renderansi`
+  - Lip Gloss based CLI rendering from normalized tokens
+- `internal/highlight/lspencode`
+  - LSP semantic token legend, encoding, and later delta support
+- `internal/highlight/theme`
+  - dark/light palette selection and style lookup
+
+This layout matches the repo’s current style better than burying everything in `internal/reporter` or `internal/lspserver`.
+
+---
+
+## 7. Token Model
+
+Use a shared internal token model with 0-based line/column positions.
 
 ```go
-type TokenKind string
+type TokenType string
 
 type Token struct {
-    Line     int // 0-based
-    StartCol int // 0-based, inclusive
-    EndCol   int // 0-based, exclusive
-    Kind     TokenKind
-    ModMask  uint32
-}
-
-type DocumentTokens struct {
-    Tokens []Token
+    Line      int
+    StartCol  int
+    EndCol    int
+    Type      TokenType
+    Modifiers uint32
 }
 ```
 
-Token kinds for v1:
+Recommended token types for v1 are standard LSP-friendly names:
 
 - `keyword`
 - `comment`
@@ -82,418 +182,368 @@ Token kinds for v1:
 - `property`
 - `function`
 
-### 4.2 Subpackages
+Recommended modifier usage for v1:
 
-- `internal/highlight/core` — shared types, range helpers, sort/merge guarantees
-- `internal/highlight/dockerfile` — Dockerfile instruction/directive tokenization
-- `internal/highlight/shellposix` — mvdan-based shell tokenization
-- `internal/highlight/extract` — shared script extraction/mapping (migrated from shellcheck rule internals)
-- `internal/highlight/renderansi` — ANSI line rendering via Lip Gloss
-- `internal/highlight/lspencode` — semantic token encoding + delta edit generation
-- `internal/highlight/theme` — dark/light palette and resolution
+- `declaration`
+- `readonly`
+- `documentation`
 
----
+The internal model can remain slightly richer than the public LSP legend if needed, but the public legend should stay small and standard unless there
+is a strong reason to add custom token types.
 
-## 5. Tokenization Strategy
+### 7.1 Normalization invariants
 
-## 5.1 Dockerfile tokens
+Every consumer should receive tokens that satisfy these invariants:
 
-Use BuildKit AST (`parser.Node`) + typed instructions + source lines to emit tokens for:
+1. Tokens are sorted by `(line, startCol, endCol, type)`.
+2. Tokens never overlap after normalization.
+3. Tokens are clipped to the actual source line width.
+4. Zero-width or invalid spans are dropped.
+5. Later, more specific tokens win over earlier, coarser tokens.
 
-- parsing directives (`# syntax=`, `# escape=`, `# check=`)
-- instruction keywords (`FROM`, `RUN`, `COPY`, `ADD`, etc.)
-- flag names and values:
-  - `RUN --mount`, `--network`, `--security`
-  - `COPY/ADD --from`, `--chown`, `--chmod`, `--link`, `--exclude`, `--checksum`, `--keep-git-dir`
-- stage alias binding (`FROM ... AS name`) and usage (`--from=name`)
-- heredoc operators and delimiters (`<<`, `<<-`, marker names)
-
-When BuildKit lacks fine-grained columns, use deterministic per-line scanners over source text.
-
-## 5.2 Embedded shell tokens
-
-For shell-form instructions and heredoc script bodies:
-
-1. Reuse extraction/mapping logic currently implemented for ShellCheck ranges (move to shared `internal/highlight/extract`).
-2. Resolve effective shell dialect per instruction:
-   - stage shell setting from semantic model
-   - updates from `SHELL` instructions
-   - heredoc shebang override (highest precedence for heredoc body)
-3. If parseable (`bash`, `posix`, `mksh`): parse with `mvdan.cc/sh/v3/syntax` and emit semantic tokens from AST nodes.
-4. If non-parseable (`powershell`, `cmd`, unknown): apply conservative lexical fallback (no false AST precision).
-
-This ensures large heredocs can be expanded and highlighted correctly for shell language context.
+That last rule matters when Dockerfile-level tokens and embedded-shell tokens compete for the same source span.
 
 ---
 
-## 6. CLI Rendering Changes
+## 8. Tokenization Strategy
 
-Refactor `internal/reporter/text.go`:
+### 8.1 Dockerfile tokenization
 
-1. Remove Chroma lexer/formatter/style fields and initialization.
-2. For each displayed snippet range:
-   - request semantic tokens from shared highlighter
-   - render line segments with Lip Gloss styles by token kind
-3. Keep existing structural output (headers, separators, line numbers, `>>>`).
-4. Add **exact violation overlay**:
-   - apply stronger style (inverse + underline + bold) for precise `rules.Location` span
-   - keep line marker as secondary cue
+Use BuildKit AST plus deterministic source scanning to emit tokens for:
 
-This provides both semantic coloring and precise issue targeting.
+- parsing directives such as `# syntax=`, `# escape=`, `# check=`
+- instruction keywords such as `FROM`, `RUN`, `COPY`, `ADD`, `ARG`, `ENV`
+- operators and punctuation with semantic value, such as heredoc operators and JSON-form punctuation where useful
+- flag names and values, including BuildKit-specific flags
+- stage alias declarations and references
+- variable interpolations where column positions can be determined reliably
+
+Examples that must be covered explicitly:
+
+- `RUN --mount=type=cache,target=/root/.cache ...`
+- `COPY --from=builder --chmod=755 ...`
+- `FROM alpine AS builder`
+- heredoc introducers like `<<EOF` and `<<-EOF`
+
+Important constraint: BuildKit gives strong line structure but not full token-level columns for everything. When column precision is missing, the
+tokenizer should use source scanning anchored by AST line ownership rather than inventing a second parser.
+
+### 8.2 Embedded shell tokenization
+
+For shell-form instructions and heredoc bodies:
+
+1. Reuse the extraction and source-mapping logic currently in `internal/rules/shellcheck/script.go`.
+2. Move that logic into `internal/highlight/extract` or a similarly neutral package.
+3. Resolve the effective dialect using:
+   - stage shell state from `internal/semantic`
+   - `SHELL` instructions
+   - heredoc shebang override when present
+4. If `shell.Variant.IsParseable()` is true, parse with `mvdan.cc/sh/v3/syntax`.
+5. If the variant is `powershell`, `cmd`, or `unknown`, use lexical fallback only.
+
+This is the correct reuse boundary: the semantic highlighter and ShellCheck both need the same script extraction and source-to-snippet mapping, so
+they should share one implementation.
+
+### 8.3 Lexical fallback contract
+
+Fallback mode must be conservative:
+
+- no invented AST precision
+- keep comments, strings, variables, and obvious operators when detectible
+- do not emit dense, low-confidence tokens that create noisy highlighting
+
+The goal is graceful degradation, not fake precision.
 
 ---
 
-## 7. Theme Resolution (Dark/Light only)
+## 9. CLI Rendering
 
-Only two palettes are supported in v1:
+Refactor `internal/reporter/text.go` to remove Chroma-specific state and replace it with token-driven segment rendering.
+
+### 9.1 Reporter changes
+
+`TextOptions` should:
+
+- keep `Color`
+- keep `ShowSource`
+- replace `ChromaStyle` with `Theme string` or equivalent `auto|dark|light`
+- keep syntax highlighting enabled by default when color is enabled
+
+### 9.2 Rendering behavior
+
+For each displayed snippet:
+
+1. Build a `SourceMap` from the file content.
+2. Request normalized semantic tokens for the snippet’s lines.
+3. Render text segments with Lip Gloss styles by token type.
+4. Apply an exact violation overlay for `rules.Location` at render time.
+5. Keep the existing line-number gutter and `>>>` marker as a secondary cue.
+
+### 9.3 Exact span overlay
+
+The overlay should be independent of the semantic token stream.
+
+Recommended overlay behavior:
+
+- if the violation has an exact column range, apply underline + bold + optional inverse to that range only
+- if the violation is point-like, highlight the token containing the point when possible, otherwise fall back to the whole line marker
+- if the violation is line-only, keep the current affected-line marker behavior
+
+Diagnostics should not be encoded into semantic token types just to make the CLI renderer simpler.
+
+---
+
+## 10. LSP Semantic Tokens
+
+Extend `internal/lspserver` to advertise and serve semantic tokens from the same shared engine.
+
+### 10.1 Capability advertisement
+
+Phase 1 should advertise:
+
+- `semanticTokensProvider.legend`
+- `semanticTokensProvider.range = true`
+- `semanticTokensProvider.full = true`
+
+Phase 2 can upgrade `full` to `{ delta: true }`.
+
+### 10.2 Handlers
+
+Add handlers for:
+
+- `textDocument/semanticTokens/full`
+- `textDocument/semanticTokens/range`
+
+Both handlers should:
+
+1. resolve content from the open document store when possible
+2. fall back to disk for file-backed URIs when appropriate
+3. parse using the existing Dockerfile pipeline
+4. generate normalized tokens
+5. encode via a shared LSP legend and encoder
+
+### 10.3 Delta support
+
+`textDocument/semanticTokens/full/delta` should be deferred to phase 2.
+
+Reasoning:
+
+- the implementation cost is not in the wire format but in stable cache identity and edit computation
+- token normalization must be frozen first, or delta churn becomes noisy and fragile
+- `full` and `range` provide most of the user-visible value immediately
+
+When added later, cache keys should at minimum include:
+
+- document URI
+- document version
+- semantic token legend version
+- tokenizer version or result ID
+
+If cache state is missing or incompatible, the server should fall back to a full response.
+
+---
+
+## 11. Theme Resolution
+
+Only two palettes are needed in v1:
 
 - `dark`
 - `light`
 
 Resolution order:
 
-1. If color output is disabled (`NO_COLOR` / `--no-color`), skip theme selection.
-2. Optional deterministic override via `TALLY_THEME`:
-   - `dark` => dark palette
-   - `light` => light palette
-   - `auto` or unset => continue
-3. Auto-detect with `lipgloss.HasDarkBackground(os.Stdin, os.Stdout)`:
-   - true => dark
-   - false => light
-4. If detection is unavailable/ambiguous, fallback to **dark**.
+1. if color output is disabled, skip theme resolution entirely
+2. if `TALLY_THEME=dark|light`, use that palette
+3. if `TALLY_THEME=auto` or unset, use `lipgloss.HasDarkBackground(os.Stdin, os.Stdout)`
+4. if detection is unavailable or ambiguous, fall back to `dark`
 
-No additional theme variants are introduced.
+This preserves deterministic behavior for tests and CI without introducing a broader theming system.
 
 ---
 
-## 8. LSP Semantic Tokens
+## 12. Implementation Plan
 
-Extend `internal/lspserver` capabilities and handlers.
+### Phase 1: shared engine + CLI
 
-### 8.1 Capabilities
+1. Create `internal/highlight/core`, `dockerfile`, `extract`, `shell`, `renderansi`, and `theme`.
+2. Move shared script extraction logic out of `internal/rules/shellcheck/script.go`.
+3. Replace Chroma usage in `internal/reporter/text.go`.
+4. Add unit tests and reporter snapshot coverage.
+5. Remove the Chroma dependency from `go.mod` and `go.sum`.
 
-Advertise `semanticTokensProvider` with:
+### Phase 2: LSP full + range
 
-- `legend` (v1 token kinds above)
-- `range: true`
-- `full: { delta: true }`
+1. Add semantic token legend and encoder.
+2. Advertise semantic token capability in `handleInitialize`.
+3. Implement `full` and `range` handlers in `internal/lspserver`.
+4. Add LSP black-box tests in `internal/lsptest`.
 
-### 8.2 Handlers
+### Phase 3: LSP delta
 
-Implement:
+1. Add per-document token cache.
+2. Implement `textDocument/semanticTokens/full/delta`.
+3. Benchmark churn behavior and fallback correctness.
 
-- `textDocument/semanticTokens/full`
-- `textDocument/semanticTokens/range`
-- `textDocument/semanticTokens/full/delta`
+### Phase 4: future dialect expansion
 
-All handlers call the same shared highlighter used by CLI.
-
-### 8.3 Delta behavior
-
-Maintain per-document semantic token cache:
-
-- key: URI + resultId + document version
-- value: encoded token array + decoded token list metadata
-
-On delta request:
-
-1. If previous `resultId` cache exists and document version is compatible, return `SemanticTokensDelta` edits.
-2. If cache miss/stale/incompatible, return full tokens (spec-compliant fallback).
-
-This keeps behavior robust while still providing efficient updates for supported clients.
+1. Add optional provider adapters for PowerShell or other dialects.
+2. Keep lexical fallback available even when an optional parser exists.
 
 ---
 
-## 9. Public API / Config Changes
+## 13. Testing Plan
 
-`internal/reporter.TextOptions`:
+### 13.1 Unit tests
 
-- remove Chroma-specific fields
-- add minimal theme mode (`auto|dark|light`)
-
-No mandatory CLI flag changes are required.
-
-Optional environment override for deterministic behavior:
-
-- `TALLY_THEME=auto|dark|light`
-
----
-
-## 10. Dependency Changes
-
-1. Remove direct dependency on `github.com/alecthomas/chroma/v2` from `go.mod`/`go.sum`.
-2. Keep `charm.land/lipgloss/v2` as rendering backend.
-
----
-
-## 11. Implementation Plan (Single Release)
-
-1. Create `internal/highlight/*` core, tokenizers, renderer, LSP encoder.
-2. Extract shared shell snippet mapping helpers from rule-internal code into neutral shared package.
-3. Replace snippet highlighter in `internal/reporter/text.go` with new renderer.
-4. Add LSP semantic token capability and handlers (`full`, `range`, `full/delta`).
-5. Add semantic token cache and delta edit generation.
-6. Remove Chroma dependency and dead code paths.
-7. Update `_integrations/zed-tally` implementation for semantic-token-first flow:
-   - remove bundled grammar declaration from `_integrations/zed-tally/extension.toml`
-   - remove extension-owned Dockerfile grammar/query assets under `_integrations/zed-tally/grammars/dockerfile/**` and
-     `_integrations/zed-tally/languages/dockerfile/**`
-   - keep LSP registration targeting built-in `Dockerfile` language
-8. Add shell tokenizer provider abstraction for future non-POSIX dialects:
-   - explicit variant registry (`bash`, `posix`, `mksh`, `powershell`, `cmd`)
-   - keep `powershell`/`cmd` on lexical fallback in v1
-   - define PowerShell AST adapter contract for phase-2 tree-sitter integration
-9. Update tests/snapshots/docs (including Zed extension docs, PowerShell strategy, and migration notes).
-
----
-
-## 12. Testing Plan
-
-## 12.1 Unit tests
-
-- Dockerfile tokenizer:
-  - directive comments
-  - `RUN --mount=...`
-  - `ADD/COPY` advanced flags
-  - heredoc boundaries
-- Shell tokenizer:
-  - bash/posix/mksh AST cases
+- Dockerfile tokenizer
+  - directives
+  - stage alias declaration and reference
+  - `RUN --mount`
+  - `COPY/ADD` advanced flags
+  - heredoc markers
+- Shell tokenizer
+  - bash, POSIX, mksh
   - heredoc shebang override
-  - fallback mode for powershell/cmd
-- Theme resolver:
+  - fallback behavior for PowerShell and `cmd`
+- Normalizer
+  - sorting
+  - overlap resolution
+  - clipping and invalid-span removal
+- Theme resolver
   - no-color path
-  - `TALLY_THEME` override
-  - auto detect path
-  - fallback behavior
-- LSP encoder:
-  - stable ordering
+  - env override
+  - auto-detect fallback
+- LSP encoder
+  - stable legend order
   - full encoding
-  - delta edit generation
+  - phase-2 delta edit generation
 
-## 12.2 Integration tests
+### 13.2 Integration tests
 
-- Reporter snapshots for representative Dockerfiles:
-  - regular RUN
-  - shell-form instructions
-  - heredoc scripts
-  - COPY/ADD flags
-  - precise violation overlay
-- LSP tests:
-  - initialize capability includes semanticTokensProvider
-  - `semanticTokens/full` response
-  - `semanticTokens/range` response
-  - `semanticTokens/full/delta` hit/miss behavior
+- text reporter snapshots for representative Dockerfiles
+- exact violation overlay snapshots
+- no-color output remains readable and stable
+- LSP initialize snapshot includes `semanticTokensProvider`
+- `semanticTokens/full` for open document content
+- `semanticTokens/range` for partial requests
+- phase-2 delta hit/miss cases
 
-## 12.3 Regression tests
+### 13.3 Benchmark coverage
 
-- No-color output remains plain and readable.
-- Existing diagnostics/code actions/formatting remain unchanged.
+Add targeted benchmarks for:
 
----
+- large Dockerfiles with many `RUN --mount` instructions
+- large heredoc bodies
+- repeated LSP full-token requests on unchanged content
 
-## 13. Windows/PowerShell Future Compatibility
-
-This design is intentionally compatible with planned Windows container support (`design-docs/26-windows-container-support.md`):
-
-- Token engine supports variant-specific pipelines.
-- Non-POSIX dialects can start with lexical fallback.
-- Later PowerShell/CMD AST support can be added behind same token model without breaking renderer/LSP contracts.
-
-### 13.1 PowerShell semantic-token requirements
-
-Any parser strategy used for future PowerShell support should satisfy:
-
-1. Stable start/end ranges at token-level precision for `RUN` shell form and heredoc-expanded scripts.
-2. Deterministic, machine-readable syntax categories mappable to LSP semantic token kinds/modifiers.
-3. Practical performance for `semanticTokens/full`, `semanticTokens/range`, and `semanticTokens/full/delta`.
-4. Predictable behavior in CI and local development (minimal hidden runtime assumptions).
-5. Graceful fallback when parser is unavailable.
-
-### 13.2 Option A — Tree-sitter (`go-tree-sitter` + `tree-sitter-powershell`)
-
-Pros (for semantic tokens):
-
-- In-process parser with precise node ranges suitable for token spans.
-- Naturally supports range-oriented workflows and can be reused for both CLI snippets and LSP handlers.
-- Grammar is actively maintained and purpose-built for modern PowerShell syntax.
-- Keeps tokenization architecture consistent with future multi-language embedding scenarios.
-
-Tradeoffs:
-
-- Adds C-backed/cgo dependency surface and associated toolchain/runtime complexity.
-- Requires careful lifecycle management of parser/tree/query objects.
-- Increases binary/build complexity versus pure-Go fallback.
-
-### 13.3 Option B — `go-powershell` + native parser scripting (Codex-style)
-
-Assessment from semantic-token perspective:
-
-- `github.com/KnicKnic/go-powershell` is primarily a PowerShell execution/hosting library, not a static AST parser API for source tokenization.
-- Codex-style parsing via `[System.Management.Automation.Language.Parser]::ParseInput(...)` is viable as a native parser access pattern, but requires
-  PowerShell runtime orchestration and JSON bridge logic.
-
-Pros:
-
-- Uses official PowerShell parser semantics.
-- Can leverage native parser behavior for tricky language constructs.
-
-Tradeoffs:
-
-- Runtime/process dependency (`pwsh`/Windows PowerShell availability) complicates portability and CI predictability.
-- Higher request overhead and operational complexity for LSP token refresh paths.
-- Less practical for low-latency, always-on semantic tokenization than an in-process parser.
-
-### 13.4 Recommendation
-
-Choose **Option A (Tree-sitter)** for phase-2 PowerShell semantic tokens.
-
-Rationale:
-
-1. It best fits LSP semantic token serving model (full/range/delta) with in-process, low-latency token extraction.
-2. It preserves cross-feature code reuse with the CLI renderer and shared token pipeline.
-3. It provides parser independence from external PowerShell runtime availability.
-
-`go-powershell`/native-parser scripting can remain a contingency path for specialized validation workflows, but not as primary semantic token source.
-
-### 13.5 Integration guidelines for phase 2
-
-1. Implement `internal/highlight/shellpowershell` behind shared shell tokenizer interface.
-2. Keep tokenizer registry dialect-driven (`shell.Variant*`) with strict fallback contract:
-   - parser available => AST semantic tokens
-   - parser unavailable => lexical fallback
-3. Map PowerShell node types to existing token legend first (`keyword`, `variable`, `string`, `operator`, `function`, `parameter`, `property`), then
-   extend legend only if required.
-4. Reuse existing script extraction/range expansion logic for Dockerfile heredocs and shell-form instructions so PowerShell path follows same
-   snippet-to-source mapping contracts.
-5. Add parser capability probe at startup and expose internal diagnostics/trace for fallback decisions.
-6. Add focused fixtures for:
-   - interpolation and expandable strings
-   - pipelines and script blocks
-   - here-strings
-   - parameter binding and splatting
-7. Keep parser implementation isolated so future parser swap is possible without changing renderer or LSP handler contracts.
+The implementation does not need a premature optimization pass, but it should prove that replacing Chroma does not create obvious regressions on
+realistic files.
 
 ---
 
-## 14. Zed Extension Strategy (Can We Drop Bundled Tree-Sitter Dockerfile Grammar?)
+## 14. Zed Strategy
 
-Short answer: **yes, we can likely drop the bundled grammar in `_integrations/zed-tally` once LSP semantic tokens are in place**, with caveats.
+The original draft assumed we could likely drop the bundled Dockerfile grammar because Dockerfile was built into Zed. That assumption is too strong.
 
-Important distinction:
+As of the current Zed docs referenced below, Dockerfile support is provided by a Dockerfile extension rather than a native built-in language. That
+changes the migration strategy.
 
-- We can drop the **extension-bundled** Dockerfile grammar.
-- We cannot drop Tree-sitter usage in Zed entirely; Zed still relies on Tree-sitter language support for structure-oriented editor behaviors.
+### 14.1 What this means for v1
 
-### 14.1 Research findings
+For the initial semantic-token rollout:
 
-1. Zed supports semantic tokens with three modes:
-   - `off` (default)
-   - `combined`
-   - `full` (semantic tokens replace Tree-sitter highlighting layer)
-2. Zed now supports LSP semantic token highlighting (preview release `0.224.0`, Feb 11, 2026).
-3. Dockerfile is listed as a built-in supported language in Zed, so we can target the built-in `Dockerfile` language instead of shipping our own
-   grammar copy.
-4. Zed language extension docs still define language metadata around grammar-backed language config; therefore, de-bundling should rely on
-   **existing built-in Dockerfile language** rather than a grammar-less custom language definition.
+- keep `_integrations/zed-tally` grammar and language assets unchanged
+- add semantic token support on the server side only
+- validate Zed behavior with `semantic_tokens = "combined"` and `"full"`
 
-### 14.2 Proposed migration
+This avoids coupling the highlighter work to editor packaging decisions.
 
-#### Phase A — Semantic-token-ready server (this project)
+### 14.2 Future de-bundling should be a separate decision
 
-Ship the LSP semantic token implementation (`full`, `range`, `full/delta`) and validate with Zed `semantic_tokens = "full"` and `combined`.
+If we later want to stop bundling Dockerfile grammar assets, that should be evaluated separately and only after we answer these questions:
 
-#### Phase B — De-bundle extension grammar
+1. Can `tally` depend on Zed’s community Dockerfile extension in a stable way?
+2. Does that preserve structural editor behavior, not just visual highlighting?
+3. Does the user experience remain acceptable when semantic tokens are disabled?
 
-Update `_integrations/zed-tally`:
-
-1. Remove extension-owned Dockerfile grammar declaration in `extension.toml`:
-   - remove `[grammars.dockerfile]` block
-2. Remove extension-owned language assets:
-   - `languages/dockerfile/config.toml`
-   - `languages/dockerfile/highlights.scm`
-   - `languages/dockerfile/injections.scm`
-   - `grammars/dockerfile/**`
-3. Keep language server registration targeting built-in Dockerfile language:
-   - `[language_servers.tally] languages = ["Dockerfile"]`
-4. Update extension README to recommend semantic token mode:
-   - per-language `semantic_tokens = "full"` (preferred) or `"combined"`
-
-#### Phase C — Compatibility fallback and quality checks
-
-1. Verify extension behavior with semantic tokens `off` (Tree-sitter fallback from Zed built-in Dockerfile support).
-2. Verify behavior with semantic tokens `combined` and `full`.
-3. If specific Dockerfile visual semantics regress in Zed (vs prior bundled grammar), provide user-facing token rule guidance in docs via
-   `global_lsp_settings.semantic_token_rules`.
-
-### 14.3 Rollback plan
-
-If de-bundling reveals unacceptable UX regressions (for example, editor structural behavior differences tied to grammar queries), reintroduce bundled
-grammar in extension while keeping semantic-token support unchanged in `tally` LSP.
-
-### 14.4 Acceptance criteria for de-bundling
-
-1. `zed-tally` works without shipping `grammars/dockerfile`.
-2. Diagnostics, formatting, and code actions remain functional.
-3. Syntax appearance in `semantic_tokens = "full"` is acceptable using `tally` semantic tokens.
-4. `semantic_tokens = "off"` remains acceptable through Zed's built-in Dockerfile language fallback.
+Until those answers are clear, grammar de-bundling should remain out of scope for this document’s acceptance criteria.
 
 ---
 
-## 15. Risks and Mitigations
+## 15. Future PowerShell Support
 
-1. **Column precision mismatch**
-   - Mitigation: source-based scanners + mapping fixtures and fuzz-style edge tests.
-2. **Token cache complexity for delta**
-   - Mitigation: strict cache keying by URI+version+resultId and full fallback.
-3. **Performance on large heredocs**
-   - Mitigation: range-limited tokenization for snippets and LSP range requests; cache full results.
-4. **Package cycle risk during extraction refactor**
-   - Mitigation: keep extraction helpers in neutral package under `internal/highlight/extract`.
-5. **Zed semantic tokens are opt-in**
-   - Mitigation: document recommended Zed settings and keep Tree-sitter fallback path.
-6. **De-bundling extension grammar could change editor structural behavior**
-   - Mitigation: phase-gated rollout with explicit rollback option.
-7. **Future PowerShell tree-sitter integration adds cgo footprint**
-   - Mitigation: isolate parser adapter, preserve lexical fallback, and gate with capability checks.
+This design should remain compatible with the Windows-container direction in `design-docs/26-windows-container-support.md`.
 
----
+For v1:
 
-## 16. Acceptance Criteria
+- use `internal/shell.Variant` as the dispatch boundary
+- keep `powershell` and `cmd` on lexical fallback
+- do not introduce cgo or runtime PowerShell-process dependencies
 
-1. Chroma imports and dependency removed.
-2. CLI snippets show semantic Dockerfile and shell highlighting with exact span overlay.
-3. Heredoc shell bodies use effective shell-aware highlighting.
-4. LSP returns semantic tokens for full/range and supports full/delta.
-5. Theme defaults to reliable dark/light auto detection with deterministic override.
-6. Existing lint diagnostics behavior remains stable.
-7. Zed integration strategy for optional grammar de-bundling is documented and actionable.
-8. PowerShell phase-2 parser strategy and recommendation are documented with integration guidelines.
+Future parser-backed PowerShell support should satisfy:
+
+1. stable token-level ranges
+2. deterministic mapping to the shared token model
+3. acceptable latency for `full`, `range`, and later `delta`
+4. graceful fallback when the parser is unavailable
+
+That follow-up work deserves its own design doc once the base highlighter ships.
 
 ---
 
-## 17. References
+## 16. Risks and Mitigations
 
-- LSP Semantic Tokens Spec (3.17):
-  - <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/>
-- Example semantic token architecture:
-  - <https://github.com/vroland/lsp-syntax-highlighter>
+1. Column precision can be inconsistent across BuildKit-derived data.
+   Mitigation: use AST-anchored source scanning and add fixtures for tricky spans.
+
+2. Sharing extraction logic could create package-cycle pressure.
+   Mitigation: move script extraction into a neutral package under `internal/highlight` or another cycle-safe location.
+
+3. Embedded-shell tokens can overlap coarse Dockerfile tokens.
+   Mitigation: define explicit normalization precedence and test it directly.
+
+4. Large heredocs can be expensive to retokenize repeatedly.
+   Mitigation: support range-limited tokenization where possible and add phase-2 LSP caching.
+
+5. Zed semantics may look different in `combined` versus `full` mode.
+   Mitigation: document recommended settings, but do not tie server rollout to extension repackaging.
+
+6. Future PowerShell parser work could add build complexity.
+   Mitigation: isolate dialect providers behind the shared shell tokenization boundary and preserve lexical fallback.
+
+---
+
+## 17. Acceptance Criteria
+
+### Required for initial delivery
+
+1. Chroma imports are removed from the reporter implementation and dependency graph.
+2. CLI snippets use the shared semantic token engine.
+3. CLI rendering highlights exact violation spans when column information exists.
+4. Heredoc and shell-form snippets use shell-aware tokenization when the dialect is parseable.
+5. LSP advertises and serves `semanticTokens/full` and `semanticTokens/range`.
+6. Existing diagnostics, formatting, and code actions remain unchanged.
+7. No-color output remains plain and readable.
+
+### Deferred to follow-up work
+
+1. `semanticTokens/full/delta`
+2. PowerShell AST-backed tokenization
+3. Zed grammar de-bundling
+
+---
+
+## 18. References
+
 - BuildKit parser package:
   - <https://pkg.go.dev/github.com/moby/buildkit/frontend/dockerfile/parser>
-- mvdan shell syntax package:
+- `mvdan.cc/sh/v3/syntax`:
   - <https://pkg.go.dev/mvdan.cc/sh/v3/syntax>
-- go-tree-sitter:
-  - <https://github.com/tree-sitter/go-tree-sitter>
-- tree-sitter-powershell grammar:
-  - <https://github.com/airbus-cert/tree-sitter-powershell>
-- go-powershell:
-  - <https://github.com/KnicKnic/go-powershell>
-- Codex PowerShell parser script reference:
-  - <https://github.com/openai/codex/blob/main/codex-rs/shell-command/src/command_safety/powershell_parser.ps1>
+- LSP semantic tokens spec:
+  - <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/>
 - Zed semantic tokens docs:
   - <https://zed.dev/docs/semantic-tokens>
-  - <https://zed.dev/docs/extensions/languages>
-  - <https://zed.dev/docs/configuring-languages>
-- Zed preview release with semantic token support:
-  - <https://zed.dev/releases/preview/0.224.0>
-- Zed supported languages (Dockerfile built-in):
-  - <https://zed.dev/languages>
+- Zed Docker language docs:
+  - <https://zed.dev/docs/languages/docker>
+- Zed Dockerfile extension page:
+  - <https://zed.dev/extensions/dockerfile>

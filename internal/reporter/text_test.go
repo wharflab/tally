@@ -280,6 +280,56 @@ func TestPrintTextPlain_Padding(t *testing.T) {
 	}
 }
 
+func TestPrintTextPlain_BlankContextLineVisible(t *testing.T) {
+	t.Parallel()
+	source := []byte("FROM alpine\n\nRUN echo hello\nCMD [\"sh\"]")
+	violations := []rules.Violation{
+		{
+			Location: rules.NewLineLocation("Dockerfile", 3),
+			RuleCode: "TestRule",
+			Message:  "Test message",
+			Severity: rules.SeverityWarning,
+		},
+	}
+	sources := map[string][]byte{"Dockerfile": source}
+
+	var buf bytes.Buffer
+	err := PrintTextPlain(&buf, violations, sources)
+	if err != nil {
+		t.Fatalf("PrintTextPlain failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "<blank>") {
+		t.Errorf("Expected blank context lines to be visible, got:\n%s", output)
+	}
+}
+
+func TestPrintTextPlain_WhitespaceOnlyContextLineVisible(t *testing.T) {
+	t.Parallel()
+	source := []byte("FROM alpine\n   \nRUN echo hello\nCMD [\"sh\"]")
+	violations := []rules.Violation{
+		{
+			Location: rules.NewLineLocation("Dockerfile", 3),
+			RuleCode: "TestRule",
+			Message:  "Test message",
+			Severity: rules.SeverityWarning,
+		},
+	}
+	sources := map[string][]byte{"Dockerfile": source}
+
+	var buf bytes.Buffer
+	err := PrintTextPlain(&buf, violations, sources)
+	if err != nil {
+		t.Fatalf("PrintTextPlain failed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "<whitespace>") {
+		t.Errorf("Expected whitespace-only context lines to be visible, got:\n%s", output)
+	}
+}
+
 func TestLineInRange(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -317,7 +367,7 @@ func TestNewTextReporter_Options(t *testing.T) {
 		{"default", DefaultTextOptions()},
 		{"color on", TextOptions{Color: &colorOn, SyntaxHighlight: true}},
 		{"color off", TextOptions{Color: &colorOff, SyntaxHighlight: false}},
-		{"custom style", TextOptions{SyntaxHighlight: true, ChromaStyle: "dracula"}},
+		{"custom theme", TextOptions{SyntaxHighlight: true, Theme: "light"}},
 	}
 
 	for _, tt := range tests {
@@ -526,48 +576,54 @@ func TestPrintTextPlain_OutOfBoundsLine(t *testing.T) {
 	}
 }
 
-func TestNewTextReporter_InvalidStyle(t *testing.T) {
+func TestNewTextReporter_InvalidThemeFallsBack(t *testing.T) {
 	t.Parallel()
-	// Test with non-existent style name - should fall back
 	colorOn := true
 	opts := TextOptions{
 		Color:           &colorOn,
 		SyntaxHighlight: true,
-		ChromaStyle:     "nonexistent-style-name",
+		Theme:           "not-a-real-theme",
 	}
 
 	r := NewTextReporter(opts)
 	if r == nil {
 		t.Fatal("NewTextReporter returned nil")
 	}
-	// Should have fallback style
-	if r.style == nil {
-		t.Error("Expected fallback style, got nil")
+	if r.palette.ByToken == nil {
+		t.Error("expected fallback palette, got nil")
 	}
 }
 
 func TestTextReporter_HighlightLine(t *testing.T) {
 	t.Parallel()
-	// Test syntax highlighting
 	colorOn := true
 	opts := TextOptions{
 		Color:           &colorOn,
 		SyntaxHighlight: true,
-		ChromaStyle:     "monokai",
+		Theme:           "dark",
 	}
 
 	r := NewTextReporter(opts)
-	if r.lexer == nil {
-		t.Skip("Lexer not initialized (likely no color support)")
+	doc := r.highlightDocument("Dockerfile", []byte("FROM alpine\nRUN echo $HOME\n"))
+	line := doc.SourceMap.Line(1)
+	rendered := r.formatLineContent(line, doc.LineTokens(1), nil)
+	if rendered == "" {
+		t.Fatal("formatLineContent returned empty string")
 	}
+	if strings.HasSuffix(rendered, "\n") {
+		t.Error("rendered content should not have trailing newline")
+	}
+}
 
-	// Test highlighting a Dockerfile line
-	highlighted := r.highlightLine("FROM alpine")
-	if highlighted == "" {
-		t.Error("highlightLine returned empty string")
-	}
-	// Should not have trailing newline
-	if strings.HasSuffix(highlighted, "\n") {
-		t.Error("highlightLine should not have trailing newline")
+func TestTextReporter_FormatLineContent_EmptyLine(t *testing.T) {
+	t.Parallel()
+	colorOff := false
+	r := NewTextReporter(TextOptions{
+		Color:           &colorOff,
+		SyntaxHighlight: false,
+	})
+
+	if got := r.formatLineContent("", nil, nil); got != "<blank>" {
+		t.Fatalf("formatLineContent(empty) = %q, want %q", got, "<blank>")
 	}
 }
