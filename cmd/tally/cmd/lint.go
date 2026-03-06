@@ -372,7 +372,7 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 			reportSkippedFixes(fixResult)
 		}
 
-		allViolations = filterFixedViolations(allViolations, fixResult)
+		allViolations = filterFixedViolations(allViolations, fixResult, res.fileConfigs)
 	}
 
 	return writeReport(cmd, res.firstCfg, allViolations, res.fileSources, len(discovered))
@@ -530,7 +530,7 @@ func applyStdinFixes(
 		reportSkippedFixes(fixResult)
 	}
 
-	allViolations = filterFixedViolations(allViolations, fixResult)
+	allViolations = filterFixedViolations(allViolations, fixResult, res.fileConfigs)
 
 	// With --fix and stdin, stdout carries the fixed Dockerfile content.
 	// Redirect the violation report to stderr unless the user explicitly
@@ -1467,42 +1467,14 @@ func mergeAsyncViolations(fast []rules.Violation, asyncResult *async.RunResult) 
 }
 
 // filterFixedViolations removes violations that were fixed from the list.
-func filterFixedViolations(violations []rules.Violation, fixResult *fix.Result) []rules.Violation {
-	// Build set of fixed locations (include column to handle multiple violations on same line)
-	type locKey struct {
-		file string
-		line int
-		col  int
-		code string
-	}
-	fixed := make(map[locKey]bool)
-	for _, fc := range fixResult.Changes {
-		for _, af := range fc.FixesApplied {
-			fixed[locKey{
-				// Use ToSlash for consistent cross-platform path matching
-				// Violations use forward slashes (PathNormalization processor)
-				file: filepath.ToSlash(fc.Path),
-				line: af.Location.Start.Line,
-				col:  af.Location.Start.Column,
-				code: af.RuleCode,
-			}] = true
-		}
-	}
-
-	// Filter violations
-	var remaining []rules.Violation
-	for _, v := range violations {
-		key := locKey{
-			file: filepath.ToSlash(v.File()),
-			line: v.Line(),
-			col:  v.Location.Start.Column,
-			code: v.RuleCode,
-		}
-		if !fixed[key] {
-			remaining = append(remaining, v)
-		}
-	}
-	return remaining
+// It also re-checks violations from rules implementing PostFixRevalidator
+// against the modified file content, suppressing stale violations.
+func filterFixedViolations(
+	violations []rules.Violation,
+	fixResult *fix.Result,
+	fileConfigs map[string]*config.Config,
+) []rules.Violation {
+	return fix.FilterFixedViolations(violations, fixResult, fileConfigs)
 }
 
 // reportNoFilesFound prints a context-aware message when no Dockerfiles are found.

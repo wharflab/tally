@@ -21,6 +21,9 @@
     "no-multi-spaces": {
       "$ref": "./no_multi_spaces.schema.json"
     },
+    "no-multiple-empty-lines": {
+      "$ref": "./no_multiple_empty_lines.schema.json"
+    },
     "no-trailing-spaces": {
       "$ref": "./no_trailing_spaces.schema.json"
     },

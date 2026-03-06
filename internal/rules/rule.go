@@ -219,3 +219,20 @@ type ConfigurableRule interface {
 	// ValidateConfig checks if a configuration is valid for this rule.
 	ValidateConfig(config any) error
 }
+
+// PostFixRevalidator is an optional interface for rules that should be
+// re-checked after fixes are applied. When a fix from another rule changes
+// the file in a way that may resolve this rule's violation (e.g., removing
+// blank lines reduces line count below max-lines limit), the violation
+// should be suppressed rather than reported as stale.
+//
+// Rules that have no auto-fix but whose violations depend on file-level
+// properties (like total line count) should implement this interface.
+type PostFixRevalidator interface {
+	Rule
+
+	// RevalidateAfterFix returns true if the violation still holds
+	// given the modified file content after fixes were applied.
+	// The config parameter is the rule-specific configuration.
+	RevalidateAfterFix(violation Violation, modifiedContent []byte, config any) bool
+}

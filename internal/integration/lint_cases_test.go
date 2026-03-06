@@ -823,6 +823,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// No multiple empty lines tests (isolated to no-multiple-empty-lines rule)
+		{
+			name:     "no-multiple-empty-lines",
+			dir:      "no-multiple-empty-lines",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/no-multiple-empty-lines")...),
+			wantExit: 1,
+		},
+
 		// Epilogue order tests (isolated to epilogue-order rule)
 		{
 			name:     "epilogue-order",

@@ -1,0 +1,133 @@
+{
+  "files": [
+    {
+      "file": "testdata/no-multiple-empty-lines/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-multiple-empty-lines/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/no-multiple-empty-lines/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "too many blank lines (2), maximum allowed is 1",
+          "rule": "tally/no-multiple-empty-lines",
+          "severity": "style",
+          "suggestedFix": {
+            "description": "Remove 1 excess blank line(s)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 4
+                  },
+                  "file": "testdata/no-multiple-empty-lines/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 3
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 98
+          }
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-multiple-empty-lines/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "testdata/no-multiple-empty-lines/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "too many blank lines (3), maximum allowed is 1",
+          "rule": "tally/no-multiple-empty-lines",
+          "severity": "style",
+          "suggestedFix": {
+            "description": "Remove 2 excess blank line(s)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 8
+                  },
+                  "file": "testdata/no-multiple-empty-lines/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 6
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 98
+          }
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-multiple-empty-lines/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "testdata/no-multiple-empty-lines/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "too many blank lines (2), maximum allowed is 1",
+          "rule": "tally/no-multiple-empty-lines",
+          "severity": "style",
+          "suggestedFix": {
+            "description": "Remove 1 excess blank line(s)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 11
+                  },
+                  "file": "testdata/no-multiple-empty-lines/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 10
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 98
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 3,
+    "total": 3,
+    "warnings": 0
+  }
+}
