@@ -155,7 +155,7 @@ func (h *healthcheckHandler) OnSuccess(resolved any) []any {
 
 	// Base image has no HEALTHCHECK. Check this stage and descendants for
 	// useless HEALTHCHECK NONE instructions.
-	descendants := findDescendants(h.semantic, h.stageIdx)
+	descendants := h.semantic.FromDescendants(h.stageIdx, nil)
 	allStages := append([]int{h.stageIdx}, descendants...)
 
 	for _, idx := range allStages {
@@ -223,25 +223,6 @@ func healthcheckNoneLocation(stage *instructions.Stage) []parser.Range {
 		}
 	}
 	return lastLoc
-}
-
-// findDescendants returns the indices of all stages that transitively inherit
-// from the given stage via FROM chain.
-func findDescendants(sem *semantic.Model, stageIdx int) []int {
-	var result []int
-	stageCount := sem.StageCount()
-	for i := range stageCount {
-		info := sem.StageInfo(i)
-		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
-			continue
-		}
-		if info.BaseImage.StageIndex == stageIdx {
-			result = append(result, i)
-			// Recurse to find grandchildren.
-			result = append(result, findDescendants(sem, i)...)
-		}
-	}
-	return result
 }
 
 // init registers the rule with the default registry.
