@@ -80,7 +80,7 @@ var allRules = []ruleEntry{
 	{&linter.RuleUndefinedArgInFrom, rules.SeverityWarning, "correctness"},
 	{&linter.RuleUndefinedVar, rules.SeverityWarning, "correctness"},
 	{&linter.RuleInvalidDefaultArgInFrom, rules.SeverityError, "correctness"},
-	{&linter.RuleInvalidBaseImagePlatform, rules.SeverityError, "correctness"},
+	{&linter.RuleInvalidBaseImagePlatform, rules.SeverityOff, "correctness"},
 	{&linter.RuleExposeInvalidFormat, rules.SeverityWarning, "correctness"},
 	{&linter.RuleCopyIgnoredFile, rules.SeverityWarning, "correctness"},
 
@@ -90,7 +90,7 @@ var allRules = []ruleEntry{
 	{&linter.RuleWorkdirRelativePath, rules.SeverityWarning, "best-practice"},
 	{&linter.RuleMultipleInstructionsDisallowed, rules.SeverityWarning, "best-practice"},
 	{&linter.RuleRedundantTargetPlatform, rules.SeverityInfo, "best-practice"},
-	{&linter.RuleFromPlatformFlagConstDisallowed, rules.SeverityWarning, "best-practice"},
+	{&linter.RuleFromPlatformFlagConstDisallowed, rules.SeverityOff, "best-practice"},
 
 	// Security rules - Potential security issues
 	{&linter.RuleSecretsUsedInArgOrEnv, rules.SeverityWarning, "security"},

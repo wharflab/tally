@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 26 | - | 26 |
+| tally | 27 | - | 27 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -42,6 +42,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/circular-stage-deps`](docs/rules/tally/circular-stage-deps.md) | Detects circular dependencies between build stages | Error | Correctness | Enabled |
 | [`tally/copy-from-empty-scratch-stage`](docs/rules/tally/copy-from-empty-scratch-stage.md) | Detects COPY --from referencing a scratch stage with no file-producing instructions | Error | Correctness | Enabled |
 | [`tally/invalid-json-form`](docs/rules/tally/invalid-json-form.md) 🔧 | Arguments appear to use JSON exec-form but contain invalid JSON | Error | Correctness | Enabled |
+| [`tally/platform-mismatch`](docs/rules/tally/platform-mismatch.md) | Explicit `--platform` on FROM does not match what the registry provides | Error | Correctness | Enabled |
 | [`tally/prefer-add-unpack`](docs/rules/tally/prefer-add-unpack.md) 🔧 | Suggests `ADD --unpack` instead of downloading and extracting remote archives in `RUN` | Info | Performance | Enabled |
 | [`tally/prefer-multi-stage-build`](docs/rules/tally/prefer-multi-stage-build.md) 🔧 | Suggests converting single-stage builds into multi-stage builds to reduce final image size | Info | Performance | Off (experimental) |
 | [`tally/prefer-copy-heredoc`](docs/rules/tally/prefer-copy-heredoc.md) 🔧 | Suggests using COPY heredoc for file creation instead of RUN echo/cat | Style | Style | Off (experimental) |
@@ -88,8 +89,8 @@ These BuildKit checks run during LLB conversion in Docker/BuildKit. tally reimpl
 | [`buildkit/DuplicateStageName`](https://docs.docker.com/reference/build-checks/duplicate-stage-name/) | Stage names should be unique | Error | Correctness | Enabled |
 | [`buildkit/ExposeInvalidFormat`](https://docs.docker.com/reference/build-checks/expose-invalid-format/) | IP address and host-port mapping should not be used in EXPOSE instruction. This will become an error in a future release | Warning | Correctness | Enabled |
 | [`buildkit/ExposeProtoCasing`](https://docs.docker.com/reference/build-checks/expose-proto-casing/) 🔧 | Protocol in EXPOSE instruction should be lowercase | Warning | Style | Enabled |
-| [`buildkit/FromPlatformFlagConstDisallowed`](https://docs.docker.com/reference/build-checks/from-platform-flag-const-disallowed/) | FROM --platform flag should not use a constant value | Warning | Best Practice | Enabled |
-| `buildkit/InvalidBaseImagePlatform` | Base image platform does not match expected target platform | Error | Correctness | Enabled |
+| [`buildkit/FromPlatformFlagConstDisallowed`](https://docs.docker.com/reference/build-checks/from-platform-flag-const-disallowed/) | FROM --platform flag should not use a constant value | Off | Best Practice | Enabled |
+| `buildkit/InvalidBaseImagePlatform` | Base image platform does not match expected target platform | Off | Correctness | Enabled |
 | [`buildkit/InvalidDefaultArgInFrom`](https://docs.docker.com/reference/build-checks/invalid-default-arg-in-from/) | Default value for global ARG results in an empty or invalid base image name | Error | Correctness | Enabled |
 | [`buildkit/JSONArgsRecommended`](https://docs.docker.com/reference/build-checks/json-args-recommended/) 🔧 | JSON arguments recommended for ENTRYPOINT/CMD to prevent unintended behavior related to OS signals | Info | Best Practice | Enabled |
 | [`buildkit/LegacyKeyValueFormat`](https://docs.docker.com/reference/build-checks/legacy-key-value-format/) 🔧 | Legacy key/value format with whitespace separator should not be used | Warning | Style | Enabled |
@@ -165,7 +166,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL3026](https://github.com/hadolint/hadolint/wiki/DL3026) | Use only an allowed registry in the FROM image | Error | ✅ `hadolint/DL3026` |
 | [DL3027](https://github.com/hadolint/hadolint/wiki/DL3027) | Do not use `apt` as it is meant to be an end-user tool, use `apt-get` or `apt-cache` instead | Warning | ✅🔧 `hadolint/DL3027` |
 | [DL3028](https://github.com/hadolint/hadolint/wiki/DL3028) | Pin versions in gem install. Instead of `gem install <gem>` use `gem install <gem>:<version>` | Warning | ⏳ |
-| [DL3029](https://github.com/hadolint/hadolint/wiki/DL3029) | Do not use --platform flag with FROM. | Warning | 🔄 `buildkit/FromPlatformFlagConstDisallowed` |
+| [DL3029](https://github.com/hadolint/hadolint/wiki/DL3029) | Do not use --platform flag with FROM. | Warning | 🔄 `buildkit/FromPlatformFlagConstDisallowed` (off by default; superseded by `tally/platform-mismatch`) |
 | [DL3030](https://github.com/hadolint/hadolint/wiki/DL3030) | Use the `-y` switch to avoid manual input `yum install -y <package>` | Warning | ✅🔧 `hadolint/DL3030` |
 | [DL3032](https://github.com/hadolint/hadolint/wiki/DL3032) | `yum clean all` missing after yum command. | Warning | ⛔ Not planned (`tally/prefer-package-cache-mounts`) |
 | [DL3033](https://github.com/hadolint/hadolint/wiki/DL3033) | Specify version with `yum install -y <package>-<version>` | Warning | ⏳ |

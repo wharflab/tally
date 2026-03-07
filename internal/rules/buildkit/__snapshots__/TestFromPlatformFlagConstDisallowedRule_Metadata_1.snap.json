@@ -1,7 +1,7 @@
 {
  "Category": "best-practice",
  "Code": "buildkit/FromPlatformFlagConstDisallowed",
- "DefaultSeverity": "warning",
+ "DefaultSeverity": "off",
  "Description": "FROM --platform flag should not use a constant value",
  "DocURL": "https://wharflab.github.io/tally/rules/buildkit/FromPlatformFlagConstDisallowed/",
  "FixPriority": 0,
