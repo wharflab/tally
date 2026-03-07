@@ -444,10 +444,17 @@ type codeAction struct {
 	IsPreferred bool           `json:"isPreferred,omitempty"`
 	Diagnostics []diagnostic   `json:"diagnostics,omitempty"`
 	Edit        *workspaceEdit `json:"edit,omitempty"`
+	Command     *command       `json:"command,omitempty"`
 }
 
 type workspaceEdit struct {
 	Changes map[string][]textEdit `json:"changes,omitempty"`
+}
+
+type command struct {
+	Title     string `json:"title"`
+	Command   string `json:"command"`
+	Arguments []any  `json:"arguments,omitempty"`
 }
 
 type textEdit struct {

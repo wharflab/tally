@@ -292,9 +292,12 @@ func TestLSP_CodeAction_DefaultIncludesFixAll(t *testing.T) {
 	}).Await(ctx, &actions)
 	require.NoError(t, err)
 
-	assert.True(t, slices.ContainsFunc(actions, func(a codeAction) bool {
+	fixAllActionIdx := slices.IndexFunc(actions, func(a codeAction) bool {
 		return a.Kind == "source.fixAll.tally"
-	}), "expected fix-all code action when only is omitted")
+	})
+	require.GreaterOrEqual(t, fixAllActionIdx, 0, "expected fix-all code action when only is omitted")
+	assert.NotNil(t, actions[fixAllActionIdx].Command, "expected fix-all code action to be command-backed")
+	assert.Equal(t, "tally.applyAllFixes", actions[fixAllActionIdx].Command.Command)
 }
 
 func TestLSP_CodeActionFixAll(t *testing.T) {
@@ -327,8 +330,18 @@ func TestLSP_CodeActionFixAll(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, actions, 1, "expected one fix-all code action")
 
-	require.NotNil(t, actions[0].Edit)
-	edits := actions[0].Edit.Changes[uri]
+	require.Nil(t, actions[0].Edit, "expected fix-all code action to defer edits to executeCommand")
+	require.NotNil(t, actions[0].Command)
+	assert.Equal(t, "tally.applyAllFixes", actions[0].Command.Command)
+
+	var edit workspaceEdit
+	err = ts.conn.Call(ctx, "workspace/executeCommand", &executeCommandParams{
+		Command:   actions[0].Command.Command,
+		Arguments: actions[0].Command.Arguments,
+	}).Await(ctx, &edit)
+	require.NoError(t, err)
+
+	edits := edit.Changes[uri]
 	require.NotEmpty(t, edits, "expected fix-all edits")
 
 	fixed := applyEdits(t, uri, original, edits)

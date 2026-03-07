@@ -86,7 +86,7 @@ func (s *Server) codeActionsForDocument(
 	}
 
 	if includeFixAll {
-		if action := s.fixAllCodeAction(ctx, doc); action != nil {
+		if action := s.fixAllCodeAction(doc); action != nil {
 			actions = append(actions, *action)
 		}
 	}
