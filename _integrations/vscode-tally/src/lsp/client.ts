@@ -194,7 +194,7 @@ export class TallyLanguageClient {
     if (typeof first === "string") {
       const unsafe =
         typeof second === "boolean" ? second : this.fixUnsafeForUri(vscode.Uri.parse(first));
-      return [first, unsafe, ...rest];
+      return [{ uri: first, unsafe }, ...rest];
     }
 
     if (isApplyAllFixesArg(first) && typeof first.unsafe !== "boolean") {
