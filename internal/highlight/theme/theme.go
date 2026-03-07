@@ -31,18 +31,7 @@ func Resolve(enabled bool, mode string) Palette {
 
 	selected := parseMode(mode)
 	if selected == ModeAuto {
-		switch strings.ToLower(os.Getenv("TALLY_THEME")) {
-		case string(ModeDark):
-			selected = ModeDark
-		case string(ModeLight):
-			selected = ModeLight
-		default:
-			if lipgloss.HasDarkBackground(os.Stdin, os.Stdout) {
-				selected = ModeDark
-			} else {
-				selected = ModeLight
-			}
-		}
+		selected = resolveAutoMode(strings.ToLower(os.Getenv("TALLY_THEME")), resolvePlatformAutoMode)
 	}
 	if selected == "" {
 		selected = ModeDark
@@ -52,6 +41,19 @@ func Resolve(enabled bool, mode string) Palette {
 		return lightPalette()
 	}
 	return darkPalette()
+}
+
+func resolveAutoMode(envTheme string, resolvePlatform func() Mode) Mode {
+	switch Mode(envTheme) {
+	case ModeDark:
+		return ModeDark
+	case ModeLight:
+		return ModeLight
+	case "", ModeAuto:
+	default:
+	}
+
+	return resolvePlatform()
 }
 
 func parseMode(mode string) Mode {

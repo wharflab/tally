@@ -21,6 +21,8 @@ import (
 	"go.bug.st/lsp"
 	"go.bug.st/lsp/textedits"
 	"golang.org/x/exp/jsonrpc2"
+
+	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 )
 
 var (
@@ -439,11 +441,12 @@ type codeActionContext struct {
 }
 
 type codeAction struct {
-	Title       string         `json:"title"`
-	Kind        string         `json:"kind,omitempty"`
-	IsPreferred bool           `json:"isPreferred,omitempty"`
-	Diagnostics []diagnostic   `json:"diagnostics,omitempty"`
-	Edit        *workspaceEdit `json:"edit,omitempty"`
+	Title       string            `json:"title"`
+	Kind        string            `json:"kind,omitempty"`
+	IsPreferred bool              `json:"isPreferred,omitempty"`
+	Diagnostics []diagnostic      `json:"diagnostics,omitempty"`
+	Edit        *workspaceEdit    `json:"edit,omitempty"`
+	Command     *protocol.Command `json:"command,omitempty"`
 }
 
 type workspaceEdit struct {
@@ -548,7 +551,4 @@ type formattingOptions struct {
 
 // Execute command types (workspace/executeCommand).
 
-type executeCommandParams struct {
-	Command   string `json:"command"`
-	Arguments []any  `json:"arguments,omitempty"`
-}
+type executeCommandParams = protocol.ExecuteCommandParams

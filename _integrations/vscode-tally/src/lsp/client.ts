@@ -180,22 +180,36 @@ export class TallyLanguageClient {
   }
 
   private resolveApplyAllFixesArgs(args: unknown[]): unknown[] {
-    if (args.length > 0) {
-      return args;
+    if (args.length === 0) {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) {
+        void vscode.window.showErrorMessage("Tally: no active editor to fix.");
+        return [];
+      }
+
+      return [this.applyAllFixesArgsForUri(editor.document.uri.toString())];
     }
 
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-      void vscode.window.showErrorMessage("Tally: no active editor to fix.");
-      return [];
+    const [first, second, ...rest] = args;
+    if (typeof first === "string") {
+      const unsafe =
+        typeof second === "boolean" ? second : this.fixUnsafeForUri(vscode.Uri.parse(first));
+      return [{ uri: first, unsafe }, ...rest];
     }
 
-    const uri = editor.document.uri.toString();
-    const unsafe = vscode.workspace
-      .getConfiguration("tally", editor.document.uri)
-      .get<boolean>("fixUnsafe", false);
+    if (isApplyAllFixesArg(first) && typeof first.unsafe !== "boolean") {
+      return [{ ...first, unsafe: this.fixUnsafeForUri(vscode.Uri.parse(first.uri)) }, ...rest];
+    }
 
-    return [{ uri, unsafe }];
+    return args;
+  }
+
+  private applyAllFixesArgsForUri(uri: string): { uri: string; unsafe: boolean } {
+    return { uri, unsafe: this.fixUnsafeForUri(vscode.Uri.parse(uri)) };
+  }
+
+  private fixUnsafeForUri(uri: vscode.Uri): boolean {
+    return vscode.workspace.getConfiguration("tally", uri).get<boolean>("fixUnsafe", false);
   }
 }
 
@@ -234,6 +248,20 @@ function isLikelyDockerfileResource(resource: vscode.Uri): boolean {
 type WorkspaceEditWire = {
   changes?: Record<string, Array<{ range: unknown; newText: unknown }>>;
 };
+
+type ApplyAllFixesArg = {
+  uri: string;
+  unsafe?: boolean;
+};
+
+function isApplyAllFixesArg(value: unknown): value is ApplyAllFixesArg {
+  return (
+    !!value &&
+    typeof value === "object" &&
+    "uri" in value &&
+    typeof (value as { uri?: unknown }).uri === "string"
+  );
+}
 
 async function applyWorkspaceEditResult(result: unknown): Promise<void> {
   const edit = toWorkspaceEdit(result);
