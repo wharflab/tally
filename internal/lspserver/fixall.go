@@ -55,10 +55,10 @@ func fixAllCandidateAllowed(violation rules.Violation, fixModes map[string]fix.F
 		return false
 	}
 
-	return fixModeAllowsSafeFix(violation.File(), violation.RuleCode, fixModes)
+	return fixModeAllowsSafeFix(violation.RuleCode, fixModes)
 }
 
-func fixModeAllowsSafeFix(_, ruleCode string, fixModes map[string]fix.FixMode) bool {
+func fixModeAllowsSafeFix(ruleCode string, fixModes map[string]fix.FixMode) bool {
 	mode := config.FixModeAlways
 	if fixModes != nil {
 		if configuredMode, ok := fixModes[ruleCode]; ok {
