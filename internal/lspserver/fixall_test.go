@@ -95,6 +95,24 @@ func TestHasFixAllCandidate(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "safe fix gated by never mode",
+			cfg: &config.Config{
+				Rules: config.RulesConfig{
+					Buildkit: map[string]config.RuleConfig{
+						"MaintainerDeprecated": {Fix: config.FixModeNever},
+					},
+				},
+			},
+			violations: []rules.Violation{
+				violationWithFix(filePath, "buildkit/MaintainerDeprecated", &rules.SuggestedFix{
+					Description: "replace maintainer",
+					Edits:       []rules.TextEdit{safeEdit},
+					Safety:      rules.FixSafe,
+				}),
+			},
+			want: false,
+		},
+		{
 			name: "safe fix gated by explicit mode",
 			cfg: &config.Config{
 				Rules: config.RulesConfig{
