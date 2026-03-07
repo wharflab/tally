@@ -364,9 +364,10 @@ func TestLSP_ExecuteCommandApplyAllFixes(t *testing.T) {
 	defer cancel()
 
 	var edit workspaceEdit
+	args := []any{uri}
 	err := ts.conn.Call(ctx, "workspace/executeCommand", &executeCommandParams{
 		Command:   "tally.applyAllFixes",
-		Arguments: []any{uri},
+		Arguments: &args,
 	}).Await(ctx, &edit)
 	require.NoError(t, err)
 
