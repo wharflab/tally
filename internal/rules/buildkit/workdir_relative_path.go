@@ -10,6 +10,7 @@ import (
 	"github.com/wharflab/tally/internal/async"
 	"github.com/wharflab/tally/internal/registry"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules/asyncutil"
 	"github.com/wharflab/tally/internal/semantic"
 )
 
@@ -176,30 +177,16 @@ func (h *workdirRelPathHandler) OnSuccess(resolved any) []any {
 		return nil
 	}
 
-	out := make([]any, 0)
-
 	descendants := h.semantic.FromDescendants(h.stageIdx, nil)
 	allStages := make([]int, 0, 1+len(descendants))
 	allStages = append(allStages, h.stageIdx)
 	allStages = append(allStages, descendants...)
 
-	for _, idx := range allStages {
-		if !h.stagesWithViolations[idx] {
-			continue
-		}
-
-		// Suppress fast-path violations.
-		out = append(out, async.CompletedCheck{
-			RuleCode:   h.meta.Code,
-			File:       h.file,
-			StageIndex: idx,
-		})
-
-		// Re-emit with resolved absolute paths.
-		out = append(out, h.refineStageViolations(idx, baseDir)...)
-	}
-
-	return out
+	return asyncutil.RefinedViolations(
+		h.meta.Code, h.file, allStages,
+		func(idx int) bool { return h.stagesWithViolations[idx] },
+		func(idx int) []any { return h.refineStageViolations(idx, baseDir) },
+	)
 }
 
 // refineStageViolations re-derives the violation for the first relative

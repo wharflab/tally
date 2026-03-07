@@ -129,8 +129,6 @@ func (h *dl3045Handler) OnSuccess(resolved any) []any {
 
 	// Base image has a WORKDIR — replace fast-path violations with refined
 	// fixes that use the actual inherited path.
-	out := make([]any, 0)
-
 	descendants := h.semantic.FromDescendants(h.stageIdx, func(i int) bool {
 		return i < len(h.stages) && stageHasExplicitWorkdir(&h.stages[i])
 	})
@@ -138,23 +136,11 @@ func (h *dl3045Handler) OnSuccess(resolved any) []any {
 	allStages = append(allStages, h.stageIdx)
 	allStages = append(allStages, descendants...)
 
-	for _, idx := range allStages {
-		if !h.stagesWithViolations[idx] {
-			continue
-		}
-
-		// Suppress fast-path violations for this stage.
-		out = append(out, async.CompletedCheck{
-			RuleCode:   h.meta.Code,
-			File:       h.file,
-			StageIndex: idx,
-		})
-
-		// Re-emit violations with precise fix using resolved WorkingDir.
-		out = append(out, h.refineStageViolations(idx, baseDir)...)
-	}
-
-	return out
+	return asyncutil.RefinedViolations(
+		h.meta.Code, h.file, allStages,
+		func(idx int) bool { return h.stagesWithViolations[idx] },
+		func(idx int) []any { return h.refineStageViolations(idx, baseDir) },
+	)
 }
 
 // refineStageViolations re-derives violations for a stage and attaches

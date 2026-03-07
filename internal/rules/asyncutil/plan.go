@@ -56,3 +56,28 @@ func PlanExternalImageChecks(
 
 	return requests
 }
+
+// RefinedViolations suppresses fast-path violations for every stage in
+// stageIndices and re-emits refined violations produced by the refine callback.
+// This is the shared "suppress + re-emit" loop used by async handlers that
+// resolve base-image metadata from the registry.
+func RefinedViolations(
+	ruleCode, file string,
+	stageIndices []int,
+	hasViolation func(stageIdx int) bool,
+	refine func(stageIdx int) []any,
+) []any {
+	var out []any
+	for _, idx := range stageIndices {
+		if !hasViolation(idx) {
+			continue
+		}
+		out = append(out, async.CompletedCheck{
+			RuleCode:   ruleCode,
+			File:       file,
+			StageIndex: idx,
+		})
+		out = append(out, refine(idx)...)
+	}
+	return out
+}
