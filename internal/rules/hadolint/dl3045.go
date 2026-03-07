@@ -131,7 +131,9 @@ func (h *dl3045Handler) OnSuccess(resolved any) []any {
 	// fixes that use the actual inherited path.
 	out := make([]any, 0)
 
-	descendants := findDL3045Descendants(h.semantic, h.stageIdx, h.stages)
+	descendants := h.semantic.FromDescendants(h.stageIdx, func(i int) bool {
+		return i < len(h.stages) && stageHasExplicitWorkdir(&h.stages[i])
+	})
 	allStages := make([]int, 0, 1+len(descendants))
 	allStages = append(allStages, h.stageIdx)
 	allStages = append(allStages, descendants...)
@@ -188,28 +190,6 @@ func (h *dl3045Handler) refineStageViolations(stageIdx int, baseDir string) []an
 	}
 
 	return out
-}
-
-// findDL3045Descendants returns descendant stage indices that transitively
-// inherit the WORKDIR (i.e., don't set their own explicit WORKDIR).
-func findDL3045Descendants(sem *semantic.Model, stageIdx int, stages []instructions.Stage) []int {
-	result := make([]int, 0)
-	for i := range sem.StageCount() {
-		info := sem.StageInfo(i)
-		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
-			continue
-		}
-		if info.BaseImage.StageIndex != stageIdx {
-			continue
-		}
-		// Check if this descendant sets its own WORKDIR.
-		if i < len(stages) && stageHasExplicitWorkdir(&stages[i]) {
-			continue
-		}
-		result = append(result, i)
-		result = append(result, findDL3045Descendants(sem, i, stages)...)
-	}
-	return result
 }
 
 // stageHasExplicitWorkdir checks if a stage has an explicit WORKDIR instruction.

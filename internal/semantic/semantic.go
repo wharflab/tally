@@ -152,6 +152,29 @@ func (m *Model) ExternalImageStages() func(yield func(*StageInfo) bool) {
 	}
 }
 
+// FromDescendants returns all stage indices that transitively inherit from
+// stageIdx via FROM <stage> references.
+//
+// If skip is non-nil it is called for each direct child; when it returns true
+// the child (and its entire subtree) is excluded from the result.
+func (m *Model) FromDescendants(stageIdx int, skip func(childIdx int) bool) []int {
+	var result []int
+	for i, info := range m.stageInfo {
+		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
+			continue
+		}
+		if info.BaseImage.StageIndex != stageIdx {
+			continue
+		}
+		if skip != nil && skip(i) {
+			continue
+		}
+		result = append(result, i)
+		result = append(result, m.FromDescendants(i, skip)...)
+	}
+	return result
+}
+
 // StageUndefinedVars groups undefined variable results by stage index.
 type StageUndefinedVars struct {
 	StageIdx int

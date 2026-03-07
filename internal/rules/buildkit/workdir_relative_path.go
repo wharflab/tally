@@ -178,7 +178,7 @@ func (h *workdirRelPathHandler) OnSuccess(resolved any) []any {
 
 	out := make([]any, 0)
 
-	descendants := findWorkdirDescendants(h.semantic, h.stageIdx)
+	descendants := h.semantic.FromDescendants(h.stageIdx, nil)
 	allStages := make([]int, 0, 1+len(descendants))
 	allStages = append(allStages, h.stageIdx)
 	allStages = append(allStages, descendants...)
@@ -264,24 +264,6 @@ func (h *workdirRelPathHandler) refineStageViolations(stageIdx int, baseDir stri
 	}
 
 	return out
-}
-
-// findWorkdirDescendants returns descendant stage indices that transitively
-// inherit from the given stage.
-func findWorkdirDescendants(sem *semantic.Model, stageIdx int) []int {
-	result := make([]int, 0)
-	for i := range sem.StageCount() {
-		info := sem.StageInfo(i)
-		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
-			continue
-		}
-		if info.BaseImage.StageIndex != stageIdx {
-			continue
-		}
-		result = append(result, i)
-		result = append(result, findWorkdirDescendants(sem, i)...)
-	}
-	return result
 }
 
 // stageOS returns the platform OS string for a stage ("windows" or "linux").
