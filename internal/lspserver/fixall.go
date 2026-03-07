@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"path/filepath"
+	"slices"
 
 	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 
@@ -38,15 +39,9 @@ func (s *Server) fixAllCodeAction(doc *Document, violations []rules.Violation) *
 
 func hasFixAllCandidate(violations []rules.Violation, cfg *config.Config) bool {
 	fixModes := fix.BuildFixModes(cfg)
-
-	for _, violation := range violations {
-		if !fixAllCandidateAllowed(violation, fixModes) {
-			continue
-		}
-		return true
-	}
-
-	return false
+	return slices.ContainsFunc(violations, func(v rules.Violation) bool {
+		return fixAllCandidateAllowed(v, fixModes)
+	})
 }
 
 func fixAllCandidateAllowed(violation rules.Violation, fixModes map[string]fix.FixMode) bool {
