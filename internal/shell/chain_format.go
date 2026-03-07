@@ -83,7 +83,6 @@ func collectChainBoundariesFromStmt(stmt *syntax.Stmt, boundaries *[]ChainBounda
 	rightStart := bin.Y.Pos()
 	op := binOpText(bin.Op)
 
-	//nolint:gosec // syntax.Pos line/col values always fit int
 	b := ChainBoundary{
 		LeftEndLine:    int(leftEnd.Line()),
 		LeftEndCol:     int(leftEnd.Col()),

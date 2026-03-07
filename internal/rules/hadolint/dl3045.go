@@ -131,8 +131,10 @@ func (h *dl3045Handler) OnSuccess(resolved any) []any {
 	// fixes that use the actual inherited path.
 	out := make([]any, 0)
 
-	allStages := []int{h.stageIdx}
-	allStages = append(allStages, findDL3045Descendants(h.semantic, h.stageIdx, h.stages)...)
+	descendants := findDL3045Descendants(h.semantic, h.stageIdx, h.stages)
+	allStages := make([]int, 0, 1+len(descendants))
+	allStages = append(allStages, h.stageIdx)
+	allStages = append(allStages, descendants...)
 
 	for _, idx := range allStages {
 		if !h.stagesWithViolations[idx] {

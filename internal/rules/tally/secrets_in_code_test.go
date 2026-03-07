@@ -158,7 +158,7 @@ func TestSecretsInCodeRule_Check_ARGDefaultWithSecret(t *testing.T) {
 
 	// gitleaks:allow
 	// GitHub PAT: ghp_ + 36 alphanumeric (realistic entropy)
-	secretValue := "ghp_SfE7gMq5K9pR2nLwHvYt3dXc8jU6bA1Z0iFo" //nolint:gosec // test data
+	secretValue := "ghp_SfE7gMq5K9pR2nLwHvYt3dXc8jU6bA1Z0iFo"
 	input := rules.LintInput{
 		File: "Dockerfile",
 		MetaArgs: []instructions.ArgCommand{
@@ -204,7 +204,6 @@ func TestSecretsInCodeRule_Check_SecretInRunCommand(t *testing.T) {
 
 	// gitleaks:allow
 	// GitHub PAT: ghp_ + 36 alphanumeric (realistic entropy)
-	//nolint:gosec // test data
 	token := "ghp_SfE7gMq5K9pR2nLwHvYt3dXc8jU6bA1Z0iFo"
 	input := rules.LintInput{
 		File: "Dockerfile",

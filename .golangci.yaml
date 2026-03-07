@@ -141,6 +141,25 @@ linters:
           - gosec
         text: "G306"
         path: ".*_test\\.go"
+      # gosec: path traversal via filepath.Join(t.TempDir(), …) is safe in tests
+      - linters:
+          - gosec
+        text: "G703"
+        path: ".*_test\\.go"
+      # gosec: hardcoded credentials in secret-detection test fixtures
+      - linters:
+          - gosec
+        text: "G101"
+        path: ".*_test\\.go"
+      # gosec: rune-to-byte conversion is safe for ASCII escape tokens
+      - linters:
+          - gosec
+        text: "G115"
+      # gosec: subprocess with variable in sync script (trusted input)
+      - linters:
+          - gosec
+        text: "G204"
+        path: "scripts/"
       # paralleltest/tparallel: subtests share tmpDir with file create/remove
       - linters:
           - paralleltest

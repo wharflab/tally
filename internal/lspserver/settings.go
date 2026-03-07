@@ -77,7 +77,7 @@ func (s *Server) handleDidChangeConfiguration(
 	// responding to the refresh.
 	if s.diagnosticRefreshSupported() {
 		conn := s.conn
-		go func() { //nolint:contextcheck // intentionally detached; outlives the notification handler
+		go func() { //nolint:contextcheck,gosec // intentionally detached; outlives the notification handler
 			refreshCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 			if err := conn.Call(refreshCtx, string(protocol.MethodWorkspaceDiagnosticRefresh), nil).Await(refreshCtx, nil); err != nil {

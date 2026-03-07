@@ -233,9 +233,9 @@ func extractInstallCommand(
 
 		pos := arg.Pos()
 		endPos := arg.End()
-		line := int(pos.Line()) - 1     //nolint:gosec // shell positions won't overflow
-		startCol := int(pos.Col()) - 1  //nolint:gosec
-		endCol := int(endPos.Col()) - 1 //nolint:gosec
+		line := int(pos.Line()) - 1
+		startCol := int(pos.Col()) - 1
+		endCol := int(endPos.Col()) - 1
 
 		// Extract raw source token for round-trip safe edits
 		raw := extractRawToken(srcLines, line, startCol, endCol)

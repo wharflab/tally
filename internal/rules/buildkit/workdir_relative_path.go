@@ -178,8 +178,10 @@ func (h *workdirRelPathHandler) OnSuccess(resolved any) []any {
 
 	out := make([]any, 0)
 
-	allStages := []int{h.stageIdx}
-	allStages = append(allStages, findWorkdirDescendants(h.semantic, h.stageIdx)...)
+	descendants := findWorkdirDescendants(h.semantic, h.stageIdx)
+	allStages := make([]int, 0, 1+len(descendants))
+	allStages = append(allStages, h.stageIdx)
+	allStages = append(allStages, descendants...)
 
 	for _, idx := range allStages {
 		if !h.stagesWithViolations[idx] {
