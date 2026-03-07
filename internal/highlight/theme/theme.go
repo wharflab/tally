@@ -2,6 +2,7 @@ package theme
 
 import (
 	"os"
+	"runtime"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -31,18 +32,9 @@ func Resolve(enabled bool, mode string) Palette {
 
 	selected := parseMode(mode)
 	if selected == ModeAuto {
-		switch strings.ToLower(os.Getenv("TALLY_THEME")) {
-		case string(ModeDark):
-			selected = ModeDark
-		case string(ModeLight):
-			selected = ModeLight
-		default:
-			if lipgloss.HasDarkBackground(os.Stdin, os.Stdout) {
-				selected = ModeDark
-			} else {
-				selected = ModeLight
-			}
-		}
+		selected = resolveAutoMode(runtime.GOOS, strings.ToLower(os.Getenv("TALLY_THEME")), func() bool {
+			return lipgloss.HasDarkBackground(os.Stdin, os.Stdout)
+		})
 	}
 	if selected == "" {
 		selected = ModeDark
@@ -52,6 +44,26 @@ func Resolve(enabled bool, mode string) Palette {
 		return lightPalette()
 	}
 	return darkPalette()
+}
+
+func resolveAutoMode(goos, envTheme string, hasDarkBackground func() bool) Mode {
+	switch Mode(envTheme) {
+	case ModeDark:
+		return ModeDark
+	case ModeLight:
+		return ModeLight
+	case "", ModeAuto:
+	default:
+	}
+
+	if goos == "windows" {
+		return ModeDark
+	}
+
+	if hasDarkBackground() {
+		return ModeDark
+	}
+	return ModeLight
 }
 
 func parseMode(mode string) Mode {
