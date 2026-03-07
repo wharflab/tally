@@ -420,7 +420,8 @@ func TestTextReporter_Print_ClearsDocCacheBetweenCalls(t *testing.T) {
 		},
 	}
 
-	r := NewTextReporter(DefaultTextOptions())
+	colorOff := false
+	r := NewTextReporter(TextOptions{Color: &colorOff, ShowSource: true})
 
 	var first bytes.Buffer
 	err := r.Print(&first, violations, map[string][]byte{
