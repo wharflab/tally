@@ -78,8 +78,21 @@
     ],
     "configurationDefaults": {
       "[dockerfile]": {
-        "editor.semanticHighlighting.enabled": true
-      }
+        "editor.semanticHighlighting.enabled": true,
+        "editor.tabSize": 1,
+        "editor.insertSpaces": false,
+        "files.eol": "\n"
+      },
+      "hadolint.maxNumberOfProblems": -1,
+      "docker.languageserver.diagnostics.deprecatedMaintainer": "ignore",
+      "docker.languageserver.diagnostics.directiveCasing": "ignore",
+      "docker.languageserver.diagnostics.emptyContinuationLine": "ignore",
+      "docker.languageserver.diagnostics.instructionCasing": "ignore",
+      "docker.languageserver.diagnostics.instructionCmdMultiple": "ignore",
+      "docker.languageserver.diagnostics.instructionEntrypointMultiple": "ignore",
+      "docker.languageserver.diagnostics.instructionHealthcheckMultiple": "ignore",
+      "docker.languageserver.diagnostics.instructionJSONInSingleQuotes": "ignore",
+      "docker.languageserver.diagnostics.instructionWorkdirRelative": "ignore"
     },
     "configuration": {
       "title": "Tally",
