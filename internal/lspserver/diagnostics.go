@@ -430,7 +430,7 @@ func clampUint32(v int) uint32 {
 	if v < 0 {
 		return 0
 	}
-	return uint32(v) //nolint:gosec // line/column numbers are well within uint32 range
+	return uint32(v)
 }
 
 // isVirtualURI reports whether docURI refers to a virtual document that doesn't

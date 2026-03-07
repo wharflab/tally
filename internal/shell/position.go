@@ -63,9 +63,9 @@ func FindCommandOccurrences(script string, variant Variant) []CommandOccurrence 
 
 		occ := CommandOccurrence{
 			Name:     baseName,
-			StartCol: int(pos.Col()) - 1,    //nolint:gosec // G115: shell scripts won't have int-overflowing positions
-			EndCol:   int(endPos.Col()) - 1, //nolint:gosec // G115: shell scripts won't have int-overflowing positions
-			Line:     int(pos.Line()) - 1,   //nolint:gosec // G115: shell scripts won't have int-overflowing positions
+			StartCol: int(pos.Col()) - 1,
+			EndCol:   int(endPos.Col()) - 1,
+			Line:     int(pos.Line()) - 1,
 		}
 
 		// Extract subcommand (first non-flag argument)
@@ -149,9 +149,9 @@ func extractWrappedOccurrences(args []*syntax.Word, variant Variant, wrapperName
 
 		occ := CommandOccurrence{
 			Name:     wa.Name,
-			StartCol: int(pos.Col()) - 1,    //nolint:gosec // G115: shell scripts won't have int-overflowing positions
-			EndCol:   int(endPos.Col()) - 1, //nolint:gosec // G115: shell scripts won't have int-overflowing positions
-			Line:     int(pos.Line()) - 1,   //nolint:gosec // G115: shell scripts won't have int-overflowing positions
+			StartCol: int(pos.Col()) - 1,
+			EndCol:   int(endPos.Col()) - 1,
+			Line:     int(pos.Line()) - 1,
 		}
 
 		// Get subcommand from remaining args

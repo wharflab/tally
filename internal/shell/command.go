@@ -186,9 +186,9 @@ func FindCommands(script string, variant Variant, names ...string) []CommandInfo
 
 		info := CommandInfo{
 			Name:     baseName,
-			Line:     int(pos.Line()) - 1,   //nolint:gosec // shell positions won't overflow
-			StartCol: int(pos.Col()) - 1,    //nolint:gosec
-			EndCol:   int(endPos.Col()) - 1, //nolint:gosec
+			Line:     int(pos.Line()) - 1,
+			StartCol: int(pos.Col()) - 1,
+			EndCol:   int(endPos.Col()) - 1,
 		}
 
 		// Extract all arguments and find subcommand with position
@@ -204,9 +204,9 @@ func FindCommands(script string, variant Variant, names ...string) []CommandInfo
 				info.Subcommand = lit
 				argPos := arg.Pos()
 				argEndPos := arg.End()
-				info.SubcommandLine = int(argPos.Line()) - 1     //nolint:gosec
-				info.SubcommandStartCol = int(argPos.Col()) - 1  //nolint:gosec
-				info.SubcommandEndCol = int(argEndPos.Col()) - 1 //nolint:gosec
+				info.SubcommandLine = int(argPos.Line()) - 1
+				info.SubcommandStartCol = int(argPos.Col()) - 1
+				info.SubcommandEndCol = int(argEndPos.Col()) - 1
 			}
 		}
 
@@ -228,9 +228,9 @@ func findWrappedCommands(args []*syntax.Word, variant Variant, wrapperName strin
 
 			info := CommandInfo{
 				Name:     wa.Name,
-				Line:     int(pos.Line()) - 1,   //nolint:gosec
-				StartCol: int(pos.Col()) - 1,    //nolint:gosec
-				EndCol:   int(endPos.Col()) - 1, //nolint:gosec
+				Line:     int(pos.Line()) - 1,
+				StartCol: int(pos.Col()) - 1,
+				EndCol:   int(endPos.Col()) - 1,
 			}
 
 			// Extract remaining args and find subcommand with position
@@ -246,9 +246,9 @@ func findWrappedCommands(args []*syntax.Word, variant Variant, wrapperName strin
 					info.Subcommand = raLit
 					raPos := ra.Pos()
 					raEndPos := ra.End()
-					info.SubcommandLine = int(raPos.Line()) - 1     //nolint:gosec
-					info.SubcommandStartCol = int(raPos.Col()) - 1  //nolint:gosec
-					info.SubcommandEndCol = int(raEndPos.Col()) - 1 //nolint:gosec
+					info.SubcommandLine = int(raPos.Line()) - 1
+					info.SubcommandStartCol = int(raPos.Col()) - 1
+					info.SubcommandEndCol = int(raEndPos.Col()) - 1
 				}
 			}
 
