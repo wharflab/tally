@@ -736,12 +736,13 @@ func renderImplementedBuildkitTable(defs []buildkitRuleDef, meta map[string]rule
 	b.WriteString("|------|-------------|----------|----------|---------|\n")
 	for _, d := range defs {
 		m := meta[d.Name]
+		sev := m.DefaultSeverity.String()
 		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n",
 			buildkitRuleLinkWithFix(d, fixable[d.Name]),
 			escapePipes(d.Description),
-			titleCase(m.DefaultSeverity.String()),
+			titleCase(sev),
 			titleCategory(m.Category),
-			buildkitDefaultLabel(d),
+			buildkitDefaultLabel(d, sev),
 		)
 	}
 	return strings.TrimRight(b.String(), "\n")
@@ -764,7 +765,7 @@ func renderCapturedBuildkitTable(defs []buildkitRuleDef, fixable map[string]bool
 			buildkitRuleLinkWithFix(d, fixable[d.Name]),
 			escapePipes(d.Description),
 			"Warning",
-			buildkitDefaultLabel(d),
+			buildkitDefaultLabel(d, "warning"),
 			status,
 		)
 	}
@@ -813,9 +814,12 @@ func buildkitDocsURL(buildkitURL string) string {
 	return "https://docs.docker.com/reference/build-checks/" + slug + "/"
 }
 
-func buildkitDefaultLabel(d buildkitRuleDef) string {
+func buildkitDefaultLabel(d buildkitRuleDef, severity string) string {
 	if d.Experimental {
 		return "Off (experimental)"
+	}
+	if severity == "off" {
+		return "Off"
 	}
 	return "Enabled"
 }

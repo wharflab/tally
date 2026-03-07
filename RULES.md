@@ -89,8 +89,8 @@ These BuildKit checks run during LLB conversion in Docker/BuildKit. tally reimpl
 | [`buildkit/DuplicateStageName`](https://docs.docker.com/reference/build-checks/duplicate-stage-name/) | Stage names should be unique | Error | Correctness | Enabled |
 | [`buildkit/ExposeInvalidFormat`](https://docs.docker.com/reference/build-checks/expose-invalid-format/) | IP address and host-port mapping should not be used in EXPOSE instruction. This will become an error in a future release | Warning | Correctness | Enabled |
 | [`buildkit/ExposeProtoCasing`](https://docs.docker.com/reference/build-checks/expose-proto-casing/) 🔧 | Protocol in EXPOSE instruction should be lowercase | Warning | Style | Enabled |
-| [`buildkit/FromPlatformFlagConstDisallowed`](https://docs.docker.com/reference/build-checks/from-platform-flag-const-disallowed/) | FROM --platform flag should not use a constant value | Off | Best Practice | Enabled |
-| `buildkit/InvalidBaseImagePlatform` | Base image platform does not match expected target platform | Off | Correctness | Enabled |
+| [`buildkit/FromPlatformFlagConstDisallowed`](https://docs.docker.com/reference/build-checks/from-platform-flag-const-disallowed/) | FROM --platform flag should not use a constant value | Off | Best Practice | Off |
+| `buildkit/InvalidBaseImagePlatform` | Base image platform does not match expected target platform | Off | Correctness | Off |
 | [`buildkit/InvalidDefaultArgInFrom`](https://docs.docker.com/reference/build-checks/invalid-default-arg-in-from/) | Default value for global ARG results in an empty or invalid base image name | Error | Correctness | Enabled |
 | [`buildkit/JSONArgsRecommended`](https://docs.docker.com/reference/build-checks/json-args-recommended/) 🔧 | JSON arguments recommended for ENTRYPOINT/CMD to prevent unintended behavior related to OS signals | Info | Best Practice | Enabled |
 | [`buildkit/LegacyKeyValueFormat`](https://docs.docker.com/reference/build-checks/legacy-key-value-format/) 🔧 | Legacy key/value format with whitespace separator should not be used | Warning | Style | Enabled |
