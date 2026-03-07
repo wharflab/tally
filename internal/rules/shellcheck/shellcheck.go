@@ -571,7 +571,8 @@ func (r *Rule) checkShellMapping(
 }
 
 func shellcheckRunContext() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), shellcheckRunTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), shellcheckRunTimeout) //nolint:gosec // G118: cancel returned to caller
+	return ctx, cancel
 }
 
 func (r *Rule) runShellcheck(script string, opts intshellcheck.Options) (intshellcheck.JSON1Output, error) {

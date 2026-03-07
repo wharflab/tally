@@ -268,7 +268,7 @@ func (r *Runner) callReactor(ctx context.Context, script string, opts Options) (
 	if err != nil {
 		return nil, fmt.Errorf("sc_check: %w", err)
 	}
-	resultPtr := uint32(results[0]) //nolint:gosec // WASM32 pointer fits uint32
+	resultPtr := uint32(results[0])
 	defer r.freePtr(cleanupCtx, resultPtr)
 
 	// Read output length.
@@ -301,11 +301,11 @@ func (r *Runner) freePtr(ctx context.Context, ptr uint32) {
 
 // wasmAlloc calls sc_alloc to allocate n bytes in WASM linear memory.
 func wasmAlloc(ctx context.Context, scAlloc api.Function, size int) (uint32, error) {
-	results, err := scAlloc.Call(ctx, uint64(size)) //nolint:gosec // int→uint64 safe for allocation sizes
+	results, err := scAlloc.Call(ctx, uint64(size))
 	if err != nil {
 		return 0, fmt.Errorf("sc_alloc(%d): %w", size, err)
 	}
-	return uint32(results[0]), nil //nolint:gosec // WASM32 pointer fits uint32
+	return uint32(results[0]), nil
 }
 
 // buildOpts generates the line-protocol string consumed by the Reactor.hs options parser.
@@ -364,7 +364,7 @@ func newCompilationCache() wazero.CompilationCache {
 		cacheDir = filepath.Join(baseDir, "tally", "shellcheck-wazero-cache")
 	}
 
-	if err := os.MkdirAll(cacheDir, 0o750); err != nil {
+	if err := os.MkdirAll(cacheDir, 0o750); err != nil { //nolint:gosec // G703: cacheDir from os.UserCacheDir + constant subpath
 		return nil
 	}
 

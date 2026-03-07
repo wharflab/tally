@@ -2,6 +2,7 @@
 
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
+export GIT_LFS_SKIP_SMUDGE=1
 
 # Build tags for containers/image pure-Go build (no CGO, no gpgme, no storage transport)
 BUILDTAGS := containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
