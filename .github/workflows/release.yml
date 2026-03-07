@@ -372,6 +372,8 @@ jobs:
           path: intellij-plugin
       - name: Publish to JetBrains Marketplace
         run: |
+          set -euo pipefail
+
           if [ -z "${JETBRAINS_MARKETPLACE_TOKEN}" ]; then
             echo "JETBRAINS_MARKETPLACE_TOKEN is not set; skipping JetBrains Marketplace publish."
             exit 0
@@ -398,17 +400,53 @@ jobs:
             CURL_ARGS+=(-F "channel=${JETBRAINS_MARKETPLACE_CHANNEL}")
           fi
 
-          curl \
-            --fail \
-            --show-error \
-            --location \
-            --retry 5 \
-            --retry-delay 2 \
-            --connect-timeout 30 \
-            --max-time 600 \
-            --header "Authorization: Bearer ${JETBRAINS_MARKETPLACE_TOKEN}" \
-            "${CURL_ARGS[@]}" \
-            https://plugins.jetbrains.com/api/updates/upload
+          RESPONSE_FILE="$(mktemp)"
+          trap 'rm -f "${RESPONSE_FILE}"' EXIT
+
+          set +e
+          HTTP_CODE="$(
+            curl \
+              --silent \
+              --show-error \
+              --location \
+              --retry 5 \
+              --retry-delay 2 \
+              --connect-timeout 30 \
+              --max-time 600 \
+              --output "${RESPONSE_FILE}" \
+              --write-out '%{http_code}' \
+              --header "Authorization: Bearer ${JETBRAINS_MARKETPLACE_TOKEN}" \
+              "${CURL_ARGS[@]}" \
+              https://plugins.jetbrains.com/api/updates/upload
+          )"
+          CURL_STATUS=$?
+          set -e
+
+          if [ "${CURL_STATUS}" -ne 0 ]; then
+            echo "::error::JetBrains Marketplace upload request failed before completion (curl exit ${CURL_STATUS})."
+            if [ -s "${RESPONSE_FILE}" ]; then
+              echo "Marketplace response:"
+              cat "${RESPONSE_FILE}"
+            fi
+            exit "${CURL_STATUS}"
+          fi
+
+          if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
+            echo "::error::JetBrains Marketplace upload failed with HTTP ${HTTP_CODE}."
+            if [ -s "${RESPONSE_FILE}" ]; then
+              echo "Marketplace response:"
+              cat "${RESPONSE_FILE}"
+            fi
+            if grep -qiE 'plugin developer agreement|accept(ed)? .*agreement|updated agreement|license agreement' "${RESPONSE_FILE}"; then
+              echo "::error::JetBrains Marketplace is blocking uploads until the vendor accepts the updated Developer Agreement. Log into plugins.jetbrains.com with the plugin owner account, accept the agreement, then rerun the release."
+            fi
+            exit 1
+          fi
+
+          echo "JetBrains Marketplace upload accepted."
+          if [ -s "${RESPONSE_FILE}" ]; then
+            cat "${RESPONSE_FILE}"
+          fi
   publish-vscode-marketplace:
     needs: build-vscode-vsix
     runs-on: ubuntu-latest
