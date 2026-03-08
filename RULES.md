@@ -45,7 +45,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/platform-mismatch`](docs/rules/tally/platform-mismatch.md) | Explicit `--platform` on FROM does not match what the registry provides | Error | Correctness | Enabled |
 | [`tally/prefer-add-unpack`](docs/rules/tally/prefer-add-unpack.md) 🔧 | Suggests `ADD --unpack` instead of downloading and extracting remote archives in `RUN` | Info | Performance | Enabled |
 | [`tally/prefer-multi-stage-build`](docs/rules/tally/prefer-multi-stage-build.md) 🔧 | Suggests converting single-stage builds into multi-stage builds to reduce final image size | Info | Performance | Off (experimental) |
-| [`tally/prefer-copy-heredoc`](docs/rules/tally/prefer-copy-heredoc.md) 🔧 | Suggests using COPY heredoc for file creation instead of RUN echo/cat | Style | Style | Enabled |
+| [`tally/prefer-copy-heredoc`](docs/rules/tally/prefer-copy-heredoc.md) 🔧 | Suggests using COPY heredoc for file creation instead of RUN echo/cat | Info | Performance | Enabled |
 | [`tally/prefer-package-cache-mounts`](docs/rules/tally/prefer-package-cache-mounts.md) 🔧 | Suggests BuildKit cache mounts for package install/build commands and removes cache cleanup commands | Info | Performance | Off (experimental) |
 | [`tally/prefer-run-heredoc`](docs/rules/tally/prefer-run-heredoc.md) 🔧 | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Off (experimental) |
 | [`tally/consistent-indentation`](docs/rules/tally/consistent-indentation.md) 🔧 | Enforces consistent indentation for Dockerfile build stages | Style | Style | Off (experimental) |

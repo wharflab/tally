@@ -1,7 +1,7 @@
 {
- "Category": "style",
+ "Category": "performance",
  "Code": "tally/prefer-copy-heredoc",
- "DefaultSeverity": "style",
+ "DefaultSeverity": "info",
  "Description": "Use COPY \u003c\u003cEOF syntax instead of RUN echo/cat for creating files",
  "DocURL": "https://wharflab.github.io/tally/rules/tally/prefer-copy-heredoc/",
  "FixPriority": 99,

@@ -4,8 +4,8 @@ Suggests using COPY heredoc for file creation instead of RUN echo/cat.
 
 | Property | Value |
 |----------|-------|
-| Severity | Style |
-| Category | Style |
+| Severity | Info |
+| Category | Performance |
 | Default | Enabled |
 | Auto-fix | Yes (`--fix --fix-unsafe`) |
 

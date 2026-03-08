@@ -19,7 +19,7 @@
           },
           "message": "use COPY \u003c\u003cEOF instead of RUN for file creation",
           "rule": "tally/prefer-copy-heredoc",
-          "severity": "style",
+          "severity": "info",
           "sourceCode": "RUN echo \"server { listen 80; }\" \u003e /etc/nginx/conf.d/default.conf",
           "suggestedFix": {
             "description": "Replace RUN with COPY \u003c\u003cEOF to /etc/nginx/conf.d/default.conf",
@@ -111,7 +111,7 @@
           },
           "message": "consecutive RUN file creations can use a single COPY heredoc",
           "rule": "tally/prefer-copy-heredoc",
-          "severity": "style",
+          "severity": "info",
           "sourceCode": "RUN echo \"line1\" \u003e /app/data.txt",
           "suggestedFix": {
             "description": "Combine 2 RUNs into single COPY \u003c\u003cEOF to /app/data.txt",
@@ -151,7 +151,7 @@
           },
           "message": "use COPY \u003c\u003cEOF instead of RUN for file creation",
           "rule": "tally/prefer-copy-heredoc",
-          "severity": "style",
+          "severity": "info",
           "sourceCode": "RUN cat \u003c\u003cINNEREOF \u003e /etc/motd",
           "suggestedFix": {
             "description": "Replace RUN with COPY \u003c\u003cEOF to /etc/motd",
@@ -191,7 +191,7 @@
           },
           "message": "use COPY \u003c\u003cEOF instead of RUN for file creation",
           "rule": "tally/prefer-copy-heredoc",
-          "severity": "style",
+          "severity": "info",
           "sourceCode": "RUN \u003c\u003cEOF cat \u003e /aria2/aria2.conf",
           "suggestedFix": {
             "description": "Replace RUN with COPY \u003c\u003cEOF to /aria2/aria2.conf",
@@ -231,7 +231,7 @@
           },
           "message": "use COPY \u003c\u003cEOF instead of RUN for file creation",
           "rule": "tally/prefer-copy-heredoc",
-          "severity": "style",
+          "severity": "info",
           "sourceCode": "RUN \u003c\u003cEOF tee /etc/supervisor/conf.d/app.conf",
           "suggestedFix": {
             "description": "Replace RUN with COPY \u003c\u003cEOF to /etc/supervisor/conf.d/app.conf",
@@ -271,7 +271,7 @@
           },
           "message": "use COPY \u003c\u003cEOF instead of RUN for file creation",
           "rule": "tally/prefer-copy-heredoc",
-          "severity": "style",
+          "severity": "info",
           "sourceCode": "RUN echo '#!/bin/sh' \u003e /entrypoint.sh \u0026\u0026 chmod +x /entrypoint.sh",
           "suggestedFix": {
             "description": "Replace RUN with COPY \u003c\u003cEOF to /entrypoint.sh",
@@ -355,8 +355,8 @@
   "summary": {
     "errors": 0,
     "files": 1,
-    "info": 0,
-    "style": 10,
+    "info": 6,
+    "style": 4,
     "total": 10,
     "warnings": 0
   }
