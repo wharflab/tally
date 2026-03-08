@@ -625,6 +625,13 @@ func lintCases(t *testing.T) []lintCase {
 		},
 
 		{
+			name:     "curl-missing-location",
+			dir:      "curl-missing-location",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/curl-missing-location")...),
+			wantExit: 1,
+		},
+
+		{
 			name:     "prefer-vex-attestation",
 			dir:      "prefer-vex-attestation",
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-vex-attestation")...),

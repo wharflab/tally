@@ -1,0 +1,175 @@
+{
+  "files": [
+    {
+      "file": "testdata/curl-missing-location/Dockerfile",
+      "violations": [
+        {
+          "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-missing-location/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/curl-missing-location/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "curl command is missing --location flag to follow HTTP redirects",
+          "rule": "tally/curl-missing-location",
+          "severity": "warning",
+          "sourceCode": "RUN curl -fsSo /tmp/file.tar.gz https://example.com/file.tar.gz",
+          "suggestedFix": {
+            "description": "Add --location flag to follow redirects",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 8,
+                    "line": 4
+                  },
+                  "file": "testdata/curl-missing-location/Dockerfile",
+                  "start": {
+                    "column": 8,
+                    "line": 4
+                  }
+                },
+                "newText": " --location"
+              }
+            ],
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-missing-location/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 7
+            },
+            "file": "testdata/curl-missing-location/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 7
+            }
+          },
+          "message": "curl command is missing --location flag to follow HTTP redirects",
+          "rule": "tally/curl-missing-location",
+          "severity": "warning",
+          "sourceCode": "RUN curl https://example.com/script.sh | sh",
+          "suggestedFix": {
+            "description": "Add --location flag to follow redirects",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 8,
+                    "line": 7
+                  },
+                  "file": "testdata/curl-missing-location/Dockerfile",
+                  "start": {
+                    "column": 8,
+                    "line": 7
+                  }
+                },
+                "newText": " --location"
+              }
+            ],
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-missing-location/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 28
+            },
+            "file": "testdata/curl-missing-location/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 28
+            }
+          },
+          "message": "curl command is missing --location flag to follow HTTP redirects",
+          "rule": "tally/curl-missing-location",
+          "severity": "warning",
+          "sourceCode": "RUN apt-get update \u0026\u0026 \\",
+          "suggestedFix": {
+            "description": "Add --location flag to follow redirects",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 8,
+                    "line": 29
+                  },
+                  "file": "testdata/curl-missing-location/Dockerfile",
+                  "start": {
+                    "column": 8,
+                    "line": 29
+                  }
+                },
+                "newText": " --location"
+              }
+            ],
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-missing-location/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 33
+            },
+            "file": "testdata/curl-missing-location/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 33
+            }
+          },
+          "message": "curl command is missing --location flag to follow HTTP redirects",
+          "rule": "tally/curl-missing-location",
+          "severity": "warning",
+          "sourceCode": "RUN curl -fsS -o /tmp/file https://example.com/file",
+          "suggestedFix": {
+            "description": "Add --location flag to follow redirects",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 8,
+                    "line": 33
+                  },
+                  "file": "testdata/curl-missing-location/Dockerfile",
+                  "start": {
+                    "column": 8,
+                    "line": 33
+                  }
+                },
+                "newText": " --location"
+              }
+            ],
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 4,
+    "warnings": 4
+  }
+}

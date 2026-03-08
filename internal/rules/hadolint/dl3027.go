@@ -1,73 +1,12 @@
 package hadolint
 
 import (
-	"strings"
-
-	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/shell"
-	"github.com/wharflab/tally/internal/sourcemap"
 )
-
-// getRunSourceScript extracts the original source for a RUN instruction
-// and replaces "RUN " with spaces to preserve column positions for shell parsing.
-// Returns the script and the 1-based start line number.
-func getRunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (string, int) {
-	runLoc := run.Location()
-	if len(runLoc) == 0 {
-		return "", 0
-	}
-
-	// BuildKit uses 1-based lines
-	startLine := runLoc[0].Start.Line
-	endLine := runLoc[len(runLoc)-1].End.Line
-
-	// Extract original source lines (SourceMap uses 0-based)
-	var lines []string
-	for lineIdx := startLine - 1; lineIdx < endLine; lineIdx++ {
-		if lineIdx >= 0 && lineIdx < sm.LineCount() {
-			lines = append(lines, sm.Line(lineIdx))
-		}
-	}
-
-	if len(lines) == 0 {
-		return "", 0
-	}
-
-	// Replace the instruction prefix with spaces to preserve column positions for
-	// shell parsing. Handles "RUN " and "ONBUILD RUN " patterns.
-	firstLine := lines[0]
-	upper := strings.ToUpper(firstLine)
-	if idx := strings.Index(upper, strings.ToUpper(command.Run)); idx >= 0 {
-		// Check that RUN is followed by whitespace (space or tab)
-		afterRun := idx + len(command.Run)
-		if afterRun < len(firstLine) && (firstLine[afterRun] == ' ' || firstLine[afterRun] == '\t') {
-			// Count contiguous whitespace after RUN
-			wsEnd := afterRun
-			for wsEnd < len(firstLine) && (firstLine[wsEnd] == ' ' || firstLine[wsEnd] == '\t') {
-				wsEnd++
-			}
-			// For ONBUILD RUN, also blank out the "ONBUILD" keyword and any
-			// leading content before "RUN" so the shell parser sees only the
-			// script. Column positions are preserved since we replace 1:1 with spaces.
-			replaceStart := idx
-			if idx > 0 {
-				// Check for ONBUILD prefix (possibly with leading whitespace)
-				prefix := strings.TrimSpace(upper[:idx])
-				if strings.EqualFold(prefix, command.Onbuild) {
-					replaceStart = 0
-				}
-			}
-			replaceLen := wsEnd - replaceStart
-			lines[0] = firstLine[:replaceStart] + strings.Repeat(" ", replaceLen) + firstLine[wsEnd:]
-		}
-	}
-
-	return strings.Join(lines, "\n"), startLine
-}
 
 // DL3027Rule implements the DL3027 linting rule.
 type DL3027Rule struct{}
@@ -132,7 +71,7 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 			if run.PrependShell {
 				// Shell form: parse original source with "RUN " replaced by spaces
 				// This preserves column positions for accurate edits on multi-line commands
-				script, startLine := getRunSourceScript(run, sm)
+				script, startLine := dockerfile.RunSourceScript(run, sm)
 				if script == "" {
 					return nil
 				}

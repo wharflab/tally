@@ -115,6 +115,32 @@ func fixCases(t *testing.T) []fixCase {
 			args:        []string{"--fix", "--fix-unsafe", "--fail-level", "none"},
 			wantApplied: 3, // prefer-add-unpack + DL3047 --progress + single DL4006 SHELL insertion.
 		},
+		// curl-missing-location: insert --location after curl
+		{
+			name:        "curl-missing-location",
+			input:       "FROM ubuntu:22.04\nRUN curl -fsSo /tmp/file https://example.com/file\n",
+			args:        []string{"--fix", "--fix-unsafe"},
+			wantApplied: 1,
+		},
+		// Cross-rule: curl-missing-location + prefer-add-unpack on the same RUN.
+		// Both rules fire (both elevated to error), but curl-missing-location
+		// suppresses its fix when tar extraction is present (prefer-add-unpack
+		// territory). Only the prefer-add-unpack fix applies (RUN → ADD --unpack).
+		{
+			name: "curl-missing-location-cross-prefer-add-unpack",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN curl -fsSo /tmp/go.tar.gz https://go.dev/dl/go1.22.0.linux-amd64.tar.gz && " +
+				"tar -xzf /tmp/go.tar.gz -C /usr/local\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/curl-missing-location", "tally/prefer-add-unpack")...),
+			wantApplied: 1,
+			config: `[rules.tally.curl-missing-location]
+severity = "error"
+
+[rules.tally.prefer-add-unpack]
+severity = "error"
+`,
+		},
 		// DL3003: cd -> WORKDIR (regression test for line number consistency)
 		{
 			// DL3003 fix is FixSuggestion (not FixSafe) because WORKDIR creates

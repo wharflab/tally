@@ -122,7 +122,7 @@ func CheckPackageManagerFlag(input rules.LintInput, meta rules.RuleMetadata, con
 			var runStartLine int
 
 			if run.PrependShell {
-				script, startLine := getRunSourceScript(run, sm)
+				script, startLine := dockerfile.RunSourceScript(run, sm)
 				if script == "" {
 					return nil
 				}

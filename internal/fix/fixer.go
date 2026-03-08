@@ -472,6 +472,25 @@ func selectNonConflictingCandidates(fc *FileChange, candidates []*fixCandidate) 
 		}
 
 		if hasConflict(c.fix.Edits, reserved) {
+			// When the new candidate's edits entirely contain a previously
+			// selected candidate's edits, the new fix is more comprehensive
+			// (e.g., a whole-line replacement that makes a point insert moot).
+			// Only swap on strict subsumption — mutual containment (identical
+			// ranges) keeps the sort-order winner.
+			if swapIdx := findSubsumedCandidate(c, selected); swapIdx >= 0 && !candidateSubsumes(selected[swapIdx], c) {
+				old := selected[swapIdx]
+				reserved = removeEdits(reserved, old.fix.Edits)
+				fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
+					RuleCode: old.violation.RuleCode,
+					Reason:   SkipConflict,
+					Location: old.violation.Location,
+				})
+				selected = slices.Delete(selected, swapIdx, swapIdx+1)
+				selected = append(selected, c)
+				reserved = append(reserved, c.fix.Edits...)
+				continue
+			}
+
 			fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
 				RuleCode: c.violation.RuleCode,
 				Reason:   SkipConflict,
@@ -484,6 +503,35 @@ func selectNonConflictingCandidates(fc *FileChange, candidates []*fixCandidate) 
 	}
 
 	return selected
+}
+
+// findSubsumedCandidate returns the index of the first selected candidate
+// whose edits are entirely contained within c's edits, or -1 if none.
+func findSubsumedCandidate(c *fixCandidate, selected []*fixCandidate) int {
+	for i, s := range selected {
+		if candidateSubsumes(c, s) {
+			return i
+		}
+	}
+	return -1
+}
+
+// removeEdits returns a new slice with all edits from remove taken out.
+func removeEdits(reserved, remove []rules.TextEdit) []rules.TextEdit {
+	result := make([]rules.TextEdit, 0, len(reserved))
+	for _, r := range reserved {
+		keep := true
+		for _, rm := range remove {
+			if r.Location == rm.Location && r.NewText == rm.NewText {
+				keep = false
+				break
+			}
+		}
+		if keep {
+			result = append(result, r)
+		}
+	}
+	return result
 }
 
 func candidateImportanceRank(c *fixCandidate) int {

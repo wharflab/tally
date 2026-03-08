@@ -14,6 +14,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // LintWarning captures parameters from BuildKit's linter.LintWarnFunc callback.
@@ -365,6 +366,66 @@ func ExtractHeredocFiles(stages []instructions.Stage) map[string]bool {
 // Handles both shell form (RUN cmd) and exec form (RUN ["cmd", "arg"]).
 func RunCommandString(run *instructions.RunCommand) string {
 	return strings.Join(run.CmdLine, " ")
+}
+
+// RunSourceScript extracts the original source for a shell-form RUN instruction
+// and replaces the "RUN " prefix (and "ONBUILD RUN ") with spaces so that column
+// positions from shell.FindCommands on the returned script map directly to
+// source-file columns. This enables accurate fix edits.
+//
+// Returns the script and the 1-based start line number, or ("", 0) if the
+// instruction has no location or no source lines.
+func RunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (string, int) {
+	runLoc := run.Location()
+	if len(runLoc) == 0 {
+		return "", 0
+	}
+
+	// BuildKit uses 1-based lines
+	startLine := runLoc[0].Start.Line
+	endLine := runLoc[len(runLoc)-1].End.Line
+
+	// Extract original source lines (SourceMap uses 0-based)
+	var lines []string
+	for lineIdx := startLine - 1; lineIdx < endLine; lineIdx++ {
+		if lineIdx >= 0 && lineIdx < sm.LineCount() {
+			lines = append(lines, sm.Line(lineIdx))
+		}
+	}
+
+	if len(lines) == 0 {
+		return "", 0
+	}
+
+	// Replace the instruction prefix with spaces to preserve column positions for
+	// shell parsing. Handles "RUN " and "ONBUILD RUN " patterns.
+	firstLine := lines[0]
+	upper := strings.ToUpper(firstLine)
+	if idx := strings.Index(upper, strings.ToUpper(command.Run)); idx >= 0 {
+		// Check that RUN is followed by whitespace (space or tab)
+		afterRun := idx + len(command.Run)
+		if afterRun < len(firstLine) && (firstLine[afterRun] == ' ' || firstLine[afterRun] == '\t') {
+			// Count contiguous whitespace after RUN
+			wsEnd := afterRun
+			for wsEnd < len(firstLine) && (firstLine[wsEnd] == ' ' || firstLine[wsEnd] == '\t') {
+				wsEnd++
+			}
+			// For ONBUILD RUN, also blank out the "ONBUILD" keyword and any
+			// leading content before "RUN" so the shell parser sees only the
+			// script. Column positions are preserved since we replace 1:1 with spaces.
+			replaceStart := idx
+			if idx > 0 {
+				prefix := strings.TrimSpace(upper[:idx])
+				if strings.EqualFold(prefix, command.Onbuild) {
+					replaceStart = 0
+				}
+			}
+			replaceLen := wsEnd - replaceStart
+			lines[0] = firstLine[:replaceStart] + strings.Repeat(" ", replaceLen) + firstLine[wsEnd:]
+		}
+	}
+
+	return strings.Join(lines, "\n"), startLine
 }
 
 // CollectHeredocPaths extracts heredoc paths from a single COPY/ADD command's
