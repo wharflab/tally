@@ -16,15 +16,38 @@ EOF
 		echo step1
 		echo step2
 		echo step3
-		echo "line1" >/app/data.txt
-		echo "line2" >>/app/data.txt
-		echo "extra" >>/tmp/log.txt
-		Welcome to the build container
-		dir=/downloads
-		max-concurrent-downloads=16
-		[program:app]
-		command=/usr/bin/app
-		autostart=true
+		EOF
+
+# Case 4: prefer-copy-heredoc — consecutive RUNs appending to same file
+	COPY <<EOF /app/data.txt
+line1
+line2
+EOF
+
+# Case 5: Should NOT trigger prefer-copy-heredoc — only 1 append (no base write)
+	RUN echo "extra" >> /tmp/log.txt
+
+# Case 6: prefer-copy-heredoc — echo with cat pattern
+COPY <<EOF /etc/motd
+Welcome to the build container
+EOF
+
+# Case 6b: prefer-copy-heredoc — BuildKit heredoc piped to cat
+COPY <<EOF /aria2/aria2.conf
+dir=/downloads
+max-concurrent-downloads=16
+EOF
+
+# Case 6c: prefer-copy-heredoc — BuildKit heredoc piped to tee
+COPY <<EOF /etc/supervisor/conf.d/app.conf
+[program:app]
+command=/usr/bin/app
+autostart=true
+EOF
+
+# Case 7+8: prefer-run-heredoc — 2 shell-form RUNs + 1 heredoc RUN merged (3 RUNs, 4 commands)
+	RUN <<-EOF
+		set -e
 		echo hello
 		echo world
 		echo "already heredoc"
