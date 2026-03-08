@@ -16,6 +16,7 @@ func TestDetectFileCreation(t *testing.T) {
 		wantNil    bool
 		wantPath   string
 		wantChmod  uint16
+		wantAppend bool
 		wantUnsafe bool
 	}{
 		{
@@ -176,10 +177,11 @@ func TestDetectFileCreation(t *testing.T) {
 			wantPath: "/app/config.txt",
 		},
 		{
-			name:     "tee -a with heredoc (append)",
-			script:   "<<EOF tee -a /app/config.txt\nextra line\nEOF",
-			variant:  VariantBash,
-			wantPath: "/app/config.txt",
+			name:       "tee -a with heredoc (append)",
+			script:     "<<EOF tee -a /app/config.txt\nextra line\nEOF",
+			variant:    VariantBash,
+			wantPath:   "/app/config.txt",
+			wantAppend: true,
 		},
 		{
 			name:    "tee with multiple files - skip",
@@ -241,6 +243,10 @@ func TestDetectFileCreation(t *testing.T) {
 
 			if result.ChmodMode != tt.wantChmod {
 				t.Errorf("ChmodMode = %04o, want %04o", result.ChmodMode, tt.wantChmod)
+			}
+
+			if result.IsAppend != tt.wantAppend {
+				t.Errorf("IsAppend = %v, want %v", result.IsAppend, tt.wantAppend)
 			}
 
 			if result.HasUnsafeVariables != tt.wantUnsafe {
