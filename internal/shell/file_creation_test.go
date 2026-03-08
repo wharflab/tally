@@ -169,6 +169,42 @@ func TestDetectFileCreation(t *testing.T) {
 			wantPath: "/app/file",
 			// chmodMode should be empty since multiple targets are not supported
 		},
+		{
+			name:     "tee with heredoc to file",
+			script:   "<<EOF tee /app/config.txt\nhello world\nEOF",
+			variant:  VariantBash,
+			wantPath: "/app/config.txt",
+		},
+		{
+			name:     "tee -a with heredoc (append)",
+			script:   "<<EOF tee -a /app/config.txt\nextra line\nEOF",
+			variant:  VariantBash,
+			wantPath: "/app/config.txt",
+		},
+		{
+			name:    "tee with multiple files - skip",
+			script:  "<<EOF tee /app/file1 /app/file2\ndata\nEOF",
+			variant: VariantBash,
+			wantNil: true,
+		},
+		{
+			name:    "tee with relative path - skip",
+			script:  "<<EOF tee config.txt\ndata\nEOF",
+			variant: VariantBash,
+			wantNil: true,
+		},
+		{
+			name:    "tee without file arg - skip",
+			script:  "<<EOF tee\ndata\nEOF",
+			variant: VariantBash,
+			wantNil: true,
+		},
+		{
+			name:     "tee with stdout suppressed",
+			script:   "<<EOF tee /app/config.txt > /dev/null\nhello\nEOF",
+			variant:  VariantBash,
+			wantPath: "/app/config.txt",
+		},
 	}
 
 	for _, tt := range tests {
@@ -619,6 +655,24 @@ func TestDetectFileCreationCatHeredoc(t *testing.T) {
 		{
 			name:       "cat heredoc with variable - unsafe",
 			script:     "cat <<EOF > /app/config\nhello $USER\nEOF",
+			wantPath:   "/app/config",
+			wantUnsafe: true,
+		},
+		{
+			name:        "tee heredoc simple",
+			script:      "<<EOF tee /app/config\nhello world\nEOF",
+			wantPath:    "/app/config",
+			wantContent: "hello world\n",
+		},
+		{
+			name:        "tee heredoc with dash (tab stripping)",
+			script:      "<<-EOF tee /app/config\n\thello\n\tworld\nEOF",
+			wantPath:    "/app/config",
+			wantContent: "hello\nworld\n",
+		},
+		{
+			name:       "tee heredoc with variable - unsafe",
+			script:     "<<EOF tee /app/config\nhello $USER\nEOF",
 			wantPath:   "/app/config",
 			wantUnsafe: true,
 		},

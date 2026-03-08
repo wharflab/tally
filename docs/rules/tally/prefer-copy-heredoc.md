@@ -6,7 +6,7 @@ Suggests using COPY heredoc for file creation instead of RUN echo/cat.
 |----------|-------|
 | Severity | Style |
 | Category | Style |
-| Default | Off (experimental) |
+| Default | Enabled |
 | Auto-fix | Yes (`--fix --fix-unsafe`) |
 
 ## Description
@@ -26,8 +26,9 @@ It relies on Dockerfile [here-documents](https://docs.docker.com/reference/docke
 
 1. **Simple file creation**: `echo "content" > /path/to/file`
 2. **File creation with chmod**: `echo "x" > /file && chmod 0755 /file`
-3. **Consecutive RUN instructions** writing to the same file
-4. **Mixed commands** with file creation in the middle (extracts just the file creation)
+3. **BuildKit heredoc piped to cat**: `RUN <<EOF cat > /path/to/file`
+4. **Consecutive RUN instructions** writing to the same file
+5. **Mixed commands** with file creation in the middle (extracts just the file creation)
 
 ## Examples
 

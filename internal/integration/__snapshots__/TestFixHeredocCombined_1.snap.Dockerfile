@@ -20,6 +20,11 @@ EOF
 		echo "line2" >>/app/data.txt
 		echo "extra" >>/tmp/log.txt
 		Welcome to the build container
+		dir=/downloads
+		max-concurrent-downloads=16
+		[program:app]
+		command=/usr/bin/app
+		autostart=true
 		echo hello
 		echo world
 		echo "already heredoc"

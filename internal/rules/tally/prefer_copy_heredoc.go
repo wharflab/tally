@@ -65,7 +65,7 @@ func (r *PreferCopyHeredocRule) Metadata() rules.RuleMetadata {
 		DocURL:          rules.TallyDocURL(PreferCopyHeredocRuleCode),
 		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
-		IsExperimental:  true,
+		IsExperimental:  false,
 		FixPriority:     99, // Run before prefer-run-heredoc (100)
 	}
 }

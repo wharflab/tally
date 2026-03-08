@@ -44,7 +44,7 @@
           }
         },
         {
-          "detail": "12 consecutive RUN instructions with 15 total commands can be combined into a single heredoc RUN",
+          "detail": "14 consecutive RUN instructions with 20 total commands can be combined into a single heredoc RUN",
           "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-run-heredoc/",
           "location": {
             "end": {
@@ -62,7 +62,7 @@
           "severity": "style",
           "sourceCode": "RUN echo \"server { listen 80; }\" \u003e /etc/nginx/conf.d/default.conf",
           "suggestedFix": {
-            "description": "Combine 15 commands into heredoc",
+            "description": "Combine 20 commands into heredoc",
             "needsResolve": true,
             "priority": 100,
             "resolverId": "prefer-run-heredoc",
@@ -176,17 +176,97 @@
           }
         },
         {
+          "detail": "Creating /aria2/aria2.conf with RUN can be replaced with COPY heredoc for better performance",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-copy-heredoc/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 29
+            },
+            "file": "testdata/heredoc-combined/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 29
+            }
+          },
+          "message": "use COPY \u003c\u003cEOF instead of RUN for file creation",
+          "rule": "tally/prefer-copy-heredoc",
+          "severity": "style",
+          "sourceCode": "RUN \u003c\u003cEOF cat \u003e /aria2/aria2.conf",
+          "suggestedFix": {
+            "description": "Replace RUN with COPY \u003c\u003cEOF to /aria2/aria2.conf",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 3,
+                    "line": 32
+                  },
+                  "file": "testdata/heredoc-combined/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 29
+                  }
+                },
+                "newText": "COPY \u003c\u003cEOF /aria2/aria2.conf\ndir=/downloads\nmax-concurrent-downloads=16\nEOF"
+              }
+            ],
+            "priority": 99,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Creating /etc/supervisor/conf.d/app.conf with RUN can be replaced with COPY heredoc for better performance",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-copy-heredoc/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 35
+            },
+            "file": "testdata/heredoc-combined/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 35
+            }
+          },
+          "message": "use COPY \u003c\u003cEOF instead of RUN for file creation",
+          "rule": "tally/prefer-copy-heredoc",
+          "severity": "style",
+          "sourceCode": "RUN \u003c\u003cEOF tee /etc/supervisor/conf.d/app.conf",
+          "suggestedFix": {
+            "description": "Replace RUN with COPY \u003c\u003cEOF to /etc/supervisor/conf.d/app.conf",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 3,
+                    "line": 39
+                  },
+                  "file": "testdata/heredoc-combined/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 35
+                  }
+                },
+                "newText": "COPY \u003c\u003cEOF /etc/supervisor/conf.d/app.conf\n[program:app]\ncommand=/usr/bin/app\nautostart=true\nEOF"
+              }
+            ],
+            "priority": 99,
+            "safety": 1
+          }
+        },
+        {
           "detail": "Creating /entrypoint.sh with RUN can be replaced with COPY heredoc for better performance",
           "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-copy-heredoc/",
           "location": {
             "end": {
               "column": 0,
-              "line": 43
+              "line": 56
             },
             "file": "testdata/heredoc-combined/Dockerfile",
             "start": {
               "column": 0,
-              "line": 43
+              "line": 56
             }
           },
           "message": "use COPY \u003c\u003cEOF instead of RUN for file creation",
@@ -200,12 +280,12 @@
                 "location": {
                   "end": {
                     "column": 64,
-                    "line": 43
+                    "line": 56
                   },
                   "file": "testdata/heredoc-combined/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 43
+                    "line": 56
                   }
                 },
                 "newText": "COPY --chmod=0755 \u003c\u003cEOF /entrypoint.sh\n#!/bin/sh\nEOF"
@@ -221,12 +301,12 @@
           "location": {
             "end": {
               "column": 0,
-              "line": 43
+              "line": 56
             },
             "file": "testdata/heredoc-combined/Dockerfile",
             "start": {
               "column": 0,
-              "line": 43
+              "line": 56
             }
           },
           "message": "consecutive RUN instructions can be combined using heredoc syntax",
@@ -247,12 +327,12 @@
           "location": {
             "end": {
               "column": 0,
-              "line": 46
+              "line": 59
             },
             "file": "testdata/heredoc-combined/Dockerfile",
             "start": {
               "column": 0,
-              "line": 46
+              "line": 59
             }
           },
           "message": "RUN instruction with chained commands can use heredoc syntax",
@@ -276,8 +356,8 @@
     "errors": 0,
     "files": 1,
     "info": 0,
-    "style": 8,
-    "total": 8,
+    "style": 10,
+    "total": 10,
     "warnings": 0
   }
 }
