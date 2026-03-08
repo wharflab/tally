@@ -708,6 +708,37 @@ func lintCases(t *testing.T) []lintCase {
 				[]string{"--format", "json", "--slow-checks=on"},
 				mustSelectRules("buildkit/InvalidBaseImagePlatform")...),
 		},
+		// tally/platform-mismatch — only fires when --platform is explicit
+		{
+			name: "slow-checks-tally-platform-mismatch",
+			dir:  "slow-checks-tally-platform-mismatch",
+			args: append(
+				[]string{"--format", "json", "--slow-checks=on"},
+				mustSelectRules("tally/platform-mismatch")...),
+			wantExit: 1,
+		},
+		{
+			name: "slow-checks-tally-platform-no-flag",
+			dir:  "slow-checks-tally-platform-no-flag",
+			args: append(
+				[]string{"--format", "json", "--slow-checks=on"},
+				mustSelectRules("tally/platform-mismatch")...),
+		},
+		{
+			name: "slow-checks-tally-platform-index-mismatch",
+			dir:  "slow-checks-tally-platform-index-mismatch",
+			args: append(
+				[]string{"--format", "json", "--slow-checks=on"},
+				mustSelectRules("tally/platform-mismatch")...),
+			wantExit: 1,
+		},
+		{
+			name: "slow-checks-tally-platform-auto-arg",
+			dir:  "slow-checks-tally-platform-auto-arg",
+			args: append(
+				[]string{"--format", "json", "--slow-checks=on"},
+				mustSelectRules("tally/platform-mismatch")...),
+		},
 		{
 			name: "slow-checks-undefined-var-enhanced",
 			dir:  "slow-checks-undefined-var-enhanced",

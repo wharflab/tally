@@ -24,7 +24,7 @@ auto-fix support where available.
 | [UndefinedArgInFrom](UndefinedArgInFrom.md) | Undefined ARG used in FROM | Warning | -- |
 | [UndefinedVar](UndefinedVar.md) | Usage of undefined variable | Warning | -- |
 | [InvalidDefaultArgInFrom](InvalidDefaultArgInFrom.md) | Default value of ARG used in FROM is not valid | Error | -- |
-| [InvalidBaseImagePlatform](InvalidBaseImagePlatform.md) | Base image platform does not match expected target platform | Error | -- |
+| [InvalidBaseImagePlatform](InvalidBaseImagePlatform.md) | Base image platform does not match expected target platform | Off | -- |
 | [ExposeInvalidFormat](ExposeInvalidFormat.md) | EXPOSE should not define IP address or host-port mapping | Warning | -- |
 | [CopyIgnoredFile](CopyIgnoredFile.md) | Attempting to COPY file that is excluded by .dockerignore | Warning | -- |
 
@@ -37,7 +37,7 @@ auto-fix support where available.
 | [WorkdirRelativePath](WorkdirRelativePath.md) | Relative workdir can have unexpected results if the base image changes | Warning | -- |
 | [MultipleInstructionsDisallowed](MultipleInstructionsDisallowed.md) | Multiple CMD/ENTRYPOINT/HEALTHCHECK in same stage; only last is used | Warning | Yes (`--fix`) |
 | [RedundantTargetPlatform](RedundantTargetPlatform.md) | Setting platform to `$TARGETPLATFORM` in FROM is redundant | Info | -- |
-| [FromPlatformFlagConstDisallowed](FromPlatformFlagConstDisallowed.md) | FROM `--platform` flag should not use a constant value | Warning | -- |
+| [FromPlatformFlagConstDisallowed](FromPlatformFlagConstDisallowed.md) | FROM `--platform` flag should not use a constant value | Off | -- |
 
 ## Security
 

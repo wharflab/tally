@@ -1,7 +1,7 @@
 {
  "Category": "correctness",
  "Code": "buildkit/InvalidBaseImagePlatform",
- "DefaultSeverity": "error",
+ "DefaultSeverity": "off",
  "Description": "Base image platform does not match expected target platform",
  "DocURL": "https://wharflab.github.io/tally/rules/buildkit/InvalidBaseImagePlatform/",
  "FixPriority": 0,

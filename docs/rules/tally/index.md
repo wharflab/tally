@@ -17,6 +17,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [circular-stage-deps](./circular-stage-deps.md) | Detects circular dependencies between build stages | Error | Correctness | Enabled |
 | [copy-from-empty-scratch-stage](./copy-from-empty-scratch-stage.md) | Detects COPY --from referencing a scratch stage with no file-producing instructions | Error | Correctness | Enabled |
 | [invalid-json-form](./invalid-json-form.md) | Arguments appear to use JSON exec-form but contain invalid JSON | Error | Correctness | Enabled |
+| [platform-mismatch](./platform-mismatch.md) | Explicit `--platform` on FROM does not match what the registry provides | Error | Correctness | Enabled |
 | [prefer-add-unpack](./prefer-add-unpack.md) | Prefer `ADD --unpack` for downloading and extracting remote archives | Info | Performance | Enabled |
 | [prefer-multi-stage-build](./prefer-multi-stage-build.md) | Suggests converting single-stage builds into multi-stage builds to reduce final image size | Info | Performance | Off (experimental) |
 | [prefer-copy-heredoc](./prefer-copy-heredoc.md) | Suggests using COPY heredoc for file creation | Style | Style | Off (experimental) |

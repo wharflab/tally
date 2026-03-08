@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "testdata/slow-checks-tally-platform-index-mismatch/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/platform-mismatch/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/slow-checks-tally-platform-index-mismatch/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "Base image multiarch:latest does not support requested platform \"linux/s390x\"; available: linux/amd64, linux/arm64",
+          "rule": "tally/platform-mismatch",
+          "severity": "error",
+          "sourceCode": "FROM --platform=linux/s390x multiarch:latest"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 1,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

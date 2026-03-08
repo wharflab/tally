@@ -4,9 +4,39 @@ Validates that the platform of an external base image matches the expected targe
 
 | Property | Value |
 |----------|-------|
-| Severity | Error |
+| Severity | Off |
 | Category | Correctness |
-| Default | Enabled (requires `--slow-checks` for async resolution) |
+| Default | Disabled (superseded by [`tally/platform-mismatch`](../tally/platform-mismatch.md)) |
+
+## Tally behavior deviation
+
+Tally disables this rule by default because its host-dependent design is
+fundamentally broken for a static linter:
+
+- **Non-deterministic results across machines.** The rule compares resolved
+  image platforms against the host's default platform (via `runtime.GOARCH`).
+  The same Dockerfile produces different violations on `linux/amd64` CI vs
+  `macOS/arm64` developer laptops.
+- **False positives on Windows containers.** The expected OS is hardcoded to
+  `"linux"`, so any Windows base image (e.g.,
+  `mcr.microsoft.com/windows/servercore`) is always flagged as a mismatch.
+- **Fires without explicit intent.** When no `--platform` flag is set on
+  `FROM`, the rule still compares against the host — even though the builder
+  will pick the correct platform at build time.
+
+Use [`tally/platform-mismatch`](../tally/platform-mismatch.md) instead. That
+rule only fires when `--platform` is explicitly set on `FROM` and the registry
+does not provide the requested platform, producing deterministic results
+regardless of host.
+
+You can re-enable this rule via configuration if you prefer the BuildKit
+behavior:
+
+```yaml
+rules:
+  buildkit/InvalidBaseImagePlatform:
+    severity: error
+```
 
 ## Description
 
@@ -35,5 +65,9 @@ FROM --platform=linux/amd64 ubuntu:22.04
 The error message includes available platforms:
 
 ```text
-image "ubuntu:22.04" is not available on platform "linux/s390x" (available: [linux/amd64, linux/arm64])
+Base image ubuntu:22.04 was pulled with platform "linux/arm64", expected "linux/s390x" for current build
 ```
+
+## See also
+
+- [`tally/platform-mismatch`](../tally/platform-mismatch.md) — deterministic replacement that only validates explicit `--platform` flags

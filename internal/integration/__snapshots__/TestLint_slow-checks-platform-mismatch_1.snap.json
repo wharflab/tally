@@ -16,9 +16,9 @@
               "line": 3
             }
           },
-          "message": "Base image python:3.12 was pulled with platform \"[linux/arm64]\", expected \"linux/amd64\" for current build",
+          "message": "Base image python:3.12 was pulled with platform \"linux/arm64\", expected \"linux/amd64\" for current build",
           "rule": "buildkit/InvalidBaseImagePlatform",
-          "severity": "error",
+          "severity": "warning",
           "sourceCode": "FROM --platform=linux/amd64 python:3.12"
         }
       ]
@@ -27,11 +27,11 @@
   "files_scanned": 1,
   "rules_enabled": 1,
   "summary": {
-    "errors": 1,
+    "errors": 0,
     "files": 1,
     "info": 0,
     "style": 0,
     "total": 1,
-    "warnings": 0
+    "warnings": 1
   }
 }

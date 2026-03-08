@@ -2,7 +2,6 @@ package buildkit
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/containerd/platforms"
@@ -81,7 +80,7 @@ func (h *platformCheckHandler) OnSuccess(resolved any) []any {
 func (h *platformCheckHandler) handleMismatchError(platErr *registry.PlatformMismatchError) []any {
 	actual := "unknown"
 	if len(platErr.Available) > 0 {
-		actual = fmt.Sprintf("[%s]", strings.Join(platErr.Available, ", "))
+		actual = strings.Join(platErr.Available, ", ")
 	}
 	msg := linter.RuleInvalidBaseImagePlatform.Format(h.ref, h.expected, actual)
 	loc := rules.NewLocationFromRanges(h.file, h.location)
@@ -139,7 +138,7 @@ func HandlePlatformMismatch(err error, meta rules.RuleMetadata, file, ref, expec
 
 	actual := "unknown"
 	if len(platErr.Available) > 0 {
-		actual = fmt.Sprintf("[%s]", strings.Join(platErr.Available, ", "))
+		actual = strings.Join(platErr.Available, ", ")
 	}
 	msg := linter.RuleInvalidBaseImagePlatform.Format(ref, expected, actual)
 	return []rules.Violation{
