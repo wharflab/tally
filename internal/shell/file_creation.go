@@ -458,14 +458,24 @@ func analyzeTeeCmd(stmt *syntax.Stmt, call *syntax.CallExpr, text string) analyz
 		return other
 	}
 
-	// Validate redirects: allow heredoc input and optional stdout redirect
-	// (tee echoes to stdout; users often add > /dev/null to suppress it).
+	// Validate redirects: allow heredoc input and at most one stdout
+	// redirect to /dev/null (tee echoes to stdout; suppress is common).
+	seenStdoutRedir := false
 	for _, redir := range stmt.Redirs {
 		switch redir.Op {
 		case syntax.Hdoc, syntax.DashHdoc:
 			// Heredoc input — this is the content source
 		case syntax.RdrOut, syntax.AppOut:
-			// stdout redirect (e.g., > /dev/null) — safe to ignore
+			if seenStdoutRedir {
+				return other
+			}
+			if redir.N != nil && redir.N.Value != "1" {
+				return other // e.g. 2> — not stdout
+			}
+			if extractRedirectTarget(redir) != "/dev/null" {
+				return other // redirect to a real file — side effect we can't drop
+			}
+			seenStdoutRedir = true
 		case syntax.RdrIn, syntax.RdrInOut, syntax.DplIn, syntax.DplOut,
 			syntax.ClbOut, syntax.WordHdoc, syntax.RdrAll, syntax.AppAll:
 			return other

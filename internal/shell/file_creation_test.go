@@ -205,6 +205,18 @@ func TestDetectFileCreation(t *testing.T) {
 			variant:  VariantBash,
 			wantPath: "/app/config.txt",
 		},
+		{
+			name:    "tee with redirect to another file - skip",
+			script:  "<<EOF tee /app/config.txt > /tmp/log\ndata\nEOF",
+			variant: VariantBash,
+			wantNil: true, // redirect creates second file, can't convert to single COPY
+		},
+		{
+			name:    "tee with stderr redirect - skip",
+			script:  "<<EOF tee /app/config.txt 2> /tmp/err\ndata\nEOF",
+			variant: VariantBash,
+			wantNil: true,
+		},
 	}
 
 	for _, tt := range tests {
