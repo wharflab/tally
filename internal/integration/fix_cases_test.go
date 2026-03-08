@@ -460,6 +460,30 @@ severity = "error"
 			wantApplied: 1,
 		},
 
+		// prefer-copy-heredoc: BuildKit heredoc piped to cat → COPY heredoc
+		{
+			name:  "prefer-copy-heredoc-buildkit-heredoc-cat",
+			input: "FROM ubuntu:22.04\nRUN <<EOF cat > /aria2/aria2.conf\ndir=/downloads\nmax-concurrent-downloads=16\nEOF\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-copy-heredoc",
+			},
+			wantApplied: 1,
+		},
+
+		// prefer-copy-heredoc: BuildKit heredoc piped to tee → COPY heredoc
+		{
+			name:  "prefer-copy-heredoc-buildkit-heredoc-tee",
+			input: "FROM ubuntu:22.04\nRUN <<EOF tee /etc/app.conf\n[app]\nkey=value\nEOF\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-copy-heredoc",
+			},
+			wantApplied: 1,
+		},
+
 		// prefer-run-heredoc: 3 consecutive RUNs → heredoc RUN
 		{
 			name: "prefer-run-heredoc-consecutive",

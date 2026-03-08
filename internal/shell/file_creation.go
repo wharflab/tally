@@ -15,6 +15,7 @@ const (
 	cmdEcho   = "echo"
 	cmdCat    = "cat"
 	cmdPrintf = "printf"
+	cmdTee    = "tee"
 	cmdChmod  = "chmod"
 	cmdUmask  = "umask"
 )
@@ -64,6 +65,7 @@ type fileCreationCmd struct {
 //   - echo "content" >> /path/to/file (append)
 //   - cat <<EOF > /path/to/file ... EOF
 //   - printf "content" > /path/to/file (limited support)
+//   - tee /path/to/file (with heredoc stdin)
 //
 // Also detects chmod chaining: echo "x" > /file && chmod 0755 /file
 //
@@ -351,6 +353,11 @@ func analyzeCallExpr(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(na
 		return analyzedCmd{cmdType: cmdTypeOther, text: text}
 	}
 
+	// Check for tee command (file target is in args, not redirects)
+	if cmdName == cmdTee {
+		return analyzeTeeCmd(stmt, call, text)
+	}
+
 	// Check for file creation commands
 	if cmdName != cmdEcho && cmdName != cmdCat && cmdName != cmdPrintf {
 		return analyzedCmd{cmdType: cmdTypeOther, text: text}
@@ -397,6 +404,94 @@ func analyzeCallExpr(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(na
 			targetPath: targetPath,
 			content:    content,
 			isAppend:   outRedir.Op == syntax.AppOut,
+		},
+		hasUnsafe: unsafe,
+	}
+}
+
+// analyzeTeeCmd handles tee as a file creation command.
+// tee writes stdin to a file argument (not a redirect target).
+// Supported: tee /file, tee -a /file (append).
+// Skipped: multiple output files, unsupported flags, relative paths.
+func analyzeTeeCmd(stmt *syntax.Stmt, call *syntax.CallExpr, text string) analyzedCmd {
+	other := analyzedCmd{cmdType: cmdTypeOther, text: text}
+
+	isAppend := false
+	var targetPath string
+	pastOptions := false
+
+	for i := 1; i < len(call.Args); i++ {
+		lit := call.Args[i].Lit()
+		if lit == "" {
+			return other // Non-literal argument (variable, etc.)
+		}
+
+		// "--" ends option parsing
+		if lit == "--" {
+			pastOptions = true
+			continue
+		}
+
+		// Parse flags (only before --)
+		if !pastOptions && strings.HasPrefix(lit, "-") && lit != "-" {
+			for _, r := range lit[1:] {
+				switch r {
+				case 'a':
+					isAppend = true
+				case 'i', 'p':
+					// -i (ignore interrupts), -p (diagnose errors) — safe to ignore
+				default:
+					return other // Unknown flag
+				}
+			}
+			continue
+		}
+
+		// File argument
+		if targetPath != "" {
+			return other // Multiple output files — can't convert to single COPY
+		}
+		targetPath = lit
+	}
+
+	if targetPath == "" || !path.IsAbs(targetPath) {
+		return other
+	}
+
+	// Validate redirects: allow heredoc input and at most one stdout
+	// redirect to /dev/null (tee echoes to stdout; suppress is common).
+	seenStdoutRedir := false
+	for _, redir := range stmt.Redirs {
+		switch redir.Op {
+		case syntax.Hdoc, syntax.DashHdoc:
+			// Heredoc input — this is the content source
+		case syntax.RdrOut, syntax.AppOut:
+			if seenStdoutRedir {
+				return other
+			}
+			if redir.N != nil && redir.N.Value != "1" {
+				return other // e.g. 2> — not stdout
+			}
+			if extractRedirectTarget(redir) != "/dev/null" {
+				return other // redirect to a real file — side effect we can't drop
+			}
+			seenStdoutRedir = true
+		case syntax.RdrIn, syntax.RdrInOut, syntax.DplIn, syntax.DplOut,
+			syntax.ClbOut, syntax.WordHdoc, syntax.RdrAll, syntax.AppAll:
+			return other
+		}
+	}
+
+	// Extract content from heredoc (same as cat — reads stdin)
+	content, unsafe := extractCatHeredocContentFromStmt(stmt)
+
+	return analyzedCmd{
+		cmdType: cmdTypeFileCreation,
+		text:    text,
+		creation: &fileCreationCmd{
+			targetPath: targetPath,
+			content:    content,
+			isAppend:   isAppend,
 		},
 		hasUnsafe: unsafe,
 	}
