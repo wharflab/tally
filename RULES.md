@@ -135,11 +135,10 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 ### DL Rules (Dockerfile Lint)
 
 <!-- BEGIN HADOLINT_DL_RULES -->
-
 | Rule | Description | Severity | Status |
 |------|-------------|----------|--------|
 | [DL1001](https://github.com/hadolint/hadolint/wiki/DL1001) | Please refrain from using inline ignore pragmas `# hadolint ignore=DLxxxx`. | Ignore | ⏳ |
-| [DL3000](https://github.com/hadolint/hadolint/wiki/DL3000) | Use absolute WORKDIR. | Error | 🔄🔧 `buildkit/WorkdirRelativePath` |
+| [DL3000](https://github.com/hadolint/hadolint/wiki/DL3000) | Use absolute WORKDIR. | Error | 🔄 `buildkit/WorkdirRelativePath` |
 | [DL3001](https://github.com/hadolint/hadolint/wiki/DL3001) | For some bash commands it makes no sense running them in a Docker container like ssh, vim, shutdown, service, ps, free, top, kill, mount, ifconfig. | Info | ✅ `hadolint/DL3001` |
 | [DL3002](https://github.com/hadolint/hadolint/wiki/DL3002) | Last user should not be root. | Warning | ✅ `hadolint/DL3002` |
 | [DL3003](https://github.com/hadolint/hadolint/wiki/DL3003) | Use WORKDIR to switch to a directory. | Warning | ✅🔧 `hadolint/DL3003` |
@@ -157,7 +156,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL3016](https://github.com/hadolint/hadolint/wiki/DL3016) | Pin versions in `npm`. | Warning | ⏳ |
 | [DL3018](https://github.com/hadolint/hadolint/wiki/DL3018) | Pin versions in apk add. Instead of `apk add <package>` use `apk add <package>=<version>`. | Warning | ⏳ |
 | [DL3019](https://github.com/hadolint/hadolint/wiki/DL3019) | Use the `--no-cache` switch to avoid the need to use `--update` and remove `/var/cache/apk/*` when done installing packages. | Info | ⛔ Not planned (`tally/prefer-package-cache-mounts`) |
-| [DL3020](https://github.com/hadolint/hadolint/wiki/DL3020) | Use `COPY` instead of `ADD` for files and folders. | Error | ✅🔧 `hadolint/DL3020` |
+| [DL3020](https://github.com/hadolint/hadolint/wiki/DL3020) | Use `COPY` instead of `ADD` for files and folders. | Error | ✅ `hadolint/DL3020` |
 | [DL3021](https://github.com/hadolint/hadolint/wiki/DL3021) | `COPY` with more than 2 arguments requires the last argument to end with `/` | Error | ✅ `hadolint/DL3021` |
 | [DL3022](https://github.com/hadolint/hadolint/wiki/DL3022) | `COPY --from` should reference a previously defined `FROM` alias | Warning | ✅ `hadolint/DL3022` |
 | [DL3023](https://github.com/hadolint/hadolint/wiki/DL3023) | `COPY --from` cannot reference its own `FROM` alias | Error | ✅ `hadolint/DL3023` |
@@ -166,7 +165,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL3026](https://github.com/hadolint/hadolint/wiki/DL3026) | Use only an allowed registry in the FROM image | Error | ✅ `hadolint/DL3026` |
 | [DL3027](https://github.com/hadolint/hadolint/wiki/DL3027) | Do not use `apt` as it is meant to be an end-user tool, use `apt-get` or `apt-cache` instead | Warning | ✅🔧 `hadolint/DL3027` |
 | [DL3028](https://github.com/hadolint/hadolint/wiki/DL3028) | Pin versions in gem install. Instead of `gem install <gem>` use `gem install <gem>:<version>` | Warning | ⏳ |
-| [DL3029](https://github.com/hadolint/hadolint/wiki/DL3029) | Do not use --platform flag with FROM. | Warning | 🔄 `buildkit/FromPlatformFlagConstDisallowed` (off by default; superseded by `tally/platform-mismatch`) |
+| [DL3029](https://github.com/hadolint/hadolint/wiki/DL3029) | Do not use --platform flag with FROM. | Warning | 🔄 `buildkit/FromPlatformFlagConstDisallowed` |
 | [DL3030](https://github.com/hadolint/hadolint/wiki/DL3030) | Use the `-y` switch to avoid manual input `yum install -y <package>` | Warning | ✅🔧 `hadolint/DL3030` |
 | [DL3032](https://github.com/hadolint/hadolint/wiki/DL3032) | `yum clean all` missing after yum command. | Warning | ⛔ Not planned (`tally/prefer-package-cache-mounts`) |
 | [DL3033](https://github.com/hadolint/hadolint/wiki/DL3033) | Specify version with `yum install -y <package>-<version>` | Warning | ⏳ |
@@ -204,7 +203,6 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL4004](https://github.com/hadolint/hadolint/wiki/DL4004) | Multiple `ENTRYPOINT` instructions found. | Error | 🔄 `buildkit/MultipleInstructionsDisallowed` |
 | [DL4005](https://github.com/hadolint/hadolint/wiki/DL4005) | Use `SHELL` to change the default shell. | Warning | ✅🔧 `hadolint/DL4005` |
 | [DL4006](https://github.com/hadolint/hadolint/wiki/DL4006) | Set the `SHELL` option -o pipefail before `RUN` with a pipe in it | Warning | ✅🔧 `hadolint/DL4006` |
-
 <!-- END HADOLINT_DL_RULES -->
 
 #### Cache-cleanup Hadolint rules marked as not planned
