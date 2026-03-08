@@ -102,3 +102,4 @@ conversion to handle `cd` correctly within the script.
 ## References
 
 - [Dockerfile here-documents](https://docs.docker.com/reference/dockerfile/#here-documents)
+- [Introduction to heredocs in Dockerfiles](https://www.docker.com/blog/introduction-to-heredocs-in-dockerfiles/)
