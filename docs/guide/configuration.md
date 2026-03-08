@@ -163,7 +163,7 @@ trusted-registries = ["docker.io", "ghcr.io"]
 
 # Or explicitly set severity
 [rules.tally.prefer-copy-heredoc]
-severity = "style"           # Enables the experimental rule
+severity = "style"           # Override the default severity
 ```
 
 ### Inline Directives Section

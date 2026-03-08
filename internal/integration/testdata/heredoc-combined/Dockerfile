@@ -25,6 +25,19 @@ RUN cat <<INNEREOF > /etc/motd
 Welcome to the build container
 INNEREOF
 
+# Case 6b: prefer-copy-heredoc — BuildKit heredoc piped to cat
+RUN <<EOF cat > /aria2/aria2.conf
+dir=/downloads
+max-concurrent-downloads=16
+EOF
+
+# Case 6c: prefer-copy-heredoc — BuildKit heredoc piped to tee
+RUN <<EOF tee /etc/supervisor/conf.d/app.conf
+[program:app]
+command=/usr/bin/app
+autostart=true
+EOF
+
 # Case 7+8: prefer-run-heredoc — 2 shell-form RUNs + 1 heredoc RUN merged (3 RUNs, 4 commands)
 RUN echo hello
 RUN echo world
