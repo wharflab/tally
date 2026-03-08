@@ -6,7 +6,8 @@
     "CLICOLOR_FORCE": "1",
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
     "GH_PAGER": "cat",
-    "GOEXPERIMENT": "jsonv2"
+    "GOEXPERIMENT": "jsonv2",
+    "TALLY_TEST_REGISTRY": "1"
   },
   "permissions": {
     "allow": [
