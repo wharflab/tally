@@ -12,7 +12,7 @@ require (
 	github.com/containerd/platforms v1.0.0-rc.2
 	github.com/distribution/reference v0.6.0
 	github.com/docker/distribution v2.8.3+incompatible
-	github.com/gkampitakis/ciinfo v0.3.3
+	github.com/gkampitakis/ciinfo v0.3.4
 	github.com/gkampitakis/go-snaps v0.5.20
 	github.com/google/go-containerregistry v0.21.2
 	github.com/google/jsonschema-go v0.4.2
@@ -38,6 +38,7 @@ require (
 	go.bug.st/lsp v0.1.3
 	go.podman.io/image/v5 v5.39.1
 	golang.org/x/exp/jsonrpc2 v0.0.0-20250718183923-645b1fa84792
+	golang.org/x/sys v0.41.0
 	mvdan.cc/sh/v3 v3.12.0
 )
 
@@ -159,7 +160,6 @@ require (
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621 // indirect
 	golang.org/x/exp/event v0.0.0-20250620022241-b7579e27df2b // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
