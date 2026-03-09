@@ -141,6 +141,24 @@ severity = "error"
 severity = "error"
 `,
 		},
+		// Cross-rule: curl-missing-location + newline-per-chained-call on the same RUN.
+		// The --location insert (priority 0) shifts columns on the same line;
+		// the newline split (priority 97) inserts \\\n which recordColumnShift
+		// skips. Both fixes should compose correctly via column shift tracking.
+		{
+			name: "curl-missing-location-cross-newline-per-chained-call",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN curl -fsSo /tmp/file https://example.com/file && chmod +x /tmp/file\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/curl-missing-location", "tally/newline-per-chained-call")...),
+			wantApplied: 2,
+			config: `[rules.tally.curl-missing-location]
+severity = "error"
+
+[rules.tally.newline-per-chained-call]
+severity = "error"
+`,
+		},
 		// DL3003: cd -> WORKDIR (regression test for line number consistency)
 		{
 			// DL3003 fix is FixSuggestion (not FixSafe) because WORKDIR creates
