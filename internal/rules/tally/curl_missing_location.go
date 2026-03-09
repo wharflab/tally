@@ -80,7 +80,15 @@ func (r *CurlMissingLocationRule) Check(input rules.LintInput) []rules.Violation
 					continue
 				}
 
-				loc := rules.NewLocationFromRanges(file, run.Location())
+				// Anchor the violation to the specific curl command when source
+				// positions are available, not the whole RUN instruction.
+				var loc rules.Location
+				if runStartLine > 0 {
+					cmdLine := runStartLine + cmd.Line
+					loc = rules.NewRangeLocation(file, cmdLine, cmd.StartCol, cmdLine, cmd.EndCol)
+				} else {
+					loc = rules.NewLocationFromRanges(file, run.Location())
+				}
 				v := rules.NewViolation(
 					loc, meta.Code,
 					"curl command is missing --location flag to follow HTTP redirects",

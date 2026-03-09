@@ -31,3 +31,9 @@ RUN apt-get update && \
 
 # Should trigger: curl with flags but no -L
 RUN curl -fsS -o /tmp/file https://example.com/file
+
+# Should trigger on second curl only: "echo curl" is not a curl command
+RUN echo curl && curl -fsSo /tmp/a https://example.com/a
+
+# Should trigger twice: two curl commands both missing -L
+RUN curl -fsSo /tmp/a https://example.com/a && curl -fsSo /tmp/b https://example.com/b
