@@ -3,9 +3,9 @@ package lspserver
 import (
 	"context"
 	"encoding/json/jsontext"
-	"io"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gkampitakis/go-snaps/snaps"
 	"github.com/stretchr/testify/assert"
@@ -123,8 +123,8 @@ func TestIsVirtualURI(t *testing.T) {
 func TestCancelPreempter_HandlesCancelRequest(t *testing.T) {
 	t.Parallel()
 
-	// With conn=nil and missing/invalid ID, Cancel is never called.
-	p := &cancelPreempter{conn: nil}
+	s := New()
+	p := &cancelPreempter{server: s}
 
 	// Missing "id" field — params.ID stays nil, id.IsValid() is false, Cancel skipped.
 	req := &jsonrpc2.Request{
@@ -154,69 +154,31 @@ func TestCancelPreempter_HandlesCancelRequest(t *testing.T) {
 	require.NoError(t, err, "invalid JSON should be silently ignored")
 }
 
-func TestCancelPreempter_ValidID(t *testing.T) {
+func TestCancelPreempter_TracksQueuedCalls(t *testing.T) {
 	t.Parallel()
 
-	// Create a real jsonrpc2.Connection so conn.Cancel can be invoked.
-	conn := dialTestConnection(t)
-	p := &cancelPreempter{conn: conn}
+	s := New()
+	p := &cancelPreempter{server: s}
 
-	// Numeric ID.
 	req := &jsonrpc2.Request{
-		Method: string(protocol.MethodCancelRequest),
-		Params: jsontext.Value(`{"id":42}`),
+		ID:     jsonrpc2.Int64ID(42),
+		Method: string(protocol.MethodTextDocumentDiagnostic),
+		Params: jsontext.Value(`{}`),
 	}
 	result, err := p.Preempt(context.Background(), req)
 	assert.Nil(t, result)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, jsonrpc2.ErrNotHandled)
 
-	// String ID.
-	req2 := &jsonrpc2.Request{
-		Method: string(protocol.MethodCancelRequest),
-		Params: jsontext.Value(`{"id":"req-1"}`),
-	}
-	result, err = p.Preempt(context.Background(), req2)
-	assert.Nil(t, result)
-	require.NoError(t, err)
-}
-
-// dialTestConnection creates a minimal jsonrpc2.Connection backed by an
-// io.Pipe. The remote end is immediately closed, but the connection object
-// is live enough for Cancel (which only touches internal bookkeeping).
-func dialTestConnection(t *testing.T) *jsonrpc2.Connection {
-	t.Helper()
-
-	pr, pw := io.Pipe()
-	rwc := struct {
-		io.Reader
-		io.Writer
-		io.Closer
-	}{pr, pw, pw}
-
-	dialer := pipeDialer{rwc: rwc}
-	conn, err := jsonrpc2.Dial(
-		context.Background(),
-		dialer,
-		jsonrpc2.ConnectionOptions{
-			Framer:  jsonrpc2.HeaderFramer(),
-			Handler: jsonrpc2.HandlerFunc(func(context.Context, *jsonrpc2.Request) (any, error) { return nil, nil }), //nolint:nilnil
-		},
-	)
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = conn.Close() })
-	return conn
-}
-
-type pipeDialer struct{ rwc io.ReadWriteCloser }
-
-func (d pipeDialer) Dial(context.Context) (io.ReadWriteCloser, error) {
-	return d.rwc, nil
+	s.requestCancelMu.Lock()
+	_, queued := s.requestQueuedIDs["i:42"]
+	s.requestCancelMu.Unlock()
+	assert.True(t, queued)
 }
 
 func TestCancelPreempter_PassesThroughOtherMethods(t *testing.T) {
 	t.Parallel()
 
-	p := &cancelPreempter{conn: nil}
+	p := &cancelPreempter{server: New()}
 
 	req := &jsonrpc2.Request{
 		Method: string(protocol.MethodTextDocumentDidOpen),
@@ -225,4 +187,41 @@ func TestCancelPreempter_PassesThroughOtherMethods(t *testing.T) {
 	result, err := p.Preempt(context.Background(), req)
 	assert.Nil(t, result)
 	require.ErrorIs(t, err, jsonrpc2.ErrNotHandled)
+}
+
+func TestStartRequestContext_CancelsQueuedRequest(t *testing.T) {
+	t.Parallel()
+
+	s := New()
+	id := jsonrpc2.Int64ID(7)
+	s.noteQueuedRequest(id)
+	s.cancelQueuedOrActiveRequest(id)
+
+	ctx, done := s.startRequestContext(context.Background(), id)
+	defer done()
+
+	require.ErrorIs(t, ctx.Err(), context.Canceled)
+}
+
+func TestCancelQueuedOrActiveRequest_CancelsActiveContext(t *testing.T) {
+	t.Parallel()
+
+	s := New()
+	id := jsonrpc2.StringID("req-1")
+
+	ctx, done := s.startRequestContext(context.Background(), id)
+	defer done()
+
+	s.cancelQueuedOrActiveRequest(id)
+
+	require.Eventually(t, func() bool {
+		return ctx.Err() == context.Canceled
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestLSPRequestError_MapsCanceledContext(t *testing.T) {
+	t.Parallel()
+
+	err := lspRequestError(context.Canceled)
+	require.EqualError(t, err, "request cancelled")
 }

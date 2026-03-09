@@ -64,6 +64,25 @@ func TestHandleDiagnostic_UntitledURI_ClosedDocument(t *testing.T) {
 	assert.Empty(t, resp.FullDocumentDiagnosticReport.Items)
 }
 
+func TestHandleDiagnostic_CanceledContextForOpenDocument(t *testing.T) {
+	t.Parallel()
+
+	s := New()
+	uri := "file:///tmp/Dockerfile"
+	s.documents.Open(uri, "dockerfile", 1, "FROM alpine\n")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	result, err := s.handleDiagnostic(ctx, &protocol.DocumentDiagnosticParams{
+		TextDocument: protocol.TextDocumentIdentifier{
+			Uri: protocol.DocumentUri(uri),
+		},
+	})
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Nil(t, result)
+}
+
 func TestPublishDiagnostics_CoalescesPerURI(t *testing.T) {
 	t.Parallel()
 

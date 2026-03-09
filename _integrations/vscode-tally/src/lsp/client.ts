@@ -3,16 +3,26 @@ import * as path from "node:path";
 import * as vscode from "vscode";
 import {
   CloseAction,
+  DidChangeConfigurationNotification,
+  DocumentDiagnosticRequest,
+  ErrorCodes,
   ErrorAction,
   type Executable,
   type ErrorHandler,
+  type MessageSignature,
+  type ResponseError,
   LanguageClient,
+  LSPErrorCodes,
   type LanguageClientOptions,
   NotebookDocumentFilter,
+  SemanticTokensDeltaRequest,
+  SemanticTokensRangeRequest,
+  SemanticTokensRequest,
   type State,
   type ServerOptions,
   type StateChangeEvent,
   TextDocumentFilter,
+  WorkspaceDiagnosticRequest,
 } from "vscode-languageclient/node";
 
 import { type BinarySource, type ResolvedBinary } from "../binary/findBinary";
@@ -144,7 +154,13 @@ export class TallyLanguageClient {
       },
     };
 
-    this.client = new LanguageClient("tally", "Tally", serverOptions, clientOptions);
+    this.client = new TallyVsCodeLanguageClient(
+      "tally",
+      "Tally",
+      serverOptions,
+      clientOptions,
+      init.output,
+    );
   }
 
   public serverKey(): string {
@@ -180,7 +196,7 @@ export class TallyLanguageClient {
   }
 
   public async sendConfiguration(settings: unknown): Promise<void> {
-    await this.client.sendNotification("workspace/didChangeConfiguration", { settings });
+    await this.client.sendNotification(DidChangeConfigurationNotification.type, { settings });
   }
 
   private resolveApplyAllFixesArgs(args: unknown[]): unknown[] {
@@ -217,6 +233,42 @@ export class TallyLanguageClient {
   }
 }
 
+class TallyVsCodeLanguageClient extends LanguageClient {
+  private readonly output: vscode.OutputChannel;
+
+  public constructor(
+    id: string,
+    name: string,
+    serverOptions: ServerOptions,
+    clientOptions: LanguageClientOptions,
+    output: vscode.OutputChannel,
+  ) {
+    super(id, name, serverOptions, clientOptions);
+    this.output = output;
+  }
+
+  public override handleFailedRequest<T>(
+    type: MessageSignature,
+    token: vscode.CancellationToken | undefined,
+    error: unknown,
+    defaultValue: T,
+    showNotification = true,
+  ): T {
+    if (isSilentRequestFailure(type, token, error)) {
+      return defaultValue;
+    }
+
+    if (isBackgroundRequest(type)) {
+      this.output.appendLine(
+        `[tally] background request ${type.method} failed: ${describeError(error)}`,
+      );
+      return defaultValue;
+    }
+
+    return super.handleFailedRequest(type, token, error, defaultValue, showNotification);
+  }
+}
+
 function isLikelyDockerfileResource(resource: vscode.Uri): boolean {
   if (resource.scheme !== "file" && resource.scheme !== "untitled") {
     return false;
@@ -247,6 +299,75 @@ function isLikelyDockerfileResource(resource: vscode.Uri): boolean {
     name.startsWith("containerfile.") ||
     name.endsWith(".dockerfile")
   );
+}
+
+function isBackgroundRequest(type: MessageSignature): boolean {
+  return (
+    type.method === DocumentDiagnosticRequest.method ||
+    type.method === WorkspaceDiagnosticRequest.method ||
+    type.method === SemanticTokensRequest.method ||
+    type.method === SemanticTokensDeltaRequest.method ||
+    type.method === SemanticTokensRangeRequest.method
+  );
+}
+
+function isSilentRequestFailure(
+  type: MessageSignature,
+  token: vscode.CancellationToken | undefined,
+  error: unknown,
+): boolean {
+  if (!isBackgroundRequest(type)) {
+    return false;
+  }
+
+  if (token?.isCancellationRequested) {
+    return true;
+  }
+
+  const responseError = asResponseError(error);
+  if (responseError) {
+    switch (responseError.code) {
+      case LSPErrorCodes.RequestCancelled:
+      case LSPErrorCodes.ServerCancelled:
+      case LSPErrorCodes.ContentModified:
+      case ErrorCodes.PendingResponseRejected:
+      case ErrorCodes.ConnectionInactive:
+        return true;
+      default:
+        break;
+    }
+  }
+  return false;
+}
+
+function asResponseError(error: unknown): ResponseError<unknown> | undefined {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+
+  if (!("code" in error) || typeof (error as { code?: unknown }).code !== "number") {
+    return undefined;
+  }
+
+  if (!("message" in error) || typeof (error as { message?: unknown }).message !== "string") {
+    return undefined;
+  }
+
+  return error as ResponseError<unknown>;
+}
+
+function describeError(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  const responseError = asResponseError(error);
+  if (responseError) {
+    return responseError.message;
+  }
+  return String(error);
 }
 
 type WorkspaceEditWire = {
