@@ -1,6 +1,7 @@
 package io.github.wharflab.tally.intellij.lsp
 
 import com.intellij.execution.configurations.GeneralCommandLine
+import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.platform.lsp.api.ProjectWideLspServerDescriptor
@@ -15,7 +16,6 @@ import org.eclipse.lsp4j.WorkspaceClientCapabilities
 internal class TallyLspServerDescriptor(
     project: Project,
     private val command: TallyCommand,
-    private val settings: TallyRuntimeSettings,
     private val formatOnReformat: Boolean,
 ) : ProjectWideLspServerDescriptor(project, "Tally") {
     override fun isSupportedFile(file: VirtualFile): Boolean = TallyFileMatcher.isSupported(file)
@@ -34,13 +34,13 @@ internal class TallyLspServerDescriptor(
         return commandLine
     }
 
-    override fun createInitializationOptions(): Any = TallySettings.initializationOptions(settings)
+    override fun createInitializationOptions(): Any = TallySettings.initializationOptions(currentSettings())
 
     override fun getWorkspaceConfiguration(item: ConfigurationItem): Any? {
         if (item.section != null && item.section != "tally") {
             return null
         }
-        return TallySettings.workspaceConfiguration(settings)
+        return TallySettings.workspaceConfiguration(currentSettings())
     }
 
     override val clientCapabilities: ClientCapabilities
@@ -75,4 +75,10 @@ internal class TallyLspServerDescriptor(
                 experimental = base.experimental
             }
         }
+
+    private fun currentSettings(): TallyRuntimeSettings =
+        TallySettings.fromService(
+            TallySettingsService.getInstance(project),
+            TrustedProjects.isProjectTrusted(project),
+        )
 }

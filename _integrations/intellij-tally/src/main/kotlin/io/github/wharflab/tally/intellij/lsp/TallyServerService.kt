@@ -1,5 +1,8 @@
 package io.github.wharflab.tally.intellij.lsp
 
+import com.intellij.ide.trustedProjects.TrustedProjects
+import com.intellij.ide.trustedProjects.TrustedProjectsListener
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
@@ -9,6 +12,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.platform.lsp.api.LspServerManager
 import org.eclipse.lsp4j.CodeActionContext
 import org.eclipse.lsp4j.CodeActionParams
+import org.eclipse.lsp4j.DidChangeConfigurationParams
 import org.eclipse.lsp4j.Position
 import org.eclipse.lsp4j.Range
 import org.eclipse.lsp4j.TextEdit
@@ -17,10 +21,58 @@ import org.eclipse.lsp4j.WorkspaceEdit
 internal class TallyServerService(
     private val project: Project,
 ) {
+    init {
+        ApplicationManager
+            .getApplication()
+            .messageBus
+            .connect(project)
+            .subscribe(
+                TrustedProjectsListener.TOPIC,
+                object : TrustedProjectsListener {
+                    override fun onProjectTrusted(project: Project) {
+                        if (project != this@TallyServerService.project) {
+                            return
+                        }
+                        sendConfiguration()
+                        restartServer()
+                    }
+
+                    override fun onProjectUntrusted(project: Project) {
+                        if (project != this@TallyServerService.project) {
+                            return
+                        }
+                        sendConfiguration()
+                        restartServer()
+                    }
+                },
+            )
+    }
+
     fun restartServer() {
         LspServerManager
             .getInstance(project)
             .stopAndRestartIfNeeded(TallyLspServerSupportProvider::class.java)
+    }
+
+    fun sendConfiguration() {
+        val params = DidChangeConfigurationParams(currentConfiguration())
+        val servers =
+            LspServerManager
+                .getInstance(project)
+                .getServersForProvider(TallyLspServerSupportProvider::class.java)
+
+        for (server in servers) {
+            try {
+                server.sendNotification { languageServer ->
+                    languageServer.workspaceService.didChangeConfiguration(params)
+                }
+            } catch (e: java.util.concurrent.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (e is com.intellij.openapi.diagnostic.ControlFlowException) throw e
+                LOG.warn("Failed to send Tally configuration update", e)
+            }
+        }
     }
 
     fun fixAll(document: Document) {
@@ -118,4 +170,12 @@ internal class TallyServerService(
 
         fun getInstance(project: Project): TallyServerService = project.service()
     }
+
+    private fun currentConfiguration(): Any =
+        TallySettings.workspaceConfiguration(
+            TallySettings.fromService(
+                TallySettingsService.getInstance(project),
+                TrustedProjects.isProjectTrusted(project),
+            ),
+        )
 }

@@ -29,6 +29,7 @@ type workspaceFolderSettings struct {
 type folderSettings struct {
 	ConfigurationPreference config.ConfigurationPreference
 	ConfigurationOverrides  map[string]any
+	WorkspaceTrusted        bool
 }
 
 func applyDefaultPreference(pref config.ConfigurationPreference) config.ConfigurationPreference {
@@ -42,6 +43,7 @@ func defaultClientSettings() clientSettings {
 	return clientSettings{
 		Global: folderSettings{
 			ConfigurationPreference: config.ConfigurationPreferenceEditorFirst,
+			WorkspaceTrusted:        false,
 		},
 	}
 }
@@ -135,6 +137,7 @@ type workspaceSettingsWire struct {
 type folderSettingsWire struct {
 	ConfigurationPreference config.ConfigurationPreference `json:"configurationPreference"`
 	Configuration           any                            `json:"configuration"`
+	WorkspaceTrusted        bool                           `json:"workspaceTrusted"`
 }
 
 func parseClientSettings(settings any) (clientSettings, bool) {
@@ -159,6 +162,7 @@ func parseClientSettings(settings any) (clientSettings, bool) {
 		Global: folderSettings{
 			ConfigurationPreference: applyDefaultPreference(wire.Global.ConfigurationPreference),
 			ConfigurationOverrides:  toOverridesMap(wire.Global.Configuration),
+			WorkspaceTrusted:        wire.Global.WorkspaceTrusted,
 		},
 	}
 
@@ -168,6 +172,7 @@ func parseClientSettings(settings any) (clientSettings, bool) {
 			Settings: folderSettings{
 				ConfigurationPreference: applyDefaultPreference(ws.Settings.ConfigurationPreference),
 				ConfigurationOverrides:  toOverridesMap(ws.Settings.Configuration),
+				WorkspaceTrusted:        ws.Settings.WorkspaceTrusted,
 			},
 		})
 	}

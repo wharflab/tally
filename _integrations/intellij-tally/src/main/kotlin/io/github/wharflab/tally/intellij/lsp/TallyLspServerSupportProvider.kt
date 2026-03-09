@@ -18,22 +18,24 @@ internal class TallyLspServerSupportProvider : LspServerSupportProvider {
             return
         }
 
+        TallyServerService.getInstance(project)
         val service = TallySettingsService.getInstance(project)
         if (!service.enabled) {
             return
         }
 
-        val settings = TallySettings.fromService(service)
+        val isTrustedProject = TrustedProjects.isProjectTrusted(project)
+        val settings = TallySettings.fromService(service, isTrustedProject)
         val sdkHomePath = ProjectRootManager.getInstance(project).projectSdk?.homePath
         val command =
             TallyBinaryResolver.resolve(
                 settings,
                 project.basePath,
                 sdkHomePath,
-                TrustedProjects.isProjectTrusted(project),
+                isTrustedProject,
             ) ?: return
         serverStarter.ensureServerStarted(
-            TallyLspServerDescriptor(project, command, settings, service.formatOnReformat),
+            TallyLspServerDescriptor(project, command, service.formatOnReformat),
         )
     }
 

@@ -278,6 +278,13 @@ func (s *Server) handleInitialize(params *protocol.InitializeParams) (any, error
 	log.Printf("lsp: initialize from %s", clientInfoString(params))
 
 	s.configureDiagnosticsMode(params)
+	if params.InitializationOptions != nil {
+		if next, ok := parseClientSettings(*params.InitializationOptions); ok {
+			s.settingsMu.Lock()
+			s.settings = next
+			s.settingsMu.Unlock()
+		}
+	}
 
 	ver := version.RawVersion()
 

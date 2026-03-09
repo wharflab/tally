@@ -31,7 +31,7 @@ func (s *Server) codeActionsForDocument(
 	// Use cached lint results from publishDiagnostics when the version matches.
 	violations, ok := s.lintCache.get(doc.URI, doc.Version)
 	if !ok {
-		violations = s.lintContent(doc.URI, []byte(doc.Content))
+		violations = s.lintContent(ctx, doc.URI, []byte(doc.Content))
 		if s.documentVersionCurrent(doc.URI, doc.Version) {
 			s.lintCache.set(doc.URI, doc.Version, violations)
 		}
