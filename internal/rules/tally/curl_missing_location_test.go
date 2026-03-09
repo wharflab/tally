@@ -3,6 +3,7 @@ package tally
 import (
 	"testing"
 
+	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/shell"
 )
 
@@ -151,7 +152,7 @@ func TestCurlMissingLocationMetadata(t *testing.T) {
 	if meta.Code != "tally/curl-missing-location" {
 		t.Errorf("Code = %q, want %q", meta.Code, "tally/curl-missing-location")
 	}
-	if meta.DefaultSeverity != 1 { // SeverityWarning
+	if meta.DefaultSeverity != rules.SeverityWarning {
 		t.Errorf("DefaultSeverity = %v, want Warning", meta.DefaultSeverity)
 	}
 	if meta.Category != "correctness" {
