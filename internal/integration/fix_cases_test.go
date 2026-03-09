@@ -115,6 +115,50 @@ func fixCases(t *testing.T) []fixCase {
 			args:        []string{"--fix", "--fix-unsafe", "--fail-level", "none"},
 			wantApplied: 3, // prefer-add-unpack + DL3047 --progress + single DL4006 SHELL insertion.
 		},
+		// curl-should-follow-redirects: insert --location after curl
+		{
+			name:        "curl-should-follow-redirects",
+			input:       "FROM ubuntu:22.04\nRUN curl -fsSo /tmp/file https://example.com/file\n",
+			args:        []string{"--fix", "--fix-unsafe"},
+			wantApplied: 1,
+		},
+		// Cross-rule: curl-should-follow-redirects + prefer-add-unpack on the same RUN.
+		// Both rules fire (both elevated to error), but curl-should-follow-redirects
+		// suppresses its fix when tar extraction is present (prefer-add-unpack
+		// territory). Only the prefer-add-unpack fix applies (RUN → ADD --unpack).
+		{
+			name: "curl-should-follow-redirects-cross-prefer-add-unpack",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN curl -fsSo /tmp/go.tar.gz https://go.dev/dl/go1.22.0.linux-amd64.tar.gz && " +
+				"tar -xzf /tmp/go.tar.gz -C /usr/local\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/curl-should-follow-redirects", "tally/prefer-add-unpack")...),
+			wantApplied: 1,
+			config: `[rules.tally.curl-should-follow-redirects]
+severity = "error"
+
+[rules.tally.prefer-add-unpack]
+severity = "error"
+`,
+		},
+		// Cross-rule: curl-should-follow-redirects + newline-per-chained-call on the same RUN.
+		// The --location insert (priority 0) shifts columns on the same line;
+		// the newline split (priority 97) inserts \\\n which recordColumnShift
+		// skips. Both fixes should compose correctly via column shift tracking.
+		{
+			name: "curl-should-follow-redirects-cross-newline-per-chained-call",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN curl -fsSo /tmp/file https://example.com/file && chmod +x /tmp/file\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/curl-should-follow-redirects", "tally/newline-per-chained-call")...),
+			wantApplied: 2,
+			config: `[rules.tally.curl-should-follow-redirects]
+severity = "error"
+
+[rules.tally.newline-per-chained-call]
+severity = "error"
+`,
+		},
 		// DL3003: cd -> WORKDIR (regression test for line number consistency)
 		{
 			// DL3003 fix is FixSuggestion (not FixSafe) because WORKDIR creates

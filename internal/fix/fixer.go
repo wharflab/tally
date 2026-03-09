@@ -472,6 +472,30 @@ func selectNonConflictingCandidates(fc *FileChange, candidates []*fixCandidate) 
 		}
 
 		if hasConflict(c.fix.Edits, reserved) {
+			// When the new candidate's edits entirely contain ALL conflicting
+			// selected candidates' edits, the new fix is more comprehensive
+			// (e.g., a whole-line replacement that makes point inserts moot).
+			// Only swap on strict subsumption — mutual containment (identical
+			// ranges) keeps the sort-order winner.
+			if evicted := findAllSubsumedConflicts(c, selected); len(evicted) > 0 {
+				for _, idx := range evicted {
+					old := selected[idx]
+					reserved = removeEdits(reserved, old.fix.Edits)
+					fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
+						RuleCode: old.violation.RuleCode,
+						Reason:   SkipConflict,
+						Location: old.violation.Location,
+					})
+				}
+				// Remove evicted indices in reverse order to preserve positions.
+				for i := len(evicted) - 1; i >= 0; i-- {
+					selected = slices.Delete(selected, evicted[i], evicted[i]+1)
+				}
+				selected = append(selected, c)
+				reserved = append(reserved, c.fix.Edits...)
+				continue
+			}
+
 			fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
 				RuleCode: c.violation.RuleCode,
 				Reason:   SkipConflict,
@@ -484,6 +508,43 @@ func selectNonConflictingCandidates(fc *FileChange, candidates []*fixCandidate) 
 	}
 
 	return selected
+}
+
+// findAllSubsumedConflicts finds all selected candidates that conflict with c
+// and checks that c strictly subsumes every one of them. Returns their sorted
+// indices if ALL conflicting candidates are strictly subsumed, or nil if any
+// conflicting candidate is not subsumed (or if subsumption is mutual).
+func findAllSubsumedConflicts(c *fixCandidate, selected []*fixCandidate) []int {
+	var conflicting []int
+	for i, s := range selected {
+		if !candidatesConflict(c, s) {
+			continue
+		}
+		// c must strictly subsume s: c contains s, but s does not contain c.
+		if !candidateSubsumes(c, s) || candidateSubsumes(s, c) {
+			return nil
+		}
+		conflicting = append(conflicting, i)
+	}
+	return conflicting
+}
+
+// removeEdits returns a new slice with all edits from remove taken out.
+func removeEdits(reserved, remove []rules.TextEdit) []rules.TextEdit {
+	result := make([]rules.TextEdit, 0, len(reserved))
+	for _, r := range reserved {
+		keep := true
+		for _, rm := range remove {
+			if r.Location == rm.Location && r.NewText == rm.NewText {
+				keep = false
+				break
+			}
+		}
+		if keep {
+			result = append(result, r)
+		}
+	}
+	return result
 }
 
 func candidateImportanceRank(c *fixCandidate) int {

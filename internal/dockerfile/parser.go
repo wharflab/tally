@@ -14,6 +14,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // LintWarning captures parameters from BuildKit's linter.LintWarnFunc callback.
@@ -365,6 +366,128 @@ func ExtractHeredocFiles(stages []instructions.Stage) map[string]bool {
 // Handles both shell form (RUN cmd) and exec form (RUN ["cmd", "arg"]).
 func RunCommandString(run *instructions.RunCommand) string {
 	return strings.Join(run.CmdLine, " ")
+}
+
+// RunSourceScript extracts the original source for a shell-form RUN instruction
+// and replaces the "RUN " prefix (and "ONBUILD RUN ") with spaces so that column
+// positions from shell.FindCommands on the returned script map directly to
+// source-file columns. This enables accurate fix edits.
+//
+// Returns the script and the 1-based start line number, or ("", 0) if the
+// instruction has no location or no source lines.
+func RunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (string, int) {
+	runLoc := run.Location()
+	if len(runLoc) == 0 {
+		return "", 0
+	}
+
+	// BuildKit uses 1-based lines
+	startLine := runLoc[0].Start.Line
+	endLine := runLoc[len(runLoc)-1].End.Line
+
+	// Extract original source lines (SourceMap uses 0-based)
+	var lines []string
+	for lineIdx := startLine - 1; lineIdx < endLine; lineIdx++ {
+		if lineIdx >= 0 && lineIdx < sm.LineCount() {
+			lines = append(lines, sm.Line(lineIdx))
+		}
+	}
+
+	if len(lines) == 0 {
+		return "", 0
+	}
+
+	// Replace the instruction prefix with spaces to preserve column positions for
+	// shell parsing. Handles "RUN " and "ONBUILD RUN " patterns.
+	firstLine := lines[0]
+	upper := strings.ToUpper(firstLine)
+	if idx := strings.Index(upper, strings.ToUpper(command.Run)); idx >= 0 {
+		// Check that RUN is followed by whitespace (space or tab)
+		afterRun := idx + len(command.Run)
+		if afterRun < len(firstLine) && (firstLine[afterRun] == ' ' || firstLine[afterRun] == '\t') {
+			// Count contiguous whitespace after RUN
+			wsEnd := afterRun
+			for wsEnd < len(firstLine) && (firstLine[wsEnd] == ' ' || firstLine[wsEnd] == '\t') {
+				wsEnd++
+			}
+			// For ONBUILD RUN, also blank out the "ONBUILD" keyword and any
+			// leading content before "RUN" so the shell parser sees only the
+			// script. Column positions are preserved since we replace 1:1 with spaces.
+			replaceStart := idx
+			if idx > 0 {
+				prefix := strings.TrimSpace(upper[:idx])
+				if strings.EqualFold(prefix, command.Onbuild) {
+					replaceStart = 0
+				}
+			}
+			replaceLen := wsEnd - replaceStart
+			lines[0] = firstLine[:replaceStart] + strings.Repeat(" ", replaceLen) + firstLine[wsEnd:]
+		}
+	}
+
+	// Also blank BuildKit RUN flags (--mount=..., --network=..., --security=...)
+	// that appear between "RUN " and the shell script. These are Dockerfile-level
+	// options, not shell arguments, and would confuse the shell parser.
+	lines[0] = blankRunFlags(lines[0])
+
+	return strings.Join(lines, "\n"), startLine
+}
+
+// blankRunFlags replaces BuildKit RUN flags (--mount, --network, --security)
+// with spaces, preserving column positions. Flags appear as --name=value
+// tokens separated by whitespace, before the shell script.
+func blankRunFlags(line string) string {
+	i := 0
+	// Skip leading whitespace (where "RUN " was blanked).
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+
+	for i < len(line) && line[i] == '-' {
+		flagStart := i
+		// Must start with "--"
+		if i+1 >= len(line) || line[i+1] != '-' {
+			break
+		}
+		// Read the flag name (--name or --name=value)
+		j := i + 2
+		for j < len(line) && line[j] != ' ' && line[j] != '\t' && line[j] != '=' {
+			j++
+		}
+		name := line[i+2 : j]
+		if !isRunFlag(name) {
+			break // Not a known RUN flag; this is the start of the shell script.
+		}
+
+		// Consume through the end of the flag value.
+		// Flags use --name=value syntax (value may contain commas but no spaces).
+		if j < len(line) && line[j] == '=' {
+			j++
+			for j < len(line) && line[j] != ' ' && line[j] != '\t' {
+				j++
+			}
+		}
+
+		// Blank the flag and trailing whitespace.
+		flagEnd := j
+		for flagEnd < len(line) && (line[flagEnd] == ' ' || line[flagEnd] == '\t') {
+			flagEnd++
+		}
+		line = line[:flagStart] + strings.Repeat(" ", flagEnd-flagStart) + line[flagEnd:]
+		i = flagEnd
+	}
+	return line
+}
+
+// isRunFlag returns true for BuildKit RUN instruction flags that are
+// Dockerfile-level options (not shell arguments).
+func isRunFlag(name string) bool {
+	switch name {
+	case "mount", "network", "security":
+		return true
+	default:
+		return false
+	}
 }
 
 // CollectHeredocPaths extracts heredoc paths from a single COPY/ADD command's

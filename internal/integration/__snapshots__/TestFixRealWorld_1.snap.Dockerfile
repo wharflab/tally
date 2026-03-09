@@ -213,7 +213,7 @@ make -j $(nproc) src.build BUILDDIR=/usr/local
 rm -rf /tmp/nccl
 mkdir /tmp/efa
 cd /tmp/efa
-curl -O https://efa-installer.amazonaws.com/aws-efa-installer-${EFA_VERSION}.tar.gz
+curl --location -O https://efa-installer.amazonaws.com/aws-efa-installer-${EFA_VERSION}.tar.gz
 tar -xf aws-efa-installer-${EFA_VERSION}.tar.gz
 cd aws-efa-installer
 apt-get update
@@ -341,7 +341,7 @@ RUN pip install --no-cache-dir --user flash-attn==${FLASH_ATTN_VERSION}
 RUN <<EOF
 set -e
 chmod +x /usr/local/bin/deep_learning_container.py
-curl -o /license.txt https://aws-dlc-licenses.s3.amazonaws.com/pytorch-1.13/license.txt
+curl --location -o /license.txt https://aws-dlc-licenses.s3.amazonaws.com/pytorch-1.13/license.txt
 rm -rf /root/.cache
 EOF
 
@@ -498,7 +498,7 @@ WORKDIR /
 RUN <<EOF
 set -e
 HOME_DIR=/root
-curl -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip
+curl --location -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip
 unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/
 cp ${HOME_DIR}/oss_compliance/test/testOSSCompliance /usr/local/bin/testOSSCompliance
 chmod +x /usr/local/bin/testOSSCompliance
@@ -519,7 +519,7 @@ apt-get install -y git-lfs
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 HOME_DIR=/root
-curl -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip
+curl --location -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip
 unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/
 cp ${HOME_DIR}/oss_compliance/test/testOSSCompliance /usr/local/bin/testOSSCompliance
 chmod +x /usr/local/bin/testOSSCompliance

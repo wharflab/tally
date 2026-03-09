@@ -625,6 +625,21 @@ func lintCases(t *testing.T) []lintCase {
 		},
 
 		{
+			name:     "curl-should-follow-redirects",
+			dir:      "curl-should-follow-redirects",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/curl-should-follow-redirects")...),
+			wantExit: 1,
+		},
+		// No-violation: all documented exception paths (IP-only, -L, --location,
+		// --location-trusted, combined flags) produce zero violations.
+		{
+			name:     "curl-should-follow-redirects-exceptions",
+			dir:      "curl-should-follow-redirects-exceptions",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/curl-should-follow-redirects")...),
+			wantExit: 0,
+		},
+
+		{
 			name:     "prefer-vex-attestation",
 			dir:      "prefer-vex-attestation",
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-vex-attestation")...),

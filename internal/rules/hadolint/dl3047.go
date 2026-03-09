@@ -90,7 +90,7 @@ func (r *DL3047Rule) Check(input rules.LintInput) []rules.Violation {
 
 			if run.PrependShell {
 				// Shell form: parse original source preserving column positions.
-				script, startLine := getRunSourceScript(run, sm)
+				script, startLine := dockerfile.RunSourceScript(run, sm)
 				if script == "" {
 					return nil
 				}

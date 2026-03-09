@@ -1,6 +1,10 @@
 package fix
 
-import "github.com/wharflab/tally/internal/rules"
+import (
+	"slices"
+
+	"github.com/wharflab/tally/internal/rules"
+)
 
 // editsOverlap checks if two edits overlap in their locations.
 // Overlapping edits cannot both be applied safely.
@@ -33,6 +37,63 @@ func editsOverlap(a, b rules.TextEdit) bool {
 	}
 
 	return true
+}
+
+// editContains returns true if edit A's range entirely contains edit B's range.
+//
+// For point edits (B.Start == B.End), strict containment is required: the point
+// must be strictly inside A's range, not at its boundaries. This is consistent
+// with editsOverlap which treats boundary point inserts as non-overlapping.
+func editContains(a, b rules.TextEdit) bool {
+	if a.Location.File != b.Location.File {
+		return false
+	}
+
+	isPointEdit := b.Location.Start.Line == b.Location.End.Line &&
+		b.Location.Start.Column == b.Location.End.Column
+
+	if isPointEdit {
+		// Strict: A must start strictly before the point and end strictly after.
+		aStartsBefore := a.Location.Start.Line < b.Location.Start.Line ||
+			(a.Location.Start.Line == b.Location.Start.Line && a.Location.Start.Column < b.Location.Start.Column)
+		aEndsAfter := a.Location.End.Line > b.Location.End.Line ||
+			(a.Location.End.Line == b.Location.End.Line && a.Location.End.Column > b.Location.End.Column)
+		return aStartsBefore && aEndsAfter
+	}
+
+	// Non-point: inclusive containment (A starts at-or-before B, ends at-or-after B).
+	aStartsBeforeOrAt := a.Location.Start.Line < b.Location.Start.Line ||
+		(a.Location.Start.Line == b.Location.Start.Line && a.Location.Start.Column <= b.Location.Start.Column)
+	aEndsAfterOrAt := a.Location.End.Line > b.Location.End.Line ||
+		(a.Location.End.Line == b.Location.End.Line && a.Location.End.Column >= b.Location.End.Column)
+	return aStartsBeforeOrAt && aEndsAfterOrAt
+}
+
+// candidateSubsumes returns true if every edit in B is entirely contained
+// within some edit in A. When true, applying A makes B moot.
+func candidateSubsumes(a, b *fixCandidate) bool {
+	for _, bEdit := range b.fix.Edits {
+		contained := false
+		for _, aEdit := range a.fix.Edits {
+			if editContains(aEdit, bEdit) {
+				contained = true
+				break
+			}
+		}
+		if !contained {
+			return false
+		}
+	}
+	return true
+}
+
+// candidatesConflict returns true if candidates a and b have any overlapping edits.
+func candidatesConflict(a, b *fixCandidate) bool {
+	return slices.ContainsFunc(a.fix.Edits, func(ae rules.TextEdit) bool {
+		return slices.ContainsFunc(b.fix.Edits, func(be rules.TextEdit) bool {
+			return editsOverlap(ae, be)
+		})
+	})
 }
 
 // editPosition returns a comparable position for sorting edits.

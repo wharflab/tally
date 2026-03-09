@@ -117,3 +117,84 @@ func TestCompareEdits(t *testing.T) {
 		})
 	}
 }
+
+func TestEditContains(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		a    rules.TextEdit
+		b    rules.TextEdit
+		want bool
+	}{
+		{
+			name: "range contains point edit",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 1, 80)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 8, 1, 8)},
+			want: true,
+		},
+		{
+			name: "range contains smaller range",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 3, 10)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 5, 2, 5)},
+			want: true,
+		},
+		{
+			name: "identical ranges",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 1, 10)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 1, 10)},
+			want: true,
+		},
+		{
+			name: "partial overlap - not contained",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 1, 10)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 5, 1, 15)},
+			want: false,
+		},
+		{
+			name: "different files",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("a.txt", 1, 0, 1, 80)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("b.txt", 1, 8, 1, 8)},
+			want: false,
+		},
+		{
+			name: "point edit does not contain range",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 8, 1, 8)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 1, 80)},
+			want: false,
+		},
+		{
+			name: "non-overlapping ranges",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 1, 5)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 10, 1, 20)},
+			want: false,
+		},
+		// Boundary point edits: consistent with editsOverlap which treats
+		// boundary inserts as non-overlapping.
+		{
+			name: "point edit at start boundary - not contained",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 1, 80)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 1, 0)},
+			want: false,
+		},
+		{
+			name: "point edit at end boundary - not contained",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 1, 80)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 80, 1, 80)},
+			want: false,
+		},
+		{
+			name: "point edit at start boundary multi-line - not contained",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 5, 3, 10)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 5, 1, 5)},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := editContains(tt.a, tt.b); got != tt.want {
+				t.Errorf("editContains() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -1,0 +1,75 @@
+# tally/curl-should-follow-redirects
+
+curl commands should include `--location` (or `--follow`) to follow HTTP redirects.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Correctness |
+| Default | Enabled |
+| Auto-fix | Yes (`--fix --fix-unsafe`) |
+
+## Description
+
+Flags `curl` commands in `RUN` instructions that are missing a redirect-following flag.
+Without such a flag, curl will not follow HTTP redirects (301, 302, 307, 308), which can
+cause downloads to silently fail when URLs are relocated.
+
+Other Dockerfile download mechanisms follow redirects by default:
+
+- **`ADD <url>`** follows up to 10 redirects (Go `net/http` default behavior)
+- **`wget`** follows up to 20 redirects by default
+
+### `--location` vs `--follow`
+
+The fix depends on how curl is invoked:
+
+- **`--location`** (`-L`) — suggested for standard downloads (GET, POST, PUT, or no `-X`).
+  This is the classic redirect flag available in all curl versions.
+- **`--follow`** — suggested when `-X`/`--request` specifies a method other than GET, POST,
+  or PUT (e.g., DELETE, PATCH, QUERY). `--location` changes non-GET methods to GET on
+  301/302 redirects, which breaks these methods. `--follow` (curl 8.16.0+) preserves the
+  HTTP method across redirects.
+
+## Examples
+
+### Before (violation)
+
+```dockerfile
+FROM ubuntu:22.04
+RUN curl -fsSo /tmp/file.tar.gz https://example.com/file.tar.gz
+RUN curl -X DELETE https://example.com/api/item/123
+```
+
+### After (fixed with --fix --fix-unsafe)
+
+```dockerfile
+FROM ubuntu:22.04
+RUN curl --location -fsSo /tmp/file.tar.gz https://example.com/file.tar.gz
+RUN curl --follow -X DELETE https://example.com/api/item/123
+```
+
+## Exceptions
+
+The rule does **not** trigger when:
+
+- `-L` or `--location` is already present (including combined flags like `-fsSL`)
+- `--location-trusted` is present (implies redirect following)
+- `--follow` is already present (curl 8.16.0+)
+- All URL arguments point to IP addresses (e.g., `http://127.0.0.1:8080/health`,
+  `http://10.0.0.1/api`), since local/internal services typically don't redirect
+- The curl command is a non-transfer invocation (`--help`, `--version`, `--manual`)
+  where redirect flags have no effect
+
+## Limitations
+
+- Only detects `curl` commands directly visible to the shell parser; commands inside
+  variables or dynamically constructed strings are not analyzed
+- Skips non-POSIX shells (e.g., PowerShell stages)
+
+## References
+
+- [curl `--location` documentation](https://curl.se/docs/manpage.html#-L)
+- [Follow redirects, but differently](https://daniel.haxx.se/blog/2025/08/06/follow-redirects-but-differently/) — curl 8.16.0 `--follow` flag
+- [Dockerfile `ADD` reference](https://docs.docker.com/reference/dockerfile/#add)
+- Design doc: [Shipwright lessons](../../../design-docs/29-shipwright-lessons-build-aware-repair.md) (Lesson 5)
