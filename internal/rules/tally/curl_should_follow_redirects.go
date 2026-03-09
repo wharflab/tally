@@ -76,7 +76,7 @@ func (r *CurlShouldFollowRedirectsRule) Check(input rules.LintInput) []rules.Vio
 					continue
 				}
 
-				if curlIsNonTransfer(cmd) || curlTargetsOnlyIPs(cmd) {
+				if curlIsNonTransfer(cmd) || curlHasNoHTTPURLs(cmd) || curlTargetsOnlyIPs(cmd) {
 					continue
 				}
 
@@ -154,6 +154,26 @@ func curlNeedsFollow(cmd *shell.CommandInfo) bool {
 	default:
 		return true // DELETE, PATCH, QUERY, etc. need --follow
 	}
+}
+
+// curlHasNoHTTPURLs returns true if the curl command has URL arguments but none
+// use http:// or https://. Redirect following only applies to HTTP(S); schemes
+// like ftp://, file://, sftp:// don't have HTTP-style redirects.
+func curlHasNoHTTPURLs(cmd *shell.CommandInfo) bool {
+	hasURL := false
+	for _, arg := range cmd.Args {
+		u, err := url.Parse(arg)
+		if err != nil || u.Scheme == "" {
+			continue
+		}
+		switch u.Scheme {
+		case "http", "https":
+			return false // Has an HTTP(S) URL — rule applies.
+		case "ftp", "ftps", "sftp", "scp", "file", "tftp":
+			hasURL = true
+		}
+	}
+	return hasURL
 }
 
 // curlTargetsOnlyIPs returns true if every URL argument in the curl command

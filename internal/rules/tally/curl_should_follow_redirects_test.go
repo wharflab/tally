@@ -91,6 +91,30 @@ func TestCurlTargetsOnlyIPs(t *testing.T) {
 	}
 }
 
+func TestCurlHasNoHTTPURLs(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		cmd  shell.CommandInfo
+		want bool
+	}{
+		{"http URL", shell.CommandInfo{Name: "curl", Args: []string{"https://example.com/file"}}, false},
+		{"ftp URL", shell.CommandInfo{Name: "curl", Args: []string{"ftp://example.com/file"}}, true},
+		{"file URL", shell.CommandInfo{Name: "curl", Args: []string{"file:///tmp/archive.tar.gz"}}, true},
+		{"sftp URL", shell.CommandInfo{Name: "curl", Args: []string{"sftp://example.com/file"}}, true},
+		{"mixed http and ftp", shell.CommandInfo{Name: "curl", Args: []string{"ftp://example.com/a", "https://example.com/b"}}, false},
+		{"no URLs", shell.CommandInfo{Name: "curl", Args: []string{"-fsSL", "-o", "/tmp/file"}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := curlHasNoHTTPURLs(&tt.cmd); got != tt.want {
+				t.Errorf("curlHasNoHTTPURLs(%v) = %v, want %v", tt.cmd.Args, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCurlIsNonTransfer(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

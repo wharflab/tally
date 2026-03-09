@@ -33,3 +33,8 @@ RUN curl -V
 
 # Exception: --follow flag already present (curl 8.16.0+)
 RUN curl --follow -X DELETE https://example.com/api/item/123
+
+# Exception: non-HTTP(S) schemes (no HTTP redirects to follow)
+RUN curl ftp://example.com/pub/file.tar.gz -o /tmp/file.tar.gz
+RUN curl file:///tmp/archive.tar.gz -o /tmp/out.tar.gz
+RUN curl sftp://example.com/path/file -o /tmp/file
