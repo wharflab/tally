@@ -381,7 +381,8 @@ func analyzeCallExpr(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(na
 				return analyzedCmd{cmdType: cmdTypeOther, text: text}
 			}
 		case syntax.RdrIn, syntax.RdrInOut, syntax.DplIn, syntax.DplOut,
-			syntax.ClbOut, syntax.WordHdoc, syntax.RdrAll, syntax.AppAll:
+			syntax.RdrClob, syntax.AppClob, syntax.WordHdoc,
+			syntax.RdrAll, syntax.RdrAllClob, syntax.AppAll, syntax.AppAllClob:
 			// Input redirects and other unsupported redirect types
 			return analyzedCmd{cmdType: cmdTypeOther, text: text}
 		}
@@ -477,7 +478,8 @@ func analyzeTeeCmd(stmt *syntax.Stmt, call *syntax.CallExpr, text string) analyz
 			}
 			seenStdoutRedir = true
 		case syntax.RdrIn, syntax.RdrInOut, syntax.DplIn, syntax.DplOut,
-			syntax.ClbOut, syntax.WordHdoc, syntax.RdrAll, syntax.AppAll:
+			syntax.RdrClob, syntax.AppClob, syntax.WordHdoc,
+			syntax.RdrAll, syntax.RdrAllClob, syntax.AppAll, syntax.AppAllClob:
 			return other
 		}
 	}
