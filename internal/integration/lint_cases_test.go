@@ -630,6 +630,14 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/curl-missing-location")...),
 			wantExit: 1,
 		},
+		// No-violation: all documented exception paths (IP-only, -L, --location,
+		// --location-trusted, combined flags) produce zero violations.
+		{
+			name:     "curl-missing-location-exceptions",
+			dir:      "curl-missing-location-exceptions",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/curl-missing-location")...),
+			wantExit: 0,
+		},
 
 		{
 			name:     "prefer-vex-attestation",
