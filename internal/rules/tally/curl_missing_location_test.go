@@ -90,6 +90,59 @@ func TestCurlTargetsOnlyIPs(t *testing.T) {
 	}
 }
 
+func TestCurlIsNonTransfer(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		cmd  shell.CommandInfo
+		want bool
+	}{
+		{
+			name: "curl --help",
+			cmd:  shell.CommandInfo{Name: "curl", Args: []string{"--help"}},
+			want: true,
+		},
+		{
+			name: "curl -h",
+			cmd:  shell.CommandInfo{Name: "curl", Args: []string{"-h"}},
+			want: true,
+		},
+		{
+			name: "curl --version",
+			cmd:  shell.CommandInfo{Name: "curl", Args: []string{"--version"}},
+			want: true,
+		},
+		{
+			name: "curl -V",
+			cmd:  shell.CommandInfo{Name: "curl", Args: []string{"-V"}},
+			want: true,
+		},
+		{
+			name: "curl --manual",
+			cmd:  shell.CommandInfo{Name: "curl", Args: []string{"--manual"}},
+			want: true,
+		},
+		{
+			name: "normal curl with URL",
+			cmd:  shell.CommandInfo{Name: "curl", Args: []string{"-fsSL", "https://example.com"}},
+			want: false,
+		},
+		{
+			name: "curl with no args",
+			cmd:  shell.CommandInfo{Name: "curl", Args: nil},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := curlIsNonTransfer(&tt.cmd); got != tt.want {
+				t.Errorf("curlIsNonTransfer(%v) = %v, want %v", tt.cmd.Args, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCurlMissingLocationMetadata(t *testing.T) {
 	t.Parallel()
 	r := NewCurlMissingLocationRule()

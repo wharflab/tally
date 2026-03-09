@@ -76,7 +76,7 @@ func (r *CurlMissingLocationRule) Check(input rules.LintInput) []rules.Violation
 					continue
 				}
 
-				if curlTargetsOnlyIPs(cmd) {
+				if curlIsNonTransfer(cmd) || curlTargetsOnlyIPs(cmd) {
 					continue
 				}
 
@@ -109,6 +109,12 @@ func (r *CurlMissingLocationRule) Check(input rules.LintInput) []rules.Violation
 			return violations
 		},
 	)
+}
+
+// curlIsNonTransfer returns true if the curl command is a non-transfer invocation
+// (e.g., --help, --version, --manual) where --location has no effect.
+func curlIsNonTransfer(cmd *shell.CommandInfo) bool {
+	return cmd.HasAnyFlag("-h", "--help", "-V", "--version", "-M", "--manual")
 }
 
 // curlTargetsOnlyIPs returns true if every URL argument in the curl command

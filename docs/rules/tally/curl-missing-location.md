@@ -49,6 +49,8 @@ The rule does **not** trigger when:
 - `--location-trusted` is present (implies redirect following)
 - All URL arguments point to IP addresses (e.g., `http://127.0.0.1:8080/health`,
   `http://10.0.0.1/api`), since local/internal services typically don't redirect
+- The curl command is a non-transfer invocation (`--help`, `--version`, `--manual`)
+  where `--location` has no effect
 
 ## Limitations
 

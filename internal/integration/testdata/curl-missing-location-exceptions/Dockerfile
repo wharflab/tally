@@ -25,3 +25,8 @@ RUN apt-get update && \
 
 # Exception: curl with -L behind BuildKit --mount flag
 RUN --mount=type=cache,target=/var/cache/apt curl -fsSL https://example.com/file -o /tmp/file
+
+# Exception: non-transfer curl commands (--help, --version)
+RUN curl --help
+RUN curl --version
+RUN curl -V
