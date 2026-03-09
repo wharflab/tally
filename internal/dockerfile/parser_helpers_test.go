@@ -94,3 +94,60 @@ DATA
 		t.Fatalf("expected exactly 2 heredoc file names, got %d (%v)", len(files), files)
 	}
 }
+
+func TestBlankRunFlags(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			"no flags",
+			"    curl -fsSL https://example.com",
+			"    curl -fsSL https://example.com",
+		},
+		{
+			"single mount",
+			"    --mount=type=cache,target=/var/cache/apt curl -fsSL https://example.com",
+			"                                             curl -fsSL https://example.com",
+		},
+		{
+			"multiple mounts",
+			"    --mount=type=cache,target=/var/cache/apt --mount=type=bind,source=go.sum,target=go.sum apt-get update",
+			"                                                                                           apt-get update",
+		},
+		{
+			"network flag",
+			"    --network=none useradd app",
+			"                   useradd app",
+		},
+		{
+			"security flag",
+			"    --security=insecure make build",
+			"                        make build",
+		},
+		{
+			"unknown flag not blanked",
+			"    --custom=value curl -fsSL",
+			"    --custom=value curl -fsSL",
+		},
+		{
+			"shell flag not blanked",
+			"    -c echo hello",
+			"    -c echo hello",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := blankRunFlags(tt.in)
+			if got != tt.want {
+				t.Errorf("blankRunFlags(%q)\ngot:  %q\nwant: %q", tt.in, got, tt.want)
+			}
+			if len(got) != len(tt.in) {
+				t.Errorf("length changed: got %d, want %d (must preserve column positions)", len(got), len(tt.in))
+			}
+		})
+	}
+}

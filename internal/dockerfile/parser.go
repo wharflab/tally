@@ -425,7 +425,69 @@ func RunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (str
 		}
 	}
 
+	// Also blank BuildKit RUN flags (--mount=..., --network=..., --security=...)
+	// that appear between "RUN " and the shell script. These are Dockerfile-level
+	// options, not shell arguments, and would confuse the shell parser.
+	lines[0] = blankRunFlags(lines[0])
+
 	return strings.Join(lines, "\n"), startLine
+}
+
+// blankRunFlags replaces BuildKit RUN flags (--mount, --network, --security)
+// with spaces, preserving column positions. Flags appear as --name=value
+// tokens separated by whitespace, before the shell script.
+func blankRunFlags(line string) string {
+	i := 0
+	// Skip leading whitespace (where "RUN " was blanked).
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+
+	for i < len(line) && line[i] == '-' {
+		flagStart := i
+		// Must start with "--"
+		if i+1 >= len(line) || line[i+1] != '-' {
+			break
+		}
+		// Read the flag name (--name or --name=value)
+		j := i + 2
+		for j < len(line) && line[j] != ' ' && line[j] != '\t' && line[j] != '=' {
+			j++
+		}
+		name := line[i+2 : j]
+		if !isRunFlag(name) {
+			break // Not a known RUN flag; this is the start of the shell script.
+		}
+
+		// Consume through the end of the flag value.
+		// Flags use --name=value syntax (value may contain commas but no spaces).
+		if j < len(line) && line[j] == '=' {
+			j++
+			for j < len(line) && line[j] != ' ' && line[j] != '\t' {
+				j++
+			}
+		}
+
+		// Blank the flag and trailing whitespace.
+		flagEnd := j
+		for flagEnd < len(line) && (line[flagEnd] == ' ' || line[flagEnd] == '\t') {
+			flagEnd++
+		}
+		line = line[:flagStart] + strings.Repeat(" ", flagEnd-flagStart) + line[flagEnd:]
+		i = flagEnd
+	}
+	return line
+}
+
+// isRunFlag returns true for BuildKit RUN instruction flags that are
+// Dockerfile-level options (not shell arguments).
+func isRunFlag(name string) bool {
+	switch name {
+	case "mount", "network", "security":
+		return true
+	default:
+		return false
+	}
 }
 
 // CollectHeredocPaths extracts heredoc paths from a single COPY/ADD command's

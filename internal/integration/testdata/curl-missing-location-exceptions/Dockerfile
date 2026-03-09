@@ -22,3 +22,6 @@ RUN curl http://192.168.1.1/api/data
 RUN apt-get update && \
     curl http://10.0.0.5:9090/config && \
     echo done
+
+# Exception: curl with -L behind BuildKit --mount flag
+RUN --mount=type=cache,target=/var/cache/apt curl -fsSL https://example.com/file -o /tmp/file

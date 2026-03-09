@@ -37,3 +37,6 @@ RUN echo curl && curl -fsSo /tmp/a https://example.com/a
 
 # Should trigger twice: two curl commands both missing -L
 RUN curl -fsSo /tmp/a https://example.com/a && curl -fsSo /tmp/b https://example.com/b
+
+# Should trigger: curl behind BuildKit --mount flag
+RUN --mount=type=cache,target=/var/cache/apt curl -fsSo /tmp/file https://example.com/file
