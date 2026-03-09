@@ -1,4 +1,4 @@
-# tally/curl-missing-location
+# tally/curl-should-follow-redirects
 
 curl commands should include `--location` (or `--follow`) to follow HTTP redirects.
 

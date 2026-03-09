@@ -625,17 +625,17 @@ func lintCases(t *testing.T) []lintCase {
 		},
 
 		{
-			name:     "curl-missing-location",
-			dir:      "curl-missing-location",
-			args:     append([]string{"--format", "json"}, mustSelectRules("tally/curl-missing-location")...),
+			name:     "curl-should-follow-redirects",
+			dir:      "curl-should-follow-redirects",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/curl-should-follow-redirects")...),
 			wantExit: 1,
 		},
 		// No-violation: all documented exception paths (IP-only, -L, --location,
 		// --location-trusted, combined flags) produce zero violations.
 		{
-			name:     "curl-missing-location-exceptions",
-			dir:      "curl-missing-location-exceptions",
-			args:     append([]string{"--format", "json"}, mustSelectRules("tally/curl-missing-location")...),
+			name:     "curl-should-follow-redirects-exceptions",
+			dir:      "curl-should-follow-redirects-exceptions",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/curl-should-follow-redirects")...),
 			wantExit: 0,
 		},
 

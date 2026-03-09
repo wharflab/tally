@@ -43,7 +43,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/copy-from-empty-scratch-stage`](docs/rules/tally/copy-from-empty-scratch-stage.md) | Detects COPY --from referencing a scratch stage with no file-producing instructions | Error | Correctness | Enabled |
 | [`tally/invalid-json-form`](docs/rules/tally/invalid-json-form.md) 🔧 | Arguments appear to use JSON exec-form but contain invalid JSON | Error | Correctness | Enabled |
 | [`tally/platform-mismatch`](docs/rules/tally/platform-mismatch.md) | Explicit `--platform` on FROM does not match what the registry provides | Error | Correctness | Enabled |
-| [`tally/curl-missing-location`](docs/rules/tally/curl-missing-location.md) 🔧 | curl commands should include `-L`/`--location` to follow HTTP redirects | Warning | Correctness | Enabled |
+| [`tally/curl-should-follow-redirects`](docs/rules/tally/curl-should-follow-redirects.md) 🔧 | curl commands should include `-L`/`--location` to follow HTTP redirects | Warning | Correctness | Enabled |
 | [`tally/prefer-add-unpack`](docs/rules/tally/prefer-add-unpack.md) 🔧 | Suggests `ADD --unpack` instead of downloading and extracting remote archives in `RUN` | Info | Performance | Enabled |
 | [`tally/prefer-multi-stage-build`](docs/rules/tally/prefer-multi-stage-build.md) 🔧 | Suggests converting single-stage builds into multi-stage builds to reduce final image size | Info | Performance | Off (experimental) |
 | [`tally/prefer-copy-heredoc`](docs/rules/tally/prefer-copy-heredoc.md) 🔧 | Suggests using COPY heredoc for file creation instead of RUN echo/cat | Info | Performance | Enabled |

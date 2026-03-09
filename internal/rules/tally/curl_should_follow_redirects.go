@@ -14,36 +14,36 @@ import (
 	"github.com/wharflab/tally/internal/sourcemap"
 )
 
-// CurlMissingLocationRuleCode is the full rule code for the curl-missing-location rule.
-const CurlMissingLocationRuleCode = rules.TallyRulePrefix + "curl-missing-location"
+// CurlShouldFollowRedirectsRuleCode is the full rule code for the curl-should-follow-redirects rule.
+const CurlShouldFollowRedirectsRuleCode = rules.TallyRulePrefix + "curl-should-follow-redirects"
 
-// CurlMissingLocationRule detects curl commands in RUN instructions that are
+// CurlShouldFollowRedirectsRule detects curl commands in RUN instructions that are
 // missing the -L/--location flag to follow HTTP redirects.
 //
 // Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.
 // Without -L, curl will not follow redirects, which can cause downloads to
 // silently fail when URLs are relocated.
-type CurlMissingLocationRule struct{}
+type CurlShouldFollowRedirectsRule struct{}
 
-// NewCurlMissingLocationRule creates a new rule instance.
-func NewCurlMissingLocationRule() *CurlMissingLocationRule {
-	return &CurlMissingLocationRule{}
+// NewCurlShouldFollowRedirectsRule creates a new rule instance.
+func NewCurlShouldFollowRedirectsRule() *CurlShouldFollowRedirectsRule {
+	return &CurlShouldFollowRedirectsRule{}
 }
 
 // Metadata returns the rule metadata.
-func (r *CurlMissingLocationRule) Metadata() rules.RuleMetadata {
+func (r *CurlShouldFollowRedirectsRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
-		Code:            CurlMissingLocationRuleCode,
+		Code:            CurlShouldFollowRedirectsRuleCode,
 		Name:            "curl should use --location to follow redirects",
 		Description:     "curl commands should include -L/--location to follow HTTP redirects",
-		DocURL:          rules.TallyDocURL(CurlMissingLocationRuleCode),
+		DocURL:          rules.TallyDocURL(CurlShouldFollowRedirectsRuleCode),
 		DefaultSeverity: rules.SeverityWarning,
 		Category:        "correctness",
 	}
 }
 
 // Check runs the curl-missing-location rule.
-func (r *CurlMissingLocationRule) Check(input rules.LintInput) []rules.Violation {
+func (r *CurlShouldFollowRedirectsRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
 
@@ -236,5 +236,5 @@ func buildCurlRedirectFix(
 
 // init registers the rule with the default registry.
 func init() {
-	rules.Register(NewCurlMissingLocationRule())
+	rules.Register(NewCurlShouldFollowRedirectsRule())
 }

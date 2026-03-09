@@ -171,13 +171,13 @@ func TestCurlNeedsFollow(t *testing.T) {
 	}
 }
 
-func TestCurlMissingLocationMetadata(t *testing.T) {
+func TestCurlShouldFollowRedirectsMetadata(t *testing.T) {
 	t.Parallel()
-	r := NewCurlMissingLocationRule()
+	r := NewCurlShouldFollowRedirectsRule()
 	meta := r.Metadata()
 
-	if meta.Code != "tally/curl-missing-location" {
-		t.Errorf("Code = %q, want %q", meta.Code, "tally/curl-missing-location")
+	if meta.Code != "tally/curl-should-follow-redirects" {
+		t.Errorf("Code = %q, want %q", meta.Code, "tally/curl-should-follow-redirects")
 	}
 	if meta.DefaultSeverity != rules.SeverityWarning {
 		t.Errorf("DefaultSeverity = %v, want Warning", meta.DefaultSeverity)
