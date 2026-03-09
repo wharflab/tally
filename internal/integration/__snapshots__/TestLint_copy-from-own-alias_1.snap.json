@@ -4,24 +4,6 @@
       "file": "testdata/copy-from-own-alias/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3022/",
-          "location": {
-            "end": {
-              "column": 0,
-              "line": 2
-            },
-            "file": "testdata/copy-from-own-alias/Dockerfile",
-            "start": {
-              "column": 0,
-              "line": 2
-            }
-          },
-          "message": "`COPY --from` should reference a previously defined `FROM` alias",
-          "rule": "hadolint/DL3022",
-          "severity": "error",
-          "sourceCode": "COPY --from=foo bar ."
-        },
-        {
           "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3023/",
           "location": {
             "end": {
@@ -43,13 +25,13 @@
     }
   ],
   "files_scanned": 1,
-  "rules_enabled": 1,
+  "rules_enabled": 2,
   "summary": {
-    "errors": 2,
+    "errors": 1,
     "files": 1,
     "info": 0,
     "style": 0,
-    "total": 2,
+    "total": 1,
     "warnings": 0
   }
 }

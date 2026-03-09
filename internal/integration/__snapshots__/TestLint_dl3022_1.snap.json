@@ -18,20 +18,20 @@
           },
           "message": "`COPY --from` should reference a previously defined `FROM` alias",
           "rule": "hadolint/DL3022",
-          "severity": "error",
+          "severity": "warning",
           "sourceCode": "COPY --from=runtime foo ."
         }
       ]
     }
   ],
   "files_scanned": 1,
-  "rules_enabled": 0,
+  "rules_enabled": 1,
   "summary": {
-    "errors": 1,
+    "errors": 0,
     "files": 1,
     "info": 0,
     "style": 0,
     "total": 1,
-    "warnings": 0
+    "warnings": 1
   }
 }

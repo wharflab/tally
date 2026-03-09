@@ -383,7 +383,7 @@ func TestLSP_NoPushDiagnosticsWhenClientSupportsPull(t *testing.T) {
 	ts := startTestServer(t)
 
 	// Initialize with LSP 3.17 pull-diagnostics client capability.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
 	defer cancel()
 
 	var result initializeResult
@@ -432,7 +432,7 @@ func TestLSP_CodeActionInPullDiagnosticsMode(t *testing.T) {
 	ts := startTestServer(t)
 
 	// Initialize with pull-diagnostics capability (like VSCode extension with disablePushDiagnostics).
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
 	defer cancel()
 
 	var result initializeResult
