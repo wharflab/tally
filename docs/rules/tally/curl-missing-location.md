@@ -1,6 +1,6 @@
 # tally/curl-missing-location
 
-curl commands should include `--location` to follow HTTP redirects.
+curl commands should include `--location` (or `--follow`) to follow HTTP redirects.
 
 | Property | Value |
 |----------|-------|
@@ -11,8 +11,8 @@ curl commands should include `--location` to follow HTTP redirects.
 
 ## Description
 
-Flags `curl` commands in `RUN` instructions that are missing the `-L`/`--location` flag.
-Without this flag, curl will not follow HTTP redirects (301, 302, 307, 308), which can
+Flags `curl` commands in `RUN` instructions that are missing a redirect-following flag.
+Without such a flag, curl will not follow HTTP redirects (301, 302, 307, 308), which can
 cause downloads to silently fail when URLs are relocated.
 
 Other Dockerfile download mechanisms follow redirects by default:
@@ -20,8 +20,16 @@ Other Dockerfile download mechanisms follow redirects by default:
 - **`ADD <url>`** follows up to 10 redirects (Go `net/http` default behavior)
 - **`wget`** follows up to 20 redirects by default
 
-Using `--location` with `curl` ensures consistent redirect-following behavior across
-all download methods in a Dockerfile.
+### `--location` vs `--follow`
+
+The fix depends on how curl is invoked:
+
+- **`--location`** (`-L`) — suggested for standard downloads (GET, POST, PUT, or no `-X`).
+  This is the classic redirect flag available in all curl versions.
+- **`--follow`** — suggested when `-X`/`--request` specifies a method other than GET, POST,
+  or PUT (e.g., DELETE, PATCH, QUERY). `--location` changes non-GET methods to GET on
+  301/302 redirects, which breaks these methods. `--follow` (curl 8.16.0+) preserves the
+  HTTP method across redirects.
 
 ## Examples
 
@@ -30,7 +38,7 @@ all download methods in a Dockerfile.
 ```dockerfile
 FROM ubuntu:22.04
 RUN curl -fsSo /tmp/file.tar.gz https://example.com/file.tar.gz
-RUN curl https://example.com/script.sh | sh
+RUN curl -X DELETE https://example.com/api/item/123
 ```
 
 ### After (fixed with --fix --fix-unsafe)
@@ -38,7 +46,7 @@ RUN curl https://example.com/script.sh | sh
 ```dockerfile
 FROM ubuntu:22.04
 RUN curl --location -fsSo /tmp/file.tar.gz https://example.com/file.tar.gz
-RUN curl --location https://example.com/script.sh | sh
+RUN curl --follow -X DELETE https://example.com/api/item/123
 ```
 
 ## Exceptions
@@ -47,10 +55,11 @@ The rule does **not** trigger when:
 
 - `-L` or `--location` is already present (including combined flags like `-fsSL`)
 - `--location-trusted` is present (implies redirect following)
+- `--follow` is already present (curl 8.16.0+)
 - All URL arguments point to IP addresses (e.g., `http://127.0.0.1:8080/health`,
   `http://10.0.0.1/api`), since local/internal services typically don't redirect
 - The curl command is a non-transfer invocation (`--help`, `--version`, `--manual`)
-  where `--location` has no effect
+  where redirect flags have no effect
 
 ## Limitations
 
@@ -61,5 +70,6 @@ The rule does **not** trigger when:
 ## References
 
 - [curl `--location` documentation](https://curl.se/docs/manpage.html#-L)
+- [Follow redirects, but differently](https://daniel.haxx.se/blog/2025/08/06/follow-redirects-but-differently/) — curl 8.16.0 `--follow` flag
 - [Dockerfile `ADD` reference](https://docs.docker.com/reference/dockerfile/#add)
 - Design doc: [Shipwright lessons](../../../design-docs/29-shipwright-lessons-build-aware-repair.md) (Lesson 5)

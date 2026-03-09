@@ -40,3 +40,9 @@ RUN curl -fsSo /tmp/a https://example.com/a && curl -fsSo /tmp/b https://example
 
 # Should trigger: curl behind BuildKit --mount flag
 RUN --mount=type=cache,target=/var/cache/apt curl -fsSo /tmp/file https://example.com/file
+
+# Should trigger with --follow suggestion: -X DELETE needs method preservation
+RUN curl -X DELETE https://example.com/api/item/123
+
+# Should trigger with --follow suggestion: -X PATCH
+RUN curl -X PATCH -d '{"status":"done"}' https://example.com/api/item/123

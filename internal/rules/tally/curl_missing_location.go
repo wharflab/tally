@@ -72,7 +72,7 @@ func (r *CurlMissingLocationRule) Check(input rules.LintInput) []rules.Violation
 			for i := range cmds {
 				cmd := &cmds[i]
 
-				if cmd.HasAnyFlag("-L", "--location", "--location-trusted") {
+				if cmd.HasAnyFlag("-L", "--location", "--location-trusted", "--follow") {
 					continue
 				}
 
@@ -89,17 +89,35 @@ func (r *CurlMissingLocationRule) Check(input rules.LintInput) []rules.Violation
 				} else {
 					loc = rules.NewLocationFromRanges(file, run.Location())
 				}
-				v := rules.NewViolation(
-					loc, meta.Code,
-					"curl command is missing --location flag to follow HTTP redirects",
-					meta.DefaultSeverity,
-				).WithDocURL(meta.DocURL).WithDetail(
-					"Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). " +
-						"This can cause downloads to silently fail when URLs are relocated. " +
-						"Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
-				)
 
-				if fix := buildCurlLocationFix(file, run, *cmd, runStartLine, sm); fix != nil {
+				// When curl uses -X/--request with a method other than GET, POST,
+				// or PUT, suggest --follow (curl 8.16.0+) which preserves the
+				// method across redirects. --location changes non-GET methods to
+				// GET on 301/302, which breaks DELETE, PATCH, QUERY, etc.
+				useFollow := curlNeedsFollow(cmd)
+
+				var msg, detail, fixFlag, fixDesc string
+				if useFollow {
+					msg = "curl command with custom method is missing --follow flag to follow HTTP redirects"
+					detail = "Without --follow, curl will not follow HTTP redirects. " +
+						"Using --location with -X would change the HTTP method to GET on 301/302 redirects. " +
+						"--follow (curl 8.16.0+) preserves the method across redirects."
+					fixFlag = " --follow"
+					fixDesc = "Add --follow flag to follow redirects (preserves HTTP method)"
+				} else {
+					msg = "curl command is missing --location flag to follow HTTP redirects"
+					detail = "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). " +
+						"This can cause downloads to silently fail when URLs are relocated. " +
+						"Other Dockerfile download mechanisms (ADD, wget) follow redirects by default."
+					fixFlag = " --location"
+					fixDesc = "Add --location flag to follow redirects"
+				}
+
+				v := rules.NewViolation(
+					loc, meta.Code, msg, meta.DefaultSeverity,
+				).WithDocURL(meta.DocURL).WithDetail(detail)
+
+				if fix := buildCurlRedirectFix(file, run, *cmd, runStartLine, sm, fixFlag, fixDesc); fix != nil {
 					v = v.WithSuggestedFix(fix)
 				}
 
@@ -115,6 +133,27 @@ func (r *CurlMissingLocationRule) Check(input rules.LintInput) []rules.Violation
 // (e.g., --help, --version, --manual) where --location has no effect.
 func curlIsNonTransfer(cmd *shell.CommandInfo) bool {
 	return cmd.HasAnyFlag("-h", "--help", "-V", "--version", "-M", "--manual")
+}
+
+// curlNeedsFollow returns true if the curl command uses -X/--request with a
+// method other than GET, POST, or PUT. For these methods, --follow (curl
+// 8.16.0+) should be used instead of --location, because --location changes
+// non-GET methods to GET on 301/302 redirects.
+func curlNeedsFollow(cmd *shell.CommandInfo) bool {
+	method := cmd.GetArgValue("-X")
+	if method == "" {
+		method = cmd.GetArgValue("--request")
+	}
+	if method == "" {
+		return false
+	}
+	method = strings.ToUpper(method)
+	switch method {
+	case "GET", "POST", "PUT":
+		return false // --location handles these correctly
+	default:
+		return true // DELETE, PATCH, QUERY, etc. need --follow
+	}
 }
 
 // curlTargetsOnlyIPs returns true if every URL argument in the curl command
@@ -156,16 +195,18 @@ func isIPHost(host string) bool {
 	return net.ParseIP(h) != nil
 }
 
-// buildCurlLocationFix creates a SuggestedFix that inserts " --location" after
-// the curl command name. Uses cmd.EndCol from FindCommands on RunSourceScript,
-// which maps directly to source columns. Only works for shell-form RUN
-// instructions parsed via RunSourceScript (runStartLine > 0).
-func buildCurlLocationFix(
+// buildCurlRedirectFix creates a SuggestedFix that inserts the given flag
+// (e.g., " --location" or " --follow") after the curl command name. Uses
+// cmd.EndCol from FindCommands on RunSourceScript, which maps directly to
+// source columns.
+func buildCurlRedirectFix(
 	file string,
 	run *instructions.RunCommand,
 	cmd shell.CommandInfo,
 	runStartLine int,
 	sm *sourcemap.SourceMap,
+	flagText string,
+	description string,
 ) *rules.SuggestedFix {
 	if sm == nil || !run.PrependShell || runStartLine == 0 {
 		return nil
@@ -174,7 +215,6 @@ func buildCurlLocationFix(
 	editLine := runStartLine + cmd.Line
 	insertCol := cmd.EndCol
 
-	// Validate the position points to the end of "curl" in the source.
 	lineIdx := editLine - 1
 	if lineIdx < 0 || lineIdx >= sm.LineCount() {
 		return nil
@@ -185,11 +225,11 @@ func buildCurlLocationFix(
 	}
 
 	return &rules.SuggestedFix{
-		Description: "Add --location flag to follow redirects",
+		Description: description,
 		Safety:      rules.FixSuggestion,
 		Edits: []rules.TextEdit{{
 			Location: rules.NewRangeLocation(file, editLine, insertCol, editLine, insertCol),
-			NewText:  " --location",
+			NewText:  flagText,
 		}},
 	}
 }

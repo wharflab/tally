@@ -144,6 +144,33 @@ func TestCurlIsNonTransfer(t *testing.T) {
 	}
 }
 
+func TestCurlNeedsFollow(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		cmd  shell.CommandInfo
+		want bool
+	}{
+		{"no -X flag", shell.CommandInfo{Name: "curl", Args: []string{"-fsSL", "https://example.com"}}, false},
+		{"-X GET", shell.CommandInfo{Name: "curl", Args: []string{"-X", "GET", "https://example.com"}}, false},
+		{"-X POST", shell.CommandInfo{Name: "curl", Args: []string{"-X", "POST", "-d", "data", "https://example.com"}}, false},
+		{"-X PUT", shell.CommandInfo{Name: "curl", Args: []string{"-X", "PUT", "-d", "data", "https://example.com"}}, false},
+		{"-X DELETE", shell.CommandInfo{Name: "curl", Args: []string{"-X", "DELETE", "https://example.com/item"}}, true},
+		{"-X PATCH", shell.CommandInfo{Name: "curl", Args: []string{"-X", "PATCH", "-d", "data", "https://example.com"}}, true},
+		{"--request DELETE", shell.CommandInfo{Name: "curl", Args: []string{"--request", "DELETE", "https://example.com"}}, true},
+		{"-X QUERY", shell.CommandInfo{Name: "curl", Args: []string{"-X", "QUERY", "-d", "q", "https://example.com"}}, true},
+		{"-X get (lowercase)", shell.CommandInfo{Name: "curl", Args: []string{"-X", "get", "https://example.com"}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := curlNeedsFollow(&tt.cmd); got != tt.want {
+				t.Errorf("curlNeedsFollow(%v) = %v, want %v", tt.cmd.Args, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCurlMissingLocationMetadata(t *testing.T) {
 	t.Parallel()
 	r := NewCurlMissingLocationRule()

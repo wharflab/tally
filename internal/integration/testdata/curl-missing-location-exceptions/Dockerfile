@@ -30,3 +30,6 @@ RUN --mount=type=cache,target=/var/cache/apt curl -fsSL https://example.com/file
 RUN curl --help
 RUN curl --version
 RUN curl -V
+
+# Exception: --follow flag already present (curl 8.16.0+)
+RUN curl --follow -X DELETE https://example.com/api/item/123
