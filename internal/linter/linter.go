@@ -160,8 +160,10 @@ func LintFile(input Input) (*Result, error) {
 	registry := rules.DefaultRegistry()
 	for _, issue := range sem.ConstructionIssues() {
 		sev := issue.Severity
-		if rule := registry.Get(issue.Code); rule != nil {
-			sev = rule.Metadata().DefaultSeverity
+		if sev == 0 { // Zero value (SeverityError) means "use rule default".
+			if rule := registry.Get(issue.Code); rule != nil {
+				sev = rule.Metadata().DefaultSeverity
+			}
 		}
 		violations = append(violations, rules.NewViolation(
 			rules.NewLocationFromRange(issue.File, issue.Location),
