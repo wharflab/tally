@@ -497,7 +497,7 @@ func TestToLangVariant(t *testing.T) {
 		{VariantPowerShell, syntax.LangBash}, // PowerShell falls back to Bash
 		{VariantCmd, syntax.LangBash},        // Cmd falls back to Bash
 		{VariantUnknown, syntax.LangBash},    // Unknown falls back to Bash
-		{Variant(99), syntax.LangBash},       // Out-of-range defaults to Bash
+		{Variant(1 << 15), syntax.LangBash},  // Out-of-range defaults to Bash
 	}
 
 	for _, tt := range tests {
