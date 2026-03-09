@@ -381,7 +381,8 @@ func analyzeCallExpr(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(na
 				return analyzedCmd{cmdType: cmdTypeOther, text: text}
 			}
 		case syntax.RdrIn, syntax.RdrInOut, syntax.DplIn, syntax.DplOut,
-			syntax.ClbOut, syntax.WordHdoc, syntax.RdrAll, syntax.AppAll:
+			syntax.RdrClob, syntax.AppClob, syntax.WordHdoc,
+			syntax.RdrAll, syntax.RdrAllClob, syntax.AppAll, syntax.AppAllClob:
 			// Input redirects and other unsupported redirect types
 			return analyzedCmd{cmdType: cmdTypeOther, text: text}
 		}
@@ -477,7 +478,8 @@ func analyzeTeeCmd(stmt *syntax.Stmt, call *syntax.CallExpr, text string) analyz
 			}
 			seenStdoutRedir = true
 		case syntax.RdrIn, syntax.RdrInOut, syntax.DplIn, syntax.DplOut,
-			syntax.ClbOut, syntax.WordHdoc, syntax.RdrAll, syntax.AppAll:
+			syntax.RdrClob, syntax.AppClob, syntax.WordHdoc,
+			syntax.RdrAll, syntax.RdrAllClob, syntax.AppAll, syntax.AppAllClob:
 			return other
 		}
 	}
@@ -853,9 +855,13 @@ func extractEchoContent(call *syntax.CallExpr, knownVars func(name string) bool)
 
 // isComplexExpansion checks if a ParamExp uses complex expansion features
 // (e.g., ${#VAR}, ${VAR:-default}, ${VAR:0:5}, etc.)
+// Mirrors the inverse of the unexported ParamExp.simple() upstream.
 func isComplexExpansion(p *syntax.ParamExp) bool {
-	return p.Excl || p.Length || p.Width || p.Index != nil ||
-		p.Slice != nil || p.Repl != nil || p.Exp != nil
+	return p.Flags != nil ||
+		p.Excl || p.Length || p.Width || p.IsSet ||
+		p.NestedParam != nil || p.Index != nil ||
+		len(p.Modifiers) != 0 || p.Slice != nil ||
+		p.Repl != nil || p.Names != 0 || p.Exp != nil
 }
 
 // extractParamExpContent handles parameter expansion, writing to content and returning unsafe status.

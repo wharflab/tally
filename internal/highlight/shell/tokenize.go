@@ -133,6 +133,8 @@ func langVariant(variant myshell.Variant) shsyntax.LangVariant {
 		return shsyntax.LangPOSIX
 	case myshell.VariantMksh:
 		return shsyntax.LangMirBSDKorn
+	case myshell.VariantZsh:
+		return shsyntax.LangZsh
 	case myshell.VariantPowerShell, myshell.VariantCmd, myshell.VariantUnknown:
 		return shsyntax.LangBash
 	}

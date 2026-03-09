@@ -13,55 +13,61 @@ import (
 )
 
 // Variant represents a shell variant for parsing and rule gating.
-// Each variant expresses what the shell can do, enabling rules to query
-// capabilities via intent-based methods rather than negation tests.
+// It is a bitset so that capability sets can be defined and tested
+// with a single bitwise AND (mirrors mvdan.cc/sh's LangVariant design).
 type Variant int
 
 const (
 	// VariantBash is the GNU Bash shell (default for Docker Linux containers).
-	VariantBash Variant = iota
+	VariantBash Variant = 1 << iota
 	// VariantPOSIX is the POSIX-compliant shell (sh, dash, ash).
 	VariantPOSIX
 	// VariantMksh is the MirBSD Korn Shell.
 	VariantMksh
+	// VariantZsh is the Z shell.
+	VariantZsh
 	// VariantPowerShell is PowerShell (cross-platform: powershell on Windows, pwsh on Linux/macOS).
 	VariantPowerShell
 	// VariantCmd is the Windows cmd.exe command interpreter.
 	VariantCmd
+
 	// VariantUnknown is an unrecognized shell. Treated conservatively: not parseable,
 	// not ShellCheck-compatible, not PowerShell.
-	VariantUnknown
+	VariantUnknown Variant = 0
+
+	// variantParseable are shells whose scripts can be parsed by mvdan.cc/sh.
+	variantParseable = VariantBash | VariantPOSIX | VariantMksh | VariantZsh
+
+	// variantShellCheck are shells that ShellCheck can analyze
+	// (zsh is mapped to the bash dialect; ShellCheck has no native zsh support).
+	variantShellCheck = VariantBash | VariantPOSIX | VariantMksh | VariantZsh
+
+	// variantHeredoc are shells compatible with BuildKit heredoc syntax (RUN <<EOF).
+	variantHeredoc = VariantBash | VariantPOSIX | VariantMksh | VariantZsh
 )
 
 // IsParseable returns true for shells whose scripts can be parsed by mvdan.cc/sh.
 // Use this to guard shell AST analysis, command extraction, and chained-command counting.
-func (v Variant) IsParseable() bool {
-	return v == VariantBash || v == VariantPOSIX || v == VariantMksh
-}
+func (v Variant) IsParseable() bool { return v&variantParseable != 0 }
 
 // IsShellCheckCompatible returns true for shells that ShellCheck can analyze.
 // Use this to guard ShellCheck WASM invocation.
-func (v Variant) IsShellCheckCompatible() bool {
-	return v == VariantBash || v == VariantPOSIX || v == VariantMksh
-}
+func (v Variant) IsShellCheckCompatible() bool { return v&variantShellCheck != 0 }
 
 // SupportsHeredoc returns true for shells compatible with BuildKit heredoc syntax (RUN <<EOF).
 // Use this to guard heredoc suggestions and fixes.
-func (v Variant) SupportsHeredoc() bool {
-	return v == VariantBash || v == VariantPOSIX || v == VariantMksh
-}
+func (v Variant) SupportsHeredoc() bool { return v&variantHeredoc != 0 }
 
 // IsPowerShell returns true for PowerShell variants (powershell, pwsh).
 // Use this to gate PowerShell-specific lint rules (tally/powershell/*).
-func (v Variant) IsPowerShell() bool {
-	return v == VariantPowerShell
-}
+func (v Variant) IsPowerShell() bool { return v == VariantPowerShell }
 
 // VariantFromShell returns the appropriate Variant for a shell name.
 // Common shell mappings:
-//   - bash, zsh -> VariantBash
+//   - bash -> VariantBash
 //   - sh, dash, ash -> VariantPOSIX
 //   - mksh, ksh -> VariantMksh
+//   - zsh -> VariantZsh
 //   - powershell, pwsh -> VariantPowerShell
 //   - cmd -> VariantCmd
 //   - unknown -> VariantUnknown
@@ -81,8 +87,7 @@ func VariantFromShell(shell string) Variant {
 	case "mksh", "ksh":
 		return VariantMksh
 	case "zsh":
-		// zsh is mostly bash-compatible for our purposes
-		return VariantBash
+		return VariantZsh
 	case "powershell", "pwsh":
 		return VariantPowerShell
 	case "cmd":
@@ -136,6 +141,7 @@ func VariantFromShellCmd(shellCmd []string) Variant {
 // toLangVariant converts our Variant to mvdan.cc/sh's LangVariant.
 // Only meaningful for parseable variants; callers should check IsParseable() first.
 func (v Variant) toLangVariant() syntax.LangVariant {
+	//nolint:exhaustive // composite mask constants (variantParseable, etc.) are capability sets, not individual variants
 	switch v {
 	case VariantBash:
 		return syntax.LangBash
@@ -143,12 +149,13 @@ func (v Variant) toLangVariant() syntax.LangVariant {
 		return syntax.LangPOSIX
 	case VariantMksh:
 		return syntax.LangMirBSDKorn
-	case VariantPowerShell, VariantCmd, VariantUnknown:
+	case VariantZsh:
+		return syntax.LangZsh
+	default:
 		// Can't be parsed by mvdan.cc/sh. Fallback to Bash —
 		// callers should have checked IsParseable() first.
 		return syntax.LangBash
 	}
-	return syntax.LangBash
 }
 
 // CommandNames extracts all command names from a shell script.
