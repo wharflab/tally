@@ -855,9 +855,13 @@ func extractEchoContent(call *syntax.CallExpr, knownVars func(name string) bool)
 
 // isComplexExpansion checks if a ParamExp uses complex expansion features
 // (e.g., ${#VAR}, ${VAR:-default}, ${VAR:0:5}, etc.)
+// Mirrors the inverse of the unexported ParamExp.simple() upstream.
 func isComplexExpansion(p *syntax.ParamExp) bool {
-	return p.Excl || p.Length || p.Width || p.Index != nil ||
-		p.Slice != nil || p.Repl != nil || p.Exp != nil
+	return p.Flags != nil ||
+		p.Excl || p.Length || p.Width || p.IsSet ||
+		p.NestedParam != nil || p.Index != nil ||
+		len(p.Modifiers) != 0 || p.Slice != nil ||
+		p.Repl != nil || p.Names != 0 || p.Exp != nil
 }
 
 // extractParamExpContent handles parameter expansion, writing to content and returning unsafe status.
