@@ -6,13 +6,17 @@ internal data class TallyRuntimeSettings(
     val importStrategy: String,
     val fixUnsafe: Boolean,
     val configurationOverride: String?,
+    val workspaceTrusted: Boolean,
 )
 
 internal object TallySettings {
     internal const val IMPORT_STRATEGY_FROM_ENVIRONMENT = "fromEnvironment"
     internal const val IMPORT_STRATEGY_USE_BUNDLED = "useBundled"
 
-    fun fromService(service: TallySettingsService): TallyRuntimeSettings {
+    fun fromService(
+        service: TallySettingsService,
+        workspaceTrusted: Boolean,
+    ): TallyRuntimeSettings {
         val executablePaths =
             service.executablePath
                 ?.takeIf { it.isNotBlank() }
@@ -24,6 +28,7 @@ internal object TallySettings {
             importStrategy = IMPORT_STRATEGY_FROM_ENVIRONMENT,
             fixUnsafe = service.fixUnsafe,
             configurationOverride = service.configurationPath?.takeIf { it.isNotBlank() },
+            workspaceTrusted = workspaceTrusted,
         )
     }
 
@@ -42,6 +47,7 @@ internal object TallySettings {
                     "configuration" to settings.configurationOverride,
                     "configurationPreference" to "editorFirst",
                     "fixUnsafe" to settings.fixUnsafe,
+                    "workspaceTrusted" to settings.workspaceTrusted,
                 ),
             "workspaces" to emptyList<Map<String, Any?>>(),
         )

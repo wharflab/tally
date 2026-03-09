@@ -313,7 +313,11 @@ func (s *Server) resolveConfig(filePath string) *config.Config {
 		return nil
 	}
 	if cfg.SlowChecks.Mode == "auto" {
-		cfg.SlowChecks.Mode = "on"
+		if settings.WorkspaceTrusted {
+			cfg.SlowChecks.Mode = "on"
+		} else {
+			cfg.SlowChecks.Mode = "off"
+		}
 	}
 	return cfg
 }

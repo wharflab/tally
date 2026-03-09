@@ -285,6 +285,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           output,
           traceOutput,
           server: resolved,
+          settings: settingsEnvelope,
         });
         attachClientObservers(client);
         updateLanguageStatusForClient(client);
@@ -428,12 +429,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     await client?.sendConfiguration(configService.lspSettings());
   });
-
-  context.subscriptions.push(
-    vscode.workspace.onDidGrantWorkspaceTrust(() => {
-      void startOrRestart("workspace trusted");
-    }),
-  );
 
   const pythonEnvApi = await getPythonEnvApi();
   if (pythonEnvApi) {

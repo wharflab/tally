@@ -12,21 +12,26 @@ export interface TallySettings {
   fixUnsafe: boolean;
 }
 
+export interface TallyLspSettings extends TallySettings {
+  workspaceTrusted: boolean;
+}
+
 export interface BinaryResolutionSettings {
   path: string[];
   importStrategy: ImportStrategy;
 }
 
-const DEFAULTS: TallySettings = {
+const DEFAULTS: TallyLspSettings = {
   enable: true,
   path: [],
   importStrategy: "fromEnvironment",
   configuration: null,
   configurationPreference: "editorFirst",
   fixUnsafe: false,
+  workspaceTrusted: false,
 };
 
-export function readEffectiveSettings(scope?: vscode.ConfigurationScope): TallySettings {
+export function readEffectiveSettings(scope?: vscode.ConfigurationScope): TallyLspSettings {
   const cfg = vscode.workspace.getConfiguration("tally", scope);
   return {
     enable: cfg.get<boolean>("enable", DEFAULTS.enable),
@@ -38,6 +43,7 @@ export function readEffectiveSettings(scope?: vscode.ConfigurationScope): TallyS
       DEFAULTS.configurationPreference,
     ),
     fixUnsafe: cfg.get<boolean>("fixUnsafe", DEFAULTS.fixUnsafe),
+    workspaceTrusted: vscode.workspace.isTrusted,
   };
 }
 

@@ -21,6 +21,7 @@ export interface TallyLanguageClientInit {
   output: vscode.OutputChannel;
   traceOutput: vscode.OutputChannel;
   server: ResolvedBinary;
+  settings: unknown;
 }
 
 export class TallyLanguageClient {
@@ -82,6 +83,9 @@ export class TallyLanguageClient {
       // diagnostics to avoid duplicate diagnostics when both are enabled.
       initializationOptions: {
         disablePushDiagnostics: true,
+        ...(typeof init.settings === "object" && init.settings !== null
+          ? (init.settings as Record<string, unknown>)
+          : {}),
       },
       diagnosticPullOptions: {
         onChange: true,

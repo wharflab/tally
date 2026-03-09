@@ -27,6 +27,12 @@ func TestResolveConfig_DefaultsSlowChecksOnInLSP(t *testing.T) {
 	t.Parallel()
 
 	s := New()
+	s.settings = clientSettings{
+		Global: folderSettings{
+			ConfigurationPreference: config.ConfigurationPreferenceEditorFirst,
+			WorkspaceTrusted:        true,
+		},
+	}
 	dir := t.TempDir()
 	filePath := filepath.Join(dir, "Dockerfile")
 	require.NoError(t, os.WriteFile(filePath, []byte("FROM alpine\n"), 0o644))
@@ -40,6 +46,12 @@ func TestResolveConfig_PreservesExplicitSlowChecksOff(t *testing.T) {
 	t.Parallel()
 
 	s := New()
+	s.settings = clientSettings{
+		Global: folderSettings{
+			ConfigurationPreference: config.ConfigurationPreferenceEditorFirst,
+			WorkspaceTrusted:        true,
+		},
+	}
 	dir := t.TempDir()
 	filePath := filepath.Join(dir, "Dockerfile")
 	configPath := filepath.Join(dir, ".tally.toml")
@@ -50,6 +62,47 @@ func TestResolveConfig_PreservesExplicitSlowChecksOff(t *testing.T) {
 	cfg := s.resolveConfig(filePath)
 	require.NotNil(t, cfg)
 	require.Equal(t, "off", cfg.SlowChecks.Mode)
+}
+
+func TestResolveConfig_DefaultsSlowChecksOffInUntrustedLSP(t *testing.T) {
+	t.Parallel()
+
+	s := New()
+	s.settings = clientSettings{
+		Global: folderSettings{
+			ConfigurationPreference: config.ConfigurationPreferenceEditorFirst,
+			WorkspaceTrusted:        false,
+		},
+	}
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "Dockerfile")
+	require.NoError(t, os.WriteFile(filePath, []byte("FROM alpine\n"), 0o644))
+
+	cfg := s.resolveConfig(filePath)
+	require.NotNil(t, cfg)
+	require.Equal(t, "off", cfg.SlowChecks.Mode)
+}
+
+func TestResolveConfig_PreservesExplicitSlowChecksOnInUntrustedLSP(t *testing.T) {
+	t.Parallel()
+
+	s := New()
+	s.settings = clientSettings{
+		Global: folderSettings{
+			ConfigurationPreference: config.ConfigurationPreferenceEditorFirst,
+			WorkspaceTrusted:        false,
+		},
+	}
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "Dockerfile")
+	configPath := filepath.Join(dir, ".tally.toml")
+
+	require.NoError(t, os.WriteFile(filePath, []byte("FROM alpine\n"), 0o644))
+	require.NoError(t, os.WriteFile(configPath, []byte("[slow-checks]\nmode = \"on\"\n"), 0o644))
+
+	cfg := s.resolveConfig(filePath)
+	require.NotNil(t, cfg)
+	require.Equal(t, "on", cfg.SlowChecks.Mode)
 }
 
 func TestLintContentWithConfig_RunsAsyncUndefinedVarResolution(t *testing.T) {

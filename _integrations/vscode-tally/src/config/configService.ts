@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 
 import {
   type BinaryResolutionSettings,
-  type TallySettings,
+  type TallyLspSettings,
   readEffectiveSettings,
   readUserBinarySettings,
 } from "./vscodeConfig";
@@ -10,12 +10,12 @@ import {
 export interface WorkspaceFolderSettings {
   uri: string;
   name: string;
-  settings: TallySettings;
+  settings: TallyLspSettings;
 }
 
 export interface LspSettingsEnvelope {
   version: 1;
-  global: TallySettings;
+  global: TallyLspSettings;
   workspaces: WorkspaceFolderSettings[];
 }
 
@@ -27,10 +27,11 @@ export class ConfigService implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<ConfigChange>();
   public readonly onDidChange = this.emitter.event;
 
-  private currentGlobal: TallySettings;
+  private currentGlobal: TallyLspSettings;
   private currentWorkspaces: WorkspaceFolderSettings[];
   private currentBinary: BinaryResolutionSettings;
   private currentUserBinary: BinaryResolutionSettings;
+  private currentTrusted: boolean;
 
   private readonly disposables: vscode.Disposable[] = [];
 
@@ -38,6 +39,7 @@ export class ConfigService implements vscode.Disposable {
     this.currentGlobal = readEffectiveSettings();
     this.currentWorkspaces = this.readWorkspaceFolders();
     this.currentUserBinary = readUserBinarySettings();
+    this.currentTrusted = vscode.workspace.isTrusted;
     this.currentBinary = {
       path: this.currentGlobal.path,
       importStrategy: this.currentGlobal.importStrategy,
@@ -50,6 +52,7 @@ export class ConfigService implements vscode.Disposable {
         }
       }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.refresh()),
+      vscode.workspace.onDidGrantWorkspaceTrust(() => this.refresh()),
     );
   }
 
@@ -82,9 +85,11 @@ export class ConfigService implements vscode.Disposable {
     const prevBinary = this.currentBinary;
     const prevUserBinary = this.currentUserBinary;
     const prevGlobal = this.currentGlobal;
+    const prevTrusted = this.currentTrusted;
 
     this.currentGlobal = readEffectiveSettings();
     this.currentWorkspaces = this.readWorkspaceFolders();
+    this.currentTrusted = vscode.workspace.isTrusted;
     this.currentBinary = {
       path: this.currentGlobal.path,
       importStrategy: this.currentGlobal.importStrategy,
@@ -96,7 +101,8 @@ export class ConfigService implements vscode.Disposable {
       prevBinary.importStrategy !== this.currentBinary.importStrategy ||
       !shallowEqualArray(prevUserBinary.path, this.currentUserBinary.path) ||
       prevUserBinary.importStrategy !== this.currentUserBinary.importStrategy ||
-      prevGlobal.enable !== this.currentGlobal.enable;
+      prevGlobal.enable !== this.currentGlobal.enable ||
+      prevTrusted !== this.currentTrusted;
 
     this.emitter.fire({ requiresRestart });
   }
