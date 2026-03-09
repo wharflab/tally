@@ -21,3 +21,26 @@ const (
 )
 
 var DL3043DocURL = rules.HadolintDocURL("DL3043")
+
+// DL3043Rule registers the rule so it appears in rules.All() with proper metadata.
+// The actual detection runs during semantic model construction in builder.go.
+type DL3043Rule struct{}
+
+func (r *DL3043Rule) Metadata() rules.RuleMetadata {
+	return rules.RuleMetadata{
+		Code:            DL3043Code,
+		Name:            "Forbidden ONBUILD trigger instruction",
+		Description:     DL3043Message,
+		DocURL:          DL3043DocURL,
+		DefaultSeverity: rules.SeverityError,
+		Category:        "correctness",
+	}
+}
+
+func (r *DL3043Rule) Check(rules.LintInput) []rules.Violation {
+	return nil // Detected during semantic model construction.
+}
+
+func init() {
+	rules.Register(&DL3043Rule{})
+}

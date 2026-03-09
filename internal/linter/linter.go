@@ -151,13 +151,21 @@ func LintFile(input Input) (*Result, error) {
 	}
 
 	// Collect construction-time violations from semantic analysis.
+	// Look up DefaultSeverity from the rule registry so that registered
+	// construction rules (e.g. hadolint/DL3022 with DefaultSeverity=Off)
+	// get the correct initial severity without hardcoding it in builder.go.
 	violations := make([]rules.Violation, 0,
 		len(sem.ConstructionIssues())+len(rules.All())+len(parseResult.Warnings))
 
+	registry := rules.DefaultRegistry()
 	for _, issue := range sem.ConstructionIssues() {
+		sev := issue.Severity
+		if rule := registry.Get(issue.Code); rule != nil {
+			sev = rule.Metadata().DefaultSeverity
+		}
 		violations = append(violations, rules.NewViolation(
 			rules.NewLocationFromRange(issue.File, issue.Location),
-			issue.Code, issue.Message, issue.Severity,
+			issue.Code, issue.Message, sev,
 		).WithDocURL(issue.DocURL))
 	}
 

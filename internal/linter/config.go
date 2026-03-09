@@ -6,7 +6,6 @@ import (
 	"github.com/wharflab/tally/internal/config"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/buildkit"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 type heredocRuleOptions struct {
@@ -30,13 +29,6 @@ func EnabledRuleCodes(cfg *config.Config) []string {
 	for _, info := range buildkit.Captured() {
 		ruleCode := rules.BuildKitRulePrefix + info.Name
 		if isRuleEnabled(ruleCode, info.DefaultSeverity, cfg) {
-			enabledSet[ruleCode] = struct{}{}
-		}
-	}
-
-	// Collect semantic construction rules (emitted outside the registry).
-	for _, ruleCode := range semantic.ConstructionRuleCodes() {
-		if isRuleEnabled(ruleCode, rules.SeverityError, cfg) {
 			enabledSet[ruleCode] = struct{}{}
 		}
 	}

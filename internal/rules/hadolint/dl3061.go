@@ -21,3 +21,26 @@ const (
 )
 
 var DL3061DocURL = rules.HadolintDocURL("DL3061")
+
+// DL3061Rule registers the rule so it appears in rules.All() with proper metadata.
+// The actual detection runs during semantic model construction in builder.go.
+type DL3061Rule struct{}
+
+func (r *DL3061Rule) Metadata() rules.RuleMetadata {
+	return rules.RuleMetadata{
+		Code:            DL3061Code,
+		Name:            "Invalid instruction order",
+		Description:     DL3061Message,
+		DocURL:          DL3061DocURL,
+		DefaultSeverity: rules.SeverityError,
+		Category:        "correctness",
+	}
+}
+
+func (r *DL3061Rule) Check(rules.LintInput) []rules.Violation {
+	return nil // Detected during semantic model construction.
+}
+
+func init() {
+	rules.Register(&DL3061Rule{})
+}
