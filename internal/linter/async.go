@@ -19,7 +19,10 @@ func MergeAsyncViolations(fast []rules.Violation, asyncResult *async.RunResult) 
 		}
 	}
 
-	if len(asyncResult.Completed) == 0 && len(asyncViolations) == 0 {
+	if len(asyncResult.Completed) == 0 {
+		if len(asyncViolations) > 0 {
+			return append(fast, asyncViolations...)
+		}
 		return fast
 	}
 
