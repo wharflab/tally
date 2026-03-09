@@ -301,8 +301,8 @@ func TestVariantFromShell(t *testing.T) {
 		{"/bin/mksh", VariantMksh},
 		{"ksh", VariantMksh},
 		{"/bin/ksh", VariantMksh},
-		{"zsh", VariantBash}, // zsh treated as bash-like
-		{"/bin/zsh", VariantBash},
+		{"zsh", VariantZsh},
+		{"/bin/zsh", VariantZsh},
 		{"powershell", VariantPowerShell},
 		{"pwsh", VariantPowerShell},
 		{"cmd", VariantCmd},
@@ -493,6 +493,7 @@ func TestToLangVariant(t *testing.T) {
 		{VariantBash, syntax.LangBash},
 		{VariantPOSIX, syntax.LangPOSIX},
 		{VariantMksh, syntax.LangMirBSDKorn},
+		{VariantZsh, syntax.LangZsh},
 		{VariantPowerShell, syntax.LangBash}, // PowerShell falls back to Bash
 		{VariantCmd, syntax.LangBash},        // Cmd falls back to Bash
 		{VariantUnknown, syntax.LangBash},    // Unknown falls back to Bash
@@ -519,6 +520,7 @@ func TestVariantCapabilities(t *testing.T) {
 		{VariantBash, true, true, true, false},
 		{VariantPOSIX, true, true, true, false},
 		{VariantMksh, true, true, true, false},
+		{VariantZsh, true, true, true, false},
 		{VariantPowerShell, false, false, false, true},
 		{VariantCmd, false, false, false, false},
 		{VariantUnknown, false, false, false, false},
