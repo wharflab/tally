@@ -158,7 +158,7 @@ func (s *Server) cancelPendingDiagnostics(docURI string) {
 }
 
 func (s *Server) publishDiagnosticsForDocument(ctx context.Context, docURI string, version int32, content []byte) {
-	violations := s.lintContent(docURI, content)
+	violations := s.lintContent(ctx, docURI, content)
 	if s.documentVersionCurrent(docURI, version) {
 		s.lintCache.set(docURI, version, violations)
 		s.notifyDiagnostics(ctx, docURI, version, violations)
@@ -212,7 +212,7 @@ func (s *Server) handleDiagnostic(ctx context.Context, params *protocol.Document
 			}, nil
 		}
 
-		violations := s.lintContent(uri, []byte(doc.Content))
+		violations := s.lintContent(ctx, uri, []byte(doc.Content))
 		if s.documentVersionCurrent(uri, doc.Version) {
 			s.lintCache.set(uri, doc.Version, violations)
 		}
@@ -272,7 +272,7 @@ func (s *Server) pullDiagnosticsFromDisk(ctx context.Context, docURI, filePath s
 		return nil, err
 	}
 
-	violations := s.lintContent(docURI, content)
+	violations := s.lintContent(ctx, docURI, content)
 	diagnostics := convertDiagnostics(violations)
 
 	return &protocol.DocumentDiagnosticResponse{
@@ -312,23 +312,26 @@ func (s *Server) resolveConfig(filePath string) *config.Config {
 		log.Printf("lsp: config load error for %s: %v", filePath, err)
 		return nil
 	}
+	if cfg.SlowChecks.Mode == "auto" {
+		cfg.SlowChecks.Mode = "on"
+	}
 	return cfg
 }
 
 // lintContent runs the shared lint pipeline and applies LSP-specific processors.
-func (s *Server) lintContent(docURI string, content []byte) []rules.Violation {
+func (s *Server) lintContent(ctx context.Context, docURI string, content []byte) []rules.Violation {
 	filePath := uriToPath(docURI)
 	cfg := s.resolveConfig(filePath)
-	violations, _ := s.lintContentWithConfig(docURI, content, cfg, nil)
-	return violations
+	return s.lintContentWithConfig(ctx, docURI, content, cfg, nil)
 }
 
 func (s *Server) lintContentWithConfig(
+	ctx context.Context,
 	docURI string,
 	content []byte,
 	cfg *config.Config,
 	parseResult *dockerfile.ParseResult,
-) ([]rules.Violation, *dockerfile.ParseResult) {
+) []rules.Violation {
 	filePath := uriToPath(docURI)
 	input := linter.Input{
 		FilePath:    filePath,
@@ -340,15 +343,22 @@ func (s *Server) lintContentWithConfig(
 	result, err := linter.LintFile(input)
 	if err != nil {
 		log.Printf("lsp: lint error for %s: %v", input.FilePath, err)
-		return nil, nil
+		return nil
 	}
+
+	violations := result.Violations
+	asyncResult := s.runAsyncChecks(ctx, filePath, content, result.Config, violations, result.AsyncPlan)
+	if asyncResult != nil {
+		violations = linter.MergeAsyncViolations(violations, asyncResult)
+	}
+
 	chain := linter.LSPProcessors()
 	procCtx := processor.NewContext(
 		map[string]*config.Config{input.FilePath: result.Config},
 		result.Config,
 		map[string][]byte{input.FilePath: content},
 	)
-	return chain.Process(result.Violations, procCtx), result.ParseResult
+	return chain.Process(violations, procCtx)
 }
 
 // convertDiagnostics converts tally violations to LSP diagnostics.

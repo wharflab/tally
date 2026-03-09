@@ -387,7 +387,7 @@ func resolveAsyncChecks(ctx stdcontext.Context, res *lintResults) (*async.RunRes
 	}
 	asyncResult, asyncPlans := runAsyncChecks(ctx, res)
 	if asyncResult != nil {
-		res.violations = mergeAsyncViolations(res.violations, asyncResult)
+		res.violations = linter.MergeAsyncViolations(res.violations, asyncResult)
 	}
 	return asyncResult, asyncPlans
 }
@@ -1413,57 +1413,6 @@ func filesWithErrors(violations []rules.Violation) map[string]bool {
 		}
 	}
 	return m
-}
-
-// mergeAsyncViolations merges async results into the fast violations.
-// For rules with async resolution (e.g. UndefinedVar), fast violations for
-// a (rule, file, stage) triple are replaced by async results when the async
-// check completes — even when it produces zero violations (eliminating false
-// positives from the fast path). Stage-level granularity ensures that fast
-// violations from non-async stages in the same file are preserved.
-func mergeAsyncViolations(fast []rules.Violation, asyncResult *async.RunResult) []rules.Violation {
-	if asyncResult == nil {
-		return fast
-	}
-
-	// Convert []any to []rules.Violation.
-	var asyncViolations []rules.Violation
-	for _, v := range asyncResult.Violations {
-		if viol, ok := v.(rules.Violation); ok {
-			asyncViolations = append(asyncViolations, viol)
-		}
-	}
-
-	if len(asyncResult.Completed) == 0 && len(asyncViolations) == 0 {
-		return fast
-	}
-
-	// Build set of (rule, file, stage) triples that completed async resolution.
-	// Fast violations for these triples are replaced by async results.
-	// Stage-level granularity ensures that fast violations from non-async stages
-	// in the same file are preserved.
-	type ruleFileStage struct {
-		ruleCode   string
-		file       string
-		stageIndex int
-	}
-	completedSet := make(map[ruleFileStage]bool)
-	for _, c := range asyncResult.Completed {
-		completedSet[ruleFileStage{ruleCode: c.RuleCode, file: c.File, stageIndex: c.StageIndex}] = true
-	}
-
-	// Filter out fast violations that were superseded by async results.
-	merged := make([]rules.Violation, 0, len(fast)+len(asyncViolations))
-	for _, v := range fast {
-		if completedSet[ruleFileStage{ruleCode: v.RuleCode, file: v.File(), stageIndex: v.StageIndex}] {
-			continue // replaced by async result
-		}
-		merged = append(merged, v)
-	}
-
-	// Append all async violations.
-	merged = append(merged, asyncViolations...)
-	return merged
 }
 
 // filterFixedViolations removes violations that were fixed from the list.
