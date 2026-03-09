@@ -152,6 +152,24 @@ func TestCancelPreempter_HandlesCancelRequest(t *testing.T) {
 	result, err = p.Preempt(context.Background(), req3)
 	assert.Nil(t, result)
 	require.NoError(t, err, "invalid JSON should be silently ignored")
+
+	// Fractional numeric IDs are invalid JSON-RPC request IDs and must be ignored.
+	req4 := &jsonrpc2.Request{
+		Method: string(protocol.MethodCancelRequest),
+		Params: jsontext.Value(`{"id":42.5}`),
+	}
+	result, err = p.Preempt(context.Background(), req4)
+	assert.Nil(t, result)
+	require.NoError(t, err, "fractional id should be silently ignored")
+
+	// Numeric IDs outside int64 range must be ignored.
+	req5 := &jsonrpc2.Request{
+		Method: string(protocol.MethodCancelRequest),
+		Params: jsontext.Value(`{"id":9223372036854775808}`),
+	}
+	result, err = p.Preempt(context.Background(), req5)
+	assert.Nil(t, result)
+	require.NoError(t, err, "out-of-range id should be silently ignored")
 }
 
 func TestCancelPreempter_TracksQueuedCalls(t *testing.T) {
@@ -224,4 +242,34 @@ func TestLSPRequestError_MapsCanceledContext(t *testing.T) {
 
 	err := lspRequestError(context.Canceled)
 	require.EqualError(t, err, "request cancelled")
+}
+
+func TestParseCancelRequestID(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		raw  jsontext.Value
+		want jsonrpc2.ID
+		ok   bool
+	}{
+		{name: "string", raw: jsontext.Value(`"req-1"`), want: jsonrpc2.StringID("req-1"), ok: true},
+		{name: "integer", raw: jsontext.Value(`42`), want: jsonrpc2.Int64ID(42), ok: true},
+		{name: "negative integer", raw: jsontext.Value(`-7`), want: jsonrpc2.Int64ID(-7), ok: true},
+		{name: "fractional", raw: jsontext.Value(`42.5`), ok: false},
+		{name: "scientific notation", raw: jsontext.Value(`1e3`), ok: false},
+		{name: "too large", raw: jsontext.Value(`9223372036854775808`), ok: false},
+		{name: "bool", raw: jsontext.Value(`true`), ok: false},
+		{name: "null", raw: jsontext.Value(`null`), ok: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, ok := parseCancelRequestID(tt.raw)
+			assert.Equal(t, tt.ok, ok)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

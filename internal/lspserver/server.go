@@ -11,11 +11,13 @@ package lspserver
 import (
 	"context"
 	stdjson "encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"io"
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 
 	jsonv2 "encoding/json/v2"
@@ -132,7 +134,7 @@ type cancelPreempter struct {
 
 // cancelRequestParams is the LSP CancelParams sent with $/cancelRequest.
 type cancelRequestParams struct {
-	ID any `json:"id"`
+	ID jsontext.Value `json:"id"`
 }
 
 func (p *cancelPreempter) Preempt(_ context.Context, req *jsonrpc2.Request) (any, error) {
@@ -148,17 +150,32 @@ func (p *cancelPreempter) Preempt(_ context.Context, req *jsonrpc2.Request) (any
 		return nil, nil //nolint:nilerr,nilnil // malformed cancel — intentionally ignored
 	}
 
-	var id jsonrpc2.ID
-	switch v := params.ID.(type) {
-	case float64:
-		id = jsonrpc2.Int64ID(int64(v))
-	case string:
-		id = jsonrpc2.StringID(v)
-	}
+	id, _ := parseCancelRequestID(params.ID)
 	if id.IsValid() {
 		p.server.cancelQueuedOrActiveRequest(id)
 	}
 	return nil, nil //nolint:nilnil // notification — no response needed
+}
+
+func parseCancelRequestID(raw jsontext.Value) (jsonrpc2.ID, bool) {
+	token := strings.TrimSpace(string(raw))
+	if token == "" || token == "null" {
+		return jsonrpc2.ID{}, false
+	}
+
+	if token[0] == '"' {
+		var id string
+		if err := jsonv2.Unmarshal(raw, &id); err != nil {
+			return jsonrpc2.ID{}, false
+		}
+		return jsonrpc2.StringID(id), true
+	}
+
+	n, err := strconv.ParseInt(token, 10, 64)
+	if err != nil {
+		return jsonrpc2.ID{}, false
+	}
+	return jsonrpc2.Int64ID(n), true
 }
 
 // handle dispatches incoming JSON-RPC messages to the appropriate handler.
