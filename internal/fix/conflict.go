@@ -1,6 +1,10 @@
 package fix
 
-import "github.com/wharflab/tally/internal/rules"
+import (
+	"slices"
+
+	"github.com/wharflab/tally/internal/rules"
+)
 
 // editsOverlap checks if two edits overlap in their locations.
 // Overlapping edits cannot both be applied safely.
@@ -66,6 +70,15 @@ func candidateSubsumes(a, b *fixCandidate) bool {
 		}
 	}
 	return true
+}
+
+// candidatesConflict returns true if candidates a and b have any overlapping edits.
+func candidatesConflict(a, b *fixCandidate) bool {
+	return slices.ContainsFunc(a.fix.Edits, func(ae rules.TextEdit) bool {
+		return slices.ContainsFunc(b.fix.Edits, func(be rules.TextEdit) bool {
+			return editsOverlap(ae, be)
+		})
+	})
 }
 
 // editPosition returns a comparable position for sorting edits.

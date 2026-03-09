@@ -472,20 +472,25 @@ func selectNonConflictingCandidates(fc *FileChange, candidates []*fixCandidate) 
 		}
 
 		if hasConflict(c.fix.Edits, reserved) {
-			// When the new candidate's edits entirely contain a previously
-			// selected candidate's edits, the new fix is more comprehensive
-			// (e.g., a whole-line replacement that makes a point insert moot).
+			// When the new candidate's edits entirely contain ALL conflicting
+			// selected candidates' edits, the new fix is more comprehensive
+			// (e.g., a whole-line replacement that makes point inserts moot).
 			// Only swap on strict subsumption — mutual containment (identical
 			// ranges) keeps the sort-order winner.
-			if swapIdx := findSubsumedCandidate(c, selected); swapIdx >= 0 && !candidateSubsumes(selected[swapIdx], c) {
-				old := selected[swapIdx]
-				reserved = removeEdits(reserved, old.fix.Edits)
-				fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
-					RuleCode: old.violation.RuleCode,
-					Reason:   SkipConflict,
-					Location: old.violation.Location,
-				})
-				selected = slices.Delete(selected, swapIdx, swapIdx+1)
+			if evicted := findAllSubsumedConflicts(c, selected); len(evicted) > 0 {
+				for _, idx := range evicted {
+					old := selected[idx]
+					reserved = removeEdits(reserved, old.fix.Edits)
+					fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
+						RuleCode: old.violation.RuleCode,
+						Reason:   SkipConflict,
+						Location: old.violation.Location,
+					})
+				}
+				// Remove evicted indices in reverse order to preserve positions.
+				for i := len(evicted) - 1; i >= 0; i-- {
+					selected = slices.Delete(selected, evicted[i], evicted[i]+1)
+				}
 				selected = append(selected, c)
 				reserved = append(reserved, c.fix.Edits...)
 				continue
@@ -505,15 +510,23 @@ func selectNonConflictingCandidates(fc *FileChange, candidates []*fixCandidate) 
 	return selected
 }
 
-// findSubsumedCandidate returns the index of the first selected candidate
-// whose edits are entirely contained within c's edits, or -1 if none.
-func findSubsumedCandidate(c *fixCandidate, selected []*fixCandidate) int {
+// findAllSubsumedConflicts finds all selected candidates that conflict with c
+// and checks that c strictly subsumes every one of them. Returns their sorted
+// indices if ALL conflicting candidates are strictly subsumed, or nil if any
+// conflicting candidate is not subsumed (or if subsumption is mutual).
+func findAllSubsumedConflicts(c *fixCandidate, selected []*fixCandidate) []int {
+	var conflicting []int
 	for i, s := range selected {
-		if candidateSubsumes(c, s) {
-			return i
+		if !candidatesConflict(c, s) {
+			continue
 		}
+		// c must strictly subsume s: c contains s, but s does not contain c.
+		if !candidateSubsumes(c, s) || candidateSubsumes(s, c) {
+			return nil
+		}
+		conflicting = append(conflicting, i)
 	}
-	return -1
+	return conflicting
 }
 
 // removeEdits returns a new slice with all edits from remove taken out.
