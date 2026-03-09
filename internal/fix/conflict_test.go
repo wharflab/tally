@@ -168,6 +168,26 @@ func TestEditContains(t *testing.T) {
 			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 10, 1, 20)},
 			want: false,
 		},
+		// Boundary point edits: consistent with editsOverlap which treats
+		// boundary inserts as non-overlapping.
+		{
+			name: "point edit at start boundary - not contained",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 1, 80)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 1, 0)},
+			want: false,
+		},
+		{
+			name: "point edit at end boundary - not contained",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 0, 1, 80)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 80, 1, 80)},
+			want: false,
+		},
+		{
+			name: "point edit at start boundary multi-line - not contained",
+			a:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 5, 3, 10)},
+			b:    rules.TextEdit{Location: rules.NewRangeLocation("f", 1, 5, 1, 5)},
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

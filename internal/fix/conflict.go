@@ -40,15 +40,30 @@ func editsOverlap(a, b rules.TextEdit) bool {
 }
 
 // editContains returns true if edit A's range entirely contains edit B's range.
-// A point edit (start == end) is contained in any range that covers its position.
+//
+// For point edits (B.Start == B.End), strict containment is required: the point
+// must be strictly inside A's range, not at its boundaries. This is consistent
+// with editsOverlap which treats boundary point inserts as non-overlapping.
 func editContains(a, b rules.TextEdit) bool {
 	if a.Location.File != b.Location.File {
 		return false
 	}
-	// A starts at or before B
+
+	isPointEdit := b.Location.Start.Line == b.Location.End.Line &&
+		b.Location.Start.Column == b.Location.End.Column
+
+	if isPointEdit {
+		// Strict: A must start strictly before the point and end strictly after.
+		aStartsBefore := a.Location.Start.Line < b.Location.Start.Line ||
+			(a.Location.Start.Line == b.Location.Start.Line && a.Location.Start.Column < b.Location.Start.Column)
+		aEndsAfter := a.Location.End.Line > b.Location.End.Line ||
+			(a.Location.End.Line == b.Location.End.Line && a.Location.End.Column > b.Location.End.Column)
+		return aStartsBefore && aEndsAfter
+	}
+
+	// Non-point: inclusive containment (A starts at-or-before B, ends at-or-after B).
 	aStartsBeforeOrAt := a.Location.Start.Line < b.Location.Start.Line ||
 		(a.Location.Start.Line == b.Location.Start.Line && a.Location.Start.Column <= b.Location.Start.Column)
-	// A ends at or after B
 	aEndsAfterOrAt := a.Location.End.Line > b.Location.End.Line ||
 		(a.Location.End.Line == b.Location.End.Line && a.Location.End.Column >= b.Location.End.Column)
 	return aStartsBeforeOrAt && aEndsAfterOrAt
