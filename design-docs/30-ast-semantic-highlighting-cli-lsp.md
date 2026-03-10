@@ -471,9 +471,10 @@ Until those answers are clear, grammar de-bundling should remain out of scope fo
 
 ---
 
-## 15. PowerShell Follow-Up
+## 15. PowerShell Parser Integration
 
-The PowerShell follow-up has been implemented as an extension of the shared highlighting pipeline, not as a second highlighting architecture.
+PowerShell parser support is part of the initial delivery and has been implemented as an extension of the shared highlighting pipeline, not as a
+second highlighting architecture.
 
 This design should remain compatible with the Windows-container direction in `design-docs/26-windows-container-support.md`.
 
