@@ -92,7 +92,7 @@ func instructionKeywordToken(line string, lineNum int) (core.Token, bool) {
 	if m == nil {
 		return core.Token{}, false
 	}
-	startCol, endCol := runeColsForByteRange(line, m[2], m[3])
+	startCol, endCol := core.RuneColsForByteRange(line, m[2], m[3])
 	return core.Token{
 		Line:     lineNum,
 		StartCol: startCol,
@@ -116,8 +116,8 @@ func fromAliasTokens(line string, lineNum int) []core.Token {
 		if asOffset < 0 {
 			continue
 		}
-		asStartCol, asEndCol := runeColsForByteRange(line, matchStart+asOffset, matchStart+asOffset+2)
-		aliasStartCol, aliasEndCol := runeColsForByteRange(line, aliasStart, aliasEnd)
+		asStartCol, asEndCol := core.RuneColsForByteRange(line, matchStart+asOffset, matchStart+asOffset+2)
+		aliasStartCol, aliasEndCol := core.RuneColsForByteRange(line, aliasStart, aliasEnd)
 		out = append(out,
 			core.Token{
 				Line:     lineNum,
@@ -144,7 +144,7 @@ func flagTokens(line string, lineNum int) []core.Token {
 	out := make([]core.Token, 0, len(matches)*3)
 	for _, idx := range matches {
 		startByte, endByte := idx[0], idx[1]
-		startCol, endCol := runeColsForByteRange(line, startByte, endByte)
+		startCol, endCol := core.RuneColsForByteRange(line, startByte, endByte)
 		out = append(out, core.Token{
 			Line:     lineNum,
 			StartCol: startCol,
@@ -166,7 +166,7 @@ func flagTokens(line string, lineNum int) []core.Token {
 			out = append(out, kvValueTokens(line, value, lineNum, valueStartByte)...)
 			continue
 		}
-		valueStartCol, valueEndCol := runeColsForByteRange(line, valueStartByte, valueEndByte)
+		valueStartCol, valueEndCol := core.RuneColsForByteRange(line, valueStartByte, valueEndByte)
 		out = append(out, core.Token{
 			Line:     lineNum,
 			StartCol: valueStartCol,
@@ -188,8 +188,8 @@ func kvValueTokens(line, value string, lineNum, baseByte int) []core.Token {
 			continue
 		}
 		if eq := strings.Index(part, "="); eq >= 0 {
-			propStartCol, propEndCol := runeColsForByteRange(line, baseByte+offsetBytes, baseByte+offsetBytes+eq)
-			valStartCol, valEndCol := runeColsForByteRange(
+			propStartCol, propEndCol := core.RuneColsForByteRange(line, baseByte+offsetBytes, baseByte+offsetBytes+eq)
+			valStartCol, valEndCol := core.RuneColsForByteRange(
 				line,
 				baseByte+offsetBytes+eq+1,
 				baseByte+offsetBytes+len(part),
@@ -211,7 +211,7 @@ func kvValueTokens(line, value string, lineNum, baseByte int) []core.Token {
 				},
 			)
 		} else {
-			startCol, endCol := runeColsForByteRange(line, baseByte+offsetBytes, baseByte+offsetBytes+len(part))
+			startCol, endCol := core.RuneColsForByteRange(line, baseByte+offsetBytes, baseByte+offsetBytes+len(part))
 			out = append(out, core.Token{
 				Line:     lineNum,
 				StartCol: startCol,
@@ -229,7 +229,7 @@ func quotedTokens(line string, lineNum int, escapeToken rune) []core.Token {
 	ranges := quotedRanges(line, escapeToken)
 	out := make([]core.Token, 0, len(ranges))
 	for _, rng := range ranges {
-		startCol, endCol := runeColsForByteRange(line, rng[0], rng[1])
+		startCol, endCol := core.RuneColsForByteRange(line, rng[0], rng[1])
 		out = append(out, core.Token{
 			Line:     lineNum,
 			StartCol: startCol,
@@ -277,7 +277,7 @@ func variableTokens(line string, lineNum int) []core.Token {
 	matches := varPattern.FindAllStringIndex(line, -1)
 	out := make([]core.Token, 0, len(matches))
 	for _, idx := range matches {
-		startCol, endCol := runeColsForByteRange(line, idx[0], idx[1])
+		startCol, endCol := core.RuneColsForByteRange(line, idx[0], idx[1])
 		out = append(out, core.Token{
 			Line:     lineNum,
 			StartCol: startCol,
@@ -304,7 +304,7 @@ func windowsPathTokens(line string, lineNum int, quoted []core.Token) []core.Tok
 		if end <= start {
 			continue
 		}
-		startCol, endCol := runeColsForByteRange(line, start, end)
+		startCol, endCol := core.RuneColsForByteRange(line, start, end)
 		out = append(out, core.Token{
 			Line:     lineNum,
 			StartCol: startCol,
@@ -353,7 +353,7 @@ func inQuotedToken(tokens []core.Token, line string, startByte int) bool {
 	if len(tokens) == 0 {
 		return false
 	}
-	startCol, _ := runeColsForByteRange(line, startByte, startByte)
+	startCol, _ := core.RuneColsForByteRange(line, startByte, startByte)
 	for _, tok := range tokens {
 		if tok.Type == core.TokenString && tok.StartCol < startCol && tok.EndCol > startCol {
 			return true
@@ -378,7 +378,7 @@ func numberTokens(line string, lineNum int) []core.Token {
 	matches := numberPattern.FindAllStringIndex(line, -1)
 	out := make([]core.Token, 0, len(matches))
 	for _, idx := range matches {
-		startCol, endCol := runeColsForByteRange(line, idx[0], idx[1])
+		startCol, endCol := core.RuneColsForByteRange(line, idx[0], idx[1])
 		out = append(out, core.Token{
 			Line:     lineNum,
 			StartCol: startCol,
@@ -395,8 +395,8 @@ func heredocTokens(line string, lineNum int) []core.Token {
 	out := make([]core.Token, 0, len(matches)*2)
 	for _, m := range matches {
 		nameStart, nameEnd := m[2], m[3]
-		opStartCol, opEndCol := runeColsForByteRange(line, m[0], nameStart)
-		nameStartCol, nameEndCol := runeColsForByteRange(line, nameStart, nameEnd)
+		opStartCol, opEndCol := core.RuneColsForByteRange(line, m[0], nameStart)
+		nameStartCol, nameEndCol := core.RuneColsForByteRange(line, nameStart, nameEnd)
 		out = append(out,
 			core.Token{
 				Line:     lineNum,
@@ -438,28 +438,6 @@ func commentTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []core.T
 		})
 	}
 	return out
-}
-
-func runeColsForByteRange(line string, startByte, endByte int) (int, int) {
-	startByte = clampByteIndex(line, startByte)
-	endByte = max(clampByteIndex(line, endByte), startByte)
-
-	startCol := utf8.RuneCountInString(line[:startByte])
-	endCol := startCol + utf8.RuneCountInString(line[startByte:endByte])
-	return startCol, endCol
-}
-
-func clampByteIndex(line string, idx int) int {
-	if idx <= 0 {
-		return 0
-	}
-	if idx >= len(line) {
-		return len(line)
-	}
-	for idx < len(line) && !utf8.RuneStart(line[idx]) {
-		idx--
-	}
-	return idx
 }
 
 func fallbackLineTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool, escapeToken rune) []core.Token {

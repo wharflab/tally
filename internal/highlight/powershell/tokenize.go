@@ -5,7 +5,6 @@ package powershell
 import (
 	"regexp"
 	"strings"
-	"unicode/utf8"
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
 
@@ -132,7 +131,7 @@ func appendNodeTokens(lines []string, node *sitter.Node, typ core.TokenType, pri
 		if line == endLine {
 			endByte = int(end.Column)
 		}
-		startCol, endCol := runeColsForByteRange(lineContent, startByte, endByte)
+		startCol, endCol := core.RuneColsForByteRange(lineContent, startByte, endByte)
 		if endCol <= startCol {
 			continue
 		}
@@ -159,26 +158,4 @@ func lineContentAt(lines []string, line int) (string, bool) {
 		return "", false
 	}
 	return lines[line], true
-}
-
-func runeColsForByteRange(line string, startByte, endByte int) (int, int) {
-	startByte = clampByteIndex(line, startByte)
-	endByte = max(clampByteIndex(line, endByte), startByte)
-
-	startCol := utf8.RuneCountInString(line[:startByte])
-	endCol := startCol + utf8.RuneCountInString(line[startByte:endByte])
-	return startCol, endCol
-}
-
-func clampByteIndex(line string, idx int) int {
-	if idx <= 0 {
-		return 0
-	}
-	if idx >= len(line) {
-		return len(line)
-	}
-	for idx < len(line) && !utf8.RuneStart(line[idx]) {
-		idx--
-	}
-	return idx
 }
