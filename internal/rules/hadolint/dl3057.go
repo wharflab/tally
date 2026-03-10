@@ -12,6 +12,7 @@ import (
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/asyncutil"
 	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 // DL3057Rule implements the DL3057 linting rule.
@@ -264,16 +265,23 @@ func shouldSuppressHealthcheck(sem *semantic.Model, stages []instructions.Stage)
 		}
 	}
 
-	lastStage := &stages[len(stages)-1]
-	cmdLine, shell := lastEntrypointArgs(lastStage)
+	lastIdx := len(stages) - 1
+	lastStage := &stages[lastIdx]
+	cmdLine, prependShell := lastEntrypointArgs(lastStage)
+
+	// Resolve the shell variant for proper parsing of shell-form commands.
+	variant := shell.VariantBash // Docker default
+	if info := sem.StageInfo(lastIdx); info != nil {
+		variant = info.ShellSetting.Variant
+	}
 
 	// Final stage runs a known serverless framework → suppress.
-	if isServerlessEntrypoint(cmdLine, shell) {
+	if isServerlessEntrypoint(cmdLine, prependShell, variant) {
 		return true
 	}
 
 	// Final stage's CMD/ENTRYPOINT is just a shell → suppress.
-	if isShellOnlyArgs(cmdLine, shell) {
+	if isShellOnlyArgs(cmdLine, prependShell, variant) {
 		return true
 	}
 
@@ -321,10 +329,15 @@ var serverlessEntrypoints = map[string]bool{
 }
 
 // isServerlessEntrypoint reports whether cmdLine invokes a known serverless
-// framework (e.g. functions-framework for Google Cloud Functions).
-func isServerlessEntrypoint(cmdLine []string, prependShell bool) bool {
-	exe := entrypointExe(cmdLine, prependShell)
-	return exe != "" && serverlessEntrypoints[exe]
+// framework. For shell form, uses the project's shell parser which properly
+// handles exec/env/command wrappers (e.g. "exec functions-framework ...").
+func isServerlessEntrypoint(cmdLine []string, prependShell bool, variant shell.Variant) bool {
+	for _, name := range entrypointCommandNames(cmdLine, prependShell, variant) {
+		if serverlessEntrypoints[name] {
+			return true
+		}
+	}
+	return false
 }
 
 // shellBinaries is the set of shell executable names that indicate an
@@ -332,6 +345,39 @@ func isServerlessEntrypoint(cmdLine []string, prependShell bool) bool {
 var shellBinaries = map[string]bool{
 	"sh": true, "bash": true, "zsh": true, "ash": true,
 	"dash": true, "fish": true, "csh": true, "tcsh": true, "ksh": true,
+}
+
+// isShellOnlyArgs reports whether cmdLine represents a bare shell invocation.
+//
+// For shell form, uses the project's shell parser which understands wrappers
+// (exec, env, …) and shell delegation (bash -c …). The last extracted command
+// name is checked: "exec bash -l" → names ["exec","bash"] → last is "bash" ✓,
+// while "bash -c my-app" → names ["bash","my-app"] → last is "my-app" ✗.
+//
+// For exec form, checks the argv directly: the executable must be a shell
+// binary and no -c/-e flag may be present.
+func isShellOnlyArgs(cmdLine []string, prependShell bool, variant shell.Variant) bool {
+	if len(cmdLine) == 0 {
+		return false
+	}
+
+	if prependShell {
+		names := shell.CommandNamesWithVariant(cmdLine[0], variant)
+		return len(names) > 0 && shellBinaries[names[len(names)-1]]
+	}
+
+	// Exec form: first element is the executable.
+	name := path.Base(cmdLine[0])
+	if !shellBinaries[name] {
+		return false
+	}
+	// -c / -e pass a command string to the shell — not interactive.
+	for _, arg := range cmdLine[1:] {
+		if arg == "-c" || arg == "-e" {
+			return false
+		}
+	}
+	return true
 }
 
 // lastEntrypointArgs returns the effective CMD/ENTRYPOINT for a stage.
@@ -362,61 +408,25 @@ func lastEntrypointArgs(stage *instructions.Stage) ([]string, bool) {
 	return lastCmdLine, lastCmdShell
 }
 
-// entrypointExe extracts the base executable name from a CMD/ENTRYPOINT,
-// stripping any directory prefix. Returns "" if cmdLine is empty.
+// entrypointCommandNames extracts command names from a CMD/ENTRYPOINT.
 //
-// In shell form, handles a leading "exec" prefix which is common Docker
-// practice (e.g. CMD exec functions-framework --target=hello).
-func entrypointExe(cmdLine []string, prependShell bool) string {
+// For shell form, delegates to shell.CommandNamesWithVariant which uses the
+// mvdan.cc/sh parser and properly handles wrappers (exec, env, command, …)
+// and shell delegation (bash -c …).
+//
+// For exec form, returns the base name of the first element.
+func entrypointCommandNames(cmdLine []string, prependShell bool, variant shell.Variant) []string {
 	if len(cmdLine) == 0 {
-		return ""
+		return nil
 	}
-	exe := cmdLine[0]
 	if prependShell {
-		// Shell form: entire command is a single string.
-		// Strip leading "exec " — a common pattern to replace the shell
-		// with the target process (e.g. "exec functions-framework ...").
-		exe = strings.TrimPrefix(exe, "exec ")
-		exe, _, _ = strings.Cut(exe, " ")
+		return shell.CommandNamesWithVariant(cmdLine[0], variant)
 	}
-	if exe == "" {
-		return ""
+	name := path.Base(cmdLine[0])
+	if name == "" || name == "." {
+		return nil
 	}
-	return path.Base(exe)
-}
-
-// isShellOnlyArgs reports whether cmdLine represents a bare shell invocation.
-// A bare shell is a known shell binary (possibly with flags like -l, --login)
-// but without -c or -e which would indicate command execution.
-func isShellOnlyArgs(cmdLine []string, prependShell bool) bool {
-	if len(cmdLine) == 0 {
-		return false
-	}
-
-	var parts []string
-	if prependShell {
-		// Shell form: entire command is a single string element ("bash -l").
-		parts = strings.Fields(cmdLine[0])
-	} else {
-		parts = cmdLine
-	}
-	if len(parts) == 0 {
-		return false
-	}
-
-	// Check executable name (strip directory prefix).
-	name := path.Base(parts[0])
-	if !shellBinaries[name] {
-		return false
-	}
-
-	// -c / -e pass a command string to the shell — not interactive.
-	for _, arg := range parts[1:] {
-		if arg == "-c" || arg == "-e" {
-			return false
-		}
-	}
-	return true
+	return []string{name}
 }
 
 // init registers the rule with the default registry.

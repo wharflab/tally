@@ -7,6 +7,7 @@ import (
 	"github.com/wharflab/tally/internal/async"
 	"github.com/wharflab/tally/internal/registry"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -526,6 +527,7 @@ func TestIsServerlessEntrypoint(t *testing.T) {
 		{"shell functions-framework", []string{"functions-framework --target=hello"}, true, true},
 		{"exec bare functions-framework", []string{"functions-framework"}, false, true},
 		{"shell exec functions-framework", []string{"exec functions-framework --target=hello --port=$PORT"}, true, true},
+		{"shell env functions-framework", []string{"env FOO=bar functions-framework --target=hello"}, true, true},
 		// Not serverless entrypoints
 		{"exec nginx", []string{"nginx"}, false, false},
 		{"exec python", []string{"python", "app.py"}, false, false},
@@ -535,7 +537,7 @@ func TestIsServerlessEntrypoint(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := isServerlessEntrypoint(tt.cmdLine, tt.prependShell); got != tt.want {
+			if got := isServerlessEntrypoint(tt.cmdLine, tt.prependShell, shell.VariantBash); got != tt.want {
 				t.Errorf("isServerlessEntrypoint(%v, %v) = %v, want %v", tt.cmdLine, tt.prependShell, got, tt.want)
 			}
 		})
@@ -563,21 +565,25 @@ func TestIsShellOnlyArgs(t *testing.T) {
 		// Exec form with -c (not shell-only)
 		{"exec bash -c cmd", []string{"bash", "-c", "echo hello"}, false, false},
 		{"exec sh -e", []string{"sh", "-e"}, false, false},
-		// Shell form
+		// Shell form — parsed by mvdan.cc/sh via shell.CommandNamesWithVariant
 		{"shell bash", []string{"bash"}, true, true},
 		{"shell /bin/bash", []string{"/bin/bash"}, true, true},
 		{"shell bash -l", []string{"bash -l"}, true, true},
-		{"shell bash -c cmd", []string{"bash -c echo hello"}, true, false},
+		{"shell exec bash", []string{"exec bash"}, true, true},
+		{"shell exec /usr/bin/bash", []string{"exec /usr/bin/bash"}, true, true},
+		{"shell bash -c cmd", []string{"bash -c 'echo hello'"}, true, false},
+		{"shell exec bash -c cmd", []string{"exec bash -c 'my-app'"}, true, false},
 		// Not shells
 		{"exec nginx", []string{"nginx"}, false, false},
 		{"exec my-app", []string{"my-app"}, false, false},
 		{"empty", []string{}, false, false},
 		{"shell empty", []string{""}, true, false},
+		{"shell nginx", []string{"nginx -g 'daemon off;'"}, true, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := isShellOnlyArgs(tt.cmdLine, tt.prependShell); got != tt.want {
+			if got := isShellOnlyArgs(tt.cmdLine, tt.prependShell, shell.VariantBash); got != tt.want {
 				t.Errorf("isShellOnlyArgs(%v, %v) = %v, want %v", tt.cmdLine, tt.prependShell, got, tt.want)
 			}
 		})
