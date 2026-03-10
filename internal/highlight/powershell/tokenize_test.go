@@ -1,6 +1,7 @@
 package powershell
 
 import (
+	"strings"
 	"testing"
 
 	highlightcore "github.com/wharflab/tally/internal/highlight/core"
@@ -29,13 +30,19 @@ func TestTokenize_UsesRuneColumns(t *testing.T) {
 	assertHasToken(t, script, tokens, highlightcore.TokenVariable, "$HOME")
 }
 
-func TestTokenize_DoesNotMarkWindowsPathAsFunction(t *testing.T) {
+func TestTokenize_DoesNotMarkPathInvocationAsFunction(t *testing.T) {
 	t.Parallel()
 
-	script := "C:\\app\\tada.exe\n"
-	tokens := Tokenize(script)
+	for _, script := range []string{
+		"C:\\app\\tada.exe\n",
+		"\\tools\\tada.exe\n",
+		"/usr/bin/curl\n",
+		"~/bin/tada\n",
+	} {
+		tokens := Tokenize(script)
 
-	assertNoToken(t, script, tokens, highlightcore.TokenFunction, "C:\\app\\tada.exe")
+		assertNoToken(t, script, tokens, highlightcore.TokenFunction, strings.TrimSpace(script))
+	}
 }
 
 func assertHasToken(

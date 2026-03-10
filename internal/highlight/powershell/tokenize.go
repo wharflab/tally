@@ -12,7 +12,7 @@ import (
 	tspowershell "github.com/wharflab/tally/internal/third_party/tree_sitter_powershell"
 )
 
-var windowsPathPattern = regexp.MustCompile(`^(?:[A-Za-z]:[\\/]|\.{1,2}[\\/]|[\\/]{2})`)
+var commandPathPattern = regexp.MustCompile(`^(?:[A-Za-z]:[\\/]|\.{1,2}[\\/]|~[\\/]|[\\/])`)
 
 var powerShellNodeTokenTypes = map[string]core.TokenType{
 	"comment":                         core.TokenComment,
@@ -83,7 +83,7 @@ func Tokenize(script string) []core.Token {
 
 		if kind == "command_name" {
 			text := strings.TrimSpace(node.Utf8Text(source))
-			if text == "" || windowsPathPattern.MatchString(text) {
+			if text == "" || commandPathPattern.MatchString(text) {
 				return
 			}
 			appendNodeTokens(lines, node, core.TokenFunction, 30, 0, &tokens)
