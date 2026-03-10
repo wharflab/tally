@@ -344,7 +344,7 @@ func lspRequestError(err error) error {
 	case errors.Is(err, context.Canceled):
 		return jsonrpc2.NewError(int64(protocol.ErrorCodeRequestCancelled), "request cancelled")
 	case errors.Is(err, context.DeadlineExceeded):
-		return jsonrpc2.NewError(int64(protocol.ErrorCodeRequestCancelled), "request timed out")
+		return jsonrpc2.NewError(int64(protocol.ErrorCodeRequestFailed), "request timed out")
 	default:
 		return err
 	}

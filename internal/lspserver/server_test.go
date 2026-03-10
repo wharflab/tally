@@ -3,6 +3,7 @@ package lspserver
 import (
 	"context"
 	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"path/filepath"
 	"testing"
 	"time"
@@ -242,6 +243,26 @@ func TestLSPRequestError_MapsCanceledContext(t *testing.T) {
 
 	err := lspRequestError(context.Canceled)
 	require.EqualError(t, err, "request cancelled")
+}
+
+func TestLSPRequestError_MapsDeadlineExceededToRequestFailed(t *testing.T) {
+	t.Parallel()
+
+	resp, err := jsonrpc2.NewResponse(jsonrpc2.Int64ID(1), nil, lspRequestError(context.DeadlineExceeded))
+	require.NoError(t, err)
+
+	wire, err := jsonrpc2.EncodeMessage(resp)
+	require.NoError(t, err)
+
+	var payload struct {
+		Error struct {
+			Code    int64  `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	require.NoError(t, jsonv2.Unmarshal(wire, &payload))
+	assert.Equal(t, int64(protocol.ErrorCodeRequestFailed), payload.Error.Code)
+	assert.Equal(t, "request timed out", payload.Error.Message)
 }
 
 func TestParseCancelRequestID(t *testing.T) {
