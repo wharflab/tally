@@ -5,8 +5,12 @@ package treesitterpowershell
 
 // Vendored from github.com/airbus-cert/tree-sitter-powershell v0.24.4.
 //
-// We wrap the generated grammar locally so builds stay deterministic and do not
-// depend on the upstream Go binding's cgo include layout.
+// We keep the full vendored grammar locally so builds stay deterministic and do
+// not depend on the upstream Go binding's cgo include layout.
+//
+// Tracking issues for removing this vendored copy once upstream is consumable:
+//   - https://github.com/airbus-cert/tree-sitter-powershell/issues/42
+//   - https://github.com/tree-sitter/tree-sitter/issues/5421
 
 // #cgo CFLAGS: -std=c11 -fPIC -I${SRCDIR}/src
 // #include "src/parser.c"
