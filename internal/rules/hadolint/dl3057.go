@@ -260,6 +260,9 @@ func shouldSuppressHealthcheck(sem *semantic.Model, stages []instructions.Stage)
 
 	// Any external base image from a serverless platform → suppress.
 	for info := range sem.ExternalImageStages() {
+		if info.Stage == nil {
+			continue
+		}
 		if isServerlessImage(info.Stage.BaseName) {
 			return true
 		}
