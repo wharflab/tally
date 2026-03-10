@@ -11,7 +11,7 @@ permissions:
   id-token: write
 env:
   GOEXPERIMENT: jsonv2
-  CGO_ENABLED: 0
+  CGO_ENABLED: 1
 jobs:
   vscode-smoke:
     name: VS Code Smoke (Linux)
