@@ -453,12 +453,10 @@ func parseNonPOSIXCommands(script string) ([]nonPOSIXCommandInfo, bool) {
 		}
 
 		switch ch {
-		case '"', '\'':
+		case '"':
 			quote = ch
 		case ' ', '\t', '\r', '\n':
 			flushToken()
-		case ';':
-			flushCommand()
 		case '|':
 			return nil, false
 		case '&':
@@ -478,7 +476,7 @@ func parseNonPOSIXCommands(script string) ([]nonPOSIXCommandInfo, bool) {
 }
 
 func normalizeNonPOSIXCommandName(name string) string {
-	name = strings.ToLower(path.Base(strings.ReplaceAll(shell.DropQuotes(name), `\`, "/")))
+	name = strings.ToLower(path.Base(strings.ReplaceAll(dropCmdQuotes(name), `\`, "/")))
 	return strings.TrimSuffix(name, ".exe")
 }
 
@@ -531,11 +529,11 @@ func findNonPOSIXDownloadCommands(cmds []nonPOSIXCommandInfo) []nonPOSIXCommandI
 
 func hasArchiveDownloadNonPOSIX(dlCmds []nonPOSIXCommandInfo) bool {
 	return slices.ContainsFunc(dlCmds, func(dl nonPOSIXCommandInfo) bool {
-		if slices.ContainsFunc(dl.Args, shell.IsArchiveURL) {
+		if url := nonPOSIXDownloadURL(dl, true); url != "" {
 			return true
 		}
 		if outFile := nonPOSIXDownloadOutputFile(dl); outFile != "" {
-			return shell.IsArchiveFilename(shell.Basename(outFile))
+			return shell.IsArchiveFilename(cmdBasename(outFile)) && nonPOSIXDownloadURL(dl, false) != ""
 		}
 		return false
 	})
@@ -557,7 +555,7 @@ func findArchiveURLNonPOSIX(dlCmds []nonPOSIXCommandInfo) string {
 
 	for _, dl := range dlCmds {
 		outFile := nonPOSIXDownloadOutputFile(dl)
-		if outFile == "" || !shell.IsArchiveFilename(shell.Basename(outFile)) {
+		if outFile == "" || !shell.IsArchiveFilename(cmdBasename(outFile)) {
 			continue
 		}
 		if url := nonPOSIXDownloadURL(dl, false); url != "" {
@@ -602,17 +600,63 @@ func findSingleExtractTarNonPOSIX(cmds []nonPOSIXCommandInfo) *shell.CommandInfo
 }
 
 func nonPOSIXDownloadOutputFile(cmd nonPOSIXCommandInfo) string {
-	downloadCmd := shell.CommandInfo{Name: cmd.Name, Args: cmd.Args}
-	return shell.DownloadOutputFile(&downloadCmd)
+	var short, long string
+	switch cmd.Name {
+	case "curl":
+		short, long = "-o", "--output"
+	case "wget":
+		short, long = "-O", "--output-document"
+	default:
+		return ""
+	}
+	for i, arg := range cmd.Args {
+		if after, found := strings.CutPrefix(arg, long+"="); found {
+			if after == "-" {
+				return ""
+			}
+			return after
+		}
+		if after, found := strings.CutPrefix(arg, short); found && after != "" {
+			if after == "-" {
+				return ""
+			}
+			return after
+		}
+		if (arg == short || arg == long) && i+1 < len(cmd.Args) {
+			val := cmd.Args[i+1]
+			if val == "-" {
+				return ""
+			}
+			return val
+		}
+	}
+	return ""
 }
 
 func nonPOSIXDownloadURL(cmd nonPOSIXCommandInfo, archiveOnly bool) string {
-	downloadCmd := shell.CommandInfo{Name: cmd.Name, Args: cmd.Args}
-	url := shell.DownloadURL(&downloadCmd)
+	url := ""
+	if i := slices.IndexFunc(cmd.Args, func(arg string) bool { return shell.IsURL(dropCmdQuotes(arg)) }); i >= 0 {
+		url = dropCmdQuotes(cmd.Args[i])
+	}
 	if !archiveOnly || shell.IsArchiveURL(url) {
 		return url
 	}
 	return ""
+}
+
+func dropCmdQuotes(s string) string {
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
+
+func cmdBasename(p string) string {
+	p = dropCmdQuotes(p)
+	if i := strings.LastIndexByte(p, '\\'); i >= 0 {
+		p = p[i+1:]
+	}
+	return path.Base(p)
 }
 
 // init registers the rule with the default registry.

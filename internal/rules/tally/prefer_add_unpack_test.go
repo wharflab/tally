@@ -213,6 +213,20 @@ RUN wget.exe https://example.com/latest -O C:\tmp\app.tar.gz && tar.exe -xf C:\t
 `,
 			wantCount: 1,
 		},
+		{
+			name: "ignore: windows default cmd semicolon is not a separator",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN curl.exe -fsSL https://example.com/app.tar.gz -o C:\tmp\app.tar.gz; tar.exe -xf C:\tmp\app.tar.gz -C C:\tools
+`,
+			wantCount: 0,
+		},
+		{
+			name: "ignore: windows default cmd single quotes are literal",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN curl.exe -fsSL 'https://example.com/app.tar.gz' -o C:\tmp\app.tar.gz && tar.exe -xf C:\tmp\app.tar.gz -C C:\tools
+`,
+			wantCount: 0,
+		},
 		// URL without archive extension, but output filename has one
 		{
 			name: "catch: curl -o archive name, URL has no extension",
