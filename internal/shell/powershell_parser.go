@@ -1,3 +1,5 @@
+//go:build cgo
+
 package shell
 
 import (
@@ -9,7 +11,15 @@ import (
 	tspowershell "github.com/wharflab/tally/internal/third_party/tree_sitter_powershell"
 )
 
-var powerShellLanguage = sitter.NewLanguage(tspowershell.Language())
+var powerShellLanguage = newPowerShellLanguage()
+
+func newPowerShellLanguage() *sitter.Language {
+	ptr := tspowershell.Language()
+	if ptr == nil {
+		return nil
+	}
+	return sitter.NewLanguage(ptr)
+}
 
 type powerShellArg struct {
 	text string
@@ -29,6 +39,9 @@ func findPowerShellCommands(script string, names ...string) []CommandInfo {
 	parser := sitter.NewParser()
 	defer parser.Close()
 
+	if powerShellLanguage == nil {
+		return nil
+	}
 	if err := parser.SetLanguage(powerShellLanguage); err != nil {
 		return nil
 	}

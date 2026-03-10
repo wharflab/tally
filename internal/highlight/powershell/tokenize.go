@@ -1,3 +1,5 @@
+//go:build cgo
+
 package powershell
 
 import (
@@ -30,7 +32,15 @@ var powerShellNodeTokenTypes = map[string]core.TokenType{
 	"member_name":                     core.TokenProperty,
 }
 
-var powerShellLanguage = sitter.NewLanguage(tspowershell.Language())
+var powerShellLanguage = newPowerShellLanguage()
+
+func newPowerShellLanguage() *sitter.Language {
+	ptr := tspowershell.Language()
+	if ptr == nil {
+		return nil
+	}
+	return sitter.NewLanguage(ptr)
+}
 
 // Tokenize returns parser-backed semantic tokens for PowerShell snippets.
 // It keeps a conservative scope: comments, strings, variables, numbers,
@@ -44,6 +54,9 @@ func Tokenize(script string) []core.Token {
 	parser := sitter.NewParser()
 	defer parser.Close()
 
+	if powerShellLanguage == nil {
+		return nil
+	}
 	if err := parser.SetLanguage(powerShellLanguage); err != nil {
 		return nil
 	}

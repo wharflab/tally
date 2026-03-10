@@ -1,3 +1,5 @@
+//go:build cgo
+
 //nolint:gocritic // cgo bindings require the special import "C" form in this vendored file.
 package treesitterpowershell
 

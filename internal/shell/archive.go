@@ -7,6 +7,11 @@ import (
 	"strings"
 )
 
+const (
+	invokeWebRequestCommand = "invoke-webrequest"
+	iwrCommand              = "iwr"
+)
+
 // ArchiveExtensions is the unified superset of archive file extensions
 // recognized by both DL3010 (hadolint) and prefer-add-unpack (tally).
 // Sorted longest-first so suffix matching is greedy
@@ -38,7 +43,7 @@ var ArchiveExtensions = []string{
 }
 
 // DownloadCommands lists commands that download remote files.
-var DownloadCommands = []string{"curl", "wget", "invoke-webrequest", "iwr"}
+var DownloadCommands = []string{"curl", "wget", invokeWebRequestCommand, iwrCommand}
 
 // ExtractionCommands lists commands that extract archive files
 // (excluding tar, which needs separate flag checking via IsTarExtract).
@@ -152,7 +157,7 @@ func DownloadOutputFile(cmd *CommandInfo) string {
 		short, long = "-o", "--output"
 	case "wget":
 		short, long = "-O", "--output-document"
-	case "invoke-webrequest", "iwr":
+	case invokeWebRequestCommand, iwrCommand:
 		return cmd.GetArgValue("-OutFile")
 	default:
 		return ""
@@ -188,7 +193,7 @@ func DownloadOutputFile(cmd *CommandInfo) string {
 // Returns "" if no URL is found.
 func DownloadURL(cmd *CommandInfo) string {
 	switch cmd.Name {
-	case "invoke-webrequest", "iwr":
+	case invokeWebRequestCommand, iwrCommand:
 		if uri := DropQuotes(cmd.GetArgValue("-Uri")); uri != "" && IsURL(uri) {
 			return uri
 		}
