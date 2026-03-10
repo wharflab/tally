@@ -24,8 +24,7 @@ The important design constraint is pragmatism: v1 should stay pure Go, reuse exi
 
 - v1 should deliver shared tokenization plus `textDocument/semanticTokens/full` and `range`
 - `full/delta` should be phase 2, after token normalization and caching are proven stable
-- v1 can ship with conservative lexical fallback for PowerShell and `cmd`; follow-up work may upgrade specific dialects behind the shared shell
-  tokenizer boundary
+- PowerShell is parser-backed through the shared shell tokenizer boundary; `cmd` remains on conservative lexical fallback
 - Zed grammar de-bundling should not be part of the initial delivery
 
 ---
