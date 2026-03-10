@@ -20,7 +20,7 @@ func ClampByteIndex(line string, idx int) int {
 	if idx >= len(line) {
 		return len(line)
 	}
-	for idx < len(line) && !utf8.RuneStart(line[idx]) {
+	for idx > 0 && !utf8.RuneStart(line[idx]) {
 		idx--
 	}
 	return idx
