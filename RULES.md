@@ -217,7 +217,17 @@ better aligned with modern container build recommendations and improves rebuild 
 
 #### DL3057: HEALTHCHECK Instruction Missing (Enhanced)
 
-tally goes beyond Hadolint's static check by resolving base image metadata from the registry when `--slow-checks` is enabled.
+tally goes beyond Hadolint's static check with smart suppression and registry-backed resolution.
+
+**Smart suppression (static):** The rule is automatically suppressed when a `HEALTHCHECK` would not be beneficial:
+
+- **Serverless base images** — AWS Lambda (`public.ecr.aws/lambda/*`, `amazon/aws-lambda-*`), Azure Functions
+  (`mcr.microsoft.com/azure-functions/*`), and OpenFaaS watchdog images.
+  These platforms manage function lifecycle externally.
+- **Serverless framework entrypoints** — When the final stage's `CMD` or `ENTRYPOINT` invokes a known FaaS wrapper
+  (e.g. `functions-framework` for Google Cloud Functions), including the common `exec` prefix pattern.
+- **Shell-only containers** — When the final stage's `CMD` or `ENTRYPOINT` is a bare interactive shell (`bash`, `sh`, etc.),
+  the container is not a long-running service.
 
 **Docker behavior:** `HEALTHCHECK` is inherited from base images at runtime. If a base image defines `HEALTHCHECK CMD ...`, child images inherit it
 automatically. `HEALTHCHECK NONE` explicitly disables any inherited health check.

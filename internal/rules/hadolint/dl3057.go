@@ -1,6 +1,9 @@
 package hadolint
 
 import (
+	"path"
+	"strings"
+
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
@@ -75,6 +78,12 @@ func (r *DL3057Rule) Check(input rules.LintInput) []rules.Violation {
 		}
 	}
 
+	// Suppress for containers where HEALTHCHECK is not beneficial
+	// (serverless functions, interactive shells, etc.).
+	if shouldSuppressHealthcheck(sem, input.Stages) {
+		return nil
+	}
+
 	// No HEALTHCHECK CMD anywhere — emit a file-level violation.
 	meta := r.Metadata()
 	loc := rules.NewFileLocation(input.File)
@@ -108,6 +117,11 @@ func (r *DL3057Rule) PlanAsync(input rules.LintInput) []async.CheckRequest {
 		if stageHasHealthcheckCmd(&input.Stages[i]) {
 			return nil
 		}
+	}
+
+	// No async work needed when the Dockerfile is already suppressed.
+	if shouldSuppressHealthcheck(sem, input.Stages) {
+		return nil
 	}
 
 	meta := r.Metadata()
@@ -223,6 +237,186 @@ func healthcheckNoneLocation(stage *instructions.Stage) []parser.Range {
 		}
 	}
 	return lastLoc
+}
+
+// shouldSuppressHealthcheck returns true when the Dockerfile shows strong
+// signals that the container will not benefit from a HEALTHCHECK instruction.
+//
+// Suppressed cases:
+//   - Serverless / FaaS base images (AWS Lambda, Azure Functions, OpenFaaS
+//     watchdog). These platforms manage function lifecycle externally; a
+//     container-level HEALTHCHECK is ignored.
+//   - Serverless framework entrypoints where the final stage's CMD or
+//     ENTRYPOINT invokes a known FaaS wrapper (e.g. functions-framework for
+//     Google Cloud Functions).
+//   - Interactive / shell-only containers where the final stage's CMD or
+//     ENTRYPOINT is a bare shell (sh, bash, etc.). These are not long-running
+//     services and have no endpoint to health-check.
+func shouldSuppressHealthcheck(sem *semantic.Model, stages []instructions.Stage) bool {
+	if len(stages) == 0 {
+		return false
+	}
+
+	// Any external base image from a serverless platform → suppress.
+	for info := range sem.ExternalImageStages() {
+		if isServerlessImage(info.Stage.BaseName) {
+			return true
+		}
+	}
+
+	lastStage := &stages[len(stages)-1]
+	cmdLine, shell := lastEntrypointArgs(lastStage)
+
+	// Final stage runs a known serverless framework → suppress.
+	if isServerlessEntrypoint(cmdLine, shell) {
+		return true
+	}
+
+	// Final stage's CMD/ENTRYPOINT is just a shell → suppress.
+	if isShellOnlyArgs(cmdLine, shell) {
+		return true
+	}
+
+	return false
+}
+
+// serverlessImagePatterns contains substrings that, when found in a base image
+// reference (case-insensitive), identify serverless / FaaS platforms where a
+// container-level HEALTHCHECK provides no benefit.
+var serverlessImagePatterns = []string{
+	// AWS Lambda runtime images
+	// e.g. public.ecr.aws/lambda/python:3.12, gallery.ecr.aws/lambda/nodejs:18
+	"ecr.aws/lambda/",
+	// AWS Lambda images on Docker Hub
+	// e.g. amazon/aws-lambda-python:3.12
+	"/aws-lambda-",
+	// Azure Functions base images
+	// e.g. mcr.microsoft.com/azure-functions/dotnet:4
+	"/azure-functions/",
+	// OpenFaaS function watchdog (entrypoint for serverless functions)
+	// e.g. ghcr.io/openfaas/of-watchdog:latest, openfaas/classic-watchdog
+	"openfaas/of-watchdog",
+	"openfaas/classic-watchdog",
+}
+
+// isServerlessImage reports whether baseName matches a known serverless / FaaS
+// base image pattern.
+func isServerlessImage(baseName string) bool {
+	lower := strings.ToLower(baseName)
+	for _, pat := range serverlessImagePatterns {
+		if strings.Contains(lower, pat) {
+			return true
+		}
+	}
+	return false
+}
+
+// serverlessEntrypoints is the set of executable names whose presence as
+// CMD or ENTRYPOINT indicates a serverless function wrapper. The container's
+// lifecycle is managed by the framework, not by Docker health checks.
+var serverlessEntrypoints = map[string]bool{
+	// Google Cloud Functions framework
+	// e.g. CMD ["functions-framework", "--target=hello"]
+	"functions-framework": true,
+}
+
+// isServerlessEntrypoint reports whether cmdLine invokes a known serverless
+// framework (e.g. functions-framework for Google Cloud Functions).
+func isServerlessEntrypoint(cmdLine []string, prependShell bool) bool {
+	exe := entrypointExe(cmdLine, prependShell)
+	return exe != "" && serverlessEntrypoints[exe]
+}
+
+// shellBinaries is the set of shell executable names that indicate an
+// interactive container when used as the sole CMD or ENTRYPOINT.
+var shellBinaries = map[string]bool{
+	"sh": true, "bash": true, "zsh": true, "ash": true,
+	"dash": true, "fish": true, "csh": true, "tcsh": true, "ksh": true,
+}
+
+// lastEntrypointArgs returns the effective CMD/ENTRYPOINT for a stage.
+// If an ENTRYPOINT is present it takes precedence over CMD, matching Docker
+// runtime semantics.
+func lastEntrypointArgs(stage *instructions.Stage) ([]string, bool) {
+	var (
+		lastCmdLine    []string
+		lastCmdShell   bool
+		lastEntryLine  []string
+		lastEntryShell bool
+		hasEntry       bool
+	)
+	for _, cmd := range stage.Commands {
+		switch c := cmd.(type) {
+		case *instructions.CmdCommand:
+			lastCmdLine = c.CmdLine
+			lastCmdShell = c.PrependShell
+		case *instructions.EntrypointCommand:
+			lastEntryLine = c.CmdLine
+			lastEntryShell = c.PrependShell
+			hasEntry = true
+		}
+	}
+	if hasEntry {
+		return lastEntryLine, lastEntryShell
+	}
+	return lastCmdLine, lastCmdShell
+}
+
+// entrypointExe extracts the base executable name from a CMD/ENTRYPOINT,
+// stripping any directory prefix. Returns "" if cmdLine is empty.
+//
+// In shell form, handles a leading "exec" prefix which is common Docker
+// practice (e.g. CMD exec functions-framework --target=hello).
+func entrypointExe(cmdLine []string, prependShell bool) string {
+	if len(cmdLine) == 0 {
+		return ""
+	}
+	exe := cmdLine[0]
+	if prependShell {
+		// Shell form: entire command is a single string.
+		// Strip leading "exec " — a common pattern to replace the shell
+		// with the target process (e.g. "exec functions-framework ...").
+		exe = strings.TrimPrefix(exe, "exec ")
+		exe, _, _ = strings.Cut(exe, " ")
+	}
+	if exe == "" {
+		return ""
+	}
+	return path.Base(exe)
+}
+
+// isShellOnlyArgs reports whether cmdLine represents a bare shell invocation.
+// A bare shell is a known shell binary (possibly with flags like -l, --login)
+// but without -c or -e which would indicate command execution.
+func isShellOnlyArgs(cmdLine []string, prependShell bool) bool {
+	if len(cmdLine) == 0 {
+		return false
+	}
+
+	var parts []string
+	if prependShell {
+		// Shell form: entire command is a single string element ("bash -l").
+		parts = strings.Fields(cmdLine[0])
+	} else {
+		parts = cmdLine
+	}
+	if len(parts) == 0 {
+		return false
+	}
+
+	// Check executable name (strip directory prefix).
+	name := path.Base(parts[0])
+	if !shellBinaries[name] {
+		return false
+	}
+
+	// -c / -e pass a command string to the shell — not interactive.
+	for _, arg := range parts[1:] {
+		if arg == "-c" || arg == "-e" {
+			return false
+		}
+	}
+	return true
 }
 
 // init registers the rule with the default registry.
