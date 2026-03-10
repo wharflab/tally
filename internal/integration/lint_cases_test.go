@@ -400,6 +400,18 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 		{
+			name: "dl3057-suppress-serverless",
+			dir:  "dl3057-suppress-serverless",
+			args: append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3057")...),
+			// wantExit: 0 (default) — suppressed for AWS Lambda base image
+		},
+		{
+			name: "dl3057-suppress-shell-cmd",
+			dir:  "dl3057-suppress-shell-cmd",
+			args: append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3057")...),
+			// wantExit: 0 (default) — suppressed for shell-only CMD
+		},
+		{
 			name:     "dl3047",
 			dir:      "dl3047",
 			args:     append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3047")...),

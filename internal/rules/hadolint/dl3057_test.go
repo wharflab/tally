@@ -7,6 +7,7 @@ import (
 	"github.com/wharflab/tally/internal/async"
 	"github.com/wharflab/tally/internal/registry"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -122,6 +123,172 @@ ONBUILD HEALTHCHECK CMD /bin/check
 `,
 			wantCount: 1, // ONBUILD triggers in child images, not this one
 		},
+
+		// === Smart suppression: serverless base images ===
+		{
+			name: "suppressed for AWS Lambda base image (ECR)",
+			dockerfile: `FROM public.ecr.aws/lambda/python:3.12
+COPY app.py /var/task/
+CMD ["app.handler"]
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed for AWS Lambda base image (Docker Hub)",
+			dockerfile: `FROM amazon/aws-lambda-python:3.12
+COPY app.py /var/task/
+CMD ["app.handler"]
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed for AWS Lambda in multi-stage build",
+			dockerfile: `FROM golang:1.21 AS builder
+RUN echo "build"
+FROM public.ecr.aws/lambda/go:latest
+COPY --from=builder /app /var/task
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed for Azure Functions base image",
+			dockerfile: `FROM mcr.microsoft.com/azure-functions/dotnet:4
+COPY . /home/site/wwwroot
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed for OpenFaaS of-watchdog",
+			dockerfile: `FROM ghcr.io/openfaas/of-watchdog:latest AS watchdog
+FROM alpine:3.18
+COPY --from=watchdog /fwatchdog /usr/bin/fwatchdog
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed for OpenFaaS classic-watchdog",
+			dockerfile: `FROM openfaas/classic-watchdog:latest AS watchdog
+FROM alpine:3.18
+COPY --from=watchdog /fwatchdog /usr/bin/fwatchdog
+`,
+			wantCount: 0,
+		},
+
+		// === Smart suppression: serverless entrypoints ===
+		{
+			name: "suppressed for functions-framework CMD (exec form)",
+			dockerfile: `FROM python:3.12-slim
+RUN pip install functions-framework
+COPY main.py .
+CMD ["functions-framework", "--target=hello"]
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed for functions-framework CMD (shell form)",
+			dockerfile: `FROM python:3.12-slim
+RUN pip install functions-framework
+COPY main.py .
+CMD functions-framework --target=hello
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed for functions-framework CMD with exec prefix",
+			dockerfile: `FROM python:3.12-slim
+RUN pip install functions-framework
+COPY main.py .
+CMD exec functions-framework --target=handle_dlq_message --source=/app/main.py --port=$PORT
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed for functions-framework ENTRYPOINT",
+			dockerfile: `FROM python:3.12-slim
+RUN pip install functions-framework
+COPY main.py .
+ENTRYPOINT ["functions-framework"]
+CMD ["--target=hello"]
+`,
+			wantCount: 0,
+		},
+
+		// === Smart suppression: shell-only CMD/ENTRYPOINT ===
+		{
+			name: "suppressed when CMD is bare bash",
+			dockerfile: `FROM ubuntu:22.04
+CMD ["bash"]
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed when CMD is /bin/sh",
+			dockerfile: `FROM alpine:3.18
+CMD ["/bin/sh"]
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed when CMD is shell form bash",
+			dockerfile: `FROM ubuntu:22.04
+CMD bash
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed when ENTRYPOINT is bare shell",
+			dockerfile: `FROM ubuntu:22.04
+ENTRYPOINT ["/bin/bash"]
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed when CMD is bash with login flag",
+			dockerfile: `FROM ubuntu:22.04
+CMD ["bash", "-l"]
+`,
+			wantCount: 0,
+		},
+		{
+			name: "not suppressed when CMD is bash -c command",
+			dockerfile: `FROM ubuntu:22.04
+CMD ["bash", "-c", "my-app"]
+`,
+			wantCount: 1,
+		},
+		{
+			name: "not suppressed when CMD is a real application",
+			dockerfile: `FROM ubuntu:22.04
+CMD ["nginx", "-g", "daemon off;"]
+`,
+			wantCount: 1,
+		},
+		{
+			name: "suppressed for shell-only in final stage of multi-stage",
+			dockerfile: `FROM golang:1.21 AS builder
+RUN echo "build"
+FROM alpine:3.18
+CMD ["ash"]
+`,
+			wantCount: 0,
+		},
+		{
+			name: "not suppressed when only non-final stage has shell CMD",
+			dockerfile: `FROM ubuntu:22.04 AS base
+CMD ["bash"]
+FROM alpine:3.18
+RUN echo "app"
+`,
+			wantCount: 1,
+		},
+		{
+			name: "suppressed when ENTRYPOINT overrides CMD with shell",
+			dockerfile: `FROM alpine:3.18
+CMD ["my-app"]
+ENTRYPOINT ["/bin/sh"]
+`,
+			wantCount: 0,
+		},
 	}
 
 	for _, tt := range tests {
@@ -193,6 +360,36 @@ func TestDL3057Rule_PlanAsync(t *testing.T) {
 		requests := r.PlanAsync(input)
 		if len(requests) != 0 {
 			t.Errorf("expected no async requests when HEALTHCHECK CMD present, got %d", len(requests))
+		}
+	})
+
+	t.Run("no plans for serverless base image", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM public.ecr.aws/lambda/python:3.12\nCOPY app.py /var/task/\n")
+		r := NewDL3057Rule()
+		requests := r.PlanAsync(input)
+		if len(requests) != 0 {
+			t.Errorf("expected no async requests for serverless image, got %d", len(requests))
+		}
+	})
+
+	t.Run("no plans for shell-only CMD", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nCMD [\"sh\"]\n")
+		r := NewDL3057Rule()
+		requests := r.PlanAsync(input)
+		if len(requests) != 0 {
+			t.Errorf("expected no async requests for shell-only CMD, got %d", len(requests))
+		}
+	})
+
+	t.Run("no plans for functions-framework CMD", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM python:3.12-slim\nCMD [\"functions-framework\", \"--target=hello\"]\n")
+		r := NewDL3057Rule()
+		requests := r.PlanAsync(input)
+		if len(requests) != 0 {
+			t.Errorf("expected no async requests for functions-framework CMD, got %d", len(requests))
 		}
 	})
 }
@@ -275,6 +472,121 @@ func TestDL3057Rule_Handler_WrongType(t *testing.T) {
 	h := makeHandler(t, "FROM alpine:3.18\n")
 	if result := h.OnSuccess("not an ImageConfig"); result != nil {
 		t.Errorf("expected nil for wrong type, got %v", result)
+	}
+}
+
+func TestIsServerlessImage(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		image string
+		want  bool
+	}{
+		// AWS Lambda
+		{"public.ecr.aws/lambda/python:3.12", true},
+		{"gallery.ecr.aws/lambda/nodejs:18", true},
+		{"public.ecr.aws/lambda/go:latest", true},
+		{"amazon/aws-lambda-python:3.12", true},
+		{"amazon/aws-lambda-java:17", true},
+		// Azure Functions
+		{"mcr.microsoft.com/azure-functions/dotnet:4", true},
+		{"mcr.microsoft.com/azure-functions/node:18", true},
+		// OpenFaaS
+		{"ghcr.io/openfaas/of-watchdog:latest", true},
+		{"openfaas/classic-watchdog:latest", true},
+		// Case insensitive
+		{"Public.ECR.AWS/Lambda/Python:3.12", true},
+		// Not serverless (image-level)
+		{"ubuntu:22.04", false},
+		{"nginx:latest", false},
+		{"alpine:3.18", false},
+		{"scratch", false},
+		{"gcr.io/my-project/my-app:latest", false},
+		{"mcr.microsoft.com/dotnet/aspnet:8.0", false},
+		{"gcr.io/google-appengine/python", false}, // App Engine can run long-lived services
+	}
+	for _, tt := range tests {
+		t.Run(tt.image, func(t *testing.T) {
+			t.Parallel()
+			if got := isServerlessImage(tt.image); got != tt.want {
+				t.Errorf("isServerlessImage(%q) = %v, want %v", tt.image, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsServerlessEntrypoint(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name         string
+		cmdLine      []string
+		prependShell bool
+		want         bool
+	}{
+		// Google Cloud Functions framework
+		{"exec functions-framework", []string{"functions-framework", "--target=hello"}, false, true},
+		{"shell functions-framework", []string{"functions-framework --target=hello"}, true, true},
+		{"exec bare functions-framework", []string{"functions-framework"}, false, true},
+		{"shell exec functions-framework", []string{"exec functions-framework --target=hello --port=$PORT"}, true, true},
+		{"shell env functions-framework", []string{"env FOO=bar functions-framework --target=hello"}, true, true},
+		// Not serverless entrypoints
+		{"exec nginx", []string{"nginx"}, false, false},
+		{"exec python", []string{"python", "app.py"}, false, false},
+		{"exec bash", []string{"bash"}, false, false},
+		{"empty", []string{}, false, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := isServerlessEntrypoint(tt.cmdLine, tt.prependShell, shell.VariantBash); got != tt.want {
+				t.Errorf("isServerlessEntrypoint(%v, %v) = %v, want %v", tt.cmdLine, tt.prependShell, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsShellOnlyArgs(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name         string
+		cmdLine      []string
+		prependShell bool
+		want         bool
+	}{
+		// Exec form shells
+		{"exec bash", []string{"bash"}, false, true},
+		{"exec /bin/sh", []string{"/bin/sh"}, false, true},
+		{"exec /usr/bin/zsh", []string{"/usr/bin/zsh"}, false, true},
+		{"exec ash", []string{"ash"}, false, true},
+		{"exec fish", []string{"fish"}, false, true},
+		{"exec dash", []string{"dash"}, false, true},
+		// Exec form with flags
+		{"exec bash -l", []string{"bash", "-l"}, false, true},
+		{"exec bash --login", []string{"bash", "--login"}, false, true},
+		// Exec form with -c (not shell-only)
+		{"exec bash -c cmd", []string{"bash", "-c", "echo hello"}, false, false},
+		{"exec sh -e", []string{"sh", "-e"}, false, false},
+		// Shell form — parsed by mvdan.cc/sh via shell.CommandNamesWithVariant
+		{"shell bash", []string{"bash"}, true, true},
+		{"shell /bin/bash", []string{"/bin/bash"}, true, true},
+		{"shell bash -l", []string{"bash -l"}, true, true},
+		{"shell exec bash", []string{"exec bash"}, true, true},
+		{"shell exec /usr/bin/bash", []string{"exec /usr/bin/bash"}, true, true},
+		{"shell bash -c cmd", []string{"bash -c 'echo hello'"}, true, false},
+		{"shell exec bash -c cmd", []string{"exec bash -c 'my-app'"}, true, false},
+		// Not shells
+		{"exec nginx", []string{"nginx"}, false, false},
+		{"exec my-app", []string{"my-app"}, false, false},
+		{"empty", []string{}, false, false},
+		{"shell empty", []string{""}, true, false},
+		{"shell nginx", []string{"nginx -g 'daemon off;'"}, true, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := isShellOnlyArgs(tt.cmdLine, tt.prependShell, shell.VariantBash); got != tt.want {
+				t.Errorf("isShellOnlyArgs(%v, %v) = %v, want %v", tt.cmdLine, tt.prependShell, got, tt.want)
+			}
+		})
 	}
 }
 
