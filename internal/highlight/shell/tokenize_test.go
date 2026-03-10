@@ -40,6 +40,17 @@ func TestTokenize_ASTRejectsMultilineQuotedStringToken(t *testing.T) {
 	}
 }
 
+func TestTokenize_PowerShellUsesParserBackedPath(t *testing.T) {
+	t.Parallel()
+
+	script := "Invoke-WebRequest \"https://example.com/app.tar.gz\" -OutFile \"$HOME/app.tar.gz\"\n"
+	tokens := Tokenize(script, myshell.VariantPowerShell)
+
+	assertHasToken(t, script, tokens, highlightcore.TokenFunction, 30, "Invoke-WebRequest")
+	assertHasToken(t, script, tokens, highlightcore.TokenParameter, 30, "-OutFile")
+	assertHasToken(t, script, tokens, highlightcore.TokenVariable, 30, "$HOME")
+}
+
 func assertHasToken(
 	t *testing.T,
 	script string,

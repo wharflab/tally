@@ -200,6 +200,13 @@ var shellWrappers = map[string]bool{
 //
 // This matches hadolint's behavior using ShellCheck.findCommandNames.
 func CommandNamesWithVariant(script string, variant Variant) []string {
+	if variant.IsPowerShell() {
+		return powerShellCommandNames(script)
+	}
+	if !variant.IsParseable() {
+		return simpleCommandNames(script)
+	}
+
 	parser := syntax.NewParser(
 		syntax.Variant(variant.toLangVariant()),
 		syntax.KeepComments(false),

@@ -11,6 +11,9 @@ import (
 
 // CommandInfo represents a parsed command with its arguments and flags.
 type CommandInfo struct {
+	// Variant is the shell variant used to parse this command.
+	Variant Variant
+
 	// Name is the base command name (e.g., "apt-get", "yum").
 	Name string
 
@@ -36,6 +39,10 @@ type CommandInfo struct {
 // Handles both short flags (-y) and long flags (--yes).
 // For short flags, also checks combined flags (e.g., -yq contains -y).
 func (c *CommandInfo) HasFlag(flag string) bool {
+	if c.Variant.IsPowerShell() {
+		return c.hasPowerShellFlag(flag)
+	}
+
 	// Normalize flag - remove leading dashes for comparison
 	normalizedFlag := strings.TrimLeft(flag, "-")
 	isLong := strings.HasPrefix(flag, "--") || len(normalizedFlag) > 1
@@ -78,6 +85,10 @@ func (c *CommandInfo) HasAnyFlag(flags ...string) bool {
 // CountFlag counts how many times a flag appears in the command.
 // Useful for checking flags like -q -q (equivalent to -qq).
 func (c *CommandInfo) CountFlag(flag string) int {
+	if c.Variant.IsPowerShell() {
+		return c.countPowerShellFlag(flag)
+	}
+
 	normalizedFlag := strings.TrimLeft(flag, "-")
 	isLong := strings.HasPrefix(flag, "--")
 	count := 0
@@ -113,6 +124,10 @@ func (c *CommandInfo) HasAnyArg(args ...string) bool {
 // GetArgValue returns the value following a flag (e.g., "-q=2" returns "2").
 // Returns empty string if not found or no value.
 func (c *CommandInfo) GetArgValue(flag string) string {
+	if c.Variant.IsPowerShell() {
+		return c.getPowerShellArgValue(flag)
+	}
+
 	normalizedFlag := strings.TrimLeft(flag, "-")
 	isLong := strings.HasPrefix(flag, "--")
 	prefix := "-"
@@ -139,6 +154,10 @@ func (c *CommandInfo) GetArgValue(flag string) string {
 // FindCommands extracts all commands matching the given name(s) from a shell script.
 // It returns detailed CommandInfo for each matching command.
 func FindCommands(script string, variant Variant, names ...string) []CommandInfo {
+	if variant.IsPowerShell() {
+		return findPowerShellCommands(script, names...)
+	}
+
 	parser := syntax.NewParser(
 		syntax.Variant(variant.toLangVariant()),
 		syntax.KeepComments(false),
@@ -185,6 +204,7 @@ func FindCommands(script string, variant Variant, names ...string) []CommandInfo
 		endPos := cmdWord.End()
 
 		info := CommandInfo{
+			Variant:  variant,
 			Name:     baseName,
 			Line:     int(pos.Line()) - 1,
 			StartCol: int(pos.Col()) - 1,
@@ -227,6 +247,7 @@ func findWrappedCommands(args []*syntax.Word, variant Variant, wrapperName strin
 			endPos := wa.Arg.End()
 
 			info := CommandInfo{
+				Variant:  variant,
 				Name:     wa.Name,
 				Line:     int(pos.Line()) - 1,
 				StartCol: int(pos.Col()) - 1,
@@ -266,6 +287,78 @@ func findWrappedCommands(args []*syntax.Word, variant Variant, wrapperName strin
 	})
 
 	return commands
+}
+
+func (c *CommandInfo) hasPowerShellFlag(flag string) bool {
+	normalizedFlag := strings.TrimLeft(strings.ToLower(flag), "-")
+	if normalizedFlag == "" {
+		return false
+	}
+	prefix := "-" + normalizedFlag
+
+	for _, arg := range c.Args {
+		raw := DropQuotes(arg)
+		if raw == "" || raw[0] != '-' {
+			continue
+		}
+		if strings.EqualFold(raw, prefix) {
+			return true
+		}
+		if len(raw) > len(prefix) && strings.EqualFold(raw[:len(prefix)], prefix) && raw[len(prefix)] == ':' {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *CommandInfo) countPowerShellFlag(flag string) int {
+	normalizedFlag := strings.TrimLeft(strings.ToLower(flag), "-")
+	if normalizedFlag == "" {
+		return 0
+	}
+	prefix := "-" + normalizedFlag
+	count := 0
+
+	for _, arg := range c.Args {
+		raw := DropQuotes(arg)
+		if raw == "" || raw[0] != '-' {
+			continue
+		}
+		if strings.EqualFold(raw, prefix) {
+			count++
+			continue
+		}
+		if len(raw) > len(prefix) && strings.EqualFold(raw[:len(prefix)], prefix) && raw[len(prefix)] == ':' {
+			count++
+		}
+	}
+	return count
+}
+
+func (c *CommandInfo) getPowerShellArgValue(flag string) string {
+	normalizedFlag := strings.TrimLeft(strings.ToLower(flag), "-")
+	if normalizedFlag == "" {
+		return ""
+	}
+	prefix := "-" + normalizedFlag
+
+	for i, arg := range c.Args {
+		raw := DropQuotes(arg)
+		if raw == "" || raw[0] != '-' {
+			continue
+		}
+		if strings.EqualFold(raw, prefix) && i+1 < len(c.Args) {
+			next := DropQuotes(c.Args[i+1])
+			if !strings.HasPrefix(next, "-") {
+				return next
+			}
+			continue
+		}
+		if len(raw) > len(prefix) && strings.EqualFold(raw[:len(prefix)], prefix) && raw[len(prefix)] == ':' {
+			return DropQuotes(raw[len(prefix)+1:])
+		}
+	}
+	return ""
 }
 
 // findNestedShellCommands finds commands within "sh -c 'code'" patterns.

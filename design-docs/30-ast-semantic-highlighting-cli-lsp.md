@@ -1,7 +1,6 @@
 # AST-Aware Semantic Highlighting for CLI Snippets and LSP
 
-> Status: implemented for Dockerfile, POSIX shell, CLI rendering, and LSP `semanticTokens/full|range`; PowerShell parser-backed highlighting remains
-> follow-up work
+> Status: implemented for Dockerfile, POSIX shell, PowerShell, CLI rendering, and LSP `semanticTokens/full|range`
 >
 > Scope: replace Chroma in CLI snippet rendering, add a shared semantic token engine, and expose semantic tokens from the existing LSP server
 
@@ -25,7 +24,8 @@ The important design constraint is pragmatism: v1 should stay pure Go, reuse exi
 
 - v1 should deliver shared tokenization plus `textDocument/semanticTokens/full` and `range`
 - `full/delta` should be phase 2, after token normalization and caching are proven stable
-- PowerShell and `cmd` should use conservative lexical fallback in v1
+- v1 can ship with conservative lexical fallback for PowerShell and `cmd`; follow-up work may upgrade specific dialects behind the shared shell
+  tokenizer boundary
 - Zed grammar de-bundling should not be part of the initial delivery
 
 ---
@@ -81,7 +81,7 @@ adapters.
 
 ## 4. Non-Goals (v1)
 
-1. Full AST-backed PowerShell or `cmd.exe` parsing.
+1. Full AST-backed `cmd.exe` parsing.
 2. User-configurable multi-theme system beyond `auto|dark|light`.
 3. Changing diagnostics, fixes, or rule semantics.
 4. Zed grammar de-bundling as part of the initial release.
@@ -240,7 +240,7 @@ For shell-form instructions and heredoc bodies:
    - `SHELL` instructions
    - heredoc shebang override when present
 4. If `shell.Variant.IsParseable()` is true, parse with `mvdan.cc/sh/v3/syntax`.
-5. If the variant is `powershell`, `cmd`, or `unknown`, use lexical fallback only.
+5. If the variant is `powershell`, use the parser-backed PowerShell tokenizer; if the variant is `cmd` or `unknown`, use lexical fallback.
 
 This is the correct reuse boundary: the semantic highlighter and ShellCheck both need the same script extraction and source-to-snippet mapping, so
 they should share one implementation.
@@ -387,7 +387,7 @@ This preserves deterministic behavior for tests and CI without introducing a bro
 
 ### Phase 4: future dialect expansion
 
-1. Add optional provider adapters for PowerShell or other dialects.
+1. Add optional provider adapters for additional dialects.
 2. Keep lexical fallback available even when an optional parser exists.
 
 ---
@@ -405,7 +405,8 @@ This preserves deterministic behavior for tests and CI without introducing a bro
 - Shell tokenizer
   - bash, POSIX, mksh
   - heredoc shebang override
-  - fallback behavior for PowerShell and `cmd`
+  - parser-backed PowerShell behavior
+  - fallback behavior for `cmd`
 - Normalizer
   - sorting
   - overlap resolution
@@ -471,10 +472,9 @@ Until those answers are clear, grammar de-bundling should remain out of scope fo
 
 ---
 
-## 15. Future PowerShell Support
+## 15. PowerShell Follow-Up
 
-The base integration points now exist in code. A follow-up engineer should treat this as an extension of the current shared highlighting pipeline, not
-as a new parallel implementation.
+The PowerShell follow-up has been implemented as an extension of the shared highlighting pipeline, not as a second highlighting architecture.
 
 This design should remain compatible with the Windows-container direction in `design-docs/26-windows-container-support.md`.
 
@@ -488,36 +488,24 @@ What is already implemented:
   - already preserves Dockerfile-to-script line alignment for remapping tokens back into the parent file
 - `internal/highlight/shell/tokenize.go`
   - current dispatch boundary for embedded shell tokenization
-  - currently uses `mvdan` for parseable POSIX-like shells and lexical fallback for `powershell`, `cmd`, and `unknown`
+  - uses `mvdan` for parseable POSIX-like shells, a tree-sitter-backed tokenizer for `powershell`, and lexical fallback for `cmd` and `unknown`
+- `internal/highlight/powershell/tokenize.go`
+  - contains the isolated tree-sitter integration and AST-to-`core.Token` mapping for PowerShell
 - `internal/highlight/core/token.go`
   - shared token model, normalization, overlap resolution, and range filtering
 - `internal/highlight/renderansi` and `internal/highlight/lspencode`
   - already consume normalized `[]core.Token`; they should not need dialect-specific logic
 
-### 15.1 Where to pick up
+### 15.1 What changed
 
-The correct implementation seam is `internal/highlight/shell/tokenize.go`.
+The implementation uses the seam this document proposed:
 
-Do not add PowerShell parsing logic directly in:
-
-- `internal/reporter/text.go`
-- `internal/lspserver/semantic_tokens.go`
-- `internal/highlight/highlight.go`
-
-Those layers already consume the shared document/token model correctly. PowerShell support should appear as a better `[]core.Token` producer behind
-the existing shell dispatch boundary.
-
-Recommended work plan:
-
-1. Add a new package, for example `internal/highlight/powershell`.
-2. Put the tree-sitter integration and PowerShell AST-to-`core.Token` mapping there.
-3. Change `internal/highlight/shell/tokenize.go` so `VariantPowerShell` dispatches to that package instead of lexical fallback.
-4. Keep `VariantCmd` and `VariantUnknown` on lexical fallback.
-5. Leave `internal/highlight/highlight.go`, `renderansi`, and `lspencode` unchanged unless the shared token model truly needs to expand.
+1. `internal/highlight/powershell` owns the grammar binding and PowerShell AST-to-`core.Token` mapping.
+2. `internal/highlight/shell/tokenize.go` dispatches `VariantPowerShell` to that package.
+3. `VariantCmd` and `VariantUnknown` remain on lexical fallback.
+4. `internal/highlight/highlight.go`, `renderansi`, and `lspencode` remain dialect-agnostic.
 
 ### 15.2 Dependency and packaging guidance
-
-If PowerShell support is implemented with tree-sitter:
 
 - keep it pure Go from the repo's point of view; do not introduce cgo
 - vendor or pin the grammar in a way that is deterministic in CI
@@ -532,7 +520,7 @@ The rest of the highlight stack should continue to depend only on:
 
 ### 15.3 Concrete integration points
 
-The intended call flow after the follow-up is:
+The implemented call flow is:
 
 1. `highlight.Analyze(...)` builds a Dockerfile `SourceMap` and semantic stage model.
 2. `shellTokens(...)` in `internal/highlight/highlight.go` determines the effective shell for each instruction.
@@ -540,7 +528,7 @@ The intended call flow after the follow-up is:
 4. `remapShellTokens(...)` calls `highlightshell.Tokenize(mapping.Script, variant)`.
 5. `highlightshell.Tokenize(...)` dispatches:
    - POSIX-like shells -> existing `mvdan` path
-   - PowerShell -> new tree-sitter tokenizer
+   - PowerShell -> tree-sitter tokenizer
    - `cmd`/unknown -> existing lexical fallback
 6. `core.Normalize(...)` resolves overlaps and clips tokens.
 7. CLI and LSP consume the resulting normalized tokens unchanged.
@@ -600,36 +588,20 @@ The new PowerShell path must continue to respect existing Dockerfile extraction 
 - therefore, if future extraction logic ever handles stdin-payload heredocs generically, keep those cases distinct from PowerShell script-body
   heredocs
 
-In other words: the follow-up should improve tokenization only after extraction has already decided "this snippet is PowerShell".
+In other words: the tokenizer upgrade only activates after extraction has already decided "this snippet is PowerShell".
 
-### 15.7 Files that likely need changes
+### 15.7 Test coverage
 
-Primary code changes:
-
-- `internal/highlight/shell/tokenize.go`
-- new files under `internal/highlight/powershell/`
-- `go.mod`
-- `go.sum`
-
-Likely tests to add or update:
+Coverage should continue to include:
 
 - `internal/highlight/shell/tokenize_test.go`
-  - add dispatch tests proving `VariantPowerShell` uses the parser-backed path
-- new `internal/highlight/powershell/*_test.go`
+  - dispatch tests proving `VariantPowerShell` uses the parser-backed path
+- `internal/highlight/powershell/*_test.go`
   - token-level tests for strings, variables, commands, comments, numbers, and member/property access
-- `internal/highlight/extract/script_test.go`
-  - only if PowerShell-specific heredoc/extraction cases reveal gaps
 - `internal/lsptest/lsp_test.go`
-  - add at least one PowerShell-backed `semanticTokens/full` or `range` black-box case once token output is stable
+  - at least one PowerShell-backed `semanticTokens/full` or `range` black-box case
 - reporter snapshot or targeted reporter tests
-  - only if a PowerShell fixture materially changes visible snippet rendering
-
-Useful existing fixtures to reuse or extend:
-
-- `internal/integration/testdata/real-world-fix-metalama/Dockerfile`
-- `internal/integration/testdata/real-world-fix-ticketdesk/Dockerfile`
-- `internal/integration/testdata/non-posix-shell/Dockerfile`
-- `internal/integration/testdata/non-posix-shell-backtick-continuation/Dockerfile`
+  - only when a PowerShell fixture materially changes visible snippet rendering
 
 ### 15.8 What should not change
 
@@ -645,7 +617,7 @@ PowerShell support should look like a tokenizer upgrade, not a second semantic-h
 
 ### 15.9 Definition of done for the PowerShell follow-up
 
-Treat the work as complete when all of these are true:
+This follow-up is complete when all of these remain true:
 
 1. `VariantPowerShell` no longer falls back to the generic lexical tokenizer.
 2. PowerShell tokens are emitted through the same `highlight.Analyze(...)` pipeline used by CLI and LSP.
@@ -673,7 +645,7 @@ Treat the work as complete when all of these are true:
 5. Zed semantics may look different in `combined` versus `full` mode.
    Mitigation: document recommended settings, but do not tie server rollout to extension repackaging.
 
-6. Future PowerShell parser work could add build complexity.
+6. PowerShell parser support adds build complexity.
    Mitigation: isolate dialect providers behind the shared shell tokenization boundary and preserve lexical fallback.
 
 ---
@@ -693,8 +665,7 @@ Treat the work as complete when all of these are true:
 ### Deferred to follow-up work
 
 1. `semanticTokens/full/delta`
-2. PowerShell AST-backed tokenization
-3. Zed grammar de-bundling
+2. Zed grammar de-bundling
 
 ---
 

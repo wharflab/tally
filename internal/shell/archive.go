@@ -38,7 +38,7 @@ var ArchiveExtensions = []string{
 }
 
 // DownloadCommands lists commands that download remote files.
-var DownloadCommands = []string{"curl", "wget"}
+var DownloadCommands = []string{"curl", "wget", "invoke-webrequest", "iwr"}
 
 // ExtractionCommands lists commands that extract archive files
 // (excluding tar, which needs separate flag checking via IsTarExtract).
@@ -152,6 +152,8 @@ func DownloadOutputFile(cmd *CommandInfo) string {
 		short, long = "-o", "--output"
 	case "wget":
 		short, long = "-O", "--output-document"
+	case "invoke-webrequest", "iwr":
+		return cmd.GetArgValue("-OutFile")
 	default:
 		return ""
 	}
@@ -185,8 +187,14 @@ func DownloadOutputFile(cmd *CommandInfo) string {
 // DownloadURL extracts the first URL argument (http/https/ftp) from a download CommandInfo.
 // Returns "" if no URL is found.
 func DownloadURL(cmd *CommandInfo) string {
-	if i := slices.IndexFunc(cmd.Args, IsURL); i >= 0 {
-		return cmd.Args[i]
+	switch cmd.Name {
+	case "invoke-webrequest", "iwr":
+		if uri := DropQuotes(cmd.GetArgValue("-Uri")); uri != "" && IsURL(uri) {
+			return uri
+		}
+	}
+	if i := slices.IndexFunc(cmd.Args, func(arg string) bool { return IsURL(DropQuotes(arg)) }); i >= 0 {
+		return DropQuotes(cmd.Args[i])
 	}
 	return ""
 }

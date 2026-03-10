@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/wharflab/tally/internal/highlight/core"
+	highlightpowershell "github.com/wharflab/tally/internal/highlight/powershell"
 	myshell "github.com/wharflab/tally/internal/shell"
 
 	shsyntax "mvdan.cc/sh/v3/syntax"
@@ -19,6 +20,12 @@ var (
 func Tokenize(script string, variant myshell.Variant) []core.Token {
 	if script == "" {
 		return nil
+	}
+	if variant.IsPowerShell() {
+		if tokens := highlightpowershell.Tokenize(script); tokens != nil {
+			return tokens
+		}
+		return lexicalTokens(script)
 	}
 	if !variant.IsParseable() {
 		return lexicalTokens(script)

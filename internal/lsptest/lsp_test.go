@@ -111,6 +111,44 @@ func TestLSP_SemanticTokensRange(t *testing.T) {
 	}, result.Data)
 }
 
+func TestLSP_SemanticTokensRange_PowerShell(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	uri := "file:///tmp/test-semantic-tokens-range-powershell/Dockerfile"
+	ts.openDocument(t, uri, strings.Join([]string{
+		"# escape=`",
+		"FROM mcr.microsoft.com/windows/servercore:ltsc2025",
+		"SHELL [\"powershell\", \"-Command\"]",
+		"RUN Invoke-WebRequest \"https://example.com/app.tar.gz\" -OutFile \"$HOME/app.tar.gz\"",
+		"",
+	}, "\n"))
+
+	ts.waitDiagnostics(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var result semanticTokensResult
+	err := ts.conn.Call(ctx, "textDocument/semanticTokens/range", &semanticTokensRangeParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+		Range: lspRange{
+			Start: position{Line: 3, Character: 0},
+			End:   position{Line: 3, Character: 200},
+		},
+	}).Await(ctx, &result)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Data)
+
+	tokenTypes := semanticTokenTypes(result.Data)
+	assert.Contains(t, tokenTypes, uint32(0), "expected RUN keyword token")
+	assert.Contains(t, tokenTypes, uint32(2), "expected PowerShell string token")
+	assert.Contains(t, tokenTypes, uint32(5), "expected PowerShell variable token")
+	assert.Contains(t, tokenTypes, uint32(6), "expected PowerShell parameter token")
+	assert.Contains(t, tokenTypes, uint32(8), "expected PowerShell command token")
+}
+
 func TestLSP_ShutdownExit(t *testing.T) {
 	t.Parallel()
 	ts := startTestServer(t)
@@ -129,6 +167,18 @@ func TestLSP_ShutdownExit(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("server process did not exit after shutdown+exit")
 	}
+}
+
+func semanticTokenTypes(data []uint32) []uint32 {
+	if len(data) == 0 {
+		return nil
+	}
+
+	types := make([]uint32, 0, len(data)/5)
+	for i := 3; i < len(data); i += 5 {
+		types = append(types, data[i])
+	}
+	return types
 }
 
 func TestLSP_DiagnosticsOnDidOpen(t *testing.T) {

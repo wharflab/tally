@@ -242,6 +242,32 @@ func TestDownloadOutputFile(t *testing.T) {
 			CommandInfo{Name: "tar", Args: []string{"-xf", "app.tar"}},
 			"",
 		},
+		{
+			"powershell Invoke-WebRequest -OutFile",
+			CommandInfo{
+				Variant: VariantPowerShell,
+				Name:    "invoke-webrequest",
+				Args: []string{
+					"https://example.com/app.tar.gz",
+					"-OutFile",
+					`C:\tmp\app.tar.gz`,
+				},
+			},
+			`C:\tmp\app.tar.gz`,
+		},
+		{
+			"powershell iwr -OutFile:value",
+			CommandInfo{
+				Variant: VariantPowerShell,
+				Name:    "iwr",
+				Args: []string{
+					"-Uri",
+					"https://example.com/app.tar.gz",
+					`-OutFile:C:\tmp\app.tar.gz`,
+				},
+			},
+			`C:\tmp\app.tar.gz`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -290,6 +316,33 @@ func TestDownloadURL(t *testing.T) {
 			"no URL",
 			CommandInfo{Name: "curl", Args: []string{"-fsSL", "-o", "/tmp/file"}},
 			"",
+		},
+		{
+			"powershell Invoke-WebRequest -Uri",
+			CommandInfo{
+				Variant: VariantPowerShell,
+				Name:    "invoke-webrequest",
+				Args: []string{
+					"-Uri",
+					"https://example.com/app.tar.gz",
+					"-OutFile",
+					`C:\tmp\app.tar.gz`,
+				},
+			},
+			"https://example.com/app.tar.gz",
+		},
+		{
+			"powershell iwr positional URL",
+			CommandInfo{
+				Variant: VariantPowerShell,
+				Name:    "iwr",
+				Args: []string{
+					`"https://example.com/app.tar.gz"`,
+					"-OutFile",
+					`C:\tmp\app.tar.gz`,
+				},
+			},
+			"https://example.com/app.tar.gz",
 		},
 	}
 
