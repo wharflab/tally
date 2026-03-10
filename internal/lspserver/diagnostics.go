@@ -199,6 +199,10 @@ func clearDiagnostics(ctx context.Context, conn *jsonrpc2.Connection, docURI str
 
 // handleDiagnostic handles textDocument/diagnostic (pull diagnostics).
 func (s *Server) handleDiagnostic(ctx context.Context, params *protocol.DocumentDiagnosticParams) (any, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	uri := string(params.TextDocument.Uri)
 
 	// Check if the document is open in the editor.
@@ -213,6 +217,9 @@ func (s *Server) handleDiagnostic(ctx context.Context, params *protocol.Document
 		}
 
 		violations := s.lintContent(ctx, uri, []byte(doc.Content))
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if s.documentVersionCurrent(uri, doc.Version) {
 			s.lintCache.set(uri, doc.Version, violations)
 		}
@@ -273,6 +280,9 @@ func (s *Server) pullDiagnosticsFromDisk(ctx context.Context, docURI, filePath s
 	}
 
 	violations := s.lintContent(ctx, docURI, content)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	diagnostics := convertDiagnostics(violations)
 
 	return &protocol.DocumentDiagnosticResponse{

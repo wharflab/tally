@@ -11,10 +11,13 @@ package lspserver
 import (
 	"context"
 	stdjson "encoding/json"
+	"encoding/json/jsontext"
+	"errors"
 	"io"
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 
 	jsonv2 "encoding/json/v2"
@@ -53,6 +56,11 @@ type Server struct {
 	pushDiagnostics            bool
 	supportsDiagnosticRefresh  bool
 	supportsDiagnosticPullMode bool
+
+	requestCancelMu          sync.Mutex
+	requestQueuedIDs         map[string]struct{}
+	requestCanceledQueuedIDs map[string]struct{}
+	activeRequestCancelsByID map[string]context.CancelFunc
 }
 
 // New creates a new LSP server.
@@ -71,7 +79,10 @@ func New() *Server {
 		settings: defaultClientSettings(),
 		// Default to push diagnostics (publishDiagnostics). If the client supports
 		// the LSP 3.17 pull model, we switch to pull to avoid duplicate diagnostics.
-		pushDiagnostics: true,
+		pushDiagnostics:          true,
+		requestQueuedIDs:         make(map[string]struct{}),
+		requestCanceledQueuedIDs: make(map[string]struct{}),
+		activeRequestCancelsByID: make(map[string]context.CancelFunc),
 	}
 }
 
@@ -109,7 +120,7 @@ func (b *serverBinder) Bind(_ context.Context, conn *jsonrpc2.Connection) (jsonr
 	b.server.conn = conn
 	return jsonrpc2.ConnectionOptions{
 		Framer:    jsonrpc2.HeaderFramer(),
-		Preempter: &cancelPreempter{conn: conn},
+		Preempter: &cancelPreempter{server: b.server},
 		Handler:   jsonrpc2.HandlerFunc(b.server.handle),
 	}, nil
 }
@@ -118,16 +129,19 @@ func (b *serverBinder) Bind(_ context.Context, conn *jsonrpc2.Connection) (jsonr
 // message queue. This prevents "method not supported" errors when the client
 // sends cancellation notifications.
 type cancelPreempter struct {
-	conn *jsonrpc2.Connection
+	server *Server
 }
 
 // cancelRequestParams is the LSP CancelParams sent with $/cancelRequest.
 type cancelRequestParams struct {
-	ID any `json:"id"`
+	ID jsontext.Value `json:"id"`
 }
 
 func (p *cancelPreempter) Preempt(_ context.Context, req *jsonrpc2.Request) (any, error) {
 	if req.Method != string(protocol.MethodCancelRequest) {
+		if req.IsCall() {
+			p.server.noteQueuedRequest(req.ID)
+		}
 		return nil, jsonrpc2.ErrNotHandled
 	}
 
@@ -136,21 +150,46 @@ func (p *cancelPreempter) Preempt(_ context.Context, req *jsonrpc2.Request) (any
 		return nil, nil //nolint:nilerr,nilnil // malformed cancel — intentionally ignored
 	}
 
-	var id jsonrpc2.ID
-	switch v := params.ID.(type) {
-	case float64:
-		id = jsonrpc2.Int64ID(int64(v))
-	case string:
-		id = jsonrpc2.StringID(v)
-	}
+	id, _ := parseCancelRequestID(params.ID)
 	if id.IsValid() {
-		p.conn.Cancel(id)
+		p.server.cancelQueuedOrActiveRequest(id)
 	}
 	return nil, nil //nolint:nilnil // notification — no response needed
 }
 
+func parseCancelRequestID(raw jsontext.Value) (jsonrpc2.ID, bool) {
+	token := strings.TrimSpace(string(raw))
+	if token == "" || token == "null" {
+		return jsonrpc2.ID{}, false
+	}
+
+	if token[0] == '"' {
+		var id string
+		if err := jsonv2.Unmarshal(raw, &id); err != nil {
+			return jsonrpc2.ID{}, false
+		}
+		return jsonrpc2.StringID(id), true
+	}
+
+	n, err := strconv.ParseInt(token, 10, 64)
+	if err != nil {
+		return jsonrpc2.ID{}, false
+	}
+	return jsonrpc2.Int64ID(n), true
+}
+
 // handle dispatches incoming JSON-RPC messages to the appropriate handler.
 func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error) {
+	if req.IsCall() {
+		var done func()
+		ctx, done = s.startRequestContext(ctx, req.ID)
+		defer done()
+
+		if err := ctx.Err(); err != nil {
+			return nil, lspRequestError(err)
+		}
+	}
+
 	switch req.Method {
 	// Lifecycle
 	case string(protocol.MethodInitialize):
@@ -225,6 +264,92 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 	}
 }
 
+func requestIDKey(id jsonrpc2.ID) string {
+	if !id.IsValid() {
+		return ""
+	}
+
+	switch v := id.Raw().(type) {
+	case int64:
+		return "i:" + strconv.FormatInt(v, 10)
+	case string:
+		return "s:" + v
+	default:
+		return ""
+	}
+}
+
+func (s *Server) noteQueuedRequest(id jsonrpc2.ID) {
+	key := requestIDKey(id)
+	if key == "" {
+		return
+	}
+
+	s.requestCancelMu.Lock()
+	s.requestQueuedIDs[key] = struct{}{}
+	s.requestCancelMu.Unlock()
+}
+
+func (s *Server) cancelQueuedOrActiveRequest(id jsonrpc2.ID) {
+	key := requestIDKey(id)
+	if key == "" {
+		return
+	}
+
+	s.requestCancelMu.Lock()
+	cancel := s.activeRequestCancelsByID[key]
+	if cancel == nil {
+		if _, queued := s.requestQueuedIDs[key]; queued {
+			s.requestCanceledQueuedIDs[key] = struct{}{}
+		}
+		s.requestCancelMu.Unlock()
+		return
+	}
+	s.requestCancelMu.Unlock()
+
+	cancel()
+}
+
+func (s *Server) startRequestContext(parent context.Context, id jsonrpc2.ID) (context.Context, func()) {
+	key := requestIDKey(id)
+	if key == "" {
+		return parent, func() {}
+	}
+
+	ctx, cancel := context.WithCancel(parent)
+
+	s.requestCancelMu.Lock()
+	delete(s.requestQueuedIDs, key)
+	if _, canceled := s.requestCanceledQueuedIDs[key]; canceled {
+		delete(s.requestCanceledQueuedIDs, key)
+		cancel()
+	}
+	s.activeRequestCancelsByID[key] = cancel
+	s.requestCancelMu.Unlock()
+
+	return ctx, func() {
+		s.requestCancelMu.Lock()
+		delete(s.requestQueuedIDs, key)
+		delete(s.requestCanceledQueuedIDs, key)
+		delete(s.activeRequestCancelsByID, key)
+		cancel()
+		s.requestCancelMu.Unlock()
+	}
+}
+
+func lspRequestError(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, context.Canceled):
+		return jsonrpc2.NewError(int64(protocol.ErrorCodeRequestCancelled), "request cancelled")
+	case errors.Is(err, context.DeadlineExceeded):
+		return jsonrpc2.NewError(int64(protocol.ErrorCodeRequestFailed), "request timed out")
+	default:
+		return err
+	}
+}
+
 // unmarshalAndCall unmarshals request params into T using json/v2
 // and calls fn. The result is pre-marshaled with json/v2 so that
 // union types with MarshalJSONTo serialize correctly through the stdlib-based
@@ -238,7 +363,7 @@ func unmarshalAndCall[T any](req *jsonrpc2.Request, fn func(*T) (any, error)) (a
 	}
 	result, err := fn(&params)
 	if err != nil {
-		return nil, err
+		return nil, lspRequestError(err)
 	}
 	if result == nil {
 		return jsonNull, nil
