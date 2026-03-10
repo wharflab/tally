@@ -10,7 +10,7 @@ permissions:
   pull-requests: write
 env:
   GOEXPERIMENT: jsonv2
-  # Keep build flags in sync with .goreleaser.yml (tags, ldflags, trimpath).
+  # Keep build flags in sync with the shipped full-featured build shape.
   BUILD_TAGS: containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
   NOTES_REF: refs/notes/binary-size
 jobs:
@@ -25,12 +25,12 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - name: Build binary
+      - name: Build full-CGO binary
         run: |
-          CGO_ENABLED=0 go build -tags "$BUILD_TAGS" -trimpath -ldflags="-s -w" -o tally-bin .
+          CGO_ENABLED=1 go build -tags "$BUILD_TAGS" -trimpath -ldflags="-s -w" -o tally-bin .
           SIZE=$(stat --format='%s' tally-bin)
           echo "SIZE=$SIZE" >> "$GITHUB_ENV"
-          echo "Binary size: $SIZE bytes ($(numfmt --to=iec-i --suffix=B "$SIZE"))"
+          echo "Full-CGO Linux binary size: $SIZE bytes ($(numfmt --to=iec-i --suffix=B "$SIZE"))"
       - name: Fetch size notes
         run: git fetch origin "$NOTES_REF":"$NOTES_REF" 2>/dev/null || true
       - name: Record size (push to main)
@@ -38,7 +38,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git notes --ref=binary-size add -f -m "$SIZE" "$GITHUB_SHA"
+          git notes --ref="$NOTES_REF" add -f -m "$SIZE" "$GITHUB_SHA"
           git push origin "$NOTES_REF" 2>/dev/null || git push origin "$NOTES_REF" --force
       - name: Post size comment on PR
         if: github.event_name == 'pull_request'
@@ -53,7 +53,7 @@ jobs:
           declare -a LABELS=()
 
           while IFS= read -r sha; do
-            blob=$(git notes --ref=binary-size list "$sha" 2>/dev/null) || continue
+            blob=$(git notes --ref="$NOTES_REF" list "$sha" 2>/dev/null) || continue
             note=$(git cat-file -p "$blob")
             subject=$(git log --format='%s' -1 "$sha" 2>/dev/null | cut -c1-30)
             # Prepend (git log is newest-first, we reverse later).
@@ -105,6 +105,8 @@ jobs:
           read -r -d '' BODY <<BODYEOF || true
           ${MARKER}
           ## Binary Size Report
+
+          Measured artifact: full-CGO Linux binary built from this workflow.
 
           | | Size |
           |---|---|
