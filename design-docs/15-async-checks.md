@@ -270,11 +270,13 @@ We want:
 Implementation notes:
 
 - Use the maintained module path `go.podman.io/image/v5` (the legacy `github.com/containers/image/v5` path is deprecated).
-- Keep `tally` pure-Go (no CGO) by building with:
+- Keep `tally`'s shipped binary full-featured by building with CGO enabled
+  while still using build tags to avoid the `containers/image` transports we do
+  not ship:
   - `containers_image_openpgp` (avoid `gpgme`)
   - `containers_image_storage_stub` (avoid containers-storage transport + heavy deps)
   - `containers_image_docker_daemon_stub` (avoid docker-daemon transport)
-  and verify `CGO_ENABLED=0` builds in CI.
+  and verify `CGO_ENABLED=1` builds in CI.
 
 ### 7.2 Proposed resolver API
 
@@ -474,7 +476,7 @@ If we find incompatibilities, define an internal `ImageResolver` interface and:
 3. **Registry resolver (`go.podman.io/image/v5`)**:
    - resolve image config env + platform for `docker://` refs
    - respect buildah/podman config overrides via `types.SystemContext`
-   - enforce pure-Go build (stub/openpgp build tags; `CGO_ENABLED=0`)
+   - enforce full-featured CGO build (stub/openpgp build tags; `CGO_ENABLED=1`)
 4. **Rules**:
    - implement async-only `buildkit/InvalidBaseImagePlatform`
    - upgrade `buildkit/UndefinedVar` to optionally use resolved base image env (semantic propagation stays in the semantic model)

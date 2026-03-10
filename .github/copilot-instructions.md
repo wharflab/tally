@@ -166,7 +166,8 @@ Excludes tests, generated code, and packaging.
 
 ## Build Tags
 
-The project uses **pure-Go** build tags to avoid CGO dependencies:
+The project ships a **full-featured CGO-enabled** binary while still using
+build tags to disable `containers/image` transports we do not ship:
 
 ```text
 BUILDTAGS := containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
