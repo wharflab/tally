@@ -332,8 +332,8 @@ func (s *Server) startRequestContext(parent context.Context, id jsonrpc2.ID) (co
 		delete(s.requestQueuedIDs, key)
 		delete(s.requestCanceledQueuedIDs, key)
 		delete(s.activeRequestCancelsByID, key)
-		s.requestCancelMu.Unlock()
 		cancel()
+		s.requestCancelMu.Unlock()
 	}
 }
 
