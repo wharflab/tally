@@ -54,6 +54,9 @@ func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Viol
 		shellVariant := shell.VariantBash
 		if sem != nil {
 			if info := sem.StageInfo(stageIdx); info != nil {
+				if info.IsWindows() {
+					continue
+				}
 				shellVariant = info.ShellSetting.Variant
 				if !shellVariant.HasParser() {
 					continue

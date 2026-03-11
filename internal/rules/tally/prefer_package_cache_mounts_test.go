@@ -250,6 +250,14 @@ RUN ["npm", "install"]
 			WantViolations: 0,
 		},
 		{
+			Name: "windows powershell stage ignored",
+			Content: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["powershell", "-Command"]
+RUN npm install
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "heredoc run",
 			Content: `FROM python:3.13
 RUN <<EOF
