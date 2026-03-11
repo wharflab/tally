@@ -1,29 +1,17 @@
-//go:build cgo
-
 package shell
 
 import (
 	"path"
 	"strings"
 
-	sitter "github.com/tree-sitter/go-tree-sitter"
+	gotreesitter "github.com/odvcencio/gotreesitter"
 
-	tspowershell "github.com/wharflab/tally/internal/third_party/tree_sitter_powershell"
+	"github.com/wharflab/tally/internal/powershellast"
 )
-
-var powerShellLanguage = newPowerShellLanguage()
-
-func newPowerShellLanguage() *sitter.Language {
-	ptr := tspowershell.Language()
-	if ptr == nil {
-		return nil
-	}
-	return sitter.NewLanguage(ptr)
-}
 
 type powerShellArg struct {
 	text string
-	node sitter.Node
+	node *gotreesitter.Node
 }
 
 func powerShellCommandNames(script string) []string {
@@ -36,22 +24,13 @@ func powerShellCommandNames(script string) []string {
 }
 
 func findPowerShellCommands(script string, names ...string) []CommandInfo {
-	parser := sitter.NewParser()
-	defer parser.Close()
-
-	if powerShellLanguage == nil {
+	lang := powershellast.Language()
+	tree, source := powershellast.Parse(script)
+	query := powershellast.CommandsQuery()
+	if tree == nil || lang == nil || query == nil {
 		return nil
 	}
-	if err := parser.SetLanguage(powerShellLanguage); err != nil {
-		return nil
-	}
-
-	source := []byte(script)
-	tree := parser.Parse(source, nil)
-	if tree == nil {
-		return nil
-	}
-	defer tree.Close()
+	defer tree.Release()
 
 	nameSet := make(map[string]bool, len(names))
 	for _, name := range names {
@@ -59,26 +38,26 @@ func findPowerShellCommands(script string, names ...string) []CommandInfo {
 	}
 
 	var commands []CommandInfo
-	walkPowerShellTree(tree.RootNode(), func(node *sitter.Node) {
-		if node == nil || node.Kind() != "command" {
-			return
+	cursor := query.Exec(tree.RootNode(), lang, source)
+	for {
+		match, ok := cursor.Next()
+		if !ok {
+			break
 		}
-
-		nameNode := node.ChildByFieldName("command_name")
+		nameNode := match.CommandName
 		if nameNode == nil {
-			return
+			continue
 		}
-
-		name := normalizePowerShellCommandName(nameNode.Utf8Text(source))
+		name := normalizePowerShellCommandName(nameNode.Text(source))
 		if name == "" {
-			return
+			continue
 		}
 		if len(nameSet) > 0 && !nameSet[name] {
-			return
+			continue
 		}
 
-		start := nameNode.StartPosition()
-		end := nameNode.EndPosition()
+		start := nameNode.StartPoint()
+		end := nameNode.EndPoint()
 		info := CommandInfo{
 			Variant:  VariantPowerShell,
 			Name:     name,
@@ -87,11 +66,11 @@ func findPowerShellCommands(script string, names ...string) []CommandInfo {
 			EndCol:   int(end.Column),
 		}
 
-		for _, arg := range powerShellCommandArgs(node, source) {
+		for _, arg := range powerShellCommandArgs(match.CommandElements, source) {
 			info.Args = append(info.Args, arg.text)
 			if info.Subcommand == "" && !strings.HasPrefix(arg.text, "-") {
-				argStart := arg.node.StartPosition()
-				argEnd := arg.node.EndPosition()
+				argStart := arg.node.StartPoint()
+				argEnd := arg.node.EndPoint()
 				info.Subcommand = arg.text
 				info.SubcommandLine = int(argStart.Row)
 				info.SubcommandStartCol = int(argStart.Column)
@@ -100,38 +79,24 @@ func findPowerShellCommands(script string, names ...string) []CommandInfo {
 		}
 
 		commands = append(commands, info)
-	})
+	}
 
 	return commands
 }
 
-func walkPowerShellTree(node *sitter.Node, visit func(*sitter.Node)) {
-	if node == nil {
-		return
-	}
-	visit(node)
-	childCount := node.NamedChildCount()
-	for i := range childCount {
-		walkPowerShellTree(node.NamedChild(i), visit)
-	}
-}
-
-func powerShellCommandArgs(node *sitter.Node, source []byte) []powerShellArg {
-	elements := node.ChildByFieldName("command_elements")
+func powerShellCommandArgs(elements *gotreesitter.Node, source []byte) []powerShellArg {
 	if elements == nil {
 		return nil
 	}
 
-	cursor := elements.Walk()
-	defer cursor.Close()
-
-	children := elements.NamedChildren(cursor)
-	args := make([]powerShellArg, 0, len(children))
-	for _, child := range children {
-		if child.Kind() == "command_argument_sep" {
+	args := make([]powerShellArg, 0, elements.NamedChildCount())
+	childCount := elements.NamedChildCount()
+	for i := range childCount {
+		child := elements.NamedChild(i)
+		if child == nil || child.Type(powershellast.Language()) == "command_argument_sep" {
 			continue
 		}
-		text := strings.TrimSpace(child.Utf8Text(source))
+		text := strings.TrimSpace(child.Text(source))
 		if text == "" {
 			continue
 		}

@@ -1,0 +1,14 @@
+(comment) @comment
+(variable) @variable
+(decimal_integer_literal) @number
+(hexadecimal_integer_literal) @number
+(real_literal) @number
+(comparison_operator) @operator
+(file_redirection_operator) @operator
+(command_parameter) @parameter
+(member_name) @property
+(string_literal) @string
+(expandable_string_literal) @string
+(expandable_here_string_literal) @string
+(verbatim_string_characters) @string
+(verbatim_here_string_characters) @string

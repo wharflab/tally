@@ -5,103 +5,17 @@ before:
   hooks:
     - go mod tidy
 builds:
-  - id: tally-linux-amd64
+  - id: tally
     binary: tally
     env:
-      - CGO_ENABLED=1
       - GOEXPERIMENT=jsonv2
-      - CC=x86_64-linux-gnu-gcc
-      - CXX=x86_64-linux-gnu-g++
-    goos: [linux]
-    goarch: [amd64]
-    # Keep build flags in sync with .github/workflows/binary-size.yml (tags,
-    # ldflags, trimpath). Release builds run inside goreleaser-cross so every
-    # shipped binary includes the cgo-backed PowerShell parser.
-    tags:
-      - containers_image_openpgp
-      - containers_image_storage_stub
-      - containers_image_docker_daemon_stub
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X github.com/wharflab/tally/internal/version.version={{.Version}} -X github.com/wharflab/tally/internal/version.commit={{.Commit}}
-  - id: tally-linux-arm64
-    binary: tally
-    env:
-      - CGO_ENABLED=1
-      - GOEXPERIMENT=jsonv2
-      - CC=aarch64-linux-gnu-gcc
-      - CXX=aarch64-linux-gnu-g++
-    goos: [linux]
-    goarch: [arm64]
-    tags:
-      - containers_image_openpgp
-      - containers_image_storage_stub
-      - containers_image_docker_daemon_stub
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X github.com/wharflab/tally/internal/version.version={{.Version}} -X github.com/wharflab/tally/internal/version.commit={{.Commit}}
-  - id: tally-darwin-amd64
-    binary: tally
-    env:
-      - CGO_ENABLED=1
-      - GOEXPERIMENT=jsonv2
-      - CC=o64-clang
-      - CXX=o64-clang++
-    goos: [darwin]
-    goarch: [amd64]
-    tags:
-      - containers_image_openpgp
-      - containers_image_storage_stub
-      - containers_image_docker_daemon_stub
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X github.com/wharflab/tally/internal/version.version={{.Version}} -X github.com/wharflab/tally/internal/version.commit={{.Commit}}
-  - id: tally-darwin-arm64
-    binary: tally
-    env:
-      - CGO_ENABLED=1
-      - GOEXPERIMENT=jsonv2
-      - CC=oa64-clang
-      - CXX=oa64-clang++
-    goos: [darwin]
-    goarch: [arm64]
-    tags:
-      - containers_image_openpgp
-      - containers_image_storage_stub
-      - containers_image_docker_daemon_stub
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X github.com/wharflab/tally/internal/version.version={{.Version}} -X github.com/wharflab/tally/internal/version.commit={{.Commit}}
-  - id: tally-windows-amd64
-    binary: tally
-    env:
-      - CGO_ENABLED=1
-      - GOEXPERIMENT=jsonv2
-      - CC=x86_64-w64-mingw32-gcc
-      - CXX=x86_64-w64-mingw32-g++
-    goos: [windows]
-    goarch: [amd64]
-    tags:
-      - containers_image_openpgp
-      - containers_image_storage_stub
-      - containers_image_docker_daemon_stub
-    flags:
-      - -trimpath
-    ldflags:
-      - -s -w -X github.com/wharflab/tally/internal/version.version={{.Version}} -X github.com/wharflab/tally/internal/version.commit={{.Commit}}
-  - id: tally-windows-arm64
-    binary: tally
-    env:
-      - CGO_ENABLED=1
-      - GOEXPERIMENT=jsonv2
-      - CC=/llvm-mingw/bin/aarch64-w64-mingw32-gcc
-      - CXX=/llvm-mingw/bin/aarch64-w64-mingw32-g++
-    goos: [windows]
-    goarch: [arm64]
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
     tags:
       - containers_image_openpgp
       - containers_image_storage_stub
