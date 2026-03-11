@@ -202,11 +202,11 @@ func hasRemoteArchiveExtraction(cmdStr string, variant shell.Variant) bool {
 //   - An output filename (-o/-O) with a recognized archive extension.
 func hasArchiveURLArg(dlCmds []shell.CommandInfo) bool {
 	return slices.ContainsFunc(dlCmds, func(dl shell.CommandInfo) bool {
-		if url := shell.DownloadURL(&dl); url != "" && shell.IsArchiveURL(url) {
+		if slices.ContainsFunc(downloadURLs(&dl), shell.IsArchiveURL) {
 			return true
 		}
 		if outFile := shell.DownloadOutputFile(&dl); outFile != "" {
-			return shell.IsArchiveFilename(shell.Basename(outFile))
+			return shell.IsArchiveFilename(shell.Basename(outFile)) && downloadSourceURL(&dl) != ""
 		}
 		return false
 	})
@@ -336,12 +336,12 @@ func extractFixData(cmdStr string, variant shell.Variant, workdir string) (strin
 func findArchiveURL(dlCmds []shell.CommandInfo) string {
 	var archiveURL string
 	for _, dl := range dlCmds {
-		for _, arg := range dl.Args {
-			if shell.IsArchiveURL(arg) {
-				if archiveURL != "" && arg != archiveURL {
+		for _, url := range downloadURLs(&dl) {
+			if shell.IsArchiveURL(url) {
+				if archiveURL != "" && url != archiveURL {
 					return "" // multiple distinct archive URLs
 				}
-				archiveURL = arg
+				archiveURL = url
 			}
 		}
 	}
@@ -352,7 +352,7 @@ func findArchiveURL(dlCmds []shell.CommandInfo) string {
 			if outFile == "" || !shell.IsArchiveFilename(shell.Basename(outFile)) {
 				continue
 			}
-			if url := shell.DownloadURL(&dlCmds[i]); url != "" {
+			if url := downloadSourceURL(&dlCmds[i]); url != "" {
 				if archiveURL != "" && url != archiveURL {
 					return ""
 				}
@@ -361,6 +361,29 @@ func findArchiveURL(dlCmds []shell.CommandInfo) string {
 		}
 	}
 	return archiveURL
+}
+
+func downloadURLs(cmd *shell.CommandInfo) []string {
+	if cmd == nil {
+		return nil
+	}
+
+	urls := make([]string, 0, len(cmd.Args))
+	for _, arg := range cmd.Args {
+		url := shell.DropQuotes(arg)
+		if shell.IsURL(url) {
+			urls = append(urls, url)
+		}
+	}
+	return urls
+}
+
+func downloadSourceURL(cmd *shell.CommandInfo) string {
+	urls := downloadURLs(cmd)
+	if len(urls) == 0 {
+		return ""
+	}
+	return urls[len(urls)-1]
 }
 
 // findDownloadOutputFile returns the single output filename from download

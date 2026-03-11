@@ -124,6 +124,13 @@ RUN curl -fsSL "https://example.com/app.tar.gz?token=abc" | tar -xz -C /opt/
 `,
 			wantCount: 1,
 		},
+		{
+			name: "catch: proxy URL before real archive URL",
+			dockerfile: `FROM ubuntu:22.04
+RUN curl --proxy https://proxy.example.com:8443 -fsSL https://example.com/app.tar.gz | tar -xz -C /opt/
+`,
+			wantCount: 1,
+		},
 		// Non-matching patterns
 		{
 			name: "ignore: curl without extraction",
@@ -414,6 +421,15 @@ RUN curl -fsSL https://example.com/app.tar.gz | tar -xz
 			wantFix:  true,
 			wantURL:  "https://example.com/app.tar.gz",
 			wantDest: "/app",
+		},
+		{
+			name: "proxy URL before real archive URL",
+			dockerfile: `FROM ubuntu:22.04
+RUN curl --proxy https://proxy.example.com:8443 -fsSL https://example.com/app.tar.gz | tar -xz -C /opt
+`,
+			wantFix:  true,
+			wantURL:  "https://example.com/app.tar.gz",
+			wantDest: "/opt",
 		},
 		{
 			name: "explicit -C overrides WORKDIR",
