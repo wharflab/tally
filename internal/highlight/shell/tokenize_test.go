@@ -51,6 +51,17 @@ func TestTokenize_PowerShellUsesParserBackedPath(t *testing.T) {
 	assertHasToken(t, script, tokens, highlightcore.TokenVariable, 30, "$HOME")
 }
 
+func TestTokenize_PowerShellEmptyResultRemainsEmpty(t *testing.T) {
+	t.Parallel()
+
+	script := "C:\\app\\tool.exe\n"
+	tokens := Tokenize(script, myshell.VariantPowerShell)
+
+	if len(tokens) != 0 {
+		t.Fatalf("Tokenize() returned %d tokens, want 0: %+v", len(tokens), tokens)
+	}
+}
+
 func assertHasToken(
 	t *testing.T,
 	script string,
