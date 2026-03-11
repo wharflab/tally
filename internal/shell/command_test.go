@@ -234,6 +234,7 @@ func TestCommandInfo_PowerShellFlags(t *testing.T) {
 
 	cmd := CommandInfo{
 		Variant: VariantPowerShell,
+		Name:    "invoke-webrequest",
 		Args:    []string{"-Uri", "https://example.com/app.tar.gz", "-OutFile:C:\\tmp\\app.tar.gz", "-Verbose:$VerbosePreference"},
 	}
 
@@ -251,6 +252,37 @@ func TestCommandInfo_PowerShellFlags(t *testing.T) {
 	}
 	if got := cmd.CountFlag("-Verbose"); got != 1 {
 		t.Fatalf("CountFlag(-Verbose) = %d, want 1", got)
+	}
+}
+
+func TestCommandInfo_PowerShellNativeToolFlagsUseNativeParsing(t *testing.T) {
+	t.Parallel()
+
+	curlCmd := CommandInfo{
+		Variant: VariantPowerShell,
+		Name:    "curl",
+		Args:    []string{"-fsSL", "-o", "app.tar.gz", "https://example.com/app.tar.gz"},
+	}
+	if !curlCmd.HasFlag("-f") {
+		t.Fatal("expected curl -f flag to be present")
+	}
+	if !curlCmd.HasFlag("-s") {
+		t.Fatal("expected curl -s flag to be present")
+	}
+	if got := curlCmd.GetArgValue("-o"); got != "app.tar.gz" {
+		t.Fatalf("GetArgValue(-o) = %q, want %q", got, "app.tar.gz")
+	}
+
+	tarCmd := CommandInfo{
+		Variant: VariantPowerShell,
+		Name:    "tar",
+		Args:    []string{"--extract", "-f", "app.tar.gz", "-C", "/tools"},
+	}
+	if !tarCmd.HasFlag("--extract") {
+		t.Fatal("expected tar --extract flag to be present")
+	}
+	if got := tarCmd.GetArgValue("-C"); got != "/tools" {
+		t.Fatalf("GetArgValue(-C) = %q, want %q", got, "/tools")
 	}
 }
 

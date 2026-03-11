@@ -39,7 +39,7 @@ type CommandInfo struct {
 // Handles both short flags (-y) and long flags (--yes).
 // For short flags, also checks combined flags (e.g., -yq contains -y).
 func (c *CommandInfo) HasFlag(flag string) bool {
-	if c.Variant.IsPowerShell() {
+	if c.usesPowerShellFlagSyntax() {
 		return c.hasPowerShellFlag(flag)
 	}
 
@@ -85,7 +85,7 @@ func (c *CommandInfo) HasAnyFlag(flags ...string) bool {
 // CountFlag counts how many times a flag appears in the command.
 // Useful for checking flags like -q -q (equivalent to -qq).
 func (c *CommandInfo) CountFlag(flag string) int {
-	if c.Variant.IsPowerShell() {
+	if c.usesPowerShellFlagSyntax() {
 		return c.countPowerShellFlag(flag)
 	}
 
@@ -124,7 +124,7 @@ func (c *CommandInfo) HasAnyArg(args ...string) bool {
 // GetArgValue returns the value following a flag (e.g., "-q=2" returns "2").
 // Returns empty string if not found or no value.
 func (c *CommandInfo) GetArgValue(flag string) string {
-	if c.Variant.IsPowerShell() {
+	if c.usesPowerShellFlagSyntax() {
 		return c.getPowerShellArgValue(flag)
 	}
 
@@ -238,6 +238,19 @@ func FindCommands(script string, variant Variant, names ...string) []CommandInfo
 	})
 
 	return commands
+}
+
+func (c *CommandInfo) usesPowerShellFlagSyntax() bool {
+	if !c.Variant.IsPowerShell() {
+		return false
+	}
+
+	switch c.Name {
+	case invokeWebRequestCommand, iwrCommand:
+		return true
+	default:
+		return false
+	}
 }
 
 // findWrappedCommands finds commands within wrapper arguments.
