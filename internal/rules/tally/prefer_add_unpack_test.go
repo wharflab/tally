@@ -13,6 +13,35 @@ func TestPreferAddUnpackRule_Metadata(t *testing.T) {
 	snaps.MatchStandaloneJSON(t, NewPreferAddUnpackRule().Metadata())
 }
 
+func TestParseNonPOSIXCommands_UTF8Safe(t *testing.T) {
+	t.Parallel()
+
+	cmds, ok := parseNonPOSIXCommands(
+		`curl.exe -fsSL "https://example.com/äpp.tar.gz" -o C:\tmp\äpp.tar.gz && tar.exe -xf C:\tmp\äpp.tar.gz -C C:\tools`,
+	)
+	if !ok {
+		t.Fatal("parseNonPOSIXCommands returned ok=false")
+	}
+	if len(cmds) != 2 {
+		t.Fatalf("got %d commands, want 2", len(cmds))
+	}
+	if cmds[0].Name != "curl" {
+		t.Fatalf("first command name = %q, want %q", cmds[0].Name, "curl")
+	}
+	if got := cmds[0].Args[1]; got != `https://example.com/äpp.tar.gz` {
+		t.Fatalf("download URL arg = %q, want %q", got, `https://example.com/äpp.tar.gz`)
+	}
+	if got := cmds[0].Args[3]; got != `C:\tmp\äpp.tar.gz` {
+		t.Fatalf("output file arg = %q, want %q", got, `C:\tmp\äpp.tar.gz`)
+	}
+	if cmds[1].Name != "tar" {
+		t.Fatalf("second command name = %q, want %q", cmds[1].Name, "tar")
+	}
+	if got := cmds[1].Args[1]; got != `C:\tmp\äpp.tar.gz` {
+		t.Fatalf("extract archive arg = %q, want %q", got, `C:\tmp\äpp.tar.gz`)
+	}
+}
+
 func TestPreferAddUnpackRule_Check(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

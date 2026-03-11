@@ -17,6 +17,11 @@ import (
 // PreferAddUnpackRuleCode is the full rule code for the prefer-add-unpack rule.
 const PreferAddUnpackRuleCode = rules.TallyRulePrefix + "prefer-add-unpack"
 
+const (
+	nonPOSIXDownloadCommandCurl = "curl"
+	nonPOSIXDownloadCommandWget = "wget"
+)
+
 // PreferAddUnpackConfig is the configuration for the prefer-add-unpack rule.
 type PreferAddUnpackConfig struct {
 	// Enabled controls whether the rule is active. True by default.
@@ -208,7 +213,7 @@ func hasArchiveURLArg(dlCmds []shell.CommandInfo) bool {
 // semantics are fully captured by ADD --unpack are included; other extractors
 // (gunzip, unzip, etc.) would be silently dropped by the fix.
 var allowedFixCommands = map[string]bool{
-	"curl": true, "wget": true, // download
+	nonPOSIXDownloadCommandCurl: true, nonPOSIXDownloadCommandWget: true, // download
 	"invoke-webrequest": true, "iwr": true, // PowerShell download
 	"tar": true, // archive extraction (the only extractor ADD --unpack replaces)
 }
@@ -441,8 +446,9 @@ func parseNonPOSIXCommands(script string) ([]nonPOSIXCommandInfo, bool) {
 		tokens = tokens[:0]
 	}
 
-	for i := 0; i < len(script); i++ {
-		ch := rune(script[i])
+	runes := []rune(script)
+	for i := 0; i < len(runes); i++ {
+		ch := runes[i]
 		if quote != 0 {
 			if ch == quote {
 				quote = 0
@@ -461,7 +467,7 @@ func parseNonPOSIXCommands(script string) ([]nonPOSIXCommandInfo, bool) {
 			return nil, false
 		case '&':
 			flushCommand()
-			if i+1 < len(script) && script[i+1] == '&' {
+			if i+1 < len(runes) && runes[i+1] == '&' {
 				i++
 			}
 		default:
@@ -523,7 +529,7 @@ func extractFixDataNonPOSIX(cmds []nonPOSIXCommandInfo, workdir string) (string,
 
 func findNonPOSIXDownloadCommands(cmds []nonPOSIXCommandInfo) []nonPOSIXCommandInfo {
 	return slices.DeleteFunc(append([]nonPOSIXCommandInfo(nil), cmds...), func(cmd nonPOSIXCommandInfo) bool {
-		return cmd.Name != "curl" && cmd.Name != "wget"
+		return cmd.Name != nonPOSIXDownloadCommandCurl && cmd.Name != nonPOSIXDownloadCommandWget
 	})
 }
 
@@ -602,9 +608,9 @@ func findSingleExtractTarNonPOSIX(cmds []nonPOSIXCommandInfo) *shell.CommandInfo
 func nonPOSIXDownloadOutputFile(cmd nonPOSIXCommandInfo) string {
 	var short, long string
 	switch cmd.Name {
-	case "curl":
+	case nonPOSIXDownloadCommandCurl:
 		short, long = "-o", "--output"
-	case "wget":
+	case nonPOSIXDownloadCommandWget:
 		short, long = "-O", "--output-document"
 	default:
 		return ""
