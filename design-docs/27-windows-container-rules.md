@@ -1,6 +1,6 @@
 # 27. Windows and PowerShell Rules (`tally/windows/*`, `tally/powershell/*`)
 
-**Status:** Proposed (rule ideas — placeholder for future implementation)
+**Status:** In progress (core shell/parser support shipped; many rule ideas in this document remain proposed)
 **Prerequisite:** [26. Windows Container Support](26-windows-container-support.md) (platform detection in semantic model)
 
 ---
