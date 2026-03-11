@@ -118,8 +118,7 @@ design therefore needs an explicit normalization stage, not just ad hoc per-cons
 
 ### 5.4 Keep v1 pure Go
 
-PowerShell tree-sitter support is implemented through a pure-Go runtime, so
-the highlighting stack stays cgo-free from the repo's point of view.
+PowerShell tree-sitter or other cgo-backed parsers are plausible future work, but they should not block the initial replacement of Chroma.
 
 ### 5.5 Phase the rollout
 

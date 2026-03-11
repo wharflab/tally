@@ -4,12 +4,12 @@ GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
 export GIT_LFS_SKIP_SMUDGE=1
 
-# Build tags for the shipped full-featured build while disabling
-# containers/image transports we do not ship.
+# Build tags for the shipped full-featured build (keep CGO enabled while
+# disabling containers/image transports we do not ship).
 BUILDTAGS := containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
 
 build:
-	GOSUMDB=sum.golang.org go build -tags '$(BUILDTAGS)' -ldflags "-s -w" -o tally
+	GOSUMDB=sum.golang.org CGO_ENABLED=1 go build -tags '$(BUILDTAGS)' -ldflags "-s -w" -o tally
 
 intellij-plugin:
 	bash _integrations/intellij-tally/build/build.sh build
@@ -23,6 +23,7 @@ intellij-plugin-smoke:
 GOTESTSUM_VERSION := v1.13.0
 GOLANGCI_LINT_VERSION := $(shell cat .golangci-lint-version | tr -d '[:space:]')
 GORELEASER_VERSION := v2.13.3
+GORELEASER_CROSS_VERSION := v1.25.7
 DEADCODE_VERSION := v0.41.0
 
 test: bin/gotestsum-$(GOTESTSUM_VERSION)
@@ -156,8 +157,19 @@ clean:
 #   - UV_PUBLISH_TOKEN env var for PyPI
 #   - ~/.gem/credentials for RubyGems
 
-release: bin/goreleaser-$(GORELEASER_VERSION)
-	GOTOOLCHAIN=auto bin/goreleaser release --clean --snapshot
+release:
+	@mkdir -p .tmp/goreleaser-home
+	docker run --rm \
+		-e GOEXPERIMENT=$(GOEXPERIMENT) \
+		-e GOTOOLCHAIN=auto \
+		-e GITHUB_TOKEN \
+		-e HOME=/tmp/goreleaser-home \
+		-u "$$(id -u):$$(id -g)" \
+		-v "$(CURDIR)":/work \
+		-v "$(CURDIR)/.tmp/goreleaser-home":/tmp/goreleaser-home \
+		-w /work \
+		ghcr.io/goreleaser/goreleaser-cross:$(GORELEASER_CROSS_VERSION) \
+		release --clean --snapshot
 
 publish-prepare: release
 	cd packaging && ruby pack.rb prepare

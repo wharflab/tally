@@ -25,12 +25,12 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-      - name: Build shipped binary
+      - name: Build full-CGO binary
         run: |
-          go build -tags "$BUILD_TAGS" -trimpath -ldflags="-s -w" -o tally-bin .
+          CGO_ENABLED=1 go build -tags "$BUILD_TAGS" -trimpath -ldflags="-s -w" -o tally-bin .
           SIZE=$(stat --format='%s' tally-bin)
           echo "SIZE=$SIZE" >> "$GITHUB_ENV"
-          echo "Shipped Linux binary size: $SIZE bytes ($(numfmt --to=iec-i --suffix=B "$SIZE"))"
+          echo "Full-CGO Linux binary size: $SIZE bytes ($(numfmt --to=iec-i --suffix=B "$SIZE"))"
       - name: Fetch size notes
         run: git fetch origin "$NOTES_REF":"$NOTES_REF" 2>/dev/null || true
       - name: Record size (push to main)
@@ -106,7 +106,7 @@ jobs:
           ${MARKER}
           ## Binary Size Report
 
-          Measured artifact: shipped Linux binary built from this workflow.
+          Measured artifact: full-CGO Linux binary built from this workflow.
 
           | | Size |
           |---|---|

@@ -1,127 +1,116 @@
+//go:build cgo
+
 package powershell
 
 import (
 	"regexp"
 	"strings"
 
-	gotreesitter "github.com/odvcencio/gotreesitter"
+	sitter "github.com/tree-sitter/go-tree-sitter"
 
 	"github.com/wharflab/tally/internal/highlight/core"
-	"github.com/wharflab/tally/internal/powershellast"
-	"github.com/wharflab/tally/internal/powershellast/queries"
+	tspowershell "github.com/wharflab/tally/internal/third_party/tree_sitter_powershell"
 )
 
 var commandPathPattern = regexp.MustCompile(`^(?:[A-Za-z]:[\\/]|\.{1,2}[\\/]|~[\\/]|[\\/])`)
 
-const semanticPriority = 30
+var powerShellNodeTokenTypes = map[string]core.TokenType{
+	"comment":                         core.TokenComment,
+	"string_literal":                  core.TokenString,
+	"expandable_string_literal":       core.TokenString,
+	"expandable_here_string_literal":  core.TokenString,
+	"verbatim_string_characters":      core.TokenString,
+	"verbatim_here_string_characters": core.TokenString,
+	"variable":                        core.TokenVariable,
+	"decimal_integer_literal":         core.TokenNumber,
+	"hexadecimal_integer_literal":     core.TokenNumber,
+	"real_literal":                    core.TokenNumber,
+	"comparison_operator":             core.TokenOperator,
+	"file_redirection_operator":       core.TokenOperator,
+	"command_parameter":               core.TokenParameter,
+	"member_name":                     core.TokenProperty,
+}
+
+var powerShellLanguage = newPowerShellLanguage()
+
+func newPowerShellLanguage() *sitter.Language {
+	ptr := tspowershell.Language()
+	if ptr == nil {
+		return nil
+	}
+	return sitter.NewLanguage(ptr)
+}
 
 // Tokenize returns parser-backed semantic tokens for PowerShell snippets.
+// It keeps a conservative scope: comments, strings, variables, numbers,
+// operators, parameters, property names, and command names that are not
+// path-like native executables.
 func Tokenize(script string) []core.Token {
 	if script == "" {
 		return nil
 	}
 
-	lang := powershellast.Language()
-	query := powershellast.SemanticQuery()
-	tree, source := powershellast.Parse(script)
-	if tree == nil || lang == nil || query == nil {
+	parser := sitter.NewParser()
+	defer parser.Close()
+
+	if powerShellLanguage == nil {
 		return nil
 	}
-	defer tree.Release()
+	if err := parser.SetLanguage(powerShellLanguage); err != nil {
+		return nil
+	}
+
+	source := []byte(script)
+	tree := parser.Parse(source, nil)
+	if tree == nil {
+		return nil
+	}
+	defer tree.Close()
 
 	lines := strings.Split(script, "\n")
 	tokens := make([]core.Token, 0, 16)
-	cursor := query.Exec(tree.RootNode(), lang, source)
 
-	for {
-		match, ok := cursor.Next()
-		if !ok {
-			break
+	walk(tree.RootNode(), func(node *sitter.Node) {
+		if node == nil || !node.IsNamed() {
+			return
 		}
-		appendSemanticMatchTokens(lines, match, &tokens)
-	}
 
-	appendCommandTokens(lines, tree.RootNode(), lang, source, &tokens)
+		kind := node.Kind()
+		if typ, ok := powerShellNodeTokenTypes[kind]; ok {
+			appendNodeTokens(lines, node, typ, 30, 0, &tokens)
+			return
+		}
+
+		if kind == "command_name" {
+			text := strings.TrimSpace(node.Utf8Text(source))
+			if text == "" || commandPathPattern.MatchString(text) {
+				return
+			}
+			appendNodeTokens(lines, node, core.TokenFunction, 30, 0, &tokens)
+		}
+	})
 
 	return tokens
 }
 
-func appendSemanticMatchTokens(lines []string, match gotreesitter.QueryMatch, tokens *[]core.Token) {
-	switch match.PatternIndex {
-	case 0:
-		appendNodeTokens(lines, queries.MatchPattern0(match).Comment, core.TokenComment, false, tokens)
-	case 1:
-		appendNodeTokens(lines, queries.MatchPattern1(match).Variable, core.TokenVariable, false, tokens)
-	case 2:
-		appendNodeTokens(lines, queries.MatchPattern2(match).Number, core.TokenNumber, false, tokens)
-	case 3:
-		appendNodeTokens(lines, queries.MatchPattern3(match).Number, core.TokenNumber, false, tokens)
-	case 4:
-		appendNodeTokens(lines, queries.MatchPattern4(match).Number, core.TokenNumber, false, tokens)
-	case 5:
-		appendNodeTokens(lines, queries.MatchPattern5(match).Operator, core.TokenOperator, false, tokens)
-	case 6:
-		appendNodeTokens(lines, queries.MatchPattern6(match).Operator, core.TokenOperator, false, tokens)
-	case 7:
-		appendNodeTokens(lines, queries.MatchPattern7(match).Parameter, core.TokenParameter, false, tokens)
-	case 8:
-		appendNodeTokens(lines, queries.MatchPattern8(match).Property, core.TokenProperty, false, tokens)
-	case 9:
-		appendNodeTokens(lines, queries.MatchPattern9(match).String, core.TokenString, true, tokens)
-	case 10:
-		appendNodeTokens(lines, queries.MatchPattern10(match).String, core.TokenString, true, tokens)
-	case 11:
-		appendNodeTokens(lines, queries.MatchPattern11(match).String, core.TokenString, true, tokens)
-	case 12:
-		appendNodeTokens(lines, queries.MatchPattern12(match).String, core.TokenString, true, tokens)
-	case 13:
-		appendNodeTokens(lines, queries.MatchPattern13(match).String, core.TokenString, true, tokens)
-	}
-}
-
-func appendCommandTokens(
-	lines []string,
-	root *gotreesitter.Node,
-	lang *gotreesitter.Language,
-	source []byte,
-	tokens *[]core.Token,
-) {
-	commandQuery := powershellast.CommandsQuery()
-	if commandQuery == nil {
+func walk(node *sitter.Node, visit func(*sitter.Node)) {
+	if node == nil {
 		return
 	}
-
-	commandCursor := commandQuery.Exec(root, lang, source)
-	for {
-		match, ok := commandCursor.Next()
-		if !ok {
-			break
-		}
-		fn := match.CommandName
-		if fn == nil {
-			continue
-		}
-		text := strings.TrimSpace(fn.Text(source))
-		if text == "" || commandPathPattern.MatchString(text) {
-			continue
-		}
-		appendNodeTokens(lines, fn, core.TokenFunction, false, tokens)
+	visit(node)
+	childCount := node.NamedChildCount()
+	for i := range childCount {
+		walk(node.NamedChild(i), visit)
 	}
 }
 
-func appendNodeTokens(
-	lines []string,
-	node *gotreesitter.Node,
-	typ core.TokenType,
-	expandQuoted bool,
-	tokens *[]core.Token,
-) {
+func appendNodeTokens(lines []string, node *sitter.Node, typ core.TokenType, priority int, modifiers uint32, tokens *[]core.Token) {
 	if node == nil {
 		return
 	}
 
-	start := node.StartPoint()
-	end := node.EndPoint()
+	start := node.StartPosition()
+	end := node.EndPosition()
 	startLine := int(start.Row)
 	endLine := int(end.Row)
 	if startLine > endLine {
@@ -134,63 +123,28 @@ func appendNodeTokens(
 			continue
 		}
 
-		lineLen := len([]rune(lineContent))
-		startCol := 0
-		endCol := lineLen
+		startByte := 0
+		endByte := len(lineContent)
 		if line == startLine {
-			startCol = min(int(start.Column), lineLen)
+			startByte = int(start.Column)
 		}
 		if line == endLine {
-			endCol = min(int(end.Column), lineLen)
+			endByte = int(end.Column)
 		}
-		if expandQuoted && startLine == endLine {
-			expandedStart, expandedEnd := expandQuotedRuneRange(lineContent, startCol, endCol)
-			if expandedStart == startCol && expandedEnd == endCol && isDegenerateVariableString(lineContent, startCol, endCol) {
-				return
-			}
-			startCol, endCol = expandedStart, expandedEnd
-		}
-
+		startCol, endCol := core.RuneColsForByteRange(lineContent, startByte, endByte)
 		if endCol <= startCol {
 			continue
 		}
 
 		*tokens = append(*tokens, core.Token{
-			Line:     line,
-			StartCol: startCol,
-			EndCol:   endCol,
-			Type:     typ,
-			Priority: semanticPriority,
+			Line:      line,
+			StartCol:  startCol,
+			EndCol:    endCol,
+			Type:      typ,
+			Modifiers: modifiers,
+			Priority:  priority,
 		})
 	}
-}
-
-func expandQuotedRuneRange(line string, startCol, endCol int) (int, int) {
-	runes := []rune(line)
-	startCol = max(0, min(startCol, len(runes)))
-	endCol = max(startCol, min(endCol, len(runes)))
-	if startCol == 0 || endCol >= len(runes) {
-		return startCol, endCol
-	}
-
-	quote := runes[startCol-1]
-	if (quote != '"' && quote != '\'') || runes[endCol] != quote {
-		return startCol, endCol
-	}
-
-	return startCol - 1, endCol + 1
-}
-
-func isDegenerateVariableString(line string, startCol, endCol int) bool {
-	runes := []rune(line)
-	startCol = max(0, min(startCol, len(runes)))
-	endCol = max(startCol, min(endCol, len(runes)))
-	if endCol <= startCol {
-		return false
-	}
-
-	text := strings.TrimSpace(string(runes[startCol:endCol]))
-	return strings.HasPrefix(text, "$")
 }
 
 func lineContentAt(lines []string, line int) (string, bool) {

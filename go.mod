@@ -27,13 +27,13 @@ require (
 	github.com/moby/docker-image-spec v1.3.1
 	github.com/moby/patternmatcher v0.6.0
 	github.com/muesli/termenv v0.16.0
-	github.com/odvcencio/gotreesitter v0.6.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
 	github.com/owenrumney/go-sarif/v3 v3.3.0
 	github.com/sirupsen/logrus v1.9.4
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.11.0
+	github.com/tree-sitter/go-tree-sitter v0.24.0
 	github.com/urfave/cli/v3 v3.7.0
 	github.com/zricethezav/gitleaks/v8 v8.30.0
 	go.bug.st/lsp v0.1.3
@@ -105,6 +105,7 @@ require (
 	github.com/magiconair/properties v1.8.9 // indirect
 	github.com/maruel/natural v1.1.1 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
+	github.com/mattn/go-pointer v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.20 // indirect
 	github.com/mholt/archives v0.1.5 // indirect
 	github.com/mikelolasagasti/xz v1.0.1 // indirect

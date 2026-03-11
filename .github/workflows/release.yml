@@ -16,6 +16,7 @@ permissions:
 env:
   GOEXPERIMENT: jsonv2
   GOTOOLCHAIN: auto
+  GORELEASER_CROSS_VERSION: v1.25.7
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -27,19 +28,22 @@ jobs:
           lfs: true
       - name: Fetch all tags
         run: git fetch --force --tags
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-      - name: Set up GoReleaser
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          version: v2.13.3
-          install-only: true
-      - name: Run GoReleaser
+      - name: Run GoReleaser in goreleaser-cross
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: goreleaser release --clean
+        run: |
+          mkdir -p "${RUNNER_TEMP}/goreleaser-home"
+          docker run --rm \
+            -e GITHUB_TOKEN \
+            -e GOEXPERIMENT \
+            -e GOTOOLCHAIN \
+            -e HOME=/tmp/goreleaser-home \
+            -u "$(id -u):$(id -g)" \
+            -v "$PWD":/work \
+            -v "${RUNNER_TEMP}/goreleaser-home":/tmp/goreleaser-home \
+            -w /work \
+            "ghcr.io/goreleaser/goreleaser-cross:${GORELEASER_CROSS_VERSION}" \
+            release --clean
       - name: Preserve artifacts permissions with tar
         run: tar -cvf dist.tar dist/
       - uses: actions/upload-artifact@v7
