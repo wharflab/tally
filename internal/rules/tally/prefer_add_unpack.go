@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/util/system"
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
@@ -16,6 +17,11 @@ import (
 
 // PreferAddUnpackRuleCode is the full rule code for the prefer-add-unpack rule.
 const PreferAddUnpackRuleCode = rules.TallyRulePrefix + "prefer-add-unpack"
+
+const (
+	nonPOSIXDownloadCommandCurl = "curl"
+	nonPOSIXDownloadCommandWget = "wget"
+)
 
 // PreferAddUnpackConfig is the configuration for the prefer-add-unpack rule.
 type PreferAddUnpackConfig struct {
@@ -95,11 +101,12 @@ func (r *PreferAddUnpackRule) Check(input rules.LintInput) []rules.Violation {
 
 	for stageIdx, stage := range input.Stages {
 		shellVariant := shell.VariantBash
+		platformOS := "linux"
 		if sem != nil {
 			if info := sem.StageInfo(stageIdx); info != nil {
 				shellVariant = info.ShellSetting.Variant
-				if !shellVariant.IsParseable() {
-					continue
+				if info.IsWindows() {
+					platformOS = "windows"
 				}
 			}
 		}
@@ -110,10 +117,9 @@ func (r *PreferAddUnpackRule) Check(input rules.LintInput) []rules.Violation {
 
 		for _, cmd := range stage.Commands {
 			if wd, ok := cmd.(*instructions.WorkdirCommand); ok {
-				if path.IsAbs(wd.Path) {
-					workdir = path.Clean(wd.Path)
-				} else {
-					workdir = path.Clean(path.Join(workdir, wd.Path))
+				normalized, err := system.NormalizeWorkdir(workdir, wd.Path, platformOS)
+				if err == nil {
+					workdir = normalized
 				}
 				continue
 			}
@@ -158,6 +164,17 @@ func (r *PreferAddUnpackRule) resolveConfig(config any) PreferAddUnpackConfig {
 // Only tar-based extractions are detected since ADD --unpack does not handle
 // single-file decompressors (gunzip, bunzip2, etc.).
 func hasRemoteArchiveExtraction(cmdStr string, variant shell.Variant) bool {
+	if variant == shell.VariantCmd {
+		cmds, ok := parseNonPOSIXCommands(cmdStr)
+		if !ok {
+			return false
+		}
+		return hasRemoteArchiveExtractionNonPOSIX(cmds)
+	}
+	if !variant.HasParser() {
+		return false
+	}
+
 	dlCmds := shell.FindCommands(cmdStr, variant, shell.DownloadCommands...)
 	if len(dlCmds) == 0 {
 		return false
@@ -185,11 +202,11 @@ func hasRemoteArchiveExtraction(cmdStr string, variant shell.Variant) bool {
 //   - An output filename (-o/-O) with a recognized archive extension.
 func hasArchiveURLArg(dlCmds []shell.CommandInfo) bool {
 	return slices.ContainsFunc(dlCmds, func(dl shell.CommandInfo) bool {
-		if slices.ContainsFunc(dl.Args, shell.IsArchiveURL) {
+		if slices.ContainsFunc(downloadURLs(&dl), shell.IsArchiveURL) {
 			return true
 		}
 		if outFile := shell.DownloadOutputFile(&dl); outFile != "" {
-			return shell.IsArchiveFilename(shell.Basename(outFile))
+			return shell.IsArchiveFilename(shell.Basename(outFile)) && downloadSourceURL(&dl) != ""
 		}
 		return false
 	})
@@ -200,7 +217,8 @@ func hasArchiveURLArg(dlCmds []shell.CommandInfo) bool {
 // semantics are fully captured by ADD --unpack are included; other extractors
 // (gunzip, unzip, etc.) would be silently dropped by the fix.
 var allowedFixCommands = map[string]bool{
-	"curl": true, "wget": true, // download
+	nonPOSIXDownloadCommandCurl: true, nonPOSIXDownloadCommandWget: true, // download
+	"invoke-webrequest": true, "iwr": true, // PowerShell download
 	"tar": true, // archive extraction (the only extractor ADD --unpack replaces)
 }
 
@@ -258,6 +276,17 @@ func buildAddUnpackFix(
 // from the Dockerfile) is used as the extraction destination.
 // Returns ("", "", false) if the command contains non-download/extract commands.
 func extractFixData(cmdStr string, variant shell.Variant, workdir string) (string, string, bool) {
+	if variant == shell.VariantCmd {
+		cmds, ok := parseNonPOSIXCommands(cmdStr)
+		if !ok {
+			return "", "", false
+		}
+		return extractFixDataNonPOSIX(cmds, workdir)
+	}
+	if !variant.HasParser() {
+		return "", "", false
+	}
+
 	// Check that ALL commands in the script are download or extraction commands
 	for _, name := range shell.CommandNamesWithVariant(cmdStr, variant) {
 		if !allowedFixCommands[name] {
@@ -307,12 +336,12 @@ func extractFixData(cmdStr string, variant shell.Variant, workdir string) (strin
 func findArchiveURL(dlCmds []shell.CommandInfo) string {
 	var archiveURL string
 	for _, dl := range dlCmds {
-		for _, arg := range dl.Args {
-			if shell.IsArchiveURL(arg) {
-				if archiveURL != "" && arg != archiveURL {
+		for _, url := range downloadURLs(&dl) {
+			if shell.IsArchiveURL(url) {
+				if archiveURL != "" && url != archiveURL {
 					return "" // multiple distinct archive URLs
 				}
-				archiveURL = arg
+				archiveURL = url
 			}
 		}
 	}
@@ -323,7 +352,7 @@ func findArchiveURL(dlCmds []shell.CommandInfo) string {
 			if outFile == "" || !shell.IsArchiveFilename(shell.Basename(outFile)) {
 				continue
 			}
-			if url := shell.DownloadURL(&dlCmds[i]); url != "" {
+			if url := downloadSourceURL(&dlCmds[i]); url != "" {
 				if archiveURL != "" && url != archiveURL {
 					return ""
 				}
@@ -332,6 +361,29 @@ func findArchiveURL(dlCmds []shell.CommandInfo) string {
 		}
 	}
 	return archiveURL
+}
+
+func downloadURLs(cmd *shell.CommandInfo) []string {
+	if cmd == nil {
+		return nil
+	}
+
+	urls := make([]string, 0, len(cmd.Args))
+	for _, arg := range cmd.Args {
+		url := shell.DropQuotes(arg)
+		if shell.IsURL(url) {
+			urls = append(urls, url)
+		}
+	}
+	return urls
+}
+
+func downloadSourceURL(cmd *shell.CommandInfo) string {
+	urls := downloadURLs(cmd)
+	if len(urls) == 0 {
+		return ""
+	}
+	return urls[len(urls)-1]
 }
 
 // findDownloadOutputFile returns the single output filename from download
@@ -378,6 +430,239 @@ func findSingleExtractTar(cmdStr string, variant shell.Variant) *shell.CommandIn
 		}
 	}
 	return extractTar
+}
+
+type nonPOSIXCommandInfo struct {
+	Name string
+	Args []string
+}
+
+// parseNonPOSIXCommands tokenizes simple cmd.exe RUN bodies into commands
+// separated by '&' or '&&'. It intentionally rejects pipelines because cmd
+// piping semantics differ from the POSIX stream model this rule handles via
+// shell parsing.
+func parseNonPOSIXCommands(script string) ([]nonPOSIXCommandInfo, bool) {
+	var (
+		token    strings.Builder
+		tokens   []string
+		commands []nonPOSIXCommandInfo
+		quote    rune
+	)
+
+	flushToken := func() {
+		if token.Len() == 0 {
+			return
+		}
+		tokens = append(tokens, token.String())
+		token.Reset()
+	}
+	flushCommand := func() {
+		flushToken()
+		if len(tokens) == 0 {
+			return
+		}
+		name := normalizeNonPOSIXCommandName(tokens[0])
+		if name == "" {
+			tokens = tokens[:0]
+			return
+		}
+		commands = append(commands, nonPOSIXCommandInfo{
+			Name: name,
+			Args: append([]string(nil), tokens[1:]...),
+		})
+		tokens = tokens[:0]
+	}
+
+	runes := []rune(script)
+	for i := 0; i < len(runes); i++ {
+		ch := runes[i]
+		if quote != 0 {
+			if ch == quote {
+				quote = 0
+				continue
+			}
+			token.WriteRune(ch)
+			continue
+		}
+
+		switch ch {
+		case '"':
+			quote = ch
+		case ' ', '\t', '\r', '\n':
+			flushToken()
+		case '|':
+			return nil, false
+		case '&':
+			flushCommand()
+			if i+1 < len(runes) && runes[i+1] == '&' {
+				i++
+			}
+		default:
+			token.WriteRune(ch)
+		}
+	}
+	if quote != 0 {
+		return nil, false
+	}
+	flushCommand()
+	return commands, len(commands) > 0
+}
+
+func normalizeNonPOSIXCommandName(name string) string {
+	name = strings.ToLower(path.Base(strings.ReplaceAll(dropCmdQuotes(name), `\`, "/")))
+	return strings.TrimSuffix(name, ".exe")
+}
+
+func hasRemoteArchiveExtractionNonPOSIX(cmds []nonPOSIXCommandInfo) bool {
+	dlCmds := findNonPOSIXDownloadCommands(cmds)
+	if len(dlCmds) == 0 || !hasArchiveDownloadNonPOSIX(dlCmds) {
+		return false
+	}
+	return findSingleExtractTarNonPOSIX(cmds) != nil
+}
+
+func extractFixDataNonPOSIX(cmds []nonPOSIXCommandInfo, workdir string) (string, string, bool) {
+	for _, cmd := range cmds {
+		if !allowedFixCommands[cmd.Name] {
+			return "", "", false
+		}
+	}
+
+	dlCmds := findNonPOSIXDownloadCommands(cmds)
+	archiveURL := findArchiveURLNonPOSIX(dlCmds)
+	if archiveURL == "" {
+		return "", "", false
+	}
+
+	outFile := findDownloadOutputFileNonPOSIX(dlCmds)
+	extractTar := findSingleExtractTarNonPOSIX(cmds)
+	if extractTar == nil || hasTarSemanticFlags(extractTar) {
+		return "", "", false
+	}
+
+	if outFile != "" &&
+		!slices.Contains(extractTar.Args, outFile) &&
+		!slices.Contains(extractTar.Args, shell.Basename(outFile)) {
+		return "", "", false
+	}
+
+	dest := workdir
+	if d := shell.TarDestination(extractTar); d != "" {
+		dest = d
+	}
+
+	return archiveURL, dest, true
+}
+
+func findNonPOSIXDownloadCommands(cmds []nonPOSIXCommandInfo) []nonPOSIXCommandInfo {
+	return slices.DeleteFunc(append([]nonPOSIXCommandInfo(nil), cmds...), func(cmd nonPOSIXCommandInfo) bool {
+		return cmd.Name != nonPOSIXDownloadCommandCurl && cmd.Name != nonPOSIXDownloadCommandWget
+	})
+}
+
+func hasArchiveDownloadNonPOSIX(dlCmds []nonPOSIXCommandInfo) bool {
+	return slices.ContainsFunc(dlCmds, func(dl nonPOSIXCommandInfo) bool {
+		if url := nonPOSIXDownloadURL(dl, true); url != "" {
+			return true
+		}
+		if outFile := nonPOSIXDownloadOutputFile(dl); outFile != "" {
+			return shell.IsArchiveFilename(cmdBasename(outFile)) && nonPOSIXDownloadURL(dl, false) != ""
+		}
+		return false
+	})
+}
+
+func findArchiveURLNonPOSIX(dlCmds []nonPOSIXCommandInfo) string {
+	var archiveURL string
+	for _, dl := range dlCmds {
+		if url := nonPOSIXDownloadURL(dl, true); url != "" {
+			if archiveURL != "" && url != archiveURL {
+				return ""
+			}
+			archiveURL = url
+		}
+	}
+	if archiveURL != "" {
+		return archiveURL
+	}
+
+	for _, dl := range dlCmds {
+		outFile := nonPOSIXDownloadOutputFile(dl)
+		if outFile == "" || !shell.IsArchiveFilename(cmdBasename(outFile)) {
+			continue
+		}
+		if url := nonPOSIXDownloadURL(dl, false); url != "" {
+			if archiveURL != "" && url != archiveURL {
+				return ""
+			}
+			archiveURL = url
+		}
+	}
+	return archiveURL
+}
+
+func findDownloadOutputFileNonPOSIX(dlCmds []nonPOSIXCommandInfo) string {
+	var outFile string
+	for _, dl := range dlCmds {
+		if f := nonPOSIXDownloadOutputFile(dl); f != "" {
+			if outFile != "" && f != outFile {
+				return ""
+			}
+			outFile = f
+		}
+	}
+	return outFile
+}
+
+func findSingleExtractTarNonPOSIX(cmds []nonPOSIXCommandInfo) *shell.CommandInfo {
+	var extractTar *shell.CommandInfo
+	for _, cmd := range cmds {
+		if cmd.Name != "tar" {
+			continue
+		}
+		tarCmd := shell.CommandInfo{Name: "tar", Args: append([]string(nil), cmd.Args...)}
+		if !shell.IsTarExtract(&tarCmd) {
+			continue
+		}
+		if extractTar != nil {
+			return nil
+		}
+		extractTar = &tarCmd
+	}
+	return extractTar
+}
+
+func nonPOSIXDownloadOutputFile(cmd nonPOSIXCommandInfo) string {
+	return shell.DownloadOutputFile(&shell.CommandInfo{
+		Name: cmd.Name,
+		Args: append([]string(nil), cmd.Args...),
+	})
+}
+
+func nonPOSIXDownloadURL(cmd nonPOSIXCommandInfo, archiveOnly bool) string {
+	url := ""
+	if i := slices.IndexFunc(cmd.Args, func(arg string) bool { return shell.IsURL(dropCmdQuotes(arg)) }); i >= 0 {
+		url = dropCmdQuotes(cmd.Args[i])
+	}
+	if !archiveOnly || shell.IsArchiveURL(url) {
+		return url
+	}
+	return ""
+}
+
+func dropCmdQuotes(s string) string {
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
+
+func cmdBasename(p string) string {
+	p = dropCmdQuotes(p)
+	if i := strings.LastIndexByte(p, '\\'); i >= 0 {
+		p = p[i+1:]
+	}
+	return path.Base(p)
 }
 
 // init registers the rule with the default registry.

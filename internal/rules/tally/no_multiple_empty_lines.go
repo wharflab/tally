@@ -245,7 +245,7 @@ func isEmptyLine(line string) bool {
 // buildSkipLinesForEmptyLines builds a set of line indices (0-based) that should be
 // skipped by this rule. We skip:
 //   - COPY heredoc bodies (opaque file content)
-//   - RUN heredoc bodies when the shell variant is not parseable
+//   - RUN heredoc bodies when the shell variant has no parser support
 func buildSkipLinesForEmptyLines(input rules.LintInput, sm *sourcemap.SourceMap) map[int]bool {
 	skip := make(map[int]bool)
 
@@ -282,7 +282,7 @@ func buildSkipLinesForEmptyLines(input rules.LintInput, sm *sourcemap.SourceMap)
 	return skip
 }
 
-// isHeredocParseable checks if a RUN heredoc at the given line has a parseable shell variant.
+// isHeredocParseable checks if a RUN heredoc at the given line has parser support.
 func isHeredocParseable(
 	sem *semantic.Model, stages []instructions.Stage, runLine int, sm *sourcemap.SourceMap,
 ) bool {
@@ -303,7 +303,7 @@ func isHeredocParseable(
 
 	for _, override := range info.HeredocShellOverrides {
 		if override.Line == runLine {
-			return override.Variant.IsParseable()
+			return override.Variant.HasParser()
 		}
 	}
 
@@ -311,7 +311,7 @@ func isHeredocParseable(
 		return false
 	}
 
-	return info.ShellSetting.Variant.IsParseable()
+	return info.ShellSetting.Variant.HasParser()
 }
 
 // hasUnknownShebang checks if the heredoc body starting after runLine has a

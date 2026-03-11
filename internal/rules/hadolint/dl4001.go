@@ -155,8 +155,7 @@ type toolTrackingDL4001 struct {
 }
 
 // recordToolUsage checks for wget/curl usage and records it.
-// Skips analysis for non-POSIX shells (e.g., PowerShell) since shell
-// command parsing doesn't apply to them.
+// Skips shells without parser support.
 func (r *DL4001Rule) recordToolUsage(
 	cmdStr string,
 	shellVariant shell.Variant,
@@ -164,8 +163,7 @@ func (r *DL4001Rule) recordToolUsage(
 	loc rules.Location,
 	t *toolTrackingDL4001,
 ) {
-	// Skip shell command analysis for non-POSIX shells
-	if !shellVariant.IsParseable() {
+	if !shellVariant.HasParser() {
 		return
 	}
 

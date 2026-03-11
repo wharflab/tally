@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"slices"
 	"testing"
 )
 
@@ -228,6 +229,63 @@ func TestCommandInfo_GetArgValue(t *testing.T) {
 	}
 }
 
+func TestCommandInfo_PowerShellFlags(t *testing.T) {
+	t.Parallel()
+
+	cmd := CommandInfo{
+		Variant: VariantPowerShell,
+		Name:    "invoke-webrequest",
+		Args:    []string{"-Uri", "https://example.com/app.tar.gz", "-OutFile:C:\\tmp\\app.tar.gz", "-Verbose:$VerbosePreference"},
+	}
+
+	if !cmd.HasFlag("-uri") {
+		t.Fatal("expected -Uri flag to be present")
+	}
+	if !cmd.HasFlag("-outfile") {
+		t.Fatal("expected -OutFile flag to be present")
+	}
+	if got := cmd.GetArgValue("-Uri"); got != "https://example.com/app.tar.gz" {
+		t.Fatalf("GetArgValue(-Uri) = %q, want %q", got, "https://example.com/app.tar.gz")
+	}
+	if got := cmd.GetArgValue("-OutFile"); got != `C:\tmp\app.tar.gz` {
+		t.Fatalf("GetArgValue(-OutFile) = %q, want %q", got, `C:\tmp\app.tar.gz`)
+	}
+	if got := cmd.CountFlag("-Verbose"); got != 1 {
+		t.Fatalf("CountFlag(-Verbose) = %d, want 1", got)
+	}
+}
+
+func TestCommandInfo_PowerShellNativeToolFlagsUseNativeParsing(t *testing.T) {
+	t.Parallel()
+
+	curlCmd := CommandInfo{
+		Variant: VariantPowerShell,
+		Name:    "curl",
+		Args:    []string{"-fsSL", "-o", "app.tar.gz", "https://example.com/app.tar.gz"},
+	}
+	if !curlCmd.HasFlag("-f") {
+		t.Fatal("expected curl -f flag to be present")
+	}
+	if !curlCmd.HasFlag("-s") {
+		t.Fatal("expected curl -s flag to be present")
+	}
+	if got := curlCmd.GetArgValue("-o"); got != "app.tar.gz" {
+		t.Fatalf("GetArgValue(-o) = %q, want %q", got, "app.tar.gz")
+	}
+
+	tarCmd := CommandInfo{
+		Variant: VariantPowerShell,
+		Name:    "tar",
+		Args:    []string{"--extract", "-f", "app.tar.gz", "-C", "/tools"},
+	}
+	if !tarCmd.HasFlag("--extract") {
+		t.Fatal("expected tar --extract flag to be present")
+	}
+	if got := tarCmd.GetArgValue("-C"); got != "/tools" {
+		t.Fatalf("GetArgValue(-C) = %q, want %q", got, "/tools")
+	}
+}
+
 func TestFindCommands(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -313,6 +371,44 @@ func TestFindCommands(t *testing.T) {
 				t.Errorf("first command subcommand = %q, want %q", cmds[0].Subcommand, tt.wantSubcmd)
 			}
 		})
+	}
+}
+
+func TestFindCommands_PowerShell(t *testing.T) {
+	t.Parallel()
+
+	script := `Invoke-WebRequest https://example.com/app.tar.gz -OutFile C:\tmp\app.tar.gz; tar.exe -xf C:\tmp\app.tar.gz -C C:\tools`
+	cmds := FindCommands(script, VariantPowerShell, "invoke-webrequest", "tar")
+	if len(cmds) != 2 {
+		t.Fatalf("expected 2 commands, got %d", len(cmds))
+	}
+
+	if cmds[0].Name != "invoke-webrequest" {
+		t.Fatalf("first command name = %q, want %q", cmds[0].Name, "invoke-webrequest")
+	}
+	if cmds[0].Subcommand != "https://example.com/app.tar.gz" {
+		t.Fatalf("first subcommand = %q, want url", cmds[0].Subcommand)
+	}
+	if got := cmds[0].GetArgValue("-OutFile"); got != `C:\tmp\app.tar.gz` {
+		t.Fatalf("GetArgValue(-OutFile) = %q, want %q", got, `C:\tmp\app.tar.gz`)
+	}
+
+	if cmds[1].Name != "tar" {
+		t.Fatalf("second command name = %q, want %q", cmds[1].Name, "tar")
+	}
+	if !IsTarExtract(&cmds[1]) {
+		t.Fatal("expected tar command to be detected as extract")
+	}
+}
+
+func TestCommandNamesWithVariant_PowerShell(t *testing.T) {
+	t.Parallel()
+
+	script := `iwr -Uri https://example.com/app.tar.xz -OutFile C:\tmp\app.tar.xz; tar.exe --extract -f C:\tmp\app.tar.xz -C C:\tools`
+	got := CommandNamesWithVariant(script, VariantPowerShell)
+	want := []string{"iwr", "tar"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("CommandNamesWithVariant() = %v, want %v", got, want)
 	}
 }
 

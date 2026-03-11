@@ -13,6 +13,35 @@ func TestPreferAddUnpackRule_Metadata(t *testing.T) {
 	snaps.MatchStandaloneJSON(t, NewPreferAddUnpackRule().Metadata())
 }
 
+func TestParseNonPOSIXCommands_UTF8Safe(t *testing.T) {
+	t.Parallel()
+
+	cmds, ok := parseNonPOSIXCommands(
+		`curl.exe -fsSL "https://example.com/äpp.tar.gz" -o C:\tmp\äpp.tar.gz && tar.exe -xf C:\tmp\äpp.tar.gz -C C:\tools`,
+	)
+	if !ok {
+		t.Fatal("parseNonPOSIXCommands returned ok=false")
+	}
+	if len(cmds) != 2 {
+		t.Fatalf("got %d commands, want 2", len(cmds))
+	}
+	if cmds[0].Name != "curl" {
+		t.Fatalf("first command name = %q, want %q", cmds[0].Name, "curl")
+	}
+	if got := cmds[0].Args[1]; got != `https://example.com/äpp.tar.gz` {
+		t.Fatalf("download URL arg = %q, want %q", got, `https://example.com/äpp.tar.gz`)
+	}
+	if got := cmds[0].Args[3]; got != `C:\tmp\äpp.tar.gz` {
+		t.Fatalf("output file arg = %q, want %q", got, `C:\tmp\äpp.tar.gz`)
+	}
+	if cmds[1].Name != "tar" {
+		t.Fatalf("second command name = %q, want %q", cmds[1].Name, "tar")
+	}
+	if got := cmds[1].Args[1]; got != `C:\tmp\äpp.tar.gz` {
+		t.Fatalf("extract archive arg = %q, want %q", got, `C:\tmp\äpp.tar.gz`)
+	}
+}
+
 func TestPreferAddUnpackRule_Check(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -92,6 +121,13 @@ RUN curl -fsSL https://example.com/data.gz -o /tmp/data.gz && gunzip /tmp/data.g
 			name: "catch: URL with query string",
 			dockerfile: `FROM ubuntu:22.04
 RUN curl -fsSL "https://example.com/app.tar.gz?token=abc" | tar -xz -C /opt/
+`,
+			wantCount: 1,
+		},
+		{
+			name: "catch: proxy URL before real archive URL",
+			dockerfile: `FROM ubuntu:22.04
+RUN curl --proxy https://proxy.example.com:8443 -fsSL https://example.com/app.tar.gz | tar -xz -C /opt/
 `,
 			wantCount: 1,
 		},
@@ -183,6 +219,50 @@ RUN curl ftp://mirror.example.com/data.tar.gz -o /tmp/data.tar.gz && tar -xf /tm
 `,
 			wantCount: 1,
 		},
+		{
+			name: "catch: powershell Invoke-WebRequest then tar.exe",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["powershell", "-Command"]
+RUN Invoke-WebRequest https://example.com/app.tar.gz -OutFile C:\tmp\app.tar.gz; tar.exe -xf C:\tmp\app.tar.gz -C C:\tools
+`,
+			wantCount: 1,
+		},
+		{
+			name: "catch: powershell iwr with -Uri then tar.exe",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["pwsh", "-Command"]
+RUN iwr -Uri https://example.com/app.tar.xz -OutFile C:\tmp\app.tar.xz; tar.exe --extract -f C:\tmp\app.tar.xz -C C:\tools
+`,
+			wantCount: 1,
+		},
+		{
+			name: "catch: windows default cmd curl.exe then tar.exe",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN curl.exe -fsSL https://example.com/app.tar.gz -o C:\tmp\app.tar.gz && tar.exe -xf C:\tmp\app.tar.gz -C C:\tools
+`,
+			wantCount: 1,
+		},
+		{
+			name: "catch: windows default cmd wget.exe output archive name",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN wget.exe https://example.com/latest -O C:\tmp\app.tar.gz && tar.exe -xf C:\tmp\app.tar.gz -C C:\tools
+`,
+			wantCount: 1,
+		},
+		{
+			name: "ignore: windows default cmd semicolon is not a separator",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN curl.exe -fsSL https://example.com/app.tar.gz -o C:\tmp\app.tar.gz; tar.exe -xf C:\tmp\app.tar.gz -C C:\tools
+`,
+			wantCount: 0,
+		},
+		{
+			name: "ignore: windows default cmd single quotes are literal",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN curl.exe -fsSL 'https://example.com/app.tar.gz' -o C:\tmp\app.tar.gz && tar.exe -xf C:\tmp\app.tar.gz -C C:\tools
+`,
+			wantCount: 0,
+		},
 		// URL without archive extension, but output filename has one
 		{
 			name: "catch: curl -o archive name, URL has no extension",
@@ -202,6 +282,14 @@ RUN wget https://foo.com/latest -O /tmp/app.tar.gz && tar -xf /tmp/app.tar.gz -C
 			name: "ignore: curl -o non-archive name, URL has no extension",
 			dockerfile: `FROM ubuntu:22.04
 RUN curl https://foo.com/latest -o setup.sh && chmod +x setup.sh
+`,
+			wantCount: 0,
+		},
+		{
+			name: "ignore: powershell zip plus Expand-Archive",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["powershell", "-Command"]
+RUN Invoke-WebRequest https://example.com/app.zip -OutFile C:\tmp\app.zip; Expand-Archive -Path C:\tmp\app.zip -DestinationPath C:\tools
 `,
 			wantCount: 0,
 		},
@@ -335,6 +423,15 @@ RUN curl -fsSL https://example.com/app.tar.gz | tar -xz
 			wantDest: "/app",
 		},
 		{
+			name: "proxy URL before real archive URL",
+			dockerfile: `FROM ubuntu:22.04
+RUN curl --proxy https://proxy.example.com:8443 -fsSL https://example.com/app.tar.gz | tar -xz -C /opt
+`,
+			wantFix:  true,
+			wantURL:  "https://example.com/app.tar.gz",
+			wantDest: "/opt",
+		},
+		{
 			name: "explicit -C overrides WORKDIR",
 			dockerfile: `FROM ubuntu:22.04
 WORKDIR /app
@@ -372,6 +469,44 @@ RUN wget https://foo.com/latest -O /tmp/app.tar.gz && tar -xf /tmp/app.tar.gz -C
 			wantFix:  true,
 			wantURL:  "https://foo.com/latest",
 			wantDest: "/opt",
+		},
+		{
+			name: "powershell Invoke-WebRequest then tar.exe",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["powershell", "-Command"]
+RUN Invoke-WebRequest https://example.com/app.tar.gz -OutFile C:\tmp\app.tar.gz; tar.exe -xf C:\tmp\app.tar.gz -C C:\tools
+`,
+			wantFix:  true,
+			wantURL:  "https://example.com/app.tar.gz",
+			wantDest: `C:\tools`,
+		},
+		{
+			name: "windows default cmd curl.exe then tar.exe",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN curl.exe -fsSL https://example.com/app.tar.gz -o C:\tmp\app.tar.gz && tar.exe -xf C:\tmp\app.tar.gz -C C:\tools
+`,
+			wantFix:  true,
+			wantURL:  "https://example.com/app.tar.gz",
+			wantDest: `C:\tools`,
+		},
+		{
+			name: "windows WORKDIR used as default dest when no -C",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+WORKDIR C:\app
+RUN curl.exe -fsSL https://example.com/app.tar.gz -o C:\tmp\app.tar.gz && tar.exe -xf C:\tmp\app.tar.gz
+`,
+			wantFix:  true,
+			wantURL:  "https://example.com/app.tar.gz",
+			wantDest: `\app`,
+		},
+		{
+			name: "no fix: powershell extra cleanup command",
+			dockerfile: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"SHELL [\"powershell\", \"-Command\"]\n" +
+				"RUN Invoke-WebRequest https://example.com/app.tar.gz -OutFile C:\\tmp\\app.tar.gz; " +
+				"tar.exe -xf C:\\tmp\\app.tar.gz -C C:\\tools; " +
+				"Remove-Item C:\\tmp\\app.tar.gz -Force\n",
+			wantFix: false,
 		},
 	}
 

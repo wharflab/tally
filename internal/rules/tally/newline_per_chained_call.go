@@ -110,7 +110,7 @@ func (r *NewlinePerChainedCallRule) Check(input rules.LintInput) []rules.Violati
 		if sem != nil {
 			if info := sem.StageInfo(stageIdx); info != nil {
 				shellVariant = info.ShellSetting.Variant
-				if !shellVariant.IsParseable() {
+				if !shellVariant.SupportsPOSIXShellAST() {
 					continue
 				}
 			}

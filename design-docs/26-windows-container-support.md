@@ -429,7 +429,7 @@ This has two implications:
 | `tally/prefer-run-heredoc` | **Must suppress** for Windows stages |
 | `tally/prefer-copy-heredoc` | **Must suppress** for Windows stages |
 | `tally/prefer-package-cache-mounts` | **Must suppress** for Windows stages (`--mount=type=cache` fails at runtime) |
-| `tally/prefer-add-unpack` | Needs investigation — does `ADD --checksum` work on Windows? |
+| `tally/prefer-add-unpack` | Supported on Windows — `ADD --unpack` is implemented in the BuildKit frontend and works for Windows container builds too |
 | `tally/windows/no-stopsignal` | **New rule** — warn on `STOPSIGNAL` in Windows stages (no-op at runtime) |
 | `tally/windows/no-run-mounts` | **New rule** — warn on `RUN --mount=type=*` in Windows stages (runtime failure) |
 | `hadolint/DL3020` (ADD→COPY) | Still valid on Windows |

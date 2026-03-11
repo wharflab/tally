@@ -24,6 +24,10 @@ Modern Dockerfiles deserve modern tooling. tally is opinionated in the right pla
 - **Modernizes on purpose**: converts eligible `RUN`/`COPY` instructions to heredocs, prefers `ADD --extract`, and more.
 - **Broad rule coverage**: combines Docker's official BuildKit checks, embedded ShellCheck for shell snippets, Hadolint-compatible rules, and
   tally-specific rules.
+- **PowerShell-aware**: parses full PowerShell syntax for semantic tokens and rule analysis, so PowerShell `RUN` instructions are treated as real
+  code instead of opaque strings.
+- **Windows-container aware**: detects Windows container OS, understands Windows paths and default shells, and recognizes `cmd.exe` and
+  PowerShell-specific build patterns.
 - **Registry-aware without Docker**: uses a Podman-compatible registry client for image metadata checks (no daemon required).
 - **Editor + CI friendly**: VS Code extension (`wharflab.tally`, powered by `tally lsp`) and outputs for JSON, SARIF, and GitHub Actions annotations.
 - **Easy to install anywhere**: Homebrew, Go, npm, pip, and RubyGems.
@@ -38,8 +42,10 @@ Dockerfile linting usually means picking a compromise:
 - **`docker buildx --check`** runs Docker's official BuildKit checks, but it requires the Docker/buildx toolchain and can be heavier than a pure
   static linter (and not always available if you're using Podman/Finch/other runtimes).
 
-Roadmap: more auto-fixes, more Hadolint parity, richer registry-aware checks, and higher-level rules (cache & tmpfs mount recommendations,
-tooling-aware checks for uv/bun, line-length and layer optimizations).
+Roadmap: more auto-fixes, more Hadolint parity, richer registry-aware checks, higher-level rules (cache & tmpfs mount recommendations,
+tooling-aware checks for uv/bun, line-length and layer optimizations), and dedicated `tally/powershell/*` plus `tally/windows/*` rule families
+for Windows-container and PowerShell-specific mistakes. That is a category of Dockerfile linting that Hadolint and other mainstream linters do
+not cover today.
 
 ## Optional: AI AutoFix via ACP
 

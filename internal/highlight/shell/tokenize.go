@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/wharflab/tally/internal/highlight/core"
+	highlightpowershell "github.com/wharflab/tally/internal/highlight/powershell"
 	myshell "github.com/wharflab/tally/internal/shell"
 
 	shsyntax "mvdan.cc/sh/v3/syntax"
@@ -20,7 +21,13 @@ func Tokenize(script string, variant myshell.Variant) []core.Token {
 	if script == "" {
 		return nil
 	}
-	if !variant.IsParseable() {
+	if variant.IsPowerShell() {
+		if tokens := highlightpowershell.Tokenize(script); tokens != nil {
+			return tokens
+		}
+		return lexicalTokens(script)
+	}
+	if !variant.SupportsPOSIXShellAST() {
 		return lexicalTokens(script)
 	}
 
@@ -163,21 +170,8 @@ func lineContentAt(lines []string, line int) (string, bool) {
 }
 
 func byteColumnToRuneColumn(line string, byteCol int) int {
-	byteCol = clampByteIndex(line, byteCol)
+	byteCol = core.ClampByteIndex(line, byteCol)
 	return utf8.RuneCountInString(line[:byteCol])
-}
-
-func clampByteIndex(line string, idx int) int {
-	if idx <= 0 {
-		return 0
-	}
-	if idx >= len(line) {
-		return len(line)
-	}
-	for idx < len(line) && !utf8.RuneStart(line[idx]) {
-		idx--
-	}
-	return idx
 }
 
 func lexicalTokens(script string) []core.Token {
@@ -198,7 +192,7 @@ func lexicalTokens(script string) []core.Token {
 		}
 
 		for _, idx := range shellStringPattern.FindAllStringIndex(line, -1) {
-			startCol, endCol := runeColsForByteRange(line, idx[0], idx[1])
+			startCol, endCol := core.RuneColsForByteRange(line, idx[0], idx[1])
 			tokens = append(tokens, core.Token{
 				Line:     lineNum,
 				StartCol: startCol,
@@ -208,7 +202,7 @@ func lexicalTokens(script string) []core.Token {
 			})
 		}
 		for _, idx := range shellVarPattern.FindAllStringIndex(line, -1) {
-			startCol, endCol := runeColsForByteRange(line, idx[0], idx[1])
+			startCol, endCol := core.RuneColsForByteRange(line, idx[0], idx[1])
 			tokens = append(tokens, core.Token{
 				Line:     lineNum,
 				StartCol: startCol,
@@ -227,7 +221,7 @@ func lexicalTokens(script string) []core.Token {
 			continue
 		}
 		if idx := strings.Index(line, first); idx >= 0 {
-			startCol, endCol := runeColsForByteRange(line, idx, idx+len(first))
+			startCol, endCol := core.RuneColsForByteRange(line, idx, idx+len(first))
 			tokens = append(tokens, core.Token{
 				Line:     lineNum,
 				StartCol: startCol,
@@ -238,13 +232,4 @@ func lexicalTokens(script string) []core.Token {
 		}
 	}
 	return tokens
-}
-
-func runeColsForByteRange(line string, startByte, endByte int) (int, int) {
-	startByte = clampByteIndex(line, startByte)
-	endByte = max(clampByteIndex(line, endByte), startByte)
-
-	startCol := utf8.RuneCountInString(line[:startByte])
-	endCol := startCol + utf8.RuneCountInString(line[startByte:endByte])
-	return startCol, endCol
 }

@@ -114,7 +114,7 @@ func (r *DL4006Rule) initStageState(sem *semantic.Model, stageIdx int) dl4006Sta
 			// per-instruction tracking in the main loop handles SHELL changes.
 			if info.ShellSetting.Source != semantic.ShellSourceInstruction {
 				state.shellVariant = info.ShellSetting.Variant
-				state.isNonPOSIX = !info.ShellSetting.Variant.IsParseable()
+				state.isNonPOSIX = !info.ShellSetting.Variant.SupportsPOSIXShellAST()
 			}
 		}
 	}
@@ -180,7 +180,7 @@ func isNonPOSIXShellCmd(shellCmd []string) bool {
 	if len(shellCmd) == 0 {
 		return false
 	}
-	return !shell.VariantFromShell(shellCmd[0]).IsParseable()
+	return !shell.VariantFromShell(shellCmd[0]).SupportsPOSIXShellAST()
 }
 
 // hasPipefailOption checks if a SHELL instruction array sets -o pipefail

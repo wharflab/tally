@@ -1,10 +1,10 @@
+---
 extends: default
-
 rules:
   line-length:
     max: 270
   document-start:
-    present: false
+    present: true
   truthy:
     allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
     check-keys: false

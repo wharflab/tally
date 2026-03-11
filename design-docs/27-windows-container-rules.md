@@ -1,6 +1,6 @@
 # 27. Windows and PowerShell Rules (`tally/windows/*`, `tally/powershell/*`)
 
-**Status:** Proposed (rule ideas — placeholder for future implementation)
+**Status:** In progress (core shell/parser support shipped; many rule ideas in this document remain proposed)
 **Prerequisite:** [26. Windows Container Support](26-windows-container-support.md) (platform detection in semantic model)
 
 ---
@@ -72,7 +72,7 @@ lumped `cmd.exe` and `powershell` together, but they're very different:
 | **Command chaining** | `&&`, `&` | `;`, pipeline | `&&`, `;`, pipeline |
 | **ShellCheck applicable** | No | No | Yes |
 | **Heredoc applicable** | No | Partial (see note) | Yes (BuildKit) |
-| **Script parsing** | No parser available | Could parse (future) | mvdan.cc/sh |
+| **Script parsing** | No parser available | tree-sitter-backed command parsing | mvdan.cc/sh |
 
 **Note on PowerShell heredoc:** BuildKit's Dockerfile heredoc (`RUN <<EOF`) can work with PowerShell
 as the active shell. For a single heredoc without a shebang, BuildKit passes the heredoc content
