@@ -27,7 +27,7 @@ func Tokenize(script string, variant myshell.Variant) []core.Token {
 		}
 		return lexicalTokens(script)
 	}
-	if !variant.IsParseable() {
+	if !variant.SupportsPOSIXShellAST() {
 		return lexicalTokens(script)
 	}
 

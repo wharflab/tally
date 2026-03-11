@@ -31,12 +31,19 @@ const (
 	// VariantCmd is the Windows cmd.exe command interpreter.
 	VariantCmd
 
-	// VariantUnknown is an unrecognized shell. Treated conservatively: not parseable,
+	// VariantUnknown is an unrecognized shell. Treated conservatively: no parser support,
 	// not ShellCheck-compatible, not PowerShell.
 	VariantUnknown Variant = 0
 
-	// variantParseable are shells whose scripts can be parsed by mvdan.cc/sh.
-	variantParseable = VariantBash | VariantPOSIX | VariantMksh | VariantZsh
+	// variantParser are shells with a dedicated parser backend wired into Tally.
+	// This is the generic "can we build a syntax tree?" capability used by rules
+	// that only need structured commands, not POSIX-specific shell semantics.
+	variantParser = VariantBash | VariantPOSIX | VariantMksh | VariantZsh | VariantPowerShell
+
+	// variantPOSIXShellAST are shells represented by the shared mvdan.cc/sh AST.
+	// Only these variants may use parseScript/toLangVariant and the helpers built
+	// on POSIX shell syntax/semantics.
+	variantPOSIXShellAST = VariantBash | VariantPOSIX | VariantMksh | VariantZsh
 
 	// variantShellCheck are shells that ShellCheck can analyze
 	// (zsh is mapped to the bash dialect; ShellCheck has no native zsh support).
@@ -46,9 +53,13 @@ const (
 	variantHeredoc = VariantBash | VariantPOSIX | VariantMksh | VariantZsh
 )
 
-// IsParseable returns true for shells whose scripts can be parsed by mvdan.cc/sh.
-// Use this to guard shell AST analysis, command extraction, and chained-command counting.
-func (v Variant) IsParseable() bool { return v&variantParseable != 0 }
+// HasParser returns true for shells with any parser backend wired into Tally.
+// Use this to guard generic syntax-tree features such as command extraction.
+func (v Variant) HasParser() bool { return v&variantParser != 0 }
+
+// SupportsPOSIXShellAST returns true for shells represented by mvdan.cc/sh.
+// Use this to guard helpers that depend on POSIX shell syntax/semantics.
+func (v Variant) SupportsPOSIXShellAST() bool { return v&variantPOSIXShellAST != 0 }
 
 // IsShellCheckCompatible returns true for shells that ShellCheck can analyze.
 // Use this to guard ShellCheck WASM invocation.
@@ -139,9 +150,10 @@ func VariantFromShellCmd(shellCmd []string) Variant {
 }
 
 // toLangVariant converts our Variant to mvdan.cc/sh's LangVariant.
-// Only meaningful for parseable variants; callers should check IsParseable() first.
+// Only meaningful for POSIX-shell AST variants; callers should check
+// SupportsPOSIXShellAST() first.
 func (v Variant) toLangVariant() syntax.LangVariant {
-	//nolint:exhaustive // composite mask constants (variantParseable, etc.) are capability sets, not individual variants
+	//nolint:exhaustive // composite mask constants (variantParser, variantPOSIXShellAST, etc.) are capability sets, not individual variants
 	switch v {
 	case VariantBash:
 		return syntax.LangBash
@@ -153,7 +165,7 @@ func (v Variant) toLangVariant() syntax.LangVariant {
 		return syntax.LangZsh
 	default:
 		// Can't be parsed by mvdan.cc/sh. Fallback to Bash —
-		// callers should have checked IsParseable() first.
+		// callers should have checked SupportsPOSIXShellAST() first.
 		return syntax.LangBash
 	}
 }
@@ -203,7 +215,7 @@ func CommandNamesWithVariant(script string, variant Variant) []string {
 	if variant.IsPowerShell() {
 		return powerShellCommandNames(script)
 	}
-	if !variant.IsParseable() {
+	if !variant.SupportsPOSIXShellAST() {
 		return simpleCommandNames(script)
 	}
 

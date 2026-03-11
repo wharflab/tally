@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/util/system"
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
@@ -100,9 +101,13 @@ func (r *PreferAddUnpackRule) Check(input rules.LintInput) []rules.Violation {
 
 	for stageIdx, stage := range input.Stages {
 		shellVariant := shell.VariantBash
+		platformOS := "linux"
 		if sem != nil {
 			if info := sem.StageInfo(stageIdx); info != nil {
 				shellVariant = info.ShellSetting.Variant
+				if info.IsWindows() {
+					platformOS = "windows"
+				}
 			}
 		}
 
@@ -112,10 +117,9 @@ func (r *PreferAddUnpackRule) Check(input rules.LintInput) []rules.Violation {
 
 		for _, cmd := range stage.Commands {
 			if wd, ok := cmd.(*instructions.WorkdirCommand); ok {
-				if path.IsAbs(wd.Path) {
-					workdir = path.Clean(wd.Path)
-				} else {
-					workdir = path.Clean(path.Join(workdir, wd.Path))
+				normalized, err := system.NormalizeWorkdir(workdir, wd.Path, platformOS)
+				if err == nil {
+					workdir = normalized
 				}
 				continue
 			}
@@ -167,7 +171,7 @@ func hasRemoteArchiveExtraction(cmdStr string, variant shell.Variant) bool {
 		}
 		return hasRemoteArchiveExtractionNonPOSIX(cmds)
 	}
-	if !variant.IsPowerShell() && !variant.IsParseable() {
+	if !variant.HasParser() {
 		return false
 	}
 
@@ -279,7 +283,7 @@ func extractFixData(cmdStr string, variant shell.Variant, workdir string) (strin
 		}
 		return extractFixDataNonPOSIX(cmds, workdir)
 	}
-	if !variant.IsPowerShell() && !variant.IsParseable() {
+	if !variant.HasParser() {
 		return "", "", false
 	}
 

@@ -105,7 +105,7 @@ func (r *RequireSecretMountsRule) Check(input rules.LintInput) []rules.Violation
 		if sem != nil {
 			if info := sem.StageInfo(stageIdx); info != nil {
 				shellVariant = info.ShellSetting.Variant
-				if !shellVariant.IsParseable() {
+				if !shellVariant.HasParser() {
 					continue
 				}
 			}

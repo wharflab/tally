@@ -511,24 +511,31 @@ func TestToLangVariant(t *testing.T) {
 func TestVariantCapabilities(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		variant              Variant
-		parseable            bool
-		shellCheckCompatible bool
-		supportsHeredoc      bool
-		isPowerShell         bool
+		variant               Variant
+		hasParser             bool
+		supportsPOSIXShellAST bool
+		shellCheckCompatible  bool
+		supportsHeredoc       bool
+		isPowerShell          bool
 	}{
-		{VariantBash, true, true, true, false},
-		{VariantPOSIX, true, true, true, false},
-		{VariantMksh, true, true, true, false},
-		{VariantZsh, true, true, true, false},
-		{VariantPowerShell, false, false, false, true},
-		{VariantCmd, false, false, false, false},
-		{VariantUnknown, false, false, false, false},
+		{VariantBash, true, true, true, true, false},
+		{VariantPOSIX, true, true, true, true, false},
+		{VariantMksh, true, true, true, true, false},
+		{VariantZsh, true, true, true, true, false},
+		{VariantPowerShell, true, false, false, false, true},
+		{VariantCmd, false, false, false, false, false},
+		{VariantUnknown, false, false, false, false, false},
 	}
 
 	for _, tt := range tests {
-		if got := tt.variant.IsParseable(); got != tt.parseable {
-			t.Errorf("Variant(%d).IsParseable() = %v, want %v", tt.variant, got, tt.parseable)
+		if got := tt.variant.HasParser(); got != tt.hasParser {
+			t.Errorf("Variant(%d).HasParser() = %v, want %v", tt.variant, got, tt.hasParser)
+		}
+		if got := tt.variant.SupportsPOSIXShellAST(); got != tt.supportsPOSIXShellAST {
+			t.Errorf(
+				"Variant(%d).SupportsPOSIXShellAST() = %v, want %v",
+				tt.variant, got, tt.supportsPOSIXShellAST,
+			)
 		}
 		if got := tt.variant.IsShellCheckCompatible(); got != tt.shellCheckCompatible {
 			t.Errorf("Variant(%d).IsShellCheckCompatible() = %v, want %v", tt.variant, got, tt.shellCheckCompatible)

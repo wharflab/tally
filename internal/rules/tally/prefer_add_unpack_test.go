@@ -474,6 +474,16 @@ RUN curl.exe -fsSL https://example.com/app.tar.gz -o C:\tmp\app.tar.gz && tar.ex
 			wantDest: `C:\tools`,
 		},
 		{
+			name: "windows WORKDIR used as default dest when no -C",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+WORKDIR C:\app
+RUN curl.exe -fsSL https://example.com/app.tar.gz -o C:\tmp\app.tar.gz && tar.exe -xf C:\tmp\app.tar.gz
+`,
+			wantFix:  true,
+			wantURL:  "https://example.com/app.tar.gz",
+			wantDest: `\app`,
+		},
+		{
 			name: "no fix: powershell extra cleanup command",
 			dockerfile: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
 				"SHELL [\"powershell\", \"-Command\"]\n" +
