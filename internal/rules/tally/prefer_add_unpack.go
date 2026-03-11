@@ -606,37 +606,10 @@ func findSingleExtractTarNonPOSIX(cmds []nonPOSIXCommandInfo) *shell.CommandInfo
 }
 
 func nonPOSIXDownloadOutputFile(cmd nonPOSIXCommandInfo) string {
-	var short, long string
-	switch cmd.Name {
-	case nonPOSIXDownloadCommandCurl:
-		short, long = "-o", "--output"
-	case nonPOSIXDownloadCommandWget:
-		short, long = "-O", "--output-document"
-	default:
-		return ""
-	}
-	for i, arg := range cmd.Args {
-		if after, found := strings.CutPrefix(arg, long+"="); found {
-			if after == "-" {
-				return ""
-			}
-			return after
-		}
-		if after, found := strings.CutPrefix(arg, short); found && after != "" {
-			if after == "-" {
-				return ""
-			}
-			return after
-		}
-		if (arg == short || arg == long) && i+1 < len(cmd.Args) {
-			val := cmd.Args[i+1]
-			if val == "-" {
-				return ""
-			}
-			return val
-		}
-	}
-	return ""
+	return shell.DownloadOutputFile(&shell.CommandInfo{
+		Name: cmd.Name,
+		Args: append([]string(nil), cmd.Args...),
+	})
 }
 
 func nonPOSIXDownloadURL(cmd nonPOSIXCommandInfo, archiveOnly bool) string {
