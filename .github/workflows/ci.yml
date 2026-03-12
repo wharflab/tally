@@ -28,6 +28,7 @@ jobs:
         run: |
           GOTESTSUM_BIN=$(make -s print-gotestsum-bin)
           make "$GOTESTSUM_BIN"
+          mkdir -p coverage
           # Exclude scripts/* from coverage collection (they are tooling, not product code).
           COVERPKG=$(go list ./... | grep -v '/scripts/' | paste -sd, -)
           "$GOTESTSUM_BIN" --format testname --junitfile junit.xml -- \
@@ -35,7 +36,6 @@ jobs:
       - name: Run integration tests with coverage
         run: |
           # Integration tests use -cover build and write binary coverage data
-          mkdir -p coverage
           GOTESTSUM_BIN=$(make -s print-gotestsum-bin)
           GOCOVERDIR="$(pwd)/coverage" "$GOTESTSUM_BIN" --format testname --junitfile junit-integration.xml -- ./internal/integration/...
       - name: Run LSP protocol tests with coverage
@@ -43,16 +43,17 @@ jobs:
           # LSP black-box tests launch tally lsp --stdio as a subprocess
           GOTESTSUM_BIN=$(make -s print-gotestsum-bin)
           GOCOVERDIR="$(pwd)/coverage" "$GOTESTSUM_BIN" --format testname --junitfile junit-lsptest.xml -- ./internal/lsptest/...
-          # Convert all binary coverage data (integration + LSP) to text format
+          # Convert all binary coverage data (integration + LSP) to text format.
           go tool covdata textfmt -i=coverage -o=coverage-integration.txt
+          # Merge unit + black-box coverage into a single Go coverprofile for Codecov.
+          bash scripts/merge-go-coverprofiles.sh coverage-merged.out coverage.out coverage-integration.txt
           # Force generated code to 100% coverage to avoid skewing project totals.
-          bash scripts/filter-go-coverprofile.sh coverage.out coverage.filtered.out
-          bash scripts/filter-go-coverprofile.sh coverage-integration.txt coverage-integration.filtered.txt
+          bash scripts/filter-go-coverprofile.sh coverage-merged.out coverage.filtered.out
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
-          files: coverage.filtered.out,coverage-integration.filtered.txt
+          files: coverage.filtered.out
           fail_ci_if_error: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}

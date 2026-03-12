@@ -55,7 +55,7 @@ func TestMain(m *testing.M) {
 			_ = os.RemoveAll(tmpDir)
 			panic("failed to create coverage directory: " + err.Error())
 		}
-		buildArgs = append(buildArgs, "-cover")
+		buildArgs = append(buildArgs, "-cover", "-covermode=atomic")
 	}
 	buildArgs = append(buildArgs, "-o", binaryPath, "github.com/wharflab/tally")
 
