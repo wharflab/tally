@@ -56,13 +56,21 @@ func geminiAcpCommand(t *testing.T) []string {
 	}
 
 	extraArgs := strings.Fields(os.Getenv("ACP_GEMINI_TEST_ARGS"))
-	return append([]string{geminiBin, "--experimental-acp"}, extraArgs...)
+	baseArgs := make([]string, 0, 4+len(extraArgs))
+	baseArgs = append(
+		baseArgs,
+		geminiBin,
+		"--experimental-acp",
+		"--allowed-mcp-server-names=none",
+		"--model=gemini-3-flash-preview",
+	)
+	return append(baseArgs, extraArgs...)
 }
 
 func geminiSmokeConfig(agentCmd []string) string {
 	return fmt.Sprintf(`[ai]
 enabled = true
-timeout = "90s"
+timeout = "5m"
 redact-secrets = false
 command = %s
 

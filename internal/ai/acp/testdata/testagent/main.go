@@ -137,16 +137,21 @@ func (a *testAgent) Prompt(ctx context.Context, params acpsdk.PromptRequest) (ac
 	}
 
 	if a.mode == "multistage" {
-		out := "```Dockerfile\n" +
-			"FROM golang:1.22-alpine AS builder\n" +
-			"WORKDIR /src\n" +
-			"COPY . .\n" +
-			"RUN go build -o /out/app ./cmd/app\n" +
-			"\n" +
-			"FROM alpine:3.20\n" +
-			"WORKDIR /src\n" +
-			"COPY --from=builder /out/app /usr/local/bin/app\n" +
-			"CMD [\"app\"]\n" +
+		out := "```diff\n" +
+			"diff --git a/Dockerfile b/Dockerfile\n" +
+			"--- a/Dockerfile\n" +
+			"+++ b/Dockerfile\n" +
+			"@@ -1,5 +1,9 @@\n" +
+			"-FROM golang:1.22-alpine\n" +
+			"+FROM golang:1.22-alpine AS builder\n" +
+			" WORKDIR /src\n" +
+			" COPY . .\n" +
+			" RUN go build -o /out/app ./cmd/app\n" +
+			"+\n" +
+			"+FROM alpine:3.20\n" +
+			"+WORKDIR /src\n" +
+			"+COPY --from=builder /out/app /usr/local/bin/app\n" +
+			" CMD [\"app\"]\n" +
 			"```\n"
 
 		if err := a.conn.SessionUpdate(ctx, acpsdk.SessionNotification{

@@ -173,7 +173,7 @@ func lintCommand() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:    "acp-command",
-				Usage:   "ACP agent command line (e.g. \"gemini --experimental-acp\")",
+				Usage:   "ACP agent command line (e.g. \"gemini --experimental-acp --allowed-mcp-server-names=none --model=gemini-3-flash-preview\")",
 				Sources: cli.EnvVars("TALLY_ACP_COMMAND"),
 			},
 			&cli.StringFlag{

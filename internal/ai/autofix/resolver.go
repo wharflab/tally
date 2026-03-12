@@ -17,6 +17,7 @@ import (
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/linter"
+	patchutil "github.com/wharflab/tally/internal/patch"
 	"github.com/wharflab/tally/internal/processor"
 	"github.com/wharflab/tally/internal/rules"
 )
@@ -25,6 +26,13 @@ const (
 	maxAgentRounds       = 2
 	maxMalformedRetries  = 1
 	unreachableStagesKey = "tally/no-unreachable-stages"
+)
+
+type agentOutputMode string
+
+const (
+	agentOutputPatch      agentOutputMode = "patch"
+	agentOutputDockerfile agentOutputMode = "dockerfile"
 )
 
 type resolver struct {
@@ -112,9 +120,10 @@ func (r *resolver) proposeMultiStageDockerfile(
 	timeout time.Duration,
 	origParse *dockerfile.ParseResult,
 ) ([]byte, error) {
-	roundInput := original
+	roundInput := []byte(normalizeLF(string(original)))
 	var proposed []byte
 	var blocking []blockingIssue
+	mode := agentOutputPatch
 
 	rp := roundPromptParams{
 		filePath:  filePath,
@@ -123,23 +132,37 @@ func (r *resolver) proposeMultiStageDockerfile(
 		origParse: origParse,
 	}
 	for round := 1; round <= maxAgentRounds; round++ {
+	retryCurrentRound:
 		rp.input = roundInput
 		rp.proposed = proposed
 		rp.blocking = blocking
-		prompt, err := buildRoundPrompt(round, rp)
+		prompt, err := buildRoundPrompt(round, rp, mode)
 		if err != nil {
 			return nil, err
 		}
 
-		parsed, noChange, err := r.runAndParseRound(ctx, filePath, cfg, timeout, prompt, roundInput)
+		result, err := r.runRound(ctx, filePath, cfg, timeout, prompt, roundInput, mode)
+		var fallbackErr *patchFallbackError
+		if errors.As(err, &fallbackErr) {
+			mode = agentOutputDockerfile
+			goto retryCurrentRound
+		}
 		if err != nil {
 			return nil, err
 		}
-		if noChange {
+		if result.noChange {
 			return nil, nil
 		}
 
-		proposed = []byte(parsed)
+		proposed = result.proposed
+		if mode == agentOutputPatch {
+			blocking = validateMultiStagePatch(result.patchMeta)
+			if len(blocking) > 0 {
+				roundInput = proposed
+				continue
+			}
+		}
+
 		proposed, blocking, err = r.checkProposal(ctx, filePath, proposed, cfg, origParse, req.FixContext)
 		if err != nil {
 			return nil, err
@@ -165,59 +188,105 @@ type roundPromptParams struct {
 	origParse *dockerfile.ParseResult
 }
 
-func buildRoundPrompt(round int, p roundPromptParams) (string, error) {
+func buildRoundPrompt(round int, p roundPromptParams, mode agentOutputMode) (string, error) {
 	switch round {
 	case 1:
-		return buildRound1Prompt(p.filePath, p.input, p.req, p.cfg, p.origParse)
+		return buildRound1Prompt(p.filePath, p.input, p.req, p.cfg, p.origParse, mode)
 	case 2:
-		return buildRound2Prompt(p.filePath, p.proposed, p.blocking, p.cfg)
+		return buildRound2Prompt(p.filePath, p.proposed, p.blocking, p.cfg, mode)
 	default:
 		return "", errors.New("ai-autofix: unexpected round")
 	}
 }
 
-func (r *resolver) runAndParseRound(
+type roundResult struct {
+	proposed  []byte
+	noChange  bool
+	patchMeta patchutil.Meta
+}
+
+type patchFallbackError struct {
+	err error
+}
+
+func (e *patchFallbackError) Error() string {
+	return "ai-autofix: falling back to Dockerfile output after patch-mode mechanical failures: " + e.err.Error()
+}
+
+func (e *patchFallbackError) Unwrap() error { return e.err }
+
+func (r *resolver) runRound(
 	ctx context.Context,
 	filePath string,
 	cfg *config.Config,
 	timeout time.Duration,
 	prompt string,
 	roundInput []byte,
-) (string, bool, error) {
-	respText, err := r.runAgent(ctx, filePath, cfg, timeout, prompt)
+	mode agentOutputMode,
+) (roundResult, error) {
+	respText, err := r.runAgent(ctx, filePath, cfg, timeout, prompt, roundInput, mode)
 	if err != nil {
-		return "", false, err
+		return roundResult{}, err
 	}
 
-	parsed, noChange, perr := parseAgentResponse(respText)
+	result, perr := parseRoundOutput(respText, roundInput, mode)
 	if perr == nil {
-		if noChange {
-			return "", true, nil
-		}
-		out, err := normalizeAgentDockerfile(parsed)
-		return out, noChange, err
+		return result, nil
 	}
 
 	lastErr := perr
 	for range maxMalformedRetries {
-		simplePrompt := buildSimplifiedPrompt(filePath, roundInput, cfg)
-		respText, err = r.runAgent(ctx, filePath, cfg, timeout, simplePrompt)
+		simplePrompt := buildSimplifiedPrompt(filePath, roundInput, cfg, mode)
+		respText, err = r.runAgent(ctx, filePath, cfg, timeout, simplePrompt, roundInput, mode)
 		if err != nil {
-			return "", false, err
+			return roundResult{}, err
 		}
-		parsed, noChange, perr = parseAgentResponse(respText)
+		result, perr = parseRoundOutput(respText, roundInput, mode)
 		if perr != nil {
 			lastErr = perr
 			continue
 		}
-		if noChange {
-			return "", true, nil
-		}
-		out, err := normalizeAgentDockerfile(parsed)
-		return out, noChange, err
+		return result, nil
 	}
 
-	return "", false, fmt.Errorf("ai-autofix: malformed agent output: %w", lastErr)
+	if mode == agentOutputPatch {
+		return roundResult{}, &patchFallbackError{err: lastErr}
+	}
+
+	return roundResult{}, fmt.Errorf("ai-autofix: malformed agent output: %w", lastErr)
+}
+
+func parseRoundOutput(text string, roundInput []byte, mode agentOutputMode) (roundResult, error) {
+	switch mode {
+	case agentOutputPatch:
+		parsed, noChange, err := parseAgentPatchResponse(text)
+		if err != nil {
+			return roundResult{}, err
+		}
+		if noChange {
+			return roundResult{noChange: true}, nil
+		}
+		proposed, meta, err := patchutil.ParseAndApply(roundInput, parsed)
+		if err != nil {
+			return roundResult{}, err
+		}
+		return roundResult{proposed: proposed, patchMeta: meta}, nil
+	case agentOutputDockerfile:
+		parsed, noChange, err := parseAgentDockerfileResponse(text)
+		if err != nil {
+			return roundResult{}, err
+		}
+		if noChange {
+			return roundResult{noChange: true}, nil
+		}
+		out, err := normalizeAgentDockerfile(parsed)
+		if err != nil {
+			return roundResult{}, err
+		}
+		return roundResult{proposed: []byte(out)}, nil
+	default:
+		return roundResult{}, errors.New("ai-autofix: unsupported agent output mode")
+	}
 }
 
 func normalizeAgentDockerfile(parsed string) (string, error) {
@@ -246,8 +315,10 @@ func (r *resolver) checkProposal(
 		}}
 	} else if err := validateStageCount(origParse, propParse); err != nil {
 		blocking = []blockingIssue{{Rule: "semantics", Message: err.Error()}}
-	} else if err := validateRuntimeSettings(origParse, propParse); err != nil {
-		blocking = []blockingIssue{{Rule: "runtime", Message: err.Error()}}
+	} else {
+		for _, err := range collectRuntimeValidationErrors(origParse, propParse) {
+			blocking = append(blocking, blockingIssue{Rule: "runtime", Message: err.Error()})
+		}
 	}
 
 	if len(blocking) > 0 {
@@ -263,6 +334,8 @@ func (r *resolver) runAgent(
 	cfg *config.Config,
 	timeout time.Duration,
 	prompt string,
+	roundInput []byte,
+	mode agentOutputMode,
 ) (string, error) {
 	if cfg.AI.MaxInputBytes > 0 && len(prompt) > cfg.AI.MaxInputBytes {
 		return "", fmt.Errorf("ai-autofix: prompt too large (%d bytes > ai.max-input-bytes=%d)", len(prompt), cfg.AI.MaxInputBytes)
@@ -273,6 +346,11 @@ func (r *resolver) runAgent(
 		det, err := r.gitleaksFactory()
 		if err != nil {
 			return "", fmt.Errorf("ai-autofix: redact-secrets enabled but detector init failed: %w", err)
+		}
+		if mode == agentOutputPatch && countSecrets(det, string(roundInput)) > 0 {
+			return "", &patchFallbackError{err: errors.New(
+				"ai-autofix: ai.redact-secrets=true and secrets were detected in the Dockerfile payload",
+			)}
 		}
 		var redactions int
 		redacted, redactions = redactSecrets(det, redacted)
@@ -298,6 +376,21 @@ func parseDockerfile(content []byte, cfg *config.Config) (*dockerfile.ParseResul
 
 func normalizeLF(s string) string {
 	return strings.ReplaceAll(s, "\r\n", "\n")
+}
+
+func countSecrets(det *detect.Detector, input string) int {
+	findings := det.DetectString(input)
+	if len(findings) == 0 {
+		return 0
+	}
+	seen := map[string]struct{}{}
+	for _, f := range findings {
+		if f.Secret == "" {
+			continue
+		}
+		seen[f.Secret] = struct{}{}
+	}
+	return len(seen)
 }
 
 func redactSecrets(det *detect.Detector, input string) (string, int) {

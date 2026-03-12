@@ -30,6 +30,7 @@ gemini --experimental-acp --allowed-mcp-server-names=none --model=gemini-3-flash
 
 Note: `--allowed-mcp-server-names` is an allowlist. Using a name you don’t have configured (like `none`) effectively disables all MCP servers.
 tally doesn’t provide any MCP servers to the agent today, so enabling MCP is usually just extra startup/latency overhead.
+For Gemini specifically, we recommend treating `--allowed-mcp-server-names=none` as the default unless you intentionally need agent-side tools.
 
 ## Quick Start
 
@@ -67,6 +68,12 @@ command = [
 ]
 ```
 
+If you use Gemini via `--acp-command`, keep the same MCP-disabled shape there as well:
+
+```bash
+tally lint --ai --acp-command "gemini --experimental-acp --allowed-mcp-server-names=none --model=gemini-3-flash-preview" ...
+```
+
 ### 3) Run an AI-powered fix
 
 AI fixes are intentionally marked as **unsafe**. That means they require `--fix-unsafe` in addition to `--fix`.
@@ -96,9 +103,10 @@ tally treats AI AutoFix as a normal part of its existing fix pipeline:
 3. For AI fixes, the SuggestedFix is marked **async** — tally will:
    - Build a prompt (including the Dockerfile text + structured evidence)
    - Run your configured agent via **ACP over stdio**
-   - Parse the response using a strict output contract (either `NO_CHANGE` or a full Dockerfile)
-   - Validate the proposal (syntax + sanity checks + lint feedback)
-   - Apply a **whole-document replacement** if it passes validation
+   - Parse the response using a strict output contract (prefer a single-file unified diff patch)
+   - Apply that patch mechanically to the exact Dockerfile content sent in the prompt
+   - Validate the proposal (syntax + invariants + lint feedback)
+   - Fall back to a whole-Dockerfile contract only after bounded mechanical patch failures
 
 If the agent output is malformed, unsafe, or fails validation, tally skips the fix and continues linting. Linting should still work even when AI is
 misconfigured or unavailable.
@@ -213,8 +221,10 @@ AI fixes are powerful — and risky. tally deliberately adds guardrails:
 - **Unsafe gating**: AI fixes are unsafe and require `--fix-unsafe`.
 - **Minimal capabilities**: tally advertises no filesystem and no terminal capabilities via ACP.
 - **Secret redaction**: prompts are best-effort redacted by default.
-- **Strict output contract**: only `NO_CHANGE` or a full Dockerfile in a fenced code block.
-- **Validation loop**: tally re-parses and re-lints proposed output before applying it.
+- **Strict output contract**: AI is expected to return a small, targeted diff patch that must apply cleanly to the exact Dockerfile bytes tally sent.
+- **Validation loop**: tally re-parses, re-lints, and checks runtime invariants before accepting the proposal.
+- **Lower-latency Gemini setup**: when you do not need agent-side tools, use `--allowed-mcp-server-names=none` to avoid extra MCP startup/tool
+  overhead.
 
 One important note: ACP is a protocol, **not a sandbox**. If you run a local agent process that can access your machine, it can still do so
 outside of ACP. Treat the agent like any other executable you run locally.
@@ -242,7 +252,7 @@ When a rule triggers, tally can send a prompt that is:
 - **concise**: no long conversations, just the task + the Dockerfile + minimal evidence
 - **precise**: “convert to multi-stage” (not “optimize everything”)
 - **bounded**: “don’t change unrelated parts unless required for the conversion”
-- **machine-checkable**: the agent must output either `NO_CHANGE` or one full Dockerfile in a fenced code block
+- **machine-checkable**: the agent must output a single-file patch that applies cleanly to the inline Dockerfile content
 
 In other words, the prompt encodes the *best practice question* you would have asked if you were an expert at prompting and Dockerfiles.
 
@@ -250,10 +260,11 @@ In other words, the prompt encodes the *best practice question* you would have a
 
 Even a good model can produce plausible-but-wrong output. tally treats the agent’s response as an untrusted proposal and validates it:
 
-- Parse the returned Dockerfile (syntax must be valid).
+- Parse and apply the returned patch against the exact Dockerfile content from the prompt.
 - Check invariants that matter for the transformation (e.g. “multi-stage” should actually produce multiple stages).
 - Re-lint the proposed output and feed back any blocking issues.
-- If the agent can’t produce a safe refactor, it must respond `NO_CHANGE` (tally skips the fix and continues linting).
+- If the patch is mechanically malformed, tally retries with a simpler prompt and only then falls back to a whole-Dockerfile contract.
+- If the proposal still can’t be made safe, tally skips the fix and continues linting.
 
 This “heuristics → focused prompt → validation loop” is the key: you get the speed of rules and the flexibility of an agent, without turning your
 lint run into a free-form AI chat session.

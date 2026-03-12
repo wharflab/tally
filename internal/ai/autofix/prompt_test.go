@@ -33,7 +33,7 @@ CMD ["app"]
 	origParse, err := parseDockerfile(input.Source, nil)
 	require.NoError(t, err)
 
-	prompt, err := buildRound1Prompt(input.File, input.Source, data, nil, origParse)
+	prompt, err := buildRound1Prompt(input.File, input.Source, data, nil, origParse, agentOutputPatch)
 	require.NoError(t, err)
 
 	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, prompt)
@@ -71,7 +71,7 @@ CMD ["app"]
 	origParse, err := parseDockerfile(input.Source, nil)
 	require.NoError(t, err)
 
-	prompt, err := buildRound1Prompt(input.File, input.Source, data, nil, origParse)
+	prompt, err := buildRound1Prompt(input.File, input.Source, data, nil, origParse, agentOutputPatch)
 	require.NoError(t, err)
 
 	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, prompt)
