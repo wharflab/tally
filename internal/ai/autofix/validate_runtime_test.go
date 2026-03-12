@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	patchutil "github.com/wharflab/tally/internal/patch"
 )
 
 func TestCollectRuntimeValidationErrors_AggregatesMultipleViolations(t *testing.T) {
@@ -33,4 +35,14 @@ func TestCollectRuntimeValidationErrors_AggregatesMultipleViolations(t *testing.
 	require.Contains(t, messages, "proposed Dockerfile changed WORKDIR in the final stage (want \"/src\", got \"/app\")")
 	require.NoError(t, validateRuntimeSettings(orig, orig))
 	require.False(t, bytes.Equal([]byte(messages[0]), []byte{}))
+}
+
+func TestValidateMultiStagePatch_AcceptsFromWithTabSeparatedArgs(t *testing.T) {
+	t.Parallel()
+
+	meta := patchutil.Meta{
+		AddedLines: []string{"FROM\tgolang:1.22-alpine AS builder"},
+	}
+
+	require.Nil(t, validateMultiStagePatch(meta))
 }

@@ -18,9 +18,8 @@ import (
 
 func validateMultiStagePatch(meta patchutil.Meta) []blockingIssue {
 	for _, line := range meta.AddedLines {
-		trimmed := strings.TrimSpace(line)
-		lower := strings.ToLower(trimmed)
-		if lower == command.From || strings.HasPrefix(lower, command.From+" ") {
+		fields := strings.Fields(line)
+		if len(fields) > 0 && strings.EqualFold(fields[0], command.From) {
 			return nil
 		}
 	}
