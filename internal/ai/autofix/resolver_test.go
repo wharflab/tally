@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/zricethezav/gitleaks/v8/detect"
 
 	"github.com/wharflab/tally/internal/ai/acp"
 	"github.com/wharflab/tally/internal/config"
@@ -58,4 +59,37 @@ func TestResolver_RunAndParseRound_NoChange_ShortCircuitsAfterRetry(t *testing.T
 	require.NoError(t, err)
 	require.True(t, out.noChange)
 	require.Nil(t, out.proposed)
+}
+
+func TestResolver_RunRound_RedactSecretsInPatchModeFallsBack(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.Default()
+	cfg.AI.Command = []string{"stub"}
+	cfg.AI.RedactSecrets = true
+
+	r := &resolver{
+		runner:          &stubAgentRunner{},
+		gitleaksFactory: detect.NewDetectorDefaultConfig,
+	}
+
+	roundInput := []byte(
+		"FROM alpine:3.20\n" +
+			"ENV GITHUB_TOKEN=ghp_123456789012345678901234567890123456\n",
+	)
+
+	_, err := r.runRound(
+		context.Background(),
+		"Dockerfile",
+		cfg,
+		5*time.Second,
+		"prompt",
+		roundInput,
+		agentOutputPatch,
+	)
+	require.Error(t, err)
+
+	var fallbackErr *patchFallbackError
+	require.ErrorAs(t, err, &fallbackErr)
+	require.ErrorContains(t, err, "ai.redact-secrets=true")
 }

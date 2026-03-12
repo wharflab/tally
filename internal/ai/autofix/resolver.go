@@ -348,9 +348,9 @@ func (r *resolver) runAgent(
 			return "", fmt.Errorf("ai-autofix: redact-secrets enabled but detector init failed: %w", err)
 		}
 		if mode == agentOutputPatch && countSecrets(det, string(roundInput)) > 0 {
-			return "", errors.New(
-				"ai-autofix: refusing patch-mode AI AutoFix because ai.redact-secrets=true and secrets were detected in the Dockerfile payload",
-			)
+			return "", &patchFallbackError{err: errors.New(
+				"ai-autofix: ai.redact-secrets=true and secrets were detected in the Dockerfile payload",
+			)}
 		}
 		var redactions int
 		redacted, redactions = redactSecrets(det, redacted)
