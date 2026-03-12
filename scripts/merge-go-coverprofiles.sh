@@ -15,6 +15,13 @@ fi
 OUT="$1"
 shift
 
+for in_file in "$@"; do
+  if [[ ! -s "$in_file" ]]; then
+    echo "coverprofile $in_file is empty or missing" >&2
+    exit 1
+  fi
+done
+
 awk '
 BEGIN {
   mode = ""
