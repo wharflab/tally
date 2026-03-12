@@ -35,6 +35,10 @@ func TestCollectRuntimeValidationErrors_AggregatesMultipleViolations(t *testing.
 	require.Contains(t, messages, "proposed Dockerfile changed WORKDIR in the final stage (want \"/src\", got \"/app\")")
 	require.NoError(t, validateRuntimeSettings(orig, orig))
 	require.False(t, bytes.Equal([]byte(messages[0]), []byte{}))
+
+	firstErr := validateRuntimeSettings(orig, proposed)
+	require.Error(t, firstErr)
+	require.Equal(t, errs[0].Error(), firstErr.Error())
 }
 
 func TestValidateMultiStagePatch_AcceptsFromWithTabSeparatedArgs(t *testing.T) {

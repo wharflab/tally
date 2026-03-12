@@ -233,48 +233,7 @@ func validateHealthcheck(orig, proposed *instructions.HealthCheckCommand) error 
 	return nil
 }
 
-func validateRuntimeSettings(orig, proposed *dockerfile.ParseResult) error {
-	if orig == nil || proposed == nil {
-		return errors.New("missing parse results for runtime validation")
-	}
-	if len(orig.Stages) == 0 || len(proposed.Stages) == 0 {
-		return errors.New("missing stages for runtime validation")
-	}
-
-	origFinal := orig.Stages[len(orig.Stages)-1]
-	propFinal := proposed.Stages[len(proposed.Stages)-1]
-	o := extractRuntime(origFinal)
-	p := extractRuntime(propFinal)
-
-	if err := validateCmd(o.cmd, p.cmd); err != nil {
-		return err
-	}
-	if err := validateEntrypoint(o.entrypoint, p.entrypoint); err != nil {
-		return err
-	}
-	if err := validateUser(o.user, p.user); err != nil {
-		return err
-	}
-	if err := validateExpose(o.expose, p.expose); err != nil {
-		return err
-	}
-	if err := validateWorkdir(o.workdir, p.workdir); err != nil {
-		return err
-	}
-	if err := validateEnv(o.env, p.env); err != nil {
-		return err
-	}
-	if err := validateLabels(o.labels, p.labels); err != nil {
-		return err
-	}
-	if err := validateHealthcheck(o.health, p.health); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func collectRuntimeValidationErrors(orig, proposed *dockerfile.ParseResult) []error {
+func runtimeValidationErrors(orig, proposed *dockerfile.ParseResult) []error {
 	if orig == nil || proposed == nil {
 		return []error{errors.New("missing parse results for runtime validation")}
 	}
@@ -305,6 +264,18 @@ func collectRuntimeValidationErrors(orig, proposed *dockerfile.ParseResult) []er
 		}
 	}
 	return errs
+}
+
+func validateRuntimeSettings(orig, proposed *dockerfile.ParseResult) error {
+	errs := runtimeValidationErrors(orig, proposed)
+	if len(errs) == 0 {
+		return nil
+	}
+	return errs[0]
+}
+
+func collectRuntimeValidationErrors(orig, proposed *dockerfile.ParseResult) []error {
+	return runtimeValidationErrors(orig, proposed)
 }
 
 func wholeFileReplacement(filePath string, original []byte, newText string) rules.TextEdit {
