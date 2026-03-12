@@ -37,5 +37,19 @@ CMD ["app"]
 
 Output format:
 - Either output exactly: NO_CHANGE
-- Or output exactly one ```Dockerfile fenced code block with the full updated Dockerfile
+- Or output exactly one ```diff fenced code block with a unified diff patch for Dockerfile
+- The patch must modify exactly one file and include at least one @@ hunk
+- Do not create/delete files, rename/copy files, or emit a binary patch
+- The patch must apply to the exact Dockerfile content shown above
 - Any other text outside the code block will be discarded
+
+Example patch shape:
+```diff
+diff --git a/Dockerfile b/Dockerfile
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -1,1 +1,2 @@
+-FROM alpine:3.20
++FROM golang:1.22-alpine AS builder
++FROM alpine:3.20
+```

@@ -7,12 +7,28 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/dockerfile"
+	patchutil "github.com/wharflab/tally/internal/patch"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
+
+func validateMultiStagePatch(meta patchutil.Meta) []blockingIssue {
+	for _, line := range meta.AddedLines {
+		trimmed := strings.TrimSpace(line)
+		lower := strings.ToLower(trimmed)
+		if lower == command.From || strings.HasPrefix(lower, command.From+" ") {
+			return nil
+		}
+	}
+	return []blockingIssue{{
+		Rule:    "patch/must-add-from",
+		Message: "Patch does not add a FROM instruction",
+	}}
+}
 
 func countFromInstructions(pr *dockerfile.ParseResult) int {
 	if pr == nil {
@@ -257,6 +273,39 @@ func validateRuntimeSettings(orig, proposed *dockerfile.ParseResult) error {
 	}
 
 	return nil
+}
+
+func collectRuntimeValidationErrors(orig, proposed *dockerfile.ParseResult) []error {
+	if orig == nil || proposed == nil {
+		return []error{errors.New("missing parse results for runtime validation")}
+	}
+	if len(orig.Stages) == 0 || len(proposed.Stages) == 0 {
+		return []error{errors.New("missing stages for runtime validation")}
+	}
+
+	origFinal := orig.Stages[len(orig.Stages)-1]
+	propFinal := proposed.Stages[len(proposed.Stages)-1]
+	o := extractRuntime(origFinal)
+	p := extractRuntime(propFinal)
+
+	checks := []func() error{
+		func() error { return validateCmd(o.cmd, p.cmd) },
+		func() error { return validateEntrypoint(o.entrypoint, p.entrypoint) },
+		func() error { return validateUser(o.user, p.user) },
+		func() error { return validateExpose(o.expose, p.expose) },
+		func() error { return validateWorkdir(o.workdir, p.workdir) },
+		func() error { return validateEnv(o.env, p.env) },
+		func() error { return validateLabels(o.labels, p.labels) },
+		func() error { return validateHealthcheck(o.health, p.health) },
+	}
+
+	var errs []error
+	for _, check := range checks {
+		if err := check(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errs
 }
 
 func wholeFileReplacement(filePath string, original []byte, newText string) rules.TextEdit {

@@ -30,6 +30,7 @@ gemini --experimental-acp --allowed-mcp-server-names=none --model=gemini-3-flash
 
 Note: `--allowed-mcp-server-names` is an allowlist. Using a name you don’t have configured (like `none`) effectively disables all MCP servers.
 tally doesn’t provide any MCP servers to the agent today, so enabling MCP is usually just extra startup/latency overhead.
+For Gemini specifically, we recommend treating `--allowed-mcp-server-names=none` as the default unless you intentionally need agent-side tools.
 
 ## Quick Start
 
@@ -65,6 +66,12 @@ command = [
   "--allowed-mcp-server-names=none",
   "--model=gemini-3-flash-preview",
 ]
+```
+
+If you use Gemini via `--acp-command`, keep the same MCP-disabled shape there as well:
+
+```bash
+tally lint --ai --acp-command "gemini --experimental-acp --allowed-mcp-server-names=none --model=gemini-3-flash-preview" ...
 ```
 
 ### 3) Run an AI-powered fix

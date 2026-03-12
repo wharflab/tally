@@ -37,10 +37,10 @@ func TestResolver_RunAndParseRound_NoChange_ShortCircuits(t *testing.T) {
 		runner: &stubAgentRunner{texts: []string{"NO_CHANGE"}},
 	}
 
-	out, noChange, err := r.runAndParseRound(context.Background(), "Dockerfile", cfg, 5*time.Second, "prompt", []byte("FROM alpine:3.20\n"))
+	out, err := r.runRound(context.Background(), "Dockerfile", cfg, 5*time.Second, "prompt", []byte("FROM alpine:3.20\n"), agentOutputPatch)
 	require.NoError(t, err)
-	require.True(t, noChange)
-	require.Empty(t, out)
+	require.True(t, out.noChange)
+	require.Nil(t, out.proposed)
 }
 
 func TestResolver_RunAndParseRound_NoChange_ShortCircuitsAfterRetry(t *testing.T) {
@@ -51,11 +51,11 @@ func TestResolver_RunAndParseRound_NoChange_ShortCircuitsAfterRetry(t *testing.T
 	cfg.AI.RedactSecrets = false
 
 	r := &resolver{
-		runner: &stubAgentRunner{texts: []string{"not a dockerfile block", "NO_CHANGE"}},
+		runner: &stubAgentRunner{texts: []string{"not a diff block", "NO_CHANGE"}},
 	}
 
-	out, noChange, err := r.runAndParseRound(context.Background(), "Dockerfile", cfg, 5*time.Second, "prompt", []byte("FROM alpine:3.20\n"))
+	out, err := r.runRound(context.Background(), "Dockerfile", cfg, 5*time.Second, "prompt", []byte("FROM alpine:3.20\n"), agentOutputPatch)
 	require.NoError(t, err)
-	require.True(t, noChange)
-	require.Empty(t, out)
+	require.True(t, out.noChange)
+	require.Nil(t, out.proposed)
 }
