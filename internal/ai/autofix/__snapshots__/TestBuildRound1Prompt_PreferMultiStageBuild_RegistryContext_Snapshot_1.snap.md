@@ -11,7 +11,7 @@ Rules (strict):
 - Only do the multi-stage conversion. Do not optimize or rewrite unrelated parts unless required for the conversion.
 - Keep all comments. If you move code lines, move any related comments with them (no orphaned comments).
 - If you need to communicate an assumption, add a VERY concise comment inside the Dockerfile.
-  - Do not output prose outside the Dockerfile code block.
+  - Do not output prose outside the required fenced code block.
 - If clearly safe, you may choose a smaller runtime base image (e.g. scratch or distroless) to reduce final size.
   - If not clearly safe, keep the runtime base image unchanged.
 - Final-stage runtime settings must remain identical (tally validates this):
