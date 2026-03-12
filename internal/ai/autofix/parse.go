@@ -30,9 +30,6 @@ func parseAgentFencedResponse(text, infoString, label string) (string, bool, err
 	if !strings.HasSuffix(trimmed, "\n```") {
 		return "", false, errors.New("output must end with a closing ``` fence")
 	}
-	if len(trimmed) <= len(opening)+4 {
-		return "", false, errors.New("expected a fenced code block or NO_CHANGE")
-	}
 	body := trimmed[len(opening) : len(trimmed)-len("```")]
 	if strings.TrimSpace(body) == "" {
 		return "", false, errors.New("empty " + label + " code block")

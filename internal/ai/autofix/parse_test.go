@@ -63,3 +63,10 @@ func TestParseAgentPatchResponse_PreservesTrailingNewline(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, strings.HasSuffix(parsed, "\n"))
 }
+
+func TestParseAgentPatchResponse_RejectsEmptyFencedBlock(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := parseAgentPatchResponse("```diff\n```")
+	require.EqualError(t, err, "empty diff patch code block")
+}
