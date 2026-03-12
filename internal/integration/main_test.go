@@ -81,7 +81,7 @@ func buildIntegrationBinary(tmpDir string) error {
 		if err := os.MkdirAll(coverageDir, 0o750); err != nil {
 			return fmt.Errorf("create coverage directory %q: %w", coverageDir, err)
 		}
-		buildArgs = append(buildArgs, "-cover")
+		buildArgs = append(buildArgs, "-cover", "-covermode=atomic")
 	}
 	buildArgs = append(buildArgs,
 		"-tags", "containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub",
