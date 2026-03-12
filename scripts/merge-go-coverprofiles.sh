@@ -41,7 +41,13 @@ FNR == 1 {
     order[n++] = key
     seen[key] = 1
   }
-  counts[key] += $3
+  if (mode == "set") {
+    if ($3 > counts[key]) {
+      counts[key] = $3
+    }
+  } else {
+    counts[key] += $3
+  }
 }
 
 END {
