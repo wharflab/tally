@@ -48,8 +48,10 @@ jobs:
             -lc '
               apt-get update
               apt-get install -y --no-install-recommends git-lfs
-              goreleaser release --clean
-              chown -R "$HOST_UID:$HOST_GID" /work/dist /tmp/goreleaser-home
+              /entrypoint.sh release --clean
+              if [ -d /work/dist ]; then
+                chown -R "$HOST_UID:$HOST_GID" /work/dist /tmp/goreleaser-home
+              fi
             '
       - name: Preserve artifacts permissions with tar
         run: tar -cvf dist.tar dist/
