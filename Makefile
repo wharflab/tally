@@ -156,9 +156,9 @@ release:
 	@exit 1
 
 publish-prepare: release
-	cd packaging && ruby pack.rb prepare
+	cd packaging/rubygems && rake prepare
 
 publish-gem: publish-prepare
-	cd packaging && ruby pack.rb publish_gem
+	cd packaging/rubygems && rake publish
 
 publish: publish-gem

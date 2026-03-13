@@ -17,7 +17,7 @@ Gem::Specification.new do |spec|
     bin/tally
     LICENSE
     NOTICE
-  ) + `find libexec/ -executable -type f -print0`.split("\x0")
+  ) + Dir.glob("libexec/**/*").select { |path| File.file?(path) }
 
   spec.licenses = ['GPL-3.0-only']
 end
