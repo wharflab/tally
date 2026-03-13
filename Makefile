@@ -1,4 +1,4 @@
-.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin update-shellcheck-wasm
+.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin update-shellcheck-wasm
 
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
@@ -160,11 +160,6 @@ publish-prepare: release
 
 publish-npm: publish-prepare
 	cd packaging && ruby pack.rb publish_npm
-
-publish-pypi: publish-prepare
-	@echo "publish-pypi now builds from packaging/pypi via uv and is run by .github/workflows/release.yml."
-	@echo "Use 'cd packaging/pypi && uv build --wheel && uv publish' with the appropriate env vars."
-	@exit 1
 
 publish-gem: publish-prepare
 	cd packaging && ruby pack.rb publish_gem
