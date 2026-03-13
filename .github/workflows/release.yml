@@ -827,6 +827,135 @@ jobs:
         run: |
           cd packaging/rubygems
           rake publish
+  publish-winget:
+    needs:
+      - preflight
+      - publish-release
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
+    steps:
+      - name: Verify WinGet publishing auth is configured
+        if: github.event_name != 'pull_request'
+        run: |
+          if [ -z "${{ vars.HARBOR_PILOT_APP_ID }}" ]; then
+            echo "::error::HARBOR_PILOT_APP_ID must be configured to publish WinGet PRs"
+            exit 1
+          fi
+      - name: Checkout tally
+        uses: actions/checkout@v6
+        if: github.event_name == 'pull_request' || vars.HARBOR_PILOT_APP_ID != ''
+        with:
+          lfs: false
+          path: tally
+      - name: Generate GitHub App token
+        id: app-token-winget
+        if: github.event_name != 'pull_request' && vars.HARBOR_PILOT_APP_ID != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.HARBOR_PILOT_APP_ID }}
+          private-key: ${{ secrets.HARBOR_PILOT_PRIVATE_KEY }}
+          owner: wharflab
+          repositories: winget-pkgs
+      - name: Checkout winget-pkgs fork
+        uses: actions/checkout@v6
+        if: github.event_name != 'pull_request' && vars.HARBOR_PILOT_APP_ID != ''
+        with:
+          lfs: false
+          repository: wharflab/winget-pkgs
+          token: ${{ steps.app-token-winget.outputs.token }}
+          path: winget-pkgs
+      - name: Checkout upstream winget-pkgs (dry run)
+        uses: actions/checkout@v6
+        if: github.event_name == 'pull_request'
+        with:
+          lfs: false
+          repository: microsoft/winget-pkgs
+          path: winget-pkgs
+      - name: Download release dist
+        uses: actions/download-artifact@v8
+        with:
+          name: release-dist
+          path: dist
+      - name: Generate WinGet manifests
+        if: github.event_name == 'pull_request' || vars.HARBOR_PILOT_APP_ID != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token-winget.outputs.token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CROSS_FORK_PR_PAT: ${{ secrets.CROSS_FORK_PR_PAT }}
+          PR_BODY: |
+            Publishing version ${{ inputs.version || github.ref_name }} of [tally](https://github.com/wharflab/tally) to WinGet.
+
+            Tally is a Dockerfile linter and formatter written in Go, promoting modern container syntax and helping avoid common pitfalls.
+
+            [Changelog](https://github.com/wharflab/tally/releases/tag/${{ inputs.version || github.ref_name }})
+        run: |
+          set -euo pipefail
+          CLEAN_VERSION="${VERSION#v}"
+          BRANCH="tally-update"
+
+          git config --global user.name "tinovyatkin"
+          git config --global user.email "tino@vtkn.io"
+
+          cd winget-pkgs
+          git remote add upstream https://github.com/microsoft/winget-pkgs.git 2>/dev/null || true
+          git fetch upstream master
+          git checkout -B "${BRANCH}" upstream/master
+          cd ..
+
+          python tally/scripts/release/generate_winget_manifests.py \
+            --version "${CLEAN_VERSION}" \
+            --dist-root dist \
+            --output-root winget-pkgs/manifests
+
+          cd winget-pkgs
+          git add manifests/w/Wharflab/Tally/"${CLEAN_VERSION}"
+          if git diff --cached --quiet; then
+            echo "No WinGet changes detected; skipping PR sync."
+            exit 0
+          fi
+          if [ "${DRY_RUN}" = "1" ]; then
+            git diff --cached > ../winget-dry-run.patch
+            echo "Generated WinGet dry-run patch:"
+            git diff --cached --stat
+            exit 0
+          fi
+
+          git commit -m "Wharflab.Tally version ${CLEAN_VERSION}"
+          git push origin "${BRANCH}" --force
+
+          if [ -z "${CROSS_FORK_PR_PAT:-}" ]; then
+            echo "::error::CROSS_FORK_PR_PAT secret is required to create cross-fork PRs to microsoft/winget-pkgs"
+            exit 1
+          fi
+          export GH_TOKEN="${CROSS_FORK_PR_PAT}"
+          PR_TITLE="Wharflab.Tally version ${CLEAN_VERSION}"
+          PR_URL=$(gh pr create \
+            --repo microsoft/winget-pkgs \
+            --head "wharflab:${BRANCH}" \
+            --base master \
+            --title "${PR_TITLE}" \
+            --body "${PR_BODY}" 2>&1) \
+          || {
+            EXISTING_PR=$(echo "${PR_URL}" | grep -oP 'pull/\K[0-9]+' | head -1)
+            if [ -n "${EXISTING_PR}" ]; then
+              gh pr edit "${EXISTING_PR}" \
+                --repo microsoft/winget-pkgs \
+                --title "${PR_TITLE}" \
+                --body "${PR_BODY}"
+              echo "Updated existing PR: https://github.com/microsoft/winget-pkgs/pull/${EXISTING_PR}"
+            else
+              echo "::error::Failed to create or update PR: ${PR_URL}"
+              exit 1
+            fi
+          }
+          echo "PR: ${PR_URL}"
+      - name: Upload WinGet dry-run patch
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: winget-dry-run-patch
+          path: winget-dry-run.patch
   publish-zed-marketplace:
     needs:
       - preflight
