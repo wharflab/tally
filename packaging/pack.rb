@@ -113,14 +113,23 @@ module Pack
     puts "Publishing tally npm..."
     cd(File.join(__dir__, "npm"))
     dry_run = ENV["NPM_PUBLISH_DRY_RUN"] == "1"
+    tag = npm_publish_tag
     Dir["tally*"].each do |package|
       puts "publishing #{package}"
       cd(File.join(__dir__, "npm", package))
       command = "npm publish --access public"
+      command += " --tag #{tag}" if tag
       command += " --dry-run" if dry_run
       system(command, exception: true)
       cd(File.join(__dir__, "npm"))
     end
+  end
+
+  def npm_publish_tag
+    explicit_tag = ENV["NPM_PUBLISH_TAG"]
+    return explicit_tag if explicit_tag && !explicit_tag.empty?
+
+    NPM_VERSION.include?("-") ? "next" : nil
   end
 
   def publish_gem

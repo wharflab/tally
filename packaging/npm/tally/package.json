@@ -7,7 +7,7 @@
     "url": "git+https://github.com/wharflab/tally.git"
   },
   "bin": {
-    "tally": "./bin/cli.js"
+    "tally": "bin/cli.js"
   },
   "files": [
     "bin/",
