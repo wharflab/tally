@@ -315,7 +315,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          lfs: true
+          lfs: false
       - name: Download signed artifacts
         uses: actions/download-artifact@v8
         with:
@@ -381,7 +381,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          lfs: true
+          lfs: false
       - name: Download signed artifacts
         uses: actions/download-artifact@v8
         with:
@@ -481,7 +481,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          lfs: true
+          lfs: false
       - name: Download IntelliJ plugin artifact
         uses: actions/download-artifact@v8
         with:
@@ -619,7 +619,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          lfs: true
+          lfs: false
       - name: Download release dist
         uses: actions/download-artifact@v8
         with:
@@ -693,7 +693,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          lfs: true
+          lfs: false
       - run: git fetch --force --tags
       - uses: actions/download-artifact@v8
         with:
@@ -723,7 +723,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          lfs: true
+          lfs: false
       - run: git fetch --force --tags
       - uses: actions/download-artifact@v8
         with:
@@ -786,7 +786,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          lfs: true
+          lfs: false
       - run: git fetch --force --tags
       - uses: actions/download-artifact@v8
         with:
@@ -812,6 +812,7 @@ jobs:
         uses: actions/checkout@v6
         if: github.event_name == 'pull_request' || vars.HARBOR_PILOT_APP_ID != ''
         with:
+          lfs: false
           path: tally
       - name: Generate GitHub App token
         id: app-token
@@ -826,6 +827,7 @@ jobs:
         uses: actions/checkout@v6
         if: github.event_name != 'pull_request' && vars.HARBOR_PILOT_APP_ID != ''
         with:
+          lfs: false
           repository: wharflab/zed-extensions
           token: ${{ steps.app-token.outputs.token }}
           path: zed-extensions
@@ -833,6 +835,7 @@ jobs:
         uses: actions/checkout@v6
         if: github.event_name == 'pull_request'
         with:
+          lfs: false
           repository: zed-industries/extensions
           path: zed-extensions
       - name: Install taplo
