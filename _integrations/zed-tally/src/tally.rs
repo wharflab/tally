@@ -307,12 +307,12 @@ fn has_tally_dependency(package_json: &str) -> bool {
 mod tests {
     use super::*;
 
-    /// The real tally-cli package.json from packaging/npm/tally/.
-    const TALLY_CLI_PACKAGE_JSON: &str = include_str!("../../../packaging/npm/tally/package.json");
+    /// The real tally-cli package.json from packaging/npm/.
+    const TALLY_CLI_PACKAGE_JSON: &str = include_str!("../../../packaging/npm/package.json");
 
-    /// A real platform-specific package.json (darwin-arm64).
-    const PLATFORM_PKG_DARWIN_ARM64: &str =
-        include_str!("../../../packaging/npm/tally-darwin-arm64/package.json");
+    /// The source-of-truth npm platform targets from packaging/npm/.
+    const PLATFORM_TARGETS_JSON: &str =
+        include_str!("../../../packaging/npm/platform-targets.json");
 
     /// The real pyproject.toml from packaging/pypi/.
     const PYPROJECT_TOML: &str = include_str!("../../../packaging/pypi/pyproject.toml");
@@ -353,11 +353,10 @@ mod tests {
     // -- npm platform packages: cross-validate names and binary paths -------
 
     #[test]
-    fn real_platform_packages_listed_in_optional_deps() {
-        // Every platform package that npm_package_name() can produce must
-        // appear in the real tally-cli optionalDependencies.
-        let pkg: Value = serde_json::from_str(TALLY_CLI_PACKAGE_JSON).unwrap();
-        let opt_deps = &pkg["optionalDependencies"];
+    fn platform_targets_cover_expected_runtime_packages() {
+        // The runtime package-name logic must stay aligned with the npm
+        // platform target metadata used to generate published packages.
+        let targets: Value = serde_json::from_str(PLATFORM_TARGETS_JSON).unwrap();
 
         let platforms: &[(&str, &str)] = &[
             ("darwin", "arm64"),
@@ -366,39 +365,42 @@ mod tests {
             ("linux", "x64"),
             ("windows", "arm64"),
             ("windows", "x64"),
+            ("freebsd", "x64"),
         ];
         for (os, arch) in platforms {
             let name = format!("@wharflab/tally-{os}-{arch}");
             assert!(
-                !opt_deps[&name].is_null(),
-                "platform package {name} missing from tally-cli optionalDependencies"
+                targets.as_array().unwrap().iter().any(|target| {
+                    target["nodeOs"].as_str() == Some(*os)
+                        && target["nodeArch"].as_str() == Some(*arch)
+                }),
+                "platform target metadata missing {name}"
             );
         }
     }
 
     #[test]
-    fn real_platform_package_declares_bin_directory() {
-        // The platform-specific package must include "bin/" in its files
-        // array — that's where npm_binary_path expects the binary to live.
-        let pkg: Value = serde_json::from_str(PLATFORM_PKG_DARWIN_ARM64).unwrap();
+    fn real_npm_package_includes_runtime_platform_metadata() {
+        let pkg: Value = serde_json::from_str(TALLY_CLI_PACKAGE_JSON).unwrap();
         let files: Vec<&str> = pkg["files"]
             .as_array()
             .unwrap()
             .iter()
-            .map(|v| v.as_str().unwrap())
+            .map(|value| value.as_str().unwrap())
             .collect();
         assert!(
-            files.iter().any(|f| f.starts_with("bin")),
-            "platform package files array must include bin/: got {files:?}"
+            files.contains(&"bin/"),
+            "tally-cli package must include bin/: got {files:?}"
+        );
+        assert!(
+            files.contains(&"platform-targets.json"),
+            "tally-cli package must include platform-targets.json: got {files:?}"
         );
     }
 
     #[test]
     fn npm_binary_path_matches_platform_package_structure() {
-        // Verify npm_binary_path produces paths consistent with the real
-        // platform package name from optionalDependencies.
-        let pkg: Value = serde_json::from_str(PLATFORM_PKG_DARWIN_ARM64).unwrap();
-        let real_name = pkg["name"].as_str().unwrap();
+        let real_name = "@wharflab/tally-darwin-arm64";
 
         let path = npm_binary_path(real_name, &Os::Mac);
         assert_eq!(path, format!("node_modules/{real_name}/bin/tally"));

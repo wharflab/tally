@@ -710,7 +710,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
-      NPM_PUBLISH_DRY_RUN: ${{ github.event_name == 'pull_request' && '1' || '0' }}
+      NPM_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -724,13 +725,17 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24.14.0
+          registry-url: https://registry.npmjs.org
       - name: Update npm
         run: npm install -g npm@latest
       - name: Publish to NPM
         run: |
-          cd packaging/
-          ruby pack.rb prepare
-          ruby pack.rb publish_npm
+          cd packaging/npm
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            npm_config_dry_run=true npm run publish:release
+          else
+            npm run publish:release
+          fi
   publish-pypi:
     needs: publish-release
     runs-on: ubuntu-latest

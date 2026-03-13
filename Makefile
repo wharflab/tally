@@ -158,11 +158,10 @@ release:
 publish-prepare: release
 	cd packaging && ruby pack.rb prepare
 
-publish-npm: publish-prepare
-	cd packaging && ruby pack.rb publish_npm
+publish-npm:
+	cd packaging/npm && npm run publish:release
 
 publish-gem: publish-prepare
 	cd packaging && ruby pack.rb publish_gem
 
-publish: publish-prepare
-	cd packaging && ruby pack.rb publish
+publish: publish-gem

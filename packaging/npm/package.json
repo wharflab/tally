@@ -11,8 +11,11 @@
   },
   "files": [
     "bin/",
-    "README.md"
+    "platform-targets.json"
   ],
+  "scripts": {
+    "publish:release": "node ./bin/prepublish.js publish-release"
+  },
   "keywords": [
     "docker",
     "dockerfile",
@@ -30,15 +33,7 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "optionalDependencies": {
-    "@wharflab/tally-darwin-arm64": "0.1.0",
-    "@wharflab/tally-darwin-x64": "0.1.0",
-    "@wharflab/tally-linux-arm64": "0.1.0",
-    "@wharflab/tally-linux-x64": "0.1.0",
-    "@wharflab/tally-windows-arm64": "0.1.0",
-    "@wharflab/tally-windows-x64": "0.1.0",
-    "@wharflab/tally-freebsd-x64": "0.1.0"
-  },
+  "optionalDependencies": {},
   "publishConfig": {
     "access": "public"
   }
