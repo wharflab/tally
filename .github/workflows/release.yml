@@ -240,7 +240,7 @@ jobs:
         with:
           pattern: release-platform-*
           merge-multiple: true
-          path: .
+          path: dist
       - name: Generate release checksums
         run: |
           set -euo pipefail
@@ -320,7 +320,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: release-dist
-          path: .
+          path: dist
       - name: Copy binary into extension bundle
         run: |
           SRC_DIR="dist/${{ matrix.dist_dir }}"
@@ -386,7 +386,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: release-dist
-          path: .
+          path: dist
       - name: Copy binaries into IntelliJ plugin bundle
         run: |
           copy_binary() {
@@ -624,7 +624,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: release-dist
-          path: .
+          path: dist
       - name: Generate Homebrew formula
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -694,7 +694,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: release-dist
-          path: .
+          path: dist
       - uses: actions/setup-node@v6
         with:
           node-version: 24.14.0
@@ -724,7 +724,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: release-dist
-          path: .
+          path: dist
       - name: Setup uv with python
         uses: astral-sh/setup-uv@v7
         with:
@@ -787,7 +787,7 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: release-dist
-          path: .
+          path: dist
       - name: Configure RubyGems Trusted Publishing
         uses: rubygems/configure-rubygems-credentials@main
       - name: Publish to Rubygems
