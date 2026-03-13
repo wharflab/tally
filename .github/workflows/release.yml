@@ -205,11 +205,6 @@ jobs:
             bundled_platform: windows
             bundled_arch: x64
             binary_name: tally.exe
-          - vscode_target: win32-arm64
-            goreleaser_dir: tally_windows_arm64_v8.0
-            bundled_platform: windows
-            bundled_arch: arm64
-            binary_name: tally.exe
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -321,7 +316,6 @@ jobs:
           copy_binary "tally_darwin_amd64*" "darwin" "x64" "tally"
           copy_binary "tally_darwin_arm64*" "darwin" "arm64" "tally"
           copy_binary "tally_windows_amd64*" "windows" "x64" "tally.exe"
-          copy_binary "tally_windows_arm64*" "windows" "arm64" "tally.exe"
       - name: Set up Java 21
         uses: actions/setup-java@v5
         with:

@@ -59,15 +59,6 @@ builds:
       - CC=x86_64-w64-mingw32-gcc
       - CXX=x86_64-w64-mingw32-g++
     goos: [windows]
-  - !!merge <<: *tally_build_defaults
-    id: tally-windows-arm64
-    env:
-      - CGO_ENABLED=1
-      - GOEXPERIMENT=jsonv2
-      - CC=/llvm-mingw/bin/aarch64-w64-mingw32-gcc
-      - CXX=/llvm-mingw/bin/aarch64-w64-mingw32-g++
-    goos: [windows]
-    goarch: [arm64]
 archives:
   - id: tally
     format_overrides:
