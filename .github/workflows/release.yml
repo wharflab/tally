@@ -134,7 +134,7 @@ jobs:
         with:
           msystem: ${{ matrix.msystem }}
           update: true
-          release: false
+          location: ${{ runner.temp }}
           path-type: inherit
           pacboy: toolchain:p
       - name: Build binary
