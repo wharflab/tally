@@ -139,6 +139,9 @@ function publishPlatformPackages(targets, version) {
       getDistBinaryPath(distRoot, target),
       path.join(packageDir, "bin", getBinaryName(target)),
     );
+    if (target.nodeOs !== "windows") {
+      fs.chmodSync(path.join(packageDir, "bin", getBinaryName(target)), 0o755);
+    }
     writeJSON(path.join(packageDir, "package.json"), buildPlatformManifest(target, version));
 
     if (!dryRun && packageVersionExists(getPlatformPackageName(target), version)) {

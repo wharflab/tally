@@ -69,6 +69,7 @@ def stage_binaries
     destination = File.join(GEM_ROOT, "libexec", "tally-#{target}", "tally#{ext}")
     FileUtils.mkdir_p(File.dirname(destination))
     FileUtils.cp(source, destination, verbose: true)
+    FileUtils.chmod(0o755, destination, verbose: true) if ext.empty?
   end
 end
 

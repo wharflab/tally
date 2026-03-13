@@ -170,5 +170,8 @@ class CustomBuildHook(BuildHookInterface):
         target_dir_name = f"tally-{self.target_platform}-{self.target_arch}"
         target_dir = bin_dir / target_dir_name
         target_dir.mkdir()
-        shutil.copy2(source, target_dir / source.name)
+        destination = target_dir / source.name
+        shutil.copy2(source, destination)
+        if self.target_platform != "windows":
+            destination.chmod(0o755)
         print(f"[HOOK] Staged binary from {source}")
