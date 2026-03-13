@@ -123,7 +123,6 @@ class CustomBuildHook(BuildHookInterface):
 
     def finalize(self, version, build_data, artifact_path) -> None:
         print(f"[HOOK] Built artifact: {artifact_path}")
-        self._restore_binaries()
 
     def _stage_target_binary(self):
         if not self.target_platform or not self.target_arch:
