@@ -28,6 +28,14 @@ jobs:
           lfs: true
       - name: Fetch all tags
         run: git fetch --force --tags
+      - name: Disable local Git LFS filters for goreleaser-cross
+        run: |
+          # actions/checkout with lfs:true populates LFS objects into the
+          # working tree, but the mounted repo config makes git inside the
+          # goreleaser-cross container try to invoke git-lfs for summary
+          # commands. The image doesn't ship git-lfs, so remove only the local
+          # repo filter hooks before entering the container.
+          git lfs uninstall --local
       - name: Run GoReleaser in goreleaser-cross
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
