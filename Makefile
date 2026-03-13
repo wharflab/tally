@@ -1,4 +1,4 @@
-.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin update-shellcheck-wasm
+.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin update-shellcheck-wasm
 
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
@@ -157,9 +157,6 @@ release:
 
 publish-prepare: release
 	cd packaging && ruby pack.rb prepare
-
-publish-npm:
-	cd packaging/npm && npm publish
 
 publish-gem: publish-prepare
 	cd packaging && ruby pack.rb publish_gem
