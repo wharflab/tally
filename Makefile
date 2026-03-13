@@ -22,8 +22,6 @@ intellij-plugin-smoke:
 
 GOTESTSUM_VERSION := v1.13.0
 GOLANGCI_LINT_VERSION := $(shell cat .golangci-lint-version | tr -d '[:space:]')
-GORELEASER_VERSION := v2.13.3
-GORELEASER_CROSS_VERSION := v1.25.7
 DEADCODE_VERSION := v0.41.0
 
 test: bin/gotestsum-$(GOTESTSUM_VERSION)
@@ -79,11 +77,6 @@ bin/pmd-$(PMD_VERSION):
 bin/golangci-lint-$(GOLANGCI_LINT_VERSION):
 	@rm -f bin/golangci-lint bin/golangci-lint-*
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/v$(GOLANGCI_LINT_VERSION)/install.sh | sh -s -- -b bin/ v$(GOLANGCI_LINT_VERSION)
-	@touch $@
-
-bin/goreleaser-$(GORELEASER_VERSION):
-	@rm -f bin/goreleaser bin/goreleaser-*
-	GOBIN=$(CURDIR)/bin go install github.com/goreleaser/goreleaser/v2@$(GORELEASER_VERSION)
 	@touch $@
 
 bin/deadcode-$(DEADCODE_VERSION):
@@ -158,18 +151,9 @@ clean:
 #   - ~/.gem/credentials for RubyGems
 
 release:
-	@mkdir -p .tmp/goreleaser-home
-	docker run --rm \
-		-e GOEXPERIMENT=$(GOEXPERIMENT) \
-		-e GOTOOLCHAIN=auto \
-		-e GITHUB_TOKEN \
-		-e HOME=/tmp/goreleaser-home \
-		-u "$$(id -u):$$(id -g)" \
-		-v "$(CURDIR)":/work \
-		-v "$(CURDIR)/.tmp/goreleaser-home":/tmp/goreleaser-home \
-		-w /work \
-		ghcr.io/goreleaser/goreleaser-cross:$(GORELEASER_CROSS_VERSION) \
-		release --clean --snapshot
+	@echo "release is now orchestrated by .github/workflows/release.yml on native GitHub runners."
+	@echo "Local multi-platform release via goreleaser-cross has been removed."
+	@exit 1
 
 publish-prepare: release
 	cd packaging && ruby pack.rb prepare

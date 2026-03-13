@@ -2,9 +2,13 @@
 
 require "fileutils"
 require "json"
+require "shellwords"
 
 # Version from VERSION env var (strips leading 'v' if present), or fallback
 VERSION = (ENV["VERSION"] || "0.1.0").sub(/^v/, "")
+NPM_VERSION = (ENV["NPM_VERSION"] || VERSION).sub(/^v/, "")
+PYPI_VERSION = (ENV["PYPI_VERSION"] || VERSION).sub(/^v/, "")
+GEM_VERSION = (ENV["GEM_VERSION"] || VERSION).sub(/^v/, "")
 
 ROOT = File.join(__dir__, "..")
 DIST = File.join(ROOT, "dist")
@@ -40,23 +44,23 @@ module Pack
 
   def set_version
     cd(__dir__)
-    puts "Replacing version to #{VERSION} in packages"
+    puts "Replacing versions in packages"
 
     # Update NPM packages
     Dir["npm/**/package.json"].each do |package_json|
-      replace_in_file(package_json, /"version": "[\d.]+"/, %{"version": "#{VERSION}"})
+      replace_in_file(package_json, /"version": "[^"]+"/, %{"version": "#{NPM_VERSION}"})
     end
 
     # Update main NPM package optional dependencies
     replace_in_file("npm/tally/package.json",
-                   /"(@wharflab\/tally-.+)": "[\d.]+"/,
-                   %{"\\1": "#{VERSION}"})
+                   /"(@wharflab\/tally-.+)": "[^"]+"/,
+                   %{"\\1": "#{NPM_VERSION}"})
 
     # Update PyPI version
-    replace_in_file("pypi/pyproject.toml", /(version\s*=\s*)"[^"]+"/, %{\\1"#{VERSION}"})
+    replace_in_file("pypi/pyproject.toml", /(version\s*=\s*)"[^"]+"/, %{\\1"#{PYPI_VERSION}"})
 
     # Update Rubygems version
-    replace_in_file("rubygems/tally-cli.gemspec", /(spec\.version\s+=\s+)"[^"]+"/, %{\\1"#{VERSION}"})
+    replace_in_file("rubygems/tally-cli.gemspec", /(spec\.version\s+=\s+)"[^"]+"/, %{\\1"#{GEM_VERSION}"})
   end
 
   def put_additional_files
@@ -70,8 +74,8 @@ module Pack
     puts "done"
   end
 
-  # Map goreleaser output directories to package destinations
-  # Goreleaser outputs: tally_{goos}_{goarch}_{variant}/tally
+  # Map release dist directories to package destinations.
+  # Release builds populate: tally_{goos}_{goarch}_{variant}/tally
   # where variant is v1 for amd64, v8.0 for arm64
   BINARY_MAPPING = {
     # [goos, goarch, variant, extension]
@@ -125,10 +129,13 @@ module Pack
   def publish_npm
     puts "Publishing tally npm..."
     cd(File.join(__dir__, "npm"))
+    dry_run = ENV["NPM_PUBLISH_DRY_RUN"] == "1"
     Dir["tally*"].each do |package|
       puts "publishing #{package}"
       cd(File.join(__dir__, "npm", package))
-      system("npm publish --access public", exception: false)
+      command = "npm publish --access public"
+      command += " --dry-run" if dry_run
+      system(command, exception: true)
       cd(File.join(__dir__, "npm"))
     end
   end
@@ -137,6 +144,10 @@ module Pack
     puts "Publishing to Rubygems..."
     cd(File.join(__dir__, "rubygems"))
     system("rake build", exception: true)
+    if ENV["GEM_PUBLISH_DRY_RUN"] == "1"
+      puts "Skipping gem push (dry run)"
+      return
+    end
     system("gem push pkg/*.gem", exception: true)
   end
 
@@ -153,7 +164,11 @@ module Pack
     end
 
     puts "Uploading to PyPI..."
-    system("uv publish", exception: true)
+    publish_command = "uv publish"
+    if ENV["PYPI_PUBLISH_URL"] && !ENV["PYPI_PUBLISH_URL"].empty?
+      publish_command += " --publish-url #{Shellwords.escape(ENV["PYPI_PUBLISH_URL"])}"
+    end
+    system(publish_command, exception: true)
   end
 
   def replace_in_file(filepath, regexp, value)

@@ -260,7 +260,7 @@ Add a workflow that:
 ### Phase 4 — binary distribution strategy
 
 - Implement `useBundled` strategy and include `tally` binaries in plugin ZIP.
-- Reuse `goreleaser` outputs to populate `extensions/intellij-tally/bundled/...` during release builds.
+- Reuse release build artifacts to populate `extensions/intellij-tally/bundled/...` during release builds.
 
 ### Phase 5 — verification and hardening
 

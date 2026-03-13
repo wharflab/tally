@@ -434,11 +434,11 @@ mod tests {
         );
     }
 
-    // -- github_release_asset: validate naming matches goreleaser template --
+    // -- github_release_asset: validate naming matches the release asset convention --
 
     #[test]
     fn github_asset_names_match_goreleaser_convention() {
-        // GoReleaser template: tally_{Version}_{MacOS|Linux|Windows}_{x86_64|arm64}.{tar.gz|zip}
+        // Release assets: tally_{Version}_{MacOS|Linux|Windows}_{x86_64|arm64}.{tar.gz|zip}
         let cases: &[(Os, Architecture, &str, DownloadedFileType)] = &[
             (
                 Os::Mac,
