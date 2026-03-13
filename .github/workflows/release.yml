@@ -471,12 +471,12 @@ jobs:
           TAG="v${VERSION#v}"
           gh release upload "$TAG" "${{ steps.intellij_zip.outputs.zip_path }}" --clobber
   publish-intellij-marketplace:
-    if: github.event_name != 'pull_request'
     needs: build-intellij-plugin
     runs-on: ubuntu-latest
     env:
       JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
       JETBRAINS_MARKETPLACE_CHANNEL: ${{ vars.JETBRAINS_MARKETPLACE_CHANNEL }}
+      JETBRAINS_MARKETPLACE_PR_CHANNEL: ${{ vars.JETBRAINS_MARKETPLACE_PR_CHANNEL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -496,6 +496,12 @@ jobs:
             exit 0
           fi
 
+          MARKETPLACE_CHANNEL="${JETBRAINS_MARKETPLACE_CHANNEL}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            MARKETPLACE_CHANNEL="${JETBRAINS_MARKETPLACE_PR_CHANNEL:-pr}"
+            echo "Publishing dry-run IntelliJ plugin to JetBrains custom channel '${MARKETPLACE_CHANNEL}'."
+          fi
+
           ZIP_PATH="$(find intellij-plugin -maxdepth 1 -type f -name '*.zip' | head -n 1)"
           if [ -z "${ZIP_PATH}" ]; then
             echo "::error::No IntelliJ plugin zip found in artifact directory."
@@ -513,8 +519,8 @@ jobs:
             -F "xmlId=${XML_ID}"
             -F "file=@${ZIP_PATH}"
           )
-          if [ -n "${JETBRAINS_MARKETPLACE_CHANNEL}" ]; then
-            CURL_ARGS+=(-F "channel=${JETBRAINS_MARKETPLACE_CHANNEL}")
+          if [ -n "${MARKETPLACE_CHANNEL}" ]; then
+            CURL_ARGS+=(-F "channel=${MARKETPLACE_CHANNEL}")
           fi
 
           RESPONSE_FILE="$(mktemp)"
@@ -587,6 +593,22 @@ jobs:
             echo "Publishing $vsix"
             bunx @vscode/vsce publish --pat "$VSCE_PAT" --packagePath "$vsix"
           done
+  explain-vscode-pr-dry-run:
+    if: github.event_name == 'pull_request'
+    needs: build-vscode-vsix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain VS Code Marketplace dry-run behavior
+        run: |
+          {
+            echo "VS Code Marketplace publish is intentionally skipped on pull_request dry-runs."
+            echo
+            echo "Reason: pre-release publishes still use the main extension ID and consume Marketplace version numbers."
+            echo "Our PR release versions use semver prerelease identifiers, which VS Code Marketplace pre-release publishing does not accept."
+            echo "Publishing PR builds would therefore either fail or force future stable releases to jump ahead of PR-only versions."
+            echo
+            echo "If we want true PR publish validation for VS Code, we need a dedicated test extension identity."
+          } >> "$GITHUB_STEP_SUMMARY"
   publish-openvsx:
     if: github.event_name != 'pull_request'
     needs: build-vscode-vsix
