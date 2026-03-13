@@ -245,7 +245,7 @@ jobs:
         run: |
           set -euo pipefail
           cd dist
-          find . -maxdepth 1 -type f \( -name 'tally_*.tar.gz' -o -name 'tally_*.zip' \) -printf '%f\n' \
+          find . -maxdepth 1 -type f \( -name 'tally_*.tar.gz' -o -name 'tally_*.zip' -o -name 'tally_*.exe' \) -printf '%f\n' \
             | sort \
             | xargs sha256sum > tally_checksums.txt
           cat tally_checksums.txt
@@ -260,14 +260,14 @@ jobs:
           if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
             gh release create "$TAG" --repo "$REPO" --title "$TAG" --generate-notes --target "$GITHUB_SHA"
           fi
-          mapfile -t assets < <(find dist -maxdepth 1 -type f \( -name 'tally_*.tar.gz' -o -name 'tally_*.zip' -o -name 'tally_checksums.txt' \) | sort)
+          mapfile -t assets < <(find dist -maxdepth 1 -type f \( -name 'tally_*.tar.gz' -o -name 'tally_*.zip' -o -name 'tally_*.exe' -o -name 'tally_checksums.txt' \) | sort)
           gh release upload "$TAG" --repo "$REPO" "${assets[@]}" --clobber
       - name: Summarize dry-run release assets
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
           echo "PR dry run would publish:" >> "$GITHUB_STEP_SUMMARY"
-          find dist -maxdepth 1 -type f \( -name 'tally_*.tar.gz' -o -name 'tally_*.zip' -o -name 'tally_checksums.txt' \) -printf '- %f\n' \
+          find dist -maxdepth 1 -type f \( -name 'tally_*.tar.gz' -o -name 'tally_*.zip' -o -name 'tally_*.exe' -o -name 'tally_checksums.txt' \) -printf '- %f\n' \
             | sort >> "$GITHUB_STEP_SUMMARY"
       - name: Upload aggregated release dist
         uses: actions/upload-artifact@v7

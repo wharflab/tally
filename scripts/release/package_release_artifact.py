@@ -57,6 +57,9 @@ def main() -> int:
         ) as zf:
             for path in package_files:
                 zf.write(path, arcname=path.name)
+
+        executable_asset = dist_root / f"tally_{args.version}_{args.archive_os}_{args.archive_arch}.exe"
+        shutil.copy2(binary_path, executable_asset)
     else:
         with tarfile.open(archive_path, mode="w:gz") as tf:
             for path in package_files:

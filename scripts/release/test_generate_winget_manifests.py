@@ -27,15 +27,15 @@ class GenerateWingetManifestsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = Path(tmpdir) / "tally_checksums.txt"
             path.write_text(
-                "ABCDEF tally_0.26.0_Windows_x86_64.zip\n"
-                "123456 tally_0.26.0_Windows_arm64.zip\n",
+                "ABCDEF tally_0.26.0_Windows_x86_64.exe\n"
+                "123456 tally_0.26.0_Windows_arm64.exe\n",
                 encoding="utf-8",
             )
             self.assertEqual(
                 read_checksums(path),
                 {
-                    "tally_0.26.0_Windows_x86_64.zip": "ABCDEF",
-                    "tally_0.26.0_Windows_arm64.zip": "123456",
+                    "tally_0.26.0_Windows_x86_64.exe": "ABCDEF",
+                    "tally_0.26.0_Windows_arm64.exe": "123456",
                 },
             )
 
@@ -63,15 +63,14 @@ class GenerateWingetManifestsTest(unittest.TestCase):
             "wharflab",
             "tally",
             {
-                "tally_0.26.0_Windows_x86_64.zip": "ABCDEF",
-                "tally_0.26.0_Windows_arm64.zip": "123456",
+                "tally_0.26.0_Windows_x86_64.exe": "ABCDEF",
+                "tally_0.26.0_Windows_arm64.exe": "123456",
             },
         )
-        self.assertIn("InstallerType: zip", installer_manifest)
-        self.assertIn("NestedInstallerType: portable", installer_manifest)
-        self.assertIn("PortableCommandAlias: tally", installer_manifest)
+        self.assertIn("InstallerType: portable", installer_manifest)
+        self.assertIn("Commands:\n    - tally", installer_manifest)
         self.assertIn(
-            "InstallerUrl: https://github.com/wharflab/tally/releases/download/v0.26.0/tally_0.26.0_Windows_x86_64.zip",
+            "InstallerUrl: https://github.com/wharflab/tally/releases/download/v0.26.0/tally_0.26.0_Windows_x86_64.exe",
             installer_manifest,
         )
 

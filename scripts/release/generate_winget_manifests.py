@@ -14,8 +14,8 @@ MANIFEST_VERSION = "1.9.0"
 SHORT_DESCRIPTION = "A fast, configurable linter for Dockerfiles and Containerfiles."
 TAG_LIST = ("docker", "dockerfile", "containerfile", "linter")
 WINDOWS_ASSETS = (
-    ("x64", "tally_{version}_Windows_x86_64.zip"),
-    ("arm64", "tally_{version}_Windows_arm64.zip"),
+    ("x64", "tally_{version}_Windows_x86_64.exe"),
+    ("arm64", "tally_{version}_Windows_arm64.exe"),
 )
 
 
@@ -109,13 +109,11 @@ def render_installer_manifest(
         if not sha256:
             raise SystemExit(f"missing checksum for {filename}")
         installer = f"""- Architecture: {architecture}
-  InstallerType: zip
-  NestedInstallerType: portable
+  InstallerType: portable
   InstallerUrl: {github_release_url(owner, repo, version, filename)}
   InstallerSha256: {sha256}
-  NestedInstallerFiles:
-    - RelativeFilePath: tally.exe
-      PortableCommandAlias: tally"""
+  Commands:
+    - tally"""
         installers.append(installer)
 
     rendered_installers = "\n".join(installers)
