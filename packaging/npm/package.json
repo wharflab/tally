@@ -11,10 +11,11 @@
   },
   "files": [
     "bin/",
+    "lib/",
     "platform-targets.json"
   ],
   "scripts": {
-    "publish:release": "node ./bin/prepublish.js publish-release"
+    "publish:release": "node ./scripts/publish-release.js publish-release"
   },
   "keywords": [
     "docker",

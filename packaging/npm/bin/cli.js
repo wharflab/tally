@@ -6,7 +6,7 @@ const {
   getBinaryName,
   getPlatformPackageName,
   getPlatformTarget,
-} = require("./platform-packages");
+} = require("../lib/platform-packages");
 
 function main() {
   try {

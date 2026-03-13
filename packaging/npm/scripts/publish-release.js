@@ -9,7 +9,7 @@ const {
   getPlatformPackageDirName,
   getPlatformPackageName,
   platformTargets,
-} = require("./platform-packages");
+} = require("../lib/platform-packages");
 
 const packageRoot = path.resolve(__dirname, "..");
 const repoRoot = path.resolve(packageRoot, "..", "..");
@@ -174,14 +174,15 @@ function publishPlatformPackages(targets, version, publishTag) {
 function createMainPackage(manifest, version, targets, publishTag) {
   removeIfExists(generatedMainPackageRoot);
   ensureDir(path.join(generatedMainPackageRoot, "bin"));
+  ensureDir(path.join(generatedMainPackageRoot, "lib"));
   copySharedDocs(generatedMainPackageRoot);
   fs.copyFileSync(
     path.join(packageRoot, "bin", "cli.js"),
     path.join(generatedMainPackageRoot, "bin", "cli.js"),
   );
   fs.copyFileSync(
-    path.join(packageRoot, "bin", "platform-packages.js"),
-    path.join(generatedMainPackageRoot, "bin", "platform-packages.js"),
+    path.join(packageRoot, "lib", "platform-packages.js"),
+    path.join(generatedMainPackageRoot, "lib", "platform-packages.js"),
   );
   fs.copyFileSync(
     path.join(packageRoot, "platform-targets.json"),
