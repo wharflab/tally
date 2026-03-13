@@ -48,8 +48,8 @@
     "@typescript/native-preview": "7.0.0-dev.20260310.1",
     "@vscode/test-electron": "2.5.2",
     "@vscode/vsce": "3.7.1",
-    "oxfmt": "0.36.0",
-    "oxlint": "1.51.0",
+    "oxfmt": "0.37.0",
+    "oxlint": "1.52.0",
     "oxlint-tsgolint": "0.16.0",
     "vscode-python-envs": "github:microsoft/vscode-python-environments#v1.22.0"
   },
