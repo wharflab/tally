@@ -796,7 +796,10 @@ jobs:
           ruby pack.rb prepare
           ruby pack.rb publish_gem
   publish-zed-marketplace:
-    needs: preflight
+    needs:
+      - preflight
+      - publish-release
+      - publish-npm
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
