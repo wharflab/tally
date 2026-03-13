@@ -20,6 +20,7 @@ Homepage = "https://github.com/wharflab/tally"
 
 [project.scripts]
 tally = "tally_cli.main:main"
+tally-cli = "tally_cli.main:main"
 
 [build-system]
 requires = ["hatchling"]
