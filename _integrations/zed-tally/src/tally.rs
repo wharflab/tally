@@ -439,7 +439,7 @@ mod tests {
     // -- github_release_asset: validate naming matches the release asset convention --
 
     #[test]
-    fn github_asset_names_match_goreleaser_convention() {
+    fn github_asset_names_match_release_convention() {
         // Release assets: tally_{Version}_{MacOS|Linux|Windows}_{x86_64|arm64}.{tar.gz|zip}
         let cases: &[(Os, Architecture, &str, DownloadedFileType)] = &[
             (

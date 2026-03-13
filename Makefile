@@ -152,7 +152,7 @@ clean:
 
 release:
 	@echo "release is now orchestrated by .github/workflows/release.yml on native GitHub runners."
-	@echo "Local multi-platform release via goreleaser-cross has been removed."
+	@echo "Local multi-platform release from the Makefile has been removed."
 	@exit 1
 
 publish-prepare: release
