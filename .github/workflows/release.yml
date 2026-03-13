@@ -255,12 +255,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          REPO="${GITHUB_REPOSITORY}"
           TAG="v${VERSION#v}"
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --title "$TAG" --generate-notes --target "$GITHUB_SHA"
+          if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release create "$TAG" --repo "$REPO" --title "$TAG" --generate-notes --target "$GITHUB_SHA"
           fi
           mapfile -t assets < <(find dist -maxdepth 1 -type f \( -name 'tally_*.tar.gz' -o -name 'tally_*.zip' -o -name 'tally_checksums.txt' \) | sort)
-          gh release upload "$TAG" "${assets[@]}" --clobber
+          gh release upload "$TAG" --repo "$REPO" "${assets[@]}" --clobber
       - name: Summarize dry-run release assets
         if: github.event_name == 'pull_request'
         run: |
