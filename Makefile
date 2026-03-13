@@ -162,7 +162,9 @@ publish-npm: publish-prepare
 	cd packaging && ruby pack.rb publish_npm
 
 publish-pypi: publish-prepare
-	cd packaging && ruby pack.rb publish_pypi
+	@echo "publish-pypi now builds from packaging/pypi via uv and is run by .github/workflows/release.yml."
+	@echo "Use 'cd packaging/pypi && uv build --wheel && uv publish' with the appropriate env vars."
+	@exit 1
 
 publish-gem: publish-prepare
 	cd packaging && ruby pack.rb publish_gem

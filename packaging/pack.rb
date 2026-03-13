@@ -2,23 +2,14 @@
 
 require "fileutils"
 require "json"
-require "shellwords"
 
 # Version from VERSION env var (strips leading 'v' if present), or fallback
 VERSION = (ENV["VERSION"] || "0.1.0").sub(/^v/, "")
 NPM_VERSION = (ENV["NPM_VERSION"] || VERSION).sub(/^v/, "")
-PYPI_VERSION = (ENV["PYPI_VERSION"] || VERSION).sub(/^v/, "")
 GEM_VERSION = (ENV["GEM_VERSION"] || VERSION).sub(/^v/, "")
 
 ROOT = File.join(__dir__, "..")
 DIST = File.join(ROOT, "dist")
-
-# Platforms with binaries and PEP425 wheel tags (no freebsd - no standard wheel tag)
-PYTHON_PLATFORMS = [
-  ["linux", "x86_64"], ["linux", "arm64"],
-  ["darwin", "x86_64"], ["darwin", "arm64"],
-  ["windows", "x86_64"], ["windows", "arm64"]
-].freeze
 
 module Pack
   extend FileUtils
@@ -38,7 +29,7 @@ module Pack
     puts "Cleaning... "
     rm(Dir["npm/**/README.md"])
     rm(Dir["npm/**/tally*"].filter(&File.method(:file?)))
-    system("git clean -fdX npm/ pypi/ rubygems/", exception: true)
+    system("git clean -fdX npm/ rubygems/", exception: true)
     puts "done"
   end
 
@@ -55,9 +46,6 @@ module Pack
     replace_in_file("npm/tally/package.json",
                    /"(@wharflab\/tally-.+)": "[^"]+"/,
                    %{"\\1": "#{NPM_VERSION}"})
-
-    # Update PyPI version
-    replace_in_file("pypi/pyproject.toml", /(version\s*=\s*)"[^"]+"/, %{\\1"#{PYPI_VERSION}"})
 
     # Update Rubygems version
     replace_in_file("rubygems/tally-cli.gemspec", /(spec\.version\s+=\s+)"[^"]+"/, %{\\1"#{GEM_VERSION}"})
@@ -79,13 +67,13 @@ module Pack
   # where variant is v1 for amd64, v8.0 for arm64
   BINARY_MAPPING = {
     # [goos, goarch, variant, extension]
-    ["linux",   "amd64", "v1",   ""]     => { npm: "linux-x64",    gem: "linux-x64",    pypi: "linux-x86_64" },
-    ["linux",   "arm64", "v8.0", ""]     => { npm: "linux-arm64",  gem: "linux-arm64",  pypi: "linux-arm64" },
-    ["darwin",  "amd64", "v1",   ""]     => { npm: "darwin-x64",   gem: "darwin-x64",   pypi: "darwin-x86_64" },
-    ["darwin",  "arm64", "v8.0", ""]     => { npm: "darwin-arm64", gem: "darwin-arm64", pypi: "darwin-arm64" },
-    ["windows", "amd64", "v1",   ".exe"] => { npm: "windows-x64",  gem: "windows-x64",  pypi: "windows-x86_64" },
-    ["windows", "arm64", "v8.0", ".exe"] => { npm: "windows-arm64",gem: "windows-arm64",pypi: "windows-arm64" },
-    ["freebsd", "amd64", "v1",   ""]     => { npm: "freebsd-x64",  gem: "freebsd-x64",  pypi: "freebsd-x86_64" },
+    ["linux",   "amd64", "v1",   ""]     => { npm: "linux-x64",    gem: "linux-x64" },
+    ["linux",   "arm64", "v8.0", ""]     => { npm: "linux-arm64",  gem: "linux-arm64" },
+    ["darwin",  "amd64", "v1",   ""]     => { npm: "darwin-x64",   gem: "darwin-x64" },
+    ["darwin",  "arm64", "v8.0", ""]     => { npm: "darwin-arm64", gem: "darwin-arm64" },
+    ["windows", "amd64", "v1",   ".exe"] => { npm: "windows-x64",  gem: "windows-x64" },
+    ["windows", "arm64", "v8.0", ".exe"] => { npm: "windows-arm64",gem: "windows-arm64" },
+    ["freebsd", "amd64", "v1",   ""]     => { npm: "freebsd-x64",  gem: "freebsd-x64" },
   }.freeze
 
   def put_binaries
@@ -111,17 +99,12 @@ module Pack
       mkdir_p(File.dirname(gem_dest))
       cp(source, gem_dest, verbose: true)
 
-      # PyPI
-      pypi_dest = "pypi/tally_cli/bin/tally-#{targets[:pypi]}/tally#{ext}"
-      mkdir_p(File.dirname(pypi_dest))
-      cp(source, pypi_dest, verbose: true)
     end
 
     puts "done"
   end
 
   def publish
-    publish_pypi
     publish_npm
     publish_gem
   end
@@ -149,26 +132,6 @@ module Pack
       return
     end
     system("gem push pkg/*.gem", exception: true)
-  end
-
-  def publish_pypi
-    puts "Publishing to PyPI..."
-    pypi_dir = File.join(__dir__, "pypi")
-
-    PYTHON_PLATFORMS.each do |os, arch|
-      puts "Building wheel for #{os}-#{arch}..."
-      cd(pypi_dir)
-      ENV["TALLY_TARGET_PLATFORM"] = os
-      ENV["TALLY_TARGET_ARCH"] = arch
-      system("uv build --wheel", exception: true)
-    end
-
-    puts "Uploading to PyPI..."
-    publish_command = "uv publish"
-    if ENV["PYPI_PUBLISH_URL"] && !ENV["PYPI_PUBLISH_URL"].empty?
-      publish_command += " --publish-url #{Shellwords.escape(ENV["PYPI_PUBLISH_URL"])}"
-    end
-    system(publish_command, exception: true)
   end
 
   def replace_in_file(filepath, regexp, value)

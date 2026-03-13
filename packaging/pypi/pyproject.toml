@@ -1,6 +1,6 @@
 [project]
 name = "tally-cli"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A fast, configurable linter for Dockerfiles and Containerfiles"
 readme = "README.md"
 license = "GPL-3.0-only"
@@ -30,6 +30,9 @@ packages = ["tally_cli"]
 artifacts = ["tally_cli/bin/**/*"]
 
 [tool.hatch.build.hooks.custom]
+path = "hatch_build.py"
+
+[tool.hatch.metadata.hooks.custom]
 path = "hatch_build.py"
 
 [tool.hatch.build.targets.sdist]

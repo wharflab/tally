@@ -26,7 +26,6 @@ env:
   GOTOOLCHAIN: auto
   DRY_RUN: ${{ github.event_name == 'pull_request' && '1' || '0' }}
   RELEASE_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
-  PYPI_DRY_RUN_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0.dev{0}{1}', github.event.pull_request.number, github.run_number) || '' }}
   GEM_DRY_RUN_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0.pre.{0}.{1}', github.event.pull_request.number, github.run_number) || '' }}
   BUILD_TAGS: containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
 jobs:
@@ -732,11 +731,43 @@ jobs:
           enable-cache: true
           python-version: "3.12"
           ignore-nothing-to-cache: true
-      - name: Publish to PyPI
+      - name: Build PyPI wheels
         run: |
-          cd packaging/
-          ruby pack.rb prepare
-          ruby pack.rb publish_pypi
+          set -euo pipefail
+          cd packaging/pypi
+          rm -rf dist
+          for target in \
+            "linux x86_64" \
+            "linux arm64" \
+            "darwin x86_64" \
+            "darwin arm64" \
+            "windows x86_64" \
+            "windows arm64"
+          do
+            IFS=' ' read -r target_platform target_arch <<EOF
+          $target
+          EOF
+            export TALLY_TARGET_PLATFORM="$target_platform"
+            export TALLY_TARGET_ARCH="$target_arch"
+            export TALLY_PYPI_VERSION="${PYPI_VERSION#v}"
+            uv build --wheel
+          done
+      - name: Upload PyPI distributions
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: pypi-dists
+          path: packaging/pypi/dist/
+      - name: Publish to TestPyPI
+        if: github.event_name == 'pull_request'
+        run: |
+          cd packaging/pypi
+          uv publish --publish-url "${PYPI_PUBLISH_URL}"
+      - name: Publish to PyPI
+        if: github.event_name != 'pull_request'
+        run: |
+          cd packaging/pypi
+          uv publish
   publish-gem:
     needs: publish-release
     runs-on: ubuntu-latest
