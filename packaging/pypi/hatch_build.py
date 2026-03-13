@@ -1,9 +1,7 @@
-import atexit
 import os
 import platform
 import shutil
 import sys
-import tempfile
 from pathlib import Path
 
 from hatchling.builders.hooks.plugin.interface import BuildHookInterface
@@ -104,9 +102,6 @@ class CustomBuildHook(BuildHookInterface):
         super().__init__(*args, **kwargs)
         self.target_platform = None
         self.target_arch = None
-        self._temp_dir = None
-        self._moved_entries = []
-        self._restore_registered = False
 
     def initialize(self, version, build_data):
         target_platform, target_arch = get_platform_info()
@@ -117,9 +112,6 @@ class CustomBuildHook(BuildHookInterface):
         if tag:
             build_data["tag"] = tag
             self._stage_target_binary()
-            if not self._restore_registered:
-                atexit.register(self._restore_binaries)
-                self._restore_registered = True
             print(f"[HOOK] Building platform wheel {tag}")
         else:
             print(
@@ -157,25 +149,12 @@ class CustomBuildHook(BuildHookInterface):
             )
 
         bin_dir = Path(self.root) / "tally_cli" / "bin"
-        bin_dir.mkdir(parents=True, exist_ok=True)
-        self._temp_dir = Path(tempfile.mkdtemp(prefix="tally-bin-backup-"))
-
-        for entry in bin_dir.iterdir():
-            destination = self._temp_dir / entry.name
-            shutil.move(str(entry), str(destination))
-            self._moved_entries.append((destination, entry))
+        if bin_dir.is_dir():
+            shutil.rmtree(bin_dir)
+        bin_dir.mkdir(parents=True)
 
         target_dir_name = f"tally-{self.target_platform}-{self.target_arch}"
         target_dir = bin_dir / target_dir_name
-        target_dir.mkdir(parents=True, exist_ok=True)
+        target_dir.mkdir()
         shutil.copy2(source, target_dir / source.name)
         print(f"[HOOK] Staged binary from {source}")
-
-    def _restore_binaries(self):
-        while self._moved_entries:
-            backup_path, original_path = self._moved_entries.pop()
-            if backup_path.exists():
-                shutil.move(str(backup_path), str(original_path))
-        if self._temp_dir and self._temp_dir.exists():
-            shutil.rmtree(self._temp_dir, ignore_errors=True)
-        self._temp_dir = None
