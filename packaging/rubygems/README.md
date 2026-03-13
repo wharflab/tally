@@ -5,21 +5,13 @@ A fast, configurable linter for Dockerfiles and Containerfiles.
 ## Installation
 
 ```bash
-pip install tally-cli
-```
-
-Or run it without installing:
-
-```bash
-pipx run tally-cli lint .
-uvx tally-cli lint .
+gem install tally-cli
 ```
 
 ## Usage
 
 ```bash
-tally lint .
-tally lint --max-lines 100 Dockerfile
+gem exec tally lint .
 ```
 
 ## Documentation

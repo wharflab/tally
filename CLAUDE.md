@@ -57,3 +57,14 @@ and a WASM-compiled shellcheck (`internal/shellcheck/`).
 - Avoid `panic`/`log.Fatal` outside `main`; return errors and keep error context (`%w`).
 - Avoid `//nolint` unless necessary; if used, scope it to a specific linter and add a brief reason.
 - Do not run `make release`/`make publish*` unless explicitly asked.
+
+## Release Workflow
+
+- Release automation lives in [`.github/workflows/release.yml`](.github/workflows/release.yml).
+- The workflow builds signed/release-ready binaries on native GitHub runners, aggregates `dist/`, then publishes GitHub assets plus npm/PyPI/RubyGems and IDE marketplace artifacts.
+- When release is broken, inspect:
+  - [`.github/workflows/release.yml`](.github/workflows/release.yml)
+  - [`scripts/release/package_release_artifact.py`](scripts/release/package_release_artifact.py)
+  - [`packaging/npm/`](packaging/npm)
+  - [`packaging/pypi/`](packaging/pypi)
+  - [`packaging/rubygems/`](packaging/rubygems)

@@ -1,0 +1,51 @@
+[
+  {
+    "goos": "linux",
+    "goarch": "amd64",
+    "variant": "v1",
+    "nodeOs": "linux",
+    "nodeArch": "x64"
+  },
+  {
+    "goos": "linux",
+    "goarch": "arm64",
+    "variant": "v8.0",
+    "nodeOs": "linux",
+    "nodeArch": "arm64"
+  },
+  {
+    "goos": "darwin",
+    "goarch": "amd64",
+    "variant": "v1",
+    "nodeOs": "darwin",
+    "nodeArch": "x64"
+  },
+  {
+    "goos": "darwin",
+    "goarch": "arm64",
+    "variant": "v8.0",
+    "nodeOs": "darwin",
+    "nodeArch": "arm64"
+  },
+  {
+    "goos": "windows",
+    "goarch": "amd64",
+    "variant": "v1",
+    "nodeOs": "windows",
+    "nodeArch": "x64"
+  },
+  {
+    "goos": "windows",
+    "goarch": "arm64",
+    "variant": "v8.0",
+    "nodeOs": "windows",
+    "nodeArch": "arm64"
+  },
+  {
+    "goos": "freebsd",
+    "goarch": "amd64",
+    "variant": "v1",
+    "nodeOs": "freebsd",
+    "nodeArch": "x64"
+  }
+]

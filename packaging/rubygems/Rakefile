@@ -1,2 +1,125 @@
-require "bundler/gem_tasks"
-task :default => :spec
+# frozen_string_literal: true
+
+require "fileutils"
+
+ROOT = File.expand_path("../..", __dir__)
+DIST = File.join(ROOT, "dist")
+GEM_ROOT = __dir__
+GEMSPEC_PATH = File.join(GEM_ROOT, "tally-cli.gemspec")
+VERSION_FILE = File.join(GEM_ROOT, "lib", "tally-cli.rb")
+LICENSE_PATH = File.join(ROOT, "LICENSE")
+NOTICE_PATH = File.join(ROOT, "NOTICE")
+BACKUP_DIR = File.join(GEM_ROOT, ".generated")
+PKG_DIR = File.join(GEM_ROOT, "pkg")
+VERSION = (ENV["GEM_VERSION"] || ENV["VERSION"] || "0.1.0").sub(/^v/, "")
+
+BINARY_MAPPING = {
+  ["linux", "amd64", "v1", ""] => "linux-x64",
+  ["linux", "arm64", "v8.0", ""] => "linux-arm64",
+  ["darwin", "amd64", "v1", ""] => "darwin-x64",
+  ["darwin", "arm64", "v8.0", ""] => "darwin-arm64",
+  ["windows", "amd64", "v1", ".exe"] => "windows-x64",
+  ["windows", "arm64", "v8.0", ".exe"] => "windows-arm64",
+  ["freebsd", "amd64", "v1", ""] => "freebsd-x64",
+}.freeze
+
+def replace_in_file(filepath, regexp, replacement)
+  text = File.read(filepath)
+  text.gsub!(regexp, replacement)
+  File.write(filepath, text)
+end
+
+def backup_file(path)
+  FileUtils.mkdir_p(BACKUP_DIR)
+  backup = File.join(BACKUP_DIR, File.basename(path))
+  FileUtils.cp(path, backup) unless File.exist?(backup)
+end
+
+def restore_file(path)
+  backup = File.join(BACKUP_DIR, File.basename(path))
+  return unless File.exist?(backup)
+
+  FileUtils.cp(backup, path)
+end
+
+def stage_version
+  puts "Setting RubyGems version to #{VERSION}"
+  backup_file(GEMSPEC_PATH)
+  backup_file(VERSION_FILE)
+  replace_in_file(GEMSPEC_PATH, /(spec\.version\s+=\s+)"[^"]+"/, "\\1\"#{VERSION}\"")
+  replace_in_file(VERSION_FILE, /(VERSION\s+=\s+)"[^"]+"/, "\\1\"#{VERSION}\"")
+end
+
+def stage_docs
+  puts "Copying LICENSE and NOTICE"
+  FileUtils.cp(LICENSE_PATH, File.join(GEM_ROOT, "LICENSE"), verbose: true)
+  FileUtils.cp(NOTICE_PATH, File.join(GEM_ROOT, "NOTICE"), verbose: true)
+end
+
+def stage_binaries
+  puts "Copying release binaries into RubyGems package"
+
+  BINARY_MAPPING.each do |(goos, goarch, variant, ext), target|
+    source = File.join(DIST, "tally_#{goos}_#{goarch}_#{variant}", "tally#{ext}")
+    unless File.exist?(source)
+      puts "Skipping #{source} (not found)"
+      next
+    end
+
+    destination = File.join(GEM_ROOT, "libexec", "tally-#{target}", "tally#{ext}")
+    FileUtils.mkdir_p(File.dirname(destination))
+    FileUtils.cp(source, destination, verbose: true)
+  end
+end
+
+desc "Clean generated RubyGems packaging artifacts"
+task :clean_generated do
+  Dir.glob(File.join(GEM_ROOT, "libexec", "tally-*")).each do |path|
+    FileUtils.rm_rf(path, verbose: true)
+  end
+  Dir.glob(File.join(PKG_DIR, "*.gem")).each do |path|
+    FileUtils.rm_f(path, verbose: true)
+  end
+  %w[LICENSE NOTICE].each do |filename|
+    path = File.join(GEM_ROOT, filename)
+    FileUtils.rm_f(path, verbose: true)
+  end
+end
+
+desc "Restore staged RubyGems files to checked-in state"
+task :restore do
+  restore_file(GEMSPEC_PATH)
+  restore_file(VERSION_FILE)
+  FileUtils.rm_rf(BACKUP_DIR, verbose: true)
+end
+
+desc "Prepare the RubyGems package from dist/"
+task :prepare do
+  Rake::Task[:clean_generated].invoke
+  stage_version
+  stage_docs
+  stage_binaries
+end
+
+desc "Build the gem from the staged package files"
+task build: :prepare do
+  FileUtils.mkdir_p(PKG_DIR)
+  sh "gem build tally-cli.gemspec"
+  gem_filename = "tally-cli-#{VERSION}.gem"
+  FileUtils.mv(File.join(GEM_ROOT, gem_filename), File.join(PKG_DIR, gem_filename), force: true)
+end
+
+desc "Publish the gem (or build only when GEM_PUBLISH_DRY_RUN=1)"
+task publish: :build do
+  begin
+    if ENV["GEM_PUBLISH_DRY_RUN"] == "1"
+      puts "Skipping gem push (dry run)"
+    else
+      sh "gem push pkg/*.gem"
+    end
+  ensure
+    Rake::Task[:restore].invoke
+  end
+end
+
+task default: :build

@@ -26,7 +26,6 @@ env:
   GOTOOLCHAIN: auto
   DRY_RUN: ${{ github.event_name == 'pull_request' && '1' || '0' }}
   RELEASE_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
-  PYPI_DRY_RUN_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0.dev{0}{1}', github.event.pull_request.number, github.run_number) || '' }}
   GEM_DRY_RUN_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0.pre.{0}.{1}', github.event.pull_request.number, github.run_number) || '' }}
   BUILD_TAGS: containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
 jobs:
@@ -135,7 +134,7 @@ jobs:
         with:
           msystem: ${{ matrix.msystem }}
           update: true
-          release: false
+          location: ${{ runner.temp }}
           path-type: inherit
           pacboy: toolchain:p
       - name: Build binary
@@ -241,7 +240,7 @@ jobs:
         with:
           pattern: release-platform-*
           merge-multiple: true
-          path: .
+          path: dist
       - name: Generate release checksums
         run: |
           set -euo pipefail
@@ -316,12 +315,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          lfs: true
+          lfs: false
       - name: Download signed artifacts
         uses: actions/download-artifact@v8
         with:
           name: release-dist
-          path: .
+          path: dist
       - name: Copy binary into extension bundle
         run: |
           SRC_DIR="dist/${{ matrix.dist_dir }}"
@@ -382,12 +381,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          lfs: true
+          lfs: false
       - name: Download signed artifacts
         uses: actions/download-artifact@v8
         with:
           name: release-dist
-          path: .
+          path: dist
       - name: Copy binaries into IntelliJ plugin bundle
         run: |
           copy_binary() {
@@ -472,17 +471,17 @@ jobs:
           TAG="v${VERSION#v}"
           gh release upload "$TAG" "${{ steps.intellij_zip.outputs.zip_path }}" --clobber
   publish-intellij-marketplace:
-    if: github.event_name != 'pull_request'
     needs: build-intellij-plugin
     runs-on: ubuntu-latest
     env:
       JETBRAINS_MARKETPLACE_TOKEN: ${{ secrets.JETBRAINS_MARKETPLACE_TOKEN }}
       JETBRAINS_MARKETPLACE_CHANNEL: ${{ vars.JETBRAINS_MARKETPLACE_CHANNEL }}
+      JETBRAINS_MARKETPLACE_PR_CHANNEL: ${{ vars.JETBRAINS_MARKETPLACE_PR_CHANNEL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          lfs: true
+          lfs: false
       - name: Download IntelliJ plugin artifact
         uses: actions/download-artifact@v8
         with:
@@ -495,6 +494,12 @@ jobs:
           if [ -z "${JETBRAINS_MARKETPLACE_TOKEN}" ]; then
             echo "JETBRAINS_MARKETPLACE_TOKEN is not set; skipping JetBrains Marketplace publish."
             exit 0
+          fi
+
+          MARKETPLACE_CHANNEL="${JETBRAINS_MARKETPLACE_CHANNEL}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            MARKETPLACE_CHANNEL="${JETBRAINS_MARKETPLACE_PR_CHANNEL:-pr}"
+            echo "Publishing dry-run IntelliJ plugin to JetBrains custom channel '${MARKETPLACE_CHANNEL}'."
           fi
 
           ZIP_PATH="$(find intellij-plugin -maxdepth 1 -type f -name '*.zip' | head -n 1)"
@@ -514,8 +519,8 @@ jobs:
             -F "xmlId=${XML_ID}"
             -F "file=@${ZIP_PATH}"
           )
-          if [ -n "${JETBRAINS_MARKETPLACE_CHANNEL}" ]; then
-            CURL_ARGS+=(-F "channel=${JETBRAINS_MARKETPLACE_CHANNEL}")
+          if [ -n "${MARKETPLACE_CHANNEL}" ]; then
+            CURL_ARGS+=(-F "channel=${MARKETPLACE_CHANNEL}")
           fi
 
           RESPONSE_FILE="$(mktemp)"
@@ -588,6 +593,22 @@ jobs:
             echo "Publishing $vsix"
             bunx @vscode/vsce publish --pat "$VSCE_PAT" --packagePath "$vsix"
           done
+  explain-vscode-pr-dry-run:
+    if: github.event_name == 'pull_request'
+    needs: build-vscode-vsix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain VS Code Marketplace dry-run behavior
+        run: |
+          {
+            echo "VS Code Marketplace publish is intentionally skipped on pull_request dry-runs."
+            echo
+            echo "Reason: pre-release publishes still use the main extension ID and consume Marketplace version numbers."
+            echo "Our PR release versions use semver prerelease identifiers, which VS Code Marketplace pre-release publishing does not accept."
+            echo "Publishing PR builds would therefore either fail or force future stable releases to jump ahead of PR-only versions."
+            echo
+            echo "If we want true PR publish validation for VS Code, we need a dedicated test extension identity."
+          } >> "$GITHUB_STEP_SUMMARY"
   publish-openvsx:
     if: github.event_name != 'pull_request'
     needs: build-vscode-vsix
@@ -620,12 +641,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          lfs: true
+          lfs: false
       - name: Download release dist
         uses: actions/download-artifact@v8
         with:
           name: release-dist
-          path: .
+          path: dist
       - name: Generate Homebrew formula
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -633,8 +654,12 @@ jobs:
           VERSION="${VERSION#v}"
           SHA256_DARWIN_ARM64="$(awk '/tally_'"${VERSION}"'_MacOS_arm64.tar.gz$/ { print $1 }' dist/tally_checksums.txt)"
           SHA256_DARWIN_AMD64="$(awk '/tally_'"${VERSION}"'_MacOS_x86_64.tar.gz$/ { print $1 }' dist/tally_checksums.txt)"
+          SHA256_LINUX_ARM64="$(awk '/tally_'"${VERSION}"'_Linux_arm64.tar.gz$/ { print $1 }' dist/tally_checksums.txt)"
+          SHA256_LINUX_AMD64="$(awk '/tally_'"${VERSION}"'_Linux_x86_64.tar.gz$/ { print $1 }' dist/tally_checksums.txt)"
           export SHA256_DARWIN_ARM64
           export SHA256_DARWIN_AMD64
+          export SHA256_LINUX_ARM64
+          export SHA256_LINUX_AMD64
 
           # Generate the formula from the checksums already produced by this release.
           chmod +x packaging/homebrew/generate-formula.sh
@@ -685,27 +710,33 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
-      NPM_PUBLISH_DRY_RUN: ${{ github.event_name == 'pull_request' && '1' || '0' }}
+      NPM_VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          lfs: true
+          lfs: false
       - run: git fetch --force --tags
       - uses: actions/download-artifact@v8
         with:
           name: release-dist
-          path: .
+          path: dist
       - uses: actions/setup-node@v6
         with:
           node-version: 24.14.0
+          registry-url: https://registry.npmjs.org
       - name: Update npm
         run: npm install -g npm@latest
       - name: Publish to NPM
         run: |
-          cd packaging/
-          ruby pack.rb prepare
-          ruby pack.rb publish_npm
+          cd packaging/npm
+          npm version --no-git-tag-version "${NPM_VERSION#v}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            npm publish --tag next --dry-run
+          else
+            npm publish
+          fi
   publish-pypi:
     needs: publish-release
     runs-on: ubuntu-latest
@@ -720,23 +751,55 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          lfs: true
+          lfs: false
       - run: git fetch --force --tags
       - uses: actions/download-artifact@v8
         with:
           name: release-dist
-          path: .
+          path: dist
       - name: Setup uv with python
         uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           python-version: "3.12"
           ignore-nothing-to-cache: true
-      - name: Publish to PyPI
+      - name: Build PyPI wheels
         run: |
-          cd packaging/
-          ruby pack.rb prepare
-          ruby pack.rb publish_pypi
+          set -euo pipefail
+          cd packaging/pypi
+          rm -rf dist
+          for target in \
+            "linux x86_64" \
+            "linux arm64" \
+            "darwin x86_64" \
+            "darwin arm64" \
+            "windows x86_64" \
+            "windows arm64"
+          do
+            IFS=' ' read -r target_platform target_arch <<EOF
+          $target
+          EOF
+            export TALLY_TARGET_PLATFORM="$target_platform"
+            export TALLY_TARGET_ARCH="$target_arch"
+            export TALLY_PYPI_VERSION="${PYPI_VERSION#v}"
+            uv build --wheel
+          done
+      - name: Upload PyPI distributions
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: pypi-dists
+          path: packaging/pypi/dist/
+      - name: Publish to TestPyPI
+        if: github.event_name == 'pull_request'
+        run: |
+          cd packaging/pypi
+          uv publish --publish-url "${PYPI_PUBLISH_URL}"
+      - name: Publish to PyPI
+        if: github.event_name != 'pull_request'
+        run: |
+          cd packaging/pypi
+          uv publish
   publish-gem:
     needs: publish-release
     runs-on: ubuntu-latest
@@ -751,21 +814,23 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          lfs: true
+          lfs: false
       - run: git fetch --force --tags
       - uses: actions/download-artifact@v8
         with:
           name: release-dist
-          path: .
+          path: dist
       - name: Configure RubyGems Trusted Publishing
         uses: rubygems/configure-rubygems-credentials@main
       - name: Publish to Rubygems
         run: |
-          cd packaging/
-          ruby pack.rb prepare
-          ruby pack.rb publish_gem
+          cd packaging/rubygems
+          rake publish
   publish-zed-marketplace:
-    needs: preflight
+    needs:
+      - preflight
+      - publish-release
+      - publish-npm
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
@@ -774,6 +839,7 @@ jobs:
         uses: actions/checkout@v6
         if: github.event_name == 'pull_request' || vars.HARBOR_PILOT_APP_ID != ''
         with:
+          lfs: false
           path: tally
       - name: Generate GitHub App token
         id: app-token
@@ -788,6 +854,7 @@ jobs:
         uses: actions/checkout@v6
         if: github.event_name != 'pull_request' && vars.HARBOR_PILOT_APP_ID != ''
         with:
+          lfs: false
           repository: wharflab/zed-extensions
           token: ${{ steps.app-token.outputs.token }}
           path: zed-extensions
@@ -795,6 +862,7 @@ jobs:
         uses: actions/checkout@v6
         if: github.event_name == 'pull_request'
         with:
+          lfs: false
           repository: zed-industries/extensions
           path: zed-extensions
       - name: Install taplo

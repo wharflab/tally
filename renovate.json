@@ -71,6 +71,11 @@
       "enabled": false
     },
     {
+      "matchFileNames": ["_integrations/vscode-tally/package.json", "_integrations/vscode-tally/bun.lock"],
+      "matchDepNames": ["@types/vscode"],
+      "automerge": false
+    },
+    {
       "matchManagers": ["dockerfile"],
       "matchFileNames": ["internal/integration/testdata/**"],
       "enabled": false

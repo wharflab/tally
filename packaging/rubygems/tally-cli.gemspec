@@ -15,9 +15,10 @@ Gem::Specification.new do |spec|
   spec.files = %w(
     lib/tally-cli.rb
     bin/tally
+    README.md
     LICENSE
     NOTICE
-  ) + `find libexec/ -executable -type f -print0`.split("\x0")
+  ) + Dir.glob("libexec/**/*").select { |path| File.file?(path) }
 
   spec.licenses = ['GPL-3.0-only']
 end

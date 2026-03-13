@@ -1,4 +1,4 @@
-.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-npm publish-pypi publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin update-shellcheck-wasm
+.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin update-shellcheck-wasm
 
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
@@ -152,20 +152,13 @@ clean:
 
 release:
 	@echo "release is now orchestrated by .github/workflows/release.yml on native GitHub runners."
-	@echo "Local multi-platform release via goreleaser-cross has been removed."
+	@echo "Local multi-platform release from the Makefile has been removed."
 	@exit 1
 
 publish-prepare: release
-	cd packaging && ruby pack.rb prepare
-
-publish-npm: publish-prepare
-	cd packaging && ruby pack.rb publish_npm
-
-publish-pypi: publish-prepare
-	cd packaging && ruby pack.rb publish_pypi
+	cd packaging/rubygems && rake prepare
 
 publish-gem: publish-prepare
-	cd packaging && ruby pack.rb publish_gem
+	cd packaging/rubygems && rake publish
 
-publish: publish-prepare
-	cd packaging && ruby pack.rb publish
+publish: publish-gem
