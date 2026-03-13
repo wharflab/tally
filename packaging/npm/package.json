@@ -15,7 +15,8 @@
     "platform-targets.json"
   ],
   "scripts": {
-    "publish:release": "node ./scripts/publish-release.js publish-release"
+    "prepublishOnly": "node ./scripts/publish-release.js prepublish",
+    "postpublish": "node ./scripts/publish-release.js restore"
   },
   "keywords": [
     "docker",

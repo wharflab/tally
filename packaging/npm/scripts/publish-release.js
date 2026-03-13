@@ -12,14 +12,16 @@ const {
 } = require("../lib/platform-packages");
 
 const packageRoot = path.resolve(__dirname, "..");
-const repoRoot = path.resolve(packageRoot, "..", "..");
+const repoRoot = process.env.TALLY_REPO_ROOT
+  ? path.resolve(process.env.TALLY_REPO_ROOT)
+  : path.resolve(packageRoot, "..", "..");
 const distRoot = process.env.TALLY_DIST_DIR
   ? path.resolve(process.env.TALLY_DIST_DIR)
   : path.join(repoRoot, "dist");
 const generatedRoot = path.join(packageRoot, ".generated");
 const generatedPackagesRoot = path.join(generatedRoot, "platform-packages");
-const generatedMainPackageRoot = path.join(generatedRoot, "main-package");
-const manifestPath = path.join(packageRoot, "package.json");
+const manifestPath = process.env.npm_package_json || path.join(packageRoot, "package.json");
+const manifestBackupPath = path.join(generatedRoot, "package.json.backup");
 const rootDocFiles = ["README.md", "LICENSE", "NOTICE"];
 
 function readJSON(filePath) {
@@ -46,18 +48,11 @@ function copySharedDocs(targetDir) {
 }
 
 function resolveVersion(manifest) {
-  const version = (process.env.NPM_VERSION || manifest.version).replace(/^v/, "");
+  const version = (process.env.npm_package_version || manifest.version).replace(/^v/, "");
   if (!version) {
     throw new Error("NPM version must not be empty");
   }
   return version;
-}
-
-function resolvePublishTag(version) {
-  if (process.env.NPM_PUBLISH_TAG) {
-    return process.env.NPM_PUBLISH_TAG;
-  }
-  return version.includes("-") ? "next" : null;
 }
 
 function isDryRun() {
@@ -114,19 +109,9 @@ function buildPlatformManifest(target, version) {
 
 function buildPublishedRootManifest(manifest, version, availableTargets, publishTag) {
   const nextManifest = structuredClone(manifest);
-  nextManifest.version = version;
   nextManifest.optionalDependencies = Object.fromEntries(
     availableTargets.map((target) => [getPlatformPackageName(target), version]),
   );
-  nextManifest.publishConfig = {
-    ...(nextManifest.publishConfig || {}),
-    access: "public",
-  };
-  if (publishTag) {
-    nextManifest.publishConfig.tag = publishTag;
-  } else {
-    delete nextManifest.publishConfig.tag;
-  }
   return nextManifest;
 }
 
@@ -136,7 +121,7 @@ function availableTargets() {
   );
 }
 
-function publishPlatformPackages(targets, version, publishTag) {
+function publishPlatformPackages(targets, version) {
   const dryRun = isDryRun();
   for (const target of targets) {
     const packageDir = path.join(
@@ -160,9 +145,6 @@ function publishPlatformPackages(targets, version, publishTag) {
     }
 
     const args = ["publish", "--access", "public"];
-    if (publishTag) {
-      args.push("--tag", publishTag);
-    }
     if (dryRun) {
       args.push("--dry-run");
     }
@@ -171,48 +153,20 @@ function publishPlatformPackages(targets, version, publishTag) {
   }
 }
 
-function createMainPackage(manifest, version, targets, publishTag) {
-  removeIfExists(generatedMainPackageRoot);
-  ensureDir(path.join(generatedMainPackageRoot, "bin"));
-  ensureDir(path.join(generatedMainPackageRoot, "lib"));
-  copySharedDocs(generatedMainPackageRoot);
-  fs.copyFileSync(
-    path.join(packageRoot, "bin", "cli.js"),
-    path.join(generatedMainPackageRoot, "bin", "cli.js"),
-  );
-  fs.copyFileSync(
-    path.join(packageRoot, "lib", "platform-packages.js"),
-    path.join(generatedMainPackageRoot, "lib", "platform-packages.js"),
-  );
-  fs.copyFileSync(
-    path.join(packageRoot, "platform-targets.json"),
-    path.join(generatedMainPackageRoot, "platform-targets.json"),
-  );
+function updateMainManifest(manifest, version, targets) {
+  ensureDir(generatedRoot);
+  if (!fs.existsSync(manifestBackupPath)) {
+    fs.copyFileSync(manifestPath, manifestBackupPath);
+  }
   writeJSON(
-    path.join(generatedMainPackageRoot, "package.json"),
-    buildPublishedRootManifest(manifest, version, targets, publishTag),
+    manifestPath,
+    buildPublishedRootManifest(manifest, version, targets),
   );
 }
 
-function publishMainPackage(version, publishTag) {
-  const args = ["publish", "--access", "public"];
-  if (publishTag) {
-    args.push("--tag", publishTag);
-  }
-  if (isDryRun()) {
-    args.push("--dry-run");
-  }
-  if (!isDryRun() && packageVersionExists("tally-cli", version)) {
-    console.log(`Skipping tally-cli@${version}; version already exists on npm.`);
-    return;
-  }
-  runOrThrow("npm", args, { cwd: generatedMainPackageRoot });
-}
-
-function publishRelease() {
+function prepublish() {
   const manifest = readJSON(manifestPath);
   const version = resolveVersion(manifest);
-  const publishTag = resolvePublishTag(version);
   const targets = availableTargets();
   if (targets.length === 0) {
     throw new Error(`No release binaries found under ${distRoot}`);
@@ -220,26 +174,28 @@ function publishRelease() {
 
   removeIfExists(generatedPackagesRoot);
   ensureDir(generatedPackagesRoot);
-  publishPlatformPackages(targets, version, publishTag);
-  createMainPackage(manifest, version, targets, publishTag);
-  publishMainPackage(version, publishTag);
+  publishPlatformPackages(targets, version);
+  updateMainManifest(manifest, version, targets);
 }
 
 function restore() {
+  if (fs.existsSync(manifestBackupPath)) {
+    fs.copyFileSync(manifestBackupPath, manifestPath);
+  }
   removeIfExists(generatedRoot);
 }
 
 const command = process.argv[2];
 try {
-  if (command === "publish-release") {
-    publishRelease();
+  if (command === "prepublish") {
+    prepublish();
   } else if (command === "restore") {
     restore();
   } else {
     throw new Error(`Unknown command: ${command}`);
   }
 } catch (error) {
-  if (command === "publish-release") {
+  if (command === "prepublish") {
     restore();
   }
   throw error;

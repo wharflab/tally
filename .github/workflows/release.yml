@@ -731,10 +731,11 @@ jobs:
       - name: Publish to NPM
         run: |
           cd packaging/npm
+          npm version --no-git-tag-version "${NPM_VERSION#v}"
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            npm_config_dry_run=true npm run publish:release
+            npm publish --tag next --dry-run
           else
-            npm run publish:release
+            npm publish
           fi
   publish-pypi:
     needs: publish-release
