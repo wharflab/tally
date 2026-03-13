@@ -27,6 +27,17 @@ common mistakes.
 - `make cpd`: runs PMD Copy/Paste Detector to find duplicate code (100 token threshold, excludes tests)
 - `make clean`: removes the built binary and deletes `bin/` + `dist/`
 
+## Release Notes
+
+- Releases are orchestrated by [`.github/workflows/release.yml`](.github/workflows/release.yml).
+- The release pipeline builds binaries on a native GitHub Actions OS matrix, packages artifacts in `dist/`, then publishes GitHub release assets and ecosystem packages from workflow jobs.
+- If release is broken, check in this order:
+  - [`.github/workflows/release.yml`](.github/workflows/release.yml)
+  - [`scripts/release/package_release_artifact.py`](scripts/release/package_release_artifact.py)
+  - [`packaging/npm/`](packaging/npm)
+  - [`packaging/pypi/`](packaging/pypi)
+  - [`packaging/rubygems/`](packaging/rubygems)
+
 ## JSON v2 Notice
 
 - This repo uses Go JSON v2 experiment: `GOEXPERIMENT=jsonv2` must be set for Go commands.
