@@ -65,6 +65,7 @@ _integrations/zed-tally/target/
 verification-*/
 packaging/npm/**/bin/tally*
 packaging/npm/**/README.md
+!packaging/npm/README.md
 
 # PyPI
 packaging/pypi/tally_cli/bin/tally-*
