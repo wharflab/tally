@@ -7,7 +7,6 @@ DIST = File.join(ROOT, "dist")
 GEM_ROOT = __dir__
 GEMSPEC_PATH = File.join(GEM_ROOT, "tally-cli.gemspec")
 VERSION_FILE = File.join(GEM_ROOT, "lib", "tally-cli.rb")
-README_PATH = File.join(ROOT, "README.md")
 LICENSE_PATH = File.join(ROOT, "LICENSE")
 NOTICE_PATH = File.join(ROOT, "NOTICE")
 BACKUP_DIR = File.join(GEM_ROOT, ".generated")
@@ -52,8 +51,7 @@ def stage_version
 end
 
 def stage_docs
-  puts "Copying README, LICENSE, and NOTICE"
-  FileUtils.cp(README_PATH, File.join(GEM_ROOT, "README.md"), verbose: true)
+  puts "Copying LICENSE and NOTICE"
   FileUtils.cp(LICENSE_PATH, File.join(GEM_ROOT, "LICENSE"), verbose: true)
   FileUtils.cp(NOTICE_PATH, File.join(GEM_ROOT, "NOTICE"), verbose: true)
 end
@@ -82,7 +80,7 @@ task :clean_generated do
   Dir.glob(File.join(PKG_DIR, "*.gem")).each do |path|
     FileUtils.rm_f(path, verbose: true)
   end
-  %w[LICENSE NOTICE README.md].each do |filename|
+  %w[LICENSE NOTICE].each do |filename|
     path = File.join(GEM_ROOT, filename)
     FileUtils.rm_f(path, verbose: true)
   end

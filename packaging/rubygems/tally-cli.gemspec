@@ -15,6 +15,7 @@ Gem::Specification.new do |spec|
   spec.files = %w(
     lib/tally-cli.rb
     bin/tally
+    README.md
     LICENSE
     NOTICE
   ) + Dir.glob("libexec/**/*").select { |path| File.file?(path) }

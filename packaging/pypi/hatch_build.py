@@ -44,6 +44,7 @@ DIST_BINARY_MAPPING = {
     ("windows", "arm64"): ("windows", "arm64", "v8.0", ".exe"),
 }
 
+ROOT_LEGAL_FILES = ("LICENSE", "NOTICE")
 
 VERSION_ENV_VARS = ("TALLY_PYPI_VERSION", "PYPI_VERSION", "VERSION")
 
@@ -102,11 +103,13 @@ class CustomBuildHook(BuildHookInterface):
         super().__init__(*args, **kwargs)
         self.target_platform = None
         self.target_arch = None
+        self._staged_legal_files: list[Path] = []
 
     def initialize(self, version, build_data):
         target_platform, target_arch = get_platform_info()
         self.target_platform = target_platform
         self.target_arch = target_arch
+        self._stage_legal_files()
 
         tag = PEP425_TAGS.get((target_platform, target_arch))
         if tag:
@@ -122,7 +125,19 @@ class CustomBuildHook(BuildHookInterface):
         print(f"[HOOK] Initialized for {target_platform}-{target_arch}")
 
     def finalize(self, version, build_data, artifact_path) -> None:
+        for staged in self._staged_legal_files:
+            if staged.exists():
+                staged.unlink()
         print(f"[HOOK] Built artifact: {artifact_path}")
+
+    def _stage_legal_files(self):
+        repo_root = Path(self.root).parents[1]
+        package_root = Path(self.root)
+        for filename in ROOT_LEGAL_FILES:
+            source = repo_root / filename
+            destination = package_root / filename
+            shutil.copy2(source, destination)
+            self._staged_legal_files.append(destination)
 
     def _stage_target_binary(self):
         if not self.target_platform or not self.target_arch:

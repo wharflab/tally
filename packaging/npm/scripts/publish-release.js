@@ -22,7 +22,7 @@ const generatedRoot = path.join(packageRoot, ".generated");
 const generatedPackagesRoot = path.join(generatedRoot, "platform-packages");
 const manifestPath = process.env.npm_package_json || path.join(packageRoot, "package.json");
 const manifestBackupPath = path.join(generatedRoot, "package.json.backup");
-const rootDocFiles = ["README.md", "LICENSE", "NOTICE"];
+const rootLegalFiles = ["LICENSE", "NOTICE"];
 
 function readJSON(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -40,9 +40,9 @@ function removeIfExists(targetPath) {
   fs.rmSync(targetPath, { recursive: true, force: true });
 }
 
-function copySharedDocs(targetDir) {
+function copyLegalFiles(targetDir) {
   ensureDir(targetDir);
-  for (const fileName of rootDocFiles) {
+  for (const fileName of rootLegalFiles) {
     fs.copyFileSync(path.join(repoRoot, fileName), path.join(targetDir, fileName));
   }
 }
@@ -130,7 +130,11 @@ function publishPlatformPackages(targets, version) {
     );
     removeIfExists(packageDir);
     ensureDir(path.join(packageDir, "bin"));
-    copySharedDocs(packageDir);
+    copyLegalFiles(packageDir);
+    fs.copyFileSync(
+      path.join(packageRoot, "README.md"),
+      path.join(packageDir, "README.md"),
+    );
     fs.copyFileSync(
       getDistBinaryPath(distRoot, target),
       path.join(packageDir, "bin", getBinaryName(target)),
