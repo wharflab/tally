@@ -632,8 +632,12 @@ jobs:
           VERSION="${VERSION#v}"
           SHA256_DARWIN_ARM64="$(awk '/tally_'"${VERSION}"'_MacOS_arm64.tar.gz$/ { print $1 }' dist/tally_checksums.txt)"
           SHA256_DARWIN_AMD64="$(awk '/tally_'"${VERSION}"'_MacOS_x86_64.tar.gz$/ { print $1 }' dist/tally_checksums.txt)"
+          SHA256_LINUX_ARM64="$(awk '/tally_'"${VERSION}"'_Linux_arm64.tar.gz$/ { print $1 }' dist/tally_checksums.txt)"
+          SHA256_LINUX_AMD64="$(awk '/tally_'"${VERSION}"'_Linux_x86_64.tar.gz$/ { print $1 }' dist/tally_checksums.txt)"
           export SHA256_DARWIN_ARM64
           export SHA256_DARWIN_AMD64
+          export SHA256_LINUX_ARM64
+          export SHA256_LINUX_AMD64
 
           # Generate the formula from the checksums already produced by this release.
           chmod +x packaging/homebrew/generate-formula.sh
