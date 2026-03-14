@@ -102,7 +102,6 @@ jobs:
             cc: clang
             cxx: clang++
             msystem: CLANG64
-            msys2_preinstalled: true
           - id: windows-arm64
             runs_on: windows-11-arm
             runner_os: Windows
@@ -115,7 +114,6 @@ jobs:
             cc: clang
             cxx: clang++
             msystem: CLANGARM64
-            msys2_preinstalled: false
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -136,8 +134,7 @@ jobs:
         with:
           msystem: ${{ matrix.msystem }}
           update: true
-          release: ${{ !matrix.msys2_preinstalled }}
-          location: ${{ matrix.msys2_preinstalled && 'C:\\msys64' || runner.temp }}
+          location: ${{ runner.temp }}
           path-type: inherit
           pacboy: toolchain:p
       - name: Build binary
