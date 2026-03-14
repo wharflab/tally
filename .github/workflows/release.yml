@@ -19,6 +19,7 @@ on:
         required: true
         type: string
 permissions:
+  attestations: write
   contents: write
   id-token: write
 env:
@@ -249,6 +250,15 @@ jobs:
             | sort \
             | xargs sha256sum > tally_checksums.txt
           cat tally_checksums.txt
+      - name: Attest release artifacts
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/tally_*.tar.gz
+            dist/tally_*.zip
+            dist/tally_*.exe
+            dist/tally_checksums.txt
       - name: Create or update GitHub release
         if: github.event_name != 'pull_request'
         env:
@@ -257,8 +267,40 @@ jobs:
           set -euo pipefail
           REPO="${GITHUB_REPOSITORY}"
           TAG="v${VERSION#v}"
+          DOCS="https://docs.github.com/en/actions/security-for-github-actions"
+          DOCS="${DOCS}/using-artifact-attestations"
+          DOCS="${DOCS}/using-artifact-attestations-to-establish-provenance-for-builds"
+          read -r -d '' ATTESTATION_BODY << ATTESTATION_EOF || true
+
+          ## Verifying GitHub Artifact Attestations
+
+          The artifacts in this release have attestations generated with
+          [GitHub Artifact Attestations](${DOCS}).
+          These can be verified using the [GitHub CLI](https://cli.github.com/):
+
+          \`\`\`shell
+          gh attestation verify <artifact> --repo ${REPO}
+          \`\`\`
+
+          You can also download the attestation from GitHub and
+          verify against that directly:
+
+          \`\`\`shell
+          gh attestation verify <artifact> --bundle <attestation>
+          \`\`\`
+          ATTESTATION_EOF
           if ! gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
-            gh release create "$TAG" --repo "$REPO" --title "$TAG" --generate-notes --target "$GITHUB_SHA"
+            NOTES="$(gh api "repos/${REPO}/releases/generate-notes" \
+              -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" \
+              --jq '.body')"
+            FULL_BODY="${NOTES}${ATTESTATION_BODY}"
+            gh release create "$TAG" --repo "$REPO" --title "$TAG" --notes "$FULL_BODY" --target "$GITHUB_SHA"
+          else
+            EXISTING_BODY="$(gh release view "$TAG" --repo "$REPO" --json body --jq '.body')"
+            if ! echo "$EXISTING_BODY" | grep -q 'Verifying GitHub Artifact Attestations'; then
+              FULL_BODY="${EXISTING_BODY}${ATTESTATION_BODY}"
+              gh release edit "$TAG" --repo "$REPO" --notes "$FULL_BODY"
+            fi
           fi
           mapfile -t assets < <(find dist -maxdepth 1 -type f \( -name 'tally_*.tar.gz' -o -name 'tally_*.zip' -o -name 'tally_*.exe' -o -name 'tally_checksums.txt' \) | sort)
           gh release upload "$TAG" --repo "$REPO" "${assets[@]}" --clobber
