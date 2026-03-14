@@ -36,10 +36,20 @@ if "hatchling.builders.hooks.plugin.interface" not in sys.modules:
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from hatch_build import CustomBuildHook
+from hatch_build import CustomBuildHook, PEP425_TAGS
 
 
 class CustomBuildHookTest(unittest.TestCase):
+    def test_linux_wheel_tags_match_glibc_baseline(self):
+        self.assertEqual(
+            PEP425_TAGS[("linux", "x86_64")],
+            "py3-none-manylinux_2_26_x86_64",
+        )
+        self.assertEqual(
+            PEP425_TAGS[("linux", "arm64")],
+            "py3-none-manylinux_2_26_aarch64",
+        )
+
     def test_stage_target_binary_replaces_previous_target(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir) / "repo"
