@@ -52,23 +52,27 @@ jobs:
             runner_os: Linux
             goos: linux
             goarch: amd64
+            go_archive_arch: amd64
             variant: v1
             binary_name: tally
             archive_os: Linux
             archive_arch: x86_64
             cc: gcc
             cxx: g++
+            container_image: public.ecr.aws/amazonlinux/amazonlinux:2
           - id: linux-arm64
             runs_on: ubuntu-24.04-arm
             runner_os: Linux
             goos: linux
             goarch: arm64
+            go_archive_arch: arm64
             variant: v8.0
             binary_name: tally
             archive_os: Linux
             archive_arch: arm64
             cc: gcc
             cxx: g++
+            container_image: public.ecr.aws/amazonlinux/amazonlinux:2
           - id: darwin-amd64
             runs_on: macos-15-intel
             runner_os: macOS
@@ -123,6 +127,7 @@ jobs:
           lfs: true
       - name: Set up Go
         uses: actions/setup-go@v6
+        if: matrix.runner_os != 'Linux'
         with:
           go-version-file: go.mod
       - name: Set up Python
@@ -139,7 +144,43 @@ jobs:
           path-type: inherit
           pacboy: toolchain:p
       - name: Build binary
-        if: matrix.runner_os != 'Windows'
+        if: matrix.runner_os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLEAN_VERSION="${RELEASE_VERSION#v}"
+          DIST_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
+          mkdir -p "${DIST_DIR}"
+          LDFLAGS="-s -w -X github.com/wharflab/tally/internal/version.version=${CLEAN_VERSION} -X github.com/wharflab/tally/internal/version.commit=${GITHUB_SHA}"
+          docker run --rm \
+            --platform "linux/${{ matrix.goarch }}" \
+            -e GOEXPERIMENT="${GOEXPERIMENT}" \
+            -e GOTOOLCHAIN="${GOTOOLCHAIN}" \
+            -e GOSUMDB="sum.golang.org" \
+            -e GOOS="${{ matrix.goos }}" \
+            -e GOARCH="${{ matrix.goarch }}" \
+            -e BUILD_TAGS="${BUILD_TAGS}" \
+            -e LDFLAGS="${LDFLAGS}" \
+            -e DIST_DIR="${DIST_DIR}" \
+            -v "${{ github.workspace }}:/src" \
+            -w /src \
+            "${{ matrix.container_image }}" \
+            bash -lc '
+              set -euo pipefail
+              yum install -y gcc gcc-c++ git curl tar gzip python3 make ca-certificates binutils
+              GO_VERSION="$(awk "/^go / { print \$2 }" go.mod)"
+              curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux.${{ matrix.go_archive_arch }}.tar.gz" | tar -C /usr/local -xz
+              export PATH=/usr/local/go/bin:$PATH
+              CC=gcc \
+              CXX=g++ \
+              CGO_ENABLED=1 \
+              GOOS="${GOOS}" \
+              GOARCH="${GOARCH}" \
+              go build -buildvcs=false -tags "${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o "${DIST_DIR}/${{ matrix.binary_name }}" .
+              chmod 755 "${DIST_DIR}/${{ matrix.binary_name }}"
+            '
+      - name: Build binary
+        if: matrix.runner_os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
@@ -383,11 +424,10 @@ jobs:
           cp "$SRC" "$DEST/${{ matrix.binary_name }}"
           chmod +x "$DEST/${{ matrix.binary_name }}"
       - name: Set extension version from tag
+        working-directory: _integrations/vscode-tally
         run: |
           CLEAN_VERSION="${VERSION#v}"
-          cd _integrations/vscode-tally
-          jq --arg v "$CLEAN_VERSION" '.version = $v' package.json > package.json.tmp
-          mv package.json.tmp package.json
+          npm version --no-git-tag-version --ignore-scripts "$CLEAN_VERSION"
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
       - name: Install dependencies
