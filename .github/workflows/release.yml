@@ -154,7 +154,7 @@ jobs:
             echo "::error::Failed to resolve Go version from go.mod"
             exit 1
           fi
-          GO_ARCHIVE_URL="https://go.dev/dl/go${GO_VERSION}.linux.${{ matrix.go_archive_arch }}.tar.gz"
+          GO_ARCHIVE_URL="https://go.dev/dl/go${GO_VERSION}.linux-${{ matrix.go_archive_arch }}.tar.gz"
           DIST_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
           mkdir -p "${DIST_DIR}"
           LDFLAGS="-s -w -X github.com/wharflab/tally/internal/version.version=${CLEAN_VERSION} -X github.com/wharflab/tally/internal/version.commit=${GITHUB_SHA}"
