@@ -186,6 +186,34 @@ jobs:
               go build -buildvcs=false -tags "${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o "${DIST_DIR}/${{ matrix.binary_name }}" .
               chmod 755 "${DIST_DIR}/${{ matrix.binary_name }}"
             '
+      - name: Smoke test Linux binary on host
+        if: matrix.runner_os == 'Linux'
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ env.RELEASE_VERSION }}
+          EXPECTED_GOOS: ${{ matrix.goos }}
+          EXPECTED_GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          BINARY="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}/${{ matrix.binary_name }}"
+          VERSION_JSON_FILE="$(mktemp)"
+          "${BINARY}" version --json > "${VERSION_JSON_FILE}"
+          cat "${VERSION_JSON_FILE}"
+          python - "${VERSION_JSON_FILE}" <<'PY'
+          import json
+          import os
+          import sys
+
+          version_json_path = sys.argv[1]
+          expected_version = os.environ["EXPECTED_VERSION"].removeprefix("v")
+
+          with open(version_json_path, encoding="utf-8") as fh:
+              payload = json.load(fh)
+
+          assert payload["version"] == expected_version, payload
+          assert payload["platform"]["os"] == os.environ["EXPECTED_GOOS"], payload
+          assert payload["platform"]["arch"] == os.environ["EXPECTED_GOARCH"], payload
+          PY
       - name: Build binary
         if: matrix.runner_os == 'macOS'
         shell: bash
