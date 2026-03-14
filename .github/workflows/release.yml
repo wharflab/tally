@@ -1022,6 +1022,11 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           $CleanVersion = $env:VERSION.TrimStart("v")
           $Branch = "tally-update"
+          if ($env:GITHUB_EVENT_NAME -eq "pull_request") {
+            $ReleaseDate = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd")
+          } else {
+            $ReleaseDate = gh release view "v$CleanVersion" --repo "$env:GITHUB_REPOSITORY" --json publishedAt --jq '.publishedAt[0:10]'
+          }
 
           git config --global user.name "tinovyatkin"
           git config --global user.email "tino@vtkn.io"
@@ -1037,6 +1042,7 @@ jobs:
           ruby tally/scripts/release/generate_winget_manifests.rb `
             --version $CleanVersion `
             --dist-root dist `
+            --release-date $ReleaseDate `
             --output-root winget-pkgs/manifests
 
           $ManifestPath = Join-Path "winget-pkgs" "manifests/w/Wharflab/Tally/$CleanVersion"

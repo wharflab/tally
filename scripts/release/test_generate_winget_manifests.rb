@@ -13,6 +13,12 @@ class GenerateWingetManifestsTest < Minitest::Test
     assert_equal "0.26.0", normalized_version("0.26.0")
   end
 
+  def test_parse_args_normalizes_release_date
+    options = parse_args(%w[--version 0.26.0 --output-root /tmp/out --release-date 2026-03-15])
+
+    assert_equal "2026-03-15", options[:release_date]
+  end
+
   def test_read_checksums
     Dir.mktmpdir do |tmpdir|
       path = Pathname(tmpdir).join("tally_checksums.txt")
@@ -50,6 +56,10 @@ class GenerateWingetManifestsTest < Minitest::Test
       "https://github.com/wharflab/tally/releases/tag/v0.26.0",
       locale_manifest_data["ReleaseNotesUrl"],
     )
+    assert_equal(
+      [{"DocumentLabel" => "Docs", "DocumentUrl" => "https://wharflab.github.io/tally/"}],
+      locale_manifest_data["Documentations"],
+    )
 
     installer_manifest_data = installer_manifest(
       "0.26.0",
@@ -59,9 +69,12 @@ class GenerateWingetManifestsTest < Minitest::Test
         "tally_0.26.0_Windows_x86_64.exe" => "ABCDEF",
         "tally_0.26.0_Windows_arm64.exe" => "123456",
       },
+      "2026-03-15",
     )
     assert_equal "portable", installer_manifest_data["Installers"][0]["InstallerType"]
     assert_equal ["tally"], installer_manifest_data["Installers"][0]["Commands"]
+    assert_equal %w[dockerfile containerfile], installer_manifest_data["FileExtensions"]
+    assert_equal "2026-03-15", installer_manifest_data["ReleaseDate"]
     assert_equal(
       "https://github.com/wharflab/tally/releases/download/v0.26.0/tally_0.26.0_Windows_x86_64.exe",
       installer_manifest_data["Installers"][0]["InstallerUrl"],
