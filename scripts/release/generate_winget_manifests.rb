@@ -10,7 +10,7 @@ PUBLISHER = "Wharflab"
 PACKAGE_NAME = "Tally"
 PACKAGE_LOCALE = "en-US"
 MANIFEST_VERSION = "1.9.0"
-SHORT_DESCRIPTION = "A fast, configurable linter for Dockerfiles and Containerfiles."
+SHORT_DESCRIPTION = "Dockerfile linter and formatter with first-class PowerShell and Windows container support."
 TAG_LIST = %w[docker dockerfile containerfile linter].freeze
 WINDOWS_ASSETS = [
   ["x64", "tally_%<version>s_Windows_x86_64.exe"],
