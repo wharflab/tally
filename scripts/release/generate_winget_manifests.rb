@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require "optparse"
+require "date"
 require "pathname"
 require "yaml"
 
@@ -12,6 +13,13 @@ PACKAGE_LOCALE = "en-US"
 MANIFEST_VERSION = "1.9.0"
 SHORT_DESCRIPTION = "Dockerfile linter and formatter with first-class PowerShell and Windows container support."
 TAG_LIST = %w[docker dockerfile containerfile linter].freeze
+FILE_EXTENSION_LIST = %w[dockerfile containerfile].freeze
+DOCUMENTATION_LIST = [
+  {
+    "DocumentLabel" => "Docs",
+    "DocumentUrl" => "https://wharflab.github.io/tally/",
+  },
+].freeze
 WINDOWS_ASSETS = [
   ["x64", "tally_%<version>s_Windows_x86_64.exe"],
   ["arm64", "tally_%<version>s_Windows_arm64.exe"],
@@ -31,6 +39,7 @@ def parse_args(argv)
     opts.on("--repo-name NAME") { |value| options[:repo_name] = value }
     opts.on("--dist-root PATH") { |value| options[:dist_root] = value }
     opts.on("--output-root PATH") { |value| options[:output_root] = value }
+    opts.on("--release-date DATE") { |value| options[:release_date] = Date.iso8601(value).iso8601 }
   end
 
   parser.parse!(argv)
@@ -102,13 +111,14 @@ def default_locale_manifest(version, owner, repo)
     "License" => "GPL-3.0-only",
     "LicenseUrl" => "https://github.com/#{owner}/#{repo}/blob/main/LICENSE",
     "ReleaseNotesUrl" => "https://github.com/#{owner}/#{repo}/releases/tag/v#{version}",
+    "Documentations" => DOCUMENTATION_LIST,
     "Tags" => TAG_LIST,
     "ManifestType" => "defaultLocale",
     "ManifestVersion" => MANIFEST_VERSION,
   }
 end
 
-def installer_manifest(version, owner, repo, checksums)
+def installer_manifest(version, owner, repo, checksums, release_date = nil)
   installers = WINDOWS_ASSETS.map do |architecture, pattern|
     filename = format(pattern, version: version)
     sha256 = checksums.fetch(filename) { raise "missing checksum for #{filename}" }
@@ -125,10 +135,12 @@ def installer_manifest(version, owner, repo, checksums)
     "PackageIdentifier" => PACKAGE_IDENTIFIER,
     "PackageVersion" => version,
     "Commands" => ["tally"],
+    "FileExtensions" => FILE_EXTENSION_LIST,
+    "ReleaseDate" => release_date,
     "Installers" => installers,
     "ManifestType" => "installer",
     "ManifestVersion" => MANIFEST_VERSION,
-  }
+  }.compact
 end
 
 def main(argv = ARGV)
@@ -151,7 +163,7 @@ def main(argv = ARGV)
   dump_manifest(
     out_dir.join("#{PACKAGE_IDENTIFIER}.installer.yaml"),
     "installer",
-    installer_manifest(version, options[:repo_owner], options[:repo_name], checksums),
+    installer_manifest(version, options[:repo_owner], options[:repo_name], checksums, options[:release_date]),
   )
 
   puts out_dir
