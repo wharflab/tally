@@ -252,7 +252,7 @@ jobs:
           cat tally_checksums.txt
       - name: Attest release artifacts
         if: github.event_name != 'pull_request'
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v4
         with:
           subject-path: |
             dist/tally_*.tar.gz
@@ -404,6 +404,11 @@ jobs:
         with:
           name: vsix-${{ matrix.vscode_target }}
           path: _integrations/vscode-tally/tally-${{ matrix.vscode_target }}.vsix
+      - name: Attest VSIX artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: _integrations/vscode-tally/tally-${{ matrix.vscode_target }}.vsix
       - name: Upload VSIX to GitHub release
         if: github.event_name != 'pull_request'
         env:
@@ -506,6 +511,11 @@ jobs:
         with:
           name: intellij-plugin-zip
           path: ${{ steps.intellij_zip.outputs.zip_path }}
+      - name: Attest IntelliJ plugin artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: ${{ steps.intellij_zip.outputs.zip_path }}
       - name: Upload IntelliJ plugin to GitHub release
         if: github.event_name != 'pull_request'
         env:
