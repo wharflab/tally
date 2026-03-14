@@ -872,10 +872,6 @@ jobs:
           lfs: false
           repository: microsoft/winget-pkgs
           path: winget-pkgs
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
       - name: Download release dist
         uses: actions/download-artifact@v8
         with:
@@ -910,7 +906,7 @@ jobs:
           git checkout -B $Branch upstream/master
           Pop-Location
 
-          python tally/scripts/release/generate_winget_manifests.py `
+          ruby tally/scripts/release/generate_winget_manifests.rb `
             --version $CleanVersion `
             --dist-root dist `
             --output-root winget-pkgs/manifests
