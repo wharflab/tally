@@ -938,12 +938,18 @@ jobs:
           }
           $env:GH_TOKEN = $env:CROSS_FORK_PR_PAT
           $PrTitle = "Wharflab.Tally version $CleanVersion"
-          $PrOutput = gh pr create `
-            --repo microsoft/winget-pkgs `
-            --head "wharflab:$Branch" `
-            --base master `
-            --title $PrTitle `
-            --body $env:PR_BODY 2>&1 | Out-String
+          $OldPSNativeCommandUseErrorActionPreference = $PSNativeCommandUseErrorActionPreference
+          $PSNativeCommandUseErrorActionPreference = $false
+          try {
+            $PrOutput = gh pr create `
+              --repo microsoft/winget-pkgs `
+              --head "wharflab:$Branch" `
+              --base master `
+              --title $PrTitle `
+              --body $env:PR_BODY 2>&1 | Out-String
+          } finally {
+            $PSNativeCommandUseErrorActionPreference = $OldPSNativeCommandUseErrorActionPreference
+          }
           if ($LASTEXITCODE -ne 0) {
             $Match = [regex]::Match($PrOutput, 'pull/(\d+)')
             if ($Match.Success) {
