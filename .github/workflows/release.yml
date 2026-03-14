@@ -149,14 +149,22 @@ jobs:
         run: |
           set -euo pipefail
           CLEAN_VERSION="${RELEASE_VERSION#v}"
+          GO_VERSION="$(sed -n 's/^go //p' go.mod | head -n 1)"
+          if [ -z "${GO_VERSION}" ]; then
+            echo "::error::Failed to resolve Go version from go.mod"
+            exit 1
+          fi
+          GO_ARCHIVE_URL="https://go.dev/dl/go${GO_VERSION}.linux.${{ matrix.go_archive_arch }}.tar.gz"
           DIST_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
           mkdir -p "${DIST_DIR}"
           LDFLAGS="-s -w -X github.com/wharflab/tally/internal/version.version=${CLEAN_VERSION} -X github.com/wharflab/tally/internal/version.commit=${GITHUB_SHA}"
+          echo "Using Go toolchain archive: ${GO_ARCHIVE_URL}"
           docker run --rm \
             --platform "linux/${{ matrix.goarch }}" \
             -e GOEXPERIMENT="${GOEXPERIMENT}" \
             -e GOTOOLCHAIN="${GOTOOLCHAIN}" \
             -e GOSUMDB="sum.golang.org" \
+            -e GO_ARCHIVE_URL="${GO_ARCHIVE_URL}" \
             -e GOOS="${{ matrix.goos }}" \
             -e GOARCH="${{ matrix.goarch }}" \
             -e BUILD_TAGS="${BUILD_TAGS}" \
@@ -168,8 +176,7 @@ jobs:
             bash -lc '
               set -euo pipefail
               yum install -y gcc gcc-c++ git curl tar gzip python3 make ca-certificates binutils
-              GO_VERSION="$(awk "/^go / { print \$2 }" go.mod)"
-              curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux.${{ matrix.go_archive_arch }}.tar.gz" | tar -C /usr/local -xz
+              curl -fsSL "${GO_ARCHIVE_URL}" | tar -C /usr/local -xz
               export PATH=/usr/local/go/bin:$PATH
               CC=gcc \
               CXX=g++ \
