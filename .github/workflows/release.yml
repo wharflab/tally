@@ -851,7 +851,7 @@ jobs:
       - name: Generate GitHub App token
         id: app-token-winget
         if: github.event_name != 'pull_request' && vars.HARBOR_PILOT_APP_ID != ''
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.HARBOR_PILOT_APP_ID }}
           private-key: ${{ secrets.HARBOR_PILOT_PRIVATE_KEY }}
@@ -974,7 +974,7 @@ jobs:
       - name: Generate GitHub App token
         id: app-token
         if: github.event_name != 'pull_request' && vars.HARBOR_PILOT_APP_ID != ''
-        uses: actions/create-github-app-token@v2
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.HARBOR_PILOT_APP_ID }}
           private-key: ${{ secrets.HARBOR_PILOT_PRIVATE_KEY }}
