@@ -30,7 +30,8 @@ common mistakes.
 ## Release Notes
 
 - Releases are orchestrated by [`.github/workflows/release.yml`](.github/workflows/release.yml).
-- The release pipeline builds binaries on a native GitHub Actions OS matrix, packages artifacts in `dist/`, then publishes GitHub release assets and ecosystem packages from workflow jobs.
+- The release pipeline builds binaries on a native GitHub Actions OS matrix, packages artifacts in `dist/`, then publishes GitHub release assets and
+  ecosystem packages from workflow jobs.
 - If release is broken, check in this order:
   - [`.github/workflows/release.yml`](.github/workflows/release.yml)
   - [`scripts/release/package_release_artifact.py`](scripts/release/package_release_artifact.py)

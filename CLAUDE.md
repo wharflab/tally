@@ -61,7 +61,8 @@ and a WASM-compiled shellcheck (`internal/shellcheck/`).
 ## Release Workflow
 
 - Release automation lives in [`.github/workflows/release.yml`](.github/workflows/release.yml).
-- The workflow builds signed/release-ready binaries on native GitHub runners, aggregates `dist/`, then publishes GitHub assets plus npm/PyPI/RubyGems and IDE marketplace artifacts.
+- The workflow builds signed/release-ready binaries on native GitHub runners, aggregates `dist/`, then publishes GitHub assets plus npm/PyPI/RubyGems
+  and IDE marketplace artifacts.
 - When release is broken, inspect:
   - [`.github/workflows/release.yml`](.github/workflows/release.yml)
   - [`scripts/release/package_release_artifact.py`](scripts/release/package_release_artifact.py)

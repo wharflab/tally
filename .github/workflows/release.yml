@@ -831,17 +831,17 @@ jobs:
     needs:
       - preflight
       - publish-release
-    runs-on: ubuntu-latest
+    runs-on: windows-2025
     env:
       VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
     steps:
       - name: Verify WinGet publishing auth is configured
         if: github.event_name != 'pull_request'
+        shell: pwsh
         run: |
-          if [ -z "${{ vars.HARBOR_PILOT_APP_ID }}" ]; then
-            echo "::error::HARBOR_PILOT_APP_ID must be configured to publish WinGet PRs"
-            exit 1
-          fi
+          if ([string]::IsNullOrWhiteSpace("${{ vars.HARBOR_PILOT_APP_ID }}")) {
+            Write-Error "::error::HARBOR_PILOT_APP_ID must be configured to publish WinGet PRs"
+          }
       - name: Checkout tally
         uses: actions/checkout@v6
         if: github.event_name == 'pull_request' || vars.HARBOR_PILOT_APP_ID != ''
@@ -889,67 +889,83 @@ jobs:
             Tally is a Dockerfile linter and formatter written in Go, promoting modern container syntax and helping avoid common pitfalls.
 
             [Changelog](https://github.com/wharflab/tally/releases/tag/${{ inputs.version || github.ref_name }})
+        shell: pwsh
         run: |
-          set -euo pipefail
-          CLEAN_VERSION="${VERSION#v}"
-          BRANCH="tally-update"
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          $CleanVersion = $env:VERSION.TrimStart("v")
+          $Branch = "tally-update"
 
           git config --global user.name "tinovyatkin"
           git config --global user.email "tino@vtkn.io"
 
-          cd winget-pkgs
-          git remote add upstream https://github.com/microsoft/winget-pkgs.git 2>/dev/null || true
+          Push-Location winget-pkgs
+          if (-not (git remote | Select-String '^upstream$')) {
+            git remote add upstream https://github.com/microsoft/winget-pkgs.git
+          }
           git fetch upstream master
-          git checkout -B "${BRANCH}" upstream/master
-          cd ..
+          git checkout -B $Branch upstream/master
+          Pop-Location
 
-          python tally/scripts/release/generate_winget_manifests.py \
-            --version "${CLEAN_VERSION}" \
-            --dist-root dist \
+          ruby tally/scripts/release/generate_winget_manifests.rb `
+            --version $CleanVersion `
+            --dist-root dist `
             --output-root winget-pkgs/manifests
 
-          cd winget-pkgs
-          git add manifests/w/Wharflab/Tally/"${CLEAN_VERSION}"
-          if git diff --cached --quiet; then
-            echo "No WinGet changes detected; skipping PR sync."
+          $ManifestPath = Join-Path "winget-pkgs" "manifests/w/Wharflab/Tally/$CleanVersion"
+          winget settings --enable LocalManifestFiles
+          winget validate --manifest $ManifestPath
+
+          Push-Location winget-pkgs
+          git add "manifests/w/Wharflab/Tally/$CleanVersion"
+          $StagedChanges = git diff --cached --name-only | Out-String
+          if ([string]::IsNullOrWhiteSpace($StagedChanges)) {
+            Write-Host "No WinGet changes detected; skipping PR sync."
             exit 0
-          fi
-          if [ "${DRY_RUN}" = "1" ]; then
-            git diff --cached > ../winget-dry-run.patch
-            echo "Generated WinGet dry-run patch:"
+          }
+          if ($env:DRY_RUN -eq "1") {
+            git diff --cached | Out-File -FilePath ..\winget-dry-run.patch -Encoding utf8NoBOM
+            Write-Host "Generated WinGet dry-run patch:"
             git diff --cached --stat
             exit 0
-          fi
-
-          git commit -m "Wharflab.Tally version ${CLEAN_VERSION}"
-          git push origin "${BRANCH}" --force
-
-          if [ -z "${CROSS_FORK_PR_PAT:-}" ]; then
-            echo "::error::CROSS_FORK_PR_PAT secret is required to create cross-fork PRs to microsoft/winget-pkgs"
-            exit 1
-          fi
-          export GH_TOKEN="${CROSS_FORK_PR_PAT}"
-          PR_TITLE="Wharflab.Tally version ${CLEAN_VERSION}"
-          PR_URL=$(gh pr create \
-            --repo microsoft/winget-pkgs \
-            --head "wharflab:${BRANCH}" \
-            --base master \
-            --title "${PR_TITLE}" \
-            --body "${PR_BODY}" 2>&1) \
-          || {
-            EXISTING_PR=$(echo "${PR_URL}" | grep -oP 'pull/\K[0-9]+' | head -1)
-            if [ -n "${EXISTING_PR}" ]; then
-              gh pr edit "${EXISTING_PR}" \
-                --repo microsoft/winget-pkgs \
-                --title "${PR_TITLE}" \
-                --body "${PR_BODY}"
-              echo "Updated existing PR: https://github.com/microsoft/winget-pkgs/pull/${EXISTING_PR}"
-            else
-              echo "::error::Failed to create or update PR: ${PR_URL}"
-              exit 1
-            fi
           }
-          echo "PR: ${PR_URL}"
+
+          git commit -m "Wharflab.Tally version $CleanVersion"
+          git push origin $Branch --force
+
+          if ([string]::IsNullOrWhiteSpace($env:CROSS_FORK_PR_PAT)) {
+            Write-Error "::error::CROSS_FORK_PR_PAT secret is required to create cross-fork PRs to microsoft/winget-pkgs"
+          }
+          $env:GH_TOKEN = $env:CROSS_FORK_PR_PAT
+          $PrTitle = "Wharflab.Tally version $CleanVersion"
+          $OldPSNativeCommandUseErrorActionPreference = $PSNativeCommandUseErrorActionPreference
+          $PSNativeCommandUseErrorActionPreference = $false
+          try {
+            $PrOutput = gh pr create `
+              --repo microsoft/winget-pkgs `
+              --head "wharflab:$Branch" `
+              --base master `
+              --title $PrTitle `
+              --body $env:PR_BODY 2>&1 | Out-String
+          } finally {
+            $PSNativeCommandUseErrorActionPreference = $OldPSNativeCommandUseErrorActionPreference
+          }
+          if ($LASTEXITCODE -ne 0) {
+            $Match = [regex]::Match($PrOutput, 'pull/(\d+)')
+            if ($Match.Success) {
+              $ExistingPr = $Match.Groups[1].Value
+              gh pr edit $ExistingPr `
+                --repo microsoft/winget-pkgs `
+                --title $PrTitle `
+                --body $env:PR_BODY
+              Write-Host "Updated existing PR: https://github.com/microsoft/winget-pkgs/pull/$ExistingPr"
+            } else {
+              Write-Error "::error::Failed to create or update PR: $PrOutput"
+            }
+          } else {
+            Write-Host "PR: $PrOutput"
+          }
+          Pop-Location
       - name: Upload WinGet dry-run patch
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v7
