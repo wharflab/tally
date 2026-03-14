@@ -134,10 +134,9 @@ end
 def main(argv = ARGV)
   options = parse_args(argv)
   version = normalized_version(options[:version])
-  repo_root = Pathname(__dir__).join("..", "..").realpath
-  dist_root = repo_root.join(options[:dist_root]).realpath
+  dist_root = Pathname(options[:dist_root]).expand_path.realpath
   checksums = read_checksums(dist_root.join("tally_checksums.txt"))
-  out_dir = manifest_dir(options[:output_root], PACKAGE_IDENTIFIER, version)
+  out_dir = manifest_dir(Pathname(options[:output_root]).expand_path, PACKAGE_IDENTIFIER, version)
 
   dump_manifest(
     out_dir.join("#{PACKAGE_IDENTIFIER}.yaml"),

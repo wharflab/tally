@@ -892,6 +892,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
           $CleanVersion = $env:VERSION.TrimStart("v")
           $Branch = "tally-update"
 
