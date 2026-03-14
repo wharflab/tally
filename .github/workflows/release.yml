@@ -918,8 +918,8 @@ jobs:
 
           Push-Location winget-pkgs
           git add "manifests/w/Wharflab/Tally/$CleanVersion"
-          git diff --cached --quiet
-          if ($LASTEXITCODE -eq 0) {
+          $StagedChanges = git diff --cached --name-only | Out-String
+          if ([string]::IsNullOrWhiteSpace($StagedChanges)) {
             Write-Host "No WinGet changes detected; skipping PR sync."
             exit 0
           }
