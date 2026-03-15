@@ -8,6 +8,7 @@ on:
     paths:
       - ".github/workflows/release.yml"
       - ".github/macos-entitlements.plist"
+      - "README.md"
       - "scripts/release/**"
       - "packaging/**"
       - "_integrations/**"
@@ -22,6 +23,7 @@ permissions:
   attestations: write
   contents: write
   id-token: write
+  packages: write
 env:
   GOEXPERIMENT: jsonv2
   GOTOOLCHAIN: auto
@@ -305,6 +307,63 @@ jobs:
         with:
           name: release-platform-${{ matrix.id }}
           path: dist/
+      - name: Log in to GHCR
+        if: matrix.runner_os != 'macOS' && matrix.id != 'windows-arm64' && env.DRY_RUN != '1'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build container image
+        if: matrix.runner_os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_REPO="$(echo "ghcr.io/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          VERSION_TAG="v${RELEASE_VERSION#v}"
+          COMPONENT_TAG="${VERSION_TAG}-linux-${{ matrix.goarch }}-build"
+          CONTEXT_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
+          OUTPUT_FLAG="--push"
+          if [ "${DRY_RUN}" = "1" ]; then
+            OUTPUT_FLAG="--load"
+          fi
+          docker buildx build \
+            --platform "linux/${{ matrix.goarch }}" \
+            --build-arg VERSION="${VERSION_TAG}" \
+            --build-arg VCS_REF="${GITHUB_SHA}" \
+            --build-arg SOURCE_URL="https://github.com/${GITHUB_REPOSITORY}" \
+            --file packaging/docker/linux.Dockerfile \
+            --tag "${IMAGE_REPO}:${COMPONENT_TAG}" \
+            "${OUTPUT_FLAG}" \
+            "${CONTEXT_DIR}"
+          {
+            echo "Container image:"
+            echo "- ${IMAGE_REPO}:${COMPONENT_TAG}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Build and push Windows container image
+        if: matrix.id == 'windows-amd64'
+        shell: pwsh
+        run: |
+          $imageRepo = "ghcr.io/$env:GITHUB_REPOSITORY".ToLowerInvariant()
+          $versionTag = "v$($env:RELEASE_VERSION.TrimStart('v'))"
+          $componentTag = "$versionTag-windows-ltsc2025-amd64-build"
+          $contextDir = "dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
+          docker build `
+            --build-arg VERSION="$versionTag" `
+            --build-arg VCS_REF="$env:GITHUB_SHA" `
+            --build-arg SOURCE_URL="https://github.com/$env:GITHUB_REPOSITORY" `
+            --file packaging/docker/windows.Dockerfile `
+            --tag "$imageRepo:$componentTag" `
+            $contextDir
+          if ($env:DRY_RUN -ne "1") {
+            docker push "$imageRepo:$componentTag"
+          }
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Container image:`n- $imageRepo:$componentTag"
+      - name: Explain Windows arm64 container skip
+        if: matrix.id == 'windows-arm64'
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Windows arm64 container publish is skipped: Microsoft Nano Server LTSC base images currently publish windows/amd64 only."
   publish-release:
     needs: build-platform
     runs-on: ubuntu-latest
@@ -392,6 +451,91 @@ jobs:
         with:
           name: release-dist
           path: dist/
+  publish-container-images:
+    needs: publish-release
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
+    steps:
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Assemble container tags
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          IMAGE_REPO="$(echo "ghcr.io/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          VERSION_TAG="v${VERSION#v}"
+          LINUX_AMD64="${IMAGE_REPO}:${VERSION_TAG}-linux-amd64-build"
+          LINUX_ARM64="${IMAGE_REPO}:${VERSION_TAG}-linux-arm64-build"
+          WINDOWS_AMD64="${IMAGE_REPO}:${VERSION_TAG}-windows-ltsc2025-amd64-build"
+
+          docker buildx imagetools create \
+            -t "${IMAGE_REPO}:${VERSION_TAG}" \
+            -t "${IMAGE_REPO}:latest" \
+            "${LINUX_AMD64}" \
+            "${LINUX_ARM64}" \
+            "${WINDOWS_AMD64}"
+
+          docker buildx imagetools create \
+            -t "${IMAGE_REPO}:${VERSION_TAG}-linux" \
+            -t "${IMAGE_REPO}:linux" \
+            -t "${IMAGE_REPO}:${VERSION_TAG}-distroless" \
+            -t "${IMAGE_REPO}:distroless" \
+            "${LINUX_AMD64}" \
+            "${LINUX_ARM64}"
+
+          docker buildx imagetools create \
+            -t "${IMAGE_REPO}:${VERSION_TAG}-linux-amd64" \
+            -t "${IMAGE_REPO}:linux-amd64" \
+            "${LINUX_AMD64}"
+
+          docker buildx imagetools create \
+            -t "${IMAGE_REPO}:${VERSION_TAG}-linux-arm64" \
+            -t "${IMAGE_REPO}:linux-arm64" \
+            "${LINUX_ARM64}"
+
+          docker buildx imagetools create \
+            -t "${IMAGE_REPO}:${VERSION_TAG}-nanoserver-ltsc2025" \
+            -t "${IMAGE_REPO}:nanoserver-ltsc2025" \
+            -t "${IMAGE_REPO}:${VERSION_TAG}-windows-ltsc2025-amd64" \
+            -t "${IMAGE_REPO}:windows-ltsc2025-amd64" \
+            "${WINDOWS_AMD64}"
+
+          {
+            echo "Published container tags:"
+            echo "- ${IMAGE_REPO}:${VERSION_TAG}"
+            echo "- ${IMAGE_REPO}:latest"
+            echo "- ${IMAGE_REPO}:distroless"
+            echo "- ${IMAGE_REPO}:linux"
+            echo "- ${IMAGE_REPO}:linux-amd64"
+            echo "- ${IMAGE_REPO}:linux-arm64"
+            echo "- ${IMAGE_REPO}:nanoserver-ltsc2025"
+            echo "- ${IMAGE_REPO}:windows-ltsc2025-amd64"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Summarize dry-run container tags
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          IMAGE_REPO="$(echo "ghcr.io/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          VERSION_TAG="v${VERSION#v}"
+          {
+            echo "PR dry run would publish container tags:"
+            echo "- ${IMAGE_REPO}:${VERSION_TAG}"
+            echo "- ${IMAGE_REPO}:latest"
+            echo "- ${IMAGE_REPO}:distroless"
+            echo "- ${IMAGE_REPO}:linux"
+            echo "- ${IMAGE_REPO}:linux-amd64"
+            echo "- ${IMAGE_REPO}:linux-arm64"
+            echo "- ${IMAGE_REPO}:nanoserver-ltsc2025"
+            echo "- ${IMAGE_REPO}:windows-ltsc2025-amd64"
+            echo
+            echo "Windows arm64 stays binary-only because Nano Server LTSC base images currently publish windows/amd64 only."
+          } >> "$GITHUB_STEP_SUMMARY"
   build-vscode-vsix:
     needs: publish-release
     runs-on: ubuntu-latest

@@ -100,6 +100,39 @@ pip install tally-cli
 gem install tally-cli
 ```
 
+### Docker / Podman
+
+Official images are published to GitHub Container Registry at `ghcr.io/wharflab/tally`.
+
+The Linux image is distroless, non-root, and shell-free. The Windows image is built on Nano Server.
+
+- `ghcr.io/wharflab/tally:latest` is the official multi-platform image index. It auto-selects a really small distroless Linux image on `linux/amd64`
+  and `linux/arm64`, and a Nano Server image on `windows/amd64`.
+- `ghcr.io/wharflab/tally:distroless` is the Linux-only distroless image index.
+- `ghcr.io/wharflab/tally:nanoserver-ltsc2025` is the Windows Nano Server image.
+- Explicit platform tags are also published: `linux-amd64`, `linux-arm64`, and `windows-ltsc2025-amd64`.
+
+Linux example with Docker:
+
+```bash
+docker run --rm ghcr.io/wharflab/tally:latest version
+docker run --rm -v "$PWD:/work" -w /work ghcr.io/wharflab/tally:latest lint Dockerfile
+```
+
+Linux example with Podman:
+
+```bash
+podman run --rm ghcr.io/wharflab/tally:distroless version
+podman run --rm -v "$PWD:/work:Z" -w /work ghcr.io/wharflab/tally:distroless lint .
+```
+
+Windows container example:
+
+```powershell
+docker run --rm ghcr.io/wharflab/tally:nanoserver-ltsc2025 version
+docker run --rm -v "${PWD}:C:\work" -w C:\work ghcr.io/wharflab/tally:nanoserver-ltsc2025 lint Dockerfile
+```
+
 ### Go
 
 ```bash
