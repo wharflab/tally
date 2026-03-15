@@ -406,6 +406,7 @@ jobs:
       - name: Set up Docker Buildx
         if: matrix.runner_os == 'Linux'
         uses: docker/setup-buildx-action@v4
+
       - name: Compute Linux container image metadata
         if: matrix.runner_os == 'Linux'
         id: linux_image_meta
