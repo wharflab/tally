@@ -11,6 +11,9 @@ config-variables:
   - UV_NO_EDITABLE
   - CARGO_TERM_COLOR
   - CLICOLOR
+  - HARBOR_PILOT_APP_ID
+  - JETBRAINS_MARKETPLACE_CHANNEL
+  - JETBRAINS_MARKETPLACE_PR_CHANNEL
 # Configuration for file paths. The keys are glob patterns to match to file
 # paths relative to the repository root. The values are the configurations for
 # the file paths. Note that the path separator is always '/'.
