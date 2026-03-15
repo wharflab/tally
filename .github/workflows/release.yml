@@ -314,8 +314,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build container image
+      - name: Set up Docker Buildx
         if: matrix.runner_os == 'Linux'
+        uses: docker/setup-buildx-action@v3
+      - name: Compute Linux container image metadata
+        if: matrix.runner_os == 'Linux'
+        id: linux_image_meta
         shell: bash
         run: |
           set -euo pipefail
@@ -323,22 +327,35 @@ jobs:
           VERSION_TAG="v${RELEASE_VERSION#v}"
           COMPONENT_TAG="${VERSION_TAG}-linux-${{ matrix.goarch }}-build"
           CONTEXT_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
-          OUTPUT_FLAG="--push"
-          if [ "${DRY_RUN}" = "1" ]; then
-            OUTPUT_FLAG="--load"
-          fi
-          docker buildx build \
-            --platform "linux/${{ matrix.goarch }}" \
-            --build-arg VERSION="${VERSION_TAG}" \
-            --build-arg VCS_REF="${GITHUB_SHA}" \
-            --build-arg SOURCE_URL="https://github.com/${GITHUB_REPOSITORY}" \
-            --file packaging/docker/linux.Dockerfile \
-            --tag "${IMAGE_REPO}:${COMPONENT_TAG}" \
-            "${OUTPUT_FLAG}" \
-            "${CONTEXT_DIR}"
+          {
+            echo "image_repo=${IMAGE_REPO}"
+            echo "version_tag=${VERSION_TAG}"
+            echo "component_tag=${COMPONENT_TAG}"
+            echo "context_dir=${CONTEXT_DIR}"
+          } >> "$GITHUB_OUTPUT"
+      - name: Build container image
+        if: matrix.runner_os == 'Linux'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ steps.linux_image_meta.outputs.context_dir }}
+          file: packaging/docker/linux.Dockerfile
+          platforms: linux/${{ matrix.goarch }}
+          build-args: |
+            VERSION=${{ steps.linux_image_meta.outputs.version_tag }}
+            VCS_REF=${{ github.sha }}
+            SOURCE_URL=https://github.com/${{ github.repository }}
+          tags: ${{ steps.linux_image_meta.outputs.image_repo }}:${{ steps.linux_image_meta.outputs.component_tag }}
+          load: ${{ env.DRY_RUN == '1' }}
+          push: ${{ env.DRY_RUN != '1' }}
+          provenance: ${{ env.DRY_RUN != '1' && 'mode=max' || 'false' }}
+          sbom: ${{ env.DRY_RUN != '1' }}
+      - name: Summarize Linux container image
+        if: matrix.runner_os == 'Linux'
+        shell: bash
+        run: |
           {
             echo "Container image:"
-            echo "- ${IMAGE_REPO}:${COMPONENT_TAG}"
+            echo "- ${{ steps.linux_image_meta.outputs.image_repo }}:${{ steps.linux_image_meta.outputs.component_tag }}"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Build and push Windows container image
         if: matrix.id == 'windows-amd64'
