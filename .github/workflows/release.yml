@@ -347,18 +347,19 @@ jobs:
           $imageRepo = "ghcr.io/$env:GITHUB_REPOSITORY".ToLowerInvariant()
           $versionTag = "v$($env:RELEASE_VERSION.TrimStart('v'))"
           $componentTag = "$versionTag-windows-ltsc2025-amd64-build"
+          $imageRef = "$($imageRepo):$componentTag"
           $contextDir = "dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
           docker build `
             --build-arg VERSION="$versionTag" `
             --build-arg VCS_REF="$env:GITHUB_SHA" `
             --build-arg SOURCE_URL="https://github.com/$env:GITHUB_REPOSITORY" `
             --file packaging/docker/windows.Dockerfile `
-            --tag "$imageRepo:$componentTag" `
+            --tag "$imageRef" `
             $contextDir
           if ($env:DRY_RUN -ne "1") {
-            docker push "$imageRepo:$componentTag"
+            docker push "$imageRef"
           }
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Container image:`n- $imageRepo:$componentTag"
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Container image:`n- $imageRef"
       - name: Explain Windows arm64 container skip
         if: matrix.id == 'windows-arm64'
         shell: pwsh
