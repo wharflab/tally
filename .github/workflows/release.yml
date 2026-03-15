@@ -317,14 +317,12 @@ jobs:
         id: meta
         with:
           images: ghcr.io/${{ github.repository }}
+          flavor: |
+            suffix=-${{ matrix.id }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value={{sha}},enable=${{ github.ref_type != 'tag' }}
-            type=ref,event=branch
+            type=semver,pattern=v{{version}}
             type=ref,event=pr
-            type=sha,format=long
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=v${{ inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
           # https://github.com/profnandaa/buildkit/blob/97b80f23f3e55861f70bb7aaf4558340af78d030/docs/windows.md#cni--networking-setup
       - name: Setup CNI
         if: matrix.id == 'windows-amd64'
@@ -619,83 +617,39 @@ jobs:
       VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
     steps:
       - name: Log in to GHCR
-        if: github.event_name != 'pull_request'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ github.token }}
       - name: Assemble container tags
-        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           IMAGE_REPO="$(echo "ghcr.io/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
-          VERSION_TAG="v${VERSION#v}"
-          LINUX_AMD64="${IMAGE_REPO}:${VERSION_TAG}-linux-amd64-build"
-          LINUX_ARM64="${IMAGE_REPO}:${VERSION_TAG}-linux-arm64-build"
-          WINDOWS_AMD64="${IMAGE_REPO}:${VERSION_TAG}-windows-ltsc2025-amd64-build"
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_TAG="pr-${{ github.event.pull_request.number }}"
+          else
+            BASE_TAG="v${VERSION#v}"
+          fi
+
+          TAGS=(-t "${IMAGE_REPO}:${BASE_TAG}")
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            TAGS+=(-t "${IMAGE_REPO}:latest")
+          fi
 
           docker buildx imagetools create \
-            -t "${IMAGE_REPO}:${VERSION_TAG}" \
-            -t "${IMAGE_REPO}:latest" \
-            "${LINUX_AMD64}" \
-            "${LINUX_ARM64}" \
-            "${WINDOWS_AMD64}"
-
-          docker buildx imagetools create \
-            -t "${IMAGE_REPO}:${VERSION_TAG}-linux" \
-            -t "${IMAGE_REPO}:linux" \
-            -t "${IMAGE_REPO}:${VERSION_TAG}-distroless" \
-            -t "${IMAGE_REPO}:distroless" \
-            "${LINUX_AMD64}" \
-            "${LINUX_ARM64}"
-
-          docker buildx imagetools create \
-            -t "${IMAGE_REPO}:${VERSION_TAG}-linux-amd64" \
-            -t "${IMAGE_REPO}:linux-amd64" \
-            "${LINUX_AMD64}"
-
-          docker buildx imagetools create \
-            -t "${IMAGE_REPO}:${VERSION_TAG}-linux-arm64" \
-            -t "${IMAGE_REPO}:linux-arm64" \
-            "${LINUX_ARM64}"
-
-          docker buildx imagetools create \
-            -t "${IMAGE_REPO}:${VERSION_TAG}-nanoserver-ltsc2025" \
-            -t "${IMAGE_REPO}:nanoserver-ltsc2025" \
-            -t "${IMAGE_REPO}:${VERSION_TAG}-windows-ltsc2025-amd64" \
-            -t "${IMAGE_REPO}:windows-ltsc2025-amd64" \
-            "${WINDOWS_AMD64}"
+            "${TAGS[@]}" \
+            "${IMAGE_REPO}:${BASE_TAG}-linux-amd64" \
+            "${IMAGE_REPO}:${BASE_TAG}-linux-arm64" \
+            "${IMAGE_REPO}:${BASE_TAG}-windows-amd64"
 
           {
             echo "Published container tags:"
-            echo "- ${IMAGE_REPO}:${VERSION_TAG}"
-            echo "- ${IMAGE_REPO}:latest"
-            echo "- ${IMAGE_REPO}:distroless"
-            echo "- ${IMAGE_REPO}:linux"
-            echo "- ${IMAGE_REPO}:linux-amd64"
-            echo "- ${IMAGE_REPO}:linux-arm64"
-            echo "- ${IMAGE_REPO}:nanoserver-ltsc2025"
-            echo "- ${IMAGE_REPO}:windows-ltsc2025-amd64"
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: Summarize dry-run container tags
-        if: github.event_name == 'pull_request'
-        run: |
-          set -euo pipefail
-          IMAGE_REPO="$(echo "ghcr.io/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
-          VERSION_TAG="v${VERSION#v}"
-          {
-            echo "PR dry run would publish container tags:"
-            echo "- ${IMAGE_REPO}:${VERSION_TAG}"
-            echo "- ${IMAGE_REPO}:latest"
-            echo "- ${IMAGE_REPO}:distroless"
-            echo "- ${IMAGE_REPO}:linux"
-            echo "- ${IMAGE_REPO}:linux-amd64"
-            echo "- ${IMAGE_REPO}:linux-arm64"
-            echo "- ${IMAGE_REPO}:nanoserver-ltsc2025"
-            echo "- ${IMAGE_REPO}:windows-ltsc2025-amd64"
-            echo
-            echo "Windows arm64 stays binary-only because Nano Server LTSC base images currently publish windows/amd64 only."
+            for t in "${TAGS[@]}"; do
+              [ "$t" = "-t" ] && continue
+              echo "- $t"
+            done
           } >> "$GITHUB_STEP_SUMMARY"
   build-vscode-vsix:
     needs: publish-release
