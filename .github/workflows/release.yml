@@ -308,14 +308,95 @@ jobs:
           name: release-platform-${{ matrix.id }}
           path: dist/
       - name: Log in to GHCR
-        if: matrix.runner_os != 'macOS' && matrix.id != 'windows-arm64' && env.DRY_RUN != '1'
+        if: matrix.runner_os != 'macOS' && matrix.id != 'windows-arm64'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ github.token }}
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=raw,value=latest,enable={{is_default_branch}}
+          # https://github.com/profnandaa/buildkit/blob/97b80f23f3e55861f70bb7aaf4558340af78d030/docs/windows.md#cni--networking-setup
+      - name: Setup CNI
+        if: matrix.id == 'windows-amd64'
+        run: |
+          $networkName = 'nat'
+          # Get-HnsNetwork is available once you have enabled the 'Hyper-V Host Compute Service' feature
+          # which must have been done at the Quick setup above
+          # Enable-WindowsOptionalFeature -Online -FeatureName containers -All
+          # Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -All
+          # the default one named `nat` should be available
+          $natInfo = Get-HnsNetwork -ErrorAction Ignore | Where-Object { $_.Name -eq $networkName }
+          if ($null -eq $natInfo) {
+              throw "NAT network not found, check if you enabled containers, Hyper-V features and restarted the machine"
+          }
+          $gateway = $natInfo.Subnets[0].GatewayAddress
+          $subnet = $natInfo.Subnets[0].AddressPrefix
+
+          $cniConfPath = "$env:ProgramFiles\containerd\cni\conf"
+          $cniBinDir = "$env:ProgramFiles\containerd\cni\bin"
+          $cniVersion = "0.3.3"
+
+          # get the CNI plugins (binaries)
+          mkdir $cniBinDir -Force
+          curl.exe -LO https://github.com/microsoft/windows-container-networking/releases/download/v$cniVersion/windows-container-networking-cni-amd64-v$cniVersion.zip
+          tar xvf windows-container-networking-cni-amd64-v$cniVersion.zip -C $cniBinDir
+
+          $natConfig = @"
+          {
+              "cniVersion": "$cniVersion",
+              "name": "$networkName",
+              "type": "nat",
+              "master": "Ethernet",
+              "ipam": {
+                  "subnet": "$subnet",
+                  "routes": [
+                      {
+                          "gateway": "$gateway"
+                      }
+                  ]
+              },
+              "capabilities": {
+                  "portMappings": true,
+                  "dns": true
+              }
+          }
+          "@
+          mkdir $cniConfPath -Force
+          Set-Content -Path "$cniConfPath\0-containerd-nat.conf" -Value $natConfig
+      - name: Setup containerd
+        if: matrix.id == 'windows-amd64'
+        run: |
+          $version = "2.2.2"
+          curl.exe -L https://github.com/containerd/containerd/releases/download/v$version/containerd-$version-windows-amd64.tar.gz -o containerd.tar.gz
+          tar.exe xvf containerd.tar.gz
+
+          .\bin\containerd.exe --register-service
+          Start-Service containerd
+      - name: Setup BuildKit
+        if: matrix.id == 'windows-amd64'
+        run: |
+          $version = "v0.28.0"
+          curl.exe -L https://github.com/moby/buildkit/releases/download/$version/buildkit-$version.windows-amd64.tar.gz -o buildkit.tar.gz
+          tar.exe xvf buildkit.tar.gz
+
+          .\bin\buildkitd.exe --register-service --containerd-cni-config-path="C:\Program Files\containerd\cni\conf\0-containerd-nat.conf" --containerd-cni-binary-dir="C:\Program Files\containerd\cni\bin"
+          Start-Service buildkitd
+      - name: Setup Docker Buildx
+        # see https://github.com/moby/buildkit/issues/6009#issuecomment-2939934642
+        if: matrix.id == 'windows-amd64'
+        run: |
+          $version = "v0.32.1"
+          curl.exe -L https://github.com/docker/buildx/releases/download/$version/buildx-$version.windows-amd64.exe -o $env:ProgramData\Docker\cli-plugins\docker-buildx.exe
+          docker buildx create npipe:////./pipe/buildkitd --bootstrap --use
       - name: Set up Docker Buildx
-        if: matrix.runner_os == 'Linux' || matrix.id == 'windows-amd64'
+        if: matrix.runner_os == 'Linux'
         uses: docker/setup-buildx-action@v4
       - name: Compute Linux container image metadata
         if: matrix.runner_os == 'Linux'
@@ -382,8 +463,6 @@ jobs:
             VCS_REF=${{ github.sha }}
             SOURCE_URL=https://github.com/${{ github.repository }}
           tags: ${{ steps.windows_image_meta.outputs.image_repo }}:${{ steps.windows_image_meta.outputs.component_tag }}
-          load: ${{ env.DRY_RUN == '1' }}
-          push: ${{ env.DRY_RUN != '1' }}
           provenance: ${{ env.DRY_RUN != '1' && 'mode=max' || 'false' }}
           sbom: ${{ env.DRY_RUN != '1' }}
       - name: Summarize Windows container image
