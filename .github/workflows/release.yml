@@ -145,7 +145,7 @@ jobs:
           location: ${{ runner.temp }}
           path-type: inherit
           pacboy: toolchain:p
-      - name: Build binary
+      - name: Build Linux binary
         if: matrix.runner_os == 'Linux'
         shell: bash
         run: |
@@ -216,7 +216,7 @@ jobs:
           assert payload["platform"]["os"] == os.environ["EXPECTED_GOOS"], payload
           assert payload["platform"]["arch"] == os.environ["EXPECTED_GOARCH"], payload
           PY
-      - name: Build binary
+      - name: Build macOS binary
         if: matrix.runner_os == 'macOS'
         shell: bash
         run: |
@@ -231,7 +231,7 @@ jobs:
           GOOS="${{ matrix.goos }}" \
           GOARCH="${{ matrix.goarch }}" \
           go build -tags "${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o "${DIST_DIR}/${{ matrix.binary_name }}" .
-      - name: Build binary
+      - name: Build Windows binary
         if: matrix.runner_os == 'Windows'
         shell: msys2 {0}
         run: |
@@ -246,7 +246,7 @@ jobs:
           export GOARCH="${{ matrix.goarch }}"
           LDFLAGS="-s -w -X github.com/wharflab/tally/internal/version.version=${CLEAN_VERSION} -X github.com/wharflab/tally/internal/version.commit=${GITHUB_SHA}"
           go build -tags "${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o "${DIST_DIR}/${{ matrix.binary_name }}" .
-      - name: Import Code Signing Certificate
+      - name: Import macOS Code Signing Certificate
         if: matrix.goos == 'darwin'
         uses: apple-actions/import-codesign-certs@v6
         with:
@@ -289,7 +289,7 @@ jobs:
             --binary-name "${{ matrix.binary_name }}" \
             --archive-os "${{ matrix.archive_os }}" \
             --archive-arch "${{ matrix.archive_arch }}"
-      - name: Package release artifact
+      - name: Package Windows release artifact
         if: matrix.runner_os == 'Windows'
         shell: msys2 {0}
         run: |
@@ -309,14 +309,14 @@ jobs:
           path: dist/
       - name: Log in to GHCR
         if: matrix.runner_os != 'macOS' && matrix.id != 'windows-arm64' && env.DRY_RUN != '1'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Docker Buildx
         if: matrix.runner_os == 'Linux' || matrix.id == 'windows-amd64'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
       - name: Compute Linux container image metadata
         if: matrix.runner_os == 'Linux'
         id: linux_image_meta
@@ -335,7 +335,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - name: Build container image
         if: matrix.runner_os == 'Linux'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ steps.linux_image_meta.outputs.context_dir }}
           file: packaging/docker/linux.Dockerfile
@@ -372,7 +372,7 @@ jobs:
           Add-Content -Path $env:GITHUB_OUTPUT -Value "context_dir=$contextDir"
       - name: Build and push Windows container image
         if: matrix.id == 'windows-amd64'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ steps.windows_image_meta.outputs.context_dir }}
           file: packaging/docker/windows.Dockerfile
