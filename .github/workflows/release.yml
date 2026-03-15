@@ -370,6 +370,8 @@ jobs:
           "@
           mkdir $cniConfPath -Force
           Set-Content -Path "$cniConfPath\0-containerd-nat.conf" -Value $natConfig
+
+        # see https://github.com/microsoft/Windows-Containers/blob/77de763e1c27a466f9ce62e4f74e3039b8f97322/helpful_tools/GitHubActions/install_buildkit_workflow.yaml#L25
       - name: Setup containerd
         if: matrix.id == 'windows-amd64'
         run: |
@@ -379,22 +381,28 @@ jobs:
 
           .\bin\containerd.exe --register-service
           Start-Service containerd
-      - name: Setup BuildKit
+      - name: Setup BuildKit on Windows
         if: matrix.id == 'windows-amd64'
+        # --containerd-cni-config-path="C:\Program Files\containerd\cni\conf\0-containerd-nat.conf" --containerd-cni-binary-dir="C:\Program Files\containerd\cni\bin"
         run: |
           $version = "v0.28.0"
           curl.exe -L https://github.com/moby/buildkit/releases/download/$version/buildkit-$version.windows-amd64.tar.gz -o buildkit.tar.gz
           tar.exe xvf buildkit.tar.gz
 
-          .\bin\buildkitd.exe --register-service --containerd-cni-config-path="C:\Program Files\containerd\cni\conf\0-containerd-nat.conf" --containerd-cni-binary-dir="C:\Program Files\containerd\cni\bin"
+          .\bin\buildkitd.exe --register-service
           Start-Service buildkitd
-      - name: Setup Docker Buildx
+      - name: Setup Docker Buildx on Windows
         # see https://github.com/moby/buildkit/issues/6009#issuecomment-2939934642
         if: matrix.id == 'windows-amd64'
         run: |
           $version = "v0.32.1"
           curl.exe -L https://github.com/docker/buildx/releases/download/$version/buildx-$version.windows-amd64.exe -o $env:ProgramData\Docker\cli-plugins\docker-buildx.exe
-          docker buildx create npipe:////./pipe/buildkitd --bootstrap --use
+      - uses: docker/setup-buildx-action@v4
+        if: matrix.id == 'windows-amd64'
+        with:
+          driver: remote
+          endpoint: npipe:////./pipe/buildkitd
+
       - name: Set up Docker Buildx
         if: matrix.runner_os == 'Linux'
         uses: docker/setup-buildx-action@v4
