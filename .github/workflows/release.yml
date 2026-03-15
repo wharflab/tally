@@ -388,7 +388,7 @@ jobs:
           curl.exe -L https://github.com/moby/buildkit/releases/download/$version/buildkit-$version.windows-amd64.tar.gz -o buildkit.tar.gz
           tar.exe xvf buildkit.tar.gz
 
-          .\bin\buildkitd.exe --register-service --containerd-cni-config-path="C:\Program Files\containerd\cni\conf\0-containerd-nat.conf" --containerd-cni-binary-dir="C:\Program Files\containerd\cni\bin"
+          .\bin\buildkitd.exe --register-service --service-name buildkitd --containerd-cni-config-path="C:\Program Files\containerd\cni\conf\0-containerd-nat.conf" --containerd-cni-binary-dir="C:\Program Files\containerd\cni\bin"
           Start-Service buildkitd
       - name: Setup Docker Buildx on Windows
         # see https://github.com/moby/buildkit/issues/6009#issuecomment-2939934642
@@ -433,11 +433,15 @@ jobs:
             VERSION=${{ steps.linux_image_meta.outputs.version_tag }}
             VCS_REF=${{ github.sha }}
             SOURCE_URL=https://github.com/${{ github.repository }}
-          tags: ${{ steps.linux_image_meta.outputs.image_repo }}:${{ steps.linux_image_meta.outputs.component_tag }}
-          load: ${{ env.DRY_RUN == '1' }}
-          push: ${{ env.DRY_RUN != '1' }}
-          provenance: ${{ env.DRY_RUN != '1' && 'mode=max' || 'false' }}
-          sbom: ${{ env.DRY_RUN != '1' }}
+          load: true
+          push: true
+          provenance: "mode=max"
+          sbom: true
+          cache-from: "type=gha"
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max' || '' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
       - name: Summarize Linux container image
         if: matrix.runner_os == 'Linux'
         shell: bash
@@ -462,6 +466,7 @@ jobs:
       - name: Build and push Windows container image
         if: matrix.id == 'windows-amd64'
         uses: docker/build-push-action@v7
+        id: docker_windows
         with:
           context: ${{ steps.windows_image_meta.outputs.context_dir }}
           file: packaging/docker/windows.Dockerfile
@@ -470,19 +475,20 @@ jobs:
             VERSION=${{ steps.windows_image_meta.outputs.version_tag }}
             VCS_REF=${{ github.sha }}
             SOURCE_URL=https://github.com/${{ github.repository }}
-          tags: ${{ steps.windows_image_meta.outputs.image_repo }}:${{ steps.windows_image_meta.outputs.component_tag }}
-          provenance: ${{ env.DRY_RUN != '1' && 'mode=max' || 'false' }}
-          sbom: ${{ env.DRY_RUN != '1' }}
+          provenance: true
+          sbom: true
+          load: true
+          push: true
+          cache-from: "type=gha"
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max' || '' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
       - name: Summarize Windows container image
         if: matrix.id == 'windows-amd64'
         shell: pwsh
         run: |
           Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Container image:`n- ${{ steps.windows_image_meta.outputs.image_repo }}:${{ steps.windows_image_meta.outputs.component_tag }}"
-      - name: Explain Windows arm64 container skip
-        if: matrix.id == 'windows-arm64'
-        shell: pwsh
-        run: |
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Windows arm64 container publish is skipped: Microsoft Nano Server LTSC base images currently publish windows/amd64 only."
   publish-release:
     needs: build-platform
     runs-on: ubuntu-latest
