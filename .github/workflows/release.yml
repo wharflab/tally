@@ -341,7 +341,7 @@ jobs:
 
           $cniConfPath = "$env:ProgramFiles\containerd\cni\conf"
           $cniBinDir = "$env:ProgramFiles\containerd\cni\bin"
-          $cniVersion = "0.3.3"
+          $cniVersion = "0.3.0"
 
           # get the CNI plugins (binaries)
           mkdir $cniBinDir -Force
@@ -383,13 +383,12 @@ jobs:
           Start-Service containerd
       - name: Setup BuildKit on Windows
         if: matrix.id == 'windows-amd64'
-        # --containerd-cni-config-path="C:\Program Files\containerd\cni\conf\0-containerd-nat.conf" --containerd-cni-binary-dir="C:\Program Files\containerd\cni\bin"
         run: |
           $version = "v0.28.0"
           curl.exe -L https://github.com/moby/buildkit/releases/download/$version/buildkit-$version.windows-amd64.tar.gz -o buildkit.tar.gz
           tar.exe xvf buildkit.tar.gz
 
-          .\bin\buildkitd.exe --register-service
+          .\bin\buildkitd.exe --register-service --containerd-cni-config-path="C:\Program Files\containerd\cni\conf\0-containerd-nat.conf" --containerd-cni-binary-dir="C:\Program Files\containerd\cni\bin"
           Start-Service buildkitd
       - name: Setup Docker Buildx on Windows
         # see https://github.com/moby/buildkit/issues/6009#issuecomment-2939934642
