@@ -473,6 +473,7 @@ jobs:
       - name: Setup Docker Buildx on Windows
         # see https://github.com/moby/buildkit/issues/6009#issuecomment-2939934642
         if: matrix.id == 'windows-amd64'
+        id: dockerbuildx_windows
         shell: pwsh
         run: |
           Write-Host "Installing Docker Buildx plugin..."
@@ -481,6 +482,8 @@ jobs:
           $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/docker/buildx/releases/latest" -UseBasicParsing
           $version = $releases.tag_name
           Write-Host "Latest buildx version: $version"
+
+          "version=$version" >> $env:GITHUB_OUTPUT
 
           # Download buildx binary for Windows
           $downloadUrl = "https://github.com/docker/buildx/releases/download/$version/buildx-$version.windows-amd64.exe"
@@ -503,7 +506,7 @@ jobs:
         if: matrix.runner_os == 'Linux' || matrix.id == 'windows-amd64'
         uses: docker/setup-buildx-action@v4
         with:
-          version: ${{ steps.buildkit.outputs.version || 'v0.32.1' }}
+          version: ${{ steps.dockerbuildx_windows.outputs.version || 'v0.32.1' }}
           driver: ${{ matrix.id == 'windows-amd64' && 'remote' || 'docker-container' }}
           endpoint: ${{ matrix.id == 'windows-amd64' && 'npipe:////./pipe/buildkitd' || '' }}
       - name: Build and push container image
@@ -622,7 +625,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4
       - name: Assemble container tags
+        id: assemble
         run: |
           set -euo pipefail
           IMAGE_REPO="$(echo "ghcr.io/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
@@ -644,6 +650,10 @@ jobs:
             "${IMAGE_REPO}:${BASE_TAG}-linux-arm64" \
             "${IMAGE_REPO}:${BASE_TAG}-windows-amd64"
 
+          DIGEST="$(docker buildx imagetools inspect "${IMAGE_REPO}:${BASE_TAG}" --format '{{.Manifest.Digest}}')"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "image_repo=${IMAGE_REPO}" >> "$GITHUB_OUTPUT"
+
           {
             echo "Published container tags:"
             for t in "${TAGS[@]}"; do
@@ -651,6 +661,10 @@ jobs:
               echo "- $t"
             done
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Sign container image
+        run: |
+          cosign sign --yes --recursive \
+            "${{ steps.assemble.outputs.image_repo }}@${{ steps.assemble.outputs.digest }}"
   build-vscode-vsix:
     needs: publish-release
     runs-on: ubuntu-latest
