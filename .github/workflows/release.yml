@@ -8,7 +8,6 @@ on:
     paths:
       - ".github/workflows/release.yml"
       - ".github/macos-entitlements.plist"
-      - "README.md"
       - "scripts/release/**"
       - "packaging/**"
       - "_integrations/**"
@@ -319,6 +318,9 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value={{sha}},enable=${{ github.ref_type != 'tag' }}
             type=ref,event=branch
             type=ref,event=pr
             type=raw,value=latest,enable={{is_default_branch}}
@@ -393,102 +395,58 @@ jobs:
       - name: Setup Docker Buildx on Windows
         # see https://github.com/moby/buildkit/issues/6009#issuecomment-2939934642
         if: matrix.id == 'windows-amd64'
+        shell: pwsh
         run: |
-          $version = "v0.32.1"
-          curl.exe -L https://github.com/docker/buildx/releases/download/$version/buildx-$version.windows-amd64.exe -o $env:ProgramData\Docker\cli-plugins\docker-buildx.exe
-      - uses: docker/setup-buildx-action@v4
-        if: matrix.id == 'windows-amd64'
-        with:
-          driver: remote
-          endpoint: npipe:////./pipe/buildkitd
+          Write-Host "Installing Docker Buildx plugin..."
+
+          # Get latest buildx version
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/docker/buildx/releases/latest" -UseBasicParsing
+          $version = $releases.tag_name
+          Write-Host "Latest buildx version: $version"
+
+          # Download buildx binary for Windows
+          $downloadUrl = "https://github.com/docker/buildx/releases/download/$version/buildx-$version.windows-amd64.exe"
+          Write-Host "Downloading from: $downloadUrl"
+          curl.exe -fSLO $downloadUrl
+
+          # Create Docker CLI plugins directory
+          $pluginsDir = "$env:USERPROFILE\.docker\cli-plugins"
+          New-Item -Path $pluginsDir -ItemType Directory -Force | Out-Null
+
+          # Install buildx plugin
+          Move-Item -Path "buildx-$version.windows-amd64.exe" -Destination "$pluginsDir\docker-buildx.exe" -Force
+
+          # Verify installation
+          Write-Host "Verifying buildx installation..."
+          docker buildx version
+
+          Write-Host "Docker Buildx plugin installed successfully"
 
       - name: Set up Docker Buildx
-        if: matrix.runner_os == 'Linux'
+        if: matrix.runner_os == 'Linux' || matrix.id == 'windows-amd64'
         uses: docker/setup-buildx-action@v4
+        with:
+          version: latest
+          driver: ${{ matrix.id == 'windows-amd64' && 'remote' || 'docker-container' }}
+          endpoint: ${{ matrix.id == 'windows-amd64' && 'npipe:////./pipe/buildkitd' || '' }}
 
-      - name: Compute Linux container image metadata
-        if: matrix.runner_os == 'Linux'
-        id: linux_image_meta
-        shell: bash
-        run: |
-          set -euo pipefail
-          IMAGE_REPO="$(echo "ghcr.io/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
-          VERSION_TAG="v${RELEASE_VERSION#v}"
-          COMPONENT_TAG="${VERSION_TAG}-linux-${{ matrix.goarch }}-build"
-          CONTEXT_DIR="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
-          {
-            echo "image_repo=${IMAGE_REPO}"
-            echo "version_tag=${VERSION_TAG}"
-            echo "component_tag=${COMPONENT_TAG}"
-            echo "context_dir=${CONTEXT_DIR}"
-          } >> "$GITHUB_OUTPUT"
-      - name: Build container image
-        if: matrix.runner_os == 'Linux'
+      - name: Build and push container image
+        if: matrix.id == 'windows-amd64' || matrix.runner_os == 'Linux'
         uses: docker/build-push-action@v7
+        id: dockerbuild
         with:
-          context: ${{ steps.linux_image_meta.outputs.context_dir }}
-          file: packaging/docker/linux.Dockerfile
-          platforms: linux/${{ matrix.goarch }}
-          build-args: |
-            VERSION=${{ steps.linux_image_meta.outputs.version_tag }}
-            VCS_REF=${{ github.sha }}
-            SOURCE_URL=https://github.com/${{ github.repository }}
-          load: true
-          push: true
-          provenance: "mode=max"
-          sbom: true
-          cache-from: "type=gha"
-          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max' || '' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          annotations: ${{ steps.meta.outputs.annotations }}
-      - name: Summarize Linux container image
-        if: matrix.runner_os == 'Linux'
-        shell: bash
-        run: |
-          {
-            echo "Container image:"
-            echo "- ${{ steps.linux_image_meta.outputs.image_repo }}:${{ steps.linux_image_meta.outputs.component_tag }}"
-          } >> "$GITHUB_STEP_SUMMARY"
-      - name: Compute Windows container image metadata
-        if: matrix.id == 'windows-amd64'
-        id: windows_image_meta
-        shell: pwsh
-        run: |
-          $imageRepo = "ghcr.io/$env:GITHUB_REPOSITORY".ToLowerInvariant()
-          $versionTag = "v$($env:RELEASE_VERSION.TrimStart('v'))"
-          $componentTag = "$versionTag-windows-ltsc2025-amd64-build"
-          $contextDir = "dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}"
-          Add-Content -Path $env:GITHUB_OUTPUT -Value "image_repo=$imageRepo"
-          Add-Content -Path $env:GITHUB_OUTPUT -Value "version_tag=$versionTag"
-          Add-Content -Path $env:GITHUB_OUTPUT -Value "component_tag=$componentTag"
-          Add-Content -Path $env:GITHUB_OUTPUT -Value "context_dir=$contextDir"
-      - name: Build and push Windows container image
-        if: matrix.id == 'windows-amd64'
-        uses: docker/build-push-action@v7
-        id: docker_windows
-        with:
-          context: ${{ steps.windows_image_meta.outputs.context_dir }}
-          file: packaging/docker/windows.Dockerfile
-          platforms: windows/amd64
-          build-args: |
-            VERSION=${{ steps.windows_image_meta.outputs.version_tag }}
-            VCS_REF=${{ github.sha }}
-            SOURCE_URL=https://github.com/${{ github.repository }}
+          context: dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}
+          file: packaging/docker/${{ matrix.goos }}.Dockerfile
+          platforms: ${{ matrix.goos }}/${{ matrix.goarch }}
           provenance: true
           sbom: true
-          load: true
+          load: false
           push: true
           cache-from: "type=gha"
           cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max' || '' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
-      - name: Summarize Windows container image
-        if: matrix.id == 'windows-amd64'
-        shell: pwsh
-        run: |
-          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Container image:`n- ${{ steps.windows_image_meta.outputs.image_repo }}:${{ steps.windows_image_meta.outputs.component_tag }}"
   publish-release:
     needs: build-platform
     runs-on: ubuntu-latest
