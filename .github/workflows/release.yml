@@ -372,7 +372,6 @@ jobs:
           "@
           mkdir $cniConfPath -Force
           Set-Content -Path "$cniConfPath\0-containerd-nat.conf" -Value $natConfig
-
         # see https://github.com/microsoft/Windows-Containers/blob/77de763e1c27a466f9ce62e4f74e3039b8f97322/helpful_tools/GitHubActions/install_buildkit_workflow.yaml#L25
       - name: Setup containerd
         if: matrix.id == 'windows-amd64'
@@ -421,15 +420,13 @@ jobs:
           docker buildx version
 
           Write-Host "Docker Buildx plugin installed successfully"
-
       - name: Set up Docker Buildx
         if: matrix.runner_os == 'Linux' || matrix.id == 'windows-amd64'
         uses: docker/setup-buildx-action@v4
         with:
-          version: latest
+          version: v0.32.1
           driver: ${{ matrix.id == 'windows-amd64' && 'remote' || 'docker-container' }}
           endpoint: ${{ matrix.id == 'windows-amd64' && 'npipe:////./pipe/buildkitd' || '' }}
-
       - name: Build and push container image
         if: matrix.id == 'windows-amd64' || matrix.runner_os == 'Linux'
         uses: docker/build-push-action@v7
@@ -438,8 +435,8 @@ jobs:
           context: dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}
           file: packaging/docker/${{ matrix.goos }}.Dockerfile
           platforms: ${{ matrix.goos }}/${{ matrix.goarch }}
-          provenance: true
-          sbom: true
+          provenance: ${{ matrix.runner_os == 'Linux' && 'mode=max' || 'false' }}
+          sbom: ${{ matrix.runner_os == 'Linux' }}
           load: false
           push: true
           cache-from: "type=gha"
