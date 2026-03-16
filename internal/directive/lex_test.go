@@ -29,6 +29,17 @@ func TestLexComment_TallyIgnoreReasonAllowsSemicolons(t *testing.T) {
 	assertLexToken(t, text, tokens, CommentTokenValue, "kept;for later")
 }
 
+func TestLexComment_TallyIgnoreReasonAllowsWhitespaceBeforeEquals(t *testing.T) {
+	t.Parallel()
+
+	text := "# tally ignore=DL3006;reason = kept for compatibility"
+	tokens := LexComment(text)
+
+	assertLexToken(t, text, tokens, CommentTokenKeyword, "reason")
+	assertLexToken(t, text, tokens, CommentTokenOperator, "=")
+	assertLexToken(t, text, tokens, CommentTokenValue, "kept for compatibility")
+}
+
 func TestLexComment_BuildxAndShell(t *testing.T) {
 	t.Parallel()
 

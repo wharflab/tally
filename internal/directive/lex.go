@@ -23,11 +23,11 @@ var (
 	escapeLexPattern = regexp.MustCompile(
 		`(?i)#\s*(escape)\s*(=)\s*(\S(?:.*\S)?)\s*$`)
 	tallyIgnoreLexPattern = regexp.MustCompile(
-		`(?i)#\s*(tally)\s+((global)\s+)?(ignore)\s*(=)\s*([A-Za-z0-9_,\s/.-]+?)(?:;(reason)\s*=\s*(.*))?$`)
+		`(?i)#\s*(tally)\s+((global)\s+)?(ignore)\s*(=)\s*([A-Za-z0-9_,\s/.-]+?)(?:;(reason)\s*(=)\s*(.*))?$`)
 	hadolintIgnoreLexPattern = regexp.MustCompile(
-		`(?i)#\s*(hadolint)\s+((global)\s+)?(ignore)\s*(=)\s*([A-Za-z0-9_,\s/.-]+?)(?:;(reason)\s*=\s*(.*))?$`)
+		`(?i)#\s*(hadolint)\s+((global)\s+)?(ignore)\s*(=)\s*([A-Za-z0-9_,\s/.-]+?)(?:;(reason)\s*(=)\s*(.*))?$`)
 	buildxLexPattern = regexp.MustCompile(
-		`(?i)#\s*(check)\s*(=)\s*(skip)\s*(=)\s*([A-Za-z0-9_,\s/.-]+?)(?:;(reason)\s*=\s*(.*))?$`)
+		`(?i)#\s*(check)\s*(=)\s*(skip)\s*(=)\s*([A-Za-z0-9_,\s/.-]+?)(?:;(reason)\s*(=)\s*(.*))?$`)
 	tallyShellLexPattern = regexp.MustCompile(
 		`(?i)#\s*(tally)\s+(shell)\s*(=)\s*([A-Za-z0-9_./-]+)\s*$`)
 	hadolintShellLexPattern = regexp.MustCompile(
@@ -102,12 +102,8 @@ func lexIgnoreComment(text string, pattern *regexp.Regexp) []CommentToken {
 	if matches[14] >= 0 && matches[15] >= 0 {
 		tokens = append(tokens,
 			CommentToken{StartByte: matches[14], EndByte: matches[15], Kind: CommentTokenKeyword},
-			CommentToken{
-				StartByte: matches[15],
-				EndByte:   matches[15] + 1,
-				Kind:      CommentTokenOperator,
-			},
-			CommentToken{StartByte: matches[16], EndByte: matches[17], Kind: CommentTokenValue},
+			CommentToken{StartByte: matches[16], EndByte: matches[17], Kind: CommentTokenOperator},
+			CommentToken{StartByte: matches[18], EndByte: matches[19], Kind: CommentTokenValue},
 		)
 	}
 	return tokens
@@ -130,12 +126,8 @@ func lexBuildxComment(text string) []CommentToken {
 	if matches[12] >= 0 && matches[13] >= 0 {
 		tokens = append(tokens,
 			CommentToken{StartByte: matches[12], EndByte: matches[13], Kind: CommentTokenKeyword},
-			CommentToken{
-				StartByte: matches[13],
-				EndByte:   matches[13] + 1,
-				Kind:      CommentTokenOperator,
-			},
-			CommentToken{StartByte: matches[14], EndByte: matches[15], Kind: CommentTokenValue},
+			CommentToken{StartByte: matches[14], EndByte: matches[15], Kind: CommentTokenOperator},
+			CommentToken{StartByte: matches[16], EndByte: matches[17], Kind: CommentTokenValue},
 		)
 	}
 	return tokens
