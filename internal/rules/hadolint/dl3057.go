@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/async"
 	"github.com/wharflab/tally/internal/registry"
@@ -17,21 +16,23 @@ import (
 
 // DL3057Rule implements the DL3057 linting rule.
 //
-// Fast path (static): If no stage in the Dockerfile contains a HEALTHCHECK CMD
-// instruction, emits a single file-level violation (StageIndex = -1). This is
-// conservative — it may be a false positive when a base image already defines
-// HEALTHCHECK, since Docker inherits it at runtime.
+// Fast path (static): If no stage in the Dockerfile contains an explicit
+// HEALTHCHECK instruction (CMD or NONE), emits a single file-level violation
+// (StageIndex = -1). HEALTHCHECK NONE counts as a deliberate opt-out and
+// suppresses the violation. This is conservative — it may still be a false
+// positive when a base image already defines HEALTHCHECK, since Docker
+// inherits it at runtime.
 //
 // Async path (registry-backed): For each external base image, checks whether it
 // defines a HEALTHCHECK. If so, emits CompletedCheck to suppress the fast-path
-// violation. Additionally detects useless HEALTHCHECK NONE instructions when the
-// base image has no healthcheck to disable.
+// violation. The async path is skipped entirely when any explicit HEALTHCHECK
+// instruction (CMD or NONE) is present, since the fast path already handles it.
 //
 // Cross-rule interactions:
 //   - buildkit/MultipleInstructionsDisallowed: flags duplicate HEALTHCHECK
-//     instructions in a single stage. DL3057 honours Docker semantics by
-//     evaluating only the last HEALTHCHECK per stage, so both rules may
-//     fire together when duplicates exist.
+//     instructions in a single stage. DL3057 treats any explicit HEALTHCHECK
+//     as addressing the requirement, so it may be suppressed while the
+//     duplicate instruction warning still fires.
 //   - ONBUILD HEALTHCHECK: BuildKit parses this as an OnbuildCommand wrapping
 //     a HealthCheckCommand. DL3057 does not inspect ONBUILD triggers, so
 //     ONBUILD HEALTHCHECK CMD does not satisfy the "has healthcheck" check.
@@ -59,9 +60,10 @@ func (r *DL3057Rule) Metadata() rules.RuleMetadata {
 
 // Check implements the fast path for DL3057.
 //
-// If any stage contains a HEALTHCHECK CMD (not NONE), no violation is reported.
-// Otherwise, a single file-level violation with StageIndex=-1 is emitted. The
-// async path may later suppress this if a base image provides HEALTHCHECK.
+// If any stage contains an explicit HEALTHCHECK instruction (CMD or NONE), no
+// violation is reported. Otherwise, a single file-level violation with
+// StageIndex=-1 is emitted. The async path may later suppress this if a base
+// image provides HEALTHCHECK.
 func (r *DL3057Rule) Check(input rules.LintInput) []rules.Violation {
 	sem, ok := input.Semantic.(*semantic.Model)
 	if !ok || sem == nil {
@@ -72,9 +74,10 @@ func (r *DL3057Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	// If any stage has an explicit HEALTHCHECK CMD, no violation needed.
+	// If any stage has an explicit HEALTHCHECK (CMD or NONE), no violation needed.
+	// HEALTHCHECK NONE is a deliberate opt-out and satisfies DL3057.
 	for i := range input.Stages {
-		if stageHasHealthcheckCmd(&input.Stages[i]) {
+		if stageHasExplicitHealthcheck(&input.Stages[i]) {
 			return nil
 		}
 	}
@@ -85,7 +88,7 @@ func (r *DL3057Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	// No HEALTHCHECK CMD anywhere — emit a file-level violation.
+	// No explicit HEALTHCHECK anywhere — emit a file-level violation.
 	meta := r.Metadata()
 	loc := rules.NewFileLocation(input.File)
 	v := rules.NewViolation(
@@ -112,10 +115,10 @@ func (r *DL3057Rule) PlanAsync(input rules.LintInput) []async.CheckRequest {
 		return nil
 	}
 
-	// If any stage already has HEALTHCHECK CMD, Check() returns nil so
-	// async refinement is unnecessary.
+	// If any stage already has an explicit HEALTHCHECK (CMD or NONE),
+	// Check() returns nil so async refinement is unnecessary.
 	for i := range input.Stages {
-		if stageHasHealthcheckCmd(&input.Stages[i]) {
+		if stageHasExplicitHealthcheck(&input.Stages[i]) {
 			return nil
 		}
 	}
@@ -128,26 +131,20 @@ func (r *DL3057Rule) PlanAsync(input rules.LintInput) []async.CheckRequest {
 	meta := r.Metadata()
 	return asyncutil.PlanExternalImageChecks(input, meta, func(
 		m rules.RuleMetadata,
-		info *semantic.StageInfo,
+		_ *semantic.StageInfo,
 		file, _ string,
 	) async.ResultHandler {
 		return &healthcheckHandler{
-			meta:     m,
-			file:     file,
-			stageIdx: info.Index,
-			semantic: sem,
-			stages:   input.Stages,
+			meta: m,
+			file: file,
 		}
 	})
 }
 
 // healthcheckHandler processes resolved image config for HEALTHCHECK detection.
 type healthcheckHandler struct {
-	meta     rules.RuleMetadata
-	file     string
-	stageIdx int
-	semantic *semantic.Model
-	stages   []instructions.Stage
+	meta rules.RuleMetadata
+	file string
 }
 
 func (h *healthcheckHandler) OnSuccess(resolved any) []any {
@@ -156,88 +153,31 @@ func (h *healthcheckHandler) OnSuccess(resolved any) []any {
 		return nil
 	}
 
-	out := make([]any, 0)
-
 	if cfg.HasHealthcheck {
 		// Base image has HEALTHCHECK — suppress the file-level fast violation.
-		out = append(out, async.CompletedCheck{
+		return []any{async.CompletedCheck{
 			RuleCode:   h.meta.Code,
 			File:       h.file,
 			StageIndex: -1, // Matches the fast-path violation's StageIndex
-		})
-		return out
+		}}
 	}
 
-	// Base image has no HEALTHCHECK. Check this stage and descendants for
-	// useless HEALTHCHECK NONE instructions.
-	descendants := h.semantic.FromDescendants(h.stageIdx, nil)
-	allStages := append([]int{h.stageIdx}, descendants...)
-
-	for _, idx := range allStages {
-		if idx < 0 || idx >= len(h.stages) {
-			continue
-		}
-		if loc := healthcheckNoneLocation(&h.stages[idx]); loc != nil {
-			// HEALTHCHECK NONE with no inherited HC to disable — useless.
-			v := rules.NewViolation(
-				rules.NewLocationFromRanges(h.file, loc),
-				h.meta.Code,
-				"`HEALTHCHECK NONE` has no effect: base image has no health check to disable",
-				h.meta.DefaultSeverity,
-			).WithDocURL(h.meta.DocURL)
-			v.StageIndex = idx
-
-			// Suppress the generic "missing" violation since we have a specific one.
-			out = append(out,
-				async.CompletedCheck{
-					RuleCode:   h.meta.Code,
-					File:       h.file,
-					StageIndex: -1,
-				},
-				v,
-			)
-		}
-	}
-
-	// Don't emit CompletedCheck(-1) when base has no HC and no HEALTHCHECK NONE:
-	// the fast-path "missing" violation should remain.
-	return out
+	// Base has no HEALTHCHECK and no explicit opt-out exists (PlanAsync
+	// already short-circuits when HEALTHCHECK NONE is present), so the
+	// fast-path "missing" violation should remain.
+	return nil
 }
 
-// stageHasHealthcheckCmd reports whether the last HEALTHCHECK instruction in a
-// stage is a CMD (not NONE). Docker only honours the final HEALTHCHECK, so we
-// must scan all commands rather than returning on the first match.
-func stageHasHealthcheckCmd(stage *instructions.Stage) bool {
-	last := ""
+// stageHasExplicitHealthcheck reports whether a stage contains any HEALTHCHECK
+// instruction (CMD or NONE). HEALTHCHECK NONE is a deliberate opt-out and
+// counts as "addressed" for DL3057 purposes.
+func stageHasExplicitHealthcheck(stage *instructions.Stage) bool {
 	for _, cmd := range stage.Commands {
-		if hc, ok := cmd.(*instructions.HealthCheckCommand); ok {
-			if hc.Health != nil && hc.Health.Test != nil &&
-				len(hc.Health.Test) > 0 {
-				last = hc.Health.Test[0]
-			}
+		if _, ok := cmd.(*instructions.HealthCheckCommand); ok {
+			return true
 		}
 	}
-	return last != "" && last != "NONE"
-}
-
-// healthcheckNoneLocation returns the location of the last HEALTHCHECK
-// instruction in a stage if it is NONE, or nil otherwise. Docker only honours
-// the final HEALTHCHECK, so earlier instructions are irrelevant.
-func healthcheckNoneLocation(stage *instructions.Stage) []parser.Range {
-	var lastLoc []parser.Range
-	for _, cmd := range stage.Commands {
-		if hc, ok := cmd.(*instructions.HealthCheckCommand); ok {
-			if hc.Health != nil && hc.Health.Test != nil &&
-				len(hc.Health.Test) > 0 {
-				if hc.Health.Test[0] == "NONE" {
-					lastLoc = hc.Location()
-				} else {
-					lastLoc = nil // CMD overrides earlier NONE
-				}
-			}
-		}
-	}
-	return lastLoc
+	return false
 }
 
 // shouldSuppressHealthcheck returns true when the Dockerfile shows strong

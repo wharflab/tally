@@ -171,6 +171,13 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 		{
+			name: "multiple-healthcheck-dl3057-overlap",
+			dir:  "multiple-healthcheck-dl3057-overlap",
+			args: append([]string{"--format", "json"},
+				mustSelectRules("buildkit/MultipleInstructionsDisallowed", "hadolint/DL3057")...),
+			wantExit: 1, // MultipleInstructionsDisallowed fires; DL3057 is suppressed by HEALTHCHECK NONE
+		},
+		{
 			name:     "copy-from-own-alias",
 			dir:      "copy-from-own-alias",
 			args:     append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3022", "hadolint/DL3023")...),
@@ -838,7 +845,6 @@ func lintCases(t *testing.T) []lintCase {
 			args: append(
 				[]string{"--format", "json", "--slow-checks=on"},
 				mustSelectRules("hadolint/DL3057")...),
-			wantExit: 1,
 		},
 		{
 			name: "slow-checks-healthcheck-missing-confirmed",

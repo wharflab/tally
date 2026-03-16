@@ -1,0 +1,58 @@
+{
+  "files": [
+    {
+      "file": "testdata/multiple-healthcheck-dl3057-overlap/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/MultipleInstructionsDisallowed/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "testdata/multiple-healthcheck-dl3057-overlap/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "Multiple HEALTHCHECK instructions should not be used in the same stage because only the last one will be used",
+          "rule": "buildkit/MultipleInstructionsDisallowed",
+          "severity": "warning",
+          "sourceCode": "HEALTHCHECK CMD /bin/check",
+          "suggestedFix": {
+            "description": "Comment out duplicate HEALTHCHECK instruction (only the last one takes effect)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 26,
+                    "line": 5
+                  },
+                  "file": "testdata/multiple-healthcheck-dl3057-overlap/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 5
+                  }
+                },
+                "newText": "# [commented out by tally - Docker will ignore all but last HEALTHCHECK]: HEALTHCHECK CMD /bin/check"
+              }
+            ],
+            "isPreferred": true,
+            "priority": -1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 2,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

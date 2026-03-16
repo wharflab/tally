@@ -58,11 +58,11 @@ RUN echo "run"
 			wantCount: 1, // Single file-level violation, not per-stage
 		},
 		{
-			name: "HEALTHCHECK NONE alone still triggers missing violation",
+			name: "HEALTHCHECK NONE alone is explicit opt-out",
 			dockerfile: `FROM scratch
 HEALTHCHECK NONE
 `,
-			wantCount: 1, // NONE doesn't count as CMD; async resolves whether base has HC
+			wantCount: 0, // NONE is a deliberate opt-out; DL3057 should not fire
 		},
 		{
 			name: "HEALTHCHECK CMD in any stage suppresses all",
@@ -101,12 +101,12 @@ HEALTHCHECK --interval=30s CMD curl -f http://localhost/ || exit 1
 			wantCount: 0,
 		},
 		{
-			name: "HEALTHCHECK CMD followed by HEALTHCHECK NONE uses last instruction",
+			name: "HEALTHCHECK CMD followed by HEALTHCHECK NONE is explicit opt-out",
 			dockerfile: `FROM scratch
 HEALTHCHECK CMD /bin/check
 HEALTHCHECK NONE
 `,
-			wantCount: 1, // Last HEALTHCHECK is NONE, so violation
+			wantCount: 0, // HEALTHCHECK NONE is a deliberate opt-out
 		},
 		{
 			name: "HEALTHCHECK NONE followed by HEALTHCHECK CMD uses last instruction",
@@ -353,6 +353,16 @@ func TestDL3057Rule_PlanAsync(t *testing.T) {
 		}
 	})
 
+	t.Run("no plans when HEALTHCHECK NONE present", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nHEALTHCHECK NONE\n")
+		r := NewDL3057Rule()
+		requests := r.PlanAsync(input)
+		if len(requests) != 0 {
+			t.Errorf("expected no async requests when HEALTHCHECK NONE present, got %d", len(requests))
+		}
+	})
+
 	t.Run("no plans when HEALTHCHECK CMD present", func(t *testing.T) {
 		t.Parallel()
 		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nHEALTHCHECK CMD curl -f http://localhost/\n")
@@ -399,11 +409,8 @@ func makeHandler(t *testing.T, dockerfile string) *healthcheckHandler {
 	r := NewDL3057Rule()
 	input := testutil.MakeLintInput(t, "Dockerfile", dockerfile)
 	return &healthcheckHandler{
-		meta:     r.Metadata(),
-		file:     input.File,
-		stageIdx: 0,
-		semantic: testutil.GetSemantic(t, input),
-		stages:   input.Stages,
+		meta: r.Metadata(),
+		file: input.File,
 	}
 }
 
@@ -428,34 +435,9 @@ func TestDL3057Rule_Handler_BaseNoHealthcheck(t *testing.T) {
 	t.Parallel()
 	h := makeHandler(t, "FROM alpine:3.18\nRUN echo hello\n")
 	result := h.OnSuccess(&registry.ImageConfig{HasHealthcheck: false})
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
-	// Should NOT contain a CompletedCheck with StageIndex=-1 (fast violation stays)
-	if hasCompletedCheckAtStage(result, -1) {
-		t.Error("should not suppress fast violation when base has no healthcheck")
-	}
-}
-
-func TestDL3057Rule_Handler_UselessHealthcheckNone(t *testing.T) {
-	t.Parallel()
-	h := makeHandler(t, "FROM alpine:3.18\nHEALTHCHECK NONE\n")
-	result := h.OnSuccess(&registry.ImageConfig{HasHealthcheck: false})
-	if result == nil {
-		t.Fatal("expected non-nil result")
-	}
-	if !hasAnyViolation(result) {
-		t.Error("expected violation about useless HEALTHCHECK NONE")
-	}
-	if !hasCompletedCheckAtStage(result, -1) {
-		t.Error("expected CompletedCheck(-1) to replace generic missing with specific NONE violation")
-	}
-	for _, item := range result {
-		if v, ok := item.(rules.Violation); ok {
-			if v.Message != "`HEALTHCHECK NONE` has no effect: base image has no health check to disable" {
-				t.Errorf("unexpected message: %s", v.Message)
-			}
-		}
+	// No HEALTHCHECK in base and no explicit opt-out → fast-path violation should remain.
+	if result != nil {
+		t.Errorf("expected nil result when base has no healthcheck, got %v", result)
 	}
 }
 
