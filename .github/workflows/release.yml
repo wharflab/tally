@@ -518,7 +518,6 @@ jobs:
           file: packaging/docker/${{ matrix.goos }}.Dockerfile
           platforms: ${{ matrix.goos }}/${{ matrix.goarch }}
           provenance: ${{ matrix.runner_os == 'Linux' && 'mode=max' || 'mode=min' }}
-          sbom: ${{ matrix.runner_os == 'Linux' }}
           load: false
           push: true
           cache-from: "type=gha"
@@ -627,6 +626,8 @@ jobs:
           password: ${{ github.token }}
       - name: Install cosign
         uses: sigstore/cosign-installer@v4.1.0
+      - name: Install syft
+        uses: anchore/sbom-action/download-syft@v0.23.1
       - name: Assemble container tags
         id: assemble
         run: |
@@ -665,6 +666,11 @@ jobs:
         run: |
           cosign sign --yes --recursive \
             "${{ steps.assemble.outputs.image_repo }}@${{ steps.assemble.outputs.digest }}"
+      - name: Generate and attach SBOM
+        run: |
+          IMAGE="${{ steps.assemble.outputs.image_repo }}@${{ steps.assemble.outputs.digest }}"
+          syft "${IMAGE}" -o spdx-json=sbom.spdx.json
+          cosign attach sbom --sbom sbom.spdx.json "${IMAGE}"
   build-vscode-vsix:
     needs: publish-release
     runs-on: ubuntu-latest
