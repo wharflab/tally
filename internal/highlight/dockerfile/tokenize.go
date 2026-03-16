@@ -435,8 +435,8 @@ func commentTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []core.T
 		if !strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if comment, ok := directiveComments[i]; ok {
-			if directiveTokens := directiveCommentTokens(line, i, comment.Text); len(directiveTokens) > 0 {
+		if _, ok := directiveComments[i]; ok {
+			if directiveTokens := directiveCommentTokens(line, i, trimmed); len(directiveTokens) > 0 {
 				out = append(out, directiveTokens...)
 				continue
 			}
