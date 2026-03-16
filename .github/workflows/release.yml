@@ -10,7 +10,6 @@ on:
       - ".github/macos-entitlements.plist"
       - "scripts/release/**"
       - "packaging/**"
-      - "_integrations/**"
       - "Makefile"
   workflow_dispatch:
     inputs:
@@ -22,6 +21,7 @@ permissions:
   attestations: write
   contents: write
   id-token: write
+  packages: write
 env:
   GOEXPERIMENT: jsonv2
   GOTOOLCHAIN: auto
@@ -143,7 +143,7 @@ jobs:
           location: ${{ runner.temp }}
           path-type: inherit
           pacboy: toolchain:p
-      - name: Build binary
+      - name: Build Linux binary
         if: matrix.runner_os == 'Linux'
         shell: bash
         run: |
@@ -214,7 +214,7 @@ jobs:
           assert payload["platform"]["os"] == os.environ["EXPECTED_GOOS"], payload
           assert payload["platform"]["arch"] == os.environ["EXPECTED_GOARCH"], payload
           PY
-      - name: Build binary
+      - name: Build macOS binary
         if: matrix.runner_os == 'macOS'
         shell: bash
         run: |
@@ -229,7 +229,7 @@ jobs:
           GOOS="${{ matrix.goos }}" \
           GOARCH="${{ matrix.goarch }}" \
           go build -tags "${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o "${DIST_DIR}/${{ matrix.binary_name }}" .
-      - name: Build binary
+      - name: Build Windows binary
         if: matrix.runner_os == 'Windows'
         shell: msys2 {0}
         run: |
@@ -244,7 +244,7 @@ jobs:
           export GOARCH="${{ matrix.goarch }}"
           LDFLAGS="-s -w -X github.com/wharflab/tally/internal/version.version=${CLEAN_VERSION} -X github.com/wharflab/tally/internal/version.commit=${GITHUB_SHA}"
           go build -tags "${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o "${DIST_DIR}/${{ matrix.binary_name }}" .
-      - name: Import Code Signing Certificate
+      - name: Import macOS Code Signing Certificate
         if: matrix.goos == 'darwin'
         uses: apple-actions/import-codesign-certs@v6
         with:
@@ -287,7 +287,7 @@ jobs:
             --binary-name "${{ matrix.binary_name }}" \
             --archive-os "${{ matrix.archive_os }}" \
             --archive-arch "${{ matrix.archive_arch }}"
-      - name: Package release artifact
+      - name: Package Windows release artifact
         if: matrix.runner_os == 'Windows'
         shell: msys2 {0}
         run: |
@@ -305,6 +305,225 @@ jobs:
         with:
           name: release-platform-${{ matrix.id }}
           path: dist/
+      - name: Log in to GHCR
+        if: matrix.runner_os != 'macOS' && matrix.id != 'windows-arm64'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: |
+            suffix=-${{ matrix.id }}
+          tags: |
+            type=semver,pattern=v{{version}}
+            type=ref,event=pr
+            type=raw,value=v${{ inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+          # https://github.com/profnandaa/buildkit/blob/97b80f23f3e55861f70bb7aaf4558340af78d030/docs/windows.md#cni--networking-setup
+      - name: Setup CNI
+        if: matrix.id == 'windows-amd64'
+        shell: pwsh
+        run: |
+          $networkName = 'nat'
+          # Get-HnsNetwork is available once you have enabled the 'Hyper-V Host Compute Service' feature
+          # which must have been done at the Quick setup above
+          # Enable-WindowsOptionalFeature -Online -FeatureName containers -All
+          # Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -All
+          # the default one named `nat` should be available
+          $natInfo = Get-HnsNetwork -ErrorAction Ignore | Where-Object { $_.Name -eq $networkName }
+          if ($null -eq $natInfo) {
+              throw "NAT network not found, check if you enabled containers, Hyper-V features and restarted the machine"
+          }
+          $gateway = $natInfo.Subnets[0].GatewayAddress
+          $subnet = $natInfo.Subnets[0].AddressPrefix
+
+          $cniConfPath = "$env:ProgramFiles\containerd\cni\conf"
+          $cniBinDir = "$env:ProgramFiles\containerd\cni\bin"
+          $cniVersion = "0.3.0"
+
+          # get the CNI plugins (binaries)
+          mkdir $cniBinDir -Force
+          curl.exe -LO https://github.com/microsoft/windows-container-networking/releases/download/v$cniVersion/windows-container-networking-cni-amd64-v$cniVersion.zip
+          tar xvf windows-container-networking-cni-amd64-v$cniVersion.zip -C $cniBinDir
+
+          $natConfig = @"
+          {
+              "cniVersion": "$cniVersion",
+              "name": "$networkName",
+              "type": "nat",
+              "master": "Ethernet",
+              "ipam": {
+                  "subnet": "$subnet",
+                  "routes": [
+                      {
+                          "gateway": "$gateway"
+                      }
+                  ]
+              },
+              "capabilities": {
+                  "portMappings": true,
+                  "dns": true
+              }
+          }
+          "@
+          mkdir $cniConfPath -Force
+          Set-Content -Path "$cniConfPath\0-containerd-nat.conf" -Value $natConfig
+        # see https://github.com/microsoft/Windows-Containers/blob/77de763e1c27a466f9ce62e4f74e3039b8f97322/helpful_tools/GitHubActions/install_buildkit_workflow.yaml#L25
+      - name: Setup containerd
+        if: matrix.id == 'windows-amd64'
+        shell: pwsh
+        run: |
+          $version = "2.2.2"
+          curl.exe -L https://github.com/containerd/containerd/releases/download/v$version/containerd-$version-windows-amd64.tar.gz -o containerd.tar.gz
+          tar.exe xvf containerd.tar.gz
+
+          .\bin\containerd.exe --register-service
+          Start-Service containerd
+      - name: Install BuildKit on Windows
+        id: buildkit
+        if: matrix.id == 'windows-amd64'
+        shell: pwsh
+        run: |
+          Write-Host "Installing BuildKit..."
+
+          # Get latest BuildKit version
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/moby/buildkit/releases/latest" -UseBasicParsing
+          $version = $releases.tag_name
+          $arch = "amd64"
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Downloading BuildKit $version..."
+          curl.exe -fSLO "https://github.com/moby/buildkit/releases/download/$version/buildkit-$version.windows-$arch.tar.gz"
+          tar.exe xvf "buildkit-$version.windows-$arch.tar.gz"
+
+          # Install to Program Files
+          $buildkitPath = "$env:ProgramFiles\buildkit"
+          New-Item -Path $buildkitPath -ItemType Directory -Force | Out-Null
+          Copy-Item -Path ".\bin\*" -Destination $buildkitPath -Force
+
+          # Add to PATH for this session
+          $env:Path = "$buildkitPath;$env:Path"
+
+          Write-Host "BuildKit installed to $buildkitPath"
+      - name: Start BuildKit daemon on Windows
+        if: matrix.id == 'windows-amd64'
+        shell: pwsh
+        run: |
+          Write-Host "Starting BuildKit daemon as Windows service..."
+
+          $buildkitPath = "$env:ProgramFiles\buildkit"
+          $cniConfPath = "$env:ProgramFiles\containerd\cni\conf\0-containerd-nat.conf"
+          $cniBinDir = "$env:ProgramFiles\containerd\cni\bin"
+
+          # Register buildkitd as a Windows service
+          Write-Host "Registering buildkitd as a Windows service..."
+          & "$buildkitPath\buildkitd.exe" --register-service `
+            --addr "npipe:////./pipe/buildkitd" `
+            --containerd-cni-config-path="$cniConfPath" `
+            --containerd-cni-binary-dir="$cniBinDir"
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Failed to register buildkitd service"
+            exit 1
+          }
+
+          # Start the buildkitd service
+          Write-Host "Starting buildkitd service..."
+          Start-Service buildkitd
+
+          # Wait for buildkitd to be ready
+          Write-Host "Waiting for BuildKit to be ready..."
+          $pipePath = "\\.\pipe\buildkitd"
+          $maxAttempts = 30
+          $attempt = 0
+          while ($attempt -lt $maxAttempts) {
+            Start-Sleep -Seconds 2
+            $attempt++
+
+            # Check if pipe exists
+            $pipeExists = Test-Path $pipePath
+            Write-Host "Attempt $attempt/$maxAttempts - Pipe exists: $pipeExists"
+
+            if ($pipeExists) {
+              $env:Path = "$buildkitPath;$env:Path"
+              $result = & "$buildkitPath\buildctl.exe" --addr "npipe:////./pipe/buildkitd" debug info 2>&1
+              if ($LASTEXITCODE -eq 0) {
+                Write-Host "BuildKit is ready!"
+                Write-Host $result
+                break
+              } else {
+                Write-Host "buildctl returned error: $result"
+              }
+            }
+          }
+
+          if ($attempt -eq $maxAttempts) {
+            Write-Host "BuildKit service status:"
+            Get-Service buildkitd | Format-List *
+            Write-Error "BuildKit failed to start"
+            exit 1
+          }
+
+          Write-Host "BuildKit daemon running as service on npipe:////./pipe/buildkitd"
+      - name: Setup Docker Buildx on Windows
+        # see https://github.com/moby/buildkit/issues/6009#issuecomment-2939934642
+        if: matrix.id == 'windows-amd64'
+        id: dockerbuildx_windows
+        shell: pwsh
+        run: |
+          Write-Host "Installing Docker Buildx plugin..."
+
+          # Get latest buildx version
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/docker/buildx/releases/latest" -UseBasicParsing
+          $version = $releases.tag_name
+          Write-Host "Latest buildx version: $version"
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+          # Download buildx binary for Windows
+          $downloadUrl = "https://github.com/docker/buildx/releases/download/$version/buildx-$version.windows-amd64.exe"
+          Write-Host "Downloading from: $downloadUrl"
+          curl.exe -fSLO $downloadUrl
+
+          # Create Docker CLI plugins directory
+          $pluginsDir = "$env:USERPROFILE\.docker\cli-plugins"
+          New-Item -Path $pluginsDir -ItemType Directory -Force | Out-Null
+
+          # Install buildx plugin
+          Move-Item -Path "buildx-$version.windows-amd64.exe" -Destination "$pluginsDir\docker-buildx.exe" -Force
+
+          # Verify installation
+          Write-Host "Verifying buildx installation..."
+          docker buildx version
+
+          Write-Host "Docker Buildx plugin installed successfully"
+      - name: Set up Docker Buildx
+        if: matrix.runner_os == 'Linux' || matrix.id == 'windows-amd64'
+        uses: docker/setup-buildx-action@v4
+        with:
+          version: ${{ steps.dockerbuildx_windows.outputs.version || 'v0.32.1' }}
+          driver: ${{ matrix.id == 'windows-amd64' && 'remote' || 'docker-container' }}
+          endpoint: ${{ matrix.id == 'windows-amd64' && 'npipe:////./pipe/buildkitd' || '' }}
+      - name: Build and push container image
+        if: matrix.id == 'windows-amd64' || matrix.runner_os == 'Linux'
+        uses: docker/build-push-action@v7
+        id: dockerbuild
+        with:
+          context: dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}
+          file: packaging/docker/${{ matrix.goos }}.Dockerfile
+          platforms: ${{ matrix.goos }}/${{ matrix.goarch }}
+          provenance: ${{ matrix.runner_os == 'Linux' && 'mode=max' || 'mode=min' }}
+          load: false
+          push: true
+          cache-from: "type=gha"
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,mode=max' || '' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
   publish-release:
     needs: build-platform
     runs-on: ubuntu-latest
@@ -392,6 +611,76 @@ jobs:
         with:
           name: release-dist
           path: dist/
+  publish-container-images:
+    needs: publish-release
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ github.event_name == 'pull_request' && format('0.0.0-pr.{0}.{1}', github.event.pull_request.number, github.run_number) || inputs.version || github.ref_name }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v4.1.0
+      - name: Install syft
+        uses: anchore/sbom-action/download-syft@v0.23.1
+      - name: Assemble container tags
+        id: assemble
+        run: |
+          set -euo pipefail
+          IMAGE_REPO="$(echo "ghcr.io/${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_TAG="pr-${{ github.event.pull_request.number }}"
+          else
+            BASE_TAG="v${VERSION#v}"
+          fi
+
+          TAGS=(-t "${IMAGE_REPO}:${BASE_TAG}")
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            TAGS+=(-t "${IMAGE_REPO}:latest")
+          fi
+
+          docker buildx imagetools create \
+            "${TAGS[@]}" \
+            "${IMAGE_REPO}:${BASE_TAG}-linux-amd64" \
+            "${IMAGE_REPO}:${BASE_TAG}-linux-arm64" \
+            "${IMAGE_REPO}:${BASE_TAG}-windows-amd64"
+
+          DIGEST="$(docker buildx imagetools inspect "${IMAGE_REPO}:${BASE_TAG}" --format '{{json .Manifest.Digest}}' | jq -r .)"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "image_repo=${IMAGE_REPO}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "Published container tags:"
+            for t in "${TAGS[@]}"; do
+              [ "$t" = "-t" ] && continue
+              echo "- $t"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Generate and attest SBOMs
+        run: |
+          set -euo pipefail
+          IMAGE_REPO="${{ steps.assemble.outputs.image_repo }}"
+          DIGEST="${{ steps.assemble.outputs.digest }}"
+
+          # Attest each platform image
+          docker buildx imagetools inspect --raw "${IMAGE_REPO}@${DIGEST}" \
+            | jq -r '.manifests[] | select(.annotations == null or (.annotations["vnd.docker.reference.type"] == null)) | "\(.platform.os)/\(.platform.architecture) \(.digest)"' \
+            | while read -r platform digest; do
+                echo "Generating SBOM for ${platform} (${digest})..."
+                syft "${IMAGE_REPO}@${digest}" -o spdx-json=sbom.spdx.json
+                cosign attest --yes --predicate sbom.spdx.json \
+                  --type spdxjson "${IMAGE_REPO}@${digest}"
+                rm -f sbom.spdx.json
+              done
+      - name: Sign container image
+        run: |
+          cosign sign --yes --recursive \
+            "${{ steps.assemble.outputs.image_repo }}@${{ steps.assemble.outputs.digest }}"
   build-vscode-vsix:
     needs: publish-release
     runs-on: ubuntu-latest

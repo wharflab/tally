@@ -100,6 +100,47 @@ pip install tally-cli
 gem install tally-cli
 ```
 
+### Docker / Podman
+
+Official images are published to GitHub Container Registry at `ghcr.io/wharflab/tally`.
+All published images are signed with [cosign](https://github.com/sigstore/cosign) (keyless/OIDC).
+
+The Linux image is distroless, non-root, and shell-free. The Windows image is built on Nano Server.
+
+- `ghcr.io/wharflab/tally:latest` is the multi-platform image index. It auto-selects a distroless Linux image on `linux/amd64`
+  and `linux/arm64`, and a Nano Server image on `windows/amd64`.
+- `ghcr.io/wharflab/tally:v<VERSION>` is the versioned multi-platform image index (e.g., `v1.2.3`).
+- Per-platform tags are also published: `v<VERSION>-linux-amd64`, `v<VERSION>-linux-arm64`, and `v<VERSION>-windows-amd64`.
+
+Linux example with Docker:
+
+```bash
+docker run --rm ghcr.io/wharflab/tally:latest version
+docker run --rm -v "$PWD:/work" -w /work ghcr.io/wharflab/tally:latest lint Dockerfile
+```
+
+Linux example with Podman:
+
+```bash
+podman run --rm ghcr.io/wharflab/tally:latest version
+podman run --rm -v "$PWD:/work:Z" -w /work ghcr.io/wharflab/tally:latest lint .
+```
+
+Windows container example:
+
+```powershell
+docker run --rm ghcr.io/wharflab/tally:latest version
+docker run --rm -v "${PWD}:C:\work" -w C:\work ghcr.io/wharflab/tally:latest lint Dockerfile
+```
+
+Verify image signatures:
+
+```bash
+cosign verify --certificate-identity-regexp='https://github.com/wharflab/tally' \
+  --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \
+  ghcr.io/wharflab/tally:latest
+```
+
 ### Go
 
 ```bash
