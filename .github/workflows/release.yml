@@ -650,7 +650,7 @@ jobs:
             "${IMAGE_REPO}:${BASE_TAG}-linux-arm64" \
             "${IMAGE_REPO}:${BASE_TAG}-windows-amd64"
 
-          DIGEST="$(docker buildx imagetools inspect "${IMAGE_REPO}:${BASE_TAG}" --format '{{.Manifest.Digest}}')"
+          DIGEST="$(docker buildx imagetools inspect "${IMAGE_REPO}:${BASE_TAG}" --format '{{json .Manifest.Digest}}' | jq -r .)"
           echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
           echo "image_repo=${IMAGE_REPO}" >> "$GITHUB_OUTPUT"
 
