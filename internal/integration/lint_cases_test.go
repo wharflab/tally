@@ -838,7 +838,6 @@ func lintCases(t *testing.T) []lintCase {
 			args: append(
 				[]string{"--format", "json", "--slow-checks=on"},
 				mustSelectRules("hadolint/DL3057")...),
-			wantExit: 1,
 		},
 		{
 			name: "slow-checks-healthcheck-missing-confirmed",

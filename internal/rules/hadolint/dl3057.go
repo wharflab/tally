@@ -72,9 +72,10 @@ func (r *DL3057Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	// If any stage has an explicit HEALTHCHECK CMD, no violation needed.
+	// If any stage has an explicit HEALTHCHECK (CMD or NONE), no violation needed.
+	// HEALTHCHECK NONE is a deliberate opt-out and satisfies DL3057.
 	for i := range input.Stages {
-		if stageHasHealthcheckCmd(&input.Stages[i]) {
+		if stageHasExplicitHealthcheck(&input.Stages[i]) {
 			return nil
 		}
 	}
@@ -112,10 +113,10 @@ func (r *DL3057Rule) PlanAsync(input rules.LintInput) []async.CheckRequest {
 		return nil
 	}
 
-	// If any stage already has HEALTHCHECK CMD, Check() returns nil so
-	// async refinement is unnecessary.
+	// If any stage already has an explicit HEALTHCHECK (CMD or NONE),
+	// Check() returns nil so async refinement is unnecessary.
 	for i := range input.Stages {
-		if stageHasHealthcheckCmd(&input.Stages[i]) {
+		if stageHasExplicitHealthcheck(&input.Stages[i]) {
 			return nil
 		}
 	}
@@ -204,20 +205,16 @@ func (h *healthcheckHandler) OnSuccess(resolved any) []any {
 	return out
 }
 
-// stageHasHealthcheckCmd reports whether the last HEALTHCHECK instruction in a
-// stage is a CMD (not NONE). Docker only honours the final HEALTHCHECK, so we
-// must scan all commands rather than returning on the first match.
-func stageHasHealthcheckCmd(stage *instructions.Stage) bool {
-	last := ""
+// stageHasExplicitHealthcheck reports whether a stage contains any HEALTHCHECK
+// instruction (CMD or NONE). HEALTHCHECK NONE is a deliberate opt-out and
+// counts as "addressed" for DL3057 purposes.
+func stageHasExplicitHealthcheck(stage *instructions.Stage) bool {
 	for _, cmd := range stage.Commands {
-		if hc, ok := cmd.(*instructions.HealthCheckCommand); ok {
-			if hc.Health != nil && hc.Health.Test != nil &&
-				len(hc.Health.Test) > 0 {
-				last = hc.Health.Test[0]
-			}
+		if _, ok := cmd.(*instructions.HealthCheckCommand); ok {
+			return true
 		}
 	}
-	return last != "" && last != "NONE"
+	return false
 }
 
 // healthcheckNoneLocation returns the location of the last HEALTHCHECK
