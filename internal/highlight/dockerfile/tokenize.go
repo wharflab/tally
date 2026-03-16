@@ -8,6 +8,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/highlight/core"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -418,6 +419,13 @@ func heredocTokens(line string, lineNum int) []core.Token {
 }
 
 func commentTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []core.Token {
+	directiveComments := make(map[int]sourcemap.Comment)
+	for _, comment := range sm.Comments() {
+		if comment.IsDirective {
+			directiveComments[comment.Line] = comment
+		}
+	}
+
 	out := make([]core.Token, 0)
 	for i, line := range sm.Lines() {
 		if excludedLines[i] {
@@ -426,6 +434,12 @@ func commentTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []core.T
 		trimmed := strings.TrimLeft(line, " \t")
 		if !strings.HasPrefix(trimmed, "#") {
 			continue
+		}
+		if _, ok := directiveComments[i]; ok {
+			if directiveTokens := directiveCommentTokens(line, i, trimmed); len(directiveTokens) > 0 {
+				out = append(out, directiveTokens...)
+				continue
+			}
 		}
 		start := utf8.RuneCountInString(line[:len(line)-len(trimmed)])
 		out = append(out, core.Token{
@@ -438,6 +452,54 @@ func commentTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []core.T
 		})
 	}
 	return out
+}
+
+func directiveCommentTokens(line string, lineNum int, text string) []core.Token {
+	indentBytes := len(line) - len(strings.TrimLeft(line, " \t"))
+	lexed := directive.LexComment(text)
+	if len(lexed) == 0 {
+		return nil
+	}
+
+	out := make([]core.Token, 0, len(lexed))
+	for _, tok := range lexed {
+		typ, priority := directiveSemanticType(tok.Kind)
+		out = append(out, byteRangeToken(line, lineNum, indentBytes+tok.StartByte, indentBytes+tok.EndByte, typ, priority))
+	}
+	return out
+}
+
+func byteRangeToken(
+	line string,
+	lineNum int,
+	startByte int,
+	endByte int,
+	typ core.TokenType,
+	priority int,
+) core.Token {
+	startCol, endCol := core.RuneColsForByteRange(line, startByte, endByte)
+	return core.Token{
+		Line:     lineNum,
+		StartCol: startCol,
+		EndCol:   endCol,
+		Type:     typ,
+		Priority: priority,
+	}
+}
+
+func directiveSemanticType(kind directive.CommentTokenKind) (core.TokenType, int) {
+	switch kind {
+	case directive.CommentTokenKeyword:
+		return core.TokenKeyword, 34
+	case directive.CommentTokenOperator:
+		return core.TokenOperator, 33
+	case directive.CommentTokenRule:
+		return core.TokenProperty, 32
+	case directive.CommentTokenValue:
+		return core.TokenString, 31
+	default:
+		return core.TokenString, 31
+	}
 }
 
 func fallbackLineTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool, escapeToken rune) []core.Token {

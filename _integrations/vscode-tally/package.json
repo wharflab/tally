@@ -159,38 +159,60 @@
         "language": "dockerfile",
         "scopes": {
           "keyword": [
+            "keyword.other.special-method.from.dockerfile",
+            "keyword.other.special-method.as.dockerfile",
+            "keyword.other.special-method.dockerfile",
+            "keyword.control.onbuild.dockerfile",
+            "keyword.control.heredoc-token.shell.dockerfile",
+            "keyword.control.shell.dockerfile",
             "keyword.control.dockerfile",
             "keyword.control"
           ],
           "comment.documentation": [
             "comment.line.number-sign.dockerfile",
+            "comment.line.number-sign.shell.dockerfile",
             "comment.line.number-sign",
             "comment"
           ],
           "comment": [
             "comment.line.number-sign.dockerfile",
+            "comment.line.number-sign.shell.dockerfile",
             "comment.line.number-sign",
             "comment"
           ],
           "string": [
             "string.quoted.double.dockerfile",
             "string.quoted.single.dockerfile",
+            "string.unquoted.dockerfile",
+            "string.unquoted.heredoc.shell.dockerfile",
             "string"
           ],
           "number": [
+            "constant.numeric.version.dockerfile",
             "constant.numeric.dockerfile",
             "constant.numeric"
           ],
           "operator": [
+            "keyword.operator.assignment.dockerfile",
+            "keyword.operator.assignment.shell.dockerfile",
+            "keyword.operator.heredoc.shell.dockerfile",
+            "keyword.operator.redirect.shell.dockerfile",
+            "keyword.operator.pipe.shell.dockerfile",
+            "keyword.operator.logical.shell.dockerfile",
             "keyword.operator.dockerfile",
             "keyword.operator"
           ],
           "variable": [
+            "variable.other.dockerfile",
+            "variable.other.normal.shell.dockerfile",
+            "variable.other.assignment.dockerfile",
             "variable.other.readwrite.dockerfile",
             "variable.other.readwrite",
             "variable"
           ],
           "variable.declaration": [
+            "entity.name.image.stage.dockerfile",
+            "variable.other.assignment.dockerfile",
             "variable.other.constant.dockerfile",
             "variable.other.constant",
             "variable"
@@ -208,6 +230,7 @@
             "variable.other.constant.property"
           ],
           "function": [
+            "support.function.builtin.shell.dockerfile",
             "entity.name.function.dockerfile",
             "entity.name.function",
             "support.function"
