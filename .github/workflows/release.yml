@@ -10,7 +10,6 @@ on:
       - ".github/macos-entitlements.plist"
       - "scripts/release/**"
       - "packaging/**"
-      - "_integrations/**"
       - "Makefile"
   workflow_dispatch:
     inputs:
