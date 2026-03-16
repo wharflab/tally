@@ -661,16 +661,26 @@ jobs:
               echo "- $t"
             done
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Generate and attest SBOMs
+        run: |
+          set -euo pipefail
+          IMAGE_REPO="${{ steps.assemble.outputs.image_repo }}"
+          DIGEST="${{ steps.assemble.outputs.digest }}"
+
+          # Attest each platform image
+          docker buildx imagetools inspect --raw "${IMAGE_REPO}@${DIGEST}" \
+            | jq -r '.manifests[] | select(.annotations == null or (.annotations["vnd.docker.reference.type"] == null)) | "\(.platform.os)/\(.platform.architecture) \(.digest)"' \
+            | while read -r platform digest; do
+                echo "Generating SBOM for ${platform} (${digest})..."
+                syft "${IMAGE_REPO}@${digest}" -o spdx-json=sbom.spdx.json
+                cosign attest --yes --predicate sbom.spdx.json \
+                  --type spdxjson "${IMAGE_REPO}@${digest}"
+                rm -f sbom.spdx.json
+              done
       - name: Sign container image
         run: |
           cosign sign --yes --recursive \
             "${{ steps.assemble.outputs.image_repo }}@${{ steps.assemble.outputs.digest }}"
-      - name: Generate and attest SBOM
-        run: |
-          IMAGE="${{ steps.assemble.outputs.image_repo }}@${{ steps.assemble.outputs.digest }}"
-          syft "${IMAGE}" -o spdx-json=sbom.spdx.json
-          cosign attest --yes --recursive --predicate sbom.spdx.json \
-            --type spdxjson "${IMAGE}"
   build-vscode-vsix:
     needs: publish-release
     runs-on: ubuntu-latest
