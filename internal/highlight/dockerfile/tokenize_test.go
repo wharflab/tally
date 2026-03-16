@@ -128,6 +128,43 @@ func TestTokenize_OnlyHighlightsStageAliasOnFrom(t *testing.T) {
 	assertNoTokenText(t, string(source), tokens, core.TokenVariable, "value")
 }
 
+func TestTokenize_DirectiveCommentsAreStructured(t *testing.T) {
+	t.Parallel()
+
+	source := []byte(strings.Join([]string{
+		"# syntax=docker/dockerfile:1.10",
+		"# escape=`",
+		"# check=skip=DL3006,DL3008",
+		"# tally global ignore=max-lines;reason=kept for compatibility",
+		"# ordinary comment",
+		"",
+	}, "\n"))
+	sm := sourcemap.New(source)
+
+	tokens := Tokenize(sm, nil, '\\')
+
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "syntax")
+	assertHasTokenText(t, string(source), tokens, core.TokenString, "docker/dockerfile:1.10")
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "escape")
+	assertHasTokenText(t, string(source), tokens, core.TokenString, "`")
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "check")
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "skip")
+	assertHasTokenText(t, string(source), tokens, core.TokenProperty, "DL3006")
+	assertHasTokenText(t, string(source), tokens, core.TokenProperty, "DL3008")
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "tally")
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "global")
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "ignore")
+	assertHasTokenText(t, string(source), tokens, core.TokenProperty, "max-lines")
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "reason")
+	assertHasTokenText(t, string(source), tokens, core.TokenString, "kept for compatibility")
+	assertHasTokenText(t, string(source), tokens, core.TokenComment, "# ordinary comment")
+
+	assertNoTokenText(t, string(source), tokens, core.TokenComment, "# syntax=docker/dockerfile:1.10")
+	assertNoTokenText(t, string(source), tokens, core.TokenComment, "# escape=`")
+	assertNoTokenText(t, string(source), tokens, core.TokenComment, "# check=skip=DL3006,DL3008")
+	assertNoTokenText(t, string(source), tokens, core.TokenComment, "# tally global ignore=max-lines;reason=kept for compatibility")
+}
+
 func assertTokenText(t *testing.T, line string, tok core.Token, want string) {
 	t.Helper()
 	got := string([]rune(line)[tok.StartCol:tok.EndCol])

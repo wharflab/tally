@@ -21,6 +21,19 @@ var (
 	instructionPattern = regexp.MustCompile(`^\s*([A-Za-z][A-Za-z0-9_-]*)\b`)
 )
 
+var directiveKeywords = map[string]struct{}{
+	"check":       {},
+	"escape":      {},
+	"global":      {},
+	"hadolint":    {},
+	"ignore":      {},
+	"reason":      {},
+	command.Shell: {},
+	"skip":        {},
+	"syntax":      {},
+	"tally":       {},
+}
+
 func Tokenize(sm *sourcemap.SourceMap, root *parser.Node, escapeToken rune) []core.Token {
 	if sm == nil {
 		return nil
@@ -418,6 +431,13 @@ func heredocTokens(line string, lineNum int) []core.Token {
 }
 
 func commentTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []core.Token {
+	directiveLines := make(map[int]bool)
+	for _, comment := range sm.Comments() {
+		if comment.IsDirective {
+			directiveLines[comment.Line] = true
+		}
+	}
+
 	out := make([]core.Token, 0)
 	for i, line := range sm.Lines() {
 		if excludedLines[i] {
@@ -426,6 +446,12 @@ func commentTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []core.T
 		trimmed := strings.TrimLeft(line, " \t")
 		if !strings.HasPrefix(trimmed, "#") {
 			continue
+		}
+		if directiveLines[i] {
+			if directive := directiveCommentTokens(line, i); len(directive) > 0 {
+				out = append(out, directive...)
+				continue
+			}
 		}
 		start := utf8.RuneCountInString(line[:len(line)-len(trimmed)])
 		out = append(out, core.Token{
@@ -438,6 +464,145 @@ func commentTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool) []core.T
 		})
 	}
 	return out
+}
+
+func directiveCommentTokens(line string, lineNum int) []core.Token {
+	hashByte := strings.IndexByte(line, '#')
+	if hashByte < 0 {
+		return nil
+	}
+	start := hashByte + 1
+	for start < len(line) && (line[start] == ' ' || line[start] == '\t') {
+		start++
+	}
+	if start >= len(line) {
+		return nil
+	}
+
+	out := make([]core.Token, 0, 8)
+	lastKeyword := ""
+	for i := start; i < len(line); {
+		switch line[i] {
+		case ' ', '\t', ',', ';':
+			i++
+			continue
+		case '=':
+			out = append(out, byteRangeToken(line, lineNum, i, i+1, core.TokenOperator, 33))
+			i++
+
+			switch lastKeyword {
+			case "ignore", "skip":
+				valueTokens, next := directivePropertyTokens(line, lineNum, i)
+				out = append(out, valueTokens...)
+				i = next
+			case "syntax", "escape", command.Shell, "reason":
+				if value, next, ok := directiveValueToken(line, lineNum, i); ok {
+					out = append(out, value)
+					i = next
+				}
+			}
+			lastKeyword = ""
+			continue
+		}
+
+		if isDirectiveWordStart(line[i]) {
+			wordStart := i
+			i++
+			for i < len(line) && isDirectiveWordChar(line[i]) {
+				i++
+			}
+
+			word := strings.ToLower(line[wordStart:i])
+			if _, ok := directiveKeywords[word]; ok {
+				out = append(out, byteRangeToken(line, lineNum, wordStart, i, core.TokenKeyword, 34))
+				lastKeyword = word
+				continue
+			}
+		}
+
+		i++
+	}
+
+	return out
+}
+
+func directivePropertyTokens(line string, lineNum, start int) ([]core.Token, int) {
+	i := start
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+
+	end := i
+	for end < len(line) && line[end] != ';' {
+		end++
+	}
+
+	out := make([]core.Token, 0, 4)
+	for j := i; j < end; {
+		if isDirectiveValueChar(line[j]) {
+			tokenStart := j
+			j++
+			for j < end && isDirectiveValueChar(line[j]) {
+				j++
+			}
+			out = append(out, byteRangeToken(line, lineNum, tokenStart, j, core.TokenProperty, 32))
+			continue
+		}
+		j++
+	}
+	return out, end
+}
+
+func directiveValueToken(line string, lineNum, start int) (core.Token, int, bool) {
+	i := start
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+	if i >= len(line) {
+		return core.Token{}, i, false
+	}
+
+	end := len(line)
+	if semicolon := strings.IndexByte(line[i:], ';'); semicolon >= 0 {
+		end = i + semicolon
+	}
+	for end > i && (line[end-1] == ' ' || line[end-1] == '\t') {
+		end--
+	}
+	if end <= i {
+		return core.Token{}, end, false
+	}
+	return byteRangeToken(line, lineNum, i, end, core.TokenString, 31), end, true
+}
+
+func byteRangeToken(
+	line string,
+	lineNum int,
+	startByte int,
+	endByte int,
+	typ core.TokenType,
+	priority int,
+) core.Token {
+	startCol, endCol := core.RuneColsForByteRange(line, startByte, endByte)
+	return core.Token{
+		Line:     lineNum,
+		StartCol: startCol,
+		EndCol:   endCol,
+		Type:     typ,
+		Priority: priority,
+	}
+}
+
+func isDirectiveWordStart(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
+
+func isDirectiveWordChar(b byte) bool {
+	return isDirectiveWordStart(b) || (b >= '0' && b <= '9') || b == '-'
+}
+
+func isDirectiveValueChar(b byte) bool {
+	return isDirectiveWordChar(b) || b == '.' || b == '/' || b == '_'
 }
 
 func fallbackLineTokens(sm *sourcemap.SourceMap, excludedLines map[int]bool, escapeToken rune) []core.Token {
