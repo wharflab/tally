@@ -165,6 +165,22 @@ func TestTokenize_DirectiveCommentsAreStructured(t *testing.T) {
 	assertNoTokenText(t, string(source), tokens, core.TokenComment, "# tally global ignore=max-lines;reason=kept for compatibility")
 }
 
+func TestTokenize_DirectiveReasonAllowsSemicolons(t *testing.T) {
+	t.Parallel()
+
+	source := []byte("# tally ignore=DL3006;reason=kept;for later\n")
+	sm := sourcemap.New(source)
+
+	tokens := Tokenize(sm, nil, '\\')
+
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "tally")
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "ignore")
+	assertHasTokenText(t, string(source), tokens, core.TokenProperty, "DL3006")
+	assertHasTokenText(t, string(source), tokens, core.TokenKeyword, "reason")
+	assertHasTokenText(t, string(source), tokens, core.TokenString, "kept;for later")
+	assertNoTokenText(t, string(source), tokens, core.TokenString, "kept")
+}
+
 func assertTokenText(t *testing.T, line string, tok core.Token, want string) {
 	t.Helper()
 	got := string([]rune(line)[tok.StartCol:tok.EndCol])
