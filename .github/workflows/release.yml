@@ -666,11 +666,12 @@ jobs:
         run: |
           cosign sign --yes --recursive \
             "${{ steps.assemble.outputs.image_repo }}@${{ steps.assemble.outputs.digest }}"
-      - name: Generate and attach SBOM
+      - name: Generate and attest SBOM
         run: |
           IMAGE="${{ steps.assemble.outputs.image_repo }}@${{ steps.assemble.outputs.digest }}"
           syft "${IMAGE}" -o spdx-json=sbom.spdx.json
-          cosign attach sbom --sbom sbom.spdx.json "${IMAGE}"
+          cosign attest --yes --recursive --predicate sbom.spdx.json \
+            --type spdxjson "${IMAGE}"
   build-vscode-vsix:
     needs: publish-release
     runs-on: ubuntu-latest
