@@ -16,21 +16,23 @@ import (
 
 // DL3057Rule implements the DL3057 linting rule.
 //
-// Fast path (static): If no stage in the Dockerfile contains a HEALTHCHECK CMD
-// instruction, emits a single file-level violation (StageIndex = -1). This is
-// conservative — it may be a false positive when a base image already defines
-// HEALTHCHECK, since Docker inherits it at runtime.
+// Fast path (static): If no stage in the Dockerfile contains an explicit
+// HEALTHCHECK instruction (CMD or NONE), emits a single file-level violation
+// (StageIndex = -1). HEALTHCHECK NONE counts as a deliberate opt-out and
+// suppresses the violation. This is conservative — it may still be a false
+// positive when a base image already defines HEALTHCHECK, since Docker
+// inherits it at runtime.
 //
 // Async path (registry-backed): For each external base image, checks whether it
 // defines a HEALTHCHECK. If so, emits CompletedCheck to suppress the fast-path
-// violation. Additionally detects useless HEALTHCHECK NONE instructions when the
-// base image has no healthcheck to disable.
+// violation. The async path is skipped entirely when any explicit HEALTHCHECK
+// instruction (CMD or NONE) is present, since the fast path already handles it.
 //
 // Cross-rule interactions:
 //   - buildkit/MultipleInstructionsDisallowed: flags duplicate HEALTHCHECK
-//     instructions in a single stage. DL3057 honours Docker semantics by
-//     evaluating only the last HEALTHCHECK per stage, so both rules may
-//     fire together when duplicates exist.
+//     instructions in a single stage. DL3057 treats any explicit HEALTHCHECK
+//     as addressing the requirement, so it may be suppressed while the
+//     duplicate instruction warning still fires.
 //   - ONBUILD HEALTHCHECK: BuildKit parses this as an OnbuildCommand wrapping
 //     a HealthCheckCommand. DL3057 does not inspect ONBUILD triggers, so
 //     ONBUILD HEALTHCHECK CMD does not satisfy the "has healthcheck" check.
@@ -58,9 +60,10 @@ func (r *DL3057Rule) Metadata() rules.RuleMetadata {
 
 // Check implements the fast path for DL3057.
 //
-// If any stage contains a HEALTHCHECK CMD (not NONE), no violation is reported.
-// Otherwise, a single file-level violation with StageIndex=-1 is emitted. The
-// async path may later suppress this if a base image provides HEALTHCHECK.
+// If any stage contains an explicit HEALTHCHECK instruction (CMD or NONE), no
+// violation is reported. Otherwise, a single file-level violation with
+// StageIndex=-1 is emitted. The async path may later suppress this if a base
+// image provides HEALTHCHECK.
 func (r *DL3057Rule) Check(input rules.LintInput) []rules.Violation {
 	sem, ok := input.Semantic.(*semantic.Model)
 	if !ok || sem == nil {
@@ -85,7 +88,7 @@ func (r *DL3057Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	// No HEALTHCHECK CMD anywhere — emit a file-level violation.
+	// No explicit HEALTHCHECK anywhere — emit a file-level violation.
 	meta := r.Metadata()
 	loc := rules.NewFileLocation(input.File)
 	v := rules.NewViolation(
