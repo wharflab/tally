@@ -271,6 +271,17 @@ func (sm *SourceMap) EffectiveStartLine(startLine int, prevComments []string) in
 	return result
 }
 
+// HasBlankLineBetween reports whether any blank line exists strictly between
+// startLine and endLine (both 1-based, exclusive on both ends).
+func (sm *SourceMap) HasBlankLineBetween(startLine, endLine int) bool {
+	for line := startLine + 1; line < endLine; line++ {
+		if strings.TrimSpace(sm.Line(line-1)) == "" {
+			return true
+		}
+	}
+	return false
+}
+
 // CommentsForLine returns all comments that appear immediately before a line.
 // This matches BuildKit's PrevComment behavior where comments are associated
 // with the following instruction.
