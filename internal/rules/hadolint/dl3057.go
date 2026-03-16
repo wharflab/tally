@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/async"
 	"github.com/wharflab/tally/internal/registry"
@@ -129,26 +128,20 @@ func (r *DL3057Rule) PlanAsync(input rules.LintInput) []async.CheckRequest {
 	meta := r.Metadata()
 	return asyncutil.PlanExternalImageChecks(input, meta, func(
 		m rules.RuleMetadata,
-		info *semantic.StageInfo,
+		_ *semantic.StageInfo,
 		file, _ string,
 	) async.ResultHandler {
 		return &healthcheckHandler{
-			meta:     m,
-			file:     file,
-			stageIdx: info.Index,
-			semantic: sem,
-			stages:   input.Stages,
+			meta: m,
+			file: file,
 		}
 	})
 }
 
 // healthcheckHandler processes resolved image config for HEALTHCHECK detection.
 type healthcheckHandler struct {
-	meta     rules.RuleMetadata
-	file     string
-	stageIdx int
-	semantic *semantic.Model
-	stages   []instructions.Stage
+	meta rules.RuleMetadata
+	file string
 }
 
 func (h *healthcheckHandler) OnSuccess(resolved any) []any {
@@ -157,52 +150,19 @@ func (h *healthcheckHandler) OnSuccess(resolved any) []any {
 		return nil
 	}
 
-	out := make([]any, 0)
-
 	if cfg.HasHealthcheck {
 		// Base image has HEALTHCHECK — suppress the file-level fast violation.
-		out = append(out, async.CompletedCheck{
+		return []any{async.CompletedCheck{
 			RuleCode:   h.meta.Code,
 			File:       h.file,
 			StageIndex: -1, // Matches the fast-path violation's StageIndex
-		})
-		return out
+		}}
 	}
 
-	// Base image has no HEALTHCHECK. Check this stage and descendants for
-	// useless HEALTHCHECK NONE instructions.
-	descendants := h.semantic.FromDescendants(h.stageIdx, nil)
-	allStages := append([]int{h.stageIdx}, descendants...)
-
-	for _, idx := range allStages {
-		if idx < 0 || idx >= len(h.stages) {
-			continue
-		}
-		if loc := healthcheckNoneLocation(&h.stages[idx]); loc != nil {
-			// HEALTHCHECK NONE with no inherited HC to disable — useless.
-			v := rules.NewViolation(
-				rules.NewLocationFromRanges(h.file, loc),
-				h.meta.Code,
-				"`HEALTHCHECK NONE` has no effect: base image has no health check to disable",
-				h.meta.DefaultSeverity,
-			).WithDocURL(h.meta.DocURL)
-			v.StageIndex = idx
-
-			// Suppress the generic "missing" violation since we have a specific one.
-			out = append(out,
-				async.CompletedCheck{
-					RuleCode:   h.meta.Code,
-					File:       h.file,
-					StageIndex: -1,
-				},
-				v,
-			)
-		}
-	}
-
-	// Don't emit CompletedCheck(-1) when base has no HC and no HEALTHCHECK NONE:
-	// the fast-path "missing" violation should remain.
-	return out
+	// Base has no HEALTHCHECK and no explicit opt-out exists (PlanAsync
+	// already short-circuits when HEALTHCHECK NONE is present), so the
+	// fast-path "missing" violation should remain.
+	return nil
 }
 
 // stageHasExplicitHealthcheck reports whether a stage contains any HEALTHCHECK
@@ -215,26 +175,6 @@ func stageHasExplicitHealthcheck(stage *instructions.Stage) bool {
 		}
 	}
 	return false
-}
-
-// healthcheckNoneLocation returns the location of the last HEALTHCHECK
-// instruction in a stage if it is NONE, or nil otherwise. Docker only honours
-// the final HEALTHCHECK, so earlier instructions are irrelevant.
-func healthcheckNoneLocation(stage *instructions.Stage) []parser.Range {
-	var lastLoc []parser.Range
-	for _, cmd := range stage.Commands {
-		if hc, ok := cmd.(*instructions.HealthCheckCommand); ok {
-			if hc.Health != nil && hc.Health.Test != nil &&
-				len(hc.Health.Test) > 0 {
-				if hc.Health.Test[0] == "NONE" {
-					lastLoc = hc.Location()
-				} else {
-					lastLoc = nil // CMD overrides earlier NONE
-				}
-			}
-		}
-	}
-	return lastLoc
 }
 
 // shouldSuppressHealthcheck returns true when the Dockerfile shows strong
