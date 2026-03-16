@@ -76,6 +76,18 @@ func (r *newlineResolver) Resolve(_ context.Context, resolveCtx ResolveContext, 
 			}
 		}
 
+		// When preceding comments exist, blank lines within the comment
+		// block (between comments and the instruction) still provide
+		// visual separation from the previous instruction.
+		if gap < wantGap && len(curr.PrevComment) > 0 {
+			for line := prevEndLine + 1; line < curr.StartLine; line++ {
+				if strings.TrimSpace(sm.Line(line-1)) == "" {
+					gap = max(gap, 1)
+					break
+				}
+			}
+		}
+
 		if gap == wantGap {
 			continue
 		}
