@@ -3,6 +3,7 @@ package semantic
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/wharflab/tally/internal/shell"
@@ -182,13 +183,8 @@ ENTRYPOINT cmd /c echo hi
 			}
 
 			wantShell := DefaultWindowsShell()
-			if len(info.ShellSetting.Shell) != len(wantShell) {
+			if !slices.Equal(info.ShellSetting.Shell, wantShell) {
 				t.Fatalf("expected shell %v, got %v", wantShell, info.ShellSetting.Shell)
-			}
-			for i, part := range wantShell {
-				if info.ShellSetting.Shell[i] != part {
-					t.Fatalf("expected shell[%d]=%q, got %q", i, part, info.ShellSetting.Shell[i])
-				}
 			}
 		})
 	}
@@ -214,13 +210,8 @@ func TestBuilderRealWorldTeamCityNanoServerFixtureInfersWindowsSecondStage(t *te
 	}
 
 	wantShell := DefaultWindowsShell()
-	if len(info.ShellSetting.Shell) != len(wantShell) {
+	if !slices.Equal(info.ShellSetting.Shell, wantShell) {
 		t.Fatalf("expected shell %v, got %v", wantShell, info.ShellSetting.Shell)
-	}
-	for i, part := range wantShell {
-		if info.ShellSetting.Shell[i] != part {
-			t.Fatalf("expected shell[%d]=%q, got %q", i, part, info.ShellSetting.Shell[i])
-		}
 	}
 }
 
