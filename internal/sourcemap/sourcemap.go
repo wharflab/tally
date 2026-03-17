@@ -271,6 +271,81 @@ func (sm *SourceMap) EffectiveStartLine(startLine int, prevComments []string) in
 	return result
 }
 
+// HasBlankLineBetween reports whether any blank line exists strictly between
+// startLine and endLine (both 1-based, exclusive on both ends).
+func (sm *SourceMap) HasBlankLineBetween(startLine, endLine int) bool {
+	if endLine-startLine <= 1 {
+		return false
+	}
+	start := max(startLine+1, 1)
+	end := min(endLine-1, sm.LineCount())
+	if start > end {
+		return false
+	}
+	for line := start; line <= end; line++ {
+		if strings.TrimSpace(sm.Line(line-1)) == "" {
+			return true
+		}
+	}
+	return false
+}
+
+// NewlineGap describes the computed and desired gap between two adjacent
+// Dockerfile instructions, used by both the lint rule and fix resolver.
+type NewlineGap struct {
+	Gap     int  // actual number of blank lines
+	WantGap int  // desired number of blank lines for the mode
+	Skip    bool // caller should skip this pair entirely
+}
+
+// ComputeNewlineGap computes the actual and desired blank-line gap between two
+// adjacent instructions. prevEndLine is the resolved 1-based end line of the
+// previous instruction. currStartLine is the 1-based start line of the current
+// instruction. prevValue and currValue are the instruction keywords (e.g. "from",
+// "env"). currPrevComment is the PrevComment slice from the current AST node.
+// mode is "grouped", "always", or "never".
+func (sm *SourceMap) ComputeNewlineGap(
+	prevEndLine, currStartLine int,
+	prevValue, currValue string,
+	currPrevComment []string,
+	mode string,
+) NewlineGap {
+	currEffectiveStart := sm.EffectiveStartLine(currStartLine, currPrevComment)
+	gap := currEffectiveStart - prevEndLine - 1
+
+	var wantGap int
+	switch mode {
+	case "always":
+		if gap >= 1 {
+			return NewlineGap{Gap: gap, WantGap: 1, Skip: true}
+		}
+		wantGap = 1
+	case "never":
+		wantGap = 0
+	default: // "grouped"
+		sameType := strings.EqualFold(prevValue, currValue)
+		if sameType && len(currPrevComment) > 0 {
+			return NewlineGap{Skip: true}
+		}
+		if sameType {
+			wantGap = 0
+		} else {
+			wantGap = 1
+		}
+	}
+
+	// When preceding comments exist, blank lines within the comment
+	// block (between comments and the instruction) still provide
+	// visual separation from the previous instruction.
+	if gap < wantGap && len(currPrevComment) > 0 {
+		if sm.HasBlankLineBetween(prevEndLine, currStartLine) {
+			gap = max(gap, 1)
+		}
+	}
+
+	return NewlineGap{Gap: gap, WantGap: wantGap}
+}
+
 // CommentsForLine returns all comments that appear immediately before a line.
 // This matches BuildKit's PrevComment behavior where comments are associated
 // with the following instruction.

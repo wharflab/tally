@@ -103,3 +103,42 @@ func TestEffectiveStartLine(t *testing.T) {
 		})
 	}
 }
+
+func TestHasBlankLineBetween(t *testing.T) {
+	t.Parallel()
+
+	// Source (1-based lines):
+	// 1: FROM alpine
+	// 2: # comment
+	// 3: (blank)
+	// 4: ENV FOO=bar
+	source := "FROM alpine\n# comment\n\nENV FOO=bar\n"
+	sm := New([]byte(source))
+
+	tests := []struct {
+		name      string
+		startLine int
+		endLine   int
+		want      bool
+	}{
+		{"blank between comment and instruction", 2, 4, true},
+		{"no blank between instruction and comment", 1, 2, false},
+		{"adjacent lines", 1, 2, false},
+		{"same line", 3, 3, false},
+		{"inverted range", 4, 1, false},
+		{"out of range high", 1, 100, true},
+		{"out of range low", -5, 4, true},
+		{"both out of range no lines", 100, 200, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := sm.HasBlankLineBetween(tt.startLine, tt.endLine)
+			if got != tt.want {
+				t.Errorf("HasBlankLineBetween(%d, %d) = %v, want %v",
+					tt.startLine, tt.endLine, got, tt.want)
+			}
+		})
+	}
+}

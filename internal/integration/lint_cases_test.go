@@ -870,6 +870,12 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/newline-between-instructions")...),
 			wantExit: 1,
 		},
+		{
+			name:     "newline-between-instructions-comment-gap",
+			dir:      "newline-between-instructions-comment-gap",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/newline-between-instructions")...),
+			wantExit: 0,
+		},
 
 		// No trailing spaces tests (isolated to no-trailing-spaces rule)
 		{
