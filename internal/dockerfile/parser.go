@@ -368,6 +368,71 @@ func RunCommandString(run *instructions.RunCommand) string {
 	return strings.Join(run.CmdLine, " ")
 }
 
+// RunScript extracts the shell script content from a RUN instruction.
+// For heredoc RUNs it returns the heredoc body. For regular RUNs it returns
+// the parsed command line, which excludes Dockerfile-level RUN flags.
+func RunScript(run *instructions.RunCommand) string {
+	if len(run.Files) > 0 && run.Files[0].Data != "" {
+		return run.Files[0].Data
+	}
+	return RunCommandString(run)
+}
+
+// RunResolvedSource combines the original RUN source with the resolved shell
+// script span inside that source. ScriptIndex is the byte offset where Script
+// begins within Source, and StartLine is the 1-based line of Source's first line.
+//
+// This is useful for fix logic that must rewrite the shell script while
+// preserving Dockerfile-level RUN flags like --mount/--network/--security.
+type RunResolvedSource struct {
+	Source      string
+	Script      string
+	ScriptIndex int
+	StartLine   int
+}
+
+// ResolveRunSource returns the original source text for a RUN instruction and
+// the byte offset where the parsed shell script begins within that source.
+// The parsed script comes from RunScript(run), so Dockerfile-level RUN flags
+// are excluded from Script and from the returned ScriptIndex.
+func ResolveRunSource(run *instructions.RunCommand, sm *sourcemap.SourceMap) (RunResolvedSource, bool) {
+	runLoc := run.Location()
+	if len(runLoc) == 0 {
+		return RunResolvedSource{}, false
+	}
+
+	startLine := runLoc[0].Start.Line
+	endLine := runLoc[len(runLoc)-1].End.Line
+
+	var lines []string
+	for lineIdx := startLine - 1; lineIdx < endLine; lineIdx++ {
+		if lineIdx >= 0 && lineIdx < sm.LineCount() {
+			lines = append(lines, sm.Line(lineIdx))
+		}
+	}
+	if len(lines) == 0 {
+		return RunResolvedSource{}, false
+	}
+
+	source := strings.Join(lines, "\n")
+	script := RunScript(run)
+	if script == "" {
+		return RunResolvedSource{}, false
+	}
+
+	scriptIdx := strings.Index(source, script)
+	if scriptIdx < 0 {
+		return RunResolvedSource{}, false
+	}
+
+	return RunResolvedSource{
+		Source:      source,
+		Script:      script,
+		ScriptIndex: scriptIdx,
+		StartLine:   startLine,
+	}, true
+}
+
 // RunSourceScript extracts the original source for a shell-form RUN instruction
 // and replaces the "RUN " prefix (and "ONBUILD RUN ") with spaces so that column
 // positions from shell.FindCommands on the returned script map directly to

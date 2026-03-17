@@ -199,6 +199,42 @@ RUN py -m pip install -U pip
 	}
 }
 
+func TestPreferShellInstructionRule_FixPreservesRunFlags(t *testing.T) {
+	t.Parallel()
+
+	rule := NewPreferShellInstructionRule()
+	const content = `FROM mcr.microsoft.com/powershell:ubuntu-22.04
+RUN --network=none pwsh -NoLogo -NoProfile -Command "Write-Host hi"
+RUN --mount=type=cache,target=/tmp/cache pwsh -NoLogo -NoProfile -Command Write-Host bye
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	sources := map[string][]byte{"Dockerfile": []byte(content)}
+	fixer := &fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := `FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh","-NoLogo","-NoProfile","-Command","$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN --network=none Write-Host hi
+RUN --mount=type=cache,target=/tmp/cache Write-Host bye
+`
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestPreferShellInstructionRule_NoFixForMixedShellPrefixes(t *testing.T) {
 	t.Parallel()
 

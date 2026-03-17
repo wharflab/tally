@@ -10,8 +10,8 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
 	shellutil "github.com/wharflab/tally/internal/shell"
@@ -537,31 +537,48 @@ func buildRunBodyRewriteEdit(
 	run *instructions.RunCommand,
 	newScript string,
 ) (rules.TextEdit, bool) {
-	runLoc := run.Location()
-	if len(runLoc) == 0 {
+	resolved, ok := dockerfile.ResolveRunSource(run, sm)
+	if !ok {
 		return rules.TextEdit{}, false
 	}
-	if len(run.CmdLine) == 0 {
+	edit := sourceRangeEdit(
+		file,
+		resolved.Source,
+		resolved.StartLine,
+		resolved.ScriptIndex,
+		resolved.ScriptIndex+len(resolved.Script),
+		newScript,
+	)
+	if edit == nil {
 		return rules.TextEdit{}, false
+	}
+	return *edit, true
+}
+
+func sourceRangeEdit(file, source string, startLine, byteStart, byteEnd int, newText string) *rules.TextEdit {
+	if byteStart < 0 || byteEnd > len(source) || byteStart > byteEnd {
+		return nil
 	}
 
-	tail := strings.TrimPrefix(run.String(), "RUN ")
-	flagsPart, found := strings.CutSuffix(tail, run.CmdLine[0])
-	if !found {
-		return rules.TextEdit{}, false
-	}
+	startLineOffset, startCol := byteToLineCol(source, byteStart)
+	endLineOffset, endCol := byteToLineCol(source, byteEnd)
 
-	endLine, endCol := resolveRunEndPosition(runLoc, sm, run)
-	return rules.TextEdit{
-		Location: rules.NewRangeLocation(
-			file,
-			runLoc[0].Start.Line,
-			runLoc[0].Start.Character+4,
-			endLine,
-			endCol,
-		),
-		NewText: flagsPart + newScript,
-	}, true
+	return &rules.TextEdit{
+		Location: rules.NewRangeLocation(file, startLine+startLineOffset, startCol, startLine+endLineOffset, endCol),
+		NewText:  newText,
+	}
+}
+
+func byteToLineCol(s string, offset int) (int, int) {
+	line := 0
+	lineStart := 0
+	for i := range offset {
+		if s[i] == '\n' {
+			line++
+			lineStart = i + 1
+		}
+	}
+	return line, offset - lineStart
 }
 
 func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocation, bool) {
@@ -632,35 +649,6 @@ func leadingIndent(line string) string {
 		i++
 	}
 	return line[:i]
-}
-
-// resolveRunEndPosition computes the end position for a RUN instruction edit range.
-func resolveRunEndPosition(loc []parser.Range, sm *sourcemap.SourceMap, run *instructions.RunCommand) (int, int) {
-	if len(loc) == 0 {
-		return 0, 0
-	}
-
-	lastRange := loc[len(loc)-1]
-	endLine := lastRange.End.Line
-	endCol := lastRange.End.Character
-	startLine := loc[0].Start.Line
-
-	if endCol == 0 && endLine > startLine && sm != nil {
-		endCol = len(sm.Line(endLine - 1))
-	}
-
-	if endLine == loc[0].Start.Line && endCol == loc[0].Start.Character {
-		fullInstr := run.String()
-		lines := strings.Split(fullInstr, "\n")
-		if len(lines) > 1 {
-			endLine = loc[0].Start.Line + len(lines) - 1
-			endCol = len(lines[len(lines)-1])
-		} else {
-			endCol = loc[0].Start.Character + len(fullInstr)
-		}
-	}
-
-	return endLine, endCol
 }
 
 // init registers the rule with the default registry.
