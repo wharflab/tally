@@ -419,7 +419,7 @@ func (b *Builder) processShellCommand(c *instructions.ShellCommand, info *StageI
 	// pwsh is cross-platform and must not imply Windows on its own.
 	if info.BaseImageOS == BaseImageOSUnknown && len(shellCmd) > 0 {
 		switch shell.NormalizeShellExecutableName(shellCmd[0]) {
-		case command.Cmd, "powershell":
+		case windowsCmdShellName, "powershell":
 			info.BaseImageOS = BaseImageOSWindows
 		}
 	}

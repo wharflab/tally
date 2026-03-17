@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/distribution/reference"
-	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
@@ -72,6 +71,9 @@ var DefaultShell = []string{"/bin/sh", "-c"}
 // defaultWindowsShellExe is the Windows cmd.exe executable name used as the
 // default shell for Windows container RUN instructions.
 const defaultWindowsShellExe = "cmd" //nolint:customlint // not a Dockerfile CMD instruction
+
+// windowsCmdShellName is the normalized executable name for the Windows cmd shell.
+const windowsCmdShellName = "cmd" //nolint:customlint // executable name, not Dockerfile CMD instruction
 
 // DefaultWindowsShell returns the default shell for Windows containers.
 // Returns a fresh copy to avoid mutation.
@@ -425,7 +427,7 @@ func addInstructionOSHeuristics(cmd instructions.Command, windowsScore, linuxSco
 
 func addShellSignalScore(shellName string, windowsScore, linuxScore *int) {
 	switch shell.NormalizeShellExecutableName(shellName) {
-	case command.Cmd, "powershell":
+	case windowsCmdShellName, "powershell":
 		*windowsScore += 6
 	case "sh", "bash", "dash", "ash", "zsh", "ksh", "mksh":
 		*linuxScore += 6
