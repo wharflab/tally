@@ -131,3 +131,27 @@ func TestParseExplicitShellInvocation(t *testing.T) {
 		})
 	}
 }
+
+func TestNormalizeShellExecutableName(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{name: "plain cmd", in: "cmd", want: "cmd"},
+		{name: "windows path exe", in: `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`, want: "powershell"},
+		{name: "unix path", in: "/bin/bash", want: "bash"},
+		{name: "mixed case", in: "PwSh.Exe", want: "pwsh"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := NormalizeShellExecutableName(tt.in); got != tt.want {
+				t.Fatalf("NormalizeShellExecutableName(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}

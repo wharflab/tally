@@ -25,7 +25,7 @@ func ParseExplicitShellInvocation(script string) (ExplicitShellInvocation, bool)
 		return ExplicitShellInvocation{}, false
 	}
 
-	shellName := normalizeShellExecutableName(DropQuotes(exeToken))
+	shellName := NormalizeShellExecutableName(DropQuotes(exeToken))
 	variant := VariantFromShell(shellName)
 	if variant == VariantUnknown {
 		return ExplicitShellInvocation{}, false
@@ -114,7 +114,9 @@ func shellInvocationWithRemainder(
 	}, true
 }
 
-func normalizeShellExecutableName(exe string) string {
+// NormalizeShellExecutableName canonicalizes a shell executable path/name to
+// its lowercase basename without a trailing .exe suffix.
+func NormalizeShellExecutableName(exe string) string {
 	exe = strings.ToLower(path.Base(strings.ReplaceAll(exe, `\`, "/")))
 	return strings.TrimSuffix(exe, ".exe")
 }

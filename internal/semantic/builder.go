@@ -418,7 +418,7 @@ func (b *Builder) processShellCommand(c *instructions.ShellCommand, info *StageI
 	// SHELL ["powershell"...] or SHELL ["cmd"...] is a Windows signal.
 	// pwsh is cross-platform and must not imply Windows on its own.
 	if info.BaseImageOS == BaseImageOSUnknown && len(shellCmd) > 0 {
-		switch normalizeShellSignalName(shellCmd[0]) {
+		switch shell.NormalizeShellExecutableName(shellCmd[0]) {
 		case command.Cmd, "powershell":
 			info.BaseImageOS = BaseImageOSWindows
 		}

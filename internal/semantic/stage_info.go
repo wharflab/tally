@@ -424,7 +424,7 @@ func addInstructionOSHeuristics(cmd instructions.Command, windowsScore, linuxSco
 }
 
 func addShellSignalScore(shellName string, windowsScore, linuxScore *int) {
-	switch normalizeShellSignalName(shellName) {
+	switch shell.NormalizeShellExecutableName(shellName) {
 	case command.Cmd, "powershell":
 		*windowsScore += 6
 	case "sh", "bash", "dash", "ash", "zsh", "ksh", "mksh":
@@ -440,11 +440,6 @@ func countTextHints(text string, hints []string) int {
 		}
 	}
 	return count
-}
-
-func normalizeShellSignalName(exe string) string {
-	exe = strings.ToLower(path.Base(strings.ReplaceAll(exe, `\`, "/")))
-	return strings.TrimSuffix(exe, ".exe")
 }
 
 // HasPackage checks if a package was installed in this stage.
