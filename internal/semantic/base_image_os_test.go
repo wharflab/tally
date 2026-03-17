@@ -112,6 +112,20 @@ RUN pwsh -NoLogo -NoProfile -Command "Write-Host hi"
 `,
 			want: BaseImageOSUnknown,
 		},
+		{
+			name: "shell form cmd with powershell wrapper",
+			content: `FROM ${base}
+CMD powershell -Command "Write-Host hi"
+`,
+			want: BaseImageOSWindows,
+		},
+		{
+			name: "shell form entrypoint with cmd wrapper",
+			content: `FROM ${base}
+ENTRYPOINT cmd /c echo hi
+`,
+			want: BaseImageOSWindows,
+		},
 	}
 
 	for _, tt := range tests {
@@ -126,6 +140,55 @@ RUN pwsh -NoLogo -NoProfile -Command "Write-Host hi"
 			got := inferStageOSHeuristically(&pr.Stages[0])
 			if got != tt.want {
 				t.Fatalf("inferStageOSHeuristically() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestBuilderShellFormStartupCommandsCanInferWindows(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{
+			name: "cmd powershell wrapper",
+			content: `FROM ${base}
+CMD powershell -Command "Write-Host hi"
+`,
+		},
+		{
+			name: "entrypoint cmd wrapper",
+			content: `FROM ${base}
+ENTRYPOINT cmd /c echo hi
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			pr := parseDockerfile(t, tt.content)
+			model := NewModel(pr, nil, "Dockerfile")
+
+			info := model.StageInfo(0)
+			if info == nil {
+				t.Fatal("expected stage info")
+			}
+			if !info.IsWindows() {
+				t.Fatalf("expected Windows stage, got %v", info.BaseImageOS)
+			}
+
+			wantShell := DefaultWindowsShell()
+			if len(info.ShellSetting.Shell) != len(wantShell) {
+				t.Fatalf("expected shell %v, got %v", wantShell, info.ShellSetting.Shell)
+			}
+			for i, part := range wantShell {
+				if info.ShellSetting.Shell[i] != part {
+					t.Fatalf("expected shell[%d]=%q, got %q", i, part, info.ShellSetting.Shell[i])
+				}
 			}
 		})
 	}

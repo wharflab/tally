@@ -394,12 +394,24 @@ func addInstructionOSHeuristics(cmd instructions.Command, windowsScore, linuxSco
 		}
 		addShellSignalScore(c.CmdLine[0], windowsScore, linuxScore)
 	case *instructions.CmdCommand:
-		if c.PrependShell || len(c.CmdLine) == 0 {
+		if len(c.CmdLine) == 0 {
+			return
+		}
+		if c.PrependShell {
+			if inv, ok := shell.ParseExplicitShellInvocation(c.CmdLine[0]); ok {
+				addShellSignalScore(inv.ShellName, windowsScore, linuxScore)
+			}
 			return
 		}
 		addShellSignalScore(c.CmdLine[0], windowsScore, linuxScore)
 	case *instructions.EntrypointCommand:
-		if c.PrependShell || len(c.CmdLine) == 0 {
+		if len(c.CmdLine) == 0 {
+			return
+		}
+		if c.PrependShell {
+			if inv, ok := shell.ParseExplicitShellInvocation(c.CmdLine[0]); ok {
+				addShellSignalScore(inv.ShellName, windowsScore, linuxScore)
+			}
 			return
 		}
 		addShellSignalScore(c.CmdLine[0], windowsScore, linuxScore)
