@@ -88,57 +88,17 @@ func (r *NewlineBetweenInstructionsRule) Check(input rules.LintInput) []rules.Vi
 		prev := children[i-1]
 		curr := children[i]
 
-		// Compute end line of previous instruction (including heredocs and continuations).
 		prevEndLine := sm.ResolveEndLine(prev.EndLine)
-
-		// Compute start of current instruction accounting for attached comments.
-		// BuildKit stores preceding comments in PrevComment but the simple
-		// formula (StartLine − len) breaks when blank lines separate
-		// comments from the instruction; scan the source to find the real
-		// position.
-		currEffectiveStart := sm.EffectiveStartLine(curr.StartLine, curr.PrevComment)
-
-		gap := currEffectiveStart - prevEndLine - 1
-
-		var wantGap int
-		switch cfg.Mode {
-		case "always":
-			if gap >= 1 {
-				continue // already has at least one blank line
-			}
-			wantGap = 1
-		case "never":
-			wantGap = 0
-		default: // "grouped"
-			sameType := strings.EqualFold(prev.Value, curr.Value)
-			if sameType && len(curr.PrevComment) > 0 {
-				// A comment between same-type instructions is an
-				// intentional separator; accept any spacing.
-				continue
-			}
-			if sameType {
-				wantGap = 0
-			} else {
-				wantGap = 1
-			}
-		}
-
-		// When preceding comments exist, blank lines within the comment
-		// block (between comments and the instruction) still provide
-		// visual separation from the previous instruction.
-		if gap < wantGap && len(curr.PrevComment) > 0 {
-			if sm.HasBlankLineBetween(prevEndLine, curr.StartLine) {
-				gap = max(gap, 1)
-			}
-		}
-
-		if gap == wantGap {
+		result := sm.ComputeNewlineGap(prevEndLine, curr.StartLine, prev.Value, curr.Value, curr.PrevComment, cfg.Mode)
+		if result.Skip || result.Gap == result.WantGap {
 			continue
 		}
 
 		// Build violation message.
 		prevName := strings.ToUpper(prev.Value)
 		currName := strings.ToUpper(curr.Value)
+		gap := result.Gap
+		wantGap := result.WantGap
 		var message string
 		switch {
 		case gap < wantGap:

@@ -3,7 +3,6 @@ package fix
 import (
 	"bytes"
 	"context"
-	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
@@ -50,53 +49,21 @@ func (r *newlineResolver) Resolve(_ context.Context, resolveCtx ResolveContext, 
 		curr := children[i]
 
 		prevEndLine := sm.ResolveEndLine(prev.EndLine)
-		currEffectiveStart := sm.EffectiveStartLine(curr.StartLine, curr.PrevComment)
-		gap := currEffectiveStart - prevEndLine - 1
-
-		var wantGap int
-		switch data.Mode {
-		case "always":
-			if gap >= 1 {
-				continue
-			}
-			wantGap = 1
-		case "never":
-			wantGap = 0
-		default: // "grouped"
-			sameType := strings.EqualFold(prev.Value, curr.Value)
-			if sameType && len(curr.PrevComment) > 0 {
-				// A comment between same-type instructions is an
-				// intentional separator; accept any spacing.
-				continue
-			}
-			if sameType {
-				wantGap = 0
-			} else {
-				wantGap = 1
-			}
-		}
-
-		// When preceding comments exist, blank lines within the comment
-		// block (between comments and the instruction) still provide
-		// visual separation from the previous instruction.
-		if gap < wantGap && len(curr.PrevComment) > 0 {
-			if sm.HasBlankLineBetween(prevEndLine, curr.StartLine) {
-				gap = max(gap, 1)
-			}
-		}
-
-		if gap == wantGap {
+		result := sm.ComputeNewlineGap(prevEndLine, curr.StartLine, prev.Value, curr.Value, curr.PrevComment, data.Mode)
+		if result.Skip || result.Gap == result.WantGap {
 			continue
 		}
 
-		if gap < wantGap {
+		currEffectiveStart := sm.EffectiveStartLine(curr.StartLine, curr.PrevComment)
+
+		if result.Gap < result.WantGap {
 			edits = append(edits, rules.TextEdit{
 				Location: rules.NewRangeLocation(resolveCtx.FilePath, prevEndLine+1, 0, prevEndLine+1, 0),
 				NewText:  "\n",
 			})
 		} else {
 			edits = append(edits, rules.TextEdit{
-				Location: rules.NewRangeLocation(resolveCtx.FilePath, prevEndLine+1+wantGap, 0, currEffectiveStart, 0),
+				Location: rules.NewRangeLocation(resolveCtx.FilePath, prevEndLine+1+result.WantGap, 0, currEffectiveStart, 0),
 				NewText:  "",
 			})
 		}
