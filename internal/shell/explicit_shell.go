@@ -129,7 +129,14 @@ func NextShellToken(s string, start int) (string, int) {
 	if s[i] == '"' || s[i] == '\'' {
 		quote := s[i]
 		j := i + 1
-		for j < len(s) && s[j] != quote {
+		for j < len(s) {
+			if s[j] == '\\' && j+1 < len(s) {
+				j += 2
+				continue
+			}
+			if s[j] == quote {
+				break
+			}
 			j++
 		}
 		if j < len(s) {
