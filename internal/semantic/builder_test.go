@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
 	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/shell"
 )
@@ -47,6 +49,33 @@ RUN echo "ok"
 	}
 	if info1.ShellSetting.Variant != shell.VariantBash {
 		t.Errorf("expected stage 1 ShellSetting.Variant=%v, got %v", shell.VariantBash, info1.ShellSetting.Variant)
+	}
+}
+
+func TestProcessShellCommandEmptyShellDoesNotPanic(t *testing.T) {
+	t.Parallel()
+
+	b := NewBuilder(nil, nil, "Dockerfile")
+	info := &StageInfo{
+		BaseImageOS: BaseImageOSUnknown,
+		ShellSetting: ShellSetting{
+			Shell:   DefaultShell,
+			Variant: shell.VariantPOSIX,
+			Source:  ShellSourceDefault,
+			Line:    -1,
+		},
+	}
+
+	b.processShellCommand(&instructions.ShellCommand{}, info)
+
+	if info.BaseImageOS != BaseImageOSUnknown {
+		t.Fatalf("expected BaseImageOSUnknown, got %v", info.BaseImageOS)
+	}
+	if info.ShellSetting.Source != ShellSourceInstruction {
+		t.Fatalf("expected shell source %v, got %v", ShellSourceInstruction, info.ShellSetting.Source)
+	}
+	if len(info.ShellSetting.Shell) != 0 {
+		t.Fatalf("expected empty shell setting, got %v", info.ShellSetting.Shell)
 	}
 }
 
