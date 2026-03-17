@@ -180,86 +180,31 @@ func TestFixRealWorldTeamCityNanoServer(t *testing.T) {
 	t.Parallel()
 	testdataDir := filepath.Join("testdata", "real-world-fix-teamcity-nanoserver")
 
-	originalContent, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile"))
+	input, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile"))
 	if err != nil {
-		t.Fatalf("failed to read original Dockerfile: %v", err)
+		t.Fatalf("failed to read fixture: %v", err)
 	}
 
-	tmpDir := t.TempDir()
-	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
-	if err := os.WriteFile(dockerfilePath, originalContent, 0o644); err != nil {
-		t.Fatalf("failed to write Dockerfile: %v", err)
+	stdout, stderr, exitCode := runTallyStdin(t, string(input),
+		"lint",
+		"--config", filepath.Join(testdataDir, ".tally.toml"),
+		"--format", "markdown",
+		"--fix", "--fix-unsafe",
+		"--slow-checks=on",
+		"-",
+	)
+
+	t.Logf("exit=%d\nstdout length=%d\nstderr:\n%s", exitCode, len(stdout), stderr)
+
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d\nstderr:\n%s", exitCode, stderr)
 	}
 
-	configContent, err := os.ReadFile(filepath.Join(testdataDir, ".tally.toml"))
-	if err != nil {
-		t.Fatalf("failed to read config: %v", err)
-	}
-	configPath := filepath.Join(tmpDir, ".tally.toml")
-	if err := os.WriteFile(configPath, configContent, 0o644); err != nil {
-		t.Fatalf("failed to write config: %v", err)
-	}
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, stdout)
+	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, stderr)
 
-	args := []string{"lint", "--config", configPath, "--slow-checks=off", "--fix", "--fix-unsafe", dockerfilePath}
-	cmd := exec.Command(binaryPath, args...)
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
-	output, err := cmd.CombinedOutput()
-	expectExitCode1(t, output, err)
-
-	fixedContent, err := os.ReadFile(dockerfilePath)
-	if err != nil {
-		t.Fatalf("failed to read fixed Dockerfile: %v", err)
-	}
-
-	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
-
-	outputStr := string(output)
-	if !strings.Contains(outputStr, "Fixed") {
-		t.Errorf("expected 'Fixed' in output, got: %s", outputStr)
-	}
-}
-
-// TestFixRealWorldTeamCityNanoServerReport snapshots the full markdown violation
-// report for the TeamCity NanoServer fixture after running auto-fix with all
-// rules enabled.
-func TestFixRealWorldTeamCityNanoServerReport(t *testing.T) {
-	t.Parallel()
-	testdataDir := filepath.Join("testdata", "real-world-fix-teamcity-nanoserver")
-
-	originalContent, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile"))
-	if err != nil {
-		t.Fatalf("failed to read original Dockerfile: %v", err)
-	}
-
-	tmpDir := t.TempDir()
-	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
-	if err := os.WriteFile(dockerfilePath, originalContent, 0o644); err != nil {
-		t.Fatalf("failed to write Dockerfile: %v", err)
-	}
-
-	configContent, err := os.ReadFile(filepath.Join(testdataDir, ".tally.toml"))
-	if err != nil {
-		t.Fatalf("failed to read config: %v", err)
-	}
-	configPath := filepath.Join(tmpDir, ".tally.toml")
-	if err := os.WriteFile(configPath, configContent, 0o644); err != nil {
-		t.Fatalf("failed to write config: %v", err)
-	}
-
-	args := []string{
-		"lint", "--config", configPath, "--format", "markdown", "--slow-checks=on",
-		"--fix", "--fix-unsafe", dockerfilePath,
-	}
-	cmd := exec.Command(binaryPath, args...)
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
-	output, err := cmd.CombinedOutput()
-	expectExitCode1(t, output, err)
-
-	normalizedOutput := strings.ReplaceAll(string(output), dockerfilePath, "<fixture>")
-	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, normalizedOutput)
-
-	if !strings.Contains(normalizedOutput, "Fixed") {
-		t.Errorf("expected 'Fixed' in output, got: %s", output)
+	if !strings.Contains(stderr, "Fixed") {
+		t.Errorf("expected 'Fixed' in stderr, got: %s", stderr)
 	}
 }
 

@@ -1,5 +1,5 @@
-Fixed 2 issues in 1 files
-**9 issues** in `<fixture>`
+Fixed 2 issues
+**9 issues** in `<stdin>`
 
 | Line | Issue |
 |------|-------|
