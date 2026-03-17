@@ -54,6 +54,14 @@ func TestParseExplicitShellInvocation(t *testing.T) {
 			wantOK:         true,
 		},
 		{
+			name:           "unicode whitespace between tokens",
+			script:         "pwsh\u00a0-Command\u00a0\"Write-Host hi\"",
+			wantShellName:  "pwsh",
+			wantVariant:    VariantPowerShell,
+			wantScriptText: "\"Write-Host hi\"",
+			wantOK:         true,
+		},
+		{
 			name:   "not a shell wrapper",
 			script: `python -m pip install tox`,
 			wantOK: false,

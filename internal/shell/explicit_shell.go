@@ -4,6 +4,7 @@ import (
 	"path"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 // ExplicitShellInvocation describes a shell wrapper explicitly invoked at the
@@ -138,8 +139,12 @@ func NextShellToken(s string, start int) (string, int) {
 	}
 
 	j := i
-	for j < len(s) && !unicode.IsSpace(rune(s[j])) {
-		j++
+	for j < len(s) {
+		r, sz := utf8.DecodeRuneInString(s[j:])
+		if unicode.IsSpace(r) {
+			break
+		}
+		j += sz
 	}
 	return s[i:j], j
 }
@@ -147,8 +152,12 @@ func NextShellToken(s string, start int) (string, int) {
 // SkipShellTokenSpaces advances over whitespace in shell-like command lines.
 func SkipShellTokenSpaces(s string, start int) int {
 	i := start
-	for i < len(s) && unicode.IsSpace(rune(s[i])) {
-		i++
+	for i < len(s) {
+		r, sz := utf8.DecodeRuneInString(s[i:])
+		if !unicode.IsSpace(r) {
+			break
+		}
+		i += sz
 	}
 	return i
 }
