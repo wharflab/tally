@@ -241,6 +241,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/powershell/prefer-shell-instruction")...),
 			wantExit: 1,
 		},
+		{
+			name: "prefer-shell-instruction-cross-rules",
+			dir:  "prefer-shell-instruction",
+			args: append([]string{"--format", "json"},
+				mustSelectRules("tally/powershell/prefer-shell-instruction", "hadolint/DL4005")...),
+			wantExit: 1,
+		},
 
 		// Shell-form RUN in scratch stage
 		{
