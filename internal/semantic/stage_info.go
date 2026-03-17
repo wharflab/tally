@@ -1,16 +1,58 @@
 package semantic
 
 import (
+	"fmt"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/distribution/reference"
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/shell"
 )
+
+var windowsDrivePathPattern = regexp.MustCompile(`(?i)(^|[^a-z0-9_])[a-z]:[\\/]`)
+
+var windowsEnvVarPattern = regexp.MustCompile(`(?i)%[a-z_][a-z0-9_()]*%`)
+
+var windowsFileSuffixPattern = regexp.MustCompile(`(?i)\.(exe|msi|ps1|cmd|bat)\b`)
+
+var linuxPathHintPattern = regexp.MustCompile(`(^|[^a-z0-9_])/(bin|usr|etc|var|tmp|home|opt|sbin)\b`)
+
+var windowsCommandHints = []string{
+	"setx",
+	"icacls",
+	"certutil",
+	"robocopy",
+	"dism",
+	"msiexec",
+	"reg ",
+	"choco",
+	"ngen",
+}
+
+var windowsIdentityHints = []string{
+	"containeradministrator",
+	"containeruser",
+	"defaultaccount",
+}
+
+var linuxCommandHints = []string{
+	"apt-get",
+	"apt ",
+	"apk ",
+	"yum ",
+	"dnf ",
+	"microdnf",
+	"pacman",
+	"zypper",
+	"chmod",
+	"chown",
+}
 
 // BaseImageOS represents the detected operating system of a stage's base image.
 type BaseImageOS int
@@ -293,6 +335,104 @@ func isLinuxImageName(lower string) bool {
 	}
 
 	return false
+}
+
+func inferStageOSHeuristically(stage *instructions.Stage) BaseImageOS {
+	if stage == nil {
+		return BaseImageOSUnknown
+	}
+
+	var windowsScore, linuxScore int
+	for _, cmd := range stage.Commands {
+		addInstructionOSHeuristics(cmd, &windowsScore, &linuxScore)
+	}
+
+	switch {
+	case windowsScore >= 6 && windowsScore >= linuxScore+3:
+		return BaseImageOSWindows
+	case linuxScore >= 6 && linuxScore >= windowsScore+3:
+		return BaseImageOSLinux
+	default:
+		return BaseImageOSUnknown
+	}
+}
+
+func addInstructionOSHeuristics(cmd instructions.Command, windowsScore, linuxScore *int) {
+	if cmd == nil {
+		return
+	}
+
+	text := strings.ToLower(fmt.Sprint(cmd))
+	if text != "" {
+		if windowsDrivePathPattern.MatchString(text) {
+			*windowsScore += 3
+		}
+		if windowsEnvVarPattern.MatchString(text) {
+			*windowsScore += 2
+		}
+		if windowsFileSuffixPattern.MatchString(text) {
+			*windowsScore++
+		}
+		if linuxPathHintPattern.MatchString(text) {
+			*linuxScore += 2
+		}
+		*windowsScore += min(2, countTextHints(text, windowsCommandHints)) * 3
+		*windowsScore += min(1, countTextHints(text, windowsIdentityHints)) * 2
+		*linuxScore += min(2, countTextHints(text, linuxCommandHints)) * 3
+	}
+
+	switch c := cmd.(type) {
+	case *instructions.RunCommand:
+		if len(c.CmdLine) == 0 {
+			return
+		}
+		if c.PrependShell {
+			if inv, ok := shell.ParseExplicitShellInvocation(c.CmdLine[0]); ok {
+				addShellSignalScore(inv.ShellName, windowsScore, linuxScore)
+			}
+			return
+		}
+		addShellSignalScore(c.CmdLine[0], windowsScore, linuxScore)
+	case *instructions.CmdCommand:
+		if c.PrependShell || len(c.CmdLine) == 0 {
+			return
+		}
+		addShellSignalScore(c.CmdLine[0], windowsScore, linuxScore)
+	case *instructions.EntrypointCommand:
+		if c.PrependShell || len(c.CmdLine) == 0 {
+			return
+		}
+		addShellSignalScore(c.CmdLine[0], windowsScore, linuxScore)
+	case *instructions.ShellCommand:
+		if len(c.Shell) == 0 {
+			return
+		}
+		addShellSignalScore(c.Shell[0], windowsScore, linuxScore)
+	}
+}
+
+func addShellSignalScore(shellName string, windowsScore, linuxScore *int) {
+	switch normalizeShellSignalName(shellName) {
+	case command.Cmd, "powershell":
+		*windowsScore += 6
+	case "sh", "bash", "dash", "ash", "zsh", "ksh", "mksh":
+		*linuxScore += 6
+	}
+}
+
+func countTextHints(text string, hints []string) int {
+	count := 0
+	for _, hint := range hints {
+		if strings.Contains(text, hint) {
+			count++
+		}
+	}
+	return count
+}
+
+func normalizeShellSignalName(exe string) string {
+	exe = strings.ToLower(path.Base(strings.ReplaceAll(exe, `\`, "/")))
+	return strings.TrimSuffix(exe, ".exe")
 }
 
 // HasPackage checks if a package was installed in this stage.

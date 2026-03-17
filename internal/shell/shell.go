@@ -215,6 +215,9 @@ func CommandNamesWithVariant(script string, variant Variant) []string {
 	if variant.IsPowerShell() {
 		return powerShellCommandNames(script)
 	}
+	if variant == VariantCmd {
+		return cmdCommandNames(script)
+	}
 	if !variant.SupportsPOSIXShellAST() {
 		return simpleCommandNames(script)
 	}

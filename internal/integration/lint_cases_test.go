@@ -235,6 +235,12 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/copy-from-empty-scratch-stage")...),
 			wantExit: 1,
 		},
+		{
+			name:     "prefer-shell-instruction",
+			dir:      "prefer-shell-instruction",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/powershell/prefer-shell-instruction")...),
+			wantExit: 1,
+		},
 
 		// Shell-form RUN in scratch stage
 		{

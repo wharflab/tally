@@ -98,8 +98,18 @@ func (b *Builder) Build() *Model {
 			info.BaseImageOS = BaseImageOSWindows
 		}
 
-		// Set OS-appropriate default shell before directives can override.
-		// Windows containers default to cmd.exe, not /bin/sh.
+		// FROM ARG analysis (UndefinedArgInFrom, InvalidDefaultArgInFrom).
+		b.applyFromArgAnalysis(info, stage, fromEval)
+
+		// Apply shell directives that appear before this stage's FROM instruction
+		b.applyShellDirectives(stage, info)
+
+		if info.BaseImageOS == BaseImageOSUnknown {
+			info.BaseImageOS = inferStageOSHeuristically(stage)
+		}
+
+		// Set OS-appropriate default shell after image/directive/heuristic
+		// detection. Windows containers default to cmd.exe, not /bin/sh.
 		if info.BaseImageOS == BaseImageOSWindows && info.ShellSetting.Source == ShellSourceDefault {
 			info.ShellSetting = ShellSetting{
 				Shell:   DefaultWindowsShell(),
@@ -108,12 +118,6 @@ func (b *Builder) Build() *Model {
 				Line:    -1,
 			}
 		}
-
-		// FROM ARG analysis (UndefinedArgInFrom, InvalidDefaultArgInFrom).
-		b.applyFromArgAnalysis(info, stage, fromEval)
-
-		// Apply shell directives that appear before this stage's FROM instruction
-		b.applyShellDirectives(stage, info)
 
 		// Seed the environment used for undefined-var analysis.
 		var stageEnv *fromEnv
@@ -412,8 +416,10 @@ func (b *Builder) processShellCommand(c *instructions.ShellCommand, info *StageI
 	}
 
 	// SHELL ["powershell"...] or SHELL ["cmd"...] is a Windows signal.
+	// pwsh is cross-platform and must not imply Windows on its own.
 	if info.BaseImageOS == BaseImageOSUnknown {
-		if variant == shell.VariantPowerShell || variant == shell.VariantCmd {
+		switch normalizeShellSignalName(shellCmd[0]) {
+		case command.Cmd, "powershell":
 			info.BaseImageOS = BaseImageOSWindows
 		}
 	}
