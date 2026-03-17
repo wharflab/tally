@@ -274,7 +274,15 @@ func (sm *SourceMap) EffectiveStartLine(startLine int, prevComments []string) in
 // HasBlankLineBetween reports whether any blank line exists strictly between
 // startLine and endLine (both 1-based, exclusive on both ends).
 func (sm *SourceMap) HasBlankLineBetween(startLine, endLine int) bool {
-	for line := startLine + 1; line < endLine; line++ {
+	if endLine-startLine <= 1 {
+		return false
+	}
+	start := max(startLine+1, 1)
+	end := min(endLine-1, sm.LineCount())
+	if start > end {
+		return false
+	}
+	for line := start; line <= end; line++ {
 		if strings.TrimSpace(sm.Line(line-1)) == "" {
 			return true
 		}
