@@ -62,6 +62,42 @@ func TestTokenize_PowerShellEmptyResultRemainsEmpty(t *testing.T) {
 	}
 }
 
+func TestTokenize_CmdUsesParserBackedPath(t *testing.T) {
+	t.Parallel()
+
+	script := "REM install\nnet stop wuauserv /y\n"
+	tokens := Tokenize(script, myshell.VariantCmd)
+
+	assertHasToken(t, script, tokens, highlightcore.TokenComment, 30, "REM install")
+	assertHasToken(t, script, tokens, highlightcore.TokenFunction, 30, "net")
+	assertHasToken(t, script, tokens, highlightcore.TokenParameter, 30, "/y")
+}
+
+func TestTokenize_CmdVariableReference(t *testing.T) {
+	t.Parallel()
+
+	script := "echo %PATH%\n"
+	tokens := Tokenize(script, myshell.VariantCmd)
+
+	assertHasToken(t, script, tokens, highlightcore.TokenVariable, 30, "%PATH%")
+}
+
+func TestTokenize_CmdPathInvocationNotFunction(t *testing.T) {
+	t.Parallel()
+
+	script := "C:\\app\\tool.exe\n"
+	tokens := Tokenize(script, myshell.VariantCmd)
+
+	for _, tok := range tokens {
+		if tok.Type == highlightcore.TokenFunction && tok.Priority == 30 {
+			text := tokenText(script, tok)
+			if text == "C:\\app\\tool.exe" {
+				t.Fatalf("unexpected function token for path invocation: %+v", tok)
+			}
+		}
+	}
+}
+
 func assertHasToken(
 	t *testing.T,
 	script string,

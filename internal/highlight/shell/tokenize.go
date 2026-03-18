@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	highlightbatch "github.com/wharflab/tally/internal/highlight/batch"
 	"github.com/wharflab/tally/internal/highlight/core"
 	highlightpowershell "github.com/wharflab/tally/internal/highlight/powershell"
 	myshell "github.com/wharflab/tally/internal/shell"
@@ -23,6 +24,12 @@ func Tokenize(script string, variant myshell.Variant) []core.Token {
 	}
 	if variant.IsPowerShell() {
 		if tokens := highlightpowershell.Tokenize(script); tokens != nil {
+			return tokens
+		}
+		return lexicalTokens(script)
+	}
+	if variant == myshell.VariantCmd {
+		if tokens := highlightbatch.Tokenize(script); tokens != nil {
 			return tokens
 		}
 		return lexicalTokens(script)
@@ -157,13 +164,7 @@ func uintToInt(v uint) (int, bool) {
 }
 
 func lineContentAt(lines []string, line int) (string, bool) {
-	if line < 0 {
-		return "", false
-	}
-	if len(lines) == 0 {
-		return "", true
-	}
-	if line >= len(lines) {
+	if line < 0 || line >= len(lines) {
 		return "", false
 	}
 	return lines[line], true
