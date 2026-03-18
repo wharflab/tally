@@ -30,7 +30,7 @@ Modern Dockerfiles deserve modern tooling. tally is opinionated in the right pla
   PowerShell-specific build patterns.
 - **Registry-aware without Docker**: uses a Podman-compatible registry client for image metadata checks (no daemon required).
 - **Editor + CI friendly**: VS Code extension (`wharflab.tally`, powered by `tally lsp`) and outputs for JSON, SARIF, and GitHub Actions annotations.
-- **Easy to install anywhere**: Homebrew, Go, npm, pip, and RubyGems.
+- **Easy to install anywhere**: Homebrew, WinGet, Go, npm, pip, and RubyGems.
 - **Written in Go**: single fast binary, built on production-grade libraries.
 
 Quality bar: **92% code coverage on Codecov** and **2,900+ Go tests executed in CI**.
@@ -80,6 +80,12 @@ Shell linting is provided via embedded ShellCheck (rules under the `shellcheck/`
 
 ```bash
 brew install wharflab/tap/tally
+```
+
+### WinGet (Windows)
+
+```powershell
+winget install --id Wharflab.Tally
 ```
 
 ### NPM
