@@ -15,7 +15,7 @@ require (
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/gkampitakis/ciinfo v0.3.4
 	github.com/gkampitakis/go-snaps v0.5.21
-	github.com/google/go-containerregistry v0.21.2
+	github.com/google/go-containerregistry v0.21.3
 	github.com/google/jsonschema-go v0.4.2
 	github.com/knadh/koanf/parsers/toml/v2 v2.2.0
 	github.com/knadh/koanf/providers/confmap v1.0.0
@@ -36,6 +36,7 @@ require (
 	github.com/tetratelabs/wazero v1.11.0
 	github.com/tree-sitter/go-tree-sitter v0.24.0
 	github.com/urfave/cli/v3 v3.7.0
+	github.com/wharflab/tree-sitter-batch v0.3.2
 	github.com/zricethezav/gitleaks/v8 v8.30.1
 	go.bug.st/lsp v0.1.3
 	go.podman.io/image/v5 v5.39.1
@@ -76,7 +77,7 @@ require (
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 // indirect
 	github.com/containers/ocicrypt v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/docker/cli v29.2.1+incompatible // indirect
+	github.com/docker/cli v29.3.0+incompatible // indirect
 	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.5 // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
@@ -151,7 +152,6 @@ require (
 	github.com/vbatts/tar-split v0.12.2 // indirect
 	github.com/wasilibs/go-re2 v1.9.0 // indirect
 	github.com/wasilibs/wazero-helpers v0.0.0-20240620070341-3dff1577cd52 // indirect
-	github.com/wharflab/tree-sitter-batch v0.3.2 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
@@ -163,7 +163,7 @@ require (
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/exp v0.0.0-20250911091902-df9299821621 // indirect
 	golang.org/x/exp/event v0.0.0-20250620022241-b7579e27df2b // indirect
-	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
