@@ -76,7 +76,7 @@ executable shellcheck-reactor
   ghc-options:
       -no-hs-main
       -optl-mexec-model=reactor
-      "-optl-Wl,--export=hs_init,--export=sc_alloc,--export=sc_free,--export=sc_check"
+      "-optl-Wl,--export=hs_init,--export=sc_alloc,--export=sc_free,--export=sc_check,--export=sc_version"
 CABALEOF
 
 wasm32-wasi-cabal update

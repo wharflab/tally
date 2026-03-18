@@ -61,17 +61,26 @@ func readBuildInfo() (string, string) {
 
 // Info holds structured version information for machine-readable output.
 type Info struct {
-	Version         string   `json:"version"`
-	BuildkitVersion string   `json:"buildkitVersion,omitempty"`
-	Platform        Platform `json:"platform"`
-	GoVersion       string   `json:"goVersion"`
-	GitCommit       string   `json:"gitCommit,omitempty"`
+	Version           string   `json:"version"`
+	BuildkitVersion   string   `json:"buildkitVersion,omitempty"`
+	ShellcheckVersion string   `json:"shellcheckVersion,omitempty"`
+	Platform          Platform `json:"platform"`
+	GoVersion         string   `json:"goVersion"`
+	GitCommit         string   `json:"gitCommit,omitempty"`
+	CGO               CGOInfo  `json:"cgo"`
 }
 
 // Platform describes the OS and architecture.
 type Platform struct {
 	OS   string `json:"os"`
 	Arch string `json:"arch"`
+}
+
+// CGOInfo describes CGO build properties embedded in the binary.
+type CGOInfo struct {
+	Enabled      bool   `json:"enabled"`
+	CCompiler    string `json:"cCompiler,omitempty"`
+	GlibcVersion string `json:"glibcVersion,omitempty"`
 }
 
 // GetInfo returns structured version information.
@@ -86,5 +95,6 @@ func GetInfo() Info {
 		},
 		GoVersion: GoVersion(),
 		GitCommit: commit,
+		CGO:       cgoInfo(),
 	}
 }
