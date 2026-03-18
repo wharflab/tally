@@ -1,6 +1,6 @@
 # AST-Aware Semantic Highlighting for CLI Snippets and LSP
 
-> Status: implemented for Dockerfile, POSIX shell, PowerShell, CLI rendering, and LSP `semanticTokens/full|range`
+> Status: implemented for Dockerfile, POSIX shell, PowerShell, cmd.exe/batch, CLI rendering, and LSP `semanticTokens/full|range`
 >
 > Scope: replace Chroma in CLI snippet rendering, add a shared semantic token engine, and expose semantic tokens from the existing LSP server
 
@@ -239,7 +239,8 @@ For shell-form instructions and heredoc bodies:
    - `SHELL` instructions
    - heredoc shebang override when present
 4. If `shell.Variant.IsParseable()` is true, parse with `mvdan.cc/sh/v3/syntax`.
-5. If the variant is `powershell`, use the parser-backed PowerShell tokenizer; if the variant is `cmd` or `unknown`, use lexical fallback.
+5. If the variant is `powershell`, use the parser-backed PowerShell tokenizer; if the variant is `cmd`, use the parser-backed batch tokenizer; if the
+   variant is `unknown`, use lexical fallback.
 
 This is the correct reuse boundary: the semantic highlighter and ShellCheck both need the same script extraction and source-to-snippet mapping, so
 they should share one implementation.
@@ -488,9 +489,11 @@ What is already implemented:
   - already preserves Dockerfile-to-script line alignment for remapping tokens back into the parent file
 - `internal/highlight/shell/tokenize.go`
   - current dispatch boundary for embedded shell tokenization
-  - uses `mvdan` for parseable POSIX-like shells, a tree-sitter-backed tokenizer for `powershell`, and lexical fallback for `cmd` and `unknown`
+  - uses `mvdan` for parseable POSIX-like shells, tree-sitter-backed tokenizers for `powershell` and `cmd`, and lexical fallback for `unknown`
 - `internal/highlight/powershell/tokenize.go`
   - contains the isolated tree-sitter integration and AST-to-`core.Token` mapping for PowerShell
+- `internal/highlight/batch/tokenize.go`
+  - contains the isolated tree-sitter integration and AST-to-`core.Token` mapping for cmd.exe/batch scripts
 - `internal/highlight/core/token.go`
   - shared token model, normalization, overlap resolution, and range filtering
 - `internal/highlight/renderansi` and `internal/highlight/lspencode`
@@ -501,9 +504,10 @@ What is already implemented:
 The implementation uses the seam this document proposed:
 
 1. `internal/highlight/powershell` owns the grammar binding and PowerShell AST-to-`core.Token` mapping.
-2. `internal/highlight/shell/tokenize.go` dispatches `VariantPowerShell` to that package.
-3. `VariantCmd` and `VariantUnknown` remain on lexical fallback.
-4. `internal/highlight/highlight.go`, `renderansi`, and `lspencode` remain dialect-agnostic.
+2. `internal/highlight/batch` owns the grammar binding and cmd.exe/batch AST-to-`core.Token` mapping.
+3. `internal/highlight/shell/tokenize.go` dispatches `VariantPowerShell` and `VariantCmd` to their respective packages.
+4. `VariantUnknown` remains on lexical fallback.
+5. `internal/highlight/highlight.go`, `renderansi`, and `lspencode` remain dialect-agnostic.
 
 ### 15.2 Dependency and packaging guidance
 
@@ -528,8 +532,9 @@ The implemented call flow is:
 4. `remapShellTokens(...)` calls `highlightshell.Tokenize(mapping.Script, variant)`.
 5. `highlightshell.Tokenize(...)` dispatches:
    - POSIX-like shells -> existing `mvdan` path
-   - PowerShell -> tree-sitter tokenizer
-   - `cmd`/unknown -> existing lexical fallback
+   - PowerShell -> tree-sitter PowerShell tokenizer
+   - cmd.exe -> tree-sitter batch tokenizer
+   - unknown -> lexical fallback
 6. `core.Normalize(...)` resolves overlaps and clips tokens.
 7. CLI and LSP consume the resulting normalized tokens unchanged.
 
@@ -595,13 +600,16 @@ In other words: the tokenizer upgrade only activates after extraction has alread
 Coverage should continue to include:
 
 - `internal/highlight/shell/tokenize_test.go`
-  - dispatch tests proving `VariantPowerShell` uses the parser-backed path
+  - dispatch tests proving `VariantPowerShell` and `VariantCmd` use their parser-backed paths
 - `internal/highlight/powershell/*_test.go`
   - token-level tests for strings, variables, commands, comments, numbers, and member/property access
+- `internal/highlight/batch/*_test.go`
+  - token-level tests for comments, strings, variables, commands, command options, redirections, and path filtering
 - `internal/lsptest/lsp_test.go`
   - at least one PowerShell-backed `semanticTokens/full` or `range` black-box case
+  - at least one cmd.exe-backed `semanticTokens/range` black-box case
 - reporter snapshot or targeted reporter tests
-  - only when a PowerShell fixture materially changes visible snippet rendering
+  - only when a PowerShell or cmd.exe fixture materially changes visible snippet rendering
 
 ### 15.8 What should not change
 
@@ -613,7 +621,7 @@ Unless the implementation reveals a real gap, avoid changing:
 - semantic token cache behavior in `internal/lspserver`
 - ShellCheck extraction semantics
 
-PowerShell support should look like a tokenizer upgrade, not a second semantic-highlighting architecture.
+PowerShell and cmd.exe/batch support should look like tokenizer upgrades, not a second semantic-highlighting architecture.
 
 ### 15.9 Definition of done for the PowerShell follow-up
 
@@ -625,6 +633,39 @@ This follow-up is complete when all of these remain true:
 4. Existing Windows-container fixtures render more usefully in CLI snippets.
 5. LSP semantic tokens for PowerShell-backed Dockerfile snippets become more specific without changing diagnostics behavior.
 6. If the parser fails or is unavailable, the code still degrades cleanly to the current lexical fallback behavior.
+
+### 15.10 cmd.exe/batch tokenizer
+
+The batch tokenizer (`internal/highlight/batch/`) follows the same architecture as the PowerShell tokenizer:
+
+1. `internal/highlight/batch/tokenize.go` (cgo build) uses `github.com/wharflab/tree-sitter-batch` to parse cmd.exe scripts and emit `core.Token`
+   spans.
+2. `internal/highlight/batch/tokenize_nocgo.go` returns nil when cgo is unavailable, falling through to lexical fallback.
+3. `internal/highlight/shell/tokenize.go` dispatches `VariantCmd` to the batch tokenizer before the generic fallback.
+
+Token coverage:
+
+- `comment` (REM, ::) → `core.TokenComment`
+- `string` (quoted strings) → `core.TokenString`
+- `variable_reference` (%VAR%, !VAR!) → `core.TokenVariable`
+- `for_variable` (%%i) → `core.TokenVariable`
+- `integer` → `core.TokenNumber`
+- `comparison_op` (==, EQU, NEQ, etc.) → `core.TokenOperator`
+- `redirect_op` (>, >>, 2>&1, etc.) → `core.TokenOperator`
+- `command_option` (/S, /y, etc.) → `core.TokenParameter`
+- `label` → `core.TokenProperty`
+- `command_name` (non-path) → `core.TokenFunction`
+
+Path-like command invocations (e.g. `C:\app\tool.exe`, `.\bin\tool.exe`) are excluded from `TokenFunction`, matching the PowerShell tokenizer's
+conservative approach.
+
+Definition of done:
+
+1. `VariantCmd` no longer falls back to the generic lexical tokenizer.
+2. Batch tokens are emitted through the same `highlight.Analyze(...)` pipeline used by CLI and LSP.
+3. Token positions remain rune-based and normalized correctly.
+4. LSP semantic tokens for cmd.exe-backed Dockerfile snippets become more specific without changing diagnostics behavior.
+5. If the parser fails or is unavailable, the code still degrades cleanly to lexical fallback.
 
 ---
 

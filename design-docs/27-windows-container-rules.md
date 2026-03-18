@@ -72,7 +72,7 @@ lumped `cmd.exe` and `powershell` together, but they're very different:
 | **Command chaining** | `&&`, `&` | `;`, pipeline | `&&`, `;`, pipeline |
 | **ShellCheck applicable** | No | No | Yes |
 | **Heredoc applicable** | No | Partial (see note) | Yes (BuildKit) |
-| **Script parsing** | No parser available | tree-sitter-backed command parsing | mvdan.cc/sh |
+| **Script parsing** | tree-sitter-backed (analysis + semantic tokens) | tree-sitter-backed (analysis + semantic tokens) | mvdan.cc/sh |
 
 **Note on PowerShell heredoc:** BuildKit's Dockerfile heredoc (`RUN <<EOF`) can work with PowerShell
 as the active shell. For a single heredoc without a shebang, BuildKit passes the heredoc content

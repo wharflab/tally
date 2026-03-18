@@ -149,6 +149,41 @@ func TestLSP_SemanticTokensRange_PowerShell(t *testing.T) {
 	assert.Contains(t, tokenTypes, uint32(8), "expected PowerShell command token")
 }
 
+func TestLSP_SemanticTokensRange_Cmd(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	uri := "file:///tmp/test-semantic-tokens-range-cmd/Dockerfile"
+	ts.openDocument(t, uri, strings.Join([]string{
+		"# escape=`",
+		"FROM mcr.microsoft.com/windows/servercore:ltsc2025",
+		"RUN net stop wuauserv /y",
+		"",
+	}, "\n"))
+
+	ts.waitDiagnostics(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var result semanticTokensResult
+	err := ts.conn.Call(ctx, "textDocument/semanticTokens/range", &semanticTokensRangeParams{
+		TextDocument: textDocumentIdentifier{URI: uri},
+		Range: lspRange{
+			Start: position{Line: 2, Character: 0},
+			End:   position{Line: 2, Character: 200},
+		},
+	}).Await(ctx, &result)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Data)
+
+	tokenTypes := semanticTokenTypes(result.Data)
+	assert.Contains(t, tokenTypes, uint32(0), "expected RUN keyword token")
+	assert.Contains(t, tokenTypes, uint32(8), "expected cmd command/function token")
+	assert.Contains(t, tokenTypes, uint32(6), "expected cmd option/parameter token")
+}
+
 func TestLSP_ShutdownExit(t *testing.T) {
 	t.Parallel()
 	ts := startTestServer(t)

@@ -3,16 +3,14 @@
 package powershell
 
 import (
-	"regexp"
 	"strings"
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
 
 	"github.com/wharflab/tally/internal/highlight/core"
+	"github.com/wharflab/tally/internal/highlight/tsutil"
 	tspowershell "github.com/wharflab/tally/internal/third_party/tree_sitter_powershell"
 )
-
-var commandPathPattern = regexp.MustCompile(`^(?:[A-Za-z]:[\\/]|\.{1,2}[\\/]|~[\\/]|[\\/])`)
 
 var powerShellNodeTokenTypes = map[string]core.TokenType{
 	"comment":                         core.TokenComment,
@@ -70,92 +68,25 @@ func Tokenize(script string) []core.Token {
 	lines := strings.Split(script, "\n")
 	tokens := make([]core.Token, 0, 16)
 
-	walk(tree.RootNode(), func(node *sitter.Node) {
+	tsutil.Walk(tree.RootNode(), func(node *sitter.Node) {
 		if node == nil || !node.IsNamed() {
 			return
 		}
 
 		kind := node.Kind()
 		if typ, ok := powerShellNodeTokenTypes[kind]; ok {
-			appendNodeTokens(lines, node, typ, 30, 0, &tokens)
+			tsutil.AppendNodeTokens(lines, node, typ, 30, 0, &tokens)
 			return
 		}
 
 		if kind == "command_name" {
 			text := strings.TrimSpace(node.Utf8Text(source))
-			if text == "" || commandPathPattern.MatchString(text) {
+			if text == "" || tsutil.CommandPathPattern.MatchString(text) {
 				return
 			}
-			appendNodeTokens(lines, node, core.TokenFunction, 30, 0, &tokens)
+			tsutil.AppendNodeTokens(lines, node, core.TokenFunction, 30, 0, &tokens)
 		}
 	})
 
 	return tokens
-}
-
-func walk(node *sitter.Node, visit func(*sitter.Node)) {
-	if node == nil {
-		return
-	}
-	visit(node)
-	childCount := node.NamedChildCount()
-	for i := range childCount {
-		walk(node.NamedChild(i), visit)
-	}
-}
-
-func appendNodeTokens(lines []string, node *sitter.Node, typ core.TokenType, priority int, modifiers uint32, tokens *[]core.Token) {
-	if node == nil {
-		return
-	}
-
-	start := node.StartPosition()
-	end := node.EndPosition()
-	startLine := int(start.Row)
-	endLine := int(end.Row)
-	if startLine > endLine {
-		return
-	}
-
-	for line := startLine; line <= endLine; line++ {
-		lineContent, ok := lineContentAt(lines, line)
-		if !ok {
-			continue
-		}
-
-		startByte := 0
-		endByte := len(lineContent)
-		if line == startLine {
-			startByte = int(start.Column)
-		}
-		if line == endLine {
-			endByte = int(end.Column)
-		}
-		startCol, endCol := core.RuneColsForByteRange(lineContent, startByte, endByte)
-		if endCol <= startCol {
-			continue
-		}
-
-		*tokens = append(*tokens, core.Token{
-			Line:      line,
-			StartCol:  startCol,
-			EndCol:    endCol,
-			Type:      typ,
-			Modifiers: modifiers,
-			Priority:  priority,
-		})
-	}
-}
-
-func lineContentAt(lines []string, line int) (string, bool) {
-	if line < 0 {
-		return "", false
-	}
-	if len(lines) == 0 {
-		return "", true
-	}
-	if line >= len(lines) {
-		return "", false
-	}
-	return lines[line], true
 }

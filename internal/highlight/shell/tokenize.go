@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	highlightbatch "github.com/wharflab/tally/internal/highlight/batch"
 	"github.com/wharflab/tally/internal/highlight/core"
 	highlightpowershell "github.com/wharflab/tally/internal/highlight/powershell"
 	myshell "github.com/wharflab/tally/internal/shell"
@@ -23,6 +24,12 @@ func Tokenize(script string, variant myshell.Variant) []core.Token {
 	}
 	if variant.IsPowerShell() {
 		if tokens := highlightpowershell.Tokenize(script); tokens != nil {
+			return tokens
+		}
+		return lexicalTokens(script)
+	}
+	if variant == myshell.VariantCmd {
+		if tokens := highlightbatch.Tokenize(script); tokens != nil {
 			return tokens
 		}
 		return lexicalTokens(script)

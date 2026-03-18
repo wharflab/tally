@@ -48,6 +48,30 @@ func assertHasLineToken(t *testing.T, source []byte, tokens []core.Token, wantTy
 	t.Fatalf("missing token type=%s text=%q in %+v", wantType, wantText, tokens)
 }
 
+func TestAnalyze_WindowsCmdTokenization(t *testing.T) {
+	t.Parallel()
+
+	source := []byte(strings.Join([]string{
+		"# escape=`",
+		"FROM mcr.microsoft.com/windows/servercore:ltsc2025",
+		"RUN net stop wuauserv /y",
+		"RUN echo %PATH%",
+		"",
+	}, "\n"))
+
+	doc := Analyze("Dockerfile", source)
+	if doc == nil {
+		t.Fatal("Analyze() returned nil")
+	}
+
+	line2 := doc.LineTokens(2)
+	assertHasLineToken(t, source, line2, core.TokenFunction, "net")
+	assertHasLineToken(t, source, line2, core.TokenParameter, "/y")
+
+	line3 := doc.LineTokens(3)
+	assertHasLineToken(t, source, line3, core.TokenVariable, "%PATH%")
+}
+
 func assertNoLineToken(t *testing.T, source []byte, tokens []core.Token, wantType core.TokenType, wantText string) {
 	t.Helper()
 
