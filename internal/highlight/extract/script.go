@@ -2,7 +2,6 @@ package extract
 
 import (
 	"path"
-	"slices"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
@@ -58,7 +57,6 @@ func ExtractShellFormScript(
 
 	lines := linesForSpan(sm, start, end)
 	lines = blankLeadingKeywordOnly(lines, keyword, escapeToken)
-	lines = normalizeContinuationToken(lines, escapeToken)
 
 	return Mapping{
 		Script:          strings.Join(lines, "\n"),
@@ -85,8 +83,6 @@ func ExtractHealthcheckCmdShellScript(
 	if !ok {
 		return Mapping{}, false
 	}
-	out = normalizeContinuationToken(out, escapeToken)
-
 	return Mapping{
 		Script:          strings.Join(out, "\n"),
 		OriginStartLine: start,
@@ -169,7 +165,6 @@ func extractRunLikeScript(
 
 	lines := linesForSpan(sm, start, end)
 	lines = blankLeadingFlags(lines, escapeToken)
-	lines = normalizeContinuationToken(lines, escapeToken)
 
 	return Mapping{
 		Script:          strings.Join(lines, "\n"),
@@ -280,13 +275,23 @@ func linesForSpan(sm *sourcemap.SourceMap, startLine, endLine int) []string {
 	return out
 }
 
-func normalizeContinuationToken(lines []string, escapeToken rune) []string {
-	if escapeToken == '\\' || len(lines) == 0 {
-		return lines
+// NormalizeContinuation rewrites Dockerfile escape tokens at the end of each
+// line into the target shell's native line-continuation character. This is a
+// no-op when the escape token already matches the target (e.g. backtick escape
+// with PowerShell, or backslash escape with POSIX shells).
+//
+// Callers should choose target based on the shell variant:
+//
+//	POSIX shells (bash, sh, …) → '\\'
+//	PowerShell                 → '`'
+//	cmd.exe                    → '^'
+func NormalizeContinuation(script string, escapeToken, target rune) string {
+	if escapeToken == target {
+		return script
 	}
-
-	out := slices.Clone(lines)
-	for i, line := range out {
+	lines := strings.Split(script, "\n")
+	changed := false
+	for i, line := range lines {
 		trimmed := strings.TrimRight(line, " \t")
 		if trimmed == "" {
 			continue
@@ -296,8 +301,12 @@ func normalizeContinuationToken(lines []string, escapeToken rune) []string {
 			continue
 		}
 		b := []byte(line)
-		b[lastIdx] = '\\'
-		out[i] = string(b)
+		b[lastIdx] = byte(target)
+		lines[i] = string(b)
+		changed = true
 	}
-	return out
+	if !changed {
+		return script
+	}
+	return strings.Join(lines, "\n")
 }
