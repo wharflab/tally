@@ -2,7 +2,6 @@ package powershell
 
 import (
 	jsonv2 "encoding/json/v2"
-	"path"
 	"regexp"
 	"slices"
 	"strconv"
@@ -476,7 +475,7 @@ func rewriteSetXPathCommandForPowerShell(cmd shellutil.CommandInfo) (string, boo
 func canPassThroughCmdInvocation(script string) bool {
 	i := shellutil.SkipShellTokenSpaces(script, 0)
 	exeToken, next := shellutil.NextShellToken(script, i)
-	if normalizeExecutableName(shellutil.DropQuotes(exeToken)) != command.Cmd {
+	if shellutil.NormalizeShellExecutableName(shellutil.DropQuotes(exeToken)) != command.Cmd {
 		return false
 	}
 
@@ -616,7 +615,7 @@ func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocat
 	}
 
 	exe := shellutil.DropQuotes(exeToken)
-	exeNorm := normalizeExecutableName(exe)
+	exeNorm := shellutil.NormalizeShellExecutableName(exe)
 	if exeNorm != "powershell" && exeNorm != "pwsh" {
 		return explicitPowerShellInvocation{}, false
 	}
@@ -654,11 +653,6 @@ func normalizeCommandScript(script string) string {
 		return shellutil.DropQuotes(token)
 	}
 	return trimmed
-}
-
-func normalizeExecutableName(exe string) string {
-	exe = strings.ToLower(path.Base(strings.ReplaceAll(exe, `\`, "/")))
-	return strings.TrimSuffix(exe, ".exe")
 }
 
 func leadingIndent(line string) string {
