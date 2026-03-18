@@ -83,12 +83,7 @@ func (v Variant) IsPowerShell() bool { return v == VariantPowerShell }
 //   - cmd -> VariantCmd
 //   - unknown -> VariantUnknown
 func VariantFromShell(shell string) Variant {
-	// Normalize: extract basename, lowercase, strip .exe suffix (for Windows shells).
-	// Replace backslashes before path.Base so Windows paths like
-	// "C:\\Windows\\System32\\...\\powershell.exe" are handled correctly
-	// (path.Base only recognises forward slashes).
-	shell = strings.ToLower(path.Base(strings.ReplaceAll(shell, `\`, "/")))
-	shell = strings.TrimSuffix(shell, ".exe")
+	shell = NormalizeShellExecutableName(shell)
 
 	switch shell {
 	case "bash":
@@ -214,6 +209,9 @@ var shellWrappers = map[string]bool{
 func CommandNamesWithVariant(script string, variant Variant) []string {
 	if variant.IsPowerShell() {
 		return powerShellCommandNames(script)
+	}
+	if variant == VariantCmd {
+		return cmdCommandNames(script)
 	}
 	if !variant.SupportsPOSIXShellAST() {
 		return simpleCommandNames(script)

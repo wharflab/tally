@@ -7,7 +7,11 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
+	"github.com/wharflab/tally/internal/directive"
+	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/sourcemap"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -219,10 +223,88 @@ EOF
 	}
 }
 
-func parseRunCommand(t *testing.T, dockerfile string) *instructions.RunCommand {
+func TestRule_DoesNotLintCmdStageAsPOSIXAfterSeparatePowerShellStage(t *testing.T) {
+	t.Parallel()
+
+	input := makeShellcheckLintInput(t, "Dockerfile", `FROM mcr.microsoft.com/powershell:nanoserver-ltsc2022 AS base
+SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN Write-Host hi
+
+FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
+RUN cmd /c icacls.exe C:\\BuildAgent\\* /grant:r DefaultAccount:(OI)(CI)F
+RUN cmd /c icacls.exe C:\\BuildAgent\\* /grant:r Users:(OI)(CI)F
+`)
+
+	violations := NewRule().Check(input)
+	for _, v := range violations {
+		if v.Line() == 5 || v.Line() == 6 {
+			t.Fatalf("expected no ShellCheck violations on cmd stage lines, got %+v", violations)
+		}
+	}
+}
+
+func TestRule_DoesNotLintExplicitPwshWrapperInCmdStage(t *testing.T) {
+	t.Parallel()
+
+	input := makeShellcheckLintInput(t, "Dockerfile", `FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
+RUN pwsh -NoLogo -NoProfile -Command " \
+    $stopTime = (get-date).AddMinutes(15); \
+    $ErrorActionPreference = 'Stop' ; \
+    $ProgressPreference = 'SilentlyContinue' ; \
+    while(!(Test-Path -Path $env:PSModuleAnalysisCachePath)) { \
+        Write-Host \"'Waiting for $env:PSModuleAnalysisCachePath'\" ; \
+        if((get-date) -gt $stopTime) { throw 'timeout expired'} \
+        Start-Sleep -Seconds 6 ; \
+    }"
+`)
+
+	violations := NewRule().Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no ShellCheck violations for explicit pwsh wrapper, got %+v", violations)
+	}
+}
+
+func TestRule_DoesNotLintExplicitWrappersWhenBaseImageOSIsUnknown(t *testing.T) {
+	t.Parallel()
+
+	input := makeShellcheckLintInput(t, "Dockerfile", `ARG base
+FROM ${base}
+RUN pwsh -NoLogo -NoProfile -Command "Write-Host hi"
+RUN cmd /c icacls.exe C:\\BuildAgent\\* /grant:r Users:(OI)(CI)F
+`)
+
+	violations := NewRule().Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no ShellCheck violations for explicit non-POSIX wrappers, got %+v", violations)
+	}
+}
+
+func makeShellcheckLintInput(tb testing.TB, file, content string) rules.LintInput {
+	tb.Helper()
+
+	result, err := dockerfile.Parse(strings.NewReader(content), nil)
+	if err != nil {
+		tb.Fatalf("failed to parse Dockerfile: %v", err)
+	}
+
+	sm := sourcemap.New(result.Source)
+	dirResult := directive.Parse(sm, nil, nil)
+	sem := semantic.NewBuilder(result, nil, file).WithShellDirectives(dirResult.ShellDirectives).Build()
+
+	return rules.LintInput{
+		File:     file,
+		AST:      result.AST,
+		Stages:   result.Stages,
+		MetaArgs: result.MetaArgs,
+		Source:   result.Source,
+		Semantic: sem,
+	}
+}
+
+func parseRunCommand(t *testing.T, dockerfileContent string) *instructions.RunCommand {
 	t.Helper()
 
-	result, err := parser.Parse(strings.NewReader(dockerfile))
+	result, err := parser.Parse(strings.NewReader(dockerfileContent))
 	if err != nil {
 		t.Fatalf("parse Dockerfile: %v", err)
 	}

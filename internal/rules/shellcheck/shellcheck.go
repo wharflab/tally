@@ -404,6 +404,8 @@ func (r *Rule) checkShellSnippet(
 	if sn, ok := heredocShebangShell(snippet); ok {
 		effectiveShellName = sn
 		scriptHasShebang = true
+	} else if inv, ok := shell.ParseExplicitShellInvocation(snippet); ok {
+		effectiveShellName = inv.ShellName
 	}
 
 	dialect, ok := dialectForShellName(effectiveShellName)
@@ -510,6 +512,8 @@ func (r *Rule) checkShellMapping(
 			effectiveShellName = sn
 			hasHeredocShebang = true
 		}
+	} else if inv, ok := shell.ParseExplicitShellInvocation(mapping.Script); ok {
+		effectiveShellName = inv.ShellName
 	}
 
 	dialect, ok := dialectForShellName(effectiveShellName)

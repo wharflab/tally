@@ -1,0 +1,88 @@
+{
+  "files": [
+    {
+      "file": "testdata/prefer-shell-instruction/Dockerfile",
+      "violations": [
+        {
+          "detail": "Found 2 run commands invoking pwsh explicitly before any PowerShell SHELL instruction.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/powershell/prefer-shell-instruction/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/prefer-shell-instruction/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "Prefer a SHELL instruction for repeated PowerShell RUN wrappers",
+          "rule": "tally/powershell/prefer-shell-instruction",
+          "severity": "style",
+          "sourceCode": "RUN pwsh -NoLogo -NoProfile -Command Install-Module PSReadLine -Force",
+          "suggestedFix": {
+            "description": "Insert a PowerShell SHELL instruction and remove repeated wrappers",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 3
+                  },
+                  "file": "testdata/prefer-shell-instruction/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 3
+                  }
+                },
+                "newText": "SHELL [\"pwsh\",\"-NoLogo\",\"-NoProfile\",\"-Command\",\"$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';\"]\n"
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 69,
+                    "line": 3
+                  },
+                  "file": "testdata/prefer-shell-instruction/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 3
+                  }
+                },
+                "newText": "Install-Module PSReadLine -Force"
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 108,
+                    "line": 5
+                  },
+                  "file": "testdata/prefer-shell-instruction/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 5
+                  }
+                },
+                "newText": "Invoke-WebRequest https://example.com/tools.zip -OutFile /tmp/tools.zip"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 95,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 2,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 1,
+    "total": 1,
+    "warnings": 0
+  }
+}

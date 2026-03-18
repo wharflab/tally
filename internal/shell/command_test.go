@@ -401,6 +401,68 @@ func TestFindCommands_PowerShell(t *testing.T) {
 	}
 }
 
+func TestFindCommands_Cmd(t *testing.T) {
+	t.Parallel()
+
+	script := `choco install git python && setx PATH "%PATH%;C:\Tools"`
+	cmds := FindCommands(script, VariantCmd, "choco", "setx")
+	if len(cmds) != 2 {
+		t.Fatalf("expected 2 commands, got %d", len(cmds))
+	}
+
+	if cmds[0].Name != "choco" || cmds[0].Subcommand != "install" {
+		t.Fatalf("first command = %#v, want choco install", cmds[0])
+	}
+	if cmds[1].Name != "setx" || cmds[1].Subcommand != "PATH" {
+		t.Fatalf("second command = %#v, want setx PATH", cmds[1])
+	}
+}
+
+func TestCommandNamesWithVariant_Cmd(t *testing.T) {
+	t.Parallel()
+
+	script := `cmd /c "echo hi" || py -m pip install -U pip`
+	got := CommandNamesWithVariant(script, VariantCmd)
+	want := []string{"cmd", "py"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("CommandNamesWithVariant() = %v, want %v", got, want)
+	}
+}
+
+func TestAnalyzeCmdScript(t *testing.T) {
+	t.Parallel()
+
+	script := `echo hi && echo bye`
+	analysis := AnalyzeCmdScript(script)
+	if analysis == nil {
+		t.Fatal("expected analysis")
+	}
+	if !analysis.HasConditionals {
+		t.Fatal("expected conditional execution to be detected")
+	}
+
+	script = `setlocal enabledelayedexpansion`
+	analysis = AnalyzeCmdScript(script)
+	if analysis == nil {
+		t.Fatal("expected analysis for setlocal script")
+	}
+	if !analysis.HasControlFlow {
+		t.Fatal("expected control flow to be detected")
+	}
+
+	script = `setx PATH '%PATH%;C:\Tools'`
+	analysis = AnalyzeCmdScript(script)
+	if analysis == nil {
+		t.Fatal("expected analysis for setx script")
+	}
+	if !analysis.HasVariableReferences {
+		t.Fatal("expected PATH expansion to be detected")
+	}
+	if analysis.HasBatchOnlySyntax() != true {
+		t.Fatal("expected PATH expansion to be treated as batch-only syntax")
+	}
+}
+
 func TestCommandNamesWithVariant_PowerShell(t *testing.T) {
 	t.Parallel()
 

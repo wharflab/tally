@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "tally/powershell/prefer-shell-instruction",
+ "DefaultSeverity": "style",
+ "Description": "Use a SHELL instruction instead of repeating powershell -Command or pwsh -Command wrappers",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/powershell/prefer-shell-instruction/",
+ "FixPriority": 95,
+ "IsExperimental": true,
+ "Name": "Prefer PowerShell SHELL instruction"
+}

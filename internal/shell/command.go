@@ -157,6 +157,9 @@ func FindCommands(script string, variant Variant, names ...string) []CommandInfo
 	if variant.IsPowerShell() {
 		return findPowerShellCommands(script, names...)
 	}
+	if variant == VariantCmd {
+		return findCmdCommands(script, names...)
+	}
 	if !variant.SupportsPOSIXShellAST() {
 		return nil
 	}

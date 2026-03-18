@@ -123,6 +123,91 @@ func TestFixRealWorldMetalama(t *testing.T) {
 	}
 }
 
+// TestFixRealWorldJaracoWindows tests auto-fix on a Windows Dockerfile derived
+// from jaraco.windows with all tally rules enabled. This fixture is tuned to
+// show multiple tally autofixes, including powershell -c unwrapping via
+// tally/powershell/prefer-shell-instruction.
+func TestFixRealWorldJaracoWindows(t *testing.T) {
+	t.Parallel()
+	testdataDir := filepath.Join("testdata", "real-world-fix-jaraco-windows")
+
+	originalContent, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read original Dockerfile: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, originalContent, 0o644); err != nil {
+		t.Fatalf("failed to write Dockerfile: %v", err)
+	}
+
+	configContent, err := os.ReadFile(filepath.Join(testdataDir, ".tally.toml"))
+	if err != nil {
+		t.Fatalf("failed to read config: %v", err)
+	}
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	if err := os.WriteFile(configPath, configContent, 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	args := []string{"lint", "--config", configPath, "--slow-checks=off", "--fix", "--fix-unsafe", dockerfilePath}
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	output, err := cmd.CombinedOutput()
+	expectExitCode1(t, output, err)
+
+	fixedContent, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read fixed Dockerfile: %v", err)
+	}
+
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
+
+	outputStr := string(output)
+	if !strings.Contains(outputStr, "Fixed") {
+		t.Errorf("expected 'Fixed' in output, got: %s", outputStr)
+	}
+}
+
+// TestFixRealWorldTeamCityNanoServer tests auto-fix on a Windows Dockerfile
+// derived from TeamCity's NanoServer agent image with all tally rules enabled.
+// Source:
+// https://github.com/npomoAtOlo/teamcity-docker-images/blob/
+// f72f707130cc0293faadff129cf24aa8d9e4b7ba/configs/windows/MinimalAgent/
+// nanoserver/NanoServer2022.Dockerfile
+func TestFixRealWorldTeamCityNanoServer(t *testing.T) {
+	t.Parallel()
+	testdataDir := filepath.Join("testdata", "real-world-fix-teamcity-nanoserver")
+
+	input, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyStdin(t, string(input),
+		"lint",
+		"--config", filepath.Join(testdataDir, ".tally.toml"),
+		"--format", "markdown",
+		"--fix", "--fix-unsafe",
+		"--slow-checks=on",
+		"-",
+	)
+
+	t.Logf("exit=%d\nstdout length=%d\nstderr:\n%s", exitCode, len(stdout), stderr)
+
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d\nstderr:\n%s", exitCode, stderr)
+	}
+
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, stdout)
+	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, stderr)
+
+	if !strings.Contains(stderr, "Fixed") {
+		t.Errorf("expected 'Fixed' in stderr, got: %s", stderr)
+	}
+}
+
 // TestFixHeredocCombined tests auto-fix with both prefer-copy-heredoc and prefer-run-heredoc
 // enabled together on a multi-stage Dockerfile that also has consistent-indentation enabled.
 // The snapshot makes it easy to review the final fixed Dockerfile.
@@ -408,6 +493,84 @@ func TestFixPowerShellAlpine(t *testing.T) {
 
 	// Snapshot the markdown report from stderr.
 	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, stderr)
+}
+
+// TestFixRealWorldBoostMSVCWindowsContainer tests the full fix pipeline on a
+// real-world Windows Dockerfile via stdin, snapshotting both the fixed
+// Dockerfile from stdout and the markdown violation report from stderr.
+// Source: https://github.com/teeks99/boost-msvc-docker/blob/e04e586bcd0de3609d396021d4ffea806a623896/14.0/Dockerfile
+func TestFixRealWorldBoostMSVCWindowsContainer(t *testing.T) {
+	t.Parallel()
+
+	input, err := os.ReadFile(filepath.Join("testdata", "real-world-fix-boost-msvc", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyStdin(t, string(input),
+		"lint", "--format", "markdown", "--fix", "--fix-unsafe", "--slow-checks=on", "-",
+	)
+
+	t.Logf("exit=%d\nstdout length=%d\nstderr:\n%s", exitCode, len(stdout), stderr)
+
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d\nstderr:\n%s", exitCode, stderr)
+	}
+
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, stdout)
+	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, stderr)
+
+	if !strings.Contains(stderr, "Fixed") {
+		t.Errorf("expected 'Fixed' in stderr, got: %s", stderr)
+	}
+}
+
+// TestFixPowerShellPreferShellInstruction exercises the end-to-end auto-fix path
+// for tally/powershell/prefer-shell-instruction using a PowerShell-on-Linux image.
+func TestFixPowerShellPreferShellInstruction(t *testing.T) {
+	t.Parallel()
+	testdataDir := filepath.Join("testdata", "prefer-shell-instruction")
+
+	originalContent, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, originalContent, 0o644); err != nil {
+		t.Fatalf("failed to write Dockerfile: %v", err)
+	}
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	if err := os.WriteFile(configPath, []byte(""), 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	args := []string{
+		"lint", "--config", configPath, "--slow-checks=off",
+		"--fix", "--fix-unsafe",
+		"--ignore", "*",
+		"--select", "tally/powershell/prefer-shell-instruction",
+		dockerfilePath,
+	}
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit code 0 (all violations fixable), got error: %v\noutput: %s", err, output)
+	}
+
+	fixedContent, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read fixed Dockerfile: %v", err)
+	}
+
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
+
+	if !strings.Contains(string(output), "Fixed") {
+		t.Errorf("expected 'Fixed' in output, got: %s", output)
+	}
 }
 
 // TestFixNewlinePerChainedCall exercises the auto-fix path for

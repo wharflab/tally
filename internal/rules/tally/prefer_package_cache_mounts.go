@@ -9,6 +9,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/runmount"
 	"github.com/wharflab/tally/internal/semantic"
@@ -256,7 +257,7 @@ func computeCleanupEdits(
 	}
 
 	startLine := runLoc[0].Start.Line
-	sourceFull, script, scriptIdx := resolveCleanupSource(run, runLoc, sm)
+	sourceFull, script, scriptIdx := resolveCleanupSource(run, sm)
 	if scriptIdx < 0 {
 		return nil
 	}
@@ -296,28 +297,13 @@ func computeCleanupEdits(
 // within the source (-1 if resolution fails).
 func resolveCleanupSource(
 	run *instructions.RunCommand,
-	runLoc []parser.Range,
 	sm *sourcemap.SourceMap,
 ) (string, string, int) {
-	lineIdx := runLoc[0].Start.Line - 1
-	endLine := runLoc[len(runLoc)-1].End.Line
-
-	var sourceLines []string
-	for i := lineIdx; i < endLine && i < sm.LineCount(); i++ {
-		sourceLines = append(sourceLines, sm.Line(i))
-	}
-	if len(sourceLines) == 0 {
+	resolved, ok := dockerfile.ResolveRunSource(run, sm)
+	if !ok {
 		return "", "", -1
 	}
-
-	sourceFull := strings.Join(sourceLines, "\n")
-	script := getRunScriptFromCmd(run)
-	if script == "" {
-		return "", "", -1
-	}
-
-	scriptIdx := strings.Index(sourceFull, script)
-	return sourceFull, script, scriptIdx
+	return resolved.Source, resolved.Script, resolved.ScriptIndex
 }
 
 type cmdSpan struct {

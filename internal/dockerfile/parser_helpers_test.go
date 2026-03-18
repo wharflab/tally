@@ -3,6 +3,10 @@ package dockerfile
 import (
 	"strings"
 	"testing"
+
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 func TestExtractRuleNameFromURL(t *testing.T) {
@@ -147,6 +151,70 @@ func TestBlankRunFlags(t *testing.T) {
 			}
 			if len(got) != len(tt.in) {
 				t.Errorf("length changed: got %d, want %d (must preserve column positions)", len(got), len(tt.in))
+			}
+		})
+	}
+}
+
+func TestResolveRunSource(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		dockerfile string
+		wantScript string
+		wantPrefix string
+	}{
+		{
+			name: "preserves buildkit run flags",
+			dockerfile: `FROM alpine
+RUN --mount=type=cache,target=/var/cache/apk --network=none echo hello
+`,
+			wantScript: "echo hello",
+			wantPrefix: "RUN --mount=type=cache,target=/var/cache/apk --network=none ",
+		},
+		{
+			name: "uses heredoc content",
+			dockerfile: `FROM alpine
+RUN <<EOF
+echo hello
+EOF
+`,
+			wantScript: "echo hello\n",
+			wantPrefix: "RUN <<EOF\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := Parse(strings.NewReader(tt.dockerfile), nil)
+			if err != nil {
+				t.Fatalf("Parse failed: %v", err)
+			}
+			sm := sourcemap.New(result.Source)
+
+			run, ok := result.Stages[0].Commands[0].(*instructions.RunCommand)
+			if !ok {
+				t.Fatal("expected RUN command")
+			}
+
+			got, ok := ResolveRunSource(run, sm)
+			if !ok {
+				t.Fatal("ResolveRunSource() returned !ok")
+			}
+			if got.Script != tt.wantScript {
+				t.Fatalf("ResolveRunSource().Script = %q, want %q", got.Script, tt.wantScript)
+			}
+			if !strings.HasPrefix(got.Source, tt.wantPrefix) {
+				t.Fatalf("ResolveRunSource().Source = %q, want prefix %q", got.Source, tt.wantPrefix)
+			}
+			if got.ScriptIndex < len(tt.wantPrefix) {
+				t.Fatalf("ResolveRunSource().ScriptIndex = %d, want >= %d", got.ScriptIndex, len(tt.wantPrefix))
+			}
+			if got.Source[got.ScriptIndex:got.ScriptIndex+len(got.Script)] != got.Script {
+				t.Fatalf("script span mismatch in source at index %d", got.ScriptIndex)
 			}
 		})
 	}

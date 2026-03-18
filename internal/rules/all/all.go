@@ -10,4 +10,5 @@ import (
 	_ "github.com/wharflab/tally/internal/rules/hadolint"
 	_ "github.com/wharflab/tally/internal/rules/shellcheck"
 	_ "github.com/wharflab/tally/internal/rules/tally"
+	_ "github.com/wharflab/tally/internal/rules/tally/powershell"
 )
