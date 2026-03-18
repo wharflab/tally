@@ -175,8 +175,7 @@ func (r *PreferShellInstructionRule) Check(input rules.LintInput) []rules.Violat
 					invocation: invocation,
 				})
 			default:
-				// Non-RUN instructions are unaffected by a SHELL insertion, so they
-				// do not break a fixable cluster.
+				// Non-RUN instructions do not participate in wrapper clustering.
 			}
 		}
 
@@ -325,6 +324,18 @@ func collectStageRunEditsForPowerShell(
 		switch cmd := stageCommands[idx].(type) {
 		case *instructions.ShellCommand:
 			return edits, true
+		case *instructions.CmdCommand:
+			if cmd.PrependShell {
+				return nil, false
+			}
+		case *instructions.EntrypointCommand:
+			if cmd.PrependShell {
+				return nil, false
+			}
+		case *instructions.HealthCheckCommand:
+			if healthcheckUsesShell(cmd) {
+				return nil, false
+			}
 		case *instructions.RunCommand:
 			if !cmd.PrependShell {
 				continue
@@ -350,6 +361,13 @@ func collectStageRunEditsForPowerShell(
 	}
 
 	return edits, true
+}
+
+func healthcheckUsesShell(cmd *instructions.HealthCheckCommand) bool {
+	if cmd == nil || cmd.Health == nil || len(cmd.Health.Test) == 0 {
+		return false
+	}
+	return strings.EqualFold(cmd.Health.Test[0], "CMD-SHELL")
 }
 
 func adaptImpactedRunForPowerShell(

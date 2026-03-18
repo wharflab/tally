@@ -272,6 +272,25 @@ RUN apk add --no-cache curl
 	}
 }
 
+func TestPreferShellInstructionRule_NoFixAcrossRuntimeShellSensitiveInstructions(t *testing.T) {
+	t.Parallel()
+
+	rule := NewPreferShellInstructionRule()
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN pwsh -Command Write-Host hi
+CMD echo hi
+RUN pwsh -Command Write-Host bye
+`)
+
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if violations[0].SuggestedFix != nil {
+		t.Fatal("expected no suggested fix when CMD would be captured by inserted SHELL")
+	}
+}
+
 func TestPreferShellInstructionRule_FixAllowsCmdSlashCWrapper(t *testing.T) {
 	t.Parallel()
 
