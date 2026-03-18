@@ -121,8 +121,15 @@ func (r *Runner) Version(ctx context.Context) (string, error) {
 }
 
 // Close releases the WASM runtime and compilation cache resources.
+// Resources are closed in reverse init order: module → compiled → runtime → cache.
 func (r *Runner) Close(ctx context.Context) error {
 	var errs []error
+	if r.mod != nil {
+		errs = append(errs, r.mod.Close(ctx))
+	}
+	if r.compiled != nil {
+		errs = append(errs, r.compiled.Close(ctx))
+	}
 	if r.rt != nil {
 		errs = append(errs, r.rt.Close(ctx))
 	}
