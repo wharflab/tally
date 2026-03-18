@@ -280,6 +280,24 @@ func TestReactorConsistency(t *testing.T) {
 	}
 }
 
+// TestReactorVersion verifies that the embedded WASM module exports
+// sc_version and returns a valid ShellCheck version string.
+func TestReactorVersion(t *testing.T) {
+	t.Parallel()
+
+	r := NewRunner()
+	ctx := context.Background()
+
+	ver, err := r.Version(ctx)
+	if err != nil {
+		t.Fatalf("Version() error: %v", err)
+	}
+	if ver == "" {
+		t.Fatal("expected non-empty version string")
+	}
+	t.Logf("shellcheck version: %s", ver)
+}
+
 func TestBuildOpts(t *testing.T) {
 	t.Parallel()
 

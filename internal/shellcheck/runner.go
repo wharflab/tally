@@ -77,6 +77,64 @@ func NewRunner() *Runner {
 	return &Runner{}
 }
 
+// Version returns the ShellCheck version embedded in the WASM module.
+// It initialises the runtime if needed (compilation is disk-cached by wazero).
+func (r *Runner) Version(ctx context.Context) (string, error) {
+	if err := r.init(ctx); err != nil {
+		return "", err
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	scVersion := r.mod.ExportedFunction("sc_version")
+	if scVersion == nil {
+		return "", errors.New("sc_version not exported by shellcheck module")
+	}
+
+	cleanupCtx := context.WithoutCancel(ctx)
+
+	outLenPtr, err := wasmAlloc(ctx, r.scAlloc, 4)
+	if err != nil {
+		return "", err
+	}
+	defer r.freePtr(cleanupCtx, outLenPtr)
+
+	results, err := scVersion.Call(ctx, uint64(outLenPtr))
+	if err != nil {
+		return "", fmt.Errorf("sc_version: %w", err)
+	}
+	resultPtr := uint32(results[0])
+	defer r.freePtr(cleanupCtx, resultPtr)
+
+	outLenBytes, ok := r.mem.Read(outLenPtr, 4)
+	if !ok {
+		return "", errors.New("failed to read version length from WASM memory")
+	}
+	outLen := binary.LittleEndian.Uint32(outLenBytes)
+
+	verBytes, ok := r.mem.Read(resultPtr, outLen)
+	if !ok {
+		return "", errors.New("failed to read version from WASM memory")
+	}
+	ver := make([]byte, len(verBytes))
+	copy(ver, verBytes)
+
+	return string(ver), nil
+}
+
+// Close releases the WASM runtime and compilation cache resources.
+func (r *Runner) Close(ctx context.Context) error {
+	var errs []error
+	if r.rt != nil {
+		errs = append(errs, r.rt.Close(ctx))
+	}
+	if r.cache != nil {
+		errs = append(errs, r.cache.Close(ctx))
+	}
+	return errors.Join(errs...)
+}
+
 func (r *Runner) Run(ctx context.Context, script string, opts Options) (JSON1Output, string, error) {
 	if err := r.init(ctx); err != nil {
 		return JSON1Output{}, "", err

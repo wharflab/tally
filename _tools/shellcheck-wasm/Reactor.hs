@@ -32,6 +32,7 @@ import Foreign.Ptr (Ptr, plusPtr)
 import Foreign.Storable (poke)
 
 import ShellCheck.Checker (checkScript)
+import ShellCheck.Data (shellcheckVersion)
 import ShellCheck.Interface
 
 -- | Reactor modules must not run main.
@@ -51,6 +52,22 @@ sc_alloc n = mallocBytes (fromIntegral n)
 foreign export ccall sc_free :: Ptr CChar -> IO ()
 sc_free :: Ptr CChar -> IO ()
 sc_free = free
+
+-- | Return the embedded ShellCheck version string.
+--
+-- Parameters:
+--   outLenPtr — host-provided pointer; sc_version writes the result length here
+--
+-- Returns: pointer to the version byte buffer (caller must sc_free it).
+foreign export ccall sc_version :: Ptr CInt -> IO (Ptr CChar)
+sc_version :: Ptr CInt -> IO (Ptr CChar)
+sc_version outLenPtr = do
+    let ver = shellcheckVersion
+        verLen = length ver
+    outBuf <- mallocBytes verLen
+    pokeCString outBuf ver verLen
+    poke outLenPtr (fromIntegral verLen)
+    return outBuf
 
 -- | Check a shell script and return JSON1-compatible output.
 --
