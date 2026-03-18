@@ -6,6 +6,7 @@ package tsutil
 
 import (
 	"regexp"
+	"strings"
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
 
@@ -16,6 +17,55 @@ import (
 // (e.g. C:\app\tool.exe, ./bin/tool, ~/script). These are typically excluded
 // from TokenFunction output.
 var CommandPathPattern = regexp.MustCompile(`^(?:[A-Za-z]:[\\/]|\.{1,2}[\\/]|~[\\/]|[\\/])`)
+
+// Tokenize parses script with the given tree-sitter language, walks the AST,
+// and emits core.Token values for every named node whose Kind() appears in
+// nodeTypes. Nodes with kind "command_name" that are not filesystem paths are
+// emitted as TokenFunction. Returns nil if parsing fails.
+func Tokenize(script string, lang *sitter.Language, nodeTypes map[string]core.TokenType) []core.Token {
+	if script == "" || lang == nil {
+		return nil
+	}
+
+	parser := sitter.NewParser()
+	defer parser.Close()
+
+	if err := parser.SetLanguage(lang); err != nil {
+		return nil
+	}
+
+	source := []byte(script)
+	tree := parser.Parse(source, nil)
+	if tree == nil {
+		return nil
+	}
+	defer tree.Close()
+
+	lines := strings.Split(script, "\n")
+	tokens := make([]core.Token, 0, 16)
+
+	Walk(tree.RootNode(), func(node *sitter.Node) {
+		if node == nil || !node.IsNamed() {
+			return
+		}
+
+		kind := node.Kind()
+		if typ, ok := nodeTypes[kind]; ok {
+			AppendNodeTokens(lines, node, typ, 30, 0, &tokens)
+			return
+		}
+
+		if kind == "command_name" {
+			text := strings.TrimSpace(node.Utf8Text(source))
+			if text == "" || CommandPathPattern.MatchString(text) {
+				return
+			}
+			AppendNodeTokens(lines, node, core.TokenFunction, 30, 0, &tokens)
+		}
+	})
+
+	return tokens
+}
 
 // Walk visits every named node in the tree-sitter parse tree.
 func Walk(node *sitter.Node, visit func(*sitter.Node)) {
