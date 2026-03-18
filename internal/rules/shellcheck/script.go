@@ -14,7 +14,11 @@ func extractRunScript(
 	node *dfparser.Node,
 	escapeToken rune,
 ) (scriptMapping, bool) {
-	return extract.ExtractRunScript(sm, node, escapeToken)
+	m, ok := extract.ExtractRunScript(sm, node, escapeToken)
+	if ok {
+		m.Script = extract.NormalizeContinuation(m.Script, escapeToken, '\\')
+	}
+	return m, ok
 }
 
 func extractOnbuildRunScript(
@@ -22,7 +26,11 @@ func extractOnbuildRunScript(
 	node *dfparser.Node,
 	escapeToken rune,
 ) (scriptMapping, bool) {
-	return extract.ExtractOnbuildRunScript(sm, node, escapeToken)
+	m, ok := extract.ExtractOnbuildRunScript(sm, node, escapeToken)
+	if ok {
+		m.Script = extract.NormalizeContinuation(m.Script, escapeToken, '\\')
+	}
+	return m, ok
 }
 
 func extractShellFormScript(
@@ -31,7 +39,11 @@ func extractShellFormScript(
 	escapeToken rune,
 	keyword string,
 ) (scriptMapping, bool) {
-	return extract.ExtractShellFormScript(sm, node, escapeToken, keyword)
+	m, ok := extract.ExtractShellFormScript(sm, node, escapeToken, keyword)
+	if ok {
+		m.Script = extract.NormalizeContinuation(m.Script, escapeToken, '\\')
+	}
+	return m, ok
 }
 
 func extractHealthcheckCmdShellScript(
@@ -39,5 +51,9 @@ func extractHealthcheckCmdShellScript(
 	node *dfparser.Node,
 	escapeToken rune,
 ) (scriptMapping, bool) {
-	return extract.ExtractHealthcheckCmdShellScript(sm, node, escapeToken)
+	m, ok := extract.ExtractHealthcheckCmdShellScript(sm, node, escapeToken)
+	if ok {
+		m.Script = extract.NormalizeContinuation(m.Script, escapeToken, '\\')
+	}
+	return m, ok
 }

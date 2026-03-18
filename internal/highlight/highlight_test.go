@@ -79,7 +79,7 @@ func TestAnalyze_PowerShellLineContinuationTokenization(t *testing.T) {
 		"# escape=`",
 		"FROM mcr.microsoft.com/windows/servercore:ltsc2025",
 		"SHELL [\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\", \"-Command\"]",
-		"RUN New-Item -ItemType Directory -Path 'C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages' -Force | Out-Null\"; `",
+		"RUN New-Item -ItemType Directory -Path 'C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages' -Force | Out-Null; `",
 		"    New-Item -ItemType Directory -Path 'C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder' -Force | Out-Null",
 		"",
 	}, "\n"))

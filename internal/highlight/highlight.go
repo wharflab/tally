@@ -109,7 +109,21 @@ func tokensForCommand(
 	if !ok {
 		return nil
 	}
-	return remapShellTokens(mapping, effectiveShellVariant(shellName, mapping))
+	variant := effectiveShellVariant(shellName, mapping)
+	mapping.Script = extract.NormalizeContinuation(mapping.Script, escapeToken, continuationRune(variant))
+	return remapShellTokens(mapping, variant)
+}
+
+// continuationRune returns the native line-continuation character for a shell variant.
+func continuationRune(variant shell.Variant) rune {
+	switch variant { //nolint:exhaustive // POSIX variants all use backslash
+	case shell.VariantPowerShell:
+		return '`'
+	case shell.VariantCmd:
+		return '^'
+	default:
+		return '\\'
+	}
 }
 
 func shellMappingForCommand(
