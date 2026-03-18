@@ -164,13 +164,7 @@ func uintToInt(v uint) (int, bool) {
 }
 
 func lineContentAt(lines []string, line int) (string, bool) {
-	if line < 0 {
-		return "", false
-	}
-	if len(lines) == 0 {
-		return "", true
-	}
-	if line >= len(lines) {
+	if line < 0 || line >= len(lines) {
 		return "", false
 	}
 	return lines[line], true
