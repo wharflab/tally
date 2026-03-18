@@ -117,10 +117,7 @@ func (r *Runner) Version(ctx context.Context) (string, error) {
 	if !ok {
 		return "", errors.New("failed to read version from WASM memory")
 	}
-	ver := make([]byte, len(verBytes))
-	copy(ver, verBytes)
-
-	return string(ver), nil
+	return string(verBytes), nil
 }
 
 // Close releases the WASM runtime and compilation cache resources.
