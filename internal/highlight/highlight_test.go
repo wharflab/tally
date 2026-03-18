@@ -72,6 +72,38 @@ func TestAnalyze_WindowsCmdTokenization(t *testing.T) {
 	assertHasLineToken(t, source, line3, core.TokenVariable, "%PATH%")
 }
 
+func TestAnalyze_PowerShellLineContinuationTokenization(t *testing.T) {
+	t.Parallel()
+
+	source := []byte(strings.Join([]string{
+		"# escape=`",
+		"FROM mcr.microsoft.com/windows/servercore:ltsc2025",
+		"SHELL [\"C:\\\\Windows\\\\System32\\\\WindowsPowerShell\\\\v1.0\\\\powershell.exe\", \"-Command\"]",
+		"RUN New-Item -ItemType Directory -Path 'C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages' -Force | Out-Null\"; `",
+		"    New-Item -ItemType Directory -Path 'C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder' -Force | Out-Null",
+		"",
+	}, "\n"))
+
+	doc := Analyze("Dockerfile", source)
+	if doc == nil {
+		t.Fatal("Analyze() returned nil")
+	}
+
+	// Line 3 (first line of RUN command) should have PowerShell tokens
+	line3 := doc.LineTokens(3)
+	assertHasLineToken(t, source, line3, core.TokenFunction, "New-Item")
+	assertHasLineToken(t, source, line3, core.TokenParameter, "-ItemType")
+	assertHasLineToken(t, source, line3, core.TokenParameter, "-Path")
+	assertHasLineToken(t, source, line3, core.TokenParameter, "-Force")
+
+	// Line 4 (continuation line) should also have PowerShell tokens
+	line4 := doc.LineTokens(4)
+	assertHasLineToken(t, source, line4, core.TokenFunction, "New-Item")
+	assertHasLineToken(t, source, line4, core.TokenParameter, "-ItemType")
+	assertHasLineToken(t, source, line4, core.TokenParameter, "-Path")
+	assertHasLineToken(t, source, line4, core.TokenParameter, "-Force")
+}
+
 func assertNoLineToken(t *testing.T, source []byte, tokens []core.Token, wantType core.TokenType, wantText string) {
 	t.Helper()
 
