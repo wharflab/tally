@@ -90,6 +90,21 @@ func TestInvalidJSONFormRule_Check(t *testing.T) {
 			WantViolations: 0,
 		},
 		{
+			Name: "PowerShell .NET class syntax is shell-form",
+			Content: "FROM mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022\n" +
+				"SHELL [\"pwsh\", \"-Command\", \"$ErrorActionPreference = 'Stop';\"]\n" +
+				"RUN [Net.ServicePointManager]::SecurityProtocol = 'tls12, tls11, tls'\n",
+			WantViolations: 0,
+		},
+		{
+			Name: "PowerShell .NET class syntax multi-line is shell-form",
+			Content: "FROM mcr.microsoft.com/powershell:lts-nanoserver-ltsc2022\n" +
+				"SHELL [\"pwsh\", \"-Command\", \"$ErrorActionPreference = 'Stop';\"]\n" +
+				"RUN [Net.ServicePointManager]::SecurityProtocol = 'tls12, tls11, tls' ; \\\n" +
+				"    Write-Host \"done\"\n",
+			WantViolations: 0,
+		},
+		{
 			Name:           "valid HEALTHCHECK CMD JSON form",
 			Content:        "FROM alpine:3.20\nHEALTHCHECK CMD [\"curl\", \"-f\", \"http://localhost/\"]\n",
 			WantViolations: 0,

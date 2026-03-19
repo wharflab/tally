@@ -9,3 +9,7 @@ func powerShellCommandNames(script string) []string {
 func findPowerShellCommands(script string, names ...string) []CommandInfo {
 	return nil
 }
+
+func canParsePowerShell(_ string) bool {
+	return false // No parser available without cgo.
+}
