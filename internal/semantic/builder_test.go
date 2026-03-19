@@ -10,6 +10,8 @@ import (
 	"github.com/wharflab/tally/internal/shell"
 )
 
+const testShellBash = "bash"
+
 func TestBuilderWithShellDirectivesAppliesToFollowingStages(t *testing.T) {
 	t.Parallel()
 	content := `FROM alpine:3.18 AS s0
@@ -51,8 +53,8 @@ RUN echo "ok"
 		t.Errorf("expected stage 1 ShellSetting.Variant=%v, got %v", shell.VariantBash, info1.ShellSetting.Variant)
 	}
 	// Directive should also propagate the shell name into ShellSetting.Shell.
-	if len(info1.ShellSetting.Shell) == 0 || info1.ShellSetting.Shell[0] != "bash" {
-		t.Errorf("expected stage 1 ShellSetting.Shell[0]=%q, got %v", "bash", info1.ShellSetting.Shell)
+	if len(info1.ShellSetting.Shell) == 0 || info1.ShellSetting.Shell[0] != testShellBash {
+		t.Errorf("expected stage 1 ShellSetting.Shell[0]=%q, got %v", testShellBash, info1.ShellSetting.Shell)
 	}
 }
 
@@ -115,16 +117,16 @@ FROM alpine:3.18
 RUN echo "bash via directive"
 `
 	pr := parseDockerfile(t, content)
-	directives := []directive.ShellDirective{{Shell: "bash", Line: 0}}
+	directives := []directive.ShellDirective{{Shell: testShellBash, Line: 0}}
 
 	model := NewBuilder(pr, nil, "Dockerfile").
 		WithShellDirectives(directives).
 		Build()
 	info := model.StageInfo(0)
 
-	// Directive sets shell to "bash", so all lines should reflect that.
-	if got := info.ShellNameAtLine(3); got != "bash" {
-		t.Errorf("line 3: ShellNameAtLine=%q, want %q", got, "bash")
+	// Directive sets shell to bash, so all lines should reflect that.
+	if got := info.ShellNameAtLine(3); got != testShellBash {
+		t.Errorf("line 3: ShellNameAtLine=%q, want %q", got, testShellBash)
 	}
 	if got := info.ShellVariantAtLine(3); got != shell.VariantBash {
 		t.Errorf("line 3: ShellVariantAtLine=%v, want VariantBash", got)
