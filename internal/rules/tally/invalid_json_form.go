@@ -8,9 +8,12 @@ import (
 	"unicode"
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 // InvalidJSONFormRuleCode is the full rule code.
@@ -71,6 +74,12 @@ func (r *InvalidJSONFormRule) Check(input rules.LintInput) []rules.Violation {
 	}
 
 	meta := r.Metadata()
+	sem, ok := input.Semantic.(*semantic.Model)
+	if !ok {
+		sem = nil
+	}
+	stageLines := stageStartLines(input.Stages)
+
 	var violations []rules.Violation
 
 	for _, node := range input.AST.AST.Children {
@@ -78,7 +87,8 @@ func (r *InvalidJSONFormRule) Check(input rules.LintInput) []rules.Violation {
 			continue
 		}
 
-		vs := r.checkNode(node, input, meta)
+		variant := shellVariantForNode(sem, stageLines, node.StartLine)
+		vs := r.checkNode(node, input, meta, variant)
 		violations = append(violations, vs...)
 	}
 
@@ -91,18 +101,19 @@ func (r *InvalidJSONFormRule) checkNode(
 	node *parser.Node,
 	input rules.LintInput,
 	meta rules.RuleMetadata,
+	variant shell.Variant,
 ) []rules.Violation {
 	keyword := strings.ToLower(node.Value)
 
 	switch {
 	case jsonFormInstructions[keyword]:
-		return r.checkInstruction(node, keyword, input, meta)
+		return r.checkInstruction(node, keyword, input, meta, variant)
 
 	case keyword == command.Healthcheck:
-		return r.checkHealthcheck(node, input, meta)
+		return r.checkHealthcheck(node, input, meta, variant)
 
 	case keyword == command.Onbuild:
-		return r.checkOnbuild(node, input, meta)
+		return r.checkOnbuild(node, input, meta, variant)
 	}
 
 	return nil
@@ -114,6 +125,7 @@ func (r *InvalidJSONFormRule) checkInstruction(
 	keyword string,
 	input rules.LintInput,
 	meta rules.RuleMetadata,
+	variant shell.Variant,
 ) []rules.Violation {
 	// If BuildKit successfully parsed JSON, nothing to flag.
 	if node.Attributes != nil && node.Attributes["json"] {
@@ -121,7 +133,7 @@ func (r *InvalidJSONFormRule) checkInstruction(
 	}
 
 	argText := extractArgsText(node.Original)
-	return r.buildViolation(node, keyword, argText, input, meta)
+	return r.buildViolation(node, keyword, argText, input, meta, variant)
 }
 
 // checkHealthcheck handles HEALTHCHECK CMD [...] where the CMD sub-instruction
@@ -130,6 +142,7 @@ func (r *InvalidJSONFormRule) checkHealthcheck(
 	node *parser.Node,
 	input rules.LintInput,
 	meta rules.RuleMetadata,
+	variant shell.Variant,
 ) []rules.Violation {
 	if node.Attributes != nil && node.Attributes["json"] {
 		return nil
@@ -141,7 +154,7 @@ func (r *InvalidJSONFormRule) checkHealthcheck(
 	}
 
 	argText := extractHealthcheckArgs(node.Original)
-	return r.buildViolation(node, "healthcheck cmd", argText, input, meta)
+	return r.buildViolation(node, "healthcheck cmd", argText, input, meta, variant)
 }
 
 // checkOnbuild handles ONBUILD <instruction> [...] where the sub-instruction
@@ -150,6 +163,7 @@ func (r *InvalidJSONFormRule) checkOnbuild(
 	node *parser.Node,
 	input rules.LintInput,
 	meta rules.RuleMetadata,
+	variant shell.Variant,
 ) []rules.Violation {
 	if node.Next == nil || len(node.Next.Children) == 0 || node.Next.Children[0] == nil {
 		return nil
@@ -168,7 +182,7 @@ func (r *InvalidJSONFormRule) checkOnbuild(
 	}
 
 	argText := extractOnbuildArgs(node.Original, subKeyword)
-	return r.buildViolation(node, subKeyword, argText, input, meta)
+	return r.buildViolation(node, subKeyword, argText, input, meta, variant)
 }
 
 // buildViolation creates a violation if argText looks like invalid JSON form.
@@ -178,9 +192,10 @@ func (r *InvalidJSONFormRule) buildViolation(
 	keyword, argText string,
 	input rules.LintInput,
 	meta rules.RuleMetadata,
+	variant shell.Variant,
 ) []rules.Violation {
 	trimmed := strings.TrimSpace(argText)
-	if !looksLikeInvalidJSON(trimmed) {
+	if !shell.LooksLikeJSONExecForm(trimmed, variant) {
 		return nil
 	}
 
@@ -199,29 +214,35 @@ func (r *InvalidJSONFormRule) buildViolation(
 	return []rules.Violation{v}
 }
 
-// looksLikeInvalidJSON returns true if the argument text starts with `[` but
-// is not a shell test construct and contains a closing `]`.
-func looksLikeInvalidJSON(trimmed string) bool {
-	if !strings.HasPrefix(trimmed, "[") {
-		return false
-	}
-	// Bash [[ test syntax is not a JSON array attempt.
-	if strings.HasPrefix(trimmed, "[[") {
-		return false
-	}
-	// Must contain a closing bracket to look like an array attempt.
-	if !strings.Contains(trimmed, "]") {
-		return false
-	}
-	// POSIX single-bracket test: `[ expression ]`. These start with "[ "
-	// and have no commas between brackets (JSON arrays use commas).
-	if strings.HasPrefix(trimmed, "[ ") {
-		closingIdx := strings.Index(trimmed, "]")
-		if closingIdx > 0 && !strings.Contains(trimmed[1:closingIdx], ",") {
-			return false
+// stageStartLines returns the 1-based FROM line for each stage.
+func stageStartLines(stages []instructions.Stage) []int {
+	lines := make([]int, len(stages))
+	for i, s := range stages {
+		if len(s.Location) > 0 {
+			lines[i] = s.Location[0].Start.Line
 		}
 	}
-	return true
+	return lines
+}
+
+// shellVariantForNode returns the effective shell variant at the given
+// 1-based line by delegating to StageInfo.ShellVariantAtLine.
+// Falls back to VariantBash when the semantic model is unavailable.
+func shellVariantForNode(sem *semantic.Model, stageLines []int, line int) shell.Variant {
+	if sem == nil {
+		return shell.VariantBash
+	}
+	stageIdx := 0
+	for i, sl := range stageLines {
+		if sl <= line {
+			stageIdx = i
+		}
+	}
+	info := sem.StageInfo(stageIdx)
+	if info == nil {
+		return shell.VariantBash
+	}
+	return info.ShellVariantAtLine(line)
 }
 
 // extractArgsText strips the instruction keyword and flags from the original

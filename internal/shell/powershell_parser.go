@@ -140,6 +140,29 @@ func powerShellCommandArgs(node *sitter.Node, source []byte) []powerShellArg {
 	return args
 }
 
+// canParsePowerShell reports whether the PowerShell tree-sitter grammar can
+// parse the script without errors. A clean parse means valid PowerShell syntax
+// (e.g., [ClassName]::Method), not a JSON exec-form attempt.
+func canParsePowerShell(script string) bool {
+	p := sitter.NewParser()
+	defer p.Close()
+
+	if powerShellLanguage == nil {
+		return false
+	}
+	if err := p.SetLanguage(powerShellLanguage); err != nil {
+		return false
+	}
+
+	tree := p.Parse([]byte(script), nil)
+	if tree == nil {
+		return false
+	}
+	defer tree.Close()
+
+	return !tree.RootNode().HasError()
+}
+
 func normalizePowerShellCommandName(name string) string {
 	name = strings.TrimSpace(DropQuotes(name))
 	if name == "" {

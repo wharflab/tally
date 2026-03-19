@@ -196,6 +196,12 @@ type StageInfo struct {
 	// Each ONBUILD expression is parsed into a typed command using BuildKit's parser.
 	OnbuildInstructions []OnbuildInstruction
 
+	// shellVariantByLine maps 1-based instruction start lines to the shell
+	// variant that was active when that instruction appeared. Built during
+	// model construction by tracking SHELL instruction transitions.
+	// Query via ShellVariantAtLine.
+	shellVariantByLine map[int]shell.Variant
+
 	// HeredocShellOverrides contains per-instruction shell overrides detected
 	// from heredoc shebang lines. Rules can use this to determine the effective
 	// shell for a specific RUN instruction instead of the stage-level shell.
@@ -207,6 +213,17 @@ type StageInfo struct {
 
 	// IsLastStage is true if this is the final stage in the Dockerfile.
 	IsLastStage bool
+}
+
+// ShellVariantAtLine returns the effective shell variant at the given
+// 1-based Dockerfile line within this stage. It accounts for mid-stage
+// SHELL instruction transitions. Returns the stage default if the line
+// is not found (e.g., non-command lines like comments or blank lines).
+func (s *StageInfo) ShellVariantAtLine(line int) shell.Variant {
+	if v, ok := s.shellVariantByLine[line]; ok {
+		return v
+	}
+	return s.ShellSetting.Variant
 }
 
 // IsWindows returns true if the base image was detected as Windows.
