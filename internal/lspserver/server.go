@@ -14,6 +14,7 @@ import (
 	"encoding/json/jsontext"
 	"errors"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"strconv"
@@ -563,8 +564,14 @@ func (stdioDialer) Dial(_ context.Context) (io.ReadWriteCloser, error) {
 	pr, pw := io.Pipe()
 	go func() {
 		_, err := io.Copy(pw, os.Stdin)
-		// Propagate the exact error (or clean EOF) to unblock jsonrpc2 readIncoming.
-		_ = pw.CloseWithError(err)
+		// Treat stdin closure as clean EOF, not an error.
+		// When the LSP client stops, it closes stdin, which should trigger
+		// a graceful shutdown without logging errors.
+		if err == nil || errors.Is(err, io.EOF) || errors.Is(err, fs.ErrClosed) || errors.Is(err, io.ErrClosedPipe) {
+			_ = pw.Close() // Clean close triggers EOF on read side
+		} else {
+			_ = pw.CloseWithError(err) // Propagate actual I/O errors
+		}
 	}()
 	return &stdioRWC{pr: pr, pw: pw}, nil
 }
