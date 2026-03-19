@@ -1,0 +1,29 @@
+:root > * {
+  /* --md-primary-fg-color:        #45744a;
+  --md-primary-fg-color--light: #45744a;
+  --md-primary-fg-color--dark:  #45744a; */
+}
+
+.no-ligatures code,
+code.no-ligatures {
+  font-variant-ligatures: none;
+}
+
+.true {
+  color: #00c853;
+}
+.trace {
+}
+.debug {
+}
+.info {
+  color: #00b8d4;
+}
+.warning {
+  color: #ff9100;
+}
+.error,
+.stop,
+.false {
+  color: #ff1744;
+}

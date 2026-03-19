@@ -3,8 +3,9 @@
 tally supports **opt-in AI AutoFix** for the kinds of Dockerfile improvements that are hard to express as a purely mechanical rewrite (or too risky
 to apply without extra validation).
 
-Instead of asking you for an API key, tally integrates with **ACP (Agent Client Protocol)** — a protocol created by the
-[Zed editor](https://zed.dev/) to standardize how tools talk to “coding agents”.
+Instead of asking you for an API key, tally integrates with
+[**ACP (Agent Client Protocol)**](https://agentclientprotocol.com/get-started/introduction) — a protocol created by the [Zed editor](https://zed.dev/)
+to standardize how tools talk to “coding agents”.
 
 From a user perspective, that means:
 
@@ -38,11 +39,13 @@ For Gemini specifically, we recommend treating `--allowed-mcp-server-names=none`
 
 The simplest way to get started is an ACP-capable CLI agent, such as:
 
-- Gemini CLI (native ACP): <https://agentclientprotocol.com/agents/gemini-cli>
+- Gemini CLI (native ACP): <https://geminicli.com/docs/cli/cli-reference/#cli-options>
 - OpenCode (native ACP): <https://opencode.ai/docs/acp/>
-- Kiro CLI (native ACP): <https://kiro.dev/docs/cli/acp/>
-- Cline (CLI v2, native ACP): <https://docs.cline.bot/cline-cli/acp-editor-integrations>
 - GitHub Copilot CLI (native ACP): <https://docs.github.com/en/copilot/reference/acp-server>
+- Docker agent (native ACP): <https://docker.github.io/docker-agent/features/acp/>
+- Cline (CLI v2, native ACP): <https://docs.cline.bot/cline-cli/acp-editor-integrations>
+- QwenCode (CLI, native ACP): <https://qwenlm.github.io/qwen-code-docs/en/users/integration-zed/#install-from-acp-registry-recommend>
+- Kiro CLI (native ACP): <https://kiro.dev/docs/cli/acp/>
 
 You can always browse the latest registry here:
 

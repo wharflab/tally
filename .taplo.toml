@@ -1,0 +1,10 @@
+exclude = ["**/node_modules/**", "**/.venv/**", "**/target/**"]
+
+[formatting]
+align_entries = true
+array_auto_collapse = false
+array_auto_expand = false
+indent_string = "    "
+inline_table_expand = false
+reorder_keys = true
+reorder_arrays = true

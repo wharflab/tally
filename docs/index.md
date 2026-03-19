@@ -7,7 +7,7 @@ tally keeps Dockerfiles and Containerfiles clean, modern, and consistent — usi
 
 ## Quick Start
 
-```bash
+```sh
 # Install via Homebrew
 brew install wharflab/tap/tally
 

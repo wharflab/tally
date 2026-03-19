@@ -49,6 +49,17 @@
     "editor.defaultFormatter": "JasonHeld.yamllint-ts",
     "files.insertFinalNewline": true
   },
+  "[toml]": {
+    "editor.defaultFormatter": "tamasfe.even-better-toml",
+    "editor.formatOnSave": true
+  },
+  "[css]": {
+    "editor.suggest.insertMode": "replace",
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.stylelint": "explicit"
+    }
+  },
   "go.toolsEnvVars": {
     "GOEXPERIMENT": "jsonv2",
     "GOSUMDB": "sum.golang.org",
@@ -56,7 +67,7 @@
   },
   "sarif-viewer.connectToGithubCodeScanning": "off",
   "typescript.native-preview.tsdk": "./_integrations/vscode-tally/node_modules/@typescript/native-preview/bin",
-  "typescript.experimental.useTsgo": true,
+  "js/ts.experimental.useTsgo": true,
   // Disable ESLint and Biome in favor of oxlint
   "eslint.enable": false,
   "biome.enabled": false,
