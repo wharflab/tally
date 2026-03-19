@@ -42,7 +42,7 @@ func Analyze(file string, source []byte) *Document {
 
 		directives := directive.Parse(sm, nil, nil).ShellDirectives
 		sem := semantic.NewBuilder(parseResult, nil, file).WithShellDirectives(directives).Build()
-		tokens = append(tokens, shellTokens(parseResult, sem, sm, directives)...)
+		tokens = append(tokens, shellTokens(parseResult, sem, sm)...)
 	} else {
 		tokens = append(tokens, highlightdockerfile.Tokenize(sm, nil, '\\')...)
 	}
@@ -63,7 +63,6 @@ func shellTokens(
 	parseResult *dfparse.ParseResult,
 	sem *semantic.Model,
 	sm *sourcemap.SourceMap,
-	directives []directive.ShellDirective,
 ) []core.Token {
 	if parseResult == nil || parseResult.AST == nil || parseResult.AST.AST == nil {
 		return nil
@@ -72,27 +71,28 @@ func shellTokens(
 	nodesByStartLine := nodeIndex(parseResult.AST.AST)
 	var out []core.Token
 
-	for stageIdx, stage := range parseResult.Stages {
+	for stageIdx := range parseResult.Stages {
 		stageInfo := (*semantic.StageInfo)(nil)
 		if sem != nil {
 			stageInfo = sem.StageInfo(stageIdx)
 		}
-		shellName := extract.InitialShellNameForStage(stage, directives, stageInfo)
 
-		for _, cmd := range stage.Commands {
-			startLine := extract.CommandStartLine(cmd.Location())
-			if shellCmd, ok := cmd.(*instructions.ShellCommand); ok {
-				if len(shellCmd.Shell) > 0 {
-					shellName = shellCmd.Shell[0]
-				}
+		for _, cmd := range parseResult.Stages[stageIdx].Commands {
+			if _, ok := cmd.(*instructions.ShellCommand); ok {
 				continue
 			}
 
+			startLine := extract.CommandStartLine(cmd.Location())
 			node := nodesByStartLine[startLine]
 			if node == nil {
 				continue
 			}
-			out = append(out, tokensForCommand(cmd, node, sm, parseResult.AST.EscapeToken, shellName)...)
+
+			baseVariant := shell.VariantFromShellCmd(semantic.DefaultShell)
+			if stageInfo != nil {
+				baseVariant = stageInfo.ShellVariantAtLine(startLine)
+			}
+			out = append(out, tokensForCommand(cmd, node, sm, parseResult.AST.EscapeToken, baseVariant)...)
 		}
 	}
 	return out
@@ -103,13 +103,13 @@ func tokensForCommand(
 	node *parser.Node,
 	sm *sourcemap.SourceMap,
 	escapeToken rune,
-	shellName string,
+	baseVariant shell.Variant,
 ) []core.Token {
 	mapping, ok := shellMappingForCommand(cmd, node, sm, escapeToken)
 	if !ok {
 		return nil
 	}
-	variant := effectiveShellVariant(shellName, mapping)
+	variant := effectiveShellVariant(baseVariant, mapping)
 	mapping.Script = extract.NormalizeContinuation(mapping.Script, escapeToken, continuationRune(variant))
 	return remapShellTokens(mapping, variant)
 }
@@ -172,7 +172,7 @@ func nodeIndex(root *parser.Node) map[int]*parser.Node {
 	return out
 }
 
-func effectiveShellVariant(shellName string, mapping extract.Mapping) shell.Variant {
+func effectiveShellVariant(baseVariant shell.Variant, mapping extract.Mapping) shell.Variant {
 	if mapping.ShellNameOverride != "" {
 		return shell.VariantFromShell(mapping.ShellNameOverride)
 	}
@@ -182,7 +182,7 @@ func effectiveShellVariant(shellName string, mapping extract.Mapping) shell.Vari
 			return shell.VariantFromShell(name)
 		}
 	}
-	return shell.VariantFromShell(shellName)
+	return baseVariant
 }
 
 func remapShellTokens(mapping extract.Mapping, variant shell.Variant) []core.Token {

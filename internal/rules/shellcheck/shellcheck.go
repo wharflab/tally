@@ -172,34 +172,13 @@ func (r *Rule) collectTasksForStage(
 
 	knownEnv := collectKnownEnv(stageInfo)
 
-	// Determine the initial shell name for this stage. Use the semantic model's
-	// OS-aware default (e.g. Windows → cmd) when available, then fall back to
-	// directive-based detection. Don't use ShellSourceInstruction as the initial
-	// shell — a SHELL instruction may appear after earlier RUNs.
-	stageShellName := initialShellNameForStage(stage, ctx.shellDirectives)
-	if stageInfo != nil &&
-		stageInfo.ShellSetting.Source == semantic.ShellSourceDefault &&
-		len(stageInfo.ShellSetting.Shell) > 0 {
-		stageShellName = stageInfo.ShellSetting.Shell[0]
-	}
-	shellName := stageShellName
-
-	// Track shell state at instruction start lines so ONBUILD triggers can
-	// reuse the dialect that was active at the ONBUILD declaration site.
-	shellNameByLine := make(map[int]string)
-
 	for _, cmd := range stage.Commands {
-		startLine := commandStartLine(cmd.Location())
-		if startLine > 0 {
-			shellNameByLine[startLine] = shellName
-		}
-
-		if shellCmd, ok := cmd.(*instructions.ShellCommand); ok {
-			if len(shellCmd.Shell) > 0 && shellCmd.Shell[0] != "" {
-				shellName = shellCmd.Shell[0]
-			}
+		if _, ok := cmd.(*instructions.ShellCommand); ok {
 			continue
 		}
+
+		startLine := commandStartLine(cmd.Location())
+		shellName := shellNameForLine(stageInfo, stage, ctx.shellDirectives, startLine)
 
 		switch c := cmd.(type) {
 		case *instructions.RunCommand:
@@ -230,41 +209,36 @@ func (r *Rule) collectTasksForStage(
 		}
 	}
 
-	r.collectOnbuildRunTasksForStage(ctx, stageIdx, stageShellName, shellNameByLine, knownEnv)
+	r.collectOnbuildRunTasksForStage(ctx, stageInfo, knownEnv)
 }
 
 func (r *Rule) collectOnbuildRunTasksForStage(
 	ctx *collectTasksContext,
-	stageIdx int,
-	stageShellName string,
-	shellNameByLine map[int]string,
+	stageInfo *semantic.StageInfo,
 	knownEnv []string,
 ) {
-	if ctx.sem == nil {
+	if ctx.sem == nil || stageInfo == nil {
 		return
 	}
 
-	for _, ob := range ctx.sem.OnbuildInstructions(stageIdx) {
+	for _, ob := range ctx.sem.OnbuildInstructions(stageInfo.Index) {
 		run, ok := ob.Command.(*instructions.RunCommand)
 		if !ok || !run.PrependShell {
 			continue
 		}
 
-		shellAtOnbuild := shellNameByLine[ob.SourceLine]
-		if shellAtOnbuild == "" {
-			shellAtOnbuild = stageShellName
-		}
+		shellName := stageInfo.ShellNameAtLine(ob.SourceLine)
 
 		node := ctx.nodesByStartLine[ob.SourceLine]
 		mapping, ok := extractOnbuildRunScript(ctx.sm, node, ctx.escapeToken)
 		if !ok {
 			// Fall back to Hadolint-parity behavior (report on instruction line only).
-			r.addShellSnippetTask(ctx.app, ctx.input.File, run.Location(), shellAtOnbuild, knownEnv, getShellFormScript(run))
+			r.addShellSnippetTask(ctx.app, ctx.input.File, run.Location(), shellName, knownEnv, getShellFormScript(run))
 			continue
 		}
 
 		fallbackLoc := rules.NewLocationFromRanges(ctx.input.File, run.Location())
-		r.addShellMappingTask(ctx.app, ctx.input.File, fallbackLoc, shellAtOnbuild, knownEnv, mapping)
+		r.addShellMappingTask(ctx.app, ctx.input.File, fallbackLoc, shellName, knownEnv, mapping)
 	}
 }
 
@@ -754,9 +728,20 @@ func heredocShebangShell(script string) (string, bool) {
 	return name, true
 }
 
-func initialShellNameForStage(stage instructions.Stage, directives []directive.ShellDirective) string {
+// shellNameForLine returns the effective shell name at the given instruction
+// line. Delegates to StageInfo.ShellNameAtLine when the semantic model is
+// available, otherwise falls back to directive-based detection.
+func shellNameForLine(
+	stageInfo *semantic.StageInfo,
+	stage instructions.Stage,
+	directives []directive.ShellDirective,
+	startLine int,
+) string {
+	if stageInfo != nil {
+		return stageInfo.ShellNameAtLine(startLine)
+	}
+	// Fallback when semantic model is unavailable: use directive-based detection.
 	shellName := semantic.DefaultShell[0]
-
 	fromLine := -1
 	if len(stage.Location) > 0 {
 		fromLine = stage.Location[0].Start.Line - 1 // 0-based
@@ -764,7 +749,6 @@ func initialShellNameForStage(stage instructions.Stage, directives []directive.S
 	if fromLine < 0 {
 		return shellName
 	}
-
 	bestLine := -1
 	for i := range directives {
 		sd := directives[i]
@@ -773,7 +757,6 @@ func initialShellNameForStage(stage instructions.Stage, directives []directive.S
 			shellName = sd.Shell
 		}
 	}
-
 	return shellName
 }
 

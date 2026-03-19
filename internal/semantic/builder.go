@@ -354,25 +354,38 @@ func (b *Builder) applyShellDirectives(stage *instructions.Stage, info *StageInf
 	}
 
 	if activeDirective != nil {
-		// Apply the directive (it only hints at shell variant for linting).
+		// Apply the directive: set both variant and shell name so that
+		// ShellNameAtLine can return the directive's shell for dialect
+		// selection in downstream consumers (shellcheck, highlight).
 		info.ShellSetting.Variant = shell.VariantFromShell(activeDirective.Shell)
 		info.ShellSetting.Source = ShellSourceDirective
 		info.ShellSetting.Line = activeDirective.Line
+		info.ShellSetting.Shell = []string{activeDirective.Shell, "-c"}
 	}
 }
 
-// buildShellVariantByLine pre-computes the effective shell variant at each
-// instruction's start line within a stage, tracking SHELL transitions.
-func buildShellVariantByLine(stage *instructions.Stage, info *StageInfo) {
-	active := info.ShellSetting.Variant
+// buildShellLookupsByLine pre-computes the effective shell variant and shell
+// executable name at each instruction's start line within a stage, tracking
+// SHELL instruction transitions.
+func buildShellLookupsByLine(stage *instructions.Stage, info *StageInfo) {
+	activeVariant := info.ShellSetting.Variant
+	activeName := DefaultShell[0]
+	if len(info.ShellSetting.Shell) > 0 {
+		activeName = info.ShellSetting.Shell[0]
+	}
+
 	info.shellVariantByLine = make(map[int]shell.Variant, len(stage.Commands))
+	info.shellNameByLine = make(map[int]string, len(stage.Commands))
 
 	for _, cmd := range stage.Commands {
 		if locs := cmd.Location(); len(locs) > 0 && locs[0].Start.Line > 0 {
-			info.shellVariantByLine[locs[0].Start.Line] = active
+			line := locs[0].Start.Line
+			info.shellVariantByLine[line] = activeVariant
+			info.shellNameByLine[line] = activeName
 		}
 		if sc, ok := cmd.(*instructions.ShellCommand); ok && len(sc.Shell) > 0 {
-			active = shell.VariantFromShellCmd(sc.Shell)
+			activeVariant = shell.VariantFromShellCmd(sc.Shell)
+			activeName = sc.Shell[0]
 		}
 	}
 }
@@ -471,7 +484,7 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 
 	declaredArgs := make(map[string]struct{})
 
-	buildShellVariantByLine(stage, info)
+	buildShellLookupsByLine(stage, info)
 
 	for _, cmd := range stage.Commands {
 		// UndefinedVar analysis must observe the environment at the point of use,

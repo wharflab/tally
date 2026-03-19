@@ -202,6 +202,12 @@ type StageInfo struct {
 	// Query via ShellVariantAtLine.
 	shellVariantByLine map[int]shell.Variant
 
+	// shellNameByLine maps 1-based instruction start lines to the shell
+	// executable name (e.g., "/bin/bash", "cmd") that was active when that
+	// instruction appeared. Built alongside shellVariantByLine.
+	// Query via ShellNameAtLine.
+	shellNameByLine map[int]string
+
 	// HeredocShellOverrides contains per-instruction shell overrides detected
 	// from heredoc shebang lines. Rules can use this to determine the effective
 	// shell for a specific RUN instruction instead of the stage-level shell.
@@ -224,6 +230,20 @@ func (s *StageInfo) ShellVariantAtLine(line int) shell.Variant {
 		return v
 	}
 	return s.ShellSetting.Variant
+}
+
+// ShellNameAtLine returns the effective shell executable name at the given
+// 1-based Dockerfile line within this stage. It accounts for mid-stage
+// SHELL instruction transitions and shell directives. Returns the stage
+// default shell name if the line is not found.
+func (s *StageInfo) ShellNameAtLine(line int) string {
+	if n, ok := s.shellNameByLine[line]; ok {
+		return n
+	}
+	if len(s.ShellSetting.Shell) > 0 {
+		return s.ShellSetting.Shell[0]
+	}
+	return DefaultShell[0]
 }
 
 // IsWindows returns true if the base image was detected as Windows.

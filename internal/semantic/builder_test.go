@@ -10,6 +10,8 @@ import (
 	"github.com/wharflab/tally/internal/shell"
 )
 
+const testShellBash = "bash"
+
 func TestBuilderWithShellDirectivesAppliesToFollowingStages(t *testing.T) {
 	t.Parallel()
 	content := `FROM alpine:3.18 AS s0
@@ -49,6 +51,101 @@ RUN echo "ok"
 	}
 	if info1.ShellSetting.Variant != shell.VariantBash {
 		t.Errorf("expected stage 1 ShellSetting.Variant=%v, got %v", shell.VariantBash, info1.ShellSetting.Variant)
+	}
+	// Directive should also propagate the shell name into ShellSetting.Shell.
+	if len(info1.ShellSetting.Shell) == 0 || info1.ShellSetting.Shell[0] != testShellBash {
+		t.Errorf("expected stage 1 ShellSetting.Shell[0]=%q, got %v", testShellBash, info1.ShellSetting.Shell)
+	}
+}
+
+func TestShellNameAtLineTracksTransitions(t *testing.T) {
+	t.Parallel()
+	content := `FROM alpine:3.18
+RUN echo "default shell"
+SHELL ["/bin/bash", "-c"]
+RUN echo "bash shell"
+SHELL ["/bin/dash", "-c"]
+RUN echo "dash shell"
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+	info := model.StageInfo(0)
+
+	// Line 2: RUN before any SHELL → default "/bin/sh"
+	if got := info.ShellNameAtLine(2); got != "/bin/sh" {
+		t.Errorf("line 2: ShellNameAtLine=%q, want %q", got, "/bin/sh")
+	}
+	// Line 3: SHELL instruction itself → still "/bin/sh" (SHELL hasn't taken effect yet)
+	if got := info.ShellNameAtLine(3); got != "/bin/sh" {
+		t.Errorf("line 3: ShellNameAtLine=%q, want %q", got, "/bin/sh")
+	}
+	// Line 4: RUN after SHELL ["/bin/bash"] → "/bin/bash"
+	if got := info.ShellNameAtLine(4); got != "/bin/bash" {
+		t.Errorf("line 4: ShellNameAtLine=%q, want %q", got, "/bin/bash")
+	}
+	// Line 6: RUN after SHELL ["/bin/dash"] → "/bin/dash"
+	if got := info.ShellNameAtLine(6); got != "/bin/dash" {
+		t.Errorf("line 6: ShellNameAtLine=%q, want %q", got, "/bin/dash")
+	}
+}
+
+func TestShellVariantAtLineTracksTransitions(t *testing.T) {
+	t.Parallel()
+	content := `FROM alpine:3.18
+RUN echo "default"
+SHELL ["/bin/bash", "-c"]
+RUN echo "bash"
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+	info := model.StageInfo(0)
+
+	// Before SHELL: default variant (POSIX for /bin/sh)
+	if got := info.ShellVariantAtLine(2); got != shell.VariantPOSIX {
+		t.Errorf("line 2: ShellVariantAtLine=%v, want VariantPOSIX", got)
+	}
+	// After SHELL ["/bin/bash"]: VariantBash
+	if got := info.ShellVariantAtLine(4); got != shell.VariantBash {
+		t.Errorf("line 4: ShellVariantAtLine=%v, want VariantBash", got)
+	}
+}
+
+func TestShellNameAtLineWithDirective(t *testing.T) {
+	t.Parallel()
+	content := `# tally shell=bash
+FROM alpine:3.18
+RUN echo "bash via directive"
+`
+	pr := parseDockerfile(t, content)
+	directives := []directive.ShellDirective{{Shell: testShellBash, Line: 0}}
+
+	model := NewBuilder(pr, nil, "Dockerfile").
+		WithShellDirectives(directives).
+		Build()
+	info := model.StageInfo(0)
+
+	// Directive sets shell to bash, so all lines should reflect that.
+	if got := info.ShellNameAtLine(3); got != testShellBash {
+		t.Errorf("line 3: ShellNameAtLine=%q, want %q", got, testShellBash)
+	}
+	if got := info.ShellVariantAtLine(3); got != shell.VariantBash {
+		t.Errorf("line 3: ShellVariantAtLine=%v, want VariantBash", got)
+	}
+}
+
+func TestShellNameAtLineFallbackForUnmappedLines(t *testing.T) {
+	t.Parallel()
+	content := `FROM alpine:3.18
+RUN echo "hello"
+`
+	pr := parseDockerfile(t, content)
+	model := NewModel(pr, nil, "Dockerfile")
+	info := model.StageInfo(0)
+
+	// Querying an unmapped line (e.g., a blank or comment line) should return
+	// the fallback shell name.
+	if got := info.ShellNameAtLine(999); got != "/bin/sh" {
+		t.Errorf("unmapped line: ShellNameAtLine=%q, want %q", got, "/bin/sh")
 	}
 }
 
