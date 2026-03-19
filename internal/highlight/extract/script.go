@@ -5,11 +5,8 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	dfparser "github.com/moby/buildkit/frontend/dockerfile/parser"
 
-	"github.com/wharflab/tally/internal/directive"
-	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -88,36 +85,6 @@ func ExtractHealthcheckCmdShellScript(
 		OriginStartLine: start,
 		FallbackLine:    start,
 	}, true
-}
-
-func InitialShellNameForStage(
-	stage instructions.Stage,
-	directives []directive.ShellDirective,
-	stageInfo *semantic.StageInfo,
-) string {
-	shellName := semantic.DefaultShell[0]
-
-	fromLine := -1
-	if len(stage.Location) > 0 {
-		fromLine = stage.Location[0].Start.Line - 1
-	}
-	if fromLine >= 0 {
-		bestLine := -1
-		for i := range directives {
-			sd := directives[i]
-			if sd.Line < fromLine && sd.Line > bestLine {
-				bestLine = sd.Line
-				shellName = sd.Shell
-			}
-		}
-	}
-
-	if stageInfo != nil &&
-		stageInfo.ShellSetting.Source == semantic.ShellSourceDefault &&
-		len(stageInfo.ShellSetting.Shell) > 0 {
-		shellName = stageInfo.ShellSetting.Shell[0]
-	}
-	return shellName
 }
 
 func CommandStartLine(location []dfparser.Range) int {
