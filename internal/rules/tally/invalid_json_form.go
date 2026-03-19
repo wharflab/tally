@@ -78,7 +78,7 @@ func (r *InvalidJSONFormRule) Check(input rules.LintInput) []rules.Violation {
 	if !ok {
 		sem = nil
 	}
-	sv := buildStageVariants(input.Stages, sem)
+	stageLines := stageStartLines(input.Stages)
 
 	var violations []rules.Violation
 
@@ -87,7 +87,7 @@ func (r *InvalidJSONFormRule) Check(input rules.LintInput) []rules.Violation {
 			continue
 		}
 
-		variant := shellVariantForLine(sv, node.StartLine)
+		variant := shellVariantForNode(sem, stageLines, node.StartLine)
 		vs := r.checkNode(node, input, meta, variant)
 		violations = append(violations, vs...)
 	}
@@ -214,40 +214,35 @@ func (r *InvalidJSONFormRule) buildViolation(
 	return []rules.Violation{v}
 }
 
-// stageVariant maps a stage's start line to its shell variant.
-type stageVariant struct {
-	startLine int
-	variant   shell.Variant
-}
-
-// buildStageVariants creates a sorted list of (startLine, variant) pairs
-// from the parsed stages and semantic model.
-func buildStageVariants(stages []instructions.Stage, sem *semantic.Model) []stageVariant {
-	result := make([]stageVariant, 0, len(stages))
-	for i, stage := range stages {
-		startLine := 0
-		if len(stage.Location) > 0 {
-			startLine = stage.Location[0].Start.Line
-		}
-		result = append(result, stageVariant{
-			startLine: startLine,
-			variant:   resolveShellVariant(sem, i),
-		})
-	}
-	return result
-}
-
-// shellVariantForLine returns the shell variant in effect at the given
-// 1-based line number by finding the most recent stage that starts at or
-// before that line. Returns VariantBash when no stages are available.
-func shellVariantForLine(variants []stageVariant, line int) shell.Variant {
-	v := shell.VariantBash
-	for _, sv := range variants {
-		if sv.startLine <= line {
-			v = sv.variant
+// stageStartLines returns the 1-based FROM line for each stage.
+func stageStartLines(stages []instructions.Stage) []int {
+	lines := make([]int, len(stages))
+	for i, s := range stages {
+		if len(s.Location) > 0 {
+			lines[i] = s.Location[0].Start.Line
 		}
 	}
-	return v
+	return lines
+}
+
+// shellVariantForNode returns the effective shell variant at the given
+// 1-based line by delegating to StageInfo.ShellVariantAtLine.
+// Falls back to VariantBash when the semantic model is unavailable.
+func shellVariantForNode(sem *semantic.Model, stageLines []int, line int) shell.Variant {
+	if sem == nil {
+		return shell.VariantBash
+	}
+	stageIdx := 0
+	for i, sl := range stageLines {
+		if sl <= line {
+			stageIdx = i
+		}
+	}
+	info := sem.StageInfo(stageIdx)
+	if info == nil {
+		return shell.VariantBash
+	}
+	return info.ShellVariantAtLine(line)
 }
 
 // extractArgsText strips the instruction keyword and flags from the original

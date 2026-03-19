@@ -361,6 +361,22 @@ func (b *Builder) applyShellDirectives(stage *instructions.Stage, info *StageInf
 	}
 }
 
+// buildShellVariantByLine pre-computes the effective shell variant at each
+// instruction's start line within a stage, tracking SHELL transitions.
+func buildShellVariantByLine(stage *instructions.Stage, info *StageInfo) {
+	active := info.ShellSetting.Variant
+	info.shellVariantByLine = make(map[int]shell.Variant, len(stage.Commands))
+
+	for _, cmd := range stage.Commands {
+		if locs := cmd.Location(); len(locs) > 0 && locs[0].Start.Line > 0 {
+			info.shellVariantByLine[locs[0].Start.Line] = active
+		}
+		if sc, ok := cmd.(*instructions.ShellCommand); ok && len(sc.Shell) > 0 {
+			active = shell.VariantFromShellCmd(sc.Shell)
+		}
+	}
+}
+
 // processStageNaming registers stage names for stage reference resolution.
 func (b *Builder) processStageNaming(stage *instructions.Stage, index int) {
 	if stage.Name == "" {
@@ -454,6 +470,8 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 	normalizedStageName := normalizeStageRef(stage.Name)
 
 	declaredArgs := make(map[string]struct{})
+
+	buildShellVariantByLine(stage, info)
 
 	for _, cmd := range stage.Commands {
 		// UndefinedVar analysis must observe the environment at the point of use,
