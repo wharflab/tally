@@ -488,14 +488,31 @@ func validateEnv(orig, proposed instructions.KeyValuePairs) error {
 	if equalKeyValuePairs(orig, proposed) {
 		return nil
 	}
-	return errors.New("proposed Dockerfile changed ENV in the final stage")
+	return fmt.Errorf(
+		"proposed Dockerfile changed ENV in the final stage (want %s, got %s)",
+		formatKeyValuePairs(orig), formatKeyValuePairs(proposed),
+	)
 }
 
 func validateLabels(orig, proposed instructions.KeyValuePairs) error {
 	if equalKeyValuePairs(orig, proposed) {
 		return nil
 	}
-	return errors.New("proposed Dockerfile changed LABEL in the final stage")
+	return fmt.Errorf(
+		"proposed Dockerfile changed LABEL in the final stage (want %s, got %s)",
+		formatKeyValuePairs(orig), formatKeyValuePairs(proposed),
+	)
+}
+
+func formatKeyValuePairs(kvs instructions.KeyValuePairs) string {
+	if len(kvs) == 0 {
+		return "[]"
+	}
+	parts := make([]string, 0, len(kvs))
+	for _, kv := range kvs {
+		parts = append(parts, kv.Key+"="+kv.Value)
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
 }
 
 func validateHealthcheck(orig, proposed *instructions.HealthCheckCommand) error {
@@ -509,7 +526,10 @@ func validateHealthcheck(orig, proposed *instructions.HealthCheckCommand) error 
 		return nil
 	}
 	if !reflect.DeepEqual(orig.Health, proposed.Health) {
-		return errors.New("proposed Dockerfile changed HEALTHCHECK in the final stage")
+		return fmt.Errorf(
+			"proposed Dockerfile changed HEALTHCHECK in the final stage (want %q, got %q)",
+			orig.String(), proposed.String(),
+		)
 	}
 	return nil
 }
