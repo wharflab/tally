@@ -75,8 +75,8 @@ CMD ["--help"]
 COPY --from=builder /bin/sh /bin/sh
 `)
 
-	if err := validateRuntimeSettings(orig, proposed); err != nil {
-		t.Fatalf("expected no runtime-settings error, got %v", err)
+	if errs := runtimeValidationErrors(orig, proposed); len(errs) > 0 {
+		t.Fatalf("expected no runtime-validation errors, got %v", errs)
 	}
 }
 
@@ -95,8 +95,8 @@ CMD ["--help"]
 COPY --from=builder /bin/sh /bin/sh
 `)
 
-	if err := validateRuntimeSettings(orig, proposed); err == nil {
-		t.Fatalf("expected runtime-settings error, got nil")
+	if errs := runtimeValidationErrors(orig, proposed); len(errs) == 0 {
+		t.Fatalf("expected runtime-validation errors, got none")
 	}
 }
 
@@ -112,8 +112,8 @@ CMD ["app"]
 COPY --from=builder /bin/sh /bin/sh
 `)
 
-	if err := validateRuntimeSettings(orig, proposed); err == nil {
-		t.Fatalf("expected runtime-settings error, got nil")
+	if errs := runtimeValidationErrors(orig, proposed); len(errs) == 0 {
+		t.Fatalf("expected runtime-validation errors, got none")
 	}
 }
 
@@ -129,7 +129,7 @@ CMD ["app"]
 COPY --from=builder /bin/sh /bin/sh
 `)
 
-	if err := validateRuntimeSettings(orig, proposed); err == nil {
-		t.Fatalf("expected runtime-settings error, got nil")
+	if errs := runtimeValidationErrors(orig, proposed); len(errs) == 0 {
+		t.Fatalf("expected runtime-validation errors, got none")
 	}
 }

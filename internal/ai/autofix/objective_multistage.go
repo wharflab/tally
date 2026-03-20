@@ -560,15 +560,3 @@ func runtimeValidationErrors(orig, proposed *dockerfile.ParseResult) []error {
 	}
 	return errs
 }
-
-func validateRuntimeSettings(orig, proposed *dockerfile.ParseResult) error {
-	errs := runtimeValidationErrors(orig, proposed)
-	if len(errs) == 0 {
-		return nil
-	}
-	return errs[0]
-}
-
-func collectRuntimeValidationErrors(orig, proposed *dockerfile.ParseResult) []error {
-	return runtimeValidationErrors(orig, proposed)
-}
