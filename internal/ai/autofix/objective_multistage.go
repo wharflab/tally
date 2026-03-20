@@ -48,6 +48,7 @@ func (o *multiStageObjective) BuildPrompt(ctx PromptContext) (string, error) {
 
 	var b strings.Builder
 	writeMultiStagePreamble(&b, runtimeSummary)
+	writeFileContext(&b, ctx.AbsPath, ctx.ContextDir)
 	writeRegistryContext(&b, ctx.Request.RegistryInsights)
 	writeSignals(&b, ctx.Request.Signals)
 	writeInputDockerfile(&b, file, lines, normalized)

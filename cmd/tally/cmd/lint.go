@@ -1158,6 +1158,12 @@ func applyFixes(
 		}); ok {
 			setter.SetRegistryInsights(registryInsightsByFile[filepath.ToSlash(v.File())])
 		}
+
+		if setter, ok := v.SuggestedFix.ResolverData.(interface {
+			SetContextDir(dir string)
+		}); ok {
+			setter.SetContextDir(cmd.String("context"))
+		}
 	}
 
 	aiFixes, maxAITimeout := planAcpFixSpinner(violations, safetyThreshold, ruleFilter, fixModes, normalizedConfigs)

@@ -51,6 +51,24 @@ func writeInputDockerfile(b *strings.Builder, file string, lines int, normalized
 	b.WriteString("```\n\n")
 }
 
+// writeFileContext writes the absolute file path and optional build context
+// directory into the prompt so the agent can access surrounding files.
+func writeFileContext(b *strings.Builder, absPath, contextDir string) {
+	if absPath == "" {
+		return
+	}
+	b.WriteString("File context:\n")
+	b.WriteString("- Path: ")
+	b.WriteString(absPath)
+	b.WriteString("\n")
+	if contextDir != "" {
+		b.WriteString("- Build context: ")
+		b.WriteString(contextDir)
+		b.WriteString("\n")
+	}
+	b.WriteString("\n")
+}
+
 func writeOutputFormat(b *strings.Builder, file string, mode agentOutputMode) {
 	b.WriteString("Output format:\n")
 	b.WriteString("- Either output exactly: NO_CHANGE\n")

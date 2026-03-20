@@ -40,10 +40,20 @@ type Objective interface {
 
 // PromptContext provides inputs for building the initial (round 1) prompt.
 type PromptContext struct {
-	FilePath  string
-	Source    []byte
-	Request   *autofixdata.ObjectiveRequest
-	Config    *config.Config
+	FilePath string
+	Source   []byte
+	Request  *autofixdata.ObjectiveRequest
+	Config   *config.Config
+
+	// AbsPath is the absolute filesystem path to the Dockerfile.
+	// Empty for stdin or virtual files (e.g. LSP unsaved buffers).
+	// Agents can use this to access surrounding files in the build context.
+	AbsPath string
+
+	// ContextDir is the explicit build context directory (from --context).
+	// Empty when not provided by the user.
+	ContextDir string
+
 	OrigParse *dockerfile.ParseResult
 	Mode      agentOutputMode
 }

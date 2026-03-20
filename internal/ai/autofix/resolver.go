@@ -139,11 +139,13 @@ func (r *resolver) proposeDockerfile(
 	mode := agentOutputPatch
 
 	rp := roundPromptParams{
-		filePath:  filePath,
-		obj:       obj,
-		req:       req,
-		cfg:       ac.cfg,
-		origParse: origParse,
+		filePath:   filePath,
+		absPath:    resolveAbsPath(filePath),
+		contextDir: req.ContextDir,
+		obj:        obj,
+		req:        req,
+		cfg:        ac.cfg,
+		origParse:  origParse,
 	}
 	for round := 1; round <= maxAgentRounds; round++ {
 	retryCurrentRound:
@@ -193,26 +195,30 @@ func (r *resolver) proposeDockerfile(
 
 // roundPromptParams bundles the inputs for buildRoundPrompt across rounds.
 type roundPromptParams struct {
-	filePath  string
-	input     []byte // round 1: original content; round 2+: previous proposal
-	proposed  []byte // round 2+: proposed content for retry
-	blocking  []blockingIssue
-	obj       Objective
-	req       *autofixdata.ObjectiveRequest
-	cfg       *config.Config
-	origParse *dockerfile.ParseResult
+	filePath   string
+	absPath    string
+	contextDir string
+	input      []byte // round 1: original content; round 2+: previous proposal
+	proposed   []byte // round 2+: proposed content for retry
+	blocking   []blockingIssue
+	obj        Objective
+	req        *autofixdata.ObjectiveRequest
+	cfg        *config.Config
+	origParse  *dockerfile.ParseResult
 }
 
 func buildRoundPrompt(round int, p roundPromptParams, mode agentOutputMode) (string, error) {
 	switch round {
 	case 1:
 		return p.obj.BuildPrompt(PromptContext{
-			FilePath:  p.filePath,
-			Source:    p.input,
-			Request:   p.req,
-			Config:    p.cfg,
-			OrigParse: p.origParse,
-			Mode:      mode,
+			FilePath:   p.filePath,
+			Source:     p.input,
+			Request:    p.req,
+			Config:     p.cfg,
+			AbsPath:    p.absPath,
+			ContextDir: p.contextDir,
+			OrigParse:  p.origParse,
+			Mode:       mode,
 		})
 	case 2:
 		return p.obj.BuildRetryPrompt(RetryPromptContext{
@@ -404,6 +410,19 @@ func (r *resolver) runAgent(
 
 func parseDockerfile(content []byte, cfg *config.Config) (*dockerfile.ParseResult, error) {
 	return dockerfile.Parse(bytes.NewReader(content), cfg)
+}
+
+// resolveAbsPath returns the absolute path for a real file, or empty for
+// synthetic paths (stdin, LSP virtual files).
+func resolveAbsPath(filePath string) string {
+	if filePath == "" || strings.HasPrefix(filePath, "<") {
+		return ""
+	}
+	abs, err := filepath.Abs(filePath)
+	if err != nil {
+		return ""
+	}
+	return abs
 }
 
 func normalizeLF(s string) string {

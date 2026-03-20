@@ -67,11 +67,17 @@ type ObjectiveRequest struct {
 	// FixContext captures CLI fix intent for the resolver loop.
 	// It is attached by cmd/tally/cmd/lint.go:applyFixes.
 	FixContext FixContext `json:"-"`
+
+	// ContextDir is the explicit build context directory (--context flag).
+	// Empty when not provided. It is attached by cmd/tally/cmd/lint.go:applyFixes.
+	ContextDir string `json:"-"`
 }
 
 func (r *ObjectiveRequest) SetConfig(cfg *config.Config) { r.Config = cfg }
 
 func (r *ObjectiveRequest) SetFixContext(ctx FixContext) { r.FixContext = ctx }
+
+func (r *ObjectiveRequest) SetContextDir(dir string) { r.ContextDir = dir }
 
 func (r *ObjectiveRequest) SetRegistryInsights(insights []RegistryInsight) {
 	r.RegistryInsights = insights
