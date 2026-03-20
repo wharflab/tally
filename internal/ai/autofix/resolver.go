@@ -353,7 +353,24 @@ func (r *resolver) checkProposal(
 		return proposed, blocking, nil
 	}
 
-	return r.validateWithLint(ctx, filePath, proposed, cfg, fixCtx)
+	proposed, blocking, err := r.validateWithLint(ctx, filePath, proposed, cfg, fixCtx)
+	if err != nil || len(blocking) > 0 {
+		return proposed, blocking, err
+	}
+
+	// Re-validate after lint normalization — safe sync fixes may have changed
+	// the content and the objective's invariants must still hold.
+	normalizedParse, normalizeErr := parseDockerfile(proposed, cfg)
+	if normalizeErr != nil {
+		blocking = []autofixdata.BlockingIssue{{
+			Rule:    "syntax",
+			Message: "normalized Dockerfile failed to parse: " + normalizeErr.Error(),
+		}}
+	} else {
+		blocking = obj.ValidateProposal(origParse, normalizedParse)
+	}
+
+	return proposed, blocking, nil
 }
 
 func (r *resolver) runAgent(
