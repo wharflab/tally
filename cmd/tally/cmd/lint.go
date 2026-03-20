@@ -1162,7 +1162,12 @@ func applyFixes(
 		if setter, ok := v.SuggestedFix.ResolverData.(interface {
 			SetContextDir(dir string)
 		}); ok {
-			setter.SetContextDir(cmd.String("context"))
+			if dir := cmd.String("context"); dir != "" {
+				if abs, err := filepath.Abs(dir); err == nil {
+					dir = abs
+				}
+				setter.SetContextDir(dir)
+			}
 		}
 	}
 
