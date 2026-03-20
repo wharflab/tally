@@ -58,19 +58,7 @@ func (o *multiStageObjective) BuildPrompt(ctx autofixdata.PromptContext) (string
 }
 
 func (o *multiStageObjective) BuildRetryPrompt(ctx autofixdata.RetryPromptContext) (string, error) {
-	type issuePayload struct {
-		Rule    string `json:"rule"`
-		Message string `json:"message"`
-		Line    int    `json:"line,omitempty"`
-		Column  int    `json:"column,omitempty"`
-		Snippet string `json:"snippet,omitempty"`
-	}
-
-	payload := make([]issuePayload, 0, len(ctx.BlockingIssues))
-	for _, iss := range ctx.BlockingIssues {
-		payload = append(payload, issuePayload(iss))
-	}
-	issuesJSON, err := json.Marshal(payload, jsontext.WithIndentPrefix(""), jsontext.WithIndent("  "))
+	issuesJSON, err := json.Marshal(ctx.BlockingIssues, jsontext.WithIndentPrefix(""), jsontext.WithIndent("  "))
 	if err != nil {
 		return "", fmt.Errorf("ai-autofix: marshal blocking issues: %w", err)
 	}
