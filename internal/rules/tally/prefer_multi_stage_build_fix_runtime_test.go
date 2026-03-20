@@ -40,14 +40,21 @@ func TestRuntimeValidationErrors_AggregatesMultipleViolations(t *testing.T) {
 	require.Empty(t, runtimeValidationErrors(orig, orig))
 }
 
-func TestValidateMultiStagePatch_AcceptsFromWithTabSeparatedArgs(t *testing.T) {
+func TestMultiStageObjective_ValidatePatch_AlwaysNil(t *testing.T) {
 	t.Parallel()
 
-	meta := patchutil.Meta{
-		AddedLines: []string{"FROM\tgolang:1.22-alpine AS builder"},
-	}
+	obj := &multiStageObjective{}
 
-	require.Empty(t, validateMultiStagePatch(meta))
+	// Patch with FROM — should pass.
+	require.Empty(t, obj.ValidatePatch(patchutil.Meta{
+		AddedLines: []string{"FROM golang:1.22 AS builder"},
+	}))
+
+	// Patch without FROM (e.g. a round-2 fix-up) — should also pass.
+	// Stage-count is enforced by ValidateProposal, not ValidatePatch.
+	require.Empty(t, obj.ValidatePatch(patchutil.Meta{
+		AddedLines: []string{"CMD [\"app\"]"},
+	}))
 }
 
 func TestMultiStageObjective_ValidateProposal(t *testing.T) {
@@ -66,20 +73,6 @@ func TestMultiStageObjective_ValidateProposal(t *testing.T) {
 	// Multi-stage proposal with preserved runtime should pass.
 	multi := parseDockerfileForTest(t, "FROM alpine:3.20 AS builder\nRUN echo\nFROM alpine:3.20\nCMD [\"app\"]\n")
 	require.Empty(t, obj.ValidateProposal(orig, multi))
-}
-
-func TestMultiStageObjective_ValidatePatch(t *testing.T) {
-	t.Parallel()
-
-	obj := &multiStageObjective{}
-
-	withFrom := patchutil.Meta{AddedLines: []string{"FROM golang:1.22 AS builder"}}
-	require.Empty(t, obj.ValidatePatch(withFrom))
-
-	noFrom := patchutil.Meta{AddedLines: []string{"RUN echo hello"}}
-	blocking := obj.ValidatePatch(noFrom)
-	require.Len(t, blocking, 1)
-	require.Equal(t, "patch/must-add-from", blocking[0].Rule)
 }
 
 func TestMultiStageObjective_Kind(t *testing.T) {

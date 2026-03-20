@@ -166,21 +166,12 @@ func (o *multiStageObjective) ValidateProposal(
 	return blocking
 }
 
-func (o *multiStageObjective) ValidatePatch(meta patchutil.Meta) []autofixdata.BlockingIssue {
-	return validateMultiStagePatch(meta)
-}
-
-func validateMultiStagePatch(meta patchutil.Meta) []autofixdata.BlockingIssue {
-	for _, line := range meta.AddedLines {
-		fields := strings.Fields(line)
-		if len(fields) > 0 && strings.EqualFold(fields[0], command.From) {
-			return nil
-		}
-	}
-	return []autofixdata.BlockingIssue{{
-		Rule:    "patch/must-add-from",
-		Message: "Patch does not add a FROM instruction",
-	}}
+// ValidatePatch returns nil — stage-count enforcement is handled by
+// ValidateProposal after the patch is applied. A patch-level FROM check
+// would break round-2 retries where the agent only fixes runtime issues
+// on an already-converted multi-stage Dockerfile.
+func (o *multiStageObjective) ValidatePatch(_ patchutil.Meta) []autofixdata.BlockingIssue {
+	return nil
 }
 
 // --- Multi-stage-specific prompt helpers ---
