@@ -85,3 +85,5 @@ cover.html
 # Docs (Zensical)
 site/
 .venv/
+
+.codex/tmp/

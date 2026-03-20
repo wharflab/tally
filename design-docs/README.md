@@ -322,6 +322,23 @@ directives, reporting, and fixes.
 
 ---
 
+### 32. [GPU Container Rules](32-gpu-container-rules.md)
+
+**Covers:** Consolidated proposal for a new GPU-specific rule namespace, including normalized rule naming, priority ranking, rollout waves, AI/ACP
+fit, and explicit out-of-scope generic proposals
+
+**Key Topics:**
+
+- Cross-report consensus rules: `prefer-runtime-final-stage` and `prefer-uv-over-conda`
+- High-confidence GPU correctness checks such as CUDA version drift and build-time GPU queries
+- Runtime policy rules for visible devices and driver capabilities
+- Why generic cache/no-cache and `--no-install-recommends` rules should stay out of `tally/gpu/*`
+- Feasibility with Tally's existing `SuggestedFix`, async resolver, and ACP plumbing
+
+**Based on:** Docker, NVIDIA Container Toolkit, Hugging Face, uv, and real-world GitHub GPU Dockerfile corpus analysis
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
