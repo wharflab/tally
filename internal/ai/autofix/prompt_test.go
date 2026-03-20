@@ -30,19 +30,19 @@ CMD ["app"]
 	data, ok := violations[0].SuggestedFix.ResolverData.(*autofixdata.ObjectiveRequest)
 	require.True(t, ok, "expected ObjectiveRequest, got %T", violations[0].SuggestedFix.ResolverData)
 
-	obj, ok := getObjective(data.Kind)
+	obj, ok := autofixdata.GetObjective(data.Kind)
 	require.True(t, ok, "objective %q not registered", data.Kind)
 
 	origParse, err := parseDockerfile(input.Source, nil)
 	require.NoError(t, err)
 
-	prompt, err := obj.BuildPrompt(PromptContext{
+	prompt, err := obj.BuildPrompt(autofixdata.PromptContext{
 		FilePath:  input.File,
 		Source:    input.Source,
 		Request:   data,
 		Config:    nil,
 		OrigParse: origParse,
-		Mode:      agentOutputPatch,
+		Mode:      autofixdata.OutputPatch,
 	})
 	require.NoError(t, err)
 
@@ -78,19 +78,19 @@ CMD ["app"]
 		},
 	}
 
-	obj, ok := getObjective(data.Kind)
+	obj, ok := autofixdata.GetObjective(data.Kind)
 	require.True(t, ok, "objective %q not registered", data.Kind)
 
 	origParse, err := parseDockerfile(input.Source, nil)
 	require.NoError(t, err)
 
-	prompt, err := obj.BuildPrompt(PromptContext{
+	prompt, err := obj.BuildPrompt(autofixdata.PromptContext{
 		FilePath:  input.File,
 		Source:    input.Source,
 		Request:   data,
 		Config:    nil,
 		OrigParse: origParse,
-		Mode:      agentOutputPatch,
+		Mode:      autofixdata.OutputPatch,
 	})
 	require.NoError(t, err)
 
@@ -115,20 +115,20 @@ CMD ["app"]
 	data, ok := violations[0].SuggestedFix.ResolverData.(*autofixdata.ObjectiveRequest)
 	require.True(t, ok)
 
-	obj, ok := getObjective(data.Kind)
+	obj, ok := autofixdata.GetObjective(data.Kind)
 	require.True(t, ok)
 
 	origParse, err := parseDockerfile(input.Source, nil)
 	require.NoError(t, err)
 
-	prompt, err := obj.BuildPrompt(PromptContext{
+	prompt, err := obj.BuildPrompt(autofixdata.PromptContext{
 		FilePath:   input.File,
 		Source:     input.Source,
 		Request:    data,
 		AbsPath:    "/home/user/project/Dockerfile",
 		ContextDir: "/home/user/project",
 		OrigParse:  origParse,
-		Mode:       agentOutputPatch,
+		Mode:       autofixdata.OutputPatch,
 	})
 	require.NoError(t, err)
 
@@ -153,43 +153,43 @@ CMD ["app"]
 	data, ok := violations[0].SuggestedFix.ResolverData.(*autofixdata.ObjectiveRequest)
 	require.True(t, ok)
 
-	obj, ok := getObjective(data.Kind)
+	obj, ok := autofixdata.GetObjective(data.Kind)
 	require.True(t, ok)
 
 	origParse, err := parseDockerfile(input.Source, nil)
 	require.NoError(t, err)
 
-	withCtx, err := obj.BuildPrompt(PromptContext{
+	withCtx, err := obj.BuildPrompt(autofixdata.PromptContext{
 		FilePath:   input.File,
 		Source:     input.Source,
 		Request:    data,
 		AbsPath:    "/home/user/project/Dockerfile",
 		ContextDir: "/home/user/project",
 		OrigParse:  origParse,
-		Mode:       agentOutputPatch,
+		Mode:       autofixdata.OutputPatch,
 	})
 	require.NoError(t, err)
 	require.Contains(t, withCtx, "- Path: /home/user/project/Dockerfile")
 	require.Contains(t, withCtx, "- Build context: /home/user/project")
 
-	withoutCtx, err := obj.BuildPrompt(PromptContext{
+	withoutCtx, err := obj.BuildPrompt(autofixdata.PromptContext{
 		FilePath:  input.File,
 		Source:    input.Source,
 		Request:   data,
 		AbsPath:   "/home/user/project/Dockerfile",
 		OrigParse: origParse,
-		Mode:      agentOutputPatch,
+		Mode:      autofixdata.OutputPatch,
 	})
 	require.NoError(t, err)
 	require.Contains(t, withoutCtx, "- Path: /home/user/project/Dockerfile")
 	require.NotContains(t, withoutCtx, "Build context:")
 
-	noPath, err := obj.BuildPrompt(PromptContext{
+	noPath, err := obj.BuildPrompt(autofixdata.PromptContext{
 		FilePath:  input.File,
 		Source:    input.Source,
 		Request:   data,
 		OrigParse: origParse,
-		Mode:      agentOutputPatch,
+		Mode:      autofixdata.OutputPatch,
 	})
 	require.NoError(t, err)
 	require.NotContains(t, noPath, "File context:")

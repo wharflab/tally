@@ -28,13 +28,6 @@ const (
 	unreachableStagesKey = "tally/no-unreachable-stages"
 )
 
-type agentOutputMode string
-
-const (
-	agentOutputPatch      agentOutputMode = "patch"
-	agentOutputDockerfile agentOutputMode = "dockerfile"
-)
-
 type resolver struct {
 	runner          agentRunner
 	gitleaksFactory func() (*detect.Detector, error)
@@ -66,7 +59,7 @@ func (r *resolver) Resolve(ctx context.Context, resolveCtx fix.ResolveContext, s
 		return nil, err
 	}
 
-	obj, ok := getObjective(req.Kind)
+	obj, ok := autofixdata.GetObjective(req.Kind)
 	if !ok {
 		return nil, fmt.Errorf("ai-autofix: unknown objective kind %q", req.Kind)
 	}
@@ -129,14 +122,14 @@ func (r *resolver) proposeDockerfile(
 	filePath string,
 	original []byte,
 	req *autofixdata.ObjectiveRequest,
-	obj Objective,
+	obj autofixdata.Objective,
 	ac agentConfig,
 	origParse *dockerfile.ParseResult,
 ) ([]byte, error) {
-	roundInput := []byte(normalizeLF(string(original)))
+	roundInput := []byte(autofixdata.NormalizeLF(string(original)))
 	var proposed []byte
-	var blocking []blockingIssue
-	mode := agentOutputPatch
+	var blocking []autofixdata.BlockingIssue
+	mode := autofixdata.OutputPatch
 
 	rp := roundPromptParams{
 		filePath:   filePath,
@@ -160,7 +153,7 @@ func (r *resolver) proposeDockerfile(
 		result, err := r.runRound(ctx, filePath, ac, prompt, roundInput, obj, mode)
 		var fallbackErr *patchFallbackError
 		if errors.As(err, &fallbackErr) {
-			mode = agentOutputDockerfile
+			mode = autofixdata.OutputDockerfile
 			goto retryCurrentRound
 		}
 		if err != nil {
@@ -171,7 +164,7 @@ func (r *resolver) proposeDockerfile(
 		}
 
 		proposed = result.proposed
-		if mode == agentOutputPatch {
+		if mode == autofixdata.OutputPatch {
 			blocking = obj.ValidatePatch(result.patchMeta)
 			if len(blocking) > 0 {
 				roundInput = proposed
@@ -200,17 +193,17 @@ type roundPromptParams struct {
 	contextDir string
 	input      []byte // round 1: original content; round 2+: previous proposal
 	proposed   []byte // round 2+: proposed content for retry
-	blocking   []blockingIssue
-	obj        Objective
+	blocking   []autofixdata.BlockingIssue
+	obj        autofixdata.Objective
 	req        *autofixdata.ObjectiveRequest
 	cfg        *config.Config
 	origParse  *dockerfile.ParseResult
 }
 
-func buildRoundPrompt(round int, p roundPromptParams, mode agentOutputMode) (string, error) {
+func buildRoundPrompt(round int, p roundPromptParams, mode autofixdata.OutputMode) (string, error) {
 	switch round {
 	case 1:
-		return p.obj.BuildPrompt(PromptContext{
+		return p.obj.BuildPrompt(autofixdata.PromptContext{
 			FilePath:   p.filePath,
 			Source:     p.input,
 			Request:    p.req,
@@ -221,7 +214,7 @@ func buildRoundPrompt(round int, p roundPromptParams, mode agentOutputMode) (str
 			Mode:       mode,
 		})
 	case 2:
-		return p.obj.BuildRetryPrompt(RetryPromptContext{
+		return p.obj.BuildRetryPrompt(autofixdata.RetryPromptContext{
 			FilePath:       p.filePath,
 			Proposed:       p.proposed,
 			BlockingIssues: p.blocking,
@@ -255,8 +248,8 @@ func (r *resolver) runRound(
 	ac agentConfig,
 	prompt string,
 	roundInput []byte,
-	obj Objective,
-	mode agentOutputMode,
+	obj autofixdata.Objective,
+	mode autofixdata.OutputMode,
 ) (roundResult, error) {
 	respText, err := r.runAgent(ctx, filePath, ac, prompt, roundInput, mode)
 	if err != nil {
@@ -270,7 +263,7 @@ func (r *resolver) runRound(
 
 	lastErr := perr
 	for range maxMalformedRetries {
-		simplePrompt := obj.BuildSimplifiedPrompt(SimplifiedPromptContext{
+		simplePrompt := obj.BuildSimplifiedPrompt(autofixdata.SimplifiedPromptContext{
 			FilePath: filePath,
 			Source:   roundInput,
 			Mode:     mode,
@@ -287,16 +280,16 @@ func (r *resolver) runRound(
 		return result, nil
 	}
 
-	if mode == agentOutputPatch {
+	if mode == autofixdata.OutputPatch {
 		return roundResult{}, &patchFallbackError{err: lastErr}
 	}
 
 	return roundResult{}, fmt.Errorf("ai-autofix: malformed agent output: %w", lastErr)
 }
 
-func parseRoundOutput(text string, roundInput []byte, mode agentOutputMode) (roundResult, error) {
+func parseRoundOutput(text string, roundInput []byte, mode autofixdata.OutputMode) (roundResult, error) {
 	switch mode {
-	case agentOutputPatch:
+	case autofixdata.OutputPatch:
 		parsed, noChange, err := parseAgentPatchResponse(text)
 		if err != nil {
 			return roundResult{}, err
@@ -309,7 +302,7 @@ func parseRoundOutput(text string, roundInput []byte, mode agentOutputMode) (rou
 			return roundResult{}, err
 		}
 		return roundResult{proposed: proposed, patchMeta: meta}, nil
-	case agentOutputDockerfile:
+	case autofixdata.OutputDockerfile:
 		parsed, noChange, err := parseAgentDockerfileResponse(text)
 		if err != nil {
 			return roundResult{}, err
@@ -328,7 +321,7 @@ func parseRoundOutput(text string, roundInput []byte, mode agentOutputMode) (rou
 }
 
 func normalizeAgentDockerfile(parsed string) (string, error) {
-	parsed = normalizeLF(parsed)
+	parsed = autofixdata.NormalizeLF(parsed)
 	if parsed == "" {
 		return "", errors.New("ai-autofix: empty Dockerfile output")
 	}
@@ -341,14 +334,14 @@ func (r *resolver) checkProposal(
 	proposed []byte,
 	cfg *config.Config,
 	origParse *dockerfile.ParseResult,
-	obj Objective,
+	obj autofixdata.Objective,
 	fixCtx autofixdata.FixContext,
-) ([]byte, []blockingIssue, error) {
-	var blocking []blockingIssue
+) ([]byte, []autofixdata.BlockingIssue, error) {
+	var blocking []autofixdata.BlockingIssue
 
 	propParse, parseErr := parseDockerfile(proposed, cfg)
 	if parseErr != nil {
-		blocking = []blockingIssue{{
+		blocking = []autofixdata.BlockingIssue{{
 			Rule:    "syntax",
 			Message: "proposed Dockerfile failed to parse: " + parseErr.Error(),
 		}}
@@ -369,7 +362,7 @@ func (r *resolver) runAgent(
 	ac agentConfig,
 	prompt string,
 	roundInput []byte,
-	mode agentOutputMode,
+	mode autofixdata.OutputMode,
 ) (string, error) {
 	cfg := ac.cfg
 	if cfg.AI.MaxInputBytes > 0 && len(prompt) > cfg.AI.MaxInputBytes {
@@ -385,7 +378,7 @@ func (r *resolver) runAgent(
 		if err != nil {
 			return "", fmt.Errorf("ai-autofix: redact-secrets enabled but detector init failed: %w", err)
 		}
-		if mode == agentOutputPatch && countSecrets(det, string(roundInput)) > 0 {
+		if mode == autofixdata.OutputPatch && countSecrets(det, string(roundInput)) > 0 {
 			return "", &patchFallbackError{err: errors.New(
 				"ai-autofix: ai.redact-secrets=true and secrets were detected in the Dockerfile payload",
 			)}
@@ -423,10 +416,6 @@ func resolveAbsPath(filePath string) string {
 		return ""
 	}
 	return abs
-}
-
-func normalizeLF(s string) string {
-	return strings.ReplaceAll(s, "\r\n", "\n")
 }
 
 func countSecrets(det *detect.Detector, input string) int {
@@ -469,7 +458,7 @@ func (r *resolver) validateWithLint(
 	proposed []byte,
 	cfg *config.Config,
 	fixCtx autofixdata.FixContext,
-) ([]byte, []blockingIssue, error) {
+) ([]byte, []autofixdata.BlockingIssue, error) {
 	lintCfg := *cfg
 	lintCfg.AI = config.AIConfig{Enabled: false}
 

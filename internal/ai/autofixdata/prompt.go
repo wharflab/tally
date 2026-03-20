@@ -1,43 +1,46 @@
-package autofix
+package autofixdata
 
 import (
 	"slices"
 	"strconv"
 	"strings"
-
-	"github.com/wharflab/tally/internal/ai/autofixdata"
 )
 
 // --- Shared prompt building blocks ---
 // These helpers are used by Objective implementations to construct prompts.
 
-func writeRegistryContext(b *strings.Builder, insights []autofixdata.RegistryInsight) {
+// WriteRegistryContext writes a "Registry context" section listing resolved
+// base image metadata from slow checks.
+func WriteRegistryContext(b *strings.Builder, insights []RegistryInsight) {
 	if len(insights) == 0 {
 		return
 	}
 	b.WriteString("Registry context (slow checks):\n")
 	for _, ins := range insights {
 		b.WriteString("- ")
-		b.WriteString(formatRegistryInsight(ins))
+		b.WriteString(FormatRegistryInsight(ins))
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
 }
 
-func writeSignals(b *strings.Builder, signals []autofixdata.Signal) {
+// WriteSignals writes a "Signals (pointers)" section listing evidence for
+// why the rule triggered.
+func WriteSignals(b *strings.Builder, signals []Signal) {
 	if len(signals) == 0 {
 		return
 	}
 	b.WriteString("Signals (pointers):\n")
 	for _, s := range signals {
 		b.WriteString("- ")
-		b.WriteString(formatSignal(s))
+		b.WriteString(FormatSignal(s))
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
 }
 
-func writeInputDockerfile(b *strings.Builder, file string, lines int, normalized string) {
+// WriteInputDockerfile writes the source Dockerfile in a fenced code block.
+func WriteInputDockerfile(b *strings.Builder, file string, lines int, normalized string) {
 	b.WriteString("Input Dockerfile (")
 	b.WriteString(file)
 	b.WriteString(", ")
@@ -51,9 +54,9 @@ func writeInputDockerfile(b *strings.Builder, file string, lines int, normalized
 	b.WriteString("```\n\n")
 }
 
-// writeFileContext writes the absolute file path and optional build context
-// directory into the prompt so the agent can access surrounding files.
-func writeFileContext(b *strings.Builder, absPath, contextDir string) {
+// WriteFileContext writes the absolute file path and optional build context
+// directory so the agent can access surrounding files.
+func WriteFileContext(b *strings.Builder, absPath, contextDir string) {
 	if absPath == "" {
 		return
 	}
@@ -69,10 +72,11 @@ func writeFileContext(b *strings.Builder, absPath, contextDir string) {
 	b.WriteString("\n")
 }
 
-func writeOutputFormat(b *strings.Builder, file string, mode agentOutputMode) {
+// WriteOutputFormat writes the output format instructions for the agent.
+func WriteOutputFormat(b *strings.Builder, file string, mode OutputMode) {
 	b.WriteString("Output format:\n")
 	b.WriteString("- Either output exactly: NO_CHANGE\n")
-	if mode == agentOutputDockerfile {
+	if mode == OutputDockerfile {
 		b.WriteString("- Or output exactly one ```Dockerfile fenced code block with the full updated Dockerfile\n")
 		b.WriteString("- Any other text outside the code block will be discarded\n")
 		return
@@ -106,7 +110,8 @@ func writeOutputFormat(b *strings.Builder, file string, mode agentOutputMode) {
 
 // --- Formatting helpers ---
 
-func formatSignal(s autofixdata.Signal) string {
+// FormatSignal returns a human-readable single-line summary of a signal.
+func FormatSignal(s Signal) string {
 	var b strings.Builder
 	if s.Line > 0 {
 		b.WriteString("line ")
@@ -134,7 +139,8 @@ func formatSignal(s autofixdata.Signal) string {
 	return b.String()
 }
 
-func formatRegistryInsight(ins autofixdata.RegistryInsight) string {
+// FormatRegistryInsight returns a human-readable summary of a registry insight.
+func FormatRegistryInsight(ins RegistryInsight) string {
 	parts := make([]string, 0, 5)
 	if ins.Ref != "" {
 		parts = append(parts, "FROM "+ins.Ref)
@@ -146,7 +152,7 @@ func formatRegistryInsight(ins autofixdata.RegistryInsight) string {
 		parts = append(parts, "resolved "+ins.ResolvedPlatform)
 	}
 	if ins.Digest != "" {
-		parts = append(parts, "digest "+shortDigest(ins.Digest))
+		parts = append(parts, "digest "+ShortDigest(ins.Digest))
 	}
 	if len(ins.AvailablePlatforms) > 0 {
 		parts = append(parts, "available "+strings.Join(ins.AvailablePlatforms, ", "))
@@ -157,7 +163,8 @@ func formatRegistryInsight(ins autofixdata.RegistryInsight) string {
 	return "stage " + strconv.Itoa(ins.StageIndex) + ": " + strings.Join(parts, "; ")
 }
 
-func shortDigest(digest string) string {
+// ShortDigest truncates a digest to a readable length.
+func ShortDigest(digest string) string {
 	digest = strings.TrimSpace(digest)
 	const prefix = "sha256:"
 	if strings.HasPrefix(digest, prefix) && len(digest) > len(prefix)+12 {
@@ -169,20 +176,22 @@ func shortDigest(digest string) string {
 	return digest
 }
 
-func formatList(items []string, maxItems int) string {
+// FormatList formats a string slice for inclusion in prompts.
+func FormatList(items []string, maxItems int) string {
 	items = slices.Clone(items)
 	items = slices.DeleteFunc(items, func(s string) bool { return strings.TrimSpace(s) == "" })
 	if len(items) == 0 {
 		return "[]"
 	}
-	items = dedupeKeepOrder(items)
+	items = DedupeKeepOrder(items)
 	if len(items) > maxItems {
 		return "[" + strings.Join(items[:maxItems], ", ") + ", ... +" + strconv.Itoa(len(items)-maxItems) + "]"
 	}
 	return "[" + strings.Join(items, ", ") + "]"
 }
 
-func dedupeKeepOrder(items []string) []string {
+// DedupeKeepOrder removes duplicates preserving first-occurrence order.
+func DedupeKeepOrder(items []string) []string {
 	seen := make(map[string]struct{}, len(items))
 	out := make([]string, 0, len(items))
 	for _, it := range items {
@@ -195,7 +204,8 @@ func dedupeKeepOrder(items []string) []string {
 	return out
 }
 
-func countLines(s string) int {
+// CountLines returns the line count of a string.
+func CountLines(s string) int {
 	if s == "" {
 		return 0
 	}
@@ -204,4 +214,9 @@ func countLines(s string) int {
 		n++
 	}
 	return n
+}
+
+// NormalizeLF replaces CRLF with LF.
+func NormalizeLF(s string) string {
+	return strings.ReplaceAll(s, "\r\n", "\n")
 }

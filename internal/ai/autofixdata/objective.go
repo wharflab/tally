@@ -1,11 +1,29 @@
-package autofix
+package autofixdata
 
 import (
-	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/config"
 	"github.com/wharflab/tally/internal/dockerfile"
 	patchutil "github.com/wharflab/tally/internal/patch"
 )
+
+// OutputMode controls whether the agent outputs a unified diff patch or a
+// full Dockerfile.
+type OutputMode string
+
+const (
+	OutputPatch      OutputMode = "patch"
+	OutputDockerfile OutputMode = "dockerfile"
+)
+
+// BlockingIssue represents a validation problem that blocks acceptance of a
+// proposed Dockerfile. It is serialized as JSON in retry prompts.
+type BlockingIssue struct {
+	Rule    string `json:"rule"`
+	Message string `json:"message"`
+	Line    int    `json:"line,omitempty"`
+	Column  int    `json:"column,omitempty"`
+	Snippet string `json:"snippet,omitempty"`
+}
 
 // Objective encapsulates objective-specific behavior for the AI AutoFix resolver.
 // Each objective provides prompt construction, validation, and acceptance
@@ -15,7 +33,7 @@ import (
 // the resolver processes a fix request.
 type Objective interface {
 	// Kind returns the unique identifier for this objective.
-	Kind() autofixdata.ObjectiveKind
+	Kind() ObjectiveKind
 
 	// BuildPrompt constructs the initial (round 1) prompt for the agent.
 	BuildPrompt(ctx PromptContext) (string, error)
@@ -31,18 +49,18 @@ type Objective interface {
 	// ValidateProposal performs objective-specific structural validation on
 	// the proposed Dockerfile beyond basic syntax checking.
 	// Returns blocking issues that must be resolved.
-	ValidateProposal(orig, proposed *dockerfile.ParseResult) []blockingIssue
+	ValidateProposal(orig, proposed *dockerfile.ParseResult) []BlockingIssue
 
 	// ValidatePatch performs objective-specific validation on patch metadata
 	// (e.g. ensuring certain instructions were added). Returns blocking issues.
-	ValidatePatch(meta patchutil.Meta) []blockingIssue
+	ValidatePatch(meta patchutil.Meta) []BlockingIssue
 }
 
 // PromptContext provides inputs for building the initial (round 1) prompt.
 type PromptContext struct {
 	FilePath string
 	Source   []byte
-	Request  *autofixdata.ObjectiveRequest
+	Request  *ObjectiveRequest
 	Config   *config.Config
 
 	// AbsPath is the absolute filesystem path to the Dockerfile.
@@ -55,32 +73,35 @@ type PromptContext struct {
 	ContextDir string
 
 	OrigParse *dockerfile.ParseResult
-	Mode      agentOutputMode
+	Mode      OutputMode
 }
 
 // RetryPromptContext provides inputs for building a retry (round 2+) prompt.
 type RetryPromptContext struct {
 	FilePath       string
 	Proposed       []byte
-	BlockingIssues []blockingIssue
+	BlockingIssues []BlockingIssue
 	Config         *config.Config
-	Mode           agentOutputMode
+	Mode           OutputMode
 }
 
 // SimplifiedPromptContext provides inputs for building a minimal fallback prompt.
 type SimplifiedPromptContext struct {
 	FilePath string
 	Source   []byte
-	Mode     agentOutputMode
+	Mode     OutputMode
 }
 
-var objectives = make(map[autofixdata.ObjectiveKind]Objective)
+var objectives = make(map[ObjectiveKind]Objective)
 
-func registerObjective(o Objective) {
+// RegisterObjective registers an Objective implementation.
+// Typically called from init() in the package that defines the objective.
+func RegisterObjective(o Objective) {
 	objectives[o.Kind()] = o
 }
 
-func getObjective(kind autofixdata.ObjectiveKind) (Objective, bool) {
+// GetObjective returns the registered Objective for the given kind.
+func GetObjective(kind ObjectiveKind) (Objective, bool) {
 	o, ok := objectives[kind]
 	return o, ok
 }

@@ -28,8 +28,8 @@ func (r *stubAgentRunner) Run(_ context.Context, _ acp.RunRequest) (acp.RunRespo
 	return out, nil
 }
 
-func multiStageObj() Objective {
-	obj, _ := getObjective(autofixdata.ObjectiveMultiStage)
+func multiStageObj() autofixdata.Objective {
+	obj, _ := autofixdata.GetObjective(autofixdata.ObjectiveMultiStage)
 	return obj
 }
 
@@ -50,7 +50,7 @@ func TestResolver_RunAndParseRound_NoChange_ShortCircuits(t *testing.T) {
 
 	out, err := r.runRound(
 		context.Background(), "Dockerfile", testAgentConfig(cfg),
-		"prompt", []byte("FROM alpine:3.20\n"), multiStageObj(), agentOutputPatch,
+		"prompt", []byte("FROM alpine:3.20\n"), multiStageObj(), autofixdata.OutputPatch,
 	)
 	require.NoError(t, err)
 	require.True(t, out.noChange)
@@ -70,7 +70,7 @@ func TestResolver_RunAndParseRound_NoChange_ShortCircuitsAfterRetry(t *testing.T
 
 	out, err := r.runRound(
 		context.Background(), "Dockerfile", testAgentConfig(cfg),
-		"prompt", []byte("FROM alpine:3.20\n"), multiStageObj(), agentOutputPatch,
+		"prompt", []byte("FROM alpine:3.20\n"), multiStageObj(), autofixdata.OutputPatch,
 	)
 	require.NoError(t, err)
 	require.True(t, out.noChange)
@@ -96,7 +96,7 @@ func TestResolver_RunRound_RedactSecretsInPatchModeFallsBack(t *testing.T) {
 
 	_, err := r.runRound(
 		context.Background(), "Dockerfile", testAgentConfig(cfg),
-		"prompt", roundInput, multiStageObj(), agentOutputPatch,
+		"prompt", roundInput, multiStageObj(), autofixdata.OutputPatch,
 	)
 	require.Error(t, err)
 

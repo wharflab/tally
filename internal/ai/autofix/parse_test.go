@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/wharflab/tally/internal/ai/autofixdata"
 )
 
 func TestParseRoundOutput_PatchModeAppliesUnifiedDiff(t *testing.T) {
@@ -34,7 +36,7 @@ func TestParseRoundOutput_PatchModeAppliesUnifiedDiff(t *testing.T) {
 	require.False(t, noChange)
 	require.Equal(t, diff, parsed)
 
-	result, err := parseRoundOutput(text, base, agentOutputPatch)
+	result, err := parseRoundOutput(text, base, autofixdata.OutputPatch)
 	require.NoError(t, err)
 	require.False(t, result.noChange)
 	require.Contains(t, string(result.proposed), "FROM alpine:3.20")
