@@ -193,4 +193,18 @@ CMD ["app"]
 	})
 	require.NoError(t, err)
 	require.NotContains(t, noPath, "File context:")
+
+	// stdin with --context: no AbsPath but ContextDir is set.
+	stdinCtx, err := obj.BuildPrompt(autofixdata.PromptContext{
+		FilePath:   input.File,
+		Source:     input.Source,
+		Request:    data,
+		ContextDir: "/home/user/project",
+		OrigParse:  origParse,
+		Mode:       autofixdata.OutputPatch,
+	})
+	require.NoError(t, err)
+	require.Contains(t, stdinCtx, "File context:")
+	require.Contains(t, stdinCtx, "- Build context: /home/user/project")
+	require.NotContains(t, stdinCtx, "- Path:")
 }

@@ -57,13 +57,15 @@ func WriteInputDockerfile(b *strings.Builder, file string, lines int, normalized
 // WriteFileContext writes the absolute file path and optional build context
 // directory so the agent can access surrounding files.
 func WriteFileContext(b *strings.Builder, absPath, contextDir string) {
-	if absPath == "" {
+	if absPath == "" && contextDir == "" {
 		return
 	}
 	b.WriteString("File context:\n")
-	b.WriteString("- Path: ")
-	b.WriteString(absPath)
-	b.WriteString("\n")
+	if absPath != "" {
+		b.WriteString("- Path: ")
+		b.WriteString(absPath)
+		b.WriteString("\n")
+	}
 	if contextDir != "" {
 		b.WriteString("- Build context: ")
 		b.WriteString(contextDir)
