@@ -8,6 +8,14 @@ import (
 // ResolverID is the FixResolver identifier for AI AutoFix.
 const ResolverID = "ai-autofix"
 
+// ObjectiveKind identifies the type of AI AutoFix objective.
+type ObjectiveKind string
+
+const (
+	// ObjectiveMultiStage is the objective for tally/prefer-multi-stage-build.
+	ObjectiveMultiStage ObjectiveKind = "prefer-multi-stage-build"
+)
+
 // FixContext carries the outer fix-application intent into the resolver so the
 // agent loop can respect CLI restrictions (safety threshold, --fix-rule, fix modes).
 type FixContext struct {
@@ -35,12 +43,18 @@ type Signal struct {
 	Line     int        `json:"line"`
 }
 
-// MultiStageResolveData is the resolver request for tally/prefer-multi-stage-build.
-// It is produced by the rule and enriched by the CLI fix path with config + fix context.
-type MultiStageResolveData struct {
-	File    string   `json:"file"`
-	Score   int      `json:"score"`
-	Signals []Signal `json:"signals,omitempty"`
+// ObjectiveRequest is the generic resolver request for AI AutoFix objectives.
+// It is produced by rules and enriched by the CLI fix path with config,
+// fix context, and registry insights.
+//
+// The Kind field determines which Objective implementation handles prompt
+// construction and validation. Signals and Facts carry evidence and
+// objective-specific data respectively.
+type ObjectiveRequest struct {
+	Kind    ObjectiveKind  `json:"kind"`
+	File    string         `json:"file"`
+	Signals []Signal       `json:"signals,omitempty"`
+	Facts   map[string]any `json:"facts,omitempty"`
 
 	// RegistryInsights carries resolved registry metadata for base images (slow checks).
 	// It is attached by cmd/tally/cmd/lint.go when slow checks ran successfully.
@@ -55,10 +69,10 @@ type MultiStageResolveData struct {
 	FixContext FixContext `json:"-"`
 }
 
-func (d *MultiStageResolveData) SetConfig(cfg *config.Config) { d.Config = cfg }
+func (r *ObjectiveRequest) SetConfig(cfg *config.Config) { r.Config = cfg }
 
-func (d *MultiStageResolveData) SetFixContext(ctx FixContext) { d.FixContext = ctx }
+func (r *ObjectiveRequest) SetFixContext(ctx FixContext) { r.FixContext = ctx }
 
-func (d *MultiStageResolveData) SetRegistryInsights(insights []RegistryInsight) {
-	d.RegistryInsights = insights
+func (r *ObjectiveRequest) SetRegistryInsights(insights []RegistryInsight) {
+	r.RegistryInsights = insights
 }

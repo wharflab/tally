@@ -104,10 +104,11 @@ func (r *PreferMultiStageBuildRule) Check(input rules.LintInput) []rules.Violati
 			Safety:       rules.FixUnsafe,
 			NeedsResolve: true,
 			ResolverID:   autofixdata.ResolverID,
-			ResolverData: &autofixdata.MultiStageResolveData{
+			ResolverData: &autofixdata.ObjectiveRequest{
+				Kind:    autofixdata.ObjectiveMultiStage,
 				File:    input.File,
-				Score:   score,
 				Signals: signals,
+				Facts:   map[string]any{"score": score},
 			},
 			Priority: meta.FixPriority,
 		}),

@@ -10,6 +10,7 @@ import (
 	"github.com/zricethezav/gitleaks/v8/detect"
 
 	"github.com/wharflab/tally/internal/ai/acp"
+	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/config"
 )
 
@@ -27,6 +28,15 @@ func (r *stubAgentRunner) Run(_ context.Context, _ acp.RunRequest) (acp.RunRespo
 	return out, nil
 }
 
+func multiStageObj() Objective {
+	obj, _ := getObjective(autofixdata.ObjectiveMultiStage)
+	return obj
+}
+
+func testAgentConfig(cfg *config.Config) agentConfig {
+	return agentConfig{cfg: cfg, timeout: 5 * time.Second}
+}
+
 func TestResolver_RunAndParseRound_NoChange_ShortCircuits(t *testing.T) {
 	t.Parallel()
 
@@ -38,7 +48,10 @@ func TestResolver_RunAndParseRound_NoChange_ShortCircuits(t *testing.T) {
 		runner: &stubAgentRunner{texts: []string{"NO_CHANGE"}},
 	}
 
-	out, err := r.runRound(context.Background(), "Dockerfile", cfg, 5*time.Second, "prompt", []byte("FROM alpine:3.20\n"), agentOutputPatch)
+	out, err := r.runRound(
+		context.Background(), "Dockerfile", testAgentConfig(cfg),
+		"prompt", []byte("FROM alpine:3.20\n"), multiStageObj(), agentOutputPatch,
+	)
 	require.NoError(t, err)
 	require.True(t, out.noChange)
 	require.Nil(t, out.proposed)
@@ -55,7 +68,10 @@ func TestResolver_RunAndParseRound_NoChange_ShortCircuitsAfterRetry(t *testing.T
 		runner: &stubAgentRunner{texts: []string{"not a diff block", "NO_CHANGE"}},
 	}
 
-	out, err := r.runRound(context.Background(), "Dockerfile", cfg, 5*time.Second, "prompt", []byte("FROM alpine:3.20\n"), agentOutputPatch)
+	out, err := r.runRound(
+		context.Background(), "Dockerfile", testAgentConfig(cfg),
+		"prompt", []byte("FROM alpine:3.20\n"), multiStageObj(), agentOutputPatch,
+	)
 	require.NoError(t, err)
 	require.True(t, out.noChange)
 	require.Nil(t, out.proposed)
@@ -79,13 +95,8 @@ func TestResolver_RunRound_RedactSecretsInPatchModeFallsBack(t *testing.T) {
 	)
 
 	_, err := r.runRound(
-		context.Background(),
-		"Dockerfile",
-		cfg,
-		5*time.Second,
-		"prompt",
-		roundInput,
-		agentOutputPatch,
+		context.Background(), "Dockerfile", testAgentConfig(cfg),
+		"prompt", roundInput, multiStageObj(), agentOutputPatch,
 	)
 	require.Error(t, err)
 

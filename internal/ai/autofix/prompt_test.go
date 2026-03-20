@@ -27,13 +27,23 @@ CMD ["app"]
 	require.Len(t, violations, 1)
 	require.NotNil(t, violations[0].SuggestedFix)
 
-	data, ok := violations[0].SuggestedFix.ResolverData.(*autofixdata.MultiStageResolveData)
-	require.True(t, ok, "expected MultiStageResolveData, got %T", violations[0].SuggestedFix.ResolverData)
+	data, ok := violations[0].SuggestedFix.ResolverData.(*autofixdata.ObjectiveRequest)
+	require.True(t, ok, "expected ObjectiveRequest, got %T", violations[0].SuggestedFix.ResolverData)
+
+	obj, ok := getObjective(data.Kind)
+	require.True(t, ok, "objective %q not registered", data.Kind)
 
 	origParse, err := parseDockerfile(input.Source, nil)
 	require.NoError(t, err)
 
-	prompt, err := buildRound1Prompt(input.File, input.Source, data, nil, origParse, agentOutputPatch)
+	prompt, err := obj.BuildPrompt(PromptContext{
+		FilePath:  input.File,
+		Source:    input.Source,
+		Request:   data,
+		Config:    nil,
+		OrigParse: origParse,
+		Mode:      agentOutputPatch,
+	})
 	require.NoError(t, err)
 
 	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, prompt)
@@ -55,8 +65,8 @@ CMD ["app"]
 	require.Len(t, violations, 1)
 	require.NotNil(t, violations[0].SuggestedFix)
 
-	data, ok := violations[0].SuggestedFix.ResolverData.(*autofixdata.MultiStageResolveData)
-	require.True(t, ok, "expected MultiStageResolveData, got %T", violations[0].SuggestedFix.ResolverData)
+	data, ok := violations[0].SuggestedFix.ResolverData.(*autofixdata.ObjectiveRequest)
+	require.True(t, ok, "expected ObjectiveRequest, got %T", violations[0].SuggestedFix.ResolverData)
 
 	data.RegistryInsights = []autofixdata.RegistryInsight{
 		{
@@ -68,10 +78,20 @@ CMD ["app"]
 		},
 	}
 
+	obj, ok := getObjective(data.Kind)
+	require.True(t, ok, "objective %q not registered", data.Kind)
+
 	origParse, err := parseDockerfile(input.Source, nil)
 	require.NoError(t, err)
 
-	prompt, err := buildRound1Prompt(input.File, input.Source, data, nil, origParse, agentOutputPatch)
+	prompt, err := obj.BuildPrompt(PromptContext{
+		FilePath:  input.File,
+		Source:    input.Source,
+		Request:   data,
+		Config:    nil,
+		OrigParse: origParse,
+		Mode:      agentOutputPatch,
+	})
 	require.NoError(t, err)
 
 	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, prompt)
