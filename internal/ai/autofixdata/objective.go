@@ -95,9 +95,14 @@ type SimplifiedPromptContext struct {
 var objectives = make(map[ObjectiveKind]Objective)
 
 // RegisterObjective registers an Objective implementation.
+// Panics if an objective with the same Kind is already registered.
 // Typically called from init() in the package that defines the objective.
 func RegisterObjective(o Objective) {
-	objectives[o.Kind()] = o
+	kind := o.Kind()
+	if _, exists := objectives[kind]; exists {
+		panic("autofixdata: duplicate objective registration: " + string(kind))
+	}
+	objectives[kind] = o
 }
 
 // GetObjective returns the registered Objective for the given kind.
