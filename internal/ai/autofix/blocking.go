@@ -4,19 +4,12 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/rules"
 )
 
-type blockingIssue struct {
-	Rule    string `json:"rule"`
-	Message string `json:"message"`
-	Line    int    `json:"line,omitempty"`
-	Column  int    `json:"column,omitempty"`
-	Snippet string `json:"snippet,omitempty"`
-}
-
-func collectBlockingIssues(violations []rules.Violation) []blockingIssue {
-	blocking := make([]blockingIssue, 0, 8)
+func collectBlockingIssues(violations []rules.Violation) []autofixdata.BlockingIssue {
+	blocking := make([]autofixdata.BlockingIssue, 0, 8)
 	seen := make(map[string]struct{})
 
 	for _, v := range violations {
@@ -31,7 +24,7 @@ func collectBlockingIssues(violations []rules.Violation) []blockingIssue {
 		}
 		seen[key] = struct{}{}
 
-		issue := blockingIssue{
+		issue := autofixdata.BlockingIssue{
 			Rule:    v.RuleCode,
 			Message: v.Message,
 		}
@@ -45,7 +38,7 @@ func collectBlockingIssues(violations []rules.Violation) []blockingIssue {
 		blocking = append(blocking, issue)
 	}
 
-	slices.SortFunc(blocking, func(a, b blockingIssue) int {
+	slices.SortFunc(blocking, func(a, b autofixdata.BlockingIssue) int {
 		if a.Line != b.Line {
 			return a.Line - b.Line
 		}

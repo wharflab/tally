@@ -46,12 +46,19 @@ CMD ["app"]
 	if v.SuggestedFix.ResolverID != autofixdata.ResolverID {
 		t.Fatalf("unexpected ResolverID: %q", v.SuggestedFix.ResolverID)
 	}
-	data, ok := v.SuggestedFix.ResolverData.(*autofixdata.MultiStageResolveData)
+	data, ok := v.SuggestedFix.ResolverData.(*autofixdata.ObjectiveRequest)
 	if !ok || data == nil {
-		t.Fatalf("expected MultiStageResolveData resolver data, got %T", v.SuggestedFix.ResolverData)
+		t.Fatalf("expected ObjectiveRequest resolver data, got %T", v.SuggestedFix.ResolverData)
 	}
-	if data.Score < 4 {
-		t.Fatalf("expected score >= 4, got %d", data.Score)
+	if data.Kind != autofixdata.ObjectiveMultiStage {
+		t.Fatalf("expected ObjectiveMultiStage kind, got %q", data.Kind)
+	}
+	score, ok := data.Facts["score"].(int)
+	if !ok {
+		t.Fatalf("expected int score in Facts, got %T", data.Facts["score"])
+	}
+	if score < 4 {
+		t.Fatalf("expected score >= 4, got %d", score)
 	}
 	foundBuild := false
 	for _, s := range data.Signals {
@@ -100,15 +107,19 @@ ENTRYPOINT ["MyApp.exe"]
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation, got %d", len(violations))
 	}
-	data, ok := violations[0].SuggestedFix.ResolverData.(*autofixdata.MultiStageResolveData)
+	data, ok := violations[0].SuggestedFix.ResolverData.(*autofixdata.ObjectiveRequest)
 	if !ok {
-		t.Fatalf("expected MultiStageResolveData, got %T", violations[0].SuggestedFix.ResolverData)
+		t.Fatalf("expected ObjectiveRequest, got %T", violations[0].SuggestedFix.ResolverData)
 	}
 	// choco install (4) + build-tools bonus (2) + msbuild (4) + nuget restore (2) = 12
-	if data.Score < 8 {
-		t.Errorf("expected score >= 8 for Windows build, got %d", data.Score)
+	score, ok := data.Facts["score"].(int)
+	if !ok {
+		t.Fatalf("expected int score in Facts, got %T", data.Facts["score"])
 	}
-	t.Logf("signals: %+v, score: %d", data.Signals, data.Score)
+	if score < 8 {
+		t.Errorf("expected score >= 8 for Windows build, got %d", score)
+	}
+	t.Logf("signals: %+v, score: %d", data.Signals, score)
 }
 
 func TestPreferMultiStageBuildRule_MinScoreConfig_Disables(t *testing.T) {

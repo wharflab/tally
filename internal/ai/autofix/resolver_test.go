@@ -10,6 +10,7 @@ import (
 	"github.com/zricethezav/gitleaks/v8/detect"
 
 	"github.com/wharflab/tally/internal/ai/acp"
+	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/config"
 )
 
@@ -27,6 +28,25 @@ func (r *stubAgentRunner) Run(_ context.Context, _ acp.RunRequest) (acp.RunRespo
 	return out, nil
 }
 
+func multiStageObj(t *testing.T) autofixdata.Objective {
+	t.Helper()
+	obj, ok := autofixdata.GetObjective(autofixdata.ObjectiveMultiStage)
+	require.Truef(t, ok, "objective %q not registered — ensure rules/tally is imported", autofixdata.ObjectiveMultiStage)
+	return obj
+}
+
+func testAgentConfig(cfg *config.Config) agentConfig {
+	return agentConfig{cfg: cfg, timeout: 5 * time.Second}
+}
+
+func testRoundParams(t *testing.T) roundPromptParams {
+	t.Helper()
+	return roundPromptParams{
+		filePath: "Dockerfile",
+		obj:      multiStageObj(t),
+	}
+}
+
 func TestResolver_RunAndParseRound_NoChange_ShortCircuits(t *testing.T) {
 	t.Parallel()
 
@@ -38,7 +58,10 @@ func TestResolver_RunAndParseRound_NoChange_ShortCircuits(t *testing.T) {
 		runner: &stubAgentRunner{texts: []string{"NO_CHANGE"}},
 	}
 
-	out, err := r.runRound(context.Background(), "Dockerfile", cfg, 5*time.Second, "prompt", []byte("FROM alpine:3.20\n"), agentOutputPatch)
+	out, err := r.runRound(
+		context.Background(), testAgentConfig(cfg),
+		"prompt", []byte("FROM alpine:3.20\n"), testRoundParams(t), autofixdata.OutputPatch,
+	)
 	require.NoError(t, err)
 	require.True(t, out.noChange)
 	require.Nil(t, out.proposed)
@@ -55,7 +78,10 @@ func TestResolver_RunAndParseRound_NoChange_ShortCircuitsAfterRetry(t *testing.T
 		runner: &stubAgentRunner{texts: []string{"not a diff block", "NO_CHANGE"}},
 	}
 
-	out, err := r.runRound(context.Background(), "Dockerfile", cfg, 5*time.Second, "prompt", []byte("FROM alpine:3.20\n"), agentOutputPatch)
+	out, err := r.runRound(
+		context.Background(), testAgentConfig(cfg),
+		"prompt", []byte("FROM alpine:3.20\n"), testRoundParams(t), autofixdata.OutputPatch,
+	)
 	require.NoError(t, err)
 	require.True(t, out.noChange)
 	require.Nil(t, out.proposed)
@@ -79,13 +105,8 @@ func TestResolver_RunRound_RedactSecretsInPatchModeFallsBack(t *testing.T) {
 	)
 
 	_, err := r.runRound(
-		context.Background(),
-		"Dockerfile",
-		cfg,
-		5*time.Second,
-		"prompt",
-		roundInput,
-		agentOutputPatch,
+		context.Background(), testAgentConfig(cfg),
+		"prompt", roundInput, testRoundParams(t), autofixdata.OutputPatch,
 	)
 	require.Error(t, err)
 

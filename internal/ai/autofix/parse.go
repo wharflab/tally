@@ -3,6 +3,8 @@ package autofix
 import (
 	"errors"
 	"strings"
+
+	"github.com/wharflab/tally/internal/ai/autofixdata"
 )
 
 func parseAgentPatchResponse(text string) (string, bool, error) {
@@ -22,7 +24,7 @@ func parseAgentFencedResponse(text, infoString, label string) (string, bool, err
 		return "", true, nil
 	}
 
-	trimmed = normalizeLF(trimmed)
+	trimmed = autofixdata.NormalizeLF(trimmed)
 	opening := "```" + infoString + "\n"
 	if !strings.HasPrefix(trimmed, opening) {
 		return "", false, errors.New("output must be a single ```" + infoString + " fenced block or NO_CHANGE")

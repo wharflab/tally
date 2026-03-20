@@ -1,16 +1,17 @@
-package autofix
+package tally
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/wharflab/tally/internal/config"
 	"github.com/wharflab/tally/internal/dockerfile"
 )
 
-func mustParseDockerfile(t *testing.T, content string) *dockerfile.ParseResult {
+func mustParseDockerfileForFix(t *testing.T, content string) *dockerfile.ParseResult {
 	t.Helper()
 	cfg := config.Default()
-	parsed, err := parseDockerfile([]byte(content), cfg)
+	parsed, err := dockerfile.Parse(bytes.NewReader([]byte(content)), cfg)
 	if err != nil {
 		t.Fatalf("parse Dockerfile: %v", err)
 	}
@@ -20,13 +21,13 @@ func mustParseDockerfile(t *testing.T, content string) *dockerfile.ParseResult {
 func TestValidateStageCount_SingleStageInputRequiresMultiStageProposal(t *testing.T) {
 	t.Parallel()
 
-	orig := mustParseDockerfile(t, "FROM alpine:3.20\nRUN echo hi\n")
-	proposedSingle := mustParseDockerfile(t, "FROM alpine:3.20\nRUN echo hi\n")
+	orig := mustParseDockerfileForFix(t, "FROM alpine:3.20\nRUN echo hi\n")
+	proposedSingle := mustParseDockerfileForFix(t, "FROM alpine:3.20\nRUN echo hi\n")
 	if err := validateStageCount(orig, proposedSingle); err == nil {
 		t.Fatalf("expected stage-count error, got nil")
 	}
 
-	proposedMulti := mustParseDockerfile(t, "FROM alpine:3.20 AS builder\nRUN echo build\nFROM alpine:3.20\nRUN echo runtime\n")
+	proposedMulti := mustParseDockerfileForFix(t, "FROM alpine:3.20 AS builder\nRUN echo build\nFROM alpine:3.20\nRUN echo runtime\n")
 	if err := validateStageCount(orig, proposedMulti); err != nil {
 		t.Fatalf("expected no stage-count error, got %v", err)
 	}
@@ -35,8 +36,8 @@ func TestValidateStageCount_SingleStageInputRequiresMultiStageProposal(t *testin
 func TestValidateStageCount_RejectsProposalWithoutFrom(t *testing.T) {
 	t.Parallel()
 
-	orig := mustParseDockerfile(t, "FROM alpine:3.20\nRUN echo hi\n")
-	proposed := mustParseDockerfile(t, "RUN echo hi\n")
+	orig := mustParseDockerfileForFix(t, "FROM alpine:3.20\nRUN echo hi\n")
+	proposed := mustParseDockerfileForFix(t, "RUN echo hi\n")
 	if err := validateStageCount(orig, proposed); err == nil {
 		t.Fatalf("expected stage-count error, got nil")
 	}
@@ -45,7 +46,7 @@ func TestValidateStageCount_RejectsProposalWithoutFrom(t *testing.T) {
 func TestValidateRuntimeSettings_PreservesFinalStageSettings(t *testing.T) {
 	t.Parallel()
 
-	orig := mustParseDockerfile(t, `FROM alpine:3.20
+	orig := mustParseDockerfileForFix(t, `FROM alpine:3.20
 WORKDIR /app
 ENV FOO=bar
 ENV BAZ=qux
@@ -58,7 +59,7 @@ ENTRYPOINT ["app"]
 CMD ["--help"]
 `)
 
-	proposed := mustParseDockerfile(t, `FROM alpine:3.20 AS builder
+	proposed := mustParseDockerfileForFix(t, `FROM alpine:3.20 AS builder
 RUN echo build
 
 FROM alpine:3.20
@@ -75,18 +76,18 @@ CMD ["--help"]
 COPY --from=builder /bin/sh /bin/sh
 `)
 
-	if err := validateRuntimeSettings(orig, proposed); err != nil {
-		t.Fatalf("expected no runtime-settings error, got %v", err)
+	if errs := runtimeValidationErrors(orig, proposed); len(errs) > 0 {
+		t.Fatalf("expected no runtime-validation errors, got %v", errs)
 	}
 }
 
 func TestValidateRuntimeSettings_FailsOnAddedCMD(t *testing.T) {
 	t.Parallel()
 
-	orig := mustParseDockerfile(t, `FROM alpine:3.20
+	orig := mustParseDockerfileForFix(t, `FROM alpine:3.20
 ENTRYPOINT ["app"]
 `)
-	proposed := mustParseDockerfile(t, `FROM alpine:3.20 AS builder
+	proposed := mustParseDockerfileForFix(t, `FROM alpine:3.20 AS builder
 RUN echo build
 
 FROM alpine:3.20
@@ -95,16 +96,16 @@ CMD ["--help"]
 COPY --from=builder /bin/sh /bin/sh
 `)
 
-	if err := validateRuntimeSettings(orig, proposed); err == nil {
-		t.Fatalf("expected runtime-settings error, got nil")
+	if errs := runtimeValidationErrors(orig, proposed); len(errs) == 0 {
+		t.Fatalf("expected runtime-validation errors, got none")
 	}
 }
 
 func TestValidateRuntimeSettings_FailsOnChangedWorkdir(t *testing.T) {
 	t.Parallel()
 
-	orig := mustParseDockerfile(t, "FROM alpine:3.20\nWORKDIR /app\nCMD [\"app\"]\n")
-	proposed := mustParseDockerfile(t, `FROM alpine:3.20 AS builder
+	orig := mustParseDockerfileForFix(t, "FROM alpine:3.20\nWORKDIR /app\nCMD [\"app\"]\n")
+	proposed := mustParseDockerfileForFix(t, `FROM alpine:3.20 AS builder
 RUN echo build
 FROM alpine:3.20
 WORKDIR /srv
@@ -112,16 +113,16 @@ CMD ["app"]
 COPY --from=builder /bin/sh /bin/sh
 `)
 
-	if err := validateRuntimeSettings(orig, proposed); err == nil {
-		t.Fatalf("expected runtime-settings error, got nil")
+	if errs := runtimeValidationErrors(orig, proposed); len(errs) == 0 {
+		t.Fatalf("expected runtime-validation errors, got none")
 	}
 }
 
 func TestValidateRuntimeSettings_FailsOnChangedEnv(t *testing.T) {
 	t.Parallel()
 
-	orig := mustParseDockerfile(t, "FROM alpine:3.20\nENV FOO=bar\nCMD [\"app\"]\n")
-	proposed := mustParseDockerfile(t, `FROM alpine:3.20 AS builder
+	orig := mustParseDockerfileForFix(t, "FROM alpine:3.20\nENV FOO=bar\nCMD [\"app\"]\n")
+	proposed := mustParseDockerfileForFix(t, `FROM alpine:3.20 AS builder
 RUN echo build
 FROM alpine:3.20
 ENV FOO=baz
@@ -129,7 +130,7 @@ CMD ["app"]
 COPY --from=builder /bin/sh /bin/sh
 `)
 
-	if err := validateRuntimeSettings(orig, proposed); err == nil {
-		t.Fatalf("expected runtime-settings error, got nil")
+	if errs := runtimeValidationErrors(orig, proposed); len(errs) == 0 {
+		t.Fatalf("expected runtime-validation errors, got none")
 	}
 }

@@ -28,16 +28,16 @@ const (
 	unreachableStagesKey = "tally/no-unreachable-stages"
 )
 
-type agentOutputMode string
-
-const (
-	agentOutputPatch      agentOutputMode = "patch"
-	agentOutputDockerfile agentOutputMode = "dockerfile"
-)
-
 type resolver struct {
 	runner          agentRunner
 	gitleaksFactory func() (*detect.Detector, error)
+}
+
+// agentConfig bundles the validated config and timeout for the agent loop,
+// reducing parameter counts on internal functions.
+type agentConfig struct {
+	cfg     *config.Config
+	timeout time.Duration
 }
 
 type agentRunner interface {
@@ -54,9 +54,14 @@ func newResolver() *resolver {
 func (r *resolver) ID() string { return autofixdata.ResolverID }
 
 func (r *resolver) Resolve(ctx context.Context, resolveCtx fix.ResolveContext, sf *rules.SuggestedFix) ([]rules.TextEdit, error) {
-	req, err := multiStageRequest(sf)
+	req, err := objectiveRequest(sf)
 	if err != nil {
 		return nil, err
+	}
+
+	obj, ok := autofixdata.GetObjective(req.Kind)
+	if !ok {
+		return nil, fmt.Errorf("ai-autofix: unknown objective kind %q", req.Kind)
 	}
 
 	cfg := req.Config
@@ -67,13 +72,14 @@ func (r *resolver) Resolve(ctx context.Context, resolveCtx fix.ResolveContext, s
 	if err != nil {
 		return nil, err
 	}
+	ac := agentConfig{cfg: cfg, timeout: timeout}
 
 	origParse, err := parseDockerfile(resolveCtx.Content, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("ai-autofix: parse original: %w", err)
 	}
 
-	proposed, err := r.proposeMultiStageDockerfile(ctx, resolveCtx.FilePath, resolveCtx.Content, req, cfg, timeout, origParse)
+	proposed, err := r.proposeDockerfile(ctx, resolveCtx.FilePath, resolveCtx.Content, req, obj, ac, origParse)
 	if err != nil || proposed == nil {
 		return nil, err
 	}
@@ -88,10 +94,10 @@ func (r *resolver) Resolve(ctx context.Context, resolveCtx fix.ResolveContext, s
 	return []rules.TextEdit{wholeFileReplacement(resolveCtx.FilePath, resolveCtx.Content, newText)}, nil
 }
 
-func multiStageRequest(sf *rules.SuggestedFix) (*autofixdata.MultiStageResolveData, error) {
-	req, ok := sf.ResolverData.(*autofixdata.MultiStageResolveData)
+func objectiveRequest(sf *rules.SuggestedFix) (*autofixdata.ObjectiveRequest, error) {
+	req, ok := sf.ResolverData.(*autofixdata.ObjectiveRequest)
 	if !ok || req == nil {
-		return nil, errors.New("ai-autofix: invalid resolver data")
+		return nil, errors.New("ai-autofix: invalid resolver data (expected *ObjectiveRequest)")
 	}
 	return req, nil
 }
@@ -111,25 +117,28 @@ func validateAIConfig(cfg *config.Config) (time.Duration, error) {
 	return timeout, nil
 }
 
-func (r *resolver) proposeMultiStageDockerfile(
+func (r *resolver) proposeDockerfile(
 	ctx context.Context,
 	filePath string,
 	original []byte,
-	req *autofixdata.MultiStageResolveData,
-	cfg *config.Config,
-	timeout time.Duration,
+	req *autofixdata.ObjectiveRequest,
+	obj autofixdata.Objective,
+	ac agentConfig,
 	origParse *dockerfile.ParseResult,
 ) ([]byte, error) {
-	roundInput := []byte(normalizeLF(string(original)))
+	roundInput := []byte(autofixdata.NormalizeLF(string(original)))
 	var proposed []byte
-	var blocking []blockingIssue
-	mode := agentOutputPatch
+	var blocking []autofixdata.BlockingIssue
+	mode := autofixdata.OutputPatch
 
 	rp := roundPromptParams{
-		filePath:  filePath,
-		req:       req,
-		cfg:       cfg,
-		origParse: origParse,
+		filePath:   filePath,
+		absPath:    resolveAbsPath(filePath),
+		contextDir: req.ContextDir,
+		obj:        obj,
+		req:        req,
+		cfg:        ac.cfg,
+		origParse:  origParse,
 	}
 	for round := 1; round <= maxAgentRounds; round++ {
 	retryCurrentRound:
@@ -141,10 +150,10 @@ func (r *resolver) proposeMultiStageDockerfile(
 			return nil, err
 		}
 
-		result, err := r.runRound(ctx, filePath, cfg, timeout, prompt, roundInput, mode)
+		result, err := r.runRound(ctx, ac, prompt, roundInput, rp, mode)
 		var fallbackErr *patchFallbackError
 		if errors.As(err, &fallbackErr) {
-			mode = agentOutputDockerfile
+			mode = autofixdata.OutputDockerfile
 			goto retryCurrentRound
 		}
 		if err != nil {
@@ -155,15 +164,15 @@ func (r *resolver) proposeMultiStageDockerfile(
 		}
 
 		proposed = result.proposed
-		if mode == agentOutputPatch {
-			blocking = validateMultiStagePatch(result.patchMeta)
+		if mode == autofixdata.OutputPatch {
+			blocking = obj.ValidatePatch(result.patchMeta)
 			if len(blocking) > 0 {
 				roundInput = proposed
 				continue
 			}
 		}
 
-		proposed, blocking, err = r.checkProposal(ctx, filePath, proposed, cfg, origParse, req.FixContext)
+		proposed, blocking, err = r.checkProposal(ctx, filePath, proposed, ac.cfg, origParse, obj, req.FixContext)
 		if err != nil {
 			return nil, err
 		}
@@ -179,21 +188,41 @@ func (r *resolver) proposeMultiStageDockerfile(
 
 // roundPromptParams bundles the inputs for buildRoundPrompt across rounds.
 type roundPromptParams struct {
-	filePath  string
-	input     []byte // round 1: original content; round 2+: previous proposal
-	proposed  []byte // round 2+: proposed content for retry
-	blocking  []blockingIssue
-	req       *autofixdata.MultiStageResolveData
-	cfg       *config.Config
-	origParse *dockerfile.ParseResult
+	filePath   string
+	absPath    string
+	contextDir string
+	input      []byte // round 1: original content; round 2+: previous proposal
+	proposed   []byte // round 2+: proposed content for retry
+	blocking   []autofixdata.BlockingIssue
+	obj        autofixdata.Objective
+	req        *autofixdata.ObjectiveRequest
+	cfg        *config.Config
+	origParse  *dockerfile.ParseResult
 }
 
-func buildRoundPrompt(round int, p roundPromptParams, mode agentOutputMode) (string, error) {
+func buildRoundPrompt(round int, p roundPromptParams, mode autofixdata.OutputMode) (string, error) {
 	switch round {
 	case 1:
-		return buildRound1Prompt(p.filePath, p.input, p.req, p.cfg, p.origParse, mode)
+		return p.obj.BuildPrompt(autofixdata.PromptContext{
+			FilePath:   p.filePath,
+			Source:     p.input,
+			Request:    p.req,
+			Config:     p.cfg,
+			AbsPath:    p.absPath,
+			ContextDir: p.contextDir,
+			OrigParse:  p.origParse,
+			Mode:       mode,
+		})
 	case 2:
-		return buildRound2Prompt(p.filePath, p.proposed, p.blocking, p.cfg, mode)
+		return p.obj.BuildRetryPrompt(autofixdata.RetryPromptContext{
+			FilePath:       p.filePath,
+			Proposed:       p.proposed,
+			BlockingIssues: p.blocking,
+			Config:         p.cfg,
+			AbsPath:        p.absPath,
+			ContextDir:     p.contextDir,
+			Mode:           mode,
+		})
 	default:
 		return "", errors.New("ai-autofix: unexpected round")
 	}
@@ -217,14 +246,13 @@ func (e *patchFallbackError) Unwrap() error { return e.err }
 
 func (r *resolver) runRound(
 	ctx context.Context,
-	filePath string,
-	cfg *config.Config,
-	timeout time.Duration,
+	ac agentConfig,
 	prompt string,
 	roundInput []byte,
-	mode agentOutputMode,
+	rp roundPromptParams,
+	mode autofixdata.OutputMode,
 ) (roundResult, error) {
-	respText, err := r.runAgent(ctx, filePath, cfg, timeout, prompt, roundInput, mode)
+	respText, err := r.runAgent(ctx, rp.filePath, ac, prompt, roundInput, mode)
 	if err != nil {
 		return roundResult{}, err
 	}
@@ -236,8 +264,14 @@ func (r *resolver) runRound(
 
 	lastErr := perr
 	for range maxMalformedRetries {
-		simplePrompt := buildSimplifiedPrompt(filePath, roundInput, cfg, mode)
-		respText, err = r.runAgent(ctx, filePath, cfg, timeout, simplePrompt, roundInput, mode)
+		simplePrompt := rp.obj.BuildSimplifiedPrompt(autofixdata.SimplifiedPromptContext{
+			FilePath:   rp.filePath,
+			Source:     roundInput,
+			AbsPath:    rp.absPath,
+			ContextDir: rp.contextDir,
+			Mode:       mode,
+		})
+		respText, err = r.runAgent(ctx, rp.filePath, ac, simplePrompt, roundInput, mode)
 		if err != nil {
 			return roundResult{}, err
 		}
@@ -249,16 +283,16 @@ func (r *resolver) runRound(
 		return result, nil
 	}
 
-	if mode == agentOutputPatch {
+	if mode == autofixdata.OutputPatch {
 		return roundResult{}, &patchFallbackError{err: lastErr}
 	}
 
 	return roundResult{}, fmt.Errorf("ai-autofix: malformed agent output: %w", lastErr)
 }
 
-func parseRoundOutput(text string, roundInput []byte, mode agentOutputMode) (roundResult, error) {
+func parseRoundOutput(text string, roundInput []byte, mode autofixdata.OutputMode) (roundResult, error) {
 	switch mode {
-	case agentOutputPatch:
+	case autofixdata.OutputPatch:
 		parsed, noChange, err := parseAgentPatchResponse(text)
 		if err != nil {
 			return roundResult{}, err
@@ -271,7 +305,7 @@ func parseRoundOutput(text string, roundInput []byte, mode agentOutputMode) (rou
 			return roundResult{}, err
 		}
 		return roundResult{proposed: proposed, patchMeta: meta}, nil
-	case agentOutputDockerfile:
+	case autofixdata.OutputDockerfile:
 		parsed, noChange, err := parseAgentDockerfileResponse(text)
 		if err != nil {
 			return roundResult{}, err
@@ -290,7 +324,7 @@ func parseRoundOutput(text string, roundInput []byte, mode agentOutputMode) (rou
 }
 
 func normalizeAgentDockerfile(parsed string) (string, error) {
-	parsed = normalizeLF(parsed)
+	parsed = autofixdata.NormalizeLF(parsed)
 	if parsed == "" {
 		return "", errors.New("ai-autofix: empty Dockerfile output")
 	}
@@ -303,42 +337,59 @@ func (r *resolver) checkProposal(
 	proposed []byte,
 	cfg *config.Config,
 	origParse *dockerfile.ParseResult,
+	obj autofixdata.Objective,
 	fixCtx autofixdata.FixContext,
-) ([]byte, []blockingIssue, error) {
-	var blocking []blockingIssue
+) ([]byte, []autofixdata.BlockingIssue, error) {
+	var blocking []autofixdata.BlockingIssue
 
 	propParse, parseErr := parseDockerfile(proposed, cfg)
 	if parseErr != nil {
-		blocking = []blockingIssue{{
+		blocking = []autofixdata.BlockingIssue{{
 			Rule:    "syntax",
 			Message: "proposed Dockerfile failed to parse: " + parseErr.Error(),
 		}}
-	} else if err := validateStageCount(origParse, propParse); err != nil {
-		blocking = []blockingIssue{{Rule: "semantics", Message: err.Error()}}
 	} else {
-		for _, err := range collectRuntimeValidationErrors(origParse, propParse) {
-			blocking = append(blocking, blockingIssue{Rule: "runtime", Message: err.Error()})
-		}
+		blocking = obj.ValidateProposal(origParse, propParse)
 	}
 
 	if len(blocking) > 0 {
 		return proposed, blocking, nil
 	}
 
-	return r.validateWithLint(ctx, filePath, proposed, cfg, fixCtx)
+	proposed, blocking, err := r.validateWithLint(ctx, filePath, proposed, cfg, fixCtx)
+	if err != nil || len(blocking) > 0 {
+		return proposed, blocking, err
+	}
+
+	// Re-validate after lint normalization — safe sync fixes may have changed
+	// the content and the objective's invariants must still hold.
+	normalizedParse, normalizeErr := parseDockerfile(proposed, cfg)
+	if normalizeErr != nil {
+		blocking = []autofixdata.BlockingIssue{{
+			Rule:    "syntax",
+			Message: "normalized Dockerfile failed to parse: " + normalizeErr.Error(),
+		}}
+	} else {
+		blocking = obj.ValidateProposal(origParse, normalizedParse)
+	}
+
+	return proposed, blocking, nil
 }
 
 func (r *resolver) runAgent(
 	ctx context.Context,
 	filePath string,
-	cfg *config.Config,
-	timeout time.Duration,
+	ac agentConfig,
 	prompt string,
 	roundInput []byte,
-	mode agentOutputMode,
+	mode autofixdata.OutputMode,
 ) (string, error) {
+	cfg := ac.cfg
 	if cfg.AI.MaxInputBytes > 0 && len(prompt) > cfg.AI.MaxInputBytes {
-		return "", fmt.Errorf("ai-autofix: prompt too large (%d bytes > ai.max-input-bytes=%d)", len(prompt), cfg.AI.MaxInputBytes)
+		return "", fmt.Errorf(
+			"ai-autofix: prompt too large (%d bytes > ai.max-input-bytes=%d)",
+			len(prompt), cfg.AI.MaxInputBytes,
+		)
 	}
 
 	redacted := prompt
@@ -347,7 +398,7 @@ func (r *resolver) runAgent(
 		if err != nil {
 			return "", fmt.Errorf("ai-autofix: redact-secrets enabled but detector init failed: %w", err)
 		}
-		if mode == agentOutputPatch && countSecrets(det, string(roundInput)) > 0 {
+		if mode == autofixdata.OutputPatch && countSecrets(det, string(roundInput)) > 0 {
 			return "", &patchFallbackError{err: errors.New(
 				"ai-autofix: ai.redact-secrets=true and secrets were detected in the Dockerfile payload",
 			)}
@@ -361,7 +412,7 @@ func (r *resolver) runAgent(
 	resp, err := r.runner.Run(ctx, acp.RunRequest{
 		Command: cfg.AI.Command,
 		Cwd:     cwd,
-		Timeout: timeout,
+		Timeout: ac.timeout,
 		Prompt:  redacted,
 	})
 	if err != nil {
@@ -374,8 +425,17 @@ func parseDockerfile(content []byte, cfg *config.Config) (*dockerfile.ParseResul
 	return dockerfile.Parse(bytes.NewReader(content), cfg)
 }
 
-func normalizeLF(s string) string {
-	return strings.ReplaceAll(s, "\r\n", "\n")
+// resolveAbsPath returns the absolute path for a real file, or empty for
+// synthetic paths (stdin, LSP virtual files).
+func resolveAbsPath(filePath string) string {
+	if filePath == "" || strings.HasPrefix(filePath, "<") {
+		return ""
+	}
+	abs, err := filepath.Abs(filePath)
+	if err != nil {
+		return ""
+	}
+	return abs
 }
 
 func countSecrets(det *detect.Detector, input string) int {
@@ -418,7 +478,7 @@ func (r *resolver) validateWithLint(
 	proposed []byte,
 	cfg *config.Config,
 	fixCtx autofixdata.FixContext,
-) ([]byte, []blockingIssue, error) {
+) ([]byte, []autofixdata.BlockingIssue, error) {
 	lintCfg := *cfg
 	lintCfg.AI = config.AIConfig{Enabled: false}
 
