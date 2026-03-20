@@ -34,10 +34,7 @@ func (o *multiStageObjective) Kind() autofixdata.ObjectiveKind {
 }
 
 func (o *multiStageObjective) BuildPrompt(ctx autofixdata.PromptContext) (string, error) {
-	file := strings.TrimSpace(ctx.Request.File)
-	if file == "" {
-		file = filepath.Base(ctx.FilePath)
-	}
+	file := multiStageTargetFile(ctx.Request.File, ctx.FilePath)
 
 	runtimeSummary, err := summarizeFinalStageRuntime(ctx.OrigParse, ctx.Source, ctx.Config)
 	if err != nil {
@@ -155,6 +152,15 @@ func (o *multiStageObjective) ValidateProposal(
 	}
 
 	return blocking
+}
+
+// multiStageTargetFile returns a stable, basename-only file name for use in
+// diff headers and prompt labels across all rounds (initial, retry, fallback).
+func multiStageTargetFile(requestFile, filePath string) string {
+	if f := strings.TrimSpace(requestFile); f != "" {
+		return filepath.Base(f)
+	}
+	return filepath.Base(filePath)
 }
 
 // ValidatePatch returns nil — stage-count enforcement is handled by
