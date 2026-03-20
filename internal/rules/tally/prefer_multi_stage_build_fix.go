@@ -120,6 +120,7 @@ func (o *multiStageObjective) BuildSimplifiedPrompt(ctx autofixdata.SimplifiedPr
 	b.WriteString("Convert the Dockerfile below to a correct multi-stage build.\n")
 	b.WriteString("Only do the multi-stage conversion; do not optimize or rewrite unrelated parts.\n")
 	b.WriteString("If you cannot do so safely, output exactly: NO_CHANGE.\n\n")
+	autofixdata.WriteFileContext(&b, ctx.AbsPath, ctx.ContextDir)
 	b.WriteString("Input Dockerfile:\n")
 	b.WriteString("```Dockerfile\n")
 	b.WriteString(autofixdata.NormalizeLF(string(ctx.Source)))
