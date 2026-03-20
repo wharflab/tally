@@ -70,6 +70,8 @@ func (o *multiStageObjective) BuildRetryPrompt(ctx autofixdata.RetryPromptContex
 	b.WriteString("- Preserve runtime settings in the final stage exactly: ENTRYPOINT, CMD, EXPOSE, USER, WORKDIR, ENV, LABEL, ")
 	b.WriteString("HEALTHCHECK.\n\n")
 
+	autofixdata.WriteFileContext(&b, ctx.AbsPath, ctx.ContextDir)
+
 	b.WriteString("Blocking issues (JSON):\n")
 	b.Write(issuesJSON)
 	b.WriteString("\n\n")
