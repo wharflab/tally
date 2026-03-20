@@ -39,6 +39,14 @@ func testAgentConfig(cfg *config.Config) agentConfig {
 	return agentConfig{cfg: cfg, timeout: 5 * time.Second}
 }
 
+func testRoundParams(t *testing.T) roundPromptParams {
+	t.Helper()
+	return roundPromptParams{
+		filePath: "Dockerfile",
+		obj:      multiStageObj(t),
+	}
+}
+
 func TestResolver_RunAndParseRound_NoChange_ShortCircuits(t *testing.T) {
 	t.Parallel()
 
@@ -51,8 +59,8 @@ func TestResolver_RunAndParseRound_NoChange_ShortCircuits(t *testing.T) {
 	}
 
 	out, err := r.runRound(
-		context.Background(), "Dockerfile", testAgentConfig(cfg),
-		"prompt", []byte("FROM alpine:3.20\n"), multiStageObj(t), autofixdata.OutputPatch,
+		context.Background(), testAgentConfig(cfg),
+		"prompt", []byte("FROM alpine:3.20\n"), testRoundParams(t), autofixdata.OutputPatch,
 	)
 	require.NoError(t, err)
 	require.True(t, out.noChange)
@@ -71,8 +79,8 @@ func TestResolver_RunAndParseRound_NoChange_ShortCircuitsAfterRetry(t *testing.T
 	}
 
 	out, err := r.runRound(
-		context.Background(), "Dockerfile", testAgentConfig(cfg),
-		"prompt", []byte("FROM alpine:3.20\n"), multiStageObj(t), autofixdata.OutputPatch,
+		context.Background(), testAgentConfig(cfg),
+		"prompt", []byte("FROM alpine:3.20\n"), testRoundParams(t), autofixdata.OutputPatch,
 	)
 	require.NoError(t, err)
 	require.True(t, out.noChange)
@@ -97,8 +105,8 @@ func TestResolver_RunRound_RedactSecretsInPatchModeFallsBack(t *testing.T) {
 	)
 
 	_, err := r.runRound(
-		context.Background(), "Dockerfile", testAgentConfig(cfg),
-		"prompt", roundInput, multiStageObj(t), autofixdata.OutputPatch,
+		context.Background(), testAgentConfig(cfg),
+		"prompt", roundInput, testRoundParams(t), autofixdata.OutputPatch,
 	)
 	require.Error(t, err)
 

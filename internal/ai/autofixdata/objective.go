@@ -82,14 +82,18 @@ type RetryPromptContext struct {
 	Proposed       []byte
 	BlockingIssues []BlockingIssue
 	Config         *config.Config
+	AbsPath        string
+	ContextDir     string
 	Mode           OutputMode
 }
 
 // SimplifiedPromptContext provides inputs for building a minimal fallback prompt.
 type SimplifiedPromptContext struct {
-	FilePath string
-	Source   []byte
-	Mode     OutputMode
+	FilePath   string
+	Source     []byte
+	AbsPath    string
+	ContextDir string
+	Mode       OutputMode
 }
 
 var objectives = make(map[ObjectiveKind]Objective)

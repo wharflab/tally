@@ -150,7 +150,7 @@ func (r *resolver) proposeDockerfile(
 			return nil, err
 		}
 
-		result, err := r.runRound(ctx, filePath, ac, prompt, roundInput, obj, mode)
+		result, err := r.runRound(ctx, ac, prompt, roundInput, rp, mode)
 		var fallbackErr *patchFallbackError
 		if errors.As(err, &fallbackErr) {
 			mode = autofixdata.OutputDockerfile
@@ -219,6 +219,8 @@ func buildRoundPrompt(round int, p roundPromptParams, mode autofixdata.OutputMod
 			Proposed:       p.proposed,
 			BlockingIssues: p.blocking,
 			Config:         p.cfg,
+			AbsPath:        p.absPath,
+			ContextDir:     p.contextDir,
 			Mode:           mode,
 		})
 	default:
@@ -244,14 +246,13 @@ func (e *patchFallbackError) Unwrap() error { return e.err }
 
 func (r *resolver) runRound(
 	ctx context.Context,
-	filePath string,
 	ac agentConfig,
 	prompt string,
 	roundInput []byte,
-	obj autofixdata.Objective,
+	rp roundPromptParams,
 	mode autofixdata.OutputMode,
 ) (roundResult, error) {
-	respText, err := r.runAgent(ctx, filePath, ac, prompt, roundInput, mode)
+	respText, err := r.runAgent(ctx, rp.filePath, ac, prompt, roundInput, mode)
 	if err != nil {
 		return roundResult{}, err
 	}
@@ -263,12 +264,14 @@ func (r *resolver) runRound(
 
 	lastErr := perr
 	for range maxMalformedRetries {
-		simplePrompt := obj.BuildSimplifiedPrompt(autofixdata.SimplifiedPromptContext{
-			FilePath: filePath,
-			Source:   roundInput,
-			Mode:     mode,
+		simplePrompt := rp.obj.BuildSimplifiedPrompt(autofixdata.SimplifiedPromptContext{
+			FilePath:   rp.filePath,
+			Source:     roundInput,
+			AbsPath:    rp.absPath,
+			ContextDir: rp.contextDir,
+			Mode:       mode,
 		})
-		respText, err = r.runAgent(ctx, filePath, ac, simplePrompt, roundInput, mode)
+		respText, err = r.runAgent(ctx, rp.filePath, ac, simplePrompt, roundInput, mode)
 		if err != nil {
 			return roundResult{}, err
 		}
