@@ -9,10 +9,10 @@ func ShellDirectivesFromDirective(directives []directive.ShellDirective) []Shell
 	}
 
 	out := make([]ShellDirective, 0, len(directives))
-	for _, directive := range directives {
+	for _, d := range directives {
 		out = append(out, ShellDirective{
-			Line:  directive.Line,
-			Shell: directive.Shell,
+			Line:  d.Line,
+			Shell: d.Shell,
 		})
 	}
 	return out
