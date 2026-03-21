@@ -213,6 +213,7 @@ jobs:
           assert payload["version"] == expected_version, payload
           assert payload["platform"]["os"] == os.environ["EXPECTED_GOOS"], payload
           assert payload["platform"]["arch"] == os.environ["EXPECTED_GOARCH"], payload
+          assert payload.get("shellcheckVersion"), f"shellcheckVersion missing or empty: {payload}"
           PY
       - name: Build macOS binary
         if: matrix.runner_os == 'macOS'
@@ -244,6 +245,32 @@ jobs:
           export GOARCH="${{ matrix.goarch }}"
           LDFLAGS="-s -w -X github.com/wharflab/tally/internal/version.version=${CLEAN_VERSION} -X github.com/wharflab/tally/internal/version.commit=${GITHUB_SHA}"
           go build -tags "${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o "${DIST_DIR}/${{ matrix.binary_name }}" .
+      - name: Smoke test Windows binary
+        if: matrix.runner_os == 'Windows'
+        shell: pwsh
+        env:
+          EXPECTED_VERSION: ${{ env.RELEASE_VERSION }}
+          EXPECTED_GOOS: ${{ matrix.goos }}
+          EXPECTED_GOARCH: ${{ matrix.goarch }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $binary = "dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}/${{ matrix.binary_name }}"
+          $versionJson = & $binary version --json | Out-String
+          Write-Host $versionJson
+          $payload = $versionJson | ConvertFrom-Json
+          $expectedVersion = $env:EXPECTED_VERSION -replace '^v', ''
+          if ($payload.version -ne $expectedVersion) {
+            throw "version mismatch: expected=$expectedVersion actual=$($payload.version)"
+          }
+          if ($payload.platform.os -ne $env:EXPECTED_GOOS) {
+            throw "os mismatch: expected=$($env:EXPECTED_GOOS) actual=$($payload.platform.os)"
+          }
+          if ($payload.platform.arch -ne $env:EXPECTED_GOARCH) {
+            throw "arch mismatch: expected=$($env:EXPECTED_GOARCH) actual=$($payload.platform.arch)"
+          }
+          if (-not $payload.shellcheckVersion) {
+            throw "shellcheckVersion missing or empty: $versionJson"
+          }
       - name: Import macOS Code Signing Certificate
         if: matrix.goos == 'darwin'
         uses: apple-actions/import-codesign-certs@v6
