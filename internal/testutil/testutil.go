@@ -43,7 +43,7 @@ func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 	sm := sourcemap.New(result.Source)
 	spanIndex := directive.NewInstructionSpanIndexFromAST(result.AST, sm)
 	directiveResult := directive.Parse(sm, nil, spanIndex)
-	fileFacts := facts.NewFileFacts(file, result, sem, toFactsShellDirectives(directiveResult.ShellDirectives))
+	fileFacts := facts.NewFileFacts(file, result, sem, facts.ShellDirectivesFromDirective(directiveResult.ShellDirectives))
 
 	return rules.LintInput{
 		File:     file,
@@ -56,21 +56,6 @@ func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 		Context:  nil, // v1.0 doesn't require context
 		Config:   nil, // Set by individual tests if needed
 	}
-}
-
-func toFactsShellDirectives(directives []directive.ShellDirective) []facts.ShellDirective {
-	if len(directives) == 0 {
-		return nil
-	}
-
-	out := make([]facts.ShellDirective, 0, len(directives))
-	for _, directive := range directives {
-		out = append(out, facts.ShellDirective{
-			Line:  directive.Line,
-			Shell: directive.Shell,
-		})
-	}
-	return out
 }
 
 // MakeLintInputWithConfig creates a LintInput with rule configuration.

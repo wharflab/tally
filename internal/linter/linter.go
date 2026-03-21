@@ -136,7 +136,7 @@ func LintFile(input Input) (*Result, error) {
 	sem := semantic.NewBuilder(parseResult, buildArgs, input.FilePath).
 		WithShellDirectives(directiveResult.ShellDirectives).
 		Build()
-	fileFacts := facts.NewFileFacts(input.FilePath, parseResult, sem, toFactsShellDirectives(directiveResult.ShellDirectives))
+	fileFacts := facts.NewFileFacts(input.FilePath, parseResult, sem, facts.ShellDirectivesFromDirective(directiveResult.ShellDirectives))
 
 	enabledRules := EnabledRuleCodes(cfg)
 
@@ -219,19 +219,4 @@ func LintFile(input Input) (*Result, error) {
 		ParseResult: parseResult,
 		Config:      cfg,
 	}, nil
-}
-
-func toFactsShellDirectives(directives []directive.ShellDirective) []facts.ShellDirective {
-	if len(directives) == 0 {
-		return nil
-	}
-
-	out := make([]facts.ShellDirective, 0, len(directives))
-	for _, directive := range directives {
-		out = append(out, facts.ShellDirective{
-			Line:  directive.Line,
-			Shell: directive.Shell,
-		})
-	}
-	return out
 }
