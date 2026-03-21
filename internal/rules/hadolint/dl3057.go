@@ -193,6 +193,9 @@ func stageHasExplicitHealthcheck(stage *instructions.Stage) bool {
 //   - Interactive / shell-only containers where the final stage's CMD or
 //     ENTRYPOINT is a bare shell (sh, bash, etc.). These are not long-running
 //     services and have no endpoint to health-check.
+//   - No explicit CMD/ENTRYPOINT in the final stage. The image delegates run
+//     orchestration to its parent image, which likely also defines HEALTHCHECK.
+//     Flagging these opaque cases produces false positives.
 func shouldSuppressHealthcheck(sem *semantic.Model, stages []instructions.Stage) bool {
 	if len(stages) == 0 {
 		return false
@@ -211,6 +214,12 @@ func shouldSuppressHealthcheck(sem *semantic.Model, stages []instructions.Stage)
 	lastIdx := len(stages) - 1
 	lastStage := &stages[lastIdx]
 	cmdLine, prependShell := lastEntrypointArgs(lastStage)
+
+	// No explicit CMD/ENTRYPOINT in the final stage — the image delegates
+	// run orchestration (and likely HEALTHCHECK) to the parent image.
+	if len(cmdLine) == 0 && !prependShell {
+		return true
+	}
 
 	// Resolve the shell variant for proper parsing of shell-form commands.
 	variant := shell.VariantBash // Docker default

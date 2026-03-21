@@ -420,10 +420,10 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 		{
-			name:     "dl3057",
-			dir:      "dl3057",
-			args:     append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3057")...),
-			wantExit: 1,
+			name: "dl3057",
+			dir:  "dl3057",
+			args: append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3057")...),
+			// wantExit: 0 (default) — suppressed: no CMD/ENTRYPOINT in final stage
 		},
 		{
 			name: "dl3057-suppress-serverless",
@@ -436,6 +436,12 @@ func lintCases(t *testing.T) []lintCase {
 			dir:  "dl3057-suppress-shell-cmd",
 			args: append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3057")...),
 			// wantExit: 0 (default) — suppressed for shell-only CMD
+		},
+		{
+			name: "dl3057-suppress-no-cmd-entrypoint",
+			dir:  "dl3057-suppress-no-cmd-entrypoint",
+			args: append([]string{"--format", "json"}, mustSelectRules("hadolint/DL3057")...),
+			// wantExit: 0 (default) — suppressed when no CMD/ENTRYPOINT (delegates to parent)
 		},
 		{
 			name:     "dl3047",
@@ -871,7 +877,7 @@ func lintCases(t *testing.T) []lintCase {
 			args: append(
 				[]string{"--format", "json", "--slow-checks=on"},
 				mustSelectRules("hadolint/DL3057")...),
-			wantExit: 1,
+			// wantExit: 0 (default) — suppressed: no CMD/ENTRYPOINT in final stage
 		},
 
 		// Consistent indentation tests (isolated to consistent-indentation rule)

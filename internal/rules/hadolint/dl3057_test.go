@@ -26,11 +26,10 @@ func TestDL3057Rule_Check(t *testing.T) {
 	}{
 		// === Fast-path tests (static, no registry) ===
 		{
-			name: "warn with no HEALTHCHECK instructions",
+			name: "no CMD or ENTRYPOINT delegates to parent — suppressed",
 			dockerfile: `FROM scratch
 `,
-			wantCount: 1,
-			wantCode:  rules.HadolintRulePrefix + "DL3057",
+			wantCount: 0,
 		},
 		{
 			name: "ok with one HEALTHCHECK CMD instruction",
@@ -48,14 +47,14 @@ FROM base
 			wantCount: 0,
 		},
 		{
-			name: "single file-level violation for multi-stage without HEALTHCHECK CMD",
+			name: "multi-stage final stage without CMD — suppressed",
 			dockerfile: `FROM alpine:3.18 AS builder
 RUN echo "build"
 
 FROM debian:bookworm
 RUN echo "run"
 `,
-			wantCount: 1, // Single file-level violation, not per-stage
+			wantCount: 0,
 		},
 		{
 			name: "HEALTHCHECK NONE alone is explicit opt-out",
@@ -117,11 +116,11 @@ HEALTHCHECK CMD /bin/check
 			wantCount: 0, // Last HEALTHCHECK is CMD, so no violation
 		},
 		{
-			name: "ONBUILD HEALTHCHECK does not satisfy healthcheck requirement",
+			name: "ONBUILD HEALTHCHECK without CMD — suppressed (no CMD delegates to parent)",
 			dockerfile: `FROM scratch
 ONBUILD HEALTHCHECK CMD /bin/check
 `,
-			wantCount: 1, // ONBUILD triggers in child images, not this one
+			wantCount: 0,
 		},
 
 		// === Smart suppression: serverless base images ===
@@ -273,13 +272,13 @@ CMD ["ash"]
 			wantCount: 0,
 		},
 		{
-			name: "not suppressed when only non-final stage has shell CMD",
+			name: "non-final stage has shell CMD but final has none — suppressed",
 			dockerfile: `FROM ubuntu:22.04 AS base
 CMD ["bash"]
 FROM alpine:3.18
 RUN echo "app"
 `,
-			wantCount: 1,
+			wantCount: 0,
 		},
 		{
 			name: "suppressed when ENTRYPOINT overrides CMD with shell",
@@ -288,6 +287,40 @@ CMD ["my-app"]
 ENTRYPOINT ["/bin/sh"]
 `,
 			wantCount: 0,
+		},
+
+		// === Smart suppression: no CMD/ENTRYPOINT (delegates to parent image) ===
+		{
+			name: "suppressed when final stage has no CMD or ENTRYPOINT",
+			dockerfile: `FROM nginx:latest
+RUN echo "custom config"
+`,
+			wantCount: 0,
+		},
+		{
+			name: "suppressed when multi-stage final stage has no CMD or ENTRYPOINT",
+			dockerfile: `FROM golang:1.21 AS builder
+RUN echo "build"
+CMD ["go", "test"]
+
+FROM alpine:3.18
+COPY --from=builder /app /app
+`,
+			wantCount: 0,
+		},
+		{
+			name: "not suppressed when final stage has CMD",
+			dockerfile: `FROM alpine:3.18
+CMD ["my-app"]
+`,
+			wantCount: 1,
+		},
+		{
+			name: "not suppressed when final stage has ENTRYPOINT",
+			dockerfile: `FROM alpine:3.18
+ENTRYPOINT ["my-app"]
+`,
+			wantCount: 1,
 		},
 	}
 
@@ -340,9 +373,9 @@ func TestDL3057Rule_RequiresSemantic(t *testing.T) {
 func TestDL3057Rule_PlanAsync(t *testing.T) {
 	t.Parallel()
 
-	t.Run("plans checks for external images", func(t *testing.T) {
+	t.Run("plans checks for external images with CMD", func(t *testing.T) {
 		t.Parallel()
-		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nRUN echo hello\n")
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nRUN echo hello\nCMD [\"my-app\"]\n")
 		r := NewDL3057Rule()
 		requests := r.PlanAsync(input)
 		if len(requests) == 0 {
@@ -350,6 +383,16 @@ func TestDL3057Rule_PlanAsync(t *testing.T) {
 		}
 		if requests[0].RuleCode != rules.HadolintRulePrefix+"DL3057" {
 			t.Errorf("RuleCode = %q, want hadolint/DL3057", requests[0].RuleCode)
+		}
+	})
+
+	t.Run("no plans when final stage has no CMD or ENTRYPOINT", func(t *testing.T) {
+		t.Parallel()
+		input := testutil.MakeLintInput(t, "Dockerfile", "FROM alpine:3.18\nRUN echo hello\n")
+		r := NewDL3057Rule()
+		requests := r.PlanAsync(input)
+		if len(requests) != 0 {
+			t.Errorf("expected no async requests when no CMD/ENTRYPOINT, got %d", len(requests))
 		}
 	})
 
