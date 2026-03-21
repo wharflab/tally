@@ -257,17 +257,17 @@ func detectPackageInstallFacts(runFacts *facts.RunFacts, evidence string, line i
 	return autofixdata.Signal{}, 0, false
 }
 
+var packageManagerScores = map[string]int{
+	"apt-get": 4,
+	"apt":     3,
+	"apk":     4,
+	"dnf":     4,
+	"yum":     4,
+	"choco":   4,
+}
+
 func packageInstallScore(manager string) int {
-	switch manager {
-	case "apt-get":
-		return 4
-	case "apt":
-		return 3
-	case "apk", "dnf", "yum", "choco":
-		return 4
-	default:
-		return 0
-	}
+	return packageManagerScores[manager]
 }
 
 func runScript(run *instructions.RunCommand) string {
@@ -281,19 +281,18 @@ func detectPackageInstall(script, evidence string, line int) (autofixdata.Signal
 	lower := strings.ToLower(script)
 
 	type mgr struct {
-		name  string
-		kw    string
-		score int
+		name string
+		kw   string
 	}
 	managers := []mgr{
 		// Linux package managers
-		{name: "apt-get", kw: "apt-get install", score: 4},
-		{name: "apt", kw: "apt install", score: 3},
-		{name: "apk", kw: "apk add", score: 4},
-		{name: "dnf", kw: "dnf install", score: 4},
-		{name: "yum", kw: "yum install", score: 4},
+		{name: "apt-get", kw: "apt-get install"},
+		{name: "apt", kw: "apt install"},
+		{name: "apk", kw: "apk add"},
+		{name: "dnf", kw: "dnf install"},
+		{name: "yum", kw: "yum install"},
 		// Windows package managers
-		{name: "choco", kw: "choco install", score: 4},
+		{name: "choco", kw: "choco install"},
 	}
 
 	for _, m := range managers {
@@ -301,7 +300,7 @@ func detectPackageInstall(script, evidence string, line int) (autofixdata.Signal
 			continue
 		}
 		pkgs := extractPackagesAfter(lower, m.kw)
-		pts := m.score
+		pts := packageInstallScore(m.name)
 		pts += buildToolBonus(pkgs)
 		return autofixdata.Signal{
 			Kind:     autofixdata.SignalKindPackageInstall,
