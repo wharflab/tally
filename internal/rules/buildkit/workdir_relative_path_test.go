@@ -109,6 +109,43 @@ func TestWorkdirRelativePathRule_Check_MultipleRelativeBeforeAbsolute(t *testing
 	}
 }
 
+func TestWorkdirRelativePathRule_Check_VariablePath(t *testing.T) {
+	t.Parallel()
+	r := NewWorkdirRelativePathRule()
+
+	tests := []struct {
+		name           string
+		path           string
+		wantViolations int
+	}{
+		{"bare variable", "${FUNCTION_DIR}", 0},
+		{"variable with suffix", "${SOME_FOO}/the/suffix", 0},
+		{"dollar without braces", "$APP_DIR", 0},
+		{"relative literal", "app", 1},
+		{"absolute with variable", "/app/${SUBDIR}", 0}, // absolute path
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := rules.LintInput{
+				File: "Dockerfile",
+				Stages: []instructions.Stage{
+					{
+						Commands: []instructions.Command{
+							&instructions.WorkdirCommand{Path: tt.path},
+						},
+					},
+				},
+			}
+			violations := r.Check(input)
+			if len(violations) != tt.wantViolations {
+				t.Errorf("path %q: got %d violations, want %d", tt.path, len(violations), tt.wantViolations)
+			}
+		})
+	}
+}
+
 func TestWorkdirRelativePathRule_Check_MultipleStages(t *testing.T) {
 	t.Parallel()
 	r := NewWorkdirRelativePathRule()

@@ -70,7 +70,8 @@ func findRelativeWorkdirViolations(
 				continue
 			}
 
-			if !hasWorkdir[stageIdx] && !system.IsAbs(workdir.Path, platformOS) {
+			if !hasWorkdir[stageIdx] && !system.IsAbs(workdir.Path, platformOS) &&
+				!strings.HasPrefix(workdir.Path, "$") {
 				loc := rules.NewLocationFromRanges(file, workdir.Location())
 				v := rules.NewViolation(
 					loc,
@@ -211,7 +212,8 @@ func (h *workdirRelPathHandler) refineStageViolations(stageIdx int, baseDir stri
 			continue
 		}
 
-		if !workdirSet && !system.IsAbs(workdir.Path, platformOS) {
+		if !workdirSet && !system.IsAbs(workdir.Path, platformOS) &&
+			!strings.HasPrefix(workdir.Path, "$") {
 			resolvedPath, err := system.NormalizeWorkdir(baseDir, workdir.Path, platformOS)
 			if err != nil {
 				break // can't resolve — skip the fix
