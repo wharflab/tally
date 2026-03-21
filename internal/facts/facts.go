@@ -370,6 +370,10 @@ func buildRunFacts(params runFactBuildParams) *RunFacts {
 
 	installVariant := params.shell.Variant
 	if !installVariant.SupportsPOSIXShellAST() {
+		// FindInstallPackages is POSIX-oriented. For non-POSIX shells we still
+		// run the lightweight extractor through a Bash-compatible parser as a
+		// best-effort fallback; unsupported scripts fail closed and produce no
+		// package installs rather than a false positive.
 		installVariant = shell.VariantBash
 	}
 
