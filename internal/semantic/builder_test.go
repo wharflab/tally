@@ -157,7 +157,7 @@ func TestProcessShellCommandEmptyShellDoesNotPanic(t *testing.T) {
 		BaseImageOS: BaseImageOSUnknown,
 		ShellSetting: ShellSetting{
 			Shell:   DefaultShell,
-			Variant: shell.VariantPOSIX,
+			Variant: shell.VariantBash,
 			Source:  ShellSourceDefault,
 			Line:    -1,
 		},

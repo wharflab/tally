@@ -281,6 +281,13 @@ func initialStageShell(
 		return newShellFacts(semantic.DefaultWindowsShell())
 	}
 
+	// Use the semantic model's ShellSetting when available — it already
+	// accounts for distro-aware variant refinement (e.g. VariantBash for
+	// most Linux distros, VariantPOSIX for Alpine/Debian/Ubuntu).
+	if semInfo != nil {
+		return newShellFactsWithVariant(semInfo.ShellSetting.Shell, semInfo.ShellSetting.Variant)
+	}
+
 	defaultShell := append([]string(nil), semantic.DefaultShell...)
 	return newShellFacts(defaultShell)
 }
@@ -305,12 +312,16 @@ func activeShellDirective(stage *instructions.Stage, shellDirectives []ShellDire
 }
 
 func newShellFacts(shellCmd []string) ShellFacts {
+	variant := shell.VariantFromShellCmd(shellCmd)
+	return newShellFactsWithVariant(shellCmd, variant)
+}
+
+func newShellFactsWithVariant(shellCmd []string, variant shell.Variant) ShellFacts {
 	cmd := append([]string(nil), shellCmd...)
 	var executable string
 	if len(cmd) > 0 {
 		executable = cmd[0]
 	}
-	variant := shell.VariantFromShellCmd(cmd)
 	return ShellFacts{
 		Command:              cmd,
 		Variant:              variant,
