@@ -73,8 +73,8 @@ skip-blank-lines = true
 
 - Format: `gofmt` + `goimports` (configured via `.golangci.yaml`, with `github.com/wharflab/tally` as the local import prefix).
 - Prefer small, focused packages under `internal/`; keep CLI wiring in `cmd/`.
-- For rule authoring, prefer the shared facts layer in `internal/facts/` when logic depends on derived stage/run state (effective `ENV`, active `SHELL`,
-  parsed `RUN` commands, package/install heuristics, cache/registry signals).
+- For rule authoring, prefer the shared facts layer in `internal/facts/` when logic depends on derived stage/run state (effective `ENV`, active
+  `SHELL`, parsed `RUN` commands, package/install heuristics, cache/registry signals).
   - Facts are built once per file by the linter and exposed to rules through `input.Facts` (`*facts.FileFacts` via type assertion).
   - Rules should consume facts read-only; if a heuristic will be reused, add it to `internal/facts/` instead of recomputing it inside each rule.
 - Tests use standard Go conventions: filenames end in `*_test.go`.
