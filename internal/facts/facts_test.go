@@ -53,6 +53,26 @@ RUN env PIP_INDEX_URL=https://example.com/simple pip install flask && npm instal
 	}
 }
 
+func TestResolveWorkdirAndUnquote(t *testing.T) {
+	t.Parallel()
+
+	if got := ResolveWorkdir("/app", "tmp/cache"); got != "/app/tmp/cache" {
+		t.Fatalf("ResolveWorkdir() relative = %q, want %q", got, "/app/tmp/cache")
+	}
+	if got := ResolveWorkdir("/app", "/var/cache"); got != "/var/cache" {
+		t.Fatalf("ResolveWorkdir() absolute = %q, want %q", got, "/var/cache")
+	}
+	if got := Unquote(`"quoted"`); got != "quoted" {
+		t.Fatalf("Unquote() double-quoted = %q, want %q", got, "quoted")
+	}
+	if got := Unquote("'single'"); got != "single" {
+		t.Fatalf("Unquote() single-quoted = %q, want %q", got, "single")
+	}
+	if got := Unquote("bare"); got != "bare" {
+		t.Fatalf("Unquote() bare = %q, want %q", got, "bare")
+	}
+}
+
 func TestFileFacts_PowerShellErrorModeIsTrackedPerRun(t *testing.T) {
 	t.Parallel()
 

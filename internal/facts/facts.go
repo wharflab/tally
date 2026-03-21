@@ -193,7 +193,7 @@ func (f *FileFacts) build() {
 		for cmdIdx, cmd := range stage.Commands {
 			switch c := cmd.(type) {
 			case *instructions.WorkdirCommand:
-				workdir = resolveWorkdir(workdir, c.Path)
+				workdir = ResolveWorkdir(workdir, c.Path)
 			case *instructions.EnvCommand:
 				applyEnvCommand(c, currentEnvValues, currentEnvBindings)
 			case *instructions.ShellCommand:
@@ -317,7 +317,7 @@ func applyEnvCommand(cmd *instructions.EnvCommand, values map[string]string, bin
 		return
 	}
 	for _, kv := range cmd.Env {
-		value := unquote(kv.Value)
+		value := Unquote(kv.Value)
 		values[kv.Key] = value
 		bindings[kv.Key] = EnvBinding{
 			Key:     kv.Key,
@@ -441,7 +441,8 @@ func resolveRunCommandScript(run *instructions.RunCommand) string {
 	return strings.Join(run.CmdLine, " ")
 }
 
-func resolveWorkdir(currentWorkdir, nextPath string) string {
+// ResolveWorkdir resolves a WORKDIR path against the current effective workdir.
+func ResolveWorkdir(currentWorkdir, nextPath string) string {
 	if nextPath == "" {
 		return currentWorkdir
 	}
@@ -451,7 +452,8 @@ func resolveWorkdir(currentWorkdir, nextPath string) string {
 	return path.Clean(path.Join(currentWorkdir, nextPath))
 }
 
-func unquote(s string) string {
+// Unquote strips a single layer of matching double or single quotes.
+func Unquote(s string) string {
 	if len(s) >= 2 && ((s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'')) {
 		return s[1 : len(s)-1]
 	}

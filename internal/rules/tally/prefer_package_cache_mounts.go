@@ -84,7 +84,7 @@ func (r *PreferPackageCacheMountsRule) checkStageLegacy(
 
 	for _, cmd := range stage.Commands {
 		if wd, ok := cmd.(*instructions.WorkdirCommand); ok {
-			workdir = resolveWorkdir(workdir, wd.Path)
+			workdir = facts.ResolveWorkdir(workdir, wd.Path)
 			continue
 		}
 
@@ -877,16 +877,6 @@ func addOSPackageManagerCacheMounts(
 	return true
 }
 
-func resolveWorkdir(currentWorkdir, nextPath string) string {
-	if nextPath == "" {
-		return currentWorkdir
-	}
-	if path.IsAbs(nextPath) {
-		return path.Clean(nextPath)
-	}
-	return path.Clean(path.Join(currentWorkdir, nextPath))
-}
-
 func hasUnresolvedWorkdirReference(workdir string) bool {
 	return strings.Contains(workdir, "$")
 }
@@ -1032,7 +1022,7 @@ func resolveCachePathOverrides(env *instructions.EnvCommand, workdir string, ove
 			if !match {
 				continue
 			}
-			val := unquote(kv.Value)
+			val := facts.Unquote(kv.Value)
 			if val == "" || strings.Contains(val, "$") {
 				continue
 			}
@@ -1054,14 +1044,6 @@ func resolveCacheTarget(overrides map[string]string, mountID, defaultTarget stri
 		return t
 	}
 	return defaultTarget
-}
-
-// unquote strips a single layer of matching double or single quotes.
-func unquote(s string) string {
-	if len(s) >= 2 && ((s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'')) {
-		return s[1 : len(s)-1]
-	}
-	return s
 }
 
 func goUsesDependencyCache(cmd shell.CommandInfo) bool {
