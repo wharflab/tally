@@ -123,6 +123,32 @@ RUN npm install lodash
 	}
 }
 
+func TestFileFacts_CacheDisablingEnvTracksAllBindingsForSameKey(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, "Dockerfile", `FROM python:3.13
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_NO_CACHE_DIR=1
+RUN pip install -r requirements.txt
+`)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+	if len(stage.Runs) != 1 {
+		t.Fatalf("expected 1 RUN fact, got %d", len(stage.Runs))
+	}
+
+	run := stage.Runs[0]
+	if len(run.CacheDisablingEnv) != 2 {
+		t.Fatalf("expected 2 cache-disabling bindings, got %d", len(run.CacheDisablingEnv))
+	}
+	if run.CacheDisablingEnv[0].Key != "PIP_NO_CACHE_DIR" || run.CacheDisablingEnv[1].Key != "PIP_NO_CACHE_DIR" {
+		t.Fatalf("unexpected cache-disabling bindings: %#v", run.CacheDisablingEnv)
+	}
+}
+
 func makeFileFacts(t *testing.T, file, content string) *FileFacts {
 	t.Helper()
 

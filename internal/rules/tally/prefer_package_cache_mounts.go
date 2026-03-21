@@ -681,23 +681,23 @@ func detectRequiredCacheMountsFromCommands(
 	return orderedRequiredMounts(requiredByTarget, cargoTarget, cachePathOverrides), cleaners
 }
 
-func cacheEnvEntriesFromFacts(bindings map[string]facts.EnvBinding) []cacheEnvEntry {
+func cacheEnvEntriesFromFacts(bindings []facts.EnvBinding) []cacheEnvEntry {
 	if len(bindings) == 0 {
 		return nil
 	}
 
 	entries := make([]cacheEnvEntry, 0, len(bindings))
-	for key, binding := range bindings {
-		if !facts.CacheDisablingEnvVars[key] || binding.Command == nil {
+	for _, binding := range bindings {
+		if !facts.CacheDisablingEnvVars[binding.Key] || binding.Command == nil {
 			continue
 		}
-		kind, ok := cleanupKindForCacheDisablingEnvVar(key)
+		kind, ok := cleanupKindForCacheDisablingEnvVar(binding.Key)
 		if !ok {
 			continue
 		}
 		entries = append(entries, cacheEnvEntry{
 			env:  binding.Command,
-			key:  key,
+			key:  binding.Key,
 			kind: kind,
 		})
 	}

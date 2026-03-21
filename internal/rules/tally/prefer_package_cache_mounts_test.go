@@ -761,6 +761,36 @@ RUN pip install -r requirements.txt
 	}
 }
 
+func TestPreferPackageCacheMountsRule_FactsPathRemovesAllRepeatedCacheDisablingEnvBindings(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM python:3.13
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_NO_CACHE_DIR=1
+RUN pip install -r requirements.txt
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewPreferPackageCacheMountsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	envRemovalEdits := 0
+	for _, edit := range violations[0].SuggestedFix.Edits {
+		if edit.NewText == "" && (edit.Location.Start.Line == 2 || edit.Location.Start.Line == 3) {
+			envRemovalEdits++
+		}
+	}
+
+	if envRemovalEdits != 2 {
+		t.Fatalf("expected 2 ENV removal edits, got %d", envRemovalEdits)
+	}
+}
+
 func TestUVUsesCache(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

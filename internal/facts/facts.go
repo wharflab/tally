@@ -37,6 +37,8 @@ type StageFacts struct {
 	FinalShell   ShellFacts
 	EffectiveEnv EnvFacts
 	Runs         []*RunFacts
+
+	cacheDisablingEnv []EnvBinding
 }
 
 // RunFacts contains derived facts for a single RUN instruction.
@@ -55,7 +57,7 @@ type RunFacts struct {
 	CommandInfos       []shell.CommandInfo
 	InstallCommands    []shell.InstallCommand
 	CachePathOverrides map[string]string
-	CacheDisablingEnv  map[string]EnvBinding
+	CacheDisablingEnv  []EnvBinding
 }
 
 // ShellFacts captures the effective shell state for a stage or RUN command.
@@ -87,15 +89,16 @@ type EnvBinding struct {
 }
 
 type runFactBuildParams struct {
-	run        *instructions.RunCommand
-	stageIdx   int
-	commandIdx int
-	workdir    string
-	shell      ShellFacts
-	envValues  map[string]string
-	envBinding map[string]EnvBinding
-	sm         *sourcemap.SourceMap
-	escape     rune
+	run               *instructions.RunCommand
+	stageIdx          int
+	commandIdx        int
+	workdir           string
+	shell             ShellFacts
+	envValues         map[string]string
+	envBinding        map[string]EnvBinding
+	cacheDisablingEnv []EnvBinding
+	sm                *sourcemap.SourceMap
+	escape            rune
 }
 
 // ShellDirective is the subset of directive metadata needed by the facts layer.
@@ -182,6 +185,7 @@ func (f *FileFacts) build() {
 		semInfo := f.stageInfo(stageIdx)
 
 		currentEnvValues, currentEnvBindings := seedStageEnv(semInfo, f.stages)
+		currentCacheDisablingEnv := seedStageCacheDisablingEnv(semInfo, f.stages)
 		currentShell := initialStageShell(stage, semInfo, f.shellDirectives)
 		workdir := "/"
 
@@ -200,21 +204,22 @@ func (f *FileFacts) build() {
 			case *instructions.WorkdirCommand:
 				workdir = ResolveWorkdir(workdir, c.Path)
 			case *instructions.EnvCommand:
-				applyEnvCommand(c, currentEnvValues, currentEnvBindings)
+				currentCacheDisablingEnv = applyEnvCommand(c, currentEnvValues, currentEnvBindings, currentCacheDisablingEnv)
 			case *instructions.ShellCommand:
 				currentShell = newShellFacts(c.Shell)
 				stageFacts.FinalShell = currentShell
 			case *instructions.RunCommand:
 				runFacts := buildRunFacts(runFactBuildParams{
-					run:        c,
-					stageIdx:   stageIdx,
-					commandIdx: cmdIdx,
-					workdir:    workdir,
-					shell:      currentShell,
-					envValues:  currentEnvValues,
-					envBinding: currentEnvBindings,
-					sm:         sm,
-					escape:     escapeToken,
+					run:               c,
+					stageIdx:          stageIdx,
+					commandIdx:        cmdIdx,
+					workdir:           workdir,
+					shell:             currentShell,
+					envValues:         currentEnvValues,
+					envBinding:        currentEnvBindings,
+					cacheDisablingEnv: currentCacheDisablingEnv,
+					sm:                sm,
+					escape:            escapeToken,
 				})
 				stageFacts.Runs = append(stageFacts.Runs, runFacts)
 				f.runs = append(f.runs, runFacts)
@@ -226,6 +231,7 @@ func (f *FileFacts) build() {
 			finalEnvValues = maps.Clone(semInfo.EffectiveEnv)
 		}
 		stageFacts.EffectiveEnv = buildEnvFacts(finalEnvValues, currentEnvBindings)
+		stageFacts.cacheDisablingEnv = append([]EnvBinding(nil), currentCacheDisablingEnv...)
 		f.stages[stageIdx] = stageFacts
 	}
 }
@@ -248,6 +254,19 @@ func seedStageEnv(semInfo *semantic.StageInfo, stages []*StageFacts) (map[string
 	}
 
 	return maps.Clone(stages[baseIdx].EffectiveEnv.Values), maps.Clone(stages[baseIdx].EffectiveEnv.Bindings)
+}
+
+func seedStageCacheDisablingEnv(semInfo *semantic.StageInfo, stages []*StageFacts) []EnvBinding {
+	if semInfo == nil || semInfo.BaseImage == nil || !semInfo.BaseImage.IsStageRef {
+		return nil
+	}
+
+	baseIdx := semInfo.BaseImage.StageIndex
+	if baseIdx < 0 || baseIdx >= len(stages) || stages[baseIdx] == nil {
+		return nil
+	}
+
+	return append([]EnvBinding(nil), stages[baseIdx].cacheDisablingEnv...)
 }
 
 func initialStageShell(
@@ -317,19 +336,29 @@ func powerShellMayMaskErrors(shellCmd []string, variant shell.Variant) bool {
 	return true
 }
 
-func applyEnvCommand(cmd *instructions.EnvCommand, values map[string]string, bindings map[string]EnvBinding) {
+func applyEnvCommand(
+	cmd *instructions.EnvCommand,
+	values map[string]string,
+	bindings map[string]EnvBinding,
+	cacheDisablingEnv []EnvBinding,
+) []EnvBinding {
 	if cmd == nil {
-		return
+		return cacheDisablingEnv
 	}
 	for _, kv := range cmd.Env {
 		value := Unquote(kv.Value)
-		values[kv.Key] = value
-		bindings[kv.Key] = EnvBinding{
+		binding := EnvBinding{
 			Key:     kv.Key,
 			Value:   value,
 			Command: cmd,
 		}
+		values[kv.Key] = value
+		bindings[kv.Key] = binding
+		if CacheDisablingEnvVars[kv.Key] {
+			cacheDisablingEnv = append(cacheDisablingEnv, binding)
+		}
 	}
+	return cacheDisablingEnv
 }
 
 func buildRunFacts(params runFactBuildParams) *RunFacts {
@@ -357,7 +386,7 @@ func buildRunFacts(params runFactBuildParams) *RunFacts {
 		CommandInfos:       commandInfos,
 		InstallCommands:    shell.FindInstallPackages(sourceScript, installVariant),
 		CachePathOverrides: deriveCachePathOverrides(envFacts.Values, params.workdir),
-		CacheDisablingEnv:  deriveCacheDisablingEnv(envFacts.Bindings),
+		CacheDisablingEnv:  append([]EnvBinding(nil), params.cacheDisablingEnv...),
 	}
 }
 
@@ -372,16 +401,6 @@ func buildEnvFacts(values map[string]string, bindings map[string]EnvBinding) Env
 		DebianFrontend:    debianFrontend,
 		AptNonInteractive: strings.EqualFold(strings.TrimSpace(debianFrontend), "noninteractive"),
 	}
-}
-
-func deriveCacheDisablingEnv(bindings map[string]EnvBinding) map[string]EnvBinding {
-	derived := make(map[string]EnvBinding, len(CacheDisablingEnvVars))
-	for key, binding := range bindings {
-		if CacheDisablingEnvVars[key] {
-			derived[key] = binding
-		}
-	}
-	return derived
 }
 
 func deriveCachePathOverrides(values map[string]string, workdir string) map[string]string {
