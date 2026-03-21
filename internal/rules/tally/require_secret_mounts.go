@@ -151,10 +151,6 @@ func (r *RequireSecretMountsRule) checkStageWithFacts(
 	meta rules.RuleMetadata,
 	commands map[string]SecretMountSpec,
 ) []rules.Violation {
-	if stageFacts == nil {
-		return nil
-	}
-
 	var violations []rules.Violation
 	for _, runFacts := range stageFacts.Runs {
 		if runFacts == nil || !runFacts.UsesShell || len(runFacts.CommandInfos) == 0 {
