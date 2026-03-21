@@ -172,7 +172,7 @@ func (r *NewlinePerChainedCallRule) checkRun(
 	isHeredocRun := len(run.Files) > 0
 	if !isHeredocRun && run.PrependShell {
 		if script := getRunScriptFromCmd(run); script != "" {
-			cmdStartCol := findCmdStartCol(instrLines[0])
+			cmdStartCol := shell.DockerfileRunCommandStartCol(instrLines[0])
 			sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol, escapeToken)
 			chainEdits = r.collectSameLineChainEdits(
 				sourceText, startLine, cmdStartCol, minCommands,
@@ -240,7 +240,7 @@ func findMountPositions(instrLines []string, startLine, cmdStartCol int) []mount
 			}
 			col := searchFrom + idx
 			// Find end of this mount value, handling quoted values.
-			endCol := skipFlagValue(line, col)
+			endCol := shell.SkipDockerfileFlagValue(line, col, true)
 			mounts = append(mounts, mountPos{line: dockerLine, col: col, end: endCol})
 			searchFrom = endCol
 		}
@@ -264,7 +264,7 @@ func (r *NewlinePerChainedCallRule) checkRunMounts(
 		return nil
 	}
 
-	cmdStartCol := findCmdStartCol(instrLines[0])
+	cmdStartCol := shell.DockerfileRunCommandStartCol(instrLines[0])
 	mounts := findMountPositions(instrLines, startLine, cmdStartCol)
 	if len(mounts) < 2 {
 		return nil
@@ -342,61 +342,6 @@ func (r *NewlinePerChainedCallRule) collectSameLineChainEdits(
 	}
 
 	return r.generateChainEdits(sameLineBoundaries, startLine, cmdStartCol, instrIndent, file)
-}
-
-// findCmdStartCol finds the byte offset where the shell command begins
-// in the first line of a RUN instruction (after RUN and any --mount/--network flags).
-func findCmdStartCol(firstLine string) int {
-	// Skip leading whitespace
-	trimmed := strings.TrimLeft(firstLine, " \t")
-	offset := len(firstLine) - len(trimmed)
-
-	// Skip "RUN" keyword
-	upper := strings.ToUpper(trimmed)
-	if strings.HasPrefix(upper, strings.ToUpper(command.Run)) {
-		offset += len(command.Run)
-	}
-
-	rest := firstLine[offset:]
-
-	// Skip whitespace after RUN
-	trimmed = strings.TrimLeft(rest, " \t")
-	offset += len(rest) - len(trimmed)
-
-	// Skip any flags (--mount=..., --network=..., --security=...)
-	for strings.HasPrefix(firstLine[offset:], "--") {
-		offset = skipFlagValue(firstLine, offset)
-		// Skip whitespace after flag
-		for offset < len(firstLine) && (firstLine[offset] == ' ' || firstLine[offset] == '\t') {
-			offset++
-		}
-	}
-
-	return offset
-}
-
-// skipFlagValue advances past a Dockerfile flag token (e.g., --mount=type=cache,target=/var)
-// starting at offset. Handles double-quoted values (e.g., source="/path with spaces").
-func skipFlagValue(line string, offset int) int {
-	for offset < len(line) {
-		ch := line[offset]
-		if ch == '"' {
-			// Skip to closing quote.
-			offset++
-			for offset < len(line) && line[offset] != '"' {
-				offset++
-			}
-			if offset < len(line) {
-				offset++ // skip closing quote
-			}
-			continue
-		}
-		if ch == ' ' || ch == '\t' || ch == '\\' {
-			break
-		}
-		offset++
-	}
-	return offset
 }
 
 // generateChainEdits creates TextEdits for chain boundary splits.

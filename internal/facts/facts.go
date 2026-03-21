@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/dockerfile"
@@ -429,7 +428,7 @@ func resolveRunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMa
 		instrLines = append(instrLines, sm.Line(line-1))
 	}
 
-	return shell.ReconstructSourceText(instrLines, findCmdStartCol(instrLines[0]), escapeToken)
+	return shell.ReconstructSourceText(instrLines, shell.DockerfileRunCommandStartCol(instrLines[0]), escapeToken)
 }
 
 func resolveRunCommandScript(run *instructions.RunCommand) string {
@@ -450,49 +449,6 @@ func resolveWorkdir(currentWorkdir, nextPath string) string {
 		return path.Clean(nextPath)
 	}
 	return path.Clean(path.Join(currentWorkdir, nextPath))
-}
-
-func findCmdStartCol(firstLine string) int {
-	trimmed := strings.TrimLeft(firstLine, " \t")
-	offset := len(firstLine) - len(trimmed)
-
-	upper := strings.ToUpper(trimmed)
-	if strings.HasPrefix(upper, strings.ToUpper(command.Run)) {
-		offset += len(command.Run)
-	}
-
-	rest := firstLine[offset:]
-	trimmed = strings.TrimLeft(rest, " \t")
-	offset += len(rest) - len(trimmed)
-
-	for strings.HasPrefix(firstLine[offset:], "--") {
-		offset = skipFlagValue(firstLine, offset)
-		for offset < len(firstLine) && (firstLine[offset] == ' ' || firstLine[offset] == '\t') {
-			offset++
-		}
-	}
-
-	return offset
-}
-
-func skipFlagValue(line string, offset int) int {
-	for offset < len(line) {
-		switch line[offset] {
-		case '"':
-			offset++
-			for offset < len(line) && line[offset] != '"' {
-				offset++
-			}
-			if offset < len(line) {
-				offset++
-			}
-		case ' ', '\t':
-			return offset
-		default:
-			offset++
-		}
-	}
-	return offset
 }
 
 func unquote(s string) string {

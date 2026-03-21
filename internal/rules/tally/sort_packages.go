@@ -115,7 +115,7 @@ func (r *SortPackagesRule) checkRunWithFacts(
 	for line := startLine; line <= endLine; line++ {
 		instrLines = append(instrLines, sm.Line(line-1))
 	}
-	cmdStartCol := findCmdStartCol(instrLines[0])
+	cmdStartCol := shell.DockerfileRunCommandStartCol(instrLines[0])
 	src := sourceContext{file: file, instrLines: instrLines, escapeToken: escapeToken}
 	return r.collectViolations(runFacts.InstallCommands, startLine, cmdStartCol, src, loc, meta)
 }
@@ -171,7 +171,7 @@ func (r *SortPackagesRule) checkRun(
 	for l := startLine; l <= endLine; l++ {
 		instrLines = append(instrLines, sm.Line(l-1))
 	}
-	cmdStartCol := findCmdStartCol(instrLines[0])
+	cmdStartCol := shell.DockerfileRunCommandStartCol(instrLines[0])
 	sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol, escapeToken)
 	installCmds := shell.FindInstallPackages(sourceText, shellVariant)
 	src := sourceContext{file: file, instrLines: instrLines, escapeToken: escapeToken}
