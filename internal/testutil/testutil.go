@@ -39,10 +39,12 @@ func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 		tb.Fatalf("failed to parse Dockerfile: %v", err)
 	}
 
-	sem := semantic.NewBuilder(result, nil, file).Build()
 	sm := sourcemap.New(result.Source)
 	spanIndex := directive.NewInstructionSpanIndexFromAST(result.AST, sm)
 	directiveResult := directive.Parse(sm, nil, spanIndex)
+	sem := semantic.NewBuilder(result, nil, file).
+		WithShellDirectives(directiveResult.ShellDirectives).
+		Build()
 	fileFacts := facts.NewFileFacts(file, result, sem, facts.ShellDirectivesFromDirective(directiveResult.ShellDirectives))
 
 	return rules.LintInput{

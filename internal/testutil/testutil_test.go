@@ -3,7 +3,10 @@ package testutil
 import (
 	"testing"
 
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 func TestParseDockerfile(t *testing.T) {
@@ -53,6 +56,40 @@ func TestMakeLintInput(t *testing.T) {
 	// MetaArgs should be empty for this content
 	if len(input.MetaArgs) != 0 {
 		t.Errorf("MetaArgs = %d, want 0", len(input.MetaArgs))
+	}
+}
+
+func TestMakeLintInput_UsesShellDirectivesForSemanticAndFacts(t *testing.T) {
+	t.Parallel()
+
+	content := `# hadolint shell=bash
+FROM alpine
+RUN echo hello
+`
+	input := MakeLintInput(t, "test/Dockerfile", content)
+
+	sem, ok := input.Semantic.(*semantic.Model)
+	if !ok || sem == nil {
+		t.Fatalf("Semantic type = %T, want *semantic.Model", input.Semantic)
+	}
+	stageInfo := sem.StageInfo(0)
+	if stageInfo == nil {
+		t.Fatal("StageInfo(0) returned nil")
+	}
+	if stageInfo.ShellSetting.Variant != shell.VariantBash {
+		t.Fatalf("semantic shell variant = %v, want %v", stageInfo.ShellSetting.Variant, shell.VariantBash)
+	}
+
+	fileFacts, ok := input.Facts.(*facts.FileFacts)
+	if !ok || fileFacts == nil {
+		t.Fatalf("Facts type = %T, want *facts.FileFacts", input.Facts)
+	}
+	stageFacts := fileFacts.Stage(0)
+	if stageFacts == nil {
+		t.Fatal("Stage(0) returned nil")
+	}
+	if stageFacts.InitialShell.Variant != shell.VariantBash {
+		t.Fatalf("facts shell variant = %v, want %v", stageFacts.InitialShell.Variant, shell.VariantBash)
 	}
 }
 
