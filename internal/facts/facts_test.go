@@ -138,20 +138,5 @@ func makeFileFacts(t *testing.T, file, content string) *FileFacts {
 		WithShellDirectives(directiveResult.ShellDirectives).
 		Build()
 
-	return NewFileFacts(file, parseResult, sem, toShellDirectives(directiveResult.ShellDirectives))
-}
-
-func toShellDirectives(directives []directive.ShellDirective) []ShellDirective {
-	if len(directives) == 0 {
-		return nil
-	}
-
-	out := make([]ShellDirective, 0, len(directives))
-	for _, directive := range directives {
-		out = append(out, ShellDirective{
-			Line:  directive.Line,
-			Shell: directive.Shell,
-		})
-	}
-	return out
+	return NewFileFacts(file, parseResult, sem, ShellDirectivesFromDirective(directiveResult.ShellDirectives))
 }
