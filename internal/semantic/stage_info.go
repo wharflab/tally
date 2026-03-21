@@ -378,6 +378,27 @@ func isLinuxImageName(lower string) bool {
 	return false
 }
 
+// isPOSIXShellDistro reports whether the base image name belongs to a Linux
+// distro whose /bin/sh is a strict POSIX shell (dash or busybox ash) rather
+// than bash. This is only Debian/Ubuntu (dash), Alpine (ash), busybox, and
+// distroless/wolfi/chainguard (Alpine-derived, ash).
+//
+// On all other major Linux distros (RHEL, CentOS, Fedora, Amazon Linux, Arch,
+// openSUSE, Oracle Linux, Rocky, Alma, …) /bin/sh is a symlink to bash.
+func isPOSIXShellDistro(baseName string) bool {
+	lower := strings.ToLower(baseName)
+	_, repoPath, _ := parseImageRef(lower)
+	name := path.Base(repoPath)
+
+	switch name {
+	case "alpine", "debian", "ubuntu",
+		"busybox",
+		"distroless", "chainguard", "wolfi":
+		return true
+	}
+	return false
+}
+
 func inferStageOSHeuristically(stage *instructions.Stage) BaseImageOS {
 	if stage == nil {
 		return BaseImageOSUnknown
@@ -570,8 +591,15 @@ func newStageInfo(index int, stage *instructions.Stage, isLast bool) *StageInfo 
 		Index: index,
 		Stage: stage,
 		ShellSetting: ShellSetting{
-			Shell:   defaultShell,
-			Variant: shell.VariantFromShellCmd(defaultShell),
+			Shell: defaultShell,
+			// Docker defaults to /bin/sh -c, but on most Linux distros
+			// /bin/sh is a symlink to bash (RHEL, CentOS, Fedora, Amazon
+			// Linux, Arch, openSUSE, Oracle Linux, Rocky, Alma, …).
+			// Only Debian/Ubuntu (dash) and Alpine (ash) use a strict
+			// POSIX sh. Default to Bash; the builder refines to
+			// VariantPOSIX for known dash/ash distros after base-image
+			// detection.
+			Variant: shell.VariantBash,
 			Source:  ShellSourceDefault,
 			Line:    -1,
 		},

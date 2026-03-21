@@ -264,6 +264,12 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/invalid-json-form")...),
 			wantExit: 1,
 		},
+		// Shell test expression [ -z "$VAR" ] should not be flagged.
+		{
+			name: "invalid-json-form-shell-test",
+			dir:  "invalid-json-form-shell-test",
+			args: append([]string{"--format", "json"}, mustSelectRules("tally/invalid-json-form")...),
+		},
 		// Cross-rule: invalid JSON triggers both tally/invalid-json-form and
 		// buildkit/JSONArgsRecommended (BuildKit falls back to shell-form).
 		{

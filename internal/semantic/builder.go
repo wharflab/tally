@@ -119,6 +119,16 @@ func (b *Builder) Build() *Model {
 			}
 		}
 
+		// Refine the default shell variant for Linux distros whose /bin/sh
+		// is a strict POSIX shell (dash or ash) rather than bash.
+		// The default is VariantBash (correct for most distros); narrow to
+		// VariantPOSIX only when the base image is a known dash/ash distro.
+		if info.ShellSetting.Source == ShellSourceDefault &&
+			info.ShellSetting.Variant == shell.VariantBash &&
+			isPOSIXShellDistro(stage.BaseName) {
+			info.ShellSetting.Variant = shell.VariantPOSIX
+		}
+
 		// Seed the environment used for undefined-var analysis.
 		var stageEnv *fromEnv
 		switch {
