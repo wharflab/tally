@@ -104,20 +104,25 @@ type ShellDirective struct {
 	Shell string
 }
 
-type cacheLocationEnvVar struct {
-	envKey          string
-	caseInsensitive bool
-	mountID         string
-	suffix          string
+// CacheLocationEnvVar defines an ENV variable that overrides a cache mount target.
+type CacheLocationEnvVar struct {
+	EnvKey          string
+	CaseInsensitive bool
+	MountID         string
+	Suffix          string
 }
 
-var cacheLocationEnvVars = []cacheLocationEnvVar{
-	{envKey: "PNPM_HOME", mountID: "pnpm", suffix: "/store"},
-	{envKey: "npm_config_cache", caseInsensitive: true, mountID: "npm"},
-	{envKey: "BUN_INSTALL_CACHE_DIR", mountID: "bun"},
+// CacheLocationEnvVars lists ENV variables that override default cache mount targets.
+// Callers must treat this slice as read-only.
+var CacheLocationEnvVars = []CacheLocationEnvVar{
+	{EnvKey: "PNPM_HOME", MountID: "pnpm", Suffix: "/store"},
+	{EnvKey: "npm_config_cache", CaseInsensitive: true, MountID: "npm"},
+	{EnvKey: "BUN_INSTALL_CACHE_DIR", MountID: "bun"},
 }
 
-var cacheDisablingEnvVars = map[string]bool{
+// CacheDisablingEnvVars lists ENV variables that disable package-manager caches.
+// Callers must treat this map as read-only.
+var CacheDisablingEnvVars = map[string]bool{
 	"UV_NO_CACHE":      true,
 	"PIP_NO_CACHE_DIR": true,
 }
@@ -370,9 +375,9 @@ func buildEnvFacts(values map[string]string, bindings map[string]EnvBinding) Env
 }
 
 func deriveCacheDisablingEnv(bindings map[string]EnvBinding) map[string]EnvBinding {
-	derived := make(map[string]EnvBinding, len(cacheDisablingEnvVars))
+	derived := make(map[string]EnvBinding, len(CacheDisablingEnvVars))
 	for key, binding := range bindings {
-		if cacheDisablingEnvVars[key] {
+		if CacheDisablingEnvVars[key] {
 			derived[key] = binding
 		}
 	}
@@ -383,10 +388,10 @@ func deriveCachePathOverrides(values map[string]string, workdir string) map[stri
 	overrides := map[string]string{}
 
 	for key, value := range values {
-		for _, loc := range cacheLocationEnvVars {
-			match := key == loc.envKey
-			if loc.caseInsensitive {
-				match = strings.EqualFold(key, loc.envKey)
+		for _, loc := range CacheLocationEnvVars {
+			match := key == loc.EnvKey
+			if loc.CaseInsensitive {
+				match = strings.EqualFold(key, loc.EnvKey)
 			}
 			if !match || value == "" || strings.Contains(value, "$") {
 				continue
@@ -396,10 +401,10 @@ func deriveCachePathOverrides(values map[string]string, workdir string) map[stri
 			if !path.IsAbs(target) {
 				target = path.Clean(path.Join(workdir, target))
 			}
-			if loc.suffix != "" {
-				target = path.Join(target, loc.suffix)
+			if loc.Suffix != "" {
+				target = path.Join(target, loc.Suffix)
 			}
-			overrides[loc.mountID] = target
+			overrides[loc.MountID] = target
 		}
 	}
 

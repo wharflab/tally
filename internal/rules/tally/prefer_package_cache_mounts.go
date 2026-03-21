@@ -688,8 +688,11 @@ func cacheEnvEntriesFromFacts(bindings map[string]facts.EnvBinding) []cacheEnvEn
 
 	entries := make([]cacheEnvEntry, 0, len(bindings))
 	for key, binding := range bindings {
-		kind, ok := cacheDisablingEnvVars[key]
-		if !ok || binding.Command == nil {
+		if !facts.CacheDisablingEnvVars[key] || binding.Command == nil {
+			continue
+		}
+		kind, ok := cleanupKindForCacheDisablingEnvVar(key)
+		if !ok {
 			continue
 		}
 		entries = append(entries, cacheEnvEntry{
@@ -952,14 +955,21 @@ func hasUnresolvedWorkdirReference(workdir string) bool {
 	return strings.Contains(workdir, "$")
 }
 
-// cacheDisablingEnvVars maps ENV variable names to the cleanupKind they disable caching for.
+// cleanupKindForCacheDisablingEnvVar maps shared cache-disabling ENV variables
+// to the cleanup kind they disable for this rule.
 //
 // Cross-rule interaction: when a Dockerfile uses the legacy format (e.g., "ENV UV_NO_CACHE 1"),
 // buildkit/LegacyKeyValueFormat (priority 91) yields to this rule's fix (priority 90), so the
 // ENV deletion runs first and the reformatting fix is harmlessly skipped.
-var cacheDisablingEnvVars = map[string]cleanupKind{
-	"UV_NO_CACHE":      cleanupUV,
-	"PIP_NO_CACHE_DIR": cleanupPip,
+func cleanupKindForCacheDisablingEnvVar(key string) (cleanupKind, bool) {
+	switch key {
+	case "UV_NO_CACHE":
+		return cleanupUV, true
+	case "PIP_NO_CACHE_DIR":
+		return cleanupPip, true
+	default:
+		return "", false
+	}
 }
 
 // cacheEnvEntry tracks a single cache-disabling ENV variable for later removal.
@@ -972,7 +982,10 @@ type cacheEnvEntry struct {
 // collectCacheDisablingEnvVars appends any cache-disabling variables from env to entries.
 func collectCacheDisablingEnvVars(env *instructions.EnvCommand, entries []cacheEnvEntry) []cacheEnvEntry {
 	for _, kv := range env.Env {
-		if kind, ok := cacheDisablingEnvVars[kv.Key]; ok {
+		if !facts.CacheDisablingEnvVars[kv.Key] {
+			continue
+		}
+		if kind, ok := cleanupKindForCacheDisablingEnvVar(kv.Key); ok {
 			entries = append(entries, cacheEnvEntry{env: env, key: kv.Key, kind: kind})
 		}
 	}
@@ -1066,29 +1079,14 @@ func buildEnvKeyRemovalEdit(file string, env *instructions.EnvCommand, keysToRem
 	}
 }
 
-// cacheLocationEnvVar defines an ENV variable that overrides a cache mount target.
-type cacheLocationEnvVar struct {
-	envKey          string
-	caseInsensitive bool
-	mountID         string
-	suffix          string // appended to the resolved value (e.g. "/store" for PNPM_HOME)
-}
-
-// cacheLocationEnvVars lists ENV variables that override default cache mount targets.
-var cacheLocationEnvVars = []cacheLocationEnvVar{
-	{envKey: "PNPM_HOME", mountID: "pnpm", suffix: "/store"},
-	{envKey: "npm_config_cache", caseInsensitive: true, mountID: "npm"},
-	{envKey: "BUN_INSTALL_CACHE_DIR", mountID: "bun"},
-}
-
 // resolveCachePathOverrides updates overrides if the ENV instruction sets any cache-location variables.
 // Relative paths are resolved against the current workdir (same logic as cargo target resolution).
 func resolveCachePathOverrides(env *instructions.EnvCommand, workdir string, overrides map[string]string) {
 	for _, kv := range env.Env {
-		for _, loc := range cacheLocationEnvVars {
-			match := kv.Key == loc.envKey
-			if loc.caseInsensitive {
-				match = strings.EqualFold(kv.Key, loc.envKey)
+		for _, loc := range facts.CacheLocationEnvVars {
+			match := kv.Key == loc.EnvKey
+			if loc.CaseInsensitive {
+				match = strings.EqualFold(kv.Key, loc.EnvKey)
 			}
 			if !match {
 				continue
@@ -1101,10 +1099,10 @@ func resolveCachePathOverrides(env *instructions.EnvCommand, workdir string, ove
 			if !path.IsAbs(target) {
 				target = path.Clean(path.Join(workdir, target))
 			}
-			if loc.suffix != "" {
-				target = path.Join(target, loc.suffix)
+			if loc.Suffix != "" {
+				target = path.Join(target, loc.Suffix)
 			}
-			overrides[loc.mountID] = target
+			overrides[loc.MountID] = target
 		}
 	}
 }
