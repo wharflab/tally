@@ -5,6 +5,25 @@ import (
 	"testing"
 )
 
+func TestFindCommands_AllCommandsIncludesWrappedCommands(t *testing.T) {
+	t.Parallel()
+
+	got := FindCommands(
+		"env PIP_INDEX_URL=https://example.com/simple pip install flask && npm install express",
+		VariantBash,
+	)
+
+	names := make([]string, 0, len(got))
+	for _, cmd := range got {
+		names = append(names, cmd.Name)
+	}
+
+	want := []string{"env", "pip", "npm"}
+	if !slices.Equal(names, want) {
+		t.Fatalf("FindCommands(all) names = %v, want %v", names, want)
+	}
+}
+
 func TestCommandInfo_HasFlag(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

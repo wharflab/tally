@@ -10,6 +10,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/runmount"
 	"github.com/wharflab/tally/internal/semantic"
@@ -46,90 +47,188 @@ func (r *PreferPackageCacheMountsRule) Metadata() rules.RuleMetadata {
 func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
-
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Safe assertion with nil fallback
+	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
 
 	var violations []rules.Violation
 
 	for stageIdx, stage := range input.Stages {
-		shellVariant := shell.VariantBash
-		if sem != nil {
-			if info := sem.StageInfo(stageIdx); info != nil {
-				if info.IsWindows() {
-					continue
-				}
-				shellVariant = info.ShellSetting.Variant
-				if !shellVariant.HasParser() {
-					continue
-				}
+		if fileFacts != nil {
+			if stageFacts := fileFacts.Stage(stageIdx); stageFacts != nil {
+				violations = append(violations, r.checkStageWithFacts(stageFacts, input.File, meta, sm)...)
+				continue
 			}
 		}
 
-		workdir := "/"
-		cachePathOverrides := map[string]string{}
-		var cacheEnvEntries []cacheEnvEntry
-		for _, cmd := range stage.Commands {
-			if wd, ok := cmd.(*instructions.WorkdirCommand); ok {
-				workdir = resolveWorkdir(workdir, wd.Path)
-				continue
-			}
+		violations = append(violations, r.checkStageLegacy(input, stageIdx, stage, meta, sm)...)
+	}
 
-			if env, ok := cmd.(*instructions.EnvCommand); ok {
-				resolveCachePathOverrides(env, workdir, cachePathOverrides)
-				cacheEnvEntries = collectCacheDisablingEnvVars(env, cacheEnvEntries)
-				continue
-			}
+	return violations
+}
 
-			run, ok := cmd.(*instructions.RunCommand)
-			if !ok || !run.PrependShell {
-				continue
-			}
+func (r *PreferPackageCacheMountsRule) checkStageLegacy(
+	input rules.LintInput,
+	stageIdx int,
+	stage instructions.Stage,
+	meta rules.RuleMetadata,
+	sm *sourcemap.SourceMap,
+) []rules.Violation {
+	shellVariant, ok := legacyStageShellVariant(input.Semantic, stageIdx)
+	if !ok {
+		return nil
+	}
 
-			script := getRunScriptFromCmd(run)
-			if script == "" {
-				continue
-			}
+	workdir := "/"
+	cachePathOverrides := map[string]string{}
+	var cacheEnvEntries []cacheEnvEntry
+	var violations []rules.Violation
 
-			required, cleaners := detectRequiredCacheMounts(script, shellVariant, workdir, cachePathOverrides)
-			if len(required) == 0 {
-				continue
-			}
-
-			existing := runmount.GetMounts(run)
-			mergedMounts, mountChanged := mergeCacheMounts(existing, required)
-			if !mountChanged {
-				continue
-			}
-
-			updatedScript, scriptCleaned := removeCacheCleanup(run, script, shellVariant, cleaners)
-
-			runLoc := run.Location()
-			if len(runLoc) == 0 {
-				continue
-			}
-
-			// Build targeted edits: mount insertion + optional script cleanup + optional ENV removal.
-			// Mount flags are added as zero-length insertions right after "RUN " so they
-			// compose with other rules' mount insertions (e.g., require-secret-mounts)
-			// without conflicting.
-			edits, remaining, envCleaned := buildCacheMountEdits(cacheMountEditParams{
-				file:            input.File,
-				run:             run,
-				runLoc:          runLoc,
-				sm:              sm,
-				shellVariant:    shellVariant,
-				existing:        existing,
-				merged:          mergedMounts,
-				cleanedScript:   updatedScript,
-				scriptCleaned:   scriptCleaned,
-				cleaners:        cleaners,
-				cacheEnvEntries: cacheEnvEntries,
-			})
-			cacheEnvEntries = remaining
-
-			v := buildViolation(meta, input.File, runLoc, required, scriptCleaned, envCleaned, edits)
-			violations = append(violations, v)
+	for _, cmd := range stage.Commands {
+		if wd, ok := cmd.(*instructions.WorkdirCommand); ok {
+			workdir = resolveWorkdir(workdir, wd.Path)
+			continue
 		}
+
+		if env, ok := cmd.(*instructions.EnvCommand); ok {
+			resolveCachePathOverrides(env, workdir, cachePathOverrides)
+			cacheEnvEntries = collectCacheDisablingEnvVars(env, cacheEnvEntries)
+			continue
+		}
+
+		run, ok := cmd.(*instructions.RunCommand)
+		if !ok || !run.PrependShell {
+			continue
+		}
+
+		script := getRunScriptFromCmd(run)
+		if script == "" {
+			continue
+		}
+
+		required, cleaners := detectRequiredCacheMounts(script, shellVariant, workdir, cachePathOverrides)
+		if len(required) == 0 {
+			continue
+		}
+
+		existing := runmount.GetMounts(run)
+		mergedMounts, mountChanged := mergeCacheMounts(existing, required)
+		if !mountChanged {
+			continue
+		}
+
+		updatedScript, scriptCleaned := removeCacheCleanup(run, script, shellVariant, cleaners)
+		runLoc := run.Location()
+		if len(runLoc) == 0 {
+			continue
+		}
+
+		edits, remaining, envCleaned := buildCacheMountEdits(cacheMountEditParams{
+			file:            input.File,
+			run:             run,
+			runLoc:          runLoc,
+			sm:              sm,
+			shellVariant:    shellVariant,
+			existing:        existing,
+			merged:          mergedMounts,
+			cleanedScript:   updatedScript,
+			scriptCleaned:   scriptCleaned,
+			cleaners:        cleaners,
+			cacheEnvEntries: cacheEnvEntries,
+		})
+		cacheEnvEntries = remaining
+
+		violations = append(violations, buildViolation(meta, input.File, runLoc, required, scriptCleaned, envCleaned, edits))
+	}
+
+	return violations
+}
+
+func legacyStageShellVariant(semanticValue any, stageIdx int) (shell.Variant, bool) {
+	shellVariant := shell.VariantBash
+
+	sem, _ := semanticValue.(*semantic.Model) //nolint:errcheck // Safe assertion with nil fallback
+	if sem == nil {
+		return shellVariant, true
+	}
+
+	info := sem.StageInfo(stageIdx)
+	if info == nil {
+		return shellVariant, true
+	}
+	if info.IsWindows() {
+		return 0, false
+	}
+
+	shellVariant = info.ShellSetting.Variant
+	if !shellVariant.HasParser() {
+		return 0, false
+	}
+
+	return shellVariant, true
+}
+
+func (r *PreferPackageCacheMountsRule) checkStageWithFacts(
+	stageFacts *facts.StageFacts,
+	file string,
+	meta rules.RuleMetadata,
+	sm *sourcemap.SourceMap,
+) []rules.Violation {
+	if stageFacts == nil || stageFacts.BaseImageOS == semantic.BaseImageOSWindows {
+		return nil
+	}
+
+	var violations []rules.Violation
+	for _, runFacts := range stageFacts.Runs {
+		if runFacts == nil || !runFacts.UsesShell || runFacts.SourceScript == "" {
+			continue
+		}
+		if !runFacts.Shell.HasParser {
+			continue
+		}
+
+		required, cleaners := detectRequiredCacheMountsFromCommands(
+			runFacts.CommandInfos,
+			runFacts.Workdir,
+			runFacts.CachePathOverrides,
+		)
+		if len(required) == 0 {
+			continue
+		}
+
+		existing := runmount.GetMounts(runFacts.Run)
+		mergedMounts, mountChanged := mergeCacheMounts(existing, required)
+		if !mountChanged {
+			continue
+		}
+
+		updatedScript, scriptCleaned := removeCacheCleanup(
+			runFacts.Run,
+			runFacts.CommandScript,
+			runFacts.Shell.Variant,
+			cleaners,
+		)
+
+		runLoc := runFacts.Run.Location()
+		if len(runLoc) == 0 {
+			continue
+		}
+
+		cacheEnvEntries := cacheEnvEntriesFromFacts(runFacts.CacheDisablingEnv)
+		edits, _, envCleaned := buildCacheMountEdits(cacheMountEditParams{
+			file:            file,
+			run:             runFacts.Run,
+			runLoc:          runLoc,
+			sm:              sm,
+			shellVariant:    runFacts.Shell.Variant,
+			existing:        existing,
+			merged:          mergedMounts,
+			cleanedScript:   updatedScript,
+			scriptCleaned:   scriptCleaned,
+			cleaners:        cleaners,
+			cacheEnvEntries: cacheEnvEntries,
+		})
+
+		v := buildViolation(meta, file, runLoc, required, scriptCleaned, envCleaned, edits)
+		violations = append(violations, v)
 	}
 
 	return violations
@@ -528,31 +627,41 @@ var orderedCacheMounts = []cacheMountSpec{
 func detectRequiredCacheMounts(
 	script string, variant shell.Variant, workdir string, cachePathOverrides map[string]string,
 ) ([]cacheMountSpec, map[cleanupKind]bool) {
+	return detectRequiredCacheMountsFromCommands(
+		shell.FindCommands(
+			script,
+			variant,
+			string(cleanupNpm),
+			"go",
+			"apt",
+			"apt-get",
+			string(cleanupApk),
+			string(cleanupDnf),
+			string(cleanupYum),
+			string(cleanupZypper),
+			string(cleanupYarn),
+			string(cleanupPnpm),
+			string(cleanupPip),
+			"bundle",
+			"cargo",
+			"dotnet",
+			"composer",
+			string(cleanupUV),
+			string(cleanupBun),
+		),
+		workdir,
+		cachePathOverrides,
+	)
+}
+
+func detectRequiredCacheMountsFromCommands(
+	cmds []shell.CommandInfo,
+	workdir string,
+	cachePathOverrides map[string]string,
+) ([]cacheMountSpec, map[cleanupKind]bool) {
 	requiredByTarget := make(map[string]cacheMountSpec)
 	cleaners := make(map[cleanupKind]bool)
 	cargoTarget := ""
-
-	cmds := shell.FindCommands(
-		script,
-		variant,
-		string(cleanupNpm),
-		"go",
-		"apt",
-		"apt-get",
-		string(cleanupApk),
-		string(cleanupDnf),
-		string(cleanupYum),
-		string(cleanupZypper),
-		string(cleanupYarn),
-		string(cleanupPnpm),
-		string(cleanupPip),
-		"bundle",
-		"cargo",
-		"dotnet",
-		"composer",
-		string(cleanupUV),
-		string(cleanupBun),
-	)
 
 	for _, cmd := range cmds {
 		if addOSPackageManagerCacheMounts(cmd, requiredByTarget, cleaners) {
@@ -562,6 +671,42 @@ func detectRequiredCacheMounts(
 	}
 
 	return orderedRequiredMounts(requiredByTarget, cargoTarget, cachePathOverrides), cleaners
+}
+
+func cacheEnvEntriesFromFacts(bindings map[string]facts.EnvBinding) []cacheEnvEntry {
+	if len(bindings) == 0 {
+		return nil
+	}
+
+	entries := make([]cacheEnvEntry, 0, len(bindings))
+	for key, binding := range bindings {
+		kind, ok := cacheDisablingEnvVars[key]
+		if !ok || binding.Command == nil {
+			continue
+		}
+		entries = append(entries, cacheEnvEntry{
+			env:  binding.Command,
+			key:  key,
+			kind: kind,
+		})
+	}
+
+	slices.SortFunc(entries, func(a, b cacheEnvEntry) int {
+		aLine := 0
+		if loc := a.env.Location(); len(loc) > 0 {
+			aLine = loc[0].Start.Line
+		}
+		bLine := 0
+		if loc := b.env.Location(); len(loc) > 0 {
+			bLine = loc[0].Start.Line
+		}
+		if aLine != bLine {
+			return aLine - bLine
+		}
+		return strings.Compare(a.key, b.key)
+	})
+
+	return entries
 }
 
 func orderedRequiredMounts(

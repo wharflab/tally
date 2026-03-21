@@ -8,6 +8,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
@@ -50,7 +51,8 @@ func (r *SortPackagesRule) Metadata() rules.RuleMetadata {
 func (r *SortPackagesRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Type assertion OK returns false for nil
+	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
+	sem, _ := input.Semantic.(*semantic.Model)     //nolint:errcheck // Type assertion OK returns false for nil
 
 	escapeToken := rune('\\')
 	if input.AST != nil {
@@ -59,6 +61,15 @@ func (r *SortPackagesRule) Check(input rules.LintInput) []rules.Violation {
 
 	var violations []rules.Violation
 	for stageIdx, stage := range input.Stages {
+		if fileFacts != nil {
+			if stageFacts := fileFacts.Stage(stageIdx); stageFacts != nil {
+				for _, runFacts := range stageFacts.Runs {
+					violations = append(violations, r.checkRunWithFacts(runFacts, input.File, sm, escapeToken, meta)...)
+				}
+				continue
+			}
+		}
+
 		variant := resolveShellVariant(sem, stageIdx)
 		// For sort-packages, attempt bash parsing even on cmd/PowerShell stages.
 		// Simple install commands (choco install -y pkg1 pkg2) are syntactically
@@ -74,6 +85,39 @@ func (r *SortPackagesRule) Check(input rules.LintInput) []rules.Violation {
 		}
 	}
 	return violations
+}
+
+func (r *SortPackagesRule) checkRunWithFacts(
+	runFacts *facts.RunFacts,
+	file string,
+	sm *sourcemap.SourceMap,
+	escapeToken rune,
+	meta rules.RuleMetadata,
+) []rules.Violation {
+	if runFacts == nil || runFacts.Run == nil || len(runFacts.Run.Location()) == 0 || !runFacts.UsesShell {
+		return nil
+	}
+
+	loc := rules.NewLocationFromRanges(file, runFacts.Run.Location())
+	if loc.IsFileLevel() {
+		return nil
+	}
+
+	isHeredoc := len(runFacts.Run.Files) > 0
+	startLine := runFacts.Run.Location()[0].Start.Line
+	if isHeredoc {
+		src := sourceContext{file: file, escapeToken: escapeToken}
+		return r.collectViolations(runFacts.InstallCommands, startLine+1, 0, src, loc, meta)
+	}
+
+	endLine := sm.ResolveEndLineWithEscape(runFacts.Run.Location()[0].End.Line, escapeToken)
+	instrLines := make([]string, 0, endLine-startLine+1)
+	for line := startLine; line <= endLine; line++ {
+		instrLines = append(instrLines, sm.Line(line-1))
+	}
+	cmdStartCol := findCmdStartCol(instrLines[0])
+	src := sourceContext{file: file, instrLines: instrLines, escapeToken: escapeToken}
+	return r.collectViolations(runFacts.InstallCommands, startLine, cmdStartCol, src, loc, meta)
 }
 
 // resolveShellVariant returns the shell variant for a stage, defaulting to Bash.

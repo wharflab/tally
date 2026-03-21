@@ -8,6 +8,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/ai/autofixdata"
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
 )
@@ -64,6 +65,7 @@ func (r *PreferMultiStageBuildRule) ValidateConfig(config any) error {
 
 func (r *PreferMultiStageBuildRule) Check(input rules.LintInput) []rules.Violation {
 	cfg := r.resolveConfig(input.Config)
+	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
 	minScore := 4
 	if cfg.MinScore != nil {
 		minScore = *cfg.MinScore
@@ -84,6 +86,11 @@ func (r *PreferMultiStageBuildRule) Check(input rules.LintInput) []rules.Violati
 	}
 
 	score, signals := scoreStage(input.Stages[0])
+	if fileFacts != nil {
+		if stageFacts := fileFacts.Stage(0); stageFacts != nil {
+			score, signals = scoreStageFacts(stageFacts)
+		}
+	}
 	if score < minScore {
 		return nil
 	}
@@ -181,6 +188,86 @@ func scoreStage(stage instructions.Stage) (int, []autofixdata.Signal) {
 	}
 
 	return score, signals
+}
+
+func scoreStageFacts(stage *facts.StageFacts) (int, []autofixdata.Signal) {
+	if stage == nil {
+		return 0, nil
+	}
+
+	score := 0
+	signals := make([]autofixdata.Signal, 0, len(stage.Runs))
+	for _, runFacts := range stage.Runs {
+		if runFacts == nil {
+			continue
+		}
+
+		line := 0
+		if loc := runFacts.Run.Location(); len(loc) > 0 {
+			line = loc[0].Start.Line
+		}
+		evidence := strings.TrimSpace(runFacts.Run.String())
+
+		if s, pts, ok := detectPackageInstallFacts(runFacts, evidence, line); ok {
+			signals = append(signals, s)
+			score += pts
+			continue
+		}
+		if s, pts, ok := detectBuildStep(runFacts.CommandScript, evidence, line); ok {
+			signals = append(signals, s)
+			score += pts
+			continue
+		}
+		if s, pts, ok := detectDownloadInstall(runFacts.CommandScript, evidence, line); ok {
+			signals = append(signals, s)
+			score += pts
+			continue
+		}
+	}
+
+	return score, signals
+}
+
+func detectPackageInstallFacts(runFacts *facts.RunFacts, evidence string, line int) (autofixdata.Signal, int, bool) {
+	if runFacts == nil {
+		return autofixdata.Signal{}, 0, false
+	}
+
+	for _, install := range runFacts.InstallCommands {
+		score := packageInstallScore(install.Manager)
+		if score == 0 {
+			continue
+		}
+
+		pkgs := make([]string, 0, len(install.Packages))
+		for _, pkg := range install.Packages {
+			pkgs = append(pkgs, strings.ToLower(pkg.Normalized))
+		}
+
+		score += buildToolBonus(pkgs)
+		return autofixdata.Signal{
+			Kind:     autofixdata.SignalKindPackageInstall,
+			Manager:  install.Manager,
+			Packages: pkgs,
+			Evidence: evidence,
+			Line:     line,
+		}, score, true
+	}
+
+	return autofixdata.Signal{}, 0, false
+}
+
+func packageInstallScore(manager string) int {
+	switch manager {
+	case "apt-get":
+		return 4
+	case "apt":
+		return 3
+	case "apk", "dnf", "yum", "choco":
+		return 4
+	default:
+		return 0
+	}
 }
 
 func runScript(run *instructions.RunCommand) string {

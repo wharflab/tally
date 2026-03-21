@@ -13,6 +13,7 @@ import (
 	"github.com/wharflab/tally/internal/config"
 	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	_ "github.com/wharflab/tally/internal/rules/all" // Register all rules.
 	"github.com/wharflab/tally/internal/rules/buildkit/fixes"
@@ -135,6 +136,7 @@ func LintFile(input Input) (*Result, error) {
 	sem := semantic.NewBuilder(parseResult, buildArgs, input.FilePath).
 		WithShellDirectives(directiveResult.ShellDirectives).
 		Build()
+	fileFacts := facts.NewFileFacts(input.FilePath, parseResult, sem, toFactsShellDirectives(directiveResult.ShellDirectives))
 
 	enabledRules := EnabledRuleCodes(cfg)
 
@@ -145,6 +147,7 @@ func LintFile(input Input) (*Result, error) {
 		MetaArgs:           parseResult.MetaArgs,
 		Source:             content,
 		Semantic:           sem,
+		Facts:              fileFacts,
 		Context:            input.BuildContext,
 		EnabledRules:       enabledRules,
 		HeredocMinCommands: heredocMinCommands(cfg),
@@ -216,4 +219,19 @@ func LintFile(input Input) (*Result, error) {
 		ParseResult: parseResult,
 		Config:      cfg,
 	}, nil
+}
+
+func toFactsShellDirectives(directives []directive.ShellDirective) []facts.ShellDirective {
+	if len(directives) == 0 {
+		return nil
+	}
+
+	out := make([]facts.ShellDirective, 0, len(directives))
+	for _, directive := range directives {
+		out = append(out, facts.ShellDirective{
+			Line:  directive.Line,
+			Shell: directive.Shell,
+		})
+	}
+	return out
 }

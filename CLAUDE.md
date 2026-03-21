@@ -37,6 +37,10 @@ and a WASM-compiled shellcheck (`internal/shellcheck/`).
 ## Rules & Fixes
 
 - Rule config: `internal/config/`. Rule logic: `internal/lint/`. Flags/env wiring: `cmd/tally/cmd/lint.go`.
+- If a rule needs derived stage/run knowledge, check `internal/facts/` first.
+  - Use `input.Facts` (`*facts.FileFacts` via type assertion) for shared derived state such as effective `ENV`, active `SHELL`, parsed `RUN`
+    commands, install/package heuristics, and cache/registry signals.
+  - Extend `internal/facts/` when multiple rules would otherwise re-derive the same heuristic; rules should consume facts, not mutate them.
 - New behavior should come with an integration fixture under `internal/integration/testdata/<case>/`.
 - Fixes:
   - Use `Violation.WithSuggestedFix()` and pick the narrowest safety level.

@@ -7,6 +7,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
 	"github.com/wharflab/tally/internal/runmount"
@@ -90,6 +91,7 @@ func (r *RequireSecretMountsRule) Check(input rules.LintInput) []rules.Violation
 	}
 
 	meta := r.Metadata()
+	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
 
 	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Safe assertion with nil fallback
 
@@ -101,6 +103,13 @@ func (r *RequireSecretMountsRule) Check(input rules.LintInput) []rules.Violation
 	var violations []rules.Violation
 
 	for stageIdx, stage := range input.Stages {
+		if fileFacts != nil {
+			if stageFacts := fileFacts.Stage(stageIdx); stageFacts != nil {
+				violations = append(violations, r.checkStageWithFacts(stageFacts, input.File, meta, cfg.Commands)...)
+				continue
+			}
+		}
+
 		shellVariant := shell.VariantBash
 		if sem != nil {
 			if info := sem.StageInfo(stageIdx); info != nil {
@@ -131,6 +140,39 @@ func (r *RequireSecretMountsRule) Check(input rules.LintInput) []rules.Violation
 			vs := r.checkMounts(input.File, meta, run, existing, found, cfg.Commands)
 			violations = append(violations, vs...)
 		}
+	}
+
+	return violations
+}
+
+func (r *RequireSecretMountsRule) checkStageWithFacts(
+	stageFacts *facts.StageFacts,
+	file string,
+	meta rules.RuleMetadata,
+	commands map[string]SecretMountSpec,
+) []rules.Violation {
+	if stageFacts == nil {
+		return nil
+	}
+
+	var violations []rules.Violation
+	for _, runFacts := range stageFacts.Runs {
+		if runFacts == nil || !runFacts.UsesShell || len(runFacts.CommandInfos) == 0 {
+			continue
+		}
+
+		found := make([]shell.CommandInfo, 0, len(runFacts.CommandInfos))
+		for _, cmd := range runFacts.CommandInfos {
+			if _, ok := commands[cmd.Name]; ok {
+				found = append(found, cmd)
+			}
+		}
+		if len(found) == 0 {
+			continue
+		}
+
+		existing := runmount.GetMounts(runFacts.Run)
+		violations = append(violations, r.checkMounts(file, meta, runFacts.Run, existing, found, commands)...)
 	}
 
 	return violations
