@@ -5,9 +5,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // ParseDockerfile parses a Dockerfile from a string using the full parsing pipeline.
@@ -36,7 +39,13 @@ func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 		tb.Fatalf("failed to parse Dockerfile: %v", err)
 	}
 
-	sem := semantic.NewBuilder(result, nil, file).Build()
+	sm := sourcemap.New(result.Source)
+	spanIndex := directive.NewInstructionSpanIndexFromAST(result.AST, sm)
+	directiveResult := directive.Parse(sm, nil, spanIndex)
+	sem := semantic.NewBuilder(result, nil, file).
+		WithShellDirectives(directiveResult.ShellDirectives).
+		Build()
+	fileFacts := facts.NewFileFacts(file, result, sem, facts.ShellDirectivesFromDirective(directiveResult.ShellDirectives))
 
 	return rules.LintInput{
 		File:     file,
@@ -45,6 +54,7 @@ func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 		MetaArgs: result.MetaArgs,
 		Source:   result.Source,
 		Semantic: sem,
+		Facts:    fileFacts,
 		Context:  nil, // v1.0 doesn't require context
 		Config:   nil, // Set by individual tests if needed
 	}

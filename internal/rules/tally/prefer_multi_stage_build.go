@@ -8,6 +8,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/ai/autofixdata"
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
 )
@@ -64,6 +65,7 @@ func (r *PreferMultiStageBuildRule) ValidateConfig(config any) error {
 
 func (r *PreferMultiStageBuildRule) Check(input rules.LintInput) []rules.Violation {
 	cfg := r.resolveConfig(input.Config)
+	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
 	minScore := 4
 	if cfg.MinScore != nil {
 		minScore = *cfg.MinScore
@@ -84,6 +86,11 @@ func (r *PreferMultiStageBuildRule) Check(input rules.LintInput) []rules.Violati
 	}
 
 	score, signals := scoreStage(input.Stages[0])
+	if fileFacts != nil {
+		if stageFacts := fileFacts.Stage(0); stageFacts != nil {
+			score, signals = scoreStageFacts(stageFacts)
+		}
+	}
 	if score < minScore {
 		return nil
 	}
@@ -183,6 +190,86 @@ func scoreStage(stage instructions.Stage) (int, []autofixdata.Signal) {
 	return score, signals
 }
 
+func scoreStageFacts(stage *facts.StageFacts) (int, []autofixdata.Signal) {
+	if stage == nil {
+		return 0, nil
+	}
+
+	score := 0
+	signals := make([]autofixdata.Signal, 0, len(stage.Runs))
+	for _, runFacts := range stage.Runs {
+		if runFacts == nil {
+			continue
+		}
+
+		line := 0
+		if loc := runFacts.Run.Location(); len(loc) > 0 {
+			line = loc[0].Start.Line
+		}
+		evidence := strings.TrimSpace(runFacts.Run.String())
+
+		if s, pts, ok := detectPackageInstallFacts(runFacts, evidence, line); ok {
+			signals = append(signals, s)
+			score += pts
+			continue
+		}
+		if s, pts, ok := detectBuildStep(runFacts.CommandScript, evidence, line); ok {
+			signals = append(signals, s)
+			score += pts
+			continue
+		}
+		if s, pts, ok := detectDownloadInstall(runFacts.CommandScript, evidence, line); ok {
+			signals = append(signals, s)
+			score += pts
+			continue
+		}
+	}
+
+	return score, signals
+}
+
+func detectPackageInstallFacts(runFacts *facts.RunFacts, evidence string, line int) (autofixdata.Signal, int, bool) {
+	if runFacts == nil {
+		return autofixdata.Signal{}, 0, false
+	}
+
+	for _, install := range runFacts.InstallCommands {
+		score := packageInstallScore(install.Manager)
+		if score == 0 {
+			continue
+		}
+
+		pkgs := make([]string, 0, len(install.Packages))
+		for _, pkg := range install.Packages {
+			pkgs = append(pkgs, strings.ToLower(pkg.Normalized))
+		}
+
+		score += buildToolBonus(pkgs)
+		return autofixdata.Signal{
+			Kind:     autofixdata.SignalKindPackageInstall,
+			Manager:  install.Manager,
+			Packages: pkgs,
+			Evidence: evidence,
+			Line:     line,
+		}, score, true
+	}
+
+	return autofixdata.Signal{}, 0, false
+}
+
+var packageManagerScores = map[string]int{
+	"apt-get": 4,
+	"apt":     3,
+	"apk":     4,
+	"dnf":     4,
+	"yum":     4,
+	"choco":   4,
+}
+
+func packageInstallScore(manager string) int {
+	return packageManagerScores[manager]
+}
+
 func runScript(run *instructions.RunCommand) string {
 	if len(run.Files) > 0 {
 		return run.Files[0].Data
@@ -194,19 +281,18 @@ func detectPackageInstall(script, evidence string, line int) (autofixdata.Signal
 	lower := strings.ToLower(script)
 
 	type mgr struct {
-		name  string
-		kw    string
-		score int
+		name string
+		kw   string
 	}
 	managers := []mgr{
 		// Linux package managers
-		{name: "apt-get", kw: "apt-get install", score: 4},
-		{name: "apt", kw: "apt install", score: 3},
-		{name: "apk", kw: "apk add", score: 4},
-		{name: "dnf", kw: "dnf install", score: 4},
-		{name: "yum", kw: "yum install", score: 4},
+		{name: "apt-get", kw: "apt-get install"},
+		{name: "apt", kw: "apt install"},
+		{name: "apk", kw: "apk add"},
+		{name: "dnf", kw: "dnf install"},
+		{name: "yum", kw: "yum install"},
 		// Windows package managers
-		{name: "choco", kw: "choco install", score: 4},
+		{name: "choco", kw: "choco install"},
 	}
 
 	for _, m := range managers {
@@ -214,7 +300,7 @@ func detectPackageInstall(script, evidence string, line int) (autofixdata.Signal
 			continue
 		}
 		pkgs := extractPackagesAfter(lower, m.kw)
-		pts := m.score
+		pts := packageInstallScore(m.name)
 		pts += buildToolBonus(pkgs)
 		return autofixdata.Signal{
 			Kind:     autofixdata.SignalKindPackageInstall,

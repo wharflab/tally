@@ -729,6 +729,68 @@ func TestGoUsesDependencyCache(t *testing.T) {
 	}
 }
 
+func TestPreferPackageCacheMountsRule_FactsPathReusesRemainingEnvRemovalsAcrossRuns(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM python:3.13
+ENV PIP_NO_CACHE_DIR=1
+RUN pip install -r requirements-dev.txt
+RUN pip install -r requirements.txt
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewPreferPackageCacheMountsRule().Check(input)
+	if len(violations) != 2 {
+		t.Fatalf("expected 2 violations, got %d", len(violations))
+	}
+
+	envRemovalEdits := 0
+	for i, violation := range violations {
+		if violation.SuggestedFix == nil {
+			t.Fatalf("violation %d missing suggested fix", i)
+		}
+		for _, edit := range violation.SuggestedFix.Edits {
+			if edit.Location.Start.Line == 2 {
+				envRemovalEdits++
+			}
+		}
+	}
+
+	if envRemovalEdits != 1 {
+		t.Fatalf("expected exactly 1 ENV removal edit across fixes, got %d", envRemovalEdits)
+	}
+}
+
+func TestPreferPackageCacheMountsRule_FactsPathRemovesAllRepeatedCacheDisablingEnvBindings(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM python:3.13
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_NO_CACHE_DIR=1
+RUN pip install -r requirements.txt
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewPreferPackageCacheMountsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	envRemovalEdits := 0
+	for _, edit := range violations[0].SuggestedFix.Edits {
+		if edit.NewText == "" && (edit.Location.Start.Line == 2 || edit.Location.Start.Line == 3) {
+			envRemovalEdits++
+		}
+	}
+
+	if envRemovalEdits != 2 {
+		t.Fatalf("expected 2 ENV removal edits, got %d", envRemovalEdits)
+	}
+}
+
 func TestUVUsesCache(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

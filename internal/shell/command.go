@@ -178,6 +178,7 @@ func FindCommands(script string, variant Variant, names ...string) []CommandInfo
 	for _, n := range names {
 		nameSet[n] = true
 	}
+	matchAll := len(nameSet) == 0
 
 	var commands []CommandInfo
 	syntax.Walk(prog, func(node syntax.Node) bool {
@@ -193,7 +194,7 @@ func FindCommands(script string, variant Variant, names ...string) []CommandInfo
 		}
 		baseName := path.Base(name)
 
-		if !nameSet[baseName] {
+		if !matchAll && !nameSet[baseName] {
 			// Check wrapped commands
 			if commandWrappers[baseName] {
 				wrapped := findWrappedCommands(call.Args[1:], variant, baseName, nameSet)
@@ -237,6 +238,14 @@ func FindCommands(script string, variant Variant, names ...string) []CommandInfo
 		}
 
 		commands = append(commands, info)
+		if matchAll {
+			if commandWrappers[baseName] {
+				commands = append(commands, findWrappedCommands(call.Args[1:], variant, baseName, nameSet)...)
+			}
+			if shellWrappers[baseName] {
+				commands = append(commands, findNestedShellCommands(call.Args[1:], variant, nameSet)...)
+			}
+		}
 		return true
 	})
 
@@ -259,9 +268,10 @@ func (c *CommandInfo) usesPowerShellFlagSyntax() bool {
 // findWrappedCommands finds commands within wrapper arguments.
 func findWrappedCommands(args []*syntax.Word, variant Variant, wrapperName string, nameSet map[string]bool) []CommandInfo {
 	var commands []CommandInfo
+	matchAll := len(nameSet) == 0
 
 	IterateWrapperArgs(args, wrapperName, func(wa WrapperArg) bool {
-		if nameSet[wa.Name] {
+		if matchAll || nameSet[wa.Name] {
 			pos := wa.Arg.Pos()
 			endPos := wa.Arg.End()
 

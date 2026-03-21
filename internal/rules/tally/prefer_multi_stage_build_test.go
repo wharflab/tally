@@ -134,3 +134,23 @@ RUN go build -o /out/app ./cmd/app
 		t.Fatalf("expected 0 violations, got %d", len(violations))
 	}
 }
+
+func TestPackageInstallScore(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]int{
+		"apt-get": 4,
+		"apt":     3,
+		"apk":     4,
+		"dnf":     4,
+		"yum":     4,
+		"choco":   4,
+		"unknown": 0,
+	}
+
+	for manager, want := range tests {
+		if got := packageInstallScore(manager); got != want {
+			t.Fatalf("packageInstallScore(%q) = %d, want %d", manager, got, want)
+		}
+	}
+}

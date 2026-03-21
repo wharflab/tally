@@ -70,6 +70,11 @@ type LintInput struct {
 	// Type is *semantic.Model but declared as any to avoid import cycle.
 	Semantic any
 
+	// Facts contains cached, derived facts shared across rules for this file.
+	// May be nil for backward compatibility in tests.
+	// Type is *facts.FileFacts but declared as any to avoid import cycle.
+	Facts any
+
 	// Config is the rule-specific configuration (type depends on rule).
 	Config any
 

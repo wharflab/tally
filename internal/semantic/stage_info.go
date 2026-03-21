@@ -156,8 +156,10 @@ type StageInfo struct {
 	// Stage is a reference to the BuildKit stage.
 	Stage *instructions.Stage
 
-	// BaseImageOS is the detected operating system of the base image.
-	// Determined by heuristics (image name, platform, escape directive, SHELL instruction).
+	// BaseImageOS is the statically detected operating system classification for
+	// this stage's base image. It is derived from Dockerfile-local heuristics
+	// such as image name, --platform, escape directive, and SHELL instruction.
+	// It is not registry-verified image metadata.
 	BaseImageOS BaseImageOS
 
 	// ShellSetting contains the active shell configuration including variant and source.
@@ -246,7 +248,7 @@ func (s *StageInfo) ShellNameAtLine(line int) string {
 	return DefaultShell[0]
 }
 
-// IsWindows returns true if the base image was detected as Windows.
+// IsWindows returns true if the stage was statically classified as Windows.
 func (s *StageInfo) IsWindows() bool {
 	return s.BaseImageOS == BaseImageOSWindows
 }

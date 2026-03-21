@@ -61,7 +61,7 @@ A second GPU+conda pass collected **252 unique Dockerfiles**:
 
 | Finding | Count |
 |---|---:|
-| `RUN conda|mamba|micromamba install ...` | 85 |
+| `RUN conda\|mamba\|micromamba install ...` | 85 |
 | "simple conda install" pattern | 79 |
 | conda installs of ML Python packages | 61 |
 | conda installs of GPU Python stack (`cudatoolkit`, `pytorch-cuda`, `cudnn`, `nccl`) | 46 |
