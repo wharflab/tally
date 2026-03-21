@@ -176,6 +176,8 @@ func (r *PreferPackageCacheMountsRule) checkStageWithFacts(
 		return nil
 	}
 
+	consumedCacheEnvEntries := make(cacheEnvEntrySet)
+	var cacheEnvEntries []cacheEnvEntry
 	var violations []rules.Violation
 	for _, runFacts := range stageFacts.Runs {
 		if runFacts == nil || !runFacts.UsesShell || runFacts.SourceScript == "" {
@@ -212,8 +214,12 @@ func (r *PreferPackageCacheMountsRule) checkStageWithFacts(
 			continue
 		}
 
-		cacheEnvEntries := cacheEnvEntriesFromFacts(runFacts.CacheDisablingEnv)
-		edits, _, envCleaned := buildCacheMountEdits(cacheMountEditParams{
+		cacheEnvEntries = mergeCacheEnvEntries(
+			cacheEnvEntries,
+			cacheEnvEntriesFromFacts(runFacts.CacheDisablingEnv),
+			consumedCacheEnvEntries,
+		)
+		edits, remaining, envCleaned := buildCacheMountEdits(cacheMountEditParams{
 			file:            file,
 			run:             runFacts.Run,
 			runLoc:          runLoc,
@@ -226,6 +232,8 @@ func (r *PreferPackageCacheMountsRule) checkStageWithFacts(
 			cleaners:        cleaners,
 			cacheEnvEntries: cacheEnvEntries,
 		})
+		consumedCacheEnvEntries.markConsumed(cacheEnvEntries, remaining)
+		cacheEnvEntries = remaining
 
 		v := buildViolation(meta, file, runLoc, required, scriptCleaned, envCleaned, edits)
 		violations = append(violations, v)
@@ -691,6 +699,71 @@ func cacheEnvEntriesFromFacts(bindings map[string]facts.EnvBinding) []cacheEnvEn
 		})
 	}
 
+	sortCacheEnvEntries(entries)
+	return entries
+}
+
+type cacheEnvEntrySet map[*instructions.EnvCommand]map[string]bool
+
+func (s cacheEnvEntrySet) add(entry cacheEnvEntry) {
+	if s[entry.env] == nil {
+		s[entry.env] = make(map[string]bool)
+	}
+	s[entry.env][entry.key] = true
+}
+
+func (s cacheEnvEntrySet) has(entry cacheEnvEntry) bool {
+	return s[entry.env] != nil && s[entry.env][entry.key]
+}
+
+func (s cacheEnvEntrySet) markConsumed(previous, remaining []cacheEnvEntry) {
+	remainingSet := make(cacheEnvEntrySet, len(remaining))
+	for _, entry := range remaining {
+		remainingSet.add(entry)
+	}
+	for _, entry := range previous {
+		if remainingSet.has(entry) {
+			continue
+		}
+		s.add(entry)
+	}
+}
+
+func mergeCacheEnvEntries(existing, current []cacheEnvEntry, consumed cacheEnvEntrySet) []cacheEnvEntry {
+	if len(current) == 0 {
+		return existing
+	}
+	if len(existing) == 0 {
+		merged := make([]cacheEnvEntry, 0, len(current))
+		for _, entry := range current {
+			if consumed.has(entry) {
+				continue
+			}
+			merged = append(merged, entry)
+		}
+		sortCacheEnvEntries(merged)
+		return merged
+	}
+
+	merged := append([]cacheEnvEntry(nil), existing...)
+	seen := make(cacheEnvEntrySet, len(existing))
+	for _, entry := range existing {
+		seen.add(entry)
+	}
+
+	for _, entry := range current {
+		if consumed.has(entry) || seen.has(entry) {
+			continue
+		}
+		merged = append(merged, entry)
+		seen.add(entry)
+	}
+
+	sortCacheEnvEntries(merged)
+	return merged
+}
+
+func sortCacheEnvEntries(entries []cacheEnvEntry) {
 	slices.SortFunc(entries, func(a, b cacheEnvEntry) int {
 		aLine := 0
 		if loc := a.env.Location(); len(loc) > 0 {
@@ -705,8 +778,6 @@ func cacheEnvEntriesFromFacts(bindings map[string]facts.EnvBinding) []cacheEnvEn
 		}
 		return strings.Compare(a.key, b.key)
 	})
-
-	return entries
 }
 
 func orderedRequiredMounts(
