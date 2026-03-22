@@ -359,9 +359,9 @@ func TestIsOctalMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
-			got := isOctalMode(tt.input)
+			got := IsOctalMode(tt.input)
 			if got != tt.want {
-				t.Errorf("isOctalMode(%q) = %v, want %v", tt.input, got, tt.want)
+				t.Errorf("IsOctalMode(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
 	}
@@ -392,20 +392,20 @@ func TestIsSymbolicMode(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
 			t.Parallel()
-			got := isSymbolicMode(tt.input)
+			got := IsSymbolicMode(tt.input)
 			if got != tt.want {
-				t.Errorf("isSymbolicMode(%q) = %v, want %v", tt.input, got, tt.want)
+				t.Errorf("IsSymbolicMode(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestSymbolicToOctal(t *testing.T) {
+func TestApplySymbolicMode(t *testing.T) {
 	t.Parallel()
 	// Base mode 0o644 (default for newly created files)
 	tests := []struct {
 		symbolic string
-		base     int
+		base     uint16
 		want     uint16
 	}{
 		// Add execute
@@ -450,9 +450,9 @@ func TestSymbolicToOctal(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.symbolic, func(t *testing.T) {
 			t.Parallel()
-			got := symbolicToOctal(tt.symbolic, tt.base)
+			got := ApplySymbolicMode(tt.symbolic, tt.base)
 			if got != tt.want {
-				t.Errorf("symbolicToOctal(%q, %04o) = %04o, want %04o", tt.symbolic, tt.base, got, tt.want)
+				t.Errorf("ApplySymbolicMode(%q, %04o) = %04o, want %04o", tt.symbolic, tt.base, got, tt.want)
 			}
 		})
 	}

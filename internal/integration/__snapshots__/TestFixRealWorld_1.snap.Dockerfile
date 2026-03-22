@@ -336,14 +336,10 @@ RUN pip install --no-cache-dir --user flash-attn==${FLASH_ATTN_VERSION}
 
  WORKDIR /root
 
- COPY deep_learning_container.py /usr/local/bin/deep_learning_container.py
+ COPY --chmod=+x deep_learning_container.py /usr/local/bin/deep_learning_container.py
 
-RUN <<EOF
-set -e
-chmod +x /usr/local/bin/deep_learning_container.py
-curl --location -o /license.txt https://aws-dlc-licenses.s3.amazonaws.com/pytorch-1.13/license.txt
-rm -rf /root/.cache
-EOF
+RUN curl --location -o /license.txt https://aws-dlc-licenses.s3.amazonaws.com/pytorch-1.13/license.txt
+RUN rm -rf /root/.cache
 
 ARG PT_TORCHDATA_URL
 ARG PT_TORCHAUDIO_URL
@@ -429,9 +425,7 @@ EOF
 
 WORKDIR /opt/
 
-COPY start_with_right_hostname.sh /usr/local/bin/start_with_right_hostname.sh
-
-RUN chmod +x /usr/local/bin/start_with_right_hostname.sh
+COPY --chmod=+x start_with_right_hostname.sh /usr/local/bin/start_with_right_hostname.sh
 
 WORKDIR /root
 

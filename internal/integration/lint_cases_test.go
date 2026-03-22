@@ -949,5 +949,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/sort-packages")...),
 			wantExit: 1,
 		},
+
+		// Prefer COPY --chmod (isolated to prefer-copy-chmod rule)
+		{
+			name:     "prefer-copy-chmod",
+			dir:      "prefer-copy-chmod",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-copy-chmod")...),
+			wantExit: 1,
+		},
 	}
 }

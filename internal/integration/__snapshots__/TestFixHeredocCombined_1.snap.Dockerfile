@@ -58,7 +58,7 @@ EOF
 FROM alpine:3.20 AS runtime
 
 # Case 9: prefer-copy-heredoc in second stage — file creation
-	COPY --chmod=0755 <<EOF /entrypoint.sh
+	COPY --chmod=+x <<EOF /entrypoint.sh
 #!/bin/sh
 EOF
 

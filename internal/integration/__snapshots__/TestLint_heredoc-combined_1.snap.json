@@ -288,7 +288,7 @@
                     "line": 56
                   }
                 },
-                "newText": "COPY --chmod=0755 \u003c\u003cEOF /entrypoint.sh\n#!/bin/sh\nEOF"
+                "newText": "COPY --chmod=+x \u003c\u003cEOF /entrypoint.sh\n#!/bin/sh\nEOF"
               }
             ],
             "priority": 99,

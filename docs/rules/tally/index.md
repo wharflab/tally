@@ -20,6 +20,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [platform-mismatch](./platform-mismatch.md) | Explicit `--platform` on FROM does not match what the registry provides | Error | Correctness | Enabled |
 | [prefer-add-unpack](./prefer-add-unpack.md) | Prefer `ADD --unpack` for downloading and extracting remote archives | Info | Performance | Enabled |
 | [prefer-multi-stage-build](./prefer-multi-stage-build.md) | Suggests converting single-stage builds into multi-stage builds to reduce final image size | Info | Performance | Off (experimental) |
+| [prefer-copy-chmod](./prefer-copy-chmod.md) | Prefer `COPY --chmod` over separate `COPY` + `RUN chmod` | Info | Style | Enabled |
 | [prefer-copy-heredoc](./prefer-copy-heredoc.md) | Suggests using COPY heredoc for file creation | Info | Performance | Enabled |
 | [prefer-package-cache-mounts](./prefer-package-cache-mounts.md) | Suggests cache mounts for package install/build commands and removes cache cleanup | Info | Performance | Off (experimental) |
 | [powershell/prefer-shell-instruction](./powershell/prefer-shell-instruction.md) | Prefer a `SHELL` instruction instead of repeating `pwsh` or `powershell -Command` in `RUN` | Style | Style | Enabled (experimental) |
