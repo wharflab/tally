@@ -26,10 +26,11 @@ func TestDL3057Rule_Check(t *testing.T) {
 	}{
 		// === Fast-path tests (static, no registry) ===
 		{
-			name: "no CMD or ENTRYPOINT delegates to parent — suppressed",
+			name: "scratch with no CMD — not suppressed (scratch has no parent)",
 			dockerfile: `FROM scratch
 `,
-			wantCount: 0,
+			wantCount: 1,
+			wantCode:  rules.HadolintRulePrefix + "DL3057",
 		},
 		{
 			name: "ok with one HEALTHCHECK CMD instruction",
@@ -116,11 +117,11 @@ HEALTHCHECK CMD /bin/check
 			wantCount: 0, // Last HEALTHCHECK is CMD, so no violation
 		},
 		{
-			name: "ONBUILD HEALTHCHECK without CMD — suppressed (no CMD delegates to parent)",
+			name: "ONBUILD HEALTHCHECK does not satisfy healthcheck requirement",
 			dockerfile: `FROM scratch
 ONBUILD HEALTHCHECK CMD /bin/check
 `,
-			wantCount: 0,
+			wantCount: 1, // ONBUILD triggers in child images, not this one; scratch has no parent
 		},
 
 		// === Smart suppression: serverless base images ===
@@ -321,6 +322,15 @@ CMD ["my-app"]
 ENTRYPOINT ["my-app"]
 `,
 			wantCount: 1,
+		},
+		{
+			name: "not suppressed when final stage inherits CMD from prior build stage",
+			dockerfile: `FROM alpine AS base
+CMD ["my-app"]
+FROM base
+RUN echo "setup"
+`,
+			wantCount: 1, // FROM <stage> inherits CMD; not an opaque external image
 		},
 	}
 
