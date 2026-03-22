@@ -105,12 +105,15 @@ func (r *PreferCopyChmodRule) checkStage(
 
 // isCopyChmodCandidate checks whether a COPY instruction is eligible for the rule.
 func isCopyChmodCandidate(c *instructions.CopyCommand) bool {
-	// Must have exactly one source file (not glob, not multiple)
-	if len(c.SourcePaths) != 1 || len(c.SourceContents) > 0 {
-		return false
+	// Heredoc COPY (e.g. COPY <<EOF /app/script.sh) — always a single dest file
+	if len(c.SourceContents) > 0 {
+		return true
 	}
 
-	// Skip glob patterns
+	// File-based COPY: must have exactly one source (not glob, not multiple)
+	if len(c.SourcePaths) != 1 {
+		return false
+	}
 	if strings.ContainsAny(c.SourcePaths[0], "*?[") {
 		return false
 	}
@@ -181,19 +184,27 @@ func (r *PreferCopyChmodRule) checkCopyChmodPair(
 	return &v
 }
 
-// effectiveCopyDest resolves the effective destination path for a single-source COPY.
+// effectiveCopyDest resolves the effective destination path for a COPY instruction.
 // Relative destinations are resolved against the stage's effective workdir.
+// For heredoc COPY the dest is used directly; for file COPY directory destinations
+// are resolved by appending the source basename.
 func effectiveCopyDest(c *instructions.CopyCommand, workdir string) string {
-	if len(c.SourcePaths) != 1 {
-		return ""
-	}
-
 	rawDest := c.DestPath
 	dest := rawDest
 
 	// Resolve relative destination against WORKDIR
 	if !path.IsAbs(dest) {
 		dest = path.Join(workdir, dest)
+	}
+
+	// Heredoc COPY: dest is always the target file path directly
+	if len(c.SourceContents) > 0 {
+		return path.Clean(dest)
+	}
+
+	// File-based COPY: need exactly one source to resolve
+	if len(c.SourcePaths) != 1 {
+		return ""
 	}
 
 	// Determine if the destination is a directory: explicit trailing slash,

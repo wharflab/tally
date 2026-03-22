@@ -208,14 +208,15 @@ RUN chmod +x /app/other.sh
 			WantViolations: 0,
 		},
 		{
-			Name: "COPY heredoc - no flag",
+			Name: "COPY heredoc + RUN chmod",
 			Content: `FROM alpine
-COPY <<EOF /app/config.txt
-hello world
+COPY <<EOF /app/start.sh
+#!/bin/sh
+exec myapp
 EOF
-RUN chmod 644 /app/config.txt
+RUN chmod +x /app/start.sh
 `,
-			WantViolations: 0,
+			WantViolations: 1,
 		},
 		{
 			Name: "RUN with multiple commands - not standalone chmod",
