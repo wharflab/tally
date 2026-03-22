@@ -26,6 +26,7 @@ linters:
     - mnd # magic numbers - too noisy
     - nlreturn # newlines before returns - too opinionated
     - noctx # context in http - not applicable
+    - nonamedreturns # named returns - too strict
     - noinlineerr # inline errors - too strict
     - tagliatelle # struct tag naming - not needed
     - testpackage # separate test packages - not needed
@@ -87,7 +88,7 @@ linters:
         - whyNoLint
         - hugeParam
         - rangeValCopy
-        - unnamedResult # conflicts with nonamedreturns linter
+        - unnamedResult # named returns preferred but not enforced
       enabled-tags:
         - diagnostic
         - experimental
@@ -109,6 +110,7 @@ linters:
           disabled: true
         - name: argument-limit
           arguments: [7]
+        - name: bare-return
     staticcheck:
       checks: ["all"]
   exclusions:
