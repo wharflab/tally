@@ -132,6 +132,18 @@ RUN chmod 755 /opt/bin/run.sh
 			WantViolations: 1,
 		},
 
+		{
+			Name: "COPY heredoc + RUN chmod",
+			Content: `FROM alpine
+COPY <<EOF /app/start.sh
+#!/bin/sh
+exec myapp
+EOF
+RUN chmod +x /app/start.sh
+`,
+			WantViolations: 1,
+		},
+
 		// === Merge cases (COPY already has --chmod + RUN chmod) ===
 		{
 			Name: "existing --chmod + symbolic overlay",
@@ -207,17 +219,6 @@ COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/other.sh
 `,
 			WantViolations: 0,
-		},
-		{
-			Name: "COPY heredoc + RUN chmod",
-			Content: `FROM alpine
-COPY <<EOF /app/start.sh
-#!/bin/sh
-exec myapp
-EOF
-RUN chmod +x /app/start.sh
-`,
-			WantViolations: 1,
 		},
 		{
 			Name: "RUN with multiple commands - not standalone chmod",
