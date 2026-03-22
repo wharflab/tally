@@ -275,6 +275,15 @@ RUN ["chmod", "-x", "/app/entrypoint.sh"]
 			WantViolations: 1,
 		},
 		{
+			Name: "exec form in non-default SHELL stage",
+			Content: `FROM alpine
+SHELL ["/bin/zsh", "-c"]
+COPY entrypoint.sh /app/entrypoint.sh
+RUN ["chmod", "+x", "/app/entrypoint.sh"]
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "exec form RUN chmod -R skipped",
 			Content: `FROM alpine
 COPY entrypoint.sh /app/entrypoint.sh

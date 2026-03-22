@@ -41,7 +41,7 @@ func (r *PreferCopyChmodRule) Check(input rules.LintInput) []rules.Violation {
 
 	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // type assertion OK
 
-	var violations []rules.Violation
+	violations := make([]rules.Violation, 0, len(input.Stages))
 
 	for stageIdx, stage := range input.Stages {
 		shellVariant := shell.VariantBash
@@ -51,10 +51,9 @@ func (r *PreferCopyChmodRule) Check(input rules.LintInput) []rules.Violation {
 			}
 		}
 
-		if !shellVariant.SupportsPOSIXShellAST() {
-			continue
-		}
-
+		// Don't skip non-POSIX stages entirely — exec-form RUN ["chmod", ...]
+		// doesn't need shell parsing. The shell variant is only used to gate
+		// shell-form parsing inside detectChmod.
 		violations = append(violations, r.checkStage(stage, shellVariant, input.File, sm, meta)...)
 	}
 
@@ -297,6 +296,10 @@ func buildChmodValueReplaceEdit(sm *sourcemap.SourceMap, file string, line int, 
 // Handles both shell-form (RUN chmod +x /f) and exec-form (RUN ["chmod", "+x", "/f"]).
 func detectChmod(run *instructions.RunCommand, shellVariant shell.Variant) *shell.ChmodInfo {
 	if run.PrependShell {
+		// Shell-form needs POSIX AST parsing
+		if !shellVariant.SupportsPOSIXShellAST() {
+			return nil
+		}
 		script := getRunCmdLine(run)
 		if script == "" {
 			return nil
