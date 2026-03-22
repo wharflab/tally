@@ -309,17 +309,17 @@ func detectChmod(run *instructions.RunCommand, shellVariant shell.Variant) *shel
 		return nil
 	}
 
-	// Reject flags (like -R) — same as shell-form DetectStandaloneChmod
 	args := run.CmdLine[1:]
 	var rawMode, target string
 	for _, arg := range args {
-		if strings.HasPrefix(arg, "-") {
-			return nil // flags like -R not supported
-		}
 		if rawMode == "" {
+			// Check mode first — symbolic modes like "-x" start with "-"
 			if shell.IsOctalMode(arg) || shell.IsSymbolicMode(arg) {
 				rawMode = arg
 				continue
+			}
+			if strings.HasPrefix(arg, "-") {
+				return nil // flags like -R not supported
 			}
 			return nil // first non-flag arg must be the mode
 		}

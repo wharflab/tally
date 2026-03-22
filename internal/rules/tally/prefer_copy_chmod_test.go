@@ -267,6 +267,14 @@ RUN ["chmod", "+x", "/app/entrypoint.sh"]
 			WantViolations: 1,
 		},
 		{
+			Name: "exec form RUN chmod symbolic -x",
+			Content: `FROM alpine
+COPY entrypoint.sh /app/entrypoint.sh
+RUN ["chmod", "-x", "/app/entrypoint.sh"]
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "exec form RUN chmod -R skipped",
 			Content: `FROM alpine
 COPY entrypoint.sh /app/entrypoint.sh
