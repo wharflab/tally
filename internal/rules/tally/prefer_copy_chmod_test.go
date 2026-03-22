@@ -112,6 +112,24 @@ RUN chmod u+x /usr/local/bin/script.sh
 `,
 			WantViolations: 1,
 		},
+		{
+			Name: "WORKDIR relative COPY dest resolved",
+			Content: `FROM alpine
+WORKDIR /app
+COPY script.sh .
+RUN chmod +x /app/script.sh
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "WORKDIR relative COPY dest with trailing slash",
+			Content: `FROM alpine
+WORKDIR /opt
+COPY run.sh ./bin/
+RUN chmod 755 /opt/bin/run.sh
+`,
+			WantViolations: 1,
+		},
 
 		// === Merge cases (COPY already has --chmod + RUN chmod) ===
 		{

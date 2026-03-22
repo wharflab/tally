@@ -8,6 +8,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
@@ -70,9 +71,14 @@ func (r *PreferCopyChmodRule) checkStage(
 ) []rules.Violation {
 	var violations []rules.Violation
 	var prevCopy *instructions.CopyCommand
+	workdir := "/" // Docker default
 
 	for _, cmd := range stage.Commands {
 		switch c := cmd.(type) {
+		case *instructions.WorkdirCommand:
+			workdir = facts.ResolveWorkdir(workdir, c.Path)
+			prevCopy = nil
+
 		case *instructions.CopyCommand:
 			prevCopy = nil // reset; evaluate this COPY as a potential candidate
 			if isCopyChmodCandidate(c) {
@@ -81,7 +87,9 @@ func (r *PreferCopyChmodRule) checkStage(
 
 		case *instructions.RunCommand:
 			if prevCopy != nil && c.PrependShell {
-				if v := r.checkCopyChmodPair(prevCopy, c, shellVariant, file, sm, meta); v != nil {
+				if v := r.checkCopyChmodPair(
+					prevCopy, c, shellVariant, workdir, file, sm, meta,
+				); v != nil {
 					violations = append(violations, *v)
 				}
 			}
@@ -115,7 +123,7 @@ func (r *PreferCopyChmodRule) checkCopyChmodPair(
 	copyCmd *instructions.CopyCommand,
 	runCmd *instructions.RunCommand,
 	shellVariant shell.Variant,
-	file string,
+	workdir, file string,
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
 ) *rules.Violation {
@@ -135,7 +143,7 @@ func (r *PreferCopyChmodRule) checkCopyChmodPair(
 	}
 
 	// Match chmod target to COPY effective destination
-	effectiveDest := effectiveCopyDest(copyCmd)
+	effectiveDest := effectiveCopyDest(copyCmd, workdir)
 	if effectiveDest == "" || effectiveDest != chmodInfo.Target {
 		return nil
 	}
@@ -174,15 +182,25 @@ func (r *PreferCopyChmodRule) checkCopyChmodPair(
 }
 
 // effectiveCopyDest resolves the effective destination path for a single-source COPY.
-func effectiveCopyDest(c *instructions.CopyCommand) string {
+// Relative destinations are resolved against the stage's effective workdir.
+func effectiveCopyDest(c *instructions.CopyCommand, workdir string) string {
 	if len(c.SourcePaths) != 1 {
 		return ""
 	}
 
-	dest := c.DestPath
+	rawDest := c.DestPath
+	dest := rawDest
 
-	// If dest is a directory (ends with /), derive filename from source
-	if strings.HasSuffix(dest, "/") {
+	// Resolve relative destination against WORKDIR
+	if !path.IsAbs(dest) {
+		dest = path.Join(workdir, dest)
+	}
+
+	// Determine if the destination is a directory: explicit trailing slash,
+	// or relative "." / ".." which always refer to directories.
+	isDir := strings.HasSuffix(rawDest, "/") ||
+		path.Clean(rawDest) == "." || path.Clean(rawDest) == ".."
+	if isDir {
 		dest = path.Join(dest, path.Base(c.SourcePaths[0]))
 	}
 
