@@ -1,6 +1,7 @@
 package tally
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -367,13 +368,13 @@ RUN chmod u+x /usr/local/bin/script.sh
 			wantFixContain: "--chmod=u+x",
 		},
 		{
-			name: "fix description includes mode",
+			name: "fix edit inserts chmod flag",
 			content: `FROM alpine
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 `,
 			wantHasFix:     true,
-			wantFixContain: "COPY --chmod=+x",
+			wantFixContain: "--chmod=+x",
 		},
 		{
 			name: "fix handles leading whitespace on COPY line",
@@ -431,16 +432,30 @@ RUN chmod +x /app/script.sh
 				if v.SuggestedFix == nil {
 					t.Fatal("expected suggested fix, got nil")
 				}
-				// Check that fix description or edit text contains expected substring
-				var sb strings.Builder
-				sb.WriteString(v.SuggestedFix.Description)
-				for _, edit := range v.SuggestedFix.Edits {
-					sb.WriteString(" ")
-					sb.WriteString(edit.NewText)
+				if len(v.SuggestedFix.Edits) == 0 {
+					t.Fatal("expected fix to have edits, got 0")
 				}
-				fixText := sb.String()
-				if !strings.Contains(fixText, tt.wantFixContain) {
-					t.Errorf("fix text %q does not contain %q", fixText, tt.wantFixContain)
+
+				// Verify the edit payloads independently from the description.
+				// At least one edit's NewText must contain the expected substring.
+				found := false
+				for _, edit := range v.SuggestedFix.Edits {
+					if strings.Contains(edit.NewText, tt.wantFixContain) {
+						found = true
+						break
+					}
+				}
+				if !found {
+					var edits []string
+					for i, edit := range v.SuggestedFix.Edits {
+						edits = append(edits, fmt.Sprintf(
+							"  edit[%d]: %q", i, edit.NewText,
+						))
+					}
+					t.Errorf(
+						"no edit contains %q\nedits:\n%s",
+						tt.wantFixContain, strings.Join(edits, "\n"),
+					)
 				}
 			}
 		})
