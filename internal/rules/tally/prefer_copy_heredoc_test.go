@@ -257,7 +257,7 @@ RUN echo "hello" > /app/config
 RUN echo "script" > /app/run.sh && chmod 755 /app/run.sh
 `,
 			wantHasFix:     true,
-			wantFixContain: "--chmod=0755",
+			wantFixContain: "--chmod=755",
 		},
 		{
 			name: "multi-line RUN with continuation",
@@ -278,23 +278,23 @@ EOF
 RUN chmod 755 /app/script.sh
 `,
 			wantHasFix:     true,
-			wantFixContain: "--chmod=0755",
+			wantFixContain: "--chmod=755",
 		},
 		{
-			name: "symbolic chmod +x converts to 0755",
+			name: "symbolic chmod +x preserved as-is",
 			content: `FROM alpine
 RUN echo "#!/bin/bash" > /app/script.sh && chmod +x /app/script.sh
 `,
 			wantHasFix:     true,
-			wantFixContain: "--chmod=0755",
+			wantFixContain: "--chmod=+x",
 		},
 		{
-			name: "symbolic chmod u+x converts to 0744",
+			name: "symbolic chmod u+x preserved as-is",
 			content: `FROM alpine
 RUN echo "data" > /app/file && chmod u+x /app/file
 `,
 			wantHasFix:     true,
-			wantFixContain: "--chmod=0744",
+			wantFixContain: "--chmod=u+x",
 		},
 		{
 			name: "cache mount preserved on remaining commands",
@@ -320,7 +320,7 @@ RUN chmod 755 /app/file
 RUN echo "b" >> /app/file
 `,
 			wantHasFix:     true,
-			wantFixContain: "--chmod=0755",
+			wantFixContain: "--chmod=755",
 		},
 	}
 
@@ -396,41 +396,44 @@ func TestPreferCopyHeredocRule_ValidateConfig(t *testing.T) {
 func TestBuildCopyHeredoc(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name       string
-		targetPath string
-		content    string
-		chmodMode  uint16
+		name         string
+		targetPath   string
+		content      string
+		rawChmodMode string
 	}{
 		{
 			name:       "simple content",
 			targetPath: "/app/config",
 			content:    "hello world\n",
-			chmodMode:  0,
 		},
 		{
-			name:       "with chmod",
-			targetPath: "/app/script.sh",
-			content:    "#!/bin/bash\necho hello\n",
-			chmodMode:  0o755,
+			name:         "with octal chmod",
+			targetPath:   "/app/script.sh",
+			content:      "#!/bin/bash\necho hello\n",
+			rawChmodMode: "0755",
+		},
+		{
+			name:         "with symbolic chmod",
+			targetPath:   "/app/run.sh",
+			content:      "#!/bin/sh\nexec app\n",
+			rawChmodMode: "+x",
 		},
 		{
 			name:       "content containing EOF",
 			targetPath: "/app/file",
 			content:    "Some EOF text\n",
-			chmodMode:  0,
 		},
 		{
 			name:       "empty content creates 0-byte file",
 			targetPath: "/app/empty",
 			content:    "",
-			chmodMode:  0,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := buildCopyHeredoc(tt.targetPath, tt.content, tt.chmodMode)
+			got := buildCopyHeredoc(tt.targetPath, tt.content, tt.rawChmodMode)
 			snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, got)
 		})
 	}

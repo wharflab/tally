@@ -1387,5 +1387,38 @@ severity = "warning"
 severity = "warning"
 `,
 		},
+
+		// prefer-copy-chmod: COPY + RUN chmod → COPY --chmod
+		{
+			name:  "prefer-copy-chmod-basic",
+			input: "FROM alpine\nCOPY entrypoint.sh /app/entrypoint.sh\nRUN chmod +x /app/entrypoint.sh\n",
+			args: []string{
+				"--fix",
+				"--select", "tally/prefer-copy-chmod",
+			},
+			wantApplied: 1,
+		},
+
+		// prefer-copy-chmod: preserves existing --chown flag
+		{
+			name:  "prefer-copy-chmod-with-chown",
+			input: "FROM alpine\nCOPY --chown=appuser:appuser entrypoint.sh /app/entrypoint.sh\nRUN chmod 755 /app/entrypoint.sh\n",
+			args: []string{
+				"--fix",
+				"--select", "tally/prefer-copy-chmod",
+			},
+			wantApplied: 1,
+		},
+
+		// prefer-copy-chmod: directory destination
+		{
+			name:  "prefer-copy-chmod-dir-dest",
+			input: "FROM alpine\nCOPY start.sh /usr/local/bin/\nRUN chmod 0755 /usr/local/bin/start.sh\n",
+			args: []string{
+				"--fix",
+				"--select", "tally/prefer-copy-chmod",
+			},
+			wantApplied: 1,
+		},
 	}
 }

@@ -696,3 +696,68 @@ func TestFixCrossRuleMultiSpacesIndentationChain(t *testing.T) {
 		t.Errorf("expected 'Fixed' in output, got: %s", output)
 	}
 }
+
+// TestFixCrossRuleCopyChmodHeredoc verifies that COPY-related rules cooperate
+// when applied to the same Dockerfile:
+//
+//   - tally/prefer-copy-chmod   — merges COPY + RUN chmod into COPY --chmod
+//   - tally/prefer-copy-heredoc — replaces RUN echo/cat > file with COPY <<EOF
+//
+// The fixture mixes patterns owned by each rule in the same stage.  Both rules
+// must apply their fixes without conflicts.
+func TestFixCrossRuleCopyChmodHeredoc(t *testing.T) {
+	t.Parallel()
+
+	// Patterns exercised:
+	//   Line 3-4:  COPY + RUN chmod +x  → prefer-copy-chmod
+	//   Line 5:    RUN echo > file      → prefer-copy-heredoc
+	//   Line 6-7:  COPY --chown + chmod → prefer-copy-chmod (with existing flag)
+	//   Line 8-11: RUN cat heredoc      → prefer-copy-heredoc
+	input := "FROM python:3.12-slim\n" +
+		"WORKDIR /app\n" +
+		"COPY entrypoint.sh /app/entrypoint.sh\n" +
+		"RUN chmod +x /app/entrypoint.sh\n" +
+		"RUN echo 'APP_ENV=production' > /app/.env\n" +
+		"COPY --chown=app:app healthcheck.sh /app/healthcheck.sh\n" +
+		"RUN chmod 755 /app/healthcheck.sh\n" +
+		"RUN cat <<'CONF' > /etc/app.conf\n" +
+		"log_level = info\n" +
+		"workers = 4\n" +
+		"CONF\n" +
+		"ENTRYPOINT [\"/app/entrypoint.sh\"]\n"
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte(input), 0o644); err != nil {
+		t.Fatalf("failed to write Dockerfile: %v", err)
+	}
+
+	args := []string{
+		"lint", "--slow-checks=off",
+		"--fix", "--fix-unsafe",
+		"--ignore", "*",
+		"--select", "tally/prefer-copy-chmod",
+		"--select", "tally/prefer-copy-heredoc",
+		dockerfilePath,
+	}
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			t.Fatalf("command failed to run: %v\noutput:\n%s", err, output)
+		}
+	}
+
+	fixedContent, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read fixed Dockerfile: %v", err)
+	}
+
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
+
+	if !strings.Contains(string(output), "Fixed") {
+		t.Errorf("expected 'Fixed' in output, got: %s", output)
+	}
+}

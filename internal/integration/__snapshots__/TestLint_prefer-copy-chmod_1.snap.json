@@ -1,0 +1,125 @@
+{
+  "files": [
+    {
+      "file": "testdata/prefer-copy-chmod/Dockerfile",
+      "violations": [
+        {
+          "detail": "Merge COPY and RUN chmod into a single COPY --chmod=+x instruction for fewer layers",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-copy-chmod/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 9
+            },
+            "file": "testdata/prefer-copy-chmod/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 9
+            }
+          },
+          "message": "use COPY --chmod=+x instead of separate COPY + RUN chmod",
+          "rule": "tally/prefer-copy-chmod",
+          "severity": "info",
+          "sourceCode": "COPY entrypoint.sh /app/entrypoint.sh",
+          "suggestedFix": {
+            "description": "Merge COPY + RUN chmod into COPY --chmod=+x",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 5,
+                    "line": 9
+                  },
+                  "file": "testdata/prefer-copy-chmod/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 9
+                  }
+                },
+                "newText": "--chmod=+x "
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 11
+                  },
+                  "file": "testdata/prefer-copy-chmod/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 10
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "priority": 99
+          }
+        },
+        {
+          "detail": "Merge COPY and RUN chmod into a single COPY --chmod=755 instruction for fewer layers",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-copy-chmod/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 12
+            },
+            "file": "testdata/prefer-copy-chmod/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 12
+            }
+          },
+          "message": "use COPY --chmod=755 instead of separate COPY + RUN chmod",
+          "rule": "tally/prefer-copy-chmod",
+          "severity": "info",
+          "sourceCode": "COPY healthcheck.sh /app/healthcheck.sh",
+          "suggestedFix": {
+            "description": "Merge COPY + RUN chmod into COPY --chmod=755",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 5,
+                    "line": 12
+                  },
+                  "file": "testdata/prefer-copy-chmod/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 12
+                  }
+                },
+                "newText": "--chmod=755 "
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 14
+                  },
+                  "file": "testdata/prefer-copy-chmod/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 13
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "priority": 99
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 2,
+    "style": 0,
+    "total": 2,
+    "warnings": 0
+  }
+}

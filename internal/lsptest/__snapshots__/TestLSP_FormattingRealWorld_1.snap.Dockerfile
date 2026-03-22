@@ -279,9 +279,8 @@ RUN pip install --no-cache-dir --user flash-attn==${FLASH_ATTN_VERSION}
 
  WORKDIR /root
 
- COPY deep_learning_container.py /usr/local/bin/deep_learning_container.py
+ COPY --chmod=+x deep_learning_container.py /usr/local/bin/deep_learning_container.py
 
-RUN chmod +x /usr/local/bin/deep_learning_container.py
 RUN curl -o /license.txt https://aws-dlc-licenses.s3.amazonaws.com/pytorch-1.13/license.txt
 RUN rm -rf /root/.cache
 
@@ -364,9 +363,7 @@ RUN wget --progress=dot:giga https://sourceforge.net/projects/boost/files/boost/
 
 WORKDIR /opt/
 
-COPY start_with_right_hostname.sh /usr/local/bin/start_with_right_hostname.sh
-
-RUN chmod +x /usr/local/bin/start_with_right_hostname.sh
+COPY --chmod=+x start_with_right_hostname.sh /usr/local/bin/start_with_right_hostname.sh
 
 WORKDIR /root
 
