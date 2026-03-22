@@ -86,7 +86,7 @@ func (r *PreferCopyChmodRule) checkStage(
 			}
 
 		case *instructions.RunCommand:
-			if prevCopy != nil && c.PrependShell {
+			if prevCopy != nil {
 				if v := r.checkCopyChmodPair(
 					prevCopy, c, shellVariant, workdir, file, sm, meta,
 				); v != nil {
@@ -130,12 +130,7 @@ func (r *PreferCopyChmodRule) checkCopyChmodPair(
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
 ) *rules.Violation {
-	script := getRunCmdLine(runCmd)
-	if script == "" {
-		return nil
-	}
-
-	chmodInfo := shell.DetectStandaloneChmod(script, shellVariant)
+	chmodInfo := detectChmod(runCmd, shellVariant)
 	if chmodInfo == nil {
 		return nil
 	}
@@ -296,6 +291,58 @@ func buildChmodValueReplaceEdit(sm *sourcemap.SourceMap, file string, line int, 
 		Location: rules.NewRangeLocation(file, line, 0, line, 0),
 		NewText:  "",
 	}
+}
+
+// detectChmod extracts chmod info from a RUN instruction.
+// Handles both shell-form (RUN chmod +x /f) and exec-form (RUN ["chmod", "+x", "/f"]).
+func detectChmod(run *instructions.RunCommand, shellVariant shell.Variant) *shell.ChmodInfo {
+	if run.PrependShell {
+		script := getRunCmdLine(run)
+		if script == "" {
+			return nil
+		}
+		return shell.DetectStandaloneChmod(script, shellVariant)
+	}
+
+	// Exec form: CmdLine is ["chmod", "<mode>", "<target>"]
+	if len(run.CmdLine) < 3 || run.CmdLine[0] != "chmod" {
+		return nil
+	}
+
+	// Reject flags (like -R) — same as shell-form DetectStandaloneChmod
+	args := run.CmdLine[1:]
+	var rawMode, target string
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			return nil // flags like -R not supported
+		}
+		if rawMode == "" {
+			if shell.IsOctalMode(arg) || shell.IsSymbolicMode(arg) {
+				rawMode = arg
+				continue
+			}
+			return nil // first non-flag arg must be the mode
+		}
+		if target != "" {
+			return nil // multiple targets not supported
+		}
+		target = arg
+	}
+	if rawMode == "" || target == "" {
+		return nil
+	}
+
+	var mode uint16
+	if shell.IsOctalMode(rawMode) {
+		mode = shell.ParseOctalMode(rawMode)
+	} else {
+		mode = shell.ApplySymbolicMode(rawMode, 0o644)
+	}
+	if mode == 0 {
+		return nil
+	}
+
+	return &shell.ChmodInfo{Mode: mode, RawMode: rawMode, Target: target}
 }
 
 // copyKeywordLen is the length of "COPY " (keyword + trailing space).

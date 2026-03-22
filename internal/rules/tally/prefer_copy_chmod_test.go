@@ -259,10 +259,18 @@ RUN chmod +x entrypoint.sh
 			WantViolations: 0,
 		},
 		{
-			Name: "exec form RUN - skip",
+			Name: "exec form RUN chmod detected",
 			Content: `FROM alpine
 COPY entrypoint.sh /app/entrypoint.sh
 RUN ["chmod", "+x", "/app/entrypoint.sh"]
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "exec form RUN chmod -R skipped",
+			Content: `FROM alpine
+COPY entrypoint.sh /app/entrypoint.sh
+RUN ["chmod", "-R", "755", "/app/entrypoint.sh"]
 `,
 			WantViolations: 0,
 		},
