@@ -139,8 +139,8 @@ func DetectStandaloneChmod(script string, variant Variant) *ChmodInfo {
 		return nil
 	}
 
-	mode, rawMode, target := parseChmod(call)
-	if mode == 0 || target == "" {
+	mode, rawMode, target, ok := parseChmod(call)
+	if !ok {
 		return nil
 	}
 
@@ -358,8 +358,8 @@ func analyzeCallExpr(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(na
 
 	// Check for chmod
 	if cmdName == cmdChmod {
-		mode, rawMode, target := parseChmod(call)
-		if mode != 0 && target != "" {
+		mode, rawMode, target, ok := parseChmod(call)
+		if ok {
 			return analyzedCmd{
 				cmdType:      cmdTypeChmod,
 				text:         text,
@@ -571,19 +571,19 @@ func stmtToString(stmt *syntax.Stmt) string {
 }
 
 // parseChmod extracts mode, raw mode string, and target from a chmod command.
-// Returns (0, "", "") if the chmod cannot be converted (e.g., recursive, multiple targets).
-func parseChmod(call *syntax.CallExpr) (uint16, string, string) {
+// Returns (0, "", "", false) if the chmod cannot be converted (e.g., recursive, multiple targets).
+// The ok return signals that a valid mode token was parsed (needed because mode 000 is valid).
+func parseChmod(call *syntax.CallExpr) (uint16, string, string, bool) {
 	if len(call.Args) < 3 {
-		return 0, "", ""
+		return 0, "", "", false
 	}
 
 	// Skip chmod itself
 	args := call.Args[1:]
 
 	var mode uint16
-	var rawMode string
-	var target string
-	seenTarget := false
+	var rawMode, target string
+	var seenMode, seenTarget bool
 
 	// Look for mode and target, skipping flags
 	for _, arg := range args {
@@ -595,8 +595,7 @@ func parseChmod(call *syntax.CallExpr) (uint16, string, string) {
 		// Skip flags (including -R for recursive)
 		if strings.HasPrefix(lit, "-") {
 			if strings.Contains(lit, "R") {
-				// Recursive chmod - skip
-				return 0, "", ""
+				return 0, "", "", false // Recursive chmod
 			}
 			continue
 		}
@@ -605,27 +604,26 @@ func parseChmod(call *syntax.CallExpr) (uint16, string, string) {
 		if IsOctalMode(lit) {
 			mode = ParseOctalMode(lit)
 			rawMode = lit
+			seenMode = true
 			continue
 		}
 
 		// Check if this is symbolic mode (e.g., +x, u+rwx)
 		if IsSymbolicMode(lit) {
-			// Convert symbolic to octal (assuming default file mode 0o644)
 			converted := ApplySymbolicMode(lit, defaultFileMode)
 			if converted == 0 {
-				// Unsupported symbolic mode (e.g., +X, +s, +t)
-				return 0, "", ""
+				return 0, "", "", false // Unsupported (e.g., +X, +s, +t)
 			}
 			mode = converted
 			rawMode = lit
+			seenMode = true
 			continue
 		}
 
-		// Must be a target path
-		if mode != 0 {
+		// Must be a target path (only after a mode has been seen)
+		if seenMode {
 			if seenTarget {
-				// Multiple targets (e.g., "chmod 755 /a /b") - not supported
-				return 0, "", ""
+				return 0, "", "", false // Multiple targets
 			}
 			target = lit
 			seenTarget = true
@@ -633,7 +631,7 @@ func parseChmod(call *syntax.CallExpr) (uint16, string, string) {
 		}
 	}
 
-	return mode, rawMode, target
+	return mode, rawMode, target, seenMode && seenTarget
 }
 
 // parseUmask extracts the umask value from a umask command.

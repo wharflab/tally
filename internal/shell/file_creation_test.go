@@ -623,6 +623,13 @@ func TestDetectStandaloneChmod(t *testing.T) {
 			variant: VariantPowerShell,
 			wantNil: true,
 		},
+		{
+			name:     "chmod 000 (zero mode is valid)",
+			script:   `chmod 000 /app/secret`,
+			variant:  VariantBash,
+			wantMode: 0,
+			wantPath: "/app/secret",
+		},
 	}
 
 	for _, tt := range tests {
