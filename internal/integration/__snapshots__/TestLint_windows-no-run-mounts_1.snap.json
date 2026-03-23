@@ -1,0 +1,76 @@
+{
+  "files": [
+    {
+      "file": "testdata/windows-no-run-mounts/Dockerfile",
+      "violations": [
+        {
+          "detail": "BuildKit accepts --mount flags without error, but the build will fail at the containerd/HCS runtime layer. All mount types (cache, secret, ssh, bind, tmpfs) are unsupported on Windows.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/windows/no-run-mounts/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 12
+            },
+            "file": "testdata/windows-no-run-mounts/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 12
+            }
+          },
+          "message": "RUN --mount=type=cache is not supported on Windows containers",
+          "rule": "tally/windows/no-run-mounts",
+          "severity": "error",
+          "sourceCode": "RUN --mount=type=cache,target=C:\\Users\\ContainerUser\\.nuget\\packages dotnet restore"
+        },
+        {
+          "detail": "BuildKit accepts --mount flags without error, but the build will fail at the containerd/HCS runtime layer. All mount types (cache, secret, ssh, bind, tmpfs) are unsupported on Windows.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/windows/no-run-mounts/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 15
+            },
+            "file": "testdata/windows-no-run-mounts/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 15
+            }
+          },
+          "message": "RUN --mount=type=secret is not supported on Windows containers",
+          "rule": "tally/windows/no-run-mounts",
+          "severity": "error",
+          "sourceCode": "RUN --mount=type=secret,id=nuget_token cmd /C type C:\\run\\secrets\\nuget_token"
+        },
+        {
+          "detail": "BuildKit accepts --mount flags without error, but the build will fail at the containerd/HCS runtime layer. All mount types (cache, secret, ssh, bind, tmpfs) are unsupported on Windows.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/windows/no-run-mounts/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 18
+            },
+            "file": "testdata/windows-no-run-mounts/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 18
+            }
+          },
+          "message": "RUN --mount=type=ssh is not supported on Windows containers",
+          "rule": "tally/windows/no-run-mounts",
+          "severity": "error",
+          "sourceCode": "RUN --mount=type=ssh git clone git@github.com:org/repo.git"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 3,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 3,
+    "warnings": 0
+  }
+}
