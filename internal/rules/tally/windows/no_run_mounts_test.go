@@ -82,6 +82,14 @@ RUN --mount=type=cache,target=/var/cache/apt apt-get update && apt-get install -
 			WantViolations: 0,
 		},
 		{
+			Name: "linux stage with pwsh shell and mount no violation",
+			Content: `FROM ubuntu:22.04
+SHELL ["pwsh", "-Command"]
+RUN --mount=type=cache,target=/tmp/cache echo ok
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "mixed stages only windows flagged",
 			Content: `FROM ubuntu:22.04 AS builder
 RUN --mount=type=cache,target=/root/.cache pip install -r requirements.txt
