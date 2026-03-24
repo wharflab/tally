@@ -249,6 +249,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// Windows: RUN --mount not supported
+		{
+			name:     "windows-no-run-mounts",
+			dir:      "windows-no-run-mounts",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/windows/no-run-mounts")...),
+			wantExit: 1,
+		},
+
 		// Shell-form RUN in scratch stage
 		{
 			name:     "shell-run-in-scratch",
