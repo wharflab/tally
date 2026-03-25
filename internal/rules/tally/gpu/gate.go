@@ -35,7 +35,8 @@ type cudaFlavor int
 
 const (
 	// cudaFlavorBase contains only the CUDA runtime library (cudart).
-	// Also the zero value, used when the flavor cannot be determined.
+	// This is the zero value; for unrecognized nvidia/cuda tags, parseCUDAImageInfo
+	// defaults to cudaFlavorDevel instead to avoid false positives.
 	cudaFlavorBase cudaFlavor = iota
 	// cudaFlavorRuntime adds math libraries and NCCL on top of base.
 	cudaFlavorRuntime
