@@ -149,6 +149,13 @@ func TestEolLastCheckWithFixes(t *testing.T) {
 			wantText:  "",
 		},
 		{
+			name:      "never - removes multiple trailing newlines",
+			content:   "FROM alpine:3.20\n\n\n",
+			config:    EolLastConfig{Mode: &modeNever},
+			wantEdits: 3, // one edit per trailing \n
+			wantText:  "",
+		},
+		{
 			name:      "never - no fix needed",
 			content:   "FROM alpine:3.20",
 			config:    EolLastConfig{Mode: &modeNever},

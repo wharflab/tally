@@ -950,6 +950,15 @@ skip-blank-lines = true
 				mustSelectRules("tally/eol-last", "tally/no-multiple-empty-lines")...),
 			wantApplied: 1, // only no-multiple-empty-lines fires (file ends with \n, so eol-last "always" is satisfied)
 		},
+		// EOL last "never" standalone: removes all trailing newlines in one pass
+		{
+			name:  "eol-last-never-multiple-trailing",
+			input: "FROM alpine:3.20\nRUN echo hello\n\n\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/eol-last")...),
+			wantApplied: 1, // single violation with 3 edits (one per trailing \n)
+			config:      "[rules.tally.eol-last]\nmode = \"never\"\n",
+		},
 
 		// No multiple empty lines: remove excess blank lines
 		{

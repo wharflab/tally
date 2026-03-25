@@ -1,8 +1,6 @@
 package tally
 
 import (
-	"fmt"
-
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
 )
@@ -137,26 +135,46 @@ func (r *EolLastRule) checkNever(input rules.LintInput, source []byte, meta rule
 		return nil
 	}
 
-	// Target only the final \n (the line terminator after the last effective line).
-	// This keeps the edit adjacent to (not overlapping with) no-multiple-empty-lines.
-	lastEffLine := effCount // 1-based
-	startCol := len(lines[effCount-1])
-	loc := rules.NewRangeLocation(input.File, lastEffLine, startCol, lastEffLine+1, 0)
-
-	msg := "file must not end with a newline"
-	if effCount < len(lines)-1 {
-		msg = fmt.Sprintf("file must not end with a newline (%d trailing blank lines should also be removed)", len(lines)-1-effCount)
+	// Count trailing newlines: from the last content line through all blank
+	// lines plus the line terminator that effectiveLineCount drops.
+	// We find the first non-blank line scanning backwards from the end.
+	lastContentIdx := effCount - 1 // 0-based
+	for lastContentIdx > 0 && lines[lastContentIdx] == "" {
+		lastContentIdx--
 	}
 
-	v := rules.NewViolation(loc, meta.Code, msg, meta.DefaultSeverity).
+	// Emit one edit per trailing newline line. Each edit removes exactly one
+	// line boundary (\n). Separate edits allow the fixer to skip individual
+	// edits that overlap with no-multiple-empty-lines without discarding the
+	// entire fix.
+	var edits []rules.TextEdit
+
+	// First edit: the \n at the end of the last content line.
+	contentLine := lastContentIdx + 1 // 1-based
+	edits = append(edits, rules.TextEdit{
+		Location: rules.NewRangeLocation(input.File, contentLine, len(lines[lastContentIdx]), contentLine+1, 0),
+		NewText:  "",
+	})
+
+	// Subsequent edits: one per trailing blank line.
+	for i := lastContentIdx + 1; i < effCount; i++ {
+		lineNum := i + 1 // 1-based
+		edits = append(edits, rules.TextEdit{
+			Location: rules.NewRangeLocation(input.File, lineNum, 0, lineNum+1, 0),
+			NewText:  "",
+		})
+	}
+
+	// Report violation at the last content line (where the unwanted \n begins).
+	loc := rules.NewRangeLocation(input.File, contentLine, len(lines[lastContentIdx]), contentLine, len(lines[lastContentIdx]))
+
+	v := rules.NewViolation(loc, meta.Code, "file must not end with a newline", meta.DefaultSeverity).
 		WithDocURL(meta.DocURL).
 		WithSuggestedFix(&rules.SuggestedFix{
-			Description: "Remove final newline",
+			Description: "Remove trailing newline(s)",
 			Safety:      rules.FixSafe,
 			Priority:    meta.FixPriority,
-			Edits: []rules.TextEdit{
-				{Location: loc, NewText: ""},
-			},
+			Edits:       edits,
 			IsPreferred: true,
 		})
 
