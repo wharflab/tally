@@ -265,6 +265,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// GPU: Redundant CUDA package install on nvidia/cuda base
+		{
+			name:     "gpu-no-redundant-cuda-install",
+			dir:      "gpu-no-redundant-cuda-install",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/gpu/no-redundant-cuda-install")...),
+			wantExit: 1,
+		},
+
 		// Shell-form RUN in scratch stage
 		{
 			name:     "shell-run-in-scratch",
