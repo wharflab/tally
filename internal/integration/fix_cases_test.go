@@ -917,6 +917,40 @@ skip-blank-lines = true
 			wantApplied: 3, // one violation per line (L2, L3, L4)
 		},
 
+		// EOL last: add missing final newline
+		{
+			name:  "eol-last-always",
+			input: "FROM alpine:3.20\nRUN echo hello",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/eol-last")...),
+			wantApplied: 1,
+		},
+		// EOL last: file already ends with newline — no fix
+		{
+			name:  "eol-last-already-ok",
+			input: "FROM alpine:3.20\nRUN echo hello\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/eol-last")...),
+			wantApplied: 0,
+		},
+		// EOL last: "never" mode removes trailing newline
+		{
+			name:  "eol-last-never",
+			input: "FROM alpine:3.20\nRUN echo hello\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/eol-last")...),
+			wantApplied: 1,
+			config:      "[rules.tally.eol-last]\nmode = \"never\"\n",
+		},
+		// EOL last cross no-multiple-empty-lines: both fixes apply (adjacent edits)
+		{
+			name:  "eol-last-cross-no-multiple-empty-lines",
+			input: "FROM alpine:3.20\nRUN echo hello\n\n\n",
+			args: append([]string{"--fix"},
+				mustSelectRules("tally/eol-last", "tally/no-multiple-empty-lines")...),
+			wantApplied: 1, // only no-multiple-empty-lines fires (file ends with \n, so eol-last "always" is satisfied)
+		},
+
 		// No multiple empty lines: remove excess blank lines
 		{
 			name:  "no-multiple-empty-lines",

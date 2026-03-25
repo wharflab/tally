@@ -222,6 +222,44 @@
       "title": "tally/consistent-indentation rule config",
       "type": "object"
     },
+    "rule-tally-eol-last": {
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/eol-last rule.",
+      "examples": [
+        {
+          "mode": "always"
+        },
+        {
+          "mode": "never",
+          "severity": "style"
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "mode": {
+          "default": "always",
+          "description": "Whether files must end with a newline (\"always\") or must not (\"never\").",
+          "enum": [
+            "always",
+            "never"
+          ],
+          "examples": [
+            "always"
+          ],
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "tally/eol-last rule config",
+      "type": "object"
+    },
     "rule-tally-max-lines": {
       "additionalProperties": false,
       "description": "Configuration options for the tally/max-lines rule.",
@@ -818,6 +856,9 @@
       "properties": {
         "consistent-indentation": {
           "$ref": "#/$defs/rule-tally-consistent-indentation"
+        },
+        "eol-last": {
+          "$ref": "#/$defs/rule-tally-eol-last"
         },
         "max-lines": {
           "$ref": "#/$defs/rule-tally-max-lines"

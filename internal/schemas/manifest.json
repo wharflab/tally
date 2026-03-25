@@ -34,6 +34,11 @@
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
+      "input": "internal/rules/tally/eol_last.schema.json",
+      "output": "internal/schemas/generated/rules/tally/eol_last.gen.go",
+      "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
+    },
+    {
       "input": "internal/rules/tally/no_trailing_spaces.schema.json",
       "output": "internal/schemas/generated/rules/tally/no_trailing_spaces.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"

@@ -40,6 +40,9 @@ type IndexSchemaJson_3 struct {
 	// "consistent-indentation".
 	ConsistentIndentation *tally.ConsistentIndentationSchemaJson `json:"consistent-indentation,omitempty"`
 
+	// EolLast corresponds to the JSON schema field "eol-last".
+	EolLast *tally.EolLastSchemaJson `json:"eol-last,omitempty"`
+
 	// MaxLines corresponds to the JSON schema field "max-lines".
 	MaxLines *tally.MaxLinesSchemaJson `json:"max-lines,omitempty"`
 

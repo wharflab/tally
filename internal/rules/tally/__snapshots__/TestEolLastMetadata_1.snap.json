@@ -1,0 +1,10 @@
+{
+ "Category": "style",
+ "Code": "tally/eol-last",
+ "DefaultSeverity": "style",
+ "Description": "Enforces a newline at the end of non-empty files",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/eol-last/",
+ "FixPriority": 99,
+ "IsExperimental": false,
+ "Name": "EOL Last"
+}
