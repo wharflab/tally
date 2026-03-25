@@ -139,6 +139,13 @@ func TestFindInstallPackages(t *testing.T) {
 			wantPkgs: [][]string{{"curl", "wget"}},
 		},
 		{
+			name:     "microdnf install",
+			script:   "microdnf install -y curl wget",
+			variant:  VariantBash,
+			wantCmds: 1,
+			wantPkgs: [][]string{{"curl", "wget"}},
+		},
+		{
 			name:     "choco install",
 			script:   "choco install -y git nodejs python3",
 			variant:  VariantBash,

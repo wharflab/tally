@@ -24,6 +24,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [prefer-copy-heredoc](./prefer-copy-heredoc.md) | Suggests using COPY heredoc for file creation | Info | Performance | Enabled |
 | [prefer-package-cache-mounts](./prefer-package-cache-mounts.md) | Suggests cache mounts for package install/build commands and removes cache cleanup | Info | Performance | Off (experimental) |
 | [powershell/prefer-shell-instruction](./powershell/prefer-shell-instruction.md) | Prefer a `SHELL` instruction instead of repeating `pwsh` or `powershell -Command` in `RUN` | Style | Style | Enabled (experimental) |
+| [gpu/no-container-runtime-in-image](./gpu/no-container-runtime-in-image.md) | NVIDIA container runtime packages belong on the host, not inside the image | Warning | Correctness | Enabled |
 | [windows/no-run-mounts](./windows/no-run-mounts.md) | `RUN --mount` flags are not supported on Windows containers | Error | Correctness | Enabled |
 | [prefer-run-heredoc](./prefer-run-heredoc.md) | Suggests using heredoc syntax for multi-command RUN | Style | Style | Off (experimental) |
 | [consistent-indentation](./consistent-indentation.md) | Enforces consistent indentation for build stages | Style | Style | Off (experimental) |

@@ -257,6 +257,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// GPU: NVIDIA container runtime packages inside image
+		{
+			name:     "gpu-no-container-runtime-in-image",
+			dir:      "gpu-no-container-runtime-in-image",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/gpu/no-container-runtime-in-image")...),
+			wantExit: 1,
+		},
+
 		// Shell-form RUN in scratch stage
 		{
 			name:     "shell-run-in-scratch",
