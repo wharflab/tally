@@ -942,7 +942,7 @@ skip-blank-lines = true
 			wantApplied: 1,
 			config:      "[rules.tally.eol-last]\nmode = \"never\"\n",
 		},
-		// EOL last cross no-multiple-empty-lines: both fixes apply (adjacent edits)
+		// EOL last cross no-multiple-empty-lines: only no-multiple-empty-lines applies in default "always" mode
 		{
 			name:  "eol-last-cross-no-multiple-empty-lines",
 			input: "FROM alpine:3.20\nRUN echo hello\n\n\n",
