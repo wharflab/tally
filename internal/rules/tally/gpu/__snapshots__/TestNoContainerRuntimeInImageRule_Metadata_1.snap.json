@@ -1,0 +1,10 @@
+{
+ "Category": "correctness",
+ "Code": "tally/gpu/no-container-runtime-in-image",
+ "DefaultSeverity": "warning",
+ "Description": "NVIDIA container runtime packages belong on the host, not inside the image",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/gpu/no-container-runtime-in-image/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "No NVIDIA container runtime in image"
+}

@@ -101,6 +101,7 @@ var installManagers = map[string]installManagerInfo{
 	"apt":      {installCommands: []string{"install"}, flagsWithValue: aptFlags},
 	"apk":      {installCommands: []string{"add"}},
 	"dnf":      {installCommands: []string{"install"}, flagsWithValue: dnfYumFlags},
+	"microdnf": {installCommands: []string{"install"}, flagsWithValue: dnfYumFlags},
 	"yum":      {installCommands: []string{"install"}, flagsWithValue: dnfYumFlags},
 	"zypper":   {installCommands: []string{"install", "in"}},
 	"npm":      {installCommands: []string{"install", "i", "add"}, flagsWithValue: npmFlags},

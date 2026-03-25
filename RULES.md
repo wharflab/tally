@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 32 | - | 32 |
+| tally | 33 | - | 33 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -50,6 +50,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/prefer-copy-heredoc`](docs/rules/tally/prefer-copy-heredoc.md) 🔧 | Suggests using COPY heredoc for file creation instead of RUN echo/cat | Info | Performance | Enabled |
 | [`tally/prefer-package-cache-mounts`](docs/rules/tally/prefer-package-cache-mounts.md) 🔧 | Suggests BuildKit cache mounts for package install/build commands and removes cache cleanup commands | Info | Performance | Off (experimental) |
 | [`tally/powershell/prefer-shell-instruction`](docs/rules/tally/powershell/prefer-shell-instruction.md) 🔧 | Prefers a PowerShell `SHELL` instruction over repeated `pwsh` or `powershell -Command` wrappers in `RUN` | Style | Style | Enabled (experimental) |
+| [`tally/gpu/no-container-runtime-in-image`](docs/rules/tally/gpu/no-container-runtime-in-image.md) | NVIDIA container runtime packages belong on the host, not inside the image | Warning | Correctness | Enabled |
 | [`tally/windows/no-run-mounts`](docs/rules/tally/windows/no-run-mounts.md) | `RUN --mount` flags are not supported on Windows containers and will fail at runtime | Error | Correctness | Enabled |
 | [`tally/prefer-run-heredoc`](docs/rules/tally/prefer-run-heredoc.md) 🔧 | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Off (experimental) |
 | [`tally/consistent-indentation`](docs/rules/tally/consistent-indentation.md) 🔧 | Enforces consistent indentation for Dockerfile build stages | Style | Style | Off (experimental) |

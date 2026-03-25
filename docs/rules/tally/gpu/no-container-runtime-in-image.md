@@ -1,0 +1,85 @@
+# tally/gpu/no-container-runtime-in-image
+
+NVIDIA container runtime packages belong on the host, not inside the image.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Correctness |
+| Default | Enabled |
+| Auto-fix | No |
+
+## Description
+
+Detects `RUN` instructions that install NVIDIA Container Toolkit host-side packages
+(`nvidia-container-toolkit`, `nvidia-docker2`, `libnvidia-container*`) inside the
+container image via a package manager (`apt`, `apt-get`, `yum`, `dnf`, `microdnf`, `apk`).
+
+These packages are part of the
+[NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), which hooks into the
+container runtime on the **host** to expose GPUs to containers. Installing them inside the image does not make the image GPU-enabled, wastes image
+layers, and can mask the real requirement: that the host or cluster runtime must have the toolkit configured.
+
+## Why this matters
+
+- **Wrong layer** -- the toolkit runs on the host/node, not in the container
+- **Does not enable GPU access** -- GPU device injection is handled by the container runtime (e.g., `nvidia-container-runtime`, CDI), not by packages
+  inside the image
+- **Bloats the image** -- the toolkit pulls in host-specific libraries that serve no purpose in the container filesystem
+- **Hides requirements** -- a working GPU setup depends on the host runtime configuration, not on image contents
+
+## Examples
+
+### Violation
+
+```dockerfile
+FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y nvidia-container-toolkit
+```
+
+```dockerfile
+FROM centos:7
+RUN yum install -y nvidia-docker2
+```
+
+```dockerfile
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y libnvidia-container1
+```
+
+### No violation
+
+```dockerfile
+# GPU base image with application packages only
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y python3 python3-pip
+```
+
+```dockerfile
+# Non-GPU image with unrelated packages
+FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl wget git
+```
+
+## Matched packages
+
+| Package | Description |
+|---------|-------------|
+| `nvidia-container-toolkit` | Main toolkit meta-package (CLI, hook, CDI generator) |
+| `nvidia-docker2` | Legacy wrapper for Docker runtime integration |
+| `libnvidia-container*` | Low-level container GPU library (`libnvidia-container1`, `libnvidia-container-tools`, etc.) |
+
+## Configuration
+
+This rule has no rule-specific options.
+
+```toml
+[rules.tally."gpu/no-container-runtime-in-image"]
+severity = "warning"
+```
+
+## References
+
+- [NVIDIA Container Toolkit Install Guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+- [NVIDIA Container Toolkit Architecture](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/arch-overview.html)
+- [GPU Container Rules design notes](../../../../design-docs/32-gpu-container-rules.md)

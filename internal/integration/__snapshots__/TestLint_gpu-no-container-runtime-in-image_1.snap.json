@@ -1,0 +1,57 @@
+{
+  "files": [
+    {
+      "file": "testdata/gpu-no-container-runtime-in-image/Dockerfile",
+      "violations": [
+        {
+          "detail": "nvidia-container-toolkit, nvidia-docker2, and libnvidia-container* are host-side NVIDIA Container Toolkit packages. They do not make the image GPU-enabled; configure the host or cluster runtime instead.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-container-runtime-in-image/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "testdata/gpu-no-container-runtime-in-image/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "installing NVIDIA container runtime packages inside the image: nvidia-container-toolkit",
+          "rule": "tally/gpu/no-container-runtime-in-image",
+          "severity": "warning",
+          "sourceCode": "RUN apt-get update \u0026\u0026 \\"
+        },
+        {
+          "detail": "nvidia-container-toolkit, nvidia-docker2, and libnvidia-container* are host-side NVIDIA Container Toolkit packages. They do not make the image GPU-enabled; configure the host or cluster runtime instead.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-container-runtime-in-image/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 12
+            },
+            "file": "testdata/gpu-no-container-runtime-in-image/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 12
+            }
+          },
+          "message": "installing NVIDIA container runtime packages inside the image: nvidia-docker2",
+          "rule": "tally/gpu/no-container-runtime-in-image",
+          "severity": "warning",
+          "sourceCode": "RUN yum install -y nvidia-docker2"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}
