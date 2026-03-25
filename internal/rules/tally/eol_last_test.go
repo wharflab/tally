@@ -156,18 +156,20 @@ func TestEolLastCheckWithFixes(t *testing.T) {
 
 	modeNever := "never"
 
+	strPtr := func(s string) *string { return &s }
+
 	tests := []struct {
 		name      string
 		content   string
 		config    any
 		wantEdits int
-		wantText  string
+		wantText  *string // nil = don't check; non-nil = assert Edits[0].NewText
 	}{
 		{
 			name:      "always - adds newline",
 			content:   "FROM alpine:3.20",
 			wantEdits: 1,
-			wantText:  "\n",
+			wantText:  strPtr("\n"),
 		},
 		{
 			name:      "always - no fix needed",
@@ -179,14 +181,14 @@ func TestEolLastCheckWithFixes(t *testing.T) {
 			content:   "FROM alpine:3.20\n",
 			config:    EolLastConfig{Mode: &modeNever},
 			wantEdits: 1,
-			wantText:  "",
+			wantText:  strPtr(""),
 		},
 		{
 			name:      "never - removes multiple trailing newlines",
 			content:   "FROM alpine:3.20\n\n\n",
 			config:    EolLastConfig{Mode: &modeNever},
 			wantEdits: 3, // one edit per trailing \n
-			wantText:  "",
+			wantText:  strPtr(""),
 		},
 		{
 			name:      "never - no fix needed",
@@ -215,9 +217,9 @@ func TestEolLastCheckWithFixes(t *testing.T) {
 					t.Error("expected NeedsResolve=false for sync fix")
 				}
 				totalEdits += len(v.SuggestedFix.Edits)
-				if tt.wantText != "" && len(v.SuggestedFix.Edits) > 0 {
-					if v.SuggestedFix.Edits[0].NewText != tt.wantText {
-						t.Errorf("edit NewText = %q, want %q", v.SuggestedFix.Edits[0].NewText, tt.wantText)
+				if tt.wantText != nil && len(v.SuggestedFix.Edits) > 0 {
+					if v.SuggestedFix.Edits[0].NewText != *tt.wantText {
+						t.Errorf("edit NewText = %q, want %q", v.SuggestedFix.Edits[0].NewText, *tt.wantText)
 					}
 				}
 			}
