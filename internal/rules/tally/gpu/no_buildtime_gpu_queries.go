@@ -75,7 +75,7 @@ func (r *NoBuildtimeGPUQueriesRule) Check(input rules.LintInput) []rules.Violati
 				continue
 			}
 			script := strings.Join(run.CmdLine, " ")
-			if v, ok := r.checkRun(input.File, stageIdx, run, script, shell.VariantPOSIX, meta); ok {
+			if v, ok := r.checkRun(input.File, stageIdx, run, script, shell.VariantUnknown, meta); ok {
 				violations = append(violations, v)
 			}
 		}
@@ -93,9 +93,6 @@ func (r *NoBuildtimeGPUQueriesRule) checkWithFacts(
 	for _, stageFacts := range fileFacts.Stages() {
 		for _, runFacts := range stageFacts.Runs {
 			variant := runFacts.Shell.Variant
-			if variant == shell.VariantUnknown {
-				variant = shell.VariantPOSIX
-			}
 			script := runFacts.SourceScript
 			if script == "" {
 				script = strings.Join(runFacts.Run.CmdLine, " ")
