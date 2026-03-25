@@ -166,13 +166,13 @@ func findRedundantCUDAPackages(installCmds []shell.InstallCommand) []string {
 			}
 			if cudaPackages[name] {
 				seen[name] = true
-				matched = append(matched, name)
+				matched = append(matched, pkg.Normalized)
 				continue
 			}
 			for _, prefix := range cudaPackagePrefixes {
 				if strings.HasPrefix(name, prefix) {
 					seen[name] = true
-					matched = append(matched, name)
+					matched = append(matched, pkg.Normalized)
 					break
 				}
 			}
