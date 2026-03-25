@@ -26,7 +26,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/buildkit v0.28.0
 	github.com/moby/docker-image-spec v1.3.1
-	github.com/moby/patternmatcher v0.6.0
+	github.com/moby/patternmatcher v0.6.1
 	github.com/muesli/termenv v0.16.0
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.1
