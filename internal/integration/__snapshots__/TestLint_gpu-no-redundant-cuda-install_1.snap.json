@@ -36,10 +36,29 @@
               "line": 12
             }
           },
-          "message": "redundant CUDA package install on nvidia/cuda base image: libcudnn8, tensorrt",
+          "message": "redundant CUDA package install on nvidia/cuda base image: libcudnn8",
           "rule": "tally/gpu/no-redundant-cuda-install",
           "severity": "warning",
-          "sourceCode": "RUN apt-get update \u0026\u0026 apt-get install -y libcudnn8 tensorrt"
+          "sourceCode": "RUN apt-get update \u0026\u0026 apt-get install -y libcudnn8"
+        },
+        {
+          "detail": "The nvidia/cuda base image already includes CUDA userspace packages. Reinstalling them via the package manager is usually redundant and can introduce version drift between the base image CUDA stack and the newly installed packages.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-redundant-cuda-install/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 21
+            },
+            "file": "testdata/gpu-no-redundant-cuda-install/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 21
+            }
+          },
+          "message": "redundant CUDA package install on nvidia/cuda base image: cuda-runtime-12-2",
+          "rule": "tally/gpu/no-redundant-cuda-install",
+          "severity": "warning",
+          "sourceCode": "RUN apt-get update \u0026\u0026 apt-get install -y cuda-runtime-12-2"
         }
       ]
     }
@@ -51,7 +70,7 @@
     "files": 1,
     "info": 0,
     "style": 0,
-    "total": 2,
-    "warnings": 2
+    "total": 3,
+    "warnings": 3
   }
 }

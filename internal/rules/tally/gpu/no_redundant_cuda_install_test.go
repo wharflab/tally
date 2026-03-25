@@ -17,9 +17,10 @@ func TestNoRedundantCUDAInstallRule_Check(t *testing.T) {
 	t.Parallel()
 
 	testutil.RunRuleTests(t, NewNoRedundantCUDAInstallRule(), []testutil.RuleTestCase{
+		// --- devel flavor: all CUDA packages are redundant ---
 		{
-			Name: "nvidia/cuda base with cuda-toolkit install",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+			Name: "devel base with cuda-toolkit install",
+			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
 RUN apt-get update && apt-get install -y cuda-toolkit
 `,
 			WantViolations: 1,
@@ -27,7 +28,7 @@ RUN apt-get update && apt-get install -y cuda-toolkit
 			WantMessages:   []string{"cuda-toolkit"},
 		},
 		{
-			Name: "nvidia/cuda base with nvidia-cuda-toolkit",
+			Name: "devel base with nvidia-cuda-toolkit",
 			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
 RUN apt-get update && apt-get install -y nvidia-cuda-toolkit
 `,
@@ -35,47 +36,15 @@ RUN apt-get update && apt-get install -y nvidia-cuda-toolkit
 			WantMessages:   []string{"nvidia-cuda-toolkit"},
 		},
 		{
-			Name: "nvidia/cuda base with libcudnn prefix match",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
-RUN apt-get update && apt-get install -y libcudnn8
+			Name: "devel base with cuda-nvcc",
+			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN apt-get update && apt-get install -y cuda-nvcc
 `,
 			WantViolations: 1,
-			WantMessages:   []string{"libcudnn8"},
+			WantMessages:   []string{"cuda-nvcc"},
 		},
 		{
-			Name: "nvidia/cuda base with tensorrt prefix match",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
-RUN apt-get update && apt-get install -y tensorrt
-`,
-			WantViolations: 1,
-			WantMessages:   []string{"tensorrt"},
-		},
-		{
-			Name: "nvidia/cuda base with cuda-compat prefix",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
-RUN apt-get update && apt-get install -y cuda-compat-12-2
-`,
-			WantViolations: 1,
-			WantMessages:   []string{"cuda-compat-12-2"},
-		},
-		{
-			Name: "nvidia/cuda base with cuda-runtime prefix",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
-RUN apt-get update && apt-get install -y cuda-runtime-12-2
-`,
-			WantViolations: 1,
-			WantMessages:   []string{"cuda-runtime-12-2"},
-		},
-		{
-			Name: "nvidia/cuda base with cuda-libraries prefix",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
-RUN apt-get update && apt-get install -y cuda-libraries-12-2
-`,
-			WantViolations: 1,
-			WantMessages:   []string{"cuda-libraries-12-2"},
-		},
-		{
-			Name: "nvidia/cuda base with cuda-nvcc prefix",
+			Name: "devel base with cuda-nvcc versioned prefix",
 			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
 RUN apt-get update && apt-get install -y cuda-nvcc-12-2
 `,
@@ -83,37 +52,129 @@ RUN apt-get update && apt-get install -y cuda-nvcc-12-2
 			WantMessages:   []string{"cuda-nvcc-12-2"},
 		},
 		{
-			Name: "nvidia/cuda base with multiple CUDA packages in one RUN",
+			Name: "devel base with multiple packages",
+			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN apt-get update && apt-get install -y cuda-toolkit cuda-nvcc-12-2 cuda-runtime
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"cuda-toolkit, cuda-nvcc-12-2, cuda-runtime"},
+		},
+		{
+			Name: "devel base with cuda-libraries prefix",
+			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN apt-get update && apt-get install -y cuda-libraries-12-2
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"cuda-libraries-12-2"},
+		},
+
+		// --- runtime flavor: runtime+base packages are redundant, devel packages are NOT ---
+		{
+			Name: "runtime base with cuda-runtime is redundant",
 			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
-RUN apt-get update && apt-get install -y cuda-toolkit libcudnn8 tensorrt
+RUN apt-get update && apt-get install -y cuda-runtime
 `,
 			WantViolations: 1,
-			WantMessages:   []string{"cuda-toolkit, libcudnn8, tensorrt"},
+			WantMessages:   []string{"cuda-runtime"},
 		},
 		{
-			Name: "nvidia/cuda base with yum install",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-centos7
-RUN yum install -y cuda-toolkit
+			Name: "runtime base with cuda-runtime versioned is redundant",
+			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y cuda-runtime-12-2
 `,
 			WantViolations: 1,
-			WantMessages:   []string{"cuda-toolkit"},
+			WantMessages:   []string{"cuda-runtime-12-2"},
 		},
 		{
-			Name: "nvidia/cuda base with dnf install",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-rockylinux9
-RUN dnf install -y cuda-toolkit-12-2
+			Name: "runtime base with cuda-libraries is redundant",
+			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y cuda-libraries-12-2
 `,
 			WantViolations: 1,
-			WantMessages:   []string{"cuda-toolkit-12-2"},
+			WantMessages:   []string{"cuda-libraries-12-2"},
 		},
 		{
-			Name: "docker.io/nvidia/cuda prefix",
-			Content: `FROM docker.io/nvidia/cuda:12.2.0-runtime-ubuntu22.04
+			Name: "runtime base with cuda-compat is redundant",
+			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y cuda-compat-12-2
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"cuda-compat-12-2"},
+		},
+		{
+			Name: "runtime base with cuda-toolkit is NOT redundant",
+			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
 RUN apt-get update && apt-get install -y cuda-toolkit
 `,
-			WantViolations: 1,
-			WantMessages:   []string{"cuda-toolkit"},
+			WantViolations: 0,
 		},
+		{
+			Name: "runtime base with cuda-nvcc is NOT redundant",
+			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y cuda-nvcc
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "runtime base with libcudnn is NOT redundant",
+			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y libcudnn8
+`,
+			WantViolations: 0,
+		},
+
+		// --- base flavor: only cudart-level packages are redundant ---
+		{
+			Name: "base flavor with cuda-runtime is redundant",
+			Content: `FROM nvidia/cuda:12.2.0-base-ubuntu22.04
+RUN apt-get update && apt-get install -y cuda-runtime
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"cuda-runtime"},
+		},
+		{
+			Name: "base flavor with cuda-libraries is NOT redundant",
+			Content: `FROM nvidia/cuda:12.2.0-base-ubuntu22.04
+RUN apt-get update && apt-get install -y cuda-libraries-12-2
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "base flavor with cuda-toolkit is NOT redundant",
+			Content: `FROM nvidia/cuda:12.2.0-base-ubuntu22.04
+RUN apt-get update && apt-get install -y cuda-toolkit
+`,
+			WantViolations: 0,
+		},
+
+		// --- cuDNN tags: libcudnn is redundant on cudnn tags ---
+		{
+			Name: "cudnn-devel base with libcudnn is redundant",
+			Content: `FROM nvidia/cuda:12.2.0-cudnn-devel-ubuntu22.04
+RUN apt-get update && apt-get install -y libcudnn8
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"libcudnn8"},
+		},
+		{
+			Name: "cudnn-runtime base with libcudnn is redundant",
+			Content: `FROM nvidia/cuda:12.2.0-cudnn-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y libcudnn8
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"libcudnn8"},
+		},
+
+		// --- tensorrt: never considered redundant (no standard tag includes it) ---
+		{
+			Name: "devel base with tensorrt is NOT redundant",
+			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN apt-get update && apt-get install -y tensorrt
+`,
+			WantViolations: 0,
+		},
+
+		// --- non-CUDA bases: never fire ---
 		{
 			Name: "nvidia/cuda base with legitimate packages no violation",
 			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
@@ -149,8 +210,10 @@ RUN apt-get update && apt-get install -y cuda-toolkit
 `,
 			WantViolations: 0,
 		},
+
+		// --- multi-stage, edge cases ---
 		{
-			Name: "multi-stage fires only on nvidia/cuda stage",
+			Name: "multi-stage fires only on nvidia/cuda devel stage",
 			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04 AS builder
 RUN apt-get update && apt-get install -y cuda-toolkit
 
@@ -168,13 +231,11 @@ RUN apt-get update && apt-get install -y python3
 FROM base AS app
 RUN apt-get update && apt-get install -y cuda-toolkit
 `,
-			// Stage ref — stageUsesNVIDIACUDABase returns false for stage refs.
-			// The base image is not directly nvidia/cuda but a reference to another stage.
 			WantViolations: 0,
 		},
 		{
-			Name: "continuation lines",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+			Name: "continuation lines on devel",
+			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
 RUN apt-get update && \
     apt-get install -y \
     cuda-toolkit
@@ -183,8 +244,8 @@ RUN apt-get update && \
 			WantMessages:   []string{"cuda-toolkit"},
 		},
 		{
-			Name: "heredoc RUN",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+			Name: "heredoc RUN on devel",
+			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
 RUN <<EOF
 apt-get update
 apt-get install -y cuda-toolkit
@@ -200,35 +261,43 @@ EOF
 			WantViolations: 0,
 		},
 		{
-			Name: "exact match cuda",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
-RUN apt-get update && apt-get install -y cuda
-`,
-			WantViolations: 1,
-			WantMessages:   []string{"cuda"},
-		},
-		{
-			Name: "exact match cuda-runtime",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
-RUN apt-get update && apt-get install -y cuda-runtime
-`,
-			WantViolations: 1,
-			WantMessages:   []string{"cuda-runtime"},
-		},
-		{
-			Name: "exact match cuda-nvcc",
-			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
-RUN apt-get update && apt-get install -y cuda-nvcc
-`,
-			WantViolations: 1,
-			WantMessages:   []string{"cuda-nvcc"},
-		},
-		{
 			Name: "non-CUDA package with cuda substring no false positive",
-			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
 RUN apt-get update && apt-get install -y barracuda
 `,
 			WantViolations: 0,
+		},
+		{
+			Name: "docker.io/nvidia/cuda prefix on devel",
+			Content: `FROM docker.io/nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN apt-get update && apt-get install -y cuda-toolkit
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"cuda-toolkit"},
+		},
+		{
+			Name: "yum install on devel",
+			Content: `FROM nvidia/cuda:12.2.0-devel-centos7
+RUN yum install -y cuda-toolkit
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"cuda-toolkit"},
+		},
+		{
+			Name: "dnf install on devel",
+			Content: `FROM nvidia/cuda:12.2.0-devel-rockylinux9
+RUN dnf install -y cuda-toolkit-12-2
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"cuda-toolkit-12-2"},
+		},
+		{
+			Name: "unrecognized tag defaults to devel to avoid false positives",
+			Content: `FROM nvidia/cuda:12.2.0
+RUN apt-get update && apt-get install -y cuda-toolkit
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"cuda-toolkit"},
 		},
 	})
 }
@@ -236,7 +305,7 @@ RUN apt-get update && apt-get install -y barracuda
 func TestNoRedundantCUDAInstallRule_CheckWithoutFacts(t *testing.T) {
 	t.Parallel()
 
-	content := `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+	content := `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
 RUN apt-get update && apt-get install -y cuda-toolkit python3
 `
 	input := testutil.MakeLintInput(t, "Dockerfile", content)
@@ -256,11 +325,11 @@ RUN apt-get update && apt-get install -y cuda-toolkit python3
 func TestNoRedundantCUDAInstallRule_CheckNilSemantic(t *testing.T) {
 	t.Parallel()
 
-	content := `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+	content := `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
 RUN apt-get update && apt-get install -y cuda-toolkit
 `
 	input := testutil.MakeLintInput(t, "Dockerfile", content)
-	input.Semantic = nil // no semantic model — stageIsGated returns false
+	input.Semantic = nil // no semantic model — stageImageInfo returns empty
 
 	violations := NewNoRedundantCUDAInstallRule().Check(input)
 

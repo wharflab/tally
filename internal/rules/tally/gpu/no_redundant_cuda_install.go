@@ -14,30 +14,54 @@ import (
 // NoRedundantCUDAInstallRuleCode is the full rule code.
 const NoRedundantCUDAInstallRuleCode = rules.TallyRulePrefix + "gpu/no-redundant-cuda-install"
 
-// cudaPackages are exact package names that indicate a CUDA-stack package.
-var cudaPackages = map[string]bool{
+// cudaBasePackages are packages present in all nvidia/cuda flavors (base, runtime, devel).
+// The base image includes at minimum the CUDA runtime library (cudart).
+var cudaBasePackages = map[string]bool{
+	"cuda":         true,
+	"cuda-runtime": true,
+}
+
+// cudaBasePackagePrefixes are prefixes present in all nvidia/cuda flavors.
+var cudaBasePackagePrefixes = []string{
+	"cuda-runtime-",
+	"cuda-compat-",
+}
+
+// cudaRuntimePackages are packages additionally present in runtime (and devel) flavors.
+// Runtime adds math libraries (cublas, cufft, etc.) and NCCL.
+var cudaRuntimePackages = map[string]bool{
+	"cuda-libraries": true,
+}
+
+// cudaRuntimePackagePrefixes are prefixes additionally present in runtime (and devel).
+var cudaRuntimePackagePrefixes = []string{
+	"cuda-libraries-",
+}
+
+// cudaDevelPackages are packages additionally present only in the devel flavor.
+// Devel adds nvcc, headers, toolkit, and development libraries.
+var cudaDevelPackages = map[string]bool{
 	"nvidia-cuda-toolkit": true,
-	"cuda":                true,
 	"cuda-toolkit":        true,
-	"cuda-runtime":        true,
 	"cuda-nvcc":           true,
 }
 
-// cudaPackagePrefixes are package name prefixes for CUDA-stack packages.
-var cudaPackagePrefixes = []string{
+// cudaDevelPackagePrefixes are prefixes additionally present only in the devel flavor.
+var cudaDevelPackagePrefixes = []string{
 	"cuda-toolkit-",
-	"cuda-runtime-",
-	"cuda-libraries-",
-	"cuda-compat-",
 	"cuda-nvcc-",
+}
+
+// cudaCuDNNPackagePrefixes are packages present only in cudnn-flavored tags
+// (e.g. nvidia/cuda:12.2.0-cudnn-runtime-ubuntu22.04).
+var cudaCuDNNPackagePrefixes = []string{
 	"libcudnn",
-	"tensorrt",
 }
 
 // NoRedundantCUDAInstallRule flags installation of CUDA userspace packages
 // via a package manager in stages that already inherit from nvidia/cuda:*.
-// The base image already provides these packages, so reinstalling them is
-// usually redundant and can introduce version drift.
+// The rule is flavor-aware: it only flags packages that are already provided
+// by the specific image variant (base, runtime, or devel) and cuDNN tag.
 type NoRedundantCUDAInstallRule struct{}
 
 // NewNoRedundantCUDAInstallRule creates a new rule instance.
@@ -71,7 +95,8 @@ func (r *NoRedundantCUDAInstallRule) Check(input rules.LintInput) []rules.Violat
 	// Fallback: iterate stages directly when facts are unavailable.
 	var violations []rules.Violation
 	for stageIdx, stage := range input.Stages {
-		if !r.stageIsGated(sem, stageIdx) {
+		imgInfo := r.stageImageInfo(sem, stageIdx)
+		if !imgInfo.IsCUDAImage {
 			continue
 		}
 		for _, cmd := range stage.Commands {
@@ -79,7 +104,7 @@ func (r *NoRedundantCUDAInstallRule) Check(input rules.LintInput) []rules.Violat
 			if !ok {
 				continue
 			}
-			if v, ok := r.checkRun(input.File, stageIdx, run, nil, meta); ok {
+			if v, ok := r.checkRun(input.File, stageIdx, run, nil, imgInfo, meta); ok {
 				violations = append(violations, v)
 			}
 		}
@@ -96,11 +121,12 @@ func (r *NoRedundantCUDAInstallRule) checkWithFacts(
 	var violations []rules.Violation
 
 	for _, stageFacts := range fileFacts.Stages() {
-		if !r.stageIsGated(sem, stageFacts.Index) {
+		imgInfo := r.stageImageInfo(sem, stageFacts.Index)
+		if !imgInfo.IsCUDAImage {
 			continue
 		}
 		for _, runFacts := range stageFacts.Runs {
-			if v, ok := r.checkRun(input.File, stageFacts.Index, runFacts.Run, runFacts.InstallCommands, meta); ok {
+			if v, ok := r.checkRun(input.File, stageFacts.Index, runFacts.Run, runFacts.InstallCommands, imgInfo, meta); ok {
 				violations = append(violations, v)
 			}
 		}
@@ -108,13 +134,12 @@ func (r *NoRedundantCUDAInstallRule) checkWithFacts(
 	return violations
 }
 
-// stageIsGated returns true if the stage uses an nvidia/cuda base image.
-func (r *NoRedundantCUDAInstallRule) stageIsGated(sem *semantic.Model, stageIdx int) bool {
+// stageImageInfo returns parsed CUDA image info for the stage.
+func (r *NoRedundantCUDAInstallRule) stageImageInfo(sem *semantic.Model, stageIdx int) cudaImageInfo {
 	if sem == nil {
-		return false
+		return cudaImageInfo{}
 	}
-	info := sem.StageInfo(stageIdx)
-	return stageUsesNVIDIACUDABase(info)
+	return parseCUDAImageInfo(sem.StageInfo(stageIdx))
 }
 
 func (r *NoRedundantCUDAInstallRule) checkRun(
@@ -122,6 +147,7 @@ func (r *NoRedundantCUDAInstallRule) checkRun(
 	stageIdx int,
 	run *instructions.RunCommand,
 	installCmds []shell.InstallCommand,
+	imgInfo cudaImageInfo,
 	meta rules.RuleMetadata,
 ) (rules.Violation, bool) {
 	if installCmds == nil {
@@ -129,7 +155,7 @@ func (r *NoRedundantCUDAInstallRule) checkRun(
 		installCmds = shell.FindInstallPackages(script, shell.VariantPOSIX)
 	}
 
-	matched := findRedundantCUDAPackages(installCmds)
+	matched := findRedundantCUDAPackages(installCmds, imgInfo)
 	if len(matched) == 0 {
 		return rules.Violation{}, false
 	}
@@ -153,8 +179,13 @@ func (r *NoRedundantCUDAInstallRule) checkRun(
 	return v, true
 }
 
-// findRedundantCUDAPackages returns the names of CUDA-stack packages found in install commands.
-func findRedundantCUDAPackages(installCmds []shell.InstallCommand) []string {
+// findRedundantCUDAPackages returns CUDA packages that are already provided by the
+// nvidia/cuda image variant. The check is flavor-aware:
+//   - base: only cudart-level packages are redundant
+//   - runtime: base + math libraries/NCCL
+//   - devel: runtime + nvcc/toolkit/headers
+//   - cuDNN tags: additionally flag libcudnn*
+func findRedundantCUDAPackages(installCmds []shell.InstallCommand, imgInfo cudaImageInfo) []string {
 	var matched []string
 	seen := make(map[string]bool)
 
@@ -164,21 +195,54 @@ func findRedundantCUDAPackages(installCmds []shell.InstallCommand) []string {
 			if seen[name] {
 				continue
 			}
-			if cudaPackages[name] {
+			if isRedundantForFlavor(name, imgInfo) {
 				seen[name] = true
 				matched = append(matched, pkg.Normalized)
-				continue
-			}
-			for _, prefix := range cudaPackagePrefixes {
-				if strings.HasPrefix(name, prefix) {
-					seen[name] = true
-					matched = append(matched, pkg.Normalized)
-					break
-				}
 			}
 		}
 	}
 	return matched
+}
+
+// isRedundantForFlavor checks if a package name is already provided by the given image flavor.
+func isRedundantForFlavor(name string, imgInfo cudaImageInfo) bool {
+	// Base-level packages: present in all flavors (base, runtime, devel).
+	if cudaBasePackages[name] || matchesPrefix(name, cudaBasePackagePrefixes) {
+		return true
+	}
+
+	// Runtime-level packages: present in runtime and devel.
+	if imgInfo.Flavor >= cudaFlavorRuntime {
+		if cudaRuntimePackages[name] || matchesPrefix(name, cudaRuntimePackagePrefixes) {
+			return true
+		}
+	}
+
+	// Devel-level packages: present only in devel.
+	if imgInfo.Flavor >= cudaFlavorDevel {
+		if cudaDevelPackages[name] || matchesPrefix(name, cudaDevelPackagePrefixes) {
+			return true
+		}
+	}
+
+	// cuDNN packages: only present when the tag includes "cudnn".
+	if imgInfo.HasCuDNN && matchesPrefix(name, cudaCuDNNPackagePrefixes) {
+		return true
+	}
+
+	// TensorRT: standard nvidia/cuda tags do not include TensorRT,
+	// so tensorrt* is never considered redundant currently.
+
+	return false
+}
+
+func matchesPrefix(name string, prefixes []string) bool {
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func init() {

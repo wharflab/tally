@@ -15,17 +15,16 @@ Detects `RUN` instructions that install CUDA userspace packages via a package ma
 (`apt`, `apt-get`, `yum`, `dnf`, `microdnf`, `apk`) in stages that already inherit from
 `nvidia/cuda:*`.
 
-The `nvidia/cuda` base images from NVIDIA already include the CUDA toolkit, runtime
-libraries, cuDNN, and other CUDA userspace components appropriate for the image variant
-(`base`, `runtime`, or `devel`). Reinstalling these packages through the OS package
-manager is usually redundant and can introduce version drift between the base image's
-CUDA stack and the newly installed packages.
+The rule is **flavor-aware**: it parses the image tag to determine the variant (`base`,
+`runtime`, or `devel`) and only flags packages that the variant already includes. For
+example, installing `cuda-toolkit` on a `runtime` image is legitimate (runtime does not
+include the toolkit), but installing `cuda-runtime` on a `runtime` image is redundant.
 
 ## Why this matters
 
 - **Redundant work** -- the base image already provides the CUDA stack for the selected variant
-- **Version drift** -- the package manager may install a different CUDA version than the one baked into the base image, causing subtle
-  incompatibilities
+- **Version drift** -- the package manager may install a different CUDA version than the one
+  baked into the base image, causing subtle incompatibilities
 - **Image bloat** -- duplicate CUDA libraries waste space in the image layers
 - **Maintenance burden** -- two sources of truth for the CUDA version make upgrades harder
 
@@ -34,21 +33,30 @@ CUDA stack and the newly installed packages.
 ### Violation
 
 ```dockerfile
-FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+# devel includes the full toolkit -- reinstalling is redundant
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
 RUN apt-get update && apt-get install -y cuda-toolkit
 ```
 
 ```dockerfile
-FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
-RUN apt-get update && apt-get install -y libcudnn8 tensorrt
+# cudnn tag already includes cuDNN -- reinstalling is redundant
+FROM nvidia/cuda:12.2.0-cudnn-devel-ubuntu22.04
+RUN apt-get update && apt-get install -y libcudnn8
 ```
 
 ```dockerfile
+# runtime includes cuda-runtime -- reinstalling is redundant
 FROM nvidia/cuda:12.2.0-runtime-centos7
 RUN yum install -y cuda-runtime-12-2
 ```
 
 ### No violation
+
+```dockerfile
+# runtime does NOT include the toolkit -- this install is legitimate
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y cuda-toolkit
+```
 
 ```dockerfile
 # nvidia/cuda base with application packages only
@@ -62,28 +70,24 @@ FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y nvidia-cuda-toolkit
 ```
 
-```dockerfile
-# nvcr.io images are not nvidia/cuda -- not flagged
-FROM nvcr.io/nvidia/pytorch:23.10-py3
-RUN apt-get update && apt-get install -y cuda-toolkit
-```
+## Flavor-aware matching
 
-## Matched packages
+The rule maps packages to the nvidia/cuda image variant that includes them:
 
-| Package | Match type |
-|---------|-----------|
-| `nvidia-cuda-toolkit` | Exact |
-| `cuda` | Exact |
-| `cuda-toolkit` | Exact |
-| `cuda-runtime` | Exact |
-| `cuda-nvcc` | Exact |
-| `cuda-toolkit-*` | Prefix |
-| `cuda-runtime-*` | Prefix |
-| `cuda-libraries-*` | Prefix |
-| `cuda-compat-*` | Prefix |
-| `cuda-nvcc-*` | Prefix |
-| `libcudnn*` | Prefix |
-| `tensorrt*` | Prefix |
+| Package | Included in | Match type |
+|---------|-------------|-----------|
+| `cuda`, `cuda-runtime` | base, runtime, devel | Exact |
+| `cuda-runtime-*`, `cuda-compat-*` | base, runtime, devel | Prefix |
+| `cuda-libraries`, `cuda-libraries-*` | runtime, devel | Exact/Prefix |
+| `nvidia-cuda-toolkit`, `cuda-toolkit`, `cuda-nvcc` | devel | Exact |
+| `cuda-toolkit-*`, `cuda-nvcc-*` | devel | Prefix |
+| `libcudnn*` | cudnn tags only | Prefix |
+
+TensorRT packages (`tensorrt*`) are never flagged because standard `nvidia/cuda` tags do
+not include TensorRT.
+
+When the tag cannot be parsed (e.g., digest-only or ARG-based), the rule defaults to
+`devel` to avoid false positives.
 
 ## Applicability
 
