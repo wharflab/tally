@@ -9,6 +9,9 @@
     "consistent-indentation": {
       "$ref": "./consistent_indentation.schema.json"
     },
+    "eol-last": {
+      "$ref": "./eol_last.schema.json"
+    },
     "max-lines": {
       "$ref": "./max_lines.schema.json"
     },

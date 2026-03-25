@@ -1,0 +1,58 @@
+{
+  "files": [
+    {
+      "file": "testdata/eol-last/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/eol-last/",
+          "location": {
+            "end": {
+              "column": 19,
+              "line": 11
+            },
+            "file": "testdata/eol-last/Dockerfile",
+            "start": {
+              "column": 19,
+              "line": 11
+            }
+          },
+          "message": "file must end with a newline",
+          "rule": "tally/eol-last",
+          "severity": "style",
+          "sourceCode": "ENTRYPOINT [\"/app\"]",
+          "suggestedFix": {
+            "description": "Add final newline",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 19,
+                    "line": 11
+                  },
+                  "file": "testdata/eol-last/Dockerfile",
+                  "start": {
+                    "column": 19,
+                    "line": 11
+                  }
+                },
+                "newText": "\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 99
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 1,
+    "total": 1,
+    "warnings": 0
+  }
+}

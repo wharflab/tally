@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/eol_last.schema.json",
+  "title": "tally/eol-last rule config",
+  "description": "Configuration options for the tally/eol-last rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" },
+    "mode": {
+      "type": "string",
+      "enum": ["always", "never"],
+      "default": "always",
+      "description": "Whether files must end with a newline (\"always\") or must not (\"never\").",
+      "examples": ["always"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "mode": "always" },
+    { "severity": "style", "mode": "never" }
+  ]
+}

@@ -31,6 +31,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [no-multi-spaces](./no-multi-spaces.md) | Disallows multiple consecutive spaces within instructions | Style | Style | Enabled |
 | [no-multiple-empty-lines](./no-multiple-empty-lines.md) | Disallows multiple consecutive empty lines | Style | Style | Enabled |
 | [no-trailing-spaces](./no-trailing-spaces.md) | Disallows trailing whitespace at the end of lines | Style | Style | Enabled |
+| [eol-last](./eol-last.md) | Enforces a newline at the end of non-empty files | Style | Style | Enabled |
 | [epilogue-order](./epilogue-order.md) | Enforces canonical order for epilogue instructions (STOPSIGNAL, HEALTHCHECK, ENTRYPOINT, CMD) | Style | Style | Enabled |
 | [sort-packages](./sort-packages.md) | Package lists in install commands should be sorted alphabetically | Style | Style | Enabled |
 | [newline-per-chained-call](./newline-per-chained-call.md) | Each chained element within an instruction should be on its own line | Style | Style | Enabled |

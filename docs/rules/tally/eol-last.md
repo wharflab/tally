@@ -1,0 +1,85 @@
+# tally/eol-last
+
+Enforces a newline at the end of non-empty files.
+
+| Property | Value |
+|----------|-------|
+| Severity | Style |
+| Category | Style |
+| Default | Enabled |
+| Auto-fix | Yes (safe) |
+
+## Description
+
+POSIX defines a line as a sequence of characters ending with a newline. Files that lack a trailing newline can cause issues with file concatenation,
+produce messy diffs in version control, and interfere with shell prompts when printed with `cat`. This rule enforces (or prohibits) a final newline in
+Dockerfiles, mirroring ESLint's [`eol-last`](https://eslint.style/rules/eol-last) rule.
+
+In the default `"always"` mode, the rule reports a violation when a non-empty file does not end with `\n`. In `"never"` mode, it reports when a file
+does end with `\n`.
+
+Empty files (zero bytes) are always ignored.
+
+## Examples
+
+### Bad (mode: "always")
+
+```dockerfile
+FROM alpine:3.20
+RUN apk --no-cache add ca-certificates
+ENTRYPOINT ["/app"]⌁
+```
+
+(where `⌁` marks the end of file with no trailing newline)
+
+### Good (mode: "always")
+
+```dockerfile
+FROM alpine:3.20
+RUN apk --no-cache add ca-certificates
+ENTRYPOINT ["/app"]
+```
+
+## Configuration
+
+Default (no config needed):
+
+```toml
+# Enabled by default with mode = "always"
+```
+
+Disable the rule:
+
+```toml
+[rules.tally.eol-last]
+severity = "off"
+```
+
+Require files to **not** end with a newline:
+
+```toml
+[rules.tally.eol-last]
+mode = "never"
+```
+
+## Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `mode` | string | `"always"` | `"always"` requires a final newline; `"never"` prohibits it |
+
+## Auto-fix
+
+This rule provides a safe auto-fix:
+
+```bash
+tally lint --fix Dockerfile
+```
+
+- In `"always"` mode, a missing final newline is appended.
+- In `"never"` mode, the trailing newline is removed.
+
+## Related Rules
+
+- [`tally/no-multiple-empty-lines`](./no-multiple-empty-lines.md) — controls excess blank lines at the end (and beginning) of files
+- [`tally/no-trailing-spaces`](./no-trailing-spaces.md) — removes trailing whitespace on individual lines

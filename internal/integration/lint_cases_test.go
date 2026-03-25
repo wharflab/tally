@@ -934,6 +934,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// EOL last tests (isolated to eol-last rule)
+		{
+			name:     "eol-last",
+			dir:      "eol-last",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/eol-last")...),
+			wantExit: 1,
+		},
+
 		// Epilogue order tests (isolated to epilogue-order rule)
 		{
 			name:     "epilogue-order",

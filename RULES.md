@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 31 | - | 31 |
+| tally | 32 | - | 32 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -57,6 +57,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/no-multi-spaces`](docs/rules/tally/no-multi-spaces.md) 🔧 | Disallows multiple consecutive spaces within instructions | Style | Style | Enabled |
 | [`tally/no-multiple-empty-lines`](docs/rules/tally/no-multiple-empty-lines.md) 🔧 | Disallows multiple consecutive empty lines | Style | Style | Enabled |
 | [`tally/no-trailing-spaces`](docs/rules/tally/no-trailing-spaces.md) 🔧 | Disallows trailing whitespace at the end of lines | Style | Style | Enabled |
+| [`tally/eol-last`](docs/rules/tally/eol-last.md) 🔧 | Enforces a newline at the end of non-empty files | Style | Style | Enabled |
 | [`tally/epilogue-order`](docs/rules/tally/epilogue-order.md) 🔧 | Enforces canonical order for epilogue instructions (STOPSIGNAL, HEALTHCHECK, ENTRYPOINT, CMD) | Style | Style | Enabled |
 | [`tally/sort-packages`](docs/rules/tally/sort-packages.md) 🔧 | Package lists in install commands should be sorted alphabetically | Style | Style | Enabled |
 | [`tally/newline-per-chained-call`](docs/rules/tally/newline-per-chained-call.md) 🔧 | Each chained element within an instruction should be on its own line | Style | Style | Enabled |
