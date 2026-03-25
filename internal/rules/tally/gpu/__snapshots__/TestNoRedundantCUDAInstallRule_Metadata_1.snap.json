@@ -1,0 +1,10 @@
+{
+ "Category": "correctness",
+ "Code": "tally/gpu/no-redundant-cuda-install",
+ "DefaultSeverity": "warning",
+ "Description": "CUDA packages are already provided by the nvidia/cuda base image",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/gpu/no-redundant-cuda-install/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "No redundant CUDA install"
+}
