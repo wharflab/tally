@@ -114,6 +114,39 @@ func TestEolLastCheck(t *testing.T) {
 			WantViolations: 1,
 			WantMessages:   []string{"file must not end with a newline"},
 		},
+
+		// === CRLF line endings ===
+		{
+			Name:           "always - CRLF file ends with newline",
+			Content:        "FROM alpine:3.20\r\nRUN echo hello\r\n",
+			WantViolations: 0,
+		},
+		{
+			Name:           "always - CRLF file missing final newline",
+			Content:        "FROM alpine:3.20\r\nRUN echo hello",
+			WantViolations: 1,
+			WantMessages:   []string{"file must end with a newline"},
+		},
+		{
+			Name:           "never - CRLF file with trailing newline",
+			Content:        "FROM alpine:3.20\r\nRUN echo hello\r\n",
+			Config:         EolLastConfig{Mode: &modeNever},
+			WantViolations: 1,
+			WantMessages:   []string{"file must not end with a newline"},
+		},
+		{
+			Name:           "never - CRLF file without trailing newline",
+			Content:        "FROM alpine:3.20\r\nRUN echo hello",
+			Config:         EolLastConfig{Mode: &modeNever},
+			WantViolations: 0,
+		},
+		{
+			Name:           "never - CRLF file with multiple trailing newlines",
+			Content:        "FROM alpine:3.20\r\n\r\n\r\n",
+			Config:         EolLastConfig{Mode: &modeNever},
+			WantViolations: 1,
+			WantMessages:   []string{"file must not end with a newline"},
+		},
 	})
 }
 
