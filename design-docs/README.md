@@ -339,7 +339,7 @@ fit, and explicit out-of-scope generic proposals
 
 ---
 
-### 33. [STOPSIGNAL Rules (`tally/stopsignal/*`)](33-stopsignal-rules.md)
+### 33. [STOPSIGNAL Rules (top-level `tally/*`)](33-stopsignal-rules.md)
 
 **Covers:** Evidence-backed proposal for STOPSIGNAL-specific lint rules, including daemon-aware
 signal mappings, PID 1 / wrapper caveats, and a phased rollout plan

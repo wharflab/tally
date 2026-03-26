@@ -1,9 +1,9 @@
-# 33. STOPSIGNAL Rules (`tally/stopsignal/*`)
+# 33. STOPSIGNAL Rules (top-level `tally/*`)
 
 **Status:** Proposed
 
 **Design Focus:** Turn `STOPSIGNAL` from obscure daemon folklore into a small set of high-confidence
-`tally/stopsignal/*` rules grounded in real-world Dockerfile usage, official daemon shutdown
+top-level `tally/*` rules grounded in real-world Dockerfile usage, official daemon shutdown
 guidance, and PID 1 signal-delivery realities.
 
 ---
@@ -25,8 +25,24 @@ proposed `tally/windows/no-stopsignal` rule in
 - Do **not** make `STOPSIGNAL` mandatory for all containers.
 - Do **not** guess daemon-specific signals through opaque shell wrappers, init systems, or custom
   entrypoint scripts unless we can prove signal flow.
+- Do **not** introduce a dedicated `tally/stopsignal/*` namespace.
 - Do **not** add blanket rules for daemons where default `SIGTERM` is already graceful enough
   (`redis-server`, `gunicorn`, `uvicorn`, `mariadbd`, likely `mysqld`, etc.).
+
+## Namespace decision
+
+Keep these rules in the top-level `tally/*` namespace.
+
+A dedicated namespace only makes sense when users frequently want to disable or enable the whole
+family because it is unrelated to their workloads, as with:
+
+- `tally/windows/*` for teams that never build Windows containers,
+- `tally/powershell/*` for teams that never use PowerShell,
+- `tally/gpu/*` for teams that never build GPU images.
+
+`STOPSIGNAL` rules are different: they are generic Dockerfile runtime-correctness and
+best-practice checks that apply broadly across ordinary Linux container images. They should stay in
+the main `tally/*` namespace and use clear rule names rather than a dedicated sub-namespace.
 
 ## Research inputs
 
@@ -231,7 +247,7 @@ Every daemon-specific rule should require `Direct` or `TransparentWrapper`.
 
 ## Proposed rules
 
-### 1. `tally/stopsignal/no-ungraceful-signal`
+### 1. `tally/no-ungraceful-stopsignal`
 
 **Severity:** warning  
 **Category:** correctness
@@ -269,7 +285,7 @@ No blind auto-fix. Suggested replacement should be daemon-aware when possible:
 - systemd/init -> `SIGRTMIN+3`
 - otherwise likely `SIGTERM`
 
-### 2. `tally/stopsignal/prefer-canonical-signal`
+### 2. `tally/prefer-canonical-stopsignal`
 
 **Severity:** info  
 **Category:** style
@@ -308,7 +324,7 @@ Safe auto-fix when the token is recognized exactly:
 - add `SIG` prefix,
 - normalize `RTMIN+3` -> `SIGRTMIN+3`.
 
-### 3. `tally/stopsignal/no-shell-wrapper-pid1`
+### 3. `tally/no-shell-wrapper-for-stopsignal`
 
 **Severity:** warning  
 **Category:** correctness
@@ -342,7 +358,7 @@ No auto-fix. Suggest:
 - direct exec-form daemon launch, or
 - a transparent wrapper that ends in `exec "$@"`.
 
-### 4. `tally/stopsignal/prefer-systemd-sigrtmin-plus-3`
+### 4. `tally/prefer-systemd-sigrtmin-plus-3`
 
 **Severity:** warning  
 **Category:** correctness
@@ -385,9 +401,9 @@ Safe auto-fix to:
 STOPSIGNAL SIGRTMIN+3
 ```
 
-Also pair with `prefer-canonical-signal` so `RTMIN+3` normalizes to `SIGRTMIN+3`.
+Also pair with `prefer-canonical-stopsignal` so `RTMIN+3` normalizes to `SIGRTMIN+3`.
 
-### 5. `tally/stopsignal/prefer-nginx-sigquit`
+### 5. `tally/prefer-nginx-sigquit`
 
 **Severity:** info  
 **Category:** best-practice
@@ -424,7 +440,7 @@ Safe suggestion, and safe auto-fix only when PID 1 confidence is high:
 STOPSIGNAL SIGQUIT
 ```
 
-### 6. `tally/stopsignal/prefer-php-fpm-sigquit`
+### 6. `tally/prefer-php-fpm-sigquit`
 
 **Severity:** info  
 **Category:** best-practice
@@ -454,7 +470,7 @@ Safe suggestion, and safe auto-fix only when PID 1 is direct or transparently wr
 STOPSIGNAL SIGQUIT
 ```
 
-### 7. `tally/stopsignal/prefer-postgres-sigint`
+### 7. `tally/prefer-postgres-sigint`
 
 **Severity:** info  
 **Category:** best-practice
@@ -490,7 +506,7 @@ STOPSIGNAL SIGINT
 The diagnostic should also mention runtime stop timeout, because PostgreSQL often needs more than
 Docker's default 10 seconds.
 
-### 8. `tally/stopsignal/prefer-httpd-sigwinch`
+### 8. `tally/prefer-httpd-sigwinch`
 
 **Severity:** info  
 **Category:** best-practice
@@ -556,28 +572,28 @@ signal forwarding and sometimes rewrite signals. That is better handled as a lat
 
 ### Phase 1: generic correctness and hygiene
 
-1. `tally/stopsignal/no-ungraceful-signal`
-2. `tally/stopsignal/prefer-canonical-signal`
-3. `tally/stopsignal/no-shell-wrapper-pid1`
+1. `tally/no-ungraceful-stopsignal`
+2. `tally/prefer-canonical-stopsignal`
+3. `tally/no-shell-wrapper-for-stopsignal`
 
 These are broadly useful, low-risk, and immediately address common misunderstanding.
 
 ### Phase 2: strongest daemon-specific rules
 
-4. `tally/stopsignal/prefer-systemd-sigrtmin-plus-3`
-5. `tally/stopsignal/prefer-nginx-sigquit`
-6. `tally/stopsignal/prefer-php-fpm-sigquit`
-7. `tally/stopsignal/prefer-postgres-sigint`
+4. `tally/prefer-systemd-sigrtmin-plus-3`
+5. `tally/prefer-nginx-sigquit`
+6. `tally/prefer-php-fpm-sigquit`
+7. `tally/prefer-postgres-sigint`
 
 ### Phase 3: next daemon-specific rule
 
-8. `tally/stopsignal/prefer-httpd-sigwinch`
+8. `tally/prefer-httpd-sigwinch`
 
 The rule is good, but likely benefits from the same runtime-process helper used by the others.
 
 ## Future extensions
 
-- `tally/stopsignal/prefer-haproxy-sigusr1`
+- `tally/prefer-haproxy-sigusr1`
   - strong upstream and official-image evidence,
   - not common enough in the balanced corpus to include in phase 1.
 - transparent-wrapper inspection for copied entrypoint scripts
