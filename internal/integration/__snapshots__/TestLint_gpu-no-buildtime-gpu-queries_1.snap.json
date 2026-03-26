@@ -1,0 +1,57 @@
+{
+  "files": [
+    {
+      "file": "testdata/gpu-no-buildtime-gpu-queries/Dockerfile",
+      "violations": [
+        {
+          "detail": "GPU devices are not available during docker build. Commands like nvidia-smi and runtime framework checks like torch.cuda.is_available() will fail or return misleading results. Move these checks to runtime (CMD, ENTRYPOINT, or an initialization script).",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-buildtime-gpu-queries/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "testdata/gpu-no-buildtime-gpu-queries/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "GPU hardware query at build time will fail: nvidia-smi",
+          "rule": "tally/gpu/no-buildtime-gpu-queries",
+          "severity": "error",
+          "sourceCode": "RUN nvidia-smi \u0026\u0026 echo \"GPU available\""
+        },
+        {
+          "detail": "GPU devices are not available during docker build. Commands like nvidia-smi and runtime framework checks like torch.cuda.is_available() will fail or return misleading results. Move these checks to runtime (CMD, ENTRYPOINT, or an initialization script).",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-buildtime-gpu-queries/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 9
+            },
+            "file": "testdata/gpu-no-buildtime-gpu-queries/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 9
+            }
+          },
+          "message": "GPU hardware query at build time will fail: torch.cuda.is_available()",
+          "rule": "tally/gpu/no-buildtime-gpu-queries",
+          "severity": "error",
+          "sourceCode": "RUN python3 -c \"import torch; print(torch.cuda.is_available())\""
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 2,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 0
+  }
+}

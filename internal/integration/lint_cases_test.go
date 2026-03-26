@@ -273,6 +273,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// GPU: Build-time GPU hardware queries
+		{
+			name:     "gpu-no-buildtime-gpu-queries",
+			dir:      "gpu-no-buildtime-gpu-queries",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/gpu/no-buildtime-gpu-queries")...),
+			wantExit: 1,
+		},
+
 		// Shell-form RUN in scratch stage
 		{
 			name:     "shell-run-in-scratch",
