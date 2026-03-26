@@ -27,6 +27,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [gpu/no-container-runtime-in-image](./gpu/no-container-runtime-in-image.md) | NVIDIA container runtime packages belong on the host, not inside the image | Warning | Correctness | Enabled |
 | [gpu/no-hardcoded-visible-devices](./gpu/no-hardcoded-visible-devices.md) | GPU visibility is deployment policy; hardcoding it in the image reduces portability | Warning | Correctness | Enabled |
 | [gpu/no-redundant-cuda-install](./gpu/no-redundant-cuda-install.md) | CUDA packages are already provided by the nvidia/cuda base image | Warning | Correctness | Enabled |
+| [gpu/prefer-minimal-driver-capabilities](./gpu/prefer-minimal-driver-capabilities.md) | NVIDIA_DRIVER_CAPABILITIES=all exposes more driver surface than most workloads need | Info | Correctness | Enabled |
 | [windows/no-run-mounts](./windows/no-run-mounts.md) | `RUN --mount` flags are not supported on Windows containers | Error | Correctness | Enabled |
 | [prefer-run-heredoc](./prefer-run-heredoc.md) | Suggests using heredoc syntax for multi-command RUN | Style | Style | Off (experimental) |
 | [consistent-indentation](./consistent-indentation.md) | Enforces consistent indentation for build stages | Style | Style | Off (experimental) |

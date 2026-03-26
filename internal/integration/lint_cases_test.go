@@ -289,6 +289,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// GPU: Prefer minimal NVIDIA driver capabilities
+		{
+			name:     "gpu-prefer-minimal-driver-capabilities",
+			dir:      "gpu-prefer-minimal-driver-capabilities",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/gpu/prefer-minimal-driver-capabilities")...),
+			wantExit: 1,
+		},
+
 		// Shell-form RUN in scratch stage
 		{
 			name:     "shell-run-in-scratch",

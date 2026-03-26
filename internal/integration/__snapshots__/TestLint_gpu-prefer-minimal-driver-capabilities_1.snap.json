@@ -1,0 +1,142 @@
+{
+  "files": [
+    {
+      "file": "testdata/gpu-prefer-minimal-driver-capabilities/Dockerfile",
+      "violations": [
+        {
+          "detail": "The 'all' capability set mounts every NVIDIA driver library and binary. Most ML and CUDA workloads only need 'compute,utility'. A smaller set follows the principle of least privilege and avoids potential compatibility issues. Set NVIDIA_DRIVER_CAPABILITIES=compute,utility unless your workload needs graphics, video, or display capabilities.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/prefer-minimal-driver-capabilities/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "testdata/gpu-prefer-minimal-driver-capabilities/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "NVIDIA_DRIVER_CAPABILITIES=all exposes more driver libraries than most workloads need",
+          "rule": "tally/gpu/prefer-minimal-driver-capabilities",
+          "severity": "info",
+          "sourceCode": "ENV NVIDIA_DRIVER_CAPABILITIES=all",
+          "suggestedFix": {
+            "description": "Replace NVIDIA_DRIVER_CAPABILITIES=all with compute,utility",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 6
+                  },
+                  "file": "testdata/gpu-prefer-minimal-driver-capabilities/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 5
+                  }
+                },
+                "newText": "ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "The 'all' capability set mounts every NVIDIA driver library and binary. Most ML and CUDA workloads only need 'compute,utility'. A smaller set follows the principle of least privilege and avoids potential compatibility issues. Set NVIDIA_DRIVER_CAPABILITIES=compute,utility unless your workload needs graphics, video, or display capabilities.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/prefer-minimal-driver-capabilities/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 15
+            },
+            "file": "testdata/gpu-prefer-minimal-driver-capabilities/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 15
+            }
+          },
+          "message": "NVIDIA_DRIVER_CAPABILITIES=all exposes more driver libraries than most workloads need",
+          "rule": "tally/gpu/prefer-minimal-driver-capabilities",
+          "severity": "info",
+          "sourceCode": "ENV NVIDIA_DRIVER_CAPABILITIES=all",
+          "suggestedFix": {
+            "description": "Replace NVIDIA_DRIVER_CAPABILITIES=all with compute,utility",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 16
+                  },
+                  "file": "testdata/gpu-prefer-minimal-driver-capabilities/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 15
+                  }
+                },
+                "newText": "ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "The 'all' capability set mounts every NVIDIA driver library and binary. Most ML and CUDA workloads only need 'compute,utility'. A smaller set follows the principle of least privilege and avoids potential compatibility issues. Set NVIDIA_DRIVER_CAPABILITIES=compute,utility unless your workload needs graphics, video, or display capabilities.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/prefer-minimal-driver-capabilities/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 26
+            },
+            "file": "testdata/gpu-prefer-minimal-driver-capabilities/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 26
+            }
+          },
+          "message": "NVIDIA_DRIVER_CAPABILITIES=all exposes more driver libraries than most workloads need",
+          "rule": "tally/gpu/prefer-minimal-driver-capabilities",
+          "severity": "info",
+          "sourceCode": "ENV NVIDIA_DRIVER_CAPABILITIES=all CUDA_HOME=/usr/local/cuda",
+          "suggestedFix": {
+            "description": "Replace NVIDIA_DRIVER_CAPABILITIES=all with compute,utility",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 27
+                  },
+                  "file": "testdata/gpu-prefer-minimal-driver-capabilities/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 26
+                  }
+                },
+                "newText": "ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility CUDA_HOME=/usr/local/cuda\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 3,
+    "style": 0,
+    "total": 3,
+    "warnings": 0
+  }
+}
