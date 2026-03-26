@@ -50,14 +50,14 @@ jobs:
           # Force generated code to 100% coverage to avoid skewing project totals.
           bash scripts/filter-go-coverprofile.sh coverage-merged.out coverage.filtered.out
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           use_oidc: true
           files: coverage.filtered.out
           fail_ci_if_error: true
       - name: Upload test results to Codecov
         if: ${{ !cancelled() }}
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           report_type: test_results
           use_oidc: true
