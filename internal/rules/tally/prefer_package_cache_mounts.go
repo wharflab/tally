@@ -1035,48 +1035,9 @@ func consumeEnvRemovalEdits(file string, cleaners map[cleanupKind]bool, entries 
 	return edits, remaining
 }
 
-// buildEnvKeyRemovalEdit constructs a TextEdit to remove specific keys from one ENV instruction.
-// All keys removed → delete entire line. Some remaining → reconstruct with fmt.Sprintf("%s=%q", ...).
+// buildEnvKeyRemovalEdit delegates to the shared rules.BuildEnvKeyRemovalEdit helper.
 func buildEnvKeyRemovalEdit(file string, env *instructions.EnvCommand, keysToRemove []string) *rules.TextEdit {
-	envLoc := env.Location()
-	if len(envLoc) == 0 {
-		return nil
-	}
-
-	removeSet := make(map[string]bool, len(keysToRemove))
-	for _, k := range keysToRemove {
-		removeSet[k] = true
-	}
-
-	startLine := envLoc[0].Start.Line
-	startCol := envLoc[0].Start.Character
-
-	// Count remaining variables after removal.
-	parts := make([]string, 0, len(env.Env))
-	for _, kv := range env.Env {
-		if removeSet[kv.Key] {
-			continue
-		}
-		parts = append(parts, kv.String())
-	}
-
-	if len(parts) == 0 {
-		// Remove the entire instruction including its trailing newline.
-		endLine := envLoc[len(envLoc)-1].End.Line
-		return &rules.TextEdit{
-			Location: rules.NewRangeLocation(file, startLine, startCol, endLine+1, 0),
-			NewText:  "",
-		}
-	}
-
-	// Multi-variable ENV: reconstruct without the removed keys.
-	endLine := envLoc[len(envLoc)-1].End.Line
-	endCol := envLoc[len(envLoc)-1].End.Character
-
-	return &rules.TextEdit{
-		Location: rules.NewRangeLocation(file, startLine, startCol, endLine, endCol),
-		NewText:  "ENV " + strings.Join(parts, " "),
-	}
+	return rules.BuildEnvKeyRemovalEdit(file, env, keysToRemove)
 }
 
 // resolveCachePathOverrides updates overrides if the ENV instruction sets any cache-location variables.
