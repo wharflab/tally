@@ -179,5 +179,38 @@ RUN python3 -c "import torch; print(torch.cuda.current_device())"
 			WantViolations: 1,
 			WantMessages:   []string{"torch.cuda.current_device()"},
 		},
+		{
+			Name: "echo torch.cuda no false positive",
+			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN echo "torch.cuda.is_available() should be checked at runtime"
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "comment in heredoc no false positive",
+			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN <<EOF
+# torch.cuda.is_available() is not available at build time
+echo "setting up environment"
+EOF
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "uv run with torch.cuda check",
+			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN uv run python -c "import torch; print(torch.cuda.is_available())"
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"torch.cuda.is_available()"},
+		},
+		{
+			Name: "uv run script with torch.cuda check",
+			Content: `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN uv run --script check_gpu.py && echo "torch.cuda.is_available()"
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"torch.cuda.is_available()"},
+		},
 	})
 }

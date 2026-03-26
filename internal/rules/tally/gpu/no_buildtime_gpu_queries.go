@@ -126,12 +126,16 @@ func (r *NoBuildtimeGPUQueriesRule) checkRun(
 		}
 	}
 
-	// Check for Python/TensorFlow GPU runtime query patterns via substring matching.
-	for _, p := range gpuQueryPatterns {
-		if strings.Contains(script, p.pattern) {
-			if !seen[p.label] {
-				seen[p.label] = true
-				matched = append(matched, p.label)
+	// Check framework GPU query patterns only when a Python-capable executor
+	// is invoked. This avoids false positives from echo, comments, or docs
+	// that mention torch.cuda.is_available() without actually running it.
+	if scriptInvokesPython(script, variant) {
+		for _, p := range gpuQueryPatterns {
+			if strings.Contains(script, p.pattern) {
+				if !seen[p.label] {
+					seen[p.label] = true
+					matched = append(matched, p.label)
+				}
 			}
 		}
 	}
@@ -160,6 +164,27 @@ func (r *NoBuildtimeGPUQueriesRule) checkRun(
 		WithDetail(detail)
 	v.StageIndex = stageIdx
 	return v, true
+}
+
+// pythonExecutors are commands that can execute Python code (directly,
+// via inline -c, heredoc, or script file).
+var pythonExecutors = []string{
+	"python",
+	"python3",
+	"python2",
+	"uv",
+}
+
+// scriptInvokesPython returns true if the shell script invokes a Python-capable
+// executor, meaning any torch.cuda / tf patterns found in the script text are
+// likely to be executed rather than echoed or commented.
+func scriptInvokesPython(script string, variant shell.Variant) bool {
+	for _, exe := range pythonExecutors {
+		if shell.ContainsCommandWithVariant(script, exe, variant) {
+			return true
+		}
+	}
+	return false
 }
 
 func init() {
