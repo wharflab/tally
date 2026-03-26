@@ -149,6 +149,22 @@ ENV NVIDIA_DRIVER_CAPABILITIES=all
 `,
 			WantViolations: 2,
 		},
+		{
+			Name: "overridden all then compute,utility no fire",
+			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+ENV NVIDIA_DRIVER_CAPABILITIES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "overridden compute,utility then all fires",
+			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+ENV NVIDIA_DRIVER_CAPABILITIES=all
+`,
+			WantViolations: 1,
+		},
 	})
 }
 
@@ -301,6 +317,14 @@ ENV NVIDIA_DRIVER_CAPABILITIES=$CAPS
 ENV NVIDIA_DRIVER_CAPABILITIES=all CUDA_HOME=/usr/local/cuda
 `,
 			wantViolations: 1,
+		},
+		{
+			name: "overridden all then compute,utility no fire without facts",
+			content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+ENV NVIDIA_DRIVER_CAPABILITIES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+`,
+			wantViolations: 0,
 		},
 	}
 

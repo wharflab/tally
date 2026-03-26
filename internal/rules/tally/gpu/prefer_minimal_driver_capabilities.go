@@ -84,6 +84,9 @@ func (r *PreferMinimalDriverCapabilitiesRule) checkFallback(
 	var violations []rules.Violation
 
 	for stageIdx, stage := range input.Stages {
+		// Track only the last binding per stage so the fallback matches the
+		// facts-path behavior (EffectiveEnv keeps the last assignment).
+		var lastBinding *facts.EnvBinding
 		for _, cmd := range stage.Commands {
 			env, ok := cmd.(*instructions.EnvCommand)
 			if !ok {
@@ -94,15 +97,17 @@ func (r *PreferMinimalDriverCapabilitiesRule) checkFallback(
 					continue
 				}
 				value := facts.Unquote(kv.Value)
-				if !isDriverCapabilitiesAll(value) {
-					continue
-				}
-
-				binding := facts.EnvBinding{Key: kv.Key, Value: value, Command: env}
-				if v, ok := r.buildViolation(input.File, stageIdx, binding, meta); ok {
-					violations = append(violations, v)
-				}
+				b := facts.EnvBinding{Key: kv.Key, Value: value, Command: env}
+				lastBinding = &b
 			}
+		}
+
+		if lastBinding == nil || !isDriverCapabilitiesAll(lastBinding.Value) {
+			continue
+		}
+
+		if v, ok := r.buildViolation(input.File, stageIdx, *lastBinding, meta); ok {
+			violations = append(violations, v)
 		}
 	}
 	return violations
