@@ -141,6 +141,9 @@ func (r *NoBuildtimeGPUQueriesRule) checkRun(
 	}
 
 	loc := rules.NewLocationFromRanges(file, run.Location())
+	// Guard against RUN instructions with missing or degenerate source ranges
+	// (e.g. synthesized nodes); NewLocationFromRanges returns a file-level
+	// location when no usable range is available.
 	if loc.IsFileLevel() {
 		return rules.Violation{}, false
 	}
