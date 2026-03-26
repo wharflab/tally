@@ -11,6 +11,10 @@ import (
 // other keys in a multi-key ENV are preserved. Returns nil if the instruction has no location
 // or the key is not found.
 func BuildEnvValueReplacementEdit(file string, env *instructions.EnvCommand, key, newValue string) *TextEdit {
+	if env == nil {
+		return nil
+	}
+
 	envLoc := env.Location()
 	if len(envLoc) == 0 {
 		return nil
@@ -45,6 +49,10 @@ func BuildEnvValueReplacementEdit(file string, env *instructions.EnvCommand, key
 // When all keys are removed, the entire instruction line is deleted. When some keys remain,
 // the instruction is reconstructed without the removed keys.
 func BuildEnvKeyRemovalEdit(file string, env *instructions.EnvCommand, keysToRemove []string) *TextEdit {
+	if env == nil {
+		return nil
+	}
+
 	envLoc := env.Location()
 	if len(envLoc) == 0 {
 		return nil
