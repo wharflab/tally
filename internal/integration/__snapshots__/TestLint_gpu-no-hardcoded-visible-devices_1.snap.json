@@ -1,0 +1,222 @@
+{
+  "files": [
+    {
+      "file": "testdata/gpu-no-hardcoded-visible-devices/Dockerfile",
+      "violations": [
+        {
+          "detail": "The nvidia/cuda base image already sets NVIDIA_VISIBLE_DEVICES=all. This ENV instruction is redundant and can be safely removed.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-hardcoded-visible-devices/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "testdata/gpu-no-hardcoded-visible-devices/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "redundant NVIDIA_VISIBLE_DEVICES=all on nvidia/cuda base image",
+          "rule": "tally/gpu/no-hardcoded-visible-devices",
+          "severity": "warning",
+          "sourceCode": "ENV NVIDIA_VISIBLE_DEVICES=all",
+          "suggestedFix": {
+            "description": "Remove redundant NVIDIA_VISIBLE_DEVICES=all (already set by nvidia/cuda base image)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 6
+                  },
+                  "file": "testdata/gpu-no-hardcoded-visible-devices/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 5
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 8
+          }
+        },
+        {
+          "detail": "GPU device visibility is deployment policy. Hardcoding device indices makes the image non-portable across hosts with different GPU topologies. Set GPU visibility at runtime via docker run --gpus or orchestrator configuration.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-hardcoded-visible-devices/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 9
+            },
+            "file": "testdata/gpu-no-hardcoded-visible-devices/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 9
+            }
+          },
+          "message": "hardcoded GPU device index in NVIDIA_VISIBLE_DEVICES=0,1",
+          "rule": "tally/gpu/no-hardcoded-visible-devices",
+          "severity": "warning",
+          "sourceCode": "ENV NVIDIA_VISIBLE_DEVICES=0,1",
+          "suggestedFix": {
+            "description": "Remove hardcoded NVIDIA_VISIBLE_DEVICES (set GPU visibility at runtime instead)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 10
+                  },
+                  "file": "testdata/gpu-no-hardcoded-visible-devices/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 9
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "GPU device visibility is deployment policy. Hardcoding device indices makes the image non-portable across hosts with different GPU topologies. Set GPU visibility at runtime via docker run --gpus or orchestrator configuration.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-hardcoded-visible-devices/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 13
+            },
+            "file": "testdata/gpu-no-hardcoded-visible-devices/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 13
+            }
+          },
+          "message": "hardcoded GPU device index in CUDA_VISIBLE_DEVICES=0",
+          "rule": "tally/gpu/no-hardcoded-visible-devices",
+          "severity": "warning",
+          "sourceCode": "ENV CUDA_VISIBLE_DEVICES=0",
+          "suggestedFix": {
+            "description": "Remove hardcoded CUDA_VISIBLE_DEVICES (set GPU visibility at runtime instead)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 14
+                  },
+                  "file": "testdata/gpu-no-hardcoded-visible-devices/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 13
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "GPU UUIDs are host-specific hardware identifiers. Hardcoding them makes the image non-portable. Set GPU visibility at runtime.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-hardcoded-visible-devices/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 17
+            },
+            "file": "testdata/gpu-no-hardcoded-visible-devices/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 17
+            }
+          },
+          "message": "hardcoded GPU UUID in NVIDIA_VISIBLE_DEVICES=GPU-aaaa-bbbb-cccc-dddd-eeee-ffffffff...",
+          "rule": "tally/gpu/no-hardcoded-visible-devices",
+          "severity": "warning",
+          "sourceCode": "ENV NVIDIA_VISIBLE_DEVICES=GPU-aaaa-bbbb-cccc-dddd-eeee-ffffffffffff",
+          "suggestedFix": {
+            "description": "Remove hardcoded NVIDIA_VISIBLE_DEVICES (set GPU visibility at runtime instead)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 18
+                  },
+                  "file": "testdata/gpu-no-hardcoded-visible-devices/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 17
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "The nvidia/cuda base image already sets NVIDIA_VISIBLE_DEVICES=all. This ENV instruction is redundant and can be safely removed.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-hardcoded-visible-devices/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 34
+            },
+            "file": "testdata/gpu-no-hardcoded-visible-devices/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 34
+            }
+          },
+          "message": "redundant NVIDIA_VISIBLE_DEVICES=all on nvidia/cuda base image",
+          "rule": "tally/gpu/no-hardcoded-visible-devices",
+          "severity": "warning",
+          "sourceCode": "ENV NVIDIA_VISIBLE_DEVICES=all CUDA_HOME=/usr/local/cuda",
+          "suggestedFix": {
+            "description": "Remove redundant NVIDIA_VISIBLE_DEVICES=all (already set by nvidia/cuda base image)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 35
+                  },
+                  "file": "testdata/gpu-no-hardcoded-visible-devices/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 34
+                  }
+                },
+                "newText": "ENV CUDA_HOME=/usr/local/cuda\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 8
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 5,
+    "warnings": 5
+  }
+}

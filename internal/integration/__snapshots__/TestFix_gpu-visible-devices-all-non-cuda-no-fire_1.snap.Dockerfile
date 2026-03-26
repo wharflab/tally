@@ -1,0 +1,3 @@
+FROM ubuntu:22.04
+ENV NVIDIA_VISIBLE_DEVICES=all
+RUN echo hello

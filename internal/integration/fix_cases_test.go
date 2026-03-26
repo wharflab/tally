@@ -1463,5 +1463,42 @@ severity = "warning"
 			},
 			wantApplied: 1,
 		},
+
+		// GPU: no-hardcoded-visible-devices FixSafe (redundant all on nvidia/cuda)
+		{
+			name:  "gpu-visible-devices-redundant-all",
+			input: "FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04\nENV NVIDIA_VISIBLE_DEVICES=all\nRUN echo hello\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/gpu/no-hardcoded-visible-devices")...),
+			wantApplied: 1,
+		},
+		// GPU: no-hardcoded-visible-devices FixSuggestion (hardcoded index, requires --fix-unsafe)
+		{
+			name:  "gpu-visible-devices-hardcoded-index",
+			input: "FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04\nENV NVIDIA_VISIBLE_DEVICES=0\nRUN echo hello\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/gpu/no-hardcoded-visible-devices")...),
+			wantApplied: 1,
+		},
+		// GPU: no-hardcoded-visible-devices FixSafe multi-key partial removal
+		{
+			name:  "gpu-visible-devices-multi-key-partial",
+			input: "FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04\nENV NVIDIA_VISIBLE_DEVICES=all CUDA_HOME=/usr/local/cuda\nRUN echo hello\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/gpu/no-hardcoded-visible-devices")...),
+			wantApplied: 1,
+		},
+		// GPU: no-hardcoded-visible-devices no-fire (all on non-CUDA base)
+		{
+			name:  "gpu-visible-devices-all-non-cuda-no-fire",
+			input: "FROM ubuntu:22.04\nENV NVIDIA_VISIBLE_DEVICES=all\nRUN echo hello\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/gpu/no-hardcoded-visible-devices")...),
+			wantApplied: 0,
+		},
 	}
 }

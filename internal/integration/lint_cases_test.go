@@ -281,6 +281,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// GPU: Hardcoded GPU visible devices in ENV
+		{
+			name:     "gpu-no-hardcoded-visible-devices",
+			dir:      "gpu-no-hardcoded-visible-devices",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/gpu/no-hardcoded-visible-devices")...),
+			wantExit: 1,
+		},
+
 		// Shell-form RUN in scratch stage
 		{
 			name:     "shell-run-in-scratch",

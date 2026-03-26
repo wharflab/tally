@@ -1,0 +1,10 @@
+{
+ "Category": "correctness",
+ "Code": "tally/gpu/no-hardcoded-visible-devices",
+ "DefaultSeverity": "warning",
+ "Description": "GPU visibility is deployment policy; hardcoding it in the image reduces portability",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/gpu/no-hardcoded-visible-devices/",
+ "FixPriority": 8,
+ "IsExperimental": false,
+ "Name": "No hardcoded GPU visible devices"
+}
