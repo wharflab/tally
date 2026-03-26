@@ -72,7 +72,7 @@ jobs:
           # Force generated code to 100% coverage to avoid skewing project totals.
           bash scripts/filter-go-coverprofile.sh coverage-vscode-smoke.txt coverage-vscode-smoke.filtered.txt
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           use_oidc: true
           files: coverage-vscode-smoke.filtered.txt
