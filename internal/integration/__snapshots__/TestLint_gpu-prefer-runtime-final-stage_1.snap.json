@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "testdata/gpu-prefer-runtime-final-stage/Dockerfile",
+      "violations": [
+        {
+          "detail": "The nvidia/cuda devel variant includes nvcc, development headers, and static libraries that add gigabytes to the final image. If this stage only runs pre-built binaries or Python packages, switch to a runtime or base variant (e.g. nvidia/cuda:12.x.y-runtime-ubuntu22.04). This stage copies artifacts from a builder stage, which is a strong signal that it serves as a runtime image.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/prefer-runtime-final-stage/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 8
+            },
+            "file": "testdata/gpu-prefer-runtime-final-stage/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 8
+            }
+          },
+          "message": "Final stage uses an NVIDIA devel image without clear build-time needs; prefer a runtime image for the shipped stage and keep devel in builder stages",
+          "rule": "tally/gpu/prefer-runtime-final-stage",
+          "severity": "warning",
+          "sourceCode": "FROM nvidia/cuda:12.2.0-devel-ubuntu22.04"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}
