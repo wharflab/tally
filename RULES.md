@@ -47,7 +47,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/prefer-add-unpack`](docs/rules/tally/prefer-add-unpack.md) 🔧 | Suggests `ADD --unpack` instead of downloading and extracting remote archives in `RUN` | Info | Performance | Enabled |
 | [`tally/prefer-multi-stage-build`](docs/rules/tally/prefer-multi-stage-build.md) 🔧 | Suggests converting single-stage builds into multi-stage builds to reduce final image size | Info | Performance | Off (experimental) |
 | [`tally/prefer-copy-chmod`](docs/rules/tally/prefer-copy-chmod.md) 🔧 | Prefer `COPY --chmod` over separate `COPY` + `RUN chmod` | Info | Style | Enabled |
-| [`tally/prefer-copy-heredoc`](docs/rules/tally/prefer-copy-heredoc.md) 🔧 | Suggests using COPY heredoc for file creation instead of RUN echo/cat | Info | Performance | Enabled |
+| [`tally/prefer-copy-heredoc`](docs/rules/tally/prefer-copy-heredoc.md) 🔧 | Suggests using COPY heredoc for file creation instead of RUN echo/cat/printf | Info | Performance | Enabled |
 | [`tally/prefer-package-cache-mounts`](docs/rules/tally/prefer-package-cache-mounts.md) 🔧 | Suggests BuildKit cache mounts for package install/build commands and removes cache cleanup commands | Info | Performance | Off (experimental) |
 | [`tally/powershell/prefer-shell-instruction`](docs/rules/tally/powershell/prefer-shell-instruction.md) 🔧 | Prefers a PowerShell `SHELL` instruction over repeated `pwsh` or `powershell -Command` wrappers in `RUN` | Style | Style | Enabled (experimental) |
 | [`tally/gpu/no-buildtime-gpu-queries`](docs/rules/tally/gpu/no-buildtime-gpu-queries.md) | GPU hardware queries in RUN will fail at build time | Error | Correctness | Enabled |
