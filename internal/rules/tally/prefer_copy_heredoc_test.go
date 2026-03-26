@@ -132,6 +132,20 @@ EOF
 			WantViolations: 1, // cat <<EOF > file should be converted to COPY <<EOF
 		},
 		{
+			Name: "printf with escape sequences to file",
+			Content: `FROM alpine
+RUN printf '#ifndef H\n#define H\n#endif\n' > /usr/include/h.h
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "printf with percent-s and newline escape to file",
+			Content: `FROM alpine
+RUN printf '%s\n' 'hello world' > /app/greeting.txt
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "disable single run check",
 			Content: `FROM alpine
 RUN echo "hello" > /app/config
@@ -311,6 +325,22 @@ RUN --mount=type=ssh git clone git@github.com:user/repo && echo "cloned" > /app/
 `,
 			wantHasFix:     true,
 			wantFixContain: "--mount=type=ssh",
+		},
+		{
+			name: "printf with escapes has fix with COPY",
+			content: `FROM alpine
+RUN printf '#ifndef H\n#define H\n#endif\n' > /usr/include/h.h
+`,
+			wantHasFix:     true,
+			wantFixContain: "COPY <<EOF /usr/include/h.h",
+		},
+		{
+			name: "printf with chmod has fix with --chmod",
+			content: `FROM alpine
+RUN printf '#!/bin/sh\nexec app\n' > /app/run.sh && chmod +x /app/run.sh
+`,
+			wantHasFix:     true,
+			wantFixContain: "--chmod=+x",
 		},
 		{
 			name: "chmod between writes preserved",

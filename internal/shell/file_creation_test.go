@@ -152,6 +152,32 @@ func TestDetectFileCreation(t *testing.T) {
 			wantUnsafe: true, // printf doesn't add newline, COPY heredoc does
 		},
 		{
+			name:     "printf with escape sequences ending in newline",
+			script:   `printf 'line1\nline2\n' > /app/file`,
+			variant:  VariantBash,
+			wantPath: "/app/file",
+		},
+		{
+			name:       "printf with escape sequences not ending in newline",
+			script:     `printf 'line1\nline2' > /app/file`,
+			variant:    VariantBash,
+			wantPath:   "/app/file",
+			wantUnsafe: true, // no trailing newline after processing
+		},
+		{
+			name:       "printf with unsupported escape sequence",
+			script:     `printf 'data\x41\n' > /app/file`,
+			variant:    VariantBash,
+			wantPath:   "/app/file",
+			wantUnsafe: true, // \x is unsupported
+		},
+		{
+			name:     "printf with percent-s and newline escape",
+			script:   `printf '%s\n' 'hello' > /app/file`,
+			variant:  VariantBash,
+			wantPath: "/app/file",
+		},
+		{
 			name:    "non-file-creation command",
 			script:  `apt-get update && apt-get install -y curl`,
 			variant: VariantBash,
@@ -724,6 +750,120 @@ func TestDetectFileCreationCatHeredoc(t *testing.T) {
 			}
 			if result.HasUnsafeVariables != tt.wantUnsafe {
 				t.Errorf("HasUnsafeVariables = %v, want %v", result.HasUnsafeVariables, tt.wantUnsafe)
+			}
+		})
+	}
+}
+
+func TestDetectFileCreationPrintfEscapes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		script      string
+		wantNil     bool
+		wantPath    string
+		wantContent string
+		wantUnsafe  bool
+	}{
+		{
+			name:        "printf with newline escapes",
+			script:      `printf '#ifndef H\n#define H\n#endif\n' > /usr/include/h.h`,
+			wantPath:    "/usr/include/h.h",
+			wantContent: "#ifndef H\n#define H\n#endif\n",
+		},
+		{
+			name:        "printf with tab and newline escapes",
+			script:      `printf 'key:\n\tvalue\n' > /app/config.yml`,
+			wantPath:    "/app/config.yml",
+			wantContent: "key:\n\tvalue\n",
+		},
+		{
+			name:        "printf with backslash escape",
+			script:      `printf 'back\\slash\n' > /app/file`,
+			wantPath:    "/app/file",
+			wantContent: "back\\slash\n",
+		},
+		{
+			name:        "printf percent-s with newline escape",
+			script:      `printf '%s\n' 'hello world' > /app/file`,
+			wantPath:    "/app/file",
+			wantContent: "hello world\n",
+		},
+		{
+			name:        "printf with literal percent via %%",
+			script:      `printf '100%% done\n' > /app/file`,
+			wantPath:    "/app/file",
+			wantContent: "100% done\n",
+		},
+		{
+			name:       "printf with unsupported octal escape",
+			script:     `printf '\101\n' > /app/file`,
+			wantPath:   "/app/file",
+			wantUnsafe: true,
+		},
+		{
+			name:       "printf with %d format specifier - unsupported",
+			script:     `printf '%d\n' 42 > /app/file`,
+			wantPath:   "/app/file",
+			wantUnsafe: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := DetectFileCreation(tt.script, VariantBash, nil)
+			if tt.wantNil {
+				if result != nil {
+					t.Errorf("expected nil, got %+v", result)
+				}
+				return
+			}
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
+			if result.TargetPath != tt.wantPath {
+				t.Errorf("TargetPath = %q, want %q", result.TargetPath, tt.wantPath)
+			}
+			if tt.wantContent != "" && result.Content != tt.wantContent {
+				t.Errorf("Content = %q, want %q", result.Content, tt.wantContent)
+			}
+			if result.HasUnsafeVariables != tt.wantUnsafe {
+				t.Errorf("HasUnsafeVariables = %v, want %v", result.HasUnsafeVariables, tt.wantUnsafe)
+			}
+		})
+	}
+}
+
+func TestProcessPrintfEscapes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		input  string
+		want   string
+		wantOk bool
+	}{
+		{"no escapes", "hello", "hello", true},
+		{"newline", `line1\nline2`, "line1\nline2", true},
+		{"tab", `col1\tcol2`, "col1\tcol2", true},
+		{"backslash", `path\\dir`, "path\\dir", true},
+		{"carriage return", `line\r\n`, "line\r\n", true},
+		{"multiple newlines", `a\nb\nc\n`, "a\nb\nc\n", true},
+		{"unsupported octal", `\101`, "", false},
+		{"unsupported hex", `\x41`, "", false},
+		{"trailing backslash", `hello\`, "", false},
+		{"empty string", "", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := processPrintfEscapes(tt.input)
+			if ok != tt.wantOk {
+				t.Errorf("processPrintfEscapes(%q) ok = %v, want %v", tt.input, ok, tt.wantOk)
+			}
+			if ok && got != tt.want {
+				t.Errorf("processPrintfEscapes(%q) = %q, want %q", tt.input, got, tt.want)
 			}
 		})
 	}

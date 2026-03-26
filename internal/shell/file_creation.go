@@ -969,50 +969,127 @@ func extractCatHeredocContent(redir *syntax.Redirect) (string, bool) {
 }
 
 // extractPrintfContent extracts content from a printf command.
-// Limited support - only handles simple "%s" or literal format strings.
+// Handles literal format strings with escape sequences (\n, \t, \\, \r)
+// and optional single %s format specifier.
 func extractPrintfContent(call *syntax.CallExpr, knownVars func(name string) bool) (string, bool) {
 	if len(call.Args) < 2 {
 		return "", false
 	}
 
-	// Get format string
-	format := call.Args[1].Lit()
-	if format == "" {
-		return "", true // Complex format - unsafe
-	}
-
-	// Very limited: only handle literal strings without format specifiers
-	if strings.Contains(format, "%") && format != "%s" {
+	// Extract format string content (use extractWordContent instead of Lit()
+	// because Lit() returns "" for single-quoted words in this parser version).
+	format, formatUnsafe := extractWordContent(call.Args[1], knownVars)
+	if formatUnsafe {
 		return "", true
 	}
+	if format == "" {
+		return "", true // empty format — no content
+	}
 
-	if format == "%s" && len(call.Args) >= 3 {
-		if len(call.Args) != 3 {
-			return "", true // extra args repeat format; unsafe
+	// Scan format string for specifiers.
+	// Allow: %s (single, string substitution) and %% (literal percent).
+	// Reject everything else (%d, %f, %x, etc.).
+	hasPercentS := false
+	for i := 0; i < len(format); i++ {
+		if format[i] != '%' {
+			continue
 		}
-		// Simple %s with argument
-		content, unsafe := extractWordContent(call.Args[2], knownVars)
-		// printf doesn't add trailing newline; mark unsafe unless content has one
-		if unsafe || !strings.HasSuffix(content, "\n") {
+		if i+1 >= len(format) {
+			return "", true // trailing %
+		}
+		switch format[i+1] {
+		case 's':
+			if hasPercentS {
+				return "", true // multiple %s — unsafe
+			}
+			hasPercentS = true
+			i++ // skip 's'
+		case '%':
+			i++ // skip second '%' — literal percent
+		default:
+			return "", true // unsupported format specifier
+		}
+	}
+
+	if hasPercentS {
+		if len(call.Args) != 3 {
+			return "", true // need exactly 1 argument for %s
+		}
+		argContent, unsafe := extractWordContent(call.Args[2], knownVars)
+		if unsafe {
 			return "", true
 		}
-		return content, false
+		// Process escape sequences in format
+		processed, ok := processPrintfEscapes(format)
+		if !ok {
+			return "", true
+		}
+		// Substitute: %s → argument, %% → %
+		processed = strings.Replace(processed, "%s", argContent, 1)
+		processed = strings.ReplaceAll(processed, "%%", "%")
+		if !strings.HasSuffix(processed, "\n") {
+			return "", true
+		}
+		return processed, false
 	}
 
-	// Literal string (escape sequences would need processing)
-	if strings.ContainsAny(format, "\\") {
-		return "", true // Has escape sequences - complex
-	}
+	// No %s format specifiers
 	if len(call.Args) != 2 {
 		return "", true // extra args repeat format; unsafe
 	}
 
-	// printf doesn't add trailing newline; mark unsafe unless content has one
-	if !strings.HasSuffix(format, "\n") {
+	// Process printf escape sequences (\n, \t, \\, \r)
+	processed, ok := processPrintfEscapes(format)
+	if !ok {
+		return "", true
+	}
+	// Handle %% → %
+	processed = strings.ReplaceAll(processed, "%%", "%")
+
+	// printf doesn't add trailing newline; COPY heredoc always ends with one
+	if !strings.HasSuffix(processed, "\n") {
 		return "", true
 	}
 
-	return format, false
+	return processed, false
+}
+
+// processPrintfEscapes interprets printf-style backslash escape sequences.
+// Handles: \n (newline), \t (tab), \\ (backslash), \r (carriage return).
+// Returns the processed string and true on success.
+// Returns ("", false) for unrecognized escape sequences (e.g., \0NNN, \xHH).
+func processPrintfEscapes(s string) (string, bool) {
+	if !strings.ContainsRune(s, '\\') {
+		return s, true // fast path: no escapes
+	}
+
+	var buf strings.Builder
+	buf.Grow(len(s))
+
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\\' {
+			buf.WriteByte(s[i])
+			continue
+		}
+		if i+1 >= len(s) {
+			return "", false // trailing backslash
+		}
+		switch s[i+1] {
+		case 'n':
+			buf.WriteByte('\n')
+		case 't':
+			buf.WriteByte('\t')
+		case '\\':
+			buf.WriteByte('\\')
+		case 'r':
+			buf.WriteByte('\r')
+		default:
+			return "", false // unsupported escape
+		}
+		i++ // skip the escaped character
+	}
+
+	return buf.String(), true
 }
 
 // ParseOctalMode parses an octal mode string (e.g., "755", "0755") to uint16.

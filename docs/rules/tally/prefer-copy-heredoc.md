@@ -25,11 +25,12 @@ It relies on Dockerfile [here-documents](https://docs.docker.com/reference/docke
 ## Detected Patterns
 
 1. **Simple file creation**: `echo "content" > /path/to/file`
-2. **File creation with chmod**: `echo "x" > /file && chmod 0755 /file`
-3. **BuildKit heredoc piped to cat**: `RUN <<EOF cat > /path/to/file`
-4. **BuildKit heredoc piped to tee**: `RUN <<EOF tee /path/to/file`
-5. **Consecutive RUN instructions** writing to the same file
-6. **Mixed commands** with file creation in the middle (extracts just the file creation)
+2. **printf with escape sequences**: `printf 'line1\nline2\n' > /path/to/file`
+3. **File creation with chmod**: `echo "x" > /file && chmod 0755 /file`
+4. **BuildKit heredoc piped to cat**: `RUN <<EOF cat > /path/to/file`
+5. **BuildKit heredoc piped to tee**: `RUN <<EOF tee /path/to/file`
+6. **Consecutive RUN instructions** writing to the same file
+7. **Mixed commands** with file creation in the middle (extracts just the file creation)
 
 ## Examples
 

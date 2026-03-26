@@ -528,6 +528,30 @@ severity = "error"
 			wantApplied: 1,
 		},
 
+		// prefer-copy-heredoc: printf with escape sequences → COPY heredoc
+		{
+			name:  "prefer-copy-heredoc-printf-escapes",
+			input: "FROM ubuntu:22.04\nRUN printf '#ifndef H\\n#define H\\nint f(void);\\n#endif\\n' > /usr/include/stub.h\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-copy-heredoc",
+			},
+			wantApplied: 1,
+		},
+
+		// prefer-copy-heredoc: printf with chmod → COPY heredoc with --chmod
+		{
+			name:  "prefer-copy-heredoc-printf-chmod",
+			input: "FROM ubuntu:22.04\nRUN printf '#!/bin/sh\\nexec app\\n' > /app/run.sh && chmod +x /app/run.sh\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-copy-heredoc",
+			},
+			wantApplied: 1,
+		},
+
 		// prefer-run-heredoc: 3 consecutive RUNs → heredoc RUN
 		{
 			name: "prefer-run-heredoc-consecutive",
