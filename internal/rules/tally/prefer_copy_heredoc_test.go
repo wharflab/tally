@@ -146,6 +146,13 @@ RUN printf '%s\n' 'hello world' > /app/greeting.txt
 			WantViolations: 1,
 		},
 		{
+			Name: "printf with literal percent to file",
+			Content: `FROM alpine
+RUN printf 'rate=100%%\n' > /app/status
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "disable single run check",
 			Content: `FROM alpine
 RUN echo "hello" > /app/config
@@ -343,6 +350,14 @@ RUN printf '#!/bin/sh\nexec app\n' > /app/run.sh && chmod +x /app/run.sh
 			wantFixContain: "--chmod=+x",
 		},
 		{
+			name: "printf literal percent has fix with correct content",
+			content: `FROM alpine
+RUN printf 'rate=100%%\n' > /app/status
+`,
+			wantHasFix:     true,
+			wantFixContain: "rate=100%",
+		},
+		{
 			name: "chmod between writes preserved",
 			content: `FROM alpine
 RUN echo "a" > /app/file
@@ -506,5 +521,31 @@ func TestChooseDelimiter(t *testing.T) {
 				t.Errorf("chooseDelimiter() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestPreferCopyHeredocRule_CrossRuleInteraction verifies that prefer-copy-heredoc
+// and prefer-run-heredoc do not both fire for printf file creation patterns.
+// prefer-copy-heredoc should handle these; prefer-run-heredoc should not.
+func TestPreferCopyHeredocRule_CrossRuleInteraction(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM alpine
+RUN printf '#!/bin/sh\nexec app\n' > /app/run.sh
+`
+	// prefer-copy-heredoc should detect the printf file creation
+	copyRule := NewPreferCopyHeredocRule()
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	copyViolations := copyRule.Check(input)
+	if len(copyViolations) != 1 {
+		t.Errorf("prefer-copy-heredoc: got %d violations, want 1", len(copyViolations))
+	}
+
+	// prefer-run-heredoc should NOT fire (single command, below min-commands threshold)
+	runRule := NewPreferHeredocRule()
+	runInput := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	runViolations := runRule.Check(runInput)
+	if len(runViolations) != 0 {
+		t.Errorf("prefer-run-heredoc: got %d violations, want 0 (should yield to prefer-copy-heredoc)", len(runViolations))
 	}
 }
