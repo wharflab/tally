@@ -90,6 +90,8 @@ func (r *PreferRuntimeFinalStageRule) Check(input rules.LintInput) []rules.Viola
 			if hasCompileSignalFacts(stageFacts) {
 				return nil
 			}
+		} else if hasCompileSignalFallback(lastStage) {
+			return nil
 		}
 	} else if hasCompileSignalFallback(lastStage) {
 		return nil
