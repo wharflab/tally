@@ -297,6 +297,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// GPU: Prefer runtime image for final stage
+		{
+			name:     "gpu-prefer-runtime-final-stage",
+			dir:      "gpu-prefer-runtime-final-stage",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/gpu/prefer-runtime-final-stage")...),
+			wantExit: 1,
+		},
+
 		// Shell-form RUN in scratch stage
 		{
 			name:     "shell-run-in-scratch",

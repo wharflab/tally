@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 37 | - | 37 |
+| tally | 38 | - | 38 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -55,6 +55,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/gpu/no-hardcoded-visible-devices`](docs/rules/tally/gpu/no-hardcoded-visible-devices.md) 🔧 | GPU visibility is deployment policy; hardcoding it in the image reduces portability | Warning | Correctness | Enabled |
 | [`tally/gpu/no-redundant-cuda-install`](docs/rules/tally/gpu/no-redundant-cuda-install.md) | CUDA packages are already provided by the nvidia/cuda base image | Warning | Correctness | Enabled |
 | [`tally/gpu/prefer-minimal-driver-capabilities`](docs/rules/tally/gpu/prefer-minimal-driver-capabilities.md) 🔧 | NVIDIA_DRIVER_CAPABILITIES=all exposes more driver surface than most workloads need | Info | Correctness | Enabled |
+| [`tally/gpu/prefer-runtime-final-stage`](docs/rules/tally/gpu/prefer-runtime-final-stage.md) | Final stage uses an NVIDIA devel image without clear build-time needs; prefer a runtime variant | Warning | Best Practices | Enabled |
 | [`tally/windows/no-run-mounts`](docs/rules/tally/windows/no-run-mounts.md) | `RUN --mount` flags are not supported on Windows containers and will fail at runtime | Error | Correctness | Enabled |
 | [`tally/prefer-run-heredoc`](docs/rules/tally/prefer-run-heredoc.md) 🔧 | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Off (experimental) |
 | [`tally/consistent-indentation`](docs/rules/tally/consistent-indentation.md) 🔧 | Enforces consistent indentation for Dockerfile build stages | Style | Style | Off (experimental) |

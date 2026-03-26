@@ -1,0 +1,10 @@
+{
+ "Category": "best-practices",
+ "Code": "tally/gpu/prefer-runtime-final-stage",
+ "DefaultSeverity": "warning",
+ "Description": "Final stage uses an NVIDIA devel image without clear build-time needs; prefer a runtime or base variant",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/gpu/prefer-runtime-final-stage/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Prefer runtime image for final stage"
+}
