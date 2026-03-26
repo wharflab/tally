@@ -1524,5 +1524,42 @@ severity = "warning"
 				mustSelectRules("tally/gpu/no-hardcoded-visible-devices")...),
 			wantApplied: 0,
 		},
+
+		// GPU: prefer-minimal-driver-capabilities FixSuggestion (requires --fix-unsafe)
+		{
+			name:  "gpu-driver-caps-all-suggestion",
+			input: "FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04\nENV NVIDIA_DRIVER_CAPABILITIES=all\nRUN echo hello\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/gpu/prefer-minimal-driver-capabilities")...),
+			wantApplied: 1,
+		},
+		// GPU: prefer-minimal-driver-capabilities not applied without --fix-unsafe
+		{
+			name:  "gpu-driver-caps-all-no-unsafe",
+			input: "FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04\nENV NVIDIA_DRIVER_CAPABILITIES=all\nRUN echo hello\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/gpu/prefer-minimal-driver-capabilities")...),
+			wantApplied: 0,
+		},
+		// GPU: prefer-minimal-driver-capabilities multi-key partial replacement
+		{
+			name:  "gpu-driver-caps-multi-key-replace",
+			input: "FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04\nENV NVIDIA_DRIVER_CAPABILITIES=all CUDA_HOME=/usr/local/cuda\nRUN echo hello\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/gpu/prefer-minimal-driver-capabilities")...),
+			wantApplied: 1,
+		},
+		// GPU: prefer-minimal-driver-capabilities no-fire (variable ref)
+		{
+			name:  "gpu-driver-caps-variable-no-fire",
+			input: "FROM ubuntu:22.04\nARG CAPS=all\nENV NVIDIA_DRIVER_CAPABILITIES=${CAPS}\nRUN echo hello\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/gpu/prefer-minimal-driver-capabilities")...),
+			wantApplied: 0,
+		},
 	}
 }
