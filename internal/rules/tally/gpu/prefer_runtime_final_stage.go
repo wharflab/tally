@@ -157,8 +157,8 @@ func hasCompileSignalFallback(stage instructions.Stage) bool {
 		script := strings.Join(run.CmdLine, " ")
 
 		// Check for compile commands.
-		for cmd := range compileSignalCommands {
-			if shell.ContainsCommand(script, cmd) {
+		for cmdName := range compileSignalCommands {
+			if shell.ContainsCommand(script, cmdName) {
 				return true
 			}
 		}
