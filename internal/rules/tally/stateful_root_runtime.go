@@ -98,7 +98,7 @@ func (r *StatefulRootRuntimeRule) Check(input rules.LintInput) []rules.Violation
 	default:
 		// No USER instruction — defaults to root unless the base image
 		// is known to default to a non-root user.
-		if isKnownNonRootBase(input.Semantic, finalIdx) {
+		if isKnownNonRootBase(input.Semantic, fileFacts, finalIdx) {
 			return nil
 		}
 		implicitRoot = true
@@ -272,7 +272,7 @@ func findMkdirStatePaths(script string) []string {
 // isKnownNonRootBase checks whether the final stage's base image is known to
 // default to a non-root user. This suppresses the rule when no explicit USER
 // instruction exists but the base image already runs as non-root.
-func isKnownNonRootBase(sem any, stageIdx int) bool {
+func isKnownNonRootBase(sem any, fileFacts *facts.FileFacts, stageIdx int) bool {
 	if sem == nil {
 		return false
 	}
@@ -301,18 +301,11 @@ func isKnownNonRootBase(sem any, stageIdx int) bool {
 		return true
 	}
 
-	// Stage inherits from a local stage — check the parent's effective USER.
-	// If the parent stage explicitly set a non-root user, this stage inherits it.
-	if info.BaseImage.IsStageRef && info.BaseImage.StageIndex >= 0 {
-		parentInfo := model.StageInfo(info.BaseImage.StageIndex)
-		if parentInfo != nil && parentInfo.Stage != nil {
-			var lastUser string
-			for _, cmd := range parentInfo.Stage.Commands {
-				if u, ok := cmd.(*instructions.UserCommand); ok {
-					lastUser = u.User
-				}
-			}
-			if lastUser != "" && !facts.IsRootUser(lastUser) {
+	// Stage inherits from a local stage — check the parent's effective USER
+	// via the already-computed StageFacts rather than re-walking commands.
+	if info.BaseImage.IsStageRef && info.BaseImage.StageIndex >= 0 && fileFacts != nil {
+		if parentFacts := fileFacts.Stage(info.BaseImage.StageIndex); parentFacts != nil {
+			if parentFacts.EffectiveUser != "" && !facts.IsRootUser(parentFacts.EffectiveUser) {
 				return true
 			}
 		}
