@@ -257,6 +257,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// Windows: STOPSIGNAL has no effect
+		{
+			name:     "windows-no-stopsignal",
+			dir:      "windows-no-stopsignal",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/windows/no-stopsignal")...),
+			wantExit: 1,
+		},
+
 		// GPU: NVIDIA container runtime packages inside image
 		{
 			name:     "gpu-no-container-runtime-in-image",

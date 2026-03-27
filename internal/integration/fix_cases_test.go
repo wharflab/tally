@@ -1598,5 +1598,24 @@ severity = "warning"
 				mustSelectRules("tally/no-ungraceful-stopsignal")...),
 			wantApplied: 0,
 		},
+
+		// Windows no-stopsignal: comment out STOPSIGNAL on Windows stage (FixSafe)
+		{
+			name:  "windows-no-stopsignal",
+			input: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\nSTOPSIGNAL SIGTERM\nCMD [\"cmd\", \"/C\", \"echo\", \"hi\"]\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/windows/no-stopsignal")...),
+			wantApplied: 1,
+		},
+		// Windows no-stopsignal: Linux stage STOPSIGNAL — no fix
+		{
+			name:  "windows-no-stopsignal-linux-no-fix",
+			input: "FROM alpine:3.20\nSTOPSIGNAL SIGTERM\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/windows/no-stopsignal")...),
+			wantApplied: 0,
+		},
 	}
 }
