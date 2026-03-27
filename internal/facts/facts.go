@@ -3,6 +3,7 @@ package facts
 import (
 	"maps"
 	"path"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -575,16 +576,15 @@ func IsRootUser(user string) bool {
 // not in the shared facts layer.
 var privilegeDropTools = []string{"gosu", "su-exec", "suexec", "setpriv"}
 
+// privilegeDropToolsRe matches any of the privilege-drop tool names as whole
+// words so that substrings like "gosuper" do not false-positive.
+var privilegeDropToolsRe = regexp.MustCompile(`\b(` + strings.Join(privilegeDropTools, "|") + `)\b`)
+
 // containsPrivilegeDropPattern checks whether a command line (from ENTRYPOINT
 // or CMD) references a known privilege-drop tool.
 func containsPrivilegeDropPattern(cmdLine []string) bool {
 	joined := strings.ToLower(strings.Join(cmdLine, " "))
-	for _, tool := range privilegeDropTools {
-		if strings.Contains(joined, tool) {
-			return true
-		}
-	}
-	return false
+	return privilegeDropToolsRe.MatchString(joined)
 }
 
 // Unquote strips a single layer of matching double or single quotes.
