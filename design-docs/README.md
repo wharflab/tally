@@ -375,6 +375,25 @@ Dockerfile corpus analysis
 
 ---
 
+### 35. [PHP Container Rules (`tally/php/*`)](35-php-container-rules.md)
+
+**Covers:** Corpus-backed proposal for PHP-specific Dockerfile rules around Composer, PHP extension builds, Xdebug, OPcache, and runtime-user
+patterns.
+
+**Key Topics:**
+
+- Balanced and app-heavy GitHub corpus analysis of PHP Dockerfiles/Containerfiles
+- PHP-specific rule candidates for Composer install flags, manifest bind mounts, extension-build cleanup, and runtime hardening
+- Alignment against Docker's PHP guide, Composer docs, Symfony deployment guidance, Laravel Sail, and the PHP OPcache manual
+- Interoperability notes with the broader USER-rule strategy from doc 34
+- Tracking follow-up work such as multi-fix LSP support for alternative IDE quick fixes
+- Appendix guidance for publishing Tally to Composer/Packagist via `codewithkyrian/platform-package-installer`
+
+**Based on:** Docker PHP guidance, Composer docs, Symfony docs, PHP manual, community PHP image guidance, and a curated GitHub PHP Dockerfile
+corpus analysis
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
