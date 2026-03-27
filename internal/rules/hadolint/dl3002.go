@@ -2,10 +2,7 @@
 package hadolint
 
 import (
-	"strings"
-
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 )
 
@@ -38,55 +35,40 @@ func (r *DL3002Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	// Only check the final stage - that's what actually runs in production
-	finalStage := input.Stages[len(input.Stages)-1]
+	finalIdx := len(input.Stages) - 1
 
-	// Find the last USER instruction in the final stage
-	var lastUser *instructions.UserCommand
-	for _, cmd := range finalStage.Commands {
-		if user, ok := cmd.(*instructions.UserCommand); ok {
-			lastUser = user
-		}
-	}
-
-	// If there's no USER instruction at all, we could warn (but hadolint doesn't by default).
-	// DL3002 specifically checks if the last USER is root.
-	if lastUser == nil {
+	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
+	if fileFacts == nil {
 		return nil
 	}
 
-	// Check if the user is root
-	if isRootUser(lastUser.User) {
-		loc := rules.NewLocationFromRanges(input.File, lastUser.Location())
-		return []rules.Violation{
-			rules.NewViolation(
-				loc,
-				r.Metadata().Code,
-				"last USER should not be root; use a non-privileged user for better security",
-				r.Metadata().DefaultSeverity,
-			).WithDocURL(r.Metadata().DocURL).WithDetail(
-				"Running containers as root increases the attack surface. " +
-					"Create a non-privileged user and switch to it with USER instruction. " +
-					"For example: RUN useradd -m appuser && USER appuser",
-			),
-		}
+	sf := fileFacts.Stage(finalIdx)
+	if sf == nil {
+		return nil
 	}
 
-	return nil
-}
-
-// isRootUser checks if a user specification refers to the root user.
-// The USER instruction can specify: username, uid, username:group, or uid:gid.
-func isRootUser(user string) bool {
-	// Strip group if present (user:group format)
-	if idx := strings.Index(user, ":"); idx != -1 {
-		user = user[:idx]
+	// DL3002 specifically checks if the last USER is explicitly root.
+	// If there's no USER instruction at all, hadolint does not warn.
+	if sf.EffectiveUser == "" || !facts.IsRootUser(sf.EffectiveUser) {
+		return nil
 	}
 
-	user = strings.TrimSpace(strings.ToLower(user))
+	// Use the last UserCommand for location.
+	lastUser := sf.UserCommands[len(sf.UserCommands)-1]
+	loc := rules.NewLocationFromRanges(input.File, lastUser.Location())
 
-	// root by name or UID 0
-	return user == "root" || user == "0"
+	return []rules.Violation{
+		rules.NewViolation(
+			loc,
+			r.Metadata().Code,
+			"last USER should not be root; use a non-privileged user for better security",
+			r.Metadata().DefaultSeverity,
+		).WithDocURL(r.Metadata().DocURL).WithDetail(
+			"Running containers as root increases the attack surface. " +
+				"Create a non-privileged user and switch to it with USER instruction. " +
+				"For example: RUN useradd -m appuser && USER appuser",
+		),
+	}
 }
 
 // init registers the rule with the default registry.

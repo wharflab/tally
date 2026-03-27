@@ -14,7 +14,7 @@ import (
 func TestFileFacts_BuildsRunFactsWithEnvShellAndCommands(t *testing.T) {
 	t.Parallel()
 
-	fileFacts := makeFileFacts(t, "Dockerfile", `# hadolint shell=bash
+	fileFacts := makeFileFacts(t, `# hadolint shell=bash
 FROM alpine:3.20
 ENV DEBIAN_FRONTEND=noninteractive npm_config_cache=.npm
 WORKDIR /app
@@ -98,7 +98,7 @@ func TestShellDirectivesFromDirective(t *testing.T) {
 func TestFileFacts_PowerShellErrorModeIsTrackedPerRun(t *testing.T) {
 	t.Parallel()
 
-	fileFacts := makeFileFacts(t, "Dockerfile", `FROM mcr.microsoft.com/powershell:nanoserver-ltsc2022
+	fileFacts := makeFileFacts(t, `FROM mcr.microsoft.com/powershell:nanoserver-ltsc2022
 SHELL ["powershell","-Command","Write-Host hi"]
 RUN npm install left-pad
 SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; Write-Host hi"]
@@ -126,7 +126,7 @@ RUN npm install lodash
 func TestFileFacts_CacheDisablingEnvTracksAllBindingsForSameKey(t *testing.T) {
 	t.Parallel()
 
-	fileFacts := makeFileFacts(t, "Dockerfile", `FROM python:3.13
+	fileFacts := makeFileFacts(t, `FROM python:3.13
 ENV PIP_NO_CACHE_DIR=1
 ENV PIP_NO_CACHE_DIR=1
 RUN pip install -r requirements.txt
@@ -149,8 +149,304 @@ RUN pip install -r requirements.txt
 	}
 }
 
-func makeFileFacts(t *testing.T, file, content string) *FileFacts {
+func TestIsRootUser(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		user string
+		want bool
+	}{
+		{"root", true},
+		{"ROOT", true},
+		{"Root", true},
+		{"0", true},
+		{"root:root", true},
+		{"0:0", true},
+		{"root:wheel", true},
+		{"0:wheel", true},
+		{"appuser", false},
+		{"1000", false},
+		{"appuser:appgroup", false},
+		{"1000:1000", false},
+		{"  root  ", true},
+		{"nobody", false},
+		{"www-data", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.user, func(t *testing.T) {
+			t.Parallel()
+			if got := IsRootUser(tt.user); got != tt.want {
+				t.Errorf("IsRootUser(%q) = %v, want %v", tt.user, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFileFacts_UserAndVolumeTracking(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, `FROM ubuntu:22.04
+WORKDIR /app
+USER root
+RUN apt-get update
+USER appuser:appgroup
+VOLUME /data /var/lib/db
+VOLUME /var/log/app
+CMD ["app"]
+`)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+	if stage.EffectiveUser != "appuser:appgroup" {
+		t.Fatalf("EffectiveUser = %q, want %q", stage.EffectiveUser, "appuser:appgroup")
+	}
+	if len(stage.UserCommands) != 2 {
+		t.Fatalf("UserCommands count = %d, want 2", len(stage.UserCommands))
+	}
+	if stage.UserCommands[0].User != "root" || stage.UserCommands[1].User != "appuser:appgroup" {
+		t.Fatalf("unexpected UserCommands: %v, %v", stage.UserCommands[0].User, stage.UserCommands[1].User)
+	}
+	wantVolumes := []string{"/data", "/var/lib/db", "/var/log/app"}
+	if len(stage.Volumes) != len(wantVolumes) {
+		t.Fatalf("Volumes count = %d, want %d", len(stage.Volumes), len(wantVolumes))
+	}
+	for i, v := range stage.Volumes {
+		if v != wantVolumes[i] {
+			t.Fatalf("Volumes[%d] = %q, want %q", i, v, wantVolumes[i])
+		}
+	}
+	if stage.FinalWorkdir != "/app" {
+		t.Fatalf("FinalWorkdir = %q, want %q", stage.FinalWorkdir, "/app")
+	}
+}
+
+func TestFileFacts_PrivilegeDropEntrypoint(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		content       string
+		stageIdx      int  // stage to check (default 0)
+		wantEntryDrop bool // HasPrivilegeDropEntrypoint
+		wantCmdDrop   bool // HasPrivilegeDropCmd
+		wantHasEP     bool // HasEntrypoint
+		wantDrops     bool // DropsPrivilegesAtRuntime
+	}{
+		{
+			name: "gosu in ENTRYPOINT",
+			content: `FROM ubuntu:22.04
+ENTRYPOINT ["gosu", "postgres", "docker-entrypoint.sh"]
+`,
+			wantEntryDrop: true, wantHasEP: true, wantDrops: true,
+		},
+		{
+			name: "su-exec in ENTRYPOINT",
+			content: `FROM alpine:3.20
+ENTRYPOINT ["su-exec", "redis", "redis-server"]
+`,
+			wantEntryDrop: true, wantHasEP: true, wantDrops: true,
+		},
+		{
+			name: "gosu in CMD without ENTRYPOINT",
+			content: `FROM ubuntu:22.04
+CMD ["gosu", "nobody", "/app"]
+`,
+			wantCmdDrop: true, wantDrops: true,
+		},
+		{
+			name: "gosu in CMD with ENTRYPOINT does not suppress",
+			content: `FROM ubuntu:22.04
+ENTRYPOINT ["/app"]
+CMD ["gosu", "nobody"]
+`,
+			wantCmdDrop: true, wantHasEP: true, wantDrops: false,
+		},
+		{
+			name: "docker-entrypoint.sh in CMD is not a tool",
+			content: `FROM ubuntu:22.04
+CMD ["docker-entrypoint.sh", "mysqld"]
+`,
+			wantDrops: false,
+		},
+		{
+			name: "setpriv in ENTRYPOINT",
+			content: `FROM ubuntu:22.04
+ENTRYPOINT ["setpriv", "--reuid=1000", "--", "/app"]
+`,
+			wantEntryDrop: true, wantHasEP: true, wantDrops: true,
+		},
+		{
+			name: "shell-form ENTRYPOINT with gosu",
+			content: `FROM ubuntu:22.04
+ENTRYPOINT exec gosu postgres "$@"
+`,
+			wantEntryDrop: true, wantHasEP: true, wantDrops: true,
+		},
+		{
+			name: "entrypoint.sh script is not a tool",
+			content: `FROM ubuntu:22.04
+ENTRYPOINT ["/entrypoint.sh"]
+`,
+			wantHasEP: true, wantDrops: false,
+		},
+		{
+			name: "regular ENTRYPOINT no priv drop",
+			content: `FROM ubuntu:22.04
+ENTRYPOINT ["/app"]
+CMD ["serve"]
+`,
+			wantHasEP: true, wantDrops: false,
+		},
+		{
+			name: "no ENTRYPOINT or CMD",
+			content: `FROM ubuntu:22.04
+RUN echo hello
+`,
+			wantDrops: false,
+		},
+		{
+			name: "later ENTRYPOINT overrides gosu ENTRYPOINT",
+			content: `FROM ubuntu:22.04
+ENTRYPOINT ["gosu", "postgres", "start"]
+ENTRYPOINT ["/app"]
+`,
+			wantHasEP: true, wantDrops: false,
+		},
+		{
+			name: "later CMD overrides gosu CMD",
+			content: `FROM ubuntu:22.04
+CMD ["gosu", "nobody", "/app"]
+CMD ["serve"]
+`,
+			wantDrops: false,
+		},
+		{
+			name:     "inherited gosu ENTRYPOINT from parent stage",
+			stageIdx: 1,
+			content: `FROM ubuntu:22.04 AS base
+ENTRYPOINT ["gosu", "postgres", "start"]
+
+FROM base
+CMD ["postgres"]
+`,
+			wantEntryDrop: true, wantHasEP: true, wantDrops: true,
+		},
+		{
+			name:     "child overrides inherited gosu ENTRYPOINT",
+			stageIdx: 1,
+			content: `FROM ubuntu:22.04 AS base
+ENTRYPOINT ["gosu", "postgres", "start"]
+
+FROM base
+ENTRYPOINT ["/app"]
+CMD ["serve"]
+`,
+			wantHasEP: true, wantDrops: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ff := makeFileFacts(t, tt.content)
+			stage := ff.Stage(tt.stageIdx)
+			if stage == nil {
+				t.Fatal("expected stage facts")
+			}
+			if stage.HasPrivilegeDropEntrypoint != tt.wantEntryDrop {
+				t.Errorf("HasPrivilegeDropEntrypoint = %v, want %v", stage.HasPrivilegeDropEntrypoint, tt.wantEntryDrop)
+			}
+			if stage.HasPrivilegeDropCmd != tt.wantCmdDrop {
+				t.Errorf("HasPrivilegeDropCmd = %v, want %v", stage.HasPrivilegeDropCmd, tt.wantCmdDrop)
+			}
+			if stage.HasEntrypoint != tt.wantHasEP {
+				t.Errorf("HasEntrypoint = %v, want %v", stage.HasEntrypoint, tt.wantHasEP)
+			}
+			if stage.DropsPrivilegesAtRuntime() != tt.wantDrops {
+				t.Errorf("DropsPrivilegesAtRuntime() = %v, want %v", stage.DropsPrivilegesAtRuntime(), tt.wantDrops)
+			}
+		})
+	}
+}
+
+func TestFileFacts_MultiStageUserIsolation(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, `FROM ubuntu:22.04 AS builder
+USER root
+WORKDIR /build
+VOLUME /build-cache
+
+FROM alpine:3.20
+USER 1000
+WORKDIR /app
+VOLUME /data
+`)
+
+	builder := fileFacts.Stage(0)
+	if builder == nil {
+		t.Fatal("expected builder stage facts")
+	}
+	if builder.EffectiveUser != "root" {
+		t.Fatalf("builder EffectiveUser = %q, want %q", builder.EffectiveUser, "root")
+	}
+	if builder.FinalWorkdir != "/build" {
+		t.Fatalf("builder FinalWorkdir = %q, want %q", builder.FinalWorkdir, "/build")
+	}
+	if len(builder.Volumes) != 1 || builder.Volumes[0] != "/build-cache" {
+		t.Fatalf("builder Volumes = %v, want [/build-cache]", builder.Volumes)
+	}
+	if builder.IsLast {
+		t.Fatal("builder should not be last stage")
+	}
+
+	runtime := fileFacts.Stage(1)
+	if runtime == nil {
+		t.Fatal("expected runtime stage facts")
+	}
+	if runtime.EffectiveUser != "1000" {
+		t.Fatalf("runtime EffectiveUser = %q, want %q", runtime.EffectiveUser, "1000")
+	}
+	if runtime.FinalWorkdir != "/app" {
+		t.Fatalf("runtime FinalWorkdir = %q, want %q", runtime.FinalWorkdir, "/app")
+	}
+	if len(runtime.Volumes) != 1 || runtime.Volumes[0] != "/data" {
+		t.Fatalf("runtime Volumes = %v, want [/data]", runtime.Volumes)
+	}
+	if !runtime.IsLast {
+		t.Fatal("runtime should be last stage")
+	}
+}
+
+func TestFileFacts_NoUserInstruction(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, `FROM ubuntu:22.04
+RUN echo hello
+VOLUME /data
+`)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+	if stage.EffectiveUser != "" {
+		t.Fatalf("EffectiveUser = %q, want empty", stage.EffectiveUser)
+	}
+	if len(stage.UserCommands) != 0 {
+		t.Fatalf("UserCommands count = %d, want 0", len(stage.UserCommands))
+	}
+	if stage.FinalWorkdir != "/" {
+		t.Fatalf("FinalWorkdir = %q, want %q", stage.FinalWorkdir, "/")
+	}
+}
+
+func makeFileFacts(t *testing.T, content string) *FileFacts {
 	t.Helper()
+
+	const file = "Dockerfile"
 
 	parseResult, err := dockerfile.Parse(strings.NewReader(content), nil)
 	if err != nil {

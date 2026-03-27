@@ -3,6 +3,7 @@ package facts
 import (
 	"maps"
 	"path"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -37,6 +38,39 @@ type StageFacts struct {
 	FinalShell   ShellFacts
 	EffectiveEnv EnvFacts
 	Runs         []*RunFacts
+
+	// EffectiveUser is the value from the last USER instruction in this stage.
+	// Empty string means no USER instruction exists in this stage (inherits
+	// from the base image).
+	EffectiveUser string
+
+	// UserCommands collects all USER instructions in this stage in order.
+	// Useful for rules that need to track the progression of USER changes
+	// or need the instruction location of the last USER.
+	UserCommands []*instructions.UserCommand
+
+	// Volumes collects all volume mount point paths declared by VOLUME
+	// instructions in this stage.
+	Volumes []string
+
+	// FinalWorkdir is the effective WORKDIR at the end of this stage.
+	FinalWorkdir string
+
+	// HasPrivilegeDropEntrypoint is true when the stage's ENTRYPOINT
+	// references a known privilege-drop tool (gosu, su-exec, suexec, setpriv).
+	// Generic script names (docker-entrypoint.sh, entrypoint.sh) are
+	// intentionally excluded — they are too ambiguous without inspecting the
+	// script contents (which requires build-context or inline-heredoc analysis).
+	HasPrivilegeDropEntrypoint bool
+
+	// HasPrivilegeDropCmd is true when the stage's CMD references a known
+	// privilege-drop tool. Because CMD provides default arguments to
+	// ENTRYPOINT when both are present, a privilege-drop tool in CMD only
+	// indicates actual privilege dropping when no ENTRYPOINT is set.
+	HasPrivilegeDropCmd bool
+
+	// HasEntrypoint is true when the stage contains an ENTRYPOINT instruction.
+	HasEntrypoint bool
 
 	cacheDisablingEnv []EnvBinding
 }
@@ -154,6 +188,18 @@ func (f *FileFacts) Stage(index int) *StageFacts {
 	return f.stages[index]
 }
 
+// DropsPrivilegesAtRuntime reports whether the stage effectively drops root
+// privileges at runtime, respecting Docker's ENTRYPOINT/CMD interaction:
+//   - A privilege-drop tool in ENTRYPOINT always counts.
+//   - A privilege-drop tool in CMD counts only when no ENTRYPOINT is set,
+//     because CMD provides default arguments to ENTRYPOINT when both exist.
+func (s *StageFacts) DropsPrivilegesAtRuntime() bool {
+	if s.HasPrivilegeDropEntrypoint {
+		return true
+	}
+	return s.HasPrivilegeDropCmd && !s.HasEntrypoint
+}
+
 // Stages returns all stage facts.
 func (f *FileFacts) Stages() []*StageFacts {
 	f.once.Do(f.build)
@@ -199,6 +245,9 @@ func (f *FileFacts) build() {
 			stageFacts.BaseImageOS = semInfo.BaseImageOS
 		}
 
+		// Seed runtime entrypoint/cmd state from parent stage.
+		seedStageEntrypointState(semInfo, f.stages, stageFacts)
+
 		for cmdIdx, cmd := range stage.Commands {
 			switch c := cmd.(type) {
 			case *instructions.WorkdirCommand:
@@ -223,8 +272,20 @@ func (f *FileFacts) build() {
 				})
 				stageFacts.Runs = append(stageFacts.Runs, runFacts)
 				f.runs = append(f.runs, runFacts)
+			case *instructions.UserCommand:
+				stageFacts.UserCommands = append(stageFacts.UserCommands, c)
+				stageFacts.EffectiveUser = c.User
+			case *instructions.VolumeCommand:
+				stageFacts.Volumes = append(stageFacts.Volumes, c.Volumes...)
+			case *instructions.EntrypointCommand:
+				stageFacts.HasEntrypoint = true
+				stageFacts.HasPrivilegeDropEntrypoint = containsPrivilegeDropPattern(c.CmdLine)
+			case *instructions.CmdCommand:
+				stageFacts.HasPrivilegeDropCmd = containsPrivilegeDropPattern(c.CmdLine)
 			}
 		}
+
+		stageFacts.FinalWorkdir = workdir
 
 		finalEnvValues := maps.Clone(currentEnvValues)
 		if semInfo != nil && semInfo.EffectiveEnv != nil {
@@ -267,6 +328,27 @@ func seedStageCacheDisablingEnv(semInfo *semantic.StageInfo, stages []*StageFact
 	}
 
 	return append([]EnvBinding(nil), stages[baseIdx].cacheDisablingEnv...)
+}
+
+// seedStageEntrypointState inherits the entrypoint/cmd privilege-drop state
+// from a parent stage when the base is a local stage ref. This ensures that
+// FROM base (where base has ENTRYPOINT ["gosu", ...]) correctly inherits the
+// privilege-drop signal. The inherited values are overridden if the child
+// stage has its own ENTRYPOINT/CMD instructions.
+func seedStageEntrypointState(semInfo *semantic.StageInfo, stages []*StageFacts, target *StageFacts) {
+	if semInfo == nil || semInfo.BaseImage == nil || !semInfo.BaseImage.IsStageRef {
+		return
+	}
+
+	baseIdx := semInfo.BaseImage.StageIndex
+	if baseIdx < 0 || baseIdx >= len(stages) || stages[baseIdx] == nil {
+		return
+	}
+
+	parent := stages[baseIdx]
+	target.HasEntrypoint = parent.HasEntrypoint
+	target.HasPrivilegeDropEntrypoint = parent.HasPrivilegeDropEntrypoint
+	target.HasPrivilegeDropCmd = parent.HasPrivilegeDropCmd
 }
 
 func initialStageShell(
@@ -489,6 +571,40 @@ func ResolveWorkdir(currentWorkdir, nextPath string) string {
 		return path.Clean(nextPath)
 	}
 	return path.Clean(path.Join(currentWorkdir, nextPath))
+}
+
+// IsRootUser checks if a USER instruction value refers to the root user.
+// The USER instruction can specify: username, uid, username:group, or uid:gid.
+// This is an exported shared helper so multiple rules can reuse the same logic.
+func IsRootUser(user string) bool {
+	// Strip group if present (user:group format).
+	if idx := strings.Index(user, ":"); idx != -1 {
+		user = user[:idx]
+	}
+
+	user = strings.TrimSpace(strings.ToLower(user))
+
+	// root by name or UID 0.
+	return user == "root" || user == "0"
+}
+
+// privilegeDropTools lists executables whose sole purpose is dropping root
+// privileges at runtime. Only unambiguous tools belong here — generic script
+// names like "entrypoint.sh" or "docker-entrypoint.sh" are intentionally
+// excluded because they could do anything; script-content inspection requires
+// build-context access or inline-heredoc analysis, which belongs in rules,
+// not in the shared facts layer.
+var privilegeDropTools = []string{"gosu", "su-exec", "suexec", "setpriv"}
+
+// privilegeDropToolsRe matches any of the privilege-drop tool names as whole
+// words so that substrings like "gosuper" do not false-positive.
+var privilegeDropToolsRe = regexp.MustCompile(`\b(` + strings.Join(privilegeDropTools, "|") + `)\b`)
+
+// containsPrivilegeDropPattern checks whether a command line (from ENTRYPOINT
+// or CMD) references a known privilege-drop tool.
+func containsPrivilegeDropPattern(cmdLine []string) bool {
+	joined := strings.ToLower(strings.Join(cmdLine, " "))
+	return privilegeDropToolsRe.MatchString(joined)
 }
 
 // Unquote strips a single layer of matching double or single quotes.
