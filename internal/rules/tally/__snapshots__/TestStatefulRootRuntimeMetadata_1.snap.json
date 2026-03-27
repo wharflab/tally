@@ -1,0 +1,10 @@
+{
+ "Category": "security",
+ "Code": "tally/stateful-root-runtime",
+ "DefaultSeverity": "warning",
+ "Description": "Final stage runs as root and signals mutable/persistent state",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/stateful-root-runtime/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "Stateful Root Runtime"
+}

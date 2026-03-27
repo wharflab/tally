@@ -1037,5 +1037,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/no-ungraceful-stopsignal")...),
 			wantExit: 1,
 		},
+
+		// Stateful root runtime (isolated to stateful-root-runtime rule)
+		{
+			name:     "stateful-root-runtime",
+			dir:      "stateful-root-runtime",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/stateful-root-runtime")...),
+			wantExit: 1,
+		},
 	}
 }

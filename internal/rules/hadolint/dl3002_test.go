@@ -182,37 +182,3 @@ RUN something else
 		})
 	}
 }
-
-func TestIsRootUser(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		user string
-		want bool
-	}{
-		{"root", true},
-		{"ROOT", true},
-		{"Root", true},
-		{"0", true},
-		{"root:root", true},
-		{"0:0", true},
-		{"root:wheel", true},
-		{"0:wheel", true},
-		{"appuser", false},
-		{"1000", false},
-		{"appuser:appgroup", false},
-		{"1000:1000", false},
-		{"  root  ", true}, // whitespace trimmed
-		{"nobody", false},
-		{"www-data", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.user, func(t *testing.T) {
-			t.Parallel()
-			got := isRootUser(tt.user)
-			if got != tt.want {
-				t.Errorf("isRootUser(%q) = %v, want %v", tt.user, got, tt.want)
-			}
-		})
-	}
-}

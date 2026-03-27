@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "testdata/stateful-root-runtime/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/stateful-root-runtime/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/stateful-root-runtime/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "final stage runs as root (no USER instruction (defaults to root)) and signals persistent state via volume /var/lib/data",
+          "rule": "tally/stateful-root-runtime",
+          "severity": "warning",
+          "sourceCode": "VOLUME /var/lib/data"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}
