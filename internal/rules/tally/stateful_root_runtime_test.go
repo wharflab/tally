@@ -371,6 +371,55 @@ CMD ["app"]
 			WantViolations: 0,
 		},
 
+		// === Inherited state from parent stages ===
+		{
+			Name: "inherited VOLUME from parent stage",
+			Content: `FROM ubuntu:22.04 AS base
+VOLUME /data
+
+FROM base
+CMD ["app"]
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"inherited volume /data"},
+		},
+		{
+			Name: "inherited WORKDIR state path from parent stage",
+			Content: `FROM ubuntu:22.04 AS base
+WORKDIR /var/lib/app
+
+FROM base
+CMD ["app"]
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"inherited workdir /var/lib/app"},
+		},
+		{
+			Name: "inherited VOLUME through chain of stages",
+			Content: `FROM ubuntu:22.04 AS base
+VOLUME /data
+
+FROM base AS middle
+
+FROM middle
+CMD ["app"]
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"inherited volume /data"},
+		},
+		{
+			Name: "relative COPY resolves against inherited WORKDIR",
+			Content: `FROM ubuntu:22.04 AS base
+WORKDIR /var
+
+FROM base
+COPY app.conf lib/app/app.conf
+CMD ["app"]
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"COPY destination /var/lib/app"},
+		},
+
 		// === Edge cases ===
 		{
 			Name: "minimal stage no stateful signals",

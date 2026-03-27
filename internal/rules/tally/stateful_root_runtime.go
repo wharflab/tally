@@ -105,7 +105,7 @@ func (r *StatefulRootRuntimeRule) Check(input rules.LintInput) []rules.Violation
 	}
 
 	// Step 2: Scan for stateful signals.
-	signals := detectStatefulSignals(input, sf, finalIdx)
+	signals := detectStatefulSignals(input, sf, fileFacts, finalIdx)
 	if len(signals) == 0 {
 		return nil
 	}
@@ -150,12 +150,23 @@ func (r *StatefulRootRuntimeRule) Check(input rules.LintInput) []rules.Violation
 
 // detectStatefulSignals scans the final stage for VOLUME instructions and
 // data/state directory patterns in WORKDIR, COPY/ADD destinations, and
-// RUN mkdir commands.
-func detectStatefulSignals(input rules.LintInput, sf *facts.StageFacts, stageIdx int) []statefulSignal {
+// RUN mkdir commands. For local stage refs (FROM <parent-stage>), inherited
+// VOLUME paths and effective WORKDIR from the parent are also included.
+func detectStatefulSignals(input rules.LintInput, sf *facts.StageFacts, fileFacts *facts.FileFacts, stageIdx int) []statefulSignal {
 	var signals []statefulSignal
 
 	stage := input.Stages[stageIdx]
 	workdir := "/" // track effective workdir to resolve relative paths
+
+	// Inherit state from parent stage when the base is a local stage ref.
+	fromLoc := rules.NewLocationFromRanges(input.File, stage.Location)
+	inheritedSignals := inheritParentStatefulSignals(input.Semantic, fileFacts, stageIdx, fromLoc)
+	signals = append(signals, inheritedSignals...)
+
+	// Initialize workdir from parent stage if this is a local stage ref.
+	if parentWorkdir := inheritedParentWorkdir(input.Semantic, fileFacts, stageIdx); parentWorkdir != "" {
+		workdir = parentWorkdir
+	}
 
 	for _, cmd := range stage.Commands {
 		switch c := cmd.(type) {
@@ -216,6 +227,83 @@ func detectStatefulSignals(input rules.LintInput, sf *facts.StageFacts, stageIdx
 	}
 
 	return signals
+}
+
+// inheritParentStatefulSignals collects stateful signals (VOLUME paths, state-path
+// WORKDIR) from parent stages when the base is a local stage ref. Walks the
+// stage-ref chain to collect inherited state. The loc parameter points at the
+// FROM instruction for attribution.
+func inheritParentStatefulSignals(sem any, fileFacts *facts.FileFacts, stageIdx int, loc rules.Location) []statefulSignal {
+	if sem == nil || fileFacts == nil {
+		return nil
+	}
+
+	model, ok := sem.(*semantic.Model)
+	if !ok || model == nil {
+		return nil
+	}
+
+	var signals []statefulSignal
+	visited := make(map[int]bool)
+
+	for idx := stageIdx; !visited[idx]; {
+		visited[idx] = true
+
+		info := model.StageInfo(idx)
+		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 {
+			break
+		}
+
+		parentIdx := info.BaseImage.StageIndex
+		parentFacts := fileFacts.Stage(parentIdx)
+		if parentFacts == nil {
+			break
+		}
+
+		for _, vol := range parentFacts.Volumes {
+			signals = append(signals, statefulSignal{
+				kind: "inherited " + command.Volume,
+				path: vol,
+				loc:  loc,
+			})
+		}
+
+		if isStatePath(parentFacts.FinalWorkdir) {
+			signals = append(signals, statefulSignal{
+				kind: "inherited " + command.Workdir,
+				path: parentFacts.FinalWorkdir,
+				loc:  loc,
+			})
+		}
+
+		idx = parentIdx
+	}
+
+	return signals
+}
+
+// inheritedParentWorkdir returns the effective WORKDIR from the parent stage
+// when the base is a local stage ref. Returns empty string otherwise.
+func inheritedParentWorkdir(sem any, fileFacts *facts.FileFacts, stageIdx int) string {
+	if sem == nil || fileFacts == nil {
+		return ""
+	}
+
+	model, ok := sem.(*semantic.Model)
+	if !ok || model == nil {
+		return ""
+	}
+
+	info := model.StageInfo(stageIdx)
+	if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 {
+		return ""
+	}
+
+	if parentFacts := fileFacts.Stage(info.BaseImage.StageIndex); parentFacts != nil {
+		return parentFacts.FinalWorkdir
+	}
+
+	return ""
 }
 
 // resolveDestPath resolves a COPY/ADD destination path against the effective
