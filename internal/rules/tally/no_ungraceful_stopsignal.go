@@ -23,9 +23,16 @@ var ungracefulSignals = map[string]string{
 
 // numericSignals maps well-known numeric signal values to their canonical names.
 // These are stable across Linux architectures (amd64, arm64, etc.).
+// Includes both ungraceful signals (used for detection) and common graceful
+// signals (for consistent normalization in messages and future rules).
 var numericSignals = map[int]string{
+	1:  "SIGHUP",
+	2:  "SIGINT",
+	3:  "SIGQUIT",
 	9:  "SIGKILL",
+	15: "SIGTERM",
 	19: "SIGSTOP",
+	28: "SIGWINCH",
 }
 
 // NoUngracefulStopsignalRule detects STOPSIGNAL values that defeat the purpose

@@ -247,8 +247,12 @@ func TestNormalizeSignalName(t *testing.T) {
 		{"sigterm", "SIGTERM"},
 		{"9", "SIGKILL"},
 		{"19", "SIGSTOP"},
-		{"15", "15"}, // Unknown numeric — returned as-is
-		{"2", "2"},   // Unknown numeric — returned as-is
+		{"1", "SIGHUP"},
+		{"2", "SIGINT"},
+		{"3", "SIGQUIT"},
+		{"15", "SIGTERM"},
+		{"28", "SIGWINCH"},
+		{"42", "42"}, // Unknown numeric — returned as-is
 		{"SIGRTMIN+3", "SIGRTMIN+3"},
 		{"SIGQUIT", "SIGQUIT"},
 		{"SIGINT", "SIGINT"},
