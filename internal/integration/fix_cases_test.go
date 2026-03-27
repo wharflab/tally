@@ -1561,5 +1561,42 @@ severity = "warning"
 				mustSelectRules("tally/gpu/prefer-minimal-driver-capabilities")...),
 			wantApplied: 0,
 		},
+
+		// No ungraceful STOPSIGNAL: SIGKILL → SIGTERM via FixSuggestion (requires --fix-unsafe)
+		{
+			name:  "no-ungraceful-stopsignal-sigkill",
+			input: "FROM alpine:3.20\nSTOPSIGNAL SIGKILL\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/no-ungraceful-stopsignal")...),
+			wantApplied: 1,
+		},
+		// No ungraceful STOPSIGNAL: SIGSTOP → SIGTERM
+		{
+			name:  "no-ungraceful-stopsignal-sigstop",
+			input: "FROM alpine:3.20\nSTOPSIGNAL SIGSTOP\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/no-ungraceful-stopsignal")...),
+			wantApplied: 1,
+		},
+		// No ungraceful STOPSIGNAL: numeric 9 → SIGTERM
+		{
+			name:  "no-ungraceful-stopsignal-numeric-9",
+			input: "FROM alpine:3.20\nSTOPSIGNAL 9\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/no-ungraceful-stopsignal")...),
+			wantApplied: 1,
+		},
+		// No ungraceful STOPSIGNAL: SIGTERM — no fix needed
+		{
+			name:  "no-ungraceful-stopsignal-sigterm-no-fix",
+			input: "FROM alpine:3.20\nSTOPSIGNAL SIGTERM\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/no-ungraceful-stopsignal")...),
+			wantApplied: 0,
+		},
 	}
 }

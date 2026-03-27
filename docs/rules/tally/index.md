@@ -13,6 +13,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [max-lines](./max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
 | [no-unreachable-stages](./no-unreachable-stages.md) | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
 | [shell-run-in-scratch](./shell-run-in-scratch.md) | Detects shell-form RUN in scratch stages where no shell exists | Warning | Correctness | Enabled |
+| [no-ungraceful-stopsignal](./no-ungraceful-stopsignal.md) | STOPSIGNAL should not use signals that prevent graceful shutdown | Warning | Correctness | Enabled |
 | [invalid-onbuild-trigger](./invalid-onbuild-trigger.md) | ONBUILD trigger instruction is not a valid Dockerfile instruction | Error | Correctness | Enabled |
 | [circular-stage-deps](./circular-stage-deps.md) | Detects circular dependencies between build stages | Error | Correctness | Enabled |
 | [copy-from-empty-scratch-stage](./copy-from-empty-scratch-stage.md) | Detects COPY --from referencing a scratch stage with no file-producing instructions | Error | Correctness | Enabled |
