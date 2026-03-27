@@ -43,8 +43,19 @@ var statePathExact = []string{
 
 // StatefulRootRuntimeRule detects final stages that run as root and signal
 // mutable/persistent state through VOLUME instructions or data/state directory
-// patterns. This is a stronger, more targeted version of the generic DL3002
-// "last USER should not be root" check.
+// patterns.
+//
+// Cross-rule interaction with hadolint/DL3002:
+//
+//   - DL3002 fires when the last USER is explicitly root, regardless of state.
+//   - This rule fires when root (explicit or implicit) intersects with stateful
+//     signals. It also suppresses for privilege-drop entrypoints and known
+//     non-root base images, which DL3002 does not.
+//   - Both rules can fire on the same Dockerfile (e.g., USER root + VOLUME /data).
+//     This is intentional: DL3002 gives a broad "consider non-root" nudge, while
+//     this rule highlights the specific elevated-risk combination.
+//   - No EnabledRules suppression is applied — the rules are complementary, not
+//     conflicting, and neither has fixes that could overlap.
 type StatefulRootRuntimeRule struct{}
 
 // NewStatefulRootRuntimeRule creates a new rule instance.

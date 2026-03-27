@@ -62,8 +62,15 @@ The rule is automatically suppressed when:
 | Privilege-drop aware | No | Yes (suppresses for gosu/su-exec patterns) |
 | Non-root base aware | N/A (only checks explicit USER) | Yes (suppresses for distroless:nonroot, chainguard) |
 
-The two rules are complementary. DL3002 is a broad reminder; this rule targets
-the specific scenario where root actually creates elevated risk.
+The two rules are complementary and both may fire on the same Dockerfile (e.g.,
+`USER root` + `VOLUME /data` triggers both). This is intentional:
+
+- **DL3002** gives a broad "consider non-root" nudge.
+- **This rule** highlights the specific elevated-risk combination of root + state.
+
+Neither rule suppresses the other via `EnabledRules` coordination because they
+serve different purposes and neither has fixes that could overlap. If you want
+only the targeted warning, disable DL3002 and keep this rule.
 
 ## References
 
