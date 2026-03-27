@@ -1,0 +1,59 @@
+{
+  "files": [
+    {
+      "file": "testdata/windows-no-stopsignal/Dockerfile",
+      "violations": [
+        {
+          "detail": "Windows containers do not support POSIX signals. BuildKit silently accepts STOPSIGNAL but the instruction is ignored at runtime.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/windows/no-stopsignal/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 8
+            },
+            "file": "testdata/windows-no-stopsignal/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 8
+            }
+          },
+          "message": "STOPSIGNAL SIGTERM has no effect on Windows containers",
+          "rule": "tally/windows/no-stopsignal",
+          "severity": "warning",
+          "sourceCode": "STOPSIGNAL SIGTERM",
+          "suggestedFix": {
+            "description": "Comment out STOPSIGNAL (has no effect on Windows)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 18,
+                    "line": 8
+                  },
+                  "file": "testdata/windows-no-stopsignal/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 8
+                  }
+                },
+                "newText": "# [commented out by tally - STOPSIGNAL has no effect on Windows containers]: STOPSIGNAL SIGTERM"
+              }
+            ],
+            "isPreferred": true,
+            "priority": -1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

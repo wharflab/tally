@@ -1598,5 +1598,35 @@ severity = "warning"
 				mustSelectRules("tally/no-ungraceful-stopsignal")...),
 			wantApplied: 0,
 		},
+
+		// Windows no-stopsignal: comment out STOPSIGNAL on Windows stage (FixSafe)
+		{
+			name:  "windows-no-stopsignal",
+			input: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\nSTOPSIGNAL SIGTERM\nCMD [\"cmd\", \"/C\", \"echo\", \"hi\"]\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/windows/no-stopsignal")...),
+			wantApplied: 1,
+		},
+		// Windows no-stopsignal: Linux stage STOPSIGNAL — no fix
+		{
+			name:  "windows-no-stopsignal-linux-no-fix",
+			input: "FROM alpine:3.20\nSTOPSIGNAL SIGTERM\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/windows/no-stopsignal")...),
+			wantApplied: 0,
+		},
+		// Cross-rule: both windows/no-stopsignal and no-ungraceful-stopsignal enabled on a
+		// Windows stage with SIGKILL. Only windows/no-stopsignal should fire (comment-out);
+		// no-ungraceful-stopsignal skips Windows stages entirely.
+		{
+			name:  "windows-no-stopsignal-cross-no-ungraceful",
+			input: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\nSTOPSIGNAL SIGKILL\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/windows/no-stopsignal", "tally/no-ungraceful-stopsignal")...),
+			wantApplied: 1, // only windows/no-stopsignal should apply
+		},
 	}
 }

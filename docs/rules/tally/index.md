@@ -31,6 +31,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [gpu/prefer-minimal-driver-capabilities](./gpu/prefer-minimal-driver-capabilities.md) | NVIDIA_DRIVER_CAPABILITIES=all exposes more driver surface than most workloads need | Info | Correctness | Enabled |
 | [gpu/prefer-runtime-final-stage](./gpu/prefer-runtime-final-stage.md) | Final stage uses an NVIDIA devel image without clear build-time needs | Warning | Best Practices | Enabled |
 | [windows/no-run-mounts](./windows/no-run-mounts.md) | `RUN --mount` flags are not supported on Windows containers | Error | Correctness | Enabled |
+| [windows/no-stopsignal](./windows/no-stopsignal.md) | `STOPSIGNAL` has no effect on Windows containers | Warning | Correctness | Enabled |
 | [prefer-run-heredoc](./prefer-run-heredoc.md) | Suggests using heredoc syntax for multi-command RUN | Style | Style | Off (experimental) |
 | [consistent-indentation](./consistent-indentation.md) | Enforces consistent indentation for build stages | Style | Style | Off (experimental) |
 | [newline-between-instructions](./newline-between-instructions.md) | Controls blank lines between Dockerfile instructions | Style | Style | Enabled (grouped) |

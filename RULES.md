@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 39 | - | 39 |
+| tally | 40 | - | 40 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -58,6 +58,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/gpu/prefer-minimal-driver-capabilities`](docs/rules/tally/gpu/prefer-minimal-driver-capabilities.md) 🔧 | NVIDIA_DRIVER_CAPABILITIES=all exposes more driver surface than most workloads need | Info | Correctness | Enabled |
 | [`tally/gpu/prefer-runtime-final-stage`](docs/rules/tally/gpu/prefer-runtime-final-stage.md) | Final stage uses an NVIDIA devel image without clear build-time needs; prefer a runtime variant | Warning | Best Practices | Enabled |
 | [`tally/windows/no-run-mounts`](docs/rules/tally/windows/no-run-mounts.md) | `RUN --mount` flags are not supported on Windows containers and will fail at runtime | Error | Correctness | Enabled |
+| [`tally/windows/no-stopsignal`](docs/rules/tally/windows/no-stopsignal.md) 🔧 | `STOPSIGNAL` has no effect on Windows containers because they do not support POSIX signals | Warning | Correctness | Enabled |
 | [`tally/prefer-run-heredoc`](docs/rules/tally/prefer-run-heredoc.md) 🔧 | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Off (experimental) |
 | [`tally/consistent-indentation`](docs/rules/tally/consistent-indentation.md) 🔧 | Enforces consistent indentation for Dockerfile build stages | Style | Style | Off (experimental) |
 | [`tally/newline-between-instructions`](docs/rules/tally/newline-between-instructions.md) 🔧 | Controls blank lines between Dockerfile instructions | Style | Style | Enabled (grouped) |
