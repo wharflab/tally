@@ -155,6 +155,7 @@ func detectStatefulSignals(input rules.LintInput, sf *facts.StageFacts, stageIdx
 	var signals []statefulSignal
 
 	stage := input.Stages[stageIdx]
+	workdir := "/" // track effective workdir to resolve relative paths
 
 	for _, cmd := range stage.Commands {
 		switch c := cmd.(type) {
@@ -169,28 +170,31 @@ func detectStatefulSignals(input rules.LintInput, sf *facts.StageFacts, stageIdx
 			}
 
 		case *instructions.WorkdirCommand:
-			if isStatePath(c.Path) {
+			workdir = facts.ResolveWorkdir(workdir, c.Path)
+			if isStatePath(workdir) {
 				signals = append(signals, statefulSignal{
 					kind: command.Workdir,
-					path: c.Path,
+					path: workdir,
 					loc:  rules.NewLocationFromRanges(input.File, c.Location()),
 				})
 			}
 
 		case *instructions.CopyCommand:
-			if isStatePath(c.DestPath) {
+			dest := resolveDestPath(c.DestPath, workdir)
+			if isStatePath(dest) {
 				signals = append(signals, statefulSignal{
 					kind: "COPY destination",
-					path: c.DestPath,
+					path: dest,
 					loc:  rules.NewLocationFromRanges(input.File, c.Location()),
 				})
 			}
 
 		case *instructions.AddCommand:
-			if isStatePath(c.DestPath) {
+			dest := resolveDestPath(c.DestPath, workdir)
+			if isStatePath(dest) {
 				signals = append(signals, statefulSignal{
 					kind: "ADD destination",
-					path: c.DestPath,
+					path: dest,
 					loc:  rules.NewLocationFromRanges(input.File, c.Location()),
 				})
 			}
@@ -212,6 +216,16 @@ func detectStatefulSignals(input rules.LintInput, sf *facts.StageFacts, stageIdx
 	}
 
 	return signals
+}
+
+// resolveDestPath resolves a COPY/ADD destination path against the effective
+// workdir, following Docker's semantics: absolute paths are used as-is,
+// relative paths are joined to the current WORKDIR.
+func resolveDestPath(dest, workdir string) string {
+	if strings.Contains(dest, "$") {
+		return dest // leave variable references unresolved
+	}
+	return facts.ResolveWorkdir(workdir, dest)
 }
 
 // isStatePath checks whether a path matches a known data/state directory pattern.

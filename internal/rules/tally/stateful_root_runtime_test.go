@@ -330,6 +330,47 @@ CMD ["/app"]
 			WantViolations: 1,
 		},
 
+		// === Relative path resolution ===
+		{
+			Name: "chained relative WORKDIR resolves to state path",
+			Content: `FROM ubuntu:22.04
+WORKDIR /var
+WORKDIR lib/app
+CMD ["app"]
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"workdir /var/lib/app"},
+		},
+		{
+			Name: "relative COPY destination resolves to state path",
+			Content: `FROM ubuntu:22.04
+WORKDIR /var
+COPY config.conf lib/app/config.conf
+CMD ["app"]
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"COPY destination /var/lib/app"},
+		},
+		{
+			Name: "relative ADD destination resolves to state path",
+			Content: `FROM ubuntu:22.04
+WORKDIR /var
+ADD data.tar.gz log/app/
+CMD ["app"]
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"ADD destination /var/log/app"},
+		},
+		{
+			Name: "relative WORKDIR under non-state path is clean",
+			Content: `FROM ubuntu:22.04
+WORKDIR /app
+WORKDIR config
+CMD ["app"]
+`,
+			WantViolations: 0,
+		},
+
 		// === Edge cases ===
 		{
 			Name: "minimal stage no stateful signals",
