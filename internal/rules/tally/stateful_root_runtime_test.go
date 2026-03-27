@@ -317,6 +317,18 @@ CMD ["/app"]
 			WantViolations: 0,
 		},
 
+		{
+			Name: "stage named chainguard with root USER is not suppressed",
+			Content: `FROM ubuntu:22.04 AS chainguard
+USER root
+
+FROM chainguard
+VOLUME /data
+CMD ["/app"]
+`,
+			WantViolations: 1,
+		},
+
 		// === Stage-ref chain tests ===
 		{
 			Name: "chained stage-ref to distroless nonroot",

@@ -410,7 +410,21 @@ func isKnownNonRootBase(sem any, fileFacts *facts.FileFacts, stageIdx int) bool 
 			return false
 		}
 
-		// Check known non-root external images at this level.
+		// If this is a local stage ref, skip image-name heuristics (a stage
+		// named "chainguard" is not the Chainguard image) and check the
+		// parent's effective USER instead.
+		if info.BaseImage.IsStageRef && info.BaseImage.StageIndex >= 0 && fileFacts != nil {
+			if parentFacts := fileFacts.Stage(info.BaseImage.StageIndex); parentFacts != nil {
+				if parentFacts.EffectiveUser != "" {
+					return !facts.IsRootUser(parentFacts.EffectiveUser)
+				}
+			}
+			// Parent has no USER — continue walking up the chain.
+			idx = info.BaseImage.StageIndex
+			continue
+		}
+
+		// Check known non-root external images.
 		raw := strings.ToLower(info.BaseImage.Raw)
 		if strings.Contains(raw, "distroless") {
 			if strings.Contains(raw, "nonroot") || strings.Contains(raw, "debug-nonroot") {
@@ -421,23 +435,7 @@ func isKnownNonRootBase(sem any, fileFacts *facts.FileFacts, stageIdx int) bool 
 			return true
 		}
 
-		// If this stage references a local parent stage, check the parent's
-		// effective USER. If the parent has an explicit non-root USER, we're
-		// done. If the parent has no USER (empty), continue walking up the
-		// chain to check the parent's base image.
-		if !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 || fileFacts == nil {
-			return false
-		}
-
-		parentIdx := info.BaseImage.StageIndex
-		if parentFacts := fileFacts.Stage(parentIdx); parentFacts != nil {
-			if parentFacts.EffectiveUser != "" {
-				return !facts.IsRootUser(parentFacts.EffectiveUser)
-			}
-		}
-
-		// Parent has no USER — continue walking up the chain.
-		idx = parentIdx
+		return false
 	}
 
 	return false
