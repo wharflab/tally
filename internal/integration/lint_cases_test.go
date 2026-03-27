@@ -1021,5 +1021,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-copy-chmod")...),
 			wantExit: 1,
 		},
+
+		// No ungraceful STOPSIGNAL (isolated to no-ungraceful-stopsignal rule)
+		{
+			name:     "no-ungraceful-stopsignal",
+			dir:      "no-ungraceful-stopsignal",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/no-ungraceful-stopsignal")...),
+			wantExit: 1,
+		},
 	}
 }

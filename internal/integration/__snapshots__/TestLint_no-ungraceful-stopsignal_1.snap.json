@@ -1,0 +1,99 @@
+{
+  "files": [
+    {
+      "file": "testdata/no-ungraceful-stopsignal/Dockerfile",
+      "violations": [
+        {
+          "detail": "Replace with a signal that allows graceful shutdown (e.g. SIGTERM)",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-ungraceful-stopsignal/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "testdata/no-ungraceful-stopsignal/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "STOPSIGNAL SIGKILL is not a graceful stop signal: cannot be caught or ignored; the container gets no chance to clean up",
+          "rule": "tally/no-ungraceful-stopsignal",
+          "severity": "warning",
+          "sourceCode": "STOPSIGNAL SIGKILL",
+          "suggestedFix": {
+            "description": "Replace with SIGTERM for graceful shutdown",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 18,
+                    "line": 2
+                  },
+                  "file": "testdata/no-ungraceful-stopsignal/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 2
+                  }
+                },
+                "newText": "SIGTERM"
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Replace with a signal that allows graceful shutdown (e.g. SIGTERM)",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-ungraceful-stopsignal/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "testdata/no-ungraceful-stopsignal/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "STOPSIGNAL SIGSTOP is not a graceful stop signal: suspends the process instead of stopping it; the container will not terminate",
+          "rule": "tally/no-ungraceful-stopsignal",
+          "severity": "warning",
+          "sourceCode": "STOPSIGNAL SIGSTOP",
+          "suggestedFix": {
+            "description": "Replace with SIGTERM for graceful shutdown",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 18,
+                    "line": 10
+                  },
+                  "file": "testdata/no-ungraceful-stopsignal/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 10
+                  }
+                },
+                "newText": "SIGTERM"
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}

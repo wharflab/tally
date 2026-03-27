@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 38 | - | 38 |
+| tally | 39 | - | 39 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -38,6 +38,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/max-lines`](docs/rules/tally/max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
 | [`tally/no-unreachable-stages`](docs/rules/tally/no-unreachable-stages.md) | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
 | [`tally/shell-run-in-scratch`](docs/rules/tally/shell-run-in-scratch.md) | Detects shell-form RUN in scratch stages where no shell exists | Warning | Correctness | Enabled |
+| [`tally/no-ungraceful-stopsignal`](docs/rules/tally/no-ungraceful-stopsignal.md) 🔧 | STOPSIGNAL should not use signals that prevent graceful shutdown | Warning | Correctness | Enabled |
 | [`tally/invalid-onbuild-trigger`](docs/rules/tally/invalid-onbuild-trigger.md) 🔧 | ONBUILD trigger instruction is not a valid Dockerfile instruction | Error | Correctness | Enabled |
 | [`tally/circular-stage-deps`](docs/rules/tally/circular-stage-deps.md) | Detects circular dependencies between build stages | Error | Correctness | Enabled |
 | [`tally/copy-from-empty-scratch-stage`](docs/rules/tally/copy-from-empty-scratch-stage.md) | Detects COPY --from referencing a scratch stage with no file-producing instructions | Error | Correctness | Enabled |
