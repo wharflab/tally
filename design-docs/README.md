@@ -339,6 +339,24 @@ fit, and explicit out-of-scope generic proposals
 
 ---
 
+### 33. [STOPSIGNAL Rules (top-level `tally/*`)](33-stopsignal-rules.md)
+
+**Covers:** Evidence-backed proposal for STOPSIGNAL-specific lint rules, including daemon-aware
+signal mappings, PID 1 / wrapper caveats, and a phased rollout plan
+
+**Key Topics:**
+
+- Balanced GitHub corpus analysis of 100 STOPSIGNAL-bearing Dockerfiles/Containerfiles
+- Generic correctness and hygiene rules for `SIGKILL`, non-canonical tokens, and shell/wrapper PID 1
+- Daemon-specific mappings for systemd/init, nginx, php-fpm, postgres, and httpd
+- Explicit out-of-scope daemons where default `SIGTERM` is already the right behavior
+- Recommended implementation order and fix-safety boundaries
+
+**Based on:** Dockerfile reference docs, upstream daemon shutdown docs, official image templates, and
+real-world GitHub Dockerfile/Containerfile corpus analysis
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
