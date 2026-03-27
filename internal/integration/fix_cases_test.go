@@ -1617,5 +1617,16 @@ severity = "warning"
 				mustSelectRules("tally/windows/no-stopsignal")...),
 			wantApplied: 0,
 		},
+		// Cross-rule: both windows/no-stopsignal and no-ungraceful-stopsignal enabled on a
+		// Windows stage with SIGKILL. Only windows/no-stopsignal should fire (comment-out);
+		// no-ungraceful-stopsignal skips Windows stages entirely.
+		{
+			name:  "windows-no-stopsignal-cross-no-ungraceful",
+			input: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\nSTOPSIGNAL SIGKILL\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/windows/no-stopsignal", "tally/no-ungraceful-stopsignal")...),
+			wantApplied: 1, // only windows/no-stopsignal should apply
+		},
 	}
 }
