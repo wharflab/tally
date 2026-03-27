@@ -357,6 +357,24 @@ real-world GitHub Dockerfile/Containerfile corpus analysis
 
 ---
 
+### 34. [USER / useradd / privilege transitions in Dockerfiles](34-user-instructions.md)
+
+**Covers:** Evidence-backed analysis of what `USER` actually changes at build time and runtime, common real-world `useradd` / numeric-user patterns,
+and a high-signal proposal for USER-specific `tally/*` rules.
+
+**Key Topics:**
+
+- Why `USER` is important but narrower than generic host-level "root vs non-root" explanations imply
+- Build-time semantics: `RUN`, `WORKDIR`, and why `COPY` / `ADD` ownership is separate
+- Real-world patterns across Debian/Ubuntu, Alpine, distroless, and `scratch`
+- High-confidence Dockerfile-only USER rules vs future cross-surface deployment-aware rules
+- A proposed supporting fact for known default non-root base images
+
+**Based on:** Dockerfile reference docs, Docker rootless docs, Distroless and Chainguard guidance, OpenShift/Podman guidance, and a curated GitHub
+Dockerfile corpus analysis
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
