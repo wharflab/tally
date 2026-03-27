@@ -269,7 +269,10 @@ func findMkdirStatePaths(script string) []string {
 		fields := strings.Fields(strings.TrimSpace(segment))
 		isMkdir := false
 		for _, f := range fields {
-			if isMkdir && strings.HasPrefix(f, "/") && !strings.HasPrefix(f, "-") {
+			if strings.HasPrefix(f, "-") {
+				continue // skip options (short -p, long --mode=755, etc.)
+			}
+			if isMkdir && strings.HasPrefix(f, "/") {
 				if isStatePath(f) {
 					result = append(result, f)
 				}

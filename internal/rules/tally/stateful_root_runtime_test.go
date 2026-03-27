@@ -485,6 +485,16 @@ func TestFindMkdirStatePaths(t *testing.T) {
 			script: "mkdir /data",
 			want:   []string{"/data"},
 		},
+		{
+			name:   "mkdir with long option --mode=755",
+			script: "mkdir --mode=755 /var/lib/data",
+			want:   []string{"/var/lib/data"},
+		},
+		{
+			name:   "mkdir with -m option and separate argument",
+			script: "mkdir -m 755 /var/lib/data",
+			want:   []string{"/var/lib/data"},
+		},
 	}
 
 	for _, tt := range tests {
