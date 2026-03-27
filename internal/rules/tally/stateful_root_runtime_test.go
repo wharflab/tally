@@ -283,6 +283,43 @@ CMD ["/app"]
 			WantViolations: 0,
 		},
 
+		// === Stage-ref chain tests ===
+		{
+			Name: "chained stage-ref to distroless nonroot",
+			Content: `FROM gcr.io/distroless/static:nonroot AS base
+
+FROM base AS runtime
+
+FROM runtime
+VOLUME /data
+CMD ["/app"]
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "chained stage-ref to chainguard",
+			Content: `FROM cgr.dev/chainguard/static:latest AS base
+
+FROM base
+VOLUME /data
+CMD ["/app"]
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "chained stage-ref with root USER in middle breaks chain",
+			Content: `FROM gcr.io/distroless/static:nonroot AS base
+
+FROM base AS middle
+USER root
+
+FROM middle
+VOLUME /data
+CMD ["/app"]
+`,
+			WantViolations: 1,
+		},
+
 		// === Edge cases ===
 		{
 			Name: "minimal stage no stateful signals",

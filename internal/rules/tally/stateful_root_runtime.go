@@ -269,9 +269,10 @@ func findMkdirStatePaths(script string) []string {
 	return result
 }
 
-// isKnownNonRootBase checks whether the final stage's base image is known to
-// default to a non-root user. This suppresses the rule when no explicit USER
-// instruction exists but the base image already runs as non-root.
+// isKnownNonRootBase checks whether a stage's base image is known to default
+// to a non-root user. It walks the stage-ref chain so that
+// FROM distroless:nonroot AS base → FROM base → FROM base2 is correctly
+// recognized as non-root at every level.
 func isKnownNonRootBase(sem any, fileFacts *facts.FileFacts, stageIdx int) bool {
 	if sem == nil {
 		return false
@@ -282,33 +283,45 @@ func isKnownNonRootBase(sem any, fileFacts *facts.FileFacts, stageIdx int) bool 
 		return false
 	}
 
-	info := model.StageInfo(stageIdx)
-	if info == nil || info.BaseImage == nil {
-		return false
-	}
+	// Walk the stage-ref chain. Guard against cycles with a visited set.
+	visited := make(map[int]bool)
 
-	raw := strings.ToLower(info.BaseImage.Raw)
+	for idx := stageIdx; !visited[idx]; {
+		visited[idx] = true
 
-	// Distroless :nonroot and :debug-nonroot tags.
-	if strings.Contains(raw, "distroless") {
-		if strings.Contains(raw, "nonroot") || strings.Contains(raw, "debug-nonroot") {
-			return true
+		info := model.StageInfo(idx)
+		if info == nil || info.BaseImage == nil {
+			return false
 		}
-	}
 
-	// Chainguard images default to UID 65532 (nonroot).
-	if strings.Contains(raw, "chainguard") || strings.Contains(raw, "cgr.dev") {
-		return true
-	}
-
-	// Stage inherits from a local stage — check the parent's effective USER
-	// via the already-computed StageFacts rather than re-walking commands.
-	if info.BaseImage.IsStageRef && info.BaseImage.StageIndex >= 0 && fileFacts != nil {
-		if parentFacts := fileFacts.Stage(info.BaseImage.StageIndex); parentFacts != nil {
-			if parentFacts.EffectiveUser != "" && !facts.IsRootUser(parentFacts.EffectiveUser) {
+		// Check known non-root external images at this level.
+		raw := strings.ToLower(info.BaseImage.Raw)
+		if strings.Contains(raw, "distroless") {
+			if strings.Contains(raw, "nonroot") || strings.Contains(raw, "debug-nonroot") {
 				return true
 			}
 		}
+		if strings.Contains(raw, "chainguard") || strings.Contains(raw, "cgr.dev") {
+			return true
+		}
+
+		// If this stage references a local parent stage, check the parent's
+		// effective USER. If the parent has an explicit non-root USER, we're
+		// done. If the parent has no USER (empty), continue walking up the
+		// chain to check the parent's base image.
+		if !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 || fileFacts == nil {
+			return false
+		}
+
+		parentIdx := info.BaseImage.StageIndex
+		if parentFacts := fileFacts.Stage(parentIdx); parentFacts != nil {
+			if parentFacts.EffectiveUser != "" {
+				return !facts.IsRootUser(parentFacts.EffectiveUser)
+			}
+		}
+
+		// Parent has no USER — continue walking up the chain.
+		idx = parentIdx
 	}
 
 	return false
