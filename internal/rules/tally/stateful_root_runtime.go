@@ -293,8 +293,10 @@ func inheritParentStatefulSignals(sem any, fileFacts *facts.FileFacts, stageIdx 
 	return signals
 }
 
-// inheritedParentWorkdir returns the effective WORKDIR from the parent stage
-// when the base is a local stage ref. Returns empty string otherwise.
+// inheritedParentWorkdir walks the stage-ref chain to find the effective
+// WORKDIR inherited from ancestor stages. If the immediate parent has no
+// WORKDIR (FinalWorkdir = "/"), it continues up the chain to find the
+// nearest ancestor that set one. Returns empty string for external bases.
 func inheritedParentWorkdir(sem any, fileFacts *facts.FileFacts, stageIdx int) string {
 	if sem == nil || fileFacts == nil {
 		return ""
@@ -305,13 +307,25 @@ func inheritedParentWorkdir(sem any, fileFacts *facts.FileFacts, stageIdx int) s
 		return ""
 	}
 
-	info := model.StageInfo(stageIdx)
-	if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 {
-		return ""
-	}
+	visited := make(map[int]bool)
 
-	if parentFacts := fileFacts.Stage(info.BaseImage.StageIndex); parentFacts != nil {
-		return parentFacts.FinalWorkdir
+	for idx := stageIdx; !visited[idx]; {
+		visited[idx] = true
+
+		info := model.StageInfo(idx)
+		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 {
+			return ""
+		}
+
+		parentIdx := info.BaseImage.StageIndex
+		if parentFacts := fileFacts.Stage(parentIdx); parentFacts != nil {
+			if parentFacts.FinalWorkdir != "/" {
+				return parentFacts.FinalWorkdir
+			}
+		}
+
+		// Parent has default "/" workdir — continue up the chain.
+		idx = parentIdx
 	}
 
 	return ""

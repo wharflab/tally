@@ -456,6 +456,21 @@ CMD ["app"]
 			WantMessages:   []string{"COPY destination /var/lib/app"},
 		},
 
+		{
+			Name: "transitive WORKDIR inheritance across chain",
+			Content: `FROM ubuntu:22.04 AS base
+WORKDIR /var
+
+FROM base AS mid
+
+FROM mid
+COPY app.conf lib/app/app.conf
+CMD ["app"]
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"COPY destination /var/lib/app"},
+		},
+
 		// === Edge cases ===
 		{
 			Name: "minimal stage no stateful signals",
