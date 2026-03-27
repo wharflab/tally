@@ -22,7 +22,7 @@ var ungracefulSignals = map[string]string{
 }
 
 // numericSignals maps well-known numeric signal values to their canonical names.
-// These are stable across Linux architectures (amd64, arm64, etc.).
+// These values are stable on amd64 and arm64; other architectures may differ.
 // Includes both ungraceful signals (used for detection) and common graceful
 // signals (for consistent normalization in messages and future rules).
 var numericSignals = map[int]string{
