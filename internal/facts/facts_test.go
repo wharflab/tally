@@ -226,51 +226,69 @@ func TestFileFacts_PrivilegeDropEntrypoint(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
-		content string
-		want    bool
+		name          string
+		content       string
+		wantEntryDrop bool // HasPrivilegeDropEntrypoint
+		wantCmdDrop   bool // HasPrivilegeDropCmd
+		wantHasEP     bool // HasEntrypoint
+		wantDrops     bool // DropsPrivilegesAtRuntime
 	}{
 		{
 			name: "gosu in ENTRYPOINT",
 			content: `FROM ubuntu:22.04
 ENTRYPOINT ["gosu", "postgres", "docker-entrypoint.sh"]
 `,
-			want: true,
+			wantEntryDrop: true, wantHasEP: true, wantDrops: true,
 		},
 		{
 			name: "su-exec in ENTRYPOINT",
 			content: `FROM alpine:3.20
 ENTRYPOINT ["su-exec", "redis", "redis-server"]
 `,
-			want: true,
+			wantEntryDrop: true, wantHasEP: true, wantDrops: true,
+		},
+		{
+			name: "gosu in CMD without ENTRYPOINT",
+			content: `FROM ubuntu:22.04
+CMD ["gosu", "nobody", "/app"]
+`,
+			wantCmdDrop: true, wantDrops: true,
+		},
+		{
+			name: "gosu in CMD with ENTRYPOINT does not suppress",
+			content: `FROM ubuntu:22.04
+ENTRYPOINT ["/app"]
+CMD ["gosu", "nobody"]
+`,
+			wantCmdDrop: true, wantHasEP: true, wantDrops: false,
 		},
 		{
 			name: "docker-entrypoint.sh in CMD is not a tool",
 			content: `FROM ubuntu:22.04
 CMD ["docker-entrypoint.sh", "mysqld"]
 `,
-			want: false,
+			wantDrops: false,
 		},
 		{
 			name: "setpriv in ENTRYPOINT",
 			content: `FROM ubuntu:22.04
 ENTRYPOINT ["setpriv", "--reuid=1000", "--", "/app"]
 `,
-			want: true,
+			wantEntryDrop: true, wantHasEP: true, wantDrops: true,
 		},
 		{
 			name: "shell-form ENTRYPOINT with gosu",
 			content: `FROM ubuntu:22.04
 ENTRYPOINT exec gosu postgres "$@"
 `,
-			want: true,
+			wantEntryDrop: true, wantHasEP: true, wantDrops: true,
 		},
 		{
 			name: "entrypoint.sh script is not a tool",
 			content: `FROM ubuntu:22.04
 ENTRYPOINT ["/entrypoint.sh"]
 `,
-			want: false,
+			wantHasEP: true, wantDrops: false,
 		},
 		{
 			name: "regular ENTRYPOINT no priv drop",
@@ -278,14 +296,14 @@ ENTRYPOINT ["/entrypoint.sh"]
 ENTRYPOINT ["/app"]
 CMD ["serve"]
 `,
-			want: false,
+			wantHasEP: true, wantDrops: false,
 		},
 		{
 			name: "no ENTRYPOINT or CMD",
 			content: `FROM ubuntu:22.04
 RUN echo hello
 `,
-			want: false,
+			wantDrops: false,
 		},
 	}
 
@@ -297,8 +315,17 @@ RUN echo hello
 			if stage == nil {
 				t.Fatal("expected stage facts")
 			}
-			if stage.HasPrivilegeDropEntrypoint != tt.want {
-				t.Errorf("HasPrivilegeDropEntrypoint = %v, want %v", stage.HasPrivilegeDropEntrypoint, tt.want)
+			if stage.HasPrivilegeDropEntrypoint != tt.wantEntryDrop {
+				t.Errorf("HasPrivilegeDropEntrypoint = %v, want %v", stage.HasPrivilegeDropEntrypoint, tt.wantEntryDrop)
+			}
+			if stage.HasPrivilegeDropCmd != tt.wantCmdDrop {
+				t.Errorf("HasPrivilegeDropCmd = %v, want %v", stage.HasPrivilegeDropCmd, tt.wantCmdDrop)
+			}
+			if stage.HasEntrypoint != tt.wantHasEP {
+				t.Errorf("HasEntrypoint = %v, want %v", stage.HasEntrypoint, tt.wantHasEP)
+			}
+			if stage.DropsPrivilegesAtRuntime() != tt.wantDrops {
+				t.Errorf("DropsPrivilegesAtRuntime() = %v, want %v", stage.DropsPrivilegesAtRuntime(), tt.wantDrops)
 			}
 		})
 	}

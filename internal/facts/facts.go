@@ -55,12 +55,21 @@ type StageFacts struct {
 	// FinalWorkdir is the effective WORKDIR at the end of this stage.
 	FinalWorkdir string
 
-	// HasPrivilegeDropEntrypoint is true when the stage's ENTRYPOINT or CMD
+	// HasPrivilegeDropEntrypoint is true when the stage's ENTRYPOINT
 	// references a known privilege-drop tool (gosu, su-exec, suexec, setpriv).
 	// Generic script names (docker-entrypoint.sh, entrypoint.sh) are
 	// intentionally excluded — they are too ambiguous without inspecting the
 	// script contents (which requires build-context or inline-heredoc analysis).
 	HasPrivilegeDropEntrypoint bool
+
+	// HasPrivilegeDropCmd is true when the stage's CMD references a known
+	// privilege-drop tool. Because CMD provides default arguments to
+	// ENTRYPOINT when both are present, a privilege-drop tool in CMD only
+	// indicates actual privilege dropping when no ENTRYPOINT is set.
+	HasPrivilegeDropCmd bool
+
+	// HasEntrypoint is true when the stage contains an ENTRYPOINT instruction.
+	HasEntrypoint bool
 
 	cacheDisablingEnv []EnvBinding
 }
@@ -178,6 +187,18 @@ func (f *FileFacts) Stage(index int) *StageFacts {
 	return f.stages[index]
 }
 
+// DropsPrivilegesAtRuntime reports whether the stage effectively drops root
+// privileges at runtime, respecting Docker's ENTRYPOINT/CMD interaction:
+//   - A privilege-drop tool in ENTRYPOINT always counts.
+//   - A privilege-drop tool in CMD counts only when no ENTRYPOINT is set,
+//     because CMD provides default arguments to ENTRYPOINT when both exist.
+func (s *StageFacts) DropsPrivilegesAtRuntime() bool {
+	if s.HasPrivilegeDropEntrypoint {
+		return true
+	}
+	return s.HasPrivilegeDropCmd && !s.HasEntrypoint
+}
+
 // Stages returns all stage facts.
 func (f *FileFacts) Stages() []*StageFacts {
 	f.once.Do(f.build)
@@ -253,12 +274,13 @@ func (f *FileFacts) build() {
 			case *instructions.VolumeCommand:
 				stageFacts.Volumes = append(stageFacts.Volumes, c.Volumes...)
 			case *instructions.EntrypointCommand:
+				stageFacts.HasEntrypoint = true
 				if containsPrivilegeDropPattern(c.CmdLine) {
 					stageFacts.HasPrivilegeDropEntrypoint = true
 				}
 			case *instructions.CmdCommand:
 				if containsPrivilegeDropPattern(c.CmdLine) {
-					stageFacts.HasPrivilegeDropEntrypoint = true
+					stageFacts.HasPrivilegeDropCmd = true
 				}
 			}
 		}

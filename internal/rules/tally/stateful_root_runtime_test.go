@@ -229,6 +229,16 @@ ENTRYPOINT ["setpriv", "--reuid=1000", "--", "/app"]
 			WantViolations: 0,
 		},
 
+		{
+			Name: "gosu in CMD with ENTRYPOINT does not suppress",
+			Content: `FROM ubuntu:22.04
+VOLUME /data
+ENTRYPOINT ["/app"]
+CMD ["gosu", "nobody"]
+`,
+			WantViolations: 1,
+		},
+
 		// === Multi-stage builds ===
 		{
 			Name: "multi-stage: builder root + VOLUME, final non-root",

@@ -111,7 +111,7 @@ func (r *StatefulRootRuntimeRule) Check(input rules.LintInput) []rules.Violation
 	}
 
 	// Step 3: Check for privilege-drop suppression.
-	if sf.HasPrivilegeDropEntrypoint {
+	if sf.DropsPrivilegesAtRuntime() {
 		return nil
 	}
 
