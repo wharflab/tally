@@ -245,6 +245,9 @@ func (f *FileFacts) build() {
 			stageFacts.BaseImageOS = semInfo.BaseImageOS
 		}
 
+		// Seed runtime entrypoint/cmd state from parent stage.
+		seedStageEntrypointState(semInfo, f.stages, stageFacts)
+
 		for cmdIdx, cmd := range stage.Commands {
 			switch c := cmd.(type) {
 			case *instructions.WorkdirCommand:
@@ -276,13 +279,9 @@ func (f *FileFacts) build() {
 				stageFacts.Volumes = append(stageFacts.Volumes, c.Volumes...)
 			case *instructions.EntrypointCommand:
 				stageFacts.HasEntrypoint = true
-				if containsPrivilegeDropPattern(c.CmdLine) {
-					stageFacts.HasPrivilegeDropEntrypoint = true
-				}
+				stageFacts.HasPrivilegeDropEntrypoint = containsPrivilegeDropPattern(c.CmdLine)
 			case *instructions.CmdCommand:
-				if containsPrivilegeDropPattern(c.CmdLine) {
-					stageFacts.HasPrivilegeDropCmd = true
-				}
+				stageFacts.HasPrivilegeDropCmd = containsPrivilegeDropPattern(c.CmdLine)
 			}
 		}
 
@@ -329,6 +328,27 @@ func seedStageCacheDisablingEnv(semInfo *semantic.StageInfo, stages []*StageFact
 	}
 
 	return append([]EnvBinding(nil), stages[baseIdx].cacheDisablingEnv...)
+}
+
+// seedStageEntrypointState inherits the entrypoint/cmd privilege-drop state
+// from a parent stage when the base is a local stage ref. This ensures that
+// FROM base (where base has ENTRYPOINT ["gosu", ...]) correctly inherits the
+// privilege-drop signal. The inherited values are overridden if the child
+// stage has its own ENTRYPOINT/CMD instructions.
+func seedStageEntrypointState(semInfo *semantic.StageInfo, stages []*StageFacts, target *StageFacts) {
+	if semInfo == nil || semInfo.BaseImage == nil || !semInfo.BaseImage.IsStageRef {
+		return
+	}
+
+	baseIdx := semInfo.BaseImage.StageIndex
+	if baseIdx < 0 || baseIdx >= len(stages) || stages[baseIdx] == nil {
+		return
+	}
+
+	parent := stages[baseIdx]
+	target.HasEntrypoint = parent.HasEntrypoint
+	target.HasPrivilegeDropEntrypoint = parent.HasPrivilegeDropEntrypoint
+	target.HasPrivilegeDropCmd = parent.HasPrivilegeDropCmd
 }
 
 func initialStageShell(

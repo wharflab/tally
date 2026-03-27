@@ -228,6 +228,7 @@ func TestFileFacts_PrivilegeDropEntrypoint(t *testing.T) {
 	tests := []struct {
 		name          string
 		content       string
+		stageIdx      int  // stage to check (default 0)
 		wantEntryDrop bool // HasPrivilegeDropEntrypoint
 		wantCmdDrop   bool // HasPrivilegeDropCmd
 		wantHasEP     bool // HasEntrypoint
@@ -305,13 +306,52 @@ RUN echo hello
 `,
 			wantDrops: false,
 		},
+		{
+			name: "later ENTRYPOINT overrides gosu ENTRYPOINT",
+			content: `FROM ubuntu:22.04
+ENTRYPOINT ["gosu", "postgres", "start"]
+ENTRYPOINT ["/app"]
+`,
+			wantHasEP: true, wantDrops: false,
+		},
+		{
+			name: "later CMD overrides gosu CMD",
+			content: `FROM ubuntu:22.04
+CMD ["gosu", "nobody", "/app"]
+CMD ["serve"]
+`,
+			wantDrops: false,
+		},
+		{
+			name:     "inherited gosu ENTRYPOINT from parent stage",
+			stageIdx: 1,
+			content: `FROM ubuntu:22.04 AS base
+ENTRYPOINT ["gosu", "postgres", "start"]
+
+FROM base
+CMD ["postgres"]
+`,
+			wantEntryDrop: true, wantHasEP: true, wantDrops: true,
+		},
+		{
+			name:     "child overrides inherited gosu ENTRYPOINT",
+			stageIdx: 1,
+			content: `FROM ubuntu:22.04 AS base
+ENTRYPOINT ["gosu", "postgres", "start"]
+
+FROM base
+ENTRYPOINT ["/app"]
+CMD ["serve"]
+`,
+			wantHasEP: true, wantDrops: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			ff := makeFileFacts(t, tt.content)
-			stage := ff.Stage(0)
+			stage := ff.Stage(tt.stageIdx)
 			if stage == nil {
 				t.Fatal("expected stage facts")
 			}

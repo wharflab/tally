@@ -239,6 +239,30 @@ CMD ["gosu", "nobody"]
 			WantViolations: 1,
 		},
 
+		{
+			Name: "inherited gosu ENTRYPOINT from parent stage suppresses",
+			Content: `FROM ubuntu:22.04 AS base
+ENTRYPOINT ["gosu", "postgres", "start"]
+
+FROM base
+VOLUME /var/lib/postgresql
+CMD ["postgres"]
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "child overrides inherited gosu ENTRYPOINT does not suppress",
+			Content: `FROM ubuntu:22.04 AS base
+ENTRYPOINT ["gosu", "postgres", "start"]
+
+FROM base
+ENTRYPOINT ["/app"]
+VOLUME /data
+CMD ["serve"]
+`,
+			WantViolations: 1,
+		},
+
 		// === Multi-stage builds ===
 		{
 			Name: "multi-stage: builder root + VOLUME, final non-root",
