@@ -118,6 +118,20 @@ func TestNoUngracefulStopsignalRule_Check(t *testing.T) {
 			WantViolations: 0,
 		},
 
+		// --- Windows stages (skipped) ---
+		{
+			Name: "Windows stage — skipped (STOPSIGNAL has no effect)",
+			Content: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"STOPSIGNAL SIGKILL\n",
+			WantViolations: 0,
+		},
+		{
+			Name: "Windows stage with SIGSTOP — skipped",
+			Content: "FROM mcr.microsoft.com/windows/nanoserver:ltsc2022\n" +
+				"STOPSIGNAL SIGSTOP\n",
+			WantViolations: 0,
+		},
+
 		// --- Multi-stage ---
 		{
 			Name: "multi-stage — violation in one stage only",
@@ -138,6 +152,15 @@ func TestNoUngracefulStopsignalRule_Check(t *testing.T) {
 				"FROM postgres:16\n" +
 				"STOPSIGNAL SIGSTOP\n",
 			WantViolations: 2,
+		},
+		{
+			Name: "multi-stage — Linux violation, Windows skipped",
+			Content: "FROM alpine:3.20 AS builder\n" +
+				"STOPSIGNAL SIGKILL\n" +
+				"\n" +
+				"FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"STOPSIGNAL SIGKILL\n",
+			WantViolations: 1,
 		},
 	})
 }

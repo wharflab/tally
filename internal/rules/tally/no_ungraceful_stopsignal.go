@@ -10,6 +10,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
 )
 
 // NoUngracefulStopsignalRuleCode is the full rule code.
@@ -57,11 +58,30 @@ func (r *NoUngracefulStopsignalRule) Metadata() rules.RuleMetadata {
 }
 
 // Check runs the no-ungraceful-stopsignal rule.
+//
+// Windows stages are skipped because STOPSIGNAL has no effect on Windows
+// containers (POSIX signals are not delivered). Reporting a signal as
+// "ungraceful" on a platform where it does nothing would be misleading.
 func (r *NoUngracefulStopsignalRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	var violations []rules.Violation
 
-	for _, stage := range input.Stages {
+	// Get semantic model for platform detection (optional).
+	var sem *semantic.Model
+	if input.Semantic != nil {
+		if s, ok := input.Semantic.(*semantic.Model); ok {
+			sem = s
+		}
+	}
+
+	for stageIdx, stage := range input.Stages {
+		// Skip Windows stages — STOPSIGNAL has no effect on Windows containers.
+		if sem != nil {
+			if info := sem.StageInfo(stageIdx); info != nil && info.IsWindows() {
+				continue
+			}
+		}
+
 		for _, cmd := range stage.Commands {
 			stopSig, ok := cmd.(*instructions.StopSignalCommand)
 			if !ok {

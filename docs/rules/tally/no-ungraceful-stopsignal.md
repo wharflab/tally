@@ -30,6 +30,9 @@ signals without the `SIG` prefix (`KILL`, `STOP`), and lowercase variants (`sigk
 Environment variable references (e.g. `STOPSIGNAL $MY_SIGNAL`) are skipped because
 the signal value cannot be determined statically.
 
+Windows stages are skipped because `STOPSIGNAL` has no effect on Windows
+containers — POSIX signals are not delivered to Windows processes.
+
 ## References
 
 - [Dockerfile reference -- STOPSIGNAL](https://docs.docker.com/reference/dockerfile/#stopsignal)
