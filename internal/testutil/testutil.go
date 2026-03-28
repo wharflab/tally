@@ -33,6 +33,12 @@ func ParseDockerfile(tb testing.TB, content string) *dockerfile.ParseResult {
 // BuildKit instruction parsing including Stages, MetaArgs, and semantic model.
 func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 	tb.Helper()
+	return MakeLintInputWithContext(tb, file, content, nil)
+}
+
+// MakeLintInputWithContext creates a LintInput for testing a rule with build context.
+func MakeLintInputWithContext(tb testing.TB, file, content string, buildContext rules.BuildContext) rules.LintInput {
+	tb.Helper()
 
 	result, err := dockerfile.Parse(strings.NewReader(content), nil)
 	if err != nil {
@@ -45,7 +51,13 @@ func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 	sem := semantic.NewBuilder(result, nil, file).
 		WithShellDirectives(directiveResult.ShellDirectives).
 		Build()
-	fileFacts := facts.NewFileFacts(file, result, sem, facts.ShellDirectivesFromDirective(directiveResult.ShellDirectives))
+	fileFacts := facts.NewFileFacts(
+		file,
+		result,
+		sem,
+		facts.ShellDirectivesFromDirective(directiveResult.ShellDirectives),
+		buildContext,
+	)
 
 	return rules.LintInput{
 		File:     file,
@@ -55,7 +67,7 @@ func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 		Source:   result.Source,
 		Semantic: sem,
 		Facts:    fileFacts,
-		Context:  nil, // v1.0 doesn't require context
+		Context:  buildContext,
 		Config:   nil, // Set by individual tests if needed
 	}
 }

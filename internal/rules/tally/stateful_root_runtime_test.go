@@ -18,7 +18,19 @@ func TestStatefulRootRuntimeCheck(t *testing.T) {
 
 	rule := NewStatefulRootRuntimeRule()
 
-	testutil.RunRuleTests(t, rule, []testutil.RuleTestCase{
+	testutil.RunRuleTests(t, rule, statefulRootRuntimePrimaryCases())
+}
+
+func TestStatefulRootRuntimeCheck_AdditionalCases(t *testing.T) {
+	t.Parallel()
+
+	rule := NewStatefulRootRuntimeRule()
+
+	testutil.RunRuleTests(t, rule, statefulRootRuntimeAdditionalCases())
+}
+
+func statefulRootRuntimePrimaryCases() []testutil.RuleTestCase {
+	return []testutil.RuleTestCase{
 		// === Core violations ===
 		{
 			Name: "explicit USER root + VOLUME",
@@ -205,6 +217,30 @@ CMD ["mysqld"]
 			WantViolations: 1,
 		},
 		{
+			Name: "copied heredoc entrypoint with gosu suppresses",
+			Content: `FROM ubuntu:22.04
+VOLUME /data
+COPY <<'EOF' /docker-entrypoint.sh
+#!/bin/sh
+exec gosu app "$@"
+EOF
+ENTRYPOINT ["/docker-entrypoint.sh"]
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "run-created entrypoint with su-exec suppresses",
+			Content: `FROM ubuntu:22.04
+VOLUME /data
+RUN cat <<'EOF' > /docker-entrypoint.sh
+#!/bin/sh
+exec su-exec app "$@"
+EOF
+ENTRYPOINT ["/docker-entrypoint.sh"]
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "gosu in CMD suppresses",
 			Content: `FROM ubuntu:22.04
 VOLUME /data
@@ -228,7 +264,11 @@ ENTRYPOINT ["setpriv", "--reuid=1000", "--", "/app"]
 `,
 			WantViolations: 0,
 		},
+	}
+}
 
+func statefulRootRuntimeAdditionalCases() []testutil.RuleTestCase {
+	return []testutil.RuleTestCase{
 		{
 			Name: "gosu in CMD with ENTRYPOINT does not suppress",
 			Content: `FROM ubuntu:22.04
@@ -513,7 +553,7 @@ CMD ["app"]
 `,
 			WantViolations: 0,
 		},
-	})
+	}
 }
 
 func TestIsStatePath(t *testing.T) {

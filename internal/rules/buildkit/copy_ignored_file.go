@@ -8,6 +8,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/shell"
 )
@@ -55,6 +56,18 @@ func (r *CopyIgnoredFileRule) Check(input rules.LintInput) []rules.Violation {
 	}
 
 	var violations []rules.Violation
+	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
+
+	if fileFacts != nil {
+		for stageIdx := range input.Stages {
+			stageFacts := fileFacts.Stage(stageIdx)
+			if stageFacts == nil {
+				continue
+			}
+			violations = append(violations, r.checkBuildContextSources(stageFacts.BuildContextSources, input.File)...)
+		}
+		return violations
+	}
 
 	for _, stage := range input.Stages {
 		for _, cmd := range stage.Commands {
@@ -62,6 +75,47 @@ func (r *CopyIgnoredFileRule) Check(input rules.LintInput) []rules.Violation {
 		}
 	}
 
+	return violations
+}
+
+func (r *CopyIgnoredFileRule) checkBuildContextSources(
+	sources []*facts.BuildContextSource,
+	file string,
+) []rules.Violation {
+	var violations []rules.Violation
+	for _, src := range sources {
+		if src == nil {
+			continue
+		}
+
+		loc := rules.NewFileLocation(file)
+		if len(src.Location) > 0 {
+			loc = rules.NewLocationFromRanges(file, src.Location)
+		} else if src.Line > 0 {
+			loc = rules.NewLineLocation(file, src.Line)
+		}
+
+		if src.IgnoreErr != nil {
+			violations = append(violations, rules.NewViolation(
+				loc,
+				r.Metadata().Code,
+				"failed to evaluate .dockerignore for '"+src.SourcePath+"'",
+				rules.SeverityWarning,
+			).WithDocURL(r.Metadata().DocURL).WithDetail(src.IgnoreErr.Error()))
+			continue
+		}
+
+		if src.IgnoredByDockerignore {
+			violations = append(violations, rules.NewViolation(
+				loc,
+				r.Metadata().Code,
+				"source '"+src.SourcePath+"' is excluded by .dockerignore and will not be copied",
+				r.Metadata().DefaultSeverity,
+			).WithDocURL(r.Metadata().DocURL).WithDetail(
+				"The file or directory '"+src.SourcePath+"' matches a pattern in .dockerignore. "+
+					"This COPY/ADD will fail or copy unexpected files during build."))
+		}
+	}
 	return violations
 }
 

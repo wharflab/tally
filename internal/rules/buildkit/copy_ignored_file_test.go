@@ -8,6 +8,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 // mockBuildContext implements rules.BuildContext for testing.
@@ -24,6 +25,10 @@ func (m *mockBuildContext) IsIgnored(path string) (bool, error) {
 
 func (m *mockBuildContext) FileExists(_ string) bool {
 	return true
+}
+
+func (m *mockBuildContext) ReadFile(_ string) ([]byte, error) {
+	return nil, nil
 }
 
 func (m *mockBuildContext) IsHeredocFile(path string) bool {
@@ -152,6 +157,29 @@ func TestCopyIgnoredFileRule_Check_IgnoredFile(t *testing.T) {
 
 	if violations[0].RuleCode != "buildkit/CopyIgnoredFile" {
 		t.Errorf("expected code %q, got %q", "buildkit/CopyIgnoredFile", violations[0].RuleCode)
+	}
+}
+
+func TestCopyIgnoredFileRule_Check_UsesBuildContextSourceFacts(t *testing.T) {
+	t.Parallel()
+
+	r := NewCopyIgnoredFileRule()
+	ctx := &mockBuildContext{
+		hasIgnore:    true,
+		ignoredPaths: map[string]bool{"ignored.txt": true},
+	}
+
+	input := testutil.MakeLintInputWithContext(t, "Dockerfile", `FROM scratch
+COPY ignored.txt /ignored.txt
+`, ctx)
+	input.Stages = []instructions.Stage{{}}
+
+	violations := r.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation from facts-backed source analysis, got %d", len(violations))
+	}
+	if violations[0].Line() != 2 {
+		t.Fatalf("violation line = %d, want 2", violations[0].Line())
 	}
 }
 

@@ -126,6 +126,32 @@ func TestFileExists(t *testing.T) {
 	}
 }
 
+func TestReadFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "config.txt"), []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, err := New(tmpDir, "")
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	content, err := ctx.ReadFile("./config.txt")
+	if err != nil {
+		t.Fatalf("ReadFile() error: %v", err)
+	}
+	if string(content) != "hello" {
+		t.Fatalf("ReadFile() = %q, want %q", string(content), "hello")
+	}
+
+	if _, err := ctx.ReadFile("../outside.txt"); err == nil {
+		t.Fatal("expected ReadFile() to reject paths outside the context")
+	}
+}
+
 func TestHeredocFiles(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()

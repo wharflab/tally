@@ -136,7 +136,13 @@ func LintFile(input Input) (*Result, error) {
 	sem := semantic.NewBuilder(parseResult, buildArgs, input.FilePath).
 		WithShellDirectives(directiveResult.ShellDirectives).
 		Build()
-	fileFacts := facts.NewFileFacts(input.FilePath, parseResult, sem, facts.ShellDirectivesFromDirective(directiveResult.ShellDirectives))
+	fileFacts := facts.NewFileFacts(
+		input.FilePath,
+		parseResult,
+		sem,
+		facts.ShellDirectivesFromDirective(directiveResult.ShellDirectives),
+		input.BuildContext,
+	)
 
 	enabledRules := EnabledRuleCodes(cfg)
 
