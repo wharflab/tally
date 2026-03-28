@@ -484,6 +484,18 @@ func collectWindowsACLRefs(script string, variant shell.Variant, refs map[string
 		}
 	}
 
+	// takeown: /u <user> — takes ownership of files for a specific user.
+	for _, cmd := range shell.FindCommands(script, variant, "takeown") {
+		for i, arg := range cmd.Args {
+			if strings.EqualFold(arg, "/u") && i+1 < len(cmd.Args) {
+				next := cmd.Args[i+1]
+				if !strings.HasPrefix(next, "/") && next != "" {
+					refs[next] = true
+				}
+			}
+		}
+	}
+
 	// PowerShell New-Object ...AccessRule("user", ...) — the common pattern
 	// for building ACLs that are later applied via Set-Acl. The username is
 	// the first constructor argument in the parenthesized argument list.
