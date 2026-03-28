@@ -1628,5 +1628,71 @@ severity = "warning"
 				mustSelectRules("tally/windows/no-stopsignal", "tally/no-ungraceful-stopsignal")...),
 			wantApplied: 1, // only windows/no-stopsignal should apply
 		},
+
+		// Prefer canonical STOPSIGNAL: missing SIG prefix → SIGTERM (FixSafe)
+		{
+			name:  "prefer-canonical-stopsignal-prefix",
+			input: "FROM alpine:3.20\nSTOPSIGNAL TERM\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-canonical-stopsignal")...),
+			wantApplied: 1,
+		},
+		// Prefer canonical STOPSIGNAL: quoted → unquoted (FixSafe)
+		{
+			name:  "prefer-canonical-stopsignal-quoted",
+			input: "FROM alpine:3.20\nSTOPSIGNAL \"SIGINT\"\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-canonical-stopsignal")...),
+			wantApplied: 1,
+		},
+		// Prefer canonical STOPSIGNAL: numeric → named (FixSafe)
+		{
+			name:  "prefer-canonical-stopsignal-numeric",
+			input: "FROM alpine:3.20\nSTOPSIGNAL 15\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-canonical-stopsignal")...),
+			wantApplied: 1,
+		},
+		// Prefer canonical STOPSIGNAL: lowercase → uppercase (FixSafe)
+		{
+			name:  "prefer-canonical-stopsignal-lowercase",
+			input: "FROM alpine:3.20\nSTOPSIGNAL sigquit\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-canonical-stopsignal")...),
+			wantApplied: 1,
+		},
+		// Prefer canonical STOPSIGNAL: RTMIN+3 → SIGRTMIN+3 (FixSafe)
+		{
+			name:  "prefer-canonical-stopsignal-rtmin",
+			input: "FROM alpine:3.20\nSTOPSIGNAL RTMIN+3\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-canonical-stopsignal")...),
+			wantApplied: 1,
+		},
+		// Prefer canonical STOPSIGNAL: already canonical — no fix
+		{
+			name:  "prefer-canonical-stopsignal-no-fix",
+			input: "FROM alpine:3.20\nSTOPSIGNAL SIGTERM\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-canonical-stopsignal")...),
+			wantApplied: 0,
+		},
+		// Cross-rule: both prefer-canonical-stopsignal and no-ungraceful-stopsignal on
+		// "SIGKILL" (quoted + ungraceful). The ungraceful fix (SIGTERM) has higher severity
+		// and wins; the canonical fix is skipped due to overlapping edit range.
+		{
+			name:  "prefer-canonical-stopsignal-cross-no-ungraceful",
+			input: "FROM alpine:3.20\nSTOPSIGNAL \"SIGKILL\"\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/prefer-canonical-stopsignal", "tally/no-ungraceful-stopsignal")...),
+			wantApplied: 1, // only no-ungraceful-stopsignal fix should apply (SIGTERM)
+		},
 	}
 }

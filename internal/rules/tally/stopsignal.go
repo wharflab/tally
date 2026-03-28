@@ -1,0 +1,160 @@
+package tally
+
+import (
+	"bytes"
+	"strconv"
+	"strings"
+
+	"github.com/moby/buildkit/frontend/dockerfile/command"
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
+)
+
+// numericSignals maps well-known numeric signal values to their canonical names.
+// These values are stable on amd64 and arm64; other architectures may differ.
+// Includes both ungraceful signals (used for detection) and common graceful
+// signals (for consistent normalization in messages and future rules).
+var numericSignals = map[int]string{
+	1:  "SIGHUP",
+	2:  "SIGINT",
+	3:  "SIGQUIT",
+	9:  "SIGKILL",
+	15: "SIGTERM",
+	19: "SIGSTOP",
+	28: "SIGWINCH",
+}
+
+// stopsignalVisit holds a STOPSIGNAL instruction with its raw and normalized values,
+// ready for rule-specific evaluation.
+type stopsignalVisit struct {
+	cmd        *instructions.StopSignalCommand
+	raw        string // original signal token
+	normalized string // canonical signal name
+}
+
+// visitStopsignals iterates all STOPSIGNAL instructions across stages, skipping
+// Windows stages and environment variable references. For each valid instruction,
+// it calls fn with the visit context.
+func visitStopsignals(input rules.LintInput, fn func(v stopsignalVisit)) {
+	var sem *semantic.Model
+	if input.Semantic != nil {
+		if s, ok := input.Semantic.(*semantic.Model); ok {
+			sem = s
+		}
+	}
+
+	for stageIdx, stage := range input.Stages {
+		if sem != nil {
+			if info := sem.StageInfo(stageIdx); info != nil && info.IsWindows() {
+				continue
+			}
+		}
+
+		for _, cmd := range stage.Commands {
+			stopSig, ok := cmd.(*instructions.StopSignalCommand)
+			if !ok {
+				continue
+			}
+
+			raw := stopSig.Signal
+			if strings.Contains(raw, "$") {
+				continue
+			}
+
+			fn(stopsignalVisit{
+				cmd:        stopSig,
+				raw:        raw,
+				normalized: normalizeSignalName(raw),
+			})
+		}
+	}
+}
+
+// signalEditLocation returns the Location covering the signal token on a
+// STOPSIGNAL source line. Returns nil if the position cannot be determined.
+func signalEditLocation(file string, source []byte, cmd *instructions.StopSignalCommand) *rules.Location {
+	locs := cmd.Location()
+	if len(locs) == 0 {
+		return nil
+	}
+
+	lineIdx := locs[0].Start.Line - 1 // 0-based
+	lines := bytes.Split(source, []byte("\n"))
+	if lineIdx < 0 || lineIdx >= len(lines) {
+		return nil
+	}
+
+	line := string(lines[lineIdx])
+
+	startCol, endCol := signalColumnRange(line)
+	if startCol < 0 {
+		return nil
+	}
+
+	loc := rules.NewRangeLocation(file, locs[0].Start.Line, startCol, locs[0].Start.Line, endCol)
+	return &loc
+}
+
+// normalizeSignalName normalizes a raw STOPSIGNAL token to its canonical form.
+//
+// Normalization steps:
+//  1. Strip surrounding double quotes ("SIGKILL" -> SIGKILL)
+//  2. Convert numeric values to signal names (9 -> SIGKILL)
+//  3. Add SIG prefix if missing (KILL -> SIGKILL)
+//  4. Uppercase
+func normalizeSignalName(raw string) string {
+	s := strings.TrimSpace(raw)
+
+	// Strip surrounding quotes.
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		s = s[1 : len(s)-1]
+	}
+
+	s = strings.TrimSpace(s)
+	s = strings.ToUpper(s)
+
+	// Try numeric conversion.
+	if num, err := strconv.Atoi(s); err == nil {
+		if name, ok := numericSignals[num]; ok {
+			return name
+		}
+		// Unknown numeric signal — return as-is.
+		return s
+	}
+
+	// Add SIG prefix if missing and not already present.
+	if !strings.HasPrefix(s, "SIG") {
+		s = "SIG" + s
+	}
+
+	return s
+}
+
+// signalColumnRange finds the 0-based [start, end) column range of the signal
+// token in a STOPSIGNAL source line such as "STOPSIGNAL SIGKILL".
+// Returns (-1, -1) if not found.
+func signalColumnRange(line string) (int, int) {
+	upper := strings.ToUpper(line)
+	prefix := strings.ToUpper(command.StopSignal)
+
+	idx := strings.Index(upper, prefix)
+	if idx < 0 {
+		return -1, -1
+	}
+
+	// Scan past "STOPSIGNAL" and any whitespace.
+	i := idx + len(prefix)
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+
+	// The remaining text up to the end of the line (trimmed) is the signal token.
+	end := len(strings.TrimRight(line, " \t"))
+	if i >= end {
+		return -1, -1
+	}
+
+	return i, end
+}

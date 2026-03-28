@@ -1,0 +1,171 @@
+{
+  "files": [
+    {
+      "file": "testdata/prefer-canonical-stopsignal/Dockerfile",
+      "violations": [
+        {
+          "detail": "Use the canonical signal name SIGINT for clarity and consistency",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-canonical-stopsignal/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/prefer-canonical-stopsignal/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "STOPSIGNAL \"SIGINT\" should be written as SIGINT",
+          "rule": "tally/prefer-canonical-stopsignal",
+          "severity": "info",
+          "sourceCode": "STOPSIGNAL \"SIGINT\"",
+          "suggestedFix": {
+            "description": "Replace with canonical signal name SIGINT",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 19,
+                    "line": 3
+                  },
+                  "file": "testdata/prefer-canonical-stopsignal/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 3
+                  }
+                },
+                "newText": "SIGINT"
+              }
+            ]
+          }
+        },
+        {
+          "detail": "Use the canonical signal name SIGQUIT for clarity and consistency",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-canonical-stopsignal/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 7
+            },
+            "file": "testdata/prefer-canonical-stopsignal/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 7
+            }
+          },
+          "message": "STOPSIGNAL QUIT should be written as SIGQUIT",
+          "rule": "tally/prefer-canonical-stopsignal",
+          "severity": "info",
+          "sourceCode": "STOPSIGNAL QUIT",
+          "suggestedFix": {
+            "description": "Replace with canonical signal name SIGQUIT",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 15,
+                    "line": 7
+                  },
+                  "file": "testdata/prefer-canonical-stopsignal/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 7
+                  }
+                },
+                "newText": "SIGQUIT"
+              }
+            ]
+          }
+        },
+        {
+          "detail": "Use the canonical signal name SIGRTMIN+3 for clarity and consistency",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-canonical-stopsignal/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 11
+            },
+            "file": "testdata/prefer-canonical-stopsignal/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 11
+            }
+          },
+          "message": "STOPSIGNAL RTMIN+3 should be written as SIGRTMIN+3",
+          "rule": "tally/prefer-canonical-stopsignal",
+          "severity": "info",
+          "sourceCode": "STOPSIGNAL RTMIN+3",
+          "suggestedFix": {
+            "description": "Replace with canonical signal name SIGRTMIN+3",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 18,
+                    "line": 11
+                  },
+                  "file": "testdata/prefer-canonical-stopsignal/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 11
+                  }
+                },
+                "newText": "SIGRTMIN+3"
+              }
+            ]
+          }
+        },
+        {
+          "detail": "Use the canonical signal name SIGTERM for clarity and consistency",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-canonical-stopsignal/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 15
+            },
+            "file": "testdata/prefer-canonical-stopsignal/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 15
+            }
+          },
+          "message": "STOPSIGNAL 15 should be written as SIGTERM",
+          "rule": "tally/prefer-canonical-stopsignal",
+          "severity": "info",
+          "sourceCode": "STOPSIGNAL 15",
+          "suggestedFix": {
+            "description": "Replace with canonical signal name SIGTERM",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 13,
+                    "line": 15
+                  },
+                  "file": "testdata/prefer-canonical-stopsignal/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 15
+                  }
+                },
+                "newText": "SIGTERM"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 4,
+    "style": 0,
+    "total": 4,
+    "warnings": 0
+  }
+}
