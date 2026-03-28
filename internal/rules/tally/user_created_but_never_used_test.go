@@ -337,6 +337,20 @@ CMD ["app"]
 			WantViolations: 1,
 		},
 
+		// === Observable script with no RUN (nil run regression) ===
+		{
+			Name: "observable script useradd with RUN in stage does not panic",
+			Content: `FROM ubuntu:22.04
+COPY <<EOF /setup.sh
+#!/bin/sh
+useradd -r appuser
+EOF
+RUN /setup.sh
+CMD ["app"]
+`,
+			WantViolations: 1,
+		},
+
 		// === Message quality ===
 		{
 			Name: "implicit root message",

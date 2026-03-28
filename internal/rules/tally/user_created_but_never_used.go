@@ -117,7 +117,15 @@ func (r *UserCreatedButNeverUsedRule) Check(input rules.LintInput) []rules.Viola
 		)
 	}
 
-	loc := rules.NewLocationFromRanges(input.File, uc.run.Location())
+	var loc rules.Location
+	switch {
+	case uc.run != nil:
+		loc = rules.NewLocationFromRanges(input.File, uc.run.Location())
+	case uc.stageIndex >= 0 && uc.stageIndex < len(input.Stages):
+		loc = rules.NewLocationFromRanges(input.File, input.Stages[uc.stageIndex].Location)
+	default:
+		loc = rules.NewLocationFromRanges(input.File, input.Stages[finalIdx].Location)
+	}
 	v := rules.NewViolation(loc, meta.Code, msg, meta.DefaultSeverity).
 		WithDocURL(meta.DocURL)
 
