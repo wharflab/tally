@@ -69,6 +69,5 @@ func enrichMultipleInstructionsDisallowedFix(v *rules.Violation, source []byte) 
 		Edits:       []rules.TextEdit{{Location: deleteLoc, NewText: ""}},
 	}
 
-	v.SuggestedFixes = []*rules.SuggestedFix{commentFix, deleteFix}
-	v.SuggestedFix = commentFix
+	*v = v.WithSuggestedFixes([]*rules.SuggestedFix{commentFix, deleteFix})
 }
