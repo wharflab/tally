@@ -82,41 +82,16 @@ func (r *StatefulRootRuntimeRule) Metadata() rules.RuleMetadata {
 //  2. The stage positively signals mutable/persistent state (VOLUME, data dirs).
 //  3. No privilege-drop entrypoint pattern is detected (gosu, su-exec, etc.).
 func (r *StatefulRootRuntimeRule) Check(input rules.LintInput) []rules.Violation {
-	if len(input.Stages) == 0 {
+	rc := checkFinalStageRoot(input)
+	if rc == nil {
 		return nil
 	}
 
-	finalIdx := len(input.Stages) - 1
-
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
-	if fileFacts == nil {
-		return nil
-	}
-
-	sf := fileFacts.Stage(finalIdx)
-	if sf == nil {
-		return nil
-	}
-
-	// Step 1: Determine whether the effective user is root.
-	implicitRoot := false
-	switch {
-	case sf.EffectiveUser != "":
-		// Explicit USER instruction exists — check if it's root.
-		if !facts.IsRootUser(sf.EffectiveUser) {
-			return nil
-		}
-	default:
-		// No USER instruction — defaults to root unless the base image
-		// is known to default to a non-root user.
-		if isKnownNonRootBase(input.Semantic, fileFacts, finalIdx) {
-			return nil
-		}
-		implicitRoot = true
-	}
+	finalIdx := rc.FinalIdx
+	sf := rc.StageFacts
 
 	// Step 2: Scan for stateful signals.
-	signals := detectStatefulSignals(input, sf, fileFacts, finalIdx)
+	signals := detectStatefulSignals(input, sf, rc.FileFacts, finalIdx)
 	if len(signals) == 0 {
 		return nil
 	}
@@ -131,7 +106,7 @@ func (r *StatefulRootRuntimeRule) Check(input rules.LintInput) []rules.Violation
 	primary := signals[0]
 
 	var rootDesc string
-	if implicitRoot {
+	if rc.ImplicitRoot {
 		rootDesc = "no USER instruction (defaults to root)"
 	} else {
 		rootDesc = "USER is " + sf.EffectiveUser

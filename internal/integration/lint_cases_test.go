@@ -1060,5 +1060,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/stateful-root-runtime")...),
 			wantExit: 1,
 		},
+
+		// User created but never used (isolated to user-created-but-never-used rule)
+		{
+			name:     "user-created-but-never-used",
+			dir:      "user-created-but-never-used",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/user-created-but-never-used")...),
+			wantExit: 1,
+		},
 	}
 }

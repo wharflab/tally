@@ -144,6 +144,19 @@ func VariantFromShellCmd(shellCmd []string) Variant {
 	return VariantFromShell(shellCmd[0])
 }
 
+// VariantFromScriptPath returns the appropriate Variant for parsing a script
+// based on its file extension. Defaults to VariantBash for unknown extensions.
+func VariantFromScriptPath(filePath string) Variant {
+	switch strings.ToLower(path.Ext(filePath)) {
+	case ".ps1":
+		return VariantPowerShell
+	case ".cmd", ".bat":
+		return VariantCmd
+	default:
+		return VariantBash
+	}
+}
+
 // toLangVariant converts our Variant to mvdan.cc/sh's LangVariant.
 // Only meaningful for POSIX-shell AST variants; callers should check
 // SupportsPOSIXShellAST() first.
