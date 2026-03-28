@@ -9,6 +9,17 @@ import (
 	"time"
 )
 
+type fakeFileInfo struct {
+	mode os.FileMode
+}
+
+func (f fakeFileInfo) Name() string       { return "fake" }
+func (f fakeFileInfo) Size() int64        { return 0 }
+func (f fakeFileInfo) Mode() os.FileMode  { return f.mode }
+func (f fakeFileInfo) ModTime() time.Time { return time.Time{} }
+func (f fakeFileInfo) IsDir() bool        { return f.mode.IsDir() }
+func (f fakeFileInfo) Sys() any           { return nil }
+
 func TestNew(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
@@ -228,6 +239,77 @@ func TestReadFile_ConcurrentCallsReuseSingleRead(t *testing.T) {
 	}
 	if got := calls.Load(); got != 1 {
 		t.Fatalf("underlying read count = %d, want 1", got)
+	}
+}
+
+func TestBuildContext_RejectsSymlinkOutsideContext(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	outsideDir := t.TempDir()
+	outsideFile := filepath.Join(outsideDir, "secret.txt")
+	if err := os.WriteFile(outsideFile, []byte("secret"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	linkPath := filepath.Join(tmpDir, "link.txt")
+	if err := os.Symlink(outsideFile, linkPath); err != nil {
+		t.Skipf("symlink creation unavailable: %v", err)
+	}
+
+	ctx, err := New(tmpDir, "")
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	if ctx.FileExists("link.txt") {
+		t.Fatal("expected FileExists() to reject symlink outside context")
+	}
+	if _, err := ctx.ReadFile("link.txt"); err == nil {
+		t.Fatal("expected ReadFile() to reject symlink outside context")
+	}
+}
+
+func TestBuildContext_RejectsSpecialFiles(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		mode os.FileMode
+	}{
+		{name: "named pipe", mode: os.ModeNamedPipe},
+		{name: "character device", mode: os.ModeDevice | os.ModeCharDevice},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tmpDir := t.TempDir()
+			ctx, err := New(tmpDir, "")
+			if err != nil {
+				t.Fatalf("New() error: %v", err)
+			}
+
+			fullPath := filepath.Join(tmpDir, "special")
+			ctx.lstat = func(path string) (os.FileInfo, error) {
+				if path == fullPath {
+					return fakeFileInfo{mode: tc.mode}, nil
+				}
+				return os.Lstat(path)
+			}
+			ctx.readFile = func(string) ([]byte, error) {
+				t.Fatal("expected ReadFile() to reject special file before I/O")
+				return nil, nil
+			}
+
+			if ctx.FileExists("special") {
+				t.Fatalf("expected FileExists() to reject %s", tc.name)
+			}
+			if _, err := ctx.ReadFile("special"); err == nil {
+				t.Fatalf("expected ReadFile() to reject %s", tc.name)
+			}
+		})
 	}
 }
 
