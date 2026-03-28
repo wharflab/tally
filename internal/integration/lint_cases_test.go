@@ -1038,6 +1038,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// Prefer canonical STOPSIGNAL (isolated to prefer-canonical-stopsignal rule)
+		{
+			name:     "prefer-canonical-stopsignal",
+			dir:      "prefer-canonical-stopsignal",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-canonical-stopsignal")...),
+			wantExit: 1,
+		},
+
 		// Stateful root runtime (isolated to stateful-root-runtime rule)
 		{
 			name:     "stateful-root-runtime",
