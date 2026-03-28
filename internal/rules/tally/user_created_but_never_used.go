@@ -479,8 +479,8 @@ func collectStageReferencedUsers(
 }
 
 // collectWindowsACLRefs scans a shell script for Windows ACL commands
-// (icacls, takeown, Set-Acl) that reference usernames, and adds those
-// usernames to the refs map.
+// (icacls, New-Object ...AccessRule) that reference usernames, and adds
+// those usernames to the refs map.
 func collectWindowsACLRefs(script string, variant shell.Variant, refs map[string]bool) {
 	// icacls: /grant <user>:(perms) or /setowner <user>
 	for _, cmd := range shell.FindCommands(script, variant, "icacls") {
@@ -497,18 +497,6 @@ func collectWindowsACLRefs(script string, variant shell.Variant, refs map[string
 				}
 				if user != "" {
 					refs[user] = true
-				}
-			}
-		}
-	}
-
-	// takeown: /u <user> — takes ownership of files for a specific user.
-	for _, cmd := range shell.FindCommands(script, variant, "takeown") {
-		for i, arg := range cmd.Args {
-			if strings.EqualFold(arg, "/u") && i+1 < len(cmd.Args) {
-				next := cmd.Args[i+1]
-				if !strings.HasPrefix(next, "/") && next != "" {
-					refs[next] = true
 				}
 			}
 		}
