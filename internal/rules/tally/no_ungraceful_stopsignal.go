@@ -11,8 +11,8 @@ const NoUngracefulStopsignalRuleCode = rules.TallyRulePrefix + "no-ungraceful-st
 
 // ungracefulSignals maps normalized signal names that defeat the purpose of STOPSIGNAL.
 var ungracefulSignals = map[string]string{
-	"SIGKILL": "cannot be caught or ignored; the container gets no chance to clean up",
-	"SIGSTOP": "suspends the process instead of stopping it; the container will not terminate",
+	signalSIGKILL: "cannot be caught or ignored; the container gets no chance to clean up",
+	signalSIGSTOP: "suspends the process instead of stopping it; the container will not terminate",
 }
 
 // NoUngracefulStopsignalRule detects STOPSIGNAL values that defeat the purpose
@@ -67,7 +67,7 @@ func (r *NoUngracefulStopsignalRule) Check(input rules.LintInput) []rules.Violat
 				Description: "Replace with SIGTERM for graceful shutdown",
 				Safety:      rules.FixSuggestion,
 				Edits: []rules.TextEdit{
-					{Location: *editLoc, NewText: "SIGTERM"},
+					{Location: *editLoc, NewText: signalSIGTERM},
 				},
 				IsPreferred: true,
 			})

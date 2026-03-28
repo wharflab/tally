@@ -12,18 +12,30 @@ import (
 	"github.com/wharflab/tally/internal/semantic"
 )
 
+// Canonical signal name constants used by STOPSIGNAL rules for normalization,
+// detection, and fix replacement text.
+const (
+	signalSIGHUP   = "SIGHUP"
+	signalSIGINT   = "SIGINT"
+	signalSIGQUIT  = "SIGQUIT"
+	signalSIGKILL  = "SIGKILL"
+	signalSIGTERM  = "SIGTERM"
+	signalSIGSTOP  = "SIGSTOP"
+	signalSIGWINCH = "SIGWINCH"
+)
+
 // numericSignals maps well-known numeric signal values to their canonical names.
 // These values are stable on amd64 and arm64; other architectures may differ.
 // Includes both ungraceful signals (used for detection) and common graceful
 // signals (for consistent normalization in messages and future rules).
 var numericSignals = map[int]string{
-	1:  "SIGHUP",
-	2:  "SIGINT",
-	3:  "SIGQUIT",
-	9:  "SIGKILL",
-	15: "SIGTERM",
-	19: "SIGSTOP",
-	28: "SIGWINCH",
+	1:  signalSIGHUP,
+	2:  signalSIGINT,
+	3:  signalSIGQUIT,
+	9:  signalSIGKILL,
+	15: signalSIGTERM,
+	19: signalSIGSTOP,
+	28: signalSIGWINCH,
 }
 
 // stopsignalVisit holds a STOPSIGNAL instruction with its raw and normalized values,
