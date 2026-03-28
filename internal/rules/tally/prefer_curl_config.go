@@ -16,9 +16,6 @@ import (
 // PreferCurlConfigRuleCode is the full rule code for the prefer-curl-config rule.
 const PreferCurlConfigRuleCode = rules.TallyRulePrefix + "prefer-curl-config"
 
-// curlConfigPath is the in-image path for the curl retry config file.
-const curlConfigPath = "/etc/curl/.curlrc"
-
 // Default curl config values.
 const (
 	defaultRetry          = 5
@@ -48,12 +45,12 @@ func DefaultPreferCurlConfigConfig() PreferCurlConfigConfig {
 
 // curlCheckContext bundles per-stage parameters for the check methods.
 type curlCheckContext struct {
-	file       string
-	curlHome   string
-	configPath string
-	isWindows  bool
-	meta       rules.RuleMetadata
-	cfg        PreferCurlConfigConfig
+	file     string
+	curlHome string
+
+	isWindows bool
+	meta      rules.RuleMetadata
+	cfg       PreferCurlConfigConfig
 }
 
 // PreferCurlConfigRule detects stages that use curl and suggests inserting a
@@ -110,16 +107,14 @@ func (r *PreferCurlConfigRule) Check(input rules.LintInput) []rules.Violation {
 		isWindows := stageIsWindows(stageIdx, sem, fileFacts)
 
 		ctx := curlCheckContext{
-			file:       input.File,
-			curlHome:   curlHomeLinux,
-			configPath: curlConfigPath,
-			isWindows:  isWindows,
-			meta:       meta,
-			cfg:        cfg,
+			file:      input.File,
+			curlHome:  curlHomeLinux,
+			isWindows: isWindows,
+			meta:      meta,
+			cfg:       cfg,
 		}
 		if isWindows {
 			ctx.curlHome = curlHomeWindows
-			ctx.configPath = ctx.curlHome + `\.curlrc`
 		}
 
 		if v := r.checkStage(stageIdx, stage, fileFacts, sem, &ctx); v != nil {
