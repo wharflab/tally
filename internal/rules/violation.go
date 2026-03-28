@@ -84,6 +84,18 @@ type TextEdit struct {
 	NewText string `json:"newText"`
 }
 
+// DeleteLineLocation returns a Location that covers an entire line including
+// its trailing newline, so that deleting the range leaves no blank line.
+// The lineNum is 1-based. totalLines is the total number of lines in the file.
+// If lineNum is the last line, the range covers only the line content (no
+// trailing newline to consume).
+func DeleteLineLocation(file string, lineNum, lineLen, totalLines int) Location {
+	if lineNum < totalLines {
+		return NewRangeLocation(file, lineNum, 0, lineNum+1, 0)
+	}
+	return NewRangeLocation(file, lineNum, 0, lineNum, lineLen)
+}
+
 // Violation represents a single linting violation.
 // This extends BuildKit's subrequests/lint.Warning with:
 //   - Severity levels (BuildKit treats all as warnings)

@@ -387,6 +387,32 @@ func TestViolation_JSON_SingleFix_NoSuggestedFixes(t *testing.T) {
 	}
 }
 
+func TestDeleteLineLocation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("middle line consumes trailing newline", func(t *testing.T) {
+		t.Parallel()
+		loc := DeleteLineLocation("Dockerfile", 3, 18, 5)
+		if loc.Start.Line != 3 || loc.Start.Column != 0 {
+			t.Errorf("Start = %d:%d, want 3:0", loc.Start.Line, loc.Start.Column)
+		}
+		if loc.End.Line != 4 || loc.End.Column != 0 {
+			t.Errorf("End = %d:%d, want 4:0", loc.End.Line, loc.End.Column)
+		}
+	})
+
+	t.Run("last line covers only content", func(t *testing.T) {
+		t.Parallel()
+		loc := DeleteLineLocation("Dockerfile", 5, 10, 5)
+		if loc.Start.Line != 5 || loc.Start.Column != 0 {
+			t.Errorf("Start = %d:%d, want 5:0", loc.Start.Line, loc.Start.Column)
+		}
+		if loc.End.Line != 5 || loc.End.Column != 10 {
+			t.Errorf("End = %d:%d, want 5:10", loc.End.Line, loc.End.Column)
+		}
+	})
+}
+
 func TestFixSafety_String(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

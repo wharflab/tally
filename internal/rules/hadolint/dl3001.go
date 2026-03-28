@@ -147,17 +147,8 @@ func (r *DL3001Rule) Check(input rules.LintInput) []rules.Violation {
 					)
 					commented := "# [commented out by tally - " +
 						"command has no purpose in a container]: " + line
-
-					// Delete range: consume the trailing newline so no blank line remains.
-					deleteLoc := editLoc
-					srcLines := strings.Split(string(input.Source), "\n")
-					lineIdx := loc.Start.Line - 1
-					if lineIdx+1 < len(srcLines) {
-						deleteLoc = rules.NewRangeLocation(
-							file, loc.Start.Line, 0,
-							loc.Start.Line+1, 0,
-						)
-					}
+					totalLines := strings.Count(string(input.Source), "\n") + 1
+					deleteLoc := rules.DeleteLineLocation(file, loc.Start.Line, len(line), totalLines)
 
 					v = v.WithSuggestedFixes([]*rules.SuggestedFix{
 						{

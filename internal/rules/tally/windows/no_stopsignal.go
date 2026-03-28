@@ -103,12 +103,7 @@ func buildFixes(file string, source []byte, cmd *instructions.StopSignalCommand)
 
 	editLoc := rules.NewRangeLocation(file, locs[0].Start.Line, 0, locs[0].Start.Line, len(line))
 	commentedLine := "# [commented out by tally - STOPSIGNAL has no effect on Windows containers]: " + line
-
-	// Determine the delete range: consume the trailing newline so no blank line remains.
-	deleteLoc := editLoc
-	if lineIdx+1 < len(lines) {
-		deleteLoc = rules.NewRangeLocation(file, locs[0].Start.Line, 0, locs[0].Start.Line+1, 0)
-	}
+	deleteLoc := rules.DeleteLineLocation(file, locs[0].Start.Line, len(line), len(lines))
 
 	return []*rules.SuggestedFix{
 		{

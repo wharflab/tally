@@ -51,13 +51,8 @@ func enrichMultipleInstructionsDisallowedFix(v *rules.Violation, source []byte) 
 
 	editLoc := createEditLocation(v.Location.File, v.Location.Start.Line, 0, len(line))
 	commentedLine := "# [commented out by tally - Docker will ignore all but last " + instrName + "]: " + string(line)
-
-	// Delete range: consume the trailing newline so no blank line remains.
-	lines := bytes.Split(source, []byte("\n"))
-	deleteLoc := editLoc
-	if lineIdx+1 < len(lines) {
-		deleteLoc = rules.NewRangeLocation(v.Location.File, v.Location.Start.Line, 0, v.Location.Start.Line+1, 0)
-	}
+	totalLines := bytes.Count(source, []byte("\n")) + 1
+	deleteLoc := rules.DeleteLineLocation(v.Location.File, v.Location.Start.Line, len(line), totalLines)
 
 	commentFix := &rules.SuggestedFix{
 		Description: "Comment out duplicate " + instrName + " instruction (only the last one takes effect)",
