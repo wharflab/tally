@@ -366,6 +366,38 @@ CMD ["app"]
 			WantViolations: 0,
 		},
 
+		// === Windows ===
+		{
+			Name: "net user /add with no USER instruction",
+			Content: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["cmd", "/S", "/C"]
+RUN net user appuser /add
+CMD ["app.exe"]
+`,
+			WantViolations: 1,
+			WantMessages:   []string{`user "appuser" is created`},
+		},
+		{
+			Name: "New-LocalUser with no USER instruction",
+			Content: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["powershell", "-Command"]
+RUN New-LocalUser -Name appuser -NoPassword
+CMD ["app.exe"]
+`,
+			WantViolations: 1,
+			WantMessages:   []string{`user "appuser" is created`},
+		},
+		{
+			Name: "icacls /grant suppresses Windows violation",
+			Content: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["cmd", "/S", "/C"]
+RUN net user appuser /add
+RUN icacls C:\app /grant appuser:F
+CMD ["app.exe"]
+`,
+			WantViolations: 0,
+		},
+
 		// === Message quality ===
 		{
 			Name: "implicit root message",
