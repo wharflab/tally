@@ -2,6 +2,8 @@ package tally
 
 import (
 	"testing"
+
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestNormalizeSignalName(t *testing.T) {
@@ -57,6 +59,7 @@ func TestSignalColumnRange(t *testing.T) {
 		{"  STOPSIGNAL SIGSTOP", 13, 20}, // indented
 		{"STOPSIGNAL  SIGKILL", 12, 19},  // double space
 		{"stopsignal sigkill", 11, 18},   // lowercase
+		{"STOPSIGNAL SIGKILL\r", 11, 18}, // CRLF — trailing \r stripped
 		{"RUN echo hello", -1, -1},       // not a STOPSIGNAL line
 		{"STOPSIGNAL", -1, -1},           // no signal value
 	}
@@ -70,5 +73,36 @@ func TestSignalColumnRange(t *testing.T) {
 					tt.line, start, end, tt.wantStart, tt.wantEnd)
 			}
 		})
+	}
+}
+
+func TestSignalEditLocation_CRLF(t *testing.T) {
+	t.Parallel()
+
+	// CRLF line endings: fix should still produce correct column range.
+	content := "FROM alpine:3.20\r\nSTOPSIGNAL TERM\r\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	r := NewPreferCanonicalStopsignalRule()
+	violations := r.Check(input)
+
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+
+	v := violations[0]
+	if v.SuggestedFix == nil {
+		t.Fatal("expected a SuggestedFix for CRLF input")
+	}
+
+	edit := v.SuggestedFix.Edits[0]
+	if edit.NewText != "SIGTERM" {
+		t.Errorf("NewText = %q, want %q", edit.NewText, "SIGTERM")
+	}
+	// "STOPSIGNAL " = 11, "TERM" = 4 chars, \r must not be included
+	if edit.Location.Start.Column != 11 {
+		t.Errorf("Start.Column = %d, want 11", edit.Location.Start.Column)
+	}
+	if edit.Location.End.Column != 15 {
+		t.Errorf("End.Column = %d, want 15 (should not include \\r)", edit.Location.End.Column)
 	}
 }

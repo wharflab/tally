@@ -85,10 +85,17 @@ func visitStopsignals(input rules.LintInput, fn func(v stopsignalVisit)) {
 }
 
 // signalEditLocation returns the Location covering the signal token on a
-// STOPSIGNAL source line. Returns nil if the position cannot be determined.
+// STOPSIGNAL source line. Returns nil if the position cannot be determined
+// or if the instruction spans multiple physical lines.
 func signalEditLocation(file string, source []byte, cmd *instructions.StopSignalCommand) *rules.Location {
 	locs := cmd.Location()
 	if len(locs) == 0 {
+		return nil
+	}
+
+	// Reject multi-line STOPSIGNAL spans — the column range calculation
+	// assumes a single physical line.
+	if locs[0].End.Line != locs[0].Start.Line {
 		return nil
 	}
 
@@ -163,7 +170,7 @@ func signalColumnRange(line string) (int, int) {
 	}
 
 	// The remaining text up to the end of the line (trimmed) is the signal token.
-	end := len(strings.TrimRight(line, " \t"))
+	end := len(strings.TrimRight(line, " \t\r"))
 	if i >= end {
 		return -1, -1
 	}
