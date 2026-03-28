@@ -255,7 +255,9 @@ func (v Violation) WithSuggestedFix(fix *SuggestedFix) Violation {
 // The preferred fix (first with IsPreferred=true, or the first element) is
 // automatically mirrored into SuggestedFix for backward compatibility.
 func (v Violation) WithSuggestedFixes(fixes []*SuggestedFix) Violation {
-	v.SuggestedFixes = fixes
+	if len(fixes) > 1 {
+		v.SuggestedFixes = fixes
+	}
 	v.SuggestedFix = preferredOf(fixes)
 	return v
 }

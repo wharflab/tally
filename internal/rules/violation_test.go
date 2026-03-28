@@ -387,6 +387,34 @@ func TestViolation_JSON_SingleFix_NoSuggestedFixes(t *testing.T) {
 	}
 }
 
+func TestViolation_JSON_SingleElementSlice_NoSuggestedFixes(t *testing.T) {
+	t.Parallel()
+	loc := NewLineLocation("Dockerfile", 1)
+	// WithSuggestedFixes with a single-element slice should NOT serialize suggestedFixes
+	v := NewViolation(loc, "r", "m", SeverityWarning).
+		WithSuggestedFixes([]*SuggestedFix{{Description: "only fix"}})
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("Marshal error: %v", err)
+	}
+
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal raw error: %v", err)
+	}
+	if _, ok := raw["suggestedFixes"]; ok {
+		t.Error("suggestedFixes should be omitted when WithSuggestedFixes is called with a single fix")
+	}
+	// SuggestedFix should still be populated
+	if v.SuggestedFix == nil {
+		t.Error("SuggestedFix should be set even for single-element slice")
+	}
+	if v.SuggestedFix.Description != "only fix" {
+		t.Errorf("SuggestedFix.Description = %q, want %q", v.SuggestedFix.Description, "only fix")
+	}
+}
+
 func TestDeleteLineLocation(t *testing.T) {
 	t.Parallel()
 
