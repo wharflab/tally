@@ -147,7 +147,7 @@ func VariantFromShellCmd(shellCmd []string) Variant {
 // VariantFromScriptPath returns the appropriate Variant for parsing a script
 // based on its file extension. Defaults to VariantBash for unknown extensions.
 func VariantFromScriptPath(filePath string) Variant {
-	switch path.Ext(filePath) {
+	switch strings.ToLower(path.Ext(filePath)) {
 	case ".ps1":
 		return VariantPowerShell
 	case ".cmd", ".bat":
