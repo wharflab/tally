@@ -1386,3 +1386,139 @@ func TestFixer_Apply_DefaultConcurrency(t *testing.T) {
 		t.Errorf("TotalApplied() = %d, want 1", result.TotalApplied())
 	}
 }
+
+func TestFixer_Apply_MultiFix_UsesPreferred(t *testing.T) {
+	t.Parallel()
+	sources := map[string][]byte{
+		"Dockerfile": []byte("FROM alpine\nSTOPSIGNAL SIGKILL"),
+	}
+
+	loc := rules.NewRangeLocation("Dockerfile", 2, 0, 2, 19)
+	fixComment := &rules.SuggestedFix{
+		Description: "Comment out STOPSIGNAL",
+		Safety:      rules.FixSafe,
+		IsPreferred: true,
+		Edits: []rules.TextEdit{
+			{
+				Location: loc,
+				NewText:  "# commented: STOPSIGNAL SIGKILL",
+			},
+		},
+	}
+	fixDelete := &rules.SuggestedFix{
+		Description: "Delete STOPSIGNAL",
+		Safety:      rules.FixSuggestion,
+		Edits: []rules.TextEdit{
+			{
+				Location: rules.NewRangeLocation("Dockerfile", 2, 0, 2, 19),
+				NewText:  "",
+			},
+		},
+	}
+
+	violations := []rules.Violation{
+		rules.NewViolation(loc, "tally/windows/no-stopsignal", "STOPSIGNAL not supported", rules.SeverityWarning).
+			WithSuggestedFixes([]*rules.SuggestedFix{fixComment, fixDelete}),
+	}
+
+	fixer := &Fixer{SafetyThreshold: FixSafe}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("Apply error: %v", err)
+	}
+
+	if result.TotalApplied() != 1 {
+		t.Errorf("TotalApplied() = %d, want 1", result.TotalApplied())
+	}
+
+	fc := result.Changes["Dockerfile"]
+	got := string(fc.ModifiedContent)
+	want := "FROM alpine\n# commented: STOPSIGNAL SIGKILL"
+	if got != want {
+		t.Errorf("ModifiedContent =\n%q\nwant:\n%q", got, want)
+	}
+
+	// Verify the preferred fix was chosen (comment out, not delete)
+	if len(fc.FixesApplied) != 1 {
+		t.Fatalf("FixesApplied len = %d, want 1", len(fc.FixesApplied))
+	}
+	if fc.FixesApplied[0].Description != "Comment out STOPSIGNAL" {
+		t.Errorf("applied fix = %q, want %q", fc.FixesApplied[0].Description, "Comment out STOPSIGNAL")
+	}
+}
+
+func TestFixer_Apply_MultiFix_PreferredUnsafe_Skipped(t *testing.T) {
+	t.Parallel()
+	sources := map[string][]byte{
+		"Dockerfile": []byte("FROM alpine\nSTOPSIGNAL SIGKILL"),
+	}
+
+	loc := rules.NewRangeLocation("Dockerfile", 2, 0, 2, 19)
+
+	// Preferred fix is unsafe; the safe alternative is not preferred.
+	// With SafetyThreshold=FixSafe, the fixer should skip this violation entirely
+	// because it only considers the preferred fix.
+	violations := []rules.Violation{
+		rules.NewViolation(loc, "tally/test-rule", "msg", rules.SeverityWarning).
+			WithSuggestedFixes([]*rules.SuggestedFix{
+				{Description: "Unsafe refactor", Safety: rules.FixUnsafe, IsPreferred: true,
+					Edits: []rules.TextEdit{{Location: loc, NewText: "# refactored"}}},
+				{Description: "Safe comment", Safety: rules.FixSafe,
+					Edits: []rules.TextEdit{{Location: loc, NewText: "# safe"}}},
+			}),
+	}
+
+	fixer := &Fixer{SafetyThreshold: FixSafe}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("Apply error: %v", err)
+	}
+
+	if result.TotalApplied() != 0 {
+		t.Errorf("TotalApplied() = %d, want 0 (preferred fix is unsafe)", result.TotalApplied())
+	}
+	if result.TotalSkipped() != 1 {
+		t.Errorf("TotalSkipped() = %d, want 1", result.TotalSkipped())
+	}
+
+	// Content should be unchanged
+	fc := result.Changes["Dockerfile"]
+	if !bytes.Equal(fc.ModifiedContent, fc.OriginalContent) {
+		t.Error("content should be unchanged when preferred fix is above safety threshold")
+	}
+}
+
+func TestFixer_Apply_MultiFix_UnsafeThreshold_AppliesPreferred(t *testing.T) {
+	t.Parallel()
+	sources := map[string][]byte{
+		"Dockerfile": []byte("FROM alpine\nSTOPSIGNAL SIGKILL"),
+	}
+
+	loc := rules.NewRangeLocation("Dockerfile", 2, 0, 2, 19)
+
+	violations := []rules.Violation{
+		rules.NewViolation(loc, "tally/test-rule", "msg", rules.SeverityWarning).
+			WithSuggestedFixes([]*rules.SuggestedFix{
+				{Description: "Unsafe refactor", Safety: rules.FixUnsafe, IsPreferred: true,
+					Edits: []rules.TextEdit{{Location: loc, NewText: "# refactored"}}},
+				{Description: "Safe comment", Safety: rules.FixSafe,
+					Edits: []rules.TextEdit{{Location: loc, NewText: "# safe"}}},
+			}),
+	}
+
+	// With --fix-unsafe, the preferred (unsafe) fix should be applied
+	fixer := &Fixer{SafetyThreshold: FixUnsafe}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("Apply error: %v", err)
+	}
+
+	if result.TotalApplied() != 1 {
+		t.Errorf("TotalApplied() = %d, want 1", result.TotalApplied())
+	}
+
+	fc := result.Changes["Dockerfile"]
+	if want := "FROM alpine\n# refactored"; string(fc.ModifiedContent) != want {
+		t.Errorf("ModifiedContent = %q, want %q", string(fc.ModifiedContent), want)
+	}
+}

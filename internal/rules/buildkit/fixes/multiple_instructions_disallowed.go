@@ -13,8 +13,9 @@ import (
 var multiInstrRegex = regexp.MustCompile(`^Multiple (\w+) instructions`)
 
 // enrichMultipleInstructionsDisallowedFix adds auto-fix for BuildKit's MultipleInstructionsDisallowed rule.
-// Docker ignores all but the last CMD/ENTRYPOINT in a stage, so the fix comments out the
-// earlier (ignored) instructions.
+// Docker ignores all but the last CMD/ENTRYPOINT in a stage, so the fix offers two alternatives:
+//  1. Comment out the earlier instruction (safe, preferred).
+//  2. Delete the instruction entirely (suggestion).
 //
 // Cross-rule interactions:
 //   - Covers CMD (DL4003), ENTRYPOINT (DL4004), and HEALTHCHECK (DL3012).
@@ -25,7 +26,7 @@ var multiInstrRegex = regexp.MustCompile(`^Multiple (\w+) instructions`)
 //
 //	CMD echo "first"
 //
-// Becomes:
+// Becomes (comment-out):
 //
 //	# [commented out by tally - Docker will ignore all but last CMD]: CMD echo "first"
 func enrichMultipleInstructionsDisallowedFix(v *rules.Violation, source []byte) {
@@ -48,19 +49,31 @@ func enrichMultipleInstructionsDisallowedFix(v *rules.Violation, source []byte) 
 		return
 	}
 
-	// Build the comment replacement
+	editLoc := createEditLocation(v.Location.File, v.Location.Start.Line, 0, len(line))
 	commentedLine := "# [commented out by tally - Docker will ignore all but last " + instrName + "]: " + string(line)
 
-	v.SuggestedFix = &rules.SuggestedFix{
+	// Delete range: consume the trailing newline so no blank line remains.
+	lines := bytes.Split(source, []byte("\n"))
+	deleteLoc := editLoc
+	if lineIdx+1 < len(lines) {
+		deleteLoc = rules.NewRangeLocation(v.Location.File, v.Location.Start.Line, 0, v.Location.Start.Line+1, 0)
+	}
+
+	commentFix := &rules.SuggestedFix{
 		Description: "Comment out duplicate " + instrName + " instruction (only the last one takes effect)",
 		Safety:      rules.FixSafe,
 		// Priority -1: must apply before cosmetic fixes (casing at 0, JSON form at 0) on the same line.
-		// Commenting out a dead instruction makes other fixes on that line moot.
-		Priority: -1,
-		Edits: []rules.TextEdit{{
-			Location: createEditLocation(v.Location.File, v.Location.Start.Line, 0, len(line)),
-			NewText:  commentedLine,
-		}},
+		Priority:    -1,
 		IsPreferred: true,
+		Edits:       []rules.TextEdit{{Location: editLoc, NewText: commentedLine}},
 	}
+	deleteFix := &rules.SuggestedFix{
+		Description: "Delete duplicate " + instrName + " instruction",
+		Safety:      rules.FixSuggestion,
+		Priority:    -1,
+		Edits:       []rules.TextEdit{{Location: deleteLoc, NewText: ""}},
+	}
+
+	v.SuggestedFixes = []*rules.SuggestedFix{commentFix, deleteFix}
+	v.SuggestedFix = commentFix
 }

@@ -203,6 +203,190 @@ func TestNewViolationFromBuildKitWarning_NoLocation(t *testing.T) {
 	}
 }
 
+func TestViolation_WithSuggestedFixes(t *testing.T) {
+	t.Parallel()
+	loc := NewRangeLocation("Dockerfile", 5, 0, 5, 20)
+	fixA := &SuggestedFix{
+		Description: "Comment out the line",
+		Safety:      FixSafe,
+		IsPreferred: true,
+		Edits:       []TextEdit{{Location: loc, NewText: "# commented: STOPSIGNAL SIGKILL"}},
+	}
+	fixB := &SuggestedFix{
+		Description: "Delete the line",
+		Safety:      FixSuggestion,
+		Edits:       []TextEdit{{Location: loc, NewText: ""}},
+	}
+
+	v := NewViolation(loc, "tally/windows/no-stopsignal", "STOPSIGNAL not supported", SeverityWarning).
+		WithSuggestedFixes([]*SuggestedFix{fixA, fixB})
+
+	// SuggestedFixes stores both alternatives
+	if len(v.SuggestedFixes) != 2 {
+		t.Fatalf("SuggestedFixes len = %d, want 2", len(v.SuggestedFixes))
+	}
+	// SuggestedFix mirrors the preferred fix for backward compatibility
+	if v.SuggestedFix != fixA {
+		t.Error("SuggestedFix should point to the preferred fix (fixA)")
+	}
+}
+
+func TestViolation_PreferredFix(t *testing.T) {
+	t.Parallel()
+	loc := NewLineLocation("Dockerfile", 1)
+
+	t.Run("from SuggestedFixes with IsPreferred", func(t *testing.T) {
+		t.Parallel()
+		fixA := &SuggestedFix{Description: "A", Safety: FixSafe}
+		fixB := &SuggestedFix{Description: "B", Safety: FixSuggestion, IsPreferred: true}
+		v := NewViolation(loc, "r", "m", SeverityWarning).WithSuggestedFixes([]*SuggestedFix{fixA, fixB})
+
+		pf := v.PreferredFix()
+		if pf != fixB {
+			t.Errorf("PreferredFix() = %q, want %q", pf.Description, fixB.Description)
+		}
+	})
+
+	t.Run("from SuggestedFixes without IsPreferred defaults to first", func(t *testing.T) {
+		t.Parallel()
+		fixA := &SuggestedFix{Description: "A"}
+		fixB := &SuggestedFix{Description: "B"}
+		v := NewViolation(loc, "r", "m", SeverityWarning).WithSuggestedFixes([]*SuggestedFix{fixA, fixB})
+
+		if pf := v.PreferredFix(); pf != fixA {
+			t.Errorf("PreferredFix() = %q, want %q (first element)", pf.Description, fixA.Description)
+		}
+	})
+
+	t.Run("falls back to SuggestedFix when SuggestedFixes is empty", func(t *testing.T) {
+		t.Parallel()
+		fix := &SuggestedFix{Description: "single fix"}
+		v := NewViolation(loc, "r", "m", SeverityWarning).WithSuggestedFix(fix)
+
+		if pf := v.PreferredFix(); pf != fix {
+			t.Errorf("PreferredFix() = %q, want %q", pf.Description, fix.Description)
+		}
+	})
+
+	t.Run("returns nil when no fix", func(t *testing.T) {
+		t.Parallel()
+		v := NewViolation(loc, "r", "m", SeverityWarning)
+		if pf := v.PreferredFix(); pf != nil {
+			t.Errorf("PreferredFix() = %v, want nil", pf)
+		}
+	})
+}
+
+func TestViolation_AllFixes(t *testing.T) {
+	t.Parallel()
+	loc := NewLineLocation("Dockerfile", 1)
+
+	t.Run("returns SuggestedFixes when populated", func(t *testing.T) {
+		t.Parallel()
+		fixA := &SuggestedFix{Description: "A"}
+		fixB := &SuggestedFix{Description: "B"}
+		v := NewViolation(loc, "r", "m", SeverityWarning).WithSuggestedFixes([]*SuggestedFix{fixA, fixB})
+
+		all := v.AllFixes()
+		if len(all) != 2 {
+			t.Fatalf("AllFixes() len = %d, want 2", len(all))
+		}
+	})
+
+	t.Run("wraps single SuggestedFix", func(t *testing.T) {
+		t.Parallel()
+		fix := &SuggestedFix{Description: "single"}
+		v := NewViolation(loc, "r", "m", SeverityWarning).WithSuggestedFix(fix)
+
+		all := v.AllFixes()
+		if len(all) != 1 {
+			t.Fatalf("AllFixes() len = %d, want 1", len(all))
+		}
+		if all[0] != fix {
+			t.Error("AllFixes()[0] should be the single SuggestedFix")
+		}
+	})
+
+	t.Run("returns nil when no fix", func(t *testing.T) {
+		t.Parallel()
+		v := NewViolation(loc, "r", "m", SeverityWarning)
+		if all := v.AllFixes(); all != nil {
+			t.Errorf("AllFixes() = %v, want nil", all)
+		}
+	})
+}
+
+func TestViolation_JSON_WithSuggestedFixes(t *testing.T) {
+	t.Parallel()
+	loc := NewLineLocation("Dockerfile", 5)
+	fixA := &SuggestedFix{
+		Description: "Comment out",
+		Safety:      FixSafe,
+		IsPreferred: true,
+		Edits:       []TextEdit{{Location: loc, NewText: "# commented"}},
+	}
+	fixB := &SuggestedFix{
+		Description: "Delete line",
+		Safety:      FixSuggestion,
+		Edits:       []TextEdit{{Location: loc, NewText: ""}},
+	}
+	v := NewViolation(loc, "test-rule", "msg", SeverityWarning).
+		WithSuggestedFixes([]*SuggestedFix{fixA, fixB})
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("Marshal error: %v", err)
+	}
+
+	var parsed Violation
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("Unmarshal error: %v", err)
+	}
+
+	// SuggestedFix preserved (backward compat)
+	if parsed.SuggestedFix == nil {
+		t.Fatal("SuggestedFix is nil after unmarshal")
+	}
+	if parsed.SuggestedFix.Description != "Comment out" {
+		t.Errorf("SuggestedFix.Description = %q, want %q", parsed.SuggestedFix.Description, "Comment out")
+	}
+
+	// SuggestedFixes preserved
+	if len(parsed.SuggestedFixes) != 2 {
+		t.Fatalf("SuggestedFixes len = %d, want 2", len(parsed.SuggestedFixes))
+	}
+	if parsed.SuggestedFixes[0].Description != "Comment out" {
+		t.Errorf("SuggestedFixes[0].Description = %q", parsed.SuggestedFixes[0].Description)
+	}
+	if parsed.SuggestedFixes[1].Description != "Delete line" {
+		t.Errorf("SuggestedFixes[1].Description = %q", parsed.SuggestedFixes[1].Description)
+	}
+	if parsed.SuggestedFixes[1].Safety != FixSuggestion {
+		t.Errorf("SuggestedFixes[1].Safety = %v, want FixSuggestion", parsed.SuggestedFixes[1].Safety)
+	}
+}
+
+func TestViolation_JSON_SingleFix_NoSuggestedFixes(t *testing.T) {
+	t.Parallel()
+	loc := NewLineLocation("Dockerfile", 1)
+	v := NewViolation(loc, "r", "m", SeverityWarning).
+		WithSuggestedFix(&SuggestedFix{Description: "single fix"})
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("Marshal error: %v", err)
+	}
+
+	// suggestedFixes key should not appear for a single fix
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("Unmarshal raw error: %v", err)
+	}
+	if _, ok := raw["suggestedFixes"]; ok {
+		t.Error("suggestedFixes should be omitted when only SuggestedFix is set")
+	}
+}
+
 func TestFixSafety_String(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -133,7 +133,7 @@ func (r *DL3001Rule) Check(input rules.LintInput) []rules.Violation {
 			v := rules.NewViolation(loc, meta.Code, msg, meta.DefaultSeverity).
 				WithDocURL(meta.DocURL)
 
-			// Offer a comment-out fix when every command in the RUN is invalid
+			// Offer fix alternatives when every command in the RUN is invalid
 			// and the instruction fits on a single line (no continuation lines).
 			ranges := run.Location()
 			singleLine := len(ranges) == 1 && ranges[0].Start.Line == ranges[0].End.Line
@@ -141,19 +141,37 @@ func (r *DL3001Rule) Check(input rules.LintInput) []rules.Violation {
 				sm := input.SourceMap()
 				line := sm.Line(loc.Start.Line - 1)
 				if line != "" {
+					editLoc := rules.NewRangeLocation(
+						file, loc.Start.Line, 0,
+						loc.Start.Line, len(line),
+					)
 					commented := "# [commented out by tally - " +
 						"command has no purpose in a container]: " + line
-					v = v.WithSuggestedFix(&rules.SuggestedFix{
-						Description: "Comment out RUN instruction that " +
-							"only runs container-irrelevant commands",
-						Safety: rules.FixSuggestion,
-						Edits: []rules.TextEdit{{
-							Location: rules.NewRangeLocation(
-								file, loc.Start.Line, 0,
-								loc.Start.Line, len(line),
-							),
-							NewText: commented,
-						}},
+
+					// Delete range: consume the trailing newline so no blank line remains.
+					deleteLoc := editLoc
+					srcLines := strings.Split(string(input.Source), "\n")
+					lineIdx := loc.Start.Line - 1
+					if lineIdx+1 < len(srcLines) {
+						deleteLoc = rules.NewRangeLocation(
+							file, loc.Start.Line, 0,
+							loc.Start.Line+1, 0,
+						)
+					}
+
+					v = v.WithSuggestedFixes([]*rules.SuggestedFix{
+						{
+							Description: "Comment out RUN instruction that " +
+								"only runs container-irrelevant commands",
+							Safety:      rules.FixSuggestion,
+							IsPreferred: true,
+							Edits:       []rules.TextEdit{{Location: editLoc, NewText: commented}},
+						},
+						{
+							Description: "Delete RUN instruction",
+							Safety:      rules.FixUnsafe,
+							Edits:       []rules.TextEdit{{Location: deleteLoc, NewText: ""}},
+						},
 					})
 				}
 			}

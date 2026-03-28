@@ -116,8 +116,16 @@ type Violation struct {
 	SourceCode string `json:"sourceCode,omitempty"`
 
 	// SuggestedFix provides a structured fix hint (optional).
+	// When SuggestedFixes is populated, this is automatically set to the preferred fix.
 	// Supports "auto-fix suggestion" without auto-applying.
 	SuggestedFix *SuggestedFix `json:"suggestedFix,omitempty"`
+
+	// SuggestedFixes holds multiple alternative fix options for this violation.
+	// Each alternative may have a different description, safety level, and edits.
+	// At most one should have IsPreferred=true; that fix is also mirrored in SuggestedFix.
+	// Omitted from JSON when there are fewer than two alternatives (the single fix
+	// is already available via SuggestedFix).
+	SuggestedFixes []*SuggestedFix `json:"suggestedFixes,omitzero"`
 
 	// StageIndex tracks which Dockerfile stage this violation belongs to.
 	// Used internally for merging async results; not serialized.
@@ -229,6 +237,52 @@ func (v Violation) WithSourceCode(code string) Violation {
 func (v Violation) WithSuggestedFix(fix *SuggestedFix) Violation {
 	v.SuggestedFix = fix
 	return v
+}
+
+// WithSuggestedFixes attaches multiple alternative fixes to the violation.
+// The preferred fix (first with IsPreferred=true, or the first element) is
+// automatically mirrored into SuggestedFix for backward compatibility.
+func (v Violation) WithSuggestedFixes(fixes []*SuggestedFix) Violation {
+	v.SuggestedFixes = fixes
+	v.SuggestedFix = preferredOf(fixes)
+	return v
+}
+
+// PreferredFix returns the preferred fix for this violation.
+// When SuggestedFixes contains alternatives, the first with IsPreferred=true wins;
+// if none is marked, the first element is returned.
+// When SuggestedFixes is empty, SuggestedFix is returned (backward compatibility).
+func (v Violation) PreferredFix() *SuggestedFix {
+	if len(v.SuggestedFixes) > 0 {
+		return preferredOf(v.SuggestedFixes)
+	}
+	return v.SuggestedFix
+}
+
+// AllFixes returns all fix alternatives for this violation.
+// Returns SuggestedFixes when populated, otherwise wraps the single SuggestedFix.
+// Returns nil when no fix is available.
+func (v Violation) AllFixes() []*SuggestedFix {
+	if len(v.SuggestedFixes) > 0 {
+		return v.SuggestedFixes
+	}
+	if v.SuggestedFix != nil {
+		return []*SuggestedFix{v.SuggestedFix}
+	}
+	return nil
+}
+
+// preferredOf returns the preferred fix from a list of alternatives.
+func preferredOf(fixes []*SuggestedFix) *SuggestedFix {
+	if len(fixes) == 0 {
+		return nil
+	}
+	for _, f := range fixes {
+		if f.IsPreferred {
+			return f
+		}
+	}
+	return fixes[0]
 }
 
 // File returns the file path from the location.

@@ -40,7 +40,51 @@
             ],
             "isPreferred": true,
             "priority": -1
-          }
+          },
+          "suggestedFixes": [
+            {
+              "description": "Comment out duplicate HEALTHCHECK instruction (only the last one takes effect)",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 16,
+                      "line": 2
+                    },
+                    "file": "testdata/multiple-healthcheck/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 2
+                    }
+                  },
+                  "newText": "# [commented out by tally - Docker will ignore all but last HEALTHCHECK]: HEALTHCHECK NONE"
+                }
+              ],
+              "isPreferred": true,
+              "priority": -1
+            },
+            {
+              "description": "Delete duplicate HEALTHCHECK instruction",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 3
+                    },
+                    "file": "testdata/multiple-healthcheck/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 2
+                    }
+                  },
+                  "newText": ""
+                }
+              ],
+              "priority": -1,
+              "safety": 1
+            }
+          ]
         }
       ]
     }

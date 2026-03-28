@@ -1195,13 +1195,25 @@ func TestMultipleInstructionsDisallowedFix(t *testing.T) {
 			enrichMultipleInstructionsDisallowedFix(&v, source)
 
 			if tt.wantFix {
-				require.NotNil(t, v.SuggestedFix, "expected a fix")
+				// Should have two alternative fixes
+				require.Len(t, v.SuggestedFixes, 2, "expected 2 fix alternatives")
+
+				// Preferred fix: comment out (also in SuggestedFix for backward compat)
+				require.NotNil(t, v.SuggestedFix, "expected SuggestedFix")
+				assert.Equal(t, v.SuggestedFixes[0], v.SuggestedFix, "SuggestedFix should mirror preferred")
 				assert.Len(t, v.SuggestedFix.Edits, 1)
 				assert.Equal(t, tt.wantText, v.SuggestedFix.Edits[0].NewText)
 				assert.Equal(t, rules.FixSafe, v.SuggestedFix.Safety)
 				assert.True(t, v.SuggestedFix.IsPreferred)
+
+				// Alternative fix: delete
+				deleteFix := v.SuggestedFixes[1]
+				assert.Equal(t, rules.FixSuggestion, deleteFix.Safety)
+				assert.False(t, deleteFix.IsPreferred)
+				assert.Empty(t, deleteFix.Edits[0].NewText)
 			} else {
 				assert.Nil(t, v.SuggestedFix, "expected no fix")
+				assert.Nil(t, v.SuggestedFixes, "expected no fix alternatives")
 			}
 		})
 	}

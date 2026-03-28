@@ -41,21 +41,8 @@ func (s *Server) codeActionsForDocument(
 
 	if includeQuickFix {
 		for _, v := range violations {
-			if v.SuggestedFix == nil {
-				continue
-			}
-
-			// Resolve async fixes (NeedsResolve) on-the-fly for code actions.
-			fixEdits := v.SuggestedFix.Edits
-			if v.SuggestedFix.NeedsResolve {
-				resolved := resolveFixEdits(ctx, doc, v.SuggestedFix)
-				if resolved == nil {
-					continue
-				}
-				fixEdits = resolved
-			}
-
-			if len(fixEdits) == 0 {
+			fixes := v.AllFixes()
+			if len(fixes) == 0 {
 				continue
 			}
 
@@ -64,24 +51,47 @@ func (s *Server) codeActionsForDocument(
 				continue
 			}
 
-			edits := convertTextEdits(fixEdits)
-			if len(edits) == 0 {
-				continue
-			}
-
 			matchedDiags := matchingDiagnostics(v, params.Context.Diagnostics)
-			action := protocol.CodeAction{
-				Title:       v.SuggestedFix.Description,
-				Kind:        ptrTo(protocol.CodeActionKindQuickFix),
-				IsPreferred: new(v.SuggestedFix.IsPreferred || v.SuggestedFix.Safety == rules.FixSafe),
-				Diagnostics: &matchedDiags,
-				Edit: &protocol.WorkspaceEdit{
-					Changes: new(map[protocol.DocumentUri][]*protocol.TextEdit{
-						params.TextDocument.Uri: edits,
-					}),
-				},
+			preferred := v.PreferredFix()
+
+			for _, sf := range fixes {
+				// Resolve async fixes (NeedsResolve) on-the-fly for code actions.
+				fixEdits := sf.Edits
+				if sf.NeedsResolve {
+					resolved := resolveFixEdits(ctx, doc, sf)
+					if resolved == nil {
+						continue
+					}
+					fixEdits = resolved
+				}
+
+				if len(fixEdits) == 0 {
+					continue
+				}
+
+				edits := convertTextEdits(fixEdits)
+				if len(edits) == 0 {
+					continue
+				}
+
+				// Only the preferred fix is marked IsPreferred in the LSP sense.
+				// For single-fix violations, the fix is preferred when explicitly
+				// marked or when it is safe.
+				isPreferred := sf == preferred && (sf.IsPreferred || sf.Safety == rules.FixSafe)
+
+				action := protocol.CodeAction{
+					Title:       sf.Description,
+					Kind:        ptrTo(protocol.CodeActionKindQuickFix),
+					IsPreferred: &isPreferred,
+					Diagnostics: &matchedDiags,
+					Edit: &protocol.WorkspaceEdit{
+						Changes: new(map[protocol.DocumentUri][]*protocol.TextEdit{
+							params.TextDocument.Uri: edits,
+						}),
+					},
+				}
+				actions = append(actions, action)
 			}
-			actions = append(actions, action)
 		}
 	}
 

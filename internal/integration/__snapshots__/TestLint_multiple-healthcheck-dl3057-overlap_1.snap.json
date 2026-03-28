@@ -40,7 +40,51 @@
             ],
             "isPreferred": true,
             "priority": -1
-          }
+          },
+          "suggestedFixes": [
+            {
+              "description": "Comment out duplicate HEALTHCHECK instruction (only the last one takes effect)",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 26,
+                      "line": 5
+                    },
+                    "file": "testdata/multiple-healthcheck-dl3057-overlap/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 5
+                    }
+                  },
+                  "newText": "# [commented out by tally - Docker will ignore all but last HEALTHCHECK]: HEALTHCHECK CMD /bin/check"
+                }
+              ],
+              "isPreferred": true,
+              "priority": -1
+            },
+            {
+              "description": "Delete duplicate HEALTHCHECK instruction",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 6
+                    },
+                    "file": "testdata/multiple-healthcheck-dl3057-overlap/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 5
+                    }
+                  },
+                  "newText": ""
+                }
+              ],
+              "priority": -1,
+              "safety": 1
+            }
+          ]
         }
       ]
     }

@@ -27,10 +27,10 @@ func (p *PathNormalization) Process(violations []rules.Violation, _ *Context) []
 		v.Location.File = strings.ReplaceAll(v.Location.File, "\\", "/")
 
 		// Also normalize paths in suggested fix edits
-		if v.SuggestedFix != nil {
-			for i := range v.SuggestedFix.Edits {
-				v.SuggestedFix.Edits[i].Location.File = strings.ReplaceAll(
-					v.SuggestedFix.Edits[i].Location.File, "\\", "/",
+		for _, sf := range v.AllFixes() {
+			for i := range sf.Edits {
+				sf.Edits[i].Location.File = strings.ReplaceAll(
+					sf.Edits[i].Location.File, "\\", "/",
 				)
 			}
 		}

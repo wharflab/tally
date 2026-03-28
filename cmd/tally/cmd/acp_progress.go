@@ -32,7 +32,7 @@ func planAcpFixSpinner(
 	maxTimeout := time.Duration(0)
 
 	for _, v := range violations {
-		sf := v.SuggestedFix
+		sf := v.PreferredFix()
 		if sf == nil || !sf.NeedsResolve {
 			continue
 		}
