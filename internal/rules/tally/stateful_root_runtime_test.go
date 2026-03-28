@@ -302,6 +302,21 @@ CMD ["serve"]
 `,
 			WantViolations: 1,
 		},
+		{
+			Name: "local stage copied entrypoint with gosu suppresses",
+			Content: `FROM ubuntu:22.04 AS builder
+COPY <<'EOF' /docker-entrypoint.sh
+#!/bin/sh
+exec gosu app "$@"
+EOF
+
+FROM ubuntu:22.04
+VOLUME /data
+COPY --from=builder /docker-entrypoint.sh /docker-entrypoint.sh
+ENTRYPOINT ["/docker-entrypoint.sh"]
+`,
+			WantViolations: 0,
+		},
 
 		// === Multi-stage builds ===
 		{

@@ -146,6 +146,7 @@ type runFactBuildParams struct {
 }
 
 type stageBuildState struct {
+	semInfo                  *semantic.StageInfo
 	currentEnvValues         map[string]string
 	currentEnvBindings       map[string]EnvBinding
 	currentCacheDisablingEnv []EnvBinding
@@ -301,6 +302,7 @@ func newStageBuildState(
 	currentEnvValues, currentEnvBindings := seedStageEnv(semInfo, stages)
 	observableFiles := seedStageObservableFiles(semInfo, stages)
 	return &stageBuildState{
+		semInfo:                  semInfo,
 		currentEnvValues:         currentEnvValues,
 		currentEnvBindings:       currentEnvBindings,
 		currentCacheDisablingEnv: seedStageCacheDisablingEnv(semInfo, stages),
@@ -365,7 +367,7 @@ func (f *FileFacts) processStageCommands(
 			f.runs = append(f.runs, runFacts)
 			recordRunObservableFile(stageFacts, state.fileTracker, runFacts, knownVars)
 		case *instructions.CopyCommand:
-			recordCopyObservableFiles(stageFacts, state.fileTracker, c, state.workdir, f.contextFiles)
+			recordCopyObservableFiles(stageFacts, state.fileTracker, state.semInfo, f.stages, c, state.workdir, f.contextFiles)
 		case *instructions.AddCommand:
 			recordAddObservableFiles(stageFacts, state.fileTracker, c, state.workdir, f.contextFiles)
 		case *instructions.UserCommand:
@@ -528,6 +530,8 @@ func recordRunObservableFile(
 func recordCopyObservableFiles(
 	stageFacts *StageFacts,
 	tracker *observableFileTracker,
+	semInfo *semantic.StageInfo,
+	stages []*StageFacts,
 	cmd *instructions.CopyCommand,
 	workdir string,
 	contextFiles ContextFileReader,
@@ -575,6 +579,13 @@ func recordCopyObservableFiles(
 		if !ok {
 			continue
 		}
+
+		if sourceStageFile := copyStageObservableSource(semInfo, stages, cmd, src); sourceStageFile != nil {
+			file := stageCopyObservableFile(destPath, line, cmd.Chmod, cmd.Chown, sourceStageFile)
+			stageFacts.ObservableFiles = append(stageFacts.ObservableFiles, file)
+			tracker.overwrite(file)
+			continue
+		}
 		if cmd.From != "" || !canObserveContextSource(src, sourceFact, contextFiles) {
 			tracker.invalidate(destPath)
 			continue
@@ -583,7 +594,7 @@ func recordCopyObservableFiles(
 		if sourceFact != nil && sourceFact.NormalizedSourcePath != "" {
 			sourcePath = sourceFact.NormalizedSourcePath
 		}
-		file := contextObservableFile(destPath, line, cmd.Chmod, cmd.Chown, sourcePath, contextFiles)
+		file := contextObservableFile(destPath, ObservableFileSourceCopyContext, line, cmd.Chmod, cmd.Chown, sourcePath, contextFiles)
 		stageFacts.ObservableFiles = append(stageFacts.ObservableFiles, file)
 		tracker.overwrite(file)
 	}
@@ -632,9 +643,20 @@ func recordAddObservableFiles(
 			stageFacts.BuildContextSources = append(stageFacts.BuildContextSources, sourceFact)
 		}
 		destPath, ok := resolveCopyDestPath(cmd.DestPath, src, workdir, totalSources)
-		if ok {
-			tracker.invalidate(destPath)
+		if !ok {
+			continue
 		}
+		if !canObserveAddContextSource(src, sourceFact, contextFiles) {
+			tracker.invalidate(destPath)
+			continue
+		}
+		sourcePath := src
+		if sourceFact != nil && sourceFact.NormalizedSourcePath != "" {
+			sourcePath = sourceFact.NormalizedSourcePath
+		}
+		file := contextObservableFile(destPath, ObservableFileSourceAddContext, line, cmd.Chmod, cmd.Chown, sourcePath, contextFiles)
+		stageFacts.ObservableFiles = append(stageFacts.ObservableFiles, file)
+		tracker.overwrite(file)
 	}
 }
 
@@ -652,6 +674,36 @@ func canObserveContextSource(sourcePath string, sourceFact *BuildContextSource, 
 		sourcePath = sourceFact.NormalizedSourcePath
 	}
 	return contextFiles.FileExists(sourcePath)
+}
+
+func canObserveAddContextSource(sourcePath string, sourceFact *BuildContextSource, contextFiles ContextFileReader) bool {
+	if !canObserveContextSource(sourcePath, sourceFact, contextFiles) {
+		return false
+	}
+	return !shell.IsArchiveFilename(path.Base(sourcePath))
+}
+
+func copyStageObservableSource(
+	semInfo *semantic.StageInfo,
+	stages []*StageFacts,
+	cmd *instructions.CopyCommand,
+	sourcePath string,
+) *ObservableFile {
+	if semInfo == nil || cmd == nil || cmd.From == "" {
+		return nil
+	}
+
+	for _, ref := range semInfo.CopyFromRefs {
+		if ref.Command != cmd || !ref.IsStageRef {
+			continue
+		}
+		if ref.StageIndex < 0 || ref.StageIndex >= len(stages) || stages[ref.StageIndex] == nil {
+			return nil
+		}
+		return stages[ref.StageIndex].observableByPath[normalizeStageCopySourcePath(sourcePath)]
+	}
+
+	return nil
 }
 
 func analyzeBuildContextSource(

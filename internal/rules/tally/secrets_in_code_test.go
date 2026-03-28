@@ -124,6 +124,35 @@ COPY id_rsa /root/.ssh/id_rsa
 	}
 }
 
+func TestSecretsInCodeRule_Check_SecretInAddedContextFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(
+		filepath.Join(tmpDir, "id_rsa"),
+		[]byte(
+			"-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA0Z3VS5JJcds3xfn/ygWyF8PbnGy0AHB7MaWdP0rPpJz5\n-----END RSA PRIVATE KEY-----\n",
+		),
+		0o600,
+	); err != nil {
+		t.Fatalf("write context file: %v", err)
+	}
+
+	ctx, err := buildcontext.New(tmpDir, "")
+	if err != nil {
+		t.Fatalf("create build context: %v", err)
+	}
+
+	input := testutil.MakeLintInputWithContext(t, "Dockerfile", `FROM ubuntu:22.04
+ADD id_rsa /root/.ssh/id_rsa
+`, ctx)
+
+	violations := NewSecretsInCodeRule().Check(input)
+	if len(violations) == 0 {
+		t.Fatal("expected violations for private key in added context file, got none")
+	}
+}
+
 func TestSecretsInCodeRule_Check_GitHubTokenInEnv(t *testing.T) {
 	t.Parallel()
 	r := NewSecretsInCodeRule()

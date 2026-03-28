@@ -142,10 +142,14 @@ func (r *SecretsInCodeRule) checkObservableFiles(file string, stageFacts *facts.
 		switch observed.Source {
 		case facts.ObservableFileSourceAddHeredoc:
 			context = "ADD heredoc"
+		case facts.ObservableFileSourceAddContext:
+			context = "ADD context file"
 		case facts.ObservableFileSourceCopyHeredoc:
 			context = "COPY heredoc"
 		case facts.ObservableFileSourceCopyContext:
 			context = "COPY context file"
+		case facts.ObservableFileSourceCopyStage:
+			context = "COPY --from stage file"
 		case facts.ObservableFileSourceRun:
 			continue
 		}

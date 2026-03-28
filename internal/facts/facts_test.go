@@ -520,6 +520,83 @@ COPY entrypoint.sh /app/entrypoint.sh
 	}
 }
 
+func TestStageFacts_FileContent_LocalStageCopyPreservesObservability(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, `FROM ubuntu:22.04 AS builder
+COPY <<'EOF' /docker-entrypoint.sh
+#!/bin/sh
+exec gosu app "$@"
+EOF
+
+FROM ubuntu:22.04
+COPY --from=builder /docker-entrypoint.sh /docker-entrypoint.sh
+`)
+
+	stage := fileFacts.Stage(1)
+	if stage == nil {
+		t.Fatal("expected final stage facts")
+	}
+
+	content, ok := stage.FileContent("/docker-entrypoint.sh")
+	if !ok {
+		t.Fatal("expected local stage copy to stay observable")
+	}
+	if !strings.Contains(content, "gosu") {
+		t.Fatalf("FileContent() = %q, want copied script content", content)
+	}
+}
+
+func TestStageFacts_FileContent_AddLocalContextFileIsObservable(t *testing.T) {
+	t.Parallel()
+
+	ctx := &countingContextReader{
+		files: map[string]string{
+			"entrypoint.sh": "#!/bin/sh\nexec gosu app \"$@\"\n",
+		},
+	}
+
+	fileFacts := makeFileFactsWithContext(t, `FROM ubuntu:22.04
+ADD entrypoint.sh /docker-entrypoint.sh
+`, ctx)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+
+	content, ok := stage.FileContent("/docker-entrypoint.sh")
+	if !ok {
+		t.Fatal("expected ADD local file to stay observable")
+	}
+	if !strings.Contains(content, "gosu") {
+		t.Fatalf("FileContent() = %q, want added script content", content)
+	}
+}
+
+func TestStageFacts_FileContent_AddLocalArchiveStaysUnobservable(t *testing.T) {
+	t.Parallel()
+
+	ctx := &countingContextReader{
+		files: map[string]string{
+			"archive.tar.gz": "not actually read",
+		},
+	}
+
+	fileFacts := makeFileFactsWithContext(t, `FROM ubuntu:22.04
+ADD archive.tar.gz /opt/
+`, ctx)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+
+	if _, ok := stage.FileContent("/opt/archive.tar.gz"); ok {
+		t.Fatal("expected ADD archive to stay unobservable")
+	}
+}
+
 func TestFileFacts_PrivilegeDropEntrypointFromObservableFiles(t *testing.T) {
 	t.Parallel()
 

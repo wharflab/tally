@@ -39,6 +39,8 @@ type ObservableFileSource string
 const (
 	ObservableFileSourceCopyHeredoc ObservableFileSource = "copy-heredoc"
 	ObservableFileSourceAddHeredoc  ObservableFileSource = "add-heredoc"
+	ObservableFileSourceAddContext  ObservableFileSource = "add-context"
+	ObservableFileSourceCopyStage   ObservableFileSource = "copy-stage"
 	ObservableFileSourceRun         ObservableFileSource = command.Run
 	ObservableFileSourceCopyContext ObservableFileSource = "copy-context"
 )
@@ -172,13 +174,14 @@ func literalObservableFile(
 
 func contextObservableFile(
 	path string,
+	source ObservableFileSource,
 	line int,
 	chmod, chown, sourcePath string,
 	ctx ContextFileReader,
 ) *ObservableFile {
 	return &ObservableFile{
 		Path:   normalizeObservablePath(path),
-		Source: ObservableFileSourceCopyContext,
+		Source: source,
 		Line:   line,
 		Chmod:  chmod,
 		Chown:  chown,
@@ -191,6 +194,22 @@ func contextObservableFile(
 				return "", false
 			}
 			return string(content), true
+		},
+	}
+}
+
+func stageCopyObservableFile(path string, line int, chmod, chown string, source *ObservableFile) *ObservableFile {
+	if source == nil {
+		return nil
+	}
+	return &ObservableFile{
+		Path:   normalizeObservablePath(path),
+		Source: ObservableFileSourceCopyStage,
+		Line:   line,
+		Chmod:  chmod,
+		Chown:  chown,
+		loadContent: func() (string, bool) {
+			return source.Content()
 		},
 	}
 }
@@ -244,6 +263,16 @@ func resolveRuntimeScriptPath(path, workdir string) string {
 		workdir = "/"
 	}
 	return pathpkg.Clean(pathpkg.Join(workdir, path))
+}
+
+func normalizeStageCopySourcePath(path string) string {
+	if path == "" {
+		return ""
+	}
+	if pathpkg.IsAbs(path) {
+		return normalizeObservablePath(path)
+	}
+	return pathpkg.Clean("/" + path)
 }
 
 func normalizeBuildContextSourcePath(path string) string {
