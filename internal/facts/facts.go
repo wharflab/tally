@@ -307,7 +307,7 @@ func newStageBuildState(
 		currentEnvBindings:       currentEnvBindings,
 		currentCacheDisablingEnv: seedStageCacheDisablingEnv(semInfo, stages),
 		currentShell:             initialStageShell(stage, semInfo, shellDirectives),
-		workdir:                  "/",
+		workdir:                  seedStageWorkdir(semInfo, stages),
 		fileTracker:              newObservableFileTracker(observableFiles),
 	}
 }
@@ -442,6 +442,22 @@ func seedStageCacheDisablingEnv(semInfo *semantic.StageInfo, stages []*StageFact
 	}
 
 	return append([]EnvBinding(nil), stages[baseIdx].cacheDisablingEnv...)
+}
+
+func seedStageWorkdir(semInfo *semantic.StageInfo, stages []*StageFacts) string {
+	if semInfo == nil || semInfo.BaseImage == nil || !semInfo.BaseImage.IsStageRef {
+		return "/"
+	}
+
+	baseIdx := semInfo.BaseImage.StageIndex
+	if baseIdx < 0 || baseIdx >= len(stages) || stages[baseIdx] == nil {
+		return "/"
+	}
+
+	if stages[baseIdx].FinalWorkdir == "" {
+		return "/"
+	}
+	return stages[baseIdx].FinalWorkdir
 }
 
 // seedStageEntrypointState inherits the entrypoint/cmd privilege-drop state
@@ -700,7 +716,8 @@ func copyStageObservableSource(
 		if ref.StageIndex < 0 || ref.StageIndex >= len(stages) || stages[ref.StageIndex] == nil {
 			return nil
 		}
-		return stages[ref.StageIndex].observableByPath[normalizeStageCopySourcePath(sourcePath)]
+		parent := stages[ref.StageIndex]
+		return parent.observableByPath[resolveStageCopySourcePath(sourcePath, parent.FinalWorkdir)]
 	}
 
 	return nil

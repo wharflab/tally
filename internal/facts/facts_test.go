@@ -547,6 +547,41 @@ COPY --from=builder /docker-entrypoint.sh /docker-entrypoint.sh
 	}
 }
 
+func TestStageFacts_FileContent_LocalStageCopyRespectsInheritedWorkdir(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, `FROM ubuntu:22.04 AS builder
+WORKDIR /app
+COPY <<'EOF' ./docker-entrypoint.sh
+#!/bin/sh
+exec gosu app "$@"
+EOF
+
+FROM builder
+COPY --from=builder ./docker-entrypoint.sh ./docker-entrypoint.sh
+ENTRYPOINT ["./docker-entrypoint.sh"]
+`)
+
+	stage := fileFacts.Stage(1)
+	if stage == nil {
+		t.Fatal("expected final stage facts")
+	}
+	if stage.FinalWorkdir != "/app" {
+		t.Fatalf("FinalWorkdir = %q, want %q", stage.FinalWorkdir, "/app")
+	}
+
+	content, ok := stage.FileContent("/app/docker-entrypoint.sh")
+	if !ok {
+		t.Fatal("expected inherited workdir copy to stay observable at /app/docker-entrypoint.sh")
+	}
+	if !strings.Contains(content, "gosu") {
+		t.Fatalf("FileContent() = %q, want copied script content", content)
+	}
+	if !stage.HasPrivilegeDropEntrypoint {
+		t.Fatal("expected inherited workdir entrypoint lookup to detect privilege-drop script")
+	}
+}
+
 func TestStageFacts_FileContent_AddLocalContextFileIsObservable(t *testing.T) {
 	t.Parallel()
 

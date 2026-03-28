@@ -265,14 +265,17 @@ func resolveRuntimeScriptPath(path, workdir string) string {
 	return pathpkg.Clean(pathpkg.Join(workdir, path))
 }
 
-func normalizeStageCopySourcePath(path string) string {
+func resolveStageCopySourcePath(path, workdir string) string {
 	if path == "" {
 		return ""
 	}
 	if pathpkg.IsAbs(path) {
 		return normalizeObservablePath(path)
 	}
-	return pathpkg.Clean("/" + path)
+	if workdir == "" {
+		workdir = "/"
+	}
+	return pathpkg.Clean(pathpkg.Join(workdir, path))
 }
 
 func normalizeBuildContextSourcePath(path string) string {
