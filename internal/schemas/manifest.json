@@ -79,6 +79,11 @@
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
+      "input": "internal/rules/tally/prefer_curl_config.schema.json",
+      "output": "internal/schemas/generated/rules/tally/prefer_curl_config.gen.go",
+      "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
+    },
+    {
       "input": "internal/rules/tally/prefer_multi_stage_build.schema.json",
       "output": "internal/schemas/generated/rules/tally/prefer_multi_stage_build.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"

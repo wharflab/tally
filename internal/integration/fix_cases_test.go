@@ -113,14 +113,15 @@ func fixCases(t *testing.T) []fixCase {
 				"RUN wget http://example.com/config.json -O /etc/app/config.json\n" +
 				"RUN curl -fsSL http://example.com/script.sh | sh\n",
 			args:        []string{"--fix", "--fix-unsafe", "--fail-level", "none"},
-			wantApplied: 3, // prefer-add-unpack + DL3047 --progress + single DL4006 SHELL insertion.
+			wantApplied: 4, // prefer-add-unpack + DL3047 --progress + DL4006 SHELL + prefer-curl-config.
 		},
 		// curl-should-follow-redirects: insert --location after curl
+		// Also triggers prefer-curl-config (all rules enabled) → 2 fixes.
 		{
 			name:        "curl-should-follow-redirects",
 			input:       "FROM ubuntu:22.04\nRUN curl -fsSo /tmp/file https://example.com/file\n",
 			args:        []string{"--fix", "--fix-unsafe"},
-			wantApplied: 1,
+			wantApplied: 2,
 		},
 		// Cross-rule: curl-should-follow-redirects + prefer-add-unpack on the same RUN.
 		// Both rules fire (both elevated to error), but curl-should-follow-redirects
@@ -159,6 +160,26 @@ severity = "error"
 severity = "error"
 `,
 		},
+		// prefer-curl-config: insert COPY heredoc + ENV before first curl usage
+		{
+			name:  "prefer-curl-config",
+			input: "FROM ubuntu:22.04\nRUN curl -fsSL https://example.com/install.sh | bash\n",
+			args: append([]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/prefer-curl-config")...),
+			wantApplied: 1,
+		},
+		// Cross-rule: prefer-curl-config (93) + curl-should-follow-redirects (0)
+		// on the same stage. Both should apply: curl-config inserts COPY/ENV
+		// before the RUN, curl-follow-redirects inserts --location inside the RUN.
+		{
+			name: "prefer-curl-config-cross-curl-redirects",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN curl -fsSo /tmp/file https://example.com/file\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/prefer-curl-config", "tally/curl-should-follow-redirects")...),
+			wantApplied: 2,
+		},
+
 		// DL3003: cd -> WORKDIR (regression test for line number consistency)
 		{
 			// DL3003 fix is FixSuggestion (not FixSafe) because WORKDIR creates
@@ -248,7 +269,7 @@ RUN cd /app && make build
 RUN apt install curl
 `,
 			args:        []string{"--fix", "--fix-unsafe", "--ignore", "tally/prefer-run-heredoc"},
-			wantApplied: 2, // DL3003 + DL3027
+			wantApplied: 3, // DL3003 + DL3027 + prefer-curl-config
 		},
 		// LegacyKeyValueFormat: Replace legacy "ENV key value" with "ENV key=value"
 		{
@@ -1439,7 +1460,7 @@ severity = "error"
 				"--select", "hadolint/DL3030",
 				"--select", "tally/prefer-package-cache-mounts",
 			},
-			wantApplied: 3, // secret mount + cache mount (with cleanup) + DL3030 -y
+			wantApplied: 4, // secret mount + cache mount (with cleanup) + DL3030 -y + prefer-curl-config
 			config: `[rules.tally.require-secret-mounts]
 severity = "warning"
 

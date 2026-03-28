@@ -748,6 +748,13 @@ func lintCases(t *testing.T) []lintCase {
 		},
 
 		{
+			name:     "prefer-curl-config",
+			dir:      "prefer-curl-config",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-curl-config")...),
+			wantExit: 1,
+		},
+
+		{
 			name:     "prefer-vex-attestation",
 			dir:      "prefer-vex-attestation",
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-vex-attestation")...),
