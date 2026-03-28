@@ -1,0 +1,57 @@
+{
+  "files": [
+    {
+      "file": "testdata/user-created-but-never-used/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/user-created-but-never-used/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/user-created-but-never-used/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "user \"appuser\" is created but the final stage never switches to it (no USER instruction (defaults to root))",
+          "rule": "tally/user-created-but-never-used",
+          "severity": "warning",
+          "sourceCode": "RUN groupadd -r appgroup \u0026\u0026 useradd -r -g appgroup appuser",
+          "suggestedFix": {
+            "description": "Add USER appuser before runtime command",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 4
+                  },
+                  "file": "testdata/user-created-but-never-used/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 4
+                  }
+                },
+                "newText": "USER appuser\n"
+              }
+            ],
+            "safety": 2
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

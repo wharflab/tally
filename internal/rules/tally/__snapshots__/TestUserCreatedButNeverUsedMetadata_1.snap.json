@@ -1,0 +1,10 @@
+{
+ "Category": "security",
+ "Code": "tally/user-created-but-never-used",
+ "DefaultSeverity": "warning",
+ "Description": "Final stage creates a user but never switches to it",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/user-created-but-never-used/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "User Created But Never Used"
+}

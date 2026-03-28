@@ -1715,5 +1715,15 @@ severity = "warning"
 				mustSelectRules("tally/prefer-canonical-stopsignal", "tally/no-ungraceful-stopsignal")...),
 			wantApplied: 1, // only no-ungraceful-stopsignal fix should apply (SIGTERM)
 		},
+
+		// User created but never used: insert USER before CMD (FixUnsafe)
+		{
+			name:  "user-created-but-never-used",
+			input: "FROM ubuntu:22.04\nRUN useradd -r appuser\nCMD [\"app\"]\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/user-created-but-never-used")...),
+			wantApplied: 1,
+		},
 	}
 }
