@@ -285,6 +285,48 @@ func TestQuickFixActions_SingleFix_UnsafeNotPreferred(t *testing.T) {
 	assert.False(t, *actions[0].IsPreferred, "single unsafe fix should not be auto-preferred")
 }
 
+func TestQuickFixActions_SingleFix_SuggestionNotPreferred(t *testing.T) {
+	t.Parallel()
+
+	// Single-fix FixSuggestion without explicit IsPreferred should NOT be
+	// auto-preferred. This preserves the pre-existing behavior: the IDE
+	// should not auto-apply a suggestion-level fix without user confirmation.
+	loc := rules.NewRangeLocation("Dockerfile", 3, 0, 3, 10)
+	v := rules.NewViolation(loc, "hadolint/DL3001", "msg", rules.SeverityWarning).
+		WithSuggestedFix(&rules.SuggestedFix{
+			Description: "Comment out line",
+			Safety:      rules.FixSuggestion,
+			Edits:       []rules.TextEdit{{Location: loc, NewText: "# ..."}},
+		})
+
+	params := makeCodeActionParams("file:///test/Dockerfile", fullRange(), &protocol.CodeActionContext{})
+	actions := quickFixActions([]rules.Violation{v}, params, nil)
+
+	require.Len(t, actions, 1)
+	assert.False(t, *actions[0].IsPreferred, "single FixSuggestion without IsPreferred should not be auto-preferred")
+}
+
+func TestQuickFixActions_SingleFix_SuggestionExplicitlyPreferred(t *testing.T) {
+	t.Parallel()
+
+	// Single-fix FixSuggestion WITH IsPreferred: true should be preferred.
+	// Rules like no-ungraceful-stopsignal use this pattern.
+	loc := rules.NewRangeLocation("Dockerfile", 3, 0, 3, 10)
+	v := rules.NewViolation(loc, "tally/no-ungraceful-stopsignal", "msg", rules.SeverityWarning).
+		WithSuggestedFix(&rules.SuggestedFix{
+			Description: "Replace SIGKILL with SIGTERM",
+			Safety:      rules.FixSuggestion,
+			IsPreferred: true,
+			Edits:       []rules.TextEdit{{Location: loc, NewText: "STOPSIGNAL SIGTERM"}},
+		})
+
+	params := makeCodeActionParams("file:///app/Dockerfile", fullRange(), &protocol.CodeActionContext{})
+	actions := quickFixActions([]rules.Violation{v}, params, nil)
+
+	require.Len(t, actions, 1)
+	assert.True(t, *actions[0].IsPreferred, "single FixSuggestion with IsPreferred should be preferred")
+}
+
 // makeCodeActionParams builds a CodeActionParams for testing.
 func makeCodeActionParams(uri protocol.DocumentUri, r protocol.Range, ctx *protocol.CodeActionContext) *protocol.CodeActionParams {
 	return &protocol.CodeActionParams{
