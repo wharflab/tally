@@ -41,6 +41,9 @@ type BuildContext struct {
 	// fileCache stores lazily read build-context files by normalized relative path.
 	fileCache map[string]cachedFile
 
+	// readFile allows tests to observe and control file reads.
+	readFile func(string) ([]byte, error)
+
 	// initialized tracks if patternMatcher was initialized
 	initialized bool
 
@@ -81,6 +84,7 @@ func New(contextDir, dockerfilePath string, opts ...Option) (*BuildContext, erro
 		DockerfilePath: absDockerfile,
 		heredocFiles:   make(map[string]bool),
 		fileCache:      make(map[string]cachedFile),
+		readFile:       os.ReadFile,
 	}
 
 	for _, opt := range opts {
@@ -144,14 +148,21 @@ func (ctx *BuildContext) ReadFile(path string) ([]byte, error) {
 	}
 	ctx.mu.RUnlock()
 
-	content, readErr := os.ReadFile(fullPath)
-
 	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
+
+	if cached, ok := ctx.fileCache[key]; ok {
+		if cached.err != nil {
+			return nil, cached.err
+		}
+		return append([]byte(nil), cached.content...), nil
+	}
+
+	content, readErr := ctx.readFile(fullPath)
 	ctx.fileCache[key] = cachedFile{
 		content: append([]byte(nil), content...),
 		err:     readErr,
 	}
-	ctx.mu.Unlock()
 
 	if readErr != nil {
 		return nil, readErr

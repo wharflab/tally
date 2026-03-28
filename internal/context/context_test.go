@@ -3,7 +3,10 @@ package context
 import (
 	"os"
 	"path/filepath"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestNew(t *testing.T) {
@@ -149,6 +152,82 @@ func TestReadFile(t *testing.T) {
 
 	if _, err := ctx.ReadFile("../outside.txt"); err == nil {
 		t.Fatal("expected ReadFile() to reject paths outside the context")
+	}
+}
+
+func TestReadFile_ConcurrentCallsReuseSingleRead(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	fullPath := filepath.Join(tmpDir, "config.txt")
+	if err := os.WriteFile(fullPath, []byte("hello"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, err := New(tmpDir, "")
+	if err != nil {
+		t.Fatalf("New() error: %v", err)
+	}
+
+	var calls atomic.Int32
+	firstReadStarted := make(chan struct{})
+	secondReadStarted := make(chan struct{}, 1)
+	releaseFirstRead := make(chan struct{})
+	ctx.readFile = func(path string) ([]byte, error) {
+		callNum := calls.Add(1)
+		if callNum == 1 {
+			close(firstReadStarted)
+			<-releaseFirstRead
+		} else {
+			secondReadStarted <- struct{}{}
+		}
+		return os.ReadFile(path)
+	}
+
+	var wg sync.WaitGroup
+	results := make(chan string, 2)
+	errs := make(chan error, 2)
+	read := func() {
+		defer wg.Done()
+		content, readErr := ctx.ReadFile("config.txt")
+		if readErr != nil {
+			errs <- readErr
+			return
+		}
+		results <- string(content)
+	}
+
+	wg.Add(1)
+	go read()
+
+	<-firstReadStarted
+
+	wg.Add(1)
+	go read()
+
+	select {
+	case <-secondReadStarted:
+		t.Fatal("expected concurrent ReadFile calls to share a single underlying read")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(releaseFirstRead)
+	wg.Wait()
+	close(results)
+	close(errs)
+
+	for readErr := range errs {
+		if readErr != nil {
+			t.Fatalf("ReadFile() error: %v", readErr)
+		}
+	}
+	for content := range results {
+		if content != "hello" {
+			t.Fatalf("ReadFile() = %q, want %q", content, "hello")
+		}
+	}
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("underlying read count = %d, want 1", got)
 	}
 }
 
