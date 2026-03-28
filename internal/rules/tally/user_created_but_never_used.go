@@ -455,16 +455,26 @@ func collectStageReferencedUsers(
 		collectWindowsACLRefs(run.CommandScript, run.Shell.Variant, refs)
 	}
 
-	// Observable entrypoint/CMD scripts — check for username references.
+	// Observable entrypoint/CMD scripts — check both metadata and body.
 	for _, of := range sf.ObservableFiles {
+		// Metadata chown (e.g. COPY --chown on the observable file itself).
+		if user := chownUser(of.Chown); user != "" {
+			refs[user] = true
+		}
+
 		content, ok := of.Content()
 		if !ok || content == "" {
 			continue
 		}
-		// Check if this file's chown references a user.
-		if user := chownUser(of.Chown); user != "" {
-			refs[user] = true
+
+		// Scan script body for chown / Windows ACL commands.
+		variant := shell.VariantFromScriptPath(of.Path)
+		for _, cmd := range shell.FindCommands(content, variant, "chown") {
+			if user := chownTarget(&cmd); user != "" {
+				refs[user] = true
+			}
 		}
+		collectWindowsACLRefs(content, variant, refs)
 	}
 }
 

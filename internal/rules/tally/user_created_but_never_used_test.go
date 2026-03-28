@@ -337,7 +337,7 @@ CMD ["app"]
 			WantViolations: 1,
 		},
 
-		// === Observable script with no RUN (nil run regression) ===
+		// === Observable script cases ===
 		{
 			Name: "observable script useradd with RUN in stage does not panic",
 			Content: `FROM ubuntu:22.04
@@ -349,6 +349,19 @@ RUN /setup.sh
 CMD ["app"]
 `,
 			WantViolations: 1,
+		},
+		{
+			Name: "observable entrypoint script with chown suppresses",
+			Content: `FROM ubuntu:22.04
+RUN useradd -r appuser
+COPY <<EOF /entrypoint.sh
+#!/bin/sh
+chown -R appuser:appuser /app
+exec "$@"
+EOF
+CMD ["app"]
+`,
+			WantViolations: 0,
 		},
 
 		// === Message quality ===
