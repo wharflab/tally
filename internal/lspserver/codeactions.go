@@ -126,9 +126,11 @@ func quickFixActions(
 			}
 
 			// Only the preferred fix is marked IsPreferred in the LSP sense.
-			// For single-fix violations, the fix is preferred when explicitly
-			// marked or when it is safe.
-			isPreferred := sf == preferred && (sf.IsPreferred || sf.Safety == rules.FixSafe)
+			// Multi-fix: always highlight the preferred alternative so the IDE
+			//   shows the user which option to pick.
+			// Single-fix: preferred only when explicitly marked or safe, so the
+			//   IDE doesn't auto-apply unsafe fixes (preserves pre-existing behavior).
+			isPreferred := sf == preferred && (len(fixes) > 1 || sf.IsPreferred || sf.Safety == rules.FixSafe)
 
 			action := protocol.CodeAction{
 				Title:       sf.Description,

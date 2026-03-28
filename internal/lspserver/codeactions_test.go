@@ -243,6 +243,48 @@ func TestQuickFixActions_NeedsResolve(t *testing.T) {
 	})
 }
 
+func TestQuickFixActions_MultiFix_SuggestionPreferred_StillMarked(t *testing.T) {
+	t.Parallel()
+
+	// Regression: when a multi-fix violation has a FixSuggestion as the preferred
+	// fix (without explicit IsPreferred), the IDE should still highlight it as
+	// preferred so the user knows which alternative to pick.
+	loc := rules.NewRangeLocation("Dockerfile", 3, 0, 3, 15)
+	v := rules.NewViolation(loc, "tally/test-rule", "msg", rules.SeverityWarning).
+		WithSuggestedFixes([]*rules.SuggestedFix{
+			{Description: "Suggestion fix", Safety: rules.FixSuggestion, Edits: []rules.TextEdit{{Location: loc, NewText: "a"}}},
+			{Description: "Unsafe fix", Safety: rules.FixUnsafe, Edits: []rules.TextEdit{{Location: loc, NewText: "b"}}},
+		})
+
+	params := makeCodeActionParams("file:///test/Dockerfile", fullRange(), &protocol.CodeActionContext{})
+	actions := quickFixActions([]rules.Violation{v}, params, nil)
+
+	require.Len(t, actions, 2)
+	// The first alternative is the preferred fix — it must be marked even though it's FixSuggestion
+	assert.True(t, *actions[0].IsPreferred, "preferred fix among alternatives should be IsPreferred")
+	assert.False(t, *actions[1].IsPreferred)
+}
+
+func TestQuickFixActions_SingleFix_UnsafeNotPreferred(t *testing.T) {
+	t.Parallel()
+
+	// Single-fix FixUnsafe without IsPreferred should NOT be auto-preferred by the IDE.
+	// This preserves the pre-existing behavior.
+	loc := rules.NewRangeLocation("Dockerfile", 2, 0, 2, 10)
+	v := rules.NewViolation(loc, "tally/test-rule", "msg", rules.SeverityWarning).
+		WithSuggestedFix(&rules.SuggestedFix{
+			Description: "Risky fix",
+			Safety:      rules.FixUnsafe,
+			Edits:       []rules.TextEdit{{Location: loc, NewText: "x"}},
+		})
+
+	params := makeCodeActionParams("file:///test/Dockerfile", fullRange(), &protocol.CodeActionContext{})
+	actions := quickFixActions([]rules.Violation{v}, params, nil)
+
+	require.Len(t, actions, 1)
+	assert.False(t, *actions[0].IsPreferred, "single unsafe fix should not be auto-preferred")
+}
+
 // makeCodeActionParams builds a CodeActionParams for testing.
 func makeCodeActionParams(uri protocol.DocumentUri, r protocol.Range, ctx *protocol.CodeActionContext) *protocol.CodeActionParams {
 	return &protocol.CodeActionParams{
