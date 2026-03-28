@@ -40,7 +40,51 @@
             ],
             "isPreferred": true,
             "priority": -1
-          }
+          },
+          "suggestedFixes": [
+            {
+              "description": "Comment out duplicate CMD instruction (only the last one takes effect)",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 16,
+                      "line": 2
+                    },
+                    "file": "testdata/multiple-instructions-disallowed/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 2
+                    }
+                  },
+                  "newText": "# [commented out by tally - Docker will ignore all but last CMD]: CMD echo \"build\""
+                }
+              ],
+              "isPreferred": true,
+              "priority": -1
+            },
+            {
+              "description": "Delete duplicate CMD instruction",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 3
+                    },
+                    "file": "testdata/multiple-instructions-disallowed/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 2
+                    }
+                  },
+                  "newText": ""
+                }
+              ],
+              "priority": -1,
+              "safety": 1
+            }
+          ]
         },
         {
           "docUrl": "https://wharflab.github.io/tally/rules/buildkit/MultipleInstructionsDisallowed/",
@@ -79,7 +123,51 @@
             ],
             "isPreferred": true,
             "priority": -1
-          }
+          },
+          "suggestedFixes": [
+            {
+              "description": "Comment out duplicate ENTRYPOINT instruction (only the last one takes effect)",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 24,
+                      "line": 6
+                    },
+                    "file": "testdata/multiple-instructions-disallowed/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 6
+                    }
+                  },
+                  "newText": "# [commented out by tally - Docker will ignore all but last ENTRYPOINT]: ENTRYPOINT [\"/bin/bash\"]"
+                }
+              ],
+              "isPreferred": true,
+              "priority": -1
+            },
+            {
+              "description": "Delete duplicate ENTRYPOINT instruction",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 7
+                    },
+                    "file": "testdata/multiple-instructions-disallowed/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 6
+                    }
+                  },
+                  "newText": ""
+                }
+              ],
+              "priority": -1,
+              "safety": 1
+            }
+          ]
         },
         {
           "docUrl": "https://wharflab.github.io/tally/rules/buildkit/MultipleInstructionsDisallowed/",
@@ -118,7 +206,51 @@
             ],
             "isPreferred": true,
             "priority": -1
-          }
+          },
+          "suggestedFixes": [
+            {
+              "description": "Comment out duplicate HEALTHCHECK instruction (only the last one takes effect)",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 41,
+                      "line": 8
+                    },
+                    "file": "testdata/multiple-instructions-disallowed/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 8
+                    }
+                  },
+                  "newText": "# [commented out by tally - Docker will ignore all but last HEALTHCHECK]: HEALTHCHECK CMD curl -f http://localhost/"
+                }
+              ],
+              "isPreferred": true,
+              "priority": -1
+            },
+            {
+              "description": "Delete duplicate HEALTHCHECK instruction",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 9
+                    },
+                    "file": "testdata/multiple-instructions-disallowed/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 8
+                    }
+                  },
+                  "newText": ""
+                }
+              ],
+              "priority": -1,
+              "safety": 1
+            }
+          ]
         }
       ]
     }

@@ -134,7 +134,8 @@ func (f *Fixer) classifyViolations(violations []rules.Violation, changes map[str
 
 	for i := range violations {
 		v := &violations[i]
-		if v.SuggestedFix == nil {
+		pf := v.PreferredFix()
+		if pf == nil {
 			continue
 		}
 
@@ -142,7 +143,7 @@ func (f *Fixer) classifyViolations(violations []rules.Violation, changes map[str
 			recordSkipped(changes, v, SkipRuleFilter, "")
 			continue
 		}
-		if v.SuggestedFix.Safety > f.SafetyThreshold {
+		if pf.Safety > f.SafetyThreshold {
 			recordSkipped(changes, v, SkipSafety, "")
 			continue
 		}
@@ -151,8 +152,8 @@ func (f *Fixer) classifyViolations(violations []rules.Violation, changes map[str
 			continue
 		}
 
-		candidate := &fixCandidate{violation: v, fix: v.SuggestedFix}
-		if v.SuggestedFix.NeedsResolve {
+		candidate := &fixCandidate{violation: v, fix: pf}
+		if pf.NeedsResolve {
 			asyncCandidates = append(asyncCandidates, candidate)
 		} else {
 			syncCandidates = append(syncCandidates, candidate)

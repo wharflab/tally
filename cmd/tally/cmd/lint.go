@@ -1136,37 +1136,39 @@ func applyFixes(
 	}
 	for i := range violations {
 		v := &violations[i]
-		if v.SuggestedFix == nil || !v.SuggestedFix.NeedsResolve {
-			continue
-		}
-		if v.SuggestedFix.ResolverID != autofixdata.ResolverID {
-			continue
-		}
-		req, ok := v.SuggestedFix.ResolverData.(interface {
-			SetConfig(cfg *config.Config)
-			SetFixContext(ctx autofixdata.FixContext)
-		})
-		if !ok {
-			continue
-		}
-		cfg := normalizedConfigs[filepath.ToSlash(v.File())]
-		req.SetConfig(cfg)
-		req.SetFixContext(fixCtx)
+		for _, sf := range v.AllFixes() {
+			if !sf.NeedsResolve {
+				continue
+			}
+			if sf.ResolverID != autofixdata.ResolverID {
+				continue
+			}
+			req, ok := sf.ResolverData.(interface {
+				SetConfig(cfg *config.Config)
+				SetFixContext(ctx autofixdata.FixContext)
+			})
+			if !ok {
+				continue
+			}
+			cfg := normalizedConfigs[filepath.ToSlash(v.File())]
+			req.SetConfig(cfg)
+			req.SetFixContext(fixCtx)
 
-		if setter, ok := v.SuggestedFix.ResolverData.(interface {
-			SetRegistryInsights(insights []autofixdata.RegistryInsight)
-		}); ok {
-			setter.SetRegistryInsights(registryInsightsByFile[filepath.ToSlash(v.File())])
-		}
+			if setter, ok := sf.ResolverData.(interface {
+				SetRegistryInsights(insights []autofixdata.RegistryInsight)
+			}); ok {
+				setter.SetRegistryInsights(registryInsightsByFile[filepath.ToSlash(v.File())])
+			}
 
-		if setter, ok := v.SuggestedFix.ResolverData.(interface {
-			SetContextDir(dir string)
-		}); ok {
-			if dir := cmd.String("context"); dir != "" {
-				if abs, err := filepath.Abs(dir); err == nil {
-					dir = abs
+			if setter, ok := sf.ResolverData.(interface {
+				SetContextDir(dir string)
+			}); ok {
+				if dir := cmd.String("context"); dir != "" {
+					if abs, err := filepath.Abs(dir); err == nil {
+						dir = abs
+					}
+					setter.SetContextDir(dir)
 				}
-				setter.SetContextDir(dir)
 			}
 		}
 	}

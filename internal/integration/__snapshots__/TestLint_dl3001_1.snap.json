@@ -38,8 +38,52 @@
                 "newText": "# [commented out by tally - command has no purpose in a container]: RUN top"
               }
             ],
+            "isPreferred": true,
             "safety": 1
-          }
+          },
+          "suggestedFixes": [
+            {
+              "description": "Comment out RUN instruction that only runs container-irrelevant commands",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 7,
+                      "line": 4
+                    },
+                    "file": "testdata/dl3001/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 4
+                    }
+                  },
+                  "newText": "# [commented out by tally - command has no purpose in a container]: RUN top"
+                }
+              ],
+              "isPreferred": true,
+              "safety": 1
+            },
+            {
+              "description": "Delete RUN instruction",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 5
+                    },
+                    "file": "testdata/dl3001/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 4
+                    }
+                  },
+                  "newText": ""
+                }
+              ],
+              "safety": 2
+            }
+          ]
         }
       ]
     }

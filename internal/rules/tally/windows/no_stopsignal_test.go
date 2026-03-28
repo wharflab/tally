@@ -124,6 +124,14 @@ func TestNoStopsignalRule_Fix(t *testing.T) {
 	}
 
 	v := violations[0]
+
+	// Should have two alternative fixes
+	allFixes := v.AllFixes()
+	if len(allFixes) != 2 {
+		t.Fatalf("expected 2 fix alternatives, got %d", len(allFixes))
+	}
+
+	// Preferred fix: comment out (backward compat via SuggestedFix)
 	if v.SuggestedFix == nil {
 		t.Fatal("expected a SuggestedFix")
 	}
@@ -153,6 +161,18 @@ func TestNoStopsignalRule_Fix(t *testing.T) {
 	}
 	if edit.Location.End.Column != 18 {
 		t.Errorf("edit End.Column = %d, want 18", edit.Location.End.Column)
+	}
+
+	// Alternative fix: delete
+	deleteFix := allFixes[1]
+	if deleteFix.Safety != rules.FixSuggestion {
+		t.Errorf("delete fix Safety = %v, want FixSuggestion", deleteFix.Safety)
+	}
+	if deleteFix.IsPreferred {
+		t.Error("delete fix should not be preferred")
+	}
+	if deleteFix.Edits[0].NewText != "" {
+		t.Errorf("delete fix NewText = %q, want empty string", deleteFix.Edits[0].NewText)
 	}
 }
 

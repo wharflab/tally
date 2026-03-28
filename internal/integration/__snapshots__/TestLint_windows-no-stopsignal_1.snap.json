@@ -41,7 +41,51 @@
             ],
             "isPreferred": true,
             "priority": -1
-          }
+          },
+          "suggestedFixes": [
+            {
+              "description": "Comment out STOPSIGNAL (has no effect on Windows)",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 18,
+                      "line": 8
+                    },
+                    "file": "testdata/windows-no-stopsignal/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 8
+                    }
+                  },
+                  "newText": "# [commented out by tally - STOPSIGNAL has no effect on Windows containers]: STOPSIGNAL SIGTERM"
+                }
+              ],
+              "isPreferred": true,
+              "priority": -1
+            },
+            {
+              "description": "Delete STOPSIGNAL instruction",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 9
+                    },
+                    "file": "testdata/windows-no-stopsignal/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 8
+                    }
+                  },
+                  "newText": ""
+                }
+              ],
+              "priority": -1,
+              "safety": 1
+            }
+          ]
         }
       ]
     }

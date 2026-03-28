@@ -45,13 +45,14 @@ func hasFixAllCandidate(violations []rules.Violation, cfg *config.Config) bool {
 }
 
 func fixAllCandidateAllowed(violation rules.Violation, fixModes map[string]fix.FixMode) bool {
-	if violation.SuggestedFix == nil {
+	pf := violation.PreferredFix()
+	if pf == nil {
 		return false
 	}
-	if violation.SuggestedFix.Safety > fix.FixSafe {
+	if pf.Safety > fix.FixSafe {
 		return false
 	}
-	if !violation.SuggestedFix.NeedsResolve && len(violation.SuggestedFix.Edits) == 0 {
+	if !pf.NeedsResolve && len(pf.Edits) == 0 {
 		return false
 	}
 

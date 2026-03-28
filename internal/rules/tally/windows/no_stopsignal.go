@@ -70,8 +70,8 @@ func (r *NoStopsignalRule) Check(input rules.LintInput) []rules.Violation {
 				WithDetail(detail)
 			v.StageIndex = info.Index
 
-			if fix := buildCommentOutFix(input.File, input.Source, stopSig); fix != nil {
-				v = v.WithSuggestedFix(fix)
+			if fixes := buildFixes(input.File, input.Source, stopSig); len(fixes) > 0 {
+				v = v.WithSuggestedFixes(fixes)
 			}
 
 			violations = append(violations, v)
@@ -81,9 +81,10 @@ func (r *NoStopsignalRule) Check(input rules.LintInput) []rules.Violation {
 	return violations
 }
 
-// buildCommentOutFix creates a SuggestedFix that comments out the STOPSIGNAL instruction
-// using the established "# [commented out by tally - reason]: ORIGINAL" pattern.
-func buildCommentOutFix(file string, source []byte, cmd *instructions.StopSignalCommand) *rules.SuggestedFix {
+// buildFixes returns alternative fixes for a STOPSIGNAL instruction on Windows:
+//  1. Comment out the line (safe, preferred) — preserves the original as a comment.
+//  2. Delete the line (suggestion) — removes the instruction entirely.
+func buildFixes(file string, source []byte, cmd *instructions.StopSignalCommand) []*rules.SuggestedFix {
 	locs := cmd.Location()
 	if len(locs) == 0 {
 		return nil
@@ -100,17 +101,24 @@ func buildCommentOutFix(file string, source []byte, cmd *instructions.StopSignal
 		return nil
 	}
 
+	editLoc := rules.NewRangeLocation(file, locs[0].Start.Line, 0, locs[0].Start.Line, len(line))
 	commentedLine := "# [commented out by tally - STOPSIGNAL has no effect on Windows containers]: " + line
+	deleteLoc := rules.DeleteLineLocation(file, locs[0].Start.Line, len(line), len(lines))
 
-	return &rules.SuggestedFix{
-		Description: "Comment out STOPSIGNAL (has no effect on Windows)",
-		Safety:      rules.FixSafe,
-		Priority:    -1, // Must apply before cosmetic fixes on the same line.
-		Edits: []rules.TextEdit{{
-			Location: rules.NewRangeLocation(file, locs[0].Start.Line, 0, locs[0].Start.Line, len(line)),
-			NewText:  commentedLine,
-		}},
-		IsPreferred: true,
+	return []*rules.SuggestedFix{
+		{
+			Description: "Comment out STOPSIGNAL (has no effect on Windows)",
+			Safety:      rules.FixSafe,
+			Priority:    -1, // Must apply before cosmetic fixes on the same line.
+			IsPreferred: true,
+			Edits:       []rules.TextEdit{{Location: editLoc, NewText: commentedLine}},
+		},
+		{
+			Description: "Delete STOPSIGNAL instruction",
+			Safety:      rules.FixSuggestion,
+			Priority:    -1,
+			Edits:       []rules.TextEdit{{Location: deleteLoc, NewText: ""}},
+		},
 	}
 }
 

@@ -295,18 +295,7 @@ RUN ssh user@host
 
 			v := violations[0]
 			if tt.wantFix {
-				if v.SuggestedFix == nil {
-					t.Fatal("expected SuggestedFix, got nil")
-				}
-				if v.SuggestedFix.Safety != rules.FixSuggestion {
-					t.Errorf("Safety = %v, want FixSuggestion", v.SuggestedFix.Safety)
-				}
-				if tt.wantText != "" && len(v.SuggestedFix.Edits) > 0 {
-					if v.SuggestedFix.Edits[0].NewText != tt.wantText {
-						t.Errorf("NewText = %q, want %q",
-							v.SuggestedFix.Edits[0].NewText, tt.wantText)
-					}
-				}
+				assertDL3001MultiFix(t, v, tt.wantText)
 			} else if v.SuggestedFix != nil {
 				t.Errorf("expected no SuggestedFix, got %+v", v.SuggestedFix)
 			}
@@ -329,6 +318,45 @@ RUN top && ps aux && top
 	msg := violations[0].Message
 	if !strings.Contains(msg, "command ps, top") {
 		t.Errorf("expected deduplicated 'ps, top' in message, got: %s", msg)
+	}
+}
+
+// assertDL3001MultiFix validates that a DL3001 violation has the expected multi-fix structure:
+// two alternatives (comment-out as preferred/suggestion, delete as unsafe).
+func assertDL3001MultiFix(t *testing.T, v rules.Violation, wantText string) {
+	t.Helper()
+
+	allFixes := v.AllFixes()
+	if len(allFixes) != 2 {
+		t.Fatalf("expected 2 fix alternatives, got %d", len(allFixes))
+	}
+
+	preferred := v.PreferredFix()
+	if preferred == nil {
+		t.Fatal("expected PreferredFix, got nil")
+	}
+	if preferred.Safety != rules.FixSuggestion {
+		t.Errorf("preferred Safety = %v, want FixSuggestion", preferred.Safety)
+	}
+	if !preferred.IsPreferred {
+		t.Error("expected preferred fix to have IsPreferred=true")
+	}
+	if wantText != "" && len(preferred.Edits) > 0 {
+		if preferred.Edits[0].NewText != wantText {
+			t.Errorf("NewText = %q, want %q", preferred.Edits[0].NewText, wantText)
+		}
+	}
+
+	deleteFix := allFixes[1]
+	if deleteFix.Safety != rules.FixUnsafe {
+		t.Errorf("delete fix Safety = %v, want FixUnsafe", deleteFix.Safety)
+	}
+	if deleteFix.Edits[0].NewText != "" {
+		t.Errorf("delete fix NewText = %q, want empty", deleteFix.Edits[0].NewText)
+	}
+
+	if v.SuggestedFix != preferred {
+		t.Error("SuggestedFix should point to the preferred fix")
 	}
 }
 

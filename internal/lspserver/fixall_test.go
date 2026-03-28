@@ -140,6 +140,79 @@ func TestHasFixAllCandidate(t *testing.T) {
 	}
 }
 
+func TestHasFixAllCandidate_MultiFix(t *testing.T) {
+	t.Parallel()
+
+	filePath := filepath.Clean("/tmp/Dockerfile")
+	safeEdit := rules.TextEdit{
+		Location: rules.NewLineLocation(filePath, 1),
+		NewText:  "# commented: STOPSIGNAL SIGKILL",
+	}
+
+	tests := []struct {
+		name       string
+		violations []rules.Violation
+		want       bool
+	}{
+		{
+			name: "preferred fix is safe",
+			violations: []rules.Violation{
+				violationWithFixes(filePath, "tally/windows/no-stopsignal", []*rules.SuggestedFix{
+					{Description: "Comment out", Safety: rules.FixSafe, IsPreferred: true, Edits: []rules.TextEdit{safeEdit}},
+					{Description: "Delete line", Safety: rules.FixSuggestion, Edits: []rules.TextEdit{safeEdit}},
+				}),
+			},
+			want: true,
+		},
+		{
+			name: "preferred fix is unsafe",
+			violations: []rules.Violation{
+				violationWithFixes(filePath, "tally/prefer-multi-stage-build", []*rules.SuggestedFix{
+					{Description: "Refactor", Safety: rules.FixUnsafe, IsPreferred: true, Edits: []rules.TextEdit{safeEdit}},
+					{Description: "Comment out", Safety: rules.FixSafe, Edits: []rules.TextEdit{safeEdit}},
+				}),
+			},
+			want: false, // fix-all uses preferred fix, which is unsafe
+		},
+		{
+			name: "preferred fix is suggestion",
+			violations: []rules.Violation{
+				violationWithFixes(filePath, "hadolint/DL3001", []*rules.SuggestedFix{
+					{Description: "Better fix", Safety: rules.FixSuggestion, IsPreferred: true, Edits: []rules.TextEdit{safeEdit}},
+					{Description: "Safe fix", Safety: rules.FixSafe, Edits: []rules.TextEdit{safeEdit}},
+				}),
+			},
+			want: false, // fix-all uses preferred fix, which is suggestion (not safe)
+		},
+		{
+			name: "no preferred marked defaults to first which is safe",
+			violations: []rules.Violation{
+				violationWithFixes(filePath, "buildkit/MaintainerDeprecated", []*rules.SuggestedFix{
+					{Description: "Safe fix", Safety: rules.FixSafe, Edits: []rules.TextEdit{safeEdit}},
+					{Description: "Suggestion", Safety: rules.FixSuggestion, Edits: []rules.TextEdit{safeEdit}},
+				}),
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, tt.want, hasFixAllCandidate(tt.violations, nil))
+		})
+	}
+}
+
+func violationWithFixes(filePath, ruleCode string, fixes []*rules.SuggestedFix) rules.Violation {
+	return rules.NewViolation(
+		rules.NewLineLocation(filePath, 1),
+		ruleCode,
+		"msg",
+		rules.SeverityWarning,
+	).WithSuggestedFixes(fixes)
+}
+
 func violationWithFix(filePath, ruleCode string, suggestedFix *rules.SuggestedFix) rules.Violation {
 	return rules.NewViolation(
 		rules.NewLineLocation(filePath, 1),

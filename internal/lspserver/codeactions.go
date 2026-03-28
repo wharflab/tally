@@ -40,49 +40,10 @@ func (s *Server) codeActionsForDocument(
 	actions := make([]protocol.CodeAction, 0, len(violations)+1)
 
 	if includeQuickFix {
-		for _, v := range violations {
-			if v.SuggestedFix == nil {
-				continue
-			}
-
-			// Resolve async fixes (NeedsResolve) on-the-fly for code actions.
-			fixEdits := v.SuggestedFix.Edits
-			if v.SuggestedFix.NeedsResolve {
-				resolved := resolveFixEdits(ctx, doc, v.SuggestedFix)
-				if resolved == nil {
-					continue
-				}
-				fixEdits = resolved
-			}
-
-			if len(fixEdits) == 0 {
-				continue
-			}
-
-			vRange := violationRange(v)
-			if !rangesOverlap(vRange, params.Range) {
-				continue
-			}
-
-			edits := convertTextEdits(fixEdits)
-			if len(edits) == 0 {
-				continue
-			}
-
-			matchedDiags := matchingDiagnostics(v, params.Context.Diagnostics)
-			action := protocol.CodeAction{
-				Title:       v.SuggestedFix.Description,
-				Kind:        ptrTo(protocol.CodeActionKindQuickFix),
-				IsPreferred: new(v.SuggestedFix.IsPreferred || v.SuggestedFix.Safety == rules.FixSafe),
-				Diagnostics: &matchedDiags,
-				Edit: &protocol.WorkspaceEdit{
-					Changes: new(map[protocol.DocumentUri][]*protocol.TextEdit{
-						params.TextDocument.Uri: edits,
-					}),
-				},
-			}
-			actions = append(actions, action)
+		resolveFn := func(sf *rules.SuggestedFix) []rules.TextEdit {
+			return resolveFixEdits(ctx, doc, sf)
 		}
+		actions = append(actions, quickFixActions(violations, params, resolveFn)...)
 	}
 
 	if includeFixAll {
@@ -113,6 +74,80 @@ func resolveFixEdits(ctx context.Context, doc *Document, suggestedFix *rules.Sug
 		return nil
 	}
 	return edits
+}
+
+// quickFixActions builds one CodeAction per fix alternative for each violation.
+// resolveFn is called for fixes with NeedsResolve=true; pass nil to skip async fixes.
+func quickFixActions(
+	violations []rules.Violation,
+	params *protocol.CodeActionParams,
+	resolveFn func(*rules.SuggestedFix) []rules.TextEdit,
+) []protocol.CodeAction {
+	var actions []protocol.CodeAction
+
+	for _, v := range violations {
+		fixes := v.AllFixes()
+		if len(fixes) == 0 {
+			continue
+		}
+
+		vRange := violationRange(v)
+		if !rangesOverlap(vRange, params.Range) {
+			continue
+		}
+
+		var ctxDiags []*protocol.Diagnostic
+		if params.Context != nil {
+			ctxDiags = params.Context.Diagnostics
+		}
+		matchedDiags := matchingDiagnostics(v, ctxDiags)
+		preferred := v.PreferredFix()
+
+		for _, sf := range fixes {
+			fixEdits := sf.Edits
+			if sf.NeedsResolve {
+				if resolveFn == nil {
+					continue
+				}
+				resolved := resolveFn(sf)
+				if resolved == nil {
+					continue
+				}
+				fixEdits = resolved
+			}
+
+			if len(fixEdits) == 0 {
+				continue
+			}
+
+			edits := convertTextEdits(fixEdits)
+			if len(edits) == 0 {
+				continue
+			}
+
+			// Only the preferred fix is marked IsPreferred in the LSP sense.
+			// Multi-fix: always highlight the preferred alternative so the IDE
+			//   shows the user which option to pick.
+			// Single-fix: preferred only when explicitly marked or safe, so the
+			//   IDE doesn't auto-apply unsafe fixes (preserves pre-existing behavior).
+			isPreferred := sf == preferred && (len(fixes) > 1 || sf.IsPreferred || sf.Safety == rules.FixSafe)
+
+			action := protocol.CodeAction{
+				Title:       sf.Description,
+				Kind:        ptrTo(protocol.CodeActionKindQuickFix),
+				IsPreferred: &isPreferred,
+				Diagnostics: &matchedDiags,
+				Edit: &protocol.WorkspaceEdit{
+					Changes: new(map[protocol.DocumentUri][]*protocol.TextEdit{
+						params.TextDocument.Uri: edits,
+					}),
+				},
+			}
+			actions = append(actions, action)
+		}
+	}
+
+	return actions
 }
 
 func kindRequested(only *[]protocol.CodeActionKind, kind protocol.CodeActionKind) bool {
