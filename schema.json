@@ -592,6 +592,64 @@
       "title": "tally/prefer-copy-heredoc rule config",
       "type": "object"
     },
+    "rule-tally-prefer-curl-config": {
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/prefer-curl-config rule.",
+      "examples": [
+        {
+          "connect-timeout": 10,
+          "retry": 3
+        },
+        {
+          "max-time": 600,
+          "retry": 10,
+          "severity": "warning"
+        }
+      ],
+      "properties": {
+        "connect-timeout": {
+          "default": 15,
+          "description": "Maximum time in seconds for the connection phase.",
+          "examples": [
+            10,
+            15
+          ],
+          "minimum": 0,
+          "type": "integer"
+        },
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "max-time": {
+          "default": 300,
+          "description": "Maximum time in seconds for the entire transfer.",
+          "examples": [
+            120,
+            300
+          ],
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retry": {
+          "default": 5,
+          "description": "Number of retries for failed transfers.",
+          "examples": [
+            3,
+            5
+          ],
+          "minimum": 0,
+          "type": "integer"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "tally/prefer-curl-config rule config",
+      "type": "object"
+    },
     "rule-tally-prefer-multi-stage-build": {
       "additionalProperties": false,
       "description": "Configuration options for the tally/prefer-multi-stage-build rule.",
@@ -883,6 +941,9 @@
         },
         "prefer-copy-heredoc": {
           "$ref": "#/$defs/rule-tally-prefer-copy-heredoc"
+        },
+        "prefer-curl-config": {
+          "$ref": "#/$defs/rule-tally-prefer-curl-config"
         },
         "prefer-multi-stage-build": {
           "$ref": "#/$defs/rule-tally-prefer-multi-stage-build"

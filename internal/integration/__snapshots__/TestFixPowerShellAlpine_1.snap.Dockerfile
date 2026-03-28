@@ -4,6 +4,15 @@ SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference
 
 WORKDIR /app
 
+ENV CURL_HOME=/etc/curl
+
+COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
+--retry-connrefused
+--connect-timeout 15
+--retry 5
+--max-time 300
+EOF
+
 RUN apk add --update nodejs nodejs-npm
 RUN Install-Module -Name Az -AllowClobber -Force
 RUN Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; \

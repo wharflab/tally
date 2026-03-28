@@ -36,6 +36,9 @@
     "prefer-copy-heredoc": {
       "$ref": "./prefer_copy_heredoc.schema.json"
     },
+    "prefer-curl-config": {
+      "$ref": "./prefer_curl_config.schema.json"
+    },
     "prefer-multi-stage-build": {
       "$ref": "./prefer_multi_stage_build.schema.json"
     },

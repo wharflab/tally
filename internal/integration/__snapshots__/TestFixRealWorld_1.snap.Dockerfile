@@ -3,6 +3,15 @@ ARG RUNTIME_IMAGE=ubuntu:22.04
 
 FROM $BUILDER_IMAGE AS python_builder_1
 
+ENV CURL_HOME=/etc/curl
+
+COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
+--retry-connrefused
+--connect-timeout 15
+--retry 5
+--max-time 300
+EOF
+
 RUN <<EOF
 set -e
 apt-get update
@@ -157,6 +166,14 @@ EOF
 WORKDIR /app
 
 ENV NVARCH=x86_64
+ENV CURL_HOME=/etc/curl
+
+COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
+--retry-connrefused
+--connect-timeout 15
+--retry 5
+--max-time 300
+EOF
 
 RUN <<EOF
 set -e

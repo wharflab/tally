@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/prefer_curl_config.schema.json",
+  "title": "tally/prefer-curl-config rule config",
+  "description": "Configuration options for the tally/prefer-curl-config rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" },
+    "retry": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 5,
+      "description": "Number of retries for failed transfers.",
+      "examples": [3, 5]
+    },
+    "connect-timeout": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 15,
+      "description": "Maximum time in seconds for the connection phase.",
+      "examples": [10, 15]
+    },
+    "max-time": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 300,
+      "description": "Maximum time in seconds for the entire transfer.",
+      "examples": [120, 300]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "retry": 3, "connect-timeout": 10 },
+    { "severity": "warning", "retry": 10, "max-time": 600 }
+  ]
+}
