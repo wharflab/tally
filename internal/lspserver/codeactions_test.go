@@ -73,7 +73,7 @@ func TestMatchingDiagnostics(t *testing.T) {
 	assert.Equal(t, "test message", matched[0].Message)
 }
 
-func TestCodeActions_MultiFix(t *testing.T) {
+func TestQuickFixActions_MultiFix(t *testing.T) {
 	t.Parallel()
 
 	loc := rules.NewRangeLocation("Dockerfile", 5, 0, 5, 20)
@@ -92,18 +92,11 @@ func TestCodeActions_MultiFix(t *testing.T) {
 	v := rules.NewViolation(loc, "tally/windows/no-stopsignal", "STOPSIGNAL not supported", rules.SeverityWarning).
 		WithSuggestedFixes([]*rules.SuggestedFix{fixA, fixB})
 
-	violations := []rules.Violation{v}
-	uri := protocol.DocumentUri("file:///test/Dockerfile")
-
-	requestRange := protocol.Range{
-		Start: protocol.Position{Line: 0, Character: 0},
-		End:   protocol.Position{Line: 100, Character: 0},
-	}
-
-	params := &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{Uri: uri},
-		Range:        requestRange,
-		Context: &protocol.CodeActionContext{
+	uri := protocol.DocumentUri("file:///project/Dockerfile")
+	params := makeCodeActionParams(
+		uri,
+		fullRange(),
+		&protocol.CodeActionContext{
 			Diagnostics: []*protocol.Diagnostic{
 				{
 					Range: protocol.Range{
@@ -114,11 +107,9 @@ func TestCodeActions_MultiFix(t *testing.T) {
 				},
 			},
 		},
-	}
+	)
 
-	// Manually build code actions using the same logic as codeActionsForDocument
-	// but without needing a full server setup.
-	actions := buildQuickFixActions(violations, params)
+	actions := quickFixActions([]rules.Violation{v}, params, nil)
 
 	require.Len(t, actions, 2, "should emit one code action per fix alternative")
 
@@ -131,7 +122,7 @@ func TestCodeActions_MultiFix(t *testing.T) {
 	assert.False(t, *actions[1].IsPreferred, "non-preferred suggestion fix should be IsPreferred=false")
 }
 
-func TestCodeActions_SingleFix_BackwardCompat(t *testing.T) {
+func TestQuickFixActions_SingleFix_BackwardCompat(t *testing.T) {
 	t.Parallel()
 
 	loc := rules.NewRangeLocation("Dockerfile", 3, 0, 3, 3)
@@ -142,14 +133,10 @@ func TestCodeActions_SingleFix_BackwardCompat(t *testing.T) {
 			Edits:       []rules.TextEdit{{Location: loc, NewText: "apt-get"}},
 		})
 
-	violations := []rules.Violation{v}
-	params := &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{Uri: "file:///test/Dockerfile"},
-		Range: protocol.Range{
-			Start: protocol.Position{Line: 0, Character: 0},
-			End:   protocol.Position{Line: 100, Character: 0},
-		},
-		Context: &protocol.CodeActionContext{
+	params := makeCodeActionParams(
+		"file:///test/Dockerfile",
+		fullRange(),
+		&protocol.CodeActionContext{
 			Diagnostics: []*protocol.Diagnostic{
 				{
 					Range: protocol.Range{
@@ -160,15 +147,15 @@ func TestCodeActions_SingleFix_BackwardCompat(t *testing.T) {
 				},
 			},
 		},
-	}
+	)
 
-	actions := buildQuickFixActions(violations, params)
+	actions := quickFixActions([]rules.Violation{v}, params, nil)
 	require.Len(t, actions, 1, "single fix should produce one action")
 	assert.Equal(t, "Replace 'apt' with 'apt-get'", actions[0].Title)
 	assert.True(t, *actions[0].IsPreferred, "safe fix should be preferred")
 }
 
-func TestCodeActions_MultiFix_DifferentSafety(t *testing.T) {
+func TestQuickFixActions_MultiFix_DifferentSafety(t *testing.T) {
 	t.Parallel()
 
 	loc := rules.NewRangeLocation("Dockerfile", 2, 0, 2, 25)
@@ -187,96 +174,88 @@ func TestCodeActions_MultiFix_DifferentSafety(t *testing.T) {
 	v := rules.NewViolation(loc, "tally/php/composer-no-interaction", "msg", rules.SeverityWarning).
 		WithSuggestedFixes([]*rules.SuggestedFix{fixSafe, fixUnsafe})
 
-	params := &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{Uri: "file:///test/Dockerfile"},
-		Range: protocol.Range{
-			Start: protocol.Position{Line: 0, Character: 0},
-			End:   protocol.Position{Line: 100, Character: 0},
-		},
-		Context: &protocol.CodeActionContext{},
-	}
+	params := makeCodeActionParams("file:///test/Dockerfile", fullRange(), &protocol.CodeActionContext{})
 
-	actions := buildQuickFixActions([]rules.Violation{v}, params)
+	actions := quickFixActions([]rules.Violation{v}, params, nil)
 	require.Len(t, actions, 2)
 
-	// Safe preferred fix
 	assert.Equal(t, "Set ENV COMPOSER_NO_INTERACTION=1", actions[0].Title)
 	assert.True(t, *actions[0].IsPreferred)
 
-	// Unsafe alternative
 	assert.Equal(t, "Add --no-interaction flag", actions[1].Title)
 	assert.False(t, *actions[1].IsPreferred)
 }
 
-func TestCodeActions_NoFixes(t *testing.T) {
+func TestQuickFixActions_NoFixes(t *testing.T) {
 	t.Parallel()
 
 	loc := rules.NewRangeLocation("Dockerfile", 1, 0, 1, 10)
 	v := rules.NewViolation(loc, "tally/no-multi-spaces", "msg", rules.SeverityWarning)
 
-	params := &protocol.CodeActionParams{
-		TextDocument: protocol.TextDocumentIdentifier{Uri: "file:///test/Dockerfile"},
-		Range: protocol.Range{
-			Start: protocol.Position{Line: 0, Character: 0},
-			End:   protocol.Position{Line: 100, Character: 0},
-		},
-		Context: &protocol.CodeActionContext{},
-	}
+	params := makeCodeActionParams("file:///test/Dockerfile", fullRange(), &protocol.CodeActionContext{})
 
-	actions := buildQuickFixActions([]rules.Violation{v}, params)
+	actions := quickFixActions([]rules.Violation{v}, params, nil)
 	assert.Empty(t, actions)
 }
 
-// buildQuickFixActions extracts the quick-fix code action logic for unit testing
-// without needing a full LSP server.
-func buildQuickFixActions(violations []rules.Violation, params *protocol.CodeActionParams) []protocol.CodeAction {
-	var actions []protocol.CodeAction
+func TestQuickFixActions_NeedsResolve(t *testing.T) {
+	t.Parallel()
 
-	for _, v := range violations {
-		fixes := v.AllFixes()
-		if len(fixes) == 0 {
-			continue
-		}
+	loc := rules.NewRangeLocation("Dockerfile", 2, 0, 2, 20)
+	resolvedEdits := []rules.TextEdit{{Location: loc, NewText: "resolved content"}}
 
-		vRange := violationRange(v)
-		if !rangesOverlap(vRange, params.Range) {
-			continue
-		}
-
-		var ctxDiags []*protocol.Diagnostic
-		if params.Context != nil {
-			ctxDiags = params.Context.Diagnostics
-		}
-		matchedDiags := matchingDiagnostics(v, ctxDiags)
-		preferred := v.PreferredFix()
-
-		for _, sf := range fixes {
-			fixEdits := sf.Edits
-			if len(fixEdits) == 0 {
-				continue
-			}
-
-			edits := convertTextEdits(fixEdits)
-			if len(edits) == 0 {
-				continue
-			}
-
-			isPreferred := sf == preferred && (sf.IsPreferred || sf.Safety == rules.FixSafe)
-
-			action := protocol.CodeAction{
-				Title:       sf.Description,
-				Kind:        ptrTo(protocol.CodeActionKindQuickFix),
-				IsPreferred: &isPreferred,
-				Diagnostics: &matchedDiags,
-				Edit: &protocol.WorkspaceEdit{
-					Changes: new(map[protocol.DocumentUri][]*protocol.TextEdit{
-						params.TextDocument.Uri: edits,
-					}),
-				},
-			}
-			actions = append(actions, action)
-		}
+	sf := &rules.SuggestedFix{
+		Description:  "Async fix",
+		Safety:       rules.FixSafe,
+		NeedsResolve: true,
+		ResolverID:   "test-resolver",
 	}
 
-	return actions
+	v := rules.NewViolation(loc, "tally/test-rule", "msg", rules.SeverityWarning).
+		WithSuggestedFix(sf)
+
+	params := makeCodeActionParams("file:///test/Dockerfile", fullRange(), &protocol.CodeActionContext{})
+
+	t.Run("resolved successfully", func(t *testing.T) {
+		t.Parallel()
+		resolveFn := func(fix *rules.SuggestedFix) []rules.TextEdit {
+			return resolvedEdits
+		}
+		actions := quickFixActions([]rules.Violation{v}, params, resolveFn)
+		require.Len(t, actions, 1)
+		assert.Equal(t, "Async fix", actions[0].Title)
+		assert.True(t, *actions[0].IsPreferred)
+	})
+
+	t.Run("resolver returns nil skips fix", func(t *testing.T) {
+		t.Parallel()
+		resolveFn := func(fix *rules.SuggestedFix) []rules.TextEdit {
+			return nil
+		}
+		actions := quickFixActions([]rules.Violation{v}, params, resolveFn)
+		assert.Empty(t, actions)
+	})
+
+	t.Run("nil resolveFn skips async fix", func(t *testing.T) {
+		t.Parallel()
+		actions := quickFixActions([]rules.Violation{v}, params, nil)
+		assert.Empty(t, actions)
+	})
+}
+
+// makeCodeActionParams builds a CodeActionParams for testing.
+func makeCodeActionParams(uri protocol.DocumentUri, r protocol.Range, ctx *protocol.CodeActionContext) *protocol.CodeActionParams {
+	return &protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{Uri: uri},
+		Range:        r,
+		Context:      ctx,
+	}
+}
+
+// fullRange returns an LSP range covering lines 0–100.
+func fullRange() protocol.Range {
+	return protocol.Range{
+		Start: protocol.Position{Line: 0, Character: 0},
+		End:   protocol.Position{Line: 100, Character: 0},
+	}
 }
