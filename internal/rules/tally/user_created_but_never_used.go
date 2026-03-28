@@ -267,8 +267,8 @@ func findStageUserCreations(fileFacts *facts.FileFacts, stageIdx int) []userCrea
 		if !ok || content == "" {
 			continue
 		}
-		// Parse as POSIX shell (scripts are typically bash/sh).
-		cmds := findUserCreationCmds(content, shell.VariantBash)
+		variant := shell.VariantFromScriptPath(of.Path)
+		cmds := findUserCreationCmds(content, variant)
 		if len(cmds) > 0 {
 			// Attribute to the first RUN in the stage as a best-effort location.
 			var run *instructions.RunCommand
