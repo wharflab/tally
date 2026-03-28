@@ -101,6 +101,11 @@ func (r *PreferCurlConfigRule) Check(input rules.LintInput) []rules.Violation {
 	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
 	sem, _ := input.Semantic.(*semantic.Model)     //nolint:errcheck // nil fallback
 
+	// Tracks stages that will have curl config after fixes are applied.
+	// A child stage (FROM parentStage) is suppressed when the parent
+	// is in this set — the fix on the parent propagates via inheritance.
+	configuredStages := map[int]bool{}
+
 	var violations []rules.Violation
 
 	for stageIdx, stage := range input.Stages {
@@ -117,12 +122,54 @@ func (r *PreferCurlConfigRule) Check(input rules.LintInput) []rules.Violation {
 			ctx.curlHome = curlHomeWindows
 		}
 
-		if v := r.checkStage(stageIdx, stage, fileFacts, sem, &ctx); v != nil {
+		// Suppress if this stage inherits from a stage that already has
+		// (or will have after fix) the curl config.
+		if parentConfigured(stageIdx, sem, configuredStages) {
+			configuredStages[stageIdx] = true
+			continue
+		}
+
+		v := r.checkStage(stageIdx, stage, fileFacts, sem, &ctx)
+		if v != nil {
+			// Stage will get the config via fix.
+			configuredStages[stageIdx] = true
 			violations = append(violations, *v)
+		} else if stageHasCurlConfig(stageIdx, fileFacts) {
+			// Stage already has the config — propagate to children.
+			configuredStages[stageIdx] = true
 		}
 	}
 
 	return violations
+}
+
+// parentConfigured returns true if this stage's base image is a local stage
+// reference that already has (or will have) the curl config.
+func parentConfigured(stageIdx int, sem *semantic.Model, configured map[int]bool) bool {
+	if sem == nil {
+		return false
+	}
+	info := sem.StageInfo(stageIdx)
+	if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
+		return false
+	}
+	return configured[info.BaseImage.StageIndex]
+}
+
+// stageHasCurlConfig returns true if the stage already has CURL_HOME set or
+// a .curlrc observable — meaning child stages will inherit the config.
+func stageHasCurlConfig(stageIdx int, fileFacts *facts.FileFacts) bool {
+	if fileFacts == nil {
+		return false
+	}
+	sf := fileFacts.Stage(stageIdx)
+	if sf == nil {
+		return false
+	}
+	if sf.EffectiveEnv.Values["CURL_HOME"] != "" {
+		return true
+	}
+	return hasCurlConfig(sf)
 }
 
 func stageIsWindows(stageIdx int, sem *semantic.Model, ff *facts.FileFacts) bool {

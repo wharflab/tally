@@ -120,6 +120,34 @@ func TestPreferCurlConfigRule_Check(t *testing.T) {
 			WantViolations: 0,
 		},
 		{
+			Name: "child stage inheriting from fixed parent is suppressed",
+			Content: "FROM ubuntu:22.04 AS downloader\n" +
+				"RUN apt-get update && apt-get install -y curl\n" +
+				"RUN curl -fsSL https://example.com/install.sh | bash\n" +
+				"FROM downloader AS fetcher\n" +
+				"RUN curl -o /tmp/data.json https://example.com/data.json\n",
+			WantViolations: 1, // only stage 1, not stage 2
+		},
+		{
+			Name: "child stage inheriting from already-configured parent is suppressed",
+			Content: "FROM ubuntu:22.04 AS base\n" +
+				"ENV CURL_HOME=/etc/curl\n" +
+				"COPY --chmod=0644 <<EOF /etc/curl/.curlrc\n" +
+				"--retry 3\n" +
+				"EOF\n" +
+				"FROM base AS runner\n" +
+				"RUN curl -fsSL https://example.com/install.sh | bash\n",
+			WantViolations: 0, // parent already configured, child inherits
+		},
+		{
+			Name: "independent stages both fire",
+			Content: "FROM ubuntu:22.04 AS a\n" +
+				"RUN curl https://example.com/a\n" +
+				"FROM alpine:3.20 AS b\n" +
+				"RUN curl https://example.com/b\n",
+			WantViolations: 2, // different base images, no inheritance
+		},
+		{
 			Name: "curlrc at non-default path suppresses",
 			Content: "FROM ubuntu:22.04\n" +
 				"COPY --chmod=0644 <<EOF /root/.curlrc\n" +

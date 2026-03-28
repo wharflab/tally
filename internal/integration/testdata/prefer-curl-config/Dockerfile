@@ -12,6 +12,10 @@ COPY --chmod=0644 <<EOF /etc/curl/.curlrc
 EOF
 RUN curl -fsSL https://example.com/install.sh | sh
 
-# Stage 3: no curl usage — should NOT trigger
+# Stage 3: inherits from downloader — should NOT trigger (parent gets the fix)
+FROM downloader AS fetcher
+RUN curl -fsSL https://example.com/data.json -o /tmp/data.json
+
+# Stage 4: no curl usage — should NOT trigger
 FROM golang:1.22 AS builder
 RUN go build -o /app ./cmd/app
