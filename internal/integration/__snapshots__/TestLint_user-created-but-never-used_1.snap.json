@@ -21,18 +21,18 @@
           "severity": "warning",
           "sourceCode": "RUN groupadd -r appgroup \u0026\u0026 useradd -r -g appgroup appuser",
           "suggestedFix": {
-            "description": "Add USER appuser before runtime command",
+            "description": "Add USER appuser as final runtime identity",
             "edits": [
               {
                 "location": {
                   "end": {
                     "column": 0,
-                    "line": 4
+                    "line": 6
                   },
                   "file": "testdata/user-created-but-never-used/Dockerfile",
                   "start": {
                     "column": 0,
-                    "line": 4
+                    "line": 6
                   }
                 },
                 "newText": "USER appuser\n"

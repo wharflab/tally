@@ -34,7 +34,7 @@ func TestUserCreatedButNeverUsedCheckWithFixes(t *testing.T) {
 		wantFixContain string
 	}{
 		{
-			name: "fix inserts USER before CMD",
+			name: "fix inserts USER at end of stage",
 			content: `FROM ubuntu:22.04
 RUN useradd -r appuser
 CMD ["app"]
@@ -43,19 +43,21 @@ CMD ["app"]
 			wantFixContain: "USER appuser",
 		},
 		{
-			name: "fix inserts USER before ENTRYPOINT",
+			name: "fix inserts USER after last USER root",
 			content: `FROM ubuntu:22.04
 RUN useradd -r appuser
-ENTRYPOINT ["app"]
+USER root
+CMD ["app"]
 `,
 			wantHasFix:     true,
 			wantFixContain: "USER appuser",
 		},
 		{
-			name: "fix uses FixUnsafe safety",
+			name: "fix after USER root overrides correctly",
 			content: `FROM ubuntu:22.04
 RUN useradd -r appuser
 CMD ["app"]
+USER root
 `,
 			wantHasFix:     true,
 			wantFixContain: "USER appuser",

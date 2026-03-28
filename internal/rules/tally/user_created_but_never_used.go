@@ -146,8 +146,9 @@ func (r *UserCreatedButNeverUsedRule) Check(input rules.LintInput) []rules.Viola
 	return []rules.Violation{v}
 }
 
-// buildFix creates an unsafe fix that inserts USER <username> before the
-// first ENTRYPOINT or CMD in the final stage, or at the end of the stage.
+// buildFix creates an unsafe fix that inserts USER <username> after the
+// last USER instruction in the final stage (so it becomes the effective
+// runtime identity), or at the end of the stage if no USER exists.
 func (r *UserCreatedButNeverUsedRule) buildFix(
 	uc userCreation,
 	input rules.LintInput,
@@ -160,36 +161,29 @@ func (r *UserCreatedButNeverUsedRule) buildFix(
 	stage := input.Stages[finalIdx]
 	sm := input.SourceMap()
 
-	// Find the first ENTRYPOINT or CMD to insert before.
+	// Insert after the last USER instruction so the new USER becomes the
+	// effective runtime identity. Docker uses the LAST USER in the stage,
+	// regardless of ENTRYPOINT/CMD position.
 	var insertLine int
 	found := false
 	for _, cmd := range stage.Commands {
-		switch c := cmd.(type) {
-		case *instructions.EntrypointCommand:
-			if loc := c.Location(); len(loc) > 0 {
-				insertLine = loc[0].Start.Line
+		if userCmd, ok := cmd.(*instructions.UserCommand); ok {
+			if loc := userCmd.Location(); len(loc) > 0 {
+				insertLine = sm.ResolveEndLine(loc[0].End.Line) + 1
 				found = true
 			}
-		case *instructions.CmdCommand:
-			if loc := c.Location(); len(loc) > 0 {
-				insertLine = loc[0].Start.Line
-				found = true
-			}
-		}
-		if found {
-			break
 		}
 	}
 
 	if !found {
-		// No ENTRYPOINT/CMD: insert at end of file.
+		// No USER instruction: insert at end of file.
 		insertLine = sm.LineCount() + 1
 	}
 
 	userInstruction := fmt.Sprintf("USER %s\n", uc.username)
 
 	return &rules.SuggestedFix{
-		Description: fmt.Sprintf("Add USER %s before runtime command", uc.username),
+		Description: fmt.Sprintf("Add USER %s as final runtime identity", uc.username),
 		Safety:      rules.FixUnsafe,
 		Edits: []rules.TextEdit{{
 			Location: rules.NewRangeLocation(input.File, insertLine, 0, insertLine, 0),
