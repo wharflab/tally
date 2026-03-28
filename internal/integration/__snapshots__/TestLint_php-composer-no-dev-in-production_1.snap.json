@@ -1,0 +1,99 @@
+{
+  "files": [
+    {
+      "file": "testdata/php-composer-no-dev-in-production/Dockerfile",
+      "violations": [
+        {
+          "detail": "Composer installs in production-like stages should exclude require-dev packages. Add --no-dev or set COMPOSER_NO_DEV=1 for the stage.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/php/composer-no-dev-in-production/",
+          "location": {
+            "end": {
+              "column": 12,
+              "line": 4
+            },
+            "file": "testdata/php-composer-no-dev-in-production/Dockerfile",
+            "start": {
+              "column": 4,
+              "line": 4
+            }
+          },
+          "message": "Production Composer install commands should include --no-dev",
+          "rule": "tally/php/composer-no-dev-in-production",
+          "severity": "warning",
+          "sourceCode": "RUN composer install",
+          "suggestedFix": {
+            "description": "Add --no-dev to composer install",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 20,
+                    "line": 4
+                  },
+                  "file": "testdata/php-composer-no-dev-in-production/Dockerfile",
+                  "start": {
+                    "column": 20,
+                    "line": 4
+                  }
+                },
+                "newText": " --no-dev"
+              }
+            ],
+            "priority": 88,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Composer installs in production-like stages should exclude require-dev packages. Add --no-dev or set COMPOSER_NO_DEV=1 for the stage.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/php/composer-no-dev-in-production/",
+          "location": {
+            "end": {
+              "column": 12,
+              "line": 16
+            },
+            "file": "testdata/php-composer-no-dev-in-production/Dockerfile",
+            "start": {
+              "column": 4,
+              "line": 16
+            }
+          },
+          "message": "Production Composer install commands should include --no-dev",
+          "rule": "tally/php/composer-no-dev-in-production",
+          "severity": "warning",
+          "sourceCode": "RUN composer install --no-interaction",
+          "suggestedFix": {
+            "description": "Add --no-dev to composer install",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 20,
+                    "line": 16
+                  },
+                  "file": "testdata/php-composer-no-dev-in-production/Dockerfile",
+                  "start": {
+                    "column": 20,
+                    "line": 16
+                  }
+                },
+                "newText": " --no-dev"
+              }
+            ],
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}
