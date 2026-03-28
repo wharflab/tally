@@ -3,12 +3,21 @@
 package context
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/moby/patternmatcher"
 )
+
+type cachedFile struct {
+	content []byte
+	err     error
+}
+
+var errNotRegularFile = errors.New("build context path is not a regular file")
 
 // BuildContext provides build-time context for context-aware rules.
 // It manages .dockerignore patterns and file existence checking.
@@ -31,6 +40,15 @@ type BuildContext struct {
 
 	// patterns stores the raw patterns for debugging
 	patterns []string
+
+	// fileCache stores lazily read build-context files by normalized relative path.
+	fileCache map[string]cachedFile
+
+	// lstat allows tests to observe and control path validation.
+	lstat func(string) (os.FileInfo, error)
+
+	// readFile allows tests to observe and control file reads.
+	readFile func(string) ([]byte, error)
 
 	// initialized tracks if patternMatcher was initialized
 	initialized bool
@@ -71,6 +89,9 @@ func New(contextDir, dockerfilePath string, opts ...Option) (*BuildContext, erro
 		ContextDir:     absContext,
 		DockerfilePath: absDockerfile,
 		heredocFiles:   make(map[string]bool),
+		fileCache:      make(map[string]cachedFile),
+		lstat:          os.Lstat,
+		readFile:       os.ReadFile,
 	}
 
 	for _, opt := range opts {
@@ -105,12 +126,53 @@ func (ctx *BuildContext) IsIgnored(path string) (bool, error) {
 // The path should be relative to the build context.
 // Returns false for directories (only regular files return true).
 func (ctx *BuildContext) FileExists(path string) bool {
-	fullPath := filepath.Join(ctx.ContextDir, path)
-	fi, err := os.Stat(fullPath)
+	_, _, err := ctx.resolvePath(path)
+	return err == nil
+}
+
+// ReadFile reads a regular file from the build context.
+// The path must be relative to the context root.
+func (ctx *BuildContext) ReadFile(path string) ([]byte, error) {
+	key, fullPath, err := ctx.resolvePath(path)
 	if err != nil {
-		return false
+		if key != "" {
+			ctx.mu.Lock()
+			ctx.fileCache[key] = cachedFile{err: err}
+			ctx.mu.Unlock()
+		}
+		return nil, err
 	}
-	return !fi.IsDir()
+
+	ctx.mu.RLock()
+	if cached, ok := ctx.fileCache[key]; ok {
+		ctx.mu.RUnlock()
+		if cached.err != nil {
+			return nil, cached.err
+		}
+		return append([]byte(nil), cached.content...), nil
+	}
+	ctx.mu.RUnlock()
+
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
+
+	if cached, ok := ctx.fileCache[key]; ok {
+		if cached.err != nil {
+			return nil, cached.err
+		}
+		return append([]byte(nil), cached.content...), nil
+	}
+
+	content, readErr := ctx.readFile(fullPath)
+	ctx.fileCache[key] = cachedFile{
+		content: append([]byte(nil), content...),
+		err:     readErr,
+	}
+
+	if readErr != nil {
+		return nil, readErr
+	}
+	return content, nil
 }
 
 // IsHeredocFile checks if a path is a virtual heredoc file.
@@ -190,4 +252,54 @@ func (ctx *BuildContext) ensureInitialized() error {
 	}
 
 	return ctx.initErr
+}
+
+func (ctx *BuildContext) resolvePath(path string) (string, string, error) {
+	normalized := filepath.Clean(filepath.FromSlash(path))
+	if normalized == "" || normalized == "." || filepath.IsAbs(normalized) {
+		return "", "", os.ErrNotExist
+	}
+
+	fullPath := filepath.Join(ctx.ContextDir, normalized)
+	rel, err := filepath.Rel(ctx.ContextDir, fullPath)
+	if err != nil {
+		return "", "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", "", os.ErrNotExist
+	}
+
+	key := filepath.ToSlash(rel)
+	if err := ctx.validateRegularPath(normalized); err != nil {
+		return key, fullPath, err
+	}
+
+	return key, fullPath, nil
+}
+
+func (ctx *BuildContext) validateRegularPath(normalized string) error {
+	current := ctx.ContextDir
+	parts := strings.Split(normalized, string(filepath.Separator))
+	for idx, part := range parts {
+		current = filepath.Join(current, part)
+		fi, err := ctx.lstat(current)
+		if err != nil {
+			return err
+		}
+		mode := fi.Mode()
+		if mode&os.ModeSymlink != 0 {
+			return errNotRegularFile
+		}
+		isLast := idx == len(parts)-1
+		if isLast {
+			if !mode.IsRegular() {
+				return errNotRegularFile
+			}
+			continue
+		}
+		if !fi.IsDir() {
+			return os.ErrNotExist
+		}
+	}
+	return nil
 }

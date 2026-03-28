@@ -1,6 +1,7 @@
 package facts
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -10,6 +11,38 @@ import (
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
+
+type countingContextReader struct {
+	files        map[string]string
+	ignoredPaths map[string]bool
+	heredocPaths map[string]bool
+	reads        map[string]int
+}
+
+func (c *countingContextReader) FileExists(path string) bool {
+	_, ok := c.files[path]
+	return ok
+}
+
+func (c *countingContextReader) ReadFile(path string) ([]byte, error) {
+	if c.reads == nil {
+		c.reads = make(map[string]int)
+	}
+	c.reads[path]++
+	content, ok := c.files[path]
+	if !ok {
+		return nil, fmt.Errorf("missing file %q", path)
+	}
+	return []byte(content), nil
+}
+
+func (c *countingContextReader) IsIgnored(path string) (bool, error) {
+	return c.ignoredPaths[path], nil
+}
+
+func (c *countingContextReader) IsHeredocFile(path string) bool {
+	return c.heredocPaths[path]
+}
 
 func TestFileFacts_BuildsRunFactsWithEnvShellAndCommands(t *testing.T) {
 	t.Parallel()
@@ -371,6 +404,299 @@ CMD ["serve"]
 	}
 }
 
+func TestStageFacts_FileContent_LazyContextRead(t *testing.T) {
+	t.Parallel()
+
+	ctx := &countingContextReader{
+		files: map[string]string{
+			"entrypoint.sh": "#!/bin/sh\nexec gosu app \"$@\"\n",
+		},
+	}
+
+	fileFacts := makeFileFactsWithContext(t, `FROM ubuntu:22.04
+COPY entrypoint.sh /app/entrypoint.sh
+`, ctx)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+	if ctx.reads["entrypoint.sh"] != 0 {
+		t.Fatalf("context file read during build = %d, want 0", ctx.reads["entrypoint.sh"])
+	}
+
+	content, ok := stage.FileContent("/app/entrypoint.sh")
+	if !ok {
+		t.Fatal("expected observable file content")
+	}
+	if !strings.Contains(content, "gosu") {
+		t.Fatalf("FileContent() = %q, want gosu script", content)
+	}
+	if ctx.reads["entrypoint.sh"] != 1 {
+		t.Fatalf("context file reads after first lookup = %d, want 1", ctx.reads["entrypoint.sh"])
+	}
+
+	content, ok = stage.FileContent("/app/entrypoint.sh")
+	if !ok || !strings.Contains(content, "gosu") {
+		t.Fatal("expected cached content on second lookup")
+	}
+	if ctx.reads["entrypoint.sh"] != 1 {
+		t.Fatalf("context file reads after cached lookup = %d, want 1", ctx.reads["entrypoint.sh"])
+	}
+}
+
+func TestStageFacts_FileContent_ComposesKnownAppend(t *testing.T) {
+	t.Parallel()
+
+	ctx := &countingContextReader{
+		files: map[string]string{
+			"entrypoint.sh": "#!/bin/sh\n",
+		},
+	}
+
+	fileFacts := makeFileFactsWithContext(t, `FROM ubuntu:22.04
+COPY entrypoint.sh /app/entrypoint.sh
+RUN echo 'exec su-exec app "$@"' >> /app/entrypoint.sh
+`, ctx)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+
+	content, ok := stage.FileContent("/app/entrypoint.sh")
+	if !ok {
+		t.Fatal("expected composed observable content")
+	}
+	if !strings.Contains(content, "#!/bin/sh") || !strings.Contains(content, "su-exec") {
+		t.Fatalf("FileContent() = %q, want combined base + append", content)
+	}
+}
+
+func TestStageFacts_FileContent_UnknownBaseStaysUnobservable(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, `FROM ubuntu:22.04
+COPY entrypoint.sh /app/entrypoint.sh
+RUN echo 'exec su-exec app "$@"' >> /app/entrypoint.sh
+`)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+
+	if _, ok := stage.FileContent("/app/entrypoint.sh"); ok {
+		t.Fatal("expected unknown base file content to stay unobservable after append")
+	}
+}
+
+func TestStageFacts_FileContent_IgnoredContextSourceStaysUnobservable(t *testing.T) {
+	t.Parallel()
+
+	ctx := &countingContextReader{
+		files: map[string]string{
+			"entrypoint.sh": "#!/bin/sh\nexec gosu app \"$@\"\n",
+		},
+		ignoredPaths: map[string]bool{
+			"entrypoint.sh": true,
+		},
+	}
+
+	fileFacts := makeFileFactsWithContext(t, `FROM ubuntu:22.04
+COPY entrypoint.sh /app/entrypoint.sh
+`, ctx)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+
+	if _, ok := stage.FileContent("/app/entrypoint.sh"); ok {
+		t.Fatal("expected ignored context source to stay unobservable")
+	}
+	if ctx.reads["entrypoint.sh"] != 0 {
+		t.Fatalf("ignored context source should not be read, got %d reads", ctx.reads["entrypoint.sh"])
+	}
+}
+
+func TestStageFacts_FileContent_LocalStageCopyPreservesObservability(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, `FROM ubuntu:22.04 AS builder
+COPY <<'EOF' /docker-entrypoint.sh
+#!/bin/sh
+exec gosu app "$@"
+EOF
+
+FROM ubuntu:22.04
+COPY --from=builder /docker-entrypoint.sh /docker-entrypoint.sh
+`)
+
+	stage := fileFacts.Stage(1)
+	if stage == nil {
+		t.Fatal("expected final stage facts")
+	}
+
+	content, ok := stage.FileContent("/docker-entrypoint.sh")
+	if !ok {
+		t.Fatal("expected local stage copy to stay observable")
+	}
+	if !strings.Contains(content, "gosu") {
+		t.Fatalf("FileContent() = %q, want copied script content", content)
+	}
+}
+
+func TestStageFacts_FileContent_LocalStageCopyRespectsInheritedWorkdir(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, `FROM ubuntu:22.04 AS builder
+WORKDIR /app
+COPY <<'EOF' ./docker-entrypoint.sh
+#!/bin/sh
+exec gosu app "$@"
+EOF
+
+FROM builder
+COPY --from=builder ./docker-entrypoint.sh ./docker-entrypoint.sh
+ENTRYPOINT ["./docker-entrypoint.sh"]
+`)
+
+	stage := fileFacts.Stage(1)
+	if stage == nil {
+		t.Fatal("expected final stage facts")
+	}
+	if stage.FinalWorkdir != "/app" {
+		t.Fatalf("FinalWorkdir = %q, want %q", stage.FinalWorkdir, "/app")
+	}
+
+	content, ok := stage.FileContent("/app/docker-entrypoint.sh")
+	if !ok {
+		t.Fatal("expected inherited workdir copy to stay observable at /app/docker-entrypoint.sh")
+	}
+	if !strings.Contains(content, "gosu") {
+		t.Fatalf("FileContent() = %q, want copied script content", content)
+	}
+	if !stage.HasPrivilegeDropEntrypoint {
+		t.Fatal("expected inherited workdir entrypoint lookup to detect privilege-drop script")
+	}
+}
+
+func TestStageFacts_FileContent_AddLocalContextFileIsObservable(t *testing.T) {
+	t.Parallel()
+
+	ctx := &countingContextReader{
+		files: map[string]string{
+			"entrypoint.sh": "#!/bin/sh\nexec gosu app \"$@\"\n",
+		},
+	}
+
+	fileFacts := makeFileFactsWithContext(t, `FROM ubuntu:22.04
+ADD entrypoint.sh /docker-entrypoint.sh
+`, ctx)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+
+	content, ok := stage.FileContent("/docker-entrypoint.sh")
+	if !ok {
+		t.Fatal("expected ADD local file to stay observable")
+	}
+	if !strings.Contains(content, "gosu") {
+		t.Fatalf("FileContent() = %q, want added script content", content)
+	}
+}
+
+func TestStageFacts_FileContent_AddLocalArchiveStaysUnobservable(t *testing.T) {
+	t.Parallel()
+
+	ctx := &countingContextReader{
+		files: map[string]string{
+			"archive.tar.gz": "not actually read",
+		},
+	}
+
+	fileFacts := makeFileFactsWithContext(t, `FROM ubuntu:22.04
+ADD archive.tar.gz /opt/
+`, ctx)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+
+	if _, ok := stage.FileContent("/opt/archive.tar.gz"); ok {
+		t.Fatal("expected ADD archive to stay unobservable")
+	}
+}
+
+func TestFileFacts_PrivilegeDropEntrypointFromObservableFiles(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		content  string
+		context  ContextFileReader
+		wantDrop bool
+	}{
+		{
+			name: "copy heredoc script",
+			content: `FROM ubuntu:22.04
+COPY <<'EOF' /docker-entrypoint.sh
+#!/bin/sh
+exec gosu postgres "$@"
+EOF
+ENTRYPOINT ["/docker-entrypoint.sh"]
+`,
+			wantDrop: true,
+		},
+		{
+			name: "run-created script",
+			content: `FROM ubuntu:22.04
+RUN cat <<'EOF' > /docker-entrypoint.sh
+#!/bin/sh
+exec su-exec postgres "$@"
+EOF
+ENTRYPOINT ["/docker-entrypoint.sh"]
+`,
+			wantDrop: true,
+		},
+		{
+			name: "context-backed script",
+			content: `FROM ubuntu:22.04
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+ENTRYPOINT ["/docker-entrypoint.sh"]
+`,
+			context: &countingContextReader{
+				files: map[string]string{
+					"docker-entrypoint.sh": "#!/bin/sh\nexec gosu postgres \"$@\"\n",
+				},
+			},
+			wantDrop: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fileFacts := makeFileFactsWithContext(t, tt.content, tt.context)
+			stage := fileFacts.Stage(0)
+			if stage == nil {
+				t.Fatal("expected stage facts")
+			}
+			if stage.HasPrivilegeDropEntrypoint != tt.wantDrop {
+				t.Fatalf("HasPrivilegeDropEntrypoint = %v, want %v", stage.HasPrivilegeDropEntrypoint, tt.wantDrop)
+			}
+			if stage.DropsPrivilegesAtRuntime() != tt.wantDrop {
+				t.Fatalf("DropsPrivilegesAtRuntime() = %v, want %v", stage.DropsPrivilegesAtRuntime(), tt.wantDrop)
+			}
+		})
+	}
+}
+
 func TestFileFacts_MultiStageUserIsolation(t *testing.T) {
 	t.Parallel()
 
@@ -445,6 +771,11 @@ VOLUME /data
 
 func makeFileFacts(t *testing.T, content string) *FileFacts {
 	t.Helper()
+	return makeFileFactsWithContext(t, content, nil)
+}
+
+func makeFileFactsWithContext(t *testing.T, content string, contextFiles ContextFileReader) *FileFacts {
+	t.Helper()
 
 	const file = "Dockerfile"
 
@@ -460,5 +791,11 @@ func makeFileFacts(t *testing.T, content string) *FileFacts {
 		WithShellDirectives(directiveResult.ShellDirectives).
 		Build()
 
-	return NewFileFacts(file, parseResult, sem, ShellDirectivesFromDirective(directiveResult.ShellDirectives))
+	return NewFileFacts(
+		file,
+		parseResult,
+		sem,
+		ShellDirectivesFromDirective(directiveResult.ShellDirectives),
+		contextFiles,
+	)
 }

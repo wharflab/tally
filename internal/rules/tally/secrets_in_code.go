@@ -8,6 +8,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 	"github.com/zricethezav/gitleaks/v8/detect"
 
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 )
 
@@ -58,9 +59,16 @@ func (r *SecretsInCodeRule) Check(input rules.LintInput) []rules.Violation {
 	// Check global ARG default values
 	violations = append(violations, r.checkMetaArgs(input)...)
 
+	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
+
 	// Check stage commands
-	for _, stage := range input.Stages {
-		violations = append(violations, r.checkStageCommands(input.File, stage.Commands)...)
+	for stageIdx, stage := range input.Stages {
+		if fileFacts != nil {
+			if stageFacts := fileFacts.Stage(stageIdx); stageFacts != nil {
+				violations = append(violations, r.checkObservableFiles(input.File, stageFacts)...)
+			}
+		}
+		violations = append(violations, r.checkStageCommands(input.File, stage.Commands, fileFacts != nil)...)
 	}
 
 	return violations
@@ -81,22 +89,28 @@ func (r *SecretsInCodeRule) checkMetaArgs(input rules.LintInput) []rules.Violati
 }
 
 // checkStageCommands scans commands within a stage.
-func (r *SecretsInCodeRule) checkStageCommands(file string, commands []instructions.Command) []rules.Violation {
+func (r *SecretsInCodeRule) checkStageCommands(file string, commands []instructions.Command, skipCopyAdd bool) []rules.Violation {
 	violations := make([]rules.Violation, 0, len(commands))
 	for _, cmd := range commands {
-		violations = append(violations, r.checkCommand(file, cmd)...)
+		violations = append(violations, r.checkCommand(file, cmd, skipCopyAdd)...)
 	}
 	return violations
 }
 
 // checkCommand scans a single command for secrets.
-func (r *SecretsInCodeRule) checkCommand(file string, cmd instructions.Command) []rules.Violation {
+func (r *SecretsInCodeRule) checkCommand(file string, cmd instructions.Command, skipCopyAdd bool) []rules.Violation {
 	switch c := cmd.(type) {
 	case *instructions.RunCommand:
 		return r.checkRunCommand(file, c)
 	case *instructions.CopyCommand:
+		if skipCopyAdd {
+			return nil
+		}
 		return r.checkCopyCommand(file, c)
 	case *instructions.AddCommand:
+		if skipCopyAdd {
+			return nil
+		}
 		return r.checkAddCommand(file, c)
 	case *instructions.EnvCommand:
 		return r.checkEnvCommand(file, c)
@@ -106,6 +120,49 @@ func (r *SecretsInCodeRule) checkCommand(file string, cmd instructions.Command) 
 		return r.checkLabelCommand(file, c)
 	}
 	return nil
+}
+
+func (r *SecretsInCodeRule) checkObservableFiles(file string, stageFacts *facts.StageFacts) []rules.Violation {
+	if stageFacts == nil {
+		return nil
+	}
+
+	var violations []rules.Violation
+	for _, observed := range stageFacts.ObservableFiles {
+		if observed == nil {
+			continue
+		}
+
+		content, ok := observed.Content()
+		if !ok {
+			continue
+		}
+
+		var context string
+		switch observed.Source {
+		case facts.ObservableFileSourceAddHeredoc:
+			context = "ADD heredoc"
+		case facts.ObservableFileSourceAddContext:
+			context = "ADD context file"
+		case facts.ObservableFileSourceCopyHeredoc:
+			context = "COPY heredoc"
+		case facts.ObservableFileSourceCopyContext:
+			context = "COPY context file"
+		case facts.ObservableFileSourceCopyStage:
+			context = "COPY --from stage file"
+		case facts.ObservableFileSourceRun:
+			continue
+		}
+
+		violations = append(
+			violations,
+			r.scanContent(content, file, []parser.Range{{
+				Start: parser.Position{Line: observed.Line},
+				End:   parser.Position{Line: observed.Line},
+			}}, context)...,
+		)
+	}
+	return violations
 }
 
 // checkRunCommand scans RUN commands for secrets.

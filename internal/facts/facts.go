@@ -7,7 +7,9 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/semantic"
@@ -22,6 +24,7 @@ type FileFacts struct {
 	parseResult     *dockerfile.ParseResult
 	semantic        *semantic.Model
 	shellDirectives []ShellDirective
+	contextFiles    ContextFileReader
 
 	once   sync.Once
 	stages []*StageFacts
@@ -56,11 +59,9 @@ type StageFacts struct {
 	// FinalWorkdir is the effective WORKDIR at the end of this stage.
 	FinalWorkdir string
 
-	// HasPrivilegeDropEntrypoint is true when the stage's ENTRYPOINT
-	// references a known privilege-drop tool (gosu, su-exec, suexec, setpriv).
-	// Generic script names (docker-entrypoint.sh, entrypoint.sh) are
-	// intentionally excluded — they are too ambiguous without inspecting the
-	// script contents (which requires build-context or inline-heredoc analysis).
+	// HasPrivilegeDropEntrypoint is true when the stage's ENTRYPOINT either
+	// directly references a known privilege-drop tool or resolves to an
+	// observable script whose content invokes one.
 	HasPrivilegeDropEntrypoint bool
 
 	// HasPrivilegeDropCmd is true when the stage's CMD references a known
@@ -72,7 +73,16 @@ type StageFacts struct {
 	// HasEntrypoint is true when the stage contains an ENTRYPOINT instruction.
 	HasEntrypoint bool
 
+	// ObservableFiles collects image files written in this stage whose content
+	// can be observed directly or loaded lazily at lint time.
+	ObservableFiles []*ObservableFile
+
+	// BuildContextSources records COPY/ADD sources resolved from the Docker
+	// build context, including .dockerignore evaluation results.
+	BuildContextSources []*BuildContextSource
+
 	cacheDisablingEnv []EnvBinding
+	observableByPath  map[string]*ObservableFile
 }
 
 // RunFacts contains derived facts for a single RUN instruction.
@@ -135,6 +145,23 @@ type runFactBuildParams struct {
 	escape            rune
 }
 
+type stageBuildState struct {
+	semInfo                  *semantic.StageInfo
+	currentEnvValues         map[string]string
+	currentEnvBindings       map[string]EnvBinding
+	currentCacheDisablingEnv []EnvBinding
+	currentShell             ShellFacts
+	workdir                  string
+	fileTracker              *observableFileTracker
+}
+
+type stageEntrypointState struct {
+	lastEntrypointCmdLine []string
+	lastCmdCmdLine        []string
+	sawLocalEntrypoint    bool
+	sawLocalCmd           bool
+}
+
 // ShellDirective is the subset of directive metadata needed by the facts layer.
 type ShellDirective struct {
 	Line  int
@@ -170,12 +197,14 @@ func NewFileFacts(
 	parseResult *dockerfile.ParseResult,
 	sem *semantic.Model,
 	shellDirectives []ShellDirective,
+	contextFiles ContextFileReader,
 ) *FileFacts {
 	return &FileFacts{
 		file:            file,
 		parseResult:     parseResult,
 		semantic:        sem,
 		shellDirectives: shellDirectives,
+		contextFiles:    contextFiles,
 	}
 }
 
@@ -200,6 +229,18 @@ func (s *StageFacts) DropsPrivilegesAtRuntime() bool {
 	return s.HasPrivilegeDropCmd && !s.HasEntrypoint
 }
 
+// FileContent returns the final observable content for a file path in this stage.
+func (s *StageFacts) FileContent(filePath string) (string, bool) {
+	if s == nil || filePath == "" {
+		return "", false
+	}
+	file := s.observableByPath[normalizeObservablePath(filePath)]
+	if file == nil {
+		return "", false
+	}
+	return file.Content()
+}
+
 // Stages returns all stage facts.
 func (f *FileFacts) Stages() []*StageFacts {
 	f.once.Do(f.build)
@@ -217,84 +258,157 @@ func (f *FileFacts) build() {
 		return
 	}
 
-	sm := sourcemap.New(f.parseResult.Source)
-	escapeToken := rune('\\')
-	if f.parseResult.AST != nil {
-		escapeToken = f.parseResult.AST.EscapeToken
-	}
-
 	stages := f.parseResult.Stages
 	f.stages = make([]*StageFacts, len(stages))
+	sm, escapeToken := factsBuildContext(f.parseResult)
 
 	for stageIdx := range stages {
-		stage := &stages[stageIdx]
-		semInfo := f.stageInfo(stageIdx)
-
-		currentEnvValues, currentEnvBindings := seedStageEnv(semInfo, f.stages)
-		currentCacheDisablingEnv := seedStageCacheDisablingEnv(semInfo, f.stages)
-		currentShell := initialStageShell(stage, semInfo, f.shellDirectives)
-		workdir := "/"
-
-		stageFacts := &StageFacts{
-			Index:        stageIdx,
-			IsLast:       stageIdx == len(stages)-1,
-			InitialShell: currentShell,
-			FinalShell:   currentShell,
-		}
-		if semInfo != nil {
-			stageFacts.BaseImageOS = semInfo.BaseImageOS
-		}
-
-		// Seed runtime entrypoint/cmd state from parent stage.
-		seedStageEntrypointState(semInfo, f.stages, stageFacts)
-
-		for cmdIdx, cmd := range stage.Commands {
-			switch c := cmd.(type) {
-			case *instructions.WorkdirCommand:
-				workdir = ResolveWorkdir(workdir, c.Path)
-			case *instructions.EnvCommand:
-				currentCacheDisablingEnv = applyEnvCommand(c, currentEnvValues, currentEnvBindings, currentCacheDisablingEnv)
-			case *instructions.ShellCommand:
-				currentShell = newShellFacts(c.Shell)
-				stageFacts.FinalShell = currentShell
-			case *instructions.RunCommand:
-				runFacts := buildRunFacts(runFactBuildParams{
-					run:               c,
-					stageIdx:          stageIdx,
-					commandIdx:        cmdIdx,
-					workdir:           workdir,
-					shell:             currentShell,
-					envValues:         currentEnvValues,
-					envBinding:        currentEnvBindings,
-					cacheDisablingEnv: currentCacheDisablingEnv,
-					sm:                sm,
-					escape:            escapeToken,
-				})
-				stageFacts.Runs = append(stageFacts.Runs, runFacts)
-				f.runs = append(f.runs, runFacts)
-			case *instructions.UserCommand:
-				stageFacts.UserCommands = append(stageFacts.UserCommands, c)
-				stageFacts.EffectiveUser = c.User
-			case *instructions.VolumeCommand:
-				stageFacts.Volumes = append(stageFacts.Volumes, c.Volumes...)
-			case *instructions.EntrypointCommand:
-				stageFacts.HasEntrypoint = true
-				stageFacts.HasPrivilegeDropEntrypoint = containsPrivilegeDropPattern(c.CmdLine)
-			case *instructions.CmdCommand:
-				stageFacts.HasPrivilegeDropCmd = containsPrivilegeDropPattern(c.CmdLine)
-			}
-		}
-
-		stageFacts.FinalWorkdir = workdir
-
-		finalEnvValues := maps.Clone(currentEnvValues)
-		if semInfo != nil && semInfo.EffectiveEnv != nil {
-			finalEnvValues = maps.Clone(semInfo.EffectiveEnv)
-		}
-		stageFacts.EffectiveEnv = buildEnvFacts(finalEnvValues, currentEnvBindings)
-		stageFacts.cacheDisablingEnv = append([]EnvBinding(nil), currentCacheDisablingEnv...)
-		f.stages[stageIdx] = stageFacts
+		f.stages[stageIdx] = f.buildStageFacts(stageIdx, &stages[stageIdx], len(stages), sm, escapeToken)
 	}
+}
+
+func factsBuildContext(parseResult *dockerfile.ParseResult) (*sourcemap.SourceMap, rune) {
+	sm := sourcemap.New(parseResult.Source)
+	escapeToken := rune('\\')
+	if parseResult.AST != nil {
+		escapeToken = parseResult.AST.EscapeToken
+	}
+	return sm, escapeToken
+}
+
+func (f *FileFacts) buildStageFacts(
+	stageIdx int,
+	stage *instructions.Stage,
+	stageCount int,
+	sm *sourcemap.SourceMap,
+	escapeToken rune,
+) *StageFacts {
+	semInfo := f.stageInfo(stageIdx)
+	knownVars := makeStageKnownVarsChecker(semInfo)
+	state := newStageBuildState(stage, semInfo, f.stages, f.shellDirectives)
+	stageFacts := newStageFacts(stageIdx, stageCount, state.currentShell, semInfo)
+	seedStageEntrypointState(semInfo, f.stages, stageFacts)
+	entrypointState := f.processStageCommands(stageFacts, stage, stageIdx, sm, escapeToken, knownVars, state)
+	finalizeStageFacts(stageFacts, semInfo, state, entrypointState)
+	return stageFacts
+}
+
+func newStageBuildState(
+	stage *instructions.Stage,
+	semInfo *semantic.StageInfo,
+	stages []*StageFacts,
+	shellDirectives []ShellDirective,
+) *stageBuildState {
+	currentEnvValues, currentEnvBindings := seedStageEnv(semInfo, stages)
+	observableFiles := seedStageObservableFiles(semInfo, stages)
+	return &stageBuildState{
+		semInfo:                  semInfo,
+		currentEnvValues:         currentEnvValues,
+		currentEnvBindings:       currentEnvBindings,
+		currentCacheDisablingEnv: seedStageCacheDisablingEnv(semInfo, stages),
+		currentShell:             initialStageShell(stage, semInfo, shellDirectives),
+		workdir:                  seedStageWorkdir(semInfo, stages),
+		fileTracker:              newObservableFileTracker(observableFiles),
+	}
+}
+
+func newStageFacts(stageIdx, stageCount int, currentShell ShellFacts, semInfo *semantic.StageInfo) *StageFacts {
+	stageFacts := &StageFacts{
+		Index:        stageIdx,
+		IsLast:       stageIdx == stageCount-1,
+		InitialShell: currentShell,
+		FinalShell:   currentShell,
+	}
+	if semInfo != nil {
+		stageFacts.BaseImageOS = semInfo.BaseImageOS
+	}
+	return stageFacts
+}
+
+func (f *FileFacts) processStageCommands(
+	stageFacts *StageFacts,
+	stage *instructions.Stage,
+	stageIdx int,
+	sm *sourcemap.SourceMap,
+	escapeToken rune,
+	knownVars func(string) bool,
+	state *stageBuildState,
+) stageEntrypointState {
+	var entrypointState stageEntrypointState
+
+	for cmdIdx, cmd := range stage.Commands {
+		switch c := cmd.(type) {
+		case *instructions.WorkdirCommand:
+			state.workdir = ResolveWorkdir(state.workdir, c.Path)
+		case *instructions.EnvCommand:
+			state.currentCacheDisablingEnv = applyEnvCommand(
+				c,
+				state.currentEnvValues,
+				state.currentEnvBindings,
+				state.currentCacheDisablingEnv,
+			)
+		case *instructions.ShellCommand:
+			state.currentShell = newShellFacts(c.Shell)
+			stageFacts.FinalShell = state.currentShell
+		case *instructions.RunCommand:
+			runFacts := buildRunFacts(runFactBuildParams{
+				run:               c,
+				stageIdx:          stageIdx,
+				commandIdx:        cmdIdx,
+				workdir:           state.workdir,
+				shell:             state.currentShell,
+				envValues:         state.currentEnvValues,
+				envBinding:        state.currentEnvBindings,
+				cacheDisablingEnv: state.currentCacheDisablingEnv,
+				sm:                sm,
+				escape:            escapeToken,
+			})
+			stageFacts.Runs = append(stageFacts.Runs, runFacts)
+			f.runs = append(f.runs, runFacts)
+			recordRunObservableFile(stageFacts, state.fileTracker, runFacts, knownVars)
+		case *instructions.CopyCommand:
+			recordCopyObservableFiles(stageFacts, state.fileTracker, state.semInfo, f.stages, c, state.workdir, f.contextFiles)
+		case *instructions.AddCommand:
+			recordAddObservableFiles(stageFacts, state.fileTracker, c, state.workdir, f.contextFiles)
+		case *instructions.UserCommand:
+			stageFacts.UserCommands = append(stageFacts.UserCommands, c)
+			stageFacts.EffectiveUser = c.User
+		case *instructions.VolumeCommand:
+			stageFacts.Volumes = append(stageFacts.Volumes, c.Volumes...)
+		case *instructions.EntrypointCommand:
+			stageFacts.HasEntrypoint = true
+			entrypointState.sawLocalEntrypoint = true
+			entrypointState.lastEntrypointCmdLine = append([]string(nil), c.CmdLine...)
+		case *instructions.CmdCommand:
+			entrypointState.sawLocalCmd = true
+			entrypointState.lastCmdCmdLine = append([]string(nil), c.CmdLine...)
+		}
+	}
+
+	return entrypointState
+}
+
+func finalizeStageFacts(
+	stageFacts *StageFacts,
+	semInfo *semantic.StageInfo,
+	state *stageBuildState,
+	entrypointState stageEntrypointState,
+) {
+	stageFacts.FinalWorkdir = state.workdir
+	stageFacts.observableByPath = state.fileTracker.snapshot()
+	if entrypointState.sawLocalEntrypoint {
+		stageFacts.HasPrivilegeDropEntrypoint = commandDropsPrivileges(entrypointState.lastEntrypointCmdLine, stageFacts)
+	}
+	if entrypointState.sawLocalCmd {
+		stageFacts.HasPrivilegeDropCmd = commandDropsPrivileges(entrypointState.lastCmdCmdLine, stageFacts)
+	}
+
+	finalEnvValues := maps.Clone(state.currentEnvValues)
+	if semInfo != nil && semInfo.EffectiveEnv != nil {
+		finalEnvValues = maps.Clone(semInfo.EffectiveEnv)
+	}
+	stageFacts.EffectiveEnv = buildEnvFacts(finalEnvValues, state.currentEnvBindings)
+	stageFacts.cacheDisablingEnv = append([]EnvBinding(nil), state.currentCacheDisablingEnv...)
 }
 
 func (f *FileFacts) stageInfo(index int) *semantic.StageInfo {
@@ -330,11 +444,25 @@ func seedStageCacheDisablingEnv(semInfo *semantic.StageInfo, stages []*StageFact
 	return append([]EnvBinding(nil), stages[baseIdx].cacheDisablingEnv...)
 }
 
+func seedStageWorkdir(semInfo *semantic.StageInfo, stages []*StageFacts) string {
+	if semInfo == nil || semInfo.BaseImage == nil || !semInfo.BaseImage.IsStageRef {
+		return "/"
+	}
+
+	baseIdx := semInfo.BaseImage.StageIndex
+	if baseIdx < 0 || baseIdx >= len(stages) || stages[baseIdx] == nil {
+		return "/"
+	}
+
+	if stages[baseIdx].FinalWorkdir == "" {
+		return "/"
+	}
+	return stages[baseIdx].FinalWorkdir
+}
+
 // seedStageEntrypointState inherits the entrypoint/cmd privilege-drop state
-// from a parent stage when the base is a local stage ref. This ensures that
-// FROM base (where base has ENTRYPOINT ["gosu", ...]) correctly inherits the
-// privilege-drop signal. The inherited values are overridden if the child
-// stage has its own ENTRYPOINT/CMD instructions.
+// from a parent stage when the base is a local stage ref. The inherited values
+// are overridden if the child stage has its own ENTRYPOINT/CMD instructions.
 func seedStageEntrypointState(semInfo *semantic.StageInfo, stages []*StageFacts, target *StageFacts) {
 	if semInfo == nil || semInfo.BaseImage == nil || !semInfo.BaseImage.IsStageRef {
 		return
@@ -349,6 +477,363 @@ func seedStageEntrypointState(semInfo *semantic.StageInfo, stages []*StageFacts,
 	target.HasEntrypoint = parent.HasEntrypoint
 	target.HasPrivilegeDropEntrypoint = parent.HasPrivilegeDropEntrypoint
 	target.HasPrivilegeDropCmd = parent.HasPrivilegeDropCmd
+}
+
+func seedStageObservableFiles(semInfo *semantic.StageInfo, stages []*StageFacts) map[string]*ObservableFile {
+	if semInfo == nil || semInfo.BaseImage == nil || !semInfo.BaseImage.IsStageRef {
+		return nil
+	}
+
+	baseIdx := semInfo.BaseImage.StageIndex
+	if baseIdx < 0 || baseIdx >= len(stages) || stages[baseIdx] == nil {
+		return nil
+	}
+
+	return maps.Clone(stages[baseIdx].observableByPath)
+}
+
+func makeStageKnownVarsChecker(semInfo *semantic.StageInfo) func(string) bool {
+	if semInfo == nil || semInfo.Variables == nil {
+		return nil
+	}
+	return func(name string) bool {
+		return semInfo.Variables.HasArg(name) || semInfo.Variables.GetEnv(name) != nil
+	}
+}
+
+func recordRunObservableFile(
+	stageFacts *StageFacts,
+	tracker *observableFileTracker,
+	runFacts *RunFacts,
+	knownVars func(string) bool,
+) {
+	if stageFacts == nil || tracker == nil || runFacts == nil || runFacts.Run == nil {
+		return
+	}
+
+	info := shell.DetectFileCreation(reconstructRunShellScript(runFacts.Run), runFacts.Shell.Variant, knownVars)
+	if info == nil {
+		return
+	}
+
+	targetPath := normalizeObservablePath(info.TargetPath)
+	if targetPath == "" {
+		return
+	}
+
+	if info.HasUnsafeVariables {
+		tracker.invalidate(targetPath)
+		return
+	}
+
+	file := literalObservableFile(
+		targetPath,
+		ObservableFileSourceRun,
+		instructionStartLine(runFacts.Run.Location()),
+		info.IsAppend,
+		info.RawChmodMode,
+		"",
+		info.Content,
+	)
+	stageFacts.ObservableFiles = append(stageFacts.ObservableFiles, file)
+	if info.IsAppend {
+		tracker.append(file)
+		return
+	}
+	tracker.overwrite(file)
+}
+
+func recordCopyObservableFiles(
+	stageFacts *StageFacts,
+	tracker *observableFileTracker,
+	semInfo *semantic.StageInfo,
+	stages []*StageFacts,
+	cmd *instructions.CopyCommand,
+	workdir string,
+	contextFiles ContextFileReader,
+) {
+	if stageFacts == nil || tracker == nil || cmd == nil {
+		return
+	}
+
+	line := instructionStartLine(cmd.Location())
+	totalSources := len(cmd.SourcePaths) + len(cmd.SourceContents)
+	heredocPaths := dockerfile.CollectHeredocPaths(cmd.SourceContents)
+
+	for _, content := range cmd.SourceContents {
+		destPath, ok := resolveCopyDestPath(cmd.DestPath, content.Path, workdir, totalSources)
+		if !ok {
+			continue
+		}
+		file := literalObservableFile(
+			destPath,
+			ObservableFileSourceCopyHeredoc,
+			line,
+			false,
+			cmd.Chmod,
+			cmd.Chown,
+			content.Data,
+		)
+		stageFacts.ObservableFiles = append(stageFacts.ObservableFiles, file)
+		tracker.overwrite(file)
+	}
+
+	for _, src := range cmd.SourcePaths {
+		if heredocPaths[src] {
+			continue
+		}
+
+		var sourceFact *BuildContextSource
+		if cmd.From == "" {
+			sourceFact = analyzeBuildContextSource(command.Copy, src, line, cmd.Location(), contextFiles)
+		}
+		if sourceFact != nil {
+			stageFacts.BuildContextSources = append(stageFacts.BuildContextSources, sourceFact)
+		}
+
+		destPath, ok := resolveCopyDestPath(cmd.DestPath, src, workdir, totalSources)
+		if !ok {
+			continue
+		}
+
+		if sourceStageFile := copyStageObservableSource(semInfo, stages, cmd, src); sourceStageFile != nil {
+			file := stageCopyObservableFile(destPath, line, cmd.Chmod, cmd.Chown, sourceStageFile)
+			stageFacts.ObservableFiles = append(stageFacts.ObservableFiles, file)
+			tracker.overwrite(file)
+			continue
+		}
+		if cmd.From != "" || !canObserveContextSource(src, sourceFact, contextFiles) {
+			tracker.invalidate(destPath)
+			continue
+		}
+		sourcePath := src
+		if sourceFact != nil && sourceFact.NormalizedSourcePath != "" {
+			sourcePath = sourceFact.NormalizedSourcePath
+		}
+		file := contextObservableFile(destPath, ObservableFileSourceCopyContext, line, cmd.Chmod, cmd.Chown, sourcePath, contextFiles)
+		stageFacts.ObservableFiles = append(stageFacts.ObservableFiles, file)
+		tracker.overwrite(file)
+	}
+}
+
+func recordAddObservableFiles(
+	stageFacts *StageFacts,
+	tracker *observableFileTracker,
+	cmd *instructions.AddCommand,
+	workdir string,
+	contextFiles ContextFileReader,
+) {
+	if stageFacts == nil || tracker == nil || cmd == nil {
+		return
+	}
+
+	line := instructionStartLine(cmd.Location())
+	totalSources := len(cmd.SourcePaths) + len(cmd.SourceContents)
+	heredocPaths := dockerfile.CollectHeredocPaths(cmd.SourceContents)
+
+	for _, content := range cmd.SourceContents {
+		destPath, ok := resolveCopyDestPath(cmd.DestPath, content.Path, workdir, totalSources)
+		if !ok {
+			continue
+		}
+		file := literalObservableFile(
+			destPath,
+			ObservableFileSourceAddHeredoc,
+			line,
+			false,
+			cmd.Chmod,
+			cmd.Chown,
+			content.Data,
+		)
+		stageFacts.ObservableFiles = append(stageFacts.ObservableFiles, file)
+		tracker.overwrite(file)
+	}
+
+	for _, src := range cmd.SourcePaths {
+		if heredocPaths[src] {
+			continue
+		}
+
+		sourceFact := analyzeBuildContextSource(command.Add, src, line, cmd.Location(), contextFiles)
+		if sourceFact != nil {
+			stageFacts.BuildContextSources = append(stageFacts.BuildContextSources, sourceFact)
+		}
+		destPath, ok := resolveCopyDestPath(cmd.DestPath, src, workdir, totalSources)
+		if !ok {
+			continue
+		}
+		if !canObserveAddContextSource(src, sourceFact, contextFiles) {
+			tracker.invalidate(destPath)
+			continue
+		}
+		sourcePath := src
+		if sourceFact != nil && sourceFact.NormalizedSourcePath != "" {
+			sourcePath = sourceFact.NormalizedSourcePath
+		}
+		file := contextObservableFile(destPath, ObservableFileSourceAddContext, line, cmd.Chmod, cmd.Chown, sourcePath, contextFiles)
+		stageFacts.ObservableFiles = append(stageFacts.ObservableFiles, file)
+		tracker.overwrite(file)
+	}
+}
+
+func canObserveContextSource(sourcePath string, sourceFact *BuildContextSource, contextFiles ContextFileReader) bool {
+	if contextFiles == nil || sourcePath == "" {
+		return false
+	}
+	if sourceFact != nil && (sourceFact.IgnoredByDockerignore || sourceFact.IgnoreErr != nil) {
+		return false
+	}
+	if strings.ContainsAny(sourcePath, "*?[") {
+		return false
+	}
+	if sourceFact != nil && sourceFact.NormalizedSourcePath != "" {
+		sourcePath = sourceFact.NormalizedSourcePath
+	}
+	return contextFiles.FileExists(sourcePath)
+}
+
+func canObserveAddContextSource(sourcePath string, sourceFact *BuildContextSource, contextFiles ContextFileReader) bool {
+	if !canObserveContextSource(sourcePath, sourceFact, contextFiles) {
+		return false
+	}
+	return !shell.IsArchiveFilename(path.Base(sourcePath))
+}
+
+func copyStageObservableSource(
+	semInfo *semantic.StageInfo,
+	stages []*StageFacts,
+	cmd *instructions.CopyCommand,
+	sourcePath string,
+) *ObservableFile {
+	if semInfo == nil || cmd == nil || cmd.From == "" {
+		return nil
+	}
+
+	for _, ref := range semInfo.CopyFromRefs {
+		if ref.Command != cmd || !ref.IsStageRef {
+			continue
+		}
+		if ref.StageIndex < 0 || ref.StageIndex >= len(stages) || stages[ref.StageIndex] == nil {
+			return nil
+		}
+		parent := stages[ref.StageIndex]
+		return parent.observableByPath[resolveStageCopySourcePath(sourcePath, parent.FinalWorkdir)]
+	}
+
+	return nil
+}
+
+func analyzeBuildContextSource(
+	instruction, sourcePath string,
+	line int,
+	location []parser.Range,
+	contextFiles ContextFileReader,
+) *BuildContextSource {
+	if contextFiles == nil || sourcePath == "" {
+		return nil
+	}
+	if isBuildContextURLSource(sourcePath) || contextFiles.IsHeredocFile(sourcePath) {
+		return nil
+	}
+
+	normalized := normalizeBuildContextSourcePath(sourcePath)
+	ignored, err := contextFiles.IsIgnored(normalized)
+	return &BuildContextSource{
+		Instruction:           instruction,
+		SourcePath:            sourcePath,
+		NormalizedSourcePath:  normalized,
+		Line:                  line,
+		Location:              location,
+		IgnoredByDockerignore: ignored,
+		IgnoreErr:             err,
+	}
+}
+
+func commandDropsPrivileges(cmdLine []string, stageFacts *StageFacts) bool {
+	if containsPrivilegeDropPattern(cmdLine) {
+		return true
+	}
+	if stageFacts == nil {
+		return false
+	}
+
+	scriptPath := referencedScriptPath(cmdLine)
+	if scriptPath == "" {
+		return false
+	}
+
+	content, ok := stageFacts.FileContent(resolveRuntimeScriptPath(scriptPath, stageFacts.FinalWorkdir))
+	if !ok {
+		return false
+	}
+	return privilegeDropToolsRe.MatchString(strings.ToLower(content))
+}
+
+func referencedScriptPath(cmdLine []string) string {
+	if len(cmdLine) == 0 {
+		return ""
+	}
+
+	first := cmdLine[0]
+	if len(cmdLine) == 1 {
+		fields := strings.Fields(first)
+		if len(fields) == 0 {
+			return ""
+		}
+		if fields[0] == "exec" && len(fields) > 1 {
+			first = fields[1]
+		} else {
+			first = fields[0]
+		}
+	}
+
+	first = strings.Trim(first, `"'`)
+	if first == "" {
+		return ""
+	}
+	if path.IsAbs(first) || strings.Contains(first, "/") || strings.Contains(first, `\`) {
+		return first
+	}
+	switch {
+	case strings.HasSuffix(first, ".sh"),
+		strings.HasSuffix(first, ".bash"),
+		strings.HasSuffix(first, ".ps1"),
+		strings.HasSuffix(first, ".cmd"),
+		strings.HasSuffix(first, ".bat"):
+		return first
+	default:
+		return ""
+	}
+}
+
+func reconstructRunShellScript(run *instructions.RunCommand) string {
+	if run == nil {
+		return ""
+	}
+	if len(run.CmdLine) == 0 {
+		return ""
+	}
+
+	script := strings.Join(run.CmdLine, " ")
+	if len(run.Files) == 0 {
+		return script
+	}
+
+	var sb strings.Builder
+	sb.WriteString(script)
+	for _, file := range run.Files {
+		sb.WriteString("\n")
+		sb.WriteString(file.Data)
+		sb.WriteString(file.Name)
+	}
+	return sb.String()
+}
+
+func instructionStartLine(location []parser.Range) int {
+	if len(location) == 0 {
+		return 0
+	}
+	return location[0].Start.Line
 }
 
 func initialStageShell(
@@ -589,11 +1074,8 @@ func IsRootUser(user string) bool {
 }
 
 // privilegeDropTools lists executables whose sole purpose is dropping root
-// privileges at runtime. Only unambiguous tools belong here — generic script
-// names like "entrypoint.sh" or "docker-entrypoint.sh" are intentionally
-// excluded because they could do anything; script-content inspection requires
-// build-context access or inline-heredoc analysis, which belongs in rules,
-// not in the shared facts layer.
+// privileges at runtime. Generic script names are intentionally excluded;
+// those are handled separately through observable script-content inspection.
 var privilegeDropTools = []string{"gosu", "su-exec", "suexec", "setpriv"}
 
 // privilegeDropToolsRe matches any of the privilege-drop tool names as whole

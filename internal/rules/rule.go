@@ -19,6 +19,10 @@ type BuildContext interface {
 	// FileExists checks if a file exists in the build context.
 	FileExists(path string) bool
 
+	// ReadFile reads a regular file from the build context.
+	// The path must be relative to the context root.
+	ReadFile(path string) ([]byte, error)
+
 	// IsHeredocFile checks if a path is a virtual heredoc file.
 	IsHeredocFile(path string) bool
 
