@@ -82,7 +82,7 @@ func MakeLintInputWithConfig(tb testing.TB, file, content string, config any) ru
 }
 
 // GetSemantic extracts the *semantic.Model from a LintInput.
-// Fails the test if the Semantic field is nil or not a *semantic.Model.
+// Fails the test if the Semantic field is nil.
 func GetSemantic(tb testing.TB, input rules.LintInput) *semantic.Model {
 	tb.Helper()
 	sem := input.Semantic
