@@ -46,9 +46,14 @@ func (r *DL3022Rule) Check(input rules.LintInput) []rules.Violation {
 	var violations []rules.Violation
 
 	for stageIdx, stage := range input.Stages {
+		currentStageName := normalizeStageRef(stage.Name)
+
 		for _, cmd := range stage.Commands {
 			copyCmd, ok := cmd.(*instructions.CopyCommand)
 			if !ok || copyCmd.From == "" {
+				continue
+			}
+			if currentStageName != "" && normalizeStageRef(copyCmd.From) == currentStageName {
 				continue
 			}
 			if isExternalCopySource(copyCmd.From) || isPreviouslyDefinedStageRef(copyCmd.From, stageIdx, definedStageNames) {

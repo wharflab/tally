@@ -56,6 +56,11 @@ func TestDL3022_CopyFromUndefinedAlias(t *testing.T) {
 			shouldFail: true,
 		},
 		{
+			name:       "don't warn on self-referencing current stage alias",
+			dockerfile: "FROM scratch AS build" + "\n" + "COPY --from=build bar .",
+			shouldFail: false,
+		},
+		{
 			name: "don't warn on valid stage count with named stage",
 			dockerfile: strings.Join([]string{
 				"FROM scratch as build",
