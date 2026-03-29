@@ -626,7 +626,7 @@ func commandInfoFromArgv(argv []string) (shell.CommandInfo, bool) {
 		Name: normalizeCommandName(argv[0]),
 		Args: append([]string(nil), argv[1:]...),
 	}
-	for _, arg := range cmd.Args {
+	for _, arg := range significantCommandArgs(cmd.Name, cmd.Args) {
 		if arg == "" || strings.HasPrefix(arg, "-") {
 			continue
 		}
@@ -769,64 +769,41 @@ func toolFromExecPackage(pkg string) (ToolID, string, bool) {
 }
 
 func execPackageFromCommand(cmd shell.CommandInfo) (string, bool) {
+	args := significantCommandArgs(cmd.Name, cmd.Args)
 	switch normalizeCommandName(cmd.Name) {
 	case "npx":
-		return firstExecutableArg(cmd.Args)
+		return firstExecutableArg(args)
 	case cmdNpm:
-		if len(cmd.Args) > 0 && (strings.EqualFold(cmd.Args[0], "exec") || strings.EqualFold(cmd.Args[0], "x")) {
-			return firstExecutableArg(cmd.Args[1:])
+		if len(args) > 0 && (strings.EqualFold(args[0], "exec") || strings.EqualFold(args[0], "x")) {
+			return firstExecutableArg(args[1:])
 		}
 	case cmdPnpm:
-		if len(cmd.Args) > 0 && (strings.EqualFold(cmd.Args[0], "exec") || strings.EqualFold(cmd.Args[0], "dlx")) {
-			return firstExecutableArg(cmd.Args[1:])
+		if len(args) > 0 && (strings.EqualFold(args[0], "exec") || strings.EqualFold(args[0], "dlx")) {
+			return firstExecutableArg(args[1:])
 		}
-		if cmd.Subcommand != "" && toolFromExecLikeSubcommand(cmd.Subcommand) {
-			return cmd.Subcommand, true
+		if subcommand := commandSubcommand(cmd); subcommand != "" && toolFromExecLikeSubcommand(subcommand) {
+			return subcommand, true
 		}
 	case "yarn":
-		if len(cmd.Args) > 0 && strings.EqualFold(cmd.Args[0], "dlx") {
-			return firstExecutableArg(cmd.Args[1:])
+		if len(args) > 0 && strings.EqualFold(args[0], "dlx") {
+			return firstExecutableArg(args[1:])
 		}
 	case "bunx":
-		return firstExecutableArg(cmd.Args)
+		return firstExecutableArg(args)
 	case "bun":
-		if len(cmd.Args) > 0 && strings.EqualFold(cmd.Args[0], "x") {
-			return firstExecutableArg(cmd.Args[1:])
+		if len(args) > 0 && strings.EqualFold(args[0], "x") {
+			return firstExecutableArg(args[1:])
 		}
 	}
 	return "", false
 }
 
 func execPackageFromArgv(argv []string) (string, bool) {
-	if len(argv) == 0 {
+	cmd, ok := commandInfoFromArgv(argv)
+	if !ok {
 		return "", false
 	}
-	switch normalizeCommandName(argv[0]) {
-	case "npx":
-		return firstExecutableArg(argv[1:])
-	case cmdNpm:
-		if len(argv) > 1 && (strings.EqualFold(argv[1], "exec") || strings.EqualFold(argv[1], "x")) {
-			return firstExecutableArg(argv[2:])
-		}
-	case cmdPnpm:
-		if len(argv) > 1 && (strings.EqualFold(argv[1], "exec") || strings.EqualFold(argv[1], "dlx")) {
-			return firstExecutableArg(argv[2:])
-		}
-		if len(argv) > 1 && toolFromExecLikeSubcommand(argv[1]) {
-			return argv[1], true
-		}
-	case "yarn":
-		if len(argv) > 1 && strings.EqualFold(argv[1], "dlx") {
-			return firstExecutableArg(argv[2:])
-		}
-	case "bunx":
-		return firstExecutableArg(argv[1:])
-	case "bun":
-		if len(argv) > 1 && strings.EqualFold(argv[1], "x") {
-			return firstExecutableArg(argv[2:])
-		}
-	}
-	return "", false
+	return execPackageFromCommand(cmd)
 }
 
 func toolFromExecLikeSubcommand(name string) bool {
@@ -916,21 +893,22 @@ func isPythonCommandName(name string) bool {
 }
 
 func isNodeScriptCommand(cmd shell.CommandInfo) bool {
+	subcommand := commandSubcommand(cmd)
 	switch normalizeCommandName(cmd.Name) {
 	case "npm":
-		return strings.EqualFold(cmd.Subcommand, command.Run) || strings.EqualFold(cmd.Subcommand, cmdStart)
+		return strings.EqualFold(subcommand, command.Run) || strings.EqualFold(subcommand, cmdStart)
 	case "pnpm":
-		switch strings.ToLower(cmd.Subcommand) {
+		switch strings.ToLower(subcommand) {
 		case command.Run, cmdStart, cmdBuild, cmdDev, cmdPreview:
 			return true
 		default:
 			return false
 		}
 	case cmdYarn:
-		if cmd.Subcommand == "" {
+		if subcommand == "" {
 			return false
 		}
-		switch strings.ToLower(cmd.Subcommand) {
+		switch strings.ToLower(subcommand) {
 		case command.Add,
 			"bin",
 			"install",
@@ -966,7 +944,7 @@ func isNodeScriptCommand(cmd shell.CommandInfo) bool {
 			return true
 		}
 	case cmdBun:
-		return strings.EqualFold(cmd.Subcommand, command.Run)
+		return strings.EqualFold(subcommand, command.Run)
 	default:
 		return false
 	}
@@ -985,6 +963,86 @@ func isExplicitBerryCommand(cmd shell.CommandInfo) bool {
 
 func containsBerryYarnSpecifier(args []string) bool {
 	return slices.ContainsFunc(args, isYarnBerryPackageManager)
+}
+
+func commandSubcommand(cmd shell.CommandInfo) string {
+	if cmd.Subcommand != "" && !packageManagerSupportsGlobalPrefix(cmd.Name) {
+		return cmd.Subcommand
+	}
+	for _, arg := range significantCommandArgs(cmd.Name, cmd.Args) {
+		if arg == "" || arg == "--" || strings.HasPrefix(arg, "-") {
+			continue
+		}
+		return arg
+	}
+	return cmd.Subcommand
+}
+
+func significantCommandArgs(name string, args []string) []string {
+	if !packageManagerSupportsGlobalPrefix(name) {
+		return args
+	}
+
+	for i := 0; i < len(args); {
+		arg := strings.TrimSpace(args[i])
+		switch {
+		case arg == "":
+			i++
+		case arg == "--":
+			return args[i:]
+		case !strings.HasPrefix(arg, "-"):
+			return args[i:]
+		case packageManagerGlobalOptionConsumesValue(name, arg):
+			if strings.Contains(arg, "=") {
+				i++
+				continue
+			}
+			i += 2
+		default:
+			i++
+		}
+	}
+	return nil
+}
+
+func packageManagerSupportsGlobalPrefix(name string) bool {
+	switch normalizeCommandName(name) {
+	case "npx", cmdNpm, cmdPnpm, cmdYarn, cmdBun:
+		return true
+	default:
+		return false
+	}
+}
+
+func packageManagerGlobalOptionConsumesValue(name, arg string) bool {
+	name = normalizeCommandName(name)
+	switch normalizedPackageManagerOption(arg) {
+	case "--workspace":
+		return name == cmdNpm
+	case "-w":
+		return name == cmdNpm
+	case "--prefix":
+		return name == cmdNpm
+	case "--dir", "--workspace-dir":
+		return name == cmdPnpm
+	case "-c":
+		return name == cmdPnpm
+	case "--filter":
+		return name == cmdPnpm
+	case "-f":
+		return name == cmdPnpm
+	case "--cwd":
+		return name == cmdYarn || name == cmdBun
+	default:
+		return false
+	}
+}
+
+func normalizedPackageManagerOption(arg string) string {
+	if eq := strings.Index(arg, "="); eq >= 0 {
+		arg = arg[:eq]
+	}
+	return strings.ToLower(strings.TrimSpace(arg))
 }
 
 func normalizeCommandName(name string) string {

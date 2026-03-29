@@ -177,6 +177,30 @@ func TestCommandInfoFromArgv(t *testing.T) {
 			wantOK:         true,
 		},
 		{
+			name:           "npm workspace flag skips operand for subcommand",
+			argv:           []string{"npm", "--workspace", "web", "start"},
+			wantName:       "npm",
+			wantSubcommand: "start",
+			wantArgs:       []string{"--workspace", "web", "start"},
+			wantOK:         true,
+		},
+		{
+			name:           "pnpm dir flag skips operand for subcommand",
+			argv:           []string{"pnpm", "--dir", "app", "build"},
+			wantName:       "pnpm",
+			wantSubcommand: "build",
+			wantArgs:       []string{"--dir", "app", "build"},
+			wantOK:         true,
+		},
+		{
+			name:           "npm yes flag keeps exec subcommand",
+			argv:           []string{"npm", "--yes", "exec", "--", "next", "build"},
+			wantName:       "npm",
+			wantSubcommand: "exec",
+			wantArgs:       []string{"--yes", "exec", "--", "next", "build"},
+			wantOK:         true,
+		},
+		{
 			name:           "windows powershell path strips exe suffix",
 			argv:           []string{`C:\Program Files\PowerShell\7\pwsh.exe`, "-Command", "Get-Item"},
 			wantName:       "pwsh",
@@ -373,6 +397,12 @@ func TestExecPackageFromCommand(t *testing.T) {
 			ok:   true,
 		},
 		{
+			name: "npm yes exec",
+			cmd:  shell.CommandInfo{Name: "npm", Args: []string{"--yes", "exec", "--", "next", "build"}},
+			want: "next",
+			ok:   true,
+		},
+		{
 			name: "pnpm dlx",
 			cmd:  shell.CommandInfo{Name: "pnpm", Args: []string{"dlx", "astro", "dev"}},
 			want: "astro",
@@ -441,6 +471,12 @@ func TestExecPackageFromArgv(t *testing.T) {
 		{
 			name: "npm cmd path exec",
 			argv: []string{`C:\Program Files\nodejs\npm.cmd`, "exec", "--", "next", "build"},
+			want: "next",
+			ok:   true,
+		},
+		{
+			name: "npm yes exec",
+			argv: []string{"npm", "--yes", "exec", "--", "next", "build"},
 			want: "next",
 			ok:   true,
 		},
@@ -600,8 +636,10 @@ func TestTelemetryPredicates(t *testing.T) {
 		}{
 			{name: "npm run", cmd: shell.CommandInfo{Name: "npm", Subcommand: "run"}, want: true},
 			{name: "npm start", cmd: shell.CommandInfo{Name: "npm", Subcommand: "start"}, want: true},
+			{name: "npm workspace start", cmd: shell.CommandInfo{Name: "npm", Args: []string{"--workspace", "web", "start"}}, want: true},
 			{name: "npm cmd run", cmd: shell.CommandInfo{Name: "npm.cmd", Subcommand: "run"}, want: true},
 			{name: "npm install", cmd: shell.CommandInfo{Name: "npm", Subcommand: "install"}, want: false},
+			{name: "pnpm dir build", cmd: shell.CommandInfo{Name: "pnpm", Args: []string{"--dir", "app", "build"}}, want: true},
 			{name: "pnpm preview", cmd: shell.CommandInfo{Name: "pnpm", Subcommand: "preview"}, want: true},
 			{name: "pnpm add", cmd: shell.CommandInfo{Name: "pnpm", Subcommand: "add"}, want: false},
 			{name: "yarn build", cmd: shell.CommandInfo{Name: "yarn", Subcommand: "build"}, want: true},

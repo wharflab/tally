@@ -194,6 +194,19 @@ CMD ["npm", "start"]
 			wantAnchorLine: 3,
 		},
 		{
+			name: "next from package json plus cmd npm workspace start",
+			content: `FROM node:22
+WORKDIR /app
+COPY package.json ./package.json
+CMD ["npm", "--workspace", "web", "start"]
+`,
+			contextFiles: map[string]string{
+				"package.json": `{"dependencies":{"next":"15.0.0"}}`,
+			},
+			wantTools:      []ToolID{ToolNextJS},
+			wantAnchorLine: 3,
+		},
+		{
 			name: "yarn berry from package manager metadata plus entrypoint yarn start",
 			content: `FROM node:22
 WORKDIR /app
