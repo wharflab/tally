@@ -5,7 +5,7 @@ package ruleschema
 // Exclude this rule for specific file paths.
 type Exclude struct {
 	// Glob patterns to exclude (e.g. "test/**").
-	Paths []string `json:"paths,omitempty"`
+	Paths []string `json:"paths,omitempty,omitzero"`
 }
 
 type Fix string
@@ -18,13 +18,13 @@ const FixUnsafeOnly Fix = "unsafe-only"
 // Generic per-rule configuration used for rules without rule-specific options.
 type GenericRuleConfig struct {
 	// Exclude corresponds to the JSON schema field "exclude".
-	Exclude *Exclude `json:"exclude,omitempty"`
+	Exclude *Exclude `json:"exclude,omitempty,omitzero"`
 
 	// Fix corresponds to the JSON schema field "fix".
-	Fix *Fix `json:"fix,omitempty"`
+	Fix *Fix `json:"fix,omitempty,omitzero"`
 
 	// Severity corresponds to the JSON schema field "severity".
-	Severity *Severity `json:"severity,omitempty"`
+	Severity *Severity `json:"severity,omitempty,omitzero"`
 }
 
 type Severity string

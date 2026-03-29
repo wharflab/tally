@@ -8,17 +8,17 @@ import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ru
 type PreferCopyHeredocSchemaJson struct {
 	// Detect sequences of consecutive RUN instructions that create/append to the same
 	// file.
-	CheckConsecutiveRuns bool `json:"check-consecutive-runs,omitempty"`
+	CheckConsecutiveRuns bool `json:"check-consecutive-runs,omitempty,omitzero"`
 
 	// Detect single RUN instructions that create files and suggest COPY heredoc.
-	CheckSingleRun bool `json:"check-single-run,omitempty"`
+	CheckSingleRun bool `json:"check-single-run,omitempty,omitzero"`
 
 	// Exclude corresponds to the JSON schema field "exclude".
-	Exclude *ruleschema.Exclude `json:"exclude,omitempty"`
+	Exclude *ruleschema.Exclude `json:"exclude,omitempty,omitzero"`
 
 	// Fix corresponds to the JSON schema field "fix".
-	Fix *ruleschema.Fix `json:"fix,omitempty"`
+	Fix *ruleschema.Fix `json:"fix,omitempty,omitzero"`
 
 	// Severity corresponds to the JSON schema field "severity".
-	Severity *ruleschema.Severity `json:"severity,omitempty"`
+	Severity *ruleschema.Severity `json:"severity,omitempty,omitzero"`
 }

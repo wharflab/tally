@@ -7,20 +7,20 @@ import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ru
 // Configuration options for the tally/no-multiple-empty-lines rule.
 type NoMultipleEmptyLinesSchemaJson struct {
 	// Exclude corresponds to the JSON schema field "exclude".
-	Exclude *ruleschema.Exclude `json:"exclude,omitempty"`
+	Exclude *ruleschema.Exclude `json:"exclude,omitempty,omitzero"`
 
 	// Fix corresponds to the JSON schema field "fix".
-	Fix *ruleschema.Fix `json:"fix,omitempty"`
+	Fix *ruleschema.Fix `json:"fix,omitempty,omitzero"`
 
 	// Maximum number of consecutive empty lines allowed anywhere in the file.
-	Max int `json:"max,omitempty"`
+	Max int `json:"max,omitempty,omitzero"`
 
 	// Maximum number of consecutive empty lines allowed at the beginning of the file.
-	MaxBof int `json:"max-bof,omitempty"`
+	MaxBof int `json:"max-bof,omitempty,omitzero"`
 
 	// Maximum number of consecutive empty lines allowed at the end of the file.
-	MaxEof int `json:"max-eof,omitempty"`
+	MaxEof int `json:"max-eof,omitempty,omitzero"`
 
 	// Severity corresponds to the JSON schema field "severity".
-	Severity *ruleschema.Severity `json:"severity,omitempty"`
+	Severity *ruleschema.Severity `json:"severity,omitempty,omitzero"`
 }

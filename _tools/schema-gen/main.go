@@ -204,7 +204,8 @@ func generateGoTypes(repoRoot string, m *manifest) error {
 		OnlyModels:                true,
 		Tags:                      []string{"json"},
 		Warner:                    func(string) {},
-		DisableOmitempty:          false,
+		DisableOmitEmpty:          false,
+		DisableOmitZero:           false,
 		DisableCustomTypesForMaps: false,
 	})
 	if err != nil {

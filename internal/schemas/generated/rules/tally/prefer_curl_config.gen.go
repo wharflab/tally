@@ -7,20 +7,20 @@ import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ru
 // Configuration options for the tally/prefer-curl-config rule.
 type PreferCurlConfigSchemaJson struct {
 	// Maximum time in seconds for the connection phase.
-	ConnectTimeout int `json:"connect-timeout,omitempty"`
+	ConnectTimeout int `json:"connect-timeout,omitempty,omitzero"`
 
 	// Exclude corresponds to the JSON schema field "exclude".
-	Exclude *ruleschema.Exclude `json:"exclude,omitempty"`
+	Exclude *ruleschema.Exclude `json:"exclude,omitempty,omitzero"`
 
 	// Fix corresponds to the JSON schema field "fix".
-	Fix *ruleschema.Fix `json:"fix,omitempty"`
+	Fix *ruleschema.Fix `json:"fix,omitempty,omitzero"`
 
 	// Maximum time in seconds for the entire transfer.
-	MaxTime int `json:"max-time,omitempty"`
+	MaxTime int `json:"max-time,omitempty,omitzero"`
 
 	// Number of retries for failed transfers.
-	Retry int `json:"retry,omitempty"`
+	Retry int `json:"retry,omitempty,omitzero"`
 
 	// Severity corresponds to the JSON schema field "severity".
-	Severity *ruleschema.Severity `json:"severity,omitempty"`
+	Severity *ruleschema.Severity `json:"severity,omitempty,omitzero"`
 }
