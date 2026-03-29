@@ -135,6 +135,64 @@ RUN bootstrap-vcpkg.bat
 			wantTools:      []ToolID{ToolVcpkg},
 			wantAnchorLine: 3,
 		},
+		{
+			name: "container start via npx wrangler",
+			content: `FROM node:22
+CMD ["npx", "wrangler", "deploy"]
+`,
+			wantTools:      []ToolID{ToolWrangler},
+			wantAnchorLine: 2,
+		},
+		{
+			name: "container start via python module",
+			content: `FROM python:3.12
+ENTRYPOINT ["python", "-m", "huggingface_hub", "scan-cache"]
+`,
+			wantTools:      []ToolID{ToolHuggingFace},
+			wantAnchorLine: 2,
+		},
+		{
+			name: "shell instruction powershell",
+			content: `FROM ubuntu:24.04
+SHELL ["pwsh", "-Command"]
+`,
+			wantTools:      []ToolID{ToolPowerShell},
+			wantAnchorLine: 2,
+		},
+		{
+			name: "container start via homebrew",
+			content: `FROM ubuntu:24.04
+CMD ["brew", "install", "jq"]
+`,
+			wantTools:      []ToolID{ToolHomebrew},
+			wantAnchorLine: 2,
+		},
+		{
+			name: "hugging face requirements manifest plus pip install",
+			content: `FROM python:3.12
+WORKDIR /app
+COPY requirements.txt ./requirements.txt
+RUN pip install -r requirements.txt
+`,
+			contextFiles: map[string]string{
+				"requirements.txt": "transformers==4.51.0\n",
+			},
+			wantTools:      []ToolID{ToolHuggingFace},
+			wantAnchorLine: 3,
+		},
+		{
+			name: "yarn berry from copied release plus corepack enable",
+			content: `FROM node:22
+WORKDIR /app
+COPY .yarn/releases/yarn-4.2.2.cjs ./.yarn/releases/yarn-4.2.2.cjs
+RUN corepack enable
+`,
+			contextFiles: map[string]string{
+				".yarn/releases/yarn-4.2.2.cjs": "",
+			},
+			wantTools:      []ToolID{ToolYarnBerry},
+			wantAnchorLine: 3,
+		},
 	}
 
 	for _, tt := range tests {
