@@ -1,0 +1,97 @@
+{
+  "files": [
+    {
+      "file": "testdata/windows-no-chown-flag/Dockerfile",
+      "violations": [
+        {
+          "detail": "Windows containers do not use POSIX file ownership (uid:gid). The --chown flag on COPY has no effect and can be safely removed.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/windows/no-chown-flag/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 12
+            },
+            "file": "testdata/windows-no-chown-flag/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 12
+            }
+          },
+          "message": "COPY --chown=ContainerUser is silently ignored on Windows containers",
+          "rule": "tally/windows/no-chown-flag",
+          "severity": "warning",
+          "sourceCode": "COPY --chown=ContainerUser --from=build /app C:/app/",
+          "suggestedFix": {
+            "description": "Remove --chown=ContainerUser (ignored on Windows)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 27,
+                    "line": 12
+                  },
+                  "file": "testdata/windows-no-chown-flag/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 12
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "detail": "Windows containers do not use POSIX file ownership (uid:gid). The --chown flag on ADD has no effect and can be safely removed.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/windows/no-chown-flag/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 15
+            },
+            "file": "testdata/windows-no-chown-flag/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 15
+            }
+          },
+          "message": "ADD --chown=1000:1000 is silently ignored on Windows containers",
+          "rule": "tally/windows/no-chown-flag",
+          "severity": "warning",
+          "sourceCode": "ADD --chown=1000:1000 config.tar.gz C:/config/",
+          "suggestedFix": {
+            "description": "Remove --chown=1000:1000 (ignored on Windows)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 22,
+                    "line": 15
+                  },
+                  "file": "testdata/windows-no-chown-flag/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 15
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}

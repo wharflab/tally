@@ -91,7 +91,7 @@ COPY --chown=ContainerUser --from=base ["C:/Program Files/Java/OpenJDK", "C:/Pro
 ENV JAVA_HOME="C:\Program Files\Java\OpenJDK" \
     CONFIG_FILE="C:\BuildAgent\conf\buildAgent.properties"
 
-COPY --chown=ContainerUser --from=base /BuildAgent /BuildAgent
+COPY --from=base /BuildAgent /BuildAgent
 
 USER ContainerAdministrator
 

@@ -1686,6 +1686,25 @@ severity = "warning"
 			wantApplied: 1, // only windows/no-stopsignal should apply
 		},
 
+		// Windows no-chown-flag: remove --chown from COPY on Windows stage (FixSafe)
+		{
+			name:  "windows-no-chown-flag",
+			input: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\nCOPY --chown=app:app src/ C:/app/\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/windows/no-chown-flag")...),
+			wantApplied: 1,
+		},
+		// Windows no-chown-flag: Linux stage — no fix
+		{
+			name:  "windows-no-chown-flag-linux-no-fix",
+			input: "FROM alpine:3.20\nCOPY --chown=app:app src/ /app/\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/windows/no-chown-flag")...),
+			wantApplied: 0,
+		},
+
 		// Prefer canonical STOPSIGNAL: missing SIG prefix → SIGTERM (FixSafe)
 		{
 			name:  "prefer-canonical-stopsignal-prefix",

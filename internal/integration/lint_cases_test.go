@@ -271,6 +271,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// Windows: --chown flag silently ignored
+		{
+			name:     "windows-no-chown-flag",
+			dir:      "windows-no-chown-flag",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/windows/no-chown-flag")...),
+			wantExit: 1,
+		},
+
 		// GPU: NVIDIA container runtime packages inside image
 		{
 			name:     "gpu-no-container-runtime-in-image",
