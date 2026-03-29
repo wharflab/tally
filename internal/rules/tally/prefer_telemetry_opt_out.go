@@ -2,6 +2,7 @@ package tally
 
 import (
 	"fmt"
+	"maps"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -21,6 +22,16 @@ const telemetryOptOutComment = "# [tally] settings to opt out from telemetry"
 // PreferTelemetryOptOutRule suggests official telemetry opt-out ENV variables
 // for stages that clearly use telemetry-enabled developer tools.
 type PreferTelemetryOptOutRule struct{}
+
+type telemetryEnvContext struct {
+	stage            *instructions.Stage
+	fileFacts        *facts.FileFacts
+	sem              *semantic.Model
+	stageIdx         int
+	stageFacts       *facts.StageFacts
+	inheritedPlanned map[string]string
+	anchorLine       int
+}
 
 // NewPreferTelemetryOptOutRule creates a new rule instance.
 func NewPreferTelemetryOptOutRule() *PreferTelemetryOptOutRule {
@@ -56,21 +67,28 @@ func (r *PreferTelemetryOptOutRule) Check(input rules.LintInput) []rules.Violati
 		if signals.Empty() {
 			continue
 		}
+		anchor, ok := signals.Anchor()
+		if !ok {
+			continue
+		}
 
 		requiredEnv := requiredTelemetryEnv(signals.OrderedToolIDs())
 		inheritedPlanned := inheritedTelemetryEnv(input.Semantic, stageIdx, plannedStageEnv)
-		missingEnv := missingTelemetryEnv(stageFacts, requiredEnv, inheritedPlanned)
+		missingEnv := missingTelemetryEnv(telemetryEnvContext{
+			stage:            &stage,
+			fileFacts:        input.Facts,
+			sem:              input.Semantic,
+			stageIdx:         stageIdx,
+			stageFacts:       stageFacts,
+			inheritedPlanned: inheritedPlanned,
+			anchorLine:       anchor.Line,
+		}, requiredEnv)
 		if len(missingEnv) == 0 {
 			continue
 		}
 
 		missingTools := toolsForMissingEnv(missingEnv)
 		if len(missingTools) == 0 {
-			continue
-		}
-
-		anchor, ok := signals.Anchor()
-		if !ok {
 			continue
 		}
 
@@ -150,21 +168,25 @@ func inheritedTelemetryEnv(
 	}
 }
 
-func missingTelemetryEnv(
-	stageFacts *facts.StageFacts,
-	required map[string]string,
-	inheritedPlanned map[string]string,
-) map[string]string {
+func missingTelemetryEnv(ctx telemetryEnvContext, required map[string]string) map[string]string {
 	if len(required) == 0 {
 		return nil
 	}
 
+	effectiveEnv := effectiveTelemetryEnvAtAnchor(
+		ctx.stage,
+		ctx.fileFacts,
+		ctx.sem,
+		ctx.stageIdx,
+		ctx.stageFacts,
+		ctx.inheritedPlanned,
+		ctx.anchorLine,
+	)
+	caseInsensitive := ctx.stageFacts != nil && ctx.stageFacts.BaseImageOS == semantic.BaseImageOSWindows
+
 	missing := map[string]string{}
 	for key, desired := range required {
-		if value, ok := inheritedPlanned[key]; ok && strings.EqualFold(value, desired) {
-			continue
-		}
-		if telemetryEnvMatches(stageFacts, key, desired) {
+		if telemetryEnvMatches(effectiveEnv, key, desired, caseInsensitive) {
 			continue
 		}
 		missing[key] = desired
@@ -172,13 +194,100 @@ func missingTelemetryEnv(
 	return missing
 }
 
-func telemetryEnvMatches(stageFacts *facts.StageFacts, key, desired string) bool {
-	if stageFacts == nil || len(stageFacts.EffectiveEnv.Values) == 0 {
+func telemetryEnvMatches(values map[string]string, key, desired string, caseInsensitive bool) bool {
+	if len(values) == 0 {
 		return false
 	}
 
-	actual, ok := lookupTelemetryEnv(stageFacts.EffectiveEnv.Values, key, stageFacts.BaseImageOS == semantic.BaseImageOSWindows)
+	actual, ok := lookupTelemetryEnv(values, key, caseInsensitive)
 	return ok && strings.EqualFold(actual, desired)
+}
+
+func effectiveTelemetryEnvAtAnchor(
+	stage *instructions.Stage,
+	fileFacts *facts.FileFacts,
+	sem *semantic.Model,
+	stageIdx int,
+	stageFacts *facts.StageFacts,
+	inheritedPlanned map[string]string,
+	anchorLine int,
+) map[string]string {
+	caseInsensitive := stageFacts != nil && stageFacts.BaseImageOS == semantic.BaseImageOSWindows
+	values := inheritedActualTelemetryEnv(fileFacts, sem, stageIdx)
+	if values == nil {
+		values = map[string]string{}
+	}
+
+	for key, value := range inheritedPlanned {
+		if _, ok := lookupTelemetryEnv(values, key, caseInsensitive); ok {
+			continue
+		}
+		setTelemetryEnv(values, key, value, caseInsensitive)
+	}
+
+	if stage == nil || anchorLine <= 0 {
+		return values
+	}
+
+	for _, cmd := range stage.Commands {
+		loc := cmd.Location()
+		if len(loc) == 0 {
+			continue
+		}
+		startLine := loc[0].Start.Line
+		if startLine > anchorLine {
+			break
+		}
+
+		envCmd, ok := cmd.(*instructions.EnvCommand)
+		if !ok {
+			continue
+		}
+
+		for _, entry := range envCmd.Env {
+			setTelemetryEnv(values, entry.Key, entry.Value, caseInsensitive)
+		}
+	}
+
+	return values
+}
+
+func inheritedActualTelemetryEnv(fileFacts *facts.FileFacts, sem *semantic.Model, stageIdx int) map[string]string {
+	if fileFacts == nil || sem == nil {
+		return nil
+	}
+
+	info := sem.StageInfo(stageIdx)
+	if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 {
+		return nil
+	}
+
+	parent := fileFacts.Stage(info.BaseImage.StageIndex)
+	if parent == nil || len(parent.EffectiveEnv.Values) == 0 {
+		return nil
+	}
+
+	inherited := make(map[string]string, len(parent.EffectiveEnv.Values))
+	maps.Copy(inherited, parent.EffectiveEnv.Values)
+	return inherited
+}
+
+func setTelemetryEnv(values map[string]string, key, value string, caseInsensitive bool) {
+	if values == nil {
+		return
+	}
+	if !caseInsensitive {
+		values[key] = value
+		return
+	}
+
+	for currentKey := range values {
+		if strings.EqualFold(currentKey, key) {
+			delete(values, currentKey)
+			break
+		}
+	}
+	values[key] = value
 }
 
 func lookupTelemetryEnv(values map[string]string, key string, caseInsensitive bool) (string, bool) {

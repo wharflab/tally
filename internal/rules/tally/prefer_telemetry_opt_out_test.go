@@ -73,6 +73,16 @@ RUN bun install
 			wantViolations: 0,
 		},
 		{
+			name: "env set after bun use is still missing at anchor",
+			content: `FROM node:22
+RUN bun install
+ENV DO_NOT_TRACK=1
+`,
+			wantViolations:    1,
+			wantMessageSubstr: "Bun",
+			wantDetailSubstr:  "DO_NOT_TRACK=1",
+		},
+		{
 			name: "child stage inherits parent env",
 			content: `FROM node:22 AS base
 ENV DO_NOT_TRACK=1
@@ -93,6 +103,18 @@ RUN next build
 			wantViolations:    1,
 			wantMessageSubstr: "Next.js",
 			wantDetailSubstr:  "NEXT_TELEMETRY_DISABLED=1",
+		},
+		{
+			name: "child stage override does not get suppressed by inherited planned env",
+			content: `FROM node:22 AS base
+RUN bun install
+FROM base
+ENV DO_NOT_TRACK=0
+RUN bun install
+`,
+			wantViolations:    2,
+			wantMessageSubstr: "Bun",
+			wantDetailSubstr:  "DO_NOT_TRACK=1",
 		},
 		{
 			name: "windows powershell and vcpkg share one violation",
@@ -124,7 +146,7 @@ RUN pip install -r requirements.txt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var ctx *telemetryBuildContext
+			var ctx rules.BuildContext
 			if len(tt.contextFiles) > 0 {
 				ctx = &telemetryBuildContext{files: tt.contextFiles}
 			}
