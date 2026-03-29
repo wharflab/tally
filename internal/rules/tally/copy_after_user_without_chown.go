@@ -277,17 +277,12 @@ func (r *CopyAfterUserWithoutChownRule) buildMoveUserFix(
 
 	userLine := userLoc[0].Start.Line
 	userEndLine := userLoc[0].End.Line
-	if ctx.sm != nil {
-		userEndLine = ctx.sm.ResolveEndLine(userEndLine)
-	}
 
 	userLineLen := 0
-	if ctx.sm != nil {
-		userLineLen = len(ctx.sm.Line(userEndLine - 1))
-	}
-
 	totalLines := 0
 	if ctx.sm != nil {
+		userEndLine = ctx.sm.ResolveEndLine(userEndLine)
+		userLineLen = len(ctx.sm.Line(userEndLine - 1))
 		totalLines = ctx.sm.LineCount()
 	}
 
