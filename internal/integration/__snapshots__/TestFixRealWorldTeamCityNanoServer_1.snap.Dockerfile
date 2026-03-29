@@ -26,13 +26,13 @@ FROM ${powershellImage} AS base
 # ... PowerShell container.
 USER ContainerAdministrator
 
-COPY scripts/*.cs /scripts/
+COPY --chown=ContainerAdministrator scripts/*.cs /scripts/
 
 SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 # Prepare build agent distribution
-COPY TeamCity/buildAgent C:/BuildAgent
-COPY run-agent.ps1 /BuildAgent/run-agent.ps1
+COPY --chown=ContainerAdministrator TeamCity/buildAgent C:/BuildAgent
+COPY --chown=ContainerAdministrator run-agent.ps1 /BuildAgent/run-agent.ps1
 
 # JDK
 ARG jdkWindowsComponent
@@ -81,7 +81,7 @@ RUN pwsh -NoLogo -NoProfile -Command " \
         Start-Sleep -Seconds 6 ; \
     }"
 
-COPY --from=base ["C:/Program Files/Java/OpenJDK", "C:/Program Files/Java/OpenJDK"]
+COPY --chown=ContainerUser --from=base ["C:/Program Files/Java/OpenJDK", "C:/Program Files/Java/OpenJDK"]
 
 ENV JAVA_HOME="C:\Program Files\Java\OpenJDK" \
     CONFIG_FILE="C:\BuildAgent\conf\buildAgent.properties"
