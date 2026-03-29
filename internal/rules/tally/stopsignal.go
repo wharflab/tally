@@ -9,7 +9,6 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 // Canonical signal name constants used by STOPSIGNAL rules for normalization,

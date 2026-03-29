@@ -11,7 +11,6 @@ import (
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
 	"github.com/wharflab/tally/internal/runmount"
-	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 )
 

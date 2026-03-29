@@ -67,8 +67,8 @@ func (r *CopyAfterUserWithoutChownRule) Check(input rules.LintInput) []rules.Vio
 	meta := r.Metadata()
 	sm := input.SourceMap()
 
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
-	sem, _ := input.Semantic.(*semantic.Model)     //nolint:errcheck // nil-safe assertion
+	fileFacts := input.Facts
+	sem := input.Semantic
 
 	violations := make([]rules.Violation, 0, len(input.Stages))
 

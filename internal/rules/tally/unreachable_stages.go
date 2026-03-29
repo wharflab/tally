@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 // UnreachableStagesRuleCode is the full rule code for the no-unreachable-stages rule.

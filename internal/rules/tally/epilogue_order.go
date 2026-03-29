@@ -6,7 +6,6 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 // EpilogueOrderRuleCode is the full rule code for the epilogue-order rule.
