@@ -1,6 +1,10 @@
 package hadolint
 
-import "github.com/wharflab/tally/internal/rules"
+import (
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
+	"github.com/wharflab/tally/internal/rules"
+)
 
 // DL3023: COPY --from should not reference the stage's own FROM alias.
 //
@@ -8,20 +12,18 @@ import "github.com/wharflab/tally/internal/rules"
 // as this creates a self-referential dependency that is invalid. The --from flag
 // should reference a previous stage, an external image, or a numeric stage index.
 //
-// IMPLEMENTATION: This rule is detected during semantic analysis in
-// internal/semantic/builder.go when processing COPY instructions. The semantic
-// builder maintains a map of stage names and checks if COPY --from references
-// the current stage being built.
-//
 // See: https://github.com/hadolint/hadolint/wiki/DL3023
 
 const DL3023Code = "hadolint/DL3023"
 
 var DL3023DocURL = rules.HadolintDocURL("DL3023")
 
-// DL3023Rule registers the rule so it appears in rules.All() with proper metadata.
-// The actual detection runs during semantic model construction in builder.go.
+// DL3023Rule checks that COPY --from does not reference its own stage alias.
 type DL3023Rule struct{}
+
+func NewDL3023Rule() *DL3023Rule {
+	return &DL3023Rule{}
+}
 
 func (r *DL3023Rule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
@@ -34,10 +36,36 @@ func (r *DL3023Rule) Metadata() rules.RuleMetadata {
 	}
 }
 
-func (r *DL3023Rule) Check(rules.LintInput) []rules.Violation {
-	return nil // Detected during semantic model construction.
+func (r *DL3023Rule) Check(input rules.LintInput) []rules.Violation {
+	meta := r.Metadata()
+	var violations []rules.Violation
+
+	for stageIdx, stage := range input.Stages {
+		stageName := normalizeStageRef(stage.Name)
+		if stageName == "" {
+			continue
+		}
+
+		for _, cmd := range stage.Commands {
+			copyCmd, ok := cmd.(*instructions.CopyCommand)
+			if !ok || copyCmd.From == "" || normalizeStageRef(copyCmd.From) != stageName {
+				continue
+			}
+
+			v := rules.NewViolation(
+				rules.NewLocationFromRanges(input.File, copyCmd.Location()),
+				meta.Code,
+				meta.Description,
+				meta.DefaultSeverity,
+			).WithDocURL(meta.DocURL)
+			v.StageIndex = stageIdx
+			violations = append(violations, v)
+		}
+	}
+
+	return violations
 }
 
 func init() {
-	rules.Register(&DL3023Rule{})
+	rules.Register(NewDL3023Rule())
 }

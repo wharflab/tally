@@ -13,7 +13,7 @@ type heredocRuleOptions struct {
 }
 
 // EnabledRuleCodes returns the set of rule codes that are active for the given config.
-// Includes registered rules, BuildKit captured rules, and semantic construction rules.
+// Includes registered rules and BuildKit parse-time rules captured from the parser.
 func EnabledRuleCodes(cfg *config.Config) []string {
 	enabledSet := make(map[string]struct{})
 

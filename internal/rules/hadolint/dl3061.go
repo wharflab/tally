@@ -1,17 +1,18 @@
 package hadolint
 
-import "github.com/wharflab/tally/internal/rules"
+import (
+	"strings"
+
+	"github.com/moby/buildkit/frontend/dockerfile/command"
+
+	"github.com/wharflab/tally/internal/rules"
+)
 
 // DL3061: Invalid instruction order - Dockerfile must begin with FROM, ARG, or comment.
 //
 // A Dockerfile must start with either a FROM instruction (to specify the base image),
 // an ARG instruction (to define build arguments that can be used in FROM), or comments.
 // Any other instruction appearing before FROM (except ARG) is invalid.
-//
-// IMPLEMENTATION: This rule is detected during semantic analysis in
-// internal/semantic/builder.go by examining the raw AST. The builder iterates
-// through top-level instructions and reports a violation if it encounters any
-// instruction other than FROM or ARG before the first FROM instruction.
 //
 // See: https://github.com/hadolint/hadolint/wiki/DL3061
 
@@ -22,9 +23,12 @@ const (
 
 var DL3061DocURL = rules.HadolintDocURL("DL3061")
 
-// DL3061Rule registers the rule so it appears in rules.All() with proper metadata.
-// The actual detection runs during semantic model construction in builder.go.
+// DL3061Rule checks that the Dockerfile starts with FROM or ARG.
 type DL3061Rule struct{}
+
+func NewDL3061Rule() *DL3061Rule {
+	return &DL3061Rule{}
+}
 
 func (r *DL3061Rule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
@@ -37,10 +41,36 @@ func (r *DL3061Rule) Metadata() rules.RuleMetadata {
 	}
 }
 
-func (r *DL3061Rule) Check(rules.LintInput) []rules.Violation {
-	return nil // Detected during semantic model construction.
+func (r *DL3061Rule) Check(input rules.LintInput) []rules.Violation {
+	if input.AST == nil || input.AST.AST == nil {
+		return nil
+	}
+
+	meta := r.Metadata()
+	for _, node := range topLevelInstructionNodes(input.AST.AST) {
+		if node == nil {
+			continue
+		}
+		if strings.EqualFold(node.Value, command.From) {
+			return nil
+		}
+		if strings.EqualFold(node.Value, command.Arg) {
+			continue
+		}
+
+		return []rules.Violation{
+			rules.NewViolation(
+				rules.NewRangeLocation(input.File, node.StartLine, 0, node.StartLine, 0),
+				meta.Code,
+				"Invalid instruction order. Dockerfile must begin with `FROM`, `ARG` or comment.",
+				meta.DefaultSeverity,
+			).WithDocURL(meta.DocURL),
+		}
+	}
+
+	return nil
 }
 
 func init() {
-	rules.Register(&DL3061Rule{})
+	rules.Register(NewDL3061Rule())
 }

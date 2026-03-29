@@ -1,33 +1,28 @@
 package semantic
 
 import (
-	"cmp"
 	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 	dfshell "github.com/moby/buildkit/frontend/dockerfile/shell"
 
-	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/dockerfile"
-	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/runmount"
 	"github.com/wharflab/tally/internal/shell"
 )
 
 // Builder constructs a semantic model from a parse result.
-// It performs single-pass analysis and accumulates violations.
+// It performs single-pass analysis and records structural build facts.
 type Builder struct {
 	parseResult     *dockerfile.ParseResult
 	buildArgs       map[string]string
 	file            string
-	shellDirectives []directive.ShellDirective
+	shellDirectives []ShellDirective
 
 	// Accumulated during build
-	issues       []Issue
 	globalScope  *VariableScope
 	stagesByName map[string]int
 }
@@ -44,14 +39,14 @@ func NewBuilder(pr *dockerfile.ParseResult, buildArgs map[string]string, file st
 }
 
 // WithShellDirectives sets the shell directives to be applied during build.
-func (b *Builder) WithShellDirectives(directives []directive.ShellDirective) *Builder {
+func (b *Builder) WithShellDirectives(directives []ShellDirective) *Builder {
 	b.shellDirectives = directives
 	return b
 }
 
 // Build constructs the semantic model.
-// This performs single-pass analysis of the Dockerfile, detecting
-// construction-time violations (e.g., instruction order issues).
+// This performs single-pass analysis of the Dockerfile and derives the
+// cross-instruction state consumed by downstream rules.
 func (b *Builder) Build() *Model {
 	if b.parseResult == nil {
 		return &Model{
@@ -59,11 +54,6 @@ func (b *Builder) Build() *Model {
 			graph:        newStageGraph(0),
 		}
 	}
-
-	// Construction-time semantic issues (based on AST, not just parsed instructions).
-	// Note: This must run even if instruction parsing was sanitized to continue.
-	b.checkDL3061InstructionOrder()
-	b.checkDL3043ForbiddenOnbuildTriggers()
 
 	stages := b.parseResult.Stages
 	metaArgs := b.parseResult.MetaArgs
@@ -166,8 +156,6 @@ func (b *Builder) Build() *Model {
 		stageInfo:    stageInfo,
 		graph:        graph,
 		buildArgs:    b.buildArgs,
-		file:         b.file,
-		issues:       b.issues,
 	}
 }
 
@@ -355,7 +343,7 @@ func (b *Builder) applyShellDirectives(stage *instructions.Stage, info *StageInf
 	}
 
 	// Find the most recent shell directive before FROM
-	var activeDirective *directive.ShellDirective
+	var activeDirective *ShellDirective
 	for i := range b.shellDirectives {
 		sd := &b.shellDirectives[i]
 		if sd.Line < fromLine && (activeDirective == nil || sd.Line > activeDirective.Line) {
@@ -464,34 +452,8 @@ func (b *Builder) processShellCommand(c *instructions.ShellCommand, info *StageI
 	}
 }
 
-// checkDuplicateInstruction reports a MultipleInstructionsDisallowed violation for the
-// previous location when a duplicate instruction is found. Returns the updated location.
-// Following BuildKit convention: the previous instruction is reported (the one Docker ignores).
-func (b *Builder) checkDuplicateInstruction(prevLoc *parser.Range, cmd instructions.Command) *parser.Range {
-	instrName := cmd.Name()
-	if prevLoc != nil {
-		issue := newIssue(
-			b.file,
-			*prevLoc,
-			rules.BuildKitRulePrefix+"MultipleInstructionsDisallowed",
-			"Multiple "+instrName+" instructions should not be used in the same stage because only the last one will be used",
-			rules.BuildKitDocURL("MultipleInstructionsDisallowed"),
-		)
-		issue.Severity = rules.SeverityWarning
-		b.issues = append(b.issues, issue)
-	}
-	if ranges := cmd.Location(); len(ranges) > 0 {
-		loc := ranges[0]
-		return &loc
-	}
-	return prevLoc
-}
-
 // processStageCommands analyzes commands within a stage.
 func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInfo, graph *StageGraph, env *fromEnv, shlex *dfshell.Lex) {
-	var lastCmdLoc, lastEntrypointLoc, lastHealthcheckLoc *parser.Range
-	normalizedStageName := normalizeStageRef(stage.Name)
-
 	declaredArgs := make(map[string]struct{})
 
 	buildShellLookupsByLine(stage, info)
@@ -516,15 +478,6 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 		case *instructions.EnvCommand:
 			applyEnvCommandToEnv(c, shlex, env)
 			info.Variables.AddEnvCommand(c)
-
-		case *instructions.CmdCommand:
-			lastCmdLoc = b.checkDuplicateInstruction(lastCmdLoc, c)
-
-		case *instructions.EntrypointCommand:
-			lastEntrypointLoc = b.checkDuplicateInstruction(lastEntrypointLoc, c)
-
-		case *instructions.HealthCheckCommand:
-			lastHealthcheckLoc = b.checkDuplicateInstruction(lastHealthcheckLoc, c)
 
 		case *instructions.ShellCommand:
 			b.processShellCommand(c, info)
@@ -554,39 +507,8 @@ func (b *Builder) processStageCommands(stage *instructions.Stage, info *StageInf
 
 		case *instructions.CopyCommand:
 			if c.From != "" {
-				// DL3023: COPY --from cannot reference its own FROM alias.
-				if stage.Name != "" && normalizeStageRef(c.From) == normalizedStageName {
-					var loc parser.Range
-					if ranges := c.Location(); len(ranges) > 0 {
-						loc = ranges[0]
-					}
-					b.issues = append(b.issues, newIssue(
-						b.file,
-						loc,
-						rules.HadolintRulePrefix+"DL3023",
-						"`COPY --from` cannot reference its own `FROM` alias",
-						rules.HadolintDocURL("DL3023"),
-					))
-				}
 				copyRef := b.processCopyFrom(c, info.Index, graph)
 				info.CopyFromRefs = append(info.CopyFromRefs, copyRef)
-
-				// DL3022: COPY --from should reference a previously defined FROM alias.
-				// If the reference didn't resolve to a stage and doesn't look like
-				// an external image (contains ":"), it's an undefined reference.
-				if !copyRef.IsStageRef && !strings.Contains(c.From, ":") {
-					var loc parser.Range
-					if ranges := c.Location(); len(ranges) > 0 {
-						loc = ranges[0]
-					}
-					b.issues = append(b.issues, newIssue(
-						b.file,
-						loc,
-						rules.HadolintRulePrefix+"DL3022",
-						"`COPY --from` should reference a previously defined `FROM` alias",
-						rules.HadolintDocURL("DL3022"),
-					))
-				}
 			}
 
 		case *instructions.OnbuildCommand:
@@ -829,110 +751,6 @@ func parseOnbuildExpression(expr string, sourceLine int) instructions.Command {
 	}
 
 	return nil
-}
-
-// checkDL3061InstructionOrder detects DL3061: Invalid instruction order.
-// Dockerfile must begin with FROM, ARG, or comment.
-//
-// We detect this from the raw AST because BuildKit's instruction parser may
-// reject invalid order and prevent downstream linting.
-func (b *Builder) checkDL3061InstructionOrder() {
-	if b.parseResult == nil || b.parseResult.AST == nil || b.parseResult.AST.AST == nil {
-		return
-	}
-
-	nodes := topLevelInstructionNodes(b.parseResult.AST.AST)
-	for _, node := range nodes {
-		if node == nil {
-			continue
-		}
-		if strings.EqualFold(node.Value, command.From) {
-			return
-		}
-		if strings.EqualFold(node.Value, command.Arg) {
-			continue
-		}
-
-		var loc parser.Range
-		if ranges := node.Location(); len(ranges) > 0 {
-			loc = ranges[0]
-		}
-		b.issues = append(b.issues, newIssue(
-			b.file,
-			loc,
-			rules.HadolintRulePrefix+"DL3061",
-			"Invalid instruction order. Dockerfile must begin with `FROM`, `ARG` or comment.",
-			rules.HadolintDocURL("DL3061"),
-		))
-		return // Report only the first offending instruction.
-	}
-}
-
-// checkDL3043ForbiddenOnbuildTriggers detects DL3043: ONBUILD must not trigger
-// ONBUILD/FROM/MAINTAINER.
-//
-// We detect this from the raw AST because BuildKit's instruction parser rejects
-// these constructs, which would otherwise prevent semantic model construction.
-func (b *Builder) checkDL3043ForbiddenOnbuildTriggers() {
-	if b.parseResult == nil || b.parseResult.AST == nil || b.parseResult.AST.AST == nil {
-		return
-	}
-
-	nodes := topLevelInstructionNodes(b.parseResult.AST.AST)
-	for _, node := range nodes {
-		if node == nil || !strings.EqualFold(node.Value, command.Onbuild) {
-			continue
-		}
-
-		trigger := onbuildTriggerKeyword(node)
-		if trigger == "" {
-			continue
-		}
-
-		if strings.EqualFold(trigger, command.Onbuild) ||
-			strings.EqualFold(trigger, command.From) ||
-			strings.EqualFold(trigger, command.Maintainer) {
-			var loc parser.Range
-			if ranges := node.Location(); len(ranges) > 0 {
-				loc = ranges[0]
-			}
-			b.issues = append(b.issues, newIssue(
-				b.file,
-				loc,
-				rules.HadolintRulePrefix+"DL3043",
-				"`ONBUILD`, `FROM` or `MAINTAINER` triggered from within `ONBUILD` instruction.",
-				rules.HadolintDocURL("DL3043"),
-			))
-		}
-	}
-}
-
-func topLevelInstructionNodes(root *parser.Node) []*parser.Node {
-	if root == nil {
-		return nil
-	}
-
-	// BuildKit parser stores Dockerfile instructions under root.Children.
-	nodes := make([]*parser.Node, 0, len(root.Children))
-	for _, child := range root.Children {
-		if child != nil {
-			nodes = append(nodes, child)
-		}
-	}
-
-	slices.SortFunc(nodes, func(a, b *parser.Node) int {
-		return cmp.Compare(a.StartLine, b.StartLine)
-	})
-
-	return nodes
-}
-
-func onbuildTriggerKeyword(node *parser.Node) string {
-	// BuildKit parser represents ONBUILD like: (ONBUILD (TRIGGER ...))
-	if node == nil || node.Next == nil || len(node.Next.Children) == 0 || node.Next.Children[0] == nil {
-		return ""
-	}
-	return node.Next.Children[0].Value
 }
 
 // normalizeStageRef normalizes a stage reference for comparison.

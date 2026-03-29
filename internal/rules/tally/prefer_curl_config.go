@@ -98,8 +98,8 @@ func (r *PreferCurlConfigRule) Check(input rules.LintInput) []rules.Violation {
 	cfg := r.resolveConfig(input.Config)
 	meta := r.Metadata()
 
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
-	sem, _ := input.Semantic.(*semantic.Model)     //nolint:errcheck // nil fallback
+	var fileFacts = input.Facts
+	var sem = input.Semantic
 
 	// Tracks stages that will have curl config after fixes are applied.
 	// A child stage (FROM parentStage) is suppressed when the parent

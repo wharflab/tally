@@ -2,14 +2,13 @@ package facts
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
-	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
-	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 type countingContextReader struct {
@@ -103,28 +102,6 @@ func TestResolveWorkdirAndUnquote(t *testing.T) {
 	}
 	if got := Unquote("bare"); got != "bare" {
 		t.Fatalf("Unquote() bare = %q, want %q", got, "bare")
-	}
-}
-
-func TestShellDirectivesFromDirective(t *testing.T) {
-	t.Parallel()
-
-	got := ShellDirectivesFromDirective([]directive.ShellDirective{
-		{Line: 3, Shell: "bash"},
-		{Line: 7, Shell: "powershell"},
-	})
-
-	if len(got) != 2 {
-		t.Fatalf("expected 2 shell directives, got %d", len(got))
-	}
-	if got[0] != (ShellDirective{Line: 3, Shell: "bash"}) {
-		t.Fatalf("unexpected first shell directive: %#v", got[0])
-	}
-	if got[1] != (ShellDirective{Line: 7, Shell: "powershell"}) {
-		t.Fatalf("unexpected second shell directive: %#v", got[1])
-	}
-	if ShellDirectivesFromDirective(nil) != nil {
-		t.Fatal("expected nil result for nil input")
 	}
 }
 
@@ -784,18 +761,51 @@ func makeFileFactsWithContext(t *testing.T, content string, contextFiles Context
 		t.Fatalf("parse dockerfile: %v", err)
 	}
 
-	sm := sourcemap.New(parseResult.Source)
-	spanIndex := directive.NewInstructionSpanIndexFromAST(parseResult.AST, sm)
-	directiveResult := directive.Parse(sm, nil, spanIndex)
+	shellDirectives := parseTestShellDirectives(content)
 	sem := semantic.NewBuilder(parseResult, nil, file).
-		WithShellDirectives(directiveResult.ShellDirectives).
+		WithShellDirectives(toSemanticShellDirectives(shellDirectives)).
 		Build()
 
 	return NewFileFacts(
 		file,
 		parseResult,
 		sem,
-		ShellDirectivesFromDirective(directiveResult.ShellDirectives),
+		shellDirectives,
 		contextFiles,
 	)
+}
+
+var testShellDirectivePattern = regexp.MustCompile(`(?i)^#\s*(?:tally|hadolint)\s+shell\s*=\s*([A-Za-z0-9_./-]+)\s*$`)
+
+func parseTestShellDirectives(content string) []ShellDirective {
+	lines := strings.Split(content, "\n")
+	var directives []ShellDirective
+
+	for i, line := range lines {
+		matches := testShellDirectivePattern.FindStringSubmatch(strings.TrimSpace(line))
+		if matches == nil {
+			continue
+		}
+		directives = append(directives, ShellDirective{
+			Line:  i,
+			Shell: strings.ToLower(matches[1]),
+		})
+	}
+
+	return directives
+}
+
+func toSemanticShellDirectives(directives []ShellDirective) []semantic.ShellDirective {
+	if len(directives) == 0 {
+		return nil
+	}
+
+	out := make([]semantic.ShellDirective, 0, len(directives))
+	for _, d := range directives {
+		out = append(out, semantic.ShellDirective{
+			Line:  d.Line,
+			Shell: d.Shell,
+		})
+	}
+	return out
 }

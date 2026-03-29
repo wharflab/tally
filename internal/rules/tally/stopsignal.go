@@ -50,12 +50,7 @@ type stopsignalVisit struct {
 // Windows stages and environment variable references. For each valid instruction,
 // it calls fn with the visit context.
 func visitStopsignals(input rules.LintInput, fn func(v stopsignalVisit)) {
-	var sem *semantic.Model
-	if input.Semantic != nil {
-		if s, ok := input.Semantic.(*semantic.Model); ok {
-			sem = s
-		}
-	}
+	var sem = input.Semantic
 
 	for stageIdx, stage := range input.Stages {
 		if sem != nil {

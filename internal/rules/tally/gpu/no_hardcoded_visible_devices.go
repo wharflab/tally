@@ -58,10 +58,9 @@ func (r *NoHardcodedVisibleDevicesRule) Metadata() rules.RuleMetadata {
 // Check runs the rule against the given input.
 func (r *NoHardcodedVisibleDevicesRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // nil-safe assertion
-
-	fileFacts, ok := input.Facts.(*facts.FileFacts)
-	if ok && fileFacts != nil {
+	var sem = input.Semantic
+	var fileFacts = input.Facts
+	if fileFacts != nil {
 		return r.checkWithFacts(input, fileFacts, sem, meta)
 	}
 

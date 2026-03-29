@@ -8,8 +8,8 @@ import (
 // windowsStages returns stages that target Windows based on the semantic model's
 // BaseImageOS detection. This is the shared gate for all tally/windows/* rules.
 func windowsStages(input rules.LintInput) []*semantic.StageInfo {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
+	sem := input.Semantic
+	if sem == nil {
 		return nil
 	}
 

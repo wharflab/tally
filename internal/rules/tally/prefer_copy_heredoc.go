@@ -87,7 +87,7 @@ func (r *PreferCopyHeredocRule) Check(input rules.LintInput) []rules.Violation {
 	sm := input.SourceMap()
 
 	// Get semantic model for shell variant and variable info
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Type assertion OK
+	var sem = input.Semantic
 
 	for stageIdx, stage := range input.Stages {
 		// Get shell variant and variable scope for this stage

@@ -1,11 +1,9 @@
 package hadolint
 
 import (
-	"strings"
 	"testing"
 
-	"github.com/wharflab/tally/internal/dockerfile"
-	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestDL3061_InvalidInstructionOrder(t *testing.T) {
@@ -97,20 +95,10 @@ FROM alpine:${VERSION}`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			// Parse Dockerfile
-			result, err := dockerfile.Parse(strings.NewReader(tt.dockerfile), nil)
-			if err != nil {
-				t.Fatalf("failed to parse Dockerfile: %v", err)
-			}
-
-			// Build semantic model
-			model := semantic.NewModel(result, nil, "Dockerfile")
-
-			// Check for DL3061 violations
-			issues := model.ConstructionIssues()
+			violations := NewDL3061Rule().Check(testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile))
 			var foundDL3061 bool
-			for _, issue := range issues {
-				if issue.Code == DL3061Code {
+			for _, violation := range violations {
+				if violation.RuleCode == DL3061Code {
 					foundDL3061 = true
 					break
 				}

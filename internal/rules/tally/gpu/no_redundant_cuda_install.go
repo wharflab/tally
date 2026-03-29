@@ -85,10 +85,9 @@ func (r *NoRedundantCUDAInstallRule) Metadata() rules.RuleMetadata {
 func (r *NoRedundantCUDAInstallRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // nil-safe assertion
-
-	fileFacts, hasFacts := input.Facts.(*facts.FileFacts)
-	if hasFacts && fileFacts != nil {
+	var sem = input.Semantic
+	var fileFacts = input.Facts
+	if fileFacts != nil {
 		return r.checkWithFacts(input, fileFacts, sem, meta)
 	}
 

@@ -1,17 +1,18 @@
 package hadolint
 
-import "github.com/wharflab/tally/internal/rules"
+import (
+	"strings"
+
+	"github.com/moby/buildkit/frontend/dockerfile/command"
+
+	"github.com/wharflab/tally/internal/rules"
+)
 
 // DL3043: ONBUILD, FROM, or MAINTAINER triggered from within ONBUILD instruction.
 //
 // The ONBUILD instruction cannot trigger ONBUILD, FROM, or MAINTAINER instructions.
 // These meta-instructions are not allowed as ONBUILD triggers because they would
 // create invalid or confusing build semantics.
-//
-// IMPLEMENTATION: This rule is detected during semantic analysis in
-// internal/semantic/builder.go by parsing the raw AST. The builder examines
-// ONBUILD instructions and checks if their trigger instruction is one of the
-// forbidden types (ONBUILD, FROM, MAINTAINER).
 //
 // See: https://github.com/hadolint/hadolint/wiki/DL3043
 
@@ -22,9 +23,12 @@ const (
 
 var DL3043DocURL = rules.HadolintDocURL("DL3043")
 
-// DL3043Rule registers the rule so it appears in rules.All() with proper metadata.
-// The actual detection runs during semantic model construction in builder.go.
+// DL3043Rule checks for forbidden ONBUILD trigger instructions.
 type DL3043Rule struct{}
+
+func NewDL3043Rule() *DL3043Rule {
+	return &DL3043Rule{}
+}
 
 func (r *DL3043Rule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
@@ -37,10 +41,41 @@ func (r *DL3043Rule) Metadata() rules.RuleMetadata {
 	}
 }
 
-func (r *DL3043Rule) Check(rules.LintInput) []rules.Violation {
-	return nil // Detected during semantic model construction.
+func (r *DL3043Rule) Check(input rules.LintInput) []rules.Violation {
+	if input.AST == nil || input.AST.AST == nil {
+		return nil
+	}
+
+	meta := r.Metadata()
+	var violations []rules.Violation
+
+	for _, node := range topLevelInstructionNodes(input.AST.AST) {
+		if node == nil || !strings.EqualFold(node.Value, command.Onbuild) {
+			continue
+		}
+
+		trigger := onbuildTriggerKeyword(node)
+		if trigger == "" {
+			continue
+		}
+
+		if !strings.EqualFold(trigger, command.Onbuild) &&
+			!strings.EqualFold(trigger, command.From) &&
+			!strings.EqualFold(trigger, command.Maintainer) {
+			continue
+		}
+
+		violations = append(violations, rules.NewViolation(
+			rules.NewRangeLocation(input.File, node.StartLine, 0, node.StartLine, 0),
+			meta.Code,
+			meta.Description,
+			meta.DefaultSeverity,
+		).WithDocURL(meta.DocURL))
+	}
+
+	return violations
 }
 
 func init() {
-	rules.Register(&DL3043Rule{})
+	rules.Register(NewDL3043Rule())
 }

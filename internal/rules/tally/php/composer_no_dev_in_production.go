@@ -39,7 +39,7 @@ func (r *ComposerNoDevInProductionRule) Metadata() rules.RuleMetadata {
 func (r *ComposerNoDevInProductionRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
+	var fileFacts = input.Facts
 
 	var violations []rules.Violation
 	for stageIdx, stage := range input.Stages {

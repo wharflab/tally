@@ -49,13 +49,13 @@ func MakeLintInputWithContext(tb testing.TB, file, content string, buildContext 
 	spanIndex := directive.NewInstructionSpanIndexFromAST(result.AST, sm)
 	directiveResult := directive.Parse(sm, nil, spanIndex)
 	sem := semantic.NewBuilder(result, nil, file).
-		WithShellDirectives(directiveResult.ShellDirectives).
+		WithShellDirectives(directive.ToSemanticShellDirectives(directiveResult.ShellDirectives)).
 		Build()
 	fileFacts := facts.NewFileFacts(
 		file,
 		result,
 		sem,
-		facts.ShellDirectivesFromDirective(directiveResult.ShellDirectives),
+		directive.ToFactsShellDirectives(directiveResult.ShellDirectives),
 		buildContext,
 	)
 
@@ -85,8 +85,8 @@ func MakeLintInputWithConfig(tb testing.TB, file, content string, config any) ru
 // Fails the test if the Semantic field is nil or not a *semantic.Model.
 func GetSemantic(tb testing.TB, input rules.LintInput) *semantic.Model {
 	tb.Helper()
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
+	sem := input.Semantic
+	if sem == nil {
 		tb.Fatal("LintInput.Semantic is not a *semantic.Model; use MakeLintInput")
 	}
 	return sem

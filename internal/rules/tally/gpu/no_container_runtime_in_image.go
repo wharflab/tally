@@ -51,8 +51,8 @@ func (r *NoContainerRuntimeInImageRule) Check(input rules.LintInput) []rules.Vio
 	meta := r.Metadata()
 	var violations []rules.Violation
 
-	fileFacts, ok := input.Facts.(*facts.FileFacts)
-	if ok && fileFacts != nil {
+	var fileFacts = input.Facts
+	if fileFacts != nil {
 		return r.checkWithFacts(input, fileFacts, meta)
 	}
 

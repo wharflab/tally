@@ -3,8 +3,7 @@
 // and COPY --from validation.
 //
 // The semantic model is built in a single pass from a ParseResult and is
-// immutable after construction. Construction-time violations are accumulated
-// and returned with the model.
+// immutable after construction.
 package semantic
 
 import (
@@ -39,12 +38,6 @@ type Model struct {
 
 	// buildArgs are CLI --build-arg values.
 	buildArgs map[string]string
-
-	// file is the path to the Dockerfile (for violation locations).
-	file string
-
-	// issues accumulated during construction.
-	issues []Issue
 }
 
 // NewModel creates a semantic model from a parse result.
@@ -119,12 +112,6 @@ func (m *Model) ResolveVariable(stageIndex int, name string) (string, bool) {
 // Graph returns the stage dependency graph.
 func (m *Model) Graph() *StageGraph {
 	return m.graph
-}
-
-// ConstructionIssues returns issues detected during model construction.
-// The caller should convert these to rules.Violation for output.
-func (m *Model) ConstructionIssues() []Issue {
-	return m.issues
 }
 
 // MetaArgs returns the global ARG instructions before the first FROM.

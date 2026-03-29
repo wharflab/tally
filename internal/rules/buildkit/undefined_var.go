@@ -29,8 +29,8 @@ func (r *UndefinedVarRule) Metadata() rules.RuleMetadata {
 }
 
 func (r *UndefinedVarRule) Check(input rules.LintInput) []rules.Violation {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
+	sem := input.Semantic
+	if sem == nil {
 		return nil
 	}
 
@@ -59,8 +59,8 @@ func (r *UndefinedVarRule) Check(input rules.LintInput) []rules.Violation {
 // When resolved, the handler re-runs undefined-var analysis with actual env instead
 // of the static approximation.
 func (r *UndefinedVarRule) PlanAsync(input rules.LintInput) []async.CheckRequest {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok {
+	sem := input.Semantic
+	if sem == nil {
 		return nil
 	}
 	return planExternalImageChecks(input, r.Metadata(),

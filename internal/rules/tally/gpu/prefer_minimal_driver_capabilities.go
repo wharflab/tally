@@ -45,8 +45,8 @@ func (r *PreferMinimalDriverCapabilitiesRule) Metadata() rules.RuleMetadata {
 func (r *PreferMinimalDriverCapabilitiesRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 
-	fileFacts, ok := input.Facts.(*facts.FileFacts)
-	if ok && fileFacts != nil {
+	var fileFacts = input.Facts
+	if fileFacts != nil {
 		return r.checkWithFacts(input, fileFacts, meta)
 	}
 

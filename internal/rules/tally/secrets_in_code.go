@@ -59,7 +59,7 @@ func (r *SecretsInCodeRule) Check(input rules.LintInput) []rules.Violation {
 	// Check global ARG default values
 	violations = append(violations, r.checkMetaArgs(input)...)
 
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
+	var fileFacts = input.Facts
 
 	// Check stage commands
 	for stageIdx, stage := range input.Stages {

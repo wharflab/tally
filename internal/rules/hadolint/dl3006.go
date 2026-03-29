@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 // DL3006Rule implements the DL3006 linting rule.
@@ -31,8 +30,8 @@ func (r *DL3006Rule) Metadata() rules.RuleMetadata {
 // Check runs the DL3006 rule.
 // It warns when a FROM instruction uses an image without an explicit tag.
 func (r *DL3006Rule) Check(input rules.LintInput) []rules.Violation {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok {
+	sem := input.Semantic
+	if sem == nil {
 		return nil
 	}
 

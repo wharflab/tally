@@ -99,7 +99,7 @@ func (r *PreferHeredocRule) Check(input rules.LintInput) []rules.Violation {
 	pipefailEnabled := input.IsRuleEnabled(rules.PipefailRuleCode)
 
 	// Get semantic model for shell variant info (may be nil)
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Type assertion OK returns false for nil, sem is nil-checked below
+	var sem = input.Semantic
 
 	for stageIdx, stage := range input.Stages {
 		// Get initial shell variant for this stage.

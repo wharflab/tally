@@ -58,7 +58,7 @@ func (r *PreferRuntimeFinalStageRule) Metadata() rules.RuleMetadata {
 
 // Check runs the rule against the given input.
 func (r *PreferRuntimeFinalStageRule) Check(input rules.LintInput) []rules.Violation {
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // nil-safe assertion
+	var sem = input.Semantic
 	if sem == nil {
 		return nil
 	}
@@ -84,8 +84,8 @@ func (r *PreferRuntimeFinalStageRule) Check(input rules.LintInput) []rules.Viola
 	}
 
 	// Check for compile signals — suppress when build tools are present.
-	fileFacts, hasFacts := input.Facts.(*facts.FileFacts)
-	if hasFacts && fileFacts != nil {
+	var fileFacts = input.Facts
+	if fileFacts != nil {
 		if stageFacts := fileFacts.Stage(lastIdx); stageFacts != nil {
 			if hasCompileSignalFacts(stageFacts) {
 				return nil

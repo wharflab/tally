@@ -24,7 +24,7 @@ func checkFinalStageRoot(input rules.LintInput) *finalStageRootCheck {
 
 	finalIdx := len(input.Stages) - 1
 
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
+	var fileFacts = input.Facts
 	if fileFacts == nil {
 		return nil
 	}

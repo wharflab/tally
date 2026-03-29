@@ -10,8 +10,8 @@ import (
 // powershellStages returns stages that either run under a PowerShell SHELL
 // instruction or explicitly invoke PowerShell from shell-form RUN commands.
 func powershellStages(input rules.LintInput) []*semantic.StageInfo {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
+	sem := input.Semantic
+	if sem == nil {
 		return nil
 	}
 

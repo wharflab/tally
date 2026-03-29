@@ -91,10 +91,7 @@ func (r *DL4001Rule) collectToolUsage(input rules.LintInput) (usageMapDL4001, us
 	wgetUsage := make(usageMapDL4001)
 	curlUsage := make(usageMapDL4001)
 
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok {
-		sem = nil
-	}
+	sem := input.Semantic
 
 	for stageIdx, stage := range input.Stages {
 		shellVariant, wgetInstalled, curlInstalled := r.getStageInfo(sem, stageIdx)

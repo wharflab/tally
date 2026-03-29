@@ -6,7 +6,6 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
-	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/shell"
 )
 
@@ -23,7 +22,7 @@ RUN echo "ok"
 	pr := parseDockerfile(t, content)
 
 	// Intentionally pass directives out of order to ensure builder picks by line, not slice order.
-	directives := []directive.ShellDirective{
+	directives := []ShellDirective{
 		{Shell: "bash", Line: 2},
 		{Shell: "dash", Line: 1},
 	}
@@ -117,7 +116,7 @@ FROM alpine:3.18
 RUN echo "bash via directive"
 `
 	pr := parseDockerfile(t, content)
-	directives := []directive.ShellDirective{{Shell: testShellBash, Line: 0}}
+	directives := []ShellDirective{{Shell: testShellBash, Line: 0}}
 
 	model := NewBuilder(pr, nil, "Dockerfile").
 		WithShellDirectives(directives).
@@ -316,21 +315,13 @@ ONBUILD COPY --from=0 /a /b
 	}
 }
 
-func TestBuilderHelpersHandleNilInputs(t *testing.T) {
+func TestBuilderNilInputBuildsEmptyModel(t *testing.T) {
 	t.Parallel()
 	b := NewBuilder(nil, nil, "Dockerfile")
-	b.checkDL3061InstructionOrder()
-	b.checkDL3043ForbiddenOnbuildTriggers()
+	model := b.Build()
 
-	if len(b.issues) != 0 {
-		t.Fatalf("expected no issues, got %d", len(b.issues))
-	}
-
-	if nodes := topLevelInstructionNodes(nil); nodes != nil {
-		t.Errorf("expected nil nodes for nil root, got %v", nodes)
-	}
-	if kw := onbuildTriggerKeyword(nil); kw != "" {
-		t.Errorf("expected empty keyword for nil node, got %q", kw)
+	if model.StageCount() != 0 {
+		t.Fatalf("expected 0 stages, got %d", model.StageCount())
 	}
 }
 

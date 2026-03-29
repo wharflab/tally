@@ -119,7 +119,7 @@ func (r *PreferShellInstructionRule) Check(input rules.LintInput) []rules.Violat
 	meta := r.Metadata()
 	sm := input.SourceMap()
 
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // nil-safe assertion
+	sem := input.Semantic
 
 	var violations []rules.Violation
 	for stageIdx, stage := range input.Stages {

@@ -37,7 +37,7 @@ func (r *DL3002Rule) Check(input rules.LintInput) []rules.Violation {
 
 	finalIdx := len(input.Stages) - 1
 
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
+	fileFacts := input.Facts
 	if fileFacts == nil {
 		return nil
 	}

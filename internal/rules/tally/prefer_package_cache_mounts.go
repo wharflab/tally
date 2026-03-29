@@ -47,7 +47,7 @@ func (r *PreferPackageCacheMountsRule) Metadata() rules.RuleMetadata {
 func (r *PreferPackageCacheMountsRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
+	var fileFacts = input.Facts
 
 	var violations []rules.Violation
 

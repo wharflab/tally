@@ -51,8 +51,8 @@ func (r *SortPackagesRule) Metadata() rules.RuleMetadata {
 func (r *SortPackagesRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
-	sem, _ := input.Semantic.(*semantic.Model)     //nolint:errcheck // Type assertion OK returns false for nil
+	var fileFacts = input.Facts
+	var sem = input.Semantic
 
 	escapeToken := rune('\\')
 	if input.AST != nil {

@@ -65,7 +65,7 @@ func (r *PreferMultiStageBuildRule) ValidateConfig(config any) error {
 
 func (r *PreferMultiStageBuildRule) Check(input rules.LintInput) []rules.Violation {
 	cfg := r.resolveConfig(input.Config)
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
+	var fileFacts = input.Facts
 	minScore := 4
 	if cfg.MinScore != nil {
 		minScore = *cfg.MinScore

@@ -92,10 +92,7 @@ func (r *PreferAddUnpackRule) Check(input rules.LintInput) []rules.Violation {
 
 	meta := r.Metadata()
 
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok {
-		sem = nil
-	}
+	var sem = input.Semantic
 
 	var violations []rules.Violation
 
