@@ -57,6 +57,11 @@ func hasFollowingRunTargetingPath(
 //	/app covers /app, /app/file, /app/sub/file
 //	/etc/app covers /etc/app/config.conf
 func cmdFileArgCoversPath(cmd *shell.CommandInfo, targetPath string) bool {
+	targetPath = path.Clean(targetPath)
+	if !path.IsAbs(targetPath) {
+		return false
+	}
+
 	sawOwnerOrMode := false // first positional arg is owner (chown) or mode (chmod) spec
 	for _, arg := range cmd.Args {
 		if strings.HasPrefix(arg, "-") {
