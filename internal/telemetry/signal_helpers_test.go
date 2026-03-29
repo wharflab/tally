@@ -132,9 +132,13 @@ func TestDirectToolFromCommandName(t *testing.T) {
 		{name: "turbo", input: "turbo", want: ToolTurborepo},
 		{name: "dotnet", input: "dotnet", want: ToolDotNetCLI},
 		{name: "pwsh", input: "pwsh", want: ToolPowerShell},
+		{name: "pwsh exe", input: "pwsh.exe", want: ToolPowerShell},
 		{name: "powershell", input: "powershell", want: ToolPowerShell},
+		{name: "powershell exe", input: "powershell.exe", want: ToolPowerShell},
+		{name: "pwsh windows path", input: `C:\Program Files\PowerShell\7\pwsh.exe`, want: ToolPowerShell},
 		{name: "vcpkg", input: "vcpkg", want: ToolVcpkg},
 		{name: "vcpkg exe", input: "vcpkg.exe", want: ToolVcpkg},
+		{name: "vcpkg windows path", input: `C:\src\vcpkg\vcpkg.exe`, want: ToolVcpkg},
 		{name: "bootstrap vcpkg", input: "bootstrap-vcpkg", want: ToolVcpkg},
 		{name: "bootstrap bat", input: "bootstrap-vcpkg.bat", want: ToolVcpkg},
 		{name: "bootstrap sh", input: "bootstrap-vcpkg.sh", want: ToolVcpkg},
@@ -147,6 +151,61 @@ func TestDirectToolFromCommandName(t *testing.T) {
 			t.Parallel()
 			if got := directToolFromCommandName(tt.input); got != tt.want {
 				t.Fatalf("directToolFromCommandName(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCommandInfoFromArgv(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		argv           []string
+		wantName       string
+		wantSubcommand string
+		wantArgs       []string
+		wantOK         bool
+	}{
+		{name: "empty", wantOK: false},
+		{
+			name:           "windows npm path strips cmd suffix",
+			argv:           []string{`C:\Program Files\nodejs\npm.cmd`, "exec", "--", "next", "build"},
+			wantName:       "npm",
+			wantSubcommand: "exec",
+			wantArgs:       []string{"exec", "--", "next", "build"},
+			wantOK:         true,
+		},
+		{
+			name:           "windows powershell path strips exe suffix",
+			argv:           []string{`C:\Program Files\PowerShell\7\pwsh.exe`, "-Command", "Get-Item"},
+			wantName:       "pwsh",
+			wantSubcommand: "Get-Item",
+			wantArgs:       []string{"-Command", "Get-Item"},
+			wantOK:         true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, ok := commandInfoFromArgv(tt.argv)
+			if ok != tt.wantOK {
+				t.Fatalf("commandInfoFromArgv(%v) ok = %t, want %t", tt.argv, ok, tt.wantOK)
+			}
+			if !tt.wantOK {
+				return
+			}
+			if got.Name != tt.wantName || got.Subcommand != tt.wantSubcommand || !slices.Equal(got.Args, tt.wantArgs) {
+				t.Fatalf(
+					"commandInfoFromArgv(%v) = %+v, want name=%q subcommand=%q args=%v",
+					tt.argv,
+					got,
+					tt.wantName,
+					tt.wantSubcommand,
+					tt.wantArgs,
+				)
 			}
 		})
 	}
@@ -308,6 +367,12 @@ func TestExecPackageFromCommand(t *testing.T) {
 			ok:   true,
 		},
 		{
+			name: "npm cmd exec",
+			cmd:  shell.CommandInfo{Name: "npm.cmd", Args: []string{"exec", "--", "next", "build"}},
+			want: "next",
+			ok:   true,
+		},
+		{
 			name: "pnpm dlx",
 			cmd:  shell.CommandInfo{Name: "pnpm", Args: []string{"dlx", "astro", "dev"}},
 			want: "astro",
@@ -370,6 +435,12 @@ func TestExecPackageFromArgv(t *testing.T) {
 		{
 			name: "npm exec",
 			argv: []string{"npm", "exec", "--", "next", "build"},
+			want: "next",
+			ok:   true,
+		},
+		{
+			name: "npm cmd path exec",
+			argv: []string{`C:\Program Files\nodejs\npm.cmd`, "exec", "--", "next", "build"},
 			want: "next",
 			ok:   true,
 		},
@@ -496,6 +567,12 @@ func TestTelemetryPredicates(t *testing.T) {
 				want:   false,
 			},
 			{
+				name:   "windows python path",
+				argv:   []string{`C:\Python311\python.exe`, "-m", "huggingface_hub", "scan-cache"},
+				module: "huggingface_hub",
+				want:   true,
+			},
+			{
 				name:   "not python",
 				argv:   []string{"node", "-m", "huggingface_hub"},
 				module: "huggingface_hub",
@@ -523,6 +600,7 @@ func TestTelemetryPredicates(t *testing.T) {
 		}{
 			{name: "npm run", cmd: shell.CommandInfo{Name: "npm", Subcommand: "run"}, want: true},
 			{name: "npm start", cmd: shell.CommandInfo{Name: "npm", Subcommand: "start"}, want: true},
+			{name: "npm cmd run", cmd: shell.CommandInfo{Name: "npm.cmd", Subcommand: "run"}, want: true},
 			{name: "npm install", cmd: shell.CommandInfo{Name: "npm", Subcommand: "install"}, want: false},
 			{name: "pnpm preview", cmd: shell.CommandInfo{Name: "pnpm", Subcommand: "preview"}, want: true},
 			{name: "pnpm add", cmd: shell.CommandInfo{Name: "pnpm", Subcommand: "add"}, want: false},
@@ -679,6 +757,11 @@ func TestStageScannerScanCommandInfo(t *testing.T) {
 		{name: "azure cli", cmd: shell.CommandInfo{Name: "az"}, wantTools: []ToolID{ToolAzureCLI}},
 		{name: "dotnet", cmd: shell.CommandInfo{Name: "dotnet"}, wantTools: []ToolID{ToolDotNetCLI}},
 		{name: "powershell", cmd: shell.CommandInfo{Name: "pwsh"}, wantTools: []ToolID{ToolPowerShell}},
+		{
+			name:      "powershell exe path",
+			cmd:       shell.CommandInfo{Name: `C:\Program Files\PowerShell\7\powershell.exe`},
+			wantTools: []ToolID{ToolPowerShell},
+		},
 		{name: "vcpkg", cmd: shell.CommandInfo{Name: "vcpkg"}, wantTools: []ToolID{ToolVcpkg}},
 		{name: "homebrew", cmd: shell.CommandInfo{Name: "brew"}, wantTools: []ToolID{ToolHomebrew}},
 	}

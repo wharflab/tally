@@ -230,7 +230,7 @@ func (s *stageScanner) scanRunFacts() {
 }
 
 func (s *stageScanner) recordCommandActivity(cmd shell.CommandInfo, candidate anchorCandidate) {
-	name := strings.ToLower(cmd.Name)
+	name := normalizeCommandName(cmd.Name)
 	switch name {
 	case "python", "python3", "py", "pip", "pip3", "uv", "hf", "huggingface-cli":
 		s.pythonActivity = earlierCandidate(s.pythonActivity, candidate)
@@ -249,7 +249,7 @@ func (s *stageScanner) recordCommandActivity(cmd shell.CommandInfo, candidate an
 
 func (s *stageScanner) scanCommandInfo(cmd shell.CommandInfo, candidate anchorCandidate) {
 	s.recordCommandActivity(cmd, candidate)
-	name := strings.ToLower(cmd.Name)
+	name := normalizeCommandName(cmd.Name)
 
 	switch directToolFromCommandName(name) {
 	case ToolBun:
@@ -517,7 +517,7 @@ func (s *stageScanner) scanStageCommands(commands []instructions.Command) {
 			if len(c.Shell) == 0 {
 				continue
 			}
-			switch directToolFromCommandName(strings.ToLower(path.Base(c.Shell[0]))) {
+			switch directToolFromCommandName(c.Shell[0]) {
 			case ToolPowerShell:
 				s.result.addSignal(
 					ToolPowerShell,
@@ -623,7 +623,7 @@ func commandInfoFromArgv(argv []string) (shell.CommandInfo, bool) {
 	}
 
 	cmd := shell.CommandInfo{
-		Name: path.Base(argv[0]),
+		Name: normalizeCommandName(argv[0]),
 		Args: append([]string(nil), argv[1:]...),
 	}
 	for _, arg := range cmd.Args {
@@ -685,6 +685,7 @@ func candidateFromCommand(cmd instructions.Command) anchorCandidate {
 }
 
 func directToolFromCommandName(name string) ToolID {
+	name = normalizeCommandName(name)
 	switch name {
 	case cmdBun, cmdBunX:
 		return ToolBun
@@ -708,7 +709,7 @@ func directToolFromCommandName(name string) ToolID {
 		return ToolDotNetCLI
 	case "pwsh", "powershell":
 		return ToolPowerShell
-	case "vcpkg", "vcpkg.exe", "bootstrap-vcpkg", fileBootstrapVcpkgBat, fileBootstrapVcpkgSh:
+	case "vcpkg", "bootstrap-vcpkg", fileBootstrapVcpkgBat, fileBootstrapVcpkgSh:
 		return ToolVcpkg
 	case "brew":
 		return ToolHomebrew
@@ -768,7 +769,7 @@ func toolFromExecPackage(pkg string) (ToolID, string, bool) {
 }
 
 func execPackageFromCommand(cmd shell.CommandInfo) (string, bool) {
-	switch strings.ToLower(cmd.Name) {
+	switch normalizeCommandName(cmd.Name) {
 	case "npx":
 		return firstExecutableArg(cmd.Args)
 	case cmdNpm:
@@ -800,7 +801,7 @@ func execPackageFromArgv(argv []string) (string, bool) {
 	if len(argv) == 0 {
 		return "", false
 	}
-	switch strings.ToLower(path.Base(argv[0])) {
+	switch normalizeCommandName(argv[0]) {
 	case "npx":
 		return firstExecutableArg(argv[1:])
 	case cmdNpm:
@@ -894,7 +895,7 @@ func isPythonModuleCommand(cmd shell.CommandInfo, module string) bool {
 }
 
 func isPythonModuleArgv(argv []string, module string) bool {
-	if len(argv) < 3 || !isPythonCommandName(path.Base(argv[0])) {
+	if len(argv) < 3 || !isPythonCommandName(argv[0]) {
 		return false
 	}
 	for i := 1; i < len(argv)-1; i++ {
@@ -906,7 +907,7 @@ func isPythonModuleArgv(argv []string, module string) bool {
 }
 
 func isPythonCommandName(name string) bool {
-	switch strings.ToLower(name) {
+	switch normalizeCommandName(name) {
 	case "python", "python3", "py":
 		return true
 	default:
@@ -915,7 +916,7 @@ func isPythonCommandName(name string) bool {
 }
 
 func isNodeScriptCommand(cmd shell.CommandInfo) bool {
-	switch strings.ToLower(cmd.Name) {
+	switch normalizeCommandName(cmd.Name) {
 	case "npm":
 		return strings.EqualFold(cmd.Subcommand, command.Run) || strings.EqualFold(cmd.Subcommand, cmdStart)
 	case "pnpm":
@@ -972,7 +973,7 @@ func isNodeScriptCommand(cmd shell.CommandInfo) bool {
 }
 
 func isExplicitBerryCommand(cmd shell.CommandInfo) bool {
-	switch strings.ToLower(cmd.Name) {
+	switch normalizeCommandName(cmd.Name) {
 	case "corepack":
 		return containsBerryYarnSpecifier(cmd.Args)
 	case cmdYarn:
@@ -984,6 +985,11 @@ func isExplicitBerryCommand(cmd shell.CommandInfo) bool {
 
 func containsBerryYarnSpecifier(args []string) bool {
 	return slices.ContainsFunc(args, isYarnBerryPackageManager)
+}
+
+func normalizeCommandName(name string) string {
+	name = shell.NormalizeShellExecutableName(strings.TrimSpace(name))
+	return strings.TrimSuffix(name, ".cmd")
 }
 
 func isYarnBerryPackageManager(value string) bool {
