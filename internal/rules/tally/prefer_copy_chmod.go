@@ -10,7 +10,6 @@ import (
 
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -39,7 +38,7 @@ func (r *PreferCopyChmodRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
 
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // type assertion OK
+	var sem = input.Semantic
 
 	violations := make([]rules.Violation, 0, len(input.Stages))
 

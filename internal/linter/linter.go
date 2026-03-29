@@ -134,13 +134,13 @@ func LintFile(input Input) (*Result, error) {
 
 	var buildArgs map[string]string
 	sem := semantic.NewBuilder(parseResult, buildArgs, input.FilePath).
-		WithShellDirectives(directiveResult.ShellDirectives).
+		WithShellDirectives(directive.ToSemanticShellDirectives(directiveResult.ShellDirectives)).
 		Build()
 	fileFacts := facts.NewFileFacts(
 		input.FilePath,
 		parseResult,
 		sem,
-		facts.ShellDirectivesFromDirective(directiveResult.ShellDirectives),
+		directive.ToFactsShellDirectives(directiveResult.ShellDirectives),
 		input.BuildContext,
 	)
 
@@ -159,26 +159,7 @@ func LintFile(input Input) (*Result, error) {
 		HeredocMinCommands: heredocMinCommands(cfg),
 	}
 
-	// Collect construction-time violations from semantic analysis.
-	// Look up DefaultSeverity from the rule registry so that registered
-	// construction rules (e.g. hadolint/DL3022 with DefaultSeverity=Off)
-	// get the correct initial severity without hardcoding it in builder.go.
-	violations := make([]rules.Violation, 0,
-		len(sem.ConstructionIssues())+len(rules.All())+len(parseResult.Warnings))
-
-	registry := rules.DefaultRegistry()
-	for _, issue := range sem.ConstructionIssues() {
-		sev := issue.Severity
-		if sev == 0 { // Zero value (SeverityError) means "use rule default".
-			if rule := registry.Get(issue.Code); rule != nil {
-				sev = rule.Metadata().DefaultSeverity
-			}
-		}
-		violations = append(violations, rules.NewViolation(
-			rules.NewLocationFromRange(issue.File, issue.Location),
-			issue.Code, issue.Message, sev,
-		).WithDocURL(issue.DocURL))
-	}
+	violations := make([]rules.Violation, 0, len(rules.All())+len(parseResult.Warnings))
 
 	// Run all registered rules.
 	for _, rule := range rules.All() {

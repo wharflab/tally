@@ -3,9 +3,7 @@ package testutil
 import (
 	"testing"
 
-	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 )
 
@@ -68,9 +66,9 @@ RUN echo hello
 `
 	input := MakeLintInput(t, "test/Dockerfile", content)
 
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
-		t.Fatalf("Semantic type = %T, want *semantic.Model", input.Semantic)
+	sem := input.Semantic
+	if sem == nil {
+		t.Fatal("Semantic is nil")
 	}
 	stageInfo := sem.StageInfo(0)
 	if stageInfo == nil {
@@ -80,9 +78,9 @@ RUN echo hello
 		t.Fatalf("semantic shell variant = %v, want %v", stageInfo.ShellSetting.Variant, shell.VariantBash)
 	}
 
-	fileFacts, ok := input.Facts.(*facts.FileFacts)
-	if !ok || fileFacts == nil {
-		t.Fatalf("Facts type = %T, want *facts.FileFacts", input.Facts)
+	fileFacts := input.Facts
+	if fileFacts == nil {
+		t.Fatal("Facts is nil")
 	}
 	stageFacts := fileFacts.Stage(0)
 	if stageFacts == nil {

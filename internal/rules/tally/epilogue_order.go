@@ -6,7 +6,6 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 // EpilogueOrderRuleCode is the full rule code for the epilogue-order rule.
@@ -50,13 +49,7 @@ func (r *EpilogueOrderRule) Metadata() rules.RuleMetadata {
 
 // Check runs the epilogue-order rule.
 func (r *EpilogueOrderRule) Check(input rules.LintInput) []rules.Violation {
-	// Semantic model is required for stage graph analysis.
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
-		return nil
-	}
-
-	graph := sem.Graph()
+	graph := input.Semantic.Graph()
 	if graph == nil {
 		return nil
 	}
@@ -65,7 +58,7 @@ func (r *EpilogueOrderRule) Check(input rules.LintInput) []rules.Violation {
 	var violations []rules.Violation
 
 	for stageIdx, stage := range input.Stages {
-		info := sem.StageInfo(stageIdx)
+		info := input.Semantic.StageInfo(stageIdx)
 		if info == nil {
 			continue
 		}

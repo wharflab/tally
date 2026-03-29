@@ -13,7 +13,6 @@ import (
 
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
-	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -96,7 +95,7 @@ func (r *NewlinePerChainedCallRule) Check(input rules.LintInput) []rules.Violati
 	}
 
 	// Get semantic model for shell variant info (may be nil)
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Type assertion OK returns false for nil
+	var sem = input.Semantic
 
 	escapeToken := rune('\\')
 	if input.AST != nil {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 // UnreachableStagesRuleCode is the full rule code for the no-unreachable-stages rule.
@@ -37,16 +36,7 @@ func (r *UnreachableStagesRule) Metadata() rules.RuleMetadata {
 // It uses the semantic model to find stages that are not reachable
 // from the final stage through COPY --from or FROM dependencies.
 func (r *UnreachableStagesRule) Check(input rules.LintInput) []rules.Violation {
-	// Semantic model is required for this rule
-	if input.Semantic == nil {
-		return nil
-	}
-
-	// Type assert to get the semantic model
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
-		return nil
-	}
+	sem := input.Semantic
 
 	// Need at least 2 stages for any stage to be unreachable
 	if sem.StageCount() < 2 {

@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 // DL3007Rule implements the DL3007 linting rule.
@@ -31,8 +30,8 @@ func (r *DL3007Rule) Metadata() rules.RuleMetadata {
 // Check runs the DL3007 rule.
 // It warns when a FROM instruction uses an image with the :latest tag.
 func (r *DL3007Rule) Check(input rules.LintInput) []rules.Violation {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok {
+	sem := input.Semantic
+	if sem == nil {
 		return nil
 	}
 

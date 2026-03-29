@@ -249,7 +249,7 @@ func isEmptyLine(line string) bool {
 func buildSkipLinesForEmptyLines(input rules.LintInput, sm *sourcemap.SourceMap) map[int]bool {
 	skip := make(map[int]bool)
 
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // type assertion, not error
+	var sem = input.Semantic
 
 	for _, node := range input.AST.AST.Children {
 		if len(node.Heredocs) == 0 {

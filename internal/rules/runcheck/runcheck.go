@@ -5,7 +5,6 @@ import (
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -18,10 +17,7 @@ type RunCommandCallback func(run *instructions.RunCommand, shellVariant shell.Va
 func ScanRunCommandsWithPOSIXShell(input rules.LintInput, callback RunCommandCallback) []rules.Violation {
 	var violations []rules.Violation
 
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok {
-		sem = nil
-	}
+	sem := input.Semantic
 
 	for stageIdx, stage := range input.Stages {
 		shellVariant := shell.VariantBash

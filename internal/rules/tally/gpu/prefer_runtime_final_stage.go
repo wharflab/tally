@@ -3,12 +3,8 @@ package gpu
 import (
 	"strings"
 
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
-	"github.com/wharflab/tally/internal/shell"
 )
 
 // PreferRuntimeFinalStageRuleCode is the full rule code.
@@ -58,11 +54,6 @@ func (r *PreferRuntimeFinalStageRule) Metadata() rules.RuleMetadata {
 
 // Check runs the rule against the given input.
 func (r *PreferRuntimeFinalStageRule) Check(input rules.LintInput) []rules.Violation {
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // nil-safe assertion
-	if sem == nil {
-		return nil
-	}
-
 	lastIdx := len(input.Stages) - 1
 	if lastIdx < 0 {
 		return nil
@@ -73,7 +64,7 @@ func (r *PreferRuntimeFinalStageRule) Check(input rules.LintInput) []rules.Viola
 		return nil
 	}
 
-	stageInfo := sem.StageInfo(lastIdx)
+	stageInfo := input.Semantic.StageInfo(lastIdx)
 	if stageInfo == nil {
 		return nil
 	}
@@ -84,16 +75,7 @@ func (r *PreferRuntimeFinalStageRule) Check(input rules.LintInput) []rules.Viola
 	}
 
 	// Check for compile signals — suppress when build tools are present.
-	fileFacts, hasFacts := input.Facts.(*facts.FileFacts)
-	if hasFacts && fileFacts != nil {
-		if stageFacts := fileFacts.Stage(lastIdx); stageFacts != nil {
-			if hasCompileSignalFacts(stageFacts) {
-				return nil
-			}
-		} else if hasCompileSignalFallback(lastStage) {
-			return nil
-		}
-	} else if hasCompileSignalFallback(lastStage) {
+	if hasCompileSignalFacts(input.Facts.Stage(lastIdx)) {
 		return nil
 	}
 
@@ -128,6 +110,9 @@ func (r *PreferRuntimeFinalStageRule) Check(input rules.LintInput) []rules.Viola
 
 // hasCompileSignalFacts checks for compile signals using precomputed facts.
 func hasCompileSignalFacts(stageFacts *facts.StageFacts) bool {
+	if stageFacts == nil {
+		return false
+	}
 	for _, runFacts := range stageFacts.Runs {
 		// Check command names from parsed shell AST.
 		for _, cmd := range runFacts.CommandInfos {
@@ -137,35 +122,6 @@ func hasCompileSignalFacts(stageFacts *facts.StageFacts) bool {
 		}
 		// Check installed packages.
 		for _, ic := range runFacts.InstallCommands {
-			for _, pkg := range ic.Packages {
-				if compileSignalPackages[strings.ToLower(pkg.Normalized)] {
-					return true
-				}
-			}
-		}
-	}
-	return false
-}
-
-// hasCompileSignalFallback checks for compile signals by parsing RUN commands directly.
-func hasCompileSignalFallback(stage instructions.Stage) bool {
-	for _, cmd := range stage.Commands {
-		run, ok := cmd.(*instructions.RunCommand)
-		if !ok {
-			continue
-		}
-		script := strings.Join(run.CmdLine, " ")
-
-		// Check for compile commands.
-		for cmdName := range compileSignalCommands {
-			if shell.ContainsCommand(script, cmdName) {
-				return true
-			}
-		}
-
-		// Check for compile-related package installs.
-		installCmds := shell.FindInstallPackages(script, shell.VariantPOSIX)
-		for _, ic := range installCmds {
 			for _, pkg := range ic.Packages {
 				if compileSignalPackages[strings.ToLower(pkg.Normalized)] {
 					return true

@@ -56,7 +56,7 @@ func (r *CopyIgnoredFileRule) Check(input rules.LintInput) []rules.Violation {
 	}
 
 	var violations []rules.Violation
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
+	fileFacts := input.Facts
 
 	if fileFacts != nil {
 		for stageIdx := range input.Stages {

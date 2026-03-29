@@ -105,7 +105,7 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Safe assertion with nil fallback
+	sem := input.Semantic
 
 	shellDirectives := directive.Parse(sm, nil, nil).ShellDirectives
 	nodesByStartLine := buildNodesByStartLine(ast)

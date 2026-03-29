@@ -10,7 +10,6 @@ import (
 
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 )
 
@@ -205,7 +204,7 @@ func collectUserCreations(
 	creations = append(creations, findStageUserCreations(fileFacts, finalIdx)...)
 
 	// Walk the FROM ancestry chain.
-	model, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // nil-safe assertion
+	var model = input.Semantic
 	if model == nil {
 		return creations
 	}
@@ -381,7 +380,7 @@ func collectReferencedUsers(
 	refs := map[string]bool{}
 
 	// Collect from the final stage and ancestry chain.
-	model, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // nil-safe assertion
+	var model = input.Semantic
 
 	visited := map[int]bool{}
 	for idx := finalIdx; !visited[idx]; {

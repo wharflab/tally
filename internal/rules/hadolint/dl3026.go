@@ -6,7 +6,6 @@ import (
 
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 // DL3026Config is the configuration for the trusted-base-image rule.
@@ -65,12 +64,8 @@ func (r *DL3026Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	if input.Semantic == nil {
-		return nil
-	}
-
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
+	sem := input.Semantic
+	if sem == nil {
 		return nil
 	}
 

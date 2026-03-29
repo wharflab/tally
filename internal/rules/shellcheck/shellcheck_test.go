@@ -289,7 +289,9 @@ func makeShellcheckLintInput(tb testing.TB, file, content string) rules.LintInpu
 
 	sm := sourcemap.New(result.Source)
 	dirResult := directive.Parse(sm, nil, nil)
-	sem := semantic.NewBuilder(result, nil, file).WithShellDirectives(dirResult.ShellDirectives).Build()
+	sem := semantic.NewBuilder(result, nil, file).
+		WithShellDirectives(directive.ToSemanticShellDirectives(dirResult.ShellDirectives)).
+		Build()
 
 	return rules.LintInput{
 		File:     file,

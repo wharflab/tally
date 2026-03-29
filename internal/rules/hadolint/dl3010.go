@@ -8,7 +8,6 @@ import (
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 )
 
@@ -51,10 +50,7 @@ func (r *DL3010Rule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 
 	// Get semantic model for shell variant info
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok {
-		sem = nil
-	}
+	sem := input.Semantic
 
 	for stageIdx, stage := range input.Stages {
 		// Get shell variant for this stage

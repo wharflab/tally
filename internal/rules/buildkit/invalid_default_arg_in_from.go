@@ -4,7 +4,6 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/linter"
 
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 // InvalidDefaultArgInFromRule implements BuildKit's InvalidDefaultArgInFrom check.
@@ -24,8 +23,8 @@ func (r *InvalidDefaultArgInFromRule) Metadata() rules.RuleMetadata {
 }
 
 func (r *InvalidDefaultArgInFromRule) Check(input rules.LintInput) []rules.Violation {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
+	sem := input.Semantic
+	if sem == nil {
 		return nil
 	}
 

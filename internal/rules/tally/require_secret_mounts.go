@@ -11,7 +11,6 @@ import (
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
 	"github.com/wharflab/tally/internal/runmount"
-	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 )
 
@@ -91,9 +90,8 @@ func (r *RequireSecretMountsRule) Check(input rules.LintInput) []rules.Violation
 	}
 
 	meta := r.Metadata()
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
-
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // Safe assertion with nil fallback
+	var fileFacts = input.Facts
+	var sem = input.Semantic
 
 	commandNames := make([]string, 0, len(cfg.Commands))
 	for name := range cfg.Commands {

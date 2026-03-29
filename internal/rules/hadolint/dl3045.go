@@ -44,10 +44,7 @@ func (r *DL3045Rule) Metadata() rules.RuleMetadata {
 func (r *DL3045Rule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok {
-		sem = nil
-	}
+	sem := input.Semantic
 
 	violations, hasWorkdir := findCopyViolations(sem, input.Stages, input.File, meta)
 
@@ -64,8 +61,8 @@ func (r *DL3045Rule) Check(input rules.LintInput) []rules.Violation {
 // images. When resolved, the handler replaces fast-path fix suggestions with
 // precise ones based on the base image's actual WorkingDir.
 func (r *DL3045Rule) PlanAsync(input rules.LintInput) []async.CheckRequest {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
+	sem := input.Semantic
+	if sem == nil {
 		return nil
 	}
 

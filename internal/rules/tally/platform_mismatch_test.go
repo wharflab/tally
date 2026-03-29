@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-
 	"github.com/wharflab/tally/internal/registry"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
@@ -295,22 +293,5 @@ func TestReferencesAutoPlatformArg(t *testing.T) {
 					tc.expr, got, tc.want)
 			}
 		})
-	}
-}
-
-// TestPlatformMismatchRule_PlanAsync_NoSemanticModel ensures the rule returns nil
-// when no semantic model is available.
-func TestPlatformMismatchRule_PlanAsync_NoSemanticModel(t *testing.T) {
-	t.Parallel()
-	r := NewPlatformMismatchRule()
-	input := rules.LintInput{
-		File: "Dockerfile",
-		Stages: []instructions.Stage{
-			{BaseName: "alpine:3.19", Platform: "linux/amd64"},
-		},
-	}
-	plans := r.PlanAsync(input)
-	if len(plans) != 0 {
-		t.Errorf("expected 0 plans without semantic model, got %d", len(plans))
 	}
 }

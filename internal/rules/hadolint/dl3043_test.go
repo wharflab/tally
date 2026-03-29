@@ -1,11 +1,9 @@
 package hadolint
 
 import (
-	"strings"
 	"testing"
 
-	"github.com/wharflab/tally/internal/dockerfile"
-	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestDL3043_ForbiddenOnbuildTriggers(t *testing.T) {
@@ -159,20 +157,10 @@ ONBUILD COPY . /app`,
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			// Parse Dockerfile
-			result, err := dockerfile.Parse(strings.NewReader(tt.dockerfile), nil)
-			if err != nil {
-				t.Fatalf("failed to parse Dockerfile: %v", err)
-			}
-
-			// Build semantic model
-			model := semantic.NewModel(result, nil, "Dockerfile")
-
-			// Check for DL3043 violations
-			issues := model.ConstructionIssues()
+			violations := NewDL3043Rule().Check(testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile))
 			var foundDL3043 bool
-			for _, issue := range issues {
-				if issue.Code == DL3043Code {
+			for _, violation := range violations {
+				if violation.RuleCode == DL3043Code {
 					foundDL3043 = true
 					break
 				}

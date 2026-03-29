@@ -6,6 +6,8 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/wharflab/tally/internal/facts"
+	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
 
@@ -70,14 +72,12 @@ type LintInput struct {
 
 	// Semantic is the semantic model for cross-instruction analysis.
 	// Provides stage resolution, variable scoping, and COPY --from validation.
-	// May be nil for backward compatibility with rules that don't need it.
-	// Type is *semantic.Model but declared as any to avoid import cycle.
-	Semantic any
+	// The lint pipeline and testutil.MakeLintInput populate this for rule execution.
+	Semantic *semantic.Model
 
 	// Facts contains cached, derived facts shared across rules for this file.
-	// May be nil for backward compatibility in tests.
-	// Type is *facts.FileFacts but declared as any to avoid import cycle.
-	Facts any
+	// The lint pipeline and testutil.MakeLintInput populate this for rule execution.
+	Facts *facts.FileFacts
 
 	// Config is the rule-specific configuration (type depends on rule).
 	Config any

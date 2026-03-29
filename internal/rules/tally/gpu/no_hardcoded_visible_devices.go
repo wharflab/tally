@@ -1,7 +1,6 @@
 package gpu
 
 import (
-	"slices"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -57,16 +56,7 @@ func (r *NoHardcodedVisibleDevicesRule) Metadata() rules.RuleMetadata {
 
 // Check runs the rule against the given input.
 func (r *NoHardcodedVisibleDevicesRule) Check(input rules.LintInput) []rules.Violation {
-	meta := r.Metadata()
-	sem, _ := input.Semantic.(*semantic.Model) //nolint:errcheck // nil-safe assertion
-
-	fileFacts, ok := input.Facts.(*facts.FileFacts)
-	if ok && fileFacts != nil {
-		return r.checkWithFacts(input, fileFacts, sem, meta)
-	}
-
-	// Fallback: iterate stages directly when facts are unavailable.
-	return r.checkFallback(input, sem, meta)
+	return r.checkWithFacts(input, input.Facts, input.Semantic, r.Metadata())
 }
 
 func (r *NoHardcodedVisibleDevicesRule) checkWithFacts(
@@ -93,41 +83,6 @@ func (r *NoHardcodedVisibleDevicesRule) checkWithFacts(
 
 			if v, ok := r.buildViolation(input.File, stageFacts.Index, binding, class, meta); ok {
 				violations = append(violations, v)
-			}
-		}
-	}
-	return violations
-}
-
-func (r *NoHardcodedVisibleDevicesRule) checkFallback(
-	input rules.LintInput,
-	sem *semantic.Model,
-	meta rules.RuleMetadata,
-) []rules.Violation {
-	var violations []rules.Violation
-
-	for stageIdx, stage := range input.Stages {
-		isCUDABase := stageIsCUDABase(sem, stageIdx)
-
-		for _, cmd := range stage.Commands {
-			env, ok := cmd.(*instructions.EnvCommand)
-			if !ok {
-				continue
-			}
-			for _, kv := range env.Env {
-				if !isVisibleDevicesKey(kv.Key) {
-					continue
-				}
-				value := facts.Unquote(kv.Value)
-				class := classifyValue(kv.Key, value, isCUDABase)
-				if class == classNone || class == classExplicitAll {
-					continue
-				}
-
-				binding := facts.EnvBinding{Key: kv.Key, Value: value, Command: env}
-				if v, ok := r.buildViolation(input.File, stageIdx, binding, class, meta); ok {
-					violations = append(violations, v)
-				}
 			}
 		}
 	}
@@ -194,10 +149,6 @@ func (r *NoHardcodedVisibleDevicesRule) buildFix(
 var visibleDevicesKeys = []string{
 	"NVIDIA_VISIBLE_DEVICES",
 	"CUDA_VISIBLE_DEVICES",
-}
-
-func isVisibleDevicesKey(key string) bool {
-	return slices.Contains(visibleDevicesKeys, key)
 }
 
 // classifyValue determines the violation class for a visible-devices ENV value.
@@ -276,9 +227,6 @@ func isGPUOrMIGUUID(value string) bool {
 }
 
 func stageIsCUDABase(sem *semantic.Model, stageIdx int) bool {
-	if sem == nil {
-		return false
-	}
 	return stageUsesNVIDIACUDABase(sem.StageInfo(stageIdx))
 }
 

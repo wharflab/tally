@@ -41,7 +41,9 @@ func Analyze(file string, source []byte) *Document {
 		tokens = append(tokens, highlightdockerfile.Tokenize(sm, root, parseResult.AST.EscapeToken)...)
 
 		directives := directive.Parse(sm, nil, nil).ShellDirectives
-		sem := semantic.NewBuilder(parseResult, nil, file).WithShellDirectives(directives).Build()
+		sem := semantic.NewBuilder(parseResult, nil, file).
+			WithShellDirectives(directive.ToSemanticShellDirectives(directives)).
+			Build()
 		tokens = append(tokens, shellTokens(parseResult, sem, sm)...)
 	} else {
 		tokens = append(tokens, highlightdockerfile.Tokenize(sm, nil, '\\')...)

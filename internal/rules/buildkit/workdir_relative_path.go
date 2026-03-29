@@ -39,10 +39,7 @@ func (r *WorkdirRelativePathRule) Metadata() rules.RuleMetadata {
 
 // Check runs the WorkdirRelativePath rule.
 func (r *WorkdirRelativePathRule) Check(input rules.LintInput) []rules.Violation {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok {
-		sem = nil
-	}
+	sem := input.Semantic
 	return findRelativeWorkdirViolations(sem, input.Stages, input.File, r.Metadata())
 }
 
@@ -117,8 +114,8 @@ func inheritedWorkdirSet(sem *semantic.Model, stageIdx int, hasWorkdir []bool) b
 // images. When resolved, the handler replaces fast-path fix suggestions with
 // precise ones that resolve the relative WORKDIR against the actual base path.
 func (r *WorkdirRelativePathRule) PlanAsync(input rules.LintInput) []async.CheckRequest {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
+	sem := input.Semantic
+	if sem == nil {
 		return nil
 	}
 

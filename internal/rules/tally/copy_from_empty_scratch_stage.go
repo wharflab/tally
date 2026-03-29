@@ -43,14 +43,7 @@ func (r *CopyFromEmptyScratchStageRule) Metadata() rules.RuleMetadata {
 // handles that case. If the user removes the failing RUN, this rule will then
 // fire on any COPY --from referencing the now-empty stage.
 func (r *CopyFromEmptyScratchStageRule) Check(input rules.LintInput) []rules.Violation {
-	if input.Semantic == nil {
-		return nil
-	}
-
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
-		return nil
-	}
+	sem := input.Semantic
 
 	// Identify empty scratch stages (scratch with no ADD, COPY, or RUN).
 	emptyScratch := make(map[int]bool)

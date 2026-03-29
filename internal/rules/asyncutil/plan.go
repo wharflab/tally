@@ -23,8 +23,8 @@ func PlanExternalImageChecks(
 	meta rules.RuleMetadata,
 	fn HandlerFactory,
 ) []async.CheckRequest {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
+	sem := input.Semantic
+	if sem == nil {
 		return nil
 	}
 

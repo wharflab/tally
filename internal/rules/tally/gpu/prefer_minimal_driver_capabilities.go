@@ -3,8 +3,6 @@ package gpu
 import (
 	"strings"
 
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 )
@@ -43,14 +41,7 @@ func (r *PreferMinimalDriverCapabilitiesRule) Metadata() rules.RuleMetadata {
 
 // Check runs the rule against the given input.
 func (r *PreferMinimalDriverCapabilitiesRule) Check(input rules.LintInput) []rules.Violation {
-	meta := r.Metadata()
-
-	fileFacts, ok := input.Facts.(*facts.FileFacts)
-	if ok && fileFacts != nil {
-		return r.checkWithFacts(input, fileFacts, meta)
-	}
-
-	return r.checkFallback(input, meta)
+	return r.checkWithFacts(input, input.Facts, r.Metadata())
 }
 
 func (r *PreferMinimalDriverCapabilitiesRule) checkWithFacts(
@@ -71,42 +62,6 @@ func (r *PreferMinimalDriverCapabilitiesRule) checkWithFacts(
 		}
 
 		if v, ok := r.buildViolation(input.File, stageFacts.Index, binding, meta); ok {
-			violations = append(violations, v)
-		}
-	}
-	return violations
-}
-
-func (r *PreferMinimalDriverCapabilitiesRule) checkFallback(
-	input rules.LintInput,
-	meta rules.RuleMetadata,
-) []rules.Violation {
-	var violations []rules.Violation
-
-	for stageIdx, stage := range input.Stages {
-		// Track only the last binding per stage so the fallback matches the
-		// facts-path behavior (EffectiveEnv keeps the last assignment).
-		var lastBinding *facts.EnvBinding
-		for _, cmd := range stage.Commands {
-			env, ok := cmd.(*instructions.EnvCommand)
-			if !ok {
-				continue
-			}
-			for _, kv := range env.Env {
-				if kv.Key != driverCapabilitiesKey {
-					continue
-				}
-				value := facts.Unquote(kv.Value)
-				b := facts.EnvBinding{Key: kv.Key, Value: value, Command: env}
-				lastBinding = &b
-			}
-		}
-
-		if lastBinding == nil || !isDriverCapabilitiesAll(lastBinding.Value) {
-			continue
-		}
-
-		if v, ok := r.buildViolation(input.File, stageIdx, *lastBinding, meta); ok {
 			violations = append(violations, v)
 		}
 	}

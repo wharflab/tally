@@ -248,20 +248,6 @@ CMD ["serve"]
 	}
 }
 
-func TestEpilogueOrderCheckNoSemanticModel(t *testing.T) {
-	t.Parallel()
-	r := NewEpilogueOrderRule()
-	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine:3.20
-CMD ["serve"]
-RUN echo hello
-`)
-	input.Semantic = nil // explicitly test nil-semantic fallback
-	violations := r.Check(input)
-	if len(violations) != 0 {
-		t.Errorf("expected 0 violations when semantic model is nil, got %d", len(violations))
-	}
-}
-
 func TestEpilogueOrderCheckWithFixes(t *testing.T) {
 	t.Parallel()
 	r := NewEpilogueOrderRule()

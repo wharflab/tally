@@ -9,7 +9,6 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 // Canonical signal name constants used by STOPSIGNAL rules for normalization,
@@ -50,12 +49,7 @@ type stopsignalVisit struct {
 // Windows stages and environment variable references. For each valid instruction,
 // it calls fn with the visit context.
 func visitStopsignals(input rules.LintInput, fn func(v stopsignalVisit)) {
-	var sem *semantic.Model
-	if input.Semantic != nil {
-		if s, ok := input.Semantic.(*semantic.Model); ok {
-			sem = s
-		}
-	}
+	var sem = input.Semantic
 
 	for stageIdx, stage := range input.Stages {
 		if sem != nil {

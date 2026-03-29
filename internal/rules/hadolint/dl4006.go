@@ -73,10 +73,7 @@ func (r *DL4006Rule) Check(input rules.LintInput) []rules.Violation {
 	var violations []rules.Violation
 	meta := r.Metadata()
 
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok {
-		sem = nil
-	}
+	sem := input.Semantic
 
 	for stageIdx, stage := range input.Stages {
 		state := r.initStageState(sem, stageIdx)
@@ -278,7 +275,7 @@ func (r *DL4006Rule) generateFix(
 // determineFixShell picks the shell path to use in the SHELL fix instruction.
 func (r *DL4006Rule) determineFixShell(input rules.LintInput, stageIdx int) string {
 	fixShell := "/bin/bash"
-	if sem, ok := input.Semantic.(*semantic.Model); ok {
+	if sem := input.Semantic; sem != nil {
 		if info := sem.StageInfo(stageIdx); info != nil && len(info.ShellSetting.Shell) > 0 {
 			shellBase := strings.ToLower(path.Base(strings.ReplaceAll(info.ShellSetting.Shell[0], `\`, "/")))
 			shellBase = strings.TrimSuffix(shellBase, ".exe")

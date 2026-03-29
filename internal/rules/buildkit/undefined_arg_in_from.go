@@ -4,7 +4,6 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/linter"
 
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 // UndefinedArgInFromRule implements BuildKit's UndefinedArgInFrom check.
@@ -23,8 +22,8 @@ func (r *UndefinedArgInFromRule) Metadata() rules.RuleMetadata {
 }
 
 func (r *UndefinedArgInFromRule) Check(input rules.LintInput) []rules.Violation {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
+	sem := input.Semantic
+	if sem == nil {
 		return nil
 	}
 

@@ -1,6 +1,10 @@
 package hadolint
 
-import "github.com/wharflab/tally/internal/rules"
+import (
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
+	"github.com/wharflab/tally/internal/rules"
+)
 
 // DL3022: COPY --from should reference a previously defined FROM alias.
 //
@@ -12,21 +16,18 @@ import "github.com/wharflab/tally/internal/rules"
 // Default severity is Off because this rule cannot account for --build-context
 // sources, which are valid COPY --from targets supplied at build time.
 //
-// IMPLEMENTATION: This rule is detected during semantic analysis in
-// internal/semantic/builder.go when processing COPY instructions. The semantic
-// builder resolves --from references against known stage names and indices,
-// and reports a violation when the reference cannot be resolved and doesn't
-// look like an external image.
-//
 // See: https://github.com/hadolint/hadolint/wiki/DL3022
 
 const DL3022Code = "hadolint/DL3022"
 
 var DL3022DocURL = rules.HadolintDocURL("DL3022")
 
-// DL3022Rule registers the rule so it appears in rules.All() with proper metadata.
-// The actual detection runs during semantic model construction in builder.go.
+// DL3022Rule checks that COPY --from references a previously defined stage.
 type DL3022Rule struct{}
+
+func NewDL3022Rule() *DL3022Rule {
+	return &DL3022Rule{}
+}
 
 func (r *DL3022Rule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
@@ -39,10 +40,44 @@ func (r *DL3022Rule) Metadata() rules.RuleMetadata {
 	}
 }
 
-func (r *DL3022Rule) Check(rules.LintInput) []rules.Violation {
-	return nil // Detected during semantic model construction.
+func (r *DL3022Rule) Check(input rules.LintInput) []rules.Violation {
+	meta := r.Metadata()
+	definedStageNames := make(map[string]struct{}, len(input.Stages))
+	var violations []rules.Violation
+
+	for stageIdx, stage := range input.Stages {
+		currentStageName := normalizeStageRef(stage.Name)
+
+		for _, cmd := range stage.Commands {
+			copyCmd, ok := cmd.(*instructions.CopyCommand)
+			if !ok || copyCmd.From == "" {
+				continue
+			}
+			if currentStageName != "" && normalizeStageRef(copyCmd.From) == currentStageName {
+				continue
+			}
+			if isExternalCopySource(copyCmd.From) || isPreviouslyDefinedStageRef(copyCmd.From, stageIdx, definedStageNames) {
+				continue
+			}
+
+			v := rules.NewViolation(
+				rules.NewLocationFromRanges(input.File, copyCmd.Location()),
+				meta.Code,
+				meta.Description,
+				meta.DefaultSeverity,
+			).WithDocURL(meta.DocURL)
+			v.StageIndex = stageIdx
+			violations = append(violations, v)
+		}
+
+		if stage.Name != "" {
+			definedStageNames[normalizeStageRef(stage.Name)] = struct{}{}
+		}
+	}
+
+	return violations
 }
 
 func init() {
-	rules.Register(&DL3022Rule{})
+	rules.Register(NewDL3022Rule())
 }

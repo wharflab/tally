@@ -65,10 +65,7 @@ func (r *DL3057Rule) Metadata() rules.RuleMetadata {
 // StageIndex=-1 is emitted. The async path may later suppress this if a base
 // image provides HEALTHCHECK.
 func (r *DL3057Rule) Check(input rules.LintInput) []rules.Violation {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
-		return nil
-	}
+	sem := input.Semantic
 
 	if sem.StageCount() == 0 {
 		return nil
@@ -110,10 +107,7 @@ func (r *DL3057Rule) Check(input rules.LintInput) []rules.Violation {
 // PlanAsync creates check requests for each external base image to resolve
 // whether it defines a HEALTHCHECK.
 func (r *DL3057Rule) PlanAsync(input rules.LintInput) []async.CheckRequest {
-	sem, ok := input.Semantic.(*semantic.Model)
-	if !ok || sem == nil {
-		return nil
-	}
+	sem := input.Semantic
 
 	// If any stage already has an explicit HEALTHCHECK (CMD or NONE),
 	// Check() returns nil so async refinement is unnecessary.

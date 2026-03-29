@@ -67,8 +67,8 @@ func (r *CopyAfterUserWithoutChownRule) Check(input rules.LintInput) []rules.Vio
 	meta := r.Metadata()
 	sm := input.SourceMap()
 
-	fileFacts, _ := input.Facts.(*facts.FileFacts) //nolint:errcheck // nil-safe assertion
-	sem, _ := input.Semantic.(*semantic.Model)     //nolint:errcheck // nil-safe assertion
+	fileFacts := input.Facts
+	sem := input.Semantic
 
 	violations := make([]rules.Violation, 0, len(input.Stages))
 
@@ -360,41 +360,19 @@ func resolveDestForChownCheck(destPath, workdir string) string {
 // inheritedUserForCopyChown returns the effective user inherited from a
 // parent stage via FROM. Returns empty string (root) for external base images.
 func inheritedUserForCopyChown(sem *semantic.Model, fileFacts *facts.FileFacts, stageIdx int) string {
-	if sem == nil || fileFacts == nil {
-		return ""
-	}
-
-	visited := make(map[int]bool)
-
-	for idx := stageIdx; !visited[idx]; {
-		visited[idx] = true
-
-		info := sem.StageInfo(idx)
-		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 {
-			return ""
+	return firstParentStageRefValue(sem, stageIdx, func(parentIdx int) (string, bool) {
+		parentFacts := fileFacts.Stage(parentIdx)
+		if parentFacts == nil || parentFacts.EffectiveUser == "" {
+			return "", false
 		}
-
-		parentIdx := info.BaseImage.StageIndex
-		if parentFacts := fileFacts.Stage(parentIdx); parentFacts != nil {
-			if parentFacts.EffectiveUser != "" {
-				return parentFacts.EffectiveUser
-			}
-		}
-
-		idx = parentIdx
-	}
-
-	return ""
+		return parentFacts.EffectiveUser, true
+	})
 }
 
 // inheritedWorkdirForCopyChown returns the effective workdir inherited from a
 // parent stage via FROM. Unlike inheritedUserForCopyChown, only the immediate
 // parent is checked because FinalWorkdir already accounts for the full chain.
 func inheritedWorkdirForCopyChown(fileFacts *facts.FileFacts, sem *semantic.Model, stageIdx int) string {
-	if sem == nil || fileFacts == nil {
-		return "/"
-	}
-
 	info := sem.StageInfo(stageIdx)
 	if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 {
 		return "/"
@@ -411,10 +389,8 @@ func inheritedWorkdirForCopyChown(fileFacts *facts.FileFacts, sem *semantic.Mode
 
 // stageShellVariantForCopyChown returns the shell variant for a stage.
 func stageShellVariantForCopyChown(sem *semantic.Model, stageIdx int) shell.Variant {
-	if sem != nil {
-		if info := sem.StageInfo(stageIdx); info != nil {
-			return info.ShellSetting.Variant
-		}
+	if info := sem.StageInfo(stageIdx); info != nil {
+		return info.ShellSetting.Variant
 	}
 	return shell.VariantBash
 }

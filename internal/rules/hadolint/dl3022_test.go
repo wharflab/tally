@@ -4,8 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/wharflab/tally/internal/dockerfile"
-	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/testutil"
 )
 
 func TestDL3022_CopyFromUndefinedAlias(t *testing.T) {
@@ -57,6 +56,11 @@ func TestDL3022_CopyFromUndefinedAlias(t *testing.T) {
 			shouldFail: true,
 		},
 		{
+			name:       "don't warn on self-referencing current stage alias",
+			dockerfile: "FROM scratch AS build" + "\n" + "COPY --from=build bar .",
+			shouldFail: false,
+		},
+		{
 			name: "don't warn on valid stage count with named stage",
 			dockerfile: strings.Join([]string{
 				"FROM scratch as build",
@@ -81,17 +85,11 @@ func TestDL3022_CopyFromUndefinedAlias(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			result, err := dockerfile.Parse(strings.NewReader(tt.dockerfile), nil)
-			if err != nil {
-				t.Fatalf("failed to parse Dockerfile: %v", err)
-			}
-
-			model := semantic.NewModel(result, nil, "Dockerfile")
-			issues := model.ConstructionIssues()
+			violations := NewDL3022Rule().Check(testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile))
 
 			var foundDL3022 bool
-			for _, issue := range issues {
-				if issue.Code == DL3022Code {
+			for _, violation := range violations {
+				if violation.RuleCode == DL3022Code {
 					foundDL3022 = true
 					break
 				}
