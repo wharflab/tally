@@ -12,6 +12,7 @@ import (
 	"github.com/wharflab/tally/internal/rules/configutil"
 	"github.com/wharflab/tally/internal/runmount"
 	"github.com/wharflab/tally/internal/shell"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // RequireSecretMountsRuleCode is the full rule code for require-secret-mounts.
@@ -90,6 +91,7 @@ func (r *RequireSecretMountsRule) Check(input rules.LintInput) []rules.Violation
 	}
 
 	meta := r.Metadata()
+	sm := input.SourceMap()
 	var fileFacts = input.Facts
 	var sem = input.Semantic
 
@@ -103,7 +105,7 @@ func (r *RequireSecretMountsRule) Check(input rules.LintInput) []rules.Violation
 	for stageIdx, stage := range input.Stages {
 		if fileFacts != nil {
 			if stageFacts := fileFacts.Stage(stageIdx); stageFacts != nil {
-				violations = append(violations, r.checkStageWithFacts(stageFacts, input.File, meta, cfg.Commands)...)
+				violations = append(violations, r.checkStageWithFacts(stageFacts, input.File, meta, cfg.Commands, sm)...)
 				continue
 			}
 		}
@@ -135,7 +137,7 @@ func (r *RequireSecretMountsRule) Check(input rules.LintInput) []rules.Violation
 			}
 
 			existing := runmount.GetMounts(run)
-			vs := r.checkMounts(input.File, meta, run, existing, found, cfg.Commands)
+			vs := r.checkMounts(input.File, meta, run, existing, found, cfg.Commands, sm)
 			violations = append(violations, vs...)
 		}
 	}
@@ -148,6 +150,7 @@ func (r *RequireSecretMountsRule) checkStageWithFacts(
 	file string,
 	meta rules.RuleMetadata,
 	commands map[string]SecretMountSpec,
+	sm *sourcemap.SourceMap,
 ) []rules.Violation {
 	var violations []rules.Violation
 	for _, runFacts := range stageFacts.Runs {
@@ -166,7 +169,7 @@ func (r *RequireSecretMountsRule) checkStageWithFacts(
 		}
 
 		existing := runmount.GetMounts(runFacts.Run)
-		violations = append(violations, r.checkMounts(file, meta, runFacts.Run, existing, found, commands)...)
+		violations = append(violations, r.checkMounts(file, meta, runFacts.Run, existing, found, commands, sm)...)
 	}
 
 	return violations
@@ -187,6 +190,7 @@ func (r *RequireSecretMountsRule) checkMounts(
 	existing []*instructions.Mount,
 	found []shell.CommandInfo,
 	commands map[string]SecretMountSpec,
+	sm *sourcemap.SourceMap,
 ) []rules.Violation {
 	seen := map[string]bool{}
 	runLoc := run.Location()
@@ -221,7 +225,7 @@ func (r *RequireSecretMountsRule) checkMounts(
 	}
 
 	// Build a single zero-length insertion containing ALL missing secret mounts.
-	edit := buildSecretMountInsertEdit(file, runLoc, missingSpecs)
+	edit := buildSecretMountInsertEdit(file, runLoc, missingSpecs, sm)
 
 	// Build a combined message listing all missing secrets.
 	msg := checkSecretMount(existing, missingSpecs[0], missingCmds[0])
@@ -289,7 +293,12 @@ func formatSpecDesc(spec SecretMountSpec) string {
 // it won't conflict with other zero-length insertions at the same point (e.g.,
 // cache mount insertion from prefer-package-cache-mounts) or with fixes deeper
 // in the command text (e.g., -y insertion, apt→apt-get).
-func buildSecretMountInsertEdit(file string, runLoc []parser.Range, specs []SecretMountSpec) []rules.TextEdit {
+func buildSecretMountInsertEdit(
+	file string,
+	runLoc []parser.Range,
+	specs []SecretMountSpec,
+	sm *sourcemap.SourceMap,
+) []rules.TextEdit {
 	var sb strings.Builder
 	for _, spec := range specs {
 		mount := &instructions.Mount{
@@ -308,7 +317,7 @@ func buildSecretMountInsertEdit(file string, runLoc []parser.Range, specs []Secr
 
 	// Insert right after "RUN " (keyword is always 3 chars + 1 space).
 	insertLine := runLoc[0].Start.Line
-	insertCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
+	insertCol := runKeywordEndColumn(runLoc, sm)
 
 	return []rules.TextEdit{
 		{
