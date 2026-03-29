@@ -124,6 +124,12 @@ CMD ["cmd", "/C", "echo", "hi"]
 `,
 			WantViolations: 0,
 		},
+		{
+			Name:           "copy chown on continuation line",
+			Content:        "FROM mcr.microsoft.com/windows/servercore:ltsc2022\nCOPY --from=build \\\n    --chown=app /src C:/dest/\n",
+			WantViolations: 1,
+			WantMessages:   []string{"COPY --chown=app is silently ignored"},
+		},
 	})
 }
 
@@ -225,6 +231,48 @@ func TestNoChownFlagRule_FixWithOtherFlags(t *testing.T) {
 	}
 	if fix.Edits[0].Location.End.Column != 30 {
 		t.Errorf("edit End.Column = %d, want 30", fix.Edits[0].Location.End.Column)
+	}
+}
+
+func TestNoChownFlagRule_FixContinuationLine(t *testing.T) {
+	t.Parallel()
+
+	// --chown=app is on the continuation line (line 3), not the COPY line (line 2)
+	content := "FROM mcr.microsoft.com/windows/servercore:ltsc2022\nCOPY --from=build \\\n    --chown=app /src C:/dest/\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	r := NewNoChownFlagRule()
+	violations := r.Check(input)
+
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected a SuggestedFix for continuation-line --chown")
+	}
+	if fix.Safety != rules.FixSafe {
+		t.Errorf("Safety = %v, want FixSafe", fix.Safety)
+	}
+	if len(fix.Edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(fix.Edits))
+	}
+
+	edit := fix.Edits[0]
+	if edit.NewText != "" {
+		t.Errorf("NewText = %q, want empty string", edit.NewText)
+	}
+	// The flag is on line 3: "    --chown=app /src C:/dest/"
+	//                          0123456789012345
+	// --chown=app starts at col 4, ends at col 16 (including trailing space)
+	if edit.Location.Start.Line != 3 {
+		t.Errorf("edit Start.Line = %d, want 3", edit.Location.Start.Line)
+	}
+	if edit.Location.Start.Column != 4 {
+		t.Errorf("edit Start.Column = %d, want 4", edit.Location.Start.Column)
+	}
+	if edit.Location.End.Column != 16 {
+		t.Errorf("edit End.Column = %d, want 16", edit.Location.End.Column)
 	}
 }
 

@@ -105,7 +105,8 @@ func (r *NoChownFlagRule) Check(input rules.LintInput) []rules.Violation {
 }
 
 // buildChownRemoveFix creates a fix that removes the --chown=value flag from
-// the source line. The fix includes the flag and one trailing space.
+// the instruction source. It scans all physical lines of the instruction
+// (handling backslash/backtick continuation) to find the flag.
 func buildChownRemoveFix(
 	file string,
 	sm *sourcemap.SourceMap,
@@ -116,23 +117,29 @@ func buildChownRemoveFix(
 		return nil
 	}
 
-	line := loc[0].Start.Line
-	lineText := sm.Line(line - 1) // 0-based
+	startLine := loc[0].Start.Line
+	endLine := sm.ResolveEndLine(loc[0].End.Line)
 
-	start, end, found := findChownFlagRange(lineText)
-	if !found {
-		return nil
+	// Scan all physical lines of the instruction for --chown=.
+	for line := startLine; line <= endLine; line++ {
+		lineText := sm.Line(line - 1) // 0-based
+		start, end, found := findChownFlagRange(lineText)
+		if !found {
+			continue
+		}
+
+		return &rules.SuggestedFix{
+			Description: fmt.Sprintf("Remove --chown=%s (ignored on Windows)", chown),
+			Safety:      rules.FixSafe,
+			IsPreferred: true,
+			Edits: []rules.TextEdit{{
+				Location: rules.NewRangeLocation(file, line, start, line, end),
+				NewText:  "",
+			}},
+		}
 	}
 
-	return &rules.SuggestedFix{
-		Description: fmt.Sprintf("Remove --chown=%s (ignored on Windows)", chown),
-		Safety:      rules.FixSafe,
-		IsPreferred: true,
-		Edits: []rules.TextEdit{{
-			Location: rules.NewRangeLocation(file, line, start, line, end),
-			NewText:  "",
-		}},
-	}
+	return nil
 }
 
 // findChownFlagRange locates the --chown=<value> flag in a source line and
