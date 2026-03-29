@@ -198,6 +198,26 @@ RUN bun install
 	}
 }
 
+func TestPreferTelemetryOptOutRule_CheckWithoutFacts(t *testing.T) {
+	t.Parallel()
+
+	rule := NewPreferTelemetryOptOutRule()
+	const content = `FROM oven/bun:1
+RUN bun install
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	input.Facts = nil
+
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if !strings.Contains(violations[0].Detail, "DO_NOT_TRACK=1") {
+		t.Fatalf("detail = %q, want DO_NOT_TRACK=1", violations[0].Detail)
+	}
+}
+
 func TestPreferTelemetryOptOutRule_FixInsertsTelemetryBlockAtStageTop(t *testing.T) {
 	t.Parallel()
 

@@ -168,6 +168,32 @@ CMD ["brew", "install", "jq"]
 			wantAnchorLine: 2,
 		},
 		{
+			name: "next from package json plus cmd npm start",
+			content: `FROM node:22
+WORKDIR /app
+COPY package.json ./package.json
+CMD ["npm", "start"]
+`,
+			contextFiles: map[string]string{
+				"package.json": `{"dependencies":{"next":"15.0.0"}}`,
+			},
+			wantTools:      []ToolID{ToolNextJS},
+			wantAnchorLine: 3,
+		},
+		{
+			name: "yarn berry from package manager metadata plus entrypoint yarn start",
+			content: `FROM node:22
+WORKDIR /app
+COPY package.json ./package.json
+ENTRYPOINT ["yarn", "start"]
+`,
+			contextFiles: map[string]string{
+				"package.json": `{"packageManager":"yarn@4.2.2"}`,
+			},
+			wantTools:      []ToolID{ToolYarnBerry},
+			wantAnchorLine: 3,
+		},
+		{
 			name: "hugging face requirements manifest plus pip install",
 			content: `FROM python:3.12
 WORKDIR /app
@@ -224,6 +250,51 @@ RUN corepack enable
 			}
 			if anchor.Line != tt.wantAnchorLine {
 				t.Fatalf("anchor line = %d, want %d", anchor.Line, tt.wantAnchorLine)
+			}
+		})
+	}
+}
+
+func TestDetectStageWithoutFacts(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		content   string
+		wantTools []ToolID
+	}{
+		{
+			name: "direct bun run still detected",
+			content: `FROM oven/bun:1
+RUN bun install
+`,
+			wantTools: []ToolID{ToolBun},
+		},
+		{
+			name: "npx wrangler run still detected",
+			content: `FROM node:22
+RUN npx wrangler deploy
+`,
+			wantTools: []ToolID{ToolWrangler},
+		},
+		{
+			name: "dotnet run still detected",
+			content: `FROM mcr.microsoft.com/dotnet/sdk:8.0
+RUN dotnet restore
+`,
+			wantTools: []ToolID{ToolDotNetCLI},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.content)
+			signals := DetectStage(input.Stages[0], nil, input.Semantic.StageInfo(0))
+
+			if got := signals.OrderedToolIDs(); !slices.Equal(got, tt.wantTools) {
+				t.Fatalf("tools = %v, want %v", got, tt.wantTools)
 			}
 		})
 	}

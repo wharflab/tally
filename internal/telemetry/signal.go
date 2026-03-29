@@ -190,8 +190,8 @@ func DetectStage(
 	scanner.scanRunFacts()
 	scanner.scanObservableFiles()
 	scanner.scanBuildContextSources()
-	scanner.finalizeManifestSignals()
 	scanner.scanStageCommands(stage.Commands)
+	scanner.finalizeManifestSignals()
 
 	return scanner.result
 }
@@ -229,7 +229,7 @@ func (s *stageScanner) scanRunFacts() {
 	}
 }
 
-func (s *stageScanner) scanCommandInfo(cmd shell.CommandInfo, candidate anchorCandidate) {
+func (s *stageScanner) recordCommandActivity(cmd shell.CommandInfo, candidate anchorCandidate) {
 	name := strings.ToLower(cmd.Name)
 	switch name {
 	case "python", "python3", "py", "pip", "pip3", "uv", "hf", "huggingface-cli":
@@ -245,6 +245,11 @@ func (s *stageScanner) scanCommandInfo(cmd shell.CommandInfo, candidate anchorCa
 			s.nodeScriptActivity = earlierCandidate(s.nodeScriptActivity, candidate)
 		}
 	}
+}
+
+func (s *stageScanner) scanCommandInfo(cmd shell.CommandInfo, candidate anchorCandidate) {
+	s.recordCommandActivity(cmd, candidate)
+	name := strings.ToLower(cmd.Name)
 
 	switch directToolFromCommandName(name) {
 	case ToolBun:
@@ -282,6 +287,31 @@ func (s *stageScanner) scanCommandInfo(cmd shell.CommandInfo, candidate anchorCa
 			ToolHuggingFace,
 			SignalKindCommand,
 			"stage runs python -m huggingface_hub",
+			candidate,
+		)
+	}
+
+	if packageName, ok := execPackageFromCommand(cmd); ok {
+		if toolID, reason, ok := toolFromExecPackage(packageName); ok {
+			s.result.addSignal(toolID, SignalKindCommand, reason, candidate)
+		}
+	}
+
+	if isExplicitBerryCommand(cmd) {
+		s.berryEvidence = earlierCandidate(s.berryEvidence, candidate)
+		s.yarnActivity = earlierCandidate(s.yarnActivity, candidate)
+		s.result.addSignal(ToolYarnBerry, SignalKindCommand, "stage configures or invokes Yarn Berry", candidate)
+	}
+}
+
+func (s *stageScanner) scanContainerCommandInfo(cmd shell.CommandInfo, candidate anchorCandidate) {
+	s.recordCommandActivity(cmd, candidate)
+
+	if isPythonModuleCommand(cmd, "huggingface_hub") {
+		s.result.addSignal(
+			ToolHuggingFace,
+			SignalKindCommand,
+			"stage runs python -m huggingface_hub at container start",
 			candidate,
 		)
 	}
@@ -475,6 +505,10 @@ func (s *stageScanner) scanStageCommands(commands []instructions.Command) {
 		}
 
 		switch c := cmd.(type) {
+		case *instructions.RunCommand:
+			if s.stageFacts == nil {
+				s.scanRawRunCommand(c, candidate)
+			}
 		case *instructions.CmdCommand:
 			s.scanDockerCommand(c.CmdLine, c.PrependShell, candidate)
 		case *instructions.EntrypointCommand:
@@ -499,14 +533,28 @@ func (s *stageScanner) scanStageCommands(commands []instructions.Command) {
 	}
 }
 
+func (s *stageScanner) scanRawRunCommand(run *instructions.RunCommand, candidate anchorCandidate) {
+	script := rawRunScript(run)
+	if script == "" {
+		return
+	}
+
+	variant := s.shellVariantAtLine(candidate.line)
+	for _, cmd := range shell.FindCommands(script, variant) {
+		s.scanCommandInfo(cmd, candidate)
+	}
+
+	installVariant := variant
+	if !installVariant.SupportsPOSIXShellAST() {
+		installVariant = shell.VariantBash
+	}
+	for _, install := range shell.FindInstallPackages(script, installVariant) {
+		s.scanInstallCommand(install, candidate)
+	}
+}
+
 func (s *stageScanner) scanDockerCommand(cmdLine []string, prependShell bool, candidate anchorCandidate) {
-	variant := shell.VariantBash
-	if s.semInfo != nil {
-		variant = s.semInfo.ShellVariantAtLine(candidate.line)
-	}
-	if s.stageFacts != nil && s.semInfo == nil {
-		variant = s.stageFacts.FinalShell.Variant
-	}
+	variant := s.shellVariantAtLine(candidate.line)
 
 	for _, name := range shell.DockerCommandNames(cmdLine, prependShell, variant) {
 		switch directToolFromCommandName(strings.ToLower(name)) {
@@ -539,21 +587,63 @@ func (s *stageScanner) scanDockerCommand(cmdLine []string, prependShell bool, ca
 		}
 	}
 
-	if !prependShell {
-		if packageName, ok := execPackageFromArgv(cmdLine); ok {
-			if toolID, reason, ok := toolFromExecPackage(packageName); ok {
-				s.result.addSignal(toolID, SignalKindCommand, reason, candidate)
-			}
-		}
-		if isPythonModuleArgv(cmdLine, "huggingface_hub") {
-			s.result.addSignal(
-				ToolHuggingFace,
-				SignalKindCommand,
-				"stage runs python -m huggingface_hub at container start",
-				candidate,
-			)
-		}
+	for _, cmd := range dockerCommandInfos(cmdLine, prependShell, variant) {
+		s.scanContainerCommandInfo(cmd, candidate)
 	}
+}
+
+func (s *stageScanner) shellVariantAtLine(line int) shell.Variant {
+	if s.semInfo != nil {
+		return s.semInfo.ShellVariantAtLine(line)
+	}
+	if s.stageFacts != nil {
+		return s.stageFacts.FinalShell.Variant
+	}
+	return shell.VariantBash
+}
+
+func dockerCommandInfos(cmdLine []string, prependShell bool, variant shell.Variant) []shell.CommandInfo {
+	if len(cmdLine) == 0 {
+		return nil
+	}
+	if prependShell {
+		return shell.FindCommands(strings.Join(cmdLine, " "), variant)
+	}
+
+	cmd, ok := commandInfoFromArgv(cmdLine)
+	if !ok {
+		return nil
+	}
+	return []shell.CommandInfo{cmd}
+}
+
+func commandInfoFromArgv(argv []string) (shell.CommandInfo, bool) {
+	if len(argv) == 0 || strings.TrimSpace(argv[0]) == "" {
+		return shell.CommandInfo{}, false
+	}
+
+	cmd := shell.CommandInfo{
+		Name: path.Base(argv[0]),
+		Args: append([]string(nil), argv[1:]...),
+	}
+	for _, arg := range cmd.Args {
+		if arg == "" || strings.HasPrefix(arg, "-") {
+			continue
+		}
+		cmd.Subcommand = arg
+		break
+	}
+	return cmd, true
+}
+
+func rawRunScript(run *instructions.RunCommand) string {
+	if run == nil {
+		return ""
+	}
+	if len(run.Files) > 0 && run.Files[0].Data != "" {
+		return run.Files[0].Data
+	}
+	return strings.Join(run.CmdLine, " ")
 }
 
 func (s *stageScanner) scanPackageJSON(content string, candidate anchorCandidate) {
