@@ -7,20 +7,20 @@ import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ru
 // Configuration options for the tally/prefer-run-heredoc rule.
 type PreferRunHeredocSchemaJson struct {
 	// Enable detection of chained commands within a single RUN (via &&).
-	CheckChainedCommands bool `json:"check-chained-commands,omitempty"`
+	CheckChainedCommands bool `json:"check-chained-commands,omitempty,omitzero"`
 
 	// Enable detection of multiple consecutive RUN instructions.
-	CheckConsecutiveRuns bool `json:"check-consecutive-runs,omitempty"`
+	CheckConsecutiveRuns bool `json:"check-consecutive-runs,omitempty,omitzero"`
 
 	// Exclude corresponds to the JSON schema field "exclude".
-	Exclude *ruleschema.Exclude `json:"exclude,omitempty"`
+	Exclude *ruleschema.Exclude `json:"exclude,omitempty,omitzero"`
 
 	// Fix corresponds to the JSON schema field "fix".
-	Fix *ruleschema.Fix `json:"fix,omitempty"`
+	Fix *ruleschema.Fix `json:"fix,omitempty,omitzero"`
 
 	// Minimum number of commands required to trigger heredoc conversion.
-	MinCommands int `json:"min-commands,omitempty"`
+	MinCommands int `json:"min-commands,omitempty,omitzero"`
 
 	// Severity corresponds to the JSON schema field "severity".
-	Severity *ruleschema.Severity `json:"severity,omitempty"`
+	Severity *ruleschema.Severity `json:"severity,omitempty,omitzero"`
 }

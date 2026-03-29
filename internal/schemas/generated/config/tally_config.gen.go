@@ -14,10 +14,10 @@ type IndexSchemaJson map[string]ruleschema.GenericRuleConfig
 // namespace.
 type IndexSchemaJson_1 struct {
 	// DL3001 corresponds to the JSON schema field "DL3001".
-	DL3001 *hadolint.Dl3001SchemaJson `json:"DL3001,omitempty"`
+	DL3001 *hadolint.Dl3001SchemaJson `json:"DL3001,omitempty,omitzero"`
 
 	// DL3026 corresponds to the JSON schema field "DL3026".
-	DL3026 *hadolint.Dl3026SchemaJson `json:"DL3026,omitempty"`
+	DL3026 *hadolint.Dl3026SchemaJson `json:"DL3026,omitempty,omitzero"`
 
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
@@ -26,11 +26,11 @@ type IndexSchemaJson_1 struct {
 // shellcheck namespace.
 type IndexSchemaJson_2 struct {
 	// ShellCheck corresponds to the JSON schema field "ShellCheck".
-	ShellCheck *ruleschema.GenericRuleConfig `json:"ShellCheck,omitempty"`
+	ShellCheck *ruleschema.GenericRuleConfig `json:"ShellCheck,omitempty,omitzero"`
 
 	// ShellCheckInternalError corresponds to the JSON schema field
 	// "ShellCheckInternalError".
-	ShellCheckInternalError *ruleschema.GenericRuleConfig `json:"ShellCheckInternalError,omitempty"`
+	ShellCheckInternalError *ruleschema.GenericRuleConfig `json:"ShellCheckInternalError,omitempty,omitzero"`
 }
 
 // Schema for rules.tally configuration; keys are rule names within the tally
@@ -38,51 +38,51 @@ type IndexSchemaJson_2 struct {
 type IndexSchemaJson_3 struct {
 	// ConsistentIndentation corresponds to the JSON schema field
 	// "consistent-indentation".
-	ConsistentIndentation *tally.ConsistentIndentationSchemaJson `json:"consistent-indentation,omitempty"`
+	ConsistentIndentation *tally.ConsistentIndentationSchemaJson `json:"consistent-indentation,omitempty,omitzero"`
 
 	// EolLast corresponds to the JSON schema field "eol-last".
-	EolLast *tally.EolLastSchemaJson `json:"eol-last,omitempty"`
+	EolLast *tally.EolLastSchemaJson `json:"eol-last,omitempty,omitzero"`
 
 	// MaxLines corresponds to the JSON schema field "max-lines".
-	MaxLines *tally.MaxLinesSchemaJson `json:"max-lines,omitempty"`
+	MaxLines *tally.MaxLinesSchemaJson `json:"max-lines,omitempty,omitzero"`
 
 	// NewlineBetweenInstructions corresponds to the JSON schema field
 	// "newline-between-instructions".
-	NewlineBetweenInstructions *tally.NewlineBetweenInstructionsSchemaJson `json:"newline-between-instructions,omitempty"`
+	NewlineBetweenInstructions *tally.NewlineBetweenInstructionsSchemaJson `json:"newline-between-instructions,omitempty,omitzero"`
 
 	// NewlinePerChainedCall corresponds to the JSON schema field
 	// "newline-per-chained-call".
-	NewlinePerChainedCall *tally.NewlinePerChainedCallSchemaJson `json:"newline-per-chained-call,omitempty"`
+	NewlinePerChainedCall *tally.NewlinePerChainedCallSchemaJson `json:"newline-per-chained-call,omitempty,omitzero"`
 
 	// NoMultiSpaces corresponds to the JSON schema field "no-multi-spaces".
-	NoMultiSpaces *tally.NoMultiSpacesSchemaJson `json:"no-multi-spaces,omitempty"`
+	NoMultiSpaces *tally.NoMultiSpacesSchemaJson `json:"no-multi-spaces,omitempty,omitzero"`
 
 	// NoMultipleEmptyLines corresponds to the JSON schema field
 	// "no-multiple-empty-lines".
-	NoMultipleEmptyLines *tally.NoMultipleEmptyLinesSchemaJson `json:"no-multiple-empty-lines,omitempty"`
+	NoMultipleEmptyLines *tally.NoMultipleEmptyLinesSchemaJson `json:"no-multiple-empty-lines,omitempty,omitzero"`
 
 	// NoTrailingSpaces corresponds to the JSON schema field "no-trailing-spaces".
-	NoTrailingSpaces *tally.NoTrailingSpacesSchemaJson `json:"no-trailing-spaces,omitempty"`
+	NoTrailingSpaces *tally.NoTrailingSpacesSchemaJson `json:"no-trailing-spaces,omitempty,omitzero"`
 
 	// PreferAddUnpack corresponds to the JSON schema field "prefer-add-unpack".
-	PreferAddUnpack *tally.PreferAddUnpackSchemaJson `json:"prefer-add-unpack,omitempty"`
+	PreferAddUnpack *tally.PreferAddUnpackSchemaJson `json:"prefer-add-unpack,omitempty,omitzero"`
 
 	// PreferCopyHeredoc corresponds to the JSON schema field "prefer-copy-heredoc".
-	PreferCopyHeredoc *tally.PreferCopyHeredocSchemaJson `json:"prefer-copy-heredoc,omitempty"`
+	PreferCopyHeredoc *tally.PreferCopyHeredocSchemaJson `json:"prefer-copy-heredoc,omitempty,omitzero"`
 
 	// PreferCurlConfig corresponds to the JSON schema field "prefer-curl-config".
-	PreferCurlConfig *tally.PreferCurlConfigSchemaJson `json:"prefer-curl-config,omitempty"`
+	PreferCurlConfig *tally.PreferCurlConfigSchemaJson `json:"prefer-curl-config,omitempty,omitzero"`
 
 	// PreferMultiStageBuild corresponds to the JSON schema field
 	// "prefer-multi-stage-build".
-	PreferMultiStageBuild *tally.PreferMultiStageBuildSchemaJson `json:"prefer-multi-stage-build,omitempty"`
+	PreferMultiStageBuild *tally.PreferMultiStageBuildSchemaJson `json:"prefer-multi-stage-build,omitempty,omitzero"`
 
 	// PreferRunHeredoc corresponds to the JSON schema field "prefer-run-heredoc".
-	PreferRunHeredoc *tally.PreferRunHeredocSchemaJson `json:"prefer-run-heredoc,omitempty"`
+	PreferRunHeredoc *tally.PreferRunHeredocSchemaJson `json:"prefer-run-heredoc,omitempty,omitzero"`
 
 	// RequireSecretMounts corresponds to the JSON schema field
 	// "require-secret-mounts".
-	RequireSecretMounts *tally.RequireSecretMountsSchemaJson `json:"require-secret-mounts,omitempty"`
+	RequireSecretMounts *tally.RequireSecretMountsSchemaJson `json:"require-secret-mounts,omitempty,omitzero"`
 
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
@@ -90,77 +90,77 @@ type IndexSchemaJson_3 struct {
 // Configuration schema for tally Dockerfile linter
 type TallyConfigSchemaJson struct {
 	// Configure opt-in AI AutoFix features (requires an ACP-capable agent).
-	Ai *TallyConfigSchemaJsonAi `json:"ai,omitempty"`
+	Ai *TallyConfigSchemaJsonAi `json:"ai,omitempty,omitzero"`
 
 	// Pre-parse file validation checks.
-	FileValidation *TallyConfigSchemaJsonFileValidation `json:"file-validation,omitempty"`
+	FileValidation *TallyConfigSchemaJsonFileValidation `json:"file-validation,omitempty,omitzero"`
 
 	// Control inline suppression directives (e.g. # tally-ignore).
-	InlineDirectives *TallyConfigSchemaJsonInlineDirectives `json:"inline-directives,omitempty"`
+	InlineDirectives *TallyConfigSchemaJsonInlineDirectives `json:"inline-directives,omitempty,omitzero"`
 
 	// Configure output format and destination.
-	Output *TallyConfigSchemaJsonOutput `json:"output,omitempty"`
+	Output *TallyConfigSchemaJsonOutput `json:"output,omitempty,omitzero"`
 
 	// Rules corresponds to the JSON schema field "rules".
-	Rules *TallyConfigSchemaJsonRules `json:"rules,omitempty"`
+	Rules *TallyConfigSchemaJsonRules `json:"rules,omitempty,omitzero"`
 
 	// Configure async checks that require network or other slow I/O (e.g. registry
 	// lookups).
-	SlowChecks *TallyConfigSchemaJsonSlowChecks `json:"slow-checks,omitempty"`
+	SlowChecks *TallyConfigSchemaJsonSlowChecks `json:"slow-checks,omitempty,omitzero"`
 }
 
 // Configure opt-in AI AutoFix features (requires an ACP-capable agent).
 type TallyConfigSchemaJsonAi struct {
 	// Argv to launch the ACP agent process over stdio.
-	Command []string `json:"command,omitempty"`
+	Command []string `json:"command,omitempty,omitzero"`
 
 	// Enable AI AutoFix. When false, AI fixes are never resolved.
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty,omitzero"`
 
 	// Maximum prompt payload size in bytes sent to the agent.
-	MaxInputBytes int `json:"max-input-bytes,omitempty"`
+	MaxInputBytes int `json:"max-input-bytes,omitempty,omitzero"`
 
 	// Redact detected secrets in Dockerfile content before sending to the agent.
-	RedactSecrets bool `json:"redact-secrets,omitempty"`
+	RedactSecrets bool `json:"redact-secrets,omitempty,omitzero"`
 
 	// Per-fix execution timeout as a Go duration string (e.g. "90s", "2m").
-	Timeout string `json:"timeout,omitempty"`
+	Timeout string `json:"timeout,omitempty,omitzero"`
 }
 
 // Pre-parse file validation checks.
 type TallyConfigSchemaJsonFileValidation struct {
 	// Maximum file size in bytes (0 = unlimited).
-	MaxFileSize int `json:"max-file-size,omitempty"`
+	MaxFileSize int `json:"max-file-size,omitempty,omitzero"`
 }
 
 // Control inline suppression directives (e.g. # tally-ignore).
 type TallyConfigSchemaJsonInlineDirectives struct {
 	// Allow inline directives to suppress violations.
-	Enabled bool `json:"enabled,omitempty"`
+	Enabled bool `json:"enabled,omitempty,omitzero"`
 
 	// Require a reason comment on every inline suppression directive.
-	RequireReason bool `json:"require-reason,omitempty"`
+	RequireReason bool `json:"require-reason,omitempty,omitzero"`
 
 	// Warn when an inline directive references a rule that does not exist.
-	ValidateRules bool `json:"validate-rules,omitempty"`
+	ValidateRules bool `json:"validate-rules,omitempty,omitzero"`
 
 	// Warn when an inline directive does not suppress any violation.
-	WarnUnused bool `json:"warn-unused,omitempty"`
+	WarnUnused bool `json:"warn-unused,omitempty,omitzero"`
 }
 
 // Configure output format and destination.
 type TallyConfigSchemaJsonOutput struct {
 	// Minimum severity that causes a non-zero exit code.
-	FailLevel TallyConfigSchemaJsonOutputFailLevel `json:"fail-level,omitempty"`
+	FailLevel TallyConfigSchemaJsonOutputFailLevel `json:"fail-level,omitempty,omitzero"`
 
 	// Output format for lint results.
-	Format TallyConfigSchemaJsonOutputFormat `json:"format,omitempty"`
+	Format TallyConfigSchemaJsonOutputFormat `json:"format,omitempty,omitzero"`
 
 	// Write output to this path instead of stdout.
-	Path string `json:"path,omitempty"`
+	Path string `json:"path,omitempty,omitzero"`
 
 	// Include source code snippets in output.
-	ShowSource bool `json:"show-source,omitempty"`
+	ShowSource bool `json:"show-source,omitempty,omitzero"`
 }
 
 type TallyConfigSchemaJsonOutputFailLevel string
@@ -181,35 +181,35 @@ const TallyConfigSchemaJsonOutputFormatText TallyConfigSchemaJsonOutputFormat = 
 
 type TallyConfigSchemaJsonRules struct {
 	// Buildkit corresponds to the JSON schema field "buildkit".
-	Buildkit IndexSchemaJson `json:"buildkit,omitempty"`
+	Buildkit IndexSchemaJson `json:"buildkit,omitempty,omitzero"`
 
 	// Glob patterns for rules to disable (e.g. "buildkit/MaintainerDeprecated").
-	Exclude []string `json:"exclude,omitempty"`
+	Exclude []string `json:"exclude,omitempty,omitzero"`
 
 	// Hadolint corresponds to the JSON schema field "hadolint".
-	Hadolint *IndexSchemaJson_1 `json:"hadolint,omitempty"`
+	Hadolint *IndexSchemaJson_1 `json:"hadolint,omitempty,omitzero"`
 
 	// Glob patterns for rules to enable (e.g. "tally/*", "hadolint/DL3026").
-	Include []string `json:"include,omitempty"`
+	Include []string `json:"include,omitempty,omitzero"`
 
 	// Shellcheck corresponds to the JSON schema field "shellcheck".
-	Shellcheck *IndexSchemaJson_2 `json:"shellcheck,omitempty"`
+	Shellcheck *IndexSchemaJson_2 `json:"shellcheck,omitempty,omitzero"`
 
 	// Tally corresponds to the JSON schema field "tally".
-	Tally *IndexSchemaJson_3 `json:"tally,omitempty"`
+	Tally *IndexSchemaJson_3 `json:"tally,omitempty,omitzero"`
 }
 
 // Configure async checks that require network or other slow I/O (e.g. registry
 // lookups).
 type TallyConfigSchemaJsonSlowChecks struct {
 	// Stop slow checks on first failure instead of collecting all results.
-	FailFast bool `json:"fail-fast,omitempty"`
+	FailFast bool `json:"fail-fast,omitempty,omitzero"`
 
 	// When to run slow checks: "auto" enables them in CI, "on" always, "off" never.
-	Mode TallyConfigSchemaJsonSlowChecksMode `json:"mode,omitempty"`
+	Mode TallyConfigSchemaJsonSlowChecksMode `json:"mode,omitempty,omitzero"`
 
 	// Overall timeout for all slow checks as a Go duration string (e.g. "20s").
-	Timeout string `json:"timeout,omitempty"`
+	Timeout string `json:"timeout,omitempty,omitzero"`
 }
 
 type TallyConfigSchemaJsonSlowChecksMode string

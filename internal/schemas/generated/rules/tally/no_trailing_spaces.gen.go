@@ -7,18 +7,18 @@ import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ru
 // Configuration options for the tally/no-trailing-spaces rule.
 type NoTrailingSpacesSchemaJson struct {
 	// Exclude corresponds to the JSON schema field "exclude".
-	Exclude *ruleschema.Exclude `json:"exclude,omitempty"`
+	Exclude *ruleschema.Exclude `json:"exclude,omitempty,omitzero"`
 
 	// Fix corresponds to the JSON schema field "fix".
-	Fix *ruleschema.Fix `json:"fix,omitempty"`
+	Fix *ruleschema.Fix `json:"fix,omitempty,omitzero"`
 
 	// Skip any line whose first non-whitespace character is # (Dockerfile comments
 	// and # lines in heredocs).
-	IgnoreComments bool `json:"ignore-comments,omitempty"`
+	IgnoreComments bool `json:"ignore-comments,omitempty,omitzero"`
 
 	// Severity corresponds to the JSON schema field "severity".
-	Severity *ruleschema.Severity `json:"severity,omitempty"`
+	Severity *ruleschema.Severity `json:"severity,omitempty,omitzero"`
 
 	// Skip lines that consist entirely of whitespace.
-	SkipBlankLines bool `json:"skip-blank-lines,omitempty"`
+	SkipBlankLines bool `json:"skip-blank-lines,omitempty,omitzero"`
 }

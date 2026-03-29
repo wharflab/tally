@@ -8,18 +8,37 @@ import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ru
 type RequireSecretMountsSchemaJson struct {
 	// Map of command names to required secret mount specifications. Each entry
 	// specifies a file target, an environment variable, or both.
-	Commands RequireSecretMountsSchemaJsonCommands `json:"commands,omitempty"`
+	Commands RequireSecretMountsSchemaJsonCommands `json:"commands,omitempty,omitzero"`
 
 	// Exclude corresponds to the JSON schema field "exclude".
-	Exclude *ruleschema.Exclude `json:"exclude,omitempty"`
+	Exclude *ruleschema.Exclude `json:"exclude,omitempty,omitzero"`
 
 	// Fix corresponds to the JSON schema field "fix".
-	Fix *ruleschema.Fix `json:"fix,omitempty"`
+	Fix *ruleschema.Fix `json:"fix,omitempty,omitzero"`
 
 	// Severity corresponds to the JSON schema field "severity".
-	Severity *ruleschema.Severity `json:"severity,omitempty"`
+	Severity *ruleschema.Severity `json:"severity,omitempty,omitzero"`
 }
 
 // Map of command names to required secret mount specifications. Each entry
 // specifies a file target, an environment variable, or both.
-type RequireSecretMountsSchemaJsonCommands map[string]interface{}
+type RequireSecretMountsSchemaJsonCommands map[string]RequireSecretMountsSchemaJsonCommandsValue
+
+type RequireSecretMountsSchemaJsonCommandsValue struct {
+	// Environment variable name to expose the secret as.
+	Env *string `json:"env,omitempty,omitzero"`
+
+	// Required secret ID for the --mount flag.
+	Id string `json:"id"`
+
+	// Fail the build if the secret is not provided. Maps to the 'required' mount
+	// parameter.
+	Required bool `json:"required,omitempty,omitzero"`
+
+	// Target path where the secret file is mounted.
+	Target *string `json:"target,omitempty,omitzero"`
+}
+
+type RequireSecretMountsSchemaJsonCommandsValue_0 map[string]interface{}
+
+type RequireSecretMountsSchemaJsonCommandsValue_1 map[string]interface{}

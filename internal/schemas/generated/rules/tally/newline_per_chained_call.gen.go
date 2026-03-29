@@ -7,14 +7,14 @@ import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ru
 // Configuration options for the tally/newline-per-chained-call rule.
 type NewlinePerChainedCallSchemaJson struct {
 	// Exclude corresponds to the JSON schema field "exclude".
-	Exclude *ruleschema.Exclude `json:"exclude,omitempty"`
+	Exclude *ruleschema.Exclude `json:"exclude,omitempty,omitzero"`
 
 	// Fix corresponds to the JSON schema field "fix".
-	Fix *ruleschema.Fix `json:"fix,omitempty"`
+	Fix *ruleschema.Fix `json:"fix,omitempty,omitzero"`
 
 	// Minimum number of chained commands required to trigger splitting.
-	MinCommands int `json:"min-commands,omitempty"`
+	MinCommands int `json:"min-commands,omitempty,omitzero"`
 
 	// Severity corresponds to the JSON schema field "severity".
-	Severity *ruleschema.Severity `json:"severity,omitempty"`
+	Severity *ruleschema.Severity `json:"severity,omitempty,omitzero"`
 }

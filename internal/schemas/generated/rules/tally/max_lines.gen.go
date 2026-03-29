@@ -7,20 +7,20 @@ import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ru
 // Configuration options for the tally/max-lines rule.
 type MaxLinesSchemaJson struct {
 	// Exclude corresponds to the JSON schema field "exclude".
-	Exclude *ruleschema.Exclude `json:"exclude,omitempty"`
+	Exclude *ruleschema.Exclude `json:"exclude,omitempty,omitzero"`
 
 	// Fix corresponds to the JSON schema field "fix".
-	Fix *ruleschema.Fix `json:"fix,omitempty"`
+	Fix *ruleschema.Fix `json:"fix,omitempty,omitzero"`
 
 	// Maximum number of lines allowed (0 = disabled).
-	Max int `json:"max,omitempty"`
+	Max int `json:"max,omitempty,omitzero"`
 
 	// Severity corresponds to the JSON schema field "severity".
-	Severity *ruleschema.Severity `json:"severity,omitempty"`
+	Severity *ruleschema.Severity `json:"severity,omitempty,omitzero"`
 
 	// Exclude blank lines from the count.
-	SkipBlankLines bool `json:"skip-blank-lines,omitempty"`
+	SkipBlankLines bool `json:"skip-blank-lines,omitempty,omitzero"`
 
 	// Exclude comment lines from the count.
-	SkipComments bool `json:"skip-comments,omitempty"`
+	SkipComments bool `json:"skip-comments,omitempty,omitzero"`
 }

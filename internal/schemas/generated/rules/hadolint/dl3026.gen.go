@@ -7,15 +7,15 @@ import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ru
 // Configuration options for the hadolint/DL3026 rule.
 type Dl3026SchemaJson struct {
 	// Exclude corresponds to the JSON schema field "exclude".
-	Exclude *ruleschema.Exclude `json:"exclude,omitempty"`
+	Exclude *ruleschema.Exclude `json:"exclude,omitempty,omitzero"`
 
 	// Fix corresponds to the JSON schema field "fix".
-	Fix *ruleschema.Fix `json:"fix,omitempty"`
+	Fix *ruleschema.Fix `json:"fix,omitempty,omitzero"`
 
 	// Severity corresponds to the JSON schema field "severity".
-	Severity *ruleschema.Severity `json:"severity,omitempty"`
+	Severity *ruleschema.Severity `json:"severity,omitempty,omitzero"`
 
 	// Allowed registries for base images in FROM (empty disables the rule). Supports
 	// "*", "*.suffix" and "prefix*" patterns.
-	TrustedRegistries []string `json:"trusted-registries,omitempty"`
+	TrustedRegistries []string `json:"trusted-registries,omitempty,omitzero"`
 }
