@@ -122,6 +122,18 @@ RUN pip install -r requirements.txt
 			wantTools: nil,
 		},
 		{
+			name: "similar package names and comments stay quiet",
+			content: `FROM python:3.12
+WORKDIR /app
+COPY requirements.txt ./requirements.txt
+RUN pip install -r requirements.txt
+`,
+			contextFiles: map[string]string{
+				"requirements.txt": "# transformers intentionally excluded\ntensorflow-datasets==4.9.0\n",
+			},
+			wantTools: nil,
+		},
+		{
 			name: "node only huggingface hub stays quiet",
 			content: `FROM node:22
 RUN npx @huggingface/hub upload

@@ -692,6 +692,32 @@ func TestTelemetryPredicates(t *testing.T) {
 	})
 }
 
+func TestContentMentionsHFPackage(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+		want    bool
+	}{
+		{name: "plain requirement", content: "transformers==4.51.0\n", want: true},
+		{name: "extras requirement", content: "huggingface_hub[cli]>=1.0\n", want: true},
+		{name: "quoted package token", content: "dependencies = [\"diffusers>=0.32.0\"]\n", want: true},
+		{name: "similar package stays quiet", content: "tensorflow-datasets==4.9.0\n", want: false},
+		{name: "commented mention stays quiet", content: "# transformers intentionally excluded\n", want: false},
+		{name: "inline comment still detects package", content: "datasets==2.19.0  # pinned\n", want: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := contentMentionsHFPackage(tt.content); got != tt.want {
+				t.Fatalf("contentMentionsHFPackage(%q) = %t, want %t", tt.content, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestStageScannerScanCommandInfo(t *testing.T) {
 	t.Parallel()
 

@@ -1020,13 +1020,42 @@ func hasDependency(manifest packageManifest, name string) bool {
 }
 
 func contentMentionsHFPackage(content string) bool {
-	content = strings.ToLower(content)
-	return strings.Contains(content, "huggingface_hub") ||
-		strings.Contains(content, "huggingface-hub") ||
-		strings.Contains(content, "transformers") ||
-		strings.Contains(content, "datasets") ||
-		strings.Contains(content, "diffusers") ||
-		strings.Contains(content, "gradio")
+	for line := range strings.SplitSeq(content, "\n") {
+		line = stripPythonManifestComment(strings.ToLower(line))
+		for _, token := range strings.FieldsFunc(line, isPackageTokenDelimiter) {
+			switch canonicalPackageSpec(token) {
+			case "huggingface-hub", "transformers", "datasets", "diffusers", "gradio":
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func stripPythonManifestComment(line string) string {
+	trimmed := strings.TrimLeft(line, " \t")
+	if strings.HasPrefix(trimmed, "#") {
+		return ""
+	}
+	for i := 1; i < len(line); i++ {
+		if line[i] == '#' && (line[i-1] == ' ' || line[i-1] == '\t') {
+			return line[:i]
+		}
+	}
+	return line
+}
+
+func isPackageTokenDelimiter(r rune) bool {
+	switch {
+	case r >= 'a' && r <= 'z':
+		return false
+	case r >= '0' && r <= '9':
+		return false
+	case r == '-', r == '_':
+		return false
+	default:
+		return true
+	}
 }
 
 func isPythonManifestFile(base string) bool {
