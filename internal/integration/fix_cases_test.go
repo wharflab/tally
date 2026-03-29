@@ -1754,5 +1754,47 @@ severity = "warning"
 				mustSelectRules("tally/user-created-but-never-used")...),
 			wantApplied: 1,
 		},
+
+		// copy-after-user-without-chown: adds --chown flag (preferred fix)
+		{
+			name:  "copy-after-user-without-chown-basic",
+			input: "FROM ubuntu:22.04\nUSER appuser\nCOPY app /app\nRUN setup.sh\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/copy-after-user-without-chown")...),
+			wantApplied: 1,
+		},
+
+		// copy-after-user-without-chown: ADD also fixed
+		{
+			name:  "copy-after-user-without-chown-add",
+			input: "FROM ubuntu:22.04\nUSER 1000\nADD config.tar.gz /etc/app/\nRUN setup.sh\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/copy-after-user-without-chown")...),
+			wantApplied: 1,
+		},
+
+		// copy-after-user-without-chown: multiple COPY/ADD all fixed
+		{
+			name:  "copy-after-user-without-chown-multi",
+			input: "FROM ubuntu:22.04\nUSER appuser\nCOPY a /a\nCOPY b /b\nRUN setup.sh\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/copy-after-user-without-chown")...),
+			wantApplied: 2,
+		},
+
+		// Cross-rule: copy-after-user-without-chown + prefer-copy-chmod compose correctly
+		{
+			name: "copy-after-user-chown-plus-chmod",
+			input: "FROM ubuntu:22.04\nUSER appuser\n" +
+				"COPY entrypoint.sh /app/entrypoint.sh\n" +
+				"RUN chmod +x /app/entrypoint.sh\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/copy-after-user-without-chown", "tally/prefer-copy-chmod")...),
+			wantApplied: 2,
+		},
 	}
 }

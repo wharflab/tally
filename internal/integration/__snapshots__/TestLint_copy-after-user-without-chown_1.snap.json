@@ -1,0 +1,293 @@
+{
+  "files": [
+    {
+      "file": "testdata/copy-after-user-without-chown/Dockerfile",
+      "violations": [
+        {
+          "detail": "Docker's COPY always creates files as root:root regardless of the active USER. Add --chown=appuser to match the intended ownership, or move USER after the COPY to clarify that USER does not affect COPY ownership.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/copy-after-user-without-chown/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 13
+            },
+            "file": "testdata/copy-after-user-without-chown/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 13
+            }
+          },
+          "message": "COPY without --chown creates root-owned files despite USER appuser",
+          "rule": "tally/copy-after-user-without-chown",
+          "severity": "warning",
+          "sourceCode": "COPY app /app",
+          "suggestedFix": {
+            "description": "Add --chown=appuser to COPY",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 5,
+                    "line": 13
+                  },
+                  "file": "testdata/copy-after-user-without-chown/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 13
+                  }
+                },
+                "newText": "--chown=appuser "
+              }
+            ],
+            "isPreferred": true,
+            "priority": 99
+          }
+        },
+        {
+          "detail": "Docker's COPY always creates files as root:root regardless of the active USER. Add --chown=appuser to match the intended ownership, or move USER after the COPY to clarify that USER does not affect COPY ownership.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/copy-after-user-without-chown/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 19
+            },
+            "file": "testdata/copy-after-user-without-chown/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 19
+            }
+          },
+          "message": "COPY without --chown creates root-owned files despite USER appuser",
+          "rule": "tally/copy-after-user-without-chown",
+          "severity": "warning",
+          "sourceCode": "COPY app /app",
+          "suggestedFix": {
+            "description": "Add --chown=appuser to COPY",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 5,
+                    "line": 19
+                  },
+                  "file": "testdata/copy-after-user-without-chown/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 19
+                  }
+                },
+                "newText": "--chown=appuser "
+              }
+            ],
+            "isPreferred": true,
+            "priority": 99
+          },
+          "suggestedFixes": [
+            {
+              "description": "Add --chown=appuser to COPY",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 5,
+                      "line": 19
+                    },
+                    "file": "testdata/copy-after-user-without-chown/Dockerfile",
+                    "start": {
+                      "column": 5,
+                      "line": 19
+                    }
+                  },
+                  "newText": "--chown=appuser "
+                }
+              ],
+              "isPreferred": true,
+              "priority": 99
+            },
+            {
+              "description": "Move USER appuser after COPY/ADD (USER does not affect COPY/ADD ownership)",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 19
+                    },
+                    "file": "testdata/copy-after-user-without-chown/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 18
+                    }
+                  },
+                  "newText": ""
+                },
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 21
+                    },
+                    "file": "testdata/copy-after-user-without-chown/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 21
+                    }
+                  },
+                  "newText": "USER appuser\n"
+                }
+              ],
+              "priority": 99
+            }
+          ]
+        },
+        {
+          "detail": "Docker's ADD always creates files as root:root regardless of the active USER. Add --chown=appuser to match the intended ownership, or move USER after the ADD to clarify that USER does not affect ADD ownership.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/copy-after-user-without-chown/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 20
+            },
+            "file": "testdata/copy-after-user-without-chown/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 20
+            }
+          },
+          "message": "ADD without --chown creates root-owned files despite USER appuser",
+          "rule": "tally/copy-after-user-without-chown",
+          "severity": "warning",
+          "sourceCode": "ADD config.tar.gz /etc/app/",
+          "suggestedFix": {
+            "description": "Add --chown=appuser to ADD",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 4,
+                    "line": 20
+                  },
+                  "file": "testdata/copy-after-user-without-chown/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 20
+                  }
+                },
+                "newText": "--chown=appuser "
+              }
+            ],
+            "isPreferred": true,
+            "priority": 99
+          },
+          "suggestedFixes": [
+            {
+              "description": "Add --chown=appuser to ADD",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 4,
+                      "line": 20
+                    },
+                    "file": "testdata/copy-after-user-without-chown/Dockerfile",
+                    "start": {
+                      "column": 4,
+                      "line": 20
+                    }
+                  },
+                  "newText": "--chown=appuser "
+                }
+              ],
+              "isPreferred": true,
+              "priority": 99
+            },
+            {
+              "description": "Move USER appuser after COPY/ADD (USER does not affect COPY/ADD ownership)",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 19
+                    },
+                    "file": "testdata/copy-after-user-without-chown/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 18
+                    }
+                  },
+                  "newText": ""
+                },
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 21
+                    },
+                    "file": "testdata/copy-after-user-without-chown/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 21
+                    }
+                  },
+                  "newText": "USER appuser\n"
+                }
+              ],
+              "priority": 99
+            }
+          ]
+        },
+        {
+          "detail": "Docker's COPY always creates files as root:root regardless of the active USER. Add --chown=appuser to match the intended ownership, or move USER after the COPY to clarify that USER does not affect COPY ownership.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/copy-after-user-without-chown/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 44
+            },
+            "file": "testdata/copy-after-user-without-chown/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 44
+            }
+          },
+          "message": "COPY without --chown creates root-owned files despite USER appuser",
+          "rule": "tally/copy-after-user-without-chown",
+          "severity": "warning",
+          "sourceCode": "COPY app /app",
+          "suggestedFix": {
+            "description": "Add --chown=appuser to COPY",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 5,
+                    "line": 44
+                  },
+                  "file": "testdata/copy-after-user-without-chown/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 44
+                  }
+                },
+                "newText": "--chown=appuser "
+              }
+            ],
+            "isPreferred": true,
+            "priority": 99
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 4,
+    "warnings": 4
+  }
+}
