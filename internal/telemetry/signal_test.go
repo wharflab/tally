@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -225,7 +226,7 @@ RUN corepack enable
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var ctx *mockBuildContext
+			var ctx rules.BuildContext
 			if len(tt.contextFiles) > 0 {
 				ctx = &mockBuildContext{files: tt.contextFiles}
 			}
