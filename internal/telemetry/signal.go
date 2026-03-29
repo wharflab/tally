@@ -3,6 +3,7 @@ package telemetry
 import (
 	"encoding/json/v2"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -879,12 +880,7 @@ func isExplicitBerryCommand(cmd shell.CommandInfo) bool {
 }
 
 func containsBerryYarnSpecifier(args []string) bool {
-	for _, arg := range args {
-		if isYarnBerryPackageManager(arg) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(args, isYarnBerryPackageManager)
 }
 
 func isYarnBerryPackageManager(value string) bool {
@@ -947,10 +943,5 @@ func hasAnyArgFold(args []string, target string) bool {
 }
 
 func pathHasSegment(value, segment string) bool {
-	for _, part := range strings.Split(path.Clean(value), "/") {
-		if part == segment {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(strings.Split(path.Clean(value), "/"), segment)
 }
