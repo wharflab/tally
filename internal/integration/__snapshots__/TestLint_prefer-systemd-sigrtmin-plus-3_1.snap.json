@@ -76,7 +76,7 @@
                     "line": 8
                   }
                 },
-                "newText": "STOPSIGNAL SIGRTMIN+3\n"
+                "newText": "# [tally] SIGRTMIN+3 is the graceful shutdown signal for systemd/init\nSTOPSIGNAL SIGRTMIN+3\n"
               }
             ],
             "isPreferred": true,
