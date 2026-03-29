@@ -1,0 +1,10 @@
+{
+ "Category": "privacy",
+ "Code": "tally/prefer-telemetry-opt-out",
+ "DefaultSeverity": "info",
+ "Description": "Stages using telemetry-enabled tools should set the vendor-documented opt-out environment variables",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/prefer-telemetry-opt-out/",
+ "FixPriority": 96,
+ "IsExperimental": false,
+ "Name": "Prefer telemetry opt-out"
+}

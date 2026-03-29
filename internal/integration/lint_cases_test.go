@@ -759,6 +759,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-curl-config")...),
 			wantExit: 1,
 		},
+		{
+			name:       "prefer-telemetry-opt-out",
+			dir:        "prefer-telemetry-opt-out",
+			args:       append([]string{"--format", "json"}, mustSelectRules("tally/prefer-telemetry-opt-out")...),
+			wantExit:   1,
+			useContext: true,
+		},
 
 		{
 			name:     "prefer-vex-attestation",

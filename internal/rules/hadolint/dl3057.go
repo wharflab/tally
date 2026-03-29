@@ -369,17 +369,7 @@ func lastEntrypointArgs(stage *instructions.Stage) ([]string, bool) {
 //
 // For exec form, returns the base name of the first element.
 func entrypointCommandNames(cmdLine []string, prependShell bool, variant shell.Variant) []string {
-	if len(cmdLine) == 0 {
-		return nil
-	}
-	if prependShell {
-		return shell.CommandNamesWithVariant(cmdLine[0], variant)
-	}
-	name := path.Base(cmdLine[0])
-	if name == "" || name == "." {
-		return nil
-	}
-	return []string{name}
+	return shell.DockerCommandNames(cmdLine, prependShell, variant)
 }
 
 // init registers the rule with the default registry.

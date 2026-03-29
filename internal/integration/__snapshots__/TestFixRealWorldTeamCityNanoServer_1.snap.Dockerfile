@@ -22,6 +22,9 @@
 # Based on ${powershellImage} 3
 FROM ${powershellImage} AS base
 
+# [tally] settings to opt out from telemetry
+ENV POWERSHELL_TELEMETRY_OPTOUT=1
+
 # On some agents, Windows 2022 requires administrator permissions to modify "C:/" folder within ...
 # ... PowerShell container.
 USER ContainerAdministrator
@@ -54,6 +57,8 @@ ARG nanoserverImage
 # Based on ${nanoserverImage} 2
 FROM ${nanoserverImage}
 
+# [tally] settings to opt out from telemetry
+ENV POWERSHELL_TELEMETRY_OPTOUT=1
 ENV ProgramFiles="C:\Program Files" \
     # set a fixed location for the Module analysis cache
     PSModuleAnalysisCachePath="C:\Users\ContainerUser\AppData\Local\Microsoft\Windows\PowerShell\docker\ModuleAnalysisCache" \

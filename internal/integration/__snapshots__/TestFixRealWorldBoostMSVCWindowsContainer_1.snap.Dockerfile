@@ -1,6 +1,9 @@
 #escape=`
 FROM teeks99/msvc-win:14.0
 
+  # [tally] settings to opt out from telemetry
+  ENV POWERSHELL_TELEMETRY_OPTOUT=1
+
 SHELL ["powershell", "-command"]
 
 # Install Chocolatey

@@ -185,7 +185,7 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 	// Skipped when a tail rewrite will handle mounts to avoid overlapping edits.
 	if !needsTailRewrite && len(newMounts) > 0 {
 		insertLine := runLoc[0].Start.Line
-		insertCol := runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
+		insertCol := runKeywordEndColumn(runLoc, p.sm)
 
 		mountText := runmount.FormatMounts(newMounts) + " "
 		edits = append(edits, rules.TextEdit{
@@ -219,7 +219,7 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 // (mount mutation, heredoc cleanup fallback).
 func buildTailRewrite(p cacheMountEditParams, mounts []*instructions.Mount) []rules.TextEdit {
 	startLine := p.runLoc[0].Start.Line
-	startCol := p.runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
+	startCol := runKeywordEndColumn(p.runLoc, p.sm)
 	endLine, endCol := resolveRunEndPosition(p.runLoc, p.sm, p.run)
 
 	script := getRunScriptFromCmd(p.run)
@@ -236,6 +236,19 @@ func buildTailRewrite(p cacheMountEditParams, mounts []*instructions.Mount) []ru
 		Location: rules.NewRangeLocation(p.file, startLine, startCol, endLine, endCol),
 		NewText:  tailText,
 	}}
+}
+
+func runKeywordEndColumn(runLoc []parser.Range, sm *sourcemap.SourceMap) int {
+	if len(runLoc) == 0 {
+		return 4 //nolint:mnd // len("RUN ")
+	}
+
+	if sm != nil && runLoc[0].Start.Line > 0 {
+		line := sm.Line(runLoc[0].Start.Line - 1)
+		return len(leadingWhitespace(line)) + 4 //nolint:mnd // len("RUN ")
+	}
+
+	return runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
 }
 
 // computeCleanupEdits produces targeted deletion edits for cache cleanup

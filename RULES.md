@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 47 | - | 47 |
+| tally | 48 | - | 48 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -51,6 +51,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/platform-mismatch`](docs/rules/tally/platform-mismatch.md) | Explicit `--platform` on FROM does not match what the registry provides | Error | Correctness | Enabled |
 | [`tally/curl-should-follow-redirects`](docs/rules/tally/curl-should-follow-redirects.md) 🔧 | curl commands should include `-L`/`--location` to follow HTTP redirects | Warning | Correctness | Enabled |
 | [`tally/prefer-curl-config`](docs/rules/tally/prefer-curl-config.md) 🔧 | Stages using curl should include a retry config to handle transient failures | Info | Correctness | Enabled |
+| [`tally/prefer-telemetry-opt-out`](docs/rules/tally/prefer-telemetry-opt-out.md) 🔧 | Stages using telemetry-enabled tools should set the vendor-documented opt-out environment variables | Info | Privacy | Enabled |
 | [`tally/prefer-add-unpack`](docs/rules/tally/prefer-add-unpack.md) 🔧 | Suggests `ADD --unpack` instead of downloading and extracting remote archives in `RUN` | Info | Performance | Enabled |
 | [`tally/prefer-multi-stage-build`](docs/rules/tally/prefer-multi-stage-build.md) 🔧 | Suggests converting single-stage builds into multi-stage builds to reduce final image size | Info | Performance | Off (experimental) |
 | [`tally/prefer-copy-chmod`](docs/rules/tally/prefer-copy-chmod.md) 🔧 | Prefer `COPY --chmod` over separate `COPY` + `RUN chmod` | Info | Style | Enabled |

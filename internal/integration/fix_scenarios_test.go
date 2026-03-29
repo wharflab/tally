@@ -573,6 +573,83 @@ func TestFixPowerShellPreferShellInstruction(t *testing.T) {
 	}
 }
 
+// TestFixTelemetryOptOutCombined runs the telemetry rule alongside the related
+// content, shell, heredoc, and formatting rules that can touch the same stages.
+func TestFixTelemetryOptOutCombined(t *testing.T) {
+	t.Parallel()
+	testdataDir := filepath.Join("testdata", "telemetry-opt-out-combined")
+
+	dockerfileContent, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+	packageJSON, err := os.ReadFile(filepath.Join(testdataDir, "package.json"))
+	if err != nil {
+		t.Fatalf("failed to read package.json fixture: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, dockerfileContent, 0o644); err != nil {
+		t.Fatalf("failed to write Dockerfile: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "package.json"), packageJSON, 0o644); err != nil {
+		t.Fatalf("failed to write package.json: %v", err)
+	}
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := `[rules.tally.prefer-telemetry-opt-out]
+severity = "info"
+
+[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+
+[rules.tally.prefer-run-heredoc]
+severity = "style"
+
+[rules.tally.consistent-indentation]
+severity = "style"
+
+[rules.tally.newline-between-instructions]
+severity = "style"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	args := []string{
+		"lint", "--config", configPath, "--context", tmpDir, "--slow-checks=off",
+		"--fix", "--fix-unsafe",
+		"--ignore", "*",
+		"--select", "tally/prefer-telemetry-opt-out",
+		"--select", "tally/prefer-curl-config",
+		"--select", "tally/prefer-package-cache-mounts",
+		"--select", "tally/powershell/prefer-shell-instruction",
+		"--select", "hadolint/DL4006",
+		"--select", "tally/prefer-run-heredoc",
+		"--select", "tally/newline-between-instructions",
+		"--select", "tally/consistent-indentation",
+		dockerfilePath,
+	}
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("expected exit code 0 (all selected violations fixable), got error: %v\noutput: %s", err, output)
+	}
+
+	fixedContent, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read fixed Dockerfile: %v", err)
+	}
+
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
+
+	if !strings.Contains(string(output), "Fixed") {
+		t.Errorf("expected 'Fixed' in output, got: %s", output)
+	}
+}
+
 // TestFixNewlinePerChainedCall exercises the auto-fix path for
 // tally/newline-per-chained-call end-to-end through the CLI.
 // The rule is globally ignored in runFixCase (harness_test.go), so this test

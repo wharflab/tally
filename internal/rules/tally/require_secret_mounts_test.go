@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	fixpkg "github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -436,6 +437,14 @@ RUN pip install -r requirements.txt
 			},
 			wantFix: "--mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf,required",
 		},
+		{
+			name: "indented RUN keeps mount after keyword",
+			content: `FROM python:3.12-slim
+    RUN pip install -r requirements.txt
+`,
+			config:  pipConfig(),
+			wantFix: "--mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf",
+		},
 	}
 
 	for _, tt := range tests {
@@ -456,6 +465,16 @@ RUN pip install -r requirements.txt
 			edit := v.SuggestedFix.Edits[0]
 			if !strings.Contains(edit.NewText, tt.wantFix) {
 				t.Errorf("fix NewText = %q, want substring %q", edit.NewText, tt.wantFix)
+			}
+
+			if tt.name == "indented RUN keeps mount after keyword" {
+				got := string(fixpkg.ApplyEdit([]byte(tt.content), edit))
+				want := `FROM python:3.12-slim
+    RUN --mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf pip install -r requirements.txt
+`
+				if got != want {
+					t.Errorf("fixed content = %q, want %q", got, want)
+				}
 			}
 		})
 	}
