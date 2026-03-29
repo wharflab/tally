@@ -310,6 +310,13 @@ func TestFindChownFlagRange(t *testing.T) {
 			wantEnd:   16,
 			wantFound: true,
 		},
+		{
+			name:      "quoted chown with escaped quote",
+			line:      `COPY --chown="my\"user" src/ /app/`,
+			wantStart: 5,
+			wantEnd:   24,
+			wantFound: true,
+		},
 	}
 
 	for _, tt := range tests {

@@ -153,7 +153,13 @@ func findChownFlagRange(lineText string) (start, end int, found bool) {
 	if pos < len(lineText) && (lineText[pos] == '"' || lineText[pos] == '\'') {
 		quote := lineText[pos]
 		pos++ // skip opening quote
-		for pos < len(lineText) && lineText[pos] != quote {
+		for pos < len(lineText) {
+			if lineText[pos] == quote {
+				break
+			}
+			if lineText[pos] == '\\' {
+				pos++ // skip escaped character
+			}
 			pos++
 		}
 		if pos < len(lineText) {
