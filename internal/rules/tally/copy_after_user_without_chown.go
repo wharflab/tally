@@ -264,7 +264,7 @@ func (r *CopyAfterUserWithoutChownRule) buildMoveUserFix(
 	ctx *copyChownCtx,
 ) *rules.SuggestedFix {
 	target := findNextRunOrWorkdir(ctx.stage, cmdIdx)
-	if target == nil {
+	if len(target) == 0 {
 		return nil
 	}
 
