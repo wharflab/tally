@@ -393,7 +393,8 @@ func inheritedUserForCopyChown(sem *semantic.Model, fileFacts *facts.FileFacts, 
 }
 
 // inheritedWorkdirForCopyChown returns the effective workdir inherited from a
-// parent stage via FROM.
+// parent stage via FROM. Unlike inheritedUserForCopyChown, only the immediate
+// parent is checked because FinalWorkdir already accounts for the full chain.
 func inheritedWorkdirForCopyChown(fileFacts *facts.FileFacts, sem *semantic.Model, stageIdx int) string {
 	if sem == nil || fileFacts == nil {
 		return "/"
