@@ -1074,5 +1074,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/user-created-but-never-used")...),
 			wantExit: 1,
 		},
+
+		// COPY/ADD after non-root USER without --chown
+		{
+			name:     "copy-after-user-without-chown",
+			dir:      "copy-after-user-without-chown",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/copy-after-user-without-chown")...),
+			wantExit: 1,
+		},
 	}
 }

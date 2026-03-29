@@ -12,6 +12,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [require-secret-mounts](./require-secret-mounts.md) | Enforces --mount=type=secret for commands accessing private registries | Warning | Security | Off (requires config) |
 | [stateful-root-runtime](./stateful-root-runtime.md) | Final stage runs as root and signals mutable/persistent state | Warning | Security | Enabled |
 | [user-created-but-never-used](./user-created-but-never-used.md) | Final stage creates a user but never switches to it | Warning | Security | Enabled |
+| [copy-after-user-without-chown](./copy-after-user-without-chown.md) | COPY/ADD without --chown after non-root USER creates root-owned files | Warning | Correctness | Enabled |
 | [max-lines](./max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
 | [no-unreachable-stages](./no-unreachable-stages.md) | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
 | [shell-run-in-scratch](./shell-run-in-scratch.md) | Detects shell-form RUN in scratch stages where no shell exists | Warning | Correctness | Enabled |

@@ -27,7 +27,7 @@ FROM alpine:3.20 AS runtime
 
 FROM runtime
 
-	COPY --from=builder /app /usr/local/bin/app
+	COPY --chown=nobody:nobody --from=builder /app /usr/local/bin/app
 
 	EXPOSE 8080
 
