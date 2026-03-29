@@ -1,0 +1,99 @@
+{
+  "files": [
+    {
+      "file": "testdata/prefer-systemd-sigrtmin-plus-3/Dockerfile",
+      "violations": [
+        {
+          "detail": "systemd requires SIGRTMIN+3 to trigger a clean manager shutdown, analogous to systemctl halt",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-systemd-sigrtmin-plus-3/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/prefer-systemd-sigrtmin-plus-3/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "STOPSIGNAL SIGTERM should be SIGRTMIN+3 for systemd/init containers",
+          "rule": "tally/prefer-systemd-sigrtmin-plus-3",
+          "severity": "warning",
+          "sourceCode": "STOPSIGNAL SIGTERM",
+          "suggestedFix": {
+            "description": "Replace with SIGRTMIN+3 for clean systemd shutdown",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 18,
+                    "line": 3
+                  },
+                  "file": "testdata/prefer-systemd-sigrtmin-plus-3/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 3
+                  }
+                },
+                "newText": "SIGRTMIN+3"
+              }
+            ],
+            "isPreferred": true,
+            "priority": -1
+          }
+        },
+        {
+          "detail": "Without STOPSIGNAL SIGRTMIN+3, the container runtime sends SIGTERM which systemd interprets as an isolate-to-rescue-mode request, not a clean shutdown",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-systemd-sigrtmin-plus-3/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 8
+            },
+            "file": "testdata/prefer-systemd-sigrtmin-plus-3/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 8
+            }
+          },
+          "message": "systemd/init container is missing STOPSIGNAL SIGRTMIN+3",
+          "rule": "tally/prefer-systemd-sigrtmin-plus-3",
+          "severity": "warning",
+          "sourceCode": "CMD [\"/usr/lib/systemd/systemd\"]",
+          "suggestedFix": {
+            "description": "Add STOPSIGNAL SIGRTMIN+3 for clean systemd shutdown",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 8
+                  },
+                  "file": "testdata/prefer-systemd-sigrtmin-plus-3/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 8
+                  }
+                },
+                "newText": "# [tally] SIGRTMIN+3 is the graceful shutdown signal for systemd/init\nSTOPSIGNAL SIGRTMIN+3\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": -1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}
