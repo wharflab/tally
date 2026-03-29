@@ -179,6 +179,13 @@ severity = "error"
 				mustSelectRules("tally/prefer-curl-config", "tally/curl-should-follow-redirects")...),
 			wantApplied: 2,
 		},
+		{
+			name:  "prefer-telemetry-opt-out",
+			input: "FROM node:22\nRUN bun install && next build\n",
+			args: append([]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/prefer-telemetry-opt-out")...),
+			wantApplied: 1,
+		},
 
 		// DL3003: cd -> WORKDIR (regression test for line number consistency)
 		{
@@ -641,7 +648,7 @@ severity = "info"
 				"--fix",
 				"--select", "tally/prefer-package-cache-mounts",
 			},
-			wantApplied: 3,
+			wantApplied: 4,
 			config: `[rules.tally.prefer-package-cache-mounts]
 severity = "info"
 `,
@@ -748,7 +755,7 @@ severity = "info"
 				"--fix",
 				"--select", "tally/prefer-package-cache-mounts",
 			},
-			wantApplied: 1,
+			wantApplied: 2,
 			config: `[rules.tally.prefer-package-cache-mounts]
 severity = "info"
 `,

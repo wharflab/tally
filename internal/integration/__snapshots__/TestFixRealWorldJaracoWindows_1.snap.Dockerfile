@@ -4,6 +4,9 @@
 
 FROM mcr.microsoft.com/dotnet/framework/sdk:4.8-windowsservercore-ltsc2019
 
+# [tally] settings to opt out from telemetry
+ENV POWERSHELL_TELEMETRY_OPTOUT=1
+
 # Download the Build Tools bootstrapper.
 ADD https://aka.ms/vs/16/release/vs_buildtools.exe vs_buildtools.exe
 

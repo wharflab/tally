@@ -1,5 +1,8 @@
 FROM mcr.microsoft.com/powershell:6.2.1-alpine-3.8
 
+# [tally] settings to opt out from telemetry
+ENV POWERSHELL_TELEMETRY_OPTOUT=1
+
 SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 WORKDIR /app

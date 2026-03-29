@@ -1,0 +1,139 @@
+{
+  "files": [
+    {
+      "file": "testdata/prefer-telemetry-opt-out/Dockerfile",
+      "violations": [
+        {
+          "detail": "Add a grouped telemetry opt-out block near the top of the stage with ENV NEXT_TELEMETRY_DISABLED=1 for Next.js.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-telemetry-opt-out/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/prefer-telemetry-opt-out/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "stage uses Next.js without its documented telemetry opt-out",
+          "rule": "tally/prefer-telemetry-opt-out",
+          "severity": "info",
+          "sourceCode": "COPY package.json ./package.json",
+          "suggestedFix": {
+            "description": "Add official telemetry opt-out environment variables",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 2
+                  },
+                  "file": "testdata/prefer-telemetry-opt-out/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 2
+                  }
+                },
+                "newText": "# [tally] settings to opt out from telemetry\nENV NEXT_TELEMETRY_DISABLED=1\n"
+              }
+            ],
+            "priority": 96,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Add a grouped telemetry opt-out block near the top of the stage with ENV HF_HUB_DISABLE_TELEMETRY=1 for Hugging Face Python ecosystem.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-telemetry-opt-out/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 8
+            },
+            "file": "testdata/prefer-telemetry-opt-out/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 8
+            }
+          },
+          "message": "stage uses Hugging Face Python ecosystem without its documented telemetry opt-out",
+          "rule": "tally/prefer-telemetry-opt-out",
+          "severity": "info",
+          "sourceCode": "COPY requirements.txt ./requirements.txt",
+          "suggestedFix": {
+            "description": "Add official telemetry opt-out environment variables",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 7
+                  },
+                  "file": "testdata/prefer-telemetry-opt-out/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 7
+                  }
+                },
+                "newText": "# [tally] settings to opt out from telemetry\nENV HF_HUB_DISABLE_TELEMETRY=1\n"
+              }
+            ],
+            "priority": 96,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Detected PowerShell, vcpkg. The fix inserts a grouped telemetry opt-out block near the top of the stage with ENV POWERSHELL_TELEMETRY_OPTOUT=1, VCPKG_DISABLE_METRICS=1.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-telemetry-opt-out/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 16
+            },
+            "file": "testdata/prefer-telemetry-opt-out/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 16
+            }
+          },
+          "message": "stage uses tools with documented telemetry opt-outs that are not set",
+          "rule": "tally/prefer-telemetry-opt-out",
+          "severity": "info",
+          "sourceCode": "RUN powershell -Command Write-Host hi",
+          "suggestedFix": {
+            "description": "Add official telemetry opt-out environment variables",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 16
+                  },
+                  "file": "testdata/prefer-telemetry-opt-out/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 16
+                  }
+                },
+                "newText": "# [tally] settings to opt out from telemetry\nENV POWERSHELL_TELEMETRY_OPTOUT=1 VCPKG_DISABLE_METRICS=1\n"
+              }
+            ],
+            "priority": 96,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 3,
+    "style": 0,
+    "total": 3,
+    "warnings": 0
+  }
+}

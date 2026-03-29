@@ -3,6 +3,8 @@ ARG RUNTIME_IMAGE=ubuntu:22.04
 
 FROM $BUILDER_IMAGE AS python_builder_1
 
+# [tally] settings to opt out from telemetry
+ENV HF_HUB_DISABLE_TELEMETRY=1
 ENV CURL_HOME=/etc/curl
 
 COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc

@@ -1,0 +1,105 @@
+# tally/prefer-telemetry-opt-out
+
+Stages using telemetry-enabled tools should set the vendor-documented opt-out environment variables.
+
+| Property | Value |
+|----------|-------|
+| Severity | Info |
+| Category | Privacy |
+| Default | Enabled |
+| Auto-fix | Yes (`--fix --fix-unsafe`) |
+
+## Description
+
+Detects build stages that clearly use tools with an official telemetry opt-out and suggests adding a
+grouped telemetry block near the top of the stage.
+
+The rule is intentionally conservative:
+
+- It emits at most **one violation per stage**
+- It only targets tools with a vendor-documented environment-variable opt-out
+- It suppresses child stages when the required opt-outs are already inherited from a parent stage
+- It only inserts the opt-outs that are still missing for that specific stage
+- The fix groups the missing opt-outs into one `ENV` instruction with a short tally comment
+
+## Supported tools
+
+The v1 rule targets these opt-outs:
+
+- `DO_NOT_TRACK=1` for Bun
+- `AZURE_CORE_COLLECT_TELEMETRY=0` for Azure CLI
+- `WRANGLER_SEND_METRICS=false` for Wrangler
+- `HF_HUB_DISABLE_TELEMETRY=1` for the Hugging Face Python ecosystem
+- `YARN_ENABLE_TELEMETRY=0` for Yarn Berry
+- `NEXT_TELEMETRY_DISABLED=1` for Next.js
+- `NUXT_TELEMETRY_DISABLED=1` for Nuxt
+- `GATSBY_TELEMETRY_DISABLED=1` for Gatsby
+- `ASTRO_TELEMETRY_DISABLED=1` for Astro
+- `TURBO_TELEMETRY_DISABLED=1` for Turborepo
+- `DOTNET_CLI_TELEMETRY_OPTOUT=1` for .NET CLI / SDK
+- `POWERSHELL_TELEMETRY_OPTOUT=1` for PowerShell
+- `VCPKG_DISABLE_METRICS=1` for vcpkg
+- `HOMEBREW_NO_ANALYTICS=1` for Homebrew
+
+## Detection signals
+
+The rule prefers strong, stage-local evidence in this order:
+
+- direct command execution in `RUN`, `CMD`, `ENTRYPOINT`, or `SHELL`
+- explicit CLI installation in the same stage
+- observable manifests or config files that clearly name the tool
+
+Examples:
+
+- `RUN bun install`
+- `RUN npx wrangler deploy`
+- `RUN python -m huggingface_hub scan-cache`
+- `RUN next build`
+- `COPY package.json ./package.json` plus `RUN npm run build` when `package.json` declares `next`
+- `COPY requirements.txt ./requirements.txt` plus `RUN pip install -r requirements.txt` when the file mentions `transformers`
+
+Manifest-based detection depends on files being observable to the linter, which means either:
+
+- they are created in the Dockerfile (for example via `COPY <<EOF` heredoc), or
+- they come from the build context and linting runs with `--context`
+
+## Auto-fix
+
+The fix inserts a small telemetry block after `FROM` and any immediately following stage-local `ARG`
+instructions:
+
+### Before
+
+```dockerfile
+FROM node:22
+RUN bun install && next build
+```
+
+### After
+
+```dockerfile
+FROM node:22
+# [tally] settings to opt out from telemetry
+ENV DO_NOT_TRACK=1 NEXT_TELEMETRY_DISABLED=1
+RUN bun install && next build
+```
+
+## Suppression
+
+The rule does **not** trigger when:
+
+- the stage already sets the required opt-out to the documented value
+- the stage inherits the required opt-out from a parent stage
+- the stage only shows unsupported or ambiguous signals such as:
+  - plain `yarn install` without Berry-specific evidence
+  - generic `npm` or `pnpm` usage without a targeted tool
+  - generic Python usage without Hugging Face packages
+  - Node-only `@huggingface/hub` usage
+  - AWS CLI usage
+
+## Related rules
+
+- [`tally/prefer-curl-config`](./prefer-curl-config.md) — stage-level environment/config insertion before tooling `RUN` steps
+- [`tally/prefer-package-cache-mounts`](./prefer-package-cache-mounts.md) — stage-local package-manager cache improvements
+- [`tally/powershell/prefer-shell-instruction`](./powershell/prefer-shell-instruction.md) — rewrites repeated PowerShell wrappers to a `SHELL`
+  instruction

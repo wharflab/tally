@@ -1,10 +1,12 @@
 package tally
 
 import (
+	"context"
 	"strings"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	fixpkg "github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/testutil"
@@ -758,6 +760,46 @@ RUN pip install -r requirements.txt
 
 	if envRemovalEdits != 1 {
 		t.Fatalf("expected exactly 1 ENV removal edit across fixes, got %d", envRemovalEdits)
+	}
+}
+
+func TestPreferPackageCacheMountsRule_FixHandlesIndentedRunInsertion(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM alpine:3.20 AS base
+	RUN echo base
+
+FROM node:22 AS build
+	RUN bun install
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewPreferPackageCacheMountsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	result, err := (&fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}).Apply(
+		context.Background(),
+		violations,
+		map[string][]byte{"Dockerfile": []byte(content)},
+	)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := `FROM alpine:3.20 AS base
+	RUN echo base
+
+FROM node:22 AS build
+	RUN --mount=type=cache,target=/root/.bun/install/cache,id=bun bun install
+`
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
 	}
 }
 
