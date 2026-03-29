@@ -145,20 +145,23 @@ func (r *PreferSystemdSigrtminPlus3Rule) buildMissingViolation(
 	stage instructions.Stage,
 ) rules.Violation {
 	// Find the last ENTRYPOINT or CMD to determine the insertion point
-	// and the violation location.
-	var runtimeLoc []parser.Range
+	// and the violation location. Track them separately so ENTRYPOINT
+	// always takes precedence, matching stageRuntimeExecutable semantics.
+	var lastEntrypointLoc, lastCmdLoc []parser.Range
 	for _, cmd := range stage.Commands {
 		switch c := cmd.(type) {
 		case *instructions.EntrypointCommand:
-			runtimeLoc = c.Location()
+			lastEntrypointLoc = c.Location()
 		case *instructions.CmdCommand:
-			// CMD only defines PID 1 when there is no ENTRYPOINT.
-			// ENTRYPOINT takes precedence, so only use CMD location
-			// if we haven't seen an ENTRYPOINT yet.
-			if runtimeLoc == nil {
-				runtimeLoc = c.Location()
-			}
+			lastCmdLoc = c.Location()
 		}
+	}
+
+	var runtimeLoc []parser.Range
+	if lastEntrypointLoc != nil {
+		runtimeLoc = lastEntrypointLoc
+	} else {
+		runtimeLoc = lastCmdLoc
 	}
 
 	var loc rules.Location

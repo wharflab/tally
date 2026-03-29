@@ -88,6 +88,14 @@ func TestPreferSystemdSigrtminPlus3Rule_Check(t *testing.T) {
 				"ENTRYPOINT [\"systemd\", \"--system\"]\n",
 			WantViolations: 1,
 		},
+		{
+			Name: "multiple CMDs no ENTRYPOINT — anchors to last CMD",
+			Content: "FROM fedora:40\n" +
+				"CMD [\"echo\", \"setup\"]\n" +
+				"CMD [\"/sbin/init\"]\n",
+			WantViolations: 1,
+			WantMessages:   []string{"missing STOPSIGNAL SIGRTMIN+3"},
+		},
 
 		// --- No violations: correct signal ---
 		{
@@ -266,6 +274,32 @@ func TestPreferSystemdSigrtminPlus3Rule_InsertionFix(t *testing.T) {
 	}
 	if edit.Location.End.Column != 0 {
 		t.Errorf("edit End.Column = %d, want 0", edit.Location.End.Column)
+	}
+}
+
+func TestPreferSystemdSigrtminPlus3Rule_InsertionFix_MultipleCMDs(t *testing.T) {
+	t.Parallel()
+
+	// When multiple CMDs exist without ENTRYPOINT, the fix should insert
+	// before the *last* CMD (the effective PID 1), not the first.
+	content := "FROM fedora:40\nCMD [\"echo\", \"setup\"]\nCMD [\"/sbin/init\"]\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	r := NewPreferSystemdSigrtminPlus3Rule()
+	violations := r.Check(input)
+
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+
+	v := violations[0]
+	if v.SuggestedFix == nil {
+		t.Fatal("expected a SuggestedFix")
+	}
+
+	edit := v.SuggestedFix.Edits[0]
+	// Should insert before line 3 (the last CMD), not line 2 (the first CMD).
+	if edit.Location.Start.Line != 3 {
+		t.Errorf("edit Start.Line = %d, want 3 (last CMD)", edit.Location.Start.Line)
 	}
 }
 
