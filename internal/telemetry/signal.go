@@ -383,7 +383,8 @@ func (s *stageScanner) scanObservableFiles() {
 			line:    file.Line,
 			command: s.commandsByLine[file.Line],
 		}
-		base := strings.ToLower(path.Base(file.Path))
+		normalizedPath := normalizeSignalPath(file.Path)
+		base := strings.ToLower(path.Base(normalizedPath))
 
 		switch {
 		case base == "package.json":
@@ -394,7 +395,7 @@ func (s *stageScanner) scanObservableFiles() {
 			if content, ok := file.Content(); ok && contentMentionsHFPackage(content) {
 				s.hfManifest = earlierCandidate(s.hfManifest, candidate)
 			}
-		case base == ".yarnrc.yml":
+		case base == ".yarnrc.yml" || pathHasSegment(normalizedPath, ".yarn"):
 			s.berryEvidence = earlierCandidate(s.berryEvidence, candidate)
 		case base == fileVcpkgExe || base == fileBootstrapVcpkgBat || base == fileBootstrapVcpkgSh:
 			s.result.addSignal(ToolVcpkg, SignalKindManifest, "stage copies vcpkg tooling", candidate)
@@ -1045,6 +1046,10 @@ func normalizedPackageManagerOption(arg string) string {
 	return strings.ToLower(strings.TrimSpace(arg))
 }
 
+func normalizeSignalPath(value string) string {
+	return path.Clean(strings.ReplaceAll(value, "\\", "/"))
+}
+
 func normalizeCommandName(name string) string {
 	name = shell.NormalizeShellExecutableName(strings.TrimSpace(name))
 	return strings.TrimSuffix(name, ".cmd")
@@ -1139,5 +1144,5 @@ func hasAnyArgFold(args []string, target string) bool {
 }
 
 func pathHasSegment(value, segment string) bool {
-	return slices.Contains(strings.Split(path.Clean(value), "/"), segment)
+	return slices.Contains(strings.Split(normalizeSignalPath(value), "/"), segment)
 }

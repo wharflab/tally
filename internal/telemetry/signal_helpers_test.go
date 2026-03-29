@@ -4,6 +4,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/shell"
 )
 
@@ -756,6 +757,30 @@ func TestContentMentionsHFPackage(t *testing.T) {
 	}
 }
 
+func TestPathHasSegment(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		value   string
+		segment string
+		want    bool
+	}{
+		{name: "unix yarn segment", value: "/app/.yarn/releases/yarn-4.2.2.cjs", segment: ".yarn", want: true},
+		{name: "windows yarn segment", value: `C:\app\.yarn\releases\yarn-4.2.2.cjs`, segment: ".yarn", want: true},
+		{name: "missing segment", value: "/app/releases/yarn-4.2.2.cjs", segment: ".yarn", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := pathHasSegment(tt.value, tt.segment); got != tt.want {
+				t.Fatalf("pathHasSegment(%q, %q) = %t, want %t", tt.value, tt.segment, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestStageScannerScanCommandInfo(t *testing.T) {
 	t.Parallel()
 
@@ -856,6 +881,37 @@ func TestStageScannerScanCommandInfo(t *testing.T) {
 				t.Fatalf("corepackEnable.valid() = %t, want %t", got, tt.wantCorepack)
 			}
 		})
+	}
+}
+
+func TestStageScannerScanObservableFiles(t *testing.T) {
+	t.Parallel()
+
+	scanner := stageScanner{
+		stageFacts: &facts.StageFacts{
+			ObservableFiles: []*facts.ObservableFile{
+				{Path: `C:\app\.yarn\releases\yarn-4.2.2.cjs`, Line: 12},
+				{Path: `C:\deps\vcpkg.exe`, Line: 18},
+			},
+		},
+	}
+
+	scanner.scanObservableFiles()
+
+	if !scanner.berryEvidence.valid() || scanner.berryEvidence.line != 12 {
+		t.Fatalf("berryEvidence = %+v, want line 12", scanner.berryEvidence)
+	}
+
+	if got := scanner.result.OrderedToolIDs(); !slices.Equal(got, []ToolID{ToolVcpkg}) {
+		t.Fatalf("scanObservableFiles tools = %v, want %v", got, []ToolID{ToolVcpkg})
+	}
+
+	anchor, ok := scanner.result.Anchor()
+	if !ok {
+		t.Fatal("Anchor() = false, want true")
+	}
+	if anchor.ToolID != ToolVcpkg || anchor.Line != 18 {
+		t.Fatalf("Anchor() = %+v, want vcpkg at line 18", anchor)
 	}
 }
 

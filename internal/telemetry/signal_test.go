@@ -39,6 +39,7 @@ func TestDetectStage(t *testing.T) {
 
 	tests := []struct {
 		name           string
+		stageIndex     int
 		content        string
 		contextFiles   map[string]string
 		wantTools      []ToolID
@@ -245,6 +246,21 @@ RUN corepack enable
 			wantTools:      []ToolID{ToolYarnBerry},
 			wantAnchorLine: 3,
 		},
+		{
+			name:       "yarn berry from stage copied release plus corepack enable",
+			stageIndex: 1,
+			content: `FROM alpine AS source
+COPY <<'EOF' /tooling/.yarn/releases/yarn-4.2.2.cjs
+placeholder
+EOF
+FROM node:22
+WORKDIR /app
+COPY --from=source /tooling/.yarn/releases/yarn-4.2.2.cjs ./.yarn/releases/yarn-4.2.2.cjs
+RUN corepack enable
+`,
+			wantTools:      []ToolID{ToolYarnBerry},
+			wantAnchorLine: 7,
+		},
 	}
 
 	for _, tt := range tests {
@@ -257,8 +273,15 @@ RUN corepack enable
 			}
 
 			input := testutil.MakeLintInputWithContext(t, "Dockerfile", tt.content, ctx)
-			stageFacts := input.Facts.Stage(0)
-			signals := DetectStage(input.Stages[0], stageFacts, input.Semantic.StageInfo(0))
+			if tt.stageIndex >= len(input.Stages) {
+				t.Fatalf("stageIndex = %d, have %d stages", tt.stageIndex, len(input.Stages))
+			}
+			stageFacts := input.Facts.Stage(tt.stageIndex)
+			signals := DetectStage(
+				input.Stages[tt.stageIndex],
+				stageFacts,
+				input.Semantic.StageInfo(tt.stageIndex),
+			)
 
 			if got := signals.OrderedToolIDs(); !slices.Equal(got, tt.wantTools) {
 				t.Fatalf("tools = %v, want %v", got, tt.wantTools)
