@@ -2,6 +2,7 @@ package tally
 
 import (
 	"bytes"
+	"path"
 	"strconv"
 	"strings"
 
@@ -14,13 +15,14 @@ import (
 // Canonical signal name constants used by STOPSIGNAL rules for normalization,
 // detection, and fix replacement text.
 const (
-	signalSIGHUP   = "SIGHUP"
-	signalSIGINT   = "SIGINT"
-	signalSIGQUIT  = "SIGQUIT"
-	signalSIGKILL  = "SIGKILL"
-	signalSIGTERM  = "SIGTERM"
-	signalSIGSTOP  = "SIGSTOP"
-	signalSIGWINCH = "SIGWINCH"
+	signalSIGHUP        = "SIGHUP"
+	signalSIGINT        = "SIGINT"
+	signalSIGQUIT       = "SIGQUIT"
+	signalSIGKILL       = "SIGKILL"
+	signalSIGTERM       = "SIGTERM"
+	signalSIGSTOP       = "SIGSTOP"
+	signalSIGWINCH      = "SIGWINCH"
+	signalSIGRTMINPlus3 = "SIGRTMIN+3"
 )
 
 // numericSignals maps well-known numeric signal values to their canonical names.
@@ -170,4 +172,58 @@ func signalColumnRange(line string) (int, int) {
 	}
 
 	return i, end
+}
+
+// systemdInitPaths lists absolute paths recognized as systemd/init PID 1 binaries.
+var systemdInitPaths = map[string]bool{
+	"/sbin/init":               true,
+	"/usr/sbin/init":           true,
+	"/lib/systemd/systemd":     true,
+	"/usr/lib/systemd/systemd": true,
+}
+
+// isSystemdInit returns true if the executable path matches a known
+// systemd/init binary (full path match or bare "systemd" name).
+func isSystemdInit(executable string) bool {
+	if systemdInitPaths[executable] {
+		return true
+	}
+	return path.Base(executable) == "systemd"
+}
+
+// stageRuntimeExecutable returns the effective PID 1 executable for a build
+// stage by examining ENTRYPOINT and CMD instructions. Returns an empty string
+// when the runtime process cannot be determined (shell form, no ENTRYPOINT/CMD,
+// or empty command line).
+//
+// Docker semantics: if ENTRYPOINT is set it defines PID 1 (CMD becomes
+// arguments); if only CMD is set then CMD defines PID 1.
+func stageRuntimeExecutable(stage instructions.Stage) string {
+	var lastEntrypoint *instructions.EntrypointCommand
+	var lastCmd *instructions.CmdCommand
+
+	for _, cmd := range stage.Commands {
+		switch c := cmd.(type) {
+		case *instructions.EntrypointCommand:
+			lastEntrypoint = c
+		case *instructions.CmdCommand:
+			lastCmd = c
+		}
+	}
+
+	if lastEntrypoint != nil {
+		if lastEntrypoint.PrependShell || len(lastEntrypoint.CmdLine) == 0 {
+			return ""
+		}
+		return lastEntrypoint.CmdLine[0]
+	}
+
+	if lastCmd != nil {
+		if lastCmd.PrependShell || len(lastCmd.CmdLine) == 0 {
+			return ""
+		}
+		return lastCmd.CmdLine[0]
+	}
+
+	return ""
 }

@@ -1745,6 +1745,63 @@ severity = "warning"
 			wantApplied: 1, // only no-ungraceful-stopsignal fix should apply (SIGTERM)
 		},
 
+		// Prefer systemd SIGRTMIN+3: wrong signal → SIGRTMIN+3 (FixSafe)
+		{
+			name:  "prefer-systemd-sigrtmin-plus-3-wrong-signal",
+			input: "FROM fedora:40\nSTOPSIGNAL SIGTERM\nENTRYPOINT [\"/sbin/init\"]\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-systemd-sigrtmin-plus-3")...),
+			wantApplied: 1,
+		},
+		// Prefer systemd SIGRTMIN+3: missing → insert STOPSIGNAL (FixSafe)
+		{
+			name:  "prefer-systemd-sigrtmin-plus-3-missing",
+			input: "FROM fedora:40\nENTRYPOINT [\"/sbin/init\"]\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-systemd-sigrtmin-plus-3")...),
+			wantApplied: 1,
+		},
+		// Prefer systemd SIGRTMIN+3: correct signal — no fix
+		{
+			name:  "prefer-systemd-sigrtmin-plus-3-no-fix",
+			input: "FROM fedora:40\nSTOPSIGNAL SIGRTMIN+3\nENTRYPOINT [\"/sbin/init\"]\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-systemd-sigrtmin-plus-3")...),
+			wantApplied: 0,
+		},
+		// Prefer systemd SIGRTMIN+3: non-systemd — no fix
+		{
+			name:  "prefer-systemd-sigrtmin-plus-3-non-systemd-no-fix",
+			input: "FROM nginx:1.27\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-systemd-sigrtmin-plus-3")...),
+			wantApplied: 0,
+		},
+		// Cross-rule: systemd + no-ungraceful on SIGKILL. systemd rule wins
+		// with Priority -1, replacing SIGKILL with SIGRTMIN+3 instead of SIGTERM.
+		{
+			name:  "prefer-systemd-sigrtmin-plus-3-cross-no-ungraceful",
+			input: "FROM fedora:40\nSTOPSIGNAL SIGKILL\nENTRYPOINT [\"/sbin/init\"]\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/prefer-systemd-sigrtmin-plus-3", "tally/no-ungraceful-stopsignal")...),
+			wantApplied: 1, // systemd fix wins with Priority -1
+		},
+		// Cross-rule: systemd + canonical on RTMIN+3. Only canonical fires
+		// (normalizes RTMIN+3 → SIGRTMIN+3); systemd sees correct signal after normalization.
+		{
+			name:  "prefer-systemd-sigrtmin-plus-3-cross-canonical-rtmin",
+			input: "FROM fedora:40\nSTOPSIGNAL RTMIN+3\nENTRYPOINT [\"/sbin/init\"]\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-systemd-sigrtmin-plus-3", "tally/prefer-canonical-stopsignal")...),
+			wantApplied: 1, // only canonical applies (RTMIN+3 → SIGRTMIN+3)
+		},
+
 		// User created but never used: insert USER before CMD (FixUnsafe)
 		{
 			name:  "user-created-but-never-used",

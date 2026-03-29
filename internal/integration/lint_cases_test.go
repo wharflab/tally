@@ -1059,6 +1059,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// Prefer systemd SIGRTMIN+3 (isolated to prefer-systemd-sigrtmin-plus-3 rule)
+		{
+			name:     "prefer-systemd-sigrtmin-plus-3",
+			dir:      "prefer-systemd-sigrtmin-plus-3",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-systemd-sigrtmin-plus-3")...),
+			wantExit: 1,
+		},
+
 		// Stateful root runtime (isolated to stateful-root-runtime rule)
 		{
 			name:     "stateful-root-runtime",
