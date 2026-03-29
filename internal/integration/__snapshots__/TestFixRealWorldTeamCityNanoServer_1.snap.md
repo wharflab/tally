@@ -1,4 +1,4 @@
-Fixed 9 issues
+Fixed 5 issues
 **9 issues** in `<stdin>`
 
 | Line | Issue |

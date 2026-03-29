@@ -234,6 +234,23 @@ COPY app /app
 `,
 			WantViolations: 0,
 		},
+		{
+			Name: "windows stage with USER and COPY without chown - no violation",
+			Content: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+USER ContainerUser
+COPY app/ C:/app/
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "windows nanoserver stage skipped",
+			Content: `FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
+USER ContainerUser
+COPY --from=build /app C:/app/
+ADD config.tar.gz C:/config/
+`,
+			WantViolations: 0,
+		},
 	})
 }
 

@@ -73,6 +73,11 @@ func (r *CopyAfterUserWithoutChownRule) Check(input rules.LintInput) []rules.Vio
 	violations := make([]rules.Violation, 0, len(input.Stages))
 
 	for stageIdx, stage := range input.Stages {
+		// Skip Windows stages: --chown is silently ignored on Windows containers,
+		// so suggesting it would conflict with tally/windows/no-chown-flag.
+		if info := sem.StageInfo(stageIdx); info != nil && info.IsWindows() {
+			continue
+		}
 		violations = append(violations,
 			r.checkStage(stageIdx, stage, fileFacts, sem, input.File, sm, meta)...)
 	}
