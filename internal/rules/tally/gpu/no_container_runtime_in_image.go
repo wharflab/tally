@@ -48,27 +48,7 @@ func (r *NoContainerRuntimeInImageRule) Metadata() rules.RuleMetadata {
 
 // Check runs the rule against the given input.
 func (r *NoContainerRuntimeInImageRule) Check(input rules.LintInput) []rules.Violation {
-	meta := r.Metadata()
-	var violations []rules.Violation
-
-	var fileFacts = input.Facts
-	if fileFacts != nil {
-		return r.checkWithFacts(input, fileFacts, meta)
-	}
-
-	// Fallback: iterate stages directly when facts are unavailable.
-	for stageIdx, stage := range input.Stages {
-		for _, cmd := range stage.Commands {
-			run, ok := cmd.(*instructions.RunCommand)
-			if !ok {
-				continue
-			}
-			if v, ok := r.checkRun(input.File, stageIdx, run, nil, meta); ok {
-				violations = append(violations, v)
-			}
-		}
-	}
-	return violations
+	return r.checkWithFacts(input, input.Facts, r.Metadata())
 }
 
 func (r *NoContainerRuntimeInImageRule) checkWithFacts(

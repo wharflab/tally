@@ -122,9 +122,6 @@ func (r *SortPackagesRule) checkRunWithFacts(
 
 // resolveShellVariant returns the shell variant for a stage, defaulting to Bash.
 func resolveShellVariant(sem *semantic.Model, stageIdx int) shell.Variant {
-	if sem == nil {
-		return shell.VariantBash
-	}
 	if info := sem.StageInfo(stageIdx); info != nil {
 		return info.ShellSetting.Variant
 	}

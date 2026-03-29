@@ -24,15 +24,8 @@ func checkFinalStageRoot(input rules.LintInput) *finalStageRootCheck {
 
 	finalIdx := len(input.Stages) - 1
 
-	var fileFacts = input.Facts
-	if fileFacts == nil {
-		return nil
-	}
-
+	fileFacts := input.Facts
 	sf := fileFacts.Stage(finalIdx)
-	if sf == nil {
-		return nil
-	}
 
 	implicitRoot := false
 	switch {

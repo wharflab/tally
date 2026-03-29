@@ -49,13 +49,7 @@ func (r *EpilogueOrderRule) Metadata() rules.RuleMetadata {
 
 // Check runs the epilogue-order rule.
 func (r *EpilogueOrderRule) Check(input rules.LintInput) []rules.Violation {
-	// Semantic model is required for stage graph analysis.
-	var sem = input.Semantic
-	if sem == nil {
-		return nil
-	}
-
-	graph := sem.Graph()
+	graph := input.Semantic.Graph()
 	if graph == nil {
 		return nil
 	}
@@ -64,7 +58,7 @@ func (r *EpilogueOrderRule) Check(input rules.LintInput) []rules.Violation {
 	var violations []rules.Violation
 
 	for stageIdx, stage := range input.Stages {
-		info := sem.StageInfo(stageIdx)
+		info := input.Semantic.StageInfo(stageIdx)
 		if info == nil {
 			continue
 		}

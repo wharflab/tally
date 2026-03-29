@@ -10,7 +10,6 @@ import (
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
 	"github.com/wharflab/tally/internal/semantic"
-	"github.com/wharflab/tally/internal/shell"
 )
 
 // PreferCurlConfigRuleCode is the full rule code for the prefer-curl-config rule.
@@ -98,9 +97,6 @@ func (r *PreferCurlConfigRule) Check(input rules.LintInput) []rules.Violation {
 	cfg := r.resolveConfig(input.Config)
 	meta := r.Metadata()
 
-	var fileFacts = input.Facts
-	var sem = input.Semantic
-
 	// Tracks stages that will have curl config after fixes are applied.
 	// A child stage (FROM parentStage) is suppressed when the parent
 	// is in this set — the fix on the parent propagates via inheritance.
@@ -109,7 +105,8 @@ func (r *PreferCurlConfigRule) Check(input rules.LintInput) []rules.Violation {
 	var violations []rules.Violation
 
 	for stageIdx, stage := range input.Stages {
-		isWindows := stageIsWindows(stageIdx, sem, fileFacts)
+		stageFacts := input.Facts.Stage(stageIdx)
+		isWindows := stageFacts.BaseImageOS == semantic.BaseImageOSWindows
 
 		ctx := curlCheckContext{
 			file:      input.File,
@@ -124,17 +121,17 @@ func (r *PreferCurlConfigRule) Check(input rules.LintInput) []rules.Violation {
 
 		// Suppress if this stage inherits from a stage that already has
 		// (or will have after fix) the curl config.
-		if parentConfigured(stageIdx, sem, configuredStages) {
+		if parentConfigured(stageIdx, input.Semantic, configuredStages) {
 			configuredStages[stageIdx] = true
 			continue
 		}
 
-		v := r.checkStage(stageIdx, stage, fileFacts, sem, &ctx)
+		v := r.checkStageWithFacts(stageFacts, stage, &ctx)
 		if v != nil {
 			// Stage will get the config via fix.
 			configuredStages[stageIdx] = true
 			violations = append(violations, *v)
-		} else if stageHasCurlConfig(stageIdx, fileFacts) {
+		} else if stageHasCurlConfig(stageFacts) {
 			// Stage already has the config — propagate to children.
 			configuredStages[stageIdx] = true
 		}
@@ -146,9 +143,6 @@ func (r *PreferCurlConfigRule) Check(input rules.LintInput) []rules.Violation {
 // parentConfigured returns true if this stage's base image is a local stage
 // reference that already has (or will have) the curl config.
 func parentConfigured(stageIdx int, sem *semantic.Model, configured map[int]bool) bool {
-	if sem == nil {
-		return false
-	}
 	info := sem.StageInfo(stageIdx)
 	if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
 		return false
@@ -158,56 +152,14 @@ func parentConfigured(stageIdx int, sem *semantic.Model, configured map[int]bool
 
 // stageHasCurlConfig returns true if the stage already has CURL_HOME set or
 // a .curlrc observable — meaning child stages will inherit the config.
-func stageHasCurlConfig(stageIdx int, fileFacts *facts.FileFacts) bool {
-	if fileFacts == nil {
+func stageHasCurlConfig(stageFacts *facts.StageFacts) bool {
+	if stageFacts == nil {
 		return false
 	}
-	sf := fileFacts.Stage(stageIdx)
-	if sf == nil {
-		return false
-	}
-	if sf.EffectiveEnv.Values["CURL_HOME"] != "" {
+	if stageFacts.EffectiveEnv.Values["CURL_HOME"] != "" {
 		return true
 	}
-	return hasCurlConfig(sf)
-}
-
-func stageIsWindows(stageIdx int, sem *semantic.Model, ff *facts.FileFacts) bool {
-	if sem != nil {
-		if info := sem.StageInfo(stageIdx); info != nil && info.BaseImageOS == semantic.BaseImageOSWindows {
-			return true
-		}
-	}
-	if ff != nil {
-		if sf := ff.Stage(stageIdx); sf != nil && sf.BaseImageOS == semantic.BaseImageOSWindows {
-			return true
-		}
-	}
-	return false
-}
-
-func (r *PreferCurlConfigRule) checkStage(
-	stageIdx int,
-	stage instructions.Stage,
-	fileFacts *facts.FileFacts,
-	sem *semantic.Model,
-	ctx *curlCheckContext,
-) *rules.Violation {
-	// Facts-first path.
-	if fileFacts != nil {
-		if stageFacts := fileFacts.Stage(stageIdx); stageFacts != nil {
-			return r.checkStageWithFacts(stageFacts, stage, ctx)
-		}
-	}
-
-	// Fallback: direct stage iteration without facts.
-	shellVariant := shell.VariantBash
-	if sem != nil {
-		if info := sem.StageInfo(stageIdx); info != nil {
-			shellVariant = info.ShellSetting.Variant
-		}
-	}
-	return r.checkStageDirect(stage, shellVariant, ctx)
+	return hasCurlConfig(stageFacts)
 }
 
 func (r *PreferCurlConfigRule) checkStageWithFacts(
@@ -301,49 +253,6 @@ func firstRunInStage(stage instructions.Stage) *instructions.RunCommand {
 			return run
 		}
 	}
-	return nil
-}
-
-func (r *PreferCurlConfigRule) checkStageDirect(
-	stage instructions.Stage,
-	shellVariant shell.Variant,
-	ctx *curlCheckContext,
-) *rules.Violation {
-	cmdNames := []string{nonPOSIXDownloadCommandCurl}
-	if ctx.isWindows {
-		cmdNames = append(cmdNames, curlExeName)
-	}
-
-	for _, cmd := range stage.Commands {
-		run, ok := cmd.(*instructions.RunCommand)
-		if !ok || !run.PrependShell {
-			continue
-		}
-
-		script := getRunScriptFromCmd(run)
-		if script == "" {
-			continue
-		}
-
-		// Check for curl package install — insert before this RUN.
-		for _, ic := range shell.FindInstallPackages(script, shellVariant) {
-			for _, pkg := range ic.Packages {
-				if pkg.Normalized == nonPOSIXDownloadCommandCurl {
-					return r.buildViolation(run, run, ctx)
-				}
-			}
-		}
-
-		// Check for direct curl invocation — insert before first RUN.
-		if cmds := shell.FindCommands(script, shellVariant, cmdNames...); len(cmds) > 0 {
-			firstRun := firstRunInStage(stage)
-			if firstRun == nil {
-				firstRun = run
-			}
-			return r.buildViolation(run, firstRun, ctx)
-		}
-	}
-
 	return nil
 }
 

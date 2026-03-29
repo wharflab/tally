@@ -191,21 +191,6 @@ RUN echo "final stage with no COPY --from"
 	}
 }
 
-func TestUnreachableStagesRule_NoSemanticModel_NoViolation(t *testing.T) {
-	t.Parallel()
-	// Test graceful handling when semantic model is nil
-	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine:3.18
-RUN echo "hello"
-`)
-
-	r := NewUnreachableStagesRule()
-	violations := r.Check(input)
-
-	if len(violations) != 0 {
-		t.Errorf("expected 0 violations when semantic model is nil, got %d", len(violations))
-	}
-}
-
 func TestUnreachableStagesRule_ViolationHasDetail(t *testing.T) {
 	t.Parallel()
 	content := `FROM golang:1.21 AS unused

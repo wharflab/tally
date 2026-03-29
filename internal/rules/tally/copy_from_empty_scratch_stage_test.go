@@ -14,22 +14,6 @@ func TestCopyFromEmptyScratchStageRule_Metadata(t *testing.T) {
 	snaps.MatchStandaloneJSON(t, NewCopyFromEmptyScratchStageRule().Metadata())
 }
 
-func TestCopyFromEmptyScratchStageRule_NoSemantic(t *testing.T) {
-	t.Parallel()
-	input := testutil.MakeLintInput(t, "Dockerfile", `FROM scratch AS empty
-
-FROM alpine:3.19
-COPY --from=empty /app /app
-`)
-	input.Semantic = nil // explicitly test nil-semantic fallback
-	r := NewCopyFromEmptyScratchStageRule()
-	violations := r.Check(input)
-
-	if len(violations) != 0 {
-		t.Errorf("expected 0 violations without semantic model, got %d", len(violations))
-	}
-}
-
 func TestCopyFromEmptyScratchStageRule_EmptyScratchWithCopyFrom(t *testing.T) {
 	t.Parallel()
 	content := `FROM scratch AS empty

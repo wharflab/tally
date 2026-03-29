@@ -36,10 +36,7 @@ func (r *UnreachableStagesRule) Metadata() rules.RuleMetadata {
 // It uses the semantic model to find stages that are not reachable
 // from the final stage through COPY --from or FROM dependencies.
 func (r *UnreachableStagesRule) Check(input rules.LintInput) []rules.Violation {
-	var sem = input.Semantic
-	if sem == nil {
-		return nil
-	}
+	sem := input.Semantic
 
 	// Need at least 2 stages for any stage to be unreachable
 	if sem.StageCount() < 2 {

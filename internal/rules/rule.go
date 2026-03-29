@@ -72,11 +72,11 @@ type LintInput struct {
 
 	// Semantic is the semantic model for cross-instruction analysis.
 	// Provides stage resolution, variable scoping, and COPY --from validation.
-	// May be nil in tests that explicitly exercise fallback behavior.
+	// The lint pipeline and testutil.MakeLintInput populate this for rule execution.
 	Semantic *semantic.Model
 
 	// Facts contains cached, derived facts shared across rules for this file.
-	// May be nil in tests that explicitly exercise fallback behavior.
+	// The lint pipeline and testutil.MakeLintInput populate this for rule execution.
 	Facts *facts.FileFacts
 
 	// Config is the rule-specific configuration (type depends on rule).

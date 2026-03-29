@@ -219,23 +219,14 @@ func detectStatefulSignals(input rules.LintInput, sf *facts.StageFacts, fileFact
 // WORKDIR) from parent stages when the base is a local stage ref. Walks the
 // stage-ref chain to collect inherited state. The loc parameter points at the
 // FROM instruction for attribution.
-func inheritParentStatefulSignals(sem any, fileFacts *facts.FileFacts, stageIdx int, loc rules.Location) []statefulSignal {
-	if sem == nil || fileFacts == nil {
-		return nil
-	}
-
-	model, ok := sem.(*semantic.Model)
-	if !ok || model == nil {
-		return nil
-	}
-
+func inheritParentStatefulSignals(sem *semantic.Model, fileFacts *facts.FileFacts, stageIdx int, loc rules.Location) []statefulSignal {
 	var signals []statefulSignal
 	visited := make(map[int]bool)
 
 	for idx := stageIdx; !visited[idx]; {
 		visited[idx] = true
 
-		info := model.StageInfo(idx)
+		info := sem.StageInfo(idx)
 		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 {
 			break
 		}
@@ -272,38 +263,14 @@ func inheritParentStatefulSignals(sem any, fileFacts *facts.FileFacts, stageIdx 
 // WORKDIR inherited from ancestor stages. If the immediate parent has no
 // WORKDIR (FinalWorkdir = "/"), it continues up the chain to find the
 // nearest ancestor that set one. Returns empty string for external bases.
-func inheritedParentWorkdir(sem any, fileFacts *facts.FileFacts, stageIdx int) string {
-	if sem == nil || fileFacts == nil {
-		return ""
-	}
-
-	model, ok := sem.(*semantic.Model)
-	if !ok || model == nil {
-		return ""
-	}
-
-	visited := make(map[int]bool)
-
-	for idx := stageIdx; !visited[idx]; {
-		visited[idx] = true
-
-		info := model.StageInfo(idx)
-		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 {
-			return ""
+func inheritedParentWorkdir(sem *semantic.Model, fileFacts *facts.FileFacts, stageIdx int) string {
+	return firstParentStageRefValue(sem, stageIdx, func(parentIdx int) (string, bool) {
+		parentFacts := fileFacts.Stage(parentIdx)
+		if parentFacts == nil || parentFacts.FinalWorkdir == "/" {
+			return "", false
 		}
-
-		parentIdx := info.BaseImage.StageIndex
-		if parentFacts := fileFacts.Stage(parentIdx); parentFacts != nil {
-			if parentFacts.FinalWorkdir != "/" {
-				return parentFacts.FinalWorkdir
-			}
-		}
-
-		// Parent has default "/" workdir — continue up the chain.
-		idx = parentIdx
-	}
-
-	return ""
+		return parentFacts.FinalWorkdir, true
+	})
 }
 
 // resolveDestPath resolves a COPY/ADD destination path against the effective
@@ -378,23 +345,14 @@ func findMkdirStatePaths(script string) []string {
 // to a non-root user. It walks the stage-ref chain so that
 // FROM distroless:nonroot AS base → FROM base → FROM base2 is correctly
 // recognized as non-root at every level.
-func isKnownNonRootBase(sem any, fileFacts *facts.FileFacts, stageIdx int) bool {
-	if sem == nil {
-		return false
-	}
-
-	model, ok := sem.(*semantic.Model)
-	if !ok || model == nil {
-		return false
-	}
-
+func isKnownNonRootBase(sem *semantic.Model, fileFacts *facts.FileFacts, stageIdx int) bool {
 	// Walk the stage-ref chain. Guard against cycles with a visited set.
 	visited := make(map[int]bool)
 
 	for idx := stageIdx; !visited[idx]; {
 		visited[idx] = true
 
-		info := model.StageInfo(idx)
+		info := sem.StageInfo(idx)
 		if info == nil || info.BaseImage == nil {
 			return false
 		}

@@ -9,7 +9,6 @@ import (
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/runcheck"
-	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -94,35 +93,4 @@ func composerCommandLocation(
 	}
 	cmdLine := runStartLine + cmd.Line
 	return rules.NewRangeLocation(file, cmdLine, cmd.StartCol, cmdLine, cmd.EndCol)
-}
-
-func effectiveRunShellVariant(semanticValue any, stageIdx int, run *instructions.RunCommand) (shell.Variant, bool) {
-	shellVariant := shell.VariantBash
-
-	sem, _ := semanticValue.(*semantic.Model) //nolint:errcheck // nil-safe assertion
-	if sem == nil {
-		return shellVariant, true
-	}
-
-	info := sem.StageInfo(stageIdx)
-	if info == nil {
-		return shellVariant, true
-	}
-	if info.IsWindows() {
-		return 0, false
-	}
-
-	if run != nil && len(run.Location()) > 0 {
-		shellVariant = info.ShellVariantAtLine(run.Location()[0].Start.Line)
-	} else {
-		shellVariant = info.ShellSetting.Variant
-	}
-
-	if shellVariant.HasParser() {
-		return shellVariant, true
-	}
-	if run != nil && !run.PrependShell {
-		return shell.VariantBash, true
-	}
-	return 0, false
 }

@@ -46,10 +46,7 @@ func (r *ShellRunInScratchRule) Metadata() rules.RuleMetadata {
 // copy-from-empty-scratch-stage error — this is the expected progressive-fix
 // sequence.
 func (r *ShellRunInScratchRule) Check(input rules.LintInput) []rules.Violation {
-	var sem = input.Semantic
-	if sem == nil {
-		return nil
-	}
+	sem := input.Semantic
 
 	var violations []rules.Violation
 

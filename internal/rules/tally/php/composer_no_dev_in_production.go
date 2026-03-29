@@ -39,7 +39,6 @@ func (r *ComposerNoDevInProductionRule) Metadata() rules.RuleMetadata {
 func (r *ComposerNoDevInProductionRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
-	var fileFacts = input.Facts
 
 	var violations []rules.Violation
 	for stageIdx, stage := range input.Stages {
@@ -47,14 +46,7 @@ func (r *ComposerNoDevInProductionRule) Check(input rules.LintInput) []rules.Vio
 			continue
 		}
 
-		if fileFacts != nil {
-			if stageFacts := fileFacts.Stage(stageIdx); stageFacts != nil {
-				violations = append(violations, r.checkStageWithFacts(stageFacts, input.File, meta, sm)...)
-				continue
-			}
-		}
-
-		violations = append(violations, r.checkStageLegacy(input, stageIdx, stage, meta, sm)...)
+		violations = append(violations, r.checkStageWithFacts(input.Facts.Stage(stageIdx), input.File, meta, sm)...)
 	}
 
 	return violations
@@ -98,39 +90,6 @@ func factsRunShellVariant(runFacts *facts.RunFacts) (shell.Variant, bool) {
 		return shell.VariantBash, true
 	}
 	return 0, false
-}
-
-func (r *ComposerNoDevInProductionRule) checkStageLegacy(
-	input rules.LintInput,
-	stageIdx int,
-	stage instructions.Stage,
-	meta rules.RuleMetadata,
-	sm *sourcemap.SourceMap,
-) []rules.Violation {
-	envValues := map[string]string{}
-	var violations []rules.Violation
-
-	for _, command := range stage.Commands {
-		switch cmd := command.(type) {
-		case *instructions.EnvCommand:
-			for _, kv := range cmd.Env {
-				envValues[kv.Key] = facts.Unquote(kv.Value)
-			}
-		case *instructions.RunCommand:
-			if composerNoDevEnabledValues(envValues) {
-				continue
-			}
-
-			shellVariant, ok := effectiveRunShellVariant(input.Semantic, stageIdx, cmd)
-			if !ok {
-				continue
-			}
-
-			violations = append(violations, r.checkRun(cmd, shellVariant, input.File, meta, sm)...)
-		}
-	}
-
-	return violations
 }
 
 func (r *ComposerNoDevInProductionRule) checkRun(

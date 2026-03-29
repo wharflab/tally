@@ -53,10 +53,7 @@ func (r *PlatformMismatchRule) Check(_ rules.LintInput) []rules.Violation {
 // PlanAsync creates check requests for each external base image that has an
 // explicit --platform flag with a statically resolvable value.
 func (r *PlatformMismatchRule) PlanAsync(input rules.LintInput) []async.CheckRequest {
-	var sem = input.Semantic
-	if sem == nil {
-		return nil
-	}
+	sem := input.Semantic
 
 	meta := r.Metadata()
 	var requests []async.CheckRequest

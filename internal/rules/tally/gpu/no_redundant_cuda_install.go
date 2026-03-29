@@ -83,32 +83,7 @@ func (r *NoRedundantCUDAInstallRule) Metadata() rules.RuleMetadata {
 
 // Check runs the rule against the given input.
 func (r *NoRedundantCUDAInstallRule) Check(input rules.LintInput) []rules.Violation {
-	meta := r.Metadata()
-
-	var sem = input.Semantic
-	var fileFacts = input.Facts
-	if fileFacts != nil {
-		return r.checkWithFacts(input, fileFacts, sem, meta)
-	}
-
-	// Fallback: iterate stages directly when facts are unavailable.
-	var violations []rules.Violation
-	for stageIdx, stage := range input.Stages {
-		imgInfo := r.stageImageInfo(sem, stageIdx)
-		if !imgInfo.IsCUDAImage {
-			continue
-		}
-		for _, cmd := range stage.Commands {
-			run, ok := cmd.(*instructions.RunCommand)
-			if !ok {
-				continue
-			}
-			if v, ok := r.checkRun(input.File, stageIdx, run, nil, imgInfo, meta); ok {
-				violations = append(violations, v)
-			}
-		}
-	}
-	return violations
+	return r.checkWithFacts(input, input.Facts, input.Semantic, r.Metadata())
 }
 
 func (r *NoRedundantCUDAInstallRule) checkWithFacts(
@@ -135,9 +110,6 @@ func (r *NoRedundantCUDAInstallRule) checkWithFacts(
 
 // stageImageInfo returns parsed CUDA image info for the stage.
 func (r *NoRedundantCUDAInstallRule) stageImageInfo(sem *semantic.Model, stageIdx int) cudaImageInfo {
-	if sem == nil {
-		return cudaImageInfo{}
-	}
 	return parseCUDAImageInfo(sem.StageInfo(stageIdx))
 }
 

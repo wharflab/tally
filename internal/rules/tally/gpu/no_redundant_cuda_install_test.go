@@ -301,39 +301,3 @@ RUN apt-get update && apt-get install -y cuda-toolkit
 		},
 	})
 }
-
-func TestNoRedundantCUDAInstallRule_CheckWithoutFacts(t *testing.T) {
-	t.Parallel()
-
-	content := `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
-RUN apt-get update && apt-get install -y cuda-toolkit python3
-`
-	input := testutil.MakeLintInput(t, "Dockerfile", content)
-	input.Facts = nil // force fallback path
-
-	rule := NewNoRedundantCUDAInstallRule()
-	violations := rule.Check(input)
-
-	if len(violations) != 1 {
-		t.Fatalf("expected 1 violation, got %d", len(violations))
-	}
-	if violations[0].RuleCode != NoRedundantCUDAInstallRuleCode {
-		t.Errorf("expected rule %q, got %q", NoRedundantCUDAInstallRuleCode, violations[0].RuleCode)
-	}
-}
-
-func TestNoRedundantCUDAInstallRule_CheckNilSemantic(t *testing.T) {
-	t.Parallel()
-
-	content := `FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
-RUN apt-get update && apt-get install -y cuda-toolkit
-`
-	input := testutil.MakeLintInput(t, "Dockerfile", content)
-	input.Semantic = nil // no semantic model — stageImageInfo returns empty
-
-	violations := NewNoRedundantCUDAInstallRule().Check(input)
-
-	if len(violations) != 0 {
-		t.Fatalf("expected 0 violations with nil semantic, got %d", len(violations))
-	}
-}

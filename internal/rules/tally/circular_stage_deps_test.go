@@ -14,19 +14,6 @@ func TestCircularStageDepsRule_Metadata(t *testing.T) {
 	snaps.MatchStandaloneJSON(t, NewCircularStageDepsRule().Metadata())
 }
 
-func TestCircularStageDepsRule_NoSemantic(t *testing.T) {
-	t.Parallel()
-	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine:3.19
-RUN echo "hello"
-`)
-	r := NewCircularStageDepsRule()
-	violations := r.Check(input)
-
-	if len(violations) != 0 {
-		t.Errorf("expected 0 violations without semantic model, got %d", len(violations))
-	}
-}
-
 func TestCircularStageDepsRule_SingleStage(t *testing.T) {
 	t.Parallel()
 	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine:3.19

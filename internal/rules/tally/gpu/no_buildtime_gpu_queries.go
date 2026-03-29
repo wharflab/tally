@@ -59,28 +59,7 @@ func (r *NoBuildtimeGPUQueriesRule) Metadata() rules.RuleMetadata {
 
 // Check runs the rule against the given input.
 func (r *NoBuildtimeGPUQueriesRule) Check(input rules.LintInput) []rules.Violation {
-	meta := r.Metadata()
-
-	var fileFacts = input.Facts
-	if fileFacts != nil {
-		return r.checkWithFacts(input, fileFacts, meta)
-	}
-
-	// Fallback: iterate stages directly when facts are unavailable.
-	var violations []rules.Violation
-	for stageIdx, stage := range input.Stages {
-		for _, cmd := range stage.Commands {
-			run, ok := cmd.(*instructions.RunCommand)
-			if !ok {
-				continue
-			}
-			script := strings.Join(run.CmdLine, " ")
-			if v, ok := r.checkRun(input.File, stageIdx, run, script, shell.VariantUnknown, meta); ok {
-				violations = append(violations, v)
-			}
-		}
-	}
-	return violations
+	return r.checkWithFacts(input, input.Facts, r.Metadata())
 }
 
 func (r *NoBuildtimeGPUQueriesRule) checkWithFacts(

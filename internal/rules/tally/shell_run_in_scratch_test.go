@@ -14,20 +14,6 @@ func TestShellRunInScratchRule_Metadata(t *testing.T) {
 	snaps.MatchStandaloneJSON(t, NewShellRunInScratchRule().Metadata())
 }
 
-func TestShellRunInScratchRule_NoSemantic(t *testing.T) {
-	t.Parallel()
-	input := testutil.MakeLintInput(t, "Dockerfile", `FROM scratch
-RUN echo "hello"
-`)
-	input.Semantic = nil // explicitly test nil-semantic fallback
-	r := NewShellRunInScratchRule()
-	violations := r.Check(input)
-
-	if len(violations) != 0 {
-		t.Errorf("expected 0 violations without semantic model, got %d", len(violations))
-	}
-}
-
 func TestShellRunInScratchRule_ShellFormRUN(t *testing.T) {
 	t.Parallel()
 	content := `FROM scratch

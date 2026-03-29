@@ -66,9 +66,6 @@ func (r *DL3057Rule) Metadata() rules.RuleMetadata {
 // image provides HEALTHCHECK.
 func (r *DL3057Rule) Check(input rules.LintInput) []rules.Violation {
 	sem := input.Semantic
-	if sem == nil {
-		return nil
-	}
 
 	if sem.StageCount() == 0 {
 		return nil
@@ -111,9 +108,6 @@ func (r *DL3057Rule) Check(input rules.LintInput) []rules.Violation {
 // whether it defines a HEALTHCHECK.
 func (r *DL3057Rule) PlanAsync(input rules.LintInput) []async.CheckRequest {
 	sem := input.Semantic
-	if sem == nil {
-		return nil
-	}
 
 	// If any stage already has an explicit HEALTHCHECK (CMD or NONE),
 	// Check() returns nil so async refinement is unnecessary.

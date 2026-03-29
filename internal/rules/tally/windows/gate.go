@@ -9,9 +9,6 @@ import (
 // BaseImageOS detection. This is the shared gate for all tally/windows/* rules.
 func windowsStages(input rules.LintInput) []*semantic.StageInfo {
 	sem := input.Semantic
-	if sem == nil {
-		return nil
-	}
 
 	stages := make([]*semantic.StageInfo, 0, sem.StageCount())
 	for i := range sem.StageCount() {

@@ -36,10 +36,7 @@ func (r *CircularStageDepsRule) Metadata() rules.RuleMetadata {
 
 // Check runs the circular-stage-deps rule.
 func (r *CircularStageDepsRule) Check(input rules.LintInput) []rules.Violation {
-	var sem = input.Semantic
-	if sem == nil {
-		return nil
-	}
+	sem := input.Semantic
 
 	if sem.StageCount() < 2 {
 		return nil

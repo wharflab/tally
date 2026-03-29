@@ -11,9 +11,6 @@ import (
 // instruction or explicitly invoke PowerShell from shell-form RUN commands.
 func powershellStages(input rules.LintInput) []*semantic.StageInfo {
 	sem := input.Semantic
-	if sem == nil {
-		return nil
-	}
 
 	stages := make([]*semantic.StageInfo, 0, sem.StageCount())
 	for i := range sem.StageCount() {
