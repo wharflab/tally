@@ -142,10 +142,9 @@ func (r *PreferPackageCacheMountsRule) checkStageLegacy(
 	return violations
 }
 
-func legacyStageShellVariant(semanticValue any, stageIdx int) (shell.Variant, bool) {
+func legacyStageShellVariant(sem *semantic.Model, stageIdx int) (shell.Variant, bool) {
 	shellVariant := shell.VariantBash
 
-	sem, _ := semanticValue.(*semantic.Model) //nolint:errcheck // Safe assertion with nil fallback
 	if sem == nil {
 		return shellVariant, true
 	}
