@@ -795,6 +795,9 @@ func parseTestShellDirectives(content string) []ShellDirective {
 	return directives
 }
 
+// Keep this local instead of importing directive.ToSemanticShellDirectives:
+// facts tests are in package facts, and importing internal/directive would
+// recreate the directive -> facts import cycle during test compilation.
 func toSemanticShellDirectives(directives []ShellDirective) []semantic.ShellDirective {
 	if len(directives) == 0 {
 		return nil
