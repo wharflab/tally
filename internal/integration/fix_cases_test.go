@@ -1313,6 +1313,35 @@ target = "/root/.config/pip/pip.conf"
 severity = "error"
 `,
 		},
+		// Combined: composer-no-dev-in-production (88) inserts --no-dev after
+		// install, prefer-package-cache-mounts (90) adds the composer cache mount,
+		// no-multi-spaces (10) collapses repeated spaces, newline-per-chained-call
+		// (97) splits the && boundary, and consistent-indentation (50) indents
+		// both RUN lines in the multi-stage file. Cache-mounts stays at warning
+		// severity here so processor supersession does not hide the overlapping
+		// warning/style violations on the same line.
+		{
+			name: "php-composer-no-dev-with-cache-mounts-and-formatting",
+			input: "FROM alpine AS base\n" +
+				"RUN echo base\n\n" +
+				"FROM php:8.4-cli AS app\n" +
+				"RUN composer  install && echo done\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules(
+					"tally/no-multi-spaces",
+					"tally/consistent-indentation",
+					"tally/php/composer-no-dev-in-production",
+					"tally/prefer-package-cache-mounts",
+					"tally/newline-per-chained-call",
+				)...),
+			wantApplied: 6,
+			config: `[rules.tally.consistent-indentation]
+severity = "style"
+
+[rules.tally.prefer-package-cache-mounts]
+severity = "warning"
+`,
+		},
 		// Full composition: two secret mounts (insertion) + two cache mounts
 		// (insertion) + cleanup removal (npm cache clean, --no-cache-dir)
 		// on the same RUN in a single --fix pass.

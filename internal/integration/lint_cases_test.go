@@ -248,6 +248,12 @@ func lintCases(t *testing.T) []lintCase {
 				mustSelectRules("tally/powershell/prefer-shell-instruction", "hadolint/DL4005")...),
 			wantExit: 1,
 		},
+		{
+			name:     "php-composer-no-dev-in-production",
+			dir:      "php-composer-no-dev-in-production",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/php/composer-no-dev-in-production")...),
+			wantExit: 1,
+		},
 
 		// Windows: RUN --mount not supported
 		{
