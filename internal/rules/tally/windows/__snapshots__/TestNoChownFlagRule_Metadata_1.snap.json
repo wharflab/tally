@@ -1,0 +1,10 @@
+{
+ "Category": "correctness",
+ "Code": "tally/windows/no-chown-flag",
+ "DefaultSeverity": "warning",
+ "Description": "COPY/ADD --chown is silently ignored on Windows containers",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/windows/no-chown-flag/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "No --chown flag on Windows"
+}

@@ -90,13 +90,14 @@ type userState struct {
 
 // copyChownCtx holds shared context passed through the check pipeline.
 type copyChownCtx struct {
-	stageIdx int
-	stage    instructions.Stage
-	file     string
-	sm       *sourcemap.SourceMap
-	meta     rules.RuleMetadata
-	variant  shell.Variant
-	workdir  string
+	stageIdx  int
+	stage     instructions.Stage
+	file      string
+	sm        *sourcemap.SourceMap
+	meta      rules.RuleMetadata
+	variant   shell.Variant
+	workdir   string
+	isWindows bool // true for Windows stages; suppresses --chown fix (alt 1)
 }
 
 // checkStage walks a single stage tracking the effective user per instruction.
@@ -109,14 +110,20 @@ func (r *CopyAfterUserWithoutChownRule) checkStage(
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
 ) []rules.Violation {
+	stageIsWindows := false
+	if info := sem.StageInfo(stageIdx); info != nil {
+		stageIsWindows = info.IsWindows()
+	}
+
 	ctx := copyChownCtx{
-		stageIdx: stageIdx,
-		stage:    stage,
-		file:     file,
-		sm:       sm,
-		meta:     meta,
-		variant:  stageShellVariantForCopyChown(sem, stageIdx),
-		workdir:  inheritedWorkdirForCopyChown(fileFacts, sem, stageIdx),
+		stageIdx:  stageIdx,
+		stage:     stage,
+		file:      file,
+		sm:        sm,
+		meta:      meta,
+		variant:   stageShellVariantForCopyChown(sem, stageIdx),
+		workdir:   inheritedWorkdirForCopyChown(fileFacts, sem, stageIdx),
+		isWindows: stageIsWindows,
 	}
 
 	us := userState{
@@ -188,12 +195,23 @@ func (r *CopyAfterUserWithoutChownRule) checkCopyOrAdd(
 			upperKeyword, us.user,
 		),
 		ctx.meta.DefaultSeverity,
-	).WithDocURL(ctx.meta.DocURL).WithDetail(fmt.Sprintf(
-		"Docker's %s always creates files as root:root regardless of the active USER. "+
-			"Add --chown=%s to match the intended ownership, "+
-			"or move USER after the %s to clarify that USER does not affect %s ownership.",
-		upperKeyword, us.user, upperKeyword, upperKeyword,
-	))
+	).WithDocURL(ctx.meta.DocURL)
+
+	if ctx.isWindows {
+		v = v.WithDetail(fmt.Sprintf(
+			"Docker's %s always creates files as root:root regardless of the active USER. "+
+				"On Windows --chown is silently ignored (see tally/windows/no-chown-flag). "+
+				"Move USER after the %s to clarify that USER does not affect %s ownership.",
+			upperKeyword, upperKeyword, upperKeyword,
+		))
+	} else {
+		v = v.WithDetail(fmt.Sprintf(
+			"Docker's %s always creates files as root:root regardless of the active USER. "+
+				"Add --chown=%s to match the intended ownership, "+
+				"or move USER after the %s to clarify that USER does not affect %s ownership.",
+			upperKeyword, us.user, upperKeyword, upperKeyword,
+		))
+	}
 	v.StageIndex = ctx.stageIdx
 
 	fixes := r.buildFixes(loc, keyword, us, cmdIdx, ctx)
@@ -213,11 +231,17 @@ func (r *CopyAfterUserWithoutChownRule) buildFixes(
 	var fixes []*rules.SuggestedFix
 
 	// Alt 1 (preferred): add --chown=<user>.
-	if fix := r.buildChownFix(instrLoc, keyword, us.user, ctx); fix != nil {
-		fixes = append(fixes, fix)
+	// Skipped on Windows stages where --chown is silently ignored
+	// (tally/windows/no-chown-flag covers that case).
+	if !ctx.isWindows {
+		if fix := r.buildChownFix(instrLoc, keyword, us.user, ctx); fix != nil {
+			fixes = append(fixes, fix)
+		}
 	}
 
 	// Alt 2: move USER down past COPY/ADD to the first RUN/WORKDIR.
+	// On Windows stages this is the only fix offered (since --chown is
+	// silently ignored, adding it would be misleading).
 	// Only offered when the USER instruction is explicit in this stage,
 	// no RUN/WORKDIR exists between USER and the COPY/ADD, and a
 	// RUN/WORKDIR exists after the COPY/ADD to serve as the target.

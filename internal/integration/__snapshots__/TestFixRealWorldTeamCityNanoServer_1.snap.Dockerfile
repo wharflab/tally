@@ -27,19 +27,20 @@ ENV POWERSHELL_TELEMETRY_OPTOUT=1
 
 # On some agents, Windows 2022 requires administrator permissions to modify "C:/" folder within ...
 # ... PowerShell container.
-USER ContainerAdministrator
 
-COPY --chown=ContainerAdministrator scripts/*.cs /scripts/
+COPY scripts/*.cs /scripts/
 
 SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 # Prepare build agent distribution
-COPY --chown=ContainerAdministrator TeamCity/buildAgent C:/BuildAgent
-COPY --chown=ContainerAdministrator run-agent.ps1 /BuildAgent/run-agent.ps1
+COPY TeamCity/buildAgent C:/BuildAgent
+COPY run-agent.ps1 /BuildAgent/run-agent.ps1
 
 # JDK
 ARG jdkWindowsComponent
 ARG jdkWindowsComponentMD5SUM
+
+USER ContainerAdministrator
 
 RUN [Net.ServicePointManager]::SecurityProtocol = 'tls12, tls11, tls' ; \
     $code = Get-Content -Path "scripts/Web.cs" -Raw ; \
@@ -86,12 +87,12 @@ RUN pwsh -NoLogo -NoProfile -Command " \
         Start-Sleep -Seconds 6 ; \
     }"
 
-COPY --chown=ContainerUser --from=base ["C:/Program Files/Java/OpenJDK", "C:/Program Files/Java/OpenJDK"]
+COPY --from=base ["C:/Program Files/Java/OpenJDK", "C:/Program Files/Java/OpenJDK"]
 
 ENV JAVA_HOME="C:\Program Files\Java\OpenJDK" \
     CONFIG_FILE="C:\BuildAgent\conf\buildAgent.properties"
 
-COPY --chown=ContainerUser --from=base /BuildAgent /BuildAgent
+COPY --from=base /BuildAgent /BuildAgent
 
 USER ContainerAdministrator
 

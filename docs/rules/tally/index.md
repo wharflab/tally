@@ -38,6 +38,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [gpu/no-redundant-cuda-install](./gpu/no-redundant-cuda-install.md) | CUDA packages are already provided by the nvidia/cuda base image | Warning | Correctness | Enabled |
 | [gpu/prefer-minimal-driver-capabilities](./gpu/prefer-minimal-driver-capabilities.md) | NVIDIA_DRIVER_CAPABILITIES=all exposes more driver surface than most workloads need | Info | Correctness | Enabled |
 | [gpu/prefer-runtime-final-stage](./gpu/prefer-runtime-final-stage.md) | Final stage uses an NVIDIA devel image without clear build-time needs | Warning | Best Practices | Enabled |
+| [windows/no-chown-flag](./windows/no-chown-flag.md) | `COPY/ADD --chown` is silently ignored on Windows containers | Warning | Correctness | Enabled |
 | [windows/no-run-mounts](./windows/no-run-mounts.md) | `RUN --mount` flags are not supported on Windows containers | Error | Correctness | Enabled |
 | [windows/no-stopsignal](./windows/no-stopsignal.md) | `STOPSIGNAL` has no effect on Windows containers | Warning | Correctness | Enabled |
 | [prefer-run-heredoc](./prefer-run-heredoc.md) | Suggests using heredoc syntax for multi-command RUN | Style | Style | Off (experimental) |

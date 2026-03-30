@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 48 | - | 48 |
+| tally | 49 | - | 49 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -65,6 +65,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/gpu/no-redundant-cuda-install`](docs/rules/tally/gpu/no-redundant-cuda-install.md) | CUDA packages are already provided by the nvidia/cuda base image | Warning | Correctness | Enabled |
 | [`tally/gpu/prefer-minimal-driver-capabilities`](docs/rules/tally/gpu/prefer-minimal-driver-capabilities.md) 🔧 | NVIDIA_DRIVER_CAPABILITIES=all exposes more driver surface than most workloads need | Info | Correctness | Enabled |
 | [`tally/gpu/prefer-runtime-final-stage`](docs/rules/tally/gpu/prefer-runtime-final-stage.md) | Final stage uses an NVIDIA devel image without clear build-time needs; prefer a runtime variant | Warning | Best Practices | Enabled |
+| [`tally/windows/no-chown-flag`](docs/rules/tally/windows/no-chown-flag.md) 🔧 | `COPY/ADD --chown` is silently ignored on Windows containers | Warning | Correctness | Enabled |
 | [`tally/windows/no-run-mounts`](docs/rules/tally/windows/no-run-mounts.md) | `RUN --mount` flags are not supported on Windows containers and will fail at runtime | Error | Correctness | Enabled |
 | [`tally/windows/no-stopsignal`](docs/rules/tally/windows/no-stopsignal.md) 🔧 | `STOPSIGNAL` has no effect on Windows containers because they do not support POSIX signals | Warning | Correctness | Enabled |
 | [`tally/prefer-run-heredoc`](docs/rules/tally/prefer-run-heredoc.md) 🔧 | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Off (experimental) |

@@ -1686,6 +1686,49 @@ severity = "warning"
 			wantApplied: 1, // only windows/no-stopsignal should apply
 		},
 
+		// Windows no-chown-flag: remove --chown from COPY on Windows stage (FixSafe)
+		{
+			name:  "windows-no-chown-flag",
+			input: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\nCOPY --chown=app:app src/ C:/app/\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/windows/no-chown-flag")...),
+			wantApplied: 1,
+		},
+		// Cross-rule: windows/no-chown-flag + copy-after-user-without-chown on a
+		// Windows stage with USER ContainerUser then COPY without --chown.
+		// copy-after-user-without-chown still reports on Windows but suppresses
+		// the --chown fix. No move-USER fix is possible here (no RUN/WORKDIR
+		// after COPY), and windows/no-chown-flag has nothing to remove. Zero fixes.
+		{
+			name:  "windows-no-chown-flag-cross-copy-after-user",
+			input: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\nUSER ContainerUser\nCOPY src/ C:/app/\n",
+			args: append(
+				[]string{"--fix", "--fail-level", "none"},
+				mustSelectRules("tally/windows/no-chown-flag", "tally/copy-after-user-without-chown")...),
+			wantApplied: 0, // no fixable violations on this Windows stage
+		},
+		// Cross-rule: windows/no-chown-flag removes --chown that was already present
+		// on a Windows stage with USER, while copy-after-user-without-chown does not
+		// fire because --chown is already set (mutually exclusive conditions).
+		{
+			name:  "windows-no-chown-flag-cross-copy-after-user-existing-chown",
+			input: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\nUSER ContainerUser\nCOPY --chown=ContainerUser src/ C:/app/\n",
+			args: append(
+				[]string{"--fix", "--fail-level", "none"},
+				mustSelectRules("tally/windows/no-chown-flag", "tally/copy-after-user-without-chown")...),
+			wantApplied: 1, // only windows/no-chown-flag removes the dead --chown
+		},
+		// Windows no-chown-flag: Linux stage — no fix
+		{
+			name:  "windows-no-chown-flag-linux-no-fix",
+			input: "FROM alpine:3.20\nCOPY --chown=app:app src/ /app/\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/windows/no-chown-flag")...),
+			wantApplied: 0,
+		},
+
 		// Prefer canonical STOPSIGNAL: missing SIG prefix → SIGTERM (FixSafe)
 		{
 			name:  "prefer-canonical-stopsignal-prefix",
