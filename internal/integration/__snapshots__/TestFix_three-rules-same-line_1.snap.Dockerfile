@@ -1,4 +1,5 @@
 FROM centos:7
+# [tally] curl configuration for improved robustness
 ENV CURL_HOME=/etc/curl
 COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
 --retry-connrefused

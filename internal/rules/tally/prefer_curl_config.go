@@ -4,12 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
-	"github.com/wharflab/tally/internal/semantic"
 )
 
 // PreferCurlConfigRuleCode is the full rule code for the prefer-curl-config rule.
@@ -42,16 +39,6 @@ func DefaultPreferCurlConfigConfig() PreferCurlConfigConfig {
 	return PreferCurlConfigConfig{Retry: &r, ConnectTimeout: &ct, MaxTime: &mt}
 }
 
-// curlCheckContext bundles per-stage parameters for the check methods.
-type curlCheckContext struct {
-	file     string
-	curlHome string
-
-	isWindows bool
-	meta      rules.RuleMetadata
-	cfg       PreferCurlConfigConfig
-}
-
 // PreferCurlConfigRule detects stages that use curl and suggests inserting a
 // COPY heredoc with retry configuration to make builds more robust against
 // transient download failures.
@@ -76,7 +63,7 @@ func (r *PreferCurlConfigRule) Metadata() rules.RuleMetadata {
 		Description:     "Stages using curl should include a retry config to handle transient failures",
 		DocURL:          rules.TallyDocURL(PreferCurlConfigRuleCode),
 		DefaultSeverity: rules.SeverityInfo,
-		Category:        "correctness",
+		Category:        "reliability",
 		FixPriority:     93, //nolint:mnd // After cache-mounts (90), before add-unpack (95)
 	}
 }
@@ -96,142 +83,42 @@ func (r *PreferCurlConfigRule) ValidateConfig(config any) error {
 func (r *PreferCurlConfigRule) Check(input rules.LintInput) []rules.Violation {
 	cfg := r.resolveConfig(input.Config)
 	meta := r.Metadata()
-
-	// Tracks stages that will have curl config after fixes are applied.
-	// A child stage (FROM parentStage) is suppressed when the parent
-	// is in this set — the fix on the parent propagates via inheritance.
-	configuredStages := map[int]bool{}
-
-	var violations []rules.Violation
-
-	for stageIdx, stage := range input.Stages {
-		stageFacts := input.Facts.Stage(stageIdx)
-		isWindows := stageFacts.BaseImageOS == semantic.BaseImageOSWindows
-
-		ctx := curlCheckContext{
-			file:      input.File,
-			curlHome:  curlHomeLinux,
-			isWindows: isWindows,
-			meta:      meta,
-			cfg:       cfg,
-		}
-		if isWindows {
-			ctx.curlHome = curlHomeWindows
-		}
-
-		// Suppress if this stage inherits from a stage that already has
-		// (or will have after fix) the curl config.
-		if parentConfigured(stageIdx, input.Semantic, configuredStages) {
-			configuredStages[stageIdx] = true
-			continue
-		}
-
-		v := r.checkStageWithFacts(stageFacts, stage, &ctx)
-		if v != nil {
-			// Stage will get the config via fix.
-			configuredStages[stageIdx] = true
-			violations = append(violations, *v)
-		} else if stageHasCurlConfig(stageFacts) {
-			// Stage already has the config — propagate to children.
-			configuredStages[stageIdx] = true
-		}
-	}
-
-	return violations
+	return checkDownloadConfigStages(input, makeDownloadConfigStageContextBuilder(input, meta, downloadConfigRuleSpec{
+		stageEnvKey:      "CURL_HOME",
+		linuxEnvValue:    curlHomeLinux,
+		windowsEnvValue:  curlHomeWindows,
+		destination:      "${CURL_HOME}/.curlrc",
+		comment:          "# [tally] curl configuration for improved robustness",
+		violationMessage: "stage uses curl without a retry config; consider adding a .curlrc with retry settings",
+		violationDetail: "Transient download failures are common during image builds. " +
+			"A .curlrc file with --retry settings makes builds more robust. " +
+			"The fix inserts a comment, ENV CURL_HOME, and a COPY heredoc with retry defaults.",
+		fixDescription:                "Add curl retry config via COPY heredoc",
+		content:                       buildCurlConfigContent(cfg),
+		hasConfig:                     hasCurlConfig,
+		triggerKind:                   curlTriggerKind,
+		skipAddUnpackOwnedInvocations: true,
+	}))
 }
-
-// parentConfigured returns true if this stage's base image is a local stage
-// reference that already has (or will have) the curl config.
-func parentConfigured(stageIdx int, sem *semantic.Model, configured map[int]bool) bool {
-	info := sem.StageInfo(stageIdx)
-	if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
-		return false
-	}
-	return configured[info.BaseImage.StageIndex]
-}
-
-// stageHasCurlConfig returns true if the stage already has CURL_HOME set or
-// a .curlrc observable — meaning child stages will inherit the config.
-func stageHasCurlConfig(stageFacts *facts.StageFacts) bool {
-	if stageFacts == nil {
-		return false
-	}
-	if stageFacts.EffectiveEnv.Values["CURL_HOME"] != "" {
-		return true
-	}
-	return hasCurlConfig(stageFacts)
-}
-
-func (r *PreferCurlConfigRule) checkStageWithFacts(
-	stageFacts *facts.StageFacts,
-	stage instructions.Stage,
-	ctx *curlCheckContext,
-) *rules.Violation {
-	// Suppress if CURL_HOME is already set.
-	if stageFacts.EffectiveEnv.Values["CURL_HOME"] != "" {
-		return nil
-	}
-
-	// Suppress if any observable file looks like a curl config.
-	// FileContent does exact path lookup; we also scan ObservableFiles
-	// for any .curlrc at an arbitrary path (e.g. /root/.curlrc,
-	// custom CURL_HOME from a parent stage).
-	if hasCurlConfig(stageFacts) {
-		return nil
-	}
-
-	// Find the first RUN that uses or installs curl.
-	for _, runFacts := range stageFacts.Runs {
-		if runFacts == nil || !runFacts.UsesShell {
-			continue
-		}
-
-		switch curlTriggerKind(runFacts, ctx.isWindows) {
-		case curlTriggerNone:
-			continue
-
-		case curlTriggerInstall:
-			return r.buildViolation(runFacts.Run, runFacts.Run, ctx)
-
-		case curlTriggerInvocation:
-			firstRun := firstRunInStage(stage)
-			if firstRun == nil {
-				firstRun = runFacts.Run
-			}
-			return r.buildViolation(runFacts.Run, firstRun, ctx)
-		}
-	}
-
-	return nil
-}
-
-// curlTrigger classifies how a RUN relates to curl.
-type curlTrigger int
-
-const (
-	curlTriggerNone       curlTrigger = iota
-	curlTriggerInstall                // curl is being installed as a package
-	curlTriggerInvocation             // curl is invoked directly
-)
 
 // curlTriggerKind returns the trigger type for a RUN instruction.
 // Install takes precedence: a RUN that both installs and invokes curl
 // (e.g. `apt-get install -y curl && curl ...`) is classified as install.
-func curlTriggerKind(runFacts *facts.RunFacts, isWindows bool) curlTrigger {
+func curlTriggerKind(runFacts *facts.RunFacts, isWindows bool) downloadConfigTrigger {
 	for i := range runFacts.InstallCommands {
 		for j := range runFacts.InstallCommands[i].Packages {
 			if runFacts.InstallCommands[i].Packages[j].Normalized == nonPOSIXDownloadCommandCurl {
-				return curlTriggerInstall
+				return downloadConfigTriggerInstall
 			}
 		}
 	}
 	for i := range runFacts.CommandInfos {
 		name := runFacts.CommandInfos[i].Name
 		if name == nonPOSIXDownloadCommandCurl || (isWindows && name == curlExeName) {
-			return curlTriggerInvocation
+			return downloadConfigTriggerInvocation
 		}
 	}
-	return curlTriggerNone
+	return downloadConfigTriggerNone
 }
 
 // hasCurlConfig returns true if any observable file in the stage has a path
@@ -244,68 +131,6 @@ func hasCurlConfig(stageFacts *facts.StageFacts) bool {
 		}
 	}
 	return false
-}
-
-// firstRunInStage returns the first RunCommand in a stage, or nil.
-func firstRunInStage(stage instructions.Stage) *instructions.RunCommand {
-	for _, cmd := range stage.Commands {
-		if run, ok := cmd.(*instructions.RunCommand); ok {
-			return run
-		}
-	}
-	return nil
-}
-
-// buildViolation creates a violation anchored at violationRun with a fix
-// that inserts before insertBeforeRun.
-func (r *PreferCurlConfigRule) buildViolation(
-	violationRun, insertBeforeRun *instructions.RunCommand,
-	ctx *curlCheckContext,
-) *rules.Violation {
-	loc := rules.NewLocationFromRanges(ctx.file, violationRun.Location())
-	v := rules.NewViolation(
-		loc,
-		ctx.meta.Code,
-		"stage uses curl without a retry config; consider adding a .curlrc with retry settings",
-		ctx.meta.DefaultSeverity,
-	).WithDocURL(ctx.meta.DocURL).WithDetail(
-		"Transient download failures are common during image builds. " +
-			"A .curlrc file with --retry settings makes builds more robust. " +
-			"The fix inserts ENV CURL_HOME and a COPY heredoc with retry defaults.",
-	)
-
-	if fix := r.buildFix(insertBeforeRun, ctx); fix != nil {
-		v = v.WithSuggestedFix(fix)
-	}
-
-	return &v
-}
-
-func (r *PreferCurlConfigRule) buildFix(
-	insertBeforeRun *instructions.RunCommand,
-	ctx *curlCheckContext,
-) *rules.SuggestedFix {
-	runLoc := insertBeforeRun.Location()
-	if len(runLoc) == 0 {
-		return nil
-	}
-
-	insertLine := runLoc[0].Start.Line
-	insertCol := runLoc[0].Start.Character
-
-	content := buildCurlConfigContent(ctx.cfg)
-	copyHeredoc := buildCurlCopyHeredoc(content, ctx.isWindows)
-	newText := fmt.Sprintf("ENV CURL_HOME=%s\n%s\n", ctx.curlHome, copyHeredoc)
-
-	return &rules.SuggestedFix{
-		Description: "Add curl retry config via COPY heredoc",
-		Safety:      rules.FixSuggestion,
-		Priority:    ctx.meta.FixPriority,
-		Edits: []rules.TextEdit{{
-			Location: rules.NewRangeLocation(ctx.file, insertLine, insertCol, insertLine, insertCol),
-			NewText:  newText,
-		}},
-	}
 }
 
 // buildCurlConfigContent builds the .curlrc file content from config values.
@@ -328,20 +153,6 @@ func buildCurlConfigContent(cfg PreferCurlConfigConfig) string {
 	fmt.Fprintf(&sb, "--connect-timeout %d\n", connectTimeout)
 	fmt.Fprintf(&sb, "--retry %d\n", retry)
 	fmt.Fprintf(&sb, "--max-time %d\n", maxTime)
-	return sb.String()
-}
-
-// buildCurlCopyHeredoc builds the COPY heredoc instruction.
-// On Linux it includes --chmod=0644; on Windows it omits --chmod.
-func buildCurlCopyHeredoc(content string, isWindows bool) string {
-	var sb strings.Builder
-	sb.WriteString("COPY ")
-	if !isWindows {
-		sb.WriteString("--chmod=0644 ")
-	}
-	sb.WriteString("<<EOF ${CURL_HOME}/.curlrc\n")
-	sb.WriteString(strings.TrimSuffix(content, "\n"))
-	sb.WriteString("\nEOF")
 	return sb.String()
 }
 

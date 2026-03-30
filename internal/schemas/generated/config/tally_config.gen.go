@@ -80,6 +80,9 @@ type IndexSchemaJson_3 struct {
 	// PreferRunHeredoc corresponds to the JSON schema field "prefer-run-heredoc".
 	PreferRunHeredoc *tally.PreferRunHeredocSchemaJson `json:"prefer-run-heredoc,omitempty,omitzero"`
 
+	// PreferWgetConfig corresponds to the JSON schema field "prefer-wget-config".
+	PreferWgetConfig *tally.PreferWgetConfigSchemaJson `json:"prefer-wget-config,omitempty,omitzero"`
+
 	// RequireSecretMounts corresponds to the JSON schema field
 	// "require-secret-mounts".
 	RequireSecretMounts *tally.RequireSecretMountsSchemaJson `json:"require-secret-mounts,omitempty,omitzero"`

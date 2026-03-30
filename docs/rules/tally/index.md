@@ -24,7 +24,8 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [copy-from-empty-scratch-stage](./copy-from-empty-scratch-stage.md) | Detects COPY --from referencing a scratch stage with no file-producing instructions | Error | Correctness | Enabled |
 | [invalid-json-form](./invalid-json-form.md) | Arguments appear to use JSON exec-form but contain invalid JSON | Error | Correctness | Enabled |
 | [platform-mismatch](./platform-mismatch.md) | Explicit `--platform` on FROM does not match what the registry provides | Error | Correctness | Enabled |
-| [prefer-curl-config](./prefer-curl-config.md) | Stages using curl should include a retry config | Info | Correctness | Enabled |
+| [prefer-curl-config](./prefer-curl-config.md) | Stages using curl should include a retry config | Info | Reliability | Enabled |
+| [prefer-wget-config](./prefer-wget-config.md) | Stages using wget should include a retry config | Info | Reliability | Enabled |
 | [prefer-telemetry-opt-out](./prefer-telemetry-opt-out.md) | Stages using telemetry-enabled tools should set the vendor-documented opt-out environment variables | Info | Privacy | Enabled |
 | [prefer-add-unpack](./prefer-add-unpack.md) | Prefer `ADD --unpack` for downloading and extracting remote archives | Info | Performance | Enabled |
 | [prefer-multi-stage-build](./prefer-multi-stage-build.md) | Suggests converting single-stage builds into multi-stage builds to reduce final image size | Info | Performance | Off (experimental) |

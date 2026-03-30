@@ -7,6 +7,7 @@ SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference
 
 WORKDIR /app
 
+# [tally] curl configuration for improved robustness
 ENV CURL_HOME=/etc/curl
 
 COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
@@ -14,6 +15,16 @@ COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
 --connect-timeout 15
 --retry 5
 --max-time 300
+EOF
+
+# [tally] wget configuration for improved robustness
+ENV WGETRC=/etc/wgetrc
+
+COPY --chmod=0644 <<EOF ${WGETRC}
+retry_connrefused = on
+timeout=15
+tries=5
+retry-on-host-error=on
 EOF
 
 RUN apk add --update nodejs nodejs-npm

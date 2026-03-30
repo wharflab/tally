@@ -737,6 +737,53 @@
       "title": "tally/prefer-run-heredoc rule config",
       "type": "object"
     },
+    "rule-tally-prefer-wget-config": {
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/prefer-wget-config rule.",
+      "examples": [
+        {
+          "timeout": 10,
+          "tries": 3
+        },
+        {
+          "severity": "warning",
+          "tries": 7
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        },
+        "timeout": {
+          "default": 15,
+          "description": "Maximum time in seconds before retrying a stalled or failed download.",
+          "examples": [
+            10,
+            15
+          ],
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tries": {
+          "default": 5,
+          "description": "Number of retries for failed downloads.",
+          "examples": [
+            3,
+            5
+          ],
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "title": "tally/prefer-wget-config rule config",
+      "type": "object"
+    },
     "rule-tally-require-secret-mounts": {
       "additionalProperties": false,
       "description": "Configuration options for the tally/require-secret-mounts rule.",
@@ -950,6 +997,9 @@
         },
         "prefer-run-heredoc": {
           "$ref": "#/$defs/rule-tally-prefer-run-heredoc"
+        },
+        "prefer-wget-config": {
+          "$ref": "#/$defs/rule-tally-prefer-wget-config"
         },
         "require-secret-mounts": {
           "$ref": "#/$defs/rule-tally-require-secret-mounts"

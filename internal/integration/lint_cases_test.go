@@ -768,6 +768,12 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 		{
+			name:     "prefer-wget-config",
+			dir:      "prefer-wget-config",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-wget-config")...),
+			wantExit: 1,
+		},
+		{
 			name:       "prefer-telemetry-opt-out",
 			dir:        "prefer-telemetry-opt-out",
 			args:       append([]string{"--format", "json"}, mustSelectRules("tally/prefer-telemetry-opt-out")...),

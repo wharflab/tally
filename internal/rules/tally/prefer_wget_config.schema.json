@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/prefer_wget_config.schema.json",
+  "title": "tally/prefer-wget-config rule config",
+  "description": "Configuration options for the tally/prefer-wget-config rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" },
+    "timeout": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 15,
+      "description": "Maximum time in seconds before retrying a stalled or failed download.",
+      "examples": [10, 15]
+    },
+    "tries": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 5,
+      "description": "Number of retries for failed downloads.",
+      "examples": [3, 5]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "timeout": 10, "tries": 3 },
+    { "severity": "warning", "tries": 7 }
+  ]
+}

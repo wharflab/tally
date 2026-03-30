@@ -3,6 +3,7 @@ COPY <<EOF /etc/nginx.conf
 server {}
 EOF
 RUN apt-get update
+# [tally] curl configuration for improved robustness
 ENV CURL_HOME=/etc/curl
 COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
 --retry-connrefused

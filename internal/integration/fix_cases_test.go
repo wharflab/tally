@@ -101,10 +101,10 @@ func fixCases(t *testing.T) []fixCase {
 			args:        []string{"--fix"},
 			wantApplied: 1,
 		},
-		// DL3047 + DL4001 + prefer-add-unpack: all three cooperating rules fire.
+		// DL3047 + DL4001 + prefer-add-unpack + prefer-wget-config all cooperate.
 		// prefer-add-unpack (priority 95) applies first and replaces the wget|tar
 		// with ADD --unpack, making DL3047 (priority 96) moot on that line.
-		// The standalone wget (no tar) only triggers DL3047 → --progress inserted.
+		// The standalone wget (no tar) still triggers DL3047 and prefer-wget-config.
 		// DL4001 has no fix. --fail-level=none prevents unfixed DL4001 from failing.
 		{
 			name: "dl3047-cross-rules",
@@ -113,7 +113,7 @@ func fixCases(t *testing.T) []fixCase {
 				"RUN wget http://example.com/config.json -O /etc/app/config.json\n" +
 				"RUN curl -fsSL http://example.com/script.sh | sh\n",
 			args:        []string{"--fix", "--fix-unsafe", "--fail-level", "none"},
-			wantApplied: 4, // prefer-add-unpack + DL3047 --progress + DL4006 SHELL + prefer-curl-config.
+			wantApplied: 5, // prefer-add-unpack + DL3047 --progress + DL4006 SHELL + curl/wget config blocks.
 		},
 		// curl-should-follow-redirects: insert --location after curl
 		// Also triggers prefer-curl-config (all rules enabled) → 2 fixes.
@@ -168,6 +168,13 @@ severity = "error"
 				mustSelectRules("tally/prefer-curl-config")...),
 			wantApplied: 1,
 		},
+		{
+			name:  "prefer-wget-config",
+			input: "FROM ubuntu:22.04\nRUN wget https://example.com/file.tar.gz -O /tmp/file.tar.gz\n",
+			args: append([]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/prefer-wget-config")...),
+			wantApplied: 1,
+		},
 		// Cross-rule: prefer-curl-config (93) + curl-should-follow-redirects (0)
 		// on the same stage. Both should apply: curl-config inserts COPY/ENV
 		// before the RUN, curl-follow-redirects inserts --location inside the RUN.
@@ -178,6 +185,39 @@ severity = "error"
 			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
 				mustSelectRules("tally/prefer-curl-config", "tally/curl-should-follow-redirects")...),
 			wantApplied: 2,
+		},
+		// Cross-rule: prefer-curl-config should defer on pure download+extract
+		// territory when prefer-add-unpack is enabled, so only ADD --unpack applies.
+		{
+			name: "prefer-curl-config-cross-prefer-add-unpack",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN curl -fsSL https://example.com/archive.tar.gz | tar -xz -C /opt\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/prefer-curl-config", "tally/prefer-add-unpack")...),
+			wantApplied: 1,
+		},
+		// Cross-rule: prefer-curl-config (93) + prefer-wget-config (94)
+		// insert at the same location before the install RUN. Zero-width line
+		// inserts must compose deterministically without conflict.
+		{
+			name: "prefer-wget-config-cross-curl-config",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN apt-get update && apt-get install -y ca-certificates curl wget\n" +
+				"RUN curl -fsSL https://example.com/install.sh | bash\n" +
+				"RUN wget https://example.com/config.json -O /etc/app/config.json\n",
+			args: append([]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/prefer-curl-config", "tally/prefer-wget-config")...),
+			wantApplied: 2,
+		},
+		// Cross-rule: prefer-wget-config should defer on pure download+extract
+		// territory when prefer-add-unpack is enabled, so only ADD --unpack applies.
+		{
+			name: "prefer-wget-config-cross-prefer-add-unpack",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN wget http://example.com/archive.tar.gz | tar -xz -C /opt\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/prefer-wget-config", "tally/prefer-add-unpack")...),
+			wantApplied: 1,
 		},
 		{
 			name:  "prefer-telemetry-opt-out",

@@ -17,8 +17,8 @@ func TestPreferCurlConfigRule_Metadata(t *testing.T) {
 	if meta.DefaultSeverity != rules.SeverityInfo {
 		t.Errorf("DefaultSeverity = %v, want Info", meta.DefaultSeverity)
 	}
-	if meta.Category != "correctness" {
-		t.Errorf("Category = %q, want %q", meta.Category, "correctness")
+	if meta.Category != "reliability" {
+		t.Errorf("Category = %q, want %q", meta.Category, "reliability")
 	}
 	if meta.FixPriority != 93 { //nolint:mnd // expected value
 		t.Errorf("FixPriority = %d, want 93", meta.FixPriority)
@@ -192,6 +192,22 @@ func TestPreferCurlConfigRule_Check(t *testing.T) {
 	})
 }
 
+func TestPreferCurlConfigRule_SkipsAddUnpackOwnedInvocationWhenRuleEnabled(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ubuntu:22.04\n" +
+		"RUN curl -fsSL https://example.com/app.tar.gz | tar -xz -C /opt\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	input.EnabledRules = []string{PreferCurlConfigRuleCode, PreferAddUnpackRuleCode}
+
+	r := NewPreferCurlConfigRule()
+	violations := r.Check(input)
+
+	if len(violations) != 0 {
+		t.Fatalf("expected 0 violations, got %d", len(violations))
+	}
+}
+
 func TestPreferCurlConfigRule_SuggestedFix(t *testing.T) {
 	t.Parallel()
 
@@ -222,7 +238,8 @@ func TestPreferCurlConfigRule_SuggestedFix(t *testing.T) {
 		t.Errorf("edit Start = (%d,%d), want (2,0)", edit.Location.Start.Line, edit.Location.Start.Column)
 	}
 
-	wantNewText := "ENV CURL_HOME=/etc/curl\n" +
+	wantNewText := "# [tally] curl configuration for improved robustness\n" +
+		"ENV CURL_HOME=/etc/curl\n" +
 		"COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc\n" +
 		"--retry-connrefused\n" +
 		"--connect-timeout 15\n" +
@@ -256,7 +273,8 @@ func TestPreferCurlConfigRule_SuggestedFix_Windows(t *testing.T) {
 	edit := v.SuggestedFix.Edits[0]
 
 	// Windows: no --chmod, CURL_HOME=c:\curl
-	wantNewText := "ENV CURL_HOME=c:\\curl\n" +
+	wantNewText := "# [tally] curl configuration for improved robustness\n" +
+		"ENV CURL_HOME=c:\\curl\n" +
 		"COPY <<EOF ${CURL_HOME}/.curlrc\n" +
 		"--retry-connrefused\n" +
 		"--connect-timeout 15\n" +
@@ -339,7 +357,8 @@ func TestPreferCurlConfigRule_SuggestedFix_CustomConfig(t *testing.T) {
 	}
 
 	edit := violations[0].SuggestedFix.Edits[0]
-	wantNewText := "ENV CURL_HOME=/etc/curl\n" +
+	wantNewText := "# [tally] curl configuration for improved robustness\n" +
+		"ENV CURL_HOME=/etc/curl\n" +
 		"COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc\n" +
 		"--retry-connrefused\n" +
 		"--connect-timeout 10\n" +

@@ -5,7 +5,7 @@ Stages using curl should include a retry config to handle transient failures.
 | Property | Value |
 |----------|-------|
 | Severity | Info |
-| Category | Correctness |
+| Category | Reliability |
 | Default | Enabled |
 | Auto-fix | Yes (`--fix --fix-unsafe`) |
 
@@ -25,7 +25,7 @@ The rule emits at most **one violation per stage** and triggers when:
 
 ## Auto-fix
 
-The fix inserts two instructions before the first relevant `RUN`:
+The fix inserts a short documentation comment plus two instructions before the first relevant `RUN`:
 
 - **Install trigger** (`apt-get install curl`): inserts right before the install `RUN`
 - **Invocation trigger** (`curl https://...`): inserts before the first `RUN` in the stage
@@ -34,6 +34,7 @@ The fix inserts two instructions before the first relevant `RUN`:
 ### Linux
 
 ```dockerfile
+# [tally] curl configuration for improved robustness
 ENV CURL_HOME=/etc/curl
 COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
 --retry-connrefused
@@ -46,6 +47,7 @@ EOF
 ### Windows
 
 ```dockerfile
+# [tally] curl configuration for improved robustness
 ENV CURL_HOME=c:\curl
 COPY <<EOF ${CURL_HOME}/.curlrc
 --retry-connrefused
@@ -90,6 +92,7 @@ RUN apt-get install -y nodejs
 
 ```dockerfile
 FROM ubuntu:22.04
+# [tally] curl configuration for improved robustness
 ENV CURL_HOME=/etc/curl
 COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
 --retry-connrefused
@@ -110,6 +113,8 @@ The rule does **not** trigger when:
   the stage (via `COPY` heredoc, `COPY` from build context, `COPY --from` another stage,
   or `RUN` file creation)
 - The `CURL_HOME` environment variable is already set in the stage
+
+Child stages inheriting from a parent stage that already has the config also do not trigger.
 
 ## Related rules
 

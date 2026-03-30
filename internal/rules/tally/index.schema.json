@@ -45,6 +45,9 @@
     "prefer-run-heredoc": {
       "$ref": "./prefer_run_heredoc.schema.json"
     },
+    "prefer-wget-config": {
+      "$ref": "./prefer_wget_config.schema.json"
+    },
     "require-secret-mounts": {
       "$ref": "./require_secret_mounts.schema.json"
     }

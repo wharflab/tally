@@ -1,0 +1,139 @@
+{
+  "files": [
+    {
+      "file": "testdata/prefer-wget-config/Dockerfile",
+      "violations": [
+        {
+          "detail": "Transient download failures are common during image builds. A wgetrc file with retry settings makes builds more robust. The fix inserts a comment, ENV WGETRC, and a COPY heredoc with retry defaults.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-wget-config/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/prefer-wget-config/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "stage uses wget without a retry config; consider adding wgetrc with retry settings",
+          "rule": "tally/prefer-wget-config",
+          "severity": "info",
+          "sourceCode": "RUN apt-get update \u0026\u0026 apt-get install -y --no-install-recommends ca-certificates wget",
+          "suggestedFix": {
+            "description": "Add wget retry config via COPY heredoc",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 3
+                  },
+                  "file": "testdata/prefer-wget-config/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 3
+                  }
+                },
+                "newText": "# [tally] wget configuration for improved robustness\nENV WGETRC=/etc/wgetrc\nCOPY --chmod=0644 \u003c\u003cEOF ${WGETRC}\nretry_connrefused = on\ntimeout=15\ntries=5\nretry-on-host-error=on\nEOF\n"
+              }
+            ],
+            "priority": 94,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Transient download failures are common during image builds. A wgetrc file with retry settings makes builds more robust. The fix inserts a comment, ENV WGETRC, and a COPY heredoc with retry defaults.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-wget-config/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 18
+            },
+            "file": "testdata/prefer-wget-config/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 18
+            }
+          },
+          "message": "stage uses wget without a retry config; consider adding wgetrc with retry settings",
+          "rule": "tally/prefer-wget-config",
+          "severity": "info",
+          "sourceCode": "RUN wget https://github.com/unicode-org/icu/releases/download/release-67-1/icu4c-67_1-src.tgz -O /tmp/icu.tgz",
+          "suggestedFix": {
+            "description": "Add wget retry config via COPY heredoc",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 17
+                  },
+                  "file": "testdata/prefer-wget-config/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 17
+                  }
+                },
+                "newText": "# [tally] wget configuration for improved robustness\nENV WGETRC=/etc/wgetrc\nCOPY --chmod=0644 \u003c\u003cEOF ${WGETRC}\nretry_connrefused = on\ntimeout=15\ntries=5\nretry-on-host-error=on\nEOF\n"
+              }
+            ],
+            "priority": 94,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Transient download failures are common during image builds. A wgetrc file with retry settings makes builds more robust. The fix inserts a comment, ENV WGETRC, and a COPY heredoc with retry defaults.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-wget-config/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 22
+            },
+            "file": "testdata/prefer-wget-config/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 22
+            }
+          },
+          "message": "stage uses wget without a retry config; consider adding wgetrc with retry settings",
+          "rule": "tally/prefer-wget-config",
+          "severity": "info",
+          "sourceCode": "RUN wget.exe https://example.com/bootstrap.zip -O C:\\tmp\\bootstrap.zip",
+          "suggestedFix": {
+            "description": "Add wget retry config via COPY heredoc",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 22
+                  },
+                  "file": "testdata/prefer-wget-config/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 22
+                  }
+                },
+                "newText": "# [tally] wget configuration for improved robustness\nENV WGETRC=c:\\wgetrc\nCOPY \u003c\u003cEOF ${WGETRC}\nretry_connrefused = on\ntimeout=15\ntries=5\nretry-on-host-error=on\nEOF\n"
+              }
+            ],
+            "priority": 94,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 3,
+    "style": 0,
+    "total": 3,
+    "warnings": 0
+  }
+}
