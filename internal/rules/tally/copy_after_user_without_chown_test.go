@@ -251,6 +251,14 @@ ADD config.tar.gz C:/config/
 `,
 			WantViolations: 0,
 		},
+		{
+			Name: "windows via platform flag is skipped",
+			Content: `FROM --platform=windows/amd64 example.com/custom/base:latest
+USER ContainerUser
+COPY app/ C:/app/
+`,
+			WantViolations: 0,
+		},
 	})
 }
 
