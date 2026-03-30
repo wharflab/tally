@@ -1697,19 +1697,20 @@ severity = "warning"
 		},
 		// Cross-rule: windows/no-chown-flag + copy-after-user-without-chown on a
 		// Windows stage with USER ContainerUser then COPY without --chown.
-		// copy-after-user-without-chown skips Windows stages, so no --chown is
-		// added and windows/no-chown-flag has nothing to remove. Zero fixes.
+		// copy-after-user-without-chown still reports on Windows but suppresses
+		// the --chown fix. No move-USER fix is possible here (no RUN/WORKDIR
+		// after COPY), and windows/no-chown-flag has nothing to remove. Zero fixes.
 		{
 			name:  "windows-no-chown-flag-cross-copy-after-user",
 			input: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\nUSER ContainerUser\nCOPY src/ C:/app/\n",
 			args: append(
 				[]string{"--fix", "--fail-level", "none"},
 				mustSelectRules("tally/windows/no-chown-flag", "tally/copy-after-user-without-chown")...),
-			wantApplied: 0, // neither rule produces a fix on this Windows stage
+			wantApplied: 0, // no fixable violations on this Windows stage
 		},
 		// Cross-rule: windows/no-chown-flag removes --chown that was already present
-		// on a Windows stage with USER, while copy-after-user-without-chown stays silent
-		// because --chown is already set (mutually exclusive conditions).
+		// on a Windows stage with USER, while copy-after-user-without-chown does not
+		// fire because --chown is already set (mutually exclusive conditions).
 		{
 			name:  "windows-no-chown-flag-cross-copy-after-user-existing-chown",
 			input: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\nUSER ContainerUser\nCOPY --chown=ContainerUser src/ C:/app/\n",
