@@ -235,29 +235,29 @@ COPY app /app
 			WantViolations: 0,
 		},
 		{
-			Name: "windows stage with USER and COPY without chown - no violation",
+			Name: "windows stage fires but no chown fix offered",
 			Content: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
 USER ContainerUser
 COPY app/ C:/app/
 `,
-			WantViolations: 0,
+			WantViolations: 1,
 		},
 		{
-			Name: "windows nanoserver stage skipped",
+			Name: "windows nanoserver stage fires for both COPY and ADD",
 			Content: `FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
 USER ContainerUser
 COPY --from=build /app C:/app/
 ADD config.tar.gz C:/config/
 `,
-			WantViolations: 0,
+			WantViolations: 2,
 		},
 		{
-			Name: "windows via platform flag is skipped",
+			Name: "windows via platform flag fires",
 			Content: `FROM --platform=windows/amd64 example.com/custom/base:latest
 USER ContainerUser
 COPY app/ C:/app/
 `,
-			WantViolations: 0,
+			WantViolations: 1,
 		},
 	})
 }
@@ -409,5 +409,40 @@ WORKDIR /app
 				t.Errorf("hasMoveUser = %v, want %v", hasMoveUser, tt.wantHasMoveUser)
 			}
 		})
+	}
+}
+
+func TestCopyAfterUserWithoutChownWindows_OnlyRearrangementFix(t *testing.T) {
+	t.Parallel()
+
+	rule := NewCopyAfterUserWithoutChownRule()
+
+	// Windows stage: USER + COPY + RUN → violation with only the
+	// rearrangement fix (move USER), no --chown fix.
+	content := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+USER ContainerUser
+COPY app/ C:/app/
+RUN powershell -Command echo hello
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+
+	v := violations[0]
+	allFixes := v.AllFixes()
+
+	// Only the move-USER fix should be offered (not the --chown fix).
+	if len(allFixes) != 1 {
+		t.Errorf("expected 1 fix (move USER only), got %d", len(allFixes))
+		for i, f := range allFixes {
+			t.Logf("  fix[%d]: %s", i, f.Description)
+		}
+	}
+
+	if len(allFixes) > 0 && !strings.Contains(allFixes[0].Description, "Move USER") {
+		t.Errorf("expected move-USER fix, got: %s", allFixes[0].Description)
 	}
 }

@@ -48,6 +48,13 @@ child stage without `--chown` will trigger the rule.
 Both rules can fire on the same `COPY` instruction. Their fixes compose
 correctly: the result is `COPY --chown=user --chmod=mode file /dest`.
 
+## Windows stages
+
+On Windows containers `--chown` is silently ignored (see
+[`tally/windows/no-chown-flag`](./windows/no-chown-flag.md)), so the "add
+`--chown`" fix is suppressed. The rule still fires — the ownership confusion is
+real — but only the "move `USER`" rearrangement fix is offered.
+
 ## Auto-fix
 
 Two fix alternatives are offered:

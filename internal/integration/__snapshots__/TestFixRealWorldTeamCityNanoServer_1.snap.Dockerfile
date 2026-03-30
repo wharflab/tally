@@ -27,7 +27,6 @@ ENV POWERSHELL_TELEMETRY_OPTOUT=1
 
 # On some agents, Windows 2022 requires administrator permissions to modify "C:/" folder within ...
 # ... PowerShell container.
-USER ContainerAdministrator
 
 COPY scripts/*.cs /scripts/
 
@@ -40,6 +39,8 @@ COPY run-agent.ps1 /BuildAgent/run-agent.ps1
 # JDK
 ARG jdkWindowsComponent
 ARG jdkWindowsComponentMD5SUM
+
+USER ContainerAdministrator
 
 RUN [Net.ServicePointManager]::SecurityProtocol = 'tls12, tls11, tls' ; \
     $code = Get-Content -Path "scripts/Web.cs" -Raw ; \
