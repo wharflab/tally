@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 50 | - | 50 |
+| tally | 51 | - | 51 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -35,6 +35,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/secrets-in-code`](docs/rules/tally/secrets-in-code.md) | Detects hardcoded secrets, API keys, and credentials using [gitleaks](https://github.com/gitleaks/gitleaks) patterns | Error | Security | Enabled |
 | [`tally/prefer-vex-attestation`](docs/rules/tally/prefer-vex-attestation.md) | Recommends attaching OpenVEX as an OCI attestation instead of copying `*.vex.json` into the image | Info | Security | Enabled |
 | [`tally/require-secret-mounts`](docs/rules/tally/require-secret-mounts.md) 🔧 | Enforces `--mount=type=secret` for commands accessing private registries | Warning | Security | Off (requires config) |
+| [`tally/prefer-add-git`](docs/rules/tally/prefer-add-git.md) 🔧 | Prefers `ADD <git source>` over cloning repositories in `RUN` for more hermetic builds | Warning | Security | Enabled |
 | [`tally/stateful-root-runtime`](docs/rules/tally/stateful-root-runtime.md) | Final stage runs as root and signals mutable/persistent state | Warning | Security | Enabled |
 | [`tally/user-created-but-never-used`](docs/rules/tally/user-created-but-never-used.md) 🔧 | Final stage creates a user but never switches to it | Warning | Security | Enabled |
 | [`tally/copy-after-user-without-chown`](docs/rules/tally/copy-after-user-without-chown.md) 🔧 | COPY/ADD without --chown after non-root USER creates root-owned files | Warning | Correctness | Enabled |

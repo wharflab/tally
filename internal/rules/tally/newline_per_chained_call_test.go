@@ -282,6 +282,20 @@ func TestNewlinePerChainedCallCheck(t *testing.T) {
 	})
 }
 
+func TestNewlinePerChainedCall_DefersToPreferAddGit(t *testing.T) {
+	t.Parallel()
+
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN echo foo && git clone https://github.com/NVIDIA/apex && echo zoo
+`)
+	input.EnabledRules = []string{rules.PreferAddGitRuleCode, NewlinePerChainedCallRuleCode}
+
+	violations := NewNewlinePerChainedCallRule().Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("got %d violations, want 0", len(violations))
+	}
+}
+
 func TestNewlinePerChainedCallCheckWithFixes(t *testing.T) {
 	t.Parallel()
 	r := NewNewlinePerChainedCallRule()

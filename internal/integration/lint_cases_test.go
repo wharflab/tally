@@ -745,6 +745,12 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-add-unpack")...),
 			wantExit: 1,
 		},
+		{
+			name:     "prefer-add-git",
+			dir:      "prefer-add-git",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-add-git")...),
+			wantExit: 1,
+		},
 
 		{
 			name:     "curl-should-follow-redirects",

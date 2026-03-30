@@ -123,6 +123,7 @@ func (r *PreferHeredocRule) Check(input rules.LintInput) []rules.Violation {
 			sm:              sm,
 			minCommands:     minCommands,
 			pipefailEnabled: pipefailEnabled,
+			deferToGit:      input.IsRuleEnabled(rules.PreferAddGitRuleCode),
 			meta:            meta,
 		}
 
@@ -159,6 +160,7 @@ type heredocCheckParams struct {
 	sm              *sourcemap.SourceMap
 	minCommands     int
 	pipefailEnabled bool
+	deferToGit      bool
 	meta            rules.RuleMetadata
 }
 
@@ -229,6 +231,13 @@ func (r *PreferHeredocRule) checkConsecutiveRuns(
 			cmdVariant = v
 		}
 
+		script := getRunScriptFromCmd(run)
+		if p.deferToGit && shell.HasGitCloneRemote(script, cmdVariant) {
+			flushSequence()
+			sequenceMounts = nil
+			continue
+		}
+
 		// Extract commands from this RUN
 		commands, isSimple := r.extractRunCommands(run, cmdVariant)
 		if len(commands) == 0 {
@@ -238,7 +247,6 @@ func (r *PreferHeredocRule) checkConsecutiveRuns(
 		}
 
 		// Check if any command has exit (breaks sequence)
-		script := getRunScriptFromCmd(run)
 		if shell.HasExitCommand(script, cmdVariant) {
 			flushSequence()
 			sequenceMounts = nil
@@ -357,6 +365,9 @@ func (r *PreferHeredocRule) checkChainedCommands(
 		variant := p.shellVariant
 		if v, ok := p.shellAtCmd[cmdIdx]; ok {
 			variant = v
+		}
+		if p.deferToGit && shell.HasGitCloneRemote(script, variant) {
+			continue
 		}
 		commandCount := shell.CountChainedCommands(script, variant)
 		if commandCount >= p.minCommands {

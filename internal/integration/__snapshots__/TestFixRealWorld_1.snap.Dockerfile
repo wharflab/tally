@@ -247,8 +247,13 @@ apt-get install -y --allow-change-held-packages --no-install-recommends build-es
 rm -rf /var/lib/apt/lists/*
 apt-get clean
 cd /tmp
-git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION}-1
-cd nccl
+EOF
+
+ADD --link https://github.com/NVIDIA/nccl.git?ref=v${NCCL_VERSION}-1 /tmp/nccl
+
+RUN <<EOF
+set -e
+cd /tmp/nccl
 make -j $(nproc) src.build BUILDDIR=/usr/local
 rm -rf /tmp/nccl
 mkdir /tmp/efa
@@ -279,11 +284,13 @@ EOF
  ENV PATH="${PATH}:/opt/amazon/openmpi/bin:/opt/amazon/efa/bin:/opt/conda/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
  ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}/opt/amazon/openmpi/lib/:/opt/amazon/efa/lib/"
 
+RUN cd /tmp
+
+ADD --link https://github.com/NVIDIA/gdrcopy.git?ref=v${GDRCOPY_VERSION} /tmp/gdrcopy
+
 RUN <<EOF
 set -e
-cd /tmp
-git clone https://github.com/NVIDIA/gdrcopy.git -b v${GDRCOPY_VERSION}
-cd gdrcopy
+cd /tmp/gdrcopy
 sed -ie '12s@$@ -L /usr/local/cuda/lib64/stubs/@' tests/Makefile
 make install
 rm -rf /tmp/gdrcopy
@@ -393,7 +400,6 @@ ENV LD_LIBRARY_PATH="/usr/local/nvidia/lib:/usr/local/nvidia/lib64:/usr/local/li
 
 RUN <<EOF
 set -e
-set -o pipefail
 echo $PATH
 echo $LD_LIBRARY_PATH
 pip install -U --force-reinstall --no-cache-dir setuptools==70.1.0 wheel==0.43.0
@@ -412,8 +418,14 @@ echo NCCL_DEBUG=INFO >>/etc/nccl.conf
 echo NCCL_SOCKET_IFNAME=^docker0 >>/etc/nccl.conf
 mkdir /tmp/efa-ofi-nccl
 cd /tmp/efa-ofi-nccl
-git clone https://github.com/aws/aws-ofi-nccl.git -b v${BRANCH_OFI}
-cd aws-ofi-nccl
+EOF
+
+ADD --link https://github.com/aws/aws-ofi-nccl.git?ref=v${BRANCH_OFI} /tmp/efa-ofi-nccl/aws-ofi-nccl
+
+RUN <<EOF
+set -e
+set -o pipefail
+cd /tmp/efa-ofi-nccl/aws-ofi-nccl
 ./autogen.sh
 ./configure --with-libfabric=/opt/amazon/efa --with-mpi=/opt/amazon/openmpi --with-cuda=/usr/local/cuda --with-nccl=/usr/local --prefix=/usr/local
 make
@@ -471,16 +483,23 @@ WORKDIR /root
 
 ARG SMDEBUG_VERSION=1.0.34
 
+RUN cd /tmp
+
+ADD --link https://github.com/awslabs/sagemaker-debugger.git?ref=${SMDEBUG_VERSION} /tmp/sagemaker-debugger
+
 RUN <<EOF
 set -e
-cd /tmp
-git clone https://github.com/awslabs/sagemaker-debugger --branch ${SMDEBUG_VERSION} --depth 1 --single-branch
-cd sagemaker-debugger
+cd /tmp/sagemaker-debugger
 pip install .
 rm -rf /tmp/*
 rm /etc/apt/sources.list.d/*
-git clone https://github.com/KarypisLab/GKlib
-cd GKlib
+EOF
+
+ADD --link --keep-git-dir=true https://github.com/KarypisLab/GKlib.git /root/GKlib
+
+RUN <<EOF
+set -e
+cd /root/GKlib
 make config
 make
 make install

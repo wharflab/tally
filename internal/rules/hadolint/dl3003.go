@@ -42,6 +42,10 @@ func (r *DL3003Rule) Check(input rules.LintInput) []rules.Violation {
 		func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
 			cmdStr := dockerfile.RunCommandString(run)
 
+			if input.IsRuleEnabled(rules.PreferAddGitRuleCode) && shell.HasGitCloneRemote(cmdStr, shellVariant) {
+				return nil
+			}
+
 			// Check if the command contains cd (handles subshells, etc.)
 			if !shell.ContainsCommandWithVariant(cmdStr, "cd", shellVariant) {
 				return nil

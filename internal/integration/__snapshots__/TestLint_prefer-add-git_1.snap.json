@@ -1,0 +1,161 @@
+{
+  "files": [
+    {
+      "file": "testdata/prefer-add-git/Dockerfile",
+      "violations": [
+        {
+          "detail": "BuildKit git sources make repository fetches explicit in the Dockerfile graph and avoid mutable network acquisition inside RUN. When the clone flow is simple enough, tally can extract it into ADD while preserving the surrounding commands.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-add-git/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "testdata/prefer-add-git/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "prefer ADD \u003cgit source\u003e over git clone in RUN for more hermetic, supply-chain-friendly builds",
+          "rule": "tally/prefer-add-git",
+          "severity": "warning",
+          "sourceCode": "RUN echo before \u0026\u0026 git clone https://github.com/NVIDIA/apex \u0026\u0026 cd apex \u0026\u0026 git checkout 0123456789abcdef0123456789abcdef01234567 \u0026\u0026 echo after",
+          "suggestedFix": {
+            "description": "Extract git clone into ADD \u003cgit source\u003e",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 141,
+                    "line": 6
+                  },
+                  "file": "testdata/prefer-add-git/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 6
+                  }
+                },
+                "newText": "RUN echo before\nADD --link --checksum=0123456789abcdef0123456789abcdef01234567 https://github.com/NVIDIA/apex.git?ref=0123456789abcdef0123456789abcdef01234567 /apex\nRUN cd /apex \u0026\u0026 echo after"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "BuildKit git sources make repository fetches explicit in the Dockerfile graph and avoid mutable network acquisition inside RUN. When the clone flow is simple enough, tally can extract it into ADD while preserving the surrounding commands.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-add-git/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 8
+            },
+            "file": "testdata/prefer-add-git/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 8
+            }
+          },
+          "message": "prefer ADD \u003cgit source\u003e over git clone in RUN for more hermetic, supply-chain-friendly builds",
+          "rule": "tally/prefer-add-git",
+          "severity": "warning",
+          "sourceCode": "RUN git clone https://github.com/aws/aws-ofi-nccl.git -b ${BRANCH_OFI}",
+          "suggestedFix": {
+            "description": "Extract git clone into ADD \u003cgit source\u003e",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 70,
+                    "line": 8
+                  },
+                  "file": "testdata/prefer-add-git/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 8
+                  }
+                },
+                "newText": "ADD --link https://github.com/aws/aws-ofi-nccl.git?ref=${BRANCH_OFI} /aws-ofi-nccl"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "BuildKit git sources make repository fetches explicit in the Dockerfile graph and avoid mutable network acquisition inside RUN. When the clone flow is simple enough, tally can extract it into ADD while preserving the surrounding commands.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-add-git/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "testdata/prefer-add-git/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "prefer ADD \u003cgit source\u003e over git clone in RUN for more hermetic, supply-chain-friendly builds",
+          "rule": "tally/prefer-add-git",
+          "severity": "warning",
+          "sourceCode": "RUN git clone https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta.git -b ${GHC_WASM_META_COMMIT}",
+          "suggestedFix": {
+            "description": "Extract git clone into ADD \u003cgit source\u003e",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 98,
+                    "line": 10
+                  },
+                  "file": "testdata/prefer-add-git/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 10
+                  }
+                },
+                "newText": "ADD --link https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta.git?ref=${GHC_WASM_META_COMMIT} /ghc-wasm-meta"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "BuildKit git sources make repository fetches explicit in the Dockerfile graph and avoid mutable network acquisition inside RUN. When the clone flow is simple enough, tally can extract it into ADD while preserving the surrounding commands.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-add-git/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 12
+            },
+            "file": "testdata/prefer-add-git/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 12
+            }
+          },
+          "message": "prefer ADD \u003cgit source\u003e over git clone in RUN for more hermetic, supply-chain-friendly builds",
+          "rule": "tally/prefer-add-git",
+          "severity": "warning",
+          "sourceCode": "RUN --network=host git clone https://github.com/example/private-repo.git"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 4,
+    "warnings": 4
+  }
+}

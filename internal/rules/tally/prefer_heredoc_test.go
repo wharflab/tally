@@ -7,6 +7,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/heredoc"
+	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/testutil"
 )
@@ -173,6 +174,20 @@ RUN echo 2
 			WantViolations: 1, // no exit, 4 commands total (1 + 2 + 1)
 		},
 	})
+}
+
+func TestPreferHeredocRule_DefersToPreferAddGit(t *testing.T) {
+	t.Parallel()
+
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN echo foo && git clone https://github.com/NVIDIA/apex && echo zoo
+`)
+	input.EnabledRules = []string{rules.HeredocRuleCode, rules.PreferAddGitRuleCode}
+
+	violations := NewPreferHeredocRule().Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("got %d violations, want 0", len(violations))
+	}
 }
 
 func TestPreferHeredocRule_CheckWithFixes(t *testing.T) {
