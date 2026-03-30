@@ -36,7 +36,7 @@
                     "line": 3
                   }
                 },
-                "newText": "# [tally] wget configuration for improved robustness\nENV WGETRC=/etc/wgetrc\nCOPY --chmod=0644 \u003c\u003cEOF ${WGETRC}\nretry_connrefused = on\ntimeout=15\ntries=5\nretry-on-host-error=on\nEOF\n"
+                "newText": "# [tally] wget configuration for improved robustness\nENV WGETRC=/etc/wgetrc\nCOPY --chmod=0644 \u003c\u003cEOF ${WGETRC}\nretry_connrefused = on\ntimeout = 15\ntries = 5\nEOF\n"
               }
             ],
             "priority": 94,
@@ -76,7 +76,7 @@
                     "line": 17
                   }
                 },
-                "newText": "# [tally] wget configuration for improved robustness\nENV WGETRC=/etc/wgetrc\nCOPY --chmod=0644 \u003c\u003cEOF ${WGETRC}\nretry_connrefused = on\ntimeout=15\ntries=5\nretry-on-host-error=on\nEOF\n"
+                "newText": "# [tally] wget configuration for improved robustness\nENV WGETRC=/etc/wgetrc\nCOPY --chmod=0644 \u003c\u003cEOF ${WGETRC}\nretry_connrefused = on\ntimeout = 15\ntries = 5\nEOF\n"
               }
             ],
             "priority": 94,
@@ -116,7 +116,7 @@
                     "line": 22
                   }
                 },
-                "newText": "# [tally] wget configuration for improved robustness\nENV WGETRC=c:\\wgetrc\nCOPY \u003c\u003cEOF ${WGETRC}\nretry_connrefused = on\ntimeout=15\ntries=5\nretry-on-host-error=on\nEOF\n"
+                "newText": "# [tally] wget configuration for improved robustness\nENV WGETRC=c:\\wgetrc\nCOPY \u003c\u003cEOF ${WGETRC}\nretry_connrefused = on\ntimeout = 15\ntries = 5\nEOF\n"
               }
             ],
             "priority": 94,

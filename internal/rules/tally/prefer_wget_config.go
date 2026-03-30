@@ -136,9 +136,8 @@ func buildWgetConfigContent(cfg PreferWgetConfigConfig) string {
 
 	var sb strings.Builder
 	sb.WriteString("retry_connrefused = on\n")
-	fmt.Fprintf(&sb, "timeout=%d\n", timeout)
-	fmt.Fprintf(&sb, "tries=%d\n", tries)
-	sb.WriteString("retry-on-host-error=on\n")
+	fmt.Fprintf(&sb, "timeout = %d\n", timeout)
+	fmt.Fprintf(&sb, "tries = %d\n", tries)
 	return sb.String()
 }
 

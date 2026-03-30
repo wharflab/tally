@@ -227,9 +227,8 @@ func TestPreferWgetConfigRule_SuggestedFix(t *testing.T) {
 		"ENV WGETRC=/etc/wgetrc\n" +
 		"COPY --chmod=0644 <<EOF ${WGETRC}\n" +
 		"retry_connrefused = on\n" +
-		"timeout=15\n" +
-		"tries=5\n" +
-		"retry-on-host-error=on\n" +
+		"timeout = 15\n" +
+		"tries = 5\n" +
 		"EOF\n"
 
 	if edit.NewText != wantNewText {
@@ -255,9 +254,8 @@ func TestPreferWgetConfigRule_SuggestedFix_Windows(t *testing.T) {
 		"ENV WGETRC=c:\\wgetrc\n" +
 		"COPY <<EOF ${WGETRC}\n" +
 		"retry_connrefused = on\n" +
-		"timeout=15\n" +
-		"tries=5\n" +
-		"retry-on-host-error=on\n" +
+		"timeout = 15\n" +
+		"tries = 5\n" +
 		"EOF\n"
 
 	if edit.NewText != wantNewText {
@@ -335,9 +333,8 @@ func TestPreferWgetConfigRule_SuggestedFix_CustomConfig(t *testing.T) {
 		"ENV WGETRC=/etc/wgetrc\n" +
 		"COPY --chmod=0644 <<EOF ${WGETRC}\n" +
 		"retry_connrefused = on\n" +
-		"timeout=10\n" +
-		"tries=3\n" +
-		"retry-on-host-error=on\n" +
+		"timeout = 10\n" +
+		"tries = 3\n" +
 		"EOF\n"
 
 	if edit.NewText != wantNewText {

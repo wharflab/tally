@@ -38,9 +38,8 @@ The fix inserts a short documentation comment plus two instructions before the f
 ENV WGETRC=/etc/wgetrc
 COPY --chmod=0644 <<EOF ${WGETRC}
 retry_connrefused = on
-timeout=15
-tries=5
-retry-on-host-error=on
+timeout = 15
+tries = 5
 EOF
 ```
 
@@ -51,9 +50,8 @@ EOF
 ENV WGETRC=c:\wgetrc
 COPY <<EOF ${WGETRC}
 retry_connrefused = on
-timeout=15
-tries=5
-retry-on-host-error=on
+timeout = 15
+tries = 5
 EOF
 ```
 
@@ -64,7 +62,6 @@ On Windows, `--chmod` is omitted since it has no effect.
 - `retry_connrefused = on` retries connection-refused failures
 - `timeout` limits how long each request can wait (default: 15 seconds)
 - `tries` controls how many attempts wget makes (default: 5)
-- `retry-on-host-error=on` retries temporary host lookup failures
 
 ## Configuration
 
@@ -94,9 +91,8 @@ FROM ubuntu:22.04
 ENV WGETRC=/etc/wgetrc
 COPY --chmod=0644 <<EOF ${WGETRC}
 retry_connrefused = on
-timeout=15
-tries=5
-retry-on-host-error=on
+timeout = 15
+tries = 5
 EOF
 RUN apt-get update && apt-get install -y ca-certificates wget
 RUN wget https://example.com/tool.tar.gz -O /tmp/tool.tar.gz

@@ -21,9 +21,8 @@ ENV WGETRC=/etc/wgetrc
 
 COPY --chmod=0644 <<EOF ${WGETRC}
 retry_connrefused = on
-timeout=15
-tries=5
-retry-on-host-error=on
+timeout = 15
+tries = 5
 EOF
 
 RUN <<EOF
@@ -167,9 +166,8 @@ ENV WGETRC=/etc/wgetrc
 
 COPY --chmod=0644 <<EOF ${WGETRC}
 retry_connrefused = on
-timeout=15
-tries=5
-retry-on-host-error=on
+timeout = 15
+tries = 5
 EOF
 
 RUN <<EOF
