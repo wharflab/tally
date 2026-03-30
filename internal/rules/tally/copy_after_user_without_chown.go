@@ -195,12 +195,23 @@ func (r *CopyAfterUserWithoutChownRule) checkCopyOrAdd(
 			upperKeyword, us.user,
 		),
 		ctx.meta.DefaultSeverity,
-	).WithDocURL(ctx.meta.DocURL).WithDetail(fmt.Sprintf(
-		"Docker's %s always creates files as root:root regardless of the active USER. "+
-			"Add --chown=%s to match the intended ownership, "+
-			"or move USER after the %s to clarify that USER does not affect %s ownership.",
-		upperKeyword, us.user, upperKeyword, upperKeyword,
-	))
+	).WithDocURL(ctx.meta.DocURL)
+
+	if ctx.isWindows {
+		v = v.WithDetail(fmt.Sprintf(
+			"Docker's %s always creates files as root:root regardless of the active USER. "+
+				"On Windows --chown is silently ignored (see tally/windows/no-chown-flag). "+
+				"Move USER after the %s to clarify that USER does not affect %s ownership.",
+			upperKeyword, upperKeyword, upperKeyword,
+		))
+	} else {
+		v = v.WithDetail(fmt.Sprintf(
+			"Docker's %s always creates files as root:root regardless of the active USER. "+
+				"Add --chown=%s to match the intended ownership, "+
+				"or move USER after the %s to clarify that USER does not affect %s ownership.",
+			upperKeyword, us.user, upperKeyword, upperKeyword,
+		))
+	}
 	v.StageIndex = ctx.stageIdx
 
 	fixes := r.buildFixes(loc, keyword, us, cmdIdx, ctx)
