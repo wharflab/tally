@@ -73,6 +73,9 @@ timeout = 10
 tries = 3
 ```
 
+Supported startup-file directives are documented in the official GNU Wget manual:
+[`Wgetrc Commands`](https://www.gnu.org/software/wget/manual/html_node/Wgetrc-Commands.html).
+
 ## Examples
 
 ### Before (violation)
