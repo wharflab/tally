@@ -115,13 +115,7 @@ func wgetTriggerKind(runFacts *facts.RunFacts, isWindows bool) downloadConfigTri
 }
 
 func hasWgetConfig(stageFacts *facts.StageFacts) bool {
-	for _, f := range stageFacts.ObservableFiles {
-		if strings.HasSuffix(f.Path, "/wgetrc") || strings.HasSuffix(f.Path, `\wgetrc`) ||
-			strings.HasSuffix(f.Path, "/.wgetrc") || strings.HasSuffix(f.Path, `\.wgetrc`) {
-			return true
-		}
-	}
-	return false
+	return stageFacts.HasObservablePathSuffix("/wgetrc", "/.wgetrc")
 }
 
 func buildWgetConfigContent(cfg PreferWgetConfigConfig) string {

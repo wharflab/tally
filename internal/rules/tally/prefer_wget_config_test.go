@@ -124,6 +124,15 @@ func TestPreferWgetConfigRule_Check(t *testing.T) {
 			WantViolations: 0,
 		},
 		{
+			Name: "Windows existing uppercase WGETRC suppresses case-insensitively",
+			Content: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"COPY <<EOF C:\\WGETRC\n" +
+				"tries = 3\n" +
+				"EOF\n" +
+				"RUN wget.exe https://example.com/file.zip -O C:\\tmp\\file.zip\n",
+			WantViolations: 0,
+		},
+		{
 			Name: "child stage inheriting from fixed parent is suppressed",
 			Content: "FROM ubuntu:22.04 AS downloader\n" +
 				"RUN apt-get update && apt-get install -y wget\n" +

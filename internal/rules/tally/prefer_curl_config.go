@@ -124,13 +124,7 @@ func curlTriggerKind(runFacts *facts.RunFacts, isWindows bool) downloadConfigTri
 // hasCurlConfig returns true if any observable file in the stage has a path
 // ending in .curlrc or _curlrc (the Windows default name).
 func hasCurlConfig(stageFacts *facts.StageFacts) bool {
-	for _, f := range stageFacts.ObservableFiles {
-		if strings.HasSuffix(f.Path, "/.curlrc") || strings.HasSuffix(f.Path, `\.curlrc`) ||
-			strings.HasSuffix(f.Path, "/_curlrc") || strings.HasSuffix(f.Path, `\_curlrc`) {
-			return true
-		}
-	}
-	return false
+	return stageFacts.HasObservablePathSuffix("/.curlrc", "/_curlrc")
 }
 
 // buildCurlConfigContent builds the .curlrc file content from config values.

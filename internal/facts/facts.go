@@ -191,6 +191,8 @@ var CacheDisablingEnvVars = map[string]bool{
 	"PIP_NO_CACHE_DIR": true,
 }
 
+const rootUserName = "root"
+
 // NewFileFacts creates a new fact store for a Dockerfile.
 func NewFileFacts(
 	file string,
@@ -1070,7 +1072,7 @@ func IsRootUser(user string) bool {
 	user = strings.TrimSpace(strings.ToLower(user))
 
 	// root by name or UID 0.
-	return user == "root" || user == "0"
+	return user == rootUserName || user == "0"
 }
 
 // privilegeDropTools lists executables whose sole purpose is dropping root

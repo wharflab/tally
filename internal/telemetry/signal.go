@@ -374,17 +374,16 @@ func (s *stageScanner) scanObservableFiles() {
 		return
 	}
 
-	for _, file := range s.stageFacts.ObservableFiles {
-		if file == nil || file.Line <= 0 {
-			continue
+	s.stageFacts.ScanObservableFiles(func(file *facts.ObservableFile, pathView facts.ObservablePathView) bool {
+		if file.Line <= 0 {
+			return true
 		}
 
 		candidate := anchorCandidate{
 			line:    file.Line,
 			command: s.commandsByLine[file.Line],
 		}
-		normalizedPath := normalizeSignalPath(file.Path)
-		base := strings.ToLower(path.Base(normalizedPath))
+		base := pathView.Base()
 
 		switch {
 		case base == "package.json":
@@ -395,12 +394,13 @@ func (s *stageScanner) scanObservableFiles() {
 			if content, ok := file.Content(); ok && contentMentionsHFPackage(content) {
 				s.hfManifest = earlierCandidate(s.hfManifest, candidate)
 			}
-		case base == ".yarnrc.yml" || pathHasSegment(normalizedPath, ".yarn"):
+		case base == ".yarnrc.yml" || pathView.HasSegment(".yarn"):
 			s.berryEvidence = earlierCandidate(s.berryEvidence, candidate)
 		case base == fileVcpkgExe || base == fileBootstrapVcpkgBat || base == fileBootstrapVcpkgSh:
 			s.result.addSignal(ToolVcpkg, SignalKindManifest, "stage copies vcpkg tooling", candidate)
 		}
-	}
+		return true
+	})
 }
 
 func (s *stageScanner) scanBuildContextSources() {

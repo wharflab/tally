@@ -148,6 +148,15 @@ func TestPreferCurlConfigRule_Check(t *testing.T) {
 			WantViolations: 2, // different base images, no inheritance
 		},
 		{
+			Name: "Windows existing uppercase _CURLRC suppresses case-insensitively",
+			Content: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"COPY <<EOF C:\\CURL\\_CURLRC\n" +
+				"--retry 3\n" +
+				"EOF\n" +
+				"RUN curl.exe -fsSL https://example.com/install.ps1 -o install.ps1\n",
+			WantViolations: 0,
+		},
+		{
 			Name: "curlrc at non-default path suppresses",
 			Content: "FROM ubuntu:22.04\n" +
 				"COPY --chmod=0644 <<EOF /root/.curlrc\n" +
