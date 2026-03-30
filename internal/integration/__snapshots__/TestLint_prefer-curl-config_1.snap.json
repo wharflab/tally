@@ -4,7 +4,7 @@
       "file": "testdata/prefer-curl-config/Dockerfile",
       "violations": [
         {
-          "detail": "Transient download failures are common during image builds. A .curlrc file with --retry settings makes builds more robust. The fix inserts ENV CURL_HOME and a COPY heredoc with retry defaults.",
+          "detail": "Transient download failures are common during image builds. A .curlrc file with --retry settings makes builds more robust. The fix inserts a comment, ENV CURL_HOME, and a COPY heredoc with retry defaults.",
           "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-curl-config/",
           "location": {
             "end": {
@@ -36,7 +36,7 @@
                     "line": 3
                   }
                 },
-                "newText": "ENV CURL_HOME=/etc/curl\nCOPY --chmod=0644 \u003c\u003cEOF ${CURL_HOME}/.curlrc\n--retry-connrefused\n--connect-timeout 15\n--retry 5\n--max-time 300\nEOF\n"
+                "newText": "# [tally] curl configuration for improved robustness\nENV CURL_HOME=/etc/curl\nCOPY --chmod=0644 \u003c\u003cEOF ${CURL_HOME}/.curlrc\n--retry-connrefused\n--connect-timeout 15\n--retry 5\n--max-time 300\nEOF\n"
               }
             ],
             "priority": 93,

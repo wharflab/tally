@@ -177,13 +177,29 @@ func cmdCommandInfo(node *sitter.Node, source []byte) (CommandInfo, bool) {
 		return CommandInfo{}, false
 	}
 
-	name := normalizeCmdCommandName(nameNode.Utf8Text(source))
+	rawName := strings.TrimSpace(nameNode.Utf8Text(source))
+	start := nameNode.StartPosition()
+	end := nameNode.EndPosition()
+
+	var argChildren []sitter.Node
+	if hasArgs {
+		argCursor := argsNode.Walk()
+		defer argCursor.Close()
+		argChildren = argsNode.NamedChildren(argCursor)
+	}
+
+	argsStart := 0
+	if repairedName, repairedEnd, ok := repairDriveQualifiedCmdName(rawName, argChildren, source); ok {
+		rawName = repairedName
+		end = repairedEnd
+		argsStart = 1
+	}
+
+	name := normalizeCmdCommandName(rawName)
 	if name == "" {
 		return CommandInfo{}, false
 	}
 
-	start := nameNode.StartPosition()
-	end := nameNode.EndPosition()
 	info := CommandInfo{
 		Variant:  VariantCmd,
 		Name:     name,
@@ -196,10 +212,7 @@ func cmdCommandInfo(node *sitter.Node, source []byte) (CommandInfo, bool) {
 		return info, true
 	}
 
-	argCursor := argsNode.Walk()
-	defer argCursor.Close()
-
-	for _, child := range argsNode.NamedChildren(argCursor) {
+	for _, child := range argChildren[argsStart:] {
 		text := strings.TrimSpace(child.Utf8Text(source))
 		if text == "" {
 			continue
@@ -216,6 +229,23 @@ func cmdCommandInfo(node *sitter.Node, source []byte) (CommandInfo, bool) {
 	}
 
 	return info, true
+}
+
+func repairDriveQualifiedCmdName(name string, args []sitter.Node, source []byte) (string, sitter.Point, bool) {
+	if len(name) != 1 || !isASCIIAlpha(name[0]) || len(args) == 0 {
+		return "", sitter.Point{}, false
+	}
+
+	firstArg := strings.TrimSpace(args[0].Utf8Text(source))
+	if !strings.HasPrefix(firstArg, `:\`) && !strings.HasPrefix(firstArg, `:/`) {
+		return "", sitter.Point{}, false
+	}
+
+	return name + firstArg, args[0].EndPosition(), true
+}
+
+func isASCIIAlpha(b byte) bool {
+	return ('a' <= b && b <= 'z') || ('A' <= b && b <= 'Z')
 }
 
 func normalizeCmdCommandName(name string) string {

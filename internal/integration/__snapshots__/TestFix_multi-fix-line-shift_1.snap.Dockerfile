@@ -1,6 +1,7 @@
 FROM ubuntu:22.04
 WORKDIR /app
 RUN make build
+# [tally] curl configuration for improved robustness
 ENV CURL_HOME=/etc/curl
 COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
 --retry-connrefused

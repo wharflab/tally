@@ -19,6 +19,7 @@ FROM node:22 AS tools
 ENV DO_NOT_TRACK=1
 
 	# bootstrap tooling
+# [tally] curl configuration for improved robustness
 ENV CURL_HOME=/etc/curl
 
 COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc

@@ -14,7 +14,6 @@ retry_connrefused = on
 timeout = 15
 tries = 5
 EOF
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
-ADD --unpack http://example.com/archive.tar.gz /opt
-RUN wget --progress=dot:giga http://example.com/config.json -O /etc/app/config.json
-RUN curl -fsSL http://example.com/script.sh | sh
+RUN apt-get update && apt-get install -y ca-certificates curl wget
+RUN curl -fsSL https://example.com/install.sh | bash
+RUN wget https://example.com/config.json -O /etc/app/config.json

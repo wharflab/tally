@@ -4,12 +4,14 @@ import (
 	"maps"
 	pathpkg "path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 )
 
@@ -71,6 +73,15 @@ type ObservableFile struct {
 	contentKnown bool
 }
 
+// ObservablePathView provides normalized, platform-aware matching helpers for
+// an observable in-image path.
+type ObservablePathView struct {
+	normalized      string
+	base            string
+	segments        []string
+	caseInsensitive bool
+}
+
 // Content returns the observable content for this file.
 func (f *ObservableFile) Content() (string, bool) {
 	if f == nil {
@@ -86,6 +97,33 @@ func (f *ObservableFile) Content() (string, bool) {
 	})
 
 	return f.content, f.contentKnown
+}
+
+// Normalized returns the normalized path representation used for matching.
+func (v ObservablePathView) Normalized() string { return v.normalized }
+
+// Base returns the base name of the normalized path.
+func (v ObservablePathView) Base() string { return v.base }
+
+// HasSegment reports whether the normalized path contains the given path segment.
+func (v ObservablePathView) HasSegment(segment string) bool {
+	return slices.Contains(v.segments, v.normalizeToken(segment))
+}
+
+// HasSuffix reports whether the normalized path ends with the given suffix.
+func (v ObservablePathView) HasSuffix(suffix string) bool {
+	return strings.HasSuffix(v.normalized, v.normalizePath(suffix))
+}
+
+func (v ObservablePathView) normalizePath(path string) string {
+	return normalizeObservableMatchPath(path, v.caseInsensitive)
+}
+
+func (v ObservablePathView) normalizeToken(token string) string {
+	if v.caseInsensitive {
+		return strings.ToLower(token)
+	}
+	return token
 }
 
 type observableFileTracker struct {
@@ -214,11 +252,70 @@ func stageCopyObservableFile(path string, line int, chmod, chown string, source 
 	}
 }
 
+// ObservablePathView returns a platform-aware path view for matching against
+// stage observable files.
+func (s *StageFacts) ObservablePathView(path string) ObservablePathView {
+	caseInsensitive := s != nil && s.BaseImageOS == semantic.BaseImageOSWindows
+	normalized := normalizeObservableMatchPath(path, caseInsensitive)
+	return ObservablePathView{
+		normalized:      normalized,
+		base:            pathpkg.Base(normalized),
+		segments:        strings.Split(normalized, "/"),
+		caseInsensitive: caseInsensitive,
+	}
+}
+
+// ScanObservableFiles iterates over observable files and provides each file's
+// platform-aware path view to the callback. Returning false stops the scan.
+func (s *StageFacts) ScanObservableFiles(scan func(*ObservableFile, ObservablePathView) bool) {
+	if s == nil || scan == nil {
+		return
+	}
+	for _, file := range s.ObservableFiles {
+		if file == nil {
+			continue
+		}
+		if !scan(file, s.ObservablePathView(file.Path)) {
+			return
+		}
+	}
+}
+
+// HasObservablePathSuffix reports whether any observable file path in the stage
+// ends with one of the supplied suffixes, using platform-aware matching.
+func (s *StageFacts) HasObservablePathSuffix(suffixes ...string) bool {
+	if s == nil || len(suffixes) == 0 {
+		return false
+	}
+
+	found := false
+	s.ScanObservableFiles(func(_ *ObservableFile, path ObservablePathView) bool {
+		if slices.ContainsFunc(suffixes, path.HasSuffix) {
+			found = true
+			return false
+		}
+		return true
+	})
+
+	return found
+}
+
 func normalizeObservablePath(path string) string {
 	if path == "" {
 		return ""
 	}
 	return pathpkg.Clean(path)
+}
+
+func normalizeObservableMatchPath(path string, caseInsensitive bool) string {
+	if path == "" {
+		return ""
+	}
+	path = pathpkg.Clean(strings.ReplaceAll(path, `\`, "/"))
+	if caseInsensitive {
+		path = strings.ToLower(path)
+	}
+	return path
 }
 
 func resolveCopyDestPath(rawDest, sourceName, workdir string, sourceCount int) (string, bool) {

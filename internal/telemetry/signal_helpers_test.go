@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/wharflab/tally/internal/facts"
+	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 )
 
@@ -889,9 +890,10 @@ func TestStageScannerScanObservableFiles(t *testing.T) {
 
 	scanner := stageScanner{
 		stageFacts: &facts.StageFacts{
+			BaseImageOS: semantic.BaseImageOSWindows,
 			ObservableFiles: []*facts.ObservableFile{
-				{Path: `C:\app\.yarn\releases\yarn-4.2.2.cjs`, Line: 12},
-				{Path: `C:\deps\vcpkg.exe`, Line: 18},
+				{Path: `C:\APP\.YARN\RELEASES\YARN-4.2.2.CJS`, Line: 12},
+				{Path: `C:\DEPS\VCPKG.EXE`, Line: 18},
 			},
 		},
 	}

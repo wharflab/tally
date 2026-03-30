@@ -437,6 +437,47 @@ func TestFindCommands_Cmd(t *testing.T) {
 	}
 }
 
+func TestFindCommands_Cmd_PathQualifiedExecutable(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		script   string
+		command  string
+		wantArgs []string
+	}{
+		{
+			name:     "curl executable path",
+			script:   `C:\Tools\CURL.EXE -fsSL https://example.com -o install.ps1`,
+			command:  "curl",
+			wantArgs: []string{"-fsSL", "https://example.com", "-o", "install.ps1"},
+		},
+		{
+			name:     "wget executable path",
+			script:   `C:\Tools\WGET.EXE https://example.com/file.zip -O C:\tmp\file.zip`,
+			command:  "wget",
+			wantArgs: []string{"https://example.com/file.zip", "-O", `C:\tmp\file.zip`},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cmds := FindCommands(tt.script, VariantCmd, tt.command)
+			if len(cmds) != 1 {
+				t.Fatalf("expected 1 command, got %d", len(cmds))
+			}
+			if cmds[0].Name != tt.command {
+				t.Fatalf("command name = %q, want %q", cmds[0].Name, tt.command)
+			}
+			if !slices.Equal(cmds[0].Args, tt.wantArgs) {
+				t.Fatalf("args = %q, want %q", cmds[0].Args, tt.wantArgs)
+			}
+		})
+	}
+}
+
 func TestCommandNamesWithVariant_Cmd(t *testing.T) {
 	t.Parallel()
 
