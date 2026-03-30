@@ -168,11 +168,7 @@ RUN apt-get update  \
 	&& apt-get install -y --allow-change-held-packages --no-install-recommends     build-essential ca-certificates check cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libgl1-mesa-glx libglib2.0-0 libgomp1 libhwloc-dev libibverbs-dev libnuma-dev libnuma1 libsm6 libssl-dev libssl3 libsubunit-dev libsubunit0 libtool libxext6 libxrender-dev openssl pkg-config python3-dev unzip vim wget zlib1g-dev                                             libcublas-11-7=${CUBLAS_VERSION}-1     libcublas-dev-11-7=${CUBLAS_VERSION}-1     libcudnn8=$CUDNN_VERSION-1+cuda11.7                                                                                                                  \
 	&& rm -rf /var/lib/apt/lists/*  \
 	&& apt-get clean
-RUN cd /tmp \
-	&& git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION}-1 \
-	&& cd nccl \
-	&& make -j $(nproc) src.build BUILDDIR=/usr/local \
-	&& rm -rf /tmp/nccl
+RUN cd /tmp && git clone https://github.com/NVIDIA/nccl.git -b v${NCCL_VERSION}-1 && cd nccl && make -j $(nproc) src.build BUILDDIR=/usr/local && rm -rf /tmp/nccl
 RUN mkdir /tmp/efa \
 	&& cd /tmp/efa \
 	&& curl -O https://efa-installer.amazonaws.com/aws-efa-installer-${EFA_VERSION}.tar.gz \
@@ -200,12 +196,7 @@ RUN mkdir /tmp/openmpi \
  ENV PATH="${PATH}:/opt/amazon/openmpi/bin:/opt/amazon/efa/bin:/opt/conda/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
  ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}/opt/amazon/openmpi/lib/:/opt/amazon/efa/lib/"
 
-RUN cd /tmp \
-	&& git clone https://github.com/NVIDIA/gdrcopy.git -b v${GDRCOPY_VERSION} \
-	&& cd gdrcopy \
-	&& sed -ie '12s@$@ -L /usr/local/cuda/lib64/stubs/@' tests/Makefile \
-	&& make install \
-	&& rm -rf /tmp/gdrcopy
+RUN cd /tmp && git clone https://github.com/NVIDIA/gdrcopy.git -b v${GDRCOPY_VERSION} && cd gdrcopy && sed -ie '12s@$@ -L /usr/local/cuda/lib64/stubs/@' tests/Makefile && make install && rm -rf /tmp/gdrcopy
 
 ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
@@ -298,10 +289,7 @@ RUN echo $PATH
 RUN echo $LD_LIBRARY_PATH
 RUN pip install -U --force-reinstall --no-cache-dir setuptools==70.1.0 wheel==0.43.0
 RUN pip install --force-reinstall --no-cache-dir setuptools==69.5.1
-RUN git clone https://github.com/NVIDIA/apex \
-	&& cd apex \
-	&& git checkout aa756ce \
-	&& pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+RUN git clone https://github.com/NVIDIA/apex && cd apex && git checkout aa756ce && pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 RUN mv $OPEN_MPI_PATH/bin/mpirun $OPEN_MPI_PATH/bin/mpirun.real \
 	&& echo '#!/bin/bash' > $OPEN_MPI_PATH/bin/mpirun \
 	&& echo "${OPEN_MPI_PATH}/bin/mpirun.real --allow-run-as-root \"\$@\"" >> $OPEN_MPI_PATH/bin/mpirun \
@@ -310,17 +298,7 @@ RUN mv $OPEN_MPI_PATH/bin/mpirun $OPEN_MPI_PATH/bin/mpirun.real \
 	&& echo "rmaps_base_mapping_policy = slot" >> $OPEN_MPI_PATH/etc/openmpi-mca-params.conf \
 	&& echo NCCL_DEBUG=INFO >> /etc/nccl.conf \
 	&& echo NCCL_SOCKET_IFNAME=^docker0 >> /etc/nccl.conf
-RUN mkdir /tmp/efa-ofi-nccl \
-	&& cd /tmp/efa-ofi-nccl \
-	&& git clone https://github.com/aws/aws-ofi-nccl.git -b v${BRANCH_OFI} \
-	&& cd aws-ofi-nccl \
-	&& ./autogen.sh \
-	&& ./configure --with-libfabric=/opt/amazon/efa --with-mpi=/opt/amazon/openmpi --with-cuda=/usr/local/cuda --with-nccl=/usr/local --prefix=/usr/local \
-	&& make \
-	&& make install \
-	&& rm -rf /tmp/efa-ofi-nccl \
-	&& rm -rf /var/lib/apt/lists/* \
-	&& apt-get clean
+RUN mkdir /tmp/efa-ofi-nccl && cd /tmp/efa-ofi-nccl && git clone https://github.com/aws/aws-ofi-nccl.git -b v${BRANCH_OFI} && cd aws-ofi-nccl && ./autogen.sh && ./configure --with-libfabric=/opt/amazon/efa --with-mpi=/opt/amazon/openmpi --with-cuda=/usr/local/cuda --with-nccl=/usr/local --prefix=/usr/local && make && make install && rm -rf /tmp/efa-ofi-nccl && rm -rf /var/lib/apt/lists/* && apt-get clean
 RUN apt-get update \
 	&& apt-get install -y --allow-downgrades --allow-change-held-packages --no-install-recommends \
 	&& apt-get install -y --no-install-recommends openssh-client openssh-server \
@@ -369,26 +347,8 @@ WORKDIR /root
 
 ARG SMDEBUG_VERSION=1.0.34
 
-RUN cd /tmp \
-	&& git clone https://github.com/awslabs/sagemaker-debugger --branch ${SMDEBUG_VERSION} --depth 1 --single-branch \
-	&& cd sagemaker-debugger \
-	&& pip install . \
-	&& rm -rf /tmp/*
-RUN rm /etc/apt/sources.list.d/* \
-	&& git clone https://github.com/KarypisLab/GKlib \
-	&& cd GKlib \
-	&& make config \
-	&& make \
-	&& make install \
-	&& cd .. \
-	&& git clone https://github.com/KarypisLab/METIS.git \
-	&& cd METIS \
-	&& make config shared=1 cc=gcc prefix=/root/local \
-	&& make install \
-	&& cd .. \
-	&& rm -rf METIS GKlib \
-	&& rm -rf /var/lib/apt/lists/* \
-	&& apt-get clean
+RUN cd /tmp && git clone https://github.com/awslabs/sagemaker-debugger --branch ${SMDEBUG_VERSION} --depth 1 --single-branch && cd sagemaker-debugger && pip install . && rm -rf /tmp/*
+RUN rm /etc/apt/sources.list.d/* && git clone https://github.com/KarypisLab/GKlib && cd GKlib && make config && make && make install && cd .. && git clone https://github.com/KarypisLab/METIS.git && cd METIS && make config shared=1 cc=gcc prefix=/root/local && make install && cd .. && rm -rf METIS GKlib && rm -rf /var/lib/apt/lists/* && apt-get clean
 
 ARG RMM_VERSION=0.15.0
 

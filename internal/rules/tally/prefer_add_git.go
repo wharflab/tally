@@ -13,6 +13,11 @@ import (
 	"github.com/wharflab/tally/internal/sourcemap"
 )
 
+var (
+	dockerfileAddKeyword = strings.ToUpper(command.Add)
+	dockerfileRunKeyword = strings.ToUpper(command.Run)
+)
+
 // PreferAddGitRule implements the prefer-add-git linting rule.
 type PreferAddGitRule struct{}
 
@@ -170,7 +175,7 @@ func buildPreferAddGitFix(
 }
 
 func buildAddGitInstruction(opportunity *shell.GitSourceOpportunity) string {
-	parts := []string{command.Add, "--link"}
+	parts := []string{dockerfileAddKeyword, "--link"}
 	if opportunity == nil {
 		return strings.Join(parts, " ")
 	}
@@ -207,12 +212,12 @@ func extractRunFlagSuffix(run *instructions.RunCommand, sm *sourcemap.SourceMap)
 
 	prefix := resolved.Source[:resolved.ScriptIndex]
 	upper := strings.ToUpper(prefix)
-	runIdx := strings.LastIndex(upper, command.Run)
+	runIdx := strings.LastIndex(upper, dockerfileRunKeyword)
 	if runIdx < 0 {
 		return " "
 	}
 
-	suffix := prefix[runIdx+len(command.Run):]
+	suffix := prefix[runIdx+len(dockerfileRunKeyword):]
 	if suffix == "" {
 		return " "
 	}
@@ -223,7 +228,7 @@ func buildRunWithSuffix(flagSuffix, script string) string {
 	if flagSuffix == "" {
 		flagSuffix = " "
 	}
-	return command.Run + flagSuffix + script
+	return dockerfileRunKeyword + flagSuffix + script
 }
 
 func init() {
