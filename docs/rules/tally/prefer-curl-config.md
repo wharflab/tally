@@ -77,6 +77,9 @@ connect-timeout = 10
 max-time = 120
 ```
 
+curl's config-file behavior is documented in the official manpage:
+[`--config`](https://curl.se/docs/manpage.html#--config).
+
 ## Examples
 
 ### Before (violation)
