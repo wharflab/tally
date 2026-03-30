@@ -180,6 +180,12 @@ func TestPreferWgetConfigRule_Check(t *testing.T) {
 			WantViolations: 1,
 		},
 		{
+			Name: "Windows path-qualified wget.exe triggers violation",
+			Content: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"RUN C:\\Tools\\WGET.EXE https://example.com/file.zip -O C:\\tmp\\file.zip\n",
+			WantViolations: 1,
+		},
+		{
 			Name: "Windows choco install wget triggers violation",
 			Content: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
 				"RUN choco install -y wget\n",

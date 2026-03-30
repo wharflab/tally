@@ -66,6 +66,12 @@ func TestPreferCurlConfigRule_Check(t *testing.T) {
 			WantViolations: 1,
 		},
 		{
+			Name: "path-qualified curl command in RUN triggers violation",
+			Content: "FROM ubuntu:22.04\n" +
+				"RUN /usr/bin/curl -fsSL https://example.com/install.sh | bash\n",
+			WantViolations: 1,
+		},
+		{
 			Name: "curl installed via apt-get triggers violation",
 			Content: "FROM ubuntu:22.04\n" +
 				"RUN apt-get update && apt-get install -y curl\n",
@@ -190,6 +196,12 @@ func TestPreferCurlConfigRule_Check(t *testing.T) {
 			Name: "Windows curl.exe triggers violation",
 			Content: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
 				"RUN curl.exe -fsSL https://example.com/install.ps1 -o install.ps1\n",
+			WantViolations: 1,
+		},
+		{
+			Name: "Windows path-qualified curl.exe triggers violation",
+			Content: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"RUN C:\\Tools\\CURL.EXE -fsSL https://example.com/install.ps1 -o install.ps1\n",
 			WantViolations: 1,
 		},
 		{
