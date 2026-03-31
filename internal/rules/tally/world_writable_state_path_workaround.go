@@ -111,6 +111,8 @@ func (r *WorldWritableStatePathWorkaroundRule) checkRun(
 			continue
 		}
 
+		isRecursive := cmd.HasFlag("-R") || cmd.HasFlag("--recursive")
+
 		// Re-parse from sourceScript to get column-accurate positions for fixes.
 		var fixCmd *shell.CommandInfo
 		if sourceScript != "" {
@@ -125,8 +127,10 @@ func (r *WorldWritableStatePathWorkaroundRule) checkRun(
 		loc := rules.NewLocationFromRanges(file, runFacts.Run.Location())
 		for _, target := range info.targets {
 			v := r.buildViolation(loc, meta, "chmod", info.rawMode, target)
-			if fix := r.buildFix(file, fixCmd, runStartLine, info, meta); fix != nil {
-				v = v.WithSuggestedFix(fix)
+			if !isRecursive {
+				if fix := r.buildFix(file, fixCmd, runStartLine, info, meta); fix != nil {
+					v = v.WithSuggestedFix(fix)
+				}
 			}
 			violations = append(violations, v)
 		}
@@ -224,28 +228,23 @@ func (r *WorldWritableStatePathWorkaroundRule) buildViolation(
 
 // worldWritableInfo holds a detected world-writable chmod/mkdir.
 type worldWritableInfo struct {
-	rawMode     string   // original mode string (e.g., "777", "a+rwx")
-	parsedMode  uint16   // parsed octal mode
-	targets     []string // target paths
-	isRecursive bool     // -R flag present (chmod only)
+	rawMode    string   // original mode string (e.g., "777", "a+rwx")
+	parsedMode uint16   // parsed octal mode
+	targets    []string // target paths
 }
 
 // extractWorldWritableChmod parses chmod arguments for world-writable modes.
 // args should NOT include the "chmod" command name itself.
 func extractWorldWritableChmod(args []string) *worldWritableInfo {
 	var (
-		rawMode     string
-		parsedMode  uint16
-		seenMode    bool
-		isRecursive bool
-		targets     []string
+		rawMode    string
+		parsedMode uint16
+		seenMode   bool
+		targets    []string
 	)
 
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-") {
-			if strings.Contains(arg, "R") {
-				isRecursive = true
-			}
 			continue
 		}
 
@@ -270,10 +269,9 @@ func extractWorldWritableChmod(args []string) *worldWritableInfo {
 	}
 
 	return &worldWritableInfo{
-		rawMode:     rawMode,
-		parsedMode:  parsedMode,
-		targets:     targets,
-		isRecursive: isRecursive,
+		rawMode:    rawMode,
+		parsedMode: parsedMode,
+		targets:    targets,
 	}
 }
 
@@ -391,9 +389,6 @@ func (r *WorldWritableStatePathWorkaroundRule) buildFix(
 	info *worldWritableInfo,
 	meta rules.RuleMetadata,
 ) *rules.SuggestedFix {
-	if info.isRecursive {
-		return nil // recursive chmod is too complex for safe suggestion
-	}
 	if !shell.IsOctalMode(info.rawMode) {
 		return nil // only offer fix for octal modes
 	}

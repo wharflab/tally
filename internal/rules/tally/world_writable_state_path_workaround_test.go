@@ -274,11 +274,19 @@ COPY --from=builder /build /app
 			WantMessages:   []string{"777"},
 		},
 
-		// === Violations: recursive chmod ===
+		// === Violations: recursive chmod (detected but no fix offered) ===
 		{
 			Name: "recursive chmod -R 777",
 			Content: `FROM ubuntu:22.04
 RUN chmod -R 777 /data
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"777"},
+		},
+		{
+			Name: "recursive chmod --recursive 777",
+			Content: `FROM ubuntu:22.04
+RUN chmod --recursive 777 /data
 `,
 			WantViolations: 1,
 			WantMessages:   []string{"777"},
