@@ -37,7 +37,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/require-secret-mounts`](docs/rules/tally/require-secret-mounts.md) 🔧 | Enforces `--mount=type=secret` for commands accessing private registries | Warning | Security | Off (requires config) |
 | [`tally/prefer-add-git`](docs/rules/tally/prefer-add-git.md) 🔧 | Prefers `ADD <git source>` over cloning repositories in `RUN` for more hermetic builds | Warning | Security | Enabled |
 | [`tally/stateful-root-runtime`](docs/rules/tally/stateful-root-runtime.md) | Final stage runs as root and signals mutable/persistent state | Warning | Security | Enabled |
-| [`tally/world-writable-state-path-workaround`](docs/rules/tally/world-writable-state-path-workaround.md) | chmod 777/a+rwx sets world-writable permissions (ownership confusion workaround) | Warning | Security | Enabled |
+| [`tally/world-writable-state-path-workaround`](docs/rules/tally/world-writable-state-path-workaround.md) 🔧 | chmod 777/a+rwx sets world-writable permissions (ownership confusion workaround) | Warning | Security | Enabled |
 | [`tally/user-created-but-never-used`](docs/rules/tally/user-created-but-never-used.md) 🔧 | Final stage creates a user but never switches to it | Warning | Security | Enabled |
 | [`tally/copy-after-user-without-chown`](docs/rules/tally/copy-after-user-without-chown.md) 🔧 | COPY/ADD without --chown after non-root USER creates root-owned files | Warning | Correctness | Enabled |
 | [`tally/max-lines`](docs/rules/tally/max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
