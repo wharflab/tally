@@ -106,6 +106,20 @@ RUN git clone https://github.com/NVIDIA/apex && cd apex && make
 	}
 }
 
+func TestDL3003Rule_DoesNotDeferUnsupportedPreferAddGitFlow(t *testing.T) {
+	t.Parallel()
+
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM ubuntu
+RUN git clone https://github.com/NVIDIA/apex && cd apex && git checkout aa756ce
+`)
+	input.EnabledRules = []string{rules.HadolintRulePrefix + "DL3003", rules.PreferAddGitRuleCode}
+
+	violations := NewDL3003Rule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+}
+
 func TestDL3003Rule_AutoFix(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

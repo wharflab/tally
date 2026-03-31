@@ -109,6 +109,13 @@ func FirstGitSourceOpportunity(script string, variant Variant, workdir string) (
 	return nil, false
 }
 
+// HasActionableGitSourceOpportunity reports whether a script has a git-clone
+// flow that prefer-add-git can extract into ADD <git source>.
+func HasActionableGitSourceOpportunity(script string, variant Variant, workdir string) bool {
+	_, ok := FirstGitSourceOpportunity(script, variant, workdir)
+	return ok
+}
+
 func buildGitSourceOpportunity(
 	steps []gitChainStep,
 	cloneIndex int,

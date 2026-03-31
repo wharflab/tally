@@ -46,7 +46,7 @@ func (r *PreferAddGitRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
 
-	runContexts := buildGitRunContexts(input)
+	runContexts := rules.BuildGitRunContexts(input)
 	if len(runContexts) == 0 {
 		return nil
 	}
@@ -90,38 +90,6 @@ func (r *PreferAddGitRule) Check(input rules.LintInput) []rules.Violation {
 	}
 
 	return violations
-}
-
-type gitRunContext struct {
-	Script  string
-	Workdir string
-	Variant shell.Variant
-}
-
-func buildGitRunContexts(input rules.LintInput) map[*instructions.RunCommand]gitRunContext {
-	contexts := make(map[*instructions.RunCommand]gitRunContext)
-	if input.Facts == nil {
-		return contexts
-	}
-
-	for stageIdx := range input.Stages {
-		stageFacts := input.Facts.Stage(stageIdx)
-		if stageFacts == nil {
-			continue
-		}
-		for _, runFacts := range stageFacts.Runs {
-			if runFacts == nil || runFacts.Run == nil {
-				continue
-			}
-			contexts[runFacts.Run] = gitRunContext{
-				Script:  runFacts.SourceScript,
-				Workdir: runFacts.Workdir,
-				Variant: runFacts.Shell.Variant,
-			}
-		}
-	}
-
-	return contexts
 }
 
 func buildPreferAddGitFix(
