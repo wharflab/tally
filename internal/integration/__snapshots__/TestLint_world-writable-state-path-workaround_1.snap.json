@@ -29,7 +29,7 @@
                     "column": 31,
                     "line": 3
                   },
-                  "file": "",
+                  "file": "testdata/world-writable-state-path-workaround/Dockerfile",
                   "start": {
                     "column": 28,
                     "line": 3
@@ -68,7 +68,7 @@
                     "column": 13,
                     "line": 7
                   },
-                  "file": "",
+                  "file": "testdata/world-writable-state-path-workaround/Dockerfile",
                   "start": {
                     "column": 10,
                     "line": 7

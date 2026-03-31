@@ -5,10 +5,10 @@ import (
 	"path"
 	"strings"
 
+	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/shell"
-	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 // WorldWritableStatePathWorkaroundRuleCode is the full rule code.
@@ -51,7 +51,6 @@ func (r *WorldWritableStatePathWorkaroundRule) Metadata() rules.RuleMetadata {
 // Check runs the world-writable-state-path-workaround rule.
 func (r *WorldWritableStatePathWorkaroundRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
-	sm := input.SourceMap()
 	fileFacts := input.Facts
 
 	var violations []rules.Violation
@@ -64,7 +63,7 @@ func (r *WorldWritableStatePathWorkaroundRule) Check(input rules.LintInput) []ru
 
 		for _, runFacts := range sf.Runs {
 			violations = append(violations,
-				r.checkRun(runFacts, input.File, sm, meta)...)
+				r.checkRun(runFacts, input, meta)...)
 		}
 	}
 
@@ -74,10 +73,10 @@ func (r *WorldWritableStatePathWorkaroundRule) Check(input rules.LintInput) []ru
 // checkRun inspects a single RUN instruction for world-writable chmod/mkdir patterns.
 func (r *WorldWritableStatePathWorkaroundRule) checkRun(
 	runFacts *facts.RunFacts,
-	file string,
-	sm *sourcemap.SourceMap,
+	input rules.LintInput,
 	meta rules.RuleMetadata,
 ) []rules.Violation {
+	file := input.File
 	if runFacts == nil || !runFacts.UsesShell {
 		return r.checkExecForm(runFacts, file, meta)
 	}
@@ -88,6 +87,15 @@ func (r *WorldWritableStatePathWorkaroundRule) checkRun(
 	}
 
 	variant := runFacts.Shell.Variant
+
+	// For fix positioning, use RunSourceScript which preserves column alignment
+	// between the shell AST and the Dockerfile source. This lets us use
+	// CommandInfo.Subcommand* positions directly instead of string searching.
+	var sourceScript string
+	var runStartLine int
+	if sm := input.SourceMap(); sm != nil && runFacts.Run.PrependShell {
+		sourceScript, runStartLine = dockerfile.RunSourceScript(runFacts.Run, sm)
+	}
 
 	var violations []rules.Violation
 
@@ -103,10 +111,21 @@ func (r *WorldWritableStatePathWorkaroundRule) checkRun(
 			continue
 		}
 
+		// Re-parse from sourceScript to get column-accurate positions for fixes.
+		var fixCmd *shell.CommandInfo
+		if sourceScript != "" {
+			for _, sc := range shell.FindCommands(sourceScript, variant, "chmod") {
+				if sc.Subcommand == info.rawMode {
+					fixCmd = &sc
+					break
+				}
+			}
+		}
+
 		loc := rules.NewLocationFromRanges(file, runFacts.Run.Location())
 		for _, target := range info.targets {
 			v := r.buildViolation(loc, meta, "chmod", info.rawMode, target)
-			if fix := r.buildFix(runFacts, sm, info, meta); fix != nil {
+			if fix := r.buildFix(file, fixCmd, runStartLine, info, meta); fix != nil {
 				v = v.WithSuggestedFix(fix)
 			}
 			violations = append(violations, v)
@@ -346,11 +365,13 @@ func suggestTighterMode(rawMode string, parsedMode uint16) string {
 }
 
 // buildFix creates a FixSuggestion that replaces the world-writable mode token
-// with a tighter mode. Only generated for octal modes (symbolic edits are too
-// varied for reliable auto-replacement).
+// with a tighter mode. Uses AST-derived positions from CommandInfo.Subcommand*
+// (via dockerfile.RunSourceScript) for precise column-accurate edits.
+// Only generated for octal modes (symbolic edits are too varied).
 func (r *WorldWritableStatePathWorkaroundRule) buildFix(
-	runFacts *facts.RunFacts,
-	sm *sourcemap.SourceMap,
+	file string,
+	cmd *shell.CommandInfo,
+	runStartLine int,
 	info *worldWritableInfo,
 	meta rules.RuleMetadata,
 ) *rules.SuggestedFix {
@@ -360,73 +381,32 @@ func (r *WorldWritableStatePathWorkaroundRule) buildFix(
 	if !shell.IsOctalMode(info.rawMode) {
 		return nil // only offer fix for octal modes
 	}
+	if cmd == nil || runStartLine == 0 {
+		return nil // no source-mapped positions available
+	}
 
 	tighter := suggestTighterMode(info.rawMode, info.parsedMode)
 
-	// Locate the mode token in the source to build a precise TextEdit.
-	runLoc := runFacts.Run.Location()
-	if len(runLoc) == 0 {
-		return nil
+	// The mode token is the Subcommand of the chmod command (first non-flag arg).
+	// RunSourceScript preserves column alignment, so Subcommand positions map
+	// directly to Dockerfile source columns.
+	editLine := runStartLine + cmd.SubcommandLine
+
+	edit := rules.TextEdit{
+		Location: rules.NewRangeLocation(
+			file,
+			editLine, cmd.SubcommandStartCol,
+			editLine, cmd.SubcommandEndCol,
+		),
+		NewText: tighter,
 	}
 
-	startLine := runLoc[0].Start.Line // 1-based
-	endLine := sm.ResolveEndLine(startLine)
-
-	// Search for the mode token in the source lines of this RUN instruction.
-	for lineNum := startLine; lineNum <= endLine; lineNum++ {
-		lineText := sm.Line(lineNum - 1) // Line() is 0-based
-		col := findModeToken(lineText, info.rawMode)
-		if col < 0 {
-			continue
-		}
-
-		edit := rules.TextEdit{
-			Location: rules.NewRangeLocation(
-				"", // file is filled by fixer
-				lineNum, col,
-				lineNum, col+len(info.rawMode),
-			),
-			NewText: tighter,
-		}
-
-		return &rules.SuggestedFix{
-			Description: fmt.Sprintf("Replace %s with %s to remove world-writable permission", info.rawMode, tighter),
-			Edits:       []rules.TextEdit{edit},
-			Safety:      rules.FixSuggestion,
-			IsPreferred: true,
-			Priority:    meta.FixPriority,
-		}
-	}
-
-	return nil
-}
-
-// findModeToken finds the column offset of a chmod mode token in a line.
-// Returns -1 if not found. Ensures the match is surrounded by whitespace or
-// line boundaries to avoid matching partial tokens.
-func findModeToken(line, mode string) int {
-	offset := 0
-	for {
-		idx := strings.Index(line[offset:], mode)
-		if idx < 0 {
-			return -1
-		}
-		col := offset + idx
-
-		// Check boundaries: must be preceded by space/tab/start and followed by space/tab/end.
-		before := col == 0 || line[col-1] == ' ' || line[col-1] == '\t'
-		after := col+len(mode) >= len(line) ||
-			line[col+len(mode)] == ' ' || line[col+len(mode)] == '\t' ||
-			line[col+len(mode)] == '\\' || line[col+len(mode)] == '&' ||
-			line[col+len(mode)] == ';' || line[col+len(mode)] == '\n'
-		if before && after {
-			return col
-		}
-
-		offset = col + len(mode)
-		if offset >= len(line) {
-			return -1
-		}
+	return &rules.SuggestedFix{
+		Description: fmt.Sprintf("Replace %s with %s to remove world-writable permission", info.rawMode, tighter),
+		Edits:       []rules.TextEdit{edit},
+		Safety:      rules.FixSuggestion,
+		IsPreferred: true,
+		Priority:    meta.FixPriority,
 	}
 }
 
