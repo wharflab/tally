@@ -21,7 +21,8 @@ Modern Dockerfiles deserve modern tooling. tally is opinionated in the right pla
 
 - **BuildKit-native**: understands modern syntax like heredocs, `RUN --mount=...`, `COPY --link`, and `ADD --checksum=...`.
 - **Fixes, not just findings**: `--fix` applies safe, mechanical rewrites; `--fix-unsafe` unlocks opt-in risky fixes (including AI).
-- **Modernizes on purpose**: converts eligible `RUN`/`COPY` instructions to heredocs, prefers BuildKit `ADD` sources for archives and git repos, and more.
+- **Modernizes on purpose**: converts eligible `RUN`/`COPY` instructions to heredocs, prefers BuildKit `ADD` sources for archives and git repos, and
+  more.
 - **Broad rule coverage**: combines Docker's official BuildKit checks, embedded ShellCheck for shell snippets, Hadolint-compatible rules, and
   tally-specific rules.
 - **PowerShell-aware**: parses full PowerShell syntax for semantic tokens and rule analysis, so PowerShell `RUN` instructions are treated as real
