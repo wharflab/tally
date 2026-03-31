@@ -100,24 +100,6 @@ func DetectFileCreation(script string, variant Variant, knownVars func(name stri
 	return DetectFileCreationWithOptions(script, variant, knownVars, FileCreationOptions{})
 }
 
-// DetectFileCreationWithPathResolver analyzes a shell script for file creation
-// patterns, allowing callers to resolve literal target paths like "~/.bashrc"
-// to an absolute in-image path.
-//
-// The resolveTargetPath callback receives the literal redirect/tee target and
-// should return the resolved absolute path, whether the resolution required
-// home-path rewriting, and whether the target is supported at all.
-func DetectFileCreationWithPathResolver(
-	script string,
-	variant Variant,
-	knownVars func(name string) bool,
-	resolveTargetPath func(rawTarget string) (resolvedPath string, resolvedHomePath bool, ok bool),
-) *FileCreationInfo {
-	return DetectFileCreationWithOptions(script, variant, knownVars, FileCreationOptions{
-		ResolveTargetPath: resolveTargetPath,
-	})
-}
-
 // DetectFileCreationWithOptions analyzes a shell script for file creation
 // patterns with optional target-path rewriting and shell-specific echo
 // semantics.
