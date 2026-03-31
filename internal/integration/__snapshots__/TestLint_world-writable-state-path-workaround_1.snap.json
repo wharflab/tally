@@ -1,0 +1,172 @@
+{
+  "files": [
+    {
+      "file": "testdata/world-writable-state-path-workaround/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/world-writable-state-path-workaround/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/world-writable-state-path-workaround/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "chmod 777 on state path /data sets world-writable permissions (ownership confusion workaround)",
+          "rule": "tally/world-writable-state-path-workaround",
+          "severity": "warning",
+          "sourceCode": "RUN mkdir -p /data \u0026\u0026 chmod 777 /data",
+          "suggestedFix": {
+            "description": "Replace 777 with 775 to remove world-writable permission",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 31,
+                    "line": 3
+                  },
+                  "file": "testdata/world-writable-state-path-workaround/Dockerfile",
+                  "start": {
+                    "column": 28,
+                    "line": 3
+                  }
+                },
+                "newText": "775"
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/world-writable-state-path-workaround/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 7
+            },
+            "file": "testdata/world-writable-state-path-workaround/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 7
+            }
+          },
+          "message": "chmod 666 on state path /var/lib/app/config sets world-writable permissions (ownership confusion workaround)",
+          "rule": "tally/world-writable-state-path-workaround",
+          "severity": "warning",
+          "sourceCode": "RUN chmod 666 /var/lib/app/config",
+          "suggestedFix": {
+            "description": "Replace 666 with 664 to remove world-writable permission",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 13,
+                    "line": 7
+                  },
+                  "file": "testdata/world-writable-state-path-workaround/Dockerfile",
+                  "start": {
+                    "column": 10,
+                    "line": 7
+                  }
+                },
+                "newText": "664"
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/world-writable-state-path-workaround/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 11
+            },
+            "file": "testdata/world-writable-state-path-workaround/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 11
+            }
+          },
+          "message": "chmod a+rwx on /app sets world-writable permissions",
+          "rule": "tally/world-writable-state-path-workaround",
+          "severity": "warning",
+          "sourceCode": "RUN chmod a+rwx /app"
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/world-writable-state-path-workaround/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 15
+            },
+            "file": "testdata/world-writable-state-path-workaround/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 15
+            }
+          },
+          "message": "mkdir -m 777 on /srv/logs sets world-writable permissions",
+          "rule": "tally/world-writable-state-path-workaround",
+          "severity": "warning",
+          "sourceCode": "RUN mkdir -pm 777 /srv/logs"
+        },
+        {
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/world-writable-state-path-workaround/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 23
+            },
+            "file": "testdata/world-writable-state-path-workaround/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 23
+            }
+          },
+          "message": "chmod 777 on state path /data sets world-writable permissions (ownership confusion workaround)",
+          "rule": "tally/world-writable-state-path-workaround",
+          "severity": "warning",
+          "sourceCode": "RUN chgrp 0 /data \u0026\u0026 chmod 777 /data",
+          "suggestedFix": {
+            "description": "Replace 777 with 775 to remove world-writable permission",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 30,
+                    "line": 23
+                  },
+                  "file": "testdata/world-writable-state-path-workaround/Dockerfile",
+                  "start": {
+                    "column": 27,
+                    "line": 23
+                  }
+                },
+                "newText": "775"
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 5,
+    "warnings": 5
+  }
+}

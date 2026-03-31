@@ -1102,6 +1102,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// World-writable state path workaround (isolated to world-writable-state-path-workaround rule)
+		{
+			name:     "world-writable-state-path-workaround",
+			dir:      "world-writable-state-path-workaround",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/world-writable-state-path-workaround")...),
+			wantExit: 1,
+		},
+
 		// User created but never used (isolated to user-created-but-never-used rule)
 		{
 			name:     "user-created-but-never-used",

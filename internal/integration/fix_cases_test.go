@@ -1932,6 +1932,51 @@ severity = "warning"
 			wantApplied: 2,
 		},
 
+		// world-writable-state-path-workaround: replaces 777 with 775
+		{
+			name:  "world-writable-state-path-workaround",
+			input: "FROM ubuntu:22.04\nRUN chmod 777 /data\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/world-writable-state-path-workaround")...),
+			wantApplied: 1,
+		},
+
+		// world-writable-state-path-workaround: 666 → 664
+		{
+			name:  "world-writable-state-path-workaround-666",
+			input: "FROM ubuntu:22.04\nRUN chmod 666 /app/config\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/world-writable-state-path-workaround")...),
+			wantApplied: 1,
+		},
+
+		// Cross-rule: world-writable + prefer-copy-chmod on same COPY+RUN chmod 777 pair.
+		// prefer-copy-chmod (priority 99) deletes the RUN and adds COPY --chmod=777,
+		// which makes world-writable's fix on the (now-deleted) RUN moot. Only the
+		// prefer-copy-chmod fix applies.
+		{
+			name:  "world-writable-cross-prefer-copy-chmod",
+			input: "FROM ubuntu:22.04\nCOPY app /app\nRUN chmod 777 /app\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/world-writable-state-path-workaround", "tally/prefer-copy-chmod")...),
+			wantApplied: 1, // prefer-copy-chmod subsumes the RUN
+		},
+
+		// Cross-rule: world-writable + copy-after-user-without-chown on different instructions.
+		// copy-after-user adds --chown to COPY; world-writable fixes chmod 777→775 in RUN.
+		// Both fixes target different instructions so both apply.
+		{
+			name:  "world-writable-cross-copy-after-user-without-chown",
+			input: "FROM ubuntu:22.04\nUSER appuser\nCOPY app /app\nRUN chmod 777 /app\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/world-writable-state-path-workaround", "tally/copy-after-user-without-chown")...),
+			wantApplied: 2,
+		},
+
 		// Cross-rule: copy-after-user-without-chown + prefer-copy-chmod compose correctly
 		{
 			name: "copy-after-user-chown-plus-chmod",

@@ -12,6 +12,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [require-secret-mounts](./require-secret-mounts.md) | Enforces --mount=type=secret for commands accessing private registries | Warning | Security | Off (requires config) |
 | [prefer-add-git](./prefer-add-git.md) | Prefer `ADD <git source>` over `git clone` inside `RUN` | Warning | Security | Enabled |
 | [stateful-root-runtime](./stateful-root-runtime.md) | Final stage runs as root and signals mutable/persistent state | Warning | Security | Enabled |
+| [world-writable-state-path-workaround](./world-writable-state-path-workaround.md) 🔧 | chmod 777/a+rwx sets world-writable permissions (ownership confusion workaround) | Warning | Security | Enabled |
 | [user-created-but-never-used](./user-created-but-never-used.md) | Final stage creates a user but never switches to it | Warning | Security | Enabled |
 | [copy-after-user-without-chown](./copy-after-user-without-chown.md) | COPY/ADD without --chown after non-root USER creates root-owned files | Warning | Correctness | Enabled |
 | [max-lines](./max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |

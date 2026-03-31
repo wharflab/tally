@@ -1,0 +1,428 @@
+package tally
+
+import (
+	"fmt"
+	"path"
+	"strings"
+
+	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/facts"
+	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/shell"
+)
+
+// WorldWritableStatePathWorkaroundRuleCode is the full rule code.
+const WorldWritableStatePathWorkaroundRuleCode = rules.TallyRulePrefix + "world-writable-state-path-workaround"
+
+// WorldWritableStatePathWorkaroundRule detects chmod 777/a+rwx or mkdir -m 777
+// patterns that set world-writable permissions — a common ownership confusion
+// workaround that weakens file security instead of fixing ownership properly
+// with USER, --chown, or group strategies.
+//
+// Cross-rule interaction:
+//
+//   - tally/prefer-copy-chmod: both can fire on the same Dockerfile.
+//     prefer-copy-chmod suggests merging COPY + RUN chmod into COPY --chmod;
+//     this rule flags the mode value itself as too permissive. Different concerns
+//     (structure vs permission value), no fix overlap.
+//   - tally/stateful-root-runtime: complementary. That rule flags root + state
+//     path; this rule flags world-writable permissions on any path. Both can fire.
+//   - tally/copy-after-user-without-chown: same ownership confusion family.
+//     No fix overlap (different instructions).
+type WorldWritableStatePathWorkaroundRule struct{}
+
+// NewWorldWritableStatePathWorkaroundRule creates a new rule instance.
+func NewWorldWritableStatePathWorkaroundRule() *WorldWritableStatePathWorkaroundRule {
+	return &WorldWritableStatePathWorkaroundRule{}
+}
+
+// Metadata returns the rule metadata.
+func (r *WorldWritableStatePathWorkaroundRule) Metadata() rules.RuleMetadata {
+	return rules.RuleMetadata{
+		Code:            WorldWritableStatePathWorkaroundRuleCode,
+		Name:            "World-Writable State Path Workaround",
+		Description:     "chmod 777/a+rwx sets world-writable permissions, a common ownership confusion workaround",
+		DocURL:          rules.TallyDocURL(WorldWritableStatePathWorkaroundRuleCode),
+		DefaultSeverity: rules.SeverityWarning,
+		Category:        "security",
+	}
+}
+
+// Check runs the world-writable-state-path-workaround rule.
+func (r *WorldWritableStatePathWorkaroundRule) Check(input rules.LintInput) []rules.Violation {
+	meta := r.Metadata()
+	fileFacts := input.Facts
+
+	var violations []rules.Violation
+
+	for stageIdx := range input.Stages {
+		sf := fileFacts.Stage(stageIdx)
+		if sf == nil {
+			continue
+		}
+
+		for _, runFacts := range sf.Runs {
+			violations = append(violations,
+				r.checkRun(runFacts, input, meta)...)
+		}
+	}
+
+	return violations
+}
+
+// checkRun inspects a single RUN instruction for world-writable chmod/mkdir patterns.
+func (r *WorldWritableStatePathWorkaroundRule) checkRun(
+	runFacts *facts.RunFacts,
+	input rules.LintInput,
+	meta rules.RuleMetadata,
+) []rules.Violation {
+	file := input.File
+	if runFacts == nil || !runFacts.UsesShell {
+		return r.checkExecForm(runFacts, file, meta)
+	}
+
+	script := runFacts.CommandScript
+	if script == "" {
+		return nil
+	}
+
+	variant := runFacts.Shell.Variant
+
+	// For fix positioning, use RunSourceScript which preserves column alignment
+	// between the shell AST and the Dockerfile source. This lets us use
+	// CommandInfo.Subcommand* positions directly instead of string searching.
+	var sourceScript string
+	var runStartLine int
+	if sm := input.SourceMap(); sm != nil && runFacts.Run.PrependShell {
+		sourceScript, runStartLine = dockerfile.RunSourceScript(runFacts.Run, sm)
+	}
+
+	// Pre-parse sourceScript chmods for column-accurate fix positions.
+	// FindCommands returns commands in AST order, so index-based correlation
+	// with the CommandScript parse is safe.
+	var sourceChmods []shell.CommandInfo
+	if sourceScript != "" {
+		sourceChmods = shell.FindCommands(sourceScript, variant, "chmod")
+	}
+
+	var violations []rules.Violation
+
+	// Detect world-writable chmod commands.
+	chmodIdx := 0
+	for _, cmd := range shell.FindCommands(script, variant, "chmod") {
+		// Track source-script index for fix correlation.
+		fixIdx := chmodIdx
+		chmodIdx++
+
+		info := extractWorldWritableChmod(cmd.Args)
+		if info == nil {
+			continue
+		}
+
+		isRecursive := cmd.HasFlag("-R") || cmd.HasFlag("--recursive")
+
+		var fixCmd *shell.CommandInfo
+		if fixIdx < len(sourceChmods) {
+			fixCmd = &sourceChmods[fixIdx]
+		}
+
+		loc := rules.NewLocationFromRanges(file, runFacts.Run.Location())
+		for _, target := range info.targets {
+			v := r.buildViolation(loc, meta, "chmod", info.rawMode, target)
+			if !isRecursive {
+				if fix := r.buildFix(file, fixCmd, runStartLine, info, meta); fix != nil {
+					v = v.WithSuggestedFix(fix)
+				}
+			}
+			violations = append(violations, v)
+		}
+	}
+
+	// Detect world-writable mkdir -m patterns.
+	for _, cmd := range shell.FindCommands(script, variant, "mkdir") {
+		info := extractWorldWritableMkdir(cmd.Args)
+		if info == nil {
+			continue
+		}
+
+		loc := rules.NewLocationFromRanges(file, runFacts.Run.Location())
+		for _, target := range info.targets {
+			v := r.buildViolation(loc, meta, "mkdir -m", info.rawMode, target)
+			violations = append(violations, v)
+		}
+	}
+
+	return violations
+}
+
+// checkExecForm handles exec-form RUN like ["chmod", "777", "/app"] or
+// ["mkdir", "-m", "777", "/data"]. Uses path.Base to handle absolute paths
+// (e.g., ["/usr/bin/chmod", ...]).
+func (r *WorldWritableStatePathWorkaroundRule) checkExecForm(
+	runFacts *facts.RunFacts,
+	file string,
+	meta rules.RuleMetadata,
+) []rules.Violation {
+	if runFacts == nil || runFacts.Run == nil {
+		return nil
+	}
+
+	cmdLine := runFacts.Run.CmdLine
+	if len(cmdLine) < 3 {
+		return nil
+	}
+
+	cmdName := path.Base(cmdLine[0])
+	loc := rules.NewLocationFromRanges(file, runFacts.Run.Location())
+
+	switch cmdName {
+	case "chmod":
+		info := extractWorldWritableChmod(cmdLine[1:])
+		if info == nil {
+			return nil
+		}
+		var violations []rules.Violation
+		for _, target := range info.targets {
+			v := r.buildViolation(loc, meta, "chmod", info.rawMode, target)
+			violations = append(violations, v)
+		}
+		return violations
+
+	case "mkdir":
+		info := extractWorldWritableMkdir(cmdLine[1:])
+		if info == nil {
+			return nil
+		}
+		var violations []rules.Violation
+		for _, target := range info.targets {
+			v := r.buildViolation(loc, meta, "mkdir -m", info.rawMode, target)
+			violations = append(violations, v)
+		}
+		return violations
+
+	default:
+		return nil
+	}
+}
+
+// buildViolation constructs a violation with a contextual message.
+func (r *WorldWritableStatePathWorkaroundRule) buildViolation(
+	loc rules.Location,
+	meta rules.RuleMetadata,
+	cmdDesc, rawMode, target string,
+) rules.Violation {
+	var msg string
+	if isStatePath(target) {
+		msg = fmt.Sprintf(
+			"%s %s on state path %s sets world-writable permissions (ownership confusion workaround)",
+			cmdDesc, rawMode, target,
+		)
+	} else {
+		msg = fmt.Sprintf(
+			"%s %s on %s sets world-writable permissions",
+			cmdDesc, rawMode, target,
+		)
+	}
+
+	return rules.NewViolation(loc, meta.Code, msg, meta.DefaultSeverity).
+		WithDocURL(meta.DocURL)
+}
+
+// worldWritableInfo holds a detected world-writable chmod/mkdir.
+type worldWritableInfo struct {
+	rawMode    string   // original mode string (e.g., "777", "a+rwx")
+	parsedMode uint16   // parsed octal mode
+	targets    []string // target paths
+}
+
+// extractWorldWritableChmod parses chmod arguments for world-writable modes.
+// args should NOT include the "chmod" command name itself.
+func extractWorldWritableChmod(args []string) *worldWritableInfo {
+	var (
+		rawMode    string
+		parsedMode uint16
+		seenMode   bool
+		targets    []string
+	)
+
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+
+		if !seenMode {
+			rawMode, parsedMode, seenMode = parseWorldWritableMode(arg)
+			if !seenMode {
+				return nil // first non-flag arg must be the mode
+			}
+			continue
+		}
+
+		// Remaining non-flag args are target paths.
+		targets = append(targets, arg)
+	}
+
+	if !seenMode || len(targets) == 0 {
+		return nil
+	}
+
+	if !isWorldWritable(parsedMode) {
+		return nil
+	}
+
+	return &worldWritableInfo{
+		rawMode:    rawMode,
+		parsedMode: parsedMode,
+		targets:    targets,
+	}
+}
+
+// extractWorldWritableMkdir parses mkdir arguments for -m/--mode with
+// world-writable values.
+func extractWorldWritableMkdir(args []string) *worldWritableInfo {
+	var (
+		rawMode    string
+		parsedMode uint16
+		seenMode   bool
+		targets    []string
+	)
+
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+
+		// --mode=777 form
+		if value, found := strings.CutPrefix(arg, "--mode="); found {
+			rawMode, parsedMode, seenMode = parseWorldWritableMode(value)
+			continue
+		}
+
+		// --mode 777 form
+		if arg == "--mode" && i+1 < len(args) {
+			i++
+			rawMode, parsedMode, seenMode = parseWorldWritableMode(args[i])
+			continue
+		}
+
+		// Handle combined short flags like -pm 777 or standalone -m 777
+		if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") {
+			flagChars := strings.TrimPrefix(arg, "-")
+			if strings.Contains(flagChars, "m") {
+				// -m is the last char → next arg is the mode value
+				if strings.HasSuffix(flagChars, "m") && i+1 < len(args) {
+					i++
+					rawMode, parsedMode, seenMode = parseWorldWritableMode(args[i])
+				}
+				// -m<value> form (e.g., -m777) — the value is embedded
+				if idx := strings.Index(flagChars, "m"); idx < len(flagChars)-1 {
+					rawMode, parsedMode, seenMode = parseWorldWritableMode(flagChars[idx+1:])
+				}
+			}
+			continue
+		}
+
+		// Non-flag arg → directory path
+		if !strings.HasPrefix(arg, "-") {
+			targets = append(targets, arg)
+		}
+	}
+
+	if !seenMode || len(targets) == 0 || !isWorldWritable(parsedMode) {
+		return nil
+	}
+
+	return &worldWritableInfo{
+		rawMode:    rawMode,
+		parsedMode: parsedMode,
+		targets:    targets,
+	}
+}
+
+// parseWorldWritableMode parses a mode string and returns the raw mode,
+// parsed octal mode, and whether parsing succeeded.
+func parseWorldWritableMode(s string) (string, uint16, bool) {
+	switch {
+	case shell.IsOctalMode(s):
+		mode := shell.ParseOctalMode(s)
+		return s, mode, true
+	case shell.IsSymbolicMode(s):
+		// Apply symbolic mode to default file mode (0o644) and also to 0o000
+		// to handle both additive (+w) and absolute (=rwx) cases.
+		fromDefault := shell.ApplySymbolicMode(s, 0o644)
+		fromZero := shell.ApplySymbolicMode(s, 0o000)
+		// Use whichever produces the more permissive result.
+		mode := fromDefault | fromZero
+		if mode == 0 {
+			return "", 0, false // unsupported symbolic mode (X, s, t)
+		}
+		return s, mode, true
+	default:
+		// Unrecognized mode format (e.g., g=u). Not parseable → skip.
+		return "", 0, false
+	}
+}
+
+// isWorldWritable checks if a mode has the others-write bit set.
+func isWorldWritable(mode uint16) bool {
+	return mode&0o002 != 0
+}
+
+// suggestTighterMode computes a tighter replacement by clearing the others-write bit.
+func suggestTighterMode(rawMode string, parsedMode uint16) string {
+	tighter := parsedMode &^ 0o002
+	if shell.IsOctalMode(rawMode) {
+		// Preserve the user's digit count: 3 digits (777) → 3 digits, 4 digits (0777) → 4 digits.
+		if len(rawMode) == 4 {
+			return fmt.Sprintf("%04o", tighter)
+		}
+		return fmt.Sprintf("%03o", tighter)
+	}
+	// For symbolic modes, suggest the octal equivalent.
+	return fmt.Sprintf("%03o", tighter)
+}
+
+// buildFix creates a FixSuggestion that replaces the world-writable mode token
+// with a tighter mode. Uses AST-derived positions from CommandInfo.Subcommand*
+// (via dockerfile.RunSourceScript) for precise column-accurate edits.
+// Only generated for octal modes (symbolic edits are too varied).
+func (r *WorldWritableStatePathWorkaroundRule) buildFix(
+	file string,
+	cmd *shell.CommandInfo,
+	runStartLine int,
+	info *worldWritableInfo,
+	meta rules.RuleMetadata,
+) *rules.SuggestedFix {
+	if !shell.IsOctalMode(info.rawMode) {
+		return nil // only offer fix for octal modes
+	}
+	if cmd == nil || runStartLine == 0 {
+		return nil // no source-mapped positions available
+	}
+
+	tighter := suggestTighterMode(info.rawMode, info.parsedMode)
+
+	// The mode token is the Subcommand of the chmod command (first non-flag arg).
+	// RunSourceScript preserves column alignment, so Subcommand positions map
+	// directly to Dockerfile source columns.
+	editLine := runStartLine + cmd.SubcommandLine
+
+	edit := rules.TextEdit{
+		Location: rules.NewRangeLocation(
+			file,
+			editLine, cmd.SubcommandStartCol,
+			editLine, cmd.SubcommandEndCol,
+		),
+		NewText: tighter,
+	}
+
+	return &rules.SuggestedFix{
+		Description: fmt.Sprintf("Replace %s with %s to remove world-writable permission", info.rawMode, tighter),
+		Edits:       []rules.TextEdit{edit},
+		Safety:      rules.FixSuggestion,
+		IsPreferred: true,
+		Priority:    meta.FixPriority,
+	}
+}
+
+func init() {
+	rules.Register(NewWorldWritableStatePathWorkaroundRule())
+}
