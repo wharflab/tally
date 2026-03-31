@@ -428,6 +428,39 @@ RUN echo "#! /bin/bash\n\n# script to activate the conda environment" > /app/bas
 	}
 }
 
+func TestPreferCopyHeredocRule_AshNoEscapeInterpretation(t *testing.T) {
+	t.Parallel()
+
+	// Alpine uses ash (BusyBox), where plain echo does NOT interpret
+	// backslash escapes. The COPY heredoc must preserve literal \n.
+	content := `FROM alpine:3.20
+RUN echo "#! /bin/sh\n\nset -e" > /app/entrypoint.sh
+SHELL ["/bin/ash", "-c"]
+RUN echo "#! /bin/ash\n\nset -e" > /app/explicit-ash.sh
+`
+
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	violations := NewPreferCopyHeredocRule().Check(input)
+	if len(violations) != 2 {
+		t.Fatalf("got %d violations, want 2", len(violations))
+	}
+
+	// Both fixes should preserve literal \n (no escape interpretation).
+	for i, v := range violations {
+		fix := v.SuggestedFix
+		if fix == nil || len(fix.Edits) == 0 {
+			t.Fatalf("violation[%d]: expected a fix with edits", i)
+		}
+		got := fix.Edits[0].NewText
+		if strings.Contains(got, "#! /bin/sh\n\nset -e") || strings.Contains(got, "#! /bin/ash\n\nset -e") {
+			t.Fatalf("violation[%d]: fix text = %q, should NOT contain actual newlines from escape interpretation on ash", i, got)
+		}
+		if !strings.Contains(got, `\n`) {
+			t.Fatalf("violation[%d]: fix text = %q, want literal \\n preserved", i, got)
+		}
+	}
+}
+
 func TestPreferCopyHeredocRule_TildeTargetFixes(t *testing.T) {
 	t.Parallel()
 	rule := NewPreferCopyHeredocRule()

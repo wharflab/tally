@@ -878,7 +878,7 @@ func preferCopyHeredocShellContextForRun(
 	return preferCopyHeredocShellContext{
 		variant: variant,
 		fileCreationOptions: shell.FileCreationOptions{
-			InterpretPlainEchoEscapes: preferCopyHeredocInterpretsPlainEchoEscapes(shellName, variant),
+			InterpretPlainEchoEscapes: preferCopyHeredocInterpretsPlainEchoEscapes(shellName, variant, isDashDefault(stageInfo)),
 		},
 	}
 }
@@ -898,12 +898,21 @@ func preferCopyHeredocHeredocShellOverride(
 	return semantic.HeredocShellOverride{}, false
 }
 
-func preferCopyHeredocInterpretsPlainEchoEscapes(shellName string, variant shell.Variant) bool {
+func isDashDefault(stageInfo *semantic.StageInfo) bool {
+	return stageInfo != nil && stageInfo.DashDefault
+}
+
+func preferCopyHeredocInterpretsPlainEchoEscapes(shellName string, variant shell.Variant, dashDefault bool) bool {
 	switch shell.NormalizeShellExecutableName(shellName) {
-	case "dash", "ash":
+	case "dash":
 		return true
+	case "ash":
+		return false
 	case "sh":
-		return variant == shell.VariantPOSIX
+		// When /bin/sh is the default and the variant is POSIX, the behavior
+		// depends on the distro: dash (Debian/Ubuntu) interprets backslash
+		// escapes in plain echo, ash (Alpine/BusyBox) does not.
+		return variant == shell.VariantPOSIX && dashDefault
 	default:
 		return false
 	}

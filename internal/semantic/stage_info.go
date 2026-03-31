@@ -162,6 +162,12 @@ type StageInfo struct {
 	// It is not registry-verified image metadata.
 	BaseImageOS BaseImageOS
 
+	// DashDefault is true when the base image is known to use dash as the
+	// default /bin/sh (Debian, Ubuntu). On these distros, plain echo interprets
+	// backslash escapes (e.g., \n → newline). False for ash-based distros
+	// (Alpine, BusyBox, distroless, Chainguard, Wolfi) where echo does not.
+	DashDefault bool
+
 	// ShellSetting contains the active shell configuration including variant and source.
 	ShellSetting ShellSetting
 
@@ -386,17 +392,36 @@ func isLinuxImageName(lower string) bool {
 // On all other major Linux distros (RHEL, CentOS, Fedora, Amazon Linux, Arch,
 // openSUSE, Oracle Linux, Rocky, Alma, …) /bin/sh is a symlink to bash.
 func isPOSIXShellDistro(baseName string) bool {
-	lower := strings.ToLower(baseName)
-	_, repoPath, _ := parseImageRef(lower)
-	name := path.Base(repoPath)
-
-	switch name {
+	switch baseImageShortName(baseName) {
 	case "alpine", "debian", "ubuntu",
 		"busybox",
 		"distroless", "chainguard", "wolfi":
 		return true
 	}
 	return false
+}
+
+// IsDashDefaultShell reports whether a base image is known to use dash as the
+// default /bin/sh. On these distros (Debian, Ubuntu) plain echo interprets
+// backslash escapes (e.g., \n → newline). Other POSIX distros (Alpine,
+// BusyBox, distroless, Chainguard, Wolfi) use ash, which does not.
+func IsDashDefaultShell(baseName string) bool {
+	return dashDefaultDistros[baseImageShortName(baseName)]
+}
+
+// dashDefaultDistros lists distros whose /bin/sh is dash (which interprets
+// backslash escapes in plain echo). All other POSIX-shell distros use ash.
+var dashDefaultDistros = map[string]bool{
+	"debian": true,
+	"ubuntu": true,
+}
+
+// baseImageShortName extracts the short repository name from a base image
+// reference (e.g., "docker.io/library/alpine:3.20" → "alpine").
+func baseImageShortName(baseName string) string {
+	lower := strings.ToLower(baseName)
+	_, repoPath, _ := parseImageRef(lower)
+	return path.Base(repoPath)
 }
 
 func inferStageOSHeuristically(stage *instructions.Stage) BaseImageOS {

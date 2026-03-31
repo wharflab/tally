@@ -119,6 +119,7 @@ func (b *Builder) Build() *Model {
 			info.ShellSetting.Variant == shell.VariantBash &&
 			isPOSIXShellDistro(effectiveBaseName) {
 			info.ShellSetting.Variant = shell.VariantPOSIX
+			info.DashDefault = IsDashDefaultShell(effectiveBaseName)
 		}
 
 		// Seed the environment used for undefined-var analysis.
