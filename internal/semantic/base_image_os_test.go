@@ -237,3 +237,27 @@ func TestBuilderRealWorldPowerShellAlpineFixtureStaysLinux(t *testing.T) {
 		t.Fatalf("expected final shell variant to be POSIX after /bin/ash SHELL, got %v", info.ShellSetting.Variant)
 	}
 }
+
+func TestBuilderResolvesBaseImageArgsForShellHeuristics(t *testing.T) {
+	t.Parallel()
+
+	pr := parseDockerfile(t, `ARG BUILDER_IMAGE=ubuntu:22.04
+FROM $BUILDER_IMAGE
+RUN echo hello
+`)
+	model := NewModel(pr, nil, "Dockerfile")
+
+	info := model.StageInfo(0)
+	if info == nil {
+		t.Fatal("expected stage info")
+	}
+	if !info.IsLinux() {
+		t.Fatalf("expected Linux stage, got %v", info.BaseImageOS)
+	}
+	if info.ShellSetting.Variant != shell.VariantPOSIX {
+		t.Fatalf("expected default shell variant POSIX for resolved ubuntu base, got %v", info.ShellSetting.Variant)
+	}
+	if got := info.ShellNameAtLine(3); got != "/bin/sh" {
+		t.Fatalf("ShellNameAtLine(3) = %q, want %q", got, "/bin/sh")
+	}
+}

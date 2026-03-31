@@ -45,12 +45,17 @@ EOF
 
 ARG PYTHON_VERSION
 
+RUN /opt/conda/bin/conda config --set auto_activate_base false && /opt/conda/bin/conda create --name default python=${PYTHON_VERSION}
+
+COPY <<EOF /root/.bashrc
+#! /bin/bash
+
+# script to activate the conda environment
+export PS1='Docker> '
+EOF
+
 RUN <<EOF
 set -e
-/opt/conda/bin/conda config --set auto_activate_base false
-/opt/conda/bin/conda create --name default python=${PYTHON_VERSION}
-echo "#! /bin/bash\n\n# script to activate the conda environment" >~/.bashrc
-echo "export PS1='Docker> '" >>~/.bashrc
 /opt/conda/bin/conda init bash
 echo "\nconda activate default" >>~/.bashrc
 /opt/conda/bin/conda clean -a
@@ -320,12 +325,17 @@ EOF
 
 ARG PYTHON_VERSION
 
+RUN /opt/conda/bin/conda config --set auto_activate_base false && /opt/conda/bin/conda create --name default python=${PYTHON_VERSION}
+
+COPY <<EOF /root/.bashrc
+#! /bin/bash
+
+# script to activate the conda environment
+export PS1='Docker> '
+EOF
+
 RUN <<EOF
 set -e
-/opt/conda/bin/conda config --set auto_activate_base false
-/opt/conda/bin/conda create --name default python=${PYTHON_VERSION}
-echo "#! /bin/bash\n\n# script to activate the conda environment" >~/.bashrc
-echo "export PS1='Docker> '" >>~/.bashrc
 /opt/conda/bin/conda init bash
 echo "\nconda activate default" >>~/.bashrc
 /opt/conda/bin/conda clean -a

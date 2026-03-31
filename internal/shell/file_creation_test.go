@@ -925,6 +925,40 @@ func TestDetectFileCreationEchoEdgeCases(t *testing.T) {
 	}
 }
 
+func TestDetectFileCreationEchoEscapesByShell(t *testing.T) {
+	t.Parallel()
+
+	script := `echo "#! /bin/bash\n\n# script to activate the conda environment" > /root/.bashrc`
+
+	t.Run("plain echo stays literal by default", func(t *testing.T) {
+		t.Parallel()
+
+		result := DetectFileCreation(script, VariantPOSIX, nil)
+		if result == nil {
+			t.Fatal("expected non-nil result")
+		}
+		want := "#! /bin/bash\\n\\n# script to activate the conda environment\n"
+		if result.Content != want {
+			t.Fatalf("Content = %q, want %q", result.Content, want)
+		}
+	})
+
+	t.Run("plain echo escapes can be interpreted when enabled", func(t *testing.T) {
+		t.Parallel()
+
+		result := DetectFileCreationWithOptions(script, VariantPOSIX, nil, FileCreationOptions{
+			InterpretPlainEchoEscapes: true,
+		})
+		if result == nil {
+			t.Fatal("expected non-nil result")
+		}
+		want := "#! /bin/bash\n\n# script to activate the conda environment\n"
+		if result.Content != want {
+			t.Fatalf("Content = %q, want %q", result.Content, want)
+		}
+	})
+}
+
 func TestDetectFileCreationWithUmask(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

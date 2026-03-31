@@ -396,6 +396,131 @@ RUN echo "b" >> /app/file
 	}
 }
 
+func TestPreferCopyHeredocRule_RunShellContext(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM ubuntu:22.04
+RUN echo "#! /bin/bash\n\n# script to activate the conda environment" > /app/default-shell
+SHELL ["/bin/bash", "-c"]
+RUN echo "#! /bin/bash\n\n# script to activate the conda environment" > /app/bash-shell
+`
+
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	violations := NewPreferCopyHeredocRule().Check(input)
+	if len(violations) != 2 {
+		t.Fatalf("got %d violations, want 2", len(violations))
+	}
+
+	firstFix := violations[0].SuggestedFix
+	if firstFix == nil || len(firstFix.Edits) == 0 {
+		t.Fatal("expected first violation to have a fix")
+	}
+	if got := firstFix.Edits[0].NewText; !strings.Contains(got, "#! /bin/bash\n\n# script to activate the conda environment") {
+		t.Fatalf("first fix text = %q, want actual newlines in COPY content", got)
+	}
+
+	secondFix := violations[1].SuggestedFix
+	if secondFix == nil || len(secondFix.Edits) == 0 {
+		t.Fatal("expected second violation to have a fix")
+	}
+	if got := secondFix.Edits[0].NewText; !strings.Contains(got, "#! /bin/bash\\n\\n# script to activate the conda environment") {
+		t.Fatalf("second fix text = %q, want literal \\\\n escapes preserved under bash", got)
+	}
+}
+
+func TestPreferCopyHeredocRule_TildeTargetFixes(t *testing.T) {
+	t.Parallel()
+	rule := NewPreferCopyHeredocRule()
+
+	tests := []struct {
+		name       string
+		content    string
+		wantPath   string
+		wantSafety string
+		wantFix    bool
+		wantCount  int
+	}{
+		{
+			name: "implicit root home resolves to /root",
+			content: `FROM alpine
+RUN echo "hello" > ~/.bashrc
+`,
+			wantPath:   "COPY <<EOF /root/.bashrc",
+			wantSafety: "unsafe",
+			wantFix:    true,
+			wantCount:  1,
+		},
+		{
+			name: "named user falls back to /home/<user>",
+			content: `FROM alpine
+USER app
+RUN echo "hello" > ~/.bashrc
+`,
+			wantPath:   "COPY <<EOF /home/app/.bashrc",
+			wantSafety: "unsafe",
+			wantFix:    true,
+			wantCount:  1,
+		},
+		{
+			name: "useradd custom home is preserved",
+			content: `FROM alpine
+RUN useradd -m -d /srv/app app
+USER app
+RUN echo "hello" > ~/.bashrc
+`,
+			wantPath:   "COPY <<EOF /srv/app/.bashrc",
+			wantSafety: "unsafe",
+			wantFix:    true,
+			wantCount:  1,
+		},
+		{
+			name: "numeric user home is not guessed",
+			content: `FROM alpine
+USER 1000
+RUN echo "hello" > ~/.bashrc
+`,
+			wantFix:   false,
+			wantCount: 0,
+		},
+		{
+			name: "variable user home is not guessed",
+			content: `FROM alpine
+ARG APP_USER=app
+USER $APP_USER
+RUN echo "hello" > ~/.bashrc
+`,
+			wantFix:   false,
+			wantCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInputWithConfig(t, "Dockerfile", tt.content, nil)
+			violations := rule.Check(input)
+
+			if len(violations) != tt.wantCount {
+				t.Fatalf("got %d violations, want %d", len(violations), tt.wantCount)
+			}
+			if !tt.wantFix {
+				return
+			}
+
+			fix := violations[0].SuggestedFix
+			if fix == nil {
+				t.Fatal("expected suggested fix")
+			}
+			if got := fix.Safety.String(); got != tt.wantSafety {
+				t.Fatalf("fix safety = %q, want %q", got, tt.wantSafety)
+			}
+			if len(fix.Edits) == 0 || !strings.Contains(fix.Edits[0].NewText, tt.wantPath) {
+				t.Fatalf("fix text = %q, want to contain %q", fix.Edits[0].NewText, tt.wantPath)
+			}
+		})
+	}
+}
+
 func TestPreferCopyHeredocRule_ValidateConfig(t *testing.T) {
 	t.Parallel()
 	rule := NewPreferCopyHeredocRule()

@@ -78,9 +78,11 @@ func (b *Builder) Build() *Model {
 
 		// Process base image
 		info.BaseImage = b.processBaseImage(stage, i, graph)
+		effectiveBaseName := resolveFromEvalWord(stage.BaseName, fromEval)
+		effectivePlatform := resolveFromEvalWord(stage.Platform, fromEval)
 
 		// Detect base image OS from name and platform heuristics.
-		info.BaseImageOS = detectBaseImageOS(stage.BaseName, stage.Platform)
+		info.BaseImageOS = detectBaseImageOS(effectiveBaseName, effectivePlatform)
 		// Strengthen the signal with the escape directive: backtick is a strong
 		// Windows indicator when the image name alone is ambiguous.
 		if info.BaseImageOS == BaseImageOSUnknown && b.parseResult != nil &&
@@ -115,7 +117,7 @@ func (b *Builder) Build() *Model {
 		// VariantPOSIX only when the base image is a known dash/ash distro.
 		if info.ShellSetting.Source == ShellSourceDefault &&
 			info.ShellSetting.Variant == shell.VariantBash &&
-			isPOSIXShellDistro(stage.BaseName) {
+			isPOSIXShellDistro(effectiveBaseName) {
 			info.ShellSetting.Variant = shell.VariantPOSIX
 		}
 
@@ -167,6 +169,18 @@ type fromArgEval struct {
 	effectiveOK  bool
 	knownKeys    []string
 	knownSet     map[string]struct{}
+}
+
+func resolveFromEvalWord(word string, eval fromArgEval) string {
+	if word == "" || !eval.effectiveOK || eval.shlex == nil || eval.effectiveEnv == nil {
+		return word
+	}
+
+	res, err := eval.shlex.ProcessWordWithMatches(word, eval.effectiveEnv)
+	if err != nil || len(res.Unmatched) != 0 || res.Result == "" {
+		return word
+	}
+	return res.Result
 }
 
 func (b *Builder) initFromArgEval(stages []instructions.Stage, metaArgs []instructions.ArgCommand) fromArgEval {
