@@ -5,6 +5,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
@@ -146,6 +147,7 @@ func buildPreferAddGitFix(
 	}
 
 	flagSuffix := extractRunFlagSuffix(run, sm)
+	indent := replacementIndent(runLoc, sm)
 	replacementParts := make([]string, 0, 3)
 	if opportunity.PrecedingCommands != "" {
 		replacementParts = append(replacementParts, buildRunWithSuffix(flagSuffix, opportunity.PrecedingCommands))
@@ -156,6 +158,9 @@ func buildPreferAddGitFix(
 	}
 
 	endLine, endCol := resolveRunEndPosition(runLoc, sm, run)
+	if sm != nil && endLine > 0 && endLine <= sm.LineCount() {
+		endCol = len(sm.Line(endLine - 1))
+	}
 	return &rules.SuggestedFix{
 		Description: "Extract git clone into ADD <git source>",
 		Safety:      rules.FixSuggestion,
@@ -165,13 +170,39 @@ func buildPreferAddGitFix(
 			Location: rules.NewRangeLocation(
 				file,
 				runLoc[0].Start.Line,
-				runLoc[0].Start.Character,
+				0,
 				endLine,
 				endCol,
 			),
-			NewText: strings.Join(replacementParts, "\n"),
+			NewText: joinReplacementLines(replacementParts, indent),
 		}},
 	}
+}
+
+func replacementIndent(runLoc []parser.Range, sm *sourcemap.SourceMap) string {
+	if sm == nil || len(runLoc) == 0 || runLoc[0].Start.Line <= 0 {
+		return ""
+	}
+	return leadingWhitespace(sm.Line(runLoc[0].Start.Line - 1))
+}
+
+func joinReplacementLines(parts []string, indent string) string {
+	if len(parts) == 0 {
+		return ""
+	}
+	if indent == "" {
+		return strings.Join(parts, "\n")
+	}
+
+	var b strings.Builder
+	for i, part := range parts {
+		if i > 0 {
+			b.WriteString("\n")
+		}
+		b.WriteString(indent)
+		b.WriteString(part)
+	}
+	return b.String()
 }
 
 func buildAddGitInstruction(opportunity *shell.GitSourceOpportunity) string {

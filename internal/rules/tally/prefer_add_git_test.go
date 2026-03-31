@@ -99,6 +99,18 @@ RUN echo foo && git clone https://github.com/NVIDIA/apex && cd apex && git check
 				"RUN cd /apex && echo zoo\n",
 		},
 		{
+			name: "indented run keeps indentation across extracted instructions",
+			content: `FROM alpine
+    RUN echo foo && git clone https://github.com/NVIDIA/apex && cd apex && git checkout 0123456789abcdef0123456789abcdef01234567 && echo zoo
+`,
+			wantHasFix: true,
+			wantFixed: "FROM alpine\n" +
+				"    RUN echo foo\n" +
+				"    ADD --link --checksum=0123456789abcdef0123456789abcdef01234567 " +
+				"https://github.com/NVIDIA/apex.git?ref=0123456789abcdef0123456789abcdef01234567 /apex\n" +
+				"    RUN cd /apex && echo zoo\n",
+		},
+		{
 			name: "abbreviated checkout commit reports without fix",
 			content: `FROM alpine
 RUN git clone https://github.com/NVIDIA/apex && cd apex && git checkout aa756ce
