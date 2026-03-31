@@ -445,8 +445,17 @@ func hasChgrpForPaths(script string, variant shell.Variant, targets []string) bo
 }
 
 // extractChgrpTargets extracts file paths from chgrp arguments.
-// chgrp [options] GROUP FILE...
+// chgrp [options] GROUP FILE...  OR  chgrp --reference=RFILE FILE...
+// When --reference is used, there is no GROUP argument — all non-flag args are files.
 func extractChgrpTargets(args []string) []string {
+	hasReference := false
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "--reference") {
+			hasReference = true
+			break
+		}
+	}
+
 	var (
 		seenGroup bool
 		paths     []string
@@ -455,7 +464,7 @@ func extractChgrpTargets(args []string) []string {
 		if strings.HasPrefix(arg, "-") {
 			continue
 		}
-		if !seenGroup {
+		if !hasReference && !seenGroup {
 			seenGroup = true // first non-flag is the group
 			continue
 		}

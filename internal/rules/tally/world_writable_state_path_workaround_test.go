@@ -402,6 +402,13 @@ RUN chgrp -R 0 /app && chmod 777 /app/data
 `,
 			WantViolations: 0,
 		},
+		{
+			Name: "chgrp --reference suppresses (no GROUP arg, all non-flags are files)",
+			Content: `FROM ubuntu:22.04
+RUN chgrp --reference=/etc/group /data && chmod 777 /data
+`,
+			WantViolations: 0,
+		},
 
 		// === No violations: mkdir safe modes ===
 		{
