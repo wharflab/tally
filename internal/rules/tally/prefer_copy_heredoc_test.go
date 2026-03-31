@@ -396,6 +396,211 @@ RUN echo "b" >> /app/file
 	}
 }
 
+func TestPreferCopyHeredocRule_RunShellContext(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM ubuntu:22.04
+RUN echo "#! /bin/bash\n\n# script to activate the conda environment" > /app/default-shell
+SHELL ["/bin/bash", "-c"]
+RUN echo "#! /bin/bash\n\n# script to activate the conda environment" > /app/bash-shell
+`
+
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	violations := NewPreferCopyHeredocRule().Check(input)
+	if len(violations) != 2 {
+		t.Fatalf("got %d violations, want 2", len(violations))
+	}
+
+	firstFix := violations[0].SuggestedFix
+	if firstFix == nil || len(firstFix.Edits) == 0 {
+		t.Fatal("expected first violation to have a fix")
+	}
+	if got := firstFix.Edits[0].NewText; !strings.Contains(got, "#! /bin/bash\n\n# script to activate the conda environment") {
+		t.Fatalf("first fix text = %q, want actual newlines in COPY content", got)
+	}
+
+	secondFix := violations[1].SuggestedFix
+	if secondFix == nil || len(secondFix.Edits) == 0 {
+		t.Fatal("expected second violation to have a fix")
+	}
+	if got := secondFix.Edits[0].NewText; !strings.Contains(got, "#! /bin/bash\\n\\n# script to activate the conda environment") {
+		t.Fatalf("second fix text = %q, want literal \\\\n escapes preserved under bash", got)
+	}
+}
+
+func TestPreferCopyHeredocRule_AshNoEscapeInterpretation(t *testing.T) {
+	t.Parallel()
+
+	// Alpine uses ash (BusyBox), where plain echo does NOT interpret
+	// backslash escapes. The COPY heredoc must preserve literal \n.
+	content := `FROM alpine:3.20
+RUN echo "#! /bin/sh\n\nset -e" > /app/entrypoint.sh
+SHELL ["/bin/ash", "-c"]
+RUN echo "#! /bin/ash\n\nset -e" > /app/explicit-ash.sh
+`
+
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	violations := NewPreferCopyHeredocRule().Check(input)
+	if len(violations) != 2 {
+		t.Fatalf("got %d violations, want 2", len(violations))
+	}
+
+	// Both fixes should preserve literal \n (no escape interpretation).
+	for i, v := range violations {
+		fix := v.SuggestedFix
+		if fix == nil || len(fix.Edits) == 0 {
+			t.Fatalf("violation[%d]: expected a fix with edits", i)
+		}
+		got := fix.Edits[0].NewText
+		if strings.Contains(got, "#! /bin/sh\n\nset -e") || strings.Contains(got, "#! /bin/ash\n\nset -e") {
+			t.Fatalf("violation[%d]: fix text = %q, should NOT contain actual newlines from escape interpretation on ash", i, got)
+		}
+		if !strings.Contains(got, `\n`) {
+			t.Fatalf("violation[%d]: fix text = %q, want literal \\n preserved", i, got)
+		}
+	}
+}
+
+func TestPreferCopyHeredocRule_ChownAfterUser(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM ubuntu:22.04
+USER app
+RUN echo "config=true" > /app/config.txt
+`
+
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	violations := NewPreferCopyHeredocRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil || len(fix.Edits) == 0 {
+		t.Fatal("expected violation to have a fix")
+	}
+	got := fix.Edits[0].NewText
+	if !strings.Contains(got, "--chown=app") {
+		t.Fatalf("fix text = %q, want --chown=app for non-root USER", got)
+	}
+}
+
+func TestPreferCopyHeredocRule_NoChownForRoot(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM ubuntu:22.04
+RUN echo "config=true" > /app/config.txt
+`
+
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	violations := NewPreferCopyHeredocRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil || len(fix.Edits) == 0 {
+		t.Fatal("expected violation to have a fix")
+	}
+	got := fix.Edits[0].NewText
+	if strings.Contains(got, "--chown") {
+		t.Fatalf("fix text = %q, should NOT contain --chown for root user", got)
+	}
+}
+
+func TestPreferCopyHeredocRule_TildeTargetFixes(t *testing.T) {
+	t.Parallel()
+	rule := NewPreferCopyHeredocRule()
+
+	tests := []struct {
+		name       string
+		content    string
+		wantPath   string
+		wantSafety string
+		wantFix    bool
+		wantCount  int
+	}{
+		{
+			name: "implicit root home resolves to /root",
+			content: `FROM alpine
+RUN echo "hello" > ~/.bashrc
+`,
+			wantPath:   "COPY <<EOF /root/.bashrc",
+			wantSafety: "unsafe",
+			wantFix:    true,
+			wantCount:  1,
+		},
+		{
+			name: "named user falls back to /home/<user>",
+			content: `FROM alpine
+USER app
+RUN echo "hello" > ~/.bashrc
+`,
+			wantPath:   "COPY --chown=app <<EOF /home/app/.bashrc",
+			wantSafety: "unsafe",
+			wantFix:    true,
+			wantCount:  1,
+		},
+		{
+			name: "useradd custom home is preserved",
+			content: `FROM alpine
+RUN useradd -m -d /srv/app app
+USER app
+RUN echo "hello" > ~/.bashrc
+`,
+			wantPath:   "COPY --chown=app <<EOF /srv/app/.bashrc",
+			wantSafety: "unsafe",
+			wantFix:    true,
+			wantCount:  1,
+		},
+		{
+			name: "numeric user home is not guessed",
+			content: `FROM alpine
+USER 1000
+RUN echo "hello" > ~/.bashrc
+`,
+			wantFix:   false,
+			wantCount: 0,
+		},
+		{
+			name: "variable user home is not guessed",
+			content: `FROM alpine
+ARG APP_USER=app
+USER $APP_USER
+RUN echo "hello" > ~/.bashrc
+`,
+			wantFix:   false,
+			wantCount: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInputWithConfig(t, "Dockerfile", tt.content, nil)
+			violations := rule.Check(input)
+
+			if len(violations) != tt.wantCount {
+				t.Fatalf("got %d violations, want %d", len(violations), tt.wantCount)
+			}
+			if !tt.wantFix {
+				return
+			}
+
+			fix := violations[0].SuggestedFix
+			if fix == nil {
+				t.Fatal("expected suggested fix")
+			}
+			if got := fix.Safety.String(); got != tt.wantSafety {
+				t.Fatalf("fix safety = %q, want %q", got, tt.wantSafety)
+			}
+			if len(fix.Edits) == 0 || !strings.Contains(fix.Edits[0].NewText, tt.wantPath) {
+				t.Fatalf("fix text = %q, want to contain %q", fix.Edits[0].NewText, tt.wantPath)
+			}
+		})
+	}
+}
+
 func TestPreferCopyHeredocRule_ValidateConfig(t *testing.T) {
 	t.Parallel()
 	rule := NewPreferCopyHeredocRule()
@@ -445,6 +650,7 @@ func TestBuildCopyHeredoc(t *testing.T) {
 		targetPath   string
 		content      string
 		rawChmodMode string
+		chownUser    string
 	}{
 		{
 			name:       "simple content",
@@ -473,12 +679,25 @@ func TestBuildCopyHeredoc(t *testing.T) {
 			targetPath: "/app/empty",
 			content:    "",
 		},
+		{
+			name:       "with chown for non-root user",
+			targetPath: "/app/config",
+			content:    "hello world\n",
+			chownUser:  "app:app",
+		},
+		{
+			name:         "with chown and chmod",
+			targetPath:   "/app/run.sh",
+			content:      "#!/bin/sh\nexec app\n",
+			rawChmodMode: "0755",
+			chownUser:    "appuser",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := buildCopyHeredoc(tt.targetPath, tt.content, tt.rawChmodMode)
+			got := buildCopyHeredoc(tt.targetPath, tt.content, tt.rawChmodMode, tt.chownUser)
 			snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, got)
 		})
 	}

@@ -23,8 +23,15 @@ const (
 // FileCreationInfo describes a detected file creation pattern in a shell script.
 // This is used to coordinate between prefer-copy-heredoc and prefer-run-heredoc rules.
 type FileCreationInfo struct {
-	// TargetPath is the absolute path to the target file.
+	// TargetPath is the absolute path to the target file after any caller-supplied
+	// path resolution has been applied.
 	TargetPath string
+
+	// ResolvedHomePath is true when the original shell target used home expansion
+	// (for example "~/.bashrc") and the caller resolved it to an absolute path.
+	// Converting such patterns to COPY usually requires an unsafe fix because COPY
+	// does not support "~" directly.
+	ResolvedHomePath bool
 
 	// Content is the literal content to write.
 	Content string
@@ -57,9 +64,22 @@ type FileCreationInfo struct {
 
 // fileCreationCmd represents a single file creation command in a chain.
 type fileCreationCmd struct {
-	targetPath string
-	content    string
-	isAppend   bool
+	targetPath       string
+	content          string
+	isAppend         bool
+	resolvedHomePath bool
+}
+
+// FileCreationOptions controls optional behavior for file creation detection.
+type FileCreationOptions struct {
+	// ResolveTargetPath lets callers rewrite literal targets like "~/.bashrc"
+	// to an absolute in-image path before matching.
+	ResolveTargetPath func(rawTarget string) (resolvedPath string, resolvedHomePath bool, ok bool)
+
+	// InterpretPlainEchoEscapes enables backslash-escape processing for plain
+	// echo output (for example \n -> newline) on shells where that behavior is
+	// part of the effective runtime semantics.
+	InterpretPlainEchoEscapes bool
 }
 
 // DetectFileCreation analyzes a shell script for file creation patterns.
@@ -77,6 +97,18 @@ type fileCreationCmd struct {
 // The knownVars function is called to check if a variable is a known ARG/ENV.
 // If nil, all variables are considered unsafe.
 func DetectFileCreation(script string, variant Variant, knownVars func(name string) bool) *FileCreationInfo {
+	return DetectFileCreationWithOptions(script, variant, knownVars, FileCreationOptions{})
+}
+
+// DetectFileCreationWithOptions analyzes a shell script for file creation
+// patterns with optional target-path rewriting and shell-specific echo
+// semantics.
+func DetectFileCreationWithOptions(
+	script string,
+	variant Variant,
+	knownVars func(name string) bool,
+	options FileCreationOptions,
+) *FileCreationInfo {
 	if !variant.SupportsPOSIXShellAST() {
 		return nil
 	}
@@ -92,7 +124,7 @@ func DetectFileCreation(script string, variant Variant, knownVars func(name stri
 	}
 
 	// Analyze the script for file creation patterns
-	return analyzeFileCreation(prog, knownVars)
+	return analyzeFileCreation(prog, knownVars, options)
 }
 
 // ChmodInfo describes a standalone chmod command.
@@ -188,7 +220,11 @@ type analyzedCmd struct {
 
 // analyzeFileCreation performs detailed analysis of file creation patterns.
 // Supports mixed commands by tracking preceding and remaining commands.
-func analyzeFileCreation(prog *syntax.File, knownVars func(name string) bool) *FileCreationInfo {
+func analyzeFileCreation(
+	prog *syntax.File,
+	knownVars func(name string) bool,
+	options FileCreationOptions,
+) *FileCreationInfo {
 	// Require exactly one top-level statement to avoid ambiguity with separators.
 	// Scripts with semicolons (cmd1; cmd2) would be incorrectly rebuilt as && chains.
 	// Only && chains within a single statement are supported.
@@ -198,7 +234,7 @@ func analyzeFileCreation(prog *syntax.File, knownVars func(name string) bool) *F
 
 	// Collect all commands with their types
 	var commands []analyzedCmd
-	collectCommands(prog, &commands, knownVars)
+	collectCommands(prog, &commands, knownVars, options)
 
 	if len(commands) == 0 {
 		return nil
@@ -225,6 +261,7 @@ func analyzeFileCreation(prog *syntax.File, knownVars func(name string) bool) *F
 	var chmodMode uint16
 	var rawChmodMode string
 	hasUnsafeVars := false
+	resolvedHomePath := false
 
 	for i := startIdx; i <= endIdx; i++ {
 		cmd := commands[i]
@@ -233,6 +270,9 @@ func analyzeFileCreation(prog *syntax.File, knownVars func(name string) bool) *F
 		}
 		if cmd.cmdType == cmdTypeFileCreation && cmd.creation != nil {
 			creations = append(creations, *cmd.creation)
+			if cmd.creation.resolvedHomePath {
+				resolvedHomePath = true
+			}
 		} else if cmd.cmdType == cmdTypeChmod && cmd.chmodTarget == targetPath {
 			chmodMode = cmd.chmodMode
 			rawChmodMode = cmd.chmodRawMode
@@ -244,13 +284,8 @@ func analyzeFileCreation(prog *syntax.File, knownVars func(name string) bool) *F
 	}
 
 	// If no explicit chmod but umask was set, calculate effective mode
-	// Default file creation mode is 0o666, umask masks off bits
-	// Default umask is 0o022, giving 0o644
-	if chmodMode == 0 && hasUmask && activeUmask != defaultUmask {
-		effectiveMode := uint16(0o666) & ^activeUmask
-		if effectiveMode != defaultFileMode {
-			chmodMode = effectiveMode
-		}
+	if chmodMode == 0 {
+		chmodMode = umaskDerivedChmodMode(activeUmask, hasUmask)
 	}
 
 	// Merge content from all creations.
@@ -287,6 +322,7 @@ func analyzeFileCreation(prog *syntax.File, knownVars func(name string) bool) *F
 
 	return &FileCreationInfo{
 		TargetPath:         targetPath,
+		ResolvedHomePath:   resolvedHomePath,
 		Content:            content.String(),
 		ChmodMode:          chmodMode,
 		RawChmodMode:       rawChmodMode,
@@ -297,15 +333,38 @@ func analyzeFileCreation(prog *syntax.File, knownVars func(name string) bool) *F
 	}
 }
 
+// umaskDerivedChmodMode computes the effective chmod mode from a umask value.
+// Returns 0 if no umask was set or it matches the default (0o022 → 0o644).
+func umaskDerivedChmodMode(activeUmask uint16, hasUmask bool) uint16 {
+	if !hasUmask || activeUmask == defaultUmask {
+		return 0
+	}
+	effectiveMode := uint16(0o666) & ^activeUmask
+	if effectiveMode == defaultFileMode {
+		return 0
+	}
+	return effectiveMode
+}
+
 // collectCommands flattens && chains and collects all commands with their types.
-func collectCommands(prog *syntax.File, commands *[]analyzedCmd, knownVars func(name string) bool) {
+func collectCommands(
+	prog *syntax.File,
+	commands *[]analyzedCmd,
+	knownVars func(name string) bool,
+	options FileCreationOptions,
+) {
 	for _, stmt := range prog.Stmts {
-		collectFromStatement(stmt, commands, knownVars)
+		collectFromStatement(stmt, commands, knownVars, options)
 	}
 }
 
 // collectFromStatement recursively collects commands from a statement.
-func collectFromStatement(stmt *syntax.Stmt, commands *[]analyzedCmd, knownVars func(name string) bool) {
+func collectFromStatement(
+	stmt *syntax.Stmt,
+	commands *[]analyzedCmd,
+	knownVars func(name string) bool,
+	options FileCreationOptions,
+) {
 	if stmt == nil || stmt.Cmd == nil {
 		return
 	}
@@ -313,8 +372,8 @@ func collectFromStatement(stmt *syntax.Stmt, commands *[]analyzedCmd, knownVars 
 	switch cmd := stmt.Cmd.(type) {
 	case *syntax.BinaryCmd:
 		if cmd.Op == syntax.AndStmt {
-			collectFromStatement(cmd.X, commands, knownVars)
-			collectFromStatement(cmd.Y, commands, knownVars)
+			collectFromStatement(cmd.X, commands, knownVars, options)
+			collectFromStatement(cmd.Y, commands, knownVars, options)
 		} else {
 			// Other binary ops (||, |) - treat as single opaque command
 			*commands = append(*commands, analyzedCmd{
@@ -323,7 +382,7 @@ func collectFromStatement(stmt *syntax.Stmt, commands *[]analyzedCmd, knownVars 
 			})
 		}
 	case *syntax.CallExpr:
-		analyzed := analyzeCallExpr(stmt, cmd, knownVars)
+		analyzed := analyzeCallExpr(stmt, cmd, knownVars, options)
 		*commands = append(*commands, analyzed)
 	default:
 		*commands = append(*commands, analyzedCmd{
@@ -334,7 +393,12 @@ func collectFromStatement(stmt *syntax.Stmt, commands *[]analyzedCmd, knownVars 
 }
 
 // analyzeCallExpr analyzes a call expression and returns its type.
-func analyzeCallExpr(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(name string) bool) analyzedCmd {
+func analyzeCallExpr(
+	stmt *syntax.Stmt,
+	call *syntax.CallExpr,
+	knownVars func(name string) bool,
+	options FileCreationOptions,
+) analyzedCmd {
 	if len(call.Args) == 0 {
 		return analyzedCmd{cmdType: cmdTypeOther, text: stmtToString(stmt)}
 	}
@@ -373,7 +437,7 @@ func analyzeCallExpr(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(na
 
 	// Check for tee command (file target is in args, not redirects)
 	if cmdName == cmdTee {
-		return analyzeTeeCmd(stmt, call, text)
+		return analyzeTeeCmd(stmt, call, text, options.ResolveTargetPath)
 	}
 
 	// Check for file creation commands
@@ -409,20 +473,22 @@ func analyzeCallExpr(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(na
 		return analyzedCmd{cmdType: cmdTypeOther, text: text}
 	}
 
-	targetPath := extractRedirectTarget(outRedir)
-	if targetPath == "" || !path.IsAbs(targetPath) {
+	rawTargetPath := extractRedirectTarget(outRedir)
+	targetPath, resolvedHomePath, ok := resolveFileCreationTarget(rawTargetPath, options.ResolveTargetPath)
+	if !ok {
 		return analyzedCmd{cmdType: cmdTypeOther, text: text}
 	}
 
-	content, unsafe := extractFileContent(stmt, call, knownVars)
+	content, unsafe := extractFileContent(stmt, call, knownVars, options)
 
 	return analyzedCmd{
 		cmdType: cmdTypeFileCreation,
 		text:    text,
 		creation: &fileCreationCmd{
-			targetPath: targetPath,
-			content:    content,
-			isAppend:   outRedir.Op == syntax.AppOut,
+			targetPath:       targetPath,
+			content:          content,
+			isAppend:         outRedir.Op == syntax.AppOut,
+			resolvedHomePath: resolvedHomePath,
 		},
 		hasUnsafe: unsafe,
 	}
@@ -432,7 +498,12 @@ func analyzeCallExpr(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(na
 // tee writes stdin to a file argument (not a redirect target).
 // Supported: tee /file, tee -a /file (append).
 // Skipped: multiple output files, unsupported flags, relative paths.
-func analyzeTeeCmd(stmt *syntax.Stmt, call *syntax.CallExpr, text string) analyzedCmd {
+func analyzeTeeCmd(
+	stmt *syntax.Stmt,
+	call *syntax.CallExpr,
+	text string,
+	resolveTargetPath func(rawTarget string) (resolvedPath string, resolvedHomePath bool, ok bool),
+) analyzedCmd {
 	other := analyzedCmd{cmdType: cmdTypeOther, text: text}
 
 	isAppend := false
@@ -473,7 +544,8 @@ func analyzeTeeCmd(stmt *syntax.Stmt, call *syntax.CallExpr, text string) analyz
 		targetPath = lit
 	}
 
-	if targetPath == "" || !path.IsAbs(targetPath) {
+	targetPath, resolvedHomePath, ok := resolveFileCreationTarget(targetPath, resolveTargetPath)
+	if !ok {
 		return other
 	}
 
@@ -509,12 +581,30 @@ func analyzeTeeCmd(stmt *syntax.Stmt, call *syntax.CallExpr, text string) analyz
 		cmdType: cmdTypeFileCreation,
 		text:    text,
 		creation: &fileCreationCmd{
-			targetPath: targetPath,
-			content:    content,
-			isAppend:   isAppend,
+			targetPath:       targetPath,
+			content:          content,
+			isAppend:         isAppend,
+			resolvedHomePath: resolvedHomePath,
 		},
 		hasUnsafe: unsafe,
 	}
+}
+
+func resolveFileCreationTarget(
+	rawTargetPath string,
+	resolveTargetPath func(rawTarget string) (resolvedPath string, resolvedHomePath bool, ok bool),
+) (string, bool, bool) {
+	if resolveTargetPath == nil {
+		resolveTargetPath = defaultFileCreationTargetPath
+	}
+	return resolveTargetPath(rawTargetPath)
+}
+
+func defaultFileCreationTargetPath(rawTargetPath string) (string, bool, bool) {
+	if rawTargetPath == "" || !path.IsAbs(rawTargetPath) {
+		return "", false, false
+	}
+	return path.Clean(rawTargetPath), false, true
 }
 
 // findFileCreationBlock finds a contiguous block of file creation commands (+ chmod).
@@ -762,12 +852,17 @@ func extractRedirectTarget(redir *syntax.Redirect) string {
 
 // extractFileContent extracts the content from a file creation command.
 // Returns the content and whether unsafe variables were found.
-func extractFileContent(stmt *syntax.Stmt, call *syntax.CallExpr, knownVars func(name string) bool) (string, bool) {
+func extractFileContent(
+	stmt *syntax.Stmt,
+	call *syntax.CallExpr,
+	knownVars func(name string) bool,
+	options FileCreationOptions,
+) (string, bool) {
 	cmdName := call.Args[0].Lit()
 
 	switch cmdName {
 	case cmdEcho:
-		return extractEchoContent(call, knownVars)
+		return extractEchoContent(call, knownVars, options.InterpretPlainEchoEscapes)
 	case cmdCat:
 		// Only heredoc-only cat is safe (e.g., "cat <<EOF > /file")
 		// cat with extra args (e.g., "cat /etc/hosts > /file" or "cat -n <<EOF") is unsafe
@@ -804,7 +899,11 @@ func extractCatHeredocContentFromStmt(stmt *syntax.Stmt) (string, bool) {
 }
 
 // extractEchoContent extracts content from an echo command.
-func extractEchoContent(call *syntax.CallExpr, knownVars func(name string) bool) (string, bool) {
+func extractEchoContent(
+	call *syntax.CallExpr,
+	knownVars func(name string) bool,
+	interpretEscapes bool,
+) (string, bool) {
 	if len(call.Args) == 1 {
 		// echo with no args prints a newline
 		return "\n", false
@@ -868,7 +967,15 @@ func extractEchoContent(call *syntax.CallExpr, knownVars func(name string) bool)
 		content.WriteString(argContent)
 	}
 
-	result := content.String() + "\n"
+	result := content.String()
+	if interpretEscapes {
+		processed, ok := processPrintfEscapes(result)
+		if !ok {
+			return "", true
+		}
+		result = processed
+	}
+	result += "\n"
 
 	return result, hasUnsafe
 }

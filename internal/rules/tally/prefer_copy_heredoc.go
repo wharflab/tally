@@ -9,6 +9,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
 	"github.com/wharflab/tally/internal/runmount"
@@ -85,20 +86,20 @@ func (r *PreferCopyHeredocRule) Check(input rules.LintInput) []rules.Violation {
 	var violations []rules.Violation
 	meta := r.Metadata()
 	sm := input.SourceMap()
+	fileFacts := input.Facts
 
 	// Get semantic model for shell variant and variable info
 	var sem = input.Semantic
 
 	for stageIdx, stage := range input.Stages {
-		// Get shell variant and variable scope for this stage
+		// Get fallback shell variant and variable scope for this stage.
 		shellVariant := shell.VariantBash
 		var varScope *semantic.VariableScope
+		var stageInfo *semantic.StageInfo
 		if sem != nil {
 			if info := sem.StageInfo(stageIdx); info != nil {
+				stageInfo = info
 				shellVariant = info.ShellSetting.Variant
-				if !shellVariant.SupportsHeredoc() {
-					continue
-				}
 				varScope = info.Variables
 			}
 		}
@@ -106,14 +107,27 @@ func (r *PreferCopyHeredocRule) Check(input rules.LintInput) []rules.Violation {
 		// Create variable checker
 		knownVars := makeKnownVarsChecker(varScope)
 
+		ctx := copyHeredocCheckContext{
+			stageIdx:        stageIdx,
+			stage:           stage,
+			fileFacts:       fileFacts,
+			sem:             sem,
+			stageInfo:       stageInfo,
+			fallbackVariant: shellVariant,
+			knownVars:       knownVars,
+			file:            input.File,
+			sm:              sm,
+			meta:            meta,
+		}
+
 		if checkSingle {
 			violations = append(violations,
-				r.checkSingleRuns(stage, shellVariant, knownVars, input.File, sm, meta, checkConsecutive)...)
+				r.checkSingleRuns(ctx, checkConsecutive)...)
 		}
 
 		if checkConsecutive {
 			violations = append(violations,
-				r.checkConsecutiveRuns(stage, shellVariant, knownVars, input.File, sm, meta)...)
+				r.checkConsecutiveRuns(ctx)...)
 		}
 	}
 
@@ -136,71 +150,101 @@ type fileCreationRun struct {
 	info *shell.FileCreationInfo
 }
 
+// copyHeredocCheckContext holds shared parameters for prefer-copy-heredoc check methods.
+type copyHeredocCheckContext struct {
+	stageIdx        int
+	stage           instructions.Stage
+	fileFacts       *facts.FileFacts
+	sem             *semantic.Model
+	stageInfo       *semantic.StageInfo
+	fallbackVariant shell.Variant
+	knownVars       func(string) bool
+	file            string
+	sm              *sourcemap.SourceMap
+	meta            rules.RuleMetadata
+}
+
+// copyHeredocSequence tracks the state of a consecutive file creation sequence.
+type copyHeredocSequence struct {
+	runs     []fileCreationRun
+	target   string
+	rawChmod string
+	chmodRun *instructions.RunCommand
+}
+
+func (s *copyHeredocSequence) reset() {
+	s.runs = nil
+	s.target = ""
+	s.rawChmod = ""
+	s.chmodRun = nil
+}
+
 // identifySequenceRuns identifies which RUN instructions are part of consecutive sequences.
 // These will be handled by checkConsecutiveRuns, so they should be skipped in checkSingleRuns.
 // A sequence is: multiple file creations to same file, or file creation + chmod.
-func identifySequenceRuns(
-	stage instructions.Stage,
-	shellVariant shell.Variant,
-	knownVars func(string) bool,
-) map[*instructions.RunCommand]bool {
+func identifySequenceRuns(ctx copyHeredocCheckContext) map[*instructions.RunCommand]bool {
 	inSequence := make(map[*instructions.RunCommand]bool)
 	var prevInfo *shell.FileCreationInfo
 	var prevRun *instructions.RunCommand
+	userState := newPreferCopyHeredocUserState(ctx.stageIdx, ctx.sem, ctx.fileFacts)
 
-	for _, cmd := range stage.Commands {
-		run, ok := cmd.(*instructions.RunCommand)
-		if !ok || !run.PrependShell {
+	for _, cmd := range ctx.stage.Commands {
+		switch c := cmd.(type) {
+		case *instructions.UserCommand:
+			userState.currentUser = c.User
 			prevInfo, prevRun = nil, nil
-			continue
-		}
+		case *instructions.RunCommand:
+			shellCtx := preferCopyHeredocShellContextForRun(c, ctx.stageInfo, ctx.fallbackVariant)
+			info := detectRunFileCreation(c, shellCtx.variant, shellCtx.fileCreationOptions, ctx.knownVars, userState)
+			userState.learnHomesFromRun(c, shellCtx.variant)
 
-		script := getRunCmdLine(run)
-		if script == "" {
+			if !c.PrependShell {
+				prevInfo, prevRun = nil, nil
+				continue
+			}
+
+			if info != nil && !info.HasUnsafeVariables {
+				// Skip if RUN has mounts that conflict with COPY conversion
+				if shouldSkipForMounts(c, info.TargetPath) {
+					prevInfo, prevRun = nil, nil
+					continue
+				}
+
+				// Mixed commands can't be part of a sequence (handled by checkSingleRuns)
+				if info.PrecedingCommands != "" || info.RemainingCommands != "" {
+					prevInfo, prevRun = nil, nil
+					continue
+				}
+
+				// Don't start sequence with append-only (unknown base content)
+				if info.IsAppend && (prevInfo == nil || info.TargetPath != prevInfo.TargetPath) {
+					prevInfo, prevRun = nil, nil
+					continue
+				}
+
+				if prevInfo != nil && prevRun != nil && info.TargetPath == prevInfo.TargetPath {
+					inSequence[prevRun] = true
+					inSequence[c] = true
+				}
+				prevInfo, prevRun = info, c
+				continue
+			}
+
+			// Check for standalone chmod that continues the sequence
+			if prevInfo != nil && prevRun != nil {
+				script := getRunCmdLine(c)
+				chmodInfo := shell.DetectStandaloneChmod(script, shellCtx.variant)
+				if chmodInfo != nil && chmodInfo.Target == prevInfo.TargetPath {
+					inSequence[prevRun] = true
+					inSequence[c] = true
+					continue
+				}
+			}
+
 			prevInfo, prevRun = nil, nil
-			continue
+		default:
+			prevInfo, prevRun = nil, nil
 		}
-
-		// Check for file creation
-		info := shell.DetectFileCreation(script, shellVariant, knownVars)
-		if info != nil && !info.HasUnsafeVariables {
-			// Skip if RUN has mounts that conflict with COPY conversion
-			if shouldSkipForMounts(run, info.TargetPath) {
-				prevInfo, prevRun = nil, nil
-				continue
-			}
-
-			// Mixed commands can't be part of a sequence (handled by checkSingleRuns)
-			if info.PrecedingCommands != "" || info.RemainingCommands != "" {
-				prevInfo, prevRun = nil, nil
-				continue
-			}
-
-			// Don't start sequence with append-only (unknown base content)
-			if info.IsAppend && (prevInfo == nil || info.TargetPath != prevInfo.TargetPath) {
-				prevInfo, prevRun = nil, nil
-				continue
-			}
-
-			if prevInfo != nil && prevRun != nil && info.TargetPath == prevInfo.TargetPath {
-				inSequence[prevRun] = true
-				inSequence[run] = true
-			}
-			prevInfo, prevRun = info, run
-			continue
-		}
-
-		// Check for standalone chmod that continues the sequence
-		if prevInfo != nil && prevRun != nil {
-			chmodInfo := shell.DetectStandaloneChmod(script, shellVariant)
-			if chmodInfo != nil && chmodInfo.Target == prevInfo.TargetPath {
-				inSequence[prevRun] = true
-				inSequence[run] = true
-				continue
-			}
-		}
-
-		prevInfo, prevRun = nil, nil
 	}
 	return inSequence
 }
@@ -209,186 +253,168 @@ func identifySequenceRuns(
 // skipSequences controls whether to skip RUNs that are part of consecutive sequences
 // (should be true when checkConsecutive is enabled, false otherwise).
 func (r *PreferCopyHeredocRule) checkSingleRuns(
-	stage instructions.Stage,
-	shellVariant shell.Variant,
-	knownVars func(string) bool,
-	file string,
-	sm *sourcemap.SourceMap,
-	meta rules.RuleMetadata,
+	ctx copyHeredocCheckContext,
 	skipSequences bool,
 ) []rules.Violation {
-	violations := make([]rules.Violation, 0, len(stage.Commands))
+	violations := make([]rules.Violation, 0, len(ctx.stage.Commands))
 	var inSequence map[*instructions.RunCommand]bool
 	if skipSequences {
-		inSequence = identifySequenceRuns(stage, shellVariant, knownVars)
+		inSequence = identifySequenceRuns(ctx)
 	}
+	userState := newPreferCopyHeredocUserState(ctx.stageIdx, ctx.sem, ctx.fileFacts)
 
 	// Report violations for standalone file creations
-	for _, cmd := range stage.Commands {
-		run, ok := cmd.(*instructions.RunCommand)
-		if !ok {
-			continue
+	for _, cmd := range ctx.stage.Commands {
+		switch c := cmd.(type) {
+		case *instructions.UserCommand:
+			userState.currentUser = c.User
+		case *instructions.RunCommand:
+			shellCtx := preferCopyHeredocShellContextForRun(c, ctx.stageInfo, ctx.fallbackVariant)
+			info := detectRunFileCreation(c, shellCtx.variant, shellCtx.fileCreationOptions, ctx.knownVars, userState)
+			userState.learnHomesFromRun(c, shellCtx.variant)
+
+			// Skip if part of a consecutive sequence
+			if inSequence[c] {
+				continue
+			}
+
+			// Only check shell form
+			if !c.PrependShell || info == nil {
+				continue
+			}
+
+			// Skip if uses unsafe variables
+			if info.HasUnsafeVariables {
+				continue
+			}
+
+			// Skip appends in single-run check (handled by consecutive check)
+			if info.IsAppend {
+				continue
+			}
+
+			// Skip if RUN has mounts that conflict with COPY conversion
+			if shouldSkipForMounts(c, info.TargetPath) {
+				continue
+			}
+
+			// Create violation
+			loc := rules.NewLocationFromRanges(ctx.file, c.Location())
+
+			v := rules.NewViolation(
+				loc,
+				ctx.meta.Code,
+				"use COPY <<EOF instead of RUN for file creation",
+				ctx.meta.DefaultSeverity,
+			).WithDocURL(ctx.meta.DocURL).WithDetail(
+				fmt.Sprintf("Creating %s with RUN can be replaced with COPY heredoc for better performance", info.TargetPath),
+			)
+
+			// Generate fix
+			if fix := r.generateFix(c, info, ctx.file, ctx.sm, ctx.meta, userState.currentUser); fix != nil {
+				v = v.WithSuggestedFix(fix)
+			}
+
+			violations = append(violations, v)
 		}
-
-		// Skip if part of a consecutive sequence
-		if inSequence[run] {
-			continue
-		}
-
-		// Only check shell form
-		if !run.PrependShell {
-			continue
-		}
-
-		script := getRunCmdLine(run)
-		if script == "" {
-			continue
-		}
-
-		// Detect file creation pattern
-		info := shell.DetectFileCreation(script, shellVariant, knownVars)
-		if info == nil {
-			continue
-		}
-
-		// Skip if uses unsafe variables
-		if info.HasUnsafeVariables {
-			continue
-		}
-
-		// Skip appends in single-run check (handled by consecutive check)
-		if info.IsAppend {
-			continue
-		}
-
-		// Skip if RUN has mounts that conflict with COPY conversion
-		if shouldSkipForMounts(run, info.TargetPath) {
-			continue
-		}
-
-		// Create violation
-		loc := rules.NewLocationFromRanges(file, run.Location())
-
-		v := rules.NewViolation(
-			loc,
-			meta.Code,
-			"use COPY <<EOF instead of RUN for file creation",
-			meta.DefaultSeverity,
-		).WithDocURL(meta.DocURL).WithDetail(
-			fmt.Sprintf("Creating %s with RUN can be replaced with COPY heredoc for better performance", info.TargetPath),
-		)
-
-		// Generate fix
-		if fix := r.generateFix(run, info, file, sm, meta); fix != nil {
-			v = v.WithSuggestedFix(fix)
-		}
-
-		violations = append(violations, v)
 	}
 
 	return violations
 }
 
 // checkConsecutiveRuns checks for sequences of RUN instructions that write to the same file.
-func (r *PreferCopyHeredocRule) checkConsecutiveRuns(
-	stage instructions.Stage,
-	shellVariant shell.Variant,
-	knownVars func(string) bool,
-	file string,
-	sm *sourcemap.SourceMap,
-	meta rules.RuleMetadata,
-) []rules.Violation {
+func (r *PreferCopyHeredocRule) checkConsecutiveRuns(ctx copyHeredocCheckContext) []rules.Violation {
 	var violations []rules.Violation
-	var sequence []fileCreationRun
-	var targetPath string
-	var sequenceRawChmodMode string               // raw mode string from trailing RUN chmod
-	var sequenceChmodRun *instructions.RunCommand // the RUN chmod instruction
+	var seq copyHeredocSequence
+	userState := newPreferCopyHeredocUserState(ctx.stageIdx, ctx.sem, ctx.fileFacts)
 
 	flushSequence := func() {
 		if v := r.createSequenceViolation(
-			sequence, targetPath, sequenceRawChmodMode, sequenceChmodRun, file, sm, meta,
+			seq.runs, seq.target, seq.rawChmod, seq.chmodRun, ctx, userState.currentUser,
 		); v != nil {
 			violations = append(violations, *v)
 		}
-		sequence = nil
-		targetPath = ""
-		sequenceRawChmodMode = ""
-		sequenceChmodRun = nil
+		seq.reset()
 	}
 
-	for _, cmd := range stage.Commands {
-		run, ok := cmd.(*instructions.RunCommand)
-		if !ok {
+	for _, cmd := range ctx.stage.Commands {
+		switch c := cmd.(type) {
+		case *instructions.UserCommand:
+			userState.currentUser = c.User
 			flushSequence()
-			continue
-		}
-
-		// Only check shell form
-		if !run.PrependShell {
+		case *instructions.RunCommand:
+			if r.handleRunInSequence(c, ctx, userState, &seq, flushSequence) {
+				continue
+			}
 			flushSequence()
-			continue
-		}
-
-		script := getRunCmdLine(run)
-		if script == "" {
+		default:
 			flushSequence()
-			continue
 		}
-
-		// Detect file creation pattern
-		info := shell.DetectFileCreation(script, shellVariant, knownVars)
-		if info != nil && !info.HasUnsafeVariables {
-			// Skip if RUN has mounts that conflict with COPY conversion
-			if shouldSkipForMounts(run, info.TargetPath) {
-				flushSequence()
-				continue
-			}
-
-			// Mixed commands can't be safely combined into a single COPY heredoc
-			// (would drop PrecedingCommands or RemainingCommands)
-			if info.PrecedingCommands != "" || info.RemainingCommands != "" {
-				flushSequence()
-				continue
-			}
-
-			// Do not start a sequence with append-only writes (unknown base content)
-			if len(sequence) == 0 && info.IsAppend {
-				flushSequence()
-				continue
-			}
-
-			// Update sequence with this file creation
-			sequence, targetPath = updateFileCreationSequence(
-				sequence, targetPath, run, info, flushSequence,
-			)
-			if sequenceRawChmodMode != "" {
-				// Chmod is no longer trailing once another write appears.
-				sequenceChmodRun = nil
-				// Inline chmod overrides earlier standalone chmod.
-				if info.ChmodMode != 0 {
-					sequenceRawChmodMode = ""
-				}
-			}
-			continue
-		}
-
-		// Check for standalone chmod that can extend the sequence
-		if len(sequence) > 0 && sequenceRawChmodMode == "" {
-			chmodInfo := shell.DetectStandaloneChmod(script, shellVariant)
-			if chmodInfo != nil && chmodInfo.Target == targetPath {
-				// This chmod targets our sequence's file - absorb it
-				sequenceRawChmodMode = chmodInfo.RawMode
-				sequenceChmodRun = run
-				continue
-			}
-		}
-
-		// Neither file creation nor matching chmod - flush
-		flushSequence()
 	}
 
 	flushSequence()
 	return violations
+}
+
+// handleRunInSequence processes a RunCommand for the consecutive sequence check.
+// Returns true if the command was absorbed into the sequence, false if the caller should flush.
+func (r *PreferCopyHeredocRule) handleRunInSequence(
+	c *instructions.RunCommand,
+	ctx copyHeredocCheckContext,
+	userState *preferCopyHeredocUserState,
+	seq *copyHeredocSequence,
+	flushSequence func(),
+) bool {
+	shellCtx := preferCopyHeredocShellContextForRun(c, ctx.stageInfo, ctx.fallbackVariant)
+	info := detectRunFileCreation(c, shellCtx.variant, shellCtx.fileCreationOptions, ctx.knownVars, userState)
+	userState.learnHomesFromRun(c, shellCtx.variant)
+
+	if !c.PrependShell {
+		return false
+	}
+
+	script := getRunCmdLine(c)
+	if script == "" {
+		return false
+	}
+
+	// Detect file creation pattern
+	if info != nil && !info.HasUnsafeVariables {
+		if shouldSkipForMounts(c, info.TargetPath) {
+			return false
+		}
+		if info.PrecedingCommands != "" || info.RemainingCommands != "" {
+			return false
+		}
+		if len(seq.runs) == 0 && info.IsAppend {
+			return false
+		}
+
+		seq.runs, seq.target = updateFileCreationSequence(
+			seq.runs, seq.target, c, info, flushSequence,
+		)
+		if seq.rawChmod != "" {
+			// Chmod is no longer trailing once another write appears.
+			seq.chmodRun = nil
+			// Inline chmod overrides earlier standalone chmod.
+			if info.ChmodMode != 0 {
+				seq.rawChmod = ""
+			}
+		}
+		return true
+	}
+
+	// Check for standalone chmod that can extend the sequence
+	if len(seq.runs) > 0 && seq.rawChmod == "" {
+		chmodInfo := shell.DetectStandaloneChmod(script, shellCtx.variant)
+		if chmodInfo != nil && chmodInfo.Target == seq.target {
+			seq.rawChmod = chmodInfo.RawMode
+			seq.chmodRun = c
+			return true
+		}
+	}
+
+	return false
 }
 
 // updateFileCreationSequence updates the sequence with a new file creation.
@@ -419,9 +445,8 @@ func (r *PreferCopyHeredocRule) createSequenceViolation(
 	sequence []fileCreationRun,
 	targetPath, rawChmodMode string,
 	chmodRun *instructions.RunCommand,
-	file string,
-	sm *sourcemap.SourceMap,
-	meta rules.RuleMetadata,
+	ctx copyHeredocCheckContext,
+	effectiveUser string,
 ) *rules.Violation {
 	// Need at least 2 RUNs to be a sequence, or 1 RUN + chmod
 	if len(sequence) < 2 && chmodRun == nil {
@@ -432,7 +457,7 @@ func (r *PreferCopyHeredocRule) createSequenceViolation(
 	}
 
 	firstRun := sequence[0].run
-	loc := rules.NewLocationFromRanges(file, firstRun.Location())
+	loc := rules.NewLocationFromRanges(ctx.file, firstRun.Location())
 
 	runCount := len(sequence)
 	if chmodRun != nil {
@@ -441,16 +466,16 @@ func (r *PreferCopyHeredocRule) createSequenceViolation(
 
 	v := rules.NewViolation(
 		loc,
-		meta.Code,
+		ctx.meta.Code,
 		"consecutive RUN file creations can use a single COPY heredoc",
-		meta.DefaultSeverity,
-	).WithDocURL(meta.DocURL).WithDetail(
+		ctx.meta.DefaultSeverity,
+	).WithDocURL(ctx.meta.DocURL).WithDetail(
 		fmt.Sprintf("%d consecutive RUN instructions write to %s; combine into single COPY <<EOF", runCount, targetPath),
 	)
 
 	// Generate fix for the sequence
 	if fix := r.generateSequenceFix(
-		sequence, targetPath, rawChmodMode, chmodRun, file, sm, meta,
+		sequence, targetPath, rawChmodMode, chmodRun, ctx, effectiveUser,
 	); fix != nil {
 		v = v.WithSuggestedFix(fix)
 	}
@@ -466,6 +491,7 @@ func (r *PreferCopyHeredocRule) generateFix(
 	file string,
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
+	effectiveUser string,
 ) *rules.SuggestedFix {
 	runLoc := run.Location()
 	if len(runLoc) == 0 {
@@ -488,7 +514,8 @@ func (r *PreferCopyHeredocRule) generateFix(
 	}
 
 	// Add COPY heredoc for the file creation
-	copyCmd := buildCopyHeredoc(info.TargetPath, info.Content, info.RawChmodMode)
+	chownUser := chownUserForCopy(effectiveUser)
+	copyCmd := buildCopyHeredoc(info.TargetPath, info.Content, info.RawChmodMode, chownUser)
 	parts = append(parts, copyCmd)
 
 	// Add remaining commands as RUN if any (preserve mounts)
@@ -505,9 +532,14 @@ func (r *PreferCopyHeredocRule) generateFix(
 		description = "Extract file creation to COPY <<EOF"
 	}
 
+	safety := rules.FixSuggestion
+	if info.ResolvedHomePath {
+		safety = rules.FixUnsafe
+	}
+
 	return &rules.SuggestedFix{
 		Description: description,
-		Safety:      rules.FixSuggestion,
+		Safety:      safety,
 		Priority:    meta.FixPriority,
 		Edits: []rules.TextEdit{{
 			Location: rules.NewRangeLocation(
@@ -527,9 +559,8 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 	sequence []fileCreationRun,
 	targetPath, trailingRawChmodMode string,
 	trailingChmodRun *instructions.RunCommand,
-	file string,
-	sm *sourcemap.SourceMap,
-	meta rules.RuleMetadata,
+	ctx copyHeredocCheckContext,
+	effectiveUser string,
 ) *rules.SuggestedFix {
 	if len(sequence) == 0 {
 		return nil
@@ -557,8 +588,17 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 		rawChmodMode = trailingRawChmodMode
 	}
 
+	safety := rules.FixSuggestion
+	for _, fcr := range sequence {
+		if fcr.info != nil && fcr.info.ResolvedHomePath {
+			safety = rules.FixUnsafe
+			break
+		}
+	}
+
 	// Build COPY heredoc
-	copyCmd := buildCopyHeredoc(targetPath, content.String(), rawChmodMode)
+	chownUser := chownUserForCopy(effectiveUser)
+	copyCmd := buildCopyHeredoc(targetPath, content.String(), rawChmodMode, chownUser)
 
 	// Calculate edit range - from first RUN to last RUN (or trailing chmod)
 	firstLoc := sequence[0].run.Location()
@@ -579,7 +619,7 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 		return nil
 	}
 
-	endLine, endCol := resolveRunEndPosition(lastLoc, sm, lastRun)
+	endLine, endCol := resolveRunEndPosition(lastLoc, ctx.sm, lastRun)
 
 	runCount := len(sequence)
 	if trailingChmodRun != nil {
@@ -588,11 +628,11 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 
 	return &rules.SuggestedFix{
 		Description: fmt.Sprintf("Combine %d RUNs into single COPY <<EOF to %s", runCount, targetPath),
-		Safety:      rules.FixSuggestion,
-		Priority:    meta.FixPriority,
+		Safety:      safety,
+		Priority:    ctx.meta.FixPriority,
 		Edits: []rules.TextEdit{{
 			Location: rules.NewRangeLocation(
-				file,
+				ctx.file,
 				firstLoc[0].Start.Line,
 				firstLoc[0].Start.Character,
 				endLine,
@@ -606,9 +646,15 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 // buildCopyHeredoc builds a COPY heredoc instruction.
 // rawChmodMode is the original mode notation (e.g. "+x", "755"); used directly since
 // COPY --chmod supports both octal and symbolic modes (Dockerfile 1.14+).
-func buildCopyHeredoc(targetPath, content, rawChmodMode string) string {
+func buildCopyHeredoc(targetPath, content, rawChmodMode, chownUser string) string {
 	var sb strings.Builder
 	sb.WriteString("COPY ")
+
+	if chownUser != "" {
+		sb.WriteString("--chown=")
+		sb.WriteString(chownUser)
+		sb.WriteString(" ")
+	}
 
 	if rawChmodMode != "" {
 		sb.WriteString("--chmod=")
@@ -636,6 +682,21 @@ func buildCopyHeredoc(targetPath, content, rawChmodMode string) string {
 	sb.WriteString(delimiter)
 
 	return sb.String()
+}
+
+// chownUserForCopy returns the user string for --chown when the active USER is
+// non-root. Returns "" (no --chown needed) when the user is root, empty, or a
+// variable/numeric reference that can't be safely embedded.
+func chownUserForCopy(effectiveUser string) string {
+	user := strings.TrimSpace(effectiveUser)
+	if user == "" || facts.IsRootUser(user) {
+		return ""
+	}
+	// Skip variable references (e.g., $APP_USER) — can't safely embed.
+	if strings.ContainsAny(user, "${}") {
+		return ""
+	}
+	return user
 }
 
 // chooseDelimiter selects a heredoc delimiter that doesn't appear in content.
@@ -752,6 +813,253 @@ func getRunCmdLine(run *instructions.RunCommand) string {
 	}
 
 	return cmdLine
+}
+
+type preferCopyHeredocUserState struct {
+	currentUser string
+	knownHomes  map[string]string
+}
+
+func newPreferCopyHeredocUserState(
+	stageIdx int,
+	sem *semantic.Model,
+	fileFacts *facts.FileFacts,
+) *preferCopyHeredocUserState {
+	state := &preferCopyHeredocUserState{
+		knownHomes: make(map[string]string),
+	}
+
+	if sem != nil && fileFacts != nil {
+		state.currentUser = inheritedUserForCopyChown(sem, fileFacts, stageIdx)
+	}
+
+	return state
+}
+
+func detectRunFileCreation(
+	run *instructions.RunCommand,
+	shellVariant shell.Variant,
+	options shell.FileCreationOptions,
+	knownVars func(string) bool,
+	userState *preferCopyHeredocUserState,
+) *shell.FileCreationInfo {
+	if run == nil || !run.PrependShell {
+		return nil
+	}
+
+	script := getRunCmdLine(run)
+	if script == "" {
+		return nil
+	}
+
+	if userState != nil {
+		options.ResolveTargetPath = userState.resolveTargetPath
+	}
+
+	if options.ResolveTargetPath == nil && !options.InterpretPlainEchoEscapes {
+		return shell.DetectFileCreation(script, shellVariant, knownVars)
+	}
+
+	return shell.DetectFileCreationWithOptions(script, shellVariant, knownVars, options)
+}
+
+type preferCopyHeredocShellContext struct {
+	variant             shell.Variant
+	fileCreationOptions shell.FileCreationOptions
+}
+
+func preferCopyHeredocShellContextForRun(
+	run *instructions.RunCommand,
+	stageInfo *semantic.StageInfo,
+	fallbackVariant shell.Variant,
+) preferCopyHeredocShellContext {
+	var line int
+	if run != nil {
+		if locs := run.Location(); len(locs) > 0 {
+			line = locs[0].Start.Line
+		}
+	}
+
+	variant := fallbackVariant
+	var shellName string
+	if stageInfo != nil {
+		if override, ok := preferCopyHeredocHeredocShellOverride(stageInfo, line); ok {
+			variant = override.Variant
+			shellName = override.Shell
+		} else if line > 0 {
+			variant = stageInfo.ShellVariantAtLine(line)
+			shellName = stageInfo.ShellNameAtLine(line)
+		} else {
+			variant = stageInfo.ShellSetting.Variant
+			if len(stageInfo.ShellSetting.Shell) > 0 {
+				shellName = stageInfo.ShellSetting.Shell[0]
+			}
+		}
+	}
+
+	return preferCopyHeredocShellContext{
+		variant: variant,
+		fileCreationOptions: shell.FileCreationOptions{
+			InterpretPlainEchoEscapes: preferCopyHeredocInterpretsPlainEchoEscapes(shellName, variant, isDashDefault(stageInfo)),
+		},
+	}
+}
+
+func preferCopyHeredocHeredocShellOverride(
+	stageInfo *semantic.StageInfo,
+	line int,
+) (semantic.HeredocShellOverride, bool) {
+	if stageInfo == nil || line <= 0 {
+		return semantic.HeredocShellOverride{}, false
+	}
+	for _, override := range stageInfo.HeredocShellOverrides {
+		if override.Line == line {
+			return override, true
+		}
+	}
+	return semantic.HeredocShellOverride{}, false
+}
+
+func isDashDefault(stageInfo *semantic.StageInfo) bool {
+	return stageInfo != nil && stageInfo.DashDefault
+}
+
+func preferCopyHeredocInterpretsPlainEchoEscapes(shellName string, variant shell.Variant, dashDefault bool) bool {
+	switch shell.NormalizeShellExecutableName(shellName) {
+	case "dash":
+		return true
+	case "ash":
+		return false
+	case "sh":
+		// When /bin/sh is the default and the variant is POSIX, the behavior
+		// depends on the distro: dash (Debian/Ubuntu) interprets backslash
+		// escapes in plain echo, ash (Alpine/BusyBox) does not.
+		return variant == shell.VariantPOSIX && dashDefault
+	default:
+		return false
+	}
+}
+
+func (s *preferCopyHeredocUserState) learnHomesFromRun(run *instructions.RunCommand, shellVariant shell.Variant) {
+	if s == nil || run == nil || !run.PrependShell {
+		return
+	}
+
+	script := getRunCmdLine(run)
+	if script == "" {
+		return
+	}
+
+	for _, cmd := range shell.FindCommands(script, shellVariant, "useradd", "adduser") {
+		username, home := extractCreatedUserHome(&cmd)
+		if username == "" || home == "" || !pathpkg.IsAbs(home) {
+			continue
+		}
+		s.knownHomes[username] = pathpkg.Clean(home)
+	}
+}
+
+func (s *preferCopyHeredocUserState) resolveTargetPath(rawTarget string) (string, bool, bool) {
+	if rawTarget == "" {
+		return "", false, false
+	}
+	if pathpkg.IsAbs(rawTarget) {
+		return pathpkg.Clean(rawTarget), false, true
+	}
+
+	if rawTarget != "~" && !strings.HasPrefix(rawTarget, "~/") {
+		return "", false, false
+	}
+
+	home, ok := s.currentHomeDir()
+	if !ok {
+		return "", false, false
+	}
+	if rawTarget == "~" {
+		return home, true, true
+	}
+
+	return pathpkg.Join(home, strings.TrimPrefix(rawTarget, "~/")), true, true
+}
+
+func (s *preferCopyHeredocUserState) currentHomeDir() (string, bool) {
+	user := effectiveUserNameForHome(s.currentUser)
+	switch {
+	case user == "", facts.IsRootUser(user):
+		return "/root", true
+	case !isResolvableNamedUser(user):
+		return "", false
+	case isNumericUser(user):
+		return "", false
+	default:
+		if home := s.knownHomes[user]; home != "" {
+			return home, true
+		}
+		return pathpkg.Join("/home", user), true
+	}
+}
+
+func effectiveUserNameForHome(user string) string {
+	user = strings.TrimSpace(user)
+	if idx := strings.Index(user, ":"); idx >= 0 {
+		user = user[:idx]
+	}
+	return strings.TrimSpace(user)
+}
+
+func isNumericUser(user string) bool {
+	if user == "" {
+		return false
+	}
+	for _, r := range user {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func isResolvableNamedUser(user string) bool {
+	if user == "" {
+		return false
+	}
+	return !strings.ContainsAny(user, `$"'{}()[] \t`)
+}
+
+func extractCreatedUserHome(cmd *shell.CommandInfo) (string, string) {
+	if cmd == nil {
+		return "", ""
+	}
+
+	username := extractCreatedUsername(cmd)
+	if username == "" {
+		return "", ""
+	}
+
+	switch cmd.Name {
+	case "useradd":
+		if home := commandArgValueAny(cmd, "-d", "--home", "--home-dir"); home != "" {
+			return username, home
+		}
+		if baseDir := commandArgValueAny(cmd, "-b", "--base-dir"); pathpkg.IsAbs(baseDir) {
+			return username, pathpkg.Join(baseDir, username)
+		}
+	case "adduser":
+		if home := commandArgValueAny(cmd, "-h", "--home", "--home-dir", "-d"); home != "" {
+			return username, home
+		}
+	}
+
+	return username, ""
+}
+
+func commandArgValueAny(cmd *shell.CommandInfo, flags ...string) string {
+	for _, flag := range flags {
+		if value := cmd.GetArgValue(flag); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // resolveRunEndPosition computes the end position for a RUN instruction using

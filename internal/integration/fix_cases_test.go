@@ -558,6 +558,19 @@ severity = "error"
 			wantApplied: 1,
 		},
 
+		// prefer-copy-heredoc: literal ~/ target resolves against the effective USER and stays unsafe
+		{
+			name: "prefer-copy-heredoc-tilde-home-root",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN echo '#!/bin/bash' > ~/.bashrc\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-copy-heredoc",
+			},
+			wantApplied: 1,
+		},
+
 		// prefer-copy-heredoc: consecutive RUNs writing to same file → single COPY heredoc
 		{
 			name: "prefer-copy-heredoc-consecutive-writes",
