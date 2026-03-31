@@ -330,8 +330,7 @@ func (r *PreferCopyHeredocRule) checkConsecutiveRuns(ctx copyHeredocCheckContext
 
 	flushSequence := func() {
 		if v := r.createSequenceViolation(
-			seq.runs, seq.target, seq.rawChmod, seq.chmodRun, ctx.file, ctx.sm, ctx.meta,
-			userState.currentUser,
+			seq.runs, seq.target, seq.rawChmod, seq.chmodRun, ctx, userState.currentUser,
 		); v != nil {
 			violations = append(violations, *v)
 		}
@@ -446,9 +445,7 @@ func (r *PreferCopyHeredocRule) createSequenceViolation(
 	sequence []fileCreationRun,
 	targetPath, rawChmodMode string,
 	chmodRun *instructions.RunCommand,
-	file string,
-	sm *sourcemap.SourceMap,
-	meta rules.RuleMetadata,
+	ctx copyHeredocCheckContext,
 	effectiveUser string,
 ) *rules.Violation {
 	// Need at least 2 RUNs to be a sequence, or 1 RUN + chmod
@@ -460,7 +457,7 @@ func (r *PreferCopyHeredocRule) createSequenceViolation(
 	}
 
 	firstRun := sequence[0].run
-	loc := rules.NewLocationFromRanges(file, firstRun.Location())
+	loc := rules.NewLocationFromRanges(ctx.file, firstRun.Location())
 
 	runCount := len(sequence)
 	if chmodRun != nil {
@@ -469,16 +466,16 @@ func (r *PreferCopyHeredocRule) createSequenceViolation(
 
 	v := rules.NewViolation(
 		loc,
-		meta.Code,
+		ctx.meta.Code,
 		"consecutive RUN file creations can use a single COPY heredoc",
-		meta.DefaultSeverity,
-	).WithDocURL(meta.DocURL).WithDetail(
+		ctx.meta.DefaultSeverity,
+	).WithDocURL(ctx.meta.DocURL).WithDetail(
 		fmt.Sprintf("%d consecutive RUN instructions write to %s; combine into single COPY <<EOF", runCount, targetPath),
 	)
 
 	// Generate fix for the sequence
 	if fix := r.generateSequenceFix(
-		sequence, targetPath, rawChmodMode, chmodRun, file, sm, meta, effectiveUser,
+		sequence, targetPath, rawChmodMode, chmodRun, ctx, effectiveUser,
 	); fix != nil {
 		v = v.WithSuggestedFix(fix)
 	}
@@ -562,9 +559,7 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 	sequence []fileCreationRun,
 	targetPath, trailingRawChmodMode string,
 	trailingChmodRun *instructions.RunCommand,
-	file string,
-	sm *sourcemap.SourceMap,
-	meta rules.RuleMetadata,
+	ctx copyHeredocCheckContext,
 	effectiveUser string,
 ) *rules.SuggestedFix {
 	if len(sequence) == 0 {
@@ -624,7 +619,7 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 		return nil
 	}
 
-	endLine, endCol := resolveRunEndPosition(lastLoc, sm, lastRun)
+	endLine, endCol := resolveRunEndPosition(lastLoc, ctx.sm, lastRun)
 
 	runCount := len(sequence)
 	if trailingChmodRun != nil {
@@ -634,10 +629,10 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 	return &rules.SuggestedFix{
 		Description: fmt.Sprintf("Combine %d RUNs into single COPY <<EOF to %s", runCount, targetPath),
 		Safety:      safety,
-		Priority:    meta.FixPriority,
+		Priority:    ctx.meta.FixPriority,
 		Edits: []rules.TextEdit{{
 			Location: rules.NewRangeLocation(
-				file,
+				ctx.file,
 				firstLoc[0].Start.Line,
 				firstLoc[0].Start.Character,
 				endLine,
