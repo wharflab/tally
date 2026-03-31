@@ -311,7 +311,7 @@ func (r *PreferCopyHeredocRule) checkSingleRuns(
 			)
 
 			// Generate fix
-			if fix := r.generateFix(c, info, ctx.file, ctx.sm, ctx.meta); fix != nil {
+			if fix := r.generateFix(c, info, ctx.file, ctx.sm, ctx.meta, userState.currentUser); fix != nil {
 				v = v.WithSuggestedFix(fix)
 			}
 
@@ -331,6 +331,7 @@ func (r *PreferCopyHeredocRule) checkConsecutiveRuns(ctx copyHeredocCheckContext
 	flushSequence := func() {
 		if v := r.createSequenceViolation(
 			seq.runs, seq.target, seq.rawChmod, seq.chmodRun, ctx.file, ctx.sm, ctx.meta,
+			userState.currentUser,
 		); v != nil {
 			violations = append(violations, *v)
 		}
@@ -448,6 +449,7 @@ func (r *PreferCopyHeredocRule) createSequenceViolation(
 	file string,
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
+	effectiveUser string,
 ) *rules.Violation {
 	// Need at least 2 RUNs to be a sequence, or 1 RUN + chmod
 	if len(sequence) < 2 && chmodRun == nil {
@@ -476,7 +478,7 @@ func (r *PreferCopyHeredocRule) createSequenceViolation(
 
 	// Generate fix for the sequence
 	if fix := r.generateSequenceFix(
-		sequence, targetPath, rawChmodMode, chmodRun, file, sm, meta,
+		sequence, targetPath, rawChmodMode, chmodRun, file, sm, meta, effectiveUser,
 	); fix != nil {
 		v = v.WithSuggestedFix(fix)
 	}
@@ -492,6 +494,7 @@ func (r *PreferCopyHeredocRule) generateFix(
 	file string,
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
+	effectiveUser string,
 ) *rules.SuggestedFix {
 	runLoc := run.Location()
 	if len(runLoc) == 0 {
@@ -514,7 +517,8 @@ func (r *PreferCopyHeredocRule) generateFix(
 	}
 
 	// Add COPY heredoc for the file creation
-	copyCmd := buildCopyHeredoc(info.TargetPath, info.Content, info.RawChmodMode)
+	chownUser := chownUserForCopy(effectiveUser)
+	copyCmd := buildCopyHeredoc(info.TargetPath, info.Content, info.RawChmodMode, chownUser)
 	parts = append(parts, copyCmd)
 
 	// Add remaining commands as RUN if any (preserve mounts)
@@ -561,6 +565,7 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 	file string,
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
+	effectiveUser string,
 ) *rules.SuggestedFix {
 	if len(sequence) == 0 {
 		return nil
@@ -597,7 +602,8 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 	}
 
 	// Build COPY heredoc
-	copyCmd := buildCopyHeredoc(targetPath, content.String(), rawChmodMode)
+	chownUser := chownUserForCopy(effectiveUser)
+	copyCmd := buildCopyHeredoc(targetPath, content.String(), rawChmodMode, chownUser)
 
 	// Calculate edit range - from first RUN to last RUN (or trailing chmod)
 	firstLoc := sequence[0].run.Location()
@@ -645,9 +651,15 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 // buildCopyHeredoc builds a COPY heredoc instruction.
 // rawChmodMode is the original mode notation (e.g. "+x", "755"); used directly since
 // COPY --chmod supports both octal and symbolic modes (Dockerfile 1.14+).
-func buildCopyHeredoc(targetPath, content, rawChmodMode string) string {
+func buildCopyHeredoc(targetPath, content, rawChmodMode, chownUser string) string {
 	var sb strings.Builder
 	sb.WriteString("COPY ")
+
+	if chownUser != "" {
+		sb.WriteString("--chown=")
+		sb.WriteString(chownUser)
+		sb.WriteString(" ")
+	}
 
 	if rawChmodMode != "" {
 		sb.WriteString("--chmod=")
@@ -675,6 +687,21 @@ func buildCopyHeredoc(targetPath, content, rawChmodMode string) string {
 	sb.WriteString(delimiter)
 
 	return sb.String()
+}
+
+// chownUserForCopy returns the user string for --chown when the active USER is
+// non-root. Returns "" (no --chown needed) when the user is root, empty, or a
+// variable/numeric reference that can't be safely embedded.
+func chownUserForCopy(effectiveUser string) string {
+	user := strings.TrimSpace(effectiveUser)
+	if user == "" || facts.IsRootUser(user) {
+		return ""
+	}
+	// Skip variable references (e.g., $APP_USER) — can't safely embed.
+	if strings.ContainsAny(user, "${}") {
+		return ""
+	}
+	return user
 }
 
 // chooseDelimiter selects a heredoc delimiter that doesn't appear in content.

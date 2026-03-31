@@ -461,6 +461,53 @@ RUN echo "#! /bin/ash\n\nset -e" > /app/explicit-ash.sh
 	}
 }
 
+func TestPreferCopyHeredocRule_ChownAfterUser(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM ubuntu:22.04
+USER app
+RUN echo "config=true" > /app/config.txt
+`
+
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	violations := NewPreferCopyHeredocRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil || len(fix.Edits) == 0 {
+		t.Fatal("expected violation to have a fix")
+	}
+	got := fix.Edits[0].NewText
+	if !strings.Contains(got, "--chown=app") {
+		t.Fatalf("fix text = %q, want --chown=app for non-root USER", got)
+	}
+}
+
+func TestPreferCopyHeredocRule_NoChownForRoot(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM ubuntu:22.04
+RUN echo "config=true" > /app/config.txt
+`
+
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	violations := NewPreferCopyHeredocRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil || len(fix.Edits) == 0 {
+		t.Fatal("expected violation to have a fix")
+	}
+	got := fix.Edits[0].NewText
+	if strings.Contains(got, "--chown") {
+		t.Fatalf("fix text = %q, should NOT contain --chown for root user", got)
+	}
+}
+
 func TestPreferCopyHeredocRule_TildeTargetFixes(t *testing.T) {
 	t.Parallel()
 	rule := NewPreferCopyHeredocRule()
@@ -489,7 +536,7 @@ RUN echo "hello" > ~/.bashrc
 USER app
 RUN echo "hello" > ~/.bashrc
 `,
-			wantPath:   "COPY <<EOF /home/app/.bashrc",
+			wantPath:   "COPY --chown=app <<EOF /home/app/.bashrc",
 			wantSafety: "unsafe",
 			wantFix:    true,
 			wantCount:  1,
@@ -501,7 +548,7 @@ RUN useradd -m -d /srv/app app
 USER app
 RUN echo "hello" > ~/.bashrc
 `,
-			wantPath:   "COPY <<EOF /srv/app/.bashrc",
+			wantPath:   "COPY --chown=app <<EOF /srv/app/.bashrc",
 			wantSafety: "unsafe",
 			wantFix:    true,
 			wantCount:  1,
@@ -603,6 +650,7 @@ func TestBuildCopyHeredoc(t *testing.T) {
 		targetPath   string
 		content      string
 		rawChmodMode string
+		chownUser    string
 	}{
 		{
 			name:       "simple content",
@@ -631,12 +679,25 @@ func TestBuildCopyHeredoc(t *testing.T) {
 			targetPath: "/app/empty",
 			content:    "",
 		},
+		{
+			name:       "with chown for non-root user",
+			targetPath: "/app/config",
+			content:    "hello world\n",
+			chownUser:  "app:app",
+		},
+		{
+			name:         "with chown and chmod",
+			targetPath:   "/app/run.sh",
+			content:      "#!/bin/sh\nexec app\n",
+			rawChmodMode: "0755",
+			chownUser:    "appuser",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			got := buildCopyHeredoc(tt.targetPath, tt.content, tt.rawChmodMode)
+			got := buildCopyHeredoc(tt.targetPath, tt.content, tt.rawChmodMode, tt.chownUser)
 			snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, got)
 		})
 	}
