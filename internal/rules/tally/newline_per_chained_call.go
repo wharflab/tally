@@ -39,6 +39,12 @@ type NewlinePerChainedCallRule struct {
 	schema map[string]any
 }
 
+type newlineRunCheckOptions struct {
+	minCommands int
+	escapeToken rune
+	deferToGit  bool
+}
+
 // NewNewlinePerChainedCallRule creates a new newline-per-chained-call rule instance.
 func NewNewlinePerChainedCallRule() *NewlinePerChainedCallRule {
 	schema, err := configutil.RuleSchema(NewlinePerChainedCallRuleCode)
@@ -103,6 +109,11 @@ func (r *NewlinePerChainedCallRule) Check(input rules.LintInput) []rules.Violati
 	}
 
 	var violations []rules.Violation
+	runOpts := newlineRunCheckOptions{
+		minCommands: minCommands,
+		escapeToken: escapeToken,
+		deferToGit:  input.IsRuleEnabled(rules.PreferAddGitRuleCode),
+	}
 
 	for stageIdx, stage := range input.Stages {
 		shellVariant := shell.VariantBash
@@ -118,7 +129,7 @@ func (r *NewlinePerChainedCallRule) Check(input rules.LintInput) []rules.Violati
 		for _, cmd := range stage.Commands {
 			switch c := cmd.(type) {
 			case *instructions.RunCommand:
-				if v := r.checkRun(c, shellVariant, input.File, sm, meta, minCommands, escapeToken); v != nil {
+				if v := r.checkRun(c, shellVariant, input.File, sm, meta, runOpts); v != nil {
 					violations = append(violations, *v)
 				}
 			case *instructions.LabelCommand:
@@ -143,15 +154,14 @@ func (r *NewlinePerChainedCallRule) checkRun(
 	file string,
 	sm *sourcemap.SourceMap,
 	meta rules.RuleMetadata,
-	minCommands int,
-	escapeToken rune,
+	opts newlineRunCheckOptions,
 ) *rules.Violation {
 	if len(run.Location()) == 0 {
 		return nil
 	}
 
 	startLine := run.Location()[0].Start.Line
-	endLine := sm.ResolveEndLineWithEscape(run.Location()[0].End.Line, escapeToken)
+	endLine := sm.ResolveEndLineWithEscape(run.Location()[0].End.Line, opts.escapeToken)
 
 	// Get instruction source lines
 	instrLines := make([]string, 0, endLine-startLine+1)
@@ -171,10 +181,13 @@ func (r *NewlinePerChainedCallRule) checkRun(
 	isHeredocRun := len(run.Files) > 0
 	if !isHeredocRun && run.PrependShell {
 		if script := getRunScriptFromCmd(run); script != "" {
+			if opts.deferToGit && shell.HasGitCloneRemote(script, shellVariant) {
+				return nil
+			}
 			cmdStartCol := shell.DockerfileRunCommandStartCol(instrLines[0])
-			sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol, escapeToken)
+			sourceText := shell.ReconstructSourceText(instrLines, cmdStartCol, opts.escapeToken)
 			chainEdits = r.collectSameLineChainEdits(
-				sourceText, startLine, cmdStartCol, minCommands,
+				sourceText, startLine, cmdStartCol, opts.minCommands,
 				shellVariant, instrIndent, file,
 			)
 		}

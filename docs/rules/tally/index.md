@@ -10,6 +10,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [secrets-in-code](./secrets-in-code.md) | Detects hardcoded secrets, API keys, and credentials | Error | Security | Enabled |
 | [prefer-vex-attestation](./prefer-vex-attestation.md) | Prefer attaching OpenVEX as an OCI attestation instead of copying VEX JSON into the image | Info | Security | Enabled |
 | [require-secret-mounts](./require-secret-mounts.md) | Enforces --mount=type=secret for commands accessing private registries | Warning | Security | Off (requires config) |
+| [prefer-add-git](./prefer-add-git.md) | Prefer `ADD <git source>` over `git clone` inside `RUN` | Warning | Security | Enabled |
 | [stateful-root-runtime](./stateful-root-runtime.md) | Final stage runs as root and signals mutable/persistent state | Warning | Security | Enabled |
 | [user-created-but-never-used](./user-created-but-never-used.md) | Final stage creates a user but never switches to it | Warning | Security | Enabled |
 | [copy-after-user-without-chown](./copy-after-user-without-chown.md) | COPY/ADD without --chown after non-root USER creates root-owned files | Warning | Correctness | Enabled |

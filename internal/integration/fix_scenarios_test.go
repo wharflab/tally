@@ -429,6 +429,70 @@ func TestFixPreferAddUnpackBeatsHeredoc(t *testing.T) {
 	}
 }
 
+// TestFixPreferAddGitCombined verifies that prefer-add-git owns RUN chains that
+// would otherwise overlap with generic RUN-formatting rules. Neighboring
+// whitespace rules still report on the original text surface, so this scenario
+// expects a non-zero exit while confirming the git-source fixes won the edit race.
+func TestFixPreferAddGitCombined(t *testing.T) {
+	t.Parallel()
+
+	input := "FROM alpine:3.20\n" +
+		"ARG BRANCH_OFI=v1.6.0\n" +
+		"RUN echo foo  && \\\n" +
+		"    git clone https://github.com/NVIDIA/apex && cd apex && git checkout 0123456789abcdef0123456789abcdef01234567 && echo zoo  \n" +
+		"RUN git clone https://github.com/aws/aws-ofi-nccl.git -b v${BRANCH_OFI}\n"
+
+	tmpDir := t.TempDir()
+	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
+	if err := os.WriteFile(dockerfilePath, []byte(input), 0o644); err != nil {
+		t.Fatalf("failed to write Dockerfile: %v", err)
+	}
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := `[rules.tally.consistent-indentation]
+severity = "style"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o644); err != nil {
+		t.Fatalf("failed to write config: %v", err)
+	}
+
+	args := []string{
+		"lint", "--config", configPath, "--slow-checks=off",
+		"--fix", "--fix-unsafe",
+		"--ignore", "*",
+		"--select", "tally/prefer-add-git",
+		"--select", "tally/prefer-run-heredoc",
+		"--select", "tally/newline-per-chained-call",
+		"--select", "hadolint/DL3003",
+		"--select", "tally/no-multi-spaces",
+		"--select", "tally/no-trailing-spaces",
+		"--select", "tally/consistent-indentation",
+		dockerfilePath,
+	}
+	cmd := exec.Command(binaryPath, args...)
+	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
+	output, err := cmd.CombinedOutput()
+	expectExitCode1(t, output, err)
+
+	fixedContent, err := os.ReadFile(dockerfilePath)
+	if err != nil {
+		t.Fatalf("failed to read fixed Dockerfile: %v", err)
+	}
+
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
+
+	gotApplied, ok, err := parseFixedCount(string(output))
+	if err != nil {
+		t.Fatalf("failed to parse fixed summary: %v\noutput:\n%s", err, output)
+	}
+	if !ok {
+		t.Fatalf("expected fixed summary in output, got:\n%s", output)
+	}
+	if gotApplied != 2 {
+		t.Fatalf("expected 2 fixes applied, got %d\noutput:\n%s", gotApplied, output)
+	}
+}
+
 // TestFixWindowsContainer tests auto-fix on a real-world Windows container Dockerfile
 // (cmd.exe default shell, servercore/iis base, MSBuild, Chocolatey) via stdin with
 // all rules enabled and markdown report output. This exercises the full fix pipeline

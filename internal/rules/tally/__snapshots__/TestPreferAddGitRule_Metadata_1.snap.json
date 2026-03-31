@@ -1,0 +1,10 @@
+{
+ "Category": "security",
+ "Code": "tally/prefer-add-git",
+ "DefaultSeverity": "warning",
+ "Description": "Use `ADD \u003cgit source\u003e` instead of cloning repositories in `RUN` for more hermetic builds",
+ "DocURL": "https://wharflab.github.io/tally/rules/tally/prefer-add-git/",
+ "FixPriority": 8,
+ "IsExperimental": false,
+ "Name": "Prefer ADD git sources over git clone in RUN"
+}

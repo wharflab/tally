@@ -36,11 +36,17 @@ func (r *DL3003Rule) Metadata() rules.RuleMetadata {
 // Skips analysis for stages using non-POSIX shells (e.g., PowerShell).
 func (r *DL3003Rule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
+	runContexts := rules.BuildGitRunContexts(input)
 
 	return ScanRunCommandsWithPOSIXShell(
 		input,
 		func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
 			cmdStr := dockerfile.RunCommandString(run)
+
+			if ctx, ok := runContexts[run]; input.IsRuleEnabled(rules.PreferAddGitRuleCode) &&
+				ok && ctx.Script != "" && shell.HasActionableGitSourceOpportunity(ctx.Script, ctx.Variant, ctx.Workdir) {
+				return nil
+			}
 
 			// Check if the command contains cd (handles subshells, etc.)
 			if !shell.ContainsCommandWithVariant(cmdStr, "cd", shellVariant) {

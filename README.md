@@ -21,7 +21,8 @@ Modern Dockerfiles deserve modern tooling. tally is opinionated in the right pla
 
 - **BuildKit-native**: understands modern syntax like heredocs, `RUN --mount=...`, `COPY --link`, and `ADD --checksum=...`.
 - **Fixes, not just findings**: `--fix` applies safe, mechanical rewrites; `--fix-unsafe` unlocks opt-in risky fixes (including AI).
-- **Modernizes on purpose**: converts eligible `RUN`/`COPY` instructions to heredocs, prefers `ADD --extract`, and more.
+- **Modernizes on purpose**: converts eligible `RUN`/`COPY` instructions to heredocs, prefers BuildKit `ADD` sources for archives and git repos, and
+  more.
 - **Broad rule coverage**: combines Docker's official BuildKit checks, embedded ShellCheck for shell snippets, Hadolint-compatible rules, and
   tally-specific rules.
 - **PowerShell-aware**: parses full PowerShell syntax for semantic tokens and rule analysis, so PowerShell `RUN` instructions are treated as real
@@ -66,7 +67,7 @@ tally integrates rules from multiple sources:
 | Source | Rules | Description |
 |--------|-------|-------------|
 | **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 22/22 rules | Docker's official Dockerfile checks (captured + reimplemented) |
-| **tally** | 50 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
+| **tally** | 51 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
 | **[Hadolint](https://github.com/hadolint/hadolint)** | 37 rules | Hadolint-compatible Dockerfile rules (expanding) |
 <!-- END RULES_TABLE -->
 
