@@ -443,6 +443,29 @@ RUN ["chmod", "755", "/app"]
 `,
 			WantViolations: 0,
 		},
+		{
+			Name: "exec form chmod with absolute path",
+			Content: `FROM ubuntu:22.04
+RUN ["/usr/bin/chmod", "777", "/app"]
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"777"},
+		},
+		{
+			Name: "exec form mkdir -m 777",
+			Content: `FROM ubuntu:22.04
+RUN ["mkdir", "-m", "777", "/data"]
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"mkdir -m"},
+		},
+		{
+			Name: "exec form mkdir -m 755 (safe)",
+			Content: `FROM ubuntu:22.04
+RUN ["mkdir", "-m", "755", "/data"]
+`,
+			WantViolations: 0,
+		},
 
 		// === Continuation lines ===
 		{

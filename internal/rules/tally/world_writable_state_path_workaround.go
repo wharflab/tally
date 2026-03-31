@@ -149,7 +149,9 @@ func (r *WorldWritableStatePathWorkaroundRule) checkRun(
 	return violations
 }
 
-// checkExecForm handles exec-form RUN like ["chmod", "777", "/app"].
+// checkExecForm handles exec-form RUN like ["chmod", "777", "/app"] or
+// ["mkdir", "-m", "777", "/data"]. Uses path.Base to handle absolute paths
+// (e.g., ["/usr/bin/chmod", ...]).
 func (r *WorldWritableStatePathWorkaroundRule) checkExecForm(
 	runFacts *facts.RunFacts,
 	file string,
@@ -164,23 +166,37 @@ func (r *WorldWritableStatePathWorkaroundRule) checkExecForm(
 		return nil
 	}
 
-	cmdName := cmdLine[0]
-	if cmdName != "chmod" {
-		return nil
-	}
-
-	info := extractWorldWritableChmod(cmdLine[1:])
-	if info == nil {
-		return nil
-	}
-
+	cmdName := path.Base(cmdLine[0])
 	loc := rules.NewLocationFromRanges(file, runFacts.Run.Location())
-	var violations []rules.Violation
-	for _, target := range info.targets {
-		v := r.buildViolation(loc, meta, "chmod", info.rawMode, target)
-		violations = append(violations, v)
+
+	switch cmdName {
+	case "chmod":
+		info := extractWorldWritableChmod(cmdLine[1:])
+		if info == nil {
+			return nil
+		}
+		var violations []rules.Violation
+		for _, target := range info.targets {
+			v := r.buildViolation(loc, meta, "chmod", info.rawMode, target)
+			violations = append(violations, v)
+		}
+		return violations
+
+	case "mkdir":
+		info := extractWorldWritableMkdir(cmdLine[1:])
+		if info == nil {
+			return nil
+		}
+		var violations []rules.Violation
+		for _, target := range info.targets {
+			v := r.buildViolation(loc, meta, "mkdir -m", info.rawMode, target)
+			violations = append(violations, v)
+		}
+		return violations
+
+	default:
+		return nil
 	}
-	return violations
 }
 
 // buildViolation constructs a violation with a contextual message.
