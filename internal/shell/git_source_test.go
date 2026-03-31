@@ -58,9 +58,26 @@ func TestFirstGitSourceOpportunity(t *testing.T) {
 			workdir:           "/",
 			wantSource:        `https://github.com/example/project.git?submodules=true`,
 			wantDestination:   `/tmp/src/project`,
-			wantPreceding:     `cd /tmp`,
+			wantPreceding:     ``,
 			wantRemaining:     `cd /tmp/src/project && make`,
 			wantUsesSubmodule: true,
+		},
+		{
+			name:            "drops cd-only prefix and carries cwd into remaining commands",
+			script:          "cd /tmp && git clone https://github.com/NVIDIA/apex && make",
+			workdir:         "/",
+			wantSource:      `https://github.com/NVIDIA/apex.git`,
+			wantDestination: `/tmp/apex`,
+			wantRemaining:   `cd /tmp && make`,
+		},
+		{
+			name:            "keeps side effects before clone and restores cwd for remaining commands",
+			script:          "mkdir /tmp/work && cd /tmp/work && git clone https://github.com/NVIDIA/apex && make",
+			workdir:         "/",
+			wantSource:      `https://github.com/NVIDIA/apex.git`,
+			wantDestination: `/tmp/work/apex`,
+			wantPreceding:   `mkdir /tmp/work && cd /tmp/work`,
+			wantRemaining:   `cd /tmp/work && make`,
 		},
 	}
 

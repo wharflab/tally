@@ -111,6 +111,26 @@ RUN echo foo && git clone https://github.com/NVIDIA/apex && cd apex && git check
 				"    RUN cd /apex && echo zoo\n",
 		},
 		{
+			name: "leading cd-only step is removed from split fix",
+			content: `FROM alpine
+RUN cd /tmp && git clone https://github.com/NVIDIA/apex && cd apex && echo zoo
+`,
+			wantHasFix: true,
+			wantFixed: "FROM alpine\n" +
+				"ADD --link https://github.com/NVIDIA/apex.git /tmp/apex\n" +
+				"RUN cd /tmp/apex && echo zoo\n",
+		},
+		{
+			name: "leading cd-only step is carried into remaining non-repo commands",
+			content: `FROM alpine
+RUN cd /tmp && git clone https://github.com/NVIDIA/apex && make
+`,
+			wantHasFix: true,
+			wantFixed: "FROM alpine\n" +
+				"ADD --link https://github.com/NVIDIA/apex.git /tmp/apex\n" +
+				"RUN cd /tmp && make\n",
+		},
+		{
 			name: "abbreviated checkout commit reports without fix",
 			content: `FROM alpine
 RUN git clone https://github.com/NVIDIA/apex && cd apex && git checkout aa756ce

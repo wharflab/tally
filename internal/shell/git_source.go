@@ -83,6 +83,7 @@ func FirstGitSourceOpportunity(script string, variant Variant, workdir string) (
 	if !ok {
 		return nil, false
 	}
+	baseWorkdir := currentDir
 
 	for i, step := range steps {
 		switch step.Kind {
@@ -95,63 +96,140 @@ func FirstGitSourceOpportunity(script string, variant Variant, workdir string) (
 			}
 			currentDir = nextDir
 		case gitChainStepClone:
-			clone := step.Clone
-			if clone == nil {
-				continue
-			}
-
-			repoName := clone.ShortName
-			if clone.DestinationArg != "" {
-				repoName = clone.DestinationArg
-			}
-			repoPath, ok := resolveGitPath(currentDir, repoName)
+			opportunity, ok := buildGitSourceOpportunity(steps, i, currentDir, baseWorkdir, variant)
 			if !ok {
 				return nil, false
 			}
-
-			consumed := i + 1
-			enteredRepo := false
-			checkoutRef := ""
-
-			if consumed < len(steps) && steps[consumed].Kind == gitChainStepCd &&
-				cdTargetsRepo(currentDir, steps[consumed].CDTarget, repoPath) {
-				enteredRepo = true
-				consumed++
+			if opportunity != nil {
+				return opportunity, true
 			}
-
-			if enteredRepo && consumed < len(steps) && steps[consumed].Kind == gitChainStepCheckout {
-				if !canEncodeGitCheckoutRef(steps[consumed].CheckoutRef) {
-					return nil, false
-				}
-				checkoutRef = steps[consumed].CheckoutRef
-				consumed++
-			}
-
-			preceding := joinGitSteps(steps[:i])
-			remaining := joinGitSteps(steps[consumed:])
-			if remaining != "" && enteredRepo {
-				remaining = "cd " + repoPath + " && " + remaining
-			}
-			keepGitDir := hasGitCommands(remaining, variant)
-
-			return &GitSourceOpportunity{
-				AddSource:         buildGitSourceURL(clone, checkoutRef),
-				AddDestination:    repoPath,
-				AddChecksum:       buildGitSourceChecksum(clone, checkoutRef),
-				RepoPath:          repoPath,
-				PrecedingCommands: preceding,
-				RemainingCommands: remaining,
-				EnteredRepo:       enteredRepo,
-				CheckoutRef:       checkoutRef,
-				CloneRef:          clone.Ref,
-				UsesSubmodules:    clone.Submodules,
-				KeepGitDir:        keepGitDir,
-				NormalizedRemote:  clone.NormalizedRemote,
-			}, true
 		}
 	}
 
 	return nil, false
+}
+
+func buildGitSourceOpportunity(
+	steps []gitChainStep,
+	cloneIndex int,
+	cloneBaseDir string,
+	baseWorkdir string,
+	variant Variant,
+) (*GitSourceOpportunity, bool) {
+	if cloneIndex < 0 || cloneIndex >= len(steps) {
+		return nil, false
+	}
+
+	clone := steps[cloneIndex].Clone
+	if clone == nil {
+		return nil, true
+	}
+
+	repoPath, ok := gitCloneRepoPath(clone, cloneBaseDir)
+	if !ok {
+		return nil, false
+	}
+
+	consumed, enteredRepo, checkoutRef, ok := consumeGitCloneFollowups(steps, cloneIndex, cloneBaseDir, repoPath)
+	if !ok {
+		return nil, false
+	}
+
+	preceding := gitClonePrecedingCommands(steps[:cloneIndex])
+	remaining := gitCloneRemainingCommands(steps[consumed:], cloneBaseDir, baseWorkdir, repoPath, enteredRepo)
+
+	return &GitSourceOpportunity{
+		AddSource:         buildGitSourceURL(clone, checkoutRef),
+		AddDestination:    repoPath,
+		AddChecksum:       buildGitSourceChecksum(clone, checkoutRef),
+		RepoPath:          repoPath,
+		PrecedingCommands: preceding,
+		RemainingCommands: remaining,
+		EnteredRepo:       enteredRepo,
+		CheckoutRef:       checkoutRef,
+		CloneRef:          clone.Ref,
+		UsesSubmodules:    clone.Submodules,
+		KeepGitDir:        hasGitCommands(remaining, variant),
+		NormalizedRemote:  clone.NormalizedRemote,
+	}, true
+}
+
+func gitCloneRepoPath(clone *gitCloneSpec, cloneBaseDir string) (string, bool) {
+	if clone == nil {
+		return "", false
+	}
+
+	repoName := clone.ShortName
+	if clone.DestinationArg != "" {
+		repoName = clone.DestinationArg
+	}
+	return resolveGitPath(cloneBaseDir, repoName)
+}
+
+func consumeGitCloneFollowups(
+	steps []gitChainStep,
+	cloneIndex int,
+	cloneBaseDir string,
+	repoPath string,
+) (consumed int, enteredRepo bool, checkoutRef string, ok bool) {
+	consumed = cloneIndex + 1
+
+	if consumed < len(steps) && steps[consumed].Kind == gitChainStepCd &&
+		cdTargetsRepo(cloneBaseDir, steps[consumed].CDTarget, repoPath) {
+		enteredRepo = true
+		consumed++
+	}
+
+	if enteredRepo && consumed < len(steps) && steps[consumed].Kind == gitChainStepCheckout {
+		if !canEncodeGitCheckoutRef(steps[consumed].CheckoutRef) {
+			return 0, false, "", false
+		}
+		checkoutRef = steps[consumed].CheckoutRef
+		consumed++
+	}
+
+	return consumed, enteredRepo, checkoutRef, true
+}
+
+func gitClonePrecedingCommands(steps []gitChainStep) string {
+	if gitStepsAreCdOnly(steps) {
+		return ""
+	}
+	return joinGitSteps(steps)
+}
+
+func gitCloneRemainingCommands(
+	steps []gitChainStep,
+	cloneBaseDir string,
+	baseWorkdir string,
+	repoPath string,
+	enteredRepo bool,
+) string {
+	remaining := joinGitSteps(steps)
+	if remaining == "" {
+		return ""
+	}
+
+	switch {
+	case enteredRepo:
+		return "cd " + repoPath + " && " + remaining
+	case cloneBaseDir != baseWorkdir:
+		return "cd " + cloneBaseDir + " && " + remaining
+	default:
+		return remaining
+	}
+}
+
+func gitStepsAreCdOnly(steps []gitChainStep) bool {
+	if len(steps) == 0 {
+		return false
+	}
+	for _, step := range steps {
+		if step.Kind != gitChainStepCd {
+			return false
+		}
+	}
+	return true
 }
 
 func gitTransformSteps(script string, variant Variant) ([]gitChainStep, bool) {

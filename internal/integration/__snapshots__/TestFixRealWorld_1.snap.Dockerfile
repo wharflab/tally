@@ -246,7 +246,6 @@ apt-get -y upgrade --only-upgrade systemd
 apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates check cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libgl1-mesa-glx libglib2.0-0 libgomp1 libhwloc-dev libibverbs-dev libnuma-dev libnuma1 libsm6 libssl-dev libssl3 libsubunit-dev libsubunit0 libtool libxext6 libxrender-dev openssl pkg-config python3-dev unzip vim wget zlib1g-dev libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7
 rm -rf /var/lib/apt/lists/*
 apt-get clean
-cd /tmp
 EOF
 
 ADD --link https://github.com/NVIDIA/nccl.git?ref=v${NCCL_VERSION}-1 /tmp/nccl
@@ -283,8 +282,6 @@ EOF
 
  ENV PATH="${PATH}:/opt/amazon/openmpi/bin:/opt/amazon/efa/bin:/opt/conda/bin:/usr/local/nvidia/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
  ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}/opt/amazon/openmpi/lib/:/opt/amazon/efa/lib/"
-
-RUN cd /tmp
 
 ADD --link https://github.com/NVIDIA/gdrcopy.git?ref=v${GDRCOPY_VERSION} /tmp/gdrcopy
 
@@ -482,8 +479,6 @@ COPY --chmod=+x start_with_right_hostname.sh /usr/local/bin/start_with_right_hos
 WORKDIR /root
 
 ARG SMDEBUG_VERSION=1.0.34
-
-RUN cd /tmp
 
 ADD --link https://github.com/awslabs/sagemaker-debugger.git?ref=${SMDEBUG_VERSION} /tmp/sagemaker-debugger
 
