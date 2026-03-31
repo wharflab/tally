@@ -1957,7 +1957,7 @@ severity = "warning"
 		// which makes world-writable's fix on the (now-deleted) RUN moot. Only the
 		// prefer-copy-chmod fix applies.
 		{
-			name: "world-writable-cross-prefer-copy-chmod",
+			name:  "world-writable-cross-prefer-copy-chmod",
 			input: "FROM ubuntu:22.04\nCOPY app /app\nRUN chmod 777 /app\n",
 			args: append(
 				[]string{"--fix", "--fix-unsafe"},
@@ -1969,7 +1969,7 @@ severity = "warning"
 		// copy-after-user adds --chown to COPY; world-writable fixes chmod 777→775 in RUN.
 		// Both fixes target different instructions so both apply.
 		{
-			name: "world-writable-cross-copy-after-user-without-chown",
+			name:  "world-writable-cross-copy-after-user-without-chown",
 			input: "FROM ubuntu:22.04\nUSER appuser\nCOPY app /app\nRUN chmod 777 /app\n",
 			args: append(
 				[]string{"--fix", "--fix-unsafe"},

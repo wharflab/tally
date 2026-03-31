@@ -100,39 +100,38 @@ RUN chmod -R 777 /data
 			}
 		})
 	}
+}
 
-	// Regression: two same-mode chmods in one RUN must get distinct fix positions.
-	t.Run("two same-mode chmods get distinct fixes", func(t *testing.T) {
-		t.Parallel()
-		input := testutil.MakeLintInput(t, "Dockerfile", `FROM ubuntu:22.04
+// TestWorldWritableStatePathWorkaroundDistinctFixPositions verifies that two
+// same-mode chmods in one RUN get distinct fix positions (regression).
+func TestWorldWritableStatePathWorkaroundDistinctFixPositions(t *testing.T) {
+	t.Parallel()
+	rule := NewWorldWritableStatePathWorkaroundRule()
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM ubuntu:22.04
 RUN chmod 777 /app && chmod 777 /data
 `)
-		violations := rule.Check(input)
-		if len(violations) != 2 {
-			t.Fatalf("got %d violations, want 2", len(violations))
-		}
+	violations := rule.Check(input)
+	if len(violations) != 2 {
+		t.Fatalf("got %d violations, want 2", len(violations))
+	}
 
-		// Both should have fixes.
-		for i, v := range violations {
-			if v.SuggestedFix == nil {
-				t.Errorf("violation[%d] has no fix", i)
-				continue
-			}
-			if len(v.SuggestedFix.Edits) == 0 {
-				t.Errorf("violation[%d] fix has no edits", i)
-				continue
-			}
+	for i, v := range violations {
+		if v.SuggestedFix == nil {
+			t.Errorf("violation[%d] has no fix", i)
+			continue
 		}
+		if len(v.SuggestedFix.Edits) == 0 {
+			t.Errorf("violation[%d] fix has no edits", i)
+		}
+	}
 
-		// The two fixes must target different columns.
-		if violations[0].SuggestedFix != nil && violations[1].SuggestedFix != nil {
-			col0 := violations[0].SuggestedFix.Edits[0].Location.Start.Column
-			col1 := violations[1].SuggestedFix.Edits[0].Location.Start.Column
-			if col0 == col1 {
-				t.Errorf("both fixes target the same column %d; expected distinct positions", col0)
-			}
+	if violations[0].SuggestedFix != nil && violations[1].SuggestedFix != nil {
+		col0 := violations[0].SuggestedFix.Edits[0].Location.Start.Column
+		col1 := violations[1].SuggestedFix.Edits[0].Location.Start.Column
+		if col0 == col1 {
+			t.Errorf("both fixes target the same column %d; expected distinct positions", col0)
 		}
-	})
+	}
 }
 
 func worldWritableCheckCases() []testutil.RuleTestCase {
