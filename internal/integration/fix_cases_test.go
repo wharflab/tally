@@ -1932,6 +1932,26 @@ severity = "warning"
 			wantApplied: 2,
 		},
 
+		// world-writable-state-path-workaround: replaces 777 with 775
+		{
+			name:  "world-writable-state-path-workaround",
+			input: "FROM ubuntu:22.04\nRUN chmod 777 /data\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/world-writable-state-path-workaround")...),
+			wantApplied: 1,
+		},
+
+		// world-writable-state-path-workaround: 666 → 664
+		{
+			name:  "world-writable-state-path-workaround-666",
+			input: "FROM ubuntu:22.04\nRUN chmod 666 /app/config\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/world-writable-state-path-workaround")...),
+			wantApplied: 1,
+		},
+
 		// Cross-rule: copy-after-user-without-chown + prefer-copy-chmod compose correctly
 		{
 			name: "copy-after-user-chown-plus-chmod",
