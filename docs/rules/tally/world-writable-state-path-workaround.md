@@ -65,14 +65,15 @@ Any octal mode where the last digit includes write (2, 3, 6, 7):
 - `chmod u+x`, `chmod +x` (execute only, no write)
 - `chmod o+r`, `chmod o+x` (read/execute only, no write)
 
-## Suppression
+## OpenShift and arbitrary-UID containers
 
-The rule is automatically suppressed when:
+Valid OpenShift patterns use group-only permission changes (`chgrp 0 && chmod g=u`,
+`chmod g+rwx`, `chmod 775`) which do **not** set the others-write bit and therefore
+do not trigger this rule. `chmod 777` is still flagged even when paired with `chgrp`,
+because it grants write to all users, not just the intended group.
 
-- A **`chgrp` command** in the same `RUN` instruction targets the same
-  path or a parent directory. This recognizes the valid OpenShift pattern
-  `chgrp 0 /path && chmod 777 /path`, where world-writable is the
-  intended behavior for arbitrary-UID containers with group 0.
+For OpenShift-compatible containers, prefer `chgrp 0 /path && chmod g=u /path`
+over `chmod 777 /path`.
 
 ## Relationship to related rules
 

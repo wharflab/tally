@@ -18,8 +18,8 @@ RUN mkdir -pm 777 /srv/logs
 FROM ubuntu:22.04 AS clean1
 RUN chmod 755 /app
 
-# Clean: OpenShift chgrp + chmod pattern (suppressed)
-FROM ubuntu:22.04 AS clean2
+# Violation: chgrp does NOT suppress world-writable chmod 777
+FROM ubuntu:22.04 AS violation5
 RUN chgrp 0 /data && chmod 777 /data
 
 # Clean: group-only chmod g+rwx

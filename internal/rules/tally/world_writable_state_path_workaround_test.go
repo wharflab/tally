@@ -413,14 +413,7 @@ RUN chmod +x /app/script.sh
 			WantViolations: 0,
 		},
 
-		// === No violations: OpenShift/group patterns (suppression) ===
-		{
-			Name: "chgrp 0 + chmod g+rwx (OpenShift pattern) suppressed",
-			Content: `FROM ubuntu:22.04
-RUN chgrp 0 /data && chmod 777 /data
-`,
-			WantViolations: 0,
-		},
+		// === No violations: group-only and unrecognized modes ===
 		{
 			Name: "chmod g=u is not flagged (unrecognized mode)",
 			Content: `FROM ubuntu:22.04
@@ -428,19 +421,26 @@ RUN chmod g=u /app
 `,
 			WantViolations: 0,
 		},
+
+		// === Violations: chgrp does NOT suppress world-writable chmod ===
+		// chgrp only changes group ownership. chmod 777 is still world-writable
+		// regardless of chgrp. Valid OpenShift patterns use group-only modes
+		// (g=u, g+rwx, 775) which don't trigger this rule in the first place.
 		{
-			Name: "chgrp covers parent directory suppresses chmod on subpath",
+			Name: "chgrp + chmod 777 still flagged (world-writable despite chgrp)",
+			Content: `FROM ubuntu:22.04
+RUN chgrp 0 /data && chmod 777 /data
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"777"},
+		},
+		{
+			Name: "chgrp parent + chmod 777 subpath still flagged",
 			Content: `FROM ubuntu:22.04
 RUN chgrp -R 0 /app && chmod 777 /app/data
 `,
-			WantViolations: 0,
-		},
-		{
-			Name: "chgrp --reference suppresses (no GROUP arg, all non-flags are files)",
-			Content: `FROM ubuntu:22.04
-RUN chgrp --reference=/etc/group /data && chmod 777 /data
-`,
-			WantViolations: 0,
+			WantViolations: 1,
+			WantMessages:   []string{"777"},
 		},
 
 		// === No violations: mkdir safe modes ===

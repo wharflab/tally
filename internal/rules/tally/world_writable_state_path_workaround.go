@@ -119,11 +119,6 @@ func (r *WorldWritableStatePathWorkaroundRule) checkRun(
 			continue
 		}
 
-		// Suppression: skip if a chgrp in the same RUN targets the same paths.
-		if hasChgrpForPaths(script, variant, info.targets) {
-			continue
-		}
-
 		isRecursive := cmd.HasFlag("-R") || cmd.HasFlag("--recursive")
 
 		var fixCmd *shell.CommandInfo
@@ -426,65 +421,6 @@ func (r *WorldWritableStatePathWorkaroundRule) buildFix(
 		IsPreferred: true,
 		Priority:    meta.FixPriority,
 	}
-}
-
-// hasChgrpForPaths checks whether the script contains a chgrp command targeting
-// any of the given paths. This is the OpenShift suppression: chgrp 0 + chmod g+rwx
-// is a valid pattern for arbitrary-UID containers.
-func hasChgrpForPaths(script string, variant shell.Variant, targets []string) bool {
-	if !strings.Contains(script, "chgrp") {
-		return false
-	}
-
-	chgrpCmds := shell.FindCommands(script, variant, "chgrp")
-	for _, cmd := range chgrpCmds {
-		chgrpPaths := extractChgrpTargets(cmd.Args)
-		for _, chgrpPath := range chgrpPaths {
-			for _, target := range targets {
-				if pathCovers(chgrpPath, target) {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
-
-// extractChgrpTargets extracts file paths from chgrp arguments.
-// chgrp [options] GROUP FILE...  OR  chgrp --reference=RFILE FILE...
-// When --reference is used, there is no GROUP argument — all non-flag args are files.
-func extractChgrpTargets(args []string) []string {
-	hasReference := false
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "--reference") {
-			hasReference = true
-			break
-		}
-	}
-
-	var (
-		seenGroup bool
-		paths     []string
-	)
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "-") {
-			continue
-		}
-		if !hasReference && !seenGroup {
-			seenGroup = true // first non-flag is the group
-			continue
-		}
-		paths = append(paths, arg)
-	}
-	return paths
-}
-
-// pathCovers checks if chgrpPath covers targetPath (exact or parent).
-func pathCovers(chgrpPath, targetPath string) bool {
-	chgrpPath = path.Clean(chgrpPath)
-	targetPath = path.Clean(targetPath)
-	return targetPath == chgrpPath || strings.HasPrefix(targetPath, chgrpPath+"/")
 }
 
 func init() {
