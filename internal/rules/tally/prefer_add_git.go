@@ -225,7 +225,9 @@ func hasUnsupportedGitRunFlags(run *instructions.RunCommand) bool {
 		return false
 	}
 	for _, flag := range run.FlagsUsed {
-		if !strings.HasPrefix(flag, "mount") {
+		name, _, _ := strings.Cut(flag, "=")
+		name = strings.TrimLeft(name, "-")
+		if name != "mount" {
 			return true
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	fixpkg "github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/rules"
@@ -214,6 +215,61 @@ RUN --mount=type=ssh git clone git@github.com:NVIDIA/apex.git
 			}
 			if tt.wantContain != "" && !strings.Contains(got, tt.wantContain) {
 				t.Fatalf("fixed content = %q, want substring %q", got, tt.wantContain)
+			}
+		})
+	}
+}
+
+func TestHasUnsupportedGitRunFlags(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		run  *instructions.RunCommand
+		want bool
+	}{
+		{
+			name: "nil run",
+			run:  nil,
+			want: false,
+		},
+		{
+			name: "mount flag supported",
+			run: &instructions.RunCommand{
+				FlagsUsed: []string{"mount=type=ssh"},
+			},
+			want: false,
+		},
+		{
+			name: "leading dashes ignored",
+			run: &instructions.RunCommand{
+				FlagsUsed: []string{"--mount=type=ssh"},
+			},
+			want: false,
+		},
+		{
+			name: "similar prefix is unsupported",
+			run: &instructions.RunCommand{
+				FlagsUsed: []string{"mountable=type=ssh"},
+			},
+			want: true,
+		},
+		{
+			name: "other flag unsupported",
+			run: &instructions.RunCommand{
+				FlagsUsed: []string{"network=host"},
+			},
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := hasUnsupportedGitRunFlags(tt.run)
+			if got != tt.want {
+				t.Fatalf("hasUnsupportedGitRunFlags() = %v, want %v", got, tt.want)
 			}
 		})
 	}
