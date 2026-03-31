@@ -97,10 +97,23 @@ func (r *WorldWritableStatePathWorkaroundRule) checkRun(
 		sourceScript, runStartLine = dockerfile.RunSourceScript(runFacts.Run, sm)
 	}
 
+	// Pre-parse sourceScript chmods for column-accurate fix positions.
+	// FindCommands returns commands in AST order, so index-based correlation
+	// with the CommandScript parse is safe.
+	var sourceChmods []shell.CommandInfo
+	if sourceScript != "" {
+		sourceChmods = shell.FindCommands(sourceScript, variant, "chmod")
+	}
+
 	var violations []rules.Violation
 
 	// Detect world-writable chmod commands.
+	chmodIdx := 0
 	for _, cmd := range shell.FindCommands(script, variant, "chmod") {
+		// Track source-script index for fix correlation.
+		fixIdx := chmodIdx
+		chmodIdx++
+
 		info := extractWorldWritableChmod(cmd.Args)
 		if info == nil {
 			continue
@@ -113,15 +126,9 @@ func (r *WorldWritableStatePathWorkaroundRule) checkRun(
 
 		isRecursive := cmd.HasFlag("-R") || cmd.HasFlag("--recursive")
 
-		// Re-parse from sourceScript to get column-accurate positions for fixes.
 		var fixCmd *shell.CommandInfo
-		if sourceScript != "" {
-			for _, sc := range shell.FindCommands(sourceScript, variant, "chmod") {
-				if sc.Subcommand == info.rawMode {
-					fixCmd = &sc
-					break
-				}
-			}
+		if fixIdx < len(sourceChmods) {
+			fixCmd = &sourceChmods[fixIdx]
 		}
 
 		loc := rules.NewLocationFromRanges(file, runFacts.Run.Location())
