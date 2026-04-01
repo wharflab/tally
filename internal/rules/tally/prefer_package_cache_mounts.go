@@ -36,9 +36,9 @@ func (r *PreferPackageCacheMountsRule) Metadata() rules.RuleMetadata {
 		Name:            "Prefer package manager cache mounts",
 		Description:     "Use BuildKit cache mounts for package manager install/build commands",
 		DocURL:          rules.TallyDocURL(PreferPackageCacheMountsRuleCode),
-		DefaultSeverity: rules.SeverityOff,
+		DefaultSeverity: rules.SeverityInfo,
 		Category:        "performance",
-		IsExperimental:  true,
+		IsExperimental:  false,
 		FixPriority:     90, // Content rewrite before heredoc structural transforms (99/100+)
 	}
 }

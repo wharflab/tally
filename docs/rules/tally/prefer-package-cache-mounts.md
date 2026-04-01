@@ -6,7 +6,7 @@ Suggests using BuildKit cache mounts for package-manager install/build commands.
 |----------|-------|
 | Severity | Info |
 | Category | Performance |
-| Default | Off (experimental) |
+| Default | Enabled |
 | Auto-fix | Yes (`--fix --fix-unsafe`) |
 
 ## Description
