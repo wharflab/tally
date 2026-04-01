@@ -105,59 +105,36 @@ func extractCmdStatements(script string) ([]string, bool) {
 		return nil, false
 	}
 
-	parts := splitCmdAndCommands(script)
-	if len(parts) == 0 {
+	if len(analysis.commandByteRanges) != len(analysis.Commands) {
 		return nil, false
 	}
 
-	if len(parts) != len(analysis.Commands) {
-		return nil, false
-	}
-	return parts, true
-}
-
-func splitCmdAndCommands(script string) []string {
-	var (
-		parts   []string
-		current strings.Builder
-		quote   byte
-	)
-
-	for i := 0; i < len(script); i++ {
-		ch := script[i]
-
-		if quote != 0 {
-			current.WriteByte(ch)
-			if ch == quote {
-				quote = 0
+	parts := make([]string, 0, len(analysis.commandByteRanges))
+	var previousEnd uint
+	for i, bounds := range analysis.commandByteRanges {
+		start, end := bounds[0], bounds[1]
+		if start > end || end > uint(len(script)) {
+			return nil, false
+		}
+		if i == 0 {
+			if strings.TrimSpace(script[:start]) != "" {
+				return nil, false
 			}
-			continue
+		} else if !strings.Contains(script[previousEnd:start], "&&") {
+			return nil, false
 		}
 
-		switch ch {
-		case '"', '\'':
-			quote = ch
-			current.WriteByte(ch)
-		case '&':
-			if i+1 < len(script) && script[i+1] == '&' {
-				part := strings.TrimSpace(current.String())
-				if part != "" {
-					parts = append(parts, part)
-				}
-				current.Reset()
-				i++
-				continue
-			}
-			current.WriteByte(ch)
-		default:
-			current.WriteByte(ch)
+		part := strings.TrimSpace(script[start:end])
+		if part == "" {
+			return nil, false
 		}
-	}
-
-	part := strings.TrimSpace(current.String())
-	if part != "" {
 		parts = append(parts, part)
+		previousEnd = end
 	}
 
-	return parts
+	if strings.TrimSpace(script[previousEnd:]) != "" {
+		return nil, false
+	}
+
+	return parts, true
 }

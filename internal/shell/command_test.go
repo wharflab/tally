@@ -544,6 +544,21 @@ func TestAnalyzeCmdScript_ThreeCommandChain(t *testing.T) {
 	}
 }
 
+func TestAnalyzeCmdScript_SingleQuotesDoNotQuoteConditionals(t *testing.T) {
+	t.Parallel()
+
+	analysis := AnalyzeCmdScript(`echo 'a && b' && echo done`)
+	if analysis == nil {
+		t.Fatal("expected analysis")
+	}
+	if len(analysis.Commands) != 3 {
+		t.Fatalf("expected 3 parsed commands, got %d", len(analysis.Commands))
+	}
+	if !analysis.HasConditionals {
+		t.Fatal("expected conditional execution to be detected")
+	}
+}
+
 func TestCommandNamesWithVariant_PowerShell(t *testing.T) {
 	t.Parallel()
 

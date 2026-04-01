@@ -85,6 +85,12 @@ func TestCountChainedCommands(t *testing.T) {
 			want:    2,
 		},
 		{
+			name:    "cmd single quotes do not suppress chain splitting",
+			script:  "echo 'a && b' && echo done",
+			variant: VariantCmd,
+			want:    3,
+		},
+		{
 			name:    "if statement counts as one",
 			script:  "if true; then echo yes; fi",
 			variant: VariantBash,
@@ -158,6 +164,12 @@ func TestExtractChainedCommands(t *testing.T) {
 			script:  "echo hello && del file.txt",
 			variant: VariantCmd,
 			want:    []string{"echo hello", "del file.txt"},
+		},
+		{
+			name:    "cmd single quotes stay literal",
+			script:  "echo 'a && b' && echo done",
+			variant: VariantCmd,
+			want:    []string{"echo 'a", "b'", "echo done"},
 		},
 	}
 

@@ -29,6 +29,8 @@ func newBatchLanguage() *sitter.Language {
 type CmdScriptAnalysis struct {
 	Commands []CommandInfo
 
+	commandByteRanges [][2]uint
+
 	HasConditionals       bool
 	HasPipes              bool
 	HasRedirections       bool
@@ -115,6 +117,7 @@ func AnalyzeCmdScript(script string) *CmdScriptAnalysis {
 		case "cmd":
 			if info, ok := cmdCommandInfo(node, source); ok {
 				analysis.Commands = append(analysis.Commands, info)
+				analysis.commandByteRanges = append(analysis.commandByteRanges, [2]uint{node.StartByte(), node.EndByte()})
 				if slices.ContainsFunc(info.Args, hasEmbeddedCmdVariableSyntax) {
 					analysis.HasVariableReferences = true
 				}

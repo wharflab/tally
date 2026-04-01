@@ -5,6 +5,8 @@ package shell
 type CmdScriptAnalysis struct {
 	Commands []CommandInfo
 
+	commandByteRanges [][2]uint
+
 	HasConditionals       bool
 	HasPipes              bool
 	HasRedirections       bool
