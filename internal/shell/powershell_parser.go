@@ -126,6 +126,22 @@ func walkPowerShellTree(node *sitter.Node, visit func(*sitter.Node)) {
 	}
 }
 
+func walkPowerShellTreeUntil(node *sitter.Node, visit func(*sitter.Node) bool) bool {
+	if node == nil {
+		return false
+	}
+	if visit(node) {
+		return true
+	}
+	childCount := node.NamedChildCount()
+	for i := range childCount {
+		if walkPowerShellTreeUntil(node.NamedChild(i), visit) {
+			return true
+		}
+	}
+	return false
+}
+
 func powerShellCommandArgs(node *sitter.Node, source []byte) []powerShellArg {
 	elements := node.ChildByFieldName("command_elements")
 	if elements == nil {
@@ -229,24 +245,19 @@ func hasPowerShellFlowControl(script, keyword string) bool {
 		return false
 	}
 
-	found := false
-	walkPowerShellTree(root, func(node *sitter.Node) {
-		if found || node == nil || node.Kind() != "flow_control_statement" {
-			return
+	return walkPowerShellTreeUntil(root, func(node *sitter.Node) bool {
+		if node == nil || node.Kind() != "flow_control_statement" {
+			return false
 		}
 
 		text := strings.TrimSpace(node.Utf8Text(source))
 		if text == "" {
-			return
+			return false
 		}
 
 		first := strings.Fields(text)[0]
-		if strings.EqualFold(first, keyword) {
-			found = true
-		}
+		return strings.EqualFold(first, keyword)
 	})
-
-	return found
 }
 
 func collectPowerShellStatements(
