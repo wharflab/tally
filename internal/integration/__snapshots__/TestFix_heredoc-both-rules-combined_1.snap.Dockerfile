@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 COPY <<EOF /etc/nginx.conf
 server {}
 EOF
-RUN apt-get update
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update
 # [tally] curl configuration for improved robustness
 ENV CURL_HOME=/etc/curl
 COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
@@ -11,5 +11,5 @@ COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
 --retry 5
 --max-time 300
 EOF
-RUN apt-get install -y curl
-RUN apt-get install -y git
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get install -y curl
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get install -y git

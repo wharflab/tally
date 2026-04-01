@@ -8,9 +8,10 @@ import (
 
 // violationKey uniquely identifies a violation for deduplication.
 type violationKey struct {
-	file string
-	line int
-	rule string
+	file   string
+	line   int
+	column int
+	rule   string
 }
 
 // Deduplication removes duplicate violations.
@@ -35,9 +36,10 @@ func (p *Deduplication) Process(violations []rules.Violation, _ *Context) []rule
 	seen := make(map[violationKey]struct{})
 	return filterViolations(violations, func(v rules.Violation) bool {
 		key := violationKey{
-			file: filepath.ToSlash(v.Location.File),
-			line: v.Location.Start.Line,
-			rule: v.RuleCode,
+			file:   filepath.ToSlash(v.Location.File),
+			line:   v.Location.Start.Line,
+			column: v.Location.Start.Column,
+			rule:   v.RuleCode,
 		}
 		if _, exists := seen[key]; exists {
 			return false

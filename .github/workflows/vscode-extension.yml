@@ -64,7 +64,6 @@ jobs:
         working-directory: _integrations/vscode-tally
         env:
           VSCODE_TEST_VERSION: ${{ steps.vscode.outputs.version }}
-          VSCODE_TEST_DOWNLOAD_TIMEOUT_MS: "120000"
         run: xvfb-run -a bun run test:e2e
       - name: Convert coverage
         run: |

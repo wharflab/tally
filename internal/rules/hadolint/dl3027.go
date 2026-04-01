@@ -29,7 +29,10 @@ func (r *DL3027Rule) Metadata() rules.RuleMetadata {
 	}
 }
 
-const aptGetReplacement = "apt-get"
+const (
+	aptGetReplacement = "apt-get"
+	aptGetSuffix      = "-get"
+)
 
 // aptCommandMapping maps apt subcommands to their replacement and safety level.
 var aptCommandMapping = map[string]struct {
@@ -63,7 +66,6 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 		input,
 		func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
 			runLoc := run.Location()
-			loc := rules.NewLocationFromRanges(file, runLoc)
 
 			var occurrences []shell.CommandOccurrence
 			var runStartLine int
@@ -88,70 +90,71 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 				return nil
 			}
 
-			// Consolidate all apt occurrences into a single violation with multiple edits
-			var edits []rules.TextEdit
-			overallSafety := rules.FixSafe // Start with safest, downgrade if needed
+			// Emit one violation per apt occurrence so that each fix is
+			// independent.  This lets the fixer skip only the edits that
+			// overlap with other rules (e.g., cache-mount cleanup deleting
+			// "apt clean") without discarding fixes on unrelated lines.
+			var violations []rules.Violation
 
 			for _, occ := range occurrences {
-				// Determine replacement based on subcommand
-				replacement := aptGetReplacement
+				// Determine replacement suffix based on subcommand.
+				suffix := aptGetSuffix
 				safety := rules.FixSuggestion // Default for unknown subcommands
 				if mapping, ok := aptCommandMapping[occ.Subcommand]; ok {
-					replacement = mapping.replacement
+					// Derive the suffix from the replacement: "apt-get" → "-get", "apt-cache" → "-cache".
+					suffix = mapping.replacement[len("apt"):]
 					safety = mapping.safety
 				}
 
-				// Track overall safety level (use least safe)
-				if safety > overallSafety {
-					overallSafety = safety
-				}
+				runLevelLoc := rules.NewLocationFromRanges(file, runLoc)
 
-				// Only add edits for shell form RUN commands
+				v := rules.NewViolation(
+					runLevelLoc,
+					meta.Code,
+					"do not use apt as it is meant to be an end-user tool, use apt-get or apt-cache instead",
+					meta.DefaultSeverity,
+				).WithDocURL(meta.DocURL).WithDetail(
+					"The apt command is designed for interactive use and has an unstable command-line interface. " +
+						"For scripting and automation (like Dockerfiles), use apt-get for package management " +
+						"or apt-cache for querying package information.",
+				)
+
+				// Only add edits for shell form RUN commands.
 				if run.PrependShell {
-					// Shell parser positions are relative to script which has "RUN " replaced with spaces
-					// occ.Line is 0-based line within script, runStartLine is 1-based
 					editLine := runStartLine + occ.Line
-					editStartCol := occ.StartCol
 					editEndCol := occ.EndCol
 
-					// Validate the calculated range actually points to "apt" in source
-					lineIdx := editLine - 1 // Convert 1-based to 0-based for SourceMap
+					lineIdx := editLine - 1
 					if lineIdx < 0 || lineIdx >= sm.LineCount() {
+						violations = append(violations, v)
 						continue
 					}
 					sourceLine := sm.Line(lineIdx)
-					if editStartCol < 0 || editEndCol > len(sourceLine) ||
-						sourceLine[editStartCol:editEndCol] != "apt" {
+					if occ.StartCol < 0 || editEndCol > len(sourceLine) ||
+						sourceLine[occ.StartCol:editEndCol] != "apt" {
+						violations = append(violations, v)
 						continue
 					}
 
-					edits = append(edits, rules.TextEdit{
-						Location: rules.NewRangeLocation(file, editLine, editStartCol, editLine, editEndCol),
-						NewText:  replacement,
+					// Source validation passed — use precise occurrence location
+					// so same-line violations survive deduplication.
+					v.Location = rules.NewRangeLocation(file, editLine, occ.StartCol, editLine, editEndCol)
+
+					// Zero-width insertion right after "apt" to produce "apt-get" / "apt-cache".
+					v = v.WithSuggestedFix(&rules.SuggestedFix{
+						Description: "Replace 'apt' with 'apt" + suffix + "'",
+						Safety:      safety,
+						Edits: []rules.TextEdit{{
+							Location: rules.NewRangeLocation(file, editLine, editEndCol, editLine, editEndCol),
+							NewText:  suffix,
+						}},
 					})
 				}
+
+				violations = append(violations, v)
 			}
 
-			v := rules.NewViolation(
-				loc,
-				meta.Code,
-				"do not use apt as it is meant to be an end-user tool, use apt-get or apt-cache instead",
-				meta.DefaultSeverity,
-			).WithDocURL(meta.DocURL).WithDetail(
-				"The apt command is designed for interactive use and has an unstable command-line interface. " +
-					"For scripting and automation (like Dockerfiles), use apt-get for package management " +
-					"or apt-cache for querying package information.",
-			)
-
-			if len(edits) > 0 {
-				v = v.WithSuggestedFix(&rules.SuggestedFix{
-					Description: "Replace 'apt' with 'apt-get' or 'apt-cache'",
-					Safety:      overallSafety,
-					Edits:       edits,
-				})
-			}
-
-			return []rules.Violation{v}
+			return violations
 		},
 	)
 }

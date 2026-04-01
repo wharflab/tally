@@ -61,7 +61,7 @@ func fixCases(t *testing.T) []fixCase {
 			name:        "dl3027-apt-to-apt-get",
 			input:       "FROM ubuntu:22.04\nRUN apt update && apt install -y curl\n",
 			args:        []string{"--fix"},
-			wantApplied: 1, // Single violation with multiple edits
+			wantApplied: 2, // One fix per apt occurrence
 		},
 		// ShellCheck SC2086: echo $var -> echo "$var"
 		{
@@ -315,7 +315,8 @@ severity = "error"
 RUN cd /app && make build
 RUN apt install curl
 `,
-			args:        []string{"--fix", "--fix-unsafe", "--ignore", "tally/prefer-run-heredoc"},
+			args: append([]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("hadolint/DL3003", "hadolint/DL3027", "tally/prefer-curl-config")...),
 			wantApplied: 3, // DL3003 + DL3027 + prefer-curl-config
 		},
 		// LegacyKeyValueFormat: Replace legacy "ENV key value" with "ENV key=value"
@@ -645,7 +646,7 @@ severity = "error"
 				"--fix",
 				"--select", "tally/prefer-run-heredoc",
 			},
-			wantApplied: 1,
+			wantApplied: 4, // cache mounts (3) + curl config (1); heredoc skipped (curl config breaks consecutiveness)
 		},
 
 		// prefer-run-heredoc: chained commands → heredoc RUN
@@ -669,9 +670,6 @@ severity = "error"
 				"--select", "tally/prefer-package-cache-mounts",
 			},
 			wantApplied: 1,
-			config: `[rules.tally.prefer-package-cache-mounts]
-severity = "info"
-`,
 		},
 		{
 			name: "prefer-package-cache-mounts-with-prefer-run-heredoc",
@@ -686,9 +684,6 @@ severity = "info"
 				"--select", "tally/prefer-run-heredoc",
 			},
 			wantApplied: 4,
-			config: `[rules.tally.prefer-package-cache-mounts]
-severity = "info"
-`,
 		},
 		{
 			name: "prefer-package-cache-mounts-no-cache-flags",
@@ -702,9 +697,6 @@ severity = "info"
 				"--select", "tally/prefer-package-cache-mounts",
 			},
 			wantApplied: 4,
-			config: `[rules.tally.prefer-package-cache-mounts]
-severity = "info"
-`,
 		},
 		{
 			name: "prefer-package-cache-mounts-uv-no-cache-env",
@@ -717,9 +709,6 @@ severity = "info"
 				"--select", "tally/prefer-package-cache-mounts",
 			},
 			wantApplied: 1,
-			config: `[rules.tally.prefer-package-cache-mounts]
-severity = "info"
-`,
 		},
 		{
 			name: "prefer-package-cache-mounts-uv-python-install",
@@ -731,9 +720,6 @@ severity = "info"
 				"--select", "tally/prefer-package-cache-mounts",
 			},
 			wantApplied: 1,
-			config: `[rules.tally.prefer-package-cache-mounts]
-severity = "info"
-`,
 		},
 		{
 			name: "prefer-package-cache-mounts-pip-no-cache-dir-env",
@@ -746,9 +732,6 @@ severity = "info"
 				"--select", "tally/prefer-package-cache-mounts",
 			},
 			wantApplied: 1,
-			config: `[rules.tally.prefer-package-cache-mounts]
-severity = "info"
-`,
 		},
 		{
 			// Cross-rule interaction: prefer-package-cache-mounts (priority 90) deletes
@@ -763,9 +746,6 @@ severity = "info"
 				"--select", "buildkit/LegacyKeyValueFormat",
 			},
 			wantApplied: 1, // cache-mounts wins; LegacyKeyValueFormat skipped (ENV already deleted)
-			config: `[rules.tally.prefer-package-cache-mounts]
-severity = "info"
-`,
 		},
 		{
 			name: "prefer-package-cache-mounts-multiline-env-removal",
@@ -779,9 +759,6 @@ severity = "info"
 				"--select", "tally/prefer-package-cache-mounts",
 			},
 			wantApplied: 1,
-			config: `[rules.tally.prefer-package-cache-mounts]
-severity = "info"
-`,
 		},
 		{
 			name: "prefer-package-cache-mounts-npm-config-cache-env",
@@ -794,9 +771,6 @@ severity = "info"
 				"--select", "tally/prefer-package-cache-mounts",
 			},
 			wantApplied: 1,
-			config: `[rules.tally.prefer-package-cache-mounts]
-severity = "info"
-`,
 		},
 		{
 			name: "prefer-package-cache-mounts-bun-install-cache-dir-env",
@@ -809,9 +783,6 @@ severity = "info"
 				"--select", "tally/prefer-package-cache-mounts",
 			},
 			wantApplied: 2,
-			config: `[rules.tally.prefer-package-cache-mounts]
-severity = "info"
-`,
 		},
 
 		// Both heredoc rules enabled together: prefer-copy-heredoc takes priority (99) over prefer-run-heredoc (100).
@@ -829,7 +800,7 @@ severity = "info"
 				"--select", "tally/prefer-copy-heredoc",
 				"--select", "tally/prefer-run-heredoc",
 			},
-			wantApplied: 2,
+			wantApplied: 5, // copy heredoc (1) + cache mounts (3) + curl config (1); run-heredoc skipped (curl config breaks consecutiveness)
 		},
 
 		// Heredoc + indentation: multi-stage with both heredoc rules + indentation.
@@ -1238,7 +1209,7 @@ skip-blank-lines = true
 			input: "FROM ubuntu:24.04\nRUN apt update && apt install -y curl\n",
 			args: append([]string{"--fix"},
 				mustSelectRules("tally/newline-per-chained-call", "hadolint/DL3027")...),
-			wantApplied: 2, // DL3027 + chain split
+			wantApplied: 3, // DL3027 (×2, one per apt) + chain split
 		},
 		// Cross-rule: DL3047 (wget --progress) + chain split on same RUN
 		{

@@ -347,13 +347,13 @@ RUN apt update && apt-get install python`
 		t.Fatal("DL3027: expected SuggestedFix with edits")
 	}
 
-	// Edit should be at column 4 (where "apt" starts after "RUN ")
+	// Zero-width insertion after "apt" at column 7 (end of "apt" starting at col 4)
 	edit27 := v27.SuggestedFix.Edits[0]
-	if edit27.Location.Start.Column != 4 {
-		t.Errorf("DL3027: edit column = %d, want 4", edit27.Location.Start.Column)
+	if edit27.Location.Start.Column != 7 {
+		t.Errorf("DL3027: edit column = %d, want 7", edit27.Location.Start.Column)
 	}
-	if edit27.NewText != "apt-get" {
-		t.Errorf("DL3027: NewText = %q, want %q", edit27.NewText, "apt-get")
+	if edit27.NewText != "-get" {
+		t.Errorf("DL3027: NewText = %q, want %q", edit27.NewText, "-get")
 	}
 	if edit27.Location.Start.Line != 2 {
 		t.Error("DL3027: edit should be on line 2")

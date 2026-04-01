@@ -58,7 +58,7 @@ RUN /usr/bin/apt install python`,
 			name: "apt in command chain",
 			dockerfile: `FROM ubuntu
 RUN apt update && apt install python`,
-			wantCount: 1, // Single violation with multiple edits for all apt commands
+			wantCount: 2, // One violation per apt occurrence for independent fix application
 		},
 		{
 			name: "apt with sudo",
@@ -165,26 +165,36 @@ func TestDL3027_MultipleApt(t *testing.T) {
 	r := NewDL3027Rule()
 	violations := r.Check(input)
 
-	if len(violations) != 1 {
-		t.Fatalf("expected 1 violation, got %d", len(violations))
+	if len(violations) != 2 {
+		t.Fatalf("expected 2 violations, got %d", len(violations))
 	}
 
-	v := violations[0]
-	if v.SuggestedFix == nil {
-		t.Fatal("expected SuggestedFix")
-	}
-	if len(v.SuggestedFix.Edits) != 2 {
-		t.Fatalf("expected 2 edits, got %d", len(v.SuggestedFix.Edits))
+	// Each violation has a single zero-width insertion edit.
+	for i, v := range violations {
+		editCount := 0
+		if v.SuggestedFix != nil {
+			editCount = len(v.SuggestedFix.Edits)
+		}
+		if editCount != 1 {
+			t.Fatalf("violation %d: expected 1 edit, got %d", i, editCount)
+		}
+		e := v.SuggestedFix.Edits[0]
+		if e.Location.Start != e.Location.End {
+			t.Errorf("violation %d: expected zero-width insertion, got %v-%v", i, e.Location.Start, e.Location.End)
+		}
+		if e.NewText != "-get" {
+			t.Errorf("violation %d: NewText = %q, want %q", i, e.NewText, "-get")
+		}
 	}
 
-	// First edit should be at column 4 (first apt)
-	if v.SuggestedFix.Edits[0].Location.Start.Column != 4 {
-		t.Errorf("first edit startCol = %d, want 4", v.SuggestedFix.Edits[0].Location.Start.Column)
+	// First edit inserts after "apt" at column 7 (end of "apt" starting at col 4)
+	if violations[0].SuggestedFix.Edits[0].Location.Start.Column != 7 {
+		t.Errorf("first edit col = %d, want 7", violations[0].SuggestedFix.Edits[0].Location.Start.Column)
 	}
 
-	// Second edit should be at column 18 (second apt)
-	if v.SuggestedFix.Edits[1].Location.Start.Column != 18 {
-		t.Errorf("second edit startCol = %d, want 18", v.SuggestedFix.Edits[1].Location.Start.Column)
+	// Second edit inserts after "apt" at column 21 (end of "apt" starting at col 18)
+	if violations[1].SuggestedFix.Edits[0].Location.Start.Column != 21 {
+		t.Errorf("second edit col = %d, want 21", violations[1].SuggestedFix.Edits[0].Location.Start.Column)
 	}
 }
 
@@ -200,28 +210,28 @@ func TestDL3027Rule_SuggestedFix(t *testing.T) {
 			name: "apt install -> apt-get (safe)",
 			dockerfile: `FROM ubuntu
 RUN apt install curl`,
-			wantReplacement: "apt-get",
+			wantReplacement: "-get",
 			wantSafety:      "safe",
 		},
 		{
 			name: "apt update -> apt-get (safe)",
 			dockerfile: `FROM ubuntu
 RUN apt update`,
-			wantReplacement: "apt-get",
+			wantReplacement: "-get",
 			wantSafety:      "safe",
 		},
 		{
 			name: "apt search -> apt-cache (suggestion)",
 			dockerfile: `FROM ubuntu
 RUN apt search curl`,
-			wantReplacement: "apt-cache",
+			wantReplacement: "-cache",
 			wantSafety:      "suggestion",
 		},
 		{
 			name: "apt show -> apt-cache (suggestion)",
 			dockerfile: `FROM ubuntu
 RUN apt show curl`,
-			wantReplacement: "apt-cache",
+			wantReplacement: "-cache",
 			wantSafety:      "suggestion",
 		},
 	}
@@ -319,10 +329,10 @@ func TestDL3027_WhitespaceDrift(t *testing.T) {
 		t.Fatal("expected edits for whitespace case")
 	}
 
-	// Verify the edit points to the correct position (column 7, after "RUN    ")
+	// Zero-width insertion after "apt" at column 10 (after "RUN    apt")
 	edit := v.SuggestedFix.Edits[0]
-	if edit.Location.Start.Column != 7 {
-		t.Errorf("edit startCol = %d, want 7", edit.Location.Start.Column)
+	if edit.Location.Start.Column != 10 {
+		t.Errorf("edit startCol = %d, want 10", edit.Location.Start.Column)
 	}
 }
 
@@ -362,9 +372,9 @@ RUN apt-get update && \
 	if edit.Location.Start.Line != 3 {
 		t.Errorf("edit line = %d, want 3", edit.Location.Start.Line)
 	}
-	// apt is at column 4 (after "    ")
-	if edit.Location.Start.Column != 4 {
-		t.Errorf("edit startCol = %d, want 4", edit.Location.Start.Column)
+	// Zero-width insertion after "apt" at column 7 (after "    apt")
+	if edit.Location.Start.Column != 7 {
+		t.Errorf("edit startCol = %d, want 7", edit.Location.Start.Column)
 	}
 }
 
@@ -395,15 +405,15 @@ ONBUILD RUN apt install python`)
 		t.Fatal("expected at least one edit")
 	}
 	edit := v.SuggestedFix.Edits[0]
-	// "ONBUILD RUN apt install python" — "apt" starts at column 12
-	if edit.Location.Start.Column != 12 {
-		t.Errorf("edit startCol = %d, want 12", edit.Location.Start.Column)
+	// "ONBUILD RUN apt install python" — zero-width insertion after "apt" at column 15
+	if edit.Location.Start.Column != 15 {
+		t.Errorf("edit startCol = %d, want 15", edit.Location.Start.Column)
 	}
-	if edit.Location.End.Column != 15 {
-		t.Errorf("edit endCol = %d, want 15", edit.Location.End.Column)
+	if edit.Location.Start != edit.Location.End {
+		t.Errorf("expected zero-width insertion, got %v-%v", edit.Location.Start, edit.Location.End)
 	}
-	if edit.NewText != "apt-get" {
-		t.Errorf("NewText = %q, want %q", edit.NewText, "apt-get")
+	if edit.NewText != "-get" {
+		t.Errorf("NewText = %q, want %q", edit.NewText, "-get")
 	}
 	if edit.Location.Start.Line != 2 {
 		t.Errorf("edit line = %d, want 2", edit.Location.Start.Line)

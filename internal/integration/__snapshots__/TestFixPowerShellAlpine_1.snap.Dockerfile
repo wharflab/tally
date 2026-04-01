@@ -26,7 +26,7 @@ timeout = 15
 tries = 5
 EOF
 
-RUN apk add --update nodejs nodejs-npm
+RUN --mount=type=cache,target=/var/cache/apk,id=apk,sharing=locked apk add --update nodejs nodejs-npm
 RUN Install-Module -Name Az -AllowClobber -Force
 RUN Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; \
     Install-Module Configuration -RequiredVersion 1.3.1 -Repository PSGallery -Scope AllUsers -Verbose; \
@@ -34,10 +34,10 @@ RUN Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; \
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
+RUN --mount=type=cache,target=/var/cache/apk,id=apk,sharing=locked apk add bind-tools gnupg git tini
 RUN <<EOF
 set -e
 set -o pipefail
-apk add --no-cache bind-tools git gnupg tini
 (curl -Ls https://cli.doppler.com/install.sh || wget -qO- https://cli.doppler.com/install.sh) | sh
 npm clean-install --only=production --silent --no-audit
 mv node_modules ../
