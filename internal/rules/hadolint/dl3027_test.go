@@ -171,8 +171,12 @@ func TestDL3027_MultipleApt(t *testing.T) {
 
 	// Each violation has a single zero-width insertion edit.
 	for i, v := range violations {
-		if v.SuggestedFix == nil || len(v.SuggestedFix.Edits) != 1 {
-			t.Fatalf("violation %d: expected 1 edit, got %d", i, len(v.SuggestedFix.Edits))
+		editCount := 0
+		if v.SuggestedFix != nil {
+			editCount = len(v.SuggestedFix.Edits)
+		}
+		if editCount != 1 {
+			t.Fatalf("violation %d: expected 1 edit, got %d", i, editCount)
 		}
 		e := v.SuggestedFix.Edits[0]
 		if e.Location.Start != e.Location.End {
