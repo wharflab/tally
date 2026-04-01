@@ -22,4 +22,5 @@ Learn how to use tally effectively.
 
 ## Advanced Setup
 
-- [Installing BuildKit for Windows Containers](./installing-buildkit-windows-containers.md) - Set up a standalone Windows BuildKit builder with `buildx`
+- [Installing BuildKit for Windows Containers](./installing-buildkit-windows-containers.md) - Set up a standalone Windows BuildKit builder with
+  `buildx`
