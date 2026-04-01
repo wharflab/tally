@@ -271,7 +271,7 @@ func collectPowerShellStatements(
 		if text != "" {
 			analysis.Statements = append(analysis.Statements, powerShellStatement{
 				Text:    text,
-				HasPipe: strings.Contains(text, "|"),
+				HasPipe: hasPowerShellPipelineOperator(node),
 			})
 		}
 		return
@@ -281,6 +281,14 @@ func collectPowerShellStatements(
 	for i := range childCount {
 		collectPowerShellStatements(node.NamedChild(i), source, analysis, kind, inComplex)
 	}
+}
+
+func hasPowerShellPipelineOperator(node *sitter.Node) bool {
+	if node == nil || node.Kind() != "pipeline" {
+		return false
+	}
+
+	return node.NamedChildCount() > 1
 }
 
 func isTopLevelPowerShellPipelineParent(kind string) bool {
