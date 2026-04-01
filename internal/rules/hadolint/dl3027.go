@@ -106,18 +106,10 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 					safety = mapping.safety
 				}
 
-				// Use the specific occurrence location so violations on the same
-				// RUN but different lines survive deduplication.
-				var occLoc rules.Location
-				if run.PrependShell && runStartLine > 0 {
-					occLine := runStartLine + occ.Line
-					occLoc = rules.NewRangeLocation(file, occLine, occ.StartCol, occLine, occ.EndCol)
-				} else {
-					occLoc = rules.NewLocationFromRanges(file, runLoc)
-				}
+				runLevelLoc := rules.NewLocationFromRanges(file, runLoc)
 
 				v := rules.NewViolation(
-					occLoc,
+					runLevelLoc,
 					meta.Code,
 					"do not use apt as it is meant to be an end-user tool, use apt-get or apt-cache instead",
 					meta.DefaultSeverity,
@@ -143,6 +135,10 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 						violations = append(violations, v)
 						continue
 					}
+
+					// Source validation passed — use precise occurrence location
+					// so same-line violations survive deduplication.
+					v.Location = rules.NewRangeLocation(file, editLine, occ.StartCol, editLine, editEndCol)
 
 					// Zero-width insertion right after "apt" to produce "apt-get" / "apt-cache".
 					v = v.WithSuggestedFix(&rules.SuggestedFix{
