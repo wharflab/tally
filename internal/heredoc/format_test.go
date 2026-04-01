@@ -40,3 +40,14 @@ func TestPowerShellBodyLines_AddsPreludeWhenMissing(t *testing.T) {
 		t.Fatalf("powerShellBodyLines() = %#v, want %#v", got, want)
 	}
 }
+
+func TestPosixBodyLines_PreservesCombinedSetFlags(t *testing.T) {
+	t.Parallel()
+
+	got := posixBodyLines([]string{"set -ex", "echo hi"}, 0, false)
+	want := []string{"set -e", "set -ex", "echo hi"}
+
+	if !slices.Equal(got, want) {
+		t.Fatalf("posixBodyLines() = %#v, want %#v", got, want)
+	}
+}
