@@ -101,12 +101,6 @@ func powerShellBodyLines(commands []string) []string {
 		if trimmed == "" {
 			continue
 		}
-		if !hasStopPrelude && isPowerShellStopPrelude(trimmed) {
-			continue
-		}
-		if !hasNativePrelude && isPowerShellNativePrelude(trimmed) {
-			continue
-		}
 		lines = append(lines, cmd)
 	}
 
