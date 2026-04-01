@@ -16,7 +16,7 @@ Windows container Dockerfiles differ from Linux ones in fundamental ways:
 - **Layer sizes** are much larger (ServerCore base is ~5 GB vs ~80 MB for Alpine)
 - **BuildKit features** like `COPY --chown` are unsupported; `RUN --mount` passes through the
   entire BuildKit pipeline but fails at the containerd/HCS runtime (see source-confirmed details
-  below); heredocs are partial (work with PowerShell shell, not with `cmd.exe`)
+  below); heredocs work with all shells (PowerShell multi-line, `cmd.exe` single-line body)
 - **Package managers** are Chocolatey, NuGet, and direct PowerShell downloads — not apt/apk/dnf
 
 These differences mean many Linux-oriented best practices don't apply, and Windows containers have
@@ -71,7 +71,7 @@ lumped `cmd.exe` and `powershell` together, but they're very different:
 | **Progress bars** | N/A | `$ProgressPreference` | N/A |
 | **Command chaining** | `&&`, `&` | `;`, pipeline | `&&`, `;`, pipeline |
 | **ShellCheck applicable** | No | No | Yes |
-| **Heredoc applicable** | No | Partial (see note) | Yes (BuildKit) |
+| **Heredoc applicable** | Yes (single-line body; see note) | Yes (multi-line body; see note) | Yes (BuildKit) |
 | **Script parsing** | tree-sitter-backed (analysis + semantic tokens) | tree-sitter-backed (analysis + semantic tokens) | mvdan.cc/sh |
 
 **Note on Windows heredoc support:** BuildKit's Dockerfile heredoc (`RUN <<EOF`) is shell-driven,
@@ -92,7 +92,7 @@ This means rules split into two namespaces:
 Fire only on Windows stages. About container platform limitations:
 
 - Layer size optimization (NTFS layers are ~100x larger)
-- BuildKit feature support (`--chown` unsupported; heredoc partial — see note above)
+- BuildKit feature support (`--chown` unsupported; heredocs work with all shells — see note above)
 - `RUN --mount` passes BuildKit validation but fails at containerd/HCS runtime (new `no-run-mounts` rule)
 - `STOPSIGNAL` is silently accepted but has no effect (new `no-stopsignal` rule)
 - Base image choices (ServerCore vs NanoServer)
@@ -165,8 +165,10 @@ func (v Variant) IsParseable() bool {
 }
 
 // SupportsHeredoc returns true for shells compatible with BuildKit heredoc syntax.
+// PowerShell gets multi-line bodies; cmd.exe gets single-line grouped commands.
 func (v Variant) SupportsHeredoc() bool {
-    return v == VariantPOSIX || v == VariantBash || v == VariantMksh
+    return v == VariantPOSIX || v == VariantBash || v == VariantMksh ||
+        v == VariantPowerShell || v == VariantCmd
 }
 
 // IsPowerShell returns true for PowerShell variants (pwsh, powershell).
@@ -759,11 +761,11 @@ The gate is a per-stage `continue` in the iteration loop:
 func (r *PreferHeredocRule) Check(input rules.LintInput) []rules.Violation {
     // ... existing setup ...
     for i := 1; i < len(input.Stages); i++ {
-        // NEW: skip stages where heredoc is not applicable
+        // Skip stages where the shell does not support heredoc.
+        // No OS gate: SupportsHeredoc() covers POSIX, PowerShell, and cmd.exe.
         if sem != nil {
             if info := sem.StageInfo(i); info != nil {
-                if info.BaseImageOS == semantic.BaseImageOSWindows ||
-                    !info.ShellSetting.Variant.SupportsHeredoc() {
+                if !info.ShellSetting.Variant.SupportsHeredoc() {
                     continue
                 }
             }
