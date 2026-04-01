@@ -101,11 +101,14 @@ func extractCmdStatements(script string) ([]string, bool) {
 		return nil, false
 	}
 
-	if strings.Contains(script, "||") {
+	if len(analysis.commandByteRanges) != len(analysis.Commands) {
 		return nil, false
 	}
-
-	if len(analysis.commandByteRanges) != len(analysis.Commands) {
+	expectedOps := 0
+	if len(analysis.Commands) > 0 {
+		expectedOps = len(analysis.Commands) - 1
+	}
+	if len(analysis.conditionalOps) != expectedOps {
 		return nil, false
 	}
 
@@ -120,8 +123,20 @@ func extractCmdStatements(script string) ([]string, bool) {
 			if strings.TrimSpace(script[:start]) != "" {
 				return nil, false
 			}
-		} else if !strings.Contains(script[previousEnd:start], "&&") {
-			return nil, false
+		} else {
+			op := analysis.conditionalOps[i-1]
+			if op.Text != "&&" {
+				return nil, false
+			}
+			if op.Start < previousEnd || op.End > start || op.End < op.Start {
+				return nil, false
+			}
+			if strings.TrimSpace(script[previousEnd:op.Start]) != "" {
+				return nil, false
+			}
+			if strings.TrimSpace(script[op.End:start]) != "" {
+				return nil, false
+			}
 		}
 
 		part := strings.TrimSpace(script[start:end])

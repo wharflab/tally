@@ -85,6 +85,12 @@ func TestCountChainedCommands(t *testing.T) {
 			want:    2,
 		},
 		{
+			name:    "cmd or chain stays unsplit",
+			script:  "echo hello || echo world",
+			variant: VariantCmd,
+			want:    1,
+		},
+		{
 			name:    "cmd single quotes do not suppress chain splitting",
 			script:  "echo 'a && b' && echo done",
 			variant: VariantCmd,
