@@ -29,7 +29,10 @@ func (r *DL3027Rule) Metadata() rules.RuleMetadata {
 	}
 }
 
-const aptGetReplacement = "apt-get"
+const (
+	aptGetReplacement = "apt-get"
+	aptGetSuffix      = "-get"
+)
 
 // aptCommandMapping maps apt subcommands to their replacement and safety level.
 var aptCommandMapping = map[string]struct {
@@ -95,7 +98,7 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 
 			for _, occ := range occurrences {
 				// Determine replacement suffix based on subcommand.
-				suffix := "-get"
+				suffix := aptGetSuffix
 				safety := rules.FixSuggestion // Default for unknown subcommands
 				if mapping, ok := aptCommandMapping[occ.Subcommand]; ok {
 					// Derive the suffix from the replacement: "apt-get" → "-get", "apt-cache" → "-cache".
