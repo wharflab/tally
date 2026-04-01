@@ -23,12 +23,10 @@ ENV PATH="C:\Windows\System32\WindowsPowerShell\v1.0;${PATH}"
 # Enable long path support
 RUN <<EOF
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
 Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -Name 'LongPathsEnabled' -Value 1
-if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
 Invoke-WebRequest -Uri https://github.com/git-for-windows/git/releases/download/v2.50.0.windows.1/PortableGit-2.50.0-64-bit.7z.exe -OutFile PortableGit.exe
-if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
 Start-Process -FilePath .\PortableGit.exe -ArgumentList '-o"C:\git"', '-y' -Wait
-if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
 Remove-Item PortableGit.exe
 EOF
 
@@ -65,10 +63,9 @@ ENV PATH="C:\Program Files\dotnet;${PATH}"
 # Install .NET Sdk 8.0.414
 RUN <<EOF
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
 & .\dotnet-install.ps1 -Version 8.0.414 -InstallDir 'C:\Program Files\dotnet'
-if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
 & .\dotnet-install.ps1 -Version 9.0.9 -Runtime dotnet -InstallDir 'C:\Program Files\dotnet'
-if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
 & .\dotnet-install.ps1 -Version 10.0.100 -InstallDir 'C:\Program Files\dotnet'
 EOF
 

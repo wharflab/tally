@@ -43,9 +43,8 @@ ENV POWERSHELL_TELEMETRY_OPTOUT=1 VCPKG_DISABLE_METRICS=1
 
 	RUN <<-EOF
 		$ErrorActionPreference = 'Stop'
+		$PSNativeCommandUseErrorActionPreference = $true
 		Write-Host hi
-		if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
 		Write-Host bye
-		if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
 		bootstrap-vcpkg.bat
 		EOF

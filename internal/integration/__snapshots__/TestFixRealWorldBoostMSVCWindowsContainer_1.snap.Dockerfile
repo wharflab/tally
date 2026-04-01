@@ -9,10 +9,9 @@ SHELL ["powershell", "-command"]
 # Install Chocolatey
 RUN <<EOF
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
 iex ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1'))
-if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
 choco feature disable --name showDownloadProgress
-if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
 choco feature enable --name allowGlobalConfirmation
 EOF
 

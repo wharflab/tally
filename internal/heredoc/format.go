@@ -15,10 +15,12 @@ import (
 //
 // For POSIX shells we prepend "set -e" (and optionally "set -o pipefail") to
 // preserve the fail-fast semantics of && chains. For PowerShell we prepend
-// "$ErrorActionPreference = 'Stop'" and add explicit inter-command guards. For
-// cmd.exe we keep the original && chain semantics in a single parenthesized
-// command block; Docker-validated WCOW heredoc bodies do not reliably execute
-// multi-line cmd chains even with caret continuations.
+// "$ErrorActionPreference = 'Stop'" and
+// "$PSNativeCommandUseErrorActionPreference = $true" so modern PowerShell also
+// treats native command failures as errors. For cmd.exe we keep the original &&
+// chain semantics in a single parenthesized command block; Docker-validated
+// WCOW heredoc bodies do not reliably execute multi-line cmd chains even with
+// caret continuations.
 //
 // See: https://github.com/moby/buildkit/issues/2722
 // See: https://github.com/moby/buildkit/issues/4195
@@ -68,8 +70,9 @@ func posixBodyLines(commands []string, variant shell.Variant, pipefail bool) []s
 }
 
 func powerShellBodyLines(commands []string) []string {
-	lines := make([]string, 0, len(commands)*2+1)
+	lines := make([]string, 0, len(commands)+2)
 	hasStopPrelude := false
+	hasNativePrelude := false
 
 	for _, cmd := range commands {
 		trimmed := strings.TrimSpace(cmd)
@@ -80,21 +83,19 @@ func powerShellBodyLines(commands []string) []string {
 			strings.EqualFold(trimmed, `$ErrorActionPreference = "Stop"`) {
 			hasStopPrelude = true
 		}
+		if strings.EqualFold(trimmed, "$PSNativeCommandUseErrorActionPreference = $true") {
+			hasNativePrelude = true
+		}
 	}
 
 	if !hasStopPrelude {
 		lines = append(lines, "$ErrorActionPreference = 'Stop'")
 	}
-
-	guard := "if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }"
-	lastIdx := -1
-	for i, cmd := range commands {
-		if strings.TrimSpace(cmd) != "" {
-			lastIdx = i
-		}
+	if !hasNativePrelude {
+		lines = append(lines, "$PSNativeCommandUseErrorActionPreference = $true")
 	}
 
-	for i, cmd := range commands {
+	for _, cmd := range commands {
 		trimmed := strings.TrimSpace(cmd)
 		if trimmed == "" {
 			continue
@@ -104,10 +105,11 @@ func powerShellBodyLines(commands []string) []string {
 				strings.EqualFold(trimmed, `$ErrorActionPreference = "Stop"`)) {
 			continue
 		}
-		lines = append(lines, cmd)
-		if i != lastIdx {
-			lines = append(lines, guard)
+		if !hasNativePrelude &&
+			strings.EqualFold(trimmed, "$PSNativeCommandUseErrorActionPreference = $true") {
+			continue
 		}
+		lines = append(lines, cmd)
 	}
 
 	return lines

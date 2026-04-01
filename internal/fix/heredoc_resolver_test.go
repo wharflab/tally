@@ -1016,11 +1016,14 @@ func TestHeredocResolver_Resolve_PowerShellWithBacktickContinuations(t *testing.
 	if !strings.Contains(got, "$ErrorActionPreference = 'Stop'") {
 		t.Fatalf("expected PowerShell fail-fast prelude, got: %s", got)
 	}
+	if !strings.Contains(got, "$PSNativeCommandUseErrorActionPreference = $true") {
+		t.Fatalf("expected PowerShell native-command prelude, got: %s", got)
+	}
 	if strings.Contains(got, "set -e") {
 		t.Fatalf("did not expect POSIX prelude in PowerShell heredoc: %s", got)
 	}
-	if !strings.Contains(got, "if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }") {
-		t.Fatalf("expected inter-command PowerShell guard, got: %s", got)
+	if strings.Contains(got, "if (-not $?") {
+		t.Fatalf("did not expect inter-command PowerShell guards, got: %s", got)
 	}
 
 	if edits[0].Location.Start.Line != 4 {

@@ -29,12 +29,10 @@ EOF
 RUN --mount=type=cache,target=/var/cache/apk,id=apk,sharing=locked apk add --update nodejs nodejs-npm
 RUN <<EOF
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
 Install-Module -Name Az -AllowClobber -Force
-if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
 Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
 Install-Module Configuration -RequiredVersion 1.3.1 -Repository PSGallery -Scope AllUsers -Verbose
-if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
 Install-Module PSSlack -RequiredVersion 1.0.2 -Repository PSGallery -Scope AllUsers -Verbose
 EOF
 
