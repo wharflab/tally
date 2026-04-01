@@ -12,7 +12,7 @@
   "go.testEnvVars": {
     "GOEXPERIMENT": "jsonv2",
     "GOSUMDB": "sum.golang.org",
-    "CGO_ENABLED": 0
+    "CGO_ENABLED": 1
   },
   "go.vetOnSave": "workspace",
   "go.useLanguageServer": true,
@@ -63,7 +63,7 @@
   "go.toolsEnvVars": {
     "GOEXPERIMENT": "jsonv2",
     "GOSUMDB": "sum.golang.org",
-    "CGO_ENABLED": 0
+    "CGO_ENABLED": 1
   },
   "sarif-viewer.connectToGithubCodeScanning": "off",
   "typescript.native-preview.tsdk": "./_integrations/vscode-tally/node_modules/@typescript/native-preview/bin",
@@ -103,5 +103,8 @@
   "explorer.fileNesting.patterns": {
     "*.go": "${capture}.schema.json",
     "package.json": "bun.lock"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
   }
 }

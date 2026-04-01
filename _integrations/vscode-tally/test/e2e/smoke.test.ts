@@ -3,8 +3,9 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { runTests } from "@vscode/test-electron";
+import { downloadAndUnzipVSCode, runTests } from "@vscode/test-electron";
 import Bun from "bun";
+import { backOff } from "exponential-backoff";
 
 function runOrThrow(cmd: string[], opts: { cwd: string; env?: Record<string, string> }): void {
   const proc = Bun.spawnSync({
@@ -78,27 +79,27 @@ test(
     );
 
     const vscodeVersion = process.env.VSCODE_TEST_VERSION;
-    const vscodeDownloadTimeoutMsRaw = process.env.VSCODE_TEST_DOWNLOAD_TIMEOUT_MS;
-    const vscodeDownloadTimeoutMsParsed = Number.parseInt(
-      vscodeDownloadTimeoutMsRaw ?? "120000",
-      10,
-    );
-    const vscodeDownloadTimeoutMs = Number.isFinite(vscodeDownloadTimeoutMsParsed)
-      ? vscodeDownloadTimeoutMsParsed
-      : 120_000;
+
+    const vscodeExecutablePath = await backOff(() => downloadAndUnzipVSCode(vscodeVersion));
 
     await runTests({
+      vscodeExecutablePath,
       extensionDevelopmentPath: extensionRoot,
       extensionTestsPath: path.join(extensionRoot, "test", "suite", "index.js"),
-      ...(vscodeVersion ? { version: vscodeVersion } : {}),
-      timeout: vscodeDownloadTimeoutMs,
-      extractSync: true,
+      timeout: 120_000,
       launchArgs: [
         repoRoot,
         "--disable-extensions",
+        "--disable-updates",
+        "--disable-crash-reporter",
+        "--disable-telemetry",
         "--disable-workspace-trust",
         "--skip-welcome",
         "--skip-release-notes",
+        "--disable-chromium-sandbox",
+        "--use-inmemory-secretstorage",
+        "--sync=off",
+        "--logExtensionHostCommunication",
         "--user-data-dir",
         userDataDir,
         "--extensions-dir",
