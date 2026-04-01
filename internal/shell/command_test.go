@@ -523,6 +523,27 @@ func TestAnalyzeCmdScript(t *testing.T) {
 	}
 }
 
+func TestAnalyzeCmdScript_ThreeCommandChain(t *testing.T) {
+	t.Parallel()
+
+	analysis := AnalyzeCmdScript(`echo one && echo two && echo three`)
+	if analysis == nil {
+		t.Fatal("expected analysis")
+	}
+	if len(analysis.Commands) != 3 {
+		t.Fatalf("expected 3 parsed commands, got %d", len(analysis.Commands))
+	}
+	if analysis.Commands[0].Name != "echo" || analysis.Commands[1].Name != "echo" || analysis.Commands[2].Name != "echo" {
+		t.Fatalf("unexpected parsed commands: %#v", analysis.Commands)
+	}
+	if !analysis.HasConditionals {
+		t.Fatal("expected conditional execution to be detected")
+	}
+	if analysis.HasPipes || analysis.HasRedirections || analysis.HasControlFlow || analysis.HasVariableReferences {
+		t.Fatalf("expected plain && chain without extra batch-only syntax, got %#v", analysis)
+	}
+}
+
 func TestCommandNamesWithVariant_PowerShell(t *testing.T) {
 	t.Parallel()
 

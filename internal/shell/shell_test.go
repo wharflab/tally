@@ -522,8 +522,8 @@ func TestVariantCapabilities(t *testing.T) {
 		{VariantPOSIX, true, true, true, true, false},
 		{VariantMksh, true, true, true, true, false},
 		{VariantZsh, true, true, true, true, false},
-		{VariantPowerShell, true, false, false, false, true},
-		{VariantCmd, false, false, false, false, false},
+		{VariantPowerShell, true, false, false, true, true},
+		{VariantCmd, false, false, false, true, false},
 		{VariantUnknown, false, false, false, false, false},
 	}
 
@@ -546,6 +546,30 @@ func TestVariantCapabilities(t *testing.T) {
 		if got := tt.variant.IsPowerShell(); got != tt.isPowerShell {
 			t.Errorf("Variant(%d).IsPowerShell() = %v, want %v", tt.variant, got, tt.isPowerShell)
 		}
+	}
+}
+
+func TestContinuationRune(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		variant Variant
+		want    rune
+	}{
+		{name: "bash", variant: VariantBash, want: '\\'},
+		{name: "powershell", variant: VariantPowerShell, want: '`'},
+		{name: "cmd", variant: VariantCmd, want: '^'},
+		{name: "unknown defaults to posix", variant: VariantUnknown, want: '\\'},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := ContinuationRune(tt.variant); got != tt.want {
+				t.Errorf("ContinuationRune(%v) = %q, want %q", tt.variant, got, tt.want)
+			}
+		})
 	}
 }
 

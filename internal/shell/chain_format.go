@@ -216,9 +216,42 @@ func forceChainNewlinesRec(cmd syntax.Command, nextLine *uint) bool {
 // trailing escape characters on continuation lines are replaced with backslash
 // so the bash shell parser handles line continuations correctly.
 func ReconstructSourceText(lines []string, cmdStartCol int, escapeToken rune) string {
+	return reconstructSourceTextWithTarget(lines, cmdStartCol, escapeToken, '\\')
+}
+
+// ContinuationRune returns the native line-continuation character for a shell variant.
+func ContinuationRune(variant Variant) rune {
+	switch variant { //nolint:exhaustive // POSIX variants all use backslash
+	case VariantPowerShell:
+		return '`'
+	case VariantCmd:
+		return '^'
+	default:
+		return '\\'
+	}
+}
+
+// ReconstructSourceTextForVariant reconstructs Dockerfile shell source for the
+// requested shell variant, rewriting Dockerfile continuation markers to the
+// shell's native continuation token when needed.
+func ReconstructSourceTextForVariant(
+	lines []string,
+	cmdStartCol int,
+	escapeToken rune,
+	variant Variant,
+) string {
+	return reconstructSourceTextWithTarget(lines, cmdStartCol, escapeToken, ContinuationRune(variant))
+}
+
+func reconstructSourceTextWithTarget(
+	lines []string,
+	cmdStartCol int,
+	escapeToken rune,
+	target rune,
+) string {
 	var sb strings.Builder
 	escByte := byte(escapeToken)
-	needsRewrite := escapeToken != '\\' && escapeToken != 0
+	needsRewrite := escapeToken != target && escapeToken != 0
 
 	for i, line := range lines {
 		if i == 0 {
@@ -230,12 +263,10 @@ func ReconstructSourceText(lines []string, cmdStartCol int, escapeToken rune) st
 			}
 		}
 
-		// Replace non-standard escape at end of continuation lines with
-		// backslash so the bash parser sees valid line continuation.
 		if needsRewrite && i < len(lines)-1 {
 			trimmed := strings.TrimRight(line, " \t")
 			if trimmed != "" && trimmed[len(trimmed)-1] == escByte {
-				line = trimmed[:len(trimmed)-1] + `\`
+				line = trimmed[:len(trimmed)-1] + string(target)
 			}
 		}
 

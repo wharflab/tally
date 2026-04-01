@@ -41,6 +41,11 @@ ENV POWERSHELL_TELEMETRY_OPTOUT=1 VCPKG_DISABLE_METRICS=1
 
 	SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
-	RUN Write-Host hi
-	RUN Write-Host bye
-	RUN bootstrap-vcpkg.bat
+	RUN <<-EOF
+		$ErrorActionPreference = 'Stop'
+		Write-Host hi
+		if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
+		Write-Host bye
+		if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }
+		bootstrap-vcpkg.bat
+		EOF

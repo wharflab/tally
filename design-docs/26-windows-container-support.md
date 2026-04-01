@@ -16,7 +16,7 @@ applies a heredoc fix that would break the build. The root causes are:
 2. ShellCheck fires on `cmd.exe` / PowerShell commands (partially guarded — see findings below)
 3. `buildkit/WorkdirRelativePath` doesn't recognize Windows absolute paths (`C:\`, `c:/`)
 4. `tally/platform-mismatch` compares against the host machine instead of validating registry data
-5. `tally/prefer-run-heredoc` suggests heredoc syntax that doesn't work on Windows
+5. `tally/prefer-run-heredoc` needs shell-aware Windows support and escape-aware formatting
 6. `tally/prefer-multi-stage-build` doesn't recognize Windows build tools
 7. `tally/prefer-package-cache-mounts` doesn't recognize Windows package managers
 8. Escape character (`# escape=` backtick) may not be respected by all rules
@@ -365,9 +365,10 @@ is passed intact with newlines to `pwsh -Command`, which correctly parses the he
 | `RUN <<EOF` (Dockerfile heredoc) + `SHELL ["pwsh"...]` | **Yes** | Newlines preserved in content passed to `pwsh -Command` |
 | `RUN ["pwsh", "-Command", "..."]` (exec form) | **No** | Single JSON string, no newlines |
 
-**Implication for tally:** `tally/prefer-run-heredoc` should still be suppressed for Windows stages
-in general (since `cmd.exe` can't handle it), but the heredoc mechanism does work when PowerShell
-is the active shell. This is an edge case we can revisit — for now, suppression is the safe default.
+**Implication for tally:** `tally/prefer-run-heredoc` should be gated by the effective shell, not by
+Windows as a whole. Live WCOW validation confirmed that PowerShell heredoc bodies work as expected,
+and `cmd.exe` also works when the heredoc body is rendered as a single grouped command block rather
+than a visually multi-line body.
 
 ### STOPSIGNAL on Windows
 
@@ -426,7 +427,7 @@ This has two implications:
 
 | Rule | Impact |
 |------|--------|
-| `tally/prefer-run-heredoc` | **Must suppress** for Windows stages |
+| `tally/prefer-run-heredoc` | **Use shell-aware gating**; supported for PowerShell and `cmd.exe` RUN heredocs |
 | `tally/prefer-copy-heredoc` | **Must suppress** for Windows stages |
 | `tally/prefer-package-cache-mounts` | **Must suppress** for Windows stages (`--mount=type=cache` fails at runtime) |
 | `tally/prefer-add-unpack` | Supported on Windows — `ADD --unpack` is implemented in the BuildKit frontend and works for Windows container builds too |
@@ -525,7 +526,7 @@ This requires the `BaseImageOS` signal from the semantic model enhancement.
 ### Phase 2: Suppress False Positives
 
 1. Gate ShellCheck on effective shell (using `BaseImageOS`-aware defaults)
-2. Gate `prefer-run-heredoc` and `prefer-copy-heredoc` on `BaseImageOS != Windows`
+2. Gate `prefer-run-heredoc` on effective shell support, and keep `prefer-copy-heredoc` on its own compatibility gate
 3. Gate `prefer-package-cache-mounts` on `BaseImageOS != Windows`
 4. Fix `WorkdirRelativePath` to recognize Windows absolute paths
 5. Update `TestFixWindowsContainer` snapshot — expect zero false positives

@@ -16,6 +16,12 @@ Suggests converting multi-command RUN instructions to heredoc syntax for better 
 This rule targets Dockerfile
 [here-documents](https://docs.docker.com/reference/dockerfile/#here-documents) with `RUN`, which are supported by BuildKit syntax.
 
+Windows shells are supported too:
+
+- POSIX shells keep the usual multi-line heredoc body with `set -e` and optional `set -o pipefail`
+- PowerShell heredocs use a multi-line body with `$ErrorActionPreference = 'Stop'` plus explicit guards between commands
+- `cmd.exe` heredocs are supported, but real WCOW builds only executed chained bodies reliably when the body stayed on one logical line, so the fixer emits a grouped single-line `(...)` command list inside the heredoc
+
 Detects two patterns:
 
 1. **Multiple consecutive RUN instructions** that could be combined
@@ -76,6 +82,11 @@ chains.
 
 See [moby/buildkit#2722](https://github.com/moby/buildkit/issues/2722) for details.
 
+On Windows, the fixer preserves the same intent with shell-native behavior instead of `set -e`:
+
+- PowerShell gets `$ErrorActionPreference = 'Stop'` plus inter-command guards
+- `cmd.exe` keeps the original `&&` semantics inside a grouped command block
+
 ## Options
 
 | Option | Type | Default | Description |
@@ -103,3 +114,4 @@ conversion to handle `cd` correctly within the script.
 
 - [Dockerfile here-documents](https://docs.docker.com/reference/dockerfile/#here-documents)
 - [Introduction to heredocs in Dockerfiles](https://www.docker.com/blog/introduction-to-heredocs-in-dockerfiles/)
+- [moby/buildkit#2722](https://github.com/moby/buildkit/issues/2722)

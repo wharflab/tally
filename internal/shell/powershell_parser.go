@@ -26,6 +26,16 @@ type powerShellArg struct {
 	node sitter.Node
 }
 
+type powerShellStatement struct {
+	Text    string
+	HasPipe bool
+}
+
+type powerShellScriptAnalysis struct {
+	Statements []powerShellStatement
+	HasComplex bool
+}
+
 func powerShellCommandNames(script string) []string {
 	cmds := findPowerShellCommands(script)
 	names := make([]string, 0, len(cmds))
@@ -161,6 +171,146 @@ func canParsePowerShell(script string) bool {
 	defer tree.Close()
 
 	return !tree.RootNode().HasError()
+}
+
+func analyzePowerShellScript(script string) *powerShellScriptAnalysis {
+	if strings.TrimSpace(script) == "" || powerShellLanguage == nil {
+		return nil
+	}
+
+	parser := sitter.NewParser()
+	defer parser.Close()
+
+	if err := parser.SetLanguage(powerShellLanguage); err != nil {
+		return nil
+	}
+
+	source := []byte(script)
+	tree := parser.Parse(source, nil)
+	if tree == nil {
+		return nil
+	}
+	defer tree.Close()
+
+	root := tree.RootNode()
+	if root.HasError() {
+		return nil
+	}
+
+	analysis := &powerShellScriptAnalysis{}
+	collectPowerShellStatements(root, source, analysis, "", false)
+	if len(analysis.Statements) == 0 && !analysis.HasComplex {
+		return nil
+	}
+	return analysis
+}
+
+func hasPowerShellFlowControl(script, keyword string) bool {
+	if strings.TrimSpace(script) == "" || powerShellLanguage == nil {
+		return false
+	}
+
+	parser := sitter.NewParser()
+	defer parser.Close()
+
+	if err := parser.SetLanguage(powerShellLanguage); err != nil {
+		return false
+	}
+
+	source := []byte(script)
+	tree := parser.Parse(source, nil)
+	if tree == nil {
+		return false
+	}
+	defer tree.Close()
+
+	root := tree.RootNode()
+	if root.HasError() {
+		return false
+	}
+
+	found := false
+	walkPowerShellTree(root, func(node *sitter.Node) {
+		if found || node == nil || node.Kind() != "flow_control_statement" {
+			return
+		}
+
+		text := strings.TrimSpace(node.Utf8Text(source))
+		if text == "" {
+			return
+		}
+
+		first := strings.Fields(text)[0]
+		if strings.EqualFold(first, keyword) {
+			found = true
+		}
+	})
+
+	return found
+}
+
+func collectPowerShellStatements(
+	node *sitter.Node,
+	source []byte,
+	analysis *powerShellScriptAnalysis,
+	parentKind string,
+	inComplex bool,
+) {
+	if node == nil || !node.IsNamed() {
+		return
+	}
+
+	kind := node.Kind()
+	if isPowerShellComplexKind(kind) {
+		analysis.HasComplex = true
+		inComplex = true
+	}
+
+	if kind == "pipeline" && !inComplex && isTopLevelPowerShellPipelineParent(parentKind) {
+		text := strings.TrimSpace(node.Utf8Text(source))
+		if text != "" {
+			analysis.Statements = append(analysis.Statements, powerShellStatement{
+				Text:    text,
+				HasPipe: strings.Contains(text, "|"),
+			})
+		}
+		return
+	}
+
+	childCount := node.NamedChildCount()
+	for i := range childCount {
+		collectPowerShellStatements(node.NamedChild(i), source, analysis, kind, inComplex)
+	}
+}
+
+func isTopLevelPowerShellPipelineParent(kind string) bool {
+	switch kind {
+	case "program", "statement_list", "script_block_body":
+		return true
+	default:
+		return false
+	}
+}
+
+func isPowerShellComplexKind(kind string) bool {
+	switch kind {
+	case "if_statement",
+		"switch_statement",
+		"foreach_statement",
+		"for_statement",
+		"while_statement",
+		"function_statement",
+		"trap_statement",
+		"try_statement",
+		"data_statement",
+		"parallel_statement",
+		"class_statement",
+		"script_block",
+		"script_block_expression":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizePowerShellCommandName(name string) string {

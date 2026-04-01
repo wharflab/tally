@@ -73,10 +73,16 @@ func TestCountChainedCommands(t *testing.T) {
 			want:    0,
 		},
 		{
-			name:    "non-POSIX shell",
-			script:  "echo hello",
+			name:    "powershell simple statement",
+			script:  "Write-Host hello",
 			variant: VariantPowerShell,
-			want:    0,
+			want:    1,
+		},
+		{
+			name:    "cmd chain counts commands",
+			script:  "echo hello && echo world",
+			variant: VariantCmd,
+			want:    2,
 		},
 		{
 			name:    "if statement counts as one",
@@ -142,10 +148,16 @@ func TestExtractChainedCommands(t *testing.T) {
 			want:    []string{"cmd1", "cmd2 || exit"},
 		},
 		{
-			name:    "non-POSIX shell returns nil",
-			script:  "echo hello",
+			name:    "powershell extracts statements",
+			script:  "Write-Host hello; Remove-Item C:\\temp\\foo",
 			variant: VariantPowerShell,
-			want:    nil,
+			want:    []string{"Write-Host hello", "Remove-Item C:\\temp\\foo"},
+		},
+		{
+			name:    "cmd extracts chained commands",
+			script:  "echo hello && del file.txt",
+			variant: VariantCmd,
+			want:    []string{"echo hello", "del file.txt"},
 		},
 	}
 
@@ -292,10 +304,16 @@ func TestIsSimpleScript(t *testing.T) {
 			want:    false,
 		},
 		{
-			name:    "non-POSIX returns false",
-			script:  "echo hello",
+			name:    "powershell simple statements",
+			script:  "Write-Host hello; Remove-Item C:\\temp\\foo",
 			variant: VariantPowerShell,
-			want:    false,
+			want:    true,
+		},
+		{
+			name:    "cmd simple chained commands",
+			script:  "echo hello && del file.txt",
+			variant: VariantCmd,
+			want:    true,
 		},
 		{
 			name:    "or chain is simple",
@@ -355,10 +373,16 @@ func TestHasExitCommand(t *testing.T) {
 			want:    true,
 		},
 		{
-			name:    "non-POSIX returns false",
-			script:  "exit 0",
+			name:    "powershell exit is detected",
+			script:  "Write-Host hello; exit 1",
 			variant: VariantPowerShell,
-			want:    false,
+			want:    true,
+		},
+		{
+			name:    "cmd exit is detected",
+			script:  "echo hello && exit /b 1",
+			variant: VariantCmd,
+			want:    true,
 		},
 	}
 
@@ -411,11 +435,18 @@ func TestIsHeredocCandidate(t *testing.T) {
 			want:        true,
 		},
 		{
-			name:        "non-POSIX shell - not candidate",
-			script:      "apt-get update && apt-get install vim && apt-get clean",
+			name:        "powershell candidate",
+			script:      "Write-Host one; Write-Host two; Write-Host three",
 			variant:     VariantPowerShell,
 			minCommands: 3,
-			want:        false,
+			want:        true,
+		},
+		{
+			name:        "cmd candidate",
+			script:      "echo one && echo two && echo three",
+			variant:     VariantCmd,
+			minCommands: 3,
+			want:        true,
 		},
 		{
 			name:        "cd in chain - still candidate",

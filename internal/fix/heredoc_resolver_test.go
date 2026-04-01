@@ -885,13 +885,10 @@ RUN apt-get update && apt-get install -y vim && apt-get clean
 	}
 }
 
-func TestHeredocResolver_Resolve_NonPOSIXShellSkipped(t *testing.T) {
+func TestHeredocResolver_Resolve_PowerShellShellSupported(t *testing.T) {
 	t.Parallel()
 	r := &heredocResolver{}
 
-	// If a sync fix introduced a non-POSIX shell (e.g., powershell),
-	// the resolver should detect it and the shell parsing should handle
-	// it gracefully.
 	dockerfile := `FROM mcr.microsoft.com/windows/servercore
 SHELL ["powershell", "-Command"]
 RUN Write-Output "hello" ; Write-Output "world" ; Write-Output "!"
@@ -917,18 +914,120 @@ RUN Write-Output "hello" ; Write-Output "world" ; Write-Output "!"
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Non-POSIX shells should not produce heredoc edits
-	if edits != nil {
-		t.Errorf("expected nil edits for non-POSIX shell, got %d edits", len(edits))
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for PowerShell shell, got %d", len(edits))
+	}
+	if !strings.Contains(edits[0].NewText, "$ErrorActionPreference = 'Stop'") {
+		t.Fatalf("expected PowerShell fail-fast prelude, got: %s", edits[0].NewText)
+	}
+	if strings.Contains(edits[0].NewText, "set -e") {
+		t.Fatalf("did not expect POSIX prelude in PowerShell heredoc: %s", edits[0].NewText)
 	}
 
-	// Verify the variant was updated to NonPOSIX
 	data, ok := fix.ResolverData.(*rules.HeredocResolveData)
 	if !ok {
 		t.Fatal("expected HeredocResolveData")
 	}
 	if data.ShellVariant != shell.VariantPowerShell {
 		t.Errorf("expected ShellVariant to be updated to VariantPowerShell, got %v", data.ShellVariant)
+	}
+}
+
+func TestHeredocResolver_Resolve_CmdShellSupported(t *testing.T) {
+	t.Parallel()
+	r := &heredocResolver{}
+
+	dockerfile := "# escape=`\n" +
+		"FROM mcr.microsoft.com/windows/nanoserver:ltsc2025\n" +
+		"RUN echo one `\n" +
+		"    && echo two `\n" +
+		"    && echo three > C:\\proof.txt\n"
+
+	fix := &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   rules.HeredocResolverID,
+		ResolverData: &rules.HeredocResolveData{
+			Type:         rules.HeredocFixChained,
+			StageIndex:   0,
+			ShellVariant: shell.VariantCmd,
+			MinCommands:  3,
+		},
+	}
+
+	edits, err := r.Resolve(context.Background(), ResolveContext{
+		Content:  []byte(dockerfile),
+		FilePath: "Dockerfile",
+	}, fix)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for cmd shell, got %d", len(edits))
+	}
+
+	got := edits[0].NewText
+	if !strings.Contains(got, "<<EOF") {
+		t.Fatalf("expected heredoc syntax in cmd edit, got: %s", got)
+	}
+	if strings.Contains(got, "set -e") || strings.Contains(got, "$ErrorActionPreference") {
+		t.Fatalf("did not expect POSIX or PowerShell prelude in cmd heredoc: %s", got)
+	}
+	if !strings.Contains(got, "(echo one && echo two && echo three > C:\\proof.txt)") {
+		t.Fatalf("expected grouped cmd heredoc body, got: %s", got)
+	}
+}
+
+func TestHeredocResolver_Resolve_PowerShellWithBacktickContinuations(t *testing.T) {
+	t.Parallel()
+	r := &heredocResolver{}
+
+	dockerfile := "# escape=`\n" +
+		"FROM mcr.microsoft.com/windows/servercore:ltsc2025\n" +
+		"SHELL [\"powershell\", \"-Command\"]\n" +
+		"RUN Set-Content -Path C:\\temp\\proof.txt -Value one; `\n" +
+		"    Add-Content -Path C:\\temp\\proof.txt -Value two; `\n" +
+		"    Add-Content -Path C:\\temp\\proof.txt -Value three\n"
+
+	fix := &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   rules.HeredocResolverID,
+		ResolverData: &rules.HeredocResolveData{
+			Type:         rules.HeredocFixChained,
+			StageIndex:   0,
+			ShellVariant: shell.VariantPowerShell,
+			MinCommands:  3,
+		},
+	}
+
+	edits, err := r.Resolve(context.Background(), ResolveContext{
+		Content:  []byte(dockerfile),
+		FilePath: "Dockerfile",
+	}, fix)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for PowerShell shell, got %d", len(edits))
+	}
+
+	got := edits[0].NewText
+	if !strings.Contains(got, "$ErrorActionPreference = 'Stop'") {
+		t.Fatalf("expected PowerShell fail-fast prelude, got: %s", got)
+	}
+	if strings.Contains(got, "set -e") {
+		t.Fatalf("did not expect POSIX prelude in PowerShell heredoc: %s", got)
+	}
+	if !strings.Contains(got, "if (-not $?) { if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; exit 1 }") {
+		t.Fatalf("expected inter-command PowerShell guard, got: %s", got)
+	}
+
+	if edits[0].Location.Start.Line != 4 {
+		t.Errorf("expected edit start line 4, got %d", edits[0].Location.Start.Line)
+	}
+	if edits[0].Location.End.Line != 6 {
+		t.Errorf("expected edit end line 6, got %d", edits[0].Location.End.Line)
 	}
 }
 
