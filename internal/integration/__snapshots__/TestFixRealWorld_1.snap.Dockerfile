@@ -196,7 +196,7 @@ RUN apt-get purge --autoremove -y curl && rm -rf /var/lib/apt/lists/*
 ENV NV_CUDA_COMPAT_PACKAGE=cuda-compat-11-7
 ENV NV_CUDA_CUDART_VERSION=11.7.99-1
 
-RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update && apt-get install -y --no-install-recommends cuda-cudart-11-7=${NV_CUDA_CUDART_VERSION} ${NV_CUDA_COMPAT_PACKAGE}
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update && apt-get install -y --no-install-recommends     cuda-cudart-11-7=${NV_CUDA_CUDART_VERSION}     ${NV_CUDA_COMPAT_PACKAGE}
 RUN echo "/usr/local/nvidia/lib" >> /etc/ld.so.conf.d/nvidia.conf \
 	&& echo "/usr/local/nvidia/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 
@@ -217,7 +217,7 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=
 set -e
 apt-get update
 apt-get -y upgrade --only-upgrade systemd
-apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7 libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libglib2.0-0 libgl1-mesa-glx libsm6 libxext6 libxrender-dev libgomp1 libibverbs-dev libhwloc-dev libnuma1 libnuma-dev libssl3 libssl-dev libtool openssl python3-dev unzip vim wget zlib1g-dev pkg-config check libsubunit0 libsubunit-dev
+apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates check cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libgl1-mesa-glx libglib2.0-0 libgomp1 libhwloc-dev libibverbs-dev libnuma-dev libnuma1 libsm6 libssl-dev libssl3 libsubunit-dev libsubunit0 libtool libxext6 libxrender-dev openssl pkg-config python3-dev unzip vim wget zlib1g-dev libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7
 EOF
 
 ADD --link https://github.com/NVIDIA/nccl.git?ref=v${NCCL_VERSION}-1 /tmp/nccl
@@ -271,7 +271,7 @@ EOF
 
 ENV REQUESTS_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
 
-RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update -q &&     apt-get install -q -y --no-install-recommends bzip2 ca-certificates git libglib2.0-0 libsm6 libxext6 libxrender1 mercurial openssh-client procps subversion wget
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update -q &&     apt-get install -q -y --no-install-recommends         bzip2         ca-certificates         git         libglib2.0-0         libsm6         libxext6         libxrender1         mercurial         openssh-client         procps         subversion         wget
 
 #ARG CONDA_VERSION=py39_22.11.1-1
 #RUN set -x &&     UNAME_M="$(uname -m)" &&     if [ "${UNAME_M}" = "x86_64" ]; then         MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-${CONDA_VERSION}-Linux-x86_64.sh";         SHA256SUM="e685005710679914a909bfb9c52183b3ccc56ad7bb84acc861d596fcbe5d28bb";     elif [ "${UNAME_M}" = "s390x" ]; then         MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-${CONDA_VERSION}-Linux-s390x.sh";         SHA256SUM="a150511e7fd19d07b770f278fb5dd2df4bc24a8f55f06d6274774f209a36c766";     elif [ "${UNAME_M}" = "aarch64" ]; then         MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-${CONDA_VERSION}-Linux-aarch64.sh";         SHA256SUM="48a96df9ff56f7421b6dd7f9f71d548023847ba918c3826059918c08326c2017";     elif [ "${UNAME_M}" = "ppc64le" ]; then         MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-${CONDA_VERSION}-Linux-ppc64le.sh";         SHA256SUM="4c86c3383bb27b44f7059336c3a46c34922df42824577b93eadecefbf7423836";     fi &&     wget "${MINICONDA_URL}" -O miniconda.sh -q &&     echo "${SHA256SUM} miniconda.sh" > shasum &&     if [ "${CONDA_VERSION}" != "latest" ]; then sha256sum --check --status shasum; fi &&     mkdir -p /opt &&     bash miniconda.sh -b -p /opt/conda &&     rm miniconda.sh shasum &&     ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh &&     echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc &&     echo "conda activate base" >> ~/.bashrc &&     find /opt/conda/ -follow -type f -name '*.a' -delete &&     find /opt/conda/ -follow -type f -name '*.js.map' -delete &&     /opt/conda/bin/conda clean -afy
@@ -506,7 +506,7 @@ EOF
 
 ENV LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:/opt/conda/lib/python3.9/site-packages/smdistributed/dataparallel/lib"
 
-RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update  && apt-get install -y --allow-change-held-packages --no-install-recommends libunwind-dev
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update  && apt-get install -y --allow-change-held-packages --no-install-recommends     libunwind-dev
 
 ARG SMPPY_BINARY
 

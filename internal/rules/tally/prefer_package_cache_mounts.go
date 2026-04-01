@@ -292,26 +292,38 @@ func computeCleanupEdits(
 	}
 	separators := shell.ExtractChainSeparators(script, variant, len(commands))
 
-	// Anchor the script start by finding the first command in the source.
-	scriptIdx := strings.Index(sourceFull, commands[0])
+	// Normalize the source: collapse continuations and runs of whitespace
+	// into single spaces so that commands wrapping across lines can be
+	// found with plain string search. rawOffsets maps each normalized
+	// byte position back to the corresponding raw byte in sourceFull.
+	normalized, rawOffsets := normalizeSource(sourceFull)
+
+	// Anchor the script start by finding the first command.
+	scriptIdx := strings.Index(normalized, commands[0])
 	if scriptIdx < 0 {
 		return nil
 	}
 
-	// Find command positions directly in the source text. Each individual
-	// command appears literally even when separated by backslash-newline
-	// continuations, so a simple sequential search works for both single-
-	// and multi-line RUNs.
-	spans := computeCommandSpans(sourceFull[scriptIdx:], commands)
+	// Find command positions in the normalized view (handles both
+	// single-line and multi-line/wrapped commands).
+	spans := computeCommandSpans(normalized[scriptIdx:], commands)
 	if spans == nil {
 		return nil
+	}
+
+	// Map spans from normalized coordinates back to raw sourceFull offsets
+	// so that sourceRangeEdit produces correct line:column positions.
+	rawScriptIdx := rawOffsets[scriptIdx]
+	for i := range spans {
+		spans[i].start = rawOffsets[scriptIdx+spans[i].start] - rawScriptIdx
+		spans[i].end = rawOffsets[scriptIdx+spans[i].end] - rawScriptIdx
 	}
 
 	ctx := cleanupEditContext{
 		file:       file,
 		sourceFull: sourceFull,
 		startLine:  startLine,
-		scriptIdx:  scriptIdx,
+		scriptIdx:  rawScriptIdx,
 		spans:      spans,
 		separators: separators,
 		variant:    variant,
@@ -386,6 +398,50 @@ func buildCleanupEdit(ctx cleanupEditContext, i int, cmd string) *rules.TextEdit
 		ctx.file, ctx.sourceFull, ctx.startLine,
 		ctx.scriptIdx+ctx.spans[i].start, ctx.scriptIdx+ctx.spans[i].end, cleaned,
 	)
+}
+
+// normalizeSource collapses backslash-newline continuations and runs of
+// whitespace (space/tab) into single spaces. This matches the normalized
+// command text produced by shell.ExtractChainedCommands, enabling plain
+// string searches for both single-line and multi-line/wrapped commands.
+//
+// It returns the normalized string and a mapping: offsets[i] is the raw
+// byte index in s corresponding to normalized byte i (with a sentinel at
+// len(normalized) mapping to len(s)).
+func normalizeSource(s string) (string, []int) {
+	buf := make([]byte, 0, len(s))
+	offsets := make([]int, 0, len(s))
+	inSpace := false
+	for i := 0; i < len(s); {
+		// Collapse backslash-newline + leading whitespace.
+		if s[i] == '\\' && i+1 < len(s) && s[i+1] == '\n' {
+			if !inSpace {
+				buf = append(buf, ' ')
+				offsets = append(offsets, i)
+				inSpace = true
+			}
+			i += 2 // skip `\` and `\n`
+			for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+				i++
+			}
+			continue
+		}
+		if s[i] == ' ' || s[i] == '\t' {
+			if !inSpace {
+				buf = append(buf, ' ')
+				offsets = append(offsets, i)
+				inSpace = true
+			}
+			i++
+			continue
+		}
+		inSpace = false
+		buf = append(buf, s[i])
+		offsets = append(offsets, i)
+		i++
+	}
+	offsets = append(offsets, len(s))
+	return string(buf), offsets
 }
 
 // sourceRangeEdit creates a TextEdit from byte offsets within a multi-line source string.

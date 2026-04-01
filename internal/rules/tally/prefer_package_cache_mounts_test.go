@@ -803,6 +803,46 @@ FROM node:22 AS build
 	}
 }
 
+// TestPreferPackageCacheMountsRule_WrappedInstallCleanupComposesWithDL3027 is a
+// regression test ensuring that a multi-line install command (with backslash
+// continuations within the command itself) followed by a cleanup command
+// produces targeted cleanup edits, not a tail rewrite that would suppress
+// DL3027 (apt → apt-get) on the same RUN instruction.
+func TestPreferPackageCacheMountsRule_WrappedInstallCleanupComposesWithDL3027(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ubuntu:22.04\nRUN apt-get install -y \\\n    wget \\\n    curl && apt-get clean\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewPreferPackageCacheMountsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	// We should get targeted edits (mount insertion + cleanup deletion),
+	// NOT a single tail rewrite covering the entire RUN body.
+	if len(fix.Edits) < 2 {
+		t.Fatalf("expected at least 2 edits (mount insertion + cleanup deletion), got %d", len(fix.Edits))
+	}
+
+	// First edit: zero-width mount insertion.
+	ins := fix.Edits[0]
+	if ins.Location.Start != ins.Location.End {
+		t.Errorf("mount insertion should be zero-width, got %v-%v", ins.Location.Start, ins.Location.End)
+	}
+
+	// Cleanup edit should NOT start on line 2 (where the install command
+	// begins), proving it doesn't overlap with DL3027 edits there.
+	cleanup := fix.Edits[1]
+	if cleanup.Location.Start.Line == 2 {
+		t.Errorf("cleanup edit starts on line 2 (overlaps install); expected a targeted deletion on a later line")
+	}
+}
+
 func TestPreferPackageCacheMountsRule_FactsPathRemovesAllRepeatedCacheDisablingEnvBindings(t *testing.T) {
 	t.Parallel()
 
