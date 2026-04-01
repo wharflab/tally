@@ -242,6 +242,45 @@
           "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-should-follow-redirects/",
           "location": {
             "end": {
+              "column": 51,
+              "line": 39
+            },
+            "file": "testdata/curl-should-follow-redirects/Dockerfile",
+            "start": {
+              "column": 47,
+              "line": 39
+            }
+          },
+          "message": "curl command is missing --location flag to follow HTTP redirects",
+          "rule": "tally/curl-should-follow-redirects",
+          "severity": "warning",
+          "sourceCode": "RUN curl -fsSo /tmp/a https://example.com/a \u0026\u0026 curl -fsSo /tmp/b https://example.com/b",
+          "suggestedFix": {
+            "description": "Add --location flag to follow redirects",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 51,
+                    "line": 39
+                  },
+                  "file": "testdata/curl-should-follow-redirects/Dockerfile",
+                  "start": {
+                    "column": 51,
+                    "line": 39
+                  }
+                },
+                "newText": " --location"
+              }
+            ],
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-should-follow-redirects/",
+          "location": {
+            "end": {
               "column": 49,
               "line": 42
             },
@@ -364,7 +403,7 @@
     "files": 1,
     "info": 0,
     "style": 0,
-    "total": 9,
-    "warnings": 9
+    "total": 10,
+    "warnings": 10
   }
 }

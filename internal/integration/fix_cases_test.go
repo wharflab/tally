@@ -61,7 +61,7 @@ func fixCases(t *testing.T) []fixCase {
 			name:        "dl3027-apt-to-apt-get",
 			input:       "FROM ubuntu:22.04\nRUN apt update && apt install -y curl\n",
 			args:        []string{"--fix"},
-			wantApplied: 1, // Single violation with multiple edits
+			wantApplied: 2, // One fix per apt occurrence
 		},
 		// ShellCheck SC2086: echo $var -> echo "$var"
 		{
@@ -1209,7 +1209,7 @@ skip-blank-lines = true
 			input: "FROM ubuntu:24.04\nRUN apt update && apt install -y curl\n",
 			args: append([]string{"--fix"},
 				mustSelectRules("tally/newline-per-chained-call", "hadolint/DL3027")...),
-			wantApplied: 2, // DL3027 + chain split
+			wantApplied: 3, // DL3027 (×2, one per apt) + chain split
 		},
 		// Cross-rule: DL3047 (wget --progress) + chain split on same RUN
 		{
