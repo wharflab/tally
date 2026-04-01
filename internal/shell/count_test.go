@@ -196,6 +196,51 @@ func TestExtractChainedCommands(t *testing.T) {
 	}
 }
 
+func TestExtractCmdStatementsFromAnalysis(t *testing.T) {
+	t.Parallel()
+
+	t.Run("accepts valid parser-aligned spans", func(t *testing.T) {
+		t.Parallel()
+
+		script := "echo hello && echo world"
+		analysis := &CmdScriptAnalysis{
+			Commands:          []CommandInfo{{Name: "echo"}, {Name: "echo"}},
+			commandByteRanges: [][2]uint{{0, 10}, {14, 24}},
+			conditionalOps:    []cmdConditionalOp{{Text: "&&", Start: 11, End: 13}},
+		}
+
+		got, ok := extractCmdStatementsFromAnalysis(script, analysis)
+		if !ok {
+			t.Fatal("expected extraction to succeed")
+		}
+		want := []string{"echo hello", "echo world"}
+		if len(got) != len(want) {
+			t.Fatalf("returned %d commands, want %d: %v", len(got), len(want), got)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("command %d = %q, want %q", i, got[i], want[i])
+			}
+		}
+	})
+
+	t.Run("rejects out of order command ranges", func(t *testing.T) {
+		t.Parallel()
+
+		script := "echo hello && echo world"
+		analysis := &CmdScriptAnalysis{
+			Commands:          []CommandInfo{{Name: "echo"}, {Name: "echo"}},
+			commandByteRanges: [][2]uint{{0, 10}, {9, 24}},
+			conditionalOps:    []cmdConditionalOp{{Text: "&&", Start: 11, End: 13}},
+		}
+
+		got, ok := extractCmdStatementsFromAnalysis(script, analysis)
+		if ok || got != nil {
+			t.Fatalf("expected malformed ranges to be rejected, got ok=%v parts=%v", ok, got)
+		}
+	})
+}
+
 func TestExtractChainSeparators(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

@@ -101,6 +101,13 @@ func extractCmdStatements(script string) ([]string, bool) {
 		return nil, false
 	}
 
+	return extractCmdStatementsFromAnalysis(script, analysis)
+}
+
+func extractCmdStatementsFromAnalysis(script string, analysis *CmdScriptAnalysis) ([]string, bool) {
+	if analysis == nil {
+		return nil, false
+	}
 	if len(analysis.commandByteRanges) != len(analysis.Commands) {
 		return nil, false
 	}
@@ -117,6 +124,9 @@ func extractCmdStatements(script string) ([]string, bool) {
 	for i, bounds := range analysis.commandByteRanges {
 		start, end := bounds[0], bounds[1]
 		if start > end || end > uint(len(script)) {
+			return nil, false
+		}
+		if i > 0 && start < previousEnd {
 			return nil, false
 		}
 		if i == 0 {
