@@ -183,6 +183,13 @@ RUN echo 3
 			WantViolations: 1,
 		},
 		{
+			Name: "windows default cmd supports chained commands",
+			Content: `FROM mcr.microsoft.com/windows/nanoserver:ltsc2025
+RUN echo one && echo two && echo three
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "windows powershell supports chained commands",
 			Content: "# escape=`\n" + `FROM mcr.microsoft.com/windows/servercore:ltsc2025
 SHELL ["powershell", "-Command"]
