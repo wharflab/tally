@@ -254,7 +254,11 @@ func runKeywordEndColumn(runLoc []parser.Range, sm *sourcemap.SourceMap) int {
 // computeCleanupEdits produces targeted deletion edits for cache cleanup
 // commands within a RUN instruction. Instead of replacing the entire script,
 // each cleanup command (and its separator) is deleted individually, so
-// edits from other rules (e.g., DL3030 -y insertion) don't conflict.
+// edits from other rules (e.g., DL3027 apt→apt-get, DL3030 -y) compose.
+//
+// It builds the source from the SourceMap and locates each chained command
+// directly in the source text, which handles both single-line and multi-line
+// (backslash-continuation) RUN instructions.
 func computeCleanupEdits(
 	file string,
 	run *instructions.RunCommand,
@@ -263,22 +267,42 @@ func computeCleanupEdits(
 	variant shell.Variant,
 	cleaners map[cleanupKind]bool,
 ) []rules.TextEdit {
-	if len(cleaners) == 0 || len(runLoc) == 0 || len(run.Files) > 0 {
+	if len(cleaners) == 0 || len(runLoc) == 0 || len(run.Files) > 0 || sm == nil {
 		return nil
 	}
 
 	startLine := runLoc[0].Start.Line
-	sourceFull, script, scriptIdx := resolveCleanupSource(run, sm)
-	if scriptIdx < 0 {
+	endLine := runLoc[len(runLoc)-1].End.Line
+
+	var lines []string
+	for lineIdx := startLine - 1; lineIdx < endLine; lineIdx++ {
+		if lineIdx >= 0 && lineIdx < sm.LineCount() {
+			lines = append(lines, sm.Line(lineIdx))
+		}
+	}
+	if len(lines) == 0 {
 		return nil
 	}
+	sourceFull := strings.Join(lines, "\n")
 
+	script := dockerfile.RunScript(run)
 	commands := shell.ExtractChainedCommands(script, variant)
 	if len(commands) == 0 {
 		return nil
 	}
 	separators := shell.ExtractChainSeparators(script, variant, len(commands))
-	spans := computeCommandSpans(script, commands)
+
+	// Anchor the script start by finding the first command in the source.
+	scriptIdx := strings.Index(sourceFull, commands[0])
+	if scriptIdx < 0 {
+		return nil
+	}
+
+	// Find command positions directly in the source text. Each individual
+	// command appears literally even when separated by backslash-newline
+	// continuations, so a simple sequential search works for both single-
+	// and multi-line RUNs.
+	spans := computeCommandSpans(sourceFull[scriptIdx:], commands)
 	if spans == nil {
 		return nil
 	}
@@ -301,20 +325,6 @@ func computeCleanupEdits(
 		}
 	}
 	return edits
-}
-
-// resolveCleanupSource extracts the source text and script for a RUN instruction.
-// Returns the joined source, the script text, and the byte index of the script
-// within the source (-1 if resolution fails).
-func resolveCleanupSource(
-	run *instructions.RunCommand,
-	sm *sourcemap.SourceMap,
-) (string, string, int) {
-	resolved, ok := dockerfile.ResolveRunSource(run, sm)
-	if !ok {
-		return "", "", -1
-	}
-	return resolved.Source, resolved.Script, resolved.ScriptIndex
 }
 
 type cmdSpan struct {

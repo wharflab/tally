@@ -8,12 +8,12 @@
           "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3027/",
           "location": {
             "end": {
-              "column": 0,
+              "column": 7,
               "line": 4
             },
             "file": "testdata/dl3027/Dockerfile",
             "start": {
-              "column": 0,
+              "column": 4,
               "line": 4
             }
           },
@@ -22,7 +22,7 @@
           "severity": "warning",
           "sourceCode": "RUN apt update",
           "suggestedFix": {
-            "description": "Replace 'apt' with 'apt-get' or 'apt-cache'",
+            "description": "Replace 'apt' with 'apt-get'",
             "edits": [
               {
                 "location": {
@@ -32,11 +32,11 @@
                   },
                   "file": "testdata/dl3027/Dockerfile",
                   "start": {
-                    "column": 4,
+                    "column": 7,
                     "line": 4
                   }
                 },
-                "newText": "apt-get"
+                "newText": "-get"
               }
             ]
           }
@@ -46,12 +46,12 @@
           "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3027/",
           "location": {
             "end": {
-              "column": 0,
+              "column": 7,
               "line": 7
             },
             "file": "testdata/dl3027/Dockerfile",
             "start": {
-              "column": 0,
+              "column": 4,
               "line": 7
             }
           },
@@ -60,7 +60,7 @@
           "severity": "warning",
           "sourceCode": "RUN apt install -y curl wget",
           "suggestedFix": {
-            "description": "Replace 'apt' with 'apt-get' or 'apt-cache'",
+            "description": "Replace 'apt' with 'apt-get'",
             "edits": [
               {
                 "location": {
@@ -70,11 +70,11 @@
                   },
                   "file": "testdata/dl3027/Dockerfile",
                   "start": {
-                    "column": 4,
+                    "column": 7,
                     "line": 7
                   }
                 },
-                "newText": "apt-get"
+                "newText": "-get"
               }
             ]
           }
@@ -84,12 +84,12 @@
           "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3027/",
           "location": {
             "end": {
-              "column": 0,
+              "column": 7,
               "line": 10
             },
             "file": "testdata/dl3027/Dockerfile",
             "start": {
-              "column": 0,
+              "column": 4,
               "line": 10
             }
           },
@@ -98,7 +98,7 @@
           "severity": "warning",
           "sourceCode": "RUN apt upgrade -y",
           "suggestedFix": {
-            "description": "Replace 'apt' with 'apt-get' or 'apt-cache'",
+            "description": "Replace 'apt' with 'apt-get'",
             "edits": [
               {
                 "location": {
@@ -108,11 +108,11 @@
                   },
                   "file": "testdata/dl3027/Dockerfile",
                   "start": {
-                    "column": 4,
+                    "column": 7,
                     "line": 10
                   }
                 },
-                "newText": "apt-get"
+                "newText": "-get"
               }
             ]
           }
@@ -122,12 +122,12 @@
           "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3027/",
           "location": {
             "end": {
-              "column": 0,
+              "column": 42,
               "line": 20
             },
             "file": "testdata/dl3027/Dockerfile",
             "start": {
-              "column": 0,
+              "column": 39,
               "line": 20
             }
           },
@@ -136,7 +136,7 @@
           "severity": "warning",
           "sourceCode": "RUN env DEBIAN_FRONTEND=noninteractive apt install -y vim",
           "suggestedFix": {
-            "description": "Replace 'apt' with 'apt-get' or 'apt-cache'",
+            "description": "Replace 'apt' with 'apt-get'",
             "edits": [
               {
                 "location": {
@@ -146,11 +146,11 @@
                   },
                   "file": "testdata/dl3027/Dockerfile",
                   "start": {
-                    "column": 39,
+                    "column": 42,
                     "line": 20
                   }
                 },
-                "newText": "apt-get"
+                "newText": "-get"
               }
             ]
           }
