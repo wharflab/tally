@@ -315,14 +315,8 @@ severity = "error"
 RUN cd /app && make build
 RUN apt install curl
 `,
-			args: []string{
-				"--fix",
-				"--fix-unsafe",
-				"--ignore",
-				"tally/prefer-run-heredoc",
-				"--ignore",
-				"tally/prefer-package-cache-mounts",
-			},
+			args: append([]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("hadolint/DL3003", "hadolint/DL3027", "tally/prefer-curl-config")...),
 			wantApplied: 3, // DL3003 + DL3027 + prefer-curl-config
 		},
 		// LegacyKeyValueFormat: Replace legacy "ENV key value" with "ENV key=value"
