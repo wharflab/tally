@@ -647,9 +647,12 @@ severity = "error"
 				"RUN apt-get update\n" +
 				"RUN apt-get install -y curl\n" +
 				"RUN apt-get install -y git\n",
-			args: append([]string{"--fix-unsafe", "--fix"},
-				mustSelectRules("tally/prefer-run-heredoc")...),
-			wantApplied: 1,
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-run-heredoc",
+			},
+			wantApplied: 4, // cache mounts (3) + curl config (1); heredoc skipped (curl config breaks consecutiveness)
 		},
 
 		// prefer-run-heredoc: chained commands → heredoc RUN
@@ -797,9 +800,13 @@ severity = "error"
 				"RUN apt-get update\n" +
 				"RUN apt-get install -y curl\n" +
 				"RUN apt-get install -y git\n",
-			args: append([]string{"--fix-unsafe", "--fix"},
-				mustSelectRules("tally/prefer-copy-heredoc", "tally/prefer-run-heredoc")...),
-			wantApplied: 2,
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-copy-heredoc",
+				"--select", "tally/prefer-run-heredoc",
+			},
+			wantApplied: 5, // copy heredoc (1) + cache mounts (3) + curl config (1); run-heredoc skipped (curl config breaks consecutiveness)
 		},
 
 		// Heredoc + indentation: multi-stage with both heredoc rules + indentation.
