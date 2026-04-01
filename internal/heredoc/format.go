@@ -46,9 +46,11 @@ func heredocBodyLines(commands []string, variant shell.Variant, pipefail bool) [
 		return powerShellBodyLines(commands)
 	case shell.VariantCmd:
 		return cmdBodyLines(commands)
-	default:
+	case shell.VariantBash, shell.VariantPOSIX, shell.VariantMksh, shell.VariantZsh, shell.VariantUnknown:
 		return posixBodyLines(commands, variant, pipefail)
 	}
+
+	return posixBodyLines(commands, variant, pipefail)
 }
 
 func posixBodyLines(commands []string, variant shell.Variant, pipefail bool) []string {
@@ -79,11 +81,10 @@ func powerShellBodyLines(commands []string) []string {
 		if trimmed == "" {
 			continue
 		}
-		if strings.EqualFold(trimmed, "$ErrorActionPreference = 'Stop'") ||
-			strings.EqualFold(trimmed, `$ErrorActionPreference = "Stop"`) {
+		if isPowerShellStopPrelude(trimmed) {
 			hasStopPrelude = true
 		}
-		if strings.EqualFold(trimmed, "$PSNativeCommandUseErrorActionPreference = $true") {
+		if isPowerShellNativePrelude(trimmed) {
 			hasNativePrelude = true
 		}
 	}
@@ -100,19 +101,34 @@ func powerShellBodyLines(commands []string) []string {
 		if trimmed == "" {
 			continue
 		}
-		if !hasStopPrelude &&
-			(strings.EqualFold(trimmed, "$ErrorActionPreference = 'Stop'") ||
-				strings.EqualFold(trimmed, `$ErrorActionPreference = "Stop"`)) {
+		if !hasStopPrelude && isPowerShellStopPrelude(trimmed) {
 			continue
 		}
-		if !hasNativePrelude &&
-			strings.EqualFold(trimmed, "$PSNativeCommandUseErrorActionPreference = $true") {
+		if !hasNativePrelude && isPowerShellNativePrelude(trimmed) {
 			continue
 		}
 		lines = append(lines, cmd)
 	}
 
 	return lines
+}
+
+func isPowerShellStopPrelude(script string) bool {
+	name, value, ok := shell.PowerShellAssignment(script)
+	if !ok || !strings.EqualFold(name, "$ErrorActionPreference") {
+		return false
+	}
+
+	return strings.EqualFold(shell.DropQuotes(value), "Stop")
+}
+
+func isPowerShellNativePrelude(script string) bool {
+	name, value, ok := shell.PowerShellAssignment(script)
+	if !ok || !strings.EqualFold(name, "$PSNativeCommandUseErrorActionPreference") {
+		return false
+	}
+
+	return strings.EqualFold(strings.TrimSpace(value), "$true")
 }
 
 func cmdBodyLines(commands []string) []string {

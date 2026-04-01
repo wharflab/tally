@@ -24,6 +24,10 @@ func canParsePowerShell(_ string) bool {
 	return false // No parser available without cgo.
 }
 
+func PowerShellAssignment(_ string) (string, string, bool) {
+	return "", "", false
+}
+
 func analyzePowerShellScript(_ string) *powerShellScriptAnalysis {
 	return nil
 }

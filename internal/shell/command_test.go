@@ -559,6 +559,63 @@ func TestAnalyzeCmdScript_SingleQuotesDoNotQuoteConditionals(t *testing.T) {
 	}
 }
 
+func TestPowerShellAssignment(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		script    string
+		wantName  string
+		wantValue string
+		wantOK    bool
+	}{
+		{
+			name:      "error action preference single quotes",
+			script:    `$ErrorActionPreference='Stop'`,
+			wantName:  "$ErrorActionPreference",
+			wantValue: `'Stop'`,
+			wantOK:    true,
+		},
+		{
+			name:      "native command preference variable",
+			script:    `$PSNativeCommandUseErrorActionPreference = $true`,
+			wantName:  "$PSNativeCommandUseErrorActionPreference",
+			wantValue: "$true",
+			wantOK:    true,
+		},
+		{
+			name:   "plain command is not an assignment",
+			script: `Write-Host hi`,
+			wantOK: false,
+		},
+		{
+			name:   "multiple statements are not a simple assignment",
+			script: `$ErrorActionPreference='Stop'; Write-Host hi`,
+			wantOK: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			gotName, gotValue, gotOK := PowerShellAssignment(tt.script)
+			if gotOK != tt.wantOK {
+				t.Fatalf("PowerShellAssignment() ok = %v, want %v", gotOK, tt.wantOK)
+			}
+			if !tt.wantOK {
+				return
+			}
+			if gotName != tt.wantName {
+				t.Fatalf("PowerShellAssignment() name = %q, want %q", gotName, tt.wantName)
+			}
+			if gotValue != tt.wantValue {
+				t.Fatalf("PowerShellAssignment() value = %q, want %q", gotValue, tt.wantValue)
+			}
+		})
+	}
+}
+
 func TestCommandNamesWithVariant_PowerShell(t *testing.T) {
 	t.Parallel()
 

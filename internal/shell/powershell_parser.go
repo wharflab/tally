@@ -189,6 +189,63 @@ func canParsePowerShell(script string) bool {
 	return !tree.RootNode().HasError()
 }
 
+// PowerShellAssignment returns the variable name and right-hand value for a
+// simple top-level PowerShell assignment expression like
+// "$ErrorActionPreference = 'Stop'".
+func PowerShellAssignment(script string) (string, string, bool) {
+	if strings.TrimSpace(script) == "" || powerShellLanguage == nil {
+		return "", "", false
+	}
+
+	parser := sitter.NewParser()
+	defer parser.Close()
+
+	if err := parser.SetLanguage(powerShellLanguage); err != nil {
+		return "", "", false
+	}
+
+	source := []byte(script)
+	tree := parser.Parse(source, nil)
+	if tree == nil {
+		return "", "", false
+	}
+	defer tree.Close()
+
+	root := tree.RootNode()
+	if root.HasError() {
+		return "", "", false
+	}
+
+	pipeline := singleTopLevelPowerShellPipeline(root)
+	if pipeline == nil || pipeline.NamedChildCount() != 1 {
+		return "", "", false
+	}
+
+	assign := pipeline.NamedChild(0)
+	if assign == nil || assign.Kind() != "assignment_expression" {
+		return "", "", false
+	}
+
+	cursor := assign.Walk()
+	defer cursor.Close()
+
+	children := assign.NamedChildren(cursor)
+	if len(children) != 3 {
+		return "", "", false
+	}
+	if children[0].Kind() != "left_assignment_expression" || children[2].Kind() != "pipeline" {
+		return "", "", false
+	}
+
+	name := strings.TrimSpace(children[0].Utf8Text(source))
+	value := strings.TrimSpace(children[2].Utf8Text(source))
+	if name == "" || value == "" {
+		return "", "", false
+	}
+
+	return name, value, true
+}
+
 func analyzePowerShellScript(script string) *powerShellScriptAnalysis {
 	if strings.TrimSpace(script) == "" || powerShellLanguage == nil {
 		return nil
@@ -219,6 +276,33 @@ func analyzePowerShellScript(script string) *powerShellScriptAnalysis {
 		return nil
 	}
 	return analysis
+}
+
+func singleTopLevelPowerShellPipeline(root *sitter.Node) *sitter.Node {
+	if root == nil || root.Kind() != "program" || root.NamedChildCount() != 1 {
+		return nil
+	}
+
+	stmtList := root.NamedChild(0)
+	if stmtList == nil {
+		return nil
+	}
+
+	switch stmtList.Kind() {
+	case "pipeline":
+		return stmtList
+	case "statement_list", "script_block_body":
+		if stmtList.NamedChildCount() != 1 {
+			return nil
+		}
+		pipeline := stmtList.NamedChild(0)
+		if pipeline == nil || pipeline.Kind() != "pipeline" {
+			return nil
+		}
+		return pipeline
+	default:
+		return nil
+	}
 }
 
 func hasPowerShellFlowControl(script, keyword string) bool {

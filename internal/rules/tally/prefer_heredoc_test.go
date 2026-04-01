@@ -354,14 +354,22 @@ func TestFormatHeredocWithMounts(t *testing.T) {
 
 	t.Run("powershell", func(t *testing.T) {
 		t.Parallel()
-		commands := []string{"Invoke-WebRequest https://example.com/app.zip -OutFile C:\\temp\\app.zip", "Expand-Archive C:\\temp\\app.zip -DestinationPath C:\\tools", "Remove-Item C:\\temp\\app.zip -Force"}
+		commands := []string{
+			"Invoke-WebRequest https://example.com/app.zip -OutFile C:\\temp\\app.zip",
+			"Expand-Archive C:\\temp\\app.zip -DestinationPath C:\\tools",
+			"Remove-Item C:\\temp\\app.zip -Force",
+		}
 		result := heredoc.FormatWithMounts(commands, nil, shell.VariantPowerShell, false)
 		snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
 	})
 
 	t.Run("cmd", func(t *testing.T) {
 		t.Parallel()
-		commands := []string{"curl.exe -fsSL https://example.com/app.zip -o C:\\temp\\app.zip", "tar.exe -xf C:\\temp\\app.zip -C C:\\tools", "del C:\\temp\\app.zip"}
+		commands := []string{
+			"curl.exe -fsSL https://example.com/app.zip -o C:\\temp\\app.zip",
+			"tar.exe -xf C:\\temp\\app.zip -C C:\\tools",
+			"del C:\\temp\\app.zip",
+		}
 		result := heredoc.FormatWithMounts(commands, nil, shell.VariantCmd, false)
 		snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
 	})
