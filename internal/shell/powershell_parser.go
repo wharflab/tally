@@ -13,6 +13,8 @@ import (
 
 var powerShellLanguage = newPowerShellLanguage()
 
+const powerShellPipelineKind = "pipeline"
+
 func newPowerShellLanguage() *sitter.Language {
 	ptr := tspowershell.Language()
 	if ptr == nil {
@@ -233,7 +235,7 @@ func PowerShellAssignment(script string) (string, string, bool) {
 	if len(children) != 3 {
 		return "", "", false
 	}
-	if children[0].Kind() != "left_assignment_expression" || children[2].Kind() != "pipeline" {
+	if children[0].Kind() != "left_assignment_expression" || children[2].Kind() != powerShellPipelineKind {
 		return "", "", false
 	}
 
@@ -289,14 +291,14 @@ func singleTopLevelPowerShellPipeline(root *sitter.Node) *sitter.Node {
 	}
 
 	switch stmtList.Kind() {
-	case "pipeline":
+	case powerShellPipelineKind:
 		return stmtList
 	case "statement_list", "script_block_body":
 		if stmtList.NamedChildCount() != 1 {
 			return nil
 		}
 		pipeline := stmtList.NamedChild(0)
-		if pipeline == nil || pipeline.Kind() != "pipeline" {
+		if pipeline == nil || pipeline.Kind() != powerShellPipelineKind {
 			return nil
 		}
 		return pipeline
@@ -365,7 +367,7 @@ func collectPowerShellStatements(
 		text := strings.TrimSpace(node.Utf8Text(source))
 		if text != "" {
 			stmt := powerShellStatement{Text: text}
-			if kind == "pipeline" {
+			if kind == powerShellPipelineKind {
 				stmt.HasPipe = hasPowerShellPipelineOperator(node)
 			}
 			analysis.Statements = append(analysis.Statements, stmt)
@@ -393,7 +395,7 @@ func isTopLevelPowerShellStatement(parentKind, kind string) bool {
 }
 
 func hasPowerShellPipelineOperator(node *sitter.Node) bool {
-	if node == nil || node.Kind() != "pipeline" {
+	if node == nil || node.Kind() != powerShellPipelineKind {
 		return false
 	}
 
