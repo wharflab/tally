@@ -1010,6 +1010,58 @@ RUN apk add --no-cache bind-tools gnupg git tini
 	}
 }
 
+func TestHeredocResolver_Resolve_ChainedUpgradesToConsecutiveAfterShellRewrite(t *testing.T) {
+	t.Parallel()
+	r := &heredocResolver{}
+
+	dockerfile := `FROM mcr.microsoft.com/windows/servercore:ltsc2025
+SHELL ["powershell", "-Command"]
+RUN Add-Content C:\temp\proof.txt one; \
+    Add-Content C:\temp\proof.txt two; \
+    Add-Content C:\temp\proof.txt three
+RUN md C:\build
+WORKDIR C:/build
+`
+
+	fix := &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   rules.HeredocResolverID,
+		ResolverData: &rules.HeredocResolveData{
+			Type:            rules.HeredocFixChained,
+			StageIndex:      0,
+			TargetStartLine: 3,
+			ShellVariant:    shell.VariantCmd, // stale original shell
+			MinCommands:     3,
+		},
+	}
+
+	edits, err := r.Resolve(context.Background(), ResolveContext{
+		Content:  []byte(dockerfile),
+		FilePath: "Dockerfile",
+	}, fix)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(edits))
+	}
+
+	got := edits[0].NewText
+	if !strings.Contains(got, "$ErrorActionPreference = 'Stop'") {
+		t.Fatalf("expected PowerShell heredoc prelude, got: %s", got)
+	}
+	if !strings.Contains(got, "md C:\\build") {
+		t.Fatalf("expected consecutive RUN to be merged into heredoc, got: %s", got)
+	}
+	if edits[0].Location.Start.Line != 3 {
+		t.Errorf("expected edit start line 3, got %d", edits[0].Location.Start.Line)
+	}
+	if edits[0].Location.End.Line != 6 {
+		t.Errorf("expected edit end line 6, got %d", edits[0].Location.End.Line)
+	}
+}
+
 func TestHeredocResolver_Resolve_PowerShellWithBacktickContinuations(t *testing.T) {
 	t.Parallel()
 	r := &heredocResolver{}

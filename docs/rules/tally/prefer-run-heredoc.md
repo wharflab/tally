@@ -116,6 +116,14 @@ check-chained-commands = true
 When this rule is enabled, `hadolint/DL3003` (cd → WORKDIR) will skip generating fixes for commands that are heredoc candidates, allowing heredoc
 conversion to handle `cd` correctly within the script.
 
+On Windows, this rule also collaborates with `tally/powershell/prefer-shell-instruction`:
+
+- if repeated `RUN powershell ...` or `RUN pwsh ...` wrappers are first normalized into a PowerShell `SHELL`, this rule will then see the rewritten
+  `RUN` instructions under the effective PowerShell shell
+- that lets a `cmd`-style `RUN powershell ... && ...` sequence become a proper PowerShell heredoc instead of falling back to a `cmd.exe` heredoc body
+- the same pass can also absorb immediately following PowerShell-safe `RUN` instructions, so a stage can end up with one larger PowerShell heredoc
+  after the `SHELL` rewrite
+
 ## References
 
 - [Dockerfile here-documents](https://docs.docker.com/reference/dockerfile/#here-documents)

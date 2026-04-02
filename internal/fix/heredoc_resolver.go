@@ -59,10 +59,48 @@ func (r *heredocResolver) Resolve(_ context.Context, resolveCtx ResolveContext, 
 	case rules.HeredocFixConsecutive:
 		return r.detectAndFixConsecutive(stage, stageInfo, data, resolveCtx.FilePath, sm), nil
 	case rules.HeredocFixChained:
+		// Sync fixes can turn an originally chained single RUN into a better
+		// consecutive-RUN opportunity (for example by inserting a SHELL that
+		// lets adjacent RUNs share the same effective shell). Only upgrade when
+		// the resulting sequence still includes the original violating RUN.
+		if data.TargetStartLine > 0 {
+			if edits := r.detectAndFixConsecutiveAtLine(
+				stage,
+				stageInfo,
+				data,
+				resolveCtx.FilePath,
+				sm,
+				data.TargetStartLine,
+			); len(edits) > 0 {
+				return edits, nil
+			}
+		}
 		return r.detectAndFixChained(stage, stageInfo, data, resolveCtx.FilePath, sm), nil
 	default:
 		return nil, nil
 	}
+}
+
+func (r *heredocResolver) detectAndFixConsecutiveAtLine(
+	stage instructions.Stage,
+	stageInfo *semantic.StageInfo,
+	data *rules.HeredocResolveData,
+	file string,
+	sm *sourcemap.SourceMap,
+	targetStartLine int,
+) []rules.TextEdit {
+	edits := r.detectAndFixConsecutive(stage, stageInfo, data, file, sm)
+	if len(edits) == 0 {
+		return nil
+	}
+
+	for _, edit := range edits {
+		if edit.Location.Start.Line <= targetStartLine && targetStartLine <= edit.Location.End.Line {
+			return []rules.TextEdit{edit}
+		}
+	}
+
+	return nil
 }
 
 // runSequence holds a sequence of consecutive RUN instructions

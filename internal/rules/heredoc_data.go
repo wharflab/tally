@@ -31,6 +31,12 @@ type HeredocResolveData struct {
 	// StageIndex is the 0-based index of the stage containing the RUN(s).
 	StageIndex int
 
+	// TargetStartLine is the 1-based start line of the original violating RUN.
+	// For chained fixes, the resolver uses this to decide whether an earlier
+	// sync fix turned that specific RUN into a consecutive-RUN merge candidate.
+	// Zero means "no anchored target".
+	TargetStartLine int
+
 	// ShellVariant is the shell variant for parsing.
 	ShellVariant shell.Variant
 

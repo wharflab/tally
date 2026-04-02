@@ -208,6 +208,53 @@ RUN py -m pip install -U pip
 	}
 }
 
+func TestPreferShellInstructionRule_FixSpansSafeInterveningWindowsCommands(t *testing.T) {
+	t.Parallel()
+
+	rule := NewPreferShellInstructionRule()
+	const content = `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN powershell -NoProfile -ExecutionPolicy Bypass -Command "Write-Host bootstrap"
+RUN powershell Add-Content C:\temp\proof.txt one && choco install git -y
+RUN md C:\build
+WORKDIR C:/build
+COPY . C:/build
+RUN powershell Add-Content C:\temp\proof.txt two
+RUN xcopy C:\build\* C:\dest /s
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	sources := map[string][]byte{"Dockerfile": []byte(content)}
+	fixer := &fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN powershell -NoProfile -ExecutionPolicy Bypass -Command "Write-Host bootstrap"
+SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN Add-Content C:\temp\proof.txt one; \
+    choco install git -y
+RUN md C:\build
+WORKDIR C:/build
+COPY . C:/build
+RUN Add-Content C:\temp\proof.txt two
+RUN xcopy C:\build\* C:\dest /s
+`
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestPreferShellInstructionRule_FixPreservesRunFlags(t *testing.T) {
 	t.Parallel()
 
@@ -244,7 +291,7 @@ RUN --mount=type=cache,target=/tmp/cache Write-Host bye
 	}
 }
 
-func TestPreferShellInstructionRule_NoFixForMixedShellPrefixes(t *testing.T) {
+func TestPreferShellInstructionRule_IgnoresMixedShellPrefixes(t *testing.T) {
 	t.Parallel()
 
 	rule := NewPreferShellInstructionRule()
@@ -254,11 +301,8 @@ RUN pwsh -Command Write-Host bye
 `)
 
 	violations := rule.Check(input)
-	if len(violations) != 1 {
-		t.Fatalf("got %d violations, want 1", len(violations))
-	}
-	if violations[0].SuggestedFix != nil {
-		t.Fatal("expected no suggested fix")
+	if len(violations) != 0 {
+		t.Fatalf("got %d violations, want 0", len(violations))
 	}
 }
 
@@ -645,7 +689,7 @@ COPY . C:/app
 `
 
 	input := testutil.MakeLintInput(t, "Dockerfile", content)
-	var violations []rules.Violation
+	violations := make([]rules.Violation, 0, 2)
 	violations = append(violations, powerShellRule.Check(input)...)
 	violations = append(violations, indentRule.Check(input)...)
 	if len(violations) != 2 {

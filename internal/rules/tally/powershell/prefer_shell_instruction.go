@@ -121,75 +121,93 @@ func (r *PreferShellInstructionRule) Check(input rules.LintInput) []rules.Violat
 	meta := r.Metadata()
 	sm := input.SourceMap()
 
-	sem := input.Semantic
-
 	var violations []rules.Violation
 	for stageIdx, stage := range input.Stages {
-		currentShell := initialStageShellVariant(sem, stageIdx)
-		currentShellCmd := initialStageShellCmd(sem, stageIdx)
-		escapeToken := rune(0)
-		if input.AST != nil {
-			escapeToken = input.AST.EscapeToken
-		}
-		cluster := powerShellCluster{
-			startIdx: -1,
-			runs:     make([]powerShellRun, 0, 4),
-		}
-
-		flush := func() {
-			if len(cluster.runs) < 2 {
-				cluster.startIdx = -1
-				cluster.runs = cluster.runs[:0]
-				return
-			}
-			if v := buildPreferShellViolation(meta, input.File, sm, stageIdx, stage.Commands, cluster, escapeToken); v != nil {
-				violations = append(violations, *v)
-			}
-			cluster.startIdx = -1
-			cluster.runs = cluster.runs[:0]
-		}
-
-		for cmdIdx, cmd := range stage.Commands {
-			switch c := cmd.(type) {
-			case *instructions.ShellCommand:
-				flush()
-				currentShell = shellutil.VariantFromShellCmd(c.Shell)
-				currentShellCmd = append([]string(nil), c.Shell...)
-			case *instructions.RunCommand:
-				if !c.PrependShell {
-					continue
-				}
-				if currentShell.IsPowerShell() {
-					flush()
-					continue
-				}
-				if len(c.CmdLine) == 0 {
-					flush()
-					continue
-				}
-
-				invocation, ok := parseExplicitPowerShellInvocation(c.CmdLine[0])
-				if !ok {
-					flush()
-					continue
-				}
-				if cluster.startIdx < 0 {
-					cluster.startIdx = cmdIdx
-					cluster.shellBefore = currentShell
-					cluster.shellBeforeCmd = append([]string(nil), currentShellCmd...)
-				}
-				cluster.runs = append(cluster.runs, powerShellRun{
-					run:        c,
-					invocation: invocation,
-				})
-			default:
-				// Non-RUN instructions do not participate in wrapper clustering.
-			}
-		}
-
-		flush()
+		violations = append(violations, r.checkStage(input, meta, sm, stageIdx, stage)...)
 	}
 
+	return violations
+}
+
+func (r *PreferShellInstructionRule) checkStage(
+	input rules.LintInput,
+	meta rules.RuleMetadata,
+	sm *sourcemap.SourceMap,
+	stageIdx int,
+	stage instructions.Stage,
+) []rules.Violation {
+	currentShell := initialStageShellVariant(input.Semantic, stageIdx)
+	currentShellCmd := initialStageShellCmd(input.Semantic, stageIdx)
+	escapeToken := rune(0)
+	if input.AST != nil {
+		escapeToken = input.AST.EscapeToken
+	}
+
+	violations := make([]rules.Violation, 0, 1)
+	cluster := powerShellCluster{
+		startIdx: -1,
+		runs:     make([]powerShellRun, 0, 4),
+	}
+
+	flush := func() {
+		if len(cluster.runs) < 2 {
+			cluster.startIdx = -1
+			cluster.runs = cluster.runs[:0]
+			return
+		}
+		if v := buildPreferShellViolation(meta, input.File, sm, stageIdx, stage.Commands, cluster, escapeToken); v != nil {
+			violations = append(violations, *v)
+		}
+		cluster.startIdx = -1
+		cluster.runs = cluster.runs[:0]
+	}
+
+	for cmdIdx, cmd := range stage.Commands {
+		switch c := cmd.(type) {
+		case *instructions.ShellCommand:
+			flush()
+			currentShell = shellutil.VariantFromShellCmd(c.Shell)
+			currentShellCmd = append([]string(nil), c.Shell...)
+		case *instructions.RunCommand:
+			if !c.PrependShell {
+				continue
+			}
+			if currentShell.IsPowerShell() {
+				flush()
+				continue
+			}
+			if len(c.CmdLine) == 0 {
+				flush()
+				continue
+			}
+
+			invocation, ok := parsePowerShellWrapperClusterCandidate(c.CmdLine[0], currentShell)
+			if !ok {
+				if cluster.startIdx >= 0 && canKeepCmdRunUnderPowerShell(c.CmdLine[0], currentShell) {
+					continue
+				}
+				flush()
+				continue
+			}
+
+			if cluster.startIdx >= 0 && !samePowerShellWrapperShape(cluster.runs[0].invocation, invocation) {
+				flush()
+			}
+			if cluster.startIdx < 0 {
+				cluster.startIdx = cmdIdx
+				cluster.shellBefore = currentShell
+				cluster.shellBeforeCmd = append([]string(nil), currentShellCmd...)
+			}
+			cluster.runs = append(cluster.runs, powerShellRun{
+				run:        c,
+				invocation: invocation,
+			})
+		default:
+			// Non-RUN instructions do not participate in wrapper clustering.
+		}
+	}
+
+	flush()
 	return violations
 }
 
@@ -323,16 +341,19 @@ func clusterHasConsistentShell(cluster []powerShellRun) bool {
 
 	first := cluster[0].invocation
 	for _, item := range cluster[1:] {
-		cur := item.invocation
-		if !strings.EqualFold(cur.normalizedExec, first.normalizedExec) {
-			return false
-		}
-		if !slices.EqualFunc(cur.prefixArgs, first.prefixArgs, strings.EqualFold) {
+		if !samePowerShellWrapperShape(first, item.invocation) {
 			return false
 		}
 	}
 
 	return true
+}
+
+func samePowerShellWrapperShape(a, b explicitPowerShellInvocation) bool {
+	if !strings.EqualFold(a.normalizedExec, b.normalizedExec) {
+		return false
+	}
+	return slices.EqualFunc(a.prefixArgs, b.prefixArgs, strings.EqualFold)
 }
 
 func collectStageRunEditsForPowerShell(
@@ -412,7 +433,7 @@ func collectStageRunEditsForPowerShell(
 				continue
 			}
 
-			nextEdits, ok := collectImpactedRunEditsForPowerShell(file, sm, edits, cluster, cmd)
+			nextEdits, ok := collectImpactedRunEditsForPowerShell(file, sm, edits, cluster, escapeToken, cmd)
 			if !ok {
 				return nil, false
 			}
@@ -469,9 +490,10 @@ func collectImpactedRunEditsForPowerShell(
 	sm *sourcemap.SourceMap,
 	edits []rules.TextEdit,
 	cluster powerShellCluster,
+	escapeToken rune,
 	run *instructions.RunCommand,
 ) ([]rules.TextEdit, bool) {
-	edit, needed, ok := adaptImpactedRunForPowerShell(file, sm, cluster.shellBefore, run)
+	edit, needed, ok := adaptImpactedRunForPowerShell(file, sm, cluster.shellBefore, escapeToken, run)
 	if !ok {
 		return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, run.Location())
 	}
@@ -542,13 +564,29 @@ func adaptImpactedRunForPowerShell(
 	file string,
 	sm *sourcemap.SourceMap,
 	shellBefore shellutil.Variant,
+	escapeToken rune,
 	run *instructions.RunCommand,
 ) (rules.TextEdit, bool, bool) {
 	if len(run.CmdLine) == 0 {
 		return rules.TextEdit{}, false, false
 	}
-	if _, ok := parseExplicitPowerShellInvocation(run.CmdLine[0]); ok {
-		return rules.TextEdit{}, false, true
+	if invocation, ok := parseExplicitPowerShellInvocation(run.CmdLine[0]); ok {
+		newScript, ok := normalizePowerShellWrapperScriptForInsertedShell(
+			run.CmdLine[0],
+			invocation,
+			shellBefore,
+			escapeToken,
+			leadingIndentForLocation(sm, run.Location()),
+		)
+		if !ok || strings.TrimSpace(newScript) == "" {
+			return rules.TextEdit{}, false, false
+		}
+
+		edit, ok := buildRunBodyRewriteEdit(file, sm, run, newScript)
+		if !ok {
+			return rules.TextEdit{}, false, false
+		}
+		return edit, true, true
 	}
 	if shellBefore != shellutil.VariantCmd {
 		return rules.TextEdit{}, false, false
@@ -583,6 +621,10 @@ func rewriteCompatibleCmdScriptForPowerShell(script string) (string, bool, bool)
 	}
 
 	cmd := analysis.Commands[0]
+	if rewritten, ok := rewriteSetEnvironmentCommandForPowerShell(cmd); ok {
+		return rewritten, true, true
+	}
+
 	if unsafeCmdBuiltinsForPowerShell[cmd.Name] {
 		return "", false, false
 	}
@@ -615,7 +657,7 @@ func normalizePowerShellWrapperScriptForInsertedShell(
 	escapeToken rune,
 	lineIndent string,
 ) (string, bool) {
-	if invocation.usesCommandArg || shellBefore != shellutil.VariantCmd {
+	if shellBefore != shellutil.VariantCmd {
 		return invocation.script, true
 	}
 
@@ -643,6 +685,35 @@ func normalizePowerShellWrapperScriptForInsertedShell(
 	}
 
 	return formatPowerShellDockerfileStatements(statements, escapeToken, lineIndent), true
+}
+
+func parsePowerShellWrapperClusterCandidate(
+	script string,
+	shellBefore shellutil.Variant,
+) (explicitPowerShellInvocation, bool) {
+	if invocation, ok := parseExplicitPowerShellInvocation(script); ok {
+		return invocation, true
+	}
+	if shellBefore != shellutil.VariantCmd {
+		return explicitPowerShellInvocation{}, false
+	}
+
+	parts := shellutil.ExtractChainedCommands(script, shellutil.VariantCmd)
+	if len(parts) < 2 {
+		return explicitPowerShellInvocation{}, false
+	}
+
+	invocation, ok := parseExplicitPowerShellInvocation(parts[0])
+	if !ok {
+		return explicitPowerShellInvocation{}, false
+	}
+	for _, part := range parts[1:] {
+		if _, _, ok := rewriteCompatibleCmdScriptForPowerShell(part); !ok {
+			return explicitPowerShellInvocation{}, false
+		}
+	}
+
+	return invocation, true
 }
 
 func formatPowerShellDockerfileStatements(statements []string, escapeToken rune, lineIndent string) string {
@@ -714,6 +785,95 @@ func rewriteSetXPathCommandForPowerShell(cmd shellutil.CommandInfo) (string, boo
 	parts = append(parts, options...)
 	parts = append(parts, "path", `"`+translated+`"`)
 	return strings.Join(parts, " "), true
+}
+
+func rewriteSetEnvironmentCommandForPowerShell(cmd shellutil.CommandInfo) (string, bool) {
+	if cmd.Name != "set" || len(cmd.Args) != 1 {
+		return "", false
+	}
+
+	assignment := stripMatchingQuotes(cmd.Args[0])
+	name, value, ok := strings.Cut(assignment, "=")
+	if !ok || name == "" || !isSimplePowerShellEnvVarName(name) {
+		return "", false
+	}
+
+	translated, ok := translateCmdEnvironmentValueForPowerShell(value)
+	if !ok {
+		return "", false
+	}
+
+	return "$env:" + normalizePowerShellEnvVarName(name) + " = " + translated, true
+}
+
+func isSimplePowerShellEnvVarName(name string) bool {
+	if name == "" {
+		return false
+	}
+	for i, r := range name {
+		switch {
+		case r >= 'A' && r <= 'Z':
+		case r >= 'a' && r <= 'z':
+		case r == '_':
+		case i > 0 && r >= '0' && r <= '9':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func normalizePowerShellEnvVarName(name string) string {
+	if strings.EqualFold(name, "path") {
+		return "Path"
+	}
+	return name
+}
+
+func translateCmdEnvironmentValueForPowerShell(value string) (string, bool) {
+	if strings.Contains(value, "`") {
+		return "", false
+	}
+
+	var b strings.Builder
+	for i := 0; i < len(value); {
+		switch value[i] {
+		case '%', '!':
+			end := strings.IndexByte(value[i+1:], value[i])
+			if end < 0 {
+				return "", false
+			}
+			end += i + 1
+
+			name := value[i+1 : end]
+			if name == "" || strings.Contains(name, ":") || !isSimplePowerShellEnvVarName(name) {
+				return "", false
+			}
+			b.WriteString("$env:")
+			b.WriteString(normalizePowerShellEnvVarName(name))
+			i = end + 1
+		default:
+			switch value[i] {
+			case '"':
+				b.WriteString("`\"")
+			case '$':
+				b.WriteString("`$")
+			default:
+				b.WriteByte(value[i])
+			}
+			i++
+		}
+	}
+
+	return `"` + b.String() + `"`, true
+}
+
+func canKeepCmdRunUnderPowerShell(script string, shellBefore shellutil.Variant) bool {
+	if shellBefore != shellutil.VariantCmd {
+		return false
+	}
+	_, _, ok := rewriteCompatibleCmdScriptForPowerShell(script)
+	return ok
 }
 
 func canPassThroughCmdInvocation(script string) bool {

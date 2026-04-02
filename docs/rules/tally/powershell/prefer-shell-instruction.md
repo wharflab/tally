@@ -86,6 +86,13 @@ severity = "style"
 The fixer is intentionally conservative. It only rewrites repeated PowerShell wrappers when the repeated `RUN` instructions share the same executable
 and the same arguments before `-Command` (for example, repeated `pwsh -NoProfile -Command ...`).
 
+On Windows container stages, the fixer also collaborates with `tally/prefer-run-heredoc`:
+
+- it can qualify bare `RUN powershell ...` chains, not only explicit `-Command` wrappers
+- when a `cmd` stage is converted to a PowerShell `SHELL`, later PowerShell-safe `RUN` instructions can stay under that shell instead of forcing an
+  immediate restore to `cmd`
+- after that rewrite, `tally/prefer-run-heredoc` can merge the resulting PowerShell `RUN` sequence into a PowerShell heredoc in the same fix pass
+
 ## References
 
 - [PowerShell Docker image](https://mcr.microsoft.com/en-us/product/powershell/about)
