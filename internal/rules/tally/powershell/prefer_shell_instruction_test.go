@@ -593,7 +593,11 @@ func TestPreferShellInstructionRule_FixCmdChainAfterBarePowerShellHonorsEscapeDi
 	t.Parallel()
 
 	rule := NewPreferShellInstructionRule()
-	const content = "# escape=`\nFROM mcr.microsoft.com/windows/servercore:ltsc2022\nRUN powershell add-windowsfeature web-asp-net45 `\n    && choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10\nRUN powershell Write-Host done\n"
+	const content = "# escape=`\n" +
+		"FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+		"RUN powershell add-windowsfeature web-asp-net45 `\n" +
+		"    && choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10\n" +
+		"RUN powershell Write-Host done\n"
 
 	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	violations := rule.Check(input)
@@ -612,7 +616,12 @@ func TestPreferShellInstructionRule_FixCmdChainAfterBarePowerShellHonorsEscapeDi
 	}
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
-	want := "# escape=`\nFROM mcr.microsoft.com/windows/servercore:ltsc2022\nSHELL [\"powershell\",\"-Command\",\"$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';\"]\nRUN add-windowsfeature web-asp-net45; `\n    choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10\nRUN Write-Host done\n"
+	want := "# escape=`\n" +
+		"FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+		"SHELL [\"powershell\",\"-Command\",\"$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';\"]\n" +
+		"RUN add-windowsfeature web-asp-net45; `\n" +
+		"    choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10\n" +
+		"RUN Write-Host done\n"
 	if got != want {
 		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
 	}

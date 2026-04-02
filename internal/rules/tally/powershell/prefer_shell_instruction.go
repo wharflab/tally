@@ -107,6 +107,11 @@ type powerShellCluster struct {
 	runs           []powerShellRun
 }
 
+type runtimeShellDependantTarget struct {
+	cmdline instructions.ShellDependantCmdLine
+	loc     []parser.Range
+}
+
 // Check runs the rule.
 func (r *PreferShellInstructionRule) Check(input rules.LintInput) []rules.Violation {
 	if len(powershellStages(input)) == 0 {
@@ -349,36 +354,44 @@ func collectStageRunEditsForPowerShell(
 			return edits, true
 		case *instructions.CmdCommand:
 			if cmd.PrependShell {
-				edit, needed, ok := adaptRuntimeCommandForPowerShell(
+				nextEdits, stop, ok := collectRuntimeShellDependantEdits(
 					file,
 					sm,
-					cluster.shellBefore,
+					edits,
+					cluster,
 					escapeToken,
-					cmd.ShellDependantCmdLine,
-					cmd.Location(),
+					runtimeShellDependantTarget{
+						cmdline: cmd.ShellDependantCmdLine,
+						loc:     cmd.Location(),
+					},
 				)
 				if !ok {
-					return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, cmd.Location())
+					return nil, false
 				}
-				if needed {
-					edits = append(edits, edit)
+				edits = nextEdits
+				if stop {
+					return edits, true
 				}
 			}
 		case *instructions.EntrypointCommand:
 			if cmd.PrependShell {
-				edit, needed, ok := adaptRuntimeCommandForPowerShell(
+				nextEdits, stop, ok := collectRuntimeShellDependantEdits(
 					file,
 					sm,
-					cluster.shellBefore,
+					edits,
+					cluster,
 					escapeToken,
-					cmd.ShellDependantCmdLine,
-					cmd.Location(),
+					runtimeShellDependantTarget{
+						cmdline: cmd.ShellDependantCmdLine,
+						loc:     cmd.Location(),
+					},
 				)
 				if !ok {
-					return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, cmd.Location())
+					return nil, false
 				}
-				if needed {
-					edits = append(edits, edit)
+				edits = nextEdits
+				if stop {
+					return edits, true
 				}
 			}
 		case *instructions.HealthCheckCommand:
@@ -391,25 +404,81 @@ func collectStageRunEditsForPowerShell(
 			}
 
 			if item, ok := clusterRuns[cmd]; ok {
-				edit, ok := buildPowerShellWrapperRewriteEdit(file, sm, item, cluster.shellBefore, escapeToken)
+				nextEdits, ok := appendClusterRunRewriteEdit(file, sm, edits, item, cluster.shellBefore, escapeToken)
 				if !ok {
 					return nil, false
 				}
-				edits = append(edits, edit)
+				edits = nextEdits
 				continue
 			}
 
-			edit, needed, ok := adaptImpactedRunForPowerShell(file, sm, cluster.shellBefore, cmd)
+			nextEdits, ok := collectImpactedRunEditsForPowerShell(file, sm, edits, cluster, cmd)
 			if !ok {
-				return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, cmd.Location())
+				return nil, false
 			}
-			if needed {
-				edits = append(edits, edit)
-			}
+			edits = nextEdits
 		}
 	}
 
 	return edits, true
+}
+
+func collectRuntimeShellDependantEdits(
+	file string,
+	sm *sourcemap.SourceMap,
+	edits []rules.TextEdit,
+	cluster powerShellCluster,
+	escapeToken rune,
+	target runtimeShellDependantTarget,
+) ([]rules.TextEdit, bool, bool) {
+	edit, needed, ok := adaptRuntimeCommandForPowerShell(
+		file,
+		sm,
+		cluster.shellBefore,
+		escapeToken,
+		target.cmdline,
+		target.loc,
+	)
+	if !ok {
+		nextEdits, ok := appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, target.loc)
+		return nextEdits, true, ok
+	}
+	if !needed {
+		return edits, false, true
+	}
+	return append(edits, edit), false, true
+}
+
+func appendClusterRunRewriteEdit(
+	file string,
+	sm *sourcemap.SourceMap,
+	edits []rules.TextEdit,
+	item powerShellRun,
+	shellBefore shellutil.Variant,
+	escapeToken rune,
+) ([]rules.TextEdit, bool) {
+	edit, ok := buildPowerShellWrapperRewriteEdit(file, sm, item, shellBefore, escapeToken)
+	if !ok {
+		return nil, false
+	}
+	return append(edits, edit), true
+}
+
+func collectImpactedRunEditsForPowerShell(
+	file string,
+	sm *sourcemap.SourceMap,
+	edits []rules.TextEdit,
+	cluster powerShellCluster,
+	run *instructions.RunCommand,
+) ([]rules.TextEdit, bool) {
+	edit, needed, ok := adaptImpactedRunForPowerShell(file, sm, cluster.shellBefore, run)
+	if !ok {
+		return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, run.Location())
+	}
+	if !needed {
+		return edits, true
+	}
+	return append(edits, edit), true
 }
 
 func appendRestoreShellEdit(
@@ -799,16 +868,11 @@ func resolveRunInstructionScriptRange(
 
 	scriptIndex := -1
 	for i := range len(source) {
-		switch source[i] {
-		case ' ', '\t', '\r', '\n':
+		if source[i] == ' ' || source[i] == '\t' || source[i] == '\r' || source[i] == '\n' {
 			continue
-		default:
-			scriptIndex = i
-			break
 		}
-		if scriptIndex >= 0 {
-			break
-		}
+		scriptIndex = i
+		break
 	}
 	if scriptIndex < 0 {
 		return "", 0, 0, false
