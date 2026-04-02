@@ -13,7 +13,13 @@ ADD https://aka.ms/vs/16/release/vs_buildtools.exe vs_buildtools.exe
 SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 # Install chocolatey
-RUN Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iwr https://chocolatey.org/install.ps1 -UseBasicParsing | iex
+RUN <<EOF
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+Set-ExecutionPolicy Bypass -Scope Process -Force
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+iwr https://chocolatey.org/install.ps1 -UseBasicParsing | iex
+EOF
 RUN choco feature enable -n allowGlobalConfirmation
 
 # install some tools

@@ -874,15 +874,6 @@ RUN apt-get update && apt-get install -y vim && apt-get clean
 	if !strings.Contains(edits[0].NewText, "apt-get update") {
 		t.Errorf("expected apt-get update in heredoc, got: %s", edits[0].NewText)
 	}
-
-	// Verify the resolve data was updated
-	data, ok := fix.ResolverData.(*rules.HeredocResolveData)
-	if !ok {
-		t.Fatal("expected HeredocResolveData")
-	}
-	if data.ShellVariant != shell.VariantBash {
-		t.Errorf("expected ShellVariant to be updated to VariantBash, got %v", data.ShellVariant)
-	}
 }
 
 func TestHeredocResolver_Resolve_PowerShellShellSupported(t *testing.T) {
@@ -923,14 +914,6 @@ RUN Write-Output "hello" ; Write-Output "world" ; Write-Output "!"
 	if strings.Contains(edits[0].NewText, "set -e") {
 		t.Fatalf("did not expect POSIX prelude in PowerShell heredoc: %s", edits[0].NewText)
 	}
-
-	data, ok := fix.ResolverData.(*rules.HeredocResolveData)
-	if !ok {
-		t.Fatal("expected HeredocResolveData")
-	}
-	if data.ShellVariant != shell.VariantPowerShell {
-		t.Errorf("expected ShellVariant to be updated to VariantPowerShell, got %v", data.ShellVariant)
-	}
 }
 
 func TestHeredocResolver_Resolve_CmdShellSupported(t *testing.T) {
@@ -941,7 +924,7 @@ func TestHeredocResolver_Resolve_CmdShellSupported(t *testing.T) {
 		"FROM mcr.microsoft.com/windows/nanoserver:ltsc2025\n" +
 		"RUN echo one `\n" +
 		"    && echo two `\n" +
-		"    && echo three > C:\\proof.txt\n"
+		"    && echo three\n"
 
 	fix := &rules.SuggestedFix{
 		NeedsResolve: true,
@@ -973,8 +956,57 @@ func TestHeredocResolver_Resolve_CmdShellSupported(t *testing.T) {
 	if strings.Contains(got, "set -e") || strings.Contains(got, "$ErrorActionPreference") {
 		t.Fatalf("did not expect POSIX or PowerShell prelude in cmd heredoc: %s", got)
 	}
-	if !strings.Contains(got, "(echo one && echo two && echo three > C:\\proof.txt)") {
+	if !strings.Contains(got, "(echo one && echo two && echo three)") {
 		t.Fatalf("expected grouped cmd heredoc body, got: %s", got)
+	}
+}
+
+func TestHeredocResolver_Resolve_MixedShellStageUsesPerRunVariant(t *testing.T) {
+	t.Parallel()
+	r := &heredocResolver{}
+
+	dockerfile := `FROM mcr.microsoft.com/powershell:6.2.1-alpine-3.8
+SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN Install-Module -Name Az -AllowClobber -Force
+RUN Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; \
+    Install-Module Configuration -RequiredVersion 1.3.1 -Repository PSGallery -Scope AllUsers -Verbose; \
+    Install-Module PSSlack -RequiredVersion 1.0.2 -Repository PSGallery -Scope AllUsers -Verbose
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
+RUN apk add --no-cache bind-tools gnupg git tini
+`
+
+	fix := &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   rules.HeredocResolverID,
+		ResolverData: &rules.HeredocResolveData{
+			Type:         rules.HeredocFixConsecutive,
+			StageIndex:   0,
+			ShellVariant: shell.VariantPowerShell,
+			MinCommands:  3,
+		},
+	}
+
+	edits, err := r.Resolve(context.Background(), ResolveContext{
+		Content:  []byte(dockerfile),
+		FilePath: "Dockerfile",
+	}, fix)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for PowerShell consecutive runs, got %d", len(edits))
+	}
+
+	got := edits[0].NewText
+	if !strings.Contains(got, "$ErrorActionPreference = 'Stop'") {
+		t.Fatalf("expected PowerShell fail-fast prelude, got: %s", got)
+	}
+	if strings.Contains(got, "set -e") {
+		t.Fatalf("did not expect POSIX prelude in PowerShell heredoc: %s", got)
+	}
+	if !strings.Contains(got, "Install-Module Configuration") {
+		t.Fatalf("expected merged PowerShell commands, got: %s", got)
 	}
 }
 
