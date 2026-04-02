@@ -14,6 +14,8 @@ import (
 var powerShellLanguage = newPowerShellLanguage()
 
 const powerShellPipelineKind = "pipeline"
+const powerShellScriptBlockBodyKind = "script_block_body"
+const powerShellStatementListKind = "statement_list"
 
 func newPowerShellLanguage() *sitter.Language {
 	ptr := tspowershell.Language()
@@ -293,7 +295,7 @@ func singleTopLevelPowerShellPipeline(root *sitter.Node) *sitter.Node {
 	switch stmtList.Kind() {
 	case powerShellPipelineKind:
 		return stmtList
-	case "statement_list", "script_block_body":
+	case powerShellStatementListKind, powerShellScriptBlockBodyKind:
 		if stmtList.NamedChildCount() != 1 {
 			return nil
 		}
@@ -387,7 +389,7 @@ func isTopLevelPowerShellStatement(parentKind, kind string) bool {
 	}
 
 	switch kind {
-	case "statement_list", "script_block_body", "empty_statement", "comment":
+	case powerShellStatementListKind, powerShellScriptBlockBodyKind, "empty_statement", "comment":
 		return false
 	default:
 		return true
@@ -404,7 +406,7 @@ func hasPowerShellPipelineOperator(node *sitter.Node) bool {
 
 func isTopLevelPowerShellPipelineParent(kind string) bool {
 	switch kind {
-	case "program", "statement_list", "script_block_body":
+	case "program", powerShellStatementListKind, powerShellScriptBlockBodyKind:
 		return true
 	default:
 		return false
