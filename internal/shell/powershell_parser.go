@@ -193,6 +193,12 @@ func canParsePowerShell(script string) bool {
 	return !tree.RootNode().HasError()
 }
 
+// CanParsePowerShellScript reports whether the PowerShell tree-sitter grammar
+// can parse the script without errors.
+func CanParsePowerShellScript(script string) bool {
+	return canParsePowerShell(script)
+}
+
 // PowerShellAssignment returns the variable name and right-hand value for a
 // simple top-level PowerShell assignment expression like
 // "$ErrorActionPreference = 'Stop'".

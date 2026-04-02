@@ -621,7 +621,9 @@ func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocat
 	}
 
 	var prefixArgs []string
+	firstTokenAfterExe := true
 	for {
+		tokenStart := shellutil.SkipShellTokenSpaces(script, next)
 		token, end := shellutil.NextShellToken(script, next)
 		if token == "" {
 			return explicitPowerShellInvocation{}, false
@@ -641,8 +643,21 @@ func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocat
 			}, true
 		}
 
+		if firstTokenAfterExe && !strings.HasPrefix(tokenNorm, "-") {
+			parsedScript := normalizeCommandScript(script[tokenStart:])
+			if shellutil.CanParsePowerShellScript(parsedScript) {
+				return explicitPowerShellInvocation{
+					executable:     exe,
+					normalizedExec: exeNorm,
+					script:         parsedScript,
+				}, true
+			}
+			return explicitPowerShellInvocation{}, false
+		}
+
 		prefixArgs = append(prefixArgs, shellutil.DropQuotes(token))
 		next = end
+		firstTokenAfterExe = false
 	}
 }
 

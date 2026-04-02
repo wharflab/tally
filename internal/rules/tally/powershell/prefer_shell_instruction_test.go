@@ -38,6 +38,14 @@ RUN @powershell -Command Start-Process notepad.exe
 			WantViolations: 1,
 		},
 		{
+			Name: "windows bare powershell commands qualify",
+			Content: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN powershell Add-Content C:\temp\proof.txt one
+RUN powershell Add-Content C:\temp\proof.txt two
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "single wrapper does not trigger",
 			Content: `FROM alpine
 RUN pwsh -Command Write-Host hi
@@ -308,5 +316,41 @@ RUN cmd /c 'echo one && echo two'
 	}
 	if violations[0].SuggestedFix == nil {
 		t.Fatal("expected suggested fix")
+	}
+}
+
+func TestPreferShellInstructionRule_FixBarePowerShellCommands(t *testing.T) {
+	t.Parallel()
+
+	rule := NewPreferShellInstructionRule()
+	const content = `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN powershell Write-Host hi
+RUN powershell Write-Host bye
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	sources := map[string][]byte{"Dockerfile": []byte(content)}
+	fixer := &fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN Write-Host hi
+RUN Write-Host bye
+`
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
 	}
 }
