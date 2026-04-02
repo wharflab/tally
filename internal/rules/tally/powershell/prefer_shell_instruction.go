@@ -866,14 +866,9 @@ func resolveRunInstructionScriptRange(
 		return "", 0, 0, false
 	}
 
-	scriptIndex := -1
-	for i := range len(source) {
-		if source[i] == ' ' || source[i] == '\t' || source[i] == '\r' || source[i] == '\n' {
-			continue
-		}
-		scriptIndex = i
-		break
-	}
+	scriptIndex := strings.IndexFunc(source, func(r rune) bool {
+		return r != ' ' && r != '\t' && r != '\r' && r != '\n'
+	})
 	if scriptIndex < 0 {
 		return "", 0, 0, false
 	}
