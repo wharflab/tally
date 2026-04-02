@@ -460,6 +460,10 @@ func rewriteCompatibleCmdScriptForPowerShell(script string) (string, bool, bool)
 		return rewritten, true, true
 	}
 
+	if !analysis.HasVariableReferences {
+		return "", false, true
+	}
+
 	for _, arg := range cmd.Args {
 		if !isPowerShellSafeCmdArg(arg) {
 			return "", false, false

@@ -27,11 +27,8 @@ remove-item C:\inetpub\wwwroot\iisstart.*
 Invoke-WebRequest https://dist.nuget.org/win-x86-commandline/latest/nuget.exe -OutFile c:/build/.nuget/nuget.exe
 nuget restore
 C:\Windows\Microsoft.NET\Framework64\v4.0.30319\MSBuild.exe /p:Platform="Any CPU" /p:VisualStudioVersion=12.0 /p:VSToolsPath=c:\MSBuild.Microsoft.VisualStudio.Web.targets.14.0.0.3\tools\VSToolsPath TicketDesk2.sln
+xcopy c:\build\TicketDesk.Web.Client\* c:\inetpub\wwwroot /s
 EOF
-
-SHELL ["cmd","/S","/C"]
-
-RUN xcopy c:\build\TicketDesk.Web.Client\* c:\inetpub\wwwroot /s
 
 # Start application
 ENTRYPOINT ["powershell.exe", "./Startup.ps1"]
