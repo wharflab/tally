@@ -319,6 +319,46 @@ RUN cmd /c 'echo one && echo two'
 	}
 }
 
+func TestPreferShellInstructionRule_FixAllowsCompatibleCmdBuiltins(t *testing.T) {
+	t.Parallel()
+
+	rule := NewPreferShellInstructionRule()
+	const content = `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN powershell -c "Write-Host hi"
+RUN powershell -c "Write-Host bye"
+RUN md c:\build
+RUN cd c:\build
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	sources := map[string][]byte{"Dockerfile": []byte(content)}
+	fixer := &fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN Write-Host hi
+RUN Write-Host bye
+RUN md c:\build
+RUN cd c:\build
+`
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestPreferShellInstructionRule_FixBarePowerShellCommands(t *testing.T) {
 	t.Parallel()
 
