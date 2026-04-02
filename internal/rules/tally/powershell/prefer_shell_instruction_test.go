@@ -394,3 +394,72 @@ RUN Write-Host bye
 		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
 	}
 }
+
+func TestPreferShellInstructionRule_FixCmdChainAfterBarePowerShell(t *testing.T) {
+	t.Parallel()
+
+	rule := NewPreferShellInstructionRule()
+	const content = `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN powershell add-windowsfeature web-asp-net45 \
+    && choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10 \
+    && choco install dotnet4.6-targetpack --allow-empty-checksums -y
+RUN powershell Write-Host done
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	sources := map[string][]byte{"Dockerfile": []byte(content)}
+	fixer := &fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN add-windowsfeature web-asp-net45; \
+    choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10; \
+    choco install dotnet4.6-targetpack --allow-empty-checksums -y
+RUN Write-Host done
+`
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferShellInstructionRule_FixCmdChainAfterBarePowerShellHonorsEscapeDirective(t *testing.T) {
+	t.Parallel()
+
+	rule := NewPreferShellInstructionRule()
+	const content = "# escape=`\nFROM mcr.microsoft.com/windows/servercore:ltsc2022\nRUN powershell add-windowsfeature web-asp-net45 `\n    && choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10\nRUN powershell Write-Host done\n"
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	sources := map[string][]byte{"Dockerfile": []byte(content)}
+	fixer := &fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := "# escape=`\nFROM mcr.microsoft.com/windows/servercore:ltsc2022\nSHELL [\"powershell\",\"-Command\",\"$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';\"]\nRUN add-windowsfeature web-asp-net45; `\n    choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10\nRUN Write-Host done\n"
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+}

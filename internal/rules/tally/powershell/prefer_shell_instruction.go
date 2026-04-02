@@ -91,6 +91,7 @@ type explicitPowerShellInvocation struct {
 	normalizedExec string
 	prefixArgs     []string
 	script         string
+	usesCommandArg bool
 }
 
 type powerShellRun struct {
@@ -118,6 +119,10 @@ func (r *PreferShellInstructionRule) Check(input rules.LintInput) []rules.Violat
 	var violations []rules.Violation
 	for stageIdx, stage := range input.Stages {
 		currentShell := initialStageShellVariant(sem, stageIdx)
+		escapeToken := rune(0)
+		if input.AST != nil {
+			escapeToken = input.AST.EscapeToken
+		}
 		cluster := powerShellCluster{
 			startIdx: -1,
 			runs:     make([]powerShellRun, 0, 4),
@@ -129,7 +134,7 @@ func (r *PreferShellInstructionRule) Check(input rules.LintInput) []rules.Violat
 				cluster.runs = cluster.runs[:0]
 				return
 			}
-			if v := buildPreferShellViolation(meta, input.File, sm, stageIdx, stage.Commands, cluster); v != nil {
+			if v := buildPreferShellViolation(meta, input.File, sm, stageIdx, stage.Commands, cluster, escapeToken); v != nil {
 				violations = append(violations, *v)
 			}
 			cluster.startIdx = -1
@@ -199,6 +204,7 @@ func buildPreferShellViolation(
 	stageIdx int,
 	stageCommands []instructions.Command,
 	cluster powerShellCluster,
+	escapeToken rune,
 ) *rules.Violation {
 	first := cluster.runs[0]
 	loc := rules.NewLocationFromRanges(file, first.run.Location())
@@ -213,7 +219,7 @@ func buildPreferShellViolation(
 	v := rules.NewViolation(loc, meta.Code, message, meta.DefaultSeverity).WithDocURL(meta.DocURL).WithDetail(detail)
 	v.StageIndex = stageIdx
 
-	if fix := buildSuggestedFix(file, sm, stageCommands, cluster); fix != nil {
+	if fix := buildSuggestedFix(file, sm, stageCommands, cluster, escapeToken); fix != nil {
 		v.SuggestedFix = fix
 	}
 
@@ -232,6 +238,7 @@ func buildSuggestedFix(
 	sm *sourcemap.SourceMap,
 	stageCommands []instructions.Command,
 	cluster powerShellCluster,
+	escapeToken rune,
 ) *rules.SuggestedFix {
 	if !clusterHasConsistentShell(cluster.runs) {
 		return nil
@@ -261,7 +268,7 @@ func buildSuggestedFix(
 		indent = leadingIndent(sm.Line(startLine - 1))
 	}
 
-	runEdits, ok := collectStageRunEditsForPowerShell(file, sm, stageCommands, cluster)
+	runEdits, ok := collectStageRunEditsForPowerShell(file, sm, stageCommands, cluster, escapeToken)
 	if !ok {
 		return nil
 	}
@@ -306,6 +313,7 @@ func collectStageRunEditsForPowerShell(
 	sm *sourcemap.SourceMap,
 	stageCommands []instructions.Command,
 	cluster powerShellCluster,
+	escapeToken rune,
 ) ([]rules.TextEdit, bool) {
 	clusterRuns := make(map[*instructions.RunCommand]powerShellRun, len(cluster.runs))
 	for _, item := range cluster.runs {
@@ -335,7 +343,7 @@ func collectStageRunEditsForPowerShell(
 			}
 
 			if item, ok := clusterRuns[cmd]; ok {
-				edit, ok := buildPowerShellWrapperRewriteEdit(file, sm, item)
+				edit, ok := buildPowerShellWrapperRewriteEdit(file, sm, item, cluster.shellBefore, escapeToken)
 				if !ok {
 					return nil, false
 				}
@@ -427,6 +435,74 @@ func rewriteCompatibleCmdScriptForPowerShell(script string) (string, bool, bool)
 	}
 
 	return "", false, true
+}
+
+func normalizePowerShellWrapperScriptForInsertedShell(
+	script string,
+	invocation explicitPowerShellInvocation,
+	shellBefore shellutil.Variant,
+	escapeToken rune,
+) (string, bool) {
+	if invocation.usesCommandArg || shellBefore != shellutil.VariantCmd {
+		return invocation.script, true
+	}
+
+	parts := shellutil.ExtractChainedCommands(script, shellutil.VariantCmd)
+	if len(parts) == 0 {
+		return "", false
+	}
+
+	firstInvocation, ok := parseExplicitPowerShellInvocation(parts[0])
+	if !ok {
+		return "", false
+	}
+
+	statements := []string{strings.TrimSpace(firstInvocation.script)}
+	for _, part := range parts[1:] {
+		rewritten, changed, ok := rewriteCompatibleCmdScriptForPowerShell(part)
+		if !ok {
+			return "", false
+		}
+		if changed {
+			statements = append(statements, strings.TrimSpace(rewritten))
+			continue
+		}
+		statements = append(statements, strings.TrimSpace(part))
+	}
+
+	return formatPowerShellDockerfileStatements(statements, escapeToken), true
+}
+
+func formatPowerShellDockerfileStatements(statements []string, escapeToken rune) string {
+	filtered := make([]string, 0, len(statements))
+	for _, stmt := range statements {
+		trimmed := strings.TrimSpace(stmt)
+		if trimmed != "" {
+			filtered = append(filtered, trimmed)
+		}
+	}
+	if len(filtered) == 0 {
+		return ""
+	}
+	if len(filtered) == 1 {
+		return filtered[0]
+	}
+	if escapeToken == 0 {
+		escapeToken = '\\'
+	}
+
+	var b strings.Builder
+	for i, stmt := range filtered {
+		b.WriteString(stmt)
+		if i == len(filtered)-1 {
+			continue
+		}
+		b.WriteString("; ")
+		b.WriteRune(escapeToken)
+		b.WriteString("\n    ")
+	}
+
+	return b.String()
 }
 
 func rewriteSetXPathCommandForPowerShell(cmd shellutil.CommandInfo) (string, bool) {
@@ -538,8 +614,19 @@ func buildPowerShellWrapperRewriteEdit(
 	file string,
 	sm *sourcemap.SourceMap,
 	item powerShellRun,
+	shellBefore shellutil.Variant,
+	escapeToken rune,
 ) (rules.TextEdit, bool) {
-	return buildRunBodyRewriteEdit(file, sm, item.run, item.invocation.script)
+	newScript, ok := normalizePowerShellWrapperScriptForInsertedShell(
+		item.run.CmdLine[0],
+		item.invocation,
+		shellBefore,
+		escapeToken,
+	)
+	if !ok || strings.TrimSpace(newScript) == "" {
+		return rules.TextEdit{}, false
+	}
+	return buildRunBodyRewriteEdit(file, sm, item.run, newScript)
 }
 
 func buildRunBodyRewriteEdit(
@@ -549,21 +636,64 @@ func buildRunBodyRewriteEdit(
 	newScript string,
 ) (rules.TextEdit, bool) {
 	resolved, ok := dockerfile.ResolveRunSource(run, sm)
+	if ok {
+		edit := sourceRangeEdit(
+			file,
+			resolved.Source,
+			resolved.StartLine,
+			resolved.ScriptIndex,
+			resolved.ScriptIndex+len(resolved.Script),
+			newScript,
+		)
+		if edit == nil {
+			return rules.TextEdit{}, false
+		}
+		return *edit, true
+	}
+
+	source, startLine, scriptIndex, ok := resolveRunInstructionScriptRange(run, sm)
 	if !ok {
 		return rules.TextEdit{}, false
 	}
-	edit := sourceRangeEdit(
-		file,
-		resolved.Source,
-		resolved.StartLine,
-		resolved.ScriptIndex,
-		resolved.ScriptIndex+len(resolved.Script),
-		newScript,
-	)
+
+	edit := sourceRangeEdit(file, source, startLine, scriptIndex, len(source), newScript)
 	if edit == nil {
 		return rules.TextEdit{}, false
 	}
 	return *edit, true
+}
+
+func resolveRunInstructionScriptRange(
+	run *instructions.RunCommand,
+	sm *sourcemap.SourceMap,
+) (string, int, int, bool) {
+	if run == nil || sm == nil {
+		return "", 0, 0, false
+	}
+
+	source, startLine := dockerfile.RunSourceScript(run, sm)
+	if source == "" || startLine == 0 {
+		return "", 0, 0, false
+	}
+
+	scriptIndex := -1
+	for i := range len(source) {
+		switch source[i] {
+		case ' ', '\t', '\r', '\n':
+			continue
+		default:
+			scriptIndex = i
+			break
+		}
+		if scriptIndex >= 0 {
+			break
+		}
+	}
+	if scriptIndex < 0 {
+		return "", 0, 0, false
+	}
+
+	return source, startLine, scriptIndex, true
 }
 
 func sourceRangeEdit(file, source string, startLine, byteStart, byteEnd int, newText string) *rules.TextEdit {
@@ -634,6 +764,7 @@ func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocat
 				normalizedExec: exeNorm,
 				prefixArgs:     prefixArgs,
 				script:         normalizeCommandScript(script[scriptStart:]),
+				usesCommandArg: true,
 			}, true
 		}
 
