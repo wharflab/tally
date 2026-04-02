@@ -8,6 +8,7 @@ import (
 
 	fixpkg "github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/rules"
+	tallyrules "github.com/wharflab/tally/internal/rules/tally"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -622,6 +623,54 @@ func TestPreferShellInstructionRule_FixCmdChainAfterBarePowerShellHonorsEscapeDi
 		"RUN add-windowsfeature web-asp-net45; `\n" +
 		"    choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10\n" +
 		"RUN Write-Host done\n"
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferShellInstructionRule_FixCollaboratesWithConsistentIndentation(t *testing.T) {
+	t.Parallel()
+
+	powerShellRule := NewPreferShellInstructionRule()
+	indentRule := tallyrules.NewConsistentIndentationRule()
+	const content = `FROM alpine AS base
+	RUN echo base
+
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+	SHELL ["cmd","/S","/C"]
+	RUN powershell add-windowsfeature web-asp-net45 \
+	    && choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10
+	RUN powershell Write-Host done
+COPY . C:/app
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	var violations []rules.Violation
+	violations = append(violations, powerShellRule.Check(input)...)
+	violations = append(violations, indentRule.Check(input)...)
+	if len(violations) != 2 {
+		t.Fatalf("got %d violations, want 2", len(violations))
+	}
+
+	sources := map[string][]byte{"Dockerfile": []byte(content)}
+	fixer := &fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := `FROM alpine AS base
+	RUN echo base
+
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+	SHELL ["cmd","/S","/C"]
+	SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+	RUN add-windowsfeature web-asp-net45; \
+	    choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10
+	RUN Write-Host done
+	COPY . C:/app
+`
 	if got != want {
 		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
 	}

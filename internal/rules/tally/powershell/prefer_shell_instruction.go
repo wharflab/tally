@@ -517,6 +517,7 @@ func adaptRuntimeCommandForPowerShell(
 		invocation,
 		shellBefore,
 		escapeToken,
+		leadingIndentForLocation(sm, loc),
 	)
 	if !ok || strings.TrimSpace(newScript) == "" {
 		return rules.TextEdit{}, false, false
@@ -612,6 +613,7 @@ func normalizePowerShellWrapperScriptForInsertedShell(
 	invocation explicitPowerShellInvocation,
 	shellBefore shellutil.Variant,
 	escapeToken rune,
+	lineIndent string,
 ) (string, bool) {
 	if invocation.usesCommandArg || shellBefore != shellutil.VariantCmd {
 		return invocation.script, true
@@ -640,10 +642,10 @@ func normalizePowerShellWrapperScriptForInsertedShell(
 		statements = append(statements, strings.TrimSpace(part))
 	}
 
-	return formatPowerShellDockerfileStatements(statements, escapeToken), true
+	return formatPowerShellDockerfileStatements(statements, escapeToken, lineIndent), true
 }
 
-func formatPowerShellDockerfileStatements(statements []string, escapeToken rune) string {
+func formatPowerShellDockerfileStatements(statements []string, escapeToken rune, lineIndent string) string {
 	filtered := make([]string, 0, len(statements))
 	for _, stmt := range statements {
 		trimmed := strings.TrimSpace(stmt)
@@ -669,7 +671,9 @@ func formatPowerShellDockerfileStatements(statements []string, escapeToken rune)
 		}
 		b.WriteString("; ")
 		b.WriteRune(escapeToken)
-		b.WriteString("\n    ")
+		b.WriteString("\n")
+		b.WriteString(lineIndent)
+		b.WriteString("    ")
 	}
 
 	return b.String()
@@ -792,6 +796,7 @@ func buildPowerShellWrapperRewriteEdit(
 		item.invocation,
 		shellBefore,
 		escapeToken,
+		leadingIndentForLocation(sm, item.run.Location()),
 	)
 	if !ok || strings.TrimSpace(newScript) == "" {
 		return rules.TextEdit{}, false
@@ -1040,6 +1045,19 @@ func leadingIndent(line string) string {
 		i++
 	}
 	return line[:i]
+}
+
+func leadingIndentForLocation(sm *sourcemap.SourceMap, loc []parser.Range) string {
+	if sm == nil || len(loc) == 0 || loc[0].Start.Line <= 0 {
+		return ""
+	}
+
+	lineNum := loc[0].Start.Line - 1
+	if lineNum < 0 || lineNum >= sm.LineCount() {
+		return ""
+	}
+
+	return leadingIndent(sm.Line(lineNum))
 }
 
 // init registers the rule with the default registry.
