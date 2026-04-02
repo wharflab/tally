@@ -9,6 +9,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
@@ -100,9 +101,10 @@ type powerShellRun struct {
 }
 
 type powerShellCluster struct {
-	startIdx    int
-	shellBefore shellutil.Variant
-	runs        []powerShellRun
+	startIdx       int
+	shellBeforeCmd []string
+	shellBefore    shellutil.Variant
+	runs           []powerShellRun
 }
 
 // Check runs the rule.
@@ -119,6 +121,7 @@ func (r *PreferShellInstructionRule) Check(input rules.LintInput) []rules.Violat
 	var violations []rules.Violation
 	for stageIdx, stage := range input.Stages {
 		currentShell := initialStageShellVariant(sem, stageIdx)
+		currentShellCmd := initialStageShellCmd(sem, stageIdx)
 		escapeToken := rune(0)
 		if input.AST != nil {
 			escapeToken = input.AST.EscapeToken
@@ -146,6 +149,7 @@ func (r *PreferShellInstructionRule) Check(input rules.LintInput) []rules.Violat
 			case *instructions.ShellCommand:
 				flush()
 				currentShell = shellutil.VariantFromShellCmd(c.Shell)
+				currentShellCmd = append([]string(nil), c.Shell...)
 			case *instructions.RunCommand:
 				if !c.PrependShell {
 					continue
@@ -167,6 +171,7 @@ func (r *PreferShellInstructionRule) Check(input rules.LintInput) []rules.Violat
 				if cluster.startIdx < 0 {
 					cluster.startIdx = cmdIdx
 					cluster.shellBefore = currentShell
+					cluster.shellBeforeCmd = append([]string(nil), currentShellCmd...)
 				}
 				cluster.runs = append(cluster.runs, powerShellRun{
 					run:        c,
@@ -195,6 +200,23 @@ func initialStageShellVariant(sem *semantic.Model, stageIdx int) shellutil.Varia
 		return shellutil.VariantCmd
 	}
 	return shellutil.VariantFromShellCmd(semantic.DefaultShell)
+}
+
+func initialStageShellCmd(sem *semantic.Model, stageIdx int) []string {
+	if sem == nil {
+		return append([]string(nil), semantic.DefaultShell...)
+	}
+	info := sem.StageInfo(stageIdx)
+	if info == nil {
+		return append([]string(nil), semantic.DefaultShell...)
+	}
+	if len(info.ShellSetting.Shell) > 0 {
+		return append([]string(nil), info.ShellSetting.Shell...)
+	}
+	if info.IsWindows() {
+		return semantic.DefaultWindowsShell()
+	}
+	return append([]string(nil), semantic.DefaultShell...)
 }
 
 func buildPreferShellViolation(
@@ -327,15 +349,15 @@ func collectStageRunEditsForPowerShell(
 			return edits, true
 		case *instructions.CmdCommand:
 			if cmd.PrependShell {
-				return nil, false
+				return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, cmd.Location())
 			}
 		case *instructions.EntrypointCommand:
 			if cmd.PrependShell {
-				return nil, false
+				return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, cmd.Location())
 			}
 		case *instructions.HealthCheckCommand:
 			if healthcheckUsesShell(cmd) {
-				return nil, false
+				return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, cmd.Location())
 			}
 		case *instructions.RunCommand:
 			if !cmd.PrependShell {
@@ -353,7 +375,7 @@ func collectStageRunEditsForPowerShell(
 
 			edit, needed, ok := adaptImpactedRunForPowerShell(file, sm, cluster.shellBefore, cmd)
 			if !ok {
-				return nil, false
+				return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, cmd.Location())
 			}
 			if needed {
 				edits = append(edits, edit)
@@ -362,6 +384,20 @@ func collectStageRunEditsForPowerShell(
 	}
 
 	return edits, true
+}
+
+func appendRestoreShellEdit(
+	file string,
+	sm *sourcemap.SourceMap,
+	edits []rules.TextEdit,
+	shellCmd []string,
+	loc []parser.Range,
+) ([]rules.TextEdit, bool) {
+	edit, ok := buildShellInsertionEdit(file, sm, shellCmd, loc)
+	if !ok {
+		return nil, false
+	}
+	return append(edits, edit), true
 }
 
 func healthcheckUsesShell(cmd *instructions.HealthCheckCommand) bool {
@@ -694,6 +730,34 @@ func resolveRunInstructionScriptRange(
 	}
 
 	return source, startLine, scriptIndex, true
+}
+
+func buildShellInsertionEdit(
+	file string,
+	sm *sourcemap.SourceMap,
+	shellCmd []string,
+	loc []parser.Range,
+) (rules.TextEdit, bool) {
+	if len(shellCmd) == 0 || len(loc) == 0 {
+		return rules.TextEdit{}, false
+	}
+
+	shellJSON, err := jsonv2.Marshal(shellCmd)
+	if err != nil {
+		return rules.TextEdit{}, false
+	}
+
+	startLine := loc[0].Start.Line
+	indent := ""
+	if sm != nil && startLine > 0 {
+		startLine = sm.EffectiveStartLine(startLine, nil)
+		indent = leadingIndent(sm.Line(startLine - 1))
+	}
+
+	return rules.TextEdit{
+		Location: rules.NewRangeLocation(file, startLine, 0, startLine, 0),
+		NewText:  indent + "SHELL " + string(shellJSON) + "\n",
+	}, true
 }
 
 func sourceRangeEdit(file, source string, startLine, byteStart, byteEnd int, newText string) *rules.TextEdit {

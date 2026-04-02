@@ -261,41 +261,81 @@ RUN pwsh -Command Write-Host bye
 	}
 }
 
-func TestPreferShellInstructionRule_NoFixWhenLaterPOSIXRunWouldBeCaptured(t *testing.T) {
+func TestPreferShellInstructionRule_FixRestoresShellBeforeLaterPOSIXRun(t *testing.T) {
 	t.Parallel()
 
 	rule := NewPreferShellInstructionRule()
-	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+	const content = `FROM alpine
 RUN pwsh -Command Write-Host hi
 RUN pwsh -Command Write-Host bye
 RUN apk add --no-cache curl
-`)
+`
 
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	violations := rule.Check(input)
 	if len(violations) != 1 {
 		t.Fatalf("got %d violations, want 1", len(violations))
 	}
-	if violations[0].SuggestedFix != nil {
-		t.Fatal("expected no suggested fix when later POSIX RUN would change shell")
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix when later POSIX RUN can be preserved with shell restore")
+	}
+
+	sources := map[string][]byte{"Dockerfile": []byte(content)}
+	fixer := &fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := `FROM alpine
+SHELL ["pwsh","-Command","$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN Write-Host hi
+RUN Write-Host bye
+SHELL ["/bin/sh","-c"]
+RUN apk add --no-cache curl
+`
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
 	}
 }
 
-func TestPreferShellInstructionRule_NoFixAcrossRuntimeShellSensitiveInstructions(t *testing.T) {
+func TestPreferShellInstructionRule_FixRestoresShellBeforeRuntimeInstruction(t *testing.T) {
 	t.Parallel()
 
 	rule := NewPreferShellInstructionRule()
-	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+	const content = `FROM alpine
 RUN pwsh -Command Write-Host hi
 CMD echo hi
 RUN pwsh -Command Write-Host bye
-`)
+`
 
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	violations := rule.Check(input)
 	if len(violations) != 1 {
 		t.Fatalf("got %d violations, want 1", len(violations))
 	}
-	if violations[0].SuggestedFix != nil {
-		t.Fatal("expected no suggested fix when CMD would be captured by inserted SHELL")
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix when CMD can be shielded by shell restore")
+	}
+
+	sources := map[string][]byte{"Dockerfile": []byte(content)}
+	fixer := &fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := `FROM alpine
+SHELL ["pwsh","-Command","$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN Write-Host hi
+SHELL ["/bin/sh","-c"]
+CMD echo hi
+RUN pwsh -Command Write-Host bye
+`
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
 	}
 }
 
