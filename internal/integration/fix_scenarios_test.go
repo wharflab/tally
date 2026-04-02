@@ -507,7 +507,7 @@ func TestFixWindowsContainer(t *testing.T) {
 	}
 
 	stdout, stderr, exitCode := runTallyStdin(t, string(input),
-		"lint", "--format", "markdown", "--output", "stderr", "--fix", "--fix-unsafe", "--slow-checks=on", "-",
+		"lint", "--format", "markdown", "--fix", "--fix-unsafe", "--slow-checks=on", "-",
 	)
 
 	// Exit code 1: some violations remain unfixable.
