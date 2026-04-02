@@ -406,15 +406,18 @@ func (r *PreferHeredocRule) checkChainedCommands(
 					if len(runLoc) > 0 {
 						targetStartLine = runLoc[0].Start.Line
 					}
-					v = v.WithSuggestedFix(r.generateChainedAsyncFix(
-						p.stageIdx,
-						targetStartLine,
-						runOrdinal,
-						variant,
-						commands,
-						p.minCommands,
-						p.pipefailEnabled,
-						p.meta,
+					v = v.WithSuggestedFix(r.generateHeredocAsyncFix(
+						heredocAsyncFixParams{
+							fixType:          rules.HeredocFixChained,
+							description:      fmt.Sprintf("Convert chained commands to heredoc (%d commands)", len(commands)),
+							stageIdx:         p.stageIdx,
+							targetStartLine:  targetStartLine,
+							targetRunOrdinal: runOrdinal,
+							shellVariant:     variant,
+							minCommands:      p.minCommands,
+							pipefailEnabled:  p.pipefailEnabled,
+							meta:             p.meta,
+						},
 					))
 				}
 			}
@@ -482,33 +485,6 @@ func (r *PreferHeredocRule) generateConsecutiveAsyncFix(
 			minCommands:     minCommands,
 			pipefailEnabled: pipefailEnabled,
 			meta:            meta,
-		},
-	)
-}
-
-// generateChainedAsyncFix generates an async fix for a single RUN with chained commands.
-// The fix is resolved at apply time to compute correct positions after sync fixes.
-func (r *PreferHeredocRule) generateChainedAsyncFix(
-	stageIdx int,
-	targetStartLine int,
-	targetRunOrdinal int,
-	shellVariant shell.Variant,
-	commands []string,
-	minCommands int,
-	pipefailEnabled bool,
-	meta rules.RuleMetadata,
-) *rules.SuggestedFix {
-	return r.generateHeredocAsyncFix(
-		heredocAsyncFixParams{
-			fixType:          rules.HeredocFixChained,
-			description:      fmt.Sprintf("Convert chained commands to heredoc (%d commands)", len(commands)),
-			stageIdx:         stageIdx,
-			targetStartLine:  targetStartLine,
-			targetRunOrdinal: targetRunOrdinal,
-			shellVariant:     shellVariant,
-			minCommands:      minCommands,
-			pipefailEnabled:  pipefailEnabled,
-			meta:             meta,
 		},
 	)
 }

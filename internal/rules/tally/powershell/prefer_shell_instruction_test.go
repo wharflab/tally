@@ -2,6 +2,7 @@ package powershell
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
@@ -11,6 +12,27 @@ import (
 	tallyrules "github.com/wharflab/tally/internal/rules/tally"
 	"github.com/wharflab/tally/internal/testutil"
 )
+
+const testPowerShellPrelude = "$ErrorActionPreference = 'Stop'; " +
+	"$PSNativeCommandUseErrorActionPreference = $true; " +
+	"$ProgressPreference = 'SilentlyContinue';"
+
+var (
+	testPwshShell                = testPowerShellShellLine("pwsh")
+	testPwshNoProfileShell       = testPowerShellShellLine("pwsh", "-NoProfile")
+	testPwshNoLogoNoProfileShell = testPowerShellShellLine("pwsh", "-NoLogo", "-NoProfile")
+	testPowershellShell          = testPowerShellShellLine("powershell")
+)
+
+func testPowerShellShellLine(executable string, args ...string) string {
+	parts := make([]string, 0, len(args)+3)
+	parts = append(parts, `"`+executable+`"`)
+	for _, arg := range args {
+		parts = append(parts, `"`+arg+`"`)
+	}
+	parts = append(parts, `"-Command"`, `"`+testPowerShellPrelude+`"`)
+	return "SHELL [" + strings.Join(parts, ",") + "]"
+}
 
 func TestPreferShellInstructionRule_Metadata(t *testing.T) {
 	t.Parallel()
@@ -118,7 +140,7 @@ RUN pwsh -NoProfile -Command Write-Host bye
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM alpine
-SHELL ["pwsh","-NoProfile","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPwshNoProfileShell + `
 RUN Write-Host hi
 ENV FOO=bar
 RUN Write-Host bye
@@ -158,7 +180,7 @@ RUN powershell -c "Write-Host bye"
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
-SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPowershellShell + `
 # Install chocolatey
 RUN Write-Host hi
 RUN Write-Host bye
@@ -197,7 +219,7 @@ RUN py -m pip install -U pip
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
-SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPowershellShell + `
 RUN Write-Host hi
 RUN Write-Host bye
 RUN setx path "$env:Path;C:\Tools"
@@ -241,7 +263,7 @@ RUN xcopy C:\build\* C:\dest /s
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
 RUN powershell -NoProfile -ExecutionPolicy Bypass -Command "Write-Host bootstrap"
-SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPowershellShell + `
 RUN Add-Content C:\temp\proof.txt one; \
     choco install git -y
 RUN md C:\build
@@ -282,7 +304,7 @@ RUN --mount=type=cache,target=/tmp/cache pwsh -NoLogo -NoProfile -Command Write-
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM mcr.microsoft.com/powershell:ubuntu-22.04
-SHELL ["pwsh","-NoLogo","-NoProfile","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPwshNoLogoNoProfileShell + `
 RUN --network=none Write-Host hi
 RUN --mount=type=cache,target=/tmp/cache Write-Host bye
 `
@@ -334,7 +356,7 @@ RUN apk add --no-cache curl
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM alpine
-SHELL ["pwsh","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPwshShell + `
 RUN Write-Host hi
 RUN Write-Host bye
 SHELL ["/bin/sh","-c"]
@@ -373,7 +395,7 @@ RUN pwsh -Command Write-Host bye
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM alpine
-SHELL ["pwsh","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPwshShell + `
 RUN Write-Host hi
 SHELL ["/bin/sh","-c"]
 CMD echo hi
@@ -412,7 +434,7 @@ CMD powershell -Command Write-Host ready
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
-SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPowershellShell + `
 RUN Write-Host hi
 RUN Write-Host bye
 CMD Write-Host ready
@@ -450,7 +472,7 @@ ENTRYPOINT powershell -Command .\Startup.ps1
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
-SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPowershellShell + `
 RUN Write-Host hi
 RUN Write-Host bye
 ENTRYPOINT .\Startup.ps1
@@ -509,7 +531,7 @@ RUN cd c:\build
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
-SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPowershellShell + `
 RUN Write-Host hi
 RUN Write-Host bye
 RUN md c:\build
@@ -548,7 +570,7 @@ RUN xcopy c:\build\TicketDesk.Web.Client\* c:\inetpub\wwwroot /s
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
-SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPowershellShell + `
 RUN Write-Host hi
 RUN Write-Host bye
 RUN xcopy c:\build\TicketDesk.Web.Client\* c:\inetpub\wwwroot /s
@@ -585,7 +607,7 @@ RUN powershell Write-Host bye
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
-SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPowershellShell + `
 RUN Write-Host hi
 RUN Write-Host bye
 `
@@ -623,7 +645,7 @@ RUN powershell Write-Host done
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
-SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+` + testPowershellShell + `
 RUN add-windowsfeature web-asp-net45; \
     choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10; \
     choco install dotnet4.6-targetpack --allow-empty-checksums -y
@@ -663,7 +685,7 @@ func TestPreferShellInstructionRule_FixCmdChainAfterBarePowerShellHonorsEscapeDi
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
 	want := "# escape=`\n" +
 		"FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
-		"SHELL [\"powershell\",\"-Command\",\"$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';\"]\n" +
+		testPowershellShell + "\n" +
 		"RUN add-windowsfeature web-asp-net45; `\n" +
 		"    choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10\n" +
 		"RUN Write-Host done\n"
@@ -709,7 +731,7 @@ COPY . C:/app
 
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
 	SHELL ["cmd","/S","/C"]
-	SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+	` + testPowershellShell + `
 	RUN add-windowsfeature web-asp-net45; \
 	    choco install microsoft-build-tools -y --allow-empty-checksums -version 14.0.23107.10
 	RUN Write-Host done
