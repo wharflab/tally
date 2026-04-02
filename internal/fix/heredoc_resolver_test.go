@@ -9,6 +9,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -18,6 +19,22 @@ func TestHeredocResolver_ID(t *testing.T) {
 	r := &heredocResolver{}
 	if got := r.ID(); got != rules.HeredocResolverID {
 		t.Errorf("ID() = %q, want %q", got, rules.HeredocResolverID)
+	}
+}
+
+func TestShellVariantAtCommand_UsesSemanticDefaultWhenLocationMissing(t *testing.T) {
+	t.Parallel()
+
+	cmd := &instructions.RunCommand{}
+	stageInfo := &semantic.StageInfo{
+		ShellSetting: semantic.ShellSetting{
+			Variant: shell.VariantPowerShell,
+		},
+	}
+
+	got := shellVariantAtCommand(cmd, stageInfo, shell.VariantCmd)
+	if got != shell.VariantPowerShell {
+		t.Fatalf("expected semantic shell variant %v, got %v", shell.VariantPowerShell, got)
 	}
 }
 

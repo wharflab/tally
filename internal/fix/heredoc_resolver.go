@@ -405,7 +405,7 @@ func shellVariantAtCommand(cmd instructions.Command, stageInfo *semantic.StageIn
 	}
 	locs := cmd.Location()
 	if len(locs) == 0 || locs[0].Start.Line <= 0 {
-		return fallback
+		return stageInfo.ShellSetting.Variant
 	}
 	return stageInfo.ShellVariantAtLine(locs[0].Start.Line)
 }
