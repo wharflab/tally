@@ -43,4 +43,4 @@ internal/schemas/generated/**/*.gen.go linguist-generated=true
 internal/rules/*/index.schema.json linguist-generated=true
 schema.json linguist-generated=true
 # exclude fixtures and snapshots from statistics
-internal/integration/testdata/* linguist-vendored
+internal/integration/testdata/** linguist-vendored
