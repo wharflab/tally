@@ -7,12 +7,6 @@ func countPowerShellStatements(script string) int {
 	if analysis == nil {
 		return 0
 	}
-	if analysis.HasComplex {
-		if len(analysis.Statements) > 0 {
-			return 1
-		}
-		return 0
-	}
 	return len(analysis.Statements)
 }
 

@@ -361,13 +361,14 @@ func collectPowerShellStatements(
 		inComplex = true
 	}
 
-	if kind == "pipeline" && !inComplex && isTopLevelPowerShellPipelineParent(parentKind) {
+	if isTopLevelPowerShellStatement(parentKind, kind) {
 		text := strings.TrimSpace(node.Utf8Text(source))
 		if text != "" {
-			analysis.Statements = append(analysis.Statements, powerShellStatement{
-				Text:    text,
-				HasPipe: hasPowerShellPipelineOperator(node),
-			})
+			stmt := powerShellStatement{Text: text}
+			if kind == "pipeline" {
+				stmt.HasPipe = hasPowerShellPipelineOperator(node)
+			}
+			analysis.Statements = append(analysis.Statements, stmt)
 		}
 		return
 	}
@@ -375,6 +376,19 @@ func collectPowerShellStatements(
 	childCount := node.NamedChildCount()
 	for i := range childCount {
 		collectPowerShellStatements(node.NamedChild(i), source, analysis, kind, inComplex)
+	}
+}
+
+func isTopLevelPowerShellStatement(parentKind, kind string) bool {
+	if !isTopLevelPowerShellPipelineParent(parentKind) {
+		return false
+	}
+
+	switch kind {
+	case "statement_list", "script_block_body", "empty_statement", "comment":
+		return false
+	default:
+		return true
 	}
 }
 
@@ -402,6 +416,7 @@ func isPowerShellComplexKind(kind string) bool {
 		"foreach_statement",
 		"for_statement",
 		"while_statement",
+		"flow_control_statement",
 		"function_statement",
 		"trap_statement",
 		"try_statement",

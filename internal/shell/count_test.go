@@ -79,6 +79,24 @@ func TestCountChainedCommands(t *testing.T) {
 			want:    1,
 		},
 		{
+			name:    "powershell mixed flow control statements are counted individually",
+			script:  "Write-Host one; exit 1; Write-Host two",
+			variant: VariantPowerShell,
+			want:    3,
+		},
+		{
+			name:    "powershell bare exit counts as one statement",
+			script:  "exit 1",
+			variant: VariantPowerShell,
+			want:    1,
+		},
+		{
+			name:    "powershell bare throw counts as one statement",
+			script:  `throw "boom"`,
+			variant: VariantPowerShell,
+			want:    1,
+		},
+		{
 			name:    "cmd chain counts commands",
 			script:  "echo hello && echo world",
 			variant: VariantCmd,
@@ -371,6 +389,12 @@ func TestIsSimpleScript(t *testing.T) {
 			script:  "Write-Host hello; Remove-Item C:\\temp\\foo",
 			variant: VariantPowerShell,
 			want:    true,
+		},
+		{
+			name:    "powershell flow control is not simple",
+			script:  "Write-Host one; exit 1; Write-Host two",
+			variant: VariantPowerShell,
+			want:    false,
 		},
 		{
 			name:    "cmd simple chained commands",
