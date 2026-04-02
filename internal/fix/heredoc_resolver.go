@@ -63,14 +63,15 @@ func (r *heredocResolver) Resolve(_ context.Context, resolveCtx ResolveContext, 
 		// consecutive-RUN opportunity (for example by inserting a SHELL that
 		// lets adjacent RUNs share the same effective shell). Only upgrade when
 		// the resulting sequence still includes the original violating RUN.
-		if data.TargetStartLine > 0 {
+		targetLine := remapTargetRunStartLine(stage, data)
+		if targetLine > 0 {
 			if edits := r.detectAndFixConsecutiveAtLine(
 				stage,
 				stageInfo,
 				data,
 				resolveCtx.FilePath,
 				sm,
-				data.TargetStartLine,
+				targetLine,
 			); len(edits) > 0 {
 				return edits, nil
 			}
@@ -101,6 +102,34 @@ func (r *heredocResolver) detectAndFixConsecutiveAtLine(
 	}
 
 	return nil
+}
+
+func remapTargetRunStartLine(stage instructions.Stage, data *rules.HeredocResolveData) int {
+	if data == nil {
+		return 0
+	}
+	if data.TargetRunOrdinal <= 0 {
+		return data.TargetStartLine
+	}
+
+	runOrdinal := 0
+	for _, cmd := range stage.Commands {
+		run, ok := cmd.(*instructions.RunCommand)
+		if !ok || !run.PrependShell {
+			continue
+		}
+		runOrdinal++
+		if runOrdinal != data.TargetRunOrdinal {
+			continue
+		}
+		locs := run.Location()
+		if len(locs) == 0 || locs[0].Start.Line <= 0 {
+			break
+		}
+		return locs[0].Start.Line
+	}
+
+	return data.TargetStartLine
 }
 
 // runSequence holds a sequence of consecutive RUN instructions

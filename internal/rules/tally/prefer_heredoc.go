@@ -165,14 +165,15 @@ type heredocCheckParams struct {
 }
 
 type heredocAsyncFixParams struct {
-	fixType         rules.HeredocFixType
-	description     string
-	stageIdx        int
-	targetStartLine int
-	shellVariant    shell.Variant
-	minCommands     int
-	pipefailEnabled bool
-	meta            rules.RuleMetadata
+	fixType          rules.HeredocFixType
+	description      string
+	stageIdx         int
+	targetStartLine  int
+	targetRunOrdinal int
+	shellVariant     shell.Variant
+	minCommands      int
+	pipefailEnabled  bool
+	meta             rules.RuleMetadata
 }
 
 // buildShellVariantMap tracks SHELL instruction changes through a stage and
@@ -345,6 +346,7 @@ func (r *PreferHeredocRule) checkChainedCommands(
 	p heredocCheckParams,
 ) []rules.Violation {
 	var violations []rules.Violation
+	runOrdinal := 0
 
 	for cmdIdx, cmd := range stage.Commands {
 		// Skip instructions where the effective shell doesn't support heredoc.
@@ -361,6 +363,7 @@ func (r *PreferHeredocRule) checkChainedCommands(
 		if !run.PrependShell {
 			continue
 		}
+		runOrdinal++
 
 		// Skip heredoc RUNs (they already use the preferred syntax)
 		if len(run.Files) > 0 {
@@ -406,6 +409,7 @@ func (r *PreferHeredocRule) checkChainedCommands(
 					v = v.WithSuggestedFix(r.generateChainedAsyncFix(
 						p.stageIdx,
 						targetStartLine,
+						runOrdinal,
 						variant,
 						commands,
 						p.minCommands,
@@ -487,6 +491,7 @@ func (r *PreferHeredocRule) generateConsecutiveAsyncFix(
 func (r *PreferHeredocRule) generateChainedAsyncFix(
 	stageIdx int,
 	targetStartLine int,
+	targetRunOrdinal int,
 	shellVariant shell.Variant,
 	commands []string,
 	minCommands int,
@@ -495,14 +500,15 @@ func (r *PreferHeredocRule) generateChainedAsyncFix(
 ) *rules.SuggestedFix {
 	return r.generateHeredocAsyncFix(
 		heredocAsyncFixParams{
-			fixType:         rules.HeredocFixChained,
-			description:     fmt.Sprintf("Convert chained commands to heredoc (%d commands)", len(commands)),
-			stageIdx:        stageIdx,
-			targetStartLine: targetStartLine,
-			shellVariant:    shellVariant,
-			minCommands:     minCommands,
-			pipefailEnabled: pipefailEnabled,
-			meta:            meta,
+			fixType:          rules.HeredocFixChained,
+			description:      fmt.Sprintf("Convert chained commands to heredoc (%d commands)", len(commands)),
+			stageIdx:         stageIdx,
+			targetStartLine:  targetStartLine,
+			targetRunOrdinal: targetRunOrdinal,
+			shellVariant:     shellVariant,
+			minCommands:      minCommands,
+			pipefailEnabled:  pipefailEnabled,
+			meta:             meta,
 		},
 	)
 }
@@ -518,12 +524,13 @@ func (r *PreferHeredocRule) generateHeredocAsyncFix(params heredocAsyncFixParams
 		NeedsResolve: true,
 		ResolverID:   rules.HeredocResolverID,
 		ResolverData: &rules.HeredocResolveData{
-			Type:            params.fixType,
-			StageIndex:      params.stageIdx,
-			TargetStartLine: params.targetStartLine,
-			ShellVariant:    params.shellVariant,
-			MinCommands:     params.minCommands,
-			PipefailEnabled: params.pipefailEnabled,
+			Type:             params.fixType,
+			StageIndex:       params.stageIdx,
+			TargetStartLine:  params.targetStartLine,
+			TargetRunOrdinal: params.targetRunOrdinal,
+			ShellVariant:     params.shellVariant,
+			MinCommands:      params.minCommands,
+			PipefailEnabled:  params.pipefailEnabled,
 		},
 	}
 }

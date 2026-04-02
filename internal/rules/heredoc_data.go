@@ -37,6 +37,12 @@ type HeredocResolveData struct {
 	// Zero means "no anchored target".
 	TargetStartLine int
 
+	// TargetRunOrdinal is the 1-based ordinal of the original violating shell-form
+	// RUN within its stage. Unlike raw line numbers, this remains stable when
+	// earlier sync fixes insert non-RUN instructions such as SHELL.
+	// Zero means "no anchored target ordinal".
+	TargetRunOrdinal int
+
 	// ShellVariant is the shell variant for parsing.
 	ShellVariant shell.Variant
 

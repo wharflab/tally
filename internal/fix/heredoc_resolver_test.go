@@ -38,6 +38,34 @@ func TestShellVariantAtCommand_UsesSemanticDefaultWhenLocationMissing(t *testing
 	}
 }
 
+func TestRemapTargetRunStartLine_UsesRunOrdinalAfterSyncInsertions(t *testing.T) {
+	t.Parallel()
+
+	dockerfile := `FROM mcr.microsoft.com/windows/servercore:ltsc2025
+SHELL ["powershell", "-Command"]
+RUN Write-Host one
+RUN Write-Host two
+`
+
+	result, err := parser.Parse(strings.NewReader(dockerfile))
+	if err != nil {
+		t.Fatalf("parse dockerfile: %v", err)
+	}
+
+	stages, _, err := instructions.Parse(result.AST, nil)
+	if err != nil {
+		t.Fatalf("parse instructions: %v", err)
+	}
+
+	got := remapTargetRunStartLine(stages[0], &rules.HeredocResolveData{
+		TargetStartLine:  2, // pre-sync line before SHELL insertion
+		TargetRunOrdinal: 1,
+	})
+	if got != 3 {
+		t.Fatalf("expected remapped line 3, got %d", got)
+	}
+}
+
 func TestHeredocResolver_Resolve_InvalidData(t *testing.T) {
 	t.Parallel()
 	r := &heredocResolver{}
@@ -1044,11 +1072,12 @@ WORKDIR C:/build
 		NeedsResolve: true,
 		ResolverID:   rules.HeredocResolverID,
 		ResolverData: &rules.HeredocResolveData{
-			Type:            rules.HeredocFixChained,
-			StageIndex:      0,
-			TargetStartLine: 3,
-			ShellVariant:    shell.VariantCmd, // stale original shell
-			MinCommands:     3,
+			Type:             rules.HeredocFixChained,
+			StageIndex:       0,
+			TargetStartLine:  2, // stale pre-sync line before SHELL insertion
+			TargetRunOrdinal: 1,
+			ShellVariant:     shell.VariantCmd, // stale original shell
+			MinCommands:      3,
 		},
 	}
 
