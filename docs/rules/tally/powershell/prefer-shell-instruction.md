@@ -30,6 +30,7 @@ Repeating the full wrapper on every `RUN` line adds noise and makes PowerShell-s
 - centralizes the shell choice instead of duplicating it across `RUN`s
 - lets tally inject sane build defaults once:
   - `$ErrorActionPreference = 'Stop'`
+  - `$PSNativeCommandUseErrorActionPreference = $true`
   - `$ProgressPreference = 'SilentlyContinue'`
 
 ## Examples
@@ -49,7 +50,7 @@ RUN pwsh -NoLogo -NoProfile -Command Invoke-WebRequest https://example.com/tools
 ```dockerfile
 FROM mcr.microsoft.com/powershell:ubuntu-22.04
 
-SHELL ["pwsh", "-NoLogo", "-NoProfile", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+SHELL ["pwsh", "-NoLogo", "-NoProfile", "-Command", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
 RUN Install-Module PSReadLine -Force
 ENV POWERSHELL_TELEMETRY_OPTOUT=1
 RUN Invoke-WebRequest https://example.com/tools.zip -OutFile /tmp/tools.zip
@@ -67,7 +68,7 @@ becomes:
 
 ```dockerfile
 FROM mcr.microsoft.com/windows/servercore:ltsc2022
-SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
 RUN Invoke-WebRequest https://example.com/file.zip -OutFile C:\temp\file.zip
 RUN Expand-Archive C:\temp\file.zip -DestinationPath C:\tools
 ```

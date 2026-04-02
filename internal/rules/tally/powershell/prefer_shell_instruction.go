@@ -21,7 +21,7 @@ import (
 // PreferShellInstructionRuleCode is the full rule code for prefer-shell-instruction.
 const PreferShellInstructionRuleCode = rules.TallyRulePrefix + "powershell/prefer-shell-instruction"
 
-const powerShellPrelude = "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"
+const powerShellPrelude = "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"
 
 var powerShellSafeUnquotedArgPattern = regexp.MustCompile(`^[A-Za-z0-9_./:\\=-]+$`)
 
