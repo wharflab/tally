@@ -29,11 +29,21 @@ func newBatchLanguage() *sitter.Language {
 type CmdScriptAnalysis struct {
 	Commands []CommandInfo
 
+	commandByteRanges [][2]uint
+	conditionalOps    []cmdConditionalOp
+
 	HasConditionals       bool
+	HasExitCommand        bool
 	HasPipes              bool
 	HasRedirections       bool
 	HasControlFlow        bool
 	HasVariableReferences bool
+}
+
+type cmdConditionalOp struct {
+	Text  string
+	Start uint
+	End   uint
 }
 
 // HasBatchOnlySyntax reports whether the script uses cmd.exe shell semantics
@@ -115,6 +125,10 @@ func AnalyzeCmdScript(script string) *CmdScriptAnalysis {
 		case "cmd":
 			if info, ok := cmdCommandInfo(node, source); ok {
 				analysis.Commands = append(analysis.Commands, info)
+				analysis.commandByteRanges = append(analysis.commandByteRanges, [2]uint{node.StartByte(), node.EndByte()})
+				if info.Name == cmdExit {
+					analysis.HasExitCommand = true
+				}
 				if slices.ContainsFunc(info.Args, hasEmbeddedCmdVariableSyntax) {
 					analysis.HasVariableReferences = true
 				}
@@ -123,13 +137,30 @@ func AnalyzeCmdScript(script string) *CmdScriptAnalysis {
 			analysis.HasVariableReferences = true
 		case "cond_exec":
 			analysis.HasConditionals = true
+			if op, ok := cmdConditionalOperator(node, source); ok {
+				analysis.conditionalOps = append(analysis.conditionalOps, op)
+			}
 		case "pipe_stmt":
 			analysis.HasPipes = true
 		case "redirect_stmt", "redirection":
 			analysis.HasRedirections = true
-		case "if_stmt", "for_stmt", "goto_stmt", "call_stmt", "setlocal_stmt", "endlocal_stmt", "variable_assignment",
-			"parenthesized", "echo_off", "exit_stmt":
+		case "exit_stmt":
+			analysis.HasExitCommand = true
 			analysis.HasControlFlow = true
+		case "if_stmt", "for_stmt", "goto_stmt", "call_stmt", "setlocal_stmt", "endlocal_stmt", "variable_assignment",
+			"parenthesized", "echo_off":
+			analysis.HasControlFlow = true
+		}
+	})
+
+	slices.SortFunc(analysis.conditionalOps, func(a, b cmdConditionalOp) int {
+		switch {
+		case a.Start < b.Start:
+			return -1
+		case a.Start > b.Start:
+			return 1
+		default:
+			return 0
 		}
 	})
 
@@ -229,6 +260,27 @@ func cmdCommandInfo(node *sitter.Node, source []byte) (CommandInfo, bool) {
 	}
 
 	return info, true
+}
+
+func cmdConditionalOperator(node *sitter.Node, source []byte) (cmdConditionalOp, bool) {
+	cursor := node.Walk()
+	defer cursor.Close()
+
+	for _, child := range node.Children(cursor) {
+		if child.IsNamed() {
+			continue
+		}
+		text := strings.TrimSpace(child.Utf8Text(source))
+		if text == "&&" || text == "||" {
+			return cmdConditionalOp{
+				Text:  text,
+				Start: child.StartByte(),
+				End:   child.EndByte(),
+			}, true
+		}
+	}
+
+	return cmdConditionalOp{}, false
 }
 
 func repairDriveQualifiedCmdName(name string, args []sitter.Node, source []byte) (string, sitter.Point, bool) {

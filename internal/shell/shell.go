@@ -49,8 +49,8 @@ const (
 	// (zsh is mapped to the bash dialect; ShellCheck has no native zsh support).
 	variantShellCheck = VariantBash | VariantPOSIX | VariantMksh | VariantZsh
 
-	// variantHeredoc are shells compatible with BuildKit heredoc syntax (RUN <<EOF).
-	variantHeredoc = VariantBash | VariantPOSIX | VariantMksh | VariantZsh
+	// variantHeredoc are shells compatible with BuildKit RUN heredoc syntax.
+	variantHeredoc = VariantBash | VariantPOSIX | VariantMksh | VariantZsh | VariantPowerShell | VariantCmd
 )
 
 // HasParser returns true for shells with any parser backend wired into Tally.
@@ -65,7 +65,7 @@ func (v Variant) SupportsPOSIXShellAST() bool { return v&variantPOSIXShellAST !=
 // Use this to guard ShellCheck WASM invocation.
 func (v Variant) IsShellCheckCompatible() bool { return v&variantShellCheck != 0 }
 
-// SupportsHeredoc returns true for shells compatible with BuildKit heredoc syntax (RUN <<EOF).
+// SupportsHeredoc returns true for shells compatible with BuildKit RUN heredoc syntax (RUN <<EOF).
 // Use this to guard heredoc suggestions and fixes.
 func (v Variant) SupportsHeredoc() bool { return v&variantHeredoc != 0 }
 

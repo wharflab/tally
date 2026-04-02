@@ -13,6 +13,10 @@ import (
 
 var powerShellLanguage = newPowerShellLanguage()
 
+const powerShellPipelineKind = "pipeline"
+const powerShellScriptBlockBodyKind = "script_block_body"
+const powerShellStatementListKind = "statement_list"
+
 func newPowerShellLanguage() *sitter.Language {
 	ptr := tspowershell.Language()
 	if ptr == nil {
@@ -24,6 +28,16 @@ func newPowerShellLanguage() *sitter.Language {
 type powerShellArg struct {
 	text string
 	node sitter.Node
+}
+
+type powerShellStatement struct {
+	Text    string
+	HasPipe bool
+}
+
+type powerShellScriptAnalysis struct {
+	Statements []powerShellStatement
+	HasComplex bool
 }
 
 func powerShellCommandNames(script string) []string {
@@ -116,6 +130,22 @@ func walkPowerShellTree(node *sitter.Node, visit func(*sitter.Node)) {
 	}
 }
 
+func walkPowerShellTreeUntil(node *sitter.Node, visit func(*sitter.Node) bool) bool {
+	if node == nil {
+		return false
+	}
+	if visit(node) {
+		return true
+	}
+	childCount := node.NamedChildCount()
+	for i := range childCount {
+		if walkPowerShellTreeUntil(node.NamedChild(i), visit) {
+			return true
+		}
+	}
+	return false
+}
+
 func powerShellCommandArgs(node *sitter.Node, source []byte) []powerShellArg {
 	elements := node.ChildByFieldName("command_elements")
 	if elements == nil {
@@ -161,6 +191,254 @@ func canParsePowerShell(script string) bool {
 	defer tree.Close()
 
 	return !tree.RootNode().HasError()
+}
+
+// CanParsePowerShellScript reports whether the PowerShell tree-sitter grammar
+// can parse the script without errors.
+func CanParsePowerShellScript(script string) bool {
+	return canParsePowerShell(script)
+}
+
+// PowerShellAssignment returns the variable name and right-hand value for a
+// simple top-level PowerShell assignment expression like
+// "$ErrorActionPreference = 'Stop'".
+func PowerShellAssignment(script string) (string, string, bool) {
+	if strings.TrimSpace(script) == "" || powerShellLanguage == nil {
+		return "", "", false
+	}
+
+	parser := sitter.NewParser()
+	defer parser.Close()
+
+	if err := parser.SetLanguage(powerShellLanguage); err != nil {
+		return "", "", false
+	}
+
+	source := []byte(script)
+	tree := parser.Parse(source, nil)
+	if tree == nil {
+		return "", "", false
+	}
+	defer tree.Close()
+
+	root := tree.RootNode()
+	if root.HasError() {
+		return "", "", false
+	}
+
+	pipeline := singleTopLevelPowerShellPipeline(root)
+	if pipeline == nil || pipeline.NamedChildCount() != 1 {
+		return "", "", false
+	}
+
+	assign := pipeline.NamedChild(0)
+	if assign == nil || assign.Kind() != "assignment_expression" {
+		return "", "", false
+	}
+
+	cursor := assign.Walk()
+	defer cursor.Close()
+
+	children := assign.NamedChildren(cursor)
+	if len(children) != 3 {
+		return "", "", false
+	}
+	if children[0].Kind() != "left_assignment_expression" || children[2].Kind() != powerShellPipelineKind {
+		return "", "", false
+	}
+
+	name := strings.TrimSpace(children[0].Utf8Text(source))
+	value := strings.TrimSpace(children[2].Utf8Text(source))
+	if name == "" || value == "" {
+		return "", "", false
+	}
+
+	return name, value, true
+}
+
+func analyzePowerShellScript(script string) *powerShellScriptAnalysis {
+	if strings.TrimSpace(script) == "" || powerShellLanguage == nil {
+		return nil
+	}
+
+	parser := sitter.NewParser()
+	defer parser.Close()
+
+	if err := parser.SetLanguage(powerShellLanguage); err != nil {
+		return nil
+	}
+
+	source := []byte(script)
+	tree := parser.Parse(source, nil)
+	if tree == nil {
+		return nil
+	}
+	defer tree.Close()
+
+	root := tree.RootNode()
+	if root.HasError() {
+		return nil
+	}
+
+	analysis := &powerShellScriptAnalysis{}
+	collectPowerShellStatements(root, source, analysis, "", false)
+	if len(analysis.Statements) == 0 && !analysis.HasComplex {
+		return nil
+	}
+	return analysis
+}
+
+func singleTopLevelPowerShellPipeline(root *sitter.Node) *sitter.Node {
+	if root == nil || root.Kind() != "program" || root.NamedChildCount() != 1 {
+		return nil
+	}
+
+	stmtList := root.NamedChild(0)
+	if stmtList == nil {
+		return nil
+	}
+
+	switch stmtList.Kind() {
+	case powerShellPipelineKind:
+		return stmtList
+	case powerShellStatementListKind, powerShellScriptBlockBodyKind:
+		if stmtList.NamedChildCount() != 1 {
+			return nil
+		}
+		pipeline := stmtList.NamedChild(0)
+		if pipeline == nil || pipeline.Kind() != powerShellPipelineKind {
+			return nil
+		}
+		return pipeline
+	default:
+		return nil
+	}
+}
+
+func hasPowerShellFlowControl(script, keyword string) bool {
+	if strings.TrimSpace(script) == "" || powerShellLanguage == nil {
+		return false
+	}
+
+	parser := sitter.NewParser()
+	defer parser.Close()
+
+	if err := parser.SetLanguage(powerShellLanguage); err != nil {
+		return false
+	}
+
+	source := []byte(script)
+	tree := parser.Parse(source, nil)
+	if tree == nil {
+		return false
+	}
+	defer tree.Close()
+
+	root := tree.RootNode()
+	if root.HasError() {
+		return false
+	}
+
+	return walkPowerShellTreeUntil(root, func(node *sitter.Node) bool {
+		if node == nil || node.Kind() != "flow_control_statement" {
+			return false
+		}
+
+		text := strings.TrimSpace(node.Utf8Text(source))
+		if text == "" {
+			return false
+		}
+
+		first := strings.Fields(text)[0]
+		return strings.EqualFold(first, keyword)
+	})
+}
+
+func collectPowerShellStatements(
+	node *sitter.Node,
+	source []byte,
+	analysis *powerShellScriptAnalysis,
+	parentKind string,
+	inComplex bool,
+) {
+	if node == nil || !node.IsNamed() {
+		return
+	}
+
+	kind := node.Kind()
+	if isPowerShellComplexKind(kind) {
+		analysis.HasComplex = true
+		inComplex = true
+	}
+
+	if isTopLevelPowerShellStatement(parentKind, kind) {
+		text := strings.TrimSpace(node.Utf8Text(source))
+		if text != "" {
+			stmt := powerShellStatement{Text: text}
+			if kind == powerShellPipelineKind {
+				stmt.HasPipe = hasPowerShellPipelineOperator(node)
+			}
+			analysis.Statements = append(analysis.Statements, stmt)
+		}
+		return
+	}
+
+	childCount := node.NamedChildCount()
+	for i := range childCount {
+		collectPowerShellStatements(node.NamedChild(i), source, analysis, kind, inComplex)
+	}
+}
+
+func isTopLevelPowerShellStatement(parentKind, kind string) bool {
+	if !isTopLevelPowerShellPipelineParent(parentKind) {
+		return false
+	}
+
+	switch kind {
+	case powerShellStatementListKind, powerShellScriptBlockBodyKind, "empty_statement", "comment":
+		return false
+	default:
+		return true
+	}
+}
+
+func hasPowerShellPipelineOperator(node *sitter.Node) bool {
+	if node == nil || node.Kind() != powerShellPipelineKind {
+		return false
+	}
+
+	return node.NamedChildCount() > 1
+}
+
+func isTopLevelPowerShellPipelineParent(kind string) bool {
+	switch kind {
+	case "program", powerShellStatementListKind, powerShellScriptBlockBodyKind:
+		return true
+	default:
+		return false
+	}
+}
+
+func isPowerShellComplexKind(kind string) bool {
+	switch kind {
+	case "if_statement",
+		"switch_statement",
+		"foreach_statement",
+		"for_statement",
+		"while_statement",
+		"flow_control_statement",
+		"function_statement",
+		"trap_statement",
+		"try_statement",
+		"data_statement",
+		"parallel_statement",
+		"class_statement",
+		"script_block",
+		"script_block_expression":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizePowerShellCommandName(name string) string {

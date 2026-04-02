@@ -16,7 +16,7 @@ Windows container Dockerfiles differ from Linux ones in fundamental ways:
 - **Layer sizes** are much larger (ServerCore base is ~5 GB vs ~80 MB for Alpine)
 - **BuildKit features** like `COPY --chown` are unsupported; `RUN --mount` passes through the
   entire BuildKit pipeline but fails at the containerd/HCS runtime (see source-confirmed details
-  below); heredocs are partial (work with PowerShell shell, not with `cmd.exe`)
+  below); heredocs work with all shells (PowerShell multi-line, `cmd.exe` single-line body)
 - **Package managers** are Chocolatey, NuGet, and direct PowerShell downloads — not apt/apk/dnf
 
 These differences mean many Linux-oriented best practices don't apply, and Windows containers have
@@ -71,17 +71,19 @@ lumped `cmd.exe` and `powershell` together, but they're very different:
 | **Progress bars** | N/A | `$ProgressPreference` | N/A |
 | **Command chaining** | `&&`, `&` | `;`, pipeline | `&&`, `;`, pipeline |
 | **ShellCheck applicable** | No | No | Yes |
-| **Heredoc applicable** | No | Partial (see note) | Yes (BuildKit) |
+| **Heredoc applicable** | Yes (single-line body; see note) | Yes (multi-line body; see note) | Yes (BuildKit) |
 | **Script parsing** | tree-sitter-backed (analysis + semantic tokens) | tree-sitter-backed (analysis + semantic tokens) | mvdan.cc/sh |
 
-**Note on PowerShell heredoc:** BuildKit's Dockerfile heredoc (`RUN <<EOF`) can work with PowerShell
-as the active shell. For a single heredoc without a shebang, BuildKit passes the heredoc content
-(with newlines preserved) as the last argument to the configured shell — so `pwsh -Command` receives
-a multi-line script. This was **tested and confirmed** to work, including PowerShell here-strings
-(`@"..."@`) which require their delimiters on separate lines. However, `cmd.exe` cannot handle
-multi-line heredoc content, and the shebang path (`/dev/pipes/`) is explicitly disabled for Windows
-in BuildKit source (`convert.go:1251`). For now, we suppress heredoc suggestions on all Windows
-stages and revisit per-shell gating later.
+**Note on Windows heredoc support:** BuildKit's Dockerfile heredoc (`RUN <<EOF`) is shell-driven,
+not Linux-only. For a single heredoc without a shebang, BuildKit passes the heredoc content (with
+newlines preserved) as the last argument to the configured shell. This was **tested and confirmed**
+to work with PowerShell, including PowerShell here-strings (`@"..."@`) which require their delimiters
+on separate lines. It was also confirmed to work with the default Windows `cmd.exe` shell, but with
+an important formatting caveat from real WCOW builds: multi-line `cmd.exe` heredoc bodies did not
+reliably continue past the first line, while a grouped single-line command block such as
+`(echo one && echo two && echo three)` did. The shebang path (`/dev/pipes/`) remains explicitly
+disabled for Windows in BuildKit source (`convert.go:1251`), so support here means "shell receives
+the heredoc body as a script string", not "BuildKit creates a temporary script file on Windows".
 
 This means rules split into two namespaces:
 
@@ -90,7 +92,7 @@ This means rules split into two namespaces:
 Fire only on Windows stages. About container platform limitations:
 
 - Layer size optimization (NTFS layers are ~100x larger)
-- BuildKit feature support (`--chown` unsupported; heredoc partial — see note above)
+- BuildKit feature support (`--chown` unsupported; heredocs work with all shells — see note above)
 - `RUN --mount` passes BuildKit validation but fails at containerd/HCS runtime (new `no-run-mounts` rule)
 - `STOPSIGNAL` is silently accepted but has no effect (new `no-stopsignal` rule)
 - Base image choices (ServerCore vs NanoServer)
@@ -163,8 +165,10 @@ func (v Variant) IsParseable() bool {
 }
 
 // SupportsHeredoc returns true for shells compatible with BuildKit heredoc syntax.
+// PowerShell gets multi-line bodies; cmd.exe gets single-line grouped commands.
 func (v Variant) SupportsHeredoc() bool {
-    return v == VariantPOSIX || v == VariantBash || v == VariantMksh
+    return v == VariantPOSIX || v == VariantBash || v == VariantMksh ||
+        v == VariantPowerShell || v == VariantCmd
 }
 
 // IsPowerShell returns true for PowerShell variants (pwsh, powershell).
@@ -384,8 +388,10 @@ RUN powershell -Command \
   Remove-Item c:\python.exe -Force
 ```
 
-**Note:** This is related to `tally/prefer-run-heredoc` but since heredocs don't work on Windows,
-this rule uses the Windows-native chaining pattern (`;` in PowerShell or `&&` in cmd).
+**Note:** This is related to `tally/prefer-run-heredoc`, which now supports Windows shells too.
+This rule is still valuable because it is about image-layer economics on Windows, not heredoc
+syntax itself, and may recommend grouping even when the final rendering uses PowerShell statements
+or a grouped single-line `cmd.exe` command block inside a heredoc.
 
 **Detection:**
 
@@ -647,7 +653,7 @@ Then consumers just read from `StageInfo`:
 |----------|--------------|----------------|----------------|
 | ShellCheck rule | Shell variant per instruction | StageInfo for initial shell + local in-rule tracking for mid-stage `SHELL` changes | `sem.StageInfo(i).ShellSetting.Variant` + shared helper for per-instruction updates |
 | `tally/windows/*` rules | Is this Windows? | (doesn't exist) | `sem.StageInfo(i).BaseImageOS` |
-| `prefer-run-heredoc` | Should suggest heredoc? | Always yes | Skip if `BaseImageOS == Windows` |
+| `prefer-run-heredoc` | Should suggest heredoc? | Always yes | Gate on `ShellSetting.Variant.SupportsHeredoc()` |
 | `prefer-package-cache-mounts` | Should suggest cache mount? | Always yes | Skip if `BaseImageOS == Windows` |
 | `buildkit/WorkdirRelativePath` | Is `c:/path` absolute? | Hardcoded `/` check | Check `BaseImageOS` for drive-letter paths |
 
@@ -743,8 +749,8 @@ gate — existing rules adding early returns for incompatible stages:
 
 | Rule | Suppress when | Reason | Where to add gate |
 |------|--------------|--------|-------------------|
-| `tally/prefer-run-heredoc` | OS=Windows OR shell=PowerShell/Cmd | Heredoc doesn't work | `prefer_heredoc.go` per-stage loop |
-| `tally/prefer-copy-heredoc` | OS=Windows OR shell=PowerShell/Cmd | Same | `prefer_copy_heredoc.go` per-stage loop |
+| `tally/prefer-run-heredoc` | shell does not support heredoc | Only shells with verified heredoc handling should get this suggestion | `prefer_heredoc.go` per-stage loop |
+| `tally/prefer-copy-heredoc` | OS=Windows OR shell does not support copy heredoc flow | COPY heredoc remains a separate compatibility question from RUN heredoc | `prefer_copy_heredoc.go` per-stage loop |
 | `tally/prefer-package-cache-mounts` | OS=Windows | `--mount=type=cache` fails at runtime (complemented by `no-run-mounts`) | `prefer_package_cache_mounts.go` per-stage loop |
 | `shellcheck/SC*` | shell=PowerShell or Cmd | Gated via `!IsShellCheckCompatible()` in the ShellCheck rule path | Works today (no change needed) |
 | `hadolint/DL4006` (pipefail) | shell=PowerShell or Cmd | POSIX-only concept | `dl4006.go` (already gated) |
@@ -755,11 +761,11 @@ The gate is a per-stage `continue` in the iteration loop:
 func (r *PreferHeredocRule) Check(input rules.LintInput) []rules.Violation {
     // ... existing setup ...
     for i := 1; i < len(input.Stages); i++ {
-        // NEW: skip stages where heredoc is not applicable
+        // Skip stages where the shell does not support heredoc.
+        // No OS gate: SupportsHeredoc() covers POSIX, PowerShell, and cmd.exe.
         if sem != nil {
             if info := sem.StageInfo(i); info != nil {
-                if info.BaseImageOS == semantic.BaseImageOSWindows ||
-                    !info.ShellSetting.Variant.SupportsHeredoc() {
+                if !info.ShellSetting.Variant.SupportsHeredoc() {
                     continue
                 }
             }
@@ -769,8 +775,9 @@ func (r *PreferHeredocRule) Check(input rules.LintInput) []rules.Violation {
 }
 ```
 
-Note: the gate uses `SupportsHeredoc()` (not `IsShellCheckCompatible()`) because heredoc
-requires a POSIX-compatible shell — PowerShell on Linux also can't use heredocs.
+Note: the gate uses `SupportsHeredoc()` (not `IsShellCheckCompatible()`) because heredoc support is
+about BuildKit plus the active shell, not POSIX-ness. PowerShell and `cmd.exe` now participate in
+this gate for `RUN` heredocs, while ShellCheck remains limited to POSIX-compatible shells.
 
 If selected `SC` codes are later implemented natively in Go, they should keep the same
 `shellcheck/SC*` rule IDs and use this same shell-compatibility gate so behavior remains

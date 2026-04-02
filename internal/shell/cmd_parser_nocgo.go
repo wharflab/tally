@@ -5,11 +5,21 @@ package shell
 type CmdScriptAnalysis struct {
 	Commands []CommandInfo
 
+	commandByteRanges [][2]uint
+	conditionalOps    []cmdConditionalOp
+
 	HasConditionals       bool
+	HasExitCommand        bool
 	HasPipes              bool
 	HasRedirections       bool
 	HasControlFlow        bool
 	HasVariableReferences bool
+}
+
+type cmdConditionalOp struct {
+	Text  string
+	Start uint
+	End   uint
 }
 
 func (a *CmdScriptAnalysis) HasBatchOnlySyntax() bool {

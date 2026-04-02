@@ -7,10 +7,13 @@ FROM teeks99/msvc-win:14.0
 SHELL ["powershell", "-command"]
 
 # Install Chocolatey
-RUN `
-    iex ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1')); `
-    choco feature disable --name showDownloadProgress; `
-    choco feature enable --name allowGlobalConfirmation
+RUN <<EOF
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+iex ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1'))
+choco feature disable --name showDownloadProgress
+choco feature enable --name allowGlobalConfirmation
+EOF
 
 WORKDIR /app
 

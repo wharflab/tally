@@ -73,10 +73,52 @@ func TestCountChainedCommands(t *testing.T) {
 			want:    0,
 		},
 		{
-			name:    "non-POSIX shell",
-			script:  "echo hello",
+			name:    "powershell simple statement",
+			script:  "Write-Host hello",
 			variant: VariantPowerShell,
-			want:    0,
+			want:    1,
+		},
+		{
+			name:    "powershell mixed flow control statements are counted individually",
+			script:  "Write-Host one; exit 1; Write-Host two",
+			variant: VariantPowerShell,
+			want:    3,
+		},
+		{
+			name:    "powershell bare exit counts as one statement",
+			script:  "exit 1",
+			variant: VariantPowerShell,
+			want:    1,
+		},
+		{
+			name:    "powershell bare throw counts as one statement",
+			script:  `throw "boom"`,
+			variant: VariantPowerShell,
+			want:    1,
+		},
+		{
+			name:    "cmd chain counts commands",
+			script:  "echo hello && echo world",
+			variant: VariantCmd,
+			want:    2,
+		},
+		{
+			name:    "cmd or chain stays unsplit",
+			script:  "echo hello || echo world",
+			variant: VariantCmd,
+			want:    1,
+		},
+		{
+			name:    "cmd single quotes do not suppress chain splitting",
+			script:  "echo 'a && b' && echo done",
+			variant: VariantCmd,
+			want:    3,
+		},
+		{
+			name:    "cmd caret escaped ampersand does not count as pure and-and chain",
+			script:  "echo foo ^&& echo bar && echo baz",
+			variant: VariantCmd,
+			want:    1,
 		},
 		{
 			name:    "if statement counts as one",
@@ -142,10 +184,28 @@ func TestExtractChainedCommands(t *testing.T) {
 			want:    []string{"cmd1", "cmd2 || exit"},
 		},
 		{
-			name:    "non-POSIX shell returns nil",
-			script:  "echo hello",
+			name:    "powershell extracts statements",
+			script:  "Write-Host hello; Remove-Item C:\\temp\\foo",
 			variant: VariantPowerShell,
+			want:    []string{"Write-Host hello", "Remove-Item C:\\temp\\foo"},
+		},
+		{
+			name:    "cmd extracts chained commands",
+			script:  "echo hello && del file.txt",
+			variant: VariantCmd,
+			want:    []string{"echo hello", "del file.txt"},
+		},
+		{
+			name:    "cmd caret escaped ampersand is not treated as pure and-and chain",
+			script:  "echo foo ^&& echo bar && echo baz",
+			variant: VariantCmd,
 			want:    nil,
+		},
+		{
+			name:    "cmd single quotes stay literal",
+			script:  "echo 'a && b' && echo done",
+			variant: VariantCmd,
+			want:    []string{"echo 'a", "b'", "echo done"},
 		},
 	}
 
@@ -164,6 +224,51 @@ func TestExtractChainedCommands(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestExtractCmdStatementsFromAnalysis(t *testing.T) {
+	t.Parallel()
+
+	t.Run("accepts valid parser-aligned spans", func(t *testing.T) {
+		t.Parallel()
+
+		script := "echo hello && echo world"
+		analysis := &CmdScriptAnalysis{
+			Commands:          []CommandInfo{{Name: "echo"}, {Name: "echo"}},
+			commandByteRanges: [][2]uint{{0, 10}, {14, 24}},
+			conditionalOps:    []cmdConditionalOp{{Text: "&&", Start: 11, End: 13}},
+		}
+
+		got, ok := extractCmdStatementsFromAnalysis(script, analysis)
+		if !ok {
+			t.Fatal("expected extraction to succeed")
+		}
+		want := []string{"echo hello", "echo world"}
+		if len(got) != len(want) {
+			t.Fatalf("returned %d commands, want %d: %v", len(got), len(want), got)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("command %d = %q, want %q", i, got[i], want[i])
+			}
+		}
+	})
+
+	t.Run("rejects out of order command ranges", func(t *testing.T) {
+		t.Parallel()
+
+		script := "echo hello && echo world"
+		analysis := &CmdScriptAnalysis{
+			Commands:          []CommandInfo{{Name: "echo"}, {Name: "echo"}},
+			commandByteRanges: [][2]uint{{0, 10}, {9, 24}},
+			conditionalOps:    []cmdConditionalOp{{Text: "&&", Start: 11, End: 13}},
+		}
+
+		got, ok := extractCmdStatementsFromAnalysis(script, analysis)
+		if ok || got != nil {
+			t.Fatalf("expected malformed ranges to be rejected, got ok=%v parts=%v", ok, got)
+		}
+	})
 }
 
 func TestExtractChainSeparators(t *testing.T) {
@@ -292,10 +397,22 @@ func TestIsSimpleScript(t *testing.T) {
 			want:    false,
 		},
 		{
-			name:    "non-POSIX returns false",
-			script:  "echo hello",
+			name:    "powershell simple statements",
+			script:  "Write-Host hello; Remove-Item C:\\temp\\foo",
+			variant: VariantPowerShell,
+			want:    true,
+		},
+		{
+			name:    "powershell flow control is not simple",
+			script:  "Write-Host one; exit 1; Write-Host two",
 			variant: VariantPowerShell,
 			want:    false,
+		},
+		{
+			name:    "cmd simple chained commands",
+			script:  "echo hello && del file.txt",
+			variant: VariantCmd,
+			want:    true,
 		},
 		{
 			name:    "or chain is simple",
@@ -355,9 +472,33 @@ func TestHasExitCommand(t *testing.T) {
 			want:    true,
 		},
 		{
-			name:    "non-POSIX returns false",
-			script:  "exit 0",
+			name:    "powershell exit is detected",
+			script:  "Write-Host hello; exit 1",
 			variant: VariantPowerShell,
+			want:    true,
+		},
+		{
+			name:    "cmd exit is detected",
+			script:  "echo hello && exit /b 1",
+			variant: VariantCmd,
+			want:    true,
+		},
+		{
+			name:    "cmd prefixed exit is detected",
+			script:  "@exit /b 1",
+			variant: VariantCmd,
+			want:    true,
+		},
+		{
+			name:    "cmd echoed exit is not detected",
+			script:  "echo exit",
+			variant: VariantCmd,
+			want:    false,
+		},
+		{
+			name:    "cmd comment exit is not detected",
+			script:  "REM exit",
+			variant: VariantCmd,
 			want:    false,
 		},
 	}
@@ -368,6 +509,39 @@ func TestHasExitCommand(t *testing.T) {
 			got := HasExitCommand(tt.script, tt.variant)
 			if got != tt.want {
 				t.Errorf("HasExitCommand() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHasPipes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		script  string
+		variant Variant
+		want    bool
+	}{
+		{
+			name:    "powershell quoted pipe is not a pipeline",
+			script:  `Write-Host "a|b"`,
+			variant: VariantPowerShell,
+			want:    false,
+		},
+		{
+			name:    "powershell pipeline is detected",
+			script:  `Get-Content foo.txt | Select-Object -First 1`,
+			variant: VariantPowerShell,
+			want:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := HasPipes(tt.script, tt.variant)
+			if got != tt.want {
+				t.Errorf("HasPipes() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -411,11 +585,18 @@ func TestIsHeredocCandidate(t *testing.T) {
 			want:        true,
 		},
 		{
-			name:        "non-POSIX shell - not candidate",
-			script:      "apt-get update && apt-get install vim && apt-get clean",
+			name:        "powershell candidate",
+			script:      "Write-Host one; Write-Host two; Write-Host three",
 			variant:     VariantPowerShell,
 			minCommands: 3,
-			want:        false,
+			want:        true,
+		},
+		{
+			name:        "cmd candidate",
+			script:      "echo one && echo two && echo three",
+			variant:     VariantCmd,
+			minCommands: 3,
+			want:        true,
 		},
 		{
 			name:        "cd in chain - still candidate",

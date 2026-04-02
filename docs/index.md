@@ -44,4 +44,5 @@ tally lint --fix Dockerfile
 ## Next Steps
 
 - [Configuration Guide](guide/configuration.md) — config files, environment variables, CLI flags
+- [Installing BuildKit for Windows Containers](guide/installing-buildkit-windows-containers.md) — standalone Windows BuildKit + `buildx remote` setup
 - [Rules Reference](rules/index.md) — available rules and how to configure them

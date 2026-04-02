@@ -11,6 +11,20 @@
 # Shell scripts always LF
 *.sh text eol=lf
 
+# Source and config files always LF
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+Dockerfile* text eol=lf
+*.Dockerfile text eol=lf
+.gitattributes text eol=lf
+Makefile text eol=lf
+
 # Windows batch files always CRLF
 *.bat text eol=crlf
 *.cmd text eol=crlf
@@ -29,4 +43,4 @@ internal/schemas/generated/**/*.gen.go linguist-generated=true
 internal/rules/*/index.schema.json linguist-generated=true
 schema.json linguist-generated=true
 # exclude fixtures and snapshots from statistics
-internal/integration/testdata/* linguist-vendored
+internal/integration/testdata/** linguist-vendored

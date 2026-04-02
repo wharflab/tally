@@ -7,11 +7,12 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/heredoc"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/runmount"
+	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -37,27 +38,18 @@ func (r *heredocResolver) Resolve(_ context.Context, resolveCtx ResolveContext, 
 		return nil, nil // Skip silently if data is wrong type
 	}
 
-	// Parse the modified content
-	dockerfile, err := parser.Parse(bytes.NewReader(resolveCtx.Content))
-	if err != nil {
-		return nil, nil //nolint:nilerr // Skip silently - don't fail fix process
-	}
-
-	stages, _, err := instructions.Parse(dockerfile.AST, nil)
+	parseResult, err := dockerfile.Parse(bytes.NewReader(resolveCtx.Content), nil)
 	if err != nil {
 		return nil, nil //nolint:nilerr // Skip silently - don't fail fix process
 	}
 
 	// Validate stage index
-	if data.StageIndex >= len(stages) {
+	if data.StageIndex >= len(parseResult.Stages) {
 		return nil, nil
 	}
-	stage := stages[data.StageIndex]
-
-	// Re-detect shell variant from the re-parsed stage.
-	// Sync fixes (e.g., DL4005 replacing "ln /bin/sh" with SHELL) may have
-	// introduced new SHELL instructions that change the effective variant.
-	r.updateShellVariant(stage, data)
+	stage := parseResult.Stages[data.StageIndex]
+	sem := semantic.NewBuilder(parseResult, nil, resolveCtx.FilePath).Build()
+	stageInfo := sem.StageInfo(data.StageIndex)
 
 	// Create sourcemap for position calculations
 	sm := sourcemap.New(resolveCtx.Content)
@@ -65,12 +57,79 @@ func (r *heredocResolver) Resolve(_ context.Context, resolveCtx ResolveContext, 
 	// Re-run detection based on fix type
 	switch data.Type {
 	case rules.HeredocFixConsecutive:
-		return r.detectAndFixConsecutive(stage, data, resolveCtx.FilePath, sm), nil
+		return r.detectAndFixConsecutive(stage, stageInfo, data, resolveCtx.FilePath, sm), nil
 	case rules.HeredocFixChained:
-		return r.detectAndFixChained(stage, data, resolveCtx.FilePath, sm), nil
+		// Sync fixes can turn an originally chained single RUN into a better
+		// consecutive-RUN opportunity (for example by inserting a SHELL that
+		// lets adjacent RUNs share the same effective shell). Only upgrade when
+		// the resulting sequence still includes the original violating RUN.
+		targetLine := remapTargetRunStartLine(stage, data)
+		if targetLine > 0 {
+			if edits := r.detectAndFixConsecutiveAtLine(
+				stage,
+				stageInfo,
+				data,
+				resolveCtx.FilePath,
+				sm,
+				targetLine,
+			); len(edits) > 0 {
+				return edits, nil
+			}
+		}
+		return r.detectAndFixChained(stage, stageInfo, data, resolveCtx.FilePath, sm), nil
 	default:
 		return nil, nil
 	}
+}
+
+func (r *heredocResolver) detectAndFixConsecutiveAtLine(
+	stage instructions.Stage,
+	stageInfo *semantic.StageInfo,
+	data *rules.HeredocResolveData,
+	file string,
+	sm *sourcemap.SourceMap,
+	targetStartLine int,
+) []rules.TextEdit {
+	edits := r.detectAndFixConsecutive(stage, stageInfo, data, file, sm)
+	if len(edits) == 0 {
+		return nil
+	}
+
+	for _, edit := range edits {
+		if edit.Location.Start.Line <= targetStartLine && targetStartLine <= edit.Location.End.Line {
+			return []rules.TextEdit{edit}
+		}
+	}
+
+	return nil
+}
+
+func remapTargetRunStartLine(stage instructions.Stage, data *rules.HeredocResolveData) int {
+	if data == nil {
+		return 0
+	}
+	if data.TargetRunOrdinal <= 0 {
+		return data.TargetStartLine
+	}
+
+	runOrdinal := 0
+	for _, cmd := range stage.Commands {
+		run, ok := cmd.(*instructions.RunCommand)
+		if !ok || !run.PrependShell {
+			continue
+		}
+		runOrdinal++
+		if runOrdinal != data.TargetRunOrdinal {
+			continue
+		}
+		locs := run.Location()
+		if len(locs) == 0 || locs[0].Start.Line <= 0 {
+			break
+		}
+		return locs[0].Start.Line
+	}
+
+	return data.TargetStartLine
 }
 
 // runSequence holds a sequence of consecutive RUN instructions
@@ -86,6 +145,7 @@ type runSequence struct {
 // multiple sub-groups, this ensures all qualifying sub-groups are fixed in one pass.
 func (r *heredocResolver) detectAndFixConsecutive(
 	stage instructions.Stage,
+	stageInfo *semantic.StageInfo,
 	data *rules.HeredocResolveData,
 	file string,
 	sm *sourcemap.SourceMap,
@@ -94,13 +154,7 @@ func (r *heredocResolver) detectAndFixConsecutive(
 	var sequence runSequence
 	var sequenceMounts []*instructions.Mount
 
-	// Track per-instruction shell variant so we don't combine RUNs
-	// across a SHELL instruction boundary (e.g. pwsh → ash).
-	currentVariant := data.ShellVariant
-
 	flush := func() {
-		// Stamp the sequence with the variant that was active when it was collected.
-		sequence.shellVariant = currentVariant
 		if edit := r.createSequenceEdit(sequence, data, file, sm); edit != nil {
 			allEdits = append(allEdits, *edit)
 		}
@@ -108,15 +162,7 @@ func (r *heredocResolver) detectAndFixConsecutive(
 	}
 
 	for _, cmd := range stage.Commands {
-		if sc, ok := cmd.(*instructions.ShellCommand); ok {
-			flush()
-			currentVariant = shell.VariantFromShellCmd(sc.Shell)
-			sequenceMounts = nil
-			continue
-		}
-
-		// Skip RUNs where the effective shell doesn't support heredoc.
-		if !currentVariant.SupportsHeredoc() {
+		if _, ok := cmd.(*instructions.ShellCommand); ok {
 			flush()
 			sequenceMounts = nil
 			continue
@@ -129,6 +175,20 @@ func (r *heredocResolver) detectAndFixConsecutive(
 			continue
 		}
 
+		runVariant := shellVariantAtCommand(cmd, stageInfo, data.ShellVariant)
+
+		// Skip RUNs where the effective shell doesn't support heredoc.
+		if !runVariant.SupportsHeredoc() {
+			flush()
+			sequenceMounts = nil
+			continue
+		}
+
+		if len(sequence.runs) > 0 && sequence.shellVariant != runVariant {
+			flush()
+			sequenceMounts = nil
+		}
+
 		// Check mount compatibility
 		runMounts := runmount.GetMounts(run)
 		if len(sequence.runs) > 0 && !runmount.MountsEqual(sequenceMounts, runMounts) {
@@ -137,7 +197,7 @@ func (r *heredocResolver) detectAndFixConsecutive(
 		}
 
 		// Extract commands using the current (per-instruction) variant.
-		commands := r.extractCommands(run, currentVariant)
+		commands := r.extractCommands(run, runVariant)
 		if len(commands) == 0 {
 			flush()
 			sequenceMounts = nil
@@ -146,7 +206,7 @@ func (r *heredocResolver) detectAndFixConsecutive(
 
 		// Check for exit command (breaks sequence)
 		script := r.getRunScript(run)
-		if shell.HasExitCommand(script, currentVariant) {
+		if shell.HasExitCommand(script, runVariant) {
 			flush()
 			sequenceMounts = nil
 			continue
@@ -154,6 +214,7 @@ func (r *heredocResolver) detectAndFixConsecutive(
 
 		if len(sequence.runs) == 0 {
 			sequenceMounts = runMounts
+			sequence.shellVariant = runVariant
 		}
 
 		sequence.runs = append(sequence.runs, run)
@@ -184,7 +245,7 @@ func (r *heredocResolver) createSequenceEdit(
 		// be converted. This handles sync fixes (e.g., DL4006 SHELL injection)
 		// that break the consecutive pattern by inserting non-RUN instructions.
 		if len(seq.runs) == 1 && len(seq.commands) >= data.MinCommands {
-			return r.createChainedEdit(seq.runs[0], seq.commands, data, file, sm)
+			return r.createChainedEdit(seq.runs[0], seq.commands, seq.shellVariant, data, file, sm)
 		}
 		return nil
 	}
@@ -237,12 +298,13 @@ func (r *heredocResolver) createSequenceEdit(
 func (r *heredocResolver) createChainedEdit(
 	run *instructions.RunCommand,
 	commands []string,
+	variant shell.Variant,
 	data *rules.HeredocResolveData,
 	file string,
 	sm *sourcemap.SourceMap,
 ) *rules.TextEdit {
 	script := r.getRunScript(run)
-	if !shell.IsSimpleScript(script, data.ShellVariant) {
+	if !shell.IsSimpleScript(script, variant) {
 		return nil
 	}
 
@@ -255,8 +317,8 @@ func (r *heredocResolver) createChainedEdit(
 	endLine := runLoc[len(runLoc)-1].End.Line
 
 	mounts := runmount.GetMounts(run)
-	pipefail := data.PipefailEnabled && commandsHavePipes(commands, data.ShellVariant)
-	heredocText := heredoc.FormatWithMounts(commands, mounts, data.ShellVariant, pipefail)
+	pipefail := data.PipefailEnabled && commandsHavePipes(commands, variant)
+	heredocText := heredoc.FormatWithMounts(commands, mounts, variant, pipefail)
 
 	indent := extractIndent(sm, startLine)
 	heredocText = applyIndent(heredocText, indent)
@@ -270,20 +332,20 @@ func (r *heredocResolver) createChainedEdit(
 // detectAndFixChained finds a RUN with chained commands and returns a fix.
 func (r *heredocResolver) detectAndFixChained(
 	stage instructions.Stage,
+	stageInfo *semantic.StageInfo,
 	data *rules.HeredocResolveData,
 	file string,
 	sm *sourcemap.SourceMap,
 ) []rules.TextEdit {
-	currentVariant := data.ShellVariant
-
 	for _, cmd := range stage.Commands {
-		if sc, ok := cmd.(*instructions.ShellCommand); ok {
-			currentVariant = shell.VariantFromShellCmd(sc.Shell)
+		if _, ok := cmd.(*instructions.ShellCommand); ok {
 			continue
 		}
 
+		runVariant := shellVariantAtCommand(cmd, stageInfo, data.ShellVariant)
+
 		// Skip instructions where the effective shell doesn't support heredoc.
-		if !currentVariant.SupportsHeredoc() {
+		if !runVariant.SupportsHeredoc() {
 			continue
 		}
 
@@ -302,33 +364,17 @@ func (r *heredocResolver) detectAndFixChained(
 			continue
 		}
 
-		commands := shell.ExtractChainedCommands(script, currentVariant)
+		commands := shell.ExtractChainedCommands(script, runVariant)
 		if len(commands) < data.MinCommands {
 			continue
 		}
 
-		if edit := r.createChainedEdit(run, commands, data, file, sm); edit != nil {
+		if edit := r.createChainedEdit(run, commands, runVariant, data, file, sm); edit != nil {
 			return []rules.TextEdit{*edit}
 		}
 	}
 
 	return nil
-}
-
-// updateShellVariant scans the re-parsed stage for SHELL instructions and
-// updates data.ShellVariant to reflect the effective shell. This is necessary
-// because sync fixes applied before the resolver (e.g., DL4005 replacing
-// "ln -sf /bin/bash /bin/sh" with a SHELL instruction) may change the shell
-// variant from what was recorded in the original semantic model.
-func (r *heredocResolver) updateShellVariant(stage instructions.Stage, data *rules.HeredocResolveData) {
-	for _, cmd := range stage.Commands {
-		shellCmd, ok := cmd.(*instructions.ShellCommand)
-		if !ok {
-			continue
-		}
-		variant := shell.VariantFromShellCmd(shellCmd.Shell)
-		data.ShellVariant = variant
-	}
 }
 
 // extractCommands extracts commands from a RUN instruction.
@@ -380,6 +426,17 @@ func commandsHavePipes(commands []string, variant shell.Variant) bool {
 		}
 	}
 	return false
+}
+
+func shellVariantAtCommand(cmd instructions.Command, stageInfo *semantic.StageInfo, fallback shell.Variant) shell.Variant {
+	if stageInfo == nil {
+		return fallback
+	}
+	locs := cmd.Location()
+	if len(locs) == 0 || locs[0].Start.Line <= 0 {
+		return stageInfo.ShellSetting.Variant
+	}
+	return stageInfo.ShellVariantAtLine(locs[0].Start.Line)
 }
 
 // extractIndent extracts leading whitespace from a line.

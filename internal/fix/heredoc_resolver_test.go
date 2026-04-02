@@ -9,6 +9,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -18,6 +19,50 @@ func TestHeredocResolver_ID(t *testing.T) {
 	r := &heredocResolver{}
 	if got := r.ID(); got != rules.HeredocResolverID {
 		t.Errorf("ID() = %q, want %q", got, rules.HeredocResolverID)
+	}
+}
+
+func TestShellVariantAtCommand_UsesSemanticDefaultWhenLocationMissing(t *testing.T) {
+	t.Parallel()
+
+	cmd := &instructions.RunCommand{}
+	stageInfo := &semantic.StageInfo{
+		ShellSetting: semantic.ShellSetting{
+			Variant: shell.VariantPowerShell,
+		},
+	}
+
+	got := shellVariantAtCommand(cmd, stageInfo, shell.VariantCmd)
+	if got != shell.VariantPowerShell {
+		t.Fatalf("expected semantic shell variant %v, got %v", shell.VariantPowerShell, got)
+	}
+}
+
+func TestRemapTargetRunStartLine_UsesRunOrdinalAfterSyncInsertions(t *testing.T) {
+	t.Parallel()
+
+	dockerfile := `FROM mcr.microsoft.com/windows/servercore:ltsc2025
+SHELL ["powershell", "-Command"]
+RUN Write-Host one
+RUN Write-Host two
+`
+
+	result, err := parser.Parse(strings.NewReader(dockerfile))
+	if err != nil {
+		t.Fatalf("parse dockerfile: %v", err)
+	}
+
+	stages, _, err := instructions.Parse(result.AST, nil)
+	if err != nil {
+		t.Fatalf("parse instructions: %v", err)
+	}
+
+	got := remapTargetRunStartLine(stages[0], &rules.HeredocResolveData{
+		TargetStartLine:  2, // pre-sync line before SHELL insertion
+		TargetRunOrdinal: 1,
+	})
+	if got != 3 {
+		t.Fatalf("expected remapped line 3, got %d", got)
 	}
 }
 
@@ -874,24 +919,12 @@ RUN apt-get update && apt-get install -y vim && apt-get clean
 	if !strings.Contains(edits[0].NewText, "apt-get update") {
 		t.Errorf("expected apt-get update in heredoc, got: %s", edits[0].NewText)
 	}
-
-	// Verify the resolve data was updated
-	data, ok := fix.ResolverData.(*rules.HeredocResolveData)
-	if !ok {
-		t.Fatal("expected HeredocResolveData")
-	}
-	if data.ShellVariant != shell.VariantBash {
-		t.Errorf("expected ShellVariant to be updated to VariantBash, got %v", data.ShellVariant)
-	}
 }
 
-func TestHeredocResolver_Resolve_NonPOSIXShellSkipped(t *testing.T) {
+func TestHeredocResolver_Resolve_PowerShellShellSupported(t *testing.T) {
 	t.Parallel()
 	r := &heredocResolver{}
 
-	// If a sync fix introduced a non-POSIX shell (e.g., powershell),
-	// the resolver should detect it and the shell parsing should handle
-	// it gracefully.
 	dockerfile := `FROM mcr.microsoft.com/windows/servercore
 SHELL ["powershell", "-Command"]
 RUN Write-Output "hello" ; Write-Output "world" ; Write-Output "!"
@@ -917,18 +950,217 @@ RUN Write-Output "hello" ; Write-Output "world" ; Write-Output "!"
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Non-POSIX shells should not produce heredoc edits
-	if edits != nil {
-		t.Errorf("expected nil edits for non-POSIX shell, got %d edits", len(edits))
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for PowerShell shell, got %d", len(edits))
+	}
+	if !strings.Contains(edits[0].NewText, "$ErrorActionPreference = 'Stop'") {
+		t.Fatalf("expected PowerShell fail-fast prelude, got: %s", edits[0].NewText)
+	}
+	if strings.Contains(edits[0].NewText, "set -e") {
+		t.Fatalf("did not expect POSIX prelude in PowerShell heredoc: %s", edits[0].NewText)
+	}
+}
+
+func TestHeredocResolver_Resolve_CmdShellSupported(t *testing.T) {
+	t.Parallel()
+	r := &heredocResolver{}
+
+	dockerfile := "# escape=`\n" +
+		"FROM mcr.microsoft.com/windows/nanoserver:ltsc2025\n" +
+		"RUN echo one `\n" +
+		"    && echo two `\n" +
+		"    && echo three\n"
+
+	fix := &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   rules.HeredocResolverID,
+		ResolverData: &rules.HeredocResolveData{
+			Type:         rules.HeredocFixChained,
+			StageIndex:   0,
+			ShellVariant: shell.VariantCmd,
+			MinCommands:  3,
+		},
 	}
 
-	// Verify the variant was updated to NonPOSIX
-	data, ok := fix.ResolverData.(*rules.HeredocResolveData)
-	if !ok {
-		t.Fatal("expected HeredocResolveData")
+	edits, err := r.Resolve(context.Background(), ResolveContext{
+		Content:  []byte(dockerfile),
+		FilePath: "Dockerfile",
+	}, fix)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if data.ShellVariant != shell.VariantPowerShell {
-		t.Errorf("expected ShellVariant to be updated to VariantPowerShell, got %v", data.ShellVariant)
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for cmd shell, got %d", len(edits))
+	}
+
+	got := edits[0].NewText
+	if !strings.Contains(got, "<<EOF") {
+		t.Fatalf("expected heredoc syntax in cmd edit, got: %s", got)
+	}
+	if strings.Contains(got, "set -e") || strings.Contains(got, "$ErrorActionPreference") {
+		t.Fatalf("did not expect POSIX or PowerShell prelude in cmd heredoc: %s", got)
+	}
+	if !strings.Contains(got, "(echo one && echo two && echo three)") {
+		t.Fatalf("expected grouped cmd heredoc body, got: %s", got)
+	}
+}
+
+func TestHeredocResolver_Resolve_MixedShellStageUsesPerRunVariant(t *testing.T) {
+	t.Parallel()
+	r := &heredocResolver{}
+
+	dockerfile := `FROM mcr.microsoft.com/powershell:6.2.1-alpine-3.8
+SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN Install-Module -Name Az -AllowClobber -Force
+RUN Set-PSRepository -Name PSGallery -InstallationPolicy Trusted; \
+    Install-Module Configuration -RequiredVersion 1.3.1 -Repository PSGallery -Scope AllUsers -Verbose; \
+    Install-Module PSSlack -RequiredVersion 1.0.2 -Repository PSGallery -Scope AllUsers -Verbose
+SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
+RUN apk add --no-cache bind-tools gnupg git tini
+`
+
+	fix := &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   rules.HeredocResolverID,
+		ResolverData: &rules.HeredocResolveData{
+			Type:         rules.HeredocFixConsecutive,
+			StageIndex:   0,
+			ShellVariant: shell.VariantPowerShell,
+			MinCommands:  3,
+		},
+	}
+
+	edits, err := r.Resolve(context.Background(), ResolveContext{
+		Content:  []byte(dockerfile),
+		FilePath: "Dockerfile",
+	}, fix)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for PowerShell consecutive runs, got %d", len(edits))
+	}
+
+	got := edits[0].NewText
+	if !strings.Contains(got, "$ErrorActionPreference = 'Stop'") {
+		t.Fatalf("expected PowerShell fail-fast prelude, got: %s", got)
+	}
+	if strings.Contains(got, "set -e") {
+		t.Fatalf("did not expect POSIX prelude in PowerShell heredoc: %s", got)
+	}
+	if !strings.Contains(got, "Install-Module Configuration") {
+		t.Fatalf("expected merged PowerShell commands, got: %s", got)
+	}
+}
+
+func TestHeredocResolver_Resolve_ChainedUpgradesToConsecutiveAfterShellRewrite(t *testing.T) {
+	t.Parallel()
+	r := &heredocResolver{}
+
+	dockerfile := `FROM mcr.microsoft.com/windows/servercore:ltsc2025
+SHELL ["powershell", "-Command"]
+RUN Add-Content C:\temp\proof.txt one; \
+    Add-Content C:\temp\proof.txt two; \
+    Add-Content C:\temp\proof.txt three
+RUN md C:\build
+WORKDIR C:/build
+`
+
+	fix := &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   rules.HeredocResolverID,
+		ResolverData: &rules.HeredocResolveData{
+			Type:             rules.HeredocFixChained,
+			StageIndex:       0,
+			TargetStartLine:  2, // stale pre-sync line before SHELL insertion
+			TargetRunOrdinal: 1,
+			ShellVariant:     shell.VariantCmd, // stale original shell
+			MinCommands:      3,
+		},
+	}
+
+	edits, err := r.Resolve(context.Background(), ResolveContext{
+		Content:  []byte(dockerfile),
+		FilePath: "Dockerfile",
+	}, fix)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(edits))
+	}
+
+	got := edits[0].NewText
+	if !strings.Contains(got, "$ErrorActionPreference = 'Stop'") {
+		t.Fatalf("expected PowerShell heredoc prelude, got: %s", got)
+	}
+	if !strings.Contains(got, "md C:\\build") {
+		t.Fatalf("expected consecutive RUN to be merged into heredoc, got: %s", got)
+	}
+	if edits[0].Location.Start.Line != 3 {
+		t.Errorf("expected edit start line 3, got %d", edits[0].Location.Start.Line)
+	}
+	if edits[0].Location.End.Line != 6 {
+		t.Errorf("expected edit end line 6, got %d", edits[0].Location.End.Line)
+	}
+}
+
+func TestHeredocResolver_Resolve_PowerShellWithBacktickContinuations(t *testing.T) {
+	t.Parallel()
+	r := &heredocResolver{}
+
+	dockerfile := "# escape=`\n" +
+		"FROM mcr.microsoft.com/windows/servercore:ltsc2025\n" +
+		"SHELL [\"powershell\", \"-Command\"]\n" +
+		"RUN Set-Content -Path C:\\temp\\proof.txt -Value one; `\n" +
+		"    Add-Content -Path C:\\temp\\proof.txt -Value two; `\n" +
+		"    Add-Content -Path C:\\temp\\proof.txt -Value three\n"
+
+	fix := &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   rules.HeredocResolverID,
+		ResolverData: &rules.HeredocResolveData{
+			Type:         rules.HeredocFixChained,
+			StageIndex:   0,
+			ShellVariant: shell.VariantPowerShell,
+			MinCommands:  3,
+		},
+	}
+
+	edits, err := r.Resolve(context.Background(), ResolveContext{
+		Content:  []byte(dockerfile),
+		FilePath: "Dockerfile",
+	}, fix)
+
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("expected 1 edit for PowerShell shell, got %d", len(edits))
+	}
+
+	got := edits[0].NewText
+	if !strings.Contains(got, "$ErrorActionPreference = 'Stop'") {
+		t.Fatalf("expected PowerShell fail-fast prelude, got: %s", got)
+	}
+	if !strings.Contains(got, "$PSNativeCommandUseErrorActionPreference = $true") {
+		t.Fatalf("expected PowerShell native-command prelude, got: %s", got)
+	}
+	if strings.Contains(got, "set -e") {
+		t.Fatalf("did not expect POSIX prelude in PowerShell heredoc: %s", got)
+	}
+	if strings.Contains(got, "if (-not $?") {
+		t.Fatalf("did not expect inter-command PowerShell guards, got: %s", got)
+	}
+
+	if edits[0].Location.Start.Line != 4 {
+		t.Errorf("expected edit start line 4, got %d", edits[0].Location.Start.Line)
+	}
+	if edits[0].Location.End.Line != 6 {
+		t.Errorf("expected edit end line 6, got %d", edits[0].Location.End.Line)
 	}
 }
 

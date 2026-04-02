@@ -173,6 +173,30 @@ RUN echo 2
 `,
 			WantViolations: 1, // no exit, 4 commands total (1 + 2 + 1)
 		},
+		{
+			Name: "windows default cmd supports consecutive runs",
+			Content: `FROM mcr.microsoft.com/windows/nanoserver:ltsc2025
+RUN echo 1
+RUN echo 2
+RUN echo 3
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "windows default cmd supports chained commands",
+			Content: `FROM mcr.microsoft.com/windows/nanoserver:ltsc2025
+RUN echo one && echo two && echo three
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "windows powershell supports chained commands",
+			Content: "# escape=`\n" + `FROM mcr.microsoft.com/windows/servercore:ltsc2025
+SHELL ["powershell", "-Command"]
+RUN Write-Host one; Write-Host two; Write-Host three
+`,
+			WantViolations: 1,
+		},
 	})
 }
 
@@ -325,6 +349,28 @@ func TestFormatHeredocWithMounts(t *testing.T) {
 			{Type: instructions.MountTypeCache, Target: "/root/.cache"},
 		}
 		result := heredoc.FormatWithMounts(commands, mounts, shell.VariantBash, false)
+		snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
+	})
+
+	t.Run("powershell", func(t *testing.T) {
+		t.Parallel()
+		commands := []string{
+			"Invoke-WebRequest https://example.com/app.zip -OutFile C:\\temp\\app.zip",
+			"Expand-Archive C:\\temp\\app.zip -DestinationPath C:\\tools",
+			"Remove-Item C:\\temp\\app.zip -Force",
+		}
+		result := heredoc.FormatWithMounts(commands, nil, shell.VariantPowerShell, false)
+		snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
+	})
+
+	t.Run("cmd", func(t *testing.T) {
+		t.Parallel()
+		commands := []string{
+			"curl.exe -fsSL https://example.com/app.zip -o C:\\temp\\app.zip",
+			"tar.exe -xf C:\\temp\\app.zip -C C:\\tools",
+			"del C:\\temp\\app.zip",
+		}
+		result := heredoc.FormatWithMounts(commands, nil, shell.VariantCmd, false)
 		snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, result)
 	})
 }

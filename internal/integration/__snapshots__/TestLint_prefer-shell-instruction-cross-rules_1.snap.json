@@ -36,7 +36,7 @@
                     "line": 3
                   }
                 },
-                "newText": "SHELL [\"pwsh\",\"-NoLogo\",\"-NoProfile\",\"-Command\",\"$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';\"]\n"
+                "newText": "SHELL [\"pwsh\",\"-NoLogo\",\"-NoProfile\",\"-Command\",\"$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';\"]\n"
               },
               {
                 "location": {

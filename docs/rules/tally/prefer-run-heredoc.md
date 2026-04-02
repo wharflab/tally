@@ -16,6 +16,16 @@ Suggests converting multi-command RUN instructions to heredoc syntax for better 
 This rule targets Dockerfile
 [here-documents](https://docs.docker.com/reference/dockerfile/#here-documents) with `RUN`, which are supported by BuildKit syntax.
 
+Shell-specific heredoc bodies are supported too:
+
+- POSIX shells keep the usual multi-line heredoc body with `set -e` and optional `set -o pipefail`
+- PowerShell heredocs use a multi-line body with `$ErrorActionPreference = 'Stop'`
+  plus explicit guards between commands. This applies to `powershell` on
+  Windows and `pwsh` on cross-platform images.
+- `cmd.exe` heredocs are supported, but real WCOW builds only executed
+  chained bodies reliably when the body stayed on one logical line, so the
+  fixer emits a grouped single-line `(...)` command list inside the heredoc
+
 Detects two patterns:
 
 1. **Multiple consecutive RUN instructions** that could be combined
@@ -76,6 +86,13 @@ chains.
 
 See [moby/buildkit#2722](https://github.com/moby/buildkit/issues/2722) for details.
 
+For non-POSIX shells, the fixer preserves the same intent with shell-native
+behavior instead of `set -e`:
+
+- PowerShell gets `$ErrorActionPreference = 'Stop'` and
+  `$PSNativeCommandUseErrorActionPreference = $true`
+- `cmd.exe` keeps the original `&&` semantics inside a grouped command block
+
 ## Options
 
 | Option | Type | Default | Description |
@@ -99,7 +116,16 @@ check-chained-commands = true
 When this rule is enabled, `hadolint/DL3003` (cd → WORKDIR) will skip generating fixes for commands that are heredoc candidates, allowing heredoc
 conversion to handle `cd` correctly within the script.
 
+On Windows, this rule also collaborates with `tally/powershell/prefer-shell-instruction`:
+
+- if repeated `RUN powershell ...` or `RUN pwsh ...` wrappers are first normalized into a PowerShell `SHELL`, this rule will then see the rewritten
+  `RUN` instructions under the effective PowerShell shell
+- that lets a `cmd`-style `RUN powershell ... && ...` sequence become a proper PowerShell heredoc instead of falling back to a `cmd.exe` heredoc body
+- the same pass can also absorb immediately following PowerShell-safe `RUN` instructions, so a stage can end up with one larger PowerShell heredoc
+  after the `SHELL` rewrite
+
 ## References
 
 - [Dockerfile here-documents](https://docs.docker.com/reference/dockerfile/#here-documents)
 - [Introduction to heredocs in Dockerfiles](https://www.docker.com/blog/introduction-to-heredocs-in-dockerfiles/)
+- [moby/buildkit#2722](https://github.com/moby/buildkit/issues/2722)

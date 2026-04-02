@@ -19,3 +19,8 @@ Learn how to use tally effectively.
 - [CI/CD](./ci-cd.md) - GitHub Actions, GitLab CI, and other pipelines
 - [Output Formats](./output-formats.md) - JSON, SARIF, and other formats
 - [Exit Codes](./exit-codes.md) - Exit codes for scripts and CI pipelines
+
+## Advanced Setup
+
+- [Installing BuildKit for Windows Containers](./installing-buildkit-windows-containers.md) - Set up a standalone Windows BuildKit builder with
+  `buildx`

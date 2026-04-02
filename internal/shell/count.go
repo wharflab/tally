@@ -14,6 +14,12 @@ const cmdExit = "exit"
 // Pipelines (|) count as a single logical command. Top-level statements separated by
 // semicolons or newlines are counted individually.
 func CountChainedCommands(script string, variant Variant) int {
+	if variant.IsPowerShell() {
+		return countPowerShellStatements(script)
+	}
+	if variant == VariantCmd {
+		return countCmdCommands(script)
+	}
 	if !variant.SupportsPOSIXShellAST() {
 		return 0
 	}
@@ -85,6 +91,12 @@ func isExitStatement(stmt *syntax.Stmt) bool {
 // Each command is formatted cleanly using the shell printer.
 // Returns nil if parsing fails or for non-POSIX shells.
 func ExtractChainedCommands(script string, variant Variant) []string {
+	if variant.IsPowerShell() {
+		return extractPowerShellStatements(script)
+	}
+	if variant == VariantCmd {
+		return extractCmdCommands(script)
+	}
 	if !variant.SupportsPOSIXShellAST() {
 		return nil
 	}
@@ -228,6 +240,12 @@ func FormatStatement(stmt *syntax.Stmt, variant Variant) string {
 // or subshells. `exit` is allowed so that common guard patterns like
 // `cd dir || exit` (often suggested by ShellCheck) don't block heredoc conversion.
 func IsSimpleScript(script string, variant Variant) bool {
+	if variant.IsPowerShell() {
+		return isSimplePowerShellScript(script)
+	}
+	if variant == VariantCmd {
+		return isSimpleCmdScript(script)
+	}
 	if !variant.SupportsPOSIXShellAST() {
 		return false
 	}
@@ -301,6 +319,9 @@ func isSimpleStatement(stmt *syntax.Stmt) bool {
 //
 // This function parses the script once and reuses the AST for all checks.
 func IsHeredocCandidate(script string, variant Variant, minCommands int) bool {
+	if variant.IsPowerShell() || variant == VariantCmd {
+		return CountChainedCommands(script, variant) >= minCommands && IsSimpleScript(script, variant)
+	}
 	if !variant.SupportsPOSIXShellAST() {
 		return false
 	}
@@ -371,6 +392,12 @@ func hasExitCommandFromAST(prog *syntax.File) bool {
 // HasPipes checks if a shell script contains any pipe operators (| or |&).
 // Returns false for non-POSIX shells or unparseable scripts.
 func HasPipes(script string, variant Variant) bool {
+	if variant.IsPowerShell() {
+		return hasPowerShellPipes(script)
+	}
+	if variant == VariantCmd {
+		return hasCmdPipes(script)
+	}
 	if !variant.SupportsPOSIXShellAST() {
 		return false
 	}
@@ -401,6 +428,12 @@ func hasPipesFromAST(prog *syntax.File) bool {
 // HasExitCommand checks if a script contains exit commands that would change
 // control flow if merged with other commands.
 func HasExitCommand(script string, variant Variant) bool {
+	if variant.IsPowerShell() {
+		return hasPowerShellExitCommand(script)
+	}
+	if variant == VariantCmd {
+		return hasCmdExitCommand(script)
+	}
 	if !variant.SupportsPOSIXShellAST() {
 		return false
 	}

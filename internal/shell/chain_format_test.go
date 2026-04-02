@@ -348,3 +348,51 @@ func TestReconstructSourceText(t *testing.T) {
 		})
 	}
 }
+
+func TestReconstructSourceTextForVariant(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		lines       []string
+		cmdStartCol int
+		escapeToken rune
+		variant     Variant
+		want        string
+	}{
+		{
+			name:        "powershell keeps backtick continuations under backtick escape",
+			lines:       []string{"RUN Write-Host one `", "    ; Write-Host two"},
+			cmdStartCol: 4,
+			escapeToken: '`',
+			variant:     VariantPowerShell,
+			want:        "Write-Host one `\n    ; Write-Host two",
+		},
+		{
+			name:        "cmd rewrites backtick escape to caret continuation",
+			lines:       []string{"RUN echo one `", "    && echo two"},
+			cmdStartCol: 4,
+			escapeToken: '`',
+			variant:     VariantCmd,
+			want:        "echo one ^\n    && echo two",
+		},
+		{
+			name:        "posix rewrites backtick escape to backslash continuation",
+			lines:       []string{"RUN echo one `", "    && echo two"},
+			cmdStartCol: 4,
+			escapeToken: '`',
+			variant:     VariantBash,
+			want:        "echo one \\\n    && echo two",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := ReconstructSourceTextForVariant(tt.lines, tt.cmdStartCol, tt.escapeToken, tt.variant)
+			if got != tt.want {
+				t.Errorf("ReconstructSourceTextForVariant():\ngot:  %q\nwant: %q", got, tt.want)
+			}
+		})
+	}
+}

@@ -13,14 +13,14 @@ import (
 // FormatWithMounts formats commands as a heredoc RUN instruction.
 // If mounts are provided, they are included in the RUN instruction.
 //
-// We always prepend "set -e" to preserve the fail-fast semantics of && chains.
-// Without it, heredocs only fail if the LAST command fails - intermediate failures
-// are silently ignored. This is different from && chains where any failure stops execution.
-//
-// When pipefail is true, "set -o pipefail" is also prepended to ensure that
-// piped commands fail properly. This is the heredoc equivalent of
-// SHELL ["/bin/bash", "-o", "pipefail", "-c"] and avoids needing a separate
-// SHELL instruction when DL4006 is enabled alongside prefer-run-heredoc.
+// For POSIX shells we prepend "set -e" (and optionally "set -o pipefail") to
+// preserve the fail-fast semantics of && chains. For PowerShell we prepend
+// "$ErrorActionPreference = 'Stop'" and
+// "$PSNativeCommandUseErrorActionPreference = $true" so modern PowerShell also
+// treats native command failures as errors. For cmd.exe we keep the original &&
+// chain semantics in a single parenthesized command block; Docker-validated
+// WCOW heredoc bodies do not reliably execute multi-line cmd chains even with
+// caret continuations.
 //
 // See: https://github.com/moby/buildkit/issues/2722
 // See: https://github.com/moby/buildkit/issues/4195
@@ -32,27 +32,117 @@ func FormatWithMounts(commands []string, mounts []*instructions.Mount, variant s
 		sb.WriteString(" ")
 	}
 	sb.WriteString("<<EOF\n")
-	sb.WriteString("set -e\n")
-	if pipefail {
-		sb.WriteString("set -o pipefail\n")
-	}
-	for _, cmd := range commands {
-		// Skip only bare "set -e" since we already added one.
-		// Preserve commands like "set -ex" or "set -euo pipefail" to retain
-		// additional flags (-x for trace, -u for undefined vars, -o pipefail).
-		if shell.SetsErrorFlag(cmd, variant) {
-			trimmed := strings.TrimSpace(cmd)
-			if trimmed == "set -e" {
-				continue
-			}
-		}
-		// Skip bare "set -o pipefail" when we already emit it.
-		if pipefail && strings.TrimSpace(cmd) == "set -o pipefail" {
-			continue
-		}
-		sb.WriteString(cmd)
+	for _, line := range heredocBodyLines(commands, variant, pipefail) {
+		sb.WriteString(line)
 		sb.WriteString("\n")
 	}
 	sb.WriteString("EOF")
 	return sb.String()
+}
+
+func heredocBodyLines(commands []string, variant shell.Variant, pipefail bool) []string {
+	switch variant {
+	case shell.VariantPowerShell:
+		return powerShellBodyLines(commands)
+	case shell.VariantCmd:
+		return cmdBodyLines(commands)
+	case shell.VariantBash, shell.VariantPOSIX, shell.VariantMksh, shell.VariantZsh, shell.VariantUnknown:
+		return posixBodyLines(commands, variant, pipefail)
+	}
+
+	return posixBodyLines(commands, variant, pipefail)
+}
+
+func posixBodyLines(commands []string, variant shell.Variant, pipefail bool) []string {
+	lines := []string{"set -e"}
+	if pipefail {
+		lines = append(lines, "set -o pipefail")
+	}
+	for _, cmd := range commands {
+		trimmed := strings.TrimSpace(cmd)
+		if shell.SetsErrorFlag(cmd, variant) && trimmed == "set -e" {
+			continue
+		}
+		if pipefail && trimmed == "set -o pipefail" {
+			continue
+		}
+		lines = append(lines, cmd)
+	}
+	return lines
+}
+
+func powerShellBodyLines(commands []string) []string {
+	lines := make([]string, 0, len(commands)+2)
+	hasStopPrelude := false
+	hasNativePrelude := false
+
+	for _, cmd := range commands {
+		trimmed := strings.TrimSpace(cmd)
+		if trimmed == "" {
+			continue
+		}
+		if isPowerShellStopPrelude(trimmed) {
+			hasStopPrelude = true
+		}
+		if isPowerShellNativePrelude(trimmed) {
+			hasNativePrelude = true
+		}
+	}
+
+	if !hasStopPrelude {
+		lines = append(lines, "$ErrorActionPreference = 'Stop'")
+	}
+	if !hasNativePrelude {
+		lines = append(lines, "$PSNativeCommandUseErrorActionPreference = $true")
+	}
+
+	for _, cmd := range commands {
+		trimmed := strings.TrimSpace(cmd)
+		if trimmed == "" {
+			continue
+		}
+		lines = append(lines, cmd)
+	}
+
+	return lines
+}
+
+func isPowerShellStopPrelude(script string) bool {
+	name, value, ok := shell.PowerShellAssignment(script)
+	if !ok || !strings.EqualFold(name, "$ErrorActionPreference") {
+		return false
+	}
+
+	return strings.EqualFold(shell.DropQuotes(value), "Stop")
+}
+
+func isPowerShellNativePrelude(script string) bool {
+	name, value, ok := shell.PowerShellAssignment(script)
+	if !ok || !strings.EqualFold(name, "$PSNativeCommandUseErrorActionPreference") {
+		return false
+	}
+
+	return strings.EqualFold(strings.TrimSpace(value), "$true")
+}
+
+func cmdBodyLines(commands []string) []string {
+	filtered := make([]string, 0, len(commands))
+	for _, cmd := range commands {
+		if strings.TrimSpace(cmd) != "" {
+			filtered = append(filtered, cmd)
+		}
+	}
+	if len(filtered) == 0 {
+		return nil
+	}
+	if len(filtered) == 1 {
+		return filtered
+	}
+
+	// Docker-validated on WCOW: cmd.exe heredoc bodies only execute reliably when
+	// the command list is kept on a single logical line. Multi-line bodies run
+	// the first line but do not continue the chain, even when using caret
+	// continuations or line-by-line guards. Keep the heredoc body as one grouped
+	// && list so it still reads like a single block of work.
+	return []string{"(" + strings.Join(filtered, " && ") + ")"}
 }

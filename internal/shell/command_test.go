@@ -523,6 +523,117 @@ func TestAnalyzeCmdScript(t *testing.T) {
 	}
 }
 
+func TestAnalyzeCmdScript_ThreeCommandChain(t *testing.T) {
+	t.Parallel()
+
+	analysis := AnalyzeCmdScript(`echo one && echo two && echo three`)
+	if analysis == nil {
+		t.Fatal("expected analysis")
+	}
+	if len(analysis.Commands) != 3 {
+		t.Fatalf("expected 3 parsed commands, got %d", len(analysis.Commands))
+	}
+	if analysis.Commands[0].Name != "echo" || analysis.Commands[1].Name != "echo" || analysis.Commands[2].Name != "echo" {
+		t.Fatalf("unexpected parsed commands: %#v", analysis.Commands)
+	}
+	if !analysis.HasConditionals {
+		t.Fatal("expected conditional execution to be detected")
+	}
+	if analysis.HasPipes || analysis.HasRedirections || analysis.HasControlFlow || analysis.HasVariableReferences {
+		t.Fatalf("expected plain && chain without extra batch-only syntax, got %#v", analysis)
+	}
+}
+
+func TestAnalyzeCmdScript_SingleQuotesDoNotQuoteConditionals(t *testing.T) {
+	t.Parallel()
+
+	analysis := AnalyzeCmdScript(`echo 'a && b' && echo done`)
+	if analysis == nil {
+		t.Fatal("expected analysis")
+	}
+	if len(analysis.Commands) != 3 {
+		t.Fatalf("expected 3 parsed commands, got %d", len(analysis.Commands))
+	}
+	if !analysis.HasConditionals {
+		t.Fatal("expected conditional execution to be detected")
+	}
+}
+
+func TestAnalyzeCmdScript_CaretEscapedAmpersandDoesNotLoseCommandText(t *testing.T) {
+	t.Parallel()
+
+	analysis := AnalyzeCmdScript(`echo foo ^&& echo bar && echo baz`)
+	if analysis == nil {
+		t.Fatal("expected analysis")
+	}
+	if len(analysis.Commands) != 3 {
+		t.Fatalf("expected 3 parsed commands, got %d", len(analysis.Commands))
+	}
+	if got := analysis.Commands[0].Args; !slices.Equal(got, []string{"foo", "^&"}) {
+		t.Fatalf("first command args = %#v, want %#v", got, []string{"foo", "^&"})
+	}
+	if !analysis.HasConditionals {
+		t.Fatal("expected conditional execution to be detected")
+	}
+}
+
+func TestPowerShellAssignment(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		script    string
+		wantName  string
+		wantValue string
+		wantOK    bool
+	}{
+		{
+			name:      "error action preference single quotes",
+			script:    `$ErrorActionPreference='Stop'`,
+			wantName:  "$ErrorActionPreference",
+			wantValue: `'Stop'`,
+			wantOK:    true,
+		},
+		{
+			name:      "native command preference variable",
+			script:    `$PSNativeCommandUseErrorActionPreference = $true`,
+			wantName:  "$PSNativeCommandUseErrorActionPreference",
+			wantValue: "$true",
+			wantOK:    true,
+		},
+		{
+			name:   "plain command is not an assignment",
+			script: `Write-Host hi`,
+			wantOK: false,
+		},
+		{
+			name:   "multiple statements are not a simple assignment",
+			script: `$ErrorActionPreference='Stop'; Write-Host hi`,
+			wantOK: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			gotName, gotValue, gotOK := PowerShellAssignment(tt.script)
+			if gotOK != tt.wantOK {
+				t.Fatalf("PowerShellAssignment() ok = %v, want %v", gotOK, tt.wantOK)
+			}
+			if !tt.wantOK {
+				return
+			}
+			if gotName != tt.wantName {
+				t.Fatalf("PowerShellAssignment() name = %q, want %q", gotName, tt.wantName)
+			}
+			if gotValue != tt.wantValue {
+				t.Fatalf("PowerShellAssignment() value = %q, want %q", gotValue, tt.wantValue)
+			}
+		})
+	}
+}
+
 func TestCommandNamesWithVariant_PowerShell(t *testing.T) {
 	t.Parallel()
 
