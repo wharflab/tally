@@ -115,6 +115,12 @@ func TestCountChainedCommands(t *testing.T) {
 			want:    3,
 		},
 		{
+			name:    "cmd caret escaped ampersand does not count as pure and-and chain",
+			script:  "echo foo ^&& echo bar && echo baz",
+			variant: VariantCmd,
+			want:    1,
+		},
+		{
 			name:    "if statement counts as one",
 			script:  "if true; then echo yes; fi",
 			variant: VariantBash,
@@ -188,6 +194,12 @@ func TestExtractChainedCommands(t *testing.T) {
 			script:  "echo hello && del file.txt",
 			variant: VariantCmd,
 			want:    []string{"echo hello", "del file.txt"},
+		},
+		{
+			name:    "cmd caret escaped ampersand is not treated as pure and-and chain",
+			script:  "echo foo ^&& echo bar && echo baz",
+			variant: VariantCmd,
+			want:    nil,
 		},
 		{
 			name:    "cmd single quotes stay literal",

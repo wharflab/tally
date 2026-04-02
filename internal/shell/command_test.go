@@ -559,6 +559,24 @@ func TestAnalyzeCmdScript_SingleQuotesDoNotQuoteConditionals(t *testing.T) {
 	}
 }
 
+func TestAnalyzeCmdScript_CaretEscapedAmpersandDoesNotLoseCommandText(t *testing.T) {
+	t.Parallel()
+
+	analysis := AnalyzeCmdScript(`echo foo ^&& echo bar && echo baz`)
+	if analysis == nil {
+		t.Fatal("expected analysis")
+	}
+	if len(analysis.Commands) != 3 {
+		t.Fatalf("expected 3 parsed commands, got %d", len(analysis.Commands))
+	}
+	if got := analysis.Commands[0].Args; !slices.Equal(got, []string{"foo", "^&"}) {
+		t.Fatalf("first command args = %#v, want %#v", got, []string{"foo", "^&"})
+	}
+	if !analysis.HasConditionals {
+		t.Fatal("expected conditional execution to be detected")
+	}
+}
+
 func TestPowerShellAssignment(t *testing.T) {
 	t.Parallel()
 
