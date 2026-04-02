@@ -339,6 +339,82 @@ RUN pwsh -Command Write-Host bye
 	}
 }
 
+func TestPreferShellInstructionRule_FixUnwrapsShellFormCmdUnderPowerShell(t *testing.T) {
+	t.Parallel()
+
+	rule := NewPreferShellInstructionRule()
+	const content = `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN powershell -Command Write-Host hi
+RUN powershell -Command Write-Host bye
+CMD powershell -Command Write-Host ready
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	sources := map[string][]byte{"Dockerfile": []byte(content)}
+	fixer := &fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN Write-Host hi
+RUN Write-Host bye
+CMD Write-Host ready
+`
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferShellInstructionRule_FixUnwrapsShellFormEntrypointUnderPowerShell(t *testing.T) {
+	t.Parallel()
+
+	rule := NewPreferShellInstructionRule()
+	const content = `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN powershell -Command Write-Host hi
+RUN powershell -Command Write-Host bye
+ENTRYPOINT powershell -Command .\Startup.ps1
+`
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	sources := map[string][]byte{"Dockerfile": []byte(content)}
+	fixer := &fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+RUN Write-Host hi
+RUN Write-Host bye
+ENTRYPOINT .\Startup.ps1
+`
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestPreferShellInstructionRule_FixAllowsCmdSlashCWrapper(t *testing.T) {
 	t.Parallel()
 

@@ -349,11 +349,37 @@ func collectStageRunEditsForPowerShell(
 			return edits, true
 		case *instructions.CmdCommand:
 			if cmd.PrependShell {
-				return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, cmd.Location())
+				edit, needed, ok := adaptRuntimeCommandForPowerShell(
+					file,
+					sm,
+					cluster.shellBefore,
+					escapeToken,
+					cmd.ShellDependantCmdLine,
+					cmd.Location(),
+				)
+				if !ok {
+					return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, cmd.Location())
+				}
+				if needed {
+					edits = append(edits, edit)
+				}
 			}
 		case *instructions.EntrypointCommand:
 			if cmd.PrependShell {
-				return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, cmd.Location())
+				edit, needed, ok := adaptRuntimeCommandForPowerShell(
+					file,
+					sm,
+					cluster.shellBefore,
+					escapeToken,
+					cmd.ShellDependantCmdLine,
+					cmd.Location(),
+				)
+				if !ok {
+					return appendRestoreShellEdit(file, sm, edits, cluster.shellBeforeCmd, cmd.Location())
+				}
+				if needed {
+					edits = append(edits, edit)
+				}
 			}
 		case *instructions.HealthCheckCommand:
 			if healthcheckUsesShell(cmd) {
@@ -398,6 +424,41 @@ func appendRestoreShellEdit(
 		return nil, false
 	}
 	return append(edits, edit), true
+}
+
+func adaptRuntimeCommandForPowerShell(
+	file string,
+	sm *sourcemap.SourceMap,
+	shellBefore shellutil.Variant,
+	escapeToken rune,
+	cmdline instructions.ShellDependantCmdLine,
+	loc []parser.Range,
+) (rules.TextEdit, bool, bool) {
+	if !cmdline.PrependShell || len(cmdline.CmdLine) == 0 {
+		return rules.TextEdit{}, false, false
+	}
+
+	invocation, ok := parseExplicitPowerShellInvocation(cmdline.CmdLine[0])
+	if !ok {
+		return rules.TextEdit{}, false, false
+	}
+
+	newScript, ok := normalizePowerShellWrapperScriptForInsertedShell(
+		cmdline.CmdLine[0],
+		invocation,
+		shellBefore,
+		escapeToken,
+	)
+	if !ok || strings.TrimSpace(newScript) == "" {
+		return rules.TextEdit{}, false, false
+	}
+
+	edit, ok := buildShellDependantCommandRewriteEdit(file, sm, loc, cmdline.CmdLine[0], newScript)
+	if !ok {
+		return rules.TextEdit{}, false, false
+	}
+
+	return edit, true, true
 }
 
 func healthcheckUsesShell(cmd *instructions.HealthCheckCommand) bool {
@@ -703,6 +764,26 @@ func buildRunBodyRewriteEdit(
 	return *edit, true
 }
 
+func buildShellDependantCommandRewriteEdit(
+	file string,
+	sm *sourcemap.SourceMap,
+	loc []parser.Range,
+	script string,
+	newScript string,
+) (rules.TextEdit, bool) {
+	source, startLine, scriptIndex, ok := resolveShellDependantInstructionScriptRange(loc, sm, script)
+	if !ok {
+		return rules.TextEdit{}, false
+	}
+
+	edit := sourceRangeEdit(file, source, startLine, scriptIndex, scriptIndex+len(script), newScript)
+	if edit == nil {
+		return rules.TextEdit{}, false
+	}
+
+	return *edit, true
+}
+
 func resolveRunInstructionScriptRange(
 	run *instructions.RunCommand,
 	sm *sourcemap.SourceMap,
@@ -729,6 +810,37 @@ func resolveRunInstructionScriptRange(
 			break
 		}
 	}
+	if scriptIndex < 0 {
+		return "", 0, 0, false
+	}
+
+	return source, startLine, scriptIndex, true
+}
+
+func resolveShellDependantInstructionScriptRange(
+	loc []parser.Range,
+	sm *sourcemap.SourceMap,
+	script string,
+) (string, int, int, bool) {
+	if len(loc) == 0 || sm == nil || script == "" {
+		return "", 0, 0, false
+	}
+
+	startLine := loc[0].Start.Line
+	endLine := loc[len(loc)-1].End.Line
+
+	var lines []string
+	for lineIdx := startLine - 1; lineIdx < endLine; lineIdx++ {
+		if lineIdx >= 0 && lineIdx < sm.LineCount() {
+			lines = append(lines, sm.Line(lineIdx))
+		}
+	}
+	if len(lines) == 0 {
+		return "", 0, 0, false
+	}
+
+	source := strings.Join(lines, "\n")
+	scriptIndex := strings.Index(source, script)
 	if scriptIndex < 0 {
 		return "", 0, 0, false
 	}
