@@ -9,6 +9,7 @@ type CmdScriptAnalysis struct {
 	conditionalOps    []cmdConditionalOp
 
 	HasConditionals       bool
+	HasExitCommand        bool
 	HasPipes              bool
 	HasRedirections       bool
 	HasControlFlow        bool

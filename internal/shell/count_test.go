@@ -447,6 +447,24 @@ func TestHasExitCommand(t *testing.T) {
 			variant: VariantCmd,
 			want:    true,
 		},
+		{
+			name:    "cmd prefixed exit is detected",
+			script:  "@exit /b 1",
+			variant: VariantCmd,
+			want:    true,
+		},
+		{
+			name:    "cmd echoed exit is not detected",
+			script:  "echo exit",
+			variant: VariantCmd,
+			want:    false,
+		},
+		{
+			name:    "cmd comment exit is not detected",
+			script:  "REM exit",
+			variant: VariantCmd,
+			want:    false,
+		},
 	}
 
 	for _, tt := range tests {

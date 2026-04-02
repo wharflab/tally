@@ -1,11 +1,6 @@
 package shell
 
-import (
-	"regexp"
-	"strings"
-)
-
-var cmdExitPattern = regexp.MustCompile(`(?i)(^|[&()\r\n \t])exit(?:[ \t\r\n]|$)`)
+import "strings"
 
 func countPowerShellStatements(script string) int {
 	analysis := analyzePowerShellScript(script)
@@ -83,7 +78,8 @@ func isSimpleCmdScript(script string) bool {
 }
 
 func hasCmdExitCommand(script string) bool {
-	return cmdExitPattern.MatchString(script)
+	analysis := AnalyzeCmdScript(script)
+	return analysis != nil && analysis.HasExitCommand
 }
 
 func hasCmdPipes(script string) bool {

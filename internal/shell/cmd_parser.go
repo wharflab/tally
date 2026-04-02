@@ -33,6 +33,7 @@ type CmdScriptAnalysis struct {
 	conditionalOps    []cmdConditionalOp
 
 	HasConditionals       bool
+	HasExitCommand        bool
 	HasPipes              bool
 	HasRedirections       bool
 	HasControlFlow        bool
@@ -125,6 +126,9 @@ func AnalyzeCmdScript(script string) *CmdScriptAnalysis {
 			if info, ok := cmdCommandInfo(node, source); ok {
 				analysis.Commands = append(analysis.Commands, info)
 				analysis.commandByteRanges = append(analysis.commandByteRanges, [2]uint{node.StartByte(), node.EndByte()})
+				if info.Name == cmdExit {
+					analysis.HasExitCommand = true
+				}
 				if slices.ContainsFunc(info.Args, hasEmbeddedCmdVariableSyntax) {
 					analysis.HasVariableReferences = true
 				}
@@ -140,8 +144,11 @@ func AnalyzeCmdScript(script string) *CmdScriptAnalysis {
 			analysis.HasPipes = true
 		case "redirect_stmt", "redirection":
 			analysis.HasRedirections = true
+		case "exit_stmt":
+			analysis.HasExitCommand = true
+			analysis.HasControlFlow = true
 		case "if_stmt", "for_stmt", "goto_stmt", "call_stmt", "setlocal_stmt", "endlocal_stmt", "variable_assignment",
-			"parenthesized", "echo_off", "exit_stmt":
+			"parenthesized", "echo_off":
 			analysis.HasControlFlow = true
 		}
 	})
