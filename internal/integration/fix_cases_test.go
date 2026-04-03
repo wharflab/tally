@@ -1972,5 +1972,44 @@ severity = "warning"
 				mustSelectRules("tally/copy-after-user-without-chown", "tally/prefer-copy-chmod")...),
 			wantApplied: 2,
 		},
+
+		// Named identity in passwd-less stage: USER fix (FixSuggestion, needs --fix --fix-unsafe)
+		{
+			name:  "named-identity-user-fix",
+			input: "FROM scratch\nUSER appuser\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/named-identity-in-passwdless-stage")...),
+			wantApplied: 1,
+		},
+		// Named identity: --chown fix
+		{
+			name:  "named-identity-chown-fix",
+			input: "FROM golang:1.22 AS builder\nRUN echo hello > /app\n\nFROM scratch\nCOPY --chown=appuser:appgroup --from=builder /app /app\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/named-identity-in-passwdless-stage")...),
+			wantApplied: 1,
+		},
+		// Named identity: numeric USER in scratch — no fix needed
+		{
+			name:  "named-identity-numeric-no-fix",
+			input: "FROM scratch\nUSER 65532\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/named-identity-in-passwdless-stage")...),
+			wantApplied: 0,
+		},
+		// Named identity: passwd copied — no fix needed
+		{
+			name: "named-identity-passwd-copied-no-fix",
+			input: "FROM golang:1.22 AS builder\nRUN useradd -r appuser\n\nFROM scratch\n" +
+				"COPY --from=builder /etc/passwd /etc/passwd\n" +
+				"COPY --from=builder /etc/group /etc/group\nUSER appuser\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/named-identity-in-passwdless-stage")...),
+			wantApplied: 0,
+		},
 	}
 }

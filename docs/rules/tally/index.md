@@ -15,6 +15,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [world-writable-state-path-workaround](./world-writable-state-path-workaround.md) 🔧 | chmod 777/a+rwx sets world-writable permissions (ownership confusion workaround) | Warning | Security | Enabled |
 | [user-created-but-never-used](./user-created-but-never-used.md) | Final stage creates a user but never switches to it | Warning | Security | Enabled |
 | [copy-after-user-without-chown](./copy-after-user-without-chown.md) | COPY/ADD without --chown after non-root USER creates root-owned files | Warning | Correctness | Enabled |
+| [named-identity-in-passwdless-stage](./named-identity-in-passwdless-stage.md) 🔧 | Named user/group in USER or --chown requires /etc/passwd which passwd-less stages lack | Warning | Correctness | Enabled |
 | [max-lines](./max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
 | [no-unreachable-stages](./no-unreachable-stages.md) | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
 | [shell-run-in-scratch](./shell-run-in-scratch.md) | Detects shell-form RUN in scratch stages where no shell exists | Warning | Correctness | Enabled |

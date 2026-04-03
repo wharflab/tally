@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 52 | - | 52 |
+| tally | 53 | - | 53 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -40,6 +40,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/world-writable-state-path-workaround`](docs/rules/tally/world-writable-state-path-workaround.md) 🔧 | chmod 777/a+rwx sets world-writable permissions (ownership confusion workaround) | Warning | Security | Enabled |
 | [`tally/user-created-but-never-used`](docs/rules/tally/user-created-but-never-used.md) 🔧 | Final stage creates a user but never switches to it | Warning | Security | Enabled |
 | [`tally/copy-after-user-without-chown`](docs/rules/tally/copy-after-user-without-chown.md) 🔧 | COPY/ADD without --chown after non-root USER creates root-owned files | Warning | Correctness | Enabled |
+| [`tally/named-identity-in-passwdless-stage`](docs/rules/tally/named-identity-in-passwdless-stage.md) 🔧 | Named user/group in USER or --chown requires /etc/passwd which passwd-less stages lack | Warning | Correctness | Enabled |
 | [`tally/max-lines`](docs/rules/tally/max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
 | [`tally/no-unreachable-stages`](docs/rules/tally/no-unreachable-stages.md) | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
 | [`tally/shell-run-in-scratch`](docs/rules/tally/shell-run-in-scratch.md) | Detects shell-form RUN in scratch stages where no shell exists | Warning | Correctness | Enabled |
