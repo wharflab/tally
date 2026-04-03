@@ -88,6 +88,34 @@ COPY --chown=myuser --from=builder /app /app
 			WantViolations: 2,
 		},
 
+		// --- Incremental state tracking ---
+		{
+			Name: "named chown before passwd copied - violation then suppressed",
+			Content: `FROM golang:1.22 AS builder
+RUN echo hello > /app
+
+FROM scratch
+COPY --chown=appuser --from=builder /app /app
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
+USER appuser
+`,
+			WantViolations: 1,
+			WantMessages:   []string{`COPY --chown uses named user "appuser"`},
+		},
+		{
+			Name: "named USER after passwd copied - no violation",
+			Content: `FROM golang:1.22 AS builder
+RUN useradd -r appuser
+
+FROM scratch
+COPY --from=builder /etc/passwd /etc/passwd
+COPY --from=builder /etc/group /etc/group
+USER appuser
+`,
+			WantViolations: 0,
+		},
+
 		// --- No violations expected ---
 		{
 			Name: "scratch with numeric USER",

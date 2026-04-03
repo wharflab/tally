@@ -53,7 +53,9 @@ func (r *NamedIdentityInPasswdlessStageRule) Metadata() rules.RuleMetadata {
 	}
 }
 
-// namedIdentityCtx carries shared state for checking a single stage.
+// namedIdentityCtx carries per-instruction state while walking a stage.
+// hasPasswd/hasGroup are updated incrementally as COPY/ADD instructions
+// that produce /etc/passwd or /etc/group are encountered.
 type namedIdentityCtx struct {
 	file      string
 	sm        *sourcemap.SourceMap
@@ -78,15 +80,10 @@ func (r *NamedIdentityInPasswdlessStageRule) Check(input rules.LintInput) []rule
 			continue
 		}
 
-		if !isPasswdlessStage(sem, fileFacts, stageIdx) {
-			continue
-		}
-
-		sf := fileFacts.Stage(stageIdx)
-		hasPasswd, hasGroup := stageHasIdentityDBs(sf, info.Stage)
-
-		// If both databases exist, no named identity issue.
-		if hasPasswd && hasGroup {
+		// Determine initial inherited identity-DB state from the ancestry
+		// chain. Returns false if the stage is not passwd-less at all.
+		inheritedPasswd, inheritedGroup, passwdless := inheritedIdentityDBState(sem, fileFacts, stageIdx)
+		if !passwdless {
 			continue
 		}
 
@@ -95,8 +92,8 @@ func (r *NamedIdentityInPasswdlessStageRule) Check(input rules.LintInput) []rule
 			sm:        sm,
 			meta:      meta,
 			stageIdx:  stageIdx,
-			hasPasswd: hasPasswd,
-			hasGroup:  hasGroup,
+			hasPasswd: inheritedPasswd,
+			hasGroup:  inheritedGroup,
 		}
 
 		// Track whether a SHELL instruction has been seen. After SHELL,
@@ -113,6 +110,10 @@ func (r *NamedIdentityInPasswdlessStageRule) Check(input rules.LintInput) []rule
 				continue
 			}
 
+			// Check for violations BEFORE updating state, so that a COPY
+			// that both provides /etc/passwd and uses --chown=named is
+			// still flagged (the passwd is not available yet when the
+			// instruction executes).
 			switch c := cmd.(type) {
 			case *instructions.UserCommand:
 				if v := r.checkUserCmd(c, &ctx); v != nil {
@@ -129,10 +130,34 @@ func (r *NamedIdentityInPasswdlessStageRule) Check(input rules.LintInput) []rule
 					violations = append(violations, *v)
 				}
 			}
+
+			// Update identity-DB state after processing each instruction.
+			updateIdentityDBState(&ctx, cmd)
 		}
 	}
 
 	return violations
+}
+
+// updateIdentityDBState updates ctx.hasPasswd/hasGroup when a COPY/ADD
+// instruction writes /etc/passwd or /etc/group into the stage.
+func updateIdentityDBState(ctx *namedIdentityCtx, cmd instructions.Command) {
+	var destPath string
+	switch c := cmd.(type) {
+	case *instructions.CopyCommand:
+		destPath = c.DestPath
+	case *instructions.AddCommand:
+		destPath = c.DestPath
+	default:
+		return
+	}
+
+	if !ctx.hasPasswd && looksLikePasswdDest(destPath, "/etc/passwd") {
+		ctx.hasPasswd = true
+	}
+	if !ctx.hasGroup && looksLikePasswdDest(destPath, "/etc/group") {
+		ctx.hasGroup = true
+	}
 }
 
 // checkUserCmd checks a USER instruction for named identities in a passwd-less stage.
@@ -334,49 +359,6 @@ func splitUserGroup(value string) (string, string) {
 	return strings.TrimSpace(user), strings.TrimSpace(group)
 }
 
-// stageHasIdentityDBs checks whether a stage has /etc/passwd and /etc/group,
-// both through the facts layer's observable files and by scanning COPY/ADD
-// destinations directly (which catches cross-stage copies from external images
-// that the facts layer cannot observe into).
-func stageHasIdentityDBs(sf *facts.StageFacts, stage *instructions.Stage) (hasPasswd, hasGroup bool) {
-	// Check observable files first (works for heredoc writes, context copies, etc.).
-	if sf != nil {
-		hasPasswd = sf.HasObservablePathSuffix("/etc/passwd")
-		hasGroup = sf.HasObservablePathSuffix("/etc/group")
-	}
-	if hasPasswd && hasGroup {
-		return hasPasswd, hasGroup
-	}
-
-	// Scan COPY/ADD destinations for /etc/passwd and /etc/group.
-	// This catches COPY --from=builder /etc/passwd /etc/passwd where the
-	// builder is an external image (facts cannot observe external image files).
-	if stage != nil {
-		for _, cmd := range stage.Commands {
-			var destPath string
-			switch c := cmd.(type) {
-			case *instructions.CopyCommand:
-				destPath = c.DestPath
-			case *instructions.AddCommand:
-				destPath = c.DestPath
-			default:
-				continue
-			}
-			if !hasPasswd && looksLikePasswdDest(destPath, "/etc/passwd") {
-				hasPasswd = true
-			}
-			if !hasGroup && looksLikePasswdDest(destPath, "/etc/group") {
-				hasGroup = true
-			}
-			if hasPasswd && hasGroup {
-				return hasPasswd, hasGroup
-			}
-		}
-	}
-
-	return hasPasswd, hasGroup
-}
-
 // looksLikePasswdDest checks if a COPY/ADD destination path produces the
 // given target file. Handles both exact paths and directory destinations.
 func looksLikePasswdDest(dest, target string) bool {
@@ -394,14 +376,16 @@ func looksLikePasswdDest(dest, target string) bool {
 	return false
 }
 
-// isPasswdlessStage determines whether a stage lacks /etc/passwd and /etc/group
-// databases. This is true for:
-//   - FROM scratch (always passwd-less)
-//   - Stages inheriting from a scratch ancestry chain without passwd files
+// inheritedIdentityDBState computes the initial hasPasswd/hasGroup state that
+// a stage inherits from its ancestry chain. It also determines whether the
+// stage is passwd-less at all (rooted in scratch).
 //
-// It is NOT true for external images (debian, alpine, distroless, etc.) which
-// ship their own /etc/passwd.
-func isPasswdlessStage(sem *semantic.Model, fileFacts *facts.FileFacts, stageIdx int) bool {
+// Returns (hasPasswd, hasGroup, isPasswdless). If isPasswdless is false, the
+// stage bases on an external image that ships /etc/passwd and the rule should
+// not fire.
+func inheritedIdentityDBState(
+	sem *semantic.Model, fileFacts *facts.FileFacts, stageIdx int,
+) (hasPasswd, hasGroup, passwdless bool) {
 	visited := make(map[int]bool)
 
 	for idx := stageIdx; !visited[idx]; {
@@ -409,45 +393,104 @@ func isPasswdlessStage(sem *semantic.Model, fileFacts *facts.FileFacts, stageIdx
 
 		info := sem.StageInfo(idx)
 		if info == nil {
-			return false
+			return false, false, false
 		}
 
-		// scratch is always passwd-less.
+		// scratch is always passwd-less and provides neither database.
 		if info.IsScratch() {
-			return true
+			return false, false, true
 		}
 
 		// External images (alpine, debian, distroless, etc.) ship /etc/passwd.
 		if info.BaseImage == nil || !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 {
-			return false
+			return false, false, false
 		}
 
-		// Local stage ref: check if parent stage produced passwd files
-		// via observable files or direct COPY/ADD destination inspection.
+		// Local stage ref: check if parent stage produced passwd files.
+		// We scan the parent's final state (all its commands) because the
+		// child inherits the parent's complete filesystem.
 		parentIdx := info.BaseImage.StageIndex
-		if fileFacts != nil {
-			parentFacts := fileFacts.Stage(parentIdx)
-			if parentFacts != nil && parentFacts.HasObservablePathSuffix("/etc/passwd") {
-				return false
-			}
-		}
-		// Also check the parent's COPY/ADD destinations directly, because
-		// COPY --from=<external> may not produce observable files.
-		if parentIdx >= 0 && parentIdx < sem.StageCount() {
-			parentInfo := sem.StageInfo(parentIdx)
-			if parentInfo != nil && parentInfo.Stage != nil {
-				hasPasswd, _ := stageHasIdentityDBs(fileFacts.Stage(parentIdx), parentInfo.Stage)
-				if hasPasswd {
-					return false
-				}
-			}
+		parentPasswd, parentGroup := parentStageIdentityDBs(sem, fileFacts, parentIdx)
+
+		if parentPasswd && parentGroup {
+			// Parent provides both — stage is not effectively passwd-less.
+			return true, true, false
 		}
 
-		// Walk up the chain.
+		if parentPasswd || parentGroup {
+			// Parent provides one but not the other. The stage is still
+			// passwd-less (rooted in scratch), but inherits partial state.
+			// Continue walking to confirm scratch root.
+			for inner := parentIdx; !visited[inner]; {
+				visited[inner] = true
+				innerInfo := sem.StageInfo(inner)
+				if innerInfo == nil {
+					return false, false, false
+				}
+				if innerInfo.IsScratch() {
+					return parentPasswd, parentGroup, true
+				}
+				if innerInfo.BaseImage == nil || !innerInfo.BaseImage.IsStageRef || innerInfo.BaseImage.StageIndex < 0 {
+					return false, false, false
+				}
+				inner = innerInfo.BaseImage.StageIndex
+			}
+			return false, false, false
+		}
+
+		// Parent has neither — walk up the chain.
 		idx = parentIdx
 	}
 
-	return false
+	return false, false, false
+}
+
+// parentStageIdentityDBs checks whether a parent stage's final state includes
+// /etc/passwd and/or /etc/group, using both observable files and direct
+// COPY/ADD destination scanning.
+func parentStageIdentityDBs(
+	sem *semantic.Model, fileFacts *facts.FileFacts, parentIdx int,
+) (hasPasswd, hasGroup bool) {
+	// Check observable files (works for heredoc writes, context copies, etc.).
+	if fileFacts != nil {
+		if pf := fileFacts.Stage(parentIdx); pf != nil {
+			hasPasswd = pf.HasObservablePathSuffix("/etc/passwd")
+			hasGroup = pf.HasObservablePathSuffix("/etc/group")
+		}
+	}
+	if hasPasswd && hasGroup {
+		return hasPasswd, hasGroup
+	}
+
+	// Scan COPY/ADD destinations directly for cross-stage copies from
+	// external images that the facts layer cannot observe into.
+	if parentIdx >= 0 && parentIdx < sem.StageCount() {
+		parentInfo := sem.StageInfo(parentIdx)
+		if parentInfo != nil && parentInfo.Stage != nil {
+			for _, cmd := range parentInfo.Stage.Commands {
+				var destPath string
+				switch c := cmd.(type) {
+				case *instructions.CopyCommand:
+					destPath = c.DestPath
+				case *instructions.AddCommand:
+					destPath = c.DestPath
+				default:
+					continue
+				}
+				if !hasPasswd && looksLikePasswdDest(destPath, "/etc/passwd") {
+					hasPasswd = true
+				}
+				if !hasGroup && looksLikePasswdDest(destPath, "/etc/group") {
+					hasGroup = true
+				}
+				if hasPasswd && hasGroup {
+					return hasPasswd, hasGroup
+				}
+			}
+		}
+	}
+
+	return hasPasswd, hasGroup
 }
 
 func init() {
