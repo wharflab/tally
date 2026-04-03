@@ -1,0 +1,136 @@
+{
+  "files": [
+    {
+      "file": "testdata/named-identity-in-passwdless-stage/Dockerfile",
+      "violations": [
+        {
+          "detail": "Named identities require /etc/passwd and /etc/group for resolution. In scratch or passwd-less stages, use numeric UIDs/GIDs instead (e.g., USER 65532:65532), or COPY the passwd/group files from a builder stage.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/named-identity-in-passwdless-stage/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 9
+            },
+            "file": "testdata/named-identity-in-passwdless-stage/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 9
+            }
+          },
+          "message": "USER uses named user \"appuser\" but this stage has no /etc/passwd",
+          "rule": "tally/named-identity-in-passwdless-stage",
+          "severity": "warning",
+          "sourceCode": "USER appuser",
+          "suggestedFix": {
+            "description": "Replace with numeric identity: USER 65532",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 10
+                  },
+                  "file": "testdata/named-identity-in-passwdless-stage/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 9
+                  }
+                },
+                "newText": "USER 65532\n"
+              }
+            ],
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Named identities in --chown require /etc/passwd and /etc/group for resolution. In scratch or passwd-less stages, use numeric UIDs/GIDs instead (e.g., --chown=65532:65532), or COPY the passwd/group files from a builder stage.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/named-identity-in-passwdless-stage/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 13
+            },
+            "file": "testdata/named-identity-in-passwdless-stage/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 13
+            }
+          },
+          "message": "COPY --chown uses named user \"appuser\" and group \"appgroup\" but this stage has no /etc/passwd or /etc/group",
+          "rule": "tally/named-identity-in-passwdless-stage",
+          "severity": "warning",
+          "sourceCode": "COPY --chown=appuser:appgroup --from=builder /myapp /myapp",
+          "suggestedFix": {
+            "description": "Replace with numeric identity: --chown=65532:65532",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 29,
+                    "line": 13
+                  },
+                  "file": "testdata/named-identity-in-passwdless-stage/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 13
+                  }
+                },
+                "newText": "--chown=65532:65532"
+              }
+            ],
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Named identities require /etc/passwd and /etc/group for resolution. In scratch or passwd-less stages, use numeric UIDs/GIDs instead (e.g., USER 65532:65532), or COPY the passwd/group files from a builder stage.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/named-identity-in-passwdless-stage/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 17
+            },
+            "file": "testdata/named-identity-in-passwdless-stage/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 17
+            }
+          },
+          "message": "USER uses named group \"appgroup\" but this stage has no /etc/group",
+          "rule": "tally/named-identity-in-passwdless-stage",
+          "severity": "warning",
+          "sourceCode": "USER 1000:appgroup",
+          "suggestedFix": {
+            "description": "Replace with numeric identity: USER 1000:65532",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 18
+                  },
+                  "file": "testdata/named-identity-in-passwdless-stage/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 17
+                  }
+                },
+                "newText": "USER 1000:65532\n"
+              }
+            ],
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 3,
+    "warnings": 3
+  }
+}

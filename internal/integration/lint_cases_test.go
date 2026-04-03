@@ -335,6 +335,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// Named identity in passwd-less stage
+		{
+			name:     "named-identity-in-passwdless-stage",
+			dir:      "named-identity-in-passwdless-stage",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/named-identity-in-passwdless-stage")...),
+			wantExit: 1,
+		},
+
 		// Invalid JSON exec-form detection
 		{
 			name:     "invalid-json-form",
