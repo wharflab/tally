@@ -25,6 +25,7 @@ const (
 	ModDeclaration uint32 = 1 << iota
 	ModReadonly
 	ModDocumentation
+	ModDefaultLibrary
 )
 
 type Token struct {

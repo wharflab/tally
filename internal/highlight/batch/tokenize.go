@@ -3,36 +3,30 @@
 package batch
 
 import (
-	sitter "github.com/tree-sitter/go-tree-sitter"
-
 	"github.com/wharflab/tally/internal/highlight/core"
 	"github.com/wharflab/tally/internal/highlight/tsutil"
-	tsbatch "github.com/wharflab/tree-sitter-batch/bindings/go"
+	tsbatch "github.com/wharflab/tree-sitter-batch"
 )
 
-var batchNodeTokenTypes = map[string]core.TokenType{
-	"comment":            core.TokenComment,
-	"string":             core.TokenString,
-	"variable_reference": core.TokenVariable,
-	"for_variable":       core.TokenVariable,
-	"integer":            core.TokenNumber,
-	"comparison_op":      core.TokenOperator,
-	"redirect_op":        core.TokenOperator,
-	"command_option":     core.TokenParameter,
-	"label":              core.TokenProperty, //nolint:customlint // tree-sitter node type, not Dockerfile instruction
+var batchHighlightQuery = tsbatch.HighlightsQuery
+
+var batchCaptureSpecs = map[string]tsutil.CaptureSpec{
+	"comment":          {Type: core.TokenComment},
+	"constant":         {Type: core.TokenParameter},
+	"function":         {Type: core.TokenFunction},
+	"keyword":          {Type: core.TokenKeyword},
+	"label":            {Type: core.TokenProperty}, //nolint:customlint // tree-sitter capture, not Dockerfile instruction
+	"number":           {Type: core.TokenNumber},
+	"operator":         {Type: core.TokenOperator},
+	"string":           {Type: core.TokenString},
+	"string.special":   {Type: core.TokenString},
+	"variable":         {Type: core.TokenVariable},
+	"variable.builtin": {Type: core.TokenVariable, Modifiers: core.ModDefaultLibrary, Priority: 31},
 }
 
-var batchLanguage = newBatchLanguage()
-
-func newBatchLanguage() *sitter.Language {
-	ptr := tsbatch.Language()
-	if ptr == nil {
-		return nil
-	}
-	return sitter.NewLanguage(ptr)
-}
+var batchLanguage = tsbatch.GetLanguage()
 
 // Tokenize returns parser-backed semantic tokens for cmd.exe/batch snippets.
 func Tokenize(script string) []core.Token {
-	return tsutil.Tokenize(script, batchLanguage, batchNodeTokenTypes)
+	return tsutil.TokenizeWithQuery(script, batchLanguage, batchHighlightQuery, batchCaptureSpecs)
 }

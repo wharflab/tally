@@ -37,6 +37,18 @@ func TestTokenize_StringLiteral(t *testing.T) {
 	assertHasToken(t, script, tokens, highlightcore.TokenString, "\"hello world\"")
 }
 
+func TestTokenize_SetAssignmentUsesStructuredQueryCaptures(t *testing.T) {
+	t.Parallel()
+
+	script := "set /p PATH=%PATH%;C:\\Tools\n"
+	tokens := Tokenize(script)
+
+	assertHasToken(t, script, tokens, highlightcore.TokenKeyword, "set")
+	assertHasToken(t, script, tokens, highlightcore.TokenParameter, "/p")
+	assertHasToken(t, script, tokens, highlightcore.TokenVariable, "PATH")
+	assertHasToken(t, script, tokens, highlightcore.TokenString, "%PATH%;C:\\Tools")
+}
+
 func TestTokenize_RedirectOperator(t *testing.T) {
 	t.Parallel()
 
@@ -79,6 +91,15 @@ func TestTokenize_UsesRuneColumns(t *testing.T) {
 	assertHasToken(t, script, tokens, highlightcore.TokenString, "\"%PATH%\"")
 }
 
+func TestTokenize_BuiltinVariableReferenceUsesDefaultLibraryModifier(t *testing.T) {
+	t.Parallel()
+
+	script := "echo %CD%\n"
+	tokens := Tokenize(script)
+
+	assertHasTokenWithModifiers(t, script, tokens, highlightcore.TokenVariable, highlightcore.ModDefaultLibrary, "%CD%")
+}
+
 func TestTokenize_EmptyScript(t *testing.T) {
 	t.Parallel()
 
@@ -119,6 +140,37 @@ func assertNoToken(t *testing.T, script string, tokens []highlightcore.Token, wa
 			t.Fatalf("unexpected token type=%s text=%q in %+v", wantType, wantText, tokens)
 		}
 	}
+}
+
+func assertHasTokenWithModifiers(
+	t *testing.T,
+	script string,
+	tokens []highlightcore.Token,
+	wantType highlightcore.TokenType,
+	wantModifiers uint32,
+	wantText string,
+) {
+	t.Helper()
+
+	for _, tok := range tokens {
+		if tok.Type != wantType || tok.Priority != 30 && tok.Priority != 31 {
+			continue
+		}
+		if tok.Modifiers != wantModifiers {
+			continue
+		}
+		if got := tokenText(script, tok); got == wantText {
+			return
+		}
+	}
+
+	t.Fatalf(
+		"missing token type=%s modifiers=%d text=%q in %+v",
+		wantType,
+		wantModifiers,
+		wantText,
+		tokens,
+	)
 }
 
 func tokenText(script string, tok highlightcore.Token) string {

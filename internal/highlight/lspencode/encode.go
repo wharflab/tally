@@ -23,6 +23,7 @@ var Legend = struct {
 		"declaration",
 		"readonly",
 		"documentation",
+		"defaultLibrary",
 	},
 }
 
@@ -90,6 +91,9 @@ func modifierMask(mods uint32) uint32 {
 	}
 	if mods&core.ModDocumentation != 0 {
 		mask |= 1 << 2
+	}
+	if mods&core.ModDefaultLibrary != 0 {
+		mask |= 1 << 3
 	}
 	return mask
 }

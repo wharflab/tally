@@ -13,6 +13,13 @@ import (
 	"github.com/wharflab/tally/internal/highlight/core"
 )
 
+// CaptureSpec describes how a tree-sitter query capture should map to a token.
+type CaptureSpec struct {
+	Type      core.TokenType
+	Modifiers uint32
+	Priority  int
+}
+
 // CommandPathPattern matches command names that look like filesystem paths
 // (e.g. C:\app\tool.exe, ./bin/tool, ~/script). These are typically excluded
 // from TokenFunction output.
@@ -65,6 +72,92 @@ func Tokenize(script string, lang *sitter.Language, nodeTypes map[string]core.To
 	})
 
 	return tokens
+}
+
+// TokenizeWithQuery parses script with the given tree-sitter language, applies
+// the supplied query, and maps captures to core.Token values. Capture names are
+// matched exactly first, then by their base name before the first dot, so a
+// query capture like @variable.builtin can reuse a generic "variable" mapping.
+func TokenizeWithQuery(
+	script string,
+	lang *sitter.Language,
+	querySource string,
+	captureSpecs map[string]CaptureSpec,
+) []core.Token {
+	if script == "" || lang == nil || strings.TrimSpace(querySource) == "" {
+		return nil
+	}
+
+	parser := sitter.NewParser()
+	defer parser.Close()
+
+	if err := parser.SetLanguage(lang); err != nil {
+		return nil
+	}
+
+	source := []byte(script)
+	tree := parser.Parse(source, nil)
+	if tree == nil {
+		return nil
+	}
+	defer tree.Close()
+
+	query, err := sitter.NewQuery(lang, querySource)
+	if err != nil {
+		return nil
+	}
+	defer query.Close()
+
+	lines := strings.Split(script, "\n")
+	captureNames := query.CaptureNames()
+	cursor := sitter.NewQueryCursor()
+	defer cursor.Close()
+
+	matches := cursor.Matches(query, tree.RootNode(), source)
+	tokens := make([]core.Token, 0, 16)
+	for match := matches.Next(); match != nil; match = matches.Next() {
+		for _, capture := range match.Captures {
+			name, ok := captureName(captureNames, capture.Index)
+			if !ok {
+				continue
+			}
+
+			spec, ok := captureSpecForName(name, captureSpecs)
+			if !ok {
+				continue
+			}
+
+			node := capture.Node
+			priority := spec.Priority
+			if priority == 0 {
+				priority = 30
+			}
+			AppendNodeTokens(lines, &node, spec.Type, priority, spec.Modifiers, &tokens)
+		}
+	}
+
+	return tokens
+}
+
+func captureName(names []string, index uint32) (string, bool) {
+	if int(index) >= len(names) {
+		return "", false
+	}
+	return names[index], true
+}
+
+func captureSpecForName(name string, specs map[string]CaptureSpec) (CaptureSpec, bool) {
+	if spec, ok := specs[name]; ok {
+		return spec, true
+	}
+
+	if before, _, ok := strings.Cut(name, "."); ok {
+		if spec, ok := specs[before]; ok {
+			return spec, true
+		}
+	}
+
+	return CaptureSpec{}, false
 }
 
 // Walk visits every named node in the tree-sitter parse tree.
