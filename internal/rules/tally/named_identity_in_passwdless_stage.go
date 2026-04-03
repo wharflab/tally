@@ -416,6 +416,9 @@ func pathBase(p string) string {
 // a stage inherits from its ancestry chain. It also determines whether the
 // stage is passwd-less at all (rooted in scratch).
 //
+// The walk accumulates identity-DB state from each ancestor, so a chain like
+// base(/etc/passwd) → mid(/etc/group) → child correctly inherits both files.
+//
 // Returns (hasPasswd, hasGroup, isPasswdless). If isPasswdless is false, the
 // stage bases on an external image that ships /etc/passwd and the rule should
 // not fire.
@@ -434,7 +437,7 @@ func inheritedIdentityDBState(
 
 		// scratch is always passwd-less and provides neither database.
 		if info.IsScratch() {
-			return false, false, true
+			return hasPasswd, hasGroup, true
 		}
 
 		// External images (alpine, debian, distroless, etc.) ship /etc/passwd.
@@ -442,39 +445,18 @@ func inheritedIdentityDBState(
 			return false, false, false
 		}
 
-		// Local stage ref: check if parent stage produced passwd files.
-		// We scan the parent's final state (all its commands) because the
-		// child inherits the parent's complete filesystem.
+		// Local stage ref: accumulate identity-DB files written in this stage.
 		parentIdx := info.BaseImage.StageIndex
-		parentPasswd, parentGroup := parentStageIdentityDBs(sem, fileFacts, parentIdx)
+		stgPasswd, stgGroup := parentStageIdentityDBs(sem, fileFacts, parentIdx)
+		hasPasswd = hasPasswd || stgPasswd
+		hasGroup = hasGroup || stgGroup
 
-		if parentPasswd && parentGroup {
-			// Parent provides both — stage is not effectively passwd-less.
+		if hasPasswd && hasGroup {
+			// Full coverage — stage is not effectively passwd-less.
 			return true, true, false
 		}
 
-		if parentPasswd || parentGroup {
-			// Parent provides one but not the other. The stage is still
-			// passwd-less (rooted in scratch), but inherits partial state.
-			// Continue walking to confirm scratch root.
-			for inner := parentIdx; !visited[inner]; {
-				visited[inner] = true
-				innerInfo := sem.StageInfo(inner)
-				if innerInfo == nil {
-					return false, false, false
-				}
-				if innerInfo.IsScratch() {
-					return parentPasswd, parentGroup, true
-				}
-				if innerInfo.BaseImage == nil || !innerInfo.BaseImage.IsStageRef || innerInfo.BaseImage.StageIndex < 0 {
-					return false, false, false
-				}
-				inner = innerInfo.BaseImage.StageIndex
-			}
-			return false, false, false
-		}
-
-		// Parent has neither — walk up the chain.
+		// Walk up the chain to accumulate from further ancestors.
 		idx = parentIdx
 	}
 

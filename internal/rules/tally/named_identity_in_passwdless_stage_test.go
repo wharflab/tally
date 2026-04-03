@@ -222,6 +222,22 @@ USER appuser
 			WantViolations: 0,
 		},
 		{
+			Name: "split inheritance: passwd in base, group in mid",
+			Content: `FROM golang:1.22 AS builder
+RUN useradd -r appuser
+
+FROM scratch AS base
+COPY --from=builder /etc/passwd /etc/passwd
+
+FROM base AS mid
+COPY --from=builder /etc/group /etc/group
+
+FROM mid
+USER appuser:appgroup
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "scratch with no USER or chown - no violation",
 			Content: `FROM scratch
 COPY --from=builder /myapp /myapp
