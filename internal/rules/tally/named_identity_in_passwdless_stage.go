@@ -272,6 +272,8 @@ func buildUserFix(
 }
 
 // buildChownFix builds a suggested fix for --chown with named identities.
+// It scans the full instruction span (which may be multi-line via `\`
+// continuations) to locate the --chown flag.
 func buildChownFix(
 	cmd instructions.Command,
 	chown string,
@@ -284,28 +286,33 @@ func buildChownFix(
 		return nil
 	}
 
-	// Find the --chown flag in the source text to do a targeted replacement.
-	line := locs[0].Start.Line
-	srcLine := ctx.sm.Line(line - 1) // SourceMap is 0-based, parser locations are 1-based
-
 	oldChown := "--chown=" + chown
-	idx := strings.Index(srcLine, oldChown)
-	if idx < 0 {
-		return nil
+	startLine := locs[0].Start.Line
+	endLine := ctx.sm.ResolveEndLine(locs[0].End.Line)
+
+	// Scan each physical line in the instruction span to find the --chown flag.
+	for lineNum := startLine; lineNum <= endLine; lineNum++ {
+		srcLine := ctx.sm.Line(lineNum - 1) // SourceMap is 0-based
+		idx := strings.Index(srcLine, oldChown)
+		if idx < 0 {
+			continue
+		}
+
+		replacement := numericReplacement(user, group, namedUser, namedGroup)
+		newChown := "--chown=" + replacement
+
+		return &rules.SuggestedFix{
+			Description: "Replace with numeric identity: --chown=" + replacement,
+			Safety:      rules.FixSuggestion,
+			Priority:    ctx.meta.FixPriority,
+			Edits: []rules.TextEdit{{
+				Location: rules.NewRangeLocation(ctx.file, lineNum, idx, lineNum, idx+len(oldChown)),
+				NewText:  newChown,
+			}},
+		}
 	}
 
-	replacement := numericReplacement(user, group, namedUser, namedGroup)
-	newChown := "--chown=" + replacement
-
-	return &rules.SuggestedFix{
-		Description: "Replace with numeric identity: --chown=" + replacement,
-		Safety:      rules.FixSuggestion,
-		Priority:    ctx.meta.FixPriority,
-		Edits: []rules.TextEdit{{
-			Location: rules.NewRangeLocation(ctx.file, line, idx, line, idx+len(oldChown)),
-			NewText:  newChown,
-		}},
-	}
+	return nil
 }
 
 // numericReplacement computes the numeric UID:GID replacement string.

@@ -295,6 +295,20 @@ COPY --chown=appuser:appgroup --from=builder /app /app
 			wantFixContain: "--chown=65532:65532",
 			wantSafety:     rules.FixSuggestion,
 		},
+		{
+			name: "COPY --chown fix works on continuation line",
+			content: `FROM golang:1.22 AS builder
+RUN echo hello > /app
+
+FROM scratch
+COPY \
+  --chown=appuser \
+  --from=builder /app /app
+`,
+			wantHasFix:     true,
+			wantFixContain: "--chown=65532",
+			wantSafety:     rules.FixSuggestion,
+		},
 	}
 
 	for _, tt := range tests {
