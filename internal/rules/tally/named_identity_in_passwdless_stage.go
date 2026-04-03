@@ -232,7 +232,10 @@ func (r *NamedIdentityInPasswdlessStageRule) checkChown(
 	return &v
 }
 
-// buildUserFix builds a suggested fix that replaces named identities with numeric ones.
+// buildUserFix builds a suggested fix that replaces only the identity operand
+// in a USER instruction, preserving original casing, indentation, and any
+// surrounding whitespace so the fix does not trigger ConsistentInstructionCasing
+// or formatting rules.
 func buildUserFix(
 	userCmd *instructions.UserCommand,
 	ctx *namedIdentityCtx,
@@ -244,19 +247,26 @@ func buildUserFix(
 		return nil
 	}
 
-	replacement := numericReplacement(user, group, namedUser, namedGroup)
-	newInstruction := strings.ToUpper(command.User) + " " + replacement + "\n"
-
 	line := locs[0].Start.Line
-	endLine := ctx.sm.ResolveEndLine(locs[0].End.Line)
+	srcLine := ctx.sm.Line(line - 1) // 0-based
+
+	// Locate the identity operand in the source line (the part after the
+	// USER keyword and whitespace). We search for the original operand text.
+	originalOperand := userCmd.User
+	idx := strings.Index(srcLine, originalOperand)
+	if idx < 0 {
+		return nil
+	}
+
+	replacement := numericReplacement(user, group, namedUser, namedGroup)
 
 	return &rules.SuggestedFix{
 		Description: "Replace with numeric identity: USER " + replacement,
 		Safety:      rules.FixSuggestion,
 		Priority:    ctx.meta.FixPriority,
 		Edits: []rules.TextEdit{{
-			Location: rules.NewRangeLocation(ctx.file, line, 0, endLine+1, 0),
-			NewText:  newInstruction,
+			Location: rules.NewRangeLocation(ctx.file, line, idx, line, idx+len(originalOperand)),
+			NewText:  replacement,
 		}},
 	}
 }

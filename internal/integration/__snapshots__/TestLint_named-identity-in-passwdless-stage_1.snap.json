@@ -27,16 +27,16 @@
               {
                 "location": {
                   "end": {
-                    "column": 0,
-                    "line": 10
+                    "column": 12,
+                    "line": 9
                   },
                   "file": "testdata/named-identity-in-passwdless-stage/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 5,
                     "line": 9
                   }
                 },
-                "newText": "USER 65532\n"
+                "newText": "65532"
               }
             ],
             "safety": 1
@@ -105,16 +105,16 @@
               {
                 "location": {
                   "end": {
-                    "column": 0,
-                    "line": 18
+                    "column": 18,
+                    "line": 17
                   },
                   "file": "testdata/named-identity-in-passwdless-stage/Dockerfile",
                   "start": {
-                    "column": 0,
+                    "column": 5,
                     "line": 17
                   }
                 },
-                "newText": "USER 1000:65532\n"
+                "newText": "1000:65532"
               }
             ],
             "safety": 1

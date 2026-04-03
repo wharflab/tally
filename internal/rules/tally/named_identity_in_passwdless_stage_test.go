@@ -250,7 +250,7 @@ func TestNamedIdentityInPasswdlessStageCheckWithFixes(t *testing.T) {
 USER appuser
 `,
 			wantHasFix:     true,
-			wantFixContain: "USER 65532",
+			wantFixContain: "65532",
 			wantSafety:     rules.FixSuggestion,
 		},
 		{
@@ -259,7 +259,7 @@ USER appuser
 USER appuser:1000
 `,
 			wantHasFix:     true,
-			wantFixContain: "USER 65532:1000",
+			wantFixContain: "65532:1000",
 			wantSafety:     rules.FixSuggestion,
 		},
 		{
@@ -268,7 +268,7 @@ USER appuser:1000
 USER appuser:appgroup
 `,
 			wantHasFix:     true,
-			wantFixContain: "USER 65532:65532",
+			wantFixContain: "65532:65532",
 			wantSafety:     rules.FixSuggestion,
 		},
 		{
