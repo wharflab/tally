@@ -143,19 +143,22 @@ func (r *NamedIdentityInPasswdlessStageRule) Check(input rules.LintInput) []rule
 // instruction writes /etc/passwd or /etc/group into the stage.
 func updateIdentityDBState(ctx *namedIdentityCtx, cmd instructions.Command) {
 	var destPath string
+	var sources []string
 	switch c := cmd.(type) {
 	case *instructions.CopyCommand:
 		destPath = c.DestPath
+		sources = c.SourcePaths
 	case *instructions.AddCommand:
 		destPath = c.DestPath
+		sources = c.SourcePaths
 	default:
 		return
 	}
 
-	if !ctx.hasPasswd && looksLikePasswdDest(destPath, "/etc/passwd") {
+	if !ctx.hasPasswd && copiesIdentityDB(destPath, sources, "/etc/passwd") {
 		ctx.hasPasswd = true
 	}
-	if !ctx.hasGroup && looksLikePasswdDest(destPath, "/etc/group") {
+	if !ctx.hasGroup && copiesIdentityDB(destPath, sources, "/etc/group") {
 		ctx.hasGroup = true
 	}
 }
@@ -376,21 +379,37 @@ func splitUserGroup(value string) (string, string) {
 	return strings.TrimSpace(user), strings.TrimSpace(group)
 }
 
-// looksLikePasswdDest checks if a COPY/ADD destination path produces the
-// given target file. Handles both exact paths and directory destinations.
-func looksLikePasswdDest(dest, target string) bool {
-	if dest == "" || target == "" {
+// copiesIdentityDB checks if a COPY/ADD instruction produces the given target
+// file (e.g., "/etc/passwd"). For exact destinations it matches directly; for
+// directory destinations it requires a source with a matching basename to avoid
+// false positives like `COPY ca-certificates.crt /etc/` matching /etc/passwd.
+func copiesIdentityDB(destPath string, sources []string, targetPath string) bool {
+	if destPath == "" || targetPath == "" {
 		return false
 	}
-	// Exact match.
-	if dest == target || dest == target+"/" {
+	// Exact destination match.
+	if destPath == targetPath || destPath == targetPath+"/" {
 		return true
 	}
-	// Directory destination: /etc/ with source /etc/passwd → /etc/passwd.
-	if strings.HasSuffix(dest, "/") && strings.HasPrefix(target, dest) {
-		return true
+	// Directory destination: check if any source basename matches the target basename.
+	if strings.HasSuffix(destPath, "/") && strings.HasPrefix(targetPath, destPath) {
+		targetBase := pathBase(targetPath)
+		for _, src := range sources {
+			if pathBase(src) == targetBase {
+				return true
+			}
+		}
 	}
 	return false
+}
+
+// pathBase returns the last path segment, handling trailing slashes.
+func pathBase(p string) string {
+	p = strings.TrimRight(p, "/")
+	if i := strings.LastIndex(p, "/"); i >= 0 {
+		return p[i+1:]
+	}
+	return p
 }
 
 // inheritedIdentityDBState computes the initial hasPasswd/hasGroup state that
@@ -486,18 +505,21 @@ func parentStageIdentityDBs(
 		if parentInfo != nil && parentInfo.Stage != nil {
 			for _, cmd := range parentInfo.Stage.Commands {
 				var destPath string
+				var sources []string
 				switch c := cmd.(type) {
 				case *instructions.CopyCommand:
 					destPath = c.DestPath
+					sources = c.SourcePaths
 				case *instructions.AddCommand:
 					destPath = c.DestPath
+					sources = c.SourcePaths
 				default:
 					continue
 				}
-				if !hasPasswd && looksLikePasswdDest(destPath, "/etc/passwd") {
+				if !hasPasswd && copiesIdentityDB(destPath, sources, "/etc/passwd") {
 					hasPasswd = true
 				}
-				if !hasGroup && looksLikePasswdDest(destPath, "/etc/group") {
+				if !hasGroup && copiesIdentityDB(destPath, sources, "/etc/group") {
 					hasGroup = true
 				}
 				if hasPasswd && hasGroup {

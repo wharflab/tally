@@ -88,6 +88,20 @@ COPY --chown=myuser --from=builder /app /app
 			WantViolations: 2,
 		},
 
+		// --- Directory dest false positive regression ---
+		{
+			Name: "COPY to /etc/ with unrelated source does not suppress",
+			Content: `FROM golang:1.22 AS builder
+RUN echo hello > /app
+
+FROM scratch
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/
+USER appuser
+`,
+			WantViolations: 1,
+			WantMessages:   []string{`named user "appuser"`},
+		},
+
 		// --- Incremental state tracking ---
 		{
 			Name: "named chown before passwd copied - violation then suppressed",
