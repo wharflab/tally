@@ -23,7 +23,8 @@
     "tokenModifiers": [
      "declaration",
      "readonly",
-     "documentation"
+     "documentation",
+     "defaultLibrary"
     ],
     "tokenTypes": [
      "keyword",
