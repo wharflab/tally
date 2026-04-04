@@ -39,7 +39,7 @@ require (
 	github.com/wharflab/tree-sitter-batch v0.5.0
 	github.com/zricethezav/gitleaks/v8 v8.30.1
 	go.bug.st/lsp v0.1.3
-	go.podman.io/image/v5 v5.39.1
+	go.podman.io/image/v5 v5.39.2
 	golang.org/x/exp/jsonrpc2 v0.0.0-20250718183923-645b1fa84792
 	golang.org/x/sys v0.42.0
 	mvdan.cc/sh/v3 v3.13.0
