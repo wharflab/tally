@@ -577,6 +577,24 @@ func TestAnalyzeCmdScript_CaretEscapedAmpersandDoesNotLoseCommandText(t *testing
 	}
 }
 
+func TestAnalyzeCmdScript_PipesAndRedirections(t *testing.T) {
+	t.Parallel()
+
+	analysis := AnalyzeCmdScript("dir | findstr foo\necho hi > output.txt")
+	if analysis == nil {
+		t.Fatal("expected analysis")
+	}
+	if !analysis.HasPipes {
+		t.Fatal("expected HasPipes to be true")
+	}
+	if !analysis.HasRedirections {
+		t.Fatal("expected HasRedirections to be true")
+	}
+	if analysis.HasConditionals {
+		t.Fatal("expected HasConditionals to be false")
+	}
+}
+
 func TestPowerShellAssignment(t *testing.T) {
 	t.Parallel()
 
