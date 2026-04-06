@@ -76,7 +76,6 @@
       "enabled": false
     },
     {
-      "matchManagers": ["dockerfile"],
       "matchFileNames": ["internal/integration/testdata/**"],
       "enabled": false
     },
