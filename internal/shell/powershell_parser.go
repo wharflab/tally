@@ -401,9 +401,7 @@ func hasPowerShellPipelineOperator(node *sitter.Node) bool {
 	}
 	if node.NamedChildCount() == 1 {
 		child := node.NamedChild(0)
-		if child != nil && child.Kind() == tspowershell.NodePipelineChain && child.NamedChildCount() > 1 {
-			return true
-		}
+		return child != nil && child.Kind() == tspowershell.NodePipelineChain && child.NamedChildCount() > 1
 	}
 	return false
 }
