@@ -34,15 +34,15 @@ const DEFAULTS: TallyLspSettings = {
 export function readEffectiveSettings(scope?: vscode.ConfigurationScope): TallyLspSettings {
   const cfg = vscode.workspace.getConfiguration("tally", scope);
   return {
-    enable: cfg.get<boolean>("enable", DEFAULTS.enable),
-    path: cfg.get<string[]>("path", DEFAULTS.path),
+    enable: cfg.get("enable", DEFAULTS.enable),
+    path: cfg.get("path", DEFAULTS.path),
     importStrategy: cfg.get<ImportStrategy>("importStrategy", DEFAULTS.importStrategy),
-    configuration: cfg.get<unknown>("configuration", DEFAULTS.configuration),
+    configuration: cfg.get("configuration", DEFAULTS.configuration),
     configurationPreference: cfg.get<ConfigurationPreference>(
       "configurationPreference",
       DEFAULTS.configurationPreference,
     ),
-    fixUnsafe: cfg.get<boolean>("fixUnsafe", DEFAULTS.fixUnsafe),
+    fixUnsafe: cfg.get("fixUnsafe", DEFAULTS.fixUnsafe),
     workspaceTrusted: vscode.workspace.isTrusted,
   };
 }

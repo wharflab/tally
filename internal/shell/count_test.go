@@ -534,6 +534,18 @@ func TestHasPipes(t *testing.T) {
 			variant: VariantPowerShell,
 			want:    true,
 		},
+		{
+			name:    "powershell multi-stage pipeline",
+			script:  `Get-Process | Where-Object CPU -gt 10 | Sort-Object CPU`,
+			variant: VariantPowerShell,
+			want:    true,
+		},
+		{
+			name:    "powershell single command is not a pipeline",
+			script:  `Get-ChildItem -Recurse`,
+			variant: VariantPowerShell,
+			want:    false,
+		},
 	}
 
 	for _, tt := range tests {

@@ -9,20 +9,12 @@ import (
 	"strings"
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
-	tsbatch "github.com/wharflab/tree-sitter-batch/bindings/go"
+	tsbatch "github.com/wharflab/tree-sitter-batch"
 )
 
-var batchLanguage = newBatchLanguage()
+var batchLanguage = tsbatch.GetLanguage()
 
 var cmdVariablePattern = regexp.MustCompile(`(?i)(%[a-z_][a-z0-9_]*(?::[^%]+)?%|![a-z_][a-z0-9_]*!|%%~?[a-z]|%~?[0-9])`)
-
-func newBatchLanguage() *sitter.Language {
-	ptr := tsbatch.Language()
-	if ptr == nil {
-		return nil
-	}
-	return sitter.NewLanguage(ptr)
-}
 
 // CmdScriptAnalysis captures the cmd.exe syntax traits that matter for fix
 // safety when rewriting a stage to PowerShell.
@@ -122,7 +114,7 @@ func AnalyzeCmdScript(script string) *CmdScriptAnalysis {
 		}
 
 		switch node.Kind() {
-		case "cmd":
+		case tsbatch.NodeCmd:
 			if info, ok := cmdCommandInfo(node, source); ok {
 				analysis.Commands = append(analysis.Commands, info)
 				analysis.commandByteRanges = append(analysis.commandByteRanges, [2]uint{node.StartByte(), node.EndByte()})
@@ -133,22 +125,29 @@ func AnalyzeCmdScript(script string) *CmdScriptAnalysis {
 					analysis.HasVariableReferences = true
 				}
 			}
-		case "variable_reference":
+		case tsbatch.NodeVariableReference:
 			analysis.HasVariableReferences = true
-		case "cond_exec":
+		case tsbatch.NodeCondExec:
 			analysis.HasConditionals = true
 			if op, ok := cmdConditionalOperator(node, source); ok {
 				analysis.conditionalOps = append(analysis.conditionalOps, op)
 			}
-		case "pipe_stmt":
+		case tsbatch.NodePipeStmt:
 			analysis.HasPipes = true
-		case "redirect_stmt", "redirection":
+		case tsbatch.NodeRedirectStmt, tsbatch.NodeRedirection:
 			analysis.HasRedirections = true
-		case "exit_stmt":
+		case tsbatch.NodeExitStmt:
 			analysis.HasExitCommand = true
 			analysis.HasControlFlow = true
-		case "if_stmt", "for_stmt", "goto_stmt", "call_stmt", "setlocal_stmt", "endlocal_stmt", "variable_assignment",
-			"parenthesized", "echo_off":
+		case tsbatch.NodeIfStmt,
+			tsbatch.NodeForStmt,
+			tsbatch.NodeGotoStmt,
+			tsbatch.NodeCallStmt,
+			tsbatch.NodeSetlocalStmt,
+			tsbatch.NodeEndlocalStmt,
+			tsbatch.NodeVariableAssignment,
+			tsbatch.NodeParenthesized,
+			tsbatch.NodeEchoOff:
 			analysis.HasControlFlow = true
 		}
 	})
@@ -195,10 +194,10 @@ func cmdCommandInfo(node *sitter.Node, source []byte) (CommandInfo, bool) {
 
 	for _, child := range node.NamedChildren(cursor) {
 		switch child.Kind() {
-		case "command_name":
+		case tsbatch.NodeCommandName:
 			nameNode = child
 			hasName = true
-		case "argument_list":
+		case tsbatch.NodeArgumentList:
 			argsNode = child
 			hasArgs = true
 		}
