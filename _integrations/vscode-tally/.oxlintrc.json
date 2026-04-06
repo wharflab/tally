@@ -52,7 +52,6 @@
     "unicorn/prefer-type-error": "error",
     "unicorn/new-for-builtins": "error",
     "unicorn/no-typeof-undefined": "error",
-    "unicorn/import-style": "off",
     "no-fallthrough": "error",
     "no-console": "error",
     "sort-imports": "off",

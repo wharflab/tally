@@ -229,7 +229,7 @@ export class TallyLanguageClient {
   }
 
   private fixUnsafeForUri(uri: vscode.Uri): boolean {
-    return vscode.workspace.getConfiguration("tally", uri).get<boolean>("fixUnsafe", false);
+    return vscode.workspace.getConfiguration("tally", uri).get("fixUnsafe", false);
   }
 }
 
