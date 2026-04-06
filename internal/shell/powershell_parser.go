@@ -8,22 +8,14 @@ import (
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
 
-	tspowershell "github.com/wharflab/tally/internal/third_party/tree_sitter_powershell"
+	tspowershell "github.com/wharflab/tree-sitter-powershell"
 )
 
-var powerShellLanguage = newPowerShellLanguage()
+var powerShellLanguage = tspowershell.GetLanguage()
 
 const powerShellPipelineKind = "pipeline"
 const powerShellScriptBlockBodyKind = "script_block_body"
 const powerShellStatementListKind = "statement_list"
-
-func newPowerShellLanguage() *sitter.Language {
-	ptr := tspowershell.Language()
-	if ptr == nil {
-		return nil
-	}
-	return sitter.NewLanguage(ptr)
-}
 
 type powerShellArg struct {
 	text string
@@ -407,7 +399,18 @@ func hasPowerShellPipelineOperator(node *sitter.Node) bool {
 		return false
 	}
 
-	return node.NamedChildCount() > 1
+	// The grammar may wrap piped commands in a pipeline_chain node
+	// (single child of the pipeline), or place commands as direct children.
+	if node.NamedChildCount() > 1 {
+		return true
+	}
+	if node.NamedChildCount() == 1 {
+		child := node.NamedChild(0)
+		if child != nil && child.Kind() == "pipeline_chain" && child.NamedChildCount() > 1 {
+			return true
+		}
+	}
+	return false
 }
 
 func isTopLevelPowerShellPipelineParent(kind string) bool {
