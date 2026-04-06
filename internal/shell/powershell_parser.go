@@ -7,15 +7,10 @@ import (
 	"strings"
 
 	sitter "github.com/tree-sitter/go-tree-sitter"
-
 	tspowershell "github.com/wharflab/tree-sitter-powershell"
 )
 
 var powerShellLanguage = tspowershell.GetLanguage()
-
-const powerShellPipelineKind = "pipeline"
-const powerShellScriptBlockBodyKind = "script_block_body"
-const powerShellStatementListKind = "statement_list"
 
 type powerShellArg struct {
 	text string
@@ -66,11 +61,11 @@ func findPowerShellCommands(script string, names ...string) []CommandInfo {
 
 	var commands []CommandInfo
 	walkPowerShellTree(tree.RootNode(), func(node *sitter.Node) {
-		if node == nil || node.Kind() != "command" {
+		if node == nil || node.Kind() != tspowershell.NodeCommand {
 			return
 		}
 
-		nameNode := node.ChildByFieldName("command_name")
+		nameNode := node.ChildByFieldName(tspowershell.FieldCommandName)
 		if nameNode == nil {
 			return
 		}
@@ -139,7 +134,7 @@ func walkPowerShellTreeUntil(node *sitter.Node, visit func(*sitter.Node) bool) b
 }
 
 func powerShellCommandArgs(node *sitter.Node, source []byte) []powerShellArg {
-	elements := node.ChildByFieldName("command_elements")
+	elements := node.ChildByFieldName(tspowershell.FieldCommandElements)
 	if elements == nil {
 		return nil
 	}
@@ -150,7 +145,7 @@ func powerShellCommandArgs(node *sitter.Node, source []byte) []powerShellArg {
 	children := elements.NamedChildren(cursor)
 	args := make([]powerShellArg, 0, len(children))
 	for _, child := range children {
-		if child.Kind() == "command_argument_sep" {
+		if child.Kind() == tspowershell.NodeCommandArgumentSep {
 			continue
 		}
 		text := strings.TrimSpace(child.Utf8Text(source))
@@ -224,7 +219,7 @@ func PowerShellAssignment(script string) (string, string, bool) {
 	}
 
 	assign := pipeline.NamedChild(0)
-	if assign == nil || assign.Kind() != "assignment_expression" {
+	if assign == nil || assign.Kind() != tspowershell.NodeAssignmentExpression {
 		return "", "", false
 	}
 
@@ -235,7 +230,7 @@ func PowerShellAssignment(script string) (string, string, bool) {
 	if len(children) != 3 {
 		return "", "", false
 	}
-	if children[0].Kind() != "left_assignment_expression" || children[2].Kind() != powerShellPipelineKind {
+	if children[0].Kind() != tspowershell.NodeLeftAssignmentExpression || children[2].Kind() != tspowershell.NodePipeline {
 		return "", "", false
 	}
 
@@ -281,7 +276,7 @@ func analyzePowerShellScript(script string) *powerShellScriptAnalysis {
 }
 
 func singleTopLevelPowerShellPipeline(root *sitter.Node) *sitter.Node {
-	if root == nil || root.Kind() != "program" || root.NamedChildCount() != 1 {
+	if root == nil || root.Kind() != tspowershell.NodeProgram || root.NamedChildCount() != 1 {
 		return nil
 	}
 
@@ -291,14 +286,14 @@ func singleTopLevelPowerShellPipeline(root *sitter.Node) *sitter.Node {
 	}
 
 	switch stmtList.Kind() {
-	case powerShellPipelineKind:
+	case tspowershell.NodePipeline:
 		return stmtList
-	case powerShellStatementListKind, powerShellScriptBlockBodyKind:
+	case tspowershell.NodeStatementList, tspowershell.NodeScriptBlockBody:
 		if stmtList.NamedChildCount() != 1 {
 			return nil
 		}
 		pipeline := stmtList.NamedChild(0)
-		if pipeline == nil || pipeline.Kind() != powerShellPipelineKind {
+		if pipeline == nil || pipeline.Kind() != tspowershell.NodePipeline {
 			return nil
 		}
 		return pipeline
@@ -332,7 +327,7 @@ func hasPowerShellFlowControl(script, keyword string) bool {
 	}
 
 	return walkPowerShellTreeUntil(root, func(node *sitter.Node) bool {
-		if node == nil || node.Kind() != "flow_control_statement" {
+		if node == nil || node.Kind() != tspowershell.NodeFlowControlStatement {
 			return false
 		}
 
@@ -367,7 +362,7 @@ func collectPowerShellStatements(
 		text := strings.TrimSpace(node.Utf8Text(source))
 		if text != "" {
 			stmt := powerShellStatement{Text: text}
-			if kind == powerShellPipelineKind {
+			if kind == tspowershell.NodePipeline {
 				stmt.HasPipe = hasPowerShellPipelineOperator(node)
 			}
 			analysis.Statements = append(analysis.Statements, stmt)
@@ -387,7 +382,7 @@ func isTopLevelPowerShellStatement(parentKind, kind string) bool {
 	}
 
 	switch kind {
-	case powerShellStatementListKind, powerShellScriptBlockBodyKind, "empty_statement", "comment":
+	case tspowershell.NodeStatementList, tspowershell.NodeScriptBlockBody, tspowershell.NodeEmptyStatement, tspowershell.NodeComment:
 		return false
 	default:
 		return true
@@ -395,7 +390,7 @@ func isTopLevelPowerShellStatement(parentKind, kind string) bool {
 }
 
 func hasPowerShellPipelineOperator(node *sitter.Node) bool {
-	if node == nil || node.Kind() != powerShellPipelineKind {
+	if node == nil || node.Kind() != tspowershell.NodePipeline {
 		return false
 	}
 
@@ -406,7 +401,7 @@ func hasPowerShellPipelineOperator(node *sitter.Node) bool {
 	}
 	if node.NamedChildCount() == 1 {
 		child := node.NamedChild(0)
-		if child != nil && child.Kind() == "pipeline_chain" && child.NamedChildCount() > 1 {
+		if child != nil && child.Kind() == tspowershell.NodePipelineChain && child.NamedChildCount() > 1 {
 			return true
 		}
 	}
@@ -415,7 +410,7 @@ func hasPowerShellPipelineOperator(node *sitter.Node) bool {
 
 func isTopLevelPowerShellPipelineParent(kind string) bool {
 	switch kind {
-	case "program", powerShellStatementListKind, powerShellScriptBlockBodyKind:
+	case tspowershell.NodeProgram, tspowershell.NodeStatementList, tspowershell.NodeScriptBlockBody:
 		return true
 	default:
 		return false
@@ -424,20 +419,20 @@ func isTopLevelPowerShellPipelineParent(kind string) bool {
 
 func isPowerShellComplexKind(kind string) bool {
 	switch kind {
-	case "if_statement",
-		"switch_statement",
-		"foreach_statement",
-		"for_statement",
-		"while_statement",
-		"flow_control_statement",
-		"function_statement",
-		"trap_statement",
-		"try_statement",
-		"data_statement",
-		"parallel_statement",
-		"class_statement",
-		"script_block",
-		"script_block_expression":
+	case tspowershell.NodeIfStatement,
+		tspowershell.NodeSwitchStatement,
+		tspowershell.NodeForeachStatement,
+		tspowershell.NodeForStatement,
+		tspowershell.NodeWhileStatement,
+		tspowershell.NodeFlowControlStatement,
+		tspowershell.NodeFunctionStatement,
+		tspowershell.NodeTrapStatement,
+		tspowershell.NodeTryStatement,
+		tspowershell.NodeDataStatement,
+		tspowershell.NodeParallelStatement,
+		tspowershell.NodeClassStatement,
+		tspowershell.NodeScriptBlock,
+		tspowershell.NodeScriptBlockExpression:
 		return true
 	default:
 		return false
