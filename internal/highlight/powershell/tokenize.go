@@ -42,11 +42,16 @@ func filterPathFunctions(script string, tokens []core.Token) []core.Token {
 	}
 
 	lines := strings.Split(script, "\n")
+	lineRunes := make(map[int][]rune)
 	out := tokens[:0]
 	for _, tok := range tokens {
 		if tok.Type == core.TokenFunction {
 			if tok.Line >= 0 && tok.Line < len(lines) {
-				runes := []rune(lines[tok.Line])
+				runes, ok := lineRunes[tok.Line]
+				if !ok {
+					runes = []rune(lines[tok.Line])
+					lineRunes[tok.Line] = runes
+				}
 				if tok.StartCol >= 0 && tok.EndCol <= len(runes) {
 					text := string(runes[tok.StartCol:tok.EndCol])
 					if tsutil.CommandPathPattern.MatchString(text) {
