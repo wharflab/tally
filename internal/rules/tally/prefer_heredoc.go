@@ -62,7 +62,7 @@ func (r *PreferHeredocRule) Metadata() rules.RuleMetadata {
 		DocURL:          rules.TallyDocURL(rules.HeredocRuleCode),
 		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
-		IsExperimental:  true,
+		IsExperimental:  false,
 		FixPriority:     100, // Structural transform: run after content fixes
 	}
 }

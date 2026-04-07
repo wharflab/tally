@@ -72,7 +72,7 @@ See the [tally rules documentation](docs/rules/tally/) for detailed descriptions
 | [`tally/windows/no-chown-flag`](docs/rules/tally/windows/no-chown-flag.md) 🔧 | `COPY/ADD --chown` is silently ignored on Windows containers | Warning | Correctness | Enabled |
 | [`tally/windows/no-run-mounts`](docs/rules/tally/windows/no-run-mounts.md) | `RUN --mount` flags are not supported on Windows containers and will fail at runtime | Error | Correctness | Enabled |
 | [`tally/windows/no-stopsignal`](docs/rules/tally/windows/no-stopsignal.md) 🔧 | `STOPSIGNAL` has no effect on Windows containers because they do not support POSIX signals | Warning | Correctness | Enabled |
-| [`tally/prefer-run-heredoc`](docs/rules/tally/prefer-run-heredoc.md) 🔧 | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Off (experimental) |
+| [`tally/prefer-run-heredoc`](docs/rules/tally/prefer-run-heredoc.md) 🔧 | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Enabled |
 | [`tally/consistent-indentation`](docs/rules/tally/consistent-indentation.md) 🔧 | Enforces consistent indentation for Dockerfile build stages | Style | Style | Off (experimental) |
 | [`tally/newline-between-instructions`](docs/rules/tally/newline-between-instructions.md) 🔧 | Controls blank lines between Dockerfile instructions | Style | Style | Enabled (grouped) |
 | [`tally/no-multi-spaces`](docs/rules/tally/no-multi-spaces.md) 🔧 | Disallows multiple consecutive spaces within instructions | Style | Style | Enabled |
