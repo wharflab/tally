@@ -6,7 +6,7 @@ Suggests using heredoc syntax for multi-command RUN instructions.
 |----------|-------|
 | Severity | Style |
 | Category | Style |
-| Default | Off (experimental) |
+| Default | Enabled |
 | Auto-fix | Yes (`--fix`) |
 
 ## Description

@@ -5,6 +5,6 @@
  "Description": "Use heredoc syntax for multi-command RUN instructions",
  "DocURL": "https://wharflab.github.io/tally/rules/tally/prefer-run-heredoc/",
  "FixPriority": 100,
- "IsExperimental": true,
+ "IsExperimental": false,
  "Name": "Prefer RUN heredoc syntax"
 }
