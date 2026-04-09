@@ -178,6 +178,30 @@ RUN docker-php-ext-install xdebug
 `,
 			WantViolations: 1,
 		},
+		// --- Observable file (COPY heredoc) ---
+		{
+			Name: "COPY heredoc script installing xdebug triggers violation",
+			Content: `FROM php:8.4-fpm AS app
+COPY <<EOF /usr/local/bin/setup.sh
+#!/bin/bash
+pecl install xdebug
+docker-php-ext-enable xdebug
+EOF
+RUN chmod +x /usr/local/bin/setup.sh && /usr/local/bin/setup.sh
+`,
+			WantViolations: 2,
+		},
+		{
+			Name: "COPY heredoc script without xdebug no violation",
+			Content: `FROM php:8.4-fpm AS app
+COPY <<EOF /usr/local/bin/setup.sh
+#!/bin/bash
+docker-php-ext-install gd intl
+EOF
+RUN chmod +x /usr/local/bin/setup.sh && /usr/local/bin/setup.sh
+`,
+			WantViolations: 0,
+		},
 	})
 }
 
