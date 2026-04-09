@@ -182,63 +182,6 @@ func TestArgsContainXdebugSubstring(t *testing.T) {
 	}
 }
 
-func TestLooksLikeShellScript(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name string
-		path string
-		want bool
-	}{
-		{name: "sh extension", path: "/usr/local/bin/setup.sh", want: true},
-		{name: "bash extension", path: "/opt/install.bash", want: true},
-		{name: "install in name", path: "/usr/local/bin/install-extensions", want: true},
-		{name: "setup in name", path: "/app/setup", want: true},
-		{name: "init in name", path: "/docker-entrypoint-init", want: true},
-		{name: "entrypoint in name", path: "/usr/local/bin/docker-entrypoint", want: true},
-		{name: "start in name", path: "/app/start-server", want: true},
-		{name: "php file", path: "/app/index.php", want: false},
-		{name: "config file", path: "/etc/php/conf.d/xdebug.ini", want: false},
-		{name: "random binary", path: "/usr/bin/composer", want: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := looksLikeShellScript(tt.path); got != tt.want {
-				t.Errorf("looksLikeShellScript(%q) = %v, want %v", tt.path, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestContentLooksLikeShellScript(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		content string
-		want    bool
-	}{
-		{name: "bin sh shebang", content: "#!/bin/sh\ndocker-php-ext-install xdebug\n", want: true},
-		{name: "bin bash shebang", content: "#!/bin/bash\nset -e\npecl install xdebug\n", want: true},
-		{name: "env sh shebang", content: "#!/usr/bin/env sh\necho hello\n", want: true},
-		{name: "env bash shebang", content: "#!/usr/bin/env bash\necho hello\n", want: true},
-		{name: "no shebang", content: "docker-php-ext-install xdebug\n", want: false},
-		{name: "php shebang", content: "#!/usr/bin/php\n<?php echo 1;\n", want: false},
-		{name: "empty", content: "", want: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := contentLooksLikeShellScript(tt.content); got != tt.want {
-				t.Errorf("contentLooksLikeShellScript() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestComposerTruthy(t *testing.T) {
 	t.Parallel()
 
