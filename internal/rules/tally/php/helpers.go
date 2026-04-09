@@ -4,7 +4,6 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/facts"
@@ -14,7 +13,10 @@ import (
 	"github.com/wharflab/tally/internal/sourcemap"
 )
 
-const subcommandInstall = "install"
+const (
+	subcommandInstall = "install"
+	subcommandAdd     = "add" //nolint:customlint // apk subcommand, not Dockerfile ADD instruction
+)
 
 var nonProductionStageTokens = []string{"dev", "development", "test", "testing", "ci", "debug"}
 
@@ -138,7 +140,7 @@ func commandReferencesXdebug(cmd shell.CommandInfo) bool {
 	case "apt-get", "apt":
 		return cmd.Subcommand == subcommandInstall && argsContainXdebugSubstring(cmd.Args)
 	case "apk":
-		return cmd.Subcommand == command.Add && argsContainXdebugSubstring(cmd.Args)
+		return cmd.Subcommand == subcommandAdd && argsContainXdebugSubstring(cmd.Args)
 	case "dnf", "yum":
 		return cmd.Subcommand == subcommandInstall && argsContainXdebugSubstring(cmd.Args)
 	default:
