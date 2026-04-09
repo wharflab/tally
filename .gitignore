@@ -87,3 +87,4 @@ site/
 .venv/
 
 .codex/tmp/
+.claude/worktrees/

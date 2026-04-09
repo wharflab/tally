@@ -8,6 +8,7 @@
     "GH_PAGER": "cat",
     "GOEXPERIMENT": "jsonv2"
   },
+  "skipWebFetchPreflight": true,
   "permissions": {
     "allow": [
       "mcp__*",
