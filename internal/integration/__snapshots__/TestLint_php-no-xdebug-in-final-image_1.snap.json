@@ -106,7 +106,74 @@
           "message": "Final image installs or enables Xdebug, a development-only tool",
           "rule": "tally/php/no-xdebug-in-final-image",
           "severity": "warning",
-          "sourceCode": "RUN apt-get install -y php-xdebug"
+          "sourceCode": "RUN apt-get install -y php-xdebug",
+          "suggestedFix": {
+            "description": "Comment out Xdebug installation",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 33,
+                    "line": 12
+                  },
+                  "file": "testdata/php-no-xdebug-in-final-image/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 12
+                  }
+                },
+                "newText": "# RUN apt-get install -y php-xdebug"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88,
+            "safety": 1
+          },
+          "suggestedFixes": [
+            {
+              "description": "Comment out Xdebug installation",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 33,
+                      "line": 12
+                    },
+                    "file": "testdata/php-no-xdebug-in-final-image/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 12
+                    }
+                  },
+                  "newText": "# RUN apt-get install -y php-xdebug"
+                }
+              ],
+              "isPreferred": true,
+              "priority": 88,
+              "safety": 1
+            },
+            {
+              "description": "Delete Xdebug installation",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 13
+                    },
+                    "file": "testdata/php-no-xdebug-in-final-image/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 12
+                    }
+                  },
+                  "newText": ""
+                }
+              ],
+              "priority": 88,
+              "safety": 2
+            }
+          ]
         }
       ]
     }

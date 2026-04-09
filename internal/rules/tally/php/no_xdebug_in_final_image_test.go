@@ -231,6 +231,42 @@ func TestNoXdebugInFinalImageRule_SuggestedFix_MultiLine(t *testing.T) {
 	}
 }
 
+func TestNoXdebugInFinalImageRule_SuggestedFix_AptGetSinglePackage(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM php:8.4-cli\nRUN apt-get install -y php-xdebug\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewNoXdebugInFinalImageRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix for standalone apt-get xdebug install")
+	}
+	if fix.Safety != rules.FixSuggestion {
+		t.Errorf("Safety = %v, want FixSuggestion", fix.Safety)
+	}
+	if fix.Edits[0].NewText != "# RUN apt-get install -y php-xdebug" {
+		t.Errorf("NewText = %q, want commented-out line", fix.Edits[0].NewText)
+	}
+}
+
+func TestNoXdebugInFinalImageRule_NoFixWhenMixedPackages(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM php:8.4-cli\nRUN apt-get install -y php-gd php-xdebug php-intl\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewNoXdebugInFinalImageRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	if violations[0].SuggestedFix != nil {
+		t.Error("expected no SuggestedFix when xdebug is mixed with other packages")
+	}
+}
+
 func TestNoXdebugInFinalImageRule_NoFixWhenMixed(t *testing.T) {
 	t.Parallel()
 

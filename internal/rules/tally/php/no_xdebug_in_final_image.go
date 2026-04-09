@@ -180,8 +180,21 @@ func commandOnlyDoesXdebug(cmd shell.CommandInfo) bool {
 			return false
 		}
 		return allNonFlagArgsAreXdebug(argsAfterSubcommand(cmd.Args, subcommandInstall))
-	case "apt-get", "apt", "apk", "dnf", "yum":
-		return false // package managers always have mixed installs
+	case "apt-get", "apt":
+		if cmd.Subcommand != subcommandInstall {
+			return false
+		}
+		return allNonFlagArgsAreXdebugSubstring(argsAfterSubcommand(cmd.Args, subcommandInstall))
+	case "apk":
+		if cmd.Subcommand != subcommandAdd {
+			return false
+		}
+		return allNonFlagArgsAreXdebugSubstring(argsAfterSubcommand(cmd.Args, subcommandAdd))
+	case "dnf", "yum":
+		if cmd.Subcommand != subcommandInstall {
+			return false
+		}
+		return allNonFlagArgsAreXdebugSubstring(argsAfterSubcommand(cmd.Args, subcommandInstall))
 	default:
 		return false
 	}
@@ -195,6 +208,22 @@ func allNonFlagArgsAreXdebug(args []string) bool {
 		}
 		lower := strings.ToLower(arg)
 		if lower != "xdebug" && !strings.HasPrefix(lower, "xdebug-") {
+			return false
+		}
+		found = true
+	}
+	return found
+}
+
+// allNonFlagArgsAreXdebugSubstring is like allNonFlagArgsAreXdebug but uses
+// substring matching for package-manager packages (e.g., "php-xdebug").
+func allNonFlagArgsAreXdebugSubstring(args []string) bool {
+	found := false
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		if !strings.Contains(strings.ToLower(arg), "xdebug") {
 			return false
 		}
 		found = true
