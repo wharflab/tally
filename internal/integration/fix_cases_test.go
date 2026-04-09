@@ -1373,6 +1373,20 @@ severity = "style"
 severity = "warning"
 `,
 		},
+		// PHP: no-xdebug-in-final-image comments out a standalone xdebug
+		// installation. The pecl install is the only command in the RUN, so the
+		// preferred comment-out fix (FixSuggestion, priority 88) applies. The
+		// builder stage is non-final so no fix there.
+		{
+			name: "php-no-xdebug-in-final-image-comment-out",
+			input: "FROM php:8.4-cli AS builder\n" +
+				"RUN docker-php-ext-install xdebug\n\n" +
+				"FROM php:8.4-fpm AS app\n" +
+				"RUN pecl install xdebug\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/php/no-xdebug-in-final-image")...),
+			wantApplied: 1,
+		},
 		// Full composition: two secret mounts (insertion) + two cache mounts
 		// (insertion) + cleanup removal (npm cache clean, --no-cache-dir)
 		// on the same RUN in a single --fix pass.

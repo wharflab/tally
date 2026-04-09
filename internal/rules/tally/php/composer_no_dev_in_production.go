@@ -111,7 +111,7 @@ func (r *ComposerNoDevInProductionRule) checkRun(
 		}
 
 		v := rules.NewViolation(
-			composerCommandLocation(file, run, cmd, runStartLine),
+			phpCommandLocation(file, run, cmd, runStartLine),
 			meta.Code,
 			meta.Description,
 			meta.DefaultSeverity,

@@ -36,6 +36,7 @@ Custom rules implemented by tally that go beyond BuildKit's checks.
 | [prefer-copy-heredoc](./prefer-copy-heredoc.md) | Suggests using COPY heredoc for file creation | Info | Performance | Enabled |
 | [prefer-package-cache-mounts](./prefer-package-cache-mounts.md) | Suggests cache mounts for package install/build commands and removes cache cleanup | Info | Performance | Enabled |
 | [php/composer-no-dev-in-production](./php/composer-no-dev-in-production.md) | Production Composer install commands should include --no-dev | Warning | Security | Enabled |
+| [php/no-xdebug-in-final-image](./php/no-xdebug-in-final-image.md) | Final image installs or enables Xdebug, a development-only tool | Warning | Best Practices | Enabled |
 | [powershell/prefer-shell-instruction](./powershell/prefer-shell-instruction.md) | Prefer a `SHELL` instruction instead of repeating `pwsh` or `powershell -Command` in `RUN` | Style | Style | Enabled (experimental) |
 | [gpu/no-container-runtime-in-image](./gpu/no-container-runtime-in-image.md) | NVIDIA container runtime packages belong on the host, not inside the image | Warning | Correctness | Enabled |
 | [gpu/no-hardcoded-visible-devices](./gpu/no-hardcoded-visible-devices.md) | GPU visibility is deployment policy; hardcoding it in the image reduces portability | Warning | Correctness | Enabled |
