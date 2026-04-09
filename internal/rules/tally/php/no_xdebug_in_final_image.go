@@ -123,12 +123,15 @@ func (r *NoXdebugInFinalImageRule) checkObservableFiles(
 		if observed == nil || observed.Source == facts.ObservableFileSourceRun {
 			continue
 		}
-		if !looksLikeShellScript(observed.Path) {
-			continue
-		}
 
 		content, ok := observed.Content()
 		if !ok || content == "" {
+			continue
+		}
+
+		// Check filename first; fall back to shebang for extensionless scripts
+		// like /usr/local/bin/docker-entrypoint.
+		if !looksLikeShellScript(observed.Path) && !contentLooksLikeShellScript(content) {
 			continue
 		}
 
@@ -308,9 +311,19 @@ func looksLikeShellScript(filePath string) bool {
 		return true
 	}
 	base := strings.ToLower(path.Base(filePath))
-	return strings.Contains(base, "install") ||
+	return strings.Contains(base, "entrypoint") || //nolint:customlint // filename pattern, not Dockerfile instruction
+		strings.Contains(base, "install") ||
 		strings.Contains(base, "setup") ||
-		strings.Contains(base, "init")
+		strings.Contains(base, "init") ||
+		strings.Contains(base, "start")
+}
+
+// contentLooksLikeShellScript checks if file content starts with a shell shebang.
+func contentLooksLikeShellScript(content string) bool {
+	return strings.HasPrefix(content, "#!/bin/sh") ||
+		strings.HasPrefix(content, "#!/bin/bash") ||
+		strings.HasPrefix(content, "#!/usr/bin/env sh") ||
+		strings.HasPrefix(content, "#!/usr/bin/env bash")
 }
 
 func init() {
