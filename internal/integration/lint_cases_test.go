@@ -254,6 +254,12 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/php/composer-no-dev-in-production")...),
 			wantExit: 1,
 		},
+		{
+			name:     "php-no-xdebug-in-final-image",
+			dir:      "php-no-xdebug-in-final-image",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/php/no-xdebug-in-final-image")...),
+			wantExit: 1,
+		},
 
 		// Windows: RUN --mount not supported
 		{

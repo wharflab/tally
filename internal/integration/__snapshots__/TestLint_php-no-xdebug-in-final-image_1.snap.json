@@ -1,0 +1,124 @@
+{
+  "files": [
+    {
+      "file": "testdata/php-no-xdebug-in-final-image/Dockerfile",
+      "violations": [
+        {
+          "detail": "Xdebug is a development and debugging tool that should not ship in production images. Move the Xdebug installation into a dedicated dev or debug build stage.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/php/no-xdebug-in-final-image/",
+          "location": {
+            "end": {
+              "column": 8,
+              "line": 11
+            },
+            "file": "testdata/php-no-xdebug-in-final-image/Dockerfile",
+            "start": {
+              "column": 4,
+              "line": 11
+            }
+          },
+          "message": "Final image installs or enables Xdebug, a development-only tool",
+          "rule": "tally/php/no-xdebug-in-final-image",
+          "severity": "warning",
+          "sourceCode": "RUN pecl install xdebug",
+          "suggestedFix": {
+            "description": "Comment out Xdebug installation",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 23,
+                    "line": 11
+                  },
+                  "file": "testdata/php-no-xdebug-in-final-image/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 11
+                  }
+                },
+                "newText": "# RUN pecl install xdebug"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88,
+            "safety": 1
+          },
+          "suggestedFixes": [
+            {
+              "description": "Comment out Xdebug installation",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 23,
+                      "line": 11
+                    },
+                    "file": "testdata/php-no-xdebug-in-final-image/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 11
+                    }
+                  },
+                  "newText": "# RUN pecl install xdebug"
+                }
+              ],
+              "isPreferred": true,
+              "priority": 88,
+              "safety": 1
+            },
+            {
+              "description": "Delete Xdebug installation",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 12
+                    },
+                    "file": "testdata/php-no-xdebug-in-final-image/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 11
+                    }
+                  },
+                  "newText": ""
+                }
+              ],
+              "priority": 88,
+              "safety": 2
+            }
+          ]
+        },
+        {
+          "detail": "Xdebug is a development and debugging tool that should not ship in production images. Move the Xdebug installation into a dedicated dev or debug build stage.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/php/no-xdebug-in-final-image/",
+          "location": {
+            "end": {
+              "column": 11,
+              "line": 12
+            },
+            "file": "testdata/php-no-xdebug-in-final-image/Dockerfile",
+            "start": {
+              "column": 4,
+              "line": 12
+            }
+          },
+          "message": "Final image installs or enables Xdebug, a development-only tool",
+          "rule": "tally/php/no-xdebug-in-final-image",
+          "severity": "warning",
+          "sourceCode": "RUN apt-get install -y php-xdebug"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}

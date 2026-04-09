@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/facts"
@@ -12,6 +13,8 @@ import (
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
+
+const subcommandInstall = "install"
 
 var nonProductionStageTokens = []string{"dev", "development", "test", "testing", "ci", "debug"}
 
@@ -59,7 +62,7 @@ func composerTruthy(value string) bool {
 }
 
 func composerInstallHasNoDev(cmd shell.CommandInfo) bool {
-	return cmd.Subcommand == "install" && cmd.HasFlag("--no-dev")
+	return cmd.Subcommand == subcommandInstall && cmd.HasFlag("--no-dev")
 }
 
 func findComposerCommands(
@@ -82,7 +85,7 @@ func findComposerCommands(
 	return filtered, runStartLine
 }
 
-func composerCommandLocation(
+func phpCommandLocation(
 	file string,
 	run *instructions.RunCommand,
 	cmd shell.CommandInfo,
@@ -93,4 +96,80 @@ func composerCommandLocation(
 	}
 	cmdLine := runStartLine + cmd.Line
 	return rules.NewRangeLocation(file, cmdLine, cmd.StartCol, cmdLine, cmd.EndCol)
+}
+
+// xdebugCommandNames are the command names that can install or enable Xdebug.
+var xdebugCommandNames = []string{
+	"docker-php-ext-install",
+	"docker-php-ext-enable",
+	"pecl",
+	"apt-get", "apt",
+	"apk",
+	"dnf", "yum",
+}
+
+// findXdebugCommands returns commands that install or enable Xdebug in a RUN instruction.
+func findXdebugCommands(
+	run *instructions.RunCommand,
+	shellVariant shell.Variant,
+	sm *sourcemap.SourceMap,
+) ([]shell.CommandInfo, int) {
+	cmds, runStartLine := runcheck.FindCommands(run, shellVariant, sm, xdebugCommandNames...)
+	if len(cmds) == 0 {
+		return nil, 0
+	}
+
+	filtered := make([]shell.CommandInfo, 0, len(cmds))
+	for _, cmd := range cmds {
+		if commandReferencesXdebug(cmd) {
+			filtered = append(filtered, cmd)
+		}
+	}
+	return filtered, runStartLine
+}
+
+// commandReferencesXdebug checks whether a parsed command installs or enables Xdebug.
+func commandReferencesXdebug(cmd shell.CommandInfo) bool {
+	switch cmd.Name {
+	case "docker-php-ext-install", "docker-php-ext-enable":
+		return argsContainXdebug(cmd.Args)
+	case "pecl":
+		return cmd.Subcommand == subcommandInstall && argsContainXdebug(cmd.Args)
+	case "apt-get", "apt":
+		return cmd.Subcommand == subcommandInstall && argsContainXdebugSubstring(cmd.Args)
+	case "apk":
+		return cmd.Subcommand == command.Add && argsContainXdebugSubstring(cmd.Args)
+	case "dnf", "yum":
+		return cmd.Subcommand == subcommandInstall && argsContainXdebugSubstring(cmd.Args)
+	default:
+		return false
+	}
+}
+
+// argsContainXdebug checks if any non-flag arg is "xdebug" or starts with "xdebug-" (versioned pecl).
+func argsContainXdebug(args []string) bool {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		lower := strings.ToLower(arg)
+		if lower == "xdebug" || strings.HasPrefix(lower, "xdebug-") {
+			return true
+		}
+	}
+	return false
+}
+
+// argsContainXdebugSubstring checks if any non-flag arg contains "xdebug" as a substring.
+// Used for package-manager installs where package names vary (php-xdebug, php8.3-xdebug, etc.).
+func argsContainXdebugSubstring(args []string) bool {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		if strings.Contains(strings.ToLower(arg), "xdebug") {
+			return true
+		}
+	}
+	return false
 }
