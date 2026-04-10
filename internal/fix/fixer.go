@@ -489,8 +489,8 @@ func selectNonConflictingCandidates(fc *FileChange, candidates []*fixCandidate) 
 					})
 				}
 				// Remove evicted indices in reverse order to preserve positions.
-				for i := len(evicted) - 1; i >= 0; i-- {
-					selected = slices.Delete(selected, evicted[i], evicted[i]+1)
+				for _, idx := range slices.Backward(evicted) {
+					selected = slices.Delete(selected, idx, idx+1)
 				}
 				selected = append(selected, c)
 				reserved = append(reserved, c.fix.Edits...)
