@@ -1,0 +1,60 @@
+---
+title: "shellcheck/SC1040"
+description: "When using `<<-`, the heredoc terminator may only be indented with tabs."
+---
+
+When using `<<-`, the heredoc terminator may only be indented with tabs.
+
+| Property | Value |
+|----------|-------|
+| Severity | Error |
+| Category | Best Practices |
+| Default | Enabled (via `shellcheck/*`) |
+| Auto-fix | Yes (`--fix`, safe) |
+
+## Description
+
+The `<<-` heredoc form strips leading **tabs** from heredoc lines. Leading spaces before the terminator are invalid and can prevent correct heredoc
+termination.
+
+tally reports this as `shellcheck/SC1040` and provides an auto-fix that removes only the extra leading spaces from the terminator indentation.
+
+## Examples
+
+### Problematic code
+
+```dockerfile
+RUN <<'SCRIPT'
+cat <<-EOF
+hello
+  EOF
+EOF
+SCRIPT
+```
+
+### Correct code
+
+```dockerfile
+RUN <<'SCRIPT'
+cat <<-EOF
+hello
+	EOF
+EOF
+SCRIPT
+```
+
+## Auto-fix
+
+The fix is minimal:
+
+- removes only leading space runs in the offending terminator line
+- preserves tab indentation
+- emits narrow edits so other fixes can still apply to the same script
+
+```bash
+tally lint --fix --select shellcheck/SC1040 Dockerfile
+```
+
+## Reference
+
+- [ShellCheck SC1040](https://www.shellcheck.net/wiki/SC1040)

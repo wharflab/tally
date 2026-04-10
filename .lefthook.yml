@@ -49,9 +49,9 @@ pre-commit:
       run: bunx -y -q @taplo/cli format {staged_files}
       stage_fixed: true
     rumdl:
-      glob: "**/*.md"
+      glob: "**/*.{md,mdx}"
       exclude: "**/__snapshots__/**"
-      run: uv tool run rumdl==0.1.67 check --fix --config .rumdl.toml --output-format concise {staged_files}
+      run: uv tool run rumdl==0.1.69 check --fix --config .rumdl.toml --output-format concise {staged_files}
       stage_fixed: true
     yamllint:
       glob: "*.{yml,yaml}"

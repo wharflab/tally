@@ -505,8 +505,7 @@ func applyEdits(t *testing.T, _ /* uri */, content string, edits []textEdit) str
 	validateNonOverlapping(t, lspEdits)
 
 	// Apply edits in reverse order (end to start) to avoid position shifts.
-	for i := len(lspEdits) - 1; i >= 0; i-- {
-		edit := lspEdits[i]
+	for _, edit := range slices.Backward(lspEdits) {
 		var err error
 		content, err = textedits.ApplyTextChange(content, edit.Range, edit.NewText)
 		require.NoError(t, err, "ApplyTextChange failed")

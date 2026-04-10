@@ -25,64 +25,64 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 ## tally Rules
 
 Custom rules implemented by tally that go beyond BuildKit's checks.
-See the [tally rules documentation](docs/rules/tally/) for detailed descriptions, examples, and configuration options.
+See the [tally rules documentation](_docs/rules/tally/) for detailed descriptions, examples, and configuration options.
 
 | Rule | Description | Severity | Category | Default |
 |------|-------------|----------|----------|---------|
-| [`tally/require-stages`](docs/rules/tally/require-stages.md) | Dockerfile has no stages to build (fail-fast syntax check) | Error | Correctness | Enabled |
-| [`tally/unknown-instruction`](docs/rules/tally/unknown-instruction.md) | Detects misspelled or invalid Dockerfile instruction keywords (fail-fast syntax check) | Error | Correctness | Enabled |
-| [`tally/syntax-directive-typo`](docs/rules/tally/syntax-directive-typo.md) | Detects typos in `# syntax=` parser directives (fail-fast syntax check) | Error | Correctness | Enabled |
-| [`tally/secrets-in-code`](docs/rules/tally/secrets-in-code.md) | Detects hardcoded secrets, API keys, and credentials using [gitleaks](https://github.com/gitleaks/gitleaks) patterns | Error | Security | Enabled |
-| [`tally/prefer-vex-attestation`](docs/rules/tally/prefer-vex-attestation.md) | Recommends attaching OpenVEX as an OCI attestation instead of copying `*.vex.json` into the image | Info | Security | Enabled |
-| [`tally/require-secret-mounts`](docs/rules/tally/require-secret-mounts.md) 🔧 | Enforces `--mount=type=secret` for commands accessing private registries | Warning | Security | Off (requires config) |
-| [`tally/prefer-add-git`](docs/rules/tally/prefer-add-git.md) 🔧 | Prefers `ADD <git source>` over cloning repositories in `RUN` for more hermetic builds | Warning | Security | Enabled |
-| [`tally/stateful-root-runtime`](docs/rules/tally/stateful-root-runtime.md) | Final stage runs as root and signals mutable/persistent state | Warning | Security | Enabled |
-| [`tally/world-writable-state-path-workaround`](docs/rules/tally/world-writable-state-path-workaround.md) 🔧 | chmod 777/a+rwx sets world-writable permissions (ownership confusion workaround) | Warning | Security | Enabled |
-| [`tally/user-created-but-never-used`](docs/rules/tally/user-created-but-never-used.md) 🔧 | Final stage creates a user but never switches to it | Warning | Security | Enabled |
-| [`tally/copy-after-user-without-chown`](docs/rules/tally/copy-after-user-without-chown.md) 🔧 | COPY/ADD without --chown after non-root USER creates root-owned files | Warning | Correctness | Enabled |
-| [`tally/named-identity-in-passwdless-stage`](docs/rules/tally/named-identity-in-passwdless-stage.md) 🔧 | Named user/group in USER or --chown requires /etc/passwd which passwd-less stages lack | Warning | Correctness | Enabled |
-| [`tally/max-lines`](docs/rules/tally/max-lines.md) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
-| [`tally/no-unreachable-stages`](docs/rules/tally/no-unreachable-stages.md) | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
-| [`tally/shell-run-in-scratch`](docs/rules/tally/shell-run-in-scratch.md) | Detects shell-form RUN in scratch stages where no shell exists | Warning | Correctness | Enabled |
-| [`tally/no-ungraceful-stopsignal`](docs/rules/tally/no-ungraceful-stopsignal.md) 🔧 | STOPSIGNAL should not use signals that prevent graceful shutdown | Warning | Correctness | Enabled |
-| [`tally/prefer-canonical-stopsignal`](docs/rules/tally/prefer-canonical-stopsignal.md) 🔧 | STOPSIGNAL should use canonical signal names (e.g. `SIGTERM`, not `TERM` or `15`) | Info | Style | Enabled |
-| [`tally/prefer-systemd-sigrtmin-plus-3`](docs/rules/tally/prefer-systemd-sigrtmin-plus-3.md) 🔧 | systemd/init containers should use STOPSIGNAL SIGRTMIN+3 for clean shutdown | Warning | Correctness | Enabled |
-| [`tally/invalid-onbuild-trigger`](docs/rules/tally/invalid-onbuild-trigger.md) 🔧 | ONBUILD trigger instruction is not a valid Dockerfile instruction | Error | Correctness | Enabled |
-| [`tally/circular-stage-deps`](docs/rules/tally/circular-stage-deps.md) | Detects circular dependencies between build stages | Error | Correctness | Enabled |
-| [`tally/copy-from-empty-scratch-stage`](docs/rules/tally/copy-from-empty-scratch-stage.md) | Detects COPY --from referencing a scratch stage with no file-producing instructions | Error | Correctness | Enabled |
-| [`tally/invalid-json-form`](docs/rules/tally/invalid-json-form.md) 🔧 | Arguments appear to use JSON exec-form but contain invalid JSON | Error | Correctness | Enabled |
-| [`tally/platform-mismatch`](docs/rules/tally/platform-mismatch.md) | Explicit `--platform` on FROM does not match what the registry provides | Error | Correctness | Enabled |
-| [`tally/curl-should-follow-redirects`](docs/rules/tally/curl-should-follow-redirects.md) 🔧 | curl commands should include `-L`/`--location` to follow HTTP redirects | Warning | Correctness | Enabled |
-| [`tally/prefer-curl-config`](docs/rules/tally/prefer-curl-config.md) 🔧 | Stages using curl should include a retry config to handle transient failures | Info | Reliability | Enabled |
-| [`tally/prefer-wget-config`](docs/rules/tally/prefer-wget-config.md) 🔧 | Stages using wget should include a retry config to handle transient failures | Info | Reliability | Enabled |
-| [`tally/prefer-telemetry-opt-out`](docs/rules/tally/prefer-telemetry-opt-out.md) 🔧 | Stages using telemetry-enabled tools should set the vendor-documented opt-out environment variables | Info | Privacy | Enabled |
-| [`tally/prefer-add-unpack`](docs/rules/tally/prefer-add-unpack.md) 🔧 | Suggests `ADD --unpack` instead of downloading and extracting remote archives in `RUN` | Info | Performance | Enabled |
-| [`tally/prefer-multi-stage-build`](docs/rules/tally/prefer-multi-stage-build.md) 🔧 | Suggests converting single-stage builds into multi-stage builds to reduce final image size | Info | Performance | Off (experimental) |
-| [`tally/prefer-copy-chmod`](docs/rules/tally/prefer-copy-chmod.md) 🔧 | Prefer `COPY --chmod` over separate `COPY` + `RUN chmod` | Info | Style | Enabled |
-| [`tally/prefer-copy-heredoc`](docs/rules/tally/prefer-copy-heredoc.md) 🔧 | Suggests using COPY heredoc for file creation instead of RUN echo/cat/printf | Info | Performance | Enabled |
-| [`tally/prefer-package-cache-mounts`](docs/rules/tally/prefer-package-cache-mounts.md) 🔧 | Suggests BuildKit cache mounts for package install/build commands and removes cache cleanup commands | Info | Performance | Enabled |
-| [`tally/php/composer-no-dev-in-production`](docs/rules/tally/php/composer-no-dev-in-production.md) 🔧 | Production Composer install commands should include `--no-dev` | Warning | Security | Enabled |
-| [`tally/php/no-xdebug-in-final-image`](docs/rules/tally/php/no-xdebug-in-final-image.md) 🔧 | Final image installs or enables Xdebug, a development-only tool | Warning | Best Practices | Enabled |
-| [`tally/powershell/prefer-shell-instruction`](docs/rules/tally/powershell/prefer-shell-instruction.md) 🔧 | Prefers a PowerShell `SHELL` instruction over repeated `pwsh` or `powershell -Command` wrappers in `RUN` | Style | Style | Enabled (experimental) |
-| [`tally/gpu/no-buildtime-gpu-queries`](docs/rules/tally/gpu/no-buildtime-gpu-queries.md) | GPU hardware queries in RUN will fail at build time | Error | Correctness | Enabled |
-| [`tally/gpu/no-container-runtime-in-image`](docs/rules/tally/gpu/no-container-runtime-in-image.md) | NVIDIA container runtime packages belong on the host, not inside the image | Warning | Correctness | Enabled |
-| [`tally/gpu/no-hardcoded-visible-devices`](docs/rules/tally/gpu/no-hardcoded-visible-devices.md) 🔧 | GPU visibility is deployment policy; hardcoding it in the image reduces portability | Warning | Correctness | Enabled |
-| [`tally/gpu/no-redundant-cuda-install`](docs/rules/tally/gpu/no-redundant-cuda-install.md) | CUDA packages are already provided by the nvidia/cuda base image | Warning | Correctness | Enabled |
-| [`tally/gpu/prefer-minimal-driver-capabilities`](docs/rules/tally/gpu/prefer-minimal-driver-capabilities.md) 🔧 | NVIDIA_DRIVER_CAPABILITIES=all exposes more driver surface than most workloads need | Info | Correctness | Enabled |
-| [`tally/gpu/prefer-runtime-final-stage`](docs/rules/tally/gpu/prefer-runtime-final-stage.md) | Final stage uses an NVIDIA devel image without clear build-time needs; prefer a runtime variant | Warning | Best Practices | Enabled |
-| [`tally/windows/no-chown-flag`](docs/rules/tally/windows/no-chown-flag.md) 🔧 | `COPY/ADD --chown` is silently ignored on Windows containers | Warning | Correctness | Enabled |
-| [`tally/windows/no-run-mounts`](docs/rules/tally/windows/no-run-mounts.md) | `RUN --mount` flags are not supported on Windows containers and will fail at runtime | Error | Correctness | Enabled |
-| [`tally/windows/no-stopsignal`](docs/rules/tally/windows/no-stopsignal.md) 🔧 | `STOPSIGNAL` has no effect on Windows containers because they do not support POSIX signals | Warning | Correctness | Enabled |
-| [`tally/prefer-run-heredoc`](docs/rules/tally/prefer-run-heredoc.md) 🔧 | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Enabled |
-| [`tally/consistent-indentation`](docs/rules/tally/consistent-indentation.md) 🔧 | Enforces consistent indentation for Dockerfile build stages | Style | Style | Off (experimental) |
-| [`tally/newline-between-instructions`](docs/rules/tally/newline-between-instructions.md) 🔧 | Controls blank lines between Dockerfile instructions | Style | Style | Enabled (grouped) |
-| [`tally/no-multi-spaces`](docs/rules/tally/no-multi-spaces.md) 🔧 | Disallows multiple consecutive spaces within instructions | Style | Style | Enabled |
-| [`tally/no-multiple-empty-lines`](docs/rules/tally/no-multiple-empty-lines.md) 🔧 | Disallows multiple consecutive empty lines | Style | Style | Enabled |
-| [`tally/no-trailing-spaces`](docs/rules/tally/no-trailing-spaces.md) 🔧 | Disallows trailing whitespace at the end of lines | Style | Style | Enabled |
-| [`tally/eol-last`](docs/rules/tally/eol-last.md) 🔧 | Enforces a newline at the end of non-empty files | Style | Style | Enabled |
-| [`tally/epilogue-order`](docs/rules/tally/epilogue-order.md) 🔧 | Enforces canonical order for epilogue instructions (STOPSIGNAL, HEALTHCHECK, ENTRYPOINT, CMD) | Style | Style | Enabled |
-| [`tally/sort-packages`](docs/rules/tally/sort-packages.md) 🔧 | Package lists in install commands should be sorted alphabetically | Style | Style | Enabled |
-| [`tally/newline-per-chained-call`](docs/rules/tally/newline-per-chained-call.md) 🔧 | Each chained element within an instruction should be on its own line | Style | Style | Enabled |
+| [`tally/require-stages`](_docs/rules/tally/require-stages.mdx) | Dockerfile has no stages to build (fail-fast syntax check) | Error | Correctness | Enabled |
+| [`tally/unknown-instruction`](_docs/rules/tally/unknown-instruction.mdx) | Detects misspelled or invalid Dockerfile instruction keywords (fail-fast syntax check) | Error | Correctness | Enabled |
+| [`tally/syntax-directive-typo`](_docs/rules/tally/syntax-directive-typo.mdx) | Detects typos in `# syntax=` parser directives (fail-fast syntax check) | Error | Correctness | Enabled |
+| [`tally/secrets-in-code`](_docs/rules/tally/secrets-in-code.mdx) | Detects hardcoded secrets, API keys, and credentials using [gitleaks](https://github.com/gitleaks/gitleaks) patterns | Error | Security | Enabled |
+| [`tally/prefer-vex-attestation`](_docs/rules/tally/prefer-vex-attestation.mdx) | Recommends attaching OpenVEX as an OCI attestation instead of copying `*.vex.json` into the image | Info | Security | Enabled |
+| [`tally/require-secret-mounts`](_docs/rules/tally/require-secret-mounts.mdx) 🔧 | Enforces `--mount=type=secret` for commands accessing private registries | Warning | Security | Off (requires config) |
+| [`tally/prefer-add-git`](_docs/rules/tally/prefer-add-git.mdx) 🔧 | Prefers `ADD <git source>` over cloning repositories in `RUN` for more hermetic builds | Warning | Security | Enabled |
+| [`tally/stateful-root-runtime`](_docs/rules/tally/stateful-root-runtime.mdx) | Final stage runs as root and signals mutable/persistent state | Warning | Security | Enabled |
+| [`tally/world-writable-state-path-workaround`](_docs/rules/tally/world-writable-state-path-workaround.mdx) 🔧 | chmod 777/a+rwx sets world-writable permissions (ownership confusion workaround) | Warning | Security | Enabled |
+| [`tally/user-created-but-never-used`](_docs/rules/tally/user-created-but-never-used.mdx) 🔧 | Final stage creates a user but never switches to it | Warning | Security | Enabled |
+| [`tally/copy-after-user-without-chown`](_docs/rules/tally/copy-after-user-without-chown.mdx) 🔧 | COPY/ADD without --chown after non-root USER creates root-owned files | Warning | Correctness | Enabled |
+| [`tally/named-identity-in-passwdless-stage`](_docs/rules/tally/named-identity-in-passwdless-stage.mdx) 🔧 | Named user/group in USER or --chown requires /etc/passwd which passwd-less stages lack | Warning | Correctness | Enabled |
+| [`tally/max-lines`](_docs/rules/tally/max-lines.mdx) | Enforces maximum number of lines in a Dockerfile | Error | Maintainability | Enabled (50 lines) |
+| [`tally/no-unreachable-stages`](_docs/rules/tally/no-unreachable-stages.mdx) | Warns about build stages that don't contribute to the final image | Warning | Best Practice | Enabled |
+| [`tally/shell-run-in-scratch`](_docs/rules/tally/shell-run-in-scratch.mdx) | Detects shell-form RUN in scratch stages where no shell exists | Warning | Correctness | Enabled |
+| [`tally/no-ungraceful-stopsignal`](_docs/rules/tally/no-ungraceful-stopsignal.mdx) 🔧 | STOPSIGNAL should not use signals that prevent graceful shutdown | Warning | Correctness | Enabled |
+| [`tally/prefer-canonical-stopsignal`](_docs/rules/tally/prefer-canonical-stopsignal.mdx) 🔧 | STOPSIGNAL should use canonical signal names (e.g. `SIGTERM`, not `TERM` or `15`) | Info | Style | Enabled |
+| [`tally/prefer-systemd-sigrtmin-plus-3`](_docs/rules/tally/prefer-systemd-sigrtmin-plus-3.mdx) 🔧 | systemd/init containers should use STOPSIGNAL SIGRTMIN+3 for clean shutdown | Warning | Correctness | Enabled |
+| [`tally/invalid-onbuild-trigger`](_docs/rules/tally/invalid-onbuild-trigger.mdx) 🔧 | ONBUILD trigger instruction is not a valid Dockerfile instruction | Error | Correctness | Enabled |
+| [`tally/circular-stage-deps`](_docs/rules/tally/circular-stage-deps.mdx) | Detects circular dependencies between build stages | Error | Correctness | Enabled |
+| [`tally/copy-from-empty-scratch-stage`](_docs/rules/tally/copy-from-empty-scratch-stage.mdx) | Detects COPY --from referencing a scratch stage with no file-producing instructions | Error | Correctness | Enabled |
+| [`tally/invalid-json-form`](_docs/rules/tally/invalid-json-form.mdx) 🔧 | Arguments appear to use JSON exec-form but contain invalid JSON | Error | Correctness | Enabled |
+| [`tally/platform-mismatch`](_docs/rules/tally/platform-mismatch.mdx) | Explicit `--platform` on FROM does not match what the registry provides | Error | Correctness | Enabled |
+| [`tally/curl-should-follow-redirects`](_docs/rules/tally/curl-should-follow-redirects.mdx) 🔧 | curl commands should include `-L`/`--location` to follow HTTP redirects | Warning | Correctness | Enabled |
+| [`tally/prefer-curl-config`](_docs/rules/tally/prefer-curl-config.mdx) 🔧 | Stages using curl should include a retry config to handle transient failures | Info | Reliability | Enabled |
+| [`tally/prefer-wget-config`](_docs/rules/tally/prefer-wget-config.mdx) 🔧 | Stages using wget should include a retry config to handle transient failures | Info | Reliability | Enabled |
+| [`tally/prefer-telemetry-opt-out`](_docs/rules/tally/prefer-telemetry-opt-out.mdx) 🔧 | Stages using telemetry-enabled tools should set the vendor-documented opt-out environment variables | Info | Privacy | Enabled |
+| [`tally/prefer-add-unpack`](_docs/rules/tally/prefer-add-unpack.mdx) 🔧 | Suggests `ADD --unpack` instead of downloading and extracting remote archives in `RUN` | Info | Performance | Enabled |
+| [`tally/prefer-multi-stage-build`](_docs/rules/tally/prefer-multi-stage-build.mdx) 🔧 | Suggests converting single-stage builds into multi-stage builds to reduce final image size | Info | Performance | Off (experimental) |
+| [`tally/prefer-copy-chmod`](_docs/rules/tally/prefer-copy-chmod.mdx) 🔧 | Prefer `COPY --chmod` over separate `COPY` + `RUN chmod` | Info | Style | Enabled |
+| [`tally/prefer-copy-heredoc`](_docs/rules/tally/prefer-copy-heredoc.mdx) 🔧 | Suggests using COPY heredoc for file creation instead of RUN echo/cat/printf | Info | Performance | Enabled |
+| [`tally/prefer-package-cache-mounts`](_docs/rules/tally/prefer-package-cache-mounts.mdx) 🔧 | Suggests BuildKit cache mounts for package install/build commands and removes cache cleanup commands | Info | Performance | Enabled |
+| [`tally/php/composer-no-dev-in-production`](_docs/rules/tally/php/composer-no-dev-in-production.mdx) 🔧 | Production Composer install commands should include `--no-dev` | Warning | Security | Enabled |
+| [`tally/php/no-xdebug-in-final-image`](_docs/rules/tally/php/no-xdebug-in-final-image.mdx) 🔧 | Final image installs or enables Xdebug, a development-only tool | Warning | Best Practices | Enabled |
+| [`tally/powershell/prefer-shell-instruction`](_docs/rules/tally/powershell/prefer-shell-instruction.mdx) 🔧 | Prefers a PowerShell `SHELL` instruction over repeated `pwsh` or `powershell -Command` wrappers in `RUN` | Style | Style | Enabled (experimental) |
+| [`tally/gpu/no-buildtime-gpu-queries`](_docs/rules/tally/gpu/no-buildtime-gpu-queries.mdx) | GPU hardware queries in RUN will fail at build time | Error | Correctness | Enabled |
+| [`tally/gpu/no-container-runtime-in-image`](_docs/rules/tally/gpu/no-container-runtime-in-image.mdx) | NVIDIA container runtime packages belong on the host, not inside the image | Warning | Correctness | Enabled |
+| [`tally/gpu/no-hardcoded-visible-devices`](_docs/rules/tally/gpu/no-hardcoded-visible-devices.mdx) 🔧 | GPU visibility is deployment policy; hardcoding it in the image reduces portability | Warning | Correctness | Enabled |
+| [`tally/gpu/no-redundant-cuda-install`](_docs/rules/tally/gpu/no-redundant-cuda-install.mdx) | CUDA packages are already provided by the nvidia/cuda base image | Warning | Correctness | Enabled |
+| [`tally/gpu/prefer-minimal-driver-capabilities`](_docs/rules/tally/gpu/prefer-minimal-driver-capabilities.mdx) 🔧 | NVIDIA_DRIVER_CAPABILITIES=all exposes more driver surface than most workloads need | Info | Correctness | Enabled |
+| [`tally/gpu/prefer-runtime-final-stage`](_docs/rules/tally/gpu/prefer-runtime-final-stage.mdx) | Final stage uses an NVIDIA devel image without clear build-time needs; prefer a runtime variant | Warning | Best Practices | Enabled |
+| [`tally/windows/no-chown-flag`](_docs/rules/tally/windows/no-chown-flag.mdx) 🔧 | `COPY/ADD --chown` is silently ignored on Windows containers | Warning | Correctness | Enabled |
+| [`tally/windows/no-run-mounts`](_docs/rules/tally/windows/no-run-mounts.mdx) | `RUN --mount` flags are not supported on Windows containers and will fail at runtime | Error | Correctness | Enabled |
+| [`tally/windows/no-stopsignal`](_docs/rules/tally/windows/no-stopsignal.mdx) 🔧 | `STOPSIGNAL` has no effect on Windows containers because they do not support POSIX signals | Warning | Correctness | Enabled |
+| [`tally/prefer-run-heredoc`](_docs/rules/tally/prefer-run-heredoc.mdx) 🔧 | Suggests using heredoc syntax for multi-command RUN instructions | Style | Style | Enabled |
+| [`tally/consistent-indentation`](_docs/rules/tally/consistent-indentation.mdx) 🔧 | Enforces consistent indentation for Dockerfile build stages | Style | Style | Off (experimental) |
+| [`tally/newline-between-instructions`](_docs/rules/tally/newline-between-instructions.mdx) 🔧 | Controls blank lines between Dockerfile instructions | Style | Style | Enabled (grouped) |
+| [`tally/no-multi-spaces`](_docs/rules/tally/no-multi-spaces.mdx) 🔧 | Disallows multiple consecutive spaces within instructions | Style | Style | Enabled |
+| [`tally/no-multiple-empty-lines`](_docs/rules/tally/no-multiple-empty-lines.mdx) 🔧 | Disallows multiple consecutive empty lines | Style | Style | Enabled |
+| [`tally/no-trailing-spaces`](_docs/rules/tally/no-trailing-spaces.mdx) 🔧 | Disallows trailing whitespace at the end of lines | Style | Style | Enabled |
+| [`tally/eol-last`](_docs/rules/tally/eol-last.mdx) 🔧 | Enforces a newline at the end of non-empty files | Style | Style | Enabled |
+| [`tally/epilogue-order`](_docs/rules/tally/epilogue-order.mdx) 🔧 | Enforces canonical order for epilogue instructions (STOPSIGNAL, HEALTHCHECK, ENTRYPOINT, CMD) | Style | Style | Enabled |
+| [`tally/sort-packages`](_docs/rules/tally/sort-packages.mdx) 🔧 | Package lists in install commands should be sorted alphabetically | Style | Style | Enabled |
+| [`tally/newline-per-chained-call`](_docs/rules/tally/newline-per-chained-call.mdx) 🔧 | Each chained element within an instruction should be on its own line | Style | Style | Enabled |
 
 ---
 
@@ -221,7 +221,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 | [DL3056](https://github.com/hadolint/hadolint/wiki/DL3056) | Label `<label>` does not conform to semantic versioning. | Warning | ⏳ |
 | [DL3057](https://github.com/hadolint/hadolint/wiki/DL3057) | `HEALTHCHECK` instruction missing. | Ignore | ✅ `hadolint/DL3057` |
 | [DL3058](https://github.com/hadolint/hadolint/wiki/DL3058) | Label `<label>` is not a valid email format - must conform to RFC5322. | Warning | ⏳ |
-| [DL3059](https://github.com/hadolint/hadolint/wiki/DL3059) | Multiple consecutive `RUN` instructions. Consider consolidation. | Info | 🔄 [`tally/prefer-run-heredoc`](docs/rules/tally/prefer-run-heredoc.md) |
+| [DL3059](https://github.com/hadolint/hadolint/wiki/DL3059) | Multiple consecutive `RUN` instructions. Consider consolidation. | Info | 🔄 [`tally/prefer-run-heredoc`](_docs/rules/tally/prefer-run-heredoc.mdx) |
 | [DL3060](https://github.com/hadolint/hadolint/wiki/DL3060) | `yarn cache clean` missing after `yarn install` was run. | Info | ⛔ Not planned (`tally/prefer-package-cache-mounts`) |
 | [DL3061](https://github.com/hadolint/hadolint/wiki/DL3061) | Invalid instruction order. Dockerfile must begin with `FROM`, `ARG` or comment. | Error | ✅ `hadolint/DL3061` |
 | [DL3062](https://github.com/hadolint/hadolint/wiki/DL3062) | Pin versions in go install. Instead of `go install <package>` use `go install <package>@<version>` | Warning | ⏳ |
@@ -238,7 +238,7 @@ See the [Hadolint Wiki](https://github.com/hadolint/hadolint/wiki) for detailed 
 
 tally intentionally does not plan to implement Hadolint rules that enforce package-manager cache cleanup patterns (for example `* clean` and
 `--no-cache-dir`).
-Instead, tally promotes BuildKit cache mounts via [`tally/prefer-package-cache-mounts`](docs/rules/tally/prefer-package-cache-mounts.md), which is
+Instead, tally promotes BuildKit cache mounts via [`tally/prefer-package-cache-mounts`](_docs/rules/tally/prefer-package-cache-mounts.mdx), which is
 better aligned with modern container build recommendations and improves rebuild performance without cache-disabling patterns.
 
 #### DL3057: HEALTHCHECK Instruction Missing (Enhanced)

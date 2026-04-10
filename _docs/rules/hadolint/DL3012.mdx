@@ -1,0 +1,19 @@
+---
+title: "hadolint/DL3012"
+description: "Provide an exact tag for multiple `HEALTHCHECK` instructions."
+---
+
+Provide an exact tag for multiple `HEALTHCHECK` instructions.
+
+> **Superseded by
+> [`buildkit/MultipleInstructionsDisallowed`](../buildkit/MultipleInstructionsDisallowed)**,
+> which covers duplicate `HEALTHCHECK`, `CMD`, and `ENTRYPOINT`
+> instructions with auto-fix support.
+
+## Description
+
+Multiple `HEALTHCHECK` instructions should not be used in the same stage because only the last one will be used.
+
+## Reference
+
+- [hadolint/DL3012](https://github.com/hadolint/hadolint/wiki/DL3012)

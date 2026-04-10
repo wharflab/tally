@@ -5,8 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "docs/**"
-      - "zensical.toml"
+      - "_docs/**"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 permissions:
@@ -23,20 +22,21 @@ jobs:
       - uses: actions/checkout@v6
         with:
           lfs: false
-      - name: Setup Python
-        uses: actions/setup-python@v6
+      - name: Setup Node
+        uses: actions/setup-node@v6
         with:
-          python-version: "3.14.3"
-      - name: Install Zensical
-        run: pip install zensical
+          node-version: "22"
       - name: Build docs
-        run: zensical build --clean
+        working-directory: _docs
+        run: npx -y mint export --output ../site.zip
+      - name: Unzip the result
+        run: unzip site.zip -d site/
       - name: Setup Pages
         uses: actions/configure-pages@v6
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5.0.0
         with:
-          path: site
+          path: site/
   deploy:
     environment:
       name: github-pages

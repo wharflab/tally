@@ -339,9 +339,9 @@ func extractCreatedUsername(cmd *shell.CommandInfo) string {
 // lastNonFlagArg returns the last argument that doesn't start with "-".
 // For useradd/adduser, the LOGIN name is always the last positional argument.
 func lastNonFlagArg(args []string) string {
-	for i := len(args) - 1; i >= 0; i-- {
-		if !strings.HasPrefix(args[i], "-") {
-			return args[i]
+	for _, arg := range slices.Backward(args) {
+		if !strings.HasPrefix(arg, "-") {
+			return arg
 		}
 	}
 	return ""

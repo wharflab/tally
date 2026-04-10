@@ -61,13 +61,13 @@ reviews:
         2. Could this rule compete with another rule for the same Dockerfile instruction or pattern?
         3. Could the auto-fix produced by this rule be flagged as a violation by another rule?
         Flag any PR that introduces or modifies a rule but is missing:
-        - Documentation of known cross-rule interactions (in code comments or a rule documentation at docs/)
+        - Documentation of known cross-rule interactions (in code comments or a rule documentation at _docs/)
         - Test cases that cover overlapping scenarios with related rules
         These cross-rule concerns should take special priority in the review.
     - path: 'internal/rules/tally/**/*.go'
       instructions: |
-        Every new tally rule must be accompanied by a corresponding documentation page under docs/rules/tally/.
-        Flag the PR if a new rule file is added here but there is no matching documentation file in docs/rules/tally/.
+        Every new tally rule must be accompanied by a corresponding documentation page under _docs/rules/tally/.
+        Flag the PR if a new rule file is added here but there is no matching documentation file in _docs/rules/tally/.
     - path: 'internal/rules/hadolint/**/*.go'
       instructions: |
         Ported Hadolint rules must match the exact behavior of the original Haskell implementation in the hadolint/hadolint repository.

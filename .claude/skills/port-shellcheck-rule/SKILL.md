@@ -26,7 +26,7 @@ This workflow must preserve the public rule contract:
 3. Prefer parser-backed implementation (`mvdan.cc/sh/v3` and existing Dockerfile mapping) over string heuristics.
 4. Parse errors own parse diagnostics; do not continue native SC linting after parse failure.
 5. If auto-fix is possible, implement it with minimal, low-conflict edits.
-6. Own documentation for migrated rules under `docs/rules/shellcheck/` and link diagnostics there.
+6. Own documentation for migrated rules under `_docs/rules/shellcheck/` and link diagnostics there.
 
 Reference: `design-docs/28-shellcheck-go-reimplementation-bridge-sc1040.md`
 
@@ -195,9 +195,9 @@ For migrated native ShellCheck rules, own docs in this repo.
 
 Create/update:
 
-1. `docs/rules/shellcheck/index.md`
-2. `docs/rules/shellcheck/$ARGUMENTS.md`
-3. `docs/rules/index.md` namespace links (if needed)
+1. `_docs/rules/shellcheck/` directory
+2. `_docs/rules/shellcheck/$ARGUMENTS.mdx`
+3. `_docs/rules/overview.mdx` namespace links (if needed)
 
 Doc page should include:
 

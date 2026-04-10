@@ -92,7 +92,7 @@ Rule naming requirements:
 1. Prefer action-first patterns: `no-*`, `prefer-*`, `require-*`, `avoid-*`.
 2. Keep it concise (typically 2-4 words).
 3. Keep it descriptive and stable (avoid vague names like `best-practice-rule`).
-4. Keep it unique across `internal/rules/tally/*.go` and `docs/rules/tally/*.md`.
+4. Keep it unique across `internal/rules/tally/*.go` and `_docs/rules/tally/*.mdx`.
 5. Final rule code is `tally/<rule_slug>`.
 
 ## Step 1: Define Rule Contract
@@ -414,14 +414,14 @@ Recommended workflow (GitHub MCP):
 
 Update all of:
 
-1. `docs/rules/tally/<rule_slug>.md` (new rule page)
-2. `docs/rules/tally/index.md` (tally rules table)
+1. `_docs/rules/tally/<rule_slug>.mdx` (new Mintlify rule page)
+2. `_docs/docs.json` (add to appropriate navigation group)
 3. `RULES.md`
    - tally summary table row
    - dedicated section for `tally/<rule_slug>`
    - namespace counts if changed
 4. `README.md` supported rules count/table when totals change
-5. `docs/index.md` tally rule count if shown
+5. `_docs/rules/overview.mdx` tally rule count if changed
 
 ## Step 8: Validate End-to-End
 

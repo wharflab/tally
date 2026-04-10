@@ -50,6 +50,10 @@ and a WASM-compiled shellcheck (`internal/shellcheck/`).
 ## Docs & Schema
 
 - If you add/change rules or defaults, update `RULES.md`.
+- If you add/change rule documentation, update `_docs/` (Mintlify docs).
+  - Each rule has its own `.mdx` page under `_docs/rules/<namespace>/<rule-name>.mdx`.
+  - Run `cd _docs && npx mint validate` to check Mintlify docs build.
+  - The docs site is published from the `wharflab/docs` repository via Mintlify.
 - If you change config schema, regenerate `schema.json` via `make jsonschema`.
 - `make schema-gen` regenerates all schemas and generated models; `make jsonschema` (alias `schema-check`) validates them.
 

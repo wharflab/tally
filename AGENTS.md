@@ -16,6 +16,10 @@ common mistakes.
   - `internal/integration/testdata/<case>/Dockerfile`: test Dockerfiles
   - `internal/integration/testdata/<case>/.tally.toml`: test config files
   - `internal/integration/__snapshots__/`: `go-snaps` snapshot outputs
+- `_docs/`: Mintlify documentation source (published via `wharflab/docs` repo)
+  - `_docs/rules/<namespace>/<rule>.mdx`: one page per rule
+  - `_docs/guides/`: user guides
+  - `_docs/docs.json`: Mintlify navigation config
 - `bin/` and `dist/`: local tools / release artifacts (ignored by Git)
 
 ## Build, Test, and Development Commands
