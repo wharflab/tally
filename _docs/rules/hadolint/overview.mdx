@@ -166,11 +166,10 @@ Both `# hadolint shell=<shell>` and `# tally shell=<shell>` formats are supporte
 
 ## ShellCheck rules (SC rules)
 
-ShellCheck rules analyze shell scripts within `RUN` commands. They require shell parsing integration and are currently planned.
+ShellCheck rules analyze shell scripts within `RUN` commands. Implementation has started with native Go reimplementations that use tally's fix and reporting infrastructure.
 
-| Category | Description | Status |
-|----------|-------------|--------|
-| SC1xxx | Syntax and parsing (quotes, escaping) | Planned |
-| SC2xxx | Logic and correctness (word splitting, globbing) | Planned |
+| Rule | Description | Status |
+|------|-------------|--------|
+| [SC1040](../shellcheck/SC1040) | `<<-` heredoc terminators may only be indented with tabs | Implemented 🔧 |
 
-Key rules in scope include SC2046 (quote to prevent word splitting), SC2086 (double quote variables), and SC2154 (referenced but not assigned).
+Additional SC1xxx (syntax/parsing) and SC2xxx (logic/correctness) rules are planned.
