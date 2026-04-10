@@ -5,21 +5,21 @@ import {
   CloseAction,
   DidChangeConfigurationNotification,
   DocumentDiagnosticRequest,
-  ErrorCodes,
   ErrorAction,
-  type Executable,
+  ErrorCodes,
   type ErrorHandler,
-  type MessageSignature,
-  type ResponseError,
+  type Executable,
   LanguageClient,
-  LSPErrorCodes,
   type LanguageClientOptions,
+  LSPErrorCodes,
+  type MessageSignature,
   NotebookDocumentFilter,
+  type ResponseError,
   SemanticTokensDeltaRequest,
   SemanticTokensRangeRequest,
   SemanticTokensRequest,
-  type State,
   type ServerOptions,
+  type State,
   type StateChangeEvent,
   TextDocumentFilter,
   WorkspaceDiagnosticRequest,
@@ -143,12 +143,10 @@ export class TallyLanguageClient {
           }
 
           const resolvedArgs = this.resolveApplyAllFixesArgs(args);
-          if (resolvedArgs.length === 0) {
-            return;
-          }
-
           const result = await next(command, resolvedArgs);
-          await applyWorkspaceEditResult(result);
+          if (resolvedArgs.length > 0) {
+            await applyWorkspaceEditResult(result);
+          }
           return result;
         },
       },
