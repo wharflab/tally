@@ -341,7 +341,7 @@ After implementation is complete, update the tracking files:
 
 ## Step 11: Create Rule Documentation
 
-Create `docs/rules/hadolint/$ARGUMENTS.md` following the pattern in `docs/rules/hadolint/DL3004.md`:
+Create `_docs/rules/hadolint/$ARGUMENTS.mdx` following the pattern in `_docs/rules/hadolint/DL3004.mdx`:
 
 - Title: `# hadolint/$ARGUMENTS`
 - Properties table (Severity, Category, Default, Auto-fix)
@@ -350,7 +350,7 @@ Create `docs/rules/hadolint/$ARGUMENTS.md` following the pattern in `docs/rules/
 - `## Auto-fix` section with before/after example (if auto-fix is supported)
 - `## Reference` section with named link: `- [hadolint/$ARGUMENTS](https://github.com/hadolint/hadolint/wiki/$ARGUMENTS)`
 
-Add the rule to `docs/rules/hadolint/index.md` in the main table.
+Add the rule to `_docs/rules/hadolint/overview.mdx` in the main table.
 
 ## Checklist Before Completion
 
@@ -366,5 +366,5 @@ Add the rule to `docs/rules/hadolint/index.md` in the main table.
 - [ ] `hadolint-status.json` updated with new rule
 - [ ] Documentation regenerated with `generate-hadolint-table.sh --update`
 - [ ] All integration snapshots updated
-- [ ] `docs/rules/hadolint/$ARGUMENTS.md` created and added to index
+- [ ] `_docs/rules/hadolint/$ARGUMENTS.mdx` created and added to overview
 - [ ] Code follows existing patterns in the codebase

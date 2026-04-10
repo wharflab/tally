@@ -1,0 +1,106 @@
+---
+title: "Auto-fix"
+description: "Apply safe and unsafe auto-fixes to Dockerfiles using tally lint --fix."
+---
+
+tally can apply fixes automatically. Fixes are designed to be:
+
+- **Atomic** — a fix applies fully or not at all.
+- **Conflict-aware** — overlapping edits are skipped rather than producing a corrupted file.
+- **Configurable** — per-rule fix modes let you control exactly which fixes run and when.
+
+## Basic usage
+
+Apply all safe fixes:
+
+```bash
+tally lint --fix Dockerfile
+```
+
+Apply unsafe fixes too (includes AI-powered fixes when enabled):
+
+```bash
+tally lint --fix --fix-unsafe Dockerfile
+```
+
+Limit fixes to specific rules:
+
+```bash
+tally lint --fix --fix-unsafe \
+  --fix-rule hadolint/DL3008 \
+  --fix-rule tally/prefer-copy-heredoc \
+  Dockerfile
+```
+
+<Tip>
+  Use `--fix-rule` to limit the blast radius when applying fixes for the first time. Start with one rule at a time to review changes before committing.
+</Tip>
+
+## Safe vs. unsafe fixes
+
+| Mode | Flag | Description |
+|------|------|-------------|
+| Safe | `--fix` | Applies mechanical rewrites with high confidence (🔧 in RULES.md) |
+| Unsafe | `--fix` + `--fix-unsafe` | Also applies riskier fixes that may change semantics, including AI-powered fixes |
+
+The 🔧 marker in the rules reference indicates a rule has auto-fix support. Safe fixes are things like adding a missing newline, reordering instructions, or converting `RUN echo` to a `COPY` heredoc. Unsafe fixes may restructure stages or change command arguments.
+
+## Per-rule fix modes
+
+Control when fixes are allowed per rule in `.tally.toml`:
+
+```toml
+[rules.tally.prefer-copy-heredoc]
+fix = "always"          # Apply whenever --fix is set (default)
+
+[rules.tally.prefer-multi-stage-build]
+fix = "explicit"        # Only when --fix-rule includes this rule explicitly
+
+[rules.tally.no-trailing-spaces]
+fix = "unsafe-only"     # Only when --fix-unsafe is also set
+
+[rules.tally.eol-last]
+fix = "never"           # Never auto-fix this rule
+```
+
+Valid fix mode values:
+
+| Value | Behavior |
+|-------|----------|
+| `always` | Apply whenever `--fix` is passed (default) |
+| `never` | Never auto-fix, even when `--fix` is set |
+| `explicit` | Only when `--fix-rule <this-rule>` is explicitly specified |
+| `unsafe-only` | Only when `--fix-unsafe` is also set |
+
+## How conflict resolution works
+
+When two fixes would modify overlapping lines, tally skips the conflicting fix rather than applying a partial or corrupted change. The skipped fix is reported to stderr:
+
+```text
+Skipped 1 fixes
+note: skipped fix tally/prefer-copy-heredoc (Dockerfile): overlapping edit at line 14
+```
+
+Fix skips are informational — linting continues and the violation is still reported so you can address it manually.
+
+## Examples of fixable rules
+
+Rules marked 🔧 in the rules reference support auto-fix. Some notable examples:
+
+| Rule | Fix type | What it does |
+|------|----------|--------------|
+| `tally/prefer-copy-heredoc` | Safe | Converts `RUN echo`/`cat`/`printf` to `COPY` heredoc |
+| `tally/prefer-copy-chmod` | Safe | Converts `COPY` + `RUN chmod` to `COPY --chmod` |
+| `tally/no-trailing-spaces` | Safe | Removes trailing whitespace |
+| `tally/eol-last` | Safe | Adds missing newline at end of file |
+| `tally/sort-packages` | Safe | Sorts package lists alphabetically |
+| `tally/epilogue-order` | Safe | Reorders `STOPSIGNAL`, `HEALTHCHECK`, `ENTRYPOINT`, `CMD` |
+| `tally/curl-should-follow-redirects` | Safe | Adds `-L` to `curl` commands |
+| `tally/prefer-multi-stage-build` | Unsafe (AI) | Converts single-stage builds to multi-stage |
+| `tally/prefer-package-cache-mounts` | Unsafe (AI) | Adds BuildKit cache mounts for package installs |
+
+## AI AutoFix
+
+Some fixes are too complex to implement deterministically. For those, tally supports an opt-in AI resolver via ACP (Agent Client Protocol).
+
+AI fixes are marked unsafe and require both `--fix` and `--fix-unsafe`. See the [AI AutoFix (ACP)](/guides/ai-autofix) guide for setup instructions.

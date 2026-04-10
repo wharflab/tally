@@ -1,0 +1,65 @@
+---
+title: "hadolint/DL3022"
+description: "`COPY --from` should reference a previously defined `FROM` alias."
+---
+
+`COPY --from` should reference a previously defined `FROM` alias.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Correctness |
+| Default | Off |
+
+## Description
+
+When using multi-stage builds, `COPY --from` should reference a stage alias that was previously defined with `FROM ... AS <alias>`. Trying to copy
+from a missing image alias results in an error at build time.
+
+### Why default Off
+
+This rule is off by default because it does not account for
+[`--build-context`](https://docs.docker.com/reference/cli/docker/buildx/build/#build-context)
+sources. As per the official Dockerfile documentation:
+
+> You can also copy files directly from named contexts
+> (specified with `--build-context <name>=<source>`) or images.
+
+Since named build contexts are supplied at build time (`docker buildx build
+--build-context name=path`), a static linter cannot verify whether a
+`COPY --from=name` reference is valid. Flagging these as violations produces
+false positives that cannot be resolved without running the actual build.
+
+To enable this rule, set its severity explicitly in your `.tally.toml`:
+
+```toml
+[rules.hadolint.DL3022]
+severity = "warning"
+```
+
+## Examples
+
+### Problematic code
+
+```dockerfile
+FROM debian:jesse
+RUN stuff
+
+FROM debian:jesse
+COPY --from=build some stuff ./
+```
+
+### Correct code
+
+```dockerfile
+FROM debian:jesse as build
+RUN stuff
+
+FROM debian:jesse
+COPY --from=build some stuff ./
+```
+
+## References
+
+- [hadolint/DL3022](https://github.com/hadolint/hadolint/wiki/DL3022)
+- [`COPY --from`](https://docs.docker.com/reference/dockerfile/#copy---from)

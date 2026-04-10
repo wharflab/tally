@@ -1,0 +1,212 @@
+---
+title: "Output formats"
+description: "Reference for all five tally output formats: text, json, sarif, github-actions, and markdown."
+---
+
+tally supports five output formats so it fits into both terminals and automation pipelines. Select a format with `--format` or the `format` key in `.tally.toml`.
+
+## Output options
+
+| Flag | Description |
+|------|-------------|
+| `--format, -f` | Output format: `text`, `json`, `sarif`, `github-actions`, `markdown` |
+| `--output, -o` | Output destination: `stdout`, `stderr`, or a file path |
+| `--no-color` | Disable colored output (also respects the `NO_COLOR` env var) |
+| `--show-source` | Show source code snippets (default: `true`) |
+| `--hide-source` | Hide source code snippets |
+
+---
+
+<Tabs>
+  <Tab title="text">
+    ## text (default)
+
+    Human-readable output with colors and source code snippets. Best for local development.
+
+    ```bash
+    tally lint Dockerfile
+    ```
+
+    Example output:
+
+    ```text
+    WARNING: StageNameCasing - https://docs.docker.com/go/dockerfile/rule/stage-name-casing/
+    Stage name 'Builder' should be lowercase
+
+    Dockerfile:2
+    ────────────────────
+       1 │ FROM alpine
+    >>>2 │ FROM ubuntu AS Builder
+       3 │ RUN echo "hello"
+    ────────────────────
+    ```
+
+    ### Source snippets
+
+    Source snippets are shown by default. Toggle them with flags:
+
+    ```bash
+    # Hide source snippets (cleaner for long files)
+    tally lint --hide-source Dockerfile
+
+    # Explicitly show (useful when config sets show-source = false)
+    tally lint --show-source Dockerfile
+    ```
+
+    In `.tally.toml`:
+
+    ```toml
+    [output]
+    show-source = false
+    ```
+  </Tab>
+  <Tab title="json">
+    ## json
+
+    Machine-readable format with full violation details, summary statistics, and scan metadata. Best for scripts, dashboards, and custom reporting.
+
+    ```bash
+    tally lint --format json Dockerfile
+    ```
+
+    Example output:
+
+    ```json
+    {
+      "files": [
+        {
+          "file": "Dockerfile",
+          "violations": [
+            {
+              "location": {
+                "file": "Dockerfile",
+                "start": { "line": 2, "column": 0 }
+              },
+              "rule": "buildkit/StageNameCasing",
+              "message": "Stage name 'Builder' should be lowercase",
+              "severity": "warning",
+              "docUrl": "https://docs.docker.com/go/dockerfile/rule/stage-name-casing/"
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "total": 1,
+        "errors": 0,
+        "warnings": 1,
+        "info": 0,
+        "style": 0,
+        "files": 1
+      },
+      "files_scanned": 1,
+      "rules_enabled": 41
+    }
+    ```
+
+    Top-level fields:
+
+    | Field | Description |
+    |-------|-------------|
+    | `files` | Array of files with their violations |
+    | `summary` | Aggregate counts: `total`, `errors`, `warnings`, `info`, `style`, `files` |
+    | `files_scanned` | Total number of files scanned |
+    | `rules_enabled` | Number of active rules with a non-`"off"` default severity |
+
+    Write JSON to a file:
+
+    ```bash
+    tally lint --format json --output results.json .
+    ```
+  </Tab>
+  <Tab title="sarif">
+    ## sarif
+
+    [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/) format for static analysis tools and CI code scanning integrations. Best for GitHub Code Scanning, Azure DevOps, and similar platforms.
+
+    ```bash
+    tally lint --format sarif --output results.sarif .
+    ```
+
+    Or redirect to a file:
+
+    ```bash
+    tally lint --format sarif . > results.sarif
+    ```
+
+    SARIF output includes rule metadata, help URIs, and per-result location data that code scanning tools use to render findings in pull requests and security dashboards.
+
+    ### GitHub Code Scanning
+
+    ```bash
+    # Generate SARIF (use --fail-level none so the step doesn't fail before upload)
+    tally lint --format sarif --output tally.sarif --fail-level none .
+
+    # Upload with the CodeQL action
+    # uses: github/codeql-action/upload-sarif@v3
+    # with:
+    #   sarif_file: tally.sarif
+    ```
+
+    See [CI/CD integration](/guides/ci-cd) for a complete GitHub Actions workflow example.
+  </Tab>
+  <Tab title="github-actions">
+    ## github-actions
+
+    Emits GitHub Actions [workflow commands](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions) (`::warning` and `::error`) for inline PR annotations.
+
+    ```bash
+    tally lint --format github-actions .
+    ```
+
+    Example output:
+
+    ```text
+    ::warning file=Dockerfile,line=2,title=StageNameCasing::Stage name 'Builder' should be lowercase
+    ```
+
+    GitHub renders these as inline annotations in the PR diff and in the Actions run summary. No upload step is needed — the annotations appear automatically when the format is used in a GitHub Actions workflow.
+
+    Severity mapping:
+
+    | tally severity | GitHub command |
+    |----------------|----------------|
+    | `error` | `::error` |
+    | `warning` | `::warning` |
+    | `info` | `::notice` |
+    | `style` | `::notice` |
+  </Tab>
+  <Tab title="markdown">
+    ## markdown
+
+    Concise Markdown tables optimized for AI agents, PR comments, and token-efficient reporting.
+
+    ```bash
+    tally lint --format markdown Dockerfile
+    ```
+
+    Example output:
+
+    ```markdown
+    **2 issues** in `Dockerfile`
+
+    | Line | Issue                                       |
+    | ---- | ------------------------------------------- |
+    | 10   | ❌ Use absolute WORKDIR                     |
+    | 2    | ⚠️ Stage name 'Builder' should be lowercase |
+    ```
+
+    Features:
+
+    - Summary line with total issue count upfront.
+    - Violations sorted by severity (errors first).
+    - Emoji severity indicators: ❌ error, ⚠️ warning, ℹ️ info, 💅 style.
+    - No rule codes or doc URLs — optimized for token efficiency.
+    - Adds a `File` column automatically when linting multiple files.
+
+    Pipe output into a file for use as a PR comment or report artifact:
+
+    ```bash
+    tally lint --format markdown . > lint-report.md
+    ```
+  </Tab>
+</Tabs>

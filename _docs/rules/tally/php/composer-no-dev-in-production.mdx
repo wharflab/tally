@@ -1,0 +1,62 @@
+---
+title: "tally/php/composer-no-dev-in-production"
+description: "Production Composer install commands should include `--no-dev`."
+---
+
+Production Composer install commands should include `--no-dev`.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Security |
+| Default | Enabled |
+| Auto-fix | Yes (suggestion, requires `--fix-unsafe`) |
+
+## Description
+
+Flags `composer install` in production-like stages when dev dependencies are still included.
+
+Shipping `require-dev` packages in a production image increases the dependency graph, image size, and attack surface. The rule accepts either:
+
+- `composer install --no-dev`
+- `ENV COMPOSER_NO_DEV=1` earlier in the same stage
+
+Stages explicitly named `dev`, `development`, `test`, `testing`, `ci`, or `debug` are skipped.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM php:8.4-cli AS app
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-interaction
+```
+
+### After
+
+```dockerfile
+FROM php:8.4-cli AS app
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction
+```
+
+### Stage-level env equivalent
+
+```dockerfile
+FROM php:8.4-cli AS app
+ENV COMPOSER_NO_DEV=1
+RUN composer install
+```
+
+## Why this rule is a suggestion fix
+
+The edit is narrow, but it changes which dependencies are installed. That is the right default for production images, but it is still a behavior
+change, so the fix is classified as `FixSuggestion`.
+
+## References
+
+- [Composer CLI: install](https://getcomposer.org/doc/03-cli.md#install-i)
+- [Docker guide for PHP: develop](https://docs.docker.com/guides/php/develop/)

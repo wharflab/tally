@@ -1,0 +1,104 @@
+---
+title: "Exit codes"
+description: "Reference for tally's exit codes and how to handle them in scripts and CI pipelines."
+---
+
+tally uses distinct exit codes so scripts and CI pipelines can react to different outcomes with precision.
+
+## Exit code reference
+
+| Code | Name | Meaning |
+|------|------|---------|
+| `0` | Success | No violations found, or all violations are below the configured `--fail-level` |
+| `1` | Violations | One or more violations at or above the configured `--fail-level` |
+| `2` | Error | Configuration, parse, or I/O error (for example: invalid config file, permission denied) |
+| `3` | No files | No Dockerfiles to lint (missing file, empty glob, empty directory) |
+| `4` | Syntax error | Dockerfile has fatal syntax issues (unknown instructions, malformed directives) |
+
+## How `--fail-level` affects exit code 1
+
+By default, tally exits with code `1` when any violation at `style` severity or above is found. Use `--fail-level` to raise or lower that threshold:
+
+```bash
+# Fail only on errors (ignore warnings, info, and style)
+tally lint --fail-level error Dockerfile
+
+# Fail on warnings or worse
+tally lint --fail-level warning Dockerfile
+
+# Never exit 1 due to violations (useful for SARIF upload workflows)
+tally lint --fail-level none --format sarif . > results.sarif
+
+# Default: fail on any violation including style issues
+tally lint --fail-level style Dockerfile
+```
+
+Available levels from most to least severe: `error`, `warning`, `info`, `style` (default), `none`.
+
+## Script examples
+
+### Basic check
+
+```bash
+tally lint .
+echo $?  # 0 = clean, 1 = violations found
+```
+
+### Handling each exit code
+
+```bash
+tally lint Dockerfile.prod
+status=$?
+
+case "$status" in
+  0) echo "No issues found." ;;
+  1) echo "Violations found — review and fix before merging."; exit 1 ;;
+  2) echo "Config or parse error — check your .tally.toml."; exit 2 ;;
+  3) echo "No Dockerfiles found — check the path."; exit 3 ;;
+  4) echo "Dockerfile has syntax errors — fix before linting."; exit 4 ;;
+  *) echo "Unknown exit code: $status"; exit "$status" ;;
+esac
+```
+
+### Distinguish "nothing to lint" from real errors
+
+Exit code `3` lets you detect a missing or empty path separately from a configuration error (code `2`):
+
+```bash
+tally lint Dockerfile.prod
+status=$?
+
+if [ "$status" -eq 3 ]; then
+  echo "No Dockerfiles found — skipping lint step."
+elif [ "$status" -ne 0 ]; then
+  exit "$status"
+fi
+```
+
+### Detect syntax errors before linting
+
+```bash
+tally lint Dockerfile
+status=$?
+
+if [ "$status" -eq 4 ]; then
+  echo "Dockerfile has fatal syntax errors — fix typos or invalid instructions first."
+  exit 4
+fi
+```
+
+### CI: fail only on errors
+
+```bash
+# In CI, treat warnings as informational rather than blocking
+tally lint --fail-level error --format github-actions .
+```
+
+## CI/CD tips
+
+- Use `--fail-level error` to allow warnings without blocking the build.
+- Use `--fail-level none` when uploading SARIF so the upload step always runs even when violations exist.
+- Exit code `3` distinguishes "the path was wrong" from "the config is broken" (code `2`), useful in matrix CI jobs where not every service has a Dockerfile.
+- Exit code `4` indicates the Dockerfile itself is malformed — fix those before addressing lint violations.
+
+See [CI/CD integration](/guides/ci-cd) for complete pipeline examples.

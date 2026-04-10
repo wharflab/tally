@@ -1,0 +1,176 @@
+---
+title: "Hadolint rules"
+description: "tally implements Hadolint DL rules natively and covers additional ones via equivalent BuildKit and tally rules."
+---
+
+[Hadolint](https://github.com/hadolint/hadolint) is a widely-used Dockerfile linter. tally implements its rules natively — so you get Hadolint-compatible checks without installing a separate tool — and adds enhancements like auto-fix and smart suppression.
+
+- DL rules implemented natively by tally
+- Additional rules covered by equivalent BuildKit or tally rules
+- Full Hadolint rule documentation: [github.com/hadolint/hadolint/wiki](https://github.com/hadolint/hadolint/wiki)
+
+<Tip>
+  tally supports the `# hadolint ignore=DLxxxx` directive format natively, so existing Hadolint suppressions work without any changes. The `# hadolint shell=powershell` directive is also supported.
+</Tip>
+
+---
+
+## Implemented rules
+
+Rules natively implemented by tally. Auto-fixable rules are marked with 🔧.
+
+| Rule | Description | Severity | Notes |
+|------|-------------|----------|-------|
+| `hadolint/DL3001` | For some bash commands it makes no sense running them in a Docker container like `ssh`, `vim`, `shutdown`, `service`, `ps`, `free`, `top`, `kill`, `mount`, `ifconfig`. | Info | |
+| `hadolint/DL3002` | Last user should not be root. | Warning | |
+| `hadolint/DL3003` 🔧 | Use WORKDIR to switch to a directory. | Warning | Auto-fixable |
+| `hadolint/DL3004` | Do not use `sudo` as it leads to unpredictable behavior. Use a tool like gosu to enforce root. | Error | |
+| `hadolint/DL3006` | Always tag the version of an image explicitly. | Warning | |
+| `hadolint/DL3007` | Using `latest` is prone to errors if the image will ever update. Pin the version explicitly to a release tag. | Warning | |
+| `hadolint/DL3010` | Use ADD for extracting archives into an image. | Info | |
+| `hadolint/DL3011` | Valid UNIX ports range from 0 to 65535. | Error | |
+| `hadolint/DL3014` 🔧 | Use the `-y` switch. | Warning | Auto-fixable |
+| `hadolint/DL3020` 🔧 | Use `COPY` instead of `ADD` for files and folders. | Error | Auto-fixable |
+| `hadolint/DL3021` | `COPY` with more than 2 arguments requires the last argument to end with `/`. | Error | |
+| `hadolint/DL3022` | `COPY --from` should reference a previously defined `FROM` alias. | Off | Off by default — does not account for `--build-context` sources |
+| `hadolint/DL3023` | `COPY --from` cannot reference its own `FROM` alias. | Error | |
+| `hadolint/DL3026` | Use only an allowed registry in the FROM image. | Off | Off by default — requires `trusted-registries` configuration |
+| `hadolint/DL3027` 🔧 | Do not use `apt` as it is meant to be an end-user tool; use `apt-get` or `apt-cache` instead. | Warning | Auto-fixable |
+| `hadolint/DL3030` 🔧 | Use the `-y` switch to avoid manual input: `yum install -y <package>`. | Warning | Auto-fixable |
+| `hadolint/DL3034` 🔧 | Non-interactive switch missing from `zypper` command: `zypper install -y`. | Warning | Auto-fixable |
+| `hadolint/DL3038` 🔧 | Use the `-y` switch to avoid manual input: `dnf install -y <package>`. | Warning | Auto-fixable |
+| `hadolint/DL3043` | `ONBUILD`, `FROM` or `MAINTAINER` triggered from within `ONBUILD` instruction. | Error | |
+| `hadolint/DL3045` 🔧 | `COPY` to a relative destination without `WORKDIR` set. | Warning | Auto-fixable |
+| `hadolint/DL3046` 🔧 | `useradd` without flag `-l` and a high UID will result in an excessively large image. | Warning | Auto-fixable |
+| `hadolint/DL3047` 🔧 | `wget` without flag `--progress` will result in excessively bloated build logs when downloading larger files. | Info | Auto-fixable |
+| `hadolint/DL3057` | `HEALTHCHECK` instruction missing. | Info | Enhanced: smart suppression for serverless/FaaS and registry-backed check with `--slow-checks` |
+| `hadolint/DL3061` | Invalid instruction order. Dockerfile must begin with `FROM`, `ARG`, or a comment. | Error | |
+| `hadolint/DL4001` | Either use Wget or Curl but not both. | Warning | |
+| `hadolint/DL4005` 🔧 | Use `SHELL` to change the default shell. | Warning | Auto-fixable |
+| `hadolint/DL4006` 🔧 | Set the `SHELL` option `-o pipefail` before `RUN` with a pipe in it. | Warning | Auto-fixable |
+
+### Enabling off-by-default rules
+
+**DL3022** and **DL3026** are off by default and must be enabled in `.tally.toml`:
+
+```toml
+# Enable DL3026 with trusted registry enforcement
+[rules.hadolint.DL3026]
+trusted-registries = ["docker.io", "ghcr.io"]
+```
+
+Providing `trusted-registries` automatically enables the rule with `severity = "warning"`. Set `severity` explicitly to use a different level.
+
+---
+
+## Covered by BuildKit and tally rules
+
+These Hadolint rules are superseded by an equivalent BuildKit or tally rule. You do not need to enable both — tally's rule provides the same or better coverage.
+
+| Hadolint rule | Equivalent tally rule | Notes |
+|---------------|-----------------------|-------|
+| DL3000 | `buildkit/WorkdirRelativePath` 🔧 | Covers absolute WORKDIR enforcement |
+| DL3012 | `buildkit/MultipleInstructionsDisallowed` 🔧 | Covers multiple HEALTHCHECK instructions |
+| DL3024 | `buildkit/DuplicateStageName` | Covers duplicate FROM alias names |
+| DL3025 | `buildkit/JSONArgsRecommended` 🔧 | Covers JSON notation for CMD and ENTRYPOINT |
+| DL3029 | `buildkit/FromPlatformFlagConstDisallowed` + `tally/platform-mismatch` | `buildkit/FromPlatformFlagConstDisallowed` is off by default; `tally/platform-mismatch` provides a stricter registry-backed check |
+| DL3044 | `buildkit/UndefinedVar` | Covers referencing an ENV variable in the same ENV statement |
+| DL3059 | `tally/prefer-run-heredoc` 🔧 | Suggests heredoc syntax instead of consolidating consecutive RUN instructions |
+| DL4000 | `buildkit/MaintainerDeprecated` 🔧 | Covers deprecated MAINTAINER instruction |
+| DL4003 | `buildkit/MultipleInstructionsDisallowed` 🔧 | Covers multiple CMD instructions |
+| DL4004 | `buildkit/MultipleInstructionsDisallowed` 🔧 | Covers multiple ENTRYPOINT instructions |
+
+---
+
+## Not planned
+
+The following rules are intentionally not implemented. tally promotes BuildKit cache mounts via `tally/prefer-package-cache-mounts` as the modern alternative to manual cache-cleanup patterns.
+
+| Rule | Description | Reason not planned |
+|------|-------------|--------------------|
+| DL3009 | Delete the apt-get lists after installing something. | `tally/prefer-package-cache-mounts` is the recommended approach |
+| DL3015 | Avoid additional packages by specifying `--no-install-recommends`. | `tally/prefer-package-cache-mounts` is the recommended approach |
+| DL3019 | Use the `--no-cache` switch with `apk add`. | `tally/prefer-package-cache-mounts` is the recommended approach |
+| DL3032 | `yum clean all` missing after yum command. | `tally/prefer-package-cache-mounts` is the recommended approach |
+| DL3036 | `zypper clean` missing after zypper use. | `tally/prefer-package-cache-mounts` is the recommended approach |
+| DL3040 | `dnf clean all` missing after dnf command. | `tally/prefer-package-cache-mounts` is the recommended approach |
+| DL3042 | Avoid cache directory with `pip install --no-cache-dir`. | `tally/prefer-package-cache-mounts` is the recommended approach |
+| DL3060 | `yarn cache clean` missing after `yarn install`. | `tally/prefer-package-cache-mounts` is the recommended approach |
+
+Cache-cleanup instructions add build-time overhead and produce smaller layers at the cost of slower rebuilds. BuildKit cache mounts (`RUN --mount=type=cache`) solve the same problem more efficiently by keeping package caches on the host between builds. See `tally/prefer-package-cache-mounts` for details.
+
+---
+
+## DL3057: HEALTHCHECK instruction missing (enhanced)
+
+tally's implementation of DL3057 goes beyond Hadolint's static check with smart suppression and an optional registry-backed resolution path.
+
+### Smart suppression (static)
+
+The rule is automatically suppressed when a `HEALTHCHECK` would not be beneficial:
+
+- **Serverless base images** — AWS Lambda (`public.ecr.aws/lambda/*`, `amazon/aws-lambda-*`), Azure Functions (`mcr.microsoft.com/azure-functions/*`), and OpenFaaS watchdog images. These platforms manage function lifecycle externally.
+- **Serverless framework entrypoints** — When the final stage's `CMD` or `ENTRYPOINT` invokes a known FaaS wrapper (e.g. `functions-framework` for Google Cloud Functions), including the common `exec` prefix pattern.
+- **Shell-only containers** — When the final stage's `CMD` or `ENTRYPOINT` is a bare interactive shell (`bash`, `sh`, etc.), the container is not a long-running service.
+
+### Registry-backed resolution (`--slow-checks`)
+
+`HEALTHCHECK` is inherited from base images at runtime. If a base image defines `HEALTHCHECK CMD ...`, child images inherit it automatically. tally can resolve this by inspecting the base image registry.
+
+| Scenario | Fast path (static) | With `--slow-checks` |
+|---|---|---|
+| No `HEALTHCHECK CMD` in Dockerfile, base has `HEALTHCHECK` | Violation (false positive) | Suppressed (inherited from base) |
+| No `HEALTHCHECK CMD` in Dockerfile, base has no `HEALTHCHECK` | Violation | Violation confirmed |
+| `HEALTHCHECK NONE` in Dockerfile, base has no `HEALTHCHECK` | Violation (generic "missing") | Specific: "HEALTHCHECK NONE has no effect" |
+
+When `--slow-checks` is off, only the fast static check runs.
+
+---
+
+## Migrating from Hadolint
+
+tally is a drop-in replacement for common Hadolint workflows. Existing inline suppression comments work without modification:
+
+```dockerfile
+# hadolint ignore=DL3006
+FROM ubuntu
+
+# hadolint ignore=DL3004,DL3027
+RUN apt install curl
+```
+
+Both `ignore=DL3006` and `ignore=hadolint/DL3006` are valid. You can also use tally's own directive format:
+
+```dockerfile
+# tally ignore=hadolint/DL3006
+FROM ubuntu
+```
+
+### Shell directive
+
+When using base images with non-POSIX shells (e.g., Windows images with PowerShell), declare the shell to disable POSIX-specific rules:
+
+```dockerfile
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+# hadolint shell=powershell
+RUN Get-Process notepad | Stop-Process
+```
+
+Supported non-POSIX shells: `powershell`, `pwsh`, `cmd` / `cmd.exe`.
+
+When a non-POSIX shell is declared, tally automatically disables shell command analysis rules (e.g., DL3004 sudo detection, DL4001 wget/curl detection) and future ShellCheck-based rules.
+
+Both `# hadolint shell=<shell>` and `# tally shell=<shell>` formats are supported.
+
+---
+
+## ShellCheck rules (SC rules)
+
+ShellCheck rules analyze shell scripts within `RUN` commands. They require shell parsing integration and are currently planned.
+
+| Category | Description | Status |
+|----------|-------------|--------|
+| SC1xxx | Syntax and parsing (quotes, escaping) | Planned |
+| SC2xxx | Logic and correctness (word splitting, globbing) | Planned |
+
+Key rules in scope include SC2046 (quote to prevent word splitting), SC2086 (double quote variables), and SC2154 (referenced but not assigned).

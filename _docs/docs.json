@@ -1,0 +1,233 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "tally",
+  "theme": "aspen",
+  "colors": {
+    "primary": "#0066CC",
+    "light": "#E8F4FF",
+    "dark": "#003D7A"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/wharflab/tally"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/wharflab/tally"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/configuration",
+              "guides/auto-fix",
+              "guides/ai-autofix",
+              "guides/ci-cd",
+              "guides/ide-integration",
+              "guides/output-formats",
+              "guides/exit-codes",
+              "guides/installing-buildkit-windows-containers"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Rules Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "rules/overview"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "rules/tally/secrets-in-code",
+              "rules/tally/prefer-vex-attestation",
+              "rules/tally/require-secret-mounts",
+              "rules/tally/stateful-root-runtime",
+              "rules/tally/user-created-but-never-used",
+              "rules/tally/copy-after-user-without-chown",
+              "rules/tally/prefer-add-git",
+              "rules/tally/world-writable-state-path-workaround",
+              "rules/tally/prefer-telemetry-opt-out"
+            ]
+          },
+          {
+            "group": "Correctness",
+            "pages": [
+              "rules/tally/require-stages",
+              "rules/tally/unknown-instruction",
+              "rules/tally/syntax-directive-typo",
+              "rules/tally/max-lines",
+              "rules/tally/no-unreachable-stages",
+              "rules/tally/shell-run-in-scratch",
+              "rules/tally/no-ungraceful-stopsignal",
+              "rules/tally/prefer-canonical-stopsignal",
+              "rules/tally/invalid-onbuild-trigger",
+              "rules/tally/circular-stage-deps",
+              "rules/tally/copy-from-empty-scratch-stage",
+              "rules/tally/invalid-json-form",
+              "rules/tally/platform-mismatch",
+              "rules/tally/curl-should-follow-redirects",
+              "rules/tally/prefer-curl-config",
+              "rules/tally/named-identity-in-passwdless-stage",
+              "rules/tally/prefer-systemd-sigrtmin-plus-3",
+              "rules/tally/prefer-wget-config"
+            ]
+          },
+          {
+            "group": "Performance",
+            "pages": [
+              "rules/tally/prefer-add-unpack",
+              "rules/tally/prefer-copy-heredoc",
+              "rules/tally/prefer-multi-stage-build",
+              "rules/tally/prefer-package-cache-mounts"
+            ]
+          },
+          {
+            "group": "Style",
+            "pages": [
+              "rules/tally/newline-between-instructions",
+              "rules/tally/no-multi-spaces",
+              "rules/tally/no-multiple-empty-lines",
+              "rules/tally/no-trailing-spaces",
+              "rules/tally/eol-last",
+              "rules/tally/epilogue-order",
+              "rules/tally/sort-packages",
+              "rules/tally/newline-per-chained-call",
+              "rules/tally/prefer-copy-chmod",
+              "rules/tally/prefer-run-heredoc",
+              "rules/tally/consistent-indentation"
+            ]
+          },
+          {
+            "group": "GPU / CUDA",
+            "pages": [
+              "rules/tally/gpu/no-buildtime-gpu-queries",
+              "rules/tally/gpu/no-container-runtime-in-image",
+              "rules/tally/gpu/no-hardcoded-visible-devices",
+              "rules/tally/gpu/no-redundant-cuda-install",
+              "rules/tally/gpu/prefer-minimal-driver-capabilities",
+              "rules/tally/gpu/prefer-runtime-final-stage"
+            ]
+          },
+          {
+            "group": "PHP",
+            "pages": [
+              "rules/tally/php/composer-no-dev-in-production",
+              "rules/tally/php/no-xdebug-in-final-image"
+            ]
+          },
+          {
+            "group": "PowerShell",
+            "pages": [
+              "rules/tally/powershell/prefer-shell-instruction"
+            ]
+          },
+          {
+            "group": "Windows",
+            "pages": [
+              "rules/tally/windows/no-chown-flag",
+              "rules/tally/windows/no-run-mounts",
+              "rules/tally/windows/no-stopsignal"
+            ]
+          },
+          {
+            "group": "BuildKit Rules",
+            "pages": [
+              "rules/buildkit/overview",
+              "rules/buildkit/ConsistentInstructionCasing",
+              "rules/buildkit/CopyIgnoredFile",
+              "rules/buildkit/DuplicateStageName",
+              "rules/buildkit/ExposeInvalidFormat",
+              "rules/buildkit/ExposeProtoCasing",
+              "rules/buildkit/FromAsCasing",
+              "rules/buildkit/FromPlatformFlagConstDisallowed",
+              "rules/buildkit/InvalidBaseImagePlatform",
+              "rules/buildkit/InvalidDefaultArgInFrom",
+              "rules/buildkit/InvalidDefinitionDescription",
+              "rules/buildkit/JSONArgsRecommended",
+              "rules/buildkit/LegacyKeyValueFormat",
+              "rules/buildkit/MaintainerDeprecated",
+              "rules/buildkit/MultipleInstructionsDisallowed",
+              "rules/buildkit/NoEmptyContinuation",
+              "rules/buildkit/RedundantTargetPlatform",
+              "rules/buildkit/ReservedStageName",
+              "rules/buildkit/SecretsUsedInArgOrEnv",
+              "rules/buildkit/StageNameCasing",
+              "rules/buildkit/UndefinedArgInFrom",
+              "rules/buildkit/UndefinedVar",
+              "rules/buildkit/WorkdirRelativePath"
+            ]
+          },
+          {
+            "group": "Hadolint Rules",
+            "pages": [
+              "rules/hadolint/overview",
+              "rules/hadolint/DL3000",
+              "rules/hadolint/DL3001",
+              "rules/hadolint/DL3002",
+              "rules/hadolint/DL3003",
+              "rules/hadolint/DL3004",
+              "rules/hadolint/DL3006",
+              "rules/hadolint/DL3007",
+              "rules/hadolint/DL3010",
+              "rules/hadolint/DL3011",
+              "rules/hadolint/DL3012",
+              "rules/hadolint/DL3014",
+              "rules/hadolint/DL3020",
+              "rules/hadolint/DL3021",
+              "rules/hadolint/DL3022",
+              "rules/hadolint/DL3023",
+              "rules/hadolint/DL3024",
+              "rules/hadolint/DL3025",
+              "rules/hadolint/DL3026",
+              "rules/hadolint/DL3027",
+              "rules/hadolint/DL3029",
+              "rules/hadolint/DL3030",
+              "rules/hadolint/DL3034",
+              "rules/hadolint/DL3038",
+              "rules/hadolint/DL3043",
+              "rules/hadolint/DL3044",
+              "rules/hadolint/DL3045",
+              "rules/hadolint/DL3046",
+              "rules/hadolint/DL3047",
+              "rules/hadolint/DL3057",
+              "rules/hadolint/DL3059",
+              "rules/hadolint/DL3061",
+              "rules/hadolint/DL4000",
+              "rules/hadolint/DL4001",
+              "rules/hadolint/DL4003",
+              "rules/hadolint/DL4004",
+              "rules/hadolint/DL4005",
+              "rules/hadolint/DL4006"
+            ]
+          },
+          {
+            "group": "ShellCheck Rules",
+            "pages": [
+              "rules/shellcheck/SC1040"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

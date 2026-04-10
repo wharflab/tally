@@ -1,0 +1,203 @@
+---
+title: "AI AutoFix (ACP)"
+description: "Use ACP-compatible coding agents to fix complex Dockerfile issues that are too risky for deterministic rewrites."
+---
+
+tally supports **opt-in AI AutoFix** for the kinds of Dockerfile improvements that are hard to express as a purely mechanical rewrite — or too risky to apply without extra validation.
+
+Instead of asking you for an API key, tally integrates with [**ACP (Agent Client Protocol)**](https://agentclientprotocol.com/get-started/introduction) — a protocol created by the [Zed editor](https://zed.dev/) to standardize how tools talk to coding agents.
+
+This means:
+
+- You choose **which agent** you want to use (Gemini CLI, OpenCode, GitHub Copilot CLI, and more).
+- You keep **credentials and model choice** inside that agent.
+- tally stays a **linter first** — fast and deterministic — and uses AI only when you explicitly opt in.
+
+## How it works
+
+tally treats AI AutoFix as a normal part of its existing fix pipeline:
+
+1. A rule detects a violation and attaches a **SuggestedFix** marked as async.
+2. tally builds a **prompt** containing the Dockerfile text and structured rule evidence.
+3. tally runs your configured agent via **ACP over stdio**.
+4. The agent returns a **unified diff patch** targeting the exact Dockerfile bytes from the prompt.
+5. tally **validates** the patch: parses it, re-lints the result, and checks invariants.
+6. If valid, the patch is applied. If not, tally skips the fix and continues linting.
+
+Linting always works even when AI is misconfigured or unavailable.
+
+## Quick start
+
+<Steps>
+  <Step title="Pick an ACP agent">
+    Choose an ACP-capable CLI agent. Any of these work out of the box:
+
+    - [Gemini CLI](https://agentclientprotocol.com/agents/gemini-cli) (native ACP)
+    - [OpenCode](https://opencode.ai/docs/acp/) (native ACP)
+    - [GitHub Copilot CLI](https://docs.github.com/en/copilot/reference/acp-server) (native ACP)
+    - [Cline CLI v2](https://docs.cline.bot/cline-cli/acp-editor-integrations) (native ACP)
+    - [Kiro CLI](https://kiro.dev/docs/cli/acp/) (native ACP)
+    - [Docker agent](https://docker.github.io/docker-agent/features/acp/) (native ACP)
+
+    Browse the full registry at [agentclientprotocol.com/get-started/registry](https://agentclientprotocol.com/get-started/registry).
+  </Step>
+  <Step title="Enable AI in .tally.toml">
+    Create or update your `.tally.toml`. The example below uses Gemini CLI with MCP servers disabled for lower latency:
+
+    ```toml
+    [ai]
+    enabled = true
+    timeout = "90s"
+    max-input-bytes = 262144
+    redact-secrets = true
+
+    command = [
+      "gemini",
+      "--experimental-acp",
+      "--allowed-mcp-server-names=none",
+      "--model=gemini-3-flash-preview",
+    ]
+    ```
+
+    <Note>
+      `--allowed-mcp-server-names` is an allowlist. Passing a name you don't have configured (like `none`) effectively disables all MCP servers. tally doesn't provide any MCP servers to the agent today, so enabling MCP is usually just extra startup and latency overhead.
+    </Note>
+  </Step>
+  <Step title="Run an AI-powered fix">
+    AI fixes are intentionally marked **unsafe** and require both `--fix` and `--fix-unsafe`. For best results, narrow the scope to a single rule:
+
+    ```bash
+    tally lint \
+      --fix --fix-unsafe \
+      --fix-rule tally/prefer-multi-stage-build \
+      path/to/Dockerfile
+    ```
+
+    To prevent AI fixes from running accidentally, set the rule's fix mode to `"explicit"` in your config:
+
+    ```toml
+    [rules.tally.prefer-multi-stage-build]
+    fix = "explicit"
+    ```
+  </Step>
+</Steps>
+
+## Recommended setup (low latency)
+
+Dockerfiles are a mature domain that most modern models understand well. For AI fixes, you usually don't need external tools or context servers — you want fast, predictable transformations.
+
+**Recommended:**
+- A fast or smaller model with solid general reasoning.
+- Disable agent-side tool integrations (MCP servers) unless you know you need them.
+
+```bash
+# Gemini CLI — fast model, no MCP overhead
+gemini --experimental-acp --allowed-mcp-server-names=none --model=gemini-3-flash-preview
+```
+
+## Configuration reference
+
+### Config file (`.tally.toml`)
+
+All AI settings live under `[ai]`:
+
+```toml
+[ai]
+enabled = false                 # Default: false
+command = ["gemini", "--experimental-acp", "--allowed-mcp-server-names=none", "--model=gemini-3-flash-preview"]
+timeout = "90s"                 # Per-fix timeout
+max-input-bytes = 262144        # Prompt size limit (bytes)
+redact-secrets = true           # Redact obvious secrets (default: true)
+```
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `ai.enabled` | `false` | Master kill-switch for AI features |
+| `ai.command` | *(empty)* | ACP agent argv (stdio). If empty, AI fixes can't run |
+| `ai.timeout` | `"90s"` | Per-fix timeout for the ACP interaction |
+| `ai.max-input-bytes` | `262144` | Maximum prompt size to send to the agent |
+| `ai.redact-secrets` | `true` | Redact obvious secrets in prompts (best-effort) |
+
+### Environment variables
+
+```bash
+TALLY_AI_ENABLED=true
+TALLY_ACP_COMMAND="gemini --experimental-acp --allowed-mcp-server-names=none --model=gemini-3-flash-preview"
+TALLY_AI_TIMEOUT=90s
+TALLY_AI_MAX_INPUT_BYTES=262144
+TALLY_AI_REDACT_SECRETS=true
+```
+
+### CLI flags
+
+```bash
+--ai                         # Enable AI (when ai.command is already in .tally.toml)
+--acp-command "..."          # Set the ACP agent command line (also enables AI)
+--ai-timeout 90s             # Override ai.timeout
+--ai-max-input-bytes 262144  # Override ai.max-input-bytes
+--ai-redact-secrets=false    # Override ai.redact-secrets
+```
+
+<Tip>
+  If your agent command needs complex quoting, prefer `ai.command = ["arg1", "arg2", ...]` in `.tally.toml` rather than `--acp-command`.
+</Tip>
+
+## Supported ACP agents
+
+### Native ACP agents
+
+| Agent | Link |
+|-------|------|
+| Gemini CLI | [agentclientprotocol.com/agents/gemini-cli](https://agentclientprotocol.com/agents/gemini-cli) |
+| OpenCode | [opencode.ai/docs/acp/](https://opencode.ai/docs/acp/) |
+| GitHub Copilot CLI | [docs.github.com/en/copilot/reference/acp-server](https://docs.github.com/en/copilot/reference/acp-server) |
+| Kiro CLI | [kiro.dev/docs/cli/acp/](https://kiro.dev/docs/cli/acp/) |
+| Cline CLI v2 | [docs.cline.bot/cline-cli/acp-editor-integrations](https://docs.cline.bot/cline-cli/acp-editor-integrations) |
+| Docker agent | [docker.github.io/docker-agent/features/acp/](https://docker.github.io/docker-agent/features/acp/) |
+| QwenCode | [qwenlm.github.io/qwen-code-docs](https://qwenlm.github.io/qwen-code-docs/en/users/integration-zed/#install-from-acp-registry-recommend) |
+
+### Zed-maintained adapters
+
+| Agent | Adapter |
+|-------|---------|
+| Claude Code | [agentclientprotocol.com/agents/claude-code](https://agentclientprotocol.com/agents/claude-code) |
+| OpenAI Codex CLI | [agentclientprotocol.com/agents/codex](https://agentclientprotocol.com/agents/codex) |
+
+## Security and privacy
+
+<Warning>
+  ACP is a protocol, **not a sandbox**. If you run a local agent process that can access your machine, it can still do so outside of ACP. Treat the agent like any other executable you run locally.
+</Warning>
+
+tally adds multiple guardrails for AI fixes:
+
+- **Explicit opt-in** — AI is off unless you set `ai.enabled = true`.
+- **Unsafe gating** — AI fixes require `--fix-unsafe` in addition to `--fix`.
+- **Minimal capabilities** — tally advertises no filesystem and no terminal capabilities via ACP.
+- **Secret redaction** — prompts are best-effort redacted before being sent to the agent (controlled by `ai.redact-secrets`).
+- **Strict output contract** — the agent must return a small, targeted diff patch that applies cleanly to the exact Dockerfile bytes tally sent.
+- **Validation loop** — tally re-parses, re-lints, and checks runtime invariants before accepting any proposed change.
+
+## Troubleshooting: "Skipped N fixes"
+
+Common reasons a fix is skipped:
+
+| Reason | Fix |
+|--------|-----|
+| `--fix` not passed | Add `--fix` to your command |
+| `--fix-unsafe` not passed | AI fixes always require `--fix-unsafe` |
+| `--fix-rule` set, but the rule didn't trigger | The rule had no violations for this Dockerfile |
+| `tally/prefer-multi-stage-build` not triggering | This rule only fires for Dockerfiles with exactly **one `FROM`** |
+| Agent timed out | Increase `--ai-timeout` or check stderr for the error message |
+| Agent failed | tally prints the reason on stderr and keeps stdout clean for JSON/SARIF output |
+
+## Why ACP instead of API keys
+
+Many tools bolt AI onto a linter by asking for an OpenAI or Anthropic API key. That approach comes with trade-offs:
+
+- **Provider lock-in** — the linter becomes a mini "AI platform" that must track models, pricing, retries, and auth.
+- **Secret sprawl** — API keys end up in dotfiles, CI secrets, and team docs.
+- **Enterprise friction** — organizations often standardize on a specific gateway, proxy, or provider policy.
+- **Inconsistent experience** — your editor agent knows your preferences, but your linter uses a completely different stack.
+
+ACP inverts this: tally stays agent-agnostic, you bring your own agent and existing auth setup, and you can switch models or providers without waiting for tally to add a new integration.

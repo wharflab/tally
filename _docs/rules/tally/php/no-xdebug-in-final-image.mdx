@@ -1,0 +1,71 @@
+---
+title: "tally/php/no-xdebug-in-final-image"
+description: "Final image installs or enables Xdebug, a development-only tool."
+---
+
+Final image installs or enables Xdebug, a development-only tool.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Best Practices |
+| Default | Enabled |
+| Auto-fix | Yes (comment-out as suggestion, delete as unsafe) |
+
+## Description
+
+Flags Xdebug installations in the final image stage. Xdebug is a PHP debugging and profiling tool designed for development workflows. Shipping it in
+production images degrades performance, increases image size, and widens the attack surface.
+
+The rule detects:
+
+- `docker-php-ext-install xdebug`
+- `docker-php-ext-enable xdebug`
+- `pecl install xdebug` (including versioned forms like `xdebug-3.4.0`)
+- Package manager installs containing xdebug (`apt-get install php-xdebug`, `apk add php-pecl-xdebug`, etc.)
+- Observable scripts (COPY heredoc, build context) that install Xdebug
+
+Stages explicitly named `dev`, `development`, `test`, `testing`, `ci`, or `debug` are skipped. Only the final stage is checked — intermediate builder
+stages are expected to have development tooling.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM php:8.4-fpm AS app
+WORKDIR /app
+COPY . .
+RUN docker-php-ext-install gd intl
+RUN pecl install xdebug && docker-php-ext-enable xdebug
+```
+
+### After
+
+Move Xdebug into a dedicated development stage:
+
+```dockerfile
+FROM php:8.4-fpm AS app
+WORKDIR /app
+COPY . .
+RUN docker-php-ext-install gd intl
+
+FROM app AS dev
+RUN pecl install xdebug && docker-php-ext-enable xdebug
+```
+
+## Fix behavior
+
+When the entire RUN instruction only installs or enables Xdebug, two alternative fixes are offered:
+
+1. **Comment out** (suggestion, preferred): Prefixes each line with `#`.
+2. **Delete** (unsafe): Removes the instruction entirely.
+
+When Xdebug is mixed with other extensions in the same command (e.g., `docker-php-ext-install gd xdebug intl`), no auto-fix is offered — the rule
+reports the violation for manual resolution.
+
+## References
+
+- [Docker guide for PHP: develop](https://docs.docker.com/guides/php/develop/)
+- [Laravel Sail: Xdebug](https://laravel.com/docs/12.x/sail)
+- [PHP OPcache manual](https://www.php.net/manual/en/book.opcache.php)

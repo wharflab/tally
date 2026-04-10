@@ -1,0 +1,179 @@
+---
+title: "Rules overview"
+description: "tally rules span four namespaces: tally/, buildkit/, hadolint/, and shellcheck/. Learn how to enable, disable, and suppress rules."
+---
+
+tally integrates rules from multiple sources. Each rule belongs to a namespace that indicates its origin, and all rules share a common configuration and suppression model.
+
+## Rule namespaces
+
+| Namespace | Source | Description |
+|-----------|--------|-------------|
+| `tally/` | tally custom rules | Security, correctness, performance, style, GPU, PHP, PowerShell, and Windows |
+| `buildkit/` | [Docker's BuildKit linter](https://docs.docker.com/reference/build-checks/) | Captured during parsing or reimplemented for static analysis |
+| `hadolint/` | [Hadolint](https://github.com/hadolint/hadolint) | Hadolint-compatible rules implemented natively |
+| `shellcheck/` | Embedded ShellCheck | Shell script analysis within `RUN` instructions |
+
+## Severity levels
+
+| Severity | Meaning |
+|----------|---------|
+| `error` | Critical issue; blocks CI by default |
+| `warning` | Important issue that should be addressed |
+| `info` | Informational suggestion |
+| `style` | Style preference; auto-fixable in most cases |
+| `off` | Rule disabled |
+
+The default fail level is `style`, meaning any violation causes a non-zero exit. Use `--fail-level` to adjust this.
+
+## Auto-fixable rules
+
+Rules marked with 🔧 can be fixed automatically with `tally lint --fix`. Some fixes are classified as suggestions (unsafe) and require `--fix --fix-unsafe` to apply. Auto-fixable rules cover formatting, style normalization, and many correctness improvements.
+
+## Enabling and disabling rules
+
+### In `.tally.toml`
+
+Use `include` and `exclude` glob patterns to select which rules run:
+
+```toml
+[rules]
+# Enable entire namespaces
+include = ["buildkit/*", "tally/*", "hadolint/*"]
+
+# Disable specific rules
+exclude = [
+  "buildkit/MaintainerDeprecated",
+  "hadolint/DL3008",
+]
+```
+
+Configure individual rules with `[rules.<namespace>.<rule-name>]`:
+
+```toml
+[rules.tally.max-lines]
+severity = "warning"
+max = 100
+skip-blank-lines = true
+skip-comments = true
+
+[rules.buildkit.StageNameCasing]
+severity = "info"
+
+[rules.hadolint.DL3026]
+severity = "warning"
+trusted-registries = ["docker.io", "gcr.io", "ghcr.io"]
+```
+
+<Tip>
+Rules that are off by default (such as `hadolint/DL3026`) are automatically enabled with `severity = "warning"` when you provide configuration options for them — no need to set `severity` explicitly unless you want a different level.
+</Tip>
+
+### With CLI flags
+
+Use `--select` to enable rules and `--ignore` to disable them:
+
+```bash
+# Enable only buildkit rules
+tally lint --select "buildkit/*" Dockerfile
+
+# Disable a specific rule
+tally lint --ignore "buildkit/MaintainerDeprecated" Dockerfile
+```
+
+## Inline suppression directives
+
+Suppress specific violations directly in your Dockerfile using comment directives.
+
+### Next-line suppression
+
+```dockerfile
+# tally ignore=StageNameCasing
+FROM alpine AS Build
+
+# tally ignore=DL3006,DL3007
+FROM ubuntu:16.04
+```
+
+### File-wide suppression
+
+```dockerfile
+# tally global ignore=max-lines;reason=Generated file, size is expected
+FROM alpine
+```
+
+### Adding a reason
+
+Use `;reason=` to document why a rule is suppressed. Required when `--require-reason` is set:
+
+```dockerfile
+# tally ignore=DL3006;reason=Using older base image for compatibility
+FROM ubuntu:16.04
+```
+
+### Suppress all rules on a line
+
+```dockerfile
+# tally ignore=all
+FROM Ubuntu AS Build
+```
+
+### Migration compatibility
+
+tally also accepts directive formats from hadolint and Docker's `check=skip` syntax:
+
+```dockerfile
+# hadolint ignore=DL3024
+FROM alpine AS builder
+
+# check=skip=StageNameCasing
+FROM alpine AS Builder
+```
+
+<Note>
+Directives work with or without namespace prefixes. Both `ignore=DL3024` and `ignore=hadolint/DL3024` are valid.
+</Note>
+
+### Shell directive for non-POSIX shells
+
+When using a non-POSIX shell (PowerShell, cmd), use the `shell` directive to disable incompatible rules:
+
+```dockerfile
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+# hadolint shell=powershell
+RUN Get-Process notepad | Stop-Process
+```
+
+Supported values: `powershell`, `pwsh`, `cmd`, `cmd.exe`.
+
+## Explore rules by category
+
+<CardGroup cols={2}>
+  <Card title="Security" icon="shield" href="/rules/tally/secrets-in-code">
+    Secret detection, VEX attestations, secret mounts, privilege rules, and telemetry opt-out.
+  </Card>
+  <Card title="Correctness" icon="circle-check" href="/rules/tally/require-stages">
+    Stage structure, signal handling, JSON exec-form, identity resolution, curl/wget config, and platform checks.
+  </Card>
+  <Card title="Performance" icon="bolt" href="/rules/tally/prefer-add-unpack">
+    Multi-stage builds, cache mounts, heredocs, and archive extraction.
+  </Card>
+  <Card title="Style" icon="paintbrush" href="/rules/tally/newline-between-instructions">
+    Formatting, sorting, indentation, and epilogue ordering — all auto-fixable.
+  </Card>
+  <Card title="GPU / CUDA" icon="microchip" href="/rules/tally/gpu/no-buildtime-gpu-queries">
+    NVIDIA/CUDA-aware rules for build-time queries, driver capabilities, and image size.
+  </Card>
+  <Card title="PHP" icon="php" href="/rules/tally/php/composer-no-dev-in-production">
+    Composer dependency hygiene and Xdebug detection.
+  </Card>
+  <Card title="Windows" icon="windows" href="/rules/tally/windows/no-run-mounts">
+    Windows container-specific rules for mounts, signals, and ownership flags.
+  </Card>
+  <Card title="BuildKit" icon="docker" href="/rules/buildkit/overview">
+    Docker's official BuildKit linter checks.
+  </Card>
+  <Card title="Hadolint" icon="code" href="/rules/hadolint/overview">
+    Hadolint DL rules implemented natively.
+  </Card>
+</CardGroup>

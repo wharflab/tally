@@ -1,0 +1,456 @@
+---
+title: "Configuration"
+description: "Complete reference for tally's config file, environment variables, CLI flags, and inline directives."
+---
+
+tally supports configuration via TOML config files, environment variables, and CLI flags. Sources cascade in a predictable order so you can set project defaults while allowing per-run overrides.
+
+## Priority order
+
+Configuration sources are applied highest-priority first:
+
+1. **CLI flags** — `--fail-level error`
+2. **Environment variables** — `TALLY_OUTPUT_FAIL_LEVEL=error`
+3. **Config file** — `.tally.toml` or `tally.toml`
+4. **Built-in defaults**
+
+## Config file
+
+### File names
+
+tally looks for these config file names, in order:
+
+1. `.tally.toml` (hidden file, recommended)
+2. `tally.toml`
+
+### Discovery
+
+tally uses cascading config discovery similar to [Ruff](https://docs.astral.sh/ruff/configuration/):
+
+1. Starting from the Dockerfile's directory, walks up the filesystem.
+2. Stops at the first `.tally.toml` or `tally.toml` found.
+3. Uses that config — no merging with parent configs.
+
+This allows monorepo setups with per-directory configurations:
+
+```text
+monorepo/
+├── .tally.toml              # Default config for most services
+├── services/
+│   ├── api/
+│   │   └── Dockerfile       # Uses monorepo/.tally.toml
+│   └── legacy/
+│       ├── .tally.toml      # Override for legacy service
+│       └── Dockerfile       # Uses services/legacy/.tally.toml
+```
+
+### Explicit config path
+
+Override discovery with `--config`:
+
+```bash
+tally lint --config /path/to/.tally.toml Dockerfile
+```
+
+---
+
+## Config file reference
+
+<Tabs>
+  <Tab title="[output]">
+    Controls how tally reports violations.
+
+    ```toml
+    [output]
+    format = "text"           # text, json, sarif, github-actions, markdown
+    path = "stdout"           # stdout, stderr, or a file path
+    show-source = true        # Show source code snippets
+    fail-level = "style"      # Minimum severity for exit code 1
+    ```
+
+    | Option | Default | Description |
+    |--------|---------|-------------|
+    | `format` | `"text"` | Output format: `text`, `json`, `sarif`, `github-actions`, `markdown` |
+    | `path` | `"stdout"` | Output destination: `stdout`, `stderr`, or a file path |
+    | `show-source` | `true` | Show source code snippets alongside violations |
+    | `fail-level` | `"style"` | Minimum severity that produces exit code 1: `error`, `warning`, `info`, `style`, `none` |
+  </Tab>
+  <Tab title="[rules]">
+    Controls which rules are enabled and how they are configured.
+
+    #### Rule selection
+
+    Use glob patterns to include or exclude rules by namespace or by specific rule code:
+
+    ```toml
+    [rules]
+    include = ["buildkit/*", "tally/*", "hadolint/*"]
+
+    exclude = [
+      "buildkit/MaintainerDeprecated",
+      "hadolint/DL3008",
+    ]
+    ```
+
+    #### Per-rule configuration
+
+    Configure individual rules with `severity` and rule-specific options:
+
+    ```toml
+    # Syntax: [rules.<namespace>.<rule-name>]
+
+    [rules.tally.max-lines]
+    severity = "error"
+    max = 500
+    skip-blank-lines = true
+    skip-comments = true
+
+    [rules.buildkit.StageNameCasing]
+    severity = "info"            # Downgrade from warning to info
+
+    [rules.hadolint.DL3026]
+    severity = "warning"
+    trusted-registries = ["docker.io", "gcr.io", "ghcr.io"]
+    ```
+
+    #### Severity levels
+
+    | Severity | Description |
+    |----------|-------------|
+    | `"off"` | Disable the rule |
+    | `"error"` | Critical issues that should block CI |
+    | `"warning"` | Important issues that should be addressed |
+    | `"info"` | Informational suggestions |
+    | `"style"` | Style preferences |
+
+    #### Enabling off-by-default rules
+
+    Some rules are disabled by default (for example, experimental rules). Enable them by providing configuration:
+
+    ```toml
+    # DL3026 is off by default — providing config auto-enables it
+    [rules.hadolint.DL3026]
+    trusted-registries = ["docker.io", "ghcr.io"]
+
+    # Or set severity explicitly
+    [rules.tally.prefer-copy-heredoc]
+    severity = "style"
+    ```
+  </Tab>
+  <Tab title="[inline-directives]">
+    Controls how inline ignore comments are processed.
+
+    ```toml
+    [inline-directives]
+    enabled = true              # Process inline directives (default: true)
+    warn-unused = false         # Warn about unused directives (default: false)
+    validate-rules = false      # Warn about unknown rule codes (default: false)
+    require-reason = false      # Require reason= on all ignore directives (default: false)
+    ```
+
+    | Option | Default | Description |
+    |--------|---------|-------------|
+    | `enabled` | `true` | Process inline directives |
+    | `warn-unused` | `false` | Warn about directives that don't suppress any violations |
+    | `validate-rules` | `false` | Warn about unknown rule codes in directives |
+    | `require-reason` | `false` | Require `reason=` on all ignore directives |
+  </Tab>
+  <Tab title="[ai]">
+    Configuration for AI AutoFix via ACP. See [AI AutoFix (ACP)](/guides/ai-autofix) for the full guide.
+
+    ```toml
+    [ai]
+    enabled = false
+    command = ["gemini", "--experimental-acp", "--allowed-mcp-server-names=none", "--model=gemini-3-flash-preview"]
+    timeout = "90s"
+    max-input-bytes = 262144
+    redact-secrets = true
+    ```
+
+    | Setting | Default | Description |
+    |---------|---------|-------------|
+    | `enabled` | `false` | Master kill-switch for AI features |
+    | `command` | *(empty)* | ACP agent argv (stdio). If empty, AI fixes can't run |
+    | `timeout` | `"90s"` | Per-fix timeout for the ACP interaction |
+    | `max-input-bytes` | `262144` | Maximum prompt size to send to the agent |
+    | `redact-secrets` | `true` | Redact obvious secrets in prompts (best-effort) |
+  </Tab>
+  <Tab title="[file-validation]">
+    Pre-parse file validation. Useful for rejecting unexpectedly large files before linting.
+
+    ```toml
+    [file-validation]
+    max-file-size = 102400   # bytes; 0 = unlimited
+    ```
+
+    | Option | Default | Description |
+    |--------|---------|-------------|
+    | `max-file-size` | `102400` (100 KB) | Maximum file size in bytes. Files above this limit are rejected before parsing. Set to `0` for unlimited. |
+  </Tab>
+  <Tab title="[slow-checks]">
+    Controls registry-aware and other slow checks that require network access.
+
+    ```toml
+    [slow-checks]
+    mode = "auto"         # auto, on, off
+    timeout = "20s"
+    fail-fast = true
+    ```
+
+    | Option | Default | Description |
+    |--------|---------|-------------|
+    | `mode` | `"auto"` | `auto` skips slow checks in CI; `on` always runs them; `off` always skips them |
+    | `timeout` | `"20s"` | Timeout for slow checks |
+    | `fail-fast` | `true` | Skip slow checks for files that already have `error`-severity violations from fast rules |
+
+    You can also control this via CLI:
+
+    ```bash
+    tally lint --slow-checks=on --slow-checks-timeout=30s Dockerfile
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Environment variables
+
+<Tabs>
+  <Tab title="Output variables">
+    | Variable | Description |
+    |----------|-------------|
+    | `TALLY_OUTPUT_FORMAT` | Output format: `text`, `json`, `sarif`, `github-actions`, `markdown` |
+    | `TALLY_FORMAT` | Alias for `TALLY_OUTPUT_FORMAT` |
+    | `TALLY_OUTPUT_PATH` | Output destination: `stdout`, `stderr`, or file path |
+    | `TALLY_OUTPUT_SHOW_SOURCE` | Show source snippets: `true` / `false` |
+    | `TALLY_OUTPUT_FAIL_LEVEL` | Minimum severity for non-zero exit |
+    | `NO_COLOR` | Disable colored output (standard env var) |
+  </Tab>
+  <Tab title="Rule variables">
+    | Variable | Description |
+    |----------|-------------|
+    | `TALLY_RULES_MAX_LINES_MAX` | Maximum lines allowed |
+    | `TALLY_RULES_MAX_LINES_SKIP_BLANK_LINES` | Exclude blank lines: `true` / `false` |
+    | `TALLY_RULES_MAX_LINES_SKIP_COMMENTS` | Exclude comment lines: `true` / `false` |
+    | `TALLY_RULES_SELECT` | Enable specific rules (comma-separated patterns) |
+    | `TALLY_RULES_IGNORE` | Disable specific rules (comma-separated patterns) |
+  </Tab>
+  <Tab title="File discovery variables">
+    | Variable | Description |
+    |----------|-------------|
+    | `TALLY_EXCLUDE` | Glob pattern(s) to exclude files (comma-separated) |
+    | `TALLY_CONTEXT` | Build context directory for context-aware rules |
+    | `TALLY_SLOW_CHECKS` | Slow checks mode: `auto`, `on`, `off` |
+    | `TALLY_SLOW_CHECKS_TIMEOUT` | Timeout for slow checks (e.g. `20s`) |
+    | `TALLY_FIX` | Apply safe fixes automatically: `true` / `false` |
+    | `TALLY_FIX_UNSAFE` | Also apply unsafe fixes: `true` / `false` |
+    | `TALLY_FIX_RULE` | Limit fixes to specific rules (comma-separated) |
+  </Tab>
+  <Tab title="Directive variables">
+    | Variable | Description |
+    |----------|-------------|
+    | `TALLY_NO_INLINE_DIRECTIVES` | Disable inline directive processing: `true` / `false` |
+    | `TALLY_INLINE_DIRECTIVES_WARN_UNUSED` | Warn about unused directives: `true` / `false` |
+    | `TALLY_INLINE_DIRECTIVES_REQUIRE_REASON` | Require `reason=` on ignore directives: `true` / `false` |
+  </Tab>
+  <Tab title="AI variables">
+    | Variable | Description |
+    |----------|-------------|
+    | `TALLY_AI_ENABLED` | Enable AI AutoFix: `true` / `false` |
+    | `TALLY_ACP_COMMAND` | ACP agent command line |
+    | `TALLY_AI_TIMEOUT` | Per-fix timeout (e.g. `90s`) |
+    | `TALLY_AI_MAX_INPUT_BYTES` | Maximum prompt size in bytes |
+    | `TALLY_AI_REDACT_SECRETS` | Redact secrets before sending to agent: `true` / `false` |
+  </Tab>
+</Tabs>
+
+---
+
+## CLI flags
+
+<Tabs>
+  <Tab title="Core flags">
+    | Flag | Description |
+    |------|-------------|
+    | `--config, -c` | Path to config file (overrides discovery) |
+    | `--exclude` | Glob pattern(s) to exclude files (repeatable) |
+    | `--context` | Build context directory for context-aware rules |
+    | `--select` | Enable specific rules (repeatable) |
+    | `--ignore` | Disable specific rules (repeatable) |
+  </Tab>
+  <Tab title="Output flags">
+    | Flag | Description |
+    |------|-------------|
+    | `--format, -f` | Output format: `text`, `json`, `sarif`, `github-actions`, `markdown` |
+    | `--output, -o` | Output destination: `stdout`, `stderr`, or file path |
+    | `--no-color` | Disable colored output |
+    | `--show-source` | Show source code snippets (default: true) |
+    | `--hide-source` | Hide source code snippets |
+    | `--fail-level` | Minimum severity for non-zero exit |
+  </Tab>
+  <Tab title="Rule flags">
+    | Flag | Description |
+    |------|-------------|
+    | `--max-lines, -l` | Maximum number of lines allowed (0 = unlimited) |
+    | `--skip-blank-lines` | Exclude blank lines from the line count |
+    | `--skip-comments` | Exclude comment lines from the line count |
+  </Tab>
+  <Tab title="Directive flags">
+    | Flag | Description |
+    |------|-------------|
+    | `--no-inline-directives` | Disable processing of inline ignore directives |
+    | `--warn-unused-directives` | Warn about directives that don't suppress any violations |
+    | `--require-reason` | Warn about ignore directives without a `reason=` explanation |
+  </Tab>
+  <Tab title="Fix flags">
+    | Flag | Description |
+    |------|-------------|
+    | `--fix` | Apply safe auto-fixes automatically |
+    | `--fix-rule` | Only fix specific rules (repeatable) |
+    | `--fix-unsafe` | Also apply unsafe fixes (requires `--fix`) |
+    | `--ai` | Enable AI AutoFix (requires an ACP agent command) |
+    | `--acp-command` | ACP agent command line |
+    | `--ai-timeout` | Per-fix AI timeout (e.g. `90s`) |
+    | `--ai-max-input-bytes` | Maximum prompt size in bytes |
+    | `--ai-redact-secrets` | Redact secrets before sending to agent |
+  </Tab>
+</Tabs>
+
+---
+
+## Inline directives
+
+Suppress specific violations using inline comment directives directly in your Dockerfile.
+
+<AccordionGroup>
+  <Accordion title="Next-line directive">
+    Suppress violations on the **next line**:
+
+    ```dockerfile
+    # tally ignore=StageNameCasing
+    FROM alpine AS Build
+    ```
+
+    Suppress multiple rules with comma-separated values:
+
+    ```dockerfile
+    # tally ignore=StageNameCasing,DL3006
+    FROM Ubuntu AS Build
+    ```
+
+    Suppress all rules on a line:
+
+    ```dockerfile
+    # tally ignore=all
+    FROM Ubuntu AS Build
+    ```
+  </Accordion>
+  <Accordion title="Global directive">
+    Suppress violations throughout the **entire file**:
+
+    ```dockerfile
+    # tally global ignore=max-lines
+    FROM alpine
+    # ... rest of file is not checked for max-lines
+    ```
+  </Accordion>
+  <Accordion title="Adding reasons">
+    Document why a rule is suppressed using `;reason=`:
+
+    ```dockerfile
+    # tally ignore=DL3006;reason=Using older base image for compatibility
+    FROM ubuntu:16.04
+
+    # tally global ignore=max-lines;reason=Generated file, size is expected
+    ```
+
+    Use `--require-reason` (or `require-reason = true` in `.tally.toml`) to enforce that all ignore directives include an explanation.
+  </Accordion>
+  <Accordion title="Migration compatibility">
+    tally supports directive formats from other linters, making migration easy:
+
+    ```dockerfile
+    # hadolint ignore=DL3006
+    FROM ubuntu
+
+    # hadolint global ignore=DL3008
+    FROM alpine
+
+    # check=skip=StageNameCasing
+    FROM alpine AS Build
+    ```
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Example configurations
+
+### Strict CI
+
+```toml
+# .tally.toml - Strict settings for CI
+[output]
+format = "sarif"
+path = "tally-results.sarif"
+fail-level = "warning"
+
+[rules]
+include = ["buildkit/*", "tally/*", "hadolint/*"]
+
+[rules.tally.max-lines]
+max = 50
+skip-blank-lines = true
+skip-comments = true
+
+[inline-directives]
+require-reason = true
+warn-unused = true
+```
+
+### Relaxed development
+
+```toml
+# .tally.toml - Relaxed settings for development
+[output]
+format = "text"
+show-source = true
+fail-level = "error"
+
+[rules]
+include = ["buildkit/*", "tally/*"]
+exclude = ["buildkit/MaintainerDeprecated"]
+
+[rules.tally.max-lines]
+severity = "warning"
+max = 200
+```
+
+### Monorepo setup
+
+Place a root `.tally.toml` with shared defaults, then override for specific services:
+
+```text
+monorepo/
+├── .tally.toml              # Shared defaults
+├── services/
+│   ├── api/
+│   │   └── Dockerfile       # Inherits root config
+│   └── legacy/
+│       ├── .tally.toml      # Legacy overrides
+│       └── Dockerfile
+```
+
+```toml
+# services/legacy/.tally.toml - Gradual migration from hadolint
+[output]
+format = "text"
+fail-level = "error"
+
+[rules]
+# Start with just BuildKit rules; add hadolint rules gradually
+include = ["buildkit/*"]
+
+[rules.buildkit.StageNameCasing]
+severity = "info"  # Downgrade during migration
+```

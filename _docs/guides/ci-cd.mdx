@@ -1,0 +1,212 @@
+---
+title: "CI/CD integration"
+description: "Integrate tally into GitHub Actions, GitLab CI, and pre-commit hooks for automated Dockerfile linting."
+---
+
+tally is designed to run fast in CI without requiring Docker Desktop or a daemon. It produces output in formats that native CI systems understand natively, including GitHub Actions annotations and SARIF for code scanning.
+
+## Quick tips
+
+- Use `--fail-level` to control which severities fail CI (for example, fail on `warning` but not on `style`).
+- Use `--exclude` to skip generated or vendor trees.
+- Commit a `.tally.toml` to keep CI and local runs consistent.
+- Use `--format github-actions` for inline PR annotations on GitHub.
+- Use `--format sarif` to upload results to GitHub Code Scanning or Azure DevOps.
+
+<Tabs>
+  <Tab title="GitHub Actions">
+    ### Basic lint step
+
+    Add tally to any workflow that touches Dockerfiles:
+
+    ```yaml
+    name: Lint
+
+    on:
+      push:
+        branches: [main]
+      pull_request:
+
+    jobs:
+      tally:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+
+          - name: Install tally
+            run: npm install -g tally-cli
+
+          - name: Lint Dockerfiles
+            run: tally lint --format github-actions .
+    ```
+
+    The `github-actions` format emits `::warning` and `::error` annotations that GitHub renders inline in the PR diff.
+
+    ### SARIF upload to Code Scanning
+
+    Upload results to GitHub Code Scanning for a persistent view of findings across commits:
+
+    ```yaml
+    name: Lint
+
+    on:
+      push:
+        branches: [main]
+      pull_request:
+      schedule:
+        - cron: "0 6 * * 1"   # Weekly on Monday
+
+    jobs:
+      tally:
+        runs-on: ubuntu-latest
+        permissions:
+          security-events: write   # Required for SARIF upload
+
+        steps:
+          - uses: actions/checkout@v4
+
+          - name: Install tally
+            run: npm install -g tally-cli
+
+          - name: Run tally
+            run: |
+              tally lint \
+                --format sarif \
+                --output tally.sarif \
+                --fail-level none \
+                .
+
+          - name: Upload SARIF
+            uses: github/codeql-action/upload-sarif@v3
+            with:
+              sarif_file: tally.sarif
+    ```
+
+    <Note>
+      Use `--fail-level none` when uploading SARIF so the step doesn't fail before the upload runs. Code Scanning will surface the findings separately.
+    </Note>
+
+    ### Matrix strategy for multiple Dockerfiles
+
+    Lint different Dockerfiles in parallel using a matrix:
+
+    ```yaml
+    jobs:
+      tally:
+        runs-on: ubuntu-latest
+        strategy:
+          matrix:
+            dockerfile:
+              - Dockerfile
+              - Dockerfile.dev
+              - services/api/Dockerfile
+
+        steps:
+          - uses: actions/checkout@v4
+
+          - name: Install tally
+            run: npm install -g tally-cli
+
+          - name: Lint ${{ matrix.dockerfile }}
+            run: tally lint --format github-actions ${{ matrix.dockerfile }}
+    ```
+  </Tab>
+  <Tab title="GitLab CI">
+    ### Basic lint step
+
+    ```yaml
+    tally:lint:
+      image: node:lts-alpine
+      stage: lint
+      script:
+        - npm install -g tally-cli
+        - tally lint --format text .
+      rules:
+        - changes:
+            - "**Dockerfile*"
+            - "**Containerfile*"
+            - .tally.toml
+    ```
+
+    ### With SARIF artifact
+
+    GitLab supports SARIF reports as Code Quality artifacts:
+
+    ```yaml
+    tally:lint:
+      image: node:lts-alpine
+      stage: lint
+      script:
+        - npm install -g tally-cli
+        - tally lint --format sarif --output gl-sast-report.sarif --fail-level none . || true
+      artifacts:
+        reports:
+          sast: gl-sast-report.sarif
+        when: always
+        expire_in: 1 week
+    ```
+  </Tab>
+  <Tab title="Pre-commit">
+    ### Using tally as a pre-commit hook
+
+    Add tally to your `.pre-commit-config.yaml`. Because tally is distributed via npm, pip, and RubyGems, you can use `language: system` with a globally installed binary:
+
+    ```yaml
+    repos:
+      - repo: local
+        hooks:
+          - id: tally
+            name: tally (Dockerfile linter)
+            language: system
+            entry: tally lint
+            args: ["--format", "text"]
+            files: '(Dockerfile|Containerfile)(\..*)?$|.*\.(Dockerfile|Containerfile)$'
+            pass_filenames: true
+    ```
+
+    Install pre-commit and the hook:
+
+    ```bash
+    pip install pre-commit
+    npm install -g tally-cli
+    pre-commit install
+    ```
+
+    Run manually against all files:
+
+    ```bash
+    pre-commit run tally --all-files
+    ```
+
+    ### Fail level for pre-commit
+
+    To only block commits on errors (not warnings or style issues), add `--fail-level error`:
+
+    ```yaml
+    - id: tally
+      name: tally (Dockerfile linter)
+      language: system
+      entry: tally lint
+      args: ["--fail-level", "error"]
+      files: '(Dockerfile|Containerfile)(\..*)?$|.*\.(Dockerfile|Containerfile)$'
+      pass_filenames: true
+    ```
+  </Tab>
+</Tabs>
+
+## Output format recommendations
+
+| CI system | Recommended format | Why |
+|-----------|-------------------|-----|
+| GitHub Actions (annotations) | `github-actions` | Inline PR diff annotations |
+| GitHub Code Scanning | `sarif` | Persistent findings in Security tab |
+| GitLab Code Quality | `sarif` | SAST artifact support |
+| Azure DevOps | `sarif` | SARIF is natively supported |
+| Terminal / local | `text` (default) | Human-readable with source snippets |
+| AI agents / scripts | `json` or `markdown` | Machine-readable or token-efficient |
+
+## Related guides
+
+- [Configuration](/guides/configuration) — set `fail-level`, `format`, and `exclude` in `.tally.toml`
+- [Output formats](/guides/output-formats) — full reference for all output formats
+- [Exit codes](/guides/exit-codes) — how to handle each exit code in scripts

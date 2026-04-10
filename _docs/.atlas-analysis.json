@@ -1,0 +1,98 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "tally",
+  "projectDescription": "A production-grade Dockerfile and Containerfile linter and formatter that uses BuildKit's official parser to enforce best practices, security rules, and safe auto-fixes.",
+  "theme": "aspen",
+  "primaryColor": "#0066CC",
+  "lightColor": "#E8F4FF",
+  "darkColor": "#003D7A",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/configuration",
+              "guides/auto-fix",
+              "guides/ai-autofix",
+              "guides/ci-cd",
+              "guides/ide-integration",
+              "guides/output-formats",
+              "guides/exit-codes"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Rules Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "rules/overview"
+            ]
+          },
+          {
+            "group": "tally Rules",
+            "pages": [
+              "rules/tally/security",
+              "rules/tally/correctness",
+              "rules/tally/performance",
+              "rules/tally/style",
+              "rules/tally/gpu",
+              "rules/tally/windows"
+            ]
+          },
+          {
+            "group": "BuildKit Rules",
+            "pages": [
+              "rules/buildkit/overview"
+            ]
+          },
+          {
+            "group": "Hadolint Rules",
+            "pages": [
+              "rules/hadolint/overview"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "BuildKit-native parser: understands heredocs, RUN --mount, COPY --link, and ADD --checksum",
+    "Safe auto-fixes with --fix; opt-in unsafe fixes with --fix-unsafe",
+    "105+ rules across BuildKit, tally, and Hadolint namespaces",
+    "Embedded ShellCheck for shell snippet analysis within RUN instructions",
+    "PowerShell and Windows container awareness",
+    "Registry-aware checks without requiring a Docker daemon",
+    "AI AutoFix via ACP (Agent Client Protocol) with validation loop",
+    "LSP server for VS Code, JetBrains, and any LSP-compatible editor",
+    "Multiple output formats: text, JSON, SARIF, GitHub Actions, Markdown",
+    "Easy install via Homebrew, WinGet, npm, pip, RubyGems, Go, or Docker"
+  ],
+  "publicApiSurface": [
+    "tally lint [DOCKERFILE...] — lint one or more Dockerfiles/Containerfiles",
+    "tally lint --fix — apply safe auto-fixes",
+    "tally lint --fix --fix-unsafe — apply safe + AI-powered unsafe fixes",
+    "tally lint --format json|sarif|github-actions|markdown|text",
+    "tally lint --fail-level error|warning|info|style|none",
+    "tally lint --context <dir> — enable context-aware rules (.dockerignore)",
+    "tally lint --select <pattern> / --ignore <pattern> — rule filtering",
+    "tally lint --slow-checks on|off|auto — registry-aware async checks",
+    "tally lint --ai --acp-command <cmd> — AI AutoFix via ACP agent",
+    "tally lsp --stdio — Language Server Protocol server",
+    "tally version — print version information",
+    ".tally.toml config file with [output], [rules], [inline-directives], [ai], [slow-checks] sections"
+  ]
+}

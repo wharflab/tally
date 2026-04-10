@@ -1,0 +1,113 @@
+---
+title: "IDE integration"
+description: "Set up real-time Dockerfile linting in VS Code, JetBrains IDEs, and any LSP-compatible editor."
+---
+
+tally provides real-time diagnostics in your editor via a built-in Language Server Protocol (LSP) server. Official extensions are available for VS Code and JetBrains IDEs. Any other editor that supports LSP can connect using `tally lsp --stdio`.
+
+<CardGroup cols={3}>
+  <Card title="VS Code" icon="square-code" href="#vs-code">
+    Install the official `wharflab.tally` extension from the Visual Studio Marketplace.
+  </Card>
+  <Card title="JetBrains" icon="square-j" href="#jetbrains-ides">
+    Install the Tally plugin from JetBrains Marketplace (plugin ID 30255-tally).
+  </Card>
+  <Card title="Generic LSP" icon="square-terminal" href="#generic-lsp">
+    Run `tally lsp --stdio` to connect any LSP-compatible editor.
+  </Card>
+</CardGroup>
+
+---
+
+## VS Code
+
+Install the official extension from the Visual Studio Marketplace:
+
+**Extension ID:** `wharflab.tally`
+
+**[Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=wharflab.tally)**
+
+The extension provides:
+
+- Real-time linting diagnostics as you type.
+- Inline violation messages with rule codes and doc links.
+- Squiggles and Problems panel integration.
+- Picks up `.tally.toml` config files automatically from your workspace.
+
+The extension uses `tally lsp --stdio` under the hood. If `tally` is not on your `PATH`, the extension will use `npx -y tally-cli lsp --stdio` as a fallback.
+
+---
+
+## JetBrains IDEs
+
+Install the official plugin from JetBrains Marketplace:
+
+**Plugin ID:** `30255-tally`
+
+**[Install from JetBrains Marketplace](https://plugins.jetbrains.com/plugin/30255-tally)**
+
+The plugin works in all IntelliJ-based IDEs including IntelliJ IDEA, GoLand, PyCharm, WebStorm, and Rider.
+
+---
+
+## Generic LSP
+
+Any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) can use tally's built-in LSP server over stdio.
+
+### Start the LSP server
+
+If tally is installed globally:
+
+```bash
+tally lsp --stdio
+```
+
+If you prefer to use the npm package without a global install:
+
+```bash
+npx -y tally-cli lsp --stdio
+```
+
+### Editor configuration examples
+
+The exact configuration depends on your editor's LSP client. The general pattern is to configure your LSP client to run `tally lsp --stdio` for Dockerfile files (`dockerfile` language ID).
+
+<CodeGroup>
+
+```lua Neovim (nvim-lspconfig)
+-- In your Neovim config (lua)
+require('lspconfig').tally.setup({
+  cmd = { 'tally', 'lsp', '--stdio' },
+  filetypes = { 'dockerfile' },
+  root_dir = require('lspconfig.util').root_pattern('.tally.toml', 'tally.toml', '.git'),
+})
+```
+
+```toml Helix (languages.toml)
+[[language]]
+name = "dockerfile"
+language-servers = ["tally"]
+
+[language-server.tally]
+command = "tally"
+args = ["lsp", "--stdio"]
+```
+
+```json Zed (settings.json)
+{
+  "lsp": {
+    "tally": {
+      "binary": {
+        "path": "tally",
+        "arguments": ["lsp", "--stdio"]
+      }
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+<Note>
+  tally's LSP server uses cascading config discovery — it finds the nearest `.tally.toml` relative to each Dockerfile being edited, the same way the CLI does.
+</Note>

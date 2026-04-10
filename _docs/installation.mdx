@@ -1,0 +1,163 @@
+---
+title: "Installation"
+description: "Install tally via Homebrew, WinGet, npm, pip, RubyGems, Docker, Go, or from source."
+---
+
+tally is a single self-contained binary. Pick the method that fits your environment.
+
+<CodeGroup>
+
+```bash Homebrew
+brew install wharflab/tap/tally
+```
+
+```powershell WinGet
+winget install --id Wharflab.Tally
+```
+
+```bash npm
+npm install -g tally-cli
+```
+
+```bash pip
+pip install tally-cli
+```
+
+```bash RubyGems
+gem install tally-cli
+```
+
+```bash Go
+go install github.com/wharflab/tally@latest
+```
+
+</CodeGroup>
+
+## Homebrew (macOS/Linux)
+
+```bash
+brew install wharflab/tap/tally
+```
+
+## WinGet (Windows)
+
+```powershell
+winget install --id Wharflab.Tally
+```
+
+## npm
+
+```bash
+npm install -g tally-cli
+```
+
+## pip
+
+```bash
+pip install tally-cli
+```
+
+## RubyGems
+
+```bash
+gem install tally-cli
+```
+
+## Docker / Podman
+
+Official images are published to GitHub Container Registry at `ghcr.io/wharflab/tally`. All images are signed with [cosign](https://github.com/sigstore/cosign) (keyless/OIDC).
+
+<Note>
+  The Linux image is distroless, non-root, and shell-free. It contains only the `tally` binary. The Windows image is built on Nano Server.
+</Note>
+
+### Image tags
+
+| Tag | Description |
+|---|---|
+| `ghcr.io/wharflab/tally:latest` | Multi-platform image index: auto-selects `linux/amd64`, `linux/arm64`, or `windows/amd64` |
+| `ghcr.io/wharflab/tally:v<VERSION>` | Versioned multi-platform image index (e.g., `v1.2.3`) |
+| `ghcr.io/wharflab/tally:v<VERSION>-linux-amd64` | Per-platform tag |
+| `ghcr.io/wharflab/tally:v<VERSION>-linux-arm64` | Per-platform tag |
+| `ghcr.io/wharflab/tally:v<VERSION>-windows-amd64` | Per-platform tag |
+
+### Docker (Linux)
+
+```bash
+# Check the version
+docker run --rm ghcr.io/wharflab/tally:latest version
+
+# Lint a Dockerfile in the current directory
+docker run --rm -v "$PWD:/work" -w /work ghcr.io/wharflab/tally:latest lint Dockerfile
+```
+
+### Podman (Linux)
+
+```bash
+# Check the version
+podman run --rm ghcr.io/wharflab/tally:latest version
+
+# Lint all Dockerfiles recursively (note the :Z label for SELinux)
+podman run --rm -v "$PWD:/work:Z" -w /work ghcr.io/wharflab/tally:latest lint .
+```
+
+### Docker (Windows containers)
+
+```powershell
+# Check the version
+docker run --rm ghcr.io/wharflab/tally:latest version
+
+# Lint a Dockerfile
+docker run --rm -v "${PWD}:C:\work" -w C:\work ghcr.io/wharflab/tally:latest lint Dockerfile
+```
+
+### Verify image signatures
+
+All published images are signed with cosign via keyless/OIDC. Verify before use:
+
+```bash
+cosign verify --certificate-identity-regexp='https://github.com/wharflab/tally' \
+  --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \
+  ghcr.io/wharflab/tally:latest
+```
+
+## Go
+
+Requires Go 1.21 or later.
+
+```bash
+go install github.com/wharflab/tally@latest
+```
+
+## From source
+
+```bash
+git clone https://github.com/wharflab/tally.git
+cd tally
+go build .
+```
+
+## Verify your installation
+
+After installing, confirm tally is on your `PATH`:
+
+```bash
+tally --help
+tally lint --help
+```
+
+Check the installed version:
+
+```bash
+# Human-readable
+tally version
+
+# Machine-readable JSON (includes ShellCheck version)
+tally version --json
+```
+
+If the command is not found, make sure the install location is in your `PATH` (for Go installs, this is usually `$GOPATH/bin` or `$HOME/go/bin`).
+
+<Tip>
+  Run `tally lint .` from your project root to immediately lint every Dockerfile and Containerfile in the repo.
+</Tip>

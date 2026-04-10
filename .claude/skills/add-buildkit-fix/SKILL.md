@@ -251,8 +251,8 @@ go run . check --fix /tmp/test.dockerfile && cat /tmp/test.dockerfile
    | `buildkit/$ARGUMENTS` | Description | Warning | ✅🔧 Captured |
    ```
 
-2. Update `docs/rules/buildkit/$ARGUMENTS.md` — add an `## Auto-fix` section with a before/after example. Set the `Auto-fix` property row to
-   `Yes (\`--fix\`)` (or `Yes (\`--fix-unsafe\`)` for non-safe fixes). Follow the pattern in `docs/rules/buildkit/StageNameCasing.md`.
+2. Update `_docs/rules/buildkit/$ARGUMENTS.mdx` — add an `## Auto-fix` section with a before/after example. Set the `Auto-fix` property row to
+   `Yes (\`--fix\`)` (or `Yes (\`--fix-unsafe\`)` for non-safe fixes). Follow the pattern in `_docs/rules/buildkit/StageNameCasing.mdx`.
 
 ## Fix Safety Levels
 
@@ -283,4 +283,4 @@ go run . check --fix /tmp/test.dockerfile && cat /tmp/test.dockerfile
 - [ ] `make lint` passes
 - [ ] Manual `--fix` verification works
 - [ ] RULES.md updated with 🔧 emoji
-- [ ] `docs/rules/buildkit/$ARGUMENTS.md` updated with Auto-fix section
+- [ ] `_docs/rules/buildkit/$ARGUMENTS.mdx` updated with Auto-fix section
