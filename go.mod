@@ -42,7 +42,7 @@ require (
 	go.bug.st/lsp v0.1.3
 	go.podman.io/image/v5 v5.39.2
 	golang.org/x/exp/jsonrpc2 v0.0.0-20250718183923-645b1fa84792
-	golang.org/x/sys v0.42.0
+	golang.org/x/sys v0.43.0
 	mvdan.cc/sh/v3 v3.13.1
 )
 
