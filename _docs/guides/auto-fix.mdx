@@ -43,7 +43,8 @@ tally lint --fix --fix-unsafe \
 | Safe | `--fix` | Applies mechanical rewrites with high confidence (🔧 in RULES.md) |
 | Unsafe | `--fix` + `--fix-unsafe` | Also applies riskier fixes that may change semantics, including AI-powered fixes |
 
-The 🔧 marker in the rules reference indicates a rule has auto-fix support. Safe fixes are things like adding a missing newline, reordering instructions, or converting `RUN echo` to a `COPY` heredoc. Unsafe fixes may restructure stages or change command arguments.
+The 🔧 marker in the rules reference indicates a rule has auto-fix support. Safe fixes are things like adding a missing newline, reordering
+instructions, or converting `RUN echo` to a `COPY` heredoc. Unsafe fixes may restructure stages or change command arguments.
 
 ## Per-rule fix modes
 
@@ -74,7 +75,8 @@ Valid fix mode values:
 
 ## How conflict resolution works
 
-When two fixes would modify overlapping lines, tally skips the conflicting fix rather than applying a partial or corrupted change. The skipped fix is reported to stderr:
+When two fixes would modify overlapping lines, tally skips the conflicting fix rather than applying a partial or corrupted change. The skipped fix is
+reported to stderr:
 
 ```text
 Skipped 1 fixes

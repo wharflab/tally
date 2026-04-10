@@ -98,7 +98,8 @@ tally lint --fail-level error --format github-actions .
 
 - Use `--fail-level error` to allow warnings without blocking the build.
 - Use `--fail-level none` when uploading SARIF so the upload step always runs even when violations exist.
-- Exit code `3` distinguishes "the path was wrong" from "the config is broken" (code `2`), useful in matrix CI jobs where not every service has a Dockerfile.
+- Exit code `3` distinguishes "the path was wrong" from "the config is broken" (code `2`), useful in matrix CI jobs where not every service has a
+  Dockerfile.
 - Exit code `4` indicates the Dockerfile itself is malformed — fix those before addressing lint violations.
 
 See [CI/CD integration](/guides/ci-cd) for complete pipeline examples.

@@ -3,9 +3,12 @@ title: "AI AutoFix (ACP)"
 description: "Use ACP-compatible coding agents to fix complex Dockerfile issues that are too risky for deterministic rewrites."
 ---
 
-tally supports **opt-in AI AutoFix** for the kinds of Dockerfile improvements that are hard to express as a purely mechanical rewrite — or too risky to apply without extra validation.
+tally supports **opt-in AI AutoFix** for the kinds of Dockerfile improvements that are hard to express as a purely mechanical rewrite — or too risky
+to apply without extra validation.
 
-Instead of asking you for an API key, tally integrates with [**ACP (Agent Client Protocol)**](https://agentclientprotocol.com/get-started/introduction) — a protocol created by the [Zed editor](https://zed.dev/) to standardize how tools talk to coding agents.
+Instead of asking you for an API key, tally integrates with
+[**ACP (Agent Client Protocol)**](https://agentclientprotocol.com/get-started/introduction) — a protocol created by the [Zed editor](https://zed.dev/)
+to standardize how tools talk to coding agents.
 
 This means:
 
@@ -84,9 +87,11 @@ Linting always works even when AI is misconfigured or unavailable.
 
 ## Recommended setup (low latency)
 
-Dockerfiles are a mature domain that most modern models understand well. For AI fixes, you usually don't need external tools or context servers — you want fast, predictable transformations.
+Dockerfiles are a mature domain that most modern models understand well. For AI fixes, you usually don't need external tools or context servers — you
+want fast, predictable transformations.
 
 **Recommended:**
+
 - A fast or smaller model with solid general reasoning.
 - Disable agent-side tool integrations (MCP servers) unless you know you need them.
 
@@ -200,4 +205,5 @@ Many tools bolt AI onto a linter by asking for an OpenAI or Anthropic API key. T
 - **Enterprise friction** — organizations often standardize on a specific gateway, proxy, or provider policy.
 - **Inconsistent experience** — your editor agent knows your preferences, but your linter uses a completely different stack.
 
-ACP inverts this: tally stays agent-agnostic, you bring your own agent and existing auth setup, and you can switch models or providers without waiting for tally to add a new integration.
+ACP inverts this: tally stays agent-agnostic, you bring your own agent and existing auth setup, and you can switch models or providers without waiting
+for tally to add a new integration.

@@ -3,7 +3,8 @@ title: "IDE integration"
 description: "Set up real-time Dockerfile linting in VS Code, JetBrains IDEs, and any LSP-compatible editor."
 ---
 
-tally provides real-time diagnostics in your editor via a built-in Language Server Protocol (LSP) server. Official extensions are available for VS Code and JetBrains IDEs. Any other editor that supports LSP can connect using `tally lsp --stdio`.
+tally provides real-time diagnostics in your editor via a built-in Language Server Protocol (LSP) server. Official extensions are available for VS
+Code and JetBrains IDEs. Any other editor that supports LSP can connect using `tally lsp --stdio`.
 
 <CardGroup cols={3}>
   <Card title="VS Code" icon="square-code" href="#vs-code">
@@ -34,7 +35,8 @@ The extension provides:
 - Squiggles and Problems panel integration.
 - Picks up `.tally.toml` config files automatically from your workspace.
 
-The extension uses `tally lsp --stdio` under the hood. If `tally` is not on your `PATH`, the extension will use `npx -y tally-cli lsp --stdio` as a fallback.
+The extension uses `tally lsp --stdio` under the hood. If `tally` is not on your `PATH`, the extension will use `npx -y tally-cli lsp --stdio` as a
+fallback.
 
 ---
 
@@ -52,7 +54,8 @@ The plugin works in all IntelliJ-based IDEs including IntelliJ IDEA, GoLand, PyC
 
 ## Generic LSP
 
-Any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) can use tally's built-in LSP server over stdio.
+Any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) can use tally's built-in LSP server
+over stdio.
 
 ### Start the LSP server
 
@@ -70,7 +73,8 @@ npx -y tally-cli lsp --stdio
 
 ### Editor configuration examples
 
-The exact configuration depends on your editor's LSP client. The general pattern is to configure your LSP client to run `tally lsp --stdio` for Dockerfile files (`dockerfile` language ID).
+The exact configuration depends on your editor's LSP client. The general pattern is to configure your LSP client to run `tally lsp --stdio` for
+Dockerfile files (`dockerfile` language ID).
 
 <CodeGroup>
 

@@ -3,7 +3,8 @@ title: "Rules overview"
 description: "tally rules span four namespaces: tally/, buildkit/, hadolint/, and shellcheck/. Learn how to enable, disable, and suppress rules."
 ---
 
-tally integrates rules from multiple sources. Each rule belongs to a namespace that indicates its origin, and all rules share a common configuration and suppression model.
+tally integrates rules from multiple sources. Each rule belongs to a namespace that indicates its origin, and all rules share a common configuration
+and suppression model.
 
 ## Rule namespaces
 
@@ -28,7 +29,8 @@ The default fail level is `style`, meaning any violation causes a non-zero exit.
 
 ## Auto-fixable rules
 
-Rules marked with 🔧 can be fixed automatically with `tally lint --fix`. Some fixes are classified as suggestions (unsafe) and require `--fix --fix-unsafe` to apply. Auto-fixable rules cover formatting, style normalization, and many correctness improvements.
+Rules marked with 🔧 can be fixed automatically with `tally lint --fix`. Some fixes are classified as suggestions (unsafe) and require
+`--fix --fix-unsafe` to apply. Auto-fixable rules cover formatting, style normalization, and many correctness improvements.
 
 ## Enabling and disabling rules
 

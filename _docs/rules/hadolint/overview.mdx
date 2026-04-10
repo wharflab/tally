@@ -3,7 +3,8 @@ title: "Hadolint rules"
 description: "tally implements Hadolint DL rules natively and covers additional ones via equivalent BuildKit and tally rules."
 ---
 
-[Hadolint](https://github.com/hadolint/hadolint) is a widely-used Dockerfile linter. tally implements its rules natively — so you get Hadolint-compatible checks without installing a separate tool — and adds enhancements like auto-fix and smart suppression.
+[Hadolint](https://github.com/hadolint/hadolint) is a widely-used Dockerfile linter. tally implements its rules natively — so you get
+Hadolint-compatible checks without installing a separate tool — and adds enhancements like auto-fix and smart suppression.
 
 - DL rules implemented natively by tally
 - Additional rules covered by equivalent BuildKit or tally rules
@@ -65,7 +66,8 @@ Providing `trusted-registries` automatically enables the rule with `severity = "
 
 ## Covered by BuildKit and tally rules
 
-These Hadolint rules are superseded by an equivalent BuildKit or tally rule. You do not need to enable both — tally's rule provides the same or better coverage.
+These Hadolint rules are superseded by an equivalent BuildKit or tally rule. You do not need to enable both — tally's rule provides the same or better
+coverage.
 
 | Hadolint rule | Equivalent tally rule | Notes |
 |---------------|-----------------------|-------|
@@ -84,7 +86,8 @@ These Hadolint rules are superseded by an equivalent BuildKit or tally rule. You
 
 ## Not planned
 
-The following rules are intentionally not implemented. tally promotes BuildKit cache mounts via `tally/prefer-package-cache-mounts` as the modern alternative to manual cache-cleanup patterns.
+The following rules are intentionally not implemented. tally promotes BuildKit cache mounts via `tally/prefer-package-cache-mounts` as the modern
+alternative to manual cache-cleanup patterns.
 
 | Rule | Description | Reason not planned |
 |------|-------------|--------------------|
@@ -97,7 +100,9 @@ The following rules are intentionally not implemented. tally promotes BuildKit c
 | DL3042 | Avoid cache directory with `pip install --no-cache-dir`. | `tally/prefer-package-cache-mounts` is the recommended approach |
 | DL3060 | `yarn cache clean` missing after `yarn install`. | `tally/prefer-package-cache-mounts` is the recommended approach |
 
-Cache-cleanup instructions add build-time overhead and produce smaller layers at the cost of slower rebuilds. BuildKit cache mounts (`RUN --mount=type=cache`) solve the same problem more efficiently by keeping package caches on the host between builds. See `tally/prefer-package-cache-mounts` for details.
+Cache-cleanup instructions add build-time overhead and produce smaller layers at the cost of slower rebuilds. BuildKit cache mounts
+(`RUN --mount=type=cache`) solve the same problem more efficiently by keeping package caches on the host between builds. See
+`tally/prefer-package-cache-mounts` for details.
 
 ---
 
@@ -109,13 +114,17 @@ tally's implementation of DL3057 goes beyond Hadolint's static check with smart 
 
 The rule is automatically suppressed when a `HEALTHCHECK` would not be beneficial:
 
-- **Serverless base images** — AWS Lambda (`public.ecr.aws/lambda/*`, `amazon/aws-lambda-*`), Azure Functions (`mcr.microsoft.com/azure-functions/*`), and OpenFaaS watchdog images. These platforms manage function lifecycle externally.
-- **Serverless framework entrypoints** — When the final stage's `CMD` or `ENTRYPOINT` invokes a known FaaS wrapper (e.g. `functions-framework` for Google Cloud Functions), including the common `exec` prefix pattern.
-- **Shell-only containers** — When the final stage's `CMD` or `ENTRYPOINT` is a bare interactive shell (`bash`, `sh`, etc.), the container is not a long-running service.
+- **Serverless base images** — AWS Lambda (`public.ecr.aws/lambda/*`, `amazon/aws-lambda-*`), Azure Functions (`mcr.microsoft.com/azure-functions/*`),
+  and OpenFaaS watchdog images. These platforms manage function lifecycle externally.
+- **Serverless framework entrypoints** — When the final stage's `CMD` or `ENTRYPOINT` invokes a known FaaS wrapper (e.g. `functions-framework` for
+  Google Cloud Functions), including the common `exec` prefix pattern.
+- **Shell-only containers** — When the final stage's `CMD` or `ENTRYPOINT` is a bare interactive shell (`bash`, `sh`, etc.), the container is not a
+  long-running service.
 
 ### Registry-backed resolution (`--slow-checks`)
 
-`HEALTHCHECK` is inherited from base images at runtime. If a base image defines `HEALTHCHECK CMD ...`, child images inherit it automatically. tally can resolve this by inspecting the base image registry.
+`HEALTHCHECK` is inherited from base images at runtime. If a base image defines `HEALTHCHECK CMD ...`, child images inherit it automatically. tally
+can resolve this by inspecting the base image registry.
 
 | Scenario | Fast path (static) | With `--slow-checks` |
 |---|---|---|
@@ -158,7 +167,8 @@ RUN Get-Process notepad | Stop-Process
 
 Supported non-POSIX shells: `powershell`, `pwsh`, `cmd` / `cmd.exe`.
 
-When a non-POSIX shell is declared, tally automatically disables shell command analysis rules (e.g., DL3004 sudo detection, DL4001 wget/curl detection) and future ShellCheck-based rules.
+When a non-POSIX shell is declared, tally automatically disables shell command analysis rules (e.g., DL3004 sudo detection, DL4001 wget/curl
+detection) and future ShellCheck-based rules.
 
 Both `# hadolint shell=<shell>` and `# tally shell=<shell>` formats are supported.
 
@@ -166,7 +176,8 @@ Both `# hadolint shell=<shell>` and `# tally shell=<shell>` formats are supporte
 
 ## ShellCheck rules (SC rules)
 
-ShellCheck rules analyze shell scripts within `RUN` commands. Implementation has started with native Go reimplementations that use tally's fix and reporting infrastructure.
+ShellCheck rules analyze shell scripts within `RUN` commands. Implementation has started with native Go reimplementations that use tally's fix and
+reporting infrastructure.
 
 | Rule | Description | Status |
 |------|-------------|--------|

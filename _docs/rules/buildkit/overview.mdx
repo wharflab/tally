@@ -7,9 +7,11 @@ description: "tally supports all 22 BuildKit checks, including reimplementations
   tally supports **22/22** BuildKit checks. 5 are captured directly from BuildKit's parser; 17 are reimplemented as static rules so they work without running Docker/BuildKit.
 </Note>
 
-BuildKit checks come from Docker's official [build checks reference](https://docs.docker.com/reference/build-checks/). tally integrates them in two ways:
+BuildKit checks come from Docker's official [build checks reference](https://docs.docker.com/reference/build-checks/). tally integrates them in two
+ways:
 
-- **Implemented by tally** — BuildKit normally runs these during LLB conversion (i.e., when actually building). tally reimplements them as pure static checks so they catch issues without a Docker daemon.
+- **Implemented by tally** — BuildKit normally runs these during LLB conversion (i.e., when actually building). tally reimplements them as pure static
+  checks so they catch issues without a Docker daemon.
 - **Captured from BuildKit parser** — These are emitted by BuildKit during Dockerfile parsing and forwarded directly to tally's diagnostic pipeline.
 
 All 11 auto-fixable rules are marked with 🔧. Run `tally lint --fix` to apply safe fixes automatically.
@@ -18,7 +20,8 @@ All 11 auto-fixable rules are marked with 🔧. Run `tally lint --fix` to apply 
 
 ## Implemented by tally
 
-These 17 checks correspond to BuildKit's LLB-conversion checks. tally runs them statically, so you get full coverage without Docker or BuildKit installed.
+These 17 checks correspond to BuildKit's LLB-conversion checks. tally runs them statically, so you get full coverage without Docker or BuildKit
+installed.
 
 <AccordionGroup>
   <Accordion title="buildkit/ConsistentInstructionCasing 🔧 — Warning">
@@ -264,7 +267,8 @@ These 17 checks correspond to BuildKit's LLB-conversion checks. tally runs them 
 
 ## Captured from BuildKit parser
 
-These 5 checks are emitted by BuildKit during Dockerfile parsing. tally captures them directly and includes them in its diagnostic output alongside statically implemented rules.
+These 5 checks are emitted by BuildKit during Dockerfile parsing. tally captures them directly and includes them in its diagnostic output alongside
+statically implemented rules.
 
 <AccordionGroup>
   <Accordion title="buildkit/FromAsCasing 🔧 — Warning">

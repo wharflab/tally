@@ -3,7 +3,8 @@ title: "CI/CD integration"
 description: "Integrate tally into GitHub Actions, GitLab CI, and pre-commit hooks for automated Dockerfile linting."
 ---
 
-tally is designed to run fast in CI without requiring Docker Desktop or a daemon. It produces output in formats that native CI systems understand natively, including GitHub Actions annotations and SARIF for code scanning.
+tally is designed to run fast in CI without requiring Docker Desktop or a daemon. It produces output in formats that native CI systems understand
+natively, including GitHub Actions annotations and SARIF for code scanning.
 
 ## Quick tips
 
@@ -15,7 +16,8 @@ tally is designed to run fast in CI without requiring Docker Desktop or a daemon
 
 <Tabs>
   <Tab title="GitHub Actions">
-    ### Basic lint step
+
+### Basic lint step
 
     Add tally to any workflow that touches Dockerfiles:
 
@@ -42,7 +44,7 @@ tally is designed to run fast in CI without requiring Docker Desktop or a daemon
 
     The `github-actions` format emits `::warning` and `::error` annotations that GitHub renders inline in the PR diff.
 
-    ### SARIF upload to Code Scanning
+### SARIF upload to Code Scanning
 
     Upload results to GitHub Code Scanning for a persistent view of findings across commits:
 
@@ -86,7 +88,7 @@ tally is designed to run fast in CI without requiring Docker Desktop or a daemon
       Use `--fail-level none` when uploading SARIF so the step doesn't fail before the upload runs. Code Scanning will surface the findings separately.
     </Note>
 
-    ### Matrix strategy for multiple Dockerfiles
+### Matrix strategy for multiple Dockerfiles
 
     Lint different Dockerfiles in parallel using a matrix:
 
@@ -110,9 +112,11 @@ tally is designed to run fast in CI without requiring Docker Desktop or a daemon
           - name: Lint ${{ matrix.dockerfile }}
             run: tally lint --format github-actions ${{ matrix.dockerfile }}
     ```
+
   </Tab>
   <Tab title="GitLab CI">
-    ### Basic lint step
+
+### Lint step
 
     ```yaml
     tally:lint:
@@ -128,7 +132,7 @@ tally is designed to run fast in CI without requiring Docker Desktop or a daemon
             - .tally.toml
     ```
 
-    ### With SARIF artifact
+### With SARIF artifact
 
     GitLab supports SARIF reports as Code Quality artifacts:
 
@@ -145,9 +149,11 @@ tally is designed to run fast in CI without requiring Docker Desktop or a daemon
         when: always
         expire_in: 1 week
     ```
+
   </Tab>
   <Tab title="Pre-commit">
-    ### Using tally as a pre-commit hook
+
+### Using tally as a pre-commit hook
 
     Add tally to your `.pre-commit-config.yaml`. Because tally is distributed via npm, pip, and RubyGems, you can use `language: system` with a globally installed binary:
 
@@ -178,7 +184,7 @@ tally is designed to run fast in CI without requiring Docker Desktop or a daemon
     pre-commit run tally --all-files
     ```
 
-    ### Fail level for pre-commit
+### Fail level for pre-commit
 
     To only block commits on errors (not warnings or style issues), add `--fail-level error`:
 
@@ -191,19 +197,20 @@ tally is designed to run fast in CI without requiring Docker Desktop or a daemon
       files: '(Dockerfile|Containerfile)(\..*)?$|.*\.(Dockerfile|Containerfile)$'
       pass_filenames: true
     ```
+
   </Tab>
 </Tabs>
 
 ## Output format recommendations
 
-| CI system | Recommended format | Why |
-|-----------|-------------------|-----|
-| GitHub Actions (annotations) | `github-actions` | Inline PR diff annotations |
-| GitHub Code Scanning | `sarif` | Persistent findings in Security tab |
-| GitLab Code Quality | `sarif` | SAST artifact support |
-| Azure DevOps | `sarif` | SARIF is natively supported |
-| Terminal / local | `text` (default) | Human-readable with source snippets |
-| AI agents / scripts | `json` or `markdown` | Machine-readable or token-efficient |
+| CI system                    | Recommended format   | Why                                 |
+| ---------------------------- | -------------------- | ----------------------------------- |
+| GitHub Actions (annotations) | `github-actions`     | Inline PR diff annotations          |
+| GitHub Code Scanning         | `sarif`              | Persistent findings in Security tab |
+| GitLab Code Quality          | `sarif`              | SAST artifact support               |
+| Azure DevOps                 | `sarif`              | SARIF is natively supported         |
+| Terminal / local             | `text` (default)     | Human-readable with source snippets |
+| AI agents / scripts          | `json` or `markdown` | Machine-readable or token-efficient |
 
 ## Related guides
 

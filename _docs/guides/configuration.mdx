@@ -3,7 +3,8 @@ title: "Configuration"
 description: "Complete reference for tally's config file, environment variables, CLI flags, and inline directives."
 ---
 
-tally supports configuration via TOML config files, environment variables, and CLI flags. Sources cascade in a predictable order so you can set project defaults while allowing per-run overrides.
+tally supports configuration via TOML config files, environment variables, and CLI flags. Sources cascade in a predictable order so you can set
+project defaults while allowing per-run overrides.
 
 ## Priority order
 
@@ -78,7 +79,7 @@ tally lint --config /path/to/.tally.toml Dockerfile
   <Tab title="[rules]">
     Controls which rules are enabled and how they are configured.
 
-    #### Rule selection
+### Rule selection
 
     Use glob patterns to include or exclude rules by namespace or by specific rule code:
 
@@ -92,7 +93,7 @@ tally lint --config /path/to/.tally.toml Dockerfile
     ]
     ```
 
-    #### Per-rule configuration
+#### Per-rule configuration
 
     Configure individual rules with `severity` and rule-specific options:
 
@@ -113,7 +114,7 @@ tally lint --config /path/to/.tally.toml Dockerfile
     trusted-registries = ["docker.io", "gcr.io", "ghcr.io"]
     ```
 
-    #### Severity levels
+#### Severity levels
 
     | Severity | Description |
     |----------|-------------|
@@ -123,7 +124,7 @@ tally lint --config /path/to/.tally.toml Dockerfile
     | `"info"` | Informational suggestions |
     | `"style"` | Style preferences |
 
-    #### Enabling off-by-default rules
+#### Enabling off-by-default rules
 
     Some rules are disabled by default (for example, experimental rules). Enable them by providing configuration:
 

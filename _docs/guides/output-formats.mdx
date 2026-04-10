@@ -3,7 +3,8 @@ title: "Output formats"
 description: "Reference for all five tally output formats: text, json, sarif, github-actions, and markdown."
 ---
 
-tally supports five output formats so it fits into both terminals and automation pipelines. Select a format with `--format` or the `format` key in `.tally.toml`.
+tally supports five output formats so it fits into both terminals and automation pipelines. Select a format with `--format` or the `format` key in
+`.tally.toml`.
 
 ## Output options
 
@@ -19,7 +20,8 @@ tally supports five output formats so it fits into both terminals and automation
 
 <Tabs>
   <Tab title="text">
-    ## text (default)
+
+## text (default)
 
     Human-readable output with colors and source code snippets. Best for local development.
 
@@ -41,7 +43,7 @@ tally supports five output formats so it fits into both terminals and automation
     ────────────────────
     ```
 
-    ### Source snippets
+### Source snippets
 
     Source snippets are shown by default. Toggle them with flags:
 
@@ -61,7 +63,8 @@ tally supports five output formats so it fits into both terminals and automation
     ```
   </Tab>
   <Tab title="json">
-    ## json
+
+## json
 
     Machine-readable format with full violation details, summary statistics, and scan metadata. Best for scripts, dashboards, and custom reporting.
 
@@ -119,7 +122,8 @@ tally supports five output formats so it fits into both terminals and automation
     ```
   </Tab>
   <Tab title="sarif">
-    ## sarif
+
+## sarif
 
     [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/) format for static analysis tools and CI code scanning integrations. Best for GitHub Code Scanning, Azure DevOps, and similar platforms.
 
@@ -135,7 +139,7 @@ tally supports five output formats so it fits into both terminals and automation
 
     SARIF output includes rule metadata, help URIs, and per-result location data that code scanning tools use to render findings in pull requests and security dashboards.
 
-    ### GitHub Code Scanning
+### GitHub Code Scanning
 
     ```bash
     # Generate SARIF (use --fail-level none so the step doesn't fail before upload)
@@ -150,7 +154,8 @@ tally supports five output formats so it fits into both terminals and automation
     See [CI/CD integration](/guides/ci-cd) for a complete GitHub Actions workflow example.
   </Tab>
   <Tab title="github-actions">
-    ## github-actions
+
+## github-actions
 
     Emits GitHub Actions [workflow commands](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions) (`::warning` and `::error`) for inline PR annotations.
 
@@ -176,7 +181,8 @@ tally supports five output formats so it fits into both terminals and automation
     | `style` | `::notice` |
   </Tab>
   <Tab title="markdown">
-    ## markdown
+
+## markdown
 
     Concise Markdown tables optimized for AI agents, PR comments, and token-efficient reporting.
 
