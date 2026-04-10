@@ -56,7 +56,8 @@
   },
   "enabledPlugins": {
     "coderabbit@claude-plugins-official": true,
-    "ast-grep@ast-grep-marketplace": true
+    "ast-grep@ast-grep-marketplace": true,
+    "mintlify@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true
 }

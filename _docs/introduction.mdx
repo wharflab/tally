@@ -1,0 +1,108 @@
+---
+title: "Introduction"
+description: "tally is a BuildKit-native Dockerfile and Containerfile linter and formatter with safe auto-fix, LSP support, and SARIF output."
+---
+
+tally is a production-grade **Dockerfile and Containerfile linter + formatter** built on BuildKit's official parser — the same foundation behind
+`docker buildx`. It catches issues before they reach production, modernizes syntax automatically, and fits cleanly into any CI pipeline or editor
+workflow.
+
+```bash
+# Lint everything in your repo (recursive)
+tally lint .
+
+# Apply all safe fixes automatically
+tally lint --fix Dockerfile
+```
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install via Homebrew, WinGet, npm, pip, RubyGems, Docker, or Go.
+  </Card>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Lint your first Dockerfile in under a minute.
+  </Card>
+  <Card title="Rules reference" icon="list-check" href="/rules/overview">
+    Rules across BuildKit, tally, Hadolint, and ShellCheck namespaces.
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure rules, output formats, and fix modes with `.tally.toml`.
+  </Card>
+</CardGroup>
+
+## Why tally?
+
+Dockerfile linting has traditionally meant picking a compromise:
+
+- **Hadolint** is popular and battle-tested, but it uses its own Dockerfile parser, so support for newer BuildKit features can lag behind. It focuses
+  on reporting — not fixing.
+- **`docker buildx --check`** runs Docker's official BuildKit checks, but it requires the Docker/buildx toolchain and is not available if you are
+  using Podman, Finch, or another runtime.
+
+tally takes a different approach:
+
+| Capability | tally | Hadolint | docker buildx --check |
+|---|---|---|---|
+| Uses BuildKit's official parser | Yes | No (own parser) | Yes |
+| Understands heredocs, `RUN --mount`, `COPY --link` | Yes | Partial | Yes |
+| Safe auto-fix (`--fix`) | Yes | No | No |
+| AI-powered fixes (`--fix-unsafe`) | Yes | No | No |
+| No Docker daemon required | Yes | Yes | No |
+| SARIF output | Yes | Yes | No |
+| LSP / editor integration | Yes | Limited | No |
+| Windows-container aware | Yes | No | Partial |
+| PowerShell semantic analysis | Yes | No | No |
+
+## Key capabilities
+
+### BuildKit-native parsing
+
+tally uses BuildKit's official parser — the same one that `docker buildx` uses. It correctly handles modern syntax like heredocs,
+`RUN --mount=type=cache`, `COPY --link`, and `ADD --checksum` without lagging behind new Docker features.
+
+### Rules across four namespaces
+
+| Namespace | Source |
+|---|---|
+| `buildkit/` | Docker's official Dockerfile checks |
+| `tally/` | Custom rules including secret detection with gitleaks |
+| `hadolint/` | Hadolint-compatible Dockerfile rules |
+| `shellcheck/` | Shell script analysis within `RUN` instructions |
+
+Rules are grouped by category: correctness, security, performance, style, and maintainability. See the [rules reference](/rules/overview) for the full
+list.
+
+### Safe auto-fix
+
+`--fix` applies safe, mechanical rewrites — things like canonicalizing `STOPSIGNAL`, adding `--chown` flags, and converting `RUN echo` patterns to
+`COPY` heredocs. Nothing is applied that could change build behavior.
+
+### AI AutoFix via ACP
+
+`--fix-unsafe` unlocks opt-in AI AutoFix for improvements that are hard to express as a deterministic rewrite. Instead of requiring an API key, tally
+integrates with **ACP (Agent Client Protocol)** so you can use the AI agent you already trust — Gemini CLI, OpenCode, GitHub Copilot CLI, and more.
+
+All AI fixes are rule-driven (one narrow transformation at a time) and verified by re-parsing and re-linting before anything is written to disk. See
+the [AI AutoFix guide](/guides/ai-autofix) for details.
+
+### LSP and editor support
+
+`tally lsp` exposes a full Language Server Protocol server over stdio, giving you real-time diagnostics in any LSP-compatible editor. Official
+extensions are available for [VS Code](https://marketplace.visualstudio.com/items?itemName=wharflab.tally) and
+[JetBrains IDEs](https://plugins.jetbrains.com/plugin/30255-tally).
+
+### CI-ready output formats
+
+tally supports text, JSON, SARIF, GitHub Actions annotations, and Markdown output. SARIF integrates with GitHub Code Scanning, Azure DevOps, and other
+tools. The Markdown format is optimized for AI agents and token efficiency.
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="Install tally" icon="download" href="/installation">
+    Choose your package manager: Homebrew, WinGet, npm, pip, RubyGems, Docker, or Go.
+  </Card>
+  <Card title="Run your first lint" icon="rocket" href="/quickstart">
+    Lint a Dockerfile, read the output, apply fixes, and set up `.tally.toml`.
+  </Card>
+</CardGroup>

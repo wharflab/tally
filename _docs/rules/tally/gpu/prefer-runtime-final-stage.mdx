@@ -1,0 +1,122 @@
+---
+title: "tally/gpu/prefer-runtime-final-stage"
+description: "Final stage uses an NVIDIA devel image without clear build-time needs; prefer a runtime or base variant for the shipped stage."
+---
+
+Final stage uses an NVIDIA devel image without clear build-time needs; prefer a runtime or base variant for the shipped stage.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Best Practices |
+| Default | Enabled |
+| Auto-fix | Not available |
+
+## Description
+
+Detects when the final stage of a Dockerfile uses `nvidia/cuda:*devel*` as its base image without
+obvious compile-time needs such as `nvcc`, `gcc`, `make`, or `cmake`. The `devel` variant includes
+the full CUDA compiler toolchain, development headers, and static libraries, which can add several
+gigabytes to the final image.
+
+## Why this matters
+
+- **Image size** -- `devel` images are typically 2--4 GB larger than the corresponding `runtime`
+  variant due to `nvcc`, development headers, and static libraries
+- **Attack surface** -- shipping compiler toolchains and development headers in production images
+  exposes unnecessary binaries that could be leveraged in a container escape or supply-chain attack
+- **Build cache efficiency** -- larger images take longer to pull, push, and layer-cache, slowing
+  down CI/CD pipelines
+- **Best practice alignment** -- NVIDIA, Hugging Face, and major ML projects recommend using
+  `devel` only in builder stages and switching to `runtime` or `base` for the shipped image
+
+## What is flagged
+
+| Pattern | Flagged? |
+|---------|----------|
+| Final stage `FROM nvidia/cuda:12.x-devel-*` with no compile signal | Yes |
+| Final stage `FROM nvidia/cuda:12.x-cudnn-devel-*` with no compile signal | Yes |
+| Final stage `FROM nvidia/cuda:12.x-devel-*` with `nvcc`, `gcc`, `make`, etc. | No -- legitimate build stage |
+| Final stage `FROM nvidia/cuda:12.x-devel-*` with `build-essential` installed | No -- build tools present |
+| Final stage `FROM nvidia/cuda:12.x-runtime-*` | No -- already a runtime variant |
+| Final stage `FROM nvidia/cuda:12.x-base-*` | No -- already a minimal variant |
+| Non-final stage using `devel` | No -- builder stages legitimately need `devel` |
+
+## Examples
+
+### Violation
+
+```dockerfile
+# Single-stage devel with no compilation
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN pip install torch
+CMD ["python", "app.py"]
+```
+
+```dockerfile
+# Multi-stage: final stage uses devel but only runs pre-built binaries
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04 AS builder
+RUN nvcc -o /app main.cu
+
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+COPY --from=builder /app /app
+CMD ["/app"]
+```
+
+### No violation
+
+```dockerfile
+# Final stage uses runtime variant
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04 AS builder
+RUN nvcc -o /app main.cu
+
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+COPY --from=builder /app /app
+CMD ["/app"]
+```
+
+```dockerfile
+# Final stage uses devel but has compile signal
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN nvcc -o /app main.cu
+CMD ["/app"]
+```
+
+```dockerfile
+# Devel only in builder stage
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04 AS builder
+RUN cmake . && make
+
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+COPY --from=builder /app /app
+CMD ["/app"]
+```
+
+## Detection details
+
+The rule fires only when all of the following are true:
+
+1. The final stage base image is `nvidia/cuda:*devel*`
+2. No compile signal is detected in the final stage
+
+Compile signals that suppress the rule:
+
+- **Commands**: `nvcc`, `gcc`, `g++`, `make`, `cmake`, `ninja`
+- **Packages**: `build-essential`, `gcc`, `g++`, `make`, `cmake`, `ninja-build`
+
+When a `COPY --from=...` instruction is present in the final stage, the violation detail notes this
+as additional evidence that the stage serves as a runtime image.
+
+## Configuration
+
+This rule has no rule-specific options.
+
+```toml
+[rules.tally."gpu/prefer-runtime-final-stage"]
+severity = "warning"
+```
+
+## References
+
+- [NVIDIA CUDA Docker images](https://hub.docker.com/r/nvidia/cuda/)
+- [Hugging Face Docker Spaces GPU docs](https://huggingface.co/docs/hub/main/en/spaces-sdks-docker)

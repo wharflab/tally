@@ -1,0 +1,62 @@
+---
+title: "tally/no-multi-spaces"
+description: "Disallows multiple consecutive spaces within Dockerfile instructions."
+---
+
+Disallows multiple consecutive spaces within Dockerfile instructions.
+
+| Property | Value |
+|----------|-------|
+| Severity | Style |
+| Category | Style |
+| Default | Enabled |
+| Auto-fix | Yes (safe) |
+
+## Description
+
+Multiple consecutive spaces within Dockerfile instructions are usually accidental and make the code harder to read. This rule flags any run of 2 or
+more consecutive space characters within instruction lines.
+
+The following are excluded:
+
+- **Leading indentation**: whitespace before the instruction keyword
+- **Heredoc body lines**: content between heredoc markers (semantically significant)
+- **Comment lines**: lines starting with `#`
+
+## Examples
+
+### Bad
+
+```dockerfile
+FROM  alpine:3.20
+RUN  apk add  --no-cache  curl
+COPY  . /app
+```
+
+### Good
+
+```dockerfile
+FROM alpine:3.20
+RUN apk add --no-cache curl
+COPY . /app
+```
+
+## Auto-fix
+
+This rule provides a safe auto-fix that replaces each run of multiple spaces with a single space:
+
+```bash
+tally lint --fix Dockerfile
+```
+
+Each contiguous run of extra spaces is replaced independently, so a line with multiple occurrences receives one edit per run.
+
+## Configuration
+
+No custom configuration options. The rule is enabled by default with severity "style".
+
+```toml
+# Disable the rule
+[rules.tally.no-multi-spaces]
+severity = "off"
+```

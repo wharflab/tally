@@ -57,7 +57,7 @@ OpenCode, GitHub Copilot CLI, and more), while tally keeps linting fast and vali
 
 AI fixes are **rule-driven** (one narrow transformation at a time) and **verified** (re-parse + re-lint) before anything is applied.
 
-- Guide: [`docs/guide/ai-autofix-acp.md`](docs/guide/ai-autofix-acp.md)
+- Guide: [`_docs/guides/ai-autofix.mdx`](_docs/guides/ai-autofix.mdx)
 
 ## Supported Rules
 
@@ -253,7 +253,7 @@ FROM alpine
 
 tally also supports `hadolint` and `check=skip` directive formats for easy migration.
 
-**See [Configuration Guide](docs/guide/configuration.md#inline-directives) for full directive syntax.**
+**See [Configuration Guide](_docs/guides/configuration.mdx) for full directive syntax.**
 
 ## Configuration
 
@@ -274,7 +274,7 @@ max = 100
 
 Configuration priority: CLI flags > environment variables > config file > defaults.
 
-**See [Configuration Guide](docs/guide/configuration.md) for full reference.**
+**See [Configuration Guide](_docs/guides/configuration.mdx) for full reference.**
 
 ## Output Formats
 
@@ -405,7 +405,7 @@ Features:
 
 ### Exit Codes
 
-See [Exit Codes](docs/guide/exit-codes.md) for the full reference.
+See [Exit Codes](_docs/guides/exit-codes.mdx) for the full reference.
 
 ### Fail Level
 

@@ -1,0 +1,141 @@
+---
+title: "Quick start"
+description: "Lint your first Dockerfile in under a minute."
+---
+
+<Steps>
+  <Step title="Install tally">
+    Pick your preferred package manager:
+
+    <CodeGroup>
+      ```bash Homebrew
+      brew install wharflab/tap/tally
+      ```
+      ```bash npm
+      npm install -g tally-cli
+      ```
+      ```bash pip
+      pip install tally-cli
+      ```
+      ```bash Go
+      go install github.com/wharflab/tally@latest
+      ```
+    </CodeGroup>
+
+    See [Installation](/installation) for WinGet, RubyGems, Docker, and from-source options.
+  </Step>
+
+  <Step title="Lint a Dockerfile">
+    Run tally against a single file or an entire directory (recursive):
+
+    ```bash
+    # Single file
+    tally lint Dockerfile
+
+    # All Dockerfiles in the current repo
+    tally lint .
+    ```
+
+    tally discovers files matching `Dockerfile`, `Dockerfile.*`, `*.Dockerfile`, `Containerfile`, and `Containerfile.*`.
+  </Step>
+
+  <Step title="Read the output">
+    By default tally prints human-readable output with source snippets:
+
+    ```text
+    WARNING: StageNameCasing - https://docs.docker.com/go/dockerfile/rule/stage-name-casing/
+    Stage name 'Builder' should be lowercase
+
+    Dockerfile:2
+    ────────────────────
+       1 │ FROM alpine
+    >>>2 │ FROM ubuntu AS Builder
+       3 │ RUN echo "hello"
+    ────────────────────
+    ```
+
+    Exit code `1` means violations were found. Exit code `0` means clean.
+  </Step>
+
+  <Step title="Apply safe fixes">
+    Many rules are auto-fixable. Apply all safe fixes with `--fix`:
+
+    ```bash
+    tally lint --fix Dockerfile
+    ```
+
+    <Warning>
+      `--fix` modifies files in place. Commit your changes before running it, or review the diff afterward.
+    </Warning>
+  </Step>
+
+  <Step title="Add a config file">
+    Create `.tally.toml` in your project root to set defaults for your whole team:
+
+    ```toml .tally.toml
+    [output]
+    format = "text"
+    fail-level = "warning"
+
+    [rules]
+    include = ["buildkit/*", "tally/*", "hadolint/*"]
+    ```
+
+    Config is discovered automatically — no `--config` flag needed.
+  </Step>
+
+  <Step title="Enable context-aware rules">
+    Pass `--context` to unlock rules that check `.dockerignore` interactions:
+
+    ```bash
+    tally lint --context . Dockerfile
+    ```
+  </Step>
+
+  <Step title="Suppress a violation inline">
+    Use an inline directive to suppress a specific rule on the next line:
+
+    ```dockerfile
+    # tally ignore=StageNameCasing
+    FROM alpine AS Build
+    ```
+
+    Add a reason to document why:
+
+    ```dockerfile
+    # tally ignore=DL3007;reason=Pinning at CI level via Renovate
+    FROM ubuntu:latest
+    ```
+  </Step>
+</Steps>
+
+## Lint from stdin
+
+Pass `-` as the filename to read from stdin. Useful in pipelines:
+
+```bash
+cat Dockerfile | tally lint -
+```
+
+With `--fix`, the fixed content is written to stdout:
+
+```bash
+cat Dockerfile | tally lint --fix - > Dockerfile.fixed
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Full reference for `.tally.toml`, environment variables, and CLI flags.
+  </Card>
+  <Card title="Auto-fix" icon="wand-magic-sparkles" href="/guides/auto-fix">
+    Learn about safe and unsafe fixes, and per-rule fix modes.
+  </Card>
+  <Card title="Rules reference" icon="list-check" href="/rules/overview">
+    Browse all rules across BuildKit, tally, Hadolint, and ShellCheck namespaces.
+  </Card>
+  <Card title="CI/CD integration" icon="code-branch" href="/guides/ci-cd">
+    Add tally to GitHub Actions, GitLab CI, and other pipelines.
+  </Card>
+</CardGroup>

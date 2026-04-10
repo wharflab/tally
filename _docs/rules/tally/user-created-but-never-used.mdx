@@ -1,0 +1,157 @@
+---
+title: "tally/user-created-but-never-used"
+description: "Final stage creates a user but never switches to it."
+---
+
+Final stage creates a user but never switches to it.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Security |
+| Default | Enabled |
+| Auto-fix | Yes (unsafe) |
+
+## Description
+
+This rule detects Dockerfiles where the final stage (or its `FROM` ancestry
+chain) creates a dedicated user via `useradd` or `adduser`, but the effective
+runtime identity stays root and no privilege-drop entrypoint pattern is
+detected. This is a high-signal indicator of an incomplete hardening attempt
+or cargo-culted user setup.
+
+On Windows containers, the rule also detects `net user /add` and
+`New-LocalUser` commands.
+
+The `USER` instruction sets the default process identity for the container at
+runtime. Creating a user without switching to it means the container runs as
+root despite the preparation work.
+
+## Suppression
+
+The rule is automatically suppressed when:
+
+- The **effective `USER`** in the final stage is non-root.
+- A **privilege-drop tool** is referenced in ENTRYPOINT or CMD (`gosu`,
+  `su-exec`, `suexec`, `setpriv`).
+- The **base image is known to default to non-root**: Distroless `:nonroot`
+  tags, Chainguard/cgr.dev images, or local stage refs whose parent stage
+  sets a non-root `USER`.
+- The created user is **referenced in an ownership or permissions context**:
+  - Linux: `COPY --chown`, `ADD --chown`, or `RUN chown`
+  - Windows: `icacls /grant <user>`, `icacls /setowner <user>`,
+    `New-Object ...AccessRule("<user>", ...)`
+
+  This indicates deliberate permissions orchestration rather than a forgotten
+  step.
+
+## Cross-stage inheritance
+
+The rule walks the `FROM <stage>` ancestry chain. If a parent stage creates a
+user that flows into the final image (via `FROM`), the rule detects it. User
+creation in stages referenced only by `COPY --from` does not trigger the rule,
+since `COPY` does not inherit `/etc/passwd`.
+
+## Relationship to other rules
+
+| | `hadolint/DL3002` | `tally/stateful-root-runtime` | `tally/user-created-but-never-used` |
+|---|---|---|---|
+| Fires when | Last `USER` is explicitly `root` | Root + stateful signal (VOLUME, data dirs) | User created but never switched to |
+| Scope | Explicit root USER only | Root + state combination | User creation without USER switch |
+| Privilege-drop aware | No | Yes | Yes |
+| Ownership suppression | N/A | N/A | Yes (--chown, chown, icacls) |
+
+The rules are complementary and may fire on the same Dockerfile. Neither
+suppresses the other.
+
+## Auto-fix
+
+The rule offers an **unsafe** auto-fix (requires `--fix-unsafe`) that inserts
+`USER <created_user>` before the first `ENTRYPOINT` or `CMD` in the final
+stage. The fix is marked unsafe because:
+
+- Subsequent instructions might require root.
+- A privilege-drop pattern (gosu) might be more appropriate.
+- The inserted `USER` might not be the correct resolution in all cases.
+
+## References
+
+- [Dockerfile reference -- USER](https://docs.docker.com/reference/dockerfile/#user)
+- [Dockerfile reference -- COPY --chown](https://docs.docker.com/reference/dockerfile/#copy---chown)
+- [Docker Blog -- Understanding the Docker USER Instruction](https://www.docker.com/blog/understanding-the-docker-user-instruction/)
+- [Chainguard Best Practices](https://github.com/chainguard-images/images/blob/main/BEST_PRACTICES.md)
+
+## Examples
+
+### Bad
+
+```dockerfile
+# User created but never switched to
+FROM ubuntu:22.04
+RUN useradd -r appuser
+CMD ["app"]
+```
+
+```dockerfile
+# User created in parent stage, never activated
+FROM ubuntu:22.04 AS base
+RUN groupadd -r appgroup && useradd -r -g appgroup appuser
+
+FROM base
+CMD ["app"]
+```
+
+```dockerfile
+# Windows: user created but never switched to
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN net user appuser P@ssw0rd /add
+CMD ["cmd", "/C", "app.exe"]
+```
+
+### Good
+
+```dockerfile
+# User created and activated
+FROM ubuntu:22.04
+RUN useradd -r -u 1000 appuser
+USER appuser
+CMD ["app"]
+```
+
+```dockerfile
+# Privilege-drop entrypoint (official image pattern)
+FROM ubuntu:22.04
+RUN useradd -r appuser
+ENTRYPOINT ["gosu", "appuser", "docker-entrypoint.sh"]
+CMD ["postgres"]
+```
+
+```dockerfile
+# User created and used for file ownership (suppressed)
+FROM ubuntu:22.04
+RUN useradd -r appuser
+COPY --chown=appuser:appuser app /app
+CMD ["app"]
+```
+
+```dockerfile
+# Numeric non-root UID (no useradd needed)
+FROM gcr.io/distroless/static:nonroot
+COPY app /app
+CMD ["/app"]
+```
+
+```dockerfile
+# Windows: user created and used for ACL permissions (suppressed)
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN net user appuser P@ssw0rd /add
+RUN icacls C:\app /grant appuser:(OI)(CI)F
+CMD ["cmd", "/C", "app.exe"]
+```
+
+## Configuration
+
+```toml
+[rules.tally.user-created-but-never-used]
+severity = "warning"  # Options: "off", "error", "warning", "info", "style"
+```

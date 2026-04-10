@@ -1,0 +1,104 @@
+---
+title: "tally/gpu/no-buildtime-gpu-queries"
+description: "GPU hardware is not available during `docker build`; runtime GPU queries in `RUN` will fail or return misleading results."
+---
+
+GPU hardware is not available during `docker build`; runtime GPU queries in `RUN` will fail or return misleading results.
+
+| Property | Value |
+|----------|-------|
+| Severity | Error |
+| Category | Correctness |
+| Default | Enabled |
+| Auto-fix | No |
+
+## Description
+
+Detects `RUN` instructions that query GPU hardware at build time. GPU devices are not attached during a normal
+`docker build`, so commands like `nvidia-smi` and runtime framework checks like `torch.cuda.is_available()` will
+either fail outright or return misleading results (e.g., zero devices, `False`).
+
+This rule does **not** fire on `CMD` or `ENTRYPOINT`, where GPU queries are expected to run at container startup.
+
+## Why this matters
+
+- **Build failures** -- `nvidia-smi` will exit non-zero when no GPU is present, breaking the build
+- **Silent wrong results** -- `torch.cuda.is_available()` returns `False` at build time, which can cause downstream
+  logic to skip GPU code paths or produce incorrect configuration
+- **Misleading smoke tests** -- a passing build does not mean GPU support works; the check must happen at runtime
+- **Official guidance** -- Hugging Face explicitly warns that GPU hardware is not available during `docker build`
+
+## Detected patterns
+
+### GPU query commands
+
+| Command | Description |
+|---------|-------------|
+| `nvidia-smi` | NVIDIA System Management Interface (queries GPU hardware) |
+| `nvidia-debugdump` | NVIDIA debug information dump |
+| `nvidia-persistenced` | NVIDIA persistence daemon (requires GPU) |
+
+### Python/ML framework runtime checks
+
+| Pattern | Description |
+|---------|-------------|
+| `torch.cuda.is_available()` | PyTorch CUDA availability check |
+| `torch.cuda.device_count()` | PyTorch CUDA device count |
+| `torch.cuda.get_device_name()` | PyTorch CUDA device name query |
+| `torch.cuda.current_device()` | PyTorch current CUDA device |
+| `tf.test.is_gpu_available()` | TensorFlow GPU availability check |
+| `tf.config.list_physical_devices()` | TensorFlow physical device listing |
+
+## Examples
+
+### Violation
+
+```dockerfile
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN nvidia-smi
+```
+
+```dockerfile
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN python3 -c "import torch; print(torch.cuda.is_available())"
+```
+
+```dockerfile
+FROM tensorflow/tensorflow:2.14.0-gpu
+RUN python -c "import tensorflow as tf; print(tf.test.is_gpu_available())"
+```
+
+### No violation
+
+```dockerfile
+# GPU query in CMD runs at container startup — correct
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+CMD ["nvidia-smi", "--loop=10"]
+```
+
+```dockerfile
+# GPU query in ENTRYPOINT runs at container startup — correct
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+ENTRYPOINT ["python3", "-c", "import torch; print(torch.cuda.is_available())"]
+```
+
+```dockerfile
+# Normal package installation — no GPU query
+FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y python3 python3-pip
+```
+
+## Configuration
+
+This rule has no rule-specific options.
+
+```toml
+[rules.tally."gpu/no-buildtime-gpu-queries"]
+severity = "error"
+```
+
+## References
+
+- [Hugging Face Docker Spaces GPU docs](https://huggingface.co/docs/hub/main/en/spaces-sdks-docker) -- explicitly warns GPU is unavailable during
+  build
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/docker-specialized.html)

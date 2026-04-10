@@ -1,0 +1,116 @@
+---
+title: "tally — Dockerfile Linter & Formatter"
+description: "Keep your Dockerfiles and Containerfiles clean, modern, and consistent. tally uses BuildKit's official parser with safe auto-fixes."
+---
+
+tally is a production-grade **Dockerfile and Containerfile linter + formatter** that catches issues before they reach production. It uses the same
+parser behind `docker buildx`, understands modern BuildKit syntax, and can fix many issues automatically.
+
+```bash
+# Lint everything in your repo
+tally lint .
+
+# Apply all safe fixes automatically
+tally lint --fix Dockerfile
+```
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install via Homebrew, npm, pip, RubyGems, WinGet, Go, or Docker.
+  </Card>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Lint your first Dockerfile in under a minute.
+  </Card>
+  <Card title="Rules reference" icon="list-check" href="/rules/overview">
+    Rules across BuildKit, tally, Hadolint, and ShellCheck namespaces.
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Configure rules, output formats, and fix modes with `.tally.toml`.
+  </Card>
+</CardGroup>
+
+## Why tally?
+
+<CardGroup cols={2}>
+  <Card title="BuildKit-native" icon="docker">
+    Understands heredocs, `RUN --mount`, `COPY --link`, and `ADD --checksum`. No lag behind new Docker features.
+  </Card>
+  <Card title="Fixes, not just findings" icon="wrench">
+    `--fix` applies safe, mechanical rewrites. `--fix-unsafe` unlocks AI-powered improvements via ACP.
+  </Card>
+  <Card title="Broad rule coverage" icon="shield-check">
+    BuildKit checks, tally rules, Hadolint rules, and embedded ShellCheck for shell snippets.
+  </Card>
+  <Card title="CI & editor ready" icon="circle-check">
+    Outputs text, JSON, SARIF, GitHub Actions annotations, and Markdown. VS Code and JetBrains extensions included.
+  </Card>
+  <Card title="No Docker daemon required" icon="server">
+    Pure static analysis. Registry-aware checks use a Podman-compatible client — no Docker Desktop needed.
+  </Card>
+  <Card title="Windows-container aware" icon="windows">
+    Detects Windows containers, understands Windows paths, and parses PowerShell `RUN` instructions semantically.
+  </Card>
+</CardGroup>
+
+## Get started
+
+<Steps>
+  <Step title="Install tally">
+    Pick your preferred package manager:
+
+    ```bash
+    # Homebrew (macOS/Linux)
+    brew install wharflab/tap/tally
+
+    # npm
+    npm install -g tally-cli
+
+    # Go
+    go install github.com/wharflab/tally@latest
+    ```
+  </Step>
+  <Step title="Lint your Dockerfile">
+    Run tally against your Dockerfile or recursively across your whole repo:
+
+    ```bash
+    tally lint Dockerfile
+    tally lint .
+    ```
+  </Step>
+  <Step title="Apply auto-fixes">
+    Fix safe, mechanical issues automatically:
+
+    ```bash
+    tally lint --fix Dockerfile
+    ```
+  </Step>
+  <Step title="Add a config file">
+    Create `.tally.toml` to set project-wide defaults:
+
+    ```toml .tally.toml
+    [output]
+    format = "text"
+    fail-level = "warning"
+
+    [rules]
+    include = ["buildkit/*", "tally/*", "hadolint/*"]
+    ```
+  </Step>
+</Steps>
+
+## Explore the docs
+
+<CardGroup cols={2}>
+  <Card title="Auto-fix guide" icon="wand-magic-sparkles" href="/guides/auto-fix">
+    Learn how safe fixes and AI-powered fixes work.
+  </Card>
+  <Card title="AI AutoFix via ACP" icon="robot" href="/guides/ai-autofix">
+    Use your own AI agent to apply complex Dockerfile improvements.
+  </Card>
+  <Card title="CI/CD integration" icon="code-branch" href="/guides/ci-cd">
+    Add tally to GitHub Actions, GitLab CI, and other pipelines.
+  </Card>
+  <Card title="IDE integration" icon="display" href="/guides/ide-integration">
+    Real-time linting in VS Code, JetBrains, and any LSP editor.
+  </Card>
+</CardGroup>

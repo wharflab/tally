@@ -119,7 +119,7 @@ format_markdown() {
                 "🔄 `buildkit/\(.buildkit_rule)`"
             elif .impl_status == "covered_by_tally" then
                 (.tally_rule | split("/") | .[1]) as $slug |
-                "🔄 [`\(.tally_rule)`](docs/rules/tally/\($slug).md)"
+                "🔄 [`\(.tally_rule)`](_docs/rules/tally/\($slug).mdx)"
             elif .impl_status == "not_planned" then
                 if .tally_rule then
                     "⛔ Not planned (`\(.tally_rule)`)"
