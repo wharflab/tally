@@ -25,7 +25,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: "22.22.2"
+          node-version: "24.14.1"
       - name: Build docs
         working-directory: _docs
         run: npx -y mint export --output ../site.zip
