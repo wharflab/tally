@@ -35,7 +35,7 @@ jobs:
           fi
       - name: Create Pull Request
         if: steps.update.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v8.1.0
+        uses: peter-evans/create-pull-request@v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "docs: sync BuildKit rules"
