@@ -15,7 +15,7 @@ require (
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/gkampitakis/ciinfo v0.3.4
 	github.com/gkampitakis/go-snaps v0.5.21
-	github.com/google/go-containerregistry v0.21.4
+	github.com/google/go-containerregistry v0.21.5
 	github.com/google/jsonschema-go v0.4.2
 	github.com/knadh/koanf/parsers/toml/v2 v2.2.0
 	github.com/knadh/koanf/providers/confmap v1.0.0
@@ -79,7 +79,7 @@ require (
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 // indirect
 	github.com/containers/ocicrypt v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/docker/cli v29.3.1+incompatible // indirect
+	github.com/docker/cli v29.4.0+incompatible // indirect
 	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.5 // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
