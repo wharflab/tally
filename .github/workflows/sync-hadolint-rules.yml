@@ -60,7 +60,7 @@ jobs:
         run: ./scripts/generate-hadolint-table.sh --summary
       - name: Create Pull Request
         if: steps.update.outputs.changed == 'true'
-        uses: peter-evans/create-pull-request@v8.1.0
+        uses: peter-evans/create-pull-request@v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "docs: sync hadolint rules from upstream"
