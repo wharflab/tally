@@ -1,0 +1,209 @@
+{
+  "files": [
+    {
+      "file": "testdata/gpu-cuda-version-mismatch/Dockerfile",
+      "violations": [
+        {
+          "detail": "The base image provides CUDA 12.1, but the install references cu118. Wheels built for a mismatched CUDA version may fail at runtime or silently fall back to CPU execution.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/cuda-version-mismatch/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "testdata/gpu-cuda-version-mismatch/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "CUDA version mismatch: install targets cu118 (CUDA 11.8) but base image provides CUDA 12.1",
+          "rule": "tally/gpu/cuda-version-mismatch",
+          "severity": "warning",
+          "sourceCode": "RUN pip install --index-url https://download.pytorch.org/whl/cu118 torch torchvision",
+          "suggestedFix": {
+            "description": "Update CUDA wheel index/suffix to cu121 to match base image (CUDA 12.1)",
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          },
+          "suggestedFixes": [
+            {
+              "description": "Update CUDA wheel index/suffix to cu121 to match base image (CUDA 12.1)",
+              "isPreferred": true,
+              "priority": 8,
+              "safety": 1
+            },
+            {
+              "description": "Update base image to CUDA 11.8 to match installed wheels",
+              "priority": 8,
+              "safety": 1
+            }
+          ]
+        },
+        {
+          "detail": "The base image provides CUDA 12.4, but the install references cu118. Wheels built for a mismatched CUDA version may fail at runtime or silently fall back to CPU execution.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/cuda-version-mismatch/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 11
+            },
+            "file": "testdata/gpu-cuda-version-mismatch/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 11
+            }
+          },
+          "message": "CUDA version mismatch: install targets cu118 (CUDA 11.8) but base image provides CUDA 12.4",
+          "rule": "tally/gpu/cuda-version-mismatch",
+          "severity": "warning",
+          "sourceCode": "RUN pip install --extra-index-url https://download.pytorch.org/whl/cu118 xformers",
+          "suggestedFix": {
+            "description": "Update CUDA wheel index/suffix to cu124 to match base image (CUDA 12.4)",
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          },
+          "suggestedFixes": [
+            {
+              "description": "Update CUDA wheel index/suffix to cu124 to match base image (CUDA 12.4)",
+              "isPreferred": true,
+              "priority": 8,
+              "safety": 1
+            },
+            {
+              "description": "Update base image to CUDA 11.8 to match installed wheels",
+              "priority": 8,
+              "safety": 1
+            }
+          ]
+        },
+        {
+          "detail": "The base image provides CUDA 12.2, but the install references cu118. Wheels built for a mismatched CUDA version may fail at runtime or silently fall back to CPU execution.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/cuda-version-mismatch/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 15
+            },
+            "file": "testdata/gpu-cuda-version-mismatch/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 15
+            }
+          },
+          "message": "CUDA version mismatch: install targets cu118 (CUDA 11.8) but base image provides CUDA 12.2",
+          "rule": "tally/gpu/cuda-version-mismatch",
+          "severity": "warning",
+          "sourceCode": "RUN pip3 install torch==2.0.0+cu118",
+          "suggestedFix": {
+            "description": "Update CUDA wheel index/suffix to cu121 to match base image (CUDA 12.2)",
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          },
+          "suggestedFixes": [
+            {
+              "description": "Update CUDA wheel index/suffix to cu121 to match base image (CUDA 12.2)",
+              "isPreferred": true,
+              "priority": 8,
+              "safety": 1
+            },
+            {
+              "description": "Update base image to CUDA 11.8 to match installed wheels",
+              "priority": 8,
+              "safety": 1
+            }
+          ]
+        },
+        {
+          "detail": "The base image provides CUDA 12.4, but the install references cu118. Wheels built for a mismatched CUDA version may fail at runtime or silently fall back to CPU execution.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/cuda-version-mismatch/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 19
+            },
+            "file": "testdata/gpu-cuda-version-mismatch/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 19
+            }
+          },
+          "message": "CUDA version mismatch: install targets cu118 (CUDA 11.8) but base image provides CUDA 12.4",
+          "rule": "tally/gpu/cuda-version-mismatch",
+          "severity": "warning",
+          "sourceCode": "RUN uv pip install --torch-backend cu118 torch",
+          "suggestedFix": {
+            "description": "Update CUDA wheel index/suffix to cu124 to match base image (CUDA 12.4)",
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          },
+          "suggestedFixes": [
+            {
+              "description": "Update CUDA wheel index/suffix to cu124 to match base image (CUDA 12.4)",
+              "isPreferred": true,
+              "priority": 8,
+              "safety": 1
+            },
+            {
+              "description": "Update base image to CUDA 11.8 to match installed wheels",
+              "priority": 8,
+              "safety": 1
+            }
+          ]
+        },
+        {
+          "detail": "The base image provides CUDA 12.2, but the install references pytorch-cuda=11.8. Wheels built for a mismatched CUDA version may fail at runtime or silently fall back to CPU execution.",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/cuda-version-mismatch/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 23
+            },
+            "file": "testdata/gpu-cuda-version-mismatch/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 23
+            }
+          },
+          "message": "CUDA version mismatch: install targets pytorch-cuda=11.8 (11.8) but base image provides CUDA 12.2",
+          "rule": "tally/gpu/cuda-version-mismatch",
+          "severity": "warning",
+          "sourceCode": "RUN conda install -y pytorch pytorch-cuda=11.8 -c pytorch -c nvidia",
+          "suggestedFix": {
+            "description": "Update conda CUDA version to 12.2 to match base image",
+            "isPreferred": true,
+            "priority": 8,
+            "safety": 1
+          },
+          "suggestedFixes": [
+            {
+              "description": "Update conda CUDA version to 12.2 to match base image",
+              "isPreferred": true,
+              "priority": 8,
+              "safety": 1
+            },
+            {
+              "description": "Update base image to CUDA 11.8 to match installed wheels",
+              "priority": 8,
+              "safety": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 5,
+    "warnings": 5
+  }
+}

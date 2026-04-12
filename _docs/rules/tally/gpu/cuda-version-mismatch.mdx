@@ -1,0 +1,147 @@
+---
+title: "tally/gpu/cuda-version-mismatch"
+description: "CUDA-specific pip/conda wheel version does not match the base image's CUDA toolkit."
+---
+
+CUDA-specific pip/conda wheel version does not match the base image's CUDA toolkit.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Correctness |
+| Default | Enabled |
+| Auto-fix | Yes (suggestion) |
+
+## Description
+
+Detects `RUN` instructions where pip, uv, or conda installs reference a CUDA version
+that does not match the base image's CUDA toolkit version. A mismatch can cause:
+
+- Silent fallback to CPU execution
+- Runtime CUDA errors or build failures
+- Subtle performance degradation
+
+The rule supports four detection paths:
+
+1. **pip/pip3 package suffixes** -- `torch==2.0.0+cu118`
+2. **pip/pip3/uv index URLs** -- `--index-url https://download.pytorch.org/whl/cu118`
+3. **uv `--torch-backend`** -- `--torch-backend cu118`
+4. **conda/mamba/micromamba** -- `pytorch-cuda=11.8` or `cudatoolkit=11.8`
+
+## Why this matters
+
+- **Silent CPU fallback** -- PyTorch may load but silently use CPU instead of GPU
+  when the CUDA wheel version doesn't match the available CUDA runtime
+- **Runtime crashes** -- mismatched CUDA versions can produce cryptic `CUDA error`
+  messages at runtime
+- **Copy-paste bugs** -- the most common real-world pattern is upgrading the base
+  image CUDA version but forgetting to update the pip `--index-url` suffix
+
+## Examples
+
+### Violation
+
+```dockerfile
+# Base provides CUDA 12.1, but pip installs CUDA 11.8 wheels
+FROM nvidia/cuda:12.1.0-devel-ubuntu20.04
+RUN pip install --index-url https://download.pytorch.org/whl/cu118 torch
+```
+
+```dockerfile
+# Base provides CUDA 12.4, but --extra-index-url uses CUDA 11.8
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+RUN pip install --extra-index-url https://download.pytorch.org/whl/cu118 xformers
+```
+
+```dockerfile
+# Base provides CUDA 12.2, but conda installs CUDA 11.8 pytorch
+FROM nvidia/cuda:12.2.0-devel-ubuntu22.04
+RUN conda install -y pytorch pytorch-cuda=11.8 -c pytorch -c nvidia
+```
+
+```dockerfile
+# Base provides CUDA 12.4, but uv uses CUDA 11.8 backend
+FROM nvidia/cuda:12.4.0-runtime-ubuntu22.04
+RUN uv pip install --torch-backend cu118 torch
+```
+
+### No violation
+
+```dockerfile
+# Exact match: CUDA 11.8 base with cu118 wheels
+FROM nvidia/cuda:11.8.0-base-ubuntu22.04
+RUN pip install --index-url https://download.pytorch.org/whl/cu118 torch
+```
+
+```dockerfile
+# Forward-compatible: cu121 wheel on CUDA 12.6 base (older minor is fine)
+FROM nvidia/cuda:12.6.0-runtime-ubuntu22.04
+RUN pip install --index-url https://download.pytorch.org/whl/cu121 torch
+```
+
+```dockerfile
+# Non-CUDA base: rule does not apply
+FROM ubuntu:22.04
+RUN pip install --index-url https://download.pytorch.org/whl/cu121 torch
+```
+
+## Version compatibility
+
+The rule uses NVIDIA's forward compatibility guarantee:
+
+- **Same major, wheel minor <= base minor** -- OK (forward-compatible)
+- **Same major, wheel minor > base minor** -- Mismatch (wheel needs newer CUDA)
+- **Different major** -- Always a mismatch
+
+### CUDA suffix mapping
+
+| Suffix | CUDA version |
+|--------|-------------|
+| `cu118` | 11.8 |
+| `cu121` | 12.1 |
+| `cu124` | 12.4 |
+| `cu126` | 12.6 |
+| `cu128` | 12.8 |
+
+## Fix suggestions
+
+The rule offers two fix alternatives:
+
+1. **Update the wheel/index to match the base image** -- preferred when the base image
+   has a higher CUDA version (the common case: base was upgraded but pip URL was not)
+2. **Update the base image to match the wheel** -- preferred when the wheel targets a
+   newer CUDA version than the base
+
+Both fixes use `FixSuggestion` safety -- verify the target wheel or image tag exists
+before applying.
+
+## Applicability
+
+This rule only fires when:
+
+- The base image is `nvidia/cuda:*` (or `docker.io/nvidia/cuda:*`)
+- The CUDA version can be parsed from the image tag
+- A CUDA version reference is found in a `RUN` instruction
+
+It does **not** fire on:
+
+- Non-NVIDIA base images
+- Stages referencing another build stage (`FROM builder`)
+- Digest-only or ARG-based image tags (version cannot be determined)
+- pip installs without CUDA suffixes or index URLs
+
+## Configuration
+
+This rule has no rule-specific options.
+
+```toml
+[rules.tally."gpu/cuda-version-mismatch"]
+severity = "warning"
+```
+
+## References
+
+- [PyTorch Previous Versions](https://pytorch.org/get-started/previous-versions/)
+- [NVIDIA CUDA Docker Hub](https://hub.docker.com/r/nvidia/cuda/)
+- [uv PyTorch integration](https://docs.astral.sh/uv/guides/integration/pytorch/)
+- [NVIDIA CUDA Compatibility](https://docs.nvidia.com/deploy/cuda-compatibility/)

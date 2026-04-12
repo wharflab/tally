@@ -333,6 +333,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// GPU: CUDA version mismatch between base image and pip/conda wheels
+		{
+			name:     "gpu-cuda-version-mismatch",
+			dir:      "gpu-cuda-version-mismatch",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/gpu/cuda-version-mismatch")...),
+			wantExit: 1,
+		},
+
 		// Shell-form RUN in scratch stage
 		{
 			name:     "shell-run-in-scratch",

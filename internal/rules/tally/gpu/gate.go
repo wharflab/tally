@@ -1,6 +1,8 @@
 package gpu
 
 import (
+	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/distribution/reference"
@@ -44,11 +46,13 @@ const (
 	cudaFlavorDevel
 )
 
-// cudaImageInfo holds the parsed flavor and optional component tags from an nvidia/cuda image tag.
+// cudaImageInfo holds the parsed flavor, version, and optional component tags from an nvidia/cuda image tag.
 type cudaImageInfo struct {
 	Flavor      cudaFlavor
 	HasCuDNN    bool
 	IsCUDAImage bool
+	CUDAMajor   int // CUDA major version (e.g., 12 for "12.2.0-devel-ubuntu22.04"); 0 if unparseable
+	CUDAMinor   int // CUDA minor version (e.g., 2 for "12.2.0-devel-ubuntu22.04")
 }
 
 // parseCUDAImageInfo extracts flavor and component info from an nvidia/cuda stage's base image
@@ -93,6 +97,12 @@ func parseCUDAImageInfo(info *semantic.StageInfo) cudaImageInfo {
 		result.Flavor = cudaFlavorDevel
 	}
 
+	// Extract CUDA major.minor version from the tag.
+	if m := cudaTagVersionRe.FindStringSubmatch(tag); m != nil {
+		result.CUDAMajor = atoiDigits(m[1])
+		result.CUDAMinor = atoiDigits(m[2])
+	}
+
 	return result
 }
 
@@ -108,4 +118,60 @@ func stageBaseImageName(info *semantic.StageInfo) string {
 		raw = raw[:i]
 	}
 	return raw
+}
+
+// cudaTagVersionRe matches the CUDA major.minor version at the start of an
+// nvidia/cuda image tag (e.g., "12.2.0-devel-ubuntu22.04" → "12", "2").
+var cudaTagVersionRe = regexp.MustCompile(`^(\d+)\.(\d+)`)
+
+// atoiDigits converts a digit-only string to int. Returns 0 on error (should
+// not happen with regex-validated input).
+func atoiDigits(s string) int {
+	n := 0
+	for _, ch := range s {
+		n = n*10 + int(ch-'0')
+	}
+	return n
+}
+
+// knownCUDASuffix represents a known published PyTorch CUDA wheel suffix.
+type knownCUDASuffix struct {
+	Major int
+	Minor int
+}
+
+// knownCUDASuffixes lists the CUDA versions for which PyTorch publishes
+// prebuilt wheels. Past releases are immutable; add new entries when PyTorch
+// ships a new cuXYZ variant.
+var knownCUDASuffixes = []knownCUDASuffix{
+	{11, 6}, {11, 7}, {11, 8},
+	{12, 1}, {12, 4}, {12, 6}, {12, 8},
+}
+
+// bestCUDASuffix returns the highest known PyTorch cuXYZ suffix where major
+// matches and minor <= the given minor. Returns ("", false) if no published
+// suffix exists for that major version at or below the given minor.
+func bestCUDASuffix(major, minor int) (string, bool) {
+	best := -1
+	for _, s := range knownCUDASuffixes {
+		if s.Major == major && s.Minor <= minor && s.Minor > best {
+			best = s.Minor
+		}
+	}
+	if best < 0 {
+		return "", false
+	}
+	return cudaSuffixString(major, best), true
+}
+
+// cudaSuffixString formats a CUDA major.minor version as a cuXYZ suffix
+// (e.g., 12, 4 → "cu124"; 11, 8 → "cu118").
+func cudaSuffixString(major, minor int) string {
+	return fmt.Sprintf("cu%d%d", major, minor)
+}
+
+// cudaVersionString formats a CUDA major.minor as a dotted version string
+// (e.g., 12, 4 → "12.4").
+func cudaVersionString(major, minor int) string {
+	return fmt.Sprintf("%d.%d", major, minor)
 }

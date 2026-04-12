@@ -120,6 +120,7 @@
           {
             "group": "GPU / CUDA",
             "pages": [
+              "rules/tally/gpu/cuda-version-mismatch",
               "rules/tally/gpu/no-buildtime-gpu-queries",
               "rules/tally/gpu/no-container-runtime-in-image",
               "rules/tally/gpu/no-hardcoded-visible-devices",

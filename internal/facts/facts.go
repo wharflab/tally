@@ -37,6 +37,14 @@ type StageFacts struct {
 	IsLast      bool
 	BaseImageOS semantic.BaseImageOS
 
+	// CUDAMajor and CUDAMinor hold the CUDA toolkit version parsed from the
+	// base image tag. Only populated for nvidia/cuda:* base images with a
+	// parseable version tag (e.g., nvidia/cuda:12.2.0-devel-ubuntu22.04 →
+	// CUDAMajor=12, CUDAMinor=2). Zero values mean the version is unknown
+	// (non-CUDA image, ARG-based tag, digest reference, or unparseable tag).
+	CUDAMajor int
+	CUDAMinor int
+
 	InitialShell ShellFacts
 	FinalShell   ShellFacts
 	EffectiveEnv EnvFacts
@@ -314,6 +322,10 @@ func newStageBuildState(
 	}
 }
 
+// cudaVersionRe matches the CUDA major.minor version at the start of an
+// nvidia/cuda image tag (e.g., "12.2.0-devel-ubuntu22.04" → "12", "2").
+var cudaVersionRe = regexp.MustCompile(`^(\d+)\.(\d+)`)
+
 func newStageFacts(stageIdx, stageCount int, currentShell ShellFacts, semInfo *semantic.StageInfo) *StageFacts {
 	stageFacts := &StageFacts{
 		Index:        stageIdx,
@@ -323,8 +335,56 @@ func newStageFacts(stageIdx, stageCount int, currentShell ShellFacts, semInfo *s
 	}
 	if semInfo != nil {
 		stageFacts.BaseImageOS = semInfo.BaseImageOS
+		stageFacts.CUDAMajor, stageFacts.CUDAMinor = parseCUDAVersionFromBaseImage(semInfo)
 	}
 	return stageFacts
+}
+
+// parseCUDAVersionFromBaseImage extracts CUDA major.minor version from an
+// nvidia/cuda:* base image tag. Returns (0, 0) for non-CUDA images, stage
+// references, digest references, or unparseable tags.
+func parseCUDAVersionFromBaseImage(info *semantic.StageInfo) (major, minor int) {
+	if info == nil || info.BaseImage == nil || info.BaseImage.IsStageRef {
+		return 0, 0
+	}
+	raw := strings.ToLower(info.BaseImage.Raw)
+	// Extract name before tag/digest.
+	name, tag, hasTag := strings.Cut(raw, ":")
+	if !hasTag {
+		if strings.Contains(raw, "@") {
+			// Digest-only reference — no parseable version.
+			return 0, 0
+		}
+	}
+	// Only nvidia/cuda images carry a CUDA toolkit version in their tag.
+	if name != "nvidia/cuda" && name != "docker.io/nvidia/cuda" {
+		return 0, 0
+	}
+	if tag == "" {
+		return 0, 0
+	}
+	// Strip digest suffix (e.g. "12.2.0-devel-ubuntu22.04@sha256:...").
+	if i := strings.IndexByte(tag, '@'); i >= 0 {
+		tag = tag[:i]
+	}
+	m := cudaVersionRe.FindStringSubmatch(tag)
+	if m == nil {
+		return 0, 0
+	}
+	// Errors are impossible: the regex guarantees digits-only groups.
+	major = atoiSafe(m[1])
+	minor = atoiSafe(m[2])
+	return major, minor
+}
+
+// atoiSafe converts a digit-only string to int. Returns 0 on error (should
+// not happen with regex-validated input).
+func atoiSafe(s string) int {
+	n := 0
+	for _, ch := range s {
+		n = n*10 + int(ch-'0')
+	}
+	return n
 }
 
 func (f *FileFacts) processStageCommands(
