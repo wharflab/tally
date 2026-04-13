@@ -22,14 +22,14 @@
           "severity": "warning",
           "sourceCode": "RUN pip install --index-url https://download.pytorch.org/whl/cu118 torch torchvision",
           "suggestedFix": {
-            "description": "Update CUDA wheel index/suffix to cu121 to match base image (CUDA 12.1)",
+            "description": "Update CUDA wheel index/suffix to cu121 (closest compatible suffix for CUDA 12.1)",
             "isPreferred": true,
             "priority": 8,
             "safety": 1
           },
           "suggestedFixes": [
             {
-              "description": "Update CUDA wheel index/suffix to cu121 to match base image (CUDA 12.1)",
+              "description": "Update CUDA wheel index/suffix to cu121 (closest compatible suffix for CUDA 12.1)",
               "isPreferred": true,
               "priority": 8,
               "safety": 1
@@ -60,14 +60,14 @@
           "severity": "warning",
           "sourceCode": "RUN pip install --extra-index-url https://download.pytorch.org/whl/cu118 xformers",
           "suggestedFix": {
-            "description": "Update CUDA wheel index/suffix to cu124 to match base image (CUDA 12.4)",
+            "description": "Update CUDA wheel index/suffix to cu124 (closest compatible suffix for CUDA 12.4)",
             "isPreferred": true,
             "priority": 8,
             "safety": 1
           },
           "suggestedFixes": [
             {
-              "description": "Update CUDA wheel index/suffix to cu124 to match base image (CUDA 12.4)",
+              "description": "Update CUDA wheel index/suffix to cu124 (closest compatible suffix for CUDA 12.4)",
               "isPreferred": true,
               "priority": 8,
               "safety": 1
@@ -98,14 +98,14 @@
           "severity": "warning",
           "sourceCode": "RUN pip3 install torch==2.0.0+cu118",
           "suggestedFix": {
-            "description": "Update CUDA wheel index/suffix to cu121 to match base image (CUDA 12.2)",
+            "description": "Update CUDA wheel index/suffix to cu121 (closest compatible suffix for CUDA 12.2)",
             "isPreferred": true,
             "priority": 8,
             "safety": 1
           },
           "suggestedFixes": [
             {
-              "description": "Update CUDA wheel index/suffix to cu121 to match base image (CUDA 12.2)",
+              "description": "Update CUDA wheel index/suffix to cu121 (closest compatible suffix for CUDA 12.2)",
               "isPreferred": true,
               "priority": 8,
               "safety": 1
@@ -136,14 +136,14 @@
           "severity": "warning",
           "sourceCode": "RUN uv pip install --torch-backend cu118 torch",
           "suggestedFix": {
-            "description": "Update CUDA wheel index/suffix to cu124 to match base image (CUDA 12.4)",
+            "description": "Update CUDA wheel index/suffix to cu124 (closest compatible suffix for CUDA 12.4)",
             "isPreferred": true,
             "priority": 8,
             "safety": 1
           },
           "suggestedFixes": [
             {
-              "description": "Update CUDA wheel index/suffix to cu124 to match base image (CUDA 12.4)",
+              "description": "Update CUDA wheel index/suffix to cu124 (closest compatible suffix for CUDA 12.4)",
               "isPreferred": true,
               "priority": 8,
               "safety": 1

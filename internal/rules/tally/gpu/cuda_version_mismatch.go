@@ -338,14 +338,18 @@ func (r *CUDAVersionMismatchRule) buildFixWheelToBase(
 		}
 	}
 
-	// For cuXYZ suffixes, look up the best known suffix.
+	// For cuXYZ suffixes, look up the best known compatible suffix.
+	// This may round down (e.g., CUDA 12.2 base → cu121) since PyTorch
+	// does not publish wheels for every CUDA minor version.
 	suffix, ok := bestCUDASuffix(baseMajor, baseMinor)
 	if !ok {
 		return nil // no known suffix for this CUDA major — cannot suggest
 	}
+	baseVer := cudaVersionString(baseMajor, baseMinor)
+	desc := fmt.Sprintf("Update CUDA wheel index/suffix to %s (closest compatible suffix for CUDA %s)",
+		suffix, baseVer)
 	return &rules.SuggestedFix{
-		Description: fmt.Sprintf("Update CUDA wheel index/suffix to %s to match base image (CUDA %s)",
-			suffix, cudaVersionString(baseMajor, baseMinor)),
+		Description: desc,
 		Safety:      rules.FixSuggestion,
 		Priority:    meta.FixPriority,
 		IsPreferred: isPreferred,
