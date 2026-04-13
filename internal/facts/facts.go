@@ -297,7 +297,7 @@ func (f *FileFacts) buildStageFacts(
 	semInfo := f.stageInfo(stageIdx)
 	knownVars := makeStageKnownVarsChecker(semInfo)
 	state := newStageBuildState(stage, semInfo, f.stages, f.shellDirectives)
-	stageFacts := newStageFacts(stageIdx, stageCount, state.currentShell, semInfo)
+	stageFacts := newStageFacts(stageIdx, stageCount, state.currentShell, semInfo, f.stages)
 	seedStageEntrypointState(semInfo, f.stages, stageFacts)
 	entrypointState := f.processStageCommands(stageFacts, stage, stageIdx, sm, escapeToken, knownVars, state)
 	finalizeStageFacts(stageFacts, semInfo, state, entrypointState)
@@ -327,7 +327,7 @@ func newStageBuildState(
 // nvidia/cuda image tag (e.g., "12.2.0-devel-ubuntu22.04" → "12", "2").
 var cudaVersionRe = regexp.MustCompile(`^(\d+)\.(\d+)`)
 
-func newStageFacts(stageIdx, stageCount int, currentShell ShellFacts, semInfo *semantic.StageInfo) *StageFacts {
+func newStageFacts(stageIdx, stageCount int, currentShell ShellFacts, semInfo *semantic.StageInfo, stages []*StageFacts) *StageFacts {
 	stageFacts := &StageFacts{
 		Index:        stageIdx,
 		IsLast:       stageIdx == stageCount-1,
@@ -337,8 +337,28 @@ func newStageFacts(stageIdx, stageCount int, currentShell ShellFacts, semInfo *s
 	if semInfo != nil {
 		stageFacts.BaseImageOS = semInfo.BaseImageOS
 		stageFacts.CUDAMajor, stageFacts.CUDAMinor = parseCUDAVersionFromBaseImage(semInfo)
+
+		// Inherit CUDA version from parent stage in multi-stage builds
+		// (e.g., FROM builder where builder uses nvidia/cuda:*).
+		if stageFacts.CUDAMajor == 0 {
+			stageFacts.CUDAMajor, stageFacts.CUDAMinor = inheritCUDAVersion(semInfo, stages)
+		}
 	}
 	return stageFacts
+}
+
+// inheritCUDAVersion returns the CUDA version from the parent stage when the
+// current stage references another build stage (FROM <stage>). Returns (0, 0)
+// when not a stage reference or the parent has no CUDA version.
+func inheritCUDAVersion(info *semantic.StageInfo, stages []*StageFacts) (int, int) {
+	if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
+		return 0, 0
+	}
+	baseIdx := info.BaseImage.StageIndex
+	if baseIdx < 0 || baseIdx >= len(stages) || stages[baseIdx] == nil {
+		return 0, 0
+	}
+	return stages[baseIdx].CUDAMajor, stages[baseIdx].CUDAMinor
 }
 
 // parseCUDAVersionFromBaseImage extracts CUDA major.minor version from an

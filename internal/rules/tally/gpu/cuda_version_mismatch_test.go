@@ -192,6 +192,17 @@ RUN pip install --index-url https://download.pytorch.org/whl/cu118 torch
 			WantViolations: 1,
 		},
 		{
+			Name: "multi-stage: inherits CUDA version from parent stage",
+			Content: `FROM nvidia/cuda:12.4.0-devel-ubuntu22.04 AS builder
+RUN nvcc --version
+
+FROM builder AS runner
+RUN pip install --index-url https://download.pytorch.org/whl/cu118 torch
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"cu118"},
+		},
+		{
 			Name: "multiple mismatched packages in same RUN",
 			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
 RUN pip install torch==2.1.0+cu118 torchvision==0.16.0+cu118
