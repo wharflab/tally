@@ -162,4 +162,4 @@ jobs:
           lfs: false
       - name: Install uv
         uses: astral-sh/setup-uv@v7
-      - run: uv tool run rumdl==0.1.69 check --output-format github .
+      - run: uv tool run rumdl==0.1.71 check --output-format github .
