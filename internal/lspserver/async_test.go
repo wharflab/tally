@@ -151,8 +151,8 @@ func TestLintContentWithConfig_RunsAsyncUndefinedVarResolution(t *testing.T) {
 
 	s := New()
 	uri := fileURI(filePath)
-	violations := s.lintContentWithConfig(context.Background(), uri, content, cfg, rawResult.ParseResult)
-	require.False(t, hasRule(violations, "buildkit/UndefinedVar"))
+	lr := s.lintContentWithConfig(context.Background(), uri, content, cfg, rawResult.ParseResult)
+	require.False(t, hasRule(lr.violations, "buildkit/UndefinedVar"))
 }
 
 func fileURI(path string) string {

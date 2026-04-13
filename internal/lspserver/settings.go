@@ -30,6 +30,9 @@ type folderSettings struct {
 	ConfigurationPreference config.ConfigurationPreference
 	ConfigurationOverrides  map[string]any
 	WorkspaceTrusted        bool
+	SuppressRuleEnabled     bool
+	ShowDocEnabled          bool
+	FixAllMode              string // "all" (iterative) or "problems" (single-pass)
 }
 
 func applyDefaultPreference(pref config.ConfigurationPreference) config.ConfigurationPreference {
@@ -39,11 +42,19 @@ func applyDefaultPreference(pref config.ConfigurationPreference) config.Configur
 	return pref
 }
 
+const (
+	fixAllModeAll      = "all"
+	fixAllModeProblems = "problems"
+)
+
 func defaultClientSettings() clientSettings {
 	return clientSettings{
 		Global: folderSettings{
 			ConfigurationPreference: config.ConfigurationPreferenceEditorFirst,
 			WorkspaceTrusted:        false,
+			SuppressRuleEnabled:     true,
+			ShowDocEnabled:          true,
+			FixAllMode:              fixAllModeAll,
 		},
 	}
 }
@@ -138,6 +149,9 @@ type folderSettingsWire struct {
 	ConfigurationPreference config.ConfigurationPreference `json:"configurationPreference"`
 	Configuration           any                            `json:"configuration"`
 	WorkspaceTrusted        bool                           `json:"workspaceTrusted"`
+	SuppressRuleEnabled     *bool                          `json:"suppressRuleEnabled"`
+	ShowDocEnabled          *bool                          `json:"showDocumentationEnabled"`
+	FixAllMode              string                         `json:"fixAllMode"`
 }
 
 func parseClientSettings(settings any) (clientSettings, bool) {
@@ -163,6 +177,9 @@ func parseClientSettings(settings any) (clientSettings, bool) {
 			ConfigurationPreference: applyDefaultPreference(wire.Global.ConfigurationPreference),
 			ConfigurationOverrides:  toOverridesMap(wire.Global.Configuration),
 			WorkspaceTrusted:        wire.Global.WorkspaceTrusted,
+			SuppressRuleEnabled:     boolPtrTrue(wire.Global.SuppressRuleEnabled),
+			ShowDocEnabled:          boolPtrTrue(wire.Global.ShowDocEnabled),
+			FixAllMode:              fixAllModeOrDefault(wire.Global.FixAllMode),
 		},
 	}
 
@@ -173,6 +190,9 @@ func parseClientSettings(settings any) (clientSettings, bool) {
 				ConfigurationPreference: applyDefaultPreference(ws.Settings.ConfigurationPreference),
 				ConfigurationOverrides:  toOverridesMap(ws.Settings.Configuration),
 				WorkspaceTrusted:        ws.Settings.WorkspaceTrusted,
+				SuppressRuleEnabled:     boolPtrTrue(ws.Settings.SuppressRuleEnabled),
+				ShowDocEnabled:          boolPtrTrue(ws.Settings.ShowDocEnabled),
+				FixAllMode:              fixAllModeOrDefault(ws.Settings.FixAllMode),
 			},
 		})
 	}
@@ -183,6 +203,23 @@ func parseClientSettings(settings any) (clientSettings, bool) {
 	})
 
 	return out, true
+}
+
+// boolPtrTrue returns the value pointed to by p, or true if p is nil.
+func boolPtrTrue(p *bool) bool {
+	if p == nil {
+		return true
+	}
+	return *p
+}
+
+func fixAllModeOrDefault(mode string) string {
+	switch mode {
+	case fixAllModeAll, fixAllModeProblems:
+		return mode
+	default:
+		return fixAllModeAll
+	}
 }
 
 func toOverridesMap(v any) map[string]any {

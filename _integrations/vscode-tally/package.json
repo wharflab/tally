@@ -143,6 +143,29 @@
           "default": false,
           "description": "Allow manual 'Fix all' command to apply unsafe fixes."
         },
+        "tally.codeAction.suppressRule.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show 'Suppress rule' code actions that insert # tally ignore= directives."
+        },
+        "tally.codeAction.showDocumentation.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show 'Show documentation' code actions to open rule docs in a browser."
+        },
+        "tally.fixAll.mode": {
+          "type": "string",
+          "default": "all",
+          "enum": [
+            "all",
+            "problems"
+          ],
+          "enumDescriptions": [
+            "Iteratively re-lint and fix until no more auto-fixable issues remain (up to 10 passes).",
+            "Apply pre-computed fixes in a single pass (faster, but may miss cascading fixes)."
+          ],
+          "description": "Strategy for 'Fix all' and source.fixAll.tally code actions."
+        },
         "tally.trace.server": {
           "type": "string",
           "enum": [

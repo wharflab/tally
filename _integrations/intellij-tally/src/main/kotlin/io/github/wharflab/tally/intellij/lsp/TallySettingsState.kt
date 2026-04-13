@@ -7,6 +7,7 @@ internal class TallySettingsState : BaseState() {
     var executablePath by string()
     var fixUnsafe by property(false)
     var fixAllOnSave by property(false)
+    var fixAllMode by string("all")
     var formatOnReformat by property(true)
     var configurationPath by string()
 }

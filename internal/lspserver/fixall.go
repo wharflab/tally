@@ -77,7 +77,52 @@ func fixModeAllowsSafeFix(ruleCode string, fixModes map[string]fix.FixMode) bool
 	}
 }
 
-func (s *Server) computeFixEdits(ctx context.Context, docURI string, content []byte, safety fix.FixSafety) []*protocol.TextEdit {
+const maxFixIterations = 10
+
+// computeFixEdits computes text edits to fix all auto-fixable violations.
+// In "all" mode (fixAllModeAll), it iteratively re-lints and re-fixes until
+// convergence or maxFixIterations. In "problems" mode (fixAllModeProblems),
+// it applies a single pass (current behavior).
+func (s *Server) computeFixEdits(
+	ctx context.Context,
+	docURI string,
+	content []byte,
+	safety fix.FixSafety,
+	mode string,
+) []*protocol.TextEdit {
+	if mode == fixAllModeAll {
+		return s.computeFixEditsIterative(ctx, docURI, content, safety)
+	}
+	fixed := s.computeFixedContent(ctx, docURI, content, safety)
+	if fixed == nil || bytes.Equal(fixed, content) {
+		return nil
+	}
+	return minimalTextEdit(content, fixed)
+}
+
+// computeFixEditsIterative runs lint+fix in a loop until the content stabilizes
+// or maxFixIterations is reached. Returns minimal text edits from original to final.
+func (s *Server) computeFixEditsIterative(ctx context.Context, docURI string, content []byte, safety fix.FixSafety) []*protocol.TextEdit {
+	current := content
+	for range maxFixIterations {
+		if ctx.Err() != nil {
+			return nil
+		}
+		next := s.computeFixedContent(ctx, docURI, current, safety)
+		if next == nil || bytes.Equal(next, current) {
+			break
+		}
+		current = next
+	}
+	if bytes.Equal(current, content) {
+		return nil
+	}
+	return minimalTextEdit(content, current)
+}
+
+// computeFixedContent runs a single lint+fix pass and returns the modified content.
+// Returns nil if there's nothing to fix or an error occurs.
+func (s *Server) computeFixedContent(ctx context.Context, docURI string, content []byte, safety fix.FixSafety) []byte {
 	input := s.lintInput(docURI, content)
 
 	result, err := linter.LintFile(input)
@@ -111,5 +156,5 @@ func (s *Server) computeFixEdits(ctx context.Context, docURI string, content []b
 		return nil
 	}
 
-	return minimalTextEdit(content, change.ModifiedContent)
+	return change.ModifiedContent
 }

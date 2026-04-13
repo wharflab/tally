@@ -19,21 +19,24 @@ func (s *Server) codeActionsForDocument(
 ) []protocol.CodeAction {
 	includeQuickFix := true
 	includeFixAll := true
+	includeSuppress := true
 	if params.Context.Only != nil {
 		includeQuickFix = kindRequested(params.Context.Only, protocol.CodeActionKindQuickFix)
 		includeFixAll = kindRequested(params.Context.Only, fixAllCodeActionKind)
+		includeSuppress = kindRequested(params.Context.Only, suppressCodeActionKind)
 	}
 
-	if !includeQuickFix && !includeFixAll {
+	if !includeQuickFix && !includeFixAll && !includeSuppress {
 		return nil
 	}
 
 	// Use cached lint results from publishDiagnostics when the version matches.
 	violations, ok := s.lintCache.get(doc.URI, doc.Version)
 	if !ok {
-		violations = s.lintContent(ctx, doc.URI, []byte(doc.Content))
+		lr := s.lintContent(ctx, doc.URI, []byte(doc.Content))
+		violations = lr.violations
 		if s.documentVersionCurrent(doc.URI, doc.Version) {
-			s.lintCache.set(doc.URI, doc.Version, violations)
+			s.lintCache.set(doc.URI, doc.Version, lr.violations, lr.config, lr.parseResult)
 		}
 	}
 
@@ -52,7 +55,29 @@ func (s *Server) codeActionsForDocument(
 		}
 	}
 
+	// Suppress-rule actions: inject # tally ignore= directives.
+	if includeSuppress && s.suppressRuleEnabled(doc.URI) {
+		entry, cached := s.lintCache.getEntry(doc.URI, doc.Version)
+		if cached {
+			actions = append(actions, suppressRuleActions(violations, params, doc.Content, entry.parseResult, entry.config)...)
+		}
+	}
+
+	// Show documentation actions (no Kind filter — they have nil kind and appear
+	// in the full lightbulb menu regardless of the Only filter).
+	if s.showDocEnabled(doc.URI) && s.showDocumentSupported {
+		actions = append(actions, showDocActions(violations, params)...)
+	}
+
 	return actions
+}
+
+func (s *Server) suppressRuleEnabled(docURI string) bool {
+	return s.settingsForFile(uriToPath(docURI)).SuppressRuleEnabled
+}
+
+func (s *Server) showDocEnabled(docURI string) bool {
+	return s.settingsForFile(uriToPath(docURI)).ShowDocEnabled
 }
 
 // resolveFixEdits resolves async fix edits on-the-fly using the registered resolver.
