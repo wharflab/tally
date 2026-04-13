@@ -89,8 +89,8 @@ RUN pip install --index-url https://download.pytorch.org/whl/cu121 torch
 
 The rule uses NVIDIA's forward compatibility guarantee:
 
-- **Same major, wheel minor <= base minor** -- OK (forward-compatible)
-- **Same major, wheel minor > base minor** -- Mismatch (wheel needs newer CUDA)
+- **Same major, wheel minor at or below base minor** -- OK (forward-compatible)
+- **Same major, wheel minor above base minor** -- Mismatch (wheel needs newer CUDA)
 - **Different major** -- Always a mismatch
 
 ### CUDA suffix mapping
