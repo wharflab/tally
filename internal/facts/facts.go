@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/distribution/reference"
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
@@ -361,50 +362,41 @@ func inheritCUDAVersion(info *semantic.StageInfo, stages []*StageFacts) (int, in
 	return stages[baseIdx].CUDAMajor, stages[baseIdx].CUDAMinor
 }
 
+// nvidiaCUDAFamiliarName is the familiar name for the nvidia/cuda image
+// as returned by distribution/reference.FamiliarName.
+const nvidiaCUDAFamiliarName = "nvidia/cuda"
+
 // parseCUDAVersionFromBaseImage extracts CUDA major.minor version from an
-// nvidia/cuda:* base image tag. Returns (0, 0) for non-CUDA images, stage
-// references, digest references, or unparseable tags.
+// nvidia/cuda:* base image tag using the distribution/reference library for
+// proper OCI image reference parsing. Returns (0, 0) for non-CUDA images,
+// stage references, digest-only references, or unparseable tags.
 func parseCUDAVersionFromBaseImage(info *semantic.StageInfo) (major, minor int) {
 	if info == nil || info.BaseImage == nil || info.BaseImage.IsStageRef {
 		return 0, 0
 	}
-	raw := strings.ToLower(info.BaseImage.Raw)
-	// Extract name before tag/digest.
-	name, tag, hasTag := strings.Cut(raw, ":")
-	if !hasTag {
-		if strings.Contains(raw, "@") {
-			// Digest-only reference — no parseable version.
-			return 0, 0
-		}
-	}
-	// Only nvidia/cuda images carry a CUDA toolkit version in their tag.
-	if name != "nvidia/cuda" && name != "docker.io/nvidia/cuda" {
+	// OCI references must be lowercase; Dockerfile image refs may use mixed case.
+	named, err := reference.ParseNormalizedNamed(strings.ToLower(info.BaseImage.Raw))
+	if err != nil {
 		return 0, 0
 	}
-	if tag == "" {
+	if reference.FamiliarName(named) != nvidiaCUDAFamiliarName {
 		return 0, 0
 	}
-	// Strip digest suffix (e.g. "12.2.0-devel-ubuntu22.04@sha256:...").
-	if i := strings.IndexByte(tag, '@'); i >= 0 {
-		tag = tag[:i]
+	tagged, ok := named.(reference.Tagged)
+	if !ok {
+		return 0, 0 // digest-only or untagged
 	}
+	tag := strings.ToLower(tagged.Tag())
 	m := cudaVersionRe.FindStringSubmatch(tag)
 	if m == nil {
 		return 0, 0
 	}
-	// Errors are impossible: the regex guarantees digits-only groups.
-	major = atoiSafe(m[1])
-	minor = atoiSafe(m[2])
-	return major, minor
-}
-
-// atoiSafe converts a digit-only string to int. Returns 0 on error.
-func atoiSafe(s string) int {
-	n, err := strconv.Atoi(s)
-	if err != nil {
-		return 0
+	maj, errMaj := strconv.Atoi(m[1])
+	mnr, errMnr := strconv.Atoi(m[2])
+	if errMaj != nil || errMnr != nil {
+		return 0, 0
 	}
-	return n
+	return maj, mnr
 }
 
 func (f *FileFacts) processStageCommands(
