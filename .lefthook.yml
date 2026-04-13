@@ -53,6 +53,10 @@ pre-commit:
       exclude: "**/__snapshots__/**"
       run: uv tool run rumdl==0.1.69 check --fix --config .rumdl.toml --output-format concise {staged_files}
       stage_fixed: true
+    mintlify-docs-verify:
+      glob: "_docs/**"
+      run: bunx -y -q mint validate
+      root: _docs
     yamllint:
       glob: "*.{yml,yaml}"
       run: uvx yamllint {staged_files}
@@ -99,3 +103,6 @@ pre-push:
       run: ./scripts/validate-hadolint-status.sh
     - name: validate-buildkit-rules
       run: GOEXPERIMENT=jsonv2 ./scripts/validate-buildkit-rules.sh
+    - name: mintlify-docs-broken-links
+      run: bunx -y -q mint broken-links
+      root: _docs
