@@ -279,6 +279,24 @@ func TestFindCommentBlockStart(t *testing.T) {
 			instructionLine0: 0,
 			want:             0,
 		},
+		{
+			name:             "stops at parser directive",
+			lines:            []string{"# syntax=docker/dockerfile:1", "# escape=\\", "# comment", "FROM alpine"},
+			instructionLine0: 3,
+			want:             2,
+		},
+		{
+			name:             "stops at bare hash",
+			lines:            []string{"FROM alpine", "#", "# description comment", "RUN make"},
+			instructionLine0: 3,
+			want:             2,
+		},
+		{
+			name:             "parser directives contiguous with instruction",
+			lines:            []string{"# syntax=docker/dockerfile:1", "FROM alpine"},
+			instructionLine0: 1,
+			want:             1,
+		},
 	}
 
 	for _, tt := range tests {

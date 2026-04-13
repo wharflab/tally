@@ -221,6 +221,11 @@ func mergeRuleIntoDirectiveLine(directiveLine int, ruleCode string, lines []stri
 // findCommentBlockStart walks backwards from the instruction line to find
 // the first line of any comment block immediately above it. Returns the
 // 0-based line where the new directive should be inserted.
+//
+// Stops at:
+//   - empty lines or non-comment lines (obvious block boundary)
+//   - bare "#" lines (empty comment — acts as a block separator in BuildKit)
+//   - parser directives (# syntax=, # escape=, # check=) which must stay at the top
 func findCommentBlockStart(instructionLine0 int, lines []string) int {
 	line := instructionLine0
 	for line > 0 {
@@ -228,9 +233,26 @@ func findCommentBlockStart(instructionLine0 int, lines []string) int {
 		if prev == "" || !strings.HasPrefix(prev, "#") {
 			break
 		}
+		// Bare "#" (empty comment) is a block separator.
+		if prev == "#" {
+			break
+		}
+		// Don't walk past parser directives.
+		if isParserDirective(prev) {
+			break
+		}
 		line--
 	}
 	return line
+}
+
+// isParserDirective returns true if the line is a Dockerfile parser directive
+// (# syntax=, # escape=, # check=) that must remain at the top of the file.
+func isParserDirective(trimmedLine string) bool {
+	lower := strings.ToLower(trimmedLine)
+	return strings.HasPrefix(lower, "# syntax=") ||
+		strings.HasPrefix(lower, "# escape=") ||
+		strings.HasPrefix(lower, "# check=")
 }
 
 // findInsertionAfterParserDirectives returns the 0-based line where a global
@@ -240,10 +262,7 @@ func findInsertionAfterParserDirectives(lines []string) int {
 	line := 0
 	for line < len(lines) {
 		trimmed := strings.TrimSpace(lines[line])
-		lower := strings.ToLower(trimmed)
-		if strings.HasPrefix(lower, "# syntax=") ||
-			strings.HasPrefix(lower, "# escape=") ||
-			strings.HasPrefix(lower, "# check=") {
+		if isParserDirective(trimmed) {
 			line++
 			continue
 		}
