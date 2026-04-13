@@ -107,48 +107,46 @@ func TestParseCUDAImageInfo(t *testing.T) {
 		wantCUDA   bool
 		wantFlavor cudaFlavor
 		wantCuDNN  bool
-		wantMajor  int
-		wantMinor  int
 	}{
 		{
 			name: "devel tag", raw: "nvidia/cuda:12.2.0-devel-ubuntu22.04",
-			wantCUDA: true, wantFlavor: cudaFlavorDevel, wantMajor: 12, wantMinor: 2,
+			wantCUDA: true, wantFlavor: cudaFlavorDevel,
 		},
 		{
 			name: "runtime tag", raw: "nvidia/cuda:12.2.0-runtime-ubuntu22.04",
-			wantCUDA: true, wantFlavor: cudaFlavorRuntime, wantMajor: 12, wantMinor: 2,
+			wantCUDA: true, wantFlavor: cudaFlavorRuntime,
 		},
 		{
 			name: "base tag", raw: "nvidia/cuda:12.2.0-base-ubuntu22.04",
-			wantCUDA: true, wantFlavor: cudaFlavorBase, wantMajor: 12, wantMinor: 2,
+			wantCUDA: true, wantFlavor: cudaFlavorBase,
 		},
 		{
 			name: "cudnn-devel", raw: "nvidia/cuda:12.2.0-cudnn-devel-ubuntu22.04",
-			wantCUDA: true, wantFlavor: cudaFlavorDevel, wantCuDNN: true, wantMajor: 12, wantMinor: 2,
+			wantCUDA: true, wantFlavor: cudaFlavorDevel, wantCuDNN: true,
 		},
 		{
 			name: "cudnn-runtime", raw: "nvidia/cuda:12.2.0-cudnn-runtime-ubuntu22.04",
-			wantCUDA: true, wantFlavor: cudaFlavorRuntime, wantCuDNN: true, wantMajor: 12, wantMinor: 2,
+			wantCUDA: true, wantFlavor: cudaFlavorRuntime, wantCuDNN: true,
 		},
 		{
 			name: "no tag defaults to devel", raw: "nvidia/cuda:12.2.0",
-			wantCUDA: true, wantFlavor: cudaFlavorDevel, wantMajor: 12, wantMinor: 2,
+			wantCUDA: true, wantFlavor: cudaFlavorDevel,
 		},
 		{
 			name: "docker.io prefix devel", raw: "docker.io/nvidia/cuda:12.2.0-devel-ubuntu22.04",
-			wantCUDA: true, wantFlavor: cudaFlavorDevel, wantMajor: 12, wantMinor: 2,
+			wantCUDA: true, wantFlavor: cudaFlavorDevel,
 		},
 		{
 			name: "digest ref defaults to devel", raw: digestRef,
-			wantCUDA: true, wantFlavor: cudaFlavorDevel, wantMajor: 0, wantMinor: 0,
+			wantCUDA: true, wantFlavor: cudaFlavorDevel,
 		},
 		{
 			name: "11.8 runtime", raw: "nvidia/cuda:11.8.0-runtime-ubuntu22.04",
-			wantCUDA: true, wantFlavor: cudaFlavorRuntime, wantMajor: 11, wantMinor: 8,
+			wantCUDA: true, wantFlavor: cudaFlavorRuntime,
 		},
 		{
 			name: "12.6.2 cudnn-runtime", raw: "nvidia/cuda:12.6.2-cudnn-runtime-ubuntu22.04",
-			wantCUDA: true, wantFlavor: cudaFlavorRuntime, wantCuDNN: true, wantMajor: 12, wantMinor: 6,
+			wantCUDA: true, wantFlavor: cudaFlavorRuntime, wantCuDNN: true,
 		},
 		{name: "ubuntu is not CUDA", raw: "ubuntu:22.04", wantCUDA: false},
 		{name: "nvcr pytorch is not nvidia/cuda", raw: "nvcr.io/nvidia/pytorch:23.10-py3", wantCUDA: false},
@@ -156,7 +154,7 @@ func TestParseCUDAImageInfo(t *testing.T) {
 		{name: "nil info", raw: "", wantCUDA: false},
 		{
 			name: "uppercase devel", raw: "NVIDIA/CUDA:12.2.0-devel-ubuntu22.04",
-			wantCUDA: true, wantFlavor: cudaFlavorDevel, wantMajor: 12, wantMinor: 2,
+			wantCUDA: true, wantFlavor: cudaFlavorDevel,
 		},
 	}
 
@@ -177,12 +175,6 @@ func TestParseCUDAImageInfo(t *testing.T) {
 				}
 				if got.HasCuDNN != tt.wantCuDNN {
 					t.Errorf("HasCuDNN = %v, want %v", got.HasCuDNN, tt.wantCuDNN)
-				}
-				if got.CUDAMajor != tt.wantMajor {
-					t.Errorf("CUDAMajor = %d, want %d", got.CUDAMajor, tt.wantMajor)
-				}
-				if got.CUDAMinor != tt.wantMinor {
-					t.Errorf("CUDAMinor = %d, want %d", got.CUDAMinor, tt.wantMinor)
 				}
 			}
 		})

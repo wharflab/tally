@@ -2,8 +2,6 @@ package gpu
 
 import (
 	"fmt"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/distribution/reference"
@@ -47,13 +45,12 @@ const (
 	cudaFlavorDevel
 )
 
-// cudaImageInfo holds the parsed flavor, version, and optional component tags from an nvidia/cuda image tag.
+// cudaImageInfo holds the parsed flavor and optional component tags from an nvidia/cuda image tag.
+// CUDA major.minor version is exposed via StageFacts.CUDAMajor/CUDAMinor in the facts layer.
 type cudaImageInfo struct {
 	Flavor      cudaFlavor
 	HasCuDNN    bool
 	IsCUDAImage bool
-	CUDAMajor   int // CUDA major version (e.g., 12 for "12.2.0-devel-ubuntu22.04"); 0 if unparseable
-	CUDAMinor   int // CUDA minor version (e.g., 2 for "12.2.0-devel-ubuntu22.04")
 }
 
 // parseCUDAImageInfo extracts flavor and component info from an nvidia/cuda stage's base image
@@ -98,12 +95,6 @@ func parseCUDAImageInfo(info *semantic.StageInfo) cudaImageInfo {
 		result.Flavor = cudaFlavorDevel
 	}
 
-	// Extract CUDA major.minor version from the tag.
-	if m := cudaTagVersionRe.FindStringSubmatch(tag); m != nil {
-		result.CUDAMajor = atoiDigits(m[1])
-		result.CUDAMinor = atoiDigits(m[2])
-	}
-
 	return result
 }
 
@@ -119,19 +110,6 @@ func stageBaseImageName(info *semantic.StageInfo) string {
 		raw = raw[:i]
 	}
 	return raw
-}
-
-// cudaTagVersionRe matches the CUDA major.minor version at the start of an
-// nvidia/cuda image tag (e.g., "12.2.0-devel-ubuntu22.04" → "12", "2").
-var cudaTagVersionRe = regexp.MustCompile(`^(\d+)\.(\d+)`)
-
-// atoiDigits converts a digit-only string to int. Returns 0 on error.
-func atoiDigits(s string) int {
-	n, err := strconv.Atoi(s)
-	if err != nil {
-		return 0
-	}
-	return n
 }
 
 // knownCUDASuffix represents a known published PyTorch CUDA wheel suffix.
