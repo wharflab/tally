@@ -34,6 +34,11 @@ func suppressRuleActions(
 	spanIndex := directive.NewInstructionSpanIndexFromAST(parseResult.AST, sm)
 	dirResult := directive.Parse(sm, nil, spanIndex)
 
+	// The first instruction's start line (0-based) marks where parser directives
+	// end. Derived from the already-parsed AST — no string-based parser directive
+	// detection needed.
+	firstInstLine0 := firstInstructionLine(parseResult)
+
 	requireReason := cfg != nil && cfg.InlineDirectives.RequireReason
 	lines := strings.Split(content, "\n")
 
@@ -59,7 +64,7 @@ func suppressRuleActions(
 		uri := params.TextDocument.Uri
 
 		// Next-line suppress action
-		if edit := suppressLineEdit(v, lines, dirResult, requireReason); edit != nil {
+		if edit := suppressLineEdit(v, lines, dirResult, firstInstLine0, requireReason); edit != nil {
 			suppressLineData := any(map[string]any{"type": "suppress-line", "ruleCode": v.RuleCode})
 			actions = append(actions, protocol.CodeAction{
 				Title: fmt.Sprintf("Suppress %s for this line", v.RuleCode),
@@ -74,7 +79,7 @@ func suppressRuleActions(
 		}
 
 		// File-level suppress action
-		if edit := suppressFileEdit(v.RuleCode, lines, dirResult, requireReason); edit != nil {
+		if edit := suppressFileEdit(v.RuleCode, lines, dirResult, firstInstLine0, requireReason); edit != nil {
 			suppressFileData := any(map[string]any{"type": "suppress-file", "ruleCode": v.RuleCode})
 			actions = append(actions, protocol.CodeAction{
 				Title: fmt.Sprintf("Suppress %s for this file", v.RuleCode),
@@ -92,6 +97,21 @@ func suppressRuleActions(
 	return actions
 }
 
+// firstInstructionLine returns the 0-based line of the first instruction in the
+// Dockerfile, derived from the already-parsed AST. Everything before this line
+// is parser directives or comments. Returns 0 if there are no instructions.
+func firstInstructionLine(pr *dockerfile.ParseResult) int {
+	if pr == nil || pr.AST == nil || pr.AST.AST == nil {
+		return 0
+	}
+	for _, child := range pr.AST.AST.Children {
+		if child != nil && child.StartLine > 0 {
+			return child.StartLine - 1 // AST uses 1-based lines
+		}
+	}
+	return 0
+}
+
 // suppressLineEdit generates a TextEdit to add a # tally ignore= directive
 // for the given violation. It inserts above the comment block preceding the
 // instruction (not between comments and the instruction) to avoid triggering
@@ -103,6 +123,7 @@ func suppressLineEdit(
 	v rules.Violation,
 	lines []string,
 	dirResult *directive.ParseResult,
+	firstInstLine0 int,
 	requireReason bool,
 ) *protocol.TextEdit {
 	// Violation line is 1-based; convert to 0-based for line array access.
@@ -128,8 +149,9 @@ func suppressLineEdit(
 		return mergeRuleIntoDirectiveLine(d.Line, v.RuleCode, lines)
 	}
 
-	// No existing directive — insert a new one above the comment block.
-	insertLine0 := findCommentBlockStart(violationLine0, lines)
+	// No existing directive — insert a new one above the comment block,
+	// but never before the first instruction (which marks the end of parser directives).
+	insertLine0 := findCommentBlockStart(violationLine0, firstInstLine0, lines)
 
 	// Match indentation of the instruction line.
 	indent := leadingWhitespace(lines[violationLine0])
@@ -154,6 +176,7 @@ func suppressFileEdit(
 	ruleCode string,
 	lines []string,
 	dirResult *directive.ParseResult,
+	firstInstLine0 int,
 	requireReason bool,
 ) *protocol.TextEdit {
 	// Check existing global directives.
@@ -171,9 +194,8 @@ func suppressFileEdit(
 		return mergeRuleIntoDirectiveLine(d.Line, ruleCode, lines)
 	}
 
-	// No existing global directive — insert after parser directives (# syntax=, # escape=).
-	insertLine0 := findInsertionAfterParserDirectives(lines)
-
+	// No existing global directive — insert right before the first instruction.
+	// Everything before firstInstLine0 is parser directives or preamble comments.
 	comment := "# tally global ignore=" + ruleCode
 	if requireReason {
 		comment += ";reason=TODO"
@@ -181,8 +203,8 @@ func suppressFileEdit(
 
 	return &protocol.TextEdit{
 		Range: protocol.Range{
-			Start: protocol.Position{Line: clampUint32(insertLine0), Character: 0},
-			End:   protocol.Position{Line: clampUint32(insertLine0), Character: 0},
+			Start: protocol.Position{Line: clampUint32(firstInstLine0), Character: 0},
+			End:   protocol.Position{Line: clampUint32(firstInstLine0), Character: 0},
 		},
 		NewText: comment + "\n",
 	}
@@ -222,13 +244,16 @@ func mergeRuleIntoDirectiveLine(directiveLine int, ruleCode string, lines []stri
 // the first line of any comment block immediately above it. Returns the
 // 0-based line where the new directive should be inserted.
 //
+// floorLine0 is the lowest line we may return (typically the first instruction
+// line from the AST), preventing insertion into the parser-directive preamble.
+//
 // Stops at:
 //   - empty lines or non-comment lines (obvious block boundary)
 //   - bare "#" lines (empty comment — acts as a block separator in BuildKit)
-//   - parser directives (# syntax=, # escape=, # check=) which must stay at the top
-func findCommentBlockStart(instructionLine0 int, lines []string) int {
+//   - floorLine0 (never walks into parser directives)
+func findCommentBlockStart(instructionLine0, floorLine0 int, lines []string) int {
 	line := instructionLine0
-	for line > 0 {
+	for line > floorLine0 {
 		prev := strings.TrimSpace(lines[line-1])
 		if prev == "" || !strings.HasPrefix(prev, "#") {
 			break
@@ -237,36 +262,7 @@ func findCommentBlockStart(instructionLine0 int, lines []string) int {
 		if prev == "#" {
 			break
 		}
-		// Don't walk past parser directives.
-		if isParserDirective(prev) {
-			break
-		}
 		line--
-	}
-	return line
-}
-
-// isParserDirective returns true if the line is a Dockerfile parser directive
-// (# syntax=, # escape=, # check=) that must remain at the top of the file.
-func isParserDirective(trimmedLine string) bool {
-	lower := strings.ToLower(trimmedLine)
-	return strings.HasPrefix(lower, "# syntax=") ||
-		strings.HasPrefix(lower, "# escape=") ||
-		strings.HasPrefix(lower, "# check=")
-}
-
-// findInsertionAfterParserDirectives returns the 0-based line where a global
-// directive should be inserted — after any # syntax= or # escape= parser
-// directives and their trailing blank lines.
-func findInsertionAfterParserDirectives(lines []string) int {
-	line := 0
-	for line < len(lines) {
-		trimmed := strings.TrimSpace(lines[line])
-		if isParserDirective(trimmed) {
-			line++
-			continue
-		}
-		break
 	}
 	return line
 }

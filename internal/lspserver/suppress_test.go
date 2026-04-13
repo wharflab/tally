@@ -30,7 +30,7 @@ func TestSuppressLineEdit_BasicInsertion(t *testing.T) {
 		rules.SeverityWarning,
 	)
 
-	edit := suppressLineEdit(v, lines, dirResult, false)
+	edit := suppressLineEdit(v, lines, dirResult, 0, false)
 	require.NotNil(t, edit)
 	assert.Equal(t, "# tally ignore=hadolint/DL3027\n", edit.NewText)
 	assert.Equal(t, uint32(1), edit.Range.Start.Line, "should insert before the RUN line (0-based line 1)")
@@ -51,7 +51,7 @@ func TestSuppressLineEdit_WithRequireReason(t *testing.T) {
 		rules.SeverityWarning,
 	)
 
-	edit := suppressLineEdit(v, lines, dirResult, true)
+	edit := suppressLineEdit(v, lines, dirResult, 0, true)
 	require.NotNil(t, edit)
 	assert.Equal(t, "# tally ignore=tally/test-rule;reason=TODO\n", edit.NewText)
 }
@@ -71,7 +71,7 @@ func TestSuppressLineEdit_AboveCommentBlock(t *testing.T) {
 		rules.SeverityWarning,
 	)
 
-	edit := suppressLineEdit(v, lines, dirResult, false)
+	edit := suppressLineEdit(v, lines, dirResult, 0, false)
 	require.NotNil(t, edit)
 	assert.Equal(t, "# tally ignore=tally/test-rule\n", edit.NewText)
 	assert.Equal(t, uint32(1), edit.Range.Start.Line,
@@ -93,7 +93,7 @@ func TestSuppressLineEdit_MergesWithExisting(t *testing.T) {
 		rules.SeverityWarning,
 	)
 
-	edit := suppressLineEdit(v, lines, dirResult, false)
+	edit := suppressLineEdit(v, lines, dirResult, 0, false)
 	require.NotNil(t, edit)
 	assert.Equal(t, ",DL3027", edit.NewText, "should append rule to existing directive")
 	assert.Equal(t, uint32(1), edit.Range.Start.Line, "should edit the existing directive line")
@@ -114,7 +114,7 @@ func TestSuppressLineEdit_AlreadySuppressed(t *testing.T) {
 		rules.SeverityWarning,
 	)
 
-	edit := suppressLineEdit(v, lines, dirResult, false)
+	edit := suppressLineEdit(v, lines, dirResult, 0, false)
 	assert.Nil(t, edit, "should return nil when rule is already suppressed")
 }
 
@@ -133,7 +133,7 @@ func TestSuppressLineEdit_Indentation(t *testing.T) {
 		rules.SeverityWarning,
 	)
 
-	edit := suppressLineEdit(v, lines, dirResult, false)
+	edit := suppressLineEdit(v, lines, dirResult, 0, false)
 	require.NotNil(t, edit)
 	assert.Equal(t, "\t# tally ignore=tally/test-rule\n", edit.NewText,
 		"should match leading whitespace of the instruction")
@@ -147,7 +147,7 @@ func TestSuppressFileEdit_BasicInsertion(t *testing.T) {
 	sm := sourcemap.New([]byte(content))
 	dirResult := directive.Parse(sm, nil, nil)
 
-	edit := suppressFileEdit("tally/max-lines", lines, dirResult, false)
+	edit := suppressFileEdit("tally/max-lines", lines, dirResult, 0, false)
 	require.NotNil(t, edit)
 	assert.Equal(t, "# tally global ignore=tally/max-lines\n", edit.NewText)
 	assert.Equal(t, uint32(0), edit.Range.Start.Line, "should insert at the top of the file")
@@ -161,7 +161,8 @@ func TestSuppressFileEdit_AfterSyntaxDirective(t *testing.T) {
 	sm := sourcemap.New([]byte(content))
 	dirResult := directive.Parse(sm, nil, nil)
 
-	edit := suppressFileEdit("tally/max-lines", lines, dirResult, false)
+	// FROM is on line 1 (0-based), so firstInstLine0 = 1
+	edit := suppressFileEdit("tally/max-lines", lines, dirResult, 1, false)
 	require.NotNil(t, edit)
 	assert.Equal(t, "# tally global ignore=tally/max-lines\n", edit.NewText)
 	assert.Equal(t, uint32(1), edit.Range.Start.Line,
@@ -176,7 +177,7 @@ func TestSuppressFileEdit_MergesWithExistingGlobal(t *testing.T) {
 	sm := sourcemap.New([]byte(content))
 	dirResult := directive.Parse(sm, nil, nil)
 
-	edit := suppressFileEdit("DL3027", lines, dirResult, false)
+	edit := suppressFileEdit("DL3027", lines, dirResult, 0, false)
 	require.NotNil(t, edit)
 	assert.Equal(t, ",DL3027", edit.NewText, "should append to existing global directive")
 	assert.Equal(t, uint32(0), edit.Range.Start.Line)
@@ -190,7 +191,7 @@ func TestSuppressFileEdit_AlreadySuppressed(t *testing.T) {
 	sm := sourcemap.New([]byte(content))
 	dirResult := directive.Parse(sm, nil, nil)
 
-	edit := suppressFileEdit("DL3027", lines, dirResult, false)
+	edit := suppressFileEdit("DL3027", lines, dirResult, 0, false)
 	assert.Nil(t, edit, "should return nil when rule is already globally suppressed")
 }
 
@@ -202,7 +203,7 @@ func TestSuppressFileEdit_WithRequireReason(t *testing.T) {
 	sm := sourcemap.New([]byte(content))
 	dirResult := directive.Parse(sm, nil, nil)
 
-	edit := suppressFileEdit("tally/max-lines", lines, dirResult, true)
+	edit := suppressFileEdit("tally/max-lines", lines, dirResult, 0, true)
 	require.NotNil(t, edit)
 	assert.Equal(t, "# tally global ignore=tally/max-lines;reason=TODO\n", edit.NewText)
 }
@@ -247,6 +248,7 @@ func TestFindCommentBlockStart(t *testing.T) {
 		name             string
 		lines            []string
 		instructionLine0 int
+		floorLine0       int
 		want             int
 	}{
 		{
@@ -280,10 +282,11 @@ func TestFindCommentBlockStart(t *testing.T) {
 			want:             0,
 		},
 		{
-			name:             "stops at parser directive",
+			name:             "stops at floor (parser directives)",
 			lines:            []string{"# syntax=docker/dockerfile:1", "# escape=\\", "# comment", "FROM alpine"},
 			instructionLine0: 3,
-			want:             2,
+			floorLine0:       3, // FROM is the first instruction
+			want:             3,
 		},
 		{
 			name:             "stops at bare hash",
@@ -295,6 +298,7 @@ func TestFindCommentBlockStart(t *testing.T) {
 			name:             "parser directives contiguous with instruction",
 			lines:            []string{"# syntax=docker/dockerfile:1", "FROM alpine"},
 			instructionLine0: 1,
+			floorLine0:       1,
 			want:             1,
 		},
 	}
@@ -302,45 +306,7 @@ func TestFindCommentBlockStart(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			assert.Equal(t, tt.want, findCommentBlockStart(tt.instructionLine0, tt.lines))
-		})
-	}
-}
-
-func TestFindInsertionAfterParserDirectives(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name  string
-		lines []string
-		want  int
-	}{
-		{
-			name:  "no parser directives",
-			lines: []string{"FROM alpine", "RUN make"},
-			want:  0,
-		},
-		{
-			name:  "syntax directive",
-			lines: []string{"# syntax=docker/dockerfile:1", "FROM alpine"},
-			want:  1,
-		},
-		{
-			name:  "syntax + escape",
-			lines: []string{"# syntax=docker/dockerfile:1", "# escape=\\", "FROM alpine"},
-			want:  2,
-		},
-		{
-			name:  "check directive",
-			lines: []string{"# check=skip=DL3006", "FROM alpine"},
-			want:  1,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			assert.Equal(t, tt.want, findInsertionAfterParserDirectives(tt.lines))
+			assert.Equal(t, tt.want, findCommentBlockStart(tt.instructionLine0, tt.floorLine0, tt.lines))
 		})
 	}
 }
