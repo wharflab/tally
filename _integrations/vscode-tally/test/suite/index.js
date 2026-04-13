@@ -136,15 +136,27 @@ async function runSmoke() {
 
   assert.strictEqual(formatted, expected, "formatted output mismatch");
 
-  // Verify command-based "fix all" path: revert to original content first so
-  // applyAllFixes runs on the same input as formatting (single pass, not a
-  // second pass on already-formatted content which may clean leftover spaces).
+  // Verify command-based "fix all" path: revert to original content first.
+  // With iterative fix-all mode ("all"), the server re-lints after each fix
+  // pass, which may clean up residual whitespace from first-pass conversions.
+  // The result may differ slightly from single-pass formatting.
   await vscode.commands.executeCommand("workbench.action.files.revert");
   await scheduler.wait(500);
   await vscode.commands.executeCommand("tally.applyAllFixes");
 
   const fixedViaCommand = normalizeNewlines(doc.getText());
-  assert.strictEqual(fixedViaCommand, expected, "fix-all command output mismatch");
+  const fixAllExpectedPath =
+    process.env.VSCODE_SMOKE_EXPECTED_FIXALL_SNAPSHOT ??
+    process.env.TALLY_EXPECTED_FIXALL_SNAPSHOT ??
+    path.join(
+      workspaceRoot,
+      "internal",
+      "lsptest",
+      "__snapshots__",
+      "TestLSP_ExecuteCommandApplyAllFixesRealWorld_1.snap.Dockerfile",
+    );
+  const fixAllExpected = normalizeNewlines(await fs.readFile(fixAllExpectedPath, "utf8"));
+  assert.strictEqual(fixedViaCommand, fixAllExpected, "fix-all command output mismatch");
 
   // Keep the workspace clean for future tests.
   await vscode.commands.executeCommand("workbench.action.files.revert");
