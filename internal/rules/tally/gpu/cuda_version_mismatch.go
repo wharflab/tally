@@ -268,12 +268,32 @@ func (r *CUDAVersionMismatchRule) buildViolation(p violationParams) (rules.Viola
 		WithDetail(detail)
 	v.StageIndex = p.stageIdx
 
-	fixes := r.buildFixes(p.baseMajor, p.baseMinor, ref, p.stageInfo, p.meta)
-	if len(fixes) > 0 {
-		v = v.WithSuggestedFixes(fixes)
+	// Only emit fix suggestions when all mismatched refs agree on the same
+	// CUDA version. If a RUN has both +cu118 and +cu124, the correct fix
+	// target is ambiguous — skip fixes entirely.
+	if allMismatchesAgree(p.mismatched) {
+		fixes := r.buildFixes(p.baseMajor, p.baseMinor, ref, p.stageInfo, p.meta)
+		if len(fixes) > 0 {
+			v = v.WithSuggestedFixes(fixes)
+		}
 	}
 
 	return v, true
+}
+
+// allMismatchesAgree returns true when every entry in refs targets the same
+// CUDA major.minor version. Returns true for single-element slices.
+func allMismatchesAgree(refs []cudaRef) bool {
+	if len(refs) <= 1 {
+		return true
+	}
+	first := refs[0]
+	for _, r := range refs[1:] {
+		if r.major != first.major || r.minor != first.minor {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *CUDAVersionMismatchRule) buildFixes(

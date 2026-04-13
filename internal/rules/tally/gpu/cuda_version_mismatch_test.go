@@ -221,6 +221,14 @@ RUN pip install \
 			WantViolations: 1,
 			WantMessages:   []string{"cu118"},
 		},
+		{
+			Name: "mixed CUDA versions in same RUN both mismatch",
+			Content: `FROM nvidia/cuda:11.7.0-runtime-ubuntu22.04
+RUN pip install torch==2.0.0+cu118 torchvision==0.16.0+cu121
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"cu118"},
+		},
 	})
 }
 
@@ -258,6 +266,13 @@ RUN conda install -y pytorch pytorch-cuda=11.8 -c pytorch -c nvidia
 `,
 			wantFixes:  2,
 			wantSafety: rules.FixSuggestion,
+		},
+		{
+			name: "no fixes when mismatched refs disagree on CUDA version",
+			content: `FROM nvidia/cuda:11.7.0-runtime-ubuntu22.04
+RUN pip install torch==2.0.0+cu118 torchvision==0.16.0+cu121
+`,
+			wantFixes: 0,
 		},
 	}
 
