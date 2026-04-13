@@ -354,17 +354,20 @@ func (r *CUDAVersionMismatchRule) buildFixBaseToWheel(
 
 // --- Regex patterns ---
 
-// cuPackageSuffixRe matches +cuXYZ at the end of a pip package name
+// cuPackageSuffixRe matches +cuXYZ in a pip package name
 // (e.g., "torch==2.0.0+cu118" captures "118").
-var cuPackageSuffixRe = regexp.MustCompile(`\+cu(\d{3,4})`)
+// Supports 2-digit legacy suffixes like cu92 (CUDA 9.2).
+var cuPackageSuffixRe = regexp.MustCompile(`\+cu(\d{2,4})`)
 
 // cuIndexURLRe matches --index-url or --extra-index-url with a cuXYZ path
 // component (e.g., ".../whl/cu121" captures "121").
-var cuIndexURLRe = regexp.MustCompile(`--(?:index-url|extra-index-url)\s+\S*/cu(\d{3,4})\b`)
+// Supports both --flag VALUE and --flag=VALUE forms.
+var cuIndexURLRe = regexp.MustCompile(`--(?:index-url|extra-index-url)(?:=|\s+)\S*/cu(\d{2,4})\b`)
 
 // torchBackendRe matches uv's --torch-backend cuXYZ flag
 // (e.g., "--torch-backend cu118" captures "118").
-var torchBackendRe = regexp.MustCompile(`--torch-backend\s+cu(\d{3,4})\b`)
+// Supports both --flag VALUE and --flag=VALUE forms.
+var torchBackendRe = regexp.MustCompile(`--torch-backend(?:=|\s+)cu(\d{2,4})\b`)
 
 // condaCUDAVersionRe matches conda pytorch-cuda=X.Y or cudatoolkit=X.Y
 // specifiers (e.g., "pytorch-cuda=11.8" captures "11.8").

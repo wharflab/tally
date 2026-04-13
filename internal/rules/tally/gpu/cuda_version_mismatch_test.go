@@ -80,6 +80,22 @@ RUN uv pip install --torch-backend cu118 torch
 			WantViolations: 1,
 			WantMessages:   []string{"cu118"},
 		},
+		{
+			Name: "index-url with equals separator",
+			Content: `FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+RUN pip install --index-url=https://download.pytorch.org/whl/cu118 torch
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"cu118"},
+		},
+		{
+			Name: "torch-backend with equals separator",
+			Content: `FROM nvidia/cuda:12.4.0-runtime-ubuntu22.04
+RUN uv pip install --torch-backend=cu118 torch
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"cu118"},
+		},
 
 		// --- conda/mamba/micromamba ---
 		{
