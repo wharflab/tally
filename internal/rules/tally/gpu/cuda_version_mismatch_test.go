@@ -297,6 +297,41 @@ RUN pip install torch==2.0.0+cu118 torchvision==0.16.0+cu121
 	}
 }
 
+// TestCUDAVersionMismatchRule_StageRefFixSuppression verifies that
+// Fix B (update base image) is suppressed for stage-ref bases while
+// Fix A (update wheel) is still offered.
+func TestCUDAVersionMismatchRule_StageRefFixSuppression(t *testing.T) {
+	t.Parallel()
+
+	rule := NewCUDAVersionMismatchRule()
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM nvidia/cuda:12.4.0-devel-ubuntu22.04 AS builder
+RUN nvcc --version
+
+FROM builder AS runner
+RUN pip install --index-url https://download.pytorch.org/whl/cu118 torch
+`)
+	violations := rule.Check(input)
+	found := false
+	for _, v := range violations {
+		if v.StageIndex == 1 {
+			found = true
+			if v.SuggestedFix == nil {
+				t.Fatal("expected SuggestedFix (wheel rewrite) on stage-ref violation")
+			}
+			if v.SuggestedFix.Safety != rules.FixSuggestion {
+				t.Errorf("SuggestedFix.Safety = %v, want %v", v.SuggestedFix.Safety, rules.FixSuggestion)
+			}
+			// WithSuggestedFixes with a single fix sets only SuggestedFix (singular).
+			if len(v.SuggestedFixes) != 0 {
+				t.Errorf("SuggestedFixes should be empty (only 1 fix), got %d", len(v.SuggestedFixes))
+			}
+		}
+	}
+	if !found {
+		t.Error("expected violation on stage index 1 (runner)")
+	}
+}
+
 func TestParseCUSuffix(t *testing.T) {
 	t.Parallel()
 

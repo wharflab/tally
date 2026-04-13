@@ -117,16 +117,20 @@ before applying.
 
 ## Applicability
 
-This rule only fires when:
+This rule fires when:
 
 - The base image is `nvidia/cuda:*` (or `docker.io/nvidia/cuda:*`)
 - The CUDA version can be parsed from the image tag
 - A CUDA version reference is found in a `RUN` instruction
+- In multi-stage builds, stages that inherit from a CUDA-based parent stage
+  (`FROM builder` where `builder` uses `nvidia/cuda:*`) also trigger the rule.
+  In this case, only the "update wheel/index" fix is offered -- the "update base
+  image" fix is skipped since the `FROM` line references a stage name, not an
+  image tag.
 
 It does **not** fire on:
 
 - Non-NVIDIA base images
-- Stages referencing another build stage (`FROM builder`)
 - Digest-only or ARG-based image tags (version cannot be determined)
 - pip installs without CUDA suffixes or index URLs
 

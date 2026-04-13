@@ -353,14 +353,15 @@ func (r *CUDAVersionMismatchRule) buildFixWheelToBase(
 }
 
 // buildFixBaseToWheel creates a fix that rewrites the FROM tag CUDA version
-// to match the wheel.
+// to match the wheel. Skipped when the base is a stage reference (FROM builder)
+// since the FROM line has no image version to rewrite.
 func (r *CUDAVersionMismatchRule) buildFixBaseToWheel(
 	ref cudaRef,
 	stageInfo *semantic.StageInfo,
 	isPreferred bool,
 	meta rules.RuleMetadata,
 ) *rules.SuggestedFix {
-	if stageInfo == nil || stageInfo.BaseImage == nil {
+	if stageInfo == nil || stageInfo.BaseImage == nil || stageInfo.BaseImage.IsStageRef {
 		return nil
 	}
 	targetVer := cudaVersionString(ref.major, ref.minor)
