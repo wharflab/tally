@@ -1,6 +1,7 @@
 package gpu
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/distribution/reference"
@@ -45,6 +46,7 @@ const (
 )
 
 // cudaImageInfo holds the parsed flavor and optional component tags from an nvidia/cuda image tag.
+// CUDA major.minor version is exposed via StageFacts.CUDAMajor/CUDAMinor in the facts layer.
 type cudaImageInfo struct {
 	Flavor      cudaFlavor
 	HasCuDNN    bool
@@ -108,4 +110,46 @@ func stageBaseImageName(info *semantic.StageInfo) string {
 		raw = raw[:i]
 	}
 	return raw
+}
+
+// knownCUDASuffix represents a known published PyTorch CUDA wheel suffix.
+type knownCUDASuffix struct {
+	Major int
+	Minor int
+}
+
+// knownCUDASuffixes lists the CUDA versions for which PyTorch publishes
+// prebuilt wheels. Past releases are immutable; add new entries when PyTorch
+// ships a new cuXYZ variant.
+var knownCUDASuffixes = []knownCUDASuffix{
+	{11, 6}, {11, 7}, {11, 8},
+	{12, 1}, {12, 4}, {12, 6}, {12, 8},
+}
+
+// bestCUDASuffix returns the highest known PyTorch cuXYZ suffix where major
+// matches and minor <= the given minor. Returns ("", false) if no published
+// suffix exists for that major version at or below the given minor.
+func bestCUDASuffix(major, minor int) (string, bool) {
+	best := -1
+	for _, s := range knownCUDASuffixes {
+		if s.Major == major && s.Minor <= minor && s.Minor > best {
+			best = s.Minor
+		}
+	}
+	if best < 0 {
+		return "", false
+	}
+	return cudaSuffixString(major, best), true
+}
+
+// cudaSuffixString formats a CUDA major.minor version as a cuXYZ suffix
+// (e.g., 12, 4 → "cu124"; 11, 8 → "cu118").
+func cudaSuffixString(major, minor int) string {
+	return fmt.Sprintf("cu%d%d", major, minor)
+}
+
+// cudaVersionString formats a CUDA major.minor as a dotted version string
+// (e.g., 12, 4 → "12.4").
+func cudaVersionString(major, minor int) string {
+	return fmt.Sprintf("%d.%d", major, minor)
 }

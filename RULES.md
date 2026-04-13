@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 54 | - | 54 |
+| tally | 55 | - | 55 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -64,6 +64,7 @@ See the [tally rules documentation](_docs/rules/tally/) for detailed description
 | [`tally/php/composer-no-dev-in-production`](_docs/rules/tally/php/composer-no-dev-in-production.mdx) 🔧 | Production Composer install commands should include `--no-dev` | Warning | Security | Enabled |
 | [`tally/php/no-xdebug-in-final-image`](_docs/rules/tally/php/no-xdebug-in-final-image.mdx) 🔧 | Final image installs or enables Xdebug, a development-only tool | Warning | Best Practices | Enabled |
 | [`tally/powershell/prefer-shell-instruction`](_docs/rules/tally/powershell/prefer-shell-instruction.mdx) 🔧 | Prefers a PowerShell `SHELL` instruction over repeated `pwsh` or `powershell -Command` wrappers in `RUN` | Style | Style | Enabled (experimental) |
+| [`tally/gpu/cuda-version-mismatch`](_docs/rules/tally/gpu/cuda-version-mismatch.mdx) 🔧 | CUDA-specific pip/conda wheel version does not match base image CUDA toolkit | Warning | Correctness | Enabled |
 | [`tally/gpu/no-buildtime-gpu-queries`](_docs/rules/tally/gpu/no-buildtime-gpu-queries.mdx) | GPU hardware queries in RUN will fail at build time | Error | Correctness | Enabled |
 | [`tally/gpu/no-container-runtime-in-image`](_docs/rules/tally/gpu/no-container-runtime-in-image.mdx) | NVIDIA container runtime packages belong on the host, not inside the image | Warning | Correctness | Enabled |
 | [`tally/gpu/no-hardcoded-visible-devices`](_docs/rules/tally/gpu/no-hardcoded-visible-devices.mdx) 🔧 | GPU visibility is deployment policy; hardcoding it in the image reduces portability | Warning | Correctness | Enabled |

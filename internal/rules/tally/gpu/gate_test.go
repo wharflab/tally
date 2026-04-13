@@ -140,6 +140,14 @@ func TestParseCUDAImageInfo(t *testing.T) {
 			name: "digest ref defaults to devel", raw: digestRef,
 			wantCUDA: true, wantFlavor: cudaFlavorDevel,
 		},
+		{
+			name: "11.8 runtime", raw: "nvidia/cuda:11.8.0-runtime-ubuntu22.04",
+			wantCUDA: true, wantFlavor: cudaFlavorRuntime,
+		},
+		{
+			name: "12.6.2 cudnn-runtime", raw: "nvidia/cuda:12.6.2-cudnn-runtime-ubuntu22.04",
+			wantCUDA: true, wantFlavor: cudaFlavorRuntime, wantCuDNN: true,
+		},
 		{name: "ubuntu is not CUDA", raw: "ubuntu:22.04", wantCUDA: false},
 		{name: "nvcr pytorch is not nvidia/cuda", raw: "nvcr.io/nvidia/pytorch:23.10-py3", wantCUDA: false},
 		{name: "nvidia/cudagl is not nvidia/cuda", raw: "nvidia/cudagl:11.4.2-runtime-ubuntu20.04", wantCUDA: false},

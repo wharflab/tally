@@ -4,9 +4,11 @@ import (
 	"maps"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/distribution/reference"
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
@@ -36,6 +38,14 @@ type StageFacts struct {
 	Index       int
 	IsLast      bool
 	BaseImageOS semantic.BaseImageOS
+
+	// CUDAMajor and CUDAMinor hold the CUDA toolkit version parsed from the
+	// base image tag. Only populated for nvidia/cuda:* base images with a
+	// parseable version tag (e.g., nvidia/cuda:12.2.0-devel-ubuntu22.04 →
+	// CUDAMajor=12, CUDAMinor=2). Zero values mean the version is unknown
+	// (non-CUDA image, ARG-based tag, digest reference, or unparseable tag).
+	CUDAMajor int
+	CUDAMinor int
 
 	InitialShell ShellFacts
 	FinalShell   ShellFacts
@@ -288,7 +298,7 @@ func (f *FileFacts) buildStageFacts(
 	semInfo := f.stageInfo(stageIdx)
 	knownVars := makeStageKnownVarsChecker(semInfo)
 	state := newStageBuildState(stage, semInfo, f.stages, f.shellDirectives)
-	stageFacts := newStageFacts(stageIdx, stageCount, state.currentShell, semInfo)
+	stageFacts := newStageFacts(stageIdx, stageCount, state.currentShell, semInfo, f.stages)
 	seedStageEntrypointState(semInfo, f.stages, stageFacts)
 	entrypointState := f.processStageCommands(stageFacts, stage, stageIdx, sm, escapeToken, knownVars, state)
 	finalizeStageFacts(stageFacts, semInfo, state, entrypointState)
@@ -314,7 +324,11 @@ func newStageBuildState(
 	}
 }
 
-func newStageFacts(stageIdx, stageCount int, currentShell ShellFacts, semInfo *semantic.StageInfo) *StageFacts {
+// cudaVersionRe matches the CUDA major.minor version at the start of an
+// nvidia/cuda image tag (e.g., "12.2.0-devel-ubuntu22.04" → "12", "2").
+var cudaVersionRe = regexp.MustCompile(`^(\d+)\.(\d+)`)
+
+func newStageFacts(stageIdx, stageCount int, currentShell ShellFacts, semInfo *semantic.StageInfo, stages []*StageFacts) *StageFacts {
 	stageFacts := &StageFacts{
 		Index:        stageIdx,
 		IsLast:       stageIdx == stageCount-1,
@@ -323,8 +337,66 @@ func newStageFacts(stageIdx, stageCount int, currentShell ShellFacts, semInfo *s
 	}
 	if semInfo != nil {
 		stageFacts.BaseImageOS = semInfo.BaseImageOS
+		stageFacts.CUDAMajor, stageFacts.CUDAMinor = parseCUDAVersionFromBaseImage(semInfo)
+
+		// Inherit CUDA version from parent stage in multi-stage builds
+		// (e.g., FROM builder where builder uses nvidia/cuda:*).
+		if stageFacts.CUDAMajor == 0 {
+			stageFacts.CUDAMajor, stageFacts.CUDAMinor = inheritCUDAVersion(semInfo, stages)
+		}
 	}
 	return stageFacts
+}
+
+// inheritCUDAVersion returns the CUDA version from the parent stage when the
+// current stage references another build stage (FROM <stage>). Returns (0, 0)
+// when not a stage reference or the parent has no CUDA version.
+func inheritCUDAVersion(info *semantic.StageInfo, stages []*StageFacts) (int, int) {
+	if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
+		return 0, 0
+	}
+	baseIdx := info.BaseImage.StageIndex
+	if baseIdx < 0 || baseIdx >= len(stages) || stages[baseIdx] == nil {
+		return 0, 0
+	}
+	return stages[baseIdx].CUDAMajor, stages[baseIdx].CUDAMinor
+}
+
+// nvidiaCUDAFamiliarName is the familiar name for the nvidia/cuda image
+// as returned by distribution/reference.FamiliarName.
+const nvidiaCUDAFamiliarName = "nvidia/cuda"
+
+// parseCUDAVersionFromBaseImage extracts CUDA major.minor version from an
+// nvidia/cuda:* base image tag using the distribution/reference library for
+// proper OCI image reference parsing. Returns (0, 0) for non-CUDA images,
+// stage references, digest-only references, or unparseable tags.
+func parseCUDAVersionFromBaseImage(info *semantic.StageInfo) (major, minor int) {
+	if info == nil || info.BaseImage == nil || info.BaseImage.IsStageRef {
+		return 0, 0
+	}
+	// OCI references must be lowercase; Dockerfile image refs may use mixed case.
+	named, err := reference.ParseNormalizedNamed(strings.ToLower(info.BaseImage.Raw))
+	if err != nil {
+		return 0, 0
+	}
+	if reference.FamiliarName(named) != nvidiaCUDAFamiliarName {
+		return 0, 0
+	}
+	tagged, ok := named.(reference.Tagged)
+	if !ok {
+		return 0, 0 // digest-only or untagged
+	}
+	tag := strings.ToLower(tagged.Tag())
+	m := cudaVersionRe.FindStringSubmatch(tag)
+	if m == nil {
+		return 0, 0
+	}
+	maj, errMaj := strconv.Atoi(m[1])
+	mnr, errMnr := strconv.Atoi(m[2])
+	if errMaj != nil || errMnr != nil {
+		return 0, 0
+	}
+	return maj, mnr
 }
 
 func (f *FileFacts) processStageCommands(
