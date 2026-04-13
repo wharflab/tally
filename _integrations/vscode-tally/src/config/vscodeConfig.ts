@@ -51,10 +51,7 @@ export function readEffectiveSettings(scope?: vscode.ConfigurationScope): TallyL
       DEFAULTS.configurationPreference,
     ),
     fixUnsafe: cfg.get("fixUnsafe", DEFAULTS.fixUnsafe),
-    suppressRuleEnabled: cfg.get(
-      "codeAction.suppressRule.enable",
-      DEFAULTS.suppressRuleEnabled,
-    ),
+    suppressRuleEnabled: cfg.get("codeAction.suppressRule.enable", DEFAULTS.suppressRuleEnabled),
     showDocumentationEnabled: cfg.get(
       "codeAction.showDocumentation.enable",
       DEFAULTS.showDocumentationEnabled,
