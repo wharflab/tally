@@ -313,6 +313,7 @@ func TestParseCUSuffix(t *testing.T) {
 		{name: "cu126", digits: "126", wantMajor: 12, wantMinor: 6, wantOK: true},
 		{name: "cu128", digits: "128", wantMajor: 12, wantMinor: 8, wantOK: true},
 		{name: "cu92", digits: "92", wantMajor: 9, wantMinor: 2, wantOK: true},
+		{name: "4-digit rejected", digits: "1210", wantMajor: 0, wantMinor: 0, wantOK: false},
 		{name: "single digit", digits: "5", wantMajor: 0, wantMinor: 0, wantOK: false},
 		{name: "empty", digits: "", wantMajor: 0, wantMinor: 0, wantOK: false},
 		{name: "non-numeric", digits: "abc", wantMajor: 0, wantMinor: 0, wantOK: false},

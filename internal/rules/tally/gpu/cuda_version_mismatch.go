@@ -396,10 +396,12 @@ var condaCUDAVersionRe = regexp.MustCompile(`(?:pytorch-cuda|cudatoolkit)[= ]+(\
 // --- Helpers ---
 
 // parseCUSuffix extracts CUDA major and minor versions from a cuXYZ numeric
-// suffix (e.g., "118" → 11, 8; "121" → 12, 1).
+// suffix (e.g., "118" → 11, 8; "121" → 12, 1). Only 2- and 3-digit suffixes
+// are supported; 4-digit inputs are rejected since no published PyTorch wheel
+// uses that format and the n/10 formula would misparse them.
 func parseCUSuffix(digits string) (major, minor int, ok bool) {
 	n, err := strconv.Atoi(digits)
-	if err != nil || n < 10 {
+	if err != nil || n < 10 || n >= 1000 {
 		return 0, 0, false
 	}
 	return n / 10, n % 10, true
