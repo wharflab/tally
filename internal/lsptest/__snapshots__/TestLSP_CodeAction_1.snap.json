@@ -67,5 +67,97 @@
   "isPreferred": true,
   "kind": "quickfix",
   "title": "Fix blank lines between instructions"
+ },
+ {
+  "edit": {
+   "changes": {
+    "file:///tmp/test-codeaction/Dockerfile": [
+     {
+      "newText": "# tally ignore=buildkit/MaintainerDeprecated\n",
+      "range": {
+       "end": {
+        "character": 0,
+        "line": 1
+       },
+       "start": {
+        "character": 0,
+        "line": 1
+       }
+      }
+     }
+    ]
+   }
+  },
+  "kind": "quickfix.suppress.tally",
+  "title": "Suppress buildkit/MaintainerDeprecated for this line"
+ },
+ {
+  "edit": {
+   "changes": {
+    "file:///tmp/test-codeaction/Dockerfile": [
+     {
+      "newText": "# tally global ignore=buildkit/MaintainerDeprecated\n",
+      "range": {
+       "end": {
+        "character": 0,
+        "line": 0
+       },
+       "start": {
+        "character": 0,
+        "line": 0
+       }
+      }
+     }
+    ]
+   }
+  },
+  "kind": "quickfix.suppress.tally",
+  "title": "Suppress buildkit/MaintainerDeprecated for this file"
+ },
+ {
+  "edit": {
+   "changes": {
+    "file:///tmp/test-codeaction/Dockerfile": [
+     {
+      "newText": "# tally ignore=tally/newline-between-instructions\n",
+      "range": {
+       "end": {
+        "character": 0,
+        "line": 1
+       },
+       "start": {
+        "character": 0,
+        "line": 1
+       }
+      }
+     }
+    ]
+   }
+  },
+  "kind": "quickfix.suppress.tally",
+  "title": "Suppress tally/newline-between-instructions for this line"
+ },
+ {
+  "edit": {
+   "changes": {
+    "file:///tmp/test-codeaction/Dockerfile": [
+     {
+      "newText": "# tally global ignore=tally/newline-between-instructions\n",
+      "range": {
+       "end": {
+        "character": 0,
+        "line": 0
+       },
+       "start": {
+        "character": 0,
+        "line": 0
+       }
+      }
+     }
+    ]
+   }
+  },
+  "kind": "quickfix.suppress.tally",
+  "title": "Suppress tally/newline-between-instructions for this file"
  }
 ]
