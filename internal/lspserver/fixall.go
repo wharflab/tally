@@ -93,7 +93,10 @@ func (s *Server) computeFixEdits(
 	if mode == fixAllModeAll {
 		return s.computeFixEditsIterative(ctx, docURI, content, safety)
 	}
-	fixed := s.computeFixedContent(ctx, docURI, content, safety)
+	filePath := uriToPath(docURI)
+	cfg := s.resolveConfig(filePath)
+	fixModes := fix.BuildFixModes(cfg)
+	fixed := computeFixedContent(ctx, filePath, content, cfg, fixModes, safety)
 	if fixed == nil || bytes.Equal(fixed, content) {
 		return nil
 	}
@@ -102,13 +105,20 @@ func (s *Server) computeFixEdits(
 
 // computeFixEditsIterative runs lint+fix in a loop until the content stabilizes
 // or maxFixIterations is reached. Returns minimal text edits from original to final.
+//
+// Config and fix modes are resolved once before the loop — they don't change
+// between iterations (only the content does).
 func (s *Server) computeFixEditsIterative(ctx context.Context, docURI string, content []byte, safety fix.FixSafety) []*protocol.TextEdit {
+	filePath := uriToPath(docURI)
+	cfg := s.resolveConfig(filePath)
+	fixModes := fix.BuildFixModes(cfg)
+
 	current := content
 	for range maxFixIterations {
 		if ctx.Err() != nil {
 			return nil
 		}
-		next := s.computeFixedContent(ctx, docURI, current, safety)
+		next := computeFixedContent(ctx, filePath, current, cfg, fixModes, safety)
 		if next == nil || bytes.Equal(next, current) {
 			break
 		}
@@ -121,9 +131,21 @@ func (s *Server) computeFixEditsIterative(ctx context.Context, docURI string, co
 }
 
 // computeFixedContent runs a single lint+fix pass and returns the modified content.
-// Returns nil if there's nothing to fix or an error occurs.
-func (s *Server) computeFixedContent(ctx context.Context, docURI string, content []byte, safety fix.FixSafety) []byte {
-	input := s.lintInput(docURI, content)
+// Config and fixModes are pre-resolved by the caller so they aren't recomputed
+// on each iteration. Returns nil if there's nothing to fix or an error occurs.
+func computeFixedContent(
+	ctx context.Context,
+	filePath string,
+	content []byte,
+	cfg *config.Config,
+	fixModes map[string]fix.FixMode,
+	safety fix.FixSafety,
+) []byte {
+	input := linter.Input{
+		FilePath: filePath,
+		Content:  content,
+		Config:   cfg,
+	}
 
 	result, err := linter.LintFile(input)
 	if err != nil {
@@ -132,21 +154,20 @@ func (s *Server) computeFixedContent(ctx context.Context, docURI string, content
 
 	chain := linter.LSPProcessors()
 	procCtx := processor.NewContext(
-		map[string]*config.Config{input.FilePath: result.Config},
+		map[string]*config.Config{filePath: result.Config},
 		result.Config,
-		map[string][]byte{input.FilePath: content},
+		map[string][]byte{filePath: content},
 	)
 	violations := chain.Process(result.Violations, procCtx)
 
-	fixModes := fix.BuildFixModes(result.Config)
-	fileKey := filepath.Clean(input.FilePath)
+	fileKey := filepath.Clean(filePath)
 	fixer := &fix.Fixer{
 		SafetyThreshold: safety,
 		FixModes: map[string]map[string]fix.FixMode{
 			fileKey: fixModes,
 		},
 	}
-	fixResult, err := fixer.Apply(ctx, violations, map[string][]byte{input.FilePath: content})
+	fixResult, err := fixer.Apply(ctx, violations, map[string][]byte{filePath: content})
 	if err != nil {
 		return nil
 	}
