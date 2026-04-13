@@ -4,6 +4,7 @@ import (
 	"maps"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -377,12 +378,11 @@ func parseCUDAVersionFromBaseImage(info *semantic.StageInfo) (major, minor int) 
 	return major, minor
 }
 
-// atoiSafe converts a digit-only string to int. Returns 0 on error (should
-// not happen with regex-validated input).
+// atoiSafe converts a digit-only string to int. Returns 0 on error.
 func atoiSafe(s string) int {
-	n := 0
-	for _, ch := range s {
-		n = n*10 + int(ch-'0')
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
 	}
 	return n
 }

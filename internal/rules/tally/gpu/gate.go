@@ -3,6 +3,7 @@ package gpu
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/distribution/reference"
@@ -124,12 +125,11 @@ func stageBaseImageName(info *semantic.StageInfo) string {
 // nvidia/cuda image tag (e.g., "12.2.0-devel-ubuntu22.04" → "12", "2").
 var cudaTagVersionRe = regexp.MustCompile(`^(\d+)\.(\d+)`)
 
-// atoiDigits converts a digit-only string to int. Returns 0 on error (should
-// not happen with regex-validated input).
+// atoiDigits converts a digit-only string to int. Returns 0 on error.
 func atoiDigits(s string) int {
-	n := 0
-	for _, ch := range s {
-		n = n*10 + int(ch-'0')
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
 	}
 	return n
 }
