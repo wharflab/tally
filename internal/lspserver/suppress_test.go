@@ -30,7 +30,7 @@ func TestSuppressLineEdit_BasicInsertion(t *testing.T) {
 		rules.SeverityWarning,
 	)
 
-	edit := suppressLineEdit(v, lines, dirResult, 0, false)
+	edit := suppressLineEdit(v, lines, dirResult, nil, 0, false)
 	require.NotNil(t, edit)
 	assert.Equal(t, "# tally ignore=hadolint/DL3027\n", edit.NewText)
 	assert.Equal(t, uint32(1), edit.Range.Start.Line, "should insert before the RUN line (0-based line 1)")
@@ -51,7 +51,7 @@ func TestSuppressLineEdit_WithRequireReason(t *testing.T) {
 		rules.SeverityWarning,
 	)
 
-	edit := suppressLineEdit(v, lines, dirResult, 0, true)
+	edit := suppressLineEdit(v, lines, dirResult, nil, 0, true)
 	require.NotNil(t, edit)
 	assert.Equal(t, "# tally ignore=tally/test-rule;reason=TODO\n", edit.NewText)
 }
@@ -71,7 +71,7 @@ func TestSuppressLineEdit_AboveCommentBlock(t *testing.T) {
 		rules.SeverityWarning,
 	)
 
-	edit := suppressLineEdit(v, lines, dirResult, 0, false)
+	edit := suppressLineEdit(v, lines, dirResult, nil, 0, false)
 	require.NotNil(t, edit)
 	assert.Equal(t, "# tally ignore=tally/test-rule\n", edit.NewText)
 	assert.Equal(t, uint32(1), edit.Range.Start.Line,
@@ -93,7 +93,7 @@ func TestSuppressLineEdit_MergesWithExisting(t *testing.T) {
 		rules.SeverityWarning,
 	)
 
-	edit := suppressLineEdit(v, lines, dirResult, 0, false)
+	edit := suppressLineEdit(v, lines, dirResult, nil, 0, false)
 	require.NotNil(t, edit)
 	assert.Equal(t, ",DL3027", edit.NewText, "should append rule to existing directive")
 	assert.Equal(t, uint32(1), edit.Range.Start.Line, "should edit the existing directive line")
@@ -114,7 +114,7 @@ func TestSuppressLineEdit_AlreadySuppressed(t *testing.T) {
 		rules.SeverityWarning,
 	)
 
-	edit := suppressLineEdit(v, lines, dirResult, 0, false)
+	edit := suppressLineEdit(v, lines, dirResult, nil, 0, false)
 	assert.Nil(t, edit, "should return nil when rule is already suppressed")
 }
 
@@ -133,10 +133,39 @@ func TestSuppressLineEdit_Indentation(t *testing.T) {
 		rules.SeverityWarning,
 	)
 
-	edit := suppressLineEdit(v, lines, dirResult, 0, false)
+	edit := suppressLineEdit(v, lines, dirResult, nil, 0, false)
 	require.NotNil(t, edit)
 	assert.Equal(t, "\t# tally ignore=tally/test-rule\n", edit.NewText,
 		"should match leading whitespace of the instruction")
+}
+
+func TestSuppressLineEdit_HeredocViolation(t *testing.T) {
+	t.Parallel()
+
+	// A ShellCheck violation inside a heredoc body (line 4, 1-based) must produce
+	// a directive above the RUN instruction (line 2), not inside the heredoc.
+	content := "FROM alpine\nRUN <<EOF\necho hello\necho $unquoted\nEOF\n"
+	source := []byte(content)
+	lines := strings.Split(content, "\n")
+	sm := sourcemap.New(source)
+
+	parseResult := parseDockerfile(t, source)
+	spanIndex := directive.NewInstructionSpanIndexFromAST(parseResult.AST, sm)
+	dirResult := directive.Parse(sm, nil, spanIndex)
+
+	// Violation on line 4 (1-based) — inside the heredoc body.
+	v := rules.NewViolation(
+		rules.NewRangeLocation("Dockerfile", 4, 5, 4, 14),
+		"shellcheck/SC2086",
+		"Double quote to prevent globbing and word splitting.",
+		rules.SeverityWarning,
+	)
+
+	edit := suppressLineEdit(v, lines, dirResult, spanIndex, 0, false)
+	require.NotNil(t, edit)
+	assert.Equal(t, "# tally ignore=shellcheck/SC2086\n", edit.NewText)
+	assert.Equal(t, uint32(1), edit.Range.Start.Line,
+		"should insert above the RUN instruction (0-based line 1), not inside the heredoc")
 }
 
 func TestSuppressFileEdit_BasicInsertion(t *testing.T) {

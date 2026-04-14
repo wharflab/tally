@@ -65,7 +65,7 @@ func suppressRuleActions(
 		uri := params.TextDocument.Uri
 
 		// Next-line suppress action
-		if edit := suppressLineEdit(v, lines, dirResult, firstInstLine0, requireReason); edit != nil {
+		if edit := suppressLineEdit(v, lines, dirResult, spanIndex, firstInstLine0, requireReason); edit != nil {
 			suppressLineData := any(map[string]any{"type": "suppress-line", "ruleCode": v.RuleCode})
 			actions = append(actions, protocol.CodeAction{
 				Title: fmt.Sprintf("Suppress %s for this line", v.RuleCode),
@@ -128,6 +128,7 @@ func suppressLineEdit(
 	v rules.Violation,
 	lines []string,
 	dirResult *directive.ParseResult,
+	spanIndex *directive.InstructionSpanIndex,
 	firstInstLine0 int,
 	requireReason bool,
 ) *protocol.TextEdit {
@@ -135,6 +136,14 @@ func suppressLineEdit(
 	violationLine0 := v.Location.Start.Line - 1
 	if violationLine0 < 0 || violationLine0 >= len(lines) {
 		return nil
+	}
+
+	// Resolve to the instruction's start line. A violation may point to a
+	// continuation line (e.g. inside a heredoc or after a backslash). The
+	// directive must go above the instruction, not in the middle of it.
+	instructionLine0 := violationLine0
+	if span, ok := spanIndex.ContainingSpan(violationLine0); ok {
+		instructionLine0 = span.StartLine
 	}
 
 	// Check existing next-line directives that target this instruction.
@@ -157,12 +166,12 @@ func suppressLineEdit(
 		return appendRuleEdit(tallyDirectiveLine.Line, v.RuleCode, lines)
 	}
 
-	// No existing directive — insert a new one above the comment block,
-	// but never before the first instruction (which marks the end of parser directives).
-	insertLine0 := findCommentBlockStart(violationLine0, firstInstLine0, lines)
+	// No existing directive — insert a new one above the comment block
+	// preceding the instruction's start line (not the violation line).
+	insertLine0 := findCommentBlockStart(instructionLine0, firstInstLine0, lines)
 
-	// Match indentation of the instruction line.
-	indent := leadingWhitespace(lines[violationLine0])
+	// Match indentation of the instruction start line.
+	indent := leadingWhitespace(lines[instructionLine0])
 	reason := ""
 	if requireReason {
 		reason = "TODO"

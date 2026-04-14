@@ -94,6 +94,23 @@ func NewInstructionSpanIndexFromSource(source []byte, sm *sourcemap.SourceMap) *
 	return NewInstructionSpanIndexFromAST(res, sm)
 }
 
+// ContainingSpan returns the instruction span that contains the given 0-based line,
+// or false if no span contains it.
+func (idx *InstructionSpanIndex) ContainingSpan(line int) (InstructionSpan, bool) {
+	if idx == nil {
+		return InstructionSpan{}, false
+	}
+	for _, span := range idx.Spans {
+		if line >= span.StartLine && line <= span.EndLine {
+			return span, true
+		}
+		if span.StartLine > line {
+			break // spans are sorted; no later span can contain this line
+		}
+	}
+	return InstructionSpan{}, false
+}
+
 func (idx *InstructionSpanIndex) nextInstructionSpan(afterLine int) (InstructionSpan, bool) {
 	if idx == nil || len(idx.Spans) == 0 {
 		return InstructionSpan{}, false
