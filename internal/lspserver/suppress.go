@@ -137,21 +137,24 @@ func suppressLineEdit(
 		return nil
 	}
 
-	// Check if an existing next-line directive already targets this instruction.
+	// Check existing next-line directives that target this instruction.
+	// Any source (tally, hadolint, buildx) can suppress the rule, but we
+	// only merge into tally-sourced directives to avoid mutating foreign syntax.
+	var tallyDirectiveLine *directive.Directive
 	for i := range dirResult.Directives {
 		d := &dirResult.Directives[i]
-		if d.Type != directive.TypeNextLine {
+		if d.Type != directive.TypeNextLine || !d.AppliesTo.Contains(violationLine0) {
 			continue
 		}
-		if !d.AppliesTo.Contains(violationLine0) {
-			continue
-		}
-		// Found an existing directive — check if it already suppresses this rule.
 		if d.SuppressesRule(v.RuleCode) {
-			return nil // already suppressed
+			return nil // already suppressed by any directive source
 		}
-		// Merge: append the rule code to the existing directive line.
-		return mergeRuleIntoDirectiveLine(d.Line, v.RuleCode, lines)
+		if d.Source == directive.SourceTally && tallyDirectiveLine == nil {
+			tallyDirectiveLine = d
+		}
+	}
+	if tallyDirectiveLine != nil {
+		return appendRuleEdit(tallyDirectiveLine.Line, v.RuleCode, lines)
 	}
 
 	// No existing directive — insert a new one above the comment block,
@@ -160,10 +163,11 @@ func suppressLineEdit(
 
 	// Match indentation of the instruction line.
 	indent := leadingWhitespace(lines[violationLine0])
-	comment := indent + "# tally ignore=" + v.RuleCode
+	reason := ""
 	if requireReason {
-		comment += ";reason=TODO"
+		reason = "TODO"
 	}
+	comment := indent + directive.FormatNextLine([]string{v.RuleCode}, reason)
 
 	return &protocol.TextEdit{
 		Range: protocol.Range{
@@ -196,15 +200,16 @@ func suppressFileEdit(
 		if d.SuppressesRule(ruleCode) {
 			return nil // already suppressed
 		}
-		return mergeRuleIntoDirectiveLine(d.Line, ruleCode, lines)
+		return appendRuleEdit(d.Line, ruleCode, lines)
 	}
 
 	// No existing global directive — insert right before the first instruction.
 	// Everything before firstInstLine0 is parser directives or preamble comments.
-	comment := "# tally global ignore=" + ruleCode
+	reason := ""
 	if requireReason {
-		comment += ";reason=TODO"
+		reason = "TODO"
 	}
+	comment := directive.FormatGlobal([]string{ruleCode}, reason)
 
 	return &protocol.TextEdit{
 		Range: protocol.Range{
@@ -215,33 +220,22 @@ func suppressFileEdit(
 	}
 }
 
-// mergeRuleIntoDirectiveLine appends a rule code to an existing directive line.
-// directiveLine is 0-based.
-func mergeRuleIntoDirectiveLine(directiveLine int, ruleCode string, lines []string) *protocol.TextEdit {
-	if directiveLine < 0 || directiveLine >= len(lines) {
+// appendRuleEdit creates a TextEdit that appends a rule code to an existing
+// directive line using directive.AppendRule for the text manipulation.
+// directiveLine0 is 0-based.
+func appendRuleEdit(directiveLine0 int, ruleCode string, lines []string) *protocol.TextEdit {
+	if directiveLine0 < 0 || directiveLine0 >= len(lines) {
 		return nil
 	}
 
-	line := lines[directiveLine]
-
-	// Find the position to insert: before ;reason= if present, otherwise at end of line.
-	insertPos := len(line)
-	if idx := strings.Index(line, ";reason="); idx >= 0 {
-		insertPos = idx
-	}
-
-	// Trim trailing whitespace before insertion point.
-	trimmed := insertPos
-	for trimmed > 0 && line[trimmed-1] == ' ' {
-		trimmed--
-	}
+	edit := directive.AppendRule(lines[directiveLine0], ruleCode)
 
 	return &protocol.TextEdit{
 		Range: protocol.Range{
-			Start: protocol.Position{Line: clampUint32(directiveLine), Character: clampUint32(trimmed)},
-			End:   protocol.Position{Line: clampUint32(directiveLine), Character: clampUint32(insertPos)},
+			Start: protocol.Position{Line: clampUint32(directiveLine0), Character: clampUint32(edit.Start)},
+			End:   protocol.Position{Line: clampUint32(directiveLine0), Character: clampUint32(edit.End)},
 		},
-		NewText: "," + ruleCode,
+		NewText: edit.NewText,
 	}
 }
 
