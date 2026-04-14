@@ -46,7 +46,8 @@ func suppressRuleActions(
 		ruleCode string
 		line     int
 	}
-	seen := make(map[seenKey]struct{})
+	seen := make(map[seenKey]struct{})    // dedup per-line actions by (rule, line)
+	seenFile := make(map[string]struct{}) // dedup file-level actions by rule only
 	var actions []protocol.CodeAction
 
 	for _, v := range violations {
@@ -78,19 +79,23 @@ func suppressRuleActions(
 			})
 		}
 
-		// File-level suppress action
-		if edit := suppressFileEdit(v.RuleCode, lines, dirResult, firstInstLine0, requireReason); edit != nil {
-			suppressFileData := any(map[string]any{"type": "suppress-file", "ruleCode": v.RuleCode})
-			actions = append(actions, protocol.CodeAction{
-				Title: fmt.Sprintf("Suppress %s for this file", v.RuleCode),
-				Kind:  ptrTo(suppressCodeActionKind),
-				Edit: &protocol.WorkspaceEdit{
-					Changes: new(map[protocol.DocumentUri][]*protocol.TextEdit{
-						uri: {edit},
-					}),
-				},
-				Data: &suppressFileData,
-			})
+		// File-level suppress action (deduplicated by ruleCode only — the same
+		// rule on different lines should produce only one "for this file" action).
+		if _, fileSeen := seenFile[v.RuleCode]; !fileSeen {
+			seenFile[v.RuleCode] = struct{}{}
+			if edit := suppressFileEdit(v.RuleCode, lines, dirResult, firstInstLine0, requireReason); edit != nil {
+				suppressFileData := any(map[string]any{"type": "suppress-file", "ruleCode": v.RuleCode})
+				actions = append(actions, protocol.CodeAction{
+					Title: fmt.Sprintf("Suppress %s for this file", v.RuleCode),
+					Kind:  ptrTo(suppressCodeActionKind),
+					Edit: &protocol.WorkspaceEdit{
+						Changes: new(map[protocol.DocumentUri][]*protocol.TextEdit{
+							uri: {edit},
+						}),
+					},
+					Data: &suppressFileData,
+				})
+			}
 		}
 	}
 

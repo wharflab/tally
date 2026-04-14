@@ -241,6 +241,40 @@ func TestSuppressRuleActions_EmitsLineAndFileActions(t *testing.T) {
 	}
 }
 
+func TestSuppressRuleActions_DedupFileAction(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM alpine\nRUN echo a\nRUN echo b\n"
+	source := []byte(content)
+	parseResult := parseDockerfile(t, source)
+
+	// Same rule on two different lines.
+	v1 := rules.NewViolation(
+		rules.NewRangeLocation("Dockerfile", 2, 0, 2, 10),
+		"tally/test-rule", "msg", rules.SeverityWarning,
+	)
+	v2 := rules.NewViolation(
+		rules.NewRangeLocation("Dockerfile", 3, 0, 3, 10),
+		"tally/test-rule", "msg", rules.SeverityWarning,
+	)
+
+	params := makeCodeActionParams("file:///test/Dockerfile", fullRange(), &protocol.CodeActionContext{})
+	actions := suppressRuleActions([]rules.Violation{v1, v2}, params, content, parseResult, nil)
+
+	// Should get 2 per-line actions + 1 file action = 3 total (not 4).
+	var lineActions, fileActions int
+	for _, a := range actions {
+		if strings.Contains(a.Title, "for this line") {
+			lineActions++
+		}
+		if strings.Contains(a.Title, "for this file") {
+			fileActions++
+		}
+	}
+	assert.Equal(t, 2, lineActions, "should have one line action per violation")
+	assert.Equal(t, 1, fileActions, "should deduplicate file action by ruleCode")
+}
+
 func TestFindCommentBlockStart(t *testing.T) {
 	t.Parallel()
 
