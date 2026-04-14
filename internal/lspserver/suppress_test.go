@@ -290,6 +290,15 @@ func TestSuppressRuleActions_EmitsLineAndFileActions(t *testing.T) {
 	assert.Contains(t, actions[0].Title, "Suppress hadolint/DL3027 for this line")
 	assert.Contains(t, actions[1].Title, "Suppress hadolint/DL3027 for this file")
 
+	// Verify Edit.Changes is populated with actual text edits.
+	for i, a := range actions {
+		require.NotNil(t, a.Edit, "action %d should have an Edit", i)
+		require.NotNil(t, a.Edit.Changes, "action %d Edit.Changes should not be nil", i)
+		edits := (*a.Edit.Changes)["file:///test/Dockerfile"]
+		require.NotEmpty(t, edits, "action %d should have edits for the document URI", i)
+		assert.NotEmpty(t, edits[0].NewText, "action %d edit should have non-empty NewText", i)
+	}
+
 	// Verify stable Data field.
 	for _, a := range actions {
 		require.NotNil(t, a.Data)
