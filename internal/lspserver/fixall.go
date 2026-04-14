@@ -96,8 +96,8 @@ func (s *Server) computeFixEdits(
 	filePath := uriToPath(docURI)
 	cfg := s.resolveConfig(filePath)
 	fixModes := fix.BuildFixModes(cfg)
-	fixed := computeFixedContent(ctx, filePath, content, cfg, fixModes, safety)
-	if fixed == nil || bytes.Equal(fixed, content) {
+	fixed, err := computeFixedContent(ctx, filePath, content, cfg, fixModes, safety)
+	if err != nil || fixed == nil || bytes.Equal(fixed, content) {
 		return nil
 	}
 	return minimalTextEdit(content, fixed)
@@ -118,9 +118,12 @@ func (s *Server) computeFixEditsIterative(ctx context.Context, docURI string, co
 		if ctx.Err() != nil {
 			return nil
 		}
-		next := computeFixedContent(ctx, filePath, current, cfg, fixModes, safety)
+		next, err := computeFixedContent(ctx, filePath, current, cfg, fixModes, safety)
+		if err != nil {
+			return nil // don't return partially-fixed content on error
+		}
 		if next == nil || bytes.Equal(next, current) {
-			break
+			break // converged
 		}
 		current = next
 	}
@@ -132,7 +135,10 @@ func (s *Server) computeFixEditsIterative(ctx context.Context, docURI string, co
 
 // computeFixedContent runs a single lint+fix pass and returns the modified content.
 // Config and fixModes are pre-resolved by the caller so they aren't recomputed
-// on each iteration. Returns nil if there's nothing to fix or an error occurs.
+// on each iteration.
+//
+// Returns (nil, nil) when there is nothing to fix (convergence).
+// Returns (nil, err) when linting or fixing fails.
 func computeFixedContent(
 	ctx context.Context,
 	filePath string,
@@ -140,7 +146,7 @@ func computeFixedContent(
 	cfg *config.Config,
 	fixModes map[string]fix.FixMode,
 	safety fix.FixSafety,
-) []byte {
+) ([]byte, error) {
 	input := linter.Input{
 		FilePath: filePath,
 		Content:  content,
@@ -149,7 +155,7 @@ func computeFixedContent(
 
 	result, err := linter.LintFile(input)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	chain := linter.LSPProcessors()
@@ -169,13 +175,13 @@ func computeFixedContent(
 	}
 	fixResult, err := fixer.Apply(ctx, violations, map[string][]byte{filePath: content})
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	change := fixResult.Changes[fileKey]
 	if change == nil || !change.HasChanges() || bytes.Equal(change.ModifiedContent, content) {
-		return nil
+		return nil, nil
 	}
 
-	return change.ModifiedContent
+	return change.ModifiedContent, nil
 }
