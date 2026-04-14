@@ -32,8 +32,8 @@ internal object TallySettings {
             fixUnsafe = service.fixUnsafe,
             configurationOverride = service.configurationPath?.takeIf { it.isNotBlank() },
             workspaceTrusted = workspaceTrusted,
-            suppressRuleEnabled = true,
-            showDocumentationEnabled = true,
+            suppressRuleEnabled = service.suppressRuleEnabled,
+            showDocumentationEnabled = service.showDocumentationEnabled,
             fixAllMode = service.fixAllMode ?: "all",
         )
     }
