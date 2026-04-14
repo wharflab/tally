@@ -39,14 +39,19 @@ type diagnosticsTask struct {
 
 // lintResultCache caches lint results keyed by document URI + version
 // to avoid redundant linting between publishDiagnostics and codeAction requests.
+// In addition to violations, it stores the resolved config and parse result
+// so that code action providers (e.g. suppress-rule) can reuse the already-parsed
+// document without re-parsing.
 type lintResultCache struct {
 	mu      sync.Mutex
 	entries map[string]lintCacheEntry
 }
 
 type lintCacheEntry struct {
-	version    int32
-	violations []rules.Violation
+	version     int32
+	violations  []rules.Violation
+	config      *config.Config
+	parseResult *dockerfile.ParseResult
 }
 
 func newLintResultCache() *lintResultCache {
@@ -63,10 +68,33 @@ func (c *lintResultCache) get(uri string, version int32) ([]rules.Violation, boo
 	return entry.violations, true
 }
 
-func (c *lintResultCache) set(uri string, version int32, violations []rules.Violation) {
+// getEntry returns the full cache entry for the given URI and version.
+// Returns a zero entry and false if not cached or version doesn't match.
+func (c *lintResultCache) getEntry(uri string, version int32) (lintCacheEntry, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.entries[uri] = lintCacheEntry{version: version, violations: violations}
+	entry, ok := c.entries[uri]
+	if !ok || entry.version != version {
+		return lintCacheEntry{}, false
+	}
+	return entry, true
+}
+
+func (c *lintResultCache) set(
+	uri string,
+	version int32,
+	violations []rules.Violation,
+	cfg *config.Config,
+	parseResult *dockerfile.ParseResult,
+) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[uri] = lintCacheEntry{
+		version:     version,
+		violations:  violations,
+		config:      cfg,
+		parseResult: parseResult,
+	}
 }
 
 func (c *lintResultCache) delete(uri string) {
@@ -158,10 +186,10 @@ func (s *Server) cancelPendingDiagnostics(docURI string) {
 }
 
 func (s *Server) publishDiagnosticsForDocument(ctx context.Context, docURI string, version int32, content []byte) {
-	violations := s.lintContent(ctx, docURI, content)
+	lr := s.lintContent(ctx, docURI, content)
 	if s.documentVersionCurrent(docURI, version) {
-		s.lintCache.set(docURI, version, violations)
-		s.notifyDiagnostics(ctx, docURI, version, violations)
+		s.lintCache.set(docURI, version, lr.violations, lr.config, lr.parseResult)
+		s.notifyDiagnostics(ctx, docURI, version, lr.violations)
 	}
 }
 
@@ -216,14 +244,14 @@ func (s *Server) handleDiagnostic(ctx context.Context, params *protocol.Document
 			}, nil
 		}
 
-		violations := s.lintContent(ctx, uri, []byte(doc.Content))
+		lr := s.lintContent(ctx, uri, []byte(doc.Content))
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
 		if s.documentVersionCurrent(uri, doc.Version) {
-			s.lintCache.set(uri, doc.Version, violations)
+			s.lintCache.set(uri, doc.Version, lr.violations, lr.config, lr.parseResult)
 		}
-		diagnostics := convertDiagnostics(violations)
+		diagnostics := convertDiagnostics(lr.violations)
 
 		return &protocol.DocumentDiagnosticResponse{
 			FullDocumentDiagnosticReport: &protocol.RelatedFullDocumentDiagnosticReport{
@@ -279,11 +307,11 @@ func (s *Server) pullDiagnosticsFromDisk(ctx context.Context, docURI, filePath s
 		return nil, err
 	}
 
-	violations := s.lintContent(ctx, docURI, content)
+	lr := s.lintContent(ctx, docURI, content)
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	diagnostics := convertDiagnostics(violations)
+	diagnostics := convertDiagnostics(lr.violations)
 
 	return &protocol.DocumentDiagnosticResponse{
 		FullDocumentDiagnosticReport: &protocol.RelatedFullDocumentDiagnosticReport{
@@ -332,8 +360,16 @@ func (s *Server) resolveConfig(filePath string) *config.Config {
 	return cfg
 }
 
+// lintResult holds the full output of a lint pass: violations plus the resolved
+// config and parse result that produced them.
+type lintResult struct {
+	violations  []rules.Violation
+	config      *config.Config
+	parseResult *dockerfile.ParseResult
+}
+
 // lintContent runs the shared lint pipeline and applies LSP-specific processors.
-func (s *Server) lintContent(ctx context.Context, docURI string, content []byte) []rules.Violation {
+func (s *Server) lintContent(ctx context.Context, docURI string, content []byte) lintResult {
 	filePath := uriToPath(docURI)
 	cfg := s.resolveConfig(filePath)
 	return s.lintContentWithConfig(ctx, docURI, content, cfg, nil)
@@ -345,7 +381,7 @@ func (s *Server) lintContentWithConfig(
 	content []byte,
 	cfg *config.Config,
 	parseResult *dockerfile.ParseResult,
-) []rules.Violation {
+) lintResult {
 	filePath := uriToPath(docURI)
 	input := linter.Input{
 		FilePath:    filePath,
@@ -357,7 +393,7 @@ func (s *Server) lintContentWithConfig(
 	result, err := linter.LintFile(input)
 	if err != nil {
 		log.Printf("lsp: lint error for %s: %v", input.FilePath, err)
-		return nil
+		return lintResult{}
 	}
 
 	violations := result.Violations
@@ -372,7 +408,11 @@ func (s *Server) lintContentWithConfig(
 		result.Config,
 		map[string][]byte{input.FilePath: content},
 	)
-	return chain.Process(violations, procCtx)
+	return lintResult{
+		violations:  chain.Process(violations, procCtx),
+		config:      result.Config,
+		parseResult: result.ParseResult,
+	}
 }
 
 // convertDiagnostics converts tally violations to LSP diagnostics.

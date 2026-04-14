@@ -6,10 +6,12 @@ import com.intellij.openapi.options.BoundSearchableConfigurable
 import com.intellij.openapi.project.Project
 import com.intellij.ui.dsl.builder.COLUMNS_LARGE
 import com.intellij.ui.dsl.builder.Cell
+import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.bindText
 import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
+import com.intellij.ui.dsl.builder.toNullableProperty
 import javax.swing.JCheckBox
 
 internal class TallyConfigurable(
@@ -69,6 +71,11 @@ internal class TallyConfigurable(
                     checkBox("Fix all on save")
                         .bindSelected(settings.state::fixAllOnSave)
                 comment("Apply safe fixes when saving Dockerfiles.")
+            }
+            row("Fix all mode:") {
+                comboBox(listOf("all", "problems"))
+                    .bindItem(settings.state::fixAllMode.toNullableProperty())
+                comment("'all' re-lints iteratively; 'problems' applies fixes in a single pass.")
             }
         }
 

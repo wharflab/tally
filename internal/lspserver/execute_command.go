@@ -17,7 +17,13 @@ func (s *Server) handleExecuteCommand(ctx context.Context, params *protocol.Exec
 	if params == nil {
 		return nil, nil //nolint:nilnil // LSP: null result is valid
 	}
-	if params.Command != applyAllFixesCommand {
+
+	switch params.Command {
+	case openRuleDocCommand:
+		return s.handleOpenRuleDoc(params.Arguments) //nolint:contextcheck // detached goroutine for showDocument
+	case applyAllFixesCommand:
+		// handled below
+	default:
 		return nil, jsonrpc2.NewError(int64(protocol.ErrorCodeInvalidParams), "unknown command: "+params.Command)
 	}
 
@@ -36,7 +42,8 @@ func (s *Server) handleExecuteCommand(ctx context.Context, params *protocol.Exec
 		safety = fix.FixUnsafe
 	}
 
-	edits := s.computeFixEdits(ctx, uri, content, safety)
+	mode := s.settingsForFile(uriToPath(uri)).FixAllMode
+	edits := s.computeFixEdits(ctx, uri, content, safety, mode)
 	if len(edits) == 0 {
 		return nil, nil //nolint:nilnil // no changes
 	}

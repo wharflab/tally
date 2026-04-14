@@ -7,6 +7,9 @@ internal data class TallyRuntimeSettings(
     val fixUnsafe: Boolean,
     val configurationOverride: String?,
     val workspaceTrusted: Boolean,
+    val suppressRuleEnabled: Boolean,
+    val showDocumentationEnabled: Boolean,
+    val fixAllMode: String,
 )
 
 internal object TallySettings {
@@ -29,6 +32,9 @@ internal object TallySettings {
             fixUnsafe = service.fixUnsafe,
             configurationOverride = service.configurationPath?.takeIf { it.isNotBlank() },
             workspaceTrusted = workspaceTrusted,
+            suppressRuleEnabled = service.suppressRuleEnabled,
+            showDocumentationEnabled = service.showDocumentationEnabled,
+            fixAllMode = service.fixAllMode ?: "all",
         )
     }
 
@@ -48,6 +54,9 @@ internal object TallySettings {
                     "configurationPreference" to "editorFirst",
                     "fixUnsafe" to settings.fixUnsafe,
                     "workspaceTrusted" to settings.workspaceTrusted,
+                    "suppressRuleEnabled" to settings.suppressRuleEnabled,
+                    "showDocumentationEnabled" to settings.showDocumentationEnabled,
+                    "fixAllMode" to settings.fixAllMode,
                 ),
             "workspaces" to emptyList<Map<String, Any?>>(),
         )

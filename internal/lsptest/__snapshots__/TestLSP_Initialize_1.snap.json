@@ -3,6 +3,7 @@
   "codeActionProvider": {
    "codeActionKinds": [
     "quickfix",
+    "quickfix.suppress.tally",
     "source.fixAll.tally"
    ]
   },
@@ -14,7 +15,8 @@
   "documentFormattingProvider": true,
   "executeCommandProvider": {
    "commands": [
-    "tally.applyAllFixes"
+    "tally.applyAllFixes",
+    "tally.openRuleDoc"
    ]
   },
   "semanticTokensProvider": {

@@ -57,6 +57,7 @@ type Server struct {
 	pushDiagnostics            bool
 	supportsDiagnosticRefresh  bool
 	supportsDiagnosticPullMode bool
+	showDocumentSupported      bool
 
 	requestCancelMu          sync.Mutex
 	requestQueuedIDs         map[string]struct{}
@@ -399,11 +400,26 @@ func lspNotify(ctx context.Context, conn *jsonrpc2.Connection, method string, pa
 	return conn.Notify(ctx, method, stdjson.RawMessage(raw))
 }
 
+// lspCall pre-marshals params with json/v2 and sends a call via conn.Call.
+// The response is awaited but the result is discarded.
+func lspCall(ctx context.Context, conn *jsonrpc2.Connection, method string, params any) error {
+	raw, err := jsonv2.Marshal(params)
+	if err != nil {
+		return err
+	}
+	return conn.Call(ctx, method, stdjson.RawMessage(raw)).Await(ctx, nil)
+}
+
 // handleInitialize responds to the initialize request with server capabilities.
 func (s *Server) handleInitialize(params *protocol.InitializeParams) (any, error) {
 	log.Printf("lsp: initialize from %s", clientInfoString(params))
 
 	s.configureDiagnosticsMode(params)
+	if params.Capabilities != nil &&
+		params.Capabilities.Window != nil &&
+		params.Capabilities.Window.ShowDocument != nil {
+		s.showDocumentSupported = params.Capabilities.Window.ShowDocument.Support
+	}
 	if params.InitializationOptions != nil {
 		if next, ok := parseClientSettings(*params.InitializationOptions); ok {
 			s.settingsMu.Lock()
@@ -429,6 +445,7 @@ func (s *Server) handleInitialize(params *protocol.InitializeParams) (any, error
 				CodeActionOptions: &protocol.CodeActionOptions{
 					CodeActionKinds: new([]protocol.CodeActionKind{
 						protocol.CodeActionKindQuickFix,
+						suppressCodeActionKind,
 						"source.fixAll.tally",
 					}),
 				},
@@ -454,6 +471,7 @@ func (s *Server) handleInitialize(params *protocol.InitializeParams) (any, error
 			ExecuteCommandProvider: &protocol.ExecuteCommandOptions{
 				Commands: []string{
 					applyAllFixesCommand,
+					openRuleDocCommand,
 				},
 			},
 		},

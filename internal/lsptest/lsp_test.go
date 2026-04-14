@@ -463,6 +463,39 @@ func TestLSP_ExecuteCommandApplyAllFixes(t *testing.T) {
 	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, fixed)
 }
 
+// TestLSP_ExecuteCommandApplyAllFixesRealWorld runs fix-all (with iterative mode)
+// on the same real-world Dockerfile used by TestLSP_FormattingRealWorld.
+// The VS Code smoke test uses this snapshot as the expected fix-all output.
+func TestLSP_ExecuteCommandApplyAllFixesRealWorld(t *testing.T) {
+	t.Parallel()
+	ts := startTestServer(t)
+	ts.initialize(t)
+
+	original, err := os.ReadFile("../integration/testdata/benchmark-real-world-fix/Dockerfile")
+	require.NoError(t, err)
+
+	uri := "file:///tmp/test-fixall-realworld/Dockerfile"
+	ts.openDocument(t, uri, string(original))
+	ts.waitDiagnostics(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), diagTimeout)
+	defer cancel()
+
+	var edit workspaceEdit
+	args := []any{uri}
+	err = ts.conn.Call(ctx, "workspace/executeCommand", &executeCommandParams{
+		Command:   "tally.applyAllFixes",
+		Arguments: &args,
+	}).Await(ctx, &edit)
+	require.NoError(t, err)
+
+	edits := edit.Changes[uri]
+	require.NotEmpty(t, edits, "expected executeCommand to return edits")
+
+	fixed := applyEdits(t, uri, string(original), edits)
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, fixed)
+}
+
 func TestLSP_NoPushDiagnosticsWhenClientSupportsPull(t *testing.T) {
 	t.Parallel()
 	ts := startTestServer(t)

@@ -447,6 +447,7 @@ type codeAction struct {
 	Diagnostics []diagnostic      `json:"diagnostics,omitempty"`
 	Edit        *workspaceEdit    `json:"edit,omitempty"`
 	Command     *protocol.Command `json:"command,omitempty"`
+	Data        any               `json:"data,omitempty"`
 }
 
 type workspaceEdit struct {
