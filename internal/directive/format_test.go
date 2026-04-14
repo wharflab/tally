@@ -71,4 +71,12 @@ func TestAppendRule(t *testing.T) {
 		assert.Equal(t, 21, edit.Start)
 		assert.Equal(t, 24, edit.End, "should replace the trailing spaces")
 	})
+
+	t.Run("trims trailing tabs", func(t *testing.T) {
+		t.Parallel()
+		edit := AppendRule("# tally ignore=DL3008\t\t;reason=test", "DL3027")
+		assert.Equal(t, ",DL3027", edit.NewText)
+		assert.Equal(t, 21, edit.Start)
+		assert.Equal(t, 23, edit.End, "should replace the trailing tabs")
+	})
 }

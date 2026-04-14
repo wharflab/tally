@@ -54,7 +54,7 @@ func AppendRule(lineText, ruleCode string) AppendRuleEdit {
 
 	// Trim trailing whitespace before insertion point.
 	trimmed := insertPos
-	for trimmed > 0 && lineText[trimmed-1] == ' ' {
+	for trimmed > 0 && (lineText[trimmed-1] == ' ' || lineText[trimmed-1] == '\t') {
 		trimmed--
 	}
 
