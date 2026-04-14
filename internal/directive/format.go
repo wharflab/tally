@@ -1,10 +1,17 @@
 package directive
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
-// reasonSeparator is the separator between the rule list and the reason field.
-// Used by both the parser (regex) and the formatter (this file).
+// reasonSeparator is the canonical separator between the rule list and the
+// reason field, used when formatting new directives.
 const reasonSeparator = ";reason="
+
+// reasonPattern matches the reason separator in existing directive text.
+// Mirrors the parser's regex: case-insensitive, optional whitespace around '='.
+var reasonPattern = regexp.MustCompile(`(?i);reason\s*=\s*`)
 
 // FormatNextLine produces a canonical next-line suppression directive comment:
 //
@@ -46,10 +53,11 @@ type AppendRuleEdit struct {
 // The edit inserts before ";reason=" if present, otherwise at end of line,
 // trimming trailing whitespace before the insertion point.
 func AppendRule(lineText, ruleCode string) AppendRuleEdit {
-	// Find insertion point: before ;reason= if present, otherwise at end.
+	// Find insertion point: before ;reason= (case-insensitive, flexible whitespace)
+	// if present, otherwise at end of line.
 	insertPos := len(lineText)
-	if idx := strings.Index(lineText, reasonSeparator); idx >= 0 {
-		insertPos = idx
+	if loc := reasonPattern.FindStringIndex(lineText); loc != nil {
+		insertPos = loc[0]
 	}
 
 	// Trim trailing whitespace before insertion point.

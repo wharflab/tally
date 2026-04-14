@@ -79,4 +79,20 @@ func TestAppendRule(t *testing.T) {
 		assert.Equal(t, 21, edit.Start)
 		assert.Equal(t, 23, edit.End, "should replace the trailing tabs")
 	})
+
+	t.Run("reason with spaces around equals", func(t *testing.T) {
+		t.Parallel()
+		edit := AppendRule("# tally ignore=DL3008;reason = false positive", "DL3027")
+		assert.Equal(t, ",DL3027", edit.NewText)
+		assert.Equal(t, 21, edit.Start)
+		assert.Equal(t, 21, edit.End, "should insert before ;reason with spaces")
+	})
+
+	t.Run("case-insensitive REASON", func(t *testing.T) {
+		t.Parallel()
+		edit := AppendRule("# tally ignore=DL3008;REASON=test", "DL3027")
+		assert.Equal(t, ",DL3027", edit.NewText)
+		assert.Equal(t, 21, edit.Start)
+		assert.Equal(t, 21, edit.End, "should recognize uppercase REASON")
+	})
 }
