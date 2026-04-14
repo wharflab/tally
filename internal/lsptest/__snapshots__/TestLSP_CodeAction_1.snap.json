@@ -69,6 +69,10 @@
   "title": "Fix blank lines between instructions"
  },
  {
+  "data": {
+   "ruleCode": "buildkit/MaintainerDeprecated",
+   "type": "suppress-line"
+  },
   "edit": {
    "changes": {
     "file:///tmp/test-codeaction/Dockerfile": [
@@ -92,6 +96,10 @@
   "title": "Suppress buildkit/MaintainerDeprecated for this line"
  },
  {
+  "data": {
+   "ruleCode": "buildkit/MaintainerDeprecated",
+   "type": "suppress-file"
+  },
   "edit": {
    "changes": {
     "file:///tmp/test-codeaction/Dockerfile": [
@@ -115,6 +123,10 @@
   "title": "Suppress buildkit/MaintainerDeprecated for this file"
  },
  {
+  "data": {
+   "ruleCode": "tally/newline-between-instructions",
+   "type": "suppress-line"
+  },
   "edit": {
    "changes": {
     "file:///tmp/test-codeaction/Dockerfile": [
@@ -138,6 +150,10 @@
   "title": "Suppress tally/newline-between-instructions for this line"
  },
  {
+  "data": {
+   "ruleCode": "tally/newline-between-instructions",
+   "type": "suppress-file"
+  },
   "edit": {
    "changes": {
     "file:///tmp/test-codeaction/Dockerfile": [
