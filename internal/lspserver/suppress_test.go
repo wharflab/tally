@@ -78,6 +78,35 @@ func TestSuppressLineEdit_AboveCommentBlock(t *testing.T) {
 		"should insert above the comment block, not between comment and instruction")
 }
 
+func TestSuppressLineEdit_DescriptionAboveFirstInstruction(t *testing.T) {
+	t.Parallel()
+
+	// # syntax= on line 0, description comment on line 1, FROM on line 2.
+	// The directive must go above the description (line 1), not between
+	// description and FROM (which would trigger InvalidDefinitionDescription).
+	content := "# syntax=docker/dockerfile:1\n# builder is the build stage\nFROM alpine AS builder\n"
+	source := []byte(content)
+	lines := strings.Split(content, "\n")
+	sm := sourcemap.New(source)
+
+	parseResult := parseDockerfile(t, source)
+	spanIndex := directive.NewInstructionSpanIndexFromAST(parseResult.AST, sm)
+	dirResult := directive.Parse(sm, nil, spanIndex)
+
+	v := rules.NewViolation(
+		rules.NewRangeLocation("Dockerfile", 3, 0, 3, 22),
+		"tally/test-rule",
+		"msg",
+		rules.SeverityWarning,
+	)
+
+	edit := suppressLineEdit(v, lines, dirResult, spanIndex, 1, false)
+	require.NotNil(t, edit)
+	assert.Equal(t, "# tally ignore=tally/test-rule\n", edit.NewText)
+	assert.Equal(t, uint32(1), edit.Range.Start.Line,
+		"should insert above the description comment (line 1), not between it and FROM (line 2)")
+}
+
 func TestSuppressLineEdit_MergesWithExisting(t *testing.T) {
 	t.Parallel()
 
@@ -345,11 +374,11 @@ func TestFindCommentBlockStart(t *testing.T) {
 			want:             0,
 		},
 		{
-			name:             "stops at floor (parser directives)",
+			name:             "walks through comments above first instruction",
 			lines:            []string{"# syntax=docker/dockerfile:1", "# escape=\\", "# comment", "FROM alpine"},
 			instructionLine0: 3,
-			floorLine0:       3, // FROM is the first instruction
-			want:             3,
+			floorLine0:       2, // floor is after parser directives (line 0-1), not at FROM
+			want:             2, // walks back through "# comment" but stops at the floor
 		},
 		{
 			name:             "stops at bare hash",
@@ -361,7 +390,7 @@ func TestFindCommentBlockStart(t *testing.T) {
 			name:             "parser directives contiguous with instruction",
 			lines:            []string{"# syntax=docker/dockerfile:1", "FROM alpine"},
 			instructionLine0: 1,
-			floorLine0:       1,
+			floorLine0:       1, // floor is after parser directive (line 0)
 			want:             1,
 		},
 	}
