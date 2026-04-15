@@ -181,15 +181,15 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 		}
 	}
 
-	// Will a tail rewrite be emitted? If so, the mount insertion must be skipped
-	// (the tail rewrite includes mounts via formatRunFlags). Tail rewrites happen
-	// when mounts are mutated OR when cleanup falls back to a full rewrite.
-	// Heredoc RUNs never use tail rewrites: they use targeted mount + line edits.
+	// Skip the zero-width mount insertion when another edit already includes
+	// all mounts: tail rewrites (non-heredoc) use formatRunFlags with merged,
+	// and heredoc mount-flag edits (buildMountFlagEdit) also use merged.
 	needsTailRewrite := !isHeredoc && (mutated || (p.scriptCleaned && len(cleanupEdits) == 0))
+	skipMountInsert := needsTailRewrite || (isHeredoc && mutated)
 
 	// Edit 1: zero-length insertion for new mount flags right after "RUN ".
-	// Skipped when a tail rewrite will handle mounts to avoid overlapping edits.
-	if !needsTailRewrite && len(newMounts) > 0 {
+	// Skipped when another edit already covers all mounts.
+	if !skipMountInsert && len(newMounts) > 0 {
 		insertLine := runLoc[0].Start.Line
 		insertCol := runKeywordEndColumn(runLoc, p.sm)
 

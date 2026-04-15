@@ -803,6 +803,19 @@ severity = "error"
 			wantApplied: 1,
 		},
 		{
+			name: "prefer-package-cache-mounts-apt-heredoc-mutated-plus-new-mount",
+			input: "FROM ubuntu:24.04\n" +
+				"RUN --mount=type=cache,target=/var/cache/apt,id=apt <<EOF\n" +
+				"apt-get update && apt-get install -y gcc && apt-get clean\n" +
+				"EOF\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 1,
+		},
+		{
 			name: "prefer-package-cache-mounts-bun-install-cache-dir-env",
 			input: "FROM oven/bun:1.2\n" +
 				"ENV BUN_INSTALL_CACHE_DIR=/tmp/bun-cache\n" +
