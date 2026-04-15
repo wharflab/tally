@@ -171,6 +171,62 @@ RUN Install-Module PSReadLine -Force
 	})
 }
 
+func TestErrorActionPreferenceRule_OverlapWithPreferShellInstruction(t *testing.T) {
+	t.Parallel()
+
+	// When prefer-shell-instruction's fix has been applied, the SHELL
+	// instruction carries the full prelude. error-action-preference must
+	// not fire in this case.
+	testutil.RunRuleTests(t, NewErrorActionPreferenceRule(), []testutil.RuleTestCase{
+		{
+			Name: "SHELL with full prelude from prefer-shell-instruction fix",
+			Content: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				`SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; ` +
+				`$PSNativeCommandUseErrorActionPreference = $true; ` +
+				`$ProgressPreference = 'SilentlyContinue';"]` + "\n" +
+				"RUN Install-Module PSReadLine -Force; Write-Host done\n",
+			WantViolations: 0,
+		},
+		{
+			Name: "SHELL with partial prelude still triggers for missing native",
+			Content: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				`SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop';"]` + "\n" +
+				"RUN Install-Module PSReadLine -Force; Write-Host done\n",
+			WantViolations: 1,
+		},
+	})
+}
+
+func TestErrorActionPreferenceRule_OverlapWithPreferRunHeredoc(t *testing.T) {
+	t.Parallel()
+
+	// prefer-run-heredoc converts multi-statement RUNs to heredoc syntax and
+	// injects the prelude in the heredoc body. However, rules check the
+	// original source, so error-action-preference should still fire on the
+	// pre-heredoc form (heredoc conversion happens at fix time, not detection).
+	testutil.RunRuleTests(t, NewErrorActionPreferenceRule(), []testutil.RuleTestCase{
+		{
+			Name: "multi-command RUN eligible for heredoc still triggers",
+			Content: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				`SHELL ["pwsh", "-Command"]` + "\n" +
+				"RUN Install-Module PSReadLine -Force; Write-Host done\n",
+			WantViolations: 1,
+		},
+		{
+			Name: "heredoc RUN with prelude already present does not trigger",
+			Content: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				`SHELL ["pwsh", "-Command"]` + "\n" +
+				"RUN <<EOF\n" +
+				"$ErrorActionPreference = 'Stop'\n" +
+				"$PSNativeCommandUseErrorActionPreference = $true\n" +
+				"Install-Module PSReadLine -Force\n" +
+				"Write-Host done\n" +
+				"EOF\n",
+			WantViolations: 0,
+		},
+	})
+}
+
 func TestShellPreludeState(t *testing.T) {
 	t.Parallel()
 

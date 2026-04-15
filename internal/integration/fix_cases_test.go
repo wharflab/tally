@@ -1823,6 +1823,24 @@ severity = "warning"
 			wantApplied: 1,
 		},
 
+		// Cross-rule: error-action-preference + prefer-shell-instruction both
+		// enabled on repeated pwsh wrappers. prefer-shell-instruction (95) runs
+		// first and inserts SHELL with the full prelude; error-action-preference
+		// (96) fix is skipped because its SHELL edit overlaps.
+		{
+			name: "powershell-error-action-preference-cross-prefer-shell-instruction",
+			input: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				"RUN pwsh -Command Install-Module PSReadLine -Force\n" +
+				"RUN pwsh -Command Invoke-WebRequest https://example.com -OutFile /tmp/f.zip\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules(
+					"tally/powershell/error-action-preference",
+					"tally/powershell/prefer-shell-instruction",
+				)...),
+			wantApplied: 1, // only prefer-shell-instruction applies
+		},
+
 		// Prefer canonical STOPSIGNAL: missing SIG prefix → SIGTERM (FixSafe)
 		{
 			name:  "prefer-canonical-stopsignal-prefix",
