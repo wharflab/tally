@@ -292,20 +292,24 @@ func (r *ErrorActionPreferenceRule) buildWrapperFix(
 		return nil
 	}
 
-	// Anchor the search to text after the -Command argument so we don't
-	// accidentally match a token that appears in the outer wrapper prefix
-	// (e.g., `RUN pwsh -Command "pwsh -Command ..."`).
-	commandArgIdx := findCommandArgEnd(source)
+	// Anchor the search past the executable name to avoid matching tokens
+	// in the "RUN powershell" prefix itself.
+	exeLower := strings.ToLower(invocation.executable)
+	anchorIdx := strings.Index(strings.ToLower(source), exeLower)
+	if anchorIdx < 0 {
+		return nil
+	}
+	searchStart := anchorIdx + len(exeLower)
 
 	firstToken := firstNonWhitespaceWord(invocation.script)
 	if firstToken == "" {
 		return nil
 	}
-	relIdx := strings.Index(source[commandArgIdx:], firstToken)
+	relIdx := strings.Index(source[searchStart:], firstToken)
 	if relIdx < 0 {
 		return nil
 	}
-	insertByte := commandArgIdx + relIdx
+	insertByte := searchStart + relIdx
 
 	prelude := buildPreludeString(needStop, needNative) + " "
 	insertLine, insertCol := sourcemap.ByteToLineCol(source, insertByte)
@@ -335,20 +339,6 @@ func firstNonWhitespaceWord(s string) string {
 		return trimmed[:idx]
 	}
 	return trimmed
-}
-
-// findCommandArgEnd returns the byte offset in source just past the
-// "-Command" (or "-c") argument of a `powershell`/`pwsh` wrapper.
-// If not found, returns 0 so the caller falls back to a full search.
-func findCommandArgEnd(source string) int {
-	lower := strings.ToLower(source)
-	for _, flag := range []string{"-command", "-c"} {
-		idx := strings.Index(lower, flag)
-		if idx >= 0 {
-			return idx + len(flag)
-		}
-	}
-	return 0
 }
 
 // shellPreludeStateFromCmd checks the SHELL command args for the two prelude variables.
