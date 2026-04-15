@@ -4,7 +4,7 @@ FROM teeks99/msvc-win:14.0
   # [tally] settings to opt out from telemetry
   ENV POWERSHELL_TELEMETRY_OPTOUT=1
 
-SHELL ["powershell", "-command"]
+SHELL ["powershell", "-command", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true;", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true;"]
 
 # Install Chocolatey
 RUN <<EOF

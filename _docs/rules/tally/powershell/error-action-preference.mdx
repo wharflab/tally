@@ -1,0 +1,93 @@
+---
+title: "tally/powershell/error-action-preference"
+description: "Require `$ErrorActionPreference = 'Stop'` and `$PSNativeCommandUseErrorActionPreference = $true` in PowerShell RUN instructions."
+---
+
+Require `$ErrorActionPreference = 'Stop'` and `$PSNativeCommandUseErrorActionPreference = $true` in PowerShell `RUN` instructions.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Correctness |
+| Default | Enabled |
+| Auto-fix | Yes (`--fix --fix-unsafe`) |
+
+## Description
+
+This rule detects PowerShell `RUN` instructions that lack fail-fast error handling. It checks for two related preferences:
+
+1. **`$ErrorActionPreference = 'Stop'`** -- catches non-terminating PowerShell cmdlet errors that would otherwise be silently swallowed.
+2. **`$PSNativeCommandUseErrorActionPreference = $true`** -- extends error handling to native command exit codes (e.g., `git`, `dotnet`, `curl`) in
+   PowerShell 7.3+.
+
+The rule fires on both Linux and Windows stages whenever PowerShell is the effective shell (via `SHELL` instruction or explicit `powershell -Command`
+/ `pwsh -Command` wrappers).
+
+## Why this matters
+
+PowerShell does not fail-fast by default. Without `$ErrorActionPreference = 'Stop'`, an intermediate `Invoke-WebRequest` can fail silently, then
+`Start-Process` runs on a missing installer, then `Remove-Item` succeeds because nothing was there. The cascading silent failures are the real danger
+in multi-statement Docker build steps.
+
+The `$PSNativeCommandUseErrorActionPreference` variable was added in PowerShell 7.3 to close a gap: even with `$ErrorActionPreference = 'Stop'`,
+non-zero exit codes from native executables were ignored. Setting it to `$true` extends the fail-fast behavior to all commands.
+
+## Examples
+
+### Before (violation)
+
+```dockerfile
+FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command"]
+RUN Install-Module PSReadLine -Force; Write-Host "done"
+```
+
+### After (fixed with `--fix --fix-unsafe`)
+
+```dockerfile
+FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true;"]
+RUN Install-Module PSReadLine -Force; Write-Host "done"
+```
+
+### Already clean (no violation)
+
+```dockerfile
+FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+RUN Install-Module PSReadLine -Force; Write-Host "done"
+```
+
+## Configuration
+
+### `min-statements`
+
+Minimum number of PowerShell statements in a `RUN` to trigger the rule.
+
+- **Type:** integer
+- **Default:** `2`
+- **Minimum:** `1`
+
+Set to `1` to also catch non-terminating error swallowing on single-command `RUN` instructions.
+
+```toml
+[rules.tally."powershell/error-action-preference"]
+min-statements = 1
+```
+
+## Fix behavior
+
+The auto-fix modifies or inserts a `SHELL` instruction at the stage level, injecting whichever preferences are missing:
+
+- **Existing `SHELL` instruction**: appends the missing preferences to the last argument.
+- **No `SHELL` instruction**: inserts a new `SHELL` instruction after the `FROM`.
+- **Explicit wrapper** (`RUN powershell -Command ...`): no auto-fix (stage-level fix not applicable).
+
+The fix uses `FixSuggestion` safety, requiring `--fix-unsafe` to apply.
+
+## Interaction with other rules
+
+- **`tally/powershell/prefer-shell-instruction`** (priority 95): runs first. If it inserts a SHELL with the full prelude, the error-action-preference
+  fix is skipped as overlapping.
+- **`tally/prefer-run-heredoc`** (priority 100): when converting multi-statement RUNs to heredocs, the heredoc formatter automatically injects both
+  preferences if missing.

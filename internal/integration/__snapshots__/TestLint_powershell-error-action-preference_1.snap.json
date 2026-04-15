@@ -1,0 +1,179 @@
+{
+  "files": [
+    {
+      "file": "testdata/powershell-error-action-preference/Dockerfile",
+      "violations": [
+        {
+          "detail": "Without $ErrorActionPreference = 'Stop', PowerShell silently continues after non-terminating errors. $PSNativeCommandUseErrorActionPreference = $true extends error handling to native command exit codes (PowerShell 7.3+).",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/powershell/error-action-preference/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 9
+            },
+            "file": "testdata/powershell-error-action-preference/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 9
+            }
+          },
+          "message": "PowerShell RUN is missing $ErrorActionPreference = 'Stop' and $PSNativeCommandUseErrorActionPreference = $true",
+          "rule": "tally/powershell/error-action-preference",
+          "severity": "warning",
+          "sourceCode": "RUN Install-Module PSReadLine -Force; Write-Host \"one\"",
+          "suggestedFix": {
+            "description": "Add $ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; to SHELL instruction",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 25,
+                    "line": 8
+                  },
+                  "file": "testdata/powershell-error-action-preference/Dockerfile",
+                  "start": {
+                    "column": 25,
+                    "line": 8
+                  }
+                },
+                "newText": ", \"$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true;\""
+              }
+            ],
+            "priority": 96,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Without $ErrorActionPreference = 'Stop', PowerShell silently continues after non-terminating errors. $PSNativeCommandUseErrorActionPreference = $true extends error handling to native command exit codes (PowerShell 7.3+).",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/powershell/error-action-preference/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "testdata/powershell-error-action-preference/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "PowerShell RUN is missing $ErrorActionPreference = 'Stop' and $PSNativeCommandUseErrorActionPreference = $true",
+          "rule": "tally/powershell/error-action-preference",
+          "severity": "warning",
+          "sourceCode": "RUN Install-Module Az -Force; Write-Host \"two\"",
+          "suggestedFix": {
+            "description": "Add $ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; to SHELL instruction",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 25,
+                    "line": 8
+                  },
+                  "file": "testdata/powershell-error-action-preference/Dockerfile",
+                  "start": {
+                    "column": 25,
+                    "line": 8
+                  }
+                },
+                "newText": ", \"$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true;\""
+              }
+            ],
+            "priority": 96,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Without $PSNativeCommandUseErrorActionPreference = $true, non-zero exit codes from native commands (git, dotnet, curl) are ignored even when $ErrorActionPreference is 'Stop' (PowerShell 7.3+).",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/powershell/error-action-preference/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 15
+            },
+            "file": "testdata/powershell-error-action-preference/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 15
+            }
+          },
+          "message": "PowerShell RUN is missing $PSNativeCommandUseErrorActionPreference = $true",
+          "rule": "tally/powershell/error-action-preference",
+          "severity": "warning",
+          "sourceCode": "RUN Install-Module PSReadLine -Force; Write-Host \"three\"",
+          "suggestedFix": {
+            "description": "Add $PSNativeCommandUseErrorActionPreference = $true; to SHELL instruction",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 60,
+                    "line": 14
+                  },
+                  "file": "testdata/powershell-error-action-preference/Dockerfile",
+                  "start": {
+                    "column": 60,
+                    "line": 14
+                  }
+                },
+                "newText": " $PSNativeCommandUseErrorActionPreference = $true;"
+              }
+            ],
+            "priority": 96,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Without $ErrorActionPreference = 'Stop', PowerShell silently continues after non-terminating errors. $PSNativeCommandUseErrorActionPreference = $true extends error handling to native command exit codes (PowerShell 7.3+).",
+          "docUrl": "https://wharflab.github.io/tally/rules/tally/powershell/error-action-preference/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 19
+            },
+            "file": "testdata/powershell-error-action-preference/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 19
+            }
+          },
+          "message": "PowerShell RUN is missing $ErrorActionPreference = 'Stop' and $PSNativeCommandUseErrorActionPreference = $true",
+          "rule": "tally/powershell/error-action-preference",
+          "severity": "warning",
+          "sourceCode": "RUN pwsh -Command \"Install-Module PSReadLine -Force; Write-Host done\"",
+          "suggestedFix": {
+            "description": "Add PowerShell error-handling preferences to wrapper script",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 19,
+                    "line": 19
+                  },
+                  "file": "testdata/powershell-error-action-preference/Dockerfile",
+                  "start": {
+                    "column": 19,
+                    "line": 19
+                  }
+                },
+                "newText": "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; "
+              }
+            ],
+            "priority": 96,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 4,
+    "warnings": 4
+  }
+}

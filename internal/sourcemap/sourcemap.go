@@ -124,6 +124,25 @@ func (sm *SourceMap) SnippetAround(line, before, after int) string {
 	return sm.Snippet(startLine, endLine)
 }
 
+// ByteToLineCol converts a byte offset within a text string to a 0-based
+// (lineOffset, column) pair. lineOffset is relative to the start of the text
+// (not an absolute Dockerfile line number). Callers typically add a base line
+// number to get an absolute position:
+//
+//	lineOff, col := sourcemap.ByteToLineCol(source, bytePos)
+//	absLine := instructionStartLine + lineOff
+func ByteToLineCol(s string, offset int) (lineOffset, col int) {
+	line := 0
+	lineStart := 0
+	for i := range offset {
+		if s[i] == '\n' {
+			line++
+			lineStart = i + 1
+		}
+	}
+	return line, offset - lineStart
+}
+
 // Source returns the raw source content.
 // The returned slice should not be modified.
 func (sm *SourceMap) Source() []byte {
