@@ -121,12 +121,18 @@ func (r *ErrorActionPreferenceRule) checkStage(
 ) []rules.Violation {
 	var violations []rules.Violation
 
+	// Track whether a stage-level SHELL fix has already been emitted so that
+	// multiple RUN violations in the same stage don't produce duplicate edits
+	// on the same SHELL instruction.
+	stageFixEmitted := false
+
 	// Track the effective SHELL args through the stage to detect prelude.
 	activeShellCmd := initialStageShellCmd(input.Semantic, stageIdx)
 
 	for _, cmd := range stage.Commands {
 		if sc, ok := cmd.(*instructions.ShellCommand); ok && len(sc.Shell) > 0 {
 			activeShellCmd = sc.Shell
+			stageFixEmitted = false // new SHELL resets tracking
 			continue
 		}
 
@@ -137,6 +143,18 @@ func (r *ErrorActionPreferenceRule) checkStage(
 
 		v := r.checkRun(params, run, run.CmdLine[0], activeShellCmd)
 		if v != nil {
+			// Suppress duplicate stage-level SHELL fixes. When multiple
+			// RUNs in the same SHELL-based stage trigger, only the first
+			// violation carries the SHELL edit; the rest report without a
+			// fix to avoid overlapping edits on the same SHELL line.
+			// Wrapper fixes (explicit powershell -Command) are per-RUN
+			// body insertions and are never suppressed.
+			variant := shellutil.VariantFromShellCmd(activeShellCmd)
+			if v.SuggestedFix != nil && variant.IsPowerShell() && stageFixEmitted {
+				v.SuggestedFix = nil
+			} else if v.SuggestedFix != nil && variant.IsPowerShell() {
+				stageFixEmitted = true
+			}
 			violations = append(violations, *v)
 		}
 	}

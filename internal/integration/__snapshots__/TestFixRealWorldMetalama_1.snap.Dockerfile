@@ -8,7 +8,7 @@ FROM mcr.microsoft.com/windows/servercore:ltsc2025
 ENV POWERSHELL_TELEMETRY_OPTOUT=1
 
 # The initial shell is Windows PowerShell (use full path to avoid HCS issues)
-SHELL ["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-Command", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true;", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true;", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true;", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true;"]
+SHELL ["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "-Command", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true;"]
 
 # Prepare environment
 ENV PSExecutionPolicyPreference=Bypass
