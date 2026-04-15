@@ -331,6 +331,10 @@ func runKeywordEndColumn(runLoc []parser.Range, sm *sourcemap.SourceMap) int {
 
 	if sm != nil && runLoc[0].Start.Line > 0 {
 		line := sm.Line(runLoc[0].Start.Line - 1)
+		// Search for "RUN " in the line to handle both plain RUN and ONBUILD RUN.
+		if idx := strings.Index(strings.ToUpper(line), "RUN "); idx >= 0 {
+			return idx + 4 //nolint:mnd // len("RUN ")
+		}
 		return len(leadingWhitespace(line)) + 4 //nolint:mnd // len("RUN ")
 	}
 
