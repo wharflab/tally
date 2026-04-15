@@ -91,3 +91,12 @@ The fix uses `FixSuggestion` safety, requiring `--fix-unsafe` to apply.
   fix is skipped as overlapping.
 - **`tally/prefer-run-heredoc`** (priority 100): when converting multi-statement RUNs to heredocs, the heredoc formatter automatically injects both
   preferences if missing.
+
+## References
+
+- [`$ErrorActionPreference`](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variables#erroractionpreference)
+  -- Microsoft Learn: controls how PowerShell responds to non-terminating errors. Default is `Continue` (silently
+  swallow); `Stop` converts them to terminating errors.
+- [`$PSNativeCommandUseErrorActionPreference`](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variables#psnativecommanduserroractionpreference)
+  -- Microsoft Learn: when `$true`, non-zero exit codes from native commands are treated as errors according to
+  `$ErrorActionPreference`. Added in PowerShell 7.3; default is `$false`.
