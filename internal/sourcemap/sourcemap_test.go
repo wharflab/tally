@@ -314,3 +314,39 @@ func TestSource(t *testing.T) {
 		t.Errorf("Source() = %q, want %q", string(got), string(source))
 	}
 }
+
+func TestByteToLineCol(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		s        string
+		offset   int
+		wantLine int
+		wantCol  int
+	}{
+		{name: "start of string", s: "hello\nworld", offset: 0, wantLine: 0, wantCol: 0},
+		{name: "mid first line", s: "hello\nworld", offset: 3, wantLine: 0, wantCol: 3},
+		{name: "at newline", s: "hello\nworld", offset: 5, wantLine: 0, wantCol: 5},
+		{name: "start of second line", s: "hello\nworld", offset: 6, wantLine: 1, wantCol: 0},
+		{name: "mid second line", s: "hello\nworld", offset: 8, wantLine: 1, wantCol: 2},
+		{name: "end of string", s: "hello\nworld", offset: 11, wantLine: 1, wantCol: 5},
+		{name: "three lines", s: "a\nbb\nccc", offset: 7, wantLine: 2, wantCol: 2},
+		{name: "negative offset clamped", s: "hello", offset: -1, wantLine: 0, wantCol: 0},
+		{name: "zero offset", s: "hello", offset: 0, wantLine: 0, wantCol: 0},
+		{name: "offset beyond length clamped", s: "hello", offset: 100, wantLine: 0, wantCol: 5},
+		{name: "empty string zero", s: "", offset: 0, wantLine: 0, wantCol: 0},
+		{name: "empty string positive", s: "", offset: 5, wantLine: 0, wantCol: 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			gotLine, gotCol := ByteToLineCol(tt.s, tt.offset)
+			if gotLine != tt.wantLine || gotCol != tt.wantCol {
+				t.Errorf("ByteToLineCol(%q, %d) = (%d, %d), want (%d, %d)",
+					tt.s, tt.offset, gotLine, gotCol, tt.wantLine, tt.wantCol)
+			}
+		})
+	}
+}

@@ -132,6 +132,13 @@ func (sm *SourceMap) SnippetAround(line, before, after int) string {
 //	lineOff, col := sourcemap.ByteToLineCol(source, bytePos)
 //	absLine := instructionStartLine + lineOff
 func ByteToLineCol(s string, offset int) (lineOffset, col int) {
+	if offset <= 0 {
+		return 0, 0
+	}
+	if offset > len(s) {
+		offset = len(s)
+	}
+
 	line := 0
 	lineStart := 0
 	for i := range offset {
