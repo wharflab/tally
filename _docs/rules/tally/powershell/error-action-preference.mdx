@@ -77,11 +77,12 @@ min-statements = 1
 
 ## Fix behavior
 
-The auto-fix modifies or inserts a `SHELL` instruction at the stage level, injecting whichever preferences are missing:
+The auto-fix injects whichever preferences are missing. The strategy depends on the shell context:
 
 - **Existing `SHELL` instruction**: appends the missing preferences to the last argument.
 - **No `SHELL` instruction**: inserts a new `SHELL` instruction after the `FROM`.
-- **Explicit wrapper** (`RUN powershell -Command ...`): no auto-fix (stage-level fix not applicable).
+- **Explicit wrapper** (`RUN powershell -Command ...`): inserts the missing preferences at the
+  start of the inner script, right before the first command.
 
 The fix uses `FixSuggestion` safety, requiring `--fix-unsafe` to apply.
 
