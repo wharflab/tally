@@ -169,21 +169,27 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 
 	mutated := mountsMutated(existing, merged)
 
-	// Pre-compute cleanup edits for the non-mutated path.
+	isHeredoc := len(run.Files) > 0
+
+	// Pre-compute cleanup edits.
 	var cleanupEdits []rules.TextEdit
-	if !mutated && p.scriptCleaned {
-		cleanupEdits = computeCleanupEdits(p.file, run, runLoc, p.sm, p.shellVariant, p.cleaners)
+	if p.scriptCleaned {
+		if isHeredoc {
+			cleanupEdits = computeHeredocCleanupEdits(p.file, run, runLoc, p.sm, p.shellVariant, p.cleaners)
+		} else if !mutated {
+			cleanupEdits = computeCleanupEdits(p.file, run, runLoc, p.sm, p.shellVariant, p.cleaners)
+		}
 	}
 
-	// Will a tail rewrite be emitted? If so, the mount insertion must be skipped
-	// (the tail rewrite includes mounts via formatRunFlags). Tail rewrites happen
-	// when mounts are mutated OR when cleanup falls back to a full rewrite
-	// (e.g., heredoc RUNs where targeted cleanup edits are not available).
-	needsTailRewrite := mutated || (p.scriptCleaned && len(cleanupEdits) == 0)
+	// Skip the zero-width mount insertion when another edit already includes
+	// all mounts: tail rewrites (non-heredoc) use formatRunFlags with merged,
+	// and heredoc mount-flag edits (buildMountFlagEdit) also use merged.
+	needsTailRewrite := !isHeredoc && (mutated || (p.scriptCleaned && len(cleanupEdits) == 0))
+	skipMountInsert := needsTailRewrite || (isHeredoc && mutated)
 
 	// Edit 1: zero-length insertion for new mount flags right after "RUN ".
-	// Skipped when a tail rewrite will handle mounts to avoid overlapping edits.
-	if !needsTailRewrite && len(newMounts) > 0 {
+	// Skipped when another edit already covers all mounts.
+	if !skipMountInsert && len(newMounts) > 0 {
 		insertLine := runLoc[0].Start.Line
 		insertCol := runKeywordEndColumn(runLoc, p.sm)
 
@@ -194,8 +200,18 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 		})
 	}
 
+	// For heredoc RUNs with mutated mounts, produce a targeted mount-flag edit
+	// instead of rewriting the entire instruction.
+	if isHeredoc && mutated {
+		edits = append(edits, buildMountFlagEdit(p, merged)...)
+	}
+
 	// Edit 2+: cleanup and/or mount rewrite.
 	switch {
+	case isHeredoc:
+		// Heredoc: use line-based cleanup edits (mount handled above).
+		edits = append(edits, cleanupEdits...)
+
 	case mutated:
 		// Mount flags modified: full tail rewrite with merged mounts + cleaned script.
 		edits = append(edits, buildTailRewrite(p, merged)...)
@@ -205,7 +221,7 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 		edits = append(edits, cleanupEdits...)
 
 	case p.scriptCleaned:
-		// Fallback (e.g., heredoc): targeted cleanup unavailable, tail rewrite
+		// Fallback: targeted cleanup unavailable, tail rewrite
 		// with merged mounts (includes new) + cleaned script.
 		edits = append(edits, buildTailRewrite(p, merged)...)
 	}
@@ -238,6 +254,116 @@ func buildTailRewrite(p cacheMountEditParams, mounts []*instructions.Mount) []ru
 	}}
 }
 
+// buildMountFlagEdit replaces only the mount flags on the RUN instruction
+// (from after "RUN " to the start of the heredoc marker), preserving the
+// heredoc body verbatim. Used for heredoc RUNs when mounts are mutated.
+// Handles both << and <<- (tab-stripping) markers, and line continuations
+// where the marker may not be on the same line as RUN.
+func buildMountFlagEdit(p cacheMountEditParams, mounts []*instructions.Mount) []rules.TextEdit {
+	if p.sm == nil || len(p.runLoc) == 0 {
+		return nil
+	}
+	startLine := p.runLoc[0].Start.Line
+	startCol := runKeywordEndColumn(p.runLoc, p.sm)
+	endLine := p.runLoc[len(p.runLoc)-1].End.Line
+
+	// Search all lines of the RUN instruction for the heredoc marker ("<<" or "<<-").
+	heredocLine := -1
+	heredocCol := -1
+	for lineIdx := startLine - 1; lineIdx < endLine && lineIdx < p.sm.LineCount(); lineIdx++ {
+		line := p.sm.Line(lineIdx)
+		if col := strings.Index(line, "<<"); col >= 0 {
+			heredocLine = lineIdx + 1 // 1-based
+			heredocCol = col
+			break
+		}
+	}
+	if heredocLine < 0 {
+		return nil
+	}
+
+	newFlags := formatRunFlags(p.run.FlagsUsed, mounts)
+	if newFlags != "" {
+		newFlags += " "
+	}
+
+	return []rules.TextEdit{{
+		Location: rules.NewRangeLocation(p.file, startLine, startCol, heredocLine, heredocCol),
+		NewText:  newFlags,
+	}}
+}
+
+// computeHeredocCleanupEdits produces targeted edits for cache cleanup commands
+// within a heredoc RUN body. Handles three cases per line:
+//  1. Standalone cleanup (e.g., "dnf clean all") → delete the entire line.
+//  2. Chained with && (e.g., "dnf update && dnf clean all") → replace line with cleaned chain.
+//  3. No-cache flags (e.g., "pip install --no-cache-dir ...") → replace line with flags stripped.
+func computeHeredocCleanupEdits(
+	file string,
+	run *instructions.RunCommand,
+	runLoc []parser.Range,
+	sm *sourcemap.SourceMap,
+	variant shell.Variant,
+	cleaners map[cleanupKind]bool,
+) []rules.TextEdit {
+	if len(cleaners) == 0 || len(runLoc) == 0 || len(run.Files) == 0 || sm == nil {
+		return nil
+	}
+
+	startLine := runLoc[0].Start.Line
+	endLine := runLoc[len(runLoc)-1].End.Line
+
+	var edits []rules.TextEdit
+	// Iterate over the heredoc body lines (between the RUN header and the EOF delimiter).
+	// The first line is the RUN instruction itself; the last is the heredoc delimiter.
+	for lineIdx := startLine; lineIdx < endLine-1; lineIdx++ {
+		if lineIdx < 0 || lineIdx >= sm.LineCount() {
+			continue
+		}
+		line := sm.Line(lineIdx)
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+
+		// Line numbers are 1-based.
+		lineNo := lineIdx + 1
+
+		// Case 1: entire line is a cleanup command → delete line.
+		if isCacheCleanupCommand(trimmed, cleaners) {
+			edits = append(edits, rules.TextEdit{
+				Location: rules.NewRangeLocation(file, lineNo, 0, lineNo+1, 0),
+				NewText:  "",
+			})
+			continue
+		}
+
+		// Case 2: line contains && chains with cleanup commands mixed in.
+		if strings.Contains(trimmed, "&&") {
+			updated, changed := removeCacheCleanupFromChain(trimmed, variant, cleaners)
+			if changed {
+				indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+				edits = append(edits, rules.TextEdit{
+					Location: rules.NewRangeLocation(file, lineNo, 0, lineNo+1, 0),
+					NewText:  indent + updated + "\n",
+				})
+			}
+			continue
+		}
+
+		// Case 3: no-cache flags on a single command.
+		updated, changed := stripNoCacheFlags(trimmed, variant, cleaners)
+		if changed {
+			indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+			edits = append(edits, rules.TextEdit{
+				Location: rules.NewRangeLocation(file, lineNo, 0, lineNo+1, 0),
+				NewText:  indent + updated + "\n",
+			})
+		}
+	}
+	return edits
+}
+
 func runKeywordEndColumn(runLoc []parser.Range, sm *sourcemap.SourceMap) int {
 	if len(runLoc) == 0 {
 		return 4 //nolint:mnd // len("RUN ")
@@ -245,6 +371,10 @@ func runKeywordEndColumn(runLoc []parser.Range, sm *sourcemap.SourceMap) int {
 
 	if sm != nil && runLoc[0].Start.Line > 0 {
 		line := sm.Line(runLoc[0].Start.Line - 1)
+		// Search for "RUN " in the line to handle both plain RUN and ONBUILD RUN.
+		if idx := strings.Index(strings.ToUpper(line), "RUN "); idx >= 0 {
+			return idx + 4 //nolint:mnd // len("RUN ")
+		}
 		return len(leadingWhitespace(line)) + 4 //nolint:mnd // len("RUN ")
 	}
 
