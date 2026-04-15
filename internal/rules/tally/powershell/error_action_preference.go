@@ -339,9 +339,12 @@ func shellPreludeStateFromCmd(shellCmd []string) (hasStop, hasNative bool) {
 		return false, false
 	}
 
-	joined := strings.ToLower(strings.Join(shellCmd[1:], " "))
-	hasStop = strings.Contains(joined, "$erroractionpreference") && strings.Contains(joined, "stop")
-	hasNative = strings.Contains(joined, "$psnativecommanduseerroractionpreference") && strings.Contains(joined, "true")
+	// The prelude lives in the last SHELL arg (e.g., the string after
+	// "-Command"). Parse it with the same assignment-based logic used for
+	// script bodies so we don't misclassify unrelated tokens like
+	// "Stop-Process" or a stray "$true".
+	script := shellCmd[len(shellCmd)-1]
+	hasStop, hasNative, _ = scanScriptPrelude(script)
 	return hasStop, hasNative
 }
 

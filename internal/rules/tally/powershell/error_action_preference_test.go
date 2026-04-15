@@ -216,6 +216,24 @@ func TestShellPreludeState(t *testing.T) {
 			wantStop:   false,
 			wantNative: true,
 		},
+		{
+			name: "false positive: Stop-Process not ErrorActionPreference",
+			shellArgs: []string{
+				"pwsh", "-Command",
+				"$ErrorActionPreference = 'Continue'; Stop-Process -Name foo",
+			},
+			wantStop:   false,
+			wantNative: false,
+		},
+		{
+			name: "false positive: unrelated $true not native preference",
+			shellArgs: []string{
+				"pwsh", "-Command",
+				"$ErrorActionPreference = 'Stop'; $someFlag = $true",
+			},
+			wantStop:   true,
+			wantNative: false,
+		},
 	}
 
 	for _, tt := range tests {
