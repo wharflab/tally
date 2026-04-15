@@ -175,7 +175,7 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 	var cleanupEdits []rules.TextEdit
 	if p.scriptCleaned {
 		if isHeredoc {
-			cleanupEdits = computeHeredocCleanupEdits(p.file, run, runLoc, p.sm, p.cleaners)
+			cleanupEdits = computeHeredocCleanupEdits(p.file, run, runLoc, p.sm, p.shellVariant, p.cleaners)
 		} else if !mutated {
 			cleanupEdits = computeCleanupEdits(p.file, run, runLoc, p.sm, p.shellVariant, p.cleaners)
 		}
@@ -293,14 +293,17 @@ func buildMountFlagEdit(p cacheMountEditParams, mounts []*instructions.Mount) []
 	}}
 }
 
-// computeHeredocCleanupEdits produces targeted line-deletion edits for cache
-// cleanup commands within a heredoc RUN body. Each cleanup line (e.g.,
-// "dnf clean all") is deleted as a whole source line.
+// computeHeredocCleanupEdits produces targeted edits for cache cleanup commands
+// within a heredoc RUN body. Handles three cases per line:
+//  1. Standalone cleanup (e.g., "dnf clean all") → delete the entire line.
+//  2. Chained with && (e.g., "dnf update && dnf clean all") → replace line with cleaned chain.
+//  3. No-cache flags (e.g., "pip install --no-cache-dir ...") → replace line with flags stripped.
 func computeHeredocCleanupEdits(
 	file string,
 	run *instructions.RunCommand,
 	runLoc []parser.Range,
 	sm *sourcemap.SourceMap,
+	variant shell.Variant,
 	cleaners map[cleanupKind]bool,
 ) []rules.TextEdit {
 	if len(cleaners) == 0 || len(runLoc) == 0 || len(run.Files) == 0 || sm == nil {
@@ -322,15 +325,41 @@ func computeHeredocCleanupEdits(
 		if trimmed == "" {
 			continue
 		}
-		if !isCacheCleanupCommand(trimmed, cleaners) {
+
+		// Line numbers are 1-based.
+		lineNo := lineIdx + 1
+
+		// Case 1: entire line is a cleanup command → delete line.
+		if isCacheCleanupCommand(trimmed, cleaners) {
+			edits = append(edits, rules.TextEdit{
+				Location: rules.NewRangeLocation(file, lineNo, 0, lineNo+1, 0),
+				NewText:  "",
+			})
 			continue
 		}
-		// Delete the entire line including its trailing newline.
-		// Line numbers are 1-based; delete from col 0 of this line to col 0 of the next.
-		edits = append(edits, rules.TextEdit{
-			Location: rules.NewRangeLocation(file, lineIdx+1, 0, lineIdx+2, 0),
-			NewText:  "",
-		})
+
+		// Case 2: line contains && chains with cleanup commands mixed in.
+		if strings.Contains(trimmed, "&&") {
+			updated, changed := removeCacheCleanupFromChain(trimmed, variant, cleaners)
+			if changed {
+				indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+				edits = append(edits, rules.TextEdit{
+					Location: rules.NewRangeLocation(file, lineNo, 0, lineNo+1, 0),
+					NewText:  indent + updated + "\n",
+				})
+			}
+			continue
+		}
+
+		// Case 3: no-cache flags on a single command.
+		updated, changed := stripNoCacheFlags(trimmed, variant, cleaners)
+		if changed {
+			indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+			edits = append(edits, rules.TextEdit{
+				Location: rules.NewRangeLocation(file, lineNo, 0, lineNo+1, 0),
+				NewText:  indent + updated + "\n",
+			})
+		}
 	}
 	return edits
 }
