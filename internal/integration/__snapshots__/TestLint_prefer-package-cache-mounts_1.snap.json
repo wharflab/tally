@@ -945,8 +945,8 @@
               {
                 "location": {
                   "end": {
-                    "column": 3,
-                    "line": 26
+                    "column": 4,
+                    "line": 23
                   },
                   "file": "testdata/prefer-package-cache-mounts/Dockerfile",
                   "start": {
@@ -954,7 +954,21 @@
                     "line": 23
                   }
                 },
-                "newText": "--mount=type=cache,target=/root/.npm,id=npm npm install\n"
+                "newText": "--mount=type=cache,target=/root/.npm,id=npm "
+              },
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 26
+                  },
+                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 25
+                  }
+                },
+                "newText": ""
               }
             ],
             "priority": 90,

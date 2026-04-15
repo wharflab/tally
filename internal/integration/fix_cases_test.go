@@ -773,6 +773,21 @@ severity = "error"
 			wantApplied: 1,
 		},
 		{
+			name: "prefer-package-cache-mounts-dnf-heredoc-cleanup",
+			input: "FROM amazonlinux:2023\n" +
+				"RUN --mount=type=cache,target=/var/cache/dnf,id=dnf <<'EOF'\n" +
+				"dnf -y update\n" +
+				"dnf -y install java-21-amazon-corretto-headless\n" +
+				"dnf clean all\n" +
+				"EOF\n",
+			args: []string{
+				"--fix-unsafe",
+				"--fix",
+				"--select", "tally/prefer-package-cache-mounts",
+			},
+			wantApplied: 1,
+		},
+		{
 			name: "prefer-package-cache-mounts-bun-install-cache-dir-env",
 			input: "FROM oven/bun:1.2\n" +
 				"ENV BUN_INSTALL_CACHE_DIR=/tmp/bun-cache\n" +
