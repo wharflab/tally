@@ -254,20 +254,31 @@ func buildTailRewrite(p cacheMountEditParams, mounts []*instructions.Mount) []ru
 	}}
 }
 
-// buildMountFlagEdit replaces only the mount flags on the RUN line (from after
-// "RUN " to the start of the heredoc marker or script), preserving the heredoc
-// body verbatim. Used for heredoc RUNs when mounts are mutated.
+// buildMountFlagEdit replaces only the mount flags on the RUN instruction
+// (from after "RUN " to the start of the heredoc marker), preserving the
+// heredoc body verbatim. Used for heredoc RUNs when mounts are mutated.
+// Handles both << and <<- (tab-stripping) markers, and line continuations
+// where the marker may not be on the same line as RUN.
 func buildMountFlagEdit(p cacheMountEditParams, mounts []*instructions.Mount) []rules.TextEdit {
 	if p.sm == nil || len(p.runLoc) == 0 {
 		return nil
 	}
 	startLine := p.runLoc[0].Start.Line
 	startCol := runKeywordEndColumn(p.runLoc, p.sm)
+	endLine := p.runLoc[len(p.runLoc)-1].End.Line
 
-	// Find the heredoc marker ("<<") on the first line to know where flags end.
-	line := p.sm.Line(startLine - 1)
-	heredocIdx := strings.Index(line, "<<")
-	if heredocIdx < 0 {
+	// Search all lines of the RUN instruction for the heredoc marker ("<<" or "<<-").
+	heredocLine := -1
+	heredocCol := -1
+	for lineIdx := startLine - 1; lineIdx < endLine && lineIdx < p.sm.LineCount(); lineIdx++ {
+		line := p.sm.Line(lineIdx)
+		if col := strings.Index(line, "<<"); col >= 0 {
+			heredocLine = lineIdx + 1 // 1-based
+			heredocCol = col
+			break
+		}
+	}
+	if heredocLine < 0 {
 		return nil
 	}
 
@@ -277,7 +288,7 @@ func buildMountFlagEdit(p cacheMountEditParams, mounts []*instructions.Mount) []
 	}
 
 	return []rules.TextEdit{{
-		Location: rules.NewRangeLocation(p.file, startLine, startCol, startLine, heredocIdx),
+		Location: rules.NewRangeLocation(p.file, startLine, startCol, heredocLine, heredocCol),
 		NewText:  newFlags,
 	}}
 }
