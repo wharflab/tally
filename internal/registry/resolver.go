@@ -51,6 +51,11 @@ type ImageConfig struct {
 	// WorkingDir is the image's configured working directory (from WORKDIR).
 	// Empty string means no explicit WORKDIR was set (default is /).
 	WorkingDir string
+
+	// Shell is the image's configured default shell (from SHELL instruction).
+	// Nil means no explicit SHELL was set (Docker defaults apply).
+	// This is a Docker extension — not part of the OCI image spec.
+	Shell []string
 }
 
 // ResolveRequest is the typed input for the registry async resolver.

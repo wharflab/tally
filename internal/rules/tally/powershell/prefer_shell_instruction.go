@@ -1107,25 +1107,13 @@ func sourceRangeEdit(file, source string, startLine, byteStart, byteEnd int, new
 		return nil
 	}
 
-	startLineOffset, startCol := byteToLineCol(source, byteStart)
-	endLineOffset, endCol := byteToLineCol(source, byteEnd)
+	startLineOffset, startCol := sourcemap.ByteToLineCol(source, byteStart)
+	endLineOffset, endCol := sourcemap.ByteToLineCol(source, byteEnd)
 
 	return &rules.TextEdit{
 		Location: rules.NewRangeLocation(file, startLine+startLineOffset, startCol, startLine+endLineOffset, endCol),
 		NewText:  newText,
 	}
-}
-
-func byteToLineCol(s string, offset int) (int, int) {
-	line := 0
-	lineStart := 0
-	for i := range offset {
-		if s[i] == '\n' {
-			line++
-			lineStart = i + 1
-		}
-	}
-	return line, offset - lineStart
 }
 
 func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocation, bool) {

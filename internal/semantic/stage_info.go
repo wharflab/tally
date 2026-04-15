@@ -75,6 +75,13 @@ const defaultWindowsShellExe = "cmd" //nolint:customlint // not a Dockerfile CMD
 // windowsCmdShellName is the normalized executable name for the Windows cmd shell.
 const windowsCmdShellName = "cmd" //nolint:customlint // executable name, not Dockerfile CMD instruction
 
+// windowsPowerShellExe is the Windows PowerShell executable name.
+const windowsPowerShellExe = "powershell"
+
+// mcrDomain is the Microsoft Container Registry domain used for Windows,
+// .NET, and PowerShell base images.
+const mcrDomain = "mcr.microsoft.com"
+
 // DefaultWindowsShell returns the default shell for Windows containers.
 // Returns a fresh copy to avoid mutation.
 func DefaultWindowsShell() []string {
@@ -330,7 +337,7 @@ func detectBaseImageOS(baseName, platform string) BaseImageOS {
 func isWindowsImageName(lower string) bool {
 	domain, repoPath, tag := parseImageRef(lower)
 
-	if domain != "mcr.microsoft.com" {
+	if domain != mcrDomain {
 		return false
 	}
 
@@ -373,7 +380,7 @@ func isLinuxImageName(lower string) bool {
 	}
 
 	// MCR Linux images (dotnet on Linux, powershell on Linux)
-	if domain == "mcr.microsoft.com" {
+	if domain == mcrDomain {
 		if strings.HasPrefix(repoPath, "dotnet/") || strings.HasPrefix(repoPath, "powershell") {
 			if !strings.Contains(tag, "nanoserver") && !strings.Contains(tag, "windowsservercore") {
 				return true
@@ -414,6 +421,15 @@ func IsDashDefaultShell(baseName string) bool {
 var dashDefaultDistros = map[string]bool{
 	"debian": true,
 	"ubuntu": true,
+}
+
+// isPowerShellImageName reports whether the image is a known PowerShell image
+// (e.g., mcr.microsoft.com/powershell:*). These images ship with pwsh as the
+// entrypoint regardless of the underlying OS (Linux or Windows).
+func isPowerShellImageName(baseName string) bool {
+	lower := strings.ToLower(baseName)
+	domain, repoPath, _ := parseImageRef(lower)
+	return domain == mcrDomain && (repoPath == windowsPowerShellExe || strings.HasPrefix(repoPath, windowsPowerShellExe+"/"))
 }
 
 // baseImageShortName extracts the short repository name from a base image
@@ -512,7 +528,7 @@ func addInstructionOSHeuristics(cmd instructions.Command, windowsScore, linuxSco
 
 func addShellSignalScore(shellName string, windowsScore, linuxScore *int) {
 	switch shell.NormalizeShellExecutableName(shellName) {
-	case windowsCmdShellName, "powershell":
+	case windowsCmdShellName, windowsPowerShellExe:
 		*windowsScore += 6
 	case "sh", "bash", "dash", "ash", "zsh", "ksh", "mksh":
 		*linuxScore += 6

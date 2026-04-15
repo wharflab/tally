@@ -111,6 +111,24 @@ func (b *Builder) Build() *Model {
 			}
 		}
 
+		// Known PowerShell images (mcr.microsoft.com/powershell:*) ship with
+		// pwsh as the default shell. Set it before the POSIX refinement so
+		// PowerShell takes priority. On Windows PowerShell images the shell
+		// executable is "powershell" (Windows PowerShell); on Linux it is "pwsh".
+		if info.ShellSetting.Source == ShellSourceDefault &&
+			isPowerShellImageName(effectiveBaseName) {
+			exe := "pwsh"
+			if info.BaseImageOS == BaseImageOSWindows {
+				exe = windowsPowerShellExe
+			}
+			info.ShellSetting = ShellSetting{
+				Shell:   []string{exe, "-Command"},
+				Variant: shell.VariantPowerShell,
+				Source:  ShellSourceDefault,
+				Line:    -1,
+			}
+		}
+
 		// Refine the default shell variant for Linux distros whose /bin/sh
 		// is a strict POSIX shell (dash or ash) rather than bash.
 		// The default is VariantBash (correct for most distros); narrow to
@@ -461,7 +479,7 @@ func (b *Builder) processShellCommand(c *instructions.ShellCommand, info *StageI
 	// pwsh is cross-platform and must not imply Windows on its own.
 	if info.BaseImageOS == BaseImageOSUnknown && len(shellCmd) > 0 {
 		switch shell.NormalizeShellExecutableName(shellCmd[0]) {
-		case windowsCmdShellName, "powershell":
+		case windowsCmdShellName, windowsPowerShellExe:
 			info.BaseImageOS = BaseImageOSWindows
 		}
 	}

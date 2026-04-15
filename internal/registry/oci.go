@@ -38,6 +38,23 @@ func extractHasHealthcheck(configBytes []byte) bool {
 	return hc != nil && len(hc.Test) > 0 && hc.Test[0] != "NONE"
 }
 
+// extractShell extracts the SHELL configuration from a Docker image config blob.
+// The OCI image spec does not include Shell, but Docker image configs do.
+func extractShell(configBytes []byte) []string {
+	var dockerCfg struct {
+		Config struct {
+			Shell []string `json:"Shell,omitempty"`
+		} `json:"config"`
+	}
+	if err := json.Unmarshal(configBytes, &dockerCfg); err != nil {
+		return nil
+	}
+	if len(dockerCfg.Config.Shell) == 0 {
+		return nil
+	}
+	return dockerCfg.Config.Shell
+}
+
 // readAll reads up to maxBytes from r.
 func readAll(r io.Reader, maxBytes int64) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(r, maxBytes))

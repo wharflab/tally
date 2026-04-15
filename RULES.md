@@ -15,7 +15,7 @@ tally supports rules from multiple sources, each with its own namespace prefix.
 <!-- BEGIN RULES_SUMMARY -->
 | Namespace | Implemented | Covered by BuildKit | Total |
 |-----------|-------------|---------------------|-------|
-| tally | 55 | - | 55 |
+| tally | 56 | - | 56 |
 | buildkit | 17 + 5 captured | - | 22 |
 | hadolint | 27 | 10 | 66 |
 <!-- END RULES_SUMMARY -->
@@ -63,6 +63,7 @@ See the [tally rules documentation](_docs/rules/tally/) for detailed description
 | [`tally/prefer-package-cache-mounts`](_docs/rules/tally/prefer-package-cache-mounts.mdx) 🔧 | Suggests BuildKit cache mounts for package install/build commands and removes cache cleanup commands | Info | Performance | Enabled |
 | [`tally/php/composer-no-dev-in-production`](_docs/rules/tally/php/composer-no-dev-in-production.mdx) 🔧 | Production Composer install commands should include `--no-dev` | Warning | Security | Enabled |
 | [`tally/php/no-xdebug-in-final-image`](_docs/rules/tally/php/no-xdebug-in-final-image.mdx) 🔧 | Final image installs or enables Xdebug, a development-only tool | Warning | Best Practices | Enabled |
+| [`tally/powershell/error-action-preference`](_docs/rules/tally/powershell/error-action-preference.mdx) 🔧 | PowerShell `RUN` should set `$ErrorActionPreference = 'Stop'` and `$PSNativeCommandUseErrorActionPreference = $true` | Warning | Correctness | Enabled |
 | [`tally/powershell/prefer-shell-instruction`](_docs/rules/tally/powershell/prefer-shell-instruction.mdx) 🔧 | Prefers a PowerShell `SHELL` instruction over repeated `pwsh` or `powershell -Command` wrappers in `RUN` | Style | Style | Enabled (experimental) |
 | [`tally/gpu/cuda-version-mismatch`](_docs/rules/tally/gpu/cuda-version-mismatch.mdx) 🔧 | CUDA-specific pip/conda wheel version does not match base image CUDA toolkit | Warning | Correctness | Enabled |
 | [`tally/gpu/no-buildtime-gpu-queries`](_docs/rules/tally/gpu/no-buildtime-gpu-queries.mdx) | GPU hardware queries in RUN will fail at build time | Error | Correctness | Enabled |

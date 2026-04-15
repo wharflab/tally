@@ -248,6 +248,14 @@ func lintCases(t *testing.T) []lintCase {
 				mustSelectRules("tally/powershell/prefer-shell-instruction", "hadolint/DL4005")...),
 			wantExit: 1,
 		},
+
+		// PowerShell: error-action-preference
+		{
+			name:     "powershell-error-action-preference",
+			dir:      "powershell-error-action-preference",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/powershell/error-action-preference")...),
+			wantExit: 1,
+		},
 		{
 			name:     "php-composer-no-dev-in-production",
 			dir:      "php-composer-no-dev-in-production",

@@ -452,26 +452,13 @@ func sourceRangeEdit(file, sourceFull string, startLine, byteStart, byteEnd int,
 	}
 
 	// Convert byte offsets to line:col positions.
-	sLine, sCol := byteToLineCol(sourceFull, byteStart)
-	eLine, eCol := byteToLineCol(sourceFull, byteEnd)
+	sLine, sCol := sourcemap.ByteToLineCol(sourceFull, byteStart)
+	eLine, eCol := sourcemap.ByteToLineCol(sourceFull, byteEnd)
 
 	return &rules.TextEdit{
 		Location: rules.NewRangeLocation(file, startLine+sLine, sCol, startLine+eLine, eCol),
 		NewText:  newText,
 	}
-}
-
-// byteToLineCol converts a byte offset in a string to (line, col) where line is 0-based.
-func byteToLineCol(s string, offset int) (int, int) {
-	line := 0
-	lineStart := 0
-	for i := range offset {
-		if s[i] == '\n' {
-			line++
-			lineStart = i + 1
-		}
-	}
-	return line, offset - lineStart
 }
 
 // collectNewMounts returns mounts in merged that are entirely new (no existing

@@ -1767,6 +1767,92 @@ severity = "warning"
 			wantApplied: 0,
 		},
 
+		// PowerShell error-action-preference: SHELL missing prelude → insert prelude (FixSuggestion)
+		{
+			name: "powershell-error-action-preference-missing-both",
+			input: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				"SHELL [\"pwsh\", \"-Command\"]\n" +
+				"RUN Install-Module PSReadLine -Force; Write-Host done\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/powershell/error-action-preference")...),
+			wantApplied: 1,
+		},
+		// PowerShell error-action-preference: single-command RUN — no fix (below threshold)
+		{
+			name: "powershell-error-action-preference-single-cmd-no-fix",
+			input: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				"SHELL [\"pwsh\", \"-Command\"]\n" +
+				"RUN Install-Module PSReadLine -Force\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/powershell/error-action-preference")...),
+			wantApplied: 0,
+		},
+		// PowerShell error-action-preference: backtick escape, multiline RUN,
+		// SHELL already has Stop — only PSNativeCommandUseErrorActionPreference missing.
+		{
+			name: "powershell-error-action-preference-backtick-multiline-native-only",
+			input: "# escape=`\n" +
+				"FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"SHELL [\"powershell\", \"-Command\", \"$ErrorActionPreference = 'Stop';\"]\n" +
+				"RUN Invoke-WebRequest -Uri https://example.com/setup.exe `\n" +
+				"      -OutFile C:\\setup.exe; `\n" +
+				"    Start-Process C:\\setup.exe -Wait; `\n" +
+				"    Remove-Item C:\\setup.exe -Force\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/powershell/error-action-preference")...),
+			wantApplied: 1,
+		},
+		// PowerShell error-action-preference: explicit powershell -Command wrapper
+		// with backtick-continued multiline body. Both preludes missing; fix
+		// prepends them to the inner script.
+		{
+			name: "powershell-error-action-preference-explicit-wrapper-backtick",
+			input: "# escape=`\n" +
+				"FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"RUN powershell -Command `\n" +
+				"    Invoke-WebRequest -Uri https://example.com/setup.exe " +
+				"-OutFile C:\\setup.exe; `\n" +
+				"    Start-Process C:\\setup.exe -Wait; `\n" +
+				"    Remove-Item C:\\setup.exe -Force\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/powershell/error-action-preference")...),
+			wantApplied: 1,
+		},
+
+		// PowerShell error-action-preference: PowerShell base image with no SHELL
+		// instruction → inserts a new SHELL after FROM with the prelude.
+		{
+			name: "powershell-error-action-preference-insert-shell-after-from",
+			input: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				"RUN Install-Module PSReadLine -Force; Write-Host done\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/powershell/error-action-preference")...),
+			wantApplied: 1,
+		},
+
+		// Cross-rule: error-action-preference + prefer-shell-instruction both
+		// enabled on repeated pwsh wrappers. prefer-shell-instruction (95) runs
+		// first and inserts SHELL with the full prelude; error-action-preference
+		// (96) fix is skipped because its SHELL edit overlaps.
+		{
+			name: "powershell-error-action-preference-cross-prefer-shell-instruction",
+			input: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				"RUN pwsh -Command Install-Module PSReadLine -Force\n" +
+				"RUN pwsh -Command Invoke-WebRequest https://example.com -OutFile /tmp/f.zip\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules(
+					"tally/powershell/error-action-preference",
+					"tally/powershell/prefer-shell-instruction",
+				)...),
+			wantApplied: 1, // only prefer-shell-instruction applies
+		},
+
 		// Prefer canonical STOPSIGNAL: missing SIG prefix → SIGTERM (FixSafe)
 		{
 			name:  "prefer-canonical-stopsignal-prefix",
