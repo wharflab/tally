@@ -1823,6 +1823,18 @@ severity = "warning"
 			wantApplied: 1,
 		},
 
+		// PowerShell error-action-preference: PowerShell base image with no SHELL
+		// instruction → inserts a new SHELL after FROM with the prelude.
+		{
+			name: "powershell-error-action-preference-insert-shell-after-from",
+			input: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				"RUN Install-Module PSReadLine -Force; Write-Host done\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/powershell/error-action-preference")...),
+			wantApplied: 1,
+		},
+
 		// Cross-rule: error-action-preference + prefer-shell-instruction both
 		// enabled on repeated pwsh wrappers. prefer-shell-instruction (95) runs
 		// first and inserts SHELL with the full prelude; error-action-preference

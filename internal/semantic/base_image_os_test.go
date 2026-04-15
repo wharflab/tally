@@ -238,6 +238,72 @@ func TestBuilderRealWorldPowerShellAlpineFixtureStaysLinux(t *testing.T) {
 	}
 }
 
+func TestBuilderPowerShellImageSetsShellVariant(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		content     string
+		wantOS      BaseImageOS
+		wantVariant shell.Variant
+		wantExe     string
+	}{
+		{
+			name:        "linux powershell ubuntu",
+			content:     "FROM mcr.microsoft.com/powershell:ubuntu-22.04\nRUN Write-Host hi\n",
+			wantOS:      BaseImageOSLinux,
+			wantVariant: shell.VariantPowerShell,
+			wantExe:     "pwsh",
+		},
+		{
+			name:        "linux powershell alpine",
+			content:     "FROM mcr.microsoft.com/powershell:lts-alpine-3.17\nRUN Write-Host hi\n",
+			wantOS:      BaseImageOSLinux,
+			wantVariant: shell.VariantPowerShell,
+			wantExe:     "pwsh",
+		},
+		{
+			name:        "windows powershell nanoserver",
+			content:     "FROM mcr.microsoft.com/powershell:nanoserver-ltsc2022\nRUN Write-Host hi\n",
+			wantOS:      BaseImageOSWindows,
+			wantVariant: shell.VariantPowerShell,
+			wantExe:     "powershell",
+		},
+		{
+			name: "explicit SHELL overrides powershell image default",
+			content: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				"SHELL [\"/bin/bash\", \"-c\"]\nRUN echo hi\n",
+			wantOS:      BaseImageOSLinux,
+			wantVariant: shell.VariantBash,
+			wantExe:     "/bin/bash",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			pr := parseDockerfile(t, tt.content)
+			model := NewModel(pr, nil, "Dockerfile")
+
+			info := model.StageInfo(0)
+			if info == nil {
+				t.Fatal("expected stage info")
+			}
+			if info.BaseImageOS != tt.wantOS {
+				t.Fatalf("BaseImageOS = %v, want %v", info.BaseImageOS, tt.wantOS)
+			}
+			// Check initial shell variant (before any mid-stage SHELL).
+			if info.ShellSetting.Variant != tt.wantVariant {
+				t.Fatalf("ShellSetting.Variant = %v, want %v", info.ShellSetting.Variant, tt.wantVariant)
+			}
+			if len(info.ShellSetting.Shell) > 0 && info.ShellSetting.Shell[0] != tt.wantExe {
+				t.Fatalf("ShellSetting.Shell[0] = %q, want %q", info.ShellSetting.Shell[0], tt.wantExe)
+			}
+		})
+	}
+}
+
 func TestBuilderResolvesBaseImageArgsForShellHeuristics(t *testing.T) {
 	t.Parallel()
 
