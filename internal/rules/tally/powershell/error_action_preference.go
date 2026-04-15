@@ -348,14 +348,21 @@ func shellPreludeStateFromCmd(shellCmd []string) (hasStop, hasNative bool) {
 	return hasStop, hasNative
 }
 
-// scanScriptPrelude checks the PowerShell script body for prelude assignments.
+// scanScriptPrelude checks the leading PowerShell assignments in a script body.
+// It stops at the first non-assignment statement so that preferences set after
+// commands (e.g., `Invoke-WebRequest ...; $ErrorActionPreference = 'Stop'`) are
+// not treated as a prelude -- the risky command already ran before fail-fast was
+// enabled.
 func scanScriptPrelude(script string) (hasStop, hasNative, hasWrongStop bool) {
 	stmts := shellutil.ExtractChainedCommands(script, shellutil.VariantPowerShell)
 	for _, stmt := range stmts {
 		trimmed := strings.TrimSpace(stmt)
+		if trimmed == "" {
+			continue
+		}
 		name, value, ok := shellutil.PowerShellAssignment(trimmed)
 		if !ok {
-			continue
+			break // first non-assignment ends the prelude
 		}
 
 		switch {

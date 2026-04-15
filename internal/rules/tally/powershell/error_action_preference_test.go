@@ -285,6 +285,14 @@ func TestScanScriptPrelude(t *testing.T) {
 			script:        "$ErrorActionPreference = 'Continue'; Install-Module PSReadLine -Force",
 			wantWrongStop: true,
 		},
+		{
+			name:   "assignment after command is not prelude",
+			script: "Invoke-WebRequest https://example.com; $ErrorActionPreference = 'Stop'",
+		},
+		{
+			name:   "native after command is not prelude",
+			script: "Write-Host hi; $PSNativeCommandUseErrorActionPreference = $true",
+		},
 	}
 
 	for _, tt := range tests {
