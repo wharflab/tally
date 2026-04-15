@@ -126,12 +126,14 @@ func (r *ErrorActionPreferenceRule) checkStage(
 	// on the same SHELL instruction.
 	stageFixEmitted := false
 
-	// Track the effective SHELL args through the stage to detect prelude.
+	// Track the effective SHELL args and instruction through the stage.
 	activeShellCmd := initialStageShellCmd(input.Semantic, stageIdx)
+	var activeShellInstr *instructions.ShellCommand // nil when no SHELL instruction precedes
 
 	for _, cmd := range stage.Commands {
 		if sc, ok := cmd.(*instructions.ShellCommand); ok && len(sc.Shell) > 0 {
 			activeShellCmd = sc.Shell
+			activeShellInstr = sc
 			stageFixEmitted = false // new SHELL resets tracking
 			continue
 		}
@@ -141,7 +143,7 @@ func (r *ErrorActionPreferenceRule) checkStage(
 			continue
 		}
 
-		v := r.checkRun(params, run, run.CmdLine[0], activeShellCmd)
+		v := r.checkRun(params, run, run.CmdLine[0], activeShellCmd, activeShellInstr)
 		if v != nil {
 			// Suppress duplicate stage-level SHELL fixes. When multiple
 			// RUNs in the same SHELL-based stage trigger, only the first
@@ -167,6 +169,7 @@ func (r *ErrorActionPreferenceRule) checkRun(
 	run *instructions.RunCommand,
 	script string,
 	activeShellCmd []string,
+	activeShellInstr *instructions.ShellCommand,
 ) *rules.Violation {
 	// Determine effective shell variant at this RUN.
 	variant := shellutil.VariantBash
@@ -175,7 +178,7 @@ func (r *ErrorActionPreferenceRule) checkRun(
 	}
 
 	if variant.IsPowerShell() {
-		return r.checkPowerShellRun(p, run, script, activeShellCmd)
+		return r.checkPowerShellRun(p, run, script, activeShellCmd, activeShellInstr)
 	}
 
 	// Path B: explicit powershell/pwsh wrapper in a non-PowerShell shell.
@@ -187,6 +190,7 @@ func (r *ErrorActionPreferenceRule) checkPowerShellRun(
 	run *instructions.RunCommand,
 	script string,
 	activeShellCmd []string,
+	activeShellInstr *instructions.ShellCommand,
 ) *rules.Violation {
 	count := shellutil.CountChainedCommands(script, shellutil.VariantPowerShell)
 	if count < p.minStatements {
@@ -217,7 +221,7 @@ func (r *ErrorActionPreferenceRule) checkPowerShellRun(
 		WithDetail(detail)
 	v.StageIndex = p.stageIdx
 
-	if fix := r.buildStageFix(p, run, activeShellCmd, !hasStop, !hasNative); fix != nil {
+	if fix := r.buildStageFix(p, activeShellCmd, activeShellInstr, !hasStop, !hasNative); fix != nil {
 		v = v.WithSuggestedFix(fix)
 	}
 
@@ -420,8 +424,8 @@ func buildViolationMessage(hasStop, hasNative, hasWrongStop bool) (msg, detail s
 // buildStageFix creates a fix that modifies or inserts a SHELL instruction at stage level.
 func (r *ErrorActionPreferenceRule) buildStageFix(
 	p checkParams,
-	_ *instructions.RunCommand,
 	activeShellCmd []string,
+	activeShellInstr *instructions.ShellCommand,
 	needStop bool,
 	needNative bool,
 ) *rules.SuggestedFix {
@@ -436,26 +440,13 @@ func (r *ErrorActionPreferenceRule) buildStageFix(
 
 	priority := p.meta.FixPriority
 
-	// Find the actual SHELL instruction in the stage commands to modify.
-	if shellCmd := findPowerShellInstruction(p.info.Stage.Commands); shellCmd != nil {
-		return r.buildShellModifyFixFromCmd(p.file, p.sm, shellCmd, priority, needStop, needNative)
+	// Modify the nearest preceding PowerShell SHELL instruction for this RUN.
+	if activeShellInstr != nil {
+		return r.buildShellModifyFixFromCmd(p.file, p.sm, activeShellInstr, priority, needStop, needNative)
 	}
 
-	// No SHELL instruction found: insert one after FROM.
+	// No SHELL instruction precedes this RUN: insert one after FROM.
 	return r.buildShellInsertFix(p.file, p.sm, p.info, priority, needStop, needNative)
-}
-
-func findPowerShellInstruction(commands []instructions.Command) *instructions.ShellCommand {
-	for _, cmd := range commands {
-		sc, ok := cmd.(*instructions.ShellCommand)
-		if !ok || len(sc.Shell) == 0 {
-			continue
-		}
-		if shellutil.VariantFromShellCmd(sc.Shell).IsPowerShell() {
-			return sc
-		}
-	}
-	return nil
 }
 
 func (r *ErrorActionPreferenceRule) buildShellModifyFixFromCmd(
