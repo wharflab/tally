@@ -60,28 +60,7 @@
           "message": "PowerShell RUN is missing $ErrorActionPreference = 'Stop' and $PSNativeCommandUseErrorActionPreference = $true",
           "rule": "tally/powershell/error-action-preference",
           "severity": "warning",
-          "sourceCode": "RUN Install-Module Az -Force; Write-Host \"two\"",
-          "suggestedFix": {
-            "description": "Add $ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; to SHELL instruction",
-            "edits": [
-              {
-                "location": {
-                  "end": {
-                    "column": 25,
-                    "line": 8
-                  },
-                  "file": "testdata/powershell-error-action-preference/Dockerfile",
-                  "start": {
-                    "column": 25,
-                    "line": 8
-                  }
-                },
-                "newText": ", \"$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true;\""
-              }
-            ],
-            "priority": 96,
-            "safety": 1
-          }
+          "sourceCode": "RUN Install-Module Az -Force; Write-Host \"two\""
         },
         {
           "detail": "Without $PSNativeCommandUseErrorActionPreference = $true, non-zero exit codes from native commands (git, dotnet, curl) are ignored even when $ErrorActionPreference is 'Stop' (PowerShell 7.3+).",
