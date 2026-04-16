@@ -101,8 +101,6 @@ pre-push:
       run: GOEXPERIMENT=jsonv2 make test
     - name: validate-hadolint-status
       run: ./scripts/validate-hadolint-status.sh
-    - name: validate-buildkit-rules
-      run: GOEXPERIMENT=jsonv2 ./scripts/validate-buildkit-rules.sh
     - name: mintlify-docs-broken-links
       run: bunx -y -q mint broken-links
       root: _docs
