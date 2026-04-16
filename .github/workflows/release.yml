@@ -1168,7 +1168,7 @@ jobs:
           path: dist
       - uses: actions/setup-node@v6
         with:
-          node-version: 24.14.1
+          node-version: 24.15.0
           registry-url: https://registry.npmjs.org
       - name: Update npm
         run: npm install -g npm@latest
