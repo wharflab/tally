@@ -72,7 +72,7 @@ pre-commit:
       run: curl --fail --data-binary @.codecov.yml https://codecov.io/validate
     # renovate:
     #   glob: "renovate.json"
-    #   run: npx -y -q -y --package renovate renovate-config-validator renovate.json
+    #   run: bunx -y -q -y --package renovate renovate-config-validator renovate.json
     actionlint:
       glob: ".github/workflows/*.{yaml,yml}"
       run: actionlint {staged_files}
@@ -82,7 +82,7 @@ pre-commit:
 commit-msg:
   commands:
     "lint commit message":
-      run: npx -y -q commitlint --edit {1}
+      run: bunx -y -q commitlint --edit {1}
     "check spelling":
       run: uv tool run typos==1.45.1 {1}
 post-merge:
