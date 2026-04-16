@@ -47,7 +47,7 @@ jobs:
         id: vscode
         run: |
           set -euo pipefail
-          VERSION=$(curl -fsSL "https://update.code.visualstudio.com/api/releases/stable?released=true" | jq -r '.[0]')
+          VERSION=$(curl --retry 5 --retry-connrefused -fsSL "https://update.code.visualstudio.com/api/releases/stable?released=true" | jq -r '.[0]')
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       - name: Cache VS Code test install
         uses: actions/cache@v5
