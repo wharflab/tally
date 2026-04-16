@@ -38,17 +38,11 @@ jobs:
           which jq && jq --version
       - name: Install ast-grep
         run: npm install --global @ast-grep/cli
-      - name: Install rumdl
-        run: pip install rumdl
       - name: Extract hadolint rules
+        id: update
         run: |
           ./scripts/extract-hadolint-rules.sh hadolint --only-dl > internal/rules/hadolint-rules.json
           rm -rf hadolint
-      - name: Update README.md
-        id: update
-        run: |
-          go run ./scripts/sync-buildkit-rules --update-readme
-          rumdl check --fix --config .rumdl.toml --output-format concise README.md
           # Check if there are changes
           if git diff --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"

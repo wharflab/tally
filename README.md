@@ -36,16 +36,6 @@ Modern Dockerfiles deserve modern tooling. tally is opinionated in the right pla
 
 Quality bar: **92% code coverage on Codecov** and **2,900+ Go tests executed in CI**.
 
-## Supported Rules
-
-<!-- BEGIN RULES_TABLE -->
-| Source | Rules | Description |
-|--------|-------|-------------|
-| **[BuildKit](https://docs.docker.com/reference/build-checks/)** | 22/22 rules | Docker's official Dockerfile checks (captured + reimplemented) |
-| **tally** | 56 rules | Custom rules including secret detection with [gitleaks](https://github.com/gitleaks/gitleaks) |
-| **[Hadolint](https://github.com/hadolint/hadolint)** | 37 rules | Hadolint-compatible Dockerfile rules (expanding) |
-<!-- END RULES_TABLE -->
-
 ## Documentation
 
 For installation, usage, configuration, rules reference, and more, visit the full documentation at
