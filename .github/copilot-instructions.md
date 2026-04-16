@@ -124,7 +124,7 @@ go test -run TestLintCommand ./internal/integration
 2. **Rule logic**: Implement in `internal/rules/<source>/`
 3. **CLI wiring**: Update `cmd/tally/cmd/lint.go` if new flags needed
 4. **Integration test**: Add fixture in `internal/integration/testdata/<case>/`
-5. **Documentation**: Update `RULES.md`
+5. **Documentation**: Update `_docs/` (Mintlify docs)
 
 ### Fix Safety Levels
 
@@ -216,5 +216,5 @@ Update after changing config structures in `internal/config/`.
 
 - **AGENTS.md**: Complete repository guidelines (structure, commands, config)
 - **CLAUDE.md**: AI contributor notes (defaults, non-negotiables, preferences)
-- **RULES.md**: Full rules reference
+- **[tally.wharflab.com](https://tally.wharflab.com/)**: Full documentation and rules reference
 - **design-docs/**: Architecture decision records and design discussions

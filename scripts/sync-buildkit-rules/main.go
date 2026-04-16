@@ -21,22 +21,14 @@ import (
 	"github.com/wharflab/tally/internal/rules"
 	_ "github.com/wharflab/tally/internal/rules/all"
 	bkregistry "github.com/wharflab/tally/internal/rules/buildkit"
-	buildkitfixes "github.com/wharflab/tally/internal/rules/buildkit/fixes"
 	"github.com/wharflab/tally/internal/syntax"
 )
 
 const (
 	readmePath = "README.md"
-	rulesPath  = "RULES.md"
 
 	readmeBeginMarker = "<!-- BEGIN RULES_TABLE -->"
 	readmeEndMarker   = "<!-- END RULES_TABLE -->"
-
-	rulesSummaryBeginMarker = "<!-- BEGIN RULES_SUMMARY -->"
-	rulesSummaryEndMarker   = "<!-- END RULES_SUMMARY -->"
-
-	buildkitBeginMarker = "<!-- BEGIN BUILDKIT_RULES -->"
-	buildkitEndMarker   = "<!-- END BUILDKIT_RULES -->"
 )
 
 type buildkitRuleDef struct {
@@ -64,7 +56,7 @@ func main() {
 	if err != nil {
 		fatalf("%v", err)
 	}
-	if !targets.readme && !targets.summary && !targets.buildkit {
+	if !targets.readme {
 		fmt.Fprintln(os.Stderr, "Nothing to do: use --update/--check or their per-file variants")
 		os.Exit(2)
 	}
@@ -82,26 +74,20 @@ const (
 )
 
 type targets struct {
-	mode     runMode
-	readme   bool
-	summary  bool
-	buildkit bool
+	mode   runMode
+	readme bool
 }
 
 func parseTargets() (targets, error) {
-	update := flag.Bool("update", false, "Update RULES.md and README.md in place")
+	update := flag.Bool("update", false, "Update README.md in place")
 	updateReadme := flag.Bool("update-readme", false, "Update README.md in place")
-	updateSummary := flag.Bool("update-summary", false, "Update RULES.md summary table in place")
-	updateBuildkt := flag.Bool("update-buildkit", false, "Update BuildKit section in RULES.md in place")
 
-	check := flag.Bool("check", false, "Verify README.md / RULES.md are up to date (no changes)")
+	check := flag.Bool("check", false, "Verify README.md is up to date (no changes)")
 	checkReadme := flag.Bool("check-readme", false, "Verify README.md is up to date (no changes)")
-	checkSummary := flag.Bool("check-summary", false, "Verify RULES.md summary table is up to date (no changes)")
-	checkBuildkt := flag.Bool("check-buildkit", false, "Verify BuildKit section in RULES.md is up to date (no changes)")
 	flag.Parse()
 
-	checkRequested := *check || *checkReadme || *checkSummary || *checkBuildkt
-	updateRequested := *update || *updateReadme || *updateSummary || *updateBuildkt
+	checkRequested := *check || *checkReadme
+	updateRequested := *update || *updateReadme
 	if checkRequested && updateRequested {
 		return targets{}, errors.New("cannot combine --update* and --check* flags")
 	}
@@ -113,15 +99,11 @@ func parseTargets() (targets, error) {
 
 	if *update || *check {
 		*updateReadme = true
-		*updateSummary = true
-		*updateBuildkt = true
 	}
 
 	return targets{
-		mode:     mode,
-		readme:   *updateReadme || *checkReadme,
-		summary:  *updateSummary || *checkSummary,
-		buildkit: *updateBuildkt || *checkBuildkt,
+		mode:   mode,
+		readme: *updateReadme || *checkReadme,
 	}, nil
 }
 
@@ -145,18 +127,12 @@ func run(targets targets) error {
 	}
 
 	implBuildkitRules := implementedBuildkitRules()
-	implBuildkitMeta := implementedBuildkitRuleMetadata()
-	fixable := makeStringSet(buildkitfixes.FixableRuleNames())
 
-	implementedRows, capturedRows, unsupportedRows := classifyBuildkitRules(defs, implBuildkitRules, usages, parserWarningURLs)
+	implementedRows, capturedRows, _ := classifyBuildkitRules(defs, implBuildkitRules, usages, parserWarningURLs)
 
-	hadolintSupported, hadolintImplemented, hadolintCovered, err := hadolintCounts("internal/rules/hadolint-status.json")
+	hadolintSupported, _, _, err := hadolintCounts("internal/rules/hadolint-status.json")
 	if err != nil {
 		return fmt.Errorf("failed to read Hadolint status file: %w", err)
-	}
-	hadolintTotal, err := hadolintTotalCount("internal/rules/hadolint-rules.json")
-	if err != nil {
-		return fmt.Errorf("failed to read Hadolint rules file: %w", err)
 	}
 
 	tallyCount := countRegisteredPrefix(rules.TallyRulePrefix) + len(syntax.RuleCodes())
@@ -179,53 +155,6 @@ func run(targets targets) error {
 			readmeEndMarker,
 			readmeBlock,
 			"go run ./scripts/sync-buildkit-rules --update-readme",
-		); err != nil {
-			return err
-		}
-	}
-
-	if targets.summary {
-		summaryBlock := renderRulesSummaryTable(
-			tallyCount,
-			len(implementedRows),
-			len(capturedRows),
-			buildkitTotal,
-			hadolintImplemented,
-			hadolintCovered,
-			hadolintTotal,
-		)
-		if err := applyOrCheck(
-			targets.mode,
-			rulesPath,
-			rulesSummaryBeginMarker,
-			rulesSummaryEndMarker,
-			summaryBlock,
-			"go run ./scripts/sync-buildkit-rules --update-summary",
-		); err != nil {
-			return err
-		}
-	}
-
-	if targets.buildkit {
-		buildkitBlock := renderRulesBuildkitSection(buildkitSectionData{
-			supported:       buildkitSupported,
-			total:           buildkitTotal,
-			captured:        len(capturedRows),
-			implemented:     len(implementedRows),
-			unsupported:     len(unsupportedRows),
-			implementedDefs: implementedRows,
-			capturedDefs:    capturedRows,
-			unsupportedDefs: unsupportedRows,
-			implementedMeta: implBuildkitMeta,
-			fixable:         fixable,
-		})
-		if err := applyOrCheck(
-			targets.mode,
-			rulesPath,
-			buildkitBeginMarker,
-			buildkitEndMarker,
-			buildkitBlock,
-			"go run ./scripts/sync-buildkit-rules --update-buildkit",
 		); err != nil {
 			return err
 		}
@@ -564,18 +493,6 @@ func implementedBuildkitRules() map[string]bool {
 	return impl
 }
 
-func implementedBuildkitRuleMetadata() map[string]rules.RuleMetadata {
-	meta := make(map[string]rules.RuleMetadata)
-	for _, r := range rules.All() {
-		if !strings.HasPrefix(r.Metadata().Code, rules.BuildKitRulePrefix) {
-			continue
-		}
-		name := strings.TrimPrefix(r.Metadata().Code, rules.BuildKitRulePrefix)
-		meta[name] = r.Metadata()
-	}
-	return meta
-}
-
 func countRegisteredPrefix(prefix string) int {
 	n := 0
 	for _, r := range rules.All() {
@@ -609,18 +526,6 @@ func hadolintCounts(path string) (int, int, int, error) {
 	return supported, implemented, covered, nil
 }
 
-func hadolintTotalCount(path string) (int, error) {
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return 0, err
-	}
-	var arr []any
-	if err := json.Unmarshal(b, &arr); err != nil {
-		return 0, err
-	}
-	return len(arr), nil
-}
-
 func renderReadmeRulesTable(buildkitSupported, buildkitTotal, tallyCount, hadolintSupported int) string {
 	var b strings.Builder
 	b.WriteString("| Source | Rules | Description |\n")
@@ -639,218 +544,6 @@ func renderReadmeRulesTable(buildkitSupported, buildkitTotal, tallyCount, hadoli
 	b.WriteString("Hadolint-compatible Dockerfile rules (expanding) |\n")
 
 	return b.String()
-}
-
-func renderRulesSummaryTable(
-	tallyCount int,
-	buildkitImplemented int,
-	buildkitCaptured int,
-	buildkitTotal int,
-	hadolintImplemented int,
-	hadolintCovered int,
-	hadolintTotal int,
-) string {
-	return fmt.Sprintf(
-		""+
-			"| Namespace | Implemented | Covered by BuildKit | Total |\n"+
-			"|-----------|-------------|---------------------|-------|\n"+
-			"| tally | %d | - | %d |\n"+
-			"| buildkit | %d + %d captured | - | %d |\n"+
-			"| hadolint | %d | %d | %d |\n",
-		tallyCount,
-		tallyCount,
-		buildkitImplemented,
-		buildkitCaptured,
-		buildkitTotal,
-		hadolintImplemented,
-		hadolintCovered,
-		hadolintTotal,
-	)
-}
-
-// buildkitSectionData bundles inputs for renderRulesBuildkitSection.
-type buildkitSectionData struct {
-	supported, total, captured, implemented, unsupported int
-	implementedDefs, capturedDefs, unsupportedDefs       []buildkitRuleDef
-	implementedMeta                                      map[string]rules.RuleMetadata
-	fixable                                              map[string]bool
-}
-
-func renderRulesBuildkitSection(d buildkitSectionData) string {
-	var b strings.Builder
-
-	b.WriteString("<!-- Auto-generated by scripts/sync-buildkit-rules -->\n\n")
-	fmt.Fprintf(&b, "tally supports **%d/%d** BuildKit checks:\n\n", d.supported, d.total)
-	fmt.Fprintf(&b, "- **%d** captured during parsing\n", d.captured)
-	fmt.Fprintf(&b, "- **%d** reimplemented by tally (BuildKit normally runs these during LLB conversion)\n", d.implemented)
-	if d.unsupported > 0 {
-		fmt.Fprintf(&b, "- **%d** not currently supported (LLB conversion only)\n", d.unsupported)
-	}
-	fmt.Fprintf(&b, "- **%d** with auto-fixes (🔧)\n\n", countFixable(d.implementedDefs, d.capturedDefs, d.fixable))
-
-	b.WriteString("### Implemented by tally\n\n")
-	b.WriteString("These BuildKit checks run during LLB conversion in Docker/BuildKit. ")
-	b.WriteString("tally reimplements them so they work as a pure static linter.\n\n")
-	b.WriteString(renderImplementedBuildkitTable(d.implementedDefs, d.implementedMeta, d.fixable))
-	b.WriteString("\n\n")
-
-	b.WriteString("### Captured from BuildKit linter\n\n")
-	b.WriteString("These checks are emitted by BuildKit during Dockerfile parsing and are captured directly by tally.\n\n")
-	b.WriteString(renderCapturedBuildkitTable(d.capturedDefs, d.fixable))
-	b.WriteString("\n\n")
-
-	if len(d.unsupportedDefs) > 0 {
-		b.WriteString("### Not currently supported\n\n")
-		b.WriteString("These BuildKit checks only run during LLB conversion (a full build). tally does not run that conversion.\n\n")
-		b.WriteString(renderUnsupportedTable(d.unsupportedDefs))
-		b.WriteString("\n\n")
-	}
-
-	b.WriteString("See [Docker Build Checks](https://docs.docker.com/reference/build-checks/) for detailed documentation.\n")
-	return b.String()
-}
-
-func countFixable(impl, captured []buildkitRuleDef, fixable map[string]bool) int {
-	n := 0
-	for _, d := range impl {
-		if fixable[d.Name] {
-			n++
-		}
-	}
-	for _, d := range captured {
-		if fixable[d.Name] {
-			n++
-		}
-	}
-	return n
-}
-
-func renderImplementedBuildkitTable(defs []buildkitRuleDef, meta map[string]rules.RuleMetadata, fixable map[string]bool) string {
-	if len(defs) == 0 {
-		return "_None._"
-	}
-
-	var b strings.Builder
-
-	b.WriteString("| Rule | Description | Severity | Category | Default |\n")
-	b.WriteString("|------|-------------|----------|----------|---------|\n")
-	for _, d := range defs {
-		m := meta[d.Name]
-		sev := m.DefaultSeverity.String()
-		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n",
-			buildkitRuleLinkWithFix(d, fixable[d.Name]),
-			escapePipes(d.Description),
-			titleCase(sev),
-			titleCategory(m.Category),
-			buildkitDefaultLabel(d, sev),
-		)
-	}
-	return strings.TrimRight(b.String(), "\n")
-}
-
-func renderCapturedBuildkitTable(defs []buildkitRuleDef, fixable map[string]bool) string {
-	if len(defs) == 0 {
-		return "_None._"
-	}
-
-	var b strings.Builder
-	b.WriteString("| Rule | Description | Severity | Default | Status |\n")
-	b.WriteString("|------|-------------|----------|---------|--------|\n")
-	for _, d := range defs {
-		status := "✅"
-		if fixable[d.Name] {
-			status = "✅🔧"
-		}
-		fmt.Fprintf(&b, "| %s | %s | %s | %s | %s |\n",
-			buildkitRuleLinkWithFix(d, fixable[d.Name]),
-			escapePipes(d.Description),
-			"Warning",
-			buildkitDefaultLabel(d, "warning"),
-			status,
-		)
-	}
-	return strings.TrimRight(b.String(), "\n")
-}
-
-func renderUnsupportedTable(defs []buildkitRuleDef) string {
-	var b strings.Builder
-	b.WriteString("| Rule | Description | Notes |\n")
-	b.WriteString("|------|-------------|-------|\n")
-	for _, d := range defs {
-		fmt.Fprintf(&b, "| %s | %s | %s |\n",
-			buildkitRuleLinkWithFix(d, false),
-			escapePipes(d.Description),
-			"Requires LLB conversion (full build)",
-		)
-	}
-	return strings.TrimRight(b.String(), "\n")
-}
-
-func buildkitRuleLink(d buildkitRuleDef) string {
-	if href := buildkitDocsURL(d.URL); href != "" {
-		return fmt.Sprintf("[`buildkit/%s`](%s)", d.Name, href)
-	}
-	return fmt.Sprintf("`buildkit/%s`", d.Name)
-}
-
-func buildkitRuleLinkWithFix(d buildkitRuleDef, fixable bool) string {
-	link := buildkitRuleLink(d)
-	if fixable {
-		return link + " 🔧"
-	}
-	return link
-}
-
-func buildkitDocsURL(buildkitURL string) string {
-	const prefix = "https://docs.docker.com/go/dockerfile/rule/"
-	if !strings.HasPrefix(buildkitURL, prefix) {
-		return ""
-	}
-	slug := strings.TrimPrefix(buildkitURL, prefix)
-	slug = strings.TrimSuffix(slug, "/")
-	if slug == "" {
-		return ""
-	}
-	return "https://docs.docker.com/reference/build-checks/" + slug + "/"
-}
-
-func buildkitDefaultLabel(d buildkitRuleDef, severity string) string {
-	if d.Experimental {
-		return "Off (experimental)"
-	}
-	if severity == "off" {
-		return "Off"
-	}
-	return "Enabled"
-}
-
-func titleCase(s string) string {
-	if s == "" {
-		return ""
-	}
-	parts := strings.FieldsFunc(s, func(r rune) bool { return r == '-' || r == '_' || r == ' ' })
-	for i, p := range parts {
-		if p == "" {
-			continue
-		}
-		parts[i] = strings.ToUpper(p[:1]) + p[1:]
-	}
-	return strings.Join(parts, " ")
-}
-
-func titleCategory(cat string) string {
-	switch cat {
-	case "best-practice":
-		return "Best Practice"
-	case "best-practices":
-		return "Best Practice"
-	default:
-		return titleCase(cat)
-	}
-}
-
-func escapePipes(s string) string {
-	return strings.ReplaceAll(s, "|", "\\|")
 }
 
 type markerBounds struct {
@@ -927,12 +620,4 @@ func checkBetweenMarkers(path, beginMarker, endMarker, newContent string) error 
 		return errors.New("generated content differs")
 	}
 	return nil
-}
-
-func makeStringSet(items []string) map[string]bool {
-	set := make(map[string]bool, len(items))
-	for _, it := range items {
-		set[it] = true
-	}
-	return set
 }

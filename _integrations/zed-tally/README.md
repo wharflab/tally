@@ -90,5 +90,5 @@ To test the extension locally:
 ## Links
 
 - [Tally documentation](https://github.com/wharflab/tally)
-- [Rule reference](https://github.com/wharflab/tally/blob/main/RULES.md)
+- [Rule reference](https://tally.wharflab.com/rules/overview)
 - [Zed extension docs](https://zed.dev/docs/extensions)
