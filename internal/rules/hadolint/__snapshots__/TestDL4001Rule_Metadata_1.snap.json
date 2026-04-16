@@ -3,7 +3,7 @@
  "Code": "hadolint/DL4001",
  "DefaultSeverity": "warning",
  "Description": "Either use wget or curl but not both to reduce image size",
- "DocURL": "https://wharflab.github.io/tally/rules/hadolint/DL4001/",
+ "DocURL": "https://tally.wharflab.com/rules/hadolint/DL4001/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "Either wget or curl but not both"

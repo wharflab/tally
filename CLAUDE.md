@@ -49,7 +49,6 @@ and a WASM-compiled shellcheck (`internal/shellcheck/`).
 
 ## Docs & Schema
 
-- If you add/change rules or defaults, update `RULES.md`.
 - If you add/change rule documentation, update `_docs/` (Mintlify docs).
   - Each rule has its own `.mdx` page under `_docs/rules/<namespace>/<rule-name>.mdx`.
   - Run `cd _docs && npx mint validate` to check Mintlify docs build.

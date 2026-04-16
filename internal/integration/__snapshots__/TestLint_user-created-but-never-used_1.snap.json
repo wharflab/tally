@@ -4,7 +4,7 @@
       "file": "testdata/user-created-but-never-used/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/user-created-but-never-used/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/user-created-but-never-used/",
           "location": {
             "end": {
               "column": 0,

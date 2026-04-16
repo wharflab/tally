@@ -161,7 +161,7 @@ const BuildKitRulePrefix = "buildkit/"
 const TallyRulePrefix = "tally/"
 
 // docURLBase is the base URL for tally rule documentation on GitHub Pages.
-const docURLBase = "https://wharflab.github.io/tally/rules/"
+const docURLBase = "https://tally.wharflab.com/rules/"
 
 // TallyDocURL returns the documentation URL for a tally rule code.
 // The ruleCode should include the "tally/" prefix (e.g. "tally/max-lines").

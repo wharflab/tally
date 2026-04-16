@@ -57,7 +57,7 @@ class GenerateWingetManifestsTest < Minitest::Test
       locale_manifest_data["ReleaseNotesUrl"],
     )
     assert_equal(
-      [{"DocumentLabel" => "Docs", "DocumentUrl" => "https://wharflab.github.io/tally/"}],
+      [{"DocumentLabel" => "Docs", "DocumentUrl" => "https://tally.wharflab.com/"}],
       locale_manifest_data["Documentations"],
     )
 

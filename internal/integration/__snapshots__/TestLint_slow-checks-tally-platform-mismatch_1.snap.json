@@ -4,7 +4,7 @@
       "file": "testdata/slow-checks-tally-platform-mismatch/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/platform-mismatch/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/platform-mismatch/",
           "location": {
             "end": {
               "column": 0,

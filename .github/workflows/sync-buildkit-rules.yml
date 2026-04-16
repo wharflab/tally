@@ -22,11 +22,11 @@ jobs:
           go-version-file: go.mod
       - name: Install rumdl
         run: pip install rumdl
-      - name: Update README.md and RULES.md
+      - name: Update README.md
         id: update
         run: |
           go run ./scripts/sync-buildkit-rules --update
-          rumdl check --fix --config .rumdl.toml --output-format concise RULES.md README.md
+          rumdl check --fix --config .rumdl.toml --output-format concise README.md
           # Check if there are changes
           if git diff --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"

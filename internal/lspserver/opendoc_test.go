@@ -19,7 +19,7 @@ func TestShowDocActions_WithDocURL(t *testing.T) {
 		"file too long",
 		rules.SeverityWarning,
 	)
-	v.DocURL = "https://wharflab.github.io/tally/rules/tally/max-lines/"
+	v.DocURL = "https://tally.wharflab.com/rules/tally/max-lines/"
 
 	params := makeCodeActionParams("file:///test/Dockerfile", fullRange(), &protocol.CodeActionContext{})
 	actions := showDocActions([]rules.Violation{v}, params)
@@ -32,7 +32,7 @@ func TestShowDocActions_WithDocURL(t *testing.T) {
 	require.NotNil(t, actions[0].Command.Arguments)
 	args, ok := (*actions[0].Command.Arguments)[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "https://wharflab.github.io/tally/rules/tally/max-lines/", args["url"])
+	assert.Equal(t, "https://tally.wharflab.com/rules/tally/max-lines/", args["url"])
 }
 
 func TestShowDocActions_NoDocURL(t *testing.T) {

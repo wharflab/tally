@@ -416,12 +416,7 @@ Update all of:
 
 1. `_docs/rules/tally/<rule_slug>.mdx` (new rule page)
 2. `_docs/rules/tally/` (tally rules directory)
-3. `RULES.md`
-   - tally summary table row
-   - dedicated section for `tally/<rule_slug>`
-   - namespace counts if changed
-4. `README.md` supported rules count/table when totals change
-5. `_docs/index.mdx` tally rule count if shown
+3. `_docs/index.mdx` tally rule count if shown
 
 ## Step 8: Validate End-to-End
 
@@ -478,5 +473,5 @@ Confirm:
 - [ ] Fixtures/docs examples are based on realistic Dockerfile patterns
 - [ ] Snapshots updated
 - [ ] Docs page + docs indexes updated
-- [ ] `RULES.md` and `README.md` counts/details updated
+- [ ] Docs page + `_docs/` indexes updated
 - [ ] `go test ./...`, `make lint`, and `make cpd` pass

@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "scratch images contain no shell. Use exec-form (RUN [\"/binary\", \"arg\"]), change the base image, or add a SHELL instruction if you've bootstrapped a shell",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/shell-run-in-scratch/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/shell-run-in-scratch/",
           "location": {
             "end": {
               "column": 0,

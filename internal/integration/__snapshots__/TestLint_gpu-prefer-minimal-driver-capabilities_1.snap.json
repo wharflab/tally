@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "The 'all' capability set mounts every NVIDIA driver library and binary. Most ML and CUDA workloads only need 'compute,utility'. A smaller set follows the principle of least privilege and avoids potential compatibility issues. Set NVIDIA_DRIVER_CAPABILITIES=compute,utility unless your workload needs graphics, video, or display capabilities.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/prefer-minimal-driver-capabilities/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/prefer-minimal-driver-capabilities/",
           "location": {
             "end": {
               "column": 0,
@@ -46,7 +46,7 @@
         },
         {
           "detail": "The 'all' capability set mounts every NVIDIA driver library and binary. Most ML and CUDA workloads only need 'compute,utility'. A smaller set follows the principle of least privilege and avoids potential compatibility issues. Set NVIDIA_DRIVER_CAPABILITIES=compute,utility unless your workload needs graphics, video, or display capabilities.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/prefer-minimal-driver-capabilities/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/prefer-minimal-driver-capabilities/",
           "location": {
             "end": {
               "column": 0,
@@ -87,7 +87,7 @@
         },
         {
           "detail": "The 'all' capability set mounts every NVIDIA driver library and binary. Most ML and CUDA workloads only need 'compute,utility'. A smaller set follows the principle of least privilege and avoids potential compatibility issues. Set NVIDIA_DRIVER_CAPABILITIES=compute,utility unless your workload needs graphics, video, or display capabilities.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/prefer-minimal-driver-capabilities/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/prefer-minimal-driver-capabilities/",
           "location": {
             "end": {
               "column": 0,

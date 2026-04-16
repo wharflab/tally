@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "nvidia-container-toolkit, nvidia-docker2, and libnvidia-container* are host-side NVIDIA Container Toolkit packages. They do not make the image GPU-enabled; configure the host or cluster runtime instead.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-container-runtime-in-image/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/no-container-runtime-in-image/",
           "location": {
             "end": {
               "column": 0,
@@ -24,7 +24,7 @@
         },
         {
           "detail": "nvidia-container-toolkit, nvidia-docker2, and libnvidia-container* are host-side NVIDIA Container Toolkit packages. They do not make the image GPU-enabled; configure the host or cluster runtime instead.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-container-runtime-in-image/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/no-container-runtime-in-image/",
           "location": {
             "end": {
               "column": 0,

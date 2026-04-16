@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Merge COPY and RUN chmod into a single COPY --chmod=+x instruction for fewer layers",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-copy-chmod/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-copy-chmod/",
           "location": {
             "end": {
               "column": 0,
@@ -58,7 +58,7 @@
         },
         {
           "detail": "Merge COPY and RUN chmod into a single COPY --chmod=755 instruction for fewer layers",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-copy-chmod/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-copy-chmod/",
           "location": {
             "end": {
               "column": 0,

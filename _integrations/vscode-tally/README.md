@@ -73,6 +73,6 @@ hardcoded `.venv/` and `venv/` directories in each workspace folder.
 
 ## Learn more
 
-- Rules reference: <https://github.com/wharflab/tally/blob/main/RULES.md>
+- Rules reference: <https://tally.wharflab.com/rules/overview>
 - Configuration guide: <https://github.com/wharflab/tally/blob/main/docs/guide/configuration.md>
 - AI AutoFix (ACP): <https://github.com/wharflab/tally/blob/main/docs/guide/ai-autofix-acp.md>

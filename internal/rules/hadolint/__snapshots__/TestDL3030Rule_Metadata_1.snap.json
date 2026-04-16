@@ -3,7 +3,7 @@
  "Code": "hadolint/DL3030",
  "DefaultSeverity": "warning",
  "Description": "Use the -y switch to avoid manual input `yum install -y \u003cpackage\u003e`",
- "DocURL": "https://wharflab.github.io/tally/rules/hadolint/DL3030/",
+ "DocURL": "https://tally.wharflab.com/rules/hadolint/DL3030/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "Use -y with yum install"

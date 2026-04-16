@@ -3,7 +3,7 @@
  "Code": "tally/copy-after-user-without-chown",
  "DefaultSeverity": "warning",
  "Description": "COPY/ADD without --chown after USER creates root-owned files",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/copy-after-user-without-chown/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/copy-after-user-without-chown/",
  "FixPriority": 99,
  "IsExperimental": false,
  "Name": "COPY/ADD after non-root USER without --chown"

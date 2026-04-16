@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Windows containers do not use POSIX file ownership (uid:gid). The --chown flag on COPY has no effect and can be safely removed.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/windows/no-chown-flag/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/windows/no-chown-flag/",
           "location": {
             "end": {
               "column": 0,
@@ -44,7 +44,7 @@
         },
         {
           "detail": "Windows containers do not use POSIX file ownership (uid:gid). The --chown flag on ADD has no effect and can be safely removed.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/windows/no-chown-flag/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/windows/no-chown-flag/",
           "location": {
             "end": {
               "column": 0,

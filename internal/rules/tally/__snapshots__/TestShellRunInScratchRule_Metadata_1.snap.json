@@ -3,7 +3,7 @@
  "Code": "tally/shell-run-in-scratch",
  "DefaultSeverity": "warning",
  "Description": "Detects shell-form RUN instructions in scratch stages where no shell exists",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/shell-run-in-scratch/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/shell-run-in-scratch/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "Shell-form RUN in Scratch Stage"

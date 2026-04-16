@@ -3,7 +3,7 @@
  "Code": "buildkit/FromPlatformFlagConstDisallowed",
  "DefaultSeverity": "off",
  "Description": "FROM --platform flag should not use a constant value",
- "DocURL": "https://wharflab.github.io/tally/rules/buildkit/FromPlatformFlagConstDisallowed/",
+ "DocURL": "https://tally.wharflab.com/rules/buildkit/FromPlatformFlagConstDisallowed/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "FromPlatformFlagConstDisallowed"

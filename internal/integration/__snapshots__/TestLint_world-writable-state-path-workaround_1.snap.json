@@ -4,7 +4,7 @@
       "file": "testdata/world-writable-state-path-workaround/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/world-writable-state-path-workaround/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/world-writable-state-path-workaround/",
           "location": {
             "end": {
               "column": 0,
@@ -43,7 +43,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/world-writable-state-path-workaround/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/world-writable-state-path-workaround/",
           "location": {
             "end": {
               "column": 0,
@@ -82,7 +82,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/world-writable-state-path-workaround/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/world-writable-state-path-workaround/",
           "location": {
             "end": {
               "column": 0,
@@ -100,7 +100,7 @@
           "sourceCode": "RUN chmod a+rwx /app"
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/world-writable-state-path-workaround/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/world-writable-state-path-workaround/",
           "location": {
             "end": {
               "column": 0,
@@ -118,7 +118,7 @@
           "sourceCode": "RUN mkdir -pm 777 /srv/logs"
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/world-writable-state-path-workaround/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/world-writable-state-path-workaround/",
           "location": {
             "end": {
               "column": 0,

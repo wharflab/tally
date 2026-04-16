@@ -4,7 +4,7 @@
       "file": "testdata/invalid-default-arg-in-from/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/InvalidDefaultArgInFrom/",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/InvalidDefaultArgInFrom/",
           "location": {
             "end": {
               "column": 0,

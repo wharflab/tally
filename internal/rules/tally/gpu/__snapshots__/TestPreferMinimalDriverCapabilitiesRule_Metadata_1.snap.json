@@ -3,7 +3,7 @@
  "Code": "tally/gpu/prefer-minimal-driver-capabilities",
  "DefaultSeverity": "info",
  "Description": "NVIDIA_DRIVER_CAPABILITIES=all exposes more driver surface than most workloads need; prefer a minimal capability set",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/gpu/prefer-minimal-driver-capabilities/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/gpu/prefer-minimal-driver-capabilities/",
  "FixPriority": 8,
  "IsExperimental": false,
  "Name": "Prefer minimal NVIDIA driver capabilities"

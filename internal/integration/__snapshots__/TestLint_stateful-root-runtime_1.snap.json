@@ -4,7 +4,7 @@
       "file": "testdata/stateful-root-runtime/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/stateful-root-runtime/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/stateful-root-runtime/",
           "location": {
             "end": {
               "column": 0,

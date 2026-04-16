@@ -4,7 +4,7 @@
       "file": "testdata/invalid-onbuild-trigger-combined/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3043/",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3043/",
           "location": {
             "end": {
               "column": 0,
@@ -22,7 +22,7 @@
           "sourceCode": "ONBUILD FROM debian:bookworm"
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/invalid-onbuild-trigger/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/invalid-onbuild-trigger/",
           "location": {
             "end": {
               "column": -1,

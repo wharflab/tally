@@ -212,7 +212,7 @@
           "notifications": [],
           "rules": [
             {
-              "helpUri": "https://wharflab.github.io/tally/rules/buildkit/InvalidDefinitionDescription/",
+              "helpUri": "https://tally.wharflab.com/rules/buildkit/InvalidDefinitionDescription/",
               "id": "buildkit/InvalidDefinitionDescription",
               "relationships": [],
               "shortDescription": {
@@ -220,12 +220,12 @@
               }
             },
             {
-              "helpUri": "https://wharflab.github.io/tally/rules/buildkit/JSONArgsRecommended/",
+              "helpUri": "https://tally.wharflab.com/rules/buildkit/JSONArgsRecommended/",
               "id": "buildkit/JSONArgsRecommended",
               "relationships": []
             },
             {
-              "helpUri": "https://wharflab.github.io/tally/rules/buildkit/MaintainerDeprecated/",
+              "helpUri": "https://tally.wharflab.com/rules/buildkit/MaintainerDeprecated/",
               "id": "buildkit/MaintainerDeprecated",
               "relationships": [],
               "shortDescription": {
@@ -233,7 +233,7 @@
               }
             },
             {
-              "helpUri": "https://wharflab.github.io/tally/rules/buildkit/StageNameCasing/",
+              "helpUri": "https://tally.wharflab.com/rules/buildkit/StageNameCasing/",
               "id": "buildkit/StageNameCasing",
               "relationships": [],
               "shortDescription": {

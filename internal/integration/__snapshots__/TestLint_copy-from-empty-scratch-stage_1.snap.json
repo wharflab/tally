@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "The scratch stage has no file-producing instructions, so COPY --from will always fail. Add content to the source stage or change the --from reference",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/copy-from-empty-scratch-stage/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/copy-from-empty-scratch-stage/",
           "location": {
             "end": {
               "column": 0,

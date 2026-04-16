@@ -3,7 +3,7 @@
  "Code": "tally/prefer-copy-chmod",
  "DefaultSeverity": "info",
  "Description": "Use COPY --chmod instead of a separate COPY followed by RUN chmod",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/prefer-copy-chmod/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/prefer-copy-chmod/",
  "FixPriority": 99,
  "IsExperimental": false,
  "Name": "Prefer COPY --chmod over separate RUN chmod"

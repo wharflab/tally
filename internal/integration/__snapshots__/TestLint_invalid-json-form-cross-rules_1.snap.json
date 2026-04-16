@@ -4,7 +4,7 @@
       "file": "testdata/invalid-json-form-cross-rules/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/JSONArgsRecommended/",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/JSONArgsRecommended/",
           "location": {
             "end": {
               "column": 0,
@@ -22,7 +22,7 @@
           "sourceCode": "CMD [bash, -lc, \"echo hello\"]"
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/invalid-json-form/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/invalid-json-form/",
           "location": {
             "end": {
               "column": 0,

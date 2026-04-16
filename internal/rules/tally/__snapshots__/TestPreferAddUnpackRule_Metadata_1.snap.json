@@ -3,7 +3,7 @@
  "Code": "tally/prefer-add-unpack",
  "DefaultSeverity": "info",
  "Description": "Use `ADD --unpack` instead of downloading and extracting remote archives in `RUN`",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/prefer-add-unpack/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/prefer-add-unpack/",
  "FixPriority": 95,
  "IsExperimental": false,
  "Name": "Prefer ADD --unpack for remote archives"

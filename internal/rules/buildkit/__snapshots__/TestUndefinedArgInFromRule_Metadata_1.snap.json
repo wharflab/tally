@@ -3,7 +3,7 @@
  "Code": "buildkit/UndefinedArgInFrom",
  "DefaultSeverity": "warning",
  "Description": "FROM command must use declared ARGs",
- "DocURL": "https://wharflab.github.io/tally/rules/buildkit/UndefinedArgInFrom/",
+ "DocURL": "https://tally.wharflab.com/rules/buildkit/UndefinedArgInFrom/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "UndefinedArgInFrom"

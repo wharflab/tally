@@ -3,7 +3,7 @@
  "Code": "tally/gpu/cuda-version-mismatch",
  "DefaultSeverity": "warning",
  "Description": "CUDA-specific pip/conda wheel version does not match the base image's CUDA toolkit",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/gpu/cuda-version-mismatch/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/gpu/cuda-version-mismatch/",
  "FixPriority": 8,
  "IsExperimental": false,
  "Name": "CUDA version mismatch"

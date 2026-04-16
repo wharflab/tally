@@ -3,7 +3,7 @@
  "Code": "tally/world-writable-state-path-workaround",
  "DefaultSeverity": "warning",
  "Description": "chmod 777/a+rwx sets world-writable permissions, a common ownership confusion workaround",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/world-writable-state-path-workaround/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/world-writable-state-path-workaround/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "World-Writable State Path Workaround"

@@ -3,7 +3,7 @@
  "Code": "buildkit/ExposeProtoCasing",
  "DefaultSeverity": "warning",
  "Description": "Protocol in EXPOSE instruction should be lowercase",
- "DocURL": "https://wharflab.github.io/tally/rules/buildkit/ExposeProtoCasing/",
+ "DocURL": "https://tally.wharflab.com/rules/buildkit/ExposeProtoCasing/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "Expose Proto Casing"

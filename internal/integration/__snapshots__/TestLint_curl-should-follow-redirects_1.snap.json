@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-should-follow-redirects/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/curl-should-follow-redirects/",
           "location": {
             "end": {
               "column": 8,
@@ -44,7 +44,7 @@
         },
         {
           "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-should-follow-redirects/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/curl-should-follow-redirects/",
           "location": {
             "end": {
               "column": 8,
@@ -83,7 +83,7 @@
         },
         {
           "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-should-follow-redirects/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/curl-should-follow-redirects/",
           "location": {
             "end": {
               "column": 8,
@@ -122,7 +122,7 @@
         },
         {
           "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-should-follow-redirects/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/curl-should-follow-redirects/",
           "location": {
             "end": {
               "column": 8,
@@ -161,7 +161,7 @@
         },
         {
           "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-should-follow-redirects/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/curl-should-follow-redirects/",
           "location": {
             "end": {
               "column": 21,
@@ -200,7 +200,7 @@
         },
         {
           "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-should-follow-redirects/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/curl-should-follow-redirects/",
           "location": {
             "end": {
               "column": 8,
@@ -239,7 +239,7 @@
         },
         {
           "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-should-follow-redirects/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/curl-should-follow-redirects/",
           "location": {
             "end": {
               "column": 51,
@@ -278,7 +278,7 @@
         },
         {
           "detail": "Without -L/--location, curl will not follow HTTP redirects (301, 302, 307, 308). This can cause downloads to silently fail when URLs are relocated. Other Dockerfile download mechanisms (ADD, wget) follow redirects by default.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-should-follow-redirects/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/curl-should-follow-redirects/",
           "location": {
             "end": {
               "column": 49,
@@ -317,7 +317,7 @@
         },
         {
           "detail": "Without --follow, curl will not follow HTTP redirects. Using --location with -X would change the HTTP method to GET on 301/302 redirects. --follow (curl 8.16.0+) preserves the method across redirects.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-should-follow-redirects/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/curl-should-follow-redirects/",
           "location": {
             "end": {
               "column": 8,
@@ -356,7 +356,7 @@
         },
         {
           "detail": "Without --follow, curl will not follow HTTP redirects. Using --location with -X would change the HTTP method to GET on 301/302 redirects. --follow (curl 8.16.0+) preserves the method across redirects.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/curl-should-follow-redirects/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/curl-should-follow-redirects/",
           "location": {
             "end": {
               "column": 8,

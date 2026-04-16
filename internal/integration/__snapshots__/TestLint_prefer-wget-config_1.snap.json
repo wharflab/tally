@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Transient download failures are common during image builds. A wgetrc file with retry settings makes builds more robust. The fix inserts a comment, ENV WGETRC, and a COPY heredoc with retry defaults.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-wget-config/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-wget-config/",
           "location": {
             "end": {
               "column": 0,
@@ -45,7 +45,7 @@
         },
         {
           "detail": "Transient download failures are common during image builds. A wgetrc file with retry settings makes builds more robust. The fix inserts a comment, ENV WGETRC, and a COPY heredoc with retry defaults.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-wget-config/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-wget-config/",
           "location": {
             "end": {
               "column": 0,
@@ -85,7 +85,7 @@
         },
         {
           "detail": "Transient download failures are common during image builds. A wgetrc file with retry settings makes builds more robust. The fix inserts a comment, ENV WGETRC, and a COPY heredoc with retry defaults.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-wget-config/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-wget-config/",
           "location": {
             "end": {
               "column": 0,

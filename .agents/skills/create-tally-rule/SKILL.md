@@ -416,12 +416,7 @@ Update all of:
 
 1. `_docs/rules/tally/<rule_slug>.mdx` (new Mintlify rule page)
 2. `_docs/docs.json` (add to appropriate navigation group)
-3. `RULES.md`
-   - tally summary table row
-   - dedicated section for `tally/<rule_slug>`
-   - namespace counts if changed
-4. `README.md` supported rules count/table when totals change
-5. `_docs/rules/overview.mdx` tally rule count if changed
+3. `_docs/rules/overview.mdx` tally rule count if changed
 
 ## Step 8: Validate End-to-End
 
@@ -478,5 +473,5 @@ Confirm:
 - [ ] Fixtures/docs examples are based on realistic Dockerfile patterns
 - [ ] Snapshots updated
 - [ ] Docs page + docs indexes updated
-- [ ] `RULES.md` and `README.md` counts/details updated
+- [ ] Docs page + `_docs/` indexes updated
 - [ ] `go test ./...`, `make lint`, and `make cpd` pass

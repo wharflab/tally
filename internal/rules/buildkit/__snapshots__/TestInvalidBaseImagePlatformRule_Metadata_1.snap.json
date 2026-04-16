@@ -3,7 +3,7 @@
  "Code": "buildkit/InvalidBaseImagePlatform",
  "DefaultSeverity": "off",
  "Description": "Base image platform does not match expected target platform",
- "DocURL": "https://wharflab.github.io/tally/rules/buildkit/InvalidBaseImagePlatform/",
+ "DocURL": "https://tally.wharflab.com/rules/buildkit/InvalidBaseImagePlatform/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "InvalidBaseImagePlatform"

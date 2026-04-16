@@ -4,7 +4,7 @@
       "file": "testdata/slow-checks-fail-fast/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/DuplicateStageName/",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/DuplicateStageName/",
           "location": {
             "end": {
               "column": 0,

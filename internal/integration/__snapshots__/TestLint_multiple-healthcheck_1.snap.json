@@ -4,7 +4,7 @@
       "file": "testdata/multiple-healthcheck/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/MultipleInstructionsDisallowed/",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/MultipleInstructionsDisallowed/",
           "location": {
             "end": {
               "column": 0,

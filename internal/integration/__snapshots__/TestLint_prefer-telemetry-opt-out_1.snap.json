@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Add a grouped telemetry opt-out block near the top of the stage with ENV NEXT_TELEMETRY_DISABLED=1 for Next.js.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-telemetry-opt-out/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-telemetry-opt-out/",
           "location": {
             "end": {
               "column": 0,
@@ -45,7 +45,7 @@
         },
         {
           "detail": "Add a grouped telemetry opt-out block near the top of the stage with ENV HF_HUB_DISABLE_TELEMETRY=1 for Hugging Face Python ecosystem.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-telemetry-opt-out/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-telemetry-opt-out/",
           "location": {
             "end": {
               "column": 0,
@@ -85,7 +85,7 @@
         },
         {
           "detail": "Detected PowerShell, vcpkg. The fix inserts a grouped telemetry opt-out block near the top of the stage with ENV POWERSHELL_TELEMETRY_OPTOUT=1, VCPKG_DISABLE_METRICS=1.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-telemetry-opt-out/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-telemetry-opt-out/",
           "location": {
             "end": {
               "column": 0,

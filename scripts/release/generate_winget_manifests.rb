@@ -17,7 +17,7 @@ FILE_EXTENSION_LIST = %w[dockerfile containerfile].freeze
 DOCUMENTATION_LIST = [
   {
     "DocumentLabel" => "Docs",
-    "DocumentUrl" => "https://wharflab.github.io/tally/",
+    "DocumentUrl" => "https://tally.wharflab.com/",
   },
 ].freeze
 WINDOWS_ASSETS = [

@@ -4,7 +4,7 @@
    {
     "code": "buildkit/MaintainerDeprecated",
     "codeDescription": {
-     "href": "https://wharflab.github.io/tally/rules/buildkit/MaintainerDeprecated/"
+     "href": "https://tally.wharflab.com/rules/buildkit/MaintainerDeprecated/"
     },
     "message": "Maintainer instruction is deprecated in favor of using label",
     "range": {

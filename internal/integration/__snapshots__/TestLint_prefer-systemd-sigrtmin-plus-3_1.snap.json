@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "systemd requires SIGRTMIN+3 to trigger a clean manager shutdown, analogous to systemctl halt",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-systemd-sigrtmin-plus-3/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-systemd-sigrtmin-plus-3/",
           "location": {
             "end": {
               "column": 0,
@@ -45,7 +45,7 @@
         },
         {
           "detail": "Without STOPSIGNAL SIGRTMIN+3, the container runtime sends SIGTERM which systemd interprets as an isolate-to-rescue-mode request, not a clean shutdown",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-systemd-sigrtmin-plus-3/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-systemd-sigrtmin-plus-3/",
           "location": {
             "end": {
               "column": 0,

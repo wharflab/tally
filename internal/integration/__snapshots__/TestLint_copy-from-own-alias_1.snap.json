@@ -4,7 +4,7 @@
       "file": "testdata/copy-from-own-alias/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/hadolint/DL3023/",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3023/",
           "location": {
             "end": {
               "column": 0,

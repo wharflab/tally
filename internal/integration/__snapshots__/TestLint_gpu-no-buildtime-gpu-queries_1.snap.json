@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "GPU devices are not available during docker build. Commands like nvidia-smi and runtime framework checks like torch.cuda.is_available() will fail or return misleading results. Move these checks to runtime (CMD, ENTRYPOINT, or an initialization script).",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-buildtime-gpu-queries/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/no-buildtime-gpu-queries/",
           "location": {
             "end": {
               "column": 0,
@@ -24,7 +24,7 @@
         },
         {
           "detail": "GPU devices are not available during docker build. Commands like nvidia-smi and runtime framework checks like torch.cuda.is_available() will fail or return misleading results. Move these checks to runtime (CMD, ENTRYPOINT, or an initialization script).",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-buildtime-gpu-queries/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/no-buildtime-gpu-queries/",
           "location": {
             "end": {
               "column": 0,

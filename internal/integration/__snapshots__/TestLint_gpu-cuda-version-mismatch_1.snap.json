@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "The base image provides CUDA 12.1, but the install references cu118. Wheels built for a mismatched CUDA version may fail at runtime or silently fall back to CPU execution.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/cuda-version-mismatch/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/cuda-version-mismatch/",
           "location": {
             "end": {
               "column": 0,
@@ -43,7 +43,7 @@
         },
         {
           "detail": "The base image provides CUDA 12.4, but the install references cu118. Wheels built for a mismatched CUDA version may fail at runtime or silently fall back to CPU execution.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/cuda-version-mismatch/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/cuda-version-mismatch/",
           "location": {
             "end": {
               "column": 0,
@@ -81,7 +81,7 @@
         },
         {
           "detail": "The base image provides CUDA 12.2, but the install references cu118. Wheels built for a mismatched CUDA version may fail at runtime or silently fall back to CPU execution.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/cuda-version-mismatch/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/cuda-version-mismatch/",
           "location": {
             "end": {
               "column": 0,
@@ -119,7 +119,7 @@
         },
         {
           "detail": "The base image provides CUDA 12.4, but the install references cu118. Wheels built for a mismatched CUDA version may fail at runtime or silently fall back to CPU execution.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/cuda-version-mismatch/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/cuda-version-mismatch/",
           "location": {
             "end": {
               "column": 0,
@@ -157,7 +157,7 @@
         },
         {
           "detail": "The base image provides CUDA 12.2, but the install references pytorch-cuda=11.8. Wheels built for a mismatched CUDA version may fail at runtime or silently fall back to CPU execution.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/cuda-version-mismatch/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/cuda-version-mismatch/",
           "location": {
             "end": {
               "column": 0,

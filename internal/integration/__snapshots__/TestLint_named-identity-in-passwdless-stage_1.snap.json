@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Named identities require /etc/passwd and /etc/group for resolution. In scratch or passwd-less stages, use numeric UIDs/GIDs instead (e.g., USER 65532:65532), or COPY the passwd/group files from a builder stage.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/named-identity-in-passwdless-stage/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/named-identity-in-passwdless-stage/",
           "location": {
             "end": {
               "column": 0,
@@ -44,7 +44,7 @@
         },
         {
           "detail": "Named identities in --chown require /etc/passwd and /etc/group for resolution. In scratch or passwd-less stages, use numeric UIDs/GIDs instead (e.g., --chown=65532:65532), or COPY the passwd/group files from a builder stage.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/named-identity-in-passwdless-stage/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/named-identity-in-passwdless-stage/",
           "location": {
             "end": {
               "column": 0,
@@ -83,7 +83,7 @@
         },
         {
           "detail": "Named identities require /etc/passwd and /etc/group for resolution. In scratch or passwd-less stages, use numeric UIDs/GIDs instead (e.g., USER 65532:65532), or COPY the passwd/group files from a builder stage.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/named-identity-in-passwdless-stage/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/named-identity-in-passwdless-stage/",
           "location": {
             "end": {
               "column": 0,

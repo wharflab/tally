@@ -3,7 +3,7 @@
  "Code": "hadolint/DL3034",
  "DefaultSeverity": "warning",
  "Description": "Non-interactive switch missing from `zypper` command: `zypper install -y`",
- "DocURL": "https://wharflab.github.io/tally/rules/hadolint/DL3034/",
+ "DocURL": "https://tally.wharflab.com/rules/hadolint/DL3034/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "Use non-interactive with zypper"

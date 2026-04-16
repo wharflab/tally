@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Found 2 run commands invoking pwsh explicitly before any PowerShell SHELL instruction.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/powershell/prefer-shell-instruction/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/powershell/prefer-shell-instruction/",
           "location": {
             "end": {
               "column": 0,
