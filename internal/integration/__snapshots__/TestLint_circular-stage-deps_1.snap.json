@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Circular stage dependencies prevent the build from completing. Restructure stages so that dependencies flow in one direction",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/circular-stage-deps/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/circular-stage-deps/",
           "location": {
             "end": {
               "column": 0,

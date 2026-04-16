@@ -3,7 +3,7 @@
  "Code": "tally/named-identity-in-passwdless-stage",
  "DefaultSeverity": "warning",
  "Description": "Named user/group in USER or --chown requires /etc/passwd which passwd-less stages lack",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/named-identity-in-passwdless-stage/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/named-identity-in-passwdless-stage/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "Named Identity in Passwd-less Stage"

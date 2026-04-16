@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Empty continuation lines will become errors in a future release",
-          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/NoEmptyContinuation/",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/NoEmptyContinuation/",
           "location": {
             "end": {
               "column": 0,

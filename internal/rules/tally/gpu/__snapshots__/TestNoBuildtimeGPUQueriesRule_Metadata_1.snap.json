@@ -3,7 +3,7 @@
  "Code": "tally/gpu/no-buildtime-gpu-queries",
  "DefaultSeverity": "error",
  "Description": "GPU hardware is not available during docker build; runtime GPU queries in RUN will fail or return misleading results",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/gpu/no-buildtime-gpu-queries/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/gpu/no-buildtime-gpu-queries/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "No build-time GPU queries"

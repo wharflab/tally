@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "The MAINTAINER instruction is deprecated, use a label instead to define an image author",
-          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/MaintainerDeprecated/",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/MaintainerDeprecated/",
           "location": {
             "end": {
               "column": 0,

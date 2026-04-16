@@ -4,7 +4,7 @@
       "file": "testdata/slow-checks-platform-meta-arg/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/InvalidBaseImagePlatform/",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/InvalidBaseImagePlatform/",
           "location": {
             "end": {
               "column": 0,

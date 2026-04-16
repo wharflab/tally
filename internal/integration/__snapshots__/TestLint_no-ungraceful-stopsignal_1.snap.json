@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Replace with a signal that allows graceful shutdown (e.g. SIGTERM)",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-ungraceful-stopsignal/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/no-ungraceful-stopsignal/",
           "location": {
             "end": {
               "column": 0,
@@ -45,7 +45,7 @@
         },
         {
           "detail": "Replace with a signal that allows graceful shutdown (e.g. SIGTERM)",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-ungraceful-stopsignal/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/no-ungraceful-stopsignal/",
           "location": {
             "end": {
               "column": 0,

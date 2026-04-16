@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Stage names should be lowercase",
-          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/StageNameCasing/",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/StageNameCasing/",
           "location": {
             "end": {
               "column": 0,

@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "The nvidia/cuda devel variant includes nvcc, development headers, and static libraries that add gigabytes to the final image. If this stage only runs pre-built binaries or Python packages, switch to a runtime or base variant (e.g. nvidia/cuda:12.x.y-runtime-ubuntu22.04). This stage copies artifacts from a builder stage, which is a strong signal that it serves as a runtime image.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/prefer-runtime-final-stage/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/prefer-runtime-final-stage/",
           "location": {
             "end": {
               "column": 0,

@@ -3,7 +3,7 @@
  "Code": "buildkit/UndefinedVar",
  "DefaultSeverity": "warning",
  "Description": "Variables should be defined before their use",
- "DocURL": "https://wharflab.github.io/tally/rules/buildkit/UndefinedVar/",
+ "DocURL": "https://tally.wharflab.com/rules/buildkit/UndefinedVar/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "UndefinedVar"

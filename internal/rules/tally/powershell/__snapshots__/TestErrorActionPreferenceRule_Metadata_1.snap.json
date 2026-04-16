@@ -3,7 +3,7 @@
  "Code": "tally/powershell/error-action-preference",
  "DefaultSeverity": "warning",
  "Description": "PowerShell RUN should set $ErrorActionPreference = 'Stop' and $PSNativeCommandUseErrorActionPreference = $true",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/powershell/error-action-preference/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/powershell/error-action-preference/",
  "FixPriority": 96,
  "IsExperimental": false,
  "Name": "Require PowerShell error-handling preferences"

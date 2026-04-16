@@ -4,7 +4,7 @@
       "file": "testdata/sort-packages/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/sort-packages/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/sort-packages/",
           "location": {
             "end": {
               "column": 0,
@@ -71,7 +71,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/sort-packages/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/sort-packages/",
           "location": {
             "end": {
               "column": 0,
@@ -166,7 +166,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/sort-packages/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/sort-packages/",
           "location": {
             "end": {
               "column": 0,

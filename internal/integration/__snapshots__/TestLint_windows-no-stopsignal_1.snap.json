@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Windows containers do not support POSIX signals. BuildKit silently accepts STOPSIGNAL but the instruction is ignored at runtime.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/windows/no-stopsignal/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/windows/no-stopsignal/",
           "location": {
             "end": {
               "column": 0,

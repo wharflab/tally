@@ -4,7 +4,7 @@
       "file": "testdata/no-multiple-empty-lines/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-multiple-empty-lines/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/no-multiple-empty-lines/",
           "location": {
             "end": {
               "column": 0,
@@ -42,7 +42,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-multiple-empty-lines/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/no-multiple-empty-lines/",
           "location": {
             "end": {
               "column": 0,
@@ -80,7 +80,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/no-multiple-empty-lines/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/no-multiple-empty-lines/",
           "location": {
             "end": {
               "column": 0,

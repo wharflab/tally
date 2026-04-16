@@ -3,7 +3,7 @@
  "Code": "tally/windows/no-run-mounts",
  "DefaultSeverity": "error",
  "Description": "RUN --mount flags are not supported on Windows containers and will fail at runtime",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/windows/no-run-mounts/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/windows/no-run-mounts/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "No RUN --mount on Windows"

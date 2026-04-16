@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Composer installs in production-like stages should exclude require-dev packages. Add --no-dev or set COMPOSER_NO_DEV=1 for the stage.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/php/composer-no-dev-in-production/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/php/composer-no-dev-in-production/",
           "location": {
             "end": {
               "column": 12,
@@ -45,7 +45,7 @@
         },
         {
           "detail": "Composer installs in production-like stages should exclude require-dev packages. Add --no-dev or set COMPOSER_NO_DEV=1 for the stage.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/php/composer-no-dev-in-production/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/php/composer-no-dev-in-production/",
           "location": {
             "end": {
               "column": 12,

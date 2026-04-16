@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "BuildKit accepts --mount flags without error, but the build will fail at the containerd/HCS runtime layer. All mount types (cache, secret, ssh, bind, tmpfs) are unsupported on Windows.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/windows/no-run-mounts/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/windows/no-run-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -24,7 +24,7 @@
         },
         {
           "detail": "BuildKit accepts --mount flags without error, but the build will fail at the containerd/HCS runtime layer. All mount types (cache, secret, ssh, bind, tmpfs) are unsupported on Windows.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/windows/no-run-mounts/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/windows/no-run-mounts/",
           "location": {
             "end": {
               "column": 0,
@@ -43,7 +43,7 @@
         },
         {
           "detail": "BuildKit accepts --mount flags without error, but the build will fail at the containerd/HCS runtime layer. All mount types (cache, secret, ssh, bind, tmpfs) are unsupported on Windows.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/windows/no-run-mounts/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/windows/no-run-mounts/",
           "location": {
             "end": {
               "column": 0,

@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "The nvidia/cuda base image already sets NVIDIA_VISIBLE_DEVICES=all. This ENV instruction is redundant and can be safely removed.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-hardcoded-visible-devices/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/no-hardcoded-visible-devices/",
           "location": {
             "end": {
               "column": 0,
@@ -45,7 +45,7 @@
         },
         {
           "detail": "GPU device visibility is deployment policy. Hardcoding device indices makes the image non-portable across hosts with different GPU topologies. Set GPU visibility at runtime via docker run --gpus or orchestrator configuration.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-hardcoded-visible-devices/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/no-hardcoded-visible-devices/",
           "location": {
             "end": {
               "column": 0,
@@ -86,7 +86,7 @@
         },
         {
           "detail": "GPU device visibility is deployment policy. Hardcoding device indices makes the image non-portable across hosts with different GPU topologies. Set GPU visibility at runtime via docker run --gpus or orchestrator configuration.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-hardcoded-visible-devices/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/no-hardcoded-visible-devices/",
           "location": {
             "end": {
               "column": 0,
@@ -127,7 +127,7 @@
         },
         {
           "detail": "GPU UUIDs are host-specific hardware identifiers. Hardcoding them makes the image non-portable. Set GPU visibility at runtime.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-hardcoded-visible-devices/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/no-hardcoded-visible-devices/",
           "location": {
             "end": {
               "column": 0,
@@ -168,7 +168,7 @@
         },
         {
           "detail": "The nvidia/cuda base image already sets NVIDIA_VISIBLE_DEVICES=all. This ENV instruction is redundant and can be safely removed.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/gpu/no-hardcoded-visible-devices/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/no-hardcoded-visible-devices/",
           "location": {
             "end": {
               "column": 0,

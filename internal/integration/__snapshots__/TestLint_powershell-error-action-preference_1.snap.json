@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Without $ErrorActionPreference = 'Stop', PowerShell silently continues after non-terminating errors. $PSNativeCommandUseErrorActionPreference = $true extends error handling to native command exit codes (PowerShell 7.3+).",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/powershell/error-action-preference/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/powershell/error-action-preference/",
           "location": {
             "end": {
               "column": 0,
@@ -45,7 +45,7 @@
         },
         {
           "detail": "Without $ErrorActionPreference = 'Stop', PowerShell silently continues after non-terminating errors. $PSNativeCommandUseErrorActionPreference = $true extends error handling to native command exit codes (PowerShell 7.3+).",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/powershell/error-action-preference/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/powershell/error-action-preference/",
           "location": {
             "end": {
               "column": 0,
@@ -64,7 +64,7 @@
         },
         {
           "detail": "Without $PSNativeCommandUseErrorActionPreference = $true, non-zero exit codes from native commands (git, dotnet, curl) are ignored even when $ErrorActionPreference is 'Stop' (PowerShell 7.3+).",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/powershell/error-action-preference/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/powershell/error-action-preference/",
           "location": {
             "end": {
               "column": 0,
@@ -104,7 +104,7 @@
         },
         {
           "detail": "Without $ErrorActionPreference = 'Stop', PowerShell silently continues after non-terminating errors. $PSNativeCommandUseErrorActionPreference = $true extends error handling to native command exit codes (PowerShell 7.3+).",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/powershell/error-action-preference/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/powershell/error-action-preference/",
           "location": {
             "end": {
               "column": 0,

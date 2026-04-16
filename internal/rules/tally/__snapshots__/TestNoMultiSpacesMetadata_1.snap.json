@@ -3,7 +3,7 @@
  "Code": "tally/no-multi-spaces",
  "DefaultSeverity": "style",
  "Description": "Disallows multiple consecutive spaces within Dockerfile instructions",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/no-multi-spaces/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/no-multi-spaces/",
  "FixPriority": 10,
  "IsExperimental": false,
  "Name": "No Multiple Spaces"

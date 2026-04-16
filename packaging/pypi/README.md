@@ -24,4 +24,4 @@ tally lint --max-lines 100 Dockerfile
 
 ## Documentation
 
-See the [GitHub repository](https://github.com/wharflab/tally) for full documentation.
+See **[tally.wharflab.com](https://tally.wharflab.com/)** for full documentation.

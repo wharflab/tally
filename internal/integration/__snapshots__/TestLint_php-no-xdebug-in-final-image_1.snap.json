@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Xdebug is a development and debugging tool that should not ship in production images. Move the Xdebug installation into a dedicated dev or debug build stage.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/php/no-xdebug-in-final-image/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/php/no-xdebug-in-final-image/",
           "location": {
             "end": {
               "column": 8,
@@ -91,7 +91,7 @@
         },
         {
           "detail": "Xdebug is a development and debugging tool that should not ship in production images. Move the Xdebug installation into a dedicated dev or debug build stage.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/php/no-xdebug-in-final-image/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/php/no-xdebug-in-final-image/",
           "location": {
             "end": {
               "column": 11,

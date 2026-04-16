@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "BuildKit git sources make repository fetches explicit in the Dockerfile graph and avoid mutable network acquisition inside RUN. When the clone flow is simple enough, tally can extract it into ADD while preserving the surrounding commands.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-add-git/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-add-git/",
           "location": {
             "end": {
               "column": 0,
@@ -46,7 +46,7 @@
         },
         {
           "detail": "BuildKit git sources make repository fetches explicit in the Dockerfile graph and avoid mutable network acquisition inside RUN. When the clone flow is simple enough, tally can extract it into ADD while preserving the surrounding commands.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-add-git/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-add-git/",
           "location": {
             "end": {
               "column": 0,
@@ -87,7 +87,7 @@
         },
         {
           "detail": "BuildKit git sources make repository fetches explicit in the Dockerfile graph and avoid mutable network acquisition inside RUN. When the clone flow is simple enough, tally can extract it into ADD while preserving the surrounding commands.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-add-git/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-add-git/",
           "location": {
             "end": {
               "column": 0,
@@ -128,7 +128,7 @@
         },
         {
           "detail": "BuildKit git sources make repository fetches explicit in the Dockerfile graph and avoid mutable network acquisition inside RUN. When the clone flow is simple enough, tally can extract it into ADD while preserving the surrounding commands.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-add-git/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-add-git/",
           "location": {
             "end": {
               "column": 0,

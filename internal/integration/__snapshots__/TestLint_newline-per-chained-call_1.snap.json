@@ -4,7 +4,7 @@
       "file": "testdata/newline-per-chained-call/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/newline-per-chained-call/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-per-chained-call/",
           "location": {
             "end": {
               "column": 0,
@@ -85,7 +85,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/newline-per-chained-call/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-per-chained-call/",
           "location": {
             "end": {
               "column": 0,
@@ -138,7 +138,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/newline-per-chained-call/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-per-chained-call/",
           "location": {
             "end": {
               "column": 0,
@@ -191,7 +191,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/newline-per-chained-call/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-per-chained-call/",
           "location": {
             "end": {
               "column": 0,
@@ -272,7 +272,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/newline-per-chained-call/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-per-chained-call/",
           "location": {
             "end": {
               "column": 0,
@@ -311,7 +311,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/newline-per-chained-call/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-per-chained-call/",
           "location": {
             "end": {
               "column": 0,
@@ -350,7 +350,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/newline-per-chained-call/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/newline-per-chained-call/",
           "location": {
             "end": {
               "column": 0,

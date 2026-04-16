@@ -4,7 +4,7 @@
       "file": "testdata/expose-proto-casing/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/ExposeProtoCasing/",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/ExposeProtoCasing/",
           "location": {
             "end": {
               "column": 0,
@@ -42,7 +42,7 @@
           }
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/ExposeProtoCasing/",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/ExposeProtoCasing/",
           "location": {
             "end": {
               "column": 0,

@@ -4,7 +4,7 @@
       "file": "testdata/expose-cross-rules/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/ExposeInvalidFormat/",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/ExposeInvalidFormat/",
           "location": {
             "end": {
               "column": 0,
@@ -22,7 +22,7 @@
           "sourceCode": "EXPOSE 127.0.0.1:80:80/TCP"
         },
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/buildkit/ExposeProtoCasing/",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/ExposeProtoCasing/",
           "location": {
             "end": {
               "column": 0,

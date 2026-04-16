@@ -3,7 +3,7 @@
  "Code": "tally/windows/no-stopsignal",
  "DefaultSeverity": "warning",
  "Description": "STOPSIGNAL has no effect on Windows containers because they do not support POSIX signals",
- "DocURL": "https://wharflab.github.io/tally/rules/tally/windows/no-stopsignal/",
+ "DocURL": "https://tally.wharflab.com/rules/tally/windows/no-stopsignal/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "No STOPSIGNAL on Windows"

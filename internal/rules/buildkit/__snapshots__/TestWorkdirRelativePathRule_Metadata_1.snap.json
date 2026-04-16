@@ -3,7 +3,7 @@
  "Code": "buildkit/WorkdirRelativePath",
  "DefaultSeverity": "warning",
  "Description": "Relative WORKDIR path used without a base absolute path",
- "DocURL": "https://wharflab.github.io/tally/rules/buildkit/WorkdirRelativePath/",
+ "DocURL": "https://tally.wharflab.com/rules/buildkit/WorkdirRelativePath/",
  "FixPriority": 0,
  "IsExperimental": false,
  "Name": "Relative WORKDIR Path"

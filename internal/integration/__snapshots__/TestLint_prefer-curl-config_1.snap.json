@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Transient download failures are common during image builds. A .curlrc file with --retry settings makes builds more robust. The fix inserts a comment, ENV CURL_HOME, and a COPY heredoc with retry defaults.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/prefer-curl-config/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-curl-config/",
           "location": {
             "end": {
               "column": 0,

@@ -5,7 +5,7 @@
       "violations": [
         {
           "detail": "Docker's COPY always creates files as root:root regardless of the active USER. Add --chown=appuser to match the intended ownership, or move USER after the COPY to clarify that USER does not affect COPY ownership.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/copy-after-user-without-chown/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/copy-after-user-without-chown/",
           "location": {
             "end": {
               "column": 0,
@@ -45,7 +45,7 @@
         },
         {
           "detail": "Docker's COPY always creates files as root:root regardless of the active USER. Add --chown=appuser to match the intended ownership, or move USER after the COPY to clarify that USER does not affect COPY ownership.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/copy-after-user-without-chown/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/copy-after-user-without-chown/",
           "location": {
             "end": {
               "column": 0,
@@ -142,7 +142,7 @@
         },
         {
           "detail": "Docker's ADD always creates files as root:root regardless of the active USER. Add --chown=appuser to match the intended ownership, or move USER after the ADD to clarify that USER does not affect ADD ownership.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/copy-after-user-without-chown/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/copy-after-user-without-chown/",
           "location": {
             "end": {
               "column": 0,
@@ -239,7 +239,7 @@
         },
         {
           "detail": "Docker's COPY always creates files as root:root regardless of the active USER. Add --chown=appuser to match the intended ownership, or move USER after the COPY to clarify that USER does not affect COPY ownership.",
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/copy-after-user-without-chown/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/copy-after-user-without-chown/",
           "location": {
             "end": {
               "column": 0,

@@ -4,7 +4,7 @@
       "file": "testdata/invalid-onbuild-trigger/Dockerfile",
       "violations": [
         {
-          "docUrl": "https://wharflab.github.io/tally/rules/tally/invalid-onbuild-trigger/",
+          "docUrl": "https://tally.wharflab.com/rules/tally/invalid-onbuild-trigger/",
           "location": {
             "end": {
               "column": -1,
