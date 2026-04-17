@@ -1,0 +1,198 @@
+{
+  "files": [
+    {
+      "file": "testdata/powershell-progress-preference/Dockerfile",
+      "violations": [
+        {
+          "detail": "PowerShell renders a per-response progress bar for Invoke-WebRequest by default. On Windows containers this collapses download throughput by an order of magnitude. Set $ProgressPreference = 'SilentlyContinue' before the call.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/powershell/progress-preference/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 9
+            },
+            "file": "testdata/powershell-progress-preference/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 9
+            }
+          },
+          "message": "PowerShell Invoke-WebRequest without $ProgressPreference = 'SilentlyContinue'",
+          "rule": "tally/powershell/progress-preference",
+          "severity": "style",
+          "sourceCode": "RUN Invoke-WebRequest https://example.com/b.zip -OutFile /tmp/b.zip",
+          "suggestedFix": {
+            "description": "Add $ProgressPreference = 'SilentlyContinue' to SHELL instruction",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 25,
+                    "line": 8
+                  },
+                  "file": "testdata/powershell-progress-preference/Dockerfile",
+                  "start": {
+                    "column": 25,
+                    "line": 8
+                  }
+                },
+                "newText": ", \"$ProgressPreference = 'SilentlyContinue';\""
+              }
+            ],
+            "priority": 97,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "PowerShell renders a per-response progress bar for Invoke-WebRequest by default. On Windows containers this collapses download throughput by an order of magnitude. Set $ProgressPreference = 'SilentlyContinue' before the call.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/powershell/progress-preference/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "testdata/powershell-progress-preference/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "PowerShell Invoke-WebRequest without $ProgressPreference = 'SilentlyContinue'",
+          "rule": "tally/powershell/progress-preference",
+          "severity": "style",
+          "sourceCode": "RUN iwr https://example.com/c.zip -OutFile /tmp/c.zip"
+        },
+        {
+          "detail": "PowerShell renders a per-response progress bar for Invoke-WebRequest by default. On Windows containers this collapses download throughput by an order of magnitude. Set $ProgressPreference = 'SilentlyContinue' before the call.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/powershell/progress-preference/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 15
+            },
+            "file": "testdata/powershell-progress-preference/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 15
+            }
+          },
+          "message": "PowerShell Invoke-WebRequest without $ProgressPreference = 'SilentlyContinue'",
+          "rule": "tally/powershell/progress-preference",
+          "severity": "style",
+          "sourceCode": "RUN Invoke-WebRequest https://example.com/d.zip -OutFile /tmp/d.zip",
+          "suggestedFix": {
+            "description": "Add $ProgressPreference = 'SilentlyContinue' to SHELL instruction",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 60,
+                    "line": 14
+                  },
+                  "file": "testdata/powershell-progress-preference/Dockerfile",
+                  "start": {
+                    "column": 60,
+                    "line": 14
+                  }
+                },
+                "newText": " $ProgressPreference = 'SilentlyContinue';"
+              }
+            ],
+            "priority": 97,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "PowerShell renders a per-response progress bar for Invoke-WebRequest by default. On Windows containers this collapses download throughput by an order of magnitude. Set $ProgressPreference = 'SilentlyContinue' before the call.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/powershell/progress-preference/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 19
+            },
+            "file": "testdata/powershell-progress-preference/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 19
+            }
+          },
+          "message": "PowerShell Invoke-WebRequest without $ProgressPreference = 'SilentlyContinue'",
+          "rule": "tally/powershell/progress-preference",
+          "severity": "style",
+          "sourceCode": "RUN pwsh -Command \"Invoke-WebRequest https://example.com/e.zip -OutFile /tmp/e.zip\"",
+          "suggestedFix": {
+            "description": "Add $ProgressPreference = 'SilentlyContinue' to wrapper script",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 19,
+                    "line": 19
+                  },
+                  "file": "testdata/powershell-progress-preference/Dockerfile",
+                  "start": {
+                    "column": 19,
+                    "line": 19
+                  }
+                },
+                "newText": "$ProgressPreference = 'SilentlyContinue'; "
+              }
+            ],
+            "priority": 97,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "PowerShell renders a per-response progress bar for Invoke-WebRequest by default. On Windows containers this collapses download throughput by an order of magnitude. Set $ProgressPreference = 'SilentlyContinue' before the call.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/powershell/progress-preference/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 29
+            },
+            "file": "testdata/powershell-progress-preference/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 29
+            }
+          },
+          "message": "PowerShell Invoke-WebRequest without $ProgressPreference = 'SilentlyContinue'",
+          "rule": "tally/powershell/progress-preference",
+          "severity": "style",
+          "sourceCode": "RUN powershell -Command \"Invoke-WebRequest https://example.com/setup.exe -OutFile C:\\\\setup.exe\"",
+          "suggestedFix": {
+            "description": "Add $ProgressPreference = 'SilentlyContinue' to wrapper script",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 25,
+                    "line": 29
+                  },
+                  "file": "testdata/powershell-progress-preference/Dockerfile",
+                  "start": {
+                    "column": 25,
+                    "line": 29
+                  }
+                },
+                "newText": "$ProgressPreference = 'SilentlyContinue'; "
+              }
+            ],
+            "priority": 97,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 5,
+    "total": 5,
+    "warnings": 0
+  }
+}

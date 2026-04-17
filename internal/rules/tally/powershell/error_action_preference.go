@@ -283,40 +283,12 @@ func (r *ErrorActionPreferenceRule) buildWrapperFix(
 	needStop bool,
 	needNative bool,
 ) *rules.SuggestedFix {
-	if p.sm == nil || len(run.Location()) == 0 {
+	insertLine, insertCol, ok := wrapperInsertionPoint(p.sm, run, invocation)
+	if !ok {
 		return nil
 	}
-
 	startLine := run.Location()[0].Start.Line
-	endLine := run.Location()[len(run.Location())-1].End.Line
-
-	// Use Snippet to get the raw source (0-based line args).
-	source := p.sm.Snippet(startLine-1, endLine-1)
-	if source == "" {
-		return nil
-	}
-
-	// Anchor the search past the executable name to avoid matching tokens
-	// in the "RUN powershell" prefix itself.
-	exeLower := strings.ToLower(invocation.executable)
-	anchorIdx := strings.Index(strings.ToLower(source), exeLower)
-	if anchorIdx < 0 {
-		return nil
-	}
-	searchStart := anchorIdx + len(exeLower)
-
-	firstToken := firstNonWhitespaceWord(invocation.script)
-	if firstToken == "" {
-		return nil
-	}
-	relIdx := strings.Index(source[searchStart:], firstToken)
-	if relIdx < 0 {
-		return nil
-	}
-	insertByte := searchStart + relIdx
-
 	prelude := buildPreludeString(needStop, needNative) + " "
-	insertLine, insertCol := sourcemap.ByteToLineCol(source, insertByte)
 
 	return &rules.SuggestedFix{
 		Description: "Add PowerShell error-handling preferences to wrapper script",

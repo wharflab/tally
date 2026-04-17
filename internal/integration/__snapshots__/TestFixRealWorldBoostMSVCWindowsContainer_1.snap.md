@@ -1,9 +1,9 @@
 note: 4 slow check(s) skipped (image not found)
-Fixed 12 issues
+Fixed 13 issues
 Skipped 1 fixes
 note: 1 AI fix(es) failed (see details below)
 note: skipped fix tally/prefer-multi-stage-build (<stdin>): resolver not registered: ai-autofix
-**5 issues** in `<stdin>`
+**6 issues** in `<stdin>`
 
 | Line | Issue |
 |------|-------|
@@ -12,4 +12,5 @@ note: skipped fix tally/prefer-multi-stage-build (<stdin>): resolver not registe
 | - | ℹ️ This Dockerfile appears to build artifacts in a single stage; consider a multi-stage build to reduce final image size. |
 | 13 | 💅 expected blank line between COPY and RUN |
 | 13 | 💅 consecutive RUN instructions can be combined using heredoc syntax |
+| 24 | 💅 PowerShell Invoke-WebRequest without $ProgressPreference = 'SilentlyContinue' |
 

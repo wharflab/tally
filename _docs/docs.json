@@ -140,7 +140,8 @@
             "group": "PowerShell",
             "pages": [
               "rules/tally/powershell/error-action-preference",
-              "rules/tally/powershell/prefer-shell-instruction"
+              "rules/tally/powershell/prefer-shell-instruction",
+              "rules/tally/powershell/progress-preference"
             ]
           },
           {
