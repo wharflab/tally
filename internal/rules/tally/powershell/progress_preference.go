@@ -100,8 +100,10 @@ func (r *ProgressPreferenceRule) checkStage(
 		}
 
 		// Suppress duplicate SHELL-level fixes within the same SHELL scope.
-		// Wrapper-body and heredoc-body fixes are per-RUN and never suppressed.
-		if v.SuggestedFix != nil && isStageShellFix(p.activeShellInstr, v.SuggestedFix, p.file) {
+		// Wrapper-body and heredoc-body fixes are per-RUN and never suppressed;
+		// only the Path 3 (variant.IsPowerShell()) violationForPowerShellRun
+		// path emits SHELL-modify / SHELL-insert edits that could overlap.
+		if v.SuggestedFix != nil && isStageLevelPowerShellFix(p, run) {
 			if stageFixEmitted {
 				v.SuggestedFix = nil
 			} else {
@@ -472,19 +474,29 @@ func buildHeredocBodyFix(
 	}
 }
 
-// isStageShellFix reports whether the fix modifies the active SHELL line,
-// so that callers can suppress duplicate SHELL edits across multiple RUNs
-// in the same SHELL scope.
-func isStageShellFix(activeShellInstr *instructions.ShellCommand, fix *rules.SuggestedFix, file string) bool {
-	if activeShellInstr == nil || fix == nil || len(fix.Edits) != 1 {
+// isStageLevelPowerShellFix reports whether the given RUN would receive a
+// stage-level SHELL fix (modify existing SHELL, or insert a new SHELL after
+// FROM). Those fixes target the same region across every RUN in the same
+// SHELL scope, so only the first should carry the edit — subsequent
+// violations in the scope report without a fix to avoid overlapping edits.
+//
+// The predicate mirrors the Path-3 branch in checkRun: active shell is
+// PowerShell and the RUN doesn't route through the wrapper or heredoc paths
+// (which produce per-RUN, non-overlapping edits).
+func isStageLevelPowerShellFix(p progressCheckParams, run *instructions.RunCommand) bool {
+	if len(run.Files) > 0 && run.Files[0].Data != "" {
+		// Heredoc fix targets the body of this specific RUN — per-RUN,
+		// never overlaps another RUN's fix.
 		return false
 	}
-	if len(activeShellInstr.Location()) == 0 {
-		return false
+	variant := shellutil.VariantFromShellCmd(p.activeShellCmd)
+	if p.info != nil && len(run.Location()) > 0 {
+		variant = p.info.ShellVariantAtLine(run.Location()[0].Start.Line)
 	}
-	shellLine := activeShellInstr.Location()[0].Start.Line
-	edit := fix.Edits[0]
-	return edit.Location.File == file && edit.Location.Start.Line == shellLine
+	// Only the PowerShell-variant path emits SHELL-modify or SHELL-insert
+	// edits. Wrapper fixes (non-PowerShell variant with explicit
+	// powershell/pwsh -Command) target the inner script of a specific RUN.
+	return variant.IsPowerShell()
 }
 
 func init() {

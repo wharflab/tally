@@ -185,6 +185,34 @@ func TestProgressPreferenceRule_MultiLineShellNoFix(t *testing.T) {
 	}
 }
 
+func TestProgressPreferenceRule_NoShellMultipleRunsSingleInsert(t *testing.T) {
+	t.Parallel()
+
+	// PowerShell-by-default stage (no SHELL instruction) with multiple IWR
+	// RUNs. Each RUN triggers a violation, but only the FIRST carries a
+	// SuggestedFix; the rest are suppressed so we don't emit overlapping
+	// SHELL-insert edits all pointing at FROM+1.
+	content := "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+		"RUN Invoke-WebRequest https://example.com/a.zip -OutFile /tmp/a.zip\n" +
+		"RUN Invoke-WebRequest https://example.com/b.zip -OutFile /tmp/b.zip\n"
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewProgressPreferenceRule().Check(input)
+	if len(violations) != 2 {
+		t.Fatalf("got %d violations, want 2", len(violations))
+	}
+
+	fixed := 0
+	for _, v := range violations {
+		if v.SuggestedFix != nil {
+			fixed++
+		}
+	}
+	if fixed != 1 {
+		t.Errorf("expected exactly 1 SuggestedFix across %d violations, got %d", len(violations), fixed)
+	}
+}
+
 func TestProgressPreferenceRule_OverlapWithPreferShellInstruction(t *testing.T) {
 	t.Parallel()
 
