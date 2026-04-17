@@ -7,9 +7,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/dockerfile"
 )
 
@@ -321,13 +323,27 @@ func assertHasUV(t *testing.T, label string, fixed []byte) {
 	}
 }
 
+// assertPreservedRuntime parses the fixed Dockerfile and verifies that the
+// final stage still carries the original CMD and WORKDIR. A byte-level
+// substring check would falsely accept a rewrite that kept CMD/WORKDIR in a
+// builder stage while dropping or mutating them in the runtime stage.
 func assertPreservedRuntime(t *testing.T, label string, fixed []byte) {
 	t.Helper()
-	if !bytes.Contains(fixed, []byte(`CMD ["python", "-m", "app"]`)) {
-		t.Fatalf("%s: CMD not preserved byte-for-byte:\n%s", label, fixed)
+	parsed, err := dockerfile.Parse(bytes.NewReader(fixed), nil)
+	if err != nil {
+		t.Fatalf("%s: parse fixed Dockerfile: %v\n%s", label, err, fixed)
 	}
-	if !bytes.Contains(fixed, []byte(`WORKDIR /app`)) {
-		t.Fatalf("%s: WORKDIR not preserved:\n%s", label, fixed)
+	if len(parsed.Stages) == 0 {
+		t.Fatalf("%s: fixed Dockerfile has no stages:\n%s", label, fixed)
+	}
+
+	rt := autofixdata.ExtractFinalStageRuntime(parsed)
+	wantCmdLine := []string{"python", "-m", "app"}
+	if rt.Cmd == nil || !slices.Equal(rt.Cmd.CmdLine, wantCmdLine) {
+		t.Fatalf("%s: final-stage CMD not preserved (want %v):\n%s", label, wantCmdLine, fixed)
+	}
+	if rt.Workdir == nil || strings.TrimSpace(rt.Workdir.Path) != "/app" {
+		t.Fatalf("%s: final-stage WORKDIR not preserved (want /app):\n%s", label, fixed)
 	}
 }
 
