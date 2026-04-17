@@ -394,6 +394,38 @@ corpus analysis
 
 ---
 
+### 36. [Telemetry Opt-Out Rule Research](36-telemetry-opt-out-rule-research.md)
+
+**Covers:** Source-backed research for a stage-scoped rule that disables telemetry, analytics, or tracking for tools used inside a container image.
+
+**Key Topics:**
+
+- Tool-specific telemetry opt-out signals vs unsupported "global switch" assumptions
+- When `ENV`-based fixes are credible and when command/config-based fixes are too weak
+- Stage-scoped detection and insertion strategy
+- Windows container constraints and noise-reduction policy
+
+**Based on:** Official tool documentation, Windows container guidance, and a research pass over common CLI telemetry conventions
+
+---
+
+### 37. [AI AutoFix via ACP: Command-Family Normalization](37-ai-autofix-command-family-normalization.md)
+
+**Covers:** Command-local ACP auto-fix design for `hadolint/DL4001`, including replacement-window output, parser-backed validation, bounded
+download-pipe support, and lessons learned from `curlconverter`.
+
+**Key Topics:**
+
+- Why `curl`/`wget` normalization is not safely solvable as a broad heuristic rewrite
+- Why this objective family should use replacement-window output instead of diff output
+- Parser-first validation of command count, pipeline shape, URL preservation, output mode, and tar extraction behavior
+- Bounded pipeline support for `download | tar-extract`
+- Reusable design principles for later command-family migrations such as `npm -> bun`
+
+**Based on:** tally shell/fix internals, `curlconverter`, curl/Wget documentation, and prior ACP design docs
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
