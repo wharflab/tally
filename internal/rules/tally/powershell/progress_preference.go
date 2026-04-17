@@ -387,7 +387,10 @@ func buildShellInsertFix(
 		indent = leadingIndentForLine(sm.Line(fromEndLine - 1))
 	}
 
-	shellInstruction := `SHELL ["` + executable + `", "-Command", "` + progressPreferenceAssignment + `"]`
+	shellArray := formatShellArray([]string{executable, "-Command", progressPreferenceAssignment})
+	if shellArray == "" {
+		return nil
+	}
 	return &rules.SuggestedFix{
 		Description: "Insert a PowerShell SHELL instruction with $ProgressPreference = 'SilentlyContinue'",
 		Safety:      rules.FixSuggestion,
@@ -395,7 +398,7 @@ func buildShellInsertFix(
 		Edits: []rules.TextEdit{
 			{
 				Location: rules.NewRangeLocation(file, insertLine, 0, insertLine, 0),
-				NewText:  indent + shellInstruction + "\n",
+				NewText:  indent + "SHELL " + shellArray + "\n",
 			},
 		},
 	}

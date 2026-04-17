@@ -31,7 +31,7 @@ func testPowerShellShellLine(executable string, args ...string) string {
 		parts = append(parts, `"`+arg+`"`)
 	}
 	parts = append(parts, `"-Command"`, `"`+testPowerShellPrelude+`"`)
-	return "SHELL [" + strings.Join(parts, ",") + "]"
+	return "SHELL [" + strings.Join(parts, ", ") + "]"
 }
 
 func TestPreferShellInstructionRule_Metadata(t *testing.T) {
@@ -359,7 +359,7 @@ RUN apk add --no-cache curl
 ` + testPwshShell + `
 RUN Write-Host hi
 RUN Write-Host bye
-SHELL ["/bin/sh","-c"]
+SHELL ["/bin/sh", "-c"]
 RUN apk add --no-cache curl
 `
 	if got != want {
@@ -397,7 +397,7 @@ RUN pwsh -Command Write-Host bye
 	want := `FROM alpine
 ` + testPwshShell + `
 RUN Write-Host hi
-SHELL ["/bin/sh","-c"]
+SHELL ["/bin/sh", "-c"]
 CMD echo hi
 RUN pwsh -Command Write-Host bye
 `

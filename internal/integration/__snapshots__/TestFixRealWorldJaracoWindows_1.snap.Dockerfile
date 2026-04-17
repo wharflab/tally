@@ -10,7 +10,7 @@ ENV POWERSHELL_TELEMETRY_OPTOUT=1
 # Download the Build Tools bootstrapper.
 ADD https://aka.ms/vs/16/release/vs_buildtools.exe vs_buildtools.exe
 
-SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
 
 # Install chocolatey
 RUN <<EOF

@@ -1,6 +1,7 @@
 package powershell
 
 import (
+	jsonv2 "encoding/json/v2"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -8,6 +9,45 @@ import (
 
 	"github.com/wharflab/tally/internal/sourcemap"
 )
+
+// formatShellArray renders a SHELL instruction array argument in the
+// canonical spaced form: `["a", "b", "c"]`. Shared by all fix emitters in
+// the powershell package so generated SHELL lines have consistent spacing
+// regardless of which rule authored them.
+//
+// Returns "" on marshal failure, which callers should treat as "skip fix".
+func formatShellArray(args []string) string {
+	// jsonv2.Marshal emits `["a","b","c"]` (no spaces). Splice a space after
+	// every top-level `,` that is not inside a quoted string to get the
+	// `["a", "b", "c"]` form used throughout the codebase.
+	raw, err := jsonv2.Marshal(args)
+	if err != nil {
+		return ""
+	}
+	var b strings.Builder
+	b.Grow(len(raw) + len(args))
+	inQuote := false
+	escape := false
+	for _, c := range string(raw) {
+		b.WriteRune(c)
+		if escape {
+			escape = false
+			continue
+		}
+		if c == '\\' {
+			escape = true
+			continue
+		}
+		if c == '"' {
+			inQuote = !inQuote
+			continue
+		}
+		if c == ',' && !inQuote {
+			b.WriteByte(' ')
+		}
+	}
+	return b.String()
+}
 
 // isMultiLineInstruction reports whether the given source range spans more
 // than one physical line. Used by SHELL-line fixes that scan a single line

@@ -526,7 +526,10 @@ func (r *ErrorActionPreferenceRule) buildShellInsertFix(
 	executable := shellExecutableForStage(info)
 	preludeToAdd := buildPreludeString(needStop, needNative)
 
-	shellInstruction := `SHELL ["` + executable + `", "-Command", "` + preludeToAdd + `"]`
+	shellArray := formatShellArray([]string{executable, "-Command", preludeToAdd})
+	if shellArray == "" {
+		return nil
+	}
 
 	indent := ""
 	if sm != nil && fromEndLine > 0 && fromEndLine <= sm.LineCount() {
@@ -540,7 +543,7 @@ func (r *ErrorActionPreferenceRule) buildShellInsertFix(
 		Edits: []rules.TextEdit{
 			{
 				Location: rules.NewRangeLocation(file, insertLine, 0, insertLine, 0),
-				NewText:  indent + shellInstruction + "\n",
+				NewText:  indent + "SHELL " + shellArray + "\n",
 			},
 		},
 	}
