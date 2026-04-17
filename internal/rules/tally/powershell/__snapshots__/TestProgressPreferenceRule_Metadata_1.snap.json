@@ -1,5 +1,5 @@
 {
- "Category": "performance",
+ "Category": "style",
  "Code": "tally/powershell/progress-preference",
  "DefaultSeverity": "style",
  "Description": "PowerShell RUN using Invoke-WebRequest should set $ProgressPreference = 'SilentlyContinue'",

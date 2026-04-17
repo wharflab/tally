@@ -35,7 +35,7 @@ func (r *ProgressPreferenceRule) Metadata() rules.RuleMetadata {
 		Description:     "PowerShell RUN using Invoke-WebRequest should set $ProgressPreference = 'SilentlyContinue'",
 		DocURL:          rules.TallyDocURL(ProgressPreferenceRuleCode),
 		DefaultSeverity: rules.SeverityStyle,
-		Category:        "performance",
+		Category:        "style",
 		FixPriority:     97, //nolint:mnd // After error-action-preference (96), before prefer-run-heredoc (100).
 	}
 }
