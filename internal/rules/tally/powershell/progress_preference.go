@@ -282,6 +282,16 @@ func shellArgsHaveProgressPreference(shellCmd []string) bool {
 // active SHELL instruction. The edit is a zero-width insertion positioned
 // either before the closing `]` (when the last arg is bare "-Command") or
 // before the last `"` (when the last arg already carries a prelude).
+//
+// When this rule fires alongside tally/powershell/error-action-preference on
+// the same SHELL line, both rules emit zero-width insertions before the
+// closing `]`. The conflict resolver stacks them rather than picking a
+// winner, so the final SHELL carries two trailing array elements (one per
+// rule) rather than a single consolidated -Command string. That is
+// semantically equivalent under pwsh -Command semantics — multiple trailing
+// string arguments are space-joined before parsing — but visually verbose.
+// tally/powershell/prefer-shell-instruction (priority 95) side-steps this by
+// building the entire SHELL in one edit with the full prelude inlined.
 func buildShellLineFix(
 	file string,
 	sm *sourcemap.SourceMap,
