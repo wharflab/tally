@@ -14,6 +14,8 @@ type ObjectiveKind string
 const (
 	// ObjectiveMultiStage is the objective for tally/prefer-multi-stage-build.
 	ObjectiveMultiStage ObjectiveKind = "prefer-multi-stage-build"
+	// ObjectiveUVOverConda is the objective for tally/gpu/prefer-uv-over-conda.
+	ObjectiveUVOverConda ObjectiveKind = "prefer-uv-over-conda"
 )
 
 // FixContext carries the outer fix-application intent into the resolver so the

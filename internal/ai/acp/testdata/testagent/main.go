@@ -19,6 +19,8 @@ import (
 // This binary is not part of the tally CLI. It intentionally supports a handful
 // of deterministic "modes" to exercise lifecycle and error handling:
 // - happy: ACP handshake + prompt emits a short agent message
+// - multistage: returns a canned unified-diff converting single-stage to multi-stage
+// - uv_over_conda: returns a canned unified-diff migrating conda to uv
 // - hang-prompt: ACP handshake + prompt blocks until cancelled
 // - error-newsession: NewSession returns an error
 // - error-prompt: Prompt returns an error
@@ -163,6 +165,29 @@ func (a *testAgent) Prompt(ctx context.Context, params acpsdk.PromptRequest) (ac
 			"+WORKDIR /src\n" +
 			"+COPY --from=builder /out/app /usr/local/bin/app\n" +
 			" CMD [\"app\"]\n" +
+			"```\n"
+
+		if err := a.conn.SessionUpdate(ctx, acpsdk.SessionNotification{
+			SessionId: params.SessionId,
+			Update:    acpsdk.UpdateAgentMessageText(out),
+		}); err != nil {
+			return acpsdk.PromptResponse{}, err
+		}
+		time.Sleep(10 * time.Millisecond)
+		return acpsdk.PromptResponse{StopReason: acpsdk.StopReasonEndTurn}, nil
+	}
+
+	if a.mode == "uv_over_conda" {
+		out := "```diff\n" +
+			"diff --git a/Dockerfile b/Dockerfile\n" +
+			"--- a/Dockerfile\n" +
+			"+++ b/Dockerfile\n" +
+			"@@ -1,3 +1,4 @@\n" +
+			" FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04\n" +
+			"-RUN conda install -y numpy torch\n" +
+			"+RUN pip install uv && \\\n" +
+			"+    uv pip install --system --index-url https://download.pytorch.org/whl/cu121 numpy torch\n" +
+			" CMD [\"python\"]\n" +
 			"```\n"
 
 		if err := a.conn.SessionUpdate(ctx, acpsdk.SessionNotification{
