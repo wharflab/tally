@@ -120,11 +120,22 @@ func (a *testAgent) Initialize(ctx context.Context, params acpsdk.InitializeRequ
 
 func (a *testAgent) Cancel(ctx context.Context, params acpsdk.CancelNotification) error { return nil }
 
+func (a *testAgent) ListSessions(ctx context.Context, params acpsdk.ListSessionsRequest) (acpsdk.ListSessionsResponse, error) {
+	return acpsdk.ListSessionsResponse{Sessions: []acpsdk.SessionInfo{}}, nil
+}
+
 func (a *testAgent) NewSession(ctx context.Context, params acpsdk.NewSessionRequest) (acpsdk.NewSessionResponse, error) {
 	if a.mode == "error-newsession" {
 		return acpsdk.NewSessionResponse{}, errors.New("forced NewSession failure")
 	}
 	return acpsdk.NewSessionResponse{SessionId: acpsdk.SessionId("sess_test")}, nil
+}
+
+func (a *testAgent) SetSessionConfigOption(
+	ctx context.Context,
+	params acpsdk.SetSessionConfigOptionRequest,
+) (acpsdk.SetSessionConfigOptionResponse, error) {
+	return acpsdk.SetSessionConfigOptionResponse{}, nil
 }
 
 func (a *testAgent) Prompt(ctx context.Context, params acpsdk.PromptRequest) (acpsdk.PromptResponse, error) {

@@ -72,11 +72,11 @@ func (c *runClient) CreateTerminal(
 	return acpsdk.CreateTerminalResponse{}, acpsdk.NewInvalidRequest(map[string]any{"error": "terminal is disabled"})
 }
 
-func (c *runClient) KillTerminalCommand(
+func (c *runClient) KillTerminal(
 	ctx context.Context,
-	params acpsdk.KillTerminalCommandRequest,
-) (acpsdk.KillTerminalCommandResponse, error) {
-	return acpsdk.KillTerminalCommandResponse{}, acpsdk.NewInvalidRequest(map[string]any{"error": "terminal is disabled"})
+	params acpsdk.KillTerminalRequest,
+) (acpsdk.KillTerminalResponse, error) {
+	return acpsdk.KillTerminalResponse{}, acpsdk.NewInvalidRequest(map[string]any{"error": "terminal is disabled"})
 }
 
 func (c *runClient) TerminalOutput(

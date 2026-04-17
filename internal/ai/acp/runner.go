@@ -195,7 +195,7 @@ func (r *Runner) Run(ctx context.Context, req RunRequest) (RunResponse, error) {
 	if _, err := conn.Initialize(runCtx, acpsdk.InitializeRequest{
 		ProtocolVersion: acpsdk.ProtocolVersionNumber,
 		ClientCapabilities: acpsdk.ClientCapabilities{
-			Fs:       acpsdk.FileSystemCapability{ReadTextFile: false, WriteTextFile: false},
+			Fs:       acpsdk.FileSystemCapabilities{ReadTextFile: false, WriteTextFile: false},
 			Terminal: false,
 		},
 	}); err != nil {
