@@ -13,23 +13,48 @@ import (
 )
 
 // RuntimeSnapshot captures the subset of final-stage instructions that
-// AI AutoFix objectives must preserve byte-for-byte in a proposed rewrite.
-// Objectives extract snapshots from the original and proposed Dockerfiles
-// and then compare them with CompareFinalStageRuntime.
+// AI AutoFix objectives must preserve byte-for-byte in a proposed rewrite
+// and that prompt builders need to summarize for the agent.
+//
+// Pointer fields (Cmd, Entrypoint, User, Workdir, Health) reference the
+// last occurrence and drive the equality validators. Count fields record
+// how many times the corresponding instruction appears and are used by
+// prompt summaries. Per-instruction occurrence slices (AllWorkdirs, …)
+// and aggregated key/port slices (Env, Labels, Expose) support both the
+// validators and the prompt renderer without re-walking stage.Commands.
 type RuntimeSnapshot struct {
 	Cmd        *instructions.CmdCommand
 	Entrypoint *instructions.EntrypointCommand
 	User       *instructions.UserCommand
-	Expose     []string
 	Workdir    *instructions.WorkdirCommand
-	Env        instructions.KeyValuePairs
-	Labels     instructions.KeyValuePairs
 	Health     *instructions.HealthCheckCommand
+
+	// Aggregated equality-validation values (all occurrences flattened).
+	Expose []string
+	Env    instructions.KeyValuePairs
+	Labels instructions.KeyValuePairs
+
+	// Per-instruction occurrence counts.
+	CmdCount        int
+	EntrypointCount int
+	UserCount       int
+	WorkdirCount    int
+	HealthCount     int
+	EnvCount        int
+	LabelCount      int
+	ExposeCount     int
+
+	// Stringified per-occurrence renderings, used by prompt summaries.
+	AllCmds        []string
+	AllEntrypoints []string
+	AllUsers       []string
+	AllWorkdirs    []string
+	AllHealths     []string
 }
 
 // ExtractFinalStageRuntime returns a RuntimeSnapshot for the final stage of
-// parsed. It walks every instruction in the final stage and captures the
-// runtime-relevant ones, ignoring RUN, COPY, ADD, FROM, ARG, etc.
+// parsed. It walks every instruction in the final stage once and captures
+// the runtime-relevant ones, ignoring RUN, COPY, ADD, FROM, ARG, etc.
 func ExtractFinalStageRuntime(parsed *dockerfile.ParseResult) RuntimeSnapshot {
 	if parsed == nil || len(parsed.Stages) == 0 {
 		return RuntimeSnapshot{}
@@ -43,23 +68,54 @@ func extractRuntime(stage instructions.Stage) RuntimeSnapshot {
 		switch c := cmd.(type) {
 		case *instructions.CmdCommand:
 			rt.Cmd = c
+			rt.CmdCount++
+			rt.AllCmds = append(rt.AllCmds, c.String())
 		case *instructions.EntrypointCommand:
 			rt.Entrypoint = c
+			rt.EntrypointCount++
+			rt.AllEntrypoints = append(rt.AllEntrypoints, c.String())
 		case *instructions.UserCommand:
 			rt.User = c
+			rt.UserCount++
+			rt.AllUsers = append(rt.AllUsers, c.String())
 		case *instructions.ExposeCommand:
+			rt.ExposeCount++
 			rt.Expose = append(rt.Expose, c.Ports...)
 		case *instructions.WorkdirCommand:
 			rt.Workdir = c
+			rt.WorkdirCount++
+			rt.AllWorkdirs = append(rt.AllWorkdirs, c.String())
 		case *instructions.EnvCommand:
+			rt.EnvCount++
 			rt.Env = append(rt.Env, c.Env...)
 		case *instructions.LabelCommand:
+			rt.LabelCount++
 			rt.Labels = append(rt.Labels, c.Labels...)
 		case *instructions.HealthCheckCommand:
 			rt.Health = c
+			rt.HealthCount++
+			rt.AllHealths = append(rt.AllHealths, c.String())
 		}
 	}
 	return rt
+}
+
+// EnvKeys returns every ENV key captured in rt, preserving declaration order.
+func (rt RuntimeSnapshot) EnvKeys() []string {
+	keys := make([]string, 0, len(rt.Env))
+	for _, kv := range rt.Env {
+		keys = append(keys, kv.Key)
+	}
+	return keys
+}
+
+// LabelKeys returns every LABEL key captured in rt, preserving declaration order.
+func (rt RuntimeSnapshot) LabelKeys() []string {
+	keys := make([]string, 0, len(rt.Labels))
+	for _, kv := range rt.Labels {
+		keys = append(keys, kv.Key)
+	}
+	return keys
 }
 
 // FinalStageRuntimeErrors compares the final-stage runtime invariants of orig

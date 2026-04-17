@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/config"
@@ -149,20 +148,6 @@ Rules (strict):
 `)
 }
 
-type finalStageRuntime struct {
-	workdir     []string
-	user        []string
-	envKeys     []string
-	envCount    int
-	labelKeys   []string
-	labelCount  int
-	exposePorts []string
-	exposeCount int
-	healthcheck []string
-	entrypoint  []string
-	cmd         []string
-}
-
 func summarizeFinalStageRuntime(parsed *dockerfile.ParseResult, source []byte, cfg *config.Config) (string, error) {
 	if parsed == nil {
 		var err error
@@ -175,8 +160,7 @@ func summarizeFinalStageRuntime(parsed *dockerfile.ParseResult, source []byte, c
 		return "", errors.New("ai-autofix: parsed Dockerfile has no stages")
 	}
 
-	stage := parsed.Stages[len(parsed.Stages)-1]
-	rt := extractFinalStageRuntime(stage)
+	rt := autofixdata.ExtractFinalStageRuntime(parsed)
 
 	lines := make([]string, 0, 10)
 	present := map[string]bool{}
@@ -202,14 +186,14 @@ func summarizeFinalStageRuntime(parsed *dockerfile.ParseResult, source []byte, c
 	}
 
 	upper := strings.ToUpper
-	addLine(upper(command.Workdir), upper(command.Workdir), len(rt.workdir), strings.Join(rt.workdir, " | "))
-	addLine(upper(command.User), upper(command.User), len(rt.user), strings.Join(rt.user, " | "))
-	addLine(upper(command.Env), upper(command.Env), rt.envCount, "keys="+autofixdata.FormatList(rt.envKeys, 8))
-	addLine(upper(command.Label), upper(command.Label), rt.labelCount, "keys="+autofixdata.FormatList(rt.labelKeys, 8))
-	addLine(upper(command.Expose), upper(command.Expose), rt.exposeCount, "ports="+autofixdata.FormatList(rt.exposePorts, 12))
-	addLine(upper(command.Healthcheck), upper(command.Healthcheck), len(rt.healthcheck), strings.Join(rt.healthcheck, " | "))
-	addLine(upper(command.Entrypoint), upper(command.Entrypoint), len(rt.entrypoint), strings.Join(rt.entrypoint, " | "))
-	addLine(upper(command.Cmd), upper(command.Cmd), len(rt.cmd), strings.Join(rt.cmd, " | "))
+	addLine(upper(command.Workdir), upper(command.Workdir), rt.WorkdirCount, strings.Join(rt.AllWorkdirs, " | "))
+	addLine(upper(command.User), upper(command.User), rt.UserCount, strings.Join(rt.AllUsers, " | "))
+	addLine(upper(command.Env), upper(command.Env), rt.EnvCount, "keys="+autofixdata.FormatList(rt.EnvKeys(), 8))
+	addLine(upper(command.Label), upper(command.Label), rt.LabelCount, "keys="+autofixdata.FormatList(rt.LabelKeys(), 8))
+	addLine(upper(command.Expose), upper(command.Expose), rt.ExposeCount, "ports="+autofixdata.FormatList(rt.Expose, 12))
+	addLine(upper(command.Healthcheck), upper(command.Healthcheck), rt.HealthCount, strings.Join(rt.AllHealths, " | "))
+	addLine(upper(command.Entrypoint), upper(command.Entrypoint), rt.EntrypointCount, strings.Join(rt.AllEntrypoints, " | "))
+	addLine(upper(command.Cmd), upper(command.Cmd), rt.CmdCount, strings.Join(rt.AllCmds, " | "))
 
 	orderedKeys := []string{
 		upper(command.Workdir), upper(command.User), upper(command.Env), upper(command.Label),
@@ -230,38 +214,6 @@ func summarizeFinalStageRuntime(parsed *dockerfile.ParseResult, source []byte, c
 	}
 
 	return strings.Join(lines, "\n") + "\n", nil
-}
-
-func extractFinalStageRuntime(stage instructions.Stage) finalStageRuntime {
-	var rt finalStageRuntime
-	for _, cmd := range stage.Commands {
-		switch c := cmd.(type) {
-		case *instructions.WorkdirCommand:
-			rt.workdir = append(rt.workdir, c.String())
-		case *instructions.UserCommand:
-			rt.user = append(rt.user, c.String())
-		case *instructions.EnvCommand:
-			rt.envCount++
-			for _, kv := range c.Env {
-				rt.envKeys = append(rt.envKeys, kv.Key)
-			}
-		case *instructions.LabelCommand:
-			rt.labelCount++
-			for _, kv := range c.Labels {
-				rt.labelKeys = append(rt.labelKeys, kv.Key)
-			}
-		case *instructions.ExposeCommand:
-			rt.exposeCount++
-			rt.exposePorts = append(rt.exposePorts, c.Ports...)
-		case *instructions.HealthCheckCommand:
-			rt.healthcheck = append(rt.healthcheck, c.String())
-		case *instructions.EntrypointCommand:
-			rt.entrypoint = append(rt.entrypoint, c.String())
-		case *instructions.CmdCommand:
-			rt.cmd = append(rt.cmd, c.String())
-		}
-	}
-	return rt
 }
 
 // --- Multi-stage-specific validation ---
