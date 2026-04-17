@@ -1,7 +1,6 @@
 package gpu
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -10,6 +9,7 @@ import (
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 // PreferUVOverCondaRuleCode is the full rule code for the prefer-uv-over-conda rule.
@@ -58,8 +58,13 @@ var condaPythonMLPackages = map[string]bool{
 	"pillow":          true,
 }
 
-// condaEnvCreateRe matches conda/mamba/micromamba `env create` invocations.
-var condaEnvCreateRe = regexp.MustCompile(`\b(conda|mamba|micromamba)\s+env\s+create\b`)
+// condaManagers enumerates the conda-family package managers recognized by
+// this rule. shell.FindInstallPackages uses the same identifiers.
+var condaManagers = map[string]bool{
+	"conda":      true,
+	"mamba":      true,
+	"micromamba": true,
+}
 
 // condaEnvFileBasenames lists COPY source basenames that indicate a heavy
 // conda environment-management workflow (not a simple package install).
@@ -143,36 +148,29 @@ func (r *PreferUVOverCondaRule) checkStage(
 		if runFacts == nil || runFacts.Run == nil {
 			continue
 		}
-		script := runFacts.SourceScript
-		if script == "" {
-			script = runFacts.CommandScript
-		}
-		if script == "" {
-			continue
-		}
-		// Skip RUNs that use `conda env create` so we don't double-count them
-		// against the suppression that already ran at file level.
-		if condaEnvCreateRe.MatchString(script) {
-			continue
-		}
-		manager, packages := findCondaMLPackageInstall(script)
-		if len(packages) == 0 {
-			continue
-		}
-		line := 0
-		if loc := runFacts.Run.Location(); len(loc) > 0 {
-			line = loc[0].Start.Line
-		}
-		evidence := strings.TrimSpace(runFacts.Run.String())
-		signals = append(signals, autofixdata.Signal{
-			Kind:     autofixdata.SignalKindPackageInstall,
-			Manager:  manager,
-			Packages: packages,
-			Evidence: evidence,
-			Line:     line,
-		})
-		if firstRun == nil {
-			firstRun = runFacts.Run
+		for _, ic := range runFacts.InstallCommands {
+			if !condaManagers[ic.Manager] {
+				continue
+			}
+			pkgs := condaMLPackageNames(ic)
+			if len(pkgs) == 0 {
+				continue
+			}
+			line := 0
+			if loc := runFacts.Run.Location(); len(loc) > 0 {
+				line = loc[0].Start.Line
+			}
+			evidence := strings.TrimSpace(runFacts.Run.String())
+			signals = append(signals, autofixdata.Signal{
+				Kind:     autofixdata.SignalKindPackageInstall,
+				Manager:  ic.Manager,
+				Packages: pkgs,
+				Evidence: evidence,
+				Line:     line,
+			})
+			if firstRun == nil {
+				firstRun = runFacts.Run
+			}
 		}
 	}
 
@@ -234,92 +232,13 @@ func stageGPUOriented(stageFacts *facts.StageFacts, stageInfo *semantic.StageInf
 	return pytorchImageNames[name]
 }
 
-// isCondaManager reports whether the command name is a conda-family package
-// manager used as a Python installer.
-func isCondaManager(manager string) bool {
-	switch manager {
-	case "conda", "mamba", "micromamba":
-		return true
-	}
-	return false
-}
-
-// condaInstallRe matches a conda/mamba/micromamba install segment and captures
-// the manager name in group 1. The regex is anchored to word boundaries so it
-// does not match `conda-lock`, `mamba-forge`, etc.
-var condaInstallRe = regexp.MustCompile(`(?i)(?:^|[\s;&|(` + "`" + `])(conda|mamba|micromamba)\s+install\b`)
-
-// findCondaMLPackageInstall scans a shell script for conda/mamba/micromamba
-// install invocations and returns the first manager + Python/ML packages
-// present. Returns ("", nil) when no qualifying install is found.
-func findCondaMLPackageInstall(script string) (string, []string) {
-	lower := strings.ToLower(script)
-	matches := condaInstallRe.FindAllStringIndex(lower, -1)
-	if len(matches) == 0 {
-		return "", nil
-	}
-
-	for _, m := range matches {
-		manager := extractCondaManager(lower[m[0]:m[1]])
-		segStart := m[1]
-		segEnd := commandSegmentEnd(lower, segStart)
-		pkgs := extractMLPackagesFromArgs(lower[segStart:segEnd])
-		if len(pkgs) > 0 {
-			return manager, pkgs
-		}
-	}
-	return "", nil
-}
-
-// extractCondaManager extracts conda|mamba|micromamba from a matched prefix.
-func extractCondaManager(prefix string) string {
-	prefix = strings.ToLower(prefix)
-	switch {
-	case strings.Contains(prefix, "micromamba"):
-		return "micromamba"
-	case strings.Contains(prefix, "mamba"):
-		return "mamba"
-	default:
-		return "conda"
-	}
-}
-
-// commandSegmentEnd returns the end offset of the current shell command
-// segment starting at idx, stopping at `&&`, `||`, `;`, `|`, or EOS.
-// Backslash-newline continuations are part of the same segment and are
-// treated as whitespace.
-func commandSegmentEnd(s string, start int) int {
-	for i := start; i < len(s); i++ {
-		c := s[i]
-		if c == ';' {
-			return i
-		}
-		if c == '|' || c == '&' {
-			return i
-		}
-	}
-	return len(s)
-}
-
-// extractMLPackagesFromArgs scans the argument region after `install` and
-// returns matching Python/ML package names. Arguments starting with `-` are
-// flags and are skipped. A flag that takes a value consumes the next token.
-func extractMLPackagesFromArgs(args string) []string {
-	tokens := strings.Fields(args)
+// condaMLPackageNames returns the subset of packages from a conda-family
+// install command that match the known Python/ML package list.
+func condaMLPackageNames(ic shell.InstallCommand) []string {
 	var pkgs []string
 	seen := make(map[string]bool)
-	for i := 0; i < len(tokens); i++ {
-		tok := tokens[i]
-		if tok == "\\" {
-			continue
-		}
-		if strings.HasPrefix(tok, "-") {
-			if condaFlagTakesValue(tok) && i+1 < len(tokens) {
-				i++
-			}
-			continue
-		}
-		name := normalizeCondaPackageName(tok)
+	for _, pkg := range ic.Packages {
+		name := normalizeCondaPackageName(pkg.Normalized)
 		if name == "" || seen[name] {
 			continue
 		}
@@ -329,26 +248,6 @@ func extractMLPackagesFromArgs(args string) []string {
 		}
 	}
 	return pkgs
-}
-
-// condaFlagTakesValue reports whether a conda-family install flag consumes
-// the next argument as its value. `--flag=value` is self-contained and does
-// not count.
-func condaFlagTakesValue(flag string) bool {
-	if strings.Contains(flag, "=") {
-		return false
-	}
-	switch flag {
-	case "-c", "--channel",
-		"-n", "--name",
-		"-p", "--prefix",
-		"-f", "--file",
-		"--override-channels",
-		"--repodata-fn",
-		"--subdir":
-		return true
-	}
-	return false
 }
 
 // normalizeCondaPackageName lowercases a conda package argument and strips a
@@ -390,10 +289,53 @@ func hasHeavyCondaEnvWorkflow(fileFacts *facts.FileFacts) bool {
 			if runFacts == nil {
 				continue
 			}
-			if condaEnvCreateRe.MatchString(runFacts.SourceScript) ||
-				condaEnvCreateRe.MatchString(runFacts.CommandScript) {
+			if runHasCondaEnvCreate(runFacts) {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+// condaEnvSubcommand and condaEnvCreateAction name the tokens used by the
+// conda/mamba/micromamba `env create` workflow. These are shell subcommands,
+// not Dockerfile instruction keywords.
+const (
+	condaEnvSubcommand   = "env" //nolint:customlint // shell subcommand, not Dockerfile ENV
+	condaEnvCreateAction = "create"
+)
+
+// runHasCondaEnvCreate returns true when a RUN invokes
+// `conda|mamba|micromamba env create` as parsed by the shell AST.
+func runHasCondaEnvCreate(runFacts *facts.RunFacts) bool {
+	script := runFacts.SourceScript
+	if script == "" {
+		script = runFacts.CommandScript
+	}
+	if script == "" {
+		return false
+	}
+	cmds := shell.FindCommands(script, runFacts.Shell.Variant, "conda", "mamba", "micromamba")
+	for _, cmd := range cmds {
+		if cmd.Subcommand != condaEnvSubcommand {
+			continue
+		}
+		// After the subcommand, look for `create` as the next non-flag arg.
+		sawEnv := false
+		for _, a := range cmd.Args {
+			if !sawEnv {
+				if a == condaEnvSubcommand {
+					sawEnv = true
+				}
+				continue
+			}
+			if strings.HasPrefix(a, "-") {
+				continue
+			}
+			if a == condaEnvCreateAction {
+				return true
+			}
+			break
 		}
 	}
 	return false

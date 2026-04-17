@@ -5,7 +5,6 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -13,6 +12,7 @@ import (
 	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/dockerfile"
 	patchutil "github.com/wharflab/tally/internal/patch"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 func init() {
@@ -156,14 +156,9 @@ Rules (strict):
 
 // --- Migration validation ---
 
-// condaPythonMLInstallRe matches conda/mamba/micromamba install commands.
-// Used as a first filter; callers then check for Python/ML package names
-// inside the match range.
-var condaPythonMLInstallRe = regexp.MustCompile(`(?m)\b(?:conda|mamba|micromamba)\s+install\b`)
-
-// uvOverCondaMigrationErrors reports migration-level validation failures on
-// the proposed Dockerfile:
-//   - remaining conda/mamba/micromamba installs of Python/ML packages.
+// uvOverCondaMigrationErrors walks the proposed Dockerfile's RUN instructions,
+// parses each with shell.FindInstallPackages, and reports every
+// conda/mamba/micromamba install that still targets a known Python/ML package.
 func uvOverCondaMigrationErrors(proposed *dockerfile.ParseResult) []error {
 	if proposed == nil {
 		return nil
@@ -179,79 +174,37 @@ func uvOverCondaMigrationErrors(proposed *dockerfile.ParseResult) []error {
 			if script == "" {
 				continue
 			}
-			lower := strings.ToLower(script)
-			if !condaPythonMLInstallRe.MatchString(lower) {
-				continue
-			}
-			if offending := firstCondaPythonMLPackage(lower); offending != "" {
-				errs = append(errs, fmt.Errorf(
-					"proposed Dockerfile still installs Python/ML package %q via conda/mamba/micromamba; migrate it to uv",
-					offending,
-				))
+			for _, ic := range shell.FindInstallPackages(script, shell.VariantBash) {
+				if !condaManagers[ic.Manager] {
+					continue
+				}
+				if offending := firstCondaMLPackageName(ic); offending != "" {
+					errs = append(errs, fmt.Errorf(
+						"proposed Dockerfile still installs Python/ML package %q via %s; migrate it to uv",
+						offending, ic.Manager,
+					))
+					break // one blocking issue per RUN is enough
+				}
 			}
 		}
 	}
 	return errs
 }
 
-// firstCondaPythonMLPackage returns the first Python/ML package name from the
-// package list that appears in a conda-family install command, or "" if the
-// install only touches non-ML packages (e.g., gcc, cmake).
-func firstCondaPythonMLPackage(lowerScript string) string {
-	for name := range condaPythonMLPackages {
-		if !containsAsToken(lowerScript, name) {
-			continue
+// firstCondaMLPackageName returns the first Python/ML package in ic, or "".
+func firstCondaMLPackageName(ic shell.InstallCommand) string {
+	for _, pkg := range ic.Packages {
+		name := normalizeCondaPackageName(pkg.Normalized)
+		if condaPythonMLPackages[name] {
+			return name
 		}
-		return name
 	}
 	return ""
 }
 
-// containsAsToken returns true if name appears in s with non-alphanumeric
-// boundaries so "torch" doesn't match "pytorch-cuda".
-func containsAsToken(s, name string) bool {
-	idx := 0
-	for {
-		rel := strings.Index(s[idx:], name)
-		if rel < 0 {
-			return false
-		}
-		pos := idx + rel
-		before := byte(' ')
-		if pos > 0 {
-			before = s[pos-1]
-		}
-		after := byte(' ')
-		if pos+len(name) < len(s) {
-			after = s[pos+len(name)]
-		}
-		if !isPkgNameByte(before) && !isPkgNameByte(after) {
-			return true
-		}
-		idx = pos + 1
-		if idx >= len(s) {
-			return false
-		}
-	}
-}
-
-// isPkgNameByte reports whether a byte can appear inside a Python package name.
-// Matches the set used for typical PyPI/conda package identifiers.
-func isPkgNameByte(b byte) bool {
-	switch {
-	case b >= 'a' && b <= 'z':
-		return true
-	case b >= '0' && b <= '9':
-		return true
-	case b == '_':
-		return true
-	case b == '.':
-		return true
-	}
-	return false
-}
-
-// runScriptText returns the shell script text of a RUN command for string matching.
+// runScriptText returns the shell script text of a RUN command for parsing.
+// Heredoc bodies are treated as the script; shell-form RUN args are joined
+// with spaces so the shell parser can handle them uniformly.
 func runScriptText(run *instructions.RunCommand) string {
 	if run == nil {
 		return ""

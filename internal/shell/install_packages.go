@@ -93,6 +93,19 @@ var (
 		"-p", "--python", "--color",
 		"--allow-insecure-host", "--directory", "--project", "--config-file",
 	}
+	// condaFlags covers conda/mamba/micromamba install flags that consume the
+	// next argument as a value. Long --flag=value forms are self-contained and
+	// do not need to be listed. Short -cXXX combined short-flag aggregation is
+	// not used by conda (flags are always separated).
+	condaFlags = []string{
+		"-c", "--channel",
+		"-n", "--name",
+		"-p", "--prefix",
+		"-f", "--file",
+		"--repodata-fn",
+		"--subdir",
+		"--solver",
+	}
 )
 
 // installManagers maps command names to their install subcommands and flags.
@@ -113,6 +126,12 @@ var installManagers = map[string]installManagerInfo{
 	"composer": {installCommands: []string{"require"}, flagsWithValue: composerFlags},
 	"uv":       {installCommands: []string{"add", "pip install"}, flagsWithValue: uvFlags},
 	"choco":    {installCommands: []string{"install"}, flagsWithValue: chocoFlags},
+	// conda-family package managers used as Python package installers.
+	// `conda env create`, `conda run`, etc. are not treated as package
+	// installs; only the `install` subcommand is recognized here.
+	"conda":      {installCommands: []string{"install"}, flagsWithValue: condaFlags},
+	"mamba":      {installCommands: []string{"install"}, flagsWithValue: condaFlags},
+	"micromamba": {installCommands: []string{"install"}, flagsWithValue: condaFlags},
 }
 
 // pipFileArgs are pip arguments that indicate file-based or local install (skip sorting).

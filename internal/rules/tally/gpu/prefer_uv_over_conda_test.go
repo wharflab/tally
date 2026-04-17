@@ -237,17 +237,17 @@ func TestNormalizeCondaPackageName(t *testing.T) {
 	}
 }
 
-func TestIsCondaManager(t *testing.T) {
+func TestCondaManagers(t *testing.T) {
 	t.Parallel()
 
 	for _, m := range []string{"conda", "mamba", "micromamba"} {
-		if !isCondaManager(m) {
-			t.Errorf("isCondaManager(%q) = false, want true", m)
+		if !condaManagers[m] {
+			t.Errorf("condaManagers[%q] = false, want true", m)
 		}
 	}
 	for _, m := range []string{"", "pip", "pip3", "uv", "apt", "apt-get"} {
-		if isCondaManager(m) {
-			t.Errorf("isCondaManager(%q) = true, want false", m)
+		if condaManagers[m] {
+			t.Errorf("condaManagers[%q] = true, want false", m)
 		}
 	}
 }
@@ -644,68 +644,6 @@ func TestUVOverCondaObjective_ValidatePatch(t *testing.T) {
 	}
 }
 
-func TestFirstCondaPythonMLPackage(t *testing.T) {
-	t.Parallel()
-
-	cases := map[string]bool{
-		"conda install -y torch numpy":          true,
-		"conda install -y flash-attn":           true,
-		"micromamba install -y xformers":        true,
-		"conda install -y gcc cmake":            false,
-		"conda install -y build-essential make": false,
-	}
-	for script, wantHit := range cases {
-		got := firstCondaPythonMLPackage(strings.ToLower(script))
-		if wantHit && got == "" {
-			t.Errorf("firstCondaPythonMLPackage(%q) = %q, want non-empty", script, got)
-		}
-		if !wantHit && got != "" {
-			t.Errorf("firstCondaPythonMLPackage(%q) = %q, want empty", script, got)
-		}
-	}
-}
-
-func TestCommandSegmentEnd(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		name string
-		in   string
-		want int
-	}{
-		{"no terminator", "install torch", len("install torch")},
-		{"semicolon", "install torch; echo", len("install torch")},
-		{"pipe", "install torch | grep x", len("install torch ")},
-		{"ampersand", "install torch && echo", len("install torch ")},
-		{"newline stays inside segment", "install \\\nfoo", len("install \\\nfoo")},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			if got := commandSegmentEnd(tc.in, 0); got != tc.want {
-				t.Errorf("commandSegmentEnd(%q) = %d, want %d", tc.in, got, tc.want)
-			}
-		})
-	}
-}
-
-func TestIsPkgNameByte(t *testing.T) {
-	t.Parallel()
-
-	yes := []byte{'a', 'z', '0', '9', '_', '.'}
-	for _, b := range yes {
-		if !isPkgNameByte(b) {
-			t.Errorf("isPkgNameByte(%q) = false, want true", b)
-		}
-	}
-	no := []byte{' ', '-', '+', '=', '"', 'A', 'Z'}
-	for _, b := range no {
-		if isPkgNameByte(b) {
-			t.Errorf("isPkgNameByte(%q) = true, want false", b)
-		}
-	}
-}
-
 func TestStageGPUOriented_NilInputs(t *testing.T) {
 	t.Parallel()
 
@@ -720,21 +658,6 @@ func TestHasHeavyCondaEnvWorkflow_NilStage(t *testing.T) {
 	input := testutil.MakeLintInput(t, "Dockerfile", "FROM nvidia/cuda:12.1.0-devel-ubuntu22.04\nRUN echo ok\n")
 	if hasHeavyCondaEnvWorkflow(input.Facts) {
 		t.Error("hasHeavyCondaEnvWorkflow with no env signals = true, want false")
-	}
-}
-
-func TestCondaFlagTakesValue(t *testing.T) {
-	t.Parallel()
-
-	for _, flag := range []string{"-c", "--channel", "-n", "--name", "-p", "--prefix", "-f", "--file"} {
-		if !condaFlagTakesValue(flag) {
-			t.Errorf("condaFlagTakesValue(%q) = false, want true", flag)
-		}
-	}
-	for _, flag := range []string{"--yes", "-y", "--no-deps", "--channel=foo", ""} {
-		if condaFlagTakesValue(flag) {
-			t.Errorf("condaFlagTakesValue(%q) = true, want false", flag)
-		}
 	}
 }
 
@@ -774,26 +697,6 @@ func TestRunScriptText_Heredoc(t *testing.T) {
 	got := runScriptText(heredocRun)
 	if !strings.Contains(got, "conda install") {
 		t.Errorf("runScriptText(heredoc) did not return heredoc body, got %q", got)
-	}
-}
-
-func TestContainsAsToken(t *testing.T) {
-	t.Parallel()
-
-	if !containsAsToken("conda install -y torch", "torch") {
-		t.Error("expected token match for torch")
-	}
-	// "pytorch-cuda" should not match bare "torch" because the boundary rule
-	// excludes it (when preceded by alphanumeric characters).
-	if containsAsToken("conda install pytorch-cuda", "torch") {
-		t.Error("bare 'torch' should not match inside 'pytorch-cuda'")
-	}
-	if !containsAsToken("install xformers ", "xformers") {
-		t.Error("expected token match for xformers")
-	}
-	// substring at very start
-	if !containsAsToken("torch", "torch") {
-		t.Error("expected match when substring is whole string")
 	}
 }
 
