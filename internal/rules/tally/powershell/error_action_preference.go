@@ -261,7 +261,7 @@ func (r *ErrorActionPreferenceRule) checkExplicitWrapper(
 		WithDetail(detail)
 	v.StageIndex = p.stageIdx
 
-	if fix := r.buildWrapperFix(p, run, script, invocation, !scriptHasStop, !scriptHasNative); fix != nil {
+	if fix := r.buildWrapperFix(p, run, invocation, !scriptHasStop, !scriptHasNative); fix != nil {
 		v = v.WithSuggestedFix(fix)
 	}
 
@@ -278,7 +278,6 @@ func (r *ErrorActionPreferenceRule) checkExplicitWrapper(
 func (r *ErrorActionPreferenceRule) buildWrapperFix(
 	p checkParams,
 	run *instructions.RunCommand,
-	_ string,
 	invocation explicitPowerShellInvocation,
 	needStop bool,
 	needNative bool,

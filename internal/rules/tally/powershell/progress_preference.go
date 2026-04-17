@@ -148,7 +148,7 @@ func (r *ProgressPreferenceRule) checkRun(p progressCheckParams, run *instructio
 		if progressPreferenceSet(invocation.script) {
 			return nil
 		}
-		return r.violationForWrapper(p, run, script, invocation)
+		return r.violationForWrapper(p, run, invocation)
 	}
 
 	// Path 3: stage shell is PowerShell. SHELL + script both contribute to the prelude.
@@ -189,7 +189,6 @@ func (r *ProgressPreferenceRule) violationForPowerShellRun(p progressCheckParams
 func (r *ProgressPreferenceRule) violationForWrapper(
 	p progressCheckParams,
 	run *instructions.RunCommand,
-	script string,
 	invocation explicitPowerShellInvocation,
 ) *rules.Violation {
 	loc := rules.NewLocationFromRanges(p.file, run.Location())
@@ -198,7 +197,7 @@ func (r *ProgressPreferenceRule) violationForWrapper(
 	}
 
 	v := newProgressPreferenceViolation(loc, p.meta, p.stageIdx)
-	if fix := buildWrapperFix(p.file, p.sm, run, script, invocation, p.meta.FixPriority); fix != nil {
+	if fix := buildWrapperFix(p.file, p.sm, run, invocation, p.meta.FixPriority); fix != nil {
 		v = v.WithSuggestedFix(fix)
 	}
 	return &v
@@ -412,7 +411,6 @@ func buildWrapperFix(
 	file string,
 	sm *sourcemap.SourceMap,
 	run *instructions.RunCommand,
-	_ string,
 	invocation explicitPowerShellInvocation,
 	priority int,
 ) *rules.SuggestedFix {
