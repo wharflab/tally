@@ -93,8 +93,13 @@ func wrapperInsertionPoint(
 		return 0, 0, false
 	}
 
+	// Use a single lower-cased view of the source for both anchor lookups.
+	// PowerShell identifiers are case-insensitive and tree-sitter may
+	// normalize casing differently from the raw source, so the executable
+	// anchor and the inner-script first-token anchor must agree.
+	sourceLower := strings.ToLower(source)
 	exeLower := strings.ToLower(invocation.executable)
-	anchorIdx := strings.Index(strings.ToLower(source), exeLower)
+	anchorIdx := strings.Index(sourceLower, exeLower)
 	if anchorIdx < 0 {
 		return 0, 0, false
 	}
@@ -104,7 +109,7 @@ func wrapperInsertionPoint(
 	if firstToken == "" {
 		return 0, 0, false
 	}
-	relIdx := strings.Index(source[searchStart:], firstToken)
+	relIdx := strings.Index(sourceLower[searchStart:], strings.ToLower(firstToken))
 	if relIdx < 0 {
 		return 0, 0, false
 	}
