@@ -1896,6 +1896,106 @@ severity = "warning"
 			wantApplied: 1, // only prefer-shell-instruction applies
 		},
 
+		// PowerShell progress-preference: SHELL missing $ProgressPreference
+		// (Shape A — last arg is bare "-Command").
+		{
+			name: "powershell-progress-preference-missing-shell",
+			input: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				"SHELL [\"pwsh\", \"-Command\"]\n" +
+				"RUN Invoke-WebRequest https://example.com/a.zip -OutFile /tmp/a.zip\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/powershell/progress-preference")...),
+			wantApplied: 1,
+		},
+		// PowerShell progress-preference: SHELL has partial prelude
+		// (Shape B — last arg already carries a trailing-`;` preamble).
+		{
+			name: "powershell-progress-preference-shell-has-partial",
+			input: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				"SHELL [\"pwsh\", \"-Command\", \"$ErrorActionPreference = 'Stop';\"]\n" +
+				"RUN Invoke-WebRequest https://example.com/b.zip -OutFile /tmp/b.zip\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/powershell/progress-preference")...),
+			wantApplied: 1,
+		},
+		// PowerShell progress-preference: RUN without IWR — no fix.
+		{
+			name: "powershell-progress-preference-no-iwr-no-fix",
+			input: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				"SHELL [\"pwsh\", \"-Command\"]\n" +
+				"RUN Install-Module PSReadLine -Force\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/powershell/progress-preference")...),
+			wantApplied: 0,
+		},
+		// PowerShell progress-preference: explicit pwsh -Command wrapper
+		// (Shape D — inner-script zero-width insertion) from a bash stage.
+		{
+			name: "powershell-progress-preference-explicit-wrapper",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN pwsh -Command \"Invoke-WebRequest https://example.com/c.zip -OutFile /tmp/c.zip\"\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/powershell/progress-preference")...),
+			wantApplied: 1,
+		},
+		// PowerShell progress-preference: backtick-continued powershell wrapper
+		// in a Windows servercore stage — exercises backtick continuation path.
+		{
+			name: "powershell-progress-preference-windows-backtick",
+			input: "# escape=`\n" +
+				"FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"RUN powershell -Command `\n" +
+				"    Invoke-WebRequest -Uri https://example.com/setup.exe " +
+				"-OutFile C:\\setup.exe\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/powershell/progress-preference")...),
+			wantApplied: 1,
+		},
+
+		// Cross-rule: progress-preference + prefer-shell-instruction both
+		// enabled. prefer-shell-instruction (priority 95) wins because its
+		// SHELL insertion carries the full prelude (including
+		// $ProgressPreference). progress-preference's SHELL edit is dropped
+		// by conflict resolution.
+		{
+			name: "powershell-progress-preference-cross-prefer-shell-instruction",
+			input: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				"RUN pwsh -Command Invoke-WebRequest https://example.com/a.zip -OutFile /tmp/a.zip\n" +
+				"RUN pwsh -Command Invoke-WebRequest https://example.com/b.zip -OutFile /tmp/b.zip\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules(
+					"tally/powershell/progress-preference",
+					"tally/powershell/prefer-shell-instruction",
+				)...),
+			wantApplied: 1, // only prefer-shell-instruction applies
+		},
+
+		// Cross-rule: progress-preference + error-action-preference both
+		// enabled on the same SHELL line. Both fixes are zero-width
+		// insertions before the closing `]`, so they stack rather than
+		// conflict — both apply and the SHELL ends up with two array
+		// elements carrying complementary preludes. The result is verbose
+		// but correct; see snapshot.
+		{
+			name: "powershell-progress-preference-cross-error-action-preference",
+			input: "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+				"SHELL [\"pwsh\", \"-Command\"]\n" +
+				"RUN Invoke-WebRequest https://example.com/a.zip -OutFile /tmp/a.zip; Write-Host done\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules(
+					"tally/powershell/progress-preference",
+					"tally/powershell/error-action-preference",
+				)...),
+			wantApplied: 2, // both rules' zero-width SHELL-line insertions apply
+		},
+
 		// Prefer canonical STOPSIGNAL: missing SIG prefix → SIGTERM (FixSafe)
 		{
 			name:  "prefer-canonical-stopsignal-prefix",

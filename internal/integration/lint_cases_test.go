@@ -256,6 +256,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/powershell/error-action-preference")...),
 			wantExit: 1,
 		},
+		// PowerShell: progress-preference
+		{
+			name:     "powershell-progress-preference",
+			dir:      "powershell-progress-preference",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/powershell/progress-preference")...),
+			wantExit: 1,
+		},
 		{
 			name:     "php-composer-no-dev-in-production",
 			dir:      "php-composer-no-dev-in-production",

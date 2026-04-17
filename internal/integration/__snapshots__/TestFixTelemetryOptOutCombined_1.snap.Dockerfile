@@ -39,7 +39,7 @@ FROM mcr.microsoft.com/windows/servercore:ltsc2022 AS win
 # [tally] settings to opt out from telemetry
 ENV POWERSHELL_TELEMETRY_OPTOUT=1 VCPKG_DISABLE_METRICS=1
 
-	SHELL ["powershell","-Command","$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+	SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
 
 	RUN <<-EOF
 		$ErrorActionPreference = 'Stop'

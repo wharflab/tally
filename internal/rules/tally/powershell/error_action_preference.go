@@ -261,7 +261,7 @@ func (r *ErrorActionPreferenceRule) checkExplicitWrapper(
 		WithDetail(detail)
 	v.StageIndex = p.stageIdx
 
-	if fix := r.buildWrapperFix(p, run, script, invocation, !scriptHasStop, !scriptHasNative); fix != nil {
+	if fix := r.buildWrapperFix(p, run, invocation, !scriptHasStop, !scriptHasNative); fix != nil {
 		v = v.WithSuggestedFix(fix)
 	}
 
@@ -278,45 +278,16 @@ func (r *ErrorActionPreferenceRule) checkExplicitWrapper(
 func (r *ErrorActionPreferenceRule) buildWrapperFix(
 	p checkParams,
 	run *instructions.RunCommand,
-	_ string,
 	invocation explicitPowerShellInvocation,
 	needStop bool,
 	needNative bool,
 ) *rules.SuggestedFix {
-	if p.sm == nil || len(run.Location()) == 0 {
+	insertLine, insertCol, ok := wrapperInsertionPoint(p.sm, run, invocation)
+	if !ok {
 		return nil
 	}
-
 	startLine := run.Location()[0].Start.Line
-	endLine := run.Location()[len(run.Location())-1].End.Line
-
-	// Use Snippet to get the raw source (0-based line args).
-	source := p.sm.Snippet(startLine-1, endLine-1)
-	if source == "" {
-		return nil
-	}
-
-	// Anchor the search past the executable name to avoid matching tokens
-	// in the "RUN powershell" prefix itself.
-	exeLower := strings.ToLower(invocation.executable)
-	anchorIdx := strings.Index(strings.ToLower(source), exeLower)
-	if anchorIdx < 0 {
-		return nil
-	}
-	searchStart := anchorIdx + len(exeLower)
-
-	firstToken := firstNonWhitespaceWord(invocation.script)
-	if firstToken == "" {
-		return nil
-	}
-	relIdx := strings.Index(source[searchStart:], firstToken)
-	if relIdx < 0 {
-		return nil
-	}
-	insertByte := searchStart + relIdx
-
 	prelude := buildPreludeString(needStop, needNative) + " "
-	insertLine, insertCol := sourcemap.ByteToLineCol(source, insertByte)
 
 	return &rules.SuggestedFix{
 		Description: "Add PowerShell error-handling preferences to wrapper script",
@@ -465,6 +436,14 @@ func (r *ErrorActionPreferenceRule) buildShellModifyFixFromCmd(
 		return nil
 	}
 
+	// Bail out on multi-line SHELL instructions (backslash/backtick
+	// continuations). The bracket/quote search below only scans the first
+	// physical line and would produce an invalid edit. Multi-line SHELL is
+	// rare; we report without a fix in that case.
+	if isMultiLineInstruction(sm, shellCmd.Location()[0]) {
+		return nil
+	}
+
 	sourceLine := sm.Line(shellLine - 1)
 	if sourceLine == "" {
 		return nil
@@ -546,7 +525,10 @@ func (r *ErrorActionPreferenceRule) buildShellInsertFix(
 	executable := shellExecutableForStage(info)
 	preludeToAdd := buildPreludeString(needStop, needNative)
 
-	shellInstruction := `SHELL ["` + executable + `", "-Command", "` + preludeToAdd + `"]`
+	shellArray := formatShellArray([]string{executable, "-Command", preludeToAdd})
+	if shellArray == "" {
+		return nil
+	}
 
 	indent := ""
 	if sm != nil && fromEndLine > 0 && fromEndLine <= sm.LineCount() {
@@ -560,7 +542,7 @@ func (r *ErrorActionPreferenceRule) buildShellInsertFix(
 		Edits: []rules.TextEdit{
 			{
 				Location: rules.NewRangeLocation(file, insertLine, 0, insertLine, 0),
-				NewText:  indent + shellInstruction + "\n",
+				NewText:  indent + "SHELL " + shellArray + "\n",
 			},
 		},
 	}

@@ -1,7 +1,6 @@
 package powershell
 
 import (
-	jsonv2 "encoding/json/v2"
 	"regexp"
 	"slices"
 	"strconv"
@@ -301,8 +300,8 @@ func buildSuggestedFix(
 	shellArgs = append(shellArgs, first.invocation.prefixArgs...)
 	shellArgs = append(shellArgs, "-Command", powerShellPrelude)
 
-	shellJSON, err := jsonv2.Marshal(shellArgs)
-	if err != nil {
+	shellArray := formatShellArray(shellArgs)
+	if shellArray == "" {
 		return nil
 	}
 
@@ -323,7 +322,7 @@ func buildSuggestedFix(
 	edits := make([]rules.TextEdit, 0, len(runEdits)+1)
 	edits = append(edits, rules.TextEdit{
 		Location: rules.NewRangeLocation(file, startLine, 0, startLine, 0),
-		NewText:  indent + "SHELL " + string(shellJSON) + "\n",
+		NewText:  indent + "SHELL " + shellArray + "\n",
 	})
 	edits = append(edits, runEdits...)
 
@@ -1084,8 +1083,8 @@ func buildShellInsertionEdit(
 		return rules.TextEdit{}, false
 	}
 
-	shellJSON, err := jsonv2.Marshal(shellCmd)
-	if err != nil {
+	shellArray := formatShellArray(shellCmd)
+	if shellArray == "" {
 		return rules.TextEdit{}, false
 	}
 
@@ -1098,7 +1097,7 @@ func buildShellInsertionEdit(
 
 	return rules.TextEdit{
 		Location: rules.NewRangeLocation(file, startLine, 0, startLine, 0),
-		NewText:  indent + "SHELL " + string(shellJSON) + "\n",
+		NewText:  indent + "SHELL " + shellArray + "\n",
 	}, true
 }
 

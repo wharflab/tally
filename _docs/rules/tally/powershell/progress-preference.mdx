@@ -1,0 +1,122 @@
+---
+title: "tally/powershell/progress-preference"
+description: "Suppress PowerShell progress bars before `Invoke-WebRequest` by setting `$ProgressPreference = 'SilentlyContinue'`."
+---
+
+Suppress PowerShell progress bars before `Invoke-WebRequest` (or its alias `iwr`)
+by setting `$ProgressPreference = 'SilentlyContinue'`.
+
+| Property | Value |
+|----------|-------|
+| Severity | Style |
+| Category | Style |
+| Default | Enabled |
+| Auto-fix | Yes (`--fix --fix-unsafe`) |
+
+## Description
+
+PowerShell's `Invoke-WebRequest` renders a per-response progress bar by default.
+On Windows containers this collapses download throughput by an order of magnitude
+because the host cannot render the bar and the cmdlet stalls waiting for terminal
+updates. Microsoft's official Windows container guidance is to set
+`$ProgressPreference = 'SilentlyContinue'` before any `Invoke-WebRequest` call.
+
+The rule fires whenever a `RUN` invokes `Invoke-WebRequest` or `iwr` without a
+preceding `$ProgressPreference = 'SilentlyContinue'` assignment. Detection
+does not depend on the stage's default shell — `Invoke-WebRequest` is a
+PowerShell-unique cmdlet, so finding it is itself the shell signal. That way the
+rule catches both SHELL-based PowerShell stages and one-off `powershell -Command`
+wrappers embedded inside bash stages.
+
+## Why this matters
+
+On Windows Server Core images specifically, users have reported
+`Invoke-WebRequest` downloads taking minutes where a `curl` or the same call
+with `$ProgressPreference = 'SilentlyContinue'` takes seconds. The progress bar
+is pure noise in a non-interactive build step.
+
+## Examples
+
+### Before (violation)
+
+```dockerfile
+FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command"]
+RUN Invoke-WebRequest https://example.com/file.zip -OutFile /tmp/file.zip
+```
+
+### After (fixed with `--fix --fix-unsafe`)
+
+```dockerfile
+FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command", "$ProgressPreference = 'SilentlyContinue';"]
+RUN Invoke-WebRequest https://example.com/file.zip -OutFile /tmp/file.zip
+```
+
+### Already clean (no violation)
+
+```dockerfile
+FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $ProgressPreference = 'SilentlyContinue';"]
+RUN Invoke-WebRequest https://example.com/file.zip -OutFile /tmp/file.zip
+```
+
+### Explicit wrapper (violation)
+
+```dockerfile
+FROM ubuntu:22.04
+RUN pwsh -Command "Invoke-WebRequest https://example.com/file.zip -OutFile /tmp/file.zip"
+```
+
+The fix prepends the assignment to the inner script:
+
+```dockerfile
+FROM ubuntu:22.04
+RUN pwsh -Command "$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://example.com/file.zip -OutFile /tmp/file.zip"
+```
+
+## Fix behavior
+
+The fix adapts to where the PowerShell script lives:
+
+- **`SHELL` with bare `-Command`**: appends a new array element
+  `"$ProgressPreference = 'SilentlyContinue';"` to the `SHELL` instruction.
+- **`SHELL` with an existing prelude**: appends the assignment to the existing
+  prelude string, inserting a `;` separator if missing.
+- **No `SHELL` in a PowerShell-by-default stage**: inserts a new `SHELL`
+  instruction after the `FROM`.
+- **Explicit `powershell -Command` / `pwsh -Command` wrapper**: zero-width
+  insertion at the start of the inner script.
+- **`RUN <<EOF` heredoc body** (PowerShell stages only): inserts the assignment
+  on a new line at the start of the heredoc body.
+
+The fix uses `FixSuggestion` safety — it requires `--fix-unsafe` to apply. A
+same-SHELL-scope suppression prevents duplicate SHELL edits when multiple RUNs
+in the same stage violate.
+
+## Interaction with other rules
+
+- **`tally/powershell/prefer-shell-instruction`** (priority 95): when it
+  converts repeated `powershell -Command` wrappers to a `SHELL` instruction, its
+  prelude already contains `$ProgressPreference = 'SilentlyContinue'`. The
+  combined `--fix --fix-unsafe` run lets `prefer-shell-instruction` win;
+  `progress-preference`'s edit is dropped as overlapping.
+- **`tally/powershell/error-action-preference`** (priority 96): both rules edit
+  the `SHELL` instruction with zero-width insertions before the closing `]`.
+  When both are enabled and both trigger, both apply — the resulting `SHELL`
+  carries two complementary array elements, each with its own preamble.
+- **`tally/prefer-run-heredoc`** (priority 100): structural conversion to
+  heredoc runs after the preference is set and carries it into the heredoc
+  body.
+
+## References
+
+- [`$ProgressPreference`](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_preference_variables#progresspreference)
+  — Microsoft Learn: controls how PowerShell renders progress reports. Default
+  is `Continue`; `SilentlyContinue` suppresses the per-response bar.
+- [`Invoke-WebRequest`](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/invoke-webrequest)
+  — Microsoft Learn: cmdlet reference documenting the progress-rendering
+  behavior.
+- [Optimize Windows Dockerfiles](https://learn.microsoft.com/en-us/virtualization/windowscontainers/manage-docker/optimize-windows-dockerfile)
+  — Microsoft Learn: Windows-container-specific Dockerfile guidance, including
+  the `$ProgressPreference` recommendation.
