@@ -3,8 +3,6 @@ package gpu
 import (
 	"strings"
 
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-
 	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
@@ -135,14 +133,16 @@ func (r *PreferUVOverCondaRule) checkWithFacts(
 }
 
 // checkStage emits at most one violation per stage, at the first qualifying
-// conda/mamba/micromamba install.
+// conda/mamba/micromamba install whose RUN carries a source-level location.
+// RUNs with file-level-only locations are promoted past: their signal is
+// still recorded, but a later RUN with a real range provides the anchor.
 func (r *PreferUVOverCondaRule) checkStage(
 	file string,
 	stageFacts *facts.StageFacts,
 	meta rules.RuleMetadata,
 ) (rules.Violation, bool) {
 	var signals []autofixdata.Signal
-	var firstRun *instructions.RunCommand
+	anchorLoc := rules.NewFileLocation(file)
 
 	for _, runFacts := range stageFacts.Runs {
 		if runFacts == nil || runFacts.Run == nil {
@@ -168,20 +168,20 @@ func (r *PreferUVOverCondaRule) checkStage(
 				Evidence: evidence,
 				Line:     line,
 			})
-			if firstRun == nil {
-				firstRun = runFacts.Run
+			if anchorLoc.IsFileLevel() {
+				anchorLoc = rules.NewLocationFromRanges(file, runFacts.Run.Location())
 			}
 		}
 	}
 
-	if firstRun == nil {
+	if len(signals) == 0 {
 		return rules.Violation{}, false
 	}
 
-	loc := rules.NewLocationFromRanges(file, firstRun.Location())
-	if loc.IsFileLevel() {
+	if anchorLoc.IsFileLevel() {
 		return rules.Violation{}, false
 	}
+	loc := anchorLoc
 
 	message := "GPU Python Dockerfile installs packages via conda; consider migrating to uv for faster, lock-friendly installs"
 	detail := "This stage uses conda/mamba/micromamba as a Python package installer on a GPU/PyTorch base image. " +

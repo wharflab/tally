@@ -11,8 +11,10 @@ import (
 
 	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/facts"
 	patchutil "github.com/wharflab/tally/internal/patch"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -641,6 +643,66 @@ func TestUVOverCondaObjective_ValidatePatch(t *testing.T) {
 	o := &uvOverCondaObjective{}
 	if got := o.ValidatePatch(patchutil.Meta{}); got != nil {
 		t.Errorf("ValidatePatch = %v, want nil", got)
+	}
+}
+
+// TestPreferUVOverCondaRule_CheckStage_PromotesPastFileLevelLocation is a
+// regression test for a bug where, if the first qualifying conda install
+// was on a RUN whose Location() was empty (file-level), the whole stage
+// violation was dropped even though later RUNs had valid locations.
+// Now the rule promotes past file-level-only RUNs and anchors on the
+// first RUN with a real source range.
+func TestPreferUVOverCondaRule_CheckStage_PromotesPastFileLevelLocation(t *testing.T) {
+	t.Parallel()
+
+	// Seed a Dockerfile whose second RUN has a real location via the parser.
+	content := `FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+RUN conda install -y numpy
+CMD ["python"]
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	stageFacts := input.Facts.Stage(0)
+	if stageFacts == nil || len(stageFacts.Runs) != 1 {
+		t.Fatalf("expected 1 RUN in stage, got %d", len(stageFacts.Runs))
+	}
+
+	// Prepend a synthetic RUN whose underlying RunCommand has no location.
+	// Facts assembled through the parser always carry location ranges, so
+	// the only way to model a file-level-only RUN is to splice one in.
+	fileLevelRun := &instructions.RunCommand{
+		ShellDependantCmdLine: instructions.ShellDependantCmdLine{
+			CmdLine: []string{"conda install -y torch"},
+		},
+	}
+	if loc := fileLevelRun.Location(); len(loc) != 0 {
+		t.Fatalf("expected synthetic RUN to have empty Location, got %v", loc)
+	}
+	syntheticRunFacts := &facts.RunFacts{
+		Run: fileLevelRun,
+		InstallCommands: []shell.InstallCommand{{
+			Manager:    "conda",
+			Subcommand: "install",
+			Packages: []shell.PackageArg{
+				{Normalized: "torch"},
+			},
+		}},
+	}
+	stageFacts.Runs = append([]*facts.RunFacts{syntheticRunFacts}, stageFacts.Runs...)
+
+	violations := NewPreferUVOverCondaRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation (rule should promote past file-level RUN), got %d", len(violations))
+	}
+	if violations[0].Location.IsFileLevel() {
+		t.Errorf("violation location is file-level; expected anchor on the second RUN")
+	}
+	// Signals from both RUNs should be present.
+	req, ok := violations[0].SuggestedFix.ResolverData.(*autofixdata.ObjectiveRequest)
+	if !ok {
+		t.Fatalf("SuggestedFix.ResolverData is %T, want *autofixdata.ObjectiveRequest", violations[0].SuggestedFix.ResolverData)
+	}
+	if len(req.Signals) != 2 {
+		t.Errorf("expected both RUN signals to be preserved, got %d", len(req.Signals))
 	}
 }
 
