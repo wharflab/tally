@@ -30,7 +30,7 @@ func TestRunClient_TerminalDisabled(t *testing.T) {
 	_, err := c.CreateTerminal(context.Background(), acpsdk.CreateTerminalRequest{})
 	assertInvalidRequestError(t, err, "terminal is disabled")
 
-	_, err = c.KillTerminalCommand(context.Background(), acpsdk.KillTerminalCommandRequest{})
+	_, err = c.KillTerminal(context.Background(), acpsdk.KillTerminalRequest{})
 	assertInvalidRequestError(t, err, "terminal is disabled")
 
 	_, err = c.TerminalOutput(context.Background(), acpsdk.TerminalOutputRequest{})
