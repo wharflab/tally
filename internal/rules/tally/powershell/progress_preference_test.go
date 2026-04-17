@@ -163,6 +163,28 @@ RUN Invoke-WebRequest https://example.com -OutFile /tmp/f.zip
 	})
 }
 
+func TestProgressPreferenceRule_MultiLineShellNoFix(t *testing.T) {
+	t.Parallel()
+
+	// A SHELL instruction spanning multiple physical lines via backslash
+	// continuation. buildShellLineFix bails out because its bracket/quote
+	// search only reads the first line and can produce invalid edits. The
+	// violation is still reported, but with no SuggestedFix attached.
+	content := "FROM mcr.microsoft.com/powershell:ubuntu-22.04\n" +
+		"SHELL [\\\n" +
+		"    \"pwsh\", \"-Command\"]\n" +
+		"RUN Invoke-WebRequest https://example.com -OutFile /tmp/f.zip\n"
+
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewProgressPreferenceRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if violations[0].SuggestedFix != nil {
+		t.Errorf("expected no SuggestedFix on multi-line SHELL, got %+v", violations[0].SuggestedFix)
+	}
+}
+
 func TestProgressPreferenceRule_OverlapWithPreferShellInstruction(t *testing.T) {
 	t.Parallel()
 

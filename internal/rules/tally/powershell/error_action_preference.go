@@ -437,6 +437,14 @@ func (r *ErrorActionPreferenceRule) buildShellModifyFixFromCmd(
 		return nil
 	}
 
+	// Bail out on multi-line SHELL instructions (backslash/backtick
+	// continuations). The bracket/quote search below only scans the first
+	// physical line and would produce an invalid edit. Multi-line SHELL is
+	// rare; we report without a fix in that case.
+	if isMultiLineInstruction(sm, shellCmd.Location()[0]) {
+		return nil
+	}
+
 	sourceLine := sm.Line(shellLine - 1)
 	if sourceLine == "" {
 		return nil

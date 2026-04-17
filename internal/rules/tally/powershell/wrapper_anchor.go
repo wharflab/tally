@@ -4,9 +4,28 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/sourcemap"
 )
+
+// isMultiLineInstruction reports whether the given source range spans more
+// than one physical line. Used by SHELL-line fixes that scan a single line
+// for brackets/quotes and need to bail out on continuation-split instructions
+// (backslash or backtick) to avoid producing invalid edit locations.
+//
+// Falls back to sm.ResolveEndLine when the parser-reported end line matches
+// the start line, which covers continuation cases where the parser collapses
+// the range (common for RUN; rare but possible for SHELL).
+func isMultiLineInstruction(sm *sourcemap.SourceMap, r parser.Range) bool {
+	if r.End.Line > r.Start.Line {
+		return true
+	}
+	if sm == nil {
+		return false
+	}
+	return sm.ResolveEndLine(r.End.Line) > r.Start.Line
+}
 
 // wrapperInsertionPoint locates the (line, column) offset inside a RUN's
 // source region where the inner script of an explicit powershell/pwsh
