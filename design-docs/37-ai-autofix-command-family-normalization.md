@@ -344,6 +344,92 @@ That provenance is useful for:
 - letting future fixes or diagnostics update the right config source instead of guessing
 - making ACP payloads explain the relevant context without dumping the whole Dockerfile
 
+### 5.6 Current in-tree beneficiaries
+
+This architecture is not justified only by future normalization work. Several rules already implement slices of the same reasoning and would become
+simpler or more consistent if they consumed shared family IR instead of reconstructing behavior ad hoc.
+
+Immediate `http-transfer` beneficiaries:
+
+- [`internal/rules/tally/curl_should_follow_redirects.go`](../internal/rules/tally/curl_should_follow_redirects.go)
+  This rule currently decides from raw `curl` flags and URL heuristics whether redirects should be followed, including request-method exceptions,
+  scheme filtering, and IP-only targets. A shared `HTTPTransferOperation` could expose effective redirect policy, request method, sink, and
+  URL/provenance once, instead of each rule reading raw `curl` syntax.
+
+- [`internal/rules/hadolint/dl3047.go`](../internal/rules/hadolint/dl3047.go)
+  This rule currently re-derives wget observability semantics from raw flags such as `--progress`, `-q`, `-nv`, and output-log redirection.
+  `HTTPTransferOperation.Observability` plus output-topology facts would let it reason in terms of effective progress/log behavior rather than
+  individual `wget` spellings.
+
+- [`internal/rules/tally/prefer_curl_config.go`](../internal/rules/tally/prefer_curl_config.go)
+  This rule currently mixes `InstallCommands`, `CommandInfos`, and stage observable-file checks to decide whether curl is installed, invoked, or
+  already configured. A shared HTTP/tool fact with provenance could expose curl presence, effective config inputs, and whether retry behavior is
+  already provided by observable `.curlrc` state.
+
+- [`internal/rules/tally/prefer_wget_config.go`](../internal/rules/tally/prefer_wget_config.go)
+  Same pattern as curl config. The rule currently infers wget usage from raw command/install detection and checks `WGETRC`-style files separately.
+  A shared HTTP/tool fact could centralize effective wget usage and config provenance.
+
+- [`internal/rules/tally/prefer_add_unpack.go`](../internal/rules/tally/prefer_add_unpack.go)
+  This rule currently recognizes download-and-extract flows with direct calls to shell helpers like `DownloadOutputFile`, URL/archive heuristics,
+  and tar detection. `HTTPTransferOperation` plus output topology and a companion archive-extract fact would remove much of this bespoke
+  detection.
+
+- [`internal/rules/hadolint/dl4001.go`](../internal/rules/hadolint/dl4001.go)
+  Today this rule only knows "wget appears" or "curl appears." The proposed normalization design is effectively a richer successor: it needs
+  family-aware lift/lower/validate for the concrete conflicting command, not just command-name presence.
+
+Current package-manager rules that point in the same direction:
+
+- [`internal/rules/hadolint/dl3014.go`](../internal/rules/hadolint/dl3014.go)
+- [`internal/rules/hadolint/dl3030.go`](../internal/rules/hadolint/dl3030.go)
+- [`internal/rules/hadolint/dl3034.go`](../internal/rules/hadolint/dl3034.go)
+- [`internal/rules/hadolint/dl3038.go`](../internal/rules/hadolint/dl3038.go)
+- [`internal/rules/runcheck/runcheck.go`](../internal/rules/runcheck/runcheck.go)
+
+These rules already share a generic "command + subcommand + required flag" framework for non-interactive package-manager installs. A richer
+package-operation fact would not replace all of that immediately, but it could centralize:
+
+- which commands are install-like operations
+- whether the operation is interactive by default
+- which token span is the correct insertion anchor
+- manager-specific subcommand aliases and effective mode
+
+That would reduce the amount of per-manager flag interpretation spread across individual rules.
+
+Rules already consuming partial package facts that a richer operation IR could subsume or extend:
+
+- [`internal/rules/tally/sort_packages.go`](../internal/rules/tally/sort_packages.go)
+  This rule already consumes `RunFacts.InstallCommands`. A package-operation fact could evolve from that same substrate instead of creating a
+  second parallel install-command model.
+
+- [`internal/rules/tally/prefer_package_cache_mounts.go`](../internal/rules/tally/prefer_package_cache_mounts.go)
+  This rule currently combines `CommandInfos`, cache-path env overrides, and cleanup heuristics to infer package-manager cache behavior. A richer
+  package-operation fact could expose effective cache directories and cleanup semantics directly.
+
+- [`internal/rules/tally/prefer_multi_stage_build.go`](../internal/rules/tally/prefer_multi_stage_build.go)
+  This rule already scores stages using `RunFacts.InstallCommands` as signals. Richer package-operation facts would give it better structured
+  evidence for "this stage installs build tooling" without regex-style fallback.
+
+Adjacent but intentionally separate:
+
+- [`internal/rules/hadolint/dl3027.go`](../internal/rules/hadolint/dl3027.go)
+  This is a real command-family rewrite already in-tree: `apt` to `apt-get` or `apt-cache`. It is a useful signal that command-family
+  normalization is broader than `curl`/`wget`, but it belongs to a future `apt` family, not to the initial `http-transfer` family.
+
+- [`internal/rules/tally/require_secret_mounts.go`](../internal/rules/tally/require_secret_mounts.go)
+  This rule currently matches raw command names against configured secret-mount requirements. It could eventually benefit from richer
+  package-operation provenance, but it does not need the first HTTP/package IR rollout.
+
+The duplication is already visible in current helpers:
+
+- [`internal/shell/archive.go`](../internal/shell/archive.go)
+- [`internal/shell/install_packages.go`](../internal/shell/install_packages.go)
+- [`internal/rules/runcheck/runcheck.go`](../internal/rules/runcheck/runcheck.go)
+
+Those helpers are useful and should remain, but they are also evidence that tally already has multiple partial interpretations of the same command
+families. The proposed IR is a way to unify those interpretations at the facts layer rather than letting each rule grow its own variant.
+
 ## 6. Dockerfile-Relevant Observation Model
 
 This design is intentionally Dockerfile-specific.
@@ -1088,6 +1174,12 @@ operation. It may matter to the Dockerfile, but it belongs to separate tool-spec
 
 - [`internal/rules/hadolint/dl4001.go`](../internal/rules/hadolint/dl4001.go)
 - [`internal/rules/hadolint/dl4001_test.go`](../internal/rules/hadolint/dl4001_test.go)
+- [`internal/rules/hadolint/dl3014.go`](../internal/rules/hadolint/dl3014.go)
+- [`internal/rules/hadolint/dl3030.go`](../internal/rules/hadolint/dl3030.go)
+- [`internal/rules/hadolint/dl3034.go`](../internal/rules/hadolint/dl3034.go)
+- [`internal/rules/hadolint/dl3038.go`](../internal/rules/hadolint/dl3038.go)
+- [`internal/rules/hadolint/dl3047.go`](../internal/rules/hadolint/dl3047.go)
+- [`internal/rules/hadolint/dl3027.go`](../internal/rules/hadolint/dl3027.go)
 - [`internal/facts/doc.go`](../internal/facts/doc.go)
 - [`internal/facts/facts.go`](../internal/facts/facts.go)
 - [`internal/facts/observable_files.go`](../internal/facts/observable_files.go)
@@ -1096,7 +1188,16 @@ operation. It may matter to the Dockerfile, but it belongs to separate tool-spec
 - [`internal/shell/command.go`](../internal/shell/command.go)
 - [`internal/shell/chain.go`](../internal/shell/chain.go)
 - [`internal/shell/archive.go`](../internal/shell/archive.go)
+- [`internal/shell/install_packages.go`](../internal/shell/install_packages.go)
 - [`internal/rules/tally/prefer_add_unpack.go`](../internal/rules/tally/prefer_add_unpack.go)
+- [`internal/rules/tally/curl_should_follow_redirects.go`](../internal/rules/tally/curl_should_follow_redirects.go)
+- [`internal/rules/tally/prefer_curl_config.go`](../internal/rules/tally/prefer_curl_config.go)
+- [`internal/rules/tally/prefer_wget_config.go`](../internal/rules/tally/prefer_wget_config.go)
+- [`internal/rules/tally/prefer_package_cache_mounts.go`](../internal/rules/tally/prefer_package_cache_mounts.go)
+- [`internal/rules/tally/sort_packages.go`](../internal/rules/tally/sort_packages.go)
+- [`internal/rules/tally/prefer_multi_stage_build.go`](../internal/rules/tally/prefer_multi_stage_build.go)
+- [`internal/rules/tally/require_secret_mounts.go`](../internal/rules/tally/require_secret_mounts.go)
+- [`internal/rules/runcheck/runcheck.go`](../internal/rules/runcheck/runcheck.go)
 - [`internal/fix/fixer.go`](../internal/fix/fixer.go)
 - [`internal/ai/autofix/resolver.go`](../internal/ai/autofix/resolver.go)
 - [`internal/ai/autofixdata/objective.go`](../internal/ai/autofixdata/objective.go)
