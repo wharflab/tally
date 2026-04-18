@@ -1,12 +1,13 @@
 package gpu
 
 import (
+	"cmp"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -369,8 +370,8 @@ func forEachRunInstallCommand(parsed *dockerfile.ParseResult, visit func(shell.I
 // sortErrorsByMessage sorts errs in-place by the Error() string so the
 // validator's output is deterministic regardless of map iteration order.
 func sortErrorsByMessage(errs []error) {
-	sort.Slice(errs, func(i, j int) bool {
-		return errs[i].Error() < errs[j].Error()
+	slices.SortFunc(errs, func(a, b error) int {
+		return cmp.Compare(a.Error(), b.Error())
 	})
 }
 
