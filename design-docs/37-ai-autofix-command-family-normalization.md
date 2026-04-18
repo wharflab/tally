@@ -13,6 +13,9 @@
 > - `design-docs/13-ai-autofix-acp.md`
 > - `design-docs/19-ai-autofix-diff-contract.md`
 
+For command-family normalization, this document takes precedence over the diff-output recommendation in doc 19: replacement-window output is the
+required contract for this flow, and diff output is intentionally out of scope here.
+
 ## 1. Decision
 
 The primary fix path for command-family normalization should be deterministic semantic transpilation, not ACP.
@@ -188,7 +191,7 @@ type Blocker struct {
     Code       string
     Reason     string
     Surfaces   []OutcomeSurface
-    Compound   bool
+    Compound   bool // true when the blocker comes from an unsafe combination, not one isolated feature
 }
 
 type Difference struct {
@@ -219,6 +222,9 @@ type LowerDecision struct {
 }
 ```
 
+`Compound` does not require different control flow from consumers. It exists so diagnostics, corpus analysis, and ACP payloads can distinguish
+single hard blockers from combinations that only become unsafe together.
+
 This makes the contract explicit:
 
 - `liftable` means "the source command can be represented as a bounded family operation"
@@ -239,7 +245,8 @@ type CommandFamilyAdapter interface {
 }
 ```
 
-The exact Go shape is not important. The separation of responsibilities is.
+The exact Go shape is not important. The separation of responsibilities is. In real implementation, rule call sites should not traffic in raw `any`
+if a sealed union or family-typed wrapper can carry the operation more safely; `any` is only shorthand in this document.
 
 ### 5.4 Placement and lifecycle: facts layer, not per-rule
 
@@ -250,6 +257,7 @@ That matches the repository's current architecture:
 - the semantic model is the source of truth for stage inheritance, effective shell, stage env, OS, and package-manager signals
 - the facts layer already projects that state onto concrete `RUN` instructions
 - rules already consume `FileFacts` and `RunFacts` as shared read-only derived analysis
+- like the rest of `FileFacts` / `RunFacts`, command-operation facts should be immutable after construction and safe for concurrent rule reads
 
 The recommended split is:
 
@@ -284,6 +292,9 @@ type RunFacts struct {
 ```
 
 Rules should read these facts. They should not author or mutate them.
+
+The illustrative `Operation any` field should likewise become a typed wrapper or sealed union before implementation so rules do not need ad hoc
+type assertions.
 
 ### 5.5 Context-aware lift inputs and provenance
 
@@ -550,6 +561,13 @@ type HTTPFailurePolicy struct {
     FailOnHTTPStatus     bool
 }
 
+type HTTPDownstreamHint string
+
+const (
+    HTTPDownstreamUnknown    HTTPDownstreamHint = "unknown"
+    HTTPDownstreamTarExtract HTTPDownstreamHint = "tar-extract"
+)
+
 type HTTPRequestSpec struct {
     Scheme         string
     Method         string
@@ -569,7 +587,7 @@ type HTTPRequestSpec struct {
 type HTTPResponseSink struct {
     Kind           HTTPResponseSinkKind
     FilePath       *Value
-    DownstreamHint string
+    DownstreamHint HTTPDownstreamHint
 }
 
 type HTTPTransferSideEffects struct {
@@ -591,6 +609,8 @@ type HTTPTransferOperation struct {
     Observability HTTPObservability
 }
 ```
+
+Validators should treat unknown downstream hints conservatively and fall back rather than guessing.
 
 The important design choice is that this is not merely an HTTP request model. It is a Dockerfile-relevant transfer model. That is the difference
 from using `curlconverter`'s `Request` model directly.
@@ -874,6 +894,9 @@ When lift, lower, or validation fails:
 - keep replacement-window output
 - do not switch to diff output
 
+This is the scoped precedence decision for this family: where doc 19 recommends diff output, this design overrides it and keeps replacement-window
+output because the validator and replacement window are the safety boundary.
+
 ACP remains useful, but it should no longer be the first resort for this family.
 
 ## 10. ACP Fallback Payload
@@ -893,14 +916,14 @@ Illustrative payload:
     "startLine": 12,
     "endLine": 12,
     "startColumn": 4,
-    "endColumn": 81,
-    "originalText": "curl -fsSL https://example.com/app.tgz | tar -xz -C /opt"
+    "endColumn": 67,
+    "originalText": "curl -fsSL https://example.com/app.tar.gz | tar -xz -C /opt/app"
   },
   "outputTopology": "stdout-pipe",
   "liftStatus": "partially-lifted",
   "operation": {
     "method": "GET",
-    "url": "https://example.com/app.tgz",
+    "url": "https://example.com/app.tar.gz",
     "responseSink": "stdout-pipe"
   },
   "relatedSources": [
@@ -1005,6 +1028,7 @@ The likely common deterministic wins are:
   - validator-accepted
   - ACP fallback
   - top blocker categories
+- use blocker distribution and validator acceptance as a rollout gate for Phase 2 broad enablement, not just as post-facto reporting
 
 ### Phase 5: next family
 
@@ -1068,7 +1092,7 @@ The `curl` lifter extracts:
 - failure policy: transport failure plus HTTP-status failure
 - response sink: `stdout-pipe`
 - output purity need: `true`
-- downstream hint: `tar`
+- downstream hint: `tar-extract`
 
 Illustrative lifted operation:
 
@@ -1089,7 +1113,7 @@ Illustrative lifted operation:
   },
   "responseSink": {
     "kind": "stdout-pipe",
-    "downstreamHint": "tar"
+    "downstreamHint": "tar-extract"
   },
   "observability": {
     "quiet": true,
