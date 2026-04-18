@@ -1,12 +1,12 @@
-# AI AutoFix via ACP: Command-Family Normalization
+# Command-Family Normalization: Semantic Lift/Lower With ACP Fallback
 
-> Status: proposal
+> Status: proposal (revision 2)
 >
 > Working name: `ato-fix`
 >
 > Pilot rule: `hadolint/DL4001`
 >
-> Broader target: reusable AI-assisted command-family normalization, later extensible to migrations such as `npm -> bun`
+> Broader target: reusable command-family normalization across families such as `curl/wget/iwr` and `npm/bun`
 >
 > Companion docs:
 >
@@ -15,734 +15,887 @@
 
 ## 1. Decision
 
-Add a new ACP-powered AI AutoFix objective for command-family normalization.
+The primary fix path for command-family normalization should be deterministic semantic transpilation, not ACP.
 
-The first objective should target `hadolint/DL4001`:
+For one offending shell command:
 
-- detect mixed `curl` / `wget` usage as today,
-- choose a preferred tool heuristically,
-- send a tightly scoped ACP prompt for one command or one supported bounded pipeline,
-- require **replacement text output for one exact window**,
-- validate that replacement mechanically with tally's shell parser and command facts,
-- splice it back into the file,
-- and apply it only as an explicit unsafe fix.
+1. parse the shell structure
+2. recognize the command family
+3. lift the source command into a family-specific abstract operation
+4. lower that operation into the preferred target tool
+5. validate Dockerfile-relevant equivalence mechanically
+6. emit a heuristic unsafe fix if validation succeeds
+7. fall back to ACP only if lift, lower, or validation fails
 
-This is not a general shell-command translator. It is a bounded AI repair path for cases where:
+This is the key revision from the prior proposal. The earlier conclusion, "fully heuristic conversion is too hard, therefore ACP should be primary,"
+was too coarse. What is not credible is broad flag-to-flag translation. What is credible is outcome-oriented semantic translation inside explicitly
+bounded command families.
 
-- detection is reliable,
-- rewrite intent is clear,
-- but deterministic translation is not credible.
+## 2. Why This Is Workable
 
-This document refines the general ACP architecture from `13-ai-autofix-acp.md` for a narrower objective family and intentionally rejects the
-patch-oriented contract proposed in `19-ai-autofix-diff-contract.md` for this class of fixes.
+The important shift is to stop treating commands as bags of flags and start treating them as descriptions of operations.
 
-## 2. Why Not Diff
+Examples:
 
-For this objective family, diff output is the wrong contract.
+- `curl -fsSL https://example.com/app.tgz | tar -xz -C /opt`
+  The operation is not "a sequence of curl flags." The operation is "perform an HTTP transfer and feed the response body into `tar`."
 
-Tally already knows:
+- `curl -o /tmp/app.tgz https://example.com/app.tgz`
+  The operation is "materialize one HTTP response body into `/tmp/app.tgz`."
 
-- which file is being edited,
-- the exact line/column window to replace,
-- the shell variant,
-- the platform OS,
-- and the extracted command facts.
+- `npm install express`
+  The operation is "mutate Node dependency state to add `express`."
 
-That means the important question is not:
+- `npm config set foo bar`
+  The operation is "mutate package-manager config state."
 
-- "did the model produce a well-formed patch?"
+If a source command can be represented as one of these operations, and the target tool can realize the same operation, then heuristic conversion is
+credible. If not, it should stop and fall back to ACP.
 
-It is:
+## 3. Design Goals and Non-Goals
 
-- "did the model produce valid replacement text for this exact command window?"
+### 3.1 Goals
 
-So the right contract is:
+- Handle the common Dockerfile cases with deterministic unsafe fixes.
+- Keep the architecture reusable across command families.
+- Separate source parsing from target serialization.
+- Make blockers explicit instead of guessing through them.
+- Validate outcome equivalence using shell parsing and family-specific checks.
 
-- `NO_CHANGE`
-- or exactly one fenced `text` block with replacement text for the declared window
+### 3.2 Non-goals
 
-Tally can compute a diff afterward for preview, logging, or UX. The model does not need to generate one.
+- Exact flag symmetry between tools.
+- Exact log formatting parity.
+- Arbitrary shell-program rewriting.
+- Whole-instruction or whole-file diff generation for this class of fix.
 
-## 3. Compressed Motivation
+## 4. What To Learn From `curlconverter`
 
-The hard part of `curl <-> wget` is not discovery. It is preserving behavior:
+`curlconverter` is the closest useful reference, but it should be copied selectively.
 
-- output defaults differ,
-- redirect behavior differs,
-- retry behavior differs,
-- recursive and timestamping modes differ,
-- and surrounding shell structure may depend on side effects such as implicit filenames.
+At the pinned commit used in this document:
 
-So the design split should be:
-
-1. heuristics choose scope and gather evidence,
-2. AI proposes a local rewrite,
-3. tally validates the replacement mechanically,
-4. tally rejects anything that does not satisfy exact shape-preservation rules.
-
-The same pattern applies even more strongly to future families like `npm -> bun`.
-
-### 3.1 External Evidence: `curlconverter`
-
-The closest serious external reference is [`curlconverter/curlconverter`](https://github.com/curlconverter/curlconverter).
-
-It is useful evidence, but for a narrower conclusion than "heuristic conversion is solved."
-
-What `curlconverter` demonstrates credibly:
-
-- shell-aware parsing is mandatory, not optional,
-- conversion benefits from an intermediate normalized request model,
-- target-specific support tables are healthier than pretending full parity,
-- and lossy behavior must be surfaced explicitly through warnings.
-
-The repository structure makes that clear:
-
-- [`src/parse.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/parse.ts) parses shell input into
-  structured `Request` objects,
-- [`src/shell/tokenizer.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/shell/tokenizer.ts)
-  handles Bash quoting, expansions, redirects, heredocs, and pipeline discovery,
+- [`src/shell/Parser.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/shell/Parser.ts) wires
+  `tree-sitter` with `tree-sitter-bash`
+- [`src/curl/opts.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/curl/opts.ts) lifts parsed
+  argv into `GlobalConfig` and `OperationConfig`
+- [`src/Request.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/Request.ts) normalizes that into
+  `Request` and `RequestUrl`
 - [`src/generators/wget.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/generators/wget.ts)
-  emits a fresh `wget` command from the normalized request model,
-- [`src/Warnings.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/Warnings.ts) records ignored or
-  unsupported parts explicitly.
+  lowers the normalized request model into `wget`, with many warnings when `wget` cannot preserve curl behavior
 
-The important negative evidence is equally strong:
+That gives tally the right architectural lesson:
 
-- the README states it knows about all `curl` arguments but that most are ignored,
-- the `wget` generator is explicitly warning-driven rather than parity-driven,
-- the converter preserves request intent better than shell topology,
-- and several tested `curl -> wget` cases accept semantic drift that is fine for a transpiler but not acceptable for an auto-fix.
+- parse shell syntax with a real parser
+- lift concrete tool syntax into a normalized internal model
+- lower through target-specific serializers
+- use target capability boundaries explicitly
 
-Concrete examples from the fixture corpus:
+But it also shows what tally must do differently.
 
-- [`curl -L http://localhost:28139`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/test/fixtures/curl_commands/get_follow_redirect.sh)
-  becomes
-  [`wget --output-document - http://localhost:28139`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/test/fixtures/wget/get_follow_redirect.sh),
-  which drops the explicit redirect-following signal,
-- [`curl 'http://localhost:28139' -x 'http://localhost:8080'`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/test/fixtures/curl_commands/get_proxy.sh)
-  also becomes plain
-  [`wget --output-document - http://localhost:28139`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/test/fixtures/wget/get_proxy.sh),
-  while the generator only warns that Wget expects proxy configuration elsewhere,
-- [`test/fixtures/curl_commands/pipelines.sh`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/test/fixtures/curl_commands/pipelines.sh)
-  proves the parser understands pipelines, but there is no corresponding `wget` fixture showing pipeline-preserving shell rewrites,
-- issue [#703](https://github.com/curlconverter/curlconverter/issues/703) shows a shell-parsing edge case around unquoted URLs with `&`, reinforcing
-  that prompt scope should be a pre-isolated command window rather than arbitrary script.
+`curlconverter` is primarily request-oriented. Tally needs to be build-outcome-oriented. For Dockerfile fixes, preserving the request alone is not
+enough. The model must also preserve:
 
-So the practical lesson is:
+- where the response body goes
+- whether stdout purity matters
+- whether shell topology changes
+- whether filesystem state changes
+- whether package/config state changes
 
-- borrow the architecture,
-- borrow the warning taxonomy mindset,
-- borrow the quoting discipline,
-- but do not borrow the acceptance model.
+In other words, tally should borrow the lift/lower architecture, but not the warning-only acceptance model.
 
-For tally, warnings are not enough. We need parser-backed acceptance rules that reject rewrites unless shell shape and statically observable behavior
-stay within a narrow validated subset.
+## 5. Core Concept: Operation Families
 
-## 4. Goals and Non-Goals
+There should not be one universal IR for all commands. There should be small family-specific IRs built on a shared core.
 
-### Goals
+Examples of families:
 
-- Provide a credible AI auto-fix path for `DL4001`.
-- Keep the AI context command-local.
-- Make command validity checkable mechanically with the shell parser.
-- Reuse tally's ACP resolver model.
-- Generalize to later command families.
+- `http-transfer`
+- `node-package-management`
+- later: `powershell-http-transfer`, `python-package-management`, `archive-extraction`
 
-### Non-Goals
+The central question for a family adapter is:
 
-- A universal shell-command translator.
-- Broad Dockerfile-aware prompting for this objective.
-- Whole-file rewrites.
-- Model-generated patches.
-- Broad terminal or filesystem access.
-- Warning-only acceptance of semantically lossy translations.
+> Can this command be represented as one operation from this family without losing Dockerfile-relevant meaning?
 
-## 5. UX and Safety Contract
+If yes, it is liftable. If no, it is blocked.
 
-### CLI behavior
+### 5.1 Shared core concepts
 
-This should behave like the current unsafe AI fix path:
+Illustrative shared types:
 
-- `--fix --fix-unsafe`
-- strongly recommended with `--fix-rule hadolint/DL4001`
-- recommended rule config: `fix = "explicit"`
+```go
+type ValueKind string
 
-Suggested user-facing fix text:
+const (
+    ValueLiteral       ValueKind = "literal"
+    ValueShellFragment ValueKind = "shell-fragment"
+    ValueOpaque        ValueKind = "opaque"
+)
 
-- `AI AutoFix: normalize mixed curl/wget usage to one tool`
+type Value struct {
+    Raw  string
+    Kind ValueKind
+}
 
-### Safety level
+type OutcomeSurface string
 
-The fix must be:
+const (
+    SurfaceFilesystem  OutcomeSurface = "filesystem"
+    SurfaceStream      OutcomeSurface = "stream"
+    SurfaceExitStatus  OutcomeSurface = "exit-status"
+    SurfaceConfigState OutcomeSurface = "config-state"
+    SurfacePkgState    OutcomeSurface = "package-state"
+)
 
-- `NeedsResolve = true`
-- `ResolverID = "ai-autofix"`
-- `Safety = FixUnsafe`
+type OutputTopology string
 
-### Output contract
+const (
+    TopologyFileSink         OutputTopology = "file-sink"
+    TopologyStdoutPipe       OutputTopology = "stdout-pipe"
+    TopologyStdoutUncaptured OutputTopology = "stdout-uncaptured"
+    TopologyShellCapture     OutputTopology = "shell-capture"
+    TopologyComplexRedirect  OutputTopology = "complex-redirect"
+)
+```
 
-For this objective, the model must output exactly one of:
+`ValueKind` matters because many source commands contain shell interpolation. The system does not need every value to be literal. It needs to know
+whether the value is safe to preserve textually, only partially understandable, or too opaque for deterministic conversion.
 
-- `NO_CHANGE`
-- one fenced `text` block containing replacement text for the declared window only
+### 5.2 Lift and lower results
 
-No patch mode. No whole-file mode. No fallback to either.
+Illustrative decision types:
 
-## 6. Core Design
+```go
+type Blocker struct {
+    Code       string
+    Reason     string
+    Surfaces   []OutcomeSurface
+    Compound   bool
+}
 
-### 6.1 Scope
+type Difference struct {
+    Code     string
+    Reason   string
+    Severity string // "log-only", "cosmetic", "unsafe"
+}
 
-The model should operate on:
+type LiftStatus string
 
-- one command, or
-- one supported bounded pipeline / archive-extraction pattern
+const (
+    Liftable        LiftStatus = "liftable"
+    PartiallyLifted LiftStatus = "partially-lifted"
+    NotLiftable     LiftStatus = "not-liftable"
+)
 
-It should not be asked to reason about the Dockerfile as a whole.
+type LiftDecision[T any] struct {
+    Status          LiftStatus
+    Operation       *T
+    HardBlockers    []Blocker
+    SoftDifferences []Difference
+}
 
-Dockerfile context remains tally's concern for:
+type LowerDecision struct {
+    ReplacementText string
+    HardBlockers    []Blocker
+    SoftDifferences []Difference
+}
+```
 
-- locating the window,
-- applying the replacement,
-- and running post-apply validation.
+This makes the contract explicit:
 
-### 6.2 Objective request
+- `liftable` means "the source command can be represented as a bounded family operation"
+- `partially-lifted` means "enough structure was recognized to help ACP, but not enough for deterministic conversion"
+- `not-liftable` means "do not attempt deterministic conversion"
 
-Add a new objective kind under `internal/ai/autofixdata`.
+### 5.3 Adapter contract
 
-Recommended kind:
+Illustrative interface:
 
-- `command-family-normalize`
+```go
+type CommandFamilyAdapter interface {
+    Family() string
+    Recognizes(cmd shell.CommandInfo) bool
+    Lift(cmd shell.CommandInfo, ctx ShellContext) LiftDecision[any]
+    Lower(op any, targetTool string, ctx LowerContext) LowerDecision
+    Validate(sourceOp any, replacement string, ctx ValidationContext) []Blocker
+}
+```
 
-Illustrative facts payload:
+The exact Go shape is not important. The separation of responsibilities is.
+
+## 6. Dockerfile-Relevant Observation Model
+
+This design is intentionally Dockerfile-specific.
+
+Command equivalence should be judged by what a `RUN` instruction makes observable to the image layer or to downstream commands, not by whether the
+target CLI looks similar.
+
+### 6.1 What matters
+
+| Concern | Relevant | Why |
+|---|---|---|
+| files created or modified | yes | persists in the image layer |
+| bytes sent to a downstream pipeline command | yes | changes behavior of the next command |
+| stdout captured by shell constructs | yes | becomes data, not logs |
+| exit behavior | yes | determines whether the build fails |
+| package graph / lockfile / manifest state | yes | persists in the image |
+| package-manager config state | yes | can affect later commands |
+| uncaptured stdout body | usually no | generally becomes build log only |
+| progress bars / verbosity / styling | usually no | log-only unless consumed structurally |
+
+This is why semantic transpilation is practical. Many tool differences are log-only from the Dockerfile point of view.
+
+### 6.2 Output topology classes
+
+For shell-form `RUN`, the system should classify the source command into one of these topologies:
+
+- `file-sink`
+  Example: `curl -o /tmp/file.tgz ...`
+
+- `stdout-pipe`
+  Example: `curl ... | tar -xz -C /opt`
+
+- `stdout-uncaptured`
+  Example: `curl ...`
+
+- `shell-capture`
+  Example: `VAR=$(curl ...)`
+
+- `complex-redirect`
+  Example: `curl ... 2>&1 | grep foo`
+
+This topology must become part of the family operation or of the validation context. `curlconverter` does not preserve enough of this on its own,
+which is why tally needs a slightly richer model.
+
+### 6.3 Compound blockers
+
+Single flags are not the only reason to refuse deterministic conversion. Some combinations are only unsafe in context.
+
+Examples:
+
+- verbose output plus `stdout-pipe`
+  Extra chatter can corrupt a data stream.
+
+- remote-name destination plus downstream file assumption
+  The target may pick a different filename or require an explicit filename.
+
+- env assignment or command substitution plus any log-affecting option
+  Now stdout content is data, not disposable output.
+
+- dynamic destination path plus target-only lowering behavior
+  The system may know the operation family but still not be able to prove equivalent filesystem state.
+
+These should be represented as explicit blockers, not left as vague caution text.
+
+## 7. HTTP Transfer Family
+
+This is the first family that should power `hadolint/DL4001`.
+
+### 7.1 Family scope
+
+The family covers commands whose essential operation is:
+
+- perform one HTTP or HTTPS transfer
+- optionally apply bounded request semantics such as headers, auth, method, redirects, retries, or body
+- deliver the response body to one Dockerfile-relevant sink
+
+Initial tools:
+
+- `curl`
+- `wget`
+- later: PowerShell `Invoke-WebRequest` / `iwr`
+
+It does not cover every `curl` feature. It covers the subset that can be normalized as a transfer operation with a bounded sink.
+
+### 7.2 IR shape
+
+Illustrative IR:
+
+```go
+type HTTPBodySourceKind string
+
+const (
+    BodyNone      HTTPBodySourceKind = "none"
+    BodyLiteral   HTTPBodySourceKind = "literal"
+    BodyFile      HTTPBodySourceKind = "file"
+    BodyStdin     HTTPBodySourceKind = "stdin"
+)
+
+type HTTPResponseSinkKind string
+
+const (
+    SinkFile             HTTPResponseSinkKind = "file"
+    SinkStdoutPipe       HTTPResponseSinkKind = "stdout-pipe"
+    SinkStdoutUncaptured HTTPResponseSinkKind = "stdout-uncaptured"
+)
+
+type HTTPFailurePolicy struct {
+    FailOnTransportError bool
+    FailOnHTTPStatus     bool
+}
+
+type HTTPRequestSpec struct {
+    Scheme         string
+    Method         string
+    URL            Value
+    Headers        []HTTPHeader
+    BodyKind       HTTPBodySourceKind
+    BodyValue      *Value
+    Auth           *HTTPAuth
+    RedirectPolicy string
+    Compression    string
+    TimeoutSeconds *float64
+    RetryPolicy    *HTTPRetryPolicy
+    TLS            *HTTPTLSOptions
+    FailurePolicy  HTTPFailurePolicy
+}
+
+type HTTPResponseSink struct {
+    Kind           HTTPResponseSinkKind
+    FilePath       *Value
+    DownstreamHint string
+}
+
+type HTTPTransferSideEffects struct {
+    CookieReadFiles  []Value
+    CookieWriteFile  *Value
+    RemoteName       bool
+}
+
+type HTTPObservability struct {
+    Quiet            bool
+    Verbose          bool
+    OutputPurityNeed bool
+}
+
+type HTTPTransferOperation struct {
+    Request      HTTPRequestSpec
+    ResponseSink HTTPResponseSink
+    SideEffects  HTTPTransferSideEffects
+    Observability HTTPObservability
+}
+```
+
+The important design choice is that this is not merely an HTTP request model. It is a Dockerfile-relevant transfer model. That is the difference
+from using `curlconverter`'s `Request` model directly.
+
+### 7.3 What the lifter decides
+
+The `curl` lifter should not try to "convert flags." It should decide whether the command is representable as `HTTPTransferOperation`.
+
+Questions it should answer:
+
+- is there exactly one URL?
+- is the scheme within supported scope?
+- what is the request method?
+- what body semantics exist?
+- where does the response body go?
+- does stdout purity matter?
+- are there response-side side effects such as cookie jars or remote-name behavior?
+- can the failure semantics be made explicit?
+
+### 7.4 Liftability rules for v1
+
+The initial deterministic subset for `DL4001` should be deliberately narrow but useful:
+
+- one URL only
+- `http` or `https`
+- explicit sink:
+  - explicit file path
+  - stdout pipe
+  - uncaptured stdout
+- simple `GET` or `HEAD`
+- no command substitution
+- no env assignment from command output
+- no merged file descriptors
+- no cookie jar or other session mutation
+- no recursive or mirror behavior
+- no remote-name destination
+- no protocol-specific features outside the target capability table
+
+This already covers the common Dockerfile download cases:
+
+- `curl -o /tmp/file.tgz URL`
+- `curl -fsSL URL | tar -xz -C /path`
+- `curl -fsS URL`
+
+### 7.5 What counts as representable
+
+For the HTTP family, "representable" should mean:
+
+- the request semantics that materially affect output can be captured
+- the sink can be captured precisely
+- any side state that matters is either captured or absent
+- any log-only differences are isolated from data-bearing streams
+
+Representable does not mean "all curl flags have been modeled." It means "the source command's Dockerfile-relevant behavior fits the family
+operation."
+
+### 7.6 Target capability tables
+
+Lowering must use target capability tables, not flag mapping tables.
+
+Illustrative capability shape:
+
+```go
+type HTTPTargetCapabilities struct {
+    Schemes            map[string]bool
+    Methods            map[string]bool
+    OutputFile         bool
+    OutputStdout       bool
+    CustomHeaders      bool
+    RequestBody        bool
+    FollowRedirects    bool
+    DisableRedirects   bool
+    FailOnHTTPStatus   bool
+    RetryControl       bool
+    TLSOptions         bool
+    CookieRead         bool
+    CookieWrite        bool
+    RemoteName         bool
+}
+```
+
+Examples:
+
+- if the lifted sink is `stdout-pipe`, the `wget` serializer may emit `-O-` even if the source command did not literally specify stdout
+- if redirects are followed by default in the target and that matches the operation, the serializer may omit an explicit flag
+- if the operation requires `FailOnHTTPStatus=true` and the target cannot preserve that contract, deterministic lowering must fail
+
+This is the correct level of abstraction. The serializer chooses the target spelling that realizes the operation. It does not mirror the source
+syntax.
+
+### 7.7 Validation contract
+
+Validation should parse the replacement command again and check family-specific invariants.
+
+For the HTTP family, validation should assert:
+
+- for a simple command window, the replacement still contains exactly one command
+- for a supported pipeline window, pipeline segment count remains equal
+- exactly one relevant transfer command still exists
+- the URL is preserved as the same literal or as the same shell fragment class
+- the response sink class is preserved
+- the output file path is preserved exactly when sink is `file`
+- the pipeline shape is preserved when sink is `stdout-pipe`
+- all non-target pipeline segments that are part of the supported pattern remain semantically unchanged
+- any downstream extractor semantics that we explicitly support remain preserved
+- no new file writes are introduced
+- no ignored blocker from the target capability table slipped through
+
+For POSIX-family shells, ShellCheck can run as a secondary guard, but the family validator remains the primary acceptance boundary.
+
+This validator is the real safety boundary for heuristic fixes.
+
+### 7.8 Hard blockers
+
+Examples of HTTP-family hard blockers:
+
+- multiple URLs
+- unsupported scheme
+- recursive or mirror semantics
+- cookie jar read or write in v1
+- remote-name or implicit filename behavior
+- protocol constraints unsupported by target capabilities
+- command substitution or env capture
+- complex fd redirection
+- multipart or upload semantics outside target support
+
+### 7.9 Soft differences
+
+Allowed soft differences are limited to log-only behavior:
+
+- progress meter shape
+- verbosity formatting
+- omitted explicit flags when target defaults already match the operation
+
+Soft differences become hard blockers when the shell topology or operation requires output purity.
+
+## 8. Node Package Management Family
+
+The same architecture should apply to `npm -> bun` and similar migrations.
+
+### 8.1 Family scope
+
+This family should cover operations whose essential outcome is mutation or realization of Node package state.
+
+Examples:
+
+- add dependencies
+- remove dependencies
+- install from manifest / lockfile
+- mutate config state
+
+### 8.2 Family operations
+
+Illustrative operation types:
+
+```go
+type NodeDependencyInstallOperation struct {
+    Mode           string // "add-packages", "manifest-install", "clean-install"
+    Packages       []PackageSpec
+    Global         bool
+    ProductionOnly bool
+    FrozenLockfile bool
+    IgnoreScripts  bool
+    WorkspaceScope *Value
+}
+
+type NodeDependencyRemoveOperation struct {
+    Packages       []PackageSpec
+    Global         bool
+    WorkspaceScope *Value
+}
+
+type NodeConfigSetOperation struct {
+    Key   string
+    Value Value
+    Scope string
+}
+```
+
+These are intentionally outcome-oriented. They describe desired package/config state, not source CLI syntax.
+
+### 8.3 Why this family fits the same model
+
+For Dockerfiles, the relevant outcomes are:
+
+- manifest changes
+- lockfile behavior
+- installed dependency graph
+- config state that affects later package-manager commands
+
+Usually irrelevant:
+
+- progress spinners
+- colorized output
+- most log formatting flags
+
+### 8.4 Representable subset for v1
+
+Good initial deterministic cases:
+
+- `npm install express`
+- `npm uninstall express`
+- `npm ci`
+
+Probable ACP or no-fix cases:
+
+- `npm run build`
+- `npm exec ...`
+- workspace-sensitive commands without explicit target equivalence
+- arbitrary `npm config set` keys without a proven mapping
+- commands whose meaningful outcome is a script side effect rather than package state
+
+### 8.5 Target capability logic
+
+Exactly the same rule applies:
+
+- if the operation can be lifted
+- and the target package manager can realize that operation
+- and validation can prove the relevant outcome contract
+
+then heuristic conversion is sound enough for an unsafe fix.
+
+Otherwise, it should fall back to ACP or no-fix.
+
+## 9. Fix Contract
+
+This revision changes the decision tree, not the ACP output format.
+
+### 9.1 Deterministic path
+
+When lift, lower, and validation succeed:
+
+- emit a normal unsafe `SuggestedFix`
+- do not invoke ACP
+- treat the family validator as the acceptance gate
+
+### 9.2 ACP fallback path
+
+When lift, lower, or validation fails:
+
+- emit an ACP-based unsafe fix
+- use the same exact replacement window
+- pass structured family context into the ACP objective
+- keep replacement-window output
+- do not switch to diff output
+
+ACP remains useful, but it should no longer be the first resort for this family.
+
+## 10. ACP Fallback Payload
+
+ACP should receive a better starting point than raw shell text.
+
+Illustrative payload:
 
 ```json
 {
-  "family": "download-client",
+  "family": "http-transfer",
   "ruleCode": "hadolint/DL4001",
-  "platformOS": "linux",
+  "preferredTool": "wget",
   "shellVariant": "bash",
-  "preferredTool": "curl",
-  "preferredReason": "curl is installed in this stage and .curlrc is present",
+  "platformOS": "linux",
   "window": {
     "startLine": 12,
     "endLine": 12,
     "startColumn": 4,
-    "endColumn": 50,
-    "originalText": "wget -q -O /tmp/file https://example.com/file",
-    "validationMode": "single-command"
+    "endColumn": 81,
+    "originalText": "curl -fsSL https://example.com/app.tgz | tar -xz -C /opt"
   },
-  "candidate": {
-    "sourceTool": "wget",
-    "raw": "wget -q -O /tmp/file https://example.com/file",
-    "urls": ["https://example.com/file"],
-    "outputMode": "file",
-    "outputPath": "/tmp/file"
+  "outputTopology": "stdout-pipe",
+  "liftStatus": "partially-lifted",
+  "operation": {
+    "method": "GET",
+    "url": "https://example.com/app.tgz",
+    "responseSink": "stdout-pipe"
   },
-  "context": {
-    "boundedPattern": "none"
-  },
-  "blockers": [],
-  "relatedRuleSignals": ["tally/curl-should-follow-redirects"]
+  "hardBlockers": [
+    {
+      "code": "fail-on-http-status-not-lowerable",
+      "reason": "target capability table cannot preserve the source failure contract"
+    }
+  ]
 }
 ```
 
-Key point: tally does the deterministic prep work.
+That gives ACP structured intent, structured blockers, and an exact replacement boundary.
 
-The model gets:
+### 10.1 ACP tool limits
 
-- exact OS,
-- exact shell,
-- exact window text,
-- exact target tool,
-- and extracted command facts.
+Even on the ACP fallback path, execution should stay narrow.
 
-This is where tally should diverge from `curlconverter`:
+Allowed:
 
-- `curlconverter` normalizes into a request model and then re-emits a target command,
-- tally should normalize into command facts and preserve shell shape as a first-class constraint.
+- shell parsing and family validation inside tally
+- objective-scoped local help or version introspection for the declared source or target tool
+  - examples: `curl --help`, `curl -V`, `wget --help`, `wget --version`
 
-That distinction matters for pipelines, output redirection, and archive extraction, where request equivalence alone is insufficient.
+Disallowed:
 
-### 6.3 Prompt model
+- network access
+- long-running tests
+- container builds
+- arbitrary filesystem mutation
+- unrelated repo exploration
 
-Do not frame the prompt as "you are editing a Dockerfile".
+The point of ACP here is localized rewrite help, not open-ended agent execution.
 
-The prompt should frame the task as:
+## 11. `DL4001` Pilot Policy
 
-- one shell command in,
-- one shell command out,
-- one exact replacement window,
-- one declared shell and OS,
-- one declared target tool.
+`hadolint/DL4001` should become the first rule using this architecture.
 
-Illustrative prompt skeleton:
+For each offending command:
 
-````text
-You are rewriting one shell command to normalize one command family.
+1. detect the mixed `curl`/`wget` usage and choose the preferred tool using existing stage heuristics
+2. isolate one candidate command window
+3. run the HTTP-family lifter
+4. if liftable, lower to the preferred tool
+5. run HTTP-family validation
+6. emit heuristic unsafe fix if accepted
+7. otherwise emit ACP fallback for that same window
 
-Task:
-- Rewrite the command below so it uses only: curl
-- Preserve behavior as closely as possible
-- If you cannot do that safely, output exactly: NO_CHANGE
+The likely common deterministic wins are:
 
-Strict rules:
-- Only rewrite the provided command text
-- Do not change text outside the declared replacement window
-- Output a command that is valid for the declared OS and shell
-- Do not introduce unrelated flags, wrappers, or shell constructs
+- explicit file downloads
+- transfer piped directly to `tar`
+- one-off uncaptured fetches with no side-state
 
-Context:
-- Rule: hadolint/DL4001
-- Platform OS: linux
-- Shell: bash
-- Preferred tool: curl
-- Reason: curl is installed in this stage and .curlrc is present
-- Validation mode: single-command
-- Optional bounded pattern: none
+## 12. Implementation Plan
 
-Input command:
-```text
-wget -q -O /tmp/file https://example.com/file
-```
+### Phase 1: shared framework
 
-Output format:
-- Either exactly NO_CHANGE
-- Or exactly one ```text code block containing replacement text for this window only
-````
+- add family adapter interfaces
+- add shared blocker and difference types
+- add topology classification for command windows
+- wire deterministic family fixes before ACP resolver dispatch
 
-### 6.4 Restricted tool introspection
+### Phase 2: HTTP pilot
 
-For this objective family, broad terminal access should remain disabled.
+- implement `HTTPTransferOperation`
+- implement `curl` lifter
+- implement `wget` lowerer
+- implement validator for file sinks, uncaptured stdout, and `download | tar-extract`
+- wire into `DL4001`
 
-Allowed exception:
+### Phase 3: ACP upgrade
 
-- objective-scoped allowlisted help/version invocations for the target tool only
+- pass lift status and partial operation into ACP objective data
+- pass blocker lists into ACP objective data
+- keep replacement-window output contract
 
-Examples:
+### Phase 4: corpus evaluation
 
-- `curl --help`
-- `curl -V`
-- `wget --help`
-- `wget --version`
+- collect a Dockerfile corpus with `curl` and `wget`
+- measure:
+  - recognizable by family
+  - liftable
+  - lowerable
+  - validator-accepted
+  - ACP fallback
+  - top blocker categories
 
-Everything else remains disallowed:
+### Phase 5: next family
 
-- networked invocations
-- test runs
-- builds
-- `docker` / `podman` / `buildctl`
-- package manager commands
-- shell wrappers
-- file writes
-- repo exploration
+- prototype `npm -> bun`
+- start with install/remove/clean-install operations
+- defer config/script operations until capability tables are explicit
 
-This is enough for flag spelling and local capability confirmation, without opening a large execution surface.
+## 13. Coverage Hypothesis
 
-## 7. Validation Model
+The claim that this approach should cover roughly 95% of `curl` usage in Dockerfiles is plausible for the narrow "download transfer" subset, but it
+should not be assumed without measurement.
 
-Validation should happen in two layers:
+This proposal recommends treating coverage as a corpus question, not as an article of faith.
 
-1. replacement-window acceptance
-2. post-apply file validation
+The architecture is sound either way:
 
-### 7.1 Replacement-window acceptance
+- high-coverage commands become deterministic unsafe fixes
+- lower-coverage commands still benefit from structured ACP fallback
 
-Because tally already knows the exact replacement window, acceptance should be based on the replacement text itself.
+## 14. Recommendation
 
-For the DL4001 pilot, validate all of the following:
+Proceed with semantic family normalization as the primary design:
 
-- output is either `NO_CHANGE` or one fenced replacement block
-- replacement parses successfully for the declared shell variant
-- replacement remains compatible with the declared platform OS
-- validation mode is satisfied exactly:
-  - `single-command`: exactly one command after parse
-  - `bounded-pipeline`: same pipeline arity and same operator skeleton
-- target command changes from the non-preferred tool to the preferred tool
-- static URLs are preserved
-- explicit output mode is preserved (`file` vs `stdout`)
-- explicit output path is preserved when present
-- no new shell metaprogramming is introduced
-
-For bounded pipeline / archive mode, additionally validate when statically extractable:
-
-- downstream command family is preserved
-- extraction target is preserved
-- extraction destination is preserved
-- the non-target pipeline segment remains AST-identical or command-fact-identical after rewrite
-
-### 7.2 What we can validate confidently
-
-With the existing shell parser and helpers, the following are realistic confidence checks for POSIX shells:
-
-- exact command count preservation
-- exact pipeline arity preservation
-- exact operator skeleton preservation
-- presence and identity of static URLs
-- explicit output file path
-- stdout vs file mode
-- tar extraction detection
-- tar extraction destination
-- non-target segment identity for bounded pipelines
-- stdout-preserving download mode for pipe rewrites such as `curl ... | tar ...` -> `wget -O- ... | tar ...`
-
-This is also where tally can be stricter than `curlconverter`:
-
-- we can validate shell topology directly,
-- we can reject conversions that only preserve approximate request semantics,
-- and we can require downstream pipeline segments to stay structurally unchanged.
-
-ShellCheck should be used as a secondary guard for POSIX shells, not as the primary acceptance gate.
-
-### 7.3 Supported bounded pipeline modes in v1
-
-Pipeline support should be explicit, not open-ended.
-
-Recommended v1 allowlist:
-
-- `download | tar-extract`
-- `download | tar-extract | <nothing else>` only
-
-Where:
-
-- left segment is exactly one `curl` or `wget` download command
-- right segment is exactly one `tar` extraction command
-- there are no additional pipeline stages
-- there is no shell metaprogramming around the pipeline
-
-Examples that should be in scope:
-
-- `curl -fsSL https://example.com/app.tar.gz | tar -xz -C /opt`
-- `wget -q -O- https://example.com/app.tar.gz | tar -xz -C /opt`
-
-Examples that should stay out of scope in v1:
-
-- `curl ... | tee file | tar ...`
-- `curl ... | sh`
-- `curl ... | gunzip | tar ...`
-- `curl ... | awk ...`
-- any pipeline with more than two stages
-- any pipeline where the non-download segment is not a statically understood extractor
-
-### 7.4 What we should not trust in v1
-
-Block or refuse when the command depends on semantics we cannot confidently validate:
-
-- `curl -X`, `--data`, `--form`, uploads, custom auth-heavy flows
-- `wget` recursive, mirror, or timestamping modes
-- implicit filename behavior such as `curl -O`
-- multi-URL transfers
-- pipelines outside the explicit bounded-pipeline allowlist
-- dynamic shell constructs hiding argv
-- Windows / PowerShell / cmd rewrites without equivalent parser-backed invariants
-
-These refusal rules are not theoretical. They follow directly from the `curlconverter` evidence that a broad `curl -> wget` converter eventually
-falls back to warnings, ignored flags, or request-level approximations.
-
-### 7.5 Post-apply validation
-
-After splicing the replacement back into the file, tally should still run:
-
-1. Dockerfile parse
-2. objective-specific validation
-3. re-lint with AI disabled and normal fix policy
-4. objective-specific re-validation on normalized content
-
-For DL4001 specifically, require:
-
-- the scoped command now uses the preferred tool
-- the scoped stage no longer mixes `curl` and `wget` for the targeted issue
-- no newly introduced violation of `tally/curl-should-follow-redirects` when the result uses `curl`
-- no parse errors
-
-## 8. Resolver Changes
-
-### 8.1 Output mode
-
-Add a new output mode:
-
-```go
-const (
-    OutputReplacement OutputMode = "replacement"
-    OutputPatch       OutputMode = "patch"
-    OutputDockerfile  OutputMode = "dockerfile"
-)
-```
-
-For this objective family:
-
-- `Primary = OutputReplacement`
-- `AllowFallback = false`
-
-### 8.2 Replacement window
-
-The resolver should support objective-supplied replacement windows directly.
-
-Illustrative shape:
-
-```go
-type ReplacementWindow struct {
-    StartLine    int
-    EndLine      int
-    StartColumn  int
-    EndColumn    int
-    OriginalText string
-}
-```
-
-Flow:
-
-1. parse model output as replacement text
-2. validate it against the shell/OS contract
-3. splice it into the known window
-4. compute a diff internally if needed for UX/debugging
-
-## 9. DL4001 Pilot Policy
-
-Offer the AI fix only when:
-
-- exactly one command or bounded pipeline is chosen as scope
-- a preferred tool is selected
-- the candidate command is statically identifiable
-- shell variant is known and parseable
-- there are no hard blockers
-
-In v1, do not let the AI:
-
-- change package installation commands
-- add or remove config files
-- rewrite multiple stages
-- rewrite text outside the single replacement window
-
-That means the first ACP objective is:
-
-- normalize one command invocation
-- not environment setup
-
-## 10. Generalization
-
-This design should generalize through family adapters, not through one giant prompt.
-
-Examples of later families:
-
-- `npm -> bun`
-- `npm -> pnpm`
-- `wget/curl -> ADD <url>` in tightly bounded cases
-
-But each family should provide its own:
-
-- extracted facts
-- validation mode
-- exact invariants
-- refusal rules
-
-`curlconverter` is another useful signal here: support tables and target-specific emitters scale better than a universal translator prompt. Tally
-should keep that idea, but replace "best-effort emit + warnings" with "AI proposal + hard validator + refusal."
-
-## 11. Implementation Plan
-
-### Phase 1: scaffolding
-
-- add new objective kind
-- add `OutputReplacement`
-- add replacement-window parsing and splice support in the resolver
-- add objective-scoped capability policy for restricted tool introspection
-
-### Phase 2: DL4001 evidence pack
-
-- refactor `DL4001` detection to emit structured AI facts
-- add preferred tool selection
-- add command-local shell/OS extraction
-- add bounded pipeline/archive classification
-- add explicit pipeline-mode classification for `download | tar-extract`
-- add blocker classification
-
-### Phase 3: validation
-
-- replacement-window validator for exact shape preservation
-- shell-parser validation of rewritten command text
-- secondary ShellCheck guard for POSIX shells
-- bounded-pipeline validator for left/right segment identity and stdout-preserving semantics
-- post-apply DL4001 invariants
-
-### Phase 4: tests
-
-- unit tests for preferred tool policy
-- prompt snapshot tests
-- replacement-output parsing tests
-- validation tests for single-command and bounded-pipeline modes
-- integration tests for `curl | tar` -> `wget -O- | tar`
-- resolver tests for `NO_CHANGE`, malformed replacement output, invalid-shape replacement, and successful replacement
-- integration fixtures for representative Dockerfiles
-
-## 12. Recommendation
-
-Proceed, but with this contract:
-
-- command-local prompt context only
-- explicit shell and OS context
-- replacement-window output, not diff
-- parser-first validation
-- optional allowlisted help/version introspection for the target tool only
-- unsafe explicit application only
-
-That is cleaner than diff mode for this objective and matches what tally can already validate confidently.
+- family-specific abstract operations first
+- target capability tables instead of flag mapping
+- Dockerfile-relevant outcome equivalence instead of CLI symmetry
+- deterministic unsafe fix when lift + lower + validate succeeds
+- ACP replacement-window fallback when it does not
+
+For `DL4001`, this means the common `curl`/`wget` cases should stop being treated as "probably AI." They should become a bounded deterministic
+transpilation problem.
 
 ## Appendix A: End-to-End Pipe Example
 
-This appendix demonstrates the proposed workflow for a concrete bounded pipeline case.
-
-### A.1 Original Dockerfile snippet
+Original Dockerfile instruction:
 
 ```Dockerfile
-FROM ubuntu:24.04
-RUN apt-get update && apt-get install -y wget ca-certificates
 RUN curl -fsSL https://example.com/app.tar.gz | tar -xz -C /opt/app
 ```
 
-Assume `DL4001` fires because the stage already standardized on `wget`.
+### A.1 Shell/topology classification
 
-### A.2 Tally detection and fact extraction
+- shell variant: `bash` or POSIX shell
+- command family: `http-transfer`
+- output topology: `stdout-pipe`
+- downstream command: `tar`
+- relevant surfaces:
+  - `stream`
+  - `filesystem`
+  - `exit-status`
 
-Tally detects:
+### A.2 Lift step
 
-- preferred tool: `wget`
-- reason: `wget` is installed in the stage; `curl` is the outlier
-- shell variant: `bash`
-- platform OS: `linux`
-- validation mode: `bounded-pipeline`
+The `curl` lifter extracts:
 
-Illustrative extracted facts:
+- one URL: `https://example.com/app.tar.gz`
+- method: `GET`
+- failure policy: transport failure plus HTTP-status failure
+- response sink: `stdout-pipe`
+- output purity need: `true`
+- downstream hint: `tar`
+
+Illustrative lifted operation:
 
 ```json
 {
-  "family": "download-client",
-  "ruleCode": "hadolint/DL4001",
-  "platformOS": "linux",
-  "shellVariant": "bash",
-  "preferredTool": "wget",
-  "preferredReason": "wget is installed in this stage",
-  "window": {
-    "startLine": 3,
-    "endLine": 3,
-    "startColumn": 4,
-    "endColumn": 63,
-    "originalText": "curl -fsSL https://example.com/app.tar.gz | tar -xz -C /opt/app",
-    "validationMode": "bounded-pipeline"
+  "family": "http-transfer",
+  "request": {
+    "scheme": "https",
+    "method": "GET",
+    "url": {
+      "raw": "https://example.com/app.tar.gz",
+      "kind": "literal"
+    },
+    "failurePolicy": {
+      "failOnTransportError": true,
+      "failOnHTTPStatus": true
+    }
   },
-  "candidate": {
-    "sourceTool": "curl",
-    "raw": "curl -fsSL https://example.com/app.tar.gz | tar -xz -C /opt/app",
-    "urls": ["https://example.com/app.tar.gz"],
-    "outputMode": "stdout"
+  "responseSink": {
+    "kind": "stdout-pipe",
+    "downstreamHint": "tar"
   },
-  "context": {
-    "boundedPattern": "download|tar-extract",
-    "pipelineArity": 2,
-    "downstreamCommand": "tar",
-    "tarExtract": true,
-    "tarDestination": "/opt/app"
+  "observability": {
+    "quiet": true,
+    "verbose": false,
+    "outputPurityNeed": true
   }
 }
 ```
 
-### A.3 Prompt sent to the model
+### A.3 Lower step
 
-Tally sends a command-local prompt, not a Dockerfile-refactor prompt.
+The target selector says this stage prefers `wget`.
 
-Illustrative content:
+The `wget` capability table says:
 
-````text
-You are rewriting one shell command to normalize one command family.
+- stdout output is supported
+- a quiet mode is available
+- this request shape is representable
 
-Task:
-- Rewrite the command below so it uses only: wget
-- Preserve behavior as closely as possible
-- If you cannot do that safely, output exactly: NO_CHANGE
-
-Strict rules:
-- Only rewrite the provided command text
-- Do not change text outside the declared replacement window
-- Output a command that is valid for the declared OS and shell
-- Preserve the pipeline shape and the downstream tar extraction behavior
-
-Context:
-- Rule: hadolint/DL4001
-- Platform OS: linux
-- Shell: bash
-- Preferred tool: wget
-- Validation mode: bounded-pipeline
-- Bounded pattern: download|tar-extract
-- Pipeline arity: 2
-- Downstream command: tar
-- Tar destination: /opt/app
-
-Input command:
-```text
-curl -fsSL https://example.com/app.tar.gz | tar -xz -C /opt/app
-```
-
-Output format:
-- Either exactly NO_CHANGE
-- Or exactly one ```text code block containing replacement text for this window only
-````
-
-### A.4 Model output
-
-Expected successful output:
+So the serializer emits:
 
 ```text
 wget -q -O- https://example.com/app.tar.gz | tar -xz -C /opt/app
 ```
 
-### A.5 Mechanical validation
+### A.4 Validation step
 
-Tally then validates the replacement without trusting the model's reasoning:
+The validator reparses the replacement and confirms:
 
-1. Parse the replacement with the Bash shell parser.
-2. Assert `bounded-pipeline` shape:
-   - pipeline arity is still 2
-   - operator skeleton is still a single `|`
-3. Assert left segment is now `wget`.
-4. Assert right segment is still `tar` extraction.
-5. Assert URL is unchanged.
-6. Assert output mode remains `stdout`.
-   - original `curl` piped to stdout
-   - rewritten `wget` must therefore use `-O-` or equivalent stdout form
-7. Assert tar destination remains `/opt/app`.
-8. Optionally run ShellCheck as a secondary guard.
+- there is still exactly one relevant transfer command in the replacement window
+- the transfer still feeds stdout into a pipeline
+- the URL is preserved
+- the downstream command is still `tar`
+- the extraction destination is still `/opt/app`
+- no intermediate file is introduced
+- no blocker from the capability table was ignored
 
-If any of those fail, the resolver rejects the output and either retries with blocking issues or returns `NO_CHANGE`.
+If all of those checks pass, tally emits a heuristic unsafe fix.
 
-### A.6 Splice back into the file
+If any check fails, tally does not guess. It falls back to ACP for that same replacement window.
 
-After successful validation, tally replaces only the known window:
+## Appendix B: `npm -> bun` Example
 
-Before:
+Original:
 
 ```Dockerfile
-RUN curl -fsSL https://example.com/app.tar.gz | tar -xz -C /opt/app
+RUN npm install express
 ```
 
-After:
+Lifted operation:
+
+```json
+{
+  "family": "node-package-management",
+  "kind": "dependency-install",
+  "mode": "add-packages",
+  "packages": [
+    { "name": "express" }
+  ],
+  "global": false
+}
+```
+
+If the `bun` capability table confirms the same operation is representable, the serializer may emit:
+
+```text
+bun add express
+```
+
+Now contrast that with:
 
 ```Dockerfile
-RUN wget -q -O- https://example.com/app.tar.gz | tar -xz -C /opt/app
+RUN npm config set fund false
 ```
 
-If the CLI or editor wants a diff preview, tally computes it after the splice. The model does not generate that diff.
+This is still recognizable as a config mutation, but if the `bun` serializer has no explicit semantic mapping for `fund=false`, the system should
+not guess. That command should go to ACP fallback or no-fix.
 
-### A.7 Post-apply checks
-
-Tally then runs normal post-apply validation:
-
-- Dockerfile parse succeeds
-- scoped command now uses `wget`
-- targeted stage is no longer mixed for the relevant command-family issue
-- no new violation is introduced by the rewrite
-
-This is the intended end-to-end workflow for bounded pipe cases in v1.
-
-## 13. Sources
+## 15. Sources
 
 ### Local tally sources
 
@@ -751,20 +904,17 @@ This is the intended end-to-end workflow for bounded pipe cases in v1.
 - [`internal/shell/command.go`](../internal/shell/command.go)
 - [`internal/shell/chain.go`](../internal/shell/chain.go)
 - [`internal/shell/archive.go`](../internal/shell/archive.go)
-- [`internal/facts/facts.go`](../internal/facts/facts.go)
+- [`internal/rules/tally/prefer_add_unpack.go`](../internal/rules/tally/prefer_add_unpack.go)
 - [`internal/fix/fixer.go`](../internal/fix/fixer.go)
 - [`internal/ai/autofix/resolver.go`](../internal/ai/autofix/resolver.go)
 - [`internal/ai/autofixdata/objective.go`](../internal/ai/autofixdata/objective.go)
-- [`internal/ai/autofixdata/prompt.go`](../internal/ai/autofixdata/prompt.go)
 - [`design-docs/13-ai-autofix-acp.md`](../design-docs/13-ai-autofix-acp.md)
+- [`design-docs/19-ai-autofix-diff-contract.md`](../design-docs/19-ai-autofix-diff-contract.md)
 
 ### External references
 
-- [curl man page](https://curl.se/docs/manpage.html)
-- [GNU Wget manual](https://www.gnu.org/software/wget/manual/wget.html)
-- [`curlconverter` README](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/README.md)
-- [`curlconverter` `src/parse.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/parse.ts)
-- [`curlconverter` `src/shell/tokenizer.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/shell/tokenizer.ts)
+- [`curlconverter` `src/shell/Parser.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/shell/Parser.ts)
+- [`curlconverter` `src/curl/opts.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/curl/opts.ts)
+- [`curlconverter` `src/Request.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/Request.ts)
 - [`curlconverter` `src/generators/wget.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/generators/wget.ts)
-- [`curlconverter` `src/Warnings.ts`](https://github.com/curlconverter/curlconverter/blob/06636420d2af2b28f78203dd7915ce0ba8fcdbba/src/Warnings.ts)
-- [`curlconverter` issue #703](https://github.com/curlconverter/curlconverter/issues/703)
+- [`curlconverter` issue #703`](https://github.com/curlconverter/curlconverter/issues/703)

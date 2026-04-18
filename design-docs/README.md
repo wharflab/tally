@@ -409,20 +409,21 @@ corpus analysis
 
 ---
 
-### 37. [AI AutoFix via ACP: Command-Family Normalization](37-ai-autofix-command-family-normalization.md)
+### 37. [Command-Family Normalization: Semantic Lift/Lower With ACP Fallback](37-ai-autofix-command-family-normalization.md)
 
-**Covers:** Command-local ACP auto-fix design for `hadolint/DL4001`, including replacement-window output, parser-backed validation, bounded
-download-pipe support, and lessons learned from `curlconverter`.
+**Covers:** A semantic command-family normalization design for `hadolint/DL4001` where tally first lifts a source command into a family-specific
+operation IR, lowers it into the preferred target tool, validates the Dockerfile-relevant outcome mechanically, and only falls back to ACP when
+deterministic transpilation fails.
 
 **Key Topics:**
 
-- Why `curl`/`wget` normalization is not safely solvable as a broad heuristic rewrite
-- Why this objective family should use replacement-window output instead of diff output
-- Parser-first validation of command count, pipeline shape, URL preservation, output mode, and tar extraction behavior
-- Bounded pipeline support for `download | tar-extract`
-- Reusable design principles for later command-family migrations such as `npm -> bun`
+- Why command-family fixes should model operations and outcomes rather than map flags argument-to-argument
+- How to adapt `curlconverter`'s parse/lift/lower architecture without inheriting its warning-only acceptance model
+- Dockerfile-relevant equivalence: files, streams, exit behavior, package state, and config state
+- Family-specific IRs and capability tables for `curl`/`wget` and later `npm`/`bun`
+- Replacement-window ACP fallback with structured blocker and partial-operation context
 
-**Based on:** tally shell/fix internals, `curlconverter`, curl/Wget documentation, and prior ACP design docs
+**Based on:** tally shell/fix internals, `curlconverter`, and prior ACP design docs
 
 ---
 
