@@ -11,6 +11,10 @@ import (
 
 // CommandInfo represents a parsed command with its arguments and flags.
 type CommandInfo struct {
+	// SourceKind describes how this command was discovered in the script.
+	// Only Direct commands have a source range that can be rewritten safely.
+	SourceKind CommandSourceKind
+
 	// Variant is the shell variant used to parse this command.
 	Variant Variant
 
@@ -28,12 +32,30 @@ type CommandInfo struct {
 	StartCol int // 0-based column where command starts
 	EndCol   int // 0-based column where command name ends
 
+	// Position information for the full command expression.
+	// Only valid when HasCommandRange is true.
+	CommandEndLine  int // 0-based line within the script where the command ends
+	CommandEndCol   int // 0-based exclusive column where the command ends
+	HasCommandRange bool
+
 	// Position information for the subcommand (if present).
 	// These are only set when Subcommand is non-empty.
 	SubcommandLine     int // 0-based line within the script
 	SubcommandStartCol int // 0-based column where subcommand starts
 	SubcommandEndCol   int // 0-based column where subcommand ends
 }
+
+// CommandSourceKind describes how a command was discovered in the shell AST.
+type CommandSourceKind string
+
+const (
+	// CommandSourceKindDirect is a normal call expression in the current script.
+	CommandSourceKindDirect CommandSourceKind = "direct"
+	// CommandSourceKindWrapped is a command reached through a wrapper like env/nice/timeout.
+	CommandSourceKindWrapped CommandSourceKind = "wrapped"
+	// CommandSourceKindNestedShell is a command parsed from nested shell code like sh -c "cmd".
+	CommandSourceKindNestedShell CommandSourceKind = "nested-shell"
+)
 
 // HasFlag checks if the command has a specific flag.
 // Handles both short flags (-y) and long flags (--yes).
@@ -211,11 +233,15 @@ func FindCommands(script string, variant Variant, names ...string) []CommandInfo
 		endPos := cmdWord.End()
 
 		info := CommandInfo{
-			Variant:  variant,
-			Name:     baseName,
-			Line:     int(pos.Line()) - 1,
-			StartCol: int(pos.Col()) - 1,
-			EndCol:   int(endPos.Col()) - 1,
+			SourceKind:      CommandSourceKindDirect,
+			Variant:         variant,
+			Name:            baseName,
+			Line:            int(pos.Line()) - 1,
+			StartCol:        int(pos.Col()) - 1,
+			EndCol:          int(endPos.Col()) - 1,
+			CommandEndLine:  int(call.End().Line()) - 1,
+			CommandEndCol:   int(call.End().Col()) - 1,
+			HasCommandRange: true,
 		}
 
 		// Extract all arguments and find subcommand with position
@@ -276,11 +302,12 @@ func findWrappedCommands(args []*syntax.Word, variant Variant, wrapperName strin
 			endPos := wa.Arg.End()
 
 			info := CommandInfo{
-				Variant:  variant,
-				Name:     wa.Name,
-				Line:     int(pos.Line()) - 1,
-				StartCol: int(pos.Col()) - 1,
-				EndCol:   int(endPos.Col()) - 1,
+				SourceKind: CommandSourceKindWrapped,
+				Variant:    variant,
+				Name:       wa.Name,
+				Line:       int(pos.Line()) - 1,
+				StartCol:   int(pos.Col()) - 1,
+				EndCol:     int(endPos.Col()) - 1,
 			}
 
 			// Extract remaining args and find subcommand with position
@@ -411,7 +438,12 @@ func findNestedShellCommands(args []*syntax.Word, variant Variant, nameSet map[s
 				for n := range nameSet {
 					names = append(names, n)
 				}
-				return FindCommands(code, variant, names...)
+				commands := FindCommands(code, variant, names...)
+				for i := range commands {
+					commands[i].SourceKind = CommandSourceKindNestedShell
+					commands[i].HasCommandRange = false
+				}
+				return commands
 			}
 			break
 		}

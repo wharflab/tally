@@ -231,3 +231,74 @@ RUN wget https://example.com/another-file
 		})
 	}
 }
+
+func TestDL4001Rule_SuggestedFix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		dockerfile  string
+		wantFix     bool
+		wantNewText string
+	}{
+		{
+			name: "rewrite wget remote file to curl when curl is installed",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl
+RUN curl -fsSL https://example.com/bootstrap.tgz
+RUN wget https://example.com/file.tgz
+`,
+			wantFix:     true,
+			wantNewText: "curl -fL -O https://example.com/file.tgz",
+		},
+		{
+			name: "rewrite piped curl stdout to wget stdout when wget is installed",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y wget
+RUN wget https://example.com/bootstrap.tgz
+RUN curl -fsSL https://example.com/app.tgz | tar -xz -C /opt
+`,
+			wantFix:     true,
+			wantNewText: "wget -nv -O- https://example.com/app.tgz",
+		},
+		{
+			name: "do not rewrite curl without redirect-following to wget",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y wget
+RUN wget https://example.com/bootstrap.tgz
+RUN curl -fsS -o /tmp/file https://example.com/file
+`,
+			wantFix: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
+			violations := NewDL4001Rule().Check(input)
+			if len(violations) != 1 {
+				t.Fatalf("got %d violations, want 1", len(violations))
+			}
+
+			v := violations[0]
+			if tt.wantFix {
+				if v.SuggestedFix == nil {
+					t.Fatal("expected SuggestedFix")
+				}
+				if v.SuggestedFix.Safety != rules.FixUnsafe {
+					t.Fatalf("fix safety = %v, want %v", v.SuggestedFix.Safety, rules.FixUnsafe)
+				}
+				if len(v.SuggestedFix.Edits) != 1 {
+					t.Fatalf("expected 1 edit, got %d", len(v.SuggestedFix.Edits))
+				}
+				if got := v.SuggestedFix.Edits[0].NewText; got != tt.wantNewText {
+					t.Fatalf("edit NewText = %q, want %q", got, tt.wantNewText)
+				}
+			} else if v.SuggestedFix != nil {
+				t.Fatalf("expected no SuggestedFix, got %+v", v.SuggestedFix)
+			}
+		})
+	}
+}

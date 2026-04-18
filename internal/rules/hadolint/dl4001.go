@@ -2,10 +2,8 @@ package hadolint
 
 import (
 	"sort"
-	"strings"
 
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
@@ -13,6 +11,11 @@ import (
 
 // DL4001Rule implements the DL4001 linting rule.
 type DL4001Rule struct{}
+
+const (
+	dl4001ToolCurl = "curl"
+	dl4001ToolWget = "wget"
+)
 
 // NewDL4001Rule creates a new DL4001 rule instance.
 func NewDL4001Rule() *DL4001Rule {
@@ -34,8 +37,14 @@ func (r *DL4001Rule) Metadata() rules.RuleMetadata {
 
 // toolUsageDL4001 tracks where a tool is used and whether it was installed.
 type toolUsageDL4001 struct {
-	locations []rules.Location
-	installed bool
+	occurrences []toolOccurrenceDL4001
+	installed   bool
+}
+
+type toolOccurrenceDL4001 struct {
+	stageIdx int
+	loc      rules.Location
+	runFacts *facts.RunFacts
 }
 
 // usageMapDL4001 tracks tool usage across stages.
@@ -51,9 +60,9 @@ func (m usageMapDL4001) anyInstalled() bool {
 	return false
 }
 
-// allLocations returns all locations from the usage map.
-// Locations are sorted by stage index for deterministic output.
-func (m usageMapDL4001) allLocations() []rules.Location {
+// allOccurrences returns all occurrences from the usage map.
+// Occurrences are sorted by stage index for deterministic output.
+func (m usageMapDL4001) allOccurrences() []toolOccurrenceDL4001 {
 	// Sort stage indices for deterministic output
 	indices := make([]int, 0, len(m))
 	for idx := range m {
@@ -61,12 +70,12 @@ func (m usageMapDL4001) allLocations() []rules.Location {
 	}
 	sort.Ints(indices)
 
-	locs := make([]rules.Location, 0, len(indices))
+	occurrences := make([]toolOccurrenceDL4001, 0, len(indices))
 	for _, idx := range indices {
 		u := m[idx]
-		locs = append(locs, u.locations...)
+		occurrences = append(occurrences, u.occurrences...)
 	}
-	return locs
+	return occurrences
 }
 
 // Check runs the DL4001 rule.
@@ -83,7 +92,7 @@ func (r *DL4001Rule) Check(input rules.LintInput) []rules.Violation {
 		return violations
 	}
 
-	return r.checkCrossStageConflicts(wgetUsage, curlUsage)
+	return r.checkCrossStageConflicts(input.File, wgetUsage, curlUsage)
 }
 
 // collectToolUsage scans all stages and collects wget/curl usage.
@@ -91,10 +100,13 @@ func (r *DL4001Rule) collectToolUsage(input rules.LintInput) (usageMapDL4001, us
 	wgetUsage := make(usageMapDL4001)
 	curlUsage := make(usageMapDL4001)
 
-	sem := input.Semantic
+	if input.Facts == nil {
+		return wgetUsage, curlUsage
+	}
 
-	for stageIdx, stage := range input.Stages {
-		shellVariant, wgetInstalled, curlInstalled := r.getStageInfo(sem, stageIdx)
+	sem := input.Semantic
+	for stageIdx, stageFacts := range input.Facts.Stages() {
+		wgetInstalled, curlInstalled := r.getStageInfo(sem, stageIdx)
 		tracking := &toolTrackingDL4001{
 			wgetInstalled: wgetInstalled,
 			curlInstalled: curlInstalled,
@@ -102,47 +114,29 @@ func (r *DL4001Rule) collectToolUsage(input rules.LintInput) (usageMapDL4001, us
 			curlUsage:     curlUsage,
 		}
 
-		for _, cmd := range stage.Commands {
-			run, ok := cmd.(*instructions.RunCommand)
-			if !ok {
+		for _, runFacts := range stageFacts.Runs {
+			if runFacts == nil || runFacts.Run == nil {
 				continue
 			}
-
-			cmdStr := r.buildCommandString(run)
-			loc := rules.NewLocationFromRanges(input.File, run.Location())
-
-			r.recordToolUsage(cmdStr, shellVariant, stageIdx, loc, tracking)
+			r.recordToolUsage(stageIdx, rules.NewLocationFromRanges(input.File, runFacts.Run.Location()), runFacts, tracking)
 		}
 	}
 
 	return wgetUsage, curlUsage
 }
 
-// getStageInfo extracts shell variant and package installation info for a stage.
-func (r *DL4001Rule) getStageInfo(sem *semantic.Model, stageIdx int) (shell.Variant, bool, bool) {
-	shellVariant := shell.VariantBash
+// getStageInfo extracts package installation info for a stage.
+func (r *DL4001Rule) getStageInfo(sem *semantic.Model, stageIdx int) (bool, bool) {
 	var wgetInstalled, curlInstalled bool
 
 	if sem != nil {
 		if info := sem.StageInfo(stageIdx); info != nil {
-			shellVariant = info.ShellSetting.Variant
 			wgetInstalled = info.HasPackage("wget")
 			curlInstalled = info.HasPackage("curl")
 		}
 	}
 
-	return shellVariant, wgetInstalled, curlInstalled
-}
-
-// buildCommandString builds the command string from a RUN command including heredocs.
-func (r *DL4001Rule) buildCommandString(run *instructions.RunCommand) string {
-	var cmdBuilder strings.Builder
-	cmdBuilder.WriteString(strings.Join(run.CmdLine, " "))
-	for _, f := range run.Files {
-		cmdBuilder.WriteByte('\n')
-		cmdBuilder.WriteString(f.Data)
-	}
-	return cmdBuilder.String()
+	return wgetInstalled, curlInstalled
 }
 
 // toolTrackingDL4001 bundles per-stage tool installation state and usage maps.
@@ -152,29 +146,26 @@ type toolTrackingDL4001 struct {
 }
 
 // recordToolUsage checks for wget/curl usage and records it.
-// Skips shells without parser support.
-func (r *DL4001Rule) recordToolUsage(
-	cmdStr string,
-	shellVariant shell.Variant,
-	stageIdx int,
-	loc rules.Location,
-	t *toolTrackingDL4001,
-) {
-	if !shellVariant.HasParser() {
-		return
-	}
-
-	if shell.ContainsCommandWithVariant(cmdStr, "wget", shellVariant) {
+func (r *DL4001Rule) recordToolUsage(stageIdx int, loc rules.Location, runFacts *facts.RunFacts, t *toolTrackingDL4001) {
+	if hasCommandNamed(runFacts.CommandInfos, "wget") {
 		if t.wgetUsage[stageIdx] == nil {
 			t.wgetUsage[stageIdx] = &toolUsageDL4001{installed: t.wgetInstalled}
 		}
-		t.wgetUsage[stageIdx].locations = append(t.wgetUsage[stageIdx].locations, loc)
+		t.wgetUsage[stageIdx].occurrences = append(t.wgetUsage[stageIdx].occurrences, toolOccurrenceDL4001{
+			stageIdx: stageIdx,
+			loc:      loc,
+			runFacts: runFacts,
+		})
 	}
-	if shell.ContainsCommandWithVariant(cmdStr, "curl", shellVariant) {
+	if hasCommandNamed(runFacts.CommandInfos, "curl") {
 		if t.curlUsage[stageIdx] == nil {
 			t.curlUsage[stageIdx] = &toolUsageDL4001{installed: t.curlInstalled}
 		}
-		t.curlUsage[stageIdx].locations = append(t.curlUsage[stageIdx].locations, loc)
+		t.curlUsage[stageIdx].occurrences = append(t.curlUsage[stageIdx].occurrences, toolOccurrenceDL4001{
+			stageIdx: stageIdx,
+			loc:      loc,
+			runFacts: runFacts,
+		})
 	}
 }
 
@@ -191,10 +182,10 @@ func (r *DL4001Rule) checkStageConflicts(input rules.LintInput, wgetUsage, curlU
 		}
 
 		msg := r.generateMessage(wget.installed, curl.installed)
-		locsToReport := r.selectLocationsToReport(wget, curl)
+		occurrences, preferredTool := r.selectOccurrencesToReport(wget, curl)
 
-		for _, loc := range locsToReport {
-			violations = append(violations, r.createViolation(loc, msg))
+		for _, occurrence := range occurrences {
+			violations = append(violations, r.createViolation(input.File, occurrence, preferredTool, msg))
 		}
 	}
 
@@ -202,43 +193,56 @@ func (r *DL4001Rule) checkStageConflicts(input rules.LintInput, wgetUsage, curlU
 }
 
 // checkCrossStageConflicts checks for wget/curl conflicts across stages.
-func (r *DL4001Rule) checkCrossStageConflicts(wgetUsage, curlUsage usageMapDL4001) []rules.Violation {
+func (r *DL4001Rule) checkCrossStageConflicts(file string, wgetUsage, curlUsage usageMapDL4001) []rules.Violation {
 	anyWgetInstalled := wgetUsage.anyInstalled()
 	anyCurlInstalled := curlUsage.anyInstalled()
 
 	msg := r.generateMessage(anyWgetInstalled, anyCurlInstalled)
 
-	var locsToReport []rules.Location
+	var occurrences []toolOccurrenceDL4001
+	preferredTool := dl4001ToolWget
 	if anyCurlInstalled && !anyWgetInstalled {
-		locsToReport = wgetUsage.allLocations()
+		occurrences = wgetUsage.allOccurrences()
+		preferredTool = dl4001ToolCurl
 	} else {
-		locsToReport = curlUsage.allLocations()
+		occurrences = curlUsage.allOccurrences()
 	}
 
-	violations := make([]rules.Violation, 0, len(locsToReport))
-	for _, loc := range locsToReport {
-		violations = append(violations, r.createViolation(loc, msg))
+	violations := make([]rules.Violation, 0, len(occurrences))
+	for _, occurrence := range occurrences {
+		violations = append(violations, r.createViolation(file, occurrence, preferredTool, msg))
 	}
 
 	return violations
 }
 
-// selectLocationsToReport chooses which tool's locations to report as violations.
-func (r *DL4001Rule) selectLocationsToReport(wget, curl *toolUsageDL4001) []rules.Location {
+// selectOccurrencesToReport chooses which tool's occurrences to report as violations.
+func (r *DL4001Rule) selectOccurrencesToReport(wget, curl *toolUsageDL4001) ([]toolOccurrenceDL4001, string) {
 	if curl.installed && !wget.installed {
-		return wget.locations
+		return wget.occurrences, dl4001ToolCurl
 	}
-	return curl.locations
+	return curl.occurrences, dl4001ToolWget
 }
 
 // createViolation creates a violation with the given location and message.
-func (r *DL4001Rule) createViolation(loc rules.Location, msg messageInfoDL4001) rules.Violation {
-	return rules.NewViolation(
-		loc,
+func (r *DL4001Rule) createViolation(
+	file string,
+	occurrence toolOccurrenceDL4001,
+	preferredTool string,
+	msg messageInfoDL4001,
+) rules.Violation {
+	v := rules.NewViolation(
+		occurrence.loc,
 		r.Metadata().Code,
 		msg.message,
 		r.Metadata().DefaultSeverity,
 	).WithDocURL(r.Metadata().DocURL).WithDetail(msg.detail)
+
+	if fix := r.buildSuggestedFix(file, occurrence, preferredTool); fix != nil {
+		v = v.WithSuggestedFix(fix)
+	}
+
+	return v
 }
 
 // messageInfoDL4001 holds a violation message and detail.
@@ -281,6 +285,80 @@ func (r *DL4001Rule) generateMessage(wgetInstalled, curlInstalled bool) messageI
 				"Standardize on one tool. curl is generally preferred in containers " +
 				"due to better scripting support and broader protocol support.",
 		}
+	}
+}
+
+func hasCommandNamed(commands []shell.CommandInfo, name string) bool {
+	for i := range commands {
+		if commands[i].Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func countCommandsNamed(commands []shell.CommandInfo, name string) int {
+	count := 0
+	for i := range commands {
+		if commands[i].Name == name {
+			count++
+		}
+	}
+	return count
+}
+
+func (r *DL4001Rule) buildSuggestedFix(file string, occurrence toolOccurrenceDL4001, preferredTool string) *rules.SuggestedFix {
+	if file == "" || occurrence.runFacts == nil {
+		return nil
+	}
+
+	sourceTool := dl4001ToolCurl
+	if preferredTool == dl4001ToolCurl {
+		sourceTool = dl4001ToolWget
+	}
+
+	if countCommandsNamed(occurrence.runFacts.CommandInfos, sourceTool) == 0 {
+		return nil
+	}
+
+	edits := make([]rules.TextEdit, 0, len(occurrence.runFacts.CommandOperationFacts))
+	covered := 0
+
+	for i := range occurrence.runFacts.CommandOperationFacts {
+		fact := occurrence.runFacts.CommandOperationFacts[i]
+		if fact.Tool != sourceTool {
+			continue
+		}
+		covered++
+		if fact.Status != facts.CommandOperationLifted || fact.SourceRange == nil || fact.HTTPTransfer == nil {
+			return nil
+		}
+
+		replacement, ok := fact.HTTPTransfer.LowerToTool(preferredTool)
+		if !ok {
+			return nil
+		}
+
+		edits = append(edits, rules.TextEdit{
+			Location: rules.NewRangeLocation(
+				file,
+				fact.SourceRange.StartLine,
+				fact.SourceRange.StartCol,
+				fact.SourceRange.EndLine,
+				fact.SourceRange.EndCol,
+			),
+			NewText: replacement,
+		})
+	}
+
+	if covered == 0 || covered != countCommandsNamed(occurrence.runFacts.CommandInfos, sourceTool) {
+		return nil
+	}
+
+	return &rules.SuggestedFix{
+		Description: "Replace " + sourceTool + " with " + preferredTool,
+		Safety:      rules.FixUnsafe,
+		Edits:       edits,
 	}
 }
 
