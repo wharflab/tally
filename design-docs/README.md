@@ -411,15 +411,17 @@ corpus analysis
 
 ### 37. [Command-Family Normalization: Semantic Lift/Lower With ACP Fallback](37-ai-autofix-command-family-normalization.md)
 
-**Covers:** A semantic command-family normalization design for `hadolint/DL4001` where tally first lifts a source command into a family-specific
-operation IR, lowers it into the preferred target tool, validates the Dockerfile-relevant outcome mechanically, and only falls back to ACP when
-deterministic transpilation fails.
+**Covers:** A semantic command-family normalization design for `hadolint/DL4001` where tally builds reusable command-family operation facts once per
+file, using semantic-model context plus env and observable-file state, then lowers those operations into a preferred target tool, validates the
+Dockerfile-relevant outcome mechanically, and only falls back to ACP when deterministic transpilation fails.
 
 **Key Topics:**
 
 - Why command-family fixes should model operations and outcomes rather than map flags argument-to-argument
 - How to adapt `curlconverter`'s parse/lift/lower architecture without inheriting its warning-only acceptance model
+- Why the IR should live in the facts layer and be shared across rules rather than rebuilt per rule
 - Dockerfile-relevant equivalence: files, streams, exit behavior, package state, and config state
+- Provenance from env bindings, observable files, and command windows back to source lines
 - Family-specific IRs and capability tables for `curl`/`wget` and later `npm`/`bun`
 - Replacement-window ACP fallback with structured blocker and partial-operation context
 

@@ -27,6 +27,9 @@ For one offending shell command:
 6. emit a heuristic unsafe fix if validation succeeds
 7. fall back to ACP only if lift, lower, or validation fails
 
+The lift step should not be implemented separately inside each rule. It should run once per file as reusable derived analysis, so rules can consume
+family IR for detection, diagnostics, heuristics, and autofix without rebuilding the same interpretation logic repeatedly.
+
 This is the key revision from the prior proposal. The earlier conclusion, "fully heuristic conversion is too hard, therefore ACP should be primary,"
 was too coarse. What is not credible is broad flag-to-flag translation. What is credible is outcome-oriented semantic translation inside explicitly
 bounded command families.
@@ -58,8 +61,10 @@ credible. If not, it should stop and fall back to ACP.
 
 - Handle the common Dockerfile cases with deterministic unsafe fixes.
 - Keep the architecture reusable across command families.
+- Build command-family IR once per file and share it read-only across rules.
 - Separate source parsing from target serialization.
 - Make blockers explicit instead of guessing through them.
+- Preserve provenance back to the Dockerfile lines and files that influenced effective behavior.
 - Validate outcome equivalence using shell parsing and family-specific checks.
 
 ### 3.2 Non-goals
@@ -224,6 +229,109 @@ type CommandFamilyAdapter interface {
 
 The exact Go shape is not important. The separation of responsibilities is.
 
+### 5.4 Placement and lifecycle: facts layer, not per-rule
+
+This IR should be built once per file in the facts layer, not rebuilt independently by each rule.
+
+That matches the repository's current architecture:
+
+- the semantic model is the source of truth for stage inheritance, effective shell, stage env, OS, and package-manager signals
+- the facts layer already projects that state onto concrete `RUN` instructions
+- rules already consume `FileFacts` and `RunFacts` as shared read-only derived analysis
+
+The recommended split is:
+
+- semantic model stays responsible for foundational stage semantics
+- facts layer consumes semantic state plus shell parsing plus observable-file state
+- command-family adapters run during `FileFacts` / `RunFacts` construction
+- rules consume lifted operations from facts instead of reparsing commands
+
+This is important beyond autofix. The same lifted operation should be reusable by rules that only need effective behavior, for example:
+
+- `curl` or `wget` policy rules that reason about redirects, retries, or progress output
+- package-manager rules that inject `-y`, `--no-cache`, or equivalent policy flags
+- config rules that check whether behavior is already implied by `.curlrc`, `wgetrc`, `.npmrc`, or environment
+
+Illustrative direction:
+
+```go
+type CommandOperationFact struct {
+    Family       string
+    CommandIndex int
+    Topology     OutputTopology
+    LiftStatus   LiftStatus
+    Operation    any
+    Provenance   OperationProvenance
+    HardBlockers []Blocker
+}
+
+type RunFacts struct {
+    // existing fields...
+    CommandOperationFacts []CommandOperationFact
+}
+```
+
+Rules should read these facts. They should not author or mutate them.
+
+### 5.5 Context-aware lift inputs and provenance
+
+Family lifting must have access to prior Dockerfile context, not just raw argv.
+
+At minimum, the lift context should be able to read:
+
+- effective shell and shell variant
+- effective environment and env bindings
+- stage OS and package-manager signals
+- observable in-image files and their writer lines
+- build-context sources when configuration files came from `COPY` / `ADD`
+- command source text and location via `SourceMap`
+
+This is necessary because effective behavior may come from configuration outside the command itself.
+
+Examples:
+
+- `curl` semantics can be influenced by `${CURL_HOME}/.curlrc`, `/root/.curlrc`, or proxy-related env
+- `wget` semantics can be influenced by `WGETRC`, `/etc/wgetrc`, or `~/.wgetrc`
+- `npm` semantics can be influenced by `.npmrc`, `NPM_CONFIG_*`, or secret-mounted config paths
+
+The operation fact should therefore include provenance, not just a normalized operation.
+
+Illustrative shape:
+
+```go
+type SourceRefKind string
+
+const (
+    SourceRefCommand        SourceRefKind = "command"
+    SourceRefEnv            SourceRefKind = "env"
+    SourceRefObservableFile SourceRefKind = "observable-file"
+    SourceRefBuildContext   SourceRefKind = "build-context"
+)
+
+type SourceRef struct {
+    Kind      SourceRefKind
+    Line      int
+    Location  []parser.Range
+    Key       string
+    Path      string
+    Detail    string
+}
+
+type OperationProvenance struct {
+    PrimaryCommand SourceRef
+    Related        []SourceRef
+}
+```
+
+The intent is not to burden every rule with location plumbing. The intent is to let one lift step resolve behavior and preserve where it came from.
+
+That provenance is useful for:
+
+- explaining why a command was or was not considered representable
+- linking blockers back to specific `ENV`, `COPY`, `ADD`, or `RUN` lines
+- letting future fixes or diagnostics update the right config source instead of guessing
+- making ACP payloads explain the relevant context without dumping the whole Dockerfile
+
 ## 6. Dockerfile-Relevant Observation Model
 
 This design is intentionally Dockerfile-specific.
@@ -380,7 +488,32 @@ type HTTPTransferOperation struct {
 The important design choice is that this is not merely an HTTP request model. It is a Dockerfile-relevant transfer model. That is the difference
 from using `curlconverter`'s `Request` model directly.
 
-### 7.3 What the lifter decides
+The operation fields should describe effective behavior after merging command arguments with context-derived config, not just literal argv.
+
+### 7.3 Context-aware effective behavior
+
+For HTTP tools, effective behavior may come from prior Dockerfile state rather than the command line alone.
+
+The lifter should therefore consult `RunFacts`, `StageFacts`, and semantic context when resolving the operation.
+
+Examples:
+
+- a `curl` command may inherit redirect or retry behavior from `${CURL_HOME}/.curlrc` or `/root/.curlrc`
+- a `wget` command may inherit retry or output behavior from `WGETRC`, `/etc/wgetrc`, or `~/.wgetrc`
+- env-based proxy or timeout settings may materially affect whether the transfer is representable
+
+That means the lift step should produce:
+
+- effective operation fields
+- provenance for the env bindings or observable files that supplied those fields
+- blockers when configuration exists but cannot be parsed confidently enough to derive effective behavior
+
+Example:
+
+- if the command omits `-L`, but an observable `.curlrc` enables location-following, the lifted operation should still record effective redirect
+  behavior, and provenance should point to the `.curlrc` writer line and any `CURL_HOME` env binding that resolved the path
+
+### 7.4 What the lifter decides
 
 The `curl` lifter should not try to "convert flags." It should decide whether the command is representable as `HTTPTransferOperation`.
 
@@ -395,7 +528,7 @@ Questions it should answer:
 - are there response-side side effects such as cookie jars or remote-name behavior?
 - can the failure semantics be made explicit?
 
-### 7.4 Liftability rules for v1
+### 7.5 Liftability rules for v1
 
 The initial deterministic subset for `DL4001` should be deliberately narrow but useful:
 
@@ -420,19 +553,20 @@ This already covers the common Dockerfile download cases:
 - `curl -fsSL URL | tar -xz -C /path`
 - `curl -fsS URL`
 
-### 7.5 What counts as representable
+### 7.6 What counts as representable
 
 For the HTTP family, "representable" should mean:
 
 - the request semantics that materially affect output can be captured
 - the sink can be captured precisely
 - any side state that matters is either captured or absent
+- any context-derived config that materially affects behavior is either resolved into the operation or treated as a blocker
 - any log-only differences are isolated from data-bearing streams
 
 Representable does not mean "all curl flags have been modeled." It means "the source command's Dockerfile-relevant behavior fits the family
 operation."
 
-### 7.6 Target capability tables
+### 7.7 Target capability tables
 
 Lowering must use target capability tables, not flag mapping tables.
 
@@ -466,7 +600,7 @@ Examples:
 This is the correct level of abstraction. The serializer chooses the target spelling that realizes the operation. It does not mirror the source
 syntax.
 
-### 7.7 Validation contract
+### 7.8 Validation contract
 
 Validation should parse the replacement command again and check family-specific invariants.
 
@@ -481,6 +615,7 @@ For the HTTP family, validation should assert:
 - the pipeline shape is preserved when sink is `stdout-pipe`
 - all non-target pipeline segments that are part of the supported pattern remain semantically unchanged
 - any downstream extractor semantics that we explicitly support remain preserved
+- any material behavior previously supplied by env or observable config is preserved explicitly or proven to remain true in the target context
 - no new file writes are introduced
 - no ignored blocker from the target capability table slipped through
 
@@ -488,7 +623,7 @@ For POSIX-family shells, ShellCheck can run as a secondary guard, but the family
 
 This validator is the real safety boundary for heuristic fixes.
 
-### 7.8 Hard blockers
+### 7.9 Hard blockers
 
 Examples of HTTP-family hard blockers:
 
@@ -498,11 +633,12 @@ Examples of HTTP-family hard blockers:
 - cookie jar read or write in v1
 - remote-name or implicit filename behavior
 - protocol constraints unsupported by target capabilities
+- config-driven behavior that materially affects the transfer but cannot be resolved from env or observable files confidently enough
 - command substitution or env capture
 - complex fd redirection
 - multipart or upload semantics outside target support
 
-### 7.9 Soft differences
+### 7.10 Soft differences
 
 Allowed soft differences are limited to log-only behavior:
 
@@ -539,6 +675,7 @@ type NodeDependencyInstallOperation struct {
     ProductionOnly bool
     FrozenLockfile bool
     IgnoreScripts  bool
+    Registry       *Value
     WorkspaceScope *Value
 }
 
@@ -557,7 +694,22 @@ type NodeConfigSetOperation struct {
 
 These are intentionally outcome-oriented. They describe desired package/config state, not source CLI syntax.
 
-### 8.3 Why this family fits the same model
+### 8.3 Context-aware effective behavior
+
+Node package-manager operations also need prior-context resolution.
+
+The lifter should use stage env, observable files, and command-local context to determine effective package-manager behavior.
+
+Examples:
+
+- `.npmrc` written earlier in the stage can change registry, auth, script policy, or lockfile behavior
+- `NPM_CONFIG_*` env can override registry and other install semantics
+- `BUN_INSTALL_CACHE_DIR` or similar env can influence cache behavior even when the command line is silent
+
+Fields like `IgnoreScripts`, `FrozenLockfile`, and `Registry` should therefore represent effective behavior after merging command flags with
+configuration context. Provenance should explain whether those values came from the command line, env, or config files.
+
+### 8.4 Why this family fits the same model
 
 For Dockerfiles, the relevant outcomes are:
 
@@ -572,7 +724,7 @@ Usually irrelevant:
 - colorized output
 - most log formatting flags
 
-### 8.4 Representable subset for v1
+### 8.5 Representable subset for v1
 
 Good initial deterministic cases:
 
@@ -588,7 +740,7 @@ Probable ACP or no-fix cases:
 - arbitrary `npm config set` keys without a proven mapping
 - commands whose meaningful outcome is a script side effect rather than package state
 
-### 8.5 Target capability logic
+### 8.6 Target capability logic
 
 Exactly the same rule applies:
 
@@ -651,12 +803,25 @@ Illustrative payload:
     "url": "https://example.com/app.tgz",
     "responseSink": "stdout-pipe"
   },
+  "relatedSources": [
+    {
+      "kind": "env",
+      "line": 5,
+      "key": "CURL_HOME"
+    },
+    {
+      "kind": "observable-file",
+      "line": 6,
+      "path": "/etc/curl/.curlrc"
+    }
+  ],
   "hardBlockers": [
     {
       "code": "fail-on-http-status-not-lowerable",
       "reason": "target capability table cannot preserve the source failure contract"
     }
-  ]
+  },
+  "provenanceSummary": "redirect behavior may be influenced by prior curl config"
 }
 ```
 
@@ -708,7 +873,10 @@ The likely common deterministic wins are:
 
 - add family adapter interfaces
 - add shared blocker and difference types
+- extend `FileFacts` / `RunFacts` with reusable `CommandOperationFacts`
 - add topology classification for command windows
+- plumb semantic-model, env, shell, and observable-file context into family lift inputs
+- add provenance/source-ref structures for env bindings, observable files, and command windows
 - wire deterministic family fixes before ACP resolver dispatch
 
 ### Phase 2: HTTP pilot
@@ -716,6 +884,7 @@ The likely common deterministic wins are:
 - implement `HTTPTransferOperation`
 - implement `curl` lifter
 - implement `wget` lowerer
+- resolve effective behavior from `EffectiveEnv` and observable `curlrc` / `wgetrc` files
 - implement validator for file sinks, uncaptured stdout, and `download | tar-extract`
 - wire into `DL4001`
 
@@ -723,6 +892,7 @@ The likely common deterministic wins are:
 
 - pass lift status and partial operation into ACP objective data
 - pass blocker lists into ACP objective data
+- pass provenance/source refs into ACP objective data
 - keep replacement-window output contract
 
 ### Phase 4: corpus evaluation
@@ -758,9 +928,12 @@ The architecture is sound either way:
 
 Proceed with semantic family normalization as the primary design:
 
+- build it once in the facts layer, not once per rule
 - family-specific abstract operations first
 - target capability tables instead of flag mapping
+- contextual lift using semantic state, env bindings, and observable files
 - Dockerfile-relevant outcome equivalence instead of CLI symmetry
+- provenance preserved for the lines and files that influenced effective behavior
 - deterministic unsafe fix when lift + lower + validate succeeds
 - ACP replacement-window fallback when it does not
 
@@ -901,6 +1074,11 @@ not guess. That command should go to ACP fallback or no-fix.
 
 - [`internal/rules/hadolint/dl4001.go`](../internal/rules/hadolint/dl4001.go)
 - [`internal/rules/hadolint/dl4001_test.go`](../internal/rules/hadolint/dl4001_test.go)
+- [`internal/facts/doc.go`](../internal/facts/doc.go)
+- [`internal/facts/facts.go`](../internal/facts/facts.go)
+- [`internal/facts/observable_files.go`](../internal/facts/observable_files.go)
+- [`internal/semantic/builder.go`](../internal/semantic/builder.go)
+- [`internal/semantic/stage_info.go`](../internal/semantic/stage_info.go)
 - [`internal/shell/command.go`](../internal/shell/command.go)
 - [`internal/shell/chain.go`](../internal/shell/chain.go)
 - [`internal/shell/archive.go`](../internal/shell/archive.go)
