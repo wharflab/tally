@@ -90,6 +90,7 @@ func findPowerShellCommands(script string, names ...string) []CommandInfo {
 
 		for _, arg := range powerShellCommandArgs(node, source) {
 			info.Args = append(info.Args, arg.text)
+			info.ArgLiteral = append(info.ArgLiteral, true)
 			if info.Subcommand == "" && !strings.HasPrefix(arg.text, "-") {
 				argStart := arg.node.StartPosition()
 				argEnd := arg.node.EndPosition()

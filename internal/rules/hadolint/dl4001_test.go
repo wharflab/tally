@@ -270,6 +270,14 @@ RUN curl -fsS -o /tmp/file https://example.com/file
 `,
 			wantFix: false,
 		},
+		{
+			name: "do not rewrite when the preferred tool already appears in the same run",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y wget
+RUN (curl -Ls https://example.com/install.sh || wget -qO- https://example.com/install.sh) | sh
+`,
+			wantFix: false,
+		},
 	}
 
 	for _, tt := range tests {

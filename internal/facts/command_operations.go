@@ -197,16 +197,27 @@ type wgetLiftState struct {
 
 func liftCurlTransfer(cmd shell.CommandInfo) (*HTTPTransferOperation, []CommandOperationBlocker, bool) {
 	state := curlLiftState{}
-	for _, arg := range cmd.Args {
-		curlConsumeArg(&state, arg)
+	for i, arg := range cmd.Args {
+		curlConsumeArg(&state, arg, commandArgIsLiteral(cmd, i))
 	}
 	return finalizeCurlLift(state)
 }
 
-func curlConsumeArg(state *curlLiftState, arg string) {
+func curlConsumeArg(state *curlLiftState, arg string, isLiteral bool) {
 	if state.expectOutputPath {
 		state.expectOutputPath = false
-		assignSinkOutput(&state.outputPath, &state.sinkKind, arg, "curl output path is not a plain shell literal", &state.blockers)
+		assignSinkOutput(
+			&state.outputPath,
+			&state.sinkKind,
+			arg,
+			isLiteral,
+			"curl output path is not a plain shell literal",
+			&state.blockers,
+		)
+		return
+	}
+	if !isLiteral {
+		state.blockers = append(state.blockers, blocker("dynamic-arg", "curl contains a non-literal shell argument"))
 		return
 	}
 
@@ -223,6 +234,7 @@ func curlConsumeArg(state *curlLiftState, arg string) {
 			&state.outputPath,
 			&state.sinkKind,
 			strings.TrimPrefix(arg, "--output="),
+			true,
 			"curl output path is not a plain shell literal",
 			&state.blockers,
 		)
@@ -231,6 +243,7 @@ func curlConsumeArg(state *curlLiftState, arg string) {
 			&state.outputPath,
 			&state.sinkKind,
 			arg[2:],
+			true,
 			"curl output path is not a plain shell literal",
 			&state.blockers,
 		)
@@ -277,6 +290,7 @@ func applyCurlShortFlags(state *curlLiftState, arg string) {
 					&state.outputPath,
 					&state.sinkKind,
 					arg[i+1:],
+					true,
 					"curl output path is not a plain shell literal",
 					&state.blockers,
 				)
@@ -326,16 +340,20 @@ func finalizeCurlLift(state curlLiftState) (*HTTPTransferOperation, []CommandOpe
 
 func liftWgetTransfer(cmd shell.CommandInfo) (*HTTPTransferOperation, []CommandOperationBlocker, bool) {
 	state := wgetLiftState{}
-	for _, arg := range cmd.Args {
-		wgetConsumeArg(&state, arg)
+	for i, arg := range cmd.Args {
+		wgetConsumeArg(&state, arg, commandArgIsLiteral(cmd, i))
 	}
 	return finalizeWgetLift(state)
 }
 
-func wgetConsumeArg(state *wgetLiftState, arg string) {
+func wgetConsumeArg(state *wgetLiftState, arg string, isLiteral bool) {
 	if state.expectOutputPath {
 		state.expectOutputPath = false
-		assignWgetOutput(state, arg)
+		assignWgetOutput(state, arg, isLiteral)
+		return
+	}
+	if !isLiteral {
+		state.blockers = append(state.blockers, blocker("dynamic-arg", "wget contains a non-literal shell argument"))
 		return
 	}
 
@@ -348,9 +366,9 @@ func wgetConsumeArg(state *wgetLiftState, arg string) {
 	case arg == "-O" || arg == "--output-document":
 		state.expectOutputPath = true
 	case strings.HasPrefix(arg, "--output-document="):
-		assignWgetOutput(state, strings.TrimPrefix(arg, "--output-document="))
+		assignWgetOutput(state, strings.TrimPrefix(arg, "--output-document="), true)
 	case strings.HasPrefix(arg, "-O") && len(arg) > 2:
-		assignWgetOutput(state, arg[2:])
+		assignWgetOutput(state, arg[2:], true)
 	case arg == "-q" || arg == "--quiet":
 		state.quiet = true
 		state.progressSupp = true
@@ -378,7 +396,7 @@ func applyWgetShortFlags(state *wgetLiftState, arg string) {
 			state.progressSupp = true
 		case 'O':
 			if i+1 < len(arg) {
-				assignWgetOutput(state, arg[i+1:])
+				assignWgetOutput(state, arg[i+1:], true)
 			} else {
 				state.expectOutputPath = true
 			}
@@ -393,7 +411,7 @@ func applyWgetShortFlags(state *wgetLiftState, arg string) {
 	}
 }
 
-func assignWgetOutput(state *wgetLiftState, value string) {
+func assignWgetOutput(state *wgetLiftState, value string, isLiteral bool) {
 	if value == "-" {
 		state.outputPath = ""
 		state.sinkKind = HTTPTransferSinkStdout
@@ -403,6 +421,7 @@ func assignWgetOutput(state *wgetLiftState, value string) {
 		&state.outputPath,
 		&state.sinkKind,
 		value,
+		isLiteral,
 		"wget output path is not a plain shell literal",
 		&state.blockers,
 	)
@@ -439,15 +458,23 @@ func assignSinkOutput(
 	outputPath *string,
 	sinkKind *HTTPTransferSinkKind,
 	value string,
+	isLiteral bool,
 	reason string,
 	blockers *[]CommandOperationBlocker,
 ) {
-	if !isPlainShellLiteralToken(value) {
+	if !isLiteral || !isPlainShellLiteralToken(value) {
 		*blockers = append(*blockers, blocker("dynamic-output", reason))
 		return
 	}
 	*outputPath = value
 	*sinkKind = HTTPTransferSinkFile
+}
+
+func commandArgIsLiteral(cmd shell.CommandInfo, index int) bool {
+	if index < 0 || index >= len(cmd.ArgLiteral) {
+		return false
+	}
+	return cmd.ArgLiteral[index]
 }
 
 func (op *HTTPTransferOperation) lowerToCurl() (string, bool) {

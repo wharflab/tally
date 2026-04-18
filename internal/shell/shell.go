@@ -332,16 +332,17 @@ func isNumeric(s string) bool {
 	return start < len(s)
 }
 
-// extractQuotedContent extracts the string content from a shell word,
-// handling single quotes, double quotes, and unquoted literals.
-func extractQuotedContent(word *syntax.Word) string {
+// extractCommandArg extracts the string content from a shell word and reports
+// whether it is a plain literal with no dynamic shell evaluation.
+func extractCommandArg(word *syntax.Word) (string, bool) {
 	// First try the simple literal case
 	if lit := word.Lit(); lit != "" {
-		return lit
+		return lit, true
 	}
 
 	// Otherwise, extract from quoted parts
 	var sb strings.Builder
+	literal := true
 	for _, part := range word.Parts {
 		switch p := part.(type) {
 		case *syntax.SglQuoted:
@@ -351,13 +352,24 @@ func extractQuotedContent(word *syntax.Word) string {
 			for _, dpart := range p.Parts {
 				if lit, ok := dpart.(*syntax.Lit); ok {
 					sb.WriteString(lit.Value)
+					continue
 				}
+				literal = false
 			}
 		case *syntax.Lit:
 			sb.WriteString(p.Value)
+		default:
+			literal = false
 		}
 	}
-	return sb.String()
+	return sb.String(), literal
+}
+
+// extractQuotedContent extracts the string content from a shell word,
+// handling single quotes, double quotes, and unquoted literals.
+func extractQuotedContent(word *syntax.Word) string {
+	content, _ := extractCommandArg(word)
+	return content
 }
 
 // extractShellWrapperCommands extracts commands from "sh -c 'code'" patterns.

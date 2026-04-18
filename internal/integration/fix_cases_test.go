@@ -113,7 +113,7 @@ func fixCases(t *testing.T) []fixCase {
 				"RUN wget http://example.com/config.json -O /etc/app/config.json\n" +
 				"RUN curl -fsSL http://example.com/script.sh | sh\n",
 			args:        []string{"--fix", "--fix-unsafe", "--fail-level", "none"},
-			wantApplied: 5, // prefer-add-unpack + DL3047 --progress + DL4006 SHELL + curl/wget config blocks.
+			wantApplied: 6, // plus DL4001 curl->wget on the standalone pipe-to-stdout transfer.
 		},
 		// curl-should-follow-redirects: insert --location after curl
 		// Also triggers prefer-curl-config (all rules enabled) → 2 fixes.

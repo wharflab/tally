@@ -320,6 +320,9 @@ func (r *DL4001Rule) buildSuggestedFix(file string, occurrence toolOccurrenceDL4
 	if countCommandsNamed(occurrence.runFacts.CommandInfos, sourceTool) == 0 {
 		return nil
 	}
+	if countCommandsNamed(occurrence.runFacts.CommandInfos, preferredTool) > 0 {
+		return nil
+	}
 
 	edits := make([]rules.TextEdit, 0, len(occurrence.runFacts.CommandOperationFacts))
 	covered := 0

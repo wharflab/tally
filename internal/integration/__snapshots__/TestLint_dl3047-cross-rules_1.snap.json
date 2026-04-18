@@ -137,7 +137,27 @@
           "message": "both wget and curl are used; pick one to reduce image size and complexity",
           "rule": "hadolint/DL4001",
           "severity": "warning",
-          "sourceCode": "RUN curl -fsSL http://example.com/script.sh | sh"
+          "sourceCode": "RUN curl -fsSL http://example.com/script.sh | sh",
+          "suggestedFix": {
+            "description": "Replace curl with wget",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 43,
+                    "line": 13
+                  },
+                  "file": "testdata/dl3047-cross-rules/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 13
+                  }
+                },
+                "newText": "wget -nv -O- http://example.com/script.sh"
+              }
+            ],
+            "safety": 2
+          }
         }
       ]
     }

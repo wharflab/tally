@@ -76,3 +76,31 @@ RUN curl -fsSL "$URL"
 		t.Fatal("expected blockers for dynamic curl command")
 	}
 }
+
+func TestFileFacts_BlocksCompositeDynamicHTTPTransferOperationFacts(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, `FROM alpine:3.20
+ARG VERSION=latest
+RUN curl -L -o /tmp/app.tgz https://example.com/releases/${VERSION}/app-${VERSION}.tgz
+`)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+	if len(stage.Runs) != 1 {
+		t.Fatalf("expected 1 RUN fact, got %d", len(stage.Runs))
+	}
+	if len(stage.Runs[0].CommandOperationFacts) != 1 {
+		t.Fatalf("expected 1 command operation fact, got %d", len(stage.Runs[0].CommandOperationFacts))
+	}
+
+	fact := stage.Runs[0].CommandOperationFacts[0]
+	if fact.Status != CommandOperationBlocked {
+		t.Fatalf("fact status = %q, want %q", fact.Status, CommandOperationBlocked)
+	}
+	if fact.HTTPTransfer != nil {
+		t.Fatalf("blocked fact should not carry HTTP transfer, got %#v", fact.HTTPTransfer)
+	}
+}
