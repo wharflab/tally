@@ -97,12 +97,17 @@ var (
 	// next argument as a value. Long --flag=value forms are self-contained and
 	// do not need to be listed. Short -cXXX combined short-flag aggregation is
 	// not used by conda (flags are always separated).
+	//
+	// Note: micromamba's install does not implement --revision, --solver, or
+	// --repodata-fn, but listing them here is safe because micromamba invocations
+	// never reach those flag names.
 	condaFlags = []string{
 		"-c", "--channel",
 		"-n", "--name",
 		"-p", "--prefix",
 		"-f", "--file",
 		"--repodata-fn",
+		"--revision",
 		"--subdir",
 		"--solver",
 	}

@@ -86,9 +86,7 @@ func WriteOutputFormat(b *strings.Builder, file string, mode OutputMode) {
 	b.WriteString("- Or output exactly one ```diff fenced code block with a unified diff patch for ")
 	b.WriteString(file)
 	b.WriteString("\n")
-	b.WriteString("- The patch must modify exactly one file and include at least one @@ hunk\n")
-	b.WriteString("- Do not create/delete files, rename/copy files, or emit a binary patch\n")
-	b.WriteString("- The patch must apply to the exact Dockerfile content shown above\n")
+	writePatchConstraints(b)
 	b.WriteString("- Any other text outside the code block will be discarded\n")
 	b.WriteString("\nExample patch shape:\n")
 	b.WriteString("```diff\n")
@@ -224,7 +222,11 @@ func WriteProposedDockerfile(b *strings.Builder, proposed []byte, mode OutputMod
 
 // WriteRetryOutputFormat writes the output-format footer used by retry prompts.
 // It emits a Dockerfile fenced example in OutputDockerfile mode or a unified
-// diff example in OutputPatch mode, ending with the NO_CHANGE instruction.
+// diff example (with the same strict constraints that WriteOutputFormat
+// enforces on round 1) in OutputPatch mode, ending with the NO_CHANGE
+// instruction. Round-2 failures happen precisely when round-1 output broke
+// these rules, so repeating them here gives the agent a better chance to
+// recover.
 func WriteRetryOutputFormat(b *strings.Builder, file string, mode OutputMode) {
 	b.WriteString("Output format:\n")
 	if mode == OutputDockerfile {
@@ -246,8 +248,17 @@ func WriteRetryOutputFormat(b *strings.Builder, file string, mode OutputMode) {
 		b.WriteString("\n")
 		b.WriteString("  @@ ...\n")
 		b.WriteString("  ```\n")
+		writePatchConstraints(b)
 	}
 	b.WriteString("- If you cannot fix the blocking issues safely, output exactly: NO_CHANGE\n")
+}
+
+// writePatchConstraints emits the shared unified-diff patch constraints that
+// both the initial-round and retry prompts require.
+func writePatchConstraints(b *strings.Builder) {
+	b.WriteString("- The patch must modify exactly one file and include at least one @@ hunk\n")
+	b.WriteString("- Do not create/delete files, rename/copy files, or emit a binary patch\n")
+	b.WriteString("- The patch must apply to the exact Dockerfile content shown above\n")
 }
 
 // WriteSimplifiedInput writes the "Input Dockerfile" block + "Output format"

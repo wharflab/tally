@@ -49,8 +49,9 @@ func (o *uvOverCondaObjective) BuildPrompt(ctx autofixdata.PromptContext) (strin
 
 // writeCUDAVersionHint emits the base image's parsed CUDA major.minor so the
 // agent can align the uv PyTorch `--index-url` wheel suffix (cuXYZ) with the
-// image's CUDA runtime. Silent when the rule did not capture a CUDA version
-// (non-nvidia/cuda base, digest ref, ARG-based tag, etc.).
+// image's CUDA runtime. Silent when the rule did not capture a valid CUDA
+// version (non-nvidia/cuda base, digest ref, ARG-based tag, missing/negative
+// minor, etc.).
 func writeCUDAVersionHint(b *strings.Builder, req *autofixdata.ObjectiveRequest) {
 	if req == nil {
 		return
@@ -59,7 +60,10 @@ func writeCUDAVersionHint(b *strings.Builder, req *autofixdata.ObjectiveRequest)
 	if !ok || major <= 0 {
 		return
 	}
-	minor, _ := autofixdata.FactsInt(req.Facts, "cuda-minor")
+	minor, ok := autofixdata.FactsInt(req.Facts, "cuda-minor")
+	if !ok || minor < 0 {
+		return
+	}
 	fmt.Fprintf(b, "Base image CUDA version: %d.%d\n", major, minor)
 	fmt.Fprintf(b, "  - Align the uv PyTorch --index-url wheel suffix with this version (e.g. cu%d%d).\n\n", major, minor)
 }
@@ -382,14 +386,20 @@ func firstCondaMLPackageName(ic shell.InstallCommand) string {
 }
 
 // runScriptText returns the shell script text of a RUN command for parsing.
-// Heredoc bodies are treated as the script; shell-form RUN args are joined
-// with spaces so the shell parser can handle them uniformly.
+// All heredoc bodies are concatenated (RUN can declare multiple heredocs,
+// e.g. RUN <<EOF1 ... EOF1 <<EOF2 ... EOF2) so a conda install hidden inside
+// a later heredoc still gets scanned. Shell-form RUN args fall back to
+// joining CmdLine with spaces so the shell parser can handle them uniformly.
 func runScriptText(run *instructions.RunCommand) string {
 	if run == nil {
 		return ""
 	}
 	if len(run.Files) > 0 {
-		return run.Files[0].Data
+		parts := make([]string, 0, len(run.Files))
+		for _, f := range run.Files {
+			parts = append(parts, f.Data)
+		}
+		return strings.Join(parts, "\n")
 	}
 	return strings.Join(run.CmdLine, " ")
 }

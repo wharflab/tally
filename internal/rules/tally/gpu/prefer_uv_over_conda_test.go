@@ -231,6 +231,11 @@ func TestNormalizeCondaPackageName(t *testing.T) {
 		"pkg 1":             "pkg",
 		"":                  "",
 		"  ":                "",
+		// Conda MatchSpec channel-qualified forms (see conda/models/match_spec).
+		"conda-forge::torch":          "torch",
+		"conda-forge/linux-64::torch": "torch",
+		"defaults::numpy=1.20":        "numpy",
+		"nvidia::pytorch-cuda=12.1":   "pytorch-cuda",
 	}
 	for in, want := range cases {
 		if got := normalizeCondaPackageName(in); got != want {

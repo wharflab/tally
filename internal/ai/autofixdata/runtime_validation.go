@@ -3,12 +3,12 @@ package autofixdata
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"slices"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	dockerspec "github.com/moby/docker-image-spec/specs-go/v1"
 
 	"github.com/wharflab/tally/internal/dockerfile"
 )
@@ -315,8 +315,36 @@ func validateUserInvariant(orig, proposed *instructions.UserCommand) error {
 	return nil
 }
 
+// validateExposeInvariant compares EXPOSE ports after normalizing each to
+// `port/proto` form (default protocol: tcp). This treats `8080` and
+// `8080/tcp` as identical because Docker inserts the default protocol at
+// image-config time.
 func validateExposeInvariant(origPorts, proposedPorts []string) error {
-	return validateSortedSetInvariant(strings.ToUpper(command.Expose), origPorts, proposedPorts)
+	normalize := func(ports []string) []string {
+		out := make([]string, 0, len(ports))
+		for _, p := range ports {
+			out = append(out, normalizeExposePort(p))
+		}
+		return out
+	}
+	return validateSortedSetInvariant(strings.ToUpper(command.Expose), normalize(origPorts), normalize(proposedPorts))
+}
+
+// normalizeExposePort returns p in canonical `port/proto` form. A missing
+// protocol is normalized to `tcp`, matching Docker's implicit default.
+// The protocol component is lowercased; an empty protocol after `/` is
+// filled with `tcp`.
+func normalizeExposePort(p string) string {
+	p = strings.TrimSpace(p)
+	if p == "" {
+		return p
+	}
+	port, proto, hasSlash := strings.Cut(p, "/")
+	proto = strings.ToLower(strings.TrimSpace(proto))
+	if !hasSlash || proto == "" {
+		proto = "tcp"
+	}
+	return port + "/" + proto
 }
 
 func validateWorkdirInvariant(orig, proposed *instructions.WorkdirCommand) error {
@@ -348,14 +376,63 @@ func validateEnvInvariant(orig, proposed instructions.KeyValuePairs) error {
 	)
 }
 
+// validateLabelsInvariant compares LABELs as an unordered map, because Docker
+// collapses multiple LABEL instructions into a single map at image-config
+// time. An AI rewrite that splits or reorders LABELs should not fail
+// validation as long as the resulting key/value set is unchanged.
 func validateLabelsInvariant(orig, proposed instructions.KeyValuePairs) error {
-	if equalKeyValuePairs(orig, proposed) {
+	if equalKeyValuePairsUnordered(orig, proposed) {
 		return nil
 	}
 	return fmt.Errorf(
 		"proposed Dockerfile changed LABEL in the final stage (want %s, got %s)",
-		formatKeyValuePairs(orig), formatKeyValuePairs(proposed),
+		formatKeyValuePairsSorted(orig), formatKeyValuePairsSorted(proposed),
 	)
+}
+
+// equalKeyValuePairsUnordered compares two KeyValuePairs as a map: same keys,
+// same values per key, regardless of declaration order. Duplicate keys use
+// last-wins semantics (matching Docker's image-config collapse).
+func equalKeyValuePairsUnordered(a, b instructions.KeyValuePairs) bool {
+	am := kvMap(a)
+	bm := kvMap(b)
+	if len(am) != len(bm) {
+		return false
+	}
+	for k, v := range am {
+		if bv, ok := bm[k]; !ok || bv != v {
+			return false
+		}
+	}
+	return true
+}
+
+func kvMap(kvs instructions.KeyValuePairs) map[string]string {
+	m := make(map[string]string, len(kvs))
+	for _, kv := range kvs {
+		m[kv.Key] = kv.Value
+	}
+	return m
+}
+
+// formatKeyValuePairsSorted renders KeyValuePairs in lexicographic key order
+// so the error message for LABEL mismatches is deterministic regardless of
+// the input order.
+func formatKeyValuePairsSorted(kvs instructions.KeyValuePairs) string {
+	if len(kvs) == 0 {
+		return "[]"
+	}
+	m := kvMap(kvs)
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	slices.Sort(keys)
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, k+"="+m[k])
+	}
+	return "[" + strings.Join(parts, ", ") + "]"
 }
 
 func validateHealthcheckInvariant(orig, proposed *instructions.HealthCheckCommand) error {
@@ -368,13 +445,28 @@ func validateHealthcheckInvariant(orig, proposed *instructions.HealthCheckComman
 	if orig == nil {
 		return nil
 	}
-	if !reflect.DeepEqual(orig.Health, proposed.Health) {
+	if !healthConfigEqual(orig.Health, proposed.Health) {
 		return fmt.Errorf(
 			"proposed Dockerfile changed HEALTHCHECK in the final stage (want %q, got %q)",
 			orig.String(), proposed.String(),
 		)
 	}
 	return nil
+}
+
+// healthConfigEqual compares two HealthcheckConfig pointers field-by-field.
+// Equivalent to reflect.DeepEqual for this type but avoids the reflect
+// dependency and runtime cost.
+func healthConfigEqual(a, b *dockerspec.HealthcheckConfig) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return slices.Equal(a.Test, b.Test) &&
+		a.Interval == b.Interval &&
+		a.Timeout == b.Timeout &&
+		a.StartPeriod == b.StartPeriod &&
+		a.StartInterval == b.StartInterval &&
+		a.Retries == b.Retries
 }
 
 func equalKeyValuePairs(a, b instructions.KeyValuePairs) bool {

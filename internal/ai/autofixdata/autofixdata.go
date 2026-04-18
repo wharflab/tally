@@ -1,6 +1,8 @@
 package autofixdata
 
 import (
+	"math"
+
 	"github.com/wharflab/tally/internal/config"
 	"github.com/wharflab/tally/internal/rules"
 )
@@ -87,8 +89,11 @@ func (r *ObjectiveRequest) SetRegistryInsights(insights []RegistryInsight) {
 
 // FactsInt reads an integer value from a facts map, tolerating the different
 // numeric types that an `any` value can hold — native int (in-process), int64,
-// or float64 (after an encoding/json round-trip). Returns (0, false) when
-// the key is absent or the value is not numeric.
+// or float64 (after an encoding/json round-trip). Non-finite floats
+// (NaN, ±Inf) and non-integral floats (e.g., 12.9) are rejected so callers
+// cannot silently feed malformed numeric data into downstream logic.
+// Returns (0, false) when the key is absent or the value is not a valid
+// whole-number.
 func FactsInt(m map[string]any, key string) (int, bool) {
 	v, ok := m[key]
 	if !ok {
@@ -102,9 +107,24 @@ func FactsInt(m map[string]any, key string) (int, bool) {
 	case int32:
 		return int(x), true
 	case float64:
-		return int(x), true
+		if n, ok := floatAsInt(x); ok {
+			return n, true
+		}
 	case float32:
-		return int(x), true
+		if n, ok := floatAsInt(float64(x)); ok {
+			return n, true
+		}
 	}
 	return 0, false
+}
+
+// floatAsInt converts f to int only when f is a finite whole number.
+func floatAsInt(f float64) (int, bool) {
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, false
+	}
+	if math.Trunc(f) != f {
+		return 0, false
+	}
+	return int(f), true
 }

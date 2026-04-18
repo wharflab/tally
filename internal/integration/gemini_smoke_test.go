@@ -11,8 +11,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
 	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/shell"
 )
 
 func TestGeminiSmoke_FixPreferMultiStageBuild(t *testing.T) {
@@ -296,24 +299,101 @@ func assertGeminiSmokeApplied(t *testing.T, output string) {
 	}
 }
 
-var (
-	// condaPythonInstallAnyRe detects any remaining conda-family install of a
-	// Python/ML package; used as a post-fix regression guard.
-	condaPythonInstallAnyRe = regexp.MustCompile(
-		`(?mi)^\s*RUN[^\n]*\b(?:conda|mamba|micromamba)\s+install\b[^\n]*\b` +
-			`(?:torch|torchvision|torchaudio|pytorch|pytorch-cuda|tensorflow|jax|numpy|scipy|transformers|flash-attn|xformers)\b`,
-	)
-	// uvPresenceRe detects that uv is installed or used anywhere in the file.
-	uvPresenceRe = regexp.MustCompile(
-		`(?mi)\b(?:uv\s+pip|pip\s+install\s+.*\buv\b|pipx\s+install\s+uv|uv\s+sync|uv\s+add|uv\s+venv)\b`,
-	)
+// condaMLRegressionPackages is the set of ML packages the gemini smoke test
+// considers a migration regression if a conda-family manager still installs
+// any of them after the fix has been applied.
+var condaMLRegressionPackages = map[string]bool{
+	"torch":        true,
+	"torchvision":  true,
+	"torchaudio":   true,
+	"pytorch":      true,
+	"pytorch-cuda": true,
+	"tensorflow":   true,
+	"jax":          true,
+	"numpy":        true,
+	"scipy":        true,
+	"transformers": true,
+	"flash-attn":   true,
+	"xformers":     true,
+}
+
+// uvPresenceRe detects that uv is installed or used anywhere in the file.
+var uvPresenceRe = regexp.MustCompile(
+	`(?mi)\b(?:uv\s+pip|pip\s+install\s+.*\buv\b|pipx\s+install\s+uv|uv\s+sync|uv\s+add|uv\s+venv)\b`,
 )
 
+// assertNoCondaPythonInstall parses the fixed Dockerfile via BuildKit and walks
+// every RUN instruction, asserting that no conda-family install command
+// targets a known ML package. The shell-AST-based install extractor already
+// handles backslash-newline continuations, heredocs, and quoting, which a
+// single-line regex would miss.
 func assertNoCondaPythonInstall(t *testing.T, label string, fixed []byte) {
 	t.Helper()
-	if condaPythonInstallAnyRe.Match(fixed) {
-		t.Fatalf("%s: conda Python install still present in fixed Dockerfile:\n%s", label, fixed)
+	parsed, err := dockerfile.Parse(bytes.NewReader(fixed), nil)
+	if err != nil {
+		t.Fatalf("%s: parse fixed Dockerfile: %v\n%s", label, err, fixed)
 	}
+	for _, stage := range parsed.Stages {
+		for _, cmd := range stage.Commands {
+			run, ok := cmd.(*instructions.RunCommand)
+			if !ok {
+				continue
+			}
+			script := runScriptText(run)
+			if script == "" {
+				continue
+			}
+			for _, ic := range shell.FindInstallPackages(script, shell.VariantBash) {
+				if !isCondaFamilyManager(ic.Manager) {
+					continue
+				}
+				for _, pkg := range ic.Packages {
+					name := strings.ToLower(strings.TrimSpace(pkg.Normalized))
+					if idx := strings.IndexAny(name, "=<>! "); idx > 0 {
+						name = name[:idx]
+					}
+					if _, after, ok := strings.Cut(name, "::"); ok {
+						name = after
+					}
+					if condaMLRegressionPackages[name] {
+						t.Fatalf(
+							"%s: conda Python install still present after fix (%s install %s):\n%s",
+							label, ic.Manager, name, fixed,
+						)
+					}
+				}
+			}
+		}
+	}
+}
+
+// isCondaFamilyManager matches the set of install managers recognized as
+// conda-family by shell.installManagers.
+func isCondaFamilyManager(manager string) bool {
+	switch manager {
+	case "conda", "mamba", "micromamba":
+		return true
+	}
+	return false
+}
+
+// runScriptText returns the RUN script to feed into shell.FindInstallPackages.
+// All heredoc bodies are concatenated (a RUN can declare multiple) so a
+// conda install hidden inside a later heredoc still gets scanned; shell-form
+// RUN args fall back to joining CmdLine with spaces so the shell AST parser
+// can process them uniformly.
+func runScriptText(run *instructions.RunCommand) string {
+	if run == nil {
+		return ""
+	}
+	if len(run.Files) > 0 {
+		parts := make([]string, 0, len(run.Files))
+		for _, f := range run.Files {
+			parts = append(parts, f.Data)
+		}
+		return strings.Join(parts, "\n")
+	}
+	return strings.Join(run.CmdLine, " ")
 }
 
 func assertHasUV(t *testing.T, label string, fixed []byte) {

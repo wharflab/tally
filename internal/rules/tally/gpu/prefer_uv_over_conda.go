@@ -97,6 +97,16 @@ func (r *PreferUVOverCondaRule) Metadata() rules.RuleMetadata {
 }
 
 // Check runs the rule against the given input.
+//
+// Cross-rule interaction: this rule attaches a FixUnsafe async resolver
+// fix whose edit is a whole-file replacement (see SuggestedFix in
+// checkStage). `tally/prefer-multi-stage-build` produces the same kind
+// of whole-file AI rewrite via the shared `ai-autofix` resolver, so the
+// two cannot compose in a single `--fix` pass — the fixer drops overlapping
+// edits. Both rules use FixPriority=150 so the deterministic ordering
+// means only one AI rewrite lands per run; users targeting both must run
+// `--fix` twice with `--fix-rule` scoping. Keep this constraint in mind
+// when adding more whole-file AI objectives.
 func (r *PreferUVOverCondaRule) Check(input rules.LintInput) []rules.Violation {
 	return r.checkWithFacts(input, input.Facts, input.Semantic, r.Metadata())
 }
@@ -250,13 +260,20 @@ func condaMLPackageNames(ic shell.InstallCommand) []string {
 	return pkgs
 }
 
-// normalizeCondaPackageName lowercases a conda package argument and strips a
-// version specifier (`=`, `==`, `<`, `>`, `!`, space) so it can be compared to
-// the known Python/ML package list.
+// normalizeCondaPackageName lowercases a conda package argument, strips a
+// leading Conda MatchSpec channel qualifier (`conda-forge::pkg`,
+// `conda-forge/linux-64::pkg`), and drops a trailing version specifier
+// (`=`, `==`, `<`, `>`, `!`, space) so the bare package name can be compared
+// to the known Python/ML package list.
 func normalizeCondaPackageName(raw string) string {
 	raw = strings.TrimSpace(strings.ToLower(raw))
 	if raw == "" {
 		return ""
+	}
+	// Channel qualifier: `channel::name`, `channel/subdir::name`.
+	// The `::` separator is unambiguous; keep the part after it.
+	if _, after, ok := strings.Cut(raw, "::"); ok {
+		raw = after
 	}
 	if idx := strings.IndexAny(raw, "=<>! "); idx > 0 {
 		raw = raw[:idx]
