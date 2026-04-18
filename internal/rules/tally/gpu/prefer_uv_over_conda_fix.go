@@ -3,8 +3,10 @@ package gpu
 import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -108,20 +110,18 @@ func (o *uvOverCondaObjective) BuildSimplifiedPrompt(ctx autofixdata.SimplifiedP
 }
 
 // ValidateProposal validates that the proposed Dockerfile preserves final-stage
-// runtime invariants and actually removes conda Python installs.
+// runtime invariants and actually migrates (not merely deletes) the conda
+// Python installs that were present in the original.
 func (o *uvOverCondaObjective) ValidateProposal(orig, proposed *dockerfile.ParseResult) []autofixdata.BlockingIssue {
-	var blocking []autofixdata.BlockingIssue
-
-	for _, err := range uvOverCondaRuntimeValidationErrors(orig, proposed) {
+	runtimeErrs := uvOverCondaRuntimeValidationErrors(orig, proposed)
+	migrationErrs := uvOverCondaMigrationErrors(orig, proposed)
+	blocking := make([]autofixdata.BlockingIssue, 0, len(runtimeErrs)+len(migrationErrs))
+	for _, err := range runtimeErrs {
 		blocking = append(blocking, autofixdata.BlockingIssue{Rule: "runtime", Message: err.Error()})
 	}
-
-	if proposed != nil {
-		for _, err := range uvOverCondaMigrationErrors(proposed) {
-			blocking = append(blocking, autofixdata.BlockingIssue{Rule: "migration", Message: err.Error()})
-		}
+	for _, err := range migrationErrs {
+		blocking = append(blocking, autofixdata.BlockingIssue{Rule: "migration", Message: err.Error()})
 	}
-
 	return blocking
 }
 
@@ -174,15 +174,176 @@ Rules (strict):
 
 // --- Migration validation ---
 
-// uvOverCondaMigrationErrors walks the proposed Dockerfile's RUN instructions,
-// parses each with shell.FindInstallPackages, and reports every
-// conda/mamba/micromamba install that still targets a known Python/ML package.
-func uvOverCondaMigrationErrors(proposed *dockerfile.ParseResult) []error {
+// uvPipManagers enumerates managers that can satisfy a Python/ML package
+// requirement in the proposed Dockerfile. pip and pip3 cover direct pip
+// installs; uv covers both `uv add` and `uv pip install` (shell.installManagers
+// normalizes the latter to "uv").
+var uvPipManagers = map[string]bool{
+	"pip":  true,
+	"pip3": true,
+	"uv":   true,
+}
+
+// uvOverCondaMigrationErrors walks the original and proposed Dockerfiles and
+// reports migration-level validation failures:
+//
+//  1. Any conda/mamba/micromamba install of a Python/ML package remains.
+//  2. A `conda env create` invocation was introduced in the proposal.
+//  3. A Python/ML package that the original installed via conda is neither
+//     reinstalled via uv/pip nor present on any conda install (i.e., it was
+//     deleted rather than migrated).
+func uvOverCondaMigrationErrors(orig, proposed *dockerfile.ParseResult) []error {
 	if proposed == nil {
 		return nil
 	}
+	remaining := findRemainingCondaMLInstalls(proposed)
+	introduced := findIntroducedCondaEnvCreate(orig, proposed)
+	deleted := findDeletedMLPackages(orig, proposed)
+	errs := make([]error, 0, len(remaining)+len(introduced)+len(deleted))
+	errs = append(errs, remaining...)
+	errs = append(errs, introduced...)
+	errs = append(errs, deleted...)
+	return errs
+}
+
+// findRemainingCondaMLInstalls reports every conda-family install of a known
+// Python/ML package that survived the migration.
+func findRemainingCondaMLInstalls(proposed *dockerfile.ParseResult) []error {
 	var errs []error
+	forEachRunInstallCommand(proposed, func(ic shell.InstallCommand) bool {
+		if !condaManagers[ic.Manager] {
+			return true
+		}
+		if offending := firstCondaMLPackageName(ic); offending != "" {
+			errs = append(errs, fmt.Errorf(
+				"proposed Dockerfile still installs Python/ML package %q via %s; migrate it to uv",
+				offending, ic.Manager,
+			))
+			return false // one blocking issue per RUN is enough
+		}
+		return true
+	})
+	return errs
+}
+
+// findIntroducedCondaEnvCreate flags a `conda env create` invocation that is
+// present in the proposal but was not in the original. A proposal that
+// "migrates" by switching to an env-create workflow bypasses the rule intent.
+func findIntroducedCondaEnvCreate(orig, proposed *dockerfile.ParseResult) []error {
+	if origHasCondaEnvCreate(orig) {
+		return nil // original already used env create; not a regression
+	}
 	for _, stage := range proposed.Stages {
+		for _, cmd := range stage.Commands {
+			run, ok := cmd.(*instructions.RunCommand)
+			if !ok {
+				continue
+			}
+			if scriptHasCondaEnvCreate(runScriptText(run), shell.VariantBash) {
+				return []error{errors.New(
+					"proposed Dockerfile introduces `conda env create`; the migration must use uv/pip, not env workflows",
+				)}
+			}
+		}
+	}
+	return nil
+}
+
+// findDeletedMLPackages verifies every Python/ML package installed via conda
+// in the original Dockerfile reappears either in a uv/pip install or in a
+// (still-surviving) conda install in the proposal. A package that vanishes
+// entirely indicates the agent deleted dependencies rather than migrating.
+func findDeletedMLPackages(orig, proposed *dockerfile.ParseResult) []error {
+	targets := collectCondaMLPackages(orig)
+	if len(targets) == 0 {
+		return nil
+	}
+
+	covered := collectInstalledPackages(proposed)
+	var errs []error
+	for name := range targets {
+		if !covered[name] {
+			errs = append(errs, fmt.Errorf(
+				"proposed Dockerfile dropped Python/ML package %q without reinstalling it via uv or pip",
+				name,
+			))
+		}
+	}
+	// Sort errors by message so the output is deterministic across runs.
+	sortErrorsByMessage(errs)
+	return errs
+}
+
+// origHasCondaEnvCreate reports whether the original Dockerfile already
+// declared a `conda env create` step, so the validator can distinguish
+// "introduced" from "preserved".
+func origHasCondaEnvCreate(orig *dockerfile.ParseResult) bool {
+	if orig == nil {
+		return false
+	}
+	for _, stage := range orig.Stages {
+		for _, cmd := range stage.Commands {
+			run, ok := cmd.(*instructions.RunCommand)
+			if !ok {
+				continue
+			}
+			if scriptHasCondaEnvCreate(runScriptText(run), shell.VariantBash) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// collectCondaMLPackages returns the set of known Python/ML packages that the
+// Dockerfile installed via a conda-family manager.
+func collectCondaMLPackages(parsed *dockerfile.ParseResult) map[string]bool {
+	targets := map[string]bool{}
+	forEachRunInstallCommand(parsed, func(ic shell.InstallCommand) bool {
+		if !condaManagers[ic.Manager] {
+			return true
+		}
+		for _, pkg := range ic.Packages {
+			name := normalizeCondaPackageName(pkg.Normalized)
+			if condaPythonMLPackages[name] {
+				targets[name] = true
+			}
+		}
+		return true
+	})
+	return targets
+}
+
+// collectInstalledPackages returns the set of package names installed in the
+// Dockerfile via any package manager recognized by shell.installManagers
+// (conda/mamba/micromamba/pip/pip3/uv, etc.). Used to check that migrated
+// packages reappear somewhere under uv/pip/conda in the proposal.
+func collectInstalledPackages(parsed *dockerfile.ParseResult) map[string]bool {
+	installed := map[string]bool{}
+	forEachRunInstallCommand(parsed, func(ic shell.InstallCommand) bool {
+		if !uvPipManagers[ic.Manager] && !condaManagers[ic.Manager] {
+			return true
+		}
+		for _, pkg := range ic.Packages {
+			name := normalizeCondaPackageName(pkg.Normalized)
+			if name != "" {
+				installed[name] = true
+			}
+		}
+		return true
+	})
+	return installed
+}
+
+// forEachRunInstallCommand invokes visit for every install command parsed
+// from every RUN in every stage. visit returns false to skip remaining
+// install commands in the same RUN (matches the "one blocking issue per
+// RUN" behavior the remaining-conda check wants).
+func forEachRunInstallCommand(parsed *dockerfile.ParseResult, visit func(shell.InstallCommand) bool) {
+	if parsed == nil {
+		return
+	}
+	for _, stage := range parsed.Stages {
 		for _, cmd := range stage.Commands {
 			run, ok := cmd.(*instructions.RunCommand)
 			if !ok {
@@ -193,20 +354,20 @@ func uvOverCondaMigrationErrors(proposed *dockerfile.ParseResult) []error {
 				continue
 			}
 			for _, ic := range shell.FindInstallPackages(script, shell.VariantBash) {
-				if !condaManagers[ic.Manager] {
-					continue
-				}
-				if offending := firstCondaMLPackageName(ic); offending != "" {
-					errs = append(errs, fmt.Errorf(
-						"proposed Dockerfile still installs Python/ML package %q via %s; migrate it to uv",
-						offending, ic.Manager,
-					))
-					break // one blocking issue per RUN is enough
+				if !visit(ic) {
+					break
 				}
 			}
 		}
 	}
-	return errs
+}
+
+// sortErrorsByMessage sorts errs in-place by the Error() string so the
+// validator's output is deterministic regardless of map iteration order.
+func sortErrorsByMessage(errs []error) {
+	sort.Slice(errs, func(i, j int) bool {
+		return errs[i].Error() < errs[j].Error()
+	})
 }
 
 // firstCondaMLPackageName returns the first Python/ML package in ic, or "".

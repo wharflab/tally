@@ -471,6 +471,59 @@ CMD ["python", "-m", "app"]
 		}
 	})
 
+	t.Run("blocks when ML packages are deleted instead of migrated", func(t *testing.T) {
+		t.Parallel()
+		proposed := mustParse(t, `FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+WORKDIR /app
+ENV FOO=bar
+RUN echo "nothing installed"
+CMD ["python", "-m", "app"]
+`)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(orig, proposed)
+		if !containsRule(blocking, "migration") {
+			t.Errorf("expected migration blocking issue for deleted packages, got %v", blocking)
+		}
+		// The validator should name the dropped packages deterministically.
+		msgs := strings.Join(issueMessages(blocking), "\n")
+		for _, want := range []string{"numpy", "torch"} {
+			if !strings.Contains(msgs, want) {
+				t.Errorf("expected dropped-package message for %q in %s", want, msgs)
+			}
+		}
+	})
+
+	t.Run("blocks when proposal introduces conda env create", func(t *testing.T) {
+		t.Parallel()
+		proposed := mustParse(t, `FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+WORKDIR /app
+ENV FOO=bar
+RUN conda env create -f /app/env.yml
+CMD ["python", "-m", "app"]
+`)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(orig, proposed)
+		if !containsRule(blocking, "migration") {
+			t.Errorf("expected migration blocking issue for introduced env create, got %v", blocking)
+		}
+		msgs := strings.Join(issueMessages(blocking), "\n")
+		if !strings.Contains(msgs, "conda env create") {
+			t.Errorf("expected env-create message, got %s", msgs)
+		}
+	})
+
+	t.Run("allows migration to uv pip install", func(t *testing.T) {
+		t.Parallel()
+		proposed := mustParse(t, `FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+WORKDIR /app
+ENV FOO=bar
+RUN pip install uv && uv pip install --system numpy torch
+CMD ["python", "-m", "app"]
+`)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(orig, proposed)
+		if containsRule(blocking, "migration") {
+			t.Errorf("uv pip install should satisfy migration; got %v", blocking)
+		}
+	})
+
 	t.Run("blocks when CMD is dropped", func(t *testing.T) {
 		t.Parallel()
 		proposed := mustParse(t, `FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
@@ -839,6 +892,14 @@ func containsRule(issues []autofixdata.BlockingIssue, rule string) bool {
 		}
 	}
 	return false
+}
+
+func issueMessages(issues []autofixdata.BlockingIssue) []string {
+	msgs := make([]string, 0, len(issues))
+	for _, i := range issues {
+		msgs = append(msgs, i.Message)
+	}
+	return msgs
 }
 
 // Ensure runScriptText covers both shell and exec form RUNs (for coverage).

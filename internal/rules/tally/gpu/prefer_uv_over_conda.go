@@ -312,10 +312,21 @@ func runHasCondaEnvCreate(runFacts *facts.RunFacts) bool {
 	if script == "" {
 		script = runFacts.CommandScript
 	}
+	return scriptHasCondaEnvCreate(script, runFacts.Shell.Variant)
+}
+
+// scriptHasCondaEnvCreate returns true when the raw shell script invokes
+// `conda|mamba|micromamba env create`, parsed via the shell AST. Shared by
+// the rule (which has facts-provided variant info) and the objective's
+// migration validator (which only has a parsed Dockerfile).
+func scriptHasCondaEnvCreate(script string, variant shell.Variant) bool {
 	if script == "" {
 		return false
 	}
-	cmds := shell.FindCommands(script, runFacts.Shell.Variant, "conda", "mamba", "micromamba")
+	if !variant.SupportsPOSIXShellAST() {
+		variant = shell.VariantBash
+	}
+	cmds := shell.FindCommands(script, variant, "conda", "mamba", "micromamba")
 	for _, cmd := range cmds {
 		if cmd.Subcommand != condaEnvSubcommand {
 			continue
