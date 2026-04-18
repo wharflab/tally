@@ -50,7 +50,7 @@ Examples:
   The operation is "mutate Node dependency state to add `express`."
 
 - `npm config set foo bar`
-  The operation is "mutate package-manager config state."
+  This is not the kind of operation this concept should model. It mutates tool-local configuration, not a portable package-management operation.
 
 If a source command can be represented as one of these operations, and the target tool can realize the same operation, then heuristic conversion is
 credible. If not, it should stop and fall back to ACP.
@@ -71,6 +71,7 @@ credible. If not, it should stop and fall back to ACP.
 
 - Exact flag symmetry between tools.
 - Exact log formatting parity.
+- Tool-self-configuration commands such as `npm config set ...` or other tool-specific control-plane mutations.
 - Arbitrary shell-program rewriting.
 - Whole-instruction or whole-file diff generation for this class of fix.
 
@@ -105,7 +106,8 @@ enough. The model must also preserve:
 - whether stdout purity matters
 - whether shell topology changes
 - whether filesystem state changes
-- whether package/config state changes
+- whether package/install state changes
+- whether contextual config inputs affect effective behavior
 
 In other words, tally should borrow the lift/lower architecture, but not the warning-only acceptance model.
 
@@ -358,7 +360,8 @@ target CLI looks similar.
 | stdout captured by shell constructs | yes | becomes data, not logs |
 | exit behavior | yes | determines whether the build fails |
 | package graph / lockfile / manifest state | yes | persists in the image |
-| package-manager config state | yes | can affect later commands |
+| contextual config inputs such as env or observable rc files | yes | can change effective command behavior |
+| tool-self-configuration commands | no for this concept | these are tool-specific control-plane operations, not portable command-family operations |
 | uncaptured stdout body | usually no | generally becomes build log only |
 | progress bars / verbosity / styling | usually no | log-only unless consumed structurally |
 
@@ -679,7 +682,6 @@ Examples:
 - add dependencies
 - remove dependencies
 - install from manifest / lockfile
-- mutate config state
 
 ### 8.2 Family operations
 
@@ -702,15 +704,9 @@ type NodeDependencyRemoveOperation struct {
     Global         bool
     WorkspaceScope *Value
 }
-
-type NodeConfigSetOperation struct {
-    Key   string
-    Value Value
-    Scope string
-}
 ```
 
-These are intentionally outcome-oriented. They describe desired package/config state, not source CLI syntax.
+These are intentionally outcome-oriented. They describe desired package/install state, not source CLI syntax.
 
 ### 8.3 Context-aware effective behavior
 
@@ -734,7 +730,7 @@ For Dockerfiles, the relevant outcomes are:
 - manifest changes
 - lockfile behavior
 - installed dependency graph
-- config state that affects later package-manager commands
+- install semantics after applying contextual config inputs such as `.npmrc` or `NPM_CONFIG_*`
 
 Usually irrelevant:
 
@@ -755,7 +751,7 @@ Probable ACP or no-fix cases:
 - `npm run build`
 - `npm exec ...`
 - workspace-sensitive commands without explicit target equivalence
-- arbitrary `npm config set` keys without a proven mapping
+- tool-self-configuration commands such as `npm config set ...`
 - commands whose meaningful outcome is a script side effect rather than package state
 
 ### 8.6 Target capability logic
@@ -1083,8 +1079,8 @@ Now contrast that with:
 RUN npm config set fund false
 ```
 
-This is still recognizable as a config mutation, but if the `bun` serializer has no explicit semantic mapping for `fund=false`, the system should
-not guess. That command should go to ACP fallback or no-fix.
+This should not be lifted into the `node-package-management` family at all. It is a tool-self-configuration command, not a portable package-state
+operation. It may matter to the Dockerfile, but it belongs to separate tool-specific logic or to no-fix, not to this normalization concept.
 
 ## 15. Sources
 

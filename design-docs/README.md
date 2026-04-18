@@ -420,7 +420,7 @@ Dockerfile-relevant outcome mechanically, and only falls back to ACP when determ
 - Why command-family fixes should model operations and outcomes rather than map flags argument-to-argument
 - How to adapt `curlconverter`'s parse/lift/lower architecture without inheriting its warning-only acceptance model
 - Why the IR should live in the facts layer and be shared across rules rather than rebuilt per rule
-- Dockerfile-relevant equivalence: files, streams, exit behavior, package state, and config state
+- Dockerfile-relevant equivalence: files, streams, exit behavior, package state, and contextual config inputs
 - Provenance from env bindings, observable files, and command windows back to source lines
 - Family-specific IRs and capability tables for `curl`/`wget` and later `npm`/`bun`
 - Replacement-window ACP fallback with structured blocker and partial-operation context
