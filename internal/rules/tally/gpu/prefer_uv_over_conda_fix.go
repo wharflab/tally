@@ -38,10 +38,28 @@ func (o *uvOverCondaObjective) BuildPrompt(ctx autofixdata.PromptContext) (strin
 	writeUVOverCondaPreamble(&b)
 	autofixdata.WriteFileContext(&b, ctx.AbsPath, ctx.ContextDir)
 	autofixdata.WriteRegistryContext(&b, ctx.Request.RegistryInsights)
+	writeCUDAVersionHint(&b, ctx.Request)
 	autofixdata.WriteSignals(&b, ctx.Request.Signals)
 	autofixdata.WriteInputDockerfile(&b, file, lines, normalized)
 	autofixdata.WriteOutputFormat(&b, file, ctx.Mode)
 	return b.String(), nil
+}
+
+// writeCUDAVersionHint emits the base image's parsed CUDA major.minor so the
+// agent can align the uv PyTorch `--index-url` wheel suffix (cuXYZ) with the
+// image's CUDA runtime. Silent when the rule did not capture a CUDA version
+// (non-nvidia/cuda base, digest ref, ARG-based tag, etc.).
+func writeCUDAVersionHint(b *strings.Builder, req *autofixdata.ObjectiveRequest) {
+	if req == nil {
+		return
+	}
+	major, ok := autofixdata.FactsInt(req.Facts, "cuda-major")
+	if !ok || major <= 0 {
+		return
+	}
+	minor, _ := autofixdata.FactsInt(req.Facts, "cuda-minor")
+	fmt.Fprintf(b, "Base image CUDA version: %d.%d\n", major, minor)
+	fmt.Fprintf(b, "  - Align the uv PyTorch --index-url wheel suffix with this version (e.g. cu%d%d).\n\n", major, minor)
 }
 
 // BuildRetryPrompt builds a retry (round 2) prompt that includes blocking

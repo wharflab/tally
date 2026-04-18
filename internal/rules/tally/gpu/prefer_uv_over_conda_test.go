@@ -321,6 +321,61 @@ CMD ["python"]
 	}
 }
 
+func TestUVOverCondaObjective_BuildPrompt_IncludesCUDAVersion(t *testing.T) {
+	t.Parallel()
+
+	o := &uvOverCondaObjective{}
+	src := []byte("FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04\nRUN conda install torch\n")
+	prompt, err := o.BuildPrompt(autofixdata.PromptContext{
+		FilePath: "Dockerfile",
+		Source:   src,
+		Request: &autofixdata.ObjectiveRequest{
+			Kind: autofixdata.ObjectiveUVOverConda,
+			File: "Dockerfile",
+			Facts: map[string]any{
+				"cuda-major": 12,
+				"cuda-minor": 1,
+			},
+		},
+		Mode: autofixdata.OutputPatch,
+	})
+	if err != nil {
+		t.Fatalf("BuildPrompt: %v", err)
+	}
+	for _, want := range []string{
+		"Base image CUDA version: 12.1",
+		"cu121",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Errorf("BuildPrompt missing %q:\n%s", want, prompt)
+		}
+	}
+}
+
+func TestUVOverCondaObjective_BuildPrompt_SkipsCUDAHintWhenAbsent(t *testing.T) {
+	t.Parallel()
+
+	o := &uvOverCondaObjective{}
+	src := []byte("FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel\nRUN conda install torch\n")
+	prompt, err := o.BuildPrompt(autofixdata.PromptContext{
+		FilePath: "Dockerfile",
+		Source:   src,
+		Request: &autofixdata.ObjectiveRequest{
+			Kind: autofixdata.ObjectiveUVOverConda,
+			File: "Dockerfile",
+			// No cuda-major/cuda-minor — e.g. pytorch/pytorch base, facts carry 0.
+			Facts: map[string]any{"cuda-major": 0, "cuda-minor": 0},
+		},
+		Mode: autofixdata.OutputPatch,
+	})
+	if err != nil {
+		t.Fatalf("BuildPrompt: %v", err)
+	}
+	if strings.Contains(prompt, "Base image CUDA version:") {
+		t.Errorf("BuildPrompt should omit CUDA hint when cuda-major is 0:\n%s", prompt)
+	}
+}
+
 func TestUVOverCondaObjective_BuildRetryPrompt(t *testing.T) {
 	t.Parallel()
 

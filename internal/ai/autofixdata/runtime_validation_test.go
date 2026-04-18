@@ -95,3 +95,36 @@ func TestExtractFinalStageRuntime_EmptyParse(t *testing.T) {
 		t.Errorf("empty stages should return zero snapshot, got %+v", rt)
 	}
 }
+
+func TestFactsInt(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		facts   map[string]any
+		key     string
+		wantVal int
+		wantOK  bool
+	}{
+		{name: "int", facts: map[string]any{"k": 12}, key: "k", wantVal: 12, wantOK: true},
+		{name: "int64", facts: map[string]any{"k": int64(7)}, key: "k", wantVal: 7, wantOK: true},
+		{name: "int32", facts: map[string]any{"k": int32(3)}, key: "k", wantVal: 3, wantOK: true},
+		{name: "float64 (json round-trip)", facts: map[string]any{"k": float64(12)}, key: "k", wantVal: 12, wantOK: true},
+		{name: "float32", facts: map[string]any{"k": float32(4)}, key: "k", wantVal: 4, wantOK: true},
+		{name: "missing key", facts: map[string]any{"other": 1}, key: "k", wantVal: 0, wantOK: false},
+		{name: "nil map", facts: nil, key: "k", wantVal: 0, wantOK: false},
+		{name: "non-numeric", facts: map[string]any{"k": "12"}, key: "k", wantVal: 0, wantOK: false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := FactsInt(tc.facts, tc.key)
+			if ok != tc.wantOK {
+				t.Fatalf("FactsInt ok = %v, want %v", ok, tc.wantOK)
+			}
+			if got != tc.wantVal {
+				t.Errorf("FactsInt value = %d, want %d", got, tc.wantVal)
+			}
+		})
+	}
+}

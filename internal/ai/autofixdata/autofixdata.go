@@ -84,3 +84,27 @@ func (r *ObjectiveRequest) SetContextDir(dir string) { r.ContextDir = dir }
 func (r *ObjectiveRequest) SetRegistryInsights(insights []RegistryInsight) {
 	r.RegistryInsights = insights
 }
+
+// FactsInt reads an integer value from a facts map, tolerating the different
+// numeric types that an `any` value can hold — native int (in-process), int64,
+// or float64 (after an encoding/json round-trip). Returns (0, false) when
+// the key is absent or the value is not numeric.
+func FactsInt(m map[string]any, key string) (int, bool) {
+	v, ok := m[key]
+	if !ok {
+		return 0, false
+	}
+	switch x := v.(type) {
+	case int:
+		return x, true
+	case int64:
+		return int(x), true
+	case int32:
+		return int(x), true
+	case float64:
+		return int(x), true
+	case float32:
+		return int(x), true
+	}
+	return 0, false
+}
