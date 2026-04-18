@@ -117,13 +117,23 @@ Examples of families:
 
 - `http-transfer`
 - `node-package-management`
-- later: `powershell-http-transfer`, `python-package-management`, `archive-extraction`
+- later: `python-package-management`, `archive-extraction`
 
 The central question for a family adapter is:
 
 > Can this command be represented as one operation from this family without losing Dockerfile-relevant meaning?
 
 If yes, it is liftable. If no, it is blocked.
+
+Shell or platform variants do not define new families on their own. They define additional parsers, serializers, and validation context for the
+same family.
+
+Examples:
+
+- PowerShell `Invoke-WebRequest` and POSIX `curl` are both tools for the same `http-transfer` family
+- `npm`, `bun`, and later `pnpm` are tools for the same `node-package-management` family
+
+The family describes the operation space. Tool adapters describe how a specific shell/tool spelling maps into or out of that family.
 
 ### 5.1 Shared core concepts
 
@@ -415,6 +425,14 @@ Initial tools:
 - later: PowerShell `Invoke-WebRequest` / `iwr`
 
 It does not cover every `curl` feature. It covers the subset that can be normalized as a transfer operation with a bounded sink.
+
+PowerShell does not need a separate operation family here. It needs:
+
+- a PowerShell-aware parser/lifter into `HTTPTransferOperation`
+- a PowerShell-aware serializer from `HTTPTransferOperation`
+- validation rules that respect the declared shell and platform context
+
+That keeps one shared transfer IR while still allowing shell-specific syntax and behavior at the adapter layer.
 
 ### 7.2 IR shape
 
