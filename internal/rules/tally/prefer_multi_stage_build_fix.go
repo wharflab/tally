@@ -194,10 +194,14 @@ func summarizeFinalStageRuntime(parsed *dockerfile.ParseResult, source []byte, c
 	addLine(upper(command.Healthcheck), upper(command.Healthcheck), rt.HealthCount, strings.Join(rt.AllHealths, " | "))
 	addLine(upper(command.Entrypoint), upper(command.Entrypoint), rt.EntrypointCount, strings.Join(rt.AllEntrypoints, " | "))
 	addLine(upper(command.Cmd), upper(command.Cmd), rt.CmdCount, strings.Join(rt.AllCmds, " | "))
+	addLine(upper(command.Shell), upper(command.Shell), rt.ShellCount, strings.Join(rt.AllShells, " | "))
+	addLine(upper(command.StopSignal), upper(command.StopSignal), rt.StopSignalCount, strings.Join(rt.AllStopSignals, " | "))
+	addLine(upper(command.Volume), upper(command.Volume), rt.VolumeCount, "paths="+autofixdata.FormatList(rt.Volumes, 12))
 
 	orderedKeys := []string{
 		upper(command.Workdir), upper(command.User), upper(command.Env), upper(command.Label),
 		upper(command.Expose), upper(command.Healthcheck), upper(command.Entrypoint), upper(command.Cmd),
+		upper(command.Shell), upper(command.StopSignal), upper(command.Volume),
 	}
 	missing := make([]string, 0, len(orderedKeys))
 	for _, k := range orderedKeys {

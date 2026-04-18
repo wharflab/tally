@@ -17,7 +17,7 @@ Rules (strict):
 - Final-stage runtime settings must remain identical (tally validates this):
   - WORKDIR: WORKDIR /app
   - CMD: CMD ["app"]
-  - Absent in input (do not add): USER, ENV, LABEL, EXPOSE, HEALTHCHECK, ENTRYPOINT
+  - Absent in input (do not add): USER, ENV, LABEL, EXPOSE, HEALTHCHECK, ENTRYPOINT, SHELL, STOPSIGNAL, VOLUME
 - If you cannot satisfy these rules safely, output exactly: NO_CHANGE.
 
 Registry context (slow checks):

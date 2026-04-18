@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/dockerfile"
@@ -28,11 +29,14 @@ type RuntimeSnapshot struct {
 	User       *instructions.UserCommand
 	Workdir    *instructions.WorkdirCommand
 	Health     *instructions.HealthCheckCommand
+	Shell      *instructions.ShellCommand
+	StopSignal *instructions.StopSignalCommand
 
 	// Aggregated equality-validation values (all occurrences flattened).
-	Expose []string
-	Env    instructions.KeyValuePairs
-	Labels instructions.KeyValuePairs
+	Expose  []string
+	Env     instructions.KeyValuePairs
+	Labels  instructions.KeyValuePairs
+	Volumes []string
 
 	// Per-instruction occurrence counts.
 	CmdCount        int
@@ -43,6 +47,9 @@ type RuntimeSnapshot struct {
 	EnvCount        int
 	LabelCount      int
 	ExposeCount     int
+	ShellCount      int
+	StopSignalCount int
+	VolumeCount     int
 
 	// Stringified per-occurrence renderings, used by prompt summaries.
 	AllCmds        []string
@@ -50,6 +57,8 @@ type RuntimeSnapshot struct {
 	AllUsers       []string
 	AllWorkdirs    []string
 	AllHealths     []string
+	AllShells      []string
+	AllStopSignals []string
 }
 
 // ExtractFinalStageRuntime returns a RuntimeSnapshot for the final stage of
@@ -95,6 +104,17 @@ func extractRuntime(stage instructions.Stage) RuntimeSnapshot {
 			rt.Health = c
 			rt.HealthCount++
 			rt.AllHealths = append(rt.AllHealths, c.String())
+		case *instructions.ShellCommand:
+			rt.Shell = c
+			rt.ShellCount++
+			rt.AllShells = append(rt.AllShells, c.String())
+		case *instructions.StopSignalCommand:
+			rt.StopSignal = c
+			rt.StopSignalCount++
+			rt.AllStopSignals = append(rt.AllStopSignals, c.String())
+		case *instructions.VolumeCommand:
+			rt.VolumeCount++
+			rt.Volumes = append(rt.Volumes, c.Volumes...)
 		}
 	}
 	return rt
@@ -158,7 +178,84 @@ func FinalStageRuntimeErrors(orig, proposed *dockerfile.ParseResult) []error {
 	if err := validateHealthcheckInvariant(o.Health, p.Health); err != nil {
 		errs = append(errs, err)
 	}
+	if err := validateShellInvariant(o.Shell, p.Shell); err != nil {
+		errs = append(errs, err)
+	}
+	if err := validateStopSignalInvariant(o.StopSignal, p.StopSignal); err != nil {
+		errs = append(errs, err)
+	}
+	if err := validateVolumeInvariant(o.Volumes, p.Volumes); err != nil {
+		errs = append(errs, err)
+	}
 	return errs
+}
+
+func validateShellInvariant(orig, proposed *instructions.ShellCommand) error {
+	if (orig == nil) != (proposed == nil) {
+		if orig == nil {
+			return errors.New("proposed Dockerfile added SHELL to the final stage")
+		}
+		return errors.New("proposed Dockerfile dropped SHELL from the final stage")
+	}
+	if orig == nil {
+		return nil
+	}
+	if !slices.Equal(orig.Shell, proposed.Shell) {
+		return fmt.Errorf(
+			"proposed Dockerfile changed SHELL in the final stage (want %v, got %v)",
+			orig.Shell, proposed.Shell,
+		)
+	}
+	return nil
+}
+
+func validateStopSignalInvariant(orig, proposed *instructions.StopSignalCommand) error {
+	if (orig == nil) != (proposed == nil) {
+		if orig == nil {
+			return errors.New("proposed Dockerfile added STOPSIGNAL to the final stage")
+		}
+		return errors.New("proposed Dockerfile dropped STOPSIGNAL from the final stage")
+	}
+	if orig == nil {
+		return nil
+	}
+	if strings.TrimSpace(orig.Signal) != strings.TrimSpace(proposed.Signal) {
+		return fmt.Errorf(
+			"proposed Dockerfile changed STOPSIGNAL in the final stage (want %q, got %q)",
+			orig.Signal, proposed.Signal,
+		)
+	}
+	return nil
+}
+
+func validateVolumeInvariant(origVols, proposedVols []string) error {
+	return validateSortedSetInvariant(strings.ToUpper(command.Volume), origVols, proposedVols)
+}
+
+// validateSortedSetInvariant compares two []string multisets (order- and
+// duplicate-insensitive after sort) and reports added/dropped/changed cases
+// with the given Dockerfile instruction name.
+func validateSortedSetInvariant(instruction string, orig, proposed []string) error {
+	if len(orig) == 0 && len(proposed) > 0 {
+		return fmt.Errorf("proposed Dockerfile added %s to the final stage", instruction)
+	}
+	if len(orig) > 0 && len(proposed) == 0 {
+		return fmt.Errorf("proposed Dockerfile dropped %s from the final stage", instruction)
+	}
+	if len(orig) == 0 {
+		return nil
+	}
+	oa := slices.Clone(orig)
+	pa := slices.Clone(proposed)
+	slices.Sort(oa)
+	slices.Sort(pa)
+	if !slices.Equal(oa, pa) {
+		return fmt.Errorf(
+			"proposed Dockerfile changed %s in the final stage (want %v, got %v)",
+			instruction, oa, pa,
+		)
+	}
+	return nil
 }
 
 func validateCmdInvariant(orig, proposed *instructions.CmdCommand) error {
@@ -219,24 +316,7 @@ func validateUserInvariant(orig, proposed *instructions.UserCommand) error {
 }
 
 func validateExposeInvariant(origPorts, proposedPorts []string) error {
-	if len(origPorts) == 0 && len(proposedPorts) > 0 {
-		return errors.New("proposed Dockerfile added EXPOSE to the final stage")
-	}
-	if len(origPorts) > 0 && len(proposedPorts) == 0 {
-		return errors.New("proposed Dockerfile dropped EXPOSE from the final stage")
-	}
-	if len(origPorts) == 0 {
-		return nil
-	}
-
-	oa := slices.Clone(origPorts)
-	pa := slices.Clone(proposedPorts)
-	slices.Sort(oa)
-	slices.Sort(pa)
-	if !slices.Equal(oa, pa) {
-		return fmt.Errorf("proposed Dockerfile changed EXPOSE in the final stage (want %v, got %v)", oa, pa)
-	}
-	return nil
+	return validateSortedSetInvariant(strings.ToUpper(command.Expose), origPorts, proposedPorts)
 }
 
 func validateWorkdirInvariant(orig, proposed *instructions.WorkdirCommand) error {

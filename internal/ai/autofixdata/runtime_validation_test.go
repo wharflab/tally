@@ -3,6 +3,7 @@ package autofixdata
 import (
 	"bytes"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/wharflab/tally/internal/dockerfile"
@@ -12,11 +13,16 @@ func TestExtractFinalStageRuntime_CountsAndOccurrences(t *testing.T) {
 	t.Parallel()
 
 	// Two WORKDIRs, two USERs, two ENVs, one LABEL with two keys, two EXPOSEs,
-	// one HEALTHCHECK, one ENTRYPOINT, one CMD — all on the final stage.
+	// one HEALTHCHECK, one ENTRYPOINT, one CMD, one SHELL, one STOPSIGNAL,
+	// two VOLUMEs — all on the final stage.
 	src := `FROM alpine:3.20 AS build
 RUN echo build
 
 FROM alpine:3.20
+SHELL ["/bin/bash", "-lc"]
+STOPSIGNAL SIGTERM
+VOLUME /data
+VOLUME /cache /logs
 WORKDIR /app
 WORKDIR /app/sub
 USER app
@@ -50,6 +56,9 @@ CMD ["python", "-m", "app"]
 		{"HealthCount", rt.HealthCount, 1},
 		{"EntrypointCount", rt.EntrypointCount, 1},
 		{"CmdCount", rt.CmdCount, 1},
+		{"ShellCount", rt.ShellCount, 1},
+		{"StopSignalCount", rt.StopSignalCount, 1},
+		{"VolumeCount", rt.VolumeCount, 2},
 	}
 	for _, tc := range cases {
 		if tc.got != tc.want {
@@ -80,6 +89,113 @@ CMD ["python", "-m", "app"]
 	if rt.Cmd == nil || rt.Entrypoint == nil || rt.Workdir == nil || rt.User == nil || rt.Health == nil {
 		t.Errorf("expected all last-occurrence pointers to be non-nil: %+v", rt)
 	}
+	if rt.Shell == nil || rt.StopSignal == nil {
+		t.Errorf("expected SHELL and STOPSIGNAL pointers to be non-nil: %+v", rt)
+	}
+	wantVolumes := []string{"/data", "/cache", "/logs"}
+	if !slices.Equal(rt.Volumes, wantVolumes) {
+		t.Errorf("Volumes = %v, want %v", rt.Volumes, wantVolumes)
+	}
+	wantShell := []string{"/bin/bash", "-lc"}
+	if !slices.Equal(rt.Shell.Shell, wantShell) {
+		t.Errorf("Shell = %v, want %v", rt.Shell.Shell, wantShell)
+	}
+	if rt.StopSignal.Signal != "SIGTERM" {
+		t.Errorf("StopSignal.Signal = %q, want SIGTERM", rt.StopSignal.Signal)
+	}
+}
+
+func TestFinalStageRuntimeErrors_ShellStopSignalVolume(t *testing.T) {
+	t.Parallel()
+
+	origSrc := `FROM alpine:3.20
+SHELL ["/bin/bash", "-lc"]
+STOPSIGNAL SIGTERM
+VOLUME /data
+CMD ["sh"]
+`
+	orig := mustParseRuntime(t, origSrc)
+
+	t.Run("SHELL dropped", func(t *testing.T) {
+		t.Parallel()
+		proposed := mustParseRuntime(t, `FROM alpine:3.20
+STOPSIGNAL SIGTERM
+VOLUME /data
+CMD ["sh"]
+`)
+		assertRuntimeErrorContains(t, FinalStageRuntimeErrors(orig, proposed), "SHELL")
+	})
+
+	t.Run("SHELL changed", func(t *testing.T) {
+		t.Parallel()
+		proposed := mustParseRuntime(t, `FROM alpine:3.20
+SHELL ["/bin/sh", "-c"]
+STOPSIGNAL SIGTERM
+VOLUME /data
+CMD ["sh"]
+`)
+		assertRuntimeErrorContains(t, FinalStageRuntimeErrors(orig, proposed), "SHELL")
+	})
+
+	t.Run("STOPSIGNAL changed", func(t *testing.T) {
+		t.Parallel()
+		proposed := mustParseRuntime(t, `FROM alpine:3.20
+SHELL ["/bin/bash", "-lc"]
+STOPSIGNAL SIGKILL
+VOLUME /data
+CMD ["sh"]
+`)
+		assertRuntimeErrorContains(t, FinalStageRuntimeErrors(orig, proposed), "STOPSIGNAL")
+	})
+
+	t.Run("VOLUME dropped", func(t *testing.T) {
+		t.Parallel()
+		proposed := mustParseRuntime(t, `FROM alpine:3.20
+SHELL ["/bin/bash", "-lc"]
+STOPSIGNAL SIGTERM
+CMD ["sh"]
+`)
+		assertRuntimeErrorContains(t, FinalStageRuntimeErrors(orig, proposed), "VOLUME")
+	})
+
+	t.Run("VOLUME changed", func(t *testing.T) {
+		t.Parallel()
+		proposed := mustParseRuntime(t, `FROM alpine:3.20
+SHELL ["/bin/bash", "-lc"]
+STOPSIGNAL SIGTERM
+VOLUME /elsewhere
+CMD ["sh"]
+`)
+		assertRuntimeErrorContains(t, FinalStageRuntimeErrors(orig, proposed), "VOLUME")
+	})
+
+	t.Run("identical runtime → no blocking", func(t *testing.T) {
+		t.Parallel()
+		proposed := mustParseRuntime(t, origSrc)
+		errs := FinalStageRuntimeErrors(orig, proposed)
+		if len(errs) != 0 {
+			t.Errorf("expected no errors for identical runtime, got %v", errs)
+		}
+	})
+}
+
+func mustParseRuntime(t *testing.T, src string) *dockerfile.ParseResult {
+	t.Helper()
+	parsed, err := dockerfile.Parse(bytes.NewReader([]byte(src)), nil)
+	if err != nil {
+		t.Fatalf("parse: %v\n%s", err, src)
+	}
+	return parsed
+}
+
+func assertRuntimeErrorContains(t *testing.T, errs []error, want string) {
+	t.Helper()
+	for _, err := range errs {
+		if err != nil && strings.Contains(err.Error(), want) {
+			return
+		}
+	}
+	t.Errorf("expected error mentioning %q, got %v", want, errs)
 }
 
 func TestExtractFinalStageRuntime_EmptyParse(t *testing.T) {
