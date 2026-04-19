@@ -57,14 +57,7 @@ func (o *commandFamilyNormalizeObjective) BuildPrompt(ctx autofixdata.PromptCont
 	writeDL4001Preamble(&b, spec)
 	autofixdata.WriteFileContext(&b, ctx.AbsPath, ctx.ContextDir)
 	writeDL4001Facts(&b, spec)
-
-	if ctx.Mode == autofixdata.OutputDockerfile {
-		normalized := autofixdata.NormalizeLF(string(ctx.Source))
-		autofixdata.WriteInputDockerfile(&b, filepath.Base(spec.File), autofixdata.CountLines(normalized), normalized)
-	} else {
-		writeDL4001Excerpt(&b, "Dockerfile excerpt", ctx.Source, spec.TargetStartLine, spec.TargetEndLine, 1)
-	}
-
+	writeDL4001PromptInput(&b, spec, ctx.Source, ctx.Mode)
 	autofixdata.WriteOutputFormat(&b, filepath.Base(spec.File), ctx.Mode)
 	return b.String(), nil
 }
@@ -122,14 +115,7 @@ func (o *commandFamilyNormalizeObjective) BuildSimplifiedPrompt(ctx autofixdata.
 	b.WriteString("- If you cannot do that safely, output exactly: NO_CHANGE.\n\n")
 
 	writeDL4001Facts(&b, spec)
-
-	if ctx.Mode == autofixdata.OutputDockerfile {
-		normalized := autofixdata.NormalizeLF(string(ctx.Source))
-		autofixdata.WriteInputDockerfile(&b, filepath.Base(spec.File), autofixdata.CountLines(normalized), normalized)
-	} else {
-		writeDL4001Excerpt(&b, "Dockerfile excerpt", ctx.Source, spec.TargetStartLine, spec.TargetEndLine, 1)
-	}
-
+	writeDL4001PromptInput(&b, spec, ctx.Source, ctx.Mode)
 	autofixdata.WriteOutputFormat(&b, filepath.Base(spec.File), ctx.Mode)
 	return b.String()
 }
@@ -435,6 +421,33 @@ func writeDL4001Facts(b *strings.Builder, spec dl4001ObjectiveSpec) {
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
+}
+
+func writeDL4001PromptInput(
+	b *strings.Builder,
+	spec dl4001ObjectiveSpec,
+	source []byte,
+	mode autofixdata.OutputMode,
+) {
+	if mode == autofixdata.OutputDockerfile {
+		normalized := autofixdata.NormalizeLF(string(source))
+		autofixdata.WriteInputDockerfile(
+			b,
+			filepath.Base(spec.File),
+			autofixdata.CountLines(normalized),
+			normalized,
+		)
+		return
+	}
+
+	writeDL4001Excerpt(
+		b,
+		"Dockerfile excerpt",
+		source,
+		spec.TargetStartLine,
+		spec.TargetEndLine,
+		1,
+	)
 }
 
 func writeDL4001Excerpt(b *strings.Builder, title string, source []byte, startLine, endLine, radius int) {
