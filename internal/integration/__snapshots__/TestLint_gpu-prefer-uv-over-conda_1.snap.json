@@ -1,0 +1,97 @@
+{
+  "files": [
+    {
+      "file": "testdata/gpu-prefer-uv-over-conda/Dockerfile",
+      "violations": [
+        {
+          "detail": "This stage uses conda/mamba/micromamba as a Python package installer on a GPU/PyTorch base image. For narrow workflows that do not rely on `conda env create` or an `environment.yml`, uv is usually a faster, lock-friendly alternative with explicit CUDA wheel index support. See https://docs.astral.sh/uv/guides/integration/pytorch/ .",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/prefer-uv-over-conda/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "testdata/gpu-prefer-uv-over-conda/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "GPU Python Dockerfile installs packages via conda; consider migrating to uv for faster, lock-friendly installs",
+          "rule": "tally/gpu/prefer-uv-over-conda",
+          "severity": "info",
+          "sourceCode": "RUN conda install -y numpy scipy transformers",
+          "suggestedFix": {
+            "description": "AI AutoFix: migrate from conda to uv",
+            "needsResolve": true,
+            "priority": 150,
+            "resolverId": "ai-autofix",
+            "safety": 2
+          }
+        },
+        {
+          "detail": "This stage uses conda/mamba/micromamba as a Python package installer on a GPU/PyTorch base image. For narrow workflows that do not rely on `conda env create` or an `environment.yml`, uv is usually a faster, lock-friendly alternative with explicit CUDA wheel index support. See https://docs.astral.sh/uv/guides/integration/pytorch/ .",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/prefer-uv-over-conda/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 12
+            },
+            "file": "testdata/gpu-prefer-uv-over-conda/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 12
+            }
+          },
+          "message": "GPU Python Dockerfile installs packages via conda; consider migrating to uv for faster, lock-friendly installs",
+          "rule": "tally/gpu/prefer-uv-over-conda",
+          "severity": "info",
+          "sourceCode": "RUN mamba install -y -c pytorch -c nvidia pytorch pytorch-cuda=12.1 xformers",
+          "suggestedFix": {
+            "description": "AI AutoFix: migrate from conda to uv",
+            "needsResolve": true,
+            "priority": 150,
+            "resolverId": "ai-autofix",
+            "safety": 2
+          }
+        },
+        {
+          "detail": "This stage uses conda/mamba/micromamba as a Python package installer on a GPU/PyTorch base image. For narrow workflows that do not rely on `conda env create` or an `environment.yml`, uv is usually a faster, lock-friendly alternative with explicit CUDA wheel index support. See https://docs.astral.sh/uv/guides/integration/pytorch/ .",
+          "docUrl": "https://tally.wharflab.com/rules/tally/gpu/prefer-uv-over-conda/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 29
+            },
+            "file": "testdata/gpu-prefer-uv-over-conda/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 29
+            }
+          },
+          "message": "GPU Python Dockerfile installs packages via conda; consider migrating to uv for faster, lock-friendly installs",
+          "rule": "tally/gpu/prefer-uv-over-conda",
+          "severity": "info",
+          "sourceCode": "RUN conda install -y flash-attn",
+          "suggestedFix": {
+            "description": "AI AutoFix: migrate from conda to uv",
+            "needsResolve": true,
+            "priority": 150,
+            "resolverId": "ai-autofix",
+            "safety": 2
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 3,
+    "style": 0,
+    "total": 3,
+    "warnings": 0
+  }
+}

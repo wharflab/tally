@@ -1,0 +1,130 @@
+---
+title: "tally/gpu/prefer-uv-over-conda"
+description: "Narrow GPU Python Dockerfiles can often be migrated from conda to uv for faster, lock-friendly installs."
+---
+
+Narrow GPU Python Dockerfiles can often be migrated from conda to uv for faster, lock-friendly installs.
+
+| Property | Value |
+|----------|-------|
+| Severity | Info |
+| Category | Best-practices |
+| Default | Enabled (experimental) |
+| Auto-fix | Yes (AI AutoFix, unsafe) |
+
+## Description
+
+This rule fires on Dockerfiles that:
+
+- Use a **GPU/PyTorch-oriented base image** (`nvidia/cuda:*`, `nvcr.io/nvidia/*`, `pytorch/pytorch:*cuda*`, or a stage that inherits CUDA from one of
+  these).
+- Install Python/ML packages (e.g. `torch`, `torchvision`, `transformers`, `flash-attn`, `xformers`) via `conda`, `mamba`, or `micromamba`.
+- Do **not** rely on a heavy conda environment-management workflow (no `conda env create`, no `environment.yml` / `conda-lock.yml` copied into the
+  image).
+
+For that narrow, migratable slice the rule suggests an AI-assisted conversion to [uv](https://docs.astral.sh/uv/), which offers faster resolution,
+explicit CUDA wheel index support, and lock-friendly reproducibility.
+
+## Why this matters
+
+- Conda resolution on GPU images is slow and can pull in unused Anaconda channels.
+- Many GPU images use conda only as a Python package installer — uv is a closer fit with
+  `pip install uv && uv pip install --index-url https://download.pytorch.org/whl/cuXYZ ...`.
+- uv supports explicit CUDA wheel indexes, which makes the CUDA alignment story (see also
+  [`tally/gpu/cuda-version-mismatch`](/rules/tally/gpu/cuda-version-mismatch)) simpler and more auditable.
+
+## Examples
+
+### Violation
+
+```dockerfile
+FROM nvidia/cuda:12.1.0-devel-ubuntu22.04
+RUN conda install -y pytorch pytorch-cuda=12.1 -c pytorch -c nvidia
+CMD ["python"]
+```
+
+```dockerfile
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel
+RUN mamba install -y numpy transformers
+```
+
+```dockerfile
+FROM nvidia/cuda:12.4.0-devel-ubuntu22.04
+RUN micromamba install -y flash-attn xformers
+```
+
+### No violation
+
+```dockerfile
+# Already uses uv.
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+RUN pip install uv && uv pip install --system --index-url https://download.pytorch.org/whl/cu121 torch
+```
+
+```dockerfile
+# Heavy conda environment workflow; migration is out of scope.
+FROM nvidia/cuda:12.1.0-devel-ubuntu22.04
+COPY environment.yml /app/
+RUN conda env create -f /app/environment.yml
+```
+
+```dockerfile
+# CPU base image; rule does not fire.
+FROM ubuntu:22.04
+RUN conda install -y numpy
+```
+
+```dockerfile
+# conda installs only system packages; not a Python package workflow.
+FROM nvidia/cuda:12.1.0-devel-ubuntu22.04
+RUN conda install -y gcc cmake
+```
+
+## Auto-fix
+
+When the rule fires, it attaches an **unsafe**, async `SuggestedFix` backed by the AI AutoFix resolver. The AI agent is asked to:
+
+- Replace conda/mamba/micromamba Python/ML installs with `uv pip install ...`.
+- Install uv before its first use (via `pip install uv` or the official installer).
+- Preserve the base image and OS package installs.
+- Preserve runtime invariants in the final stage (`CMD`, `ENTRYPOINT`, `USER`, `WORKDIR`, `ENV`, `LABEL`, `EXPOSE`, `HEALTHCHECK`).
+- Output `NO_CHANGE` if the file is better left alone (e.g. an `environment.yml`-driven workflow snuck past detection).
+
+Applying the fix requires:
+
+- `--fix --fix-unsafe`
+- A configured ACP-capable agent in the config file (see the top-level `[ai]` section)
+
+The resolver returns a single edit that replaces the entire Dockerfile content.
+
+## Applicability
+
+The rule fires when **all** of the following hold for one stage:
+
+1. The stage is GPU-oriented:
+   - base image resolves to `nvidia/cuda:*` (or `nvcr.io/nvidia/*`, `nvidia/cudagl:*`), or
+   - base image resolves to `pytorch/pytorch:*` (or `nvcr.io/nvidia/pytorch:*`), or
+   - `StageFacts.CUDAMajor > 0` (inherited via a stage reference).
+2. A `RUN` invokes `conda`, `mamba`, or `micromamba` with an `install` subcommand that lists at least one known Python/ML package.
+3. The Dockerfile as a whole does not show signs of a heavier conda workflow:
+   - no `conda env create` / `mamba env create` / `micromamba env create` in any `RUN`
+   - no `environment.yml`, `environment.yaml`, `conda-lock.yml`, or `conda-lock.yaml` in the build context
+
+Violations are emitted at most once per stage; the AI AutoFix rewrite is file-scoped.
+
+## Configuration
+
+This rule has no rule-specific options.
+
+```toml
+[rules.tally."gpu/prefer-uv-over-conda"]
+severity = "info"
+fix = "explicit"
+```
+
+## References
+
+- [uv: PyTorch integration](https://docs.astral.sh/uv/guides/integration/pytorch/)
+- [uv: Docker integration](https://docs.astral.sh/uv/guides/integration/docker/)
+- [NVIDIA CUDA image tags](https://hub.docker.com/r/nvidia/cuda/)
+- [tally/gpu/cuda-version-mismatch](/rules/tally/gpu/cuda-version-mismatch)

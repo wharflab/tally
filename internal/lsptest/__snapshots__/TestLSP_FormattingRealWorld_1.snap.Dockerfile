@@ -238,8 +238,8 @@ RUN ln -s /opt/conda/envs/default/bin/pip /usr/local/bin/pip \
 	&& /opt/conda/bin/conda config --set ssl_verify False \
 	&& pip install --no-cache-dir --upgrade pip --no-cache-dir --trusted-host pypi.org --trusted-host files.pythonhosted.org
 RUN pip install --no-cache-dir pyOpenSSL --upgrade
-RUN /opt/conda/bin/conda install -y -c conda-forge cython mkl mkl-include parso typing h5py requests pyopenssl libgcc conda-content-trust charset-normalizer accelerate \
-	&& /opt/conda/bin/conda install -c dglteam -y dgl-cuda11.7=0.9.1 \
+RUN /opt/conda/bin/conda install -y -c conda-forge    accelerate charset-normalizer conda-content-trust cython h5py libgcc mkl mkl-include parso pyopenssl requests typing                                              \
+	&& /opt/conda/bin/conda install -c dglteam -y dgl-cuda11.7=0.9.1  \
 	&& /opt/conda/bin/conda install -c pytorch -y magma-cuda117 \
     && /opt/conda/bin/conda install -c fastai fastai \
 	&& pip uninstall -y dataclasses \
@@ -324,7 +324,7 @@ RUN pip uninstall -y horovod \
 	&& ldconfig
 RUN mkdir -p /etc/pki/tls/certs \
 	&& cp /etc/ssl/certs/ca-certificates.crt /etc/pki/tls/certs/ca-bundle.crt
-RUN conda install -y -c conda-forge scikit-learn pandas
+RUN conda install -y -c conda-forge     pandas scikit-learn    
 
 WORKDIR /
 

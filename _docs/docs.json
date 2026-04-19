@@ -126,7 +126,8 @@
               "rules/tally/gpu/no-hardcoded-visible-devices",
               "rules/tally/gpu/no-redundant-cuda-install",
               "rules/tally/gpu/prefer-minimal-driver-capabilities",
-              "rules/tally/gpu/prefer-runtime-final-stage"
+              "rules/tally/gpu/prefer-runtime-final-stage",
+              "rules/tally/gpu/prefer-uv-over-conda"
             ]
           },
           {

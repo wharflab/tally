@@ -906,6 +906,28 @@ command = ['%s', '-mode=multistage']
 fix = "explicit"
 `, acpAgentPath),
 		},
+		{
+			name: "ai-autofix-prefer-uv-over-conda",
+			input: `FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+RUN conda install -y numpy torch
+CMD ["python"]
+`,
+			args: append([]string{
+				"--fix",
+				"--fix-unsafe",
+				"--fix-rule", "tally/gpu/prefer-uv-over-conda",
+			}, mustSelectRules("tally/gpu/prefer-uv-over-conda")...),
+			wantApplied: 1,
+			config: fmt.Sprintf(`[ai]
+enabled = true
+timeout = "10s"
+redact-secrets = false
+command = ['%s', '-mode=uv_over_conda']
+
+[rules.tally."gpu/prefer-uv-over-conda"]
+fix = "explicit"
+`, acpAgentPath),
+		},
 
 		// Newline between instructions: grouped mode (default) - insert blank lines.
 		// The async resolver generates all edits in one pass, so only 1 fix is recorded.

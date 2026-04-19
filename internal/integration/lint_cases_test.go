@@ -356,6 +356,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// GPU: Prefer uv over conda for narrow Python/ML Dockerfiles
+		{
+			name:     "gpu-prefer-uv-over-conda",
+			dir:      "gpu-prefer-uv-over-conda",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/gpu/prefer-uv-over-conda")...),
+			wantExit: 1,
+		},
+
 		// Shell-form RUN in scratch stage
 		{
 			name:     "shell-run-in-scratch",

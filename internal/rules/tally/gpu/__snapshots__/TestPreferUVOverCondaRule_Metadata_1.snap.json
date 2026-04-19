@@ -1,0 +1,10 @@
+{
+ "Category": "best-practices",
+ "Code": "tally/gpu/prefer-uv-over-conda",
+ "DefaultSeverity": "info",
+ "Description": "Narrow GPU Python Dockerfiles can often be migrated from conda to uv for faster, lock-friendly installs",
+ "DocURL": "https://tally.wharflab.com/rules/tally/gpu/prefer-uv-over-conda/",
+ "FixPriority": 150,
+ "IsExperimental": true,
+ "Name": "Prefer uv over conda"
+}

@@ -168,6 +168,18 @@ TALLY_AI_REDACT_SECRETS=true
 | Claude Code | [agentclientprotocol.com/agents/claude-code](https://agentclientprotocol.com/agents/claude-code) |
 | OpenAI Codex CLI | [agentclientprotocol.com/agents/codex](https://agentclientprotocol.com/agents/codex) |
 
+## Rules with AI AutoFix
+
+Today tally routes AI AutoFix to two rule objectives. Each objective owns its own prompt, validators, and acceptance criteria:
+
+| Rule | Objective | What it does |
+|------|-----------|--------------|
+| [`tally/prefer-multi-stage-build`](/rules/tally/prefer-multi-stage-build) | `prefer-multi-stage-build` | Converts single-stage Dockerfiles into a builder + runtime split, preserving final-stage runtime invariants. |
+| [`tally/gpu/prefer-uv-over-conda`](/rules/tally/gpu/prefer-uv-over-conda) | `prefer-uv-over-conda` | Migrates narrow GPU Python Dockerfiles from conda/mamba/micromamba to uv, preserving final-stage runtime invariants. |
+
+Each rule emits a whole-file rewrite, so only one AI fix can land per `--fix` invocation. If a single Dockerfile triggers both rules, run
+`--fix --fix-unsafe --fix-rule <rule>` twice, once per rule, to compose the rewrites.
+
 ## Security and privacy
 
 <Warning>
