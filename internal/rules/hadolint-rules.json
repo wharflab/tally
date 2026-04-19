@@ -129,7 +129,7 @@
     "code": "DL3022",
     "description": "`COPY --from` should reference a previously defined `FROM` alias",
     "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3022",
-    "severity": "Off"
+    "severity": "Warning"
   },
   {
     "code": "DL3023",
