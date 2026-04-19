@@ -102,7 +102,14 @@ func (r *resolver) Resolve(ctx context.Context, resolveCtx fix.ResolveContext, s
 	}
 
 	if builder, ok := obj.(resolvedEditsBuilder); ok {
-		return builder.BuildResolvedEdits(resolveCtx.FilePath, resolveCtx.Content, proposed, req)
+		edits, err := builder.BuildResolvedEdits(resolveCtx.FilePath, resolveCtx.Content, []byte(newText), req)
+		if err != nil {
+			return nil, err
+		}
+		if len(edits) == 0 {
+			return nil, errors.New("ai-autofix: resolved edit builder produced no edits for changed proposal")
+		}
+		return edits, nil
 	}
 	return []rules.TextEdit{wholeFileReplacement(resolveCtx.FilePath, resolveCtx.Content, newText)}, nil
 }

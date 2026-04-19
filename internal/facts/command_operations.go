@@ -482,7 +482,7 @@ func commandArgIsLiteral(cmd shell.CommandInfo, index int) bool {
 }
 
 func (op *HTTPTransferOperation) lowerToCurl() (string, bool) {
-	if op == nil || op.Method != http.MethodGet || !isPlainShellLiteralToken(op.URL) {
+	if op == nil || op.Method != http.MethodGet || !op.FollowsRedirects || !op.FailOnHTTPStatus || !isPlainShellLiteralToken(op.URL) {
 		return "", false
 	}
 	if op.SinkKind == HTTPTransferSinkFile && !isPlainShellLiteralToken(op.OutputPath) {

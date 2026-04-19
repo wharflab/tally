@@ -1,6 +1,9 @@
 package facts
 
-import "testing"
+import (
+	"net/http"
+	"testing"
+)
 
 func TestFileFacts_BuildsHTTPTransferOperationFacts(t *testing.T) {
 	t.Parallel()
@@ -145,5 +148,36 @@ RUN curl -sSL https://example.com/app.tgz
 	}
 	if _, ok := fact.HTTPTransfer.LowerToTool(httpTransferToolWget); ok {
 		t.Fatal("expected curl without -f to refuse wget lowering")
+	}
+}
+
+func TestHTTPTransferOperation_LowerToCurlRequiresFailAndRedirect(t *testing.T) {
+	t.Parallel()
+
+	op := &HTTPTransferOperation{
+		URL:              "https://example.com/app.tgz",
+		Method:           http.MethodGet,
+		SinkKind:         HTTPTransferSinkStdout,
+		FollowsRedirects: true,
+		FailOnHTTPStatus: true,
+	}
+
+	got, ok := op.LowerToTool(httpTransferToolCurl)
+	if !ok {
+		t.Fatal("expected lowering to curl when redirect and fail semantics are present")
+	}
+	if got != "curl -fL https://example.com/app.tgz" {
+		t.Fatalf("curl lowering = %q, want %q", got, "curl -fL https://example.com/app.tgz")
+	}
+
+	op.FailOnHTTPStatus = false
+	if _, ok := op.LowerToTool(httpTransferToolCurl); ok {
+		t.Fatal("expected lowering to curl to fail without fail-on-http-status semantics")
+	}
+
+	op.FailOnHTTPStatus = true
+	op.FollowsRedirects = false
+	if _, ok := op.LowerToTool(httpTransferToolCurl); ok {
+		t.Fatal("expected lowering to curl to fail without redirect-follow semantics")
 	}
 }

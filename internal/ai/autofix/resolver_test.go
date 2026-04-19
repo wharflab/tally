@@ -12,11 +12,56 @@ import (
 	"github.com/wharflab/tally/internal/ai/acp"
 	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/fix"
+	patchutil "github.com/wharflab/tally/internal/patch"
 	"github.com/wharflab/tally/internal/rules"
 
 	_ "github.com/wharflab/tally/internal/rules/hadolint"
 )
+
+const emptyEditsObjectiveKind = autofixdata.ObjectiveKind("test-empty-edits")
+
+type emptyEditsObjective struct{}
+
+func init() {
+	autofixdata.RegisterObjective(emptyEditsObjective{})
+}
+
+func (emptyEditsObjective) Kind() autofixdata.ObjectiveKind { return emptyEditsObjectiveKind }
+
+func (emptyEditsObjective) BuildPrompt(autofixdata.PromptContext) (string, error) {
+	return "rewrite the Dockerfile", nil
+}
+
+func (emptyEditsObjective) BuildRetryPrompt(autofixdata.RetryPromptContext) (string, error) {
+	return "retry the Dockerfile rewrite", nil
+}
+
+func (emptyEditsObjective) BuildSimplifiedPrompt(autofixdata.SimplifiedPromptContext) string {
+	return "rewrite the Dockerfile"
+}
+
+func (emptyEditsObjective) ValidateProposal(
+	_ *autofixdata.ObjectiveRequest,
+	_ *dockerfile.ParseResult,
+	_ *dockerfile.ParseResult,
+) []autofixdata.BlockingIssue {
+	return nil
+}
+
+func (emptyEditsObjective) ValidatePatch(*autofixdata.ObjectiveRequest, patchutil.Meta) []autofixdata.BlockingIssue {
+	return nil
+}
+
+func (emptyEditsObjective) BuildResolvedEdits(
+	_ string,
+	_ []byte,
+	_ []byte,
+	_ *autofixdata.ObjectiveRequest,
+) ([]rules.TextEdit, error) {
+	return nil, nil
+}
 
 type stubAgentRunner struct {
 	texts []string
@@ -75,6 +120,14 @@ func commandFamilyNormalizeRequest(cfg *config.Config) *autofixdata.ObjectiveReq
 		FixContext: autofixdata.FixContext{
 			RuleFilter: []string{rules.HadolintRulePrefix + "DL4001"},
 		},
+	}
+}
+
+func emptyEditsRequest(cfg *config.Config) *autofixdata.ObjectiveRequest {
+	return &autofixdata.ObjectiveRequest{
+		Kind:   emptyEditsObjectiveKind,
+		File:   "Dockerfile",
+		Config: cfg,
 	}
 }
 
@@ -190,4 +243,38 @@ func TestResolver_Resolve_CommandFamilyNormalizeReturnsFocusedEdit(t *testing.T)
 		fixed[0].Location,
 	)
 	require.Equal(t, "wget -nv -O- https://example.com/install.sh", fixed[0].NewText)
+}
+
+func TestResolver_Resolve_ResolvedEditsBuilderRejectsEmptyEdits(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.Default()
+	cfg.AI.Enabled = true
+	cfg.AI.Timeout = "5s"
+	cfg.AI.Command = []string{"stub"}
+	cfg.AI.RedactSecrets = false
+
+	r := &resolver{
+		runner: &stubAgentRunner{texts: []string{
+			"```diff\n" +
+				"diff --git a/Dockerfile b/Dockerfile\n" +
+				"--- a/Dockerfile\n" +
+				"+++ b/Dockerfile\n" +
+				"@@ -1 +1 @@\n" +
+				"-FROM alpine:3.20\n" +
+				"+FROM alpine:3.21\n" +
+				"```\n",
+		}},
+	}
+
+	_, err := r.Resolve(context.Background(), fix.ResolveContext{
+		FilePath: "Dockerfile",
+		Content:  []byte("FROM alpine:3.20\n"),
+	}, &rules.SuggestedFix{
+		NeedsResolve: true,
+		ResolverID:   autofixdata.ResolverID,
+		ResolverData: emptyEditsRequest(cfg),
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "resolved edit builder produced no edits")
 }
