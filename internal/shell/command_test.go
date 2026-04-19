@@ -420,6 +420,19 @@ func TestFindCommands_PowerShell(t *testing.T) {
 	}
 }
 
+func TestFindCommands_PowerShell_ArgLiteralTracksDynamicSyntax(t *testing.T) {
+	t.Parallel()
+
+	script := `Invoke-WebRequest 'https://example.com/app.tar.gz' -OutFile $dest`
+	cmds := FindCommands(script, VariantPowerShell, "invoke-webrequest")
+	if len(cmds) != 1 {
+		t.Fatalf("expected 1 command, got %d", len(cmds))
+	}
+	if got, want := cmds[0].ArgLiteral, []bool{true, true, false}; !slices.Equal(got, want) {
+		t.Fatalf("ArgLiteral = %v, want %v", got, want)
+	}
+}
+
 func TestFindCommands_Cmd(t *testing.T) {
 	t.Parallel()
 
@@ -434,6 +447,19 @@ func TestFindCommands_Cmd(t *testing.T) {
 	}
 	if cmds[1].Name != "setx" || cmds[1].Subcommand != "PATH" {
 		t.Fatalf("second command = %#v, want setx PATH", cmds[1])
+	}
+}
+
+func TestFindCommands_Cmd_ArgLiteralTracksVariableSyntax(t *testing.T) {
+	t.Parallel()
+
+	script := `curl %URL% -o out.txt`
+	cmds := FindCommands(script, VariantCmd, "curl")
+	if len(cmds) != 1 {
+		t.Fatalf("expected 1 command, got %d", len(cmds))
+	}
+	if got, want := cmds[0].ArgLiteral, []bool{false, true, true}; !slices.Equal(got, want) {
+		t.Fatalf("ArgLiteral = %v, want %v", got, want)
 	}
 }
 

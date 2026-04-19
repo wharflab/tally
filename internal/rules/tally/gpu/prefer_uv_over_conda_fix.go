@@ -117,7 +117,10 @@ func (o *uvOverCondaObjective) BuildSimplifiedPrompt(ctx autofixdata.SimplifiedP
 // ValidateProposal validates that the proposed Dockerfile preserves final-stage
 // runtime invariants and actually migrates (not merely deletes) the conda
 // Python installs that were present in the original.
-func (o *uvOverCondaObjective) ValidateProposal(orig, proposed *dockerfile.ParseResult) []autofixdata.BlockingIssue {
+func (o *uvOverCondaObjective) ValidateProposal(
+	_ *autofixdata.ObjectiveRequest,
+	orig, proposed *dockerfile.ParseResult,
+) []autofixdata.BlockingIssue {
 	runtimeErrs := uvOverCondaRuntimeValidationErrors(orig, proposed)
 	migrationErrs := uvOverCondaMigrationErrors(orig, proposed)
 	blocking := make([]autofixdata.BlockingIssue, 0, len(runtimeErrs)+len(migrationErrs))
@@ -131,7 +134,10 @@ func (o *uvOverCondaObjective) ValidateProposal(orig, proposed *dockerfile.Parse
 }
 
 // ValidatePatch defers to ValidateProposal.
-func (o *uvOverCondaObjective) ValidatePatch(_ patchutil.Meta) []autofixdata.BlockingIssue {
+func (o *uvOverCondaObjective) ValidatePatch(
+	_ *autofixdata.ObjectiveRequest,
+	_ patchutil.Meta,
+) []autofixdata.BlockingIssue {
 	return nil
 }
 

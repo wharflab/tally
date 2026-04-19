@@ -64,6 +64,7 @@ type HTTPTransferOperation struct {
 	SinkKind           HTTPTransferSinkKind
 	OutputPath         string
 	FollowsRedirects   bool
+	FailOnHTTPStatus   bool
 	Quiet              bool
 	ShowErrors         bool
 	ProgressSuppressed bool
@@ -178,6 +179,7 @@ type curlLiftState struct {
 	sinkKind         HTTPTransferSinkKind
 	hasRemoteName    bool
 	followsRedirects bool
+	failOnHTTPStatus bool
 	quiet            bool
 	showErrorsFlag   bool
 	progressSupp     bool
@@ -273,7 +275,7 @@ func applyCurlShortFlags(state *curlLiftState, arg string) {
 	for i := 1; i < len(arg); i++ {
 		switch arg[i] {
 		case 'f':
-			// Supported and intentionally ignored for lowering.
+			state.failOnHTTPStatus = true
 		case 'L':
 			state.followsRedirects = true
 		case 's':
@@ -332,6 +334,7 @@ func finalizeCurlLift(state curlLiftState) (*HTTPTransferOperation, []CommandOpe
 		SinkKind:           state.sinkKind,
 		OutputPath:         state.outputPath,
 		FollowsRedirects:   state.followsRedirects,
+		FailOnHTTPStatus:   state.failOnHTTPStatus,
 		Quiet:              state.quiet,
 		ShowErrors:         !state.quiet || state.showErrorsFlag,
 		ProgressSuppressed: state.progressSupp,
@@ -448,6 +451,7 @@ func finalizeWgetLift(state wgetLiftState) (*HTTPTransferOperation, []CommandOpe
 		SinkKind:           state.sinkKind,
 		OutputPath:         state.outputPath,
 		FollowsRedirects:   true,
+		FailOnHTTPStatus:   true,
 		Quiet:              state.quiet,
 		ShowErrors:         !state.quiet,
 		ProgressSuppressed: state.progressSupp,
@@ -506,7 +510,7 @@ func (op *HTTPTransferOperation) lowerToCurl() (string, bool) {
 }
 
 func (op *HTTPTransferOperation) lowerToWget() (string, bool) {
-	if op == nil || op.Method != http.MethodGet || !op.FollowsRedirects || !isPlainShellLiteralToken(op.URL) {
+	if op == nil || op.Method != http.MethodGet || !op.FollowsRedirects || !op.FailOnHTTPStatus || !isPlainShellLiteralToken(op.URL) {
 		return "", false
 	}
 	if op.SinkKind == HTTPTransferSinkFile && !isPlainShellLiteralToken(op.OutputPath) {

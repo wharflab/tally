@@ -121,7 +121,7 @@
           }
         },
         {
-          "detail": "Using both wget and curl increases image size and maintenance burden. Standardize on one tool. curl is generally preferred in containers due to better scripting support and broader protocol support.",
+          "detail": "Using both wget and curl increases image size and maintenance burden. Standardize on one tool for consistency across the image.",
           "docUrl": "https://tally.wharflab.com/rules/hadolint/DL4001/",
           "location": {
             "end": {

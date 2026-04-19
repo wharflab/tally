@@ -90,7 +90,7 @@ func findPowerShellCommands(script string, names ...string) []CommandInfo {
 
 		for _, arg := range powerShellCommandArgs(node, source) {
 			info.Args = append(info.Args, arg.text)
-			info.ArgLiteral = append(info.ArgLiteral, true)
+			info.ArgLiteral = append(info.ArgLiteral, isPlainPowerShellLiteralArg(arg.text))
 			if info.Subcommand == "" && !strings.HasPrefix(arg.text, "-") {
 				argStart := arg.node.StartPosition()
 				argEnd := arg.node.EndPosition()
@@ -156,6 +156,24 @@ func powerShellCommandArgs(node *sitter.Node, source []byte) []powerShellArg {
 		args = append(args, powerShellArg{text: text, node: child})
 	}
 	return args
+}
+
+func isPlainPowerShellLiteralArg(text string) bool {
+	raw := strings.TrimSpace(text)
+	if raw == "" {
+		return false
+	}
+	if len(raw) >= 2 && raw[0] == '\'' && raw[len(raw)-1] == '\'' {
+		return true
+	}
+	if len(raw) >= 2 && raw[0] == '"' && raw[len(raw)-1] == '"' {
+		body := raw[1 : len(raw)-1]
+		return !strings.Contains(body, "$") && !strings.Contains(body, "`")
+	}
+	if strings.HasPrefix(raw, "@") {
+		return false
+	}
+	return !strings.Contains(raw, "$") && !strings.Contains(raw, "`")
 }
 
 // canParsePowerShell reports whether the PowerShell tree-sitter grammar can

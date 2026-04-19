@@ -105,7 +105,7 @@ func fixCases(t *testing.T) []fixCase {
 		// prefer-add-unpack (priority 95) applies first and replaces the wget|tar
 		// with ADD --unpack, making DL3047 (priority 96) moot on that line.
 		// The standalone wget (no tar) still triggers DL3047 and prefer-wget-config.
-		// DL4001 has no fix. --fail-level=none prevents unfixed DL4001 from failing.
+		// The standalone curl|sh transfer is normalized by DL4001 to wget.
 		{
 			name: "dl3047-cross-rules",
 			input: "FROM ubuntu:22.04\n" +
@@ -113,7 +113,7 @@ func fixCases(t *testing.T) []fixCase {
 				"RUN wget http://example.com/config.json -O /etc/app/config.json\n" +
 				"RUN curl -fsSL http://example.com/script.sh | sh\n",
 			args:        []string{"--fix", "--fix-unsafe", "--fail-level", "none"},
-			wantApplied: 6, // plus DL4001 curl->wget on the standalone pipe-to-stdout transfer.
+			wantApplied: 6,
 		},
 		// curl-should-follow-redirects: insert --location after curl
 		// Also triggers prefer-curl-config (all rules enabled) → 2 fixes.

@@ -21,6 +21,7 @@ import (
 // - happy: ACP handshake + prompt emits a short agent message
 // - multistage: returns a canned unified-diff converting single-stage to multi-stage
 // - uv_over_conda: returns a canned unified-diff migrating conda to uv
+// - command_family_normalize: returns a canned unified-diff rewriting curl to wget
 // - hang-prompt: ACP handshake + prompt blocks until cancelled
 // - error-newsession: NewSession returns an error
 // - error-prompt: Prompt returns an error
@@ -188,6 +189,28 @@ func (a *testAgent) Prompt(ctx context.Context, params acpsdk.PromptRequest) (ac
 			"+RUN pip install uv && \\\n" +
 			"+    uv pip install --system --index-url https://download.pytorch.org/whl/cu121 numpy torch\n" +
 			" CMD [\"python\"]\n" +
+			"```\n"
+
+		if err := a.conn.SessionUpdate(ctx, acpsdk.SessionNotification{
+			SessionId: params.SessionId,
+			Update:    acpsdk.UpdateAgentMessageText(out),
+		}); err != nil {
+			return acpsdk.PromptResponse{}, err
+		}
+		time.Sleep(10 * time.Millisecond)
+		return acpsdk.PromptResponse{StopReason: acpsdk.StopReasonEndTurn}, nil
+	}
+
+	if a.mode == "command_family_normalize" {
+		out := "```diff\n" +
+			"diff --git a/Dockerfile b/Dockerfile\n" +
+			"--- a/Dockerfile\n" +
+			"+++ b/Dockerfile\n" +
+			"@@ -1,3 +1,3 @@\n" +
+			" FROM ubuntu:22.04\n" +
+			" RUN wget -qO- https://example.com/bootstrap.sh >/dev/null\n" +
+			"-RUN curl -sS https://example.com/install.sh | sh\n" +
+			"+RUN wget -nv -O- https://example.com/install.sh | sh\n" +
 			"```\n"
 
 		if err := a.conn.SessionUpdate(ctx, acpsdk.SessionNotification{

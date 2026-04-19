@@ -1136,7 +1136,7 @@ The `wget` capability table says:
 So the serializer emits:
 
 ```text
-wget -q -O- https://example.com/app.tar.gz | tar -xz -C /opt/app
+wget -nv -O- https://example.com/app.tar.gz | tar -xz -C /opt/app
 ```
 
 ### A.4 Validation step

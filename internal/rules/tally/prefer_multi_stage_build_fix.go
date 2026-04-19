@@ -89,6 +89,7 @@ func (o *multiStageObjective) BuildSimplifiedPrompt(ctx autofixdata.SimplifiedPr
 }
 
 func (o *multiStageObjective) ValidateProposal(
+	_ *autofixdata.ObjectiveRequest,
 	orig, proposed *dockerfile.ParseResult,
 ) []autofixdata.BlockingIssue {
 	var blocking []autofixdata.BlockingIssue
@@ -117,7 +118,10 @@ func multiStageTargetFile(requestFile, filePath string) string {
 // ValidateProposal after the patch is applied. A patch-level FROM check
 // would break round-2 retries where the agent only fixes runtime issues
 // on an already-converted multi-stage Dockerfile.
-func (o *multiStageObjective) ValidatePatch(_ patchutil.Meta) []autofixdata.BlockingIssue {
+func (o *multiStageObjective) ValidatePatch(
+	_ *autofixdata.ObjectiveRequest,
+	_ patchutil.Meta,
+) []autofixdata.BlockingIssue {
 	return nil
 }
 

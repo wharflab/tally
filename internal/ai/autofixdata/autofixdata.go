@@ -18,6 +18,9 @@ const (
 	ObjectiveMultiStage ObjectiveKind = "prefer-multi-stage-build"
 	// ObjectiveUVOverConda is the objective for tally/gpu/prefer-uv-over-conda.
 	ObjectiveUVOverConda ObjectiveKind = "prefer-uv-over-conda"
+	// ObjectiveCommandFamilyNormalize is the objective for focused command-family
+	// rewrites such as hadolint/DL4001 curl↔wget normalization.
+	ObjectiveCommandFamilyNormalize ObjectiveKind = "command-family-normalize"
 )
 
 // FixContext carries the outer fix-application intent into the resolver so the

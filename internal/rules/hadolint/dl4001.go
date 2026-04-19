@@ -3,6 +3,9 @@ package hadolint
 import (
 	"sort"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
+
+	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
@@ -13,8 +16,9 @@ import (
 type DL4001Rule struct{}
 
 const (
-	dl4001ToolCurl = "curl"
-	dl4001ToolWget = "wget"
+	dl4001ToolCurl     = "curl"
+	dl4001ToolWget     = "wget"
+	dl4001ValueUnknown = "unknown"
 )
 
 // NewDL4001Rule creates a new DL4001 rule instance.
@@ -92,7 +96,7 @@ func (r *DL4001Rule) Check(input rules.LintInput) []rules.Violation {
 		return violations
 	}
 
-	return r.checkCrossStageConflicts(input.File, wgetUsage, curlUsage)
+	return r.checkCrossStageConflicts(input, wgetUsage, curlUsage)
 }
 
 // collectToolUsage scans all stages and collects wget/curl usage.
@@ -185,7 +189,7 @@ func (r *DL4001Rule) checkStageConflicts(input rules.LintInput, wgetUsage, curlU
 		occurrences, preferredTool := r.selectOccurrencesToReport(wget, curl)
 
 		for _, occurrence := range occurrences {
-			violations = append(violations, r.createViolation(input.File, occurrence, preferredTool, msg))
+			violations = append(violations, r.createViolation(input, occurrence, preferredTool, msg))
 		}
 	}
 
@@ -193,7 +197,7 @@ func (r *DL4001Rule) checkStageConflicts(input rules.LintInput, wgetUsage, curlU
 }
 
 // checkCrossStageConflicts checks for wget/curl conflicts across stages.
-func (r *DL4001Rule) checkCrossStageConflicts(file string, wgetUsage, curlUsage usageMapDL4001) []rules.Violation {
+func (r *DL4001Rule) checkCrossStageConflicts(input rules.LintInput, wgetUsage, curlUsage usageMapDL4001) []rules.Violation {
 	anyWgetInstalled := wgetUsage.anyInstalled()
 	anyCurlInstalled := curlUsage.anyInstalled()
 
@@ -210,7 +214,7 @@ func (r *DL4001Rule) checkCrossStageConflicts(file string, wgetUsage, curlUsage 
 
 	violations := make([]rules.Violation, 0, len(occurrences))
 	for _, occurrence := range occurrences {
-		violations = append(violations, r.createViolation(file, occurrence, preferredTool, msg))
+		violations = append(violations, r.createViolation(input, occurrence, preferredTool, msg))
 	}
 
 	return violations
@@ -226,7 +230,7 @@ func (r *DL4001Rule) selectOccurrencesToReport(wget, curl *toolUsageDL4001) ([]t
 
 // createViolation creates a violation with the given location and message.
 func (r *DL4001Rule) createViolation(
-	file string,
+	input rules.LintInput,
 	occurrence toolOccurrenceDL4001,
 	preferredTool string,
 	msg messageInfoDL4001,
@@ -238,7 +242,7 @@ func (r *DL4001Rule) createViolation(
 		r.Metadata().DefaultSeverity,
 	).WithDocURL(r.Metadata().DocURL).WithDetail(msg.detail)
 
-	if fix := r.buildSuggestedFix(file, occurrence, preferredTool); fix != nil {
+	if fix := r.buildSuggestedFix(input, occurrence, preferredTool); fix != nil {
 		v = v.WithSuggestedFix(fix)
 	}
 
@@ -274,16 +278,14 @@ func (r *DL4001Rule) generateMessage(wgetInstalled, curlInstalled bool) messageI
 		return messageInfoDL4001{
 			message: "both wget and curl are installed; pick one to reduce image size",
 			detail: "Both wget and curl are being installed, which increases image size unnecessarily. " +
-				"Choose one tool and use it consistently. curl is generally preferred in containers " +
-				"due to better scripting support and broader protocol support.",
+				"Choose one tool and use it consistently across the image.",
 		}
 
 	default:
 		return messageInfoDL4001{
 			message: "both wget and curl are used; pick one to reduce image size and complexity",
 			detail: "Using both wget and curl increases image size and maintenance burden. " +
-				"Standardize on one tool. curl is generally preferred in containers " +
-				"due to better scripting support and broader protocol support.",
+				"Standardize on one tool for consistency across the image.",
 		}
 	}
 }
@@ -307,7 +309,22 @@ func countCommandsNamed(commands []shell.CommandInfo, name string) int {
 	return count
 }
 
-func (r *DL4001Rule) buildSuggestedFix(file string, occurrence toolOccurrenceDL4001, preferredTool string) *rules.SuggestedFix {
+func (r *DL4001Rule) buildSuggestedFix(
+	input rules.LintInput,
+	occurrence toolOccurrenceDL4001,
+	preferredTool string,
+) *rules.SuggestedFix {
+	if fix := r.buildDeterministicSuggestedFix(input.File, occurrence, preferredTool); fix != nil {
+		return fix
+	}
+	return r.buildAISuggestedFix(input, occurrence, preferredTool)
+}
+
+func (r *DL4001Rule) buildDeterministicSuggestedFix(
+	file string,
+	occurrence toolOccurrenceDL4001,
+	preferredTool string,
+) *rules.SuggestedFix {
 	if file == "" || occurrence.runFacts == nil {
 		return nil
 	}
@@ -362,6 +379,144 @@ func (r *DL4001Rule) buildSuggestedFix(file string, occurrence toolOccurrenceDL4
 		Description: "Replace " + sourceTool + " with " + preferredTool,
 		Safety:      rules.FixUnsafe,
 		Edits:       edits,
+	}
+}
+
+func (r *DL4001Rule) buildAISuggestedFix(
+	input rules.LintInput,
+	occurrence toolOccurrenceDL4001,
+	preferredTool string,
+) *rules.SuggestedFix {
+	if input.File == "" || occurrence.runFacts == nil {
+		return nil
+	}
+
+	sourceTool := dl4001ToolCurl
+	if preferredTool == dl4001ToolCurl {
+		sourceTool = dl4001ToolWget
+	}
+	if countCommandsNamed(occurrence.runFacts.CommandInfos, sourceTool) != 1 {
+		return nil
+	}
+	if countCommandsNamed(occurrence.runFacts.CommandInfos, preferredTool) > 0 {
+		return nil
+	}
+
+	var targetFact *facts.CommandOperationFact
+	for i := range occurrence.runFacts.CommandOperationFacts {
+		fact := &occurrence.runFacts.CommandOperationFacts[i]
+		if fact.Tool != sourceTool {
+			continue
+		}
+		if fact.SourceRange == nil || fact.SourceRange.StartLine != fact.SourceRange.EndLine {
+			return nil
+		}
+		targetFact = fact
+		break
+	}
+	if targetFact == nil {
+		return nil
+	}
+
+	targetIndex := firstCommandIndexNamed(occurrence.runFacts.CommandInfos, sourceTool)
+	if targetIndex < 0 {
+		return nil
+	}
+
+	sm := input.SourceMap()
+	lineText := sm.Line(targetFact.SourceRange.StartLine - 1)
+	if lineText == "" || targetFact.SourceRange.EndCol > len(lineText) {
+		return nil
+	}
+	targetCommandText := lineText[targetFact.SourceRange.StartCol:targetFact.SourceRange.EndCol]
+
+	blockers := make([]string, 0, len(targetFact.Blockers)+1)
+	for _, blocker := range targetFact.Blockers {
+		blockers = append(blockers, blocker.Reason)
+	}
+	if targetFact.HTTPTransfer != nil {
+		if _, ok := targetFact.HTTPTransfer.LowerToTool(preferredTool); !ok {
+			blockers = append(blockers, "deterministic lowering is unavailable for this command")
+		}
+	}
+	if len(blockers) == 0 {
+		blockers = append(blockers, "deterministic lowering is unavailable for this command")
+	}
+
+	commandNames := make([]string, 0, len(occurrence.runFacts.CommandInfos))
+	for _, cmd := range occurrence.runFacts.CommandInfos {
+		commandNames = append(commandNames, cmd.Name)
+	}
+
+	return &rules.SuggestedFix{
+		Description:  "AI AutoFix: replace " + sourceTool + " with " + preferredTool,
+		Safety:       rules.FixUnsafe,
+		NeedsResolve: true,
+		ResolverID:   autofixdata.ResolverID,
+		ResolverData: &autofixdata.ObjectiveRequest{
+			Kind: autofixdata.ObjectiveCommandFamilyNormalize,
+			File: input.File,
+			Facts: map[string]any{
+				"platform-os":            dl4001PlatformOS(input.Semantic, occurrence.stageIdx),
+				"shell-variant":          dl4001ShellVariant(occurrence.runFacts.Shell.Variant),
+				"preferred-tool":         preferredTool,
+				"source-tool":            sourceTool,
+				"target-start-line":      targetFact.SourceRange.StartLine,
+				"target-end-line":        targetFact.SourceRange.EndLine,
+				"target-start-col":       targetFact.SourceRange.StartCol,
+				"target-end-col":         targetFact.SourceRange.EndCol,
+				"target-command-text":    targetCommandText,
+				"target-run-script":      occurrence.runFacts.SourceScript,
+				"target-command-index":   targetIndex,
+				"original-command-names": commandNames,
+				"literal-urls":           literalURLsFromCommand(targetFact.Command),
+				"blockers":               blockers,
+			},
+		},
+	}
+}
+
+func firstCommandIndexNamed(commands []shell.CommandInfo, name string) int {
+	for i, cmd := range commands {
+		if cmd.Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
+func dl4001PlatformOS(sem *semantic.Model, stageIdx int) string {
+	if sem != nil {
+		if info := sem.StageInfo(stageIdx); info != nil {
+			switch {
+			case info.IsWindows():
+				return "windows"
+			case info.IsLinux():
+				return "linux"
+			}
+		}
+	}
+	return dl4001ValueUnknown
+}
+
+func dl4001ShellVariant(variant shell.Variant) string {
+	switch variant {
+	case shell.VariantBash:
+		return "bash"
+	case shell.VariantPOSIX:
+		return "sh"
+	case shell.VariantMksh:
+		return "mksh"
+	case shell.VariantZsh:
+		return "zsh"
+	case shell.VariantPowerShell:
+		return "powershell"
+	case shell.VariantCmd:
+		return command.Cmd
+	case shell.VariantUnknown:
+		return dl4001ValueUnknown
+	default:
+		return dl4001ValueUnknown
 	}
 }
 
