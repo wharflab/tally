@@ -46,7 +46,8 @@ func TestTokenize_SetAssignmentUsesStructuredQueryCaptures(t *testing.T) {
 	assertHasToken(t, script, tokens, highlightcore.TokenKeyword, "set")
 	assertHasToken(t, script, tokens, highlightcore.TokenParameter, "/p")
 	assertHasToken(t, script, tokens, highlightcore.TokenVariable, "PATH")
-	assertHasToken(t, script, tokens, highlightcore.TokenString, "%PATH%;C:\\Tools")
+	assertHasToken(t, script, tokens, highlightcore.TokenVariable, "%PATH%")
+	assertHasToken(t, script, tokens, highlightcore.TokenString, ";C:\\Tools")
 }
 
 func TestTokenize_RedirectOperator(t *testing.T) {
