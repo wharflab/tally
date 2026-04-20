@@ -1,6 +1,6 @@
 # Command-Family Normalization: Semantic Lift/Lower With ACP Fallback
 
-> Status: proposal (revision 2)
+> Status: proposal (revision 2), with DL4001 MVP partially implemented
 >
 > Working name: `ato-fix`
 >
@@ -992,33 +992,96 @@ The likely common deterministic wins are:
 
 ## 12. Implementation Plan
 
-### Phase 1: shared framework
+### 12.1 Current MVP status
 
-- add family adapter interfaces
-- add shared blocker and difference types
+The current PR implements the first vertical slice of this design for `hadolint/DL4001`. It does not yet implement the full generalized framework
+described above, but it does prove the core lift/lower/validate/fallback flow on the initial `http-transfer` family.
+
+Implemented in the current PR as MVP:
+
+- shared `RunFacts.CommandOperationFacts` for the initial `http-transfer` family, including lifted vs blocked status and source replacement ranges
+- bounded `HTTPTransferOperation` normalization for current `curl`/`wget` GET-transfer cases
+- deterministic `curl <-> wget` lowering where the shared IR can preserve Dockerfile-relevant behavior
+- `DL4001` integration that prefers deterministic focused rewrites first and falls back to ACP only for commands that cannot be lowered safely
+- ACP replacement-window objective plumbing for one focused command window, including resolved-edit building instead of whole-file replacement
+- focused validator checks for:
+  - Dockerfile locality outside the target command window
+  - command-count preservation inside the containing `RUN`
+  - preservation of non-target commands
+  - literal URL preservation
+  - output destination preservation via sink/output-path comparison
+  - multiline `RUN` handling when the target command starts on a continuation line
+- tests for facts lifting/lowering, resolver behavior, focused objective validation, and `DL4001` suggested-fix behavior
+
+Still intentionally left out of the MVP:
+
+- generic family-adapter interfaces extracted as a reusable framework instead of the current HTTP-first implementation
+- shared `Difference` modeling and richer partial-lift reporting beyond blockers
+- standalone topology classification separate from family IR
+- context-aware effective-behavior resolution from `EffectiveEnv`, observable files, `.curlrc`, `wgetrc`, and similar config inputs
+- provenance/source-ref graphs for command windows, env bindings, observable files, and build-context inputs
+- structured partial-lift/provenance payloads passed through ACP objective data
+- corpus measurement and rollout gating
+- PowerShell `Invoke-WebRequest` / `iwr`
+- next family work such as `npm -> bun`
+
+This split is intentional. The MVP takes the minimum HTTP-first path needed to validate the architecture on one real rule before extracting broader
+generic abstractions.
+
+### 12.2 Phase 1: shared framework
+
+Status: partially implemented in MVP.
+
+Completed in MVP:
+
 - extend `FileFacts` / `RunFacts` with reusable `CommandOperationFacts`
-- add topology classification for command windows
+- wire deterministic family fixes before ACP resolver dispatch for the `DL4001` pilot
+
+Remaining after MVP:
+
+- add explicit family adapter interfaces
+- add shared blocker and difference types at the framework level
+- add topology classification for command windows as a first-class shared fact
 - plumb semantic-model, env, shell, and observable-file context into family lift inputs
 - add provenance/source-ref structures for env bindings, observable files, and command windows
-- wire deterministic family fixes before ACP resolver dispatch
 
-### Phase 2: HTTP pilot
+### 12.3 Phase 2: HTTP pilot
+
+Status: partially implemented in MVP.
+
+Completed in MVP:
 
 - implement `HTTPTransferOperation`
 - implement `curl` lifter
 - implement `wget` lowerer
+- implement initial validator coverage for bounded focused rewrites
+- wire the HTTP family into `DL4001`
+
+Remaining after MVP:
+
 - resolve effective behavior from `EffectiveEnv` and observable `curlrc` / `wgetrc` files
-- implement validator for file sinks, uncaptured stdout, and `download | tar-extract`
-- wire into `DL4001`
+- separate explicit topology/downstream hints from the current sink-focused validation
+- broaden validator coverage with measured rollout data rather than only hand-picked fixtures
+- add additional shell/tool adapters such as PowerShell `Invoke-WebRequest`
 
-### Phase 3: ACP upgrade
+### 12.4 Phase 3: ACP upgrade
 
-- pass lift status and partial operation into ACP objective data
-- pass blocker lists into ACP objective data
+Status: partially implemented in MVP.
+
+Completed in MVP:
+
+- keep the replacement-window output contract
+- pass focused command-window metadata and blocker summaries into ACP objective data
+
+Remaining after MVP:
+
+- pass lift status and partial operation into ACP objective data as structured fields
+- pass blocker lists into ACP objective data as richer typed payloads rather than just summarized strings
 - pass provenance/source refs into ACP objective data
-- keep replacement-window output contract
 
-### Phase 4: corpus evaluation
+### 12.5 Phase 4: corpus evaluation
+
+Status: not started in MVP.
 
 - collect a Dockerfile corpus with `curl` and `wget`
 - measure:
@@ -1030,7 +1093,9 @@ The likely common deterministic wins are:
   - top blocker categories
 - use blocker distribution and validator acceptance as a rollout gate for Phase 2 broad enablement, not just as post-facto reporting
 
-### Phase 5: next family
+### 12.6 Phase 5: next family
+
+Status: not started in MVP.
 
 - prototype `npm -> bun`
 - start with install/remove/clean-install operations
