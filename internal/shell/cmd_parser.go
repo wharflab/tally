@@ -247,7 +247,9 @@ func cmdCommandInfo(node *sitter.Node, source []byte) (CommandInfo, bool) {
 		if text == "" {
 			continue
 		}
+		isLiteral := !hasEmbeddedCmdVariableSyntax(text)
 		info.Args = append(info.Args, text)
+		info.ArgLiteral = append(info.ArgLiteral, isLiteral)
 		if info.Subcommand == "" && !strings.HasPrefix(text, "/") {
 			argStart := child.StartPosition()
 			argEnd := child.EndPosition()

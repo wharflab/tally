@@ -44,6 +44,15 @@ type agentRunner interface {
 	Run(ctx context.Context, req acp.RunRequest) (acp.RunResponse, error)
 }
 
+type resolvedEditsBuilder interface {
+	BuildResolvedEdits(
+		filePath string,
+		original []byte,
+		proposed []byte,
+		req *autofixdata.ObjectiveRequest,
+	) ([]rules.TextEdit, error)
+}
+
 func newResolver() *resolver {
 	return &resolver{
 		runner:          acp.NewRunner(),
@@ -90,6 +99,17 @@ func (r *resolver) Resolve(ctx context.Context, resolveCtx fix.ResolveContext, s
 	}
 	if bytes.Equal(resolveCtx.Content, []byte(newText)) {
 		return nil, nil
+	}
+
+	if builder, ok := obj.(resolvedEditsBuilder); ok {
+		edits, err := builder.BuildResolvedEdits(resolveCtx.FilePath, resolveCtx.Content, []byte(newText), req)
+		if err != nil {
+			return nil, err
+		}
+		if len(edits) == 0 {
+			return nil, errors.New("ai-autofix: resolved edit builder produced no edits for changed proposal")
+		}
+		return edits, nil
 	}
 	return []rules.TextEdit{wholeFileReplacement(resolveCtx.FilePath, resolveCtx.Content, newText)}, nil
 }
@@ -165,14 +185,14 @@ func (r *resolver) proposeDockerfile(
 
 		proposed = result.proposed
 		if mode == autofixdata.OutputPatch {
-			blocking = obj.ValidatePatch(result.patchMeta)
+			blocking = obj.ValidatePatch(req, result.patchMeta)
 			if len(blocking) > 0 {
 				roundInput = proposed
 				continue
 			}
 		}
 
-		proposed, blocking, err = r.checkProposal(ctx, filePath, proposed, ac.cfg, origParse, obj, req.FixContext)
+		proposed, blocking, err = r.checkProposal(ctx, filePath, proposed, ac.cfg, origParse, obj, req)
 		if err != nil {
 			return nil, err
 		}
@@ -218,6 +238,7 @@ func buildRoundPrompt(round int, p roundPromptParams, mode autofixdata.OutputMod
 			FilePath:       p.filePath,
 			Proposed:       p.proposed,
 			BlockingIssues: p.blocking,
+			Request:        p.req,
 			Config:         p.cfg,
 			AbsPath:        p.absPath,
 			ContextDir:     p.contextDir,
@@ -267,6 +288,7 @@ func (r *resolver) runRound(
 		simplePrompt := rp.obj.BuildSimplifiedPrompt(autofixdata.SimplifiedPromptContext{
 			FilePath:   rp.filePath,
 			Source:     roundInput,
+			Request:    rp.req,
 			AbsPath:    rp.absPath,
 			ContextDir: rp.contextDir,
 			Mode:       mode,
@@ -338,7 +360,7 @@ func (r *resolver) checkProposal(
 	cfg *config.Config,
 	origParse *dockerfile.ParseResult,
 	obj autofixdata.Objective,
-	fixCtx autofixdata.FixContext,
+	req *autofixdata.ObjectiveRequest,
 ) ([]byte, []autofixdata.BlockingIssue, error) {
 	var blocking []autofixdata.BlockingIssue
 
@@ -349,14 +371,14 @@ func (r *resolver) checkProposal(
 			Message: "proposed Dockerfile failed to parse: " + parseErr.Error(),
 		}}
 	} else {
-		blocking = obj.ValidateProposal(origParse, propParse)
+		blocking = obj.ValidateProposal(req, origParse, propParse)
 	}
 
 	if len(blocking) > 0 {
 		return proposed, blocking, nil
 	}
 
-	proposed, blocking, err := r.validateWithLint(ctx, filePath, proposed, cfg, fixCtx)
+	proposed, blocking, err := r.validateWithLint(ctx, filePath, proposed, cfg, req.FixContext)
 	if err != nil || len(blocking) > 0 {
 		return proposed, blocking, err
 	}
@@ -370,7 +392,7 @@ func (r *resolver) checkProposal(
 			Message: "normalized Dockerfile failed to parse: " + normalizeErr.Error(),
 		}}
 	} else {
-		blocking = obj.ValidateProposal(origParse, normalizedParse)
+		blocking = obj.ValidateProposal(req, origParse, normalizedParse)
 	}
 
 	return proposed, blocking, nil

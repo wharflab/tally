@@ -49,11 +49,11 @@ type Objective interface {
 	// ValidateProposal performs objective-specific structural validation on
 	// the proposed Dockerfile beyond basic syntax checking.
 	// Returns blocking issues that must be resolved.
-	ValidateProposal(orig, proposed *dockerfile.ParseResult) []BlockingIssue
+	ValidateProposal(req *ObjectiveRequest, orig, proposed *dockerfile.ParseResult) []BlockingIssue
 
 	// ValidatePatch performs objective-specific validation on patch metadata
 	// (e.g. ensuring certain instructions were added). Returns blocking issues.
-	ValidatePatch(meta patchutil.Meta) []BlockingIssue
+	ValidatePatch(req *ObjectiveRequest, meta patchutil.Meta) []BlockingIssue
 }
 
 // PromptContext provides inputs for building the initial (round 1) prompt.
@@ -81,6 +81,7 @@ type RetryPromptContext struct {
 	FilePath       string
 	Proposed       []byte
 	BlockingIssues []BlockingIssue
+	Request        *ObjectiveRequest
 	Config         *config.Config
 	AbsPath        string
 	ContextDir     string
@@ -91,6 +92,7 @@ type RetryPromptContext struct {
 type SimplifiedPromptContext struct {
 	FilePath   string
 	Source     []byte
+	Request    *ObjectiveRequest
 	AbsPath    string
 	ContextDir string
 	Mode       OutputMode

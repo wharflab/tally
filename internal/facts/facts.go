@@ -108,10 +108,11 @@ type RunFacts struct {
 	Shell         ShellFacts
 	Env           EnvFacts
 
-	CommandInfos       []shell.CommandInfo
-	InstallCommands    []shell.InstallCommand
-	CachePathOverrides map[string]string
-	CacheDisablingEnv  []EnvBinding
+	CommandInfos          []shell.CommandInfo
+	CommandOperationFacts []CommandOperationFact
+	InstallCommands       []shell.InstallCommand
+	CachePathOverrides    map[string]string
+	CacheDisablingEnv     []EnvBinding
 }
 
 // ShellFacts captures the effective shell state for a stage or RUN command.
@@ -1030,19 +1031,20 @@ func buildRunFacts(params runFactBuildParams) *RunFacts {
 	}
 
 	return &RunFacts{
-		StageIndex:         params.stageIdx,
-		CommandIndex:       params.commandIdx,
-		Run:                params.run,
-		UsesShell:          params.run != nil && params.run.PrependShell,
-		Workdir:            params.workdir,
-		CommandScript:      commandScript,
-		SourceScript:       sourceScript,
-		Shell:              params.shell,
-		Env:                envFacts,
-		CommandInfos:       commandInfos,
-		InstallCommands:    shell.FindInstallPackages(sourceScript, installVariant),
-		CachePathOverrides: deriveCachePathOverrides(envFacts.Values, params.workdir),
-		CacheDisablingEnv:  append([]EnvBinding(nil), params.cacheDisablingEnv...),
+		StageIndex:            params.stageIdx,
+		CommandIndex:          params.commandIdx,
+		Run:                   params.run,
+		UsesShell:             params.run != nil && params.run.PrependShell,
+		Workdir:               params.workdir,
+		CommandScript:         commandScript,
+		SourceScript:          sourceScript,
+		Shell:                 params.shell,
+		Env:                   envFacts,
+		CommandInfos:          commandInfos,
+		CommandOperationFacts: buildCommandOperationFacts(params.run, params.sm, params.shell),
+		InstallCommands:       shell.FindInstallPackages(sourceScript, installVariant),
+		CachePathOverrides:    deriveCachePathOverrides(envFacts.Values, params.workdir),
+		CacheDisablingEnv:     append([]EnvBinding(nil), params.cacheDisablingEnv...),
 	}
 }
 

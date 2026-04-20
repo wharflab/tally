@@ -456,7 +456,7 @@ ENV FOO=bar
 RUN pip install uv && uv pip install --system numpy torch
 CMD ["python", "-m", "app"]
 `)
-		blocking := (&uvOverCondaObjective{}).ValidateProposal(orig, proposed)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(nil, orig, proposed)
 		if len(blocking) != 0 {
 			t.Errorf("expected no blocking issues, got %v", blocking)
 		}
@@ -470,7 +470,7 @@ ENV FOO=bar
 RUN conda install -y numpy torch
 CMD ["python", "-m", "app"]
 `)
-		blocking := (&uvOverCondaObjective{}).ValidateProposal(orig, proposed)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(nil, orig, proposed)
 		if !containsRule(blocking, "migration") {
 			t.Errorf("expected migration blocking issue, got %v", blocking)
 		}
@@ -484,7 +484,7 @@ ENV FOO=bar
 RUN echo "nothing installed"
 CMD ["python", "-m", "app"]
 `)
-		blocking := (&uvOverCondaObjective{}).ValidateProposal(orig, proposed)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(nil, orig, proposed)
 		if !containsRule(blocking, "migration") {
 			t.Errorf("expected migration blocking issue for deleted packages, got %v", blocking)
 		}
@@ -505,7 +505,7 @@ ENV FOO=bar
 RUN conda env create -f /app/env.yml
 CMD ["python", "-m", "app"]
 `)
-		blocking := (&uvOverCondaObjective{}).ValidateProposal(orig, proposed)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(nil, orig, proposed)
 		if !containsRule(blocking, "migration") {
 			t.Errorf("expected migration blocking issue for introduced env create, got %v", blocking)
 		}
@@ -523,7 +523,7 @@ ENV FOO=bar
 RUN pip install uv && uv pip install --system numpy torch
 CMD ["python", "-m", "app"]
 `)
-		blocking := (&uvOverCondaObjective{}).ValidateProposal(orig, proposed)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(nil, orig, proposed)
 		if containsRule(blocking, "migration") {
 			t.Errorf("uv pip install should satisfy migration; got %v", blocking)
 		}
@@ -536,7 +536,7 @@ WORKDIR /app
 ENV FOO=bar
 RUN uv pip install --system numpy torch
 `)
-		blocking := (&uvOverCondaObjective{}).ValidateProposal(orig, proposed)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(nil, orig, proposed)
 		if !containsRule(blocking, "runtime") {
 			t.Errorf("expected runtime blocking issue, got %v", blocking)
 		}
@@ -550,7 +550,7 @@ ENV FOO=bar
 RUN uv pip install --system numpy torch
 CMD ["python", "-m", "app"]
 `)
-		blocking := (&uvOverCondaObjective{}).ValidateProposal(orig, proposed)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(nil, orig, proposed)
 		if !containsRule(blocking, "runtime") {
 			t.Errorf("expected runtime blocking issue for WORKDIR, got %v", blocking)
 		}
@@ -564,7 +564,7 @@ ENV FOO=baz
 RUN uv pip install --system numpy torch
 CMD ["python", "-m", "app"]
 `)
-		blocking := (&uvOverCondaObjective{}).ValidateProposal(orig, proposed)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(nil, orig, proposed)
 		if !containsRule(blocking, "runtime") {
 			t.Errorf("expected runtime blocking issue for ENV, got %v", blocking)
 		}
@@ -579,7 +579,7 @@ CMD ["python"]
 RUN conda install -y gcc cmake
 CMD ["python"]
 `)
-		blocking := (&uvOverCondaObjective{}).ValidateProposal(sysOrig, sysProposed)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(nil, sysOrig, sysProposed)
 		for _, b := range blocking {
 			if b.Rule == "migration" {
 				t.Errorf("unexpected migration block for system conda install: %v", b)
@@ -589,7 +589,7 @@ CMD ["python"]
 
 	t.Run("handles nil parse results", func(t *testing.T) {
 		t.Parallel()
-		blocking := (&uvOverCondaObjective{}).ValidateProposal(nil, nil)
+		blocking := (&uvOverCondaObjective{}).ValidateProposal(nil, nil, nil)
 		if len(blocking) == 0 {
 			t.Error("expected blocking issue for nil parse results")
 		}
@@ -708,7 +708,7 @@ CMD ["python", "-m", "app"]
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			proposed := mustParse(t, tc.swap)
-			blocking := o.ValidateProposal(orig, proposed)
+			blocking := o.ValidateProposal(nil, orig, proposed)
 			if !tc.wantHit && len(blocking) > 0 {
 				t.Errorf("expected no blocking, got %v", blocking)
 				return
@@ -744,7 +744,7 @@ LABEL foo=bar
 HEALTHCHECK CMD curl -f http://localhost/ || exit 1
 CMD ["python"]
 `)
-	blocking := (&uvOverCondaObjective{}).ValidateProposal(orig, proposed)
+	blocking := (&uvOverCondaObjective{}).ValidateProposal(nil, orig, proposed)
 	if len(blocking) == 0 {
 		t.Fatal("expected blocking for added runtime instructions")
 	}
@@ -754,7 +754,7 @@ func TestUVOverCondaObjective_ValidatePatch(t *testing.T) {
 	t.Parallel()
 
 	o := &uvOverCondaObjective{}
-	if got := o.ValidatePatch(patchutil.Meta{}); got != nil {
+	if got := o.ValidatePatch(nil, patchutil.Meta{}); got != nil {
 		t.Errorf("ValidatePatch = %v, want nil", got)
 	}
 }

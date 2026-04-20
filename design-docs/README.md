@@ -255,6 +255,23 @@ converts users into project-level adoption via `.tally.toml` + CI snippets.
 
 ---
 
+### 24. [Lessons from TypeScript-Go VS Code Extension (TypeScript Native Preview)](24-vscode-extension-lessons-from-typescript-go-native-preview.md)
+
+**Covers:** Actionable implementation patterns to borrow for Tally’s Go-binary-backed VS Code extension, especially around traceability, crash
+recovery, diagnostic pull configuration, and status UI.
+
+**Key Topics:**
+
+- Separate output and protocol-trace channels for better LSP debugging
+- `vscode-languageclient` watchdog behavior and how to surface restarts in the UI
+- Standard `tally.trace.server` configuration instead of custom tracing plumbing
+- Diagnostic pull-mode tuning and `match` handling when only a URI is available
+- Concrete backlog items for `extensions/vscode-tally/`
+
+**Based on:** `microsoft/typescript-go`’s `_extension/`, VS Code, and `vscode-languageclient`
+
+---
+
 ### 25. [CLI-Config Integration Refactor](25-cli-config-integration-refactor.md)
 
 **Covers:** Replacing hand-written CLI-to-config glue code with idiomatic urfave/cli v3 patterns (`Validator`, `Destination`, `Sources`)
@@ -319,6 +336,57 @@ directives, reporting, and fixes.
 - Required “port all upstream-relevant test vectors” policy
 - Native SC autofix integration model and rollout checklist
 - Alignment with Windows shell-gating behavior from doc 27
+
+---
+
+### 29. [Lessons from Shipwright: Build-Aware Dockerfile Repair](29-shipwright-lessons-build-aware-repair.md)
+
+**Covers:** Actionable lessons from Shipwright’s academic Dockerfile repair system, mapped onto Tally’s roadmap for diagnostics, slow checks,
+repair safety, datasets, and future search/ACP workflows.
+
+**Key Topics:**
+
+- Why static linting alone misses many real build failures
+- Error taxonomy lessons for package churn, missing dependencies, stale URLs, and base-image drift
+- Build-time validation and fix-safety classification for slower or riskier repairs
+- Search-based and ML-assisted recommendation ideas worth adapting selectively
+- Benchmark-dataset and real-world PR-validation lessons for evaluating repair quality
+
+**Based on:** the Shipwright paper, dataset, and implementation
+
+---
+
+### 30. [AST-Aware Semantic Highlighting for CLI Snippets and LSP](30-ast-semantic-highlighting-cli-lsp.md)
+
+**Covers:** A shared semantic-token engine for Dockerfile and embedded shell syntax that replaces Chroma in the CLI and powers LSP
+`semanticTokens/full|range`.
+
+**Key Topics:**
+
+- One tokenization engine with separate CLI and LSP adapters
+- Reuse of existing BuildKit AST, shell parsing, semantic model, and sourcemap primitives
+- Token normalization rules that preserve stable spans across renderers
+- Incremental rollout strategy: `full` and `range` first, `full/delta` later
+- Parser-backed PowerShell support and conservative lexical fallback for `cmd`
+
+**Based on:** tally’s existing AST/semantic/highlighting internals and the LSP semantic tokens protocol
+
+---
+
+### 31. [Semantic Token Alignment With `better-dockerfile-syntax`](31-semantic-token-alignment-with-better-dockerfile-syntax.md)
+
+**Covers:** How Tally’s semantic-token model should align with the `better-dockerfile-syntax` TextMate grammar without erasing useful Dockerfile
+and embedded-shell scopes.
+
+**Key Topics:**
+
+- Why `better-dockerfile-syntax` is useful as a grammar reference, not as a semantic-token source
+- Where semantic token boundaries currently override helpful TextMate scopes
+- Why parser directives such as `# syntax=` and `# escape=` need Tally-owned semantic structure
+- How `semanticTokenScopes` fallback mapping should mirror the grammar’s real scope vocabulary
+- A staged plan: fix boundaries first, then fix scope mapping, then add Dockerfile-specific token types if needed
+
+**Based on:** `jeff-hykin/better-dockerfile-syntax`, VS Code semantic token behavior, and Tally’s current token legend and fallback mapping
 
 ---
 
@@ -391,6 +459,41 @@ patterns.
 
 **Based on:** Docker PHP guidance, Composer docs, Symfony docs, PHP manual, community PHP image guidance, and a curated GitHub PHP Dockerfile
 corpus analysis
+
+---
+
+### 36. [Telemetry Opt-Out Rule Research](36-telemetry-opt-out-rule-research.md)
+
+**Covers:** Source-backed research for a stage-scoped rule that disables telemetry, analytics, or tracking for tools used inside a container image.
+
+**Key Topics:**
+
+- Tool-specific telemetry opt-out signals vs unsupported "global switch" assumptions
+- When `ENV`-based fixes are credible and when command/config-based fixes are too weak
+- Stage-scoped detection and insertion strategy
+- Windows container constraints and noise-reduction policy
+
+**Based on:** Official tool documentation, Windows container guidance, and a research pass over common CLI telemetry conventions
+
+---
+
+### 37. [Command-Family Normalization: Semantic Lift/Lower With ACP Fallback](37-ai-autofix-command-family-normalization.md)
+
+**Covers:** A semantic command-family normalization design for `hadolint/DL4001` where tally builds reusable command-family operation facts once per
+file, using semantic-model context plus env and observable-file state, then lowers those operations into a preferred target tool, validates the
+Dockerfile-relevant outcome mechanically, and only falls back to ACP when deterministic transpilation fails.
+
+**Key Topics:**
+
+- Why command-family fixes should model operations and outcomes rather than map flags argument-to-argument
+- How to adapt `curlconverter`'s parse/lift/lower architecture without inheriting its warning-only acceptance model
+- Why the IR should live in the facts layer and be shared across rules rather than rebuilt per rule
+- Dockerfile-relevant equivalence: files, streams, exit behavior, package state, and contextual config inputs
+- Provenance from env bindings, observable files, and command windows back to source lines
+- Family-specific IRs and capability tables for `curl`/`wget` and later `npm`/`bun`
+- Replacement-window ACP fallback with structured blocker and partial-operation context
+
+**Based on:** tally shell/fix internals, `curlconverter`, and prior ACP design docs
 
 ---
 

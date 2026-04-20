@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
 )
@@ -227,6 +228,130 @@ RUN wget https://example.com/another-file
 				if !strings.Contains(violations[0].Message, tt.wantMsgContains) {
 					t.Errorf("Message %q should contain %q", violations[0].Message, tt.wantMsgContains)
 				}
+			}
+		})
+	}
+}
+
+//nolint:gocognit,nestif // The table covers both sync and async fix contracts in one place.
+func TestDL4001Rule_SuggestedFix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		dockerfile       string
+		wantFix          bool
+		wantNeedsResolve bool
+		wantNewText      string
+		wantLoc          rules.Location
+	}{
+		{
+			name: "rewrite wget remote file to curl when curl is installed",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl
+RUN curl -fsSL https://example.com/bootstrap.tgz
+RUN wget https://example.com/file.tgz
+`,
+			wantFix:          true,
+			wantNeedsResolve: false,
+			wantNewText:      "curl -fL -O https://example.com/file.tgz",
+			wantLoc:          rules.NewRangeLocation("Dockerfile", 4, len("RUN "), 4, len("RUN wget https://example.com/file.tgz")),
+		},
+		{
+			name: "rewrite piped curl stdout to wget stdout when wget is installed",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y wget
+RUN wget https://example.com/bootstrap.tgz
+RUN curl -fsSL https://example.com/app.tgz | tar -xz -C /opt
+`,
+			wantFix:          true,
+			wantNeedsResolve: false,
+			wantNewText:      "wget -nv -O- https://example.com/app.tgz",
+			wantLoc:          rules.NewRangeLocation("Dockerfile", 4, len("RUN "), 4, len("RUN curl -fsSL https://example.com/app.tgz")),
+		},
+		{
+			name: "use ai fallback for curl without redirect-following to wget",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y wget
+RUN wget https://example.com/bootstrap.tgz
+RUN curl -fsS -o /tmp/file https://example.com/file
+`,
+			wantFix:          true,
+			wantNeedsResolve: true,
+		},
+		{
+			name: "use ai fallback for curl without fail-on-http-status to wget",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y wget
+RUN wget https://example.com/bootstrap.tgz
+RUN curl -sSL https://example.com/app.tgz | tar -xz -C /opt
+`,
+			wantFix:          true,
+			wantNeedsResolve: true,
+		},
+		{
+			name: "do not rewrite when the preferred tool already appears in the same run",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y wget
+RUN (curl -Ls https://example.com/install.sh || wget -qO- https://example.com/install.sh) | sh
+`,
+			wantFix: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
+			violations := NewDL4001Rule().Check(input)
+			if len(violations) != 1 {
+				t.Fatalf("got %d violations, want 1", len(violations))
+			}
+
+			v := violations[0]
+			if tt.wantFix {
+				if v.SuggestedFix == nil {
+					t.Fatal("expected SuggestedFix")
+				}
+				if v.SuggestedFix.Safety != rules.FixUnsafe {
+					t.Fatalf("fix safety = %v, want %v", v.SuggestedFix.Safety, rules.FixUnsafe)
+				}
+				if v.SuggestedFix.NeedsResolve != tt.wantNeedsResolve {
+					t.Fatalf("NeedsResolve = %v, want %v", v.SuggestedFix.NeedsResolve, tt.wantNeedsResolve)
+				}
+				if tt.wantNeedsResolve {
+					if v.SuggestedFix.ResolverID != autofixdata.ResolverID {
+						t.Fatalf("ResolverID = %q, want %q", v.SuggestedFix.ResolverID, autofixdata.ResolverID)
+					}
+					if len(v.SuggestedFix.Edits) != 0 {
+						t.Fatalf("expected no immediate edits for async fix, got %d", len(v.SuggestedFix.Edits))
+					}
+					req, ok := v.SuggestedFix.ResolverData.(*autofixdata.ObjectiveRequest)
+					if !ok || req == nil {
+						t.Fatalf("expected ObjectiveRequest resolver data, got %T", v.SuggestedFix.ResolverData)
+					}
+					if req.Kind != autofixdata.ObjectiveCommandFamilyNormalize {
+						t.Fatalf("ObjectiveRequest.Kind = %q, want %q", req.Kind, autofixdata.ObjectiveCommandFamilyNormalize)
+					}
+					got, ok := req.Facts["preferred-tool"].(string)
+					if !ok || got == "" {
+						t.Fatal("expected preferred-tool fact for async fix")
+					}
+				} else {
+					if len(v.SuggestedFix.Edits) != 1 {
+						t.Fatalf("expected 1 edit, got %d", len(v.SuggestedFix.Edits))
+					}
+					edit := v.SuggestedFix.Edits[0]
+					if got := edit.NewText; got != tt.wantNewText {
+						t.Fatalf("edit NewText = %q, want %q", got, tt.wantNewText)
+					}
+					if edit.Location != tt.wantLoc {
+						t.Fatalf("edit Location = %#v, want %#v", edit.Location, tt.wantLoc)
+					}
+				}
+			} else if v.SuggestedFix != nil {
+				t.Fatalf("expected no SuggestedFix, got %+v", v.SuggestedFix)
 			}
 		})
 	}

@@ -46,13 +46,13 @@ func TestMultiStageObjective_ValidatePatch_AlwaysNil(t *testing.T) {
 	obj := &multiStageObjective{}
 
 	// Patch with FROM — should pass.
-	require.Empty(t, obj.ValidatePatch(patchutil.Meta{
+	require.Empty(t, obj.ValidatePatch(nil, patchutil.Meta{
 		AddedLines: []string{"FROM golang:1.22 AS builder"},
 	}))
 
 	// Patch without FROM (e.g. a round-2 fix-up) — should also pass.
 	// Stage-count is enforced by ValidateProposal, not ValidatePatch.
-	require.Empty(t, obj.ValidatePatch(patchutil.Meta{
+	require.Empty(t, obj.ValidatePatch(nil, patchutil.Meta{
 		AddedLines: []string{"CMD [\"app\"]"},
 	}))
 }
@@ -66,13 +66,13 @@ func TestMultiStageObjective_ValidateProposal(t *testing.T) {
 
 	// Single-stage proposal should be blocked.
 	single := parseDockerfileForTest(t, "FROM alpine:3.20\nCMD [\"app\"]\n")
-	blocking := obj.ValidateProposal(orig, single)
+	blocking := obj.ValidateProposal(nil, orig, single)
 	require.NotEmpty(t, blocking)
 	require.Equal(t, "semantics", blocking[0].Rule)
 
 	// Multi-stage proposal with preserved runtime should pass.
 	multi := parseDockerfileForTest(t, "FROM alpine:3.20 AS builder\nRUN echo\nFROM alpine:3.20\nCMD [\"app\"]\n")
-	require.Empty(t, obj.ValidateProposal(orig, multi))
+	require.Empty(t, obj.ValidateProposal(nil, orig, multi))
 }
 
 func TestMultiStageObjective_Kind(t *testing.T) {
