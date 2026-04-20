@@ -30,7 +30,7 @@ ENV POWERSHELL_TELEMETRY_OPTOUT=1
 
 COPY scripts/*.cs /scripts/
 
-SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue'; $PSNativeCommandUseErrorActionPreference = $true;"]
 
 # Prepare build agent distribution
 COPY TeamCity/buildAgent C:/BuildAgent
