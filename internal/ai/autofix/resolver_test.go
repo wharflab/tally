@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	gitleaksconfig "github.com/zricethezav/gitleaks/v8/config"
 	"github.com/zricethezav/gitleaks/v8/detect"
+	gitleaksregexp "github.com/zricethezav/gitleaks/v8/regexp"
 
 	"github.com/wharflab/tally/internal/ai/acp"
 	"github.com/wharflab/tally/internal/ai/autofixdata"
@@ -131,6 +133,18 @@ func emptyEditsRequest(cfg *config.Config) *autofixdata.ObjectiveRequest {
 	}
 }
 
+func testSecretDetector() *detect.Detector {
+	return detect.NewDetector(gitleaksconfig.Config{
+		Rules: map[string]gitleaksconfig.Rule{
+			"test-github-token": {
+				RuleID:      "test-github-token",
+				Description: "match the test github token",
+				Regex:       gitleaksregexp.MustCompile(`ghp_[0-9]{36}`),
+			},
+		},
+	})
+}
+
 func TestResolver_RunAndParseRound_NoChange_ShortCircuits(t *testing.T) {
 	t.Parallel()
 
@@ -180,7 +194,7 @@ func TestResolver_RunRound_RedactSecretsInPatchModeFallsBack(t *testing.T) {
 
 	r := &resolver{
 		runner:          &stubAgentRunner{},
-		gitleaksFactory: detect.NewDetectorDefaultConfig,
+		gitleaksFactory: func() (*detect.Detector, error) { return testSecretDetector(), nil },
 	}
 
 	roundInput := []byte(

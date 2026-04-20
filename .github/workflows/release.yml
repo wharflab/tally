@@ -1202,7 +1202,7 @@ jobs:
           name: release-dist
           path: dist
       - name: Setup uv with python
-        uses: astral-sh/setup-uv@v8
+        uses: astral-sh/setup-uv@v8.1.0
         with:
           enable-cache: true
           python-version: "3.12"
