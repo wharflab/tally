@@ -77,6 +77,105 @@ func TestCommandFamilyNormalizeObjective_ValidateProposal_LocalityAndRewrite(t *
 	require.Equal(t, "shape", blocking[0].Rule)
 }
 
+func TestCommandFamilyNormalizeObjective_ValidateProposal_MultilineRunContinuationTarget(t *testing.T) {
+	t.Parallel()
+
+	req := &autofixdata.ObjectiveRequest{
+		Kind: autofixdata.ObjectiveCommandFamilyNormalize,
+		File: "Dockerfile",
+		Facts: map[string]any{
+			"platform-os":            "linux",
+			"shell-variant":          "bash",
+			"preferred-tool":         "wget",
+			"source-tool":            "curl",
+			"target-start-line":      3,
+			"target-end-line":        3,
+			"target-start-col":       len("    "),
+			"target-end-col":         len("    curl -fsSL https://example.com/app.tgz"),
+			"target-command-text":    "curl -fsSL https://example.com/app.tgz",
+			"target-run-script":      "printf hi && \\\n    curl -fsSL https://example.com/app.tgz \\\n    | tar -xz -C /opt",
+			"target-command-index":   1,
+			"original-command-names": []string{"printf", "curl", "tar"},
+			"literal-urls":           []string{"https://example.com/app.tgz"},
+			"blockers":               []string{"deterministic lowering is unavailable for this command"},
+		},
+	}
+	obj := &commandFamilyNormalizeObjective{}
+	orig := parseDL4001Dockerfile(
+		t,
+		"FROM ubuntu:22.04\nRUN printf hi && \\\n    curl -fsSL https://example.com/app.tgz \\\n    | tar -xz -C /opt\n",
+	)
+	proposed := parseDL4001Dockerfile(
+		t,
+		"FROM ubuntu:22.04\nRUN printf hi && \\\n    wget -nv -O- https://example.com/app.tgz \\\n    | tar -xz -C /opt\n",
+	)
+
+	require.Empty(t, obj.ValidateProposal(req, orig, proposed))
+}
+
+func TestCommandFamilyNormalizeObjective_ValidateProposal_AllowsNonTargetSourceToolCommand(t *testing.T) {
+	t.Parallel()
+
+	req := &autofixdata.ObjectiveRequest{
+		Kind: autofixdata.ObjectiveCommandFamilyNormalize,
+		File: "Dockerfile",
+		Facts: map[string]any{
+			"platform-os":            "linux",
+			"shell-variant":          "bash",
+			"preferred-tool":         "wget",
+			"source-tool":            "curl",
+			"target-start-line":      2,
+			"target-end-line":        2,
+			"target-start-col":       len("RUN "),
+			"target-end-col":         len("RUN curl -fsSL https://example.com/app.tgz"),
+			"target-command-text":    "curl -fsSL https://example.com/app.tgz",
+			"target-run-script":      "curl -fsSL https://example.com/app.tgz | sh && curl --version",
+			"target-command-index":   0,
+			"original-command-names": []string{"curl", "sh", "curl"},
+			"literal-urls":           []string{"https://example.com/app.tgz"},
+			"blockers":               []string{"deterministic lowering is unavailable for this command"},
+		},
+	}
+	obj := &commandFamilyNormalizeObjective{}
+	orig := parseDL4001Dockerfile(t, "FROM ubuntu:22.04\nRUN curl -fsSL https://example.com/app.tgz | sh && curl --version\n")
+	proposed := parseDL4001Dockerfile(t, "FROM ubuntu:22.04\nRUN wget -nv -O- https://example.com/app.tgz | sh && curl --version\n")
+
+	require.Empty(t, obj.ValidateProposal(req, orig, proposed))
+}
+
+func TestCommandFamilyNormalizeObjective_ValidateProposal_RejectsSinkChanges(t *testing.T) {
+	t.Parallel()
+
+	req := &autofixdata.ObjectiveRequest{
+		Kind: autofixdata.ObjectiveCommandFamilyNormalize,
+		File: "Dockerfile",
+		Facts: map[string]any{
+			"platform-os":            "linux",
+			"shell-variant":          "bash",
+			"preferred-tool":         "wget",
+			"source-tool":            "curl",
+			"target-start-line":      2,
+			"target-end-line":        2,
+			"target-start-col":       len("RUN "),
+			"target-end-col":         len("RUN curl -fsSL -o /tmp/app.tgz https://example.com/app.tgz"),
+			"target-command-text":    "curl -fsSL -o /tmp/app.tgz https://example.com/app.tgz",
+			"target-run-script":      "curl -fsSL -o /tmp/app.tgz https://example.com/app.tgz",
+			"target-command-index":   0,
+			"original-command-names": []string{"curl"},
+			"literal-urls":           []string{"https://example.com/app.tgz"},
+			"blockers":               []string{"deterministic lowering is unavailable for this command"},
+		},
+	}
+	obj := &commandFamilyNormalizeObjective{}
+	orig := parseDL4001Dockerfile(t, "FROM ubuntu:22.04\nRUN curl -fsSL -o /tmp/app.tgz https://example.com/app.tgz\n")
+	proposed := parseDL4001Dockerfile(t, "FROM ubuntu:22.04\nRUN wget https://example.com/app.tgz\n")
+
+	blocking := obj.ValidateProposal(req, orig, proposed)
+	require.NotEmpty(t, blocking)
+	require.Equal(t, "rewrite", blocking[0].Rule)
+	require.Contains(t, blocking[0].Message, "download destination")
+}
+
 func TestCommandFamilyNormalizeObjective_BuildResolvedEdits(t *testing.T) {
 	t.Parallel()
 
@@ -107,7 +206,7 @@ func TestCommandFamilyNormalizeObjective_RunSourceScript_UsesOriginalSource(t *t
 	t.Parallel()
 
 	parsed := parseDL4001Dockerfile(t, "FROM ubuntu:22.04\nRUN curl \"$URL\" \\\n    | sh -eux\n")
-	run := findRunByStartLine(parsed, 2)
+	run := findRunContainingLine(parsed, 3)
 	require.NotNil(t, run)
 
 	script := runSourceScript(parsed, run)

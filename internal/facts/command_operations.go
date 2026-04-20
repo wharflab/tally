@@ -70,6 +70,11 @@ type HTTPTransferOperation struct {
 	ProgressSuppressed bool
 }
 
+// LiftHTTPTransferOperation normalizes a curl/wget command into an HTTP transfer operation when safe.
+func LiftHTTPTransferOperation(cmd shell.CommandInfo) (*HTTPTransferOperation, []CommandOperationBlocker, bool) {
+	return liftHTTPTransferOperation(cmd)
+}
+
 // LowerToTool serializes a lifted transfer into a target tool command when safe.
 func (op *HTTPTransferOperation) LowerToTool(targetTool string) (string, bool) {
 	if op == nil {

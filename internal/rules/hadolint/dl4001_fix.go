@@ -13,6 +13,7 @@ import (
 
 	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/facts"
 	patchutil "github.com/wharflab/tally/internal/patch"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/shell"
@@ -215,7 +216,7 @@ func (o *commandFamilyNormalizeObjective) ValidateProposal(
 		}}
 	}
 
-	run := findRunByStartLine(proposed, spec.TargetStartLine)
+	run := findRunContainingLine(proposed, spec.TargetStartLine)
 	if run == nil {
 		return []autofixdata.BlockingIssue{{
 			Rule:    "shape",
@@ -274,15 +275,6 @@ func (o *commandFamilyNormalizeObjective) ValidateProposal(
 		}
 	}
 
-	if countNamedCommands(commands, spec.SourceTool) > 0 {
-		return []autofixdata.BlockingIssue{{
-			Rule:    "rewrite",
-			Message: "rewrite still leaves the non-preferred download tool in the target RUN instruction",
-			Line:    spec.TargetStartLine,
-			Snippet: proposedScript,
-		}}
-	}
-
 	target := commands[spec.TargetCommandIndex]
 	if target.Name != spec.PreferredTool {
 		return []autofixdata.BlockingIssue{{
@@ -303,6 +295,10 @@ func (o *commandFamilyNormalizeObjective) ValidateProposal(
 				Snippet: proposedScript,
 			}}
 		}
+	}
+
+	if issues := validateHTTPTransferDestination(spec, orig, target, proposedScript); len(issues) > 0 {
+		return issues
 	}
 
 	return nil
@@ -566,7 +562,7 @@ func splitNormalizedLines(source []byte) []string {
 	return strings.Split(autofixdata.NormalizeLF(string(source)), "\n")
 }
 
-func findRunByStartLine(parsed *dockerfile.ParseResult, startLine int) *instructions.RunCommand {
+func findRunContainingLine(parsed *dockerfile.ParseResult, line int) *instructions.RunCommand {
 	if parsed == nil {
 		return nil
 	}
@@ -576,8 +572,10 @@ func findRunByStartLine(parsed *dockerfile.ParseResult, startLine int) *instruct
 			if !ok || len(run.Location()) == 0 {
 				continue
 			}
-			if run.Location()[0].Start.Line == startLine {
-				return run
+			for _, loc := range run.Location() {
+				if loc.Start.Line <= line && line <= loc.End.Line {
+					return run
+				}
 			}
 		}
 	}
@@ -616,16 +614,6 @@ func variantFromFact(name string) shell.Variant {
 	}
 }
 
-func countNamedCommands(commands []shell.CommandInfo, name string) int {
-	count := 0
-	for _, cmd := range commands {
-		if cmd.Name == name {
-			count++
-		}
-	}
-	return count
-}
-
 func literalURLsFromCommand(cmd shell.CommandInfo) []string {
 	var urls []string
 	for i, arg := range cmd.Args {
@@ -646,4 +634,81 @@ func equalStringSlices(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func validateHTTPTransferDestination(
+	spec dl4001ObjectiveSpec,
+	orig *dockerfile.ParseResult,
+	target shell.CommandInfo,
+	proposedScript string,
+) []autofixdata.BlockingIssue {
+	expected, ok := liftTargetHTTPTransfer(orig, spec)
+	if !ok || expected == nil {
+		return nil
+	}
+
+	actual, blockers, ok := facts.LiftHTTPTransferOperation(target)
+	if !ok || actual == nil {
+		message := "rewrite changed the target command into a form whose output destination cannot be validated"
+		if len(blockers) > 0 {
+			message += ": " + blockers[0].Reason
+		}
+		return []autofixdata.BlockingIssue{{
+			Rule:    "rewrite",
+			Message: message,
+			Line:    spec.TargetStartLine,
+			Snippet: proposedScript,
+		}}
+	}
+
+	if expected.SinkKind == actual.SinkKind && expected.OutputPath == actual.OutputPath {
+		return nil
+	}
+
+	return []autofixdata.BlockingIssue{{
+		Rule: "rewrite",
+		Message: fmt.Sprintf(
+			"rewrite changed the download destination from %s to %s",
+			describeHTTPTransferDestination(expected),
+			describeHTTPTransferDestination(actual),
+		),
+		Line:    spec.TargetStartLine,
+		Snippet: proposedScript,
+	}}
+}
+
+func liftTargetHTTPTransfer(parsed *dockerfile.ParseResult, spec dl4001ObjectiveSpec) (*facts.HTTPTransferOperation, bool) {
+	run := findRunContainingLine(parsed, spec.TargetStartLine)
+	if run == nil {
+		return nil, false
+	}
+	script := runSourceScript(parsed, run)
+	if strings.TrimSpace(script) == "" {
+		return nil, false
+	}
+	commands := shell.FindCommands(script, variantFromFact(spec.ShellVariant))
+	if spec.TargetCommandIndex < 0 || spec.TargetCommandIndex >= len(commands) {
+		return nil, false
+	}
+	op, _, ok := facts.LiftHTTPTransferOperation(commands[spec.TargetCommandIndex])
+	return op, ok
+}
+
+func describeHTTPTransferDestination(op *facts.HTTPTransferOperation) string {
+	if op == nil {
+		return "unknown destination"
+	}
+	switch op.SinkKind {
+	case facts.HTTPTransferSinkStdout:
+		return "stdout"
+	case facts.HTTPTransferSinkRemoteFile:
+		return "remote-derived file name"
+	case facts.HTTPTransferSinkFile:
+		return fmt.Sprintf("file %q", op.OutputPath)
+	default:
+		if op.OutputPath != "" {
+			return fmt.Sprintf("%s %q", op.SinkKind, op.OutputPath)
+		}
+		return string(op.SinkKind)
+	}
 }
