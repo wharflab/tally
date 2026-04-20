@@ -457,6 +457,8 @@ github.com/wharflab/tree-sitter-batch v0.7.0 h1:wGAXKLfOpZbQIvY9IkI2ktebUvaOqnqN
 github.com/wharflab/tree-sitter-batch v0.7.0/go.mod h1:pn5t1ZUQ6WNU5dCIaWbaR4D5dHgmIQKv66MM8qlMl+8=
 github.com/wharflab/tree-sitter-batch v0.7.2 h1:ZTcO7GmtaTW6w4+6KKia63c8WHLOmxCARDg+4lx2zCI=
 github.com/wharflab/tree-sitter-batch v0.7.2/go.mod h1:pn5t1ZUQ6WNU5dCIaWbaR4D5dHgmIQKv66MM8qlMl+8=
+github.com/wharflab/tree-sitter-batch v0.9.0 h1:uHmFC1lW89R/H4ZhqWfkOOe9M4eaQ359z04Bc+RqyFQ=
+github.com/wharflab/tree-sitter-batch v0.9.0/go.mod h1:pn5t1ZUQ6WNU5dCIaWbaR4D5dHgmIQKv66MM8qlMl+8=
 github.com/wharflab/tree-sitter-powershell v0.28.0 h1:yNQFaVf0GstpdLDRAh9Z7J79zoEwtGd8qvbth+X8CGQ=
 github.com/wharflab/tree-sitter-powershell v0.28.0/go.mod h1:KI9j2ME0o0c4T/iHMxP0ei6UR485dRjWPkff85WWfco=
 github.com/wharflab/tree-sitter-powershell v0.29.1 h1:k1UJt/YHl7s3A/fO5SyBp4zGruJbioujFGNzbPJkrcQ=
