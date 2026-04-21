@@ -180,7 +180,9 @@ func heredocBodyScriptMode(
 // meaningful (non-continuation-only) content. Lines that contain only leading
 // whitespace plus a trailing line-continuation are skipped, so callers can
 // locate the instruction/heredoc header even when flags span several physical
-// lines joined by the Dockerfile escape token.
+// lines joined by the Dockerfile escape token. A line is treated as
+// "continuation-only" whenever stripping its trailing escape token leaves
+// nothing but whitespace — independent of how flag-blanking padded the line.
 func firstHeaderLine(lines []string, escapeToken rune) (int, string) {
 	escape := string(escapeToken)
 	for i, line := range lines {
@@ -188,7 +190,7 @@ func firstHeaderLine(lines []string, escapeToken rune) (int, string) {
 		if trimmed == "" {
 			continue
 		}
-		if trimmed == escape {
+		if prefix, ok := strings.CutSuffix(trimmed, escape); ok && strings.TrimSpace(prefix) == "" {
 			continue
 		}
 		return i, line
