@@ -171,4 +171,4 @@ jobs:
       - uses: actions/checkout@v6
       - name: Install uv
         uses: astral-sh/setup-uv@v8.1.0
-      - run: uv tool run rumdl==0.1.77 check --output-format github .
+      - run: uv tool run rumdl==0.1.78 check --output-format github .
