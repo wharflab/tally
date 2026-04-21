@@ -157,7 +157,7 @@ shellcheck-wasm: $(SHELLCHECK_WASM)
 
 $(SHELLCHECK_WASM): $(SHELLCHECK_WASM_INPUTS)
 	@mkdir -p $(dir $@)
-	docker build \
+	docker buildx build \
 		--progress=plain \
 		--build-arg GHC_WASM_META_COMMIT="$(GHC_WASM_META_COMMIT)" \
 		--build-arg SHELLCHECK_VERSION="$(patsubst v%,%,$(SHELLCHECK_VERSION))" \

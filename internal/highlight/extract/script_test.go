@@ -74,6 +74,85 @@ EOF
 	}
 }
 
+func TestExtractRunScript_FlagsAcrossContinuationBeforeHeredoc(t *testing.T) {
+	t.Parallel()
+
+	mapping := extractRunScriptForTest(t, `FROM alpine
+RUN --mount=type=cache,target=/root/.cache,id=cache \
+	--mount=type=bind,source=payload,target=/payload,readonly \
+	<<EOF
+set -e
+echo hi
+EOF
+`)
+
+	if !mapping.IsHeredoc {
+		t.Fatalf("expected heredoc body mapping when flags span continuation lines, got Script=%q", mapping.Script)
+	}
+	if mapping.Script != "set -e\necho hi" {
+		t.Fatalf("expected body-only script, got %q", mapping.Script)
+	}
+	// Opener appears on line 4 of the Dockerfile, so the body starts on line 5.
+	if mapping.OriginStartLine != 5 {
+		t.Fatalf("expected body origin line 5, got %d", mapping.OriginStartLine)
+	}
+}
+
+func TestExtractRunScript_FlagsAcrossContinuationWithShellOverride(t *testing.T) {
+	t.Parallel()
+
+	mapping := extractRunScriptForTest(t, `FROM alpine
+RUN --mount=type=cache,target=/root/.cache,id=cache \
+	<<EOF bash
+echo hi
+EOF
+`)
+
+	if !mapping.IsHeredoc {
+		t.Fatalf("expected heredoc body mapping, got Script=%q", mapping.Script)
+	}
+	if mapping.ShellNameOverride != "bash" {
+		t.Fatalf("expected shell override bash, got %q", mapping.ShellNameOverride)
+	}
+	if mapping.Script != "echo hi" {
+		t.Fatalf("expected body-only script, got %q", mapping.Script)
+	}
+	if mapping.OriginStartLine != 4 {
+		t.Fatalf("expected body origin line 4, got %d", mapping.OriginStartLine)
+	}
+}
+
+func TestExtractRunScript_FilePayloadWithFlagsAcrossContinuation(t *testing.T) {
+	t.Parallel()
+
+	mapping := extractRunScriptForTest(t, `FROM alpine
+RUN --mount=type=cache,target=/root/.cache,id=cache \
+	--mount=type=bind,source=etc,target=/etc,readonly \
+	<<EOF cat > /etc/app.conf
+enable-rpc=true
+EOF
+`)
+
+	if mapping.IsHeredoc {
+		t.Fatalf(
+			"expected file-payload heredoc to remain non-heredoc data even when flags span continuation lines, got Script=%q",
+			mapping.Script,
+		)
+	}
+	if strings.Contains(mapping.Script, ">>>") {
+		t.Fatalf("unexpected marker content in script %q", mapping.Script)
+	}
+	if !strings.Contains(mapping.Script, "<<EOF cat > /etc/app.conf") {
+		t.Fatalf("expected heredoc command to be preserved in script, got %q", mapping.Script)
+	}
+	if !strings.Contains(mapping.Script, "enable-rpc=true") {
+		t.Fatalf("expected payload lines to remain in script, got %q", mapping.Script)
+	}
+	if mapping.OriginStartLine != 2 {
+		t.Fatalf("expected command origin line 2, got %d", mapping.OriginStartLine)
+	}
+}
+
 func extractRunScriptForTest(t *testing.T, content string) Mapping {
 	t.Helper()
 

@@ -2,6 +2,15 @@ FROM dhi.io/debian-base:trixie-dev AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# [tally] curl configuration for improved robustness
+ENV CURL_HOME=/etc/curl
+COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
+--retry-connrefused
+--connect-timeout 15
+--retry 5
+--max-time 300
+EOF
+
 RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
 	--mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked \
 	apt-get update \
@@ -25,7 +34,9 @@ COPY Reactor.hs /shellcheck/Reactor.hs
 
 ARG AST_GREP_VERSION=0.40.5
 
-RUN --mount=type=bind,source=rewrites,target=/rewrites,readonly <<EOF
+RUN --mount=type=cache,target=/root/.npm,id=npm \
+	--mount=type=bind,source=rewrites,target=/rewrites,readonly \
+	<<EOF
 set -e
 ./striptests
 . ~/.ghc-wasm/env
