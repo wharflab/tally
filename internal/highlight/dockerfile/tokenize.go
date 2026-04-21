@@ -532,12 +532,32 @@ func heredocBodyLines(sm *sourcemap.SourceMap, root *parser.Node, escapeToken ru
 			continue
 		}
 		end := sm.ResolveEndLineWithEscape(node.EndLine, escapeToken)
-		for line := node.StartLine; line <= end; line++ {
-			if line == node.StartLine || line == end {
-				continue
-			}
+		opener := heredocOpenerLine(sm, node.StartLine, end, escapeToken)
+		for line := opener + 1; line < end; line++ {
 			out[line-1] = true
 		}
 	}
 	return out
+}
+
+// heredocOpenerLine returns the 1-based physical line within [startLine, end]
+// that carries the `<<TAG` opener. BuildKit reports node.StartLine as the line
+// containing the instruction keyword (e.g. RUN), but the opener may sit on a
+// later physical line when flags span backslash-continued lines. Everything
+// between the opener line and the terminator (node.EndLine) is the heredoc
+// body; earlier continuation lines still carry Dockerfile flag/argument
+// tokens and must not be treated as body.
+func heredocOpenerLine(sm *sourcemap.SourceMap, startLine, end int, escapeToken rune) int {
+	limit := min(end, sm.LineCount())
+	escape := string(escapeToken)
+	for line := startLine; line <= limit; line++ {
+		trimmed := strings.TrimRight(sm.Line(line-1), " \t")
+		if trimmed == "" {
+			continue
+		}
+		if !strings.HasSuffix(trimmed, escape) {
+			return line
+		}
+	}
+	return startLine
 }
