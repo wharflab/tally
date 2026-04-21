@@ -9,7 +9,14 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked \
 
 ARG GHC_WASM_META_COMMIT
 
-ADD "https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta.git?ref=${GHC_WASM_META_COMMIT}" /ghc/
+# Clone at a specific commit. Avoid `ADD <git-url>?ref=<sha>` because
+# BuildKit's git fetcher mishandles the redirect to the canonical URL
+# (which strips `.git`) on both GitHub and gitlab.haskell.org.
+RUN git init /ghc \
+	&& cd /ghc \
+	&& git remote add origin https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta.git \
+	&& git fetch --depth 1 origin "${GHC_WASM_META_COMMIT}" \
+	&& git checkout FETCH_HEAD
 
 WORKDIR /ghc
 
@@ -17,9 +24,6 @@ RUN ./setup.sh
 
 ARG SHELLCHECK_VERSION
 
-# Clone via `git` instead of `ADD <git-url>` because GitHub 301-redirects
-# `.../shellcheck.git?ref=...` to a URL that strips `.git`, which breaks
-# BuildKit's git fetcher. `git clone --branch` handles the redirect correctly.
 RUN git clone --depth 1 --branch "v${SHELLCHECK_VERSION}" \
 	https://github.com/koalaman/shellcheck.git /shellcheck
 
