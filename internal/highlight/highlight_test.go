@@ -143,10 +143,18 @@ func TestAnalyze_RunHeredocWithMultiLineMounts(t *testing.T) {
 	assertHasLineToken(t, source, line3, core.TokenProperty, "type")
 	assertHasLineToken(t, source, line3, core.TokenString, "bind")
 
-	// Heredoc opener line still gets `<<` and tag tokens.
+	// Heredoc opener line still gets `<<` and tag tokens. The tag is emitted
+	// as a keyword so VS Code's fallback maps it to the grammar's
+	// keyword.control.heredoc-token.shell.dockerfile scope.
 	line4 := doc.LineTokens(4)
 	assertHasLineToken(t, source, line4, core.TokenOperator, "<<")
-	assertHasLineToken(t, source, line4, core.TokenString, "EOF")
+	assertHasLineToken(t, source, line4, core.TokenKeyword, "EOF")
+
+	// Closing terminator line emits a matching keyword token for the tag so
+	// the grammar's heredoc-token scope theming applies there too. Source
+	// layout: line 7 is the `EOF` terminator.
+	line7 := doc.LineTokens(7)
+	assertHasLineToken(t, source, line7, core.TokenKeyword, "EOF")
 }
 
 // TestAnalyze_ShellcheckWasmDockerfile exercises the semantic tokenizer on the
@@ -194,7 +202,14 @@ func TestAnalyze_ShellcheckWasmDockerfile(t *testing.T) {
 
 	openerLine := doc.LineTokens(38)
 	assertHasLineToken(t, source, openerLine, core.TokenOperator, "<<")
-	assertHasLineToken(t, source, openerLine, core.TokenString, "EOF")
+	assertHasLineToken(t, source, openerLine, core.TokenKeyword, "EOF")
+
+	// The matching terminator line (105, 0-based) reads `EOF` on its own.
+	// Verify we emit a keyword token there too so the grammar's closing tag
+	// styling still applies under semantic highlighting.
+	requireLinePrefix(t, lines, 105, "EOF")
+	terminatorLine := doc.LineTokens(105)
+	assertHasLineToken(t, source, terminatorLine, core.TokenKeyword, "EOF")
 }
 
 func requireLinePrefix(t *testing.T, lines []string, line int, prefix string) {

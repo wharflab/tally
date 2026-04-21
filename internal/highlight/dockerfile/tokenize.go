@@ -77,6 +77,11 @@ func tokenizeNode(
 		tokens = append(tokens, numberTokens(text, lineIdx)...)
 		tokens = append(tokens, heredocTokens(text, lineIdx)...)
 	}
+
+	if len(node.Heredocs) > 0 {
+		opener := heredocOpenerLine(sm, startLine, endLine, escapeToken)
+		tokens = append(tokens, heredocTerminatorTokens(sm, node, opener, endLine)...)
+	}
 	return tokens
 }
 
@@ -410,10 +415,50 @@ func heredocTokens(line string, lineNum int) []core.Token {
 				Line:     lineNum,
 				StartCol: nameStartCol,
 				EndCol:   nameEndCol,
-				Type:     core.TokenString,
+				Type:     core.TokenKeyword,
 				Priority: 24,
 			},
 		)
+	}
+	return out
+}
+
+// heredocTerminatorTokens emits keyword tokens for each physical line within
+// the instruction's span that matches one of the node's heredoc terminator
+// names, so themes can style the closing tag the same as the opener tag.
+// Chomp heredocs (`<<-TAG`) allow the terminator to be preceded by leading
+// tabs, which are stripped before matching. The quoting style of the opener
+// (`<<'EOF'`, `<<"EOF"`) does not appear in the terminator line.
+func heredocTerminatorTokens(sm *sourcemap.SourceMap, node *parser.Node, openerLine, end int) []core.Token {
+	if len(node.Heredocs) == 0 {
+		return nil
+	}
+	limit := min(end, sm.LineCount())
+	hdIdx := 0
+	var out []core.Token
+	for line := openerLine + 1; line <= limit && hdIdx < len(node.Heredocs); line++ {
+		raw := sm.Line(line - 1)
+		candidate := strings.TrimRight(raw, " \t\r")
+		if node.Heredocs[hdIdx].Chomp {
+			candidate = strings.TrimLeft(candidate, "\t")
+		}
+		if candidate != node.Heredocs[hdIdx].Name {
+			continue
+		}
+		start := strings.Index(raw, candidate)
+		if start < 0 {
+			hdIdx++
+			continue
+		}
+		startCol, endCol := core.RuneColsForByteRange(raw, start, start+len(candidate))
+		out = append(out, core.Token{
+			Line:     line - 1,
+			StartCol: startCol,
+			EndCol:   endCol,
+			Type:     core.TokenKeyword,
+			Priority: 24,
+		})
+		hdIdx++
 	}
 	return out
 }
