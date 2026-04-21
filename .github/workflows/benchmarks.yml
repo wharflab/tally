@@ -19,8 +19,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-        with:
-          lfs: true
+      - uses: ./.github/actions/shellcheck-wasm
       - name: Setup Go
         uses: actions/setup-go@v6
         with:

@@ -12,12 +12,25 @@ permissions:
 env:
   GOEXPERIMENT: jsonv2
 jobs:
+  # Producer job: rebuilds/restores shellcheck.wasm from the buildx GHA cache
+  # (~15s on cache hit) and uploads it as a workflow artifact for
+  # test-windows, which cannot run BuildKit. Linux jobs here call the
+  # composite action directly for parallelism.
+  shellcheck-wasm:
+    name: Build shellcheck.wasm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/shellcheck-wasm
+        with:
+          artifact-name: shellcheck-wasm
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          lfs: true
+      - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -65,11 +78,13 @@ jobs:
           fail_ci_if_error: true
   test-windows:
     name: Test (Windows)
+    needs: shellcheck-wasm
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: ./.github/actions/download-shellcheck-wasm
         with:
-          lfs: true
+          artifact-name: shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -82,8 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          lfs: true
+      - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -99,8 +113,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          lfs: true
+      - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -116,8 +129,6 @@ jobs:
       PMD_VERSION: 7.20.0
     steps:
       - uses: actions/checkout@v6
-        with:
-          lfs: true
       - name: Setup PMD
         run: |
           curl -fL "https://github.com/pmd/pmd/releases/download/pmd_releases%2F${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip" -o pmd.zip
@@ -158,8 +169,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          lfs: false
       - name: Install uv
         uses: astral-sh/setup-uv@v8.1.0
       - run: uv tool run rumdl==0.1.77 check --output-format github .

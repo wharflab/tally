@@ -1,0 +1,36 @@
+---
+name: Download shellcheck.wasm artifact
+description: |
+  Downloads a shellcheck.wasm artifact produced earlier in the same workflow
+  by the `shellcheck-wasm` composite action and places it at
+  internal/shellcheck/wasm/shellcheck.wasm so subsequent `go build`/`go test`
+  steps find the embedded binary.
+
+  Use this action in macOS/Windows jobs (which cannot run Docker) that depend
+  on a Linux `shellcheck-wasm` job via `needs:`.
+inputs:
+  artifact-name:
+    description: Artifact name passed to the upstream shellcheck-wasm action.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Prepare destination
+      shell: bash
+      run: mkdir -p internal/shellcheck/wasm
+    - name: Download shellcheck.wasm artifact
+      uses: actions/download-artifact@v7
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: internal/shellcheck/wasm
+    - name: Verify artifact
+      shell: bash
+      run: |
+        set -euo pipefail
+        path=internal/shellcheck/wasm/shellcheck.wasm
+        if [ ! -s "$path" ]; then
+          echo "::error::shellcheck.wasm missing or empty at $path after download"
+          exit 1
+        fi
+        size=$(wc -c <"$path")
+        echo "Downloaded shellcheck.wasm: ${size} bytes"

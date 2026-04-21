@@ -30,7 +30,9 @@ Makefile text eol=lf
 *.cmd text eol=crlf
 
 # WASM
-*.wasm filter=lfs diff=lfs merge=lfs -text
+# internal/shellcheck/wasm/shellcheck.wasm is built on demand by
+# `make shellcheck-wasm` (see _tools/shellcheck-wasm/) and is .gitignored.
+# CI restores it from actions/cache keyed on the pinned upstream versions.
 *.wasm linguist-detectable=true
 *.wasm linguist-documentation=false
 *.wasm linguist-language=WebAssembly

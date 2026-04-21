@@ -5,13 +5,19 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/intellij-plugin.yml"
+      - ".github/actions/shellcheck-wasm/**"
+      - ".github/actions/download-shellcheck-wasm/**"
       - "_integrations/intellij-tally/**"
+      - "_tools/shellcheck-wasm/**"
       - "Makefile"
   push:
     branches: [main]
     paths:
       - ".github/workflows/intellij-plugin.yml"
+      - ".github/actions/shellcheck-wasm/**"
+      - ".github/actions/download-shellcheck-wasm/**"
       - "_integrations/intellij-tally/**"
+      - "_tools/shellcheck-wasm/**"
       - "Makefile"
   workflow_dispatch:
 permissions:
@@ -25,8 +31,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
-        with:
-          lfs: true
+      - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:

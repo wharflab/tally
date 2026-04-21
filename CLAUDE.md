@@ -25,6 +25,10 @@ and a WASM-compiled shellcheck (`internal/shellcheck/`).
 - When running `go build`, `go test`, or `go run` directly, pass
   `-tags 'containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub'`.
   - `make` targets handle this automatically.
+- `internal/shellcheck/wasm/shellcheck.wasm` is `.gitignored` — build it with `make shellcheck-wasm` (requires Docker).
+  - `make build`/`make test`/`make lint`/`make deadcode` fail fast with a pointer if the wasm is missing.
+  - Bump upstream versions via `_tools/shellcheck-wasm/versions.env` (`SHELLCHECK_VERSION`, `GHC_WASM_META_COMMIT`,
+    `AST_GREP_VERSION`) — that file is the single source of truth shared by the Makefile and the CI composite action.
 
 ## Snapshots (Maintainer Preference)
 

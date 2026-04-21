@@ -20,8 +20,7 @@ jobs:
       GOCOVERDIR: ${{ github.workspace }}/coverage-vscode-smoke
     steps:
       - uses: actions/checkout@v6
-        with:
-          lfs: true
+      - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
