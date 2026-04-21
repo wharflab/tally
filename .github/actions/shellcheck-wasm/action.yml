@@ -1,92 +1,74 @@
 ---
-name: Build or restore shellcheck.wasm
+name: Build shellcheck.wasm
 description: |
-  Restores internal/shellcheck/wasm/shellcheck.wasm from actions/cache keyed on
-  the pinned upstream versions and the build recipe. On cache miss (e.g. after
-  a version bump), invokes `make shellcheck-wasm` which uses Docker to
-  reproduce the artifact, then primes the cache for subsequent runs.
+  Builds internal/shellcheck/wasm/shellcheck.wasm via buildx with the
+  GitHub Actions cache backend (mode=max). Layer caching is handled
+  transparently by BuildKit: on cache hit the final wasm is restored from
+  cached layers in seconds; on miss BuildKit rebuilds from the Dockerfile
+  in _tools/shellcheck-wasm/ and primes the cache for subsequent runs.
 
-  The wasm is no longer checked into the repository; every workflow that needs
-  it (directly or transitively via `go build`/`go test`) must invoke this
-  action before compiling Go code.
-
-  Requires a Linux runner with Docker available (every GitHub-hosted
-  `ubuntu-*` image qualifies). macOS/Windows jobs cannot run this action; use
-  the sibling `download-shellcheck-wasm` action to consume an artifact
-  produced by an earlier Linux job in the same workflow.
+  The wasm is not checked into the repository; every workflow that needs it
+  runs this action in one Linux job to produce a workflow artifact, which
+  downstream Linux/macOS/Windows jobs pull via the sibling
+  `download-shellcheck-wasm` action. The cache-setup step installs a recent
+  upstream BuildKit so the Dockerfile's `ADD <git-url>?ref=...` instructions
+  work against github.com and gitlab.haskell.org — older BuildKit shipped
+  with some Docker Engine releases mishandles the 301 redirect that drops
+  `.git` from the URL.
 inputs:
   artifact-name:
     description: |
-      If set, upload the resulting wasm as a workflow artifact with this name
-      so macOS/Windows jobs in the same workflow can download it via
-      actions/download-artifact.
-    required: false
-    default: ""
-outputs:
-  path:
-    description: Path to the restored or freshly built shellcheck.wasm.
-    value: ${{ steps.locate.outputs.path }}
-  cache-hit:
-    description: |
-      "true" when actions/cache restored an exact hit, "false" otherwise.
-      Useful for test jobs that want to record whether a fresh build ran.
-    value: ${{ steps.restore.outputs.cache-hit }}
+      Name of the workflow artifact to upload the built wasm as. Downstream
+      jobs in the same workflow retrieve it with download-shellcheck-wasm.
+    required: true
 runs:
   using: composite
   steps:
-    - name: Resolve cache key
-      id: key
+    - name: Load pinned versions
+      id: versions
       shell: bash
       run: |
         set -euo pipefail
-        # Everything that can change the wasm bytes: pinned versions, the build
-        # recipe (Dockerfile + Reactor.hs), and every ast-grep rewrite. The
-        # salt prefix lets us bust stale caches intentionally without bumping a
-        # pinned version (e.g. after fixing a non-hermetic build step).
-        hash=$(
-          find \
-            _tools/shellcheck-wasm/versions.env \
-            _tools/shellcheck-wasm/Dockerfile \
-            _tools/shellcheck-wasm/Reactor.hs \
-            _tools/shellcheck-wasm/rewrites \
-            -type f \
-            | sort \
-            | xargs sha256sum \
-            | sha256sum \
-            | awk '{print $1}'
-        )
-        echo "key=shellcheck-wasm-v1-${hash}" >> "$GITHUB_OUTPUT"
-    - name: Restore cached shellcheck.wasm
-      id: restore
-      uses: actions/cache@v5
+        # versions.env is KEY=VALUE lines; re-emit as step outputs with the
+        # `v` prefix stripped from SHELLCHECK_VERSION (the Dockerfile re-adds
+        # it when building the git ref, matching the convention the Makefile
+        # uses via $(patsubst v%,%,$(SHELLCHECK_VERSION))).
+        while IFS='=' read -r key value; do
+          case "$key" in
+            ''|\#*) continue ;;
+          esac
+          if [ "$key" = SHELLCHECK_VERSION ]; then
+            value="${value#v}"
+          fi
+          echo "${key}=${value}" >> "$GITHUB_OUTPUT"
+        done < _tools/shellcheck-wasm/versions.env
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    - name: Build shellcheck.wasm
+      uses: docker/build-push-action@v6
       with:
-        path: internal/shellcheck/wasm/shellcheck.wasm
-        key: ${{ steps.key.outputs.key }}
-    - name: Build shellcheck.wasm (cache miss)
-      if: steps.restore.outputs.cache-hit != 'true'
-      shell: bash
-      run: |
-        set -euo pipefail
-        if ! command -v docker >/dev/null 2>&1; then
-          echo "::error::Docker is required to build shellcheck.wasm; run this action on a Linux runner."
-          exit 1
-        fi
-        make shellcheck-wasm
+        context: _tools/shellcheck-wasm
+        file: _tools/shellcheck-wasm/Dockerfile
+        push: false
+        outputs: type=local,dest=internal/shellcheck/wasm
+        cache-from: type=gha,scope=shellcheck-wasm
+        cache-to: type=gha,mode=max,scope=shellcheck-wasm
+        build-args: |
+          SHELLCHECK_VERSION=${{ steps.versions.outputs.SHELLCHECK_VERSION }}
+          GHC_WASM_META_COMMIT=${{ steps.versions.outputs.GHC_WASM_META_COMMIT }}
+          AST_GREP_VERSION=${{ steps.versions.outputs.AST_GREP_VERSION }}
     - name: Verify artifact
-      id: locate
       shell: bash
       run: |
         set -euo pipefail
         path=internal/shellcheck/wasm/shellcheck.wasm
         if [ ! -s "$path" ]; then
-          echo "::error::shellcheck.wasm missing or empty at $path after restore/build"
+          echo "::error::shellcheck.wasm missing or empty at $path after build"
           exit 1
         fi
         size=$(wc -c <"$path")
-        echo "Restored shellcheck.wasm: ${size} bytes (cache-hit=${{ steps.restore.outputs.cache-hit }})"
-        echo "path=$path" >> "$GITHUB_OUTPUT"
+        echo "Built shellcheck.wasm: ${size} bytes"
     - name: Upload wasm as workflow artifact
-      if: inputs.artifact-name != ''
       uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact-name }}
