@@ -10,6 +10,7 @@ Either use Wget or Curl but not both.
 | Severity | Warning |
 | Category | Best Practice |
 | Default | Enabled |
+| Auto-fix | Yes (`--fix --fix-unsafe`; AI AutoFix fallback) |
 
 ## Description
 
@@ -32,6 +33,90 @@ RUN curl http://bing.com
 FROM debian
 RUN curl http://google.com
 RUN curl http://bing.com
+```
+
+## Auto-fix
+
+The rule rewrites offending commands to the tool already installed (or otherwise preferred) in the stage. Rewriting is **bidirectional**:
+`curl → wget` when `wget` is installed, and `wget → curl` when `curl` is installed. All fixes are **unsafe** (`FixUnsafe`) and require
+`--fix --fix-unsafe`.
+
+Two paths exist:
+
+- **Deterministic rewrite.** When the offending command is a simple HTTP `GET` that follows redirects, fails on HTTP status, and has a literal URL
+  and plain sink (explicit `-o`/`-O` file, stdout pipe, or remote-name), tally lowers it locally through a shared `HTTPTransferOperation` IR and emits
+  a concrete replacement edit.
+- **AI AutoFix fallback.** When the command falls outside that narrow liftable subset (for example `curl` without `-L`, without `-f`, or with shell
+  interpolation, command substitution, or multi-line continuations), tally emits an async `SuggestedFix` backed by the AI AutoFix resolver. Applying
+  this fallback additionally requires an ACP-capable agent configured in the top-level `[ai]` section.
+
+The rule refuses to attach a fix when the preferred tool already appears in the same `RUN` (for example
+`curl ... || wget ...`).
+
+On Windows stages the replacement is emitted with a `.exe` suffix (`curl.exe`, `wget.exe`); on Linux stages the bare
+tool name is used.
+
+### Deterministic rewrite examples
+
+```dockerfile
+# Before — curl is installed in the stage, so wget is rewritten.
+RUN apt-get update && apt-get install -y curl
+RUN curl -fsSL https://example.com/bootstrap.tgz
+RUN wget https://example.com/file.tgz
+
+# After (with --fix --fix-unsafe)
+RUN apt-get update && apt-get install -y curl
+RUN curl -fsSL https://example.com/bootstrap.tgz
+RUN curl -fL -O https://example.com/file.tgz
+```
+
+```dockerfile
+# Before — wget is installed in the stage, so the piped curl is rewritten.
+RUN apt-get update && apt-get install -y wget
+RUN wget https://example.com/bootstrap.tgz
+RUN curl -fsSL https://example.com/app.tgz | tar -xz -C /opt
+
+# After (with --fix --fix-unsafe)
+RUN apt-get update && apt-get install -y wget
+RUN wget https://example.com/bootstrap.tgz
+RUN wget -nv -O- https://example.com/app.tgz | tar -xz -C /opt
+```
+
+### When the AI AutoFix fallback is used
+
+Examples where deterministic lowering cannot preserve Dockerfile-relevant behavior and the rule falls back to AI AutoFix:
+
+```dockerfile
+# curl without -L: redirect-following semantics cannot be preserved deterministically.
+RUN curl -fsS -o /tmp/file https://example.com/file
+```
+
+```dockerfile
+# curl without -f: fail-on-HTTP-status semantics cannot be preserved deterministically.
+RUN curl -sSL https://example.com/app.tgz | tar -xz -C /opt
+```
+
+## Configuration
+
+### `fix-preference`
+
+- Type: `string`
+- Allowed values: `"auto"`, `"curl"`, `"wget"`
+- Default: `"auto"`
+
+Controls which tool auto-fixes converge on, and therefore which of the two offending tools is reported as the violation.
+
+- `"auto"` (default): infer the target from stage install signals. If only `curl` is installed, `wget` calls are reported and rewritten to `curl`;
+  if only `wget` is installed, `curl` calls are reported and rewritten to `wget`. When both (or neither) are installed, `wget` is preferred.
+- `"curl"`: always report and rewrite `wget` calls to `curl`, regardless of which tool is installed.
+- `"wget"`: always report and rewrite `curl` calls to `wget`, regardless of which tool is installed.
+
+Explicit preferences are useful when the Dockerfile installs both tools (or neither) and you want a project-wide convention. An invalid value falls
+back to `"auto"`.
+
+```toml
+[rules.hadolint.DL4001]
+fix-preference = "curl"
 ```
 
 ## Reference

@@ -75,19 +75,38 @@ func LiftHTTPTransferOperation(cmd shell.CommandInfo) (*HTTPTransferOperation, [
 	return liftHTTPTransferOperation(cmd)
 }
 
+// HTTPTransferLowerOptions tunes how a lifted transfer is serialized.
+type HTTPTransferLowerOptions struct {
+	// WindowsTarget signals that the replacement executes on a Windows container,
+	// so tool names should be emitted with a .exe suffix (curl.exe, wget.exe).
+	WindowsTarget bool
+}
+
 // LowerToTool serializes a lifted transfer into a target tool command when safe.
-func (op *HTTPTransferOperation) LowerToTool(targetTool string) (string, bool) {
+// Additional options may adjust the output for a specific target platform.
+func (op *HTTPTransferOperation) LowerToTool(targetTool string, opts ...HTTPTransferLowerOptions) (string, bool) {
 	if op == nil {
 		return "", false
 	}
+	var lower HTTPTransferLowerOptions
+	if len(opts) > 0 {
+		lower = opts[0]
+	}
 	switch targetTool {
 	case httpTransferToolCurl:
-		return op.lowerToCurl()
+		return op.lowerToCurl(lower)
 	case httpTransferToolWget:
-		return op.lowerToWget()
+		return op.lowerToWget(lower)
 	default:
 		return "", false
 	}
+}
+
+func httpTransferToolBinary(tool string, opts HTTPTransferLowerOptions) string {
+	if opts.WindowsTarget {
+		return tool + ".exe"
+	}
+	return tool
 }
 
 // CommandOperationFact stores one family-normalized view of a command.
@@ -106,7 +125,7 @@ func buildCommandOperationFacts(
 	sm *sourcemap.SourceMap,
 	shellFacts ShellFacts,
 ) []CommandOperationFact {
-	if run == nil || !shellFacts.Variant.SupportsPOSIXShellAST() {
+	if run == nil {
 		return nil
 	}
 
@@ -486,7 +505,7 @@ func commandArgIsLiteral(cmd shell.CommandInfo, index int) bool {
 	return cmd.ArgLiteral[index]
 }
 
-func (op *HTTPTransferOperation) lowerToCurl() (string, bool) {
+func (op *HTTPTransferOperation) lowerToCurl(opts HTTPTransferLowerOptions) (string, bool) {
 	if op == nil || op.Method != http.MethodGet || !op.FollowsRedirects || !op.FailOnHTTPStatus || !isPlainShellLiteralToken(op.URL) {
 		return "", false
 	}
@@ -499,7 +518,7 @@ func (op *HTTPTransferOperation) lowerToCurl() (string, bool) {
 		flags = "-fsSL"
 	}
 
-	parts := []string{httpTransferToolCurl, flags}
+	parts := []string{httpTransferToolBinary(httpTransferToolCurl, opts), flags}
 	switch op.SinkKind {
 	case HTTPTransferSinkFile:
 		parts = append(parts, "-o", op.OutputPath)
@@ -514,7 +533,7 @@ func (op *HTTPTransferOperation) lowerToCurl() (string, bool) {
 	return strings.Join(parts, " "), true
 }
 
-func (op *HTTPTransferOperation) lowerToWget() (string, bool) {
+func (op *HTTPTransferOperation) lowerToWget(opts HTTPTransferLowerOptions) (string, bool) {
 	if op == nil || op.Method != http.MethodGet || !op.FollowsRedirects || !op.FailOnHTTPStatus || !isPlainShellLiteralToken(op.URL) {
 		return "", false
 	}
@@ -522,7 +541,7 @@ func (op *HTTPTransferOperation) lowerToWget() (string, bool) {
 		return "", false
 	}
 
-	parts := []string{httpTransferToolWget}
+	parts := []string{httpTransferToolBinary(httpTransferToolWget, opts)}
 	switch {
 	case op.Quiet && op.ShowErrors:
 		parts = append(parts, "-nv")

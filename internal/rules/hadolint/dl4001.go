@@ -8,22 +8,63 @@ import (
 	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/rules/configutil"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 )
-
-// DL4001Rule implements the DL4001 linting rule.
-type DL4001Rule struct{}
 
 const (
 	dl4001ToolCurl     = "curl"
 	dl4001ToolWget     = "wget"
 	dl4001ValueUnknown = "unknown"
+
+	// DL4001FixPreferenceAuto lets tally pick the fix direction from stage install signals.
+	DL4001FixPreferenceAuto = "auto"
+	// DL4001FixPreferenceCurl forces rewrites to curl regardless of which tool is installed.
+	DL4001FixPreferenceCurl = dl4001ToolCurl
+	// DL4001FixPreferenceWget forces rewrites to wget regardless of which tool is installed.
+	DL4001FixPreferenceWget = dl4001ToolWget
 )
+
+// DL4001Config is the configuration for the DL4001 rule.
+type DL4001Config struct {
+	// FixPreference selects which tool auto-fixes should converge on.
+	// Values: "auto" (default; infer from stage install signals), "curl", "wget".
+	FixPreference string `json:"fix-preference,omitempty" koanf:"fix-preference"`
+}
+
+// DefaultDL4001Config returns the default configuration.
+func DefaultDL4001Config() DL4001Config {
+	return DL4001Config{FixPreference: DL4001FixPreferenceAuto}
+}
+
+// DL4001Rule implements the DL4001 linting rule.
+type DL4001Rule struct {
+	schema map[string]any
+}
 
 // NewDL4001Rule creates a new DL4001 rule instance.
 func NewDL4001Rule() *DL4001Rule {
-	return &DL4001Rule{}
+	schema, err := configutil.RuleSchema(rules.HadolintRulePrefix + "DL4001")
+	if err != nil {
+		panic(err)
+	}
+	return &DL4001Rule{schema: schema}
+}
+
+// Schema returns the JSON Schema for this rule's configuration.
+func (r *DL4001Rule) Schema() map[string]any {
+	return r.schema
+}
+
+// DefaultConfig returns the default configuration for this rule.
+func (r *DL4001Rule) DefaultConfig() any {
+	return DefaultDL4001Config()
+}
+
+// ValidateConfig validates the configuration against the rule's JSON Schema.
+func (r *DL4001Rule) ValidateConfig(config any) error {
+	return configutil.ValidateRuleOptions(r.Metadata().Code, config)
 }
 
 // Metadata returns the rule metadata.
@@ -85,18 +126,29 @@ func (m usageMapDL4001) allOccurrences() []toolOccurrenceDL4001 {
 // Check runs the DL4001 rule.
 // It warns when both wget and curl are used in different RUN instructions.
 func (r *DL4001Rule) Check(input rules.LintInput) []rules.Violation {
+	cfg := r.resolveConfig(input.Config)
 	wgetUsage, curlUsage := r.collectToolUsage(input)
 
 	if len(wgetUsage) == 0 || len(curlUsage) == 0 {
 		return nil
 	}
 
-	violations := r.checkStageConflicts(input, wgetUsage, curlUsage)
+	violations := r.checkStageConflicts(input, wgetUsage, curlUsage, cfg)
 	if len(violations) > 0 {
 		return violations
 	}
 
-	return r.checkCrossStageConflicts(input, wgetUsage, curlUsage)
+	return r.checkCrossStageConflicts(input, wgetUsage, curlUsage, cfg)
+}
+
+func (r *DL4001Rule) resolveConfig(config any) DL4001Config {
+	cfg := configutil.Coerce(config, DefaultDL4001Config())
+	switch cfg.FixPreference {
+	case DL4001FixPreferenceCurl, DL4001FixPreferenceWget, DL4001FixPreferenceAuto:
+		return cfg
+	default:
+		return DefaultDL4001Config()
+	}
 }
 
 // collectToolUsage scans all stages and collects wget/curl usage.
@@ -174,7 +226,11 @@ func (r *DL4001Rule) recordToolUsage(stageIdx int, loc rules.Location, runFacts 
 }
 
 // checkStageConflicts checks for wget/curl conflicts within individual stages.
-func (r *DL4001Rule) checkStageConflicts(input rules.LintInput, wgetUsage, curlUsage usageMapDL4001) []rules.Violation {
+func (r *DL4001Rule) checkStageConflicts(
+	input rules.LintInput,
+	wgetUsage, curlUsage usageMapDL4001,
+	cfg DL4001Config,
+) []rules.Violation {
 	var violations []rules.Violation
 
 	for stageIdx := range input.Stages {
@@ -186,7 +242,7 @@ func (r *DL4001Rule) checkStageConflicts(input rules.LintInput, wgetUsage, curlU
 		}
 
 		msg := r.generateMessage(wget.installed, curl.installed)
-		occurrences, preferredTool := r.selectOccurrencesToReport(wget, curl)
+		occurrences, preferredTool := r.selectOccurrencesToReport(wget, curl, cfg)
 
 		for _, occurrence := range occurrences {
 			violations = append(violations, r.createViolation(input, occurrence, preferredTool, msg))
@@ -197,17 +253,20 @@ func (r *DL4001Rule) checkStageConflicts(input rules.LintInput, wgetUsage, curlU
 }
 
 // checkCrossStageConflicts checks for wget/curl conflicts across stages.
-func (r *DL4001Rule) checkCrossStageConflicts(input rules.LintInput, wgetUsage, curlUsage usageMapDL4001) []rules.Violation {
+func (r *DL4001Rule) checkCrossStageConflicts(
+	input rules.LintInput,
+	wgetUsage, curlUsage usageMapDL4001,
+	cfg DL4001Config,
+) []rules.Violation {
 	anyWgetInstalled := wgetUsage.anyInstalled()
 	anyCurlInstalled := curlUsage.anyInstalled()
 
 	msg := r.generateMessage(anyWgetInstalled, anyCurlInstalled)
 
+	preferredTool := crossStagePreferredTool(cfg, anyWgetInstalled, anyCurlInstalled)
 	var occurrences []toolOccurrenceDL4001
-	preferredTool := dl4001ToolWget
-	if anyCurlInstalled && !anyWgetInstalled {
+	if preferredTool == dl4001ToolCurl {
 		occurrences = wgetUsage.allOccurrences()
-		preferredTool = dl4001ToolCurl
 	} else {
 		occurrences = curlUsage.allOccurrences()
 	}
@@ -220,8 +279,33 @@ func (r *DL4001Rule) checkCrossStageConflicts(input rules.LintInput, wgetUsage, 
 	return violations
 }
 
+// crossStagePreferredTool resolves the fix direction across stages, letting an explicit
+// fix-preference override install-state inference.
+func crossStagePreferredTool(cfg DL4001Config, anyWgetInstalled, anyCurlInstalled bool) string {
+	switch cfg.FixPreference {
+	case DL4001FixPreferenceCurl:
+		return dl4001ToolCurl
+	case DL4001FixPreferenceWget:
+		return dl4001ToolWget
+	}
+	if anyCurlInstalled && !anyWgetInstalled {
+		return dl4001ToolCurl
+	}
+	return dl4001ToolWget
+}
+
 // selectOccurrencesToReport chooses which tool's occurrences to report as violations.
-func (r *DL4001Rule) selectOccurrencesToReport(wget, curl *toolUsageDL4001) ([]toolOccurrenceDL4001, string) {
+// An explicit fix-preference forces the direction regardless of install state.
+func (r *DL4001Rule) selectOccurrencesToReport(
+	wget, curl *toolUsageDL4001,
+	cfg DL4001Config,
+) ([]toolOccurrenceDL4001, string) {
+	switch cfg.FixPreference {
+	case DL4001FixPreferenceCurl:
+		return wget.occurrences, dl4001ToolCurl
+	case DL4001FixPreferenceWget:
+		return curl.occurrences, dl4001ToolWget
+	}
 	if curl.installed && !wget.installed {
 		return wget.occurrences, dl4001ToolCurl
 	}
@@ -314,16 +398,20 @@ func (r *DL4001Rule) buildSuggestedFix(
 	occurrence toolOccurrenceDL4001,
 	preferredTool string,
 ) *rules.SuggestedFix {
-	if fix := r.buildDeterministicSuggestedFix(input.File, occurrence, preferredTool); fix != nil {
+	lowerOpts := facts.HTTPTransferLowerOptions{
+		WindowsTarget: dl4001StageIsWindows(input.Semantic, occurrence.stageIdx),
+	}
+	if fix := r.buildDeterministicSuggestedFix(input.File, occurrence, preferredTool, lowerOpts); fix != nil {
 		return fix
 	}
-	return r.buildAISuggestedFix(input, occurrence, preferredTool)
+	return r.buildAISuggestedFix(input, occurrence, preferredTool, lowerOpts)
 }
 
 func (r *DL4001Rule) buildDeterministicSuggestedFix(
 	file string,
 	occurrence toolOccurrenceDL4001,
 	preferredTool string,
+	lowerOpts facts.HTTPTransferLowerOptions,
 ) *rules.SuggestedFix {
 	if file == "" || occurrence.runFacts == nil {
 		return nil
@@ -354,7 +442,7 @@ func (r *DL4001Rule) buildDeterministicSuggestedFix(
 			return nil
 		}
 
-		replacement, ok := fact.HTTPTransfer.LowerToTool(preferredTool)
+		replacement, ok := fact.HTTPTransfer.LowerToTool(preferredTool, lowerOpts)
 		if !ok {
 			return nil
 		}
@@ -382,10 +470,22 @@ func (r *DL4001Rule) buildDeterministicSuggestedFix(
 	}
 }
 
+func dl4001StageIsWindows(sem *semantic.Model, stageIdx int) bool {
+	if sem == nil {
+		return false
+	}
+	info := sem.StageInfo(stageIdx)
+	if info == nil {
+		return false
+	}
+	return info.IsWindows()
+}
+
 func (r *DL4001Rule) buildAISuggestedFix(
 	input rules.LintInput,
 	occurrence toolOccurrenceDL4001,
 	preferredTool string,
+	lowerOpts facts.HTTPTransferLowerOptions,
 ) *rules.SuggestedFix {
 	if input.File == "" || occurrence.runFacts == nil {
 		return nil
@@ -435,7 +535,7 @@ func (r *DL4001Rule) buildAISuggestedFix(
 		blockers = append(blockers, blocker.Reason)
 	}
 	if targetFact.HTTPTransfer != nil {
-		if _, ok := targetFact.HTTPTransfer.LowerToTool(preferredTool); !ok {
+		if _, ok := targetFact.HTTPTransfer.LowerToTool(preferredTool, lowerOpts); !ok {
 			blockers = append(blockers, "deterministic lowering is unavailable for this command")
 		}
 	}

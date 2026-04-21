@@ -450,6 +450,62 @@ func TestFindCommands_Cmd(t *testing.T) {
 	}
 }
 
+func TestFindCommands_Cmd_PopulatesExeSuffixAndCommandRange(t *testing.T) {
+	t.Parallel()
+
+	script := `curl.exe -fsSL https://example.com/app.tgz -o C:\tmp\app.tgz`
+	cmds := FindCommands(script, VariantCmd, "curl")
+	if len(cmds) != 1 {
+		t.Fatalf("expected 1 command, got %d", len(cmds))
+	}
+	cmd := cmds[0]
+	if !cmd.HasExeSuffix {
+		t.Fatal("expected HasExeSuffix=true for curl.exe invocation")
+	}
+	if !cmd.HasCommandRange {
+		t.Fatal("expected HasCommandRange=true for cmd parser")
+	}
+	if cmd.CommandEndCol == 0 {
+		t.Fatalf("expected non-zero CommandEndCol, got %d", cmd.CommandEndCol)
+	}
+
+	bare := FindCommands(`curl -fsSL https://example.com`, VariantCmd, "curl")
+	if len(bare) != 1 {
+		t.Fatalf("bare curl: expected 1 command, got %d", len(bare))
+	}
+	if bare[0].HasExeSuffix {
+		t.Fatal("expected HasExeSuffix=false for bare curl")
+	}
+}
+
+func TestFindCommands_PowerShell_PopulatesExeSuffixAndCommandRange(t *testing.T) {
+	t.Parallel()
+
+	script := `wget.exe https://example.com/file.tgz`
+	cmds := FindCommands(script, VariantPowerShell, "wget")
+	if len(cmds) != 1 {
+		t.Fatalf("expected 1 command, got %d", len(cmds))
+	}
+	cmd := cmds[0]
+	if !cmd.HasExeSuffix {
+		t.Fatal("expected HasExeSuffix=true for wget.exe invocation")
+	}
+	if !cmd.HasCommandRange {
+		t.Fatal("expected HasCommandRange=true for PowerShell parser")
+	}
+	if cmd.CommandEndCol == 0 {
+		t.Fatalf("expected non-zero CommandEndCol, got %d", cmd.CommandEndCol)
+	}
+
+	bare := FindCommands(`curl -fL https://example.com`, VariantPowerShell, "curl")
+	if len(bare) != 1 {
+		t.Fatalf("bare curl: expected 1 command, got %d", len(bare))
+	}
+	if bare[0].HasExeSuffix {
+		t.Fatal("expected HasExeSuffix=false for bare curl")
+	}
+}
+
 func TestFindCommands_Cmd_ArgLiteralTracksVariableSyntax(t *testing.T) {
 	t.Parallel()
 

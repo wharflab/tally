@@ -19,7 +19,15 @@ type CommandInfo struct {
 	Variant Variant
 
 	// Name is the base command name (e.g., "apt-get", "yum").
+	// For Windows shells the name is normalized lowercase without a trailing ".exe";
+	// callers that need to distinguish an explicit .exe invocation from a shell alias
+	// (e.g., PowerShell's curl/wget aliases for Invoke-WebRequest) should use HasExeSuffix.
 	Name string
+
+	// HasExeSuffix is true when the source invocation ended with a ".exe" suffix.
+	// This is preserved across normalization and is used on PowerShell to distinguish
+	// the GNU binary (curl.exe) from the built-in alias (curl -> Invoke-WebRequest).
+	HasExeSuffix bool
 
 	// Subcommand is the first non-flag argument (e.g., "install" in "apt-get install").
 	Subcommand string
@@ -48,6 +56,16 @@ type CommandInfo struct {
 	SubcommandLine     int // 0-based line within the script
 	SubcommandStartCol int // 0-based column where subcommand starts
 	SubcommandEndCol   int // 0-based column where subcommand ends
+}
+
+// hasExeSuffix reports whether a raw command token ends with an ASCII ".exe" suffix.
+// It ignores surrounding whitespace and quotes so it works for tree-sitter literals too.
+func hasExeSuffix(rawName string) bool {
+	name := strings.TrimSpace(DropQuotes(rawName))
+	if len(name) < len(".exe") {
+		return false
+	}
+	return strings.EqualFold(name[len(name)-len(".exe"):], ".exe")
 }
 
 // CommandSourceKind describes how a command was discovered in the shell AST.

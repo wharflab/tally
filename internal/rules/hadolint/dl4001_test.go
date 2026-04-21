@@ -356,3 +356,207 @@ RUN (curl -Ls https://example.com/install.sh || wget -qO- https://example.com/in
 		})
 	}
 }
+
+func TestDL4001Rule_FixPreference(t *testing.T) {
+	t.Parallel()
+
+	const dockerfileCurlInstalled = `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl
+RUN curl -fsSL https://example.com/bootstrap.tgz
+RUN wget https://example.com/file.tgz
+`
+
+	const dockerfileWgetInstalled = `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y wget
+RUN wget https://example.com/bootstrap.tgz
+RUN curl -fsSL https://example.com/app.tgz
+`
+
+	tests := []struct {
+		name        string
+		dockerfile  string
+		config      any
+		wantNewText string
+		wantLoc     rules.Location
+	}{
+		{
+			name:        "auto infers curl when curl is installed",
+			dockerfile:  dockerfileCurlInstalled,
+			config:      DL4001Config{FixPreference: DL4001FixPreferenceAuto},
+			wantNewText: "curl -fL -O https://example.com/file.tgz",
+			wantLoc: rules.NewRangeLocation(
+				"Dockerfile", 4, len("RUN "),
+				4, len("RUN wget https://example.com/file.tgz"),
+			),
+		},
+		{
+			name:        "explicit curl preference overrides wget install signal",
+			dockerfile:  dockerfileWgetInstalled,
+			config:      DL4001Config{FixPreference: DL4001FixPreferenceCurl},
+			wantNewText: "curl -fL -O https://example.com/bootstrap.tgz",
+			wantLoc: rules.NewRangeLocation(
+				"Dockerfile", 3, len("RUN "),
+				3, len("RUN wget https://example.com/bootstrap.tgz"),
+			),
+		},
+		{
+			name:        "explicit wget preference overrides curl install signal",
+			dockerfile:  dockerfileCurlInstalled,
+			config:      DL4001Config{FixPreference: DL4001FixPreferenceWget},
+			wantNewText: "wget -nv -O- https://example.com/bootstrap.tgz",
+			wantLoc: rules.NewRangeLocation(
+				"Dockerfile", 3, len("RUN "),
+				3, len("RUN curl -fsSL https://example.com/bootstrap.tgz"),
+			),
+		},
+		{
+			name:        "map-form config routed through schema coercion",
+			dockerfile:  dockerfileCurlInstalled,
+			config:      map[string]any{"fix-preference": "wget"},
+			wantNewText: "wget -nv -O- https://example.com/bootstrap.tgz",
+			wantLoc: rules.NewRangeLocation(
+				"Dockerfile", 3, len("RUN "),
+				3, len("RUN curl -fsSL https://example.com/bootstrap.tgz"),
+			),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInputWithConfig(t, "Dockerfile", tt.dockerfile, tt.config)
+
+			violations := NewDL4001Rule().Check(input)
+			if len(violations) != 1 {
+				t.Fatalf("got %d violations, want 1", len(violations))
+			}
+			v := violations[0]
+			if v.SuggestedFix == nil {
+				t.Fatal("expected SuggestedFix")
+			}
+			if v.SuggestedFix.NeedsResolve {
+				t.Fatalf("NeedsResolve = true, want deterministic fix")
+			}
+			if len(v.SuggestedFix.Edits) != 1 {
+				t.Fatalf("expected 1 edit, got %d", len(v.SuggestedFix.Edits))
+			}
+			edit := v.SuggestedFix.Edits[0]
+			if edit.NewText != tt.wantNewText {
+				t.Fatalf("edit NewText = %q, want %q", edit.NewText, tt.wantNewText)
+			}
+			if edit.Location != tt.wantLoc {
+				t.Fatalf("edit Location = %#v, want %#v", edit.Location, tt.wantLoc)
+			}
+		})
+	}
+}
+
+func TestDL4001Rule_WindowsLoweringAddsExeSuffix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		dockerfile  string
+		wantNewText string
+		wantLoc     rules.Location
+	}{
+		{
+			name: "pwsh on windows stage lowers to wget.exe",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["pwsh", "-Command"]
+RUN curl -fL -o /tmp/boot.tgz https://example.com/bootstrap.tgz
+RUN wget.exe https://example.com/file.tgz
+`,
+			wantNewText: "wget.exe -O /tmp/boot.tgz https://example.com/bootstrap.tgz",
+			wantLoc: rules.NewRangeLocation(
+				"Dockerfile", 3, len("RUN "),
+				3, len("RUN curl -fL -o /tmp/boot.tgz https://example.com/bootstrap.tgz"),
+			),
+		},
+		{
+			name: "cmd on windows stage lowers to curl.exe",
+			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["cmd", "/S", "/C"]
+RUN wget.exe https://example.com/bootstrap.tgz
+RUN curl.exe -fL -O https://example.com/file.tgz
+`,
+			// With explicit cmd shell and neither tool declared installed, the rule prefers wget
+			// across stages — but here we test the same-stage path: the offending tool is curl.
+			wantNewText: "wget.exe https://example.com/file.tgz",
+			wantLoc: rules.NewRangeLocation(
+				"Dockerfile", 4, len("RUN "),
+				4, len("RUN curl.exe -fL -O https://example.com/file.tgz"),
+			),
+		},
+		{
+			name: "linux stage keeps bare tool name",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get install -y curl
+RUN curl -fsSL https://example.com/bootstrap.tgz
+RUN wget https://example.com/file.tgz
+`,
+			wantNewText: "curl -fL -O https://example.com/file.tgz",
+			wantLoc: rules.NewRangeLocation(
+				"Dockerfile", 4, len("RUN "),
+				4, len("RUN wget https://example.com/file.tgz"),
+			),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
+
+			violations := NewDL4001Rule().Check(input)
+			if len(violations) != 1 {
+				t.Fatalf("got %d violations, want 1", len(violations))
+			}
+			v := violations[0]
+			if v.SuggestedFix == nil {
+				t.Fatal("expected SuggestedFix")
+			}
+			if v.SuggestedFix.NeedsResolve {
+				t.Fatalf("NeedsResolve = true, want deterministic fix")
+			}
+			if len(v.SuggestedFix.Edits) != 1 {
+				t.Fatalf("expected 1 edit, got %d", len(v.SuggestedFix.Edits))
+			}
+			edit := v.SuggestedFix.Edits[0]
+			if edit.NewText != tt.wantNewText {
+				t.Fatalf("edit NewText = %q, want %q", edit.NewText, tt.wantNewText)
+			}
+			if edit.Location != tt.wantLoc {
+				t.Fatalf("edit Location = %#v, want %#v", edit.Location, tt.wantLoc)
+			}
+		})
+	}
+}
+
+func TestDL4001Rule_FixPreferenceInvalidFallsBackToAuto(t *testing.T) {
+	t.Parallel()
+
+	dockerfile := `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl
+RUN curl -fsSL https://example.com/bootstrap.tgz
+RUN wget https://example.com/file.tgz
+`
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", dockerfile, map[string]any{
+		"fix-preference": "nope",
+	})
+
+	violations := NewDL4001Rule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	v := violations[0]
+	if v.SuggestedFix == nil || v.SuggestedFix.NeedsResolve {
+		t.Fatalf("expected deterministic SuggestedFix, got %+v", v.SuggestedFix)
+	}
+	if len(v.SuggestedFix.Edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(v.SuggestedFix.Edits))
+	}
+	if got := v.SuggestedFix.Edits[0].NewText; got != "curl -fL -O https://example.com/file.tgz" {
+		t.Fatalf("edit NewText = %q, want auto-inferred curl rewrite", got)
+	}
+}
