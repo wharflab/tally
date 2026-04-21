@@ -463,9 +463,10 @@ RUN curl -fsSL https://example.com/app.tgz
 			if v.SuggestedFix.NeedsResolve {
 				t.Fatalf("NeedsResolve = true, want deterministic fix")
 			}
-			if len(v.SuggestedFix.Edits) != 1 {
-				t.Fatalf("expected 1 edit, got %d", len(v.SuggestedFix.Edits))
+			if len(v.SuggestedFix.Edits) < 1 {
+				t.Fatalf("expected at least 1 edit, got %d", len(v.SuggestedFix.Edits))
 			}
+			// The rewrite edit is always the first; install-removal edits (if any) follow.
 			edit := v.SuggestedFix.Edits[0]
 			if edit.NewText != tt.wantNewText {
 				t.Fatalf("edit NewText = %q, want %q", edit.NewText, tt.wantNewText)
@@ -590,6 +591,163 @@ RUN wget https://example.com/file.tgz
 	// rewrite the installed curl usage.
 	if got := v.SuggestedFix.Edits[0].NewText; got != "wget -nv -O- https://example.com/bootstrap.tgz" {
 		t.Fatalf("edit NewText = %q, want auto-inferred wget rewrite", got)
+	}
+}
+
+func TestDL4001Rule_InstallRemoval(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		dockerfile  string
+		wantApplied string
+	}{
+		{
+			// Multi-package install: the non-preferred tool is dropped from the install list
+			// and every invocation is rewritten to the preferred tool. Both tools must be
+			// invoked somewhere for DL4001 to fire.
+			name: "multi-package install drops non-preferred tool",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl wget
+RUN curl https://example.com/bootstrap.tgz
+RUN wget https://example.com/file.tgz
+`,
+			wantApplied: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl
+RUN curl https://example.com/bootstrap.tgz
+RUN curl -fL -O https://example.com/file.tgz
+`,
+		},
+		{
+			// Version-pinned package: strip =version before matching so "wget=1.21" still
+			// gets identified as the wget package.
+			name: "version-pinned package is recognized for removal",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl=7.88.1-10 wget=1.21.3-1ubuntu1
+RUN curl https://example.com/bootstrap.tgz
+RUN wget https://example.com/file.tgz
+`,
+			wantApplied: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl=7.88.1-10
+RUN curl https://example.com/bootstrap.tgz
+RUN curl -fL -O https://example.com/file.tgz
+`,
+		},
+		{
+			// Single-package install: MVP skips removal to avoid producing a syntactically
+			// broken "apt-get install -y" line. Only the invocation is rewritten.
+			name: "single-package install is left alone",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get install -y wget
+RUN curl https://example.com/bootstrap.tgz
+RUN wget https://example.com/file.tgz
+`,
+			wantApplied: `FROM ubuntu:22.04
+RUN apt-get install -y wget
+RUN curl https://example.com/bootstrap.tgz
+RUN curl -fL -O https://example.com/file.tgz
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
+			violations := NewDL4001Rule().Check(input)
+			if len(violations) == 0 {
+				t.Fatal("expected at least one violation")
+			}
+
+			var edits []rules.TextEdit
+			for _, v := range violations {
+				if v.SuggestedFix == nil {
+					continue
+				}
+				edits = append(edits, v.SuggestedFix.Edits...)
+			}
+			got := applyEditsInReverse(tt.dockerfile, edits)
+			if got != tt.wantApplied {
+				t.Fatalf("applied diff:\n--- want\n%s\n--- got\n%s", tt.wantApplied, got)
+			}
+		})
+	}
+}
+
+// applyEditsInReverse applies a slice of TextEdits to src by replaying them in
+// descending source order so earlier offsets are not invalidated by later deletes.
+// This is a test helper only; the production fix pipeline has its own applier.
+func applyEditsInReverse(src string, edits []rules.TextEdit) string {
+	lines := strings.Split(src, "\n")
+	sorted := make([]rules.TextEdit, len(edits))
+	copy(sorted, edits)
+	for i := range sorted {
+		for j := i + 1; j < len(sorted); j++ {
+			a, b := sorted[i].Location, sorted[j].Location
+			if b.Start.Line > a.Start.Line ||
+				(b.Start.Line == a.Start.Line && b.Start.Column > a.Start.Column) {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+	for _, e := range sorted {
+		startLine := e.Location.Start.Line - 1
+		endLine := e.Location.End.Line - 1
+		startCol := e.Location.Start.Column
+		endCol := e.Location.End.Column
+		if startLine < 0 || startLine >= len(lines) {
+			continue
+		}
+		if startLine == endLine {
+			line := lines[startLine]
+			if endCol > len(line) {
+				endCol = len(line)
+			}
+			lines[startLine] = line[:startCol] + e.NewText + line[endCol:]
+		} else {
+			before := lines[startLine][:startCol]
+			after := lines[endLine][endCol:]
+			merged := before + e.NewText + after
+			lines = append(lines[:startLine], append([]string{merged}, lines[endLine+1:]...)...)
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+func TestDL4001Rule_InstallRemovalHintsACPFallback(t *testing.T) {
+	t.Parallel()
+
+	// curl -fsS omits -L, so the deterministic path can't lower it to wget and
+	// the rule emits an ACP fallback. The fallback should still carry a hint to
+	// drop the source tool from the install so the agent can rewrite holistically.
+	dockerfile := `FROM ubuntu:22.04
+RUN apt-get install -y curl wget
+RUN wget -q https://example.com/bootstrap.tgz
+RUN curl -fsS -o /tmp/file https://example.com/file
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", dockerfile)
+	violations := NewDL4001Rule().Check(input)
+	if len(violations) == 0 {
+		t.Fatal("expected a violation")
+	}
+
+	foundHint := false
+	for _, v := range violations {
+		fix := v.SuggestedFix
+		if fix == nil || !fix.NeedsResolve {
+			continue
+		}
+		req, ok := fix.ResolverData.(*autofixdata.ObjectiveRequest)
+		if !ok || req == nil {
+			continue
+		}
+		if hint, ok := req.Facts["remove-source-tool-install"].(string); ok && hint != "" {
+			foundHint = true
+			break
+		}
+	}
+	if !foundHint {
+		t.Fatal("expected at least one ACP fix to carry remove-source-tool-install hint")
 	}
 }
 

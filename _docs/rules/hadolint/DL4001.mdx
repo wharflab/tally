@@ -64,6 +64,18 @@ The rule refuses to attach a fix when the preferred tool already appears in the 
 
 On Windows stages the replacement is emitted with a `.exe` suffix (`curl.exe`, `wget.exe`); on Linux stages the bare tool name is used.
 
+### Install removal
+
+When the non-preferred tool is rewritten, the rule also removes it from any multi-package install commands in the Dockerfile. This is the point of
+DL4001 — avoiding the installation of the second tool. Removal follows these rules:
+
+- **Multi-package install** (e.g. `apt-get install -y curl wget`): the non-preferred package is deleted surgically, leaving the other packages
+  untouched.
+- **Version-pinned package** (e.g. `wget=1.21.3-1ubuntu1`): the version suffix is recognized so the right token is removed.
+- **Single-package install** (e.g. `RUN apt-get install -y wget` on its own): the removal is skipped for the deterministic path to avoid leaving
+  behind a dangling `apt-get install -y`. The ACP AutoFix fallback still receives a hint to drop the install, so an agent can rewrite the whole RUN
+  holistically when it handles the rewrite.
+
 ### Deterministic rewrite examples
 
 ```dockerfile
@@ -77,6 +89,19 @@ RUN wget https://example.com/file.tgz
 RUN apt-get update && apt-get install -y curl
 RUN wget -nv -O- https://example.com/bootstrap.tgz
 RUN wget https://example.com/file.tgz
+```
+
+```dockerfile
+# Before — both tools are installed and both are used. curl wins the first-seen
+# tie-break, and wget is dropped from the install list so it isn't pulled at all.
+RUN apt-get update && apt-get install -y curl wget
+RUN curl https://example.com/bootstrap.tgz
+RUN wget https://example.com/file.tgz
+
+# After (with --fix --fix-unsafe)
+RUN apt-get update && apt-get install -y curl
+RUN curl https://example.com/bootstrap.tgz
+RUN curl -fL -O https://example.com/file.tgz
 ```
 
 ```dockerfile

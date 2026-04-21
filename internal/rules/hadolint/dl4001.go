@@ -2,6 +2,7 @@ package hadolint
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/wharflab/tally/internal/rules/configutil"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 const (
@@ -135,12 +137,15 @@ func (r *DL4001Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	violations := r.checkStageConflicts(input, wgetUsage, curlUsage, cfg)
-	if len(violations) > 0 {
-		return violations
+	violations, preferredTool := r.checkStageConflicts(input, wgetUsage, curlUsage, cfg)
+	if len(violations) == 0 {
+		violations, preferredTool = r.checkCrossStageConflicts(input, wgetUsage, curlUsage, cfg)
 	}
 
-	return r.checkCrossStageConflicts(input, wgetUsage, curlUsage, cfg)
+	if preferredTool != "" {
+		attachInstallRemoval(input, violations, preferredTool)
+	}
+	return violations
 }
 
 func (r *DL4001Rule) resolveConfig(config any) DL4001Config {
@@ -232,12 +237,16 @@ func (r *DL4001Rule) recordToolUsage(stageIdx int, loc rules.Location, runFacts 
 }
 
 // checkStageConflicts checks for wget/curl conflicts within individual stages.
+// Returns the violations and the preferred tool (empty if no conflict was found).
+// Same-stage conflicts always pick the same preferred tool across stages if they all agree;
+// otherwise the first stage's decision wins for install-removal purposes.
 func (r *DL4001Rule) checkStageConflicts(
 	input rules.LintInput,
 	wgetUsage, curlUsage usageMapDL4001,
 	cfg DL4001Config,
-) []rules.Violation {
+) ([]rules.Violation, string) {
 	var violations []rules.Violation
+	preferredTool := ""
 
 	for stageIdx := range input.Stages {
 		wget := wgetUsage[stageIdx]
@@ -248,15 +257,18 @@ func (r *DL4001Rule) checkStageConflicts(
 		}
 
 		msg := r.generateMessage(wget.installed, curl.installed)
-		preferredTool := preferredToolForConflict(cfg, wget.occurrences, curl.occurrences)
-		occurrences := nonPreferredOccurrences(preferredTool, wget, curl)
+		stagePreferred := preferredToolForConflict(cfg, wget.occurrences, curl.occurrences)
+		if preferredTool == "" {
+			preferredTool = stagePreferred
+		}
+		occurrences := nonPreferredOccurrences(stagePreferred, wget, curl)
 
 		for _, occurrence := range occurrences {
-			violations = append(violations, r.createViolation(input, occurrence, preferredTool, msg))
+			violations = append(violations, r.createViolation(input, occurrence, stagePreferred, msg))
 		}
 	}
 
-	return violations
+	return violations, preferredTool
 }
 
 // checkCrossStageConflicts checks for wget/curl conflicts across stages.
@@ -264,7 +276,7 @@ func (r *DL4001Rule) checkCrossStageConflicts(
 	input rules.LintInput,
 	wgetUsage, curlUsage usageMapDL4001,
 	cfg DL4001Config,
-) []rules.Violation {
+) ([]rules.Violation, string) {
 	anyWgetInstalled := wgetUsage.anyInstalled()
 	anyCurlInstalled := curlUsage.anyInstalled()
 
@@ -286,7 +298,7 @@ func (r *DL4001Rule) checkCrossStageConflicts(
 		violations = append(violations, r.createViolation(input, occurrence, preferredTool, msg))
 	}
 
-	return violations
+	return violations, preferredTool
 }
 
 // preferredToolForConflict returns the tool that should win an auto-mode tie-break,
@@ -668,6 +680,169 @@ func dl4001ShellVariant(variant shell.Variant) string {
 	default:
 		return dl4001ValueUnknown
 	}
+}
+
+// attachInstallRemoval augments the fix for the first deterministic violation with
+// edits that drop the non-preferred tool (sourceTool) from any install commands in
+// the Dockerfile. This keeps DL4001 true to its intent: "avoid installing the second
+// tool." For ACP-resolved fallback fixes, the removal hint is carried in the
+// objective facts so the agent can include it in its rewrite.
+//
+// Removal is only attempted when the install has at least two packages. Single-package
+// installs would leave behind a dangling "apt-get install -y" shell command; dropping
+// the whole install subcommand (or the whole RUN) is reserved for the ACP path.
+func attachInstallRemoval(input rules.LintInput, violations []rules.Violation, preferredTool string) {
+	if len(violations) == 0 || input.Facts == nil || input.File == "" {
+		return
+	}
+
+	sourceTool := dl4001ToolCurl
+	if preferredTool == dl4001ToolCurl {
+		sourceTool = dl4001ToolWget
+	}
+
+	sm := input.SourceMap()
+	removalEdits := buildInstallRemovalEdits(input.File, input.Facts, sm, sourceTool)
+
+	// Always hint ACP-resolved fixes so the agent drops the install even when we
+	// couldn't produce deterministic removal edits (e.g. single-package install or
+	// version-pinned package that our normalizer doesn't match).
+	hintACPFixes(violations, sourceTool)
+
+	if len(removalEdits) == 0 {
+		return
+	}
+
+	for i := range violations {
+		fix := violations[i].SuggestedFix
+		if fix == nil || fix.NeedsResolve {
+			continue
+		}
+		fix.Edits = append(fix.Edits, removalEdits...)
+		fix.Description += "; remove " + sourceTool + " from install"
+		return
+	}
+}
+
+func hintACPFixes(violations []rules.Violation, sourceTool string) {
+	for i := range violations {
+		fix := violations[i].SuggestedFix
+		if fix == nil || !fix.NeedsResolve {
+			continue
+		}
+		req, ok := fix.ResolverData.(*autofixdata.ObjectiveRequest)
+		if !ok || req == nil {
+			continue
+		}
+		if req.Facts == nil {
+			req.Facts = map[string]any{}
+		}
+		req.Facts["remove-source-tool-install"] = sourceTool
+	}
+}
+
+func buildInstallRemovalEdits(
+	file string,
+	fileFacts *facts.FileFacts,
+	sm *sourcemap.SourceMap,
+	sourceTool string,
+) []rules.TextEdit {
+	if fileFacts == nil || sm == nil {
+		return nil
+	}
+	var edits []rules.TextEdit
+	for _, stageFacts := range fileFacts.Stages() {
+		for _, runFacts := range stageFacts.Runs {
+			edits = append(edits, installRemovalEditsForRun(file, runFacts, sm, sourceTool)...)
+		}
+	}
+	return edits
+}
+
+func installRemovalEditsForRun(
+	file string,
+	runFacts *facts.RunFacts,
+	sm *sourcemap.SourceMap,
+	sourceTool string,
+) []rules.TextEdit {
+	if runFacts == nil || runFacts.Run == nil || len(runFacts.Run.Location()) == 0 {
+		return nil
+	}
+	if len(runFacts.InstallCommands) == 0 {
+		return nil
+	}
+
+	startLine := runFacts.Run.Location()[0].Start.Line
+	firstLine := sm.Line(startLine - 1)
+	if firstLine == "" {
+		return nil
+	}
+	cmdStartCol := shell.DockerfileRunCommandStartCol(firstLine)
+
+	var edits []rules.TextEdit
+	for _, ic := range runFacts.InstallCommands {
+		if len(ic.Packages) < 2 {
+			// MVP: skip single-package installs; removing the sole package would leave
+			// a broken "install -y" behind. The ACP path can handle this case.
+			continue
+		}
+		for i, pkg := range ic.Packages {
+			if !packageMatchesTool(pkg.Normalized, sourceTool) {
+				continue
+			}
+			editLoc := packageDeleteLocation(file, ic.Packages, i, startLine, cmdStartCol)
+			edits = append(edits, rules.TextEdit{Location: editLoc, NewText: ""})
+		}
+	}
+	return edits
+}
+
+// packageDeleteLocation computes the Dockerfile-level range to delete for the i-th
+// package in an install command. It also deletes one adjacent whitespace byte to
+// keep the surrounding text cleanly spaced:
+//   - for the first package, the trailing space is consumed instead of a leading one
+//   - for other packages, the preceding space is consumed
+func packageDeleteLocation(
+	file string,
+	pkgs []shell.PackageArg,
+	i, startLine, cmdStartCol int,
+) rules.Location {
+	pkg := pkgs[i]
+	docStartLine := startLine + pkg.Line
+	docEndLine := startLine + pkg.Line
+	docStartCol := pkg.StartCol
+	docEndCol := pkg.EndCol
+	if pkg.Line == 0 {
+		docStartCol += cmdStartCol
+		docEndCol += cmdStartCol
+	}
+	if i == 0 && i+1 < len(pkgs) {
+		// Eat the trailing space toward the next package (same line is the common case).
+		next := pkgs[i+1]
+		if next.Line == pkg.Line && next.StartCol > pkg.EndCol {
+			docEndCol = next.StartCol
+			if pkg.Line == 0 {
+				docEndCol += cmdStartCol
+			}
+		}
+	} else if i > 0 && docStartCol > 0 {
+		docStartCol--
+	}
+	return rules.NewRangeLocation(file, docStartLine, docStartCol, docEndLine, docEndCol)
+}
+
+// packageMatchesTool reports whether a normalized package token matches sourceTool,
+// ignoring common version suffixes used by apt/apk/dnf/zypper/yum/choco.
+func packageMatchesTool(normalized, tool string) bool {
+	name := normalized
+	// Strip version suffixes: "wget=1.2", "wget==1.2", "wget@1.2", "wget:1.2-0".
+	for _, sep := range []string{"==", "=", "@", ":"} {
+		if idx := strings.Index(name, sep); idx >= 0 {
+			name = name[:idx]
+			break
+		}
+	}
+	return strings.EqualFold(name, tool)
 }
 
 // init registers the rule with the default registry.
