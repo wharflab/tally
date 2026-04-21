@@ -17,6 +17,9 @@ Either use Wget or Curl but not both.
 Don't install two tools that have the same effect. Using both `wget` and `curl` in a Dockerfile adds unnecessary cruft to the image. Pick one and use
 it consistently.
 
+The rule fires when both tools are present in the Dockerfile in any combination: both invoked, both installed, or one installed while the other is
+invoked. Installing the second tool is itself the offense — even if you never call it, it still inflates the image.
+
 ## Examples
 
 ### Problematic code

@@ -114,6 +114,26 @@ RUN curl localhost
 			// inconsistent across the build. Uncomment wantCount: 0 to match hadolint.
 			wantCount: 1, // We flag curl (stricter than hadolint)
 		},
+		{
+			// Install both, invoke only curl: wget is dead weight and still counts
+			// as "in play" for DL4001 because the point is to avoid the install.
+			name: "both installed, only curl invoked - flags wget install",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y --no-install-recommends wget curl
+RUN curl https://example.com/file
+`,
+			wantCount: 1,
+			wantCode:  rules.HadolintRulePrefix + "DL4001",
+		},
+		{
+			// Both installed, neither invoked: the install alone is the offense.
+			name: "both installed, neither invoked - flags install",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get install -y curl wget
+`,
+			wantCount: 1,
+			wantCode:  rules.HadolintRulePrefix + "DL4001",
+		},
 	}
 
 	for _, tt := range tests {

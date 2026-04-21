@@ -145,7 +145,24 @@ func (r *DL4001Rule) Check(input rules.LintInput) []rules.Violation {
 	if preferredTool != "" {
 		attachInstallRemoval(input, violations, preferredTool)
 	}
+	dropEmptyInstallOnlyFixes(violations)
 	return violations
+}
+
+// dropEmptyInstallOnlyFixes strips SuggestedFixes that turned out to have no
+// edits (install-only violations for stages whose installs we can't surgically
+// remove). The violation itself is still reported so the user is aware the
+// offending install exists; we just don't attach a no-op fix.
+func dropEmptyInstallOnlyFixes(violations []rules.Violation) {
+	for i := range violations {
+		fix := violations[i].SuggestedFix
+		if fix == nil || fix.NeedsResolve {
+			continue
+		}
+		if len(fix.Edits) == 0 {
+			violations[i].SuggestedFix = nil
+		}
+	}
 }
 
 func (r *DL4001Rule) resolveConfig(config any) DL4001Config {
@@ -158,7 +175,11 @@ func (r *DL4001Rule) resolveConfig(config any) DL4001Config {
 	}
 }
 
-// collectToolUsage scans all stages and collects wget/curl usage.
+// collectToolUsage scans all stages and collects wget/curl usage. A stage that
+// installs a tool but never invokes it still counts as "using" it for DL4001's
+// purposes: installing a redundant tool is itself the offense the rule targets.
+// Such stages get an install-anchored occurrence so the violation has a location
+// to report and the fix has a line to anchor install-removal onto.
 func (r *DL4001Rule) collectToolUsage(input rules.LintInput) (usageMapDL4001, usageMapDL4001) {
 	wgetUsage := make(usageMapDL4001)
 	curlUsage := make(usageMapDL4001)
@@ -183,9 +204,65 @@ func (r *DL4001Rule) collectToolUsage(input rules.LintInput) (usageMapDL4001, us
 			}
 			r.recordToolUsage(stageIdx, rules.NewLocationFromRanges(input.File, runFacts.Run.Location()), runFacts, tracking)
 		}
+
+		r.seedInstallOnlyOccurrences(input, stageIdx, stageFacts, tracking)
 	}
 
 	return wgetUsage, curlUsage
+}
+
+// seedInstallOnlyOccurrences makes sure an installed-but-uninvoked tool still
+// appears in the usage map so the rule fires and the fix has an anchor location.
+func (r *DL4001Rule) seedInstallOnlyOccurrences(
+	input rules.LintInput,
+	stageIdx int,
+	stageFacts *facts.StageFacts,
+	t *toolTrackingDL4001,
+) {
+	if stageFacts == nil {
+		return
+	}
+	if t.wgetInstalled && t.wgetUsage[stageIdx] == nil {
+		if loc, runFacts, ok := firstInstallOccurrence(input.File, stageFacts, dl4001ToolWget); ok {
+			t.wgetUsage[stageIdx] = &toolUsageDL4001{installed: true, occurrences: []toolOccurrenceDL4001{{
+				stageIdx:         stageIdx,
+				loc:              loc,
+				runFacts:         runFacts,
+				invocationCount:  0,
+				installedInStage: true,
+			}}}
+		}
+	}
+	if t.curlInstalled && t.curlUsage[stageIdx] == nil {
+		if loc, runFacts, ok := firstInstallOccurrence(input.File, stageFacts, dl4001ToolCurl); ok {
+			t.curlUsage[stageIdx] = &toolUsageDL4001{installed: true, occurrences: []toolOccurrenceDL4001{{
+				stageIdx:         stageIdx,
+				loc:              loc,
+				runFacts:         runFacts,
+				invocationCount:  0,
+				installedInStage: true,
+			}}}
+		}
+	}
+}
+
+// firstInstallOccurrence returns the location of the first install RUN that
+// installs tool and the associated RunFacts. Returns false when no such RUN
+// exists (which is expected when the tool is inherited from the base image).
+func firstInstallOccurrence(file string, stageFacts *facts.StageFacts, tool string) (rules.Location, *facts.RunFacts, bool) {
+	for _, runFacts := range stageFacts.Runs {
+		if runFacts == nil || runFacts.Run == nil {
+			continue
+		}
+		for _, ic := range runFacts.InstallCommands {
+			for _, pkg := range ic.Packages {
+				if packageMatchesTool(pkg.Normalized, tool) {
+					return rules.NewLocationFromRanges(file, runFacts.Run.Location()), runFacts, true
+				}
+			}
+		}
+	}
+	return rules.Location{}, nil, false
 }
 
 // getStageInfo extracts package installation info for a stage.
@@ -463,10 +540,29 @@ func (r *DL4001Rule) buildSuggestedFix(
 	lowerOpts := facts.HTTPTransferLowerOptions{
 		WindowsTarget: dl4001StageIsWindows(input.Semantic, occurrence.stageIdx),
 	}
+	if occurrence.invocationCount == 0 {
+		// Install-only occurrence: no invocation to rewrite. Emit an empty-edit
+		// deterministic fix so attachInstallRemoval can append the install-drop
+		// edits onto it. If no install has a matching removable package (e.g.
+		// single-package install), the fix stays empty and gets pruned by the
+		// final violation pass.
+		return &rules.SuggestedFix{
+			Description: "Drop " + dl4001SourceTool(preferredTool) + " from install",
+			Safety:      rules.FixUnsafe,
+			Edits:       nil,
+		}
+	}
 	if fix := r.buildDeterministicSuggestedFix(input.File, occurrence, preferredTool, lowerOpts); fix != nil {
 		return fix
 	}
 	return r.buildAISuggestedFix(input, occurrence, preferredTool, lowerOpts)
+}
+
+func dl4001SourceTool(preferredTool string) string {
+	if preferredTool == dl4001ToolCurl {
+		return dl4001ToolWget
+	}
+	return dl4001ToolCurl
 }
 
 func (r *DL4001Rule) buildDeterministicSuggestedFix(
@@ -718,8 +814,11 @@ func attachInstallRemoval(input rules.LintInput, violations []rules.Violation, p
 		if fix == nil || fix.NeedsResolve {
 			continue
 		}
+		wasEmpty := len(fix.Edits) == 0
 		fix.Edits = append(fix.Edits, removalEdits...)
-		fix.Description += "; remove " + sourceTool + " from install"
+		if !wasEmpty {
+			fix.Description += "; remove " + sourceTool + " from install"
+		}
 		return
 	}
 }
