@@ -90,13 +90,15 @@ RUN curl https://example.com/file2
 			wantCount: 1,
 		},
 		{
-			name: "multiple curl usages flagged",
+			name: "most-frequent tool wins tiebreak",
 			dockerfile: `FROM ubuntu:22.04
 RUN wget https://example.com/file1
 RUN curl https://example.com/file2
 RUN curl https://example.com/file3
 `,
-			wantCount: 2, // Both curl usages are flagged
+			// Neither tool is installed explicitly; curl is used twice vs wget once,
+			// so auto mode prefers curl and flags the single wget use.
+			wantCount: 1,
 		},
 		// Tests from hadolint/hadolint test/Hadolint/Rule/DL4001Spec.hs
 		{
@@ -147,17 +149,19 @@ func TestDL4001Rule_Check_SmartMessages(t *testing.T) {
 		wantMsgContains string
 	}{
 		{
-			name: "curl installed, wget used - recommend curl",
+			name: "curl installed, wget used without install - prefer wget (used-without-install wins)",
 			dockerfile: `FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y curl
 RUN curl https://example.com/file1
 RUN wget https://example.com/file2
 `,
+			// wget is used without being installed, so auto mode prefers wget and
+			// flags the curl usage. The message still reflects the install state.
 			wantCount:       1,
 			wantMsgContains: "curl is installed",
 		},
 		{
-			name: "wget installed, curl used - recommend wget",
+			name: "wget installed, curl used without install - prefer curl (used-without-install wins)",
 			dockerfile: `FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y wget
 RUN wget https://example.com/file1
@@ -186,12 +190,14 @@ RUN wget https://example.com/file2
 			wantMsgContains: "both wget and curl are used",
 		},
 		{
-			name: "apk add curl, wget used",
+			name: "apk add curl, wget used without install - prefer wget (used-without-install wins)",
 			dockerfile: `FROM alpine:3.18
 RUN apk add --no-cache curl
 RUN curl https://example.com/file1
 RUN wget https://example.com/file2
 `,
+			// wget is used without install; auto mode prefers wget and flags curl.
+			// Message still reports the install state for user context.
 			wantCount:       1,
 			wantMsgContains: "curl is installed",
 		},
@@ -246,7 +252,9 @@ func TestDL4001Rule_SuggestedFix(t *testing.T) {
 		wantLoc          rules.Location
 	}{
 		{
-			name: "rewrite wget remote file to curl when curl is installed",
+			// curl is explicitly installed; wget is used without install, so auto mode
+			// prefers wget (the used-without-install tool) and rewrites the installed curl.
+			name: "rewrite curl to wget when wget is used without install",
 			dockerfile: `FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y curl
 RUN curl -fsSL https://example.com/bootstrap.tgz
@@ -254,11 +262,19 @@ RUN wget https://example.com/file.tgz
 `,
 			wantFix:          true,
 			wantNeedsResolve: false,
-			wantNewText:      "curl -fL -O https://example.com/file.tgz",
-			wantLoc:          rules.NewRangeLocation("Dockerfile", 4, len("RUN "), 4, len("RUN wget https://example.com/file.tgz")),
+			wantNewText:      "wget -nv -O- https://example.com/bootstrap.tgz",
+			wantLoc: rules.NewRangeLocation(
+				"Dockerfile",
+				3,
+				len("RUN "),
+				3,
+				len("RUN curl -fsSL https://example.com/bootstrap.tgz"),
+			),
 		},
 		{
-			name: "rewrite piped curl stdout to wget stdout when wget is installed",
+			// wget is explicitly installed; curl is used without install, so auto mode
+			// prefers curl and rewrites the installed wget.
+			name: "rewrite wget to curl when curl is used without install",
 			dockerfile: `FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y wget
 RUN wget https://example.com/bootstrap.tgz
@@ -266,14 +282,16 @@ RUN curl -fsSL https://example.com/app.tgz | tar -xz -C /opt
 `,
 			wantFix:          true,
 			wantNeedsResolve: false,
-			wantNewText:      "wget -nv -O- https://example.com/app.tgz",
-			wantLoc:          rules.NewRangeLocation("Dockerfile", 4, len("RUN "), 4, len("RUN curl -fsSL https://example.com/app.tgz")),
+			wantNewText:      "curl -fL -O https://example.com/bootstrap.tgz",
+			wantLoc:          rules.NewRangeLocation("Dockerfile", 3, len("RUN "), 3, len("RUN wget https://example.com/bootstrap.tgz")),
 		},
 		{
+			// Both tools used without install; curl has one invocation, wget has one — tie.
+			// First-seen is wget (line 3) so preferred = wget, curl is flagged.
+			// curl -fsS ... lacks -L and cannot be deterministically lowered to wget, so AI fallback.
 			name: "use ai fallback for curl without redirect-following to wget",
 			dockerfile: `FROM ubuntu:22.04
-RUN apt-get update && apt-get install -y wget
-RUN wget https://example.com/bootstrap.tgz
+RUN wget -q https://example.com/bootstrap.tgz
 RUN curl -fsS -o /tmp/file https://example.com/file
 `,
 			wantFix:          true,
@@ -282,8 +300,7 @@ RUN curl -fsS -o /tmp/file https://example.com/file
 		{
 			name: "use ai fallback for curl without fail-on-http-status to wget",
 			dockerfile: `FROM ubuntu:22.04
-RUN apt-get update && apt-get install -y wget
-RUN wget https://example.com/bootstrap.tgz
+RUN wget -q https://example.com/bootstrap.tgz
 RUN curl -sSL https://example.com/app.tgz | tar -xz -C /opt
 `,
 			wantFix:          true,
@@ -366,8 +383,11 @@ RUN curl -fsSL https://example.com/bootstrap.tgz
 RUN wget https://example.com/file.tgz
 `
 
-	const dockerfileWgetInstalled = `FROM ubuntu:22.04
-RUN apt-get update && apt-get install -y wget
+	// Both tools installed, so auto mode defaults to wget via the first-seen
+	// tiebreak (wget appears first on line 3). Explicit curl/wget preferences
+	// must override that tie-break regardless.
+	const dockerfileBothInstalledWgetFirst = `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl wget
 RUN wget https://example.com/bootstrap.tgz
 RUN curl -fsSL https://example.com/app.tgz
 `
@@ -380,18 +400,21 @@ RUN curl -fsSL https://example.com/app.tgz
 		wantLoc     rules.Location
 	}{
 		{
-			name:        "auto infers curl when curl is installed",
+			// curl is installed but wget is used-without-install, so auto mode prefers wget.
+			name:        "auto prefers the used-without-install tool",
 			dockerfile:  dockerfileCurlInstalled,
 			config:      DL4001Config{FixPreference: DL4001FixPreferenceAuto},
-			wantNewText: "curl -fL -O https://example.com/file.tgz",
+			wantNewText: "wget -nv -O- https://example.com/bootstrap.tgz",
 			wantLoc: rules.NewRangeLocation(
-				"Dockerfile", 4, len("RUN "),
-				4, len("RUN wget https://example.com/file.tgz"),
+				"Dockerfile", 3, len("RUN "),
+				3, len("RUN curl -fsSL https://example.com/bootstrap.tgz"),
 			),
 		},
 		{
-			name:        "explicit curl preference overrides wget install signal",
-			dockerfile:  dockerfileWgetInstalled,
+			// With both tools installed and wget seen first, auto would prefer wget.
+			// Explicit "curl" flips the direction to rewrite wget to curl.
+			name:        "explicit curl preference overrides auto tie-break",
+			dockerfile:  dockerfileBothInstalledWgetFirst,
 			config:      DL4001Config{FixPreference: DL4001FixPreferenceCurl},
 			wantNewText: "curl -fL -O https://example.com/bootstrap.tgz",
 			wantLoc: rules.NewRangeLocation(
@@ -400,7 +423,10 @@ RUN curl -fsSL https://example.com/app.tgz
 			),
 		},
 		{
-			name:        "explicit wget preference overrides curl install signal",
+			// dockerfileCurlInstalled: auto would prefer wget (curl installed, wget UWI);
+			// explicit "wget" confirms the override path still emits a deterministic lowering
+			// pointing at the curl line.
+			name:        "explicit wget preference rewrites installed curl",
 			dockerfile:  dockerfileCurlInstalled,
 			config:      DL4001Config{FixPreference: DL4001FixPreferenceWget},
 			wantNewText: "wget -nv -O- https://example.com/bootstrap.tgz",
@@ -461,27 +487,29 @@ func TestDL4001Rule_WindowsLoweringAddsExeSuffix(t *testing.T) {
 		wantLoc     rules.Location
 	}{
 		{
-			name: "pwsh on windows stage lowers to wget.exe",
+			// Both tools used-without-install in the same stage; first-seen is curl (line 3),
+			// so auto prefers curl and rewrites wget.exe (line 4) to curl.exe.
+			name: "pwsh on windows stage lowers to curl.exe",
 			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
 SHELL ["pwsh", "-Command"]
 RUN curl -fL -o /tmp/boot.tgz https://example.com/bootstrap.tgz
 RUN wget.exe https://example.com/file.tgz
 `,
-			wantNewText: "wget.exe -O /tmp/boot.tgz https://example.com/bootstrap.tgz",
+			wantNewText: "curl.exe -fL -O https://example.com/file.tgz",
 			wantLoc: rules.NewRangeLocation(
-				"Dockerfile", 3, len("RUN "),
-				3, len("RUN curl -fL -o /tmp/boot.tgz https://example.com/bootstrap.tgz"),
+				"Dockerfile", 4, len("RUN "),
+				4, len("RUN wget.exe https://example.com/file.tgz"),
 			),
 		},
 		{
-			name: "cmd on windows stage lowers to curl.exe",
+			// Both tools used-without-install in the same stage; first-seen is wget (line 3),
+			// so auto prefers wget and rewrites curl.exe (line 4) to wget.exe.
+			name: "cmd on windows stage lowers to wget.exe",
 			dockerfile: `FROM mcr.microsoft.com/windows/servercore:ltsc2022
 SHELL ["cmd", "/S", "/C"]
 RUN wget.exe https://example.com/bootstrap.tgz
 RUN curl.exe -fL -O https://example.com/file.tgz
 `,
-			// With explicit cmd shell and neither tool declared installed, the rule prefers wget
-			// across stages — but here we test the same-stage path: the offending tool is curl.
 			wantNewText: "wget.exe https://example.com/file.tgz",
 			wantLoc: rules.NewRangeLocation(
 				"Dockerfile", 4, len("RUN "),
@@ -489,16 +517,18 @@ RUN curl.exe -fL -O https://example.com/file.tgz
 			),
 		},
 		{
+			// curl is installed, wget is used-without-install, so auto prefers wget and
+			// rewrites the installed curl usage. Linux stage keeps bare wget name.
 			name: "linux stage keeps bare tool name",
 			dockerfile: `FROM ubuntu:22.04
 RUN apt-get install -y curl
 RUN curl -fsSL https://example.com/bootstrap.tgz
 RUN wget https://example.com/file.tgz
 `,
-			wantNewText: "curl -fL -O https://example.com/file.tgz",
+			wantNewText: "wget -nv -O- https://example.com/bootstrap.tgz",
 			wantLoc: rules.NewRangeLocation(
-				"Dockerfile", 4, len("RUN "),
-				4, len("RUN wget https://example.com/file.tgz"),
+				"Dockerfile", 3, len("RUN "),
+				3, len("RUN curl -fsSL https://example.com/bootstrap.tgz"),
 			),
 		},
 	}
@@ -556,7 +586,93 @@ RUN wget https://example.com/file.tgz
 	if len(v.SuggestedFix.Edits) != 1 {
 		t.Fatalf("expected 1 edit, got %d", len(v.SuggestedFix.Edits))
 	}
-	if got := v.SuggestedFix.Edits[0].NewText; got != "curl -fL -O https://example.com/file.tgz" {
-		t.Fatalf("edit NewText = %q, want auto-inferred curl rewrite", got)
+	// Auto mode: curl is installed, wget is used-without-install → prefer wget and
+	// rewrite the installed curl usage.
+	if got := v.SuggestedFix.Edits[0].NewText; got != "wget -nv -O- https://example.com/bootstrap.tgz" {
+		t.Fatalf("edit NewText = %q, want auto-inferred wget rewrite", got)
+	}
+}
+
+func TestDL4001Rule_AutoTieBreaks(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		dockerfile  string
+		wantNewText string
+		wantLoc     rules.Location
+	}{
+		{
+			// Both tools used-without-install; curl is used twice vs wget once, so
+			// invocation-count tie-break prefers curl. The single wget is rewritten.
+			name: "invocation count breaks used-without-install tie",
+			dockerfile: `FROM ubuntu:22.04
+RUN wget https://example.com/file1
+RUN curl https://example.com/file2
+RUN curl https://example.com/file3
+`,
+			wantNewText: "curl -fL -O https://example.com/file1",
+			wantLoc: rules.NewRangeLocation(
+				"Dockerfile", 2, len("RUN "),
+				2, len("RUN wget https://example.com/file1"),
+			),
+		},
+		{
+			// Both tools used-without-install with equal invocation count; first-seen is
+			// curl (line 2) so auto prefers curl and rewrites the wget usage.
+			name: "first-seen breaks invocation-count tie",
+			dockerfile: `FROM ubuntu:22.04
+RUN curl https://example.com/file1
+RUN wget https://example.com/file2
+`,
+			wantNewText: "curl -fL -O https://example.com/file2",
+			wantLoc: rules.NewRangeLocation(
+				"Dockerfile", 3, len("RUN "),
+				3, len("RUN wget https://example.com/file2"),
+			),
+		},
+		{
+			// curl is used without install; wget is installed and used — auto prefers
+			// curl regardless of invocation count, because the used-without-install
+			// signal is stronger than the count tie-break.
+			name: "used-without-install beats invocation count",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get install -y wget
+RUN wget https://example.com/file1
+RUN wget https://example.com/file2
+RUN curl https://example.com/file3
+`,
+			wantNewText: "curl -fL -O https://example.com/file1",
+			wantLoc: rules.NewRangeLocation(
+				"Dockerfile", 3, len("RUN "),
+				3, len("RUN wget https://example.com/file1"),
+			),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
+
+			violations := NewDL4001Rule().Check(input)
+			if len(violations) == 0 {
+				t.Fatal("expected at least one violation")
+			}
+			v := violations[0]
+			if v.SuggestedFix == nil {
+				t.Fatal("expected SuggestedFix")
+			}
+			if len(v.SuggestedFix.Edits) != 1 {
+				t.Fatalf("expected 1 edit, got %d", len(v.SuggestedFix.Edits))
+			}
+			edit := v.SuggestedFix.Edits[0]
+			if edit.NewText != tt.wantNewText {
+				t.Fatalf("edit NewText = %q, want %q", edit.NewText, tt.wantNewText)
+			}
+			if edit.Location != tt.wantLoc {
+				t.Fatalf("edit Location = %#v, want %#v", edit.Location, tt.wantLoc)
+			}
+		})
 	}
 }

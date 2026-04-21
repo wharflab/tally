@@ -87,9 +87,11 @@ type toolUsageDL4001 struct {
 }
 
 type toolOccurrenceDL4001 struct {
-	stageIdx int
-	loc      rules.Location
-	runFacts *facts.RunFacts
+	stageIdx         int
+	loc              rules.Location
+	runFacts         *facts.RunFacts
+	invocationCount  int
+	installedInStage bool
 }
 
 // usageMapDL4001 tracks tool usage across stages.
@@ -203,24 +205,28 @@ type toolTrackingDL4001 struct {
 
 // recordToolUsage checks for wget/curl usage and records it.
 func (r *DL4001Rule) recordToolUsage(stageIdx int, loc rules.Location, runFacts *facts.RunFacts, t *toolTrackingDL4001) {
-	if hasCommandNamed(runFacts.CommandInfos, "wget") {
+	if n := countCommandsNamed(runFacts.CommandInfos, "wget"); n > 0 {
 		if t.wgetUsage[stageIdx] == nil {
 			t.wgetUsage[stageIdx] = &toolUsageDL4001{installed: t.wgetInstalled}
 		}
 		t.wgetUsage[stageIdx].occurrences = append(t.wgetUsage[stageIdx].occurrences, toolOccurrenceDL4001{
-			stageIdx: stageIdx,
-			loc:      loc,
-			runFacts: runFacts,
+			stageIdx:         stageIdx,
+			loc:              loc,
+			runFacts:         runFacts,
+			invocationCount:  n,
+			installedInStage: t.wgetInstalled,
 		})
 	}
-	if hasCommandNamed(runFacts.CommandInfos, "curl") {
+	if n := countCommandsNamed(runFacts.CommandInfos, "curl"); n > 0 {
 		if t.curlUsage[stageIdx] == nil {
 			t.curlUsage[stageIdx] = &toolUsageDL4001{installed: t.curlInstalled}
 		}
 		t.curlUsage[stageIdx].occurrences = append(t.curlUsage[stageIdx].occurrences, toolOccurrenceDL4001{
-			stageIdx: stageIdx,
-			loc:      loc,
-			runFacts: runFacts,
+			stageIdx:         stageIdx,
+			loc:              loc,
+			runFacts:         runFacts,
+			invocationCount:  n,
+			installedInStage: t.curlInstalled,
 		})
 	}
 }
@@ -242,7 +248,8 @@ func (r *DL4001Rule) checkStageConflicts(
 		}
 
 		msg := r.generateMessage(wget.installed, curl.installed)
-		occurrences, preferredTool := r.selectOccurrencesToReport(wget, curl, cfg)
+		preferredTool := preferredToolForConflict(cfg, wget.occurrences, curl.occurrences)
+		occurrences := nonPreferredOccurrences(preferredTool, wget, curl)
 
 		for _, occurrence := range occurrences {
 			violations = append(violations, r.createViolation(input, occurrence, preferredTool, msg))
@@ -263,12 +270,15 @@ func (r *DL4001Rule) checkCrossStageConflicts(
 
 	msg := r.generateMessage(anyWgetInstalled, anyCurlInstalled)
 
-	preferredTool := crossStagePreferredTool(cfg, anyWgetInstalled, anyCurlInstalled)
+	allWget := wgetUsage.allOccurrences()
+	allCurl := curlUsage.allOccurrences()
+	preferredTool := preferredToolForConflict(cfg, allWget, allCurl)
+
 	var occurrences []toolOccurrenceDL4001
 	if preferredTool == dl4001ToolCurl {
-		occurrences = wgetUsage.allOccurrences()
+		occurrences = allWget
 	} else {
-		occurrences = curlUsage.allOccurrences()
+		occurrences = allCurl
 	}
 
 	violations := make([]rules.Violation, 0, len(occurrences))
@@ -279,37 +289,86 @@ func (r *DL4001Rule) checkCrossStageConflicts(
 	return violations
 }
 
-// crossStagePreferredTool resolves the fix direction across stages, letting an explicit
-// fix-preference override install-state inference.
-func crossStagePreferredTool(cfg DL4001Config, anyWgetInstalled, anyCurlInstalled bool) string {
+// preferredToolForConflict returns the tool that should win an auto-mode tie-break,
+// using usage-based heuristics: tools used without an explicit install beat tools
+// that require one; otherwise invocation count breaks the tie; otherwise first seen.
+// An explicit fix-preference always takes precedence.
+func preferredToolForConflict(cfg DL4001Config, wget, curl []toolOccurrenceDL4001) string {
 	switch cfg.FixPreference {
 	case DL4001FixPreferenceCurl:
 		return dl4001ToolCurl
 	case DL4001FixPreferenceWget:
 		return dl4001ToolWget
 	}
-	if anyCurlInstalled && !anyWgetInstalled {
+
+	wgetUWI := hasUsageWithoutInstall(wget)
+	curlUWI := hasUsageWithoutInstall(curl)
+	if wgetUWI != curlUWI {
+		if curlUWI {
+			return dl4001ToolCurl
+		}
+		return dl4001ToolWget
+	}
+
+	wgetCount := totalInvocations(wget)
+	curlCount := totalInvocations(curl)
+	if wgetCount != curlCount {
+		if curlCount > wgetCount {
+			return dl4001ToolCurl
+		}
+		return dl4001ToolWget
+	}
+
+	if positionBefore(firstOccurrence(curl), firstOccurrence(wget)) {
 		return dl4001ToolCurl
 	}
 	return dl4001ToolWget
 }
 
-// selectOccurrencesToReport chooses which tool's occurrences to report as violations.
-// An explicit fix-preference forces the direction regardless of install state.
-func (r *DL4001Rule) selectOccurrencesToReport(
-	wget, curl *toolUsageDL4001,
-	cfg DL4001Config,
-) ([]toolOccurrenceDL4001, string) {
-	switch cfg.FixPreference {
-	case DL4001FixPreferenceCurl:
-		return wget.occurrences, dl4001ToolCurl
-	case DL4001FixPreferenceWget:
-		return curl.occurrences, dl4001ToolWget
+// nonPreferredOccurrences returns the occurrences of the non-preferred tool in this conflict.
+func nonPreferredOccurrences(preferredTool string, wget, curl *toolUsageDL4001) []toolOccurrenceDL4001 {
+	if preferredTool == dl4001ToolCurl {
+		return wget.occurrences
 	}
-	if curl.installed && !wget.installed {
-		return wget.occurrences, dl4001ToolCurl
+	return curl.occurrences
+}
+
+func hasUsageWithoutInstall(occurrences []toolOccurrenceDL4001) bool {
+	for _, occ := range occurrences {
+		if !occ.installedInStage {
+			return true
+		}
 	}
-	return curl.occurrences, dl4001ToolWget
+	return false
+}
+
+func totalInvocations(occurrences []toolOccurrenceDL4001) int {
+	total := 0
+	for _, occ := range occurrences {
+		total += occ.invocationCount
+	}
+	return total
+}
+
+func firstOccurrence(occurrences []toolOccurrenceDL4001) rules.Position {
+	if len(occurrences) == 0 {
+		return rules.Position{Line: -1, Column: -1}
+	}
+	best := occurrences[0].loc.Start
+	for _, occ := range occurrences[1:] {
+		if positionBefore(occ.loc.Start, best) {
+			best = occ.loc.Start
+		}
+	}
+	return best
+}
+
+// positionBefore reports whether a precedes b in source order.
+func positionBefore(a, b rules.Position) bool {
+	if a.Line != b.Line {
+		return a.Line < b.Line
+	}
+	return a.Column < b.Column
 }
 
 // createViolation creates a violation with the given location and message.
@@ -372,15 +431,6 @@ func (r *DL4001Rule) generateMessage(wgetInstalled, curlInstalled bool) messageI
 				"Standardize on one tool for consistency across the image.",
 		}
 	}
-}
-
-func hasCommandNamed(commands []shell.CommandInfo, name string) bool {
-	for i := range commands {
-		if commands[i].Name == name {
-			return true
-		}
-	}
-	return false
 }
 
 func countCommandsNamed(commands []shell.CommandInfo, name string) int {

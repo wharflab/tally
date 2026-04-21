@@ -37,11 +37,21 @@ RUN curl http://bing.com
 
 ## Auto-fix
 
-The rule rewrites offending commands to the tool already installed (or otherwise preferred) in the stage. Rewriting is **bidirectional**:
-`curl → wget` when `wget` is installed, and `wget → curl` when `curl` is installed. All fixes are **unsafe** (`FixUnsafe`) and require
-`--fix --fix-unsafe`.
+The rule rewrites offending commands to the tool it picks as the winner for the Dockerfile. Rewriting is **bidirectional**: `curl → wget` or
+`wget → curl`. All fixes are **unsafe** (`FixUnsafe`) and require `--fix --fix-unsafe`.
 
-Two paths exist:
+### How the winning tool is chosen (auto mode)
+
+Auto mode uses usage-based heuristics, not tool-install flags. The winner — and therefore the direction of the rewrite — is decided in this order:
+
+1. **Used without explicit install wins.** If exactly one of `curl` / `wget` is used without being explicitly installed by the Dockerfile (e.g.,
+   it comes from the base image), that tool wins and the other one is rewritten. Installing the tool you already get "for free" is the thing
+   DL4001 is pushing back on.
+2. **Most invocations wins.** If both tools are in the same install category (both installed, or both used-without-install), the tool with more
+   total invocations across the Dockerfile wins.
+3. **First seen wins.** If invocation counts tie, the tool whose first use appears earlier in the Dockerfile wins.
+
+Two fix paths exist once the direction is chosen:
 
 - **Deterministic rewrite.** When the offending command is a simple HTTP `GET` that follows redirects, fails on HTTP status, and has a literal URL
   and plain sink (explicit `-o`/`-O` file, stdout pipe, or remote-name), tally lowers it locally through a shared `HTTPTransferOperation` IR and emits
@@ -50,36 +60,36 @@ Two paths exist:
   interpolation, command substitution, or multi-line continuations), tally emits an async `SuggestedFix` backed by the AI AutoFix resolver. Applying
   this fallback additionally requires an ACP-capable agent configured in the top-level `[ai]` section.
 
-The rule refuses to attach a fix when the preferred tool already appears in the same `RUN` (for example
-`curl ... || wget ...`).
+The rule refuses to attach a fix when the preferred tool already appears in the same `RUN` (for example `curl ... || wget ...`).
 
-On Windows stages the replacement is emitted with a `.exe` suffix (`curl.exe`, `wget.exe`); on Linux stages the bare
-tool name is used.
+On Windows stages the replacement is emitted with a `.exe` suffix (`curl.exe`, `wget.exe`); on Linux stages the bare tool name is used.
 
 ### Deterministic rewrite examples
 
 ```dockerfile
-# Before — curl is installed in the stage, so wget is rewritten.
+# Before — curl is explicitly installed, wget comes from the base image,
+# so wget wins (used-without-install) and the installed curl is rewritten.
 RUN apt-get update && apt-get install -y curl
 RUN curl -fsSL https://example.com/bootstrap.tgz
 RUN wget https://example.com/file.tgz
 
 # After (with --fix --fix-unsafe)
 RUN apt-get update && apt-get install -y curl
-RUN curl -fsSL https://example.com/bootstrap.tgz
-RUN curl -fL -O https://example.com/file.tgz
+RUN wget -nv -O- https://example.com/bootstrap.tgz
+RUN wget https://example.com/file.tgz
 ```
 
 ```dockerfile
-# Before — wget is installed in the stage, so the piped curl is rewritten.
-RUN apt-get update && apt-get install -y wget
-RUN wget https://example.com/bootstrap.tgz
-RUN curl -fsSL https://example.com/app.tgz | tar -xz -C /opt
+# Before — neither tool is installed (both come from the base image) and
+# curl is used twice vs wget once, so curl wins the count tie-break.
+RUN wget https://example.com/file1
+RUN curl https://example.com/file2
+RUN curl https://example.com/file3
 
 # After (with --fix --fix-unsafe)
-RUN apt-get update && apt-get install -y wget
-RUN wget https://example.com/bootstrap.tgz
-RUN wget -nv -O- https://example.com/app.tgz | tar -xz -C /opt
+RUN curl -fL -O https://example.com/file1
+RUN curl https://example.com/file2
+RUN curl https://example.com/file3
 ```
 
 ### When the AI AutoFix fallback is used
@@ -106,13 +116,13 @@ RUN curl -sSL https://example.com/app.tgz | tar -xz -C /opt
 
 Controls which tool auto-fixes converge on, and therefore which of the two offending tools is reported as the violation.
 
-- `"auto"` (default): infer the target from stage install signals. If only `curl` is installed, `wget` calls are reported and rewritten to `curl`;
-  if only `wget` is installed, `curl` calls are reported and rewritten to `wget`. When both (or neither) are installed, `wget` is preferred.
-- `"curl"`: always report and rewrite `wget` calls to `curl`, regardless of which tool is installed.
-- `"wget"`: always report and rewrite `curl` calls to `wget`, regardless of which tool is installed.
+- `"auto"` (default): pick the winner using the usage-based heuristics described in the Auto-fix section above (used-without-install → invocation
+  count → first seen).
+- `"curl"`: always report and rewrite `wget` calls to `curl`, regardless of usage or install state.
+- `"wget"`: always report and rewrite `curl` calls to `wget`, regardless of usage or install state.
 
-Explicit preferences are useful when the Dockerfile installs both tools (or neither) and you want a project-wide convention. An invalid value falls
-back to `"auto"`.
+Explicit preferences are useful when you want a project-wide convention and don't want auto mode's heuristics to decide per-file. An invalid value
+falls back to `"auto"`.
 
 ```toml
 [rules.hadolint.DL4001]
