@@ -17,7 +17,11 @@ RUN ./setup.sh
 
 ARG SHELLCHECK_VERSION
 
-ADD "https://github.com/koalaman/shellcheck.git?ref=v${SHELLCHECK_VERSION}" /shellcheck/
+# Clone via `git` instead of `ADD <git-url>` because GitHub 301-redirects
+# `.../shellcheck.git?ref=...` to a URL that strips `.git`, which breaks
+# BuildKit's git fetcher. `git clone --branch` handles the redirect correctly.
+RUN git clone --depth 1 --branch "v${SHELLCHECK_VERSION}" \
+	https://github.com/koalaman/shellcheck.git /shellcheck
 
 WORKDIR /shellcheck
 
