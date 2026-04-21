@@ -109,12 +109,12 @@ func extractRunLikeScript(
 	end = max(end, start)
 
 	if len(node.Heredocs) > 0 {
-		if overrideShell, bodyOnly := heredocBodyScriptMode(
+		if overrideShell, openerOffset, bodyOnly := heredocBodyScriptMode(
 			linesForSpan(sm, start, end),
 			escapeToken,
 			blankLeadingFlags,
 		); bodyOnly {
-			bodyStart := start + 1
+			bodyStart := start + openerOffset + 1
 			bodyEnd := end - 1
 			if bodyEnd < bodyStart {
 				return Mapping{}, false
@@ -140,43 +140,60 @@ func extractRunLikeScript(
 	}, true
 }
 
+// heredocBodyScriptMode reports whether lines represent a heredoc whose body is
+// a shell script (as opposed to a data payload fed to a command via stdin). It
+// returns the optional shell override (e.g. "bash" from `RUN <<EOF bash`) and
+// the 0-based line index within lines at which the `<<TAG` opener appears, so
+// the caller can compute the body's start line even when flags span multiple
+// continuation lines before the opener.
 func heredocBodyScriptMode(
 	lines []string,
 	escapeToken rune,
 	blankLeadingFlags func(lines []string, escapeToken rune) []string,
-) (string, bool) {
+) (string, int, bool) {
 	if len(lines) == 0 {
-		return "", false
+		return "", 0, false
 	}
 
 	blanked := blankLeadingFlags(lines, escapeToken)
-	header := firstNonEmptyLine(blanked)
+	headerIdx, header := firstHeaderLine(blanked, escapeToken)
 	if header == "" {
-		return "", false
+		return "", 0, false
 	}
 
 	rest, ok := heredocCommandRemainder(header)
 	if !ok {
-		return "", false
+		return "", 0, false
 	}
 	if rest == "" {
-		return "", true
+		return "", headerIdx, true
 	}
 
 	shellName, ok := heredocShellOverride(rest)
 	if !ok {
-		return "", false
+		return "", 0, false
 	}
-	return shellName, true
+	return shellName, headerIdx, true
 }
 
-func firstNonEmptyLine(lines []string) string {
-	for _, line := range lines {
-		if strings.TrimSpace(line) != "" {
-			return line
+// firstHeaderLine returns the index and content of the first line that carries
+// meaningful (non-continuation-only) content. Lines that contain only leading
+// whitespace plus a trailing line-continuation are skipped, so callers can
+// locate the instruction/heredoc header even when flags span several physical
+// lines joined by the Dockerfile escape token.
+func firstHeaderLine(lines []string, escapeToken rune) (int, string) {
+	escape := string(escapeToken)
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
 		}
+		if trimmed == escape {
+			continue
+		}
+		return i, line
 	}
-	return ""
+	return 0, ""
 }
 
 func heredocCommandRemainder(line string) (string, bool) {
