@@ -77,6 +77,11 @@ func tokenizeNode(
 		tokens = append(tokens, numberTokens(text, lineIdx)...)
 		tokens = append(tokens, heredocTokens(text, lineIdx)...)
 	}
+
+	if len(node.Heredocs) > 0 {
+		opener := heredocOpenerLine(sm, startLine, endLine, escapeToken)
+		tokens = append(tokens, heredocTerminatorTokens(sm, node, opener, endLine)...)
+	}
 	return tokens
 }
 
@@ -410,10 +415,50 @@ func heredocTokens(line string, lineNum int) []core.Token {
 				Line:     lineNum,
 				StartCol: nameStartCol,
 				EndCol:   nameEndCol,
-				Type:     core.TokenString,
+				Type:     core.TokenKeyword,
 				Priority: 24,
 			},
 		)
+	}
+	return out
+}
+
+// heredocTerminatorTokens emits keyword tokens for each physical line within
+// the instruction's span that matches one of the node's heredoc terminator
+// names, so themes can style the closing tag the same as the opener tag.
+// Chomp heredocs (`<<-TAG`) allow the terminator to be preceded by leading
+// tabs, which are stripped before matching. The quoting style of the opener
+// (`<<'EOF'`, `<<"EOF"`) does not appear in the terminator line.
+func heredocTerminatorTokens(sm *sourcemap.SourceMap, node *parser.Node, openerLine, end int) []core.Token {
+	if len(node.Heredocs) == 0 {
+		return nil
+	}
+	limit := min(end, sm.LineCount())
+	hdIdx := 0
+	var out []core.Token
+	for line := openerLine + 1; line <= limit && hdIdx < len(node.Heredocs); line++ {
+		raw := sm.Line(line - 1)
+		candidate := strings.TrimRight(raw, " \t\r")
+		if node.Heredocs[hdIdx].Chomp {
+			candidate = strings.TrimLeft(candidate, "\t")
+		}
+		if candidate != node.Heredocs[hdIdx].Name {
+			continue
+		}
+		start := strings.Index(raw, candidate)
+		if start < 0 {
+			hdIdx++
+			continue
+		}
+		startCol, endCol := core.RuneColsForByteRange(raw, start, start+len(candidate))
+		out = append(out, core.Token{
+			Line:     line - 1,
+			StartCol: startCol,
+			EndCol:   endCol,
+			Type:     core.TokenKeyword,
+			Priority: 24,
+		})
+		hdIdx++
 	}
 	return out
 }
@@ -532,12 +577,32 @@ func heredocBodyLines(sm *sourcemap.SourceMap, root *parser.Node, escapeToken ru
 			continue
 		}
 		end := sm.ResolveEndLineWithEscape(node.EndLine, escapeToken)
-		for line := node.StartLine; line <= end; line++ {
-			if line == node.StartLine || line == end {
-				continue
-			}
+		opener := heredocOpenerLine(sm, node.StartLine, end, escapeToken)
+		for line := opener + 1; line < end; line++ {
 			out[line-1] = true
 		}
 	}
 	return out
+}
+
+// heredocOpenerLine returns the 1-based physical line within [startLine, end]
+// that carries the `<<TAG` opener. BuildKit reports node.StartLine as the line
+// containing the instruction keyword (e.g. RUN), but the opener may sit on a
+// later physical line when flags span backslash-continued lines. Everything
+// between the opener line and the terminator (node.EndLine) is the heredoc
+// body; earlier continuation lines still carry Dockerfile flag/argument
+// tokens and must not be treated as body.
+func heredocOpenerLine(sm *sourcemap.SourceMap, startLine, end int, escapeToken rune) int {
+	limit := min(end, sm.LineCount())
+	escape := string(escapeToken)
+	for line := startLine; line <= limit; line++ {
+		trimmed := strings.TrimRight(sm.Line(line-1), " \t")
+		if trimmed == "" {
+			continue
+		}
+		if !strings.HasSuffix(trimmed, escape) {
+			return line
+		}
+	}
+	return startLine
 }

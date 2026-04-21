@@ -65,6 +65,68 @@ func TestQuotedTokens_RespectEscapeDirective(t *testing.T) {
 	assertTokenText(t, line, tokens[0], "\"say `\"hello`\"\"")
 }
 
+func TestTokenize_HeredocMarkersAreKeywords(t *testing.T) {
+	t.Parallel()
+
+	source := []byte(strings.Join([]string{
+		"FROM alpine",
+		"RUN <<EOF",
+		"echo hi",
+		"EOF",
+		"COPY <<-CHOMP /tmp/out",
+		"\tinline",
+		"\tCHOMP",
+		"",
+	}, "\n"))
+
+	sm := sourcemap.New(source)
+	result, err := parser.Parse(bytes.NewReader(source))
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+
+	tokens := Tokenize(sm, result.AST, '\\')
+
+	// Opener tag `EOF` should be a keyword token so VS Code's fallback maps
+	// it to keyword.control.heredoc-token.shell.dockerfile.
+	assertHasLineTokenType(t, string(source), tokens, 1, core.TokenKeyword, "EOF")
+
+	// Terminator `EOF` on its own line must also be a keyword token.
+	assertHasLineTokenType(t, string(source), tokens, 3, core.TokenKeyword, "EOF")
+
+	// Chomp terminator (`<<-TAG`) has leading tabs stripped before matching.
+	assertHasLineTokenType(t, string(source), tokens, 6, core.TokenKeyword, "CHOMP")
+}
+
+func assertHasLineTokenType(
+	t *testing.T,
+	source string,
+	tokens []core.Token,
+	wantLine int,
+	wantType core.TokenType,
+	wantText string,
+) {
+	t.Helper()
+
+	lines := strings.Split(source, "\n")
+	for _, tok := range tokens {
+		if tok.Line != wantLine || tok.Type != wantType {
+			continue
+		}
+		if tok.Line < 0 || tok.Line >= len(lines) {
+			continue
+		}
+		runes := []rune(lines[tok.Line])
+		if tok.StartCol < 0 || tok.EndCol < tok.StartCol || tok.EndCol > len(runes) {
+			continue
+		}
+		if got := string(runes[tok.StartCol:tok.EndCol]); got == wantText {
+			return
+		}
+	}
+	t.Fatalf("missing token line=%d type=%s text=%q in %+v", wantLine, wantType, wantText, tokens)
+}
+
 func TestTokenize_WindowsPaths(t *testing.T) {
 	t.Parallel()
 
