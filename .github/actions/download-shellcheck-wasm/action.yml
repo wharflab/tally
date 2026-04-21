@@ -19,7 +19,7 @@ runs:
       shell: bash
       run: mkdir -p internal/shellcheck/wasm
     - name: Download shellcheck.wasm artifact
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: ${{ inputs.artifact-name }}
         path: internal/shellcheck/wasm
