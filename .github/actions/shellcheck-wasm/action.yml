@@ -78,7 +78,7 @@ runs:
         echo "Built shellcheck.wasm: ${size} bytes"
     - name: Upload wasm as workflow artifact
       if: inputs.artifact-name != ''
-      uses: actions/upload-artifact@v8
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact-name }}
         path: internal/shellcheck/wasm/shellcheck.wasm
