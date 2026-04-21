@@ -14,7 +14,8 @@
     "ms-sarifvscode.sarif-viewer",
     "oxc.oxc-vscode",
     "stylelint.vscode-stylelint",
-    "tamasfe.even-better-toml"
+    "tamasfe.even-better-toml",
+    "unifiedjs.vscode-mdx"
   ],
   "unwantedRecommendations": [
     "dbaeumer.vscode-eslint",
