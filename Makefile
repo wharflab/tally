@@ -1,15 +1,31 @@
-.PHONY: build intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin update-shellcheck-wasm
+.PHONY: build check-shellcheck-wasm intellij-plugin intellij-plugin-verify intellij-plugin-smoke test test-verbose lint lint-fix deadcode cpd clean release publish-prepare publish-gem publish jsonschema schema-gen schema-check lsp-protocol print-gotestsum-bin shellcheck-wasm update-shellcheck-wasm
 
 GOEXPERIMENT ?= jsonv2
 export GOEXPERIMENT
-export GIT_LFS_SKIP_SMUDGE=1
+
+# Pinned versions for the embedded ShellCheck wasm. Changing any value here
+# invalidates the local file-target, the CI cache, and the release workflow's
+# restored artifact. See _tools/shellcheck-wasm/versions.env.
+include _tools/shellcheck-wasm/versions.env
 
 # Build tags for the shipped full-featured build (keep CGO enabled while
 # disabling containers/image transports we do not ship).
 BUILDTAGS := containers_image_openpgp,containers_image_storage_stub,containers_image_docker_daemon_stub
 
-build:
+build: check-shellcheck-wasm
 	GOSUMDB=sum.golang.org CGO_ENABLED=1 go build -tags '$(BUILDTAGS)' -ldflags "-s -w" -o tally
+
+# Friendlier diagnostic than the raw `go:embed` error when the wasm artifact is
+# missing. We don't auto-build here because that would silently pull Docker on
+# an ordinary `make build`.
+.PHONY: check-shellcheck-wasm
+check-shellcheck-wasm:
+	@if [ ! -s internal/shellcheck/wasm/shellcheck.wasm ]; then \
+		echo "internal/shellcheck/wasm/shellcheck.wasm is missing."; \
+		echo "Run 'make shellcheck-wasm' (requires Docker) to build it, or"; \
+		echo "download the artifact from a recent CI run."; \
+		exit 1; \
+	fi
 
 intellij-plugin:
 	bash _integrations/intellij-tally/build/build.sh build
@@ -24,25 +40,25 @@ GOTESTSUM_VERSION := v1.13.0
 GOLANGCI_LINT_VERSION := $(shell cat .golangci-lint-version | tr -d '[:space:]')
 DEADCODE_VERSION := v0.41.0
 
-test: bin/gotestsum-$(GOTESTSUM_VERSION)
+test: check-shellcheck-wasm bin/gotestsum-$(GOTESTSUM_VERSION)
 	bin/gotestsum-$(GOTESTSUM_VERSION) --format testname -- -tags '$(BUILDTAGS)' -race -count=1 -timeout=30s ./...
 
-test-verbose: bin/gotestsum-$(GOTESTSUM_VERSION)
+test-verbose: check-shellcheck-wasm bin/gotestsum-$(GOTESTSUM_VERSION)
 	bin/gotestsum-$(GOTESTSUM_VERSION) --format standard-verbose -- -tags '$(BUILDTAGS)' -race -count=1 -timeout=30s ./...
 
-lint: bin/golangci-lint-$(GOLANGCI_LINT_VERSION) bin/custom-gcl
+lint: check-shellcheck-wasm bin/golangci-lint-$(GOLANGCI_LINT_VERSION) bin/custom-gcl
 	bin/custom-gcl run
 
 bin/custom-gcl: bin/golangci-lint-$(GOLANGCI_LINT_VERSION) .custom-gcl.yml _tools/customlint/*.go
 	bin/golangci-lint custom
 
-lint-fix: bin/golangci-lint-$(GOLANGCI_LINT_VERSION) bin/custom-gcl
+lint-fix: check-shellcheck-wasm bin/golangci-lint-$(GOLANGCI_LINT_VERSION) bin/custom-gcl
 	bin/custom-gcl run --fix
 
 # Filter out internal/lsp/protocol/ from deadcode: that package is generated
 # and only a subset of LSP methods are dispatched, so helpers backing unused
 # methods are expected to appear unreachable.
-deadcode: bin/deadcode-$(DEADCODE_VERSION)
+deadcode: check-shellcheck-wasm bin/deadcode-$(DEADCODE_VERSION)
 	@tmp=$$(mktemp); \
 	bin/deadcode -test ./... 2>&1 | grep -v 'internal/lsp/protocol/' >"$$tmp" || true; \
 	if [ -s "$$tmp" ]; then cat "$$tmp"; rm "$$tmp"; exit 1; fi; \
@@ -126,23 +142,43 @@ lsp-protocol:
 	bun run _tools/lspgen/fetchModel.mts
 	bun run _tools/lspgen/generate.mts
 
-update-shellcheck-wasm:
-	mkdir -p internal/shellcheck/wasm
+# File target: the embedded ShellCheck wasm. Prerequisites list every input
+# that can change the output, so Make only rebuilds when the pins, the
+# Dockerfile, the Reactor, or the ast-grep rewrites change. The artifact is
+# .gitignored; fresh checkouts build it on demand (or restore it from CI cache).
+SHELLCHECK_WASM := internal/shellcheck/wasm/shellcheck.wasm
+SHELLCHECK_WASM_INPUTS := \
+	_tools/shellcheck-wasm/versions.env \
+	_tools/shellcheck-wasm/Dockerfile \
+	_tools/shellcheck-wasm/Reactor.hs \
+	$(wildcard _tools/shellcheck-wasm/rewrites/*.yml)
+
+shellcheck-wasm: $(SHELLCHECK_WASM)
+
+$(SHELLCHECK_WASM): $(SHELLCHECK_WASM_INPUTS)
+	@mkdir -p $(dir $@)
 	docker build \
-	    --progress=plain \
+		--progress=plain \
 		--build-arg GHC_WASM_META_COMMIT="$(GHC_WASM_META_COMMIT)" \
 		--build-arg SHELLCHECK_VERSION="$(patsubst v%,%,$(SHELLCHECK_VERSION))" \
+		--build-arg AST_GREP_VERSION="$(AST_GREP_VERSION)" \
 		-t tally-shellcheck-wasm -f _tools/shellcheck-wasm/Dockerfile _tools/shellcheck-wasm
-	# Extract the built shellcheck.wasm from the container and place it in internal/shellcheck/wasm
-	docker cp "$$(docker create --rm tally-shellcheck-wasm):/shellcheck.wasm" internal/shellcheck/wasm/shellcheck.wasm
-# 	docker run --rm -v "$(CURDIR)/internal/shellcheck/wasm:/out" tally-shellcheck-wasm
+	# Extract the built shellcheck.wasm from the container.
+	docker cp "$$(docker create --rm tally-shellcheck-wasm):/shellcheck.wasm" $@
+	@touch $@
 
-SHELLCHECK_VERSION := v0.11.0
-GHC_WASM_META_COMMIT := 4e1f900e9933966634bc2e29dbeb81d09ce36727
+# Force-rebuild target kept for humans who want to refresh after pulling new
+# upstream ShellCheck source without touching a pinned version.
+update-shellcheck-wasm:
+	rm -f $(SHELLCHECK_WASM)
+	$(MAKE) $(SHELLCHECK_WASM)
 
 clean:
 	rm -f tally
 	rm -rf bin/ dist/
+	# Note: $(SHELLCHECK_WASM) is not removed here because rebuilding it
+	# requires Docker and several minutes. Use `make update-shellcheck-wasm`
+	# to force-refresh, or delete the file manually.
 
 # Release and publish targets
 # Prerequisites:

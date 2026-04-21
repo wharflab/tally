@@ -44,7 +44,7 @@
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^Makefile$/"],
+      "managerFilePatterns": ["/^_tools/shellcheck-wasm/versions\\.env$/"],
       "matchStrings": ["SHELLCHECK_VERSION\\s*[:=]\\s*(?<currentValue>v\\d+\\.\\d+\\.\\d+)"],
       "depNameTemplate": "koalaman/shellcheck",
       "datasourceTemplate": "github-releases",

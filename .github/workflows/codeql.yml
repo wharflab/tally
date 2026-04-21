@@ -15,7 +15,17 @@ defaults:
   run:
     shell: bash
 jobs:
+  shellcheck-wasm:
+    name: Build shellcheck.wasm
+    runs-on: ubuntu-latest
+    if: github.repository == 'wharflab/tally'
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: ./.github/actions/shellcheck-wasm
+        with:
+          artifact-name: shellcheck-wasm
   analyze:
+    needs: shellcheck-wasm
     runs-on: ubuntu-latest
     if: github.repository == 'wharflab/tally'
     permissions:
@@ -25,8 +35,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
+      - uses: ./.github/actions/download-shellcheck-wasm
         with:
-          lfs: true
+          artifact-name: shellcheck-wasm
       - name: Setup Go
         uses: actions/setup-go@v6.4.0
         with:

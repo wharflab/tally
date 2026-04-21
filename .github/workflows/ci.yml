@@ -12,12 +12,22 @@ permissions:
 env:
   GOEXPERIMENT: jsonv2
 jobs:
-  test:
+  shellcheck-wasm:
+    name: Build shellcheck.wasm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: ./.github/actions/shellcheck-wasm
         with:
-          lfs: true
+          artifact-name: shellcheck-wasm
+  test:
+    needs: shellcheck-wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/download-shellcheck-wasm
+        with:
+          artifact-name: shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -65,11 +75,13 @@ jobs:
           fail_ci_if_error: true
   test-windows:
     name: Test (Windows)
+    needs: shellcheck-wasm
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: ./.github/actions/download-shellcheck-wasm
         with:
-          lfs: true
+          artifact-name: shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -79,11 +91,13 @@ jobs:
       - name: Run tests
         run: go test ./... -v -race
   lint:
+    needs: shellcheck-wasm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: ./.github/actions/download-shellcheck-wasm
         with:
-          lfs: true
+          artifact-name: shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -96,11 +110,13 @@ jobs:
           version-file: .golangci-lint-version
   deadcode:
     name: Dead Code Detection
+    needs: shellcheck-wasm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+      - uses: ./.github/actions/download-shellcheck-wasm
         with:
-          lfs: true
+          artifact-name: shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -116,8 +132,6 @@ jobs:
       PMD_VERSION: 7.20.0
     steps:
       - uses: actions/checkout@v6
-        with:
-          lfs: true
       - name: Setup PMD
         run: |
           curl -fL "https://github.com/pmd/pmd/releases/download/pmd_releases%2F${PMD_VERSION}/pmd-dist-${PMD_VERSION}-bin.zip" -o pmd.zip
@@ -158,8 +172,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with:
-          lfs: false
       - name: Install uv
         uses: astral-sh/setup-uv@v8.1.0
       - run: uv tool run rumdl==0.1.76 check --output-format github .

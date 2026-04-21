@@ -13,15 +13,25 @@ env:
   GOEXPERIMENT: jsonv2
   CGO_ENABLED: 1
 jobs:
+  shellcheck-wasm:
+    name: Build shellcheck.wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/shellcheck-wasm
+        with:
+          artifact-name: shellcheck-wasm
   vscode-smoke:
     name: VS Code Smoke (Linux)
+    needs: shellcheck-wasm
     runs-on: ubuntu-latest
     env:
       GOCOVERDIR: ${{ github.workspace }}/coverage-vscode-smoke
     steps:
       - uses: actions/checkout@v6
+      - uses: ./.github/actions/download-shellcheck-wasm
         with:
-          lfs: true
+          artifact-name: shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:

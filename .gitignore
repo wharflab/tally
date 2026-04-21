@@ -41,6 +41,9 @@ go.work.sum
 # Built binary
 /tally
 
+# Built ShellCheck wasm (produced by `make shellcheck-wasm`, cached in CI).
+internal/shellcheck/wasm/shellcheck.wasm
+
 # GoReleaser
 dist/
 

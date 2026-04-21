@@ -1,0 +1,95 @@
+---
+name: Build or restore shellcheck.wasm
+description: |
+  Restores internal/shellcheck/wasm/shellcheck.wasm from actions/cache keyed on
+  the pinned upstream versions and the build recipe. On cache miss (e.g. after
+  a version bump), invokes `make shellcheck-wasm` which uses Docker to
+  reproduce the artifact, then primes the cache for subsequent runs.
+
+  The wasm is no longer checked into the repository; every workflow that needs
+  it (directly or transitively via `go build`/`go test`) must invoke this
+  action before compiling Go code.
+
+  Requires a Linux runner with Docker available (every GitHub-hosted
+  `ubuntu-*` image qualifies). macOS/Windows jobs cannot run this action; use
+  the sibling `download-shellcheck-wasm` action to consume an artifact
+  produced by an earlier Linux job in the same workflow.
+inputs:
+  artifact-name:
+    description: |
+      If set, upload the resulting wasm as a workflow artifact with this name
+      so macOS/Windows jobs in the same workflow can download it via
+      actions/download-artifact.
+    required: false
+    default: ""
+outputs:
+  path:
+    description: Path to the restored or freshly built shellcheck.wasm.
+    value: ${{ steps.locate.outputs.path }}
+  cache-hit:
+    description: |
+      "true" when actions/cache restored an exact hit, "false" otherwise.
+      Useful for test jobs that want to record whether a fresh build ran.
+    value: ${{ steps.restore.outputs.cache-hit }}
+runs:
+  using: composite
+  steps:
+    - name: Resolve cache key
+      id: key
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Everything that can change the wasm bytes: pinned versions, the build
+        # recipe (Dockerfile + Reactor.hs), and every ast-grep rewrite. The
+        # salt prefix lets us bust stale caches intentionally without bumping a
+        # pinned version (e.g. after fixing a non-hermetic build step).
+        hash=$(
+          find \
+            _tools/shellcheck-wasm/versions.env \
+            _tools/shellcheck-wasm/Dockerfile \
+            _tools/shellcheck-wasm/Reactor.hs \
+            _tools/shellcheck-wasm/rewrites \
+            -type f \
+            | sort \
+            | xargs sha256sum \
+            | sha256sum \
+            | awk '{print $1}'
+        )
+        echo "key=shellcheck-wasm-v1-${hash}" >> "$GITHUB_OUTPUT"
+    - name: Restore cached shellcheck.wasm
+      id: restore
+      uses: actions/cache@v5
+      with:
+        path: internal/shellcheck/wasm/shellcheck.wasm
+        key: ${{ steps.key.outputs.key }}
+    - name: Build shellcheck.wasm (cache miss)
+      if: steps.restore.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! command -v docker >/dev/null 2>&1; then
+          echo "::error::Docker is required to build shellcheck.wasm; run this action on a Linux runner."
+          exit 1
+        fi
+        make shellcheck-wasm
+    - name: Verify artifact
+      id: locate
+      shell: bash
+      run: |
+        set -euo pipefail
+        path=internal/shellcheck/wasm/shellcheck.wasm
+        if [ ! -s "$path" ]; then
+          echo "::error::shellcheck.wasm missing or empty at $path after restore/build"
+          exit 1
+        fi
+        size=$(wc -c <"$path")
+        echo "Restored shellcheck.wasm: ${size} bytes (cache-hit=${{ steps.restore.outputs.cache-hit }})"
+        echo "path=$path" >> "$GITHUB_OUTPUT"
+    - name: Upload wasm as workflow artifact
+      if: inputs.artifact-name != ''
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: internal/shellcheck/wasm/shellcheck.wasm
+        if-no-files-found: error
+        retention-days: 1

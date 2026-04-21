@@ -5,13 +5,19 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/intellij-plugin.yml"
+      - ".github/actions/shellcheck-wasm/**"
+      - ".github/actions/download-shellcheck-wasm/**"
       - "_integrations/intellij-tally/**"
+      - "_tools/shellcheck-wasm/**"
       - "Makefile"
   push:
     branches: [main]
     paths:
       - ".github/workflows/intellij-plugin.yml"
+      - ".github/actions/shellcheck-wasm/**"
+      - ".github/actions/download-shellcheck-wasm/**"
       - "_integrations/intellij-tally/**"
+      - "_tools/shellcheck-wasm/**"
       - "Makefile"
   workflow_dispatch:
 permissions:
@@ -19,14 +25,24 @@ permissions:
 env:
   GOEXPERIMENT: jsonv2
 jobs:
+  shellcheck-wasm:
+    name: Build shellcheck.wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/shellcheck-wasm
+        with:
+          artifact-name: shellcheck-wasm
   build-intellij-plugin:
     name: Build IntelliJ plugin
+    needs: shellcheck-wasm
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
+      - uses: ./.github/actions/download-shellcheck-wasm
         with:
-          lfs: true
+          artifact-name: shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
