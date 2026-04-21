@@ -36,7 +36,7 @@ require (
 	github.com/tetratelabs/wazero v1.11.0
 	github.com/tree-sitter/go-tree-sitter v0.24.0
 	github.com/urfave/cli/v3 v3.8.0
-	github.com/wharflab/tree-sitter-batch v0.9.0
+	github.com/wharflab/tree-sitter-batch v0.11.1
 	github.com/wharflab/tree-sitter-powershell v0.31.0
 	github.com/zricethezav/gitleaks/v8 v8.30.1
 	go.bug.st/lsp v0.1.3
