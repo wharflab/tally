@@ -122,6 +122,37 @@ EOF
 	}
 }
 
+func TestExtractRunScript_FilePayloadWithFlagsAcrossContinuation(t *testing.T) {
+	t.Parallel()
+
+	mapping := extractRunScriptForTest(t, `FROM alpine
+RUN --mount=type=cache,target=/root/.cache,id=cache \
+	--mount=type=bind,source=etc,target=/etc,readonly \
+	<<EOF cat > /etc/app.conf
+enable-rpc=true
+EOF
+`)
+
+	if mapping.IsHeredoc {
+		t.Fatalf(
+			"expected file-payload heredoc to remain non-heredoc data even when flags span continuation lines, got Script=%q",
+			mapping.Script,
+		)
+	}
+	if strings.Contains(mapping.Script, ">>>") {
+		t.Fatalf("unexpected marker content in script %q", mapping.Script)
+	}
+	if !strings.Contains(mapping.Script, "<<EOF cat > /etc/app.conf") {
+		t.Fatalf("expected heredoc command to be preserved in script, got %q", mapping.Script)
+	}
+	if !strings.Contains(mapping.Script, "enable-rpc=true") {
+		t.Fatalf("expected payload lines to remain in script, got %q", mapping.Script)
+	}
+	if mapping.OriginStartLine != 2 {
+		t.Fatalf("expected command origin line 2, got %d", mapping.OriginStartLine)
+	}
+}
+
 func extractRunScriptForTest(t *testing.T, content string) Mapping {
 	t.Helper()
 
