@@ -4,23 +4,31 @@ description: |
   Builds internal/shellcheck/wasm/shellcheck.wasm via buildx with the
   GitHub Actions cache backend (mode=max). Layer caching is handled
   transparently by BuildKit: on cache hit the final wasm is restored from
-  cached layers in seconds; on miss BuildKit rebuilds from the Dockerfile
-  in _tools/shellcheck-wasm/ and primes the cache for subsequent runs.
+  cached layers in ~15 seconds; on miss BuildKit rebuilds from the
+  Dockerfile in _tools/shellcheck-wasm/ (~12 minutes) and primes the cache
+  for subsequent runs.
 
-  The wasm is not checked into the repository; every workflow that needs it
-  runs this action in one Linux job to produce a workflow artifact, which
-  downstream Linux/macOS/Windows jobs pull via the sibling
-  `download-shellcheck-wasm` action. The cache-setup step installs a recent
-  upstream BuildKit so the Dockerfile's `ADD <git-url>?ref=...` instructions
-  work against github.com and gitlab.haskell.org — older BuildKit shipped
-  with some Docker Engine releases mishandles the 301 redirect that drops
-  `.git` from the URL.
+  Every Linux job that needs the wasm (directly or transitively via
+  `go build`/`go test`) should invoke this action before compiling Go code
+  — independent parallel runs are fine, they all share the same GHA cache
+  scope. macOS/Windows jobs cannot run BuildKit; pass `artifact-name` in
+  one Linux job so the action also uploads the wasm as a workflow artifact
+  that `download-shellcheck-wasm` consumes.
+
+  The setup-buildx-action step installs a recent upstream BuildKit so the
+  Dockerfile's `ADD <git-url>?ref=...` instructions work against github.com
+  and gitlab.haskell.org — older BuildKit shipped with some Docker Engine
+  releases mishandles the 301 redirect that drops `.git` from the URL.
 inputs:
   artifact-name:
     description: |
-      Name of the workflow artifact to upload the built wasm as. Downstream
-      jobs in the same workflow retrieve it with download-shellcheck-wasm.
-    required: true
+      When set, upload the built wasm as a workflow artifact under this
+      name. Use this in exactly one Linux job in workflows that have
+      macOS/Windows consumers (which fetch the artifact via
+      download-shellcheck-wasm). Linux-only workflows should leave this
+      blank and have each Linux job call this action directly.
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -43,9 +51,9 @@ runs:
           echo "${key}=${value}" >> "$GITHUB_OUTPUT"
         done < _tools/shellcheck-wasm/versions.env
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
     - name: Build shellcheck.wasm
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@v7
       with:
         context: _tools/shellcheck-wasm
         file: _tools/shellcheck-wasm/Dockerfile
@@ -69,7 +77,8 @@ runs:
         size=$(wc -c <"$path")
         echo "Built shellcheck.wasm: ${size} bytes"
     - name: Upload wasm as workflow artifact
-      uses: actions/upload-artifact@v7
+      if: inputs.artifact-name != ''
+      uses: actions/upload-artifact@v8
       with:
         name: ${{ inputs.artifact-name }}
         path: internal/shellcheck/wasm/shellcheck.wasm

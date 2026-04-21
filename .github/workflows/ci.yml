@@ -12,6 +12,10 @@ permissions:
 env:
   GOEXPERIMENT: jsonv2
 jobs:
+  # Producer job: rebuilds/restores shellcheck.wasm from the buildx GHA cache
+  # (~15s on cache hit) and uploads it as a workflow artifact for
+  # test-windows, which cannot run BuildKit. Linux jobs here call the
+  # composite action directly for parallelism.
   shellcheck-wasm:
     name: Build shellcheck.wasm
     runs-on: ubuntu-latest
@@ -21,13 +25,10 @@ jobs:
         with:
           artifact-name: shellcheck-wasm
   test:
-    needs: shellcheck-wasm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/download-shellcheck-wasm
-        with:
-          artifact-name: shellcheck-wasm
+      - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -91,13 +92,10 @@ jobs:
       - name: Run tests
         run: go test ./... -v -race
   lint:
-    needs: shellcheck-wasm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/download-shellcheck-wasm
-        with:
-          artifact-name: shellcheck-wasm
+      - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -110,13 +108,10 @@ jobs:
           version-file: .golangci-lint-version
   deadcode:
     name: Dead Code Detection
-    needs: shellcheck-wasm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: ./.github/actions/download-shellcheck-wasm
-        with:
-          artifact-name: shellcheck-wasm
+      - uses: ./.github/actions/shellcheck-wasm
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
