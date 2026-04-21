@@ -433,6 +433,8 @@ github.com/wasilibs/wazero-helpers v0.0.0-20240620070341-3dff1577cd52 h1:OvLBa8S
 github.com/wasilibs/wazero-helpers v0.0.0-20240620070341-3dff1577cd52/go.mod h1:jMeV4Vpbi8osrE/pKUxRZkVaA0EX7NZN0A9/oRzgpgY=
 github.com/wharflab/tree-sitter-batch v0.9.0 h1:uHmFC1lW89R/H4ZhqWfkOOe9M4eaQ359z04Bc+RqyFQ=
 github.com/wharflab/tree-sitter-batch v0.9.0/go.mod h1:pn5t1ZUQ6WNU5dCIaWbaR4D5dHgmIQKv66MM8qlMl+8=
+github.com/wharflab/tree-sitter-batch v0.11.1 h1:kR6GDsj4oHVmMMQcNnj3pbSNNPXwAK8+xSH0xWg0ZTo=
+github.com/wharflab/tree-sitter-batch v0.11.1/go.mod h1:pn5t1ZUQ6WNU5dCIaWbaR4D5dHgmIQKv66MM8qlMl+8=
 github.com/wharflab/tree-sitter-powershell v0.31.0 h1:EIAI/kjF17wCDMnwkH1LHrgxPjJ0uDn5PmR+VP3Ei0A=
 github.com/wharflab/tree-sitter-powershell v0.31.0/go.mod h1:KI9j2ME0o0c4T/iHMxP0ei6UR485dRjWPkff85WWfco=
 github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f h1:J9EGpcZtP0E/raorCMxlFGSTBrsSlaDGf3jU/qvAE2c=
