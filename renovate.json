@@ -52,6 +52,23 @@
     },
     {
       "customType": "regex",
+      "managerFilePatterns": ["/^_tools/shellcheck-wasm/versions\\.env$/"],
+      "matchStrings": ["AST_GREP_VERSION\\s*[:=]\\s*(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "ast-grep/ast-grep",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^_tools/shellcheck-wasm/versions\\.env$/"],
+      "matchStrings": ["GHC_WASM_META_COMMIT\\s*[:=]\\s*(?<currentDigest>[a-f0-9]{40})"],
+      "currentValueTemplate": "master",
+      "depNameTemplate": "https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta",
+      "packageNameTemplate": "https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta.git",
+      "datasourceTemplate": "git-refs"
+    },
+    {
+      "customType": "regex",
       "managerFilePatterns": ["/^\\.golangci-lint-version$/", "/^\\.custom-gcl\\.yml$/"],
       "matchStrings": ["(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
       "depNameTemplate": "golangci/golangci-lint",
@@ -98,11 +115,6 @@
       "matchDepNames": ["pmd/pmd"],
       "automerge": true,
       "groupName": "PMD"
-    },
-    {
-      "matchDepNames": ["koalaman/shellcheck"],
-      "automerge": false,
-      "labels": ["dependencies", "renovate", "manual-artifact-update"]
     },
     {
       "matchManagers": ["gomod"],
