@@ -1452,6 +1452,31 @@ severity = "warning"
 				mustSelectRules("tally/php/no-xdebug-in-final-image")...),
 			wantApplied: 1,
 		},
+		// PHP: enable-opcache-in-production inserts
+		// `RUN docker-php-ext-install opcache` after the final FROM for official
+		// php:*fpm*/*apache* images. Fix is FixSuggestion safety, so --fix-unsafe
+		// is needed to apply it in batch mode.
+		{
+			name: "php-enable-opcache-in-production-insert-run",
+			input: "FROM php:8.4-fpm\n" +
+				"WORKDIR /app\n" +
+				"COPY . .\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/php/enable-opcache-in-production")...),
+			wantApplied: 1,
+		},
+		// PHP: enable-opcache-in-production package-manager path. Adds the
+		// matching phpNN-opcache package alongside the existing phpNN-fpm
+		// install on a generic Debian base.
+		{
+			name: "php-enable-opcache-in-production-append-opcache-package",
+			input: "FROM debian:12-slim\n" +
+				"RUN apt-get install -y php8.3-fpm\n" +
+				"CMD [\"php-fpm8.3\", \"-F\"]\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/php/enable-opcache-in-production")...),
+			wantApplied: 1,
+		},
 		// Full composition: two secret mounts (insertion) + two cache mounts
 		// (insertion) + cleanup removal (npm cache clean, --no-cache-dir)
 		// on the same RUN in a single --fix pass.

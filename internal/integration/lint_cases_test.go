@@ -275,6 +275,12 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/php/no-xdebug-in-final-image")...),
 			wantExit: 1,
 		},
+		{
+			name:     "php-enable-opcache-in-production",
+			dir:      "php-enable-opcache-in-production",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/php/enable-opcache-in-production")...),
+			wantExit: 1,
+		},
 
 		// Windows: RUN --mount not supported
 		{

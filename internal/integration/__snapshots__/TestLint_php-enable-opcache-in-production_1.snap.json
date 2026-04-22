@@ -1,0 +1,60 @@
+{
+  "files": [
+    {
+      "file": "testdata/php-enable-opcache-in-production/Dockerfile",
+      "violations": [
+        {
+          "detail": "OPcache stores precompiled PHP bytecode in shared memory, dramatically reducing request-time overhead. Install and enable it in this runtime stage, e.g. RUN docker-php-ext-install opcache.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/php/enable-opcache-in-production/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "testdata/php-enable-opcache-in-production/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "Production PHP web runtime images should install and enable OPcache",
+          "rule": "tally/php/enable-opcache-in-production",
+          "severity": "info",
+          "sourceCode": "FROM php:8.4-fpm AS app",
+          "suggestedFix": {
+            "description": "Add RUN docker-php-ext-install opcache after the final FROM",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 7
+                  },
+                  "file": "testdata/php-enable-opcache-in-production/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 7
+                  }
+                },
+                "newText": "RUN docker-php-ext-install opcache\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}
