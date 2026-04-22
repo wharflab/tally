@@ -1477,6 +1477,24 @@ severity = "warning"
 				mustSelectRules("tally/php/enable-opcache-in-production")...),
 			wantApplied: 1,
 		},
+		// PHP: enable-opcache-in-production composed with sort-packages on the
+		// same RUN. Demonstrates the documented composition: enable-opcache
+		// inserts php8.3-opcache directly after the php8.3-fpm token, which
+		// can leave the list out of sort order (e.g. fpm opcache gd). The
+		// follow-up sort violation is caught by sort-packages on the next
+		// --fix pass; the two rules do not conflict on this pass.
+		{
+			name: "php-enable-opcache-in-production-with-sort-packages",
+			input: "FROM debian:12-slim\n" +
+				"RUN apt-get install -y php8.3-fpm php8.3-gd\n" +
+				"CMD [\"php-fpm8.3\", \"-F\"]\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules(
+					"tally/php/enable-opcache-in-production",
+					"tally/sort-packages",
+				)...),
+			wantApplied: 1, // only enable-opcache applies; sort-packages has nothing to fix on the original
+		},
 		// Full composition: two secret mounts (insertion) + two cache mounts
 		// (insertion) + cleanup removal (npm cache clean, --no-cache-dir)
 		// on the same RUN in a single --fix pass.

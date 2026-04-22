@@ -139,6 +139,19 @@ func stageBaseImageRaw(info *semantic.StageInfo) string {
 // OPcache package next to an existing PHP FPM package in the stage's
 // install commands. Fires only when exactly one php*-fpm package is present
 // across the stage's runs, so the distro/version naming is unambiguous.
+//
+// Cross-rule interactions (fix priority 88):
+//   - tally/sort-packages (priority 9): runs first; sorts any pre-existing
+//     unsorted list before this fix appends. Appending opcache at the end
+//     can leave the list out of order (e.g. "php8.3-fpm php8.3-zlib" +
+//     "php8.3-opcache" -> opcache belongs between); sort-packages then
+//     catches it on the next --fix pass.
+//   - tally/no-multi-spaces (priority 10): the inserted text is " pkg" —
+//     exactly one leading space — so the combined RUN never contains a
+//     multi-space run as a result of this fix.
+//   - tally/prefer-package-cache-mounts (priority 90): operates on RUN
+//     flags (--mount=type=cache), not package args; the two fixes touch
+//     disjoint surfaces and apply in the same pass without conflict.
 func buildOpcachePackageManagerFix(
 	file string,
 	sf *facts.StageFacts,
