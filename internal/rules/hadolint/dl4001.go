@@ -870,14 +870,7 @@ func hintACPFixes(violations []rules.Violation, sourceTool string) {
 // ignoring common version suffixes used by apt/apk/dnf/zypper/yum/choco. Used by
 // firstInstallOccurrence to find the anchor for the cleanup violation.
 func packageMatchesTool(normalized, tool string) bool {
-	name := normalized
-	for _, sep := range []string{"==", "=", "@", ":"} {
-		if idx := strings.Index(name, sep); idx >= 0 {
-			name = name[:idx]
-			break
-		}
-	}
-	return strings.EqualFold(name, tool)
+	return strings.EqualFold(shell.StripPackageVersion(normalized), tool)
 }
 
 // init registers the rule with the default registry.

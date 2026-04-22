@@ -253,13 +253,18 @@ func cmdCommandInfo(node *sitter.Node, source []byte) (CommandInfo, bool) {
 			continue
 		}
 		isLiteral := !hasEmbeddedCmdVariableSyntax(text)
+		argStart := child.StartPosition()
+		argEnd := child.EndPosition()
 		info.Args = append(info.Args, text)
 		info.ArgLiteral = append(info.ArgLiteral, isLiteral)
-		argEnd := child.EndPosition()
+		info.ArgRanges = append(info.ArgRanges, ArgRange{
+			Line:     int(argStart.Row),
+			StartCol: int(argStart.Column),
+			EndCol:   int(argEnd.Column),
+		})
 		info.CommandEndLine = int(argEnd.Row)
 		info.CommandEndCol = int(argEnd.Column)
 		if info.Subcommand == "" && !strings.HasPrefix(text, "/") {
-			argStart := child.StartPosition()
 			info.Subcommand = text
 			info.SubcommandLine = int(argStart.Row)
 			info.SubcommandStartCol = int(argStart.Column)

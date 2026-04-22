@@ -29,6 +29,38 @@ type InstallCommand struct {
 	Packages   []PackageArg // non-flag args after subcommand, with positions
 }
 
+// StripPackageVersion returns the package name with any trailing version
+// specifier removed. Handles the forms used by the package-manager syntaxes
+// tally understands:
+//
+//   - apt/apk/dnf/yum/zypper: "name=1.2"
+//   - pip: "name==1.2"
+//   - npm/yarn/pnpm/bun: "name@1.2" — a leading "@" is a scope
+//     marker (e.g. "@types/node"), so the version separator is the first
+//     "@" past index 0, not the first "@" overall
+//   - Debian arch qualifier / rpm epoch: "libfoo:amd64", "foo:1-2"
+//
+// The caller is expected to pass an already-normalized (unquoted) token.
+func StripPackageVersion(name string) string {
+	// "==" before "=" so "pkg==1" strips to "pkg" instead of "pkg=" with
+	// a trailing "=1" left behind.
+	if before, _, ok := strings.Cut(name, "=="); ok {
+		return before
+	}
+	if before, _, ok := strings.Cut(name, "="); ok {
+		return before
+	}
+	// Scoped npm package: leading "@" belongs to the name. Only an "@"
+	// past the first character counts as a version separator.
+	if idx := strings.Index(name[min(len(name), 1):], "@"); idx >= 0 {
+		return name[:idx+min(len(name), 1)]
+	}
+	if before, _, ok := strings.Cut(name, ":"); ok {
+		return before
+	}
+	return name
+}
+
 // installManagerInfo describes how to parse a package manager command for sorting.
 type installManagerInfo struct {
 	installCommands []string
@@ -150,9 +182,44 @@ var pipFileArgs = map[string]bool{
 }
 
 // FindInstallPackages parses a shell script and extracts install commands with
-// per-argument position information. Positions are 0-based line and column offsets
-// within the source text.
+// per-argument position information. Positions are 0-based line and column
+// offsets within the source text.
+//
+// Dispatches to a variant-aware path: shells with tree-sitter grammars
+// (PowerShell, cmd) are handled via FindCommands so their native tokenization
+// and line-continuation rules are honored; POSIX variants go through the
+// mvdan.cc/sh AST walker for full flag/wrapper fidelity.
 func FindInstallPackages(script string, variant Variant) []InstallCommand {
+	if variant.IsPowerShell() || variant == VariantCmd {
+		return findInstallPackagesViaFindCommands(script, variant)
+	}
+	return findInstallPackagesViaPOSIX(script, variant)
+}
+
+// findInstallPackagesViaFindCommands builds install commands from FindCommands
+// output — the only entry point that honors tree-sitter grammars for cmd and
+// PowerShell. Relies on CommandInfo.Args / CommandInfo.ArgRanges so package
+// positions map back to the original script correctly.
+func findInstallPackagesViaFindCommands(script string, variant Variant) []InstallCommand {
+	srcLines := strings.Split(script, "\n")
+	managerNames := make([]string, 0, len(installManagers))
+	for name := range installManagers {
+		managerNames = append(managerNames, name)
+	}
+	var commands []InstallCommand
+	for _, cmd := range FindCommands(script, variant, managerNames...) {
+		mgr, found := installManagers[cmd.Name]
+		if !found {
+			continue
+		}
+		if ic := extractInstallFromCommandInfo(cmd, mgr, srcLines); ic != nil {
+			commands = append(commands, *ic)
+		}
+	}
+	return commands
+}
+
+func findInstallPackagesViaPOSIX(script string, variant Variant) []InstallCommand {
 	parser := syntax.NewParser(
 		syntax.Variant(variant.toLangVariant()),
 		syntax.KeepComments(false),
@@ -200,6 +267,113 @@ func FindInstallPackages(script string, variant Variant) []InstallCommand {
 	})
 
 	return commands
+}
+
+// extractInstallFromCommandInfo builds an InstallCommand from a CommandInfo
+// produced by FindCommands. Mirrors extractInstallCommand but works with the
+// string/ArgRange representation instead of syntax.Word nodes.
+func extractInstallFromCommandInfo(
+	cmd CommandInfo,
+	mgr installManagerInfo,
+	srcLines []string,
+) *InstallCommand {
+	if len(cmd.ArgRanges) != len(cmd.Args) {
+		// Parser didn't preserve arg ranges; falling back would produce
+		// wrong-offset edits, so skip rather than guess.
+		return nil
+	}
+	installIdx, subcommand := findInstallSubcommandInStrings(cmd.Args, mgr.installCommands)
+	if installIdx < 0 {
+		return nil
+	}
+
+	// Pip file-based installs: skip entirely so they aren't treated as
+	// package lists.
+	isPip := cmd.Name == "pip" || cmd.Name == "pip3" || strings.HasPrefix(subcommand, "pip")
+	if isPip {
+		for _, arg := range cmd.Args[installIdx+1:] {
+			if arg == "" {
+				continue
+			}
+			if pipFileArgs[arg] {
+				return nil
+			}
+			if !strings.HasPrefix(arg, "-") && (strings.HasPrefix(arg, ".") || strings.HasPrefix(arg, "/")) {
+				return nil
+			}
+		}
+	}
+
+	packages := make([]PackageArg, 0, len(cmd.Args)-installIdx)
+	skipNext := false
+	for i := installIdx + 1; i < len(cmd.Args); i++ {
+		if skipNext {
+			skipNext = false
+			continue
+		}
+		arg := cmd.Args[i]
+		if arg == "" {
+			continue
+		}
+		if strings.HasPrefix(arg, "-") {
+			if flagConsumesValue(arg, mgr.flagsWithValue) {
+				skipNext = true
+			}
+			continue
+		}
+		r := cmd.ArgRanges[i]
+		raw := extractRawToken(srcLines, r.Line, r.StartCol, r.EndCol)
+		packages = append(packages, PackageArg{
+			Value:      raw,
+			Normalized: arg,
+			Line:       r.Line,
+			StartCol:   r.StartCol,
+			EndCol:     r.EndCol,
+			IsVar:      strings.Contains(arg, "$"),
+		})
+	}
+
+	if len(packages) == 0 {
+		return nil
+	}
+
+	return &InstallCommand{
+		Manager:    cmd.Name,
+		Subcommand: subcommand,
+		Packages:   packages,
+	}
+}
+
+// findInstallSubcommandInStrings locates the install subcommand in a []string
+// arg list. Compound subcommands (e.g. "pip install") match consecutive args.
+// Returns the index of the last token of the matched subcommand (so packages
+// start at index+1) and the full subcommand string.
+func findInstallSubcommandInStrings(args, installCommands []string) (int, string) {
+	bestStart := -1
+	bestEndIdx := -1
+	bestCmd := ""
+	for _, cmd := range installCommands {
+		parts := strings.Split(cmd, " ")
+		for j := 0; j+len(parts) <= len(args); j++ {
+			match := true
+			for k, part := range parts {
+				if args[j+k] != part {
+					match = false
+					break
+				}
+			}
+			if !match {
+				continue
+			}
+			if bestStart < 0 || j < bestStart {
+				bestStart = j
+				bestEndIdx = j + len(parts) - 1
+				bestCmd = cmd
+			}
+			break
+		}
+	}
+	return bestEndIdx, bestCmd
 }
 
 // extractInstallCommand extracts package arguments with positions from a call expression.

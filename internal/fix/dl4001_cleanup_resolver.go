@@ -76,7 +76,8 @@ func (r *dl4001CleanupResolver) Resolve(
 // uses the already-parsed AST and the per-stage shell variant so it picks
 // up cmd/PowerShell calls too.
 func (r *dl4001CleanupResolver) stillInvokesSourceTool(ctx cleanupCtx) bool {
-	for _, stage := range ctx.parseResult.Stages {
+	for stageIdx, stage := range ctx.parseResult.Stages {
+		stageInfo := ctx.sem.StageInfo(stageIdx)
 		for _, cmd := range stage.Commands {
 			run, ok := cmd.(*instructions.RunCommand)
 			if !ok {
@@ -85,16 +86,12 @@ func (r *dl4001CleanupResolver) stillInvokesSourceTool(ctx cleanupCtx) bool {
 			if !run.PrependShell && len(run.Files) == 0 {
 				continue
 			}
-			// Use POSIX reconstruction + bash parsing for the scan: bash is
-			// permissive enough to recognize a bare "curl https://..." call
-			// as a command regardless of whether the Dockerfile was authored
-			// for cmd or PowerShell, and backslash continuations match what
-			// the POSIX parser expects.
-			script, _ := resolveRunScript(run, ctx.sm, ctx.escapeToken, shell.VariantBash)
+			variant := runShellVariant(run, stageInfo)
+			script, _ := resolveRunScript(run, ctx.sm, ctx.escapeToken, variant)
 			if script == "" {
 				continue
 			}
-			for _, c := range shell.FindCommands(script, shell.VariantBash, ctx.sourceTool) {
+			for _, c := range shell.FindCommands(script, variant, ctx.sourceTool) {
 				if c.Name == ctx.sourceTool {
 					return true
 				}
@@ -158,10 +155,7 @@ func (r *dl4001CleanupResolver) installEdits(
 		node := nodes[nodeIdx]
 
 		variant := runShellVariant(run, stageInfo)
-		// FindInstallPackages always uses the POSIX AST parser under the
-		// hood, so feed it a backslash-escaped reconstruction regardless of
-		// the stage's native shell.
-		script, startLine := resolveRunScript(run, ctx.sm, ctx.escapeToken, shell.VariantBash)
+		script, startLine := resolveRunScript(run, ctx.sm, ctx.escapeToken, variant)
 		if script == "" {
 			continue
 		}
@@ -462,14 +456,7 @@ func commandMentionsTool(cmd shell.CommandInfo, tool string) bool {
 		if strings.HasPrefix(arg, "-") {
 			continue
 		}
-		name := arg
-		for _, sep := range []string{"==", "=", "@", ":"} {
-			if idx := strings.Index(name, sep); idx >= 0 {
-				name = name[:idx]
-				break
-			}
-		}
-		if strings.EqualFold(name, tool) {
+		if strings.EqualFold(shell.StripPackageVersion(arg), tool) {
 			return true
 		}
 	}
@@ -624,14 +611,7 @@ func dl4001PackageDeleteLocation(
 // token whose normalized name matches tool, stripping common version suffixes.
 func findInstallPackageIndex(pkgs []shell.PackageArg, tool string) (int, shell.PackageArg) {
 	for i, pkg := range pkgs {
-		name := pkg.Normalized
-		for _, sep := range []string{"==", "=", "@", ":"} {
-			if idx := strings.Index(name, sep); idx >= 0 {
-				name = name[:idx]
-				break
-			}
-		}
-		if strings.EqualFold(name, tool) {
+		if strings.EqualFold(shell.StripPackageVersion(pkg.Normalized), tool) {
 			return i, pkg
 		}
 	}
@@ -643,14 +623,7 @@ func findInstallPackageIndex(pkgs []shell.PackageArg, tool string) (int, shell.P
 func installRunHasOtherPackages(installs []shell.InstallCommand, sourceTool string) bool {
 	for _, ic := range installs {
 		for _, pkg := range ic.Packages {
-			name := pkg.Normalized
-			for _, sep := range []string{"==", "=", "@", ":"} {
-				if idx := strings.Index(name, sep); idx >= 0 {
-					name = name[:idx]
-					break
-				}
-			}
-			if !strings.EqualFold(name, sourceTool) {
+			if !strings.EqualFold(shell.StripPackageVersion(pkg.Normalized), sourceTool) {
 				return true
 			}
 		}
