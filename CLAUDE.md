@@ -55,6 +55,8 @@ and a WASM-compiled shellcheck (`internal/shellcheck/`).
   - If a fix needs external data, implement a resolver (`fix.FixResolver`) instead of doing IO/network in the rule.
   - PREFER narrow edits over whole-region replacement (e.g. delete one package token, not the whole install line).
   - Async resolvers run AFTER sync fixes; always scan the post-sync content before emitting edits — don't trust the original state.
+  - In tests, apply a fix's edits back to source with `fix.ApplyFix(src, v.SuggestedFix)` (or `fix.ApplyEdits(src, edits)`) — don't hand-roll a
+    reverse-order `ApplyEdit` loop.
   - tally assumes PowerShell 7+ in Windows containers, so `curl`/`wget` resolve to the binaries (no PS 5.1 alias gotcha).
 
 ## Docs & Schema

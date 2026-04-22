@@ -3,9 +3,46 @@
 package fix
 
 import (
+	"cmp"
+	"slices"
+
 	"github.com/wharflab/tally/internal/config"
 	"github.com/wharflab/tally/internal/rules"
 )
+
+// ApplyEdits applies a set of text edits to src and returns the result.
+// Edits are sorted by descending position (later edits first) so earlier
+// offsets are not invalidated, matching the ordering used by the production
+// fixer for a single fix. Input src is not modified.
+//
+// Intended for tests that want to round-trip a rule's SuggestedFix.Edits
+// back through the source without reimplementing the reverse-order loop.
+func ApplyEdits(src []byte, edits []rules.TextEdit) []byte {
+	if len(edits) == 0 {
+		return src
+	}
+	ordered := slices.Clone(edits)
+	slices.SortStableFunc(ordered, func(a, b rules.TextEdit) int {
+		if c := cmp.Compare(b.Location.Start.Line, a.Location.Start.Line); c != 0 {
+			return c
+		}
+		return cmp.Compare(b.Location.Start.Column, a.Location.Start.Column)
+	})
+	out := src
+	for _, e := range ordered {
+		out = ApplyEdit(out, e)
+	}
+	return out
+}
+
+// ApplyFix applies a SuggestedFix's edits to src and returns the result.
+// Returns src unchanged when fix is nil or has no edits.
+func ApplyFix(src []byte, fix *rules.SuggestedFix) []byte {
+	if fix == nil {
+		return src
+	}
+	return ApplyEdits(src, fix.Edits)
+}
 
 // Re-export FixSafety from rules package for convenience.
 // This allows fix package users to use fix.FixSafe instead of rules.FixSafe.

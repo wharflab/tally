@@ -2,7 +2,6 @@ package fix
 
 import (
 	"context"
-	"slices"
 	"strings"
 	"testing"
 
@@ -326,12 +325,8 @@ func TestDL4001CleanupResolver_DropsInstallSubcommandInChain(t *testing.T) {
 		t.Fatalf("Resolve: %v", err)
 	}
 
-	// Apply edits via the production ApplyEdit helper (back-to-front so
-	// earlier offsets are not invalidated by later deletes).
-	got := []byte(dockerfile)
-	for _, edit := range slices.Backward(edits) {
-		got = ApplyEdit(got, edit)
-	}
+	// Apply edits via the production helper.
+	got := ApplyEdits([]byte(dockerfile), edits)
 	if strings.Contains(string(got), "apt-get install") {
 		t.Fatalf("apt-get install should have been removed:\n%s", got)
 	}
