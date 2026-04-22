@@ -480,6 +480,30 @@ func TestEnableOpcacheInProductionRule_SuggestedFix_PackageManagerRHEL(t *testin
 	}
 }
 
+// Multi-line RUN with backslash continuation: the php*-fpm package lives on
+// line 1 of the reconstructed script (not the RUN line). Validates that
+// DockerfileRunCommandStartCol is only added on line 0, not on continuation
+// lines where the reconstructed source preserves the original indentation.
+func TestEnableOpcacheInProductionRule_SuggestedFix_PackageManagerContinuation(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM debian:12-slim\nRUN apt-get install -y \\\n    php8.3-fpm\nCMD [\"php-fpm8.3\", \"-F\"]\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewEnableOpcacheInProductionRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	v := violations[0]
+	if v.SuggestedFix == nil {
+		t.Fatal("expected SuggestedFix for apt-get install across a continuation line")
+	}
+
+	want := "FROM debian:12-slim\nRUN apt-get install -y \\\n    php8.3-fpm php8.3-opcache\nCMD [\"php-fpm8.3\", \"-F\"]\n"
+	if got := string(fix.ApplyFix([]byte(content), v.SuggestedFix)); got != want {
+		t.Errorf("ApplyFix mismatch:\nwant:\n%q\ngot:\n%q", want, got)
+	}
+}
+
 func TestEnableOpcacheInProductionRule_NoFixWhenMultiplePHPFPMPackages(t *testing.T) {
 	t.Parallel()
 
