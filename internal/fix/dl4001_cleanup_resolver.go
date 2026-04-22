@@ -249,14 +249,25 @@ func extractEnvKeys(node *parser.Node) []string {
 }
 
 // copyTargetsToolConfig reports whether a COPY/ADD instruction writes a known
-// config file for the tool (e.g. /.curlrc, /_curlrc, /.wgetrc, /etc/wgetrc).
-// Heredoc COPYs end up with the destination as the last non-flag argument.
+// config file for the tool. Heredoc COPYs end up with the destination as the
+// last non-flag argument. Two destination shapes count as a match:
+//   - a literal path whose suffix is the tool's config filename
+//     (e.g. `/etc/.wgetrc`, `/root/.curlrc`, or `${CURL_HOME}/.curlrc`
+//     where the ${VAR} prefix is stripped);
+//   - a bare env-var reference to the tool's config env var itself
+//     (e.g. `${WGETRC}` or `${CURL_HOME}`) — the final path is guaranteed
+//     to be the tool's config file by construction.
 func copyTargetsToolConfig(node *parser.Node, sourceTool string) bool {
 	args := copyArgs(node)
 	if len(args) == 0 {
 		return false
 	}
 	dst := args[len(args)-1]
+
+	if name, ok := bareEnvVarName(dst); ok && isToolConfigEnvKey(name, sourceTool) {
+		return true
+	}
+
 	dst = stripEnvReference(dst)
 	dstLower := strings.ToLower(dst)
 	switch sourceTool {
@@ -268,6 +279,25 @@ func copyTargetsToolConfig(node *parser.Node, sourceTool string) bool {
 			strings.HasSuffix(dstLower, "/etc/wgetrc")
 	}
 	return false
+}
+
+// bareEnvVarName returns the variable name for a destination that is entirely
+// an env-var reference with no literal path component (e.g. "${WGETRC}",
+// "$CURL_HOME"). Returns false for empty strings, literal paths, or mixed
+// forms like "${CURL_HOME}/.curlrc" — those are handled by stripEnvReference
+// + suffix matching instead.
+func bareEnvVarName(s string) (string, bool) {
+	if !strings.HasPrefix(s, "$") {
+		return "", false
+	}
+	inner := s[1:]
+	if strings.HasPrefix(inner, "{") && strings.HasSuffix(inner, "}") {
+		inner = inner[1 : len(inner)-1]
+	}
+	if inner == "" || strings.ContainsAny(inner, "/\\${}") {
+		return "", false
+	}
+	return inner, true
 }
 
 // copyArgs returns the non-flag arguments for a COPY/ADD node.

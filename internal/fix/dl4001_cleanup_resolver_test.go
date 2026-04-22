@@ -265,6 +265,54 @@ func TestDL4001CleanupResolver_UsesPerRunShellVariant(t *testing.T) {
 	}
 }
 
+func TestDL4001CleanupResolver_DropsBareEnvVarCopy(t *testing.T) {
+	t.Parallel()
+
+	// COPY destination is a bare env-var reference (no /literal suffix).
+	// "${WGETRC}" expands to the wget config file path at build time, so
+	// the entire COPY is config for wget and must be removed when wget is
+	// evicted. Without handling bare env-var destinations, the previous
+	// code left this COPY in place and produced a broken image referring
+	// to WGETRC after ENV WGETRC was deleted.
+	dockerfile := `FROM ubuntu:22.04
+RUN apt-get install -y curl wget
+ENV WGETRC=/etc/wgetrc
+COPY --chmod=0644 <<EOF ${WGETRC}
+retry_connrefused = on
+EOF
+RUN curl https://example.com/one
+RUN wget https://example.com/two
+`
+
+	r := &dl4001CleanupResolver{}
+	edits, err := r.Resolve(
+		context.Background(),
+		ResolveContext{FilePath: "Dockerfile", Content: []byte(dockerfile)},
+		&rules.SuggestedFix{
+			ResolverID:   rules.DL4001CleanupResolverID,
+			ResolverData: &rules.DL4001CleanupResolveData{SourceTool: "wget"},
+		},
+	)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	// Expect a whole-instruction delete covering the COPY heredoc (lines 4-6).
+	found := false
+	for _, e := range edits {
+		if e.NewText != "" {
+			continue
+		}
+		if e.Location.Start.Line == 4 && e.Location.End.Line >= 7 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected delete of COPY ${WGETRC} heredoc (lines 4-6), edits=%+v", edits)
+	}
+}
+
 func TestDL4001CleanupResolver_DropsCurlrcCopy(t *testing.T) {
 	t.Parallel()
 
