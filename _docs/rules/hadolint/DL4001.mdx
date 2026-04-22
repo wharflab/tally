@@ -56,20 +56,22 @@ Auto mode uses usage-based heuristics, not tool-install flags. The winner — an
 
 The fix runs in two phases:
 
-- **Sync invocation rewrites.** Each offending invocation is rewritten in place. When the source command is a simple HTTP `GET` that follows
-  redirects, fails on HTTP status, and has a literal URL and plain sink (explicit `-o`/`-O` file, stdout pipe, or remote-name), tally lowers it
-  locally through a shared `HTTPTransferOperation` IR and emits a concrete replacement edit. Commands outside that subset fall back to an async
-  AI AutoFix `SuggestedFix` — applying that fallback additionally requires an ACP-capable agent configured in the top-level `[ai]` section.
-- **Post-sync cleanup.** After every sync fix has been applied (including edits from peer rules like `tally/sort-packages` and
-  `tally/prefer-curl-config`), DL4001's async cleanup resolver re-parses the modified Dockerfile and removes anything that's now stale for the
-  evicted tool:
-  - the tool's entry in install commands (package-only for multi-package installs, the whole install-only RUN for single-package installs),
-  - any `.curlrc`/`.wgetrc`-style COPY heredocs that point at the tool's config file,
-  - any `CURL_HOME` / `WGETRC` / `WGETHOSTS` ENV bindings,
-  - tally-authored annotation comments that precede those instructions.
+- **Rewrite each invocation.** Tally doesn't try to translate `curl` flags into the equivalent `wget` flags argument-by-argument — that's
+  a fragile game with many edge cases. Instead, each offending command is read as a single HTTP action ("download this URL into this file",
+  "download this URL and pipe it into `tar`", etc.), and the replacement is produced from scratch using whichever target tool was chosen.
+  What matters for a Docker image build is the *outcome* — which bytes end up where, which errors fail the build — and that's what the
+  rewrite preserves. When a command is too elaborate to reinterpret this way (non-HTTP features, shell interpolation, custom scripting),
+  tally falls back to the AI AutoFix path, which additionally requires an ACP-capable agent configured in the top-level `[ai]` section.
+- **Clean up what's left.** After all the invocation rewrites are applied, tally re-reads the resulting Dockerfile and removes anything
+  that exists only to serve the evicted tool:
+  - the tool's entry in install commands (dropped from the package list, or the whole install RUN if it only installed that one tool),
+  - COPY heredocs that write the tool's config file (`.curlrc` / `.wgetrc` / `/etc/wgetrc`),
+  - `ENV` bindings that point at those config paths (`CURL_HOME`, `WGETRC`, `WGETHOSTS`),
+  - any annotation comments tally itself added when it inserted the config.
 
-Running cleanup after peer-rule sync fixes is what lets DL4001 compose with rules that touch the install line (`sort-packages`) or add tool
-config (`prefer-curl-config`) without conflicting edit ranges.
+Doing the cleanup after the main rewrite is what lets DL4001 play nicely with peer rules. If `tally/sort-packages` reorders the install
+line or `tally/prefer-curl-config` inserts a `.curlrc` heredoc, those edits are already applied by the time cleanup runs, so the cleanup
+sees the finished state and does the right thing instead of fighting anyone for the same source range.
 
 The rule refuses to attach a sync fix when the preferred tool already appears in the same `RUN` (for example `curl ... || wget ...`).
 
