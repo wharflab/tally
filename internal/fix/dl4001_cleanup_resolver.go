@@ -11,6 +11,7 @@ import (
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -42,15 +43,30 @@ func (r *dl4001CleanupResolver) Resolve(
 	}
 	sm := sourcemap.New(resolveCtx.Content)
 
-	escapeToken := parseEscapeToken(parseResult)
+	ctx := cleanupCtx{
+		file:        resolveCtx.FilePath,
+		parseResult: parseResult,
+		sm:          sm,
+		sem:         semantic.NewBuilder(parseResult, nil, resolveCtx.FilePath).Build(),
+		sourceTool:  data.SourceTool,
+		escapeToken: parseEscapeToken(parseResult),
+	}
 	var edits []rules.TextEdit
 	for stageIdx, stage := range parseResult.Stages {
-		edits = append(edits, r.installEdits(
-			resolveCtx.FilePath, stage, stageIdx, parseResult, sm, data.SourceTool, escapeToken,
-		)...)
+		edits = append(edits, r.installEdits(ctx, stage, stageIdx)...)
 	}
 	edits = append(edits, r.configArtifactEdits(resolveCtx.FilePath, parseResult, sm, data.SourceTool)...)
 	return edits, nil
+}
+
+// cleanupCtx bundles per-Resolve state so helpers don't need long argument lists.
+type cleanupCtx struct {
+	file        string
+	parseResult *dockerfile.ParseResult
+	sm          *sourcemap.SourceMap
+	sem         *semantic.Model
+	sourceTool  string
+	escapeToken rune
 }
 
 func parseEscapeToken(parseResult *dockerfile.ParseResult) rune {
@@ -60,24 +76,21 @@ func parseEscapeToken(parseResult *dockerfile.ParseResult) rune {
 	return '\\'
 }
 
-// installEdits emits edits that drop data.SourceTool from every install command
+// installEdits emits edits that drop ctx.sourceTool from every install command
 // in the stage. When the install has other packages, only the matching package
 // token is deleted (plus adjacent whitespace). When the install has just that
 // one package, we fall back to deleting the whole install subcommand (including
 // a leading "&&" glue) or the whole RUN when the install is the only command.
 func (r *dl4001CleanupResolver) installEdits(
-	file string,
+	ctx cleanupCtx,
 	stage instructions.Stage,
 	stageIdx int,
-	parseResult *dockerfile.ParseResult,
-	sm *sourcemap.SourceMap,
-	sourceTool string,
-	escapeToken rune,
 ) []rules.TextEdit {
-	nodes := stageASTChildren(stageIdx, parseResult.AST)
+	nodes := stageASTChildren(stageIdx, ctx.parseResult.AST)
 	if len(nodes) == 0 {
 		return nil
 	}
+	stageInfo := ctx.sem.StageInfo(stageIdx)
 	var edits []rules.TextEdit
 
 	runIdx := -1
@@ -99,11 +112,11 @@ func (r *dl4001CleanupResolver) installEdits(
 		}
 		node := nodes[nodeIdx]
 
-		script, startLine := resolveRunScript(run, sm, escapeToken)
+		script, startLine := resolveRunScript(run, ctx.sm, ctx.escapeToken)
 		if script == "" {
 			continue
 		}
-		variant := runShellVariant(run)
+		variant := runShellVariant(run, stageInfo)
 		installs := shell.FindInstallPackages(script, variant)
 		if len(installs) == 0 {
 			continue
@@ -115,19 +128,19 @@ func (r *dl4001CleanupResolver) installEdits(
 		// the "RUN <<EOF" opener, so there's no prefix to account for.
 		cmdStartCol := 0
 		if len(run.Files) == 0 {
-			firstLine := sm.Line(run.Location()[0].Start.Line - 1)
+			firstLine := ctx.sm.Line(run.Location()[0].Start.Line - 1)
 			cmdStartCol = shell.DockerfileRunCommandStartCol(firstLine)
 		}
 
-		runHasOtherPackages := installRunHasOtherPackages(installs, sourceTool)
+		runHasOtherPackages := installRunHasOtherPackages(installs, ctx.sourceTool)
 		for _, ic := range installs {
-			hit, _ := findInstallPackageIndex(ic.Packages, sourceTool)
+			hit, _ := findInstallPackageIndex(ic.Packages, ctx.sourceTool)
 			if hit < 0 {
 				continue
 			}
 			if len(ic.Packages) >= 2 {
 				edits = append(edits, rules.TextEdit{
-					Location: dl4001PackageDeleteLocation(file, ic.Packages, hit, startLine, cmdStartCol),
+					Location: dl4001PackageDeleteLocation(ctx.file, ic.Packages, hit, startLine, cmdStartCol),
 					NewText:  "",
 				})
 				continue
@@ -135,7 +148,7 @@ func (r *dl4001CleanupResolver) installEdits(
 
 			if !runHasOtherPackages && isRunFullyInstallSubcommand(run, script, variant) {
 				edits = append(edits, rules.TextEdit{
-					Location: dl4001DeleteInstruction(file, node, sm),
+					Location: dl4001DeleteInstruction(ctx.file, node, ctx.sm),
 					NewText:  "",
 				})
 				continue
@@ -399,10 +412,19 @@ func resolveRunScript(run *instructions.RunCommand, sm *sourcemap.SourceMap, esc
 	return shell.ReconstructSourceText(lines, cmdStartCol, escapeToken), startLine
 }
 
-func runShellVariant(_ *instructions.RunCommand) shell.Variant {
-	// The resolver doesn't have stage semantic context; bash is the safe default
-	// for apt/apk/dnf/zypper/yum installs we care about.
-	return shell.VariantBash
+// runShellVariant returns the effective shell variant for a RUN instruction
+// at its position in the stage, accounting for any SHELL instructions that
+// appeared before it. This matters for FindInstallPackages and CountChainedCommands,
+// which dispatch to shell-specific grammar (PowerShell, cmd) when appropriate.
+// Falls back to bash when stage info isn't available (e.g. malformed semantic model).
+func runShellVariant(run *instructions.RunCommand, stageInfo *semantic.StageInfo) shell.Variant {
+	if stageInfo == nil {
+		return shell.VariantBash
+	}
+	if locs := run.Location(); len(locs) > 0 && locs[0].Start.Line > 0 {
+		return stageInfo.ShellVariantAtLine(locs[0].Start.Line)
+	}
+	return stageInfo.ShellSetting.Variant
 }
 
 func init() {

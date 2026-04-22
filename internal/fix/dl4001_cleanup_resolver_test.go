@@ -214,6 +214,57 @@ func TestDL4001CleanupResolver_RespectsBacktickEscape(t *testing.T) {
 	}
 }
 
+func TestDL4001CleanupResolver_UsesPerRunShellVariant(t *testing.T) {
+	t.Parallel()
+
+	// Windows/PowerShell stage: the install uses PowerShell's statement
+	// separator ";" (POSIX treats that as end-of-command), and the choco
+	// install references curl twice — once with a quoted version, once with
+	// a literal name. If the resolver parsed this under bash semantics,
+	// PowerShell-specific tokens would be misread and we'd miss the "curl"
+	// package token. Using the stage's effective shell variant ensures
+	// FindInstallPackages walks the right grammar.
+	dockerfile := "FROM mcr.microsoft.com/windows/servercore:ltsc2025\n" +
+		"SHELL [\"pwsh\", \"-Command\"]\n" +
+		"RUN $ErrorActionPreference='Stop'; choco install -y curl wget ca-certificates\n" +
+		"RUN curl.exe https://example.com/one\n" +
+		"RUN wget.exe https://example.com/two\n"
+
+	r := &dl4001CleanupResolver{}
+	edits, err := r.Resolve(
+		context.Background(),
+		ResolveContext{FilePath: "Dockerfile", Content: []byte(dockerfile)},
+		&rules.SuggestedFix{
+			ResolverID:   rules.DL4001CleanupResolverID,
+			ResolverData: &rules.DL4001CleanupResolveData{SourceTool: "curl"},
+		},
+	)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	// Expect an edit that deletes "curl" from the choco install on line 3.
+	found := false
+	dockerfileLines := strings.Split(dockerfile, "\n")
+	for _, e := range edits {
+		if e.NewText != "" || e.Location.Start.Line != 3 {
+			continue
+		}
+		line := dockerfileLines[2]
+		if e.Location.End.Column > len(line) {
+			t.Fatalf("edit extends past line 3: %+v, line=%q", e.Location, line)
+		}
+		slice := line[e.Location.Start.Column:e.Location.End.Column]
+		if strings.Contains(slice, "curl") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected edit deleting 'curl' from choco install on line 3, edits=%+v", edits)
+	}
+}
+
 func TestDL4001CleanupResolver_DropsCurlrcCopy(t *testing.T) {
 	t.Parallel()
 
