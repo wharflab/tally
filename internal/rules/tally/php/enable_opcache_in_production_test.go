@@ -520,6 +520,30 @@ func TestEnableOpcacheInProductionRule_SuggestedFix_SortPackagesEnabled(t *testi
 	}
 }
 
+// Heredoc RUN: the install command lives in the heredoc body, which
+// starts on the line AFTER "RUN <<EOF". Validates that the fix applies
+// to the correct Dockerfile line (shell-parser columns are 0-based
+// within the heredoc body and need the extra +1 line offset).
+func TestEnableOpcacheInProductionRule_SuggestedFix_PackageManagerHeredoc(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM debian:12-slim\nRUN <<EOF\napt-get install -y php8.3-fpm\nEOF\nCMD [\"php-fpm8.3\", \"-F\"]\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewEnableOpcacheInProductionRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	v := violations[0]
+	if v.SuggestedFix == nil {
+		t.Fatal("expected SuggestedFix for a heredoc RUN installing php*-fpm")
+	}
+
+	want := "FROM debian:12-slim\nRUN <<EOF\napt-get install -y php8.3-fpm php8.3-opcache\nEOF\nCMD [\"php-fpm8.3\", \"-F\"]\n"
+	if got := string(fix.ApplyFix([]byte(content), v.SuggestedFix)); got != want {
+		t.Errorf("ApplyFix mismatch:\nwant:\n%q\ngot:\n%q", want, got)
+	}
+}
+
 // Multi-line RUN with backslash continuation: the php*-fpm package lives on
 // line 1 of the reconstructed script (not the RUN line). Validates that
 // DockerfileRunCommandStartCol is only added on line 0, not on continuation

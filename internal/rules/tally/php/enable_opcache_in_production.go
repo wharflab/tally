@@ -221,10 +221,27 @@ func buildOpcachePackageManagerFix(
 	if len(locs) == 0 {
 		return nil
 	}
-	runStartLine := locs[0].Start.Line // 1-based
+	// Source-line base for shell-parser-relative positions depends on
+	// whether the RUN uses a heredoc:
+	//   - heredoc RUN: body starts on the line AFTER the "RUN <<EOF"
+	//     opener. BuildKit exposes the first body line as Location()[1]
+	//     when available; fall back to opener+1.
+	//   - shell-form RUN: body starts on the opener line itself.
+	// For heredoc bodies cmdStartCol is always 0 (no "RUN " prefix).
+	var (
+		runStartLine = locs[0].Start.Line
+		isHeredoc    = len(targetRun.Run.Files) > 0
+	)
+	if isHeredoc {
+		if len(locs) > 1 {
+			runStartLine = locs[1].Start.Line
+		} else {
+			runStartLine = locs[0].Start.Line + 1
+		}
+	}
 	editLine := runStartLine + anchor.Line
 	editCol := anchor.EndCol
-	if anchor.Line == 0 {
+	if !isHeredoc && anchor.Line == 0 {
 		lineIdx := runStartLine - 1
 		if lineIdx < 0 || lineIdx >= sm.LineCount() {
 			return nil
