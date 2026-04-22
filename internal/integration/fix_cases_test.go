@@ -1478,21 +1478,21 @@ severity = "warning"
 			wantApplied: 1,
 		},
 		// PHP: enable-opcache-in-production composed with sort-packages on the
-		// same RUN. Original list is unsorted AND will have packages both
-		// before and after opcache in the sorted result, so sort-packages is
-		// guaranteed to fire. Demonstrates that the two rules apply together
-		// in one --fix pass without overlapping edits.
+		// same RUN. Exercises the sort-packages-enabled branch of the fix:
+		// the insertion anchors at the LAST original package (php8.3-cli)
+		// rather than at php8.3-fpm, so opcache lands after the sorted
+		// block in a single --fix pass.
 		{
 			name: "php-enable-opcache-in-production-with-sort-packages",
 			input: "FROM debian:12-slim\n" +
-				"RUN apt-get install -y php8.3-zip php8.3-cli php8.3-fpm\n" +
+				"RUN apt-get install -y php8.3-fpm php8.3-cli\n" +
 				"CMD [\"php-fpm8.3\", \"-F\"]\n",
 			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
 				mustSelectRules(
 					"tally/php/enable-opcache-in-production",
 					"tally/sort-packages",
 				)...),
-			wantApplied: 2, // sort-packages reorders + enable-opcache appends opcache
+			wantApplied: 2,
 		},
 		// Full composition: two secret mounts (insertion) + two cache mounts
 		// (insertion) + cleanup removal (npm cache clean, --no-cache-dir)

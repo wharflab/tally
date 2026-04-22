@@ -95,8 +95,8 @@ RUN apt-get install -y php8.3-fpm php8.3-opcache
 - the stage is detected via `CMD`/`ENTRYPOINT` but no `php*-fpm` package is visible in an install command in the same Dockerfile
 - the stage installs **multiple different** `php*-fpm` packages (ambiguous target version)
 
-The package-manager fix composes with `tally/sort-packages`: running tally with `--fix` twice is enough to land an alphabetically sorted list in all
-cases.
+The package-manager fix coordinates with `tally/sort-packages`: when both rules are enabled, the inserted opcache package is appended at the end of
+the install command so that sort-packages produces a correctly ordered list in the same `--fix` pass.
 
 ## Examples
 

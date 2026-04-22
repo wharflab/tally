@@ -19,6 +19,11 @@ import (
 // EnableOpcacheInProductionRuleCode is the full rule code.
 const EnableOpcacheInProductionRuleCode = rules.TallyRulePrefix + "php/enable-opcache-in-production"
 
+// sortPackagesRuleCode identifies the tally/sort-packages rule. Referenced
+// here (rather than imported from the parent tally package) to keep
+// internal/rules/tally/php free of an upward dependency on its parent.
+const sortPackagesRuleCode = rules.TallyRulePrefix + "sort-packages"
+
 // EnableOpcacheInProductionRule flags production PHP web runtime images that
 // do not enable OPcache.
 type EnableOpcacheInProductionRule struct{}
@@ -81,7 +86,13 @@ func (r *EnableOpcacheInProductionRule) Check(input rules.LintInput) []rules.Vio
 	)
 	if fix := buildOpcacheInstallFix(input.File, stage, stageFacts, info, meta.FixPriority); fix != nil {
 		v = v.WithSuggestedFix(fix)
-	} else if fix := buildOpcachePackageManagerFix(input.File, stageFacts, input.SourceMap(), meta.FixPriority); fix != nil {
+	} else if fix := buildOpcachePackageManagerFix(
+		input.File,
+		stageFacts,
+		input.SourceMap(),
+		meta.FixPriority,
+		input.IsRuleEnabled(sortPackagesRuleCode),
+	); fix != nil {
 		v = v.WithSuggestedFix(fix)
 	}
 	return []rules.Violation{v}
@@ -140,23 +151,32 @@ func stageBaseImageRaw(info *semantic.StageInfo) string {
 // install commands. Fires only when exactly one php*-fpm package is present
 // across the stage's runs, so the distro/version naming is unambiguous.
 //
-// Cross-rule interactions (fix priority 88):
-//   - tally/sort-packages (priority 9): runs first; sorts any pre-existing
-//     unsorted list before this fix appends. Appending opcache at the end
-//     can leave the list out of order (e.g. "php8.3-fpm php8.3-zlib" +
-//     "php8.3-opcache" -> opcache belongs between); sort-packages then
-//     catches it on the next --fix pass.
-//   - tally/no-multi-spaces (priority 10): the inserted text is " pkg" —
-//     exactly one leading space — so the combined RUN never contains a
-//     multi-space run as a result of this fix.
-//   - tally/prefer-package-cache-mounts (priority 90): operates on RUN
-//     flags (--mount=type=cache), not package args; the two fixes touch
-//     disjoint surfaces and apply in the same pass without conflict.
+// Fix priority: 88.
+//
+// Insertion anchor depends on whether tally/sort-packages is also enabled
+// in the current run:
+//
+//   - sort-packages enabled: anchor is the LAST package in the install
+//     command. sort-packages edits replace the first literal with the
+//     sorted block and delete the rest; our zero-width insertion at the
+//     final literal's EndCol lands at the trailing boundary of that
+//     deletion (adjacency, not overlap) and ends up appended to the
+//     sorted block, preserving sort order in one --fix pass for the
+//     common case (packages alphabetically before "opcache").
+//   - sort-packages NOT enabled: anchor is the php*-fpm token itself.
+//     The new opcache package is inserted directly after its sibling,
+//     keeping related PHP extensions visually grouped.
+//
+// Both branches produce a single " <pkg>" (one leading space) zero-width
+// insertion, so the fix never creates a multi-space run and does not
+// conflict with tally/no-multi-spaces. The fix also does not overlap
+// with tally/prefer-package-cache-mounts (which operates on RUN flags).
 func buildOpcachePackageManagerFix(
 	file string,
 	sf *facts.StageFacts,
 	sm *sourcemap.SourceMap,
 	priority int,
+	sortPackagesEnabled bool,
 ) *rules.SuggestedFix {
 	if sf == nil || sm == nil {
 		return nil
@@ -193,14 +213,18 @@ func buildOpcachePackageManagerFix(
 	if found != 1 || targetRun == nil || targetRun.Run == nil || !targetRun.UsesShell {
 		return nil
 	}
+	anchor := targetPkg
+	if sortPackagesEnabled && len(targetIC.Packages) > 0 {
+		anchor = targetIC.Packages[len(targetIC.Packages)-1]
+	}
 	locs := targetRun.Run.Location()
 	if len(locs) == 0 {
 		return nil
 	}
 	runStartLine := locs[0].Start.Line // 1-based
-	editLine := runStartLine + targetPkg.Line
-	editCol := targetPkg.EndCol
-	if targetPkg.Line == 0 {
+	editLine := runStartLine + anchor.Line
+	editCol := anchor.EndCol
+	if anchor.Line == 0 {
 		lineIdx := runStartLine - 1
 		if lineIdx < 0 || lineIdx >= sm.LineCount() {
 			return nil

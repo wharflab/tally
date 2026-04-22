@@ -480,6 +480,37 @@ func TestEnableOpcacheInProductionRule_SuggestedFix_PackageManagerRHEL(t *testin
 	}
 }
 
+// When tally/sort-packages is enabled, the fix anchors at the LAST package
+// in the install command (not the php*-fpm token itself) so the inserted
+// opcache lands at the end of the sorted block. This keeps the composition
+// with sort-packages clean: both fixes apply in a single --fix pass and
+// produce a fully sorted list with opcache at the correct position.
+func TestEnableOpcacheInProductionRule_SuggestedFix_SortPackagesEnabled(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM debian:12-slim\nRUN apt-get install -y php8.3-fpm php8.3-cli\nCMD [\"php-fpm8.3\", \"-F\"]\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	input.EnabledRules = []string{
+		EnableOpcacheInProductionRuleCode,
+		sortPackagesRuleCode,
+	}
+	violations := NewEnableOpcacheInProductionRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	v := violations[0]
+	if v.SuggestedFix == nil {
+		t.Fatal("expected SuggestedFix")
+	}
+
+	// Anchor is php8.3-cli (last package), so opcache is inserted AFTER it,
+	// not after php8.3-fpm.
+	want := "FROM debian:12-slim\nRUN apt-get install -y php8.3-fpm php8.3-cli php8.3-opcache\nCMD [\"php-fpm8.3\", \"-F\"]\n"
+	if got := string(fix.ApplyFix([]byte(content), v.SuggestedFix)); got != want {
+		t.Errorf("ApplyFix mismatch:\nwant:\n%q\ngot:\n%q", want, got)
+	}
+}
+
 // Multi-line RUN with backslash continuation: the php*-fpm package lives on
 // line 1 of the reconstructed script (not the RUN line). Validates that
 // DockerfileRunCommandStartCol is only added on line 0, not on continuation
