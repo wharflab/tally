@@ -260,9 +260,26 @@ func buildOpcachePackageManagerFix(
 	}
 }
 
+// osPackageManagersForPHP is the set of install-command managers whose
+// packages follow the phpNN-opcache naming convention. Only installs from
+// these managers can be mapped to a matching OPcache system package;
+// application-level managers (composer, npm, pip, ...) may happen to
+// ship a package called "php-fpm" but it would not come with a
+// companion system OPcache extension.
+var osPackageManagersForPHP = map[string]bool{
+	"apt":      true,
+	"apt-get":  true,
+	"apk":      true,
+	"dnf":      true,
+	"microdnf": true,
+	"yum":      true,
+	"zypper":   true,
+}
+
 // derivePHPOpcachePackage maps a PHP FPM package name to the matching OPcache
 // package name on the same distro family. Returns "" if the package is not a
-// recognized php*-fpm form.
+// recognized php*-fpm form or the install command is not from a supported
+// OS package manager.
 //
 // Supported forms:
 //   - Debian/Ubuntu:    phpMAJOR.MINOR-fpm       -> phpMAJOR.MINOR-opcache
@@ -271,6 +288,9 @@ func buildOpcachePackageManagerFix(
 //   - RHEL/Fedora/UBI:  php-fpm                  -> php-opcache
 //   - Remi SCL:         phpMAJORMINOR-php-fpm    -> phpMAJORMINOR-php-opcache
 func derivePHPOpcachePackage(pkgName, manager string) string {
+	if !osPackageManagersForPHP[strings.ToLower(manager)] {
+		return ""
+	}
 	name := strings.ToLower(shell.StripPackageVersion(pkgName))
 	switch {
 	case name == "php-fpm":
@@ -282,7 +302,6 @@ func derivePHPOpcachePackage(pkgName, manager string) string {
 		// e.g. php8.3-fpm (Debian), php83-fpm (Alpine)
 		return strings.TrimSuffix(name, "-fpm") + "-opcache"
 	default:
-		_ = manager
 		return ""
 	}
 }
@@ -461,7 +480,13 @@ func commandReferencesOpcacheExt(cmd shell.CommandInfo) bool {
 
 // installCommandInstallsOpcache reports whether a normalized package-manager
 // install references an OPcache package (e.g., php-opcache, php8.3-opcache).
+// Only OS-level package managers are considered; an npm/pip/composer package
+// that happens to contain "opcache" in its name does not imply the PHP
+// OPcache extension is enabled in the image.
 func installCommandInstallsOpcache(ic shell.InstallCommand) bool {
+	if !osPackageManagersForPHP[strings.ToLower(ic.Manager)] {
+		return false
+	}
 	for _, pkg := range ic.Packages {
 		name := strings.ToLower(shell.StripPackageVersion(pkg.Normalized))
 		if strings.Contains(name, "opcache") {

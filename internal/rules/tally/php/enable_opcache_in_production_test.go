@@ -307,12 +307,12 @@ func TestCommandReferencesOpcacheExt(t *testing.T) {
 func TestInstallCommandInstallsOpcache(t *testing.T) {
 	t.Parallel()
 
-	makeIC := func(names ...string) shell.InstallCommand {
+	makeIC := func(manager string, names ...string) shell.InstallCommand {
 		pkgs := make([]shell.PackageArg, 0, len(names))
 		for _, n := range names {
 			pkgs = append(pkgs, shell.PackageArg{Normalized: n})
 		}
-		return shell.InstallCommand{Packages: pkgs}
+		return shell.InstallCommand{Manager: manager, Packages: pkgs}
 	}
 
 	tests := []struct {
@@ -320,14 +320,19 @@ func TestInstallCommandInstallsOpcache(t *testing.T) {
 		ic   shell.InstallCommand
 		want bool
 	}{
-		{name: "php-opcache", ic: makeIC("php-opcache"), want: true},
-		{name: "php8.3-opcache", ic: makeIC("php8.3-opcache"), want: true},
-		{name: "php-opcache with version spec", ic: makeIC("php-opcache=8.3+1ubuntu1"), want: true},
-		{name: "php-opcache with arch", ic: makeIC("php-opcache:amd64"), want: true},
-		{name: "alpine pecl variant", ic: makeIC("php83-opcache"), want: true},
-		{name: "mixed packages including opcache", ic: makeIC("php-gd", "php-opcache", "php-intl"), want: true},
-		{name: "no opcache package", ic: makeIC("php-gd", "php-intl"), want: false},
+		{name: "apt php-opcache", ic: makeIC("apt-get", "php-opcache"), want: true},
+		{name: "apt php8.3-opcache", ic: makeIC("apt-get", "php8.3-opcache"), want: true},
+		{name: "apt php-opcache with version spec", ic: makeIC("apt-get", "php-opcache=8.3+1ubuntu1"), want: true},
+		{name: "apt php-opcache with arch", ic: makeIC("apt-get", "php-opcache:amd64"), want: true},
+		{name: "apk php83-opcache", ic: makeIC("apk", "php83-opcache"), want: true},
+		{name: "dnf mixed packages", ic: makeIC("dnf", "php-gd", "php-opcache", "php-intl"), want: true},
+		{name: "apt no opcache", ic: makeIC("apt-get", "php-gd", "php-intl"), want: false},
 		{name: "empty", ic: shell.InstallCommand{}, want: false},
+		// Non-OS package managers must not count as an OPcache signal even
+		// if the package name contains "opcache".
+		{name: "npm fake opcache package", ic: makeIC("npm", "opcache"), want: false},
+		{name: "pip fake opcache package", ic: makeIC("pip", "php-opcache"), want: false},
+		{name: "composer fake opcache package", ic: makeIC("composer", "php-opcache"), want: false},
 	}
 
 	for _, tt := range tests {
@@ -587,24 +592,33 @@ func TestDerivePHPOpcachePackage(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		in   string
-		want string
+		in      string
+		manager string
+		want    string
 	}{
-		{"php8.3-fpm", "php8.3-opcache"},
-		{"php7.4-fpm", "php7.4-opcache"},
-		{"php83-fpm", "php83-opcache"},
-		{"php-fpm", "php-opcache"},
-		{"php83-php-fpm", "php83-php-opcache"},
-		{"PHP8.3-FPM", "php8.3-opcache"},              // case-insensitive
-		{"php8.3-fpm=8.3+1ubuntu1", "php8.3-opcache"}, // version stripped
-		{"php8.3-fpm:amd64", "php8.3-opcache"},        // arch stripped
-		{"php8.3-cli", ""},                            // CLI is not fpm
-		{"nginx", ""},
-		{"", ""},
+		{in: "php8.3-fpm", manager: "apt-get", want: "php8.3-opcache"},
+		{in: "php7.4-fpm", manager: "apt", want: "php7.4-opcache"},
+		{in: "php83-fpm", manager: "apk", want: "php83-opcache"},
+		{in: "php-fpm", manager: "dnf", want: "php-opcache"},
+		{in: "php-fpm", manager: "yum", want: "php-opcache"},
+		{in: "php-fpm", manager: "microdnf", want: "php-opcache"},
+		{in: "php83-php-fpm", manager: "dnf", want: "php83-php-opcache"},
+		{in: "PHP8.3-FPM", manager: "apt-get", want: "php8.3-opcache"}, // case-insensitive
+		{in: "php8.3-fpm=8.3+1ubuntu1", manager: "apt-get", want: "php8.3-opcache"},
+		{in: "php8.3-fpm:amd64", manager: "apt-get", want: "php8.3-opcache"},
+		{in: "php8.3-cli", manager: "apt-get", want: ""}, // CLI is not fpm
+		{in: "nginx", manager: "apt-get", want: ""},
+		{in: "", manager: "apt-get", want: ""},
+		// Non-OS package managers must not receive an OS opcache derivation,
+		// even if the package happens to look like php-fpm.
+		{in: "php8.3-fpm", manager: "npm", want: ""},
+		{in: "php-fpm", manager: "pip", want: ""},
+		{in: "php-fpm", manager: "composer", want: ""},
+		{in: "php-fpm", manager: "", want: ""},
 	}
 	for _, tt := range tests {
-		if got := derivePHPOpcachePackage(tt.in, ""); got != tt.want {
-			t.Errorf("derivePHPOpcachePackage(%q) = %q, want %q", tt.in, got, tt.want)
+		if got := derivePHPOpcachePackage(tt.in, tt.manager); got != tt.want {
+			t.Errorf("derivePHPOpcachePackage(%q, %q) = %q, want %q", tt.in, tt.manager, got, tt.want)
 		}
 	}
 }
