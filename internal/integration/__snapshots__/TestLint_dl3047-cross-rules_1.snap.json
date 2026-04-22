@@ -121,7 +121,7 @@
           }
         },
         {
-          "detail": "Using both wget and curl increases image size and maintenance burden. Standardize on one tool for consistency across the image.",
+          "detail": "Using both wget and curl increases maintenance burden. Replace curl commands with wget to keep the Dockerfile consistent.",
           "docUrl": "https://tally.wharflab.com/rules/hadolint/DL4001/",
           "location": {
             "end": {
@@ -134,7 +134,7 @@
               "line": 13
             }
           },
-          "message": "both wget and curl are used; pick one to reduce image size and complexity",
+          "message": "both wget and curl are used; standardize on wget",
           "rule": "hadolint/DL4001",
           "severity": "warning",
           "sourceCode": "RUN curl -fsSL http://example.com/script.sh | sh",

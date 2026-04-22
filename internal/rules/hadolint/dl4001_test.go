@@ -231,6 +231,20 @@ RUN wget https://example.com/another-file
 			wantCount:       2,
 			wantMsgContains: "both wget and curl are installed",
 		},
+		// Message must NOT contradict the chosen fix direction. Here curl is
+		// installed but wget is the preferred (used-without-install) tool;
+		// the old code said "use curl instead" while the fix rewrote curl → wget.
+		// The new wording mentions wget as the keep-tool.
+		{
+			name: "message names the preferred tool, not the installed one",
+			dockerfile: `FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl
+RUN curl https://example.com/file1
+RUN wget https://example.com/file2
+`,
+			wantCount:       2,
+			wantMsgContains: "switch to wget",
+		},
 	}
 
 	for _, tt := range tests {

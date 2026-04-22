@@ -324,11 +324,11 @@ func (r *DL4001Rule) checkStageConflicts(
 			continue
 		}
 
-		msg := r.generateMessage(wget.installed, curl.installed)
 		stagePreferred := preferredToolForConflict(cfg, wget.occurrences, curl.occurrences)
 		if preferredTool == "" {
 			preferredTool = stagePreferred
 		}
+		msg := r.generateMessage(wget.installed, curl.installed, stagePreferred)
 		occurrences := nonPreferredOccurrences(stagePreferred, wget, curl)
 
 		for _, occurrence := range occurrences {
@@ -348,11 +348,11 @@ func (r *DL4001Rule) checkCrossStageConflicts(
 	anyWgetInstalled := wgetUsage.anyInstalled()
 	anyCurlInstalled := curlUsage.anyInstalled()
 
-	msg := r.generateMessage(anyWgetInstalled, anyCurlInstalled)
-
 	allWget := wgetUsage.allOccurrences()
 	allCurl := curlUsage.allOccurrences()
 	preferredTool := preferredToolForConflict(cfg, allWget, allCurl)
+
+	msg := r.generateMessage(anyWgetInstalled, anyCurlInstalled, preferredTool)
 
 	var occurrences []toolOccurrenceDL4001
 	if preferredTool == dl4001ToolCurl {
@@ -491,37 +491,58 @@ type messageInfoDL4001 struct {
 	detail  string
 }
 
-// generateMessage creates a context-aware message based on which tools are installed.
-func (r *DL4001Rule) generateMessage(wgetInstalled, curlInstalled bool) messageInfoDL4001 {
+// generateMessage creates a context-aware message aligned with the tool that
+// was actually chosen to win (preferredTool). Without this, the wording could
+// contradict the attached fix — e.g. "curl is installed; use curl instead"
+// while the fix rewrites curl → wget because the usage-based heuristics
+// picked wget.
+func (r *DL4001Rule) generateMessage(
+	wgetInstalled, curlInstalled bool,
+	preferredTool string,
+) messageInfoDL4001 {
+	sourceTool := dl4001SourceTool(preferredTool)
+	preferredInstalled, sourceInstalled := wgetInstalled, curlInstalled
+	if preferredTool == dl4001ToolCurl {
+		preferredInstalled, sourceInstalled = curlInstalled, wgetInstalled
+	}
+
 	switch {
-	case curlInstalled && !wgetInstalled:
+	case preferredInstalled && sourceInstalled:
 		return messageInfoDL4001{
-			message: "wget is used but curl is installed; use curl instead to avoid installing wget",
-			detail: "You're already installing curl in this Dockerfile. " +
-				"Using wget requires installing an additional package, increasing image size. " +
-				"Replace wget commands with curl equivalents.",
-		}
-
-	case wgetInstalled && !curlInstalled:
-		return messageInfoDL4001{
-			message: "curl is used but wget is installed; use wget instead to avoid installing curl",
-			detail: "You're already installing wget in this Dockerfile. " +
-				"Using curl requires installing an additional package, increasing image size. " +
-				"Replace curl commands with wget equivalents.",
-		}
-
-	case wgetInstalled && curlInstalled:
-		return messageInfoDL4001{
-			message: "both wget and curl are installed; pick one to reduce image size",
+			message: "both wget and curl are installed; keep " + preferredTool +
+				" and remove " + sourceTool,
 			detail: "Both wget and curl are being installed, which increases image size unnecessarily. " +
-				"Choose one tool and use it consistently across the image.",
+				"Keep " + preferredTool + " and replace " + sourceTool + " usages with " + preferredTool + ".",
 		}
-
-	default:
+	case sourceInstalled && !preferredInstalled:
+		// The non-preferred tool is the one being installed; preferring the
+		// other means the install is redundant once invocations are rewritten.
 		return messageInfoDL4001{
-			message: "both wget and curl are used; pick one to reduce image size and complexity",
-			detail: "Using both wget and curl increases image size and maintenance burden. " +
-				"Standardize on one tool for consistency across the image.",
+			message: sourceTool + " is installed but " + preferredTool +
+				" is available; switch to " + preferredTool + " and drop the " +
+				sourceTool + " install",
+			detail: "You're installing " + sourceTool + " only for a couple of downloads, " +
+				"but " + preferredTool + " is already available. " +
+				"Replace " + sourceTool + " commands with " + preferredTool +
+				" equivalents and drop the " + sourceTool + " install.",
+		}
+	case preferredInstalled && !sourceInstalled:
+		// The preferred tool is installed; the non-preferred tool is coming
+		// from the base image and just needs its invocations rewritten.
+		return messageInfoDL4001{
+			message: preferredTool + " is installed; replace " + sourceTool +
+				" commands with " + preferredTool + " to avoid mixing two tools",
+			detail: "You're already installing " + preferredTool + " in this Dockerfile. " +
+				"Using " + sourceTool + " alongside it adds maintenance burden. " +
+				"Replace " + sourceTool + " commands with " + preferredTool + " equivalents.",
+		}
+	default:
+		// Neither installed — both tools come from the base image. Still
+		// worth standardizing on one to reduce cognitive overhead.
+		return messageInfoDL4001{
+			message: "both wget and curl are used; standardize on " + preferredTool,
+			detail: "Using both wget and curl increases maintenance burden. " +
+				"Replace " + sourceTool + " commands with " + preferredTool + " to keep the Dockerfile consistent.",
 		}
 	}
 }
