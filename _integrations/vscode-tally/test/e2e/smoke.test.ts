@@ -80,7 +80,9 @@ test(
 
     const vscodeVersion = process.env.VSCODE_TEST_VERSION;
 
-    const vscodeExecutablePath = await backOff(() => downloadAndUnzipVSCode(vscodeVersion));
+    const vscodeExecutablePath = await backOff(() =>
+      downloadAndUnzipVSCode({ version: vscodeVersion, extractSync: true }),
+    );
 
     await runTests({
       vscodeExecutablePath,
