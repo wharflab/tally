@@ -265,6 +265,90 @@ func TestDL4001CleanupResolver_UsesPerRunShellVariant(t *testing.T) {
 	}
 }
 
+func TestDL4001CleanupResolver_DropsInstallSubcommandInChain(t *testing.T) {
+	t.Parallel()
+
+	// The install has wget as its only package, but it sits inside a
+	// chained RUN alongside unrelated commands (apt-get update, apt-get
+	// clean). Deleting the whole RUN would drop those side effects; the
+	// resolver must delete just the "apt-get install -y wget" segment.
+	dockerfile := "FROM ubuntu:22.04\n" +
+		"RUN apt-get update && apt-get install -y wget && apt-get clean\n" +
+		"RUN curl https://example.com/one\n" +
+		"RUN wget https://example.com/two\n"
+
+	r := &dl4001CleanupResolver{}
+	edits, err := r.Resolve(
+		context.Background(),
+		ResolveContext{FilePath: "Dockerfile", Content: []byte(dockerfile)},
+		&rules.SuggestedFix{
+			ResolverID:   rules.DL4001CleanupResolverID,
+			ResolverData: &rules.DL4001CleanupResolveData{SourceTool: "wget"},
+		},
+	)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	// Apply all edits (in reverse source order) and verify the result.
+	got := applyEditsToDockerfile(dockerfile, edits)
+	// Install subcommand gone; apt-get update and apt-get clean preserved.
+	if strings.Contains(got, "apt-get install") {
+		t.Fatalf("apt-get install should have been removed:\n%s", got)
+	}
+	if !strings.Contains(got, "apt-get update") {
+		t.Fatalf("apt-get update should be preserved:\n%s", got)
+	}
+	if !strings.Contains(got, "apt-get clean") {
+		t.Fatalf("apt-get clean should be preserved:\n%s", got)
+	}
+}
+
+// applyEditsToDockerfile applies a set of TextEdits to the source Dockerfile.
+// Edits are applied in descending (line, column) order so earlier offsets are
+// not invalidated by later deletes.
+func applyEditsToDockerfile(src string, edits []rules.TextEdit) string {
+	lines := strings.Split(src, "\n")
+	sorted := make([]rules.TextEdit, len(edits))
+	copy(sorted, edits)
+	for i := range sorted {
+		for j := i + 1; j < len(sorted); j++ {
+			a, b := sorted[i].Location, sorted[j].Location
+			if b.Start.Line > a.Start.Line ||
+				(b.Start.Line == a.Start.Line && b.Start.Column > a.Start.Column) {
+				sorted[i], sorted[j] = sorted[j], sorted[i]
+			}
+		}
+	}
+	for _, e := range sorted {
+		startLine := e.Location.Start.Line - 1
+		endLine := e.Location.End.Line - 1
+		startCol := e.Location.Start.Column
+		endCol := e.Location.End.Column
+		if startLine < 0 || startLine >= len(lines) {
+			continue
+		}
+		if startLine == endLine {
+			line := lines[startLine]
+			if endCol > len(line) {
+				endCol = len(line)
+			}
+			lines[startLine] = line[:startCol] + e.NewText + line[endCol:]
+		} else {
+			before := lines[startLine][:startCol]
+			after := ""
+			if endLine < len(lines) && endCol <= len(lines[endLine]) {
+				after = lines[endLine][endCol:]
+			}
+			merged := before + e.NewText + after
+			if endLine+1 <= len(lines) {
+				lines = append(lines[:startLine], append([]string{merged}, lines[endLine+1:]...)...)
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 func TestDL4001CleanupResolver_DropsBareEnvVarCopy(t *testing.T) {
 	t.Parallel()
 

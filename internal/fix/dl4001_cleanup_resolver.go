@@ -153,10 +153,16 @@ func (r *dl4001CleanupResolver) installEdits(
 				})
 				continue
 			}
-			// Single-package install inside a multi-step RUN: deleting the
-			// package leaves a dangling "apt-get install -y". Leave it for a
-			// future pass — the sync rewrites already happened, so emitting
-			// nothing here is safe.
+			// Single-package install inside a multi-step RUN (e.g.
+			// "apt-get update && apt-get install -y wget && apt-get clean"):
+			// produce a narrow delete that drops just the install subcommand
+			// and one adjacent && separator, leaving the other commands intact.
+			if loc, ok := installSubcommandDeleteLocation(
+				ctx.file, script, ic, ctx.sourceTool,
+				variant, startLine, cmdStartCol,
+			); ok {
+				edits = append(edits, rules.TextEdit{Location: loc, NewText: ""})
+			}
 		}
 	}
 	return edits
@@ -336,6 +342,210 @@ func dl4001DeleteInstruction(
 	startLine := sm.EffectiveStartLine(node.StartLine, node.PrevComment)
 	endLine := sm.ResolveEndLine(node.EndLine)
 	return rules.NewRangeLocation(file, startLine, 0, endLine+1, 0)
+}
+
+// installSubcommandDeleteLocation returns a narrow delete range covering one
+// install subcommand and its adjacent "&&"/"||"/";" glue inside a chained RUN
+// (e.g. removes "apt-get install -y wget && " from
+// "apt-get update && apt-get install -y wget && apt-get clean").
+//
+// The returned range is anchored at the install's CommandInfo span (from
+// shell.FindCommands, which already gives us start/end positions); the start
+// or end is then extended to absorb one adjacent separator so we don't leave
+// a dangling "&&" behind. Trailing separator is preferred (keeps the chain's
+// first segment canonical); leading separator is consumed only when the
+// install is the last statement in the chain.
+//
+// ic is the already-identified InstallCommand whose subcommand matches a
+// recognized install verb ("install"/"add"/"require"/"i"); it's used to
+// correlate the right CommandInfo when a script contains multiple manager
+// invocations (e.g. apt-get update vs apt-get install).
+func installSubcommandDeleteLocation(
+	file, script string, ic shell.InstallCommand, tool string,
+	variant shell.Variant,
+	startLine, cmdStartCol int,
+) (rules.Location, bool) {
+	cmds := shell.FindCommands(script, variant, ic.Manager)
+	for _, c := range cmds {
+		if !c.HasCommandRange {
+			continue
+		}
+		// Correlate by subcommand + presence of the target package token.
+		if c.Subcommand != ic.Subcommand || !commandMentionsTool(c, tool) {
+			continue
+		}
+		// Script-relative command span.
+		startScriptLine, startScriptCol := c.Line, c.StartCol
+		endScriptLine, endScriptCol := c.CommandEndLine, c.CommandEndCol
+
+		// Extend end to eat one trailing && / || / ; separator (preferred).
+		extended := false
+		if sepStart, sepEnd, ok := nextSeparatorAfter(script, endScriptLine, endScriptCol); ok {
+			_ = sepStart
+			endScriptLine, endScriptCol = sepEnd.line, sepEnd.col
+			extended = true
+		}
+		// Otherwise, try a preceding separator so we don't leave "&& <removed>".
+		if !extended {
+			if sepStart, _, ok := prevSeparatorBefore(script, startScriptLine, startScriptCol); ok {
+				startScriptLine, startScriptCol = sepStart.line, sepStart.col
+			}
+		}
+
+		docStartLine := startLine + startScriptLine
+		docEndLine := startLine + endScriptLine
+		docStartCol := startScriptCol
+		docEndCol := endScriptCol
+		if startScriptLine == 0 {
+			docStartCol += cmdStartCol
+		}
+		if endScriptLine == 0 {
+			docEndCol += cmdStartCol
+		}
+		return rules.NewRangeLocation(file, docStartLine, docStartCol, docEndLine, docEndCol), true
+	}
+	return rules.Location{}, false
+}
+
+// commandMentionsTool reports whether a CommandInfo names the evicted tool
+// as a positional argument (stripping version suffixes). Used to distinguish
+// the "apt-get install -y wget" invocation from a sibling "apt-get update".
+func commandMentionsTool(cmd shell.CommandInfo, tool string) bool {
+	for _, arg := range cmd.Args {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		name := arg
+		for _, sep := range []string{"==", "=", "@", ":"} {
+			if idx := strings.Index(name, sep); idx >= 0 {
+				name = name[:idx]
+				break
+			}
+		}
+		if strings.EqualFold(name, tool) {
+			return true
+		}
+	}
+	return false
+}
+
+// scriptPos is a 0-based (line, col) script-relative position.
+type scriptPos struct{ line, col int }
+
+// nextSeparatorAfter walks script bytes starting at (line, col) and, if the
+// next non-whitespace run begins with "&&", "||", or ";", returns the
+// separator's start and the position just after it (and any trailing spaces
+// up to the next command token). Returns false if no separator follows.
+func nextSeparatorAfter(script string, line, col int) (scriptPos, scriptPos, bool) {
+	offset := scriptOffset(script, line, col)
+	if offset < 0 {
+		return scriptPos{}, scriptPos{}, false
+	}
+	// Skip whitespace.
+	wsEnd := offset
+	for wsEnd < len(script) && (script[wsEnd] == ' ' || script[wsEnd] == '\t') {
+		wsEnd++
+	}
+	sepLen := 0
+	switch {
+	case strings.HasPrefix(script[wsEnd:], "&&"):
+		sepLen = 2
+	case strings.HasPrefix(script[wsEnd:], "||"):
+		sepLen = 2
+	case wsEnd < len(script) && script[wsEnd] == ';':
+		sepLen = 1
+	default:
+		return scriptPos{}, scriptPos{}, false
+	}
+	// Consume any whitespace following the separator so the remaining chain
+	// stays flush with how the script was formatted.
+	postEnd := wsEnd + sepLen
+	for postEnd < len(script) && (script[postEnd] == ' ' || script[postEnd] == '\t') {
+		postEnd++
+	}
+	startLine, startCol := scriptLineCol(script, wsEnd)
+	endLine, endCol := scriptLineCol(script, postEnd)
+	_ = startLine
+	_ = startCol
+	return scriptPos{line: line, col: col}, scriptPos{line: endLine, col: endCol}, true
+}
+
+// prevSeparatorBefore walks script bytes backward from (line, col) and, if
+// the preceding non-whitespace run ends with "&&", "||", or ";", returns the
+// position just before that separator's leading whitespace.
+func prevSeparatorBefore(script string, line, col int) (scriptPos, scriptPos, bool) {
+	offset := scriptOffset(script, line, col)
+	if offset < 0 {
+		return scriptPos{}, scriptPos{}, false
+	}
+	i := offset
+	// Walk back over whitespace.
+	for i > 0 && (script[i-1] == ' ' || script[i-1] == '\t') {
+		i--
+	}
+	sepLen := 0
+	switch {
+	case i >= 2 && script[i-2:i] == "&&":
+		sepLen = 2
+	case i >= 2 && script[i-2:i] == "||":
+		sepLen = 2
+	case i >= 1 && script[i-1] == ';':
+		sepLen = 1
+	default:
+		return scriptPos{}, scriptPos{}, false
+	}
+	// Consume whitespace before the separator too.
+	j := i - sepLen
+	for j > 0 && (script[j-1] == ' ' || script[j-1] == '\t') {
+		j--
+	}
+	startLine, startCol := scriptLineCol(script, j)
+	endLine, endCol := scriptLineCol(script, offset)
+	_ = endLine
+	_ = endCol
+	return scriptPos{line: startLine, col: startCol}, scriptPos{line: line, col: col}, true
+}
+
+// scriptOffset converts a 0-based (line, col) pair into a byte offset into
+// script, or -1 when the position is out of range.
+func scriptOffset(script string, line, col int) int {
+	offset := 0
+	curLine := 0
+	for offset < len(script) && curLine < line {
+		if script[offset] == '\n' {
+			curLine++
+		}
+		offset++
+	}
+	if curLine != line {
+		return -1
+	}
+	// Advance within the line.
+	remaining := col
+	for remaining > 0 && offset < len(script) && script[offset] != '\n' {
+		offset++
+		remaining--
+	}
+	if remaining > 0 {
+		return -1
+	}
+	return offset
+}
+
+// scriptLineCol converts a byte offset back to a 0-based (line, col) pair.
+func scriptLineCol(script string, offset int) (int, int) {
+	if offset > len(script) {
+		offset = len(script)
+	}
+	line := 0
+	lineStart := 0
+	for i := range offset {
+		if script[i] == '\n' {
+			line++
+			lineStart = i + 1
+		}
+	}
+	return line, offset - lineStart
 }
 
 // dl4001PackageDeleteLocation computes the span to delete for a single package
