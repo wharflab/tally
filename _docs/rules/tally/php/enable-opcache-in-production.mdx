@@ -95,18 +95,8 @@ RUN apt-get install -y php8.3-fpm php8.3-opcache
 - the stage is detected via `CMD`/`ENTRYPOINT` but no `php*-fpm` package is visible in an install command in the same Dockerfile
 - the stage installs **multiple different** `php*-fpm` packages (ambiguous target version)
 
-### Interaction with other tally rules
-
-The package-manager fix runs at `FixPriority: 88` and inserts a single leading space plus the new package name at the `EndCol` of the existing
-`php*-fpm` token. Interactions with neighboring rules:
-
-- `tally/sort-packages` (priority 9): runs first. This rule sorts the original package list before the opcache fix appends. The inserted token lands
-  immediately after the `php*-fpm` package, which can leave the list out of alphabetical order
-  (e.g., `... php8.3-fpm php8.3-gd` + the fix → `... php8.3-fpm php8.3-opcache php8.3-gd`). `sort-packages` catches that on the next `--fix` pass.
-- `tally/no-multi-spaces` (priority 10): the inserted text is exactly `" phpNN-opcache"` (one leading space), so this fix never creates a multi-space
-  run.
-- `tally/prefer-package-cache-mounts` (priority 90): operates on `RUN` flags (`--mount=type=cache,...`), not package arguments — the two fixes touch
-  disjoint surfaces and compose cleanly in the same pass.
+The package-manager fix composes with `tally/sort-packages`: running tally with `--fix` twice is enough to land an alphabetically sorted list in all
+cases.
 
 ## Examples
 
