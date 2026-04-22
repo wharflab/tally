@@ -188,7 +188,7 @@ func (r *dl4001CleanupResolver) installEdits(
 				continue
 			}
 
-			if !runHasOtherPackages && isRunFullyInstallSubcommand(run, script, variant) {
+			if !runHasOtherPackages && isRunFullyInstallSubcommand(script, variant) {
 				edits = append(edits, rules.TextEdit{
 					Location: dl4001DeleteInstruction(ctx.file, node, ctx.sm),
 					NewText:  "",
@@ -635,7 +635,7 @@ func installRunHasOtherPackages(installs []shell.InstallCommand, sourceTool stri
 // a single install command for the evicted tool, so deleting the whole RUN
 // is safe. Conservative: any additional shell command (update, cleanup, etc.)
 // returns false so we don't drop side effects.
-func isRunFullyInstallSubcommand(_ *instructions.RunCommand, script string, variant shell.Variant) bool {
+func isRunFullyInstallSubcommand(script string, variant shell.Variant) bool {
 	return shell.CountChainedCommands(script, variant) == 1
 }
 
