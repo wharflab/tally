@@ -42,12 +42,22 @@ func (r *dl4001CleanupResolver) Resolve(
 	}
 	sm := sourcemap.New(resolveCtx.Content)
 
+	escapeToken := parseEscapeToken(parseResult)
 	var edits []rules.TextEdit
 	for stageIdx, stage := range parseResult.Stages {
-		edits = append(edits, r.installEdits(resolveCtx.FilePath, stage, stageIdx, parseResult, sm, data.SourceTool)...)
+		edits = append(edits, r.installEdits(
+			resolveCtx.FilePath, stage, stageIdx, parseResult, sm, data.SourceTool, escapeToken,
+		)...)
 	}
 	edits = append(edits, r.configArtifactEdits(resolveCtx.FilePath, parseResult, sm, data.SourceTool)...)
 	return edits, nil
+}
+
+func parseEscapeToken(parseResult *dockerfile.ParseResult) rune {
+	if parseResult != nil && parseResult.AST != nil && parseResult.AST.EscapeToken != 0 {
+		return parseResult.AST.EscapeToken
+	}
+	return '\\'
 }
 
 // installEdits emits edits that drop data.SourceTool from every install command
@@ -62,6 +72,7 @@ func (r *dl4001CleanupResolver) installEdits(
 	parseResult *dockerfile.ParseResult,
 	sm *sourcemap.SourceMap,
 	sourceTool string,
+	escapeToken rune,
 ) []rules.TextEdit {
 	nodes := stageASTChildren(stageIdx, parseResult.AST)
 	if len(nodes) == 0 {
@@ -88,7 +99,7 @@ func (r *dl4001CleanupResolver) installEdits(
 		}
 		node := nodes[nodeIdx]
 
-		script, startLine := resolveRunScript(run, sm)
+		script, startLine := resolveRunScript(run, sm, escapeToken)
 		if script == "" {
 			continue
 		}
@@ -361,7 +372,7 @@ func isRunFullyInstallSubcommand(_ *instructions.RunCommand, script string, vari
 	return shell.CountChainedCommands(script, variant) == 1
 }
 
-func resolveRunScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (string, int) {
+func resolveRunScript(run *instructions.RunCommand, sm *sourcemap.SourceMap, escapeToken rune) (string, int) {
 	if len(run.Files) > 0 {
 		// Heredoc RUN: the body starts on the line AFTER the "RUN <<EOF"
 		// opener. BuildKit reports the opener as Location()[0] and the first
@@ -379,13 +390,13 @@ func resolveRunScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (st
 		return strings.Join(run.CmdLine, " "), 0
 	}
 	startLine := run.Location()[0].Start.Line
-	endLine := sm.ResolveEndLine(run.Location()[0].End.Line)
+	endLine := sm.ResolveEndLineWithEscape(run.Location()[0].End.Line, escapeToken)
 	lines := make([]string, 0, endLine-startLine+1)
 	for line := startLine; line <= endLine; line++ {
 		lines = append(lines, sm.Line(line-1))
 	}
 	cmdStartCol := shell.DockerfileRunCommandStartCol(lines[0])
-	return shell.ReconstructSourceText(lines, cmdStartCol, '\\'), startLine
+	return shell.ReconstructSourceText(lines, cmdStartCol, escapeToken), startLine
 }
 
 func runShellVariant(_ *instructions.RunCommand) shell.Variant {

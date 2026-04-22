@@ -158,6 +158,62 @@ RUN wget https://example.com/two
 	}
 }
 
+func TestDL4001CleanupResolver_RespectsBacktickEscape(t *testing.T) {
+	t.Parallel()
+
+	// Windows Dockerfile with backtick escape: a RUN instruction continues
+	// across lines with backtick. The resolver must honor the escape
+	// directive; otherwise line continuation won't be detected and the
+	// reconstructed script will be wrong.
+	dockerfile := "# escape=`\n" +
+		"FROM mcr.microsoft.com/windows/servercore:ltsc2025\n" +
+		"SHELL [\"pwsh\", \"-Command\"]\n" +
+		"RUN choco install -y `\n" +
+		"    curl `\n" +
+		"    wget\n" +
+		"RUN curl https://example.com/one\n" +
+		"RUN wget https://example.com/two\n"
+
+	r := &dl4001CleanupResolver{}
+	edits, err := r.Resolve(
+		context.Background(),
+		ResolveContext{FilePath: "Dockerfile", Content: []byte(dockerfile)},
+		&rules.SuggestedFix{
+			ResolverID:   rules.DL4001CleanupResolverID,
+			ResolverData: &rules.DL4001CleanupResolveData{SourceTool: "curl"},
+		},
+	)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	// The choco install spans lines 4-6 with "curl" on line 5. A correct
+	// cleanup edit deletes "curl" on line 5 (1-based). If the resolver
+	// assumes backslash escape, it won't detect the continuation and will
+	// miss the "curl" token inside the multi-line install entirely.
+	foundCurlEdit := false
+	dockerfileLines := strings.Split(dockerfile, "\n")
+	for _, e := range edits {
+		if e.NewText != "" {
+			continue
+		}
+		if e.Location.Start.Line == 5 {
+			line := dockerfileLines[4]
+			if e.Location.End.Column > len(line) {
+				t.Fatalf("edit extends past line 5: %+v, line=%q", e.Location, line)
+			}
+			slice := line[e.Location.Start.Column:e.Location.End.Column]
+			if strings.Contains(slice, "curl") {
+				foundCurlEdit = true
+				break
+			}
+		}
+	}
+	if !foundCurlEdit {
+		t.Fatalf("expected edit deleting 'curl' on line 5 of backtick-escaped RUN, edits=%+v", edits)
+	}
+}
+
 func TestDL4001CleanupResolver_DropsCurlrcCopy(t *testing.T) {
 	t.Parallel()
 
