@@ -428,15 +428,14 @@ func installSubcommandDeleteLocation(
 
 		// Extend end to eat one trailing && / || / ; separator (preferred).
 		extended := false
-		if sepStart, sepEnd, ok := nextSeparatorAfter(script, endScriptLine, endScriptCol); ok {
-			_ = sepStart
-			endScriptLine, endScriptCol = sepEnd.line, sepEnd.col
+		if end, ok := nextSeparatorAfter(script, endScriptLine, endScriptCol); ok {
+			endScriptLine, endScriptCol = end.line, end.col
 			extended = true
 		}
 		// Otherwise, try a preceding separator so we don't leave "&& <removed>".
 		if !extended {
-			if sepStart, _, ok := prevSeparatorBefore(script, startScriptLine, startScriptCol); ok {
-				startScriptLine, startScriptCol = sepStart.line, sepStart.col
+			if start, ok := prevSeparatorBefore(script, startScriptLine, startScriptCol); ok {
+				startScriptLine, startScriptCol = start.line, start.col
 			}
 		}
 
@@ -482,12 +481,12 @@ type scriptPos struct{ line, col int }
 
 // nextSeparatorAfter walks script bytes starting at (line, col) and, if the
 // next non-whitespace run begins with "&&", "||", or ";", returns the
-// separator's start and the position just after it (and any trailing spaces
-// up to the next command token). Returns false if no separator follows.
-func nextSeparatorAfter(script string, line, col int) (scriptPos, scriptPos, bool) {
+// position just after the separator (and any trailing whitespace up to the
+// next command token). Returns false if no separator follows.
+func nextSeparatorAfter(script string, line, col int) (scriptPos, bool) {
 	offset := scriptOffset(script, line, col)
 	if offset < 0 {
-		return scriptPos{}, scriptPos{}, false
+		return scriptPos{}, false
 	}
 	// Skip whitespace.
 	wsEnd := offset
@@ -503,7 +502,7 @@ func nextSeparatorAfter(script string, line, col int) (scriptPos, scriptPos, boo
 	case wsEnd < len(script) && script[wsEnd] == ';':
 		sepLen = 1
 	default:
-		return scriptPos{}, scriptPos{}, false
+		return scriptPos{}, false
 	}
 	// Consume any whitespace following the separator so the remaining chain
 	// stays flush with how the script was formatted.
@@ -511,20 +510,17 @@ func nextSeparatorAfter(script string, line, col int) (scriptPos, scriptPos, boo
 	for postEnd < len(script) && (script[postEnd] == ' ' || script[postEnd] == '\t') {
 		postEnd++
 	}
-	startLine, startCol := scriptLineCol(script, wsEnd)
 	endLine, endCol := scriptLineCol(script, postEnd)
-	_ = startLine
-	_ = startCol
-	return scriptPos{line: line, col: col}, scriptPos{line: endLine, col: endCol}, true
+	return scriptPos{line: endLine, col: endCol}, true
 }
 
 // prevSeparatorBefore walks script bytes backward from (line, col) and, if
 // the preceding non-whitespace run ends with "&&", "||", or ";", returns the
 // position just before that separator's leading whitespace.
-func prevSeparatorBefore(script string, line, col int) (scriptPos, scriptPos, bool) {
+func prevSeparatorBefore(script string, line, col int) (scriptPos, bool) {
 	offset := scriptOffset(script, line, col)
 	if offset < 0 {
-		return scriptPos{}, scriptPos{}, false
+		return scriptPos{}, false
 	}
 	i := offset
 	// Walk back over whitespace.
@@ -540,7 +536,7 @@ func prevSeparatorBefore(script string, line, col int) (scriptPos, scriptPos, bo
 	case i >= 1 && script[i-1] == ';':
 		sepLen = 1
 	default:
-		return scriptPos{}, scriptPos{}, false
+		return scriptPos{}, false
 	}
 	// Consume whitespace before the separator too.
 	j := i - sepLen
@@ -548,10 +544,7 @@ func prevSeparatorBefore(script string, line, col int) (scriptPos, scriptPos, bo
 		j--
 	}
 	startLine, startCol := scriptLineCol(script, j)
-	endLine, endCol := scriptLineCol(script, offset)
-	_ = endLine
-	_ = endCol
-	return scriptPos{line: startLine, col: startCol}, scriptPos{line: line, col: col}, true
+	return scriptPos{line: startLine, col: startCol}, true
 }
 
 // scriptOffset converts a 0-based (line, col) pair into a byte offset into
