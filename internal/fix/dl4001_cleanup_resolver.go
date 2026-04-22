@@ -167,45 +167,52 @@ func nodeIsConfigArtifactForTool(node *parser.Node, sourceTool string) bool {
 	return false
 }
 
-// envBindsToToolConfig reports whether an ENV instruction binds a tool-specific
-// config env var (CURL_HOME, WGETRC, WGETHOSTS, CURLHOME — case-insensitive).
+// envBindsToToolConfig reports whether an ENV instruction is dedicated to the
+// tool-specific config env vars (CURL_HOME, CURLHOME, WGETRC, WGETHOSTS). It
+// returns true only when EVERY key in the instruction is a tool-config key;
+// an ENV that mixes tool config with unrelated bindings is left alone so we
+// don't drop the caller's data. Surgical intra-ENV editing (keeping some
+// pairs, deleting others) is intentionally out of scope for this resolver —
+// the risk of mis-quoting or splitting line-continued ENV instructions
+// outweighs the cosmetic win of removing just the tool key.
 func envBindsToToolConfig(node *parser.Node, sourceTool string) bool {
 	keys := extractEnvKeys(node)
+	if len(keys) == 0 {
+		return false
+	}
 	for _, key := range keys {
-		k := strings.ToUpper(key)
-		switch sourceTool {
-		case "curl":
-			if k == "CURL_HOME" || k == "CURLHOME" {
-				return true
-			}
-		case "wget":
-			if k == "WGETRC" || k == "WGETHOSTS" {
-				return true
-			}
+		if !isToolConfigEnvKey(key, sourceTool) {
+			return false
 		}
+	}
+	return true
+}
+
+func isToolConfigEnvKey(key, sourceTool string) bool {
+	k := strings.ToUpper(key)
+	switch sourceTool {
+	case "curl":
+		return k == "CURL_HOME" || k == "CURLHOME"
+	case "wget":
+		return k == "WGETRC" || k == "WGETHOSTS"
 	}
 	return false
 }
 
-// extractEnvKeys returns the keys in an ENV instruction, handling both
-// "ENV KEY VALUE" (single pair) and "ENV K1=V1 K2=V2" (multiple pairs) forms.
+// extractEnvKeys returns the keys in an ENV instruction. BuildKit's parser
+// represents ENV as a chain of (key, value, separator) triples for both
+// "ENV KEY=VALUE" and legacy "ENV KEY VALUE" forms (the trailing separator
+// node is "=" in the first form, empty in the second).
 func extractEnvKeys(node *parser.Node) []string {
 	var keys []string
 	n := node.Next
 	for n != nil {
-		token := n.Value
-		if eq := strings.IndexByte(token, '='); eq > 0 {
-			keys = append(keys, token[:eq])
+		keys = append(keys, n.Value)
+		// Advance past value and separator nodes if present.
+		for step := 0; step < 2 && n.Next != nil; step++ {
 			n = n.Next
-			continue
 		}
-		// KEY VALUE form — collect the key, skip the value.
-		keys = append(keys, token)
-		if n.Next != nil {
-			n = n.Next.Next
-		} else {
-			n = nil
-		}
+		n = n.Next
 	}
 	return keys
 }
