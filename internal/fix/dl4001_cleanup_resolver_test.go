@@ -2,6 +2,7 @@ package fix
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/wharflab/tally/internal/rules"
@@ -88,6 +89,72 @@ RUN wget https://example.com/two
 	}
 	if !foundEnvDelete {
 		t.Fatalf("expected ENV-only line 3 to be deleted, edits=%+v", edits)
+	}
+}
+
+func TestDL4001CleanupResolver_DoesNotMisalignHeredocEdits(t *testing.T) {
+	t.Parallel()
+
+	// Heredoc RUN: the install lives on the first line of the heredoc body,
+	// which does NOT share a column origin with the "RUN <<EOF" line above.
+	// Any edits the resolver emits must either target the right column or
+	// skip the heredoc entirely — they must never reference a column offset
+	// derived from the "RUN <<EOF" line.
+	dockerfile := `FROM ubuntu:22.04
+RUN <<EOF
+apt-get install -y curl wget
+EOF
+RUN curl https://example.com/one
+RUN wget https://example.com/two
+`
+
+	r := &dl4001CleanupResolver{}
+	edits, err := r.Resolve(
+		context.Background(),
+		ResolveContext{FilePath: "Dockerfile", Content: []byte(dockerfile)},
+		&rules.SuggestedFix{
+			ResolverID:   rules.DL4001CleanupResolverID,
+			ResolverData: &rules.DL4001CleanupResolveData{SourceTool: "curl"},
+		},
+	)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	// The install line inside the heredoc is line 3, column 0 ("apt-get ...").
+	// A correct edit for "curl" (multi-package case) would target roughly
+	// line 3, columns near "curl". An INCORRECT edit would either point at a
+	// bogus column (cmdStartCol added from the RUN <<EOF header line) or
+	// reference line 0/outside the file. Assert the heredoc isn't mauled.
+	dockerfileLines := strings.Split(dockerfile, "\n")
+	for _, e := range edits {
+		if e.NewText != "" {
+			continue
+		}
+		startLine := e.Location.Start.Line
+		endLine := e.Location.End.Line
+		if startLine < 1 || endLine < startLine {
+			t.Fatalf("invalid edit range: %+v", e.Location)
+		}
+		if e.Location.Start.Line == 3 {
+			line := dockerfileLines[2]
+			startCol := e.Location.Start.Column
+			endCol := e.Location.End.Column
+			if startCol < 0 || endCol > len(line) || startCol > endCol {
+				t.Fatalf(
+					"edit column out of bounds for heredoc body line %q: %+v",
+					line,
+					e.Location,
+				)
+			}
+			// Whatever slice we cut out must at least contain "curl" — otherwise
+			// we'd be deleting the wrong bytes. Allow a leading space from the
+			// "delete with leading space" branch of packageDeleteLocation.
+			slice := line[startCol:endCol]
+			if !strings.Contains(slice, "curl") {
+				t.Fatalf("heredoc edit deletes %q, which does not contain 'curl'", slice)
+			}
+		}
 	}
 }
 

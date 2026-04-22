@@ -98,8 +98,15 @@ func (r *dl4001CleanupResolver) installEdits(
 			continue
 		}
 
-		firstLine := sm.Line(run.Location()[0].Start.Line - 1)
-		cmdStartCol := shell.DockerfileRunCommandStartCol(firstLine)
+		// Column adjustment applies only to non-heredoc shell-form RUNs, where
+		// the script's line 0 starts after "RUN " plus any flags on the same
+		// Dockerfile line. Heredoc bodies start at column 0 of the line after
+		// the "RUN <<EOF" opener, so there's no prefix to account for.
+		cmdStartCol := 0
+		if len(run.Files) == 0 {
+			firstLine := sm.Line(run.Location()[0].Start.Line - 1)
+			cmdStartCol = shell.DockerfileRunCommandStartCol(firstLine)
+		}
 
 		runHasOtherPackages := installRunHasOtherPackages(installs, sourceTool)
 		for _, ic := range installs {
@@ -356,7 +363,17 @@ func isRunFullyInstallSubcommand(_ *instructions.RunCommand, script string, vari
 
 func resolveRunScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (string, int) {
 	if len(run.Files) > 0 {
-		return run.Files[0].Data, 0
+		// Heredoc RUN: the body starts on the line AFTER the "RUN <<EOF"
+		// opener. BuildKit reports the opener as Location()[0] and the first
+		// body line as Location()[1], so prefer the latter when available
+		// and fall back to opener+1 for hand-rolled test inputs.
+		startLine := 0
+		if loc := run.Location(); len(loc) > 1 {
+			startLine = loc[1].Start.Line
+		} else if len(loc) > 0 {
+			startLine = loc[0].Start.Line + 1
+		}
+		return run.Files[0].Data, startLine
 	}
 	if !run.PrependShell || len(run.Location()) == 0 {
 		return strings.Join(run.CmdLine, " "), 0
