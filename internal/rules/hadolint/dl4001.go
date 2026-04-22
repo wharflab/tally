@@ -12,7 +12,6 @@ import (
 	"github.com/wharflab/tally/internal/rules/configutil"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
-	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 const (
@@ -128,7 +127,11 @@ func (m usageMapDL4001) allOccurrences() []toolOccurrenceDL4001 {
 }
 
 // Check runs the DL4001 rule.
-// It warns when both wget and curl are used in different RUN instructions.
+// It warns when both wget and curl are present in the Dockerfile — either
+// invoked as commands or pulled in by package installs. Each offending
+// invocation gets a narrow sync rewrite; a single extra violation owns an
+// async post-sync cleanup that drops the non-preferred tool from installs
+// and deletes any now-stale config artifacts (e.g. a .curlrc heredoc).
 func (r *DL4001Rule) Check(input rules.LintInput) []rules.Violation {
 	cfg := r.resolveConfig(input.Config)
 	wgetUsage, curlUsage := r.collectToolUsage(input)
@@ -142,27 +145,15 @@ func (r *DL4001Rule) Check(input rules.LintInput) []rules.Violation {
 		violations, preferredTool = r.checkCrossStageConflicts(input, wgetUsage, curlUsage, cfg)
 	}
 
-	if preferredTool != "" {
-		attachInstallRemoval(input, violations, preferredTool)
+	if preferredTool == "" {
+		return violations
 	}
-	dropEmptyInstallOnlyFixes(violations)
-	return violations
-}
 
-// dropEmptyInstallOnlyFixes strips SuggestedFixes that turned out to have no
-// edits (install-only violations for stages whose installs we can't surgically
-// remove). The violation itself is still reported so the user is aware the
-// offending install exists; we just don't attach a no-op fix.
-func dropEmptyInstallOnlyFixes(violations []rules.Violation) {
-	for i := range violations {
-		fix := violations[i].SuggestedFix
-		if fix == nil || fix.NeedsResolve {
-			continue
-		}
-		if len(fix.Edits) == 0 {
-			violations[i].SuggestedFix = nil
-		}
+	if cleanup := r.buildCleanupViolation(input, preferredTool, wgetUsage, curlUsage); cleanup != nil {
+		violations = append(violations, *cleanup)
 	}
+	hintACPFixes(violations, dl4001SourceTool(preferredTool))
+	return violations
 }
 
 func (r *DL4001Rule) resolveConfig(config any) DL4001Config {
@@ -372,6 +363,9 @@ func (r *DL4001Rule) checkCrossStageConflicts(
 
 	violations := make([]rules.Violation, 0, len(occurrences))
 	for _, occurrence := range occurrences {
+		if occurrence.invocationCount == 0 {
+			continue // install-only handled by the cleanup violation
+		}
 		violations = append(violations, r.createViolation(input, occurrence, preferredTool, msg))
 	}
 
@@ -414,12 +408,22 @@ func preferredToolForConflict(cfg DL4001Config, wget, curl []toolOccurrenceDL400
 	return dl4001ToolWget
 }
 
-// nonPreferredOccurrences returns the occurrences of the non-preferred tool in this conflict.
+// nonPreferredOccurrences returns the invocation occurrences of the non-preferred
+// tool. Install-only occurrences (invocationCount==0) are omitted: those stages
+// have no invocation to rewrite, and the cleanup violation emitted separately
+// already covers removing the install and config.
 func nonPreferredOccurrences(preferredTool string, wget, curl *toolUsageDL4001) []toolOccurrenceDL4001 {
+	src := curl.occurrences
 	if preferredTool == dl4001ToolCurl {
-		return wget.occurrences
+		src = wget.occurrences
 	}
-	return curl.occurrences
+	out := make([]toolOccurrenceDL4001, 0, len(src))
+	for _, occ := range src {
+		if occ.invocationCount > 0 {
+			out = append(out, occ)
+		}
+	}
+	return out
 }
 
 func hasUsageWithoutInstall(occurrences []toolOccurrenceDL4001) bool {
@@ -537,20 +541,14 @@ func (r *DL4001Rule) buildSuggestedFix(
 	occurrence toolOccurrenceDL4001,
 	preferredTool string,
 ) *rules.SuggestedFix {
+	if occurrence.invocationCount == 0 {
+		// Install-only occurrence: no invocation to rewrite here. The async
+		// cleanup violation (emitted separately) handles install/config
+		// removal after sync fixes run.
+		return nil
+	}
 	lowerOpts := facts.HTTPTransferLowerOptions{
 		WindowsTarget: dl4001StageIsWindows(input.Semantic, occurrence.stageIdx),
-	}
-	if occurrence.invocationCount == 0 {
-		// Install-only occurrence: no invocation to rewrite. Emit an empty-edit
-		// deterministic fix so attachInstallRemoval can append the install-drop
-		// edits onto it. If no install has a matching removable package (e.g.
-		// single-package install), the fix stays empty and gets pruned by the
-		// final violation pass.
-		return &rules.SuggestedFix{
-			Description: "Drop " + dl4001SourceTool(preferredTool) + " from install",
-			Safety:      rules.FixUnsafe,
-			Edits:       nil,
-		}
 	}
 	if fix := r.buildDeterministicSuggestedFix(input.File, occurrence, preferredTool, lowerOpts); fix != nil {
 		return fix
@@ -563,6 +561,58 @@ func dl4001SourceTool(preferredTool string) string {
 		return dl4001ToolWget
 	}
 	return dl4001ToolCurl
+}
+
+// buildCleanupViolation emits a single violation whose fix is an async
+// post-sync cleanup for the non-preferred tool. The violation is anchored at
+// the first install RUN that installs the source tool; if no such install
+// exists (tool inherited from base image), no cleanup violation is emitted.
+func (r *DL4001Rule) buildCleanupViolation(
+	input rules.LintInput,
+	preferredTool string,
+	wgetUsage, curlUsage usageMapDL4001,
+) *rules.Violation {
+	sourceTool := dl4001SourceTool(preferredTool)
+	installed := false
+	if sourceTool == dl4001ToolCurl {
+		installed = curlUsage.anyInstalled()
+	} else {
+		installed = wgetUsage.anyInstalled()
+	}
+	if !installed || input.Facts == nil || input.File == "" {
+		return nil
+	}
+
+	loc, ok := r.findFirstInstallLocation(input, sourceTool)
+	if !ok {
+		return nil
+	}
+
+	message := "remove stale " + sourceTool + " install and config after switching to " + preferredTool
+	detail := "DL4001 cleanup: after rewriting " + sourceTool + " invocations to " + preferredTool +
+		", the " + sourceTool + " install and any " + sourceTool + "-specific config files are dead weight."
+
+	v := rules.NewViolation(loc, r.Metadata().Code, message, r.Metadata().DefaultSeverity).
+		WithDocURL(r.Metadata().DocURL).
+		WithDetail(detail).
+		WithSuggestedFix(&rules.SuggestedFix{
+			Description:  "Drop " + sourceTool + " install and config",
+			Safety:       rules.FixUnsafe,
+			NeedsResolve: true,
+			ResolverID:   rules.DL4001CleanupResolverID,
+			ResolverData: &rules.DL4001CleanupResolveData{SourceTool: sourceTool},
+		})
+	return &v
+}
+
+func (r *DL4001Rule) findFirstInstallLocation(input rules.LintInput, sourceTool string) (rules.Location, bool) {
+	for _, stageFacts := range input.Facts.Stages() {
+		loc, _, ok := firstInstallOccurrence(input.File, stageFacts, sourceTool)
+		if ok {
+			return loc, true
+		}
+	}
+	return rules.Location{}, false
 }
 
 func (r *DL4001Rule) buildDeterministicSuggestedFix(
@@ -778,51 +828,6 @@ func dl4001ShellVariant(variant shell.Variant) string {
 	}
 }
 
-// attachInstallRemoval augments the fix for the first deterministic violation with
-// edits that drop the non-preferred tool (sourceTool) from any install commands in
-// the Dockerfile. This keeps DL4001 true to its intent: "avoid installing the second
-// tool." For ACP-resolved fallback fixes, the removal hint is carried in the
-// objective facts so the agent can include it in its rewrite.
-//
-// Removal is only attempted when the install has at least two packages. Single-package
-// installs would leave behind a dangling "apt-get install -y" shell command; dropping
-// the whole install subcommand (or the whole RUN) is reserved for the ACP path.
-func attachInstallRemoval(input rules.LintInput, violations []rules.Violation, preferredTool string) {
-	if len(violations) == 0 || input.Facts == nil || input.File == "" {
-		return
-	}
-
-	sourceTool := dl4001ToolCurl
-	if preferredTool == dl4001ToolCurl {
-		sourceTool = dl4001ToolWget
-	}
-
-	sm := input.SourceMap()
-	removalEdits := buildInstallRemovalEdits(input.File, input.Facts, sm, sourceTool)
-
-	// Always hint ACP-resolved fixes so the agent drops the install even when we
-	// couldn't produce deterministic removal edits (e.g. single-package install or
-	// version-pinned package that our normalizer doesn't match).
-	hintACPFixes(violations, sourceTool)
-
-	if len(removalEdits) == 0 {
-		return
-	}
-
-	for i := range violations {
-		fix := violations[i].SuggestedFix
-		if fix == nil || fix.NeedsResolve {
-			continue
-		}
-		wasEmpty := len(fix.Edits) == 0
-		fix.Edits = append(fix.Edits, removalEdits...)
-		if !wasEmpty {
-			fix.Description += "; remove " + sourceTool + " from install"
-		}
-		return
-	}
-}
-
 func hintACPFixes(violations []rules.Violation, sourceTool string) {
 	for i := range violations {
 		fix := violations[i].SuggestedFix
@@ -840,101 +845,11 @@ func hintACPFixes(violations []rules.Violation, sourceTool string) {
 	}
 }
 
-func buildInstallRemovalEdits(
-	file string,
-	fileFacts *facts.FileFacts,
-	sm *sourcemap.SourceMap,
-	sourceTool string,
-) []rules.TextEdit {
-	if fileFacts == nil || sm == nil {
-		return nil
-	}
-	var edits []rules.TextEdit
-	for _, stageFacts := range fileFacts.Stages() {
-		for _, runFacts := range stageFacts.Runs {
-			edits = append(edits, installRemovalEditsForRun(file, runFacts, sm, sourceTool)...)
-		}
-	}
-	return edits
-}
-
-func installRemovalEditsForRun(
-	file string,
-	runFacts *facts.RunFacts,
-	sm *sourcemap.SourceMap,
-	sourceTool string,
-) []rules.TextEdit {
-	if runFacts == nil || runFacts.Run == nil || len(runFacts.Run.Location()) == 0 {
-		return nil
-	}
-	if len(runFacts.InstallCommands) == 0 {
-		return nil
-	}
-
-	startLine := runFacts.Run.Location()[0].Start.Line
-	firstLine := sm.Line(startLine - 1)
-	if firstLine == "" {
-		return nil
-	}
-	cmdStartCol := shell.DockerfileRunCommandStartCol(firstLine)
-
-	var edits []rules.TextEdit
-	for _, ic := range runFacts.InstallCommands {
-		if len(ic.Packages) < 2 {
-			// MVP: skip single-package installs; removing the sole package would leave
-			// a broken "install -y" behind. The ACP path can handle this case.
-			continue
-		}
-		for i, pkg := range ic.Packages {
-			if !packageMatchesTool(pkg.Normalized, sourceTool) {
-				continue
-			}
-			editLoc := packageDeleteLocation(file, ic.Packages, i, startLine, cmdStartCol)
-			edits = append(edits, rules.TextEdit{Location: editLoc, NewText: ""})
-		}
-	}
-	return edits
-}
-
-// packageDeleteLocation computes the Dockerfile-level range to delete for the i-th
-// package in an install command. It also deletes one adjacent whitespace byte to
-// keep the surrounding text cleanly spaced:
-//   - for the first package, the trailing space is consumed instead of a leading one
-//   - for other packages, the preceding space is consumed
-func packageDeleteLocation(
-	file string,
-	pkgs []shell.PackageArg,
-	i, startLine, cmdStartCol int,
-) rules.Location {
-	pkg := pkgs[i]
-	docStartLine := startLine + pkg.Line
-	docEndLine := startLine + pkg.Line
-	docStartCol := pkg.StartCol
-	docEndCol := pkg.EndCol
-	if pkg.Line == 0 {
-		docStartCol += cmdStartCol
-		docEndCol += cmdStartCol
-	}
-	if i == 0 && i+1 < len(pkgs) {
-		// Eat the trailing space toward the next package (same line is the common case).
-		next := pkgs[i+1]
-		if next.Line == pkg.Line && next.StartCol > pkg.EndCol {
-			docEndCol = next.StartCol
-			if pkg.Line == 0 {
-				docEndCol += cmdStartCol
-			}
-		}
-	} else if i > 0 && docStartCol > 0 {
-		docStartCol--
-	}
-	return rules.NewRangeLocation(file, docStartLine, docStartCol, docEndLine, docEndCol)
-}
-
 // packageMatchesTool reports whether a normalized package token matches sourceTool,
-// ignoring common version suffixes used by apt/apk/dnf/zypper/yum/choco.
+// ignoring common version suffixes used by apt/apk/dnf/zypper/yum/choco. Used by
+// firstInstallOccurrence to find the anchor for the cleanup violation.
 func packageMatchesTool(normalized, tool string) bool {
 	name := normalized
-	// Strip version suffixes: "wget=1.2", "wget==1.2", "wget@1.2", "wget:1.2-0".
 	for _, sep := range []string{"==", "=", "@", ":"} {
 		if idx := strings.Index(name, sep); idx >= 0 {
 			name = name[:idx]

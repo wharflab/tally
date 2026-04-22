@@ -2298,11 +2298,15 @@ severity = "warning"
 					"tally/sort-packages",
 				)...),
 			config: "[rules.hadolint.DL4001]\nfix-preference = \"wget\"\n",
-			// Three fixes apply: two DL4001 curl→wget rewrites (one per RUN) and one
-			// prefer-curl-config COPY heredoc insert. sort-packages is superseded by
-			// DL4001's install-line edit and gets skipped; the snapshot is the
-			// authoritative check for the composed output.
-			wantApplied: 3,
+			// Five fixes apply:
+			//   - two DL4001 sync curl→wget rewrites (one per RUN),
+			//   - one sort-packages reorder on the install line (no longer blocked
+			//     since DL4001's sync no longer touches the install),
+			//   - one prefer-curl-config .curlrc COPY heredoc insert,
+			//   - one DL4001 async cleanup that drops curl from the install and
+			//     deletes the now-stale .curlrc + ENV CURL_HOME.
+			// The snapshot is the authoritative check for the composed output.
+			wantApplied: 5,
 		},
 	}
 }

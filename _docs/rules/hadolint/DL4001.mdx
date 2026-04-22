@@ -54,30 +54,26 @@ Auto mode uses usage-based heuristics, not tool-install flags. The winner — an
    total invocations across the Dockerfile wins.
 3. **First seen wins.** If invocation counts tie, the tool whose first use appears earlier in the Dockerfile wins.
 
-Two fix paths exist once the direction is chosen:
+The fix runs in two phases:
 
-- **Deterministic rewrite.** When the offending command is a simple HTTP `GET` that follows redirects, fails on HTTP status, and has a literal URL
-  and plain sink (explicit `-o`/`-O` file, stdout pipe, or remote-name), tally lowers it locally through a shared `HTTPTransferOperation` IR and emits
-  a concrete replacement edit.
-- **AI AutoFix fallback.** When the command falls outside that narrow liftable subset (for example `curl` without `-L`, without `-f`, or with shell
-  interpolation, command substitution, or multi-line continuations), tally emits an async `SuggestedFix` backed by the AI AutoFix resolver. Applying
-  this fallback additionally requires an ACP-capable agent configured in the top-level `[ai]` section.
+- **Sync invocation rewrites.** Each offending invocation is rewritten in place. When the source command is a simple HTTP `GET` that follows
+  redirects, fails on HTTP status, and has a literal URL and plain sink (explicit `-o`/`-O` file, stdout pipe, or remote-name), tally lowers it
+  locally through a shared `HTTPTransferOperation` IR and emits a concrete replacement edit. Commands outside that subset fall back to an async
+  AI AutoFix `SuggestedFix` — applying that fallback additionally requires an ACP-capable agent configured in the top-level `[ai]` section.
+- **Post-sync cleanup.** After every sync fix has been applied (including edits from peer rules like `tally/sort-packages` and
+  `tally/prefer-curl-config`), DL4001's async cleanup resolver re-parses the modified Dockerfile and removes anything that's now stale for the
+  evicted tool:
+  - the tool's entry in install commands (package-only for multi-package installs, the whole install-only RUN for single-package installs),
+  - any `.curlrc`/`.wgetrc`-style COPY heredocs that point at the tool's config file,
+  - any `CURL_HOME` / `WGETRC` / `WGETHOSTS` ENV bindings,
+  - tally-authored annotation comments that precede those instructions.
 
-The rule refuses to attach a fix when the preferred tool already appears in the same `RUN` (for example `curl ... || wget ...`).
+Running cleanup after peer-rule sync fixes is what lets DL4001 compose with rules that touch the install line (`sort-packages`) or add tool
+config (`prefer-curl-config`) without conflicting edit ranges.
+
+The rule refuses to attach a sync fix when the preferred tool already appears in the same `RUN` (for example `curl ... || wget ...`).
 
 On Windows stages the replacement is emitted with a `.exe` suffix (`curl.exe`, `wget.exe`); on Linux stages the bare tool name is used.
-
-### Install removal
-
-When the non-preferred tool is rewritten, the rule also removes it from any multi-package install commands in the Dockerfile. This is the point of
-DL4001 — avoiding the installation of the second tool. Removal follows these rules:
-
-- **Multi-package install** (e.g. `apt-get install -y curl wget`): the non-preferred package is deleted surgically, leaving the other packages
-  untouched.
-- **Version-pinned package** (e.g. `wget=1.21.3-1ubuntu1`): the version suffix is recognized so the right token is removed.
-- **Single-package install** (e.g. `RUN apt-get install -y wget` on its own): the removal is skipped for the deterministic path to avoid leaving
-  behind a dangling `apt-get install -y`. The ACP AutoFix fallback still receives a hint to drop the install, so an agent can rewrite the whole RUN
-  holistically when it handles the rewrite.
 
 ### Deterministic rewrite examples
 

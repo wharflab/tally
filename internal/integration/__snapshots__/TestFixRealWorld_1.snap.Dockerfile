@@ -15,17 +15,13 @@ COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
 --retry 5
 --max-time 300
 EOF
-
-# [tally] wget configuration for improved robustness
-ENV WGETRC=/etc/wgetrc
-
 COPY --chmod=0644 <<EOF ${WGETRC}
 retry_connrefused = on
 timeout = 15
 tries = 5
 EOF
 
-RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update && apt-get install -y --no-install-recommends curl ca-certificates
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update && apt-get install -y --no-install-recommends ca-certificates curl
 
 ARG MAMBA_VERSION
 
@@ -145,11 +141,6 @@ ENV DLC_CONTAINER_TYPE=training
 LABEL org.opencontainers.image.ref.name=ubuntu
 LABEL org.opencontainers.image.version=22.04
 
-#CMD ["/bin/bash"]
-
-# [tally] wget configuration for improved robustness
-ENV WGETRC=/etc/wgetrc
-
 COPY --chmod=0644 <<EOF ${WGETRC}
 retry_connrefused = on
 timeout = 15
@@ -157,7 +148,7 @@ tries = 5
 EOF
 
 RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update \
-    && apt-get install -y build-essential zlib1g-dev libncurses5-dev libgdbm-dev libnss3-dev libssl-dev libreadline-dev libffi-dev libsqlite3-dev libbz2-dev liblzma-dev
+    && apt-get install -y build-essential libbz2-dev libffi-dev libgdbm-dev liblzma-dev libncurses5-dev libnss3-dev libreadline-dev libsqlite3-dev libssl-dev zlib1g-dev
 
 #RUN cd /tmp \
 #    && wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz \
@@ -217,7 +208,7 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=
 set -e
 apt-get update
 apt-get -y upgrade --only-upgrade systemd
-apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7 libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libglib2.0-0 libgl1-mesa-glx libsm6 libxext6 libxrender-dev libgomp1 libibverbs-dev libhwloc-dev libnuma1 libnuma-dev libssl3 libssl-dev libtool openssl python3-dev unzip vim zlib1g-dev pkg-config check libsubunit0 libsubunit-dev
+apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates check cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libgl1-mesa-glx libglib2.0-0 libgomp1 libhwloc-dev libibverbs-dev libnuma-dev libnuma1 libsm6 libssl-dev libssl3 libsubunit-dev libsubunit0 libtool libxext6 libxrender-dev openssl pkg-config python3-dev unzip vim zlib1g-dev libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7
 EOF
 
 ADD --link https://github.com/NVIDIA/nccl.git?ref=v${NCCL_VERSION}-1 /tmp/nccl

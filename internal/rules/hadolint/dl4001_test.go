@@ -46,7 +46,8 @@ RUN apt-get update && apt-get install -y wget
 RUN wget https://example.com/file1
 RUN curl -o file2 https://example.com/file2
 `,
-			wantCount: 1, // One violation for curl
+			// One sync violation for curl plus one async cleanup for the wget install.
+			wantCount: 2,
 			wantCode:  rules.HadolintRulePrefix + "DL4001",
 		},
 		{
@@ -169,15 +170,14 @@ func TestDL4001Rule_Check_SmartMessages(t *testing.T) {
 		wantMsgContains string
 	}{
 		{
+			// Sync rewrite of curl + async cleanup violation for the curl install.
 			name: "curl installed, wget used without install - prefer wget (used-without-install wins)",
 			dockerfile: `FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y curl
 RUN curl https://example.com/file1
 RUN wget https://example.com/file2
 `,
-			// wget is used without being installed, so auto mode prefers wget and
-			// flags the curl usage. The message still reflects the install state.
-			wantCount:       1,
+			wantCount:       2,
 			wantMsgContains: "curl is installed",
 		},
 		{
@@ -187,7 +187,7 @@ RUN apt-get update && apt-get install -y wget
 RUN wget https://example.com/file1
 RUN curl https://example.com/file2
 `,
-			wantCount:       1,
+			wantCount:       2,
 			wantMsgContains: "wget is installed",
 		},
 		{
@@ -197,10 +197,11 @@ RUN apt-get update && apt-get install -y curl wget
 RUN curl https://example.com/file1
 RUN wget https://example.com/file2
 `,
-			wantCount:       1,
+			wantCount:       2,
 			wantMsgContains: "both wget and curl are installed",
 		},
 		{
+			// Neither installed: no cleanup violation, only the sync rewrite.
 			name: "neither installed - generic message",
 			dockerfile: `FROM ubuntu:22.04
 RUN curl https://example.com/file1
@@ -216,9 +217,7 @@ RUN apk add --no-cache curl
 RUN curl https://example.com/file1
 RUN wget https://example.com/file2
 `,
-			// wget is used without install; auto mode prefers wget and flags curl.
-			// Message still reports the install state for user context.
-			wantCount:       1,
+			wantCount:       2,
 			wantMsgContains: "curl is installed",
 		},
 		// Test case from benchmark real-world Dockerfile pattern
@@ -229,7 +228,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 RUN curl -L -o /tmp/file.sh https://example.com/file.sh
 RUN wget https://example.com/another-file
 `,
-			wantCount:       1,
+			wantCount:       2,
 			wantMsgContains: "both wget and curl are installed",
 		},
 	}
@@ -342,11 +341,10 @@ RUN (curl -Ls https://example.com/install.sh || wget -qO- https://example.com/in
 
 			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 			violations := NewDL4001Rule().Check(input)
-			if len(violations) != 1 {
-				t.Fatalf("got %d violations, want 1", len(violations))
+			v, ok := firstNonCleanupViolation(violations)
+			if !ok {
+				t.Fatalf("no non-cleanup violation in %d results", len(violations))
 			}
-
-			v := violations[0]
 			if tt.wantFix {
 				if v.SuggestedFix == nil {
 					t.Fatal("expected SuggestedFix")
@@ -473,20 +471,19 @@ RUN curl -fsSL https://example.com/app.tgz
 			input := testutil.MakeLintInputWithConfig(t, "Dockerfile", tt.dockerfile, tt.config)
 
 			violations := NewDL4001Rule().Check(input)
-			if len(violations) != 1 {
-				t.Fatalf("got %d violations, want 1", len(violations))
+			v, ok := firstNonCleanupViolation(violations)
+			if !ok {
+				t.Fatalf("no sync violation in %d results", len(violations))
 			}
-			v := violations[0]
 			if v.SuggestedFix == nil {
 				t.Fatal("expected SuggestedFix")
 			}
 			if v.SuggestedFix.NeedsResolve {
 				t.Fatalf("NeedsResolve = true, want deterministic fix")
 			}
-			if len(v.SuggestedFix.Edits) < 1 {
-				t.Fatalf("expected at least 1 edit, got %d", len(v.SuggestedFix.Edits))
+			if len(v.SuggestedFix.Edits) != 1 {
+				t.Fatalf("expected 1 edit, got %d", len(v.SuggestedFix.Edits))
 			}
-			// The rewrite edit is always the first; install-removal edits (if any) follow.
 			edit := v.SuggestedFix.Edits[0]
 			if edit.NewText != tt.wantNewText {
 				t.Fatalf("edit NewText = %q, want %q", edit.NewText, tt.wantNewText)
@@ -560,10 +557,10 @@ RUN wget https://example.com/file.tgz
 			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 
 			violations := NewDL4001Rule().Check(input)
-			if len(violations) != 1 {
-				t.Fatalf("got %d violations, want 1", len(violations))
+			v, ok := firstNonCleanupViolation(violations)
+			if !ok {
+				t.Fatalf("no sync violation in %d results", len(violations))
 			}
-			v := violations[0]
 			if v.SuggestedFix == nil {
 				t.Fatal("expected SuggestedFix")
 			}
@@ -597,10 +594,10 @@ RUN wget https://example.com/file.tgz
 	})
 
 	violations := NewDL4001Rule().Check(input)
-	if len(violations) != 1 {
-		t.Fatalf("got %d violations, want 1", len(violations))
+	v, ok := firstNonCleanupViolation(violations)
+	if !ok {
+		t.Fatalf("no sync violation in %d results", len(violations))
 	}
-	v := violations[0]
 	if v.SuggestedFix == nil || v.SuggestedFix.NeedsResolve {
 		t.Fatalf("expected deterministic SuggestedFix, got %+v", v.SuggestedFix)
 	}
@@ -614,59 +611,46 @@ RUN wget https://example.com/file.tgz
 	}
 }
 
-func TestDL4001Rule_InstallRemoval(t *testing.T) {
+func TestDL4001Rule_EmitsAsyncCleanupViolation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		dockerfile  string
-		wantApplied string
+		name            string
+		dockerfile      string
+		wantCleanupTool string
+		wantCleanup     bool
 	}{
 		{
-			// Multi-package install: the non-preferred tool is dropped from the install list
-			// and every invocation is rewritten to the preferred tool. Both tools must be
-			// invoked somewhere for DL4001 to fire.
-			name: "multi-package install drops non-preferred tool",
+			// Both tools installed + invoked: cleanup violation fires for the
+			// non-preferred tool's install and any config artifacts.
+			name: "multi-package install emits cleanup",
 			dockerfile: `FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y curl wget
 RUN curl https://example.com/bootstrap.tgz
 RUN wget https://example.com/file.tgz
 `,
-			wantApplied: `FROM ubuntu:22.04
-RUN apt-get update && apt-get install -y curl
-RUN curl https://example.com/bootstrap.tgz
-RUN curl -fL -O https://example.com/file.tgz
-`,
+			wantCleanup:     true,
+			wantCleanupTool: "wget",
 		},
 		{
-			// Version-pinned package: strip =version before matching so "wget=1.21" still
-			// gets identified as the wget package.
-			name: "version-pinned package is recognized for removal",
-			dockerfile: `FROM ubuntu:22.04
-RUN apt-get update && apt-get install -y curl=7.88.1-10 wget=1.21.3-1ubuntu1
-RUN curl https://example.com/bootstrap.tgz
-RUN wget https://example.com/file.tgz
-`,
-			wantApplied: `FROM ubuntu:22.04
-RUN apt-get update && apt-get install -y curl=7.88.1-10
-RUN curl https://example.com/bootstrap.tgz
-RUN curl -fL -O https://example.com/file.tgz
-`,
-		},
-		{
-			// Single-package install: MVP skips removal to avoid producing a syntactically
-			// broken "apt-get install -y" line. Only the invocation is rewritten.
-			name: "single-package install is left alone",
+			// Only one tool is installed — cleanup still fires to drop it.
+			name: "single-package install of non-preferred tool emits cleanup",
 			dockerfile: `FROM ubuntu:22.04
 RUN apt-get install -y wget
 RUN curl https://example.com/bootstrap.tgz
 RUN wget https://example.com/file.tgz
 `,
-			wantApplied: `FROM ubuntu:22.04
-RUN apt-get install -y wget
+			wantCleanup:     true,
+			wantCleanupTool: "wget",
+		},
+		{
+			// Neither tool is explicitly installed: no cleanup violation needed.
+			name: "no install, no cleanup",
+			dockerfile: `FROM ubuntu:22.04
 RUN curl https://example.com/bootstrap.tgz
-RUN curl -fL -O https://example.com/file.tgz
+RUN wget https://example.com/file.tgz
 `,
+			wantCleanup: false,
 		},
 	}
 
@@ -675,63 +659,29 @@ RUN curl -fL -O https://example.com/file.tgz
 			t.Parallel()
 			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 			violations := NewDL4001Rule().Check(input)
-			if len(violations) == 0 {
-				t.Fatal("expected at least one violation")
-			}
 
-			var edits []rules.TextEdit
+			var cleanup *rules.SuggestedFix
 			for _, v := range violations {
-				if v.SuggestedFix == nil {
-					continue
+				if v.SuggestedFix != nil && v.SuggestedFix.ResolverID == rules.DL4001CleanupResolverID {
+					cleanup = v.SuggestedFix
+					break
 				}
-				edits = append(edits, v.SuggestedFix.Edits...)
 			}
-			got := applyEditsInReverse(tt.dockerfile, edits)
-			if got != tt.wantApplied {
-				t.Fatalf("applied diff:\n--- want\n%s\n--- got\n%s", tt.wantApplied, got)
+			if tt.wantCleanup != (cleanup != nil) {
+				t.Fatalf("cleanup present = %v, want %v", cleanup != nil, tt.wantCleanup)
+			}
+			if !tt.wantCleanup {
+				return
+			}
+			data, ok := cleanup.ResolverData.(*rules.DL4001CleanupResolveData)
+			if !ok || data == nil {
+				t.Fatalf("unexpected ResolverData %T", cleanup.ResolverData)
+			}
+			if data.SourceTool != tt.wantCleanupTool {
+				t.Fatalf("SourceTool = %q, want %q", data.SourceTool, tt.wantCleanupTool)
 			}
 		})
 	}
-}
-
-// applyEditsInReverse applies a slice of TextEdits to src by replaying them in
-// descending source order so earlier offsets are not invalidated by later deletes.
-// This is a test helper only; the production fix pipeline has its own applier.
-func applyEditsInReverse(src string, edits []rules.TextEdit) string {
-	lines := strings.Split(src, "\n")
-	sorted := make([]rules.TextEdit, len(edits))
-	copy(sorted, edits)
-	for i := range sorted {
-		for j := i + 1; j < len(sorted); j++ {
-			a, b := sorted[i].Location, sorted[j].Location
-			if b.Start.Line > a.Start.Line ||
-				(b.Start.Line == a.Start.Line && b.Start.Column > a.Start.Column) {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
-	for _, e := range sorted {
-		startLine := e.Location.Start.Line - 1
-		endLine := e.Location.End.Line - 1
-		startCol := e.Location.Start.Column
-		endCol := e.Location.End.Column
-		if startLine < 0 || startLine >= len(lines) {
-			continue
-		}
-		if startLine == endLine {
-			line := lines[startLine]
-			if endCol > len(line) {
-				endCol = len(line)
-			}
-			lines[startLine] = line[:startCol] + e.NewText + line[endCol:]
-		} else {
-			before := lines[startLine][:startCol]
-			after := lines[endLine][endCol:]
-			merged := before + e.NewText + after
-			lines = append(lines[:startLine], append([]string{merged}, lines[endLine+1:]...)...)
-		}
-	}
-	return strings.Join(lines, "\n")
 }
 
 func TestDL4001Rule_InstallRemovalHintsACPFallback(t *testing.T) {
@@ -834,10 +784,10 @@ RUN curl https://example.com/file3
 			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
 
 			violations := NewDL4001Rule().Check(input)
-			if len(violations) == 0 {
-				t.Fatal("expected at least one violation")
+			v, ok := firstNonCleanupViolation(violations)
+			if !ok {
+				t.Fatalf("no sync violation in %d results", len(violations))
 			}
-			v := violations[0]
 			if v.SuggestedFix == nil {
 				t.Fatal("expected SuggestedFix")
 			}
@@ -853,4 +803,18 @@ RUN curl https://example.com/file3
 			}
 		})
 	}
+}
+
+// firstNonCleanupViolation returns the first violation whose fix is not the
+// async DL4001 cleanup resolver. Tests for sync-path behavior use this to
+// filter out the optional cleanup violation that fires when a tool is
+// explicitly installed.
+func firstNonCleanupViolation(violations []rules.Violation) (rules.Violation, bool) {
+	for _, v := range violations {
+		if v.SuggestedFix != nil && v.SuggestedFix.ResolverID == rules.DL4001CleanupResolverID {
+			continue
+		}
+		return v, true
+	}
+	return rules.Violation{}, false
 }
