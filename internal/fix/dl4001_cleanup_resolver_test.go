@@ -2,6 +2,7 @@ package fix
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -325,63 +326,21 @@ func TestDL4001CleanupResolver_DropsInstallSubcommandInChain(t *testing.T) {
 		t.Fatalf("Resolve: %v", err)
 	}
 
-	// Apply all edits (in reverse source order) and verify the result.
-	got := applyEditsToDockerfile(dockerfile, edits)
-	// Install subcommand gone; apt-get update and apt-get clean preserved.
-	if strings.Contains(got, "apt-get install") {
+	// Apply edits via the production ApplyEdit helper (back-to-front so
+	// earlier offsets are not invalidated by later deletes).
+	got := []byte(dockerfile)
+	for _, edit := range slices.Backward(edits) {
+		got = ApplyEdit(got, edit)
+	}
+	if strings.Contains(string(got), "apt-get install") {
 		t.Fatalf("apt-get install should have been removed:\n%s", got)
 	}
-	if !strings.Contains(got, "apt-get update") {
+	if !strings.Contains(string(got), "apt-get update") {
 		t.Fatalf("apt-get update should be preserved:\n%s", got)
 	}
-	if !strings.Contains(got, "apt-get clean") {
+	if !strings.Contains(string(got), "apt-get clean") {
 		t.Fatalf("apt-get clean should be preserved:\n%s", got)
 	}
-}
-
-// applyEditsToDockerfile applies a set of TextEdits to the source Dockerfile.
-// Edits are applied in descending (line, column) order so earlier offsets are
-// not invalidated by later deletes.
-func applyEditsToDockerfile(src string, edits []rules.TextEdit) string {
-	lines := strings.Split(src, "\n")
-	sorted := make([]rules.TextEdit, len(edits))
-	copy(sorted, edits)
-	for i := range sorted {
-		for j := i + 1; j < len(sorted); j++ {
-			a, b := sorted[i].Location, sorted[j].Location
-			if b.Start.Line > a.Start.Line ||
-				(b.Start.Line == a.Start.Line && b.Start.Column > a.Start.Column) {
-				sorted[i], sorted[j] = sorted[j], sorted[i]
-			}
-		}
-	}
-	for _, e := range sorted {
-		startLine := e.Location.Start.Line - 1
-		endLine := e.Location.End.Line - 1
-		startCol := e.Location.Start.Column
-		endCol := e.Location.End.Column
-		if startLine < 0 || startLine >= len(lines) {
-			continue
-		}
-		if startLine == endLine {
-			line := lines[startLine]
-			if endCol > len(line) {
-				endCol = len(line)
-			}
-			lines[startLine] = line[:startCol] + e.NewText + line[endCol:]
-		} else {
-			before := lines[startLine][:startCol]
-			after := ""
-			if endLine < len(lines) && endCol <= len(lines[endLine]) {
-				after = lines[endLine][endCol:]
-			}
-			merged := before + e.NewText + after
-			if endLine+1 <= len(lines) {
-				lines = append(lines[:startLine], append([]string{merged}, lines[endLine+1:]...)...)
-			}
-		}
-	}
-	return strings.Join(lines, "\n")
 }
 
 func TestDL4001CleanupResolver_DropsBareEnvVarCopy(t *testing.T) {
