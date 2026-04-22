@@ -468,7 +468,7 @@ RUN pip install -r requirements.txt
 			}
 
 			if tt.name == "indented RUN keeps mount after keyword" {
-				got := string(fixpkg.ApplyEdit([]byte(tt.content), edit))
+				got := string(fixpkg.ApplyFix([]byte(tt.content), v.SuggestedFix))
 				want := `FROM python:3.12-slim
     RUN --mount=type=secret,id=pipconf,target=/root/.config/pip/pip.conf pip install -r requirements.txt
 `

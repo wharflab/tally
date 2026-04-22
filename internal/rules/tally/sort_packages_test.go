@@ -1,7 +1,6 @@
 package tally
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
@@ -207,10 +206,7 @@ func TestSortPackagesFix(t *testing.T) {
 			}
 
 			// Apply edits back-to-front using the production fix engine.
-			got := []byte(tt.content)
-			for _, edit := range slices.Backward(fix.Edits) {
-				got = fixpkg.ApplyEdit(got, edit)
-			}
+			got := fixpkg.ApplyFix([]byte(tt.content), fix)
 			if string(got) != tt.want {
 				t.Errorf("after fix:\ngot:  %q\nwant: %q", got, tt.want)
 			}

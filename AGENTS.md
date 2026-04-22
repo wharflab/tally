@@ -91,6 +91,8 @@ skip-blank-lines = true
   [`design-docs/16-integration-tests-refactor-and-placement.md` §8](design-docs/16-integration-tests-refactor-and-placement.md#8-decision-tree-where-should-this-test-go)
 - Update snapshots when intentional output changes:
   - `UPDATE_SNAPS=true go test ./internal/integration/...`
+- In rule/resolver tests, round-trip a fix back to source with `fix.ApplyFix(src, v.SuggestedFix)` or `fix.ApplyEdits(src, edits)` — handles
+  edit ordering so you don't need a manual reverse-order `ApplyEdit` loop.
 
 ## Commit & Pull Request Guidelines
 

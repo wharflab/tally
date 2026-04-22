@@ -1,7 +1,6 @@
 package tally
 
 import (
-	"slices"
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
@@ -250,9 +249,7 @@ func TestNoMultiSpacesCheckWithFixes(t *testing.T) {
 				if v.SuggestedFix.Safety != rules.FixSafe {
 					t.Errorf("fix safety = %v, want FixSafe", v.SuggestedFix.Safety)
 				}
-				for _, edit := range slices.Backward(v.SuggestedFix.Edits) {
-					got = fixpkg.ApplyEdit(got, edit)
-				}
+				got = fixpkg.ApplyFix(got, v.SuggestedFix)
 			}
 
 			if string(got) != tt.want {

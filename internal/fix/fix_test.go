@@ -1,6 +1,7 @@
 package fix
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/wharflab/tally/internal/rules"
@@ -76,4 +77,84 @@ func TestFixSafety_ReExport(t *testing.T) {
 	if FixUnsafe != rules.FixUnsafe {
 		t.Errorf("FixUnsafe = %v, want %v", FixUnsafe, rules.FixUnsafe)
 	}
+}
+
+func TestApplyEdits(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty edits returns src", func(t *testing.T) {
+		t.Parallel()
+		src := []byte("FROM alpine\n")
+		got := ApplyEdits(src, nil)
+		if !bytes.Equal(got, src) {
+			t.Errorf("ApplyEdits(nil) = %q, want %q", got, src)
+		}
+	})
+
+	t.Run("ascending-order edits applied correctly", func(t *testing.T) {
+		t.Parallel()
+		// Two same-line edits given in ascending order: ApplyEdits must
+		// reverse them so the first edit's position is not invalidated.
+		src := []byte("RUN apt install curl wget\n")
+		edits := []rules.TextEdit{
+			{Location: rules.NewRangeLocation("Dockerfile", 1, 4, 1, 7), NewText: "apt-get"},
+			{Location: rules.NewRangeLocation("Dockerfile", 1, 21, 1, 25), NewText: "htop"},
+		}
+		want := "RUN apt-get install curl htop\n"
+		if got := ApplyEdits(src, edits); string(got) != want {
+			t.Errorf("ApplyEdits() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("multi-line descending order", func(t *testing.T) {
+		t.Parallel()
+		src := []byte("FROM alpine\nRUN foo\nRUN bar\n")
+		edits := []rules.TextEdit{
+			{Location: rules.NewRangeLocation("Dockerfile", 2, 4, 2, 7), NewText: "FOO"},
+			{Location: rules.NewRangeLocation("Dockerfile", 3, 4, 3, 7), NewText: "BAR"},
+		}
+		want := "FROM alpine\nRUN FOO\nRUN BAR\n"
+		if got := ApplyEdits(src, edits); string(got) != want {
+			t.Errorf("ApplyEdits() = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("does not mutate input slice", func(t *testing.T) {
+		t.Parallel()
+		edits := []rules.TextEdit{
+			{Location: rules.NewRangeLocation("Dockerfile", 1, 0, 1, 4), NewText: "ENV"},
+			{Location: rules.NewRangeLocation("Dockerfile", 2, 0, 2, 4), NewText: "ENV"},
+		}
+		first := edits[0]
+		_ = ApplyEdits([]byte("FROM alpine\nFROM alpine\n"), edits)
+		if edits[0] != first {
+			t.Errorf("ApplyEdits mutated input slice: edits[0] = %+v, want %+v", edits[0], first)
+		}
+	})
+}
+
+func TestApplyFix(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil fix returns src", func(t *testing.T) {
+		t.Parallel()
+		src := []byte("FROM alpine\n")
+		if got := ApplyFix(src, nil); !bytes.Equal(got, src) {
+			t.Errorf("ApplyFix(nil) = %q, want %q", got, src)
+		}
+	})
+
+	t.Run("applies edits from fix", func(t *testing.T) {
+		t.Parallel()
+		src := []byte("RUN apt install curl\n")
+		fix := &rules.SuggestedFix{
+			Edits: []rules.TextEdit{
+				{Location: rules.NewRangeLocation("Dockerfile", 1, 4, 1, 7), NewText: "apt-get"},
+			},
+		}
+		want := "RUN apt-get install curl\n"
+		if got := ApplyFix(src, fix); string(got) != want {
+			t.Errorf("ApplyFix() = %q, want %q", got, want)
+		}
+	})
 }
