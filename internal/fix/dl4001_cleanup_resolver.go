@@ -51,12 +51,57 @@ func (r *dl4001CleanupResolver) Resolve(
 		sourceTool:  data.SourceTool,
 		escapeToken: parseEscapeToken(parseResult),
 	}
+
+	// Safety gate: if the Dockerfile still invokes the source tool after the
+	// sync pass (commands that fell outside the deterministic subset, AI
+	// fallbacks that didn't resolve, etc.), removing the install or config
+	// artifacts would turn the build into "tool: command not found". Skip
+	// the whole cleanup in that case — the user will see the remaining
+	// DL4001 violations and can deal with them manually.
+	if r.stillInvokesSourceTool(ctx) {
+		return nil, nil
+	}
+
 	var edits []rules.TextEdit
 	for stageIdx, stage := range parseResult.Stages {
 		edits = append(edits, r.installEdits(ctx, stage, stageIdx)...)
 	}
 	edits = append(edits, r.configArtifactEdits(resolveCtx.FilePath, parseResult, sm, data.SourceTool)...)
 	return edits, nil
+}
+
+// stillInvokesSourceTool scans every RUN in every stage for a remaining
+// invocation of the evicted tool. An invocation is a shell command whose
+// basename matches the tool (stripping ".exe" on Windows shells). The scan
+// uses the already-parsed AST and the per-stage shell variant so it picks
+// up cmd/PowerShell calls too.
+func (r *dl4001CleanupResolver) stillInvokesSourceTool(ctx cleanupCtx) bool {
+	for _, stage := range ctx.parseResult.Stages {
+		for _, cmd := range stage.Commands {
+			run, ok := cmd.(*instructions.RunCommand)
+			if !ok {
+				continue
+			}
+			if !run.PrependShell && len(run.Files) == 0 {
+				continue
+			}
+			// Use POSIX reconstruction + bash parsing for the scan: bash is
+			// permissive enough to recognize a bare "curl https://..." call
+			// as a command regardless of whether the Dockerfile was authored
+			// for cmd or PowerShell, and backslash continuations match what
+			// the POSIX parser expects.
+			script, _ := resolveRunScript(run, ctx.sm, ctx.escapeToken, shell.VariantBash)
+			if script == "" {
+				continue
+			}
+			for _, c := range shell.FindCommands(script, shell.VariantBash, ctx.sourceTool) {
+				if c.Name == ctx.sourceTool {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 // cleanupCtx bundles per-Resolve state so helpers don't need long argument lists.
@@ -112,11 +157,14 @@ func (r *dl4001CleanupResolver) installEdits(
 		}
 		node := nodes[nodeIdx]
 
-		script, startLine := resolveRunScript(run, ctx.sm, ctx.escapeToken)
+		variant := runShellVariant(run, stageInfo)
+		// FindInstallPackages always uses the POSIX AST parser under the
+		// hood, so feed it a backslash-escaped reconstruction regardless of
+		// the stage's native shell.
+		script, startLine := resolveRunScript(run, ctx.sm, ctx.escapeToken, shell.VariantBash)
 		if script == "" {
 			continue
 		}
-		variant := runShellVariant(run, stageInfo)
 		installs := shell.FindInstallPackages(script, variant)
 		if len(installs) == 0 {
 			continue
@@ -625,7 +673,12 @@ func isRunFullyInstallSubcommand(_ *instructions.RunCommand, script string, vari
 	return shell.CountChainedCommands(script, variant) == 1
 }
 
-func resolveRunScript(run *instructions.RunCommand, sm *sourcemap.SourceMap, escapeToken rune) (string, int) {
+func resolveRunScript(
+	run *instructions.RunCommand,
+	sm *sourcemap.SourceMap,
+	escapeToken rune,
+	variant shell.Variant,
+) (string, int) {
 	if len(run.Files) > 0 {
 		// Heredoc RUN: the body starts on the line AFTER the "RUN <<EOF"
 		// opener. BuildKit reports the opener as Location()[0] and the first
@@ -649,7 +702,12 @@ func resolveRunScript(run *instructions.RunCommand, sm *sourcemap.SourceMap, esc
 		lines = append(lines, sm.Line(line-1))
 	}
 	cmdStartCol := shell.DockerfileRunCommandStartCol(lines[0])
-	return shell.ReconstructSourceText(lines, cmdStartCol, escapeToken), startLine
+	// Use the shell's native continuation token so variant-specific parsers
+	// (tree-sitter PowerShell/cmd, mvdan.cc/sh POSIX) handle line
+	// continuations correctly. A backtick-escaped "RUN ... `\n" on a
+	// PowerShell stage must keep backtick continuations so the PowerShell
+	// parser sees the whole chain as one command.
+	return shell.ReconstructSourceTextForVariant(lines, cmdStartCol, escapeToken, variant), startLine
 }
 
 // runShellVariant returns the effective shell variant for a RUN instruction

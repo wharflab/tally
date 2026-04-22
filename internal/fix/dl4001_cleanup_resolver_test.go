@@ -24,14 +24,14 @@ func TestDL4001CleanupResolver_PreservesMixedEnv(t *testing.T) {
 	// APP_VERSION and PATH, which is data loss. The resolver must either
 	// leave the instruction alone or surgically drop only CURL_HOME; the
 	// current MVP chooses "leave it alone" and still removes the COPY
-	// heredoc writing .curlrc.
+	// heredoc writing .curlrc. Fixture is post-sync — curl invocations
+	// have already been rewritten to wget.
 	dockerfile := `FROM ubuntu:22.04
 RUN apt-get install -y curl wget
 ENV CURL_HOME=/etc/curl APP_VERSION=1.0 PATH=/usr/local/bin:$PATH
 COPY --chmod=0644 <<EOF ${CURL_HOME}/.curlrc
 --retry 5
 EOF
-RUN curl https://example.com/one
 RUN wget https://example.com/two
 `
 
@@ -60,10 +60,12 @@ func TestDL4001CleanupResolver_DeletesDedicatedEnv(t *testing.T) {
 	t.Parallel()
 
 	// An ENV that binds only a tool-config key is safe to delete entirely.
+	// This fixture simulates the post-sync state where curl invocations have
+	// already been rewritten to wget — the guard that blocks cleanup when
+	// the tool is still invoked must not trip here.
 	dockerfile := `FROM ubuntu:22.04
 RUN apt-get install -y curl wget
 ENV CURL_HOME=/etc/curl
-RUN curl https://example.com/one
 RUN wget https://example.com/two
 `
 
@@ -99,12 +101,12 @@ func TestDL4001CleanupResolver_DoesNotMisalignHeredocEdits(t *testing.T) {
 	// which does NOT share a column origin with the "RUN <<EOF" line above.
 	// Any edits the resolver emits must either target the right column or
 	// skip the heredoc entirely — they must never reference a column offset
-	// derived from the "RUN <<EOF" line.
+	// derived from the "RUN <<EOF" line. Fixture is post-sync: curl
+	// invocations have already been rewritten to wget.
 	dockerfile := `FROM ubuntu:22.04
 RUN <<EOF
 apt-get install -y curl wget
 EOF
-RUN curl https://example.com/one
 RUN wget https://example.com/two
 `
 
@@ -164,14 +166,14 @@ func TestDL4001CleanupResolver_RespectsBacktickEscape(t *testing.T) {
 	// Windows Dockerfile with backtick escape: a RUN instruction continues
 	// across lines with backtick. The resolver must honor the escape
 	// directive; otherwise line continuation won't be detected and the
-	// reconstructed script will be wrong.
+	// reconstructed script will be wrong. Fixture is post-sync — curl
+	// invocations have already been rewritten to wget.
 	dockerfile := "# escape=`\n" +
 		"FROM mcr.microsoft.com/windows/servercore:ltsc2025\n" +
 		"SHELL [\"pwsh\", \"-Command\"]\n" +
 		"RUN choco install -y `\n" +
 		"    curl `\n" +
 		"    wget\n" +
-		"RUN curl https://example.com/one\n" +
 		"RUN wget https://example.com/two\n"
 
 	r := &dl4001CleanupResolver{}
@@ -223,11 +225,11 @@ func TestDL4001CleanupResolver_UsesPerRunShellVariant(t *testing.T) {
 	// a literal name. If the resolver parsed this under bash semantics,
 	// PowerShell-specific tokens would be misread and we'd miss the "curl"
 	// package token. Using the stage's effective shell variant ensures
-	// FindInstallPackages walks the right grammar.
+	// FindInstallPackages walks the right grammar. Fixture is post-sync —
+	// curl.exe invocations have already been rewritten to wget.exe.
 	dockerfile := "FROM mcr.microsoft.com/windows/servercore:ltsc2025\n" +
 		"SHELL [\"pwsh\", \"-Command\"]\n" +
 		"RUN $ErrorActionPreference='Stop'; choco install -y curl wget ca-certificates\n" +
-		"RUN curl.exe https://example.com/one\n" +
 		"RUN wget.exe https://example.com/two\n"
 
 	r := &dl4001CleanupResolver{}
@@ -265,6 +267,38 @@ func TestDL4001CleanupResolver_UsesPerRunShellVariant(t *testing.T) {
 	}
 }
 
+func TestDL4001CleanupResolver_PreservesInstallWhenInvocationsRemain(t *testing.T) {
+	t.Parallel()
+
+	// Simulates the post-sync state of a Dockerfile where the sync rewrites
+	// couldn't cover every wget invocation (complex flags, shell substitution,
+	// etc. fell outside the deterministic subset). wget is still called at
+	// runtime, so we MUST NOT remove the wget install — that would turn the
+	// build into "wget: command not found".
+	dockerfile := `FROM ubuntu:22.04
+RUN apt-get install -y curl wget
+RUN wget --mirror --recursive https://example.com/stuff
+RUN curl -fL -O https://example.com/file.tgz
+`
+
+	r := &dl4001CleanupResolver{}
+	edits, err := r.Resolve(
+		context.Background(),
+		ResolveContext{FilePath: "Dockerfile", Content: []byte(dockerfile)},
+		&rules.SuggestedFix{
+			ResolverID:   rules.DL4001CleanupResolverID,
+			ResolverData: &rules.DL4001CleanupResolveData{SourceTool: "wget"},
+		},
+	)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+
+	if len(edits) != 0 {
+		t.Fatalf("expected no edits (wget still invoked), got %d: %+v", len(edits), edits)
+	}
+}
+
 func TestDL4001CleanupResolver_DropsInstallSubcommandInChain(t *testing.T) {
 	t.Parallel()
 
@@ -272,10 +306,11 @@ func TestDL4001CleanupResolver_DropsInstallSubcommandInChain(t *testing.T) {
 	// chained RUN alongside unrelated commands (apt-get update, apt-get
 	// clean). Deleting the whole RUN would drop those side effects; the
 	// resolver must delete just the "apt-get install -y wget" segment.
+	// Fixture is post-sync — wget invocations have already been rewritten
+	// to curl.
 	dockerfile := "FROM ubuntu:22.04\n" +
 		"RUN apt-get update && apt-get install -y wget && apt-get clean\n" +
-		"RUN curl https://example.com/one\n" +
-		"RUN wget https://example.com/two\n"
+		"RUN curl https://example.com/one\n"
 
 	r := &dl4001CleanupResolver{}
 	edits, err := r.Resolve(
@@ -357,7 +392,8 @@ func TestDL4001CleanupResolver_DropsBareEnvVarCopy(t *testing.T) {
 	// the entire COPY is config for wget and must be removed when wget is
 	// evicted. Without handling bare env-var destinations, the previous
 	// code left this COPY in place and produced a broken image referring
-	// to WGETRC after ENV WGETRC was deleted.
+	// to WGETRC after ENV WGETRC was deleted. Fixture is post-sync — wget
+	// invocations have already been rewritten to curl.
 	dockerfile := `FROM ubuntu:22.04
 RUN apt-get install -y curl wget
 ENV WGETRC=/etc/wgetrc
@@ -365,7 +401,6 @@ COPY --chmod=0644 <<EOF ${WGETRC}
 retry_connrefused = on
 EOF
 RUN curl https://example.com/one
-RUN wget https://example.com/two
 `
 
 	r := &dl4001CleanupResolver{}
@@ -400,12 +435,12 @@ RUN wget https://example.com/two
 func TestDL4001CleanupResolver_DropsCurlrcCopy(t *testing.T) {
 	t.Parallel()
 
+	// Fixture is post-sync — curl invocations have already been rewritten to wget.
 	dockerfile := `FROM ubuntu:22.04
 RUN apt-get install -y curl wget
 COPY --chmod=0644 <<EOF /etc/.curlrc
 --retry 5
 EOF
-RUN curl https://example.com/one
 RUN wget https://example.com/two
 `
 
