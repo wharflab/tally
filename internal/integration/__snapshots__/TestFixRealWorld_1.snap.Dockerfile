@@ -447,7 +447,7 @@ WORKDIR /
 
 RUN <<EOF
 set -e
-wget --progress=dot:giga https://sourceforge.net/projects/boost/files/boost/1.73.0/boost_1_73_0.tar.gz/download -O boost_1_73_0.tar.gz && tar -xzf boost_1_73_0.tar.gz && cd boost_1_73_0 && ./bootstrap.sh && ./b2 threading=multi --prefix=/opt/conda -j 64 cxxflags=-fPIC cflags=-fPIC install || true
+curl -fL -o boost_1_73_0.tar.gz https://sourceforge.net/projects/boost/files/boost/1.73.0/boost_1_73_0.tar.gz/download && tar -xzf boost_1_73_0.tar.gz && cd boost_1_73_0 && ./bootstrap.sh && ./b2 threading=multi --prefix=/opt/conda -j 64 cxxflags=-fPIC cflags=-fPIC install || true
 cd ..
 rm -rf boost_1_73_0.tar.gz
 rm -rf boost_1_73_0

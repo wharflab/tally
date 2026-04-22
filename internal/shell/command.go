@@ -19,7 +19,15 @@ type CommandInfo struct {
 	Variant Variant
 
 	// Name is the base command name (e.g., "apt-get", "yum").
+	// For Windows shells the name is normalized lowercase without a trailing ".exe";
+	// callers that need to distinguish an explicit .exe invocation from a shell alias
+	// (e.g., PowerShell's curl/wget aliases for Invoke-WebRequest) should use HasExeSuffix.
 	Name string
+
+	// HasExeSuffix is true when the source invocation ended with a ".exe" suffix.
+	// This is preserved across normalization and is used on PowerShell to distinguish
+	// the GNU binary (curl.exe) from the built-in alias (curl -> Invoke-WebRequest).
+	HasExeSuffix bool
 
 	// Subcommand is the first non-flag argument (e.g., "install" in "apt-get install").
 	Subcommand string
@@ -31,6 +39,11 @@ type CommandInfo struct {
 	// word with no variable expansion, command substitution, or other dynamic
 	// evaluation. The slice is aligned with Args.
 	ArgLiteral []bool
+
+	// ArgRanges reports the script-relative source range for each arg. Aligned
+	// with Args; empty when the underlying parser didn't preserve positions.
+	// Positions are 0-based (line, column byte offset).
+	ArgRanges []ArgRange
 
 	// Position information for the command name.
 	Line     int // 0-based line within the script
@@ -48,6 +61,24 @@ type CommandInfo struct {
 	SubcommandLine     int // 0-based line within the script
 	SubcommandStartCol int // 0-based column where subcommand starts
 	SubcommandEndCol   int // 0-based column where subcommand ends
+}
+
+// hasExeSuffix reports whether a raw command token ends with an ASCII ".exe" suffix.
+// It ignores surrounding whitespace and quotes so it works for tree-sitter literals too.
+func hasExeSuffix(rawName string) bool {
+	name := strings.TrimSpace(DropQuotes(rawName))
+	if len(name) < len(".exe") {
+		return false
+	}
+	return strings.EqualFold(name[len(name)-len(".exe"):], ".exe")
+}
+
+// ArgRange is the script-relative source range of a single argument token.
+// Columns are 0-based byte offsets within Line; EndCol is exclusive.
+type ArgRange struct {
+	Line     int
+	StartCol int
+	EndCol   int
 }
 
 // CommandSourceKind describes how a command was discovered in the shell AST.
@@ -346,18 +377,24 @@ func appendCommandArgs(info *CommandInfo, words []*syntax.Word) {
 		if lit == "" {
 			continue
 		}
+		pos := word.Pos()
+		endPos := word.End()
+		argRange := ArgRange{
+			Line:     int(pos.Line()) - 1,
+			StartCol: int(pos.Col()) - 1,
+			EndCol:   int(endPos.Col()) - 1,
+		}
 		info.Args = append(info.Args, lit)
 		info.ArgLiteral = append(info.ArgLiteral, literal)
+		info.ArgRanges = append(info.ArgRanges, argRange)
 
 		if info.Subcommand != "" || strings.HasPrefix(lit, "-") {
 			continue
 		}
-		pos := word.Pos()
-		endPos := word.End()
 		info.Subcommand = lit
-		info.SubcommandLine = int(pos.Line()) - 1
-		info.SubcommandStartCol = int(pos.Col()) - 1
-		info.SubcommandEndCol = int(endPos.Col()) - 1
+		info.SubcommandLine = argRange.Line
+		info.SubcommandStartCol = argRange.StartCol
+		info.SubcommandEndCol = argRange.EndCol
 	}
 }
 

@@ -450,3 +450,99 @@ func TestFindInstallPackagesMultiLine(t *testing.T) {
 		t.Errorf("packages[1].Line = %d, want 2", pkgs[1].Line)
 	}
 }
+
+func TestStripPackageVersion(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		// apt/apk/dnf-style "=" pin.
+		{"apt version pin", "wget=1.21.3-1ubuntu1", "wget"},
+		{"apk version pin", "curl=8.11.1-r2", "curl"},
+		// pip's "==" pin.
+		{"pip equality", "flask==2.0.3", "flask"},
+		{"pip equality bare name", "numpy", "numpy"},
+		// npm plain and versioned.
+		{"npm plain", "express", "express"},
+		{"npm versioned", "express@5.0.0", "express"},
+		// Scoped npm packages: leading "@" is part of the name, must be
+		// preserved. The version separator is the second "@".
+		{"npm scoped bare", "@types/node", "@types/node"},
+		{"npm scoped versioned", "@types/node@22.0.0", "@types/node"},
+		{"npm scoped with tag", "@babel/core@next", "@babel/core"},
+		// Debian arch qualifier.
+		{"arch qualifier", "libfoo:amd64", "libfoo"},
+		// No separator at all.
+		{"plain name", "curl", "curl"},
+		{"empty", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := StripPackageVersion(tt.in); got != tt.want {
+				t.Errorf("StripPackageVersion(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFindInstallPackages_PowerShellChocoInstall(t *testing.T) {
+	t.Parallel()
+
+	// PowerShell-authored Dockerfile: the install uses ";" as a statement
+	// separator (illegal in POSIX) and the continuation character is a
+	// backtick. FindInstallPackages should still recognize the choco install
+	// and report package positions relative to the original script.
+	script := "$ErrorActionPreference='Stop'; choco install -y curl wget ca-certificates"
+	installs := FindInstallPackages(script, VariantPowerShell)
+	if len(installs) != 1 {
+		t.Fatalf("expected 1 install, got %d: %+v", len(installs), installs)
+	}
+	ic := installs[0]
+	if ic.Manager != "choco" || ic.Subcommand != "install" {
+		t.Fatalf("unexpected manager/subcommand: %+v", ic)
+	}
+	gotPkgs := make([]string, 0, len(ic.Packages))
+	for _, pkg := range ic.Packages {
+		gotPkgs = append(gotPkgs, pkg.Normalized)
+		// Per-arg positions must be within the script line and point at the
+		// package token, not at the "-y" flag or the statement separator.
+		if pkg.Line != 0 {
+			t.Errorf("package %q on unexpected line %d", pkg.Normalized, pkg.Line)
+		}
+		slice := script[pkg.StartCol:pkg.EndCol]
+		if slice != pkg.Normalized {
+			t.Errorf("package %q range [%d:%d] = %q", pkg.Normalized, pkg.StartCol, pkg.EndCol, slice)
+		}
+	}
+	want := []string{"curl", "wget", "ca-certificates"}
+	if !slices.Equal(gotPkgs, want) {
+		t.Fatalf("packages = %v, want %v", gotPkgs, want)
+	}
+}
+
+func TestFindInstallPackages_CmdChocoInstall(t *testing.T) {
+	t.Parallel()
+
+	// cmd.exe-authored install: no alien tokens in this simple case, but
+	// FindInstallPackages still needs to go through the cmd tree-sitter path
+	// so it doesn't misinterpret cmd-specific syntax elsewhere.
+	script := "choco install -y curl wget"
+	installs := FindInstallPackages(script, VariantCmd)
+	if len(installs) != 1 {
+		t.Fatalf("expected 1 install, got %d: %+v", len(installs), installs)
+	}
+	ic := installs[0]
+	if ic.Manager != "choco" || len(ic.Packages) != 2 {
+		t.Fatalf("unexpected install: %+v", ic)
+	}
+	gotPkgs := []string{ic.Packages[0].Normalized, ic.Packages[1].Normalized}
+	want := []string{"curl", "wget"}
+	if !slices.Equal(gotPkgs, want) {
+		t.Fatalf("packages = %v, want %v", gotPkgs, want)
+	}
+}

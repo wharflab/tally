@@ -2276,5 +2276,37 @@ severity = "warning"
 				mustSelectRules("tally/named-identity-in-passwdless-stage")...),
 			wantApplied: 0,
 		},
+		// DL4001 composed with sort-packages and prefer-curl-config: both tools are
+		// explicitly installed and curl is invoked on multiple RUNs. The user forces
+		// fix-preference=wget, so DL4001 must rewrite every curl call to wget and
+		// drop curl from the multi-package install. sort-packages should re-sort the
+		// resulting install. prefer-curl-config is also enabled to exercise rule
+		// interaction: it points at curl, which is about to disappear, so the
+		// snapshot captures how the composed fixer handles that tension.
+		{
+			name: "dl4001-with-sort-packages-and-prefer-curl-config",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN apt-get update && apt-get install -y --no-install-recommends " +
+				"wget curl ca-certificates\n" +
+				"RUN curl -fsSL https://example.com/one.tgz -o /tmp/one.tgz\n" +
+				"RUN curl -fsSL https://example.com/two.tgz -o /tmp/two.tgz\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules(
+					"hadolint/DL4001",
+					"tally/prefer-curl-config",
+					"tally/sort-packages",
+				)...),
+			config: "[rules.hadolint.DL4001]\nfix-preference = \"wget\"\n",
+			// Five fixes apply:
+			//   - two DL4001 sync curl→wget rewrites (one per RUN),
+			//   - one sort-packages reorder on the install line (no longer blocked
+			//     since DL4001's sync no longer touches the install),
+			//   - one prefer-curl-config .curlrc COPY heredoc insert,
+			//   - one DL4001 async cleanup that drops curl from the install and
+			//     deletes the now-stale .curlrc + ENV CURL_HOME.
+			// The snapshot is the authoritative check for the composed output.
+			wantApplied: 5,
+		},
 	}
 }

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/hadolint/dl4001.schema.json",
+  "title": "hadolint/DL4001 rule config",
+  "description": "Configuration options for the hadolint/DL4001 rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" },
+    "fix-preference": {
+      "type": "string",
+      "description": "Which tool auto-fixes should converge on. \"auto\" (default) infers the target from stage install signals. \"curl\" and \"wget\" force the fix direction regardless of which tool is installed.",
+      "enum": ["auto", "curl", "wget"],
+      "default": "auto",
+      "examples": ["curl", "wget"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "fix-preference": "curl" },
+    { "severity": "warning", "fix-preference": "wget" }
+  ]
+}

@@ -181,3 +181,36 @@ func TestHTTPTransferOperation_LowerToCurlRequiresFailAndRedirect(t *testing.T) 
 		t.Fatal("expected lowering to curl to fail without redirect-follow semantics")
 	}
 }
+
+func TestHTTPTransferOperation_LowerToToolWindowsAddsExeSuffix(t *testing.T) {
+	t.Parallel()
+
+	op := &HTTPTransferOperation{
+		URL:              "https://example.com/app.tgz",
+		Method:           http.MethodGet,
+		SinkKind:         HTTPTransferSinkStdout,
+		FollowsRedirects: true,
+		FailOnHTTPStatus: true,
+	}
+
+	winCurl, ok := op.LowerToTool(httpTransferToolCurl, HTTPTransferLowerOptions{WindowsTarget: true})
+	if !ok {
+		t.Fatal("expected curl lowering to succeed")
+	}
+	if winCurl != "curl.exe -fL https://example.com/app.tgz" {
+		t.Fatalf("windows curl = %q, want curl.exe prefix", winCurl)
+	}
+
+	winWget, ok := op.LowerToTool(httpTransferToolWget, HTTPTransferLowerOptions{WindowsTarget: true})
+	if !ok {
+		t.Fatal("expected wget lowering to succeed")
+	}
+	if winWget != "wget.exe -O- https://example.com/app.tgz" {
+		t.Fatalf("windows wget = %q, want wget.exe prefix", winWget)
+	}
+
+	linuxCurl, _ := op.LowerToTool(httpTransferToolCurl)
+	if linuxCurl != "curl -fL https://example.com/app.tgz" {
+		t.Fatalf("linux curl = %q, want bare curl", linuxCurl)
+	}
+}

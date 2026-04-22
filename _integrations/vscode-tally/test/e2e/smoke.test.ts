@@ -69,7 +69,7 @@ test(
       },
     });
 
-    process.env.VSCODE_SMOKE_EXPECTED_DIAGNOSTICS = "269";
+    process.env.VSCODE_SMOKE_EXPECTED_DIAGNOSTICS = "268";
     process.env.VSCODE_SMOKE_EXPECTED_FORMAT_SNAPSHOT = path.join(
       repoRoot,
       "internal",
@@ -80,7 +80,9 @@ test(
 
     const vscodeVersion = process.env.VSCODE_TEST_VERSION;
 
-    const vscodeExecutablePath = await backOff(() => downloadAndUnzipVSCode(vscodeVersion));
+    const vscodeExecutablePath = await backOff(() =>
+      downloadAndUnzipVSCode({ version: vscodeVersion, extractSync: true }),
+    );
 
     await runTests({
       vscodeExecutablePath,

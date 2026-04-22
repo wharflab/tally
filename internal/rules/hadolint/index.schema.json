@@ -11,6 +11,9 @@
     },
     "DL3026": {
       "$ref": "./dl3026.schema.json"
+    },
+    "DL4001": {
+      "$ref": "./dl4001.schema.json"
     }
   },
   "additionalProperties": {

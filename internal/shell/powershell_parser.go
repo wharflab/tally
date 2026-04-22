@@ -70,7 +70,8 @@ func findPowerShellCommands(script string, names ...string) []CommandInfo {
 			return
 		}
 
-		name := normalizePowerShellCommandName(nameNode.Utf8Text(source))
+		rawName := nameNode.Utf8Text(source)
+		name := normalizePowerShellCommandName(rawName)
 		if name == "" {
 			return
 		}
@@ -81,19 +82,31 @@ func findPowerShellCommands(script string, names ...string) []CommandInfo {
 		start := nameNode.StartPosition()
 		end := nameNode.EndPosition()
 		info := CommandInfo{
-			Variant:  VariantPowerShell,
-			Name:     name,
-			Line:     int(start.Row),
-			StartCol: int(start.Column),
-			EndCol:   int(end.Column),
+			SourceKind:      CommandSourceKindDirect,
+			Variant:         VariantPowerShell,
+			Name:            name,
+			HasExeSuffix:    hasExeSuffix(rawName),
+			Line:            int(start.Row),
+			StartCol:        int(start.Column),
+			EndCol:          int(end.Column),
+			CommandEndLine:  int(end.Row),
+			CommandEndCol:   int(end.Column),
+			HasCommandRange: true,
 		}
 
 		for _, arg := range powerShellCommandArgs(node, source) {
+			argStart := arg.node.StartPosition()
+			argEnd := arg.node.EndPosition()
 			info.Args = append(info.Args, arg.text)
 			info.ArgLiteral = append(info.ArgLiteral, isPlainPowerShellLiteralArg(arg.text))
+			info.ArgRanges = append(info.ArgRanges, ArgRange{
+				Line:     int(argStart.Row),
+				StartCol: int(argStart.Column),
+				EndCol:   int(argEnd.Column),
+			})
+			info.CommandEndLine = int(argEnd.Row)
+			info.CommandEndCol = int(argEnd.Column)
 			if info.Subcommand == "" && !strings.HasPrefix(arg.text, "-") {
-				argStart := arg.node.StartPosition()
-				argEnd := arg.node.EndPosition()
 				info.Subcommand = arg.text
 				info.SubcommandLine = int(argStart.Row)
 				info.SubcommandStartCol = int(argStart.Column)

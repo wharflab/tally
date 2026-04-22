@@ -19,6 +19,9 @@ type IndexSchemaJson_1 struct {
 	// DL3026 corresponds to the JSON schema field "DL3026".
 	DL3026 *hadolint.Dl3026SchemaJson `json:"DL3026,omitempty,omitzero"`
 
+	// DL4001 corresponds to the JSON schema field "DL4001".
+	DL4001 *hadolint.Dl4001SchemaJson `json:"DL4001,omitempty,omitzero"`
+
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 

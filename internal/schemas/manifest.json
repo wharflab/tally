@@ -107,6 +107,11 @@
       "input": "internal/rules/hadolint/dl3026.schema.json",
       "output": "internal/schemas/generated/rules/hadolint/dl3026.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/hadolint"
+    },
+    {
+      "input": "internal/rules/hadolint/dl4001.schema.json",
+      "output": "internal/schemas/generated/rules/hadolint/dl4001.gen.go",
+      "package": "github.com/wharflab/tally/internal/schemas/generated/rules/hadolint"
     }
   ]
 }

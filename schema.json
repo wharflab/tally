@@ -197,6 +197,46 @@
       "title": "hadolint/DL3026 rule config",
       "type": "object"
     },
+    "rule-hadolint-dl4001": {
+      "additionalProperties": false,
+      "description": "Configuration options for the hadolint/DL4001 rule.",
+      "examples": [
+        {
+          "fix-preference": "curl"
+        },
+        {
+          "fix-preference": "wget",
+          "severity": "warning"
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "fix-preference": {
+          "default": "auto",
+          "description": "Which tool auto-fixes should converge on. \"auto\" (default) infers the target from stage install signals. \"curl\" and \"wget\" force the fix direction regardless of which tool is installed.",
+          "enum": [
+            "auto",
+            "curl",
+            "wget"
+          ],
+          "examples": [
+            "curl",
+            "wget"
+          ],
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "hadolint/DL4001 rule config",
+      "type": "object"
+    },
     "rule-tally-consistent-indentation": {
       "additionalProperties": false,
       "description": "Configuration options for the tally/consistent-indentation rule.",
@@ -913,6 +953,9 @@
         },
         "DL3026": {
           "$ref": "#/$defs/rule-hadolint-dl3026"
+        },
+        "DL4001": {
+          "$ref": "#/$defs/rule-hadolint-dl4001"
         }
       },
       "title": "hadolint/* rule namespace config",
