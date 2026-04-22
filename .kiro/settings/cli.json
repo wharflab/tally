@@ -1,0 +1,8 @@
+{
+  "chat.defaultModel": "claude-opus-4.7",
+  "chat.ui": "tui",
+  "chat.enableTodoList": true,
+  "chat.enableSubagent": true,
+  "chat.enableCodeIntelligence": true,
+  "chat.enableThinking": true
+}
