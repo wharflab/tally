@@ -305,7 +305,7 @@ func stageLooksLikePHPWebRuntime(info *semantic.StageInfo, stage instructions.St
 			return true
 		}
 	}
-	if cmd := stageRuntimeCommandName(stage); cmd != "" && isPHPWebRuntimeCommand(cmd) {
+	if slices.ContainsFunc(stageRuntimeCommandNames(stage), isPHPWebRuntimeCommand) {
 		return true
 	}
 	return false
@@ -340,11 +340,14 @@ func officialPHPWebRuntimeTag(raw string) bool {
 	return strings.Contains(tag, "fpm") || strings.Contains(tag, "apache")
 }
 
-// stageRuntimeCommandName returns the executable name of the last ENTRYPOINT
-// or CMD in the stage (ENTRYPOINT takes precedence when both are present).
-// For shell-form instructions, parses the script to find the first command
-// name. Returns the lowercased path basename, or "" when unavailable.
-func stageRuntimeCommandName(stage instructions.Stage) string {
+// stageRuntimeCommandNames returns the executable names of the last
+// ENTRYPOINT and CMD in the stage (both are considered, since a common
+// PHP web runtime pattern is ENTRYPOINT ["docker-entrypoint.sh"] +
+// CMD ["php-fpm"] — the actual runtime process is php-fpm, started via
+// the entrypoint wrapper). For shell-form instructions, parses the script
+// to find the first command name. Returns lowercased path basenames; an
+// empty slice when no ENTRYPOINT or CMD is present.
+func stageRuntimeCommandNames(stage instructions.Stage) []string {
 	var lastEntrypoint *instructions.EntrypointCommand
 	var lastCmd *instructions.CmdCommand
 	for _, c := range stage.Commands {
@@ -356,13 +359,18 @@ func stageRuntimeCommandName(stage instructions.Stage) string {
 		}
 	}
 
+	names := make([]string, 0, 2) //nolint:mnd // up to ENTRYPOINT + CMD
 	if lastEntrypoint != nil {
-		return commandNameFromCmdLine(lastEntrypoint.CmdLine, lastEntrypoint.PrependShell)
+		if name := commandNameFromCmdLine(lastEntrypoint.CmdLine, lastEntrypoint.PrependShell); name != "" {
+			names = append(names, name)
+		}
 	}
 	if lastCmd != nil {
-		return commandNameFromCmdLine(lastCmd.CmdLine, lastCmd.PrependShell)
+		if name := commandNameFromCmdLine(lastCmd.CmdLine, lastCmd.PrependShell); name != "" {
+			names = append(names, name)
+		}
 	}
-	return ""
+	return names
 }
 
 func commandNameFromCmdLine(cmdLine []string, prependShell bool) string {

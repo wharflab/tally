@@ -93,6 +93,15 @@ CMD php-fpm -F
 `,
 			WantViolations: 1,
 		},
+		{
+			Name: "wrapper ENTRYPOINT + CMD php-fpm still triggers",
+			Content: `FROM debian:12-slim
+RUN apt-get install -y php8.3-fpm
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["php-fpm", "-F"]
+`,
+			WantViolations: 1,
+		},
 		// --- Compliant: OPcache signal present ---
 		{
 			Name: "docker-php-ext-install opcache suppresses",
