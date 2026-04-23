@@ -140,6 +140,8 @@ func TestFindUserCreationCmds(t *testing.T) {
 		{"cmd net user add", "net user alice pass /add", shell.VariantCmd, 1},
 		{"cmd net user delete not matched", "net user alice /delete", shell.VariantCmd, 0},
 		{"cmd net share /add not matched", "net share foo /add", shell.VariantCmd, 0},
+		{"pwsh New-LocalUser named", "New-LocalUser -Name alice -NoPassword", shell.VariantPowerShell, 1},
+		{"pwsh New-LocalUser positional", "New-LocalUser alice -NoPassword", shell.VariantPowerShell, 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -164,6 +166,9 @@ func TestExtractCreatedUsername(t *testing.T) {
 		{"useradd with flags", "useradd -r --home-dir /opt/app app", shell.VariantBash, "app"},
 		{"adduser disabled-password", "adduser -D alice", shell.VariantBash, "alice"},
 		{"net user /add", "net user alice pass /add", shell.VariantCmd, "alice"},
+		{"pwsh New-LocalUser -Name", "New-LocalUser -Name alice -NoPassword", shell.VariantPowerShell, "alice"},
+		{"pwsh New-LocalUser positional", "New-LocalUser alice -NoPassword", shell.VariantPowerShell, "alice"},
+		{"pwsh New-LocalUser positional with -Description", "New-LocalUser alice -Description 'test'", shell.VariantPowerShell, "alice"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

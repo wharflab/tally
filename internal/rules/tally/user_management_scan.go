@@ -137,7 +137,18 @@ func extractCreatedUsername(cmd *shell.CommandInfo) string {
 		}
 
 	case strings.EqualFold(cmd.Name, "New-LocalUser"):
-		return cmd.GetArgValue("-Name")
+		// -Name is Position 0, so `New-LocalUser alice -NoPassword` is a
+		// valid positional invocation. Prefer the named form, fall back to
+		// the first positional arg (using the PowerShell grammar's
+		// flag-vs-value classification surfaced via isFlagArg).
+		if v := cmd.GetArgValue("-Name"); v != "" {
+			return v
+		}
+		for i := range cmd.Args {
+			if !isFlagArg(cmd, i) {
+				return cmd.Args[i]
+			}
+		}
 	}
 
 	return ""
