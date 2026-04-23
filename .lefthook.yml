@@ -51,7 +51,7 @@ pre-commit:
     rumdl:
       glob: "**/*.{md,mdx}"
       exclude: "**/__snapshots__/**"
-      run: uv tool run rumdl==0.1.78 check --fix --config .rumdl.toml --output-format concise {staged_files}
+      run: uv tool run rumdl==0.1.80 check --fix --config .rumdl.toml --output-format concise {staged_files}
       stage_fixed: true
     mintlify-docs-verify:
       glob: "_docs/**"
