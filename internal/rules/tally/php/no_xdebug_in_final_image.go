@@ -5,6 +5,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/facts"
@@ -127,7 +128,8 @@ func (r *NoXdebugInFinalImageRule) newRunViolation(
 // A RUN qualifies when every parsed command is either:
 //   - a docker-php-ext-install/enable whose args are all Xdebug, or
 //   - a `pecl install` whose non-flag args are all Xdebug, or
-//   - an OS package-manager install whose package list is all Xdebug.
+//   - an OS package-manager install/remove whose package list is all Xdebug, or
+//   - a harmless OS package-manager cache-refresh/cleanup command.
 func runOnlyInstallsXdebug(runFacts *facts.RunFacts) bool {
 	if len(runFacts.CommandInfos) == 0 {
 		return false
@@ -160,13 +162,11 @@ func runOnlyInstallsXdebug(runFacts *facts.RunFacts) bool {
 			}
 			sawXdebug = true
 		default:
-			// Anything else is only permitted if it's a recognized OS package
-			// manager — InstallCommands was already validated above, so any
-			// other command name means the RUN does additional work.
-			if !osPackageManagersForPHP[strings.ToLower(cmd.Name)] {
+			allowed, touchesXdebug := osPackageManagerCommandOnlyTouchesXdebug(cmd)
+			if !allowed {
 				return false
 			}
-			sawXdebug = true
+			sawXdebug = sawXdebug || touchesXdebug
 		}
 	}
 	return sawXdebug
@@ -179,7 +179,63 @@ func argsAfterSubcommand(args []string, subcmd string) []string {
 			return args[i+1:]
 		}
 	}
-	return args
+	return nil
+}
+
+func osPackageManagerCommandOnlyTouchesXdebug(cmd shell.CommandInfo) (allowed, touchesXdebug bool) {
+	if !osPackageManagersForPHP[strings.ToLower(cmd.Name)] {
+		return false, false
+	}
+
+	args := argsAfterSubcommand(cmd.Args, cmd.Subcommand)
+	switch strings.ToLower(cmd.Subcommand) {
+	case "install", command.Add, "in", "remove", "del", "erase", "purge":
+		matches := allNonFlagArgsAreXdebugPackages(args)
+		return matches, matches
+	case "update", "upgrade", "refresh", "makecache", "autoremove":
+		return noNonFlagArgs(args), false
+	case "clean":
+		return onlyCleanupTargets(args), false
+	default:
+		return false, false
+	}
+}
+
+func noNonFlagArgs(args []string) bool {
+	for _, arg := range args {
+		if !strings.HasPrefix(arg, "-") {
+			return false
+		}
+	}
+	return true
+}
+
+func allNonFlagArgsAreXdebugPackages(args []string) bool {
+	found := false
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		if !packageNameContainsXdebug(shell.PackageArg{Normalized: arg}) {
+			return false
+		}
+		found = true
+	}
+	return found
+}
+
+func onlyCleanupTargets(args []string) bool {
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		switch strings.ToLower(arg) {
+		case "all", "packages", "metadata", "dbcache", "expire-cache":
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func (r *NoXdebugInFinalImageRule) checkObservableFiles(

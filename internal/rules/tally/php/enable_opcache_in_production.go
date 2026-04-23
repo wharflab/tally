@@ -536,11 +536,62 @@ func copyCarriesPHPExtension(cmd *instructions.CopyCommand) bool {
 	if pathTargetsPHPExtensions(cmd.DestPath) {
 		return true
 	}
-	return slices.ContainsFunc(cmd.SourcePaths, pathTargetsPHPExtensions)
+	return slices.ContainsFunc(cmd.SourcePaths, func(src string) bool {
+		return destinationPreservesPHPExtensionTree(src, cmd.DestPath)
+	})
+}
+
+func destinationPreservesPHPExtensionTree(src, dest string) bool {
+	srcPath := normalizeContainerPath(src)
+	destPath := normalizeContainerPath(dest)
+	if srcPath == "" || destPath == "" {
+		return false
+	}
+
+	for _, prefix := range phpExtensionCopyPathPrefixes {
+		mapped, ok := remapCopiedPath(srcPath, destPath, prefix)
+		if ok && pathTargetsPHPExtensions(mapped) {
+			return true
+		}
+	}
+	return false
+}
+
+func remapCopiedPath(src, dest, target string) (string, bool) {
+	srcPath := normalizeContainerPath(src)
+	destPath := normalizeContainerPath(dest)
+	targetPath := normalizeContainerPath(target)
+	if srcPath == "" || destPath == "" || targetPath == "" {
+		return "", false
+	}
+
+	switch {
+	case srcPath == targetPath:
+		return destPath, true
+	case strings.HasPrefix(srcPath, targetPath+"/"):
+		rel := strings.TrimPrefix(srcPath, targetPath+"/")
+		return path.Join(destPath, rel), true
+	case strings.HasPrefix(targetPath+"/", srcPath+"/"):
+		rel := strings.TrimPrefix(targetPath, srcPath)
+		return path.Join(destPath, strings.TrimPrefix(rel, "/")), true
+	default:
+		return "", false
+	}
+}
+
+func normalizeContainerPath(p string) string {
+	if p == "" {
+		return ""
+	}
+	cleaned := strings.TrimRight(path.Clean(p), "/")
+	if cleaned == "." {
+		return ""
+	}
+	return cleaned
 }
 
 func pathTargetsPHPExtensions(p string) bool {
-	normalized := strings.TrimRight(p, "/")
+	normalized := normalizeContainerPath(p)
 	if normalized == "" {
 		return false
 	}

@@ -22,4 +22,34 @@ type CacheMountsResolveData struct {
 	// within its stage. Stable across earlier sync fixes that insert
 	// non-RUN instructions (e.g., SHELL) before it.
 	RunOrdinal int
+
+	// RunSignature is a whitespace-normalized representation of the original
+	// RUN script. The resolver uses it as a stable fingerprint when earlier
+	// sync fixes delete or reorder other RUN instructions in the same stage.
+	RunSignature string
+
+	// CommandNames is the exact sequence of parsed command names observed in
+	// the original RUN script. The resolver uses it to avoid matching a
+	// different package-manager RUN that happens to require the same cache
+	// mount targets.
+	CommandNames []string
+
+	// RequiredTargets is the exact set of cache mount targets detected for the
+	// original RUN. The resolver re-runs detection on post-sync content and
+	// only emits edits when the matched RUN still requires the same targets.
+	RequiredTargets []string
+
+	// CacheEnvSelections identifies the specific cache-disabling ENV bindings
+	// consumed during sync analysis for this RUN. Async resolution re-selects
+	// only these bindings so repeated ENV keys are removed at most once across
+	// multiple RUN fixes in the same stage.
+	CacheEnvSelections []CacheMountsEnvSelection
+}
+
+// CacheMountsEnvSelection identifies a cache-disabling ENV binding by its
+// position in the sorted active binding list for a RUN plus the key name it
+// must still match after post-sync reparsing.
+type CacheMountsEnvSelection struct {
+	BindingIndex int
+	Key          string
 }

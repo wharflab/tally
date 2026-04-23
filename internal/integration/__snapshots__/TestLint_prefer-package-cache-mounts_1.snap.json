@@ -143,51 +143,9 @@
           "sourceCode": "RUN apk add --no-cache curl \u0026\u0026 rm -rf /var/cache/apk/*",
           "suggestedFix": {
             "description": "Add package cache mount(s) and remove cache cleanup commands",
-            "edits": [
-              {
-                "location": {
-                  "end": {
-                    "column": 4,
-                    "line": 8
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 4,
-                    "line": 8
-                  }
-                },
-                "newText": "--mount=type=cache,target=/var/cache/apk,id=apk,sharing=locked "
-              },
-              {
-                "location": {
-                  "end": {
-                    "column": 27,
-                    "line": 8
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 4,
-                    "line": 8
-                  }
-                },
-                "newText": "apk add curl"
-              },
-              {
-                "location": {
-                  "end": {
-                    "column": 54,
-                    "line": 8
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 27,
-                    "line": 8
-                  }
-                },
-                "newText": ""
-              }
-            ],
+            "needsResolve": true,
             "priority": 90,
+            "resolverId": "prefer-package-cache-mounts",
             "safety": 1
           }
         },
@@ -481,51 +439,9 @@
           "sourceCode": "RUN pip install --no-cache-dir -r requirements.txt \u0026\u0026 pip cache purge",
           "suggestedFix": {
             "description": "Add package cache mount(s) and remove cache cleanup commands",
-            "edits": [
-              {
-                "location": {
-                  "end": {
-                    "column": 4,
-                    "line": 14
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 4,
-                    "line": 14
-                  }
-                },
-                "newText": "--mount=type=cache,target=/root/.cache/pip,id=pip "
-              },
-              {
-                "location": {
-                  "end": {
-                    "column": 50,
-                    "line": 14
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 4,
-                    "line": 14
-                  }
-                },
-                "newText": "pip install -r requirements.txt"
-              },
-              {
-                "location": {
-                  "end": {
-                    "column": 69,
-                    "line": 14
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 50,
-                    "line": 14
-                  }
-                },
-                "newText": ""
-              }
-            ],
+            "needsResolve": true,
             "priority": 90,
+            "resolverId": "prefer-package-cache-mounts",
             "safety": 1
           }
         },
@@ -751,51 +667,9 @@
           "sourceCode": "RUN uv sync --no-cache --frozen \u0026\u0026 uv cache clean",
           "suggestedFix": {
             "description": "Add package cache mount(s) and remove cache cleanup commands",
-            "edits": [
-              {
-                "location": {
-                  "end": {
-                    "column": 4,
-                    "line": 20
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 4,
-                    "line": 20
-                  }
-                },
-                "newText": "--mount=type=cache,target=/root/.cache/uv,id=uv "
-              },
-              {
-                "location": {
-                  "end": {
-                    "column": 31,
-                    "line": 20
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 4,
-                    "line": 20
-                  }
-                },
-                "newText": "uv sync --frozen"
-              },
-              {
-                "location": {
-                  "end": {
-                    "column": 49,
-                    "line": 20
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 31,
-                    "line": 20
-                  }
-                },
-                "newText": ""
-              }
-            ],
+            "needsResolve": true,
             "priority": 90,
+            "resolverId": "prefer-package-cache-mounts",
             "safety": 1
           }
         },
@@ -859,51 +733,9 @@
           "sourceCode": "RUN bun install --no-cache \u0026\u0026 bun pm cache rm",
           "suggestedFix": {
             "description": "Add package cache mount(s) and remove cache cleanup commands",
-            "edits": [
-              {
-                "location": {
-                  "end": {
-                    "column": 4,
-                    "line": 22
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 4,
-                    "line": 22
-                  }
-                },
-                "newText": "--mount=type=cache,target=/root/.bun/install/cache,id=bun "
-              },
-              {
-                "location": {
-                  "end": {
-                    "column": 26,
-                    "line": 22
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 4,
-                    "line": 22
-                  }
-                },
-                "newText": "bun install"
-              },
-              {
-                "location": {
-                  "end": {
-                    "column": 45,
-                    "line": 22
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 26,
-                    "line": 22
-                  }
-                },
-                "newText": ""
-              }
-            ],
+            "needsResolve": true,
             "priority": 90,
+            "resolverId": "prefer-package-cache-mounts",
             "safety": 1
           }
         },

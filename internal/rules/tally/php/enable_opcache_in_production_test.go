@@ -263,12 +263,32 @@ COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 			WantViolations: 0,
 		},
 		{
+			Name: "final stage copies parent php tree from builder with opcache no violation",
+			Content: `FROM php:8.4-fpm AS builder
+RUN docker-php-ext-install opcache
+
+FROM php:8.4-fpm
+COPY --from=builder /usr/local/ /usr/local/
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "final stage copies unrelated files from builder with opcache still violates",
 			Content: `FROM php:8.4-fpm AS builder
 RUN docker-php-ext-install opcache
 
 FROM php:8.4-fpm
 COPY --from=builder /app /app
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "final stage copies php conf to inactive destination still violates",
+			Content: `FROM php:8.4-fpm AS builder
+RUN docker-php-ext-install opcache
+
+FROM php:8.4-fpm
+COPY --from=builder /usr/local/etc/php/conf.d/ /tmp/conf.d/
 `,
 			WantViolations: 1,
 		},

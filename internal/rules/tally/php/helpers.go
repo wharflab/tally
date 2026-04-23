@@ -136,18 +136,13 @@ func findXdebugCommands(
 		return nil, 0
 	}
 
-	installsByName := make(map[string][]shell.InstallCommand, len(runFacts.InstallCommands))
-	for _, ic := range runFacts.InstallCommands {
-		installsByName[ic.Manager] = append(installsByName[ic.Manager], ic)
-	}
-
 	filtered := make([]shell.CommandInfo, 0, len(cmds))
 	for _, cmd := range cmds {
 		if phpExtensionReferencesXdebug(cmd) {
 			filtered = append(filtered, cmd)
 			continue
 		}
-		if commandInstallsXdebugPackage(cmd, installsByName) {
+		if commandInstallsXdebugPackage(cmd, runFacts.InstallCommands) {
 			filtered = append(filtered, cmd)
 		}
 	}
@@ -168,14 +163,69 @@ func phpExtensionReferencesXdebug(cmd shell.CommandInfo) bool {
 }
 
 // commandInstallsXdebugPackage reports whether a CommandInfo matching an OS
-// package manager corresponds to an InstallCommand whose package list
-// contains an Xdebug-bearing package. Defers package-name normalization to
-// shell.StripPackageVersion via installCommandInstallsXdebug.
-func commandInstallsXdebugPackage(cmd shell.CommandInfo, installsByName map[string][]shell.InstallCommand) bool {
+// package manager corresponds to the exact InstallCommand occurrence whose
+// package list contains an Xdebug-bearing package. Defers package-name
+// normalization to shell.StripPackageVersion via installCommandInstallsXdebug.
+func commandInstallsXdebugPackage(cmd shell.CommandInfo, installs []shell.InstallCommand) bool {
 	if !osPackageManagersForPHP[strings.ToLower(cmd.Name)] {
 		return false
 	}
-	return slices.ContainsFunc(installsByName[cmd.Name], installCommandInstallsXdebug)
+	return slices.ContainsFunc(installs, func(ic shell.InstallCommand) bool {
+		return installCommandMatchesCommand(cmd, ic) && installCommandInstallsXdebug(ic)
+	})
+}
+
+func installCommandMatchesCommand(cmd shell.CommandInfo, ic shell.InstallCommand) bool {
+	if !strings.EqualFold(cmd.Name, ic.Manager) {
+		return false
+	}
+	if cmd.Subcommand != ic.Subcommand {
+		return false
+	}
+	if len(ic.Packages) == 0 {
+		return false
+	}
+
+	packages := make([]string, 0, len(ic.Packages))
+	for _, pkg := range ic.Packages {
+		packages = append(packages, pkg.Normalized)
+	}
+	return slices.Equal(packageArgsForPHPManager(cmd.Name, argsAfterSubcommand(cmd.Args, cmd.Subcommand)), packages)
+}
+
+func packageArgsForPHPManager(manager string, args []string) []string {
+	var got []string
+	skipNext := false
+	for _, arg := range args {
+		if skipNext {
+			skipNext = false
+			continue
+		}
+		if strings.HasPrefix(arg, "-") {
+			if phpManagerFlagConsumesValue(manager, arg) {
+				skipNext = true
+			}
+			continue
+		}
+		got = append(got, arg)
+	}
+	return got
+}
+
+func phpManagerFlagConsumesValue(manager, flag string) bool {
+	switch strings.ToLower(manager) {
+	case "apt", "apt-get":
+		switch flag {
+		case "-o", "--option", "-t", "--target-release":
+			return true
+		}
+	case "dnf", "microdnf", "yum":
+		switch flag {
+		case "--root", "--installroot", "--releasever", "--repo":
+			return true
+		}
+	}
+	return false
 }
 
 // installCommandInstallsXdebug reports whether a normalized package-manager
