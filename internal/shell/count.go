@@ -118,11 +118,24 @@ func ExtractChainedCommands(script string, variant Variant) []string {
 	return commands
 }
 
-// ExtractChainSeparators returns the raw separator text between commands in an
-// && chain (for example " && " or " && \\\n    "). The result length is
-// commandCount-1 on success; otherwise nil.
-func ExtractChainSeparators(script string, variant Variant, commandCount int) []string {
-	if !variant.SupportsPOSIXShellAST() || commandCount <= 1 {
+// CommandRange is the byte range of a single chained leaf command within a
+// shell script. StartOffset is the command's start byte (inclusive); EndOffset
+// is the command's end byte (exclusive). Offsets reference the script passed
+// to [ExtractChainCommandRanges].
+type CommandRange struct {
+	StartOffset uint
+	EndOffset   uint
+}
+
+// ExtractChainCommandRanges returns the byte-offset range of each chained
+// leaf command in the script. && chains are flattened so that each leaf
+// contributes one range; top-level statements separated by `;` or newline
+// each produce their own range. Compound commands (if, for, while, etc.)
+// and || chains are treated as a single leaf.
+//
+// Returns nil for non-POSIX shells or when the parser fails.
+func ExtractChainCommandRanges(script string, variant Variant) []CommandRange {
+	if !variant.SupportsPOSIXShellAST() {
 		return nil
 	}
 
@@ -136,45 +149,71 @@ func ExtractChainSeparators(script string, variant Variant, commandCount int) []
 		return nil
 	}
 
-	boundaries := make([][2]uint, 0, commandCount-1)
+	var ranges []CommandRange
 	for _, stmt := range prog.Stmts {
-		collectAndBoundaries(stmt, &boundaries)
+		collectCommandRanges(stmt, &ranges)
 	}
-	if len(boundaries) != commandCount-1 {
+	return ranges
+}
+
+// ExtractChainSeparators returns the raw separator text between commands in a
+// chained script. Handles both && chains within a statement (" && ",
+// " && \\\n    ") and top-level `;`/newline separators between statements
+// ("; ", "; \\\n    "). The result length is commandCount-1 on success;
+// otherwise nil.
+func ExtractChainSeparators(script string, variant Variant, commandCount int) []string {
+	if commandCount <= 1 {
 		return nil
 	}
 
-	separators := make([]string, 0, len(boundaries))
-	for _, boundary := range boundaries {
-		start, end := boundary[0], boundary[1]
+	ranges := ExtractChainCommandRanges(script, variant)
+	if len(ranges) != commandCount {
+		return nil
+	}
+
+	separators := make([]string, 0, commandCount-1)
+	for i := range commandCount - 1 {
+		start, end := ranges[i].EndOffset, ranges[i+1].StartOffset
 		if start > uint(len(script)) || end > uint(len(script)) || end < start {
 			return nil
 		}
 		separators = append(separators, script[start:end])
 	}
-
 	return separators
 }
 
-func collectAndBoundaries(stmt *syntax.Stmt, boundaries *[][2]uint) {
+// collectCommandRanges walks a statement and appends the Pos/End byte
+// offsets of each chained-leaf command. && chains are flattened so that
+// each leaf command contributes one CommandRange; compound or || chains
+// are treated as a single leaf.
+func collectCommandRanges(stmt *syntax.Stmt, ranges *[]CommandRange) {
 	if stmt == nil || stmt.Cmd == nil {
 		return
 	}
-
-	binaryCmd, ok := stmt.Cmd.(*syntax.BinaryCmd)
-	if !ok || binaryCmd.Op != syntax.AndStmt {
+	if binaryCmd, ok := stmt.Cmd.(*syntax.BinaryCmd); ok && binaryCmd.Op == syntax.AndStmt {
+		collectCommandRanges(binaryCmd.X, ranges)
+		collectCommandRanges(binaryCmd.Y, ranges)
 		return
 	}
+	*ranges = append(*ranges, CommandRange{
+		StartOffset: stmt.Pos().Offset(),
+		EndOffset:   commandLeafEndOffset(stmt),
+	})
+}
 
-	collectAndBoundaries(binaryCmd.X, boundaries)
-
-	start := binaryCmd.X.End().Offset()
-	end := binaryCmd.Y.Pos().Offset()
-	if end >= start {
-		*boundaries = append(*boundaries, [2]uint{start, end})
+// commandLeafEndOffset returns the end offset of stmt's command content,
+// extended to cover statement-level redirections (Stmt.Redirs) but NOT the
+// trailing ';'/'&' terminator. Stmt.End() conflates the two — it returns
+// Semicolon+1 when the statement has a terminator — which would shift the
+// chain-separator extraction one byte, so we compute the end manually.
+func commandLeafEndOffset(stmt *syntax.Stmt) uint {
+	end := stmt.Cmd.End().Offset()
+	for _, redir := range stmt.Redirs {
+		if re := redir.End().Offset(); re > end {
+			end = re
+		}
 	}
-
-	collectAndBoundaries(binaryCmd.Y, boundaries)
+	return end
 }
 
 // extractFromStatement extracts commands from a statement, flattening && chains.

@@ -87,6 +87,13 @@ RUN apk add --no-cache php83-pecl-xdebug
 			WantViolations: 1,
 		},
 		{
+			Name: "only exact xdebug install command is reported among same-manager commands",
+			Content: `FROM php:8.4-cli
+RUN apt-get update && apt-get install -y php-xdebug && apt-get install -y curl
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "chained install and enable reports both",
 			Content: `FROM php:8.4-cli
 RUN pecl install xdebug && docker-php-ext-enable xdebug
@@ -277,6 +284,25 @@ func TestNoXdebugInFinalImageRule_SuggestedFix_AptGetSinglePackage(t *testing.T)
 	}
 }
 
+func TestNoXdebugInFinalImageRule_SuggestedFix_AptGetUpdateInstallClean(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM php:8.4-cli\nRUN apt-get update && apt-get install -y php-xdebug && apt-get clean\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewNoXdebugInFinalImageRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix for xdebug-only package-manager RUN")
+	}
+	if fix.Edits[0].NewText != "# RUN apt-get update && apt-get install -y php-xdebug && apt-get clean" {
+		t.Errorf("NewText = %q, want commented-out line", fix.Edits[0].NewText)
+	}
+}
+
 func TestNoXdebugInFinalImageRule_NoFixWhenMixedPackages(t *testing.T) {
 	t.Parallel()
 
@@ -288,6 +314,20 @@ func TestNoXdebugInFinalImageRule_NoFixWhenMixedPackages(t *testing.T) {
 	}
 	if violations[0].SuggestedFix != nil {
 		t.Error("expected no SuggestedFix when xdebug is mixed with other packages")
+	}
+}
+
+func TestNoXdebugInFinalImageRule_NoFixWhenPackageManagerDoesOtherWork(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM php:8.4-cli\nRUN apt-get install -y php-xdebug && apt-get remove -y curl\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewNoXdebugInFinalImageRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	if violations[0].SuggestedFix != nil {
+		t.Error("expected no SuggestedFix when the RUN does non-xdebug package-manager work")
 	}
 }
 

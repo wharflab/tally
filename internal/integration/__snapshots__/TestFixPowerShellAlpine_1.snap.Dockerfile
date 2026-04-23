@@ -38,7 +38,7 @@ EOF
 
 SHELL ["/bin/ash", "-eo", "pipefail", "-c"]
 
-RUN --mount=type=cache,target=/var/cache/apk,id=apk,sharing=locked apk add bind-tools gnupg git tini
+RUN --mount=type=cache,target=/var/cache/apk,id=apk,sharing=locked apk add bind-tools git gnupg tini
 RUN <<EOF
 set -e
 set -o pipefail

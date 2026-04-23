@@ -295,6 +295,34 @@ RUN bun install
 	})
 }
 
+// resolveIfAsync materializes edits for assertions: returns fix.Edits for
+// sync fixes, and invokes the registered resolver against the original
+// content for async (NeedsResolve) fixes.
+func resolveIfAsync(t *testing.T, fix *rules.SuggestedFix, content string) []rules.TextEdit {
+	t.Helper()
+	if !fix.NeedsResolve {
+		return fix.Edits
+	}
+	resolver := fixpkg.GetResolver(fix.ResolverID)
+	if resolver == nil {
+		t.Fatalf("resolver %q not registered", fix.ResolverID)
+	}
+	resolved, err := resolver.Resolve(context.Background(), fixpkg.ResolveContext{
+		FilePath: "Dockerfile",
+		Content:  []byte(content),
+	}, fix)
+	if err != nil {
+		t.Fatalf("resolver error: %v", err)
+	}
+	return resolved
+}
+
+func applyResolvedFix(t *testing.T, fix *rules.SuggestedFix, content string) string {
+	t.Helper()
+	edits := resolveIfAsync(t, fix, content)
+	return string(fixpkg.ApplyEdits([]byte(content), edits))
+}
+
 func TestPreferPackageCacheMountsRule_CheckWithFixes(t *testing.T) {
 	t.Parallel()
 	r := NewPreferPackageCacheMountsRule()
@@ -676,26 +704,22 @@ RUN npm install
 				t.Fatalf("fix priority = %d, want 90", fix.Priority)
 			}
 
+			edits := resolveIfAsync(t, fix, tt.content)
+			fixedContent := applyResolvedFix(t, fix, tt.content)
+
 			// Only check edit count if explicitly set (non-zero)
-			if tt.wantEditCount != 0 && len(fix.Edits) != tt.wantEditCount {
-				t.Fatalf("fix edits = %d, want %d", len(fix.Edits), tt.wantEditCount)
+			if tt.wantEditCount != 0 && len(edits) != tt.wantEditCount {
+				t.Fatalf("fix edits = %d, want %d", len(edits), tt.wantEditCount)
 			}
 
-			// Concatenate all edit texts for contains/notContains checks.
-			var allNewText strings.Builder
-			for _, edit := range fix.Edits {
-				allNewText.WriteString(edit.NewText)
-				allNewText.WriteString("\n")
-			}
-			combined := allNewText.String()
 			for _, want := range tt.wantFixContains {
-				if !strings.Contains(combined, want) {
-					t.Fatalf("fix missing %q in:\n%s", want, combined)
+				if !strings.Contains(fixedContent, want) {
+					t.Fatalf("fixed content missing %q in:\n%s", want, fixedContent)
 				}
 			}
 			for _, notWant := range tt.wantNotContains {
-				if strings.Contains(combined, notWant) {
-					t.Fatalf("fix unexpectedly contains %q in:\n%s", notWant, combined)
+				if strings.Contains(fixedContent, notWant) {
+					t.Fatalf("fixed content unexpectedly contains %q in:\n%s", notWant, fixedContent)
 				}
 			}
 		})
@@ -870,6 +894,64 @@ RUN pip install -r requirements.txt
 
 	if envRemovalEdits != 2 {
 		t.Fatalf("expected 2 ENV removal edits, got %d", envRemovalEdits)
+	}
+}
+
+func TestPreferPackageCacheMountsResolver_ReidentifiesRunAfterEarlierRunRemoved(t *testing.T) {
+	t.Parallel()
+
+	original := `FROM python:3.13
+RUN pip install --no-cache-dir left-pad
+RUN pip install --no-cache-dir lodash
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", original)
+	violations := NewPreferPackageCacheMountsRule().Check(input)
+	if len(violations) != 2 {
+		t.Fatalf("expected 2 violations, got %d", len(violations))
+	}
+
+	fix := violations[1].SuggestedFix
+	if fix == nil || !fix.NeedsResolve {
+		t.Fatal("expected async suggested fix for second RUN")
+	}
+
+	modified := `FROM python:3.13
+RUN pip install --no-cache-dir lodash
+`
+	got := applyResolvedFix(t, fix, modified)
+	want := `FROM python:3.13
+RUN --mount=type=cache,target=/root/.cache/pip,id=pip pip install lodash
+`
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferPackageCacheMountsResolver_OnlyRemovesSelectedEnvBindings(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM python:3.13
+ENV PIP_NO_CACHE_DIR=1
+RUN pip install --no-cache-dir left-pad
+RUN pip install --no-cache-dir lodash
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewPreferPackageCacheMountsRule().Check(input)
+	if len(violations) != 2 {
+		t.Fatalf("expected 2 violations, got %d", len(violations))
+	}
+
+	secondFix := violations[1].SuggestedFix
+	if secondFix == nil || !secondFix.NeedsResolve {
+		t.Fatal("expected async suggested fix for second RUN")
+	}
+
+	got := applyResolvedFix(t, secondFix, content)
+	if !strings.Contains(got, "ENV PIP_NO_CACHE_DIR=1") {
+		t.Fatalf("second async fix unexpectedly removed shared ENV binding:\n%s", got)
+	}
+	if !strings.Contains(got, "--mount=type=cache,target=/root/.cache/pip,id=pip") {
+		t.Fatalf("second async fix did not rewrite the target RUN:\n%s", got)
 	}
 }
 

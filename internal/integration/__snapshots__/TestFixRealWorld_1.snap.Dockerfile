@@ -82,21 +82,15 @@ EOF
 
 ARG TRITON_VERSION
 
-RUN --mount=type=cache,target=/root/.cache/pip,id=pip pip install -U smclarify "sagemaker>=2,<3" sagemaker-experiments==0.* sagemaker-pytorch-training triton==${TRITON_VERSION}
-RUN --mount=type=cache,target=/root/.cache/pip,id=pip pip install -U "bokeh>=3.0.1,<4" "imageio>=2.22,<3" "opencv-python>=4.6,<5" "plotly>=5.11,<6" "seaborn>=0.12,<1" "numba>=0.56.4,<0.57" "shap>=0.41,<1"
+RUN --mount=type=cache,target=/root/.cache/pip,id=pip pip install -U "sagemaker>=2,<3" sagemaker-experiments==0.* sagemaker-pytorch-training smclarify triton==${TRITON_VERSION}
+RUN --mount=type=cache,target=/root/.cache/pip,id=pip pip install -U "bokeh>=3.0.1,<4" "imageio>=2.22,<3" "numba>=0.56.4,<0.57" "opencv-python>=4.6,<5" "plotly>=5.11,<6" "seaborn>=0.12,<1" "shap>=0.41,<1"
 RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update && apt-get install -y build-essential
 
 ARG DATASETS_VERSION
 ARG DIFFUSERS_VERSION
 ARG TRANSFORMERS_VERSION
 
-RUN --mount=type=cache,target=/root/.cache/pip,id=pip pip install kenlm==0.1 transformers[sklearn,sentencepiece,audio,vision]==${TRANSFORMERS_VERSION} datasets==${DATASETS_VERSION} diffusers==${DIFFUSERS_VERSION} $PT_TORCHAUDIO_URL multiprocess==0.70.14 dill==0.3.6 sagemaker==2.132.0 evaluate gevent~=23.9.0 pyarrow~=14.0.1
-RUN --mount=type=cache,target=/root/.cache/pip,id=pip pip install setuptools==69.5.1
-
-WORKDIR /app
-
-COPY requirements1.txt .
-
+RUN --mount=type=cache,target=/root/.cache/pip,id=pip pip install dill==0.3.6 evaluate gevent~=23.9.0 kenlm==0.1 multiprocess==0.70.14 pyarrow~=14.0.1 sagemaker==2.132.0 transformers[sklearn,sentencepiece,audio,vision]==${TRANSFORMERS_VERSION} datasets==${DATASETS_VERSION} diffusers==${DIFFUSERS_VERSION} "$PT_TORCHAUDIO_URL"
 RUN --mount=type=cache,target=/root/.cache/pip,id=pip pip install -r requirements1.txt
 
 ARG SMD_MODEL_PARALLEL_URL
@@ -371,7 +365,7 @@ RUN echo $PATH
 RUN echo $LD_LIBRARY_PATH
 RUN --mount=type=cache,target=/root/.cache/pip,id=pip <<EOF
 set -e
-pip install -U --force-reinstall wheel==0.43.0 setuptools==70.1.0
+pip install -U --force-reinstall setuptools==70.1.0 wheel==0.43.0
 pip install --force-reinstall setuptools==69.5.1
 git clone https://github.com/NVIDIA/apex
 cd apex

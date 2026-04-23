@@ -587,6 +587,40 @@ func TestFixRealWorldBoostMSVCWindowsContainer(t *testing.T) {
 	}
 }
 
+// TestFixRealWorldPHPFPM56 tests the full fix pipeline on a real-world
+// php:5.6-fpm builder+runtime Dockerfile via stdin, snapshotting both the
+// fixed Dockerfile (stdout) and the markdown violation report (stderr).
+// This fixture exercises heavy apt-get/pecl/docker-php-ext usage and
+// many-package RUNs, overlapping with the PHP rule family
+// (no-xdebug-in-final-image, enable-opcache-in-production,
+// composer-no-dev-in-production) plus broader tally rules.
+// Source: https://github.com/irvin-s/docker_repair/blob/6e3d43423b58a2631ff6850f64b11226f081bb4b/binacle_data/sources/456933631.Dockerfile
+func TestFixRealWorldPHPFPM56(t *testing.T) {
+	t.Parallel()
+
+	input, err := os.ReadFile(filepath.Join("testdata", "real-world-fix-php-fpm-56", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("failed to read fixture: %v", err)
+	}
+
+	stdout, stderr, exitCode := runTallyStdin(t, string(input),
+		"lint", "--format", "markdown", "--fix", "--fix-unsafe", "--slow-checks=on", "-",
+	)
+
+	t.Logf("exit=%d\nstdout length=%d\nstderr:\n%s", exitCode, len(stdout), stderr)
+
+	if exitCode != 1 {
+		t.Fatalf("expected exit code 1, got %d\nstderr:\n%s", exitCode, stderr)
+	}
+
+	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, stdout)
+	snaps.WithConfig(snaps.Ext(".md")).MatchStandaloneSnapshot(t, stderr)
+
+	if !strings.Contains(stderr, "Fixed") {
+		t.Errorf("expected 'Fixed' in stderr, got: %s", stderr)
+	}
+}
+
 // TestFixPowerShellPreferShellInstruction exercises the end-to-end auto-fix path
 // for tally/powershell/prefer-shell-instruction using a PowerShell-on-Linux image.
 func TestFixPowerShellPreferShellInstruction(t *testing.T) {

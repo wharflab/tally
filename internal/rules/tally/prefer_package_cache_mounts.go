@@ -70,38 +70,13 @@ func (r *PreferPackageCacheMountsRule) checkStageWithFacts(
 	consumedCacheEnvEntries := make(cacheEnvEntrySet)
 	var cacheEnvEntries []cacheEnvEntry
 	var violations []rules.Violation
+	runOrdinal := 0
 	for _, runFacts := range stageFacts.Runs {
-		if runFacts == nil || !runFacts.UsesShell || runFacts.SourceScript == "" {
-			continue
+		if runFacts != nil && runFacts.UsesShell {
+			runOrdinal++
 		}
-		if !runFacts.Shell.HasParser {
-			continue
-		}
-
-		required, cleaners := detectRequiredCacheMountsFromCommands(
-			runFacts.CommandInfos,
-			runFacts.Workdir,
-			runFacts.CachePathOverrides,
-		)
-		if len(required) == 0 {
-			continue
-		}
-
-		existing := runmount.GetMounts(runFacts.Run)
-		mergedMounts, mountChanged := mergeCacheMounts(existing, required)
-		if !mountChanged {
-			continue
-		}
-
-		updatedScript, scriptCleaned := removeCacheCleanup(
-			runFacts.Run,
-			runFacts.CommandScript,
-			runFacts.Shell.Variant,
-			cleaners,
-		)
-
-		runLoc := runFacts.Run.Location()
-		if len(runLoc) == 0 {
+		analysis := analyzeRunForCacheMounts(runFacts)
+		if analysis == nil {
 			continue
 		}
 
@@ -110,27 +85,138 @@ func (r *PreferPackageCacheMountsRule) checkStageWithFacts(
 			cacheEnvEntriesFromFacts(runFacts.CacheDisablingEnv),
 			consumedCacheEnvEntries,
 		)
-		edits, remaining, envCleaned := buildCacheMountEdits(cacheMountEditParams{
+		currentCacheEnvEntries := cacheEnvEntries
+		result := buildCacheMountEdits(cacheMountEditParams{
 			file:            file,
 			run:             runFacts.Run,
-			runLoc:          runLoc,
+			runLoc:          analysis.runLoc,
 			sm:              sm,
 			shellVariant:    runFacts.Shell.Variant,
-			existing:        existing,
-			merged:          mergedMounts,
-			cleanedScript:   updatedScript,
-			scriptCleaned:   scriptCleaned,
-			cleaners:        cleaners,
-			cacheEnvEntries: cacheEnvEntries,
+			existing:        analysis.existing,
+			merged:          analysis.merged,
+			cleanedScript:   analysis.cleanedScript,
+			scriptCleaned:   analysis.scriptCleaned,
+			cleaners:        analysis.cleaners,
+			cacheEnvEntries: currentCacheEnvEntries,
 		})
-		consumedCacheEnvEntries.markConsumed(cacheEnvEntries, remaining)
-		cacheEnvEntries = remaining
+		consumedCacheEnvEntries.markConsumed(currentCacheEnvEntries, result.RemainingEnvEntries)
+		cacheEnvEntries = result.RemainingEnvEntries
 
-		v := buildViolation(meta, file, runLoc, required, scriptCleaned, envCleaned, edits)
+		v := buildViolation(violationParams{
+			meta:          meta,
+			file:          file,
+			runLoc:        analysis.runLoc,
+			required:      analysis.required,
+			scriptCleaned: analysis.scriptCleaned,
+			envCleaned:    result.EnvCleaned,
+			edits:         result.Edits,
+			needsAsync:    result.NeedsAsync,
+			stageIdx:      stageFacts.Index,
+			runOrdinal:    runOrdinal,
+			resolverData: buildCacheMountsResolveData(
+				stageFacts.Index,
+				runOrdinal,
+				runFacts,
+				analysis.required,
+				currentCacheEnvEntries,
+				result.ConsumedEnvEntries,
+			),
+		})
 		violations = append(violations, v)
 	}
 
 	return violations
+}
+
+// runAnalysis holds the per-RUN inputs to buildCacheMountEdits.
+type runAnalysis struct {
+	runLoc        []parser.Range
+	existing      []*instructions.Mount
+	merged        []*instructions.Mount
+	required      []cacheMountSpec
+	cleaners      map[cleanupKind]bool
+	cleanedScript string
+	scriptCleaned bool
+}
+
+// analyzeRunForCacheMounts runs the detection and mount-merge step for a
+// single RUN. Returns nil when the RUN isn't eligible (non-shell, no cache
+// needed, or no mount change).
+func analyzeRunForCacheMounts(runFacts *facts.RunFacts) *runAnalysis {
+	if runFacts == nil || !runFacts.UsesShell || runFacts.SourceScript == "" {
+		return nil
+	}
+	if !runFacts.Shell.HasParser {
+		return nil
+	}
+
+	required, cleaners := detectRequiredCacheMountsFromCommands(
+		runFacts.CommandInfos,
+		runFacts.Workdir,
+		runFacts.CachePathOverrides,
+	)
+	if len(required) == 0 {
+		return nil
+	}
+
+	existing := runmount.GetMounts(runFacts.Run)
+	merged, mountChanged := mergeCacheMounts(existing, required)
+	if !mountChanged {
+		return nil
+	}
+
+	cleanedScript, scriptCleaned := removeCacheCleanup(
+		runFacts.Run,
+		runFacts.CommandScript,
+		runFacts.Shell.Variant,
+		cleaners,
+	)
+
+	runLoc := runFacts.Run.Location()
+	if len(runLoc) == 0 {
+		return nil
+	}
+
+	return &runAnalysis{
+		runLoc:        runLoc,
+		existing:      existing,
+		merged:        merged,
+		required:      required,
+		cleaners:      cleaners,
+		cleanedScript: cleanedScript,
+		scriptCleaned: scriptCleaned,
+	}
+}
+
+// computeCacheMountEditsForRun produces the full set of cache-mount edits
+// for a single RUN using post-sync-fix content. Used by the async resolver
+// after sync narrow fixes have landed; forces the tail-rewrite branch to
+// emit real edits rather than re-deferring.
+func computeCacheMountEditsForRun(
+	file string,
+	runFacts *facts.RunFacts,
+	sm *sourcemap.SourceMap,
+	cacheEnvEntries []cacheEnvEntry,
+) []rules.TextEdit {
+	analysis := analyzeRunForCacheMounts(runFacts)
+	if analysis == nil {
+		return nil
+	}
+	result := buildCacheMountEdits(cacheMountEditParams{
+		file:                 file,
+		run:                  runFacts.Run,
+		runLoc:               analysis.runLoc,
+		sm:                   sm,
+		shellVariant:         runFacts.Shell.Variant,
+		existing:             analysis.existing,
+		merged:               analysis.merged,
+		cleanedScript:        analysis.cleanedScript,
+		scriptCleaned:        analysis.scriptCleaned,
+		cleaners:             analysis.cleaners,
+		cacheEnvEntries:      cacheEnvEntries,
+		forceEmitTailRewrite: true,
+	})
+	return result.Edits
 }
 
 // buildCacheMountEdits produces targeted, non-overlapping edits:
@@ -150,12 +236,38 @@ type cacheMountEditParams struct {
 	scriptCleaned   bool
 	cleaners        map[cleanupKind]bool
 	cacheEnvEntries []cacheEnvEntry
+	// forceEmitTailRewrite is set by the async resolver so the tail
+	// rewrite branch emits real edits rather than returning needsAsync.
+	// In sync Check, this stays false and the rule defers to the resolver.
+	forceEmitTailRewrite bool
+}
+
+// cacheMountEditResult bundles the outputs of buildCacheMountEdits.
+type cacheMountEditResult struct {
+	// Edits are the sync edits to apply immediately. Nil when NeedsAsync
+	// is true.
+	Edits []rules.TextEdit
+	// ConsumedEnvEntries are the specific cache-disabling ENV bindings this
+	// run selected for removal. Async resolution carries only these bindings
+	// forward so shared ENV keys are removed at most once across multiple RUNs.
+	ConsumedEnvEntries []cacheEnvEntry
+	// RemainingEnvEntries are cache env entries not consumed by this
+	// run's cleanup; callers carry them forward to later runs in the
+	// same stage so the same binding isn't removed twice.
+	RemainingEnvEntries []cacheEnvEntry
+	// EnvCleaned reports whether env removal edits were produced.
+	EnvCleaned bool
+	// NeedsAsync is true when the fix needs a whole-RUN tail rewrite
+	// that would subsume narrow sync fixes on the same RUN. Callers
+	// should convert the fix to async so the tail rewrite runs on
+	// post-sync content. When true, Edits is nil.
+	NeedsAsync bool
 }
 
 // The insertion-based approach lets cache mount additions compose with other rules'
 // mount insertions at the same point (e.g., require-secret-mounts) without conflicting.
-func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvEntry, bool) {
-	envEdits, remaining := consumeEnvRemovalEdits(p.file, p.cleaners, p.cacheEnvEntries)
+func buildCacheMountEdits(p cacheMountEditParams) cacheMountEditResult {
+	envEdits, matched, remaining := consumeEnvRemovalEdits(p.file, p.cleaners, p.cacheEnvEntries)
 
 	existing := p.existing
 	merged := p.merged
@@ -180,11 +292,26 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 			cleanupEdits = computeCleanupEdits(p.file, run, runLoc, p.sm, p.shellVariant, p.cleaners)
 		}
 	}
+	cleanupOverlapsMountInsert := cleanupEditsOverlapMountInsert(runLoc, p.sm, cleanupEdits)
 
 	// Skip the zero-width mount insertion when another edit already includes
 	// all mounts: tail rewrites (non-heredoc) use formatRunFlags with merged,
 	// and heredoc mount-flag edits (buildMountFlagEdit) also use merged.
-	needsTailRewrite := !isHeredoc && (mutated || (p.scriptCleaned && len(cleanupEdits) == 0))
+	needsTailRewrite := !isHeredoc && (mutated || (p.scriptCleaned && (len(cleanupEdits) == 0 || cleanupOverlapsMountInsert)))
+
+	// Non-heredoc tail rewrites span the entire RUN script and would
+	// subsume narrow sync fixes on the same RUN (quoting, flag insertion
+	// by other rules). Defer the whole fix to the async resolver so those
+	// fixes land first and the tail rewrite sees updated content.
+	if needsTailRewrite && !p.forceEmitTailRewrite {
+		return cacheMountEditResult{
+			ConsumedEnvEntries:  matched,
+			RemainingEnvEntries: remaining,
+			EnvCleaned:          len(envEdits) > 0,
+			NeedsAsync:          true,
+		}
+	}
+
 	skipMountInsert := needsTailRewrite || (isHeredoc && mutated)
 
 	// Edit 1: zero-length insertion for new mount flags right after "RUN ".
@@ -206,28 +333,53 @@ func buildCacheMountEdits(p cacheMountEditParams) ([]rules.TextEdit, []cacheEnvE
 		edits = append(edits, buildMountFlagEdit(p, merged)...)
 	}
 
-	// Edit 2+: cleanup and/or mount rewrite.
-	switch {
-	case isHeredoc:
-		// Heredoc: use line-based cleanup edits (mount handled above).
-		edits = append(edits, cleanupEdits...)
+	// Edit 2+: cleanup edits (heredoc or targeted non-heredoc).
+	edits = append(edits, cleanupEdits...)
 
-	case mutated:
-		// Mount flags modified: full tail rewrite with merged mounts + cleaned script.
-		edits = append(edits, buildTailRewrite(p, merged)...)
-
-	case len(cleanupEdits) > 0:
-		// Targeted cleanup deletions (non-heredoc): compose with other rules' edits.
-		edits = append(edits, cleanupEdits...)
-
-	case p.scriptCleaned:
-		// Fallback: targeted cleanup unavailable, tail rewrite
-		// with merged mounts (includes new) + cleaned script.
+	// Async resolver path: emit the whole-RUN tail rewrite now that narrow
+	// sync fixes have already been applied to the content the resolver sees.
+	if needsTailRewrite && p.forceEmitTailRewrite {
 		edits = append(edits, buildTailRewrite(p, merged)...)
 	}
 
 	edits = append(edits, envEdits...)
-	return edits, remaining, len(envEdits) > 0
+	return cacheMountEditResult{
+		ConsumedEnvEntries:  matched,
+		Edits:               edits,
+		RemainingEnvEntries: remaining,
+		EnvCleaned:          len(envEdits) > 0,
+	}
+}
+
+func cleanupEditsOverlapMountInsert(
+	runLoc []parser.Range,
+	sm *sourcemap.SourceMap,
+	edits []rules.TextEdit,
+) bool {
+	if len(runLoc) == 0 || sm == nil || len(edits) == 0 {
+		return false
+	}
+
+	line := runLoc[0].Start.Line
+	col := runKeywordEndColumn(runLoc, sm)
+	for _, edit := range edits {
+		if locationContainsPoint(edit.Location, line, col) {
+			return true
+		}
+	}
+	return false
+}
+
+func locationContainsPoint(loc rules.Location, line, col int) bool {
+	point := rules.Position{Line: line, Column: col}
+	return comparePosition(loc.Start, point) <= 0 && comparePosition(point, loc.End) < 0
+}
+
+func comparePosition(a, b rules.Position) int {
+	if a.Line != b.Line {
+		return a.Line - b.Line
+	}
+	return a.Column - b.Column
 }
 
 // buildTailRewrite produces a single edit replacing everything after "RUN "
@@ -416,10 +568,25 @@ func computeCleanupEdits(
 	sourceFull := strings.Join(lines, "\n")
 
 	script := dockerfile.RunScript(run)
-	commands := shell.ExtractChainedCommands(script, variant)
-	if len(commands) == 0 {
+	ranges := shell.ExtractChainCommandRanges(script, variant)
+	if len(ranges) == 0 {
 		return nil
 	}
+
+	// Derive raw command text directly from script[range], then normalize
+	// whitespace the same way normalizeSource does (collapse runs of spaces
+	// and tabs into a single space) so substring search in `normalized`
+	// matches byte-for-byte. Avoids the round-trip through the mvdan
+	// printer, which reformats some constructs (e.g., "$( curl" → "$(curl")
+	// and loses raw-source fidelity.
+	commands := make([]string, len(ranges))
+	for i, r := range ranges {
+		if int(r.EndOffset) > len(script) || r.StartOffset > r.EndOffset {
+			return nil
+		}
+		commands[i] = normalizeWhitespaceRuns(script[r.StartOffset:r.EndOffset])
+	}
+
 	separators := shell.ExtractChainSeparators(script, variant, len(commands))
 
 	// Normalize the source: collapse continuations and runs of whitespace
@@ -530,6 +697,29 @@ func buildCleanupEdit(ctx cleanupEditContext, i int, cmd string) *rules.TextEdit
 	)
 }
 
+// normalizeWhitespaceRuns collapses runs of spaces and tabs within s into
+// single spaces, matching the whitespace treatment in normalizeSource. Used
+// to make command text extracted from a buildkit-joined RUN script (which
+// preserves original indentation after line continuations) comparable to
+// the whitespace-collapsed source view.
+func normalizeWhitespaceRuns(s string) string {
+	var buf strings.Builder
+	buf.Grow(len(s))
+	inSpace := false
+	for i := range len(s) {
+		if s[i] == ' ' || s[i] == '\t' {
+			if !inSpace {
+				buf.WriteByte(' ')
+				inSpace = true
+			}
+			continue
+		}
+		inSpace = false
+		buf.WriteByte(s[i])
+	}
+	return buf.String()
+}
+
 // normalizeSource collapses backslash-newline continuations and runs of
 // whitespace (space/tab) into single spaces. This matches the normalized
 // command text produced by shell.ExtractChainedCommands, enabling plain
@@ -629,38 +819,133 @@ func mountsMutated(existing, merged []*instructions.Mount) bool {
 	return false
 }
 
-func buildViolation(
-	meta rules.RuleMetadata,
-	file string,
-	runLoc []parser.Range,
-	required []cacheMountSpec,
-	scriptCleaned, envCleaned bool,
-	edits []rules.TextEdit,
-) rules.Violation {
+type violationParams struct {
+	meta          rules.RuleMetadata
+	file          string
+	runLoc        []parser.Range
+	required      []cacheMountSpec
+	scriptCleaned bool
+	envCleaned    bool
+	edits         []rules.TextEdit
+	needsAsync    bool
+	stageIdx      int
+	runOrdinal    int
+	resolverData  *rules.CacheMountsResolveData
+}
+
+func buildViolation(p violationParams) rules.Violation {
 	fixDescription := "Add package cache mount(s)"
 	switch {
-	case scriptCleaned && envCleaned:
+	case p.scriptCleaned && p.envCleaned:
 		fixDescription = "Add package cache mount(s), remove cache cleanup commands, and remove cache-disabling ENV vars"
-	case scriptCleaned:
+	case p.scriptCleaned:
 		fixDescription = "Add package cache mount(s) and remove cache cleanup commands"
-	case envCleaned:
+	case p.envCleaned:
 		fixDescription = "Add package cache mount(s) and remove cache-disabling ENV vars"
 	}
 
-	mountDescriptions := describeMounts(required)
-	return rules.NewViolation(
-		rules.NewLocationFromRanges(file, runLoc),
-		meta.Code,
+	mountDescriptions := describeMounts(p.required)
+	v := rules.NewViolation(
+		rules.NewLocationFromRanges(p.file, p.runLoc),
+		p.meta.Code,
 		"use cache mounts for package manager cache directories",
-		meta.DefaultSeverity,
-	).WithDocURL(meta.DocURL).WithDetail(
+		p.meta.DefaultSeverity,
+	).WithDocURL(p.meta.DocURL).WithDetail(
 		"Detected package install/build command; add cache mount(s): " + strings.Join(mountDescriptions, ", "),
-	).WithSuggestedFix(&rules.SuggestedFix{
+	)
+
+	if p.needsAsync {
+		return v.WithSuggestedFix(&rules.SuggestedFix{
+			Description:  fixDescription,
+			Safety:       rules.FixSuggestion,
+			Priority:     p.meta.FixPriority,
+			NeedsResolve: true,
+			ResolverID:   rules.CacheMountsResolverID,
+			ResolverData: p.resolverData,
+		})
+	}
+
+	return v.WithSuggestedFix(&rules.SuggestedFix{
 		Description: fixDescription,
 		Safety:      rules.FixSuggestion,
-		Priority:    meta.FixPriority,
-		Edits:       edits,
+		Priority:    p.meta.FixPriority,
+		Edits:       p.edits,
 	})
+}
+
+func buildCacheMountsResolveData(
+	stageIdx int,
+	runOrdinal int,
+	runFacts *facts.RunFacts,
+	required []cacheMountSpec,
+	cacheEnvEntries []cacheEnvEntry,
+	consumed []cacheEnvEntry,
+) *rules.CacheMountsResolveData {
+	if runFacts == nil {
+		return nil
+	}
+
+	return &rules.CacheMountsResolveData{
+		StageIndex:         stageIdx,
+		RunOrdinal:         runOrdinal,
+		RunSignature:       normalizeResolverRunSignature(runFacts.CommandScript),
+		CommandNames:       resolverCommandNames(runFacts.CommandInfos),
+		RequiredTargets:    requiredTargets(required),
+		CacheEnvSelections: cacheEnvSelections(cacheEnvEntries, consumed),
+	}
+}
+
+func normalizeResolverRunSignature(script string) string {
+	return strings.Join(strings.Fields(script), " ")
+}
+
+func resolverCommandNames(commands []shell.CommandInfo) []string {
+	if len(commands) == 0 {
+		return nil
+	}
+
+	names := make([]string, 0, len(commands))
+	for _, cmd := range commands {
+		names = append(names, strings.ToLower(cmd.Name))
+	}
+	return names
+}
+
+func requiredTargets(required []cacheMountSpec) []string {
+	if len(required) == 0 {
+		return nil
+	}
+
+	targets := make([]string, 0, len(required))
+	for _, mount := range required {
+		targets = append(targets, mount.Target)
+	}
+	return targets
+}
+
+func cacheEnvSelections(allEntries, selected []cacheEnvEntry) []rules.CacheMountsEnvSelection {
+	if len(selected) == 0 {
+		return nil
+	}
+
+	selections := make([]rules.CacheMountsEnvSelection, 0, len(selected))
+	for _, entry := range selected {
+		bindingIndex := -1
+		for i, candidate := range allEntries {
+			if candidate.env == entry.env && candidate.key == entry.key {
+				bindingIndex = i
+				break
+			}
+		}
+		if bindingIndex < 0 {
+			continue
+		}
+		selections = append(selections, rules.CacheMountsEnvSelection{
+			BindingIndex: bindingIndex,
+			Key:          entry.key,
+		})
+	}
+	return selections
 }
 
 type cacheMountSpec struct {
@@ -1036,8 +1321,13 @@ type cacheEnvEntry struct {
 	kind cleanupKind
 }
 
-// consumeEnvRemovalEdits builds TextEdits for matching entries and returns the remaining (unconsumed) entries.
-func consumeEnvRemovalEdits(file string, cleaners map[cleanupKind]bool, entries []cacheEnvEntry) ([]rules.TextEdit, []cacheEnvEntry) {
+// consumeEnvRemovalEdits builds TextEdits for matching entries and returns the
+// matched plus remaining (unconsumed) entries.
+func consumeEnvRemovalEdits(
+	file string,
+	cleaners map[cleanupKind]bool,
+	entries []cacheEnvEntry,
+) ([]rules.TextEdit, []cacheEnvEntry, []cacheEnvEntry) {
 	// Partition entries into matched vs remaining.
 	var matched []cacheEnvEntry
 	var remaining []cacheEnvEntry
@@ -1049,7 +1339,7 @@ func consumeEnvRemovalEdits(file string, cleaners map[cleanupKind]bool, entries 
 		}
 	}
 	if len(matched) == 0 {
-		return nil, entries
+		return nil, nil, entries
 	}
 
 	// Group matched entries by ENV instruction pointer.
@@ -1076,7 +1366,7 @@ func consumeEnvRemovalEdits(file string, cleaners map[cleanupKind]bool, entries 
 		}
 	}
 
-	return edits, remaining
+	return edits, matched, remaining
 }
 
 // buildEnvKeyRemovalEdit delegates to the shared rules.BuildEnvKeyRemovalEdit helper.

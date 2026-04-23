@@ -69,7 +69,7 @@ func (r *EnableOpcacheInProductionRule) Check(input rules.LintInput) []rules.Vio
 		return nil
 	}
 
-	if stageHasOpcacheSignal(stageFacts) {
+	if stageHasOpcacheSignal(stageFacts, info, input.Facts, input.Semantic) {
 		return nil
 	}
 
@@ -261,11 +261,11 @@ func buildOpcachePackageManagerFix(
 }
 
 // osPackageManagersForPHP is the set of install-command managers whose
-// packages follow the phpNN-opcache naming convention. Only installs from
-// these managers can be mapped to a matching OPcache system package;
-// application-level managers (composer, npm, pip, ...) may happen to
-// ship a package called "php-fpm" but it would not come with a
-// companion system OPcache extension.
+// packages follow PHP distro naming conventions (phpNN-opcache, php-xdebug,
+// etc.). Only installs from these managers can be mapped to a matching
+// companion system package; application-level managers (composer, npm,
+// pip, ...) may happen to ship a package called "php-fpm" but it would
+// not come with a matching system extension.
 var osPackageManagersForPHP = map[string]bool{
 	"apt":      true,
 	"apt-get":  true,
@@ -274,6 +274,13 @@ var osPackageManagersForPHP = map[string]bool{
 	"microdnf": true,
 	"yum":      true,
 	"zypper":   true,
+}
+
+// osPackageManagersForPHPSorted is the same set in a stable order, used to
+// seed runcheck.FindCommands when searching for OS-package-manager installs
+// in a RUN instruction.
+var osPackageManagersForPHPSorted = []string{
+	"apt", "apt-get", "apk", "dnf", "microdnf", "yum", "zypper",
 }
 
 // derivePHPOpcachePackage maps a PHP FPM package name to the matching OPcache
@@ -432,8 +439,30 @@ func isPHPWebRuntimeCommand(name string) bool {
 }
 
 // stageHasOpcacheSignal reports whether the stage has any signal that OPcache
-// is installed, enabled, or configured.
-func stageHasOpcacheSignal(sf *facts.StageFacts) bool {
+// is installed, enabled, or configured. Signals include:
+//
+//   - PHP_OPCACHE_* environment variables
+//   - RUN commands that install or enable opcache (docker-php-ext-*, pecl,
+//     OS package-manager installs of php*-opcache)
+//   - Observable ini files referencing opcache
+//   - COPY --from=<stage> of PHP extension or conf.d directories when the
+//     source stage itself has an opcache signal (multi-stage builder pattern)
+func stageHasOpcacheSignal(
+	sf *facts.StageFacts,
+	info *semantic.StageInfo,
+	ff *facts.FileFacts,
+	sem *semantic.Model,
+) bool {
+	return stageHasOpcacheSignalWithVisited(sf, info, ff, sem, map[int]bool{})
+}
+
+func stageHasOpcacheSignalWithVisited(
+	sf *facts.StageFacts,
+	info *semantic.StageInfo,
+	ff *facts.FileFacts,
+	sem *semantic.Model,
+	visited map[int]bool,
+) bool {
 	if sf == nil {
 		return false
 	}
@@ -445,7 +474,137 @@ func stageHasOpcacheSignal(sf *facts.StageFacts) bool {
 			return true
 		}
 	}
-	return slices.ContainsFunc(sf.ObservableFiles, observableFileHasOpcacheSignal)
+	if slices.ContainsFunc(sf.ObservableFiles, observableFileHasOpcacheSignal) {
+		return true
+	}
+	return inheritedOpcacheSignalFromCopyFrom(info, ff, sem, visited)
+}
+
+// inheritedOpcacheSignalFromCopyFrom reports whether this stage inherits an
+// opcache install via COPY --from=<builder> of PHP extension or conf.d
+// directories. The source stage is inspected recursively so transitive
+// builder chains are handled.
+func inheritedOpcacheSignalFromCopyFrom(
+	info *semantic.StageInfo,
+	ff *facts.FileFacts,
+	sem *semantic.Model,
+	visited map[int]bool,
+) bool {
+	if info == nil || ff == nil || sem == nil {
+		return false
+	}
+	for _, ref := range info.CopyFromRefs {
+		if !ref.IsStageRef || ref.StageIndex < 0 || ref.Command == nil {
+			continue
+		}
+		if visited[ref.StageIndex] {
+			continue
+		}
+		if !copyCarriesPHPExtension(ref.Command) {
+			continue
+		}
+		visited[ref.StageIndex] = true
+		srcFacts := ff.Stage(ref.StageIndex)
+		srcInfo := sem.StageInfo(ref.StageIndex)
+		if stageHasOpcacheSignalWithVisited(srcFacts, srcInfo, ff, sem, visited) {
+			return true
+		}
+	}
+	return false
+}
+
+// phpExtensionCopyPathPrefixes are destination-path prefixes whose contents
+// include the opcache extension and/or its enabling ini file on official
+// php:* base images:
+//
+//   - /usr/local/lib/php/extensions/ — the .so lives under an ABI-suffixed
+//     subdirectory here (e.g., no-debug-non-zts-20131226/opcache.so)
+//   - /usr/local/etc/php/conf.d/ — docker-php-ext-enable writes the ini here
+//     (e.g., docker-php-ext-opcache.ini)
+var phpExtensionCopyPathPrefixes = []string{
+	"/usr/local/lib/php/extensions/",
+	"/usr/local/etc/php/conf.d/",
+}
+
+// copyCarriesPHPExtension reports whether a COPY command copies PHP
+// extension artifacts (the .so under /usr/local/lib/php/extensions/ or the
+// enabling ini under /usr/local/etc/php/conf.d/).
+func copyCarriesPHPExtension(cmd *instructions.CopyCommand) bool {
+	if cmd == nil {
+		return false
+	}
+	if pathTargetsPHPExtensions(cmd.DestPath) {
+		return true
+	}
+	return slices.ContainsFunc(cmd.SourcePaths, func(src string) bool {
+		return destinationPreservesPHPExtensionTree(src, cmd.DestPath)
+	})
+}
+
+func destinationPreservesPHPExtensionTree(src, dest string) bool {
+	srcPath := normalizeContainerPath(src)
+	destPath := normalizeContainerPath(dest)
+	if srcPath == "" || destPath == "" {
+		return false
+	}
+
+	for _, prefix := range phpExtensionCopyPathPrefixes {
+		mapped, ok := remapCopiedPath(srcPath, destPath, prefix)
+		if ok && pathTargetsPHPExtensions(mapped) {
+			return true
+		}
+	}
+	return false
+}
+
+func remapCopiedPath(src, dest, target string) (string, bool) {
+	srcPath := normalizeContainerPath(src)
+	destPath := normalizeContainerPath(dest)
+	targetPath := normalizeContainerPath(target)
+	if srcPath == "" || destPath == "" || targetPath == "" {
+		return "", false
+	}
+
+	switch {
+	case srcPath == targetPath:
+		return destPath, true
+	case strings.HasPrefix(srcPath, targetPath+"/"):
+		rel := strings.TrimPrefix(srcPath, targetPath+"/")
+		return path.Join(destPath, rel), true
+	case strings.HasPrefix(targetPath+"/", srcPath+"/"):
+		rel := strings.TrimPrefix(targetPath, srcPath)
+		return path.Join(destPath, strings.TrimPrefix(rel, "/")), true
+	default:
+		return "", false
+	}
+}
+
+func normalizeContainerPath(p string) string {
+	if p == "" {
+		return ""
+	}
+	cleaned := strings.TrimRight(path.Clean(p), "/")
+	if cleaned == "." {
+		return ""
+	}
+	return cleaned
+}
+
+func pathTargetsPHPExtensions(p string) bool {
+	normalized := normalizeContainerPath(p)
+	if normalized == "" {
+		return false
+	}
+	for _, prefix := range phpExtensionCopyPathPrefixes {
+		trimmedPrefix := strings.TrimRight(prefix, "/")
+		if normalized == trimmedPrefix {
+			return true
+		}
+		if strings.HasPrefix(normalized, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func envHasOpcacheSignal(env facts.EnvFacts) bool {

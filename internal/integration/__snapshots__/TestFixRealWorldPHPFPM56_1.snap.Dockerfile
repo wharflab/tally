@@ -1,0 +1,114 @@
+FROM php:5.6-fpm AS builder
+
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked <<EOF
+set -e
+set -o pipefail
+set -ex
+apt-get update
+apt-get install -y autoconf build-essential libbsd-dev libbz2-dev libc-client2007e-dev libc6-dev libcurl3 libcurl4-openssl-dev libedit-dev libedit2 libgmp-dev libgpgme11-dev libicu-dev libjpeg-dev libkrb5-dev libldap2-dev libldb-dev libmagick++-dev libmagickwand-dev libmcrypt-dev libmemcached-dev libpcre3-dev libpng-dev libsqlite3-0 libsqlite3-dev libssh2-1-dev libssl-dev libtinfo-dev libtool libvpx-dev libwebp-dev libxml2 libxml2-dev libxpm-dev libxslt1-dev
+ln -s /usr/include/x86_64-linux-gnu/gmp.h /usr/include
+docker-php-ext-configure ldap --with-libdir=lib/x86_64-linux-gnu
+docker-php-ext-configure gd --with-png-dir=/usr --with-jpeg-dir=/usr --with-freetype-dir=/usr --with-xpm-dir=/usr --with-vpx-dir=/usr
+docker-php-ext-configure gmp --with-libdir=lib/x86_64-linux-gnu
+docker-php-ext-configure imap --with-kerberos --with-imap-ssl
+docker-php-ext-install bcmath bz2 calendar dba exif gd gettext gmp imap intl ldap mcrypt mysql mysqli opcache pdo_mysql shmop soap sockets sysvmsg sysvsem sysvshm wddx xmlrpc xsl zip
+pecl install gnupg-1.4.0 igbinary-2.0.1 imagick-3.4.3 memcached-2.2.0 msgpack-0.5.7 redis-3.1.3 runkit-1.0.4
+echo "\n" | pecl install ssh2-0.13
+docker-php-ext-enable --ini-name pecl.ini gnupg igbinary imagick memcached msgpack redis runkit ssh2
+curl --connect-timeout 10 -o ioncube.tar.gz -kfSL "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_lin_x86-64.tar.gz"
+tar -zxvf ioncube.tar.gz
+cp ioncube/ioncube_loader_lin_5.6.so /usr/local/lib/php/extensions/no-debug-non-zts-20131226/ioncube.so
+rm -Rf ioncube*
+NR_VERSION="$(curl --location --connect-timeout 10 -skS https://download.newrelic.com/php_agent/release/ | sed -n 's/.*>\(.*linux\).tar.gz<.*/\1/p')"
+curl --connect-timeout 10 -o nr.tar.gz -kfSL "https://download.newrelic.com/php_agent/release/$NR_VERSION.tar.gz"
+tar -xf nr.tar.gz
+cp "$NR_VERSION"/agent/x64/newrelic-20131226.so /usr/local/lib/php/extensions/no-debug-non-zts-20131226/newrelic.so
+rm -rf newrelic-php5* nr.tar.gz
+echo "zend_extension=ioncube.so" >/usr/local/etc/php/conf.d/01-ioncube.ini
+echo "extension=newrelic.so" >/usr/local/etc/php/conf.d/10-newrelic.ini
+echo "runkit.internal_override=1" >/usr/local/etc/php/conf.d/10-runkit.ini
+EOF
+
+# Now that all the modules are built/downloaded, use the original php:5.6-fpm image and
+# install only the runtime dependencies with the new modules and config files.
+FROM php:5.6-fpm
+
+WORKDIR /
+
+RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked <<EOF
+set -e
+set -o pipefail
+set -ex
+apt-get update
+apt-get install -y --no-install-recommends libc-client2007e libgpgme11 libicu57 libmagickwand-6.q16-3 libmcrypt4 libmemcached11 libmemcachedutil2 libpng16-16 libvpx4 libwebp6 libxpm4 libxslt1.1 ssmtp
+rm -rf /tmp/pear /usr/share/doc /usr/share/man /var/lib/apt/lists/*
+cd /usr/local/etc/php
+php-fpm -v 2>/dev/null | sed -E 's/PHP ([5|7].[0-9]{1,2}.[0-9]{1,2})(.*)/\1/g' | head -n1 >php_version.txt
+EOF
+
+COPY --from=builder /usr/local/lib/php/extensions/no-debug-non-zts-20131226/ /usr/local/lib/php/extensions/no-debug-non-zts-20131226/
+COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
+
+RUN pear install --alldeps \
+        Auth_SASL \
+        Auth_SASL2-beta \
+        Benchmark \
+        pear.php.net/Console_Color2-0.1.2 \
+        Console_Table \
+        HTTP_OAuth-0.3.1 \
+        HTTP_Request2 \
+        Log \
+        Mail \
+        MDB2 \
+        Net_GeoIP \
+        Net_SMTP \
+        Net_Socket \
+        XML_RPC2 \
+        pear.symfony.com/YAML \
+    ;
+
+COPY <<EOF /usr/local/etc/php-fpm.d/www.conf
+[global]
+daemonize = no
+error_log = /proc/self/fd/2
+
+[www]
+listen = [::]:9000
+listen.owner = www-data
+listen.group = www-data
+
+user = www-data
+group = www-data
+
+access.log = /proc/self/fd/2
+
+pm = static
+pm.max_children = 1
+pm.start_servers = 1
+request_terminate_timeout = 65s
+pm.max_requests = 1000
+catch_workers_output = yes
+EOF
+COPY <<EOF /usr/local/php/php/auto_prepends/default_prepend.php
+<?php
+if (function_exists("uopz_allow_exit")) {
+    uopz_allow_exit(true);
+}
+?>
+EOF
+COPY <<EOF /etc/ssmtp/ssmtp.conf
+FromLineOverride=YES
+mailhub=127.0.0.1
+UseTLS=NO
+UseSTARTTLS=NO
+EOF
+COPY <<EOF /usr/local/etc/php/conf.d/php.ini
+[PHP]
+log_errors = On
+error_log = /dev/stderr
+auto_prepend_file = /usr/local/php/php/auto_prepends/default_prepend.php
+EOF
+
+EXPOSE 9000
+
+CMD ["php-fpm"]
