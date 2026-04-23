@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	fixpkg "github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -766,5 +767,313 @@ RUN printf '#!/bin/sh\nexec app\n' > /app/run.sh
 	runViolations := runRule.Check(runInput)
 	if len(runViolations) != 0 {
 		t.Errorf("prefer-run-heredoc: got %d violations, want 0 (should yield to prefer-copy-heredoc)", len(runViolations))
+	}
+}
+
+// TestPreferCopyHeredocRule_PhpFpmStyleFullFix is a snapshot-style test that
+// runs the fix against the exact shape from the original feature request and
+// verifies the applied output.
+func TestPreferCopyHeredocRule_PhpFpmStyleFullFix(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM php:8.3-fpm-alpine
+RUN set -ex \
+    && { \
+        echo '[global]'; \
+        echo 'daemonize = no'; \
+        echo 'error_log = /proc/self/fd/2'; \
+        echo; \
+        echo '[www]'; \
+        echo 'listen = [::]:9000'; \
+        echo 'listen.owner = www-data'; \
+        echo 'listen.group = www-data'; \
+        echo; \
+        echo 'user = www-data'; \
+        echo 'group = www-data'; \
+        echo; \
+        echo 'access.log = /proc/self/fd/2'; \
+        echo; \
+        echo 'pm = static'; \
+        echo 'pm.max_children = 1'; \
+        echo 'pm.start_servers = 1'; \
+        echo 'request_terminate_timeout = 65s'; \
+        echo 'pm.max_requests = 1000'; \
+        echo 'catch_workers_output = yes'; \
+    } | tee /usr/local/etc/php-fpm.d/www.conf \
+    && mkdir -p /usr/local/php/php/auto_prepends \
+    && { \
+        echo '<?php'; \
+        echo 'if (function_exists("uopz_allow_exit")) {'; \
+        echo '    uopz_allow_exit(true);'; \
+        echo '}'; \
+        echo '?>'; \
+    } | tee /usr/local/php/php/auto_prepends/default_prepend.php \
+    && { \
+        echo 'FromLineOverride=YES'; \
+        echo 'mailhub=127.0.0.1'; \
+        echo 'UseTLS=NO'; \
+        echo 'UseSTARTTLS=NO'; \
+    } | tee /etc/ssmtp/ssmtp.conf \
+    && { \
+        echo '[PHP]'; \
+        echo 'log_errors = On'; \
+        echo 'error_log = /dev/stderr'; \
+        echo 'auto_prepend_file = /usr/local/php/php/auto_prepends/default_prepend.php'; \
+    } | tee /usr/local/etc/php/conf.d/php.ini \
+    ;
+`
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	violations := NewPreferCopyHeredocRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil || len(fix.Edits) == 0 {
+		t.Fatal("expected a suggested fix")
+	}
+
+	applied := string(fixpkg.ApplyFix([]byte(content), fix))
+	// Collapse leading whitespace to make the snapshot diff-friendly.
+	if strings.Contains(applied, "mkdir -p /usr/local/php/php/auto_prepends") {
+		t.Errorf("mkdir -p should be absorbed by COPY destination\n--- applied ---\n%s", applied)
+	}
+	if got := strings.Count(applied, "COPY <<EOF "); got != 4 {
+		t.Errorf("got %d COPY heredocs, want 4\n--- applied ---\n%s", got, applied)
+	}
+	// A leftover `RUN set -ex` would be pure noise — shell options don't
+	// cross RUN boundaries — so the extraction should drop it entirely.
+	if strings.Contains(applied, "RUN set -ex") {
+		t.Errorf("leftover shell-state-only RUN should be dropped\n--- applied ---\n%s", applied)
+	}
+	// All four destination paths must be present.
+	wantTargets := []string{
+		"/usr/local/etc/php-fpm.d/www.conf",
+		"/usr/local/php/php/auto_prepends/default_prepend.php",
+		"/etc/ssmtp/ssmtp.conf",
+		"/usr/local/etc/php/conf.d/php.ini",
+	}
+	for _, want := range wantTargets {
+		if !strings.Contains(applied, "COPY <<EOF "+want) {
+			t.Errorf("missing COPY for %s\n--- applied ---\n%s", want, applied)
+		}
+	}
+}
+
+// TestPreferCopyHeredocRule_PhpFpmStyleMultiTargetFix covers the real-world
+// shape from the user request: a single RUN that builds several config files
+// via `{ echo ...; echo ...; } | tee /path` chains joined by &&, with an
+// intervening `mkdir -p` that the COPY destinations should absorb.
+func TestPreferCopyHeredocRule_PhpFpmStyleMultiTargetFix(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM php:8.3-fpm-alpine
+RUN set -ex \
+    && { \
+        echo '[global]'; \
+        echo 'daemonize = no'; \
+    } | tee /usr/local/etc/php-fpm.d/www.conf \
+    && mkdir -p /usr/local/php/php/auto_prepends \
+    && { \
+        echo '<?php'; \
+        echo '?>'; \
+    } | tee /usr/local/php/php/auto_prepends/default_prepend.php \
+    && { \
+        echo 'FromLineOverride=YES'; \
+        echo 'UseTLS=NO'; \
+    } | tee /etc/ssmtp/ssmtp.conf \
+    && { \
+        echo '[PHP]'; \
+        echo 'log_errors = On'; \
+    } | tee /usr/local/etc/php/conf.d/php.ini \
+    ;
+`
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	violations := NewPreferCopyHeredocRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil || len(fix.Edits) == 0 {
+		t.Fatal("expected a suggested fix")
+	}
+
+	newText := fix.Edits[0].NewText
+
+	wantContains := []string{
+		"COPY <<EOF /usr/local/etc/php-fpm.d/www.conf",
+		"COPY <<EOF /usr/local/php/php/auto_prepends/default_prepend.php",
+		"COPY <<EOF /etc/ssmtp/ssmtp.conf",
+		"COPY <<EOF /usr/local/etc/php/conf.d/php.ini",
+	}
+	for _, want := range wantContains {
+		if !strings.Contains(newText, want) {
+			t.Errorf("fix text missing %q\nfull text:\n%s", want, newText)
+		}
+	}
+
+	// The mkdir -p should be absorbed: COPY auto-creates parent directories.
+	if strings.Contains(newText, "mkdir -p /usr/local/php/php/auto_prepends") {
+		t.Errorf("fix text should not retain mkdir -p absorbed by COPY destination\nfull text:\n%s", newText)
+	}
+
+	// The count should match: exactly four COPY lines.
+	if got := strings.Count(newText, "COPY <<EOF "); got != 4 {
+		t.Errorf("got %d COPY heredocs, want 4\nfull text:\n%s", got, newText)
+	}
+}
+
+// TestPreferCopyHeredocRule_BlankLinesAroundCopy verifies that COPY heredocs
+// emitted by the fix are visually separated from neighbouring instructions
+// with blank lines — the convention in hand-crafted Dockerfiles because the
+// heredoc body is embedded file content. Existing adjacent blanks aren't
+// duplicated.
+func TestPreferCopyHeredocRule_BlankLinesAroundCopy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		content        string
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name: "multi-target surrounded by RUNs gets blanks",
+			content: `FROM alpine
+RUN apk add --no-cache curl
+RUN { echo 'a=1'; } | tee /etc/one.conf \
+    && { echo 'b=2'; } | tee /etc/two.conf
+RUN apk add --no-cache bash
+`,
+			wantContains: []string{
+				"RUN apk add --no-cache curl\n\nCOPY <<EOF /etc/one.conf",
+				"EOF\n\nCOPY <<EOF /etc/two.conf",
+				"EOF\n\nRUN apk add --no-cache bash",
+			},
+		},
+		{
+			name: "already-blank line above is not duplicated",
+			content: `FROM alpine
+
+RUN echo 'hi' > /etc/config
+
+RUN echo bye
+`,
+			wantContains: []string{
+				"FROM alpine\n\nCOPY <<EOF /etc/config",
+				"EOF\n\nRUN echo bye",
+			},
+			// No triple-newlines anywhere.
+			wantNotContain: []string{"\n\n\n"},
+		},
+		{
+			name: "file-start RUN gets no leading blank",
+			content: `FROM alpine
+RUN echo 'hi' > /etc/config
+`,
+			wantContains: []string{
+				"FROM alpine\n\nCOPY <<EOF /etc/config",
+			},
+			wantNotContain: []string{"\n\n\n"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInputWithConfig(t, "Dockerfile", tt.content, nil)
+			violations := NewPreferCopyHeredocRule().Check(input)
+			if len(violations) == 0 {
+				t.Fatal("expected a violation")
+			}
+			applied := string(fixpkg.ApplyFix([]byte(tt.content), violations[0].SuggestedFix))
+			for _, want := range tt.wantContains {
+				if !strings.Contains(applied, want) {
+					t.Errorf("applied fix missing %q\n---\n%s", want, applied)
+				}
+			}
+			for _, notWant := range tt.wantNotContain {
+				if strings.Contains(applied, notWant) {
+					t.Errorf("applied fix should not contain %q\n---\n%s", notWant, applied)
+				}
+			}
+		})
+	}
+}
+
+// TestPreferCopyHeredocRule_DropsShellStateOnlyLeftovers verifies that
+// extraction drops a leftover RUN that would contain only shell-state-only
+// commands (`set`, `shopt`) — those don't cross RUN boundaries and would
+// just clutter the output. `trap` is deliberately NOT classified as
+// state-only: its registered handler body can still execute within the
+// same RUN (for example on EXIT) and is allowed to mutate the filesystem.
+func TestPreferCopyHeredocRule_DropsShellStateOnlyLeftovers(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		content     string
+		wantFixText string
+		wantFixLack string
+	}{
+		{
+			name: "set -ex alone is dropped (single-target)",
+			content: `FROM alpine
+RUN set -ex && echo 'hello' > /etc/config
+`,
+			wantFixText: "COPY <<EOF /etc/config",
+			wantFixLack: "RUN set -ex",
+		},
+		{
+			name: "shopt alone is dropped (single-target)",
+			content: `FROM alpine
+RUN shopt -s nullglob && echo 'x' > /etc/config
+`,
+			wantFixText: "COPY <<EOF /etc/config",
+			wantFixLack: "RUN shopt",
+		},
+		{
+			name: "mixed set -ex + real command survives",
+			content: `FROM alpine
+RUN set -ex && apt-get update && echo 'x' > /etc/config
+`,
+			wantFixText: "apt-get update",
+			wantFixLack: "",
+		},
+		{
+			// `trap 'echo cleanup >/marker' EXIT` registers an EXIT handler
+			// that executes before the RUN's shell exits and writes to
+			// /marker. Dropping the trap would silently lose that side
+			// effect, so `trap` must NEVER be treated as state-only.
+			name: "trap with EXIT handler is preserved",
+			content: `FROM alpine
+RUN trap 'echo cleanup > /marker' EXIT && echo 'x' > /etc/config
+`,
+			wantFixText: `trap 'echo cleanup > /marker' EXIT`,
+			wantFixLack: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInputWithConfig(t, "Dockerfile", tt.content, nil)
+			violations := NewPreferCopyHeredocRule().Check(input)
+			if len(violations) == 0 {
+				t.Fatal("expected a violation")
+			}
+			fix := violations[0].SuggestedFix
+			if fix == nil || len(fix.Edits) == 0 {
+				t.Fatal("expected a fix")
+			}
+			got := fix.Edits[0].NewText
+			if !strings.Contains(got, tt.wantFixText) {
+				t.Errorf("fix text missing %q\nfull:\n%s", tt.wantFixText, got)
+			}
+			if tt.wantFixLack != "" && strings.Contains(got, tt.wantFixLack) {
+				t.Errorf("fix text should not contain %q\nfull:\n%s", tt.wantFixLack, got)
+			}
+		})
 	}
 }

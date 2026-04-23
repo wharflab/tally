@@ -1041,6 +1041,328 @@ func TestDetectFileCreationWithUmask(t *testing.T) {
 	}
 }
 
+func TestDetectFileCreationPipeToTee(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		script      string
+		wantNil     bool
+		wantPath    string
+		wantContent string
+		wantAppend  bool
+	}{
+		{
+			name:        "single echo piped to tee",
+			script:      `echo 'hello' | tee /etc/config`,
+			wantPath:    "/etc/config",
+			wantContent: "hello\n",
+		},
+		{
+			name:        "brace group of echos piped to tee",
+			script:      `{ echo 'a'; echo 'b'; echo 'c'; } | tee /etc/config`,
+			wantPath:    "/etc/config",
+			wantContent: "a\nb\nc\n",
+		},
+		{
+			name:        "brace group piped to tee -a",
+			script:      `{ echo 'a'; echo 'b'; } | tee -a /etc/config`,
+			wantPath:    "/etc/config",
+			wantContent: "a\nb\n",
+			wantAppend:  true,
+		},
+		{
+			name:        "pipe tee with stdout /dev/null",
+			script:      `{ echo 'x'; } | tee /etc/config > /dev/null`,
+			wantPath:    "/etc/config",
+			wantContent: "x\n",
+		},
+		{
+			name:    "pipe to tee with relative path - skip",
+			script:  `{ echo 'x'; } | tee config.txt`,
+			wantNil: true,
+		},
+		{
+			name:    "pipe to non-tee command",
+			script:  `{ echo 'x'; } | cat > /etc/config`,
+			wantNil: true,
+		},
+		{
+			name:        "brace group of printf piped to tee",
+			script:      `{ printf 'a\n'; printf 'b\n'; } | tee /etc/config`,
+			wantPath:    "/etc/config",
+			wantContent: "a\nb\n",
+		},
+		{
+			name:        "brace group mixing echo and printf",
+			script:      `{ echo 'a'; printf 'b\n'; echo 'c'; } | tee /etc/config`,
+			wantPath:    "/etc/config",
+			wantContent: "a\nb\nc\n",
+		},
+		{
+			name:        "cat heredoc piped to tee",
+			script:      "cat <<EOF | tee /etc/config\nhello\nworld\nEOF",
+			wantPath:    "/etc/config",
+			wantContent: "hello\nworld\n",
+		},
+		{
+			// Heredoc attached to tee on the pipe RHS redirects tee's stdin
+			// (last input redirect wins in bash), so the producer's output
+			// is discarded. We can't faithfully reconstruct COPY content
+			// from the producer in this case — reject the pattern.
+			name:    "producer piped to tee with heredoc on tee - skip",
+			script:  "echo ignored | tee /etc/config <<EOF\nactual heredoc\nEOF",
+			wantNil: true,
+		},
+		{
+			// `cat /some/file` reads from a file we can't inline at lint
+			// time, so the producer content is statically unknown — the
+			// whole pipe must fall through as opaque.
+			name:    "cat file-arg piped to tee - skip",
+			script:  `cat /etc/hosts | tee /etc/config`,
+			wantNil: true,
+		},
+		{
+			// Same reasoning for cat with flags (`-n`, `-A`, etc.).
+			name:    "cat flag piped to tee - skip",
+			script:  `cat -n /etc/hosts | tee /etc/config`,
+			wantNil: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := DetectFileCreation(tt.script, VariantBash, nil)
+			if tt.wantNil {
+				if result != nil {
+					t.Errorf("expected nil, got %+v", result)
+				}
+				return
+			}
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
+			if result.TargetPath != tt.wantPath {
+				t.Errorf("TargetPath = %q, want %q", result.TargetPath, tt.wantPath)
+			}
+			if result.Content != tt.wantContent {
+				t.Errorf("Content = %q, want %q", result.Content, tt.wantContent)
+			}
+			if result.IsAppend != tt.wantAppend {
+				t.Errorf("IsAppend = %v, want %v", result.IsAppend, tt.wantAppend)
+			}
+		})
+	}
+}
+
+// TestDetectFileCreations_RepeatedTargetRejected locks in that a chain
+// which writes to the same target more than once across non-contiguous
+// blocks (e.g. `echo a > /a && echo b > /b && echo c > /a`) is rejected.
+// Emitting one COPY per slot would silently overwrite earlier content or
+// misrepresent append semantics.
+func TestDetectFileCreations_RepeatedTargetRejected(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		script string
+	}{
+		{
+			name:   "overwrite then append to earlier target",
+			script: `echo a > /a && echo b > /b && echo c >> /a`,
+		},
+		{
+			name:   "overwrite to earlier target via interleaved second target",
+			script: `echo a > /a && echo b > /b && echo c > /a`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := DetectFileCreations(tt.script, VariantBash, nil, FileCreationOptions{})
+			if got != nil {
+				t.Errorf("expected nil for repeated-target chain, got slots: %+v", got.Slots)
+			}
+		})
+	}
+}
+
+// TestDetectFileCreations_TrailingChmodFoldedBack covers the edge case
+// where a `chmod` for an earlier target appears after an intervening
+// creation of a *different* target — e.g. `echo x > /a && echo y > /b &&
+// chmod 755 /a`. The chmod should be folded back into the earlier /a
+// slot so the fix emits `COPY --chmod=755 /a` rather than a standalone
+// `RUN chmod 755 /a`.
+func TestDetectFileCreations_TrailingChmodFoldedBack(t *testing.T) {
+	t.Parallel()
+
+	script := `echo x > /a && echo y > /b && chmod 755 /a`
+	got := DetectFileCreations(script, VariantBash, nil, FileCreationOptions{})
+	if got == nil {
+		t.Fatal("expected non-nil MultiFileCreationInfo")
+	}
+
+	if len(got.Slots) != 2 {
+		t.Fatalf("got %d slots, want 2", len(got.Slots))
+	}
+	// Slot[0] is /a with the folded chmod.
+	if got.Slots[0].Info.TargetPath != "/a" {
+		t.Errorf("slot[0] TargetPath = %q, want /a", got.Slots[0].Info.TargetPath)
+	}
+	if got.Slots[0].Info.RawChmodMode != "755" {
+		t.Errorf("slot[0] RawChmodMode = %q, want 755 (chmod should be folded into the /a slot)",
+			got.Slots[0].Info.RawChmodMode)
+	}
+	// Slot[1] is /b, unchanged, no chmod.
+	if got.Slots[1].Info.TargetPath != "/b" {
+		t.Errorf("slot[1] TargetPath = %q, want /b", got.Slots[1].Info.TargetPath)
+	}
+	if got.Slots[1].Info.RawChmodMode != "" {
+		t.Errorf("slot[1] RawChmodMode = %q, want empty", got.Slots[1].Info.RawChmodMode)
+	}
+
+	// The trailing chmod should no longer appear as a standalone command.
+	for _, cmd := range got.Commands {
+		if cmd.Kind == MultiCmdChmod {
+			t.Errorf("chmod for a slot target should be absorbed, saw leftover Chmod command %q", cmd.Text)
+		}
+	}
+}
+
+// TestDetectFileCreations_TrailingChmodNotFoldedOverExisting verifies that
+// a trailing chmod for a slot that *already* has an in-block chmod is not
+// silently folded in (last-write semantics would be contradicted). It is
+// preserved as a standalone Chmod command so the author's intent surfaces
+// in the fix.
+func TestDetectFileCreations_TrailingChmodNotFoldedOverExisting(t *testing.T) {
+	t.Parallel()
+
+	// /a gets an in-block chmod 644, then later a standalone chmod 755.
+	script := `echo x > /a && chmod 644 /a && echo y > /b && chmod 755 /a`
+	got := DetectFileCreations(script, VariantBash, nil, FileCreationOptions{})
+	if got == nil {
+		t.Fatal("expected non-nil MultiFileCreationInfo")
+	}
+	if len(got.Slots) != 2 {
+		t.Fatalf("got %d slots, want 2", len(got.Slots))
+	}
+	// Slot[0] keeps the in-block chmod.
+	if got.Slots[0].Info.RawChmodMode != "644" {
+		t.Errorf("slot[0] RawChmodMode = %q, want 644 (in-block chmod must win)",
+			got.Slots[0].Info.RawChmodMode)
+	}
+	// The trailing chmod 755 /a must remain as a standalone command.
+	var sawStandaloneChmod bool
+	for _, cmd := range got.Commands {
+		if cmd.Kind == MultiCmdChmod {
+			sawStandaloneChmod = true
+			break
+		}
+	}
+	if !sawStandaloneChmod {
+		t.Error("expected the trailing chmod to remain as a standalone command (don't silently contradict the in-block chmod)")
+	}
+}
+
+func TestDetectFileCreations_MultiTarget(t *testing.T) {
+	t.Parallel()
+
+	script := `set -ex ` +
+		`&& { echo 'a=1'; echo 'b=2'; } | tee /etc/one.conf ` +
+		`&& mkdir -p /var/app ` +
+		`&& { echo 'x'; } | tee /var/app/config ` +
+		`&& { echo 'y'; } | tee /etc/three.ini`
+
+	got := DetectFileCreations(script, VariantBash, nil, FileCreationOptions{})
+	if got == nil {
+		t.Fatal("expected non-nil MultiFileCreationInfo")
+	}
+	if got.HasUnsafeVariables {
+		t.Errorf("HasUnsafeVariables = true, want false")
+	}
+
+	wantSlots := []struct {
+		target  string
+		content string
+	}{
+		{"/etc/one.conf", "a=1\nb=2\n"},
+		{"/var/app/config", "x\n"},
+		{"/etc/three.ini", "y\n"},
+	}
+	if len(got.Slots) != len(wantSlots) {
+		t.Fatalf("got %d slots, want %d", len(got.Slots), len(wantSlots))
+	}
+	for i, want := range wantSlots {
+		if got.Slots[i].Info.TargetPath != want.target {
+			t.Errorf("slot[%d] TargetPath = %q, want %q", i, got.Slots[i].Info.TargetPath, want.target)
+		}
+		if got.Slots[i].Info.Content != want.content {
+			t.Errorf("slot[%d] Content = %q, want %q", i, got.Slots[i].Info.Content, want.content)
+		}
+	}
+
+	// mkdir -p should be recognized so callers can elide it.
+	var sawMkdir bool
+	for _, c := range got.Commands {
+		if c.Kind == MultiCmdMkdirP && c.MkdirTarget == "/var/app" {
+			sawMkdir = true
+		}
+	}
+	if !sawMkdir {
+		t.Errorf("expected a MultiCmdMkdirP for /var/app in commands")
+	}
+}
+
+func TestAnalyzeMkdirCmd(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		script     string
+		wantTarget string
+		wantOk     bool
+	}{
+		{"mkdir -p /var/app", "/var/app", true},
+		{"mkdir --parents /var/app", "/var/app", true},
+		// Quoted forms: the AST resolves to the logical word, so these
+		// should all succeed.
+		{`mkdir -p "/var/app"`, "/var/app", true},
+		{`mkdir -p '/var/app'`, "/var/app", true},
+		{`mkdir -p "/path with spaces/sub"`, "/path with spaces/sub", true},
+		{`mkdir -p '/var/app'/sub`, "/var/app/sub", true},
+		// -- ends option parsing, so target after is positional.
+		{"mkdir -p -- /var/app", "/var/app", true},
+
+		// Rejected forms
+		{"mkdir /var/app", "", false},                // missing -p
+		{"mkdir -p /a /b", "", false},                // multiple targets
+		{"mkdir -p var/app", "", false},              // relative path
+		{"mkdir -p --mode=0755 /var/app", "", false}, // unsupported flag
+		{"mkdir -p -m 0755 /var/app", "", false},     // unsupported flag
+		{"mkdir -pv /var/app", "", false},            // combined flags: -pv not recognized as only -p
+		{"mkdir -p $HOME/app", "", false},            // variable expansion
+		{"mkdir -p $(dirname /foo/bar)", "", false},  // command substitution
+	}
+	for _, tt := range tests {
+		t.Run(tt.script, func(t *testing.T) {
+			t.Parallel()
+			prog, err := parseScript(tt.script, VariantBash)
+			if err != nil {
+				t.Fatalf("parseScript failed: %v", err)
+			}
+			if len(prog.Stmts) == 0 {
+				t.Fatal("no statements parsed")
+			}
+			call, ok := prog.Stmts[0].Cmd.(*syntax.CallExpr)
+			if !ok {
+				t.Fatalf("expected CallExpr, got %T", prog.Stmts[0].Cmd)
+			}
+			target, gotOk := analyzeMkdirCmd(call)
+			if gotOk != tt.wantOk || target != tt.wantTarget {
+				t.Errorf("analyzeMkdirCmd(%q) = (%q, %v), want (%q, %v)", tt.script, target, gotOk, tt.wantTarget, tt.wantOk)
+			}
+		})
+	}
+}
+
 func TestParseUmask(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

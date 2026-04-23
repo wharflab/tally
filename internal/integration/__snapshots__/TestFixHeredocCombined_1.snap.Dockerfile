@@ -3,7 +3,8 @@
 FROM ubuntu:22.04 AS builder
 
 # Case 1: prefer-copy-heredoc — single RUN creating a config file via echo redirect
-	COPY <<EOF /etc/nginx/conf.d/default.conf
+	
+COPY <<EOF /etc/nginx/conf.d/default.conf
 server { listen 80; }
 EOF
 
@@ -19,7 +20,8 @@ EOF
 		EOF
 
 # Case 4: prefer-copy-heredoc — consecutive RUNs appending to same file
-	COPY <<EOF /app/data.txt
+	
+COPY <<EOF /app/data.txt
 line1
 line2
 EOF
@@ -28,17 +30,20 @@ EOF
 	RUN echo "extra" >> /tmp/log.txt
 
 # Case 6: prefer-copy-heredoc — echo with cat pattern
+
 COPY <<EOF /etc/motd
 Welcome to the build container
 EOF
 
 # Case 6b: prefer-copy-heredoc — BuildKit heredoc piped to cat
+
 COPY <<EOF /aria2/aria2.conf
 dir=/downloads
 max-concurrent-downloads=16
 EOF
 
 # Case 6c: prefer-copy-heredoc — BuildKit heredoc piped to tee
+
 COPY <<EOF /etc/supervisor/conf.d/app.conf
 [program:app]
 command=/usr/bin/app
@@ -58,7 +63,8 @@ EOF
 FROM alpine:3.20 AS runtime
 
 # Case 9: prefer-copy-heredoc in second stage — file creation
-	COPY --chmod=+x <<EOF /entrypoint.sh
+	
+COPY --chmod=+x <<EOF /entrypoint.sh
 #!/bin/sh
 EOF
 
