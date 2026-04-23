@@ -1,7 +1,9 @@
 FROM ubuntu:22.04
+
 COPY <<EOF /etc/nginx.conf
 server {}
 EOF
+
 RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update
 # [tally] curl configuration for improved robustness
 ENV CURL_HOME=/etc/curl

@@ -36,7 +36,7 @@
                     "line": 6
                   }
                 },
-                "newText": "COPY \u003c\u003cEOF /etc/nginx/conf.d/default.conf\nserver { listen 80; }\nEOF"
+                "newText": "\nCOPY \u003c\u003cEOF /etc/nginx/conf.d/default.conf\nserver { listen 80; }\nEOF"
               }
             ],
             "priority": 99,
@@ -128,7 +128,7 @@
                     "line": 17
                   }
                 },
-                "newText": "COPY \u003c\u003cEOF /app/data.txt\nline1\nline2\nEOF"
+                "newText": "\nCOPY \u003c\u003cEOF /app/data.txt\nline1\nline2\nEOF"
               }
             ],
             "priority": 99,
@@ -168,7 +168,7 @@
                     "line": 24
                   }
                 },
-                "newText": "COPY \u003c\u003cEOF /etc/motd\nWelcome to the build container\nEOF"
+                "newText": "\nCOPY \u003c\u003cEOF /etc/motd\nWelcome to the build container\nEOF"
               }
             ],
             "priority": 99,
@@ -208,7 +208,7 @@
                     "line": 29
                   }
                 },
-                "newText": "COPY \u003c\u003cEOF /aria2/aria2.conf\ndir=/downloads\nmax-concurrent-downloads=16\nEOF"
+                "newText": "\nCOPY \u003c\u003cEOF /aria2/aria2.conf\ndir=/downloads\nmax-concurrent-downloads=16\nEOF"
               }
             ],
             "priority": 99,
@@ -248,7 +248,7 @@
                     "line": 35
                   }
                 },
-                "newText": "COPY \u003c\u003cEOF /etc/supervisor/conf.d/app.conf\n[program:app]\ncommand=/usr/bin/app\nautostart=true\nEOF"
+                "newText": "\nCOPY \u003c\u003cEOF /etc/supervisor/conf.d/app.conf\n[program:app]\ncommand=/usr/bin/app\nautostart=true\nEOF"
               }
             ],
             "priority": 99,
@@ -288,7 +288,7 @@
                     "line": 56
                   }
                 },
-                "newText": "COPY --chmod=+x \u003c\u003cEOF /entrypoint.sh\n#!/bin/sh\nEOF"
+                "newText": "\nCOPY --chmod=+x \u003c\u003cEOF /entrypoint.sh\n#!/bin/sh\nEOF"
               }
             ],
             "priority": 99,

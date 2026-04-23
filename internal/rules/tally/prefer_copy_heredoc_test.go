@@ -924,6 +924,84 @@ RUN set -ex \
 	}
 }
 
+// TestPreferCopyHeredocRule_BlankLinesAroundCopy verifies that COPY heredocs
+// emitted by the fix are visually separated from neighbouring instructions
+// with blank lines — the convention in hand-crafted Dockerfiles because the
+// heredoc body is embedded file content. Existing adjacent blanks aren't
+// duplicated.
+func TestPreferCopyHeredocRule_BlankLinesAroundCopy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		content        string
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name: "multi-target surrounded by RUNs gets blanks",
+			content: `FROM alpine
+RUN apk add --no-cache curl
+RUN { echo 'a=1'; } | tee /etc/one.conf \
+    && { echo 'b=2'; } | tee /etc/two.conf
+RUN apk add --no-cache bash
+`,
+			wantContains: []string{
+				"RUN apk add --no-cache curl\n\nCOPY <<EOF /etc/one.conf",
+				"EOF\n\nCOPY <<EOF /etc/two.conf",
+				"EOF\n\nRUN apk add --no-cache bash",
+			},
+		},
+		{
+			name: "already-blank line above is not duplicated",
+			content: `FROM alpine
+
+RUN echo 'hi' > /etc/config
+
+RUN echo bye
+`,
+			wantContains: []string{
+				"FROM alpine\n\nCOPY <<EOF /etc/config",
+				"EOF\n\nRUN echo bye",
+			},
+			// No triple-newlines anywhere.
+			wantNotContain: []string{"\n\n\n"},
+		},
+		{
+			name: "file-start RUN gets no leading blank",
+			content: `FROM alpine
+RUN echo 'hi' > /etc/config
+`,
+			wantContains: []string{
+				"FROM alpine\n\nCOPY <<EOF /etc/config",
+			},
+			wantNotContain: []string{"\n\n\n"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInputWithConfig(t, "Dockerfile", tt.content, nil)
+			violations := NewPreferCopyHeredocRule().Check(input)
+			if len(violations) == 0 {
+				t.Fatal("expected a violation")
+			}
+			applied := string(fixpkg.ApplyFix([]byte(tt.content), violations[0].SuggestedFix))
+			for _, want := range tt.wantContains {
+				if !strings.Contains(applied, want) {
+					t.Errorf("applied fix missing %q\n---\n%s", want, applied)
+				}
+			}
+			for _, notWant := range tt.wantNotContain {
+				if strings.Contains(applied, notWant) {
+					t.Errorf("applied fix should not contain %q\n---\n%s", notWant, applied)
+				}
+			}
+		})
+	}
+}
+
 // TestPreferCopyHeredocRule_DropsShellStateOnlyLeftovers verifies that
 // extraction drops a leftover RUN that would contain only shell-state-only
 // commands (set / shopt / trap) — those don't cross RUN boundaries and

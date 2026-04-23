@@ -639,9 +639,8 @@ func (r *PreferCopyHeredocRule) generateMultiFix(
 		return nil
 	}
 
-	newText := strings.Join(parts, "\n")
-
 	endLine, endCol := resolveRunEndPosition(runLoc, ctx.sm, run)
+	newText := joinFixParts(parts, ctx.sm, runLoc[0].Start.Line, endLine)
 
 	safety := rules.FixSuggestion
 	if multi.ResolvedHomePath {
@@ -663,6 +662,74 @@ func (r *PreferCopyHeredocRule) generateMultiFix(
 			NewText: newText,
 		}},
 	}
+}
+
+// joinFixParts joins fix output fragments, inserting blank-line padding
+// around every COPY heredoc block. Embedded file bodies are a lot easier
+// to read when they're visually separated from surrounding instructions
+// (it's the convention in every hand-crafted Dockerfile using heredocs).
+//
+// Top/bottom edges are padded based on what's above/below the replaced
+// RUN: if the adjacent source line already has a blank line, we don't
+// inject a duplicate.
+func joinFixParts(parts []string, sm *sourcemap.SourceMap, runStartLine, runEndLine int) string {
+	if len(parts) == 0 {
+		return ""
+	}
+
+	// Interior joints: blank line around any COPY block.
+	var sb strings.Builder
+	for i, part := range parts {
+		if i > 0 {
+			prevIsCopy := isCopyHeredocPart(parts[i-1])
+			curIsCopy := isCopyHeredocPart(part)
+			if prevIsCopy || curIsCopy {
+				sb.WriteString("\n\n")
+			} else {
+				sb.WriteString("\n")
+			}
+		}
+		sb.WriteString(part)
+	}
+	body := sb.String()
+
+	// Top edge: if the first emitted part is a COPY and the previous
+	// source line (just before the RUN) isn't already blank, prepend one.
+	if isCopyHeredocPart(parts[0]) && !prevLineIsBlank(sm, runStartLine) {
+		body = "\n" + body
+	}
+	// Bottom edge: same check against the line just after the RUN.
+	if isCopyHeredocPart(parts[len(parts)-1]) && !nextLineIsBlank(sm, runEndLine) {
+		body += "\n"
+	}
+
+	return body
+}
+
+// isCopyHeredocPart reports whether a fix fragment is a COPY <<... heredoc
+// block (as produced by buildCopyHeredoc).
+func isCopyHeredocPart(part string) bool {
+	return strings.HasPrefix(part, "COPY ")
+}
+
+// prevLineIsBlank checks whether the source line immediately before the
+// given 1-based line number is blank (or doesn't exist). Used to avoid
+// injecting a duplicate blank separator above the edit.
+func prevLineIsBlank(sm *sourcemap.SourceMap, line int) bool {
+	if sm == nil || line <= 1 {
+		return true
+	}
+	return strings.TrimSpace(sm.Line(line-2)) == ""
+}
+
+// nextLineIsBlank checks whether the source line immediately after the
+// given 1-based line number is blank (or doesn't exist). Used to avoid
+// injecting a duplicate blank separator below the edit.
+func nextLineIsBlank(sm *sourcemap.SourceMap, line int) bool {
+	if sm == nil || line >= sm.LineCount() {
+		return true
+	}
+	return strings.TrimSpace(sm.Line(line)) == ""
 }
 
 // mkdirAbsorbedByCopy reports whether the given mkdir -p target is created
@@ -722,9 +789,8 @@ func (r *PreferCopyHeredocRule) generateFix(
 		parts = append(parts, runPrefix+info.RemainingCommands)
 	}
 
-	newText := strings.Join(parts, "\n")
-
 	endLine, endCol := resolveRunEndPosition(runLoc, sm, run)
+	newText := joinFixParts(parts, sm, runLoc[0].Start.Line, endLine)
 
 	description := "Replace RUN with COPY <<EOF to " + info.TargetPath
 	if info.PrecedingCommands != "" || info.RemainingCommands != "" {
@@ -819,6 +885,7 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 	}
 
 	endLine, endCol := resolveRunEndPosition(lastLoc, ctx.sm, lastRun)
+	newText := joinFixParts([]string{copyCmd}, ctx.sm, firstLoc[0].Start.Line, endLine)
 
 	runCount := len(sequence)
 	if trailingChmodRun != nil {
@@ -837,7 +904,7 @@ func (r *PreferCopyHeredocRule) generateSequenceFix(
 				endLine,
 				endCol,
 			),
-			NewText: copyCmd,
+			NewText: newText,
 		}},
 	}
 }

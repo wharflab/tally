@@ -118,12 +118,18 @@ exec nginx -g "daemon off;"
 EOF
 
 RUN apt-get update
+
 COPY <<EOF /etc/myapp.env
 APP_ENV=production
 LOG_FORMAT=json
 EOF
+
 RUN apt-get clean
 ```
+
+Emitted `COPY <<EOF` blocks are surrounded by blank lines to keep the embedded
+file content readable; the fix doesn't inject duplicate blanks when the source
+already has one adjacent to the replacement.
 
 ### Multi-target with brace-grouped pipes
 
@@ -164,15 +170,18 @@ COPY <<EOF /usr/local/etc/php-fpm.d/www.conf
 [global]
 daemonize = no
 EOF
+
 COPY <<EOF /usr/local/php/php/auto_prepends/default_prepend.php
 <?php
 if (function_exists("uopz_allow_exit")) { uopz_allow_exit(true); }
 ?>
 EOF
+
 COPY <<EOF /etc/ssmtp/ssmtp.conf
 FromLineOverride=YES
 UseTLS=NO
 EOF
+
 COPY <<EOF /usr/local/etc/php/conf.d/php.ini
 [PHP]
 log_errors = On
