@@ -498,8 +498,19 @@ func (r *PreferCopyHeredocRule) createSequenceViolation(
 
 // multiTargetViolation builds a Violation and fix for a RUN that creates
 // multiple distinct files in one && chain. Returns ok=false when the fix
-// can't be generated (missing location, any slot appends without a prior
-// overwrite, mount conflicts with any target, etc.).
+// can't be generated.
+//
+// Conservative bail-out: the multi-target path requires every slot in the
+// RUN to be a clean overwrite with literal content and no mount conflict.
+// If *any* slot is append-only, uses unsafe variables, or conflicts with a
+// mount target, the whole multi-target fix is aborted — mixed cases (say,
+// one overwrite slot plus one append slot) then fall through to the
+// single-target path in checkSingleRuns, which will typically flag only the
+// first extractable block. This is intentional: generating a partial fix
+// for a multi-write RUN risks silently dropping content we can't inline.
+//
+// generateMultiFix performs the actual location/range checks; this function
+// only validates the per-slot preconditions listed above.
 func (r *PreferCopyHeredocRule) multiTargetViolation(
 	run *instructions.RunCommand,
 	multi *shell.MultiFileCreationInfo,
@@ -522,11 +533,6 @@ func (r *PreferCopyHeredocRule) multiTargetViolation(
 		if shouldSkipForMounts(run, slot.Info.TargetPath) {
 			return rules.Violation{}, false
 		}
-	}
-
-	runLoc := run.Location()
-	if len(runLoc) == 0 {
-		return rules.Violation{}, false
 	}
 
 	fix := r.generateMultiFix(run, multi, ctx, effectiveUser)
