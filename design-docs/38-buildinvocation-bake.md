@@ -1,973 +1,880 @@
-# BuildInvocation Model and Docker Bake / Compose Integration
+# BuildInvocation, Orchestrator Entrypoints, and IDE Integration
 
-**Research Focus:** Give tally a first-class representation of *how* a Dockerfile is actually built (build args, target stage, platforms, named
-build contexts, exposed ports, env vars, etc.) by consuming Docker Bake and Docker Compose files as new lint entrypoints, so rules can reason about
-build-time context that is not present in the Dockerfile text alone.
+**Status:** Implementation-ready proposal
 
-**Status:** Research — not an implementation request. See
-[issue #327](https://github.com/wharflab/tally/issues/327).
+**Primary goal:** make tally understand the planned build, not just the Dockerfile text, by introducing a first-class `BuildInvocation` model and
+supporting Docker Bake and Docker Compose as explicit lint entrypoints. The same model must also be reusable by `tally lsp --stdio` and the IDE
+plugins built on top of it.
+
+**Tracking issue:** [#327](https://github.com/wharflab/tally/issues/327)
 
 **Related design docs:**
 
+- [01 — Linter Pipeline Architecture](01-linter-pipeline-architecture.md)
 - [02 — Docker Buildx Bake `--check` Analysis](02-buildx-bake-check-analysis.md)
+- [05 — Reporters and Output Formatting](05-reporters-and-output.md)
 - [07 — Context-Aware Linting Foundation](07-context-aware-foundation.md)
+- [11 — VSCode Extension Architecture](11-vscode-extension-architecture.md)
+- [17 — IntelliJ Plugin Lean Build](17-intellij-plugin-lean-build.md)
+
+---
+
+## Decision Summary
+
+This proposal makes four concrete product decisions:
+
+1. `tally lint <path>` continues to be the only CLI entrypoint, but an **explicit file path** may now be a Dockerfile, a Bake file, or a Compose
+   file.
+2. tally introduces `BuildInvocation`, a stable data model describing **one planned build of one Dockerfile under one invocation context**.
+3. Linting an orchestrator file fans out into **one lint run per invocation**, then fans results back into a single report with invocation-aware
+   attribution.
+4. The same invocation layer is shared by the CLI and LSP, but the editor workflow is intentionally narrower: the first LSP integration remains
+   **Dockerfile-document-centric**, with invocation context supplied by explicit workspace settings rather than by making Bake or Compose documents
+   first-class LSP targets.
+
+The design is intentionally conservative where silent partial support would make results untrustworthy. Unsupported orchestrator constructs must
+raise clear errors instead of being ignored.
 
 ---
 
 ## Problem
 
-Some of tally's advanced rules increasingly depend on build-time context that is not representable in a single Dockerfile:
+An increasing number of useful Dockerfile checks depend on how the file is actually built:
 
-- build args (`--build-arg`)
-- selected target stage (`--target`)
-- selected platform(s) (`--platform`)
-- named build contexts (`--build-context name=...`)
-- multiple build context directories (one per service)
-- service-level metadata: exposed ports, env vars, secrets, networks, labels
+- build args
+- selected target stage
+- selected platform(s)
+- additional or named build contexts
+- service-level runtime metadata from Compose such as ports, env vars, labels, networks, and secrets
 
-Today tally has a filesystem-oriented build context in [`internal/context/context.go`](../internal/context/context.go)
-(`.dockerignore` parsing, file existence checks). It does not have a first-class concept of the **invocation context** — the actual set of
-flags and orchestrator-level metadata a real build would use.
+Today tally has a filesystem-oriented build context in [`internal/context/context.go`](../internal/context/context.go), but it does not have a
+first-class concept of the **invocation context**. That leaves several classes of bugs invisible until build time:
 
-A naive model — asking the user to restate `--build-arg`, `--platform`, `--target` on the tally CLI — is weak:
+- `COPY --from=<name>` that relies on a named build context declared outside the Dockerfile
+- `FROM ${NODE_VERSION}` where the real value only exists in Bake or Compose
+- platform-sensitive base image checks that need the actual target platform instead of host defaults
+- Compose services whose `ports:` or `environment:` drift from the Dockerfile they build
 
-- users already declare these in Bake HCL or Compose YAML
-- duplicating them on the tally CLI creates drift
-- results become untrustworthy as soon as the two sources disagree
+Requiring users to restate `--build-arg`, `--target`, `--platform`, or `--build-context` on the tally CLI is not acceptable:
 
-Real projects already define builds declaratively. tally should read those declarations directly.
+- the source of truth already exists in Bake HCL or Compose YAML
+- duplicating it on the CLI creates drift
+- once the two disagree, lint output stops being trustworthy
 
----
-
-## Scope
-
-**In scope:**
-
-- A `BuildInvocation` data model that captures everything a rule might want to know about a planned build.
-- `tally lint <path>` accepting **orchestrator files as new entrypoints** — Docker Bake HCL and Docker Compose YAML — on equal footing with plain
-  Dockerfiles. Content-sniffing dispatches to the right mode.
-- Using upstream libraries (`github.com/docker/buildx/bake`, `github.com/compose-spec/compose-go/v2`) as Go module dependencies, same pattern
-  tally already uses for BuildKit's Dockerfile parser.
-- A clear reporting model for the multi-invocation case (one Dockerfile referenced by many services/targets).
-- Interaction with the existing async / registry-backed analysis pipeline.
-
-**Out of scope (see [Non-Goals](#non-goals-mvp) below for the full list):**
-
-- New lint rules that consume `BuildInvocation` data (plumbing first, rules follow in separate issues).
-- CI definition parsing (GitHub Actions, GitLab, etc.).
-- Lint rules targeting the orchestrator files themselves.
-- Bake matrix expansion, Compose profiles / override files.
+The correct unit is not “a Dockerfile plus a few optional flags”. The correct unit is “a planned build invocation”.
 
 ---
 
-## Design invariants
+## Goals
 
-These are hard constraints. Any implementation that violates one of these is wrong, not just suboptimal.
+- Add a `BuildInvocation` model that can express the build-time and service-time data future rules will need.
+- Accept explicit Bake and Compose files as `tally lint` entrypoints without changing existing Dockerfile behavior.
+- Preserve current rule behavior when invocation data is absent.
+- Reuse the same invocation layer in CLI, LSP, and IDE plugins.
+- Keep the MVP implementable without refactoring the entire lint engine or reporter stack.
+- Preserve future extensibility for richer orchestrators, new invocation facets, and invocation-aware rules.
 
-1. **Orchestrator entrypoint + `--fix` is a hard error.** The same Dockerfile referenced by multiple invocations can receive conflicting fixes
-   from different contexts. tally must reject this combination with a clear error and exit non-zero, pointing the user to
-   `tally lint <path-to-Dockerfile>` for autofix. There is no escape hatch.
-2. **Malformed orchestrator files fail fast.** If the bake/compose file cannot be parsed, tally errors out immediately without attempting
-   partial linting. tally should validate Bake/Compose syntax up-front using upstream parsers.
-3. **Orchestrator with zero Dockerfile references exits 0.** The user may be wiring up CI linting before their Dockerfiles exist, or the file may
-   only reference prebuilt images from a registry. tally validates the file, emits a clean explanatory notice, and exits 0.
-4. **Same Dockerfile referenced N times yields N independent lint runs.** Each run receives its own `BuildInvocation`. Diagnostics are grouped by
-   target/service name in the reporter output. A single Dockerfile producing different violations under different contexts is the entire point of
-   this design.
-5. **No rule is *required* to consume invocation data.** Facets on `BuildInvocation` are advisory. A rule that doesn't need them ignores them;
-   a rule that wants them treats absence as a no-op (same semantics as today's context-aware rules when `--context` isn't given). Existing rules
-   continue to work unchanged.
-6. **`BuildInvocation` wraps `BuildContext`.** The invocation is the top-level concept. Today's filesystem-oriented `BuildContext` (dockerignore,
-   file existence) becomes one facet inside the invocation. No existing behaviour changes when there's no orchestrator file.
-7. **Upstream libraries are dependencies, not vendored code.** `github.com/docker/buildx/bake` and `github.com/compose-spec/compose-go/v2` are
-   pulled in as Go modules, same as tally already uses BuildKit's Dockerfile parser. tally does not copy or fork orchestrator-file parsers.
+## Non-Goals
+
+- New rules that consume invocation data in the same implementation issue. The MVP is plumbing first.
+- Parsing CI definitions such as GitHub Actions or GitLab pipelines.
+- Lint rules targeting Bake or Compose files themselves.
+- Implicit CLI auto-discovery of orchestrator files from a Dockerfile path.
+- Compose override layering beyond what the explicitly provided file already references through the upstream parser.
+- Bake or Compose inline Dockerfiles in the MVP. These must fail clearly instead of being silently ignored.
+- Autofix support when the CLI entrypoint is an orchestrator file.
 
 ---
 
-## Non-Goals (MVP)
+## Hard Constraints
 
-The first implementation explicitly does **not** include any of the following. These are called out here so reviewers can confirm the scope cut is
-acceptable.
+These are design constraints, not suggestions.
 
-1. **No vendoring / forking of bake or compose parsers.** Use upstream libraries only.
-2. **No new rules that require `BuildInvocation` data.** The MVP ships the plumbing only. Rules that consume invocation facets are a separate
-   follow-up. Every existing rule continues to work unchanged whether or not an invocation is attached.
-3. **No bake matrix expansion.** Bake supports a `matrix` attribute that explodes a single target into many. MVP treats matrix-expanded targets
-   as a single invocation; full expansion is deferred.
-4. **No Compose profile merging, no override files.** MVP reads only the single file passed as the entrypoint, default profile only, no
-   `docker-compose.override.yml` layering.
-5. **No auto-discovery.** tally does not walk up parent directories looking for orchestrator files. The entrypoint path is always explicit.
-6. **No caching of parsed invocation metadata across runs.** Re-parse on every invocation. Caching can be added later if profiling warrants it.
-7. **No lint rules targeting the orchestrator files themselves.** Once both parsers are wired, such rules become feasible, but they are out of
-   scope for MVP. Noted here explicitly as a possible future direction.
-8. **No `--fix` on orchestrator entrypoints, ever.** This is a design invariant (see #1 above), not a "not yet" item.
+1. **CLI orchestrator entrypoints and `--fix` are incompatible.** The same Dockerfile can be linted under multiple invocations, so a mutating
+   orchestrator run is ambiguous by definition.
+2. **Malformed orchestrator files fail fast.** No partial linting.
+3. **Unsupported orchestrator features fail clearly.** tally must not silently drop semantics it cannot model yet.
+4. **Each invocation is independent.** The same Dockerfile referenced by N invocations yields N lint runs and N sets of attributed diagnostics.
+5. **Existing rules remain valid.** A rule that does not care about invocation data must continue to work without code changes.
+6. **Config discovery stays Dockerfile-based.** For an orchestrator run, each invocation loads config as if the referenced Dockerfile had been
+   linted directly, then applies CLI overrides on top.
+7. **The provider layer is shared.** CLI and LSP must build on the same invocation discovery and normalization code, not on separate ad hoc
+   implementations.
+8. **Paths are canonical internally.** All path-valued fields are stored as absolute, `filepath.Clean`'d paths.
 
 ---
 
-## BuildInvocation Model
+## User-Facing CLI Behavior
 
-A `BuildInvocation` describes **one planned build of one Dockerfile**. When tally's entrypoint is a Dockerfile, there is exactly one invocation
-with most facets empty. When the entrypoint is an orchestrator file, tally produces one invocation per referenced target/service.
+### Entrypoint Rules
 
-### Conceptual shape
+The CLI keeps one command: `tally lint <path>`.
 
-All facets are optional. Absence is legal and means "this facet was not declared." Rules that care about a facet treat `nil` / empty as
-"information not available" and behave the same as today's context-aware rules do when `--context` isn't given.
+Entrypoint classification changes as follows:
 
-```mermaid
-classDiagram
-    class BuildInvocation {
-        +InvocationSource Source
-        +string DockerfilePath
-        +*context.BuildContext Context
-        +map~string,*string~ BuildArgs
-        +string[] Platforms
-        +string TargetStage
-        +map~string,NamedContext~ NamedContexts
-        +map~string,*string~ Environment
-        +Port[] ExposedPorts
-        +string[] Networks
-        +map~string,string~ Labels
-        +SecretRef[] Secrets
-    }
-    class Port {
-        +int ContainerStart
-        +int ContainerEnd
-        +int HostStart
-        +int HostEnd
-        +string Protocol
-    }
-    class SecretRef {
-        +string ID
-        +string Source
-        +string Target
-    }
-    class InvocationSource {
-        +string Kind
-        +string File
-        +string Name
-    }
-    class NamedContext {
-        +string Kind
-        +string Value
-    }
-    class BuildContext {
-        +string ContextDir
-        +string DockerfilePath
-        +IsIgnored(path) bool
-        +FileExists(path) bool
-    }
-    BuildInvocation "1" --> "1" InvocationSource : Source
-    BuildInvocation "1" --> "0..1" BuildContext : Context
-    BuildInvocation "1" --> "*" NamedContext : NamedContexts
+- Directory inputs and glob inputs keep their current meaning: Dockerfile discovery only.
+- A single explicit regular file path may be classified as Dockerfile, Bake, or Compose.
+- Orchestrator mode is only available when the user passes exactly one explicit regular file path.
+
+That yields the following behavior:
+
+| User input | Meaning in MVP |
+|---|---|
+| `tally lint .` | Existing Dockerfile discovery flow. No orchestrator detection. |
+| `tally lint Dockerfile` | Existing single-Dockerfile flow. |
+| `tally lint compose.yaml` | New Compose orchestrator flow. |
+| `tally lint docker-bake.hcl` | New Bake orchestrator flow. |
+| `tally lint compose.yaml Dockerfile` | Error, exit `2`. Mixed explicit inputs are not supported in orchestrator mode. |
+| `tally lint -` | Existing stdin Dockerfile flow only. stdin is not an orchestrator entrypoint in MVP. |
+
+This preserves current directory/glob behavior while making the orchestrator workflow explicit and predictable.
+
+### Dispatch Algorithm
+
+For a single explicit file input:
+
+1. If the file name matches Dockerfile conventions (`Dockerfile`, `*.Dockerfile`, `Containerfile`, variants), treat it as Dockerfile mode.
+2. Else if the file name or content matches Bake, treat it as Bake mode.
+3. Else if the file name or content matches Compose, treat it as Compose mode.
+4. Else error with exit `2`.
+
+Filename patterns are a fast path; parser-backed sniffing is the source of truth.
+
+### Flag Semantics
+
+- `--target` is valid only in Bake mode.
+- `--service` is valid only in Compose mode.
+- Both flags may be repeated.
+- unknown `--target` names exit `2`.
+- unknown `--service` names, or services that exist but have no `build:` section, exit `2`.
+- `--context` is valid only in plain Dockerfile mode. It is an error in orchestrator mode because the orchestrator is already the source of
+  context truth.
+- `--fix` is valid only in plain Dockerfile mode and stdin Dockerfile mode.
+
+Invalid flag/mode combinations exit `2`.
+
+### Exit Codes
+
+The existing repo exit codes remain authoritative:
+
+| Exit code | Meaning |
+|---|---|
+| `0` | Clean run, or a valid orchestrator file that resolves to no lintable Dockerfile invocations. |
+| `1` | Violations at or above the configured fail level were found. |
+| `2` | CLI misuse, orchestrator parse/load failure, config error, or unsupported orchestrator feature. |
+| `3` | Existing “no Dockerfiles found” case from directory/glob discovery only. |
+| `4` | Fatal Dockerfile syntax error in any referenced Dockerfile. |
+
+Two points matter here:
+
+- A valid Compose/Bake file with zero lintable Dockerfiles is **not** “no files found”; it exits `0`, not `3`.
+- If an orchestrator resolves to one or more Dockerfiles and any of those Dockerfiles has a fatal syntax error, the run exits `4`, preserving the
+  current Dockerfile syntax contract.
+
+### Reporter UX
+
+Reporter behavior must remain deterministic and invocation-aware:
+
+- `text` and `markdown` group diagnostics by invocation source.
+- `json` and `sarif` attach a structured `invocation` object to each diagnostic.
+- `github-actions` stays flat, but prefixes the message with an invocation label because that format has no grouping primitive.
+
+The report summary must distinguish:
+
+- unique Dockerfiles scanned
+- invocations scanned
+- total diagnostics
+
+`reporter.ReportMetadata` therefore needs a new `InvocationsScanned` field in addition to `FilesScanned`.
+
+Illustrative text output:
+
+```text
+[compose service: api]
+  api/Dockerfile:12: hadolint/DL3008 - Pin versions in apt-get install
+
+[compose service: worker]
+  worker/Dockerfile:8: hadolint/DL3008 - Pin versions in apt-get install
+
+Summary: 2 Dockerfiles, 2 invocations, 2 violations.
 ```
 
-### Illustrative Go types
+Even if two invocations point at the same Dockerfile text, they remain distinct findings.
 
-The sketches below are **illustrative, not binding** — the exact field names and package layout will be decided during the MVP implementation
-issue. They exist here to anchor the vocabulary.
+---
+
+## Core Architecture
+
+### BuildInvocation Model
+
+`BuildInvocation` describes one planned build of one Dockerfile under one invocation context.
+
+Illustrative shape:
 
 ```go
-// Package invocation describes a planned build of a Dockerfile.
-// Illustrative only — not the implementation API.
+// Package invocation models planned Dockerfile builds.
+// Illustrative only; exact package/file layout may vary.
 package invocation
 
 import "github.com/wharflab/tally/internal/context"
 
-// BuildInvocation captures everything a rule might want to know about a
-// planned build. All facets are optional.
 type BuildInvocation struct {
-    // Source records where this invocation came from (Dockerfile, bake
-    // target, compose service) so reporters can group and attribute.
-    Source InvocationSource
+	// Stable identity for one invocation within a run. Used by reporters,
+	// async bookkeeping, and LSP diagnostics.
+	Key string
 
-    // DockerfilePath is the absolute, filepath.Clean'd path of the
-    // Dockerfile to be linted. Providers MUST normalize to absolute
-    // before returning an invocation (see "Path normalization" below).
-    // Reporters may render this as relative at the UI boundary for
-    // readability; storage and comparison always use the absolute form.
-    DockerfilePath string
+	Source InvocationSource
 
-    // Context is the filesystem / dockerignore facet. Wraps the existing
-    // *context.BuildContext unchanged. May be nil when no context dir is
-    // known yet.
-    Context *context.BuildContext
+	// Absolute path to the Dockerfile being linted.
+	DockerfilePath string
 
-    // Build-time inputs declared by the orchestrator.
-    //
-    // BuildArgs uses *string so we can distinguish three states the
-    // orchestrators express differently:
-    //   - declared without default (bake `args = { FOO = null }`,
-    //                               compose `build.args: [FOO]`) → nil
-    //   - explicitly empty         (`FOO = ""`)                  → &""
-    //   - explicitly set           (`FOO = "22"`)                → &"22"
-    // This also matches the upstream compose-go and buildx types.
-    BuildArgs   map[string]*string
-    Platforms   []string
-    TargetStage string
+	// Declared primary build context, whether local or remote.
+	ContextRef ContextRef
 
-    // NamedContexts maps --build-context names (e.g. "alpine",
-    // "myapp-src") to their sources. Enables rules like
-    // "COPY --from=<name> must reference a declared context".
-    NamedContexts map[string]NamedContext
+	// Local filesystem context for rules that need .dockerignore/filesystem
+	// access. Nil when the declared context is remote or otherwise non-local.
+	FilesystemContext *context.BuildContext
 
-    // Runtime-facing metadata from Compose. Bake generally does not expose
-    // these; that's fine — the facets stay empty.
-    //
-    // Environment uses *string for the same reason BuildArgs does:
-    // compose `environment: [VAR]` / `VAR:` means "inherit from host",
-    // which is semantically different from `VAR=""`.
-    Environment  map[string]*string
-    ExposedPorts []Port
-    Networks     []string
-    Labels       map[string]string
-    Secrets      []SecretRef
+	BuildArgs     map[string]*string
+	Platforms     []string
+	TargetStage   string
+	NamedContexts map[string]ContextRef
+
+	// Compose-derived runtime metadata. Usually empty for Bake.
+	Environment  map[string]*string
+	ExposedPorts []Port
+	Networks     []string
+	Labels       map[string]string
+	Secrets      []SecretRef
 }
 
 type InvocationSource struct {
-    Kind string // "dockerfile" | "bake" | "compose"
-    File string // path to the originating file
-    Name string // target/service name ("" for plain Dockerfile)
+	Kind string // "dockerfile" | "bake" | "compose"
+	File string // absolute path to the originating file
+	Name string // target or service name; empty for plain Dockerfile mode
 }
 
-type NamedContext struct {
-    Kind  string // "dir" | "image" | "git" | "target" | "oci-layout" | ...
-    Value string
+type ContextRef struct {
+	Kind  string // "dir" | "git" | "url" | "docker-image" | "target" | "service" | "oci-layout" | ...
+	Value string // absolute path for local dirs; canonical string otherwise
 }
 
-// Port represents a port declaration from Compose. Compose natively supports
-// ranges (e.g. "8080-8085:3000-3005"), and expanding a range into N Port
-// values would waste allocation for large ranges and lose the "these were
-// declared together" grouping. Instead, ranges are preserved as Start/End
-// pairs; single ports have Start == End.
-//
-// Rules that want "does EXPOSE <p> match any container-side port?" check
-//   p >= ContainerStart && p <= ContainerEnd
-// for each declaration.
 type Port struct {
-    ContainerStart int    // inclusive
-    ContainerEnd   int    // inclusive; == ContainerStart for a single port
-    HostStart      int    // 0 if unpublished
-    HostEnd        int    // 0 if unpublished; == HostStart for a single port
-    Protocol       string // "tcp" | "udp"
+	ContainerStart int
+	ContainerEnd   int
+	HostStart      int
+	HostEnd        int
+	Protocol       string
 }
 
-// SecretRef is a reference to a secret declared by the orchestrator.
-// tally never reads or stores the secret value itself — only the
-// orchestrator-side metadata needed for rule analysis.
-//
-// Target is the path at which the secret is mounted inside the running
-// container (Compose: `services.x.secrets[i].target`, defaulting to
-// `/run/secrets/<source>`). It is distinct from Dockerfile-side
-// `RUN --mount=type=secret,target=...`, which controls where the secret
-// is exposed during a single RUN; rules that cross-check the two should
-// compare them explicitly rather than assume they match.
 type SecretRef struct {
-    ID     string
-    Source string // env var or file path, without the value itself
-    Target string // container mount path; "" means default (/run/secrets/<source>)
+	ID     string
+	Source string
+	Target string
 }
 ```
 
-### Relationship to existing types
+### Why `ContextRef` and `FilesystemContext` both exist
 
-- `BuildInvocation.Context` is a pointer to the existing
-  [`context.BuildContext`](../internal/context/context.go). It is not redefined, duplicated, or wrapped through an interface. Existing callers
-  that only care about the filesystem facet continue to use `BuildContext` directly.
-- Today's pipeline in [`internal/linter/linter.go`](../internal/linter/linter.go) threads `rules.BuildContext` through `LintInput.Context`. The
-  MVP adds `LintInput.Invocation *BuildInvocation` alongside, initially nil for the plain-Dockerfile path. Rules inspect whichever they need;
-  both fields may coexist for one release cycle before the plain `Context` field is fully subsumed.
-- [`internal/rules/rule.go`](../internal/rules/rule.go) — rules already consume per-rule config via `cfg.Rules.GetOptions(code)`. They use the
-  same pattern for invocation facets: check for nil/empty, proceed or no-op.
+This split is required for correctness and extensibility:
 
-### Path normalization
+- `ContextRef` captures the declared build context even when it is remote or non-filesystem.
+- `FilesystemContext` exposes the existing `.dockerignore` and file-existence functionality only when that facet is actually available.
 
-One canonical rule for every path field on `BuildInvocation` (`DockerfilePath`, `Context.ContextDir`, `Context.DockerfilePath`, and any path-valued
-`NamedContext`):
+Without this split, the model cannot represent a valid remote build context without pretending local filesystem checks are possible.
 
-> **All paths are stored as absolute, `filepath.Clean`'d strings. Providers are responsible for performing this normalization before returning an
-> invocation. Relative paths appear only at rendering boundaries — reporter output, examples in this doc, test snapshots — where they improve
-> readability.**
+### Build Arg Semantics
 
-This matches the existing [`internal/context/context.go`](../internal/context/context.go) convention, where `BuildContext.DockerfilePath` and
-`BuildContext.ContextDir` are both `filepath.Abs`-resolved at construction. It avoids the class of bugs where one rule compares
-`./api/Dockerfile` to `/home/alice/project/api/Dockerfile` and silently decides they're different files, and it makes cross-invocation
-deduplication on "is this the same Dockerfile?" a simple string equality check.
+`BuildArgs` uses `map[string]*string` to preserve three states:
 
-The worked examples below show relative paths (`"Dockerfile"`, `"./api/Dockerfile"`) because rendering absolute paths with the author's home
-directory would add noise without clarifying anything. In an actual `BuildInvocation` struct at runtime these values are absolute.
+- declared without concrete value yet
+- explicitly set to empty string
+- explicitly set to a non-empty value
 
-### InvocationProvider interface
+The lint pipeline derives a plain `map[string]string` only for the subset of args with concrete values when building the semantic model. Nil-valued
+args remain “declared but unresolved”.
 
-Discovery is pluggable so Bake and Compose can be added symmetrically.
+### Path Normalization
+
+All path-valued fields are stored as absolute, cleaned paths:
+
+- `BuildInvocation.DockerfilePath`
+- `InvocationSource.File`
+- `ContextRef.Value` when `Kind == "dir"`
+- any local path captured in `SecretRef.Source`
+
+Reporters and examples may render relative paths for readability, but equality and cache keys use the canonical absolute form.
+
+### Discovery and Provider Contract
+
+Introduce a shared provider layer under a new package such as `internal/invocation/`.
+
+Illustrative contract:
 
 ```go
-// InvocationProvider discovers invocations from an entrypoint file.
-// Illustrative only.
-type InvocationProvider interface {
-    // Discover parses the entrypoint and returns one BuildInvocation per
-    // referenced Dockerfile. For a plain Dockerfile entrypoint, returns
-    // exactly one invocation with most facets empty.
-    Discover(path string) ([]BuildInvocation, error)
+type ResolveOptions struct {
+	Path     string
+	Targets  []string // bake only
+	Services []string // compose only
+}
+
+type DiscoveryResult struct {
+	Kind              string // "dockerfile" | "bake" | "compose"
+	EntrypointPath    string
+	Invocations       []BuildInvocation
+	ZeroLintableReason string // only set when Invocations is empty and parsing succeeded
+}
+
+type Provider interface {
+	Discover(ctx context.Context, opts ResolveOptions) (*DiscoveryResult, error)
 }
 ```
 
-Two providers ship in MVP:
+`ZeroLintableReason` exists so the CLI, LSP, and tests can distinguish:
 
-- `bakeProvider` — uses [`github.com/docker/buildx/bake`](https://pkg.go.dev/github.com/docker/buildx/bake) to evaluate HCL.
-- `composeProvider` — uses [`github.com/compose-spec/compose-go/v2`](https://pkg.go.dev/github.com/compose-spec/compose-go/v2) to load Compose
-  projects.
+- parser failure
+- unsupported feature failure
+- valid file with nothing to lint
 
-A trivial third provider — "plain Dockerfile" — returns a single invocation with `Source.Kind = "dockerfile"` and all orchestrator-derived facets
-empty, so downstream code can treat every entrypoint uniformly.
+This is better than inferring semantics from an empty slice alone.
 
-## Bake Integration
+### Pipeline Integration
 
-### Why Bake is first-class
+The implementation should touch the current pipeline in the smallest set of places that preserves correctness.
 
-Docker Bake is the canonical declarative build-definition format for the Docker ecosystem. `docker buildx bake` is already the supported way to
-run multi-target, multi-platform, matrix-style builds, and it is the format Docker recommends for CI. Bake target definitions carry every piece of
-invocation context tally needs: `context`, `dockerfile`, `args`, `platforms`, `target`, `contexts`, `secret`, `ssh`, `labels`.
+### CLI wiring
 
-### Data-flow
+`cmd/tally/cmd/lint.go` keeps today’s directory/glob discovery path for Dockerfiles. A new higher-level dispatcher handles the single-explicit-file
+case:
 
-```mermaid
-flowchart LR
-    A[tally lint docker-bake.hcl] --> B[bakeProvider.Discover]
-    B --> C[docker/buildx/bake<br/>ReadLocalFiles + ReadTargets]
-    C --> D[map target -> BuildInvocation]
-    D --> E[N LintFile calls]
-    E --> F[grouped reporter output]
+1. classify the explicit file as Dockerfile, Bake, or Compose
+2. plain Dockerfile: existing code path
+3. Bake/Compose: provider discovery, then per-invocation lint fan-out
+
+`internal/discovery` remains Dockerfile-focused. Orchestrator resolution is a higher layer, not a redefinition of directory/glob discovery.
+
+### `linter.Input` and `rules.LintInput`
+
+Add:
+
+```go
+Invocation *invocation.BuildInvocation
 ```
 
-tally delegates HCL evaluation entirely to `github.com/docker/buildx/bake`. That package already handles variable interpolation, target
-inheritance (`inherits`), group expansion, and the JSON/HCL format variants. Re-implementing any of this would be a maintenance trap.
+to both `linter.Input` and `rules.LintInput`.
 
-### Target → BuildInvocation mapping
+Keep `BuildContext` / `Context` for one release cycle as a convenience field populated from `Invocation.FilesystemContext` when present. That
+minimizes immediate churn across existing rules.
 
-| Bake target field | BuildInvocation facet | Notes |
-|---|---|---|
-| `context` (string) | `Context.ContextDir` | Resolved to absolute path relative to the bake file. `"."` is common. |
-| `dockerfile` (string) | `DockerfilePath` | Default `"Dockerfile"` relative to `context`. |
-| `args` (map) | `BuildArgs` | Variable interpolation already applied by the buildx library. |
-| `platforms` (list) | `Platforms` | Empty list → native platform (rule treats as absent). |
-| `target` (string) | `TargetStage` | Empty → final stage (rule treats as absent). |
-| `contexts` (map) | `NamedContexts` | Each value classified as `dir`/`image`/`target:...`/`oci-layout://...`/`https://...` |
-| `secret` (list) | `Secrets` | IDs and source refs only — tally never reads secret values. |
-| `labels` (map) | `Labels` | |
-| `matrix` | — (MVP) | MVP lints the un-expanded target; see [Non-Goals](#non-goals-mvp). |
-| `output`, `cache-from`, `cache-to`, `tags` | — | Not relevant to lint decisions. |
+### Parse caching and per-invocation rebuild
 
-The `Source` facet is populated with `Kind = "bake"`, `File = <bake-file-path>`, `Name = <target-name>`.
+When the same Dockerfile appears in multiple invocations:
 
-### Worked example — moby/buildkit's own bake file
+- parse the Dockerfile once per unique `DockerfilePath`
+- reuse the `dockerfile.ParseResult`
+- rebuild the semantic model, facts, and rule input **per invocation**
 
-The following is the real `docker-bake.hcl` from the
-[moby/buildkit repository](https://github.com/moby/buildkit/blob/master/docker-bake.hcl) (excerpted). It is a good stress test: multi-stage
-inheritance, a `contexts` map that references another bake target, multi-platform, and conditional logic.
+This distinction is mandatory because invocation data affects semantic interpretation:
 
-```hcl
-# https://github.com/moby/buildkit/blob/master/docker-bake.hcl (excerpt)
-target "_common" {
-  args = {
-    ALPINE_VERSION = ALPINE_VERSION
-    GO_VERSION     = GO_VERSION
-    BUILDKIT_CONTEXT_KEEP_GIT_DIR = 1
-  }
-}
+- build args
+- selected target stage
+- future platform-sensitive checks
 
-target "binaries" {
-  inherits = ["_common"]
-  target   = "binaries"
-  output   = [bindir("build")]
-}
+The current semantic builder already accepts build args. It must also gain an invocation-aware target stage input, because using “last stage in the
+file” is incorrect once the real build target comes from Bake or Compose.
 
-target "binaries-cross" {
-  inherits  = ["binaries"]
-  output    = [bindir("cross")]
-  platforms = [
-    "darwin/amd64", "darwin/arm64",
-    "linux/amd64",  "linux/arm64",
-    "linux/s390x",  "linux/ppc64le", "linux/riscv64",
-    "windows/amd64","windows/arm64"
-  ]
-}
+### Config loading
 
-target "integration-tests-binaries" {
-  inherits = ["_common"]
-  target   = "binaries"
-  context  = TEST_BINARIES_CONTEXT
-}
+For orchestrator mode, config discovery must use the Dockerfile path, not the orchestrator file path. That preserves the current cascading config
+semantics and avoids surprising users who already colocate `.tally.toml` next to Dockerfiles.
 
-target "integration-tests" {
-  inherits = ["integration-tests-base"]
-  target   = "integration-tests"
-  context  = TEST_CONTEXT
-  contexts = TEST_CONTEXT != TEST_BINARIES_CONTEXT ? {
-    "binaries" = "target:integration-tests-binaries"
-  } : null
-  args = {
-    GOBUILDFLAGS     = TEST_COVERAGE == "1" ? "-cover" : null
-    BUILDKIT_SYNTAX  = BUILDKIT_SYNTAX
-  }
-  output = ["type=docker,name=${TEST_IMAGE_NAME}"]
-}
+### Async and registry integration
+
+The existing async runtime can remain in place, but the bookkeeping key space must expand.
+
+Today several async flows identify work by combinations of:
+
+- file path
+- stage index
+- resolver key
+
+That is not sufficient once the same Dockerfile/stage is linted under multiple invocations.
+
+Required change:
+
+- add `InvocationKey string` to `async.CheckRequest`
+- add `InvocationKey string` to `async.CompletedCheck`
+- add `InvocationKey string` to `rules.Violation`
+
+Resolver result dedupe may still happen by `(ResolverID, Key)` when the network lookup is identical. What changes is the **merge/suppression**
+identity, which must become `(RuleCode, File, InvocationKey, StageIndex)`.
+
+This preserves the current async architecture while preventing one invocation from suppressing another invocation’s diagnostics.
+
+### Violation and reporter attribution
+
+Add an optional `Invocation` field to `rules.Violation` for serialization and UI:
+
+```go
+Invocation *InvocationSource `json:"invocation,omitempty"`
 ```
 
-Running `tally lint docker-bake.hcl` on this file produces multiple `BuildInvocation`s. For `integration-tests`, the harvested invocation
-contains (showing only populated facets):
+Populate it whenever `LintInput.Invocation != nil`.
 
-```text
-Source.Kind      = "bake"
-Source.File      = "docker-bake.hcl"
-Source.Name      = "integration-tests"
-DockerfilePath   = "Dockerfile"          # inherited default
-Context.ContextDir = "."                 # TEST_CONTEXT resolved
-TargetStage      = "integration-tests"
-BuildArgs = {
-  ALPINE_VERSION: ALPINE_VERSION,         # inherited from _common
-  GO_VERSION: GO_VERSION,
-  BUILDKIT_CONTEXT_KEEP_GIT_DIR: "1",
-  GOBUILDFLAGS: "-cover",                 # when TEST_COVERAGE=1
-}
-NamedContexts = {
-  "binaries": { Kind: "target", Value: "integration-tests-binaries" }
-}
-```
+Required reporter updates:
 
-### Before / after: a newly catchable violation
-
-Consider the `integration-tests` Dockerfile stage at `./frontend/dockerfile/cmd/dockerfile-frontend/Dockerfile` (or any of buildkit's Dockerfiles)
-containing:
-
-```dockerfile
-FROM scratch AS integration-tests
-COPY --from=binaries /out/buildkitd /usr/local/bin/
-COPY --from=frontend-src /app/extra /extra
-```
-
-**Before this design:**
-
-tally has no idea what `--from=binaries` or `--from=frontend-src` refer to. They could be stage names (valid), registry image references (valid),
-or `--build-context` names (valid only if the orchestrator declared them). Today tally can only check that the name syntactically exists as a
-previous stage name in the same Dockerfile. Both lines pass because tally assumes out-of-file references are out of scope.
-
-**After this design:**
-
-A new rule (out of scope for MVP, but enabled by this plumbing) can check:
-
-> For each `COPY --from=<name>` where `<name>` is not a prior stage name in the same file, `<name>` must appear as a key in
-> `BuildInvocation.NamedContexts`. Otherwise the build will fail at runtime with "context <name> not found".
-
-For the `integration-tests` invocation above, `binaries` resolves (it's in `NamedContexts`). `frontend-src` does not — tally flags:
-
-```text
-Dockerfile:3: COPY --from=frontend-src references an unknown context.
-  The bake target 'integration-tests' declares contexts: binaries.
-  Add 'frontend-src' to the target's 'contexts' map, or use a stage name.
-  [bake target: integration-tests]
-```
-
-This violation is impossible to produce without a `BuildInvocation`. It's also a concrete pre-flight check that catches a real class of bake
-misconfiguration that today only surfaces at build time.
-
-## Compose Integration
-
-### Why Compose is first-class (equally with Bake)
-
-Docker Compose is the most widespread declarative build/run format in the ecosystem. Most projects that have a Dockerfile also have a Compose file
-next to it. Compose's `services.<name>.build:` block carries the same kind of invocation context as a bake target, plus additional runtime
-metadata (`environment`, `ports`, `networks`, `secrets`, `labels`) that Bake does not expose. That runtime metadata is exactly the material future
-rules need for cross-checks like "does the `EXPOSE` list match published `ports:`?" or "does a service depend on an env var the Dockerfile never
-`ENV`-declares?".
-
-### Data-flow
-
-```mermaid
-flowchart LR
-    A[tally lint docker-compose.yml] --> B[composeProvider.Discover]
-    B --> C[compose-spec/compose-go<br/>LoadWithContext]
-    C --> D[project.Services -> BuildInvocation]
-    D --> E[N LintFile calls]
-    E --> F[grouped reporter output]
-```
-
-tally delegates YAML schema validation, variable interpolation, and merge resolution to `github.com/compose-spec/compose-go/v2`. The Compose spec
-has enough corner cases (short form `build:` as a string, long form as an object, extension fields, variable interpolation, profile filtering)
-that re-implementing any of it would be a maintenance trap.
-
-### Service → BuildInvocation mapping
-
-| Compose service field | BuildInvocation facet | Notes |
-|---|---|---|
-| `build.context` | `Context.ContextDir` | Defaults to the directory of the Compose file. |
-| `build.dockerfile` | `DockerfilePath` | Default `"Dockerfile"` relative to `context`. |
-| `build.dockerfile_inline` | (MVP: ignored) | Deferred; see [Non-Goals](#non-goals-mvp). |
-| `build.args` | `BuildArgs` | `null` values passed through (variable was declared, no default). |
-| `build.platforms` | `Platforms` | Fall back to `platform` on the service if `build.platforms` unset. |
-| `build.target` | `TargetStage` | |
-| `build.additional_contexts` | `NamedContexts` | Same classification as bake `contexts`. |
-| `build.secrets` | `Secrets` | Cross-referenced with top-level `secrets:` block for source resolution. |
-| `build.labels` | `Labels` | Service-level `labels` also merged in. |
-| `environment` | `Environment` | Service runtime env, *not* build-time. Exposed so rules can compare with Dockerfile `ENV`. |
-| `ports` | `ExposedPorts` | For rules cross-checking `EXPOSE`. |
-| `networks` | `Networks` | |
-| `profiles`, `depends_on`, `command`, `entrypoint` | — (MVP) | Not currently relevant to lint. |
-
-The `Source` facet is populated with `Kind = "compose"`, `File = <compose-file-path>`, `Name = <service-name>`.
-
-### Compose-specific quirks (called out explicitly)
-
-- **Image-only services.** A service with only `image: redis:7` and no `build:` block has no Dockerfile to lint. It contributes to the "no
-  Dockerfile references" count for invariant #3 but produces no invocation. A file containing only image-only services exits 0 with the
-  "nothing to lint" notice.
-- **Short-form `build:`.** Compose allows `build: ./path` as shorthand for `build: { context: ./path }`. The compose-go library normalizes this;
-  tally consumes the normalized form only.
-- **Default profile only (MVP).** Services tagged with `profiles: [debug]` etc. are skipped unless they are in the default (unprofiled) set.
-  Multi-profile runs are deferred.
-- **Override files.** `docker-compose.override.yml` is not auto-merged. If a user wants a merged view, they can ask Compose itself to produce one
-  (`docker compose config`) and lint that output, but MVP does not wire this in.
-- **Variable interpolation.** `${VAR}` references are resolved by compose-go using the shell environment at the time `tally lint` runs. This
-  mirrors how `docker compose` itself behaves and keeps results reproducible when the user pins variables.
-
-### Worked example — a realistic compose file
-
-```yaml
-# compose.yaml
-services:
-  api:
-    build:
-      context: ./api
-      dockerfile: Dockerfile
-      target: runtime
-      args:
-        NODE_VERSION: "22"
-        BUILD_SHA: ${GIT_SHA}
-      additional_contexts:
-        shared-protos: ../protos
-        base-image: docker-image://ghcr.io/acme/node-base:22
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgres://db:5432/app
-    ports:
-      - "8080:3000"
-    networks: [backend]
-
-  worker:
-    build:
-      context: ./worker
-      target: runtime
-      args:
-        NODE_VERSION: "22"
-    environment:
-      NODE_ENV: production
-      QUEUE_URL: redis://cache:6379
-    networks: [backend]
-
-  db:
-    image: postgres:16
-  cache:
-    image: redis:7
-```
-
-Running `tally lint compose.yaml` produces two invocations (`api`, `worker`). The `db` and `cache` services are image-only and contribute
-nothing. If `api` and `worker` happened to share `./api/Dockerfile`, it would be linted twice — once per invocation — with different
-`BuildArgs`, `Environment`, and `NamedContexts` each time.
-
-For `api`:
-
-```text
-Source.Kind      = "compose"
-Source.File      = "compose.yaml"
-Source.Name      = "api"
-DockerfilePath   = "./api/Dockerfile"
-Context.ContextDir = "./api"
-TargetStage      = "runtime"
-BuildArgs        = { NODE_VERSION: "22", BUILD_SHA: <resolved from env> }
-NamedContexts    = {
-  "shared-protos": { Kind: "dir",   Value: "../protos" },
-  "base-image":    { Kind: "image", Value: "ghcr.io/acme/node-base:22" },
-}
-Environment      = { NODE_ENV: "production", DATABASE_URL: "postgres://db:5432/app" }
-ExposedPorts     = [{ ContainerStart: 3000, ContainerEnd: 3000, HostStart: 8080, HostEnd: 8080, Protocol: "tcp" }]
-Networks         = ["backend"]
-```
-
-### Before / after: a newly catchable violation
-
-Assume `./api/Dockerfile` contains:
-
-```dockerfile
-FROM base-image AS runtime
-EXPOSE 8000
-COPY --from=shared-schemas ./schemas /app/schemas
-```
-
-**Before this design:**
-
-- `EXPOSE 8000` is tolerated even though the service publishes container port `3000`.
-- `COPY --from=shared-schemas` looks like a stage reference. tally sees no prior stage with that name and likely errors as "undefined stage".
-  But the error message has no idea a similar name (`shared-protos`) was declared in compose — so the fix suggestion is unhelpful.
-
-**After this design:**
-
-- A future rule can warn: `EXPOSE 8000 does not match any container-side port in compose service 'api' (ports: 3000). The image may be reachable
-  only on a port the service never publishes.`
-- The undefined-stage error can be enriched: `COPY --from=shared-schemas — no such stage, and no such named context in service 'api'. Did you
-  mean 'shared-protos'?`
-
-Neither refinement is possible without a `BuildInvocation`. As with Bake, the rules themselves are out of scope for MVP — this design only ships
-the plumbing that makes them implementable.
-
-## CLI UX
-
-### Single entrypoint, content-sniffed dispatch
-
-`tally lint <path>` stays the single entrypoint. tally sniffs the file to decide the mode:
-
-1. If the filename matches `Dockerfile`, `*.Dockerfile`, or `Containerfile` — dockerfile mode.
-2. Else if the extension is `.hcl` and the content parses as bake (or the filename matches `docker-bake.hcl` / `*.bake.hcl`) — bake mode.
-3. Else if the extension is `.yml` / `.yaml` and the content parses as a Compose file (or the filename matches `docker-compose.y*ml` /
-   `compose.y*ml`) — compose mode.
-4. Otherwise tally errors: `tally: unable to determine entrypoint type for <path>; expected a Dockerfile, a Docker Bake HCL file, or a Compose
-   YAML file`.
-
-Filename patterns are the fast path; content sniffing is the fallback so unconventional names (`build.hcl`, `stack.yml`) still work.
-
-### Narrowing scope
-
-Orchestrator files can declare dozens of targets/services. Users sometimes want to lint just one:
-
-- `--target <name>` — restricts bake-mode lint to a single target. Error if the target doesn't exist.
-- `--service <name>` — restricts compose-mode lint to a single service. Error if the service doesn't exist or has no `build:`.
-
-Both flags may be passed multiple times to select a subset. Neither flag has any effect in Dockerfile mode (tally errors with
-`--target / --service are only valid with bake or compose entrypoints`).
-
-### `--fix` rejection on orchestrator entrypoints
-
-This is a [design invariant](#design-invariants). The exact error:
-
-```text
-tally: --fix is not supported when linting orchestrator files.
-The same Dockerfile can be referenced by multiple targets/services with
-different build contexts, which would produce conflicting fixes.
-
-Run 'tally lint <path-to-Dockerfile>' directly to autofix a specific
-Dockerfile.
-```
-
-Exit code: `2` (same as other CLI misuse errors — distinguishable from "lint found violations" which stays `1`).
-
-### Zero-Dockerfile orchestrator
-
-When an orchestrator file is valid but contains no Dockerfile references (all services are image-only, or a bake file only defines `meta-helper`
-targets with no `dockerfile`), tally emits a notice and exits 0. Exact wording:
-
-```text
-tally: <path> parsed successfully, but no Dockerfile references were found.
-Nothing to lint. (If this is unexpected, check 'build:' blocks / bake
-target 'dockerfile' attributes.)
-```
-
-This supports users wiring up CI linting before their Dockerfiles exist, which the issue explicitly calls out.
-
-### Malformed orchestrator
-
-If the orchestrator file can't be parsed (HCL syntax error, compose schema violation), tally fails fast with the upstream parser's error message
-and exits `2`. No partial linting, no "lint what we can" fallback.
-
-### Entrypoint × mode × `--fix` × exit codes
-
-| Entrypoint                 | Mode       | `--target` / `--service` | `--fix` allowed | Clean exit | Violations exit | Misuse exit |
-|----------------------------|------------|--------------------------|-----------------|------------|-----------------|-------------|
-| `Dockerfile` / `*.Dockerfile` / `Containerfile` | dockerfile | n/a (error if passed) | ✅ yes          | `0`        | `1`             | `2`         |
-| `docker-bake.hcl` / `*.bake.hcl` / `*.hcl` (sniffed) | bake       | ✅ `--target`            | ❌ error        | `0`        | `1`             | `2`         |
-| `docker-compose.y*ml` / `compose.y*ml` / `*.y*ml` (sniffed) | compose    | ✅ `--service`          | ❌ error        | `0`        | `1`             | `2`         |
-
-Note the three distinct exit codes: `0` clean, `1` violations found, `2` CLI misuse / malformed input. Today's `tally lint Dockerfile`
-semantics are preserved exactly.
-
-### No auto-discovery
-
-tally does **not** walk up parent directories looking for a bake or compose file when the user ran `tally lint Dockerfile`. If the user wants
-orchestrator context, they pass the orchestrator file explicitly. This matches ruff-style "one path, one thing" semantics and avoids surprise
-when a parent directory's bake file wasn't meant to apply.
-
-## Multi-Invocation Reporting
-
-### The orchestrator entrypoint is the reporter
-
-When the entrypoint is an orchestrator file, tally does not behave like a batch of N separate `tally lint Dockerfile` invocations. It behaves as
-a single run that *fans out* over N invocations and *fans in* their results before emitting any output. The orchestrator entrypoint owns the
-reporter.
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant T as tally lint (orchestrator mode)
-    participant P as InvocationProvider
-    participant L as linter.LintFile
-    participant R as Reporter
-
-    U->>T: tally lint docker-bake.hcl
-    T->>P: Discover("docker-bake.hcl")
-    P-->>T: [inv1, inv2, inv3]
-    loop for each invocation (deterministic order)
-        T->>L: LintFile(inv_i)
-        L-->>T: violations_i (tagged with Source)
-    end
-    T->>T: aggregate + group by Source.Name
-    T->>R: render(groups)
-    R-->>U: grouped output + single exit code
-```
-
-### One violation per (Dockerfile, invocation) pair
-
-Invariant #4: the same Dockerfile referenced by N invocations produces N independent lint runs. A violation in run `i` is **not** merged with the
-same-looking violation from run `j`, because the whole point of this design is that the two runs have different context. A rule that reads
-`BuildArgs` may legitimately fire for invocation `api` and not for `worker` even though the Dockerfile text is identical.
-
-Each violation carries its `Source` (`Kind`, `File`, `Name`) so reporters can group, attribute, and deduplicate for display without losing
-provenance.
-
-### Deterministic iteration order
-
-Order of invocations is fixed so snapshot tests and CI comparisons are stable:
-
-- **Bake:** alphabetical by target name. `github.com/docker/buildx/bake` stores targets in Go maps (non-deterministic iteration) and itself
-  sorts alphabetically when materializing the synthetic `default` group, so tally sorts too. Users who want a specific presentation order can
-  pass the targets explicitly via repeated `--target` flags (see below).
-- **Compose:** alphabetical by service name. Compose files are typically authored with no meaningful service ordering (maps in YAML are
-  unordered by spec), so imposing alphabetical order gives a stable presentation that doesn't depend on YAML library internals.
-
-If `--target` / `--service` narrows the set, iteration follows the CLI-arg order (the user's explicit intent), falling back to alphabetical for
-any remaining targets matched by globs or groups.
-
-### Grouped output
-
-Text reporter (default):
-
-```text
-[bake target: binaries]
-  Dockerfile:12: hadolint/DL3008 - Pin versions in apt-get install
-  Dockerfile:18: tally/run-format - consider heredoc for multi-line RUN
-
-[bake target: integration-tests]
-  Dockerfile:3: tally/copy-from-named-context-missing - 'frontend-src' not declared
-  Dockerfile:12: hadolint/DL3008 - Pin versions in apt-get install
-
-Summary: 2 targets linted, 4 violations.
-```
-
-Note that `Dockerfile:12: hadolint/DL3008` appears twice — once per target — and that is correct. They are two independent findings even if the
-underlying text is identical, because each one is attributable to a distinct build invocation.
-
-JSON / SARIF reporters attach `Source` to each diagnostic. Existing consumers that don't know about `Source` simply see an extra field they can
-ignore; consumers that do can present grouped UIs.
-
-### Single exit code
-
-The orchestrator run has one exit code, following the standard table above:
-
-- `0` — every invocation clean.
-- `1` — at least one violation in at least one invocation.
-- `2` — CLI misuse (invalid `--target`, `--fix` with orchestrator, etc.) or malformed orchestrator file.
-
-This keeps CI integration simple: `tally lint docker-bake.hcl || exit $?` works the same way as `tally lint Dockerfile || exit $?`.
-
-## Async and Registry Interaction
-
-This section answers research question #7 from the issue: *how should BuildInvocation interact with async checks and registry-backed analysis?*
-
-### Context
-
-tally already has an async-check layer ([`internal/async/runtime.go`](../internal/async/runtime.go)) and a registry resolver
-([`internal/registry/resolver.go`](../internal/registry/resolver.go)). `AsyncRule.PlanAsync` (see
-[`internal/rules/async.go`](../internal/rules/async.go) and [`internal/linter/linter.go`](../internal/linter/linter.go)) lets rules emit
-`async.CheckRequest`s that the linter later resolves against an image registry. Today these checks run with default-platform assumptions because
-the linter has no way to know which platform(s) the user actually intends to build for.
-
-`BuildInvocation.Platforms` and `BuildInvocation.BuildArgs` change that. When an invocation is attached to `LintInput`, an async rule that
-resolves a base image can ask for the manifest matching the declared platform — and for multi-platform invocations, ask for each platform's
-manifest independently.
-
-### Data-flow for a base-image platform check
-
-```mermaid
-sequenceDiagram
-    participant L as linter.LintFile
-    participant R as AsyncRule (e.g. base-image-platform)
-    participant P as async.Runtime
-    participant Reg as registry.Resolver
-
-    L->>R: PlanAsync(LintInput{Invocation})
-    Note right of R: read Invocation.Platforms<br/>read Invocation.BuildArgs<br/>(e.g. ARG TAG for FROM)
-    R-->>L: []CheckRequest{image, platforms}
-    L->>P: Run(requests)
-    loop for each (image, platform)
-        P->>Reg: ResolveManifest(image, platform)
-        Reg-->>P: manifest or not-found
-    end
-    P-->>L: resolved results
-    L->>R: finalize(results) -> []Violation
-```
-
-### What this unlocks, concretely
-
-- **`InvalidBaseImagePlatform`-equivalent rule** can now resolve manifests for *all* declared platforms and warn when the base image doesn't
-  publish one of them, instead of silently defaulting to the host platform.
-- **`FROM ${TAG}` resolution.** When a Dockerfile writes `FROM node:${NODE_VERSION}` and the invocation's `BuildArgs` supply
-  `NODE_VERSION=22`, registry-backed checks can resolve `node:22` rather than giving up on the unresolved variable.
-- **Named-context base-image checks.** A Dockerfile writing `FROM base-image` where `base-image` is declared in
-  `NamedContexts` as a `docker-image://` reference can be registry-resolved just like a regular `FROM <image>`.
-
-### What stays the same
-
-- The async runtime's request/batch/caching behaviour is unchanged. `BuildInvocation` only enriches the *contents* of `CheckRequest`s.
-- Rules that don't care about platforms or build args ignore the invocation and emit the same `CheckRequest`s they emit today.
-- When the entrypoint is a plain Dockerfile and no invocation is attached, async rules behave exactly as they do now.
-
-The upshot: `BuildInvocation` plugs into the async / registry foundation additively. No refactor of
-[`internal/async/`](../internal/async/) or [`internal/registry/`](../internal/registry/) is required for MVP; only new data flows through the
-existing channels.
-
-## UX Tradeoffs
-
-The issue's acceptance criteria require the proposal to *address the UX problem directly, not just the type shape*. Three shapes were
-considered. One is recommended; the other two are described on their own terms so the rejection is defensible.
-
-### Option A — Orchestrator file as entrypoint (recommended)
-
-```bash
-tally lint Dockerfile              # existing behaviour, unchanged
-tally lint docker-bake.hcl         # NEW — fans out over bake targets
-tally lint compose.yaml            # NEW — fans out over compose services
-tally lint docker-bake.hcl --target api
-```
-
-The entrypoint file determines the mode. `tally lint` stays the one command users type.
-
-**Pros:**
-
-- Matches user mental model: "lint this file" works regardless of which kind of file it is.
-- Mirrors `docker buildx bake` and `docker compose` themselves — users already pass these files as the primary argument to Docker tooling.
-- Zero duplication. Users don't restate build args or platforms anywhere.
-- Existing `tally lint Dockerfile` semantics are preserved exactly. Users who never adopt orchestrator linting see no change.
-- Composes cleanly with editors: an LSP or CI runner can pass the file the user opened and tally does the right thing.
-
-**Cons:**
-
-- Requires content-sniffing for files with unconventional names. Mitigated by fast-path filename patterns (covered in [CLI UX](#cli-ux)).
-- The `--fix` restriction (invariant #1) becomes a surprise if the user expected symmetric behaviour. Mitigated by the explicit error message
-  pointing to the Dockerfile path.
-
-### Option B — Orchestrator file as a flag on `tally lint Dockerfile`
-
-```bash
-tally lint Dockerfile --bake ./docker-bake.hcl --target api
-tally lint Dockerfile --compose ./compose.yaml --service api
-```
-
-The user always passes the Dockerfile, and the orchestrator is metadata.
-
-**Why this was rejected:**
-
-- Duplicates configuration. The orchestrator already points at the Dockerfile. Asking the user to name both is the exact redundancy the issue
-  calls out as "unrealistic" and "drifts quickly".
-- Doesn't match mental model. Users think in services/targets, not in Dockerfiles. A single bake file may reference many Dockerfiles; which one
-  goes on the CLI?
-- Makes the one-Dockerfile-many-invocations case awkward. The whole point is N lint runs from one orchestrator file. Option B forces the user
-  to invoke tally N times, losing the aggregated reporter.
-- The `--fix` restriction gets fuzzier — the entrypoint is still a Dockerfile, so refusing `--fix` looks like an arbitrary flag combination
-  rather than a structural invariant.
-
-### Option C — Explicit `lint-bake` / `lint-compose` subcommands
-
-```bash
-tally lint Dockerfile
-tally lint-bake docker-bake.hcl --target api
-tally lint-compose compose.yaml --service api
-```
-
-Separate subcommands per orchestrator kind.
-
-**Why this was rejected:**
-
-- Fragments the CLI surface. Three commands to remember, three help pages, three sets of shared flags duplicated across them.
-- Editors and CI runners that pass a filename don't know which subcommand to call. They'd need to content-sniff *before* invoking tally, which
-  just moves the sniffing problem outside the binary.
-- Adding a new orchestrator (Kubernetes manifests? Earthfiles?) requires a new subcommand and breaks shell completions. Option A absorbs new
-  orchestrators by adding an `InvocationProvider` implementation; no CLI change required.
-- Offers nothing Option A doesn't, at the cost of ergonomics.
-
-### Decision
-
-Option A. The fan-out / aggregation model is expressible in any of the three, but Option A is the only one that doesn't make users think about
-*which* tally command to run. The user thinks about *what file* they want linted, and the binary works out the rest.
-
-## Rollout Plan
-
-Three phases. Each phase has a concrete acceptance criterion that a follow-up issue can test against.
-
-### Phase 1 — Research (this document)
-
-Scope: deliver this design doc. No code.
-
-**Acceptance:** the doc, read top-to-bottom, answers the issue's seven research questions and meets all four acceptance criteria. The scope cut
-(non-goals list) is agreed and no concerns remain about the invariants.
-
-### Phase 2 — MVP implementation (separate follow-up issue)
-
-Scope: ship the plumbing end-to-end with zero new rules consuming invocation data.
-
-- Introduce the `BuildInvocation` / `InvocationSource` / `NamedContext` / `InvocationProvider` types.
-- Implement `bakeProvider` using `github.com/docker/buildx/bake`.
-- Implement `composeProvider` using `github.com/compose-spec/compose-go/v2`.
-- Implement content-sniffing entrypoint dispatch in `cmd/tally/cmd/lint.go`.
-- Add `--target` and `--service` flags.
-- Reject `--fix` on orchestrator entrypoints with the exact error message from [CLI UX](#cli-ux). Exit code `2`.
-- Emit the "no Dockerfile references" notice when applicable. Exit code `0`.
-- Fail fast on malformed orchestrator files with the upstream parser's error. Exit code `2`.
-- Thread `Invocation` through `LintInput` in [`internal/linter/linter.go`](../internal/linter/linter.go) as a new optional field alongside the
-  existing `Context`. No existing rule signatures change.
-- Grouped reporter output for the orchestrator case (text + JSON + SARIF). Each violation carries its `Source`.
-- Snapshot tests for every new exit path, with one real bake file and one real compose file in `internal/integration/testdata/`.
-
-**Acceptance:**
-
-> `tally lint docker-bake.hcl` runs existing rules against every referenced Dockerfile, groups output by target, rejects `--fix` with a
-> clear error (exit `2`), exits `0` with the explanatory notice if no Dockerfiles are referenced, and exits `1` with grouped diagnostics when
-> violations are found. The same must hold for `tally lint compose.yaml` with `--service` instead of `--target`. Every existing
-> `tally lint Dockerfile` snapshot test continues to pass unchanged.
-
-### Phase 3+ — Invocation-consuming rules and richer integrations
-
-Scope: rules and features that take advantage of the plumbing. These are separate issues, each optional and each with its own design
-considerations.
-
-Candidate follow-ups, in rough priority order:
-
-- **`tally/copy-from-named-context-missing`** — validate every `COPY --from=<name>` against prior stage names and
-  `Invocation.NamedContexts`. Concrete value demonstrated in the Bake and Compose worked examples.
-- **`tally/expose-ports-mismatch`** — cross-check Dockerfile `EXPOSE` against Compose `ports:` when both are known.
-- **`tally/env-arg-not-declared`** — cross-check Dockerfile `ENV` / `ARG` against Compose `environment:` / `build.args:` for drift.
-- **Platform-aware base-image resolution** in the async / registry layer (see [Async and Registry Interaction](#async-and-registry-interaction))
-  once `Invocation.Platforms` is threaded through.
-- **Bake matrix expansion** — lint each matrix cell as its own invocation.
-- **Compose profiles and `docker-compose.override.yml` merging.**
-- **Lint rules targeting the orchestrator files themselves** (e.g. warn on a bake target with `context = "."` and no `.dockerignore` in that
-  directory, or warn on a Compose service with `build.target` set to a stage that doesn't exist in the referenced Dockerfile — the second
-  rule already needs both parsers, which is a direct payoff from Phase 2).
-
-Each of these ships as its own issue, linked back to #327 for historical context.
+- `reporter.SortViolations` sorts by invocation label before file/line/rule.
+- JSON and SARIF include `invocation`.
+- GitHub Actions prefixes the human-readable message with the invocation label.
+- text and markdown group by invocation.
 
 ---
 
-## Related Design Docs
+## Bake Provider
 
-- [02 — Docker Buildx Bake `--check` Analysis](02-buildx-bake-check-analysis.md) — BuildKit's own linter, two-phase architecture, rule catalogue.
-- [07 — Context-Aware Linting Foundation](07-context-aware-foundation.md) — the `BuildContext` seed this document extends into `BuildInvocation`.
-- [01 — Linter Pipeline Architecture](01-linter-pipeline-architecture.md) — the pipeline stage where invocation fan-out plugs in.
-- [05 — Reporters and Output Formatting](05-reporters-and-output.md) — the reporter layer that gains grouped-output semantics under this design.
-- Upstream issue: [#327 — Research: design BuildInvocation model and explore Docker Bake integration](https://github.com/wharflab/tally/issues/327).
+### Upstream dependency
+
+Use the official Buildx package:
+
+- [`github.com/docker/buildx/bake`](https://pkg.go.dev/github.com/docker/buildx/bake)
+
+The provider must delegate HCL parsing and target resolution to Buildx rather than re-implementing Bake semantics.
+
+### Target selection semantics
+
+The provider must follow Buildx’s own target-selection semantics:
+
+- explicit `--target` names are authoritative
+- when no targets are supplied, use the same target set `docker buildx bake` would use for that file
+
+In practice, that means:
+
+- if the file defines a `default` group, lint the targets in that group
+- otherwise lint the targets Buildx resolves as the implicit default for that file
+
+tally must not invent a different Bake selection model.
+
+### Mapping
+
+| Bake field | BuildInvocation field | Notes |
+|---|---|---|
+| target name | `Source.Name` | Always set. |
+| file path | `Source.File` | Absolute path to the Bake file. |
+| `context` | `ContextRef` | Classify local dir vs remote/git/url. |
+| local `context` | `FilesystemContext` | Build `context.BuildContext` only for local directories. |
+| `dockerfile` | `DockerfilePath` | Default `Dockerfile` under the resolved context dir. |
+| `args` | `BuildArgs` | Preserve nil vs empty vs explicit values. |
+| `platforms` | `Platforms` | |
+| `target` | `TargetStage` | |
+| `contexts` | `NamedContexts` | Classify each reference. |
+| `secret` | `Secrets` | Metadata only, never secret values. |
+| `labels` | `Labels` | |
+
+### Unsupported or deferred Bake features
+
+| Feature | MVP behavior | Reason |
+|---|---|---|
+| `dockerfile-inline` | hard error, exit `2` | No stable file-path/report/fix contract in the MVP. |
+| unresolved matrix expansion | hard error, exit `2` | Partial or collapsed linting would be misleading. |
+| remote Bake definition URLs | hard error, exit `2` | CLI entrypoint model is explicit local files only. |
+
+Important nuance on matrix:
+
+- if the upstream Buildx API already returns fully materialized targets, each materialized target becomes its own invocation
+- if unresolved matrix structure remains visible to tally, the provider must error rather than guess
+
+### Example of a concrete future payoff
+
+A future rule can validate:
+
+> `COPY --from=<name>` that is not a prior stage name must correspond to a declared named build context.
+
+That check becomes possible because Bake already exposes the `contexts` map in provider discovery.
+
+---
+
+## Compose Provider
+
+### Upstream dependency
+
+Use the official Compose Go library:
+
+- [`github.com/compose-spec/compose-go/v2`](https://github.com/compose-spec/compose-go)
+
+Use the upstream project-loading flow rather than hand-rolling YAML, interpolation, profile filtering, or path normalization. The preferred
+implementation path is the official project loader API (`cli.NewProjectOptions` / `LoadProject`) or an equivalent upstream-supported loader path.
+
+### Service selection semantics
+
+Without `--service`, lint all services in the loaded project that:
+
+- are active in the default profile set
+- have a `build:` section
+
+With `--service`, lint only the selected services, but still reject profile-only services that are inactive because Compose profiles are out of
+scope for the MVP.
+
+Image-only services are valid inputs and count toward the “nothing to lint” notice, but they do not produce invocations.
+
+### Mapping
+
+| Compose field | BuildInvocation field | Notes |
+|---|---|---|
+| service name | `Source.Name` | Always set. |
+| Compose file path | `Source.File` | Absolute path to the file the user passed. |
+| `build.context` | `ContextRef` | Local path or remote source. |
+| local `build.context` | `FilesystemContext` | Build local context only when the main context is a local directory. |
+| `build.dockerfile` | `DockerfilePath` | Default `Dockerfile` under the resolved context dir. |
+| `build.args` | `BuildArgs` | Preserve nil values. |
+| `build.platforms` | `Platforms` | Fall back to service `platform` only when appropriate. |
+| `build.target` | `TargetStage` | |
+| `build.additional_contexts` | `NamedContexts` | Classify `dir`, `docker-image`, `service`, git/url, etc. |
+| `build.secrets` | `Secrets` | Cross-reference top-level secret sources when possible. |
+| `build.labels` and service `labels` | `Labels` | Merge into one map with clear precedence. |
+| service `environment` | `Environment` | Runtime env, not build args. |
+| service `ports` | `ExposedPorts` | Preserve ranges instead of exploding them. |
+| service `networks` | `Networks` | |
+
+### Unsupported or deferred Compose features
+
+| Feature | MVP behavior | Reason |
+|---|---|---|
+| `build.dockerfile_inline` | hard error, exit `2` | Same reason as Bake inline Dockerfiles. |
+| profiles beyond the default set | unsupported | Avoid loading behavior that differs from explicit selection semantics. |
+| implicit sibling override file loading | unsupported | CLI stays explicit; no hidden extra files. |
+| unsaved orchestrator buffer state in LSP | unsupported | Initial LSP implementation reads orchestrators from disk only. |
+
+This is intentionally strict. Compose files are often heavily templated, and silent partial support would create false confidence.
+
+### Future rule examples unlocked by Compose
+
+- cross-check Dockerfile `EXPOSE` against service `ports:`
+- compare Dockerfile `ENV` / `ARG` usage against Compose `environment:` and `build.args:`
+- diagnose a `COPY --from=` name that matches neither a stage name nor a declared additional context
+
+---
+
+## LSP and IDE Integration
+
+This proposal must cover LSP and the maintained IDE plugins explicitly because the CLI fan-out model does not map directly onto “the user opened
+one Dockerfile in an editor”.
+
+### Scope Decision
+
+The initial LSP integration stays **Dockerfile-document-centric**:
+
+- Dockerfile documents remain the primary lint target in LSP mode.
+- Bake and Compose documents are not first-class LSP lint targets in the MVP.
+- Invocation context is applied to a Dockerfile document only when the workspace explicitly tells the server which orchestrator files matter.
+
+This is the least risky path because it preserves the editor’s mental model:
+
+- diagnostics attach to the file the user is editing
+- quick fixes edit the current Dockerfile document only
+- the plugins do not need to invent a multi-document grouped-report UI before the underlying invocation layer is stable
+
+### New LSP Settings
+
+Extend `internal/lspserver/settings.go` with a new folder-level setting:
+
+```go
+InvocationEntrypoints []string `json:"invocationEntrypoints"`
+```
+
+User-facing setting name in both plugins:
+
+- `tally.invocationEntrypoints`
+
+Rules:
+
+- values are workspace-relative paths
+- only explicit files are allowed
+- empty list means invocation-aware editor linting is disabled
+
+Example conceptual payload sent via `workspace/didChangeConfiguration`:
+
+```json
+{
+  "tally": {
+    "workspaces": [
+      {
+        "uri": "file:///repo",
+        "settings": {
+          "invocationEntrypoints": [
+            "compose.yaml",
+            "docker-bake.hcl"
+          ]
+        }
+      }
+    ]
+  }
+}
+```
+
+### LSP Server Behavior
+
+For a Dockerfile document `D`:
+
+1. resolve workspace settings
+2. load and cache the configured orchestrator files for that workspace
+3. find all invocations whose `DockerfilePath == D`
+4. if zero invocations match, lint as today
+5. if one invocation matches, lint with that `BuildInvocation`
+6. if multiple invocations match, run one lint pass per invocation and publish multiple diagnostics for the document
+
+The cache key for the invocation index should include:
+
+- workspace root
+- configured entrypoint paths
+- content hash or mtime of each entrypoint file
+
+This index is separate from the existing `lintCache`, which remains keyed by document version.
+
+### Diagnostics UX in editors
+
+LSP diagnostics need a compact attribution model because editors do not have the CLI’s grouped text report.
+
+Required behavior:
+
+- plain Dockerfile lint: `Diagnostic.Source = "tally"`
+- invocation-aware lint: `Diagnostic.Source = "tally/<kind>:<name>"`
+- `Diagnostic.Data` includes a structured invocation object so code actions and richer UIs can round-trip the metadata
+
+Example conceptual `Diagnostic.Data`:
+
+```json
+{
+  "invocation": {
+    "kind": "compose",
+    "file": "/repo/compose.yaml",
+    "name": "api",
+    "key": "compose|/repo/compose.yaml|api|/repo/api/Dockerfile"
+  }
+}
+```
+
+This gives VS Code and IntelliJ enough information to display a useful label or future hover/tooltip detail without parsing strings back out of the
+message text.
+
+### Fixes and Code Actions in LSP
+
+Autofix policy must be stricter in the editor than on the CLI, because the editor always edits the Dockerfile directly.
+
+Rules:
+
+- zero matching invocations: existing quick-fix and fix-all behavior
+- one matching invocation: existing quick-fix and fix-all behavior
+- multiple matching invocations: diagnostics remain enabled, but **all mutating code actions are disabled**
+
+That includes:
+
+- per-diagnostic quick fixes
+- `source.fixAll.tally`
+- `tally.applyAllFixes`
+
+Reason: even if a particular fix looks text-local, the editor cannot assume it is valid across all active invocation contexts.
+
+The server should return no mutating code actions in the multi-invocation case. The plugins may optionally surface a non-mutating explanation such
+as “Fixes are disabled because this Dockerfile is linted under multiple build invocations.”
+
+### Orchestrator file change invalidation
+
+The current LSP server already handles `workspace/didChangeConfiguration`, but it does not currently watch orchestrator files. That must change for
+invocation-aware editor linting to be credible.
+
+Required implementation:
+
+- add `workspace/didChangeWatchedFiles` handling in the LSP server
+- VS Code and IntelliJ plugins register watchers for `tally.invocationEntrypoints`
+- when a watched orchestrator file changes on disk, the server invalidates the invocation index and refreshes diagnostics for open Dockerfile
+  documents in that workspace
+
+MVP limitation:
+
+- unsaved Compose/Bake buffer edits are ignored until the orchestrator file is saved
+
+This is an intentional scope cut. Pulling unsaved multi-document state into invocation discovery can be added later, but it should not be part of
+the first implementation.
+
+### Plugin responsibilities
+
+#### VS Code
+
+The VS Code extension should:
+
+- expose `tally.invocationEntrypoints`
+- forward it through `workspace/configuration`
+- watch those files and forward save/change notifications
+- show the diagnostic `source` label so users can distinguish invocation-specific findings
+
+#### IntelliJ
+
+The IntelliJ plugin should do the same at the LSP boundary:
+
+- expose the same setting name and semantics
+- watch configured orchestrator files
+- invalidate diagnostics when those files change
+- surface the invocation label in the LSP diagnostic UI where possible
+
+Both plugins should stay thin. Orchestrator parsing remains server-side.
+
+---
+
+## Unsupported Feature Policy
+
+The MVP must use a single consistent rule:
+
+> If an orchestrator construct materially affects which Dockerfile is built or how it is built, and tally cannot model that construct
+> correctly yet, the run errors out with exit `2`.
+
+This is the safest policy for a lint tool. “Best effort” would create false negatives exactly in the cases where build context matters most.
+
+At minimum this policy applies to:
+
+- inline Dockerfiles
+- unresolved Bake matrix expansion
+- invalid selection flags
+- unsupported profile-driven Compose selection
+
+Remote build contexts do **not** fall under this hard-error policy as long as they can still be represented faithfully in `ContextRef`. In that
+case:
+
+- `ContextRef` is populated
+- `FilesystemContext` is nil
+- filesystem-dependent rules no-op
+
+That is a valid and truthful partial capability, unlike silently dropping a Dockerfile source or target-selection mechanism.
+
+---
+
+## Test Plan
+
+The MVP is not complete without end-to-end tests that cover CLI and editor flows.
+
+### Unit tests
+
+Add package-level tests for:
+
+- entrypoint classification
+- path normalization
+- Bake target mapping
+- Compose service mapping
+- unsupported-feature errors
+- invocation-key stability
+- async merge behavior with same file/stage under multiple invocations
+
+### CLI integration tests
+
+Add new integration fixtures under `internal/integration/testdata/` for at least:
+
+- Bake file with multiple targets sharing one Dockerfile
+- Compose file with multiple services, including image-only services
+- valid orchestrator with zero lintable Dockerfiles
+- malformed orchestrator file
+- unsupported inline Dockerfile
+- same Dockerfile under multiple invocations producing duplicate-attributed diagnostics
+- `--fix` rejection
+- `--context` rejection in orchestrator mode
+- fatal Dockerfile syntax error discovered through an orchestrator run
+
+Snapshot coverage must include:
+
+- `text`
+- `json`
+- `sarif`
+- `github-actions`
+- `markdown`
+
+### LSP server tests
+
+Add tests in `internal/lspserver/` for:
+
+- parsing and storing `invocationEntrypoints`
+- zero/one/many matching invocations for one Dockerfile URI
+- `Diagnostic.Source` and `Diagnostic.Data` population
+- fix/code-action suppression in the multi-invocation case
+- invocation-index invalidation on watched orchestrator changes
+
+### IDE plugin tests
+
+The plugins do not need full orchestrator parsers. They do need contract tests that verify:
+
+- settings flow into `workspace/configuration`
+- file watchers trigger refresh/invalidation
+- invocation labels are visible in diagnostics
+
+---
+
+## Rollout Plan
+
+### Phase 1: Shared invocation layer and CLI orchestration
+
+Deliver:
+
+- `internal/invocation` package with shared types and providers
+- Bake and Compose provider implementations
+- CLI explicit-file dispatch
+- per-invocation lint fan-out
+- reporter changes
+- async bookkeeping changes
+
+Acceptance:
+
+- `tally lint compose.yaml` and `tally lint docker-bake.hcl` work end to end
+- existing Dockerfile directory/glob behavior is unchanged
+
+### Phase 2: LSP server integration
+
+Deliver:
+
+- `InvocationEntrypoints` LSP setting
+- invocation index for Dockerfile documents
+- diagnostic attribution in `Source` and `Data`
+- watched-file invalidation
+- multi-invocation fix suppression
+
+Acceptance:
+
+- opening a Dockerfile in VS Code or IntelliJ can produce invocation-aware diagnostics when the workspace is configured
+- the same Dockerfile still behaves exactly as today when no invocation entrypoints are configured
+
+### Phase 3: Invocation-aware rules
+
+Candidate follow-ups:
+
+- missing named build context for `COPY --from=`
+- Compose `EXPOSE` vs `ports:` mismatch
+- env/arg drift checks
+- platform-aware registry checks
+- orchestrator-file lint rules
+- inline Dockerfile support
+- Bake matrix expansion support
+- richer editor UI for active invocations
+
+---
+
+## Implementation Checklist
+
+- Add `internal/invocation` shared package.
+- Add `BuildInvocation`, `InvocationSource`, `ContextRef`, and provider interfaces.
+- Extend `linter.Input`, `rules.LintInput`, `rules.Violation`, and async bookkeeping with invocation identity.
+- Update semantic builder to accept invocation target stage and concrete build args.
+- Add CLI dispatch for explicit file entrypoints.
+- Preserve existing `internal/discovery` behavior for directories/globs.
+- Update all reporters to carry invocation attribution.
+- Add LSP settings, watched-file invalidation, and multi-invocation fix suppression.
+- Add CLI, LSP, and plugin contract tests before any invocation-aware rules ship.
+
+---
+
+## Rationale for This Shape
+
+This design is intentionally stricter than the original research framing in three places:
+
+- orchestrator inputs are explicit and narrow on the CLI, because the current discovery model is Dockerfile-oriented and should not become
+  ambiguous
+- unsupported features error instead of degrading silently, because invocation-aware linting is only valuable when users can trust it
+- LSP integration is Dockerfile-centric first, because that matches how the maintained IDE plugins already present diagnostics and fixes
+
+That trade-off is the right one for the first implementation. It gives tally a reusable invocation foundation without forcing the CLI, the LSP
+server, and both IDE plugins to solve every multi-file UX problem in one step.
