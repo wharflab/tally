@@ -3,8 +3,8 @@
 **Status:** Implementation-ready proposal
 
 **Primary goal:** make tally understand the planned build, not just the Dockerfile text, by introducing a first-class `BuildInvocation` model and
-supporting Docker Bake and Docker Compose as explicit lint entrypoints. The same model must also be reusable by `tally lsp --stdio` and the IDE
-plugins built on top of it.
+supporting Docker Bake definition files and Docker Compose files as explicit lint entrypoints. For Bake, this includes both HCL and JSON Bake
+files. The same model must also be reusable by `tally lsp --stdio` and the IDE plugins built on top of it.
 
 **Tracking issue:** [#327](https://github.com/wharflab/tally/issues/327)
 
@@ -57,7 +57,7 @@ first-class concept of the **invocation context**. That leaves several classes o
 
 Requiring users to restate `--build-arg`, `--target`, `--platform`, or `--build-context` on the tally CLI is not acceptable:
 
-- the source of truth already exists in Bake HCL or Compose YAML
+- the source of truth already exists in Bake HCL/JSON or Compose YAML
 - duplicating it on the CLI creates drift
 - once the two disagree, lint output stops being trustworthy
 
@@ -68,7 +68,7 @@ The correct unit is not “a Dockerfile plus a few optional flags”. The correc
 ## Goals
 
 - Add a `BuildInvocation` model that can express the build-time and service-time data future rules will need.
-- Accept explicit Bake and Compose files as `tally lint` entrypoints without changing existing Dockerfile behavior.
+- Accept explicit Bake HCL/JSON files and Compose YAML files as `tally lint` entrypoints without changing existing Dockerfile behavior.
 - Preserve current rule behavior when invocation data is absent.
 - Reuse the same invocation layer in CLI, LSP, and IDE plugins.
 - Keep the MVP implementable without refactoring the entire lint engine or reporter stack.
@@ -123,7 +123,8 @@ That yields the following behavior:
 | `tally lint .` | Existing Dockerfile discovery flow. No orchestrator detection. |
 | `tally lint Dockerfile` | Existing single-Dockerfile flow. |
 | `tally lint compose.yaml` | New Compose orchestrator flow. |
-| `tally lint docker-bake.hcl` | New Bake orchestrator flow. |
+| `tally lint docker-bake.hcl` | New Bake HCL orchestrator flow. |
+| `tally lint docker-bake.json` | New Bake JSON orchestrator flow. |
 | `tally lint compose.yaml Dockerfile` | Error, exit `2`. Mixed explicit inputs are not supported in orchestrator mode. |
 | `tally lint -` | Existing stdin Dockerfile flow only. stdin is not an orchestrator entrypoint in MVP. |
 
@@ -134,11 +135,26 @@ This preserves current directory/glob behavior while making the orchestrator wor
 For a single explicit file input:
 
 1. If the file name matches Dockerfile conventions (`Dockerfile`, `*.Dockerfile`, `Containerfile`, variants), treat it as Dockerfile mode.
-2. Else if the file name or content matches Bake, treat it as Bake mode.
-3. Else if the file name or content matches Compose, treat it as Compose mode.
-4. Else error with exit `2`.
+2. Else if the file name ends in `.json`, run the Bake JSON parser. If it succeeds, treat it as Bake mode.
+3. Else if the file name ends in `.hcl`, run the Bake HCL parser. If it succeeds, treat it as Bake mode.
+4. Else if the file name ends in `.yml` or `.yaml`, run the Compose loader. If it succeeds, treat it as Compose mode.
+5. Else for extensionless or unconventional names, perform full-parse sniffing:
+   - first try Compose validation
+   - then try Bake HCL parsing
+   - then try Bake JSON parsing
+6. Otherwise error with exit `2`.
 
-Filename patterns are a fast path; parser-backed sniffing is the source of truth.
+Two implementation notes:
+
+- The “sniff” is a real parser pass, not a heuristic token scan. These files are typically small, and correctness matters more than saving a
+  trivial parse.
+- The classifier should not throw parse work away. It should hand the successful parse result or loaded model down into provider discovery
+  instead of reparsing the same bytes.
+
+This mirrors upstream feasibility:
+
+- Buildx exposes `ParseHCLFile` with explicit HCL-vs-JSON handling and a fallback mode for extensionless names.
+- compose-go exposes full-load validation for Compose YAML.
 
 ### Flag Semantics
 
@@ -335,6 +351,35 @@ type Provider interface {
 
 This is better than inferring semantics from an empty slice alone.
 
+### Parse reuse and parser outputs
+
+The dispatcher should preserve successful parse results where the upstream libraries make that possible.
+
+For Bake:
+
+- Buildx exposes `ParseHCLFile(dt, fn)` which returns `(*hcl.File, bool, error)`.
+- Buildx also exposes `ParseFiles(files, defaults, vars)` which returns `(*bake.Config, *hclparser.ParseMeta, error)`.
+- `ParseMeta` is Buildx-specific metadata about the evaluated HCL graph, not a Dockerfile-style AST we should thread through the linter.
+
+The recommended Bake provider flow is therefore:
+
+- perform classification with the same parsing rules Buildx itself uses
+- call `bake.ParseFiles` once for the selected file set
+- preserve the resulting `*bake.Config` and `*hclparser.ParseMeta` inside provider discovery as needed
+- resolve selected targets from that parsed config instead of sniffing once and then reparsing via a second high-level helper
+
+For Compose:
+
+- compose-go exposes `loader.LoadModelWithContext`, which returns a canonical `map[string]any`
+- compose-go exposes `loader.LoadWithContext`, which returns `*types.Project`
+- compose-go does **not** expose a stable public YAML AST comparable to BuildKit’s Dockerfile AST
+
+The Compose provider should therefore be model-based, not AST-based:
+
+- preserve the loaded `*types.Project`
+- optionally preserve the canonical map model when it is useful for debugging or future metadata extraction
+- do not design downstream APIs around a Compose AST that the library does not publicly provide
+
 ### Pipeline Integration
 
 The implementation should touch the current pipeline in the smallest set of places that preserves correctness.
@@ -349,6 +394,8 @@ case:
 3. Bake/Compose: provider discovery, then per-invocation lint fan-out
 
 `internal/discovery` remains Dockerfile-focused. Orchestrator resolution is a higher layer, not a redefinition of directory/glob discovery.
+
+For Bake JSON support, this dispatcher must treat `.json` as a possible Bake entrypoint, not as an unknown generic file type.
 
 ### `linter.Input` and `rules.LintInput`
 
@@ -455,7 +502,15 @@ Use the official Buildx package:
 
 - [`github.com/docker/buildx/bake`](https://pkg.go.dev/github.com/docker/buildx/bake)
 
-The provider must delegate HCL parsing and target resolution to Buildx rather than re-implementing Bake semantics.
+The provider must delegate Bake parsing and target resolution to Buildx rather than re-implementing Bake semantics. This includes both HCL and
+JSON Bake files.
+
+Relevant public API surface:
+
+- `ParseHCLFile(dt, fn)` parses HCL or JSON Bake source into `*hcl.File`
+- `ParseFiles(files, defaults, vars)` returns merged/evaluated `*bake.Config` plus `*hclparser.ParseMeta`
+- `ReadTargets(...)` is available, but it reparses from raw files; the provider should avoid an unnecessary second parse if it already has the
+  result from classification
 
 ### Target selection semantics
 
@@ -470,6 +525,10 @@ In practice, that means:
 - otherwise lint the targets Buildx resolves as the implicit default for that file
 
 tally must not invent a different Bake selection model.
+
+One terminology note: Docker documentation treats Compose files as one possible Bake definition source. tally intentionally keeps Compose as a
+separate provider/mode because the downstream metadata and future rule opportunities differ substantially from Bake HCL/JSON, even though Buildx
+can ingest both under one command family.
 
 ### Mapping
 
