@@ -1104,6 +1104,15 @@ func TestDetectFileCreationPipeToTee(t *testing.T) {
 			wantPath:    "/etc/config",
 			wantContent: "hello\nworld\n",
 		},
+		{
+			// Heredoc attached to tee on the pipe RHS redirects tee's stdin
+			// (last input redirect wins in bash), so the producer's output
+			// is discarded. We can't faithfully reconstruct COPY content
+			// from the producer in this case — reject the pattern.
+			name:    "producer piped to tee with heredoc on tee - skip",
+			script:  "echo ignored | tee /etc/config <<EOF\nactual heredoc\nEOF",
+			wantNil: true,
+		},
 	}
 
 	for _, tt := range tests {

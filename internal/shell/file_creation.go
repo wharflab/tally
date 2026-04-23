@@ -878,7 +878,7 @@ func analyzeTeeCmd(
 		return other
 	}
 
-	if !teeRedirectsAreCompatible(stmt) {
+	if !teeRedirectsAreCompatible(stmt, true) {
 		return other
 	}
 
@@ -1012,12 +1012,23 @@ func isShellStateOnlyCmd(name string) bool {
 // (or its enclosing pipeline end) can be safely absorbed into a COPY. tee
 // echoes to stdout; a redirect to /dev/null is common and harmless, but
 // anything else (a real file, stderr) would be a side effect we can't drop.
-func teeRedirectsAreCompatible(stmt *syntax.Stmt) bool {
+//
+// allowInputHeredoc controls how a heredoc redirect is treated:
+//   - true: heredoc is tee's stdin (direct `tee /file <<EOF ... EOF` form),
+//     which is legitimate content we can reconstruct.
+//   - false: the caller is a `producer | tee /file` pipeline. A heredoc
+//     here would override the producer as tee's stdin (last input redirect
+//     wins in bash), so we cannot faithfully reconstruct content from the
+//     producer — reject the pattern.
+func teeRedirectsAreCompatible(stmt *syntax.Stmt, allowInputHeredoc bool) bool {
 	seenStdoutRedir := false
 	for _, redir := range stmt.Redirs {
 		switch redir.Op {
 		case syntax.Hdoc, syntax.DashHdoc:
-			// Heredoc input — stdin source for tee.
+			if !allowInputHeredoc {
+				return false
+			}
+			// Heredoc input — stdin source for direct tee.
 		case syntax.RdrOut, syntax.AppOut:
 			if seenStdoutRedir {
 				return false
@@ -1069,7 +1080,9 @@ func analyzePipeToTee(
 		return other, false
 	}
 
-	if !teeRedirectsAreCompatible(bin.Y) {
+	// Disallow heredoc on the pipe's tee side: it would override `producer`
+	// as tee's actual stdin, making producer content irrelevant.
+	if !teeRedirectsAreCompatible(bin.Y, false) {
 		return other, false
 	}
 
