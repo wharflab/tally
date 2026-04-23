@@ -485,6 +485,7 @@ func analyzeFileCreations(
 	info := &MultiFileCreationInfo{}
 	// Track which command index belongs to which slot.
 	slotIndexByCmd := make(map[int]int, len(commands))
+	slotIndexByTarget := make(map[string]int, len(blocks))
 	for _, blk := range blocks {
 		slot := buildSlotFromBlock(commands, blk.start, blk.end, blk.target, umaskAt, umaskSeen)
 		if slot == nil {
@@ -494,6 +495,7 @@ func analyzeFileCreations(
 		slot.EndIndex = blk.end
 		idx := len(info.Slots)
 		info.Slots = append(info.Slots, *slot)
+		slotIndexByTarget[blk.target] = idx
 		for k := blk.start; k <= blk.end; k++ {
 			slotIndexByCmd[k] = idx
 		}
@@ -502,6 +504,15 @@ func analyzeFileCreations(
 	if len(info.Slots) == 0 {
 		return nil
 	}
+
+	// Fold back trailing chmods that target an already-emitted slot. Example:
+	// `echo x > /a && echo y > /b && chmod 755 /a` — the chmod for /a breaks
+	// the /a block but its effect is purely on that slot's final mode, so we
+	// can attribute it to the /a slot and drop it from the standalone command
+	// stream. We only fold when the slot has no chmod yet; a chmod already
+	// in the block wins (last-write semantics) and a subsequent trailing
+	// chmod would contradict it, so skip the fold in that case.
+	absorbStandaloneChmods(commands, info, slotIndexByCmd, slotIndexByTarget)
 
 	// Emit a flat list of MultiAnalyzedCmd.
 	info.Commands = make([]MultiAnalyzedCmd, 0, len(commands))
@@ -676,6 +687,53 @@ func buildSlotFromBlock(
 			IsAppend:           allAppend,
 			HasUnsafeVariables: hasUnsafeVars,
 		},
+	}
+}
+
+// absorbStandaloneChmods folds `chmod <target>` commands that appear outside
+// any block (i.e. not captured by findCreationBlocks) back into the
+// matching slot when safe. This turns patterns like
+//
+//	echo x > /a && echo y > /b && chmod 755 /a
+//
+// into two clean `COPY --chmod=755 /a` / `COPY /b` heredocs instead of
+// emitting a standalone `RUN chmod 755 /a` after the /b COPY.
+//
+// Safety rules:
+//   - Only one block may exist for the target (guaranteed by the dedup pass
+//     at the callsite).
+//   - The slot must not already have a chmod: the in-block chmod wins by
+//     last-write semantics, and a *later* chmod contradicting it is the
+//     user's intent that we preserve verbatim rather than silently swap.
+//   - We walk all standalone chmod commands in source order, so the last
+//     trailing chmod for a target still wins over earlier trailing ones.
+func absorbStandaloneChmods(
+	commands []analyzedCmd,
+	info *MultiFileCreationInfo,
+	slotIndexByCmd map[int]int,
+	slotIndexByTarget map[string]int,
+) {
+	for i, cmd := range commands {
+		if cmd.cmdType != cmdTypeChmod {
+			continue
+		}
+		if _, inBlock := slotIndexByCmd[i]; inBlock {
+			continue
+		}
+		slotIdx, ok := slotIndexByTarget[cmd.chmodTarget]
+		if !ok {
+			continue
+		}
+		slot := &info.Slots[slotIdx]
+		if slot.Info.RawChmodMode != "" || slot.Info.ChmodMode != 0 {
+			// An in-block chmod already set the mode; a contradicting
+			// trailing chmod is the author's explicit intent — leave it
+			// as a standalone RUN rather than silently overwrite.
+			continue
+		}
+		slot.Info.RawChmodMode = cmd.chmodRawMode
+		slot.Info.ChmodMode = cmd.chmodMode
+		slotIndexByCmd[i] = slotIdx
 	}
 }
 

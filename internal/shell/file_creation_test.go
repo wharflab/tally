@@ -1187,6 +1187,83 @@ func TestDetectFileCreations_RepeatedTargetRejected(t *testing.T) {
 	}
 }
 
+// TestDetectFileCreations_TrailingChmodFoldedBack covers the edge case
+// where a `chmod` for an earlier target appears after an intervening
+// creation of a *different* target — e.g. `echo x > /a && echo y > /b &&
+// chmod 755 /a`. The chmod should be folded back into the earlier /a
+// slot so the fix emits `COPY --chmod=755 /a` rather than a standalone
+// `RUN chmod 755 /a`.
+func TestDetectFileCreations_TrailingChmodFoldedBack(t *testing.T) {
+	t.Parallel()
+
+	script := `echo x > /a && echo y > /b && chmod 755 /a`
+	got := DetectFileCreations(script, VariantBash, nil, FileCreationOptions{})
+	if got == nil {
+		t.Fatal("expected non-nil MultiFileCreationInfo")
+	}
+
+	if len(got.Slots) != 2 {
+		t.Fatalf("got %d slots, want 2", len(got.Slots))
+	}
+	// Slot[0] is /a with the folded chmod.
+	if got.Slots[0].Info.TargetPath != "/a" {
+		t.Errorf("slot[0] TargetPath = %q, want /a", got.Slots[0].Info.TargetPath)
+	}
+	if got.Slots[0].Info.RawChmodMode != "755" {
+		t.Errorf("slot[0] RawChmodMode = %q, want 755 (chmod should be folded into the /a slot)",
+			got.Slots[0].Info.RawChmodMode)
+	}
+	// Slot[1] is /b, unchanged, no chmod.
+	if got.Slots[1].Info.TargetPath != "/b" {
+		t.Errorf("slot[1] TargetPath = %q, want /b", got.Slots[1].Info.TargetPath)
+	}
+	if got.Slots[1].Info.RawChmodMode != "" {
+		t.Errorf("slot[1] RawChmodMode = %q, want empty", got.Slots[1].Info.RawChmodMode)
+	}
+
+	// The trailing chmod should no longer appear as a standalone command.
+	for _, cmd := range got.Commands {
+		if cmd.Kind == MultiCmdChmod {
+			t.Errorf("chmod for a slot target should be absorbed, saw leftover Chmod command %q", cmd.Text)
+		}
+	}
+}
+
+// TestDetectFileCreations_TrailingChmodNotFoldedOverExisting verifies that
+// a trailing chmod for a slot that *already* has an in-block chmod is not
+// silently folded in (last-write semantics would be contradicted). It is
+// preserved as a standalone Chmod command so the author's intent surfaces
+// in the fix.
+func TestDetectFileCreations_TrailingChmodNotFoldedOverExisting(t *testing.T) {
+	t.Parallel()
+
+	// /a gets an in-block chmod 644, then later a standalone chmod 755.
+	script := `echo x > /a && chmod 644 /a && echo y > /b && chmod 755 /a`
+	got := DetectFileCreations(script, VariantBash, nil, FileCreationOptions{})
+	if got == nil {
+		t.Fatal("expected non-nil MultiFileCreationInfo")
+	}
+	if len(got.Slots) != 2 {
+		t.Fatalf("got %d slots, want 2", len(got.Slots))
+	}
+	// Slot[0] keeps the in-block chmod.
+	if got.Slots[0].Info.RawChmodMode != "644" {
+		t.Errorf("slot[0] RawChmodMode = %q, want 644 (in-block chmod must win)",
+			got.Slots[0].Info.RawChmodMode)
+	}
+	// The trailing chmod 755 /a must remain as a standalone command.
+	var sawStandaloneChmod bool
+	for _, cmd := range got.Commands {
+		if cmd.Kind == MultiCmdChmod {
+			sawStandaloneChmod = true
+			break
+		}
+	}
+	if !sawStandaloneChmod {
+		t.Error("expected the trailing chmod to remain as a standalone command (don't silently contradict the in-block chmod)")
+	}
+}
+
 func TestDetectFileCreations_MultiTarget(t *testing.T) {
 	t.Parallel()
 
