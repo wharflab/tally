@@ -387,16 +387,30 @@ func usermodGroupsValue(cmd *shell.CommandInfo) string {
 			continue
 		}
 		// Short combined form: a single leading "-" followed by a run of
-		// boolean short flags, optionally ending with -G. The value for -G
-		// is the next positional arg.
+		// boolean short flags ending with -G. Examples:
+		//   -G docker        (separate value)
+		//   -Gdocker         (attached value)
+		//   -aG docker       (combined switches + separate value)
+		//   -aGdocker        (combined switches + attached value)
+		// The characters before 'G' must all be boolean switches; any
+		// character after 'G' is the attached value.
 		body := arg[1:]
-		if !strings.ContainsRune(body, 'G') {
+		gIdx := strings.IndexRune(body, 'G')
+		if gIdx < 0 {
 			continue
 		}
-		for _, r := range body {
-			if r != 'G' && !isUsermodBooleanShortFlag(r) {
-				goto nextArg
+		allBoolean := true
+		for _, r := range body[:gIdx] {
+			if !isUsermodBooleanShortFlag(r) {
+				allBoolean = false
+				break
 			}
+		}
+		if !allBoolean {
+			continue
+		}
+		if attached := body[gIdx+1:]; attached != "" {
+			return attached
 		}
 		if i+1 < len(cmd.Args) {
 			next := cmd.Args[i+1]
@@ -404,7 +418,6 @@ func usermodGroupsValue(cmd *shell.CommandInfo) string {
 				return next
 			}
 		}
-	nextArg:
 	}
 	return ""
 }

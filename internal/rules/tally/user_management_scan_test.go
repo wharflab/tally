@@ -414,6 +414,26 @@ func TestFindUserMembershipCmdsEdgeCases(t *testing.T) {
 			variant: shell.VariantBash,
 			want:    nil,
 		},
+		// POSIX getopt attached-value forms for -G: value glued directly to
+		// the option with no separator. Valid for shadow-utils usermod.
+		{
+			name:    "usermod -Gdocker attached value",
+			script:  "usermod -Gdocker app",
+			variant: shell.VariantBash,
+			want:    []membershipInfo{{User: "app", Groups: []string{"docker"}}},
+		},
+		{
+			name:    "usermod -aGdocker combined attached value",
+			script:  "usermod -aGdocker app",
+			variant: shell.VariantBash,
+			want:    []membershipInfo{{User: "app", Groups: []string{"docker"}}},
+		},
+		{
+			name:    "usermod -aGdocker,wheel comma list attached",
+			script:  "usermod -aGdocker,wheel app",
+			variant: shell.VariantBash,
+			want:    []membershipInfo{{User: "app", Groups: []string{"docker", "wheel"}}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
