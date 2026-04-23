@@ -32,7 +32,7 @@ func TestStageLooksLikeDev(t *testing.T) {
 	}
 }
 
-func TestCommandReferencesXdebug(t *testing.T) {
+func TestPHPExtensionReferencesXdebug(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -71,31 +71,6 @@ func TestCommandReferencesXdebug(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "apt-get install php-xdebug",
-			cmd:  shell.CommandInfo{Name: "apt-get", Subcommand: "install", Args: []string{"install", "-y", "php-xdebug"}},
-			want: true,
-		},
-		{
-			name: "apt-get install versioned php8.3-xdebug",
-			cmd:  shell.CommandInfo{Name: "apt-get", Subcommand: "install", Args: []string{"install", "php8.3-xdebug"}},
-			want: true,
-		},
-		{
-			name: "apk add php-pecl-xdebug",
-			cmd:  shell.CommandInfo{Name: "apk", Subcommand: "add", Args: []string{"add", "--no-cache", "php83-pecl-xdebug"}},
-			want: true,
-		},
-		{
-			name: "dnf install php-pecl-xdebug",
-			cmd:  shell.CommandInfo{Name: "dnf", Subcommand: "install", Args: []string{"install", "php-pecl-xdebug"}},
-			want: true,
-		},
-		{
-			name: "yum install php-pecl-xdebug",
-			cmd:  shell.CommandInfo{Name: "yum", Subcommand: "install", Args: []string{"install", "php-pecl-xdebug"}},
-			want: true,
-		},
-		{
 			name: "docker-php-ext-install gd only",
 			cmd:  shell.CommandInfo{Name: "docker-php-ext-install", Subcommand: "gd", Args: []string{"gd"}},
 			want: false,
@@ -106,13 +81,15 @@ func TestCommandReferencesXdebug(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "apt-get update",
-			cmd:  shell.CommandInfo{Name: "apt-get", Subcommand: "update", Args: []string{"update"}},
+			name: "unrelated command",
+			cmd:  shell.CommandInfo{Name: "echo", Subcommand: "hello", Args: []string{"hello"}},
 			want: false,
 		},
 		{
-			name: "unrelated command",
-			cmd:  shell.CommandInfo{Name: "echo", Subcommand: "hello", Args: []string{"hello"}},
+			// OS package manager installs are handled via InstallCommand,
+			// not phpExtensionReferencesXdebug.
+			name: "apt-get install php-xdebug ignored by ext matcher",
+			cmd:  shell.CommandInfo{Name: "apt-get", Subcommand: "install", Args: []string{"install", "-y", "php-xdebug"}},
 			want: false,
 		},
 	}
@@ -120,8 +97,8 @@ func TestCommandReferencesXdebug(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := commandReferencesXdebug(tt.cmd); got != tt.want {
-				t.Errorf("commandReferencesXdebug(%v) = %v, want %v", tt.cmd.Name, got, tt.want)
+			if got := phpExtensionReferencesXdebug(tt.cmd); got != tt.want {
+				t.Errorf("phpExtensionReferencesXdebug(%v) = %v, want %v", tt.cmd.Name, got, tt.want)
 			}
 		})
 	}
@@ -155,28 +132,80 @@ func TestArgsContainXdebug(t *testing.T) {
 	}
 }
 
-func TestArgsContainXdebugSubstring(t *testing.T) {
+func TestInstallCommandInstallsXdebug(t *testing.T) {
 	t.Parallel()
+
+	makeIC := func(manager string, names ...string) shell.InstallCommand {
+		pkgs := make([]shell.PackageArg, 0, len(names))
+		for _, n := range names {
+			pkgs = append(pkgs, shell.PackageArg{Normalized: n})
+		}
+		return shell.InstallCommand{Manager: manager, Packages: pkgs}
+	}
 
 	tests := []struct {
 		name string
-		args []string
+		ic   shell.InstallCommand
 		want bool
 	}{
-		{name: "php-xdebug", args: []string{"php-xdebug"}, want: true},
-		{name: "php8.3-xdebug", args: []string{"php8.3-xdebug"}, want: true},
-		{name: "php-pecl-xdebug", args: []string{"php-pecl-xdebug"}, want: true},
-		{name: "php83-pecl-xdebug", args: []string{"php83-pecl-xdebug"}, want: true},
-		{name: "skip flags", args: []string{"-y", "php-xdebug"}, want: true},
-		{name: "no xdebug", args: []string{"php-gd", "php-intl"}, want: false},
-		{name: "empty", args: nil, want: false},
+		{name: "apt php-xdebug", ic: makeIC("apt-get", "php-xdebug"), want: true},
+		{name: "apt php8.3-xdebug", ic: makeIC("apt-get", "php8.3-xdebug"), want: true},
+		{name: "apt php-xdebug with version spec", ic: makeIC("apt-get", "php-xdebug=3.1.6-1+deb12u1"), want: true},
+		{name: "apt php-xdebug with arch", ic: makeIC("apt-get", "php-xdebug:amd64"), want: true},
+		{name: "apk php83-pecl-xdebug", ic: makeIC("apk", "php83-pecl-xdebug"), want: true},
+		{name: "dnf php-pecl-xdebug", ic: makeIC("dnf", "php-pecl-xdebug"), want: true},
+		{name: "yum mixed packages", ic: makeIC("yum", "php-gd", "php-pecl-xdebug", "php-intl"), want: true},
+		{name: "microdnf php-pecl-xdebug", ic: makeIC("microdnf", "php-pecl-xdebug"), want: true},
+		{name: "zypper php-xdebug", ic: makeIC("zypper", "php-xdebug"), want: true},
+		{name: "apt no xdebug", ic: makeIC("apt-get", "php-gd", "php-intl"), want: false},
+		{name: "empty", ic: shell.InstallCommand{}, want: false},
+		// Non-OS package managers must not count: an npm/pip/composer package
+		// whose name happens to contain "xdebug" is not the PHP extension.
+		{name: "npm fake xdebug package", ic: makeIC("npm", "xdebug"), want: false},
+		{name: "pip fake xdebug package", ic: makeIC("pip", "php-xdebug"), want: false},
+		{name: "composer fake xdebug package", ic: makeIC("composer", "php-xdebug"), want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := argsContainXdebugSubstring(tt.args); got != tt.want {
-				t.Errorf("argsContainXdebugSubstring(%v) = %v, want %v", tt.args, got, tt.want)
+			if got := installCommandInstallsXdebug(tt.ic); got != tt.want {
+				t.Errorf("installCommandInstallsXdebug(%v) = %v, want %v", tt.ic.Packages, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPackagesOnlyXdebug(t *testing.T) {
+	t.Parallel()
+
+	makeIC := func(manager string, names ...string) shell.InstallCommand {
+		pkgs := make([]shell.PackageArg, 0, len(names))
+		for _, n := range names {
+			pkgs = append(pkgs, shell.PackageArg{Normalized: n})
+		}
+		return shell.InstallCommand{Manager: manager, Packages: pkgs}
+	}
+
+	tests := []struct {
+		name string
+		ic   shell.InstallCommand
+		want bool
+	}{
+		{name: "apt single xdebug", ic: makeIC("apt-get", "php-xdebug"), want: true},
+		{name: "apt versioned xdebug", ic: makeIC("apt-get", "php-xdebug=3.1.6"), want: true},
+		{name: "apt xdebug only (multi)", ic: makeIC("apt-get", "php-xdebug", "php8.3-xdebug"), want: true},
+		{name: "apt mixed with non-xdebug", ic: makeIC("apt-get", "php-gd", "php-xdebug"), want: false},
+		{name: "apt no xdebug", ic: makeIC("apt-get", "php-gd"), want: false},
+		{name: "apt empty packages", ic: makeIC("apt-get"), want: false},
+		{name: "npm not OS manager", ic: makeIC("npm", "xdebug"), want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := packagesOnlyXdebug(tt.ic); got != tt.want {
+				t.Errorf("packagesOnlyXdebug(%v) = %v, want %v", tt.ic, got, tt.want)
 			}
 		})
 	}

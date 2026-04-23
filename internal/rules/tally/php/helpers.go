@@ -15,17 +15,20 @@ import (
 
 const (
 	subcommandInstall = "install"
-	subcommandAdd     = "add" //nolint:customlint // apk subcommand, not Dockerfile ADD instruction
 
 	cmdDockerPHPExtInstall = "docker-php-ext-install"
 	cmdDockerPHPExtEnable  = "docker-php-ext-enable"
 	cmdPecl                = "pecl"
-	cmdApk                 = "apk"
-	cmdApt                 = "apt"
-	cmdAptGet              = "apt-get"
-	cmdDnf                 = "dnf"
-	cmdYum                 = "yum"
 )
+
+// phpExtensionCommandNames are the PHP-specific extension commands that
+// can install or enable a PHP extension. General OS package-manager
+// installs are handled separately via facts.RunFacts.InstallCommands.
+var phpExtensionCommandNames = []string{
+	cmdDockerPHPExtInstall,
+	cmdDockerPHPExtEnable,
+	cmdPecl,
+}
 
 var nonProductionStageTokens = []string{"dev", "development", "test", "testing", "ci", "debug"}
 
@@ -109,55 +112,106 @@ func phpCommandLocation(
 	return rules.NewRangeLocation(file, cmdLine, cmd.StartCol, cmdLine, cmd.EndCol)
 }
 
-// xdebugCommandNames are the command names that can install or enable Xdebug.
-var xdebugCommandNames = []string{
-	"docker-php-ext-install",
-	"docker-php-ext-enable",
-	"pecl",
-	"apt-get", "apt",
-	"apk",
-	"dnf", "yum",
-}
-
-// findXdebugCommands returns commands that install or enable Xdebug in a RUN instruction.
+// findXdebugCommands returns RUN commands that install or enable Xdebug,
+// covering both PHP-specific extension commands (docker-php-ext-install,
+// docker-php-ext-enable, pecl install) and OS package-manager installs
+// (apt/apt-get/apk/dnf/microdnf/yum/zypper) whose package list contains
+// an Xdebug-bearing package.
+//
+// Positions come from runcheck.FindCommands so they map back to the
+// Dockerfile source; OS package-manager detection defers to
+// facts.RunFacts.InstallCommands + shell.StripPackageVersion for
+// version/arch-tolerant package-name comparison.
 func findXdebugCommands(
-	run *instructions.RunCommand,
+	runFacts *facts.RunFacts,
 	shellVariant shell.Variant,
 	sm *sourcemap.SourceMap,
 ) ([]shell.CommandInfo, int) {
-	cmds, runStartLine := runcheck.FindCommands(run, shellVariant, sm, xdebugCommandNames...)
+	names := make([]string, 0, len(phpExtensionCommandNames)+len(osPackageManagersForPHPSorted))
+	names = append(names, phpExtensionCommandNames...)
+	names = append(names, osPackageManagersForPHPSorted...)
+
+	cmds, runStartLine := runcheck.FindCommands(runFacts.Run, shellVariant, sm, names...)
 	if len(cmds) == 0 {
 		return nil, 0
 	}
 
+	installsByName := make(map[string][]shell.InstallCommand, len(runFacts.InstallCommands))
+	for _, ic := range runFacts.InstallCommands {
+		installsByName[ic.Manager] = append(installsByName[ic.Manager], ic)
+	}
+
 	filtered := make([]shell.CommandInfo, 0, len(cmds))
 	for _, cmd := range cmds {
-		if commandReferencesXdebug(cmd) {
+		if phpExtensionReferencesXdebug(cmd) {
+			filtered = append(filtered, cmd)
+			continue
+		}
+		if commandInstallsXdebugPackage(cmd, installsByName) {
 			filtered = append(filtered, cmd)
 		}
 	}
 	return filtered, runStartLine
 }
 
-// commandReferencesXdebug checks whether a parsed command installs or enables Xdebug.
-func commandReferencesXdebug(cmd shell.CommandInfo) bool {
+// phpExtensionReferencesXdebug checks whether a docker-php-ext-* or pecl
+// command installs or enables Xdebug.
+func phpExtensionReferencesXdebug(cmd shell.CommandInfo) bool {
 	switch cmd.Name {
-	case "docker-php-ext-install", "docker-php-ext-enable":
+	case cmdDockerPHPExtInstall, cmdDockerPHPExtEnable:
 		return argsContainXdebug(cmd.Args)
-	case "pecl":
+	case cmdPecl:
 		return cmd.Subcommand == subcommandInstall && argsContainXdebug(cmd.Args)
-	case "apt-get", "apt":
-		return cmd.Subcommand == subcommandInstall && argsContainXdebugSubstring(cmd.Args)
-	case "apk":
-		return cmd.Subcommand == subcommandAdd && argsContainXdebugSubstring(cmd.Args)
-	case "dnf", "yum":
-		return cmd.Subcommand == subcommandInstall && argsContainXdebugSubstring(cmd.Args)
 	default:
 		return false
 	}
 }
 
-// argsContainXdebug checks if any non-flag arg is "xdebug" or starts with "xdebug-" (versioned pecl).
+// commandInstallsXdebugPackage reports whether a CommandInfo matching an OS
+// package manager corresponds to an InstallCommand whose package list
+// contains an Xdebug-bearing package. Defers package-name normalization to
+// shell.StripPackageVersion via installCommandInstallsXdebug.
+func commandInstallsXdebugPackage(cmd shell.CommandInfo, installsByName map[string][]shell.InstallCommand) bool {
+	if !osPackageManagersForPHP[strings.ToLower(cmd.Name)] {
+		return false
+	}
+	return slices.ContainsFunc(installsByName[cmd.Name], installCommandInstallsXdebug)
+}
+
+// installCommandInstallsXdebug reports whether a normalized package-manager
+// install references an Xdebug package (e.g., php-xdebug, php8.3-xdebug,
+// php83-pecl-xdebug). Only OS-level package managers are considered; an
+// npm/pip/composer package with "xdebug" in its name does not imply the PHP
+// Xdebug extension is installed in the image.
+func installCommandInstallsXdebug(ic shell.InstallCommand) bool {
+	if !osPackageManagersForPHP[strings.ToLower(ic.Manager)] {
+		return false
+	}
+	return slices.ContainsFunc(ic.Packages, packageNameContainsXdebug)
+}
+
+// packagesOnlyXdebug reports whether every package in an install command is
+// an Xdebug package. Returns false for empty package lists.
+func packagesOnlyXdebug(ic shell.InstallCommand) bool {
+	if !osPackageManagersForPHP[strings.ToLower(ic.Manager)] || len(ic.Packages) == 0 {
+		return false
+	}
+	for _, pkg := range ic.Packages {
+		if !packageNameContainsXdebug(pkg) {
+			return false
+		}
+	}
+	return true
+}
+
+func packageNameContainsXdebug(pkg shell.PackageArg) bool {
+	name := strings.ToLower(shell.StripPackageVersion(pkg.Normalized))
+	return strings.Contains(name, "xdebug")
+}
+
+// argsContainXdebug checks if any non-flag arg is "xdebug" or starts with
+// "xdebug-" (used by docker-php-ext-* and `pecl install`, where args are
+// PHP extension names, not distro package names).
 func argsContainXdebug(args []string) bool {
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-") {
@@ -165,20 +219,6 @@ func argsContainXdebug(args []string) bool {
 		}
 		lower := strings.ToLower(arg)
 		if lower == "xdebug" || strings.HasPrefix(lower, "xdebug-") {
-			return true
-		}
-	}
-	return false
-}
-
-// argsContainXdebugSubstring checks if any non-flag arg contains "xdebug" as a substring.
-// Used for package-manager installs where package names vary (php-xdebug, php8.3-xdebug, etc.).
-func argsContainXdebugSubstring(args []string) bool {
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "-") {
-			continue
-		}
-		if strings.Contains(strings.ToLower(arg), "xdebug") {
 			return true
 		}
 	}

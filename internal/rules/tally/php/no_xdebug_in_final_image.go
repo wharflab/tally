@@ -83,33 +83,103 @@ func (r *NoXdebugInFinalImageRule) checkRunCommands(
 			continue
 		}
 
-		xdebugCmds, runStartLine := findXdebugCommands(runFacts.Run, shellVariant, sm)
+		xdebugCmds, runStartLine := findXdebugCommands(runFacts, shellVariant, sm)
 		if len(xdebugCmds) == 0 {
 			continue
 		}
 
-		allXdebug := allCommandsOnlyXdebug(runFacts.CommandInfos)
+		onlyXdebug := runOnlyInstallsXdebug(runFacts)
 
 		for _, cmd := range xdebugCmds {
-			v := rules.NewViolation(
-				phpCommandLocation(file, runFacts.Run, cmd, runStartLine),
-				meta.Code,
-				meta.Description,
-				meta.DefaultSeverity,
-			).WithDocURL(meta.DocURL).WithDetail(
-				"Xdebug is a development and debugging tool that should not ship in production images. " +
-					"Move the Xdebug installation into a dedicated dev or debug build stage.",
-			)
-
-			if allXdebug {
+			v := r.newRunViolation(file, runFacts.Run, cmd, runStartLine, meta)
+			if onlyXdebug {
 				v = v.WithSuggestedFixes(buildXdebugFixes(file, source, runFacts.Run, meta.FixPriority, sm))
 			}
-
 			violations = append(violations, v)
 		}
 	}
 
 	return violations
+}
+
+func (r *NoXdebugInFinalImageRule) newRunViolation(
+	file string,
+	run *instructions.RunCommand,
+	cmd shell.CommandInfo,
+	runStartLine int,
+	meta rules.RuleMetadata,
+) rules.Violation {
+	return rules.NewViolation(
+		phpCommandLocation(file, run, cmd, runStartLine),
+		meta.Code,
+		meta.Description,
+		meta.DefaultSeverity,
+	).WithDocURL(meta.DocURL).WithDetail(
+		"Xdebug is a development and debugging tool that should not ship in production images. " +
+			"Move the Xdebug installation into a dedicated dev or debug build stage.",
+	)
+}
+
+// runOnlyInstallsXdebug reports whether every command in a RUN instruction
+// exclusively installs or enables Xdebug (no other extensions or packages),
+// meaning the entire instruction can be safely commented out or deleted.
+//
+// A RUN qualifies when every parsed command is either:
+//   - a docker-php-ext-install/enable whose args are all Xdebug, or
+//   - a `pecl install` whose non-flag args are all Xdebug, or
+//   - an OS package-manager install whose package list is all Xdebug.
+func runOnlyInstallsXdebug(runFacts *facts.RunFacts) bool {
+	if len(runFacts.CommandInfos) == 0 {
+		return false
+	}
+
+	// All OS package-manager installs in this RUN must target only Xdebug.
+	for _, ic := range runFacts.InstallCommands {
+		if !osPackageManagersForPHP[strings.ToLower(ic.Manager)] {
+			return false
+		}
+		if !packagesOnlyXdebug(ic) {
+			return false
+		}
+	}
+
+	sawXdebug := false
+	for _, cmd := range runFacts.CommandInfos {
+		switch cmd.Name {
+		case cmdDockerPHPExtInstall, cmdDockerPHPExtEnable:
+			if !allNonFlagArgsAreXdebug(cmd.Args) {
+				return false
+			}
+			sawXdebug = true
+		case cmdPecl:
+			if cmd.Subcommand != subcommandInstall {
+				return false
+			}
+			if !allNonFlagArgsAreXdebug(argsAfterSubcommand(cmd.Args, subcommandInstall)) {
+				return false
+			}
+			sawXdebug = true
+		default:
+			// Anything else is only permitted if it's a recognized OS package
+			// manager — InstallCommands was already validated above, so any
+			// other command name means the RUN does additional work.
+			if !osPackageManagersForPHP[strings.ToLower(cmd.Name)] {
+				return false
+			}
+			sawXdebug = true
+		}
+	}
+	return sawXdebug
+}
+
+// argsAfterSubcommand returns args after the first occurrence of subcmd.
+func argsAfterSubcommand(args []string, subcmd string) []string {
+	for i, a := range args {
+		if a == subcmd {
+			return args[i+1:]
+		}
+	}
+	return args
 }
 
 func (r *NoXdebugInFinalImageRule) checkObservableFiles(
@@ -135,72 +205,55 @@ func (r *NoXdebugInFinalImageRule) checkObservableFiles(
 			continue
 		}
 
-		cmds := shell.FindCommands(content, shell.VariantBash, xdebugCommandNames...)
-		for _, cmd := range cmds {
-			if !commandReferencesXdebug(cmd) {
-				continue
-			}
-
-			v := rules.NewViolation(
-				rules.NewLineLocation(file, observed.Line),
-				meta.Code,
-				"Observable script installs Xdebug in the final image",
-				meta.DefaultSeverity,
-			).WithDocURL(meta.DocURL).WithDetail(
-				"The script at " + observed.Path + " installs Xdebug. " +
-					"Move the Xdebug installation into a dedicated dev or debug build stage.",
-			)
-			violations = append(violations, v)
+		for range extensionXdebugOccurrences(content) {
+			violations = append(violations, observableXdebugViolation(file, observed, meta))
+		}
+		for range installXdebugOccurrences(content) {
+			violations = append(violations, observableXdebugViolation(file, observed, meta))
 		}
 	}
 
 	return violations
 }
 
-// allCommandsOnlyXdebug reports whether every command in a RUN instruction
-// exclusively does Xdebug work (no other extensions or packages), meaning the
-// entire instruction can be safely commented out or deleted.
-func allCommandsOnlyXdebug(cmds []shell.CommandInfo) bool {
-	if len(cmds) == 0 {
-		return false
-	}
-	for _, cmd := range cmds {
-		if !commandOnlyDoesXdebug(cmd) {
-			return false
+// extensionXdebugOccurrences counts xdebug installs/enables via
+// docker-php-ext-* or pecl in a shell script.
+func extensionXdebugOccurrences(script string) []shell.CommandInfo {
+	var hits []shell.CommandInfo
+	for _, cmd := range shell.FindCommands(script, shell.VariantBash, phpExtensionCommandNames...) {
+		if phpExtensionReferencesXdebug(cmd) {
+			hits = append(hits, cmd)
 		}
 	}
-	return true
+	return hits
 }
 
-// commandOnlyDoesXdebug checks whether a command installs/enables Xdebug
-// exclusively, with no other extensions or packages.
-func commandOnlyDoesXdebug(cmd shell.CommandInfo) bool {
-	switch cmd.Name {
-	case "docker-php-ext-install", "docker-php-ext-enable":
-		return allNonFlagArgsAreXdebug(cmd.Args)
-	case "pecl":
-		if cmd.Subcommand != subcommandInstall {
-			return false
+// installXdebugOccurrences counts OS package-manager installs of xdebug
+// packages in a shell script.
+func installXdebugOccurrences(script string) []shell.InstallCommand {
+	var hits []shell.InstallCommand
+	for _, ic := range shell.FindInstallPackages(script, shell.VariantBash) {
+		if installCommandInstallsXdebug(ic) {
+			hits = append(hits, ic)
 		}
-		return allNonFlagArgsAreXdebug(argsAfterSubcommand(cmd.Args, subcommandInstall))
-	case "apt-get", "apt":
-		if cmd.Subcommand != subcommandInstall {
-			return false
-		}
-		return allNonFlagArgsAreXdebugSubstring(argsAfterSubcommand(cmd.Args, subcommandInstall))
-	case "apk":
-		if cmd.Subcommand != subcommandAdd {
-			return false
-		}
-		return allNonFlagArgsAreXdebugSubstring(argsAfterSubcommand(cmd.Args, subcommandAdd))
-	case "dnf", "yum":
-		if cmd.Subcommand != subcommandInstall {
-			return false
-		}
-		return allNonFlagArgsAreXdebugSubstring(argsAfterSubcommand(cmd.Args, subcommandInstall))
-	default:
-		return false
 	}
+	return hits
+}
+
+func observableXdebugViolation(
+	file string,
+	observed *facts.ObservableFile,
+	meta rules.RuleMetadata,
+) rules.Violation {
+	return rules.NewViolation(
+		rules.NewLineLocation(file, observed.Line),
+		meta.Code,
+		"Observable script installs Xdebug in the final image",
+		meta.DefaultSeverity,
+	).WithDocURL(meta.DocURL).WithDetail(
+		"The script at " + observed.Path + " installs Xdebug. " +
+			"Move the Xdebug installation into a dedicated dev or debug build stage.",
+	)
 }
 
 func allNonFlagArgsAreXdebug(args []string) bool {
@@ -216,31 +269,6 @@ func allNonFlagArgsAreXdebug(args []string) bool {
 		found = true
 	}
 	return found
-}
-
-// allNonFlagArgsAreXdebugSubstring is like allNonFlagArgsAreXdebug but uses
-// substring matching for package-manager packages (e.g., "php-xdebug").
-func allNonFlagArgsAreXdebugSubstring(args []string) bool {
-	found := false
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "-") {
-			continue
-		}
-		if !strings.Contains(strings.ToLower(arg), "xdebug") {
-			return false
-		}
-		found = true
-	}
-	return found
-}
-
-func argsAfterSubcommand(args []string, subcmd string) []string {
-	for i, arg := range args {
-		if arg == subcmd {
-			return args[i+1:]
-		}
-	}
-	return args
 }
 
 // buildXdebugFixes returns comment-out and delete fix alternatives for a RUN

@@ -1452,6 +1452,19 @@ severity = "warning"
 				mustSelectRules("tally/php/no-xdebug-in-final-image")...),
 			wantApplied: 1,
 		},
+		// PHP: no-xdebug-in-final-image apt-get flavor. Exercises the OS
+		// package-manager detection path (shell.InstallCommand +
+		// shell.StripPackageVersion) with a versioned package name. The RUN
+		// contains only an xdebug install so the preferred comment-out fix
+		// applies.
+		{
+			name: "php-no-xdebug-in-final-image-apt-get-comment-out",
+			input: "FROM php:8.4-fpm AS app\n" +
+				"RUN apt-get install -y php-xdebug=3.1.6-1+deb12u1\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/php/no-xdebug-in-final-image")...),
+			wantApplied: 1,
+		},
 		// PHP: enable-opcache-in-production inserts
 		// `RUN docker-php-ext-install opcache` after the final FROM for official
 		// php:*fpm*/*apache* images. Fix is FixSuggestion safety, so --fix-unsafe

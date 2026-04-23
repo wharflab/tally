@@ -241,6 +241,61 @@ RUN echo done
 `,
 			WantViolations: 0,
 		},
+		// --- COPY --from inheritance: final stage inherits opcache from builder ---
+		{
+			Name: "final stage copies ext dir from builder with opcache no violation",
+			Content: `FROM php:5.6-fpm AS builder
+RUN docker-php-ext-install opcache
+
+FROM php:5.6-fpm
+COPY --from=builder /usr/local/lib/php/extensions/no-debug-non-zts-20131226/ /usr/local/lib/php/extensions/no-debug-non-zts-20131226/
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "final stage copies conf.d from builder with opcache no violation",
+			Content: `FROM php:8.4-fpm AS builder
+RUN docker-php-ext-install opcache
+
+FROM php:8.4-fpm
+COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "final stage copies unrelated files from builder with opcache still violates",
+			Content: `FROM php:8.4-fpm AS builder
+RUN docker-php-ext-install opcache
+
+FROM php:8.4-fpm
+COPY --from=builder /app /app
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "final stage copies ext dir from builder without opcache still violates",
+			Content: `FROM php:8.4-fpm AS builder
+RUN docker-php-ext-install gd
+
+FROM php:8.4-fpm
+COPY --from=builder /usr/local/lib/php/extensions/no-debug-non-zts-20230831/ /usr/local/lib/php/extensions/no-debug-non-zts-20230831/
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "transitive COPY --from chain preserves opcache inheritance",
+			Content: `FROM php:8.4-fpm AS base-ext
+RUN docker-php-ext-install opcache
+
+FROM php:8.4-fpm AS intermediate
+COPY --from=base-ext /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
+
+FROM php:8.4-fpm
+COPY --from=intermediate /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
+COPY --from=intermediate /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
+`,
+			WantViolations: 0,
+		},
 	})
 }
 
