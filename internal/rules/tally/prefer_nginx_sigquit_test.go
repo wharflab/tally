@@ -255,7 +255,7 @@ func TestPreferNginxSigquitRule_InsertionFix(t *testing.T) {
 	}
 
 	edit := v.SuggestedFix.Edits[0]
-	wantText := "# [tally] SIGQUIT is the graceful shutdown signal for nginx\nSTOPSIGNAL SIGQUIT\n"
+	wantText := "# [tally] SIGQUIT is the graceful shutdown signal for nginx / openresty\nSTOPSIGNAL SIGQUIT\n"
 	if edit.NewText != wantText {
 		t.Errorf("NewText = %q, want %q", edit.NewText, wantText)
 	}

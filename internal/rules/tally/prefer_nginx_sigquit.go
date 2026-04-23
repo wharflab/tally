@@ -82,7 +82,7 @@ func (r *PreferNginxSigquitRule) Check(input rules.LintInput) []rules.Violation 
 		missingDetail: "Without STOPSIGNAL SIGQUIT, the container runtime sends SIGTERM" +
 			" which triggers nginx's fast shutdown — active connections are" +
 			" dropped instead of draining",
-		insertText: "# [tally] SIGQUIT is the graceful shutdown signal for nginx\nSTOPSIGNAL SIGQUIT\n",
+		insertText: "# [tally] SIGQUIT is the graceful shutdown signal for nginx / openresty\nSTOPSIGNAL SIGQUIT\n",
 	})
 }
 

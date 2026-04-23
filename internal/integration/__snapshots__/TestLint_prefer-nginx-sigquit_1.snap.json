@@ -77,7 +77,7 @@
                     "line": 8
                   }
                 },
-                "newText": "# [tally] SIGQUIT is the graceful shutdown signal for nginx\nSTOPSIGNAL SIGQUIT\n"
+                "newText": "# [tally] SIGQUIT is the graceful shutdown signal for nginx / openresty\nSTOPSIGNAL SIGQUIT\n"
               }
             ],
             "isPreferred": true,
@@ -117,7 +117,7 @@
                     "line": 12
                   }
                 },
-                "newText": "# [tally] SIGQUIT is the graceful shutdown signal for nginx\nSTOPSIGNAL SIGQUIT\n"
+                "newText": "# [tally] SIGQUIT is the graceful shutdown signal for nginx / openresty\nSTOPSIGNAL SIGQUIT\n"
               }
             ],
             "isPreferred": true,
