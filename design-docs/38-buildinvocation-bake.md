@@ -181,7 +181,11 @@ type BuildInvocation struct {
     // target, compose service) so reporters can group and attribute.
     Source InvocationSource
 
-    // DockerfilePath is the absolute path of the Dockerfile to be linted.
+    // DockerfilePath is the absolute, filepath.Clean'd path of the
+    // Dockerfile to be linted. Providers MUST normalize to absolute
+    // before returning an invocation (see "Path normalization" below).
+    // Reporters may render this as relative at the UI boundary for
+    // readability; storage and comparison always use the absolute form.
     DockerfilePath string
 
     // Context is the filesystem / dockerignore facet. Wraps the existing
@@ -275,6 +279,23 @@ type SecretRef struct {
   both fields may coexist for one release cycle before the plain `Context` field is fully subsumed.
 - [`internal/rules/rule.go`](../internal/rules/rule.go) — rules already consume per-rule config via `cfg.Rules.GetOptions(code)`. They use the
   same pattern for invocation facets: check for nil/empty, proceed or no-op.
+
+### Path normalization
+
+One canonical rule for every path field on `BuildInvocation` (`DockerfilePath`, `Context.ContextDir`, `Context.DockerfilePath`, and any path-valued
+`NamedContext`):
+
+> **All paths are stored as absolute, `filepath.Clean`'d strings. Providers are responsible for performing this normalization before returning an
+> invocation. Relative paths appear only at rendering boundaries — reporter output, examples in this doc, test snapshots — where they improve
+> readability.**
+
+This matches the existing [`internal/context/context.go`](../internal/context/context.go) convention, where `BuildContext.DockerfilePath` and
+`BuildContext.ContextDir` are both `filepath.Abs`-resolved at construction. It avoids the class of bugs where one rule compares
+`./api/Dockerfile` to `/home/alice/project/api/Dockerfile` and silently decides they're different files, and it makes cross-invocation
+deduplication on "is this the same Dockerfile?" a simple string equality check.
+
+The worked examples below show relative paths (`"Dockerfile"`, `"./api/Dockerfile"`) because rendering absolute paths with the author's home
+directory would add noise without clarifying anything. In an actual `BuildInvocation` struct at runtime these values are absolute.
 
 ### InvocationProvider interface
 
