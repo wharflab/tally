@@ -342,6 +342,24 @@ func TestExtractChainSeparators(t *testing.T) {
 			commandCount: 3,
 			want:         []string{"\n", "\n"},
 		},
+		{
+			// Regression: statement-level redirections must be counted as
+			// part of the command's range so the separator after them is
+			// recognized correctly. `Stmt.Cmd.End()` alone would stop at
+			// "clean" and report the separator as ">/dev/null; ".
+			name:         "redirected command before semicolon",
+			script:       "apt-get clean >/dev/null; rm -rf /var/lib/apt/lists/*",
+			variant:      VariantBash,
+			commandCount: 2,
+			want:         []string{"; "},
+		},
+		{
+			name:         "redirected command before &&",
+			script:       "apt-get clean >/dev/null && rm -rf /var/lib/apt/lists/*",
+			variant:      VariantBash,
+			commandCount: 2,
+			want:         []string{" && "},
+		},
 	}
 
 	for _, tt := range tests {
@@ -354,6 +372,64 @@ func TestExtractChainSeparators(t *testing.T) {
 			for i := range got {
 				if got[i] != tt.want[i] {
 					t.Fatalf("separator %d = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}
+
+func TestExtractChainCommandRanges(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		script  string
+		variant Variant
+		want    []string // raw text slice of script[range] per command
+	}{
+		{
+			name:    "simple && chain",
+			script:  "apt-get update && apt-get clean",
+			variant: VariantBash,
+			want:    []string{"apt-get update", "apt-get clean"},
+		},
+		{
+			name:    "semicolon chain",
+			script:  "apt-get update; apt-get clean",
+			variant: VariantBash,
+			want:    []string{"apt-get update", "apt-get clean"},
+		},
+		{
+			name:    "redirected command includes redirection",
+			script:  "apt-get clean >/dev/null; rm -rf /var/lib/apt/lists/*",
+			variant: VariantBash,
+			want:    []string{"apt-get clean >/dev/null", "rm -rf /var/lib/apt/lists/*"},
+		},
+		{
+			name:    "multiple redirections",
+			script:  "apt-get clean >/dev/null 2>&1; rm -rf /tmp/foo",
+			variant: VariantBash,
+			want:    []string{"apt-get clean >/dev/null 2>&1", "rm -rf /tmp/foo"},
+		},
+		{
+			name:    "non-posix returns nil",
+			script:  "apt-get update",
+			variant: VariantPowerShell,
+			want:    nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := ExtractChainCommandRanges(tt.script, tt.variant)
+			if len(got) != len(tt.want) {
+				t.Fatalf("ExtractChainCommandRanges() returned %d ranges, want %d", len(got), len(tt.want))
+			}
+			for i, r := range got {
+				sliced := tt.script[r.StartOffset:r.EndOffset]
+				if sliced != tt.want[i] {
+					t.Errorf("range %d = %q, want %q", i, sliced, tt.want[i])
 				}
 			}
 		})

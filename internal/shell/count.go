@@ -197,8 +197,23 @@ func collectCommandRanges(stmt *syntax.Stmt, ranges *[]CommandRange) {
 	}
 	*ranges = append(*ranges, CommandRange{
 		StartOffset: stmt.Pos().Offset(),
-		EndOffset:   stmt.Cmd.End().Offset(),
+		EndOffset:   commandLeafEndOffset(stmt),
 	})
+}
+
+// commandLeafEndOffset returns the end offset of stmt's command content,
+// extended to cover statement-level redirections (Stmt.Redirs) but NOT the
+// trailing ';'/'&' terminator. Stmt.End() conflates the two — it returns
+// Semicolon+1 when the statement has a terminator — which would shift the
+// chain-separator extraction one byte, so we compute the end manually.
+func commandLeafEndOffset(stmt *syntax.Stmt) uint {
+	end := stmt.Cmd.End().Offset()
+	for _, redir := range stmt.Redirs {
+		if re := redir.End().Offset(); re > end {
+			end = re
+		}
+	}
+	return end
 }
 
 // extractFromStatement extracts commands from a statement, flattening && chains.
