@@ -497,6 +497,29 @@ Dockerfile-relevant outcome mechanically, and only falls back to ACP when determ
 
 ---
 
+### 38. [BuildInvocation Model and Docker Bake / Compose Integration](38-buildinvocation-bake.md)
+
+**Covers:** A research deliverable that proposes `BuildInvocation` as a first-class representation of *how* a Dockerfile is actually built, and
+designs orchestrator-file entrypoints (`tally lint docker-bake.hcl`, `tally lint compose.yaml`) that harvest build args, platforms, target stages,
+named build contexts, and service-level runtime metadata, so context-aware rules can reason about invocation data without users restating it on
+the CLI.
+
+**Key Topics:**
+
+- `BuildInvocation` as the top-level concept wrapping today's filesystem-oriented `BuildContext`
+- Symmetric treatment of Docker Bake HCL and Docker Compose YAML as primary invocation sources (upstream libraries as deps, never vendored)
+- Content-sniffed `tally lint <path>` entrypoint dispatch; `--target` / `--service` for scope narrowing
+- Hard rejection of `--fix` on orchestrator entrypoints as a design invariant (conflicting fixes across invocations)
+- Zero-Dockerfile orchestrator exits 0 with an explanatory notice so CI lint can be wired up early
+- Multi-invocation reporting: one Dockerfile × N invocations → N lint runs grouped by target/service
+- Interaction with the async / registry-backed analysis layer via `Invocation.Platforms` / `BuildArgs`
+- UX tradeoffs (entrypoint vs flag vs subcommand); three-phase rollout plan with concrete MVP acceptance criteria
+
+**Based on:** issue [#327](https://github.com/wharflab/tally/issues/327), existing design docs 02 and 07, `github.com/docker/buildx/bake`,
+`github.com/compose-spec/compose-go/v2`, real bake file from `moby/buildkit`
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
