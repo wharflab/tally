@@ -557,35 +557,30 @@ func (r *PreferCopyHeredocRule) multiTargetViolation(
 	return v, true
 }
 
-// generateMultiFix builds a fix that replaces a multi-target RUN with a
-// sequence of COPY heredocs (one per distinct target) and, when non-creation
-// commands remain, a surrounding RUN. `mkdir -p /parent` entries are dropped
-// when a subsequent COPY writes under /parent — BuildKit COPY auto-creates
-// parent directories.
-func (r *PreferCopyHeredocRule) generateMultiFix(
+// runPrefixToken is the literal "RUN " prefix used when emitting shell-form
+// RUN instructions in generated fixes. Declared once so lints like goconst
+// don't nudge us per call site.
+const runPrefixToken = "RUN "
+
+// buildMultiFixParts walks the multi-target analysis and produces the ordered
+// sequence of fix parts: COPY heredocs for each distinct target, interleaved
+// with RUN-wrapped surviving commands. `mkdir -p /parent` commands absorbed
+// by a following COPY destination are skipped, and a leftover RUN that
+// contains only shell-state-only commands (set/shopt) is dropped.
+func buildMultiFixParts(
 	run *instructions.RunCommand,
 	multi *shell.MultiFileCreationInfo,
-	ctx copyHeredocCheckContext,
 	effectiveUser string,
-) *rules.SuggestedFix {
-	runLoc := run.Location()
-	if len(runLoc) == 0 {
-		return nil
-	}
-
+) []string {
 	creationTargets := make([]string, 0, len(multi.Slots))
 	for _, slot := range multi.Slots {
 		creationTargets = append(creationTargets, slot.Info.TargetPath)
 	}
 
-	// Build the output: walk commands in order, emitting either a COPY heredoc
-	// for creation slots or a preserved shell command for others. Contiguous
-	// "other" commands collapse into a single RUN; mkdir -p entries absorbed
-	// by a later COPY destination are skipped.
 	mountFlags := runmount.FormatMounts(runmount.GetMounts(run))
-	runPrefix := "RUN "
+	runPrefix := runPrefixToken
 	if mountFlags != "" {
-		runPrefix = "RUN " + mountFlags + " "
+		runPrefix = runPrefixToken + mountFlags + " "
 	}
 
 	chownUser := chownUserForCopy(effectiveUser)
@@ -604,8 +599,8 @@ func (r *PreferCopyHeredocRule) generateMultiFix(
 			return
 		}
 		// Drop a leftover RUN that contains only shell-state commands
-		// (`set -ex`, `shopt`, `trap`) — these don't cross RUN boundaries,
-		// so preserving them after extraction is pure noise.
+		// (`set -ex`, `shopt`) — these don't cross RUN boundaries, so
+		// preserving them after extraction is pure noise.
 		if !pendingAllStateOnly {
 			parts = append(parts, runPrefix+strings.Join(pendingRun, " && "))
 		}
@@ -635,12 +630,31 @@ func (r *PreferCopyHeredocRule) generateMultiFix(
 				continue
 			}
 			appendPending(cmd.Text, false)
-		default:
+		case shell.MultiCmdOther:
 			appendPending(cmd.Text, cmd.IsShellStateOnly)
 		}
 	}
 	flushRun()
+	return parts
+}
 
+// generateMultiFix builds a fix that replaces a multi-target RUN with a
+// sequence of COPY heredocs (one per distinct target) and, when non-creation
+// commands remain, a surrounding RUN. `mkdir -p /parent` entries are dropped
+// when a subsequent COPY writes under /parent — BuildKit COPY auto-creates
+// parent directories.
+func (r *PreferCopyHeredocRule) generateMultiFix(
+	run *instructions.RunCommand,
+	multi *shell.MultiFileCreationInfo,
+	ctx copyHeredocCheckContext,
+	effectiveUser string,
+) *rules.SuggestedFix {
+	runLoc := run.Location()
+	if len(runLoc) == 0 {
+		return nil
+	}
+
+	parts := buildMultiFixParts(run, multi, effectiveUser)
 	if len(parts) == 0 {
 		return nil
 	}
@@ -685,9 +699,10 @@ func joinFixParts(parts []string, sm *sourcemap.SourceMap, runStartLine, runEndL
 
 	// Interior joints: blank line around any COPY block.
 	var sb strings.Builder
+	var prevPart string
 	for i, part := range parts {
 		if i > 0 {
-			prevIsCopy := isCopyHeredocPart(parts[i-1])
+			prevIsCopy := isCopyHeredocPart(prevPart)
 			curIsCopy := isCopyHeredocPart(part)
 			if prevIsCopy || curIsCopy {
 				sb.WriteString("\n\n")
@@ -696,6 +711,7 @@ func joinFixParts(parts []string, sm *sourcemap.SourceMap, runStartLine, runEndL
 			}
 		}
 		sb.WriteString(part)
+		prevPart = part
 	}
 	body := sb.String()
 
@@ -773,9 +789,9 @@ func (r *PreferCopyHeredocRule) generateFix(
 
 	// Get mount flags to preserve on remaining RUN commands
 	mountFlags := runmount.FormatMounts(runmount.GetMounts(run))
-	runPrefix := "RUN "
+	runPrefix := runPrefixToken
 	if mountFlags != "" {
-		runPrefix = "RUN " + mountFlags + " "
+		runPrefix = runPrefixToken + mountFlags + " "
 	}
 
 	// Add preceding commands as RUN if any (preserve mounts). The shell
@@ -1372,7 +1388,7 @@ func resolveRunEndPosition(loc []parser.Range, sm *sourcemap.SourceMap, run *ins
 	if endLine == loc[0].Start.Line && endCol == loc[0].Start.Character {
 		cmdStr := getRunScriptFromCmd(run)
 		mountFlags := runmount.FormatMounts(runmount.GetMounts(run))
-		fullInstr := "RUN "
+		fullInstr := runPrefixToken
 		if mountFlags != "" {
 			fullInstr += mountFlags + " "
 		}

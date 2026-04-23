@@ -452,57 +452,9 @@ func analyzeFileCreations(
 		return nil
 	}
 
-	// Compute an effective umask at each index for proper mode derivation.
-	umaskAt := make([]uint16, len(commands))
-	umaskSeen := make([]bool, len(commands))
-	var curUmask uint16
-	var curSeen bool
-	for i, cmd := range commands {
-		if cmd.cmdType == cmdTypeUmask {
-			curUmask = cmd.umaskValue
-			curSeen = true
-		}
-		umaskAt[i] = curUmask
-		umaskSeen[i] = curSeen
-	}
+	umaskAt, umaskSeen := computeUmaskSnapshot(commands)
 
-	// Find contiguous creation blocks (file creations + chmod to same target).
-	// A new block starts whenever the target path differs from the previous
-	// creation, or a non-creation/non-matching-chmod command appears.
-	type blockRange struct {
-		start, end int
-		target     string
-	}
-	var blocks []blockRange
-	i := 0
-	for i < len(commands) {
-		cmd := commands[i]
-		if cmd.cmdType != cmdTypeFileCreation || cmd.creation == nil {
-			i++
-			continue
-		}
-		target := cmd.creation.targetPath
-		start := i
-		end := i
-		j := i + 1
-		for j < len(commands) {
-			next := commands[j]
-			switch {
-			case next.cmdType == cmdTypeFileCreation && next.creation != nil && next.creation.targetPath == target:
-				end = j
-				j++
-				continue
-			case next.cmdType == cmdTypeChmod && next.chmodTarget == target:
-				end = j
-				j++
-				continue
-			}
-			break
-		}
-		blocks = append(blocks, blockRange{start: start, end: end, target: target})
-		i = end + 1
-	}
-
+	blocks := findCreationBlocks(commands)
 	if len(blocks) == 0 {
 		return nil
 	}
@@ -560,7 +512,7 @@ func analyzeFileCreations(
 			case cmdTypeFileCreation:
 				// Shouldn't happen: all creations are slot-mapped. Fall through.
 				entry.Kind = MultiCmdOther
-			default:
+			case cmdTypeOther, cmdTypeUmask:
 				entry.Kind = MultiCmdOther
 			}
 		}
@@ -579,6 +531,68 @@ func analyzeFileCreations(
 	}
 
 	return info
+}
+
+// creationBlockRange describes a contiguous block of analyzedCmd entries that
+// all target the same file path (creation(s) optionally followed by chmod).
+type creationBlockRange struct {
+	start, end int
+	target     string
+}
+
+// computeUmaskSnapshot returns the effective umask value (and seen-flag) at
+// each command index, carrying forward the most recent `umask` call.
+func computeUmaskSnapshot(commands []analyzedCmd) ([]uint16, []bool) {
+	umaskAt := make([]uint16, len(commands))
+	umaskSeen := make([]bool, len(commands))
+	var curUmask uint16
+	var curSeen bool
+	for i, cmd := range commands {
+		if cmd.cmdType == cmdTypeUmask {
+			curUmask = cmd.umaskValue
+			curSeen = true
+		}
+		umaskAt[i] = curUmask
+		umaskSeen[i] = curSeen
+	}
+	return umaskAt, umaskSeen
+}
+
+// findCreationBlocks groups consecutive file-creation and matching-target
+// chmod commands into contiguous blocks. A new block starts whenever the
+// target path differs from the previous creation, or a non-creation /
+// non-matching-chmod command appears between them.
+func findCreationBlocks(commands []analyzedCmd) []creationBlockRange {
+	var blocks []creationBlockRange
+	i := 0
+	for i < len(commands) {
+		cmd := commands[i]
+		if cmd.cmdType != cmdTypeFileCreation || cmd.creation == nil {
+			i++
+			continue
+		}
+		target := cmd.creation.targetPath
+		start := i
+		end := i
+		j := i + 1
+		for j < len(commands) {
+			next := commands[j]
+			switch {
+			case next.cmdType == cmdTypeFileCreation && next.creation != nil && next.creation.targetPath == target:
+				end = j
+				j++
+				continue
+			case next.cmdType == cmdTypeChmod && next.chmodTarget == target:
+				end = j
+				j++
+				continue
+			}
+			break
+		}
+		blocks = append(blocks, creationBlockRange{start: start, end: end, target: target})
+		i = end + 1
+	}
+	return blocks
 }
 
 // buildSlotFromBlock constructs a MultiFileCreationSlot from a contiguous
@@ -734,8 +748,9 @@ func collectFromStatement(
 				cmdType: cmdTypeOther,
 				text:    stmtToString(stmt),
 			})
-		default:
-			// Other binary ops (||) - treat as single opaque command
+		case syntax.OrStmt:
+			// || chains are treated as a single opaque command (the
+			// fallback branch has different semantics from && splitting).
 			*commands = append(*commands, analyzedCmd{
 				cmdType: cmdTypeOther,
 				text:    stmtToString(stmt),
@@ -915,7 +930,7 @@ func analyzeTeeCmd(
 // parseTeeTarget parses tee's arguments and returns the single file target and
 // whether -a (append) was set. Returns ok=false if the form cannot be safely
 // converted to COPY (non-literal args, unknown flags, multiple output files).
-func parseTeeTarget(call *syntax.CallExpr) (target string, isAppend bool, ok bool) {
+func parseTeeTarget(call *syntax.CallExpr) (target string, isAppend, ok bool) {
 	pastOptions := false
 	for i := 1; i < len(call.Args); i++ {
 		lit := call.Args[i].Lit()
@@ -1146,11 +1161,11 @@ func flattenProducerStmts(stmt *syntax.Stmt) []*syntax.Stmt {
 	}
 	// A brace group can't carry its own redirects — the pipe already sinks
 	// the whole group's output.
-	if _, isBlock := stmt.Cmd.(*syntax.Block); isBlock {
+	if block, isBlock := stmt.Cmd.(*syntax.Block); isBlock {
 		if len(stmt.Redirs) > 0 {
 			return nil
 		}
-		return stmt.Cmd.(*syntax.Block).Stmts
+		return block.Stmts
 	}
 	return []*syntax.Stmt{stmt}
 }
@@ -1177,7 +1192,10 @@ func producerStmtContent(
 		switch redir.Op {
 		case syntax.Hdoc, syntax.DashHdoc:
 			// OK — handled below for cat.
-		default:
+		case syntax.RdrOut, syntax.AppOut,
+			syntax.RdrIn, syntax.RdrInOut, syntax.DplIn, syntax.DplOut,
+			syntax.RdrClob, syntax.AppClob, syntax.WordHdoc,
+			syntax.RdrAll, syntax.RdrAllClob, syntax.AppAll, syntax.AppAllClob:
 			return "", false, false
 		}
 	}
