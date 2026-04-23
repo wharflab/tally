@@ -996,13 +996,18 @@ func analyzeMkdirCmd(call *syntax.CallExpr) (string, bool) {
 }
 
 // isShellStateOnlyCmd reports whether a command name is known to only
-// affect the current shell's options (e.g. `set -e`, `shopt -s nullglob`,
-// `trap -`). Such commands never cross RUN boundaries — each RUN starts a
-// fresh shell — so a leftover RUN that contains nothing but these can be
+// affect the current shell's options (e.g. `set -e`, `shopt -s nullglob`).
+// Such commands never cross RUN boundaries — each RUN starts a fresh
+// shell — so a leftover RUN that contains nothing but these can be
 // dropped entirely.
+//
+// `trap` is intentionally excluded: the registered handler body can run
+// within the same RUN (e.g. on EXIT) and can mutate the image. Dropping
+// the trap would silently lose that side effect. Preserving all `trap`
+// invocations is safer than trying to prove a particular form is inert.
 func isShellStateOnlyCmd(name string) bool {
 	switch name {
-	case "set", "shopt", "trap":
+	case "set", "shopt":
 		return true
 	}
 	return false

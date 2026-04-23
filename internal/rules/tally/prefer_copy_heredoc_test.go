@@ -1004,8 +1004,10 @@ RUN echo 'hi' > /etc/config
 
 // TestPreferCopyHeredocRule_DropsShellStateOnlyLeftovers verifies that
 // extraction drops a leftover RUN that would contain only shell-state-only
-// commands (set / shopt / trap) — those don't cross RUN boundaries and
-// would just clutter the output.
+// commands (`set`, `shopt`) — those don't cross RUN boundaries and would
+// just clutter the output. `trap` is deliberately NOT classified as
+// state-only: its registered handler body can still execute within the
+// same RUN (for example on EXIT) and is allowed to mutate the filesystem.
 func TestPreferCopyHeredocRule_DropsShellStateOnlyLeftovers(t *testing.T) {
 	t.Parallel()
 
@@ -1037,6 +1039,18 @@ RUN shopt -s nullglob && echo 'x' > /etc/config
 RUN set -ex && apt-get update && echo 'x' > /etc/config
 `,
 			wantFixText: "apt-get update",
+			wantFixLack: "",
+		},
+		{
+			// `trap 'echo cleanup >/marker' EXIT` registers an EXIT handler
+			// that executes before the RUN's shell exits and writes to
+			// /marker. Dropping the trap would silently lose that side
+			// effect, so `trap` must NEVER be treated as state-only.
+			name: "trap with EXIT handler is preserved",
+			content: `FROM alpine
+RUN trap 'echo cleanup > /marker' EXIT && echo 'x' > /etc/config
+`,
+			wantFixText: `trap 'echo cleanup > /marker' EXIT`,
 			wantFixLack: "",
 		},
 	}
