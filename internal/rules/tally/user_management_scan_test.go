@@ -369,6 +369,31 @@ func TestFindUserMembershipCmdsEdgeCases(t *testing.T) {
 			variant: shell.VariantPowerShell,
 			want:    nil,
 		},
+		// Regression for PR #551: PowerShell common-parameter switches
+		// (e.g. -Verbose, -WhatIf) take no value. The positional fallback
+		// must not consume the next arg after a switch.
+		{
+			name:    "Add-LocalGroupMember -Verbose then positional pair",
+			script:  "Add-LocalGroupMember -Verbose docker app",
+			variant: shell.VariantPowerShell,
+			want:    []membershipInfo{{User: "app", Groups: []string{"docker"}}},
+		},
+		{
+			name:    "Add-LocalGroupMember -WhatIf then positional pair",
+			script:  "Add-LocalGroupMember -WhatIf docker app",
+			variant: shell.VariantPowerShell,
+			want:    []membershipInfo{{User: "app", Groups: []string{"docker"}}},
+		},
+		// Quoted positional whose text starts with "-": the PowerShell
+		// grammar parses it as a string_literal (value), not a
+		// command_parameter. A textual HasPrefix("-") check would
+		// misclassify it as a flag.
+		{
+			name:    "Add-LocalGroupMember quoted dashed positional",
+			script:  `Add-LocalGroupMember docker "-app"`,
+			variant: shell.VariantPowerShell,
+			want:    []membershipInfo{{User: `"-app"`, Groups: []string{"docker"}}},
+		},
 		{
 			name:    "usermod no -G flag no fire",
 			script:  "usermod -L app",

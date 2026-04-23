@@ -341,14 +341,19 @@ func creationFlagsMatch(flag string, creationFlags map[string]bool) bool {
 	return false
 }
 
-// twoPositionalValues extracts exactly two non-flag arguments from a
-// PowerShell command. Returns ok=false if fewer or more than two exist.
+// twoPositionalValues extracts exactly two positional arguments from a
+// PowerShell command, using the tree-sitter-powershell-provided ArgKinds to
+// skip parameters (`-Verbose`, `-Group`, etc.) without guessing at their
+// value-arity. Returns ok=false if fewer or more than two positionals exist.
+//
+// Using the grammar's classification is strictly more correct than a textual
+// HasPrefix("-") check: the grammar recognises quoted tokens like `"-app"`
+// as value expressions rather than parameter tokens, and it never consumes
+// the arg after a switch (e.g. `-Verbose`) as its value.
 func twoPositionalValues(cmd *shell.CommandInfo) (first, second string, ok bool) {
 	var positionals []string
-	for i := 0; i < len(cmd.Args); i++ {
-		arg := cmd.Args[i]
-		if strings.HasPrefix(arg, "-") {
-			i++
+	for i, arg := range cmd.Args {
+		if isFlagArg(cmd, i) {
 			continue
 		}
 		positionals = append(positionals, arg)
@@ -357,6 +362,17 @@ func twoPositionalValues(cmd *shell.CommandInfo) (first, second string, ok bool)
 		return "", "", false
 	}
 	return positionals[0], positionals[1], true
+}
+
+// isFlagArg reports whether the i-th argument of cmd is a flag/parameter.
+// If the parser populated ArgKinds (PowerShell today), that classification
+// is authoritative. Otherwise the function falls back to a textual "-" prefix
+// check so POSIX callers still get the historical behavior.
+func isFlagArg(cmd *shell.CommandInfo, i int) bool {
+	if i < len(cmd.ArgKinds) && cmd.ArgKinds[i] != shell.ArgKindUnknown {
+		return cmd.ArgKinds[i] == shell.ArgKindFlag
+	}
+	return strings.HasPrefix(cmd.Args[i], "-")
 }
 
 // usermodGroupsValue returns the value of usermod's -G / --groups flag,
