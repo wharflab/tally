@@ -665,31 +665,6 @@ func (r *PreferCopyHeredocRule) generateMultiFix(
 	}
 }
 
-// isShellStateOnlyChain reports whether a joined " && " command string is
-// built entirely from shell-state commands (`set`, `shopt`, `trap`). Such
-// chains have no effect across RUN boundaries — each RUN starts a fresh
-// shell — so they can be dropped when extraction would otherwise leave
-// them alone in a leftover RUN.
-func isShellStateOnlyChain(chain string) bool {
-	chain = strings.TrimSpace(chain)
-	if chain == "" {
-		return false
-	}
-	for part := range strings.SplitSeq(chain, " && ") {
-		fields := strings.Fields(strings.TrimSpace(part))
-		if len(fields) == 0 {
-			return false
-		}
-		switch fields[0] {
-		case "set", "shopt", "trap":
-			// state-only
-		default:
-			return false
-		}
-	}
-	return true
-}
-
 // mkdirAbsorbedByCopy reports whether the given mkdir -p target is created
 // (implicitly) by a subsequent COPY heredoc destination. BuildKit's COPY
 // creates all missing parent directories of its destination.
@@ -730,10 +705,10 @@ func (r *PreferCopyHeredocRule) generateFix(
 		runPrefix = "RUN " + mountFlags + " "
 	}
 
-	// Add preceding commands as RUN if any (preserve mounts). Drop a RUN
-	// that would contain only shell-state commands (`set -ex`, `shopt`,
-	// `trap`) — they don't cross RUN boundaries, so they'd be noise.
-	if info.PrecedingCommands != "" && !isShellStateOnlyChain(info.PrecedingCommands) {
+	// Add preceding commands as RUN if any (preserve mounts). The shell
+	// layer already drops chains that would be pure shell-state noise
+	// (`set -ex`, `shopt`, `trap`) — options don't cross RUN boundaries.
+	if info.PrecedingCommands != "" {
 		parts = append(parts, runPrefix+info.PrecedingCommands)
 	}
 
@@ -743,7 +718,7 @@ func (r *PreferCopyHeredocRule) generateFix(
 	parts = append(parts, copyCmd)
 
 	// Add remaining commands as RUN if any (preserve mounts)
-	if info.RemainingCommands != "" && !isShellStateOnlyChain(info.RemainingCommands) {
+	if info.RemainingCommands != "" {
 		parts = append(parts, runPrefix+info.RemainingCommands)
 	}
 
@@ -752,9 +727,7 @@ func (r *PreferCopyHeredocRule) generateFix(
 	endLine, endCol := resolveRunEndPosition(runLoc, sm, run)
 
 	description := "Replace RUN with COPY <<EOF to " + info.TargetPath
-	hasRealSurrounding := (info.PrecedingCommands != "" && !isShellStateOnlyChain(info.PrecedingCommands)) ||
-		(info.RemainingCommands != "" && !isShellStateOnlyChain(info.RemainingCommands))
-	if hasRealSurrounding {
+	if info.PrecedingCommands != "" || info.RemainingCommands != "" {
 		description = "Extract file creation to COPY <<EOF"
 	}
 

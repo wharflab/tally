@@ -407,18 +407,13 @@ func analyzeFileCreation(
 		content.WriteString(c.content)
 	}
 
-	// Build preceding commands string
-	preceding := make([]string, 0, startIdx)
-	for i := range startIdx {
-		preceding = append(preceding, commands[i].text)
-	}
-
-	// Build remaining commands string
-	remainingCount := len(commands) - endIdx - 1
-	remaining := make([]string, 0, remainingCount)
-	for i := endIdx + 1; i < len(commands); i++ {
-		remaining = append(remaining, commands[i].text)
-	}
+	// Build preceding / remaining chains. Shell-state-only commands
+	// (`set -e`, `shopt`, `trap`) are dropped when *all* commands on the
+	// side are state-only, since shell options don't persist across RUN
+	// boundaries and preserving them alone would be pure noise. A mixed
+	// chain (state + real work) keeps everything.
+	preceding := collectNonStateOnlyChain(commands[:startIdx])
+	remaining := collectNonStateOnlyChain(commands[endIdx+1:])
 
 	// When umask-derived mode has no explicit raw string, format it
 	if chmodMode != 0 && rawChmodMode == "" {
@@ -659,6 +654,32 @@ func umaskDerivedChmodMode(activeUmask uint16, hasUmask bool) uint16 {
 		return 0
 	}
 	return effectiveMode
+}
+
+// collectNonStateOnlyChain returns the command texts of slice, dropping them
+// all when every entry is shell-state-only (e.g. `set -e`, `shopt`, `trap`).
+// Those commands don't cross RUN boundaries, so preserving them alone in a
+// leftover RUN is pure noise. A mix of state-only and real commands keeps
+// everything — the `set -e` guard matters when there's real work alongside.
+func collectNonStateOnlyChain(slice []analyzedCmd) []string {
+	if len(slice) == 0 {
+		return nil
+	}
+	allStateOnly := true
+	for _, cmd := range slice {
+		if !cmd.isShellState {
+			allStateOnly = false
+			break
+		}
+	}
+	if allStateOnly {
+		return nil
+	}
+	out := make([]string, 0, len(slice))
+	for _, cmd := range slice {
+		out = append(out, cmd.text)
+	}
+	return out
 }
 
 // collectCommands flattens && chains and collects all commands with their types.
