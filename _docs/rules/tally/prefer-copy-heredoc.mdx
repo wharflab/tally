@@ -210,12 +210,15 @@ When extracting file creation from mixed commands, mounts are preserved on the r
 
 ## Chmod Support
 
-Converts both octal and symbolic chmod modes to `COPY --chmod`:
+Preserves the original mode notation on `COPY --chmod`. `COPY --chmod`
+accepts both octal and symbolic modes (Dockerfile frontend 1.14+), so the
+fixer emits whichever form the source wrote:
 
-- Octal: `chmod 755` → `--chmod=0755`
-- Symbolic: `chmod +x` → `--chmod=0755`, `chmod u+x` → `--chmod=0744`
+- Octal: `chmod 755` → `--chmod=755`, `chmod 0755` → `--chmod=0755`
+- Symbolic: `chmod +x` → `--chmod=+x`, `chmod u+x` → `--chmod=u+x`
 
-Symbolic modes are converted based on a 0644 base (default for newly created files).
+Symbolic modes are copied verbatim — the fixer does not convert them to
+octal. That keeps the diff minimal and preserves the author's intent.
 
 ## Options
 
