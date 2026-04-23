@@ -18,6 +18,7 @@ const (
 	cmdTee    = "tee"
 	cmdChmod  = "chmod"
 	cmdUmask  = "umask"
+	cmdMkdir  = "mkdir"
 )
 
 // FileCreationInfo describes a detected file creation pattern in a shell script.
@@ -296,6 +297,7 @@ const (
 	cmdTypeFileCreation
 	cmdTypeChmod
 	cmdTypeUmask
+	cmdTypeMkdirP
 )
 
 // analyzedCmd represents a command with its type and original text.
@@ -307,6 +309,7 @@ type analyzedCmd struct {
 	chmodRawMode string           // original mode string for cmdTypeChmod (e.g., "+x", "755")
 	chmodTarget  string           // non-empty for cmdTypeChmod
 	umaskValue   uint16           // non-zero for cmdTypeUmask (the mask value, e.g., 0o077)
+	mkdirTarget  string           // non-empty for cmdTypeMkdirP (absolute literal path)
 	hasUnsafe    bool
 }
 
@@ -532,15 +535,14 @@ func analyzeFileCreations(
 			switch cmd.cmdType {
 			case cmdTypeChmod:
 				entry.Kind = MultiCmdChmod
+			case cmdTypeMkdirP:
+				entry.Kind = MultiCmdMkdirP
+				entry.MkdirTarget = cmd.mkdirTarget
 			case cmdTypeFileCreation:
 				// Shouldn't happen: all creations are slot-mapped. Fall through.
 				entry.Kind = MultiCmdOther
 			default:
 				entry.Kind = MultiCmdOther
-				if target, ok := detectMkdirP(cmd.text); ok {
-					entry.Kind = MultiCmdMkdirP
-					entry.MkdirTarget = target
-				}
 			}
 		}
 		if cmd.hasUnsafe {
@@ -634,42 +636,6 @@ func buildSlotFromBlock(
 			HasUnsafeVariables: hasUnsafeVars,
 		},
 	}
-}
-
-// detectMkdirP reports whether text is `mkdir -p <absolute path>` with a
-// single literal target. Other forms (multiple targets, --mode, relative
-// paths, variables) return false because we can't safely elide them.
-func detectMkdirP(text string) (string, bool) {
-	fields := strings.Fields(text)
-	if len(fields) < 3 || fields[0] != "mkdir" {
-		return "", false
-	}
-	sawP := false
-	var target string
-	for _, f := range fields[1:] {
-		switch {
-		case f == "-p", f == "--parents":
-			sawP = true
-		case strings.HasPrefix(f, "-"):
-			return "", false
-		default:
-			if target != "" {
-				return "", false
-			}
-			target = f
-		}
-	}
-	if !sawP || target == "" {
-		return "", false
-	}
-	// Strip matching surrounding quotes, if any; otherwise reject.
-	if strings.ContainsAny(target, "\"'`$") {
-		return "", false
-	}
-	if !path.IsAbs(target) {
-		return "", false
-	}
-	return path.Clean(target), true
 }
 
 // umaskDerivedChmodMode computes the effective chmod mode from a umask value.
@@ -787,6 +753,18 @@ func analyzeCallExpr(
 	// Check for tee command (file target is in args, not redirects)
 	if cmdName == cmdTee {
 		return analyzeTeeCmd(stmt, call, text, options.ResolveTargetPath)
+	}
+
+	// Check for mkdir -p (for later absorption by COPY destinations)
+	if cmdName == cmdMkdir {
+		if target, ok := analyzeMkdirCmd(call); ok {
+			return analyzedCmd{
+				cmdType:     cmdTypeMkdirP,
+				text:        text,
+				mkdirTarget: target,
+			}
+		}
+		return analyzedCmd{cmdType: cmdTypeOther, text: text}
 	}
 
 	// Check for file creation commands
@@ -921,6 +899,65 @@ func parseTeeTarget(call *syntax.CallExpr) (target string, isAppend bool, ok boo
 		target = lit
 	}
 	return target, isAppend, true
+}
+
+// analyzeMkdirCmd parses a `mkdir` call and reports the single absolute
+// literal target when the form is `mkdir -p /abs/path` (or `--parents`).
+// Quoted paths work because the AST preserves the logical word regardless
+// of quoting. Returns ok=false for any form we can't safely absorb:
+//   - missing -p / --parents
+//   - additional flags (e.g. -m, --mode, -Z, -v)
+//   - multiple positional targets
+//   - non-literal target (variable, command substitution)
+//   - relative path
+func analyzeMkdirCmd(call *syntax.CallExpr) (string, bool) {
+	if call == nil || len(call.Args) < 3 {
+		return "", false
+	}
+	sawP := false
+	var target string
+	var targetSet bool
+	pastOptions := false
+	for i := 1; i < len(call.Args); i++ {
+		arg := call.Args[i]
+		lit := arg.Lit()
+
+		if !pastOptions && lit == "--" {
+			pastOptions = true
+			continue
+		}
+
+		// Flag tokens are always literal (they start with '-' before any quoting).
+		if !pastOptions && lit != "" && strings.HasPrefix(lit, "-") && lit != "-" {
+			switch lit {
+			case "-p", "--parents":
+				sawP = true
+			default:
+				// Unsupported flags (e.g. -m 0755, --mode=0755, -Z, -v) — skip fix.
+				return "", false
+			}
+			continue
+		}
+
+		// Positional: extract the logical word content, which expands quoted
+		// literals but still flags variable expansion / command substitution.
+		content, unsafeWord := extractWordContent(arg, nil)
+		if unsafeWord || content == "" {
+			return "", false
+		}
+		if targetSet {
+			return "", false
+		}
+		target = content
+		targetSet = true
+	}
+	if !sawP || !targetSet {
+		return "", false
+	}
+	if !path.IsAbs(target) {
+		return "", false
+	}
+	return path.Clean(target), true
 }
 
 // teeRedirectsAreCompatible reports whether the redirects on a tee statement
@@ -1136,8 +1173,9 @@ func findFileCreationBlock(commands []analyzedCmd) (int, int, string) {
 			} else {
 				return startIdx, endIdx, targetPath // Different target, stop
 			}
-		case cmdTypeOther, cmdTypeUmask:
-			// Other commands or umask after file creation don't affect the file
+		case cmdTypeOther, cmdTypeUmask, cmdTypeMkdirP:
+			// Other commands, umask, or mkdir after file creation don't
+			// affect the file we're building.
 			return startIdx, endIdx, targetPath
 		}
 	}

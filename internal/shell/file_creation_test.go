@@ -1174,28 +1174,51 @@ func TestDetectFileCreations_MultiTarget(t *testing.T) {
 	}
 }
 
-func TestDetectMkdirP(t *testing.T) {
+func TestAnalyzeMkdirCmd(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		text       string
+		script     string
 		wantTarget string
 		wantOk     bool
 	}{
 		{"mkdir -p /var/app", "/var/app", true},
 		{"mkdir --parents /var/app", "/var/app", true},
+		// Quoted forms: the AST resolves to the logical word, so these
+		// should all succeed.
+		{`mkdir -p "/var/app"`, "/var/app", true},
+		{`mkdir -p '/var/app'`, "/var/app", true},
+		{`mkdir -p "/path with spaces/sub"`, "/path with spaces/sub", true},
+		{`mkdir -p '/var/app'/sub`, "/var/app/sub", true},
+		// -- ends option parsing, so target after is positional.
+		{"mkdir -p -- /var/app", "/var/app", true},
+
+		// Rejected forms
 		{"mkdir /var/app", "", false},                // missing -p
 		{"mkdir -p /a /b", "", false},                // multiple targets
 		{"mkdir -p var/app", "", false},              // relative path
 		{"mkdir -p --mode=0755 /var/app", "", false}, // unsupported flag
-		{"mkdir -p \"/var/app\"", "", false},         // quoted arg
-		{"echo hi", "", false},                       // not mkdir
+		{"mkdir -p -m 0755 /var/app", "", false},     // unsupported flag
+		{"mkdir -pv /var/app", "", false},            // combined flags: -pv not recognized as only -p
+		{"mkdir -p $HOME/app", "", false},            // variable expansion
+		{"mkdir -p $(dirname /foo/bar)", "", false},  // command substitution
 	}
 	for _, tt := range tests {
-		t.Run(tt.text, func(t *testing.T) {
+		t.Run(tt.script, func(t *testing.T) {
 			t.Parallel()
-			target, ok := detectMkdirP(tt.text)
-			if ok != tt.wantOk || target != tt.wantTarget {
-				t.Errorf("detectMkdirP(%q) = (%q, %v), want (%q, %v)", tt.text, target, ok, tt.wantTarget, tt.wantOk)
+			prog, err := parseScript(tt.script, VariantBash)
+			if err != nil {
+				t.Fatalf("parseScript failed: %v", err)
+			}
+			if len(prog.Stmts) == 0 {
+				t.Fatal("no statements parsed")
+			}
+			call, ok := prog.Stmts[0].Cmd.(*syntax.CallExpr)
+			if !ok {
+				t.Fatalf("expected CallExpr, got %T", prog.Stmts[0].Cmd)
+			}
+			target, gotOk := analyzeMkdirCmd(call)
+			if gotOk != tt.wantOk || target != tt.wantTarget {
+				t.Errorf("analyzeMkdirCmd(%q) = (%q, %v), want (%q, %v)", tt.script, target, gotOk, tt.wantTarget, tt.wantOk)
 			}
 		})
 	}
