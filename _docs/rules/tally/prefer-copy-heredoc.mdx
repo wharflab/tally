@@ -71,7 +71,8 @@ follow-up `chmod`), and heredoc bodies are easier to read than escaped
 6. **Brace-grouped producers piped to tee**: `{ echo a; printf 'b\n'; } | tee /path` (mixes of `echo` / `printf` / `cat <<EOF` are supported)
 7. **Consecutive RUN instructions** writing to the same file
 8. **Mixed commands** with file creation in the middle (extracts just the file creation)
-9. **Multiple distinct targets in one RUN**: a single `&&` chain that writes to several files is split into one `COPY <<EOF` per target. Any `mkdir -p /parent` whose target is a prefix of a COPY destination is dropped, since `COPY` auto-creates parent directories.
+9. **Multiple distinct targets in one RUN**: a single `&&` chain that writes to several files is split into one `COPY <<EOF` per target. Any
+   `mkdir -p /parent` whose target is a prefix of a COPY destination is dropped, since `COPY` auto-creates parent directories.
 
 ## Examples
 
