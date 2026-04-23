@@ -259,14 +259,14 @@ type BuildInvocation struct {
 }
 
 type InvocationSource struct {
-	Kind string // "dockerfile" | "bake" | "compose"
-	File string // absolute path to the originating file
-	Name string // target or service name; empty for plain Dockerfile mode
+	Kind string // "dockerfile" | "bake" | "compose" | "aws-cdk-asset-manifest" | "skaffold" | "bazel" | ...
+	File string // absolute path to the originating file or manifest
+	Name string // target, service, asset ID, artifact name, or Bazel label; empty for plain Dockerfile mode
 }
 
 type ContextRef struct {
-	Kind  string // "dir" | "git" | "url" | "docker-image" | "target" | "service" | "oci-layout" | ...
-	Value string // absolute path for local dirs; canonical string otherwise
+	Kind  string // "dir" | "tar" | "git" | "url" | "empty" | "docker-image" | "target" | "service" | "oci-layout" | ...
+	Value string // absolute path for local dirs / OCI layouts; canonical string otherwise
 }
 
 type Port struct {
@@ -283,6 +283,55 @@ type SecretRef struct {
 	Target string
 }
 ```
+
+### `InvocationSource.Kind` values
+
+`InvocationSource.Kind` should be a stable source-family enum, not a narrow “only the MVP” union. The first implementation only emits `dockerfile`,
+`bake`, and `compose`, but the model should reserve adjacent orchestrator families now so future providers do not need a shape change.
+
+| Kind | MVP status | `File` meaning | `Name` meaning | Reference |
+|---|---|---|---|---|
+| `dockerfile` | now | Dockerfile path, or a synthetic stdin marker in stdin mode | empty | [Docker build overview](https://docs.docker.com/build/concepts/overview/) |
+| `bake` | now | Bake definition file (`.hcl` or `.json`) | target name | [Bake](https://docs.docker.com/build/bake/) |
+| `compose` | now | Compose file | service name | [Compose Build Specification](https://docs.docker.com/reference/compose-file/build/) |
+| `aws-cdk-asset-manifest` | future | synthesized CDK asset manifest path | Docker image asset identifier | [Cloud Assembly Schema](https://docs.aws.amazon.com/cdk/api/v2/docs/cloud-assembly-schema-readme.html), [AssetManifest](https://docs.aws.amazon.com/cdk/api/v2/docs/%40aws-cdk_cloud-assembly-schema.AssetManifest.html), [DockerImageAsset](https://docs.aws.amazon.com/cdk/api/v2/docs/%40aws-cdk_cloud-assembly-schema.DockerImageAsset.html) |
+| `skaffold` | future | `skaffold.yaml` | artifact image name or artifact identifier | [Skaffold config model](https://skaffold.dev/docs/design/config/), [Skaffold Docker builder](https://skaffold.dev/docs/builders/builder-types/docker/) |
+| `bazel` | future | entry `BUILD.bazel` or other workspace file chosen by the provider | Bazel label | [rules_oci](https://github.com/bazel-contrib/rules_oci), especially its `rules_buildx` extension for Dockerfile-backed targets |
+
+Two scope notes matter:
+
+- Plain Kubernetes manifests are intentionally **not** listed as an `InvocationSource.Kind`. They normally deploy already-built image references,
+  not Dockerfile builds. The Kubernetes-adjacent source worth reserving here is `skaffold.yaml`, because it actually defines image build artifacts.
+- `bazel` is deliberately broader than `rules_oci`. The first Bazel-family provider may well target `rules_oci` and `rules_buildx`, but the
+  invocation model should key off the source family, not one repository name.
+
+### `ContextRef.Kind` values
+
+`ContextRef.Kind` should classify the **declared source shape** without dereferencing remote content. The provider should not fetch a remote URL just
+to decide whether it ultimately serves a tarball or a text Dockerfile. When the declaration itself is already precise, prefer the more specific kind.
+
+The kinds that should be documented and reserved now are:
+
+| Kind | Meaning | Typical `Value` | Reference |
+|---|---|---|---|
+| `dir` | Local filesystem directory context | absolute path | [Build context](https://docs.docker.com/build/concepts/context/), [Compose `build.context`](https://docs.docker.com/reference/compose-file/build/), [Bake additional contexts](https://docs.docker.com/build/bake/contexts/) |
+| `tar` | Tar archive context when the declaration itself makes that explicit | absolute path or canonical tarball URL | [Build context](https://docs.docker.com/build/concepts/context/) |
+| `git` | Git repository URL | canonical Git URL | [Build context](https://docs.docker.com/build/concepts/context/), [Compose `additional_contexts`](https://docs.docker.com/reference/compose-file/build/) |
+| `url` | Generic remote URL that the builder will interpret | canonical URL | [Build context](https://docs.docker.com/build/concepts/context/), [Bake additional contexts](https://docs.docker.com/build/bake/contexts/) |
+| `empty` | No filesystem context; the declaration itself means “Dockerfile text only” | empty string, stdin marker, or canonical URL to the text Dockerfile | [Empty context](https://docs.docker.com/build/concepts/context/#empty-context) |
+| `docker-image` | Named context backed by an image reference | `docker-image://...` | [Named contexts](https://docs.docker.com/build/concepts/context/) |
+| `target` | Named context backed by another Bake target | `target:<name>` | [Named contexts with Bake](https://docs.docker.com/build/concepts/context/) |
+| `service` | Named context backed by another Compose service | `service:<name>` | [Compose `additional_contexts`](https://docs.docker.com/reference/compose-file/build/) |
+| `oci-layout` | Named context backed by a local OCI image layout directory | absolute path plus tag/digest selector as needed | [docker buildx build `--build-context`](https://docs.docker.com/reference/cli/docker/image/build/) |
+
+Operational guidance for these kinds:
+
+- `dir` is the only kind that automatically enables the derived local file-reading capability used by the facts layer.
+- `git`, `tar`, `url`, and `empty` may all be perfectly valid build contexts, but they are not locally inspectable by tally in the MVP.
+- `url` is intentionally retained even though Docker docs also discuss remote tarballs and remote text files. That distinction may require network
+  dereference, which the normalization layer should avoid.
+- `empty` is used only when the declaration itself already implies “no filesystem context”, such as stdin Dockerfile mode or an explicitly known
+  text-only remote Dockerfile.
 
 ### Why `BuildInvocation` stays declarative
 
