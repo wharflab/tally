@@ -130,6 +130,13 @@ classDiagram
         +map~string,string~ Labels
         +SecretRef[] Secrets
     }
+    class Port {
+        +int ContainerStart
+        +int ContainerEnd
+        +int HostStart
+        +int HostEnd
+        +string Protocol
+    }
     class InvocationSource {
         +string Kind
         +string File
@@ -219,10 +226,21 @@ type NamedContext struct {
     Value string
 }
 
+// Port represents a port declaration from Compose. Compose natively supports
+// ranges (e.g. "8080-8085:3000-3005"), and expanding a range into N Port
+// values would waste allocation for large ranges and lose the "these were
+// declared together" grouping. Instead, ranges are preserved as Start/End
+// pairs; single ports have Start == End.
+//
+// Rules that want "does EXPOSE <p> match any container-side port?" check
+//   p >= ContainerStart && p <= ContainerEnd
+// for each declaration.
 type Port struct {
-    Number   int
-    Protocol string // "tcp" | "udp"
-    HostPort int    // 0 if unpublished
+    ContainerStart int    // inclusive
+    ContainerEnd   int    // inclusive; == ContainerStart for a single port
+    HostStart      int    // 0 if unpublished
+    HostEnd        int    // 0 if unpublished; == HostStart for a single port
+    Protocol       string // "tcp" | "udp"
 }
 
 type SecretRef struct {
@@ -534,7 +552,7 @@ NamedContexts    = {
   "base-image":    { Kind: "image", Value: "ghcr.io/acme/node-base:22" },
 }
 Environment      = { NODE_ENV: "production", DATABASE_URL: "postgres://db:5432/app" }
-ExposedPorts     = [{ Number: 3000, Protocol: "tcp", HostPort: 8080 }]
+ExposedPorts     = [{ ContainerStart: 3000, ContainerEnd: 3000, HostStart: 8080, HostEnd: 8080, Protocol: "tcp" }]
 Networks         = ["backend"]
 ```
 
