@@ -1204,17 +1204,24 @@ func TestDetectFileCreations_MultiTarget(t *testing.T) {
 		t.Errorf("HasUnsafeVariables = true, want false")
 	}
 
-	wantTargets := []string{"/etc/one.conf", "/var/app/config", "/etc/three.ini"}
-	if len(got.Slots) != len(wantTargets) {
-		t.Fatalf("got %d slots, want %d", len(got.Slots), len(wantTargets))
+	wantSlots := []struct {
+		target  string
+		content string
+	}{
+		{"/etc/one.conf", "a=1\nb=2\n"},
+		{"/var/app/config", "x\n"},
+		{"/etc/three.ini", "y\n"},
 	}
-	for i, want := range wantTargets {
-		if got.Slots[i].Info.TargetPath != want {
-			t.Errorf("slot[%d] TargetPath = %q, want %q", i, got.Slots[i].Info.TargetPath, want)
+	if len(got.Slots) != len(wantSlots) {
+		t.Fatalf("got %d slots, want %d", len(got.Slots), len(wantSlots))
+	}
+	for i, want := range wantSlots {
+		if got.Slots[i].Info.TargetPath != want.target {
+			t.Errorf("slot[%d] TargetPath = %q, want %q", i, got.Slots[i].Info.TargetPath, want.target)
 		}
-	}
-	if got := got.Slots[0].Info.Content; got != "a=1\nb=2\n" {
-		t.Errorf("slot[0] Content = %q, want %q", got, "a=1\nb=2\n")
+		if got.Slots[i].Info.Content != want.content {
+			t.Errorf("slot[%d] Content = %q, want %q", i, got.Slots[i].Info.Content, want.content)
+		}
 	}
 
 	// mkdir -p should be recognized so callers can elide it.
