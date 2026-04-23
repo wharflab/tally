@@ -87,7 +87,15 @@ type FileCreationOptions struct {
 // chained script. Multiple slots can coexist when a RUN writes to several
 // distinct files in one && chain.
 type MultiFileCreationSlot struct {
-	// Info is the resolved creation for this slot (target, content, chmod, etc.).
+	// Info is the resolved creation for this slot: target, content, chmod,
+	// append flag, unsafe-variable flag, and home-path resolution flag.
+	//
+	// Note: Info.PrecedingCommands and Info.RemainingCommands are always
+	// empty on slots produced by the multi-target path (buildSlotFromBlock).
+	// Use MultiFileCreationInfo.Commands (the flattened command list) to
+	// reconstruct ordering between slots and non-creation commands. The
+	// preceding/remaining fields are only populated by the single-target
+	// entry point, DetectFileCreation.
 	Info FileCreationInfo
 	// CmdIndex is the index of the flattened command that produced this slot.
 	CmdIndex int
