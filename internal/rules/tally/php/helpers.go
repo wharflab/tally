@@ -16,6 +16,15 @@ import (
 const (
 	subcommandInstall = "install"
 	subcommandAdd     = "add" //nolint:customlint // apk subcommand, not Dockerfile ADD instruction
+
+	cmdDockerPHPExtInstall = "docker-php-ext-install"
+	cmdDockerPHPExtEnable  = "docker-php-ext-enable"
+	cmdPecl                = "pecl"
+	cmdApk                 = "apk"
+	cmdApt                 = "apt"
+	cmdAptGet              = "apt-get"
+	cmdDnf                 = "dnf"
+	cmdYum                 = "yum"
 )
 
 var nonProductionStageTokens = []string{"dev", "development", "test", "testing", "ci", "debug"}

@@ -13,7 +13,6 @@ Source: [32-gpu-container-rules.md](32-gpu-container-rules.md)
 
 | Rule ID | Severity | Description | Notes |
 |---------|----------|-------------|-------|
-| `tally/gpu/prefer-uv-over-conda` | Info | Suggest uv over conda for GPU Python deps | |
 | `tally/gpu/require-torch-cuda-arch-list` | Info | Warn when CUDA extensions built without `TORCH_CUDA_ARCH_LIST` | |
 | `tally/gpu/hardcoded-cuda-path` | Info | Detect hardcoded `/usr/local/cuda-X.Y` paths (use `/usr/local/cuda`) | |
 | `tally/gpu/ld-library-path-overwrite` | Warning | Detect `LD_LIBRARY_PATH` overwrite without preserving existing value | |
@@ -53,10 +52,9 @@ Source: [35-php-container-rules.md](35-php-container-rules.md)
 | `tally/php/remove-build-deps-after-extension-build` | Warning | Warn on leftover build deps after `docker-php-ext-install`/`pecl install` | |
 | `tally/php/composer-no-interaction-in-build` | Info | Detect `composer install` without `--no-interaction` | |
 | `tally/php/prefer-composer-stage` | Info | Suggest `composer:*` image instead of curl-installing composer | |
-| `tally/php/enable-opcache-in-production` | Info | Suggest enabling OPcache in production PHP runtimes | |
 | `tally/php/prefer-non-root-runtime` | Info | Suggest running as non-root (www-data) in production | |
 
-**Already implemented (1):** `composer-no-dev-in-production`
+**Already implemented (3):** `composer-no-dev-in-production`, `no-xdebug-in-final-image`, `enable-opcache-in-production`
 
 ---
 

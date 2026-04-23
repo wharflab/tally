@@ -43,6 +43,7 @@ require (
 	go.podman.io/image/v5 v5.39.2
 	golang.org/x/exp/jsonrpc2 v0.0.0-20250718183923-645b1fa84792
 	golang.org/x/sys v0.43.0
+	gopkg.in/ini.v1 v1.67.1
 	mvdan.cc/sh/v3 v3.13.1
 )
 
@@ -169,6 +170,5 @@ require (
 	golang.org/x/text v0.34.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
-	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

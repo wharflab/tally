@@ -1,0 +1,124 @@
+---
+title: "tally/php/enable-opcache-in-production"
+description: "Production PHP web runtime images should install and enable OPcache."
+---
+
+Production PHP web runtime images should install and enable OPcache.
+
+| Property | Value |
+|----------|-------|
+| Severity | Info |
+| Category | Performance |
+| Default | Enabled |
+| Auto-fix | Yes (heuristic: official `php:*` images or single `php*-fpm` package) |
+
+## What is OPcache?
+
+OPcache is a PHP extension that stores precompiled script bytecode in shared memory, removing the need for PHP to re-read and re-parse scripts on
+every request. Because only the low-level bytecode needs to run — no lexing, parsing, or compilation — it has a large, measurable impact on the
+request throughput of any real-world PHP application.
+
+When a request comes in:
+
+1. PHP checks whether OPcache is enabled.
+2. If the script's bytecode is already in the cache, OPcache returns it straight from shared memory and the Zend Engine executes it. The tokenize →
+   parse → compile pipeline is skipped entirely.
+3. If the bytecode is not cached, PHP processes the script as usual (tokenize, parse, compile to opcodes), stores the resulting bytecode in shared
+   memory, and then executes it. Subsequent requests hit the cache.
+
+OPcache ships with PHP core and is the canonical production cache for PHP web runtimes. Enabling it is a one-line change with no application-code
+impact.
+
+## Description
+
+Flags long-running PHP web runtime stages that do not install, enable, or configure OPcache. OPcache stores precompiled PHP bytecode in shared memory,
+avoiding per-request script compilation and delivering a substantial throughput improvement in production.
+
+The rule only triggers on the **final** build stage. A stage is treated as a PHP web runtime when any of the following hold:
+
+- the base image is an official `php:*` tag whose tag contains `fpm` or `apache`
+- the base image is a known PHP web runtime derivative (`serversideup/php`, `dunglas/frankenphp`, `bitnami/php-fpm`, `trafex/php-nginx`,
+  `webdevops/php-nginx`, `webdevops/php-apache`)
+- the effective `ENTRYPOINT` or `CMD` starts a known PHP web server wrapper (`php-fpm`, `php-fpm7.4`, `php-fpm8.3`, `apache2-foreground`,
+  `httpd-foreground`, `frankenphp`, `rr`)
+
+Stages explicitly named `dev`, `development`, `test`, `testing`, `ci`, or `debug` are skipped, as are non-final stages. CLI-only PHP images
+(`php:*-cli` with no PHP web server wrapper) are also skipped.
+
+### Signals treated as compliant
+
+Any of the following in the final stage suppress the violation:
+
+- `docker-php-ext-install opcache`, `docker-php-ext-enable opcache`, or `docker-php-ext-configure opcache`
+- `pecl install opcache`
+- Package-manager installs referencing OPcache (`apt-get install php-opcache`, `apk add php83-opcache`, `dnf install php-opcache`, etc.), with
+  version/architecture specifiers stripped (`php-opcache=8.3+1ubuntu1`, `php-opcache:amd64`)
+- An image file that looks like an OPcache ini (`*opcache*.ini`) or whose content enables OPcache via `opcache.*` keys (e.g., `opcache.enable=1`) or
+  `zend_extension=opcache`
+- A stage-level environment variable prefixed with `PHP_OPCACHE_`
+
+## Fix behavior
+
+The rule offers two heuristic `FixSuggestion` fixes:
+
+### 1. Official `php:*fpm*` / `*apache*` base
+
+When the base image is an official `php:*fpm*` or `php:*apache*` Linux tag, the rule inserts a new `RUN docker-php-ext-install opcache` line
+immediately after the final `FROM`. The edit is narrow, zero-width at the insertion column, and does not modify any existing lines.
+
+### 2. Generic base that installs PHP via a package manager
+
+When the final stage is detected as PHP only via `CMD`/`ENTRYPOINT` (e.g., `debian:12-slim` + `CMD ["php-fpm8.3"]`) **and** the stage's install
+commands include exactly one `php*-fpm` package, the rule appends the matching `php*-opcache` package to that same install command. The matching
+package name is derived directly from the existing PHP package the user chose:
+
+| Package in `RUN` | Derived OPcache package |
+|---|---|
+| `php8.3-fpm` (Debian/Ubuntu) | `php8.3-opcache` |
+| `php-fpm` (unversioned) | `php-opcache` |
+| `php83-fpm` (Alpine) | `php83-opcache` |
+| `php83-php-fpm` (Remi SCL) | `php83-php-opcache` |
+
+Example:
+
+```dockerfile
+# Before
+RUN apt-get install -y php8.3-fpm
+# After
+RUN apt-get install -y php8.3-fpm php8.3-opcache
+```
+
+### No fix is offered
+
+- the base image is a non-official derivative (`serversideup/php`, `dunglas/frankenphp`, `bitnami/php-fpm`, ...) — they usually bundle OPcache or
+  expect different ini paths, and the right remediation is image-specific
+- the stage is detected via `CMD`/`ENTRYPOINT` but no `php*-fpm` package is visible in an install command in the same Dockerfile
+- the stage installs **multiple different** `php*-fpm` packages (ambiguous target version)
+
+The package-manager fix coordinates with `tally/sort-packages`: when both rules are enabled, the inserted opcache package is appended at the end of
+the install command so that sort-packages produces a correctly ordered list in the same `--fix` pass.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM php:8.4-fpm
+WORKDIR /app
+COPY . .
+```
+
+### After
+
+```dockerfile
+FROM php:8.4-fpm
+RUN docker-php-ext-install opcache
+WORKDIR /app
+COPY . .
+```
+
+## References
+
+- [PHP OPcache manual](https://www.php.net/manual/en/book.opcache.php)
+- [Docker guide for PHP: develop](https://docs.docker.com/guides/php/develop/)
+- [Composer autoloader optimization](https://getcomposer.org/doc/articles/autoloader-optimization.md)

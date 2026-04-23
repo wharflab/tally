@@ -134,6 +134,7 @@
             "group": "PHP",
             "pages": [
               "rules/tally/php/composer-no-dev-in-production",
+              "rules/tally/php/enable-opcache-in-production",
               "rules/tally/php/no-xdebug-in-final-image"
             ]
           },
