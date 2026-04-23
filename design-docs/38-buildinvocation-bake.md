@@ -120,11 +120,11 @@ classDiagram
         +InvocationSource Source
         +string DockerfilePath
         +*context.BuildContext Context
-        +map~string,string~ BuildArgs
+        +map~string,*string~ BuildArgs
         +string[] Platforms
         +string TargetStage
         +map~string,NamedContext~ NamedContexts
-        +map~string,string~ Environment
+        +map~string,*string~ Environment
         +Port[] ExposedPorts
         +string[] Networks
         +map~string,string~ Labels
@@ -178,7 +178,15 @@ type BuildInvocation struct {
     Context *context.BuildContext
 
     // Build-time inputs declared by the orchestrator.
-    BuildArgs   map[string]string
+    //
+    // BuildArgs uses *string so we can distinguish three states the
+    // orchestrators express differently:
+    //   - declared without default (bake `args = { FOO = null }`,
+    //                               compose `build.args: [FOO]`) → nil
+    //   - explicitly empty         (`FOO = ""`)                  → &""
+    //   - explicitly set           (`FOO = "22"`)                → &"22"
+    // This also matches the upstream compose-go and buildx types.
+    BuildArgs   map[string]*string
     Platforms   []string
     TargetStage string
 
@@ -189,7 +197,11 @@ type BuildInvocation struct {
 
     // Runtime-facing metadata from Compose. Bake generally does not expose
     // these; that's fine — the facets stay empty.
-    Environment  map[string]string
+    //
+    // Environment uses *string for the same reason BuildArgs does:
+    // compose `environment: [VAR]` / `VAR:` means "inherit from host",
+    // which is semantically different from `VAR=""`.
+    Environment  map[string]*string
     ExposedPorts []Port
     Networks     []string
     Labels       map[string]string
