@@ -233,8 +233,9 @@ Illustrative shape:
 package invocation
 
 type BuildInvocation struct {
-	// Stable identity for one invocation within a run. Used by reporters,
-	// async bookkeeping, and LSP diagnostics.
+	// Deterministic cross-run identity for one invocation. Providers should
+	// derive it from the normalized source tuple described below, not from
+	// random IDs or process-local counters.
 	Key string
 
 	Source InvocationSource
@@ -267,22 +268,26 @@ type BuildInvocation struct {
 
 type InvocationSource struct {
 	Kind string // "dockerfile" | "bake" | "compose" | "aws-cdk-asset-manifest" | "skaffold" | "bazel" | ...
-	File string // absolute path to the originating file or manifest
+	File string // absolute path to the originating file/manifest, or synthetic stdin marker
 	Name string // target, service, asset ID, artifact name, or Bazel label; empty for plain Dockerfile mode
 }
 
 type ContextRef struct {
 	Kind  string // "dir" | "tar" | "git" | "url" | "empty" | "docker-image" | "target" | "service" | "oci-layout" | ...
-	Value string // absolute path for local dirs / OCI layouts; canonical string otherwise
+	Value string // absolute path for local path-bearing contexts; canonical string otherwise
 }
 
 type PortSpec struct {
+	// Inclusive container-visible port range. For a single port,
+	// Start == End. Protocol is normalized lowercase.
 	Start    int
 	End      int
 	Protocol string
 }
 
 type PortBinding struct {
+	// Inclusive published host/container port ranges. For a single port,
+	// HostStart == HostEnd and ContainerStart == ContainerEnd.
 	ContainerStart int
 	ContainerEnd   int
 	HostStart      int
@@ -295,8 +300,11 @@ type PortBinding struct {
 
 type SecretRef struct {
 	Scope  string // "build" | "service"
+	// Source is the declared origin name/path, not the secret value.
 	ID     string
 	Source string
+	// Target is the effective secret ID or mount target visible to the
+	// builder/runtime after defaulting has been applied.
 	Target string
 }
 
@@ -407,15 +415,60 @@ The invocation model should therefore preserve these service-level overrides exp
 This matters even before new rules are added, because the repo already contains runtime-oriented checks around `HEALTHCHECK`, `ENTRYPOINT`, `CMD`,
 `STOPSIGNAL`, `USER`, and `EXPOSE`.
 
+### Invocation key semantics
+
+`BuildInvocation.Key` must be stable across runs and editor sessions as long as the normalized invocation tuple does not change.
+
+The recommended canonical format is:
+
+```text
+<source-kind>|<source-file>|<source-name>|<dockerfile-path>
+```
+
+Where:
+
+- `source-kind` is `InvocationSource.Kind`
+- `source-file` is normalized `InvocationSource.File`
+- `source-name` is `InvocationSource.Name` and may be empty in plain Dockerfile mode
+- `dockerfile-path` is normalized `BuildInvocation.DockerfilePath`
+
+Example:
+
+```text
+compose|/repo/compose.yaml|api|/repo/api/Dockerfile
+```
+
+Providers should use that exact structure. They should not use random UUIDs, Go map iteration order, or ephemeral counters.
+
+### Supporting type semantics
+
+`InvocationSource`, `PortSpec`, `PortBinding`, and `SecretRef` need explicit semantics so providers do not guess.
+
+- `InvocationSource.Kind` identifies the source family.
+- `InvocationSource.File` is the absolute local file path that directly produced the invocation, or a synthetic stdin marker in stdin Dockerfile mode.
+- `InvocationSource.Name` identifies the concrete target/service/asset/label within that file and stays empty for plain Dockerfile mode.
+- `PortSpec` models container-visible ports such as Compose `expose:`. Single ports use `Start == End`. Ranges are inclusive. `Protocol` defaults to
+  lowercase `tcp` when the source declaration omits it.
+- `PortBinding` models published host-to-container ports such as Compose `ports:`. Host and container ranges are inclusive. Single ports use equal
+  start/end values. `HostIP`, `AppProtocol`, and `Mode` preserve long-syntax metadata instead of collapsing it away.
+- `SecretRef` stores declaration metadata only and never stores secret contents.
+- For build-scoped secrets, `Target` is the effective secret ID visible to `RUN --mount=type=secret,id=...`. If the declaration omits it, providers
+  should normalize `Target` to the effective ID the builder sees. When the Dockerfile mount does not override its file path, BuildKit's default
+  file location is `/run/secrets/<id>`.
+- For service-scoped secrets, short syntax defaults to `/run/secrets/<secret_name>` and long syntax may override the mounted file name or absolute
+  path. Providers should preserve the effective target naming/path information when the source model exposes it.
+
 ### Path Normalization
 
 All path-valued fields are stored as absolute, cleaned paths:
 
 - `BuildInvocation.DockerfilePath`
 - `InvocationSource.File`
-- `ContextRef.Value` when `Kind == "dir"`
+- `ContextRef.Value` for any local path-bearing context kind, currently `dir`, local `tar`, and local `oci-layout`
+- path-valued entries in `BuildInvocation.NamedContexts`, via the same normalized `ContextRef` contract
 - any local path captured in `SecretRef.Source`
 
+Providers should perform this normalization at construction time, before building `BuildInvocation.Key` or appending to `DiscoveryResult.Invocations`.
 Reporters and examples may render relative paths for readability, but equality and cache keys use the canonical absolute form.
 
 ### Discovery and Provider Contract
@@ -434,7 +487,7 @@ type ResolveOptions struct {
 type DiscoveryResult struct {
 	Kind              string // "dockerfile" | "bake" | "compose"
 	EntrypointPath    string
-	Invocations       []BuildInvocation
+	Invocations       []BuildInvocation // deterministic order; see provider rules below
 	ZeroLintableReason string // only set when Invocations is empty and parsing succeeded
 }
 
@@ -450,6 +503,9 @@ type Provider interface {
 - valid file with nothing to lint
 
 This is better than inferring semantics from an empty slice alone.
+
+Providers must return `DiscoveryResult.Invocations` in deterministic order. They must not depend on Go map iteration order or parser traversal order.
+The provider-specific ordering rules below are part of the contract, not an implementation detail.
 
 ### Parse reuse and parser outputs
 
@@ -571,7 +627,7 @@ Required change:
 - add `InvocationKey string` to `rules.Violation`
 
 Resolver result dedupe may still happen by `(ResolverID, Key)` when the network lookup is identical. What changes is the **merge/suppression**
-identity, which must become `(RuleCode, File, InvocationKey, StageIndex)`.
+identity, which should become `(RuleCode, InvocationKey, StageIndex)` because `InvocationKey` already includes the normalized Dockerfile path.
 
 This preserves the current async architecture while preventing one invocation from suppressing another invocation’s diagnostics.
 
@@ -625,6 +681,13 @@ In practice, that means:
 - otherwise lint the targets Buildx resolves as the implicit default for that file
 
 tally must not invent a different Bake selection model.
+
+Deterministic ordering:
+
+- when `ResolveOptions.Targets` is non-empty, preserve explicit target names in CLI order, de-duplicated by first occurrence
+- if explicit targets pull in additional targets indirectly through upstream expansion, append only the not-already-selected targets in
+  alphabetical order by target name
+- when no explicit `--target` is provided, construct `DiscoveryResult.Invocations` in alphabetical order by target name
 
 One terminology note: Docker documentation treats Compose files as one possible Bake definition source. tally intentionally keeps Compose as a
 separate provider/mode because the downstream metadata and future rule opportunities differ substantially from Bake HCL/JSON, even though Buildx
@@ -712,10 +775,19 @@ Without `--service`, lint all services in the loaded project that:
 - are active in the default profile set
 - have a `build:` section
 
-With `--service`, lint only the selected services, but still reject profile-only services that are inactive because Compose profiles are out of
-scope for the MVP.
+Compose profile activation beyond the default set is a hard error in the MVP. tally must not silently ignore profile-gated buildable services or
+guess how profile selection should work.
+
+With `--service`, lint only the selected services, but reject any selected service that is inactive under the default profile set with exit `2`.
+Likewise, if the file contains buildable services that require non-default profiles to participate in selection, provider discovery fails with
+exit `2` rather than degrading to a partial view.
 
 Image-only services are valid inputs and count toward the “nothing to lint” notice, but they do not produce invocations.
+
+Deterministic ordering:
+
+- when `ResolveOptions.Services` is non-empty, preserve explicit service names in CLI order, de-duplicated by first occurrence
+- when no explicit `--service` is provided, construct `DiscoveryResult.Invocations` in alphabetical order by service name
 
 ### Mapping
 
@@ -785,7 +857,7 @@ Other service-level runtime metadata is also intentionally deferred for now beca
 | Feature | MVP behavior | Reason |
 |---|---|---|
 | `build.dockerfile_inline` | hard error, exit `2` | Same reason as Bake inline Dockerfiles. |
-| profiles beyond the default set | unsupported | Avoid loading behavior that differs from explicit selection semantics. |
+| profiles beyond the default set | hard error, exit `2` | Material service-selection semantics must fail clearly instead of being guessed or ignored. |
 | implicit sibling override file loading | unsupported | CLI stays explicit; no hidden extra files. |
 | unsaved orchestrator buffer state in LSP | unsupported | Initial LSP implementation reads orchestrators from disk only. |
 
@@ -980,7 +1052,7 @@ At minimum this policy applies to:
 - inline Dockerfiles
 - unresolved Bake matrix expansion
 - invalid selection flags
-- unsupported profile-driven Compose selection
+- Compose profile-driven selection beyond the default profile set
 
 This policy does **not** require every valid Buildx/Compose execution knob to be elevated into `BuildInvocation` on day one. If a field does not
 change which Dockerfile is selected or the invocation facets that current/planned lint rules depend on, it may remain documented-as-deferred instead
