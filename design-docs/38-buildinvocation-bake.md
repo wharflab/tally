@@ -250,12 +250,19 @@ type BuildInvocation struct {
 	TargetStage   string
 	NamedContexts map[string]ContextRef
 
-	// Compose-derived runtime metadata. Usually empty for Bake.
-	Environment  map[string]*string
-	ExposedPorts []Port
-	Networks     []string
-	Labels       map[string]string
-	Secrets      []SecretRef
+	// Compose-derived runtime metadata and service overrides. Usually empty for Bake.
+	Environment        map[string]*string
+	PublishedPorts     []PortBinding
+	ExposedPorts       []PortSpec
+	Networks           []string
+	Labels             map[string]string
+	Secrets            []SecretRef
+	Healthcheck        *HealthcheckSpec
+	EntrypointOverride *CommandOverride
+	CommandOverride    *CommandOverride
+	RuntimeUser        string
+	RuntimeWorkingDir  string
+	StopSignal         string
 }
 
 type InvocationSource struct {
@@ -269,18 +276,47 @@ type ContextRef struct {
 	Value string // absolute path for local dirs / OCI layouts; canonical string otherwise
 }
 
-type Port struct {
+type PortSpec struct {
+	Start    int
+	End      int
+	Protocol string
+}
+
+type PortBinding struct {
 	ContainerStart int
 	ContainerEnd   int
 	HostStart      int
 	HostEnd        int
+	HostIP         string
 	Protocol       string
+	AppProtocol    string
+	Mode           string
 }
 
 type SecretRef struct {
+	Scope  string // "build" | "service"
 	ID     string
 	Source string
 	Target string
+}
+
+type HealthcheckSpec struct {
+	Test          []string
+	Disable       bool
+	Interval      string
+	Timeout       string
+	Retries       *uint64
+	StartPeriod   string
+	StartInterval string
+}
+
+type CommandOverride struct {
+	// Args is the Compose-normalized argv form. Nil means "not declared".
+	Args []string
+
+	// ClearsImageValue is true when Compose explicitly clears the image's
+	// default command/entrypoint with [] or an empty string.
+	ClearsImageValue bool
 }
 ```
 
@@ -355,6 +391,21 @@ This keeps the model correct while still allowing `.dockerignore` evaluation and
 
 The lint pipeline derives a plain `map[string]string` only for the subset of args with concrete values when building the semantic model. Nil-valued
 args remain “declared but unresolved”.
+
+### Runtime override semantics
+
+Compose can override runtime-facing Dockerfile semantics that tally already lints today, including `HEALTHCHECK`, `ENTRYPOINT`, `CMD`, `USER`,
+`WORKDIR`, `EXPOSE`, and `STOPSIGNAL`.
+
+The invocation model should therefore preserve these service-level overrides explicitly rather than treating Compose as “ports + env only”:
+
+- `Healthcheck` captures service `healthcheck`, including explicit disable semantics
+- `EntrypointOverride` and `CommandOverride` preserve both argv content and the “explicitly cleared” state
+- `RuntimeUser`, `RuntimeWorkingDir`, and `StopSignal` capture the corresponding service overrides
+- `PublishedPorts` and `ExposedPorts` stay distinct because Compose `ports:` and `expose:` are not the same thing
+
+This matters even before new rules are added, because the repo already contains runtime-oriented checks around `HEALTHCHECK`, `ENTRYPOINT`, `CMD`,
+`STOPSIGNAL`, `USER`, and `EXPOSE`.
 
 ### Path Normalization
 
@@ -591,8 +642,34 @@ can ingest both under one command family.
 | `platforms` | `Platforms` | |
 | `target` | `TargetStage` | |
 | `contexts` | `NamedContexts` | Classify each reference. |
-| `secret` | `Secrets` | Metadata only, never secret values. |
+| `secret` | `Secrets` | Metadata only, never secret values. Store with `Scope == "build"`. |
 | `labels` | `Labels` | |
+
+### Deferred Bake execution metadata
+
+Buildx targets expose more execution controls than the first `BuildInvocation` revision stores directly. The proposal should name them explicitly so
+they are not mistaken for accidental omissions:
+
+- `attest`
+- `cache-from` / `cache-to`
+- `output`
+- `pull`
+- `no-cache` / `no-cache-filter`
+- `network`
+- `ssh`
+- `entitlements`
+- `extra-hosts`
+- `shm-size`
+- `ulimits`
+- `tags`
+- `policy`
+- `call`
+
+These do **not** need to block the MVP when tally can still truthfully determine which Dockerfile is linted and with which build args, target,
+platforms, and contexts. They should either:
+
+- stay provider-private until a rule or reporter needs them, or
+- move later into a dedicated execution-options facet instead of bloating the base `BuildInvocation` shape immediately
 
 ### Unsupported or deferred Bake features
 
@@ -652,11 +729,56 @@ Image-only services are valid inputs and count toward the “nothing to lint” 
 | `build.platforms` | `Platforms` | Fall back to service `platform` only when appropriate. |
 | `build.target` | `TargetStage` | |
 | `build.additional_contexts` | `NamedContexts` | Classify `dir`, `docker-image`, `service`, git/url, etc. |
-| `build.secrets` | `Secrets` | Cross-reference top-level secret sources when possible. |
-| `build.labels` and service `labels` | `Labels` | Merge into one map with clear precedence. |
-| service `environment` | `Environment` | Runtime env, not build args. |
-| service `ports` | `ExposedPorts` | Preserve ranges instead of exploding them. |
+| `build.secrets` | `Secrets` | Cross-reference top-level secret sources when possible. Store with `Scope == "build"`. |
+| `build.labels`, service `labels`, and service `label_file` | `Labels` | Use compose-go's label resolution so file-backed labels are not dropped. Merge with clear precedence. |
+| service `env_file` and `environment` | `Environment` | Runtime env, not build args. Use compose-go's env-file resolution so precedence is preserved. |
+| service `ports` | `PublishedPorts` | Preserve long-syntax details and ranges instead of exploding them. |
+| service `expose` | `ExposedPorts` | Distinct from published host ports. |
 | service `networks` | `Networks` | |
+| service `secrets` | `Secrets` | Preserve runtime secret refs too. Store with `Scope == "service"`. |
+| service `healthcheck` | `Healthcheck` | Must preserve override and disable semantics. |
+| service `entrypoint` | `EntrypointOverride` | Preserve explicit-empty "clear image entrypoint" cases. |
+| service `command` | `CommandOverride` | Preserve explicit-empty "clear image command" cases. |
+| service `user` | `RuntimeUser` | |
+| service `working_dir` | `RuntimeWorkingDir` | |
+| service `stop_signal` | `StopSignal` | |
+
+Compose-specific implementation notes:
+
+- Load through compose-go's project loader and retain the resolved `*types.Project`.
+- Preserve service `healthcheck` because Compose can override or disable a Dockerfile `HEALTHCHECK`, and tally already carries healthcheck-oriented
+  rules today.
+- Treat `command` and `entrypoint` as override-capable values, not plain string slices, because Compose distinguishes "unset" from "explicitly clear
+  the image default".
+
+### Deferred Compose build execution metadata
+
+The first invocation model revision does not need to store every Compose build execution knob directly, but the proposal should acknowledge them:
+
+- `build.cache_from` / `build.cache_to`
+- `build.no_cache` / `build.no_cache_filter`
+- `build.pull`
+- `build.network`
+- `build.ssh`
+- `build.entitlements`
+- `build.extra_hosts`
+- `build.shm_size`
+- `build.ulimits`
+- `build.tags`
+- `build.provenance`
+- `build.sbom`
+- `build.privileged`
+
+Other service-level runtime metadata is also intentionally deferred for now because no current rule depends on it yet:
+
+- `configs`
+- `volumes`
+- `depends_on`
+- `network_mode`
+- `extra_hosts`
+- `hostname`
+- `init`
+- `develop`
 
 ### Unsupported or deferred Compose features
 
@@ -672,6 +794,7 @@ This is intentionally strict. Compose files are often heavily templated, and sil
 ### Future rule examples unlocked by Compose
 
 - cross-check Dockerfile `EXPOSE` against service `ports:`
+- compare Dockerfile `HEALTHCHECK` with service `healthcheck:` and recognize explicit Compose disable/override semantics
 - compare Dockerfile `ENV` / `ARG` usage against Compose `environment:` and `build.args:`
 - diagnose a `COPY --from=` name that matches neither a stage name nor a declared additional context
 
@@ -858,6 +981,10 @@ At minimum this policy applies to:
 - unresolved Bake matrix expansion
 - invalid selection flags
 - unsupported profile-driven Compose selection
+
+This policy does **not** require every valid Buildx/Compose execution knob to be elevated into `BuildInvocation` on day one. If a field does not
+change which Dockerfile is selected or the invocation facets that current/planned lint rules depend on, it may remain documented-as-deferred instead
+of becoming a hard error immediately. The key requirement is that the omission is explicit in this design and does not make lint output misleading.
 
 Remote build contexts do **not** fall under this hard-error policy as long as they can still be represented faithfully in `ContextRef`. In that
 case:
