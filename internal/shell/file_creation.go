@@ -1172,8 +1172,12 @@ func producerStmtContent(
 		return content, unsafe, true
 	case cmdCat:
 		if len(call.Args) > 1 {
-			// cat with file args or flags: content depends on files we can't inline.
-			return "", true, true
+			// `cat /some/file` (or `cat -flag`) reads from a source we
+			// can't inline at lint time, so the producer's content is
+			// statically unknown. Returning ok=false makes the whole
+			// pipe fall through as opaque rather than creating a
+			// file-creation slot with empty/misleading content.
+			return "", false, false
 		}
 		content, unsafe := extractCatHeredocContentFromStmt(stmt)
 		return content, unsafe, true

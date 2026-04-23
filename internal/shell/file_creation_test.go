@@ -1113,6 +1113,20 @@ func TestDetectFileCreationPipeToTee(t *testing.T) {
 			script:  "echo ignored | tee /etc/config <<EOF\nactual heredoc\nEOF",
 			wantNil: true,
 		},
+		{
+			// `cat /some/file` reads from a file we can't inline at lint
+			// time, so the producer content is statically unknown — the
+			// whole pipe must fall through as opaque.
+			name:    "cat file-arg piped to tee - skip",
+			script:  `cat /etc/hosts | tee /etc/config`,
+			wantNil: true,
+		},
+		{
+			// Same reasoning for cat with flags (`-n`, `-A`, etc.).
+			name:    "cat flag piped to tee - skip",
+			script:  `cat -n /etc/hosts | tee /etc/config`,
+			wantNil: true,
+		},
 	}
 
 	for _, tt := range tests {
