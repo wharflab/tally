@@ -59,5 +59,10 @@
     "ast-grep@ast-grep-marketplace": true,
     "mintlify@claude-plugins-official": true
   },
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": true,
+  "worktree": {
+    "symlinkDirectories": [
+      "internal/shellcheck/wasm"
+    ]
+  }
 }
