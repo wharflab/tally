@@ -1,0 +1,122 @@
+---
+title: "tally/prefer-nginx-sigquit"
+description: "nginx and openresty containers should use STOPSIGNAL SIGQUIT for graceful shutdown."
+---
+
+nginx and openresty containers should use STOPSIGNAL SIGQUIT for graceful shutdown.
+
+| Property | Value |
+|----------|-------|
+| Severity | Info |
+| Category | Best-practice |
+| Default | Enabled |
+| Auto-fix | Yes — safe for missing `STOPSIGNAL`, suggestion (requires `--fix-unsafe`) for replacing an existing value |
+
+## Description
+
+When a container runs `nginx` or `openresty` as PID 1, the container runtime's
+default stop signal (`SIGTERM`, signal 15) triggers nginx's **fast shutdown**:
+active connections are dropped immediately. The correct signal for a
+container stop is `SIGQUIT`, which triggers nginx's **graceful shutdown**:
+workers finish in-flight requests, then exit.
+
+This rule fires when:
+
+- the stage's effective PID 1 is `nginx` or `openresty` (bare name or
+  absolute path such as `/usr/sbin/nginx`), **and**
+- `STOPSIGNAL` is either missing or set to a signal that normalizes to
+  anything other than `SIGQUIT`.
+
+### When the rule does not fire
+
+- **Shell-form** `ENTRYPOINT` or `CMD` — the shell becomes PID 1, not nginx,
+  so the signal mapping is unreliable.
+- **Opaque exec-form shell wrappers** (`["sh", "-c", ...]`, `["bash", "-c",
+  ...]`) — the first token is `sh` / `bash`, not nginx.
+- **Non-nginx executables** (postgres, php-fpm, systemd, etc.) — other
+  daemon-specific rules handle those.
+- **`nginx-debug`** and similar variants — the basename must be exactly
+  `nginx` or `openresty`.
+- **Windows stages** — `STOPSIGNAL` has no effect on Windows containers.
+- **Environment variable** signals (e.g. `STOPSIGNAL $MY_SIGNAL`) — the
+  value cannot be determined statically.
+
+## References
+
+- [Dockerfile reference -- STOPSIGNAL](https://docs.docker.com/reference/dockerfile/#stopsignal)
+- [nginx -- Controlling nginx](https://nginx.org/en/docs/control.html)
+
+## Examples
+
+### Bad
+
+```dockerfile
+FROM nginx:1.27
+# Default SIGTERM forces fast shutdown, dropping active connections
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+```dockerfile
+FROM nginx:1.27
+# SIGTERM is fast shutdown, not graceful
+STOPSIGNAL SIGTERM
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+```dockerfile
+FROM openresty/openresty:alpine
+# openresty inherits nginx's signal semantics
+CMD ["openresty", "-g", "daemon off;"]
+```
+
+### Good
+
+```dockerfile
+FROM nginx:1.27
+STOPSIGNAL SIGQUIT
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+```dockerfile
+FROM openresty/openresty:alpine
+STOPSIGNAL SIGQUIT
+CMD ["openresty", "-g", "daemon off;"]
+```
+
+## Auto-fix
+
+The rule provides two fix modes depending on the violation:
+
+**Missing STOPSIGNAL** — inserts `STOPSIGNAL SIGQUIT` before the
+ENTRYPOINT/CMD instruction. `FixSafe`: applied with plain `--fix`.
+
+```bash
+tally lint --fix Dockerfile
+```
+
+**Wrong STOPSIGNAL present** — replaces the signal token with `SIGQUIT`.
+`FixSuggestion`: requires `--fix-unsafe` because the user explicitly chose
+a signal and `SIGTERM` is still a valid (if not preferred) shutdown signal.
+
+```bash
+tally lint --fix --fix-unsafe Dockerfile
+```
+
+## Cross-rule interactions
+
+- **tally/prefer-canonical-stopsignal**: Normalizes tokens such as `QUIT` or
+  `3` into `SIGQUIT`. This rule checks the normalized value, so those
+  spellings are accepted as correct and only the canonical rule fires.
+- **tally/no-ungraceful-stopsignal**: On an nginx stage with `SIGKILL` or
+  `SIGSTOP`, both rules want to replace the signal. The fixer's
+  category-based conflict resolution ranks `correctness` above
+  `best-practice`, so `no-ungraceful-stopsignal` wins first and replaces
+  with `SIGTERM`. A subsequent `--fix-unsafe` pass then promotes `SIGTERM`
+  to `SIGQUIT` via this rule's wrong-signal fix.
+
+## Configuration
+
+```toml
+[rules.tally.prefer-nginx-sigquit]
+severity = "info"  # Options: "off", "error", "warning", "info", "style"
+```

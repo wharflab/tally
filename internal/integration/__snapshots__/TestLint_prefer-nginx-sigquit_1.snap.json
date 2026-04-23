@@ -1,0 +1,140 @@
+{
+  "files": [
+    {
+      "file": "testdata/prefer-nginx-sigquit/Dockerfile",
+      "violations": [
+        {
+          "detail": "nginx treats SIGQUIT as graceful shutdown (workers drain in-flight requests) and SIGTERM as fast shutdown (active connections dropped)",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-nginx-sigquit/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/prefer-nginx-sigquit/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "STOPSIGNAL SIGTERM should be SIGQUIT for nginx / openresty containers",
+          "rule": "tally/prefer-nginx-sigquit",
+          "severity": "info",
+          "sourceCode": "STOPSIGNAL SIGTERM",
+          "suggestedFix": {
+            "description": "Replace with SIGQUIT for graceful nginx shutdown",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 18,
+                    "line": 3
+                  },
+                  "file": "testdata/prefer-nginx-sigquit/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 3
+                  }
+                },
+                "newText": "SIGQUIT"
+              }
+            ],
+            "isPreferred": true,
+            "priority": -1,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Without STOPSIGNAL SIGQUIT, the container runtime sends SIGTERM which triggers nginx's fast shutdown — active connections are dropped instead of draining",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-nginx-sigquit/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 8
+            },
+            "file": "testdata/prefer-nginx-sigquit/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 8
+            }
+          },
+          "message": "nginx / openresty container is missing STOPSIGNAL SIGQUIT",
+          "rule": "tally/prefer-nginx-sigquit",
+          "severity": "info",
+          "sourceCode": "CMD [\"nginx\", \"-g\", \"daemon off;\"]",
+          "suggestedFix": {
+            "description": "Add STOPSIGNAL SIGQUIT for graceful nginx shutdown",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 8
+                  },
+                  "file": "testdata/prefer-nginx-sigquit/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 8
+                  }
+                },
+                "newText": "# [tally] SIGQUIT is the graceful shutdown signal for nginx / openresty\nSTOPSIGNAL SIGQUIT\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": -1
+          }
+        },
+        {
+          "detail": "Without STOPSIGNAL SIGQUIT, the container runtime sends SIGTERM which triggers nginx's fast shutdown — active connections are dropped instead of draining",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-nginx-sigquit/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 12
+            },
+            "file": "testdata/prefer-nginx-sigquit/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 12
+            }
+          },
+          "message": "nginx / openresty container is missing STOPSIGNAL SIGQUIT",
+          "rule": "tally/prefer-nginx-sigquit",
+          "severity": "info",
+          "sourceCode": "CMD [\"openresty\", \"-g\", \"daemon off;\"]",
+          "suggestedFix": {
+            "description": "Add STOPSIGNAL SIGQUIT for graceful nginx shutdown",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 12
+                  },
+                  "file": "testdata/prefer-nginx-sigquit/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 12
+                  }
+                },
+                "newText": "# [tally] SIGQUIT is the graceful shutdown signal for nginx / openresty\nSTOPSIGNAL SIGQUIT\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": -1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 3,
+    "style": 0,
+    "total": 3,
+    "warnings": 0
+  }
+}

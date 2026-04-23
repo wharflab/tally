@@ -76,6 +76,37 @@ func TestSignalColumnRange(t *testing.T) {
 	}
 }
 
+func TestIsNginxOrOpenResty(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		executable string
+		want       bool
+	}{
+		{"nginx", true},
+		{"openresty", true},
+		{"/usr/sbin/nginx", true},
+		{"/usr/local/nginx/sbin/nginx", true},
+		{"/usr/local/openresty/nginx/sbin/nginx", true},
+		{"/usr/local/openresty/bin/openresty", true},
+		{"/sbin/init", false},
+		{"systemd", false},
+		{"postgres", false},
+		{"php-fpm", false},
+		{"nginx-debug", false},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.executable, func(t *testing.T) {
+			t.Parallel()
+			if got := isNginxOrOpenResty(tt.executable); got != tt.want {
+				t.Errorf("isNginxOrOpenResty(%q) = %v, want %v", tt.executable, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSignalEditLocation_CRLF(t *testing.T) {
 	t.Parallel()
 

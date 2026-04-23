@@ -8,6 +8,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/rules"
 )
@@ -189,6 +190,170 @@ func isSystemdInit(executable string) bool {
 		return true
 	}
 	return path.Base(executable) == "systemd"
+}
+
+// isNginxOrOpenResty returns true if the executable's base name is "nginx"
+// or "openresty". Matching on the base name covers absolute paths such as
+// /usr/sbin/nginx and /usr/local/openresty/nginx/sbin/nginx.
+func isNginxOrOpenResty(executable string) bool {
+	base := path.Base(executable)
+	return base == "nginx" || base == "openresty"
+}
+
+// daemonStopsignalRule describes a daemon-specific STOPSIGNAL rule so that the
+// generic check/fix scaffolding can be shared. It captures the behavior that
+// varies between daemons: how to recognize the PID 1 binary, what the target
+// signal is, and how to build the violation messages and fixes.
+type daemonStopsignalRule struct {
+	meta           rules.RuleMetadata
+	isDaemon       func(executable string) bool
+	targetSignal   string
+	wrongFix       daemonStopsignalFixSpec
+	missingFix     daemonStopsignalFixSpec
+	missingMessage string
+	missingDetail  string
+	wrongDetail    string
+	wrongMessage   func(normalized string) string
+	insertText     string
+}
+
+// daemonStopsignalFixSpec captures the fix-kind metadata (safety level plus
+// description) for one of a daemon rule's two fix paths.
+type daemonStopsignalFixSpec struct {
+	Description string
+	Safety      rules.FixSafety
+}
+
+// checkDaemonStopsignal runs the shared STOPSIGNAL check loop for a
+// daemon-specific rule. It iterates stages, identifies the PID 1 binary via
+// stageRuntimeExecutable, and delegates to the daemon-specific predicates and
+// templates for message/fix construction.
+func checkDaemonStopsignal(input rules.LintInput, spec daemonStopsignalRule) []rules.Violation {
+	sem := input.Semantic
+	var violations []rules.Violation
+
+	for stageIdx, stage := range input.Stages {
+		if sem != nil {
+			if info := sem.StageInfo(stageIdx); info != nil && info.IsWindows() {
+				continue
+			}
+		}
+
+		executable := stageRuntimeExecutable(stage)
+		if executable == "" || !spec.isDaemon(executable) {
+			continue
+		}
+
+		var lastStopSig *instructions.StopSignalCommand
+		for _, cmd := range stage.Commands {
+			if ss, ok := cmd.(*instructions.StopSignalCommand); ok {
+				lastStopSig = ss
+			}
+		}
+
+		if lastStopSig == nil {
+			violations = append(violations, buildMissingStopsignalViolation(input, spec, stage))
+			continue
+		}
+
+		raw := lastStopSig.Signal
+		if strings.Contains(raw, "$") {
+			continue
+		}
+
+		normalized := normalizeSignalName(raw)
+		if normalized == spec.targetSignal {
+			continue
+		}
+
+		violations = append(violations, buildWrongStopsignalViolation(input, spec, lastStopSig, normalized))
+	}
+
+	return violations
+}
+
+// buildWrongStopsignalViolation emits a violation for a STOPSIGNAL set to a
+// signal other than the daemon's preferred value.
+func buildWrongStopsignalViolation(
+	input rules.LintInput,
+	spec daemonStopsignalRule,
+	cmd *instructions.StopSignalCommand,
+	normalized string,
+) rules.Violation {
+	loc := rules.NewLocationFromRanges(input.File, cmd.Location())
+
+	v := rules.NewViolation(loc, spec.meta.Code, spec.wrongMessage(normalized), spec.meta.DefaultSeverity).
+		WithDocURL(spec.meta.DocURL).
+		WithDetail(spec.wrongDetail)
+
+	if editLoc := signalEditLocation(input.File, input.Source, cmd); editLoc != nil {
+		v = v.WithSuggestedFix(&rules.SuggestedFix{
+			Description: spec.wrongFix.Description,
+			Safety:      spec.wrongFix.Safety,
+			Priority:    -1,
+			IsPreferred: true,
+			Edits: []rules.TextEdit{
+				{Location: *editLoc, NewText: spec.targetSignal},
+			},
+		})
+	}
+
+	return v
+}
+
+// buildMissingStopsignalViolation emits a violation for a daemon stage that
+// has no STOPSIGNAL at all, inserting the daemon's preferred value before the
+// ENTRYPOINT or CMD that defines PID 1.
+func buildMissingStopsignalViolation(
+	input rules.LintInput,
+	spec daemonStopsignalRule,
+	stage instructions.Stage,
+) rules.Violation {
+	var lastEntrypointLoc, lastCmdLoc []parser.Range
+	for _, cmd := range stage.Commands {
+		switch c := cmd.(type) {
+		case *instructions.EntrypointCommand:
+			lastEntrypointLoc = c.Location()
+		case *instructions.CmdCommand:
+			lastCmdLoc = c.Location()
+		}
+	}
+
+	var runtimeLoc []parser.Range
+	if lastEntrypointLoc != nil {
+		runtimeLoc = lastEntrypointLoc
+	} else {
+		runtimeLoc = lastCmdLoc
+	}
+
+	var loc rules.Location
+	if len(runtimeLoc) > 0 {
+		loc = rules.NewLocationFromRanges(input.File, runtimeLoc)
+	} else {
+		loc = rules.NewLocationFromRanges(input.File, stage.Location)
+	}
+
+	v := rules.NewViolation(loc, spec.meta.Code, spec.missingMessage, spec.meta.DefaultSeverity).
+		WithDocURL(spec.meta.DocURL).
+		WithDetail(spec.missingDetail)
+
+	if len(runtimeLoc) > 0 {
+		insertLine := runtimeLoc[0].Start.Line
+		v = v.WithSuggestedFix(&rules.SuggestedFix{
+			Description: spec.missingFix.Description,
+			Safety:      spec.missingFix.Safety,
+			Priority:    -1,
+			IsPreferred: true,
+			Edits: []rules.TextEdit{
+				{
+					Location: rules.NewRangeLocation(input.File, insertLine, 0, insertLine, 0),
+					NewText:  spec.insertText,
+				},
+			},
+		})
+	}
+
+	return v
 }
 
 // stageRuntimeExecutable returns the effective PID 1 executable for a build

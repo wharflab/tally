@@ -2183,6 +2183,75 @@ severity = "warning"
 			wantApplied: 1, // only canonical applies (RTMIN+3 → SIGRTMIN+3)
 		},
 
+		// Prefer nginx SIGQUIT: missing STOPSIGNAL → insert (FixSafe)
+		{
+			name:  "prefer-nginx-sigquit-missing",
+			input: "FROM nginx:1.27\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-nginx-sigquit")...),
+			wantApplied: 1,
+		},
+		// Prefer nginx SIGQUIT: wrong signal under --fix — no apply (FixSuggestion)
+		{
+			name:  "prefer-nginx-sigquit-wrong-signal-safe-no-fix",
+			input: "FROM nginx:1.27\nSTOPSIGNAL SIGTERM\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-nginx-sigquit")...),
+			wantApplied: 0,
+		},
+		// Prefer nginx SIGQUIT: wrong signal under --fix-unsafe → replace
+		{
+			name:  "prefer-nginx-sigquit-wrong-signal",
+			input: "FROM nginx:1.27\nSTOPSIGNAL SIGTERM\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/prefer-nginx-sigquit")...),
+			wantApplied: 1,
+		},
+		// Prefer nginx SIGQUIT: already correct — no fix
+		{
+			name:  "prefer-nginx-sigquit-no-fix",
+			input: "FROM nginx:1.27\nSTOPSIGNAL SIGQUIT\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-nginx-sigquit")...),
+			wantApplied: 0,
+		},
+		// Prefer nginx SIGQUIT: non-nginx daemon — no fix
+		{
+			name:  "prefer-nginx-sigquit-non-nginx-no-fix",
+			input: "FROM postgres:16\nCMD [\"postgres\"]\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-nginx-sigquit")...),
+			wantApplied: 0,
+		},
+		// Cross-rule: nginx + no-ungraceful on SIGKILL. no-ungraceful
+		// (category: correctness) outranks prefer-nginx-sigquit (category:
+		// best-practice) in conflict resolution, so SIGKILL becomes SIGTERM,
+		// not SIGQUIT. A subsequent --fix-unsafe pass then triggers
+		// prefer-nginx-sigquit's wrong-signal fix (SIGTERM → SIGQUIT).
+		{
+			name:  "prefer-nginx-sigquit-cross-no-ungraceful",
+			input: "FROM nginx:1.27\nSTOPSIGNAL SIGKILL\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/prefer-nginx-sigquit", "tally/no-ungraceful-stopsignal")...),
+			wantApplied: 1, // no-ungraceful wins by category rank → SIGTERM
+		},
+		// Cross-rule: nginx + canonical on QUIT. Only canonical fires
+		// (normalizes QUIT → SIGQUIT); nginx sees correct signal after normalization.
+		{
+			name:  "prefer-nginx-sigquit-cross-canonical",
+			input: "FROM nginx:1.27\nSTOPSIGNAL QUIT\nCMD [\"nginx\", \"-g\", \"daemon off;\"]\n",
+			args: append(
+				[]string{"--fix"},
+				mustSelectRules("tally/prefer-nginx-sigquit", "tally/prefer-canonical-stopsignal")...),
+			wantApplied: 1, // only canonical applies (QUIT → SIGQUIT)
+		},
+
 		// User created but never used: insert USER before CMD (FixUnsafe)
 		{
 			name:  "user-created-but-never-used",
