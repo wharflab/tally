@@ -137,6 +137,11 @@ classDiagram
         +int HostEnd
         +string Protocol
     }
+    class SecretRef {
+        +string ID
+        +string Source
+        +string Target
+    }
     class InvocationSource {
         +string Kind
         +string File
@@ -243,9 +248,20 @@ type Port struct {
     Protocol       string // "tcp" | "udp"
 }
 
+// SecretRef is a reference to a secret declared by the orchestrator.
+// tally never reads or stores the secret value itself — only the
+// orchestrator-side metadata needed for rule analysis.
+//
+// Target is the path at which the secret is mounted inside the running
+// container (Compose: `services.x.secrets[i].target`, defaulting to
+// `/run/secrets/<source>`). It is distinct from Dockerfile-side
+// `RUN --mount=type=secret,target=...`, which controls where the secret
+// is exposed during a single RUN; rules that cross-check the two should
+// compare them explicitly rather than assume they match.
 type SecretRef struct {
     ID     string
     Source string // env var or file path, without the value itself
+    Target string // container mount path; "" means default (/run/secrets/<source>)
 }
 ```
 
