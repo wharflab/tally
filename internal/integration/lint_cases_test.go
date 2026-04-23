@@ -1145,6 +1145,14 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 
+		// Prefer nginx SIGQUIT (isolated to prefer-nginx-sigquit rule)
+		{
+			name:     "prefer-nginx-sigquit",
+			dir:      "prefer-nginx-sigquit",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/prefer-nginx-sigquit")...),
+			wantExit: 1,
+		},
+
 		// Stateful root runtime (isolated to stateful-root-runtime rule)
 		{
 			name:     "stateful-root-runtime",

@@ -2,10 +2,6 @@ package tally
 
 import (
 	"fmt"
-	"strings"
-
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/rules"
 )
@@ -57,148 +53,29 @@ func (r *PreferSystemdSigrtminPlus3Rule) Metadata() rules.RuleMetadata {
 // Windows stages are skipped because STOPSIGNAL has no effect on Windows
 // containers.
 func (r *PreferSystemdSigrtminPlus3Rule) Check(input rules.LintInput) []rules.Violation {
-	meta := r.Metadata()
-	sem := input.Semantic
-	var violations []rules.Violation
-
-	for stageIdx, stage := range input.Stages {
-		if sem != nil {
-			if info := sem.StageInfo(stageIdx); info != nil && info.IsWindows() {
-				continue
-			}
-		}
-
-		executable := stageRuntimeExecutable(stage)
-		if executable == "" || !isSystemdInit(executable) {
-			continue
-		}
-
-		// Find the last STOPSIGNAL instruction in this stage.
-		var lastStopSig *instructions.StopSignalCommand
-		for _, cmd := range stage.Commands {
-			if ss, ok := cmd.(*instructions.StopSignalCommand); ok {
-				lastStopSig = ss
-			}
-		}
-
-		if lastStopSig == nil {
-			violations = append(violations, r.buildMissingViolation(meta, input, stage))
-			continue
-		}
-
-		raw := lastStopSig.Signal
-		if strings.Contains(raw, "$") {
-			continue
-		}
-
-		normalized := normalizeSignalName(raw)
-		if normalized == signalSIGRTMINPlus3 {
-			continue
-		}
-
-		violations = append(violations, r.buildWrongSignalViolation(meta, input, lastStopSig, normalized))
-	}
-
-	return violations
-}
-
-// buildWrongSignalViolation creates a violation for a STOPSIGNAL that is
-// present but set to the wrong value.
-func (r *PreferSystemdSigrtminPlus3Rule) buildWrongSignalViolation(
-	meta rules.RuleMetadata,
-	input rules.LintInput,
-	cmd *instructions.StopSignalCommand,
-	normalized string,
-) rules.Violation {
-	loc := rules.NewLocationFromRanges(input.File, cmd.Location())
-
-	msg := fmt.Sprintf(
-		"STOPSIGNAL %s should be SIGRTMIN+3 for systemd/init containers",
-		normalized,
-	)
-
-	v := rules.NewViolation(loc, meta.Code, msg, meta.DefaultSeverity).
-		WithDocURL(meta.DocURL).
-		WithDetail("systemd requires SIGRTMIN+3 to trigger a clean manager shutdown, analogous to systemctl halt")
-
-	if editLoc := signalEditLocation(input.File, input.Source, cmd); editLoc != nil {
-		v = v.WithSuggestedFix(&rules.SuggestedFix{
+	return checkDaemonStopsignal(input, daemonStopsignalRule{
+		meta:         r.Metadata(),
+		isDaemon:     isSystemdInit,
+		targetSignal: signalSIGRTMINPlus3,
+		wrongFix: daemonStopsignalFixSpec{
 			Description: "Replace with SIGRTMIN+3 for clean systemd shutdown",
 			Safety:      rules.FixSafe,
-			Priority:    -1,
-			IsPreferred: true,
-			Edits: []rules.TextEdit{
-				{Location: *editLoc, NewText: signalSIGRTMINPlus3},
-			},
-		})
-	}
-
-	return v
-}
-
-// buildMissingViolation creates a violation when no STOPSIGNAL is present in a
-// systemd/init stage. The fix inserts STOPSIGNAL SIGRTMIN+3 before the
-// ENTRYPOINT or CMD that defines the init process.
-func (r *PreferSystemdSigrtminPlus3Rule) buildMissingViolation(
-	meta rules.RuleMetadata,
-	input rules.LintInput,
-	stage instructions.Stage,
-) rules.Violation {
-	// Find the last ENTRYPOINT or CMD to determine the insertion point
-	// and the violation location. Track them separately so ENTRYPOINT
-	// always takes precedence, matching stageRuntimeExecutable semantics.
-	var lastEntrypointLoc, lastCmdLoc []parser.Range
-	for _, cmd := range stage.Commands {
-		switch c := cmd.(type) {
-		case *instructions.EntrypointCommand:
-			lastEntrypointLoc = c.Location()
-		case *instructions.CmdCommand:
-			lastCmdLoc = c.Location()
-		}
-	}
-
-	var runtimeLoc []parser.Range
-	if lastEntrypointLoc != nil {
-		runtimeLoc = lastEntrypointLoc
-	} else {
-		runtimeLoc = lastCmdLoc
-	}
-
-	var loc rules.Location
-	if len(runtimeLoc) > 0 {
-		loc = rules.NewLocationFromRanges(input.File, runtimeLoc)
-	} else {
-		loc = rules.NewLocationFromRanges(input.File, stage.Location)
-	}
-
-	v := rules.NewViolation(loc, meta.Code,
-		"systemd/init container is missing STOPSIGNAL SIGRTMIN+3",
-		meta.DefaultSeverity,
-	).
-		WithDocURL(meta.DocURL).
-		WithDetail(
-			"Without STOPSIGNAL SIGRTMIN+3, the container runtime sends SIGTERM" +
-				" which systemd interprets as an isolate-to-rescue-mode request, not a clean shutdown",
-		)
-
-	// Insert STOPSIGNAL before the runtime instruction.
-	if len(runtimeLoc) > 0 {
-		insertLine := runtimeLoc[0].Start.Line
-		v = v.WithSuggestedFix(&rules.SuggestedFix{
+		},
+		missingFix: daemonStopsignalFixSpec{
 			Description: "Add STOPSIGNAL SIGRTMIN+3 for clean systemd shutdown",
 			Safety:      rules.FixSafe,
-			Priority:    -1,
-			IsPreferred: true,
-			Edits: []rules.TextEdit{
-				{
-					Location: rules.NewRangeLocation(input.File, insertLine, 0, insertLine, 0),
-					NewText:  "# [tally] SIGRTMIN+3 is the graceful shutdown signal for systemd/init\nSTOPSIGNAL SIGRTMIN+3\n",
-				},
-			},
-		})
-	}
-
-	return v
+		},
+		wrongMessage: func(normalized string) string {
+			return fmt.Sprintf("STOPSIGNAL %s should be SIGRTMIN+3 for systemd/init containers", normalized)
+		},
+		wrongDetail: "systemd requires SIGRTMIN+3 to trigger a clean manager" +
+			" shutdown, analogous to systemctl halt",
+		missingMessage: "systemd/init container is missing STOPSIGNAL SIGRTMIN+3",
+		missingDetail: "Without STOPSIGNAL SIGRTMIN+3, the container runtime sends" +
+			" SIGTERM which systemd interprets as an isolate-to-rescue-mode" +
+			" request, not a clean shutdown",
+		insertText: "# [tally] SIGRTMIN+3 is the graceful shutdown signal for systemd/init\nSTOPSIGNAL SIGRTMIN+3\n",
+	})
 }
 
 func init() {

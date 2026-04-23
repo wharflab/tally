@@ -88,6 +88,7 @@
               "rules/tally/curl-should-follow-redirects",
               "rules/tally/prefer-curl-config",
               "rules/tally/named-identity-in-passwdless-stage",
+              "rules/tally/prefer-nginx-sigquit",
               "rules/tally/prefer-systemd-sigrtmin-plus-3",
               "rules/tally/prefer-wget-config"
             ]
