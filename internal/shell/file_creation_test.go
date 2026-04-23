@@ -1155,6 +1155,38 @@ func TestDetectFileCreationPipeToTee(t *testing.T) {
 	}
 }
 
+// TestDetectFileCreations_RepeatedTargetRejected locks in that a chain
+// which writes to the same target more than once across non-contiguous
+// blocks (e.g. `echo a > /a && echo b > /b && echo c > /a`) is rejected.
+// Emitting one COPY per slot would silently overwrite earlier content or
+// misrepresent append semantics.
+func TestDetectFileCreations_RepeatedTargetRejected(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		script string
+	}{
+		{
+			name:   "overwrite then append to earlier target",
+			script: `echo a > /a && echo b > /b && echo c >> /a`,
+		},
+		{
+			name:   "overwrite to earlier target via interleaved second target",
+			script: `echo a > /a && echo b > /b && echo c > /a`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := DetectFileCreations(tt.script, VariantBash, nil, FileCreationOptions{})
+			if got != nil {
+				t.Errorf("expected nil for repeated-target chain, got slots: %+v", got.Slots)
+			}
+		})
+	}
+}
+
 func TestDetectFileCreations_MultiTarget(t *testing.T) {
 	t.Parallel()
 

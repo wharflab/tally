@@ -507,6 +507,20 @@ func analyzeFileCreations(
 		return nil
 	}
 
+	// Reject chains that write to the same target from more than one
+	// non-contiguous block (e.g. `echo a > /a && echo b > /b && echo c > /a`).
+	// Emitting one COPY per slot would silently overwrite earlier content
+	// or misrepresent append semantics — callers assume one slot per
+	// distinct target path. Merging non-contiguous same-target blocks is
+	// out of scope; reject as opaque for now.
+	seenTargets := make(map[string]struct{}, len(blocks))
+	for _, blk := range blocks {
+		if _, dup := seenTargets[blk.target]; dup {
+			return nil
+		}
+		seenTargets[blk.target] = struct{}{}
+	}
+
 	// Build slots from blocks.
 	info := &MultiFileCreationInfo{}
 	// Track which command index belongs to which slot.
