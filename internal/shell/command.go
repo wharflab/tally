@@ -40,6 +40,16 @@ type CommandInfo struct {
 	// evaluation. The slice is aligned with Args.
 	ArgLiteral []bool
 
+	// ArgKinds reports the parser-derived semantic kind of each arg (flag vs
+	// value). Aligned with Args. For PowerShell the kind is driven by the
+	// tree-sitter `command_parameter` vs value-expression distinction, so
+	// switch parameters, quoted values starting with "-", and similar edge
+	// cases are classified correctly. For POSIX shells every arg is reported
+	// as ArgKindUnknown because the sh parser does not separate flags from
+	// values at the AST level; callers that need that for POSIX should keep
+	// using HasPrefix("-") or cmd.HasFlag.
+	ArgKinds []ArgKind
+
 	// ArgRanges reports the script-relative source range for each arg. Aligned
 	// with Args; empty when the underlying parser didn't preserve positions.
 	// Positions are 0-based (line, column byte offset).
@@ -80,6 +90,24 @@ type ArgRange struct {
 	StartCol int
 	EndCol   int
 }
+
+// ArgKind is the parser-derived semantic role of an argument. Only
+// CommandInfos produced by parsers that distinguish parameters from values
+// (e.g. the PowerShell tree-sitter grammar) populate this beyond
+// ArgKindUnknown.
+type ArgKind uint8
+
+const (
+	// ArgKindUnknown means the parser did not classify this arg. Callers
+	// should fall back to textual heuristics (e.g. HasPrefix("-")).
+	ArgKindUnknown ArgKind = iota
+	// ArgKindFlag means the parser identified this arg as a flag/parameter
+	// token (e.g. PowerShell `command_parameter` like `-Verbose`, `-Group`).
+	ArgKindFlag
+	// ArgKindValue means the parser identified this arg as a value/positional
+	// expression (e.g. PowerShell `generic_token`, `string_literal`).
+	ArgKindValue
+)
 
 // CommandSourceKind describes how a command was discovered in the shell AST.
 type CommandSourceKind string

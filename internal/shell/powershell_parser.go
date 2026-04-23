@@ -97,8 +97,10 @@ func findPowerShellCommands(script string, names ...string) []CommandInfo {
 		for _, arg := range powerShellCommandArgs(node, source) {
 			argStart := arg.node.StartPosition()
 			argEnd := arg.node.EndPosition()
+			kind := powerShellArgKind(arg.node.Kind())
 			info.Args = append(info.Args, arg.text)
 			info.ArgLiteral = append(info.ArgLiteral, isPlainPowerShellLiteralArg(arg.text))
+			info.ArgKinds = append(info.ArgKinds, kind)
 			info.ArgRanges = append(info.ArgRanges, ArgRange{
 				Line:     int(argStart.Row),
 				StartCol: int(argStart.Column),
@@ -106,7 +108,7 @@ func findPowerShellCommands(script string, names ...string) []CommandInfo {
 			})
 			info.CommandEndLine = int(argEnd.Row)
 			info.CommandEndCol = int(argEnd.Column)
-			if info.Subcommand == "" && !strings.HasPrefix(arg.text, "-") {
+			if info.Subcommand == "" && kind != ArgKindFlag {
 				info.Subcommand = arg.text
 				info.SubcommandLine = int(argStart.Row)
 				info.SubcommandStartCol = int(argStart.Column)
@@ -169,6 +171,23 @@ func powerShellCommandArgs(node *sitter.Node, source []byte) []powerShellArg {
 		args = append(args, powerShellArg{text: text, node: child})
 	}
 	return args
+}
+
+// powerShellArgKind maps a tree-sitter node kind from the PowerShell grammar
+// onto the parser-agnostic ArgKind enum.
+//
+// The grammar defines `command_parameter` as a dedicated token for
+// parameter tokens (`-Verbose`, `-Group`, `--`). Every other kind that can
+// appear inside `command_elements` (generic tokens, string literals, array
+// literals, script blocks, etc.) is a value/positional. This is strictly
+// more accurate than inspecting the argument text: a quoted value like
+// `"-quoted"` has text starting with `-` but parses as `string_literal`,
+// not `command_parameter`.
+func powerShellArgKind(nodeKind string) ArgKind {
+	if nodeKind == tspowershell.NodeCommandParameter {
+		return ArgKindFlag
+	}
+	return ArgKindValue
 }
 
 func isPlainPowerShellLiteralArg(text string) bool {

@@ -2262,6 +2262,36 @@ severity = "warning"
 			wantApplied: 1,
 		},
 
+		// user-explicit-group-drops-supplementary-groups: drop :group from USER
+		// (FixSuggestion — applies only with --fix-unsafe)
+		{
+			name:  "user-explicit-group-drops-supplementary-groups-linux",
+			input: "FROM ubuntu:22.04\nRUN useradd -G docker app\nUSER app:app\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/user-explicit-group-drops-supplementary-groups")...),
+			wantApplied: 1,
+		},
+		{
+			name: "user-explicit-group-drops-supplementary-groups-windows",
+			input: "FROM mcr.microsoft.com/windows/servercore:ltsc2022\n" +
+				"RUN net user app password /add && net localgroup docker app /add\n" +
+				"USER app:docker\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/user-explicit-group-drops-supplementary-groups")...),
+			wantApplied: 1,
+		},
+		// Bare USER (no explicit group) — no fix applied
+		{
+			name:  "user-explicit-group-drops-supplementary-groups-no-group-no-fix",
+			input: "FROM ubuntu:22.04\nRUN useradd -G docker app\nUSER app\n",
+			args: append(
+				[]string{"--fix", "--fix-unsafe"},
+				mustSelectRules("tally/user-explicit-group-drops-supplementary-groups")...),
+			wantApplied: 0,
+		},
+
 		// copy-after-user-without-chown: adds --chown flag (preferred fix)
 		{
 			name:  "copy-after-user-without-chown-basic",

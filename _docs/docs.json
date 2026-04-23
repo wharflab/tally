@@ -63,6 +63,7 @@
               "rules/tally/require-secret-mounts",
               "rules/tally/stateful-root-runtime",
               "rules/tally/user-created-but-never-used",
+              "rules/tally/user-explicit-group-drops-supplementary-groups",
               "rules/tally/copy-after-user-without-chown",
               "rules/tally/prefer-add-git",
               "rules/tally/world-writable-state-path-workaround",

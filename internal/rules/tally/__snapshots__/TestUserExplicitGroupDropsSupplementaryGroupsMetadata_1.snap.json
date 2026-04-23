@@ -1,0 +1,10 @@
+{
+ "Category": "security",
+ "Code": "tally/user-explicit-group-drops-supplementary-groups",
+ "DefaultSeverity": "warning",
+ "Description": "USER name:group drops supplementary groups the Dockerfile established via useradd -G / usermod / gpasswd / net localgroup / Add-LocalGroupMember",
+ "DocURL": "https://tally.wharflab.com/rules/tally/user-explicit-group-drops-supplementary-groups/",
+ "FixPriority": 0,
+ "IsExperimental": false,
+ "Name": "USER explicit group drops supplementary groups"
+}

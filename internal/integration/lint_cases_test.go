@@ -1184,5 +1184,14 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/copy-after-user-without-chown")...),
 			wantExit: 1,
 		},
+
+		// USER name:group drops supplementary groups (Linux + Windows)
+		{
+			name: "user-explicit-group-drops-supplementary-groups",
+			dir:  "user-explicit-group-drops-supplementary-groups",
+			args: append([]string{"--format", "json"},
+				mustSelectRules("tally/user-explicit-group-drops-supplementary-groups")...),
+			wantExit: 1,
+		},
 	}
 }
