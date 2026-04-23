@@ -426,7 +426,9 @@ func isUsermodBooleanShortFlag(r rune) bool {
 }
 
 // gpasswdAddTarget extracts (user, group) from a `gpasswd -a USER GROUP`
-// invocation. Handles both `-a USER` and `-a=USER` flag forms.
+// invocation. Handles the standalone `-a USER` / `--add USER` forms as well
+// as the attached forms `-a=USER`, `-aUSER` (POSIX getopt combined short
+// flag), and `--add=USER`.
 func gpasswdAddTarget(cmd *shell.CommandInfo) (user, group string) {
 	for i, arg := range cmd.Args {
 		if arg == "-a" || arg == "--add" {
@@ -436,13 +438,18 @@ func gpasswdAddTarget(cmd *shell.CommandInfo) (user, group string) {
 			group = firstNonFlagAfter(cmd.Args, i+2)
 			return user, group
 		}
-		if value, found := strings.CutPrefix(arg, "-a="); found {
+		if value, found := strings.CutPrefix(arg, "--add="); found {
 			user = value
 			group = firstNonFlagAfter(cmd.Args, i+1)
 			return user, group
 		}
-		if value, found := strings.CutPrefix(arg, "--add="); found {
-			user = value
+		// Attached short-flag form: `-a=USER` or `-aUSER`. Guard against
+		// spurious `--add` matches: args starting with `--` are handled above.
+		if strings.HasPrefix(arg, "--") {
+			continue
+		}
+		if value, found := strings.CutPrefix(arg, "-a"); found && value != "" {
+			user = strings.TrimPrefix(value, "=")
 			group = firstNonFlagAfter(cmd.Args, i+1)
 			return user, group
 		}

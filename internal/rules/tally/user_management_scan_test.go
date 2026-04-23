@@ -364,6 +364,14 @@ func TestFindUserMembershipCmdsEdgeCases(t *testing.T) {
 			want:    []membershipInfo{{User: "alice", Groups: []string{"wheel"}}},
 		},
 		{
+			// POSIX getopt combined-short-flag form: -a immediately glued
+			// to the value with no separator. Valid for shadow-utils gpasswd.
+			name:    "gpasswd -aUSER positional GROUP",
+			script:  "gpasswd -aalice wheel",
+			variant: shell.VariantBash,
+			want:    []membershipInfo{{User: "alice", Groups: []string{"wheel"}}},
+		},
+		{
 			name:    "Add-LocalGroupMember with three positionals skipped",
 			script:  "Add-LocalGroupMember docker app extra",
 			variant: shell.VariantPowerShell,
