@@ -735,13 +735,14 @@ provenance.
 
 Order of invocations is fixed so snapshot tests and CI comparisons are stable:
 
-- **Bake:** source-declaration order. Bake's own evaluator already exposes targets in a predictable order based on the HCL file; tally preserves
-  that. Users who care about a specific order can control it by ordering targets in their bake file, which matches how `docker buildx bake`
-  itself presents them.
+- **Bake:** alphabetical by target name. `github.com/docker/buildx/bake` stores targets in Go maps (non-deterministic iteration) and itself
+  sorts alphabetically when materializing the synthetic `default` group, so tally sorts too. Users who want a specific presentation order can
+  pass the targets explicitly via repeated `--target` flags (see below).
 - **Compose:** alphabetical by service name. Compose files are typically authored with no meaningful service ordering (maps in YAML are
   unordered by spec), so imposing alphabetical order gives a stable presentation that doesn't depend on YAML library internals.
 
-If `--target` / `--service` narrows the set, iteration still follows the same rules over the filtered subset.
+If `--target` / `--service` narrows the set, iteration follows the CLI-arg order (the user's explicit intent), falling back to alphabetical for
+any remaining targets matched by globs or groups.
 
 ### Grouped output
 
