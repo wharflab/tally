@@ -216,8 +216,6 @@ Illustrative shape:
 // Illustrative only; exact package/file layout may vary.
 package invocation
 
-import "github.com/wharflab/tally/internal/context"
-
 type BuildInvocation struct {
 	// Stable identity for one invocation within a run. Used by reporters,
 	// async bookkeeping, and LSP diagnostics.
@@ -230,10 +228,6 @@ type BuildInvocation struct {
 
 	// Declared primary build context, whether local or remote.
 	ContextRef ContextRef
-
-	// Local filesystem context for rules that need .dockerignore/filesystem
-	// access. Nil when the declared context is remote or otherwise non-local.
-	FilesystemContext *context.BuildContext
 
 	BuildArgs     map[string]*string
 	Platforms     []string
@@ -274,14 +268,17 @@ type SecretRef struct {
 }
 ```
 
-### Why `ContextRef` and `FilesystemContext` both exist
+### Why `BuildInvocation` stays declarative
 
-This split is required for correctness and extensibility:
+`BuildInvocation` is the semantic model. It should describe what the build declaration says, not carry around a prepared local filesystem helper.
 
-- `ContextRef` captures the declared build context even when it is remote or non-filesystem.
-- `FilesystemContext` exposes the existing `.dockerignore` and file-existence functionality only when that facet is actually available.
+- `ContextRef` captures the declared primary context whether it is local, remote, git-based, or otherwise non-filesystem.
+- local filesystem inspection is a **derived linter capability**, not part of the invocation model itself.
 
-Without this split, the model cannot represent a valid remote build context without pretending local filesystem checks are possible.
+For local directory contexts (`ContextRef.Kind == "dir"`), the linter may construct an internal helper that implements the file-observation
+capabilities needed by the facts layer and the small number of filesystem-aware checks. For remote or non-local contexts, no such helper exists.
+
+This keeps the model correct while still allowing `.dockerignore` evaluation and safe file access when that capability is actually available.
 
 ### Build Arg Semantics
 
@@ -363,8 +360,13 @@ Invocation *invocation.BuildInvocation
 
 to both `linter.Input` and `rules.LintInput`.
 
-Keep `BuildContext` / `Context` for one release cycle as a convenience field populated from `Invocation.FilesystemContext` when present. That
-minimizes immediate churn across existing rules.
+Do **not** add `context.BuildContext` or a similar filesystem helper to `BuildInvocation`.
+
+The current `rules.BuildContext` / `LintInput.Context` path should be retired rather than propagated. The implementation should derive a narrow
+local-context reader from `Invocation.ContextRef` only when the primary context is a local directory, and use that internal capability where
+needed during lint execution.
+
+That reader can reuse the existing implementation in `internal/context/`, but it is an execution detail, not part of the public invocation model.
 
 ### Parse caching and per-invocation rebuild
 
@@ -382,6 +384,21 @@ This distinction is mandatory because invocation data affects semantic interpret
 
 The current semantic builder already accepts build args. It must also gain an invocation-aware target stage input, because using “last stage in the
 file” is incorrect once the real build target comes from Bake or Compose.
+
+### Derived local context capability
+
+Filesystem-aware analysis should be driven from a narrow internal capability derived from `Invocation.ContextRef`, not from `*context.BuildContext`
+stored on the model.
+
+The recommended shape is:
+
+- keep `BuildInvocation` declarative
+- when `Invocation.ContextRef.Kind == "dir"`, build a local context reader for the facts layer
+- refactor the remaining direct `LintInput.Context` consumer(s) to use facts or the same narrow reader
+- remove `rules.BuildContext` from the steady-state rule API
+
+This is feasible because the current production rule usage of `LintInput.Context` is minimal, while most context-derived behavior already flows
+through the facts layer.
 
 ### Config loading
 
@@ -460,8 +477,7 @@ tally must not invent a different Bake selection model.
 |---|---|---|
 | target name | `Source.Name` | Always set. |
 | file path | `Source.File` | Absolute path to the Bake file. |
-| `context` | `ContextRef` | Classify local dir vs remote/git/url. |
-| local `context` | `FilesystemContext` | Build `context.BuildContext` only for local directories. |
+| `context` | `ContextRef` | Classify local dir vs remote/git/url. Local dir contexts may additionally yield a derived local context reader during lint execution. |
 | `dockerfile` | `DockerfilePath` | Default `Dockerfile` under the resolved context dir. |
 | `args` | `BuildArgs` | Preserve nil vs empty vs explicit values. |
 | `platforms` | `Platforms` | |
@@ -522,8 +538,7 @@ Image-only services are valid inputs and count toward the “nothing to lint” 
 |---|---|---|
 | service name | `Source.Name` | Always set. |
 | Compose file path | `Source.File` | Absolute path to the file the user passed. |
-| `build.context` | `ContextRef` | Local path or remote source. |
-| local `build.context` | `FilesystemContext` | Build local context only when the main context is a local directory. |
+| `build.context` | `ContextRef` | Local path or remote source. Local dir contexts may additionally yield a derived local context reader during lint execution. |
 | `build.dockerfile` | `DockerfilePath` | Default `Dockerfile` under the resolved context dir. |
 | `build.args` | `BuildArgs` | Preserve nil values. |
 | `build.platforms` | `Platforms` | Fall back to service `platform` only when appropriate. |
@@ -740,7 +755,7 @@ Remote build contexts do **not** fall under this hard-error policy as long as th
 case:
 
 - `ContextRef` is populated
-- `FilesystemContext` is nil
+- no derived local context reader is created
 - filesystem-dependent rules no-op
 
 That is a valid and truthful partial capability, unlike silently dropping a Dockerfile source or target-selection mechanism.
@@ -859,6 +874,8 @@ Candidate follow-ups:
 - Add `BuildInvocation`, `InvocationSource`, `ContextRef`, and provider interfaces.
 - Extend `linter.Input`, `rules.LintInput`, `rules.Violation`, and async bookkeeping with invocation identity.
 - Update semantic builder to accept invocation target stage and concrete build args.
+- Derive local context-reading capability from `Invocation.ContextRef` only for local directory contexts.
+- Refactor remaining `rules.BuildContext` consumers onto facts or the derived local reader, and retire `rules.BuildContext` from the steady-state API.
 - Add CLI dispatch for explicit file entrypoints.
 - Preserve existing `internal/discovery` behavior for directories/globs.
 - Update all reporters to carry invocation attribution.
