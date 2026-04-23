@@ -1,0 +1,144 @@
+---
+title: "tally/user-explicit-group-drops-supplementary-groups"
+description: "USER name:group silently drops supplementary groups established earlier in the Dockerfile."
+---
+
+USER name:group silently drops supplementary groups established earlier in the Dockerfile.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Security |
+| Default  | Enabled |
+| Auto-fix | Yes (suggestion) |
+| Platforms | Linux + Windows |
+
+## Description
+
+Docker's [`USER`](https://docs.docker.com/reference/dockerfile/#user) reference
+is explicit about an easy-to-miss behavior:
+
+> Note that when specifying a group for the user, the user will have only the
+> specified group membership. Any other configured group memberships will be
+> ignored.
+
+This applies to both Linux and Windows containers. Any supplementary group
+the Dockerfile adds the user to via one of these commands is silently dropped
+the moment `USER name:group` takes effect:
+
+| Platform   | Commands                                                             |
+|------------|----------------------------------------------------------------------|
+| Linux      | `useradd -G`, `usermod -aG` / `-G`, `gpasswd -a`, `adduser USER GROUP`, `addgroup USER GROUP` |
+| Windows cmd | `net localgroup <GROUP> <USER> /add`                                |
+| Windows PS  | `Add-LocalGroupMember -Group <GROUP> -Member <USER>`                |
+
+The most common real-world symptom on Linux is a user added to the `docker`
+group then locked out of `/var/run/docker.sock` at runtime. On Windows, the
+corresponding symptom is a user added to a local group (for example a
+custom `app-writers` group) then unable to access files whose ACL only grants
+that group.
+
+## Examples
+
+### Bad — Linux
+
+```dockerfile
+FROM ubuntu:22.04
+RUN groupadd -r docker && \
+    useradd -r -g app -G docker,wheel app
+USER app:app
+```
+
+The `docker` and `wheel` supplementary groups are dropped at runtime.
+
+### Bad — Windows cmd
+
+```dockerfile
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+RUN net user app password /add && net localgroup docker app /add
+USER app:docker
+```
+
+`app` is added to `docker` via `net localgroup /add`, but `USER app:docker`
+restricts the process to only the `docker` token — any other local-group
+membership is dropped.
+
+### Bad — Windows PowerShell
+
+```dockerfile
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
+SHELL ["pwsh", "-Command"]
+RUN New-LocalUser -Name app -NoPassword -AccountNeverExpires ; \
+    Add-LocalGroupMember -Group docker -Member app
+USER app:docker
+```
+
+### Good — drop the explicit group
+
+```dockerfile
+FROM ubuntu:22.04
+RUN useradd -r -g app -G docker app
+USER app
+```
+
+Docker uses the user's primary group from `/etc/passwd` (or the Windows
+token) plus every supplementary group that was added.
+
+## Suppression
+
+The rule does not fire when:
+
+- The `USER` instruction uses no explicit group (`USER app` rather than `USER app:group`).
+- The user is root or UID 0.
+- The user specifier is numeric (`USER 1000:1000`). We do not correlate UIDs
+  to `useradd`-created accounts; the rule targets named identities.
+- The stage is passwd-less (scratch-rooted without a copied `/etc/passwd`).
+  That case belongs to `tally/named-identity-in-passwdless-stage`.
+
+## Suggested fix
+
+The rule proposes a `FixSuggestion` that removes the `:group` portion so
+the user's supplementary groups survive. Run with `--fix --fix-unsafe` to
+apply it.
+
+```dockerfile
+# Before
+USER app:app
+
+# After
+USER app
+```
+
+If the explicit group was an intentional primary-group override, keep the
+current form and resolve the rule via configuration:
+
+```toml
+[rules.tally.user-explicit-group-drops-supplementary-groups]
+severity = "off"
+```
+
+## Related rules
+
+- [`tally/named-identity-in-passwdless-stage`](./named-identity-in-passwdless-stage) —
+  fires in scratch-rooted stages where `/etc/passwd` is missing. Passwd-less
+  stages are explicitly skipped by this rule to avoid overlapping edits on
+  the same operand.
+- [`tally/user-created-but-never-used`](./user-created-but-never-used) —
+  fires when the final stage never switches to a non-root user.
+  Complementary; our rule requires an explicit non-root USER.
+- [`tally/copy-after-user-without-chown`](./copy-after-user-without-chown) —
+  targets COPY/ADD ownership, not USER. Complementary.
+
+## Configuration
+
+```toml
+[rules.tally.user-explicit-group-drops-supplementary-groups]
+severity = "warning"  # Options: "off", "error", "warning", "info", "style"
+```
+
+## References
+
+- Docker Dockerfile reference: [USER](https://docs.docker.com/reference/dockerfile/#user)
+- `setgroups(2)` (Linux) — the syscall whose effects are described above
+- [Microsoft Add-LocalGroupMember cmdlet](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.localaccounts/add-localgroupmember)
+- [Microsoft `net localgroup` reference](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2012-r2-and-2012/cc754051(v=ws.11))

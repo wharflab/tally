@@ -192,7 +192,11 @@ func (r *UserCreatedButNeverUsedRule) buildFix(
 }
 
 // collectUserCreations scans the final stage and its FROM ancestry chain
-// for user creation commands (useradd, adduser, net user /add, New-LocalUser).
+// for user-creation commands (useradd, adduser, net user /add, New-LocalUser).
+//
+// When evidence comes from an observable file (COPY heredoc, build context
+// script), the userCreation is attributed to the stage's first RUN as a
+// best-effort source position.
 func collectUserCreations(
 	input rules.LintInput,
 	fileFacts *facts.FileFacts,
@@ -200,140 +204,24 @@ func collectUserCreations(
 ) []userCreation {
 	var creations []userCreation
 
-	// Scan the final stage itself.
-	creations = append(creations, findStageUserCreations(fileFacts, finalIdx)...)
-
-	// Walk the FROM ancestry chain.
-	var model = input.Semantic
-	if model == nil {
-		return creations
-	}
-
-	visited := map[int]bool{finalIdx: true}
-	for idx := finalIdx; ; {
-		info := model.StageInfo(idx)
-		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef || info.BaseImage.StageIndex < 0 {
-			break
+	visitStageAndAncestryRunScripts(input, fileFacts, finalIdx, func(sv scriptVisit) {
+		run := sv.Run
+		if run == nil {
+			if sf := fileFacts.Stage(sv.StageIndex); sf != nil && len(sf.Runs) > 0 {
+				run = sf.Runs[0].Run
+			}
 		}
-
-		parentIdx := info.BaseImage.StageIndex
-		if visited[parentIdx] {
-			break
-		}
-		visited[parentIdx] = true
-
-		creations = append(creations, findStageUserCreations(fileFacts, parentIdx)...)
-		idx = parentIdx
-	}
-
-	return creations
-}
-
-// findStageUserCreations scans a single stage's RUN commands and observable
-// files for user creation commands.
-func findStageUserCreations(fileFacts *facts.FileFacts, stageIdx int) []userCreation {
-	sf := fileFacts.Stage(stageIdx)
-	if sf == nil {
-		return nil
-	}
-
-	var creations []userCreation
-
-	// Scan direct RUN commands.
-	for _, run := range sf.Runs {
-		cmds := findUserCreationCmds(run.CommandScript, run.Shell.Variant)
+		cmds := findUserCreationCmds(sv.Script, sv.Variant)
 		for i := range cmds {
 			creations = append(creations, userCreation{
 				username:   extractCreatedUsername(&cmds[i]),
-				stageIndex: stageIdx,
-				run:        run.Run,
+				stageIndex: sv.StageIndex,
+				run:        run,
 			})
 		}
-	}
-
-	// Scan observable files (COPY heredoc scripts, build context scripts).
-	for _, of := range sf.ObservableFiles {
-		if !looksLikeScript(of.Path) {
-			continue
-		}
-		content, ok := of.Content()
-		if !ok || content == "" {
-			continue
-		}
-		variant := shell.VariantFromScriptPath(of.Path)
-		cmds := findUserCreationCmds(content, variant)
-		if len(cmds) > 0 {
-			// Attribute to the first RUN in the stage as a best-effort location.
-			var run *instructions.RunCommand
-			if len(sf.Runs) > 0 {
-				run = sf.Runs[0].Run
-			}
-			for i := range cmds {
-				creations = append(creations, userCreation{
-					username:   extractCreatedUsername(&cmds[i]),
-					stageIndex: stageIdx,
-					run:        run,
-				})
-			}
-		}
-	}
+	})
 
 	return creations
-}
-
-// findUserCreationCmds finds user creation commands in a shell script.
-func findUserCreationCmds(script string, variant shell.Variant) []shell.CommandInfo {
-	var result []shell.CommandInfo
-
-	// Linux: useradd, adduser
-	result = append(result, shell.FindCommands(script, variant, "useradd", "adduser")...)
-
-	// Windows cmd: net user <name> /add
-	if variant == shell.VariantCmd {
-		for _, cmd := range shell.FindCommands(script, variant, "net") {
-			if !strings.EqualFold(cmd.Subcommand, "user") { //nolint:customlint // shell "user" subcommand, not Dockerfile USER
-				continue
-			}
-			if slices.ContainsFunc(cmd.Args, func(a string) bool {
-				return strings.EqualFold(a, "/add")
-			}) {
-				result = append(result, cmd)
-			}
-		}
-	}
-
-	// Windows PowerShell: New-LocalUser
-	if variant.IsPowerShell() {
-		result = append(result, shell.FindCommands(script, variant, "New-LocalUser")...)
-	}
-
-	return result
-}
-
-// extractCreatedUsername extracts the username from a user creation command.
-// For useradd/adduser: the last non-flag argument (LOGIN is always last positional).
-// For net user /add: the argument between "user" and "/add".
-// For New-LocalUser: the -Name parameter value.
-func extractCreatedUsername(cmd *shell.CommandInfo) string {
-	switch {
-	case cmd.Name == "useradd" || cmd.Name == "adduser":
-		return lastNonFlagArg(cmd.Args)
-
-	case strings.EqualFold(cmd.Name, "net"):
-		// net user <name> /add — find the positional arg that is the username.
-		for _, arg := range cmd.Args {
-			if strings.EqualFold(arg, "user") || strings.HasPrefix(arg, "/") { //nolint:customlint // shell subcommand
-				continue
-			}
-			// First non-"user", non-flag arg is the username.
-			return arg
-		}
-
-	case strings.EqualFold(cmd.Name, "New-LocalUser"):
-		return cmd.GetArgValue("-Name")
-	}
-
-	return ""
 }
 
 // lastNonFlagArg returns the last argument that doesn't start with "-".

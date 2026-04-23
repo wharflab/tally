@@ -1,0 +1,175 @@
+{
+  "files": [
+    {
+      "file": "testdata/user-explicit-group-drops-supplementary-groups/Dockerfile",
+      "violations": [
+        {
+          "detail": "Docker's USER name:group sets ONLY the given group at runtime. Supplementary groups added earlier — via useradd -G / adduser / addgroup / usermod -aG / gpasswd on Linux, or net localgroup /add / Add-LocalGroupMember on Windows — are silently dropped. Drop the \":group\" portion to preserve supplementary group membership, or accept the explicit group as an intentional primary-group override.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/user-explicit-group-drops-supplementary-groups/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "testdata/user-explicit-group-drops-supplementary-groups/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "USER \"app\" specifies explicit group \"app\" but this user has supplementary groups (docker, wheel) that Docker will ignore",
+          "rule": "tally/user-explicit-group-drops-supplementary-groups",
+          "severity": "warning",
+          "sourceCode": "USER app:app",
+          "suggestedFix": {
+            "description": "Drop \":app\" from USER (Docker would otherwise drop supplementary groups)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 12,
+                    "line": 5
+                  },
+                  "file": "testdata/user-explicit-group-drops-supplementary-groups/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 5
+                  }
+                },
+                "newText": "app"
+              }
+            ],
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Docker's USER name:group sets ONLY the given group at runtime. Supplementary groups added earlier — via useradd -G / adduser / addgroup / usermod -aG / gpasswd on Linux, or net localgroup /add / Add-LocalGroupMember on Windows — are silently dropped. Drop the \":group\" portion to preserve supplementary group membership, or accept the explicit group as an intentional primary-group override.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/user-explicit-group-drops-supplementary-groups/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 15
+            },
+            "file": "testdata/user-explicit-group-drops-supplementary-groups/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 15
+            }
+          },
+          "message": "USER \"app\" specifies explicit group \"app\" but this user has supplementary groups (docker, wheel) that Docker will ignore",
+          "rule": "tally/user-explicit-group-drops-supplementary-groups",
+          "severity": "warning",
+          "sourceCode": "USER app:app",
+          "suggestedFix": {
+            "description": "Drop \":app\" from USER (Docker would otherwise drop supplementary groups)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 12,
+                    "line": 15
+                  },
+                  "file": "testdata/user-explicit-group-drops-supplementary-groups/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 15
+                  }
+                },
+                "newText": "app"
+              }
+            ],
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Docker's USER name:group sets ONLY the given group at runtime. Supplementary groups added earlier — via useradd -G / adduser / addgroup / usermod -aG / gpasswd on Linux, or net localgroup /add / Add-LocalGroupMember on Windows — are silently dropped. Drop the \":group\" portion to preserve supplementary group membership, or accept the explicit group as an intentional primary-group override.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/user-explicit-group-drops-supplementary-groups/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 21
+            },
+            "file": "testdata/user-explicit-group-drops-supplementary-groups/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 21
+            }
+          },
+          "message": "USER \"app\" specifies explicit group \"docker\" but this user has supplementary groups (docker) that Docker will ignore",
+          "rule": "tally/user-explicit-group-drops-supplementary-groups",
+          "severity": "warning",
+          "sourceCode": "USER app:docker",
+          "suggestedFix": {
+            "description": "Drop \":docker\" from USER (Docker would otherwise drop supplementary groups)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 15,
+                    "line": 21
+                  },
+                  "file": "testdata/user-explicit-group-drops-supplementary-groups/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 21
+                  }
+                },
+                "newText": "app"
+              }
+            ],
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Docker's USER name:group sets ONLY the given group at runtime. Supplementary groups added earlier — via useradd -G / adduser / addgroup / usermod -aG / gpasswd on Linux, or net localgroup /add / Add-LocalGroupMember on Windows — are silently dropped. Drop the \":group\" portion to preserve supplementary group membership, or accept the explicit group as an intentional primary-group override.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/user-explicit-group-drops-supplementary-groups/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 28
+            },
+            "file": "testdata/user-explicit-group-drops-supplementary-groups/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 28
+            }
+          },
+          "message": "USER \"app\" specifies explicit group \"docker\" but this user has supplementary groups (docker) that Docker will ignore",
+          "rule": "tally/user-explicit-group-drops-supplementary-groups",
+          "severity": "warning",
+          "sourceCode": "USER app:docker",
+          "suggestedFix": {
+            "description": "Drop \":docker\" from USER (Docker would otherwise drop supplementary groups)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 15,
+                    "line": 28
+                  },
+                  "file": "testdata/user-explicit-group-drops-supplementary-groups/Dockerfile",
+                  "start": {
+                    "column": 5,
+                    "line": 28
+                  }
+                },
+                "newText": "app"
+              }
+            ],
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 4,
+    "warnings": 4
+  }
+}
