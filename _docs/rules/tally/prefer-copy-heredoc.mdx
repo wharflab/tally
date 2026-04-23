@@ -21,9 +21,45 @@ It relies on Dockerfile [here-documents](https://docs.docker.com/reference/docke
 
 ## Why COPY heredoc?
 
-- **Performance**: `COPY` doesn't spawn a shell container, making it faster
-- **Atomicity**: `COPY --chmod` sets permissions in a single layer
-- **Readability**: Heredocs are cleaner than escaped echo statements
+Three reasons, in order of importance:
+
+1. **Hermeticity and intent.** A `RUN` that writes a file is an opaque shell
+   invocation: the frontend cannot tell, without parsing your shell, whether
+   the instruction installs a package, mutates system state, or just drops a
+   config file. `COPY <<EOF` declares the same operation as a pure, fully
+   specified input-to-output mapping. See Bazel's
+   [hermeticity](https://bazel.build/basics/hermeticity) guide for the
+   underlying principle — a build step whose output is a function of its
+   declared inputs is easier to cache, reason about, and reproduce.
+
+2. **Observable content for other rules.** tally tracks files written via
+   `COPY <<EOF` (and `ADD <<EOF`) as
+   [observable files](https://pkg.go.dev/github.com/wharflab/tally/internal/facts#ObservableFile):
+   their content is visible at lint time. This lets other rules reason about
+   what the image actually contains. For example:
+
+   - [`tally/secrets-in-code`](/rules/tally/secrets-in-code) scans heredoc
+     bodies for API keys and tokens.
+   - [`tally/user-created-but-never-used`](/rules/tally/user-created-but-never-used)
+     inspects `/etc/passwd`-style content to learn about created users.
+   - [`tally/php/no-xdebug-in-final-image`](/rules/tally/php/no-xdebug-in-final-image)
+     reads `php.ini`-style config to detect Xdebug activation.
+
+   Content hidden inside a `RUN echo ... > /path` is **not** observable —
+   tally can only see the shell source, not the final file — so downstream
+   rules give up, and the rule set catches fewer real issues in your image.
+
+3. **Predictable cache keys.** `COPY <<EOF` participates in BuildKit's content
+   cache: the layer hash is derived from the literal heredoc body, so the
+   layer hits cache whenever the content is unchanged. A `RUN` layer hashes
+   over the command string, so any innocuous edit (trailing whitespace,
+   reordered `&&` clauses, comments) busts the cache even when the file it
+   produces is identical. Splitting "create this file" into its own `COPY`
+   keeps it out of the rebuild path of unrelated shell changes.
+
+Secondary benefits: `COPY --chmod` sets permissions in a single layer (no
+follow-up `chmod`), and heredoc bodies are easier to read than escaped
+`echo` statements with manual `\n` separators.
 
 ## Detected Patterns
 
@@ -32,8 +68,10 @@ It relies on Dockerfile [here-documents](https://docs.docker.com/reference/docke
 3. **File creation with chmod**: `echo "x" > /file && chmod 0755 /file`
 4. **BuildKit heredoc piped to cat**: `RUN <<EOF cat > /path/to/file`
 5. **BuildKit heredoc piped to tee**: `RUN <<EOF tee /path/to/file`
-6. **Consecutive RUN instructions** writing to the same file
-7. **Mixed commands** with file creation in the middle (extracts just the file creation)
+6. **Brace-grouped producers piped to tee**: `{ echo a; printf 'b\n'; } | tee /path` (mixes of `echo` / `printf` / `cat <<EOF` are supported)
+7. **Consecutive RUN instructions** writing to the same file
+8. **Mixed commands** with file creation in the middle (extracts just the file creation)
+9. **Multiple distinct targets in one RUN**: a single `&&` chain that writes to several files is split into one `COPY <<EOF` per target. Any `mkdir -p /parent` whose target is a prefix of a COPY destination is dropped, since `COPY` auto-creates parent directories.
 
 ## Examples
 
@@ -85,6 +123,60 @@ APP_ENV=production
 LOG_FORMAT=json
 EOF
 RUN apt-get clean
+```
+
+### Multi-target with brace-grouped pipes
+
+A single `RUN` that builds several config files via `{ echo ...; echo ...; } | tee /path`
+chains — a common pattern in official images such as `php:fpm` — expands into one
+`COPY <<EOF` per destination. `mkdir -p` is absorbed when a later `COPY` writes under
+the same directory tree.
+
+#### Before (violation)
+
+```dockerfile
+RUN set -ex \
+    && { \
+        echo '[global]'; \
+        echo 'daemonize = no'; \
+    } | tee /usr/local/etc/php-fpm.d/www.conf \
+    && mkdir -p /usr/local/php/php/auto_prepends \
+    && { \
+        echo '<?php'; \
+        echo 'if (function_exists("uopz_allow_exit")) { uopz_allow_exit(true); }'; \
+        echo '?>'; \
+    } | tee /usr/local/php/php/auto_prepends/default_prepend.php \
+    && { \
+        echo 'FromLineOverride=YES'; \
+        echo 'UseTLS=NO'; \
+    } | tee /etc/ssmtp/ssmtp.conf \
+    && { \
+        echo '[PHP]'; \
+        echo 'log_errors = On'; \
+    } | tee /usr/local/etc/php/conf.d/php.ini
+```
+
+#### After (fixed with `--fix --fix-unsafe`)
+
+```dockerfile
+RUN set -ex
+COPY <<EOF /usr/local/etc/php-fpm.d/www.conf
+[global]
+daemonize = no
+EOF
+COPY <<EOF /usr/local/php/php/auto_prepends/default_prepend.php
+<?php
+if (function_exists("uopz_allow_exit")) { uopz_allow_exit(true); }
+?>
+EOF
+COPY <<EOF /etc/ssmtp/ssmtp.conf
+FromLineOverride=YES
+UseTLS=NO
+EOF
+COPY <<EOF /usr/local/etc/php/conf.d/php.ini
+[PHP]
+log_errors = On
+EOF
 ```
 
 ## Limitations
@@ -141,3 +233,4 @@ it.
 
 - [Dockerfile here-documents](https://docs.docker.com/reference/dockerfile/#here-documents)
 - [Introduction to heredocs in Dockerfiles](https://www.docker.com/blog/introduction-to-heredocs-in-dockerfiles/)
+- [Bazel: hermeticity](https://bazel.build/basics/hermeticity) — the build-system principle behind motivation #1
