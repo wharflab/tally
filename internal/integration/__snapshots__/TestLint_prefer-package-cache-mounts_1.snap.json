@@ -117,23 +117,9 @@
           "sourceCode": "RUN --mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf \\",
           "suggestedFix": {
             "description": "Add package cache mount(s) and remove cache cleanup commands",
-            "edits": [
-              {
-                "location": {
-                  "end": {
-                    "column": 61,
-                    "line": 7
-                  },
-                  "file": "testdata/prefer-package-cache-mounts/Dockerfile",
-                  "start": {
-                    "column": 4,
-                    "line": 5
-                  }
-                },
-                "newText": "--mount=type=secret,id=aptcfg,target=/etc/apt/auth.conf --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=cache,target=/var/lib/apt,id=aptlib,sharing=locked apt-get update \u0026\u0026 apt-get install -y gcc"
-              }
-            ],
+            "needsResolve": true,
             "priority": 90,
+            "resolverId": "prefer-package-cache-mounts",
             "safety": 1
           }
         },

@@ -295,6 +295,28 @@ RUN bun install
 	})
 }
 
+// resolveIfAsync materializes edits for assertions: returns fix.Edits for
+// sync fixes, and invokes the registered resolver against the original
+// content for async (NeedsResolve) fixes.
+func resolveIfAsync(t *testing.T, fix *rules.SuggestedFix, content string) []rules.TextEdit {
+	t.Helper()
+	if !fix.NeedsResolve {
+		return fix.Edits
+	}
+	resolver := fixpkg.GetResolver(fix.ResolverID)
+	if resolver == nil {
+		t.Fatalf("resolver %q not registered", fix.ResolverID)
+	}
+	resolved, err := resolver.Resolve(context.Background(), fixpkg.ResolveContext{
+		FilePath: "Dockerfile",
+		Content:  []byte(content),
+	}, fix)
+	if err != nil {
+		t.Fatalf("resolver error: %v", err)
+	}
+	return resolved
+}
+
 func TestPreferPackageCacheMountsRule_CheckWithFixes(t *testing.T) {
 	t.Parallel()
 	r := NewPreferPackageCacheMountsRule()
@@ -676,14 +698,16 @@ RUN npm install
 				t.Fatalf("fix priority = %d, want 90", fix.Priority)
 			}
 
+			edits := resolveIfAsync(t, fix, tt.content)
+
 			// Only check edit count if explicitly set (non-zero)
-			if tt.wantEditCount != 0 && len(fix.Edits) != tt.wantEditCount {
-				t.Fatalf("fix edits = %d, want %d", len(fix.Edits), tt.wantEditCount)
+			if tt.wantEditCount != 0 && len(edits) != tt.wantEditCount {
+				t.Fatalf("fix edits = %d, want %d", len(edits), tt.wantEditCount)
 			}
 
 			// Concatenate all edit texts for contains/notContains checks.
 			var allNewText strings.Builder
-			for _, edit := range fix.Edits {
+			for _, edit := range edits {
 				allNewText.WriteString(edit.NewText)
 				allNewText.WriteString("\n")
 			}

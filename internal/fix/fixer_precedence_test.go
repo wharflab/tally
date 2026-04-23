@@ -1,10 +1,15 @@
-package fix
+// This file lives in package fix_test (external test package) so it can
+// import internal/rules/all — which transitively pulls in internal/rules/tally,
+// some of whose rules register post-sync FixResolvers back into internal/fix.
+// Placing it in package fix would form an import cycle.
+package fix_test
 
 import (
 	"bytes"
 	"context"
 	"testing"
 
+	"github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/rules"
 	_ "github.com/wharflab/tally/internal/rules/all"
 )
@@ -64,7 +69,7 @@ func TestFixer_Apply_ConflictPrefersPerformanceOverStyle(t *testing.T) {
 		},
 	}
 
-	fixer := &Fixer{SafetyThreshold: FixSafe}
+	fixer := &fix.Fixer{SafetyThreshold: fix.FixSafe}
 	result, err := fixer.Apply(context.Background(), violations, sources)
 	if err != nil {
 		t.Fatalf("Apply error: %v", err)
@@ -92,7 +97,7 @@ func TestFixer_Apply_ConflictPrefersPerformanceOverStyle(t *testing.T) {
 
 	foundStyleConflict := false
 	for _, skip := range fc.FixesSkipped {
-		if skip.RuleCode == "tally/consistent-indentation" && skip.Reason == SkipConflict {
+		if skip.RuleCode == "tally/consistent-indentation" && skip.Reason == fix.SkipConflict {
 			foundStyleConflict = true
 			break
 		}
