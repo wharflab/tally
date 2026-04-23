@@ -1,19 +1,19 @@
-id = "tally"
-name = "Tally"
-version = "0.1.0"
+authors        = ["Wharflab <https://tally.wharflab.com/>"]
+description    = "Dockerfile linting, formatting, and code actions powered by Tally"
+id             = "tally"
+name           = "Tally"
+repository     = "https://github.com/wharflab/tally"
 schema_version = 1
-authors = ["Wharflab <https://github.com/wharflab>"]
-description = "Dockerfile linting, formatting, and code actions powered by Tally"
-repository = "https://github.com/wharflab/tally"
+version        = "0.1.0"
 
 [grammars.dockerfile]
+commit     = "971acdd908568b4531b0ba28a445bf0bb720aba5"
 repository = "https://github.com/camdencheek/tree-sitter-dockerfile"
-commit = "971acdd908568b4531b0ba28a445bf0bb720aba5"
 
 [language_servers.tally]
-name = "Tally"
-languages = ["Dockerfile"]
 code_actions_kind = ["quickfix", "source.fixAll.tally"]
+languages         = ["Dockerfile"]
+name              = "Tally"
 
 [language_servers.tally.language_ids]
 "Dockerfile" = "dockerfile"

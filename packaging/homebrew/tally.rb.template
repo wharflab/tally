@@ -4,7 +4,7 @@
 # Homebrew formula for tally - auto-generated, do not edit manually
 class Tally < Formula
   desc "Fast, configurable linter for Dockerfiles and Containerfiles"
-  homepage "https://github.com/wharflab/tally"
+  homepage "https://tally.wharflab.com/"
   license "GPL-3.0-only"
   version "{{VERSION}}"
 

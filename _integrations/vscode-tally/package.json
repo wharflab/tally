@@ -24,6 +24,7 @@
     "url": "https://github.com/wharflab/tally"
   },
   "publisher": "wharflab",
+  "homepage": "https://tally.wharflab.com/",
   "main": "./dist/extension.cjs",
   "scripts": {
     "postinstall": "cp node_modules/vscode-python-envs/src/api.ts src/vendor/pythonEnvsApi.d.ts",

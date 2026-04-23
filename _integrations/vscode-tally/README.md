@@ -1,7 +1,7 @@
 # Tally for VS Code
 
 Lint, format, and auto-fix **Dockerfiles** and **Containerfiles** in VS Code using
-[tally](https://github.com/wharflab/tally): a BuildKit-native linter + formatter with safe auto-fixes (and optional AI-powered fixes).
+[tally](https://tally.wharflab.com/): a BuildKit-native linter + formatter with safe auto-fixes (and optional AI-powered fixes).
 
 ## What you get
 
@@ -74,5 +74,5 @@ hardcoded `.venv/` and `venv/` directories in each workspace folder.
 ## Learn more
 
 - Rules reference: <https://tally.wharflab.com/rules/overview>
-- Configuration guide: <https://github.com/wharflab/tally/blob/main/docs/guide/configuration.md>
-- AI AutoFix (ACP): <https://github.com/wharflab/tally/blob/main/docs/guide/ai-autofix-acp.md>
+- Configuration guide: <https://tally.wharflab.com/guides/configuration>
+- AI AutoFix (ACP): <https://tally.wharflab.com/guides/ai-autofix>

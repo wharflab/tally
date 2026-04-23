@@ -20,7 +20,7 @@ const distRoot = process.env.TALLY_DIST_DIR
   : path.join(repoRoot, "dist");
 const generatedRoot = path.join(packageRoot, ".generated");
 const generatedPackagesRoot = path.join(generatedRoot, "platform-packages");
-const manifestPath = process.env.npm_package_json || path.join(packageRoot, "package.json");
+const manifestPath = process.env.npm_package_json ?? path.join(packageRoot, "package.json");
 const manifestBackupPath = path.join(generatedRoot, "package.json.backup");
 const rootLegalFiles = ["LICENSE", "NOTICE"];
 
@@ -48,7 +48,7 @@ function copyLegalFiles(targetDir) {
 }
 
 function resolveVersion(manifest) {
-  const version = (process.env.npm_package_version || manifest.version).replace(/^v/, "");
+  const version = (process.env.npm_package_version ?? manifest.version).replace(/^v/, "");
   if (!version) {
     throw new Error("NPM version must not be empty");
   }
@@ -77,7 +77,7 @@ function packageVersionExists(packageName, version) {
   if (result.status === 0) {
     return true;
   }
-  const stderr = `${result.stderr || ""}${result.stdout || ""}`;
+  const stderr = `${result.stderr ?? ""}${result.stdout ?? ""}`;
   if (stderr.includes("E404") || stderr.includes("404 No match found")) {
     return false;
   }
@@ -97,7 +97,7 @@ function buildPlatformManifest(target, version) {
     bugs: {
       url: "https://github.com/wharflab/tally/issues",
     },
-    homepage: "https://github.com/wharflab/tally#readme",
+    homepage: "https://tally.wharflab.com/",
     os: [target.nodeOs === "windows" ? "win32" : target.nodeOs],
     cpu: [target.nodeArch],
     files: ["bin/", "README.md"],
@@ -145,9 +145,7 @@ function publishPlatformPackages(targets, version) {
     writeJSON(path.join(packageDir, "package.json"), buildPlatformManifest(target, version));
 
     if (!dryRun && packageVersionExists(getPlatformPackageName(target), version)) {
-      console.log(
-        `Skipping ${getPlatformPackageName(target)}@${version}; version already exists on npm.`,
-      );
+      
       continue;
     }
 
@@ -155,7 +153,7 @@ function publishPlatformPackages(targets, version) {
     if (dryRun) {
       args.push("--dry-run");
     }
-    console.log(`Publishing ${getPlatformPackageName(target)} from ${packageDir}`);
+    
     runOrThrow("npm", args, { cwd: packageDir });
   }
 }

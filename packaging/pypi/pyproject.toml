@@ -1,33 +1,33 @@
 [project]
-name = "tally-cli"
-dynamic = ["version"]
+authors = [{ name = "Konstantin Vyatkin", email = "tino@vtkn.io" }]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Quality Assurance",
+]
 description = "A fast, configurable linter for Dockerfiles and Containerfiles"
-readme = "README.md"
+dynamic = ["version"]
 license = "GPL-3.0-only"
 license-files = ["LICENSE", "NOTICE"]
-authors = [{ name = "Konstantin Vyatkin", email = "tino@vtkn.io" }]
+name = "tally-cli"
+readme = "README.md"
 requires-python = ">=3.9"
-classifiers = [
-  "Operating System :: OS Independent",
-  "Topic :: Software Development :: Quality Assurance",
-  "Environment :: Console",
-  "Intended Audience :: Developers",
-  "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-]
 
 [project.urls]
-Homepage = "https://github.com/wharflab/tally"
+Homepage = "https://tally.wharflab.com/"
 
 [project.scripts]
 tally = "tally_cli.main:main"
 
 [build-system]
-requires = ["hatchling"]
 build-backend = "hatchling.build"
+requires      = ["hatchling"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["tally_cli"]
 artifacts = ["tally_cli/bin/**/*"]
+packages  = ["tally_cli"]
 
 [tool.hatch.build.hooks.custom]
 path = "hatch_build.py"
@@ -37,10 +37,10 @@ path = "hatch_build.py"
 
 [tool.hatch.build.targets.sdist]
 include = [
-  "tally_cli/",
-  "LICENSE",
-  "NOTICE",
-  "README.md",
-  "pyproject.toml",
-  "hatch_build.py",
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "hatch_build.py",
+    "pyproject.toml",
+    "tally_cli/",
 ]

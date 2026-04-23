@@ -1,6 +1,6 @@
 # Tally for Zed
 
-[Tally](https://github.com/wharflab/tally) is a fast, configurable linter, formatter, and fixer for Dockerfiles and Containerfiles.
+[Tally](https://tally.wharflab.com/) is a fast, configurable linter, formatter, and fixer for Dockerfiles and Containerfiles.
 
 This extension brings full tally support to [Zed](https://zed.dev), including:
 
@@ -89,6 +89,6 @@ To test the extension locally:
 
 ## Links
 
-- [Tally documentation](https://github.com/wharflab/tally)
+- [Tally documentation](https://tally.wharflab.com/)
 - [Rule reference](https://tally.wharflab.com/rules/overview)
 - [Zed extension docs](https://zed.dev/docs/extensions)

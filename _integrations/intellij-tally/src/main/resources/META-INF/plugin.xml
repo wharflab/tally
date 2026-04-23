@@ -2,7 +2,7 @@
     <id>@PLUGIN_ID@</id>
     <name>Tally</name>
     <version>@PLUGIN_VERSION@</version>
-    <vendor email="opensource@wharflab.com" url="https://github.com/wharflab/tally">WharfLab</vendor>
+    <vendor email="hello@wharflab.com" url="https://tally.wharflab.com/">WharfLab</vendor>
     <description><![CDATA[
       <p><strong>Lint, format, and auto-fix Dockerfiles and Containerfiles in IntelliJ.</strong></p>
       <ul>
