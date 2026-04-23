@@ -270,6 +270,7 @@ func (r *PreferCopyHeredocRule) checkSingleRuns(
 			userState.currentUser = c.User
 		case *instructions.RunCommand:
 			shellCtx := preferCopyHeredocShellContextForRun(c, ctx.stageInfo, ctx.fallbackVariant)
+			multi := detectRunFileCreations(c, shellCtx.variant, shellCtx.fileCreationOptions, ctx.knownVars, userState)
 			info := detectRunFileCreation(c, shellCtx.variant, shellCtx.fileCreationOptions, ctx.knownVars, userState)
 			userState.learnHomesFromRun(c, shellCtx.variant)
 
@@ -279,7 +280,19 @@ func (r *PreferCopyHeredocRule) checkSingleRuns(
 			}
 
 			// Only check shell form
-			if !c.PrependShell || info == nil {
+			if !c.PrependShell {
+				continue
+			}
+
+			// Multi-target path: emit a single violation covering all targets.
+			if multi != nil && len(multi.Slots) > 1 && !multi.HasUnsafeVariables {
+				if v, ok := r.multiTargetViolation(c, multi, ctx, userState.currentUser); ok {
+					violations = append(violations, v)
+					continue
+				}
+			}
+
+			if info == nil {
 				continue
 			}
 
@@ -481,6 +494,177 @@ func (r *PreferCopyHeredocRule) createSequenceViolation(
 	}
 
 	return &v
+}
+
+// multiTargetViolation builds a Violation and fix for a RUN that creates
+// multiple distinct files in one && chain. Returns ok=false when the fix
+// can't be generated (missing location, any slot appends without a prior
+// overwrite, mount conflicts with any target, etc.).
+func (r *PreferCopyHeredocRule) multiTargetViolation(
+	run *instructions.RunCommand,
+	multi *shell.MultiFileCreationInfo,
+	ctx copyHeredocCheckContext,
+	effectiveUser string,
+) (rules.Violation, bool) {
+	if multi == nil || len(multi.Slots) < 2 {
+		return rules.Violation{}, false
+	}
+
+	for _, slot := range multi.Slots {
+		if slot.Info.HasUnsafeVariables {
+			return rules.Violation{}, false
+		}
+		// Append-only slots need prior content to merge — skip multi-fix
+		// since each slot is independent and can't safely be converted.
+		if slot.Info.IsAppend {
+			return rules.Violation{}, false
+		}
+		if shouldSkipForMounts(run, slot.Info.TargetPath) {
+			return rules.Violation{}, false
+		}
+	}
+
+	runLoc := run.Location()
+	if len(runLoc) == 0 {
+		return rules.Violation{}, false
+	}
+
+	fix := r.generateMultiFix(run, multi, ctx, effectiveUser)
+	if fix == nil {
+		return rules.Violation{}, false
+	}
+
+	loc := rules.NewLocationFromRanges(ctx.file, run.Location())
+	targetList := make([]string, 0, len(multi.Slots))
+	for _, slot := range multi.Slots {
+		targetList = append(targetList, slot.Info.TargetPath)
+	}
+	v := rules.NewViolation(
+		loc,
+		ctx.meta.Code,
+		"use COPY <<EOF instead of RUN for file creation",
+		ctx.meta.DefaultSeverity,
+	).WithDocURL(ctx.meta.DocURL).WithDetail(
+		fmt.Sprintf("RUN creates %d files (%s); each can become its own COPY heredoc",
+			len(multi.Slots), strings.Join(targetList, ", ")),
+	).WithSuggestedFix(fix)
+	return v, true
+}
+
+// generateMultiFix builds a fix that replaces a multi-target RUN with a
+// sequence of COPY heredocs (one per distinct target) and, when non-creation
+// commands remain, a surrounding RUN. `mkdir -p /parent` entries are dropped
+// when a subsequent COPY writes under /parent — BuildKit COPY auto-creates
+// parent directories.
+func (r *PreferCopyHeredocRule) generateMultiFix(
+	run *instructions.RunCommand,
+	multi *shell.MultiFileCreationInfo,
+	ctx copyHeredocCheckContext,
+	effectiveUser string,
+) *rules.SuggestedFix {
+	runLoc := run.Location()
+	if len(runLoc) == 0 {
+		return nil
+	}
+
+	creationTargets := make([]string, 0, len(multi.Slots))
+	for _, slot := range multi.Slots {
+		creationTargets = append(creationTargets, slot.Info.TargetPath)
+	}
+
+	// Build the output: walk commands in order, emitting either a COPY heredoc
+	// for creation slots or a preserved shell command for others. Contiguous
+	// "other" commands collapse into a single RUN; mkdir -p entries absorbed
+	// by a later COPY destination are skipped.
+	mountFlags := runmount.FormatMounts(runmount.GetMounts(run))
+	runPrefix := "RUN "
+	if mountFlags != "" {
+		runPrefix = "RUN " + mountFlags + " "
+	}
+
+	chownUser := chownUserForCopy(effectiveUser)
+
+	var parts []string
+	var pendingRun []string
+	flushRun := func() {
+		if len(pendingRun) == 0 {
+			return
+		}
+		parts = append(parts, runPrefix+strings.Join(pendingRun, " && "))
+		pendingRun = pendingRun[:0]
+	}
+
+	emittedSlots := make(map[int]bool, len(multi.Slots))
+	for _, cmd := range multi.Commands {
+		switch cmd.Kind {
+		case shell.MultiCmdCreation:
+			if emittedSlots[cmd.SlotIndex] {
+				continue
+			}
+			emittedSlots[cmd.SlotIndex] = true
+			flushRun()
+			slot := multi.Slots[cmd.SlotIndex]
+			parts = append(parts,
+				buildCopyHeredoc(slot.Info.TargetPath, slot.Info.Content, slot.Info.RawChmodMode, chownUser))
+		case shell.MultiCmdChmod:
+			// Chmod commands targeting a slot are already folded into that
+			// slot; any chmod that reaches us here targets something outside
+			// our creation set — preserve it as a shell command.
+			pendingRun = append(pendingRun, cmd.Text)
+		case shell.MultiCmdMkdirP:
+			if mkdirAbsorbedByCopy(cmd.MkdirTarget, creationTargets) {
+				continue
+			}
+			pendingRun = append(pendingRun, cmd.Text)
+		default:
+			pendingRun = append(pendingRun, cmd.Text)
+		}
+	}
+	flushRun()
+
+	if len(parts) == 0 {
+		return nil
+	}
+
+	newText := strings.Join(parts, "\n")
+
+	endLine, endCol := resolveRunEndPosition(runLoc, ctx.sm, run)
+
+	safety := rules.FixSuggestion
+	if multi.ResolvedHomePath {
+		safety = rules.FixUnsafe
+	}
+
+	return &rules.SuggestedFix{
+		Description: fmt.Sprintf("Split RUN into %d COPY <<EOF instructions", len(multi.Slots)),
+		Safety:      safety,
+		Priority:    ctx.meta.FixPriority,
+		Edits: []rules.TextEdit{{
+			Location: rules.NewRangeLocation(
+				ctx.file,
+				runLoc[0].Start.Line,
+				runLoc[0].Start.Character,
+				endLine,
+				endCol,
+			),
+			NewText: newText,
+		}},
+	}
+}
+
+// mkdirAbsorbedByCopy reports whether the given mkdir -p target is created
+// (implicitly) by a subsequent COPY heredoc destination. BuildKit's COPY
+// creates all missing parent directories of its destination.
+func mkdirAbsorbedByCopy(mkdirTarget string, creationTargets []string) bool {
+	if mkdirTarget == "" {
+		return false
+	}
+	for _, dest := range creationTargets {
+		if isPathUnder(dest, mkdirTarget) {
+			return true
+		}
+	}
+	return false
 }
 
 // generateFix generates a fix for a single RUN file creation.
@@ -861,6 +1045,30 @@ func detectRunFileCreation(
 	}
 
 	return shell.DetectFileCreationWithOptions(script, shellVariant, knownVars, options)
+}
+
+// detectRunFileCreations runs the multi-target analysis for a RUN instruction,
+// applying the same options (target-path resolution, plain-echo escape
+// semantics) used by the single-target detector. Returns nil if the script is
+// not a file-creation chain or uses unsupported shell features.
+func detectRunFileCreations(
+	run *instructions.RunCommand,
+	shellVariant shell.Variant,
+	options shell.FileCreationOptions,
+	knownVars func(string) bool,
+	userState *preferCopyHeredocUserState,
+) *shell.MultiFileCreationInfo {
+	if run == nil || !run.PrependShell {
+		return nil
+	}
+	script := getRunCmdLine(run)
+	if script == "" {
+		return nil
+	}
+	if userState != nil {
+		options.ResolveTargetPath = userState.resolveTargetPath
+	}
+	return shell.DetectFileCreations(script, shellVariant, knownVars, options)
 }
 
 type preferCopyHeredocShellContext struct {

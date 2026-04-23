@@ -1041,6 +1041,166 @@ func TestDetectFileCreationWithUmask(t *testing.T) {
 	}
 }
 
+func TestDetectFileCreationPipeToTee(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		script      string
+		wantNil     bool
+		wantPath    string
+		wantContent string
+		wantAppend  bool
+	}{
+		{
+			name:        "single echo piped to tee",
+			script:      `echo 'hello' | tee /etc/config`,
+			wantPath:    "/etc/config",
+			wantContent: "hello\n",
+		},
+		{
+			name:        "brace group of echos piped to tee",
+			script:      `{ echo 'a'; echo 'b'; echo 'c'; } | tee /etc/config`,
+			wantPath:    "/etc/config",
+			wantContent: "a\nb\nc\n",
+		},
+		{
+			name:        "brace group piped to tee -a",
+			script:      `{ echo 'a'; echo 'b'; } | tee -a /etc/config`,
+			wantPath:    "/etc/config",
+			wantContent: "a\nb\n",
+			wantAppend:  true,
+		},
+		{
+			name:        "pipe tee with stdout /dev/null",
+			script:      `{ echo 'x'; } | tee /etc/config > /dev/null`,
+			wantPath:    "/etc/config",
+			wantContent: "x\n",
+		},
+		{
+			name:    "pipe to tee with relative path - skip",
+			script:  `{ echo 'x'; } | tee config.txt`,
+			wantNil: true,
+		},
+		{
+			name:    "pipe to non-tee command",
+			script:  `{ echo 'x'; } | cat > /etc/config`,
+			wantNil: true,
+		},
+		{
+			name:        "brace group of printf piped to tee",
+			script:      `{ printf 'a\n'; printf 'b\n'; } | tee /etc/config`,
+			wantPath:    "/etc/config",
+			wantContent: "a\nb\n",
+		},
+		{
+			name:        "brace group mixing echo and printf",
+			script:      `{ echo 'a'; printf 'b\n'; echo 'c'; } | tee /etc/config`,
+			wantPath:    "/etc/config",
+			wantContent: "a\nb\nc\n",
+		},
+		{
+			name:        "cat heredoc piped to tee",
+			script:      "cat <<EOF | tee /etc/config\nhello\nworld\nEOF",
+			wantPath:    "/etc/config",
+			wantContent: "hello\nworld\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			result := DetectFileCreation(tt.script, VariantBash, nil)
+			if tt.wantNil {
+				if result != nil {
+					t.Errorf("expected nil, got %+v", result)
+				}
+				return
+			}
+			if result == nil {
+				t.Fatal("expected non-nil result")
+			}
+			if result.TargetPath != tt.wantPath {
+				t.Errorf("TargetPath = %q, want %q", result.TargetPath, tt.wantPath)
+			}
+			if result.Content != tt.wantContent {
+				t.Errorf("Content = %q, want %q", result.Content, tt.wantContent)
+			}
+			if result.IsAppend != tt.wantAppend {
+				t.Errorf("IsAppend = %v, want %v", result.IsAppend, tt.wantAppend)
+			}
+		})
+	}
+}
+
+func TestDetectFileCreations_MultiTarget(t *testing.T) {
+	t.Parallel()
+
+	script := `set -ex ` +
+		`&& { echo 'a=1'; echo 'b=2'; } | tee /etc/one.conf ` +
+		`&& mkdir -p /var/app ` +
+		`&& { echo 'x'; } | tee /var/app/config ` +
+		`&& { echo 'y'; } | tee /etc/three.ini`
+
+	got := DetectFileCreations(script, VariantBash, nil, FileCreationOptions{})
+	if got == nil {
+		t.Fatal("expected non-nil MultiFileCreationInfo")
+	}
+	if got.HasUnsafeVariables {
+		t.Errorf("HasUnsafeVariables = true, want false")
+	}
+
+	wantTargets := []string{"/etc/one.conf", "/var/app/config", "/etc/three.ini"}
+	if len(got.Slots) != len(wantTargets) {
+		t.Fatalf("got %d slots, want %d", len(got.Slots), len(wantTargets))
+	}
+	for i, want := range wantTargets {
+		if got.Slots[i].Info.TargetPath != want {
+			t.Errorf("slot[%d] TargetPath = %q, want %q", i, got.Slots[i].Info.TargetPath, want)
+		}
+	}
+	if got := got.Slots[0].Info.Content; got != "a=1\nb=2\n" {
+		t.Errorf("slot[0] Content = %q, want %q", got, "a=1\nb=2\n")
+	}
+
+	// mkdir -p should be recognized so callers can elide it.
+	var sawMkdir bool
+	for _, c := range got.Commands {
+		if c.Kind == MultiCmdMkdirP && c.MkdirTarget == "/var/app" {
+			sawMkdir = true
+		}
+	}
+	if !sawMkdir {
+		t.Errorf("expected a MultiCmdMkdirP for /var/app in commands")
+	}
+}
+
+func TestDetectMkdirP(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		text       string
+		wantTarget string
+		wantOk     bool
+	}{
+		{"mkdir -p /var/app", "/var/app", true},
+		{"mkdir --parents /var/app", "/var/app", true},
+		{"mkdir /var/app", "", false},                // missing -p
+		{"mkdir -p /a /b", "", false},                // multiple targets
+		{"mkdir -p var/app", "", false},              // relative path
+		{"mkdir -p --mode=0755 /var/app", "", false}, // unsupported flag
+		{"mkdir -p \"/var/app\"", "", false},         // quoted arg
+		{"echo hi", "", false},                       // not mkdir
+	}
+	for _, tt := range tests {
+		t.Run(tt.text, func(t *testing.T) {
+			t.Parallel()
+			target, ok := detectMkdirP(tt.text)
+			if ok != tt.wantOk || target != tt.wantTarget {
+				t.Errorf("detectMkdirP(%q) = (%q, %v), want (%q, %v)", tt.text, target, ok, tt.wantTarget, tt.wantOk)
+			}
+		})
+	}
+}
+
 func TestParseUmask(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

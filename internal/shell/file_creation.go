@@ -82,6 +82,71 @@ type FileCreationOptions struct {
 	InterpretPlainEchoEscapes bool
 }
 
+// MultiFileCreationSlot describes a single file-creation sub-block inside a
+// chained script. Multiple slots can coexist when a RUN writes to several
+// distinct files in one && chain.
+type MultiFileCreationSlot struct {
+	// Info is the resolved creation for this slot (target, content, chmod, etc.).
+	Info FileCreationInfo
+	// CmdIndex is the index of the flattened command that produced this slot.
+	CmdIndex int
+	// EndIndex is the last contributing command index (inclusive).
+	EndIndex int
+}
+
+// MultiFileCreationInfo describes the set of file creations and interleaved
+// non-creation commands found in a single shell script. It is produced by
+// DetectFileCreations when the script has one or more distinct target paths.
+type MultiFileCreationInfo struct {
+	// Slots lists each distinct file creation in chain order.
+	Slots []MultiFileCreationSlot
+
+	// Commands is the flattened command list (file creations, chmods, umasks,
+	// and "other" commands) in original order. Non-creation commands are
+	// preserved verbatim so callers can emit them before/between COPYs.
+	Commands []MultiAnalyzedCmd
+
+	// HasUnsafeVariables is true if any command in the script uses unsafe
+	// variables (shell vars, command substitution, complex expansions).
+	HasUnsafeVariables bool
+
+	// ResolvedHomePath is true if any slot used tilde (~) expansion.
+	ResolvedHomePath bool
+}
+
+// MultiAnalyzedCmd is a per-command record exposed to callers alongside
+// MultiFileCreationInfo. It mirrors the internal analyzedCmd but is part of
+// the public API surface for rules that need to know which commands were
+// file creations vs other shell commands.
+type MultiAnalyzedCmd struct {
+	// Kind identifies how this command should be handled.
+	Kind MultiCmdKind
+	// Text is the original (printed) command text.
+	Text string
+	// SlotIndex points into MultiFileCreationInfo.Slots for Kind == MultiCmdCreation.
+	SlotIndex int
+	// MkdirTarget, for Kind == MultiCmdMkdirP, is the absolute directory path
+	// that `mkdir -p` would create. Empty for non-mkdir commands.
+	MkdirTarget string
+}
+
+// MultiCmdKind identifies the role of a command within a MultiFileCreationInfo.
+type MultiCmdKind int
+
+const (
+	// MultiCmdOther is a generic command we can't absorb into a COPY heredoc.
+	MultiCmdOther MultiCmdKind = iota
+	// MultiCmdCreation is a file-creation command contributing to Slots.
+	MultiCmdCreation
+	// MultiCmdChmod is a chmod command (already folded into the matching slot
+	// when possible; otherwise treated as "other").
+	MultiCmdChmod
+	// MultiCmdMkdirP is a `mkdir -p /path` command with a literal absolute path.
+	// Callers can elide it when a subsequent COPY creates the same (or a
+	// descendant) directory — BuildKit's COPY auto-creates parent directories.
+	MultiCmdMkdirP
+)
+
 // DetectFileCreation analyzes a shell script for file creation patterns.
 // Returns nil if the script is not primarily a file creation operation.
 //
@@ -125,6 +190,33 @@ func DetectFileCreationWithOptions(
 
 	// Analyze the script for file creation patterns
 	return analyzeFileCreation(prog, knownVars, options)
+}
+
+// DetectFileCreations analyzes a shell script and returns every distinct
+// file-creation target found in its && chain. Unlike DetectFileCreation it
+// does not collapse mixed scripts into preceding/remaining strings; instead
+// it returns the full flattened command list plus one slot per creation.
+// Returns nil if the script contains no recognizable file creation.
+func DetectFileCreations(
+	script string,
+	variant Variant,
+	knownVars func(name string) bool,
+	options FileCreationOptions,
+) *MultiFileCreationInfo {
+	if !variant.SupportsPOSIXShellAST() {
+		return nil
+	}
+
+	prog, err := parseScript(script, variant)
+	if err != nil {
+		return nil
+	}
+
+	if !isSimpleScriptFromAST(prog) {
+		return nil
+	}
+
+	return analyzeFileCreations(prog, knownVars, options)
 }
 
 // ChmodInfo describes a standalone chmod command.
@@ -333,6 +425,253 @@ func analyzeFileCreation(
 	}
 }
 
+// analyzeFileCreations performs multi-target file-creation analysis.
+// Unlike analyzeFileCreation it does not collapse to a single target; instead
+// it walks the flattened && chain and reports every distinct creation in
+// order, with interleaved non-creation commands preserved verbatim.
+func analyzeFileCreations(
+	prog *syntax.File,
+	knownVars func(name string) bool,
+	options FileCreationOptions,
+) *MultiFileCreationInfo {
+	if len(prog.Stmts) != 1 {
+		return nil
+	}
+
+	var commands []analyzedCmd
+	collectCommands(prog, &commands, knownVars, options)
+	if len(commands) == 0 {
+		return nil
+	}
+
+	// Compute an effective umask at each index for proper mode derivation.
+	umaskAt := make([]uint16, len(commands))
+	umaskSeen := make([]bool, len(commands))
+	var curUmask uint16
+	var curSeen bool
+	for i, cmd := range commands {
+		if cmd.cmdType == cmdTypeUmask {
+			curUmask = cmd.umaskValue
+			curSeen = true
+		}
+		umaskAt[i] = curUmask
+		umaskSeen[i] = curSeen
+	}
+
+	// Find contiguous creation blocks (file creations + chmod to same target).
+	// A new block starts whenever the target path differs from the previous
+	// creation, or a non-creation/non-matching-chmod command appears.
+	type blockRange struct {
+		start, end int
+		target     string
+	}
+	var blocks []blockRange
+	i := 0
+	for i < len(commands) {
+		cmd := commands[i]
+		if cmd.cmdType != cmdTypeFileCreation || cmd.creation == nil {
+			i++
+			continue
+		}
+		target := cmd.creation.targetPath
+		start := i
+		end := i
+		j := i + 1
+		for j < len(commands) {
+			next := commands[j]
+			switch {
+			case next.cmdType == cmdTypeFileCreation && next.creation != nil && next.creation.targetPath == target:
+				end = j
+				j++
+				continue
+			case next.cmdType == cmdTypeChmod && next.chmodTarget == target:
+				end = j
+				j++
+				continue
+			}
+			break
+		}
+		blocks = append(blocks, blockRange{start: start, end: end, target: target})
+		i = end + 1
+	}
+
+	if len(blocks) == 0 {
+		return nil
+	}
+
+	// Build slots from blocks.
+	info := &MultiFileCreationInfo{}
+	// Track which command index belongs to which slot.
+	slotIndexByCmd := make(map[int]int, len(commands))
+	for _, blk := range blocks {
+		slot := buildSlotFromBlock(commands, blk.start, blk.end, blk.target, umaskAt, umaskSeen)
+		if slot == nil {
+			continue
+		}
+		slot.CmdIndex = blk.start
+		slot.EndIndex = blk.end
+		idx := len(info.Slots)
+		info.Slots = append(info.Slots, *slot)
+		for k := blk.start; k <= blk.end; k++ {
+			slotIndexByCmd[k] = idx
+		}
+	}
+
+	if len(info.Slots) == 0 {
+		return nil
+	}
+
+	// Emit a flat list of MultiAnalyzedCmd.
+	info.Commands = make([]MultiAnalyzedCmd, 0, len(commands))
+	for k, cmd := range commands {
+		entry := MultiAnalyzedCmd{Text: cmd.text, SlotIndex: -1}
+		if slotIdx, ok := slotIndexByCmd[k]; ok {
+			entry.Kind = MultiCmdCreation
+			entry.SlotIndex = slotIdx
+		} else {
+			switch cmd.cmdType {
+			case cmdTypeChmod:
+				entry.Kind = MultiCmdChmod
+			case cmdTypeFileCreation:
+				// Shouldn't happen: all creations are slot-mapped. Fall through.
+				entry.Kind = MultiCmdOther
+			default:
+				entry.Kind = MultiCmdOther
+				if target, ok := detectMkdirP(cmd.text); ok {
+					entry.Kind = MultiCmdMkdirP
+					entry.MkdirTarget = target
+				}
+			}
+		}
+		if cmd.hasUnsafe {
+			info.HasUnsafeVariables = true
+		}
+		info.Commands = append(info.Commands, entry)
+	}
+	for _, slot := range info.Slots {
+		if slot.Info.HasUnsafeVariables {
+			info.HasUnsafeVariables = true
+		}
+		if slot.Info.ResolvedHomePath {
+			info.ResolvedHomePath = true
+		}
+	}
+
+	return info
+}
+
+// buildSlotFromBlock constructs a MultiFileCreationSlot from a contiguous
+// block of commands, all targeting the same file path.
+func buildSlotFromBlock(
+	commands []analyzedCmd,
+	start, end int,
+	targetPath string,
+	umaskAt []uint16,
+	umaskSeen []bool,
+) *MultiFileCreationSlot {
+	var creations []fileCreationCmd
+	var chmodMode uint16
+	var rawChmodMode string
+	hasUnsafeVars := false
+	resolvedHomePath := false
+
+	for k := start; k <= end; k++ {
+		cmd := commands[k]
+		if cmd.hasUnsafe {
+			hasUnsafeVars = true
+		}
+		switch {
+		case cmd.cmdType == cmdTypeFileCreation && cmd.creation != nil:
+			creations = append(creations, *cmd.creation)
+			if cmd.creation.resolvedHomePath {
+				resolvedHomePath = true
+			}
+		case cmd.cmdType == cmdTypeChmod && cmd.chmodTarget == targetPath:
+			chmodMode = cmd.chmodMode
+			rawChmodMode = cmd.chmodRawMode
+		}
+	}
+
+	if len(creations) == 0 {
+		return nil
+	}
+
+	// umask contribution is read from the last umask seen at or before the block start.
+	if chmodMode == 0 && start < len(umaskAt) {
+		seenIdx := start
+		if seenIdx > 0 {
+			seenIdx = start - 1
+		}
+		if seenIdx < len(umaskAt) {
+			chmodMode = umaskDerivedChmodMode(umaskAt[seenIdx], umaskSeen[seenIdx])
+		}
+	}
+
+	var content strings.Builder
+	allAppend := true
+	for i, c := range creations {
+		if i > 0 && !c.isAppend {
+			content.Reset()
+		}
+		if !c.isAppend {
+			allAppend = false
+		}
+		content.WriteString(c.content)
+	}
+
+	if chmodMode != 0 && rawChmodMode == "" {
+		rawChmodMode = FormatOctalMode(chmodMode)
+	}
+
+	return &MultiFileCreationSlot{
+		Info: FileCreationInfo{
+			TargetPath:         targetPath,
+			ResolvedHomePath:   resolvedHomePath,
+			Content:            content.String(),
+			ChmodMode:          chmodMode,
+			RawChmodMode:       rawChmodMode,
+			IsAppend:           allAppend,
+			HasUnsafeVariables: hasUnsafeVars,
+		},
+	}
+}
+
+// detectMkdirP reports whether text is `mkdir -p <absolute path>` with a
+// single literal target. Other forms (multiple targets, --mode, relative
+// paths, variables) return false because we can't safely elide them.
+func detectMkdirP(text string) (string, bool) {
+	fields := strings.Fields(text)
+	if len(fields) < 3 || fields[0] != "mkdir" {
+		return "", false
+	}
+	sawP := false
+	var target string
+	for _, f := range fields[1:] {
+		switch {
+		case f == "-p", f == "--parents":
+			sawP = true
+		case strings.HasPrefix(f, "-"):
+			return "", false
+		default:
+			if target != "" {
+				return "", false
+			}
+			target = f
+		}
+	}
+	if !sawP || target == "" {
+		return "", false
+	}
+	// Strip matching surrounding quotes, if any; otherwise reject.
+	if strings.ContainsAny(target, "\"'`$") {
+		return "", false
+	}
+	if !path.IsAbs(target) {
+		return "", false
+	}
+	return path.Clean(target), true
+}
+
 // umaskDerivedChmodMode computes the effective chmod mode from a umask value.
 // Returns 0 if no umask was set or it matches the default (0o022 → 0o644).
 func umaskDerivedChmodMode(activeUmask uint16, hasUmask bool) uint16 {
@@ -371,11 +710,21 @@ func collectFromStatement(
 
 	switch cmd := stmt.Cmd.(type) {
 	case *syntax.BinaryCmd:
-		if cmd.Op == syntax.AndStmt {
+		switch cmd.Op {
+		case syntax.AndStmt:
 			collectFromStatement(cmd.X, commands, knownVars, options)
 			collectFromStatement(cmd.Y, commands, knownVars, options)
-		} else {
-			// Other binary ops (||, |) - treat as single opaque command
+		case syntax.Pipe, syntax.PipeAll:
+			if analyzed, ok := analyzePipeToTee(stmt, cmd, knownVars, options); ok {
+				*commands = append(*commands, analyzed)
+				return
+			}
+			*commands = append(*commands, analyzedCmd{
+				cmdType: cmdTypeOther,
+				text:    stmtToString(stmt),
+			})
+		default:
+			// Other binary ops (||) - treat as single opaque command
 			*commands = append(*commands, analyzedCmd{
 				cmdType: cmdTypeOther,
 				text:    stmtToString(stmt),
@@ -506,42 +855,9 @@ func analyzeTeeCmd(
 ) analyzedCmd {
 	other := analyzedCmd{cmdType: cmdTypeOther, text: text}
 
-	isAppend := false
-	var targetPath string
-	pastOptions := false
-
-	for i := 1; i < len(call.Args); i++ {
-		lit := call.Args[i].Lit()
-		if lit == "" {
-			return other // Non-literal argument (variable, etc.)
-		}
-
-		// "--" ends option parsing
-		if lit == "--" {
-			pastOptions = true
-			continue
-		}
-
-		// Parse flags (only before --)
-		if !pastOptions && strings.HasPrefix(lit, "-") && lit != "-" {
-			for _, r := range lit[1:] {
-				switch r {
-				case 'a':
-					isAppend = true
-				case 'i', 'p':
-					// -i (ignore interrupts), -p (diagnose errors) — safe to ignore
-				default:
-					return other // Unknown flag
-				}
-			}
-			continue
-		}
-
-		// File argument
-		if targetPath != "" {
-			return other // Multiple output files — can't convert to single COPY
-		}
-		targetPath = lit
+	targetPath, isAppend, ok := parseTeeTarget(call)
+	if !ok {
+		return other
 	}
 
 	targetPath, resolvedHomePath, ok := resolveFileCreationTarget(targetPath, resolveTargetPath)
@@ -549,29 +865,8 @@ func analyzeTeeCmd(
 		return other
 	}
 
-	// Validate redirects: allow heredoc input and at most one stdout
-	// redirect to /dev/null (tee echoes to stdout; suppress is common).
-	seenStdoutRedir := false
-	for _, redir := range stmt.Redirs {
-		switch redir.Op {
-		case syntax.Hdoc, syntax.DashHdoc:
-			// Heredoc input — this is the content source
-		case syntax.RdrOut, syntax.AppOut:
-			if seenStdoutRedir {
-				return other
-			}
-			if redir.N != nil && redir.N.Value != "1" {
-				return other // e.g. 2> — not stdout
-			}
-			if extractRedirectTarget(redir) != "/dev/null" {
-				return other // redirect to a real file — side effect we can't drop
-			}
-			seenStdoutRedir = true
-		case syntax.RdrIn, syntax.RdrInOut, syntax.DplIn, syntax.DplOut,
-			syntax.RdrClob, syntax.AppClob, syntax.WordHdoc,
-			syntax.RdrAll, syntax.RdrAllClob, syntax.AppAll, syntax.AppAllClob:
-			return other
-		}
+	if !teeRedirectsAreCompatible(stmt) {
+		return other
 	}
 
 	// Extract content from heredoc (same as cat — reads stdin)
@@ -588,6 +883,204 @@ func analyzeTeeCmd(
 		},
 		hasUnsafe: unsafe,
 	}
+}
+
+// parseTeeTarget parses tee's arguments and returns the single file target and
+// whether -a (append) was set. Returns ok=false if the form cannot be safely
+// converted to COPY (non-literal args, unknown flags, multiple output files).
+func parseTeeTarget(call *syntax.CallExpr) (target string, isAppend bool, ok bool) {
+	pastOptions := false
+	for i := 1; i < len(call.Args); i++ {
+		lit := call.Args[i].Lit()
+		if lit == "" {
+			return "", false, false
+		}
+
+		if lit == "--" {
+			pastOptions = true
+			continue
+		}
+
+		if !pastOptions && strings.HasPrefix(lit, "-") && lit != "-" {
+			for _, r := range lit[1:] {
+				switch r {
+				case 'a':
+					isAppend = true
+				case 'i', 'p':
+					// -i / -p are safe to ignore
+				default:
+					return "", false, false
+				}
+			}
+			continue
+		}
+
+		if target != "" {
+			return "", false, false
+		}
+		target = lit
+	}
+	return target, isAppend, true
+}
+
+// teeRedirectsAreCompatible reports whether the redirects on a tee statement
+// (or its enclosing pipeline end) can be safely absorbed into a COPY. tee
+// echoes to stdout; a redirect to /dev/null is common and harmless, but
+// anything else (a real file, stderr) would be a side effect we can't drop.
+func teeRedirectsAreCompatible(stmt *syntax.Stmt) bool {
+	seenStdoutRedir := false
+	for _, redir := range stmt.Redirs {
+		switch redir.Op {
+		case syntax.Hdoc, syntax.DashHdoc:
+			// Heredoc input — stdin source for tee.
+		case syntax.RdrOut, syntax.AppOut:
+			if seenStdoutRedir {
+				return false
+			}
+			if redir.N != nil && redir.N.Value != "1" {
+				return false
+			}
+			if extractRedirectTarget(redir) != "/dev/null" {
+				return false
+			}
+			seenStdoutRedir = true
+		case syntax.RdrIn, syntax.RdrInOut, syntax.DplIn, syntax.DplOut,
+			syntax.RdrClob, syntax.AppClob, syntax.WordHdoc,
+			syntax.RdrAll, syntax.RdrAllClob, syntax.AppAll, syntax.AppAllClob:
+			return false
+		}
+	}
+	return true
+}
+
+// analyzePipeToTee recognizes the pattern `producer | tee [-a] /path` and
+// converts it to a file-creation analyzed command. The producer can be a
+// single echo/cat/printf statement or a brace-group of such statements; their
+// output is concatenated and piped into tee.
+func analyzePipeToTee(
+	stmt *syntax.Stmt,
+	bin *syntax.BinaryCmd,
+	knownVars func(name string) bool,
+	options FileCreationOptions,
+) (analyzedCmd, bool) {
+	text := stmtToString(stmt)
+	other := analyzedCmd{cmdType: cmdTypeOther, text: text}
+
+	if bin.Y == nil || bin.Y.Cmd == nil {
+		return other, false
+	}
+	teeCall, ok := bin.Y.Cmd.(*syntax.CallExpr)
+	if !ok || len(teeCall.Args) == 0 || teeCall.Args[0].Lit() != cmdTee {
+		return other, false
+	}
+
+	target, isAppend, ok := parseTeeTarget(teeCall)
+	if !ok || target == "" {
+		return other, false
+	}
+
+	target, resolvedHomePath, ok := resolveFileCreationTarget(target, options.ResolveTargetPath)
+	if !ok {
+		return other, false
+	}
+
+	if !teeRedirectsAreCompatible(bin.Y) {
+		return other, false
+	}
+
+	// Producer side: echo/cat/printf statements that emit the file's content.
+	producers := flattenProducerStmts(bin.X)
+	if len(producers) == 0 {
+		return other, false
+	}
+
+	var content strings.Builder
+	hasUnsafe := false
+	for _, prod := range producers {
+		pc, prodUnsafe, ok := producerStmtContent(prod, knownVars, options)
+		if !ok {
+			return other, false
+		}
+		if prodUnsafe {
+			hasUnsafe = true
+		}
+		content.WriteString(pc)
+	}
+
+	return analyzedCmd{
+		cmdType: cmdTypeFileCreation,
+		text:    text,
+		creation: &fileCreationCmd{
+			targetPath:       target,
+			content:          content.String(),
+			isAppend:         isAppend,
+			resolvedHomePath: resolvedHomePath,
+		},
+		hasUnsafe: hasUnsafe,
+	}, true
+}
+
+// flattenProducerStmts returns the sequence of content-producing statements on
+// the left side of a pipe. Brace groups (`{ a; b; }`) are flattened to their
+// inner statements; a single statement is returned as-is.
+func flattenProducerStmts(stmt *syntax.Stmt) []*syntax.Stmt {
+	if stmt == nil || stmt.Cmd == nil {
+		return nil
+	}
+	// A brace group can't carry its own redirects — the pipe already sinks
+	// the whole group's output.
+	if _, isBlock := stmt.Cmd.(*syntax.Block); isBlock {
+		if len(stmt.Redirs) > 0 {
+			return nil
+		}
+		return stmt.Cmd.(*syntax.Block).Stmts
+	}
+	return []*syntax.Stmt{stmt}
+}
+
+// producerStmtContent extracts the stdout content a single producer statement
+// would emit. Only echo/cat/printf are recognized; any other command type
+// makes the producer ineligible for COPY conversion.
+func producerStmtContent(
+	stmt *syntax.Stmt,
+	knownVars func(name string) bool,
+	options FileCreationOptions,
+) (string, bool, bool) {
+	if stmt == nil || stmt.Cmd == nil {
+		return "", false, false
+	}
+	call, ok := stmt.Cmd.(*syntax.CallExpr)
+	if !ok || len(call.Args) == 0 {
+		return "", false, false
+	}
+	// Only a heredoc redirect (for cat <<EOF) is acceptable on a producer;
+	// any stdout redirect would divert output away from the pipe, breaking
+	// the model we're converting to COPY.
+	for _, redir := range stmt.Redirs {
+		switch redir.Op {
+		case syntax.Hdoc, syntax.DashHdoc:
+			// OK — handled below for cat.
+		default:
+			return "", false, false
+		}
+	}
+	name := call.Args[0].Lit()
+	switch name {
+	case cmdEcho:
+		content, unsafe := extractEchoContent(call, knownVars, options.InterpretPlainEchoEscapes)
+		return content, unsafe, true
+	case cmdPrintf:
+		content, unsafe := extractPrintfContent(call, knownVars)
+		return content, unsafe, true
+	case cmdCat:
+		if len(call.Args) > 1 {
+			// cat with file args or flags: content depends on files we can't inline.
+			return "", true, true
+		}
+		content, unsafe := extractCatHeredocContentFromStmt(stmt)
+		return content, unsafe, true
+	}
+	return "", false, false
 }
 
 func resolveFileCreationTarget(

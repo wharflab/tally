@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	fixpkg "github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -766,5 +767,158 @@ RUN printf '#!/bin/sh\nexec app\n' > /app/run.sh
 	runViolations := runRule.Check(runInput)
 	if len(runViolations) != 0 {
 		t.Errorf("prefer-run-heredoc: got %d violations, want 0 (should yield to prefer-copy-heredoc)", len(runViolations))
+	}
+}
+
+// TestPreferCopyHeredocRule_PhpFpmStyleFullFix is a snapshot-style test that
+// runs the fix against the exact shape from the original feature request and
+// verifies the applied output.
+func TestPreferCopyHeredocRule_PhpFpmStyleFullFix(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM php:8.3-fpm-alpine
+RUN set -ex \
+    && { \
+        echo '[global]'; \
+        echo 'daemonize = no'; \
+        echo 'error_log = /proc/self/fd/2'; \
+        echo; \
+        echo '[www]'; \
+        echo 'listen = [::]:9000'; \
+        echo 'listen.owner = www-data'; \
+        echo 'listen.group = www-data'; \
+        echo; \
+        echo 'user = www-data'; \
+        echo 'group = www-data'; \
+        echo; \
+        echo 'access.log = /proc/self/fd/2'; \
+        echo; \
+        echo 'pm = static'; \
+        echo 'pm.max_children = 1'; \
+        echo 'pm.start_servers = 1'; \
+        echo 'request_terminate_timeout = 65s'; \
+        echo 'pm.max_requests = 1000'; \
+        echo 'catch_workers_output = yes'; \
+    } | tee /usr/local/etc/php-fpm.d/www.conf \
+    && mkdir -p /usr/local/php/php/auto_prepends \
+    && { \
+        echo '<?php'; \
+        echo 'if (function_exists("uopz_allow_exit")) {'; \
+        echo '    uopz_allow_exit(true);'; \
+        echo '}'; \
+        echo '?>'; \
+    } | tee /usr/local/php/php/auto_prepends/default_prepend.php \
+    && { \
+        echo 'FromLineOverride=YES'; \
+        echo 'mailhub=127.0.0.1'; \
+        echo 'UseTLS=NO'; \
+        echo 'UseSTARTTLS=NO'; \
+    } | tee /etc/ssmtp/ssmtp.conf \
+    && { \
+        echo '[PHP]'; \
+        echo 'log_errors = On'; \
+        echo 'error_log = /dev/stderr'; \
+        echo 'auto_prepend_file = /usr/local/php/php/auto_prepends/default_prepend.php'; \
+    } | tee /usr/local/etc/php/conf.d/php.ini \
+    ;
+`
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	violations := NewPreferCopyHeredocRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil || len(fix.Edits) == 0 {
+		t.Fatal("expected a suggested fix")
+	}
+
+	applied := string(fixpkg.ApplyFix([]byte(content), fix))
+	// Collapse leading whitespace to make the snapshot diff-friendly.
+	if strings.Contains(applied, "mkdir -p /usr/local/php/php/auto_prepends") {
+		t.Errorf("mkdir -p should be absorbed by COPY destination\n--- applied ---\n%s", applied)
+	}
+	if got := strings.Count(applied, "COPY <<EOF "); got != 4 {
+		t.Errorf("got %d COPY heredocs, want 4\n--- applied ---\n%s", got, applied)
+	}
+	// set -ex should survive as a leading RUN.
+	if !strings.Contains(applied, "RUN set -ex") {
+		t.Errorf("leading RUN set -ex missing\n--- applied ---\n%s", applied)
+	}
+	// All four destination paths must be present.
+	wantTargets := []string{
+		"/usr/local/etc/php-fpm.d/www.conf",
+		"/usr/local/php/php/auto_prepends/default_prepend.php",
+		"/etc/ssmtp/ssmtp.conf",
+		"/usr/local/etc/php/conf.d/php.ini",
+	}
+	for _, want := range wantTargets {
+		if !strings.Contains(applied, "COPY <<EOF "+want) {
+			t.Errorf("missing COPY for %s\n--- applied ---\n%s", want, applied)
+		}
+	}
+}
+
+// TestPreferCopyHeredocRule_PhpFpmStyleMultiTargetFix covers the real-world
+// shape from the user request: a single RUN that builds several config files
+// via `{ echo ...; echo ...; } | tee /path` chains joined by &&, with an
+// intervening `mkdir -p` that the COPY destinations should absorb.
+func TestPreferCopyHeredocRule_PhpFpmStyleMultiTargetFix(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM php:8.3-fpm-alpine
+RUN set -ex \
+    && { \
+        echo '[global]'; \
+        echo 'daemonize = no'; \
+    } | tee /usr/local/etc/php-fpm.d/www.conf \
+    && mkdir -p /usr/local/php/php/auto_prepends \
+    && { \
+        echo '<?php'; \
+        echo '?>'; \
+    } | tee /usr/local/php/php/auto_prepends/default_prepend.php \
+    && { \
+        echo 'FromLineOverride=YES'; \
+        echo 'UseTLS=NO'; \
+    } | tee /etc/ssmtp/ssmtp.conf \
+    && { \
+        echo '[PHP]'; \
+        echo 'log_errors = On'; \
+    } | tee /usr/local/etc/php/conf.d/php.ini \
+    ;
+`
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, nil)
+	violations := NewPreferCopyHeredocRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	fix := violations[0].SuggestedFix
+	if fix == nil || len(fix.Edits) == 0 {
+		t.Fatal("expected a suggested fix")
+	}
+
+	newText := fix.Edits[0].NewText
+
+	wantContains := []string{
+		"COPY <<EOF /usr/local/etc/php-fpm.d/www.conf",
+		"COPY <<EOF /usr/local/php/php/auto_prepends/default_prepend.php",
+		"COPY <<EOF /etc/ssmtp/ssmtp.conf",
+		"COPY <<EOF /usr/local/etc/php/conf.d/php.ini",
+	}
+	for _, want := range wantContains {
+		if !strings.Contains(newText, want) {
+			t.Errorf("fix text missing %q\nfull text:\n%s", want, newText)
+		}
+	}
+
+	// The mkdir -p should be absorbed: COPY auto-creates parent directories.
+	if strings.Contains(newText, "mkdir -p /usr/local/php/php/auto_prepends") {
+		t.Errorf("fix text should not retain mkdir -p absorbed by COPY destination\nfull text:\n%s", newText)
+	}
+
+	// The count should match: exactly four COPY lines.
+	if got := strings.Count(newText, "COPY <<EOF "); got != 4 {
+		t.Errorf("got %d COPY heredocs, want 4\nfull text:\n%s", got, newText)
 	}
 }
