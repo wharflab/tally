@@ -130,7 +130,8 @@ RUN apt-get clean
 A single `RUN` that builds several config files via `{ echo ...; echo ...; } | tee /path`
 chains — a common pattern in official images such as `php:fpm` — expands into one
 `COPY <<EOF` per destination. `mkdir -p` is absorbed when a later `COPY` writes under
-the same directory tree.
+the same directory tree, and a leading `set -ex` is dropped entirely (shell options
+don't cross RUN boundaries, so preserving it in a standalone RUN would be pure noise).
 
 #### Before (violation)
 
@@ -159,7 +160,6 @@ RUN set -ex \
 #### After (fixed with `--fix --fix-unsafe`)
 
 ```dockerfile
-RUN set -ex
 COPY <<EOF /usr/local/etc/php-fpm.d/www.conf
 [global]
 daemonize = no

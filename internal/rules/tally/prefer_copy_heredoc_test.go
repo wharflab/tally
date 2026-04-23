@@ -841,9 +841,10 @@ RUN set -ex \
 	if got := strings.Count(applied, "COPY <<EOF "); got != 4 {
 		t.Errorf("got %d COPY heredocs, want 4\n--- applied ---\n%s", got, applied)
 	}
-	// set -ex should survive as a leading RUN.
-	if !strings.Contains(applied, "RUN set -ex") {
-		t.Errorf("leading RUN set -ex missing\n--- applied ---\n%s", applied)
+	// A leftover `RUN set -ex` would be pure noise — shell options don't
+	// cross RUN boundaries — so the extraction should drop it entirely.
+	if strings.Contains(applied, "RUN set -ex") {
+		t.Errorf("leftover shell-state-only RUN should be dropped\n--- applied ---\n%s", applied)
 	}
 	// All four destination paths must be present.
 	wantTargets := []string{
@@ -920,5 +921,67 @@ RUN set -ex \
 	// The count should match: exactly four COPY lines.
 	if got := strings.Count(newText, "COPY <<EOF "); got != 4 {
 		t.Errorf("got %d COPY heredocs, want 4\nfull text:\n%s", got, newText)
+	}
+}
+
+// TestPreferCopyHeredocRule_DropsShellStateOnlyLeftovers verifies that
+// extraction drops a leftover RUN that would contain only shell-state-only
+// commands (set / shopt / trap) — those don't cross RUN boundaries and
+// would just clutter the output.
+func TestPreferCopyHeredocRule_DropsShellStateOnlyLeftovers(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		content     string
+		wantFixText string
+		wantFixLack string
+	}{
+		{
+			name: "set -ex alone is dropped (single-target)",
+			content: `FROM alpine
+RUN set -ex && echo 'hello' > /etc/config
+`,
+			wantFixText: "COPY <<EOF /etc/config",
+			wantFixLack: "RUN set -ex",
+		},
+		{
+			name: "shopt alone is dropped (single-target)",
+			content: `FROM alpine
+RUN shopt -s nullglob && echo 'x' > /etc/config
+`,
+			wantFixText: "COPY <<EOF /etc/config",
+			wantFixLack: "RUN shopt",
+		},
+		{
+			name: "mixed set -ex + real command survives",
+			content: `FROM alpine
+RUN set -ex && apt-get update && echo 'x' > /etc/config
+`,
+			wantFixText: "apt-get update",
+			wantFixLack: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInputWithConfig(t, "Dockerfile", tt.content, nil)
+			violations := NewPreferCopyHeredocRule().Check(input)
+			if len(violations) == 0 {
+				t.Fatal("expected a violation")
+			}
+			fix := violations[0].SuggestedFix
+			if fix == nil || len(fix.Edits) == 0 {
+				t.Fatal("expected a fix")
+			}
+			got := fix.Edits[0].NewText
+			if !strings.Contains(got, tt.wantFixText) {
+				t.Errorf("fix text missing %q\nfull:\n%s", tt.wantFixText, got)
+			}
+			if tt.wantFixLack != "" && strings.Contains(got, tt.wantFixLack) {
+				t.Errorf("fix text should not contain %q\nfull:\n%s", tt.wantFixLack, got)
+			}
+		})
 	}
 }

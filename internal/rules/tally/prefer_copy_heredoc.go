@@ -586,12 +586,25 @@ func (r *PreferCopyHeredocRule) generateMultiFix(
 
 	var parts []string
 	var pendingRun []string
+	pendingAllStateOnly := true
+	appendPending := func(text string, stateOnly bool) {
+		pendingRun = append(pendingRun, text)
+		if !stateOnly {
+			pendingAllStateOnly = false
+		}
+	}
 	flushRun := func() {
 		if len(pendingRun) == 0 {
 			return
 		}
-		parts = append(parts, runPrefix+strings.Join(pendingRun, " && "))
+		// Drop a leftover RUN that contains only shell-state commands
+		// (`set -ex`, `shopt`, `trap`) — these don't cross RUN boundaries,
+		// so preserving them after extraction is pure noise.
+		if !pendingAllStateOnly {
+			parts = append(parts, runPrefix+strings.Join(pendingRun, " && "))
+		}
 		pendingRun = pendingRun[:0]
+		pendingAllStateOnly = true
 	}
 
 	emittedSlots := make(map[int]bool, len(multi.Slots))
@@ -610,14 +623,14 @@ func (r *PreferCopyHeredocRule) generateMultiFix(
 			// Chmod commands targeting a slot are already folded into that
 			// slot; any chmod that reaches us here targets something outside
 			// our creation set — preserve it as a shell command.
-			pendingRun = append(pendingRun, cmd.Text)
+			appendPending(cmd.Text, false)
 		case shell.MultiCmdMkdirP:
 			if mkdirAbsorbedByCopy(cmd.MkdirTarget, creationTargets) {
 				continue
 			}
-			pendingRun = append(pendingRun, cmd.Text)
+			appendPending(cmd.Text, false)
 		default:
-			pendingRun = append(pendingRun, cmd.Text)
+			appendPending(cmd.Text, cmd.IsShellStateOnly)
 		}
 	}
 	flushRun()
@@ -650,6 +663,31 @@ func (r *PreferCopyHeredocRule) generateMultiFix(
 			NewText: newText,
 		}},
 	}
+}
+
+// isShellStateOnlyChain reports whether a joined " && " command string is
+// built entirely from shell-state commands (`set`, `shopt`, `trap`). Such
+// chains have no effect across RUN boundaries — each RUN starts a fresh
+// shell — so they can be dropped when extraction would otherwise leave
+// them alone in a leftover RUN.
+func isShellStateOnlyChain(chain string) bool {
+	chain = strings.TrimSpace(chain)
+	if chain == "" {
+		return false
+	}
+	for part := range strings.SplitSeq(chain, " && ") {
+		fields := strings.Fields(strings.TrimSpace(part))
+		if len(fields) == 0 {
+			return false
+		}
+		switch fields[0] {
+		case "set", "shopt", "trap":
+			// state-only
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // mkdirAbsorbedByCopy reports whether the given mkdir -p target is created
@@ -692,8 +730,10 @@ func (r *PreferCopyHeredocRule) generateFix(
 		runPrefix = "RUN " + mountFlags + " "
 	}
 
-	// Add preceding commands as RUN if any (preserve mounts)
-	if info.PrecedingCommands != "" {
+	// Add preceding commands as RUN if any (preserve mounts). Drop a RUN
+	// that would contain only shell-state commands (`set -ex`, `shopt`,
+	// `trap`) — they don't cross RUN boundaries, so they'd be noise.
+	if info.PrecedingCommands != "" && !isShellStateOnlyChain(info.PrecedingCommands) {
 		parts = append(parts, runPrefix+info.PrecedingCommands)
 	}
 
@@ -703,7 +743,7 @@ func (r *PreferCopyHeredocRule) generateFix(
 	parts = append(parts, copyCmd)
 
 	// Add remaining commands as RUN if any (preserve mounts)
-	if info.RemainingCommands != "" {
+	if info.RemainingCommands != "" && !isShellStateOnlyChain(info.RemainingCommands) {
 		parts = append(parts, runPrefix+info.RemainingCommands)
 	}
 
@@ -712,7 +752,9 @@ func (r *PreferCopyHeredocRule) generateFix(
 	endLine, endCol := resolveRunEndPosition(runLoc, sm, run)
 
 	description := "Replace RUN with COPY <<EOF to " + info.TargetPath
-	if info.PrecedingCommands != "" || info.RemainingCommands != "" {
+	hasRealSurrounding := (info.PrecedingCommands != "" && !isShellStateOnlyChain(info.PrecedingCommands)) ||
+		(info.RemainingCommands != "" && !isShellStateOnlyChain(info.RemainingCommands))
+	if hasRealSurrounding {
 		description = "Extract file creation to COPY <<EOF"
 	}
 

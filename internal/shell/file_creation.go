@@ -129,6 +129,11 @@ type MultiAnalyzedCmd struct {
 	// MkdirTarget, for Kind == MultiCmdMkdirP, is the absolute directory path
 	// that `mkdir -p` would create. Empty for non-mkdir commands.
 	MkdirTarget string
+	// IsShellStateOnly is true for commands that only mutate the current
+	// shell's options and don't cross RUN boundaries (e.g. `set -ex`,
+	// `shopt -s nullglob`). Fix builders can drop such commands when they
+	// would otherwise be left alone in a RUN that no longer hosts real work.
+	IsShellStateOnly bool
 }
 
 // MultiCmdKind identifies the role of a command within a MultiFileCreationInfo.
@@ -311,6 +316,11 @@ type analyzedCmd struct {
 	umaskValue   uint16           // non-zero for cmdTypeUmask (the mask value, e.g., 0o077)
 	mkdirTarget  string           // non-empty for cmdTypeMkdirP (absolute literal path)
 	hasUnsafe    bool
+	// isShellState is true for commands that only mutate the current shell's
+	// options (`set`, `shopt`). They have no effect across RUNs — each RUN
+	// starts a fresh shell — so fix builders can drop them when they'd end
+	// up alone in a leftover RUN buffer.
+	isShellState bool
 }
 
 // analyzeFileCreation performs detailed analysis of file creation patterns.
@@ -527,7 +537,7 @@ func analyzeFileCreations(
 	// Emit a flat list of MultiAnalyzedCmd.
 	info.Commands = make([]MultiAnalyzedCmd, 0, len(commands))
 	for k, cmd := range commands {
-		entry := MultiAnalyzedCmd{Text: cmd.text, SlotIndex: -1}
+		entry := MultiAnalyzedCmd{Text: cmd.text, SlotIndex: -1, IsShellStateOnly: cmd.isShellState}
 		if slotIdx, ok := slotIndexByCmd[k]; ok {
 			entry.Kind = MultiCmdCreation
 			entry.SlotIndex = slotIdx
@@ -769,7 +779,11 @@ func analyzeCallExpr(
 
 	// Check for file creation commands
 	if cmdName != cmdEcho && cmdName != cmdCat && cmdName != cmdPrintf {
-		return analyzedCmd{cmdType: cmdTypeOther, text: text}
+		return analyzedCmd{
+			cmdType:      cmdTypeOther,
+			text:         text,
+			isShellState: isShellStateOnlyCmd(cmdName),
+		}
 	}
 
 	// Validate redirects: allow exactly one stdout output redirect and
@@ -958,6 +972,19 @@ func analyzeMkdirCmd(call *syntax.CallExpr) (string, bool) {
 		return "", false
 	}
 	return path.Clean(target), true
+}
+
+// isShellStateOnlyCmd reports whether a command name is known to only
+// affect the current shell's options (e.g. `set -e`, `shopt -s nullglob`,
+// `trap -`). Such commands never cross RUN boundaries — each RUN starts a
+// fresh shell — so a leftover RUN that contains nothing but these can be
+// dropped entirely.
+func isShellStateOnlyCmd(name string) bool {
+	switch name {
+	case "set", "shopt", "trap":
+		return true
+	}
+	return false
 }
 
 // teeRedirectsAreCompatible reports whether the redirects on a tee statement
