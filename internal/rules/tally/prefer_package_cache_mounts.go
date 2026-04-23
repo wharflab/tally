@@ -416,10 +416,25 @@ func computeCleanupEdits(
 	sourceFull := strings.Join(lines, "\n")
 
 	script := dockerfile.RunScript(run)
-	commands := shell.ExtractChainedCommands(script, variant)
-	if len(commands) == 0 {
+	ranges := shell.ExtractChainCommandRanges(script, variant)
+	if len(ranges) == 0 {
 		return nil
 	}
+
+	// Derive raw command text directly from script[range], then normalize
+	// whitespace the same way normalizeSource does (collapse runs of spaces
+	// and tabs into a single space) so substring search in `normalized`
+	// matches byte-for-byte. Avoids the round-trip through the mvdan
+	// printer, which reformats some constructs (e.g., "$( curl" → "$(curl")
+	// and loses raw-source fidelity.
+	commands := make([]string, len(ranges))
+	for i, r := range ranges {
+		if int(r.EndOffset) > len(script) || r.StartOffset > r.EndOffset {
+			return nil
+		}
+		commands[i] = normalizeWhitespaceRuns(script[r.StartOffset:r.EndOffset])
+	}
+
 	separators := shell.ExtractChainSeparators(script, variant, len(commands))
 
 	// Normalize the source: collapse continuations and runs of whitespace
@@ -528,6 +543,29 @@ func buildCleanupEdit(ctx cleanupEditContext, i int, cmd string) *rules.TextEdit
 		ctx.file, ctx.sourceFull, ctx.startLine,
 		ctx.scriptIdx+ctx.spans[i].start, ctx.scriptIdx+ctx.spans[i].end, cleaned,
 	)
+}
+
+// normalizeWhitespaceRuns collapses runs of spaces and tabs within s into
+// single spaces, matching the whitespace treatment in normalizeSource. Used
+// to make command text extracted from a buildkit-joined RUN script (which
+// preserves original indentation after line continuations) comparable to
+// the whitespace-collapsed source view.
+func normalizeWhitespaceRuns(s string) string {
+	var buf strings.Builder
+	buf.Grow(len(s))
+	inSpace := false
+	for i := range len(s) {
+		if s[i] == ' ' || s[i] == '\t' {
+			if !inSpace {
+				buf.WriteByte(' ')
+				inSpace = true
+			}
+			continue
+		}
+		inSpace = false
+		buf.WriteByte(s[i])
+	}
+	return buf.String()
 }
 
 // normalizeSource collapses backslash-newline continuations and runs of

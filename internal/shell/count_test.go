@@ -310,6 +310,38 @@ func TestExtractChainSeparators(t *testing.T) {
 			commandCount: 2,
 			want:         nil,
 		},
+		{
+			name:         "semicolon separators",
+			script:       "apt-get update; apt-get install -y curl; apt-get clean",
+			variant:      VariantBash,
+			commandCount: 3,
+			want:         []string{"; ", "; "},
+		},
+		{
+			name: "semicolon with continuation separators",
+			script: "apt-get update; \\\n" +
+				"    apt-get install -y curl; \\\n" +
+				"    apt-get clean",
+			variant:      VariantBash,
+			commandCount: 3,
+			want:         []string{"; \\\n    ", "; \\\n    "},
+		},
+		{
+			name: "mixed semicolon and && separators",
+			script: "set -ex; \\\n" +
+				"    apt-get update && apt-get install -y curl; \\\n" +
+				"    apt-get clean",
+			variant:      VariantBash,
+			commandCount: 4,
+			want:         []string{"; \\\n    ", " && ", "; \\\n    "},
+		},
+		{
+			name:         "newline separators at top level",
+			script:       "apt-get update\napt-get install -y curl\napt-get clean",
+			variant:      VariantBash,
+			commandCount: 3,
+			want:         []string{"\n", "\n"},
+		},
 	}
 
 	for _, tt := range tests {
