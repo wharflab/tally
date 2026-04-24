@@ -253,33 +253,42 @@ func buildContextReader(input Input, parseResult *dockerfile.ParseResult) facts.
 }
 
 func attachInvocation(violations []rules.Violation, inv *invocation.BuildInvocation) {
-	if inv == nil || inv.Source.Kind == invocation.KindDockerfile {
+	if inv == nil {
 		return
 	}
-	source := inv.Source
+	var source *invocation.InvocationSource
+	if inv.Source.Kind != invocation.KindDockerfile {
+		src := inv.Source
+		source = &src
+	}
 	for i := range violations {
-		violations[i].Invocation = &source
 		violations[i].InvocationKey = inv.Key
+		if source != nil {
+			violations[i].Invocation = source
+		}
 	}
 }
 
 func attachInvocationToAsyncRequest(req *async.CheckRequest, inv *invocation.BuildInvocation) {
-	if req == nil || inv == nil || inv.Source.Kind == invocation.KindDockerfile {
+	if req == nil || inv == nil {
 		return
 	}
 	req.InvocationKey = inv.Key
+	exposeSource := inv.Source.Kind != invocation.KindDockerfile
 	source := inv.Source
 	req.Handler = invocationAwareHandler{
-		inner: req.Handler,
-		key:   inv.Key,
-		src:   source,
+		inner:        req.Handler,
+		key:          inv.Key,
+		src:          source,
+		exposeSource: exposeSource,
 	}
 }
 
 type invocationAwareHandler struct {
-	inner async.ResultHandler
-	key   string
-	src   invocation.InvocationSource
+	inner        async.ResultHandler
+	key          string
+	src          invocation.InvocationSource
+	exposeSource bool
 }
 
 func (h invocationAwareHandler) OnSuccess(resolved any) []any {
@@ -294,8 +303,10 @@ func (h invocationAwareHandler) OnSuccess(resolved any) []any {
 		switch v := result.(type) {
 		case rules.Violation:
 			v.InvocationKey = h.key
-			source := h.src
-			v.Invocation = &source
+			if h.exposeSource {
+				source := h.src
+				v.Invocation = &source
+			}
 			results[i] = v
 		case async.CompletedCheck:
 			if v.InvocationKey == "" {

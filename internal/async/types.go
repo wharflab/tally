@@ -53,8 +53,8 @@ type CheckRequest struct {
 	// File is the source file this request is associated with.
 	File string
 
-	// InvocationKey identifies the orchestrator invocation this request belongs
-	// to. Empty means plain Dockerfile mode.
+	// InvocationKey identifies the build invocation this request belongs to.
+	// Empty means no invocation context was provided.
 	InvocationKey string
 
 	// StageIndex identifies the stage this request is for (used for merging).

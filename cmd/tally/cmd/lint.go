@@ -529,7 +529,8 @@ func lintStdinContent(cmd *cli.Command, content []byte) (*lintResults, *config.C
 		firstCfg:    cfg,
 	}
 	if inv != nil {
-		res.fileInvocations = map[string]*invocation.BuildInvocation{stdinPath: inv}
+		res.fileInvocations = make(map[string]*invocation.BuildInvocation, 1)
+		addFileInvocation(res.fileInvocations, inv)
 	}
 	return res, cfg, nil
 }
@@ -780,7 +781,7 @@ func lintInvocations(ctx stdcontext.Context, invocations []invocation.BuildInvoc
 		}
 
 		res.fileSources[file] = result.ParseResult.Source
-		res.fileInvocations[inv.Key] = &inv
+		addFileInvocation(res.fileInvocations, &inv)
 		res.violations = append(res.violations, result.Violations...)
 		res.asyncPlans = append(res.asyncPlans, result.AsyncPlan...)
 	}
@@ -851,7 +852,7 @@ func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, cm
 
 		res.fileSources[file] = result.ParseResult.Source
 		if inv != nil {
-			res.fileInvocations[file] = inv
+			addFileInvocation(res.fileInvocations, inv)
 		}
 		res.violations = append(res.violations, result.Violations...)
 		res.asyncPlans = append(res.asyncPlans, result.AsyncPlan...)
@@ -1341,6 +1342,13 @@ func invocationFromContextFlag(file, contextDir string) *invocation.BuildInvocat
 		return nil
 	}
 	return inv
+}
+
+func addFileInvocation(fileInvocations map[string]*invocation.BuildInvocation, inv *invocation.BuildInvocation) {
+	if inv == nil {
+		return
+	}
+	fileInvocations[inv.Key] = inv
 }
 
 func contextDirForViolation(v rules.Violation, fileInvocations map[string]*invocation.BuildInvocation) string {
