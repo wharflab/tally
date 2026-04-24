@@ -256,6 +256,10 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 		return nil, unmarshalAndNotify(req, func(p *protocol.DidChangeConfigurationParams) {
 			s.handleDidChangeConfiguration(ctx, p)
 		})
+	case string(protocol.MethodWorkspaceDidChangeWatchedFiles):
+		return nil, unmarshalAndNotify(req, func(p *protocol.DidChangeWatchedFilesParams) {
+			s.handleDidChangeWatchedFiles(ctx, p)
+		})
 	case string(protocol.MethodWorkspaceExecuteCommand):
 		return unmarshalAndCall(req, func(p *protocol.ExecuteCommandParams) (any, error) {
 			return s.handleExecuteCommand(ctx, p)

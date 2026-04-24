@@ -4,7 +4,7 @@
       "file": "testdata/context-copy-ignored/Dockerfile",
       "violations": [
         {
-          "detail": "The file or directory 'ignored.txt' matches a pattern in .dockerignore. This COPY/ADD will fail or copy unexpected files during build.",
+          "detail": "The source 'ignored.txt' is not present in the resolved build context. It may be excluded by .dockerignore or otherwise unavailable to the build.",
           "docUrl": "https://tally.wharflab.com/rules/buildkit/CopyIgnoredFile/",
           "location": {
             "end": {
@@ -17,7 +17,7 @@
               "line": 3
             }
           },
-          "message": "source 'ignored.txt' is excluded by .dockerignore and will not be copied",
+          "message": "source 'ignored.txt' is not available in the build context and will not be copied",
           "rule": "buildkit/CopyIgnoredFile",
           "severity": "warning",
           "sourceCode": "COPY ignored.txt /app/"

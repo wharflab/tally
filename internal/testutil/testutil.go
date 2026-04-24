@@ -8,6 +8,7 @@ import (
 	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/facts"
+	"github.com/wharflab/tally/internal/invocation"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/sourcemap"
@@ -37,7 +38,11 @@ func MakeLintInput(tb testing.TB, file, content string) rules.LintInput {
 }
 
 // MakeLintInputWithContext creates a LintInput for testing a rule with build context.
-func MakeLintInputWithContext(tb testing.TB, file, content string, buildContext rules.BuildContext) rules.LintInput {
+func MakeLintInputWithContext(
+	tb testing.TB,
+	file, content string,
+	buildContext facts.ContextFileReader,
+) rules.LintInput {
 	tb.Helper()
 
 	result, err := dockerfile.Parse(strings.NewReader(content), nil)
@@ -51,6 +56,22 @@ func MakeLintInputWithContext(tb testing.TB, file, content string, buildContext 
 	sem := semantic.NewBuilder(result, nil, file).
 		WithShellDirectives(directive.ToSemanticShellDirectives(directiveResult.ShellDirectives)).
 		Build()
+	var inv *invocation.BuildInvocation
+	if buildContext != nil {
+		inv = &invocation.BuildInvocation{
+			Source: invocation.InvocationSource{
+				Kind: invocation.KindDockerfile,
+				File: file,
+			},
+			DockerfilePath: file,
+			ContextRef: invocation.ContextRef{
+				Kind:  invocation.ContextKindDir,
+				Value: ".",
+			},
+		}
+		inv.Key = invocation.InvocationKey(inv.Source, inv.DockerfilePath)
+	}
+	invocationCtx := invocation.NewContext(inv)
 	fileFacts := facts.NewFileFacts(
 		file,
 		result,
@@ -60,15 +81,15 @@ func MakeLintInputWithContext(tb testing.TB, file, content string, buildContext 
 	)
 
 	return rules.LintInput{
-		File:     file,
-		AST:      result.AST,
-		Stages:   result.Stages,
-		MetaArgs: result.MetaArgs,
-		Source:   result.Source,
-		Semantic: sem,
-		Facts:    fileFacts,
-		Context:  buildContext,
-		Config:   nil, // Set by individual tests if needed
+		File:              file,
+		AST:               result.AST,
+		Stages:            result.Stages,
+		MetaArgs:          result.MetaArgs,
+		Source:            result.Source,
+		Semantic:          sem,
+		Facts:             fileFacts,
+		InvocationContext: invocationCtx,
+		Config:            nil, // Set by individual tests if needed
 	}
 }
 

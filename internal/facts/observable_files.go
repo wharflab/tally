@@ -23,16 +23,16 @@ type ContextFileReader interface {
 	IsHeredocFile(path string) bool
 }
 
-// BuildContextSource describes a COPY/ADD source that resolves against the
-// Docker build context.
+// BuildContextSource describes a COPY/ADD source reference against the Docker
+// build context.
 type BuildContextSource struct {
-	Instruction           string
-	SourcePath            string
-	NormalizedSourcePath  string
-	Line                  int
-	Location              []parser.Range
-	IgnoredByDockerignore bool
-	IgnoreErr             error
+	Instruction          string
+	SourcePath           string
+	NormalizedSourcePath string
+	Line                 int
+	Location             []parser.Range
+	AvailableInContext   bool
+	AvailabilityErr      error
 }
 
 // ObservableFileSource describes how a file's content became observable.

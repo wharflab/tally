@@ -199,12 +199,16 @@ func fanOutHandlers(group *pendingGroup, value any) ([]any, []CompletedCheck) {
 		}
 		req := group.requests[i]
 		completed = append(completed, CompletedCheck{
-			RuleCode:   req.RuleCode,
-			File:       req.File,
-			StageIndex: req.StageIndex,
+			RuleCode:      req.RuleCode,
+			File:          req.File,
+			InvocationKey: req.InvocationKey,
+			StageIndex:    req.StageIndex,
 		})
 		for _, v := range results {
 			if cc, ok := v.(CompletedCheck); ok {
+				if cc.InvocationKey == "" {
+					cc.InvocationKey = req.InvocationKey
+				}
 				completed = append(completed, cc)
 			} else {
 				violations = append(violations, v)

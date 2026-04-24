@@ -48,7 +48,7 @@ func (r *UnreachableStagesRule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
-	unreachable := graph.UnreachableStages()
+	unreachable := graph.UnreachableStagesFrom(sem.FinalStageIndex())
 	if len(unreachable) == 0 {
 		return nil
 	}

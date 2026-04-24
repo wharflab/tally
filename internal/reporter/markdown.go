@@ -44,6 +44,9 @@ func (r *MarkdownReporter) Report(violations []rules.Violation, _ map[string][]b
 	fileCount := len(fileSet)
 
 	// Write summary and table
+	if hasInvocation(sorted) {
+		return r.writeInvocationTable(sorted, fileCount)
+	}
 	if fileCount == 1 {
 		var filename string
 		for f := range fileSet {
@@ -53,6 +56,44 @@ func (r *MarkdownReporter) Report(violations []rules.Violation, _ map[string][]b
 	}
 
 	return r.writeMultiFileTable(sorted, fileCount)
+}
+
+func hasInvocation(violations []rules.Violation) bool {
+	for _, v := range violations {
+		if v.Invocation != nil {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *MarkdownReporter) writeInvocationTable(sorted []rules.Violation, fileCount int) error {
+	if _, err := fmt.Fprintf(r.writer, "**%d %s** across %d files\n\n",
+		len(sorted), pluralize(len(sorted), "issue", "issues"), fileCount); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(r.writer, "| Invocation | File | Line | Issue |"); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(r.writer, "|------------|------|------|-------|"); err != nil {
+		return err
+	}
+	for _, v := range sorted {
+		if _, err := fmt.Fprintf(
+			r.writer,
+			"| %s | %s | %s | %s %s |\n",
+			escapeMarkdown(
+				InvocationLabel(v),
+			),
+			v.Location.File,
+			formatLineNumber(v),
+			severityEmoji(v.Severity),
+			escapeMarkdown(v.Message),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // writeSingleFileTable writes a markdown table for violations in a single file.
@@ -138,6 +179,9 @@ func shouldSwap(a, b rules.Violation) bool {
 	}
 
 	// Then by file
+	if InvocationLabel(a) != InvocationLabel(b) {
+		return InvocationLabel(a) > InvocationLabel(b)
+	}
 	if a.Location.File != b.Location.File {
 		return a.Location.File > b.Location.File
 	}

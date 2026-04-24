@@ -33,6 +33,7 @@ type folderSettings struct {
 	SuppressRuleEnabled     bool
 	ShowDocEnabled          bool
 	FixAllMode              string // "all" (iterative) or "problems" (single-pass)
+	InvocationEntrypoints   []string
 }
 
 func applyDefaultPreference(pref config.ConfigurationPreference) config.ConfigurationPreference {
@@ -89,34 +90,58 @@ func (s *Server) handleDidChangeConfiguration(
 	// which could deadlock if the client needs to send requests before
 	// responding to the refresh.
 	if s.diagnosticRefreshSupported() {
-		conn := s.conn
-		go func() { //nolint:contextcheck,gosec // intentionally detached; outlives the notification handler
-			refreshCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
-			if err := conn.Call(refreshCtx, string(protocol.MethodWorkspaceDiagnosticRefresh), nil).Await(refreshCtx, nil); err != nil {
-				log.Printf("lsp: workspace/diagnostic/refresh failed: %v", err)
-			}
-		}()
+		s.requestDiagnosticRefresh(ctx)
 	}
 }
 
+func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, _ *protocol.DidChangeWatchedFilesParams) {
+	s.lintCache.clear()
+	if s.pushDiagnosticsEnabled() {
+		for _, doc := range s.documents.All() {
+			s.publishDiagnostics(ctx, doc)
+		}
+		return
+	}
+	if s.diagnosticRefreshSupported() {
+		s.requestDiagnosticRefresh(ctx)
+	}
+}
+
+func (s *Server) requestDiagnosticRefresh(ctx context.Context) {
+	conn := s.conn
+	go func() {
+		refreshCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		if err := conn.Call(refreshCtx, string(protocol.MethodWorkspaceDiagnosticRefresh), nil).Await(refreshCtx, nil); err != nil {
+			log.Printf("lsp: workspace/diagnostic/refresh failed: %v", err)
+		}
+	}()
+}
+
 func (s *Server) settingsForFile(filePath string) folderSettings {
+	_, settings := s.workspaceSettingsForFile(filePath)
+	return settings
+}
+
+func (s *Server) workspaceSettingsForFile(filePath string) (string, folderSettings) {
 	s.settingsMu.RLock()
 	defer s.settingsMu.RUnlock()
 
 	filePath = filepath.Clean(filePath)
 
+	root := ""
 	best := s.settings.Global
 	for _, ws := range s.settings.Workspaces {
 		if ws.Root == "" {
 			continue
 		}
 		if pathWithin(ws.Root, filePath) {
+			root = ws.Root
 			best = ws.Settings
 			break
 		}
 	}
-	return best
+	return root, best
 }
 
 func pathWithin(root, filePath string) bool {
@@ -152,6 +177,7 @@ type folderSettingsWire struct {
 	SuppressRuleEnabled     *bool                          `json:"suppressRuleEnabled"`
 	ShowDocEnabled          *bool                          `json:"showDocumentationEnabled"`
 	FixAllMode              string                         `json:"fixAllMode"`
+	InvocationEntrypoints   []string                       `json:"invocationEntrypoints"`
 }
 
 func parseClientSettings(settings any) (clientSettings, bool) {
@@ -180,6 +206,7 @@ func parseClientSettings(settings any) (clientSettings, bool) {
 			SuppressRuleEnabled:     boolPtrTrue(wire.Global.SuppressRuleEnabled),
 			ShowDocEnabled:          boolPtrTrue(wire.Global.ShowDocEnabled),
 			FixAllMode:              fixAllModeOrDefault(wire.Global.FixAllMode),
+			InvocationEntrypoints:   cleanEntrypoints(wire.Global.InvocationEntrypoints),
 		},
 	}
 
@@ -193,6 +220,7 @@ func parseClientSettings(settings any) (clientSettings, bool) {
 				SuppressRuleEnabled:     boolPtrTrue(ws.Settings.SuppressRuleEnabled),
 				ShowDocEnabled:          boolPtrTrue(ws.Settings.ShowDocEnabled),
 				FixAllMode:              fixAllModeOrDefault(ws.Settings.FixAllMode),
+				InvocationEntrypoints:   cleanEntrypoints(ws.Settings.InvocationEntrypoints),
 			},
 		})
 	}
@@ -203,6 +231,27 @@ func parseClientSettings(settings any) (clientSettings, bool) {
 	})
 
 	return out, true
+}
+
+func cleanEntrypoints(in []string) []string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(in))
+	seen := map[string]struct{}{}
+	for _, path := range in {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+		path = filepath.Clean(path)
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		out = append(out, path)
+	}
+	return out
 }
 
 // boolPtrTrue returns the value pointed to by p, or true if p is nil.

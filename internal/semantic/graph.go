@@ -92,7 +92,16 @@ func (g *StageGraph) UnreachableStages() []int {
 		return nil
 	}
 
-	finalStage := g.stageCount - 1
+	return g.UnreachableStagesFrom(g.stageCount - 1)
+}
+
+// UnreachableStagesFrom returns indices of stages not reachable from the
+// specified final stage index.
+func (g *StageGraph) UnreachableStagesFrom(finalStage int) []int {
+	if g.stageCount == 0 || finalStage < 0 || finalStage >= g.stageCount {
+		return nil
+	}
+
 	var unreachable []int
 
 	for i := range g.stageCount {

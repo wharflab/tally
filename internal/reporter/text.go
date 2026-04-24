@@ -133,11 +133,30 @@ func NewTextReporter(opts TextOptions) *TextReporter {
 
 // Print writes violations to the writer.
 func (r *TextReporter) Print(w io.Writer, violations []rules.Violation, sources map[string][]byte) error {
+	return r.PrintReport(w, violations, sources, ReportMetadata{})
+}
+
+// PrintReport writes violations and optional run metadata to the writer.
+func (r *TextReporter) PrintReport(w io.Writer, violations []rules.Violation, sources map[string][]byte, metadata ReportMetadata) error {
 	r.docCache = make(map[string]*highlight.Document, len(sources))
 	sorted := SortViolations(violations)
 
+	lastLabel := ""
 	for _, v := range sorted {
+		label := InvocationLabel(v)
+		if label != "" && label != lastLabel {
+			if _, err := fmt.Fprintf(w, "\n[%s]\n", label); err != nil {
+				return err
+			}
+			lastLabel = label
+		}
 		if err := r.printViolation(w, v, sources[v.Location.File]); err != nil {
+			return err
+		}
+	}
+	if metadata.InvocationsScanned > 0 {
+		if _, err := fmt.Fprintf(w, "\nSummary: %d Dockerfiles, %d invocations, %d violations.\n",
+			metadata.FilesScanned, metadata.InvocationsScanned, len(violations)); err != nil {
 			return err
 		}
 	}

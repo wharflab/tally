@@ -87,8 +87,9 @@ type StageFacts struct {
 	// can be observed directly or loaded lazily at lint time.
 	ObservableFiles []*ObservableFile
 
-	// BuildContextSources records COPY/ADD sources resolved from the Docker
-	// build context, including .dockerignore evaluation results.
+	// BuildContextSources records COPY/ADD source references that resolve
+	// against the Docker build context, including whether the source is
+	// available in the resolved context.
 	BuildContextSources []*BuildContextSource
 
 	cacheDisablingEnv []EnvBinding
@@ -755,7 +756,7 @@ func canObserveContextSource(sourcePath string, sourceFact *BuildContextSource, 
 	if contextFiles == nil || sourcePath == "" {
 		return false
 	}
-	if sourceFact != nil && (sourceFact.IgnoredByDockerignore || sourceFact.IgnoreErr != nil) {
+	if sourceFact != nil && (!sourceFact.AvailableInContext || sourceFact.AvailabilityErr != nil) {
 		return false
 	}
 	if strings.ContainsAny(sourcePath, "*?[") {
@@ -813,15 +814,29 @@ func analyzeBuildContextSource(
 
 	normalized := normalizeBuildContextSourcePath(sourcePath)
 	ignored, err := contextFiles.IsIgnored(normalized)
-	return &BuildContextSource{
-		Instruction:           instruction,
-		SourcePath:            sourcePath,
-		NormalizedSourcePath:  normalized,
-		Line:                  line,
-		Location:              location,
-		IgnoredByDockerignore: ignored,
-		IgnoreErr:             err,
+	available := false
+	if err == nil && !ignored {
+		available = contextSourceAvailable(contextFiles, normalized)
 	}
+	return &BuildContextSource{
+		Instruction:          instruction,
+		SourcePath:           sourcePath,
+		NormalizedSourcePath: normalized,
+		Line:                 line,
+		Location:             location,
+		AvailableInContext:   available,
+		AvailabilityErr:      err,
+	}
+}
+
+func contextSourceAvailable(contextFiles ContextFileReader, normalized string) bool {
+	if contextFiles == nil {
+		return false
+	}
+	if paths, ok := contextFiles.(interface{ PathExists(path string) bool }); ok {
+		return paths.PathExists(normalized)
+	}
+	return contextFiles.FileExists(normalized)
 }
 
 func commandDropsPrivileges(cmdLine []string, stageFacts *StageFacts) bool {

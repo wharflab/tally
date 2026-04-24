@@ -27,8 +27,9 @@ func (p *Supersession) Name() string {
 // lower-severity ones.
 func (p *Supersession) Process(violations []rules.Violation, _ *Context) []rules.Violation {
 	type locKey struct {
-		file string
-		line int
+		invocationKey string
+		file          string
+		line          int
 	}
 
 	// Collect locations that have at least one error-level violation.
@@ -39,8 +40,9 @@ func (p *Supersession) Process(violations []rules.Violation, _ *Context) []rules
 				continue
 			}
 			errorLocations[locKey{
-				file: filepath.ToSlash(v.Location.File),
-				line: v.Location.Start.Line,
+				invocationKey: v.InvocationKey,
+				file:          filepath.ToSlash(v.Location.File),
+				line:          v.Location.Start.Line,
 			}] = struct{}{}
 		}
 	}
@@ -57,8 +59,9 @@ func (p *Supersession) Process(violations []rules.Violation, _ *Context) []rules
 			return true
 		}
 		key := locKey{
-			file: filepath.ToSlash(v.Location.File),
-			line: v.Location.Start.Line,
+			invocationKey: v.InvocationKey,
+			file:          filepath.ToSlash(v.Location.File),
+			line:          v.Location.Start.Line,
 		}
 		_, hasError := errorLocations[key]
 		return !hasError

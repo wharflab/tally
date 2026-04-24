@@ -40,23 +40,24 @@ func (s *Server) codeActionsForDocument(
 		}
 	}
 
+	multipleInvocationContexts := hasMultipleInvocationContexts(violations)
 	actions := make([]protocol.CodeAction, 0, len(violations)+1)
 
-	if includeQuickFix {
+	if includeQuickFix && !multipleInvocationContexts {
 		resolveFn := func(sf *rules.SuggestedFix) []rules.TextEdit {
 			return resolveFixEdits(ctx, doc, sf)
 		}
 		actions = append(actions, quickFixActions(violations, params, resolveFn)...)
 	}
 
-	if includeFixAll {
+	if includeFixAll && !multipleInvocationContexts {
 		if action := s.fixAllCodeAction(doc, violations); action != nil {
 			actions = append(actions, *action)
 		}
 	}
 
 	// Suppress-rule actions: inject # tally ignore= directives.
-	if includeSuppress && s.suppressRuleEnabled(doc.URI) {
+	if includeSuppress && !multipleInvocationContexts && s.suppressRuleEnabled(doc.URI) {
 		entry, cached := s.lintCache.getEntry(doc.URI, doc.Version)
 		if cached {
 			actions = append(actions, suppressRuleActions(violations, params, doc.Content, entry.parseResult, entry.config)...)
@@ -70,6 +71,20 @@ func (s *Server) codeActionsForDocument(
 	}
 
 	return actions
+}
+
+func hasMultipleInvocationContexts(violations []rules.Violation) bool {
+	seen := map[string]struct{}{}
+	for _, v := range violations {
+		if v.InvocationKey == "" {
+			continue
+		}
+		seen[v.InvocationKey] = struct{}{}
+		if len(seen) > 1 {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) suppressRuleEnabled(docURI string) bool {

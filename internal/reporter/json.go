@@ -17,6 +17,8 @@ type JSONOutput struct {
 	Summary Summary `json:"summary"`
 	// FilesScanned is the total number of files scanned.
 	FilesScanned int `json:"files_scanned"`
+	// InvocationsScanned is the total number of build invocations scanned.
+	InvocationsScanned int `json:"invocations_scanned,omitzero"`
 	// RulesEnabled is the total number of rules that were active.
 	RulesEnabled int `json:"rules_enabled"`
 }
@@ -29,12 +31,13 @@ type FileResult struct {
 
 // Summary contains aggregate statistics about violations.
 type Summary struct {
-	Total    int `json:"total"`
-	Errors   int `json:"errors"`
-	Warnings int `json:"warnings"`
-	Info     int `json:"info"`
-	Style    int `json:"style"`
-	Files    int `json:"files"`
+	Total       int `json:"total"`
+	Errors      int `json:"errors"`
+	Warnings    int `json:"warnings"`
+	Info        int `json:"info"`
+	Style       int `json:"style"`
+	Files       int `json:"files"`
+	Invocations int `json:"invocations,omitzero"`
 }
 
 // JSONReporter formats violations as JSON output.
@@ -66,10 +69,11 @@ func (r *JSONReporter) Report(violations []rules.Violation, _ map[string][]byte,
 
 	// Build output structure
 	output := JSONOutput{
-		Files:        make([]FileResult, 0, len(filesOrder)),
-		Summary:      calculateSummary(violations, len(filesOrder)),
-		FilesScanned: metadata.FilesScanned,
-		RulesEnabled: metadata.RulesEnabled,
+		Files:              make([]FileResult, 0, len(filesOrder)),
+		Summary:            calculateSummary(violations, len(filesOrder), metadata.InvocationsScanned),
+		FilesScanned:       metadata.FilesScanned,
+		InvocationsScanned: metadata.InvocationsScanned,
+		RulesEnabled:       metadata.RulesEnabled,
 	}
 
 	for _, file := range filesOrder {
@@ -89,10 +93,11 @@ func (r *JSONReporter) Report(violations []rules.Violation, _ map[string][]byte,
 }
 
 // calculateSummary computes aggregate statistics from violations.
-func calculateSummary(violations []rules.Violation, fileCount int) Summary {
+func calculateSummary(violations []rules.Violation, fileCount, invocationCount int) Summary {
 	summary := Summary{
-		Total: len(violations),
-		Files: fileCount,
+		Total:       len(violations),
+		Files:       fileCount,
+		Invocations: invocationCount,
 	}
 
 	for _, v := range violations {

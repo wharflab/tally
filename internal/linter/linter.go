@@ -11,9 +11,11 @@ import (
 
 	"github.com/wharflab/tally/internal/async"
 	"github.com/wharflab/tally/internal/config"
+	buildcontext "github.com/wharflab/tally/internal/context"
 	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/facts"
+	"github.com/wharflab/tally/internal/invocation"
 	"github.com/wharflab/tally/internal/rules"
 	_ "github.com/wharflab/tally/internal/rules/all" // Register all rules.
 	"github.com/wharflab/tally/internal/rules/buildkit/fixes"
@@ -55,9 +57,8 @@ type Input struct {
 	// the caller has already parsed for syntax checks.
 	ParseResult *dockerfile.ParseResult
 
-	// BuildContext provides context-aware checks (e.g. .dockerignore).
-	// If nil, context-aware checks are skipped.
-	BuildContext rules.BuildContext
+	// Invocation describes the build orchestration context, when present.
+	Invocation *invocation.BuildInvocation
 
 	// Channel receives progress and diagnostic output. Nil means silent.
 	Channel Channel
@@ -93,8 +94,6 @@ type Result struct {
 // reused directly (avoiding a second parse); otherwise the file is parsed
 // from the resolved content.
 func LintFile(input Input) (*Result, error) {
-	content := input.Content
-
 	cfg := input.Config
 	if cfg == nil {
 		var err error
@@ -104,28 +103,9 @@ func LintFile(input Input) (*Result, error) {
 		}
 	}
 
-	var parseResult *dockerfile.ParseResult
-	if input.ParseResult != nil {
-		parseResult = input.ParseResult
-		// Populate content from the pre-parsed result so that sourcemap.New,
-		// directive.Parse, and semantic.NewBuilder all operate on the same
-		// bytes that were parsed — not a separate re-read from disk.
-		if content == nil {
-			content = parseResult.Source
-		}
-	} else {
-		if content == nil {
-			var err error
-			content, err = os.ReadFile(input.FilePath)
-			if err != nil {
-				return nil, err
-			}
-		}
-		var parseErr error
-		parseResult, parseErr = dockerfile.Parse(bytes.NewReader(content), cfg)
-		if parseErr != nil {
-			return nil, parseErr
-		}
+	content, parseResult, err := resolveParseInput(input, cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	sm := sourcemap.New(content)
@@ -133,15 +113,24 @@ func LintFile(input Input) (*Result, error) {
 	directiveResult := directive.Parse(sm, nil, spanIndex)
 
 	var buildArgs map[string]string
+	targetStage := ""
+	if input.Invocation != nil {
+		buildArgs = invocation.ConcreteBuildArgs(input.Invocation.BuildArgs)
+		targetStage = input.Invocation.TargetStage
+	}
 	sem := semantic.NewBuilder(parseResult, buildArgs, input.FilePath).
+		WithTargetStage(targetStage).
 		WithShellDirectives(directive.ToSemanticShellDirectives(directiveResult.ShellDirectives)).
 		Build()
+
+	invocationCtx := invocation.NewContext(input.Invocation)
+	contextFiles := buildContextReader(input, parseResult)
 	fileFacts := facts.NewFileFacts(
 		input.FilePath,
 		parseResult,
 		sem,
 		directive.ToFactsShellDirectives(directiveResult.ShellDirectives),
-		input.BuildContext,
+		contextFiles,
 	)
 
 	enabledRules := EnabledRuleCodes(cfg)
@@ -152,9 +141,9 @@ func LintFile(input Input) (*Result, error) {
 		Stages:             parseResult.Stages,
 		MetaArgs:           parseResult.MetaArgs,
 		Source:             content,
+		InvocationContext:  invocationCtx,
 		Semantic:           sem,
 		Facts:              fileFacts,
-		Context:            input.BuildContext,
 		EnabledRules:       enabledRules,
 		HeredocMinCommands: heredocMinCommands(cfg),
 	}
@@ -174,6 +163,8 @@ func LintFile(input Input) (*Result, error) {
 			input.FilePath, w.RuleName, w.Description, w.URL, w.Message, w.Location,
 		))
 	}
+
+	attachInvocation(violations, input.Invocation)
 
 	// Enrich BuildKit violations with auto-fix suggestions.
 	fixes.EnrichBuildKitFixes(violations, sem, content)
@@ -197,7 +188,10 @@ func LintFile(input Input) (*Result, error) {
 		}
 		ruleInput := baseInput
 		ruleInput.Config = cfg.Rules.GetOptions(code)
-		asyncPlan = append(asyncPlan, ar.PlanAsync(ruleInput)...)
+		for _, req := range ar.PlanAsync(ruleInput) {
+			attachInvocationToAsyncRequest(&req, input.Invocation)
+			asyncPlan = append(asyncPlan, req)
+		}
 	}
 
 	return &Result{
@@ -206,4 +200,109 @@ func LintFile(input Input) (*Result, error) {
 		ParseResult: parseResult,
 		Config:      cfg,
 	}, nil
+}
+
+func resolveParseInput(input Input, cfg *config.Config) ([]byte, *dockerfile.ParseResult, error) {
+	content := input.Content
+	if input.ParseResult != nil {
+		parseResult := input.ParseResult
+		// Populate content from the pre-parsed result so that sourcemap.New,
+		// directive.Parse, and semantic.NewBuilder all operate on the same
+		// bytes that were parsed — not a separate re-read from disk.
+		if content == nil {
+			content = parseResult.Source
+		}
+		return content, parseResult, nil
+	}
+
+	if content == nil {
+		var err error
+		content, err = os.ReadFile(input.FilePath)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	parseResult, err := dockerfile.Parse(bytes.NewReader(content), cfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	return content, parseResult, nil
+}
+
+func buildContextReader(input Input, parseResult *dockerfile.ParseResult) facts.ContextFileReader {
+	if input.Invocation == nil {
+		return nil
+	}
+
+	if input.Invocation.ContextRef.Kind != invocation.ContextKindDir || input.Invocation.ContextRef.Value == "" {
+		return nil
+	}
+
+	local, err := buildcontext.New(input.Invocation.ContextRef.Value, input.FilePath,
+		buildcontext.WithHeredocFiles(dockerfile.ExtractHeredocFiles(parseResult.Stages)))
+	if err != nil {
+		if input.Channel != nil {
+			input.Channel.Warn(
+				"failed to create build context for " + invocation.LabelForSource(&input.Invocation.Source) + ": " + err.Error(),
+			)
+		}
+		return nil
+	}
+
+	return local
+}
+
+func attachInvocation(violations []rules.Violation, inv *invocation.BuildInvocation) {
+	if inv == nil || inv.Source.Kind == invocation.KindDockerfile {
+		return
+	}
+	source := inv.Source
+	for i := range violations {
+		violations[i].Invocation = &source
+		violations[i].InvocationKey = inv.Key
+	}
+}
+
+func attachInvocationToAsyncRequest(req *async.CheckRequest, inv *invocation.BuildInvocation) {
+	if req == nil || inv == nil || inv.Source.Kind == invocation.KindDockerfile {
+		return
+	}
+	req.InvocationKey = inv.Key
+	source := inv.Source
+	req.Handler = invocationAwareHandler{
+		inner: req.Handler,
+		key:   inv.Key,
+		src:   source,
+	}
+}
+
+type invocationAwareHandler struct {
+	inner async.ResultHandler
+	key   string
+	src   invocation.InvocationSource
+}
+
+func (h invocationAwareHandler) OnSuccess(resolved any) []any {
+	if h.inner == nil {
+		return nil
+	}
+	results := h.inner.OnSuccess(resolved)
+	if results == nil {
+		return nil
+	}
+	for i, result := range results {
+		switch v := result.(type) {
+		case rules.Violation:
+			v.InvocationKey = h.key
+			source := h.src
+			v.Invocation = &source
+			results[i] = v
+		case async.CompletedCheck:
+			if v.InvocationKey == "" {
+				v.InvocationKey = h.key
+			}
+			results[i] = v
+		}
+	}
+	return results
 }

@@ -19,6 +19,7 @@ import (
 type Builder struct {
 	parseResult     *dockerfile.ParseResult
 	buildArgs       map[string]string
+	targetStage     string
 	file            string
 	shellDirectives []ShellDirective
 
@@ -44,14 +45,22 @@ func (b *Builder) WithShellDirectives(directives []ShellDirective) *Builder {
 	return b
 }
 
+// WithTargetStage sets the invocation-selected target stage name.
+func (b *Builder) WithTargetStage(stage string) *Builder {
+	b.targetStage = stage
+	return b
+}
+
 // Build constructs the semantic model.
 // This performs single-pass analysis of the Dockerfile and derives the
 // cross-instruction state consumed by downstream rules.
 func (b *Builder) Build() *Model {
 	if b.parseResult == nil {
 		return &Model{
-			stagesByName: make(map[string]int),
-			graph:        newStageGraph(0),
+			stagesByName:    make(map[string]int),
+			graph:           newStageGraph(0),
+			targetStageName: defaultTargetStageName,
+			finalStageIndex: -1,
 		}
 	}
 
@@ -64,10 +73,12 @@ func (b *Builder) Build() *Model {
 	stageCount := len(stages)
 	stageInfo := make([]*StageInfo, stageCount)
 	graph := newStageGraph(stageCount)
+	finalStageIdx := targetStageIndex(stages, b.targetStage)
+	targetStageName := effectiveTargetStageName(stages, b.targetStage)
 
 	for i := range stages {
 		stage := &stages[i]
-		isLast := i == stageCount-1
+		isLast := i == finalStageIdx
 
 		// Create stage info
 		info := newStageInfo(i, stage, isLast)
@@ -96,49 +107,7 @@ func (b *Builder) Build() *Model {
 		// Apply shell directives that appear before this stage's FROM instruction
 		b.applyShellDirectives(stage, info)
 
-		if info.BaseImageOS == BaseImageOSUnknown {
-			info.BaseImageOS = inferStageOSHeuristically(stage)
-		}
-
-		// Set OS-appropriate default shell after image/directive/heuristic
-		// detection. Windows containers default to cmd.exe, not /bin/sh.
-		if info.BaseImageOS == BaseImageOSWindows && info.ShellSetting.Source == ShellSourceDefault {
-			info.ShellSetting = ShellSetting{
-				Shell:   DefaultWindowsShell(),
-				Variant: shell.VariantCmd,
-				Source:  ShellSourceDefault,
-				Line:    -1,
-			}
-		}
-
-		// Known PowerShell images (mcr.microsoft.com/powershell:*) ship with
-		// pwsh as the default shell. Set it before the POSIX refinement so
-		// PowerShell takes priority. On Windows PowerShell images the shell
-		// executable is "powershell" (Windows PowerShell); on Linux it is "pwsh".
-		if info.ShellSetting.Source == ShellSourceDefault &&
-			isPowerShellImageName(effectiveBaseName) {
-			exe := "pwsh"
-			if info.BaseImageOS == BaseImageOSWindows {
-				exe = windowsPowerShellExe
-			}
-			info.ShellSetting = ShellSetting{
-				Shell:   []string{exe, "-Command"},
-				Variant: shell.VariantPowerShell,
-				Source:  ShellSourceDefault,
-				Line:    -1,
-			}
-		}
-
-		// Refine the default shell variant for Linux distros whose /bin/sh
-		// is a strict POSIX shell (dash or ash) rather than bash.
-		// The default is VariantBash (correct for most distros); narrow to
-		// VariantPOSIX only when the base image is a known dash/ash distro.
-		if info.ShellSetting.Source == ShellSourceDefault &&
-			info.ShellSetting.Variant == shell.VariantBash &&
-			isPOSIXShellDistro(effectiveBaseName) {
-			info.ShellSetting.Variant = shell.VariantPOSIX
-			info.DashDefault = IsDashDefaultShell(effectiveBaseName)
-		}
+		applyDefaultShellSemantics(info, stage, effectiveBaseName)
 
 		// Seed the environment used for undefined-var analysis.
 		var stageEnv *fromEnv
@@ -171,12 +140,60 @@ func (b *Builder) Build() *Model {
 	b.resolveForwardRefs(stages, stageInfo, graph)
 
 	return &Model{
-		stages:       stages,
-		metaArgs:     metaArgs,
-		stagesByName: b.stagesByName,
-		stageInfo:    stageInfo,
-		graph:        graph,
-		buildArgs:    b.buildArgs,
+		stages:          stages,
+		metaArgs:        metaArgs,
+		stagesByName:    b.stagesByName,
+		stageInfo:       stageInfo,
+		graph:           graph,
+		buildArgs:       b.buildArgs,
+		targetStageName: targetStageName,
+		finalStageIndex: finalStageIdx,
+	}
+}
+
+func applyDefaultShellSemantics(info *StageInfo, stage *instructions.Stage, effectiveBaseName string) {
+	if info.BaseImageOS == BaseImageOSUnknown {
+		info.BaseImageOS = inferStageOSHeuristically(stage)
+	}
+
+	// Set OS-appropriate default shell after image/directive/heuristic
+	// detection. Windows containers default to cmd.exe, not /bin/sh.
+	if info.BaseImageOS == BaseImageOSWindows && info.ShellSetting.Source == ShellSourceDefault {
+		info.ShellSetting = ShellSetting{
+			Shell:   DefaultWindowsShell(),
+			Variant: shell.VariantCmd,
+			Source:  ShellSourceDefault,
+			Line:    -1,
+		}
+	}
+
+	// Known PowerShell images (mcr.microsoft.com/powershell:*) ship with
+	// pwsh as the default shell. Set it before the POSIX refinement so
+	// PowerShell takes priority. On Windows PowerShell images the shell
+	// executable is "powershell" (Windows PowerShell); on Linux it is "pwsh".
+	if info.ShellSetting.Source == ShellSourceDefault &&
+		isPowerShellImageName(effectiveBaseName) {
+		exe := "pwsh"
+		if info.BaseImageOS == BaseImageOSWindows {
+			exe = windowsPowerShellExe
+		}
+		info.ShellSetting = ShellSetting{
+			Shell:   []string{exe, "-Command"},
+			Variant: shell.VariantPowerShell,
+			Source:  ShellSourceDefault,
+			Line:    -1,
+		}
+	}
+
+	// Refine the default shell variant for Linux distros whose /bin/sh
+	// is a strict POSIX shell (dash or ash) rather than bash.
+	// The default is VariantBash (correct for most distros); narrow to
+	// VariantPOSIX only when the base image is a known dash/ash distro.
+	if info.ShellSetting.Source == ShellSourceDefault &&
+		info.ShellSetting.Variant == shell.VariantBash &&
+		isPOSIXShellDistro(effectiveBaseName) {
+		info.ShellSetting.Variant = shell.VariantPOSIX
+		info.DashDefault = IsDashDefaultShell(effectiveBaseName)
 	}
 }
 
@@ -214,7 +231,7 @@ func (b *Builder) initFromArgEval(stages []instructions.Stage, metaArgs []instru
 	// Match BuildKit behavior by seeding:
 	// - defaultsEnv with the automatic args without --build-arg overrides
 	// - effectiveEnv and the semantic global scope with override-aware values
-	targetStage := targetStageName(stages)
+	targetStage := effectiveTargetStageName(stages, b.targetStage)
 	autoArgsNoOverrides := defaultFromArgs(targetStage, nil)
 	autoArgsWithOverrides := defaultFromArgs(targetStage, b.buildArgs)
 	b.addAutoArgsToGlobalScope(autoArgsWithOverrides)
@@ -239,12 +256,30 @@ func (b *Builder) initFromArgEval(stages []instructions.Stage, metaArgs []instru
 	}
 }
 
-func targetStageName(stages []instructions.Stage) string {
+func effectiveTargetStageName(stages []instructions.Stage, override string) string {
+	if override != "" {
+		return override
+	}
 	targetStage := defaultTargetStageName
 	if len(stages) > 0 && stages[len(stages)-1].Name != "" {
 		targetStage = stages[len(stages)-1].Name
 	}
 	return targetStage
+}
+
+func targetStageIndex(stages []instructions.Stage, override string) int {
+	if len(stages) == 0 {
+		return -1
+	}
+	if override != "" {
+		normalized := normalizeStageRef(override)
+		for i := range stages {
+			if normalizeStageRef(stages[i].Name) == normalized {
+				return i
+			}
+		}
+	}
+	return len(stages) - 1
 }
 
 func (b *Builder) addAutoArgsToGlobalScope(autoArgs map[string]string) {

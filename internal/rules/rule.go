@@ -7,34 +7,10 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/facts"
+	"github.com/wharflab/tally/internal/invocation"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
-
-// BuildContext is an interface for build-time context awareness.
-// Rules can type-assert this to *context.BuildContext if they need
-// context-aware features like .dockerignore checking.
-type BuildContext interface {
-	// IsIgnored checks if a path would be ignored by .dockerignore.
-	IsIgnored(path string) (bool, error)
-
-	// FileExists checks if a file exists in the build context.
-	FileExists(path string) bool
-
-	// ReadFile reads a regular file from the build context.
-	// The path must be relative to the context root.
-	ReadFile(path string) ([]byte, error)
-
-	// IsHeredocFile checks if a path is a virtual heredoc file.
-	IsHeredocFile(path string) bool
-
-	// HasIgnoreFile returns true if a .dockerignore file exists.
-	HasIgnoreFile() bool
-
-	// HasIgnoreExclusions returns true if .dockerignore contains negated patterns.
-	// When exclusions exist, static copy-source validation is unreliable.
-	HasIgnoreExclusions() bool
-}
 
 // LintInput contains all the information a rule needs to check a Dockerfile.
 // Rules should work with the AST and typed instructions, not raw source text.
@@ -44,7 +20,7 @@ type BuildContext interface {
 // exits without invoking any rules (following ESLint's approach).
 //
 // IMPORTANT: LintInput is read-only. Rules must not mutate any fields (File,
-// AST, Stages, MetaArgs, Source, Context, Config). If a rule needs to modify
+// AST, Stages, MetaArgs, Source, InvocationContext, Config). If a rule needs to modify
 // data, it must copy it first. This prevents hidden coupling between rules.
 type LintInput struct {
 	// File is the path to the Dockerfile being linted.
@@ -66,9 +42,9 @@ type LintInput struct {
 	// Used for snippet extraction and directive parsing.
 	Source []byte
 
-	// Context is optional build context for context-aware rules.
-	// Rules should check for nil before using.
-	Context BuildContext
+	// InvocationContext contains invocation metadata for Dockerfile --context,
+	// Bake, Compose, or any other invocation-aware entrypoint.
+	InvocationContext *invocation.InvocationContext
 
 	// Semantic is the semantic model for cross-instruction analysis.
 	// Provides stage resolution, variable scoping, and COPY --from validation.
@@ -124,6 +100,14 @@ func (input LintInput) GetHeredocMinCommands() int {
 		return input.HeredocMinCommands
 	}
 	return HeredocDefaultMinCommands
+}
+
+// FinalStageIndex returns the semantic final stage for this invocation.
+func (input LintInput) FinalStageIndex() int {
+	if input.Semantic == nil {
+		return len(input.Stages) - 1
+	}
+	return input.Semantic.FinalStageIndex()
 }
 
 // SnippetForLocation extracts the source code at a location.
@@ -194,8 +178,8 @@ type Rule interface {
 	Metadata() RuleMetadata
 
 	// Check runs the rule against the given input and returns any violations.
-	// The AST and Source fields are guaranteed non-nil. The Context field
-	// may be nil in v1.0 (context-aware linting is optional).
+	// The AST and Source fields are guaranteed non-nil. InvocationContext may
+	// be nil or lack a local reader when context-aware linting is unavailable.
 	Check(input LintInput) []Violation
 }
 

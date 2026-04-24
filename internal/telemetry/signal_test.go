@@ -5,7 +5,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -29,10 +29,6 @@ func (m *mockBuildContext) ReadFile(path string) ([]byte, error) {
 }
 
 func (m *mockBuildContext) IsHeredocFile(string) bool { return false }
-
-func (m *mockBuildContext) HasIgnoreFile() bool { return false }
-
-func (m *mockBuildContext) HasIgnoreExclusions() bool { return false }
 
 func TestDetectStage(t *testing.T) {
 	t.Parallel()
@@ -267,7 +263,7 @@ RUN corepack enable
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var ctx rules.BuildContext
+			var ctx facts.ContextFileReader
 			if len(tt.contextFiles) > 0 {
 				ctx = &mockBuildContext{files: tt.contextFiles}
 			}
