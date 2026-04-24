@@ -90,7 +90,7 @@ func (s *Server) handleDidChangeConfiguration(
 	// which could deadlock if the client needs to send requests before
 	// responding to the refresh.
 	if s.diagnosticRefreshSupported() {
-		s.requestDiagnosticRefresh(ctx)
+		s.requestDiagnosticRefresh(context.WithoutCancel(ctx))
 	}
 }
 
@@ -103,14 +103,14 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, _ *protocol.Di
 		return
 	}
 	if s.diagnosticRefreshSupported() {
-		s.requestDiagnosticRefresh(ctx)
+		s.requestDiagnosticRefresh(context.WithoutCancel(ctx))
 	}
 }
 
-func (s *Server) requestDiagnosticRefresh(ctx context.Context) {
+func (s *Server) requestDiagnosticRefresh(rootCtx context.Context) {
 	conn := s.conn
 	go func() {
-		refreshCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		refreshCtx, cancel := context.WithTimeout(rootCtx, 2*time.Second)
 		defer cancel()
 		if err := conn.Call(refreshCtx, string(protocol.MethodWorkspaceDiagnosticRefresh), nil).Await(refreshCtx, nil); err != nil {
 			log.Printf("lsp: workspace/diagnostic/refresh failed: %v", err)
