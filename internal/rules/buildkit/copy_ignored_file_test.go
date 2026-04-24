@@ -13,10 +13,12 @@ import (
 )
 
 type mockBuildContext struct {
-	files        map[string]string
-	ignoredPaths map[string]bool
-	ignoreErr    map[string]error
-	heredocPaths map[string]bool
+	files           map[string]string
+	ignoredPaths    map[string]bool
+	ignoreErr       map[string]error
+	heredocPaths    map[string]bool
+	fileExistsCalls map[string]int
+	pathExistsCalls map[string]int
 }
 
 func (m *mockBuildContext) IsIgnored(path string) (bool, error) {
@@ -27,11 +29,17 @@ func (m *mockBuildContext) IsIgnored(path string) (bool, error) {
 }
 
 func (m *mockBuildContext) FileExists(path string) bool {
-	if m.files == nil {
-		return false
+	if m.fileExistsCalls != nil {
+		m.fileExistsCalls[path]++
 	}
-	_, ok := m.files[path]
-	return ok
+	return m.exists(path)
+}
+
+func (m *mockBuildContext) PathExists(path string) bool {
+	if m.pathExistsCalls != nil {
+		m.pathExistsCalls[path]++
+	}
+	return m.exists(path)
 }
 
 func (m *mockBuildContext) ReadFile(path string) ([]byte, error) {
@@ -44,6 +52,11 @@ func (m *mockBuildContext) ReadFile(path string) ([]byte, error) {
 
 func (m *mockBuildContext) IsHeredocFile(path string) bool {
 	return m.heredocPaths[path]
+}
+
+func (m *mockBuildContext) exists(path string) bool {
+	_, ok := m.files[path]
+	return ok
 }
 
 func TestCopyIgnoredFileRule_Metadata(t *testing.T) {
@@ -86,6 +99,31 @@ COPY . /app
 	violations := NewCopyIgnoredFileRule().Check(input)
 	if len(violations) != 0 {
 		t.Fatalf("expected no violations for whole-context COPY, got %d", len(violations))
+	}
+}
+
+func TestCopyIgnoredFileRule_Check_SkipsGlobContextSourceAvailabilityProbe(t *testing.T) {
+	t.Parallel()
+
+	context := &mockBuildContext{
+		fileExistsCalls: map[string]int{},
+		pathExistsCalls: map[string]int{},
+	}
+	input := testutil.MakeLintInputWithContext(t, "Dockerfile", `FROM scratch
+COPY *.go /app
+`, context)
+
+	violations := NewCopyIgnoredFileRule().Check(input)
+	for _, violation := range violations {
+		if strings.Contains(violation.Message, "source '*.go' is not available") {
+			t.Fatalf("expected no unavailable-source violation for glob source, got %q", violation.Message)
+		}
+	}
+	if got := context.pathExistsCalls["*.go"]; got != 0 {
+		t.Fatalf("PathExists(\"*.go\") calls = %d, want 0", got)
+	}
+	if got := context.fileExistsCalls["*.go"]; got != 0 {
+		t.Fatalf("FileExists(\"*.go\") calls = %d, want 0", got)
 	}
 }
 

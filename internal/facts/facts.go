@@ -759,7 +759,7 @@ func canObserveContextSource(sourcePath string, sourceFact *BuildContextSource, 
 	if sourceFact != nil && (!sourceFact.AvailableInContext || sourceFact.AvailabilityErr != nil) {
 		return false
 	}
-	if strings.ContainsAny(sourcePath, "*?[") {
+	if isContextSourceGlob(sourcePath) {
 		return false
 	}
 	if sourceFact != nil && sourceFact.NormalizedSourcePath != "" {
@@ -814,8 +814,11 @@ func analyzeBuildContextSource(
 
 	normalized := normalizeBuildContextSourcePath(sourcePath)
 	ignored, err := contextFiles.IsIgnored(normalized)
-	available := false
-	if err == nil && !ignored {
+	isGlob := isContextSourceGlob(sourcePath)
+	// Globs expand during the build; probing the literal pattern would make
+	// PathExists/FileExists report unknown matches as missing.
+	available := isGlob
+	if err == nil && !ignored && !isGlob {
 		available = contextSourceAvailable(contextFiles, normalized)
 	}
 	return &BuildContextSource{
@@ -827,6 +830,10 @@ func analyzeBuildContextSource(
 		AvailableInContext:   available,
 		AvailabilityErr:      err,
 	}
+}
+
+func isContextSourceGlob(sourcePath string) bool {
+	return strings.ContainsAny(sourcePath, "*?[")
 }
 
 func contextSourceAvailable(contextFiles ContextFileReader, normalized string) bool {
