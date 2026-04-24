@@ -34,7 +34,10 @@ func (p BakeProvider) Discover(_ context.Context, opts ResolveOptions) (*Discove
 		return nil, fmt.Errorf("parse Bake file %s: %w", entrypoint, err)
 	}
 
-	targetNames := bakeTargetNames(cfg, opts.Targets)
+	targetNames, err := bakeTargetNames(cfg, opts.Targets)
+	if err != nil {
+		return nil, err
+	}
 
 	result := &DiscoveryResult{
 		Kind:           KindBake,
@@ -67,9 +70,9 @@ func bakeDefaults(baseDir string) map[string]string {
 	}
 }
 
-func bakeTargetNames(cfg *bake.Config, requested []string) []string {
+func bakeTargetNames(cfg *bake.Config, requested []string) ([]string, error) {
 	if cfg == nil {
-		return nil
+		return nil, nil
 	}
 
 	if len(requested) > 0 {
@@ -78,7 +81,13 @@ func bakeTargetNames(cfg *bake.Config, requested []string) []string {
 		var indirect []string
 		for _, name := range dedupePreserveOrder(requested) {
 			targets, _ := cfg.ResolveGroup(name)
+			if len(targets) == 0 || (!bakeGroupExists(cfg, name) && !bakeTargetExists(cfg, name)) {
+				return nil, fmt.Errorf("unknown bake target %q", name)
+			}
 			for _, target := range targets {
+				if !bakeTargetExists(cfg, target) {
+					return nil, fmt.Errorf("unknown bake target %q", target)
+				}
 				if _, ok := seen[target]; ok {
 					continue
 				}
@@ -91,13 +100,37 @@ func bakeTargetNames(cfg *bake.Config, requested []string) []string {
 			}
 		}
 		sort.Strings(indirect)
-		return append(ordered, indirect...)
+		return append(ordered, indirect...), nil
 	}
 
 	targets, _ := cfg.ResolveGroup("default")
 	targets = dedupePreserveOrder(targets)
 	sort.Strings(targets)
-	return targets
+	return targets, nil
+}
+
+func bakeGroupExists(cfg *bake.Config, name string) bool {
+	if cfg == nil {
+		return false
+	}
+	for _, group := range cfg.Groups {
+		if group != nil && group.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func bakeTargetExists(cfg *bake.Config, name string) bool {
+	if cfg == nil {
+		return false
+	}
+	for _, target := range cfg.Targets {
+		if target != nil && target.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func bakeInvocation(entrypoint, baseDir, name string, target *bake.Target) (BuildInvocation, error) {
