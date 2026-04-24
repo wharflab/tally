@@ -780,7 +780,7 @@ func lintInvocations(ctx stdcontext.Context, invocations []invocation.BuildInvoc
 		}
 
 		res.fileSources[file] = result.ParseResult.Source
-		res.fileInvocations[file] = &inv
+		res.fileInvocations[inv.Key] = &inv
 		res.violations = append(res.violations, result.Violations...)
 		res.asyncPlans = append(res.asyncPlans, result.AsyncPlan...)
 	}
@@ -1347,7 +1347,10 @@ func contextDirForViolation(v rules.Violation, fileInvocations map[string]*invoc
 	if len(fileInvocations) == 0 {
 		return ""
 	}
-	inv := fileInvocations[v.File()]
+	inv := fileInvocations[v.InvocationKey]
+	if inv == nil {
+		inv = fileInvocations[v.File()]
+	}
 	if inv == nil {
 		inv = fileInvocations[filepath.Clean(v.File())]
 	}

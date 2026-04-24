@@ -3,6 +3,9 @@ package cmd
 import (
 	"slices"
 	"testing"
+
+	"github.com/wharflab/tally/internal/invocation"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 func TestParseACPCmd(t *testing.T) {
@@ -96,5 +99,69 @@ func TestParseACPCmd(t *testing.T) {
 				t.Fatalf("parseACPCmd(%q) = %#v, want %#v", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestContextDirForViolationUsesInvocationKey(t *testing.T) {
+	t.Parallel()
+
+	file := "Dockerfile"
+	first := &invocation.BuildInvocation{
+		Key:            "compose|compose.yaml|api|Dockerfile",
+		DockerfilePath: file,
+		ContextRef: invocation.ContextRef{
+			Kind:  invocation.ContextKindDir,
+			Value: "/workspace/api",
+		},
+	}
+	second := &invocation.BuildInvocation{
+		Key:            "compose|compose.yaml|worker|Dockerfile",
+		DockerfilePath: file,
+		ContextRef: invocation.ContextRef{
+			Kind:  invocation.ContextKindDir,
+			Value: "/workspace/worker",
+		},
+	}
+	violation := rules.NewViolation(
+		rules.NewLineLocation(file, 1),
+		"test/rule",
+		"message",
+		rules.SeverityWarning,
+	)
+	violation.InvocationKey = first.Key
+
+	got := contextDirForViolation(violation, map[string]*invocation.BuildInvocation{
+		first.Key:  first,
+		second.Key: second,
+	})
+	if got != "/workspace/api" {
+		t.Fatalf("contextDirForViolation() = %q, want %q", got, "/workspace/api")
+	}
+}
+
+func TestContextDirForViolationFallsBackToFileForDockerfileContext(t *testing.T) {
+	t.Parallel()
+
+	file := "Dockerfile"
+	inv := &invocation.BuildInvocation{
+		Key:            "dockerfile|Dockerfile||Dockerfile",
+		DockerfilePath: file,
+		ContextRef: invocation.ContextRef{
+			Kind:  invocation.ContextKindDir,
+			Value: "/workspace/app",
+		},
+	}
+	violation := rules.NewViolation(
+		rules.NewLineLocation(file, 1),
+		"test/rule",
+		"message",
+		rules.SeverityWarning,
+	)
+
+	got := contextDirForViolation(violation, map[string]*invocation.BuildInvocation{
+		file: inv,
+	})
+	if got != "/workspace/app" {
+		t.Fatalf("contextDirForViolation() = %q, want %q", got, "/workspace/app")
 	}
 }
