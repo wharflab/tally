@@ -204,9 +204,6 @@ func normalizeNamedContexts(baseDir string, contexts map[string]string) (map[str
 		}
 		out[key] = ref
 	}
-	if len(out) == 0 {
-		return map[string]ContextRef{}, nil
-	}
 	return out, nil
 }
 
