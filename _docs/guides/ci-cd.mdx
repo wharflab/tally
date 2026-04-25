@@ -13,6 +13,7 @@ natively, including GitHub Actions annotations and SARIF for code scanning.
 - Commit a `.tally.toml` to keep CI and local runs consistent.
 - Use `--format github-actions` for inline PR annotations on GitHub.
 - Use `--format sarif` to upload results to GitHub Code Scanning or Azure DevOps.
+- Lint `docker-bake.hcl` or `compose.yaml` directly when those files define the real build.
 
 <Tabs>
   <Tab title="GitHub Actions">
@@ -200,6 +201,28 @@ natively, including GitHub Actions annotations and SARIF for code scanning.
 
   </Tab>
 </Tabs>
+
+## Lint Bake or Compose in CI
+
+If your CI builds images through Bake or Compose, lint the same entrypoint rather than rediscovering Dockerfiles:
+
+```bash
+# Docker Buildx Bake
+tally lint --format github-actions docker-bake.hcl
+
+# Docker Compose
+tally lint --format github-actions compose.yaml
+```
+
+Select only the build that changed:
+
+```bash
+tally lint --format github-actions docker-bake.hcl --target api
+tally lint --format github-actions compose.yaml --service api
+```
+
+Do not use `--fix` in orchestrator CI jobs. Orchestrator runs can represent multiple builds of the same Dockerfile, so fixes are only available when
+linting a Dockerfile directly. See [Build invocations](/guides/build-invocations) for the full behavior.
 
 ## Output format recommendations
 

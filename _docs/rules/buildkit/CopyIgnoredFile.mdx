@@ -19,6 +19,24 @@ in `.dockerignore`. Files which match the patterns in a `.dockerignore` file are
 not present in the context of the image when it is built. Trying to copy or add
 a file which is missing from the context will result in a build error.
 
+## Build context requirement
+
+This rule needs build context information. In direct Dockerfile mode, pass a local context directory:
+
+```bash
+tally lint --context . Dockerfile
+```
+
+When linting a Bake or Compose entrypoint, tally uses the local `context` declared by the selected target or service:
+
+```bash
+tally lint docker-bake.hcl --target api
+tally lint compose.yaml --service api
+```
+
+Remote, tar, git, and empty contexts are valid build declarations, but tally does not fetch or unpack them during linting. For those contexts, this
+rule only reports problems that can be determined without reading context files.
+
 ## Examples
 
 Given a `.dockerignore` containing `*/tmp/*`:

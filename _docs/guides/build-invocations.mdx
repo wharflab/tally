@@ -1,0 +1,329 @@
+---
+title: "Build invocations"
+description: "Lint Dockerfiles through Docker Buildx Bake and Docker Compose entrypoints."
+---
+
+A build invocation is one planned build of one Dockerfile. When you lint a Bake or Compose file, tally resolves each target or service into the
+Dockerfile, build context, build args, platform, target stage, named contexts, and runtime metadata declared by that orchestrator.
+
+Use invocation-aware linting when the Dockerfile is not the whole source of truth for the build.
+
+<CardGroup cols={2}>
+  <Card title="Bake targets" icon="layers" href="#docker-buildx-bake">
+    Lint the targets from `docker-bake.hcl` or `docker-bake.json`.
+  </Card>
+  <Card title="Compose services" icon="boxes" href="#docker-compose">
+    Lint services with a `build:` section from `compose.yaml`.
+  </Card>
+  <Card title="Build context" icon="folder-tree" href="#build-contexts">
+    Use the orchestrator's context instead of repeating `--context`.
+  </Card>
+  <Card title="Editor context" icon="square-code" href="#lsp-and-editor-use">
+    Attach Bake or Compose context to Dockerfile diagnostics in LSP clients.
+  </Card>
+</CardGroup>
+
+## Supported entrypoints
+
+`tally lint` still uses one command. The behavior depends on the explicit path you pass.
+
+| Input | Behavior |
+|-------|----------|
+| `tally lint .` | Recursively discovers Dockerfiles and Containerfiles. No orchestrator discovery is performed. |
+| `tally lint Dockerfile` | Lints one Dockerfile directly. |
+| `tally lint docker-bake.hcl` | Resolves Bake targets and lints each resulting build invocation. |
+| `tally lint docker-bake.json` | Resolves Bake JSON targets and lints each resulting build invocation. |
+| `tally lint compose.yaml` | Resolves Compose services with `build:` sections and lints each resulting build invocation. |
+
+<Warning>
+  Orchestrator mode requires one explicit regular file. Do not mix a Bake or Compose file with other lint inputs in the same command.
+</Warning>
+
+Directory and glob inputs keep their Dockerfile discovery behavior. This means `tally lint .` does not search for `compose.yaml` or
+`docker-bake.hcl`; pass those files explicitly when they are the build source of truth.
+
+## Dockerfile mode and `--context`
+
+For direct Dockerfile linting, use `--context` when rules need access to files in the build context:
+
+```bash
+tally lint --context . Dockerfile
+```
+
+This is useful for checks that depend on `.dockerignore` or on files copied into the image.
+
+When you lint a Bake or Compose entrypoint, do not pass `--context`. tally derives the primary build context from the selected target or service.
+
+```bash
+# Correct: context comes from docker-bake.hcl
+tally lint docker-bake.hcl
+
+# Error: --context is only for direct Dockerfile mode
+tally lint --context . docker-bake.hcl
+```
+
+## Docker Buildx Bake
+
+Lint all targets in the Bake default group:
+
+```bash
+tally lint docker-bake.hcl
+```
+
+Select specific targets or groups with `--target`:
+
+```bash
+tally lint docker-bake.hcl --target api --target worker
+```
+
+Example Bake file:
+
+```hcl docker-bake.hcl
+group "default" {
+  targets = ["api", "worker"]
+}
+
+target "api" {
+  context = "./services/api"
+  dockerfile = "Dockerfile"
+  target = "runtime"
+  platforms = ["linux/amd64"]
+  args = {
+    NODE_VERSION = "22"
+  }
+  contexts = {
+    base = "target:base"
+  }
+}
+
+target "worker" {
+  context = "./services/worker"
+  dockerfile = "Containerfile"
+}
+```
+
+tally uses the resolved target data when linting:
+
+- `context` becomes the primary build context.
+- `dockerfile` selects the file to lint.
+- `args` with concrete values are available to Dockerfile analysis.
+- `target` selects the effective final stage.
+- `platforms` are available to platform-aware checks.
+- `contexts` are preserved as named build contexts.
+
+### Bake limitations
+
+| Feature | Behavior |
+|---------|----------|
+| `dockerfile-inline` | Error. tally needs a real Dockerfile path for diagnostics and fixes. |
+| Multi-file Bake setups | Error when sibling Bake files are detected. Pass one explicit file that contains the full target definition, or lint the resolved Dockerfiles directly. |
+| Remote Bake definition URLs | Not supported as lint entrypoints. Pass a local Bake file. |
+| Non-local primary contexts | Supported as invocation metadata, but tally cannot inspect remote files or resolve a relative Dockerfile from a remote context. |
+
+## Docker Compose
+
+Lint all active services with a `build:` section:
+
+```bash
+tally lint compose.yaml
+```
+
+Select specific services with `--service`:
+
+```bash
+tally lint compose.yaml --service api --service worker
+```
+
+Example Compose file:
+
+```yaml compose.yaml
+services:
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        NODE_VERSION: "22"
+      additional_contexts:
+        base: service:base
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: production
+
+  worker:
+    build:
+      context: ./services/worker
+      dockerfile: Containerfile
+
+  redis:
+    image: redis:7
+```
+
+In this example, `api` and `worker` produce lint invocations. `redis` does not, because it has no `build:` section.
+
+tally preserves both build-time and selected runtime metadata:
+
+- `build.context`, `build.dockerfile`, `build.args`, `build.platforms`, `build.target`, and `build.additional_contexts`
+- service `platform` when `build.platforms` is not set
+- service `environment`, `ports`, `expose`, `labels`, `networks`, `secrets`, `healthcheck`, `entrypoint`, `command`, `user`, `working_dir`, and
+  `stop_signal`
+
+Some rules do not use all of this metadata yet. The data is still part of the invocation so current and future checks agree on the same planned
+build.
+
+### Compose limitations
+
+| Feature | Behavior |
+|---------|----------|
+| `build.dockerfile_inline` | Error. tally needs a real Dockerfile path. |
+| Profile-gated build services | Error. tally does not guess which non-default profiles should be active. |
+| Selected service without `build:` | Error. `--service` must name a buildable service. |
+| Image-only services | Allowed, but they do not produce lint invocations. |
+| Unsaved Compose file edits in an editor | Ignored until the file is saved. |
+
+## Build contexts
+
+The primary context is the context used for regular `COPY` and `ADD` sources.
+
+| Context kind | Example | Local file inspection |
+|--------------|---------|-----------------------|
+| Local directory | `context = "."`, `build.context: ./app` | Yes |
+| Local tar archive | `context = "./context.tar"` | No |
+| Git repository | `context = "https://github.com/acme/app.git"` | No |
+| Remote URL | `context = "https://example.com/context"` | No |
+| Empty context | `context = "-"` | No |
+| Named image context | `docker-image://alpine:3.20` | No |
+| Bake target context | `target:base` | No local file inspection |
+| Compose service context | `service:base` | No local file inspection |
+
+Only local directory contexts let tally evaluate `.dockerignore` and read files copied by `COPY` or `ADD`. Remote and non-directory contexts are
+valid invocation metadata, but tally does not fetch them during linting.
+
+Named contexts are tracked separately from the primary context. They are available to rules that need to know that a name was declared, but they do
+not make files locally readable unless a future rule explicitly supports that context kind.
+
+## Output and attribution
+
+When an orchestrator produces more than one invocation, tally keeps diagnostics separate even if multiple invocations point at the same Dockerfile.
+
+Text output groups findings by invocation:
+
+```text
+[bake target: api]
+  services/api/Dockerfile:12: buildkit/UndefinedVar - Usage of undefined variable '$NODE_VERSION'
+
+[bake target: worker]
+  services/worker/Containerfile:8: tally/max-lines - File has 520 lines, exceeding maximum of 500
+
+Summary: 2 Dockerfiles, 2 invocations, 2 violations.
+```
+
+JSON output includes invocation metadata on each violation and reports both file and invocation counts:
+
+```json
+{
+  "files": [
+    {
+      "file": "services/api/Dockerfile",
+      "violations": [
+        {
+          "rule": "buildkit/UndefinedVar",
+          "message": "Usage of undefined variable '$NODE_VERSION'",
+          "invocation": {
+            "kind": "bake",
+            "file": "/repo/docker-bake.hcl",
+            "name": "api"
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total": 1,
+    "files": 1,
+    "invocations": 1
+  },
+  "files_scanned": 1,
+  "invocations_scanned": 1
+}
+```
+
+SARIF stores invocation metadata in result properties. GitHub Actions annotations prefix the message with the invocation label. Markdown output adds
+an `Invocation` column.
+
+## Fixes
+
+`--fix` is not supported when the lint entrypoint is a Bake or Compose file:
+
+```bash
+tally lint --fix compose.yaml
+```
+
+This exits with code `2`. A single Dockerfile can be linted under multiple invocation contexts, and applying one text edit through an orchestrator
+entrypoint could be wrong for another target or service.
+
+To apply fixes, lint the Dockerfile directly:
+
+```bash
+tally lint --fix services/api/Dockerfile
+```
+
+Review the fix against the relevant Bake or Compose invocation before committing it.
+
+## LSP and editor use
+
+The LSP server remains Dockerfile-document-centric. To attach orchestrator context to Dockerfile diagnostics, configure invocation entrypoints in
+your editor or LSP client.
+
+User-facing setting:
+
+```json
+{
+  "tally.invocationEntrypoints": [
+    "compose.yaml",
+    "docker-bake.hcl"
+  ]
+}
+```
+
+Protocol payload shape used by LSP clients:
+
+```json
+{
+  "tally": {
+    "workspaces": [
+      {
+        "uri": "file:///repo",
+        "settings": {
+          "invocationEntrypoints": [
+            "compose.yaml",
+            "docker-bake.hcl"
+          ]
+        }
+      }
+    ]
+  }
+}
+```
+
+For each open Dockerfile, tally finds invocations from those entrypoints whose resolved Dockerfile path matches the document. Diagnostics use source
+labels such as `tally/bake:api` or `tally/compose:worker`.
+
+Mutating code actions are only shown when the requested diagnostic or range belongs to one invocation context. Broad fix-all actions are disabled
+when the selected diagnostics span multiple invocation contexts.
+
+## Exit codes
+
+Orchestrator entrypoints use the same exit-code family as Dockerfile linting:
+
+| Code | Orchestrator meaning |
+|------|----------------------|
+| `0` | Clean run, or a valid Bake/Compose file with no lintable invocations. |
+| `1` | Violations were found at or above `--fail-level`. |
+| `2` | CLI misuse, parse/load failure, unsupported orchestrator feature, or invalid target/service selection. |
+| `4` | A referenced Dockerfile has fatal syntax errors. |
+
+Exit code `3` remains the Dockerfile discovery "no files found" case for directory and glob inputs. A valid orchestrator file with zero buildable
+targets or services exits `0`, not `3`.

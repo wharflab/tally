@@ -27,6 +27,9 @@ tally lint --fix Dockerfile
   <Card title="Configuration" icon="gear" href="/guides/configuration">
     Configure rules, output formats, and fix modes with `.tally.toml`.
   </Card>
+  <Card title="Build invocations" icon="layers" href="/guides/build-invocations">
+    Lint Dockerfiles through Bake targets and Compose services.
+  </Card>
 </CardGroup>
 
 ## Why tally?
@@ -43,6 +46,9 @@ tally lint --fix Dockerfile
   </Card>
   <Card title="CI & editor ready" icon="circle-check">
     Outputs text, JSON, SARIF, GitHub Actions annotations, and Markdown. VS Code and JetBrains extensions included.
+  </Card>
+  <Card title="Bake and Compose aware" icon="layers">
+    Resolves build args, contexts, platforms, and target stages from orchestrator entrypoints.
   </Card>
   <Card title="No Docker daemon required" icon="server">
     Pure static analysis. Registry-aware checks use a Podman-compatible client — no Docker Desktop needed.
@@ -109,6 +115,9 @@ tally lint --fix Dockerfile
   </Card>
   <Card title="CI/CD integration" icon="code-branch" href="/guides/ci-cd">
     Add tally to GitHub Actions, GitLab CI, and other pipelines.
+  </Card>
+  <Card title="Build invocations" icon="layers" href="/guides/build-invocations">
+    Lint the builds declared by Docker Buildx Bake and Docker Compose.
   </Card>
   <Card title="IDE integration" icon="display" href="/guides/ide-integration">
     Real-time linting in VS Code, JetBrains, and any LSP editor.

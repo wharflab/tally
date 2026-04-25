@@ -52,6 +52,51 @@ The plugin works in all IntelliJ-based IDEs including IntelliJ IDEA, GoLand, PyC
 
 ---
 
+## Invocation-aware diagnostics
+
+By default, the LSP server lints the Dockerfile document you are editing. If your workspace builds that Dockerfile through Bake or Compose, configure
+invocation entrypoints so diagnostics use the same build args, target stage, platform, and build context as the real build.
+
+User-facing setting:
+
+```json
+{
+  "tally.invocationEntrypoints": [
+    "compose.yaml",
+    "docker-bake.hcl"
+  ]
+}
+```
+
+For generic LSP clients that send the full tally settings envelope, the payload shape is:
+
+```json
+{
+  "tally": {
+    "workspaces": [
+      {
+        "uri": "file:///repo",
+        "settings": {
+          "invocationEntrypoints": [
+            "compose.yaml",
+            "docker-bake.hcl"
+          ]
+        }
+      }
+    ]
+  }
+}
+```
+
+When a configured entrypoint resolves to the open Dockerfile, diagnostics use source labels such as `tally/bake:api` or `tally/compose:worker`.
+
+If a code action request spans diagnostics from more than one invocation context, mutating quick fixes and fix-all actions are hidden. This prevents
+one edit from being applied as if it were valid for every target or service.
+
+See [Build invocations](/guides/build-invocations) for CLI behavior and orchestrator limitations.
+
+---
+
 ## Generic LSP
 
 Any editor that supports the [Language Server Protocol](https://microsoft.github.io/language-server-protocol/) can use tally's built-in LSP server

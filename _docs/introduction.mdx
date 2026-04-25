@@ -28,6 +28,9 @@ tally lint --fix Dockerfile
   <Card title="Configuration" icon="gear" href="/guides/configuration">
     Configure rules, output formats, and fix modes with `.tally.toml`.
   </Card>
+  <Card title="Build invocations" icon="layers" href="/guides/build-invocations">
+    Lint Dockerfiles through Bake targets and Compose services.
+  </Card>
 </CardGroup>
 
 ## Why tally?
@@ -47,6 +50,7 @@ tally takes a different approach:
 | Understands heredocs, `RUN --mount`, `COPY --link` | Yes | Partial | Yes |
 | Safe auto-fix (`--fix`) | Yes | No | No |
 | AI-powered fixes (`--fix-unsafe`) | Yes | No | No |
+| Bake and Compose entrypoints | Yes | No | Partial (Bake only) |
 | No Docker daemon required | Yes | Yes | No |
 | SARIF output | Yes | Yes | No |
 | LSP / editor integration | Yes | Limited | No |
@@ -77,6 +81,12 @@ list.
 `--fix` applies safe, mechanical rewrites — things like canonicalizing `STOPSIGNAL`, adding `--chown` flags, and converting `RUN echo` patterns to
 `COPY` heredocs. Nothing is applied that could change build behavior.
 
+### Build invocation context
+
+tally can lint Dockerfiles through Docker Buildx Bake and Docker Compose entrypoints. When you run `tally lint docker-bake.hcl` or
+`tally lint compose.yaml`, tally resolves each target or service into the Dockerfile, build context, build args, platform, and selected target stage.
+See [Build invocations](/guides/build-invocations) for the full workflow.
+
 ### AI AutoFix via ACP
 
 `--fix-unsafe` unlocks opt-in AI AutoFix for improvements that are hard to express as a deterministic rewrite. Instead of requiring an API key, tally
@@ -104,5 +114,8 @@ tools. The Markdown format is optimized for AI agents and token efficiency.
   </Card>
   <Card title="Run your first lint" icon="rocket" href="/quickstart">
     Lint a Dockerfile, read the output, apply fixes, and set up `.tally.toml`.
+  </Card>
+  <Card title="Lint Bake and Compose" icon="layers" href="/guides/build-invocations">
+    Use the build definition your project already uses.
   </Card>
 </CardGroup>

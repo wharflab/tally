@@ -9,11 +9,11 @@ tally uses distinct exit codes so scripts and CI pipelines can react to differen
 
 | Code | Name | Meaning |
 |------|------|---------|
-| `0` | Success | No violations found, or all violations are below the configured `--fail-level` |
+| `0` | Success | No violations found, all violations are below the configured `--fail-level`, or a valid orchestrator file has no lintable invocations |
 | `1` | Violations | One or more violations at or above the configured `--fail-level` |
-| `2` | Error | Configuration, parse, or I/O error (for example: invalid config file, permission denied) |
-| `3` | No files | No Dockerfiles to lint (missing file, empty glob, empty directory) |
-| `4` | Syntax error | Dockerfile has fatal syntax issues (unknown instructions, malformed directives) |
+| `2` | Error | Configuration, parse, I/O, CLI usage, or unsupported orchestrator error |
+| `3` | No files | No Dockerfiles to lint from directory or glob discovery (missing file, empty glob, empty directory) |
+| `4` | Syntax error | Dockerfile has fatal syntax issues (unknown instructions, malformed directives), including Dockerfiles referenced by an orchestrator |
 
 ## How `--fail-level` affects exit code 1
 
@@ -34,6 +34,29 @@ tally lint --fail-level style Dockerfile
 ```
 
 Available levels from most to least severe: `error`, `warning`, `info`, `style` (default), `none`.
+
+## Orchestrator entrypoints
+
+Bake and Compose entrypoints use the same exit-code family, with two differences from directory discovery:
+
+- A valid Bake or Compose file with no lintable targets or services exits `0`, not `3`.
+- Invalid target/service selection, unsupported inline Dockerfiles, profile-gated build services, multi-file Bake setups, and invalid flag
+  combinations exit `2`.
+
+Examples:
+
+```bash
+# Code 0 when compose.yaml is valid but only contains image-only services
+tally lint compose.yaml
+
+# Code 2: --target is only valid for Bake entrypoints
+tally lint compose.yaml --target api
+
+# Code 2: --fix is not supported for orchestrator entrypoints
+tally lint --fix docker-bake.hcl
+```
+
+See [Build invocations](/guides/build-invocations) for supported entrypoint behavior.
 
 ## Script examples
 

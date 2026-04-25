@@ -18,6 +18,22 @@ tally supports five output formats so it fits into both terminals and automation
 
 ---
 
+## Invocation-aware output
+
+When you lint a Bake or Compose entrypoint, tally may run more than one invocation for the same Dockerfile. Output formats preserve that attribution:
+
+| Format | Invocation behavior |
+|--------|---------------------|
+| `text` | Groups findings under labels such as `[bake target: api]` or `[compose service: worker]` and prints an invocation summary. |
+| `json` | Adds an `invocation` object to each orchestrator-derived violation and includes `invocations_scanned`. |
+| `sarif` | Stores invocation metadata in each result's properties. |
+| `github-actions` | Prefixes annotation messages with the invocation label. |
+| `markdown` | Adds an `Invocation` column when invocation metadata is present. |
+
+See [Build invocations](/guides/build-invocations) for CLI examples and supported entrypoints.
+
+---
+
 <Tabs>
   <Tab title="text">
 
@@ -113,7 +129,16 @@ tally supports five output formats so it fits into both terminals and automation
     | `files` | Array of files with their violations |
     | `summary` | Aggregate counts: `total`, `errors`, `warnings`, `info`, `style`, `files` |
     | `files_scanned` | Total number of files scanned |
+    | `invocations_scanned` | Total number of build invocations scanned; omitted or `0` for direct Dockerfile runs |
     | `rules_enabled` | Number of active rules with a non-`"off"` default severity |
+
+    Orchestrator-derived violations also include:
+
+    | Field | Description |
+    |-------|-------------|
+    | `invocation.kind` | `bake` or `compose` |
+    | `invocation.file` | Absolute path to the Bake or Compose file |
+    | `invocation.name` | Target or service name |
 
     Write JSON to a file:
 
@@ -208,6 +233,7 @@ tally supports five output formats so it fits into both terminals and automation
     - Emoji severity indicators: ❌ error, ⚠️ warning, ℹ️ info, 💅 style.
     - No rule codes or doc URLs — optimized for token efficiency.
     - Adds a `File` column automatically when linting multiple files.
+    - Adds an `Invocation` column automatically when linting Bake or Compose entrypoints.
 
     Pipe output into a file for use as a PR comment or report artifact:
 
