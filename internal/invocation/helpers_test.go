@@ -23,17 +23,7 @@ func TestInvocationKeyUsesUnambiguousSeparator(t *testing.T) {
 func TestClassifyContextRefReturnsAbsoluteLocalDir(t *testing.T) {
 	t.Parallel()
 
-	dir := t.TempDir()
-	oldwd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd: %v", err)
-	}
-	rel, err := filepath.Rel(oldwd, dir)
-	if err != nil {
-		t.Fatalf("Rel: %v", err)
-	}
-
-	ref, err := ClassifyContextRef(rel, ".")
+	ref, err := ClassifyContextRef(filepath.Join(".", "relative-context"), ".")
 	if err != nil {
 		t.Fatalf("ClassifyContextRef() error: %v", err)
 	}
