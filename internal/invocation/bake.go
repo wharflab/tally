@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/containerd/platforms"
 	"github.com/docker/buildx/bake"
@@ -26,9 +27,10 @@ func (p BakeProvider) Discover(_ context.Context, opts ResolveOptions) (*Discove
 	if err != nil {
 		return nil, fmt.Errorf("read Bake file %s: %w", entrypoint, err)
 	}
+	if err := rejectUnsupportedMultiFileBake(entrypoint, baseDir); err != nil {
+		return nil, err
+	}
 
-	// ResolveOptions.Path is one explicit entrypoint; Buildx multi-file
-	// composition via repeated -f flags is not represented by this provider API.
 	files := []bake.File{{Name: entrypoint, Data: data}}
 	cfg, _, err := bake.ParseFiles(files, bakeDefaults(baseDir), nil)
 	if err != nil {
@@ -69,6 +71,78 @@ func bakeDefaults(baseDir string) map[string]string {
 		"BAKE_CMD_CONTEXT":    baseDir,
 		"BAKE_LOCAL_PLATFORM": platforms.Format(spec),
 	}
+}
+
+func rejectUnsupportedMultiFileBake(entrypoint, baseDir string) error {
+	files, err := additionalBakeFiles(entrypoint, baseDir)
+	if err != nil {
+		return err
+	}
+	if len(files) == 0 {
+		return nil
+	}
+	return fmt.Errorf(
+		"bake file %s appears to be part of a multi-file Bake setup; found additional Bake file(s): %s. "+
+			"tally currently supports one explicit Bake entrypoint file, so merge the files or lint the resolved Dockerfiles directly",
+		entrypoint,
+		strings.Join(files, ", "),
+	)
+}
+
+func additionalBakeFiles(entrypoint, baseDir string) ([]string, error) {
+	candidates, err := bakeFileCandidates(baseDir)
+	if err != nil {
+		return nil, err
+	}
+	entrypoint = filepath.Clean(entrypoint)
+	files := make([]string, 0, len(candidates))
+	for _, candidate := range candidates {
+		candidate = filepath.Clean(candidate)
+		if candidate == entrypoint {
+			continue
+		}
+		if !isBakeFileCandidate(candidate, baseDir) {
+			continue
+		}
+		files = append(files, filepath.Base(candidate))
+	}
+	return files, nil
+}
+
+func bakeFileCandidates(baseDir string) ([]string, error) {
+	var candidates []string
+	for _, pattern := range []string{"*.hcl", "*.json"} {
+		matches, err := filepath.Glob(filepath.Join(baseDir, pattern))
+		if err != nil {
+			return nil, err
+		}
+		candidates = append(candidates, matches...)
+	}
+	slices.Sort(candidates)
+	return slices.Compact(candidates), nil
+}
+
+func isBakeFileCandidate(path, baseDir string) bool {
+	if _, ok := defaultBakeFileNames[filepath.Base(path)]; ok {
+		return true
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	cfg, _, err := bake.ParseFiles([]bake.File{{Name: path, Data: data}}, bakeDefaults(baseDir), nil)
+	if err != nil || cfg == nil {
+		return false
+	}
+	return len(cfg.Groups) > 0 || len(cfg.Targets) > 0
+}
+
+var defaultBakeFileNames = map[string]struct{}{
+	"docker-bake.json":          {},
+	"docker-bake.hcl":           {},
+	"docker-bake.override.json": {},
+	"docker-bake.override.hcl":  {},
 }
 
 func bakeTargetNames(cfg *bake.Config, requested []string) ([]string, error) {

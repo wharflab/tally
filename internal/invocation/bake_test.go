@@ -69,6 +69,60 @@ target "worker" {
 	}
 }
 
+func TestBakeProviderDiscoverRejectsSiblingBakeFile(t *testing.T) {
+	t.Parallel()
+
+	entrypoint := writeBakeFixture(t, `target "api" {
+  context = "."
+}
+`)
+	sibling := filepath.Join(filepath.Dir(entrypoint), "docker-bake.override.hcl")
+	if err := os.WriteFile(sibling, []byte(`target "worker" {
+  context = "."
+}
+`), 0o600); err != nil {
+		t.Fatalf("write sibling Bake file: %v", err)
+	}
+
+	_, err := BakeProvider{}.Discover(context.Background(), ResolveOptions{Path: entrypoint})
+	if err == nil {
+		t.Fatal("expected multi-file Bake error")
+	}
+	if !strings.Contains(err.Error(), "multi-file Bake setup") {
+		t.Fatalf("error = %q, want multi-file Bake setup", err)
+	}
+	if !strings.Contains(err.Error(), "docker-bake.override.hcl") {
+		t.Fatalf("error = %q, want sibling file name", err)
+	}
+}
+
+func TestBakeProviderDiscoverIgnoresUnrelatedSiblingHCLAndJSON(t *testing.T) {
+	t.Parallel()
+
+	entrypoint := writeBakeFixture(t, `target "api" {
+  context = "."
+}
+`)
+	dir := filepath.Dir(entrypoint)
+	if err := os.WriteFile(filepath.Join(dir, "terraform.hcl"), []byte(`resource "x" "y" {}`), 0o600); err != nil {
+		t.Fatalf("write unrelated HCL: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"scripts":{"build":"go build"}}`), 0o600); err != nil {
+		t.Fatalf("write unrelated JSON: %v", err)
+	}
+
+	result, err := BakeProvider{}.Discover(context.Background(), ResolveOptions{
+		Path:    entrypoint,
+		Targets: []string{"api"},
+	})
+	if err != nil {
+		t.Fatalf("Discover() error: %v", err)
+	}
+	if got := invocationNames(result.Invocations); !slices.Equal(got, []string{"api"}) {
+		t.Fatalf("invocation names = %v, want [api]", got)
+	}
+}
+
 func TestBakeSecretsDiscriminatesEnvSource(t *testing.T) {
 	t.Parallel()
 
