@@ -459,7 +459,7 @@ func (s *Server) lintContentWithInvocations(
 	}
 
 	if len(violations) == 0 && parsed == nil {
-		return lintResult{}
+		return lintResult{config: resolved}
 	}
 	asyncResult := s.runAsyncChecks(ctx, filePath, content, resolved, violations, asyncPlans)
 	if asyncResult != nil {
@@ -511,15 +511,45 @@ func (s *Server) invocationsForDocument(ctx context.Context, filePath string) []
 func discoverLSPEntrypoint(ctx context.Context, entrypoint string) (*invocation.DiscoveryResult, error) {
 	ext := strings.ToLower(filepath.Ext(entrypoint))
 	switch ext {
-	case ".json", ".hcl":
+	case ".hcl":
 		return (invocation.BakeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})
+	case ".json":
+		if kind, ok := invocation.ProbeEntrypointKind(entrypoint); ok {
+			return discoverLSPEntrypointByKind(ctx, entrypoint, kind)
+		}
+		if result, err := (invocation.BakeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint}); err == nil {
+			return result, nil
+		}
+		return (invocation.ComposeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})
 	case ".yml", ".yaml":
 		return (invocation.ComposeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})
 	default:
-		if result, err := (invocation.ComposeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint}); err == nil {
+		kind, ok := invocation.ProbeEntrypointKind(entrypoint)
+		if !ok {
+			return nil, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", entrypoint)
+		}
+		return discoverLSPEntrypointByKind(ctx, entrypoint, kind)
+	}
+}
+
+func discoverLSPEntrypointByKind(ctx context.Context, entrypoint, kind string) (*invocation.DiscoveryResult, error) {
+	switch kind {
+	case invocation.KindCompose:
+		result, composeErr := (invocation.ComposeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})
+		if composeErr != nil {
+			return nil, composeErr
+		}
+		if len(result.Invocations) > 0 {
 			return result, nil
 		}
+		if bakeResult, bakeErr := (invocation.BakeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint}); bakeErr == nil {
+			return bakeResult, nil
+		}
+		return result, nil
+	case invocation.KindBake:
 		return (invocation.BakeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})
+	default:
+		return nil, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", entrypoint)
 	}
 }
 

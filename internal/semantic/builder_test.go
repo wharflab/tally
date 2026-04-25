@@ -11,6 +11,22 @@ import (
 
 const testShellBash = "bash"
 
+func TestEffectiveTargetStageNameFallsBackWithIndex(t *testing.T) {
+	t.Parallel()
+
+	stages := []instructions.Stage{
+		{Name: "builder"},
+		{Name: "runtime"},
+	}
+
+	if got := targetStageIndex(stages, "missing"); got != 1 {
+		t.Fatalf("targetStageIndex(missing) = %d, want 1", got)
+	}
+	if got := effectiveTargetStageName(stages, "missing"); got != "runtime" {
+		t.Fatalf("effectiveTargetStageName(missing) = %q, want runtime", got)
+	}
+}
+
 func TestBuilderWithShellDirectivesAppliesToFollowingStages(t *testing.T) {
 	t.Parallel()
 	content := `FROM alpine:3.18 AS s0

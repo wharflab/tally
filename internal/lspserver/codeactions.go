@@ -117,6 +117,11 @@ func violationMatchesCodeActionParams(v rules.Violation, params *protocol.CodeAc
 	return false
 }
 
+// hasMultipleInvocationContexts reports whether violations span two or more
+// distinct non-empty InvocationKey values. Empty keys are invocation-agnostic
+// direct-scan diagnostics, so mixing "" with one non-empty key is still one
+// context. InvocationKey is the stable identity used for dedupe and async
+// merging.
 func hasMultipleInvocationContexts(violations []rules.Violation) bool {
 	seen := map[string]struct{}{}
 	for _, v := range violations {

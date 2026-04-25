@@ -144,6 +144,9 @@ func (r *TextReporter) PrintReport(w io.Writer, violations []rules.Violation, so
 	lastLabel := ""
 	for _, v := range sorted {
 		label := InvocationLabel(v)
+		if label == "" {
+			lastLabel = ""
+		}
 		if label != "" && label != lastLabel {
 			if _, err := fmt.Fprintf(w, "\n[%s]\n", label); err != nil {
 				return err
@@ -155,12 +158,25 @@ func (r *TextReporter) PrintReport(w io.Writer, violations []rules.Violation, so
 		}
 	}
 	if metadata.InvocationsScanned > 0 {
-		if _, err := fmt.Fprintf(w, "\nSummary: %d Dockerfiles, %d invocations, %d violations.\n",
-			metadata.FilesScanned, metadata.InvocationsScanned, len(violations)); err != nil {
+		if _, err := fmt.Fprintf(w, "\nSummary: %d %s, %d %s, %d %s.\n",
+			metadata.FilesScanned,
+			plural(metadata.FilesScanned, "Dockerfile", "Dockerfiles"),
+			metadata.InvocationsScanned,
+			plural(metadata.InvocationsScanned, "invocation", "invocations"),
+			len(violations),
+			plural(len(violations), "violation", "violations"),
+		); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func plural(n int, singular, plural string) string {
+	if n == 1 {
+		return singular
+	}
+	return plural
 }
 
 // printViolation formats a single violation.

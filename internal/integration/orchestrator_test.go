@@ -172,8 +172,6 @@ func assertOrchestratorOutput(
 			gotNames = append(gotNames, violation.Invocation.Name)
 		}
 	}
-	slices.Sort(gotNames)
-	slices.Sort(wantNames)
 	if !slices.Equal(gotNames, wantNames) {
 		t.Fatalf("invocation names = %v, want %v", gotNames, wantNames)
 	}

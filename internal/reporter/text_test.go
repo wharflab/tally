@@ -408,6 +408,29 @@ func TestTextReporter_Print(t *testing.T) {
 	}
 }
 
+func TestTextReporter_PrintReport_PluralizesInvocationSummary(t *testing.T) {
+	t.Parallel()
+
+	colorOff := false
+	r := NewTextReporter(TextOptions{Color: &colorOff})
+	var buf bytes.Buffer
+	err := r.PrintReport(&buf, []rules.Violation{{
+		Location: rules.NewLineLocation("Dockerfile", 1),
+		RuleCode: "TestRule",
+		Message:  "Test message",
+		Severity: rules.SeverityWarning,
+	}}, nil, ReportMetadata{
+		FilesScanned:       1,
+		InvocationsScanned: 1,
+	})
+	if err != nil {
+		t.Fatalf("PrintReport failed: %v", err)
+	}
+	if !strings.Contains(buf.String(), "Summary: 1 Dockerfile, 1 invocation, 1 violation.") {
+		t.Fatalf("summary did not singularize:\n%s", buf.String())
+	}
+}
+
 func TestTextReporter_Print_ClearsDocCacheBetweenCalls(t *testing.T) {
 	t.Parallel()
 

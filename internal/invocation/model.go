@@ -3,7 +3,11 @@
 // Compose.
 package invocation
 
-import "context"
+import (
+	"context"
+	jsonv2 "encoding/json/v2"
+	"time"
+)
 
 const (
 	defaultDockerfileName = "Dockerfile"
@@ -27,7 +31,10 @@ const (
 )
 
 // BuildInvocation describes one planned build of one Dockerfile under one
-// invocation context.
+// invocation context. Providers must store local path-typed fields as absolute,
+// cleaned paths at runtime, including DockerfilePath, ContextRef.Value when the
+// context kind is "dir", and NamedContexts values that refer to local dirs. The
+// rest of the pipeline relies on simple string equality for grouping and lookup.
 type BuildInvocation struct {
 	Key string `json:"-"`
 
@@ -41,18 +48,22 @@ type BuildInvocation struct {
 	TargetStage   string                `json:"targetStage,omitempty"`
 	NamedContexts map[string]ContextRef `json:"namedContexts,omitempty"`
 
-	Environment        map[string]*string `json:"environment,omitempty"`
-	PublishedPorts     []PortBinding      `json:"publishedPorts,omitempty"`
-	ExposedPorts       []PortSpec         `json:"exposedPorts,omitempty"`
-	Networks           []string           `json:"networks,omitempty"`
-	Labels             map[string]string  `json:"labels,omitempty"`
-	Secrets            []SecretRef        `json:"secrets,omitempty"`
-	Healthcheck        *HealthcheckSpec   `json:"healthcheck,omitempty"`
-	EntrypointOverride *CommandOverride   `json:"entrypointOverride,omitempty"`
-	CommandOverride    *CommandOverride   `json:"commandOverride,omitempty"`
-	RuntimeUser        string             `json:"runtimeUser,omitempty"`
-	RuntimeWorkingDir  string             `json:"runtimeWorkingDir,omitempty"`
-	StopSignal         string             `json:"stopSignal,omitempty"`
+	Environment    map[string]*string `json:"environment,omitempty"`
+	PublishedPorts []PortBinding      `json:"publishedPorts,omitempty"`
+	ExposedPorts   []PortSpec         `json:"exposedPorts,omitempty"`
+	Networks       []string           `json:"networks,omitempty"`
+	// Labels flattens build-time image labels and Compose service/container
+	// labels into one map. Compose service labels take precedence over build
+	// labels with the same key, so consumers must not assume every label came
+	// from a Dockerfile LABEL instruction.
+	Labels             map[string]string `json:"labels,omitempty"`
+	Secrets            []SecretRef       `json:"secrets,omitempty"`
+	Healthcheck        *HealthcheckSpec  `json:"healthcheck,omitempty"`
+	EntrypointOverride *CommandOverride  `json:"entrypointOverride,omitempty"`
+	CommandOverride    *CommandOverride  `json:"commandOverride,omitempty"`
+	RuntimeUser        string            `json:"runtimeUser,omitempty"`
+	RuntimeWorkingDir  string            `json:"runtimeWorkingDir,omitempty"`
+	StopSignal         string            `json:"stopSignal,omitempty"`
 }
 
 // InvocationSource identifies the source declaration that produced an
@@ -106,6 +117,52 @@ type HealthcheckSpec struct {
 	Retries       *uint64  `json:"retries,omitempty"`
 	StartPeriod   string   `json:"startPeriod,omitempty"`
 	StartInterval string   `json:"startInterval,omitempty"`
+
+	IntervalDur      time.Duration `json:"-"`
+	TimeoutDur       time.Duration `json:"-"`
+	StartPeriodDur   time.Duration `json:"-"`
+	StartIntervalDur time.Duration `json:"-"`
+}
+
+// UnmarshalJSON preserves the string form while also populating parsed duration
+// companions for consumers that need numeric comparisons.
+func (s *HealthcheckSpec) UnmarshalJSON(data []byte) error {
+	type healthcheckSpec HealthcheckSpec
+	var parsed healthcheckSpec
+	if err := jsonv2.Unmarshal(data, &parsed); err != nil {
+		return err
+	}
+	*s = HealthcheckSpec(parsed)
+	return s.parseDurations()
+}
+
+func (s *HealthcheckSpec) parseDurations() error {
+	var err error
+	if s.Interval != "" {
+		s.IntervalDur, err = time.ParseDuration(s.Interval)
+		if err != nil {
+			return err
+		}
+	}
+	if s.Timeout != "" {
+		s.TimeoutDur, err = time.ParseDuration(s.Timeout)
+		if err != nil {
+			return err
+		}
+	}
+	if s.StartPeriod != "" {
+		s.StartPeriodDur, err = time.ParseDuration(s.StartPeriod)
+		if err != nil {
+			return err
+		}
+	}
+	if s.StartInterval != "" {
+		s.StartIntervalDur, err = time.ParseDuration(s.StartInterval)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // CommandOverride preserves Compose command/entrypoint override semantics.

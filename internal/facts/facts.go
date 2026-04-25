@@ -836,11 +836,15 @@ func isContextSourceGlob(sourcePath string) bool {
 	return strings.ContainsAny(sourcePath, "*?[")
 }
 
+type pathExister interface {
+	PathExists(path string) bool
+}
+
 func contextSourceAvailable(contextFiles ContextFileReader, normalized string) bool {
 	if contextFiles == nil {
 		return false
 	}
-	if paths, ok := contextFiles.(interface{ PathExists(path string) bool }); ok {
+	if paths, ok := contextFiles.(pathExister); ok {
 		return paths.PathExists(normalized)
 	}
 	return contextFiles.FileExists(normalized)

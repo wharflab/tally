@@ -46,6 +46,8 @@ func applyDefaultPreference(pref config.ConfigurationPreference) config.Configur
 const (
 	fixAllModeAll      = "all"
 	fixAllModeProblems = "problems"
+
+	watchedFilesDebounceDelay = 250 * time.Millisecond
 )
 
 func defaultClientSettings() clientSettings {
@@ -95,6 +97,28 @@ func (s *Server) handleDidChangeConfiguration(
 }
 
 func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, _ *protocol.DidChangeWatchedFilesParams) {
+	rootCtx := context.WithoutCancel(ctx)
+	s.watchedFilesMu.Lock()
+	s.watchedFilesSeq++
+	seq := s.watchedFilesSeq
+	if s.watchedFilesTimer != nil {
+		s.watchedFilesTimer.Stop()
+	}
+	s.watchedFilesTimer = time.AfterFunc(watchedFilesDebounceDelay, func() {
+		s.runDidChangeWatchedFiles(rootCtx, seq)
+	})
+	s.watchedFilesMu.Unlock()
+}
+
+func (s *Server) runDidChangeWatchedFiles(ctx context.Context, seq uint64) {
+	s.watchedFilesMu.Lock()
+	if seq != s.watchedFilesSeq {
+		s.watchedFilesMu.Unlock()
+		return
+	}
+	s.watchedFilesTimer = nil
+	s.watchedFilesMu.Unlock()
+
 	s.lintCache.clear()
 	if s.pushDiagnosticsEnabled() {
 		for _, doc := range s.documents.All() {

@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 
 	"github.com/containerd/platforms"
 	"github.com/docker/buildx/bake"
@@ -99,13 +98,13 @@ func bakeTargetNames(cfg *bake.Config, requested []string) ([]string, error) {
 				seen[target] = struct{}{}
 			}
 		}
-		sort.Strings(indirect)
+		slices.Sort(indirect)
 		return append(ordered, indirect...), nil
 	}
 
 	targets, _ := cfg.ResolveGroup("default")
 	targets = dedupePreserveOrder(targets)
-	sort.Strings(targets)
+	slices.Sort(targets)
 	return targets, nil
 }
 
@@ -174,7 +173,6 @@ func bakeInvocation(entrypoint, baseDir, name string, target *bake.Target) (Buil
 		BuildArgs:      cloneStringPtrMap(target.Args),
 		Platforms:      cloneStrings(target.Platforms),
 		TargetStage:    targetStage,
-		NamedContexts:  nil,
 		Labels:         bakeLabels(target.Labels),
 		Secrets:        bakeSecrets(baseDir, target.Secrets),
 	}

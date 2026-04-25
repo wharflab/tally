@@ -7,7 +7,7 @@ import (
 
 // InvocationContext is the rule-facing view of one build invocation.
 type InvocationContext struct {
-	Invocation *BuildInvocation
+	invocation *BuildInvocation
 }
 
 // NewContext creates an invocation context from normalized invocation metadata.
@@ -16,7 +16,7 @@ func NewContext(inv *BuildInvocation) *InvocationContext {
 		return nil
 	}
 	return &InvocationContext{
-		Invocation: inv,
+		invocation: inv,
 	}
 }
 
@@ -42,6 +42,9 @@ func NewDockerfileInvocation(dockerfilePath, contextDir string) (*BuildInvocatio
 		if canonical, err := CanonicalPath(sourceFile); err == nil {
 			sourceFile = canonical
 			dockerfile = canonical
+		} else if abs, absErr := filepath.Abs(sourceFile); absErr == nil {
+			sourceFile = filepath.Clean(abs)
+			dockerfile = sourceFile
 		}
 	}
 
@@ -60,8 +63,16 @@ func NewDockerfileInvocation(dockerfilePath, contextDir string) (*BuildInvocatio
 
 // ContextRef returns the declared primary context reference.
 func (c *InvocationContext) ContextRef() ContextRef {
-	if c == nil || c.Invocation == nil {
+	if c == nil || c.invocation == nil {
 		return ContextRef{}
 	}
-	return c.Invocation.ContextRef
+	return c.invocation.ContextRef
+}
+
+// Invocation returns the underlying build invocation, if any.
+func (c *InvocationContext) Invocation() *BuildInvocation {
+	if c == nil {
+		return nil
+	}
+	return c.invocation
 }

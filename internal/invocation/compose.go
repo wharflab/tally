@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	composecli "github.com/compose-spec/compose-go/v2/cli"
 	composetypes "github.com/compose-spec/compose-go/v2/types"
@@ -32,7 +33,6 @@ func (p ComposeProvider) Discover(ctx context.Context, opts ResolveOptions) (*Di
 		composecli.WithDotEnv,
 		composecli.WithProfiles([]string{}),
 		composecli.WithResolvedPaths(true),
-		composecli.WithDiscardEnvFile,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("load Compose options for %s: %w", entrypoint, err)
@@ -157,6 +157,14 @@ func composeInvocation(
 	if err != nil {
 		return BuildInvocation{}, fmt.Errorf("compose service %q has invalid additional context: %w", name, err)
 	}
+	publishedPorts, err := composePublishedPorts(service.Ports)
+	if err != nil {
+		return BuildInvocation{}, fmt.Errorf("compose service %q has invalid published port: %w", name, err)
+	}
+	exposedPorts, err := composeExposedPorts(service.Expose)
+	if err != nil {
+		return BuildInvocation{}, fmt.Errorf("compose service %q has invalid exposed port: %w", name, err)
+	}
 
 	inv := BuildInvocation{
 		Source:             source,
@@ -167,8 +175,8 @@ func composeInvocation(
 		TargetStage:        build.Target,
 		NamedContexts:      namedContexts,
 		Environment:        cloneMappingWithEquals(service.Environment),
-		PublishedPorts:     composePublishedPorts(service.Ports),
-		ExposedPorts:       composeExposedPorts(service.Expose),
+		PublishedPorts:     publishedPorts,
+		ExposedPorts:       exposedPorts,
 		Networks:           composeNetworkNames(service),
 		Labels:             composeLabels(build.Labels, service.Labels),
 		Secrets:            composeSecrets(baseDir, build.Secrets, service.Secrets, project.Secrets),
@@ -199,6 +207,9 @@ func cloneMappingWithEquals(in composetypes.MappingWithEquals) map[string]*strin
 	return out
 }
 
+// composeLabels flattens build-time image labels and service/container labels.
+// Service labels intentionally take precedence over build labels with the same
+// key, so callers must not treat the result as Dockerfile-only label metadata.
 func composeLabels(buildLabels, serviceLabels composetypes.Labels) map[string]string {
 	labels := make(map[string]string, len(buildLabels)+len(serviceLabels))
 	maps.Copy(labels, buildLabels)
@@ -209,9 +220,9 @@ func composeLabels(buildLabels, serviceLabels composetypes.Labels) map[string]st
 	return labels
 }
 
-func composePublishedPorts(ports []composetypes.ServicePortConfig) []PortBinding {
+func composePublishedPorts(ports []composetypes.ServicePortConfig) ([]PortBinding, error) {
 	if len(ports) == 0 {
-		return nil
+		return nil, nil
 	}
 	out := make([]PortBinding, 0, len(ports))
 	for _, port := range ports {
@@ -222,9 +233,10 @@ func composePublishedPorts(ports []composetypes.ServicePortConfig) []PortBinding
 		hostStart, hostEnd := 0, 0
 		if port.Published != "" {
 			start, end, err := parsePortRange(port.Published)
-			if err == nil {
-				hostStart, hostEnd = start, end
+			if err != nil {
+				return nil, fmt.Errorf("published port %q: %w", port.Published, err)
 			}
+			hostStart, hostEnd = start, end
 		}
 		target := int(port.Target)
 		out = append(out, PortBinding{
@@ -238,21 +250,22 @@ func composePublishedPorts(ports []composetypes.ServicePortConfig) []PortBinding
 			Mode:           port.Mode,
 		})
 	}
-	return out
+	return out, nil
 }
 
-func composeExposedPorts(expose composetypes.StringOrNumberList) []PortSpec {
+func composeExposedPorts(expose composetypes.StringOrNumberList) ([]PortSpec, error) {
 	if len(expose) == 0 {
-		return nil
+		return nil, nil
 	}
 	out := make([]PortSpec, 0, len(expose))
 	for _, item := range expose {
 		spec, err := parseExpose(item)
-		if err == nil {
-			out = append(out, spec)
+		if err != nil {
+			return nil, fmt.Errorf("expose %q: %w", item, err)
 		}
+		out = append(out, spec)
 	}
-	return out
+	return out, nil
 }
 
 func parseExpose(value string) (PortSpec, error) {
@@ -309,11 +322,7 @@ func composeSecretRef(baseDir, scope string, secret composetypes.ServiceSecretCo
 	id := ref.Source
 	target := ref.Target
 	if target == "" {
-		if scope == SecretScopeService {
-			target = "/run/secrets/" + id
-		} else {
-			target = id
-		}
+		target = "/run/secrets/" + id
 	}
 
 	source := id
@@ -348,25 +357,36 @@ func composeHealthcheck(hc *composetypes.HealthCheckConfig) *HealthcheckSpec {
 	}
 	if hc.Interval != nil {
 		spec.Interval = hc.Interval.String()
+		spec.IntervalDur = time.Duration(*hc.Interval)
 	}
 	if hc.Timeout != nil {
 		spec.Timeout = hc.Timeout.String()
+		spec.TimeoutDur = time.Duration(*hc.Timeout)
 	}
 	if hc.StartPeriod != nil {
 		spec.StartPeriod = hc.StartPeriod.String()
+		spec.StartPeriodDur = time.Duration(*hc.StartPeriod)
 	}
 	if hc.StartInterval != nil {
 		spec.StartInterval = hc.StartInterval.String()
+		spec.StartIntervalDur = time.Duration(*hc.StartInterval)
 	}
 	return spec
 }
 
+// composeCommandOverride relies on compose-go preserving unset command fields
+// as nil ShellCommand values and explicit command: [] values as non-nil empty
+// slices, matching Compose override semantics.
 func composeCommandOverride(command composetypes.ShellCommand) *CommandOverride {
 	if command == nil {
 		return nil
 	}
+	args := slices.Clone([]string(command))
+	if args == nil {
+		args = []string{}
+	}
 	return &CommandOverride{
-		Args:             slices.Clone([]string(command)),
+		Args:             args,
 		ClearsImageValue: len(command) == 0,
 	}
 }

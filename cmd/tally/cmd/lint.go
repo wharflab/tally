@@ -648,40 +648,59 @@ func classifyLintEntrypoint(ctx stdcontext.Context, inputs []string, cmd *cli.Co
 
 	ext := strings.ToLower(filepath.Ext(input))
 	switch ext {
-	case ".json", ".hcl":
-		result, err := invocation.BakeProvider{}.Discover(ctx, invocation.ResolveOptions{
-			Path:    input,
-			Targets: cmd.StringSlice("target"),
-		})
+	case ".hcl":
+		result, err := discoverBakeEntrypoint(ctx, input, cmd)
 		return result, true, err
-	case ".yml", ".yaml":
-		result, err := invocation.ComposeProvider{}.Discover(ctx, invocation.ResolveOptions{
-			Path:     input,
-			Services: cmd.StringSlice("service"),
-		})
-		return result, true, err
-	default:
-		result, composeErr := invocation.ComposeProvider{}.Discover(ctx, invocation.ResolveOptions{
-			Path:     input,
-			Services: cmd.StringSlice("service"),
-		})
-		if composeErr == nil {
-			return result, true, nil
+	case ".json":
+		if kind, ok := invocation.ProbeEntrypointKind(input); ok {
+			result, err := discoverEntrypointByKind(ctx, input, kind, cmd)
+			return result, true, err
 		}
-		result, bakeErr := invocation.BakeProvider{}.Discover(ctx, invocation.ResolveOptions{
-			Path:    input,
-			Targets: cmd.StringSlice("target"),
-		})
+		result, bakeErr := discoverBakeEntrypoint(ctx, input, cmd)
 		if bakeErr == nil {
 			return result, true, nil
 		}
-		return nil, true, fmt.Errorf(
-			"could not classify %s as Dockerfile, Compose, or Bake: compose: %w; bake: %w",
-			input,
-			composeErr,
-			bakeErr,
-		)
+		result, composeErr := discoverComposeEntrypoint(ctx, input, cmd)
+		if composeErr == nil {
+			return result, true, nil
+		}
+		return nil, true, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", input)
+	case ".yml", ".yaml":
+		result, err := discoverComposeEntrypoint(ctx, input, cmd)
+		return result, true, err
+	default:
+		kind, ok := invocation.ProbeEntrypointKind(input)
+		if !ok {
+			return nil, true, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", input)
+		}
+		result, err := discoverEntrypointByKind(ctx, input, kind, cmd)
+		return result, true, err
 	}
+}
+
+func discoverEntrypointByKind(ctx stdcontext.Context, input, kind string, cmd *cli.Command) (*invocation.DiscoveryResult, error) {
+	switch kind {
+	case invocation.KindCompose:
+		return discoverComposeEntrypoint(ctx, input, cmd)
+	case invocation.KindBake:
+		return discoverBakeEntrypoint(ctx, input, cmd)
+	default:
+		return nil, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", input)
+	}
+}
+
+func discoverComposeEntrypoint(ctx stdcontext.Context, input string, cmd *cli.Command) (*invocation.DiscoveryResult, error) {
+	return invocation.ComposeProvider{}.Discover(ctx, invocation.ResolveOptions{
+		Path:     input,
+		Services: cmd.StringSlice("service"),
+	})
+}
+
+func discoverBakeEntrypoint(ctx stdcontext.Context, input string, cmd *cli.Command) (*invocation.DiscoveryResult, error) {
+	return invocation.BakeProvider{}.Discover(ctx, invocation.ResolveOptions{
+		Path:    input,
+		Targets: cmd.StringSlice("target"),
+	})
 }
 
 func isRegularFile(path string) bool {
@@ -743,13 +762,17 @@ func lintInvocations(ctx stdcontext.Context, invocations []invocation.BuildInvoc
 	for _, inv := range invocations {
 		file := inv.DockerfilePath
 
-		cfg, err := loadConfigForFile(cmd, file)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load config for %s: %w", file, err)
+		cfg := res.fileConfigs[file]
+		if cfg == nil {
+			var err error
+			cfg, err = loadConfigForFile(cmd, file)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load config for %s: %w", file, err)
+			}
+			validateAIConfig(cfg, file)
+			validateDurationConfigs(cfg, file)
+			res.fileConfigs[file] = cfg
 		}
-		validateAIConfig(cfg, file)
-		validateDurationConfigs(cfg, file)
-		res.fileConfigs[file] = cfg
 		if res.firstCfg == nil {
 			res.firstCfg = cfg
 		}
@@ -760,6 +783,7 @@ func lintInvocations(ctx stdcontext.Context, invocations []invocation.BuildInvoc
 
 		parseResult := parseCache[file]
 		if parseResult == nil {
+			var err error
 			parseResult, err = dockerfile.ParseFile(ctx, file, cfg)
 			if err != nil {
 				return nil, fmt.Errorf("failed to lint %s: %w", file, err)

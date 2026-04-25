@@ -1,9 +1,13 @@
 package invocation
 
 import (
+	"bufio"
+	"encoding/json/jsontext"
+	jsonv2 "encoding/json/v2"
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -29,7 +33,7 @@ func InvocationKey(source InvocationSource, dockerfilePath string) string {
 		filepath.Clean(source.File),
 		source.Name,
 		filepath.Clean(dockerfilePath),
-	}, "|")
+	}, "\x00")
 }
 
 // LabelForSource returns a human-readable invocation label for grouping.
@@ -85,7 +89,7 @@ func IsObviousOrchestratorName(path string) bool {
 func ClassifyContextRef(baseDir, raw string) (ContextRef, error) {
 	value := strings.TrimSpace(raw)
 	if value == "" || value == "." {
-		return ContextRef{Kind: ContextKindDir, Value: filepath.Clean(baseDir)}, nil
+		return normalizeLocalContextValue(baseDir, ".", ContextKindDir)
 	}
 
 	switch {
@@ -137,7 +141,7 @@ func ResolveDockerfilePath(baseDir string, ctx ContextRef, dockerfile string) (s
 		dockerfile = defaultDockerfileName
 	}
 	if filepath.IsAbs(dockerfile) {
-		return filepath.Clean(dockerfile), nil
+		return CanonicalPath(dockerfile)
 	}
 	if ctx.Kind != ContextKindDir {
 		return "", fmt.Errorf(
@@ -147,9 +151,29 @@ func ResolveDockerfilePath(baseDir string, ctx ContextRef, dockerfile string) (s
 		)
 	}
 	if ctx.Value == "" {
-		return filepath.Clean(filepath.Join(baseDir, dockerfile)), nil
+		base, err := CanonicalPath(baseDir)
+		if err != nil {
+			return "", err
+		}
+		return filepath.Clean(filepath.Join(base, dockerfile)), nil
 	}
 	return filepath.Clean(filepath.Join(ctx.Value, dockerfile)), nil
+}
+
+// ProbeEntrypointKind performs a cheap content-based classification for files
+// whose extension alone is ambiguous.
+func ProbeEntrypointKind(path string) (string, bool) {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".hcl":
+		return KindBake, true
+	case ".yml", ".yaml":
+		return KindCompose, true
+	case ".json":
+		return probeJSONEntrypointKind(path)
+	default:
+		return probeTextEntrypointKind(path)
+	}
 }
 
 // ConcreteBuildArgs returns only build args with concrete values.
@@ -210,11 +234,70 @@ func dedupePreserveOrder(in []string) []string {
 }
 
 func normalizeLocalContextValue(baseDir, value, kind string) (ContextRef, error) {
+	base, err := CanonicalPath(baseDir)
+	if err != nil {
+		return ContextRef{}, err
+	}
 	path := value
 	if !filepath.IsAbs(path) {
-		path = filepath.Join(baseDir, path)
+		path = filepath.Join(base, path)
 	}
 	return ContextRef{Kind: kind, Value: filepath.Clean(path)}, nil
+}
+
+func probeJSONEntrypointKind(path string) (string, bool) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", false
+	}
+	var top map[string]jsontext.Value
+	if err := jsonv2.Unmarshal(data, &top); err != nil {
+		return "", false
+	}
+	if _, ok := top["services"]; ok {
+		return KindCompose, true
+	}
+	if _, ok := top["target"]; ok {
+		return KindBake, true
+	}
+	if _, ok := top["targets"]; ok {
+		return KindBake, true
+	}
+	if _, ok := top["group"]; ok {
+		return KindBake, true
+	}
+	return "", false
+}
+
+func probeTextEntrypointKind(path string) (string, bool) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", false
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	checked := 0
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") {
+			continue
+		}
+		checked++
+		switch {
+		case line == "services:" || strings.HasPrefix(line, "services: "):
+			return KindCompose, true
+		case strings.HasPrefix(line, "target ") ||
+			strings.HasPrefix(line, "group ") ||
+			strings.HasPrefix(line, "targets ") ||
+			strings.HasPrefix(line, "targets ="):
+			return KindBake, true
+		}
+		if checked >= 64 {
+			break
+		}
+	}
+	return "", false
 }
 
 func looksLikeGitURL(value string) bool {

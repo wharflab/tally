@@ -256,15 +256,12 @@ func attachInvocation(violations []rules.Violation, inv *invocation.BuildInvocat
 	if inv == nil {
 		return
 	}
-	var source *invocation.InvocationSource
-	if inv.Source.Kind != invocation.KindDockerfile {
-		src := inv.Source
-		source = &src
-	}
+	exposeSource := inv.Source.Kind != invocation.KindDockerfile
 	for i := range violations {
 		violations[i].InvocationKey = inv.Key
-		if source != nil {
-			violations[i].Invocation = source
+		if exposeSource {
+			source := inv.Source
+			violations[i].Invocation = &source
 		}
 	}
 }

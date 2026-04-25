@@ -257,14 +257,11 @@ func (b *Builder) initFromArgEval(stages []instructions.Stage, metaArgs []instru
 }
 
 func effectiveTargetStageName(stages []instructions.Stage, override string) string {
-	if override != "" {
-		return override
+	idx := targetStageIndex(stages, override)
+	if idx >= 0 && stages[idx].Name != "" {
+		return stages[idx].Name
 	}
-	targetStage := defaultTargetStageName
-	if len(stages) > 0 && stages[len(stages)-1].Name != "" {
-		targetStage = stages[len(stages)-1].Name
-	}
-	return targetStage
+	return defaultTargetStageName
 }
 
 func targetStageIndex(stages []instructions.Stage, override string) int {

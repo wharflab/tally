@@ -130,6 +130,7 @@ COPY *.go /app
 func TestCopyIgnoredFileRule_Check_UnavailableContextSource(t *testing.T) {
 	t.Parallel()
 
+	r := NewCopyIgnoredFileRule()
 	input := testutil.MakeLintInputWithContext(t, "Dockerfile", `FROM scratch
 COPY ignored.txt /ignored.txt
 `, &mockBuildContext{
@@ -137,9 +138,12 @@ COPY ignored.txt /ignored.txt
 		ignoredPaths: map[string]bool{"ignored.txt": true},
 	})
 
-	violations := NewCopyIgnoredFileRule().Check(input)
+	violations := r.Check(input)
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	if violations[0].Severity != r.Metadata().DefaultSeverity {
+		t.Fatalf("severity = %s, want %s", violations[0].Severity, r.Metadata().DefaultSeverity)
 	}
 	if violations[0].RuleCode != rules.BuildKitRulePrefix+"CopyIgnoredFile" {
 		t.Fatalf("violation code = %q", violations[0].RuleCode)

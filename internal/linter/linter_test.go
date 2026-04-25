@@ -72,6 +72,33 @@ func TestAttachInvocation_OrchestratorSetsKeyAndSource(t *testing.T) {
 	}
 }
 
+func TestAttachInvocation_OrchestratorUsesPerViolationSourceCopy(t *testing.T) {
+	t.Parallel()
+
+	inv := &invocation.BuildInvocation{
+		Key: "compose\x00compose.yaml\x00api\x00Dockerfile",
+		Source: invocation.InvocationSource{
+			Kind: invocation.KindCompose,
+			File: "compose.yaml",
+			Name: "api",
+		},
+		DockerfilePath: "Dockerfile",
+	}
+	violations := []rules.Violation{
+		rules.NewViolation(rules.NewLineLocation("Dockerfile", 1), "test/rule", "one", rules.SeverityWarning),
+		rules.NewViolation(rules.NewLineLocation("Dockerfile", 2), "test/rule", "two", rules.SeverityWarning),
+	}
+
+	attachInvocation(violations, inv)
+
+	if violations[0].Invocation == nil || violations[1].Invocation == nil {
+		t.Fatal("Invocation source missing")
+	}
+	if violations[0].Invocation == violations[1].Invocation {
+		t.Fatal("violations share Invocation source pointer, want per-violation copies")
+	}
+}
+
 func TestAttachInvocationToAsyncRequest_DockerfileSetsKeyWithoutSource(t *testing.T) {
 	t.Parallel()
 
@@ -115,8 +142,42 @@ func TestAttachInvocationToAsyncRequest_DockerfileSetsKeyWithoutSource(t *testin
 	}
 }
 
+func TestAttachInvocationToAsyncRequest_DockerfileSetsCompletedCheckKey(t *testing.T) {
+	t.Parallel()
+
+	inv := &invocation.BuildInvocation{
+		Key: "dockerfile\x00Dockerfile\x00\x00Dockerfile",
+		Source: invocation.InvocationSource{
+			Kind: invocation.KindDockerfile,
+			File: "Dockerfile",
+		},
+		DockerfilePath: "Dockerfile",
+	}
+	req := &async.CheckRequest{
+		Handler: staticAsyncHandler{
+			async.CompletedCheck{RuleCode: "test/rule", File: "Dockerfile"},
+		},
+	}
+
+	attachInvocationToAsyncRequest(req, inv)
+
+	results := req.Handler.OnSuccess(nil)
+	if len(results) != 1 {
+		t.Fatalf("OnSuccess returned %d results, want 1", len(results))
+	}
+	completed, ok := results[0].(async.CompletedCheck)
+	if !ok {
+		t.Fatalf("OnSuccess result type = %T, want async.CompletedCheck", results[0])
+	}
+	if completed.InvocationKey != inv.Key {
+		t.Fatalf("completed InvocationKey = %q, want %q", completed.InvocationKey, inv.Key)
+	}
+}
+
 type staticAsyncHandler []any
 
 func (h staticAsyncHandler) OnSuccess(any) []any {
-	return []any(h)
+	out := make([]any, len(h))
+	copy(out, h)
+	return out
 }

@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	jsonv2 "encoding/json/v2"
 	"golang.org/x/exp/jsonrpc2"
@@ -52,6 +53,10 @@ type Server struct {
 
 	settingsMu sync.RWMutex
 	settings   clientSettings
+
+	watchedFilesMu    sync.Mutex
+	watchedFilesTimer *time.Timer
+	watchedFilesSeq   uint64
 
 	diagMu                     sync.RWMutex
 	pushDiagnostics            bool

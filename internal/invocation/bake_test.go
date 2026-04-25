@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -60,7 +61,7 @@ target "worker" {
 	}
 	got := invocationNames(result.Invocations)
 	want := []string{"api", "worker"}
-	if strings.Join(got, ",") != strings.Join(want, ",") {
+	if !slices.Equal(got, want) {
 		t.Fatalf("invocation names = %v, want %v", got, want)
 	}
 }

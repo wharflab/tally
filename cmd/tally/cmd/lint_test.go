@@ -212,3 +212,56 @@ func TestContextDirForViolationFallsBackToFileForDockerfileContext(t *testing.T)
 		t.Fatalf("contextDirForViolation() = %q, want %q", got, "/workspace/app")
 	}
 }
+
+func TestContextDirForViolationFallsBackToCleanFile(t *testing.T) {
+	t.Parallel()
+
+	inv := &invocation.BuildInvocation{
+		Key:            "dockerfile\x00Dockerfile\x00\x00Dockerfile",
+		DockerfilePath: "Dockerfile",
+		ContextRef: invocation.ContextRef{
+			Kind:  invocation.ContextKindDir,
+			Value: "/workspace/app",
+		},
+	}
+	violation := rules.NewViolation(
+		rules.NewLineLocation("./Dockerfile", 1),
+		"test/rule",
+		"message",
+		rules.SeverityWarning,
+	)
+
+	got := contextDirForViolation(violation, map[string]*invocation.BuildInvocation{
+		"Dockerfile": inv,
+	})
+	if got != "/workspace/app" {
+		t.Fatalf("contextDirForViolation() = %q, want %q", got, "/workspace/app")
+	}
+}
+
+func TestContextDirForViolationIgnoresNonLocalContext(t *testing.T) {
+	t.Parallel()
+
+	inv := &invocation.BuildInvocation{
+		Key:            "bake\x00docker-bake.hcl\x00api\x00Dockerfile",
+		DockerfilePath: "Dockerfile",
+		ContextRef: invocation.ContextRef{
+			Kind:  invocation.ContextKindGit,
+			Value: "https://github.com/wharflab/tally.git",
+		},
+	}
+	violation := rules.NewViolation(
+		rules.NewLineLocation("Dockerfile", 1),
+		"test/rule",
+		"message",
+		rules.SeverityWarning,
+	)
+	violation.InvocationKey = inv.Key
+
+	got := contextDirForViolation(violation, map[string]*invocation.BuildInvocation{
+		inv.Key: inv,
+	})
+	if got != "" {
+		t.Fatalf("contextDirForViolation() = %q, want empty for non-dir context", got)
+	}
+}
