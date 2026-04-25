@@ -144,14 +144,8 @@ func (r *TextReporter) PrintReport(w io.Writer, violations []rules.Violation, so
 	lastLabel := ""
 	for _, v := range sorted {
 		label := InvocationLabel(v)
-		if label == "" {
-			lastLabel = ""
-		}
-		if label != "" && label != lastLabel {
-			if _, err := fmt.Fprintf(w, "\n[%s]\n", label); err != nil {
-				return err
-			}
-			lastLabel = label
+		if err := emitLabelHeaderIfChanged(w, label, &lastLabel); err != nil {
+			return err
 		}
 		if err := r.printViolation(w, v, sources[v.Location.File]); err != nil {
 			return err
@@ -172,11 +166,26 @@ func (r *TextReporter) PrintReport(w io.Writer, violations []rules.Violation, so
 	return nil
 }
 
-func plural(n int, singular, plural string) string {
+func emitLabelHeaderIfChanged(w io.Writer, label string, lastLabel *string) error {
+	if label == "" {
+		*lastLabel = ""
+		return nil
+	}
+	if label == *lastLabel {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "\n[%s]\n", label); err != nil {
+		return err
+	}
+	*lastLabel = label
+	return nil
+}
+
+func plural(n int, singular, many string) string {
 	if n == 1 {
 		return singular
 	}
-	return plural
+	return many
 }
 
 // printViolation formats a single violation.

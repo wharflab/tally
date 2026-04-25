@@ -6,7 +6,6 @@ import (
 	"maps"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"time"
 
@@ -83,7 +82,7 @@ func rejectProfileGatedBuilds(project *composetypes.Project) error {
 	if len(names) == 0 {
 		return nil
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return fmt.Errorf("compose profiles are not supported for buildable services: %s", strings.Join(names, ", "))
 }
 
@@ -114,7 +113,7 @@ func composeServiceNames(project *composetypes.Project, requested []string) ([]s
 			names = append(names, name)
 		}
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return names, nil
 }
 
@@ -292,7 +291,7 @@ func composeNetworkNames(service composetypes.ServiceConfig) []string {
 	for name := range service.Networks {
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return names
 }
 
@@ -335,7 +334,7 @@ func composeSecretRef(baseDir, scope string, secret composetypes.ServiceSecretCo
 				source = filepath.Clean(filepath.Join(baseDir, source))
 			}
 		case obj.Environment != "":
-			source = obj.Environment
+			source = envSecretSource(obj.Environment)
 		}
 	}
 	return SecretRef{
@@ -381,12 +380,8 @@ func composeCommandOverride(command composetypes.ShellCommand) *CommandOverride 
 	if command == nil {
 		return nil
 	}
-	args := slices.Clone([]string(command))
-	if args == nil {
-		args = []string{}
-	}
 	return &CommandOverride{
-		Args:             args,
+		Args:             slices.Clone([]string(command)),
 		ClearsImageValue: len(command) == 0,
 	}
 }

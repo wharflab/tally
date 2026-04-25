@@ -107,7 +107,7 @@ func TestContextDirForViolationUsesInvocationKey(t *testing.T) {
 
 	file := "Dockerfile"
 	first := &invocation.BuildInvocation{
-		Key:            "compose|compose.yaml|api|Dockerfile",
+		Key:            "compose\x00compose.yaml\x00api\x00Dockerfile",
 		DockerfilePath: file,
 		ContextRef: invocation.ContextRef{
 			Kind:  invocation.ContextKindDir,
@@ -115,7 +115,7 @@ func TestContextDirForViolationUsesInvocationKey(t *testing.T) {
 		},
 	}
 	second := &invocation.BuildInvocation{
-		Key:            "compose|compose.yaml|worker|Dockerfile",
+		Key:            "compose\x00compose.yaml\x00worker\x00Dockerfile",
 		DockerfilePath: file,
 		ContextRef: invocation.ContextRef{
 			Kind:  invocation.ContextKindDir,
@@ -143,7 +143,7 @@ func TestAddFileInvocationUsesInvocationKey(t *testing.T) {
 	t.Parallel()
 
 	inv := &invocation.BuildInvocation{
-		Key:            "dockerfile|/workspace/Dockerfile||/workspace/Dockerfile",
+		Key:            "dockerfile\x00/workspace/Dockerfile\x00\x00/workspace/Dockerfile",
 		DockerfilePath: "/workspace/Dockerfile",
 	}
 	fileInvocations := make(map[string]*invocation.BuildInvocation)
@@ -163,7 +163,7 @@ func TestContextDirForViolationUsesDockerfileInvocationKey(t *testing.T) {
 
 	file := "Dockerfile"
 	inv := &invocation.BuildInvocation{
-		Key:            "dockerfile|Dockerfile||Dockerfile",
+		Key:            "dockerfile\x00Dockerfile\x00\x00Dockerfile",
 		DockerfilePath: file,
 		ContextRef: invocation.ContextRef{
 			Kind:  invocation.ContextKindDir,
@@ -186,12 +186,12 @@ func TestContextDirForViolationUsesDockerfileInvocationKey(t *testing.T) {
 	}
 }
 
-func TestContextDirForViolationFallsBackToFileForDockerfileContext(t *testing.T) {
+func TestContextDirForViolationRequiresInvocationKey(t *testing.T) {
 	t.Parallel()
 
 	file := "Dockerfile"
 	inv := &invocation.BuildInvocation{
-		Key:            "dockerfile|Dockerfile||Dockerfile",
+		Key:            "dockerfile\x00Dockerfile\x00\x00Dockerfile",
 		DockerfilePath: file,
 		ContextRef: invocation.ContextRef{
 			Kind:  invocation.ContextKindDir,
@@ -208,12 +208,12 @@ func TestContextDirForViolationFallsBackToFileForDockerfileContext(t *testing.T)
 	got := contextDirForViolation(violation, map[string]*invocation.BuildInvocation{
 		file: inv,
 	})
-	if got != "/workspace/app" {
-		t.Fatalf("contextDirForViolation() = %q, want %q", got, "/workspace/app")
+	if got != "" {
+		t.Fatalf("contextDirForViolation() = %q, want empty without invocation key", got)
 	}
 }
 
-func TestContextDirForViolationFallsBackToCleanFile(t *testing.T) {
+func TestContextDirForViolationDoesNotUseCleanFileFallback(t *testing.T) {
 	t.Parallel()
 
 	inv := &invocation.BuildInvocation{
@@ -234,8 +234,8 @@ func TestContextDirForViolationFallsBackToCleanFile(t *testing.T) {
 	got := contextDirForViolation(violation, map[string]*invocation.BuildInvocation{
 		"Dockerfile": inv,
 	})
-	if got != "/workspace/app" {
-		t.Fatalf("contextDirForViolation() = %q, want %q", got, "/workspace/app")
+	if got != "" {
+		t.Fatalf("contextDirForViolation() = %q, want empty without invocation key", got)
 	}
 }
 

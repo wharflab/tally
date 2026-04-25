@@ -15,7 +15,7 @@ func TestInitFromArgEval_UsesAutomaticArgsWithAndWithoutOverrides(t *testing.T) 
 		"BUILDPLATFORM": "override-build-platform",
 	}, "Dockerfile")
 
-	eval := b.initFromArgEval(pr.Stages, pr.MetaArgs)
+	eval := b.initFromArgEval(pr.MetaArgs, effectiveTargetStageName(pr.Stages, ""))
 
 	gotEffective, ok := eval.effectiveEnv.Get("BUILDPLATFORM")
 	require.True(t, ok)

@@ -22,7 +22,9 @@ func NewContext(inv *BuildInvocation) *InvocationContext {
 
 // NewDockerfileInvocation creates the normalized invocation used by direct
 // Dockerfile linting when a context directory is declared, for example via
-// --context.
+// --context. ClassifyContextRef receives baseDir "." so CanonicalPath resolves
+// the context against the process working directory, not the Dockerfile's
+// directory.
 func NewDockerfileInvocation(dockerfilePath, contextDir string) (*BuildInvocation, error) {
 	ctx, err := ClassifyContextRef(".", contextDir)
 	if err != nil {

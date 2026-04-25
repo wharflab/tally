@@ -27,6 +27,8 @@ func (p BakeProvider) Discover(_ context.Context, opts ResolveOptions) (*Discove
 		return nil, fmt.Errorf("read Bake file %s: %w", entrypoint, err)
 	}
 
+	// ResolveOptions.Path is one explicit entrypoint; Buildx multi-file
+	// composition via repeated -f flags is not represented by this provider API.
 	files := []bake.File{{Name: entrypoint, Data: data}}
 	cfg, _, err := bake.ParseFiles(files, bakeDefaults(baseDir), nil)
 	if err != nil {
@@ -73,6 +75,7 @@ func bakeTargetNames(cfg *bake.Config, requested []string) ([]string, error) {
 	if cfg == nil {
 		return nil, nil
 	}
+	groupNames, targetNames := bakeNameSets(cfg)
 
 	if len(requested) > 0 {
 		ordered := make([]string, 0, len(requested))
@@ -80,11 +83,13 @@ func bakeTargetNames(cfg *bake.Config, requested []string) ([]string, error) {
 		var indirect []string
 		for _, name := range dedupePreserveOrder(requested) {
 			targets, _ := cfg.ResolveGroup(name)
-			if len(targets) == 0 || (!bakeGroupExists(cfg, name) && !bakeTargetExists(cfg, name)) {
+			_, groupExists := groupNames[name]
+			_, targetExists := targetNames[name]
+			if len(targets) == 0 || (!groupExists && !targetExists) {
 				return nil, fmt.Errorf("unknown bake target %q", name)
 			}
 			for _, target := range targets {
-				if !bakeTargetExists(cfg, target) {
+				if _, ok := targetNames[target]; !ok {
 					return nil, fmt.Errorf("unknown bake target %q", target)
 				}
 				if _, ok := seen[target]; ok {
@@ -108,28 +113,20 @@ func bakeTargetNames(cfg *bake.Config, requested []string) ([]string, error) {
 	return targets, nil
 }
 
-func bakeGroupExists(cfg *bake.Config, name string) bool {
-	if cfg == nil {
-		return false
-	}
+func bakeNameSets(cfg *bake.Config) (map[string]struct{}, map[string]struct{}) {
+	groups := make(map[string]struct{}, len(cfg.Groups))
 	for _, group := range cfg.Groups {
-		if group != nil && group.Name == name {
-			return true
+		if group != nil {
+			groups[group.Name] = struct{}{}
 		}
 	}
-	return false
-}
-
-func bakeTargetExists(cfg *bake.Config, name string) bool {
-	if cfg == nil {
-		return false
-	}
+	targets := make(map[string]struct{}, len(cfg.Targets))
 	for _, target := range cfg.Targets {
-		if target != nil && target.Name == name {
-			return true
+		if target != nil {
+			targets[target.Name] = struct{}{}
 		}
 	}
-	return false
+	return groups, targets
 }
 
 func bakeInvocation(entrypoint, baseDir, name string, target *bake.Target) (BuildInvocation, error) {
@@ -162,7 +159,7 @@ func bakeInvocation(entrypoint, baseDir, name string, target *bake.Target) (Buil
 		File: entrypoint,
 		Name: name,
 	}
-	targetStage := ""
+	var targetStage string
 	if target.Target != nil {
 		targetStage = *target.Target
 	}
@@ -233,7 +230,7 @@ func bakeSecrets(baseDir string, secrets buildflags.Secrets) []SecretRef {
 			source = filepath.Clean(filepath.Join(baseDir, source))
 		}
 		if source == "" {
-			source = secret.Env
+			source = envSecretSource(secret.Env)
 		}
 		out = append(out, SecretRef{
 			Scope:  SecretScopeBuild,

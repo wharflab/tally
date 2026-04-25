@@ -12,7 +12,7 @@ func TestAttachInvocation_DockerfileSetsKeyWithoutSource(t *testing.T) {
 	t.Parallel()
 
 	inv := &invocation.BuildInvocation{
-		Key: "dockerfile|Dockerfile||Dockerfile",
+		Key: "dockerfile\x00Dockerfile\x00\x00Dockerfile",
 		Source: invocation.InvocationSource{
 			Kind: invocation.KindDockerfile,
 			File: "Dockerfile",
@@ -171,6 +171,24 @@ func TestAttachInvocationToAsyncRequest_DockerfileSetsCompletedCheckKey(t *testi
 	}
 	if completed.InvocationKey != inv.Key {
 		t.Fatalf("completed InvocationKey = %q, want %q", completed.InvocationKey, inv.Key)
+	}
+}
+
+func TestAttachInvocationToAsyncRequest_NilHandlerOnlySetsKey(t *testing.T) {
+	t.Parallel()
+
+	inv := &invocation.BuildInvocation{
+		Key: "dockerfile\x00Dockerfile\x00\x00Dockerfile",
+	}
+	req := &async.CheckRequest{}
+
+	attachInvocationToAsyncRequest(req, inv)
+
+	if req.InvocationKey != inv.Key {
+		t.Fatalf("request InvocationKey = %q, want %q", req.InvocationKey, inv.Key)
+	}
+	if req.Handler != nil {
+		t.Fatalf("request Handler = %#v, want nil", req.Handler)
 	}
 }
 

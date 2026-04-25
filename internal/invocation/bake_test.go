@@ -7,6 +7,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/docker/buildx/util/buildflags"
 )
 
 func TestBakeProviderDiscoverUnknownRequestedTarget(t *testing.T) {
@@ -32,7 +34,8 @@ func TestBakeProviderDiscoverUnknownRequestedTarget(t *testing.T) {
 func TestBakeProviderDiscoverRequestedGroup(t *testing.T) {
 	t.Parallel()
 
-	entrypoint := writeBakeFixture(t, `group "default" {
+	entrypoint := writeBakeFixture(t, `// Deliberately present so requesting "backend" does not fall through to default.
+group "default" {
   targets = ["api"]
 }
 
@@ -66,15 +69,30 @@ target "worker" {
 	}
 }
 
+func TestBakeSecretsDiscriminatesEnvSource(t *testing.T) {
+	t.Parallel()
+
+	secrets := bakeSecrets(t.TempDir(), buildflags.Secrets{&buildflags.Secret{
+		ID:  "token",
+		Env: "TOKEN",
+	}})
+	if len(secrets) != 1 {
+		t.Fatalf("bakeSecrets() returned %d secrets, want 1", len(secrets))
+	}
+	if secrets[0].Source != "env:TOKEN" {
+		t.Fatalf("secret Source = %q, want env:TOKEN", secrets[0].Source)
+	}
+}
+
 func writeBakeFixture(t *testing.T, bakeContent string) string {
 	t.Helper()
 
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM scratch\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "Dockerfile"), []byte("FROM scratch\n"), 0o600); err != nil {
 		t.Fatalf("write Dockerfile: %v", err)
 	}
 	entrypoint := filepath.Join(dir, "docker-bake.hcl")
-	if err := os.WriteFile(entrypoint, []byte(bakeContent), 0o644); err != nil {
+	if err := os.WriteFile(entrypoint, []byte(bakeContent), 0o600); err != nil {
 		t.Fatalf("write Bake file: %v", err)
 	}
 	return entrypoint

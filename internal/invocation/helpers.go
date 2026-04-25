@@ -9,9 +9,16 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+)
+
+var (
+	composeServicesPattern = regexp.MustCompile(`^\s*services\s*:`)
+	bakeDeclarationPattern = regexp.MustCompile(`^\s*(?:target|group)\s*(?:"|\{|\b)`)
+	bakeTargetsPattern     = regexp.MustCompile(`^\s*targets\s*(?:=|\b)`)
 )
 
 // CanonicalPath returns an absolute, cleaned local path.
@@ -270,13 +277,12 @@ func probeJSONEntrypointKind(path string) (string, bool) {
 }
 
 func probeTextEntrypointKind(path string) (string, bool) {
-	f, err := os.Open(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", false
 	}
-	defer f.Close()
 
-	scanner := bufio.NewScanner(f)
+	scanner := bufio.NewScanner(strings.NewReader(stripBlockComments(string(data))))
 	checked := 0
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -285,12 +291,10 @@ func probeTextEntrypointKind(path string) (string, bool) {
 		}
 		checked++
 		switch {
-		case line == "services:" || strings.HasPrefix(line, "services: "):
+		case composeServicesPattern.MatchString(line):
 			return KindCompose, true
-		case strings.HasPrefix(line, "target ") ||
-			strings.HasPrefix(line, "group ") ||
-			strings.HasPrefix(line, "targets ") ||
-			strings.HasPrefix(line, "targets ="):
+		case bakeDeclarationPattern.MatchString(line) ||
+			bakeTargetsPattern.MatchString(line):
 			return KindBake, true
 		}
 		if checked >= 64 {
@@ -300,9 +304,37 @@ func probeTextEntrypointKind(path string) (string, bool) {
 	return "", false
 }
 
+func stripBlockComments(data string) string {
+	var b strings.Builder
+	b.Grow(len(data))
+	inBlock := false
+	for i := 0; i < len(data); i++ {
+		if inBlock {
+			if data[i] == '\n' {
+				b.WriteByte('\n')
+			}
+			if i+1 < len(data) && data[i] == '*' && data[i+1] == '/' {
+				inBlock = false
+				i++
+			}
+			continue
+		}
+		if i+1 < len(data) && data[i] == '/' && data[i+1] == '*' {
+			inBlock = true
+			i++
+			continue
+		}
+		b.WriteByte(data[i])
+	}
+	return b.String()
+}
+
+// looksLikeGitURL intentionally keeps this heuristic narrow; repository URLs
+// without a .git suffix or GitHub fragment may be classified as generic URLs.
 func looksLikeGitURL(value string) bool {
 	lower := strings.ToLower(value)
-	return strings.Contains(lower, ".git") || strings.Contains(lower, "#") && strings.Contains(lower, "github.com")
+	return strings.Contains(lower, ".git") ||
+		(strings.Contains(lower, "#") && strings.Contains(lower, "github.com"))
 }
 
 func looksLikeTar(value string) bool {
@@ -321,6 +353,9 @@ func parsePortRange(value string) (int, int, error) {
 	if err != nil {
 		return 0, 0, err
 	}
+	if err := validatePort(start); err != nil {
+		return 0, 0, err
+	}
 	if !hasRange {
 		return start, start, nil
 	}
@@ -328,8 +363,18 @@ func parsePortRange(value string) (int, int, error) {
 	if err != nil {
 		return 0, 0, err
 	}
+	if err := validatePort(end); err != nil {
+		return 0, 0, err
+	}
 	if end < start {
 		return 0, 0, fmt.Errorf("invalid descending port range %q", value)
 	}
 	return start, end, nil
+}
+
+func validatePort(port int) error {
+	if port < 0 || port > 65535 {
+		return fmt.Errorf("port %d out of range (0-65535)", port)
+	}
+	return nil
 }

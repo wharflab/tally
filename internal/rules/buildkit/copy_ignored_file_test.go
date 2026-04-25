@@ -216,6 +216,7 @@ ADD https://example.com/file.txt /file.txt
 func TestCopyIgnoredFileRule_Check_ADDUnavailableContextSource(t *testing.T) {
 	t.Parallel()
 
+	r := NewCopyIgnoredFileRule()
 	input := testutil.MakeLintInputWithContext(t, "Dockerfile", `FROM scratch
 ADD ignored.tar.gz /tmp/
 `, &mockBuildContext{
@@ -223,9 +224,18 @@ ADD ignored.tar.gz /tmp/
 		ignoredPaths: map[string]bool{"ignored.tar.gz": true},
 	})
 
-	violations := NewCopyIgnoredFileRule().Check(input)
+	violations := r.Check(input)
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation for ADD source, got %d", len(violations))
+	}
+	if violations[0].Severity != r.Metadata().DefaultSeverity {
+		t.Fatalf("severity = %s, want %s", violations[0].Severity, r.Metadata().DefaultSeverity)
+	}
+	if !strings.Contains(violations[0].Message, "not available in the build context") {
+		t.Fatalf("violation message = %q", violations[0].Message)
+	}
+	if violations[0].Line() != 2 {
+		t.Fatalf("violation line = %d, want 2", violations[0].Line())
 	}
 }
 

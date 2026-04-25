@@ -127,7 +127,7 @@ func (s *Server) runDidChangeWatchedFiles(ctx context.Context, seq uint64) {
 		return
 	}
 	if s.diagnosticRefreshSupported() {
-		s.requestDiagnosticRefresh(context.WithoutCancel(ctx))
+		s.requestDiagnosticRefresh(ctx)
 	}
 }
 

@@ -517,7 +517,8 @@ func discoverLSPEntrypoint(ctx context.Context, entrypoint string) (*invocation.
 		if kind, ok := invocation.ProbeEntrypointKind(entrypoint); ok {
 			return discoverLSPEntrypointByKind(ctx, entrypoint, kind)
 		}
-		if result, err := (invocation.BakeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint}); err == nil {
+		result, err := (invocation.BakeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})
+		if err == nil && len(result.Invocations) > 0 {
 			return result, nil
 		}
 		return (invocation.ComposeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})

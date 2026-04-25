@@ -624,7 +624,7 @@ func runLintOrchestrator(ctx stdcontext.Context, cmd *cli.Command, discovered *i
 	if err != nil {
 		return handleLintError(err)
 	}
-	res.filesScanned = uniqueDockerfileCount(discovered.Invocations)
+	res.filesScanned = len(res.fileSources)
 	res.invocationsScanned = len(discovered.Invocations)
 
 	resolveAsyncChecks(ctx, res)
@@ -810,14 +810,6 @@ func lintInvocations(ctx stdcontext.Context, invocations []invocation.BuildInvoc
 		res.asyncPlans = append(res.asyncPlans, result.AsyncPlan...)
 	}
 	return res, nil
-}
-
-func uniqueDockerfileCount(invocations []invocation.BuildInvocation) int {
-	seen := make(map[string]struct{}, len(invocations))
-	for _, inv := range invocations {
-		seen[inv.DockerfilePath] = struct{}{}
-	}
-	return len(seen)
 }
 
 // lintFiles runs the lint pipeline on each discovered file and aggregates results.
@@ -1380,12 +1372,6 @@ func contextDirForViolation(v rules.Violation, fileInvocations map[string]*invoc
 		return ""
 	}
 	inv := fileInvocations[v.InvocationKey]
-	if inv == nil {
-		inv = fileInvocations[v.File()]
-	}
-	if inv == nil {
-		inv = fileInvocations[filepath.Clean(v.File())]
-	}
 	if inv == nil || inv.ContextRef.Kind != invocation.ContextKindDir {
 		return ""
 	}

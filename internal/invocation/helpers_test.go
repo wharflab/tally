@@ -64,9 +64,17 @@ func TestProbeEntrypointKindText(t *testing.T) {
 	if err := os.WriteFile(composePath, []byte("# comment\nname: app\nservices:\n  api:\n    build: .\n"), 0o644); err != nil {
 		t.Fatalf("write compose text: %v", err)
 	}
+	spacedComposePath := filepath.Join(dir, "compose-spaced.conf")
+	if err := os.WriteFile(spacedComposePath, []byte("name: app\nservices :\n  api:\n    build: .\n"), 0o644); err != nil {
+		t.Fatalf("write spaced compose text: %v", err)
+	}
 	bakePath := filepath.Join(dir, "Bakefile")
 	if err := os.WriteFile(bakePath, []byte("// comment\nvariable \"TAG\" {}\ntarget \"api\" {}\n"), 0o644); err != nil {
 		t.Fatalf("write Bake text: %v", err)
+	}
+	compactBakePath := filepath.Join(dir, "Bakefile.compact")
+	if err := os.WriteFile(compactBakePath, []byte("/* target \"ignored\" {} */\ntarget\"api\"{}\n"), 0o644); err != nil {
+		t.Fatalf("write compact Bake text: %v", err)
 	}
 	otherPath := filepath.Join(dir, "README")
 	if err := os.WriteFile(otherPath, []byte("not an orchestrator\n"), 0o644); err != nil {
@@ -76,10 +84,30 @@ func TestProbeEntrypointKindText(t *testing.T) {
 	if got, ok := ProbeEntrypointKind(composePath); !ok || got != KindCompose {
 		t.Fatalf("ProbeEntrypointKind(compose text) = %q, %v; want %q, true", got, ok, KindCompose)
 	}
+	if got, ok := ProbeEntrypointKind(spacedComposePath); !ok || got != KindCompose {
+		t.Fatalf("ProbeEntrypointKind(spaced compose text) = %q, %v; want %q, true", got, ok, KindCompose)
+	}
 	if got, ok := ProbeEntrypointKind(bakePath); !ok || got != KindBake {
 		t.Fatalf("ProbeEntrypointKind(Bakefile) = %q, %v; want %q, true", got, ok, KindBake)
 	}
+	if got, ok := ProbeEntrypointKind(compactBakePath); !ok || got != KindBake {
+		t.Fatalf("ProbeEntrypointKind(compact Bakefile) = %q, %v; want %q, true", got, ok, KindBake)
+	}
 	if got, ok := ProbeEntrypointKind(otherPath); ok || got != "" {
 		t.Fatalf("ProbeEntrypointKind(other) = %q, %v; want empty, false", got, ok)
+	}
+}
+
+func TestParsePortRangeRejectsOutOfRangePorts(t *testing.T) {
+	t.Parallel()
+
+	tests := []string{"-1", "65536", "80-65536"}
+	for _, value := range tests {
+		t.Run(value, func(t *testing.T) {
+			t.Parallel()
+			if _, _, err := parsePortRange(value); err == nil {
+				t.Fatalf("parsePortRange(%q) error = nil, want out-of-range error", value)
+			}
+		})
 	}
 }

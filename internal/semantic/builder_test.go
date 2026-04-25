@@ -11,7 +11,7 @@ import (
 
 const testShellBash = "bash"
 
-func TestEffectiveTargetStageNameFallsBackWithIndex(t *testing.T) {
+func TestTargetStageResolution(t *testing.T) {
 	t.Parallel()
 
 	stages := []instructions.Stage{
@@ -19,11 +19,28 @@ func TestEffectiveTargetStageNameFallsBackWithIndex(t *testing.T) {
 		{Name: "runtime"},
 	}
 
-	if got := targetStageIndex(stages, "missing"); got != 1 {
-		t.Fatalf("targetStageIndex(missing) = %d, want 1", got)
+	tests := []struct {
+		name     string
+		override string
+		wantIdx  int
+		wantName string
+	}{
+		{"empty override falls back to last", "", 1, "runtime"},
+		{"matched override wins", "builder", 0, "builder"},
+		{"unknown override falls back to last", "missing", 1, "runtime"},
+		{"case-insensitive match", "BUILDER", 0, "builder"},
 	}
-	if got := effectiveTargetStageName(stages, "missing"); got != "runtime" {
-		t.Fatalf("effectiveTargetStageName(missing) = %q, want runtime", got)
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := targetStageIndex(stages, tc.override); got != tc.wantIdx {
+				t.Errorf("targetStageIndex(%q) = %d, want %d", tc.override, got, tc.wantIdx)
+			}
+			if got := effectiveTargetStageName(stages, tc.override); got != tc.wantName {
+				t.Errorf("effectiveTargetStageName(%q) = %q, want %q", tc.override, got, tc.wantName)
+			}
+		})
 	}
 }
 

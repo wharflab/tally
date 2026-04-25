@@ -271,6 +271,9 @@ func attachInvocationToAsyncRequest(req *async.CheckRequest, inv *invocation.Bui
 		return
 	}
 	req.InvocationKey = inv.Key
+	if req.Handler == nil {
+		return
+	}
 	exposeSource := inv.Source.Kind != invocation.KindDockerfile
 	source := inv.Source
 	req.Handler = invocationAwareHandler{

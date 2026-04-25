@@ -67,14 +67,13 @@ func (b *Builder) Build() *Model {
 	stages := b.parseResult.Stages
 	metaArgs := b.parseResult.MetaArgs
 
-	fromEval := b.initFromArgEval(stages, metaArgs)
+	finalStageIdx, targetStageName := resolveTargetStage(stages, b.targetStage)
+	fromEval := b.initFromArgEval(metaArgs, targetStageName)
 
 	// Build stage info and graph
 	stageCount := len(stages)
 	stageInfo := make([]*StageInfo, stageCount)
 	graph := newStageGraph(stageCount)
-	finalStageIdx := targetStageIndex(stages, b.targetStage)
-	targetStageName := effectiveTargetStageName(stages, b.targetStage)
 
 	for i := range stages {
 		stage := &stages[i]
@@ -219,7 +218,7 @@ func resolveFromEvalWord(word string, eval fromArgEval) string {
 	return res.Result
 }
 
-func (b *Builder) initFromArgEval(stages []instructions.Stage, metaArgs []instructions.ArgCommand) fromArgEval {
+func (b *Builder) initFromArgEval(metaArgs []instructions.ArgCommand, targetStage string) fromArgEval {
 	// BuildKit-style word expander for ARG evaluation in FROM/meta scope.
 	escapeToken := rune('\\')
 	if b.parseResult != nil && b.parseResult.AST != nil {
@@ -231,7 +230,6 @@ func (b *Builder) initFromArgEval(stages []instructions.Stage, metaArgs []instru
 	// Match BuildKit behavior by seeding:
 	// - defaultsEnv with the automatic args without --build-arg overrides
 	// - effectiveEnv and the semantic global scope with override-aware values
-	targetStage := effectiveTargetStageName(stages, b.targetStage)
 	autoArgsNoOverrides := defaultFromArgs(targetStage, nil)
 	autoArgsWithOverrides := defaultFromArgs(targetStage, b.buildArgs)
 	b.addAutoArgsToGlobalScope(autoArgsWithOverrides)
@@ -257,26 +255,33 @@ func (b *Builder) initFromArgEval(stages []instructions.Stage, metaArgs []instru
 }
 
 func effectiveTargetStageName(stages []instructions.Stage, override string) string {
-	idx := targetStageIndex(stages, override)
-	if idx >= 0 && stages[idx].Name != "" {
-		return stages[idx].Name
-	}
-	return defaultTargetStageName
+	_, name := resolveTargetStage(stages, override)
+	return name
 }
 
 func targetStageIndex(stages []instructions.Stage, override string) int {
+	idx, _ := resolveTargetStage(stages, override)
+	return idx
+}
+
+func resolveTargetStage(stages []instructions.Stage, override string) (int, string) {
 	if len(stages) == 0 {
-		return -1
+		return -1, defaultTargetStageName
 	}
 	if override != "" {
 		normalized := normalizeStageRef(override)
 		for i := range stages {
 			if normalizeStageRef(stages[i].Name) == normalized {
-				return i
+				return i, stages[i].Name
 			}
 		}
 	}
-	return len(stages) - 1
+	idx := len(stages) - 1
+	name := stages[idx].Name
+	if name == "" {
+		name = defaultTargetStageName
+	}
+	return idx, name
 }
 
 func (b *Builder) addAutoArgsToGlobalScope(autoArgs map[string]string) {

@@ -51,6 +51,22 @@ func TestComposeSecretRefBuildDefaultTarget(t *testing.T) {
 	}
 }
 
+func TestComposeSecretRefDiscriminatesEnvSource(t *testing.T) {
+	t.Parallel()
+
+	ref := composeSecretRef(
+		t.TempDir(),
+		SecretScopeBuild,
+		composetypes.ServiceSecretConfig(composetypes.FileReferenceConfig{Source: "token"}),
+		composetypes.Secrets{
+			"token": composetypes.SecretConfig(composetypes.FileObjectConfig{Environment: "TOKEN"}),
+		},
+	)
+	if ref.Source != "env:TOKEN" {
+		t.Fatalf("Source = %q, want env:TOKEN", ref.Source)
+	}
+}
+
 func TestComposeCommandOverrideNilEmptyAndClone(t *testing.T) {
 	t.Parallel()
 
@@ -116,5 +132,22 @@ func TestHealthcheckSpecUnmarshalParsesDurationCompanions(t *testing.T) {
 	}
 	if spec.TimeoutDur != time.Second {
 		t.Fatalf("TimeoutDur = %s, want 1s", spec.TimeoutDur)
+	}
+}
+
+func TestHealthcheckSpecParseDurationsReportsAllErrors(t *testing.T) {
+	t.Parallel()
+
+	spec := &HealthcheckSpec{
+		Interval: "bad-interval",
+		Timeout:  "bad-timeout",
+	}
+	err := spec.parseDurations()
+	if err == nil {
+		t.Fatal("parseDurations() error = nil, want joined duration errors")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, "interval") || !strings.Contains(msg, "timeout") {
+		t.Fatalf("parseDurations() error = %q, want interval and timeout context", msg)
 	}
 }

@@ -6,6 +6,8 @@ package invocation
 import (
 	"context"
 	jsonv2 "encoding/json/v2"
+	"errors"
+	"fmt"
 	"time"
 )
 
@@ -101,11 +103,20 @@ type PortBinding struct {
 }
 
 // SecretRef stores declaration metadata only. It never stores secret values.
+// Source may be an absolute local file path, an env:<name> environment source,
+// or a provider-specific secret identifier.
 type SecretRef struct {
 	Scope  string `json:"scope"`
 	ID     string `json:"id,omitempty"`
 	Source string `json:"source,omitempty"`
 	Target string `json:"target,omitempty"`
+}
+
+func envSecretSource(name string) string {
+	if name == "" {
+		return ""
+	}
+	return "env:" + name
 }
 
 // HealthcheckSpec preserves Compose healthcheck override metadata.
@@ -137,32 +148,23 @@ func (s *HealthcheckSpec) UnmarshalJSON(data []byte) error {
 }
 
 func (s *HealthcheckSpec) parseDurations() error {
-	var err error
-	if s.Interval != "" {
-		s.IntervalDur, err = time.ParseDuration(s.Interval)
-		if err != nil {
-			return err
+	var errs []error
+	parse := func(name, raw string, dst *time.Duration) {
+		if raw == "" {
+			return
 		}
-	}
-	if s.Timeout != "" {
-		s.TimeoutDur, err = time.ParseDuration(s.Timeout)
+		duration, err := time.ParseDuration(raw)
 		if err != nil {
-			return err
+			errs = append(errs, fmt.Errorf("%s %q: %w", name, raw, err))
+			return
 		}
+		*dst = duration
 	}
-	if s.StartPeriod != "" {
-		s.StartPeriodDur, err = time.ParseDuration(s.StartPeriod)
-		if err != nil {
-			return err
-		}
-	}
-	if s.StartInterval != "" {
-		s.StartIntervalDur, err = time.ParseDuration(s.StartInterval)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	parse("interval", s.Interval, &s.IntervalDur)
+	parse("timeout", s.Timeout, &s.TimeoutDur)
+	parse("startPeriod", s.StartPeriod, &s.StartPeriodDur)
+	parse("startInterval", s.StartInterval, &s.StartIntervalDur)
+	return errors.Join(errs...)
 }
 
 // CommandOverride preserves Compose command/entrypoint override semantics.
