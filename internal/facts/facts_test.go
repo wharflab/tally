@@ -43,6 +43,23 @@ func (c *countingContextReader) IsHeredocFile(path string) bool {
 	return c.heredocPaths[path]
 }
 
+type pathAwareContextReader struct {
+	countingContextReader
+
+	paths           map[string]bool
+	pathExistsCalls map[string]int
+}
+
+func (c *pathAwareContextReader) PathExists(path string) bool {
+	if c.pathExistsCalls != nil {
+		c.pathExistsCalls[path]++
+	}
+	if _, ok := c.files[path]; ok {
+		return true
+	}
+	return c.paths[path]
+}
+
 func TestFileFacts_BuildsRunFactsWithEnvShellAndCommands(t *testing.T) {
 	t.Parallel()
 
@@ -494,6 +511,49 @@ COPY entrypoint.sh /app/entrypoint.sh
 	}
 	if ctx.reads["entrypoint.sh"] != 0 {
 		t.Fatalf("ignored context source should not be read, got %d reads", ctx.reads["entrypoint.sh"])
+	}
+}
+
+func TestStageFacts_FileContent_DirectoryContextSourceAvailableButUnobservable(t *testing.T) {
+	t.Parallel()
+
+	ctx := &pathAwareContextReader{
+		countingContextReader: countingContextReader{
+			files: map[string]string{
+				"srcdir/entrypoint.sh": "#!/bin/sh\nexec gosu app \"$@\"\n",
+			},
+		},
+		paths:           map[string]bool{"srcdir": true},
+		pathExistsCalls: map[string]int{},
+	}
+
+	fileFacts := makeFileFactsWithContext(t, `FROM ubuntu:22.04
+COPY srcdir/ /app/
+`, ctx)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+	if len(stage.BuildContextSources) != 1 {
+		t.Fatalf("BuildContextSources count = %d, want 1", len(stage.BuildContextSources))
+	}
+
+	source := stage.BuildContextSources[0]
+	if !source.AvailableInContext {
+		t.Fatal("expected directory source to be available in context")
+	}
+	if source.ObservableFileSourcePath != "" {
+		t.Fatalf("ObservableFileSourcePath = %q, want empty for directory source", source.ObservableFileSourcePath)
+	}
+	if ctx.pathExistsCalls["srcdir"] != 1 {
+		t.Fatalf("PathExists(\"srcdir\") calls = %d, want 1", ctx.pathExistsCalls["srcdir"])
+	}
+	if _, ok := stage.FileContent("/app/srcdir"); ok {
+		t.Fatal("expected directory source to stay unobservable")
+	}
+	if ctx.reads["srcdir"] != 0 {
+		t.Fatalf("directory context source should not be read, got %d reads", ctx.reads["srcdir"])
 	}
 }
 

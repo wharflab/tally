@@ -33,6 +33,9 @@ type BuildContextSource struct {
 	Location             []parser.Range
 	AvailableInContext   bool
 	AvailabilityErr      error
+	// ObservableFileSourcePath is set when this source is a concrete regular
+	// context file whose content can be observed at lint time.
+	ObservableFileSourcePath string
 }
 
 // ObservableFileSource describes how a file's content became observable.
