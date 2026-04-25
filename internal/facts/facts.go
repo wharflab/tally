@@ -765,6 +765,7 @@ func canObserveContextSource(sourcePath string, sourceFact *BuildContextSource, 
 	if sourceFact != nil && sourceFact.NormalizedSourcePath != "" {
 		sourcePath = sourceFact.NormalizedSourcePath
 	}
+	// In canObserveContextSource, contextFiles.FileExists narrows sourceFact.AvailableInContext's PathExists result to files.
 	return contextFiles.FileExists(sourcePath)
 }
 
