@@ -133,15 +133,59 @@ func NewTextReporter(opts TextOptions) *TextReporter {
 
 // Print writes violations to the writer.
 func (r *TextReporter) Print(w io.Writer, violations []rules.Violation, sources map[string][]byte) error {
+	return r.PrintReport(w, violations, sources, ReportMetadata{})
+}
+
+// PrintReport writes violations and optional run metadata to the writer.
+func (r *TextReporter) PrintReport(w io.Writer, violations []rules.Violation, sources map[string][]byte, metadata ReportMetadata) error {
 	r.docCache = make(map[string]*highlight.Document, len(sources))
 	sorted := SortViolations(violations)
 
+	lastLabel := ""
 	for _, v := range sorted {
+		label := InvocationLabel(v)
+		if err := emitLabelHeaderIfChanged(w, label, &lastLabel); err != nil {
+			return err
+		}
 		if err := r.printViolation(w, v, sources[v.Location.File]); err != nil {
 			return err
 		}
 	}
+	if metadata.InvocationsScanned > 0 {
+		if _, err := fmt.Fprintf(w, "\nSummary: %d %s, %d %s, %d %s.\n",
+			metadata.FilesScanned,
+			plural(metadata.FilesScanned, "Dockerfile", "Dockerfiles"),
+			metadata.InvocationsScanned,
+			plural(metadata.InvocationsScanned, "invocation", "invocations"),
+			len(violations),
+			plural(len(violations), "violation", "violations"),
+		); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func emitLabelHeaderIfChanged(w io.Writer, label string, lastLabel *string) error {
+	if label == "" {
+		*lastLabel = ""
+		return nil
+	}
+	if label == *lastLabel {
+		return nil
+	}
+	if _, err := fmt.Fprintf(w, "\n[%s]\n", label); err != nil {
+		return err
+	}
+	*lastLabel = label
+	return nil
+}
+
+func plural(n int, singular, many string) string {
+	if n == 1 {
+		return singular
+	}
+	return many
 }
 
 // printViolation formats a single violation.

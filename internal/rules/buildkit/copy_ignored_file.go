@@ -1,16 +1,10 @@
 package buildkit
 
 import (
-	"path/filepath"
 	"strings"
 
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
-	"github.com/moby/buildkit/frontend/dockerfile/parser"
-
-	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/shell"
 )
 
 // CopyIgnoredFileRule implements the copy-ignored-file linting rule.
@@ -37,45 +31,22 @@ func (r *CopyIgnoredFileRule) Metadata() rules.RuleMetadata {
 // Check runs the copy-ignored-file rule.
 // This rule requires a build context to be set.
 func (r *CopyIgnoredFileRule) Check(input rules.LintInput) []rules.Violation {
-	// Skip if no build context is provided
-	if input.Context == nil {
-		return nil
-	}
-
-	// Skip if no .dockerignore
-	if !input.Context.HasIgnoreFile() {
-		return nil
-	}
-
-	// Skip when negated patterns (exclusions) exist — static analysis cannot
-	// reliably determine whether a path is truly excluded when negations
-	// re-include files inside excluded directories.
-	// See: https://github.com/moby/buildkit/pull/6534
-	if input.Context.HasIgnoreExclusions() {
+	if !hasPrimaryContextRef(input) || input.Facts == nil {
 		return nil
 	}
 
 	var violations []rules.Violation
-	fileFacts := input.Facts
-
-	if fileFacts != nil {
-		for stageIdx := range input.Stages {
-			stageFacts := fileFacts.Stage(stageIdx)
-			if stageFacts == nil {
-				continue
-			}
-			violations = append(violations, r.checkBuildContextSources(stageFacts.BuildContextSources, input.File)...)
+	for _, stageFacts := range input.Facts.Stages() {
+		if stageFacts == nil {
+			continue
 		}
-		return violations
+		violations = append(violations, r.checkBuildContextSources(stageFacts.BuildContextSources, input.File)...)
 	}
-
-	for _, stage := range input.Stages {
-		for _, cmd := range stage.Commands {
-			violations = append(violations, r.checkCommand(cmd, input.Context, input.File)...)
-		}
-	}
-
 	return violations
+}
+
+func hasPrimaryContextRef(input rules.LintInput) bool {
+	return input.InvocationContext != nil && input.InvocationContext.ContextRef().Kind != ""
 }
 
 func (r *CopyIgnoredFileRule) checkBuildContextSources(
@@ -87,6 +58,9 @@ func (r *CopyIgnoredFileRule) checkBuildContextSources(
 		if src == nil {
 			continue
 		}
+		if !isSpecificContextSource(src) {
+			continue
+		}
 
 		loc := rules.NewFileLocation(file)
 		if len(src.Location) > 0 {
@@ -95,125 +69,36 @@ func (r *CopyIgnoredFileRule) checkBuildContextSources(
 			loc = rules.NewLineLocation(file, src.Line)
 		}
 
-		if src.IgnoreErr != nil {
+		if src.AvailabilityErr != nil {
 			violations = append(violations, rules.NewViolation(
 				loc,
 				r.Metadata().Code,
-				"failed to evaluate .dockerignore for '"+src.SourcePath+"'",
+				"failed to evaluate build context availability for '"+src.SourcePath+"'",
 				rules.SeverityWarning,
-			).WithDocURL(r.Metadata().DocURL).WithDetail(src.IgnoreErr.Error()))
+			).WithDocURL(r.Metadata().DocURL).WithDetail(src.AvailabilityErr.Error()))
 			continue
 		}
 
-		if src.IgnoredByDockerignore {
+		if !src.AvailableInContext {
 			violations = append(violations, rules.NewViolation(
 				loc,
 				r.Metadata().Code,
-				"source '"+src.SourcePath+"' is excluded by .dockerignore and will not be copied",
+				"source '"+src.SourcePath+"' is not available in the build context and will not be copied",
 				r.Metadata().DefaultSeverity,
 			).WithDocURL(r.Metadata().DocURL).WithDetail(
-				"The file or directory '"+src.SourcePath+"' matches a pattern in .dockerignore. "+
-					"This COPY/ADD will fail or copy unexpected files during build."))
+				"The source '"+src.SourcePath+"' is not present in the resolved build context. "+
+					"It may be excluded by .dockerignore or otherwise unavailable to the build."))
 		}
 	}
 	return violations
 }
 
-// checkCommand checks a single command for ignored COPY/ADD sources.
-func (r *CopyIgnoredFileRule) checkCommand(cmd instructions.Command, ctx rules.BuildContext, file string) []rules.Violation {
-	switch c := cmd.(type) {
-	case *instructions.CopyCommand:
-		return r.checkCopyAdd(c.SourcePaths, c.SourceContents, c.From, c.Location(), ctx, file)
-	case *instructions.AddCommand:
-		return r.checkCopyAdd(c.SourcePaths, c.SourceContents, "", c.Location(), ctx, file)
+func isSpecificContextSource(src *facts.BuildContextSource) bool {
+	path := src.NormalizedSourcePath
+	if path == "" {
+		path = src.SourcePath
 	}
-	return nil
-}
-
-// checkCopyAdd checks COPY/ADD sources against .dockerignore.
-func (r *CopyIgnoredFileRule) checkCopyAdd(
-	sourcePaths []string,
-	sourceContents []instructions.SourceContent,
-	from string,
-	location []parser.Range,
-	ctx rules.BuildContext,
-	file string,
-) []rules.Violation {
-	// Skip if copying from another stage or image
-	if from != "" {
-		return nil
-	}
-
-	// Build set of heredoc paths to skip (using shared helper)
-	heredocPaths := dockerfile.CollectHeredocPaths(sourceContents)
-
-	var violations []rules.Violation
-
-	for _, src := range sourcePaths {
-		// Skip URLs (ADD supports URLs)
-		if isURLCopyIgnored(src) {
-			continue
-		}
-
-		// Skip heredoc sources
-		if heredocPaths[src] {
-			continue
-		}
-
-		// Skip if marked as heredoc in context
-		if ctx.IsHeredocFile(src) {
-			continue
-		}
-
-		// Normalize path (remove leading ./)
-		normalizedSrc := normalizePathCopyIgnored(src)
-
-		// Check if ignored
-		ignored, err := ctx.IsIgnored(normalizedSrc)
-		if err != nil {
-			// Surface the error as a warning so users know the rule was skipped
-			loc := rules.NewLocationFromRanges(file, location)
-			violations = append(violations, rules.NewViolation(
-				loc,
-				r.Metadata().Code,
-				"failed to evaluate .dockerignore for '"+src+"'",
-				rules.SeverityWarning,
-			).WithDocURL(r.Metadata().DocURL).WithDetail(err.Error()))
-			continue
-		}
-
-		if ignored {
-			loc := rules.NewLocationFromRanges(file, location)
-			violations = append(violations, rules.NewViolation(
-				loc,
-				r.Metadata().Code,
-				"source '"+src+"' is excluded by .dockerignore and will not be copied",
-				r.Metadata().DefaultSeverity,
-			).WithDocURL(r.Metadata().DocURL).WithDetail(
-				"The file or directory '"+src+"' matches a pattern in .dockerignore. "+
-					"This COPY/ADD will fail or copy unexpected files during build."))
-		}
-	}
-
-	return violations
-}
-
-// isURLCopyIgnored checks if a path looks like a URL.
-func isURLCopyIgnored(p string) bool {
-	return shell.IsURL(p) || strings.HasPrefix(p, "git://")
-}
-
-// normalizePathCopyIgnored normalizes a source path for comparison.
-// Handles edge cases like trailing slashes, double slashes, and redundant segments.
-// Uses forward slashes for cross-platform compatibility with .dockerignore patterns.
-func normalizePathCopyIgnored(path string) string {
-	cleaned := filepath.Clean(path)
-	// filepath.Clean converts "." to ".", keep it as-is for root context
-	if cleaned == "." {
-		return "."
-	}
-	// Convert to forward slashes for consistent matching across platforms
-	return filepath.ToSlash(cleaned)
+	return path != "" && path != "." && !strings.ContainsAny(path, "*?[")
 }
 
 // init registers the rule with the default registry.

@@ -383,34 +383,6 @@ temp/
 	}
 }
 
-func TestHasIgnoreFile(t *testing.T) {
-	t.Parallel()
-	tmpDir := t.TempDir()
-
-	ctx, err := New(tmpDir, "")
-	if err != nil {
-		t.Fatalf("New() error: %v", err)
-	}
-
-	if ctx.HasIgnoreFile() {
-		t.Error("expected HasIgnoreFile to return false without .dockerignore")
-	}
-
-	// Create .dockerignore
-	if err := os.WriteFile(filepath.Join(tmpDir, ".dockerignore"), []byte("*.log\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	ctx2, err := New(tmpDir, "")
-	if err != nil {
-		t.Fatalf("New() error: %v", err)
-	}
-
-	if !ctx2.HasIgnoreFile() {
-		t.Error("expected HasIgnoreFile to return true with .dockerignore")
-	}
-}
-
 func TestContainerignore(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()

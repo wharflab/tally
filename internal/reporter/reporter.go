@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/wharflab/tally/internal/invocation"
 	"github.com/wharflab/tally/internal/rules"
 )
 
@@ -23,6 +24,8 @@ import (
 type ReportMetadata struct {
 	// FilesScanned is the total number of files that were scanned.
 	FilesScanned int
+	// InvocationsScanned is the total number of build invocations scanned.
+	InvocationsScanned int
 	// RulesEnabled is the total number of rules that were active (not "off").
 	RulesEnabled int
 }
@@ -40,6 +43,12 @@ func SortViolations(violations []rules.Violation) []rules.Violation {
 	sorted := make([]rules.Violation, len(violations))
 	copy(sorted, violations)
 	sort.SliceStable(sorted, func(i, j int) bool {
+		if labelI, labelJ := InvocationLabel(sorted[i]), InvocationLabel(sorted[j]); labelI != labelJ {
+			return labelI < labelJ
+		}
+		if sorted[i].InvocationKey != sorted[j].InvocationKey {
+			return sorted[i].InvocationKey < sorted[j].InvocationKey
+		}
 		if sorted[i].Location.File != sorted[j].Location.File {
 			return sorted[i].Location.File < sorted[j].Location.File
 		}
@@ -52,6 +61,11 @@ func SortViolations(violations []rules.Violation) []rules.Violation {
 		return sorted[i].RuleCode < sorted[j].RuleCode
 	})
 	return sorted
+}
+
+// InvocationLabel returns a human-readable grouping label for a violation.
+func InvocationLabel(v rules.Violation) string {
+	return invocation.LabelForSource(v.Invocation)
 }
 
 // Format represents an output format type.
@@ -194,8 +208,8 @@ type textReporterAdapter struct {
 }
 
 // Report implements Reporter.
-func (a *textReporterAdapter) Report(violations []rules.Violation, sources map[string][]byte, _ ReportMetadata) error {
-	return a.reporter.Print(a.writer, violations, sources)
+func (a *textReporterAdapter) Report(violations []rules.Violation, sources map[string][]byte, metadata ReportMetadata) error {
+	return a.reporter.PrintReport(a.writer, violations, sources, metadata)
 }
 
 // GetWriter returns an io.Writer for the given output path.

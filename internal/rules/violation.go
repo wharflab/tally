@@ -1,6 +1,10 @@
 package rules
 
-import "github.com/moby/buildkit/frontend/dockerfile/parser"
+import (
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
+
+	"github.com/wharflab/tally/internal/invocation"
+)
 
 // FixSafety categorizes how reliable a fix is.
 type FixSafety int
@@ -142,6 +146,13 @@ type Violation struct {
 	// StageIndex tracks which Dockerfile stage this violation belongs to.
 	// Used internally for merging async results; not serialized.
 	StageIndex int `json:"-"`
+
+	// Invocation carries structured attribution for orchestrator-derived runs.
+	Invocation *invocation.InvocationSource `json:"invocation,omitempty"`
+
+	// InvocationKey is the stable internal identity of the invocation that
+	// produced this violation. Used for dedupe and async merging.
+	InvocationKey string `json:"-"`
 }
 
 // NewViolation creates a new violation with the minimum required fields.

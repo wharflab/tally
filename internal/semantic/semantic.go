@@ -38,6 +38,13 @@ type Model struct {
 
 	// buildArgs are CLI --build-arg values.
 	buildArgs map[string]string
+
+	// targetStageName is the BuildKit target stage name used for automatic ARGs.
+	targetStageName string
+
+	// finalStageIndex is the stage that contributes to the image for this
+	// invocation. It may differ from the last stage when --target is set.
+	finalStageIndex int
 }
 
 // NewModel creates a semantic model from a parse result.
@@ -112,6 +119,24 @@ func (m *Model) ResolveVariable(stageIndex int, name string) (string, bool) {
 // Graph returns the stage dependency graph.
 func (m *Model) Graph() *StageGraph {
 	return m.graph
+}
+
+// TargetStageName returns the effective target stage name used for automatic
+// build args.
+func (m *Model) TargetStageName() string {
+	if m == nil || m.targetStageName == "" {
+		return defaultTargetStageName
+	}
+	return m.targetStageName
+}
+
+// FinalStageIndex returns the stage that contributes to this invocation's
+// output image.
+func (m *Model) FinalStageIndex() int {
+	if m == nil {
+		return -1
+	}
+	return m.finalStageIndex
 }
 
 // MetaArgs returns the global ARG instructions before the first FROM.

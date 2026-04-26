@@ -53,7 +53,11 @@ func (r *GitHubActionsReporter) Report(violations []rules.Violation, _ map[strin
 		parts = append(parts, "title="+escapeGitHubProperty(v.RuleCode))
 
 		// Escape message (newlines not allowed in workflow commands)
-		message := escapeGitHubMessage(v.Message)
+		messageText := v.Message
+		if label := InvocationLabel(v); label != "" {
+			messageText = "[" + label + "] " + messageText
+		}
+		message := escapeGitHubMessage(messageText)
 
 		if _, err := fmt.Fprintf(r.writer, "::%s %s::%s\n",
 			level,

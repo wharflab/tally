@@ -240,7 +240,7 @@ tally lint --config /path/to/.tally.toml Dockerfile
     | Variable | Description |
     |----------|-------------|
     | `TALLY_EXCLUDE` | Glob pattern(s) to exclude files (comma-separated) |
-    | `TALLY_CONTEXT` | Build context directory for context-aware rules |
+    | `TALLY_CONTEXT` | Build context directory for direct Dockerfile linting |
     | `TALLY_SLOW_CHECKS` | Slow checks mode: `auto`, `on`, `off` |
     | `TALLY_SLOW_CHECKS_TIMEOUT` | Timeout for slow checks (e.g. `20s`) |
     | `TALLY_FIX` | Apply safe fixes automatically: `true` / `false` |
@@ -275,7 +275,9 @@ tally lint --config /path/to/.tally.toml Dockerfile
     |------|-------------|
     | `--config, -c` | Path to config file (overrides discovery) |
     | `--exclude` | Glob pattern(s) to exclude files (repeatable) |
-    | `--context` | Build context directory for context-aware rules |
+    | `--context` | Build context directory for direct Dockerfile linting |
+    | `--target` | Bake target or group to lint (repeatable; Bake entrypoints only) |
+    | `--service` | Compose service to lint (repeatable; Compose entrypoints only) |
     | `--select` | Enable specific rules (repeatable) |
     | `--ignore` | Disable specific rules (repeatable) |
   </Tab>
@@ -316,6 +318,26 @@ tally lint --config /path/to/.tally.toml Dockerfile
     | `--ai-redact-secrets` | Redact secrets before sending to agent |
   </Tab>
 </Tabs>
+
+---
+
+## Build context and invocation flags
+
+`--context` applies only when you lint Dockerfiles directly:
+
+```bash
+tally lint --context . Dockerfile
+```
+
+When you pass a Bake or Compose file, tally reads the build context from the selected target or service instead:
+
+```bash
+tally lint docker-bake.hcl --target api
+tally lint compose.yaml --service api
+```
+
+Do not combine `--context` with a Bake or Compose entrypoint. Use `--target` only with Bake, and `--service` only with Compose. See
+[Build invocations](/guides/build-invocations) for the full entrypoint behavior.
 
 ---
 

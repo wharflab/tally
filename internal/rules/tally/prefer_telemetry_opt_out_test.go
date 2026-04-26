@@ -8,6 +8,7 @@ import (
 
 	"github.com/gkampitakis/go-snaps/snaps"
 
+	"github.com/wharflab/tally/internal/facts"
 	fixpkg "github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
@@ -33,10 +34,6 @@ func (m *telemetryBuildContext) ReadFile(path string) ([]byte, error) {
 }
 
 func (m *telemetryBuildContext) IsHeredocFile(string) bool { return false }
-
-func (m *telemetryBuildContext) HasIgnoreFile() bool { return false }
-
-func (m *telemetryBuildContext) HasIgnoreExclusions() bool { return false }
 
 func TestPreferTelemetryOptOutRule_Metadata(t *testing.T) {
 	t.Parallel()
@@ -146,7 +143,7 @@ RUN pip install -r requirements.txt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			var ctx rules.BuildContext
+			var ctx facts.ContextFileReader
 			if len(tt.contextFiles) > 0 {
 				ctx = &telemetryBuildContext{files: tt.contextFiles}
 			}

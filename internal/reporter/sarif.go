@@ -106,6 +106,14 @@ func (r *SARIFReporter) Report(violations []rules.Violation, _ map[string][]byte
 		result := sarif.NewRuleResult(v.RuleCode).
 			WithMessage(sarif.NewTextMessage(v.Message)).
 			WithLevel(severityToSARIFLevel(v.Severity))
+		if v.Invocation != nil {
+			result.WithProperties(sarif.NewPropertyBag().Add("invocation", map[string]string{
+				"kind": v.Invocation.Kind,
+				"file": filepath.ToSlash(v.Invocation.File),
+				"name": v.Invocation.Name,
+				"key":  v.InvocationKey,
+			}))
+		}
 
 		// Add location if not file-level
 		if !v.Location.IsFileLevel() {

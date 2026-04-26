@@ -53,6 +53,10 @@ type CheckRequest struct {
 	// File is the source file this request is associated with.
 	File string
 
+	// InvocationKey identifies the build invocation this request belongs to.
+	// Empty means no invocation context was provided.
+	InvocationKey string
+
 	// StageIndex identifies the stage this request is for (used for merging).
 	StageIndex int
 }
@@ -81,9 +85,10 @@ type Skipped struct {
 // produced zero violations). Used by the merge logic to know which fast-path
 // violations should be replaced.
 type CompletedCheck struct {
-	RuleCode   string
-	File       string
-	StageIndex int
+	RuleCode      string
+	File          string
+	InvocationKey string
+	StageIndex    int
 }
 
 // RunResult contains the output of an async runtime execution.

@@ -3,6 +3,9 @@ package cmd
 import (
 	"slices"
 	"testing"
+
+	"github.com/wharflab/tally/internal/invocation"
+	"github.com/wharflab/tally/internal/rules"
 )
 
 func TestParseACPCmd(t *testing.T) {
@@ -96,5 +99,169 @@ func TestParseACPCmd(t *testing.T) {
 				t.Fatalf("parseACPCmd(%q) = %#v, want %#v", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestContextDirForViolationUsesInvocationKey(t *testing.T) {
+	t.Parallel()
+
+	file := "Dockerfile"
+	first := &invocation.BuildInvocation{
+		Key:            "compose\x00compose.yaml\x00api\x00Dockerfile",
+		DockerfilePath: file,
+		ContextRef: invocation.ContextRef{
+			Kind:  invocation.ContextKindDir,
+			Value: "/workspace/api",
+		},
+	}
+	second := &invocation.BuildInvocation{
+		Key:            "compose\x00compose.yaml\x00worker\x00Dockerfile",
+		DockerfilePath: file,
+		ContextRef: invocation.ContextRef{
+			Kind:  invocation.ContextKindDir,
+			Value: "/workspace/worker",
+		},
+	}
+	violation := rules.NewViolation(
+		rules.NewLineLocation(file, 1),
+		"test/rule",
+		"message",
+		rules.SeverityWarning,
+	)
+	violation.InvocationKey = first.Key
+
+	got := contextDirForViolation(violation, map[string]*invocation.BuildInvocation{
+		first.Key:  first,
+		second.Key: second,
+	})
+	if got != "/workspace/api" {
+		t.Fatalf("contextDirForViolation() = %q, want %q", got, "/workspace/api")
+	}
+}
+
+func TestAddFileInvocationUsesInvocationKey(t *testing.T) {
+	t.Parallel()
+
+	inv := &invocation.BuildInvocation{
+		Key:            "dockerfile\x00/workspace/Dockerfile\x00\x00/workspace/Dockerfile",
+		DockerfilePath: "/workspace/Dockerfile",
+	}
+	fileInvocations := make(map[string]*invocation.BuildInvocation)
+
+	addFileInvocation(fileInvocations, inv)
+
+	if got := fileInvocations[inv.Key]; got != inv {
+		t.Fatalf("fileInvocations[inv.Key] = %#v, want %#v", got, inv)
+	}
+	if got := fileInvocations[inv.DockerfilePath]; got != nil {
+		t.Fatalf("fileInvocations[inv.DockerfilePath] = %#v, want nil", got)
+	}
+}
+
+func TestContextDirForViolationUsesDockerfileInvocationKey(t *testing.T) {
+	t.Parallel()
+
+	file := "Dockerfile"
+	inv := &invocation.BuildInvocation{
+		Key:            "dockerfile\x00Dockerfile\x00\x00Dockerfile",
+		DockerfilePath: file,
+		ContextRef: invocation.ContextRef{
+			Kind:  invocation.ContextKindDir,
+			Value: "/workspace/app",
+		},
+	}
+	violation := rules.NewViolation(
+		rules.NewLineLocation(file, 1),
+		"test/rule",
+		"message",
+		rules.SeverityWarning,
+	)
+	violation.InvocationKey = inv.Key
+
+	got := contextDirForViolation(violation, map[string]*invocation.BuildInvocation{
+		inv.Key: inv,
+	})
+	if got != "/workspace/app" {
+		t.Fatalf("contextDirForViolation() = %q, want %q", got, "/workspace/app")
+	}
+}
+
+func TestContextDirForViolationRequiresInvocationKey(t *testing.T) {
+	t.Parallel()
+
+	file := "Dockerfile"
+	inv := &invocation.BuildInvocation{
+		Key:            "dockerfile\x00Dockerfile\x00\x00Dockerfile",
+		DockerfilePath: file,
+		ContextRef: invocation.ContextRef{
+			Kind:  invocation.ContextKindDir,
+			Value: "/workspace/app",
+		},
+	}
+	violation := rules.NewViolation(
+		rules.NewLineLocation(file, 1),
+		"test/rule",
+		"message",
+		rules.SeverityWarning,
+	)
+
+	got := contextDirForViolation(violation, map[string]*invocation.BuildInvocation{
+		file: inv,
+	})
+	if got != "" {
+		t.Fatalf("contextDirForViolation() = %q, want empty without invocation key", got)
+	}
+}
+
+func TestContextDirForViolationDoesNotUseCleanFileFallback(t *testing.T) {
+	t.Parallel()
+
+	inv := &invocation.BuildInvocation{
+		Key:            "dockerfile\x00Dockerfile\x00\x00Dockerfile",
+		DockerfilePath: "Dockerfile",
+		ContextRef: invocation.ContextRef{
+			Kind:  invocation.ContextKindDir,
+			Value: "/workspace/app",
+		},
+	}
+	violation := rules.NewViolation(
+		rules.NewLineLocation("./Dockerfile", 1),
+		"test/rule",
+		"message",
+		rules.SeverityWarning,
+	)
+
+	got := contextDirForViolation(violation, map[string]*invocation.BuildInvocation{
+		"Dockerfile": inv,
+	})
+	if got != "" {
+		t.Fatalf("contextDirForViolation() = %q, want empty without invocation key", got)
+	}
+}
+
+func TestContextDirForViolationIgnoresNonLocalContext(t *testing.T) {
+	t.Parallel()
+
+	inv := &invocation.BuildInvocation{
+		Key:            "bake\x00docker-bake.hcl\x00api\x00Dockerfile",
+		DockerfilePath: "Dockerfile",
+		ContextRef: invocation.ContextRef{
+			Kind:  invocation.ContextKindGit,
+			Value: "https://github.com/wharflab/tally.git",
+		},
+	}
+	violation := rules.NewViolation(
+		rules.NewLineLocation("Dockerfile", 1),
+		"test/rule",
+		"message",
+		rules.SeverityWarning,
+	)
+	violation.InvocationKey = inv.Key
+
+	got := contextDirForViolation(violation, map[string]*invocation.BuildInvocation{
+		inv.Key: inv,
+	})
+	if got != "" {
+		t.Fatalf("contextDirForViolation() = %q, want empty for non-dir context", got)
 	}
 }

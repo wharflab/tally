@@ -20,11 +20,11 @@ import (
 	"github.com/wharflab/tally/internal/ai/autofixdata"
 	"github.com/wharflab/tally/internal/async"
 	"github.com/wharflab/tally/internal/config"
-	"github.com/wharflab/tally/internal/context"
 	"github.com/wharflab/tally/internal/discovery"
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/fileval"
 	"github.com/wharflab/tally/internal/fix"
+	"github.com/wharflab/tally/internal/invocation"
 	"github.com/wharflab/tally/internal/linter"
 	"github.com/wharflab/tally/internal/processor"
 	"github.com/wharflab/tally/internal/registry"
@@ -141,6 +141,14 @@ func lintCommand() *cli.Command {
 				Usage:   "Build context directory for context-aware rules",
 				Sources: cli.EnvVars("TALLY_CONTEXT"),
 			},
+			&cli.StringSliceFlag{
+				Name:  "target",
+				Usage: "Bake target to lint (can be repeated)",
+			},
+			&cli.StringSliceFlag{
+				Name:  "service",
+				Usage: "Compose service to lint (can be repeated)",
+			},
 			&cli.StringFlag{
 				Name:    "slow-checks",
 				Usage:   "Slow checks mode: auto, on, off",
@@ -199,11 +207,23 @@ func lintCommand() *cli.Command {
 
 // lintResults holds the aggregated results of linting all discovered files.
 type lintResults struct {
-	violations  []rules.Violation
-	asyncPlans  []async.CheckRequest
-	fileSources map[string][]byte
-	fileConfigs map[string]*config.Config
-	firstCfg    *config.Config
+	violations         []rules.Violation
+	asyncPlans         []async.CheckRequest
+	fileSources        map[string][]byte
+	fileConfigs        map[string]*config.Config
+	fileInvocations    map[string]*invocation.BuildInvocation
+	firstCfg           *config.Config
+	filesScanned       int
+	invocationsScanned int
+}
+
+type applyFixesInput struct {
+	violations      []rules.Violation
+	sources         map[string][]byte
+	fileConfigs     map[string]*config.Config
+	fileInvocations map[string]*invocation.BuildInvocation
+	asyncPlans      []async.CheckRequest
+	asyncResult     *async.RunResult
 }
 
 func collectRegistryInsights(
@@ -317,6 +337,24 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 		return runLintStdin(ctx, cmd)
 	}
 
+	orchestrator, classified, err := classifyLintEntrypoint(ctx, inputs, cmd)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return cli.Exit("", ExitConfigError)
+	}
+	if classified {
+		if orchestrator != nil {
+			return runLintOrchestrator(ctx, cmd, orchestrator)
+		}
+		if hasOrchestratorSelectionFlags(cmd) {
+			fmt.Fprintf(os.Stderr, "Error: --target and --service are only valid for orchestrator entrypoints\n")
+			return cli.Exit("", ExitConfigError)
+		}
+	} else if err := rejectMixedOrchestratorInputs(inputs, cmd); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return cli.Exit("", ExitConfigError)
+	}
+
 	// Discover files using the discovery package
 	discoveryOpts := discovery.Options{
 		Patterns:        discovery.DefaultPatterns(),
@@ -352,7 +390,14 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 
 	warnFixUnsafe(cmd)
 	if cmd.Bool("fix") {
-		fixResult, fixErr := applyFixes(ctx, cmd, allViolations, res.fileSources, res.fileConfigs, asyncPlans, asyncResult)
+		fixResult, fixErr := applyFixes(ctx, cmd, applyFixesInput{
+			violations:      allViolations,
+			sources:         res.fileSources,
+			fileConfigs:     res.fileConfigs,
+			fileInvocations: res.fileInvocations,
+			asyncPlans:      asyncPlans,
+			asyncResult:     asyncResult,
+		})
 		if fixErr != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to apply fixes: %v\n", fixErr)
 			return cli.Exit("", ExitConfigError)
@@ -375,7 +420,7 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 		allViolations = filterFixedViolations(allViolations, fixResult, res.fileConfigs)
 	}
 
-	return writeReport(cmd, res.firstCfg, allViolations, res.fileSources, len(discovered))
+	return writeReport(cmd, res.firstCfg, allViolations, res.fileSources, len(discovered), 0)
 }
 
 // resolveAsyncChecks executes async check plans if enabled and merges the
@@ -437,7 +482,7 @@ func runLintStdin(ctx stdcontext.Context, cmd *cli.Command) error {
 	if cmd.Bool("fix") {
 		return applyStdinFixes(ctx, cmd, content, allViolations, res, asyncPlans, asyncResult)
 	}
-	return writeReport(cmd, cfg, allViolations, res.fileSources, 1)
+	return writeReport(cmd, cfg, allViolations, res.fileSources, 1, 0)
 }
 
 // lintStdinContent parses and lints content read from stdin.
@@ -464,10 +509,12 @@ func lintStdinContent(cmd *cli.Command, content []byte) (*lintResults, *config.C
 		return nil, nil, cli.Exit("", ExitSyntaxError)
 	}
 
+	inv := invocationFromContextFlag(stdinPath, cmd.String("context"))
 	result, err := linter.LintFile(linter.Input{
 		FilePath:    stdinPath,
 		Config:      cfg,
 		ParseResult: parseResult,
+		Invocation:  inv,
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to lint stdin: %v\n", err)
@@ -480,6 +527,10 @@ func lintStdinContent(cmd *cli.Command, content []byte) (*lintResults, *config.C
 		fileSources: map[string][]byte{stdinPath: result.ParseResult.Source},
 		fileConfigs: map[string]*config.Config{stdinPath: cfg},
 		firstCfg:    cfg,
+	}
+	if inv != nil {
+		res.fileInvocations = make(map[string]*invocation.BuildInvocation, 1)
+		addFileInvocation(res.fileInvocations, inv)
 	}
 	return res, cfg, nil
 }
@@ -506,7 +557,14 @@ func applyStdinFixes(
 	content []byte, allViolations []rules.Violation,
 	res *lintResults, asyncPlans []async.CheckRequest, asyncResult *async.RunResult,
 ) error {
-	fixResult, fixErr := applyFixes(ctx, cmd, allViolations, res.fileSources, res.fileConfigs, asyncPlans, asyncResult)
+	fixResult, fixErr := applyFixes(ctx, cmd, applyFixesInput{
+		violations:      allViolations,
+		sources:         res.fileSources,
+		fileConfigs:     res.fileConfigs,
+		fileInvocations: res.fileInvocations,
+		asyncPlans:      asyncPlans,
+		asyncResult:     asyncResult,
+	})
 	if fixErr != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to apply fixes: %v\n", fixErr)
 		return cli.Exit("", ExitConfigError)
@@ -544,14 +602,222 @@ func applyStdinFixes(
 			fmt.Fprintf(os.Stderr, "note: --output overridden to stderr in stdin fix mode (stdout carries fixed content)\n")
 		}
 	}
-	return writeReportTo(cmd, cfg, allViolations, res.fileSources, 1, reportPath)
+	return writeReportTo(cmd, cfg, allViolations, res.fileSources, 1, 0, reportPath)
+}
+
+func runLintOrchestrator(ctx stdcontext.Context, cmd *cli.Command, discovered *invocation.DiscoveryResult) error {
+	if err := validateOrchestratorFlags(cmd, discovered.Kind); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return cli.Exit("", ExitConfigError)
+	}
+
+	if len(discovered.Invocations) == 0 {
+		cfg, err := loadConfigForFile(cmd, discovered.EntrypointPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: failed to load config: %v\n", err)
+			return cli.Exit("", ExitConfigError)
+		}
+		return writeReport(cmd, cfg, nil, nil, 0, 0)
+	}
+
+	res, err := lintInvocations(ctx, discovered.Invocations, cmd)
+	if err != nil {
+		return handleLintError(err)
+	}
+	res.filesScanned = len(res.fileSources)
+	res.invocationsScanned = len(discovered.Invocations)
+
+	resolveAsyncChecks(ctx, res)
+
+	allViolations := processViolations(res, res.firstCfg)
+	warnFixUnsafe(cmd)
+	return writeReport(cmd, res.firstCfg, allViolations, res.fileSources, res.filesScanned, res.invocationsScanned)
+}
+
+func classifyLintEntrypoint(ctx stdcontext.Context, inputs []string, cmd *cli.Command) (*invocation.DiscoveryResult, bool, error) {
+	if len(inputs) != 1 {
+		return nil, false, nil
+	}
+	input := inputs[0]
+	if !isRegularFile(input) {
+		return nil, false, nil
+	}
+	if invocation.IsDockerfileName(input) {
+		return nil, true, nil
+	}
+
+	ext := strings.ToLower(filepath.Ext(input))
+	switch ext {
+	case ".hcl":
+		result, err := discoverBakeEntrypoint(ctx, input, cmd)
+		return result, true, err
+	case ".json":
+		if kind, ok := invocation.ProbeEntrypointKind(input); ok {
+			result, err := discoverEntrypointByKind(ctx, input, kind, cmd)
+			return result, true, err
+		}
+		result, bakeErr := discoverBakeEntrypoint(ctx, input, cmd)
+		if bakeErr == nil {
+			return result, true, nil
+		}
+		result, composeErr := discoverComposeEntrypoint(ctx, input, cmd)
+		if composeErr == nil {
+			return result, true, nil
+		}
+		return nil, true, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", input)
+	case ".yml", ".yaml":
+		result, err := discoverComposeEntrypoint(ctx, input, cmd)
+		return result, true, err
+	default:
+		kind, ok := invocation.ProbeEntrypointKind(input)
+		if !ok {
+			return nil, true, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", input)
+		}
+		result, err := discoverEntrypointByKind(ctx, input, kind, cmd)
+		return result, true, err
+	}
+}
+
+func discoverEntrypointByKind(ctx stdcontext.Context, input, kind string, cmd *cli.Command) (*invocation.DiscoveryResult, error) {
+	switch kind {
+	case invocation.KindCompose:
+		return discoverComposeEntrypoint(ctx, input, cmd)
+	case invocation.KindBake:
+		return discoverBakeEntrypoint(ctx, input, cmd)
+	default:
+		return nil, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", input)
+	}
+}
+
+func discoverComposeEntrypoint(ctx stdcontext.Context, input string, cmd *cli.Command) (*invocation.DiscoveryResult, error) {
+	return invocation.ComposeProvider{}.Discover(ctx, invocation.ResolveOptions{
+		Path:     input,
+		Services: cmd.StringSlice("service"),
+	})
+}
+
+func discoverBakeEntrypoint(ctx stdcontext.Context, input string, cmd *cli.Command) (*invocation.DiscoveryResult, error) {
+	return invocation.BakeProvider{}.Discover(ctx, invocation.ResolveOptions{
+		Path:    input,
+		Targets: cmd.StringSlice("target"),
+	})
+}
+
+func isRegularFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular()
+}
+
+func rejectMixedOrchestratorInputs(inputs []string, cmd *cli.Command) error {
+	if hasOrchestratorSelectionFlags(cmd) {
+		return errors.New("--target and --service are only valid for a single explicit orchestrator file")
+	}
+	for _, input := range inputs {
+		info, err := os.Stat(input)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		if invocation.IsDockerfileName(input) {
+			continue
+		}
+		if invocation.IsObviousOrchestratorName(input) {
+			return errors.New("orchestrator entrypoints cannot be mixed with other lint inputs")
+		}
+	}
+	return nil
+}
+
+func hasOrchestratorSelectionFlags(cmd *cli.Command) bool {
+	return cmd.IsSet("target") || cmd.IsSet("service")
+}
+
+func validateOrchestratorFlags(cmd *cli.Command, kind string) error {
+	if cmd.Bool("fix") {
+		return errors.New("--fix is not supported for orchestrator entrypoints")
+	}
+	if cmd.IsSet("context") && cmd.String("context") != "" {
+		return errors.New("--context is not supported for orchestrator entrypoints")
+	}
+	switch kind {
+	case invocation.KindBake:
+		if cmd.IsSet("service") {
+			return errors.New("--service is only valid for Compose entrypoints")
+		}
+	case invocation.KindCompose:
+		if cmd.IsSet("target") {
+			return errors.New("--target is only valid for Bake entrypoints")
+		}
+	}
+	return nil
+}
+
+func lintInvocations(ctx stdcontext.Context, invocations []invocation.BuildInvocation, cmd *cli.Command) (*lintResults, error) {
+	res := &lintResults{
+		fileSources:     make(map[string][]byte),
+		fileConfigs:     make(map[string]*config.Config),
+		fileInvocations: make(map[string]*invocation.BuildInvocation),
+	}
+	parseCache := make(map[string]*dockerfile.ParseResult)
+
+	for _, inv := range invocations {
+		file := inv.DockerfilePath
+
+		cfg := res.fileConfigs[file]
+		if cfg == nil {
+			var err error
+			cfg, err = loadConfigForFile(cmd, file)
+			if err != nil {
+				return nil, fmt.Errorf("failed to load config for %s: %w", file, err)
+			}
+			validateAIConfig(cfg, file)
+			validateDurationConfigs(cfg, file)
+			res.fileConfigs[file] = cfg
+		}
+		if res.firstCfg == nil {
+			res.firstCfg = cfg
+		}
+
+		if err := fileval.ValidateFile(file, cfg.FileValidation.MaxFileSize); err != nil {
+			return nil, fmt.Errorf("failed to lint %s: %w", file, err)
+		}
+
+		parseResult := parseCache[file]
+		if parseResult == nil {
+			var err error
+			parseResult, err = dockerfile.ParseFile(ctx, file, cfg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to lint %s: %w", file, err)
+			}
+			if syntaxErrors := syntax.Check(file, parseResult.AST, parseResult.Source); len(syntaxErrors) > 0 {
+				return nil, &syntax.CheckError{Errors: syntaxErrors}
+			}
+			parseCache[file] = parseResult
+		}
+
+		result, err := linter.LintFile(linter.Input{
+			FilePath:    file,
+			Config:      cfg,
+			ParseResult: parseResult,
+			Invocation:  &inv,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to lint %s: %w", file, err)
+		}
+
+		res.fileSources[file] = result.ParseResult.Source
+		addFileInvocation(res.fileInvocations, &inv)
+		res.violations = append(res.violations, result.Violations...)
+		res.asyncPlans = append(res.asyncPlans, result.AsyncPlan...)
+	}
+	return res, nil
 }
 
 // lintFiles runs the lint pipeline on each discovered file and aggregates results.
 func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, cmd *cli.Command) (*lintResults, error) {
 	res := &lintResults{
-		fileSources: make(map[string][]byte),
-		fileConfigs: make(map[string]*config.Config),
+		fileSources:     make(map[string][]byte),
+		fileConfigs:     make(map[string]*config.Config),
+		fileInvocations: make(map[string]*invocation.BuildInvocation),
 	}
 
 	for _, df := range discovered {
@@ -585,27 +851,25 @@ func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, cm
 			return nil, &syntax.CheckError{Errors: syntaxErrors}
 		}
 
-		// Build context for context-aware rules (e.g. .dockerignore checks).
-		var buildCtx rules.BuildContext
+		var inv *invocation.BuildInvocation
 		if df.ContextDir != "" {
-			buildCtx, err = context.New(df.ContextDir, file,
-				context.WithHeredocFiles(extractHeredocFiles(parseResult)))
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: failed to create build context: %v\n", err)
-			}
+			inv = invocationFromContextFlag(file, df.ContextDir)
 		}
 
 		result, err := linter.LintFile(linter.Input{
-			FilePath:     file,
-			Config:       cfg,
-			BuildContext: buildCtx,
-			ParseResult:  parseResult,
+			FilePath:    file,
+			Config:      cfg,
+			ParseResult: parseResult,
+			Invocation:  inv,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to lint %s: %w", file, err)
 		}
 
 		res.fileSources[file] = result.ParseResult.Source
+		if inv != nil {
+			addFileInvocation(res.fileInvocations, inv)
+		}
 		res.violations = append(res.violations, result.Violations...)
 		res.asyncPlans = append(res.asyncPlans, result.AsyncPlan...)
 	}
@@ -631,9 +895,9 @@ func handleLintError(err error) error {
 // writeReport formats and writes the violation report using the configured output path.
 func writeReport(
 	cmd *cli.Command, cfg *config.Config, violations []rules.Violation,
-	fileSources map[string][]byte, filesScanned int,
+	fileSources map[string][]byte, filesScanned, invocationsScanned int,
 ) error {
-	return writeReportTo(cmd, cfg, violations, fileSources, filesScanned, "")
+	return writeReportTo(cmd, cfg, violations, fileSources, filesScanned, invocationsScanned, "")
 }
 
 // writeReportTo formats and writes the violation report. If outputOverride is
@@ -641,7 +905,7 @@ func writeReport(
 // stdout free for fixed content in stdin mode).
 func writeReportTo(
 	cmd *cli.Command, cfg *config.Config, violations []rules.Violation,
-	fileSources map[string][]byte, filesScanned int, outputOverride string,
+	fileSources map[string][]byte, filesScanned, invocationsScanned int, outputOverride string,
 ) error {
 	outCfg := getOutputConfig(cmd, cfg)
 	if outputOverride != "" {
@@ -687,8 +951,9 @@ func writeReportTo(
 
 	rulesEnabled := len(linter.EnabledRuleCodes(cfg))
 	metadata := reporter.ReportMetadata{
-		FilesScanned: filesScanned,
-		RulesEnabled: rulesEnabled,
+		FilesScanned:       filesScanned,
+		InvocationsScanned: invocationsScanned,
+		RulesEnabled:       rulesEnabled,
 	}
 
 	if err := rep.Report(violations, fileSources, metadata); err != nil {
@@ -1083,23 +1348,42 @@ func validateDurationConfigs(cfg *config.Config, file string) {
 	}
 }
 
-// extractHeredocFiles extracts virtual file paths from heredoc COPY/ADD commands.
-// These are inline files created by heredoc syntax that should not be checked
-// against .dockerignore.
-func extractHeredocFiles(parseResult *dockerfile.ParseResult) map[string]bool {
-	return dockerfile.ExtractHeredocFiles(parseResult.Stages)
+func invocationFromContextFlag(file, contextDir string) *invocation.BuildInvocation {
+	if contextDir == "" {
+		return nil
+	}
+	inv, err := invocation.NewDockerfileInvocation(file, contextDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to normalize build context %q for %s: %v\n", contextDir, file, err)
+		return nil
+	}
+	return inv
+}
+
+func addFileInvocation(fileInvocations map[string]*invocation.BuildInvocation, inv *invocation.BuildInvocation) {
+	if inv == nil {
+		return
+	}
+	fileInvocations[inv.Key] = inv
+}
+
+func contextDirForViolation(v rules.Violation, fileInvocations map[string]*invocation.BuildInvocation) string {
+	if len(fileInvocations) == 0 {
+		return ""
+	}
+	inv := fileInvocations[v.InvocationKey]
+	if inv == nil || inv.ContextRef.Kind != invocation.ContextKindDir {
+		return ""
+	}
+	return inv.ContextRef.Value
 }
 
 // applyFixes applies automatic fixes to violations that have suggested fixes.
-// fileConfigs maps file paths to their per-file configs (for per-file fix modes).
+// input.fileConfigs maps file paths to their per-file configs.
 func applyFixes(
 	ctx stdcontext.Context,
 	cmd *cli.Command,
-	violations []rules.Violation,
-	sources map[string][]byte,
-	fileConfigs map[string]*config.Config,
-	asyncPlans []async.CheckRequest,
-	asyncResult *async.RunResult,
+	input applyFixesInput,
 ) (*fix.Result, error) {
 	// Determine safety threshold
 	safetyThreshold := fix.FixSafe
@@ -1111,12 +1395,12 @@ func applyFixes(
 	ruleFilter := cmd.StringSlice("fix-rule")
 
 	// Build per-file fix modes from fileConfigs
-	fixModes := buildPerFileFixModes(fileConfigs)
+	fixModes := buildPerFileFixModes(input.fileConfigs)
 
 	// Register AI resolver only when AI is enabled for at least one file config.
 	aiEnabled := false
-	normalizedConfigs := make(map[string]*config.Config, len(fileConfigs))
-	for path, cfg := range fileConfigs {
+	normalizedConfigs := make(map[string]*config.Config, len(input.fileConfigs))
+	for path, cfg := range input.fileConfigs {
 		normalizedConfigs[filepath.ToSlash(path)] = cfg
 		if cfg != nil && cfg.AI.Enabled {
 			aiEnabled = true
@@ -1126,7 +1410,7 @@ func applyFixes(
 		autofix.Register()
 	}
 
-	registryInsightsByFile := collectRegistryInsights(asyncPlans, asyncResult)
+	registryInsightsByFile := collectRegistryInsights(input.asyncPlans, input.asyncResult)
 
 	// Enrich AI resolver requests with per-file config + outer fix context.
 	fixCtx := autofixdata.FixContext{
@@ -1134,8 +1418,8 @@ func applyFixes(
 		RuleFilter:      ruleFilter,
 		FixModes:        fixModes,
 	}
-	for i := range violations {
-		v := &violations[i]
+	for i := range input.violations {
+		v := &input.violations[i]
 		for _, sf := range v.AllFixes() {
 			if !sf.NeedsResolve {
 				continue
@@ -1163,17 +1447,14 @@ func applyFixes(
 			if setter, ok := sf.ResolverData.(interface {
 				SetContextDir(dir string)
 			}); ok {
-				if dir := cmd.String("context"); dir != "" {
-					if abs, err := filepath.Abs(dir); err == nil {
-						dir = abs
-					}
+				if dir := contextDirForViolation(*v, input.fileInvocations); dir != "" {
 					setter.SetContextDir(dir)
 				}
 			}
 		}
 	}
 
-	aiFixes, maxAITimeout := planAcpFixSpinner(violations, safetyThreshold, ruleFilter, fixModes, normalizedConfigs)
+	aiFixes, maxAITimeout := planAcpFixSpinner(input.violations, safetyThreshold, ruleFilter, fixModes, normalizedConfigs)
 	stopSpinner := startAcpFixSpinner(aiFixes, maxAITimeout)
 	defer stopSpinner()
 
@@ -1184,7 +1465,7 @@ func applyFixes(
 		Concurrency:     4,
 	}
 
-	result, err := fixer.Apply(ctx, violations, sources)
+	result, err := fixer.Apply(ctx, input.violations, input.sources)
 	if err != nil {
 		return nil, err
 	}
@@ -1268,7 +1549,7 @@ func filterAsyncPlans(res *lintResults) ([]async.CheckRequest, time.Duration) {
 	procCtx := processor.NewContext(res.fileConfigs, res.firstCfg, res.fileSources)
 	filtered := processor.NewSeverityOverride().Process(res.violations, procCtx)
 	filtered = processor.NewEnableFilter().Process(filtered, procCtx)
-	errorFiles := filesWithErrors(filtered)
+	errorContexts := filesWithErrors(filtered)
 	maxTimeout := 20 * time.Second
 	plans := make([]async.CheckRequest, 0, len(res.asyncPlans))
 	var skippedAuto int
@@ -1291,7 +1572,7 @@ func filterAsyncPlans(res *lintResults) ([]async.CheckRequest, time.Duration) {
 		}
 
 		// Per-file fail-fast: skip if fast rules produced SeverityError.
-		if slowCfg.FailFast && errorFiles[req.File] {
+		if slowCfg.FailFast && errorContexts[asyncErrorKey(req.File, req.InvocationKey)] {
 			continue
 		}
 
@@ -1417,15 +1698,19 @@ func compactSingleLine(s string, maxLen int) string {
 	return s
 }
 
-// filesWithErrors returns a set of files that have SeverityError violations.
+// filesWithErrors returns a set of file/invocation pairs that have SeverityError violations.
 func filesWithErrors(violations []rules.Violation) map[string]bool {
 	m := make(map[string]bool)
 	for _, v := range violations {
 		if v.Severity == rules.SeverityError {
-			m[v.File()] = true
+			m[asyncErrorKey(v.File(), v.InvocationKey)] = true
 		}
 	}
 	return m
+}
+
+func asyncErrorKey(file, invocationKey string) string {
+	return invocationKey + "|" + filepath.ToSlash(file)
 }
 
 // filterFixedViolations removes violations that were fixed from the list.

@@ -87,8 +87,9 @@ type StageFacts struct {
 	// can be observed directly or loaded lazily at lint time.
 	ObservableFiles []*ObservableFile
 
-	// BuildContextSources records COPY/ADD sources resolved from the Docker
-	// build context, including .dockerignore evaluation results.
+	// BuildContextSources records COPY/ADD source references that resolve
+	// against the Docker build context, including whether the source is
+	// available in the resolved context.
 	BuildContextSources []*BuildContextSource
 
 	cacheDisablingEnv []EnvBinding
@@ -677,15 +678,19 @@ func recordCopyObservableFiles(
 			tracker.overwrite(file)
 			continue
 		}
-		if cmd.From != "" || !canObserveContextSource(src, sourceFact, contextFiles) {
+		if cmd.From != "" || sourceFact == nil || sourceFact.ObservableFileSourcePath == "" {
 			tracker.invalidate(destPath)
 			continue
 		}
-		sourcePath := src
-		if sourceFact != nil && sourceFact.NormalizedSourcePath != "" {
-			sourcePath = sourceFact.NormalizedSourcePath
-		}
-		file := contextObservableFile(destPath, ObservableFileSourceCopyContext, line, cmd.Chmod, cmd.Chown, sourcePath, contextFiles)
+		file := contextObservableFile(
+			destPath,
+			ObservableFileSourceCopyContext,
+			line,
+			cmd.Chmod,
+			cmd.Chown,
+			sourceFact.ObservableFileSourcePath,
+			contextFiles,
+		)
 		stageFacts.ObservableFiles = append(stageFacts.ObservableFiles, file)
 		tracker.overwrite(file)
 	}
@@ -737,41 +742,22 @@ func recordAddObservableFiles(
 		if !ok {
 			continue
 		}
-		if !canObserveAddContextSource(src, sourceFact, contextFiles) {
+		if sourceFact == nil || sourceFact.ObservableFileSourcePath == "" {
 			tracker.invalidate(destPath)
 			continue
 		}
-		sourcePath := src
-		if sourceFact != nil && sourceFact.NormalizedSourcePath != "" {
-			sourcePath = sourceFact.NormalizedSourcePath
-		}
-		file := contextObservableFile(destPath, ObservableFileSourceAddContext, line, cmd.Chmod, cmd.Chown, sourcePath, contextFiles)
+		file := contextObservableFile(
+			destPath,
+			ObservableFileSourceAddContext,
+			line,
+			cmd.Chmod,
+			cmd.Chown,
+			sourceFact.ObservableFileSourcePath,
+			contextFiles,
+		)
 		stageFacts.ObservableFiles = append(stageFacts.ObservableFiles, file)
 		tracker.overwrite(file)
 	}
-}
-
-func canObserveContextSource(sourcePath string, sourceFact *BuildContextSource, contextFiles ContextFileReader) bool {
-	if contextFiles == nil || sourcePath == "" {
-		return false
-	}
-	if sourceFact != nil && (sourceFact.IgnoredByDockerignore || sourceFact.IgnoreErr != nil) {
-		return false
-	}
-	if strings.ContainsAny(sourcePath, "*?[") {
-		return false
-	}
-	if sourceFact != nil && sourceFact.NormalizedSourcePath != "" {
-		sourcePath = sourceFact.NormalizedSourcePath
-	}
-	return contextFiles.FileExists(sourcePath)
-}
-
-func canObserveAddContextSource(sourcePath string, sourceFact *BuildContextSource, contextFiles ContextFileReader) bool {
-	if !canObserveContextSource(sourcePath, sourceFact, contextFiles) {
-		return false
-	}
-	return !shell.IsArchiveFilename(path.Base(sourcePath))
 }
 
 func copyStageObservableSource(
@@ -813,15 +799,58 @@ func analyzeBuildContextSource(
 
 	normalized := normalizeBuildContextSourcePath(sourcePath)
 	ignored, err := contextFiles.IsIgnored(normalized)
-	return &BuildContextSource{
-		Instruction:           instruction,
-		SourcePath:            sourcePath,
-		NormalizedSourcePath:  normalized,
-		Line:                  line,
-		Location:              location,
-		IgnoredByDockerignore: ignored,
-		IgnoreErr:             err,
+	isGlob := isContextSourceGlob(sourcePath)
+	// Globs expand during the build; probing the literal pattern would make
+	// PathExists/FileExists report unknown matches as missing.
+	available := isGlob
+	observableSourcePath := ""
+	if err == nil && !ignored && !isGlob {
+		var regularFile bool
+		available, regularFile = contextSourceAvailability(contextFiles, normalized)
+		if regularFile && canObserveBuildContextSource(instruction, normalized) {
+			observableSourcePath = normalized
+		}
 	}
+	return &BuildContextSource{
+		Instruction:              instruction,
+		SourcePath:               sourcePath,
+		NormalizedSourcePath:     normalized,
+		Line:                     line,
+		Location:                 location,
+		AvailableInContext:       available,
+		AvailabilityErr:          err,
+		ObservableFileSourcePath: observableSourcePath,
+	}
+}
+
+func isContextSourceGlob(sourcePath string) bool {
+	return strings.ContainsAny(sourcePath, "*?[")
+}
+
+func canObserveBuildContextSource(instruction, sourcePath string) bool {
+	return instruction != command.Add || !shell.IsArchiveFilename(path.Base(sourcePath))
+}
+
+type pathExister interface {
+	PathExists(path string) bool
+}
+
+func contextSourceAvailability(contextFiles ContextFileReader, normalized string) (availableInContext, regularFile bool) {
+	if contextFiles == nil {
+		return false, false
+	}
+
+	// A regular file is both available and observable; PathExists only broadens
+	// availability to valid directory sources.
+	if contextFiles.FileExists(normalized) {
+		return true, true
+	}
+
+	if paths, ok := contextFiles.(pathExister); ok {
+		return paths.PathExists(normalized), false
+	}
+
+	return false, false
 }
 
 func commandDropsPrivileges(cmdLine []string, stageFacts *StageFacts) bool {

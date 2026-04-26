@@ -18,7 +18,7 @@ import (
 	"github.com/wharflab/tally/internal/testutil"
 )
 
-// fakeBuildContext is a minimal rules.BuildContext for tests that need
+// fakeBuildContext is a minimal facts.ContextFileReader for tests that need
 // COPY sources to be observable (e.g., environment.yml suppression).
 type fakeBuildContext struct {
 	files map[string]bool
@@ -28,8 +28,6 @@ func (f *fakeBuildContext) IsIgnored(string) (bool, error)  { return false, nil 
 func (f *fakeBuildContext) FileExists(path string) bool     { return f.files[path] }
 func (f *fakeBuildContext) ReadFile(string) ([]byte, error) { return nil, nil }
 func (f *fakeBuildContext) IsHeredocFile(string) bool       { return false }
-func (f *fakeBuildContext) HasIgnoreFile() bool             { return false }
-func (f *fakeBuildContext) HasIgnoreExclusions() bool       { return false }
 
 func TestPreferUVOverCondaRule_Metadata(t *testing.T) {
 	t.Parallel()

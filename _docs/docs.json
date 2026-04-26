@@ -35,6 +35,7 @@
             "group": "Guides",
             "pages": [
               "guides/configuration",
+              "guides/build-invocations",
               "guides/auto-fix",
               "guides/ai-autofix",
               "guides/ci-cd",

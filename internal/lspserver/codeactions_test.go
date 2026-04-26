@@ -1,6 +1,7 @@
 package lspserver
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,6 +72,95 @@ func TestMatchingDiagnostics(t *testing.T) {
 	matched := matchingDiagnostics(v, diags)
 	assert.Len(t, matched, 1)
 	assert.Equal(t, "test message", matched[0].Message)
+}
+
+func TestCodeActionsForDocument_FiltersInvocationContextsByRequestedRange(t *testing.T) {
+	t.Parallel()
+
+	s := New()
+	content := "FROM alpine\nRUN apt-get update\nRUN echo later\n"
+	uri := protocol.DocumentUri("file:///test/Dockerfile")
+	doc := &Document{
+		URI:     string(uri),
+		Version: 1,
+		Content: content,
+	}
+
+	selectedLoc := rules.NewRangeLocation("/test/Dockerfile", 2, 0, 2, 18)
+	selected := rules.NewViolation(selectedLoc, "tally/selected-rule", "selected msg", rules.SeverityWarning).
+		WithSuggestedFix(&rules.SuggestedFix{
+			Description: "Fix selected violation",
+			Safety:      rules.FixSafe,
+			Edits:       []rules.TextEdit{{Location: selectedLoc, NewText: "RUN apt-get update && true"}},
+		})
+	selected.InvocationKey = "bake://target:selected"
+
+	otherLoc := rules.NewRangeLocation("/test/Dockerfile", 3, 0, 3, 14)
+	other := rules.NewViolation(otherLoc, "tally/other-rule", "other msg", rules.SeverityWarning).
+		WithSuggestedFix(&rules.SuggestedFix{
+			Description: "Fix unrelated violation",
+			Safety:      rules.FixSafe,
+			Edits:       []rules.TextEdit{{Location: otherLoc, NewText: "RUN echo fixed"}},
+		})
+	other.InvocationKey = "bake://target:other"
+
+	parseResult := parseDockerfile(t, []byte(content))
+	s.lintCache.set(doc.URI, doc.Version, []rules.Violation{selected, other}, nil, parseResult)
+
+	params := makeCodeActionParams(
+		uri,
+		protocol.Range{
+			Start: protocol.Position{Line: 1, Character: 0},
+			End:   protocol.Position{Line: 1, Character: 18},
+		},
+		&protocol.CodeActionContext{},
+	)
+
+	actions := s.codeActionsForDocument(context.Background(), doc, params)
+	titles := codeActionTitles(actions)
+
+	assert.Contains(t, titles, "Fix selected violation")
+	assert.Contains(t, titles, "Fix all auto-fixable issues")
+	assert.Contains(t, titles, "Suppress tally/selected-rule for this line")
+	assert.Contains(t, titles, "Suppress tally/selected-rule for this file")
+	assert.NotContains(t, titles, "Fix unrelated violation")
+	assert.NotContains(t, titles, "Suppress tally/other-rule for this line")
+}
+
+func TestFilterViolationsForParams_IncludesCursorWithinViolation(t *testing.T) {
+	t.Parallel()
+
+	first := rules.NewViolation(
+		rules.NewRangeLocation("Dockerfile", 2, 0, 2, 18),
+		"tally/first-rule",
+		"first msg",
+		rules.SeverityWarning,
+	)
+	first.InvocationKey = "bake://target:first"
+
+	second := rules.NewViolation(
+		rules.NewRangeLocation("Dockerfile", 4, 0, 4, 12),
+		"tally/second-rule",
+		"second msg",
+		rules.SeverityWarning,
+	)
+	second.InvocationKey = "bake://target:second"
+
+	params := makeCodeActionParams(
+		"file:///test/Dockerfile",
+		protocol.Range{
+			Start: protocol.Position{Line: 1, Character: 5},
+			End:   protocol.Position{Line: 1, Character: 5},
+		},
+		&protocol.CodeActionContext{},
+	)
+
+	filtered := filterViolationsForParams([]rules.Violation{first, second}, params)
+
+	require.Len(t, filtered, 1)
+	assert.Equal(t, "tally/first-rule", filtered[0].RuleCode)
+	assert.True(t, hasMultipleInvocationContexts([]rules.Violation{first, second}))
+	assert.False(t, hasMultipleInvocationContexts(filtered))
 }
 
 func TestQuickFixActions_MultiFix(t *testing.T) {
@@ -342,4 +432,12 @@ func fullRange() protocol.Range {
 		Start: protocol.Position{Line: 0, Character: 0},
 		End:   protocol.Position{Line: 100, Character: 0},
 	}
+}
+
+func codeActionTitles(actions []protocol.CodeAction) []string {
+	titles := make([]string, 0, len(actions))
+	for _, action := range actions {
+		titles = append(titles, action.Title)
+	}
+	return titles
 }

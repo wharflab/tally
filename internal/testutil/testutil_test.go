@@ -41,8 +41,8 @@ func TestMakeLintInput(t *testing.T) {
 	if string(input.Source) != content {
 		t.Errorf("Source = %q, want %q", string(input.Source), content)
 	}
-	if input.Context != nil {
-		t.Error("Context should be nil")
+	if input.InvocationContext != nil {
+		t.Error("InvocationContext should be nil")
 	}
 	if input.Config != nil {
 		t.Error("Config should be nil")

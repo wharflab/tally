@@ -40,36 +40,100 @@ func (s *Server) codeActionsForDocument(
 		}
 	}
 
-	actions := make([]protocol.CodeAction, 0, len(violations)+1)
+	filteredViolations := filterViolationsForParams(violations, params)
+	multipleInvocationContexts := hasMultipleInvocationContexts(filteredViolations)
+	fixAllViolations := violationsForFixAll(violations, filteredViolations)
+	fixAllMultipleInvocationContexts := hasMultipleInvocationContexts(fixAllViolations)
+	actions := make([]protocol.CodeAction, 0, len(filteredViolations)+1)
 
-	if includeQuickFix {
+	if includeQuickFix && !multipleInvocationContexts {
 		resolveFn := func(sf *rules.SuggestedFix) []rules.TextEdit {
 			return resolveFixEdits(ctx, doc, sf)
 		}
-		actions = append(actions, quickFixActions(violations, params, resolveFn)...)
+		actions = append(actions, quickFixActions(filteredViolations, params, resolveFn)...)
 	}
 
-	if includeFixAll {
-		if action := s.fixAllCodeAction(doc, violations); action != nil {
+	if includeFixAll && !fixAllMultipleInvocationContexts {
+		if action := s.fixAllCodeAction(doc, fixAllViolations); action != nil {
 			actions = append(actions, *action)
 		}
 	}
 
 	// Suppress-rule actions: inject # tally ignore= directives.
-	if includeSuppress && s.suppressRuleEnabled(doc.URI) {
+	if includeSuppress && !multipleInvocationContexts && s.suppressRuleEnabled(doc.URI) {
 		entry, cached := s.lintCache.getEntry(doc.URI, doc.Version)
 		if cached {
-			actions = append(actions, suppressRuleActions(violations, params, doc.Content, entry.parseResult, entry.config)...)
+			actions = append(actions, suppressRuleActions(filteredViolations, params, doc.Content, entry.parseResult, entry.config)...)
 		}
 	}
 
 	// Show documentation actions (no Kind filter — they have nil kind and appear
 	// in the full lightbulb menu regardless of the Only filter).
 	if s.showDocEnabled(doc.URI) && s.showDocumentSupported {
-		actions = append(actions, showDocActions(violations, params)...)
+		actions = append(actions, showDocActions(filteredViolations, params)...)
 	}
 
 	return actions
+}
+
+func violationsForFixAll(violations, filteredViolations []rules.Violation) []rules.Violation {
+	if len(filteredViolations) > 0 {
+		return filteredViolations
+	}
+	// Source fix-all requests can arrive at an arbitrary cursor position with no
+	// diagnostics in context. Keep those whole-document source actions available.
+	return violations
+}
+
+func filterViolationsForParams(violations []rules.Violation, params *protocol.CodeActionParams) []rules.Violation {
+	if params == nil {
+		return violations
+	}
+
+	filtered := make([]rules.Violation, 0, len(violations))
+	for _, v := range violations {
+		if violationMatchesCodeActionParams(v, params) {
+			filtered = append(filtered, v)
+		}
+	}
+	return filtered
+}
+
+func violationMatchesCodeActionParams(v rules.Violation, params *protocol.CodeActionParams) bool {
+	if params == nil {
+		return true
+	}
+
+	vRange := violationRange(v)
+	if rangesOverlap(vRange, params.Range) {
+		return true
+	}
+	if rangeIsEmpty(params.Range) && rangeContainsPosition(vRange, params.Range.Start) {
+		return true
+	}
+	if params.Context != nil && len(matchingDiagnostics(v, params.Context.Diagnostics)) > 0 {
+		return true
+	}
+	return false
+}
+
+// hasMultipleInvocationContexts reports whether violations span two or more
+// distinct non-empty InvocationKey values. Empty keys are invocation-agnostic
+// direct-scan diagnostics, so mixing "" with one non-empty key is still one
+// context. InvocationKey is the stable identity used for dedupe and async
+// merging.
+func hasMultipleInvocationContexts(violations []rules.Violation) bool {
+	seen := map[string]struct{}{}
+	for _, v := range violations {
+		if v.InvocationKey == "" {
+			continue
+		}
+		seen[v.InvocationKey] = struct{}{}
+		if len(seen) > 1 {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) suppressRuleEnabled(docURI string) bool {
@@ -116,8 +180,7 @@ func quickFixActions(
 			continue
 		}
 
-		vRange := violationRange(v)
-		if !rangesOverlap(vRange, params.Range) {
+		if !violationMatchesCodeActionParams(v, params) {
 			continue
 		}
 
@@ -231,6 +294,21 @@ func rangesOverlap(a, b protocol.Range) bool {
 		return false
 	}
 	return true
+}
+
+func rangeIsEmpty(r protocol.Range) bool {
+	return r.Start.Line == r.End.Line && r.Start.Character == r.End.Character
+}
+
+func rangeContainsPosition(r protocol.Range, p protocol.Position) bool {
+	return !positionBefore(p, r.Start) && positionBefore(p, r.End)
+}
+
+func positionBefore(a, b protocol.Position) bool {
+	if a.Line != b.Line {
+		return a.Line < b.Line
+	}
+	return a.Character < b.Character
 }
 
 // matchingDiagnostics finds diagnostics that match a violation by message and range.

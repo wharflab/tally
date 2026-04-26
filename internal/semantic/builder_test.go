@@ -11,6 +11,39 @@ import (
 
 const testShellBash = "bash"
 
+func TestTargetStageResolution(t *testing.T) {
+	t.Parallel()
+
+	stages := []instructions.Stage{
+		{Name: "builder"},
+		{Name: "runtime"},
+	}
+
+	tests := []struct {
+		name     string
+		override string
+		wantIdx  int
+		wantName string
+	}{
+		{"empty override falls back to last", "", 1, "runtime"},
+		{"matched override wins", "builder", 0, "builder"},
+		{"unknown override falls back to last", "missing", 1, "runtime"},
+		{"case-insensitive match", "BUILDER", 0, "builder"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := targetStageIndex(stages, tc.override); got != tc.wantIdx {
+				t.Errorf("targetStageIndex(%q) = %d, want %d", tc.override, got, tc.wantIdx)
+			}
+			if got := effectiveTargetStageName(stages, tc.override); got != tc.wantName {
+				t.Errorf("effectiveTargetStageName(%q) = %q, want %q", tc.override, got, tc.wantName)
+			}
+		})
+	}
+}
+
 func TestBuilderWithShellDirectivesAppliesToFollowingStages(t *testing.T) {
 	t.Parallel()
 	content := `FROM alpine:3.18 AS s0

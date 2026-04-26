@@ -39,6 +39,27 @@ description: "Lint your first Dockerfile in under a minute."
     tally discovers files matching `Dockerfile`, `Dockerfile.*`, `*.Dockerfile`, `Containerfile`, and `Containerfile.*`.
   </Step>
 
+  <Step title="Lint a Bake or Compose entrypoint">
+    If your build is defined by Docker Buildx Bake or Docker Compose, pass that file directly:
+
+    ```bash
+    # Lint Bake targets from the default group
+    tally lint docker-bake.hcl
+
+    # Lint Compose services with build sections
+    tally lint compose.yaml
+    ```
+
+    Use `--target` for Bake targets or groups and `--service` for Compose services:
+
+    ```bash
+    tally lint docker-bake.hcl --target api
+    tally lint compose.yaml --service api
+    ```
+
+    See [Build invocations](/guides/build-invocations) for context handling, output attribution, and limitations.
+  </Step>
+
   <Step title="Read the output">
     By default tally prints human-readable output with source snippets:
 
@@ -85,11 +106,13 @@ description: "Lint your first Dockerfile in under a minute."
   </Step>
 
   <Step title="Enable context-aware rules">
-    Pass `--context` to unlock rules that check `.dockerignore` interactions:
+    In direct Dockerfile mode, pass `--context` to unlock rules that check `.dockerignore` interactions:
 
     ```bash
     tally lint --context . Dockerfile
     ```
+
+    Bake and Compose entrypoints derive the build context from the selected target or service, so they do not use `--context`.
   </Step>
 
   <Step title="Suppress a violation inline">
@@ -128,6 +151,9 @@ cat Dockerfile | tally lint --fix - > Dockerfile.fixed
 <CardGroup cols={2}>
   <Card title="Configuration" icon="gear" href="/guides/configuration">
     Full reference for `.tally.toml`, environment variables, and CLI flags.
+  </Card>
+  <Card title="Build invocations" icon="layers" href="/guides/build-invocations">
+    Lint Dockerfiles through Bake targets and Compose services.
   </Card>
   <Card title="Auto-fix" icon="wand-magic-sparkles" href="/guides/auto-fix">
     Learn about safe and unsafe fixes, and per-rule fix modes.

@@ -27,26 +27,29 @@ func MergeAsyncViolations(fast []rules.Violation, asyncResult *async.RunResult) 
 	}
 
 	type ruleFileStage struct {
-		ruleCode   string
-		file       string
-		stageIndex int
+		ruleCode      string
+		invocationKey string
+		file          string
+		stageIndex    int
 	}
 
 	completedSet := make(map[ruleFileStage]bool, len(asyncResult.Completed))
 	for _, c := range asyncResult.Completed {
 		completedSet[ruleFileStage{
-			ruleCode:   c.RuleCode,
-			file:       c.File,
-			stageIndex: c.StageIndex,
+			ruleCode:      c.RuleCode,
+			invocationKey: c.InvocationKey,
+			file:          c.File,
+			stageIndex:    c.StageIndex,
 		}] = true
 	}
 
 	merged := make([]rules.Violation, 0, len(fast)+len(asyncViolations))
 	for _, v := range fast {
 		if completedSet[ruleFileStage{
-			ruleCode:   v.RuleCode,
-			file:       v.File(),
-			stageIndex: v.StageIndex,
+			ruleCode:      v.RuleCode,
+			invocationKey: v.InvocationKey,
+			file:          v.File(),
+			stageIndex:    v.StageIndex,
 		}] {
 			continue
 		}

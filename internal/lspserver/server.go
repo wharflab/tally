@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	jsonv2 "encoding/json/v2"
 	"golang.org/x/exp/jsonrpc2"
@@ -52,6 +53,10 @@ type Server struct {
 
 	settingsMu sync.RWMutex
 	settings   clientSettings
+
+	watchedFilesMu    sync.Mutex
+	watchedFilesTimer *time.Timer
+	watchedFilesSeq   uint64
 
 	diagMu                     sync.RWMutex
 	pushDiagnostics            bool
@@ -255,6 +260,10 @@ func (s *Server) handle(ctx context.Context, req *jsonrpc2.Request) (any, error)
 	case string(protocol.MethodWorkspaceDidChangeConfiguration):
 		return nil, unmarshalAndNotify(req, func(p *protocol.DidChangeConfigurationParams) {
 			s.handleDidChangeConfiguration(ctx, p)
+		})
+	case string(protocol.MethodWorkspaceDidChangeWatchedFiles):
+		return nil, unmarshalAndNotify(req, func(p *protocol.DidChangeWatchedFilesParams) {
+			s.handleDidChangeWatchedFiles(ctx, p)
 		})
 	case string(protocol.MethodWorkspaceExecuteCommand):
 		return unmarshalAndCall(req, func(p *protocol.ExecuteCommandParams) (any, error) {

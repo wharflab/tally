@@ -23,6 +23,10 @@ Apply unsafe fixes too (includes AI-powered fixes when enabled):
 tally lint --fix --fix-unsafe Dockerfile
 ```
 
+<Warning>
+  `--fix` is not supported when the lint entrypoint is a Bake or Compose file. Lint the Dockerfile directly when you want tally to modify files.
+</Warning>
+
 Limit fixes to specific rules:
 
 ```bash

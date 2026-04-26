@@ -25,8 +25,7 @@ func showDocActions(violations []rules.Violation, params *protocol.CodeActionPar
 			continue
 		}
 
-		vRange := violationRange(v)
-		if !rangesOverlap(vRange, params.Range) {
+		if !violationMatchesCodeActionParams(v, params) {
 			continue
 		}
 

@@ -130,6 +130,13 @@ func (ctx *BuildContext) FileExists(path string) bool {
 	return err == nil
 }
 
+// PathExists checks if a file or directory exists in the build context.
+// The path should be relative to the build context.
+func (ctx *BuildContext) PathExists(path string) bool {
+	_, _, err := ctx.resolveExistingPath(path, false)
+	return err == nil
+}
+
 // ReadFile reads a regular file from the build context.
 // The path must be relative to the context root.
 func (ctx *BuildContext) ReadFile(path string) ([]byte, error) {
@@ -205,33 +212,6 @@ func (ctx *BuildContext) Patterns() []string {
 	return ctx.patterns
 }
 
-// HasIgnoreFile returns true if a .dockerignore file exists.
-func (ctx *BuildContext) HasIgnoreFile() bool {
-	if err := ctx.ensureInitialized(); err != nil {
-		return false
-	}
-
-	ctx.mu.RLock()
-	defer ctx.mu.RUnlock()
-	return len(ctx.patterns) > 0
-}
-
-// HasIgnoreExclusions returns true if .dockerignore contains negated patterns (lines starting with !).
-// When exclusions exist, static copy-source validation is unreliable because
-// a directory may be excluded but a file inside it re-included.
-func (ctx *BuildContext) HasIgnoreExclusions() bool {
-	if err := ctx.ensureInitialized(); err != nil {
-		return false
-	}
-
-	ctx.mu.RLock()
-	defer ctx.mu.RUnlock()
-	if ctx.patternMatcher == nil {
-		return false
-	}
-	return ctx.patternMatcher.Exclusions()
-}
-
 // ensureInitialized lazily loads .dockerignore patterns.
 func (ctx *BuildContext) ensureInitialized() error {
 	ctx.mu.Lock()
@@ -255,12 +235,22 @@ func (ctx *BuildContext) ensureInitialized() error {
 }
 
 func (ctx *BuildContext) resolvePath(path string) (string, string, error) {
+	return ctx.resolveExistingPath(path, true)
+}
+
+func (ctx *BuildContext) resolveExistingPath(path string, regularOnly bool) (string, string, error) {
 	normalized := filepath.Clean(filepath.FromSlash(path))
-	if normalized == "" || normalized == "." || filepath.IsAbs(normalized) {
+	if normalized == "" || filepath.IsAbs(normalized) {
+		return "", "", os.ErrNotExist
+	}
+	if normalized == "." && regularOnly {
 		return "", "", os.ErrNotExist
 	}
 
-	fullPath := filepath.Join(ctx.ContextDir, normalized)
+	fullPath := ctx.ContextDir
+	if normalized != "." {
+		fullPath = filepath.Join(ctx.ContextDir, normalized)
+	}
 	rel, err := filepath.Rel(ctx.ContextDir, fullPath)
 	if err != nil {
 		return "", "", err
@@ -270,14 +260,31 @@ func (ctx *BuildContext) resolvePath(path string) (string, string, error) {
 	}
 
 	key := filepath.ToSlash(rel)
-	if err := ctx.validateRegularPath(normalized); err != nil {
+	if err := ctx.validateExistingPath(normalized, regularOnly); err != nil {
 		return key, fullPath, err
 	}
 
 	return key, fullPath, nil
 }
 
-func (ctx *BuildContext) validateRegularPath(normalized string) error {
+func (ctx *BuildContext) validateExistingPath(normalized string, regularOnly bool) error {
+	if normalized == "." {
+		fi, err := ctx.lstat(ctx.ContextDir)
+		if err != nil {
+			return err
+		}
+		if fi.Mode()&os.ModeSymlink != 0 {
+			return errNotRegularFile
+		}
+		if regularOnly && !fi.Mode().IsRegular() {
+			return errNotRegularFile
+		}
+		if !regularOnly && !fi.Mode().IsRegular() && !fi.IsDir() {
+			return errNotRegularFile
+		}
+		return nil
+	}
+
 	current := ctx.ContextDir
 	parts := strings.Split(normalized, string(filepath.Separator))
 	for idx, part := range parts {
@@ -292,7 +299,10 @@ func (ctx *BuildContext) validateRegularPath(normalized string) error {
 		}
 		isLast := idx == len(parts)-1
 		if isLast {
-			if !mode.IsRegular() {
+			if regularOnly && !mode.IsRegular() {
+				return errNotRegularFile
+			}
+			if !regularOnly && !mode.IsRegular() && !fi.IsDir() {
 				return errNotRegularFile
 			}
 			continue

@@ -18,8 +18,10 @@ import (
 
 	protocol "github.com/wharflab/tally/internal/lsp/protocol"
 
+	"github.com/wharflab/tally/internal/async"
 	"github.com/wharflab/tally/internal/config"
 	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/invocation"
 	"github.com/wharflab/tally/internal/linter"
 	"github.com/wharflab/tally/internal/processor"
 	"github.com/wharflab/tally/internal/rules"
@@ -383,6 +385,10 @@ func (s *Server) lintContentWithConfig(
 	parseResult *dockerfile.ParseResult,
 ) lintResult {
 	filePath := uriToPath(docURI)
+	if invocations := s.invocationsForDocument(ctx, filePath); len(invocations) > 0 {
+		return s.lintContentWithInvocations(ctx, docURI, content, cfg, parseResult, invocations)
+	}
+
 	input := linter.Input{
 		FilePath:    filePath,
 		Content:     content,
@@ -415,16 +421,167 @@ func (s *Server) lintContentWithConfig(
 	}
 }
 
+func (s *Server) lintContentWithInvocations(
+	ctx context.Context,
+	docURI string,
+	content []byte,
+	cfg *config.Config,
+	parseResult *dockerfile.ParseResult,
+	invocations []invocation.BuildInvocation,
+) lintResult {
+	filePath := uriToPath(docURI)
+	var (
+		violations []rules.Violation
+		asyncPlans []async.CheckRequest
+		parsed     = parseResult
+		resolved   = cfg
+	)
+
+	for _, inv := range invocations {
+		input := linter.Input{
+			FilePath:    filePath,
+			Content:     content,
+			Config:      cfg,
+			ParseResult: parsed,
+			Invocation:  &inv,
+		}
+		result, err := linter.LintFile(input)
+		if err != nil {
+			log.Printf("lsp: lint error for %s (%s): %v", input.FilePath, invocation.LabelForSource(&inv.Source), err)
+			continue
+		}
+		if parsed == nil {
+			parsed = result.ParseResult
+		}
+		resolved = result.Config
+		violations = append(violations, result.Violations...)
+		asyncPlans = append(asyncPlans, result.AsyncPlan...)
+	}
+
+	if len(violations) == 0 && parsed == nil {
+		return lintResult{config: resolved}
+	}
+	asyncResult := s.runAsyncChecks(ctx, filePath, content, resolved, violations, asyncPlans)
+	if asyncResult != nil {
+		violations = linter.MergeAsyncViolations(violations, asyncResult)
+	}
+
+	chain := linter.LSPProcessors()
+	procCtx := processor.NewContext(
+		map[string]*config.Config{filePath: resolved},
+		resolved,
+		map[string][]byte{filePath: content},
+	)
+	return lintResult{
+		violations:  chain.Process(violations, procCtx),
+		config:      resolved,
+		parseResult: parsed,
+	}
+}
+
+func (s *Server) invocationsForDocument(ctx context.Context, filePath string) []invocation.BuildInvocation {
+	root, settings := s.workspaceSettingsForFile(filePath)
+	if len(settings.InvocationEntrypoints) == 0 {
+		return nil
+	}
+	if root == "" {
+		root = filepath.Dir(filePath)
+	}
+	filePath = filepath.Clean(filePath)
+
+	var out []invocation.BuildInvocation
+	for _, entrypoint := range settings.InvocationEntrypoints {
+		if !filepath.IsAbs(entrypoint) {
+			entrypoint = filepath.Join(root, entrypoint)
+		}
+		result, err := discoverLSPEntrypoint(ctx, entrypoint)
+		if err != nil {
+			log.Printf("lsp: invocation entrypoint %s: %v", entrypoint, err)
+			continue
+		}
+		for _, inv := range result.Invocations {
+			if filepath.Clean(inv.DockerfilePath) == filePath {
+				out = append(out, inv)
+			}
+		}
+	}
+	return out
+}
+
+func discoverLSPEntrypoint(ctx context.Context, entrypoint string) (*invocation.DiscoveryResult, error) {
+	ext := strings.ToLower(filepath.Ext(entrypoint))
+	switch ext {
+	case ".hcl":
+		return (invocation.BakeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})
+	case ".json":
+		if kind, ok := invocation.ProbeEntrypointKind(entrypoint); ok {
+			return discoverLSPEntrypointByKind(ctx, entrypoint, kind)
+		}
+		result, err := (invocation.BakeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})
+		if err == nil && len(result.Invocations) > 0 {
+			return result, nil
+		}
+		return (invocation.ComposeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})
+	case ".yml", ".yaml":
+		return (invocation.ComposeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})
+	default:
+		kind, ok := invocation.ProbeEntrypointKind(entrypoint)
+		if !ok {
+			return nil, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", entrypoint)
+		}
+		return discoverLSPEntrypointByKind(ctx, entrypoint, kind)
+	}
+}
+
+func discoverLSPEntrypointByKind(ctx context.Context, entrypoint, kind string) (*invocation.DiscoveryResult, error) {
+	switch kind {
+	case invocation.KindCompose:
+		result, composeErr := (invocation.ComposeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})
+		if composeErr != nil {
+			return nil, composeErr
+		}
+		if len(result.Invocations) > 0 {
+			return result, nil
+		}
+		if bakeResult, bakeErr := (invocation.BakeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint}); bakeErr == nil {
+			return bakeResult, nil
+		}
+		return result, nil
+	case invocation.KindBake:
+		return (invocation.BakeProvider{}).Discover(ctx, invocation.ResolveOptions{Path: entrypoint})
+	default:
+		return nil, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", entrypoint)
+	}
+}
+
 // convertDiagnostics converts tally violations to LSP diagnostics.
 func convertDiagnostics(violations []rules.Violation) []*protocol.Diagnostic {
 	diagnostics := make([]*protocol.Diagnostic, 0, len(violations))
 	for _, v := range violations {
+		source := "tally"
+		if v.Invocation != nil {
+			source = "tally/" + v.Invocation.Kind
+			if v.Invocation.Name != "" {
+				source += ":" + v.Invocation.Name
+			}
+		}
 		d := &protocol.Diagnostic{
 			Range:    violationRange(v),
-			Severity: new(severityToLSP(v.Severity)),
-			Source:   new("tally"),
-			Code:     &protocol.IntegerOrString{String: new(v.RuleCode)},
+			Severity: ptrTo(severityToLSP(v.Severity)),
+			Source:   ptrTo(source),
+			Code:     &protocol.IntegerOrString{String: ptrTo(v.RuleCode)},
 			Message:  v.Message,
+		}
+		if v.Invocation != nil {
+			data := any(map[string]any{
+				"invocation": map[string]string{
+					"kind": v.Invocation.Kind,
+					"file": v.Invocation.File,
+					"name": v.Invocation.Name,
+					"key":  v.InvocationKey,
+				},
+			})
+			d.Data = &data
 		}
 		if v.DocURL != "" {
 			d.CodeDescription = &protocol.CodeDescription{

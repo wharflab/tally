@@ -51,8 +51,7 @@ func suppressRuleActions(
 	var actions []protocol.CodeAction
 
 	for _, v := range violations {
-		vRange := violationRange(v)
-		if !rangesOverlap(vRange, params.Range) {
+		if !violationMatchesCodeActionParams(v, params) {
 			continue
 		}
 

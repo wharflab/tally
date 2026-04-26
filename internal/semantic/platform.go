@@ -45,7 +45,7 @@ func resolvePlatformExpr(expr string, model *Model) (string, []string) {
 	}
 
 	// Build an environment from meta ARGs + build args + automatic platform args.
-	env := newFromEnv(defaultFromArgs(targetStageName(model.stages), model.buildArgs))
+	env := newFromEnv(defaultFromArgs(model.TargetStageName(), model.buildArgs))
 
 	// Add meta ARGs.
 	for _, ma := range model.metaArgs {

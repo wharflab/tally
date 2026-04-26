@@ -408,6 +408,51 @@ func TestTextReporter_Print(t *testing.T) {
 	}
 }
 
+func TestTextReporter_PrintReport_PluralizesInvocationSummary(t *testing.T) {
+	t.Parallel()
+
+	colorOff := false
+	r := NewTextReporter(TextOptions{Color: &colorOff})
+	violations := []rules.Violation{{
+		Location: rules.NewLineLocation("Dockerfile", 1),
+		RuleCode: "TestRule",
+		Message:  "Test message",
+		Severity: rules.SeverityWarning,
+	}}
+
+	var singular bytes.Buffer
+	err := r.PrintReport(&singular, violations, nil, ReportMetadata{
+		FilesScanned:       1,
+		InvocationsScanned: 1,
+	})
+	if err != nil {
+		t.Fatalf("PrintReport failed: %v", err)
+	}
+	if !strings.Contains(singular.String(), "Summary: 1 Dockerfile, 1 invocation, 1 violation.") {
+		t.Fatalf("summary did not singularize:\n%s", singular.String())
+	}
+
+	var plural bytes.Buffer
+	err = r.PrintReport(&plural, []rules.Violation{
+		violations[0],
+		{
+			Location: rules.NewLineLocation("other.Dockerfile", 1),
+			RuleCode: "TestRule",
+			Message:  "Other message",
+			Severity: rules.SeverityWarning,
+		},
+	}, nil, ReportMetadata{
+		FilesScanned:       2,
+		InvocationsScanned: 2,
+	})
+	if err != nil {
+		t.Fatalf("PrintReport plural failed: %v", err)
+	}
+	if !strings.Contains(plural.String(), "Summary: 2 Dockerfiles, 2 invocations, 2 violations.") {
+		t.Fatalf("summary did not pluralize:\n%s", plural.String())
+	}
+}
+
 func TestTextReporter_Print_ClearsDocCacheBetweenCalls(t *testing.T) {
 	t.Parallel()
 
