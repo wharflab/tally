@@ -12,6 +12,37 @@ permissions:
 env:
   GOEXPERIMENT: jsonv2
 jobs:
+  metrics:
+    name: Mehen Metrics
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ophidiarium/mehen@codex/github-action-metrics
+        with:
+          install-method: cargo
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          paths: |
+            main.go
+            cmd
+            internal
+            _tools
+            _integrations/vscode-tally/src
+            _integrations/vscode-tally/test
+            _integrations/zed-tally
+            packaging/pypi
+            scripts
+          exclude: |
+            **/node_modules/**
+            **/target/**
+            **/dist/**
+
   # Producer job: rebuilds/restores shellcheck.wasm from the buildx GHA cache
   # (~15s on cache hit) and uploads it as a workflow artifact for
   # test-windows, which cannot run BuildKit. Linux jobs here call the
