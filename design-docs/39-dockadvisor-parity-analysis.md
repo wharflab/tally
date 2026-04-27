@@ -467,7 +467,7 @@ Validate that the protocol suffix in `EXPOSE` is one of `tcp` or `udp` (case-ins
 
 Dockadvisor computes a 0–100 score using the formula:
 
-```
+```text
 score = 100 − (errors × 15 + warnings × 5)
 ```
 
@@ -479,6 +479,7 @@ computes a similar quality metric, though this would need careful design to avoi
 ### C. Dockadvisor's `InvalidDefaultArgInFrom` vs BuildKit's Implementation
 
 Both dockadvisor and tally implement `InvalidDefaultArgInFrom`, but via different mechanisms:
+
 - **Dockadvisor** reimplements the check from scratch using regex-based variable extraction.
 - **Tally** delegates to BuildKit's own `linter.RuleInvalidDefaultArgInFrom` which is the
   authoritative implementation.
@@ -510,6 +511,7 @@ structured command objects, heredoc unpacking, or BuildKit's own build-time vali
 
 Tally uses `instructions.Parse` to get structured `instructions.Command` objects, enabling
 checks like:
+
 - Detecting `COPY --from` references to non-existent stages (stage graph analysis)
 - Checking heredoc body content
 - Analysing `RUN --mount` flag combinations

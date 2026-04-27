@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: ophidiarium/mehen@codex/github-action-metrics
+      - uses: ophidiarium/mehen@v0
         with:
           install-method: cargo
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -42,7 +42,6 @@ jobs:
             **/node_modules/**
             **/target/**
             **/dist/**
-
   # Producer job: rebuilds/restores shellcheck.wasm from the buildx GHA cache
   # (~15s on cache hit) and uploads it as a workflow artifact for
   # test-windows, which cannot run BuildKit. Linux jobs here call the

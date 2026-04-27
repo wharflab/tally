@@ -31,12 +31,15 @@ Tally source-of-truth used here:
 
 ## Executive summary
 
-- **Most dockerfilelint “implemented” checks are already covered in Tally** via either BuildKit parser checks, Hadolint-backed rules, or existing Tally rules.
+- **Most dockerfilelint “implemented” checks are already covered in Tally** via either BuildKit parser checks, Hadolint-backed rules, or existing
+  Tally rules.
 - **Highest-value gaps for Tally** (relative to dockerfilelint):
   1. **`apt-get_recommends`** equivalent (`--no-install-recommends`) — straightforward and still useful.
   2. **`apt-get update` must be paired with `apt-get install` in the same RUN** — somewhat opinionated but often desirable in CI policy profiles.
-  3. **LABEL `key=value` structural validation parity** — mostly parser/BuildKit already validates syntax; additional policy might still add value for consistency.
-- Many unchecked dockerfilelint “planned” ideas are either outdated (e.g., one `ENV` line for cache layers), conflicting with modern multi-stage best practices, or already better handled by existing Tally/BuildKit/Hadolint rules.
+  3. **LABEL `key=value` structural validation parity** — mostly parser/BuildKit already validates syntax; additional policy might still add value for
+     consistency.
+- Many unchecked dockerfilelint “planned” ideas are either outdated (e.g., one `ENV` line for cache layers), conflicting with modern multi-stage best
+  practices, or already better handled by existing Tally/BuildKit/Hadolint rules.
 
 ---
 
@@ -111,7 +114,8 @@ Legend:
 
 #### 4) `label_invalid` parity (optional)
 
-- **Why it may be worth adding:** improves explicit feedback quality for key/value format violations even if parser already rejects many malformed cases.
+- **Why it may be worth adding:** improves explicit feedback quality for key/value format violations even if parser already rejects many malformed
+  cases.
 - **dockerfilelint implementation:**
   - <https://github.com/replicatedhq/dockerfilelint/blob/main/lib/checks.js>
   - <https://github.com/replicatedhq/dockerfilelint/blob/main/lib/index.js>
@@ -129,17 +133,20 @@ The README includes planned but not fully implemented checks. Below is the subse
 
 1. **COPY parity checks (similar to ADD)**
    - Intent: validate COPY semantics similarly to ADD and detect cache-antagonistic COPY patterns.
-   - Relevance to Tally: moderate; Tally already has COPY-focused rules (`prefer-copy-chmod`, `copy-after-user-without-chown`, BuildKit COPY validations), but explicit multi-source/cache policy could be useful as style guidance.
+   - Relevance to Tally: moderate; Tally already has COPY-focused rules (`prefer-copy-chmod`, `copy-after-user-without-chown`, BuildKit COPY
+     validations), but explicit multi-source/cache policy could be useful as style guidance.
    - Upstream reference: <https://github.com/replicatedhq/dockerfilelint/blob/main/README.md#copy>
 
 2. **STOPSIGNAL validation & uniqueness**
    - Intent: validate signal values and single declaration.
-   - Relevance to Tally: moderate-high; Tally already has nuanced signal guidance (`prefer-canonical-stopsignal`, `no-ungraceful-stopsignal`, `windows/no-stopsignal`, service-specific recommendations). A uniqueness constraint could still be additive.
+   - Relevance to Tally: moderate-high; Tally already has nuanced signal guidance (`prefer-canonical-stopsignal`, `no-ungraceful-stopsignal`,
+     `windows/no-stopsignal`, service-specific recommendations). A uniqueness constraint could still be additive.
    - Upstream reference: <https://github.com/replicatedhq/dockerfilelint/blob/main/README.md#stopsignal>
 
 3. **ENTRYPOINT validation support**
    - Intent: additional entrypoint structure checks.
-   - Relevance to Tally: moderate; Tally already carries `hadolint/DL4003`, `DL4004`, and shell-focused process checks, so only targeted gaps may remain.
+   - Relevance to Tally: moderate; Tally already carries `hadolint/DL4003`, `DL4004`, and shell-focused process checks, so only targeted gaps may
+     remain.
    - Upstream reference: <https://github.com/replicatedhq/dockerfilelint/blob/main/README.md#entrypoint>
 
 4. **ONBUILD validation support**
@@ -198,5 +205,5 @@ The README includes planned but not fully implemented checks. Below is the subse
    - This explains why several dockerfilelint checks map to parser-level validations already present in Tally/BuildKit.
 
 4. **Some dockerfilelint README intents encode older cache-layer optimization advice.**
-   - Examples: “single ENV line”, “single EXPOSE line”. In modern teams, these are often style choices rather than universally accepted lint violations.
-
+   - Examples: “single ENV line”, “single EXPOSE line”. In modern teams, these are often style choices rather than universally accepted lint
+     violations.
