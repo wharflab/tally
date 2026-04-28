@@ -1,0 +1,70 @@
+---
+title: "tally/labels/no-duplicate-keys"
+description: "LABEL keys should be set at most once per build stage."
+---
+
+LABEL keys should be set at most once per build stage.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Correctness |
+| Default | Enabled |
+| Auto-fix | Yes |
+
+## Description
+
+Docker image labels are a key/value map. If the same key is written more than once
+in one build stage, Docker keeps the last value and the earlier value becomes
+review noise.
+
+This rule reports duplicate keys within the same stage. It does not compare labels
+across stages, because intermediate stages often describe different build artifacts
+and only the selected final stage's labels are published in the resulting image.
+
+Dynamic keys such as `LABEL "$PREFIX.name"=value` are skipped by duplicate
+detection because their final key cannot be proven statically.
+
+## Auto-fix
+
+For redundant standalone `LABEL` instructions, the preferred fix comments out
+the earlier instruction. A second fix option removes it. The fix targets earlier
+labels because Docker keeps the last value for a key.
+
+When the duplicate key appears inside a multi-pair `LABEL` instruction, Tally
+still reports the duplicate but does not rewrite the instruction unless the
+obsolete pair can be removed without dropping unrelated labels.
+
+## Examples
+
+### Bad
+
+```dockerfile
+FROM alpine:3.20
+
+LABEL org.opencontainers.image.source="https://github.com/example/app"
+LABEL org.opencontainers.image.source="https://github.com/example/app-v2"
+```
+
+### Good
+
+```dockerfile
+FROM alpine:3.20
+
+LABEL org.opencontainers.image.title="app" \
+      org.opencontainers.image.source="https://github.com/example/app"
+```
+
+## Configuration
+
+No custom configuration options. The rule is enabled by default with severity
+`warning`.
+
+```toml
+[rules.tally.labels.no-duplicate-keys]
+severity = "off"
+```
+
+## Related Rules
+
+- [`tally/labels/valid-key`](/rules/tally/labels/valid-key)

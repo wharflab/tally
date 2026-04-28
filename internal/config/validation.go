@@ -121,6 +121,9 @@ func configFromSchema(schemaCfg *generatedconfig.TallyConfigSchemaJson) *Config 
 func validateAndNormalize(raw map[string]any) error {
 	normalizeCompatibilityAliases(raw)
 	normalizeRuleShorthand(raw)
+	if err := normalizeNestedRuleTables(raw); err != nil {
+		return err
+	}
 
 	validator, err := schemavalidator.DefaultValidator()
 	if err != nil {
@@ -136,6 +139,77 @@ func validateAndNormalize(raw map[string]any) error {
 		return err
 	}
 	return nil
+}
+
+func normalizeNestedRuleTables(raw map[string]any) error {
+	rulesRaw, ok := raw["rules"].(map[string]any)
+	if !ok {
+		return nil
+	}
+
+	for namespace, entry := range rulesRaw {
+		namespaceRaw, ok := entry.(map[string]any)
+		if !ok || namespace == "include" || namespace == "exclude" {
+			continue
+		}
+
+		normalized := make(map[string]any, len(namespaceRaw))
+		for name, ruleEntry := range namespaceRaw {
+			if err := flattenNestedRuleTable(normalized, namespace, []string{name}, ruleEntry); err != nil {
+				return err
+			}
+		}
+		rulesRaw[namespace] = normalized
+	}
+	return nil
+}
+
+func flattenNestedRuleTable(out map[string]any, namespace string, nameParts []string, entry any) error {
+	entryMap, isMap := entry.(map[string]any)
+	ruleName := strings.Join(nameParts, "/")
+	if !isMap || isRuleConfigEntry(namespace, ruleName, entryMap) || hasRuleOptionShape(entryMap) {
+		if _, exists := out[ruleName]; exists {
+			return fmt.Errorf("rule %s/%s is configured more than once", namespace, ruleName)
+		}
+		out[ruleName] = entry
+		return nil
+	}
+
+	for childName, childEntry := range entryMap {
+		childParts := append(slices.Clone(nameParts), childName)
+		if err := flattenNestedRuleTable(out, namespace, childParts, childEntry); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func isRuleConfigEntry(namespace, ruleName string, entry map[string]any) bool {
+	if _, ok := schemasembed.RuleSchemaID(namespace + "/" + ruleName); ok {
+		return true
+	}
+	return entryHasAny(entry, "severity", "fix", "exclude")
+}
+
+func hasRuleOptionShape(entry map[string]any) bool {
+	if len(entry) == 0 {
+		return true
+	}
+	for _, value := range entry {
+		if _, ok := value.(map[string]any); !ok {
+			return true
+		}
+	}
+	return false
+}
+
+func entryHasAny(entry map[string]any, keys ...string) bool {
+	for _, key := range keys {
+		if _, ok := entry[key]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func validateRuleOptions(raw map[string]any, validator schemavalidator.Validator) error {

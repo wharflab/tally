@@ -121,6 +121,13 @@
             ]
           },
           {
+            "group": "Labels",
+            "pages": [
+              "rules/tally/labels/no-duplicate-keys",
+              "rules/tally/labels/valid-key"
+            ]
+          },
+          {
             "group": "GPU / CUDA",
             "pages": [
               "rules/tally/gpu/cuda-version-mismatch",

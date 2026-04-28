@@ -1,0 +1,77 @@
+---
+title: "tally/labels/valid-key"
+description: "LABEL keys should follow Docker's documented key format and avoid reserved Docker namespaces."
+---
+
+LABEL keys should follow Docker's documented key format and avoid reserved Docker
+namespaces.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Correctness |
+| Default | Enabled |
+| Auto-fix | No |
+
+## Description
+
+Docker recommends label keys use lower-case alphanumeric characters, periods, and
+hyphens. Labels intended for wider reuse should use reverse-DNS prefixes such as
+`org.opencontainers.image.source` or `com.example.team.owner` so independent tools
+do not collide.
+
+This rule reports keys with whitespace, uppercase characters, unsupported
+punctuation, repeated separators, missing alphanumeric boundaries, or Docker
+reserved namespaces such as `com.docker.*`, `io.docker.*`, and
+`org.dockerproject.*`.
+
+The rule allows known Docker-owned keys that appear in normal Docker workflows,
+including `com.docker.image.source.entrypoint` and Docker extension namespaces.
+
+Dynamic keys are reported at `info` severity because they prevent static checks
+from validating keys and finding duplicates. The old `LABEL key value` form is
+left to BuildKit's `LegacyKeyValueFormat` rule.
+
+## Examples
+
+### Bad
+
+```dockerfile
+FROM alpine:3.20
+
+LABEL "bad key"=value
+LABEL Bad.Key=value
+LABEL bad/key=value
+LABEL com.docker.compose.project=demo
+LABEL "$LABEL_PREFIX.name"=demo
+```
+
+### Good
+
+```dockerfile
+FROM alpine:3.20
+
+LABEL org.opencontainers.image.title="demo" \
+      org.opencontainers.image.source="https://github.com/example/demo" \
+      com.example.team.owner="platform"
+```
+
+## Configuration
+
+No custom configuration options. The rule is enabled by default with severity
+`warning`.
+
+```toml
+[rules.tally.labels.valid-key]
+severity = "off"
+```
+
+## References
+
+- [Docker object labels](https://docs.docker.com/engine/manage-resources/labels/)
+- [OCI image annotations](https://github.com/opencontainers/image-spec/blob/main/annotations.md)
+
+## Related Rules
+
+- [`buildkit/LegacyKeyValueFormat`](/rules/buildkit/LegacyKeyValueFormat)
+- [`tally/labels/no-duplicate-keys`](/rules/tally/labels/no-duplicate-keys)

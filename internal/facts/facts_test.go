@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
@@ -120,6 +122,87 @@ func TestResolveWorkdirAndUnquote(t *testing.T) {
 	if got := Unquote("bare"); got != "bare" {
 		t.Fatalf("Unquote() bare = %q, want %q", got, "bare")
 	}
+}
+
+func TestFileFacts_LabelFactsNormalizeKeysAndTrackDuplicates(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, `FROM alpine:3.20
+ENV PREFIX=org.example
+LABEL "org.opencontainers.image.title"="Demo" \
+      org.opencontainers.image.source="https://github.com/example/demo"
+LABEL org.opencontainers.image.source="https://github.com/example/demo"
+LABEL "$PREFIX.dynamic"="value"
+`)
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+	if len(stage.LabelInstructions) != 3 {
+		t.Fatalf("LabelInstructions count = %d, want 3", len(stage.LabelInstructions))
+	}
+	if len(stage.Labels) != 4 {
+		t.Fatalf("Labels count = %d, want 4", len(stage.Labels))
+	}
+	if got := stage.Labels[0].Key; got != "org.opencontainers.image.title" {
+		t.Fatalf("first label key = %q, want normalized OCI key", got)
+	}
+	if got := stage.Labels[0].Value; got != "Demo" {
+		t.Fatalf("first label value = %q, want normalized value", got)
+	}
+	if !stage.Labels[3].KeyIsDynamic {
+		t.Fatal("expected dynamic key to be marked")
+	}
+
+	dups := stage.DuplicateLabelGroups()
+	sourceDups := dups["org.opencontainers.image.source"]
+	if len(sourceDups) != 2 {
+		t.Fatalf("source duplicate count = %d, want 2", len(sourceDups))
+	}
+	if _, ok := dups[`"$PREFIX.dynamic"`]; ok {
+		t.Fatal("dynamic key should not be grouped for duplicate checks")
+	}
+}
+
+func TestFileFacts_LabelFactsUseDockerfileEscapeToken(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, "# escape=`\n"+
+		"FROM alpine:3.20\n"+
+		"LABEL com.example.path=\"C:\\Program Files\\App\"\n")
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+	if len(stage.Labels) != 1 {
+		t.Fatalf("Labels count = %d, want 1", len(stage.Labels))
+	}
+	if got := stage.Labels[0].Value; got != `C:\Program Files\App` {
+		t.Fatalf("label value = %q, want Windows path with backslashes preserved", got)
+	}
+}
+
+func TestRecordLabelInstructionPanicsOnNilRequiredInputs(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil stage facts", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := instructions.NewLabelCommand("com.example.name", "demo", false)
+		assertPanicsWith(t, "recordLabelInstruction called with nil StageFacts", func() {
+			recordLabelInstruction(nil, cmd, 0, 0, nil, '\\')
+		})
+	})
+
+	t.Run("nil label command", func(t *testing.T) {
+		t.Parallel()
+
+		assertPanicsWith(t, "recordLabelInstruction called with nil LabelCommand", func() {
+			recordLabelInstruction(&StageFacts{}, nil, 0, 0, nil, '\\')
+		})
+	})
 }
 
 func TestFileFacts_PowerShellErrorModeIsTrackedPerRun(t *testing.T) {
@@ -809,6 +892,22 @@ VOLUME /data
 func makeFileFacts(t *testing.T, content string) *FileFacts {
 	t.Helper()
 	return makeFileFactsWithContext(t, content, nil)
+}
+
+func assertPanicsWith(t *testing.T, want string, fn func()) {
+	t.Helper()
+
+	defer func() {
+		got := recover()
+		if got == nil {
+			t.Fatalf("expected panic %q", want)
+		}
+		if gotMsg := fmt.Sprint(got); gotMsg != want {
+			t.Fatalf("panic = %q, want %q", gotMsg, want)
+		}
+	}()
+
+	fn()
 }
 
 func makeFileFactsWithContext(t *testing.T, content string, contextFiles ContextFileReader) *FileFacts {
