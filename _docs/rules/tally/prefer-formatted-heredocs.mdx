@@ -14,8 +14,8 @@ Pretty-prints `COPY` and `ADD` heredoc bodies when the destination filename has 
 
 ## Description
 
-This rule formats heredoc payloads that are copied into JSON, YAML, TOML, or XML files. It detects the file type from the heredoc destination path
-extension and uses the repository's `.editorconfig` settings for indentation.
+This rule formats heredoc payloads that are copied into JSON, YAML, TOML, XML, or INI files. It detects the file type from the heredoc destination
+path extension and uses the repository's `.editorconfig` settings for indentation.
 
 For EditorConfig lookup, tally resolves a virtual filename next to the Dockerfile using the destination basename. For example, a heredoc in
 `services/api/Dockerfile` targeting `/etc/app/config.yaml` is matched as `services/api/config.yaml`, so selectors such as `*.yaml` and `config.yaml`
@@ -55,6 +55,7 @@ EOF
 | `.yaml`, `.yml` | YAML |
 | `.toml` | TOML |
 | `.xml` | XML |
+| `.ini` | INI |
 
 ## Configuration
 

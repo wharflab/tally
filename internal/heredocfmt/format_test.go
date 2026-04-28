@@ -69,6 +69,47 @@ func TestFormatTOMLAllowsHashesInMultilineStrings(t *testing.T) {
 	}
 }
 
+func TestFormatINIUsesPrettyFormat(t *testing.T) {
+	t.Parallel()
+
+	content := "zend_extension=opcache\n[opcache]\nopcache.enable=1\nopcache.memory_consumption=128\n"
+	got, err := formatINI(content, style{indent: "  ", indentWidth: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "zend_extension = opcache\n\n[opcache]\n  opcache.enable             = 1\n  opcache.memory_consumption = 128\n"
+	if got != want {
+		t.Fatalf("formatted INI mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestFormatINIPreservesDuplicateKeys(t *testing.T) {
+	t.Parallel()
+
+	got, err := formatINI("extension=foo\nextension=bar\n", style{indent: "  ", indentWidth: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if strings.Count(got, "extension") != 2 {
+		t.Fatalf("expected duplicate keys to be preserved, got:\n%s", got)
+	}
+}
+
+func TestFormatINIPreservesComments(t *testing.T) {
+	t.Parallel()
+
+	got, err := formatINI("[opcache]\n; extension settings\nopcache.enable=1\n", style{indent: "  ", indentWidth: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(got, "; extension settings") {
+		t.Fatalf("expected comment to be preserved, got:\n%s", got)
+	}
+}
+
 func TestFormatXMLAllowsIndentationOnlyCharData(t *testing.T) {
 	t.Parallel()
 

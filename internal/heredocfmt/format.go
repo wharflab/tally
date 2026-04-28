@@ -16,6 +16,7 @@ import (
 	editorconfig "github.com/editorconfig/editorconfig-core-go/v2"
 	toml "github.com/pelletier/go-toml/v2"
 	yaml "go.yaml.in/yaml/v4"
+	ini "gopkg.in/ini.v1"
 )
 
 const defaultIndentWidth = 2
@@ -30,6 +31,7 @@ const (
 	KindYAML Kind = "yaml"
 	KindTOML Kind = "toml"
 	KindXML  Kind = "xml"
+	KindINI  Kind = "ini"
 )
 
 // Formatter resolves EditorConfig style once per virtual target filename and formats heredoc content.
@@ -62,6 +64,8 @@ func SupportedKind(filename string) (Kind, bool) {
 		return KindTOML, true
 	case ".xml":
 		return KindXML, true
+	case ".ini":
+		return KindINI, true
 	default:
 		return "", false
 	}
@@ -189,6 +193,8 @@ func formatContent(kind Kind, content string, st style) (string, error) {
 		return formatTOML(content, st)
 	case KindXML:
 		return formatXML(content, st)
+	case KindINI:
+		return formatINI(content, st)
 	default:
 		return "", errSkipFormat
 	}
@@ -318,6 +324,44 @@ func tomlHasComment(content string) bool {
 		i++
 	}
 	return false
+}
+
+func formatINI(content string, st style) (string, error) {
+	if strings.TrimSpace(content) == "" {
+		return "", errSkipFormat
+	}
+
+	cfg, err := ini.LoadSources(ini.LoadOptions{
+		AllowBooleanKeys:           true,
+		AllowDuplicateShadowValues: true,
+		AllowNonUniqueSections:     true,
+		AllowShadows:               true,
+		PreserveSurroundedQuote:    true,
+	}, []byte(content))
+	if err != nil {
+		return "", err
+	}
+	if iniIsEmpty(cfg) {
+		return "", errSkipFormat
+	}
+
+	var buf bytes.Buffer
+	if _, err := cfg.WriteToIndent(&buf, st.indent); err != nil {
+		return "", err
+	}
+	return ensureTrailingNewline(buf.String()), nil
+}
+
+func iniIsEmpty(cfg *ini.File) bool {
+	if cfg == nil {
+		return true
+	}
+	for _, section := range cfg.Sections() {
+		if section.Comment != "" || len(section.Keys()) > 0 {
+			return false
+		}
+	}
+	return true
 }
 
 type xmlTokenKind int

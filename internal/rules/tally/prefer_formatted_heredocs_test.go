@@ -71,6 +71,18 @@ EOF
 			WantMessages:   []string{"COPY heredoc for /etc/app/config.toml should be pretty-printed as TOML"},
 		},
 		{
+			Name: "compact INI COPY heredoc",
+			Content: `FROM alpine
+COPY <<EOF /etc/app/php.ini
+zend_extension=opcache
+[opcache]
+opcache.enable=1
+EOF
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"COPY heredoc for /etc/app/php.ini should be pretty-printed as INI"},
+		},
+		{
 			Name: "already formatted JSON",
 			Content: `FROM alpine
 COPY <<EOF /etc/app/config.json
@@ -171,6 +183,37 @@ EOF
 	want := `FROM alpine
 COPY <<EOF /etc/app/config.toml
 a = 1
+EOF
+`
+	if got != want {
+		t.Fatalf("fixed content mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_FixINI(t *testing.T) {
+	t.Parallel()
+	content := `FROM alpine
+COPY <<EOF /etc/app/php.ini
+zend_extension=opcache
+[opcache]
+opcache.enable=1
+opcache.memory_consumption=128
+EOF
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewPreferFormattedHeredocsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	want := `FROM alpine
+COPY <<EOF /etc/app/php.ini
+zend_extension = opcache
+
+[opcache]
+  opcache.enable             = 1
+  opcache.memory_consumption = 128
 EOF
 `
 	if got != want {

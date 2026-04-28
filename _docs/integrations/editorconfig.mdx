@@ -24,8 +24,8 @@ The pattern matches `Dockerfile`, `Dockerfile.*`, `Containerfile`, and `Containe
 
 ## Rules that use EditorConfig
 
-- [`tally/prefer-formatted-heredocs`](/rules/tally/prefer-formatted-heredocs) formats `COPY` and `ADD` heredoc bodies for JSON, YAML, TOML, and XML
-  files.
+- [`tally/prefer-formatted-heredocs`](/rules/tally/prefer-formatted-heredocs) formats `COPY` and `ADD` heredoc bodies for JSON, YAML, TOML, XML, and
+  INI files.
 
 For heredoc payloads, tally resolves EditorConfig settings using a virtual filename next to the Dockerfile and the heredoc destination basename. For
 example, a heredoc in `services/api/Dockerfile` targeting `/etc/app/config.yaml` is resolved as `services/api/config.yaml`, so `*.yaml` and
