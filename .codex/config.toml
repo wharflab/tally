@@ -1,0 +1,6 @@
+[shell_environment_policy]
+inherit = "core"
+
+[shell_environment_policy.set]
+GH_PAGER     = "cat"
+GOEXPERIMENT = "jsonv2"
