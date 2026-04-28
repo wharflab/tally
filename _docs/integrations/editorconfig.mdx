@@ -1,0 +1,32 @@
+---
+title: "EditorConfig integration"
+description: "Use EditorConfig settings to keep tally formatting fixes aligned with your repository style."
+---
+
+tally reads `.editorconfig` for formatting rules that need repository style preferences. Use `.editorconfig` for shared whitespace and indentation
+settings, and use `.tally.toml` for enabling, disabling, or changing the severity of lint rules.
+
+This page will collect tally features that integrate with EditorConfig as they are added.
+
+## Recommended Dockerfile settings
+
+Add this section to your repository's `.editorconfig` to keep Dockerfiles and Containerfiles consistent:
+
+```ini
+[{Containerfile,Containerfile.,Dockerfile,Dockerfile.}*]
+indent_style = tab
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+```
+
+The pattern matches `Dockerfile`, `Dockerfile.*`, `Containerfile`, and `Containerfile.*`.
+
+## Rules that use EditorConfig
+
+- [`tally/prefer-formatted-heredocs`](/rules/tally/prefer-formatted-heredocs) formats `COPY` and `ADD` heredoc bodies for JSON, YAML, TOML, and XML
+  files.
+
+For heredoc payloads, tally resolves EditorConfig settings using a virtual filename next to the Dockerfile and the heredoc destination basename. For
+example, a heredoc in `services/api/Dockerfile` targeting `/etc/app/config.yaml` is resolved as `services/api/config.yaml`, so `*.yaml` and
+`config.yaml` sections apply.

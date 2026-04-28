@@ -1,0 +1,77 @@
+package fix
+
+import (
+	"bytes"
+	"context"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/wharflab/tally/internal/rules"
+)
+
+func TestFormattedHeredocsFinalizerFormatsGeneratedHeredoc(t *testing.T) {
+	t.Parallel()
+
+	file := filepath.Join(t.TempDir(), "Dockerfile")
+	src := []byte("FROM alpine\nRUN true\n")
+	loc := rules.NewRangeLocation(file, 2, 0, 2, len("RUN true"))
+	violation := rules.NewViolation(loc, "test/emit-copy-heredoc", "emit COPY heredoc", rules.SeverityStyle).
+		WithSuggestedFix(&rules.SuggestedFix{
+			Description: "Emit COPY heredoc",
+			Safety:      rules.FixSafe,
+			Priority:    1,
+			Edits: []rules.TextEdit{
+				{
+					Location: loc,
+					NewText: "COPY <<EOF /etc/app/config.json\n" +
+						"{\"b\":2,\"a\":1}\n" +
+						"EOF",
+				},
+			},
+			IsPreferred: true,
+		})
+
+	fixer := &Fixer{
+		SafetyThreshold: rules.FixSafe,
+		EnabledRules: map[string][]string{
+			filepath.Clean(file): {rules.FormattedHeredocsRuleCode},
+		},
+	}
+	result, err := fixer.Apply(context.Background(), []rules.Violation{violation}, map[string][]byte{file: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	change := result.Changes[filepath.Clean(file)]
+	if change == nil {
+		t.Fatal("missing file change")
+	}
+	got := string(change.ModifiedContent)
+	want := "COPY <<EOF /etc/app/config.json\n{\n  \"b\": 2,\n  \"a\": 1\n}\nEOF"
+	if !strings.Contains(got, want) {
+		t.Fatalf("generated heredoc was not formatted\ngot:\n%s\nwant substring:\n%s", got, want)
+	}
+	if result.TotalApplied() != 2 {
+		t.Fatalf("applied fixes = %d, want 2", result.TotalApplied())
+	}
+}
+
+func TestFormattedHeredocsFinalizerRequiresRuleEnabled(t *testing.T) {
+	t.Parallel()
+
+	file := filepath.Join(t.TempDir(), "Dockerfile")
+	src := []byte("FROM alpine\nCOPY <<EOF /etc/app/config.json\n{\"a\":1}\nEOF\n")
+	fixer := &Fixer{SafetyThreshold: rules.FixSafe}
+	result, err := fixer.Apply(context.Background(), nil, map[string][]byte{file: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+	change := result.Changes[filepath.Clean(file)]
+	if change == nil {
+		t.Fatal("missing file change")
+	}
+	if !bytes.Equal(change.ModifiedContent, src) {
+		t.Fatalf("finalizer ran without enabled-rule context:\n%s", change.ModifiedContent)
+	}
+}

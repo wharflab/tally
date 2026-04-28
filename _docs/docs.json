@@ -44,6 +44,12 @@
               "guides/exit-codes",
               "guides/installing-buildkit-windows-containers"
             ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "integrations/editorconfig"
+            ]
           }
         ]
       },
@@ -116,6 +122,7 @@
               "rules/tally/sort-packages",
               "rules/tally/newline-per-chained-call",
               "rules/tally/prefer-copy-chmod",
+              "rules/tally/prefer-formatted-heredocs",
               "rules/tally/prefer-run-heredoc",
               "rules/tally/consistent-indentation"
             ]

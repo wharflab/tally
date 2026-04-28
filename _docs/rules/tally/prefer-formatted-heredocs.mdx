@@ -1,0 +1,85 @@
+---
+title: "tally/prefer-formatted-heredocs"
+description: "Pretty-print COPY and ADD heredocs for structured file types."
+---
+
+Pretty-prints `COPY` and `ADD` heredoc bodies when the destination filename has a supported structured-data extension.
+
+| Property | Value |
+|----------|-------|
+| Severity | Style |
+| Category | Style |
+| Default | Enabled |
+| Auto-fix | Yes (safe) |
+
+## Description
+
+This rule formats heredoc payloads that are copied into JSON, YAML, TOML, or XML files. It detects the file type from the heredoc destination path
+extension and uses the repository's `.editorconfig` settings for indentation.
+
+For EditorConfig lookup, tally resolves a virtual filename next to the Dockerfile using the destination basename. For example, a heredoc in
+`services/api/Dockerfile` targeting `/etc/app/config.yaml` is matched as `services/api/config.yaml`, so selectors such as `*.yaml` and `config.yaml`
+apply naturally.
+
+The formatter also runs as a final auto-fix pass. This means heredocs emitted by other rules, such as `tally/prefer-copy-heredoc`, are formatted in
+the same `--fix` run when this rule is enabled.
+
+## Examples
+
+### Bad
+
+```dockerfile
+FROM alpine:3.20
+COPY <<EOF /etc/app/config.json
+{"b":2,"a":1}
+EOF
+```
+
+### Good
+
+```dockerfile
+FROM alpine:3.20
+COPY <<EOF /etc/app/config.json
+{
+  "b": 2,
+  "a": 1
+}
+EOF
+```
+
+## Supported Types
+
+| Extension | Format |
+|-----------|--------|
+| `.json` | JSON |
+| `.yaml`, `.yml` | YAML |
+| `.toml` | TOML |
+| `.xml` | XML |
+
+## Configuration
+
+Default (no config needed):
+
+```toml
+# Enabled by default with no rule-specific options
+```
+
+This rule intentionally has no formatter-specific options. Use `.editorconfig` for indentation style and width.
+See [EditorConfig integration](/integrations/editorconfig) for recommended Dockerfile settings and path resolution details.
+
+## Auto-fix
+
+Run:
+
+```bash
+tally lint --fix Dockerfile
+```
+
+To format heredocs produced by another selected rule, select both rules:
+
+```bash
+tally lint --fix --fix-unsafe \
+  --select tally/prefer-copy-heredoc \
+  --select tally/prefer-formatted-heredocs \
+  Dockerfile
+```

@@ -559,6 +559,21 @@ severity = "error"
 			wantApplied: 1,
 		},
 
+		// prefer-formatted-heredocs runs as a finalizer, so it formats the COPY heredoc
+		// produced by prefer-copy-heredoc in the same fix pass.
+		{
+			name:  "prefer-copy-heredoc-formats-generated-json",
+			input: "FROM ubuntu:22.04\nRUN printf '{\"b\":2,\"a\":1}\\n' > /etc/app/config.json\n",
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 2,
+		},
+
 		// prefer-copy-heredoc: literal ~/ target resolves against the effective USER and stays unsafe
 		{
 			name: "prefer-copy-heredoc-tilde-home-root",

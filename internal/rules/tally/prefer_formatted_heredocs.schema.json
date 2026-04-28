@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/prefer_formatted_heredocs.schema.json",
+  "title": "tally/prefer-formatted-heredocs rule config",
+  "description": "Configuration options for the tally/prefer-formatted-heredocs rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../rule-config.schema.json#/$defs/exclude" }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "severity": "style" }
+  ]
+}

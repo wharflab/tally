@@ -690,6 +690,28 @@
       "title": "tally/prefer-curl-config rule config",
       "type": "object"
     },
+    "rule-tally-prefer-formatted-heredocs": {
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/prefer-formatted-heredocs rule.",
+      "examples": [
+        {
+          "severity": "style"
+        }
+      ],
+      "properties": {
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "tally/prefer-formatted-heredocs rule config",
+      "type": "object"
+    },
     "rule-tally-prefer-multi-stage-build": {
       "additionalProperties": false,
       "description": "Configuration options for the tally/prefer-multi-stage-build rule.",
@@ -1034,6 +1056,9 @@
         },
         "prefer-curl-config": {
           "$ref": "#/$defs/rule-tally-prefer-curl-config"
+        },
+        "prefer-formatted-heredocs": {
+          "$ref": "#/$defs/rule-tally-prefer-formatted-heredocs"
         },
         "prefer-multi-stage-build": {
           "$ref": "#/$defs/rule-tally-prefer-multi-stage-build"

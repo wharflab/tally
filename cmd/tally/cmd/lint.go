@@ -1461,6 +1461,7 @@ func applyFixes(
 	fixer := &fix.Fixer{
 		SafetyThreshold: safetyThreshold,
 		RuleFilter:      ruleFilter,
+		EnabledRules:    buildPerFileEnabledRules(input.fileConfigs, input.sources),
 		FixModes:        fixModes,
 		Concurrency:     4,
 	}
@@ -1504,6 +1505,21 @@ func buildPerFileFixModes(fileConfigs map[string]*config.Config) map[string]map[
 		}
 	}
 	return result
+}
+
+func buildPerFileEnabledRules(
+	fileConfigs map[string]*config.Config,
+	sources map[string][]byte,
+) map[string][]string {
+	enabledRules := make(map[string][]string, len(sources))
+	for path := range sources {
+		cfg := fileConfigs[path]
+		if cfg == nil {
+			cfg = fileConfigs[filepath.ToSlash(path)]
+		}
+		enabledRules[filepath.Clean(path)] = linter.EnabledRuleCodes(cfg)
+	}
+	return enabledRules
 }
 
 // runAsyncChecks executes async check plans if slow checks are enabled.
