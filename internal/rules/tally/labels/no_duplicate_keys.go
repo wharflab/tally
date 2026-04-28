@@ -45,19 +45,21 @@ func (r *NoDuplicateKeysRule) Check(input rules.LintInput) []rules.Violation {
 			if len(group) < 2 {
 				continue
 			}
-			firstDuplicate := group[1]
+			allEqual := allLabelValuesEqual(group)
 			message := fmt.Sprintf("label key %q is set more than once in this stage; Docker keeps the last value", group[0].Key)
-			if allLabelValuesEqual(group) {
+			if allEqual {
 				message = fmt.Sprintf("label key %q repeats the same value in this stage", group[0].Key)
 			}
-			violations = append(violations, rules.NewViolation(
-				rules.NewLocationFromRanges(input.File, firstDuplicate.Location),
-				meta.Code,
-				message,
-				meta.DefaultSeverity,
-			).WithDocURL(meta.DocURL).WithDetail(
-				"Consolidate this key into a single LABEL pair so reviews do not need to infer which value wins.",
-			))
+			for _, duplicate := range group[1:] {
+				violations = append(violations, rules.NewViolation(
+					rules.NewLocationFromRanges(input.File, duplicate.Location),
+					meta.Code,
+					message,
+					meta.DefaultSeverity,
+				).WithDocURL(meta.DocURL).WithDetail(
+					"Consolidate this key into a single LABEL pair so reviews do not need to infer which value wins.",
+				))
+			}
 		}
 	}
 	return violations

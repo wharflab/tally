@@ -64,6 +64,19 @@ LABEL org.opencontainers.image.title="demo2"
 			WantViolations: 1,
 		},
 		{
+			Name: "reports every redundant duplicate",
+			Content: `FROM alpine:3.20
+LABEL org.opencontainers.image.title="demo"
+LABEL org.opencontainers.image.title="demo2"
+LABEL org.opencontainers.image.title="demo3"
+`,
+			WantViolations: 2,
+			WantMessages: []string{
+				`label key "org.opencontainers.image.title" is set more than once`,
+				`label key "org.opencontainers.image.title" is set more than once`,
+			},
+		},
+		{
 			Name: "same key in different stages is independent",
 			Content: `FROM alpine:3.20 AS build
 LABEL org.opencontainers.image.title="builder"
