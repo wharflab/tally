@@ -10,7 +10,7 @@ LABEL keys should be set at most once per build stage.
 | Severity | Warning |
 | Category | Correctness |
 | Default | Enabled |
-| Auto-fix | No |
+| Auto-fix | Yes |
 
 ## Description
 
@@ -24,6 +24,16 @@ and only the selected final stage's labels are published in the resulting image.
 
 Dynamic keys such as `LABEL "$PREFIX.name"=value` are skipped by duplicate
 detection because their final key cannot be proven statically.
+
+## Auto-fix
+
+For redundant standalone `LABEL` instructions, the preferred fix comments out
+the earlier instruction. A second fix option removes it. The fix targets earlier
+labels because Docker keeps the last value for a key.
+
+When the duplicate key appears inside a multi-pair `LABEL` instruction, Tally
+still reports the duplicate but does not rewrite the instruction unless the
+obsolete pair can be removed without dropping unrelated labels.
 
 ## Examples
 

@@ -9,11 +9,11 @@ Research date: 2026-04-28.
 Implementation status as of 2026-04-28:
 
 - Implemented the shared Dockerfile `LABEL` facts layer in `internal/facts`.
-- Implemented `tally/labels/no-duplicate-keys` as a diagnostic-only rule.
+- Implemented `tally/labels/no-duplicate-keys` with safe fixes for redundant standalone `LABEL` instructions.
 - Implemented `tally/labels/valid-key` with Docker-reserved namespace guardrails and allowlists.
 - Registered the new `internal/rules/tally/labels` package and added docs, navigation, unit tests, integration fixtures, and snapshots for the two
   implemented rules.
-- Deferred the originally proposed partial duplicate-key auto-fix until source-preserving label-pair edits are designed.
+- Deferred source-preserving auto-fixes for duplicate keys embedded inside multi-pair `LABEL` instructions.
 
 The recommendation is to add a dedicated `tally/labels/*` namespace for Dockerfile and Containerfile `LABEL` management rules. The namespace should
 focus on maintenance value: preventing accidental overrides, making image metadata easier to review, keeping generated provenance labels out of the
@@ -671,7 +671,7 @@ Implementation notes:
 
 ## Rule Specification: `tally/labels/no-duplicate-keys`
 
-Implementation status: implemented as a diagnostic-only rule. The partial auto-fix described below is still deferred.
+Implementation status: implemented with diagnostics and a partial auto-fix for redundant standalone `LABEL` instructions.
 
 Purpose: prevent accidental overwrites inside a stage.
 
@@ -690,14 +690,18 @@ Do not report when:
 
 Fix strategy:
 
-- If duplicate labels are in the same contiguous `LABEL` block and the earlier duplicate is identical, remove the earlier pair.
-- If duplicate values differ, do not auto-fix by default. Suggest keeping the later value or consolidating manually.
-- If duplicates are non-contiguous, emit diagnostics only.
+- Report every earlier occurrence for a duplicated key; Docker keeps the last value in the stage.
+- For a redundant standalone `LABEL` instruction, offer two fixes:
+  - preferred: comment out the earlier instruction, preserving reviewer context;
+  - secondary: delete the earlier instruction.
+- Keep both fixes scoped to earlier labels, because removing or commenting them preserves the effective image label map.
+- If the obsolete key is embedded inside a multi-pair `LABEL` instruction, report it but skip source edits until pair-level removal can preserve
+  unrelated labels and continuation syntax.
 
 Message examples:
 
 ```text
-label "org.opencontainers.image.source" is set more than once in this stage; Docker keeps the last value
+label key "org.opencontainers.image.source" is overwritten later in this stage; Docker keeps the last value
 ```
 
 ## Rule Specification: `tally/labels/no-buildx-git-overlap`
@@ -1568,7 +1572,7 @@ Auto-fixes should be conservative.
 
 Safe in v1:
 
-- Remove an earlier duplicate pair from the same contiguous label block when the value is identical.
+- Comment out or remove redundant standalone `LABEL` instructions for duplicate keys, because Docker keeps the last label value in the stage.
 - Group adjacent `LABEL` instructions within the same stage when no comments or dependency-changing instructions are crossed.
 - Reorder pairs inside one existing multi-line `LABEL` block when no comments are embedded and all pairs are parseable.
 
@@ -1659,7 +1663,8 @@ Compatibility tests:
 Notes:
 
 - Item 13 is partially complete for the first two implemented rules and the namespace navigation.
-- The `no-duplicate-keys` auto-fix remains intentionally unimplemented until pair-level source edits are reliable.
+- The `no-duplicate-keys` auto-fix is implemented for redundant standalone `LABEL` instructions; pair-level edits inside multi-pair `LABEL`
+  instructions remain deferred.
 
 ## Open Questions
 

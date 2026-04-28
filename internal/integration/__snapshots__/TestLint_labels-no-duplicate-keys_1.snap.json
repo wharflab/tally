@@ -9,18 +9,82 @@
           "location": {
             "end": {
               "column": 0,
-              "line": 3
+              "line": 2
             },
             "file": "testdata/labels-no-duplicate-keys/Dockerfile",
             "start": {
               "column": 0,
-              "line": 3
+              "line": 2
             }
           },
-          "message": "label key \"org.opencontainers.image.title\" repeats the same value in this stage",
+          "message": "label key \"org.opencontainers.image.title\" is repeated later with the same value in this stage",
           "rule": "tally/labels/no-duplicate-keys",
           "severity": "warning",
-          "sourceCode": "LABEL org.opencontainers.image.title=\"builder\""
+          "sourceCode": "LABEL org.opencontainers.image.title=\"builder\"",
+          "suggestedFix": {
+            "description": "Comment out duplicate LABEL \"org.opencontainers.image.title\" (Docker keeps the last value)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 46,
+                    "line": 2
+                  },
+                  "file": "testdata/labels-no-duplicate-keys/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 2
+                  }
+                },
+                "newText": "# [commented out by tally - Docker keeps the last LABEL value for org.opencontainers.image.title]: LABEL org.opencontainers.image.title=\"builder\""
+              }
+            ],
+            "isPreferred": true,
+            "priority": -1
+          },
+          "suggestedFixes": [
+            {
+              "description": "Comment out duplicate LABEL \"org.opencontainers.image.title\" (Docker keeps the last value)",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 46,
+                      "line": 2
+                    },
+                    "file": "testdata/labels-no-duplicate-keys/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 2
+                    }
+                  },
+                  "newText": "# [commented out by tally - Docker keeps the last LABEL value for org.opencontainers.image.title]: LABEL org.opencontainers.image.title=\"builder\""
+                }
+              ],
+              "isPreferred": true,
+              "priority": -1
+            },
+            {
+              "description": "Delete duplicate LABEL \"org.opencontainers.image.title\"",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 3
+                    },
+                    "file": "testdata/labels-no-duplicate-keys/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 2
+                    }
+                  },
+                  "newText": ""
+                }
+              ],
+              "priority": -1
+            }
+          ]
         },
         {
           "detail": "Consolidate this key into a single LABEL pair so reviews do not need to infer which value wins.",
@@ -28,18 +92,82 @@
           "location": {
             "end": {
               "column": 0,
-              "line": 7
+              "line": 6
             },
             "file": "testdata/labels-no-duplicate-keys/Dockerfile",
             "start": {
               "column": 0,
-              "line": 7
+              "line": 6
             }
           },
-          "message": "label key \"org.opencontainers.image.source\" is set more than once in this stage; Docker keeps the last value",
+          "message": "label key \"org.opencontainers.image.source\" is overwritten later in this stage; Docker keeps the last value",
           "rule": "tally/labels/no-duplicate-keys",
           "severity": "warning",
-          "sourceCode": "LABEL org.opencontainers.image.source=\"https://github.com/example/demo-v2\""
+          "sourceCode": "LABEL \"org.opencontainers.image.source\"=\"https://github.com/example/demo\"",
+          "suggestedFix": {
+            "description": "Comment out duplicate LABEL \"org.opencontainers.image.source\" (Docker keeps the last value)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 73,
+                    "line": 6
+                  },
+                  "file": "testdata/labels-no-duplicate-keys/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 6
+                  }
+                },
+                "newText": "# [commented out by tally - Docker keeps the last LABEL value for org.opencontainers.image.source]: LABEL \"org.opencontainers.image.source\"=\"https://github.com/example/demo\""
+              }
+            ],
+            "isPreferred": true,
+            "priority": -1
+          },
+          "suggestedFixes": [
+            {
+              "description": "Comment out duplicate LABEL \"org.opencontainers.image.source\" (Docker keeps the last value)",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 73,
+                      "line": 6
+                    },
+                    "file": "testdata/labels-no-duplicate-keys/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 6
+                    }
+                  },
+                  "newText": "# [commented out by tally - Docker keeps the last LABEL value for org.opencontainers.image.source]: LABEL \"org.opencontainers.image.source\"=\"https://github.com/example/demo\""
+                }
+              ],
+              "isPreferred": true,
+              "priority": -1
+            },
+            {
+              "description": "Delete duplicate LABEL \"org.opencontainers.image.source\"",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 7
+                    },
+                    "file": "testdata/labels-no-duplicate-keys/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 6
+                    }
+                  },
+                  "newText": ""
+                }
+              ],
+              "priority": -1
+            }
+          ]
         }
       ]
     }
