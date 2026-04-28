@@ -238,6 +238,14 @@ func (a *testAgent) SetSessionMode(ctx context.Context, params acpsdk.SetSession
 	return acpsdk.SetSessionModeResponse{}, nil
 }
 
+func (a *testAgent) CloseSession(ctx context.Context, params acpsdk.CloseSessionRequest) (acpsdk.CloseSessionResponse, error) {
+	return acpsdk.CloseSessionResponse{}, acpsdk.NewMethodNotFound(acpsdk.AgentMethodSessionClose)
+}
+
+func (a *testAgent) ResumeSession(ctx context.Context, params acpsdk.ResumeSessionRequest) (acpsdk.ResumeSessionResponse, error) {
+	return acpsdk.ResumeSessionResponse{}, acpsdk.NewMethodNotFound(acpsdk.AgentMethodSessionResume)
+}
+
 func startChild() error {
 	var command string
 	var args []string
