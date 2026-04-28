@@ -87,12 +87,13 @@ RUN Invoke-WebRequest -Uri https://aka.ms/vs/17/release/vs_buildtools.exe -OutFi
 
 ENV VSINSTALLDIR=C:\BuildTools
 
-RUN New-Item -ItemType Directory -Path 'C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages' -Force | Out-Null"; `
-    New-Item -ItemType Directory -Path 'C:\Program Files\dotnet\sdk\NuGetFallbackFolder' -Force | Out-Null
-
-# Epilogue
-# Create docker-context directory for build scripts
-RUN New-Item -ItemType Directory -Path c:\docker-context -Force | Out-Null
+RUN <<EOF
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+New-Item -ItemType Directory -Path 'C:\Program Files (x86)\Microsoft Visual Studio\Shared\NuGetPackages' -Force | Out-Null"
+New-Item -ItemType Directory -Path 'C:\Program Files\dotnet\sdk\NuGetFallbackFolder' -Force | Out-Null
+New-Item -ItemType Directory -Path c:\docker-context -Force | Out-Null
+EOF
 
 # Create directories for mountpoints
 ARG MOUNTPOINTS
