@@ -488,7 +488,7 @@ func (f *FileFacts) processStageCommands(
 				state.currentCacheDisablingEnv,
 			)
 		case *instructions.LabelCommand:
-			recordLabelInstruction(stageFacts, c, stageIdx, cmdIdx, state.currentEnvValues)
+			recordLabelInstruction(stageFacts, c, stageIdx, cmdIdx, state.currentEnvValues, escapeToken)
 		case *instructions.ShellCommand:
 			state.currentShell = newShellFacts(c.Shell)
 			stageFacts.FinalShell = state.currentShell
@@ -627,6 +627,7 @@ func recordLabelInstruction(
 	stageIdx int,
 	commandIdx int,
 	envValues map[string]string,
+	escapeToken rune,
 ) {
 	if stageFacts == nil || cmd == nil {
 		return
@@ -640,9 +641,11 @@ func recordLabelInstruction(
 		Pairs:        make([]LabelPairFact, 0, len(cmd.Labels)),
 	}
 
+	lex := dfshell.NewLex(escapeToken)
+	envGetter := labelEnvGetter(envValues)
 	for pairIdx, kv := range cmd.Labels {
-		key, keyDynamic, keyErr := expandLabelWord(kv.Key, envValues)
-		value, valueDynamic, valueErr := expandLabelWord(kv.Value, envValues)
+		key, keyDynamic, keyErr := expandLabelWord(lex, envGetter, kv.Key)
+		value, valueDynamic, valueErr := expandLabelWord(lex, envGetter, kv.Value)
 		expansionErr := keyErr
 		if expansionErr == "" {
 			expansionErr = valueErr
@@ -673,9 +676,8 @@ func recordLabelInstruction(
 	stageFacts.LabelInstructions = append(stageFacts.LabelInstructions, inst)
 }
 
-func expandLabelWord(raw string, envValues map[string]string) (value string, dynamic bool, expansionErr string) {
-	lex := dfshell.NewLex('\\')
-	result, err := lex.ProcessWordWithMatches(raw, labelEnvGetter(envValues))
+func expandLabelWord(lex *dfshell.Lex, envGetter dfshell.EnvGetter, raw string) (value string, dynamic bool, expansionErr string) {
+	result, err := lex.ProcessWordWithMatches(raw, envGetter)
 	if err != nil {
 		return raw, false, err.Error()
 	}

@@ -163,6 +163,25 @@ LABEL "$PREFIX.dynamic"="value"
 	}
 }
 
+func TestFileFacts_LabelFactsUseDockerfileEscapeToken(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, "# escape=`\n"+
+		"FROM alpine:3.20\n"+
+		"LABEL com.example.path=\"C:\\Program Files\\App\"\n")
+
+	stage := fileFacts.Stage(0)
+	if stage == nil {
+		t.Fatal("expected stage facts")
+	}
+	if len(stage.Labels) != 1 {
+		t.Fatalf("Labels count = %d, want 1", len(stage.Labels))
+	}
+	if got := stage.Labels[0].Value; got != `C:\Program Files\App` {
+		t.Fatalf("label value = %q, want Windows path with backslashes preserved", got)
+	}
+}
+
 func TestFileFacts_PowerShellErrorModeIsTrackedPerRun(t *testing.T) {
 	t.Parallel()
 
