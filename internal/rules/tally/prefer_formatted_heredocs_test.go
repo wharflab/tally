@@ -145,8 +145,8 @@ EOF
 	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
 	want := `FROM alpine
 COPY <<EOF /etc/app/config.yaml
-b: 2
-a: 1
+"b": 2
+"a": 1
 EOF
 `
 	if got != want {

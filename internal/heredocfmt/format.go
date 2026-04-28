@@ -243,9 +243,6 @@ func clearYAMLFlowStyle(node *yaml.Node) {
 		return
 	}
 	node.Style &^= yaml.FlowStyle
-	if node.Kind == yaml.ScalarNode {
-		node.Style &^= yaml.DoubleQuotedStyle | yaml.SingleQuotedStyle
-	}
 	for _, child := range node.Content {
 		clearYAMLFlowStyle(child)
 	}
@@ -272,31 +269,53 @@ func formatTOML(content string, st style) (string, error) {
 }
 
 func tomlHasComment(content string) bool {
-	inString := byte(0)
+	inString := false
+	stringQuote := byte(0)
+	multiline := false
 	escaped := false
-	for i := range len(content) {
+	for i := 0; i < len(content); {
 		ch := content[i]
-		if inString != 0 {
-			if escaped {
-				escaped = false
+		if inString {
+			if multiline && strings.HasPrefix(content[i:], strings.Repeat(string(stringQuote), 3)) && !escaped {
+				inString = false
+				multiline = false
+				stringQuote = 0
+				i += 3
 				continue
 			}
-			if ch == '\\' && inString == '"' {
+			if !multiline && ch == stringQuote && !escaped {
+				inString = false
+				stringQuote = 0
+				i++
+				continue
+			}
+			if stringQuote == '"' && ch == '\\' && !escaped {
 				escaped = true
+				i++
 				continue
 			}
-			if ch == inString {
-				inString = 0
-			}
+			escaped = false
+			i++
+			continue
+		}
+
+		if strings.HasPrefix(content[i:], `"""`) || strings.HasPrefix(content[i:], `'''`) {
+			inString = true
+			stringQuote = ch
+			multiline = true
+			i += 3
 			continue
 		}
 		if ch == '"' || ch == '\'' {
-			inString = ch
+			inString = true
+			stringQuote = ch
+			i++
 			continue
 		}
 		if ch == '#' {
 			return true
 		}
+		i++
 	}
 	return false
 }
@@ -399,10 +418,11 @@ func (f *xmlFormatter) writeEnd(tok xml.EndElement) error {
 
 func (f *xmlFormatter) writeCharData(tok xml.CharData) error {
 	text := string(tok)
-	if strings.TrimSpace(text) == "" {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
 		return nil
 	}
-	if strings.TrimSpace(text) != text {
+	if trimmed != text {
 		return errSkipFormat
 	}
 	if err := f.enc.EncodeToken(tok); err != nil {
