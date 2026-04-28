@@ -1,0 +1,110 @@
+{
+  "files": [
+    {
+      "file": "testdata/labels-valid-key/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/labels/valid-key/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/labels-valid-key/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "label key \"bad key\" contains whitespace",
+          "rule": "tally/labels/valid-key",
+          "severity": "warning",
+          "sourceCode": "LABEL \"bad key\"=value"
+        },
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/labels/valid-key/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "testdata/labels-valid-key/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "label key \"Bad.Key\" uses uppercase characters; Docker recommends lower-case label keys",
+          "rule": "tally/labels/valid-key",
+          "severity": "warning",
+          "sourceCode": "LABEL Bad.Key=value"
+        },
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/labels/valid-key/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "testdata/labels-valid-key/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "label key \"bad/key\" contains '/', which is outside Docker's documented label-key guidance",
+          "rule": "tally/labels/valid-key",
+          "severity": "warning",
+          "sourceCode": "LABEL bad/key=value"
+        },
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/labels/valid-key/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "testdata/labels-valid-key/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "label key \"com.docker.compose.project\" uses a Docker-reserved namespace",
+          "rule": "tally/labels/valid-key",
+          "severity": "warning",
+          "sourceCode": "LABEL com.docker.compose.project=demo"
+        },
+        {
+          "detail": "Keep LABEL keys static so duplicate detection, key validation, and schema checks can reason about image metadata reliably.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/labels/valid-key/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 8
+            },
+            "file": "testdata/labels-valid-key/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 8
+            }
+          },
+          "message": "label key \"$LABEL_PREFIX.name\" uses variable expansion and cannot be validated statically",
+          "rule": "tally/labels/valid-key",
+          "severity": "info",
+          "sourceCode": "LABEL \"$LABEL_PREFIX.name\"=demo"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 5,
+    "warnings": 4
+  }
+}

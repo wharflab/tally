@@ -111,6 +111,18 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("buildkit/LegacyKeyValueFormat")...),
 			wantExit: 1,
 		},
+		{
+			name:     "labels-no-duplicate-keys",
+			dir:      "labels-no-duplicate-keys",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/labels/no-duplicate-keys")...),
+			wantExit: 1,
+		},
+		{
+			name:     "labels-valid-key",
+			dir:      "labels-valid-key",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/labels/valid-key")...),
+			wantExit: 1,
+		},
 
 		{
 			name:     "multiple-instructions-disallowed",

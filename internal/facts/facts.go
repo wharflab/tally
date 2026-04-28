@@ -4,6 +4,7 @@ import (
 	"maps"
 	"path"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
+	dfshell "github.com/moby/buildkit/frontend/dockerfile/shell"
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/semantic"
@@ -92,8 +94,16 @@ type StageFacts struct {
 	// available in the resolved context.
 	BuildContextSources []*BuildContextSource
 
+	// Labels records Dockerfile LABEL pairs declared directly in this stage.
+	// It does not include labels inherited from a base image or parent stage.
+	Labels []LabelPairFact
+
+	// LabelInstructions records LABEL instructions declared directly in this stage.
+	LabelInstructions []LabelInstructionFact
+
 	cacheDisablingEnv []EnvBinding
 	observableByPath  map[string]*ObservableFile
+	labelsByKey       map[string][]LabelPairFact
 }
 
 // RunFacts contains derived facts for a single RUN instruction.
@@ -142,6 +152,32 @@ type EnvBinding struct {
 	Key     string
 	Value   string
 	Command *instructions.EnvCommand
+}
+
+// LabelInstructionFact describes one Dockerfile LABEL instruction.
+type LabelInstructionFact struct {
+	StageIndex   int
+	CommandIndex int
+	Command      *instructions.LabelCommand
+	Pairs        []LabelPairFact
+	Location     []parser.Range
+}
+
+// LabelPairFact describes one key/value pair inside a LABEL instruction.
+type LabelPairFact struct {
+	StageIndex     int
+	CommandIndex   int
+	PairIndex      int
+	Key            string
+	Value          string
+	RawKey         string
+	RawValue       string
+	KeyIsDynamic   bool
+	ValueIsDynamic bool
+	ExpansionError string
+	NoDelim        bool
+	Location       []parser.Range
+	Command        *instructions.LabelCommand
 }
 
 type runFactBuildParams struct {
@@ -255,6 +291,20 @@ func (s *StageFacts) FileContent(filePath string) (string, bool) {
 	return file.Content()
 }
 
+// DuplicateLabelGroups returns label keys declared more than once in this stage.
+func (s *StageFacts) DuplicateLabelGroups() map[string][]LabelPairFact {
+	out := map[string][]LabelPairFact{}
+	if s == nil {
+		return out
+	}
+	for key, pairs := range s.labelsByKey {
+		if len(pairs) > 1 {
+			out[key] = append([]LabelPairFact(nil), pairs...)
+		}
+	}
+	return out
+}
+
 // Stages returns all stage facts.
 func (f *FileFacts) Stages() []*StageFacts {
 	f.once.Do(f.build)
@@ -265,6 +315,19 @@ func (f *FileFacts) Stages() []*StageFacts {
 func (f *FileFacts) Runs() []*RunFacts {
 	f.once.Do(f.build)
 	return append([]*RunFacts(nil), f.runs...)
+}
+
+// Labels returns all Dockerfile LABEL pairs across all stages.
+func (f *FileFacts) Labels() []LabelPairFact {
+	f.once.Do(f.build)
+	var labels []LabelPairFact
+	for _, stage := range f.stages {
+		if stage == nil {
+			continue
+		}
+		labels = append(labels, stage.Labels...)
+	}
+	return labels
 }
 
 func (f *FileFacts) build() {
@@ -336,6 +399,7 @@ func newStageFacts(stageIdx, stageCount int, currentShell ShellFacts, semInfo *s
 		IsLast:       stageIdx == stageCount-1,
 		InitialShell: currentShell,
 		FinalShell:   currentShell,
+		labelsByKey:  map[string][]LabelPairFact{},
 	}
 	if semInfo != nil {
 		stageFacts.BaseImageOS = semInfo.BaseImageOS
@@ -423,6 +487,8 @@ func (f *FileFacts) processStageCommands(
 				state.currentEnvBindings,
 				state.currentCacheDisablingEnv,
 			)
+		case *instructions.LabelCommand:
+			recordLabelInstruction(stageFacts, c, stageIdx, cmdIdx, state.currentEnvValues)
 		case *instructions.ShellCommand:
 			state.currentShell = newShellFacts(c.Shell)
 			stageFacts.FinalShell = state.currentShell
@@ -553,6 +619,87 @@ func seedStageEntrypointState(semInfo *semantic.StageInfo, stages []*StageFacts,
 	target.HasEntrypoint = parent.HasEntrypoint
 	target.HasPrivilegeDropEntrypoint = parent.HasPrivilegeDropEntrypoint
 	target.HasPrivilegeDropCmd = parent.HasPrivilegeDropCmd
+}
+
+func recordLabelInstruction(
+	stageFacts *StageFacts,
+	cmd *instructions.LabelCommand,
+	stageIdx int,
+	commandIdx int,
+	envValues map[string]string,
+) {
+	if stageFacts == nil || cmd == nil {
+		return
+	}
+
+	inst := LabelInstructionFact{
+		StageIndex:   stageIdx,
+		CommandIndex: commandIdx,
+		Command:      cmd,
+		Location:     cmd.Location(),
+		Pairs:        make([]LabelPairFact, 0, len(cmd.Labels)),
+	}
+
+	for pairIdx, kv := range cmd.Labels {
+		key, keyDynamic, keyErr := expandLabelWord(kv.Key, envValues)
+		value, valueDynamic, valueErr := expandLabelWord(kv.Value, envValues)
+		expansionErr := keyErr
+		if expansionErr == "" {
+			expansionErr = valueErr
+		}
+
+		pair := LabelPairFact{
+			StageIndex:     stageIdx,
+			CommandIndex:   commandIdx,
+			PairIndex:      pairIdx,
+			Key:            key,
+			Value:          value,
+			RawKey:         kv.Key,
+			RawValue:       kv.Value,
+			KeyIsDynamic:   keyDynamic,
+			ValueIsDynamic: valueDynamic,
+			ExpansionError: expansionErr,
+			NoDelim:        kv.NoDelim,
+			Location:       cmd.Location(),
+			Command:        cmd,
+		}
+		inst.Pairs = append(inst.Pairs, pair)
+		stageFacts.Labels = append(stageFacts.Labels, pair)
+		if !pair.KeyIsDynamic && pair.ExpansionError == "" && pair.Key != "" {
+			stageFacts.labelsByKey[pair.Key] = append(stageFacts.labelsByKey[pair.Key], pair)
+		}
+	}
+
+	stageFacts.LabelInstructions = append(stageFacts.LabelInstructions, inst)
+}
+
+func expandLabelWord(raw string, envValues map[string]string) (value string, dynamic bool, expansionErr string) {
+	lex := dfshell.NewLex('\\')
+	result, err := lex.ProcessWordWithMatches(raw, labelEnvGetter(envValues))
+	if err != nil {
+		return raw, false, err.Error()
+	}
+	if len(result.Matched) > 0 || len(result.Unmatched) > 0 {
+		return raw, true, ""
+	}
+	return result.Result, false, ""
+}
+
+func labelEnvGetter(envValues map[string]string) dfshell.EnvGetter {
+	if len(envValues) == 0 {
+		return dfshell.EnvsFromSlice(nil)
+	}
+	keys := make([]string, 0, len(envValues))
+	for key := range envValues {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+
+	env := make([]string, 0, len(keys))
+	for _, key := range keys {
+		env = append(env, key+"="+envValues[key])
+	}
+	return dfshell.EnvsFromSlice(env)
 }
 
 func seedStageObservableFiles(semInfo *semantic.StageInfo, stages []*StageFacts) map[string]*ObservableFile {

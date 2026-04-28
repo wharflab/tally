@@ -1,0 +1,57 @@
+{
+  "files": [
+    {
+      "file": "testdata/labels-no-duplicate-keys/Dockerfile",
+      "violations": [
+        {
+          "detail": "Consolidate this key into a single LABEL pair so reviews do not need to infer which value wins.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/labels/no-duplicate-keys/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/labels-no-duplicate-keys/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "label key \"org.opencontainers.image.title\" repeats the same value in this stage",
+          "rule": "tally/labels/no-duplicate-keys",
+          "severity": "warning",
+          "sourceCode": "LABEL org.opencontainers.image.title=\"builder\""
+        },
+        {
+          "detail": "Consolidate this key into a single LABEL pair so reviews do not need to infer which value wins.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/labels/no-duplicate-keys/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 7
+            },
+            "file": "testdata/labels-no-duplicate-keys/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 7
+            }
+          },
+          "message": "label key \"org.opencontainers.image.source\" is set more than once in this stage; Docker keeps the last value",
+          "rule": "tally/labels/no-duplicate-keys",
+          "severity": "warning",
+          "sourceCode": "LABEL org.opencontainers.image.source=\"https://github.com/example/demo-v2\""
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}

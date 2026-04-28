@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -329,6 +330,116 @@ max = 100
 	enabled = cfg.Rules.IsEnabled("buildkit/StageNameCasing")
 	if enabled != nil {
 		t.Errorf("unconfigured rule should return nil, got %v", *enabled)
+	}
+}
+
+func TestLoad_NamespacedTallyRuleConfig(t *testing.T) {
+	t.Parallel()
+	tmpDir, dockerfilePath := setupTempProject(t)
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := `
+[rules.tally.labels.valid-key]
+severity = "off"
+
+[rules.tally.windows.no-run-mounts]
+severity = "error"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dockerfilePath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if sev := cfg.Rules.GetSeverity("tally/labels/valid-key"); sev != "off" {
+		t.Fatalf("GetSeverity(tally/labels/valid-key) = %q, want off", sev)
+	}
+	if sev := cfg.Rules.GetSeverity("tally/windows/no-run-mounts"); sev != "error" {
+		t.Fatalf("GetSeverity(tally/windows/no-run-mounts) = %q, want error", sev)
+	}
+}
+
+func TestLoad_NamespacedRuleConfigKeepsQuotedSlashCompatibility(t *testing.T) {
+	t.Parallel()
+	tmpDir, dockerfilePath := setupTempProject(t)
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := `
+[rules.tally."labels/valid-key"]
+severity = "off"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dockerfilePath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if sev := cfg.Rules.GetSeverity("tally/labels/valid-key"); sev != "off" {
+		t.Fatalf("GetSeverity(tally/labels/valid-key) = %q, want off", sev)
+	}
+}
+
+func TestLoad_NamespacedRuleConfigRejectsDuplicateForms(t *testing.T) {
+	t.Parallel()
+	tmpDir, dockerfilePath := setupTempProject(t)
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := `
+[rules.tally."labels/valid-key"]
+severity = "off"
+
+[rules.tally.labels.valid-key]
+severity = "warning"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(dockerfilePath)
+	if err == nil {
+		t.Fatal("Load() error = nil, want duplicate rule config error")
+	}
+	if !strings.Contains(err.Error(), "tally/labels/valid-key is configured more than once") {
+		t.Fatalf("Load() error = %q, want duplicate rule config error", err)
+	}
+}
+
+func TestLoad_NamespacedTallyRuleConfigDoesNotFlattenRuleOptions(t *testing.T) {
+	t.Parallel()
+	tmpDir, dockerfilePath := setupTempProject(t)
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := `
+[rules.tally.require-secret-mounts.commands.pip]
+id = "pipconf"
+target = "/root/.config/pip/pip.conf"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dockerfilePath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	opts := cfg.Rules.GetOptions("tally/require-secret-mounts")
+	commands, ok := opts["commands"].(map[string]any)
+	if !ok {
+		t.Fatalf("commands option = %T, want map[string]any", opts["commands"])
+	}
+	pip, ok := commands["pip"].(map[string]any)
+	if !ok {
+		t.Fatalf("commands.pip option = %T, want map[string]any", commands["pip"])
+	}
+	if pip["id"] != "pipconf" {
+		t.Fatalf("commands.pip.id = %v, want pipconf", pip["id"])
 	}
 }
 
