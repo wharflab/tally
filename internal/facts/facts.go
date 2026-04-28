@@ -629,8 +629,11 @@ func recordLabelInstruction(
 	envValues map[string]string,
 	escapeToken rune,
 ) {
-	if stageFacts == nil || cmd == nil {
-		return
+	if stageFacts == nil {
+		panic("recordLabelInstruction called with nil StageFacts")
+	}
+	if cmd == nil {
+		panic("recordLabelInstruction called with nil LabelCommand")
 	}
 
 	inst := LabelInstructionFact{

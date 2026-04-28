@@ -6,6 +6,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
@@ -180,6 +182,27 @@ func TestFileFacts_LabelFactsUseDockerfileEscapeToken(t *testing.T) {
 	if got := stage.Labels[0].Value; got != `C:\Program Files\App` {
 		t.Fatalf("label value = %q, want Windows path with backslashes preserved", got)
 	}
+}
+
+func TestRecordLabelInstructionPanicsOnNilRequiredInputs(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil stage facts", func(t *testing.T) {
+		t.Parallel()
+
+		cmd := instructions.NewLabelCommand("com.example.name", "demo", false)
+		assertPanicsWith(t, "recordLabelInstruction called with nil StageFacts", func() {
+			recordLabelInstruction(nil, cmd, 0, 0, nil, '\\')
+		})
+	})
+
+	t.Run("nil label command", func(t *testing.T) {
+		t.Parallel()
+
+		assertPanicsWith(t, "recordLabelInstruction called with nil LabelCommand", func() {
+			recordLabelInstruction(&StageFacts{}, nil, 0, 0, nil, '\\')
+		})
+	})
 }
 
 func TestFileFacts_PowerShellErrorModeIsTrackedPerRun(t *testing.T) {
@@ -869,6 +892,22 @@ VOLUME /data
 func makeFileFacts(t *testing.T, content string) *FileFacts {
 	t.Helper()
 	return makeFileFactsWithContext(t, content, nil)
+}
+
+func assertPanicsWith(t *testing.T, want string, fn func()) {
+	t.Helper()
+
+	defer func() {
+		got := recover()
+		if got == nil {
+			t.Fatalf("expected panic %q", want)
+		}
+		if gotMsg := fmt.Sprint(got); gotMsg != want {
+			t.Fatalf("panic = %q, want %q", gotMsg, want)
+		}
+	}()
+
+	fn()
 }
 
 func makeFileFactsWithContext(t *testing.T, content string, contextFiles ContextFileReader) *FileFacts {

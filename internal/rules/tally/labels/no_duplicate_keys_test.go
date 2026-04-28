@@ -155,10 +155,10 @@ LABEL org.opencontainers.image.title="demo2"
 	}
 
 	gotCommented := string(fixpkg.ApplyFix([]byte(content), commentFix))
-	wantCommented := `FROM alpine:3.20
-# [commented out by tally - Docker keeps the last LABEL value for org.opencontainers.image.title]: LABEL org.opencontainers.image.title="demo"
-LABEL org.opencontainers.image.title="demo2"
-`
+	wantCommented := "FROM alpine:3.20\n" +
+		"# [commented out by tally - Docker keeps the last LABEL value for " +
+		"org.opencontainers.image.title]: LABEL org.opencontainers.image.title=\"demo\"\n" +
+		"LABEL org.opencontainers.image.title=\"demo2\"\n"
 	if gotCommented != wantCommented {
 		t.Errorf("comment fix mismatch\ngot:\n%s\nwant:\n%s", gotCommented, wantCommented)
 	}
@@ -205,11 +205,12 @@ LABEL org.opencontainers.image.title="demo3"
 	}
 
 	got := string(fixpkg.ApplyEdits([]byte(content), edits))
-	want := `FROM alpine:3.20
-# [commented out by tally - Docker keeps the last LABEL value for org.opencontainers.image.title]: LABEL org.opencontainers.image.title="demo"
-# [commented out by tally - Docker keeps the last LABEL value for org.opencontainers.image.title]: LABEL org.opencontainers.image.title="demo2"
-LABEL org.opencontainers.image.title="demo3"
-`
+	want := "FROM alpine:3.20\n" +
+		"# [commented out by tally - Docker keeps the last LABEL value for " +
+		"org.opencontainers.image.title]: LABEL org.opencontainers.image.title=\"demo\"\n" +
+		"# [commented out by tally - Docker keeps the last LABEL value for " +
+		"org.opencontainers.image.title]: LABEL org.opencontainers.image.title=\"demo2\"\n" +
+		"LABEL org.opencontainers.image.title=\"demo3\"\n"
 	if got != want {
 		t.Errorf("fix-all previous labels mismatch\ngot:\n%s\nwant:\n%s", got, want)
 	}
