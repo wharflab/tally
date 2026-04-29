@@ -66,14 +66,17 @@ uv tool run typos
 
 ## Git Hooks
 
-Pre-commit hooks are managed by Lefthook (`.lefthook.yml`):
+Pre-commit hooks are managed by [hk](https://hk.jdx.dev) (`hk.pkl`):
 
-- Go linting (golangci-lint)
+- Go formatting & linting (gofmt, golangci-lint)
 - TOML formatting (taplo)
 - Markdown linting (rumdl)
-- YAML linting (yamllint)
+- YAML linting/formatting (yamllint, yamlfmt)
 - Spell checking (typos)
 - Commit message validation (commitlint)
+
+Install hooks once with `hk install --global` (Git 2.54+, uses config-based hooks
+and works natively across worktrees) or `hk install` for this repo only.
 
 ## Darwin-Specific Notes
 

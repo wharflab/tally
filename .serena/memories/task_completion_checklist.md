@@ -12,7 +12,7 @@ When completing a task (especially new features or bug fixes), ensure:
 ## Code Quality
 
 - [ ] Code builds: `go build ./...` or `make build`
-- [ ] Linting passes (auto-run on pre-commit via Lefthook)
+- [ ] Linting passes (auto-run on pre-commit via hk)
 - [ ] No spelling errors (typos)
 - [ ] Follow existing code patterns
 

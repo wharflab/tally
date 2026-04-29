@@ -38,7 +38,7 @@
 - `internal/config/config.go` - Config system with cascading discovery
 - `internal/lint/rules.go` - Linting rule implementations
 - `cmd/tally/cmd/lint.go` - Main lint command with CLI flags
-- `.lefthook.yml` - Git hooks configuration
+- `hk.pkl` - Git hooks configuration (managed by [hk](https://hk.jdx.dev))
 - `.golangci.yaml` - Go linter configuration
 - `.goreleaser.yml` - Multi-platform release configuration
 

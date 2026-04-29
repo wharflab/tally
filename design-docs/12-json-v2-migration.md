@@ -72,9 +72,9 @@ env:
   GOEXPERIMENT: jsonv2
 ```
 
-### 4.3 Lefthook / Local Hooks
+### 4.3 hk / Local Hooks
 
-Ensure pre-commit and pre-push commands run with `GOEXPERIMENT=jsonv2`.
+Ensure pre-commit and pre-push commands run with `GOEXPERIMENT=jsonv2` (set globally in `hk.pkl`).
 
 ### 4.4 Developer Onboarding
 
