@@ -25,11 +25,14 @@ The pattern matches `Dockerfile`, `Dockerfile.*`, `Containerfile`, and `Containe
 ## Rules that use EditorConfig
 
 - [`tally/prefer-formatted-heredocs`](/rules/tally/prefer-formatted-heredocs) formats `COPY` and `ADD` heredoc bodies for JSON, YAML, TOML, XML, and
-  INI files, plus `RUN` heredoc bodies that are executed as shell scripts.
+  INI files, plus shell heredocs from executable `RUN` heredocs and `COPY` heredocs with a shell shebang or `.sh` destination.
 
 For structured heredoc payloads, tally resolves EditorConfig settings using a virtual filename next to the Dockerfile and the heredoc destination
 basename. For example, a heredoc in `services/api/Dockerfile` targeting `/etc/app/config.yaml` is resolved as `services/api/config.yaml`, so
 `*.yaml` and `config.yaml` sections apply.
+
+`COPY` shell heredocs use that same destination-basename lookup. For example, a heredoc targeting `/usr/local/bin/entrypoint.sh` is resolved as
+`entrypoint.sh`, so `*.sh` and `entrypoint.sh` sections apply.
 
 For `RUN` shell heredocs, tally uses a virtual filename next to the Dockerfile named `Dockerfile.heredoc.<dialect>`, such as
 `Dockerfile.heredoc.sh`, `Dockerfile.heredoc.bash`, or `Dockerfile.heredoc.zsh`.
@@ -43,14 +46,14 @@ The heredoc formatter currently reads these EditorConfig properties:
 | `indent_style` | Uses tabs when set to `tab`; otherwise uses spaces. |
 | `indent_size` | Sets the number of spaces per indent level when it is a positive integer. |
 | `tab_width` | Used as the fallback indent width when `indent_size` is not a positive integer. |
-| `max_line_length` | YAML and RUN shell heredocs. For YAML, a positive integer is used as the preferred scalar wrapping width. For shell heredocs, a positive integer is used as the preferred command wrapping width; unset and invalid values use `100`, and `off` disables the shell line-width pass. This is a formatting preference, not a hard maximum. |
-| `binary_next_line` | RUN shell heredocs only. Mirrors `shfmt --binary-next-line`. |
-| `switch_case_indent` | RUN shell heredocs only. Mirrors `shfmt --case-indent`. |
-| `space_redirects` | RUN shell heredocs only. Mirrors `shfmt --space-redirects`. |
-| `keep_padding` | RUN shell heredocs only. Mirrors `shfmt --keep-padding`. |
-| `function_next_line` | RUN shell heredocs only. Mirrors `shfmt --func-next-line`. |
-| `simplify` | RUN shell heredocs only. Mirrors `shfmt --simplify`. |
-| `minify` | RUN shell heredocs only. Mirrors `shfmt --minify` and implies `simplify`. |
+| `max_line_length` | YAML and shell heredocs. For YAML, a positive integer is used as the preferred scalar wrapping width. For shell heredocs, a positive integer is used as the preferred command wrapping width; unset and invalid values use `100`, and `off` disables the shell line-width pass. This is a formatting preference, not a hard maximum. |
+| `binary_next_line` | Shell heredocs only. Mirrors `shfmt --binary-next-line`. |
+| `switch_case_indent` | Shell heredocs only. Mirrors `shfmt --case-indent`. |
+| `space_redirects` | Shell heredocs only. Mirrors `shfmt --space-redirects`. |
+| `keep_padding` | Shell heredocs only. Mirrors `shfmt --keep-padding`. |
+| `function_next_line` | Shell heredocs only. Mirrors `shfmt --func-next-line`. |
+| `simplify` | Shell heredocs only. Mirrors `shfmt --simplify`. |
+| `minify` | Shell heredocs only. Mirrors `shfmt --minify` and implies `simplify`. |
 
 Other EditorConfig properties are intentionally not interpreted by the heredoc formatter today:
 

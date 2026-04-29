@@ -139,6 +139,12 @@ func FormatDockerfileHeredocs(file string, result *dockerfile.ParseResult) ([]ru
 		if err != nil {
 			return nil, err
 		}
+		if !ok && strings.EqualFold(doc.Instruction, command.Copy) {
+			formatted, _, ok, err = formatter.FormatShellTarget(doc.TargetPath, doc.Content)
+			if err != nil {
+				return nil, err
+			}
+		}
 		if !ok || formatted == doc.Content {
 			continue
 		}

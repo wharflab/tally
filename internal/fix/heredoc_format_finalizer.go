@@ -16,7 +16,7 @@ func (formattedHeredocsFinalizer) RuleCode() string {
 }
 
 func (formattedHeredocsFinalizer) Description() string {
-	return "Pretty-print COPY/ADD heredocs"
+	return "Pretty-print Dockerfile heredocs"
 }
 
 func (formattedHeredocsFinalizer) Safety() rules.FixSafety {

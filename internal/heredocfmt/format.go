@@ -128,6 +128,28 @@ func (f *Formatter) FormatShell(content string, variant shell.Variant) (string, 
 	return formatted, true, nil
 }
 
+// FormatShellTarget formats a COPY heredoc body as a shell script when the destination or shebang implies one.
+func (f *Formatter) FormatShellTarget(target, content string) (string, shell.Variant, bool, error) {
+	variant, ok := shellTargetVariant(target, content)
+	if !ok {
+		return "", shell.VariantUnknown, false, nil
+	}
+
+	st, err := f.styleForShellTarget(target, variant)
+	if err != nil {
+		return "", variant, false, err
+	}
+
+	formatted, err := formatShell(content, variant, st)
+	if err != nil {
+		if errors.Is(err, errSkipFormat) {
+			return "", variant, false, nil
+		}
+		return "", variant, false, err
+	}
+	return formatted, variant, true, nil
+}
+
 func (f *Formatter) styleForTarget(target string) (style, error) {
 	virtualName, err := VirtualFilename(f.dockerfilePath, target)
 	if err != nil {
@@ -148,6 +170,24 @@ func (f *Formatter) styleForTarget(target string) (style, error) {
 
 func (f *Formatter) styleForShell(variant shell.Variant) (style, error) {
 	virtualName, err := VirtualShellFilename(f.dockerfilePath, variant)
+	if err != nil {
+		return style{}, err
+	}
+	if st, ok := f.styleCache[virtualName]; ok {
+		return st, nil
+	}
+
+	def, err := editorconfig.GetDefinitionForFilename(virtualName)
+	if err != nil {
+		return style{}, err
+	}
+	st := shellStyleFromDefinition(def)
+	f.styleCache[virtualName] = st
+	return st, nil
+}
+
+func (f *Formatter) styleForShellTarget(target string, variant shell.Variant) (style, error) {
+	virtualName, err := VirtualShellTargetFilename(f.dockerfilePath, target, variant)
 	if err != nil {
 		return style{}, err
 	}
@@ -194,6 +234,19 @@ func VirtualShellFilename(dockerfilePath string, variant shell.Variant) (string,
 	return filepath.Join(dir, "Dockerfile.heredoc."+shellExtension(variant)), nil
 }
 
+// VirtualShellTargetFilename returns the synthetic filename used for COPY shell heredoc EditorConfig matching.
+func VirtualShellTargetFilename(dockerfilePath, target string, variant shell.Variant) (string, error) {
+	base := targetBasenameAny(target)
+	if base == "" {
+		return VirtualShellFilename(dockerfilePath, variant)
+	}
+	dir, err := dockerfileDir(dockerfilePath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, filepath.FromSlash(base)), nil
+}
+
 func shellExtension(variant shell.Variant) string {
 	switch variant {
 	case shell.VariantPOSIX:
@@ -213,14 +266,22 @@ func shellExtension(variant shell.Variant) string {
 }
 
 func targetBasename(target string) string {
+	base := targetBasenameAny(target)
+	if base == "" {
+		return ""
+	}
+	if _, ok := SupportedKind(base); !ok {
+		return ""
+	}
+	return base
+}
+
+func targetBasenameAny(target string) string {
 	target = strings.TrimSpace(target)
 	target = strings.Trim(target, `"'`)
 	target = strings.ReplaceAll(target, `\`, `/`)
 	base := path.Base(target)
 	if base == "." || base == "/" || base == "" {
-		return ""
-	}
-	if _, ok := SupportedKind(base); !ok {
 		return ""
 	}
 	return base
@@ -329,6 +390,27 @@ func rawBool(def *editorconfig.Definition, key string) bool {
 		return false
 	}
 	return strings.EqualFold(strings.TrimSpace(def.Raw[key]), "true")
+}
+
+func shellTargetVariant(target, content string) (shell.Variant, bool) {
+	firstLine, _, _ := strings.Cut(content, "\n")
+	if name, ok := shell.ShellFromShebang(firstLine); ok {
+		variant := shell.VariantFromShell(name)
+		return variant, variant.SupportsPOSIXShellAST()
+	}
+	if strings.HasPrefix(firstLine, "#!") {
+		return shell.VariantUnknown, false
+	}
+	if isDotShTarget(target) {
+		return shell.VariantPOSIX, true
+	}
+	return shell.VariantUnknown, false
+}
+
+func isDotShTarget(target string) bool {
+	target = strings.TrimSpace(target)
+	target = strings.Trim(target, `"'`)
+	return strings.EqualFold(path.Ext(filepath.ToSlash(target)), ".sh")
 }
 
 func formatContent(kind Kind, content string, st style) (string, error) {

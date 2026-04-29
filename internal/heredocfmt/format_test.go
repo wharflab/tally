@@ -3,6 +3,8 @@ package heredocfmt
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -191,6 +193,99 @@ func TestFormatShellWrapsMaxLineLength(t *testing.T) {
 
 	if !strings.Contains(got, "\\\n  ") {
 		t.Fatalf("expected shell line wrapping, got:\n%s", got)
+	}
+}
+
+func TestShellTargetVariant(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		target  string
+		content string
+		want    shell.Variant
+		wantOK  bool
+	}{
+		{
+			name:    "bash shebang without extension",
+			target:  "/usr/local/bin/entrypoint",
+			content: "#!/usr/bin/env bash\nif true; then echo hi; fi\n",
+			want:    shell.VariantBash,
+			wantOK:  true,
+		},
+		{
+			name:    "ksh shebang maps to mksh",
+			target:  "/usr/local/bin/entrypoint",
+			content: "#!/bin/ksh\nif true; then echo hi; fi\n",
+			want:    shell.VariantMksh,
+			wantOK:  true,
+		},
+		{
+			name:    "sh extension without shebang uses POSIX",
+			target:  "/usr/local/bin/entrypoint.sh",
+			content: "if true; then echo hi; fi\n",
+			want:    shell.VariantPOSIX,
+			wantOK:  true,
+		},
+		{
+			name:    "unsupported shebang is skipped even with sh extension",
+			target:  "/usr/local/bin/entrypoint.sh",
+			content: "#!/usr/bin/env python\nprint('hi')\n",
+			wantOK:  false,
+		},
+		{
+			name:    "non-sh extension without shebang is skipped",
+			target:  "/usr/local/bin/entrypoint.bash",
+			content: "if true; then echo hi; fi\n",
+			wantOK:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := shellTargetVariant(tt.target, tt.content)
+			if ok != tt.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tt.wantOK)
+			}
+			if got != tt.want {
+				t.Fatalf("variant = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatShellTargetUsesDestinationEditorConfig(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".editorconfig"), []byte(`root = true
+
+[entrypoint.sh]
+indent_style = space
+indent_size = 2
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	f := NewFormatter(filepath.Join(dir, "Dockerfile"))
+	got, variant, ok, err := f.FormatShellTarget(
+		"/usr/local/bin/entrypoint.sh",
+		"if true; then\n echo hi\nfi\n",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("FormatShellTarget ok = false, want true")
+	}
+	if variant != shell.VariantPOSIX {
+		t.Fatalf("variant = %v, want %v", variant, shell.VariantPOSIX)
+	}
+
+	want := "if true; then\n  echo hi\nfi\n"
+	if got != want {
+		t.Fatalf("formatted shell target mismatch\ngot:\n%s\nwant:\n%s", got, want)
 	}
 }
 

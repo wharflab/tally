@@ -1,9 +1,10 @@
 ---
 title: "tally/prefer-formatted-heredocs"
-description: "Pretty-print structured COPY/ADD heredocs and shell RUN heredocs."
+description: "Pretty-print structured COPY/ADD heredocs and shell heredocs."
 ---
 
-Pretty-prints structured `COPY` and `ADD` heredoc bodies, and `RUN` heredoc bodies that are executed as shell scripts.
+Pretty-prints structured `COPY` and `ADD` heredoc bodies, `COPY` heredocs that contain shell scripts, and `RUN` heredoc bodies that are executed as
+shell scripts.
 
 | Property | Value |
 |----------|-------|
@@ -14,9 +15,13 @@ Pretty-prints structured `COPY` and `ADD` heredoc bodies, and `RUN` heredoc bodi
 
 ## Description
 
-This rule formats heredoc payloads that are copied into JSON, YAML, TOML, XML, or INI files. It detects the file type from the heredoc destination
-path extension and uses the repository's `.editorconfig` settings for indentation. YAML heredocs can also use `max_line_length` as a preferred scalar
-wrapping width.
+This rule formats heredoc payloads that are copied into JSON, YAML, TOML, XML, or INI files. It detects structured file types from the heredoc
+destination path extension and uses the repository's `.editorconfig` settings for indentation. YAML heredocs can also use `max_line_length` as a
+preferred scalar wrapping width.
+
+The rule also formats `COPY` heredocs as shell scripts when the first payload line is a recognized shell shebang, or when the destination path ends
+in `.sh` and the payload has no shebang. Plain `.sh` payloads are parsed as POSIX shell. Unsupported shebangs are skipped instead of falling back to
+the `.sh` extension.
 
 The rule also formats `RUN <<EOF` heredocs whose body is executed as a shell script. It uses `mvdan.cc/sh/v3`, the same formatter library behind
 `shfmt`, for Bash, POSIX shell, mksh, Bats, and zsh. Heredocs that are stdin payloads for another command, such as `RUN cat <<EOF`, are left alone.
@@ -25,6 +30,9 @@ PowerShell, cmd, and unknown shebang bodies are skipped.
 For structured payload EditorConfig lookup, tally resolves a virtual filename next to the Dockerfile using the destination basename. For example, a
 heredoc in `services/api/Dockerfile` targeting `/etc/app/config.yaml` is matched as `services/api/config.yaml`, so selectors such as `*.yaml` and
 `config.yaml` apply naturally.
+
+`COPY` shell heredocs use the same destination-basename lookup, so a target such as `/usr/local/bin/entrypoint.sh` is matched as
+`entrypoint.sh` and can use EditorConfig sections such as `*.sh` or `entrypoint.sh`.
 
 For `RUN` shell heredocs, tally resolves a virtual filename next to the Dockerfile named `Dockerfile.heredoc.<dialect>`, such as
 `Dockerfile.heredoc.sh`, `Dockerfile.heredoc.bash`, or `Dockerfile.heredoc.zsh`.
@@ -76,6 +84,28 @@ chown -R app:app /opt/app
 EOF
 ```
 
+### Bad: COPY shell
+
+```dockerfile
+FROM alpine:3.20
+COPY <<EOF /usr/local/bin/entrypoint
+#!/usr/bin/env bash
+set -eu; mkdir -p /run/app /var/cache/app; chown -R app:app /run/app /var/cache/app
+EOF
+```
+
+### Good: COPY shell
+
+```dockerfile
+FROM alpine:3.20
+COPY <<EOF /usr/local/bin/entrypoint
+#!/usr/bin/env bash
+set -eu
+mkdir -p /run/app /var/cache/app
+chown -R app:app /run/app /var/cache/app
+EOF
+```
+
 ## Supported Types
 
 | Extension | Format |
@@ -87,6 +117,9 @@ EOF
 | `.ini` | INI |
 
 ## Supported Shells
+
+Shell formatting applies to executable `RUN` heredocs and to `COPY` heredocs with a recognized shell shebang. A `COPY` heredoc targeting `.sh`
+without a shebang uses POSIX shell.
 
 | Shell | Formatter dialect |
 |-------|-------------------|
@@ -105,7 +138,7 @@ Default (no config needed):
 ```
 
 This rule intentionally has no rule-specific formatter options. Use `.editorconfig` for indentation style and width, YAML scalar wrapping width, and
-RUN shell heredoc line width.
+shell heredoc line width.
 See [EditorConfig integration](/integrations/editorconfig) for recommended Dockerfile settings and path resolution details.
 
 The rule reads `indent_style`, `indent_size`, `tab_width`, and `max_line_length`. For YAML, `max_line_length` is used as a preferred scalar wrapping
