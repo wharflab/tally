@@ -520,6 +520,14 @@ the CLI.
 
 ---
 
+### 41. [Docker CLI Plugin Support](41-docker-cli-plugin.md)
+
+**Covers:** Two-phase implementation plan for running tally as `docker lint`: first migrate the small standalone CLI from `urfave/cli/v3` to
+Cobra while preserving koanf-backed config precedence, then add Docker CLI plugin support with Docker's Cobra plugin helper, Homebrew
+`lib/docker/cli-plugins` integration, WinGet considerations, release smoke tests, and dedicated docs.
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
