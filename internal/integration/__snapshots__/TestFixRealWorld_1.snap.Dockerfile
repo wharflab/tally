@@ -77,7 +77,9 @@ RUN --mount=type=cache,target=/root/.cache/pip,id=pip <<EOF
 set -e
 pip install -U "cython<3.0.0" wheel
 pip install pyyaml==5.4.1 --no-build-isolation
-pip install -U "awscli>1.27,<2" boto3 "click==8.1.2,<9" "cmake>=3.24.3,<3.25" "cryptography>41" ipython "mpi4py>=3.1.4,<3.2" "opencv-python>=4.6.0,<4.7" packaging Pillow "psutil>=5.9.4,<5.10" "pyyaml>=5.4,<5.5"
+pip install -U "awscli>1.27,<2" boto3 "click==8.1.2,<9" "cmake>=3.24.3,<3.25" "cryptography>41" \
+	ipython "mpi4py>=3.1.4,<3.2" "opencv-python>=4.6.0,<4.7" packaging Pillow \
+	"psutil>=5.9.4,<5.10" "pyyaml>=5.4,<5.5"
 EOF
 
 ARG TRITON_VERSION
@@ -211,7 +213,14 @@ RUN --mount=type=cache,target=/var/cache/apt,id=apt,sharing=locked --mount=type=
 set -e
 apt-get update
 apt-get -y upgrade --only-upgrade systemd
-apt-get install -y --allow-change-held-packages --no-install-recommends build-essential ca-certificates check cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 cuda-libraries-11-7 curl emacs git hwloc jq libcufft-dev-11-7 libcurand-dev-11-7 libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libgl1-mesa-glx libglib2.0-0 libgomp1 libhwloc-dev libibverbs-dev libnuma-dev libnuma1 libsm6 libssl-dev libssl3 libsubunit-dev libsubunit0 libtool libxext6 libxrender-dev openssl pkg-config python3-dev unzip vim wget zlib1g-dev libcublas-11-7=${CUBLAS_VERSION}-1 libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7
+apt-get install -y --allow-change-held-packages --no-install-recommends build-essential \
+	ca-certificates check cmake cuda-command-line-tools-11-7 cuda-cudart-11-7 \
+	cuda-libraries-11-7 curl emacs git hwloc jq libcufft-dev-11-7 libcurand-dev-11-7 \
+	libcurl4-openssl-dev libcusolver-dev-11-7 libcusparse-dev-11-7 libgl1-mesa-glx libglib2.0-0 \
+	libgomp1 libhwloc-dev libibverbs-dev libnuma-dev libnuma1 libsm6 libssl-dev libssl3 \
+	libsubunit-dev libsubunit0 libtool libxext6 libxrender-dev openssl pkg-config python3-dev \
+	unzip vim wget zlib1g-dev libcublas-11-7=${CUBLAS_VERSION}-1 \
+	libcublas-dev-11-7=${CUBLAS_VERSION}-1 libcudnn8=$CUDNN_VERSION-1+cuda11.7
 EOF
 
 ADD --link https://github.com/NVIDIA/nccl.git?ref=v${NCCL_VERSION}-1 /tmp/nccl
@@ -316,7 +325,8 @@ pip install pyOpenSSL --upgrade
 EOF
 RUN <<EOF
 set -e
-/opt/conda/bin/conda install -y -c conda-forge accelerate charset-normalizer conda-content-trust cython h5py libgcc mkl mkl-include parso pyopenssl requests typing
+/opt/conda/bin/conda install -y -c conda-forge accelerate charset-normalizer conda-content-trust \
+	cython h5py libgcc mkl mkl-include parso pyopenssl requests typing
 /opt/conda/bin/conda install -c dglteam -y dgl-cuda11.7=0.9.1
 /opt/conda/bin/conda install -c pytorch -y magma-cuda117
 /opt/conda/bin/conda install -c fastai fastai
@@ -392,7 +402,8 @@ RUN <<EOF
 set -e
 cd /tmp/efa-ofi-nccl/aws-ofi-nccl
 ./autogen.sh
-./configure --with-libfabric=/opt/amazon/efa --with-mpi=/opt/amazon/openmpi --with-cuda=/usr/local/cuda --with-nccl=/usr/local --prefix=/usr/local
+./configure --with-libfabric=/opt/amazon/efa --with-mpi=/opt/amazon/openmpi \
+	--with-cuda=/usr/local/cuda --with-nccl=/usr/local --prefix=/usr/local
 make
 make install
 rm -rf /tmp/efa-ofi-nccl
@@ -516,7 +527,8 @@ WORKDIR /
 RUN <<EOF
 set -e
 HOME_DIR=/root
-curl --location -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip
+curl --location -o ${HOME_DIR}/oss_compliance.zip \
+	https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip
 unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/
 cp ${HOME_DIR}/oss_compliance/test/testOSSCompliance /usr/local/bin/testOSSCompliance
 chmod +x /usr/local/bin/testOSSCompliance
@@ -538,7 +550,8 @@ EOF
 RUN <<EOF
 set -e
 HOME_DIR=/root
-curl --location -o ${HOME_DIR}/oss_compliance.zip https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip
+curl --location -o ${HOME_DIR}/oss_compliance.zip \
+	https://aws-dlinfra-utilities.s3.amazonaws.com/oss_compliance.zip
 unzip ${HOME_DIR}/oss_compliance.zip -d ${HOME_DIR}/
 cp ${HOME_DIR}/oss_compliance/test/testOSSCompliance /usr/local/bin/testOSSCompliance
 chmod +x /usr/local/bin/testOSSCompliance

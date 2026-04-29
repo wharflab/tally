@@ -916,7 +916,7 @@ RUN printf 'zend_extension=opcache\n[opcache]\nopcache.enable=1\n' > /etc/app/ph
 				"--fix",
 				"--select", "tally/prefer-package-cache-mounts",
 			},
-			wantApplied: 1,
+			wantApplied: 2,
 		},
 		{
 			name: "prefer-package-cache-mounts-apt-heredoc-mutated-plus-new-mount",

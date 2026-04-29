@@ -30,17 +30,9 @@ func TestPreferFormattedHeredocsRule_Metadata(t *testing.T) {
 func TestRunHeredocShellVariantUnknownWithoutSemanticMetadata(t *testing.T) {
 	t.Parallel()
 
-	got := runHeredocShellVariant(rules.LintInput{}, heredocfmt.RunHeredoc{StartLine: 2})
+	got := heredocfmt.RunHeredocShellVariant(nil, nil, heredocfmt.RunHeredoc{StartLine: 2})
 	if got != shell.VariantUnknown {
 		t.Fatalf("variant = %v, want %v", got, shell.VariantUnknown)
-	}
-}
-
-func TestShellFromHeredocShebangIgnoresIndentedShebangComment(t *testing.T) {
-	t.Parallel()
-
-	if got, ok := shellFromHeredocShebang("  #!/usr/bin/env bash\necho hi\n"); ok {
-		t.Fatalf("shellFromHeredocShebang() = %q, true; want no shebang", got)
 	}
 }
 

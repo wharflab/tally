@@ -6,13 +6,11 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
-	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/heredocfmt"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
-	"github.com/wharflab/tally/internal/shell"
 )
 
 // PreferFormattedHeredocsRule implements heredoc body pretty-printing.
@@ -131,7 +129,7 @@ func (r *PreferFormattedHeredocsRule) Check(input rules.LintInput) []rules.Viola
 	}
 
 	for _, doc := range heredocfmt.CollectRunHeredocs(parseResult) {
-		variant := runHeredocShellVariant(input, doc)
+		variant := heredocfmt.RunHeredocShellVariant(input.Stages, input.Semantic, doc)
 		if !variant.SupportsPOSIXShellAST() {
 			continue
 		}
@@ -161,49 +159,6 @@ func (r *PreferFormattedHeredocsRule) Check(input rules.LintInput) []rules.Viola
 	}
 
 	return violations
-}
-
-func runHeredocShellVariant(input rules.LintInput, doc heredocfmt.RunHeredoc) shell.Variant {
-	if name, ok := shellFromHeredocShebang(doc.Content); ok {
-		return shell.VariantFromShell(name)
-	}
-	if doc.ShellNameOverride != "" {
-		return shell.VariantFromShell(doc.ShellNameOverride)
-	}
-	if input.Semantic == nil {
-		return shell.VariantUnknown
-	}
-
-	stageIdx := stageIndexAtLine(input.Stages, doc.StartLine)
-	if stageIdx < 0 {
-		return shell.VariantUnknown
-	}
-	info := input.Semantic.StageInfo(stageIdx)
-	if info == nil {
-		return shell.VariantUnknown
-	}
-	return info.ShellVariantAtLine(doc.StartLine)
-}
-
-func shellFromHeredocShebang(content string) (string, bool) {
-	firstLine, _, _ := strings.Cut(content, "\n")
-	if name, ok := shell.ShellFromShebang(firstLine); ok {
-		return name, true
-	}
-	if strings.HasPrefix(firstLine, "#!") {
-		return "", true
-	}
-	return "", false
-}
-
-func stageIndexAtLine(stages []instructions.Stage, line int) int {
-	stageIdx := -1
-	for i, stage := range stages {
-		if len(stage.Location) > 0 && stage.Location[0].Start.Line <= line {
-			stageIdx = i
-		}
-	}
-	return stageIdx
 }
 
 func init() {

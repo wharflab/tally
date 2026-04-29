@@ -11,6 +11,8 @@ import (
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/highlight/extract"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
 
@@ -151,8 +153,52 @@ func isOnbuildRunNode(node *parser.Node) bool {
 		strings.EqualFold(node.Next.Children[0].Value, command.Run)
 }
 
-// FormatDockerfileHeredocs builds text edits that pretty-print COPY/ADD heredoc bodies.
-func FormatDockerfileHeredocs(file string, result *dockerfile.ParseResult) ([]rules.TextEdit, error) {
+// RunHeredocShellVariant returns the shell variant used to parse a RUN heredoc body.
+func RunHeredocShellVariant(stages []instructions.Stage, sem *semantic.Model, doc RunHeredoc) shell.Variant {
+	if name, ok := shellFromHeredocShebang(doc.Content); ok {
+		return shell.VariantFromShell(name)
+	}
+	if doc.ShellNameOverride != "" {
+		return shell.VariantFromShell(doc.ShellNameOverride)
+	}
+	if sem == nil {
+		return shell.VariantUnknown
+	}
+
+	stageIdx := stageIndexAtLine(stages, doc.StartLine)
+	if stageIdx < 0 {
+		return shell.VariantUnknown
+	}
+	info := sem.StageInfo(stageIdx)
+	if info == nil {
+		return shell.VariantUnknown
+	}
+	return info.ShellVariantAtLine(doc.StartLine)
+}
+
+func shellFromHeredocShebang(content string) (string, bool) {
+	firstLine, _, _ := strings.Cut(content, "\n")
+	if name, ok := shell.ShellFromShebang(firstLine); ok {
+		return name, true
+	}
+	if strings.HasPrefix(firstLine, "#!") {
+		return "", true
+	}
+	return "", false
+}
+
+func stageIndexAtLine(stages []instructions.Stage, line int) int {
+	stageIdx := -1
+	for i, stage := range stages {
+		if len(stage.Location) > 0 && stage.Location[0].Start.Line <= line {
+			stageIdx = i
+		}
+	}
+	return stageIdx
+}
+
+// FormatDockerfileHeredocs builds text edits that pretty-print Dockerfile heredoc bodies.
+func FormatDockerfileHeredocs(file string, result *dockerfile.ParseResult, sem *semantic.Model) ([]rules.TextEdit, error) {
 	formatter := NewFormatter(file)
 	var edits []rules.TextEdit
 	for _, doc := range CollectDockerfileHeredocs(result) {
@@ -165,6 +211,25 @@ func FormatDockerfileHeredocs(file string, result *dockerfile.ParseResult) ([]ru
 			if err != nil {
 				return nil, err
 			}
+		}
+		if !ok || formatted == doc.Content {
+			continue
+		}
+
+		edits = append(edits, rules.TextEdit{
+			Location: rules.NewRangeLocation(file, doc.BodyStartLine, 0, doc.TerminatorLine, 0),
+			NewText:  WithBodyPrefix(formatted, doc.BodyPrefix),
+		})
+	}
+	for _, doc := range CollectRunHeredocs(result) {
+		variant := RunHeredocShellVariant(result.Stages, sem, doc)
+		if !variant.SupportsPOSIXShellAST() {
+			continue
+		}
+
+		formatted, ok, err := formatter.FormatShell(doc.Content, variant)
+		if err != nil {
+			return nil, err
 		}
 		if !ok || formatted == doc.Content {
 			continue
