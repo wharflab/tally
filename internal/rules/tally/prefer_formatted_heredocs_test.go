@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"github.com/wharflab/tally/internal/fix"
+	"github.com/wharflab/tally/internal/heredocfmt"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -22,6 +24,15 @@ func TestPreferFormattedHeredocsRule_Metadata(t *testing.T) {
 	}
 	if meta.FixPriority != rules.FormattedHeredocsFixPriority {
 		t.Fatalf("FixPriority = %d, want %d", meta.FixPriority, rules.FormattedHeredocsFixPriority)
+	}
+}
+
+func TestRunHeredocShellVariantUnknownWithoutSemanticMetadata(t *testing.T) {
+	t.Parallel()
+
+	got := runHeredocShellVariant(rules.LintInput{}, heredocfmt.RunHeredoc{StartLine: 2})
+	if got != shell.VariantUnknown {
+		t.Fatalf("variant = %v, want %v", got, shell.VariantUnknown)
 	}
 }
 
@@ -281,13 +292,14 @@ func TestPreferFormattedHeredocsRule_FixRUNEditorConfigMaxLineLength(t *testing.
 [*.sh]
 indent_style = space
 indent_size = 2
-max_line_length = 48
+max_line_length = 64
 `); err != nil {
 		t.Fatal(err)
 	}
 	file := filepath.Join(dir, "Dockerfile")
 	content := `FROM alpine
 RUN <<EOF
+#!/bin/sh
 apt-get install -y --no-install-recommends alpha beta gamma delta epsilon zeta
 EOF
 `

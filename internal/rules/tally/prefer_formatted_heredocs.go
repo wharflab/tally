@@ -171,16 +171,16 @@ func runHeredocShellVariant(input rules.LintInput, doc heredocfmt.RunHeredoc) sh
 		return shell.VariantFromShell(doc.ShellNameOverride)
 	}
 	if input.Semantic == nil {
-		return shell.VariantBash
+		return shell.VariantUnknown
 	}
 
 	stageIdx := stageIndexAtLine(input.Stages, doc.StartLine)
 	if stageIdx < 0 {
-		return shell.VariantBash
+		return shell.VariantUnknown
 	}
 	info := input.Semantic.StageInfo(stageIdx)
 	if info == nil {
-		return shell.VariantBash
+		return shell.VariantUnknown
 	}
 	return info.ShellVariantAtLine(doc.StartLine)
 }
