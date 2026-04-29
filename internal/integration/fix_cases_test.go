@@ -623,6 +623,45 @@ severity = "error"
 			)...),
 			wantApplied: 2,
 		},
+		// Mixed finalizer coverage: pre-existing COPY/ADD heredocs are formatted
+		// while prefer-copy-heredoc injects new COPY heredocs in the same fix run.
+		{
+			name: "prefer-formatted-heredocs-existing-and-generated",
+			input: `FROM ubuntu:22.04
+COPY <<JSON /etc/app/existing.json
+{"b":2,"a":1}
+JSON
+
+COPY <<YAML /etc/app/existing.yaml
+{"enabled":true,"port":8080}
+YAML
+
+ADD <<XML /etc/app/existing.xml
+<app><feature>on</feature></app>
+XML
+
+COPY <<EOF /etc/app/already.json
+{
+  "ok": true
+}
+EOF
+
+COPY <<EOF /etc/app/config.txt
+{"b":2,"a":1}
+EOF
+
+RUN printf 'title="generated"\n[owner]\nname="tally"\n' > /etc/app/generated.toml
+RUN printf 'zend_extension=opcache\n[opcache]\nopcache.enable=1\n' > /etc/app/php.ini
+`,
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 6, // three existing heredocs + two conversions + one finalizer pass for generated heredocs
+		},
 
 		// prefer-copy-heredoc: literal ~/ target resolves against the effective USER and stays unsafe
 		{
