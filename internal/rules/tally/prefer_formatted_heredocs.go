@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/heredocfmt"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
+	"github.com/wharflab/tally/internal/shell"
 )
 
-// PreferFormattedHeredocsRule implements heredoc body pretty-printing for typed files.
+// PreferFormattedHeredocsRule implements heredoc body pretty-printing.
 type PreferFormattedHeredocsRule struct {
 	schema map[string]any
 }
@@ -30,7 +33,7 @@ func (r *PreferFormattedHeredocsRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
 		Code:            rules.FormattedHeredocsRuleCode,
 		Name:            "Prefer formatted heredocs",
-		Description:     "Pretty-print COPY/ADD heredocs for JSON, YAML, TOML, and XML files",
+		Description:     "Pretty-print COPY/ADD typed heredocs and RUN shell heredocs",
 		DocURL:          rules.TallyDocURL(rules.FormattedHeredocsRuleCode),
 		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
@@ -94,7 +97,80 @@ func (r *PreferFormattedHeredocsRule) Check(input rules.LintInput) []rules.Viola
 		violations = append(violations, v)
 	}
 
+	for _, doc := range heredocfmt.CollectRunHeredocs(parseResult) {
+		variant := runHeredocShellVariant(input, doc)
+		if !variant.SupportsPOSIXShellAST() {
+			continue
+		}
+
+		formatted, ok, err := formatter.FormatShell(doc.Content, variant)
+		if err != nil || !ok || formatted == doc.Content {
+			continue
+		}
+
+		loc := rules.NewRangeLocation(input.File, doc.BodyStartLine, 0, doc.TerminatorLine, 0)
+		message := doc.Instruction + " heredoc should be pretty-printed as a shell script"
+		v := rules.NewViolation(loc, meta.Code, message, meta.DefaultSeverity).
+			WithDocURL(meta.DocURL).
+			WithSuggestedFix(&rules.SuggestedFix{
+				Description: "Pretty-print RUN heredoc body",
+				Safety:      rules.FixSafe,
+				Priority:    meta.FixPriority,
+				Edits: []rules.TextEdit{
+					{
+						Location: loc,
+						NewText:  heredocfmt.WithBodyPrefix(formatted, doc.BodyPrefix),
+					},
+				},
+				IsPreferred: true,
+			})
+		violations = append(violations, v)
+	}
+
 	return violations
+}
+
+func runHeredocShellVariant(input rules.LintInput, doc heredocfmt.RunHeredoc) shell.Variant {
+	if name, ok := shellFromHeredocShebang(doc.Content); ok {
+		return shell.VariantFromShell(name)
+	}
+	if doc.ShellNameOverride != "" {
+		return shell.VariantFromShell(doc.ShellNameOverride)
+	}
+	if input.Semantic == nil {
+		return shell.VariantBash
+	}
+
+	stageIdx := stageIndexAtLine(input.Stages, doc.StartLine)
+	if stageIdx < 0 {
+		return shell.VariantBash
+	}
+	info := input.Semantic.StageInfo(stageIdx)
+	if info == nil {
+		return shell.VariantBash
+	}
+	return info.ShellVariantAtLine(doc.StartLine)
+}
+
+func shellFromHeredocShebang(content string) (string, bool) {
+	firstLine, _, _ := strings.Cut(content, "\n")
+	if name, ok := shell.ShellFromShebang(firstLine); ok {
+		return name, true
+	}
+	if strings.HasPrefix(strings.TrimSpace(firstLine), "#!") {
+		return "", true
+	}
+	return "", false
+}
+
+func stageIndexAtLine(stages []instructions.Stage, line int) int {
+	stageIdx := -1
+	for i, stage := range stages {
+		if len(stage.Location) > 0 && stage.Location[0].Start.Line <= line {
+			stageIdx = i
+		}
+	}
+	return stageIdx
 }
 
 func init() {

@@ -301,6 +301,8 @@ func TestVariantFromShell(t *testing.T) {
 		{"/bin/mksh", VariantMksh},
 		{"ksh", VariantMksh},
 		{"/bin/ksh", VariantMksh},
+		{"bats", VariantBats},
+		{"/usr/bin/bats", VariantBats},
 		{"zsh", VariantZsh},
 		{"/bin/zsh", VariantZsh},
 		{"powershell", VariantPowerShell},
@@ -493,6 +495,7 @@ func TestToLangVariant(t *testing.T) {
 		{VariantBash, syntax.LangBash},
 		{VariantPOSIX, syntax.LangPOSIX},
 		{VariantMksh, syntax.LangMirBSDKorn},
+		{VariantBats, syntax.LangBats},
 		{VariantZsh, syntax.LangZsh},
 		{VariantPowerShell, syntax.LangBash}, // PowerShell falls back to Bash
 		{VariantCmd, syntax.LangBash},        // Cmd falls back to Bash
@@ -521,6 +524,7 @@ func TestVariantCapabilities(t *testing.T) {
 		{VariantBash, true, true, true, true, false},
 		{VariantPOSIX, true, true, true, true, false},
 		{VariantMksh, true, true, true, true, false},
+		{VariantBats, true, true, false, true, false},
 		{VariantZsh, true, true, true, true, false},
 		{VariantPowerShell, true, false, false, true, true},
 		{VariantCmd, false, false, false, true, false},
@@ -587,6 +591,7 @@ func TestShellFromShebang(t *testing.T) {
 		{"#!/bin/zsh", "zsh", true},
 		{"#!/usr/bin/env zsh", "zsh", true},
 		{"#!/bin/mksh", "mksh", true},
+		{"#!/usr/bin/env bats", "bats", true},
 		{"#!/bin/ksh", "ksh", true},
 		{"#!/usr/bin/env ksh", "ksh", true},
 		{"#!/usr/bin/python3", "", false},

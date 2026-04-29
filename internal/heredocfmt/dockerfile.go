@@ -9,6 +9,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/dockerfile"
+	"github.com/wharflab/tally/internal/highlight/extract"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -22,6 +23,17 @@ type DockerfileHeredoc struct {
 	BodyStartLine  int
 	TerminatorLine int
 	BodyPrefix     string
+}
+
+// RunHeredoc describes a RUN heredoc body whose contents are executed as a script.
+type RunHeredoc struct {
+	Instruction       string
+	Content           string
+	StartLine         int
+	BodyStartLine     int
+	TerminatorLine    int
+	BodyPrefix        string
+	ShellNameOverride string
 }
 
 // CollectDockerfileHeredocs returns supported COPY/ADD heredocs from a parsed Dockerfile.
@@ -69,6 +81,51 @@ func CollectDockerfileHeredocs(result *dockerfile.ParseResult) []DockerfileHered
 				BodyPrefix:     span.bodyPrefix,
 			})
 		}
+	}
+	return docs
+}
+
+// CollectRunHeredocs returns RUN heredocs whose body is executed as a shell script.
+func CollectRunHeredocs(result *dockerfile.ParseResult) []RunHeredoc {
+	if result == nil || result.AST == nil || result.AST.AST == nil {
+		return nil
+	}
+
+	sm := sourcemap.New(result.Source)
+	escapeToken := result.AST.EscapeToken
+	if escapeToken == 0 {
+		escapeToken = '\\'
+	}
+
+	var docs []RunHeredoc
+	for _, node := range result.AST.AST.Children {
+		if len(node.Heredocs) != 1 || !strings.EqualFold(node.Value, command.Run) {
+			continue
+		}
+
+		mapping, ok := extract.ExtractRunScript(sm, node, escapeToken)
+		if !ok || !mapping.IsHeredoc {
+			continue
+		}
+
+		spans := heredocBodySpans(node, sm, escapeToken)
+		if len(spans) == 0 {
+			continue
+		}
+		span := spans[0]
+		if span.bodyStartLine <= 0 || span.terminatorLine <= 0 {
+			continue
+		}
+
+		docs = append(docs, RunHeredoc{
+			Instruction:       strings.ToUpper(node.Value),
+			Content:           node.Heredocs[0].Content,
+			StartLine:         node.StartLine,
+			BodyStartLine:     span.bodyStartLine,
+			TerminatorLine:    span.terminatorLine,
+			BodyPrefix:        span.bodyPrefix,
+			ShellNameOverride: mapping.ShellNameOverride,
+		})
 	}
 	return docs
 }

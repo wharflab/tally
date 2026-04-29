@@ -7,6 +7,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
+
 	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
@@ -82,6 +83,7 @@ func TestShellcheckDialect(t *testing.T) {
 		{name: "default", shellName: "", want: "sh"},
 		{name: "sh", shellName: "/bin/sh", want: "sh"},
 		{name: "bash", shellName: "/bin/bash", want: "bash"},
+		{name: "bats-maps-to-bash", shellName: "/usr/bin/bats", want: "bash"},
 		{name: "windows-bash", shellName: `C:\Program Files\Git\bin\bash.exe`, want: "bash"},
 		{name: "zsh-maps-to-bash", shellName: "/usr/bin/zsh", want: "bash"},
 		{name: "dash", shellName: "/bin/dash", want: "dash"},

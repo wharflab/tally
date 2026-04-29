@@ -18,8 +18,9 @@ import (
 	intshellcheck "github.com/wharflab/tally/internal/shellcheck"
 	"github.com/wharflab/tally/internal/sourcemap"
 
-	"github.com/wharflab/tally/internal/rules"
 	"mvdan.cc/sh/v3/syntax"
+
+	"github.com/wharflab/tally/internal/rules"
 )
 
 const (
@@ -879,7 +880,7 @@ func shellcheckDialect(shellName string) string {
 	name = strings.TrimSuffix(name, ".exe")
 
 	switch name {
-	case "bash", "zsh":
+	case "bash", "bats", "zsh":
 		return shellDialectBash
 	case "sh":
 		return "sh"

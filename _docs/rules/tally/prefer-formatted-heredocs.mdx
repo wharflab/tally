@@ -1,9 +1,9 @@
 ---
 title: "tally/prefer-formatted-heredocs"
-description: "Pretty-print COPY and ADD heredocs for structured file types."
+description: "Pretty-print structured COPY/ADD heredocs and shell RUN heredocs."
 ---
 
-Pretty-prints `COPY` and `ADD` heredoc bodies when the destination filename has a supported structured-data extension.
+Pretty-prints structured `COPY` and `ADD` heredoc bodies, and `RUN` heredoc bodies that are executed as shell scripts.
 
 | Property | Value |
 |----------|-------|
@@ -18,16 +18,23 @@ This rule formats heredoc payloads that are copied into JSON, YAML, TOML, XML, o
 path extension and uses the repository's `.editorconfig` settings for indentation. YAML heredocs can also use `max_line_length` as a preferred scalar
 wrapping width.
 
-For EditorConfig lookup, tally resolves a virtual filename next to the Dockerfile using the destination basename. For example, a heredoc in
-`services/api/Dockerfile` targeting `/etc/app/config.yaml` is matched as `services/api/config.yaml`, so selectors such as `*.yaml` and `config.yaml`
-apply naturally.
+The rule also formats `RUN <<EOF` heredocs whose body is executed as a shell script. It uses `mvdan.cc/sh/v3`, the same formatter library behind
+`shfmt`, for Bash, POSIX shell, mksh, Bats, and zsh. Heredocs that are stdin payloads for another command, such as `RUN cat <<EOF`, are left alone.
+PowerShell, cmd, and unknown shebang bodies are skipped.
+
+For structured payload EditorConfig lookup, tally resolves a virtual filename next to the Dockerfile using the destination basename. For example, a
+heredoc in `services/api/Dockerfile` targeting `/etc/app/config.yaml` is matched as `services/api/config.yaml`, so selectors such as `*.yaml` and
+`config.yaml` apply naturally.
+
+For `RUN` shell heredocs, tally resolves a virtual filename next to the Dockerfile named `Dockerfile.heredoc.<dialect>`, such as
+`Dockerfile.heredoc.sh`, `Dockerfile.heredoc.bash`, or `Dockerfile.heredoc.zsh`.
 
 The formatter also runs as a final auto-fix pass. This means heredocs emitted by other rules, such as `tally/prefer-copy-heredoc`, are formatted in
 the same `--fix` run when this rule is enabled.
 
 ## Examples
 
-### Bad
+### Bad: COPY
 
 ```dockerfile
 FROM alpine:3.20
@@ -36,7 +43,7 @@ COPY <<EOF /etc/app/config.json
 EOF
 ```
 
-### Good
+### Good: COPY
 
 ```dockerfile
 FROM alpine:3.20
@@ -45,6 +52,27 @@ COPY <<EOF /etc/app/config.json
   "b": 2,
   "a": 1
 }
+EOF
+```
+
+### Bad: RUN
+
+```dockerfile
+FROM alpine:3.20
+RUN <<EOF
+set -eu; apk add --no-cache ca-certificates curl openssl; install -d -o app -g app /opt/app/bin /opt/app/cache; chown -R app:app /opt/app
+EOF
+```
+
+### Good: RUN
+
+```dockerfile
+FROM alpine:3.20
+RUN <<EOF
+set -eu
+apk add --no-cache ca-certificates curl openssl
+install -d -o app -g app /opt/app/bin /opt/app/cache
+chown -R app:app /opt/app
 EOF
 ```
 
@@ -58,6 +86,16 @@ EOF
 | `.xml`, `.config`, `.xsd`, `.wsdl`, `.xsl`, `.xslt` | XML |
 | `.ini` | INI |
 
+## Supported Shells
+
+| Shell | Formatter dialect |
+|-------|-------------------|
+| `bash` | Bash |
+| `sh`, `dash`, `ash` | POSIX shell |
+| `mksh`, `ksh` | mksh |
+| `bats` | Bats |
+| `zsh` | zsh |
+
 ## Configuration
 
 Default (no config needed):
@@ -66,14 +104,21 @@ Default (no config needed):
 # Enabled by default with no rule-specific options
 ```
 
-This rule intentionally has no formatter-specific options. Use `.editorconfig` for indentation style and width, and for YAML scalar wrapping width.
+This rule intentionally has no rule-specific formatter options. Use `.editorconfig` for indentation style and width, YAML scalar wrapping width, and
+RUN shell heredoc line width.
 See [EditorConfig integration](/integrations/editorconfig) for recommended Dockerfile settings and path resolution details.
 
-The rule reads `indent_style`, `indent_size`, `tab_width`, and YAML-only `max_line_length`. `max_line_length` is treated as a preferred wrapping
-width, not a hard maximum. It does not currently interpret `insert_final_newline`, `end_of_line`, `charset`, or `trim_trailing_whitespace` for the
-virtual payload file. Formatted heredoc bodies always end with exactly one newline before the heredoc terminator, and line endings follow the parent
-Dockerfile/fix application rather than a separate payload setting. The current structured serializers do not emit incidental trailing whitespace, but
-tally does not run a separate trailing-whitespace trim pass because whitespace can be payload data.
+The rule reads `indent_style`, `indent_size`, `tab_width`, and `max_line_length`. For YAML, `max_line_length` is used as a preferred scalar wrapping
+width. For shell heredocs, it is used as a preferred command wrapping width; when unset or invalid, tally uses `100`, and `off` disables this shell
+line-width pass. This is not a hard maximum.
+
+For shell heredocs, tally also reads shfmt-compatible EditorConfig booleans: `binary_next_line`, `switch_case_indent`, `space_redirects`,
+`keep_padding`, `function_next_line`, `simplify`, and `minify`.
+
+The rule does not currently interpret `insert_final_newline`, `end_of_line`, `charset`, or `trim_trailing_whitespace` for the virtual payload file.
+Formatted heredoc bodies always end with exactly one newline before the heredoc terminator, and line endings follow the parent Dockerfile/fix
+application rather than a separate payload setting. The current formatters do not emit incidental trailing whitespace, but tally does not run a
+separate trailing-whitespace trim pass because whitespace can be payload data.
 
 ## Auto-fix
 

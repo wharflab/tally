@@ -93,6 +93,41 @@ EOF
 			WantMessages:   []string{"COPY heredoc for /etc/app/php.ini should be pretty-printed as INI"},
 		},
 		{
+			Name: "unformatted RUN heredoc",
+			Content: `FROM alpine
+RUN <<EOF
+if true; then
+ echo hi
+fi
+EOF
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"RUN heredoc should be pretty-printed as a shell script"},
+		},
+		{
+			Name: "RUN heredoc stdin payload is skipped",
+			Content: `FROM alpine
+RUN cat <<EOF
+if true; then
+ echo hi
+fi
+EOF
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "PowerShell RUN heredoc is skipped",
+			Content: `FROM mcr.microsoft.com/powershell:nanoserver-ltsc2022
+SHELL ["pwsh", "-Command"]
+RUN <<EOF
+if ($true) {
+ Write-Host hi
+}
+EOF
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "already formatted JSON",
 			Content: `FROM alpine
 COPY <<EOF /etc/app/config.json
@@ -122,6 +157,64 @@ EOF
 			WantViolations: 0,
 		},
 	})
+}
+
+func TestPreferFormattedHeredocsRule_FixRUN(t *testing.T) {
+	t.Parallel()
+	content := `FROM alpine
+RUN <<EOF
+if true; then
+ echo hi
+fi
+EOF
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewPreferFormattedHeredocsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	want := `FROM alpine
+RUN <<EOF
+if true; then
+	echo hi
+fi
+EOF
+`
+	if got != want {
+		t.Fatalf("fixed content mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_FixRUNEditorConfigMaxLineLength(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := writeTestFile(filepath.Join(dir, ".editorconfig"), `root = true
+
+[*.sh]
+indent_style = space
+indent_size = 2
+max_line_length = 48
+`); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "Dockerfile")
+	content := `FROM alpine
+RUN <<EOF
+apt-get install -y --no-install-recommends alpha beta gamma delta epsilon zeta
+EOF
+`
+	input := testutil.MakeLintInput(t, file, content)
+	violations := NewPreferFormattedHeredocsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	if !strings.Contains(got, "\\\n  ") {
+		t.Fatalf("expected wrapped shell command with 2-space continuation, got:\n%s", got)
+	}
 }
 
 func TestPreferFormattedHeredocsRule_FixJSON(t *testing.T) {

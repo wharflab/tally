@@ -46,7 +46,7 @@ func heredocBodyLines(commands []string, variant shell.Variant, pipefail bool) [
 		return powerShellBodyLines(commands)
 	case shell.VariantCmd:
 		return cmdBodyLines(commands)
-	case shell.VariantBash, shell.VariantPOSIX, shell.VariantMksh, shell.VariantZsh, shell.VariantUnknown:
+	case shell.VariantBash, shell.VariantPOSIX, shell.VariantMksh, shell.VariantBats, shell.VariantZsh, shell.VariantUnknown:
 		return posixBodyLines(commands, variant, pipefail)
 	}
 

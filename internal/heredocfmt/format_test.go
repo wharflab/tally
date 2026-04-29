@@ -2,10 +2,13 @@ package heredocfmt
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
 	editorconfig "github.com/editorconfig/editorconfig-core-go/v2"
+
+	"github.com/wharflab/tally/internal/shell"
 )
 
 func TestSupportedKindXMLAliases(t *testing.T) {
@@ -88,6 +91,106 @@ func TestStyleFromDefinitionReadsMaxLineLength(t *testing.T) {
 	})
 	if st.maxLineLength != 0 {
 		t.Fatalf("maxLineLength = %d, want 0 for off", st.maxLineLength)
+	}
+}
+
+func TestShellStyleDefaultMaxLineLength(t *testing.T) {
+	t.Parallel()
+
+	st := shellStyleFromDefinition(nil)
+	if st.maxLineLength != defaultShellMaxLineLength {
+		t.Fatalf("maxLineLength = %d, want %d", st.maxLineLength, defaultShellMaxLineLength)
+	}
+	if st.shellIndent != 0 {
+		t.Fatalf("shellIndent = %d, want tabs", st.shellIndent)
+	}
+
+	st = shellStyleFromDefinition(&editorconfig.Definition{
+		IndentStyle: editorconfig.IndentStyleSpaces,
+		IndentSize:  "4",
+		Raw: map[string]string{
+			"indent_style": "space",
+			"indent_size":  "4",
+		},
+	})
+	if st.shellIndent != 4 {
+		t.Fatalf("shellIndent = %d, want 4", st.shellIndent)
+	}
+}
+
+func TestShellStyleMaxLineLengthOff(t *testing.T) {
+	t.Parallel()
+
+	st := shellStyleFromDefinition(&editorconfig.Definition{
+		Raw: map[string]string{
+			"max_line_length": "off",
+		},
+	})
+	if st.maxLineLength != 0 {
+		t.Fatalf("maxLineLength = %d, want 0", st.maxLineLength)
+	}
+}
+
+func TestFormatShellUsesShfmt(t *testing.T) {
+	t.Parallel()
+
+	got, err := formatShell("if true; then\n  echo hi\nfi\n", shell.VariantPOSIX, shellStyleFromDefinition(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "if true; then\n\techo hi\nfi\n"
+	if got != want {
+		t.Fatalf("formatted shell mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestFormatShellSupportsMvdanVariants(t *testing.T) {
+	t.Parallel()
+
+	for _, variant := range []shell.Variant{
+		shell.VariantBash,
+		shell.VariantPOSIX,
+		shell.VariantMksh,
+		shell.VariantBats,
+		shell.VariantZsh,
+	} {
+		t.Run(fmt.Sprint(variant), func(t *testing.T) {
+			t.Parallel()
+			got, err := formatShell("echo hi\n", variant, shellStyleFromDefinition(nil))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != "echo hi\n" {
+				t.Fatalf("formatted shell mismatch: %q", got)
+			}
+		})
+	}
+}
+
+func TestFormatShellWrapsMaxLineLength(t *testing.T) {
+	t.Parallel()
+
+	st := shellStyleFromDefinition(&editorconfig.Definition{
+		IndentStyle: editorconfig.IndentStyleSpaces,
+		IndentSize:  "2",
+		Raw: map[string]string{
+			"indent_style":    "space",
+			"indent_size":     "2",
+			"max_line_length": "48",
+		},
+	})
+	got, err := formatShell(
+		"apt-get install -y --no-install-recommends alpha beta gamma delta epsilon zeta\n",
+		shell.VariantPOSIX,
+		st,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(got, "\\\n  ") {
+		t.Fatalf("expected shell line wrapping, got:\n%s", got)
 	}
 }
 

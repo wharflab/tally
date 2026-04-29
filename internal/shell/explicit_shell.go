@@ -37,7 +37,7 @@ func ParseExplicitShellInvocation(script string) (ExplicitShellInvocation, bool)
 		return parsePowerShellInvocation(script, next, shellName)
 	case VariantCmd:
 		return parseCmdInvocation(script, next, shellName)
-	case VariantBash, VariantPOSIX, VariantMksh, VariantZsh:
+	case VariantBash, VariantPOSIX, VariantMksh, VariantBats, VariantZsh:
 		return parsePOSIXShellInvocation(script, next, shellName, variant)
 	default:
 		return ExplicitShellInvocation{}, false

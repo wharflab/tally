@@ -603,6 +603,8 @@ func variantFromFact(name string) shell.Variant {
 		return shell.VariantPOSIX
 	case "mksh", "ksh":
 		return shell.VariantMksh
+	case "bats":
+		return shell.VariantBats
 	case "zsh":
 		return shell.VariantZsh
 	case "powershell", "pwsh":

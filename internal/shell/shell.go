@@ -24,6 +24,8 @@ const (
 	VariantPOSIX
 	// VariantMksh is the MirBSD Korn Shell.
 	VariantMksh
+	// VariantBats is the Bash Automated Testing System shell dialect.
+	VariantBats
 	// VariantZsh is the Z shell.
 	VariantZsh
 	// VariantPowerShell is PowerShell (cross-platform: powershell on Windows, pwsh on Linux/macOS).
@@ -38,19 +40,19 @@ const (
 	// variantParser are shells with a dedicated parser backend wired into Tally.
 	// This is the generic "can we build a syntax tree?" capability used by rules
 	// that only need structured commands, not POSIX-specific shell semantics.
-	variantParser = VariantBash | VariantPOSIX | VariantMksh | VariantZsh | VariantPowerShell
+	variantParser = VariantBash | VariantPOSIX | VariantMksh | VariantBats | VariantZsh | VariantPowerShell
 
 	// variantPOSIXShellAST are shells represented by the shared mvdan.cc/sh AST.
 	// Only these variants may use parseScript/toLangVariant and the helpers built
 	// on POSIX shell syntax/semantics.
-	variantPOSIXShellAST = VariantBash | VariantPOSIX | VariantMksh | VariantZsh
+	variantPOSIXShellAST = VariantBash | VariantPOSIX | VariantMksh | VariantBats | VariantZsh
 
 	// variantShellCheck are shells that ShellCheck can analyze
 	// (zsh is mapped to the bash dialect; ShellCheck has no native zsh support).
 	variantShellCheck = VariantBash | VariantPOSIX | VariantMksh | VariantZsh
 
 	// variantHeredoc are shells compatible with BuildKit RUN heredoc syntax.
-	variantHeredoc = VariantBash | VariantPOSIX | VariantMksh | VariantZsh | VariantPowerShell | VariantCmd
+	variantHeredoc = VariantBash | VariantPOSIX | VariantMksh | VariantBats | VariantZsh | VariantPowerShell | VariantCmd
 )
 
 // HasParser returns true for shells with any parser backend wired into Tally.
@@ -78,6 +80,7 @@ func (v Variant) IsPowerShell() bool { return v == VariantPowerShell }
 //   - bash -> VariantBash
 //   - sh, dash, ash -> VariantPOSIX
 //   - mksh, ksh -> VariantMksh
+//   - bats -> VariantBats
 //   - zsh -> VariantZsh
 //   - powershell, pwsh -> VariantPowerShell
 //   - cmd -> VariantCmd
@@ -92,6 +95,8 @@ func VariantFromShell(shell string) Variant {
 		return VariantPOSIX
 	case "mksh", "ksh":
 		return VariantMksh
+	case "bats":
+		return VariantBats
 	case "zsh":
 		return VariantZsh
 	case "powershell", "pwsh":
@@ -169,6 +174,8 @@ func (v Variant) toLangVariant() syntax.LangVariant {
 		return syntax.LangPOSIX
 	case VariantMksh:
 		return syntax.LangMirBSDKorn
+	case VariantBats:
+		return syntax.LangBats
 	case VariantZsh:
 		return syntax.LangZsh
 	default:
