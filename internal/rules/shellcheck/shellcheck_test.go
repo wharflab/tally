@@ -104,6 +104,19 @@ func TestShellcheckDialect(t *testing.T) {
 	}
 }
 
+func TestIsAllowedShebangAcceptsBats(t *testing.T) {
+	t.Parallel()
+
+	for _, script := range []string{
+		"#!/usr/bin/bats\n@test \"demo\" { run true; }\n",
+		"#!/usr/bin/env bats\n@test \"demo\" { run true; }\n",
+	} {
+		if !isAllowedShebang(script) {
+			t.Fatalf("expected bats shebang to be allowed: %q", script)
+		}
+	}
+}
+
 func TestCheckShellSnippetReportsViolationOnFallbackLocation(t *testing.T) {
 	t.Parallel()
 

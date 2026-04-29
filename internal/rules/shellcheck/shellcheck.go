@@ -907,9 +907,11 @@ func isAllowedShebang(script string) bool {
 	allowed := []string{
 		"#!/bin/sh",
 		"#!/bin/bash",
+		"#!/usr/bin/bats",
 		"#!/bin/ksh",
 		"#!/usr/bin/env sh",
 		"#!/usr/bin/env bash",
+		"#!/usr/bin/env bats",
 		"#!/usr/bin/env ksh",
 	}
 	return slices.Contains(allowed, line)
