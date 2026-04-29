@@ -520,6 +520,20 @@ the CLI.
 
 ---
 
+### 39. [Dockadvisor Parity Analysis](39-dockadvisor-parity-analysis.md)
+
+**Covers:** A rule-by-rule comparison between Dockadvisor and tally, identifying overlap, gaps, and follow-up opportunities such as EXPOSE
+validation, image-reference checks, and Dockadvisor's quality scoring and WASM model.
+
+---
+
+### 40. [LABEL Rules Research and Proposal](40-label-rules-research.md)
+
+**Covers:** Research and implementation planning for the `tally/labels/*` namespace, including duplicate label detection, label-key validation,
+Buildx and Compose label ownership, schema-driven label policy, and future label organization rules.
+
+---
+
 ### 41. [Docker CLI Plugin Support](41-docker-cli-plugin.md)
 
 **Covers:** Two-phase implementation plan for running tally as `docker lint`: first migrate the small standalone CLI from `urfave/cli/v3` to

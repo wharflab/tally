@@ -29,8 +29,9 @@ tally lint Dockerfile
 docker lint Dockerfile
 ```
 
-The plugin command is exposed through the executable name `docker-lint`. Docker invokes that plugin as the `lint` subcommand, so the Cobra command
-tree should make `lint` the plugin command root while preserving `tally lint` as the normal standalone entrypoint.
+The plugin command is exposed through the executable name `docker-lint`. Docker runs plugin executables with the original Docker argv after
+`docker`, so `docker lint Dockerfile` reaches the executable as `docker-lint lint Dockerfile`. Docker's `plugin.Run` helper supplies the outer
+dummy Cobra root and mounts tally's `lint` command beneath it; the implementation should not treat the leading `lint` token as a Dockerfile path.
 
 For Homebrew, follow the current Homebrew core pattern used by `docker-buildx` and `docker-compose`:
 
@@ -55,7 +56,7 @@ Relevant upstream constants are in Docker CLI's metadata package:
 - `MetadataSubcommandName = "docker-cli-plugin-metadata"`
 - metadata schema version is `"0.1.0"`
 
-Reference: <https://pkg.go.dev/github.com/Docker/cli/cli-plugins/metadata>
+Reference: <https://pkg.go.dev/github.com/docker/cli/cli-plugins/metadata>
 
 Docker also provides a Cobra plugin helper in `github.com/docker/cli/cli-plugins/plugin`.
 
@@ -67,6 +68,8 @@ The helper's value proposition:
 - initializes Docker CLI config, context store, streams, and optional API client access
 - exposes the hidden `docker-cli-plugin-metadata` command
 - wires Docker-style help, completion, flag errors, status errors, and parent CLI cancellation through `DOCKER_CLI_PLUGIN_SOCKET`
+- accounts for Docker's plugin argv shape: the Docker CLI manager runs `docker-lint` with `os.Args[1:]`, so the leading `lint` command name is
+  still present when the plugin process starts
 
 The helper is not lightweight: `go list -deps github.com/docker/cli/cli-plugins/plugin` currently reports hundreds of packages including Docker
 CLI command machinery, Moby client types, OpenTelemetry, and gRPC. This repo already depends on much of Docker/Buildx, and the benefit of correct
@@ -88,7 +91,8 @@ This does not remove the need for a small `lintOptions` layer. Several flags are
 
 - `--hide-source` and `--no-inline-directives` invert config values
 - `--select` / `--ignore` currently append to configured rule selections instead of replacing them
-- `--acp-command` parses a shell-like command string into `ai.command` and also enables AI
+- `--acp-command` parses a shell-like command string into `ai.command` and also enables AI; because tally already depends on
+  `mvdan.cc/sh/v3`, the migration should prefer that parser or a shared internal shell helper over extending a hand-rolled splitter
 - `--fix`, `--fix-rule`, `--fix-unsafe`, `--target`, `--service`, `--context`, and `NO_COLOR` are invocation behavior rather than persistent
   configuration
 
@@ -256,11 +260,9 @@ Recommended pattern:
 
 ```go
 type lintOptions struct {
-    configPath string
-    maxLines int
-    maxLinesSet bool
-    skipBlankLines bool
-    skipBlankLinesSet bool
+    configPath     string
+    maxLines       *int
+    skipBlankLines *bool
     // ...
 }
 
@@ -282,6 +284,9 @@ Prefer passing `lintOptions` through the lint pipeline instead of passing `*cobr
 
 - the linter no longer depends on a specific CLI framework
 - Docker plugin phase can reuse the same options parser while adding Docker CLI context data
+
+For option values where "unset" and "explicitly set to the default" differ, use pointer fields (`*bool`, `*int`, `*string`) instead of parallel
+`Foo` / `FooSet` fields. Keep plain values for fields where absence has no behavioral meaning.
 
 The minimum viable refactor is to replace `*cli.Command` with a small interface or `lintOptions` on these internal helpers:
 
@@ -327,7 +332,7 @@ Recommended CLI flag categories:
 |---|---|---|
 | Direct config keys | `--format`, `--output`, `--show-source`, `--fail-level`, `--warn-unused-directives`, `--require-reason`, `--slow-checks`, `--slow-checks-timeout`, `--ai`, `--ai-timeout`, `--ai-max-input-bytes`, `--ai-redact-secrets` | load with `posflag.ProviderWithFlag` |
 | Rule option shorthands | `--max-lines`, `--skip-blank-lines`, `--skip-comments` | load with `posflag.ProviderWithFlag` into canonical `rules.tally.max-lines.*` keys |
-| Transforming config flags | `--hide-source`, `--no-inline-directives`, `--acp-command` | apply through `lintOptions` after config decode |
+| Transforming config flags | `--hide-source`, `--no-inline-directives`, `--acp-command` | apply through `lintOptions` after config decode; parse `--acp-command` with `mvdan.cc/sh/v3` or a shared shell helper if compatibility can be preserved |
 | Appending rule selection flags | `--select`, `--ignore` | apply through `lintOptions` after config decode to preserve append semantics |
 | Operational flags | `--config`, `--context`, `--target`, `--service`, `--exclude`, `--no-color`, `--fix`, `--fix-rule`, `--fix-unsafe` | keep outside koanf |
 
@@ -852,10 +857,12 @@ Tasks:
 - preserve the standalone command tree and help output
 - introduce a framework-neutral `lintOptions` struct or interface
 - replace `cli.Exit("", code)` with an equivalent typed error / status-code path
-- preserve `cmd.IsSet` semantics through `posflag.ProviderWithFlag` for config-shaped flags and explicit `*Set` fields or pflag `Changed` for
+- preserve `cmd.IsSet` semantics through `posflag.ProviderWithFlag` for config-shaped flags and pointer-valued options or pflag `Changed` for
   operational flags
 - move env-backed CLI-only aliases out of framework declarations and into explicit option loading
 - keep koanf as the owner of config-shaped `TALLY_*` env vars
+- replace or validate the current `--acp-command` splitter against `mvdan.cc/sh/v3` so quoting behavior is not reimplemented by hand during the
+  framework migration
 - add tests covering flag/env/config precedence
 
 Acceptance criteria:
