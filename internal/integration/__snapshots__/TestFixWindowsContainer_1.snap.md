@@ -1,3 +1,4 @@
+note: 3 slow check(s) skipped (registry unreachable or rate-limited)
 Fixed 5 issues
 Skipped 2 fixes
 note: 1 AI fix(es) failed (see details below)

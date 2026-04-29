@@ -1,4 +1,4 @@
-Fixed 7 issues
+Fixed 8 issues
 Skipped 2 fixes
 **12 issues** in `<stdin>`
 
