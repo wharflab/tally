@@ -623,6 +623,18 @@ severity = "error"
 			)...),
 			wantApplied: 2,
 		},
+		{
+			name:  "prefer-copy-heredoc-formats-generated-shell",
+			input: "FROM ubuntu:22.04\nRUN printf 'if true; then\\n echo hi\\nfi\\n' > /usr/local/bin/entrypoint.sh\n",
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 2,
+		},
 		// Mixed finalizer coverage: pre-existing COPY/ADD heredocs are formatted
 		// while prefer-copy-heredoc injects new COPY heredocs in the same fix run.
 		{
