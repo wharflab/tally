@@ -36,6 +36,14 @@ func TestRunHeredocShellVariantUnknownWithoutSemanticMetadata(t *testing.T) {
 	}
 }
 
+func TestShellFromHeredocShebangIgnoresIndentedShebangComment(t *testing.T) {
+	t.Parallel()
+
+	if got, ok := shellFromHeredocShebang("  #!/usr/bin/env bash\necho hi\n"); ok {
+		t.Fatalf("shellFromHeredocShebang() = %q, true; want no shebang", got)
+	}
+}
+
 func TestPreferFormattedHeredocsRule_Check(t *testing.T) {
 	t.Parallel()
 	rule := NewPreferFormattedHeredocsRule()

@@ -190,7 +190,7 @@ func shellFromHeredocShebang(content string) (string, bool) {
 	if name, ok := shell.ShellFromShebang(firstLine); ok {
 		return name, true
 	}
-	if strings.HasPrefix(strings.TrimSpace(firstLine), "#!") {
+	if strings.HasPrefix(firstLine, "#!") {
 		return "", true
 	}
 	return "", false
