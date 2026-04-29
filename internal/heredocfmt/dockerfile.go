@@ -99,11 +99,11 @@ func CollectRunHeredocs(result *dockerfile.ParseResult) []RunHeredoc {
 
 	var docs []RunHeredoc
 	for _, node := range result.AST.AST.Children {
-		if len(node.Heredocs) != 1 || !strings.EqualFold(node.Value, command.Run) {
+		if len(node.Heredocs) != 1 {
 			continue
 		}
 
-		mapping, ok := extract.ExtractRunScript(sm, node, escapeToken)
+		instruction, mapping, ok := extractRunHeredocMapping(sm, node, escapeToken)
 		if !ok || !mapping.IsHeredoc {
 			continue
 		}
@@ -118,7 +118,7 @@ func CollectRunHeredocs(result *dockerfile.ParseResult) []RunHeredoc {
 		}
 
 		docs = append(docs, RunHeredoc{
-			Instruction:       strings.ToUpper(node.Value),
+			Instruction:       instruction,
 			Content:           node.Heredocs[0].Content,
 			StartLine:         node.StartLine,
 			BodyStartLine:     span.bodyStartLine,
@@ -128,6 +128,27 @@ func CollectRunHeredocs(result *dockerfile.ParseResult) []RunHeredoc {
 		})
 	}
 	return docs
+}
+
+func extractRunHeredocMapping(sm *sourcemap.SourceMap, node *parser.Node, escapeToken rune) (string, extract.Mapping, bool) {
+	if strings.EqualFold(node.Value, command.Run) {
+		mapping, ok := extract.ExtractRunScript(sm, node, escapeToken)
+		return strings.ToUpper(command.Run), mapping, ok
+	}
+	if !isOnbuildRunNode(node) {
+		return "", extract.Mapping{}, false
+	}
+	mapping, ok := extract.ExtractOnbuildRunScript(sm, node, escapeToken)
+	return strings.ToUpper(command.Onbuild + " " + command.Run), mapping, ok
+}
+
+func isOnbuildRunNode(node *parser.Node) bool {
+	if node == nil || !strings.EqualFold(node.Value, command.Onbuild) {
+		return false
+	}
+	return node.Next != nil &&
+		len(node.Next.Children) > 0 &&
+		strings.EqualFold(node.Next.Children[0].Value, command.Run)
 }
 
 // FormatDockerfileHeredocs builds text edits that pretty-print COPY/ADD heredoc bodies.

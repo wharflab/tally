@@ -105,6 +105,18 @@ EOF
 			WantMessages:   []string{"RUN heredoc should be pretty-printed as a shell script"},
 		},
 		{
+			Name: "unformatted ONBUILD RUN heredoc",
+			Content: `FROM alpine
+ONBUILD RUN <<EOF
+if true; then
+ echo hi
+fi
+EOF
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"ONBUILD RUN heredoc should be pretty-printed as a shell script"},
+		},
+		{
 			Name: "COPY sh heredoc without shebang",
 			Content: `FROM alpine
 COPY <<EOF /usr/local/bin/entrypoint.sh
