@@ -448,8 +448,12 @@ func formatShell(content string, variant shell.Variant, st style) (string, error
 		return "", err
 	}
 	if st.maxLineLength > 0 && hasLineLongerThan(formatted, st.maxLineLength) {
-		if wrapLongShellCalls(prog, st) {
-			formatted, err = printShell(prog, st)
+		wrappedProg, err := parseShell(formatted, variant)
+		if err != nil {
+			return "", errSkipFormat
+		}
+		if wrapLongShellCalls(wrappedProg, st) {
+			formatted, err = printShell(wrappedProg, st)
 			if err != nil {
 				return "", err
 			}
@@ -510,12 +514,17 @@ func hasLineLongerThan(s string, maxLen int) bool {
 	if maxLen <= 0 {
 		return false
 	}
-	for line := range strings.SplitSeq(strings.TrimRight(s, "\n"), "\n") {
-		if len(line) > maxLen {
+	s = strings.TrimRight(s, "\n")
+	for {
+		idx := strings.IndexByte(s, '\n')
+		if idx < 0 {
+			return len(s) > maxLen
+		}
+		if idx > maxLen {
 			return true
 		}
+		s = s[idx+1:]
 	}
-	return false
 }
 
 func wrapLongShellCalls(prog *syntax.File, st style) bool {
@@ -538,13 +547,9 @@ func wrapLongShellCall(call *syntax.CallExpr, st style) bool {
 		return false
 	}
 
-	words := make([]string, 0, len(call.Args))
-	for _, word := range call.Args {
-		text, ok := shellWordText(word, st)
-		if !ok {
-			return false
-		}
-		words = append(words, text)
+	words, ok := shellWordTexts(call.Args, st)
+	if !ok {
+		return false
 	}
 
 	lineLen := leadingColumn(call.Args[0]) + len(words[0])
@@ -557,7 +562,7 @@ func wrapLongShellCall(call *syntax.CallExpr, st style) bool {
 		nextLen := lineLen + 1 + len(words[i])
 		if nextLen > st.maxLineLength {
 			breaks[i] = true
-			lineLen = len(st.indent) + len(words[i])
+			lineLen = st.indentWidth + len(words[i])
 			continue
 		}
 		lineLen = nextLen
@@ -567,13 +572,19 @@ func wrapLongShellCall(call *syntax.CallExpr, st style) bool {
 	if line == 0 {
 		line = 1
 	}
+	currentLine := line
 	modified := false
 	for i, shouldBreak := range breaks {
-		if !shouldBreak {
+		if i == 0 {
 			continue
 		}
-		line++
-		if setWordStart(call.Args[i], line) {
+		if shouldBreak {
+			currentLine++
+		}
+		if currentLine == line {
+			continue
+		}
+		if setWordLine(call.Args[i], currentLine) {
 			modified = true
 		}
 	}
@@ -594,21 +605,6 @@ func callNeedsWrap(words []string, firstLineLen, maxLen int) bool {
 	return false
 }
 
-func shellWordText(word *syntax.Word, st style) (string, bool) {
-	if word == nil {
-		return "", false
-	}
-	var buf bytes.Buffer
-	if err := syntax.NewPrinter(shellPrinterOptions(st)...).Print(&buf, word); err != nil {
-		return "", false
-	}
-	text := buf.String()
-	if text == "" || strings.Contains(text, "\n") {
-		return "", false
-	}
-	return text, true
-}
-
 func leadingColumn(word *syntax.Word) int {
 	if word == nil {
 		return 0
@@ -620,27 +616,131 @@ func leadingColumn(word *syntax.Word) int {
 	return int(col - 1)
 }
 
-func setWordStart(word *syntax.Word, line uint) bool {
+func shellWordTexts(words []*syntax.Word, st style) ([]string, bool) {
+	printer := syntax.NewPrinter(shellPrinterOptions(st)...)
+	texts := make([]string, 0, len(words))
+	for _, word := range words {
+		if word == nil {
+			return nil, false
+		}
+		var buf bytes.Buffer
+		if err := printer.Print(&buf, word); err != nil {
+			return nil, false
+		}
+		text := buf.String()
+		if text == "" || strings.Contains(text, "\n") {
+			return nil, false
+		}
+		texts = append(texts, text)
+	}
+	return texts, true
+}
+
+func setWordLine(word *syntax.Word, line uint) bool {
 	if word == nil || len(word.Parts) == 0 {
 		return false
 	}
-	switch part := word.Parts[0].(type) {
+	baseCol := word.Pos().Col()
+	if baseCol == 0 {
+		baseCol = 1
+	}
+	for _, part := range word.Parts {
+		if !setWordPartLine(part, line, baseCol) {
+			return false
+		}
+	}
+	return true
+}
+
+func setWordPartsLine(parts []syntax.WordPart, line, baseCol uint) bool {
+	for _, part := range parts {
+		if !setWordPartLine(part, line, baseCol) {
+			return false
+		}
+	}
+	return true
+}
+
+func setWordPartLine(part syntax.WordPart, line, baseCol uint) bool {
+	switch part := part.(type) {
 	case *syntax.Lit:
-		part.ValuePos = syntax.NewPos(0, line, 1)
+		setLitLine(part, line, baseCol)
 	case *syntax.SglQuoted:
-		part.Left = syntax.NewPos(0, line, 1)
+		part.Left = withLineRelative(part.Left, line, baseCol)
+		part.Right = withLineRelative(part.Right, line, baseCol)
 	case *syntax.DblQuoted:
-		part.Left = syntax.NewPos(0, line, 1)
+		part.Left = withLineRelative(part.Left, line, baseCol)
+		part.Right = withLineRelative(part.Right, line, baseCol)
+		return setWordPartsLine(part.Parts, line, baseCol)
 	case *syntax.ParamExp:
-		part.Dollar = syntax.NewPos(0, line, 1)
+		part.Dollar = withLineRelative(part.Dollar, line, baseCol)
+		part.Rbrace = withLineRelative(part.Rbrace, line, baseCol)
+		setLitLine(part.Flags, line, baseCol)
+		setLitLine(part.Param, line, baseCol)
+		if part.NestedParam != nil && !setWordPartLine(part.NestedParam, line, baseCol) {
+			return false
+		}
+		for _, modifier := range part.Modifiers {
+			setLitLine(modifier, line, baseCol)
+		}
+		if part.Repl != nil {
+			if !setNestedWordLine(part.Repl.Orig, line, baseCol) || !setNestedWordLine(part.Repl.With, line, baseCol) {
+				return false
+			}
+		}
+		if part.Exp != nil && !setNestedWordLine(part.Exp.Word, line, baseCol) {
+			return false
+		}
 	case *syntax.CmdSubst:
-		part.Left = syntax.NewPos(0, line, 1)
+		part.Left = withLineRelative(part.Left, line, baseCol)
+		part.Right = withLineRelative(part.Right, line, baseCol)
 	case *syntax.ArithmExp:
-		part.Left = syntax.NewPos(0, line, 1)
+		part.Left = withLineRelative(part.Left, line, baseCol)
+		part.Right = withLineRelative(part.Right, line, baseCol)
+	case *syntax.ProcSubst:
+		part.OpPos = withLineRelative(part.OpPos, line, baseCol)
+		part.Rparen = withLineRelative(part.Rparen, line, baseCol)
+	case *syntax.ExtGlob:
+		part.OpPos = withLineRelative(part.OpPos, line, baseCol)
+		setLitLine(part.Pattern, line, baseCol)
+	case *syntax.BraceExp:
+		for _, elem := range part.Elems {
+			if !setNestedWordLine(elem, line, baseCol) {
+				return false
+			}
+		}
 	default:
 		return false
 	}
 	return true
+}
+
+func setNestedWordLine(word *syntax.Word, line, baseCol uint) bool {
+	if word == nil {
+		return true
+	}
+	return setWordPartsLine(word.Parts, line, baseCol)
+}
+
+func setLitLine(lit *syntax.Lit, line, baseCol uint) {
+	if lit == nil {
+		return
+	}
+	lit.ValuePos = withLineRelative(lit.ValuePos, line, baseCol)
+	lit.ValueEnd = withLineRelative(lit.ValueEnd, line, baseCol)
+}
+
+func withLineRelative(pos syntax.Pos, line, baseCol uint) syntax.Pos {
+	if !pos.IsValid() {
+		return pos
+	}
+	col := pos.Col()
+	if col == 0 {
+		col = 1
+	} else if col >= baseCol {
+		col = col - baseCol + 1
+	}
+	return syntax.NewPos(0, line, col)
 }
 
 func formatJSON(content string, st style) (string, error) {

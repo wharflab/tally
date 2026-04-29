@@ -196,6 +196,52 @@ func TestFormatShellWrapsMaxLineLength(t *testing.T) {
 	}
 }
 
+func TestFormatShellWrapsAllWordsAfterBreak(t *testing.T) {
+	t.Parallel()
+
+	st := shellStyleFromDefinition(&editorconfig.Definition{
+		IndentStyle: editorconfig.IndentStyleSpaces,
+		IndentSize:  "2",
+		Raw: map[string]string{
+			"indent_style":    "space",
+			"indent_size":     "2",
+			"max_line_length": "24",
+		},
+	})
+	got, err := formatShell("cmd alpha beta gamma delta epsilon zeta\n", shell.VariantPOSIX, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "cmd alpha beta gamma \\\n  delta epsilon zeta\n"
+	if got != want {
+		t.Fatalf("formatted shell mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestFormatShellWrapsMultipartWord(t *testing.T) {
+	t.Parallel()
+
+	st := shellStyleFromDefinition(&editorconfig.Definition{
+		IndentStyle: editorconfig.IndentStyleSpaces,
+		IndentSize:  "2",
+		Raw: map[string]string{
+			"indent_style":    "space",
+			"indent_size":     "2",
+			"max_line_length": "24",
+		},
+	})
+	got, err := formatShell("cmd alpha beta prefix${APP_ENV}suffix gamma\n", shell.VariantPOSIX, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "cmd alpha beta \\\n  prefix${APP_ENV}suffix \\\n  gamma\n"
+	if got != want {
+		t.Fatalf("formatted shell mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestShellTargetVariant(t *testing.T) {
 	t.Parallel()
 
