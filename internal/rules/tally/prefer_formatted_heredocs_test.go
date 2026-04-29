@@ -51,6 +51,16 @@ EOF
 			WantMessages:   []string{"ADD heredoc for /etc/app/config.xml should be pretty-printed as XML"},
 		},
 		{
+			Name: "compact XML config COPY heredoc",
+			Content: `FROM alpine
+COPY <<EOF /etc/app/Web.config
+<configuration><system.web></system.web></configuration>
+EOF
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"COPY heredoc for /etc/app/Web.config should be pretty-printed as XML"},
+		},
+		{
 			Name: "compact YAML COPY heredoc",
 			Content: `FROM alpine
 COPY <<EOF /etc/app/config.yaml

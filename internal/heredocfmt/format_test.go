@@ -6,6 +6,32 @@ import (
 	"testing"
 )
 
+func TestSupportedKindXMLAliases(t *testing.T) {
+	t.Parallel()
+
+	tests := []string{
+		"/etc/app/config.xml",
+		"/etc/app/Web.config",
+		"/schema/app.xsd",
+		"/schema/service.wsdl",
+		"/transforms/app.xsl",
+		"/transforms/app.xslt",
+	}
+
+	for _, filename := range tests {
+		t.Run(filename, func(t *testing.T) {
+			t.Parallel()
+			got, ok := SupportedKind(filename)
+			if !ok {
+				t.Fatalf("SupportedKind(%q) ok = false, want true", filename)
+			}
+			if got != KindXML {
+				t.Fatalf("SupportedKind(%q) = %q, want %q", filename, got, KindXML)
+			}
+		})
+	}
+}
+
 func TestFormatYAMLPreservesQuotedScalars(t *testing.T) {
 	t.Parallel()
 

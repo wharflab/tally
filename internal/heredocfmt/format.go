@@ -62,7 +62,7 @@ func SupportedKind(filename string) (Kind, bool) {
 		return KindYAML, true
 	case ".toml":
 		return KindTOML, true
-	case ".xml":
+	case ".xml", ".config", ".xsd", ".wsdl", ".xsl", ".xslt":
 		return KindXML, true
 	case ".ini":
 		return KindINI, true
