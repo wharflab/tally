@@ -452,14 +452,18 @@ func formatShell(content string, variant shell.Variant, st style) (string, error
 		if err != nil {
 			return "", errSkipFormat
 		}
-		if wrapLongShellCalls(wrappedProg, st) {
-			formatted, err = printShell(wrappedProg, st)
-			if err != nil {
-				return "", err
-			}
-			if _, err := parseShell(formatted, variant); err != nil {
-				return "", errSkipFormat
-			}
+		if !wrapLongShellCalls(wrappedProg, st) {
+			return "", errSkipFormat
+		}
+		formatted, err = printShell(wrappedProg, st)
+		if err != nil {
+			return "", err
+		}
+		if _, err := parseShell(formatted, variant); err != nil {
+			return "", errSkipFormat
+		}
+		if hasLineLongerThan(formatted, st.maxLineLength) {
+			return "", errSkipFormat
 		}
 	}
 	return ensureTrailingNewline(formatted), nil

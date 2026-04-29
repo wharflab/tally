@@ -179,7 +179,7 @@ func TestFormatShellWrapsMaxLineLength(t *testing.T) {
 		Raw: map[string]string{
 			"indent_style":    "space",
 			"indent_size":     "2",
-			"max_line_length": "48",
+			"max_line_length": "64",
 		},
 	})
 	got, err := formatShell(
@@ -205,7 +205,7 @@ func TestFormatShellWrapsAllWordsAfterBreak(t *testing.T) {
 		Raw: map[string]string{
 			"indent_style":    "space",
 			"indent_size":     "2",
-			"max_line_length": "24",
+			"max_line_length": "28",
 		},
 	})
 	got, err := formatShell("cmd alpha beta gamma delta epsilon zeta\n", shell.VariantPOSIX, st)
@@ -213,7 +213,7 @@ func TestFormatShellWrapsAllWordsAfterBreak(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := "cmd alpha beta gamma \\\n  delta epsilon zeta\n"
+	want := "cmd alpha beta gamma delta \\\n  epsilon zeta\n"
 	if got != want {
 		t.Fatalf("formatted shell mismatch\ngot:\n%s\nwant:\n%s", got, want)
 	}
@@ -228,7 +228,7 @@ func TestFormatShellWrapsMultipartWord(t *testing.T) {
 		Raw: map[string]string{
 			"indent_style":    "space",
 			"indent_size":     "2",
-			"max_line_length": "24",
+			"max_line_length": "32",
 		},
 	})
 	got, err := formatShell("cmd alpha beta prefix${APP_ENV}suffix gamma\n", shell.VariantPOSIX, st)
@@ -236,9 +236,23 @@ func TestFormatShellWrapsMultipartWord(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := "cmd alpha beta \\\n  prefix${APP_ENV}suffix \\\n  gamma\n"
+	want := "cmd alpha beta \\\n  prefix${APP_ENV}suffix gamma\n"
 	if got != want {
 		t.Fatalf("formatted shell mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestFormatShellSkipsWhenMaxLineLengthCannotBeMet(t *testing.T) {
+	t.Parallel()
+
+	st := shellStyleFromDefinition(&editorconfig.Definition{
+		Raw: map[string]string{
+			"max_line_length": "12",
+		},
+	})
+	_, err := formatShell("cmd this_argument_is_too_long_to_wrap\n", shell.VariantPOSIX, st)
+	if !errors.Is(err, errSkipFormat) {
+		t.Fatalf("error = %v, want errSkipFormat", err)
 	}
 }
 
