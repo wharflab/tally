@@ -48,4 +48,4 @@ Other EditorConfig properties are intentionally not interpreted by the heredoc f
 | `insert_final_newline` | Heredoc bodies always need a newline before the terminator, so formatted payloads always end with exactly one newline regardless of this setting. |
 | `end_of_line` | Heredoc payloads are embedded in the Dockerfile and should follow the parent Dockerfile's line-ending convention rather than a separate virtual target setting. |
 | `charset` | tally already reads Dockerfiles as text and does not transcode heredoc payloads during formatting. |
-| `trim_trailing_whitespace` | Structured serializers decide the payload whitespace they emit; tally does not run a separate trailing-whitespace pass based on this property. |
+| `trim_trailing_whitespace` | Formatted output for the currently supported structured formats does not emit incidental trailing whitespace. tally does not read this property or run a separate trimming pass, because whitespace may be payload data in some formats. |

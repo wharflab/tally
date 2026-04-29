@@ -70,7 +70,8 @@ See [EditorConfig integration](/integrations/editorconfig) for recommended Docke
 
 The rule reads `indent_style`, `indent_size`, and `tab_width`. It does not currently interpret `insert_final_newline`, `end_of_line`, `charset`, or
 `trim_trailing_whitespace` for the virtual payload file. Formatted heredoc bodies always end with exactly one newline before the heredoc terminator,
-and line endings follow the parent Dockerfile/fix application rather than a separate payload setting.
+and line endings follow the parent Dockerfile/fix application rather than a separate payload setting. The current structured serializers do not emit
+incidental trailing whitespace, but tally does not run a separate trailing-whitespace trim pass because whitespace can be payload data.
 
 ## Auto-fix
 
