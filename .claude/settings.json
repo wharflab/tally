@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bunx lefthook install",
+            "command": "hk install",
             "async": true
           }
         ]

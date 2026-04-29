@@ -178,7 +178,7 @@ These are set automatically in the Makefile.
 ## Commit Conventions
 
 - **Semantic commits** (Conventional Commits): `feat:`, `fix:`, `chore:`, etc.
-- Enforced by `commitlint` via Lefthook (`.lefthook.yml`)
+- Enforced by `commitlint` via hk (`hk.pkl`)
 - Pre-commit hooks run: `make lint`, `make cpd`, `make test`
 - Pre-push hooks run: `make build`
 

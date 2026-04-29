@@ -28,10 +28,10 @@
       "problemMatcher": ["$tsc"]
     },
     {
-      "label": "Install lefthook",
+      "label": "Install hk hooks",
       "type": "shell",
-      "command": "bunx",
-      "args": ["lefthook", "install"],
+      "command": "hk",
+      "args": ["install"],
       "runOptions": {
         "runOn": "folderOpen"
       }

@@ -37,7 +37,7 @@
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^\\.lefthook\\.yml$/", "/^\\.github/workflows/ci\\.yml$/"],
+      "managerFilePatterns": ["/^hk\\.pkl$/", "/^\\.github/workflows/ci\\.yml$/"],
       "matchStrings": ["uv tool run (?<depName>[a-z0-9_-]+)==(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
       "datasourceTemplate": "pypi",
       "versioningTemplate": "pep440"

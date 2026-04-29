@@ -96,7 +96,8 @@ skip-blank-lines = true
 
 ## Commit & Pull Request Guidelines
 
-- Follow semantic commit rules (Conventional Commits), e.g. `feat: ...`, `fix: ...`, `chore: ...` (enforced via `commitlint` in `.lefthook.yml`).
-- Run `make lint`, `make cpd`, and `make test` before opening a PR (Lefthook runs these on `pre-commit` and `make build` on `pre-push`).
+- Follow semantic commit rules (Conventional Commits), e.g. `feat: ...`, `fix: ...`, `chore: ...` (enforced via `commitlint` in `hk.pkl`).
+- Run `make lint`, `make cpd`, and `make test` before opening a PR (hk runs these on `pre-commit` and `make build` on `pre-push`).
+- Git hooks are managed by [hk](https://hk.jdx.dev) (`hk.pkl`). Install once with `hk install --global` (Git 2.54+, config-based hooks, worktree-native) or `hk install` for this repo only.
 - PRs should explain *what* changed and *why*, note any snapshot updates, and avoid committing build outputs (the `tally` binary is Git-ignored).
 - CI runs: tests, golangci-lint, and CPD (copy/paste detection) automatically on all PRs.
