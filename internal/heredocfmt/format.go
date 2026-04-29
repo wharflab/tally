@@ -41,8 +41,9 @@ type Formatter struct {
 }
 
 type style struct {
-	indent      string
-	indentWidth int
+	indent        string
+	indentWidth   int
+	maxLineLength int
 }
 
 // NewFormatter creates a formatter for heredocs inside dockerfilePath.
@@ -171,11 +172,12 @@ func styleFromDefinition(def *editorconfig.Definition) style {
 
 	width := parseIndentWidth(def)
 	if strings.EqualFold(def.IndentStyle, editorconfig.IndentStyleTab) {
-		return style{indent: "\t", indentWidth: width}
+		return style{indent: "\t", indentWidth: width, maxLineLength: parseMaxLineLength(def)}
 	}
 	return style{
-		indent:      strings.Repeat(" ", width),
-		indentWidth: width,
+		indent:        strings.Repeat(" ", width),
+		indentWidth:   width,
+		maxLineLength: parseMaxLineLength(def),
 	}
 }
 
@@ -190,6 +192,21 @@ func parseIndentWidth(def *editorconfig.Definition) int {
 		return def.TabWidth
 	}
 	return defaultIndentWidth
+}
+
+func parseMaxLineLength(def *editorconfig.Definition) int {
+	if def == nil || def.Raw == nil {
+		return 0
+	}
+	value := strings.TrimSpace(strings.ToLower(def.Raw["max_line_length"]))
+	if value == "" || value == "off" {
+		return 0
+	}
+	n, err := strconv.Atoi(value)
+	if err != nil || n <= 0 {
+		return 0
+	}
+	return n
 }
 
 func formatContent(kind Kind, content string, st style) (string, error) {
@@ -240,6 +257,10 @@ func formatYAML(content string, st style) (string, error) {
 	}
 	clearYAMLFlowStyle(&node)
 
+	if st.maxLineLength > 0 {
+		return formatYAMLWithLineWidth(&node, st)
+	}
+
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(st.indentWidth)
@@ -248,6 +269,22 @@ func formatYAML(content string, st style) (string, error) {
 		return "", err
 	}
 	if err := enc.Close(); err != nil {
+		return "", err
+	}
+	return ensureTrailingNewline(strings.TrimSuffix(buf.String(), "...\n")), nil
+}
+
+func formatYAMLWithLineWidth(node *yaml.Node, st style) (string, error) {
+	var buf bytes.Buffer
+	dumper, err := yaml.NewDumper(&buf, yaml.WithIndent(st.indentWidth), yaml.WithLineWidth(st.maxLineLength))
+	if err != nil {
+		return "", err
+	}
+	if err := dumper.Dump(node); err != nil {
+		_ = dumper.Close()
+		return "", err
+	}
+	if err := dumper.Close(); err != nil {
 		return "", err
 	}
 	return ensureTrailingNewline(strings.TrimSuffix(buf.String(), "...\n")), nil

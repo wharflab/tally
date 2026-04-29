@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	editorconfig "github.com/editorconfig/editorconfig-core-go/v2"
 )
 
 func TestSupportedKindXMLAliases(t *testing.T) {
@@ -45,6 +47,47 @@ func TestFormatYAMLPreservesQuotedScalars(t *testing.T) {
 	}
 	if !strings.Contains(got, "mode: '0644'") {
 		t.Fatalf("expected single-quoted scalar to stay quoted, got:\n%s", got)
+	}
+}
+
+func TestFormatYAMLUsesMaxLineLength(t *testing.T) {
+	t.Parallel()
+
+	content := "message: alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu\n"
+	got, err := formatYAML(content, style{indent: "  ", indentWidth: 2, maxLineLength: 32})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(got, "\n  ") {
+		t.Fatalf("expected YAML line wrapping, got:\n%s", got)
+	}
+	for _, word := range []string{"alpha", "lambda", "mu"} {
+		if !strings.Contains(got, word) {
+			t.Fatalf("expected wrapped YAML to preserve scalar word %q, got:\n%s", word, got)
+		}
+	}
+}
+
+func TestStyleFromDefinitionReadsMaxLineLength(t *testing.T) {
+	t.Parallel()
+
+	st := styleFromDefinition(&editorconfig.Definition{
+		Raw: map[string]string{
+			"max_line_length": "40",
+		},
+	})
+	if st.maxLineLength != 40 {
+		t.Fatalf("maxLineLength = %d, want 40", st.maxLineLength)
+	}
+
+	st = styleFromDefinition(&editorconfig.Definition{
+		Raw: map[string]string{
+			"max_line_length": "off",
+		},
+	})
+	if st.maxLineLength != 0 {
+		t.Fatalf("maxLineLength = %d, want 0 for off", st.maxLineLength)
 	}
 }
 

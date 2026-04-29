@@ -40,6 +40,7 @@ The heredoc formatter currently reads these EditorConfig properties:
 | `indent_style` | Uses tabs when set to `tab`; otherwise uses spaces. |
 | `indent_size` | Sets the number of spaces per indent level when it is a positive integer. |
 | `tab_width` | Used as the fallback indent width when `indent_size` is not a positive integer. |
+| `max_line_length` | YAML heredocs only. When set to a positive integer, uses that value as the preferred YAML scalar wrapping width. `off`, unset, and invalid values do not override the YAML serializer default. This is a formatting preference, not a hard maximum. |
 
 Other EditorConfig properties are intentionally not interpreted by the heredoc formatter today:
 

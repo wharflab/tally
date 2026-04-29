@@ -286,6 +286,34 @@ EOF
 	}
 }
 
+func TestPreferFormattedHeredocsRule_EditorConfigYAMLMaxLineLength(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := writeTestFile(filepath.Join(dir, ".editorconfig"), `root = true
+
+[*.yaml]
+max_line_length = 32
+`); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "Dockerfile")
+	content := `FROM alpine
+COPY <<EOF /etc/app/config.yaml
+message: alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu
+EOF
+`
+	input := testutil.MakeLintInput(t, file, content)
+	violations := NewPreferFormattedHeredocsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	if !strings.Contains(got, "\n  ") {
+		t.Fatalf("expected YAML line wrapping, got:\n%s", got)
+	}
+}
+
 func TestPreferFormattedHeredocsRule_ChompedHeredocKeepsTabPrefix(t *testing.T) {
 	t.Parallel()
 	content := "FROM alpine AS build\n\tCOPY <<-EOF /etc/app/config.json\n\t{\"a\":1}\n\tEOF\n"
