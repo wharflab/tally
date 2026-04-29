@@ -15,7 +15,7 @@ Pretty-prints `COPY` and `ADD` heredoc bodies when the destination filename has 
 ## Description
 
 This rule formats heredoc payloads that are copied into JSON, YAML, TOML, XML, or INI files. It detects the file type from the heredoc destination
-path extension and uses the repository's `.editorconfig` settings for indentation.
+path extension and uses the repository's `.editorconfig` settings for indentation only.
 
 For EditorConfig lookup, tally resolves a virtual filename next to the Dockerfile using the destination basename. For example, a heredoc in
 `services/api/Dockerfile` targeting `/etc/app/config.yaml` is matched as `services/api/config.yaml`, so selectors such as `*.yaml` and `config.yaml`
@@ -67,6 +67,10 @@ Default (no config needed):
 
 This rule intentionally has no formatter-specific options. Use `.editorconfig` for indentation style and width.
 See [EditorConfig integration](/integrations/editorconfig) for recommended Dockerfile settings and path resolution details.
+
+The rule reads `indent_style`, `indent_size`, and `tab_width`. It does not currently interpret `insert_final_newline`, `end_of_line`, `charset`, or
+`trim_trailing_whitespace` for the virtual payload file. Formatted heredoc bodies always end with exactly one newline before the heredoc terminator,
+and line endings follow the parent Dockerfile/fix application rather than a separate payload setting.
 
 ## Auto-fix
 
