@@ -116,7 +116,7 @@ local commitMsgSteps = new Mapping<String, Step> {
 local postMergeSteps = new Mapping<String, Step> {
     ["delete-merged-branches"] {
         shell = "bash -o errexit -o pipefail -c"
-        check = "git branch --merged | grep -Ev '\\*|master|main|dev|develop|development|stag|staging|prod|production' | xargs -r git branch -d; git fetch --prune"
+        check = "git branch --merged | grep -Ev '\\*|master|main|dev|develop|development|stag|staging|prod|production' | xargs git branch -d 2>/dev/null || true; git fetch --prune"
     }
 }
 
