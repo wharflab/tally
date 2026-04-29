@@ -78,7 +78,7 @@ USER ContainerUser
 
 # intialize powershell module cache
 RUN pwsh -NoLogo -NoProfile -Command " \
-    $stopTime = (get-date).AddMinutes(15); \
+    $ErrorActionPreference = 'Stop'; $PSNativeCommandUseErrorActionPreference = $true; $stopTime = (get-date).AddMinutes(15); \
     $ErrorActionPreference = 'Stop' ; \
     $ProgressPreference = 'SilentlyContinue' ; \
     while(!(Test-Path -Path $env:PSModuleAnalysisCachePath)) { \
