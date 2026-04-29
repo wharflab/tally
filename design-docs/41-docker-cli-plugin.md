@@ -355,6 +355,46 @@ env loading overlap for some names. For example, `TALLY_RULES_SELECT` is a CLI c
 `rules.*` value. Keeping CLI-only env aliases out of koanf avoids accidental schema-validation failures and makes precedence easier to reason
 about.
 
+### Viper Migration Assessment
+
+Viper is worth considering because it is the companion package to Cobra and provides native helpers for common Cobra/pflag workflows:
+
+- `BindPFlag` / `BindPFlags` for changed-flag precedence
+- `BindEnv`, `AutomaticEnv`, `SetEnvPrefix`, and `SetEnvKeyReplacer` for env variables
+- defaults, aliases, config file loading, and optional config watching in one API
+
+The dependency footprint is not the main issue. The repository already receives `github.com/spf13/viper` indirectly today, and Viper itself uses
+the same `github.com/go-viper/mapstructure/v2` decoder family that koanf v2 uses. A Viper migration would mostly be a behavior migration, not a
+dependency-size decision.
+
+Recommendation: do not migrate from koanf to Viper in the same phase as the Cobra migration. Phase 1 should be Cobra plus the existing koanf config
+loader, with `posflag.ProviderWithFlag` added where direct config-shaped flags need Cobra/pflag integration. Revisit Viper only as a separate
+config refactor after Cobra parity tests are stable.
+
+Reasons to keep koanf in Phase 1:
+
+- The current custom config logic is tally domain behavior, not accidental koanf boilerplate. Viper would not remove closest-config discovery,
+  compatibility aliases, nested rule-table normalization, generated schema coercion/validation, per-rule option validation, unknown `TALLY_*`
+  filtering, or LSP/editor override precedence.
+- koanf's provider model matches the current explicit source ordering: defaults, filesystem config, env, editor overrides, and later CLI flags.
+  `confmap.Provider` already supports the LSP override modes without involving CLI state.
+- koanf preserves map key case through the raw config path. That matters because tally rule keys are externally visible and case-sensitive, for
+  example BuildKit rule IDs like `StageNameCasing` and compatibility rule IDs like `DL4000` / `SC2086`.
+- Viper reads config into an internal case-insensitive key map. That behavior is convenient for app settings, but it is risky for tally's rule
+  namespace because it can collapse or rewrite case-sensitive rule IDs before the rule decoder sees them.
+- Viper's `AutomaticEnv` and `Unmarshal` story has improved, but the struct-binding path is still experimental in v1.21. A stable migration would
+  likely require explicit `BindEnv` mappings for every env key, which is not materially simpler than the current transform and validation layer.
+- A one-phase Cobra plus Viper migration would move CLI parsing, env parsing, config decoding, LSP override precedence, and plugin preparation at
+  the same time. Regressions would be harder to isolate.
+
+Viper could still be useful later if the project wants a dedicated config redesign. A follow-up spike should prove these behaviors before changing
+the main loader:
+
+- case-preserving rule ID decoding for `buildkit/StageNameCasing`, `hadolint/DL4000`, `shellcheck/SC2086`, and tally rule option maps
+- exact precedence parity for CLI flags, `TALLY_*` env vars, config files, and LSP overrides
+- explicit handling for CLI-only env aliases that should not enter schema validation
+- removal or retention plan for koanf use in rule option decoding helpers
+
 ### Phase 1 Acceptance Criteria
 
 - `go test ./cmd/tally/cmd ./internal/config ./internal/integration/...` passes.
@@ -859,6 +899,7 @@ Tasks:
 - replace `cli.Exit("", code)` with an equivalent typed error / status-code path
 - preserve `cmd.IsSet` semantics through `posflag.ProviderWithFlag` for config-shaped flags and pointer-valued options or pflag `Changed` for
   operational flags
+- keep koanf in Phase 1; do not combine the CLI framework migration with a Viper config migration
 - move env-backed CLI-only aliases out of framework declarations and into explicit option loading
 - keep koanf as the owner of config-shaped `TALLY_*` env vars
 - replace or validate the current `--acp-command` splitter against `mvdan.cc/sh/v3` so quoting behavior is not reimplemented by hand during the
@@ -1008,6 +1049,8 @@ Acceptance criteria:
 |---|---|
 | Cobra migration changes env/config precedence | add explicit flag/env/config precedence tests before plugin work |
 | `cmd.IsSet` behavior changes because pflag only tracks command-line input | use koanf `posflag` for config-shaped flags; represent explicit state in `lintOptions` and load CLI-only env aliases deliberately |
+| Viper migration hides CLI migration regressions | keep Viper out of Phase 1; evaluate it only in a dedicated config spike |
+| Viper lowercases case-sensitive rule IDs | keep koanf unless a prototype proves exact case-preserving decoding for BuildKit, Hadolint, ShellCheck, and tally rule keys |
 | koanf-loaded CLI flags replace existing append/transform semantics | keep `--select`, `--ignore`, `--hide-source`, `--no-inline-directives`, and `--acp-command` outside the direct `posflag` path |
 | CLI-only env vars accidentally enter koanf and fail schema validation | keep CLI-only env handling outside koanf or add explicit config mappings before enabling them |
 | `tally lint --context` collides conceptually with Docker global `--context` | use Docker's plugin helper so `docker --context X lint ...` is parsed separately from `docker lint --context DIR ...` |
@@ -1043,7 +1086,13 @@ Acceptance criteria:
    Recommendation: support it if Cobra can do so without adding a positional `version` command under `docker lint`. Otherwise rely on metadata and
    `tally version` rather than adding a positional `version` command that conflicts with lint target paths.
 
-5. Should `docker lint` auto-discover Docker context from the Docker CLI?
+5. Should the Cobra migration also move config from koanf to Viper?
+
+   Recommendation: no. Cobra has enough value for Docker integration on its own, while Viper would be a separate config behavior migration. Keep
+   Phase 1 scoped to Cobra plus koanf and revisit Viper only after a prototype proves case-preserving rule decoding and exact env/config/LSP
+   precedence parity.
+
+6. Should `docker lint` auto-discover Docker context from the Docker CLI?
 
    Recommendation: no. `docker lint` should remain a local static analysis command. Build invocation semantics should continue through the
    planned Bake/Compose support from design doc 38.
