@@ -94,7 +94,10 @@ func (f *Formatter) FormatTarget(target, content string) (string, Kind, bool, er
 }
 
 func (f *Formatter) styleForTarget(target string) (style, error) {
-	virtualName := VirtualFilename(f.dockerfilePath, target)
+	virtualName, err := VirtualFilename(f.dockerfilePath, target)
+	if err != nil {
+		return style{}, err
+	}
 	if st, ok := f.styleCache[virtualName]; ok {
 		return st, nil
 	}
@@ -113,7 +116,7 @@ func (f *Formatter) styleForTarget(target string) (style, error) {
 // The file lives next to the Dockerfile so .editorconfig discovery follows the
 // repository layout, while the basename comes from the heredoc destination so
 // selectors such as *.json, config.yaml, or package.json still match.
-func VirtualFilename(dockerfilePath, target string) string {
+func VirtualFilename(dockerfilePath, target string) (string, error) {
 	base := targetBasename(target)
 	if base == "" {
 		if kind, ok := SupportedKind(target); ok {
@@ -122,7 +125,11 @@ func VirtualFilename(dockerfilePath, target string) string {
 			base = "heredoc"
 		}
 	}
-	return filepath.Join(dockerfileDir(dockerfilePath), filepath.FromSlash(base))
+	dir, err := dockerfileDir(dockerfilePath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, filepath.FromSlash(base)), nil
 }
 
 func targetBasename(target string) string {
@@ -139,17 +146,19 @@ func targetBasename(target string) string {
 	return base
 }
 
-func dockerfileDir(dockerfilePath string) string {
+func dockerfileDir(dockerfilePath string) (string, error) {
 	if dockerfilePath == "" || dockerfilePath == "-" {
-		if wd, err := os.Getwd(); err == nil {
-			return wd
+		wd, err := os.Getwd()
+		if err != nil {
+			return "", err
 		}
-		return "."
+		return wd, nil
 	}
-	if abs, err := filepath.Abs(dockerfilePath); err == nil {
-		return filepath.Dir(abs)
+	abs, err := filepath.Abs(dockerfilePath)
+	if err != nil {
+		return "", err
 	}
-	return filepath.Dir(dockerfilePath)
+	return filepath.Dir(abs), nil
 }
 
 func styleFromDefinition(def *editorconfig.Definition) style {
@@ -466,6 +475,8 @@ func (f *xmlFormatter) writeCharData(tok xml.CharData) error {
 	if trimmed == "" {
 		return nil
 	}
+	// Leading or trailing whitespace around text is mixed content whose spacing
+	// may be significant, so skip formatting instead of changing semantics.
 	if trimmed != text {
 		return errSkipFormat
 	}
