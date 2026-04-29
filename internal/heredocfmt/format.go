@@ -358,7 +358,7 @@ func formatINI(content string, st style) (string, error) {
 	if _, err := cfg.WriteToIndent(&buf, st.indent); err != nil {
 		return "", err
 	}
-	return ensureTrailingNewline(buf.String()), nil
+	return ensureTrailingNewline(normalizeLineEndings(buf.String())), nil
 }
 
 func iniIsEmpty(cfg *ini.File) bool {
@@ -525,4 +525,9 @@ func (f *xmlFormatter) string() (string, error) {
 func ensureTrailingNewline(s string) string {
 	s = strings.TrimRight(s, "\n")
 	return s + "\n"
+}
+
+func normalizeLineEndings(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	return strings.ReplaceAll(s, "\r", "\n")
 }

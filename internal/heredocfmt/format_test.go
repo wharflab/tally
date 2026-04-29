@@ -136,6 +136,19 @@ func TestFormatINIPreservesComments(t *testing.T) {
 	}
 }
 
+func TestNormalizeLineEndings(t *testing.T) {
+	t.Parallel()
+
+	got := normalizeLineEndings("a\r\nb\rc\n")
+	if strings.Contains(got, "\r") {
+		t.Fatalf("expected LF-only output, got %q", got)
+	}
+	want := "a\nb\nc\n"
+	if got != want {
+		t.Fatalf("normalizeLineEndings() = %q, want %q", got, want)
+	}
+}
+
 func TestFormatXMLAllowsIndentationOnlyCharData(t *testing.T) {
 	t.Parallel()
 
