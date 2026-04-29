@@ -573,6 +573,56 @@ severity = "error"
 			)...),
 			wantApplied: 2,
 		},
+		{
+			name:  "prefer-copy-heredoc-formats-generated-yaml",
+			input: "FROM ubuntu:22.04\nRUN printf '{b: 2, a: 1}\\n' > /etc/app/config.yaml\n",
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 2,
+		},
+		{
+			name:  "prefer-copy-heredoc-formats-generated-toml",
+			input: "FROM ubuntu:22.04\nRUN printf 'title=\"demo\"\\n[owner]\\nname=\"tally\"\\n' > /etc/app/config.toml\n",
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 2,
+		},
+		{
+			name:  "prefer-copy-heredoc-formats-generated-xml",
+			input: "FROM ubuntu:22.04\nRUN printf '<root><child>1</child></root>\\n' > /etc/app/config.xml\n",
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 2,
+		},
+		{
+			name: "prefer-copy-heredoc-formats-generated-ini",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN printf 'zend_extension=opcache\\n[opcache]\\n" +
+				"opcache.enable=1\\nopcache.memory_consumption=128\\n' > /etc/app/php.ini\n",
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 2,
+		},
 
 		// prefer-copy-heredoc: literal ~/ target resolves against the effective USER and stays unsafe
 		{
