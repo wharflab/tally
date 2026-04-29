@@ -13,4 +13,3 @@ note: skipped fix tally/prefer-multi-stage-build (<stdin>): resolver not registe
 | - | ℹ️ This Dockerfile appears to build artifacts in a single stage; consider a multi-stage build to reduce final image size. |
 | 13 | 💅 expected blank line between COPY and RUN |
 | 24 | 💅 PowerShell Invoke-WebRequest without $ProgressPreference = 'SilentlyContinue' |
-

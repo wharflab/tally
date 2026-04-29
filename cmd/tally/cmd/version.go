@@ -1,30 +1,26 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
 	"os"
 
-	"github.com/urfave/cli/v3"
+	"github.com/spf13/cobra"
 
 	"github.com/wharflab/tally/internal/shellcheck"
 	"github.com/wharflab/tally/internal/version"
 )
 
-func versionCommand() *cli.Command {
-	return &cli.Command{
-		Name:  "version",
-		Usage: "Print version information",
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  "json",
-				Usage: "Output version information as JSON",
-			},
-		},
-		Action: func(ctx context.Context, cmd *cli.Command) error {
-			if cmd.Bool("json") {
+func versionCommand() *cobra.Command {
+	var asJSON bool
+
+	cmd := &cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := cmd.Context()
+			if asJSON {
 				info := version.GetInfo()
 				runner := shellcheck.NewRunner()
 				defer runner.Close(ctx)
@@ -43,4 +39,7 @@ func versionCommand() *cli.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&asJSON, "json", false, "Output version information as JSON")
+	return cmd
 }

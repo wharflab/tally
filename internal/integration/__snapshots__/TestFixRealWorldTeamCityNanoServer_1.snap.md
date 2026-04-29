@@ -16,4 +16,3 @@ Skipped 2 fixes
 | 68 | 💅 expected blank line between RUN and USER |
 | 90 | 💅 expected blank line between USER and RUN |
 | 92 | 💅 expected blank line between RUN and USER |
-
