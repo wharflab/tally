@@ -57,6 +57,41 @@ func TestFormattedHeredocsFinalizerFormatsGeneratedHeredoc(t *testing.T) {
 	}
 }
 
+func TestFormattedHeredocsFinalizerFormatsRunHeredoc(t *testing.T) {
+	t.Parallel()
+
+	file := filepath.Join(t.TempDir(), "Dockerfile")
+	src := []byte("FROM ubuntu:22.04\n" +
+		"RUN <<EOF\n" +
+		"apt-get install -y --no-install-recommends build-essential ca-certificates curl git jq openssl " +
+		"pkg-config python3-dev unzip vim wget zlib1g-dev\n" +
+		"EOF\n")
+	fixer := &Fixer{
+		SafetyThreshold: rules.FixSafe,
+		EnabledRules: map[string][]string{
+			filepath.Clean(file): {rules.FormattedHeredocsRuleCode},
+		},
+	}
+	result, err := fixer.Apply(context.Background(), nil, map[string][]byte{file: src})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	change := result.Changes[filepath.Clean(file)]
+	if change == nil {
+		t.Fatal("missing file change")
+	}
+	got := string(change.ModifiedContent)
+	want := "apt-get install -y --no-install-recommends build-essential ca-certificates curl git jq openssl \\\n" +
+		"\tpkg-config python3-dev unzip vim wget zlib1g-dev"
+	if !strings.Contains(got, want) {
+		t.Fatalf("RUN heredoc was not formatted\ngot:\n%s\nwant substring:\n%s", got, want)
+	}
+	if result.TotalApplied() != 1 {
+		t.Fatalf("applied fixes = %d, want 1", result.TotalApplied())
+	}
+}
+
 func TestFormattedHeredocsFinalizerRequiresRuleEnabled(t *testing.T) {
 	t.Parallel()
 

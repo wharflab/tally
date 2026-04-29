@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"github.com/wharflab/tally/internal/fix"
+	"github.com/wharflab/tally/internal/heredocfmt"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/testutil"
 )
 
@@ -22,6 +24,15 @@ func TestPreferFormattedHeredocsRule_Metadata(t *testing.T) {
 	}
 	if meta.FixPriority != rules.FormattedHeredocsFixPriority {
 		t.Fatalf("FixPriority = %d, want %d", meta.FixPriority, rules.FormattedHeredocsFixPriority)
+	}
+}
+
+func TestRunHeredocShellVariantUnknownWithoutSemanticMetadata(t *testing.T) {
+	t.Parallel()
+
+	got := heredocfmt.RunHeredocShellVariant(nil, nil, heredocfmt.RunHeredoc{StartLine: 2})
+	if got != shell.VariantUnknown {
+		t.Fatalf("variant = %v, want %v", got, shell.VariantUnknown)
 	}
 }
 
@@ -93,6 +104,99 @@ EOF
 			WantMessages:   []string{"COPY heredoc for /etc/app/php.ini should be pretty-printed as INI"},
 		},
 		{
+			Name: "unformatted RUN heredoc",
+			Content: `FROM alpine
+RUN <<EOF
+if true; then
+ echo hi
+fi
+EOF
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"RUN heredoc should be pretty-printed as a shell script"},
+		},
+		{
+			Name: "unformatted ONBUILD RUN heredoc",
+			Content: `FROM alpine
+ONBUILD RUN <<EOF
+if true; then
+ echo hi
+fi
+EOF
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"ONBUILD RUN heredoc should be pretty-printed as a shell script"},
+		},
+		{
+			Name: "COPY sh heredoc without shebang",
+			Content: `FROM alpine
+COPY <<EOF /usr/local/bin/entrypoint.sh
+if true; then
+ echo hi
+fi
+EOF
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"COPY heredoc for /usr/local/bin/entrypoint.sh should be pretty-printed as a shell script"},
+		},
+		{
+			Name: "COPY extensionless shell heredoc with shebang",
+			Content: `FROM alpine
+COPY <<EOF /usr/local/bin/entrypoint
+#!/usr/bin/env bash
+if true; then
+ echo hi
+fi
+EOF
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"COPY heredoc for /usr/local/bin/entrypoint should be pretty-printed as a shell script"},
+		},
+		{
+			Name: "ADD sh heredoc is skipped",
+			Content: `FROM alpine
+ADD <<EOF /usr/local/bin/entrypoint.sh
+if true; then
+ echo hi
+fi
+EOF
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "COPY sh heredoc with unsupported shebang is skipped",
+			Content: `FROM alpine
+COPY <<EOF /usr/local/bin/entrypoint.sh
+#!/usr/bin/env python
+print("hi")
+EOF
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "RUN heredoc stdin payload is skipped",
+			Content: `FROM alpine
+RUN cat <<EOF
+if true; then
+ echo hi
+fi
+EOF
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "PowerShell RUN heredoc is skipped",
+			Content: `FROM mcr.microsoft.com/powershell:nanoserver-ltsc2022
+SHELL ["pwsh", "-Command"]
+RUN <<EOF
+if ($true) {
+ Write-Host hi
+}
+EOF
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "already formatted JSON",
 			Content: `FROM alpine
 COPY <<EOF /etc/app/config.json
@@ -122,6 +226,93 @@ EOF
 			WantViolations: 0,
 		},
 	})
+}
+
+func TestPreferFormattedHeredocsRule_FixRUN(t *testing.T) {
+	t.Parallel()
+	content := `FROM alpine
+RUN <<EOF
+if true; then
+ echo hi
+fi
+EOF
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewPreferFormattedHeredocsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	want := `FROM alpine
+RUN <<EOF
+if true; then
+	echo hi
+fi
+EOF
+`
+	if got != want {
+		t.Fatalf("fixed content mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_FixCOPYShell(t *testing.T) {
+	t.Parallel()
+	content := `FROM alpine
+COPY <<EOF /usr/local/bin/entrypoint.sh
+if true; then
+ echo hi
+fi
+EOF
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewPreferFormattedHeredocsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	want := `FROM alpine
+COPY <<EOF /usr/local/bin/entrypoint.sh
+if true; then
+	echo hi
+fi
+EOF
+`
+	if got != want {
+		t.Fatalf("fixed content mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_FixRUNEditorConfigMaxLineLength(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	if err := writeTestFile(filepath.Join(dir, ".editorconfig"), `root = true
+
+[*.sh]
+indent_style = space
+indent_size = 2
+max_line_length = 64
+`); err != nil {
+		t.Fatal(err)
+	}
+	file := filepath.Join(dir, "Dockerfile")
+	content := `FROM alpine
+RUN <<EOF
+#!/bin/sh
+apt-get install -y --no-install-recommends alpha beta gamma delta epsilon zeta
+EOF
+`
+	input := testutil.MakeLintInput(t, file, content)
+	violations := NewPreferFormattedHeredocsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	if !strings.Contains(got, "\\\n  ") {
+		t.Fatalf("expected wrapped shell command with 2-space continuation, got:\n%s", got)
+	}
 }
 
 func TestPreferFormattedHeredocsRule_FixJSON(t *testing.T) {

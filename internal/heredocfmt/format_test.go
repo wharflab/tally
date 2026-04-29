@@ -2,10 +2,15 @@ package heredocfmt
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	editorconfig "github.com/editorconfig/editorconfig-core-go/v2"
+
+	"github.com/wharflab/tally/internal/shell"
 )
 
 func TestSupportedKindXMLAliases(t *testing.T) {
@@ -88,6 +93,259 @@ func TestStyleFromDefinitionReadsMaxLineLength(t *testing.T) {
 	})
 	if st.maxLineLength != 0 {
 		t.Fatalf("maxLineLength = %d, want 0 for off", st.maxLineLength)
+	}
+}
+
+func TestShellStyleDefaultMaxLineLength(t *testing.T) {
+	t.Parallel()
+
+	st := shellStyleFromDefinition(nil)
+	if st.maxLineLength != defaultShellMaxLineLength {
+		t.Fatalf("maxLineLength = %d, want %d", st.maxLineLength, defaultShellMaxLineLength)
+	}
+	if st.shellIndent != 0 {
+		t.Fatalf("shellIndent = %d, want tabs", st.shellIndent)
+	}
+
+	st = shellStyleFromDefinition(&editorconfig.Definition{
+		IndentStyle: editorconfig.IndentStyleSpaces,
+		IndentSize:  "4",
+		Raw: map[string]string{
+			"indent_style": "space",
+			"indent_size":  "4",
+		},
+	})
+	if st.shellIndent != 4 {
+		t.Fatalf("shellIndent = %d, want 4", st.shellIndent)
+	}
+}
+
+func TestShellStyleMaxLineLengthOff(t *testing.T) {
+	t.Parallel()
+
+	st := shellStyleFromDefinition(&editorconfig.Definition{
+		Raw: map[string]string{
+			"max_line_length": "off",
+		},
+	})
+	if st.maxLineLength != 0 {
+		t.Fatalf("maxLineLength = %d, want 0", st.maxLineLength)
+	}
+}
+
+func TestFormatShellUsesShfmt(t *testing.T) {
+	t.Parallel()
+
+	got, err := formatShell("if true; then\n  echo hi\nfi\n", shell.VariantPOSIX, shellStyleFromDefinition(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "if true; then\n\techo hi\nfi\n"
+	if got != want {
+		t.Fatalf("formatted shell mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestFormatShellSupportsMvdanVariants(t *testing.T) {
+	t.Parallel()
+
+	for _, variant := range []shell.Variant{
+		shell.VariantBash,
+		shell.VariantPOSIX,
+		shell.VariantMksh,
+		shell.VariantBats,
+		shell.VariantZsh,
+	} {
+		t.Run(fmt.Sprint(variant), func(t *testing.T) {
+			t.Parallel()
+			got, err := formatShell("echo hi\n", variant, shellStyleFromDefinition(nil))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != "echo hi\n" {
+				t.Fatalf("formatted shell mismatch: %q", got)
+			}
+		})
+	}
+}
+
+func TestFormatShellWrapsMaxLineLength(t *testing.T) {
+	t.Parallel()
+
+	st := shellStyleFromDefinition(&editorconfig.Definition{
+		IndentStyle: editorconfig.IndentStyleSpaces,
+		IndentSize:  "2",
+		Raw: map[string]string{
+			"indent_style":    "space",
+			"indent_size":     "2",
+			"max_line_length": "64",
+		},
+	})
+	got, err := formatShell(
+		"apt-get install -y --no-install-recommends alpha beta gamma delta epsilon zeta\n",
+		shell.VariantPOSIX,
+		st,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(got, "\\\n  ") {
+		t.Fatalf("expected shell line wrapping, got:\n%s", got)
+	}
+}
+
+func TestFormatShellWrapsAllWordsAfterBreak(t *testing.T) {
+	t.Parallel()
+
+	st := shellStyleFromDefinition(&editorconfig.Definition{
+		IndentStyle: editorconfig.IndentStyleSpaces,
+		IndentSize:  "2",
+		Raw: map[string]string{
+			"indent_style":    "space",
+			"indent_size":     "2",
+			"max_line_length": "28",
+		},
+	})
+	got, err := formatShell("cmd alpha beta gamma delta epsilon zeta\n", shell.VariantPOSIX, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "cmd alpha beta gamma delta \\\n  epsilon zeta\n"
+	if got != want {
+		t.Fatalf("formatted shell mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestFormatShellWrapsMultipartWord(t *testing.T) {
+	t.Parallel()
+
+	st := shellStyleFromDefinition(&editorconfig.Definition{
+		IndentStyle: editorconfig.IndentStyleSpaces,
+		IndentSize:  "2",
+		Raw: map[string]string{
+			"indent_style":    "space",
+			"indent_size":     "2",
+			"max_line_length": "32",
+		},
+	})
+	got, err := formatShell("cmd alpha beta prefix${APP_ENV}suffix gamma\n", shell.VariantPOSIX, st)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "cmd alpha beta \\\n  prefix${APP_ENV}suffix gamma\n"
+	if got != want {
+		t.Fatalf("formatted shell mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestFormatShellSkipsWhenMaxLineLengthCannotBeMet(t *testing.T) {
+	t.Parallel()
+
+	st := shellStyleFromDefinition(&editorconfig.Definition{
+		Raw: map[string]string{
+			"max_line_length": "12",
+		},
+	})
+	_, err := formatShell("cmd this_argument_is_too_long_to_wrap\n", shell.VariantPOSIX, st)
+	if !errors.Is(err, errSkipFormat) {
+		t.Fatalf("error = %v, want errSkipFormat", err)
+	}
+}
+
+func TestShellTargetVariant(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		target  string
+		content string
+		want    shell.Variant
+		wantOK  bool
+	}{
+		{
+			name:    "bash shebang without extension",
+			target:  "/usr/local/bin/entrypoint",
+			content: "#!/usr/bin/env bash\nif true; then echo hi; fi\n",
+			want:    shell.VariantBash,
+			wantOK:  true,
+		},
+		{
+			name:    "ksh shebang maps to mksh",
+			target:  "/usr/local/bin/entrypoint",
+			content: "#!/bin/ksh\nif true; then echo hi; fi\n",
+			want:    shell.VariantMksh,
+			wantOK:  true,
+		},
+		{
+			name:    "sh extension without shebang uses POSIX",
+			target:  "/usr/local/bin/entrypoint.sh",
+			content: "if true; then echo hi; fi\n",
+			want:    shell.VariantPOSIX,
+			wantOK:  true,
+		},
+		{
+			name:    "unsupported shebang is skipped even with sh extension",
+			target:  "/usr/local/bin/entrypoint.sh",
+			content: "#!/usr/bin/env python\nprint('hi')\n",
+			wantOK:  false,
+		},
+		{
+			name:    "non-sh extension without shebang is skipped",
+			target:  "/usr/local/bin/entrypoint.bash",
+			content: "if true; then echo hi; fi\n",
+			wantOK:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := shellTargetVariant(tt.target, tt.content)
+			if ok != tt.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tt.wantOK)
+			}
+			if got != tt.want {
+				t.Fatalf("variant = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatShellTargetUsesDestinationEditorConfig(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".editorconfig"), []byte(`root = true
+
+[entrypoint.sh]
+indent_style = space
+indent_size = 2
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	f := NewFormatter(filepath.Join(dir, "Dockerfile"))
+	got, variant, ok, err := f.FormatShellTarget(
+		"/usr/local/bin/entrypoint.sh",
+		"if true; then\n echo hi\nfi\n",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("FormatShellTarget ok = false, want true")
+	}
+	if variant != shell.VariantPOSIX {
+		t.Fatalf("variant = %v, want %v", variant, shell.VariantPOSIX)
+	}
+
+	want := "if true; then\n  echo hi\nfi\n"
+	if got != want {
+		t.Fatalf("formatted shell target mismatch\ngot:\n%s\nwant:\n%s", got, want)
 	}
 }
 

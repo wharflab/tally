@@ -836,6 +836,8 @@ func dl4001ShellVariant(variant shell.Variant) string {
 		return "sh"
 	case shell.VariantMksh:
 		return "mksh"
+	case shell.VariantBats:
+		return "bats"
 	case shell.VariantZsh:
 		return "zsh"
 	case shell.VariantPowerShell:

@@ -7,6 +7,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
+
 	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/rules"
@@ -82,6 +83,7 @@ func TestShellcheckDialect(t *testing.T) {
 		{name: "default", shellName: "", want: "sh"},
 		{name: "sh", shellName: "/bin/sh", want: "sh"},
 		{name: "bash", shellName: "/bin/bash", want: "bash"},
+		{name: "bats-maps-to-bash", shellName: "/usr/bin/bats", want: "bash"},
 		{name: "windows-bash", shellName: `C:\Program Files\Git\bin\bash.exe`, want: "bash"},
 		{name: "zsh-maps-to-bash", shellName: "/usr/bin/zsh", want: "bash"},
 		{name: "dash", shellName: "/bin/dash", want: "dash"},
@@ -99,6 +101,19 @@ func TestShellcheckDialect(t *testing.T) {
 				t.Fatalf("shellcheckDialect(%q) = %q, want %q", tt.shellName, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestIsAllowedShebangAcceptsBats(t *testing.T) {
+	t.Parallel()
+
+	for _, script := range []string{
+		"#!/usr/bin/bats\n@test \"demo\" { run true; }\n",
+		"#!/usr/bin/env bats\n@test \"demo\" { run true; }\n",
+	} {
+		if !isAllowedShebang(script) {
+			t.Fatalf("expected bats shebang to be allowed: %q", script)
+		}
 	}
 }
 

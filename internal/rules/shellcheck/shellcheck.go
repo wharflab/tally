@@ -18,8 +18,9 @@ import (
 	intshellcheck "github.com/wharflab/tally/internal/shellcheck"
 	"github.com/wharflab/tally/internal/sourcemap"
 
-	"github.com/wharflab/tally/internal/rules"
 	"mvdan.cc/sh/v3/syntax"
+
+	"github.com/wharflab/tally/internal/rules"
 )
 
 const (
@@ -879,7 +880,7 @@ func shellcheckDialect(shellName string) string {
 	name = strings.TrimSuffix(name, ".exe")
 
 	switch name {
-	case "bash", "zsh":
+	case "bash", "bats", "zsh":
 		return shellDialectBash
 	case "sh":
 		return "sh"
@@ -906,9 +907,11 @@ func isAllowedShebang(script string) bool {
 	allowed := []string{
 		"#!/bin/sh",
 		"#!/bin/bash",
+		"#!/usr/bin/bats",
 		"#!/bin/ksh",
 		"#!/usr/bin/env sh",
 		"#!/usr/bin/env bash",
+		"#!/usr/bin/env bats",
 		"#!/usr/bin/env ksh",
 	}
 	return slices.Contains(allowed, line)

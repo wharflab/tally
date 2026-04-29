@@ -1,4 +1,4 @@
-// Package heredocfmt formats typed file content embedded in Dockerfile heredocs.
+// Package heredocfmt formats content embedded in Dockerfile heredocs.
 package heredocfmt
 
 import (
@@ -17,9 +17,13 @@ import (
 	toml "github.com/pelletier/go-toml/v2"
 	yaml "go.yaml.in/yaml/v4"
 	ini "gopkg.in/ini.v1"
+	"mvdan.cc/sh/v3/syntax"
+
+	"github.com/wharflab/tally/internal/shell"
 )
 
 const defaultIndentWidth = 2
+const defaultShellMaxLineLength = 100
 
 var errSkipFormat = errors.New("skip formatting")
 
@@ -41,9 +45,18 @@ type Formatter struct {
 }
 
 type style struct {
-	indent        string
-	indentWidth   int
-	maxLineLength int
+	indent           string
+	indentWidth      int
+	maxLineLength    int
+	maxLineLengthSet bool
+	shellIndent      uint
+	binaryNextLine   bool
+	caseIndent       bool
+	spaceRedirects   bool
+	keepPadding      bool
+	functionNextLine bool
+	simplify         bool
+	minify           bool
 }
 
 // NewFormatter creates a formatter for heredocs inside dockerfilePath.
@@ -94,6 +107,49 @@ func (f *Formatter) FormatTarget(target, content string) (string, Kind, bool, er
 	return formatted, kind, true, nil
 }
 
+// FormatShell formats a RUN heredoc body as a shell script for a mvdan.cc/sh-supported variant.
+func (f *Formatter) FormatShell(content string, variant shell.Variant) (string, bool, error) {
+	if !variant.SupportsPOSIXShellAST() {
+		return "", false, nil
+	}
+
+	st, err := f.styleForShell(variant)
+	if err != nil {
+		return "", false, err
+	}
+
+	formatted, err := formatShell(content, variant, st)
+	if err != nil {
+		if errors.Is(err, errSkipFormat) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	return formatted, true, nil
+}
+
+// FormatShellTarget formats a COPY heredoc body as a shell script when the destination or shebang implies one.
+func (f *Formatter) FormatShellTarget(target, content string) (string, shell.Variant, bool, error) {
+	variant, ok := shellTargetVariant(target, content)
+	if !ok {
+		return "", shell.VariantUnknown, false, nil
+	}
+
+	st, err := f.styleForShellTarget(target, variant)
+	if err != nil {
+		return "", variant, false, err
+	}
+
+	formatted, err := formatShell(content, variant, st)
+	if err != nil {
+		if errors.Is(err, errSkipFormat) {
+			return "", variant, false, nil
+		}
+		return "", variant, false, err
+	}
+	return formatted, variant, true, nil
+}
+
 func (f *Formatter) styleForTarget(target string) (style, error) {
 	virtualName, err := VirtualFilename(f.dockerfilePath, target)
 	if err != nil {
@@ -108,6 +164,42 @@ func (f *Formatter) styleForTarget(target string) (style, error) {
 		return style{}, err
 	}
 	st := styleFromDefinition(def)
+	f.styleCache[virtualName] = st
+	return st, nil
+}
+
+func (f *Formatter) styleForShell(variant shell.Variant) (style, error) {
+	virtualName, err := VirtualShellFilename(f.dockerfilePath, variant)
+	if err != nil {
+		return style{}, err
+	}
+	if st, ok := f.styleCache[virtualName]; ok {
+		return st, nil
+	}
+
+	def, err := editorconfig.GetDefinitionForFilename(virtualName)
+	if err != nil {
+		return style{}, err
+	}
+	st := shellStyleFromDefinition(def)
+	f.styleCache[virtualName] = st
+	return st, nil
+}
+
+func (f *Formatter) styleForShellTarget(target string, variant shell.Variant) (style, error) {
+	virtualName, err := VirtualShellTargetFilename(f.dockerfilePath, target, variant)
+	if err != nil {
+		return style{}, err
+	}
+	if st, ok := f.styleCache[virtualName]; ok {
+		return st, nil
+	}
+
+	def, err := editorconfig.GetDefinitionForFilename(virtualName)
+	if err != nil {
+		return style{}, err
+	}
+	st := shellStyleFromDefinition(def)
 	f.styleCache[virtualName] = st
 	return st, nil
 }
@@ -133,15 +225,63 @@ func VirtualFilename(dockerfilePath, target string) (string, error) {
 	return filepath.Join(dir, filepath.FromSlash(base)), nil
 }
 
+// VirtualShellFilename returns the synthetic filename used for RUN heredoc EditorConfig matching.
+func VirtualShellFilename(dockerfilePath string, variant shell.Variant) (string, error) {
+	dir, err := dockerfileDir(dockerfilePath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "Dockerfile.heredoc."+shellExtension(variant)), nil
+}
+
+// VirtualShellTargetFilename returns the synthetic filename used for COPY shell heredoc EditorConfig matching.
+func VirtualShellTargetFilename(dockerfilePath, target string, variant shell.Variant) (string, error) {
+	base := targetBasenameAny(target)
+	if base == "" {
+		return VirtualShellFilename(dockerfilePath, variant)
+	}
+	dir, err := dockerfileDir(dockerfilePath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, filepath.FromSlash(base)), nil
+}
+
+func shellExtension(variant shell.Variant) string {
+	switch variant {
+	case shell.VariantPOSIX:
+		return "sh"
+	case shell.VariantBash:
+		return "bash"
+	case shell.VariantMksh:
+		return "mksh"
+	case shell.VariantBats:
+		return "bats"
+	case shell.VariantZsh:
+		return "zsh"
+	case shell.VariantPowerShell, shell.VariantCmd, shell.VariantUnknown:
+		return "sh"
+	}
+	return "sh"
+}
+
 func targetBasename(target string) string {
+	base := targetBasenameAny(target)
+	if base == "" {
+		return ""
+	}
+	if _, ok := SupportedKind(base); !ok {
+		return ""
+	}
+	return base
+}
+
+func targetBasenameAny(target string) string {
 	target = strings.TrimSpace(target)
 	target = strings.Trim(target, `"'`)
 	target = strings.ReplaceAll(target, `\`, `/`)
 	base := path.Base(target)
 	if base == "." || base == "/" || base == "" {
-		return ""
-	}
-	if _, ok := SupportedKind(base); !ok {
 		return ""
 	}
 	return base
@@ -171,14 +311,47 @@ func styleFromDefinition(def *editorconfig.Definition) style {
 	}
 
 	width := parseIndentWidth(def)
+	maxLineLength, maxLineLengthSet := parseMaxLineLength(def)
+	st := style{
+		maxLineLength:    maxLineLength,
+		maxLineLengthSet: maxLineLengthSet,
+		binaryNextLine:   rawBool(def, "binary_next_line"),
+		caseIndent:       rawBool(def, "switch_case_indent"),
+		spaceRedirects:   rawBool(def, "space_redirects"),
+		keepPadding:      rawBool(def, "keep_padding"),
+		functionNextLine: rawBool(def, "function_next_line"),
+		minify:           rawBool(def, "minify"),
+		simplify:         rawBool(def, "simplify") || rawBool(def, "minify"),
+	}
 	if strings.EqualFold(def.IndentStyle, editorconfig.IndentStyleTab) {
-		return style{indent: "\t", indentWidth: width, maxLineLength: parseMaxLineLength(def)}
+		st.indent = "\t"
+		st.indentWidth = width
+		return st
 	}
-	return style{
-		indent:        strings.Repeat(" ", width),
-		indentWidth:   width,
-		maxLineLength: parseMaxLineLength(def),
+	st.indent = strings.Repeat(" ", width)
+	st.indentWidth = width
+	return st
+}
+
+func shellStyleFromDefinition(def *editorconfig.Definition) style {
+	st := styleFromDefinition(def)
+	st.indent = "\t"
+	st.indentWidth = 8
+	st.shellIndent = 0
+
+	if def != nil && strings.EqualFold(def.IndentStyle, editorconfig.IndentStyleSpaces) {
+		width := 8
+		if n := parseIndentWidth(def); n > 0 {
+			width = n
+		}
+		st.indent = strings.Repeat(" ", width)
+		st.indentWidth = width
+		st.shellIndent = uint(width)
 	}
+	if !st.maxLineLengthSet {
+		st.maxLineLength = defaultShellMaxLineLength
+	}
+	return st
 }
 
 func parseIndentWidth(def *editorconfig.Definition) int {
@@ -194,19 +367,50 @@ func parseIndentWidth(def *editorconfig.Definition) int {
 	return defaultIndentWidth
 }
 
-func parseMaxLineLength(def *editorconfig.Definition) int {
+func parseMaxLineLength(def *editorconfig.Definition) (int, bool) {
 	if def == nil || def.Raw == nil {
-		return 0
+		return 0, false
 	}
 	value := strings.TrimSpace(strings.ToLower(def.Raw["max_line_length"]))
-	if value == "" || value == "off" {
-		return 0
+	if value == "" {
+		return 0, false
+	}
+	if value == "off" {
+		return 0, true
 	}
 	n, err := strconv.Atoi(value)
 	if err != nil || n <= 0 {
-		return 0
+		return 0, false
 	}
-	return n
+	return n, true
+}
+
+func rawBool(def *editorconfig.Definition, key string) bool {
+	if def == nil || def.Raw == nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(def.Raw[key]), "true")
+}
+
+func shellTargetVariant(target, content string) (shell.Variant, bool) {
+	firstLine, _, _ := strings.Cut(content, "\n")
+	if name, ok := shell.ShellFromShebang(firstLine); ok {
+		variant := shell.VariantFromShell(name)
+		return variant, variant.SupportsPOSIXShellAST()
+	}
+	if strings.HasPrefix(firstLine, "#!") {
+		return shell.VariantUnknown, false
+	}
+	if isDotShTarget(target) {
+		return shell.VariantPOSIX, true
+	}
+	return shell.VariantUnknown, false
+}
+
+func isDotShTarget(target string) bool {
+	target = strings.TrimSpace(target)
+	target = strings.Trim(target, `"'`)
+	return strings.EqualFold(path.Ext(filepath.ToSlash(target)), ".sh")
 }
 
 func formatContent(kind Kind, content string, st style) (string, error) {
@@ -224,6 +428,323 @@ func formatContent(kind Kind, content string, st style) (string, error) {
 	default:
 		return "", errSkipFormat
 	}
+}
+
+func formatShell(content string, variant shell.Variant, st style) (string, error) {
+	if strings.TrimSpace(content) == "" || !variant.SupportsPOSIXShellAST() {
+		return "", errSkipFormat
+	}
+
+	prog, err := parseShell(content, variant)
+	if err != nil {
+		return "", err
+	}
+	if st.simplify {
+		syntax.Simplify(prog)
+	}
+
+	formatted, err := printShell(prog, st)
+	if err != nil {
+		return "", err
+	}
+	if st.maxLineLength > 0 && hasLineLongerThan(formatted, st.maxLineLength) {
+		wrappedProg, err := parseShell(formatted, variant)
+		if err != nil {
+			return "", errSkipFormat
+		}
+		if !wrapLongShellCalls(wrappedProg, st) {
+			return "", errSkipFormat
+		}
+		formatted, err = printShell(wrappedProg, st)
+		if err != nil {
+			return "", err
+		}
+		if _, err := parseShell(formatted, variant); err != nil {
+			return "", errSkipFormat
+		}
+		if hasLineLongerThan(formatted, st.maxLineLength) {
+			return "", errSkipFormat
+		}
+	}
+	return ensureTrailingNewline(formatted), nil
+}
+
+func parseShell(content string, variant shell.Variant) (*syntax.File, error) {
+	return syntax.NewParser(
+		syntax.KeepComments(true),
+		syntax.Variant(shellLangVariant(variant)),
+	).Parse(strings.NewReader(content), "")
+}
+
+func shellLangVariant(variant shell.Variant) syntax.LangVariant {
+	switch variant {
+	case shell.VariantPOSIX:
+		return syntax.LangPOSIX
+	case shell.VariantBash:
+		return syntax.LangBash
+	case shell.VariantMksh:
+		return syntax.LangMirBSDKorn
+	case shell.VariantBats:
+		return syntax.LangBats
+	case shell.VariantZsh:
+		return syntax.LangZsh
+	case shell.VariantPowerShell, shell.VariantCmd, shell.VariantUnknown:
+		return syntax.LangBash
+	}
+	return syntax.LangBash
+}
+
+func printShell(prog *syntax.File, st style) (string, error) {
+	var buf bytes.Buffer
+	if err := syntax.NewPrinter(shellPrinterOptions(st)...).Print(&buf, prog); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+func shellPrinterOptions(st style) []syntax.PrinterOption {
+	return []syntax.PrinterOption{
+		syntax.Indent(st.shellIndent),
+		syntax.BinaryNextLine(st.binaryNextLine),
+		syntax.SwitchCaseIndent(st.caseIndent),
+		syntax.SpaceRedirects(st.spaceRedirects),
+		syntax.KeepPadding(st.keepPadding), //nolint:staticcheck // Match shfmt's supported keep_padding EditorConfig option.
+		syntax.FunctionNextLine(st.functionNextLine),
+		syntax.Minify(st.minify),
+	}
+}
+
+func hasLineLongerThan(s string, maxLen int) bool {
+	if maxLen <= 0 {
+		return false
+	}
+	s = strings.TrimRight(s, "\n")
+	for {
+		idx := strings.IndexByte(s, '\n')
+		if idx < 0 {
+			return len(s) > maxLen
+		}
+		if idx > maxLen {
+			return true
+		}
+		s = s[idx+1:]
+	}
+}
+
+func wrapLongShellCalls(prog *syntax.File, st style) bool {
+	modified := false
+	syntax.Walk(prog, func(node syntax.Node) bool {
+		call, ok := node.(*syntax.CallExpr)
+		if !ok {
+			return true
+		}
+		if wrapLongShellCall(call, st) {
+			modified = true
+		}
+		return true
+	})
+	return modified
+}
+
+func wrapLongShellCall(call *syntax.CallExpr, st style) bool {
+	if call == nil || len(call.Assigns) > 0 || len(call.Args) < 2 || st.maxLineLength <= 0 {
+		return false
+	}
+
+	words, ok := shellWordTexts(call.Args, st)
+	if !ok {
+		return false
+	}
+
+	lineLen := leadingColumn(call.Args[0]) + len(words[0])
+	if !callNeedsWrap(words, lineLen, st.maxLineLength) {
+		return false
+	}
+
+	breaks := make([]bool, len(words))
+	for i := 1; i < len(words); i++ {
+		nextLen := lineLen + 1 + len(words[i])
+		if nextLen > st.maxLineLength {
+			breaks[i] = true
+			lineLen = st.indentWidth + len(words[i])
+			continue
+		}
+		lineLen = nextLen
+	}
+
+	line := call.Args[0].Pos().Line()
+	if line == 0 {
+		line = 1
+	}
+	currentLine := line
+	modified := false
+	for i, shouldBreak := range breaks {
+		if i == 0 {
+			continue
+		}
+		if shouldBreak {
+			currentLine++
+		}
+		if currentLine == line {
+			continue
+		}
+		if setWordLine(call.Args[i], currentLine) {
+			modified = true
+		}
+	}
+	return modified
+}
+
+func callNeedsWrap(words []string, firstLineLen, maxLen int) bool {
+	if firstLineLen > maxLen {
+		return true
+	}
+	lineLen := firstLineLen
+	for _, word := range words[1:] {
+		lineLen += 1 + len(word)
+		if lineLen > maxLen {
+			return true
+		}
+	}
+	return false
+}
+
+func leadingColumn(word *syntax.Word) int {
+	if word == nil {
+		return 0
+	}
+	col := word.Pos().Col()
+	if col == 0 {
+		return 0
+	}
+	return int(col - 1)
+}
+
+func shellWordTexts(words []*syntax.Word, st style) ([]string, bool) {
+	printer := syntax.NewPrinter(shellPrinterOptions(st)...)
+	texts := make([]string, 0, len(words))
+	for _, word := range words {
+		if word == nil {
+			return nil, false
+		}
+		var buf bytes.Buffer
+		if err := printer.Print(&buf, word); err != nil {
+			return nil, false
+		}
+		text := buf.String()
+		if text == "" || strings.Contains(text, "\n") {
+			return nil, false
+		}
+		texts = append(texts, text)
+	}
+	return texts, true
+}
+
+func setWordLine(word *syntax.Word, line uint) bool {
+	if word == nil || len(word.Parts) == 0 {
+		return false
+	}
+	baseCol := word.Pos().Col()
+	if baseCol == 0 {
+		baseCol = 1
+	}
+	for _, part := range word.Parts {
+		if !setWordPartLine(part, line, baseCol) {
+			return false
+		}
+	}
+	return true
+}
+
+func setWordPartsLine(parts []syntax.WordPart, line, baseCol uint) bool {
+	for _, part := range parts {
+		if !setWordPartLine(part, line, baseCol) {
+			return false
+		}
+	}
+	return true
+}
+
+func setWordPartLine(part syntax.WordPart, line, baseCol uint) bool {
+	switch part := part.(type) {
+	case *syntax.Lit:
+		setLitLine(part, line, baseCol)
+	case *syntax.SglQuoted:
+		part.Left = withLineRelative(part.Left, line, baseCol)
+		part.Right = withLineRelative(part.Right, line, baseCol)
+	case *syntax.DblQuoted:
+		part.Left = withLineRelative(part.Left, line, baseCol)
+		part.Right = withLineRelative(part.Right, line, baseCol)
+		return setWordPartsLine(part.Parts, line, baseCol)
+	case *syntax.ParamExp:
+		part.Dollar = withLineRelative(part.Dollar, line, baseCol)
+		part.Rbrace = withLineRelative(part.Rbrace, line, baseCol)
+		setLitLine(part.Flags, line, baseCol)
+		setLitLine(part.Param, line, baseCol)
+		if part.NestedParam != nil && !setWordPartLine(part.NestedParam, line, baseCol) {
+			return false
+		}
+		for _, modifier := range part.Modifiers {
+			setLitLine(modifier, line, baseCol)
+		}
+		if part.Repl != nil {
+			if !setNestedWordLine(part.Repl.Orig, line, baseCol) || !setNestedWordLine(part.Repl.With, line, baseCol) {
+				return false
+			}
+		}
+		if part.Exp != nil && !setNestedWordLine(part.Exp.Word, line, baseCol) {
+			return false
+		}
+	case *syntax.CmdSubst:
+		part.Left = withLineRelative(part.Left, line, baseCol)
+		part.Right = withLineRelative(part.Right, line, baseCol)
+	case *syntax.ArithmExp:
+		part.Left = withLineRelative(part.Left, line, baseCol)
+		part.Right = withLineRelative(part.Right, line, baseCol)
+	case *syntax.ProcSubst:
+		part.OpPos = withLineRelative(part.OpPos, line, baseCol)
+		part.Rparen = withLineRelative(part.Rparen, line, baseCol)
+	case *syntax.ExtGlob:
+		part.OpPos = withLineRelative(part.OpPos, line, baseCol)
+		setLitLine(part.Pattern, line, baseCol)
+	case *syntax.BraceExp:
+		for _, elem := range part.Elems {
+			if !setNestedWordLine(elem, line, baseCol) {
+				return false
+			}
+		}
+	default:
+		return false
+	}
+	return true
+}
+
+func setNestedWordLine(word *syntax.Word, line, baseCol uint) bool {
+	if word == nil {
+		return true
+	}
+	return setWordPartsLine(word.Parts, line, baseCol)
+}
+
+func setLitLine(lit *syntax.Lit, line, baseCol uint) {
+	if lit == nil {
+		return
+	}
+	lit.ValuePos = withLineRelative(lit.ValuePos, line, baseCol)
+	lit.ValueEnd = withLineRelative(lit.ValueEnd, line, baseCol)
+}
+
+func withLineRelative(pos syntax.Pos, line, baseCol uint) syntax.Pos {
+	if !pos.IsValid() {
+		return pos
+	}
+	col := pos.Col()
+	if col == 0 {
+		col = 1
+	} else if col >= baseCol {
+		col = col - baseCol + 1
+	}
+	return syntax.NewPos(0, line, col)
 }
 
 func formatJSON(content string, st style) (string, error) {

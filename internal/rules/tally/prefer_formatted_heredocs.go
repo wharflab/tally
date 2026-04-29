@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/command"
+
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/heredocfmt"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/rules/configutil"
 )
 
-// PreferFormattedHeredocsRule implements heredoc body pretty-printing for typed files.
+// PreferFormattedHeredocsRule implements heredoc body pretty-printing.
 type PreferFormattedHeredocsRule struct {
 	schema map[string]any
 }
@@ -30,7 +32,7 @@ func (r *PreferFormattedHeredocsRule) Metadata() rules.RuleMetadata {
 	return rules.RuleMetadata{
 		Code:            rules.FormattedHeredocsRuleCode,
 		Name:            "Prefer formatted heredocs",
-		Description:     "Pretty-print COPY/ADD heredocs for JSON, YAML, TOML, and XML files",
+		Description:     "Pretty-print typed heredocs and shell heredocs",
 		DocURL:          rules.TallyDocURL(rules.FormattedHeredocsRuleCode),
 		DefaultSeverity: rules.SeverityStyle,
 		Category:        "style",
@@ -66,21 +68,83 @@ func (r *PreferFormattedHeredocsRule) Check(input rules.LintInput) []rules.Viola
 
 	for _, doc := range heredocfmt.CollectDockerfileHeredocs(parseResult) {
 		formatted, kind, ok, err := formatter.FormatTarget(doc.TargetPath, doc.Content)
+		if err != nil {
+			continue
+		}
+		if kind != "" {
+			if !ok || formatted == doc.Content {
+				continue
+			}
+
+			loc := rules.NewRangeLocation(input.File, doc.BodyStartLine, 0, doc.TerminatorLine, 0)
+			message := fmt.Sprintf(
+				"%s heredoc for %s should be pretty-printed as %s",
+				doc.Instruction,
+				doc.TargetPath,
+				strings.ToUpper(string(kind)),
+			)
+			v := rules.NewViolation(loc, meta.Code, message, meta.DefaultSeverity).
+				WithDocURL(meta.DocURL).
+				WithSuggestedFix(&rules.SuggestedFix{
+					Description: "Pretty-print heredoc body",
+					Safety:      rules.FixSafe,
+					Priority:    meta.FixPriority,
+					Edits: []rules.TextEdit{
+						{
+							Location: loc,
+							NewText:  heredocfmt.WithBodyPrefix(formatted, doc.BodyPrefix),
+						},
+					},
+					IsPreferred: true,
+				})
+			violations = append(violations, v)
+			continue
+		}
+
+		if !strings.EqualFold(doc.Instruction, command.Copy) {
+			continue
+		}
+		formatted, _, ok, err = formatter.FormatShellTarget(doc.TargetPath, doc.Content)
 		if err != nil || !ok || formatted == doc.Content {
 			continue
 		}
 
 		loc := rules.NewRangeLocation(input.File, doc.BodyStartLine, 0, doc.TerminatorLine, 0)
-		message := fmt.Sprintf(
-			"%s heredoc for %s should be pretty-printed as %s",
-			doc.Instruction,
-			doc.TargetPath,
-			strings.ToUpper(string(kind)),
-		)
+		message := doc.Instruction + " heredoc for " + doc.TargetPath + " should be pretty-printed as a shell script"
 		v := rules.NewViolation(loc, meta.Code, message, meta.DefaultSeverity).
 			WithDocURL(meta.DocURL).
 			WithSuggestedFix(&rules.SuggestedFix{
-				Description: "Pretty-print heredoc body",
+				Description: "Pretty-print COPY shell heredoc body",
+				Safety:      rules.FixSafe,
+				Priority:    meta.FixPriority,
+				Edits: []rules.TextEdit{
+					{
+						Location: loc,
+						NewText:  heredocfmt.WithBodyPrefix(formatted, doc.BodyPrefix),
+					},
+				},
+				IsPreferred: true,
+			})
+		violations = append(violations, v)
+	}
+
+	for _, doc := range heredocfmt.CollectRunHeredocs(parseResult) {
+		variant := heredocfmt.RunHeredocShellVariant(input.Stages, input.Semantic, doc)
+		if !variant.SupportsPOSIXShellAST() {
+			continue
+		}
+
+		formatted, ok, err := formatter.FormatShell(doc.Content, variant)
+		if err != nil || !ok || formatted == doc.Content {
+			continue
+		}
+
+		loc := rules.NewRangeLocation(input.File, doc.BodyStartLine, 0, doc.TerminatorLine, 0)
+		message := doc.Instruction + " heredoc should be pretty-printed as a shell script"
+		v := rules.NewViolation(loc, meta.Code, message, meta.DefaultSeverity).
+			WithDocURL(meta.DocURL).
+			WithSuggestedFix(&rules.SuggestedFix{
+				Description: "Pretty-print RUN heredoc body",
 				Safety:      rules.FixSafe,
 				Priority:    meta.FixPriority,
 				Edits: []rules.TextEdit{

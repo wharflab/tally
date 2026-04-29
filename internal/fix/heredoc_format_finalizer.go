@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 
+	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/heredocfmt"
 	"github.com/wharflab/tally/internal/rules"
+	"github.com/wharflab/tally/internal/semantic"
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 type formattedHeredocsFinalizer struct{}
@@ -16,7 +19,7 @@ func (formattedHeredocsFinalizer) RuleCode() string {
 }
 
 func (formattedHeredocsFinalizer) Description() string {
-	return "Pretty-print COPY/ADD heredocs"
+	return "Pretty-print Dockerfile heredocs"
 }
 
 func (formattedHeredocsFinalizer) Safety() rules.FixSafety {
@@ -35,9 +38,22 @@ func (formattedHeredocsFinalizer) Finalize(
 	if err != nil {
 		return nil, err
 	}
-	return heredocfmt.FormatDockerfileHeredocs(ctx.FilePath, result)
+	sem := semanticModelForFinalizer(ctx.FilePath, result)
+	return heredocfmt.FormatDockerfileHeredocs(ctx.FilePath, result, sem)
 }
 
 func init() {
 	RegisterFinalizer(formattedHeredocsFinalizer{})
+}
+
+func semanticModelForFinalizer(file string, result *dockerfile.ParseResult) *semantic.Model {
+	if result == nil {
+		return semantic.NewModel(nil, nil, file)
+	}
+	sm := sourcemap.New(result.Source)
+	spanIndex := directive.NewInstructionSpanIndexFromAST(result.AST, sm)
+	directiveResult := directive.Parse(sm, nil, spanIndex)
+	return semantic.NewBuilder(result, nil, file).
+		WithShellDirectives(directive.ToSemanticShellDirectives(directiveResult.ShellDirectives)).
+		Build()
 }
