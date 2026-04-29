@@ -10,4 +10,3 @@ note: skipped fix tally/prefer-multi-stage-build (<stdin>): resolver not registe
 | - | ℹ️ This Dockerfile appears to build artifacts in a single stage; consider a multi-stage build to reduce final image size. |
 | 8 | 💅 RUN instruction with chained commands can use heredoc syntax |
 | 16 | 💅 unexpected blank line between RUN and RUN |
-

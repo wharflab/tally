@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/urfave/cli/v3"
+	"github.com/spf13/cobra"
 
 	"github.com/wharflab/tally/internal/ai/autofix"
 	"github.com/wharflab/tally/internal/ai/autofixdata"
@@ -43,166 +43,24 @@ const (
 	ExitSyntaxError = 4 // Dockerfile has fatal syntax issues (unknown instructions, malformed directives)
 )
 
-func lintCommand() *cli.Command {
-	return &cli.Command{
-		Name:      "lint",
-		Usage:     "Lint Dockerfile(s) for issues",
-		ArgsUsage: "[DOCKERFILE...]",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:    "config",
-				Aliases: []string{"c"},
-				Usage:   "Path to config file (default: auto-discover)",
-			},
-			&cli.IntFlag{
-				Name:    "max-lines",
-				Aliases: []string{"l"},
-				Usage:   "Maximum number of lines allowed (0 = unlimited)",
-				Sources: cli.EnvVars("TALLY_RULES_MAX_LINES_MAX"),
-			},
-			&cli.BoolFlag{
-				Name:    "skip-blank-lines",
-				Usage:   "Exclude blank lines from the line count",
-				Sources: cli.EnvVars("TALLY_RULES_MAX_LINES_SKIP_BLANK_LINES"),
-			},
-			&cli.BoolFlag{
-				Name:    "skip-comments",
-				Usage:   "Exclude comment lines from the line count",
-				Sources: cli.EnvVars("TALLY_RULES_MAX_LINES_SKIP_COMMENTS"),
-			},
-			&cli.StringFlag{
-				Name:    "format",
-				Aliases: []string{"f"},
-				Usage:   "Output format: " + reporter.ValidFormatsUsage(),
-				Sources: cli.EnvVars("TALLY_FORMAT", "TALLY_OUTPUT_FORMAT"),
-				Validator: func(s string) error {
-					_, err := reporter.ParseFormat(s)
-					return err
-				},
-			},
-			&cli.StringFlag{
-				Name:    "output",
-				Aliases: []string{"o"},
-				Usage:   "Output path: stdout, stderr, or file path",
-				Sources: cli.EnvVars("TALLY_OUTPUT_PATH"),
-			},
-			&cli.BoolFlag{
-				Name:    "no-color",
-				Usage:   "Disable colored output",
-				Sources: cli.EnvVars("NO_COLOR"),
-			},
-			&cli.BoolFlag{
-				Name:    "show-source",
-				Usage:   "Show source code snippets (default: true)",
-				Value:   true,
-				Sources: cli.EnvVars("TALLY_OUTPUT_SHOW_SOURCE"),
-			},
-			&cli.BoolFlag{
-				Name:  "hide-source",
-				Usage: "Hide source code snippets",
-			},
-			&cli.StringFlag{
-				Name:    "fail-level",
-				Usage:   "Minimum severity to cause non-zero exit: error, warning, info, style, none",
-				Sources: cli.EnvVars("TALLY_OUTPUT_FAIL_LEVEL"),
-			},
-			&cli.BoolFlag{
-				Name:    "no-inline-directives",
-				Usage:   "Disable processing of inline ignore directives",
-				Sources: cli.EnvVars("TALLY_NO_INLINE_DIRECTIVES"),
-			},
-			&cli.BoolFlag{
-				Name:    "warn-unused-directives",
-				Usage:   "Warn about unused ignore directives",
-				Sources: cli.EnvVars("TALLY_INLINE_DIRECTIVES_WARN_UNUSED"),
-			},
-			&cli.BoolFlag{
-				Name:    "require-reason",
-				Usage:   "Warn about ignore directives without reason= explanation",
-				Sources: cli.EnvVars("TALLY_INLINE_DIRECTIVES_REQUIRE_REASON"),
-			},
-			&cli.StringSliceFlag{
-				Name:    "exclude",
-				Usage:   "Glob pattern to exclude files (can be repeated)",
-				Sources: cli.EnvVars("TALLY_EXCLUDE"),
-			},
-			&cli.StringSliceFlag{
-				Name:    "select",
-				Usage:   "Enable specific rules (pattern: rule-code, namespace/*, *)",
-				Sources: cli.EnvVars("TALLY_RULES_SELECT"),
-			},
-			&cli.StringSliceFlag{
-				Name:    "ignore",
-				Usage:   "Disable specific rules (pattern: rule-code, namespace/*, *)",
-				Sources: cli.EnvVars("TALLY_RULES_IGNORE"),
-			},
-			&cli.StringFlag{
-				Name:    "context",
-				Usage:   "Build context directory for context-aware rules",
-				Sources: cli.EnvVars("TALLY_CONTEXT"),
-			},
-			&cli.StringSliceFlag{
-				Name:  "target",
-				Usage: "Bake target to lint (can be repeated)",
-			},
-			&cli.StringSliceFlag{
-				Name:  "service",
-				Usage: "Compose service to lint (can be repeated)",
-			},
-			&cli.StringFlag{
-				Name:    "slow-checks",
-				Usage:   "Slow checks mode: auto, on, off",
-				Sources: cli.EnvVars("TALLY_SLOW_CHECKS"),
-			},
-			&cli.StringFlag{
-				Name:    "slow-checks-timeout",
-				Usage:   "Timeout for slow checks (e.g., 20s)",
-				Sources: cli.EnvVars("TALLY_SLOW_CHECKS_TIMEOUT"),
-			},
-			&cli.BoolFlag{
-				Name:    "fix",
-				Usage:   "Apply all safe fixes automatically",
-				Sources: cli.EnvVars("TALLY_FIX"),
-			},
-			&cli.StringSliceFlag{
-				Name:    "fix-rule",
-				Usage:   "Only fix specific rules (can be repeated)",
-				Sources: cli.EnvVars("TALLY_FIX_RULE"),
-			},
-			&cli.BoolFlag{
-				Name:    "fix-unsafe",
-				Usage:   "Also apply suggestion/unsafe fixes (requires --fix)",
-				Sources: cli.EnvVars("TALLY_FIX_UNSAFE"),
-			},
-			&cli.BoolFlag{
-				Name:    "ai",
-				Usage:   "Enable AI AutoFix (requires an ACP agent command)",
-				Sources: cli.EnvVars("TALLY_AI_ENABLED"),
-			},
-			&cli.StringFlag{
-				Name:    "acp-command",
-				Usage:   "ACP agent command line (e.g. \"gemini --experimental-acp --allowed-mcp-server-names=none --model=gemini-3-flash-preview\")",
-				Sources: cli.EnvVars("TALLY_ACP_COMMAND"),
-			},
-			&cli.StringFlag{
-				Name:    "ai-timeout",
-				Usage:   "Per-fix AI timeout (e.g., 90s)",
-				Sources: cli.EnvVars("TALLY_AI_TIMEOUT"),
-			},
-			&cli.IntFlag{
-				Name:    "ai-max-input-bytes",
-				Usage:   "Maximum prompt size in bytes",
-				Sources: cli.EnvVars("TALLY_AI_MAX_INPUT_BYTES"),
-			},
-			&cli.BoolFlag{
-				Name:    "ai-redact-secrets",
-				Usage:   "Redact obvious secrets before sending content to the agent",
-				Value:   true,
-				Sources: cli.EnvVars("TALLY_AI_REDACT_SECRETS"),
-			},
+func lintCommand() *cobra.Command {
+	opts := &lintOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "lint [DOCKERFILE...]",
+		Short: "Lint Dockerfile(s) for issues",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.flags = cmd.Flags()
+			if err := finalizeLintOptions(cmd.Flags(), opts); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				return exitWith(ExitConfigError)
+			}
+			return runLint(cmd.Context(), opts, args)
 		},
-		Action: runLint,
 	}
+
+	addLintFlags(cmd.Flags(), opts)
+	return cmd
 }
 
 // lintResults holds the aggregated results of linting all discovered files.
@@ -323,8 +181,8 @@ func formatPlatformParts(osName, arch, variant string) string {
 const stdinPath = "<stdin>"
 
 // runLint is the action handler for the lint command.
-func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
-	inputs := cmd.Args().Slice()
+func runLint(ctx stdcontext.Context, opts *lintOptions, args []string) error {
+	inputs := args
 	if len(inputs) == 0 {
 		inputs = []string{"."}
 	}
@@ -334,32 +192,32 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 		return err
 	}
 	if slices.Contains(inputs, "-") {
-		return runLintStdin(ctx, cmd)
+		return runLintStdin(ctx, opts)
 	}
 
-	orchestrator, classified, err := classifyLintEntrypoint(ctx, inputs, cmd)
+	orchestrator, classified, err := classifyLintEntrypoint(ctx, inputs, opts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return cli.Exit("", ExitConfigError)
+		return exitWith(ExitConfigError)
 	}
 	if classified {
 		if orchestrator != nil {
-			return runLintOrchestrator(ctx, cmd, orchestrator)
+			return runLintOrchestrator(ctx, opts, orchestrator)
 		}
-		if hasOrchestratorSelectionFlags(cmd) {
+		if hasOrchestratorSelectionFlags(opts) {
 			fmt.Fprintf(os.Stderr, "Error: --target and --service are only valid for orchestrator entrypoints\n")
-			return cli.Exit("", ExitConfigError)
+			return exitWith(ExitConfigError)
 		}
-	} else if err := rejectMixedOrchestratorInputs(inputs, cmd); err != nil {
+	} else if err := rejectMixedOrchestratorInputs(inputs, opts); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return cli.Exit("", ExitConfigError)
+		return exitWith(ExitConfigError)
 	}
 
 	// Discover files using the discovery package
 	discoveryOpts := discovery.Options{
 		Patterns:        discovery.DefaultPatterns(),
-		ExcludePatterns: cmd.StringSlice("exclude"),
-		ContextDir:      cmd.String("context"),
+		ExcludePatterns: opts.exclude,
+		ContextDir:      opts.contextDir,
 	}
 
 	discovered, err := discovery.Discover(inputs, discoveryOpts)
@@ -367,19 +225,19 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 		var notFound *discovery.FileNotFoundError
 		if errors.As(err, &notFound) {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", notFound)
-			return cli.Exit("", ExitNoFiles)
+			return exitWith(ExitNoFiles)
 		}
 		fmt.Fprintf(os.Stderr, "Error: failed to discover files: %v\n", err)
-		return cli.Exit("", ExitConfigError)
+		return exitWith(ExitConfigError)
 	}
 
 	if len(discovered) == 0 {
 		reportNoFilesFound(inputs)
-		return cli.Exit("", ExitNoFiles)
+		return exitWith(ExitNoFiles)
 	}
 
 	// Lint all discovered files
-	res, err := lintFiles(ctx, discovered, cmd)
+	res, err := lintFiles(ctx, discovered, opts)
 	if err != nil {
 		return handleLintError(err)
 	}
@@ -388,9 +246,9 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 
 	allViolations := processViolations(res, res.firstCfg)
 
-	warnFixUnsafe(cmd)
-	if cmd.Bool("fix") {
-		fixResult, fixErr := applyFixes(ctx, cmd, applyFixesInput{
+	warnFixUnsafe(opts)
+	if opts.fix {
+		fixResult, fixErr := applyFixes(ctx, opts, applyFixesInput{
 			violations:      allViolations,
 			sources:         res.fileSources,
 			fileConfigs:     res.fileConfigs,
@@ -400,12 +258,12 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 		})
 		if fixErr != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to apply fixes: %v\n", fixErr)
-			return cli.Exit("", ExitConfigError)
+			return exitWith(ExitConfigError)
 		}
 
 		if err := writeFixedFiles(fixResult); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return cli.Exit("", ExitConfigError)
+			return exitWith(ExitConfigError)
 		}
 
 		if fixResult.TotalApplied() > 0 {
@@ -420,7 +278,7 @@ func runLint(ctx stdcontext.Context, cmd *cli.Command) error {
 		allViolations = filterFixedViolations(allViolations, fixResult, res.fileConfigs)
 	}
 
-	return writeReport(cmd, res.firstCfg, allViolations, res.fileSources, len(discovered), 0)
+	return writeReport(opts, res.firstCfg, allViolations, res.fileSources, len(discovered), 0)
 }
 
 // resolveAsyncChecks executes async check plans if enabled and merges the
@@ -438,8 +296,8 @@ func resolveAsyncChecks(ctx stdcontext.Context, res *lintResults) (*async.RunRes
 }
 
 // warnFixUnsafe emits a warning when --fix-unsafe is set without --fix.
-func warnFixUnsafe(cmd *cli.Command) {
-	if cmd.Bool("fix-unsafe") && !cmd.Bool("fix") {
+func warnFixUnsafe(opts *lintOptions) {
+	if opts.fixUnsafe && !opts.fix {
 		fmt.Fprintf(os.Stderr, "Warning: --fix-unsafe has no effect without --fix\n")
 	}
 }
@@ -448,28 +306,28 @@ func warnFixUnsafe(cmd *cli.Command) {
 func checkStdinInput(inputs []string) error {
 	if slices.Contains(inputs, "-") && len(inputs) > 1 {
 		fmt.Fprintf(os.Stderr, "Error: cannot mix stdin (-) with file arguments\n")
-		return cli.Exit("", ExitConfigError)
+		return exitWith(ExitConfigError)
 	}
 	return nil
 }
 
 // runLintStdin handles the stdin code path: read from stdin, lint, and either
 // report diagnostics (no --fix) or write fixed content to stdout (--fix).
-func runLintStdin(ctx stdcontext.Context, cmd *cli.Command) error {
+func runLintStdin(ctx stdcontext.Context, opts *lintOptions) error {
 	if stat, err := os.Stdin.Stat(); err == nil && (stat.Mode()&os.ModeCharDevice) != 0 {
 		fmt.Fprintf(os.Stderr, "Warning: reading from terminal; use Ctrl+D to end input or pipe a Dockerfile\n")
 	}
 	content, err := io.ReadAll(os.Stdin)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to read stdin: %v\n", err)
-		return cli.Exit("", ExitConfigError)
+		return exitWith(ExitConfigError)
 	}
 	if len(content) == 0 {
 		fmt.Fprintf(os.Stderr, "Error: empty input from stdin\n")
-		return cli.Exit("", ExitNoFiles)
+		return exitWith(ExitNoFiles)
 	}
 
-	res, cfg, err := lintStdinContent(cmd, content)
+	res, cfg, err := lintStdinContent(opts, content)
 	if err != nil {
 		return err
 	}
@@ -478,20 +336,20 @@ func runLintStdin(ctx stdcontext.Context, cmd *cli.Command) error {
 
 	allViolations := processViolations(res, cfg)
 
-	warnFixUnsafe(cmd)
-	if cmd.Bool("fix") {
-		return applyStdinFixes(ctx, cmd, content, allViolations, res, asyncPlans, asyncResult)
+	warnFixUnsafe(opts)
+	if opts.fix {
+		return applyStdinFixes(ctx, opts, content, allViolations, res, asyncPlans, asyncResult)
 	}
-	return writeReport(cmd, cfg, allViolations, res.fileSources, 1, 0)
+	return writeReport(opts, cfg, allViolations, res.fileSources, 1, 0)
 }
 
 // lintStdinContent parses and lints content read from stdin.
-func lintStdinContent(cmd *cli.Command, content []byte) (*lintResults, *config.Config, error) {
+func lintStdinContent(opts *lintOptions, content []byte) (*lintResults, *config.Config, error) {
 	// Load config from CWD (stdin has no file path for cascading discovery).
-	cfg, err := loadConfigForFile(cmd, ".")
+	cfg, err := loadConfigForFile(opts, ".")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to load config: %v\n", err)
-		return nil, nil, cli.Exit("", ExitConfigError)
+		return nil, nil, exitWith(ExitConfigError)
 	}
 	validateAIConfig(cfg, stdinPath)
 	validateDurationConfigs(cfg, stdinPath)
@@ -499,17 +357,17 @@ func lintStdinContent(cmd *cli.Command, content []byte) (*lintResults, *config.C
 	parseResult, err := dockerfile.Parse(bytes.NewReader(content), cfg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to parse stdin: %v\n", err)
-		return nil, nil, cli.Exit("", ExitConfigError)
+		return nil, nil, exitWith(ExitConfigError)
 	}
 
 	if syntaxErrors := syntax.Check(stdinPath, parseResult.AST, parseResult.Source); len(syntaxErrors) > 0 {
 		for _, e := range syntaxErrors {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", e.Error())
 		}
-		return nil, nil, cli.Exit("", ExitSyntaxError)
+		return nil, nil, exitWith(ExitSyntaxError)
 	}
 
-	inv := invocationFromContextFlag(stdinPath, cmd.String("context"))
+	inv := invocationFromContextFlag(stdinPath, opts.contextDir)
 	result, err := linter.LintFile(linter.Input{
 		FilePath:    stdinPath,
 		Config:      cfg,
@@ -518,7 +376,7 @@ func lintStdinContent(cmd *cli.Command, content []byte) (*lintResults, *config.C
 	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to lint stdin: %v\n", err)
-		return nil, nil, cli.Exit("", ExitConfigError)
+		return nil, nil, exitWith(ExitConfigError)
 	}
 
 	res := &lintResults{
@@ -553,11 +411,11 @@ func processViolations(res *lintResults, cfg *config.Config) []rules.Violation {
 
 // applyStdinFixes applies fixes and writes the result to stdout.
 func applyStdinFixes(
-	ctx stdcontext.Context, cmd *cli.Command,
+	ctx stdcontext.Context, opts *lintOptions,
 	content []byte, allViolations []rules.Violation,
 	res *lintResults, asyncPlans []async.CheckRequest, asyncResult *async.RunResult,
 ) error {
-	fixResult, fixErr := applyFixes(ctx, cmd, applyFixesInput{
+	fixResult, fixErr := applyFixes(ctx, opts, applyFixesInput{
 		violations:      allViolations,
 		sources:         res.fileSources,
 		fileConfigs:     res.fileConfigs,
@@ -567,7 +425,7 @@ func applyStdinFixes(
 	})
 	if fixErr != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to apply fixes: %v\n", fixErr)
-		return cli.Exit("", ExitConfigError)
+		return exitWith(ExitConfigError)
 	}
 
 	// Write fixed content (or original if unchanged) to stdout.
@@ -577,7 +435,7 @@ func applyStdinFixes(
 	}
 	if _, err := os.Stdout.Write(outputContent); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to write output: %v\n", err)
-		return cli.Exit("", ExitConfigError)
+		return exitWith(ExitConfigError)
 	}
 
 	if fixResult.TotalApplied() > 0 {
@@ -594,33 +452,33 @@ func applyStdinFixes(
 	// Redirect the violation report to stderr unless the user explicitly
 	// chose a different output destination (--output or config).
 	cfg := res.firstCfg
-	outCfg := getOutputConfig(cmd, cfg)
+	outCfg := getOutputConfig(opts, cfg)
 	reportPath := outCfg.path
 	if reportPath == "" || reportPath == "stdout" {
 		reportPath = "stderr"
-		if cmd.IsSet("output") {
+		if opts.flags != nil && opts.flags.Changed("output") {
 			fmt.Fprintf(os.Stderr, "note: --output overridden to stderr in stdin fix mode (stdout carries fixed content)\n")
 		}
 	}
-	return writeReportTo(cmd, cfg, allViolations, res.fileSources, 1, 0, reportPath)
+	return writeReportTo(opts, cfg, allViolations, res.fileSources, 1, 0, reportPath)
 }
 
-func runLintOrchestrator(ctx stdcontext.Context, cmd *cli.Command, discovered *invocation.DiscoveryResult) error {
-	if err := validateOrchestratorFlags(cmd, discovered.Kind); err != nil {
+func runLintOrchestrator(ctx stdcontext.Context, opts *lintOptions, discovered *invocation.DiscoveryResult) error {
+	if err := validateOrchestratorFlags(opts, discovered.Kind); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return cli.Exit("", ExitConfigError)
+		return exitWith(ExitConfigError)
 	}
 
 	if len(discovered.Invocations) == 0 {
-		cfg, err := loadConfigForFile(cmd, discovered.EntrypointPath)
+		cfg, err := loadConfigForFile(opts, discovered.EntrypointPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: failed to load config: %v\n", err)
-			return cli.Exit("", ExitConfigError)
+			return exitWith(ExitConfigError)
 		}
-		return writeReport(cmd, cfg, nil, nil, 0, 0)
+		return writeReport(opts, cfg, nil, nil, 0, 0)
 	}
 
-	res, err := lintInvocations(ctx, discovered.Invocations, cmd)
+	res, err := lintInvocations(ctx, discovered.Invocations, opts)
 	if err != nil {
 		return handleLintError(err)
 	}
@@ -630,11 +488,11 @@ func runLintOrchestrator(ctx stdcontext.Context, cmd *cli.Command, discovered *i
 	resolveAsyncChecks(ctx, res)
 
 	allViolations := processViolations(res, res.firstCfg)
-	warnFixUnsafe(cmd)
-	return writeReport(cmd, res.firstCfg, allViolations, res.fileSources, res.filesScanned, res.invocationsScanned)
+	warnFixUnsafe(opts)
+	return writeReport(opts, res.firstCfg, allViolations, res.fileSources, res.filesScanned, res.invocationsScanned)
 }
 
-func classifyLintEntrypoint(ctx stdcontext.Context, inputs []string, cmd *cli.Command) (*invocation.DiscoveryResult, bool, error) {
+func classifyLintEntrypoint(ctx stdcontext.Context, inputs []string, opts *lintOptions) (*invocation.DiscoveryResult, bool, error) {
 	if len(inputs) != 1 {
 		return nil, false, nil
 	}
@@ -649,57 +507,57 @@ func classifyLintEntrypoint(ctx stdcontext.Context, inputs []string, cmd *cli.Co
 	ext := strings.ToLower(filepath.Ext(input))
 	switch ext {
 	case ".hcl":
-		result, err := discoverBakeEntrypoint(ctx, input, cmd)
+		result, err := discoverBakeEntrypoint(ctx, input, opts)
 		return result, true, err
 	case ".json":
 		if kind, ok := invocation.ProbeEntrypointKind(input); ok {
-			result, err := discoverEntrypointByKind(ctx, input, kind, cmd)
+			result, err := discoverEntrypointByKind(ctx, input, kind, opts)
 			return result, true, err
 		}
-		result, bakeErr := discoverBakeEntrypoint(ctx, input, cmd)
+		result, bakeErr := discoverBakeEntrypoint(ctx, input, opts)
 		if bakeErr == nil {
 			return result, true, nil
 		}
-		result, composeErr := discoverComposeEntrypoint(ctx, input, cmd)
+		result, composeErr := discoverComposeEntrypoint(ctx, input, opts)
 		if composeErr == nil {
 			return result, true, nil
 		}
 		return nil, true, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", input)
 	case ".yml", ".yaml":
-		result, err := discoverComposeEntrypoint(ctx, input, cmd)
+		result, err := discoverComposeEntrypoint(ctx, input, opts)
 		return result, true, err
 	default:
 		kind, ok := invocation.ProbeEntrypointKind(input)
 		if !ok {
 			return nil, true, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", input)
 		}
-		result, err := discoverEntrypointByKind(ctx, input, kind, cmd)
+		result, err := discoverEntrypointByKind(ctx, input, kind, opts)
 		return result, true, err
 	}
 }
 
-func discoverEntrypointByKind(ctx stdcontext.Context, input, kind string, cmd *cli.Command) (*invocation.DiscoveryResult, error) {
+func discoverEntrypointByKind(ctx stdcontext.Context, input, kind string, opts *lintOptions) (*invocation.DiscoveryResult, error) {
 	switch kind {
 	case invocation.KindCompose:
-		return discoverComposeEntrypoint(ctx, input, cmd)
+		return discoverComposeEntrypoint(ctx, input, opts)
 	case invocation.KindBake:
-		return discoverBakeEntrypoint(ctx, input, cmd)
+		return discoverBakeEntrypoint(ctx, input, opts)
 	default:
 		return nil, fmt.Errorf("%s is not a Dockerfile, Compose, or Bake file", input)
 	}
 }
 
-func discoverComposeEntrypoint(ctx stdcontext.Context, input string, cmd *cli.Command) (*invocation.DiscoveryResult, error) {
+func discoverComposeEntrypoint(ctx stdcontext.Context, input string, opts *lintOptions) (*invocation.DiscoveryResult, error) {
 	return invocation.ComposeProvider{}.Discover(ctx, invocation.ResolveOptions{
 		Path:     input,
-		Services: cmd.StringSlice("service"),
+		Services: opts.services,
 	})
 }
 
-func discoverBakeEntrypoint(ctx stdcontext.Context, input string, cmd *cli.Command) (*invocation.DiscoveryResult, error) {
+func discoverBakeEntrypoint(ctx stdcontext.Context, input string, opts *lintOptions) (*invocation.DiscoveryResult, error) {
 	return invocation.BakeProvider{}.Discover(ctx, invocation.ResolveOptions{
 		Path:    input,
-		Targets: cmd.StringSlice("target"),
+		Targets: opts.targets,
 	})
 }
 
@@ -708,8 +566,8 @@ func isRegularFile(path string) bool {
 	return err == nil && info.Mode().IsRegular()
 }
 
-func rejectMixedOrchestratorInputs(inputs []string, cmd *cli.Command) error {
-	if hasOrchestratorSelectionFlags(cmd) {
+func rejectMixedOrchestratorInputs(inputs []string, opts *lintOptions) error {
+	if hasOrchestratorSelectionFlags(opts) {
 		return errors.New("--target and --service are only valid for a single explicit orchestrator file")
 	}
 	for _, input := range inputs {
@@ -727,31 +585,31 @@ func rejectMixedOrchestratorInputs(inputs []string, cmd *cli.Command) error {
 	return nil
 }
 
-func hasOrchestratorSelectionFlags(cmd *cli.Command) bool {
-	return cmd.IsSet("target") || cmd.IsSet("service")
+func hasOrchestratorSelectionFlags(opts *lintOptions) bool {
+	return len(opts.targets) > 0 || len(opts.services) > 0
 }
 
-func validateOrchestratorFlags(cmd *cli.Command, kind string) error {
-	if cmd.Bool("fix") {
+func validateOrchestratorFlags(opts *lintOptions, kind string) error {
+	if opts.fix {
 		return errors.New("--fix is not supported for orchestrator entrypoints")
 	}
-	if cmd.IsSet("context") && cmd.String("context") != "" {
+	if opts.contextSet && opts.contextDir != "" {
 		return errors.New("--context is not supported for orchestrator entrypoints")
 	}
 	switch kind {
 	case invocation.KindBake:
-		if cmd.IsSet("service") {
+		if len(opts.services) > 0 {
 			return errors.New("--service is only valid for Compose entrypoints")
 		}
 	case invocation.KindCompose:
-		if cmd.IsSet("target") {
+		if len(opts.targets) > 0 {
 			return errors.New("--target is only valid for Bake entrypoints")
 		}
 	}
 	return nil
 }
 
-func lintInvocations(ctx stdcontext.Context, invocations []invocation.BuildInvocation, cmd *cli.Command) (*lintResults, error) {
+func lintInvocations(ctx stdcontext.Context, invocations []invocation.BuildInvocation, opts *lintOptions) (*lintResults, error) {
 	res := &lintResults{
 		fileSources:     make(map[string][]byte),
 		fileConfigs:     make(map[string]*config.Config),
@@ -765,7 +623,7 @@ func lintInvocations(ctx stdcontext.Context, invocations []invocation.BuildInvoc
 		cfg := res.fileConfigs[file]
 		if cfg == nil {
 			var err error
-			cfg, err = loadConfigForFile(cmd, file)
+			cfg, err = loadConfigForFile(opts, file)
 			if err != nil {
 				return nil, fmt.Errorf("failed to load config for %s: %w", file, err)
 			}
@@ -813,7 +671,7 @@ func lintInvocations(ctx stdcontext.Context, invocations []invocation.BuildInvoc
 }
 
 // lintFiles runs the lint pipeline on each discovered file and aggregates results.
-func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, cmd *cli.Command) (*lintResults, error) {
+func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, opts *lintOptions) (*lintResults, error) {
 	res := &lintResults{
 		fileSources:     make(map[string][]byte),
 		fileConfigs:     make(map[string]*config.Config),
@@ -823,7 +681,7 @@ func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, cm
 	for _, df := range discovered {
 		file := df.Path
 
-		cfg, err := loadConfigForFile(cmd, file)
+		cfg, err := loadConfigForFile(opts, file)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load config for %s: %w", file, err)
 		}
@@ -886,28 +744,28 @@ func handleLintError(err error) error {
 		for _, e := range syntaxErr.Errors {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", e.Error())
 		}
-		return cli.Exit("", ExitSyntaxError)
+		return exitWith(ExitSyntaxError)
 	}
 	fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-	return cli.Exit("", ExitConfigError)
+	return exitWith(ExitConfigError)
 }
 
 // writeReport formats and writes the violation report using the configured output path.
 func writeReport(
-	cmd *cli.Command, cfg *config.Config, violations []rules.Violation,
+	opts *lintOptions, cfg *config.Config, violations []rules.Violation,
 	fileSources map[string][]byte, filesScanned, invocationsScanned int,
 ) error {
-	return writeReportTo(cmd, cfg, violations, fileSources, filesScanned, invocationsScanned, "")
+	return writeReportTo(opts, cfg, violations, fileSources, filesScanned, invocationsScanned, "")
 }
 
 // writeReportTo formats and writes the violation report. If outputOverride is
 // non-empty, it overrides the configured output path (e.g. "stderr" to keep
 // stdout free for fixed content in stdin mode).
 func writeReportTo(
-	cmd *cli.Command, cfg *config.Config, violations []rules.Violation,
+	opts *lintOptions, cfg *config.Config, violations []rules.Violation,
 	fileSources map[string][]byte, filesScanned, invocationsScanned int, outputOverride string,
 ) error {
-	outCfg := getOutputConfig(cmd, cfg)
+	outCfg := getOutputConfig(opts, cfg)
 	if outputOverride != "" {
 		outCfg.path = outputOverride
 	}
@@ -915,13 +773,13 @@ func writeReportTo(
 	formatType, err := reporter.ParseFormat(outCfg.format)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return cli.Exit("", ExitConfigError)
+		return exitWith(ExitConfigError)
 	}
 
 	writer, closeWriter, err := reporter.GetWriter(outCfg.path)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return cli.Exit("", ExitConfigError)
+		return exitWith(ExitConfigError)
 	}
 	defer func() {
 		if err := closeWriter(); err != nil {
@@ -929,7 +787,7 @@ func writeReportTo(
 		}
 	}()
 
-	opts := reporter.Options{
+	reportOpts := reporter.Options{
 		Format:      formatType,
 		Writer:      writer,
 		ShowSource:  outCfg.showSource,
@@ -938,15 +796,15 @@ func writeReportTo(
 		ToolURI:     "https://github.com/wharflab/tally",
 	}
 
-	if cmd.IsSet("no-color") && cmd.Bool("no-color") {
+	if opts.noColor != nil && *opts.noColor {
 		noColor := false
-		opts.Color = &noColor
+		reportOpts.Color = &noColor
 	}
 
-	rep, err := reporter.New(opts)
+	rep, err := reporter.New(reportOpts)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to create reporter: %v\n", err)
-		return cli.Exit("", ExitConfigError)
+		return exitWith(ExitConfigError)
 	}
 
 	rulesEnabled := len(linter.EnabledRuleCodes(cfg))
@@ -958,117 +816,59 @@ func writeReportTo(
 
 	if err := rep.Report(violations, fileSources, metadata); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to write output: %v\n", err)
-		return cli.Exit("", ExitConfigError)
+		return exitWith(ExitConfigError)
 	}
 
 	exitCode := determineExitCode(violations, outCfg.failLevel)
 	if exitCode != ExitSuccess {
-		return cli.Exit("", exitCode)
+		return exitWith(exitCode)
 	}
 
 	return nil
 }
 
-// loadConfigForFile loads configuration for a target file, applying CLI overrides.
-func loadConfigForFile(cmd *cli.Command, targetPath string) (*config.Config, error) {
+// loadConfigForFile loads configuration for a target file.
+//
+// Simple config-shaped flags (--format, --max-lines, --ai-*, ...) participate
+// in koanf's defaults -> config file -> env -> CLI precedence through the
+// posflag provider supplied by lintFlagMapper. Only flags with append,
+// inversion, or non-config semantics need explicit handling here.
+func loadConfigForFile(opts *lintOptions, targetPath string) (*config.Config, error) {
 	var cfg *config.Config
 	var err error
-
-	// Check if a specific config file was provided
-	if configPath := cmd.String("config"); configPath != "" {
-		// Load from specific config file
-		cfg, err = config.LoadFromFile(configPath)
-		if err != nil {
-			return nil, err
-		}
+	if opts.configPath != "" {
+		cfg, err = config.LoadFromFileWithFlags(opts.configPath, opts.flags, lintFlagMapper())
 	} else {
-		// Auto-discover config file based on target path
-		cfg, err = config.Load(targetPath)
-		if err != nil {
-			return nil, err
-		}
+		cfg, err = config.LoadWithFlags(targetPath, opts.flags, lintFlagMapper())
+	}
+	if err != nil {
+		return nil, err
 	}
 
-	// Apply CLI flag overrides for max-lines rule
-	// Only override if the flag was explicitly set
-	if cmd.IsSet("max-lines") || cmd.IsSet("skip-blank-lines") || cmd.IsSet("skip-comments") {
-		// Get current options or defaults
-		opts := cfg.Rules.GetOptions("tally/max-lines")
-		if opts == nil {
-			opts = make(map[string]any)
-		}
-
-		if cmd.IsSet("max-lines") {
-			opts["max"] = cmd.Int("max-lines")
-		}
-		if cmd.IsSet("skip-blank-lines") {
-			opts["skip-blank-lines"] = cmd.Bool("skip-blank-lines")
-		}
-		if cmd.IsSet("skip-comments") {
-			opts["skip-comments"] = cmd.Bool("skip-comments")
-		}
-
-		// Get existing config or create new
-		ruleCfg := cfg.Rules.Get("tally/max-lines")
-		if ruleCfg != nil {
-			ruleCfg.Options = opts
-			cfg.Rules.Set("tally/max-lines", *ruleCfg)
-		} else {
-			cfg.Rules.Set("tally/max-lines", config.RuleConfig{Options: opts})
-		}
+	// --select / --ignore append to the configured selection rather than
+	// replacing it, so they live outside the posflag layer.
+	if len(opts.selectR) > 0 {
+		cfg.Rules.Include = append(cfg.Rules.Include, opts.selectR...)
+	}
+	if len(opts.ignore) > 0 {
+		cfg.Rules.Exclude = append(cfg.Rules.Exclude, opts.ignore...)
 	}
 
-	// Apply rule selection overrides from CLI flags
-	if cmd.IsSet("select") {
-		cfg.Rules.Include = append(cfg.Rules.Include, cmd.StringSlice("select")...)
-	}
-	if cmd.IsSet("ignore") {
-		cfg.Rules.Exclude = append(cfg.Rules.Exclude, cmd.StringSlice("ignore")...)
+	// --no-inline-directives inverts the enabled setting.
+	if opts.noInlineDirectives != nil {
+		cfg.InlineDirectives.Enabled = !*opts.noInlineDirectives
 	}
 
-	// Output settings are handled in getOutputConfig to avoid duplication
-
-	// --no-inline-directives flag inverts the enabled setting
-	if cmd.IsSet("no-inline-directives") {
-		cfg.InlineDirectives.Enabled = !cmd.Bool("no-inline-directives")
-	}
-
-	if cmd.IsSet("warn-unused-directives") {
-		cfg.InlineDirectives.WarnUnused = cmd.Bool("warn-unused-directives")
-	}
-
-	if cmd.IsSet("require-reason") {
-		cfg.InlineDirectives.RequireReason = cmd.Bool("require-reason")
-	}
-
-	// Apply slow-checks CLI overrides
-	if cmd.IsSet("slow-checks") {
-		cfg.SlowChecks.Mode = cmd.String("slow-checks")
-	}
-	if cmd.IsSet("slow-checks-timeout") {
-		cfg.SlowChecks.Timeout = cmd.String("slow-checks-timeout")
-	}
-
-	// Apply AI CLI overrides
-	if cmd.IsSet("ai") {
-		cfg.AI.Enabled = cmd.Bool("ai")
-	}
-	if cmd.IsSet("acp-command") {
-		argv, err := parseACPCmd(cmd.String("acp-command"))
+	// --acp-command takes a shell-quoted string and implicitly enables AI.
+	// posflag can't express the parse step or the implicit enable, so we do
+	// it here after koanf has produced the merged ai.* view.
+	if opts.acpCommandSet {
+		argv, err := parseACPCmd(opts.acpCommand)
 		if err != nil {
 			return nil, err
 		}
 		cfg.AI.Command = argv
 		cfg.AI.Enabled = true
-	}
-	if cmd.IsSet("ai-timeout") {
-		cfg.AI.Timeout = cmd.String("ai-timeout")
-	}
-	if cmd.IsSet("ai-max-input-bytes") {
-		cfg.AI.MaxInputBytes = cmd.Int("ai-max-input-bytes")
-	}
-	if cmd.IsSet("ai-redact-secrets") {
-		cfg.AI.RedactSecrets = cmd.Bool("ai-redact-secrets")
 	}
 
 	return cfg, nil
@@ -1223,7 +1023,7 @@ type outputConfig struct {
 }
 
 // getOutputConfig returns output configuration from CLI flags and config.
-func getOutputConfig(cmd *cli.Command, cfg *config.Config) outputConfig {
+func getOutputConfig(opts *lintOptions, cfg *config.Config) outputConfig {
 	// Start with defaults
 	oc := outputConfig{
 		format:     "text",
@@ -1233,41 +1033,23 @@ func getOutputConfig(cmd *cli.Command, cfg *config.Config) outputConfig {
 	}
 
 	if cfg != nil {
-		// Apply config values
+		// Flag values already flowed into cfg.Output via the posflag layer,
+		// so reading cfg is the one true source here.
 		if cfg.Output.Format != "" {
 			oc.format = cfg.Output.Format
 		}
-
 		if cfg.Output.Path != "" {
 			oc.path = cfg.Output.Path
 		}
-
 		oc.showSource = cfg.Output.ShowSource
-
 		if cfg.Output.FailLevel != "" {
 			oc.failLevel = cfg.Output.FailLevel
 		}
 	}
 
-	// CLI flags take precedence
-	if cmd.IsSet("format") {
-		oc.format = cmd.String("format")
-	}
-
-	if cmd.IsSet("output") {
-		oc.path = cmd.String("output")
-	}
-
-	if cmd.IsSet("show-source") {
-		oc.showSource = cmd.Bool("show-source")
-	}
-
-	if cmd.IsSet("hide-source") && cmd.Bool("hide-source") {
+	// --hide-source is an inversion flag that can't go through posflag.
+	if opts.hideSource {
 		oc.showSource = false
-	}
-
-	if cmd.IsSet("fail-level") {
-		oc.failLevel = cmd.String("fail-level")
 	}
 
 	return oc
@@ -1382,17 +1164,17 @@ func contextDirForViolation(v rules.Violation, fileInvocations map[string]*invoc
 // input.fileConfigs maps file paths to their per-file configs.
 func applyFixes(
 	ctx stdcontext.Context,
-	cmd *cli.Command,
+	opts *lintOptions,
 	input applyFixesInput,
 ) (*fix.Result, error) {
 	// Determine safety threshold
 	safetyThreshold := fix.FixSafe
-	if cmd.Bool("fix-unsafe") {
+	if opts.fixUnsafe {
 		safetyThreshold = fix.FixUnsafe
 	}
 
 	// Get rule filter
-	ruleFilter := cmd.StringSlice("fix-rule")
+	ruleFilter := opts.fixRule
 
 	// Build per-file fix modes from fileConfigs
 	fixModes := buildPerFileFixModes(input.fileConfigs)

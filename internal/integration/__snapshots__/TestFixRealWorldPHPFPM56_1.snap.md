@@ -13,4 +13,3 @@ Fixed 12 issues
 | 92 | ℹ️ echo may not expand escape sequences. Use printf. |
 | 164 | 💅 RUN instruction with chained commands can use heredoc syntax |
 | 210 | 💅 expected blank line between EXPOSE and CMD |
-

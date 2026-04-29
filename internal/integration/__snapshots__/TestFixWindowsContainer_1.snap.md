@@ -11,4 +11,3 @@ note: skipped fix tally/prefer-multi-stage-build (<stdin>): resolver not registe
 | 4 | 💅 consecutive RUN instructions can be combined using heredoc syntax |
 | 17 | 💅 expected blank line between WORKDIR and COPY |
 | 22 | 💅 PowerShell Invoke-WebRequest without $ProgressPreference = 'SilentlyContinue' |
-

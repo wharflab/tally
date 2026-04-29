@@ -20,8 +20,10 @@ import (
 	"github.com/knadh/koanf/parsers/toml/v2"
 	"github.com/knadh/koanf/providers/env/v2"
 	"github.com/knadh/koanf/providers/file"
+	"github.com/knadh/koanf/providers/posflag"
 	"github.com/knadh/koanf/providers/structs"
 	"github.com/knadh/koanf/v2"
+	"github.com/spf13/pflag"
 )
 
 // ConfigFileNames defines the config file names to search for, in priority order.
@@ -184,17 +186,43 @@ func Default() *Config {
 // It discovers the closest config file, loads it, and applies
 // environment variable overrides.
 func Load(targetPath string) (*Config, error) {
-	return loadWithConfigPath(Discover(targetPath))
+	return loadWithConfigPath(Discover(targetPath), nil)
 }
 
-// LoadFromFile loads configuration from a specific config file path.
-// Unlike Load, it does not perform config discovery.
-func LoadFromFile(configPath string) (*Config, error) {
-	return loadWithConfigPath(configPath)
+// FlagKeyMapper maps a pflag.Flag to a canonical koanf key and value. Returning
+// an empty key causes the flag to be skipped (use this for operational flags
+// that shouldn't participate in koanf layering).
+type FlagKeyMapper func(f *pflag.Flag) (string, any)
+
+// LoadWithFlags loads configuration and layers CLI flags on top using
+// koanf/posflag. Flag values explicitly set on the command line override env /
+// config; defaults of unchanged flags are only merged when no earlier provider
+// already produced a value, which matches the precedence documented at the top
+// of this file.
+func LoadWithFlags(targetPath string, flags *pflag.FlagSet, mapper FlagKeyMapper) (*Config, error) {
+	return loadWithConfigPath(Discover(targetPath), flagLayer(flags, mapper))
 }
 
-// loadWithConfigPath is an internal helper that loads config with an optional config file path.
-func loadWithConfigPath(configPath string) (*Config, error) {
+// LoadFromFileWithFlags is LoadFromFile + posflag layering.
+func LoadFromFileWithFlags(configPath string, flags *pflag.FlagSet, mapper FlagKeyMapper) (*Config, error) {
+	return loadWithConfigPath(configPath, flagLayer(flags, mapper))
+}
+
+type flagProvider struct {
+	flags  *pflag.FlagSet
+	mapper FlagKeyMapper
+}
+
+func flagLayer(flags *pflag.FlagSet, mapper FlagKeyMapper) *flagProvider {
+	if flags == nil || mapper == nil {
+		return nil
+	}
+	return &flagProvider{flags: flags, mapper: mapper}
+}
+
+// loadWithConfigPath is an internal helper that loads config with an optional
+// config file path and an optional CLI-flag layer applied last.
+func loadWithConfigPath(configPath string, flags *flagProvider) (*Config, error) {
 	k := koanf.New(".")
 
 	// 1. Load defaults
@@ -218,7 +246,18 @@ func loadWithConfigPath(configPath string) (*Config, error) {
 		return nil, err
 	}
 
-	// 4. Validate merged raw config and decode.
+	// 4. Layer CLI flags last — posflag respects `Changed` so defaults only
+	//    fill in values that no earlier provider produced.
+	if flags != nil {
+		provider := posflag.ProviderWithFlag(flags.flags, ".", k, func(f *pflag.Flag) (string, any) {
+			return flags.mapper(f)
+		})
+		if err := k.Load(provider, nil); err != nil {
+			return nil, err
+		}
+	}
+
+	// 5. Validate merged raw config and decode.
 	cfg, err := decodeConfig(k.Raw())
 	if err != nil {
 		return nil, err

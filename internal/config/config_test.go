@@ -510,7 +510,7 @@ func TestEnvKeyTransform(t *testing.T) {
 func TestLoad_IgnoresUnknownTallyEnvVars(t *testing.T) {
 	t.Setenv("TALLY_EXPECTED_DIAGNOSTICS", "172")
 
-	cfg, err := loadWithConfigPath("")
+	cfg, err := loadWithConfigPath("", nil)
 	if err != nil {
 		t.Fatalf("loadWithConfigPath(\"\") error = %v", err)
 	}
