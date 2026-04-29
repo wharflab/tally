@@ -9,6 +9,12 @@ const HeredocResolverID = "prefer-run-heredoc"
 // Used by other rules (like DL3003) to check if heredoc conversion is enabled.
 const HeredocRuleCode = TallyRulePrefix + "prefer-run-heredoc"
 
+// FormattedHeredocsRuleCode is the full rule code for the prefer-formatted-heredocs rule.
+const FormattedHeredocsRuleCode = TallyRulePrefix + "prefer-formatted-heredocs"
+
+// FormattedHeredocsFixPriority runs after structural heredoc conversion resolvers.
+const FormattedHeredocsFixPriority = 300
+
 // PipefailRuleCode is the full rule code for the DL4006 pipefail rule.
 // Used by the heredoc formatter to determine whether to add set -o pipefail.
 const PipefailRuleCode = HadolintRulePrefix + "DL4006"

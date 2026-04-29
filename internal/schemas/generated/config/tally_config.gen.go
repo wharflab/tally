@@ -76,6 +76,10 @@ type IndexSchemaJson_3 struct {
 	// PreferCurlConfig corresponds to the JSON schema field "prefer-curl-config".
 	PreferCurlConfig *tally.PreferCurlConfigSchemaJson `json:"prefer-curl-config,omitempty,omitzero"`
 
+	// PreferFormattedHeredocs corresponds to the JSON schema field
+	// "prefer-formatted-heredocs".
+	PreferFormattedHeredocs *tally.PreferFormattedHeredocsSchemaJson `json:"prefer-formatted-heredocs,omitempty,omitzero"`
+
 	// PreferMultiStageBuild corresponds to the JSON schema field
 	// "prefer-multi-stage-build".
 	PreferMultiStageBuild *tally.PreferMultiStageBuildSchemaJson `json:"prefer-multi-stage-build,omitempty,omitzero"`

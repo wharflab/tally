@@ -28,6 +28,11 @@ type Fixer struct {
 	// If empty, all rules are eligible.
 	RuleFilter []string
 
+	// EnabledRules maps file paths to rule codes enabled for each file.
+	// Post-fix finalizers use this because they may run without an original violation.
+	// If nil, finalizers are disabled.
+	EnabledRules map[string][]string
+
 	// FixModes maps file paths to their per-rule fix modes.
 	// Outer key is the normalized file path, inner key is the rule code.
 	// Uses config.FixMode constants (FixModeAlways, FixModeNever, etc.).
@@ -111,6 +116,10 @@ func (f *Fixer) Apply(ctx context.Context, violations []rules.Violation, sources
 			}
 		}
 	}
+
+	// Phase 3: Run finalizers after all normal fixes. This catches cleanup
+	// opportunities introduced by earlier fixers, such as newly emitted heredocs.
+	f.applyFinalizers(ctx, result.Changes)
 
 	return result, nil
 }
@@ -243,6 +252,105 @@ func (f *Fixer) fixModeAllowed(filePath, ruleCode string) bool {
 		// Unknown mode, treat as always
 		return true
 	}
+}
+
+func (f *Fixer) ruleEnabledForFile(filePath, ruleCode string) bool {
+	if f.EnabledRules == nil {
+		return false
+	}
+	normalizedPath := normalizePath(filePath)
+	if rulesForFile, ok := f.EnabledRules[normalizedPath]; ok {
+		return slices.Contains(rulesForFile, ruleCode)
+	}
+	if rulesForFile, ok := f.EnabledRules[filepath.ToSlash(normalizedPath)]; ok {
+		return slices.Contains(rulesForFile, ruleCode)
+	}
+	if rulesForFile, ok := f.EnabledRules[filePath]; ok {
+		return slices.Contains(rulesForFile, ruleCode)
+	}
+	return false
+}
+
+func (f *Fixer) applyFinalizers(ctx context.Context, changes map[string]*FileChange) {
+	finalizers := registeredFinalizers()
+	if len(finalizers) == 0 {
+		return
+	}
+	slices.SortStableFunc(finalizers, func(a, b Finalizer) int {
+		if c := cmp.Compare(a.Priority(), b.Priority()); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.RuleCode(), b.RuleCode())
+	})
+
+	files := make([]string, 0, len(changes))
+	for file := range changes {
+		files = append(files, file)
+	}
+	slices.Sort(files)
+
+	for _, file := range files {
+		fc := changes[file]
+		if fc == nil {
+			continue
+		}
+		for _, finalizer := range finalizers {
+			if !f.finalizerAllowed(fc.Path, finalizer) {
+				continue
+			}
+			edits, err := finalizer.Finalize(ctx, FinalizeContext{
+				FilePath: fc.Path,
+				Content:  fc.ModifiedContent,
+			})
+			if err != nil {
+				fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
+					RuleCode: finalizer.RuleCode(),
+					Reason:   SkipResolveError,
+					Location: rules.NewFileLocation(fc.Path),
+					Error:    err.Error(),
+				})
+				continue
+			}
+			if len(edits) == 0 {
+				continue
+			}
+
+			severity := rules.SeverityStyle
+			if rule := rules.DefaultRegistry().Get(finalizer.RuleCode()); rule != nil {
+				severity = rule.Metadata().DefaultSeverity
+			}
+			v := rules.NewViolation(
+				rules.NewFileLocation(fc.Path),
+				finalizer.RuleCode(),
+				finalizer.Description(),
+				severity,
+			)
+			f.applyFixesToFile(fc, []*fixCandidate{{
+				violation: &v,
+				fix: &rules.SuggestedFix{
+					Description: finalizer.Description(),
+					Safety:      finalizer.Safety(),
+					Priority:    finalizer.Priority(),
+					Edits:       edits,
+					IsPreferred: true,
+				},
+			}})
+		}
+	}
+}
+
+func (f *Fixer) finalizerAllowed(filePath string, finalizer Finalizer) bool {
+	ruleCode := finalizer.RuleCode()
+	if !f.ruleEnabledForFile(filePath, ruleCode) {
+		return false
+	}
+	if !f.ruleAllowed(ruleCode) {
+		return false
+	}
+	if finalizer.Safety() > f.SafetyThreshold {
+		return false
+	}
+	return f.fixModeAllowed(filePath, ruleCode)
 }
 
 // resolveAsyncFixes runs resolvers for fixes that need external data.

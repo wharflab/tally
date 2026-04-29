@@ -559,6 +559,110 @@ severity = "error"
 			wantApplied: 1,
 		},
 
+		// prefer-formatted-heredocs runs as a finalizer, so it formats the COPY heredoc
+		// produced by prefer-copy-heredoc in the same fix pass.
+		{
+			name:  "prefer-copy-heredoc-formats-generated-json",
+			input: "FROM ubuntu:22.04\nRUN printf '{\"b\":2,\"a\":1}\\n' > /etc/app/config.json\n",
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 2,
+		},
+		{
+			name:  "prefer-copy-heredoc-formats-generated-yaml",
+			input: "FROM ubuntu:22.04\nRUN printf '{b: 2, a: 1}\\n' > /etc/app/config.yaml\n",
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 2,
+		},
+		{
+			name:  "prefer-copy-heredoc-formats-generated-toml",
+			input: "FROM ubuntu:22.04\nRUN printf 'title=\"demo\"\\n[owner]\\nname=\"tally\"\\n' > /etc/app/config.toml\n",
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 2,
+		},
+		{
+			name:  "prefer-copy-heredoc-formats-generated-xml",
+			input: "FROM ubuntu:22.04\nRUN printf '<root><child>1</child></root>\\n' > /etc/app/config.xml\n",
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 2,
+		},
+		{
+			name: "prefer-copy-heredoc-formats-generated-ini",
+			input: "FROM ubuntu:22.04\n" +
+				"RUN printf 'zend_extension=opcache\\n[opcache]\\n" +
+				"opcache.enable=1\\nopcache.memory_consumption=128\\n' > /etc/app/php.ini\n",
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 2,
+		},
+		// Mixed finalizer coverage: pre-existing COPY/ADD heredocs are formatted
+		// while prefer-copy-heredoc injects new COPY heredocs in the same fix run.
+		{
+			name: "prefer-formatted-heredocs-existing-and-generated",
+			input: `FROM ubuntu:22.04
+COPY <<JSON /etc/app/existing.json
+{"b":2,"a":1}
+JSON
+
+COPY <<YAML /etc/app/existing.yaml
+{"enabled":true,"port":8080}
+YAML
+
+ADD <<XML /etc/app/existing.xml
+<app><feature>on</feature></app>
+XML
+
+COPY <<EOF /etc/app/already.json
+{
+  "ok": true
+}
+EOF
+
+COPY <<EOF /etc/app/config.txt
+{"b":2,"a":1}
+EOF
+
+RUN printf 'title="generated"\n[owner]\nname="tally"\n' > /etc/app/generated.toml
+RUN printf 'zend_extension=opcache\n[opcache]\nopcache.enable=1\n' > /etc/app/php.ini
+`,
+			args: append([]string{
+				"--fix-unsafe",
+				"--fix",
+			}, mustSelectRules(
+				"tally/prefer-copy-heredoc",
+				"tally/prefer-formatted-heredocs",
+			)...),
+			wantApplied: 6, // three existing heredocs + two conversions + one finalizer pass for generated heredocs
+		},
+
 		// prefer-copy-heredoc: literal ~/ target resolves against the effective USER and stays unsafe
 		{
 			name: "prefer-copy-heredoc-tilde-home-root",

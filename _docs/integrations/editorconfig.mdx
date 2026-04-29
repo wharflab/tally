@@ -1,0 +1,52 @@
+---
+title: "EditorConfig integration"
+description: "Use EditorConfig settings to keep tally formatting fixes aligned with your repository style."
+---
+
+tally reads `.editorconfig` for formatting rules that need repository style preferences. Use `.editorconfig` for shared whitespace and indentation
+settings, and use `.tally.toml` for enabling, disabling, or changing the severity of lint rules.
+
+This page will collect tally features that integrate with EditorConfig as they are added.
+
+## Recommended Dockerfile settings
+
+Add this section to your repository's `.editorconfig` to keep Dockerfiles and Containerfiles consistent:
+
+```ini
+[{Containerfile,Containerfile.,Dockerfile,Dockerfile.}*]
+indent_style = tab
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+```
+
+The pattern matches `Dockerfile`, `Dockerfile.*`, `Containerfile`, and `Containerfile.*`.
+
+## Rules that use EditorConfig
+
+- [`tally/prefer-formatted-heredocs`](/rules/tally/prefer-formatted-heredocs) formats `COPY` and `ADD` heredoc bodies for JSON, YAML, TOML, XML, and
+  INI files.
+
+For heredoc payloads, tally resolves EditorConfig settings using a virtual filename next to the Dockerfile and the heredoc destination basename. For
+example, a heredoc in `services/api/Dockerfile` targeting `/etc/app/config.yaml` is resolved as `services/api/config.yaml`, so `*.yaml` and
+`config.yaml` sections apply.
+
+## Supported Properties
+
+The heredoc formatter currently reads these EditorConfig properties:
+
+| Property | Behavior |
+|----------|----------|
+| `indent_style` | Uses tabs when set to `tab`; otherwise uses spaces. |
+| `indent_size` | Sets the number of spaces per indent level when it is a positive integer. |
+| `tab_width` | Used as the fallback indent width when `indent_size` is not a positive integer. |
+| `max_line_length` | YAML heredocs only. When set to a positive integer, uses that value as the preferred YAML scalar wrapping width. `off`, unset, and invalid values do not override the YAML serializer default. This is a formatting preference, not a hard maximum. |
+
+Other EditorConfig properties are intentionally not interpreted by the heredoc formatter today:
+
+| Property | Reason |
+|----------|--------|
+| `insert_final_newline` | Heredoc bodies always need a newline before the terminator, so formatted payloads always end with exactly one newline regardless of this setting. |
+| `end_of_line` | Heredoc payloads are embedded in the Dockerfile and should follow the parent Dockerfile's line-ending convention rather than a separate virtual target setting. |
+| `charset` | tally already reads Dockerfiles as text and does not transcode heredoc payloads during formatting. |
+| `trim_trailing_whitespace` | Formatted output for the currently supported structured formats does not emit incidental trailing whitespace. tally does not read this property or run a separate trimming pass, because whitespace may be payload data in some formats. |

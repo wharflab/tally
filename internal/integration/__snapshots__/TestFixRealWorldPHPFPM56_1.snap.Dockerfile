@@ -104,9 +104,9 @@ UseSTARTTLS=NO
 EOF
 COPY <<EOF /usr/local/etc/php/conf.d/php.ini
 [PHP]
-log_errors = On
-error_log = /dev/stderr
-auto_prepend_file = /usr/local/php/php/auto_prepends/default_prepend.php
+  log_errors        = On
+  error_log         = /dev/stderr
+  auto_prepend_file = /usr/local/php/php/auto_prepends/default_prepend.php
 EOF
 
 EXPOSE 9000
