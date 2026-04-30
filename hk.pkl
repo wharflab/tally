@@ -1,164 +1,172 @@
 amends "package://github.com/jdx/hk/releases/download/v1.44.2/hk@1.44.2#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.44.2/hk@1.44.2#/Builtins.pkl"
 
 // Git hook manager: https://hk.jdx.dev
 // Install hooks for this repo: `hk install`
 // Preferred: `hk install --global` (requires Git 2.54+; uses config-based hooks).
 
 env {
-    ["GOEXPERIMENT"] = "jsonv2"
+  ["GOEXPERIMENT"] = "jsonv2"
 }
 
 local preCommitSteps = new Mapping<String, Step> {
-    ["format-go"] {
-        glob = List("**/*.go")
-        fix = "gofmt -w -s {{files}}"
-        stage = List("**/*.go")
-    }
-    ["lint-go"] {
-        glob = List("**/*.go")
-        fix = "make lint-fix"
-        stage = List("**/*.go")
-        depends = List("format-go")
-    }
-    ["ts-typecheck"] {
-        glob = List("_integrations/vscode-tally/**/*.ts")
-        dir = "_integrations/vscode-tally"
-        check = "bunx @typescript/native-preview --noEmit"
-    }
-    ["ts-lint"] {
-        glob = List("_integrations/vscode-tally/**/*.{js,ts,cjs,mjs,d.cts,d.mts}")
-        dir = "_integrations/vscode-tally"
-        fix = "bunx -y -q oxlint --type-aware --fix --fix-suggestions {{files}}"
-        stage = List("_integrations/vscode-tally/**/*.{js,ts,cjs,mjs,d.cts,d.mts}")
-    }
-    ["ts-format"] {
-        glob = List("_integrations/vscode-tally/**/*.{js,ts,cjs,mjs,mts,cts,jsx,tsx}")
-        dir = "_integrations/vscode-tally"
-        fix = "bunx -y -q oxfmt --no-error-on-unmatched-pattern --write {{files}}"
-        stage = List("_integrations/vscode-tally/**/*.{js,ts,cjs,mjs,mts,cts,jsx,tsx}")
-    }
-    ["ktlint-format"] {
-        glob = List("_integrations/intellij-tally/src/main/kotlin/**/*.kt")
-        fix = "bash _integrations/intellij-tally/build/ktlint.sh --format {{files}}"
-        stage = List("_integrations/intellij-tally/src/main/kotlin/**/*.kt")
-    }
-    ["ktlint-lint"] {
-        glob = List("_integrations/intellij-tally/src/main/kotlin/**/*.kt")
-        check = "bash _integrations/intellij-tally/build/ktlint.sh {{files}}"
-        depends = List("ktlint-format")
-    }
-    ["rust-fmt"] {
-        glob = List("_integrations/zed-tally/**/*.rs")
-        fix = "cargo fmt --manifest-path _integrations/zed-tally/Cargo.toml -- {{files}}"
-        stage = List("_integrations/zed-tally/**/*.rs")
-    }
-    ["rust-clippy"] {
-        glob = List("_integrations/zed-tally/**/*.rs")
-        check = "cargo clippy --manifest-path _integrations/zed-tally/Cargo.toml --target wasm32-wasip2 -- -D warnings"
-        depends = List("rust-fmt")
-    }
-    ["taplo"] {
-        glob = List("**/*.toml")
-        fix = "bunx -y -q @taplo/cli format {{files}}"
-        stage = List("**/*.toml")
-    }
-    ["rumdl"] {
-        glob = List("**/*.{md,mdx}")
-        exclude = List("**/__snapshots__/**")
-        fix = "uv tool run rumdl==0.1.84 fmt {{files}}"
-        stage = List("**/*.{md,mdx}")
-    }
-    ["mintlify-docs-verify"] {
-        glob = List("_docs/**")
-        dir = "_docs"
-        check = "bunx -y -q mint validate"
-    }
-    ["yamllint"] {
-        glob = List("**/*.{yml,yaml}")
-        check = "uvx yamllint {{files}}"
-    }
-    ["format-yml"] {
-        glob = List("**/{.yamlfmt,*.yml,*.yaml}")
-        fix = "yamlfmt {{files}}"
-        stage = List("**/{.yamlfmt,*.yml,*.yaml}")
-    }
-    ["typos"] {
-        glob = List("**/*.{py,js,ts,tsx,toml,yaml,yml,json,html,css,md,txt,rst,tex}")
-        check = "uv tool run typos==1.45.2 --force-exclude {{files}}"
-    }
-    ["codecov"] {
-        glob = List("codecov.yml", ".codecov.yml")
-        check = "curl --fail --data-binary @.codecov.yml https://codecov.io/validate"
-    }
-    ["actionlint"] {
-        glob = List(".github/workflows/*.{yaml,yml}")
-        check = "actionlint {{files}}"
-    }
-    ["commitlint-config"] {
-        glob = List(".commitlintrc.yaml")
-        check = "uvx check-jsonschema --schemafile https://json.schemastore.org/commitlintrc.json .commitlintrc.yaml"
-    }
-    ["hk-validate"] {
-        glob = List("hk.pkl")
-        check = "hk validate"
-    }
+  ["format-go"] = (Builtins.go_fmt) {
+    glob = List("**/*.go")
+  }
+  ["lint-go"] {
+    glob = List("**/*.go")
+    fix = "make lint-fix"
+    depends = List("format-go")
+  }
+  ["ts-typecheck"] {
+    glob = List("_integrations/vscode-tally/**/*.ts")
+    dir = "_integrations/vscode-tally"
+    check = "bunx @typescript/native-preview --noEmit"
+  }
+  ["ts-lint"] = (Builtins.ox_lint) {
+    glob =
+      List(
+        "_integrations/vscode-tally/**/*.js",
+        "_integrations/vscode-tally/**/*.ts",
+        "_integrations/vscode-tally/**/*.cjs",
+        "_integrations/vscode-tally/**/*.mjs",
+        "_integrations/vscode-tally/**/*.cts",
+        "_integrations/vscode-tally/**/*.mts",
+      )
+    dir = "_integrations/vscode-tally"
+    fix = "bunx -y -q oxlint --type-aware --fix --fix-suggestions {{files}}"
+  }
+  ["ts-format"] {
+    glob =
+      List(
+        "_integrations/vscode-tally/**/*.js",
+        "_integrations/vscode-tally/**/*.ts",
+        "_integrations/vscode-tally/**/*.cjs",
+        "_integrations/vscode-tally/**/*.mjs",
+        "_integrations/vscode-tally/**/*.cts",
+        "_integrations/vscode-tally/**/*.mts",
+      )
+    dir = "_integrations/vscode-tally"
+    fix = "bunx -y -q oxfmt --no-error-on-unmatched-pattern --write {{files}}"
+  }
+  ["ktlint-format"] {
+    glob = List("_integrations/intellij-tally/src/main/kotlin/**/*.kt")
+    fix = "bash _integrations/intellij-tally/build/ktlint.sh --format {{files}}"
+  }
+  ["ktlint-lint"] {
+    glob = List("_integrations/intellij-tally/src/main/kotlin/**/*.kt")
+    check = "bash _integrations/intellij-tally/build/ktlint.sh {{files}}"
+    depends = List("ktlint-format")
+  }
+  ["rust-fmt"] {
+    glob = List("_integrations/zed-tally/**/*.rs")
+    fix = "cargo fmt --manifest-path _integrations/zed-tally/Cargo.toml -- {{files}}"
+  }
+  ["rust-clippy"] {
+    glob = List("_integrations/zed-tally/**/*.rs")
+    check =
+      "cargo clippy --manifest-path _integrations/zed-tally/Cargo.toml --target wasm32-wasip2 -- -D warnings"
+    depends = List("rust-fmt")
+  }
+  ["taplo"] {
+    glob = List("**/*.toml")
+    fix = "bunx -y -q @taplo/cli format {{files}}"
+  }
+  ["rumdl"] {
+    glob = List("**/*.{md,mdx}")
+    exclude = List("**/__snapshots__/**")
+    fix = "uv tool run rumdl==0.1.84 fmt {{files}}"
+  }
+  ["mintlify-docs-verify"] {
+    glob = List("_docs/**")
+    dir = "_docs"
+    check = "bunx -y -q mint validate"
+  }
+  ["yamllint"] {
+    glob = List("**/*.{yml,yaml}")
+    check = "uvx yamllint {{files}}"
+  }
+  ["format-yml"] {
+    glob = List("**/{.yamlfmt,*.yml,*.yaml}")
+    fix = "yamlfmt {{files}}"
+  }
+  ["typos"] {
+    glob = List("**/*.{py,js,ts,tsx,toml,yaml,yml,json,html,css,md,txt,rst,tex}")
+    check = "uv tool run typos==1.45.2 --force-exclude {{files}}"
+  }
+  ["codecov"] {
+    glob = List("codecov.yml", ".codecov.yml")
+    check = "curl --fail --data-binary @.codecov.yml https://codecov.io/validate"
+  }
+  ["actionlint"] = (Builtins.actionlint) {}
+  ["commitlint-config"] {
+    glob = List(".commitlintrc.yaml")
+    check =
+      "uvx check-jsonschema --schemafile https://json.schemastore.org/commitlintrc.json .commitlintrc.yaml"
+  }
+  ["hk-validate"] {
+    glob = List("hk.pkl")
+    check = "hk validate"
+  }
+  ["pkl-format"] = (Builtins.pkl_format) {}
 }
 
 local commitMsgSteps = new Mapping<String, Step> {
-    ["commitlint"] {
-        check = "bunx -y -q commitlint --edit {{commit_msg_file}}"
-    }
-    ["typos-commit-msg"] {
-        check = "uv tool run typos==1.45.2 {{commit_msg_file}}"
-    }
+  ["commitlint"] {
+    check = "bunx -y -q commitlint --edit {{commit_msg_file}}"
+  }
+  ["typos-commit-msg"] {
+    check = "uv tool run typos==1.45.2 {{commit_msg_file}}"
+  }
 }
 
 local postMergeSteps = new Mapping<String, Step> {
-    ["delete-merged-branches"] {
-        shell = "bash -o errexit -o pipefail -c"
-        check = "git branch --merged | grep -Ev '\\*|master|main|dev|develop|development|stag|staging|prod|production' | xargs git branch -d 2>/dev/null || true; git fetch --prune"
-    }
+  ["delete-merged-branches"] {
+    shell = "bash -o errexit -o pipefail -c"
+    check =
+      "git branch --merged | grep -Ev '\\*|master|main|dev|develop|development|stag|staging|prod|production' | xargs git branch -d 2>/dev/null || true; git fetch --prune"
+  }
 }
 
 local prePushSteps = new Mapping<String, Step> {
-    ["build"] {
-        check = "make build"
-    }
-    ["deadcode"] {
-        check = "make deadcode"
-    }
-    ["test"] {
-        check = "make test"
-    }
-    ["validate-hadolint-status"] {
-        check = "./scripts/validate-hadolint-status.sh"
-    }
-    ["mintlify-docs-broken-links"] {
-        dir = "_docs"
-        check = "bunx -y -q mint broken-links"
-    }
+  ["build"] {
+    check = "make build"
+  }
+  ["deadcode"] {
+    check = "make deadcode"
+  }
+  ["test"] {
+    check = "make test"
+  }
+  ["validate-hadolint-status"] {
+    check = "./scripts/validate-hadolint-status.sh"
+  }
+  ["mintlify-docs-broken-links"] {
+    dir = "_docs"
+    check = "bunx -y -q mint broken-links"
+  }
 }
 
 hooks {
-    ["pre-commit"] {
-        fix = true
-        stash = "git"
-        steps = preCommitSteps
-    }
-    ["commit-msg"] {
-        steps = commitMsgSteps
-    }
-    ["post-merge"] {
-        steps = postMergeSteps
-    }
-    ["pre-push"] {
-        steps = prePushSteps
-    }
-    ["fix"] {
-        fix = true
-        steps = preCommitSteps
-    }
-    ["check"] {
-        steps = preCommitSteps
-    }
+  ["pre-commit"] {
+    fix = true
+    stash = "git"
+    steps = preCommitSteps
+  }
+  ["commit-msg"] {
+    steps = commitMsgSteps
+  }
+  ["post-merge"] {
+    steps = postMergeSteps
+  }
+  ["pre-push"] {
+    steps = prePushSteps
+  }
+  ["fix"] {
+    fix = true
+    steps = preCommitSteps
+  }
+  ["check"] {
+    steps = preCommitSteps
+  }
 }

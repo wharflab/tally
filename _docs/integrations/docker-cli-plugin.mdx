@@ -3,7 +3,8 @@ title: "Docker CLI plugin"
 description: "Run tally as docker lint from the Docker CLI."
 ---
 
-The Docker CLI plugin lets you run `tally lint` as `docker lint`. It is a client-side Docker CLI plugin, not a Docker Engine plugin, so it does not install anything into the Docker daemon.
+The Docker CLI plugin lets you run `tally lint` as `docker lint`. It is a client-side Docker CLI plugin, not a Docker Engine plugin, so it does not
+install anything into the Docker daemon.
 
 `docker lint` maps to the lint command only. Use `tally lsp --stdio` for editor integrations and `tally version` for full standalone version details.
 
@@ -86,7 +87,8 @@ docker lint --help
 
 On Windows, repeat the copy after upgrading tally unless your installer manages the plugin file for you.
 
-Homebrew also installs a `docker-lint` symlink under its own Docker plugin directory. If you prefer to use that Homebrew-managed file, add Homebrew's plugin directory to `~/.docker/config.json`:
+Homebrew also installs a `docker-lint` symlink under its own Docker plugin directory. If you prefer to use that Homebrew-managed file, add Homebrew's
+plugin directory to `~/.docker/config.json`:
 
 ```json
 {
@@ -124,7 +126,8 @@ The first command selects Docker's current context. The second command passes ta
 
 ### `docker: 'lint' is not a docker command`
 
-Docker did not find `docker-lint`. Check that the file exists in one of Docker's CLI plugin directories or in a directory listed by `cliPluginsExtraDirs`.
+Docker did not find `docker-lint`. Check that the file exists in one of Docker's CLI plugin directories or in a directory listed by
+`cliPluginsExtraDirs`.
 
 ```bash
 ls ~/.docker/cli-plugins/docker-lint
@@ -140,11 +143,13 @@ Run the metadata command directly:
 ~/.docker/cli-plugins/docker-lint docker-cli-plugin-metadata
 ```
 
-The output should be JSON with `"SchemaVersion": "0.1.0"` and `"Vendor": "Wharflab"`. If it prints normal tally help instead, the file is not named `docker-lint`.
+The output should be JSON with `"SchemaVersion": "0.1.0"` and `"Vendor": "Wharflab"`. If it prints normal tally help instead, the file is not named
+`docker-lint`.
 
 ### Wrong architecture binary
 
-Use a tally binary that matches your operating system and CPU architecture. This matters when copying binaries manually between machines or between Intel and Apple Silicon Macs.
+Use a tally binary that matches your operating system and CPU architecture. This matters when copying binaries manually between machines or between
+Intel and Apple Silicon Macs.
 
 ### Missing execute bit on macOS/Linux
 
@@ -156,10 +161,12 @@ chmod +x ~/.docker/cli-plugins/docker-lint
 
 ### Command name conflict
 
-`lint` is a generic plugin command name. If another `docker-lint` exists earlier in Docker's plugin search path, Docker may run that plugin instead. Remove the conflicting file or adjust `cliPluginsExtraDirs`.
+`lint` is a generic plugin command name. If another `docker-lint` exists earlier in Docker's plugin search path, Docker may run that plugin instead.
+Remove the conflicting file or adjust `cliPluginsExtraDirs`.
 
 ## Limitations
 
 `docker lint` exposes linting only. It does not expose `tally lsp` or `tally version` as Docker subcommands.
 
-WinGet exposes `docker-lint` as a command alias, but Docker does not search `PATH` for CLI plugins. Run `tally register-docker-plugin` after installing or upgrading tally through WinGet.
+WinGet exposes `docker-lint` as a command alias, but Docker does not search `PATH` for CLI plugins. Run `tally register-docker-plugin` after
+installing or upgrading tally through WinGet.
