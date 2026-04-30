@@ -156,8 +156,7 @@ the stripped environment because PowerShellGet had no registered repositories.
 The modern PSResourceGet path worked after repairing the app-data variables:
 
 ```text
-Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser \
-  -TrustRepository -Reinstall -Quiet
+Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -Reinstall -Quiet
 ```
 
 Installed module:
