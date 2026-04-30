@@ -133,9 +133,8 @@ WinGet precedent is different from Homebrew:
 - `Docker.DockerCompose` is also a WinGet portable package with `Commands: docker-compose`; it likewise does not install into Docker's CLI plugin
   directory.
   Reference: <https://github.com/microsoft/winget-pkgs/blob/master/manifests/d/Docker/DockerCompose/5.1.3/Docker.DockerCompose.installer.yaml>
-- The WinGet installer schema allows up to 16 `Commands`, described as commands or aliases to run the package. That can expose `docker-lint` as a
-  direct command, but it is not by itself Docker CLI plugin registration.
-  Reference: <https://aka.ms/winget-manifest.installer.1.12.0.schema.json>
+- The WinGet portable installer validator currently accepts only zero or one `Commands` value per portable installer. Keep `tally` as that command;
+  `docker-lint` must be registered later with `tally register-docker-plugin`.
 
 Docker CLI plugin discovery looks for `docker-*` executables in the Docker config `cli-plugins` directory, configured `cliPluginsExtraDirs`, and
 platform system plugin directories. On Windows, the system plugin directory is `%ProgramFiles%\Docker\cli-plugins`; user installs should prefer
@@ -677,44 +676,23 @@ MVP recommendation:
 
 1. Keep the package identifier `Wharflab.Tally`.
 2. Keep `tally` as the primary WinGet command.
-3. Add `docker-lint` to the manifest `Commands` list after the plugin invocation mode exists:
-
-   ```yaml
-   Commands:
-   - tally
-   - docker-lint
-   ```
-
+3. Do not add `docker-lint` to the WinGet portable `Commands` list; WinGet validation rejects multiple portable commands.
 4. Do not try to make the WinGet manifest install directly into `%USERPROFILE%\.docker\cli-plugins`.
 5. Do not edit Docker's `config.json` from WinGet.
 6. Do not rely on Windows registry registration. Docker CLI plugin discovery does not consume registry entries.
 
-This mirrors Docker's own WinGet precedent for Buildx and Compose: WinGet exposes portable commands, while Docker CLI plugin discovery is handled
-by Docker plugin directories or `cliPluginsExtraDirs`.
+This mirrors Docker's own WinGet precedent for Buildx and Compose: WinGet exposes a portable command, while Docker CLI plugin discovery is handled
+by Docker plugin directories.
 
-Documentation should offer two Windows paths:
+Documentation should offer the simple Windows path:
 
-1. Simple and deterministic:
+```powershell
+winget install --id Wharflab.Tally -e
+tally register-docker-plugin
+docker lint --help
+```
 
-   ```powershell
-   winget install --id Wharflab.Tally -e
-   New-Item -ItemType Directory -Force "$env:USERPROFILE\.docker\cli-plugins"
-   Copy-Item (Get-Command tally.exe).Source "$env:USERPROFILE\.docker\cli-plugins\docker-lint.exe" -Force
-   docker lint --help
-   ```
-
-   Users must repeat the copy after `winget upgrade Wharflab.Tally` unless a future installer handles plugin placement.
-
-2. Advanced, if WinGet's `docker-lint` command alias is available and Docker can execute that alias directly:
-
-   ```powershell
-   $pluginDir = Split-Path (Get-Command docker-lint.exe).Source
-   ```
-
-   Add `$pluginDir` to Docker CLI `cliPluginsExtraDirs` in `%USERPROFILE%\.docker\config.json`.
-
-The implementation issue must validate the advanced path on a real Windows runner before documenting it as supported. If Docker cannot execute the
-WinGet alias directly, keep it as unsupported and document only the copy path.
+Users should rerun the registration after `winget upgrade Wharflab.Tally`.
 
 ---
 
@@ -941,7 +919,7 @@ Tasks:
 - add Homebrew `docker-lint` symlink under `lib/docker/cli-plugins`
 - add Homebrew caveats for `cliPluginsExtraDirs`
 - fix formula test to use `tally lint`
-- add `docker-lint` to generated WinGet `Commands` after validation
+- keep generated WinGet `Commands` limited to `tally`
 - update docs with Homebrew, WinGet, and manual install paths
 
 Acceptance criteria:
@@ -1007,15 +985,15 @@ Files:
 
 Tasks:
 
-- add `docker-lint` to generated WinGet `Commands`
-- update manifest tests to expect both `tally` and `docker-lint`
-- decide, after Windows validation, whether docs can support `cliPluginsExtraDirs` pointing at the WinGet alias directory
+- keep generated WinGet `Commands` limited to `tally`
+- update manifest tests to reject the invalid multi-command portable installer shape
+- document `tally register-docker-plugin` as the WinGet plugin setup path
 
 Acceptance criteria:
 
 - `winget validate --manifest` accepts the generated manifests
 - `winget install --manifest` exposes `tally`
-- `winget install --manifest` exposes `docker-lint` if the multiple-command alias path validates
+- `winget install --manifest` does not attempt to expose `docker-lint` as a second portable command
 - docs do not imply that `winget install Wharflab.Tally` alone makes `docker lint` work unless that exact path has been verified
 
 #### Documentation
@@ -1061,7 +1039,7 @@ Acceptance criteria:
 | Release metadata has wrong version | add release smoke asserting metadata `Version` against `RELEASE_VERSION` |
 | Plugin root drifts from `tally lint` flags | build plugin root from shared Cobra lint command/options and add representative flag tests |
 | Symlink invocation is not detected on Windows | trim `.exe` in detection and copy binary to `docker-lint.exe` in Windows tests |
-| WinGet exposes `docker-lint` but Docker does not discover it | document the copy-to-plugin-dir path; only document `cliPluginsExtraDirs` for WinGet after real Windows validation |
+| WinGet cannot expose both `tally` and `docker-lint` as portable commands | keep WinGet focused on `tally` and document `tally register-docker-plugin` |
 
 ---
 
@@ -1077,9 +1055,8 @@ Acceptance criteria:
 
 3. Should WinGet expose `docker-lint` in addition to `tally`?
 
-   Recommendation: yes, if local manifest validation confirms multiple portable command aliases work with the current WinGet client. This is
-   useful even before full Docker CLI discovery because it gives users a direct `docker-lint` command and gives Docker a possible
-   `cliPluginsExtraDirs` target.
+   Recommendation: no. Current WinGet validation rejects multiple `Commands` values for portable installers, so WinGet should expose `tally` and
+   users should run `tally register-docker-plugin` for Docker CLI registration.
 
 4. Should `docker lint --version` be guaranteed?
 
@@ -1112,6 +1089,6 @@ The feature is complete when:
 - Docker current context/config metadata is available to the plugin path without requiring daemon access
 - Homebrew installs a `docker-lint` symlink under `#{HOMEBREW_PREFIX}/lib/docker/cli-plugins`
 - Homebrew caveats explain `cliPluginsExtraDirs`
-- WinGet keeps `tally` as the primary command and, after validation, exposes `docker-lint` as an additional portable command alias
+- WinGet keeps `tally` as the primary command and plugin registration is handled by `tally register-docker-plugin`
 - docs include a dedicated Docker CLI plugin integration page
 - tests cover metadata, invocation detection, plugin root behavior, and release version injection

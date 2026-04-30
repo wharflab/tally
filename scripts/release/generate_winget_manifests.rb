@@ -14,7 +14,7 @@ MANIFEST_VERSION = "1.9.0"
 SHORT_DESCRIPTION = "Dockerfile linter and formatter with first-class PowerShell and Windows container support."
 TAG_LIST = %w[docker dockerfile containerfile linter].freeze
 FILE_EXTENSION_LIST = %w[dockerfile containerfile].freeze
-COMMAND_LIST = %w[tally docker-lint].freeze
+COMMAND_LIST = %w[tally].freeze
 DOCUMENTATION_LIST = [
   {
     "DocumentLabel" => "Docs",

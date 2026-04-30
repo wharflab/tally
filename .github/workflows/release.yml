@@ -1567,14 +1567,14 @@ jobs:
           EXT_TOML="_integrations/zed-tally/extension.toml"
           CARGO_TOML="_integrations/zed-tally/Cargo.toml"
 
-          sed -i "s/^version = .*/version = \"${CLEAN_VERSION}\"/" "${EXT_TOML}"
+          sed -i -E "s/^version[[:space:]]*=.*/version = \"${CLEAN_VERSION}\"/" "${EXT_TOML}"
           ACTUAL="$(taplo get -f "${EXT_TOML}" --strip-newline version)"
           if [ "${ACTUAL}" != "${CLEAN_VERSION}" ]; then
             echo "::error::Failed to set version in extension.toml (expected=${CLEAN_VERSION}, actual=${ACTUAL})"
             exit 1
           fi
 
-          sed -i "0,/^version = .*/s/^version = .*/version = \"${CLEAN_VERSION}\"/" "${CARGO_TOML}"
+          sed -i -E "0,/^version[[:space:]]*=.*/s//version = \"${CLEAN_VERSION}\"/" "${CARGO_TOML}"
           ACTUAL="$(taplo get -f "${CARGO_TOML}" --strip-newline package.version)"
           if [ "${ACTUAL}" != "${CLEAN_VERSION}" ]; then
             echo "::error::Failed to set version in Cargo.toml (expected=${CLEAN_VERSION}, actual=${ACTUAL})"
