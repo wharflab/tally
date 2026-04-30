@@ -1,6 +1,6 @@
 ---
 title: "Installation"
-description: "Install tally via Homebrew, WinGet, npm, uv, pip, RubyGems, Docker, Go, or from source."
+description: "Install tally via Homebrew, WinGet, npm, Bun, uv, pip, RubyGems, Docker, Go, or from source."
 ---
 
 tally is a single self-contained binary. Pick the method that fits your environment.
@@ -17,6 +17,10 @@ winget install --id Wharflab.Tally
 
 ```bash npm
 npm install -g tally-cli
+```
+
+```bash Bun
+bun add -g tally-cli
 ```
 
 ```bash uv
@@ -63,6 +67,15 @@ npm install -g tally-cli
 ```
 
 Use a global npm install for Docker CLI plugin setup. Project-local `node_modules` installs are rejected by `tally register-docker-plugin`.
+
+## Bun
+
+```bash
+bun add -g tally-cli
+```
+
+Use a global Bun install for Docker CLI plugin setup. `bunx` and project-local `node_modules` launches are rejected by
+`tally register-docker-plugin`.
 
 ## uv
 

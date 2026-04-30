@@ -13,6 +13,8 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 
 	home := filepath.Join(string(filepath.Separator), "Users", "me")
 	npmRoot := filepath.Join(home, ".nvm", "versions", "node", "v24.0.0", "lib", "node_modules")
+	bunRoot := filepath.Join(home, ".bun", "install", "global")
+	bunBin := filepath.Join(home, ".bun", "bin")
 	uvToolDir := filepath.Join(home, ".local", "share", "uv", "tools")
 	registrar := dockerPluginRegistrar{
 		goos:    "linux",
@@ -23,6 +25,8 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 			switch name + " " + strings.Join(args, " ") {
 			case "npm root -g":
 				return npmRoot, nil
+			case "bun pm bin -g":
+				return bunBin, nil
 			case "uv tool dir":
 				return uvToolDir, nil
 			default:
@@ -62,6 +66,25 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 			want: "global npm",
 		},
 		{
+			name: "bun global",
+			path: filepath.Join(
+				bunRoot,
+				"node_modules",
+				"tally-cli",
+				"node_modules",
+				"@wharflab",
+				"tally-darwin-arm64",
+				"bin",
+				"tally",
+			),
+			want: "global Bun",
+		},
+		{
+			name: "bun global bin",
+			path: filepath.Join(bunBin, "tally"),
+			want: "global Bun",
+		},
+		{
 			name: "npm local",
 			path: filepath.Join(
 				home,
@@ -76,6 +99,22 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 				"tally",
 			),
 			wantErr: "project-local npm",
+		},
+		{
+			name: "bun local",
+			path: filepath.Join(
+				home,
+				"work",
+				"project",
+				"node_modules",
+				"tally-cli",
+				"node_modules",
+				"@wharflab",
+				"tally-darwin-arm64",
+				"bin",
+				"tally",
+			),
+			wantErr: "project-local npm/Bun",
 		},
 		{
 			name: "uv tool",

@@ -28,6 +28,11 @@ npm install -g tally-cli
 tally register-docker-plugin
 ```
 
+```bash Bun
+bun add -g tally-cli
+tally register-docker-plugin
+```
+
 ```bash uv
 uv tool install tally-cli
 tally register-docker-plugin
@@ -35,7 +40,7 @@ tally register-docker-plugin
 
 </CodeGroup>
 
-The command refuses project-local or temporary launches such as `node_modules`, `.venv`, and `go run`. Use a global install before running it.
+The command refuses project-local or temporary launches such as `node_modules`, `bunx`, `.venv`, and `go run`. Use a global install before running it.
 
 During registration, tally runs `docker info --format json`, checks the Docker CLI version, inspects existing Docker CLI plugins, and verifies the
 registration after writing `docker-lint`. If Docker already has a non-tally `lint` plugin, tally stops instead of shadowing it. If an older tally

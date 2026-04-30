@@ -93,7 +93,7 @@ func registerDockerPluginCommand() *cobra.Command {
 The command registers docker-lint in Docker's per-user CLI plugin directory.
 It does not download Docker, Docker Compose, Docker Buildx, or another tally
 binary. It only runs from persistent global installs such as Homebrew, WinGet,
-global npm installs, uv tool installs, or a direct global binary.`,
+global npm or Bun installs, uv tool installs, or a direct global binary.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			registrar := newDockerPluginRegistrar()
 			out := cmd.OutOrStdout()
@@ -433,7 +433,13 @@ func (r dockerPluginRegistrar) classifySource(source string) (string, error) {
 		if r.isNPMGlobalPath(source) {
 			return "global npm", nil
 		}
-		return "", fmt.Errorf("%s looks like a project-local npm install; run npm install -g tally-cli first", source)
+		if r.isBunGlobalPath(source) {
+			return "global Bun", nil
+		}
+		return "", fmt.Errorf(
+			"%s looks like a project-local npm/Bun install; run npm install -g tally-cli or bun add -g tally-cli first",
+			source,
+		)
 	case looksLikePythonPackagePath(source):
 		if r.isUVToolPath(source) {
 			return "uv tool", nil
@@ -442,6 +448,8 @@ func (r dockerPluginRegistrar) classifySource(source string) (string, error) {
 			"%s looks like a Python virtual environment or package install; use uv tool install tally-cli for automatic plugin registration",
 			source,
 		)
+	case r.isBunGlobalPath(source):
+		return "global Bun", nil
 	case looksLikeGlobalBinaryPath(source):
 		return "global binary", nil
 	default:
@@ -528,7 +536,17 @@ func (r dockerPluginRegistrar) projectRoot() string {
 		return ""
 	}
 	for {
-		for _, marker := range []string{".git", "go.mod", "package.json", "pyproject.toml", "node_modules", ".venv", "venv"} {
+		for _, marker := range []string{
+			".git",
+			"go.mod",
+			"package.json",
+			"pyproject.toml",
+			"bun.lock",
+			"bun.lockb",
+			"node_modules",
+			".venv",
+			"venv",
+		} {
 			if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
 				return dir
 			}
@@ -559,6 +577,49 @@ func (r dockerPluginRegistrar) npmGlobalRoots() []string {
 		if out, err := r.commandOut("npm", "root", "-g"); err == nil {
 			roots = appendPathList(roots, out)
 		}
+	}
+	return cleanPathList(roots)
+}
+
+func (r dockerPluginRegistrar) isBunGlobalPath(path string) bool {
+	for _, root := range r.bunGlobalRoots() {
+		if r.pathWithin(path, root) {
+			return true
+		}
+	}
+	return false
+}
+
+func (r dockerPluginRegistrar) bunGlobalRoots() []string {
+	var roots []string
+	if v := strings.TrimSpace(os.Getenv("BUN_INSTALL_GLOBAL_DIR")); v != "" {
+		roots = appendPathList(roots, v)
+	}
+	if v := strings.TrimSpace(os.Getenv("TALLY_BUN_GLOBAL_DIR")); v != "" {
+		roots = appendPathList(roots, v)
+	}
+	if v := strings.TrimSpace(os.Getenv("TALLY_BUN_GLOBAL_ROOT")); v != "" {
+		roots = appendPathList(roots, v)
+	}
+	if v := strings.TrimSpace(os.Getenv("BUN_INSTALL_BIN")); v != "" {
+		roots = appendPathList(roots, v)
+	}
+	if v := strings.TrimSpace(os.Getenv("BUN_INSTALL")); v != "" {
+		roots = append(roots,
+			filepath.Join(v, "install", "global"),
+			filepath.Join(v, "bin"),
+		)
+	}
+	if r.commandOut != nil {
+		if out, err := r.commandOut("bun", "pm", "bin", "-g"); err == nil {
+			roots = appendPathList(roots, out)
+		}
+	}
+	if r.homeDir != "" {
+		roots = append(roots,
+			filepath.Join(r.homeDir, ".bun", "install", "global"),
+			filepath.Join(r.homeDir, ".bun", "bin"),
+		)
 	}
 	return cleanPathList(roots)
 }
@@ -769,6 +830,10 @@ func commandOutputWithTimeout(name string, args ...string) (string, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		return commandTextOutput(exec.CommandContext(ctx, "npm", "root", "-g"))
+	case "bun pm bin -g":
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		return commandTextOutput(exec.CommandContext(ctx, "bun", "pm", "bin", "-g"))
 	case "uv tool dir":
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
