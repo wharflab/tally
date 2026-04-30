@@ -53,6 +53,7 @@ Examples:
 	cmd.AddCommand(lintCommand())
 	cmd.AddCommand(lspCommand())
 	cmd.AddCommand(versionCommand())
+	cmd.AddCommand(registerDockerPluginCommand())
 
 	return cmd
 }
@@ -60,4 +61,13 @@ Examples:
 // Execute runs the CLI application.
 func Execute() error {
 	return NewRootCommand().Execute()
+}
+
+// ExecuteForExecutable dispatches to the standalone CLI or Docker CLI plugin
+// mode based on the invoked executable name.
+func ExecuteForExecutable(executable string) error {
+	if IsDockerLintPluginExecutable(executable) {
+		return ExecuteDockerPlugin()
+	}
+	return Execute()
 }

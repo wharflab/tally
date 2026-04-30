@@ -228,6 +228,26 @@ jobs:
           assert payload["platform"]["arch"] == os.environ["EXPECTED_GOARCH"], payload
           assert payload.get("shellcheckVersion"), f"shellcheckVersion missing or empty: {payload}"
           PY
+          PLUGIN_DIR="$(mktemp -d)"
+          ln -s "$(pwd)/${BINARY}" "${PLUGIN_DIR}/docker-lint"
+          PLUGIN_METADATA_FILE="$(mktemp)"
+          "${PLUGIN_DIR}/docker-lint" docker-cli-plugin-metadata > "${PLUGIN_METADATA_FILE}"
+          cat "${PLUGIN_METADATA_FILE}"
+          python - "${PLUGIN_METADATA_FILE}" <<'PY'
+          import json
+          import os
+          import sys
+
+          metadata_path = sys.argv[1]
+          expected_version = os.environ["EXPECTED_VERSION"].removeprefix("v")
+
+          with open(metadata_path, encoding="utf-8") as fh:
+              payload = json.load(fh)
+
+          assert payload["SchemaVersion"] == "0.1.0", payload
+          assert payload["Vendor"] == "Wharflab", payload
+          assert payload["Version"] == expected_version, payload
+          PY
       - name: Build macOS binary
         if: matrix.runner_os == 'macOS'
         shell: bash
@@ -243,6 +263,34 @@ jobs:
           GOOS="${{ matrix.goos }}" \
           GOARCH="${{ matrix.goarch }}" \
           go build -tags "${BUILD_TAGS}" -trimpath -ldflags "${LDFLAGS}" -o "${DIST_DIR}/${{ matrix.binary_name }}" .
+      - name: Smoke test macOS Docker plugin metadata
+        if: matrix.runner_os == 'macOS'
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ env.RELEASE_VERSION }}
+        run: |
+          set -euo pipefail
+          BINARY="dist/tally_${{ matrix.goos }}_${{ matrix.goarch }}_${{ matrix.variant }}/${{ matrix.binary_name }}"
+          PLUGIN_DIR="$(mktemp -d)"
+          ln -s "$(pwd)/${BINARY}" "${PLUGIN_DIR}/docker-lint"
+          PLUGIN_METADATA_FILE="$(mktemp)"
+          "${PLUGIN_DIR}/docker-lint" docker-cli-plugin-metadata > "${PLUGIN_METADATA_FILE}"
+          cat "${PLUGIN_METADATA_FILE}"
+          python - "${PLUGIN_METADATA_FILE}" <<'PY'
+          import json
+          import os
+          import sys
+
+          metadata_path = sys.argv[1]
+          expected_version = os.environ["EXPECTED_VERSION"].removeprefix("v")
+
+          with open(metadata_path, encoding="utf-8") as fh:
+              payload = json.load(fh)
+
+          assert payload["SchemaVersion"] == "0.1.0", payload
+          assert payload["Vendor"] == "Wharflab", payload
+          assert payload["Version"] == expected_version, payload
+          PY
       - name: Build Windows binary
         if: matrix.runner_os == 'Windows'
         shell: msys2 {0}
@@ -283,6 +331,20 @@ jobs:
           }
           if (-not $payload.shellcheckVersion) {
             throw "shellcheckVersion missing or empty: $versionJson"
+          }
+          $plugin = Join-Path $env:RUNNER_TEMP "docker-lint.exe"
+          Copy-Item $binary $plugin -Force
+          $metadataJson = & $plugin docker-cli-plugin-metadata | Out-String
+          Write-Host $metadataJson
+          $metadata = $metadataJson | ConvertFrom-Json
+          if ($metadata.SchemaVersion -ne "0.1.0") {
+            throw "metadata schema mismatch: $metadataJson"
+          }
+          if ($metadata.Vendor -ne "Wharflab") {
+            throw "metadata vendor mismatch: $metadataJson"
+          }
+          if ($metadata.Version -ne $expectedVersion) {
+            throw "metadata version mismatch: expected=$expectedVersion actual=$($metadata.Version)"
           }
       - name: Import macOS Code Signing Certificate
         if: matrix.goos == 'darwin'

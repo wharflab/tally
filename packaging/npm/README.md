@@ -6,6 +6,8 @@ A fast, configurable linter for Dockerfiles and Containerfiles.
 
 ```bash
 npm install -g tally-cli
+# or
+bun add -g tally-cli
 ```
 
 ## Usage

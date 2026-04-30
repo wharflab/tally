@@ -5,6 +5,7 @@ go 1.26.2
 require (
 	charm.land/bubbles/v2 v2.1.0
 	charm.land/lipgloss/v2 v2.0.3
+	github.com/Masterminds/semver/v3 v3.4.0
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
 	github.com/bluekeyes/go-gitdiff v0.8.1
 	github.com/bmatcuk/doublestar/v4 v4.10.0
@@ -14,6 +15,7 @@ require (
 	github.com/containerd/platforms v1.0.0-rc.4
 	github.com/distribution/reference v0.6.0
 	github.com/docker/buildx v0.33.0
+	github.com/docker/cli v29.4.0+incompatible
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/editorconfig/editorconfig-core-go/v2 v2.6.4
 	github.com/gkampitakis/ciinfo v0.3.4
@@ -46,6 +48,7 @@ require (
 	github.com/wharflab/tree-sitter-powershell v0.36.0
 	github.com/zricethezav/gitleaks/v8 v8.30.1
 	go.bug.st/lsp v0.1.3
+	go.opentelemetry.io/otel v1.40.0
 	go.podman.io/image/v5 v5.39.2
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	golang.org/x/exp/jsonrpc2 v0.0.0-20250718183923-645b1fa84792
@@ -61,7 +64,6 @@ require (
 	github.com/BobuSumisu/aho-corasick v1.0.3 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/Masterminds/goutils v1.1.1 // indirect
-	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.3.0 // indirect
@@ -122,7 +124,6 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0 // indirect
 	github.com/digitorus/pkcs7 v0.0.0-20230818184609-3a137a874352 // indirect
 	github.com/digitorus/timestamp v0.0.0-20231217203849-220c5c2851b7 // indirect
-	github.com/docker/cli v29.4.0+incompatible // indirect
 	github.com/docker/docker v28.5.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.5 // indirect
 	github.com/docker/go-connections v0.6.0 // indirect
@@ -294,7 +295,6 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.63.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0 // indirect
-	go.opentelemetry.io/otel v1.40.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.40.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.40.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.40.0 // indirect

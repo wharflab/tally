@@ -44,8 +44,13 @@ const (
 )
 
 func lintCommand() *cobra.Command {
-	opts := &lintOptions{}
+	return newLintCommand(&lintOptions{})
+}
 
+func newLintCommand(opts *lintOptions) *cobra.Command {
+	if opts == nil {
+		opts = &lintOptions{}
+	}
 	cmd := &cobra.Command{
 		Use:   "lint [DOCKERFILE...]",
 		Short: "Lint Dockerfile(s) for issues",

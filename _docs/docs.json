@@ -48,7 +48,8 @@
           {
             "group": "Integrations",
             "pages": [
-              "integrations/editorconfig"
+              "integrations/editorconfig",
+              "integrations/docker-cli-plugin"
             ]
           }
         ]
