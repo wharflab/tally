@@ -1,0 +1,27 @@
+---
+title: "powershell/PSUseSupportsShouldProcess"
+description: "Use SupportsShouldProcess"
+sidebarTitle: "PSUseSupportsShouldProcess"
+---
+
+`powershell/PSUseSupportsShouldProcess` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+This rule discourages manual declaration of `WhatIf` and `Confirm` parameters in a function/cmdlet.
+These parameters are, however, provided automatically when a function declares a `CmdletBinding`
+attribute with `SupportsShouldProcess` as its named argument. Using `SupportsShouldProcess` not only
+provides these parameters but also some generic functionality that allows the function/cmdlet
+authors to provide the desired interactive experience while using the cmdlet.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseSupportsShouldProcess](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseSupportsShouldProcess.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

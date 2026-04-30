@@ -1,0 +1,26 @@
+---
+title: "powershell/PSPlaceOpenBrace"
+description: "Place open braces consistently"
+sidebarTitle: "PSPlaceOpenBrace"
+---
+
+`powershell/PSPlaceOpenBrace` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Open brace placement should follow a consistent style. It can either follow K&R style (on same line)
+or the Allman style (not on same line).
+
+**Note**: This rule is not enabled by default. The user needs to enable it through settings.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[PlaceOpenBrace](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/PlaceOpenBrace.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -1,0 +1,29 @@
+---
+title: "powershell/PSAvoidGlobalAliases"
+description: "Avoid global aliases."
+sidebarTitle: "PSAvoidGlobalAliases"
+---
+
+`powershell/PSAvoidGlobalAliases` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Globally scoped aliases override existing aliases within the sessions with matching names. This name
+collision can cause difficult to debug issues for consumers of modules and scripts.
+
+To understand more about scoping, see `Get-Help about_Scopes`.
+
+**NOTE** This rule is not available in PowerShell version 3 or 4 because it uses the
+`StaticParameterBinder.BindCommand` API.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidGlobalAliases](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidGlobalAliases.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

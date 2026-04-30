@@ -1,0 +1,41 @@
+---
+title: "powershell/PSUseCompatibleSyntax"
+description: "Use compatible syntax"
+sidebarTitle: "PSUseCompatibleSyntax"
+---
+
+`powershell/PSUseCompatibleSyntax` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+This rule identifies syntax elements that are incompatible with targeted PowerShell versions.
+
+It cannot identify syntax elements incompatible with PowerShell 3 or 4 when run from those
+PowerShell versions because they aren't able to parse the incompatible syntaxes.
+
+```powershell
+@{
+    Rules = @{
+        PSUseCompatibleSyntax = @{
+            Enable = $true
+            TargetVersions = @(
+                '6.0',
+                '5.1',
+                '4.0'
+            )
+        }
+    }
+}
+```
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseCompatibleSyntax](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseCompatibleSyntax.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

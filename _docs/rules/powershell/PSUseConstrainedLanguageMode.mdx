@@ -1,0 +1,47 @@
+---
+title: "powershell/PSUseConstrainedLanguageMode"
+description: "Use patterns compatible with Constrained Language Mode"
+sidebarTitle: "PSUseConstrainedLanguageMode"
+---
+
+`powershell/PSUseConstrainedLanguageMode` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+This rule identifies PowerShell patterns that are restricted or not permitted in Constrained
+Language Mode (CLM).
+
+Constrained Language Mode is a PowerShell security feature that restricts:
+
+- .NET types that can be used
+- COM objects that can be instantiated
+- Commands that can be executed
+- Language features that can be used
+
+CLM is commonly used in:
+
+- Application Control environments (Application Control for Business, AppLocker)
+- Just Enough Administration (JEA) endpoints
+- Secure environments requiring additional PowerShell restrictions
+
+Digitally signed scripts from trusted publishers execute in Full Language Mode (FLM) even in CLM
+environments. The rule detects signature blocks (`# SIG # Begin signature block`) and adjusts checks
+accordingly. Most restrictions don't apply to signed scripts, but certain checks (dot-sourcing,
+parameter types, manifest best practices) are always enforced.
+
+> [!IMPORTANT]
+> The rule performs a simple text check for signature blocks and does NOT validate signature
+> authenticity or certificate trust. Actual signature validation is performed by PowerShell at
+> runtime.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseConstrainedLanguageMode](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseConstrainedLanguageMode.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

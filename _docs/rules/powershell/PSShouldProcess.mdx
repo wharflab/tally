@@ -1,0 +1,32 @@
+---
+title: "powershell/PSShouldProcess"
+description: "Should Process"
+sidebarTitle: "PSShouldProcess"
+---
+
+`powershell/PSShouldProcess` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+If a cmdlet declares the `SupportsShouldProcess` attribute, then it should also call
+`ShouldProcess`. A violation is any function which either declares `SupportsShouldProcess` attribute
+but makes no calls to `ShouldProcess` or it calls `ShouldProcess` but does not declare
+`SupportsShouldProcess`.
+
+For more information, see the following articles:
+
+- [about_Functions_Advanced_Methods][01]
+- [about_Functions_CmdletBindingAttribute][02]
+- [Everything you wanted to know about ShouldProcess][03]
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[ShouldProcess](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/ShouldProcess.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

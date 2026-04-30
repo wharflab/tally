@@ -1,0 +1,40 @@
+---
+title: "powershell/PSUseShouldProcessForStateChangingFunctions"
+description: "Use ShouldProcess For State Changing Functions"
+sidebarTitle: "PSUseShouldProcessForStateChangingFunctions"
+---
+
+`powershell/PSUseShouldProcessForStateChangingFunctions` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in
+Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Functions whose verbs change system state should support `ShouldProcess`. To enable the
+`ShouldProcess` feature, set the `SupportsShouldProcess` argument in the `CmdletBinding` attribute.
+The `SupportsShouldProcess` argument adds **Confirm** and **WhatIf** parameters to the function. The
+**Confirm** parameter prompts the user before it runs the command on each object in the pipeline.
+The **WhatIf** parameter lists the changes that the command would make, instead of running the
+command.
+
+Verbs that should support `ShouldProcess`:
+
+- `New`
+- `Set`
+- `Remove`
+- `Start`
+- `Stop`
+- `Restart`
+- `Reset`
+- `Update`
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseShouldProcessForStateChangingFunctions](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseShouldProcessForStateChangingFunctions.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -1,6 +1,8 @@
 package rules
 
 import (
+	"strings"
+
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/invocation"
@@ -200,6 +202,21 @@ const ShellcheckRulePrefix = "shellcheck/"
 
 // PowerShellRulePrefix is the namespace prefix for PowerShell script diagnostics.
 const PowerShellRulePrefix = "powershell/"
+
+// PowerShellDiagnosticDocURL returns the documentation URL for a PowerShell
+// script diagnostic. The rule name may be either a bare PSScriptAnalyzer rule
+// name, for example "PSAvoidUsingWriteHost", or a fully namespaced tally rule
+// code.
+func PowerShellDiagnosticDocURL(ruleName string) string {
+	ruleCode := ruleName
+	if !strings.HasPrefix(ruleCode, PowerShellRulePrefix) {
+		ruleCode = PowerShellRulePrefix + ruleName
+	}
+	if IsDynamicRuleCode(ruleCode) {
+		return docURLBase + ruleCode + "/"
+	}
+	return TallyDocURL(PowerShellRulePrefix + "PowerShell")
+}
 
 // ShellcheckDocURL returns the documentation URL for a ShellCheck diagnostic code.
 // The ruleCode should be the SC code without prefix (e.g. "SC2086").

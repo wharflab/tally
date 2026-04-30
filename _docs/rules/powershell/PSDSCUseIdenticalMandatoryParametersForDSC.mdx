@@ -1,0 +1,26 @@
+---
+title: "powershell/PSDSCUseIdenticalMandatoryParametersForDSC"
+description: "Use identical mandatory parameters for DSC Get/Test/Set TargetResource functions"
+sidebarTitle: "PSDSCUseIdenticalMandatoryParametersForDSC"
+---
+
+`powershell/PSDSCUseIdenticalMandatoryParametersForDSC` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in
+Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Error |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+For script based DSC resources, if a property is declared with attributes `Key` of `Required` in a
+mof file, then is should be present as a mandatory parameter in the corresponding
+`Get-TargetResource`, `Set-TargetResource` and `Test-TargetResource` functions.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[DSCUseIdenticalMandatoryParametersForDSC](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/DSCUseIdenticalMandatoryParametersForDSC.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

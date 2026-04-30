@@ -1,0 +1,26 @@
+---
+title: "powershell/PSAvoidShouldContinueWithoutForce"
+description: "Avoid Using ShouldContinue Without Boolean Force Parameter"
+sidebarTitle: "PSAvoidShouldContinueWithoutForce"
+---
+
+`powershell/PSAvoidShouldContinueWithoutForce` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Functions that use ShouldContinue should have a boolean force parameter to allow user to bypass it.
+
+You can get more details by running `Get-Help about_Functions_CmdletBindingAttribute` and
+`Get-Help about_Functions_Advanced_Methods` command in PowerShell.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidShouldContinueWithoutForce](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidShouldContinueWithoutForce.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

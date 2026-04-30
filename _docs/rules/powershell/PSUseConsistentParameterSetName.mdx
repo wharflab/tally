@@ -1,0 +1,42 @@
+---
+title: "powershell/PSUseConsistentParameterSetName"
+description: "Use consistent parameter set names and proper parameter set configuration."
+sidebarTitle: "PSUseConsistentParameterSetName"
+---
+
+`powershell/PSUseConsistentParameterSetName` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Parameter set names in PowerShell are case-sensitive, unlike most other PowerShell elements. This
+rule ensures consistent casing and proper configuration of parameter sets to avoid runtime errors
+and improve code clarity.
+
+The rule performs five different checks:
+
+1. **Missing DefaultParameterSetName** - Warns when parameter sets are used but no default is
+   specified
+1. **Multiple parameter declarations** - Detects when a parameter is declared multiple times in the
+   same parameter set. This is ultimately a runtime exception - this check helps catch it sooner.
+1. **Case mismatch between DefaultParameterSetName and ParameterSetName** - Ensures consistent
+   casing
+1. **Case mismatch between different ParameterSetName values** - Ensures all references to the same
+
+   parameter set use identical casing
+1. **Parameter set names containing newlines** - Warns against using newline characters in parameter
+   set names
+
+> [!NOTE]
+> This rule isn't enabled by default. The user needs to enable it through settings.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseConsistentParameterSetName](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseConsistentParameterSetName.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

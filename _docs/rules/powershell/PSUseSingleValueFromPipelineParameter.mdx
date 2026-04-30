@@ -1,0 +1,26 @@
+---
+title: "powershell/PSUseSingleValueFromPipelineParameter"
+description: "Use at most a single ValueFromPipeline parameter per parameter set."
+sidebarTitle: "PSUseSingleValueFromPipelineParameter"
+---
+
+`powershell/PSUseSingleValueFromPipelineParameter` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Parameter sets should have at most one parameter marked as `ValueFromPipeline = true`.
+
+This rule identifies functions where multiple parameters within the same parameter set have
+`ValueFromPipeline` set to `true` (either explicitly or implicitly).
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseSingleValueFromPipelineParameter](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseSingleValueFromPipelineParameter.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

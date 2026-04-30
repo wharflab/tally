@@ -1,0 +1,24 @@
+---
+title: "powershell/PSAvoidNullOrEmptyHelpMessageAttribute"
+description: "Avoid using null or empty HelpMessage parameter attribute."
+sidebarTitle: "PSAvoidNullOrEmptyHelpMessageAttribute"
+---
+
+`powershell/PSAvoidNullOrEmptyHelpMessageAttribute` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+The value of the `HelpMessage` attribute should not be an empty string or a null value as this
+causes PowerShell's interpreter to throw an error when executing the function or cmdlet.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidNullOrEmptyHelpMessageAttribute](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidNullOrEmptyHelpMessageAttribute.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

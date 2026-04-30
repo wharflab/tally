@@ -1,0 +1,35 @@
+---
+title: "powershell/PSDSCStandardDSCFunctionsInResource"
+description: "Use Standard Get/Set/Test TargetResource functions in DSC Resource"
+sidebarTitle: "PSDSCStandardDSCFunctionsInResource"
+---
+
+`powershell/PSDSCStandardDSCFunctionsInResource` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Error |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+All DSC resources are required to implement the correct functions.
+
+For non-class based resources:
+
+- `Set-TargetResource`
+- `Test-TargetResource`
+- `Get-TargetResource`
+
+For class based resources:
+
+- `Set`
+- `Test`
+- `Get`
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[DSCStandardDSCFunctionsInResource](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/DSCStandardDSCFunctionsInResource.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

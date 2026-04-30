@@ -1,0 +1,30 @@
+---
+title: "powershell/PSUseApprovedVerbs"
+description: "Cmdlet Verbs"
+sidebarTitle: "PSUseApprovedVerbs"
+---
+
+`powershell/PSUseApprovedVerbs` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+All cmdlets must used approved verbs.
+
+Approved verbs can be found by running the command `Get-Verb`.
+
+For a more information about approved verbs, see [Approved Verbs for PowerShell Commands][01]. Some
+unapproved verbs are documented on the approved verbs page and point to approved alternatives. Try
+searching for the verb you used to find its approved form. For example, searching for `Read`,
+`Open`, or `Search` leads you to `Get`.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseApprovedVerbs](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseApprovedVerbs.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

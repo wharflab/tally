@@ -1,0 +1,24 @@
+---
+title: "powershell/PSReviewUnusedParameter"
+description: "ReviewUnusedParameter"
+sidebarTitle: "PSReviewUnusedParameter"
+---
+
+`powershell/PSReviewUnusedParameter` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+This rule identifies parameters declared in a script, scriptblock, or function scope that have not
+been used in that scope.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[ReviewUnusedParameter](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/ReviewUnusedParameter.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

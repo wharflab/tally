@@ -1,0 +1,32 @@
+---
+title: "powershell/PSUseToExportFieldsInManifest"
+description: "Use the *ToExport module manifest fields."
+sidebarTitle: "PSUseToExportFieldsInManifest"
+---
+
+`powershell/PSUseToExportFieldsInManifest` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+To improve the performance of module auto-discovery, module manifests should not use wildcards
+(`'*'`) or null (`$null`) in the following entries:
+
+- `AliasesToExport`
+- `CmdletsToExport`
+- `FunctionsToExport`
+- `VariablesToExport`
+
+Using wildcards or null has causes PowerShell to perform expensive work to analyze a module during
+module auto-discovery.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseToExportFieldsInManifest](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseToExportFieldsInManifest.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

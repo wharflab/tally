@@ -1,0 +1,31 @@
+---
+title: "powershell/PSProvideCommentHelp"
+description: "Basic Comment Help"
+sidebarTitle: "PSProvideCommentHelp"
+---
+
+`powershell/PSProvideCommentHelp` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Info |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Comment based help should be provided for all PowerShell commands. This test only checks for the
+presence of comment based help and not on the validity or format.
+
+For assistance on comment based help, use the command `Get-Help about_comment_based_help` or the
+following articles:
+
+- [Writing Comment-based Help][01]
+- [Writing Help for PowerShell Cmdlets][02]
+- [Create XML-based help using PlatyPS][03]
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[ProvideCommentHelp](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/ProvideCommentHelp.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

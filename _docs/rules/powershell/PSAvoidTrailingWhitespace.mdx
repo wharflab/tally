@@ -1,0 +1,24 @@
+---
+title: "powershell/PSAvoidTrailingWhitespace"
+description: "Avoid trailing whitespace"
+sidebarTitle: "PSAvoidTrailingWhitespace"
+---
+
+`powershell/PSAvoidTrailingWhitespace` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Information |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Lines should not end with whitespace characters. This can cause problems with the line-continuation
+backtick, and also clutters up future commits to source control.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidTrailingWhitespace](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidTrailingWhitespace.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

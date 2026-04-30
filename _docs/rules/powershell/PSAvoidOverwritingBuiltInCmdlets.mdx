@@ -1,0 +1,27 @@
+---
+title: "powershell/PSAvoidOverwritingBuiltInCmdlets"
+description: "Avoid overwriting built in cmdlets"
+sidebarTitle: "PSAvoidOverwritingBuiltInCmdlets"
+---
+
+`powershell/PSAvoidOverwritingBuiltInCmdlets` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+This rule flags cmdlets that are available in a given edition/version of PowerShell on a given
+operating system which are overwritten by a function declaration. It works by comparing function
+declarations against a set of allowlists that ship with PSScriptAnalyzer. These allowlist files are
+used by other PSScriptAnalyzer rules. More information can be found in the documentation for the
+[UseCompatibleCmdlets][01] rule.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidOverwritingBuiltInCmdlets](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidOverwritingBuiltInCmdlets.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

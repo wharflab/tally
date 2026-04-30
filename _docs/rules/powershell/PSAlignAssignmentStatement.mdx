@@ -1,0 +1,58 @@
+---
+title: "powershell/PSAlignAssignmentStatement"
+description: "Align assignment statement"
+sidebarTitle: "PSAlignAssignmentStatement"
+---
+
+`powershell/PSAlignAssignmentStatement` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Consecutive assignment statements are more readable when they're aligned. Assignments are considered
+aligned when their `equals` signs line up vertically.
+
+This rule looks at the key-value pairs in hashtables (including DSC configurations) as well as enum
+definitions.
+
+Consider the following example with a hashtable and enum that isn't aligned.
+
+```powershell
+$hashtable = @{
+    property = 'value'
+    anotherProperty = 'another value'
+}
+
+enum Enum {
+    member = 1
+    anotherMember = 2
+}
+```
+
+Alignment in this case would look like the following.
+
+```powershell
+$hashtable = @{
+    property        = 'value'
+    anotherProperty = 'another value'
+}
+
+enum Enum {
+    member        = 1
+    anotherMember = 2
+}
+```
+
+The rule ignores any assignments within hashtables and enums which are on the same line as others.
+For example, the rule ignores `$h = @{a = 1; b = 2}`.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AlignAssignmentStatement](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AlignAssignmentStatement.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -1,0 +1,25 @@
+---
+title: "powershell/PSUseUTF8EncodingForHelpFile"
+description: "Use UTF8 Encoding For Help File"
+sidebarTitle: "PSUseUTF8EncodingForHelpFile"
+---
+
+`powershell/PSUseUTF8EncodingForHelpFile` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Check that an `about_` help file uses UTF-8 encoding. The filename must start with `about_` and end
+with `.help.txt`. The rule uses the **CurrentEncoding** property of the **StreamReader** class to
+determine the encoding of the file.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseUTF8EncodingForHelpFile](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseUTF8EncodingForHelpFile.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

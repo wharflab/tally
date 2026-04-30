@@ -1,0 +1,26 @@
+---
+title: "powershell/PSAvoidDefaultValueForMandatoryParameter"
+description: "Avoid Default Value For Mandatory Parameter"
+sidebarTitle: "PSAvoidDefaultValueForMandatoryParameter"
+---
+
+`powershell/PSAvoidDefaultValueForMandatoryParameter` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in
+Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Mandatory parameters should not have a default values because there is no scenario where the default
+can be used. PowerShell prompts for a value if the parameter value is not specified when calling the
+function.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidDefaultValueForMandatoryParameter](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidDefaultValueForMandatoryParameter.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

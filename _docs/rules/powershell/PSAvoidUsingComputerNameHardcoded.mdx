@@ -1,0 +1,24 @@
+---
+title: "powershell/PSAvoidUsingComputerNameHardcoded"
+description: "Avoid Using ComputerName Hardcoded"
+sidebarTitle: "PSAvoidUsingComputerNameHardcoded"
+---
+
+`powershell/PSAvoidUsingComputerNameHardcoded` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Error |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+The names of computers should never be hard coded as this will expose sensitive information. The
+`ComputerName` parameter should never have a hard coded value.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidUsingComputerNameHardcoded](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingComputerNameHardcoded.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

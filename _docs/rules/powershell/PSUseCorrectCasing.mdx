@@ -1,0 +1,26 @@
+---
+title: "powershell/PSUseCorrectCasing"
+description: "Use exact casing of cmdlet/function/parameter name."
+sidebarTitle: "PSUseCorrectCasing"
+---
+
+`powershell/PSUseCorrectCasing` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Information |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+This is a style/formatting rule. PowerShell is case insensitive wherever possible, so the casing of
+cmdlet names, parameters, keywords and operators doesn't matter. This rule nonetheless ensures
+consistent casing for clarity and readability. Using lowercase keywords helps distinguish them from
+commands. Using lowercase operators helps distinguish them from parameters.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseCorrectCasing](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseCorrectCasing.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

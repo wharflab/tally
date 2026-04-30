@@ -67,6 +67,9 @@ RUN Write-Host hi
 	if got := violations[0].RuleCode; got != rules.PowerShellRulePrefix+"PSAvoidUsingWriteHost" {
 		t.Fatalf("RuleCode = %q", got)
 	}
+	if got, want := violations[0].DocURL, rules.PowerShellDiagnosticDocURL("PSAvoidUsingWriteHost"); got != want {
+		t.Fatalf("DocURL = %q, want %q", got, want)
+	}
 	if violations[0].Severity != rules.SeverityWarning {
 		t.Fatalf("Severity = %v", violations[0].Severity)
 	}

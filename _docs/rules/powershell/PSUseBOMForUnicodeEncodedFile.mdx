@@ -1,0 +1,27 @@
+---
+title: "powershell/PSUseBOMForUnicodeEncodedFile"
+description: "Use BOM encoding for non-ASCII files"
+sidebarTitle: "PSUseBOMForUnicodeEncodedFile"
+---
+
+`powershell/PSUseBOMForUnicodeEncodedFile` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+For a file encoded with a format other than ASCII, ensure Byte Order Mark (BOM) is present to ensure
+that any application consuming this file can interpret it correctly.
+
+You can use this rule to test any arbitrary text file, but the intent is to ensure that PowerShell
+scripts are saved with a BOM when using a Unicode encoding.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseBOMForUnicodeEncodedFile](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseBOMForUnicodeEncodedFile.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

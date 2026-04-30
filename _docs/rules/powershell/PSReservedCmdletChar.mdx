@@ -1,0 +1,26 @@
+---
+title: "powershell/PSReservedCmdletChar"
+description: "Reserved Cmdlet Chars"
+sidebarTitle: "PSReservedCmdletChar"
+---
+
+`powershell/PSReservedCmdletChar` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Error |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+You cannot use following reserved characters in a function or cmdlet name as these can cause parsing
+or runtime errors.
+
+Reserved Characters include: ``#,(){}[]&/\\$^;:\"'<>|?@`*%+=~``
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[ReservedCmdletChar](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/ReservedCmdletChar.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -1,0 +1,42 @@
+---
+title: "powershell/PSAvoidUsingWMICmdlet"
+description: "Avoid Using Get-WMIObject, Remove-WMIObject, Invoke-WmiMethod, Register-WmiEvent, Set-WmiInstance"
+sidebarTitle: "PSAvoidUsingWMICmdlet"
+---
+
+`powershell/PSAvoidUsingWMICmdlet` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+As of PowerShell 3.0, the CIM cmdlets should be used over the WMI cmdlets.
+
+The following cmdlets should not be used:
+
+- `Get-WmiObject`
+- `Remove-WmiObject`
+- `Invoke-WmiMethod`
+- `Register-WmiEvent`
+- `Set-WmiInstance`
+
+Use the following cmdlets instead:
+
+- `Get-CimInstance`
+- `Remove-CimInstance`
+- `Invoke-CimMethod`
+- `Register-CimIndicationEvent`
+- `Set-CimInstance`
+
+The CIM cmdlets comply with WS-Management (WSMan) standards and with the Common Information Model
+(CIM) standard, allowing for the management of Windows and non-Windows operating systems.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidUsingWMICmdlet](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingWMICmdlet.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -1,0 +1,24 @@
+---
+title: "powershell/PSDSCUseIdenticalParametersForDSC"
+description: "Use Identical Parameters For DSC Test and Set Functions"
+sidebarTitle: "PSDSCUseIdenticalParametersForDSC"
+---
+
+`powershell/PSDSCUseIdenticalParametersForDSC` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Error |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+The `Get-TargetResource`, `Test-TargetResource` and `Set-TargetResource` functions of DSC Resource
+must have the same parameters.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[DSCUseIdenticalParametersForDSC](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/DSCUseIdenticalParametersForDSC.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

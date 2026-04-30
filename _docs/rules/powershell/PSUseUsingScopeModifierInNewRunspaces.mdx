@@ -1,0 +1,32 @@
+---
+title: "powershell/PSUseUsingScopeModifierInNewRunspaces"
+description: "Use 'Using:' scope modifier in RunSpace ScriptBlocks"
+sidebarTitle: "PSUseUsingScopeModifierInNewRunspaces"
+---
+
+`powershell/PSUseUsingScopeModifierInNewRunspaces` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+If a scriptblock is intended to be run in a new runspace, variables inside it should use the
+`$using:` scope modifier, or be initialized within the scriptblock. This applies to:
+
+- `Invoke-Command`- Only with the **ComputerName** or **Session** parameter.
+- `Workflow { InlineScript {} }`
+- `Foreach-Object` - Only with the **Parallel** parameter
+- `Start-Job`
+- `Start-ThreadJob`
+- The `Script` resource in DSC configurations, specifically for the `GetScript`, `TestScript` and
+  `SetScript` properties.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseUsingScopeModifierInNewRunspaces](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseUsingScopeModifierInNewRunspaces.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

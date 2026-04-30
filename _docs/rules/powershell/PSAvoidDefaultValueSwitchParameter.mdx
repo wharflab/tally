@@ -1,0 +1,29 @@
+---
+title: "powershell/PSAvoidDefaultValueSwitchParameter"
+description: "Switch Parameters Should Not Default To True"
+sidebarTitle: "PSAvoidDefaultValueSwitchParameter"
+---
+
+`powershell/PSAvoidDefaultValueSwitchParameter` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+If your parameter takes only `true` and `false`, define the parameter as type `[Switch]`. PowerShell
+treats a switch parameter as `true` when it's used with a command. If the parameter isn't included
+with the command, PowerShell considers the parameter to be false. Don't define `[Boolean]`
+parameters.
+
+You shouldn't define a switch parameter with a default value of `$true` because this isn't the
+expected behavior of a switch parameter.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidDefaultValueSwitchParameter](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidDefaultValueSwitchParameter.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

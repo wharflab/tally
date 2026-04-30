@@ -1,0 +1,29 @@
+---
+title: "powershell/PSUseLiteralInitializerForHashtable"
+description: "Create hashtables with literal initializers"
+sidebarTitle: "PSUseLiteralInitializerForHashtable"
+---
+
+`powershell/PSUseLiteralInitializerForHashtable` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Creating a hashtable using `[hashtable]::new()` or `New-Object -TypeName hashtable` without passing
+a `IEqualityComparer` object to the constructor creates a hashtable where the keys are looked-up in
+a case-sensitive manner. However, PowerShell is case-insensitive in nature and it is best to create
+hashtables with case-insensitive key look-up.
+
+This rule is intended to warn the author of the case-sensitive nature of the hashtable when created
+using the `new` method or the `New-Object` cmdlet.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseLiteralInitializerForHashtable](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseLiteralInitializerForHashtable.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -1,0 +1,25 @@
+---
+title: "powershell/PSReservedParams"
+description: "Reserved Parameters"
+sidebarTitle: "PSReservedParams"
+---
+
+`powershell/PSReservedParams` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Error |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+You can't redefine [common parameters][01] in an advanced function. Using the `CmdletBinding` or
+`Parameter` attributes creates an advanced function. The common parameters are are automatically
+available in advanced functions, so you can't redefine them.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[ReservedParams](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/ReservedParams.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

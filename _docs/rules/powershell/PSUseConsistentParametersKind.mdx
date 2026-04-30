@@ -1,0 +1,43 @@
+---
+title: "powershell/PSUseConsistentParametersKind"
+description: "Use the same pattern when defining parameters."
+sidebarTitle: "PSUseConsistentParametersKind"
+---
+
+`powershell/PSUseConsistentParametersKind` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+All functions should use the same pattern when defining parameters. Possible pattern types are:
+
+1. `Inline`
+
+   ```powershell
+   function f([Parameter()]$FirstParam) {
+       return
+   }
+   ```
+
+1. `ParamBlock`
+
+   ```powershell
+   function f {
+       param([Parameter()]$FirstParam)
+       return
+   }
+   ```
+
+In simple scenarios, both function definitions shown are considered to be equal. The purpose of this
+rule is to enforce consistent code style across the codebase.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseConsistentParametersKind](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseConsistentParametersKind.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -1,0 +1,27 @@
+---
+title: "powershell/PSUseDeclaredVarsMoreThanAssignments"
+description: "Extra Variables"
+sidebarTitle: "PSUseDeclaredVarsMoreThanAssignments"
+---
+
+`powershell/PSUseDeclaredVarsMoreThanAssignments` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Variables that are assigned but not used are not needed.
+
+> [!NOTE]
+> For this rule, the variable must be used within the same scriptblock that it was declared or it
+> won't be considered to be 'used'.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseDeclaredVarsMoreThanAssignments](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseDeclaredVarsMoreThanAssignments.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

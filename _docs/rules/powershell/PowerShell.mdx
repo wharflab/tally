@@ -17,7 +17,9 @@ Runs PowerShell script diagnostics for PowerShell snippets embedded in Dockerfil
 tally analyzes Dockerfile `RUN` instructions that execute PowerShell, including stages with `SHELL ["pwsh", "-Command"]`, explicit `RUN pwsh -Command
 ...` wrappers, and PowerShell heredoc bodies.
 
-Diagnostics are reported in the `powershell/*` namespace using the upstream PowerShell rule name, such as `powershell/PSAvoidUsingWriteHost`.
+Diagnostics are reported in the `powershell/*` namespace using the upstream PowerShell rule name, such as `powershell/PSAvoidUsingWriteHost`. Each
+concrete diagnostic links to its own tally documentation page, for example
+[`powershell/PSAvoidUsingWriteHost`](/rules/powershell/PSAvoidUsingWriteHost).
 
 The PowerShell analyzer sidecar starts lazily. Dockerfiles without PowerShell snippets do not start `pwsh`.
 

@@ -198,7 +198,7 @@ func (r *Rule) checkMapping(file string, mapping scriptMapping) []rules.Violatio
 			rules.PowerShellRulePrefix+d.RuleName,
 			d.Message,
 			mapSeverity(d.Severity),
-		))
+		).WithDocURL(rules.PowerShellDiagnosticDocURL(d.RuleName)))
 	}
 	return violations
 }

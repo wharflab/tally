@@ -1,0 +1,30 @@
+---
+title: "powershell/PSPossibleIncorrectUsageOfRedirectionOperator"
+description: "\\'>\\' is not a comparison operator. Use \\'-gt\\' (greater than) or \\'-ge\\' (greater or equal)."
+sidebarTitle: "PSPossibleIncorrectUsageOfRedirectionOperator"
+---
+
+`powershell/PSPossibleIncorrectUsageOfRedirectionOperator` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in
+Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Information |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+In many programming languages, the comparison operator for 'greater than' is `>` but `PowerShell`
+uses `-gt` for it and `-ge` (greater or equal) for `>=`. Therefore, it can easily happen that the
+wrong operator is used unintentionally. This rule catches a few special cases where the likelihood
+of that is quite high.
+
+The rule looks for usages of `>` or `>=` operators inside `if`, `elseif`, `while` and `do-while`
+statements because this is likely going to be unintentional usage.
+
+## Reference
+
+This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+[PossibleIncorrectUsageOfRedirectionOperator](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/PossibleIncorrectUsageOfRedirectionOperator.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
