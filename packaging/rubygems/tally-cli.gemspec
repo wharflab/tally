@@ -20,5 +20,5 @@ Gem::Specification.new do |spec|
     NOTICE
   ) + Dir.glob("libexec/**/*").select { |path| File.file?(path) }
 
-  spec.licenses = ['GPL-3.0-only']
+  spec.licenses = ['AGPL-3.0-only']
 end
