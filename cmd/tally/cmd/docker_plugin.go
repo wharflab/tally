@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"errors"
-	"path/filepath"
+	"path"
 	"strings"
 
 	dockercli "github.com/docker/cli/cli"
@@ -21,7 +21,7 @@ const dockerLintPluginName = "lint"
 // IsDockerLintPluginExecutable reports whether executable should run tally in
 // Docker CLI plugin mode.
 func IsDockerLintPluginExecutable(executable string) bool {
-	base := strings.ToLower(filepath.Base(strings.ReplaceAll(executable, "\\", "/")))
+	base := strings.ToLower(path.Base(strings.ReplaceAll(executable, "\\", "/")))
 	base = strings.TrimSuffix(base, ".exe")
 	return base == metadata.NamePrefix+dockerLintPluginName
 }

@@ -85,7 +85,7 @@ func TestDockerCLIPluginSeparatesDockerAndTallyConfigFlags(t *testing.T) {
 	pluginPath := dockerPluginPath(t)
 	tmpDir := t.TempDir()
 	dockerConfigDir := filepath.Join(tmpDir, "docker-config")
-	if err := os.MkdirAll(dockerConfigDir, 0o755); err != nil {
+	if err := os.MkdirAll(dockerConfigDir, 0o750); err != nil {
 		t.Fatalf("create Docker config dir: %v", err)
 	}
 	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
