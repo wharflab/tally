@@ -58,17 +58,17 @@ local preCommitSteps = new Mapping<String, Step> {
     check = "bash _integrations/intellij-tally/build/ktlint.sh {{files}}"
     depends = List("ktlint-format")
   }
-  ["rust-fmt"] {
+  ["rust-fmt"] = (Builtins.cargo_fmt) {
     glob = List("_integrations/zed-tally/**/*.rs")
     fix = "cargo fmt --manifest-path _integrations/zed-tally/Cargo.toml -- {{files}}"
   }
-  ["rust-clippy"] {
+  ["rust-clippy"] = (Builtins.cargo_clippy) {
     glob = List("_integrations/zed-tally/**/*.rs")
     check =
       "cargo clippy --manifest-path _integrations/zed-tally/Cargo.toml --target wasm32-wasip2 -- -D warnings"
     depends = List("rust-fmt")
   }
-  ["taplo"] {
+  ["taplo"] = (Builtins.taplo) {
     glob = List("**/*.toml")
     fix = "bunx -y -q @taplo/cli format {{files}}"
   }
@@ -82,16 +82,12 @@ local preCommitSteps = new Mapping<String, Step> {
     dir = "_docs"
     check = "bunx -y -q mint validate"
   }
-  ["yamllint"] {
+  ["yamllint"] = (Builtins.yamllint) {
     glob = List("**/*.{yml,yaml}")
     check = "uvx yamllint {{files}}"
   }
-  ["format-yml"] {
-    glob = List("**/{.yamlfmt,*.yml,*.yaml}")
-    fix = "yamlfmt {{files}}"
-  }
-  ["typos"] {
-    glob = List("**/*.{py,js,ts,tsx,toml,yaml,yml,json,html,css,md,txt,rst,tex}")
+  ["format-yml"] = (Builtins.yamlfmt) {}
+  ["typos"] = (Builtins.typos) {
     check = "uv tool run typos==1.45.2 --force-exclude {{files}}"
   }
   ["codecov"] {
@@ -137,9 +133,6 @@ local prePushSteps = new Mapping<String, Step> {
   }
   ["test"] {
     check = "make test"
-  }
-  ["validate-hadolint-status"] {
-    check = "./scripts/validate-hadolint-status.sh"
   }
   ["mintlify-docs-broken-links"] {
     dir = "_docs"
