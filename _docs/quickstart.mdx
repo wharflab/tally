@@ -14,6 +14,9 @@ description: "Lint your first Dockerfile in under a minute."
       ```bash npm
       npm install -g tally-cli
       ```
+      ```bash uv
+      uv tool install tally-cli
+      ```
       ```bash pip
       pip install tally-cli
       ```
@@ -38,9 +41,10 @@ description: "Lint your first Dockerfile in under a minute."
 
     tally discovers files matching `Dockerfile`, `Dockerfile.*`, `*.Dockerfile`, `Containerfile`, and `Containerfile.*`.
 
-    If you configured the Docker CLI plugin, the same lint command is available as:
+    To make the same lint command available through Docker, register the Docker CLI plugin:
 
     ```bash
+    tally register-docker-plugin
     docker lint Dockerfile
     ```
   </Step>

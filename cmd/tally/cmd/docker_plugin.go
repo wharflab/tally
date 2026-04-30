@@ -56,7 +56,7 @@ func dockerPluginMetadata() metadata.Metadata {
 	return metadata.Metadata{
 		SchemaVersion:    "0.1.0",
 		Vendor:           "Wharflab",
-		Version:          version.Version(),
+		Version:          version.RawVersion(),
 		ShortDescription: "Lint Dockerfiles and Containerfiles",
 		URL:              "https://tally.wharflab.com/",
 	}

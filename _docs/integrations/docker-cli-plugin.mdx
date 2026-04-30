@@ -7,25 +7,44 @@ The Docker CLI plugin lets you run `tally lint` as `docker lint`. It is a client
 
 `docker lint` maps to the lint command only. Use `tally lsp --stdio` for editor integrations and `tally version` for full standalone version details.
 
-## Install with Homebrew
+## Install
 
-Homebrew installs the `tally` binary and a `docker-lint` plugin symlink.
+Install tally globally, make sure `docker info` works, then ask tally to register the `docker-lint` plugin with Docker.
 
-```bash
+<CodeGroup>
+
+```bash Homebrew
 brew install wharflab/tap/tally
+tally register-docker-plugin
 ```
 
-Add Homebrew's Docker plugin directory to `~/.docker/config.json`:
-
-```json
-{
-  "cliPluginsExtraDirs": [
-    "/opt/homebrew/lib/docker/cli-plugins"
-  ]
-}
+```powershell WinGet
+winget install --id Wharflab.Tally
+tally register-docker-plugin
 ```
 
-Use `/usr/local/lib/docker/cli-plugins` on Intel macOS, or the matching Linuxbrew prefix on Linux.
+```bash npm
+npm install -g tally-cli
+tally register-docker-plugin
+```
+
+```bash uv
+uv tool install tally-cli
+tally register-docker-plugin
+```
+
+</CodeGroup>
+
+The command refuses project-local or temporary launches such as `node_modules`, `.venv`, and `go run`. Use a global install before running it.
+
+During registration, tally runs `docker info --format json`, checks the Docker CLI version, inspects existing Docker CLI plugins, and verifies the
+registration after writing `docker-lint`. If Docker already has a non-tally `lint` plugin, tally stops instead of shadowing it. If an older tally
+plugin is present, tally reports the upgrade. If a newer tally plugin is already registered, tally does not overwrite it unless you pass `--force`.
+
+```text
+Found Docker CLI version 29.4.1
+Upgrading tally lint plugin from version 0.5.6 to 0.7.19
+```
 
 Verify the plugin:
 
@@ -33,9 +52,15 @@ Verify the plugin:
 docker lint --help
 ```
 
-## Manual install
+Use `--dry-run` to inspect the Docker CLI version, source, target path, and existing plugin decision before making changes:
 
-If you installed tally through another package manager, register the same binary as `docker-lint`.
+```bash
+tally register-docker-plugin --dry-run
+```
+
+## Manual fallback
+
+If you cannot use `tally register-docker-plugin`, register the same binary as `docker-lint`.
 
 <CodeGroup>
 
@@ -54,6 +79,18 @@ docker lint --help
 </CodeGroup>
 
 On Windows, repeat the copy after upgrading tally unless your installer manages the plugin file for you.
+
+Homebrew also installs a `docker-lint` symlink under its own Docker plugin directory. If you prefer to use that Homebrew-managed file, add Homebrew's plugin directory to `~/.docker/config.json`:
+
+```json
+{
+  "cliPluginsExtraDirs": [
+    "/opt/homebrew/lib/docker/cli-plugins"
+  ]
+}
+```
+
+Use `/usr/local/lib/docker/cli-plugins` on Intel macOS, or the matching Linuxbrew prefix on Linux.
 
 ## Usage
 
@@ -87,7 +124,7 @@ Docker did not find `docker-lint`. Check that the file exists in one of Docker's
 ls ~/.docker/cli-plugins/docker-lint
 ```
 
-For Homebrew installs, confirm that your Docker config uses the absolute Homebrew prefix path.
+Run `tally register-docker-plugin --dry-run` to confirm where tally will register `docker-lint`.
 
 ### Invalid plugin metadata
 
@@ -119,4 +156,4 @@ chmod +x ~/.docker/cli-plugins/docker-lint
 
 `docker lint` exposes linting only. It does not expose `tally lsp` or `tally version` as Docker subcommands.
 
-WinGet exposes `docker-lint` as a command alias, but Docker does not search `PATH` for CLI plugins. Use the Windows manual install command above to copy the binary into Docker's plugin directory.
+WinGet exposes `docker-lint` as a command alias, but Docker does not search `PATH` for CLI plugins. Run `tally register-docker-plugin` after installing or upgrading tally through WinGet.

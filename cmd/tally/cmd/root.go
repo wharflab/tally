@@ -53,6 +53,7 @@ Examples:
 	cmd.AddCommand(lintCommand())
 	cmd.AddCommand(lspCommand())
 	cmd.AddCommand(versionCommand())
+	cmd.AddCommand(registerDockerPluginCommand())
 
 	return cmd
 }

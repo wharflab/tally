@@ -1,6 +1,6 @@
 ---
 title: "Installation"
-description: "Install tally via Homebrew, WinGet, npm, pip, RubyGems, Docker, Go, or from source."
+description: "Install tally via Homebrew, WinGet, npm, uv, pip, RubyGems, Docker, Go, or from source."
 ---
 
 tally is a single self-contained binary. Pick the method that fits your environment.
@@ -17,6 +17,10 @@ winget install --id Wharflab.Tally
 
 ```bash npm
 npm install -g tally-cli
+```
+
+```bash uv
+uv tool install tally-cli
 ```
 
 ```bash pip
@@ -39,7 +43,10 @@ go install github.com/wharflab/tally@latest
 brew install wharflab/tap/tally
 ```
 
-Homebrew also installs a `docker-lint` symlink for Docker CLI plugin usage. See [Docker CLI plugin](/integrations/docker-cli-plugin) to configure Docker's `cliPluginsExtraDirs`.
+Run `tally register-docker-plugin` if you want Docker to discover the plugin without editing `~/.docker/config.json`.
+
+Homebrew also installs a `docker-lint` symlink under Homebrew's Docker plugin directory. See
+[Docker CLI plugin](/integrations/docker-cli-plugin) if you prefer to configure Docker's `cliPluginsExtraDirs`.
 
 ## WinGet (Windows)
 
@@ -47,11 +54,23 @@ Homebrew also installs a `docker-lint` symlink for Docker CLI plugin usage. See 
 winget install --id Wharflab.Tally
 ```
 
+Run `tally register-docker-plugin` after installation to register the plugin with Docker.
+
 ## npm
 
 ```bash
 npm install -g tally-cli
 ```
+
+Use a global npm install for Docker CLI plugin setup. Project-local `node_modules` installs are rejected by `tally register-docker-plugin`.
+
+## uv
+
+```bash
+uv tool install tally-cli
+```
+
+Use `uv tool install` for Python-managed Docker CLI plugin setup. Project-local virtual environments are rejected by `tally register-docker-plugin`.
 
 ## pip
 
@@ -149,7 +168,13 @@ tally --help
 tally lint --help
 ```
 
-If you configured the Docker CLI plugin, verify that Docker can discover it:
+To enable the Docker CLI plugin, run the registration command from a global tally install:
+
+```bash
+tally register-docker-plugin
+```
+
+Then verify that Docker can discover it:
 
 ```bash
 docker lint --help
