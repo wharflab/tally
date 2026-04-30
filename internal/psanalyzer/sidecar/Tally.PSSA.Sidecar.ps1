@@ -106,7 +106,7 @@ try {
     exit 1
 }
 
-while (($line = [Console]::In.ReadLine()) -ne $null) {
+while ($null -ne ($line = [Console]::In.ReadLine())) {
     if ([string]::IsNullOrWhiteSpace($line)) {
         continue
     }
