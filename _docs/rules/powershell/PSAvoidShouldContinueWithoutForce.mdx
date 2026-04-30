@@ -19,8 +19,51 @@ Functions that use ShouldContinue should have a boolean force parameter to allow
 You can get more details by running `Get-Help about_Functions_CmdletBindingAttribute` and
 `Get-Help about_Functions_Advanced_Methods` command in PowerShell.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Call the `ShouldContinue` method in advanced functions when `ShouldProcess` method returns `$true`.
+
+## Examples
+
+### Problematic code
+
+```powershell
+Function Test-ShouldContinue
+{
+    [CmdletBinding(SupportsShouldProcess=$true)]
+    Param
+    (
+        $MyString = 'blah'
+    )
+
+    if ($PsCmdlet.ShouldContinue('ShouldContinue Query', 'ShouldContinue Caption'))
+    {
+        ...
+    }
+}
+```
+
+### Correct code
+
+```powershell
+Function Test-ShouldContinue
+{
+    [CmdletBinding(SupportsShouldProcess=$true)]
+    Param
+    (
+        $MyString = 'blah',
+        [Switch]$Force
+    )
+
+    if ($Force -or $PsCmdlet.ShouldContinue('ShouldContinue Query', 'ShouldContinue Caption'))
+    {
+        ...
+    }
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidShouldContinueWithoutForce](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidShouldContinueWithoutForce.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

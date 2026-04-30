@@ -24,8 +24,49 @@ The use of `Write-Host` in a function is discouraged unless the function uses th
 `Show` verb explicitly means _display information to the user_. This rule doesn't apply to functions
 with the `Show` verb.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Replace `Write-Host` with `Write-Output` or `Write-Verbose` depending on whether the intention is
+logging or returning one or more objects.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function Get-MeaningOfLife
+{
+    Write-Host 'Computing the answer to the ultimate question of life, the universe and everything'
+    Write-Host 42
+}
+```
+
+### Correct code
+
+Use `Write-Verbose` for informational messages. The user can decide whether to see the message by
+providing the **Verbose** parameter.
+
+```powershell
+function Get-MeaningOfLife
+{
+    [CmdletBinding()]Param() # makes it possible to support Verbose output
+
+    Write-Verbose 'Computing the answer to the ultimate question of life, the universe and everything'
+    Write-Output 42
+}
+
+function Show-Something
+{
+    Write-Host 'show something on screen'
+}
+```
+
+## More information
+
+[Write-Host](https://learn.microsoft.com/powershell/module/microsoft.powershell.utility/write-host)
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidUsingWriteHost](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingWriteHost.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

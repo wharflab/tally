@@ -22,8 +22,32 @@ hashtables with case-insensitive key look-up.
 This rule is intended to warn the author of the case-sensitive nature of the hashtable when created
 using the `new` method or the `New-Object` cmdlet.
 
-## Reference
+## How to Fix
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Create the hashtable using a literal hashtable expression.
+
+## Examples
+
+### Problematic code (`[hashtable]::new()`)
+
+```powershell
+$hashtable = [hashtable]::new()
+```
+
+### Problematic code (`New-Object`)
+
+```powershell
+$hashtable = New-Object -TypeName hashtable
+```
+
+### Correct code
+
+```powershell
+$hashtable = @{}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [UseLiteralInitializerForHashtable](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseLiteralInitializerForHashtable.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

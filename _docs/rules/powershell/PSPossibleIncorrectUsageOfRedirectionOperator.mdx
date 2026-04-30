@@ -23,8 +23,28 @@ of that is quite high.
 The rule looks for usages of `>` or `>=` operators inside `if`, `elseif`, `while` and `do-while`
 statements because this is likely going to be unintentional usage.
 
-## Reference
+## Examples
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+### Problematic code
+
+```powershell
+if ($a > $b)
+{
+    ...
+}
+```
+
+### Correct code
+
+```powershell
+if ($a -gt $b)
+{
+    ...
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [PossibleIncorrectUsageOfRedirectionOperator](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/PossibleIncorrectUsageOfRedirectionOperator.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

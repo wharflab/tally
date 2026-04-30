@@ -16,11 +16,46 @@ sidebarTitle: "PSAvoidExclaimOperator"
 
 Avoid using the negation operator (`!`). Use `-not` for improved readability.
 
-> [!NOTE]
-> This rule is not enabled by default. The user needs to enable it through settings.
+<Note>
+  This rule is not enabled by default. The user needs to enable it through settings.
+</Note>
 
-## Reference
+## How to Fix
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Replace the `!` negation operator with the PowerShell `-not` operator.
+
+## Examples
+
+### Problematic code
+
+```powershell
+$MyVar = !$true
+```
+
+### Correct code
+
+```powershell
+$MyVar = -not $true
+```
+
+## Configuration
+
+```powershell
+Rules = @{
+    PSAvoidExclaimOperator  = @{
+        Enable = $true
+    }
+}
+```
+
+### Parameters
+
+- `Enable`: **bool** (Default value is `$false`)
+
+  Enable or disable the rule during ScriptAnalyzer invocation.
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidExclaimOperator](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidExclaimOperator.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

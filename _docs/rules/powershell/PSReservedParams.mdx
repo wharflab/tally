@@ -18,8 +18,44 @@ You can't redefine [common parameters][01] in an advanced function. Using the `C
 `Parameter` attributes creates an advanced function. The common parameters are are automatically
 available in advanced functions, so you can't redefine them.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Change the name of the parameter.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function Test
+{
+    [CmdletBinding()]
+    Param
+    (
+        $ErrorVariable,
+        $Parameter2
+    )
+}
+```
+
+### Correct code
+
+```powershell
+function Test
+{
+    [CmdletBinding()]
+    Param
+    (
+        $Err,
+        $Parameter2
+    )
+}
+```
+
+[01]: /powershell/module/microsoft.powershell.core/about/about_commonparameters
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [ReservedParams](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/ReservedParams.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

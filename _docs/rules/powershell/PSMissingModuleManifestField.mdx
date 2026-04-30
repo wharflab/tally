@@ -24,8 +24,39 @@ Module manifests must contain the following keys (and a corresponding value) to 
 
 All other keys are optional. The order of the entries is not important.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Please consider adding the missing fields to the manifest.
+
+## Examples
+
+### Problematic code
+
+```powershell
+@{
+    Author              = 'PowerShell Author'
+    NestedModules       = @('.\mymodule.psm1')
+    FunctionsToExport   = '*'
+    CmdletsToExport     = '*'
+    VariablesToExport   = '*'
+}
+```
+
+### Correct code
+
+```powershell
+@{
+    ModuleVersion       = '1.0'
+    Author              = 'PowerShell Author'
+    NestedModules       = @('.\mymodule.psm1')
+    FunctionsToExport   = '*'
+    CmdletsToExport     = '*'
+    VariablesToExport   = '*'
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [MissingModuleManifestField](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/MissingModuleManifestField.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

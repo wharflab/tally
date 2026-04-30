@@ -17,8 +17,104 @@ sidebarTitle: "PSDSCUseIdenticalParametersForDSC"
 The `Get-TargetResource`, `Test-TargetResource` and `Set-TargetResource` functions of DSC Resource
 must have the same parameters.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Correct the parameters for the functions in DSC resource.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function Get-TargetResource
+{
+    [OutputType([Hashtable])]
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name,
+
+        [String]
+        $TargetResource
+    )
+    ...
+}
+
+function Set-TargetResource
+{
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+
+function Test-TargetResource
+{
+    [OutputType([System.Boolean])]
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+```
+
+### Correct code
+
+```powershell
+function Get-TargetResource
+{
+    [OutputType([Hashtable])]
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name,
+
+        [String]
+        $TargetResource
+    )
+    ...
+}
+
+function Set-TargetResource
+{
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name,
+
+        [String]
+        $TargetResource
+    )
+    ...
+}
+
+function Test-TargetResource
+{
+    [OutputType([System.Boolean])]
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name,
+
+        [String]
+        $TargetResource
+    )
+    ...
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [DSCUseIdenticalParametersForDSC](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/DSCUseIdenticalParametersForDSC.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

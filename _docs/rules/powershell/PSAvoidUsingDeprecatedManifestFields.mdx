@@ -18,8 +18,30 @@ In PowerShell 5.0, a number of fields in module manifest files (`.psd1`) have be
 
 The field `ModuleToProcess` has been replaced with the `RootModule` field.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Replace `ModuleToProcess` with `RootModule` in the module manifest.
+
+## Examples
+
+### Problematic code
+
+```powershell
+ModuleToProcess ='psscriptanalyzer'
+
+ModuleVersion = '1.0'
+```
+
+### Correct code
+
+```powershell
+RootModule ='psscriptanalyzer'
+
+ModuleVersion = '1.0'
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidUsingDeprecatedManifestFields](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingDeprecatedManifestFields.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

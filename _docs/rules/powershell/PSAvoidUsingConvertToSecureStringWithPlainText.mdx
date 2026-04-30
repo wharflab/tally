@@ -18,8 +18,34 @@ Dockerfiles.
 The use of the `AsPlainText` parameter with the `ConvertTo-SecureString` command can expose secure
 information.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Use a standard encrypted variable to perform any SecureString conversions.
+
+## Recommendations
+
+If you do need an ability to retrieve the password from somewhere without prompting the user,
+consider using the
+[SecretStore](https://www.powershellgallery.com/packages/Microsoft.PowerShell.SecretStore)
+module from the PowerShell Gallery.
+
+## Examples
+
+### Problematic code
+
+```powershell
+$UserInput = Read-Host 'Please enter your secure code'
+$EncryptedInput = ConvertTo-SecureString -String $UserInput -AsPlainText -Force
+```
+
+### Correct code
+
+```powershell
+$SecureUserInput = Read-Host 'Please enter your secure code' -AsSecureString
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidUsingConvertToSecureStringWithPlainText](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingConvertToSecureStringWithPlainText.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

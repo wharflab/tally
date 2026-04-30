@@ -29,8 +29,45 @@ Using the full command name makes it easier to maintain your scripts in the the 
 Using the full command names also allows for syntax highlighting in sites and applications like
 GitHub and Visual Studio Code.
 
-## Reference
+## How to Fix
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Use the full cmdlet name and not an alias.
+
+## Alias Allowlist
+
+To prevent `PSScriptAnalyzer` from flagging your preferred aliases, create an allowlist of the
+aliases in your settings file and point `PSScriptAnalyzer` to use the settings file. For example, to
+disable `PSScriptAnalyzer` from flagging `cd`, which is an alias of `Set-Location`, set the settings
+file content to the following.
+
+```powershell
+# PSScriptAnalyzerSettings.psd1
+
+@{
+    'Rules' = @{
+        'PSAvoidUsingCmdletAliases' = @{
+            'allowlist' = @('cd')
+        }
+    }
+}
+```
+
+## Examples
+
+### Problematic code
+
+```powershell
+gps | Where-Object {$_.WorkingSet -gt 20000000}
+```
+
+### Correct code
+
+```powershell
+Get-Process | Where-Object {$_.WorkingSet -gt 20000000}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidUsingCmdletAliases](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingCmdletAliases.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -19,8 +19,28 @@ or runtime errors.
 
 Reserved Characters include: ``#,(){}[]&/\\$^;:\"'<>|?@`*%+=~``
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Remove reserved characters from names.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function MyFunction[1]
+{...}
+```
+
+### Correct code
+
+```powershell
+function MyFunction
+{...}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [ReservedCmdletChar](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/ReservedCmdletChar.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

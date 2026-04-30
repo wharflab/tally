@@ -23,8 +23,56 @@ The rule looks for usages of `==` and `=` operators inside `if`, `else if`, `whi
 statements but it does not warn if any kind of command or expression is used at the right hand side
 as this is probably by design.
 
-## Reference
+## Examples
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+### Problematic code
+
+```powershell
+if ($a = $b)
+{
+    ...
+}
+```
+
+```powershell
+if ($a == $b)
+{
+
+}
+```
+
+### Correct code
+
+```powershell
+if ($a -eq $b) # Compare $a with $b
+{
+    ...
+}
+```
+
+```powershell
+if ($a = Get-Something) # Only execute action if command returns something and assign result to variable
+{
+    Do-SomethingWith $a
+}
+```
+
+## Implicit suppression using Clang style
+
+There are some rare cases where assignment of variable inside an `if` statement is by design.
+Instead of suppressing the rule, one can also signal that assignment was intentional by wrapping the
+expression in extra parenthesis. An exception for this is when `$null` is used on the LHS because
+there is no use case for this.
+
+```powershell
+if (($shortVariableName = $SuperLongVariableName['SpecialItem']['AnotherItem']))
+{
+    ...
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [PossibleIncorrectUsageOfAssignmentOperator](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/PossibleIncorrectUsageOfAssignmentOperator.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

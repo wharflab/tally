@@ -25,8 +25,64 @@ For more information, see the following articles:
 - [about_Functions_CmdletBindingAttribute][02]
 - [Everything you wanted to know about ShouldProcess][03]
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+To fix a violation of this rule, please call `ShouldProcess` method when a cmdlet declares
+`SupportsShouldProcess` attribute. Or please add `SupportsShouldProcess` attribute argument when
+calling `ShouldProcess`.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function Set-File
+{
+    [CmdletBinding(SupportsShouldProcess=$true)]
+    Param
+    (
+        # Path to file
+        [Parameter(Mandatory=$true)]
+        $Path
+    )
+    'String' | Out-File -FilePath $Path
+}
+```
+
+### Correct code
+
+```powershell
+function Set-File
+{
+    [CmdletBinding(SupportsShouldProcess=$true)]
+    Param
+    (
+        # Path to file
+        [Parameter(Mandatory=$true)]
+        $Path,
+
+        [Parameter(Mandatory=$true)]
+        [string]$Content
+    )
+
+    if ($PSCmdlet.ShouldProcess($Path, ("Setting content to '{0}'" -f $Content)))
+    {
+        $Content | Out-File -FilePath $Path
+    }
+    else
+    {
+        # Code that should be processed if doing a WhatIf operation
+        # Must NOT change anything outside of the function / script
+    }
+}
+```
+
+[01]: /powershell/module/microsoft.powershell.core/about/about_functions_advanced_methods
+[02]: /powershell/module/microsoft.powershell.core/about/about_Functions_CmdletBindingAttribute
+[03]: /powershell/scripting/learn/deep-dives/everything-about-shouldprocess
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [ShouldProcess](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/ShouldProcess.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

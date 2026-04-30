@@ -26,8 +26,22 @@ There are exceptions to that when double quoted strings are more readable. For e
 string value itself must contain a single quote or other special characters, such as newline
 (`` "`n" ``), are already being escaped. The rule does not warn in these cases.
 
-## Reference
+## Examples
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+### Problematic code
+
+```powershell
+$constantValue = "I Love PowerShell"
+```
+
+### Correct code
+
+```powershell
+$constantValue = 'I Love PowerShell'
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidUsingDoubleQuotesForConstantString](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingDoubleQuotesForConstantString.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

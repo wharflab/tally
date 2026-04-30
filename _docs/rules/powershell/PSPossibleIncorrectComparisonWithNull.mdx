@@ -28,8 +28,63 @@ There are multiple reasons why this occurs:
 The only way to reliably check if a value is `$null` is to place `$null` on the left side of the
 operator so that a scalar comparison is performed.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Move `$null` to the left side of the comparison.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function Test-CompareWithNull
+{
+    if ($DebugPreference -eq $null)
+    {
+    }
+}
+```
+
+### Correct code
+
+```powershell
+function Test-CompareWithNull
+{
+    if ($null -eq $DebugPreference)
+    {
+    }
+}
+```
+
+## Try it Yourself
+
+```powershell
+# This example returns 'false' because the comparison does not return any objects from the array
+if (@() -eq $null) { 'true' } else { 'false' }
+# This example returns 'true' because the array is empty
+if ($null -ne @()) { 'true' } else { 'false' }
+```
+
+This is how the comparison operator works by-design. But, as demonstrated, this can lead
+to non-intuitive behavior, especially when the intent is simple test for null.
+
+The following example demonstrates the designed behavior of the comparison operator when the
+left-hand side is a collection. Each element in the collection is compared to the right-hand side
+value. When true, that element of the collection is returned.
+
+```powershell
+PS> 1,2,3,1,2 -eq $null
+PS> 1,2,3,1,2 -eq 1
+1
+1
+PS> (1,2,3,1,2 -eq $null).count
+0
+PS> (1,2,$null,3,$null,1,2 -eq $null).count
+2
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [PossibleIncorrectComparisonWithNull](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/PossibleIncorrectComparisonWithNull.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -17,8 +17,64 @@ sidebarTitle: "PSReviewUnusedParameter"
 This rule identifies parameters declared in a script, scriptblock, or function scope that have not
 been used in that scope.
 
-## Reference
+## Configuration settings
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+By default, this rule doesn't consider child scopes other than scriptblocks provided to
+`Where-Object` or `ForEach-Object`. The `CommandsToTraverse` setting is an string array allows you
+to add additional commands that accept scriptblocks that this rule should examine.
+
+```powershell
+@{
+    Rules = @{
+        PSReviewUnusedParameter = @{
+            CommandsToTraverse = @(
+                'Invoke-PSFProtectedCommand'
+            )
+        }
+    }
+}
+```
+
+## How
+
+Consider removing the unused parameter.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function Test-Parameter
+{
+    Param (
+        $Parameter1,
+
+        # this parameter is never called in the function
+        $Parameter2
+    )
+
+    Get-Something $Parameter1
+}
+```
+
+### Correct code
+
+```powershell
+function Test-Parameter
+{
+    Param (
+        $Parameter1,
+
+        # now this parameter is being called in the same scope
+        $Parameter2
+    )
+
+    Get-Something $Parameter1 $Parameter2
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [ReviewUnusedParameter](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/ReviewUnusedParameter.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

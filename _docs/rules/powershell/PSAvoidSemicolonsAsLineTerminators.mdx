@@ -16,11 +16,52 @@ sidebarTitle: "PSAvoidSemicolonsAsLineTerminators"
 
 Lines should not end with a semicolon.
 
-> [!NOTE]
-> This rule is not enabled by default. The user needs to enable it through settings.
+<Note>
+  This rule is not enabled by default. The user needs to enable it through settings.
+</Note>
 
-## Reference
+## Examples
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+### Problematic code
+
+```powershell
+Install-Module -Name PSScriptAnalyzer; $a = 1 + $b;
+```
+
+```powershell
+Install-Module -Name PSScriptAnalyzer;
+$a = 1 + $b
+```
+
+### Correct code
+
+```powershell
+Install-Module -Name PSScriptAnalyzer; $a = 1 + $b
+```
+
+```powershell
+Install-Module -Name PSScriptAnalyzer
+$a = 1 + $b
+```
+
+## Configuration
+
+```powershell
+Rules = @{
+    PSAvoidSemicolonsAsLineTerminators  = @{
+        Enable     = $true
+    }
+}
+```
+
+### Parameters
+
+#### Enable: bool (Default value is `$false`)
+
+Enable or disable the rule during ScriptAnalyzer invocation.
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidSemicolonsAsLineTerminators](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidSemicolonsAsLineTerminators.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

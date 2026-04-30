@@ -19,8 +19,39 @@ Mandatory parameters should not have a default values because there is no scenar
 can be used. PowerShell prompts for a value if the parameter value is not specified when calling the
 function.
 
-## Reference
+## Examples
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+### Problematic code
+
+```powershell
+function Test
+{
+
+    [CmdletBinding()]
+    Param
+    (
+        [Parameter(Mandatory=$true)]
+        $Parameter1 = 'default Value'
+    )
+}
+```
+
+### Correct code
+
+```powershell
+function Test
+{
+    [CmdletBinding()]
+    Param
+    (
+        [Parameter(Mandatory=$true)]
+        $Parameter1
+    )
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidDefaultValueForMandatoryParameter](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidDefaultValueForMandatoryParameter.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

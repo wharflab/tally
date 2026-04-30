@@ -23,8 +23,34 @@ unapproved verbs are documented on the approved verbs page and point to approved
 searching for the verb you used to find its approved form. For example, searching for `Read`,
 `Open`, or `Search` leads you to `Get`.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Change the verb in the cmdlet's name to an approved verb.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function Change-Item
+{
+    ...
+}
+```
+
+### Correct code
+
+```powershell
+function Update-Item
+{
+    ...
+}
+```
+
+[01]: /powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [UseApprovedVerbs](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseApprovedVerbs.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

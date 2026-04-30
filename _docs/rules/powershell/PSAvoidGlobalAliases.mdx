@@ -22,8 +22,26 @@ To understand more about scoping, see `Get-Help about_Scopes`.
 **NOTE** This rule is not available in PowerShell version 3 or 4 because it uses the
 `StaticParameterBinder.BindCommand` API.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Use other scope modifiers for new aliases.
+
+## Examples
+
+### Problematic code
+
+```powershell
+New-Alias -Name Name -Value Value -Scope Global
+```
+
+### Correct code
+
+```powershell
+New-Alias -Name Name1 -Value Value
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidGlobalAliases](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidGlobalAliases.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

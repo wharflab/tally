@@ -33,8 +33,56 @@ Verbs that should support `ShouldProcess`:
 - `Reset`
 - `Update`
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Include the `SupportsShouldProcess` argument in the `CmdletBinding` attribute.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function Set-ServiceObject
+{
+    [CmdletBinding()]
+    param
+    (
+        [string]
+        $Parameter1
+    )
+    ...
+}
+```
+
+### Correct code
+
+```powershell
+function Set-ServiceObject
+{
+    [CmdletBinding(SupportsShouldProcess = $true)]
+    param
+    (
+        [string]
+        $Parameter1
+    )
+    ...
+}
+```
+
+## More information
+
+- [about_Functions_CmdletBindingAttribute][01]
+- [Everything you wanted to know about ShouldProcess][04]
+- [Required Development Guidelines][03]
+- [Requesting Confirmation from Cmdlets][02]
+
+[01]: /powershell/module/microsoft.powershell.core/about/about_functions_cmdletbindingattribute
+[02]: /powershell/scripting/developer/cmdlet/requesting-confirmation-from-cmdlets
+[03]: /powershell/scripting/developer/cmdlet/required-development-guidelines#support-confirmation-requests-rd04
+[04]: /powershell/scripting/learn/deep-dives/everything-about-shouldprocess
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [UseShouldProcessForStateChangingFunctions](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseShouldProcessForStateChangingFunctions.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

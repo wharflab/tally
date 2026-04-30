@@ -36,8 +36,44 @@ All functions should use the same pattern when defining parameters. Possible pat
 In simple scenarios, both function definitions shown are considered to be equal. The purpose of this
 rule is to enforce consistent code style across the codebase.
 
-## Reference
+## How to Fix
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Rewrite function so it defines parameters as specified in the rule
+
+## Examples
+
+When the rule sets parameters definition kind to `Inline`:
+
+```powershell
+# Correct
+function f([Parameter()]$FirstParam) {
+    return
+}
+
+# Incorrect
+function g {
+    param([Parameter()]$FirstParam)
+    return
+}
+```
+
+When the rule sets parameters definition kind to `ParamBlock`:
+
+```powershell
+# Incorrect
+function f([Parameter()]$FirstParam) {
+    return
+}
+
+# Correct
+function g {
+    param([Parameter()]$FirstParam)
+    return
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [UseConsistentParametersKind](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseConsistentParametersKind.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

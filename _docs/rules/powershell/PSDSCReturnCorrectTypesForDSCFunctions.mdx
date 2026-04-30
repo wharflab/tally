@@ -28,8 +28,144 @@ For class based resources:
 - `Test` must return a boolean.
 - `Get` must return an instance of the DSC class.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Ensure that each function returns the correct type.
+
+## Example 1
+
+### Problematic code
+
+```powershell
+function Get-TargetResource
+{
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+
+function Set-TargetResource
+{
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+
+function Test-TargetResource
+{
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+```
+
+### Correct code
+
+```powershell
+function Get-TargetResource
+{
+    [OutputType([Hashtable])]
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+
+function Set-TargetResource
+{
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+
+function Test-TargetResource
+{
+    [OutputType([System.Boolean])]
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+```
+
+## Example 2
+
+### Problematic code
+
+```powershell
+[DscResource()]
+class MyDSCResource
+{
+    [DscProperty(Key)]
+    [string] $Name
+
+    [String] Get()
+    {
+        ...
+    }
+
+    [String] Set()
+    {
+        ...
+    }
+
+    [bool] Test()
+    {
+        ...
+    }
+}
+```
+
+### Correct code
+
+```powershell
+[DscResource()]
+class MyDSCResource
+{
+    [DscProperty(Key)]
+    [string] $Name
+
+    [MyDSCResource] Get()
+    {
+        ...
+    }
+
+    [void] Set()
+    {
+        ...
+    }
+
+    [bool] Test()
+    {
+        ...
+    }
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [DSCReturnCorrectTypesForDSCFunctions](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/DSCReturnCorrectTypesForDSCFunctions.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

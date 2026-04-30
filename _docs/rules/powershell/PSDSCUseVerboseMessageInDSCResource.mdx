@@ -17,8 +17,37 @@ sidebarTitle: "PSDSCUseVerboseMessageInDSCResource"
 Best practice recommends that additional user information is provided within commands, functions and
 scripts using `Write-Verbose`.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Make use of the `Write-Verbose` command.
+
+## Examples
+
+### Problematic code
+
+```powershell
+Function Test-Function
+{
+    [CmdletBinding()]
+    Param()
+    ...
+}
+```
+
+### Correct code
+
+```powershell
+Function Test-Function
+{
+    [CmdletBinding()]
+    Param()
+    Write-Verbose 'Verbose output'
+    ...
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [DSCUseVerboseMessageInDSCResource](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/DSCUseVerboseMessageInDSCResource.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

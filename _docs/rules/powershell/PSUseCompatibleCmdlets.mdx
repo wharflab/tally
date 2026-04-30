@@ -16,11 +16,11 @@ sidebarTitle: "PSUseCompatibleCmdlets"
 
 This rule flags cmdlets that aren't available in a given Edition and Version of PowerShell on a
 given Operating System. It works by comparing a cmdlet against a set of allowlists which ship with
-PSScriptAnalyzer. They can be found at `/path/to/PSScriptAnalyzerModule/Settings`. These files are
-of the form, `<psedition>-<psversion>-<os>.json` where `<psedition>` can be either `Core` or
-`Desktop`, `<os>` can be either `Windows`, `Linux` or `MacOS`, and `<psversion>` is the PowerShell
-version. To enable the rule to check if your script is compatible on PowerShell Core on windows, put
-the following your settings file:
+PSScriptAnalyzer. They can be found at `/path/to/PSScriptAnalyzerModule/Settings`. These files use
+the `<psedition>-<psversion>-<os>.json` form, where `<psedition>` can be either `Core` or `Desktop`,
+`<os>` can be either `Windows`, `Linux` or `MacOS`, and `<psversion>` is the PowerShell version. To
+enable the rule to check if your script is compatible on PowerShell Core on windows, put the
+following your settings file:
 
 ```powershell
 @{
@@ -52,8 +52,8 @@ reached it's end of life.
 
 [01]: https://github.com/PowerShell/PSScriptAnalyzer/blob/main/Utils/New-CommandDataFile.ps1
 
-## Reference
+## Source
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [UseCompatibleCmdlets](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseCompatibleCmdlets.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

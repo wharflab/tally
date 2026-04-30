@@ -26,8 +26,34 @@ Globally scoped variables include:
 
 To understand more about scoping, see `Get-Help about_Scopes`.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Use other scope modifiers for variables.
+
+## Examples
+
+### Problematic code
+
+```powershell
+$Global:var1 = $null
+function Test-NotGlobal ($var)
+{
+    $a = $var + $var1
+}
+```
+
+### Correct code
+
+```powershell
+$var1 = $null
+function Test-NotGlobal ($var1, $var2)
+{
+    $a = $var1 + $var2
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidGlobalVars](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidGlobalVars.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

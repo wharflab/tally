@@ -19,8 +19,41 @@ A command should return the same type as declared in `OutputType`.
 You can get more details by running `Get-Help about_Functions_OutputTypeAttribute` command in
 PowerShell.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Specify that the OutputType attribute lists and the types returned in the cmdlet match.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function Get-Foo
+{
+        [CmdletBinding()]
+        [OutputType([String])]
+        Param(
+        )
+        return 4
+}
+```
+
+### Correct code
+
+```powershell
+function Get-Foo
+{
+        [CmdletBinding()]
+        [OutputType([String])]
+        Param(
+        )
+
+        return 'four'
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [UseOutputTypeCorrectly](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseOutputTypeCorrectly.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -20,8 +20,33 @@ only be assigned in certain special cases to achieve a certain effect as a speci
 
 To understand more about automatic variables, see `Get-Help about_Automatic_Variables`.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Use variable names in functions or their parameters that do not conflict with automatic variables.
+
+## Examples
+
+### Problematic code
+
+The variable `$Error` is an automatic variables that exists in the global scope and should therefore
+never be used as a variable or parameter name.
+
+```powershell
+function foo($Error){ }
+```
+
+```powershell
+function Get-CustomErrorMessage($ErrorMessage){ $Error = "Error occurred: $ErrorMessage" }
+```
+
+### Correct code
+
+```powershell
+function Get-CustomErrorMessage($ErrorMessage){ $FinalErrorMessage = "Error occurred: $ErrorMessage" }
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidAssignmentToAutomaticVariable](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidAssignmentToAutomaticVariable.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

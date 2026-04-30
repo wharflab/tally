@@ -12,6 +12,8 @@ sidebarTitle: "PSAvoidUsingPositionalParameters"
 | Category | PSScriptAnalyzer |
 | Auto-fix | No |
 
+**Severity Level: Information**
+
 ## Description
 
 Using positional parameters reduces the readability of code and can introduce errors. It is possible
@@ -23,8 +25,47 @@ rule from being too noisy, this rule gets only triggered when there are 3 or mor
 supplied. A simple example where the risk of using positional parameters is negligible, is
 `Test-Path $Path`.
 
-## Reference
+## Configuration
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+```powershell
+Rules = @{
+    PSAvoidUsingPositionalParameters = @{
+        CommandAllowList = 'Join-Path', 'MyCmdletOrScript'
+        Enable           = $true
+    }
+}
+```
+
+### Parameters
+
+#### CommandAllowList: string[] (Default value is @()')
+
+Commands or scripts to be excluded from this rule.
+
+#### Enable: bool (Default value is `$true`)
+
+Enable or disable the rule during ScriptAnalyzer invocation.
+
+## How
+
+Use full parameter names when calling commands.
+
+## Examples
+
+### Problematic code
+
+```powershell
+Get-Command ChildItem Microsoft.PowerShell.Management
+```
+
+### Correct code
+
+```powershell
+Get-Command -Noun ChildItem -Module Microsoft.PowerShell.Management
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidUsingPositionalParameters](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingPositionalParameters.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

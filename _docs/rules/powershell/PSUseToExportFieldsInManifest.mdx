@@ -25,8 +25,45 @@ To improve the performance of module auto-discovery, module manifests should not
 Using wildcards or null has causes PowerShell to perform expensive work to analyze a module during
 module auto-discovery.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Use an explicit list in the entries.
+
+## Example 1
+
+Suppose there are no functions in your module to export. Then,
+
+### Problematic code
+
+```powershell
+FunctionsToExport = $null
+```
+
+### Correct code
+
+```powershell
+FunctionToExport = @()
+```
+
+## Example 2
+
+Suppose there are only two functions in your module, `Get-Foo` and `Set-Foo` that you want to
+export. Then,
+
+### Problematic code
+
+```powershell
+FunctionsToExport = '*'
+```
+
+### Correct code
+
+```powershell
+FunctionToExport = @(Get-Foo, Set-Foo)
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [UseToExportFieldsInManifest](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseToExportFieldsInManifest.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

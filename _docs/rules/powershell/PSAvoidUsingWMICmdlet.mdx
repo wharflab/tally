@@ -35,8 +35,34 @@ Use the following cmdlets instead:
 The CIM cmdlets comply with WS-Management (WSMan) standards and with the Common Information Model
 (CIM) standard, allowing for the management of Windows and non-Windows operating systems.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Change to the equivalent CIM based cmdlet.
+
+- `Get-WmiObject` -> `Get-CimInstance`
+- `Remove-WmiObject` -> `Remove-CimInstance`
+- `Invoke-WmiMethod` -> `Invoke-CimMethod`
+- `Register-WmiEvent` -> `Register-CimIndicationEvent`
+- `Set-WmiInstance` -> `Set-CimInstance`
+
+## Examples
+
+### Problematic code
+
+```powershell
+Get-WmiObject -Query 'Select * from Win32_Process where name LIKE "myprocess%"' | Remove-WmiObject
+Invoke-WmiMethod -Class Win32_Process -Name 'Create' -ArgumentList @{ CommandLine = 'notepad.exe' }
+```
+
+### Correct code
+
+```powershell
+Get-CimInstance -Query 'Select * from Win32_Process where name LIKE "myprocess%"' | Remove-CIMInstance
+Invoke-CimMethod -ClassName Win32_Process -MethodName 'Create' -Arguments @{ CommandLine = 'notepad.exe' }
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidUsingWMICmdlet](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingWMICmdlet.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

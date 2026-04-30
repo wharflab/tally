@@ -25,8 +25,56 @@ If a scriptblock is intended to be run in a new runspace, variables inside it sh
 - The `Script` resource in DSC configurations, specifically for the `GetScript`, `TestScript` and
   `SetScript` properties.
 
-## Reference
+## How to Fix
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Within the ScriptBlock, instead of just using a variable from the parent scope, you have to add the
+`using:` scope modifier to it.
+
+## Examples
+
+### Problematic code
+
+```powershell
+$var = 'foo'
+1..2 | ForEach-Object -Parallel { $var }
+```
+
+### Correct code
+
+```powershell
+$var = 'foo'
+1..2 | ForEach-Object -Parallel { $using:var }
+```
+
+## More correct examples
+
+```powershell
+$bar = 'bar'
+Invoke-Command -ComputerName 'foo' -ScriptBlock { $using:bar }
+```
+
+```powershell
+$bar = 'bar'
+$s = New-PSSession -ComputerName 'foo'
+Invoke-Command -Session $s -ScriptBlock { $using:bar }
+```
+
+```powershell
+# Remark: Workflow is supported on Windows PowerShell only
+Workflow {
+    $foo = 'foo'
+    InlineScript { $using:foo }
+}
+```
+
+```powershell
+$foo = 'foo'
+Start-ThreadJob -ScriptBlock { $using:foo }
+Start-Job -ScriptBlock {$using:foo }
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [UseUsingScopeModifierInNewRunspaces](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseUsingScopeModifierInNewRunspaces.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

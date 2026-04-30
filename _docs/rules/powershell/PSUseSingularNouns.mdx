@@ -24,8 +24,54 @@ function Get-Elements {
 }
 ```
 
-## Reference
+## Configuration
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+```powershell
+Rules = @{
+    PSUseSingularNouns = @{
+        Enable           = $true
+        NounAllowList    = 'Data', 'Windows', 'Foos'
+    }
+}
+```
+
+### Parameters
+
+- `Enable`: `bool` (Default value is `$true`)
+
+  Enable or disable the rule during ScriptAnalyzer invocation.
+
+- `NounAllowList`: `string[]` (Default value is `{'Data', 'Windows'}`)
+
+  Commands to be excluded from this rule. `Data` and `Windows` are common false positives and are
+  excluded by default.
+
+## How
+
+Change plurals to singular.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function Get-Files
+{
+    ...
+}
+```
+
+### Correct code
+
+```powershell
+function Get-File
+{
+    ...
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [UseSingularNouns](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseSingularNouns.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -19,8 +19,26 @@ name collision can cause difficult to debug issues for consumers of modules.
 
 To understand more about scoping, see `Get-Help about_Scopes`.
 
-## Reference
+## How
 
-This rule description is adapted from Microsoft's PSScriptAnalyzer documentation for
+Use other scope modifiers for functions.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function global:functionName {}
+```
+
+### Correct code
+
+```powershell
+function functionName {}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
 [AvoidGlobalFunctions](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidGlobalFunctions.md),
 licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
