@@ -60,6 +60,7 @@ type dockerPluginRegistrar struct {
 	dockerConfig   string
 	args0          string
 	currentVersion string
+	virtualEnv     string
 	executable     func() (string, error)
 	lookPath       func(string) (string, error)
 	commandOut     func(string, ...string) (string, error)
@@ -152,6 +153,7 @@ func newDockerPluginRegistrar() dockerPluginRegistrar {
 		dockerConfig:   os.Getenv("DOCKER_CONFIG"),
 		args0:          os.Args[0],
 		currentVersion: version.RawVersion(),
+		virtualEnv:     os.Getenv("VIRTUAL_ENV"),
 		executable:     os.Executable,
 		lookPath:       exec.LookPath,
 		commandOut:     commandOutputWithTimeout,
@@ -420,6 +422,12 @@ func (r dockerPluginRegistrar) classifySource(source string) (string, error) {
 	if r.pathWithin(source, r.tempDir) {
 		return "", fmt.Errorf("%s is a temporary executable, not a persistent global install", source)
 	}
+	if r.isVirtualEnvPath(source) {
+		return "", fmt.Errorf(
+			"%s is inside the active Python virtual environment; use uv tool install tally-cli for automatic plugin registration",
+			source,
+		)
+	}
 	if r.isProjectLocalExecutable(source) {
 		return "", fmt.Errorf("%s is inside the current project; install tally globally before registering the Docker plugin", source)
 	}
@@ -544,8 +552,6 @@ func (r dockerPluginRegistrar) projectRoot() string {
 			"bun.lock",
 			"bun.lockb",
 			"node_modules",
-			".venv",
-			"venv",
 		} {
 			if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
 				return dir
@@ -622,6 +628,10 @@ func (r dockerPluginRegistrar) bunGlobalRoots() []string {
 		)
 	}
 	return cleanPathList(roots)
+}
+
+func (r dockerPluginRegistrar) isVirtualEnvPath(path string) bool {
+	return r.pathWithin(path, strings.TrimSpace(r.virtualEnv))
 }
 
 func (r dockerPluginRegistrar) isUVToolPath(path string) bool {
@@ -900,9 +910,7 @@ func looksLikeWingetPath(path string) bool {
 
 func looksLikePythonPackagePath(path string) bool {
 	return pathHasSegment(path, "site-packages") ||
-		pathHasSegment(path, "dist-packages") ||
-		pathHasSegment(path, ".venv") ||
-		pathHasSegment(path, "venv")
+		pathHasSegment(path, "dist-packages")
 }
 
 func looksLikeGlobalBinaryPath(path string) bool {

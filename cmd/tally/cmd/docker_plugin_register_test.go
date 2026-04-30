@@ -16,11 +16,13 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 	bunRoot := filepath.Join(home, ".bun", "install", "global")
 	bunBin := filepath.Join(home, ".bun", "bin")
 	uvToolDir := filepath.Join(home, ".local", "share", "uv", "tools")
+	virtualEnv := filepath.Join(home, "work", "project", ".custom-env")
 	registrar := dockerPluginRegistrar{
-		goos:    "linux",
-		homeDir: home,
-		cwd:     filepath.Join(home, "work", "project"),
-		tempDir: filepath.Join(string(filepath.Separator), "tmp"),
+		goos:       "linux",
+		homeDir:    home,
+		cwd:        filepath.Join(home, "work", "project"),
+		tempDir:    filepath.Join(string(filepath.Separator), "tmp"),
+		virtualEnv: virtualEnv,
 		commandOut: func(name string, args ...string) (string, error) {
 			switch name + " " + strings.Join(args, " ") {
 			case "npm root -g":
@@ -132,12 +134,12 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 			want: "uv tool",
 		},
 		{
-			name: "python venv",
+			name: "python package install",
 			path: filepath.Join(
 				home,
 				"work",
 				"project",
-				".venv",
+				"python-env",
 				"lib",
 				"python3.14",
 				"site-packages",
@@ -147,6 +149,16 @@ func TestDockerPluginRegistrarClassifySource(t *testing.T) {
 				"tally",
 			),
 			wantErr: "Python virtual environment",
+		},
+		{
+			name:    "active virtualenv",
+			path:    filepath.Join(virtualEnv, "bin", "tally"),
+			wantErr: "active Python virtual environment",
+		},
+		{
+			name: "venv directory name without virtualenv",
+			path: filepath.Join(home, "tools", "venv", "bin", "tally"),
+			want: "global binary",
 		},
 		{
 			name:    "temporary go run",
