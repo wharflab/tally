@@ -1,13 +1,13 @@
 [package]
-name = "zed-tally"
-version = "0.1.0"
 edition = "2021"
-license = "GPL-3.0-only"
+license = "AGPL-3.0-only"
+name    = "zed-tally"
 publish = false
+version = "0.1.0"
 
 [lib]
 crate-type = ["cdylib"]
-path = "src/tally.rs"
+path       = "src/tally.rs"
 
 [dependencies]
 zed_extension_api = "0.7.0"

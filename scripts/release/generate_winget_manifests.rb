@@ -109,7 +109,7 @@ def default_locale_manifest(version, owner, repo)
     "PackageUrl" => "https://github.com/#{owner}/#{repo}",
     "ShortDescription" => SHORT_DESCRIPTION,
     "Moniker" => "tally",
-    "License" => "GPL-3.0-only",
+    "License" => "AGPL-3.0-only",
     "LicenseUrl" => "https://github.com/#{owner}/#{repo}/blob/main/LICENSE",
     "ReleaseNotesUrl" => "https://github.com/#{owner}/#{repo}/releases/tag/v#{version}",
     "Documentations" => DOCUMENTATION_LIST,

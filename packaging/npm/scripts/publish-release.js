@@ -93,7 +93,7 @@ function buildPlatformManifest(target, version) {
       type: "git",
       url: "git+https://github.com/wharflab/tally.git",
     },
-    license: "GPL-3.0-only",
+    license: "AGPL-3.0-only",
     bugs: {
       url: "https://github.com/wharflab/tally/issues",
     },

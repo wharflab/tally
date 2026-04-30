@@ -3,13 +3,13 @@ authors = [{ name = "Konstantin Vyatkin", email = "tino@vtkn.io" }]
 classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Operating System :: OS Independent",
     "Topic :: Software Development :: Quality Assurance",
 ]
 description = "A fast, configurable linter for Dockerfiles and Containerfiles"
 dynamic = ["version"]
-license = "GPL-3.0-only"
+license = "AGPL-3.0-only"
 license-files = ["LICENSE", "NOTICE"]
 name = "tally-cli"
 readme = "README.md"

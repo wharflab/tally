@@ -30,7 +30,7 @@ This document:
 
 - **Implementing ShellCheck in Go is not realistic** (hundreds of diagnostics + CFG/dataflow + a large test corpus). Don’t try to “port ShellCheck”
   for parity.
-- With Tally distributed as **GPLv3**, we can ship **a single Tally binary** that embeds **ShellCheck (GPLv3) compiled to WASI WebAssembly** and
+- With Tally distributed as **AGPLv3**, we can ship **a single Tally binary** that embeds **ShellCheck (GPLv3) compiled to WASI WebAssembly** and
   executes it via **wazero**. This removes the “users must install shellcheck” friction while keeping full upstream parity (we’re literally running
   ShellCheck).
 - The parity approach becomes:
@@ -262,7 +262,7 @@ Tally already depends on `mvdan.cc/sh/v3` (currently `v3.12.0`).
 
 ---
 
-## 4) Implementation options (single-binary GPLv3)
+## 4) Implementation options (single-binary AGPLv3)
 
 ### 4.1 Options matrix
 
@@ -665,10 +665,10 @@ Keep this heuristic **opt-in** or gated behind a “best effort” mode since it
 
 ---
 
-## Appendix: GPLv3 compliance notes (embedding ShellCheck)
+## Appendix: AGPLv3/GPLv3 compliance notes (embedding ShellCheck)
 
 Embedding `shellcheck.wasm` means the Tally binary distributes ShellCheck “object code” as part of the combined work. With Tally itself being
-GPLv3, this is allowed — but we should still make compliance *easy* and auditable:
+AGPLv3, section 13 permits combining with GPLv3-covered work — but we should still make compliance *easy* and auditable:
 
 - Pin the exact upstream ShellCheck version tag used to build the wasm (`SHELLCHECK_VERSION` in `Makefile`).
 - Keep the wasm build recipe in-repo (`_tools/shellcheck-wasm/Dockerfile`) and make it reproducible (pinned toolchain commit, pinned build flags).
