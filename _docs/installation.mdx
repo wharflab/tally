@@ -1,6 +1,6 @@
 ---
 title: "Installation"
-description: "Install tally via Homebrew, WinGet, npm, pip, RubyGems, Docker, Go, or from source."
+description: "Install tally via Homebrew, WinGet, npm, Bun, uv, pip, RubyGems, Docker, Go, or from source."
 ---
 
 tally is a single self-contained binary. Pick the method that fits your environment.
@@ -17,6 +17,14 @@ winget install --id Wharflab.Tally
 
 ```bash npm
 npm install -g tally-cli
+```
+
+```bash Bun
+bun add -g tally-cli
+```
+
+```bash uv
+uv tool install tally-cli
 ```
 
 ```bash pip
@@ -39,17 +47,44 @@ go install github.com/wharflab/tally@latest
 brew install wharflab/tap/tally
 ```
 
+Run `tally register-docker-plugin` if you want Docker to discover the plugin without editing `~/.docker/config.json`.
+
+Homebrew also installs a `docker-lint` symlink under Homebrew's Docker plugin directory. See
+[Docker CLI plugin](/integrations/docker-cli-plugin) if you prefer to configure Docker's `cliPluginsExtraDirs`.
+
 ## WinGet (Windows)
 
 ```powershell
 winget install --id Wharflab.Tally
 ```
 
+Run `tally register-docker-plugin` after installation to register the plugin with Docker.
+
 ## npm
 
 ```bash
 npm install -g tally-cli
 ```
+
+Use a global npm install for Docker CLI plugin setup. Project-local `node_modules` installs are rejected by `tally register-docker-plugin`.
+
+## Bun
+
+```bash
+bun add -g tally-cli
+```
+
+Use a global Bun install for Docker CLI plugin setup. `bunx` and project-local `node_modules` launches are rejected by
+`tally register-docker-plugin`.
+
+## uv
+
+```bash
+uv tool install tally-cli
+```
+
+Use `uv tool install` for Python-managed Docker CLI plugin setup. Active Python virtual environments are rejected by
+`tally register-docker-plugin`.
 
 ## pip
 
@@ -145,6 +180,18 @@ After installing, confirm tally is on your `PATH`:
 ```bash
 tally --help
 tally lint --help
+```
+
+To enable the Docker CLI plugin, run the registration command from a global tally install:
+
+```bash
+tally register-docker-plugin
+```
+
+Then verify that Docker can discover it:
+
+```bash
+docker lint --help
 ```
 
 Check the installed version:

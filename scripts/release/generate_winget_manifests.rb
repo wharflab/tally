@@ -14,6 +14,7 @@ MANIFEST_VERSION = "1.9.0"
 SHORT_DESCRIPTION = "Dockerfile linter and formatter with first-class PowerShell and Windows container support."
 TAG_LIST = %w[docker dockerfile containerfile linter].freeze
 FILE_EXTENSION_LIST = %w[dockerfile containerfile].freeze
+COMMAND_LIST = %w[tally].freeze
 DOCUMENTATION_LIST = [
   {
     "DocumentLabel" => "Docs",
@@ -127,14 +128,14 @@ def installer_manifest(version, owner, repo, checksums, release_date = nil)
       "InstallerType" => "portable",
       "InstallerUrl" => github_release_url(owner, repo, version, filename),
       "InstallerSha256" => sha256,
-      "Commands" => ["tally"],
+      "Commands" => COMMAND_LIST,
     }
   end
 
   {
     "PackageIdentifier" => PACKAGE_IDENTIFIER,
     "PackageVersion" => version,
-    "Commands" => ["tally"],
+    "Commands" => COMMAND_LIST,
     "FileExtensions" => FILE_EXTENSION_LIST,
     "ReleaseDate" => release_date,
     "Installers" => installers,
