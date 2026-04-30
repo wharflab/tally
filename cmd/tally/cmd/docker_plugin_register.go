@@ -61,6 +61,7 @@ type dockerPluginRegistrar struct {
 	args0          string
 	currentVersion string
 	virtualEnv     string
+	dirWritable    func(string) bool
 	executable     func() (string, error)
 	lookPath       func(string) (string, error)
 	commandOut     func(string, ...string) (string, error)
@@ -474,8 +475,12 @@ func (r dockerPluginRegistrar) targetPath(
 	}
 
 	name := dockerPluginExecutableName(r.goos)
+	fallbackReason := ""
 	if dir, ok := commonDockerPluginDir(dockerInfo.Plugins); ok {
-		return filepath.Join(dir, name), "existing Docker CLI plugin directory", nil
+		if r.isDirWritable(dir) {
+			return filepath.Join(dir, name), "existing Docker CLI plugin directory", nil
+		}
+		fallbackReason = "inferred Docker CLI plugin directory is not writable"
 	}
 
 	configDir := r.dockerConfig
@@ -485,7 +490,11 @@ func (r dockerPluginRegistrar) targetPath(
 		}
 		configDir = filepath.Join(r.homeDir, ".docker")
 	}
-	return filepath.Join(configDir, "cli-plugins", name), "Docker per-user CLI plugin directory", nil
+	targetReason := "Docker per-user CLI plugin directory"
+	if fallbackReason != "" {
+		targetReason += "; " + fallbackReason
+	}
+	return filepath.Join(configDir, "cli-plugins", name), targetReason, nil
 }
 
 func dockerPluginExecutableName(goos string) string {
@@ -512,6 +521,33 @@ func commonDockerPluginDir(plugins []dockerCLIPluginInfo) (string, bool) {
 		}
 	}
 	return dir, dir != ""
+}
+
+func (r dockerPluginRegistrar) isDirWritable(dir string) bool {
+	if r.dirWritable != nil {
+		return r.dirWritable(dir)
+	}
+	return dirWritable(dir)
+}
+
+func dirWritable(dir string) bool {
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		return false
+	}
+	file, err := os.CreateTemp(dir, ".tally-write-test-*")
+	if err != nil {
+		return false
+	}
+	name := file.Name()
+	if err := file.Close(); err != nil {
+		_ = os.Remove(name)
+		return false
+	}
+	if err := os.Remove(name); err != nil {
+		return false
+	}
+	return true
 }
 
 func (r dockerPluginRegistrar) checkExistingTarget(plan dockerPluginRegistrationPlan) error {

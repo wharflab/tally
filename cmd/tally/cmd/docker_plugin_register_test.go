@@ -235,8 +235,9 @@ func TestDockerPluginRegistrarTargetPathUsesExistingPluginDirectory(t *testing.T
 
 	pluginDir := filepath.Join(string(filepath.Separator), "Users", "me", ".docker", "cli-plugins")
 	registrar := dockerPluginRegistrar{
-		goos:    "linux",
-		homeDir: filepath.Join(string(filepath.Separator), "Users", "me"),
+		goos:        "linux",
+		homeDir:     filepath.Join(string(filepath.Separator), "Users", "me"),
+		dirWritable: func(string) bool { return true },
 	}
 	got, reason, err := registrar.targetPath(dockerCLIInfo{
 		Plugins: []dockerCLIPluginInfo{
@@ -253,6 +254,36 @@ func TestDockerPluginRegistrarTargetPathUsesExistingPluginDirectory(t *testing.T
 	}
 	if reason != "existing Docker CLI plugin directory" {
 		t.Fatalf("target reason = %q", reason)
+	}
+}
+
+func TestDockerPluginRegistrarTargetPathFallsBackWhenExistingPluginDirectoryIsNotWritable(t *testing.T) {
+	t.Parallel()
+
+	pluginDir := filepath.Join(string(filepath.Separator), "usr", "libexec", "docker", "cli-plugins")
+	dockerConfig := filepath.Join(string(filepath.Separator), "Users", "me", ".docker")
+	registrar := dockerPluginRegistrar{
+		goos:         "linux",
+		homeDir:      filepath.Join(string(filepath.Separator), "Users", "me"),
+		dockerConfig: dockerConfig,
+		dirWritable:  func(string) bool { return false },
+	}
+	got, reason, err := registrar.targetPath(dockerCLIInfo{
+		Plugins: []dockerCLIPluginInfo{
+			{Name: "buildx", Path: filepath.Join(pluginDir, "docker-buildx")},
+			{Name: "compose", Path: filepath.Join(pluginDir, "docker-compose")},
+		},
+	}, nil)
+	if err != nil {
+		t.Fatalf("targetPath: %v", err)
+	}
+	want := filepath.Join(dockerConfig, "cli-plugins", "docker-lint")
+	if got != want {
+		t.Fatalf("targetPath = %q, want %q", got, want)
+	}
+	wantReason := "Docker per-user CLI plugin directory; inferred Docker CLI plugin directory is not writable"
+	if reason != wantReason {
+		t.Fatalf("target reason = %q, want %q", reason, wantReason)
 	}
 }
 
