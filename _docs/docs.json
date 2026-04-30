@@ -248,6 +248,12 @@
             "pages": [
               "rules/shellcheck/SC1040"
             ]
+          },
+          {
+            "group": "PowerShell Rules",
+            "pages": [
+              "rules/powershell/PowerShell"
+            ]
           }
         ]
       }

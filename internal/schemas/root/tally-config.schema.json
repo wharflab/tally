@@ -29,6 +29,9 @@
         },
         "shellcheck": {
           "$ref": "../../rules/shellcheck/index.schema.json"
+        },
+        "powershell": {
+          "$ref": "../../rules/powershell/index.schema.json"
         }
       },
       "additionalProperties": false

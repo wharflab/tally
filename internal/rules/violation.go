@@ -198,6 +198,9 @@ func HadolintDocURL(ruleCode string) string {
 // ShellcheckRulePrefix is the namespace prefix for ShellCheck-derived rules.
 const ShellcheckRulePrefix = "shellcheck/"
 
+// PowerShellRulePrefix is the namespace prefix for PowerShell script diagnostics.
+const PowerShellRulePrefix = "powershell/"
+
 // ShellcheckDocURL returns the documentation URL for a ShellCheck diagnostic code.
 // The ruleCode should be the SC code without prefix (e.g. "SC2086").
 //

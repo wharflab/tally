@@ -141,7 +141,9 @@ func (p *InlineDirectiveFilter) processFile(
 	// Set up rule validator if configured
 	var validator directive.RuleValidator
 	if cfg.InlineDirectives.ValidateRules {
-		validator = p.registry.Has
+		validator = func(code string) bool {
+			return p.registry.Has(code) || rules.IsDynamicRuleCode(code)
+		}
 	}
 
 	// Parse directives

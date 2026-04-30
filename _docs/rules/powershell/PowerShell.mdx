@@ -1,0 +1,72 @@
+---
+title: "powershell/PowerShell"
+description: "Runs PowerShell script diagnostics for PowerShell snippets embedded in Dockerfiles."
+---
+
+Runs PowerShell script diagnostics for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Best Practices |
+| Default | Disabled |
+| Auto-fix | No |
+
+## Description
+
+tally analyzes Dockerfile `RUN` instructions that execute PowerShell, including stages with `SHELL ["pwsh", "-Command"]`, explicit `RUN pwsh -Command
+...` wrappers, and PowerShell heredoc bodies.
+
+Diagnostics are reported in the `powershell/*` namespace using the upstream PowerShell rule name, such as `powershell/PSAvoidUsingWriteHost`.
+
+The PowerShell analyzer sidecar starts lazily. Dockerfiles without PowerShell snippets do not start `pwsh`.
+
+Enable this analyzer with `--select powershell/PowerShell`, `--select powershell/*`, or a specific rule such as
+`--select powershell/PSAvoidUsingWriteHost`.
+
+## Requirements
+
+- PowerShell 7 (`pwsh`) must be available on `PATH`.
+- The first PowerShell analyzer run installs `PSScriptAnalyzer` automatically for that `pwsh` environment when the module is missing.
+
+Use `TALLY_POWERSHELL=/path/to/pwsh` when `pwsh` is not on `PATH` or when tally should use a specific PowerShell installation.
+
+The automatic install uses the selected `pwsh` environment's PowerShell package tooling (`Install-PSResource` when available, otherwise
+`Install-Module`) and installs to `CurrentUser` scope. If the host has no network access or blocks PowerShell Gallery, preinstall the module in that
+environment and rerun tally.
+
+Cold installation downloads the PSScriptAnalyzer module and can take more than a few seconds depending on network speed. If the bootstrap is still
+running after 3 seconds, tally writes a progress note to stderr and repeats it periodically until the sidecar is ready. Set
+`TALLY_POWERSHELL_PROGRESS=0` to silence these notes.
+
+## Examples
+
+### Problematic code
+
+```dockerfile
+FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command"]
+RUN Write-Host hi
+```
+
+### Reported diagnostic
+
+```text
+powershell/PSAvoidUsingWriteHost
+```
+
+### Disable a specific PowerShell rule
+
+```bash
+tally lint --ignore powershell/PSAvoidUsingWriteHost Dockerfile
+```
+
+### Disable PowerShell script analysis
+
+```bash
+tally lint --ignore powershell/* Dockerfile
+```
+
+## Reference
+
+- [PSScriptAnalyzer rules](https://learn.microsoft.com/en-us/powershell/utility-modules/psscriptanalyzer/rules/readme?view=ps-modules)

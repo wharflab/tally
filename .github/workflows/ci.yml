@@ -67,6 +67,17 @@ jobs:
           go-version-file: go.mod
       - name: Build
         run: go build ./...
+      - name: Verify PowerShell analyzer runtime
+        shell: pwsh
+        run: |
+          $PSVersionTable.PSVersion
+          Get-Module -ListAvailable PSScriptAnalyzer | Select-Object Name, Version, Path
+      - name: Ensure PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+            Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -Quiet
+          }
       - name: Run unit tests with coverage
         run: |
           GOTESTSUM_BIN=$(make -s print-gotestsum-bin)
