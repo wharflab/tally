@@ -13,6 +13,9 @@ tally lint .
 
 # Apply all safe fixes automatically
 tally lint --fix Dockerfile
+
+# Register docker lint, then lint a Bake file through Docker
+tally register-docker-plugin && docker lint bake.hcl
 ```
 
 ## Why tally
