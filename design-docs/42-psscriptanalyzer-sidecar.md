@@ -1,8 +1,9 @@
 # PSScriptAnalyzer Integration: Sidecar Design
 
 > **Date**: 2026-04-21
-> **Status**: Draft — findings verified on macOS host; Windows claims based on
-> documentation/research only (not yet reproduced).
+> **Windows verification**: 2026-04-30
+> **Status**: Design note — macOS host checks and Windows sidecar smoke tests
+> reproduced.
 > **Purpose**: Decide how tally should invoke PowerShell's PSScriptAnalyzer to
 > lint `.ps1` / `.psm1` content — both standalone and inside Dockerfile
 > `RUN pwsh -Command ...` / `SHELL ["pwsh", ...]` contexts.
@@ -42,11 +43,12 @@ if not, what ships instead.
   macOS/Linux the same path works but adds ~100 MB of shipped runtime and
   kills Go's cross-compilation story. For a linter, the juice isn't worth the
   squeeze.
-- A long-running `pwsh` (or Windows PowerShell 5.1) subprocess speaking
-  JSON-framed IPC gets us everything we need with a single code path across
-  all three OSes. The cold-start tax (~0.75 s on this machine) amortizes to
-  zero over a session, and PSScriptAnalyzer's batch throughput on real fixtures
-  is acceptable.
+- A long-running `pwsh` subprocess speaking JSON-framed IPC gets us everything
+  we need with a single code path across all three OSes. Windows PowerShell 5.1
+  also works as a fallback, but the runner must preserve/repair standard
+  Windows environment variables and be deliberate about `PSModulePath`.
+  The cold-start tax amortizes over a session, and PSScriptAnalyzer's batch
+  throughput on real fixtures is acceptable.
 
 ## What we verified on macOS (2026-04-21)
 
@@ -113,6 +115,118 @@ by Go with `encoding/json/v2` — no custom parsing.
 The ~0.75 s is dominated by `Import-Module PSScriptAnalyzer`. Amortized
 across a session it's free; per-file `pwsh` spawn is a non-starter for
 LSP-scale use.
+
+## What we verified on Windows (2026-04-30)
+
+Host: `Microsoft Windows 10.0.26200` from PowerShell's `$PSVersionTable.OS`,
+`pwsh 7.6.x`, and Windows PowerShell `5.1.26100.7462`.
+
+### Host discovery and environment
+
+- `pwsh.exe` was available at
+  `C:\Program Files\PowerShell\7\pwsh.exe`.
+- `powershell.exe` was available at
+  `C:\WINDOWS\System32\WindowsPowerShell\v1.0\powershell.exe`.
+- In the Codex desktop process environment, `WINDIR`, `SystemRoot`,
+  `APPDATA`, and `LOCALAPPDATA` were missing even though `PATH`, `TEMP`,
+  `TMP`, and `USERPROFILE` were present.
+- With that sanitized environment, Windows PowerShell 5.1 failed before
+  executing user code:
+
+```text
+Internal Windows PowerShell error. Loading managed Windows PowerShell failed
+with error 8009001d.
+```
+
+- Setting `WINDIR=C:\WINDOWS` and `SystemRoot=C:\WINDOWS` before spawning
+  `powershell.exe` fixed startup. For bootstrap/install paths, setting
+  `APPDATA=%USERPROFILE%\AppData\Roaming` and
+  `LOCALAPPDATA=%USERPROFILE%\AppData\Local` also avoided local module
+  tooling failures.
+
+This does not invalidate the sidecar design, but it is a concrete Windows
+runner requirement: do not blindly inherit a stripped environment when
+spawning PowerShell. On Windows, the Go runner should ensure `SystemRoot` and
+`WINDIR` are set before process creation, and should pass through or repair
+the user profile app-data variables when it performs module bootstrap.
+
+### Install and import
+
+`Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force` failed in
+the stripped environment because PowerShellGet had no registered repositories.
+The modern PSResourceGet path worked after repairing the app-data variables:
+
+```text
+Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser \
+  -TrustRepository -Reinstall -Quiet
+```
+
+Installed module:
+
+```text
+C:\Users\tino\Documents\PowerShell\Modules\PSScriptAnalyzer\1.25.0
+```
+
+Measured size: **285.5 MiB**, 50 files. This matches the macOS result: the
+module is too large to vendor casually.
+
+PowerShell 7 found the module immediately. Windows PowerShell 5.1 did not
+discover a module installed under `Documents\PowerShell\Modules` when launched
+with `-File`. Adding that directory to `PSModulePath` inside a `-Command`
+startup prelude fixed import:
+
+```powershell
+$env:PSModulePath = 'C:\Users\tino\Documents\PowerShell\Modules;' + $env:PSModulePath
+Import-Module PSScriptAnalyzer
+```
+
+With that prelude, Windows PowerShell 5.1 imported PSScriptAnalyzer 1.25.0
+and `Get-ScriptAnalyzerRule` returned **75** rules, matching PowerShell 7 and
+the macOS run.
+
+### Sidecar protocol smoke test
+
+A minimal sidecar script was executed with newline-delimited JSON requests over
+stdio:
+
+- handshake line: `{"ready":true,"version":"1.25.0","ps":"..."}`
+- file-backed `Invoke-ScriptAnalyzer -Path <Bad.ps1>`
+- in-memory `Invoke-ScriptAnalyzer -ScriptDefinition <source>`
+- shutdown request
+
+PowerShell 7 succeeded. Example file-backed diagnostics included:
+
+- `PSAvoidUsingWriteHost`
+- `PSPossibleIncorrectComparisonWithNull`
+- `PSUseApprovedVerbs`
+- `PSAvoidUsingPlainTextForPassword`
+- `PSReviewUnusedParameter`
+- `PSAvoidUsingCmdletAliases`
+
+Windows PowerShell 5.1 also succeeded when launched as:
+
+```text
+powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass \
+  -Command "<set PSModulePath>; & '<sidecar.ps1>'"
+```
+
+The 5.1 sidecar returned compact JSON for the ready handshake, both analysis
+requests, and shutdown. File-backed diagnostics included line, column, rule
+name, integer severity, message, and Windows `ScriptPath`. `ScriptDefinition`
+diagnostics returned line/column data and an empty `ScriptPath`, as expected.
+
+### Timing
+
+Simple cold-process timings for `Import-Module PSScriptAnalyzer` plus
+`Get-ScriptAnalyzerRule` on this Windows host:
+
+| Scenario | Wall time |
+| --- | ---: |
+| `pwsh.exe -NoProfile` cold-ish runs | 3.03 s, 2.07 s, 1.66 s |
+| `powershell.exe` 5.1 with `PSModulePath` prelude | 4.38 s, 2.08 s, 1.75 s |
+
+These numbers reinforce the long-lived sidecar requirement. Per-file process
+startup would be too expensive; startup once per tally session is acceptable.
 
 ## Why not the alternatives
 
@@ -229,7 +343,9 @@ as regular diagnostics with `severity:3`.
    - Locate `pwsh` / `powershell.exe` on `PATH` (configurable via
      `TALLY_POWERSHELL` env + tally config).
    - Write `Tally.PSSA.Sidecar.ps1` to a per-session temp dir.
-   - Spawn `<shell> -NoProfile -NonInteractive -File <script>`.
+   - Spawn `<shell> -NoProfile -NonInteractive -File <script>` for `pwsh`.
+     For Windows PowerShell fallback, prefer `-Command "<prelude>; & <script>"`
+     so the runner can repair `PSModulePath` before `Import-Module`.
    - Read a `{"ready":true,"version":"1.25.0"}` handshake line (or bail with
      timeout).
 3. Each subsequent call: write request, read response. Mutex-serialized —
@@ -272,7 +388,9 @@ Two levers:
 | Concern                                    | Strategy |
 | ------------------------------------------ | -------- |
 | `pwsh` / `powershell.exe` missing on PATH  | `tally doctor` surfaces it; lint flags `.ps1` files as "analyzer not available, pass `--no-psanalyzer` to silence" |
-| PSScriptAnalyzer module not installed      | Sidecar attempts `Install-Module -Scope CurrentUser -Force` on handshake failure, guarded by `--allow-module-install` config |
+| PSScriptAnalyzer module not installed      | Sidecar attempts PSResourceGet/PowerShellGet install on handshake failure, guarded by `--allow-module-install` config |
+| Sanitized Windows environment              | Runner ensures `SystemRoot` / `WINDIR` before spawning PowerShell; bootstrap also repairs `APPDATA` / `LOCALAPPDATA` when absent |
+| Module installed for `pwsh` but 5.1 fallback is used | Runner probes both `Documents\PowerShell\Modules` and `Documents\WindowsPowerShell\Modules`, then prepends discovered paths to `PSModulePath` in the 5.1 prelude |
 
 We do **not** bundle the 286 MB module in the tally release. The user's
 `pwsh` already has access to PowerShell Gallery; first-run bootstrap is the
@@ -291,12 +409,15 @@ reasonable default.
 ### Windows
 
 - `powershell.exe` (Windows PowerShell 5.1) is preinstalled on every
-  supported Windows version. Zero install cost.
+  supported Windows version. Zero shell install cost.
 - PSScriptAnalyzer supports 5.1 as a first-class target; the core ruleset is
-  identical to what 7.x runs. (Some very new rules may be 7.x-only — TBD
-  when we enumerate.)
-- Using 5.1 as the default on Windows + 7.x as optional upgrade = no
-  install-a-second-toolchain burden anywhere.
+  identical in the smoke test: 75 rules in both 5.1 and 7.x.
+- Prefer `pwsh` when available. It has cleaner module discovery for modules
+  installed by `Install-PSResource` into `Documents\PowerShell\Modules`.
+- Use Windows PowerShell 5.1 as the fallback when `pwsh` is absent. The runner
+  must repair `SystemRoot` / `WINDIR` in sanitized environments and should use
+  a `-Command` startup prelude to prepend the discovered PSScriptAnalyzer module
+  path before invoking the embedded sidecar script.
 - Named-pipe IPC (`\\.\pipe\PSHost.*`) via `github.com/Microsoft/go-winio` is
   available if stdio framing becomes a bottleneck. Not proposed for v1;
   stdio keeps the codebase identical across OSes.
@@ -317,7 +438,8 @@ reasonable default.
 1. **Module bootstrap UX.** 286 MB download on first use is a surprise.
    Options: (a) prompt / require explicit flag, (b) detect and print a clear
    message, (c) vendor a smaller subset. Recommended: start with (b),
-   revisit if users complain.
+   revisit if users complain. On Windows, prefer PSResourceGet when available;
+   PowerShellGet can fail if repository state or app-data env vars are broken.
 2. **Severity mapping.** PSScriptAnalyzer severity 0..3 vs tally's internal
    `error`/`warning`/`info`/`style`. We need to decide on one canonical
    mapping and document it in `_docs/`.
@@ -328,9 +450,9 @@ reasonable default.
 4. **Fix suggestions.** `SuggestedCorrections` are available on some rules —
    worth exposing through tally's `FixSafe` / `FixSuggestion` levels, but
    needs per-rule safety review.
-5. **Windows verification pending.** All Windows claims in this doc are
-   based on docs. Before ship: reproduce the macOS fixture run on a Windows
-   host with both `powershell.exe` 5.1 and `pwsh` 7.x.
+5. **Windows environment normalization.** The runner should explicitly protect
+   `powershell.exe` from stripped process environments. Missing `SystemRoot`
+   / `WINDIR` can prevent Windows PowerShell from starting at all.
 6. **Sidecar crash recovery.** A ParseError or a rule with a bug can throw
    inside the runspace. The sidecar catches per-request; we should also
    detect sidecar-died-mid-request and respawn once with backoff.
@@ -341,8 +463,10 @@ reasonable default.
 ## Next steps
 
 - [ ] Prototype `internal/psanalyzer/runner.go` + embedded sidecar script.
-- [ ] Reproduce the macOS fixture run on a Windows host, both PS 5.1 and
+- [x] Reproduce the sidecar smoke test on a Windows host, both PS 5.1 and
       `pwsh` 7.
+- [ ] Add Windows-specific runner tests for environment repair and 5.1
+      `PSModulePath` prelude generation.
 - [ ] Wire a `--powershell` enable flag into `cmd/tally/cmd/lint.go`.
 - [ ] Decide severity mapping and document in `_docs/rules/powershell/`.
 - [ ] Add integration fixture under `internal/integration/testdata/`
@@ -359,5 +483,5 @@ reasonable default.
   expose a hosted-scenario C# API that accepts a pre-parsed AST.
 - MS Q&A — "Blazor WASM to execute PowerShell script" — authoritative "no,
   PowerShell cannot run in the WASM sandbox".
-- `design-drafts/shellcheck-reactor-single-instance.md` — architectural
+- `design-docs/shellcheck-reactor-single-instance.md` — architectural
   precedent for the long-lived-instance pattern we're mirroring here.

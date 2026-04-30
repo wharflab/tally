@@ -542,6 +542,14 @@ Cobra while preserving koanf-backed config precedence, then add Docker CLI plugi
 
 ---
 
+### 42. [PSScriptAnalyzer Integration: Sidecar Design](42-psscriptanalyzer-sidecar.md)
+
+**Covers:** A PowerShell sidecar design for running PSScriptAnalyzer against standalone PowerShell files and Dockerfile PowerShell `RUN`
+commands, including JSON-over-stdio protocol shape, PowerShell 7 and Windows PowerShell 5.1 feasibility checks, module bootstrap behavior,
+Windows environment requirements, and implementation risks.
+
+---
+
 ## Quick Start Guides
 
 ### For Immediate Implementation
