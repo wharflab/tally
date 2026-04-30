@@ -8,6 +8,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/wharflab/tally/internal/highlight/extract"
 	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
@@ -81,7 +82,7 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 }
 
 func collectTasks(input rules.LintInput, sm *sourcemap.SourceMap) []task {
-	nodesByStartLine := buildNodesByStartLine(input.AST)
+	nodesByStartLine := extract.NodeIndexFromResult(input.AST)
 	escapeToken := input.AST.EscapeToken
 	if escapeToken == 0 {
 		escapeToken = '\\'
@@ -122,7 +123,7 @@ func collectStageTasks(
 				continue
 			}
 
-			startLine := commandStartLine(c.Location())
+			startLine := extract.CommandStartLine(c.Location())
 			variant := activeVariant
 			if info != nil {
 				variant = info.ShellVariantAtLine(startLine)
@@ -251,28 +252,6 @@ func mapSeverity(sev int) rules.Severity {
 	default:
 		return rules.SeverityWarning
 	}
-}
-
-func buildNodesByStartLine(ast *parser.Result) map[int]*parser.Node {
-	if ast == nil || ast.AST == nil || len(ast.AST.Children) == 0 {
-		return nil
-	}
-
-	nodes := make(map[int]*parser.Node, len(ast.AST.Children))
-	for _, node := range ast.AST.Children {
-		if node == nil || node.StartLine <= 0 {
-			continue
-		}
-		nodes[node.StartLine] = node
-	}
-	return nodes
-}
-
-func commandStartLine(location []parser.Range) int {
-	if len(location) == 0 {
-		return 0
-	}
-	return location[0].Start.Line
 }
 
 func getShellFormScript(run *instructions.RunCommand) string {

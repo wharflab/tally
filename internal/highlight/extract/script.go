@@ -94,6 +94,28 @@ func CommandStartLine(location []dfparser.Range) int {
 	return location[0].Start.Line
 }
 
+func NodeIndex(root *dfparser.Node) map[int]*dfparser.Node {
+	if root == nil {
+		return nil
+	}
+
+	out := make(map[int]*dfparser.Node, len(root.Children))
+	for _, node := range root.Children {
+		if node == nil || node.StartLine <= 0 {
+			continue
+		}
+		out[node.StartLine] = node
+	}
+	return out
+}
+
+func NodeIndexFromResult(ast *dfparser.Result) map[int]*dfparser.Node {
+	if ast == nil || ast.AST == nil {
+		return nil
+	}
+	return NodeIndex(ast.AST)
+}
+
 func extractRunLikeScript(
 	sm *sourcemap.SourceMap,
 	node *dfparser.Node,
