@@ -499,7 +499,11 @@ func testDockerPluginRegistrar(t *testing.T, currentVersion string) dockerPlugin
 	t.Helper()
 
 	tmp := t.TempDir()
-	source := filepath.Join(tmp, "bin", "tally")
+	sourceName := tallyExecutableBaseName
+	if runtime.GOOS == windowsGOOS {
+		sourceName += ".exe"
+	}
+	source := filepath.Join(tmp, "bin", sourceName)
 	if err := os.MkdirAll(filepath.Dir(source), 0o750); err != nil {
 		t.Fatalf("mkdir source dir: %v", err)
 	}
@@ -507,7 +511,7 @@ func testDockerPluginRegistrar(t *testing.T, currentVersion string) dockerPlugin
 		t.Fatalf("write source: %v", err)
 	}
 	return dockerPluginRegistrar{
-		goos:           "linux",
+		goos:           runtime.GOOS,
 		homeDir:        tmp,
 		cwd:            filepath.Join(tmp, "outside"),
 		tempDir:        filepath.Join(tmp, "tmp"),

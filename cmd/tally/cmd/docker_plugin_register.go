@@ -31,6 +31,7 @@ const (
 	installModeSymlink              = "symlink"
 	minimumDockerCLIVersion         = "20.10.0"
 	tallyDockerPluginVendor         = "Wharflab"
+	tallyExecutableBaseName         = "tally"
 	windowsGOOS                     = "windows"
 )
 
@@ -399,14 +400,14 @@ func stableHomebrewExecutable(path string) (string, bool) {
 	slash := filepath.ToSlash(filepath.Clean(path))
 	parts := strings.Split(slash, "/")
 	for idx := 0; idx+4 < len(parts); idx++ {
-		if parts[idx] != "Cellar" || parts[idx+1] != "tally" || parts[idx+3] != "bin" {
+		if parts[idx] != "Cellar" || parts[idx+1] != tallyExecutableBaseName || parts[idx+3] != "bin" {
 			continue
 		}
 		prefix := strings.Join(parts[:idx], "/")
 		if prefix == "" {
 			prefix = "/"
 		}
-		stable := filepath.FromSlash(strings.TrimRight(prefix, "/") + "/bin/tally")
+		stable := filepath.FromSlash(strings.TrimRight(prefix, "/") + "/bin/" + tallyExecutableBaseName)
 		if _, err := os.Stat(stable); err == nil {
 			return stable, true
 		}
@@ -951,7 +952,7 @@ func looksLikePythonPackagePath(path string) bool {
 
 func looksLikeGlobalBinaryPath(path string) bool {
 	base := strings.ToLower(filepath.Base(path))
-	if base != "tally" && base != "tally.exe" {
+	if base != tallyExecutableBaseName && base != tallyExecutableBaseName+".exe" {
 		return false
 	}
 	for _, segment := range []string{"bin", "sbin", "go", "tools", "packages"} {
