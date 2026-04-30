@@ -72,7 +72,8 @@ class GenerateWingetManifestsTest < Minitest::Test
       "2026-03-15",
     )
     assert_equal "portable", installer_manifest_data["Installers"][0]["InstallerType"]
-    assert_equal ["tally"], installer_manifest_data["Installers"][0]["Commands"]
+    assert_equal %w[tally docker-lint], installer_manifest_data["Commands"]
+    assert_equal %w[tally docker-lint], installer_manifest_data["Installers"][0]["Commands"]
     assert_equal %w[dockerfile containerfile], installer_manifest_data["FileExtensions"]
     assert_equal "2026-03-15", installer_manifest_data["ReleaseDate"]
     assert_equal(

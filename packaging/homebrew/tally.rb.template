@@ -30,6 +30,18 @@ class Tally < Formula
 
   def install
     bin.install "tally"
+    (lib/"docker/cli-plugins").install_symlink bin/"tally" => "docker-lint"
+  end
+
+  def caveats
+    <<~EOS
+      tally is also installed as a Docker CLI plugin. For Docker to find the plugin,
+      add "cliPluginsExtraDirs" to ~/.docker/config.json:
+
+        "cliPluginsExtraDirs": [
+            "#{HOMEBREW_PREFIX}/lib/docker/cli-plugins"
+        ]
+    EOS
   end
 
   test do
@@ -40,8 +52,13 @@ class Tally < Formula
     DOCKERFILE
 
     # Run tally and check it executes successfully
-    output = shell_output("#{bin}/tally check #{testpath}/Dockerfile --format json")
+    output = shell_output("#{bin}/tally lint #{testpath}/Dockerfile --format json --ignore '*'")
     assert_match "files_scanned", output
+
+    # Verify Docker CLI plugin metadata without requiring Docker itself
+    metadata = shell_output("#{lib}/docker/cli-plugins/docker-lint docker-cli-plugin-metadata")
+    assert_match "\"SchemaVersion\": \"0.1.0\"", metadata
+    assert_match "\"Vendor\": \"Wharflab\"", metadata
 
     # Verify version output
     assert_match version.to_s, shell_output("#{bin}/tally version")

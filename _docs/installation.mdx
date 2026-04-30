@@ -39,6 +39,8 @@ go install github.com/wharflab/tally@latest
 brew install wharflab/tap/tally
 ```
 
+Homebrew also installs a `docker-lint` symlink for Docker CLI plugin usage. See [Docker CLI plugin](/integrations/docker-cli-plugin) to configure Docker's `cliPluginsExtraDirs`.
+
 ## WinGet (Windows)
 
 ```powershell
@@ -145,6 +147,12 @@ After installing, confirm tally is on your `PATH`:
 ```bash
 tally --help
 tally lint --help
+```
+
+If you configured the Docker CLI plugin, verify that Docker can discover it:
+
+```bash
+docker lint --help
 ```
 
 Check the installed version:

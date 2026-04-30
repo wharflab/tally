@@ -61,3 +61,12 @@ Examples:
 func Execute() error {
 	return NewRootCommand().Execute()
 }
+
+// ExecuteForExecutable dispatches to the standalone CLI or Docker CLI plugin
+// mode based on the invoked executable name.
+func ExecuteForExecutable(executable string) error {
+	if IsDockerLintPluginExecutable(executable) {
+		return ExecuteDockerPlugin()
+	}
+	return Execute()
+}

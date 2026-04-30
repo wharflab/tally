@@ -60,6 +60,15 @@ type lintOptions struct {
 	// Complex (shell-quoted) AI flag: parsed then folded into the config.
 	acpCommand    string
 	acpCommandSet bool
+
+	// Optional metadata captured when tally is invoked as a Docker CLI plugin.
+	dockerPlugin *dockerPluginContext
+}
+
+type dockerPluginContext struct {
+	CurrentContext string
+	ConfigPath     string
+	EndpointHost   string
 }
 
 // addLintFlags registers all lint flags on the given FlagSet. The flags are
