@@ -35,6 +35,26 @@ func TestNormalizePowerShellEnvLeavesNonWindowsUntouched(t *testing.T) {
 	}
 }
 
+func TestRunnerStopProcessCleansTempDir(t *testing.T) {
+	t.Parallel()
+
+	tempDir := t.TempDir()
+	r := &Runner{
+		tempDir: tempDir,
+		waitCh:  make(chan error, 1),
+	}
+	r.waitCh <- nil
+
+	r.stopProcess()
+
+	if r.tempDir != "" {
+		t.Fatalf("tempDir = %q, want empty", r.tempDir)
+	}
+	if _, err := os.Stat(tempDir); !os.IsNotExist(err) {
+		t.Fatalf("temp dir still exists after stopProcess(): %v", err)
+	}
+}
+
 func TestRunnerAnalyzeWithInstalledPSScriptAnalyzer(t *testing.T) {
 	t.Parallel()
 

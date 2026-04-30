@@ -343,6 +343,7 @@ func (r *Runner) stopProcess() {
 		}
 	}
 	r.clearProcess()
+	r.cleanupTempDir()
 }
 
 func killProcess(cmd *exec.Cmd) {
