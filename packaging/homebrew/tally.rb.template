@@ -49,6 +49,8 @@ class Tally < Formula
   end
 
   test do
+    require "json"
+
     # Create a simple Dockerfile to test
     (testpath/"Dockerfile").write <<~DOCKERFILE
       FROM alpine:latest
@@ -60,9 +62,9 @@ class Tally < Formula
     assert_match "files_scanned", output
 
     # Verify Docker CLI plugin metadata without requiring Docker itself
-    metadata = shell_output("#{lib}/docker/cli-plugins/docker-lint docker-cli-plugin-metadata")
-    assert_match "\"SchemaVersion\": \"0.1.0\"", metadata
-    assert_match "\"Vendor\": \"Wharflab\"", metadata
+    metadata = JSON.parse(shell_output("#{lib}/docker/cli-plugins/docker-lint docker-cli-plugin-metadata"))
+    assert_equal "0.1.0", metadata["SchemaVersion"]
+    assert_equal "Wharflab", metadata["Vendor"]
 
     fakebin = testpath/"fakebin"
     fakebin.mkpath
@@ -85,9 +87,9 @@ class Tally < Formula
     system "#{bin}/tally", "register-docker-plugin"
     plugin = testpath/".docker/cli-plugins/docker-lint"
     assert_predicate plugin, :exist?
-    metadata = shell_output("#{plugin} docker-cli-plugin-metadata")
-    assert_match "\"SchemaVersion\": \"0.1.0\"", metadata
-    assert_match "\"Vendor\": \"Wharflab\"", metadata
+    metadata = JSON.parse(shell_output("#{plugin} docker-cli-plugin-metadata"))
+    assert_equal "0.1.0", metadata["SchemaVersion"]
+    assert_equal "Wharflab", metadata["Vendor"]
 
     # Verify version output
     assert_match version.to_s, shell_output("#{bin}/tally version")
