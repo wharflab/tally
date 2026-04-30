@@ -159,6 +159,7 @@
           {
             "group": "PowerShell",
             "pages": [
+              "rules/powershell/PowerShell",
               "rules/tally/powershell/error-action-preference",
               "rules/tally/powershell/prefer-shell-instruction",
               "rules/tally/powershell/progress-preference"
@@ -247,12 +248,6 @@
             "group": "ShellCheck Rules",
             "pages": [
               "rules/shellcheck/SC1040"
-            ]
-          },
-          {
-            "group": "PowerShell Rules",
-            "pages": [
-              "rules/powershell/PowerShell"
             ]
           }
         ]
