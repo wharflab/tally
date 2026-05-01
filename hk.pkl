@@ -88,7 +88,7 @@ local preCommitSteps = new Mapping<String, Step> {
   }
   ["format-yml"] = (Builtins.yamlfmt) {}
   ["typos"] = (Builtins.typos) {
-    check = "uv tool run typos==1.45.2 --force-exclude {{files}}"
+    check = "uv tool run typos==1.46.0 --force-exclude {{files}}"
   }
   ["codecov"] {
     glob = List("codecov.yml", ".codecov.yml")
@@ -112,7 +112,7 @@ local commitMsgSteps = new Mapping<String, Step> {
     check = "bunx -y -q commitlint --edit {{commit_msg_file}}"
   }
   ["typos-commit-msg"] {
-    check = "uv tool run typos==1.45.2 {{commit_msg_file}}"
+    check = "uv tool run typos==1.46.0 {{commit_msg_file}}"
   }
 }
 
