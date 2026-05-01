@@ -66,17 +66,7 @@ func (r *Runner) Analyze(ctx context.Context, req AnalyzeRequest) ([]Diagnostic,
 		return nil, errors.New("path or script definition is required")
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	if err := r.ensureStarted(ctx); err != nil {
-		return nil, err
-	}
-
-	r.nextID++
-	id := strconv.FormatInt(r.nextID, 10)
 	wireReq := request{
-		ID:               id,
 		Op:               "analyze",
 		Path:             req.Path,
 		ScriptDefinition: req.ScriptDefinition,
@@ -86,22 +76,30 @@ func (r *Runner) Analyze(ctx context.Context, req AnalyzeRequest) ([]Diagnostic,
 		wireReq.Settings = &settings
 	}
 
-	resp, err := r.roundTrip(ctx, wireReq)
+	resp, err := r.sendRequest(ctx, wireReq)
 	if err != nil {
-		r.stopProcess()
 		return nil, err
 	}
-	if resp.ID != id {
-		r.stopProcess()
-		return nil, fmt.Errorf("psanalyzer sidecar returned response id %q for request %q", resp.ID, id)
-	}
-	if !resp.OK {
-		if resp.Error == "" {
-			resp.Error = "unknown sidecar error"
-		}
-		return nil, errors.New(resp.Error)
-	}
 	return resp.Diagnostics, nil
+}
+
+func (r *Runner) Format(ctx context.Context, req FormatRequest) (string, error) {
+	if strings.TrimSpace(req.ScriptDefinition) == "" {
+		return "", errors.New("script definition is required")
+	}
+
+	resp, err := r.sendRequest(ctx, request{
+		Op:               "format",
+		ScriptDefinition: req.ScriptDefinition,
+	})
+	if err != nil {
+		return "", err
+	}
+	return resp.Formatted, nil
+}
+
+func (r *Runner) FormatPowerShell(ctx context.Context, script string) (string, error) {
+	return r.Format(ctx, FormatRequest{ScriptDefinition: script})
 }
 
 func (r *Runner) Close(ctx context.Context) error {
@@ -283,6 +281,36 @@ func (r *Runner) findExecutable() (string, error) {
 	}
 	r.executable = exe
 	return exe, nil
+}
+
+func (r *Runner) sendRequest(ctx context.Context, wireReq request) (response, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if err := r.ensureStarted(ctx); err != nil {
+		return response{}, err
+	}
+
+	r.nextID++
+	id := strconv.FormatInt(r.nextID, 10)
+	wireReq.ID = id
+
+	resp, err := r.roundTrip(ctx, wireReq)
+	if err != nil {
+		r.stopProcess()
+		return response{}, err
+	}
+	if resp.ID != id {
+		r.stopProcess()
+		return response{}, fmt.Errorf("psanalyzer sidecar returned response id %q for request %q", resp.ID, id)
+	}
+	if !resp.OK {
+		if resp.Error == "" {
+			resp.Error = "unknown sidecar error"
+		}
+		return response{}, errors.New(resp.Error)
+	}
+	return resp, nil
 }
 
 func (r *Runner) roundTrip(ctx context.Context, req request) (response, error) {

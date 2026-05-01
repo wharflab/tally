@@ -1,4 +1,4 @@
-Fixed 5 issues
+Fixed 6 issues
 Skipped 2 fixes
 note: 1 AI fix(es) failed (see details below)
 note: skipped fix tally/prefer-multi-stage-build (<stdin>): resolver not registered: ai-autofix

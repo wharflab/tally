@@ -7,12 +7,15 @@ import (
 	"github.com/wharflab/tally/internal/directive"
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/heredocfmt"
+	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
 
-type formattedHeredocsFinalizer struct{}
+type formattedHeredocsFinalizer struct {
+	powerShellFormatter heredocfmt.PowerShellFormatter
+}
 
 func (formattedHeredocsFinalizer) RuleCode() string {
 	return rules.FormattedHeredocsRuleCode
@@ -30,8 +33,8 @@ func (formattedHeredocsFinalizer) Priority() int {
 	return rules.FormattedHeredocsFixPriority
 }
 
-func (formattedHeredocsFinalizer) Finalize(
-	_ context.Context,
+func (f formattedHeredocsFinalizer) Finalize(
+	finalizeCtx context.Context,
 	ctx FinalizeContext,
 ) ([]rules.TextEdit, error) {
 	result, err := dockerfile.Parse(bytes.NewReader(ctx.Content), nil)
@@ -39,11 +42,17 @@ func (formattedHeredocsFinalizer) Finalize(
 		return nil, err
 	}
 	sem := semanticModelForFinalizer(ctx.FilePath, result)
-	return heredocfmt.FormatDockerfileHeredocs(ctx.FilePath, result, sem)
+	return heredocfmt.FormatDockerfileHeredocsWithPowerShell(
+		finalizeCtx,
+		ctx.FilePath,
+		result,
+		sem,
+		f.powerShellFormatter,
+	)
 }
 
 func init() {
-	RegisterFinalizer(formattedHeredocsFinalizer{})
+	RegisterFinalizer(formattedHeredocsFinalizer{powerShellFormatter: psanalyzer.NewRunner()})
 }
 
 func semanticModelForFinalizer(file string, result *dockerfile.ParseResult) *semantic.Model {

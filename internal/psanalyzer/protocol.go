@@ -6,6 +6,10 @@ type AnalyzeRequest struct {
 	Settings         Settings
 }
 
+type FormatRequest struct {
+	ScriptDefinition string
+}
+
 type Settings struct {
 	IncludeRules []string
 	ExcludeRules []string
@@ -41,4 +45,5 @@ type response struct {
 	OK          bool         `json:"ok,omitempty"`
 	Error       string       `json:"error,omitempty"`
 	Diagnostics []Diagnostic `json:"diagnostics,omitempty"`
+	Formatted   string       `json:"formatted,omitempty"`
 }

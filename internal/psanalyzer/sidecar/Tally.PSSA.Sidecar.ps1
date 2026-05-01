@@ -86,6 +86,110 @@ function Import-PSScriptAnalyzerModule {
     return $module
 }
 
+function Get-TallyAnalyzerSetting {
+    param([object] $Request)
+
+    if ($null -eq $Request.settings) {
+        return $null
+    }
+
+    $settings = @{}
+    if ($null -ne $Request.settings.includeRules -and @($Request.settings.includeRules).Count -gt 0) {
+        $settings['IncludeRules'] = @($Request.settings.includeRules)
+    }
+    if ($null -ne $Request.settings.excludeRules -and @($Request.settings.excludeRules).Count -gt 0) {
+        $settings['ExcludeRules'] = @($Request.settings.excludeRules)
+    }
+    if ($null -ne $Request.settings.severity -and @($Request.settings.severity).Count -gt 0) {
+        $settings['Severity'] = @($Request.settings.severity)
+    }
+    if ($settings.Count -eq 0) {
+        return $null
+    }
+    return $settings
+}
+
+function ConvertTo-TallyDiagnostic {
+    param([Parameter(Mandatory=$true)] [object] $Diagnostic)
+
+    $extent = $Diagnostic.Extent
+    $lineValue = $null
+    $columnValue = $null
+    $endLine = $null
+    $endColumn = $null
+    if ($null -ne $Diagnostic.Line -and $Diagnostic.Line -gt 0) {
+        $lineValue = [int] $Diagnostic.Line
+    }
+    if ($null -ne $Diagnostic.Column -and $Diagnostic.Column -gt 0) {
+        $columnValue = [int] $Diagnostic.Column
+    }
+    if ($null -ne $extent) {
+        if ($extent.EndLineNumber -gt 0) {
+            $endLine = [int] $extent.EndLineNumber
+        }
+        if ($extent.EndColumnNumber -gt 0) {
+            $endColumn = [int] $extent.EndColumnNumber
+        }
+    }
+
+    return @{
+        ruleName = [string] $Diagnostic.RuleName
+        severity = [int] $Diagnostic.Severity
+        line = $lineValue
+        column = $columnValue
+        endLine = $endLine
+        endColumn = $endColumn
+        message = [string] $Diagnostic.Message
+        scriptPath = [string] $Diagnostic.ScriptPath
+    }
+}
+
+function Invoke-TallyAnalyzeRequest {
+    param([Parameter(Mandatory=$true)] [object] $Request)
+
+    $params = @{}
+    if ($null -ne $Request.path -and $Request.path -ne '') {
+        $params['Path'] = [string] $Request.path
+    } elseif ($null -ne $Request.scriptDefinition) {
+        $params['ScriptDefinition'] = [string] $Request.scriptDefinition
+    } else {
+        throw 'an analyze request must include path or scriptDefinition'
+    }
+
+    $settings = Get-TallyAnalyzerSetting -Request $Request
+    if ($null -ne $settings) {
+        $params['Settings'] = $settings
+    }
+
+    $rawDiagnostics = @(Invoke-ScriptAnalyzer @params)
+    $diagnostics = @(
+        foreach ($diagnostic in $rawDiagnostics) {
+            ConvertTo-TallyDiagnostic -Diagnostic $diagnostic
+        }
+    )
+
+    return @{
+        id = $Request.id
+        ok = $true
+        diagnostics = $diagnostics
+    }
+}
+
+function Invoke-TallyFormatRequest {
+    param([Parameter(Mandatory=$true)] [object] $Request)
+
+    if ($null -eq $Request.scriptDefinition) {
+        throw 'a format request must include scriptDefinition'
+    }
+
+    $formatted = Invoke-Formatter -ScriptDefinition ([string] $Request.scriptDefinition)
+    return @{
+        id = $Request.id
+        ok = $true
+        formatted = [string] $formatted
+    }
+}
+
 try {
     if ($PSVersionTable.PSVersion.Major -lt 7) {
         throw "PowerShell 7 or newer is required to run tally's PowerShell analyzer sidecar."
@@ -120,75 +224,12 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
             break
         }
 
-        if ($req.op -ne 'analyze') {
-            throw "unsupported operation: $($req.op)"
-        }
-
-        $params = @{}
-        if ($null -ne $req.path -and $req.path -ne '') {
-            $params['Path'] = [string] $req.path
-        } elseif ($null -ne $req.scriptDefinition) {
-            $params['ScriptDefinition'] = [string] $req.scriptDefinition
+        if ($req.op -eq 'analyze') {
+            Write-JsonLine (Invoke-TallyAnalyzeRequest -Request $req)
+        } elseif ($req.op -eq 'format') {
+            Write-JsonLine (Invoke-TallyFormatRequest -Request $req)
         } else {
-            throw 'an analyze request must include path or scriptDefinition'
-        }
-
-        if ($null -ne $req.settings) {
-            $settings = @{}
-            if ($null -ne $req.settings.includeRules -and @($req.settings.includeRules).Count -gt 0) {
-                $settings['IncludeRules'] = @($req.settings.includeRules)
-            }
-            if ($null -ne $req.settings.excludeRules -and @($req.settings.excludeRules).Count -gt 0) {
-                $settings['ExcludeRules'] = @($req.settings.excludeRules)
-            }
-            if ($null -ne $req.settings.severity -and @($req.settings.severity).Count -gt 0) {
-                $settings['Severity'] = @($req.settings.severity)
-            }
-            if ($settings.Count -gt 0) {
-                $params['Settings'] = $settings
-            }
-        }
-
-        $rawDiagnostics = @(Invoke-ScriptAnalyzer @params)
-        $diagnostics = @(
-            foreach ($d in $rawDiagnostics) {
-                $extent = $d.Extent
-                $lineValue = $null
-                $columnValue = $null
-                $endLine = $null
-                $endColumn = $null
-                if ($null -ne $d.Line -and $d.Line -gt 0) {
-                    $lineValue = [int] $d.Line
-                }
-                if ($null -ne $d.Column -and $d.Column -gt 0) {
-                    $columnValue = [int] $d.Column
-                }
-                if ($null -ne $extent) {
-                    if ($extent.EndLineNumber -gt 0) {
-                        $endLine = [int] $extent.EndLineNumber
-                    }
-                    if ($extent.EndColumnNumber -gt 0) {
-                        $endColumn = [int] $extent.EndColumnNumber
-                    }
-                }
-
-                @{
-                    ruleName = [string] $d.RuleName
-                    severity = [int] $d.Severity
-                    line = $lineValue
-                    column = $columnValue
-                    endLine = $endLine
-                    endColumn = $endColumn
-                    message = [string] $d.Message
-                    scriptPath = [string] $d.ScriptPath
-                }
-            }
-        )
-
-        Write-JsonLine @{
-            id = $req.id
-            ok = $true
-            diagnostics = $diagnostics
+            throw "unsupported operation: $($req.op)"
         }
     } catch {
         $id = $null

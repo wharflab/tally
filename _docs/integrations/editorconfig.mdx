@@ -25,7 +25,8 @@ The pattern matches `Dockerfile`, `Dockerfile.*`, `Containerfile`, and `Containe
 ## Rules that use EditorConfig
 
 - [`tally/prefer-formatted-heredocs`](/rules/tally/prefer-formatted-heredocs) formats `COPY` and `ADD` heredoc bodies for JSON, YAML, TOML, XML, and
-  INI files, plus shell heredocs from executable `RUN` heredocs and `COPY` heredocs with a shell shebang or `.sh` destination.
+  INI files, plus shell heredocs from executable `RUN` heredocs and `COPY` heredocs with a shell shebang or `.sh` destination. PowerShell heredocs
+  are formatted through PSScriptAnalyzer and do not use EditorConfig today.
 
 For structured heredoc payloads, tally resolves EditorConfig settings using a virtual filename next to the Dockerfile and the heredoc destination
 basename. For example, a heredoc in `services/api/Dockerfile` targeting `/etc/app/config.yaml` is resolved as `services/api/config.yaml`, so

@@ -5,8 +5,8 @@
 > **Status**: Design note — macOS host checks and Windows sidecar smoke tests
 > reproduced.
 > **Purpose**: Decide how tally should invoke PowerShell's PSScriptAnalyzer to
-> lint `.ps1` / `.psm1` content — both standalone and inside Dockerfile
-> `RUN pwsh -Command ...` / `SHELL ["pwsh", ...]` contexts.
+> lint and format `.ps1` / `.psm1` / `.psd1` content — both standalone and
+> inside Dockerfile `RUN pwsh -Command ...` / `SHELL ["pwsh", ...]` contexts.
 
 ## Goal
 
@@ -18,6 +18,9 @@ integration:
 - Single long-lived process for the linter session (amortize cold start).
 - Structured, line-/column-accurate diagnostics usable by existing
   `internal/lint` and `internal/lsp` pipelines.
+- PowerShell formatting via `Invoke-Formatter` for heredoc content, without
+  starting `pwsh` unless a PowerShell snippet actually needs analysis or
+  formatting.
 - Cross-platform: Windows, macOS, Linux — the three targets tally already
   supports.
 
@@ -44,7 +47,7 @@ if not, what ships instead.
   kills Go's cross-compilation story. For a linter, the juice isn't worth the
   squeeze.
 - A long-running `pwsh` 7.x subprocess speaking JSON-framed IPC gets us
-  everything we need with a single code path across all three OSes. Windows
+  diagnostics and formatting with a single code path across all three OSes. Windows
   PowerShell 5.1 is **not** a supported host fallback: tally's Dockerfile
   PowerShell target is `pwsh` 7.x syntax, and PSScriptAnalyzer hosted in 5.1
   uses the 5.1 parser. The cold-start tax amortizes over a session, and

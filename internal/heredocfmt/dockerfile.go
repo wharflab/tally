@@ -1,6 +1,7 @@
 package heredocfmt
 
 import (
+	"context"
 	"path"
 	"strings"
 
@@ -197,8 +198,15 @@ func stageIndexAtLine(stages []instructions.Stage, line int) int {
 	return stageIdx
 }
 
-// FormatDockerfileHeredocs builds text edits that pretty-print Dockerfile heredoc bodies.
-func FormatDockerfileHeredocs(file string, result *dockerfile.ParseResult, sem *semantic.Model) ([]rules.TextEdit, error) {
+// FormatDockerfileHeredocsWithPowerShell builds text edits that pretty-print Dockerfile heredoc bodies.
+// PowerShell formatting is attempted only when formatter is non-nil and the heredoc is clearly PowerShell.
+func FormatDockerfileHeredocsWithPowerShell(
+	ctx context.Context,
+	file string,
+	result *dockerfile.ParseResult,
+	sem *semantic.Model,
+	powerShellFormatter PowerShellFormatter,
+) ([]rules.TextEdit, error) {
 	formatter := NewFormatter(file)
 	var edits []rules.TextEdit
 	for _, doc := range CollectDockerfileHeredocs(result) {
@@ -212,6 +220,20 @@ func FormatDockerfileHeredocs(file string, result *dockerfile.ParseResult, sem *
 				return nil, err
 			}
 		}
+		if !ok && strings.EqualFold(doc.Instruction, command.Copy) {
+			formatted, ok, err = formatter.FormatPowerShellTarget(
+				ctx,
+				powerShellFormatter,
+				doc.TargetPath,
+				doc.Content,
+			)
+			if err != nil {
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
+				continue
+			}
+		}
 		if !ok || formatted == doc.Content {
 			continue
 		}
@@ -223,6 +245,24 @@ func FormatDockerfileHeredocs(file string, result *dockerfile.ParseResult, sem *
 	}
 	for _, doc := range CollectRunHeredocs(result) {
 		variant := RunHeredocShellVariant(result.Stages, sem, doc)
+		if variant.IsPowerShell() {
+			formatted, ok, err := formatter.FormatPowerShell(ctx, powerShellFormatter, doc.Content)
+			if err != nil {
+				if ctx.Err() != nil {
+					return nil, ctx.Err()
+				}
+				continue
+			}
+			if !ok || formatted == doc.Content {
+				continue
+			}
+
+			edits = append(edits, rules.TextEdit{
+				Location: rules.NewRangeLocation(file, doc.BodyStartLine, 0, doc.TerminatorLine, 0),
+				NewText:  WithBodyPrefix(formatted, doc.BodyPrefix),
+			})
+			continue
+		}
 		if !variant.SupportsPOSIXShellAST() {
 			continue
 		}

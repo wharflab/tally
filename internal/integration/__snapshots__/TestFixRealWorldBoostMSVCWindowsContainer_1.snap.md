@@ -1,5 +1,5 @@
 note: 4 slow check(s) skipped (image not found)
-Fixed 15 issues
+Fixed 16 issues
 Skipped 1 fixes
 note: 1 AI fix(es) failed (see details below)
 note: skipped fix tally/prefer-multi-stage-build (<stdin>): resolver not registered: ai-autofix

@@ -594,6 +594,8 @@ func TestShellFromShebang(t *testing.T) {
 		{"#!/usr/bin/env bats", "bats", true},
 		{"#!/bin/ksh", "ksh", true},
 		{"#!/usr/bin/env ksh", "ksh", true},
+		{"#!/usr/bin/env pwsh", "pwsh", true},
+		{"#!/usr/bin/powershell", "powershell", true},
 		{"#!/usr/bin/python3", "", false},
 		{"#!/usr/bin/env python3", "", false},
 		{"echo hello", "", false},

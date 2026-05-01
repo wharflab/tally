@@ -1,10 +1,10 @@
 ---
 title: "tally/prefer-formatted-heredocs"
-description: "Pretty-print structured COPY/ADD heredocs and shell heredocs."
+description: "Pretty-print structured COPY/ADD heredocs, shell heredocs, and PowerShell heredocs."
 ---
 
-Pretty-prints structured `COPY` and `ADD` heredoc bodies, `COPY` heredocs that contain shell scripts, and `RUN` heredoc bodies that are executed as
-shell scripts.
+Pretty-prints structured `COPY` and `ADD` heredoc bodies, `COPY` heredocs that contain shell or PowerShell scripts, and executable `RUN` heredoc
+bodies.
 
 | Property | Value |
 |----------|-------|
@@ -25,7 +25,11 @@ the `.sh` extension.
 
 The rule also formats `RUN <<EOF` heredocs whose body is executed as a shell script. It uses `mvdan.cc/sh/v3`, the same formatter library behind
 `shfmt`, for Bash, POSIX shell, mksh, Bats, and zsh. Heredocs that are stdin payloads for another command, such as `RUN cat <<EOF`, are left alone.
-PowerShell, cmd, and unknown shebang bodies are skipped.
+cmd and unknown shebang bodies are skipped.
+
+PowerShell heredocs are formatted with PSScriptAnalyzer's `Invoke-Formatter`. This applies to `COPY` heredocs targeting `.ps1`, `.psm1`, or `.psd1`
+files, and to `RUN <<EOF` bodies when the active Dockerfile `SHELL` is PowerShell or the heredoc has a PowerShell shebang. tally starts the
+PowerShell sidecar lazily, only when a PowerShell heredoc actually needs formatting.
 
 For structured payload EditorConfig lookup, tally resolves a virtual filename next to the Dockerfile using the destination basename. For example, a
 heredoc in `services/api/Dockerfile` targeting `/etc/app/config.yaml` is matched as `services/api/config.yaml`, so selectors such as `*.yaml` and
@@ -36,6 +40,8 @@ heredoc in `services/api/Dockerfile` targeting `/etc/app/config.yaml` is matched
 
 For `RUN` shell heredocs, tally resolves a virtual filename next to the Dockerfile named `Dockerfile.heredoc.<dialect>`, such as
 `Dockerfile.heredoc.sh`, `Dockerfile.heredoc.bash`, or `Dockerfile.heredoc.zsh`.
+
+PowerShell heredocs use PSScriptAnalyzer's own default formatter settings. They do not use EditorConfig today.
 
 The formatter also runs as a final auto-fix pass. This means heredocs emitted by other rules, such as `tally/prefer-copy-heredoc`, are formatted in
 the same `--fix` run when this rule is enabled.
@@ -106,6 +112,30 @@ chown -R app:app /run/app /var/cache/app
 EOF
 ```
 
+### Bad: RUN PowerShell
+
+```dockerfile
+FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+SHELL ["pwsh", "-Command"]
+RUN <<EOF
+if ($true) {
+Write-Host hi
+}
+EOF
+```
+
+### Good: RUN PowerShell
+
+```dockerfile
+FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+SHELL ["pwsh", "-Command"]
+RUN <<EOF
+if ($true) {
+    Write-Host hi
+}
+EOF
+```
+
 ## Supported Types
 
 | Extension | Format |
@@ -116,10 +146,18 @@ EOF
 | `.xml`, `.config`, `.xsd`, `.wsdl`, `.xsl`, `.xslt` | XML |
 | `.ini` | INI |
 
+## Supported PowerShell Targets
+
+| Extension | Format |
+|-----------|--------|
+| `.ps1` | PowerShell script |
+| `.psm1` | PowerShell script module |
+| `.psd1` | PowerShell data file or module manifest |
+
 ## Supported Shells
 
 Shell formatting applies to executable `RUN` heredocs and to `COPY` heredocs with a recognized shell shebang. A `COPY` heredoc targeting `.sh`
-without a shebang uses POSIX shell.
+without a shebang uses POSIX shell. PowerShell `RUN` heredocs use PSScriptAnalyzer instead of a shfmt dialect.
 
 | Shell | Formatter dialect |
 |-------|-------------------|
@@ -138,14 +176,14 @@ Default (no config needed):
 ```
 
 This rule intentionally has no rule-specific formatter options. Use `.editorconfig` for indentation style and width, YAML scalar wrapping width, and
-shell heredoc line width.
+POSIX-style shell heredoc line width.
 See [EditorConfig integration](/integrations/editorconfig) for recommended Dockerfile settings and path resolution details.
 
 The rule reads `indent_style`, `indent_size`, `tab_width`, and `max_line_length`. For YAML, `max_line_length` is used as a preferred scalar wrapping
 width. For shell heredocs, it is used as a preferred command wrapping width; when unset or invalid, tally uses `100`, and `off` disables this shell
 line-width pass. This is not a hard maximum.
 
-For shell heredocs, tally also reads shfmt-compatible EditorConfig booleans: `binary_next_line`, `switch_case_indent`, `space_redirects`,
+For POSIX-style shell heredocs, tally also reads shfmt-compatible EditorConfig booleans: `binary_next_line`, `switch_case_indent`, `space_redirects`,
 `keep_padding`, `function_next_line`, `simplify`, and `minify`.
 
 The rule does not currently interpret `insert_final_newline`, `end_of_line`, `charset`, or `trim_trailing_whitespace` for the virtual payload file.

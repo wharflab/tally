@@ -10,6 +10,16 @@ import (
 	"github.com/wharflab/tally/internal/rules"
 )
 
+type fakePowerShellFormatter struct {
+	formatted string
+	calls     []string
+}
+
+func (f *fakePowerShellFormatter) FormatPowerShell(_ context.Context, script string) (string, error) {
+	f.calls = append(f.calls, script)
+	return f.formatted, nil
+}
+
 func TestFormattedHeredocsFinalizerFormatsGeneratedHeredoc(t *testing.T) {
 	t.Parallel()
 
@@ -89,6 +99,39 @@ func TestFormattedHeredocsFinalizerFormatsRunHeredoc(t *testing.T) {
 	}
 	if result.TotalApplied() != 1 {
 		t.Fatalf("applied fixes = %d, want 1", result.TotalApplied())
+	}
+}
+
+func TestFormattedHeredocsFinalizerFormatsPowerShellRunHeredoc(t *testing.T) {
+	t.Parallel()
+
+	file := filepath.Join(t.TempDir(), "Dockerfile")
+	src := []byte("FROM mcr.microsoft.com/powershell:lts-alpine-3.20\n" +
+		"SHELL [\"pwsh\", \"-Command\"]\n" +
+		"RUN <<EOF\n" +
+		"if ($true) {\n" +
+		"Write-Host hi\n" +
+		"}\n" +
+		"EOF\n")
+	formatter := &fakePowerShellFormatter{
+		formatted: "if ($true) {\n    Write-Host hi\n}\n",
+	}
+	finalizer := formattedHeredocsFinalizer{powerShellFormatter: formatter}
+	edits, err := finalizer.Finalize(context.Background(), FinalizeContext{
+		FilePath: file,
+		Content:  src,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("got %d edits, want 1", len(edits))
+	}
+	if len(formatter.calls) != 1 {
+		t.Fatalf("PowerShell formatter calls = %d, want 1", len(formatter.calls))
+	}
+	if want := "if ($true) {\n    Write-Host hi\n}\n"; edits[0].NewText != want {
+		t.Fatalf("edit text mismatch\ngot:\n%s\nwant:\n%s", edits[0].NewText, want)
 	}
 }
 

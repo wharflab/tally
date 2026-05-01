@@ -91,6 +91,39 @@ func TestRunnerAnalyzeWithInstalledPSScriptAnalyzer(t *testing.T) {
 	t.Fatalf("expected PSAvoidUsingWriteHost diagnostic, got %#v", diags)
 }
 
+func TestRunnerFormatWithInstalledPSScriptAnalyzer(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS == "js" {
+		t.Skip("pwsh sidecar is not available on js")
+	}
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh not available")
+	}
+	if out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command",
+		"if (Get-Module -ListAvailable PSScriptAnalyzer) { 'yes' }").Output(); err != nil ||
+		strings.TrimSpace(string(out)) != "yes" {
+		t.Skip("PSScriptAnalyzer module not available")
+	}
+
+	r := NewRunner()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	defer func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		_ = r.Close(closeCtx)
+	}()
+
+	formatted, err := r.Format(ctx, FormatRequest{ScriptDefinition: "if ($true) {\nWrite-Host hi\n}\n"})
+	if err != nil {
+		t.Fatalf("Format() error = %v", err)
+	}
+	if !strings.Contains(formatted, "    Write-Host hi") {
+		t.Fatalf("expected formatted PowerShell indentation, got:\n%s", formatted)
+	}
+}
+
 func TestSidecarBootstrapsMissingPSScriptAnalyzer(t *testing.T) {
 	t.Parallel()
 
