@@ -18,9 +18,14 @@ This rule flags cmdlets that aren't available in a given Edition and Version of 
 given Operating System. It works by comparing a cmdlet against a set of allowlists which ship with
 PSScriptAnalyzer. They can be found at `/path/to/PSScriptAnalyzerModule/Settings`. These files use
 the `<psedition>-<psversion>-<os>.json` form, where `<psedition>` can be either `Core` or `Desktop`,
-`<os>` can be either `Windows`, `Linux` or `MacOS`, and `<psversion>` is the PowerShell version. To
-enable the rule to check if your script is compatible on PowerShell Core on windows, put the
-following your settings file:
+`<os>` can be either `Windows`, `Linux` or `macOS`, and `<psversion>` is the PowerShell version. To
+enable the rule to check if your script is compatible on PowerShell Core on Windows, put the
+following in your settings file:
+
+<Note>
+  This section describes upstream PSScriptAnalyzer settings. tally currently does not forward rule-specific settings such as `compatibility` to the
+  analyzer sidecar.
+</Note>
 
 ```powershell
 @{
@@ -32,7 +37,7 @@ following your settings file:
 }
 ```
 
-The parameter `compatibility` is a list that contain any of the following
+The parameter `compatibility` is a list that contains any of the following:
 
 - desktop-2.0-windows
 - desktop-3.0-windows
@@ -46,9 +51,9 @@ The parameter `compatibility` is a list that contain any of the following
 Usually, patched versions of PowerShell have the same cmdlet data, therefore only settings of major
 and minor versions of PowerShell are supplied. You can also create a custom settings file with the
 [New-CommandDataFile.ps1][01] script. Place the created `.json` file in the `Settings` folder of the
-`PSScriptAnalyzer` module folder. Then the `compatibility` parameter values is just the filename.
+`PSScriptAnalyzer` module folder. Then the `compatibility` parameter value is just the filename.
 Note that the `core-6.0.2-*` files were removed in PSScriptAnalyzer 1.18 since PowerShell 6.0
-reached it's end of life.
+reached its end of life.
 
 [01]: https://github.com/PowerShell/PSScriptAnalyzer/blob/main/Utils/New-CommandDataFile.ps1
 

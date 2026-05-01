@@ -33,6 +33,8 @@ type task struct {
 	mapping scriptMapping
 }
 
+type runScriptExtractor func(*sourcemap.SourceMap, *parser.Node, rune) (scriptMapping, bool)
+
 // Rule runs PowerShell script analysis on PowerShell snippets in Dockerfile instructions.
 type Rule struct {
 	analyzer analyzer
@@ -119,51 +121,100 @@ func collectStageTasks(
 		case *instructions.ShellCommand:
 			activeVariant = shellutil.VariantFromShellCmd(c.Shell)
 		case *instructions.RunCommand:
-			if !c.PrependShell || len(c.CmdLine) == 0 {
-				continue
-			}
-
 			startLine := extract.CommandStartLine(c.Location())
 			variant := activeVariant
 			if info != nil {
 				variant = info.ShellVariantAtLine(startLine)
 			}
+			tasks = append(tasks, collectRunCommandTasks(
+				sm,
+				nodesByStartLine,
+				escapeToken,
+				c,
+				startLine,
+				variant,
+				extractRunScript,
+			)...)
+		}
+	}
 
-			mapping, ok := extractRunScript(sm, nodesByStartLine[startLine], escapeToken)
-			if !ok {
-				mapping = scriptMapping{
-					Script:          getShellFormScript(c),
-					OriginStartLine: startLine,
-					FallbackLine:    startLine,
-				}
-			}
-			if strings.TrimSpace(mapping.Script) == "" {
-				continue
-			}
-			if mapping.ShellNameOverride != "" {
-				variant = shellutil.VariantFromShell(mapping.ShellNameOverride)
-			}
-
-			if variant.IsPowerShell() {
-				tasks = append(tasks, task{mapping: mapping})
-				continue
-			}
-
-			invocation, ok := parseExplicitPowerShellInvocation(mapping.Script)
+	if info != nil {
+		for _, ob := range info.OnbuildInstructions {
+			run, ok := ob.Command.(*instructions.RunCommand)
 			if !ok {
 				continue
 			}
-
-			tasks = append(tasks, task{mapping: scriptMapping{
-				Script:            invocation.script,
-				OriginStartLine:   mapping.OriginStartLine + invocation.startLine,
-				OriginStartColumn: invocation.startColumn,
-				FallbackLine:      mapping.FallbackLine,
-			}})
+			tasks = append(tasks, collectRunCommandTasks(
+				sm,
+				nodesByStartLine,
+				escapeToken,
+				run,
+				ob.SourceLine,
+				info.ShellVariantAtLine(ob.SourceLine),
+				extractOnbuildRunScript,
+			)...)
 		}
 	}
 
 	return tasks
+}
+
+func collectRunCommandTasks(
+	sm *sourcemap.SourceMap,
+	nodesByStartLine map[int]*parser.Node,
+	escapeToken rune,
+	run *instructions.RunCommand,
+	startLine int,
+	variant shellutil.Variant,
+	extractor runScriptExtractor,
+) []task {
+	if len(run.CmdLine) == 0 {
+		return nil
+	}
+
+	if !run.PrependShell {
+		invocation, ok := parseExecFormPowerShellInvocation(run.CmdLine)
+		if !ok {
+			return nil
+		}
+		return []task{{mapping: scriptMapping{
+			Script:          invocation.script,
+			OriginStartLine: startLine,
+			FallbackLine:    startLine,
+		}}}
+	}
+
+	mapping, ok := extractor(sm, nodesByStartLine[startLine], escapeToken)
+	if !ok {
+		mapping = scriptMapping{
+			Script:          getShellFormScript(run),
+			OriginStartLine: startLine,
+			FallbackLine:    startLine,
+		}
+	}
+	if strings.TrimSpace(mapping.Script) == "" {
+		return nil
+	}
+	if mapping.ShellNameOverride != "" {
+		variant = shellutil.VariantFromShell(mapping.ShellNameOverride)
+	}
+
+	if variant.IsPowerShell() {
+		return []task{{mapping: mapping}}
+	}
+
+	invocation, ok := parseExplicitPowerShellInvocation(mapping.Script)
+	if !ok {
+		return nil
+	}
+
+	invocationLine := mapping.OriginStartLine + invocation.startLine
+	return []task{{mapping: scriptMapping{
+		Script:            invocation.script,
+		OriginStartLine:   invocationLine,
+		OriginStartColumn: invocation.startColumn,
+		FallbackLine:      invocationLine,
+	}}}
 }
 
 func (r *Rule) checkMapping(file string, mapping scriptMapping) []rules.Violation {

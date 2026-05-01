@@ -10,7 +10,7 @@
   },
   "examples": [
     {
-      "example-rule": {
+      "PSAvoidUsingWriteHost": {
         "severity": "warning"
       }
     }

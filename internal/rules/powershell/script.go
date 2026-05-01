@@ -33,13 +33,31 @@ func extractRunScript(
 	if !ok {
 		return scriptMapping{}, false
 	}
-	m.Script = extract.NormalizeContinuation(m.Script, escapeToken, '`')
+	return scriptMappingFromExtract(m, escapeToken), true
+}
+
+func extractOnbuildRunScript(
+	sm *sourcemap.SourceMap,
+	node *dfparser.Node,
+	escapeToken rune,
+) (scriptMapping, bool) {
+	m, ok := extract.ExtractOnbuildRunScript(sm, node, escapeToken)
+	if !ok {
+		return scriptMapping{}, false
+	}
+	return scriptMappingFromExtract(m, escapeToken), true
+}
+
+func scriptMappingFromExtract(m extract.Mapping, escapeToken rune) scriptMapping {
+	if !m.IsHeredoc {
+		m.Script = extract.NormalizeContinuation(m.Script, escapeToken, '`')
+	}
 	return scriptMapping{
 		Script:            m.Script,
 		OriginStartLine:   m.OriginStartLine,
 		FallbackLine:      m.FallbackLine,
 		ShellNameOverride: m.ShellNameOverride,
-	}, true
+	}
 }
 
 func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocation, bool) {
@@ -61,9 +79,7 @@ func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocat
 		return explicitPowerShellInvocation{}, false
 	}
 
-	firstTokenAfterExe := true
 	for {
-		tokenStart := shellutil.SkipShellTokenSpaces(script, next)
 		token, end := shellutil.NextShellToken(script, next)
 		if token == "" {
 			return explicitPowerShellInvocation{}, false
@@ -74,13 +90,31 @@ func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocat
 			return invocationFromRemainder(script, end)
 		}
 
-		if firstTokenAfterExe && !strings.HasPrefix(tokenNorm, "-") {
-			return invocationFromRemainder(script, tokenStart)
-		}
-
 		next = end
-		firstTokenAfterExe = false
 	}
+}
+
+func parseExecFormPowerShellInvocation(args []string) (explicitPowerShellInvocation, bool) {
+	if len(args) == 0 {
+		return explicitPowerShellInvocation{}, false
+	}
+	exe := shellutil.NormalizeShellExecutableName(args[0])
+	if exe != "powershell" && exe != "pwsh" {
+		return explicitPowerShellInvocation{}, false
+	}
+
+	for i := 1; i < len(args); i++ {
+		tokenNorm := strings.ToLower(args[i])
+		if tokenNorm != "-command" && tokenNorm != "-c" {
+			continue
+		}
+		if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+			return explicitPowerShellInvocation{}, false
+		}
+		return explicitPowerShellInvocation{script: args[i+1]}, true
+	}
+
+	return explicitPowerShellInvocation{}, false
 }
 
 func invocationFromRemainder(script string, start int) (explicitPowerShellInvocation, bool) {

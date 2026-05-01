@@ -23,7 +23,11 @@ used by other PSScriptAnalyzer rules. More information can be found in the docum
 ## Configuration
 
 To enable the rule to check if your script is compatible on PowerShell Core on Windows, put the
-following your settings file.
+following in your settings file.
+
+<Note>
+  This section describes upstream PSScriptAnalyzer settings. tally currently does not forward rule-specific PSScriptAnalyzer settings to the sidecar.
+</Note>
 
 ```powershell
 @{
@@ -42,8 +46,9 @@ following your settings file.
 The parameter `PowerShellVersion` is a list of allowlists that ship with PSScriptAnalyzer.
 
 <Note>
-  The default value for `PowerShellVersion` is `core-6.1.0-windows` if PowerShell 6 or
-  later is installed, and `desktop-5.1.14393.206-windows` if it's not.
+  In upstream PSScriptAnalyzer, the default value for `PowerShellVersion` is `core-6.1.0-windows` if PowerShell 6 or later is installed, and
+  `desktop-5.1.14393.206-windows` if it is not. tally itself requires `pwsh` 7.x as the analyzer host and does not support `powershell.exe` or Windows
+  PowerShell 5.1 as the host process.
 </Note>
 
 Usually, patched versions of PowerShell have the same cmdlet data, therefore only settings of major

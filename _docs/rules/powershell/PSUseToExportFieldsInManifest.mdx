@@ -22,7 +22,7 @@ To improve the performance of module auto-discovery, module manifests should not
 - `FunctionsToExport`
 - `VariablesToExport`
 
-Using wildcards or null has causes PowerShell to perform expensive work to analyze a module during
+Using wildcards or null causes PowerShell to perform expensive work to analyze a module during
 module auto-discovery.
 
 ## How
@@ -42,7 +42,7 @@ FunctionsToExport = $null
 ### Correct code
 
 ```powershell
-FunctionToExport = @()
+FunctionsToExport = @()
 ```
 
 ## Example 2
@@ -59,7 +59,7 @@ FunctionsToExport = '*'
 ### Correct code
 
 ```powershell
-FunctionToExport = @(Get-Foo, Set-Foo)
+FunctionsToExport = @(Get-Foo, Set-Foo)
 ```
 
 ## Source

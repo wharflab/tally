@@ -3,6 +3,7 @@ package powershell
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/wharflab/tally/internal/psanalyzer"
@@ -110,6 +111,99 @@ RUN pwsh -Command "Write-Host hi"
 	}
 }
 
+func TestRuleChecksExecFormPowerShellCommandRun(t *testing.T) {
+	t.Parallel()
+
+	line, col := 1, 1
+	fake := &fakeAnalyzer{diagnostics: []psanalyzer.Diagnostic{{
+		RuleName: "PSAvoidUsingWriteHost",
+		Severity: 1,
+		Line:     &line,
+		Column:   &col,
+		Message:  "Avoid using Write-Host.",
+	}}}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN ["pwsh", "-NoProfile", "-Command", "Write-Host hi"]
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1: %#v", len(violations), violations)
+	}
+	if len(fake.scripts) != 1 || fake.scripts[0] != "Write-Host hi" {
+		t.Fatalf("analyzed scripts = %#v, want exec-form PowerShell command body", fake.scripts)
+	}
+	if violations[0].Location.Start.Line != 2 || violations[0].Location.Start.Column != 0 {
+		t.Fatalf("Location = %#v, want exec-form RUN line", violations[0].Location)
+	}
+}
+
+func TestRuleSkipsPowerShellFileInvocation(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		dockerfile string
+	}{
+		{
+			name: "shell form",
+			dockerfile: `FROM alpine
+RUN pwsh ./build.ps1 -Foo Bar
+`,
+		},
+		{
+			name: "exec form",
+			dockerfile: `FROM alpine
+RUN ["pwsh", "-File", "./build.ps1"]
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			fake := &fakeAnalyzer{}
+			rule := newRuleWithAnalyzer(fake)
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.dockerfile)
+			input.EnabledRules = []string{PowerShellRuleCode}
+
+			violations := rule.Check(input)
+			if len(violations) != 0 {
+				t.Fatalf("expected no violations, got %#v", violations)
+			}
+			if len(fake.scripts) != 0 {
+				t.Fatalf("analyzer was called for PowerShell file invocation: %#v", fake.scripts)
+			}
+		})
+	}
+}
+
+func TestRuleReportsAnalyzerFailureAtExplicitInvocationLine(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeAnalyzer{err: errors.New("module not available")}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN pwsh \
+    -Command "Write-Host hi"
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1: %#v", len(violations), violations)
+	}
+	if violations[0].RuleCode != metaFailureRuleCode {
+		t.Fatalf("RuleCode = %q, want %q", violations[0].RuleCode, metaFailureRuleCode)
+	}
+	if violations[0].Location.Start.Line != 3 {
+		t.Fatalf("Location = %#v, want explicit invocation command line", violations[0].Location)
+	}
+}
+
 func TestRuleChecksPowerShellHeredocOverride(t *testing.T) {
 	t.Parallel()
 
@@ -138,6 +232,62 @@ EOF
 	}
 	if violations[0].Location.Start.Line != 3 || violations[0].Location.Start.Column != 0 {
 		t.Fatalf("Location = %#v, want heredoc body at line 3 column 0", violations[0].Location)
+	}
+}
+
+func TestRulePreservesPowerShellHeredocBackslashContinuation(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeAnalyzer{}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN <<EOF pwsh
+Write-Host foo \
+Write-Host bar
+EOF
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations, got %#v", violations)
+	}
+	if len(fake.scripts) != 1 {
+		t.Fatalf("analyzed scripts = %#v, want one heredoc body", fake.scripts)
+	}
+	want := "Write-Host foo \\\nWrite-Host bar"
+	if fake.scripts[0] != want {
+		t.Fatalf("analyzed script = %q, want %q", fake.scripts[0], want)
+	}
+}
+
+func TestRuleChecksOnbuildPowerShellRun(t *testing.T) {
+	t.Parallel()
+
+	line, col := 1, 1
+	fake := &fakeAnalyzer{diagnostics: []psanalyzer.Diagnostic{{
+		RuleName: "PSAvoidUsingWriteHost",
+		Severity: 1,
+		Line:     &line,
+		Column:   &col,
+		Message:  "Avoid using Write-Host.",
+	}}}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command"]
+ONBUILD RUN Write-Host hi
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1: %#v", len(violations), violations)
+	}
+	if len(fake.scripts) != 1 || strings.TrimSpace(fake.scripts[0]) != "Write-Host hi" {
+		t.Fatalf("analyzed scripts = %#v, want ONBUILD PowerShell RUN script", fake.scripts)
+	}
+	if violations[0].Location.Start.Line != 3 {
+		t.Fatalf("Location = %#v, want ONBUILD RUN line", violations[0].Location)
 	}
 }
 

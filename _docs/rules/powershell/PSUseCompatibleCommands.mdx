@@ -75,7 +75,7 @@ platform can be specified as:
 
 - A platform name (like `ubuntu_x64_18.04_6.1.1_x64_4.0.30319.42000_core`), which will have `.json`
   added to the end and is searched for in the default profile directory.
-- A filename (like `my_custom_platform.json`), which will be searched for the in the default profile
+- A filename (like `my_custom_platform.json`), which will be searched for in the default profile
   directory.
 - An absolute path to a file (like `D:\PowerShellProfiles\TargetMachine.json`).
 
@@ -95,7 +95,7 @@ target.
 | ----------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `Enable`          | Activates the rule                                                               | bool (`$true`/`$false`)                                                                 | No (default: `$false`)                                                        | `$true`                                                                                                                       |
 | `TargetProfiles`  | The list of PowerShell profiles to target                                        | string[]: absolute paths to profile files or names of profiles in the profile directory | No (default: `@()`)                                                           | `@('ubuntu_x64_18.04_6.1.3_x64_4.0.30319.42000_core', 'win-48_x64_10.0.17763.0_5.1.17763.316_x64_4.0.30319.42000_framework')` |
-| `ProfileDirPath`  | The location to search for profiles by name and use for union profile generation | string: absolute path to new profile dir                                                | No (defaults to `compatibility_profiles` directory in PSScriptAnalyzer module | `C:\Users\me\Documents\pssaCompatProfiles`                                                                                    |
+| `ProfileDirPath`  | The location to search for profiles by name and use for union profile generation | string: absolute path to new profile dir                                                | No (defaults to `compatibility_profiles` directory in PSScriptAnalyzer module) | `C:\Users\me\Documents\pssaCompatProfiles`                                                                                    |
 | `IgnoreCommands`  | Commands to ignore compatibility of in scripts                                   | string[]: names of commands to ignore                                                   | No (default: `@()`)                                                           | `@('Get-ChildItem','Import-Module')`                                                                                          |
 
 An example configuration might look like:

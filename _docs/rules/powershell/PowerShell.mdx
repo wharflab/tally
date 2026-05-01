@@ -29,6 +29,7 @@ Enable this analyzer with `--select powershell/PowerShell`, `--select powershell
 ## Requirements
 
 - PowerShell 7 (`pwsh`) must be available on `PATH`.
+- Windows PowerShell 5.1 (`powershell.exe`) is not supported as an analyzer host; use PowerShell 7+ (`pwsh`).
 - The first PowerShell analyzer run installs `PSScriptAnalyzer` automatically for that `pwsh` environment when the module is missing.
 
 Use `TALLY_POWERSHELL=/path/to/pwsh` when `pwsh` is not on `PATH` or when tally should use a specific PowerShell installation.

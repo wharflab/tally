@@ -15,7 +15,7 @@ sidebarTitle: "PSAvoidAssignmentToAutomaticVariable"
 ## Description
 
 PowerShell has built-in variables known as automatic variables. Many of them are read-only and
-PowerShell throws an error when trying to assign an value on those. Other automatic variables should
+PowerShell throws an error when trying to assign a value on those. Other automatic variables should
 only be assigned in certain special cases to achieve a certain effect as a special technique.
 
 To understand more about automatic variables, see `Get-Help about_Automatic_Variables`.
@@ -28,7 +28,7 @@ Use variable names in functions or their parameters that do not conflict with au
 
 ### Problematic code
 
-The variable `$Error` is an automatic variables that exists in the global scope and should therefore
+The variable `$Error` is an automatic variable that exists in the global scope and should therefore
 never be used as a variable or parameter name.
 
 ```powershell

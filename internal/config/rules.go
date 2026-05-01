@@ -176,7 +176,8 @@ func matchesAnyIncludePattern(ruleCode string, patterns []string) bool {
 			return strings.HasPrefix(ruleCode, "powershell/")
 		}
 		if ruleCode == "powershell/PowerShell" {
-			return strings.HasPrefix(pattern, "powershell/PS")
+			name, ok := strings.CutPrefix(pattern, "powershell/")
+			return ok && isPowerShellAnalyzerRuleName(name)
 		}
 		return false
 	})
@@ -261,15 +262,15 @@ func (rc *RulesConfig) GetOptions(ruleCode string) map[string]any {
 	return nil
 }
 
-// EnablesPowerShellAnalyzer reports whether a concrete powershell/PS... rule
-// config should activate the analyzer engine even though the concrete rule is
-// discovered dynamically from PSScriptAnalyzer output.
+// EnablesPowerShellAnalyzer reports whether a concrete powershell/* analyzer
+// diagnostic config should activate the analyzer engine even though the
+// concrete rule is discovered dynamically from PSScriptAnalyzer output.
 func (rc *RulesConfig) EnablesPowerShellAnalyzer() bool {
 	if rc == nil {
 		return false
 	}
 	for name, cfg := range rc.Powershell {
-		if !strings.HasPrefix(name, "PS") {
+		if !isPowerShellAnalyzerRuleName(name) {
 			continue
 		}
 		if cfg.Severity != "" && cfg.Severity != SeverityOffValue {
@@ -280,6 +281,20 @@ func (rc *RulesConfig) EnablesPowerShellAnalyzer() bool {
 		}
 	}
 	return false
+}
+
+func isPowerShellAnalyzerRuleName(name string) bool {
+	switch name {
+	case "", "PowerShell", "PowerShellInternalError":
+		return false
+	}
+	for _, r := range name {
+		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			continue
+		}
+		return false
+	}
+	return true
 }
 
 // GetOptionsTyped returns typed rule options merged over defaults.

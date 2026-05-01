@@ -76,7 +76,36 @@ jobs:
         shell: pwsh
         run: |
           if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
-            Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -Quiet
+            $installPSResource = Get-Command -Name Install-PSResource -ErrorAction SilentlyContinue
+            if ($null -ne $installPSResource) {
+              $params = @{
+                Name = 'PSScriptAnalyzer'
+                Scope = 'CurrentUser'
+                ErrorAction = 'Stop'
+              }
+              if ($installPSResource.Parameters.ContainsKey('TrustRepository')) { $params['TrustRepository'] = $true }
+              if ($installPSResource.Parameters.ContainsKey('AcceptLicense')) { $params['AcceptLicense'] = $true }
+              if ($installPSResource.Parameters.ContainsKey('Quiet')) { $params['Quiet'] = $true }
+              Install-PSResource @params | Out-Null
+              return
+            }
+
+            $installModule = Get-Command -Name Install-Module -ErrorAction SilentlyContinue
+            if ($null -ne $installModule) {
+              $params = @{
+                Name = 'PSScriptAnalyzer'
+                Scope = 'CurrentUser'
+                Force = $true
+                ErrorAction = 'Stop'
+              }
+              if ($installModule.Parameters.ContainsKey('AcceptLicense')) { $params['AcceptLicense'] = $true }
+              if ($installModule.Parameters.ContainsKey('AllowClobber')) { $params['AllowClobber'] = $true }
+              if ($installModule.Parameters.ContainsKey('SkipPublisherCheck')) { $params['SkipPublisherCheck'] = $true }
+              Install-Module @params | Out-Null
+              return
+            }
+
+            throw 'PSScriptAnalyzer is not installed, and neither Install-PSResource nor Install-Module is available in this pwsh environment.'
           }
       - name: Run unit tests with coverage
         run: |

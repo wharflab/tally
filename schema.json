@@ -991,7 +991,7 @@
       "description": "Schema for rules.powershell configuration; keys are rule names within the powershell namespace.",
       "examples": [
         {
-          "example-rule": {
+          "PSAvoidUsingWriteHost": {
             "severity": "warning"
           }
         }

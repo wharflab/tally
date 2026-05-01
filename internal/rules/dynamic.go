@@ -18,19 +18,23 @@ func IsDynamicRuleCode(ruleCode string) bool {
 		return true
 	}
 
-	if strings.HasPrefix(ruleCode, PowerShellRulePrefix+"PS") {
-		name := strings.TrimPrefix(ruleCode, PowerShellRulePrefix)
-		if len(name) <= 2 {
-			return false
-		}
-		for _, r := range name {
-			if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-				continue
-			}
-			return false
-		}
-		return true
+	if name, ok := strings.CutPrefix(ruleCode, PowerShellRulePrefix); ok {
+		return isDynamicPowerShellRuleName(name)
 	}
 
 	return false
+}
+
+func isDynamicPowerShellRuleName(name string) bool {
+	switch name {
+	case "", "PowerShell", "PowerShellInternalError":
+		return false
+	}
+	for _, r := range name {
+		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			continue
+		}
+		return false
+	}
+	return true
 }

@@ -605,6 +605,8 @@ func ruleExampleKey(namespace string) string {
 		return "StageNameCasing"
 	case "shellcheck":
 		return "SC2086"
+	case "powershell":
+		return "PSAvoidUsingWriteHost"
 	default:
 		return "example-rule"
 	}
