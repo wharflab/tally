@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/wharflab/tally/internal/config"
+	fixpkg "github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
@@ -108,6 +109,107 @@ RUN Write-Host hi
 	}
 	if len(fake.scripts) != 1 || fake.scripts[0] == "" {
 		t.Fatalf("expected one analyzed script, got %#v", fake.scripts)
+	}
+}
+
+func TestRuleAttachesPowerShellSuggestedFix(t *testing.T) {
+	t.Parallel()
+
+	line, col, endLine, endCol := 1, 5, 1, 8
+	fake := &fakeAnalyzer{diagnostics: []psanalyzer.Diagnostic{{
+		RuleName:  "PSAvoidUsingCmdletAliases",
+		Severity:  1,
+		Line:      &line,
+		Column:    &col,
+		EndLine:   &endLine,
+		EndColumn: &endCol,
+		Message:   "'gci' is an alias of 'Get-ChildItem'.",
+		SuggestedCorrections: []psanalyzer.SuggestedCorrection{{
+			Description: "Replace gci with Get-ChildItem",
+			Line:        1,
+			Column:      5,
+			EndLine:     1,
+			EndColumn:   8,
+			Text:        "Get-ChildItem",
+		}},
+	}}}
+	rule := newRuleWithAnalyzer(fake)
+	content := `FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command"]
+RUN gci
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1: %#v", len(violations), violations)
+	}
+	gotFix := violations[0].SuggestedFix
+	if gotFix == nil {
+		t.Fatal("expected PowerShell suggested correction to be exposed as a suggested fix")
+	}
+	if gotFix.Description != "Replace gci with Get-ChildItem" {
+		t.Fatalf("fix description = %q", gotFix.Description)
+	}
+	if gotFix.Safety != rules.FixSuggestion {
+		t.Fatalf("fix safety = %v, want %v", gotFix.Safety, rules.FixSuggestion)
+	}
+	if !gotFix.IsPreferred {
+		t.Fatalf("expected single PowerShell fix to be preferred")
+	}
+	if len(gotFix.Edits) != 1 {
+		t.Fatalf("fix edits = %#v, want one edit", gotFix.Edits)
+	}
+	edit := gotFix.Edits[0]
+	if edit.Location.Start.Line != 3 || edit.Location.Start.Column != 4 ||
+		edit.Location.End.Line != 3 || edit.Location.End.Column != 7 {
+		t.Fatalf("edit location = %#v, want RUN body range", edit.Location)
+	}
+
+	got := string(fixpkg.ApplyFix([]byte(content), gotFix))
+	want := `FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command"]
+RUN Get-ChildItem
+`
+	if got != want {
+		t.Fatalf("applied fix mismatch:\nwant:\n%s\ngot:\n%s", want, got)
+	}
+}
+
+func TestRuleSkipsPowerShellSuggestedFixWithoutPreciseMapping(t *testing.T) {
+	t.Parallel()
+
+	line, col, endLine, endCol := 1, 1, 1, 4
+	fake := &fakeAnalyzer{diagnostics: []psanalyzer.Diagnostic{{
+		RuleName:  "PSAvoidUsingCmdletAliases",
+		Severity:  1,
+		Line:      &line,
+		Column:    &col,
+		EndLine:   &endLine,
+		EndColumn: &endCol,
+		Message:   "'gci' is an alias of 'Get-ChildItem'.",
+		SuggestedCorrections: []psanalyzer.SuggestedCorrection{{
+			Description: "Replace gci with Get-ChildItem",
+			Line:        1,
+			Column:      1,
+			EndLine:     1,
+			EndColumn:   4,
+			Text:        "Get-ChildItem",
+		}},
+	}}}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN ["pwsh", "-NoProfile", "-Command", "gci"]
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1: %#v", len(violations), violations)
+	}
+	if violations[0].SuggestedFix != nil {
+		t.Fatalf("expected no suggested fix for approximate exec-form mapping, got %#v", violations[0].SuggestedFix)
 	}
 }
 

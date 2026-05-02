@@ -10,7 +10,7 @@ SHELL ["powershell", "-command", "$ErrorActionPreference = 'Stop'; $PSNativeComm
 RUN <<EOF
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
-iex ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1'))
+Invoke-Expression ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1'))
 choco feature disable --name showDownloadProgress
 choco feature enable --name allowGlobalConfirmation
 EOF
@@ -31,9 +31,9 @@ Invoke-WebRequest https://www.python.org/ftp/python/3.9.0/python-3.9.0.exe -OutF
 Start-Process -filepath 'python-3.9.0.exe' -ArgumentList '/quiet', 'TargetDir=C:\Python39-32\', 'CompileAll=1', 'PrependPath=0' -PassThru -Wait
 Remove-Item -Path python-3.9.0.exe -Force
 setx /M PYTHONIOENCODING UTF-8
-del .\Packages.config
-move .\user-config.jam $env:USERPROFILE
-cd $env:USERPROFILE
+Remove-Item .\Packages.config
+Move-Item .\user-config.jam $env:USERPROFILE
+Set-Location $env:USERPROFILE
 Invoke-WebRequest https://curl.haxx.se/ca/cacert.pem -OutFile $env:USERPROFILE\cacert.pem
 $plaintext_pw = 'PASSWORD'
 $secure_pw = ConvertTo-SecureString $plaintext_pw -AsPlainText -Force

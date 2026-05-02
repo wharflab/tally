@@ -16,6 +16,7 @@ type scriptMapping struct {
 	OriginStartColumn int
 	FallbackLine      int
 	ShellNameOverride string
+	CanFix            bool
 }
 
 type explicitPowerShellInvocation struct {
@@ -58,6 +59,7 @@ func scriptMappingFromExtract(m extract.Mapping, escapeToken rune) scriptMapping
 		OriginStartColumn: m.OriginStartColumn,
 		FallbackLine:      m.FallbackLine,
 		ShellNameOverride: m.ShellNameOverride,
+		CanFix:            true,
 	}
 }
 

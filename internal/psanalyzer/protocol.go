@@ -18,14 +18,24 @@ type Settings struct {
 }
 
 type Diagnostic struct {
-	RuleName   string `json:"ruleName"`
-	Severity   int    `json:"severity"`
-	Line       *int   `json:"line"`
-	Column     *int   `json:"column"`
-	EndLine    *int   `json:"endLine"`
-	EndColumn  *int   `json:"endColumn"`
-	Message    string `json:"message"`
-	ScriptPath string `json:"scriptPath"`
+	RuleName             string                `json:"ruleName"`
+	Severity             int                   `json:"severity"`
+	Line                 *int                  `json:"line"`
+	Column               *int                  `json:"column"`
+	EndLine              *int                  `json:"endLine"`
+	EndColumn            *int                  `json:"endColumn"`
+	Message              string                `json:"message"`
+	ScriptPath           string                `json:"scriptPath"`
+	SuggestedCorrections []SuggestedCorrection `json:"suggestedCorrections,omitempty"`
+}
+
+type SuggestedCorrection struct {
+	Description string `json:"description"`
+	Line        int    `json:"line"`
+	Column      int    `json:"column"`
+	EndLine     int    `json:"endLine"`
+	EndColumn   int    `json:"endColumn"`
+	Text        string `json:"text"`
 }
 
 type request struct {

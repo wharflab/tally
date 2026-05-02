@@ -207,6 +207,81 @@ function Invoke-ScriptAnalyzer {
 	}
 }
 
+func TestRunnerAnalyzeReturnsSuggestedCorrections(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("pwsh sidecar is not available on js")
+	}
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh not available")
+	}
+
+	moduleRoot := t.TempDir()
+	homeDir := t.TempDir()
+	writeFakePSScriptAnalyzerModule(t, moduleRoot, `
+function Invoke-ScriptAnalyzer {
+    param(
+        [string] $Path,
+        [string] $ScriptDefinition,
+        [hashtable] $Settings
+    )
+    [pscustomobject] @{
+        RuleName = 'PSAvoidUsingCmdletAliases'
+        Severity = 1
+        Line = 1
+        Column = 1
+        Message = 'alias should be expanded'
+        ScriptPath = ''
+        SuggestedCorrections = @(
+            [pscustomobject] @{
+                Description = 'Replace gci with Get-ChildItem'
+                StartLineNumber = 1
+                StartColumnNumber = 1
+                EndLineNumber = 1
+                EndColumnNumber = 4
+                Text = 'Get-ChildItem'
+                Lines = @('Get-ChildItem')
+            }
+        )
+    }
+}
+`)
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(homeDir, ".local", "share"))
+	t.Setenv("PSModulePath", moduleRoot)
+	t.Setenv(progressNoticeEnv, progressNoticeEnvMute)
+
+	r := NewRunner()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	defer func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		_ = r.Close(closeCtx)
+	}()
+
+	diags, err := r.Analyze(ctx, AnalyzeRequest{ScriptDefinition: "gci\n"})
+	if err != nil {
+		t.Fatalf("Analyze() error = %v", err)
+	}
+	if len(diags) != 1 {
+		t.Fatalf("diagnostics = %#v, want one diagnostic", diags)
+	}
+	corrections := diags[0].SuggestedCorrections
+	if len(corrections) != 1 {
+		t.Fatalf("suggested corrections = %#v, want one correction", corrections)
+	}
+	got := corrections[0]
+	if got.Description != "Replace gci with Get-ChildItem" ||
+		got.Line != 1 ||
+		got.Column != 1 ||
+		got.EndLine != 1 ||
+		got.EndColumn != 4 ||
+		got.Text != "Get-ChildItem" {
+		t.Fatalf("suggested correction = %#v", got)
+	}
+}
+
 func TestSidecarBootstrapsMissingPSScriptAnalyzer(t *testing.T) {
 	t.Parallel()
 

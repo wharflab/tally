@@ -218,6 +218,7 @@ func collectRunCommandTasks(
 		OriginStartLine:   invocationLine,
 		OriginStartColumn: invocation.startColumn,
 		FallbackLine:      invocationLine,
+		CanFix:            mapping.CanFix,
 	}}}
 }
 
@@ -251,12 +252,16 @@ func (r *Rule) checkMapping(file string, mapping scriptMapping, settings psanaly
 		if !ok {
 			loc = rules.NewLineLocation(file, mapping.FallbackLine)
 		}
-		violations = append(violations, rules.NewViolation(
+		v := rules.NewViolation(
 			loc,
 			rules.PowerShellRulePrefix+d.RuleName,
 			d.Message,
 			mapSeverity(d.Severity),
-		).WithDocURL(rules.PowerShellDiagnosticDocURL(d.RuleName)))
+		).WithDocURL(rules.PowerShellDiagnosticDocURL(d.RuleName))
+		if fixes := buildPowerShellSuggestedFixes(file, mapping, d); len(fixes) > 0 {
+			v = v.WithSuggestedFixes(fixes)
+		}
+		violations = append(violations, v)
 	}
 	return violations
 }
@@ -267,36 +272,112 @@ func mapDiagnosticLocation(file string, mapping scriptMapping, d psanalyzer.Diag
 	}
 
 	line := *d.Line
+	col := 1
+	if d.Column != nil && *d.Column > 0 {
+		col = *d.Column
+	}
+
+	endLine := line
+	if d.EndLine != nil && *d.EndLine > 0 {
+		endLine = *d.EndLine
+	}
+
+	endCol := col + 1
+	if d.EndColumn != nil && *d.EndColumn > 0 {
+		endCol = *d.EndColumn
+	}
+
+	return mapScriptRange(file, mapping, line, col, endLine, endCol)
+}
+
+func buildPowerShellSuggestedFixes(
+	file string,
+	mapping scriptMapping,
+	d psanalyzer.Diagnostic,
+) []*rules.SuggestedFix {
+	if !mapping.CanFix || len(d.SuggestedCorrections) == 0 {
+		return nil
+	}
+
+	fixes := make([]*rules.SuggestedFix, 0, len(d.SuggestedCorrections))
+	for _, correction := range d.SuggestedCorrections {
+		edit, ok := mapSuggestedCorrection(file, mapping, correction)
+		if !ok {
+			continue
+		}
+		description := strings.TrimSpace(correction.Description)
+		if description == "" {
+			description = "Apply PowerShell fix for " + d.RuleName
+		}
+		fixes = append(fixes, &rules.SuggestedFix{
+			Description: description,
+			Edits:       []rules.TextEdit{edit},
+			Safety:      rules.FixSuggestion,
+			IsPreferred: len(fixes) == 0,
+			Priority:    0,
+		})
+	}
+	return fixes
+}
+
+func mapSuggestedCorrection(
+	file string,
+	mapping scriptMapping,
+	c psanalyzer.SuggestedCorrection,
+) (rules.TextEdit, bool) {
+	if c.Line <= 0 || c.Column <= 0 || c.EndLine <= 0 || c.EndColumn <= 0 {
+		return rules.TextEdit{}, false
+	}
+	loc, ok := mapScriptRange(file, mapping, c.Line, c.Column, c.EndLine, c.EndColumn)
+	if !ok {
+		return rules.TextEdit{}, false
+	}
+	return rules.TextEdit{
+		Location: loc,
+		NewText:  c.Text,
+	}, true
+}
+
+func mapScriptRange(
+	file string,
+	mapping scriptMapping,
+	line int,
+	col int,
+	endLine int,
+	endCol int,
+) (rules.Location, bool) {
+	if line <= 0 || mapping.OriginStartLine <= 0 {
+		return rules.Location{}, false
+	}
+
 	startLine := mapping.OriginStartLine + line - 1
 	startCol := 0
-	if d.Column != nil && *d.Column > 0 {
-		startCol = *d.Column - 1
+	if col > 0 {
+		startCol = col - 1
 	}
 	if line == 1 {
 		startCol += mapping.OriginStartColumn
 	}
 
-	endLine := startLine
-	if d.EndLine != nil && *d.EndLine > 0 {
-		endLine = mapping.OriginStartLine + *d.EndLine - 1
+	if endLine <= 0 {
+		endLine = line
 	}
+	endDockerLine := mapping.OriginStartLine + endLine - 1
 
-	endCol := startCol + 1
-	if d.EndColumn != nil && *d.EndColumn > 0 {
-		endCol = *d.EndColumn - 1
-		if d.EndLine != nil && *d.EndLine == 1 {
-			endCol += mapping.OriginStartColumn
-		} else if d.EndLine == nil && line == 1 {
-			endCol += mapping.OriginStartColumn
+	endDockerCol := startCol + 1
+	if endCol > 0 {
+		endDockerCol = endCol - 1
+		if endLine == 1 {
+			endDockerCol += mapping.OriginStartColumn
 		}
 	}
 
-	if endLine < startLine || (endLine == startLine && endCol < startCol) {
-		endLine = startLine
-		endCol = startCol + 1
+	if endDockerLine < startLine || (endDockerLine == startLine && endDockerCol < startCol) {
+		endDockerLine = startLine
+		endDockerCol = startCol + 1
 	}
 
-	return rules.NewRangeLocation(file, startLine, startCol, endLine, endCol), true
+	return rules.NewRangeLocation(file, startLine, startCol, endDockerLine, endDockerCol), true
 }
 
 func mapSeverity(sev int) rules.Severity {

@@ -176,6 +176,17 @@ function ConvertTo-TallyDiagnostic {
         }
     }
 
+    $suggestedCorrections = @()
+    if ($null -ne $Diagnostic.SuggestedCorrections) {
+        $suggestedCorrections = @(
+            foreach ($correction in @($Diagnostic.SuggestedCorrections)) {
+                if ($null -ne $correction) {
+                    ConvertTo-TallyCorrection -Correction $correction
+                }
+            }
+        )
+    }
+
     return @{
         ruleName = [string] $Diagnostic.RuleName
         severity = [int] $Diagnostic.Severity
@@ -185,6 +196,27 @@ function ConvertTo-TallyDiagnostic {
         endColumn = $endColumn
         message = [string] $Diagnostic.Message
         scriptPath = [string] $Diagnostic.ScriptPath
+        suggestedCorrections = $suggestedCorrections
+    }
+}
+
+function ConvertTo-TallyCorrection {
+    param([Parameter(Mandatory=$true)] [object] $Correction)
+
+    $text = ''
+    if ($null -ne $Correction.Text) {
+        $text = [string] $Correction.Text
+    } elseif ($null -ne $Correction.Lines) {
+        $text = [string]::Join([Environment]::NewLine, @($Correction.Lines))
+    }
+
+    return @{
+        description = [string] $Correction.Description
+        line = [int] $Correction.StartLineNumber
+        column = [int] $Correction.StartColumnNumber
+        endLine = [int] $Correction.EndLineNumber
+        endColumn = [int] $Correction.EndColumnNumber
+        text = $text
     }
 }
 

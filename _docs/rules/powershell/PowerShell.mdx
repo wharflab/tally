@@ -10,7 +10,7 @@ Runs PowerShell script diagnostics for PowerShell snippets embedded in Dockerfil
 | Severity | Warning |
 | Category | Best Practices |
 | Default | Enabled, gated by slow checks |
-| Auto-fix | No |
+| Auto-fix | Suggestions when PSScriptAnalyzer provides corrections |
 
 ## Description
 
@@ -30,6 +30,9 @@ bypass the slow-check gate.
 
 Rule-specific options under `rules.powershell.<RuleName>` are forwarded to PSScriptAnalyzer as `Settings.Rules` entries. This supports upstream
 options such as `Enable`, `TargetProfiles`, and compatibility profile settings documented on the concrete `powershell/*` rule pages.
+
+When an upstream PSScriptAnalyzer diagnostic includes suggested corrections, tally exposes them as normal fix suggestions. These fixes are only
+attached when the PowerShell snippet can be mapped back to precise Dockerfile source ranges.
 
 ## Requirements
 
