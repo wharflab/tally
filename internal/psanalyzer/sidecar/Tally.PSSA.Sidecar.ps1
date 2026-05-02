@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$script:TallyPSScriptAnalyzerVersion = '1.25.0'
+$script:TallyPSScriptAnalyzerVersion = $env:TALLY_PSSCRIPTANALYZER_VERSION
 
 function Write-JsonLine {
     param([Parameter(Mandatory=$true)] [object] $Value)
@@ -66,6 +66,10 @@ function Install-PSScriptAnalyzerModule {
 }
 
 function Import-PSScriptAnalyzerModule {
+    if ([string]::IsNullOrWhiteSpace($script:TallyPSScriptAnalyzerVersion)) {
+        throw 'TALLY_PSSCRIPTANALYZER_VERSION is not set.'
+    }
+    $script:TallyPSScriptAnalyzerVersion = $script:TallyPSScriptAnalyzerVersion.Trim()
     $requiredVersion = [Version] $script:TallyPSScriptAnalyzerVersion
     $available = @(Get-Module -ListAvailable -Name PSScriptAnalyzer | Where-Object { $_.Version -eq $requiredVersion })
     if ($available.Count -eq 0) {

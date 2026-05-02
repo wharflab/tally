@@ -190,6 +190,11 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 		_ = os.RemoveAll(tempDir)
 		return nil, fmt.Errorf("write psanalyzer sidecar: %w", err)
 	}
+	version := requiredPSScriptAnalyzerVersion()
+	if version == "" {
+		_ = os.RemoveAll(tempDir)
+		return nil, errors.New("PSScriptAnalyzer version pin is empty")
+	}
 
 	//nolint:gosec // G204: exe is pwsh from PATH or explicit TALLY_POWERSHELL configuration.
 	cmd := exec.Command(
@@ -200,7 +205,11 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 		"-File",
 		sidecarPath,
 	)
-	cmd.Env = normalizePowerShellEnv(runtime.GOOS, os.Environ())
+	cmd.Env = appendEnvOverride(
+		normalizePowerShellEnv(runtime.GOOS, os.Environ()),
+		psscriptAnalyzerVersionEnv,
+		version,
+	)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -468,6 +477,18 @@ func normalizePowerShellEnv(goos string, env []string) []string {
 	}
 
 	return out
+}
+
+func appendEnvOverride(env []string, key, value string) []string {
+	out := make([]string, 0, len(env)+1)
+	for _, entry := range env {
+		k, _, ok := strings.Cut(entry, "=")
+		if ok && strings.EqualFold(k, key) {
+			continue
+		}
+		out = append(out, entry)
+	}
+	return append(out, key+"="+value)
 }
 
 type tailBuffer struct {

@@ -66,12 +66,12 @@ Host: `darwin 25.4.0` arm64, `pwsh 7.6.0` from Homebrew.
 ### Install and import
 
 ```text
-Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force \
+Install-Module -Name PSScriptAnalyzer -RequiredVersion <version> -Scope CurrentUser -Force \
   -AcceptLicense -SkipPublisherCheck
 ```
 
 - Clean install, no errors. Landed at
-  `~/.local/share/powershell/Modules/PSScriptAnalyzer/1.25.0/`.
+  `~/.local/share/powershell/Modules/PSScriptAnalyzer/<version>/`.
 - Module on disk: **286 MB**. The bulk is `compatibility_profiles/` (the JSON
   databases that power `PSUseCompatibleCmdlets` / `...Types`). The core DLLs
   (`Microsoft.Windows.PowerShell.ScriptAnalyzer.dll`,
@@ -171,7 +171,7 @@ Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -R
 Installed module:
 
 ```text
-C:\Users\tino\Documents\PowerShell\Modules\PSScriptAnalyzer\1.25.0
+C:\Users\tino\Documents\PowerShell\Modules\PSScriptAnalyzer\<version>
 ```
 
 Measured size: **285.5 MiB**, 50 files. This matches the macOS result: the
@@ -185,7 +185,7 @@ returned **75** rules.
 A minimal `pwsh` 7 sidecar script was executed with newline-delimited JSON
 requests over stdio:
 
-- handshake line: `{"ready":true,"version":"1.25.0","ps":"..."}`
+- handshake line: `{"ready":true,"version":"<module-version>","ps":"..."}`
 - file-backed `Invoke-ScriptAnalyzer -Path <Bad.ps1>`
 - in-memory `Invoke-ScriptAnalyzer -ScriptDefinition <source>`
 - shutdown request
@@ -223,8 +223,8 @@ Results:
 
 | Host | Result |
 | --- | --- |
-| `pwsh 7.6.1` + PSScriptAnalyzer 1.25.0 | Analyzed successfully with no diagnostics; `Invoke-Formatter` preserved valid syntax. |
-| Windows PowerShell 5.1 + PSScriptAnalyzer 1.25.0 | Reported parse errors for `??`, ternary `? :`, and `&&`; also misinterpreted `?` as the `Where-Object` alias. |
+| `pwsh 7.6.1` + the pinned PSScriptAnalyzer release | Analyzed successfully with no diagnostics; `Invoke-Formatter` preserved valid syntax. |
+| Windows PowerShell 5.1 + the pinned PSScriptAnalyzer release | Reported parse errors for `??`, ternary `? :`, and `&&`; also misinterpreted `?` as the `Where-Object` alias. |
 
 Conclusion: Windows PowerShell 5.1 must not be used as a host fallback for
 PSScriptAnalyzer in tally. A 5.1 host runs the 5.1 parser and cannot reliably
@@ -355,7 +355,7 @@ as regular diagnostics with `severity:3`.
      tally config).
    - Write `Tally.PSSA.Sidecar.ps1` to a per-session temp dir.
    - Spawn `pwsh -NoProfile -NonInteractive -File <script>`.
-   - Read a `{"ready":true,"version":"1.25.0"}` handshake line (or bail with
+   - Read a `{"ready":true,"version":"<module-version>"}` handshake line (or bail with
      timeout).
 3. Each subsequent call: write request, read response. Mutex-serialized —
    the sidecar handles one request at a time.
@@ -397,7 +397,7 @@ Two levers:
 | Concern                               | Strategy |
 | ------------------------------------- | -------- |
 | `pwsh` 7.x missing on PATH            | `tally doctor` surfaces it; lint flags `.ps1` files as "analyzer not available, pass `--no-psanalyzer` to silence" |
-| PSScriptAnalyzer 1.25.0 module not installed | Sidecar attempts a pinned PSResourceGet/PowerShellGet install on handshake failure, guarded by `--allow-module-install` config |
+| Pinned PSScriptAnalyzer module not installed | Sidecar attempts a pinned PSResourceGet/PowerShellGet install on handshake failure, guarded by `--allow-module-install` config |
 | Sanitized Windows environment         | Runner ensures standard Windows env vars are present before spawning `pwsh`; bootstrap also repairs `APPDATA` / `LOCALAPPDATA` when absent |
 
 We do **not** bundle the 286 MB module in the tally release. The user's
@@ -485,7 +485,7 @@ reasonable default.
 - Microsoft Learn — "Using PSScriptAnalyzer", ScriptAnalyzer as a .NET library
   section: documents the `Initialize`/`AnalyzePath`/`GetRule` surface and its
   Runspace requirement.
-- PowerShell Gallery — `PSScriptAnalyzer 1.25.0` (what we installed).
+- PowerShell Gallery — PSScriptAnalyzer release used during prototyping.
 - GitHub `PowerShell/PSScriptAnalyzer#1056` — ongoing feature request to
   expose a hosted-scenario C# API that accepts a pre-parsed AST.
 - MS Q&A — "Blazor WASM to execute PowerShell script" — authoritative "no,

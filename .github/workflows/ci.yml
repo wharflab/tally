@@ -75,7 +75,11 @@ jobs:
       - name: Ensure PSScriptAnalyzer
         shell: pwsh
         run: |
-          $requiredVersion = [Version]'1.25.0'
+          $requiredVersionText = (Get-Content -LiteralPath 'internal/psanalyzer/psscriptanalyzer.version' -Raw).Trim()
+          if ([string]::IsNullOrWhiteSpace($requiredVersionText)) {
+            throw 'internal/psanalyzer/psscriptanalyzer.version is empty.'
+          }
+          $requiredVersion = [Version]$requiredVersionText
           $installed = Get-Module -ListAvailable PSScriptAnalyzer |
             Where-Object { $_.Version -eq $requiredVersion } |
             Select-Object -First 1

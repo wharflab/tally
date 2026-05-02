@@ -3,6 +3,7 @@ package psanalyzer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -110,10 +111,10 @@ func TestRunnerAnalyzeWithInstalledPSScriptAnalyzer(t *testing.T) {
 	if _, err := exec.LookPath("pwsh"); err != nil {
 		t.Skip("pwsh not available")
 	}
-	if out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command",
-		"if (Get-Module -ListAvailable PSScriptAnalyzer) { 'yes' }").Output(); err != nil ||
+	installedCmd := psscriptAnalyzerInstalledCommand()
+	if out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", installedCmd).Output(); err != nil ||
 		strings.TrimSpace(string(out)) != "yes" {
-		t.Skip("PSScriptAnalyzer module not available")
+		t.Skip("required PSScriptAnalyzer module version not available")
 	}
 
 	r := NewRunner()
@@ -146,10 +147,10 @@ func TestRunnerFormatWithInstalledPSScriptAnalyzer(t *testing.T) {
 	if _, err := exec.LookPath("pwsh"); err != nil {
 		t.Skip("pwsh not available")
 	}
-	if out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command",
-		"if (Get-Module -ListAvailable PSScriptAnalyzer) { 'yes' }").Output(); err != nil ||
+	installedCmd := psscriptAnalyzerInstalledCommand()
+	if out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", installedCmd).Output(); err != nil ||
 		strings.TrimSpace(string(out)) != "yes" {
-		t.Skip("PSScriptAnalyzer module not available")
+		t.Skip("required PSScriptAnalyzer module version not available")
 	}
 
 	r := NewRunner()
@@ -362,7 +363,7 @@ function Install-PSResource {
     if ($Name -ne 'PSScriptAnalyzer') {
         throw "unexpected module: $Name"
     }
-    if ($Version -ne '1.25.0') {
+    if ($Version -ne $env:TALLY_TEST_REQUIRED_PSSA_VERSION) {
         throw "unexpected version: $Version"
     }
     $moduleDir = Join-Path (Join-Path $moduleRoot 'PSScriptAnalyzer') $Version
@@ -393,7 +394,9 @@ function Invoke-ScriptAnalyzer {
 	cmd := exec.CommandContext(ctx, "pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", prelude)
 	cmd.Env = append(normalizePowerShellEnv(runtime.GOOS, os.Environ()),
 		"PSModulePath="+moduleRoot,
+		psscriptAnalyzerVersionEnv+"="+requiredPSScriptAnalyzerVersion(),
 		"TALLY_TEST_MODULE_ROOT="+moduleRoot,
+		"TALLY_TEST_REQUIRED_PSSA_VERSION="+requiredPSScriptAnalyzerVersion(),
 		"TALLY_TEST_SIDECAR="+sidecarPath,
 	)
 	cmd.Stdin = strings.NewReader("{\"id\":\"1\",\"op\":\"shutdown\"}\n")
@@ -412,7 +415,13 @@ function Invoke-ScriptAnalyzer {
 	if !strings.Contains(output, `"ok":true`) {
 		t.Fatalf("sidecar output missing shutdown response: %s", output)
 	}
-	if _, err := os.Stat(filepath.Join(moduleRoot, "PSScriptAnalyzer", "1.25.0", "PSScriptAnalyzer.psm1")); err != nil {
+	modulePath := filepath.Join(
+		moduleRoot,
+		"PSScriptAnalyzer",
+		requiredPSScriptAnalyzerVersion(),
+		"PSScriptAnalyzer.psm1",
+	)
+	if _, err := os.Stat(modulePath); err != nil {
 		t.Fatalf("fake installer did not create module: %v", err)
 	}
 }
@@ -420,23 +429,30 @@ function Invoke-ScriptAnalyzer {
 func writeFakePSScriptAnalyzerModule(t *testing.T, moduleRoot, moduleScript string) {
 	t.Helper()
 
-	moduleDir := filepath.Join(moduleRoot, "PSScriptAnalyzer", "1.25.0")
+	moduleDir := filepath.Join(moduleRoot, "PSScriptAnalyzer", requiredPSScriptAnalyzerVersion())
 	if err := os.MkdirAll(moduleDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(moduleDir, "PSScriptAnalyzer.psm1"), []byte(moduleScript), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	manifest := `@{
+	manifest := fmt.Sprintf(`@{
     RootModule = 'PSScriptAnalyzer.psm1'
-    ModuleVersion = '1.25.0'
+    ModuleVersion = '%s'
     GUID = 'd6245804-193d-414e-bac3-f7f51deafabb'
     FunctionsToExport = @('Invoke-ScriptAnalyzer')
 }
-`
+`, requiredPSScriptAnalyzerVersion())
 	if err := os.WriteFile(filepath.Join(moduleDir, "PSScriptAnalyzer.psd1"), []byte(manifest), 0o600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func psscriptAnalyzerInstalledCommand() string {
+	return fmt.Sprintf(
+		"if (Get-Module -ListAvailable PSScriptAnalyzer | Where-Object { $_.Version -eq [Version]'%s' }) { 'yes' }",
+		requiredPSScriptAnalyzerVersion(),
+	)
 }
 
 func powerShellUserModuleRoot(homeDir string) string {

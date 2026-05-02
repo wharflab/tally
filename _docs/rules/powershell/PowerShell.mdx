@@ -38,13 +38,14 @@ attached when the PowerShell snippet can be mapped back to precise Dockerfile so
 
 - PowerShell 7 (`pwsh`) must be available on `PATH`.
 - Windows PowerShell 5.1 (`powershell.exe`) is not supported as an analyzer host; use PowerShell 7+ (`pwsh`).
-- The first PowerShell analyzer run installs `PSScriptAnalyzer` 1.25.0 automatically for that `pwsh` environment when the tested version is missing.
+- The first PowerShell analyzer run installs tally's pinned `PSScriptAnalyzer` release automatically for that `pwsh` environment when the tested
+  version is missing.
 
 Use `TALLY_POWERSHELL=/path/to/pwsh` when `pwsh` is not on `PATH` or when tally should use a specific PowerShell installation.
 
 The automatic install uses the selected `pwsh` environment's PowerShell package tooling (`Install-PSResource` when available, otherwise
-`Install-Module`) and installs the tested `PSScriptAnalyzer` 1.25.0 release to `CurrentUser` scope. If the host has no network access or blocks
-PowerShell Gallery, preinstall that module version in the environment and rerun tally.
+`Install-Module`) and installs tally's pinned `PSScriptAnalyzer` release to `CurrentUser` scope. If the host has no network access or blocks
+PowerShell Gallery, preinstall the version pinned by your tally release and rerun tally.
 
 Cold installation downloads the PSScriptAnalyzer module and can take more than a few seconds depending on network speed. If the bootstrap is still
 running after 3 seconds, tally writes a progress note to stderr and repeats it periodically until the sidecar is ready. Set
