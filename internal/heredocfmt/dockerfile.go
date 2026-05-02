@@ -220,7 +220,7 @@ func FormatDockerfileHeredocsWithPowerShell(
 				return nil, err
 			}
 		}
-		if !ok && strings.EqualFold(doc.Instruction, command.Copy) {
+		if !ok && isPowerShellFileHeredocInstruction(doc.Instruction) {
 			formatted, ok, err = formatter.FormatPowerShellTarget(
 				ctx,
 				powerShellFormatter,
@@ -281,6 +281,10 @@ func FormatDockerfileHeredocsWithPowerShell(
 		})
 	}
 	return edits, nil
+}
+
+func isPowerShellFileHeredocInstruction(instruction string) bool {
+	return strings.EqualFold(instruction, command.Copy) || strings.EqualFold(instruction, command.Add)
 }
 
 type heredocBodySpan struct {

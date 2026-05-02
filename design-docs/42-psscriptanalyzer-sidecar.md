@@ -62,7 +62,7 @@ Host: `darwin 25.4.0` arm64, `pwsh 7.6.0` from Homebrew.
 ### Install and import
 
 ```text
-Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force \
+Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force \
   -AcceptLicense -SkipPublisherCheck
 ```
 
@@ -393,7 +393,7 @@ Two levers:
 | Concern                               | Strategy |
 | ------------------------------------- | -------- |
 | `pwsh` 7.x missing on PATH            | `tally doctor` surfaces it; lint flags `.ps1` files as "analyzer not available, pass `--no-psanalyzer` to silence" |
-| PSScriptAnalyzer module not installed | Sidecar attempts PSResourceGet/PowerShellGet install on handshake failure, guarded by `--allow-module-install` config |
+| PSScriptAnalyzer 1.25.0 module not installed | Sidecar attempts a pinned PSResourceGet/PowerShellGet install on handshake failure, guarded by `--allow-module-install` config |
 | Sanitized Windows environment         | Runner ensures standard Windows env vars are present before spawning `pwsh`; bootstrap also repairs `APPDATA` / `LOCALAPPDATA` when absent |
 
 We do **not** bundle the 286 MB module in the tally release. The user's

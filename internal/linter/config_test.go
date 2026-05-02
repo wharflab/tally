@@ -40,6 +40,23 @@ func TestEnabledRuleCodesPowerShellDynamicOptionsConfigEnablesEngine(t *testing.
 	}
 }
 
+func TestEnabledRuleCodesPowerShellDynamicOptionsOffDoesNotEnableEngine(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.Default()
+	cfg.Rules.Powershell = map[string]config.RuleConfig{
+		"PSAvoidUsingWriteHost": {
+			Severity: "off",
+			Options:  map[string]any{"Enable": true},
+		},
+	}
+
+	enabled := EnabledRuleCodes(cfg)
+	if slices.Contains(enabled, rules.PowerShellRulePrefix+"PowerShell") {
+		t.Fatalf("EnabledRuleCodes() = %#v, did not want powershell engine enabled by disabled concrete rule options", enabled)
+	}
+}
+
 func TestEnabledRuleCodesPowerShellParserDiagnosticConfigEnablesEngine(t *testing.T) {
 	t.Parallel()
 
@@ -56,6 +73,22 @@ func TestEnabledRuleCodesPowerShellParserDiagnosticConfigEnablesEngine(t *testin
 	}
 }
 
+func TestEnabledRuleCodesPowerShellInternalErrorConfigEnablesEngine(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.Default()
+	cfg.Rules.Powershell = map[string]config.RuleConfig{
+		"PowerShellInternalError": {
+			Severity: "warning",
+		},
+	}
+
+	enabled := EnabledRuleCodes(cfg)
+	if !slices.Contains(enabled, rules.PowerShellRulePrefix+"PowerShell") {
+		t.Fatalf("EnabledRuleCodes() = %#v, want powershell engine enabled by internal-error config", enabled)
+	}
+}
+
 func TestEnabledRuleCodesPowerShellDynamicIncludeEnablesEngine(t *testing.T) {
 	t.Parallel()
 
@@ -65,6 +98,18 @@ func TestEnabledRuleCodesPowerShellDynamicIncludeEnablesEngine(t *testing.T) {
 	enabled := EnabledRuleCodes(cfg)
 	if !slices.Contains(enabled, rules.PowerShellRulePrefix+"PowerShell") {
 		t.Fatalf("EnabledRuleCodes() = %#v, want powershell engine enabled by dynamic include", enabled)
+	}
+}
+
+func TestEnabledRuleCodesPowerShellInternalErrorIncludeEnablesEngine(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.Default()
+	cfg.Rules.Include = []string{rules.PowerShellRulePrefix + "PowerShellInternalError"}
+
+	enabled := EnabledRuleCodes(cfg)
+	if !slices.Contains(enabled, rules.PowerShellRulePrefix+"PowerShell") {
+		t.Fatalf("EnabledRuleCodes() = %#v, want powershell engine enabled by internal-error include", enabled)
 	}
 }
 

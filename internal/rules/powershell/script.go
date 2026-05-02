@@ -55,6 +55,7 @@ func scriptMappingFromExtract(m extract.Mapping, escapeToken rune) scriptMapping
 	return scriptMapping{
 		Script:            m.Script,
 		OriginStartLine:   m.OriginStartLine,
+		OriginStartColumn: m.OriginStartColumn,
 		FallbackLine:      m.FallbackLine,
 		ShellNameOverride: m.ShellNameOverride,
 	}
@@ -75,7 +76,7 @@ func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocat
 		return explicitPowerShellInvocation{}, false
 	}
 	exe := shellutil.NormalizeShellExecutableName(shellutil.DropQuotes(exeToken))
-	if exe != "powershell" && exe != "pwsh" {
+	if exe != "pwsh" {
 		return explicitPowerShellInvocation{}, false
 	}
 
@@ -99,7 +100,7 @@ func parseExecFormPowerShellInvocation(args []string) (explicitPowerShellInvocat
 		return explicitPowerShellInvocation{}, false
 	}
 	exe := shellutil.NormalizeShellExecutableName(args[0])
-	if exe != "powershell" && exe != "pwsh" {
+	if exe != "pwsh" {
 		return explicitPowerShellInvocation{}, false
 	}
 
@@ -108,10 +109,14 @@ func parseExecFormPowerShellInvocation(args []string) (explicitPowerShellInvocat
 		if tokenNorm != "-command" && tokenNorm != "-c" {
 			continue
 		}
-		if i+1 >= len(args) || strings.TrimSpace(args[i+1]) == "" {
+		if i+1 >= len(args) {
 			return explicitPowerShellInvocation{}, false
 		}
-		return explicitPowerShellInvocation{script: args[i+1]}, true
+		script := strings.TrimSpace(strings.Join(args[i+1:], " "))
+		if script == "" {
+			return explicitPowerShellInvocation{}, false
+		}
+		return explicitPowerShellInvocation{script: script}, true
 	}
 
 	return explicitPowerShellInvocation{}, false

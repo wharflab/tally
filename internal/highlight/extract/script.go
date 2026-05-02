@@ -19,6 +19,9 @@ type Mapping struct {
 	// OriginStartLine is the 1-based Dockerfile line corresponding to script line 1.
 	OriginStartLine int
 
+	// OriginStartColumn is the 0-based Dockerfile column corresponding to script column 1.
+	OriginStartColumn int
+
 	// FallbackLine is the 1-based Dockerfile line to use if precise mapping fails.
 	FallbackLine int
 

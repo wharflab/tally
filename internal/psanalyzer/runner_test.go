@@ -153,6 +153,7 @@ function Install-PSResource {
     param(
         [Parameter(Mandatory=$true)] [string] $Name,
         [string] $Scope,
+        [string] $Version,
         [switch] $TrustRepository,
         [switch] $AcceptLicense,
         [switch] $Quiet
@@ -160,7 +161,10 @@ function Install-PSResource {
     if ($Name -ne 'PSScriptAnalyzer') {
         throw "unexpected module: $Name"
     }
-    $moduleDir = Join-Path $moduleRoot 'PSScriptAnalyzer'
+    if ($Version -ne '1.25.0') {
+        throw "unexpected version: $Version"
+    }
+    $moduleDir = Join-Path (Join-Path $moduleRoot 'PSScriptAnalyzer') $Version
     New-Item -ItemType Directory -Force -Path $moduleDir | Out-Null
     @'
 function Invoke-ScriptAnalyzer {
@@ -172,6 +176,13 @@ function Invoke-ScriptAnalyzer {
     @()
 }
 '@ | Set-Content -LiteralPath (Join-Path $moduleDir 'PSScriptAnalyzer.psm1') -Encoding UTF8
+    @"
+@{
+    RootModule = 'PSScriptAnalyzer.psm1'
+    ModuleVersion = '$Version'
+    GUID = 'd6245804-193d-414e-bac3-f7f51deafabb'
+}
+"@ | Set-Content -LiteralPath (Join-Path $moduleDir 'PSScriptAnalyzer.psd1') -Encoding UTF8
 }
 & $env:TALLY_TEST_SIDECAR
 `
@@ -200,7 +211,7 @@ function Invoke-ScriptAnalyzer {
 	if !strings.Contains(output, `"ok":true`) {
 		t.Fatalf("sidecar output missing shutdown response: %s", output)
 	}
-	if _, err := os.Stat(filepath.Join(moduleRoot, "PSScriptAnalyzer", "PSScriptAnalyzer.psm1")); err != nil {
+	if _, err := os.Stat(filepath.Join(moduleRoot, "PSScriptAnalyzer", "1.25.0", "PSScriptAnalyzer.psm1")); err != nil {
 		t.Fatalf("fake installer did not create module: %v", err)
 	}
 }

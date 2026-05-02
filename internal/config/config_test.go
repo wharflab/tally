@@ -648,6 +648,18 @@ func TestRulesConfigIncludeExclude(t *testing.T) {
 	}
 }
 
+func TestRulesConfigPowerShellInternalErrorIncludeEnablesEngine(t *testing.T) {
+	t.Parallel()
+
+	rc := &RulesConfig{
+		Include: []string{"powershell/PowerShellInternalError"},
+	}
+	enabled := rc.IsEnabled("powershell/PowerShell")
+	if enabled == nil || *enabled != true {
+		t.Error("powershell/PowerShell should be enabled when powershell/PowerShellInternalError is included")
+	}
+}
+
 func TestRulesConfigGetOptionsTyped(t *testing.T) {
 	t.Parallel()
 	type opts struct {

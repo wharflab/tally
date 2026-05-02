@@ -1,4 +1,5 @@
 $ErrorActionPreference = 'Stop'
+$script:TallyPSScriptAnalyzerVersion = '1.25.0'
 
 function Write-JsonLine {
     param([Parameter(Mandatory=$true)] [object] $Value)
@@ -23,6 +24,7 @@ function Install-PSScriptAnalyzerModule {
         $params = @{
             Name = 'PSScriptAnalyzer'
             Scope = 'CurrentUser'
+            Version = $script:TallyPSScriptAnalyzerVersion
             ErrorAction = 'Stop'
         }
         if ($installPSResource.Parameters.ContainsKey('TrustRepository')) {
@@ -43,6 +45,7 @@ function Install-PSScriptAnalyzerModule {
         $params = @{
             Name = 'PSScriptAnalyzer'
             Scope = 'CurrentUser'
+            RequiredVersion = $script:TallyPSScriptAnalyzerVersion
             Force = $true
             ErrorAction = 'Stop'
         }
@@ -63,20 +66,21 @@ function Install-PSScriptAnalyzerModule {
 }
 
 function Import-PSScriptAnalyzerModule {
-    $available = @(Get-Module -ListAvailable -Name PSScriptAnalyzer)
+    $requiredVersion = [Version] $script:TallyPSScriptAnalyzerVersion
+    $available = @(Get-Module -ListAvailable -Name PSScriptAnalyzer | Where-Object { $_.Version -eq $requiredVersion })
     if ($available.Count -eq 0) {
-        Write-ProgressLine 'Installing PSScriptAnalyzer for PowerShell analyzer first use. This downloads the module into the selected pwsh CurrentUser scope.'
+        Write-ProgressLine "Installing PSScriptAnalyzer $script:TallyPSScriptAnalyzerVersion for PowerShell analyzer first use. This downloads the module into the selected pwsh CurrentUser scope."
         try {
             Install-PSScriptAnalyzerModule
         } catch {
-            throw "PSScriptAnalyzer is not installed and automatic installation failed: $($_.Exception.Message)"
+            throw "PSScriptAnalyzer $script:TallyPSScriptAnalyzerVersion is not installed and automatic installation failed: $($_.Exception.Message)"
         }
     }
 
     try {
-        Import-Module PSScriptAnalyzer -ErrorAction Stop
+        Import-Module PSScriptAnalyzer -RequiredVersion $script:TallyPSScriptAnalyzerVersion -ErrorAction Stop
     } catch {
-        throw "PSScriptAnalyzer could not be imported: $($_.Exception.Message)"
+        throw "PSScriptAnalyzer $script:TallyPSScriptAnalyzerVersion could not be imported: $($_.Exception.Message)"
     }
 
     $module = Get-Module PSScriptAnalyzer

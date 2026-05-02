@@ -75,12 +75,17 @@ jobs:
       - name: Ensure PSScriptAnalyzer
         shell: pwsh
         run: |
-          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+          $requiredVersion = [Version]'1.25.0'
+          $installed = Get-Module -ListAvailable PSScriptAnalyzer |
+            Where-Object { $_.Version -eq $requiredVersion } |
+            Select-Object -First 1
+          if ($null -eq $installed) {
             $installPSResource = Get-Command -Name Install-PSResource -ErrorAction SilentlyContinue
             if ($null -ne $installPSResource) {
               $params = @{
                 Name = 'PSScriptAnalyzer'
                 Scope = 'CurrentUser'
+                Version = $requiredVersion.ToString()
                 ErrorAction = 'Stop'
               }
               if ($installPSResource.Parameters.ContainsKey('TrustRepository')) { $params['TrustRepository'] = $true }
@@ -95,6 +100,7 @@ jobs:
               $params = @{
                 Name = 'PSScriptAnalyzer'
                 Scope = 'CurrentUser'
+                RequiredVersion = $requiredVersion.ToString()
                 Force = $true
                 ErrorAction = 'Stop'
               }
@@ -105,7 +111,7 @@ jobs:
               return
             }
 
-            throw 'PSScriptAnalyzer is not installed, and neither Install-PSResource nor Install-Module is available in this pwsh environment.'
+            throw "PSScriptAnalyzer $requiredVersion is not installed, and neither Install-PSResource nor Install-Module is available in this pwsh environment."
           }
       - name: Run unit tests with coverage
         run: |

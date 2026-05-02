@@ -130,6 +130,9 @@ func TestFormattedHeredocsFinalizerFormatsPowerShellRunHeredoc(t *testing.T) {
 	if len(formatter.calls) != 1 {
 		t.Fatalf("PowerShell formatter calls = %d, want 1", len(formatter.calls))
 	}
+	if wantScript := "if ($true) {\nWrite-Host hi\n}\n"; formatter.calls[0] != wantScript {
+		t.Fatalf("formatter input mismatch\ngot:\n%s\nwant:\n%s", formatter.calls[0], wantScript)
+	}
 	if want := "if ($true) {\n    Write-Host hi\n}\n"; edits[0].NewText != want {
 		t.Fatalf("edit text mismatch\ngot:\n%s\nwant:\n%s", edits[0].NewText, want)
 	}

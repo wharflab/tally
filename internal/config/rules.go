@@ -273,7 +273,10 @@ func (rc *RulesConfig) EnablesPowerShellAnalyzer() bool {
 		if !isPowerShellAnalyzerRuleName(name) {
 			continue
 		}
-		if cfg.Severity != "" && cfg.Severity != SeverityOffValue {
+		if cfg.Severity == SeverityOffValue {
+			continue
+		}
+		if cfg.Severity != "" {
 			return true
 		}
 		if len(cfg.Options) > 0 {
@@ -285,7 +288,7 @@ func (rc *RulesConfig) EnablesPowerShellAnalyzer() bool {
 
 func isPowerShellAnalyzerRuleName(name string) bool {
 	switch name {
-	case "", "PowerShell", "PowerShellInternalError":
+	case "", "PowerShell":
 		return false
 	}
 	for _, r := range name {

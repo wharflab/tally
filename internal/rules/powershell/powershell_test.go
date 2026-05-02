@@ -124,7 +124,7 @@ func TestRuleChecksExecFormPowerShellCommandRun(t *testing.T) {
 	}}}
 	rule := newRuleWithAnalyzer(fake)
 	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
-RUN ["pwsh", "-NoProfile", "-Command", "Write-Host hi"]
+RUN ["pwsh", "-NoProfile", "-Command", "Write-Host", "hi"]
 `)
 	input.EnabledRules = []string{PowerShellRuleCode}
 
@@ -137,6 +137,46 @@ RUN ["pwsh", "-NoProfile", "-Command", "Write-Host hi"]
 	}
 	if violations[0].Location.Start.Line != 2 || violations[0].Location.Start.Column != 0 {
 		t.Fatalf("Location = %#v, want exec-form RUN line", violations[0].Location)
+	}
+}
+
+func TestRuleRejectsWindowsPowerShellWrapper(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeAnalyzer{}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN powershell -Command "Write-Host hi"
+RUN powershell.exe -Command "Write-Host bye"
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations, got %#v", violations)
+	}
+	if len(fake.scripts) != 0 {
+		t.Fatalf("analyzer was called for Windows PowerShell wrapper: %#v", fake.scripts)
+	}
+}
+
+func TestRuleRejectsExecFormWindowsPowerShell(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeAnalyzer{}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN ["powershell", "-Command", "Write-Host hi"]
+RUN ["powershell.exe", "-Command", "Write-Host bye"]
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations, got %#v", violations)
+	}
+	if len(fake.scripts) != 0 {
+		t.Fatalf("analyzer was called for exec-form Windows PowerShell wrapper: %#v", fake.scripts)
 	}
 }
 
