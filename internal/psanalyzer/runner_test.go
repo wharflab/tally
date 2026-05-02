@@ -135,8 +135,8 @@ func TestRunnerAnalyzeForwardsRuleSettings(t *testing.T) {
 		t.Skip("pwsh not available")
 	}
 
-	moduleRoot := t.TempDir()
 	homeDir := t.TempDir()
+	moduleRoot := powerShellUserModuleRoot(homeDir)
 	writeFakePSScriptAnalyzerModule(t, moduleRoot, `
 function Invoke-ScriptAnalyzer {
     param(
@@ -174,7 +174,7 @@ function Invoke-ScriptAnalyzer {
 	t.Setenv("HOME", homeDir)
 	t.Setenv("USERPROFILE", homeDir)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(homeDir, ".local", "share"))
-	t.Setenv("PSModulePath", moduleRoot)
+	t.Setenv("PSModulePath", "")
 	t.Setenv(progressNoticeEnv, progressNoticeEnvMute)
 
 	r := NewRunner()
@@ -215,8 +215,8 @@ func TestRunnerAnalyzeReturnsSuggestedCorrections(t *testing.T) {
 		t.Skip("pwsh not available")
 	}
 
-	moduleRoot := t.TempDir()
 	homeDir := t.TempDir()
+	moduleRoot := powerShellUserModuleRoot(homeDir)
 	writeFakePSScriptAnalyzerModule(t, moduleRoot, `
 function Invoke-ScriptAnalyzer {
     param(
@@ -248,7 +248,7 @@ function Invoke-ScriptAnalyzer {
 	t.Setenv("HOME", homeDir)
 	t.Setenv("USERPROFILE", homeDir)
 	t.Setenv("XDG_DATA_HOME", filepath.Join(homeDir, ".local", "share"))
-	t.Setenv("PSModulePath", moduleRoot)
+	t.Setenv("PSModulePath", "")
 	t.Setenv(progressNoticeEnv, progressNoticeEnvMute)
 
 	r := NewRunner()
@@ -391,6 +391,13 @@ func writeFakePSScriptAnalyzerModule(t *testing.T, moduleRoot, moduleScript stri
 	if err := os.WriteFile(filepath.Join(moduleDir, "PSScriptAnalyzer.psd1"), []byte(manifest), 0o600); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func powerShellUserModuleRoot(homeDir string) string {
+	if runtime.GOOS == "windows" {
+		return filepath.Join(homeDir, "Documents", "PowerShell", "Modules")
+	}
+	return filepath.Join(homeDir, ".local", "share", "powershell", "Modules")
 }
 
 func assertEnvHas(t *testing.T, env []string, key, want string) {
