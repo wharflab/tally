@@ -20,7 +20,9 @@ integration:
   `internal/lint` and `internal/lsp` pipelines.
 - PowerShell formatting via `Invoke-Formatter` for heredoc content, without
   starting `pwsh` unless a PowerShell snippet actually needs analysis or
-  formatting.
+  formatting. Formatting uses PSScriptAnalyzer's code-formatting settings with
+  `PSUseCorrectCasing` disabled so host-specific cmdlet discovery does not make
+  Dockerfile fixes differ by operating system.
 - Cross-platform: Windows, macOS, Linux — the three targets tally already
   supports.
 

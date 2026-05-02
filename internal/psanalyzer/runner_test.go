@@ -115,12 +115,15 @@ func TestRunnerFormatWithInstalledPSScriptAnalyzer(t *testing.T) {
 		_ = r.Close(closeCtx)
 	}()
 
-	formatted, err := r.Format(ctx, FormatRequest{ScriptDefinition: "if ($true) {\nWrite-Host hi\n}\n"})
+	formatted, err := r.Format(ctx, FormatRequest{ScriptDefinition: "if ($true) {\nwrite-host hi\n}\n"})
 	if err != nil {
 		t.Fatalf("Format() error = %v", err)
 	}
-	if !strings.Contains(formatted, "    Write-Host hi") {
+	if !strings.Contains(formatted, "    write-host hi") {
 		t.Fatalf("expected formatted PowerShell indentation, got:\n%s", formatted)
+	}
+	if strings.Contains(formatted, "Write-Host") {
+		t.Fatalf("expected formatter to preserve command casing, got:\n%s", formatted)
 	}
 }
 

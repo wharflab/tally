@@ -175,6 +175,34 @@ function Invoke-TallyAnalyzeRequest {
     }
 }
 
+function Get-TallyFormatterSetting {
+    $module = Get-Module PSScriptAnalyzer
+    if ($null -eq $module) {
+        throw 'PSScriptAnalyzer formatter settings requested before module import.'
+    }
+
+    $settingsPath = Join-Path $module.ModuleBase 'Settings/CodeFormatting.psd1'
+    $settings = Import-PowerShellDataFile -LiteralPath $settingsPath
+
+    # PSUseCorrectCasing depends on the cmdlets available in the host process.
+    # Dockerfiles often target Windows images from Linux/macOS hosts, so keep
+    # command casing stable instead of reflecting the sidecar host OS.
+    if ($settings.ContainsKey('IncludeRules')) {
+        $settings['IncludeRules'] = @(
+            foreach ($rule in @($settings['IncludeRules'])) {
+                if ($rule -ne 'PSUseCorrectCasing') {
+                    $rule
+                }
+            }
+        )
+    }
+    if ($settings.ContainsKey('Rules') -and $null -ne $settings['Rules'] -and $settings['Rules'].ContainsKey('PSUseCorrectCasing')) {
+        $settings['Rules'].Remove('PSUseCorrectCasing')
+    }
+
+    return $settings
+}
+
 function Invoke-TallyFormatRequest {
     param([Parameter(Mandatory=$true)] [object] $Request)
 
@@ -182,7 +210,7 @@ function Invoke-TallyFormatRequest {
         throw 'a format request must include scriptDefinition'
     }
 
-    $formatted = Invoke-Formatter -ScriptDefinition ([string] $Request.scriptDefinition)
+    $formatted = Invoke-Formatter -ScriptDefinition ([string] $Request.scriptDefinition) -Settings (Get-TallyFormatterSetting)
     return @{
         id = $Request.id
         ok = $true

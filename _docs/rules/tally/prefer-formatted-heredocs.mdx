@@ -41,7 +41,8 @@ heredoc in `services/api/Dockerfile` targeting `/etc/app/config.yaml` is matched
 For `RUN` shell heredocs, tally resolves a virtual filename next to the Dockerfile named `Dockerfile.heredoc.<dialect>`, such as
 `Dockerfile.heredoc.sh`, `Dockerfile.heredoc.bash`, or `Dockerfile.heredoc.zsh`.
 
-PowerShell heredocs use PSScriptAnalyzer's own default formatter settings. They do not use EditorConfig today.
+PowerShell heredocs use PSScriptAnalyzer's code formatter with command-casing rewrites disabled, so formatting is stable across Linux, macOS, and
+Windows hosts. They do not use EditorConfig today.
 
 The formatter also runs as a final auto-fix pass. This means heredocs emitted by other rules, such as `tally/prefer-copy-heredoc`, are formatted in
 the same `--fix` run when this rule is enabled.
