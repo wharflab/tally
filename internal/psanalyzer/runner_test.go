@@ -82,23 +82,18 @@ func TestRunnerAnalyzeInitializationFailureIsUnavailable(t *testing.T) {
 	}
 }
 
-func TestRunnerStopProcessCleansTempDir(t *testing.T) {
+func TestRunnerStopProcessClearsProcessState(t *testing.T) {
 	t.Parallel()
 
-	tempDir := t.TempDir()
 	r := &Runner{
-		tempDir: tempDir,
-		waitCh:  make(chan error, 1),
+		waitCh: make(chan error, 1),
 	}
 	r.waitCh <- nil
 
 	r.stopProcess()
 
-	if r.tempDir != "" {
-		t.Fatalf("tempDir = %q, want empty", r.tempDir)
-	}
-	if _, err := os.Stat(tempDir); !os.IsNotExist(err) {
-		t.Fatalf("temp dir still exists after stopProcess(): %v", err)
+	if r.cmd != nil || r.stdin != nil || r.stdout != nil || r.waitCh != nil {
+		t.Fatalf("runner process state not cleared: %#v", r)
 	}
 }
 
@@ -340,11 +335,6 @@ func TestSidecarBootstrapsMissingPSScriptAnalyzer(t *testing.T) {
 	}
 
 	tmp := t.TempDir()
-	sidecarPath := filepath.Join(tmp, "Tally.PSSA.Sidecar.ps1")
-	if err := os.WriteFile(sidecarPath, sidecarScript, 0o600); err != nil {
-		t.Fatal(err)
-	}
-
 	moduleRoot := filepath.Join(tmp, "modules")
 	prelude := `
 $ErrorActionPreference = 'Stop'
@@ -386,20 +376,18 @@ function Invoke-ScriptAnalyzer {
 }
 "@ | Set-Content -LiteralPath (Join-Path $moduleDir 'PSScriptAnalyzer.psd1') -Encoding UTF8
 }
-& $env:TALLY_TEST_SIDECAR
 `
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", prelude)
+	cmd := exec.CommandContext(ctx, "pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "-")
 	cmd.Env = append(normalizePowerShellEnv(runtime.GOOS, os.Environ()),
 		"PSModulePath="+moduleRoot,
 		psscriptAnalyzerVersionEnv+"="+requiredPSScriptAnalyzerVersion(),
 		"TALLY_TEST_MODULE_ROOT="+moduleRoot,
 		"TALLY_TEST_REQUIRED_PSSA_VERSION="+requiredPSScriptAnalyzerVersion(),
-		"TALLY_TEST_SIDECAR="+sidecarPath,
 	)
-	cmd.Stdin = strings.NewReader("{\"id\":\"1\",\"op\":\"shutdown\"}\n")
+	cmd.Stdin = strings.NewReader(prelude + string(sidecarScript) + "\n{\"id\":\"1\",\"op\":\"shutdown\"}\n")
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {

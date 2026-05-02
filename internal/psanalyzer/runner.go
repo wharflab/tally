@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -42,19 +41,16 @@ type Runner struct {
 	stdin  io.WriteCloser
 	stdout *bufio.Reader
 	waitCh chan error
-
-	tempDir string
-	nextID  int64
+	nextID int64
 
 	stderr tailBuffer
 }
 
 type sidecarProcess struct {
-	cmd     *exec.Cmd
-	stdin   io.WriteCloser
-	stdout  io.ReadCloser
-	stderr  io.ReadCloser
-	tempDir string
+	cmd    *exec.Cmd
+	stdin  io.WriteCloser
+	stdout io.ReadCloser
+	stderr io.ReadCloser
 }
 
 func NewRunner() *Runner {
@@ -121,7 +117,6 @@ func (r *Runner) Close(ctx context.Context) error {
 	defer r.mu.Unlock()
 
 	if r.cmd == nil {
-		r.cleanupTempDir()
 		return nil
 	}
 
@@ -140,14 +135,12 @@ func (r *Runner) Close(ctx context.Context) error {
 	select {
 	case err := <-r.waitCh:
 		r.clearProcess()
-		r.cleanupTempDir()
 		if err != nil {
 			return err
 		}
 		return shutdownErr
 	case <-ctx.Done():
 		r.stopProcess()
-		r.cleanupTempDir()
 		return ctx.Err()
 	}
 }
@@ -170,7 +163,6 @@ func (r *Runner) ensureStarted(ctx context.Context) error {
 
 	if err := r.awaitReady(ctx); err != nil {
 		r.stopProcess()
-		r.cleanupTempDir()
 		if errors.Is(err, context.Canceled) {
 			return err
 		}
@@ -181,29 +173,18 @@ func (r *Runner) ensureStarted(ctx context.Context) error {
 }
 
 func startSidecarProcess(exe string) (*sidecarProcess, error) {
-	tempDir, err := os.MkdirTemp("", "tally-psanalyzer-*")
-	if err != nil {
-		return nil, fmt.Errorf("create psanalyzer temp dir: %w", err)
-	}
-	sidecarPath := filepath.Join(tempDir, "Tally.PSSA.Sidecar.ps1")
-	if err := os.WriteFile(sidecarPath, sidecarScript, 0o600); err != nil {
-		_ = os.RemoveAll(tempDir)
-		return nil, fmt.Errorf("write psanalyzer sidecar: %w", err)
-	}
 	version := requiredPSScriptAnalyzerVersion()
 	if version == "" {
-		_ = os.RemoveAll(tempDir)
 		return nil, errors.New("PSScriptAnalyzer version pin is empty")
 	}
 
-	//nolint:gosec // G204: exe is pwsh from PATH or explicit TALLY_POWERSHELL configuration.
 	cmd := exec.Command(
 		exe,
 		"-NoLogo",
 		"-NoProfile",
 		"-NonInteractive",
-		"-File",
-		sidecarPath,
+		"-Command",
+		"-",
 	)
 	cmd.Env = appendEnvOverride(
 		normalizePowerShellEnv(runtime.GOOS, os.Environ()),
@@ -213,32 +194,54 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		_ = os.RemoveAll(tempDir)
 		return nil, fmt.Errorf("open psanalyzer stdin: %w", err)
 	}
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		_ = os.RemoveAll(tempDir)
 		return nil, fmt.Errorf("open psanalyzer stdout: %w", err)
 	}
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
-		_ = os.RemoveAll(tempDir)
 		return nil, fmt.Errorf("open psanalyzer stderr: %w", err)
 	}
 
 	if err := cmd.Start(); err != nil {
-		_ = os.RemoveAll(tempDir)
 		return nil, fmt.Errorf("start %s: %w", exe, err)
+	}
+	if err := writeSidecarScript(stdin, cmd); err != nil {
+		return nil, err
 	}
 
 	return &sidecarProcess{
-		cmd:     cmd,
-		stdin:   stdin,
-		stdout:  stdoutPipe,
-		stderr:  stderrPipe,
-		tempDir: tempDir,
+		cmd:    cmd,
+		stdin:  stdin,
+		stdout: stdoutPipe,
+		stderr: stderrPipe,
 	}, nil
+}
+
+func writeSidecarScript(stdin io.WriteCloser, cmd *exec.Cmd) error {
+	if _, err := stdin.Write(sidecarScript); err != nil {
+		return stopStartedSidecar(stdin, cmd, fmt.Errorf("write psanalyzer sidecar to stdin: %w", err))
+	}
+	if len(sidecarScript) == 0 || sidecarScript[len(sidecarScript)-1] != '\n' {
+		if _, err := io.WriteString(stdin, "\n"); err != nil {
+			return stopStartedSidecar(stdin, cmd, fmt.Errorf("finish psanalyzer sidecar stdin: %w", err))
+		}
+	}
+	// In stdin command mode, PowerShell waits for a blank line before executing a
+	// multiline block. Keep the pipe open after the script so JSON requests can
+	// use the same stdin stream.
+	if _, err := io.WriteString(stdin, "\n"); err != nil {
+		return stopStartedSidecar(stdin, cmd, fmt.Errorf("finish psanalyzer sidecar stdin: %w", err))
+	}
+	return nil
+}
+
+func stopStartedSidecar(stdin io.Closer, cmd *exec.Cmd, err error) error {
+	_ = stdin.Close()
+	killProcess(cmd)
+	return errors.Join(err, cmd.Wait())
 }
 
 func (r *Runner) attachProcess(proc *sidecarProcess) {
@@ -247,7 +250,6 @@ func (r *Runner) attachProcess(proc *sidecarProcess) {
 	r.stdin = proc.stdin
 	r.stdout = bufio.NewReader(proc.stdout)
 	r.waitCh = make(chan error, 1)
-	r.tempDir = proc.tempDir
 
 	go r.stderr.capture(proc.stderr)
 	go func() {
@@ -397,7 +399,6 @@ func (r *Runner) stopProcess() {
 		}
 	}
 	r.clearProcess()
-	r.cleanupTempDir()
 }
 
 func killProcess(cmd *exec.Cmd) {
@@ -414,13 +415,6 @@ func (r *Runner) clearProcess() {
 	r.stdin = nil
 	r.stdout = nil
 	r.waitCh = nil
-}
-
-func (r *Runner) cleanupTempDir() {
-	if r.tempDir != "" {
-		_ = os.RemoveAll(r.tempDir)
-		r.tempDir = ""
-	}
 }
 
 func (r *Runner) stderrSuffix() string {
