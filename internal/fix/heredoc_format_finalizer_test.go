@@ -118,8 +118,9 @@ func TestFormattedHeredocsFinalizerFormatsPowerShellRunHeredoc(t *testing.T) {
 	}
 	finalizer := formattedHeredocsFinalizer{powerShellFormatter: formatter}
 	edits, err := finalizer.Finalize(context.Background(), FinalizeContext{
-		FilePath: file,
-		Content:  src,
+		FilePath:          file,
+		Content:           src,
+		SlowChecksEnabled: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -135,6 +136,42 @@ func TestFormattedHeredocsFinalizerFormatsPowerShellRunHeredoc(t *testing.T) {
 	}
 	if want := "if ($true) {\n    Write-Host hi\n}\n"; edits[0].NewText != want {
 		t.Fatalf("edit text mismatch\ngot:\n%s\nwant:\n%s", edits[0].NewText, want)
+	}
+}
+
+func TestFormattedHeredocsFinalizerSkipsPowerShellWhenSlowChecksDisabled(t *testing.T) {
+	t.Parallel()
+
+	file := filepath.Join(t.TempDir(), "Dockerfile")
+	src := []byte("FROM mcr.microsoft.com/powershell:lts-alpine-3.20\n" +
+		"SHELL [\"pwsh\", \"-Command\"]\n" +
+		"ADD <<EOF /opt/app/MyModule.psm1\n" +
+		"function Get-Greeting {\n" +
+		"Write-Host hi\n" +
+		"}\n" +
+		"EOF\n" +
+		"RUN <<EOF\n" +
+		"if ($true) {\n" +
+		"Write-Host hi\n" +
+		"}\n" +
+		"EOF\n")
+	formatter := &fakePowerShellFormatter{
+		formatted: "unused\n",
+	}
+	finalizer := formattedHeredocsFinalizer{powerShellFormatter: formatter}
+	edits, err := finalizer.Finalize(context.Background(), FinalizeContext{
+		FilePath:          file,
+		Content:           src,
+		SlowChecksEnabled: false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 0 {
+		t.Fatalf("got %d edits, want none when slow checks are disabled", len(edits))
+	}
+	if len(formatter.calls) != 0 {
+		t.Fatalf("PowerShell formatter calls = %d, want none", len(formatter.calls))
 	}
 }
 

@@ -42,12 +42,16 @@ func (f formattedHeredocsFinalizer) Finalize(
 		return nil, err
 	}
 	sem := semanticModelForFinalizer(ctx.FilePath, result)
+	powerShellFormatter := f.powerShellFormatter
+	if !ctx.SlowChecksEnabled {
+		powerShellFormatter = nil
+	}
 	return heredocfmt.FormatDockerfileHeredocsWithPowerShell(
 		finalizeCtx,
 		ctx.FilePath,
 		result,
 		sem,
-		f.powerShellFormatter,
+		powerShellFormatter,
 	)
 }
 

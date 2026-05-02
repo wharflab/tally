@@ -33,6 +33,11 @@ type Fixer struct {
 	// If nil, finalizers are disabled.
 	EnabledRules map[string][]string
 
+	// SlowChecksEnabled maps file paths to whether slow-check-gated finalizer
+	// work may run for that file. If nil or missing a file, slow work is allowed
+	// for backward compatibility with direct Fixer tests.
+	SlowChecksEnabled map[string]bool
+
 	// FixModes maps file paths to their per-rule fix modes.
 	// Outer key is the normalized file path, inner key is the rule code.
 	// Uses config.FixMode constants (FixModeAlways, FixModeNever, etc.).
@@ -299,8 +304,9 @@ func (f *Fixer) applyFinalizers(ctx context.Context, changes map[string]*FileCha
 				continue
 			}
 			edits, err := finalizer.Finalize(ctx, FinalizeContext{
-				FilePath: fc.Path,
-				Content:  fc.ModifiedContent,
+				FilePath:          fc.Path,
+				Content:           fc.ModifiedContent,
+				SlowChecksEnabled: f.slowChecksEnabledForFile(fc.Path),
 			})
 			if err != nil {
 				fc.FixesSkipped = append(fc.FixesSkipped, SkippedFix{
@@ -337,6 +343,23 @@ func (f *Fixer) applyFinalizers(ctx context.Context, changes map[string]*FileCha
 			}})
 		}
 	}
+}
+
+func (f *Fixer) slowChecksEnabledForFile(filePath string) bool {
+	if f.SlowChecksEnabled == nil {
+		return true
+	}
+	normalizedPath := normalizePath(filePath)
+	if enabled, ok := f.SlowChecksEnabled[normalizedPath]; ok {
+		return enabled
+	}
+	if enabled, ok := f.SlowChecksEnabled[filepath.ToSlash(normalizedPath)]; ok {
+		return enabled
+	}
+	if enabled, ok := f.SlowChecksEnabled[filePath]; ok {
+		return enabled
+	}
+	return true
 }
 
 func (f *Fixer) finalizerAllowed(filePath string, finalizer Finalizer) bool {

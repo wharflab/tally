@@ -3,8 +3,8 @@ title: "tally/prefer-formatted-heredocs"
 description: "Pretty-print structured COPY/ADD heredocs, shell heredocs, and PowerShell heredocs."
 ---
 
-Pretty-prints structured `COPY` and `ADD` heredoc bodies, `COPY` heredocs that contain shell or PowerShell scripts, and executable `RUN` heredoc
-bodies.
+Pretty-prints structured `COPY` and `ADD` heredoc bodies, `COPY` heredocs that contain shell scripts, `COPY` or `ADD` heredocs that contain
+PowerShell scripts, and executable `RUN` heredoc bodies.
 
 | Property | Value |
 |----------|-------|
@@ -27,8 +27,8 @@ The rule also formats `RUN <<EOF` heredocs whose body is executed as a shell scr
 `shfmt`, for Bash, POSIX shell, mksh, Bats, and zsh. Heredocs that are stdin payloads for another command, such as `RUN cat <<EOF`, are left alone.
 cmd and unknown shebang bodies are skipped.
 
-PowerShell heredocs are formatted with PSScriptAnalyzer's `Invoke-Formatter`. This applies to `COPY` heredocs targeting `.ps1`, `.psm1`, or `.psd1`
-files, and to `RUN <<EOF` bodies when the active Dockerfile `SHELL` is PowerShell or the heredoc has a PowerShell shebang. tally starts the
+PowerShell heredocs are formatted with PSScriptAnalyzer's `Invoke-Formatter`. This applies to `COPY` or `ADD` heredocs targeting `.ps1`, `.psm1`, or
+`.psd1` files, and to `RUN <<EOF` bodies when the active Dockerfile `SHELL` is PowerShell or the heredoc has a PowerShell shebang. tally starts the
 PowerShell sidecar lazily, only when slow checks are enabled and a PowerShell heredoc actually needs formatting.
 
 For structured payload EditorConfig lookup, tally resolves a virtual filename next to the Dockerfile using the destination basename. For example, a

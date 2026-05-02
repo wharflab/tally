@@ -178,6 +178,18 @@ EOF
 			WantViolations: 0,
 		},
 		{
+			Name: "ADD PowerShell module heredoc",
+			Content: `FROM alpine
+ADD <<EOF /opt/app/MyModule.psm1
+function Get-Greeting {
+Write-Host hi
+}
+EOF
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"ADD heredoc for /opt/app/MyModule.psm1 should be pretty-printed as PowerShell"},
+		},
+		{
 			Name: "COPY sh heredoc with unsupported shebang is skipped",
 			Content: `FROM alpine
 COPY <<EOF /usr/local/bin/entrypoint.sh
@@ -320,6 +332,37 @@ EOF
 	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
 	want := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
 COPY <<EOF /opt/app/MyModule.psm1
+function Get-Greeting {
+    Write-Host hi
+}
+EOF
+`
+	if got != want {
+		t.Fatalf("fixed content mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_FixADDPowerShellModule(t *testing.T) {
+	t.Parallel()
+	content := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+ADD <<EOF /opt/app/MyModule.psm1
+function Get-Greeting {
+Write-Host hi
+}
+EOF
+`
+	rule := newPreferFormattedHeredocsRuleWithPowerShellFormatter(&fakePowerShellFormatter{
+		formatted: "function Get-Greeting {\n    Write-Host hi\n}\n",
+	})
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	want := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+ADD <<EOF /opt/app/MyModule.psm1
 function Get-Greeting {
     Write-Host hi
 }

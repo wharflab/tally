@@ -1246,11 +1246,12 @@ func applyFixes(
 	defer stopSpinner()
 
 	fixer := &fix.Fixer{
-		SafetyThreshold: safetyThreshold,
-		RuleFilter:      ruleFilter,
-		EnabledRules:    buildPerFileEnabledRules(input.fileConfigs, input.sources),
-		FixModes:        fixModes,
-		Concurrency:     4,
+		SafetyThreshold:   safetyThreshold,
+		RuleFilter:        ruleFilter,
+		EnabledRules:      buildPerFileEnabledRules(input.fileConfigs, input.sources),
+		SlowChecksEnabled: buildPerFileSlowChecksEnabled(input.fileConfigs, input.sources),
+		FixModes:          fixModes,
+		Concurrency:       4,
 	}
 
 	result, err := fixer.Apply(ctx, input.violations, input.sources)
@@ -1307,6 +1308,21 @@ func buildPerFileEnabledRules(
 		enabledRules[filepath.Clean(path)] = linter.EnabledRuleCodes(cfg)
 	}
 	return enabledRules
+}
+
+func buildPerFileSlowChecksEnabled(fileConfigs map[string]*config.Config, sources map[string][]byte) map[string]bool {
+	enabled := make(map[string]bool, len(sources))
+	for path := range sources {
+		cfg := fileConfigs[path]
+		if cfg == nil {
+			cfg = fileConfigs[filepath.ToSlash(path)]
+		}
+		if cfg == nil {
+			cfg = config.Default()
+		}
+		enabled[filepath.Clean(path)] = config.SlowChecksEnabled(cfg.SlowChecks.Mode)
+	}
+	return enabled
 }
 
 // runAsyncChecks executes async check plans if slow checks are enabled.

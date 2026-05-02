@@ -165,7 +165,7 @@ func (f *Formatter) FormatPowerShell(
 	return formatPowerShell(ctx, formatter, content)
 }
 
-// FormatPowerShellTarget formats a COPY heredoc body as PowerShell when the destination is a PowerShell file.
+// FormatPowerShellTarget formats a COPY/ADD heredoc body as PowerShell when the destination is a PowerShell file.
 func (f *Formatter) FormatPowerShellTarget(
 	ctx context.Context,
 	formatter PowerShellFormatter,
@@ -441,7 +441,7 @@ func isDotShTarget(target string) bool {
 	return strings.EqualFold(path.Ext(filepath.ToSlash(target)), ".sh")
 }
 
-// IsPowerShellTarget reports whether a COPY heredoc destination is a PowerShell script or module file.
+// IsPowerShellTarget reports whether a COPY/ADD heredoc destination is a PowerShell script or module file.
 func IsPowerShellTarget(target string) bool {
 	switch strings.ToLower(path.Ext(targetBasenameAny(target))) {
 	case ".ps1", ".psm1", ".psd1":

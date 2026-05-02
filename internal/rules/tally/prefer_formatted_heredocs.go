@@ -106,10 +106,13 @@ func (r *PreferFormattedHeredocsRule) checkDockerfileHeredoc(
 	if kind != "" {
 		return formattedTypedHeredocViolation(input.File, meta, doc, formatted, kind, ok)
 	}
-	if !strings.EqualFold(doc.Instruction, command.Copy) {
-		return rules.Violation{}, false
+	if strings.EqualFold(doc.Instruction, command.Copy) {
+		return r.checkCopyScriptHeredoc(input, formatter, meta, doc)
 	}
-	return r.checkCopyScriptHeredoc(input, formatter, meta, doc)
+	if strings.EqualFold(doc.Instruction, command.Add) {
+		return r.checkPowerShellScriptHeredoc(input, formatter, meta, doc)
+	}
+	return rules.Violation{}, false
 }
 
 func formattedTypedHeredocViolation(
@@ -139,33 +142,39 @@ func (r *PreferFormattedHeredocsRule) checkCopyScriptHeredoc(
 	meta rules.RuleMetadata,
 	doc heredocfmt.DockerfileHeredoc,
 ) (rules.Violation, bool) {
-	powerShellFormatted := false
 	formatted, _, ok, err := formatter.FormatShellTarget(doc.TargetPath, doc.Content)
 	if err != nil {
 		return rules.Violation{}, false
 	}
 	if !ok {
-		if !input.SlowChecksEnabled {
-			return rules.Violation{}, false
-		}
-		formatted, ok, err = r.formatPowerShellTarget(formatter, doc.TargetPath, doc.Content)
-		if err != nil {
-			return rules.Violation{}, false
-		}
-		powerShellFormatted = ok
+		return r.checkPowerShellScriptHeredoc(input, formatter, meta, doc)
 	}
-	if !ok || formatted == doc.Content {
+	if formatted == doc.Content {
 		return rules.Violation{}, false
 	}
 
-	formatLabel := "a shell script"
-	description := "Pretty-print COPY shell heredoc body"
-	if powerShellFormatted {
-		formatLabel = "PowerShell"
-		description = "Pretty-print COPY PowerShell heredoc body"
-	}
 	loc := heredocBodyLocation(input.File, doc.BodyStartLine, doc.TerminatorLine)
-	message := doc.Instruction + " heredoc for " + doc.TargetPath + " should be pretty-printed as " + formatLabel
+	message := doc.Instruction + " heredoc for " + doc.TargetPath + " should be pretty-printed as a shell script"
+	return formattedHeredocViolation(meta, loc, message, "Pretty-print COPY shell heredoc body", formatted, doc.BodyPrefix), true
+}
+
+func (r *PreferFormattedHeredocsRule) checkPowerShellScriptHeredoc(
+	input rules.LintInput,
+	formatter *heredocfmt.Formatter,
+	meta rules.RuleMetadata,
+	doc heredocfmt.DockerfileHeredoc,
+) (rules.Violation, bool) {
+	if !input.SlowChecksEnabled {
+		return rules.Violation{}, false
+	}
+	formatted, ok, err := r.formatPowerShellTarget(formatter, doc.TargetPath, doc.Content)
+	if err != nil || !ok || formatted == doc.Content {
+		return rules.Violation{}, false
+	}
+
+	loc := heredocBodyLocation(input.File, doc.BodyStartLine, doc.TerminatorLine)
+	message := doc.Instruction + " heredoc for " + doc.TargetPath + " should be pretty-printed as PowerShell"
+	description := "Pretty-print " + doc.Instruction + " PowerShell heredoc body"
 	return formattedHeredocViolation(meta, loc, message, description, formatted, doc.BodyPrefix), true
 }
 
