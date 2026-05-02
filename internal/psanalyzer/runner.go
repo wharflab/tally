@@ -86,6 +86,9 @@ func (r *Runner) Analyze(ctx context.Context, req AnalyzeRequest) ([]Diagnostic,
 
 	resp, err := r.sendRequest(ctx, wireReq)
 	if err != nil {
+		if IsUnavailable(err) {
+			reportUnavailable("linting", err)
+		}
 		return nil, err
 	}
 	return resp.Diagnostics, nil
@@ -101,6 +104,9 @@ func (r *Runner) Format(ctx context.Context, req FormatRequest) (string, error) 
 		ScriptDefinition: req.ScriptDefinition,
 	})
 	if err != nil {
+		if IsUnavailable(err) {
+			reportUnavailable("formatting", err)
+		}
 		return "", err
 	}
 	return resp.Formatted, nil

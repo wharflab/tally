@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -27,6 +28,7 @@ import (
 	"github.com/wharflab/tally/internal/invocation"
 	"github.com/wharflab/tally/internal/linter"
 	"github.com/wharflab/tally/internal/processor"
+	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/registry"
 	"github.com/wharflab/tally/internal/reporter"
 	"github.com/wharflab/tally/internal/rules"
@@ -42,6 +44,8 @@ const (
 	ExitNoFiles     = 3 // No Dockerfiles found (missing file, empty glob, empty directory)
 	ExitSyntaxError = 4 // Dockerfile has fatal syntax issues (unknown instructions, malformed directives)
 )
+
+const installPowerShellURL = "https://learn.microsoft.com/en-us/powershell/scripting/install/install-powershell"
 
 func lintCommand() *cobra.Command {
 	return newLintCommand(&lintOptions{})
@@ -60,12 +64,39 @@ func newLintCommand(opts *lintOptions) *cobra.Command {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				return exitWith(ExitConfigError)
 			}
-			return runLint(cmd.Context(), opts, args)
+			return runLintWithPowerShellReporter(cmd.Context(), opts, args)
 		},
 	}
 
 	addLintFlags(cmd.Flags(), opts)
 	return cmd
+}
+
+func runLintWithPowerShellReporter(ctx stdcontext.Context, opts *lintOptions, args []string) error {
+	defer installPowerShellUnavailableReporter(os.Stderr)()
+	return runLint(ctx, opts, args)
+}
+
+func installPowerShellUnavailableReporter(w io.Writer) func() {
+	var once sync.Once
+	return psanalyzer.SetUnavailableReporter(func(event psanalyzer.UnavailableEvent) {
+		once.Do(func() {
+			detail := ""
+			if event.Err != nil {
+				detail = strings.TrimSpace(event.Err.Error())
+			}
+			if detail != "" {
+				detail = ": " + detail
+			}
+			fmt.Fprintf(
+				w,
+				"note: PowerShell script linting/formatting skipped%s. "+
+					"Requires a usable PowerShell 7+ installation and PSScriptAnalyzer; install PowerShell: %s\n",
+				detail,
+				installPowerShellURL,
+			)
+		})
+	})
 }
 
 // lintResults holds the aggregated results of linting all discovered files.
