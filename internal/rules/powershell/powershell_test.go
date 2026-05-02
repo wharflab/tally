@@ -421,7 +421,7 @@ RUN ["pwsh", "-File", "./build.ps1"]
 func TestRuleReportsAnalyzerFailureAtExplicitInvocationLine(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakeAnalyzer{err: errors.New("module not available")}
+	fake := &fakeAnalyzer{err: errors.New("sidecar protocol failed")}
 	rule := newRuleWithAnalyzer(fake)
 	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
 RUN pwsh \
@@ -438,6 +438,26 @@ RUN pwsh \
 	}
 	if violations[0].Location.Start.Line != 3 {
 		t.Fatalf("Location = %#v, want explicit invocation command line", violations[0].Location)
+	}
+}
+
+func TestRuleSkipsUnavailableAnalyzerFailure(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeAnalyzer{err: psanalyzer.ErrUnavailable}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN pwsh \
+    -Command "Write-Host hi"
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected unavailable analyzer to be skipped, got %#v", violations)
+	}
+	if len(fake.scripts) != 1 {
+		t.Fatalf("analyzer calls = %d, want 1", len(fake.scripts))
 	}
 }
 
@@ -531,7 +551,7 @@ ONBUILD RUN Write-Host hi
 func TestRuleReportsAnalyzerFailureOnPowerShellSnippet(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakeAnalyzer{err: errors.New("module not available")}
+	fake := &fakeAnalyzer{err: errors.New("sidecar request failed")}
 	rule := newRuleWithAnalyzer(fake)
 	input := testutil.MakeLintInput(t, "Dockerfile", `FROM mcr.microsoft.com/powershell:ubuntu-22.04
 SHELL ["pwsh", "-Command"]

@@ -153,19 +153,22 @@ func (r *Runner) ensureStarted(ctx context.Context) error {
 
 	exe, err := r.findExecutable()
 	if err != nil {
-		return err
+		return newUnavailableError(err)
 	}
 
 	proc, err := startSidecarProcess(exe)
 	if err != nil {
-		return err
+		return newUnavailableError(err)
 	}
 	r.attachProcess(proc)
 
 	if err := r.awaitReady(ctx); err != nil {
 		r.stopProcess()
 		r.cleanupTempDir()
-		return err
+		if errors.Is(err, context.Canceled) {
+			return err
+		}
+		return newUnavailableError(err)
 	}
 
 	return nil

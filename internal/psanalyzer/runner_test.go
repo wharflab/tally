@@ -2,6 +2,7 @@ package psanalyzer
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,6 +33,51 @@ func TestNormalizePowerShellEnvLeavesNonWindowsUntouched(t *testing.T) {
 	got := normalizePowerShellEnv("linux", env)
 	if len(got) != len(env) {
 		t.Fatalf("expected non-Windows env to remain unchanged, got %#v", got)
+	}
+}
+
+func TestIsUnavailableRecognizesWrappedError(t *testing.T) {
+	t.Parallel()
+
+	err := errors.Join(errors.New("startup failed"), ErrUnavailable)
+	if !IsUnavailable(err) {
+		t.Fatalf("IsUnavailable(%v) = false, want true", err)
+	}
+	if IsUnavailable(errors.New("sidecar request failed")) {
+		t.Fatal("unexpected unavailable classification for ordinary error")
+	}
+}
+
+func TestRunnerAnalyzeMissingExecutableIsUnavailable(t *testing.T) {
+	t.Setenv(executableEnv, filepath.Join(t.TempDir(), "missing-pwsh"))
+
+	r := NewRunner()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	_, err := r.Analyze(ctx, AnalyzeRequest{ScriptDefinition: "Write-Host hi\n"})
+	if !IsUnavailable(err) {
+		t.Fatalf("Analyze() error = %v, want unavailable error", err)
+	}
+}
+
+func TestRunnerAnalyzeInitializationFailureIsUnavailable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("false executable is not available on Windows")
+	}
+	falseExe, err := exec.LookPath("false")
+	if err != nil {
+		t.Skip("false executable not available")
+	}
+	t.Setenv(executableEnv, falseExe)
+
+	r := NewRunner()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = r.Analyze(ctx, AnalyzeRequest{ScriptDefinition: "Write-Host hi\n"})
+	if !IsUnavailable(err) {
+		t.Fatalf("Analyze() error = %v, want unavailable error", err)
 	}
 }
 

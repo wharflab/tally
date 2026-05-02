@@ -11,6 +11,7 @@ import (
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/highlight/extract"
+	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
@@ -228,8 +229,8 @@ func FormatDockerfileHeredocsWithPowerShell(
 				doc.Content,
 			)
 			if err != nil {
-				if ctx.Err() != nil {
-					return nil, ctx.Err()
+				if retErr := powerShellFormatError(ctx, err); retErr != nil {
+					return nil, retErr
 				}
 				continue
 			}
@@ -248,8 +249,8 @@ func FormatDockerfileHeredocsWithPowerShell(
 		if variant.IsPowerShell() {
 			formatted, ok, err := formatter.FormatPowerShell(ctx, powerShellFormatter, doc.Content)
 			if err != nil {
-				if ctx.Err() != nil {
-					return nil, ctx.Err()
+				if retErr := powerShellFormatError(ctx, err); retErr != nil {
+					return nil, retErr
 				}
 				continue
 			}
@@ -281,6 +282,16 @@ func FormatDockerfileHeredocsWithPowerShell(
 		})
 	}
 	return edits, nil
+}
+
+func powerShellFormatError(ctx context.Context, err error) error {
+	if psanalyzer.IsUnavailable(err) {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	return nil
 }
 
 func isPowerShellFileHeredocInstruction(instruction string) bool {

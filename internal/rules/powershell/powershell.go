@@ -235,6 +235,9 @@ func (r *Rule) checkMapping(file string, mapping scriptMapping, settings psanaly
 		Settings:         settings,
 	})
 	if err != nil {
+		if psanalyzer.IsUnavailable(err) {
+			return nil
+		}
 		loc := rules.NewLineLocation(file, mapping.FallbackLine)
 		msg := "failed to run PowerShell analyzer"
 		if detail := strings.TrimSpace(err.Error()); detail != "" {

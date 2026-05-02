@@ -13,12 +13,17 @@ import (
 
 type fakePowerShellFormatter struct {
 	formatted string
+	err       error
+	cancel    context.CancelFunc
 	calls     []string
 }
 
 func (f *fakePowerShellFormatter) FormatPowerShell(_ context.Context, script string) (string, error) {
 	f.calls = append(f.calls, script)
-	return f.formatted, nil
+	if f.cancel != nil {
+		f.cancel()
+	}
+	return f.formatted, f.err
 }
 
 func TestFormattedHeredocsFinalizerUsesSharedPowerShellRunner(t *testing.T) {
@@ -189,6 +194,39 @@ func TestFormattedHeredocsFinalizerSkipsPowerShellWhenSlowChecksDisabled(t *test
 	}
 	if len(formatter.calls) != 0 {
 		t.Fatalf("PowerShell formatter calls = %d, want none", len(formatter.calls))
+	}
+}
+
+func TestFormattedHeredocsFinalizerSkipsUnavailablePowerShellFormatter(t *testing.T) {
+	t.Parallel()
+
+	file := filepath.Join(t.TempDir(), "Dockerfile")
+	src := []byte("FROM mcr.microsoft.com/powershell:lts-alpine-3.20\n" +
+		"SHELL [\"pwsh\", \"-Command\"]\n" +
+		"RUN <<EOF\n" +
+		"if ($true) {\n" +
+		"Write-Host hi\n" +
+		"}\n" +
+		"EOF\n")
+	ctx, cancel := context.WithCancel(context.Background())
+	formatter := &fakePowerShellFormatter{
+		err:    psanalyzer.ErrUnavailable,
+		cancel: cancel,
+	}
+	finalizer := formattedHeredocsFinalizer{powerShellFormatter: formatter}
+	edits, err := finalizer.Finalize(ctx, FinalizeContext{
+		FilePath:          file,
+		Content:           src,
+		SlowChecksEnabled: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 0 {
+		t.Fatalf("got %d edits, want none when PowerShell formatter is unavailable", len(edits))
+	}
+	if len(formatter.calls) != 1 {
+		t.Fatalf("PowerShell formatter calls = %d, want 1", len(formatter.calls))
 	}
 }
 
