@@ -79,7 +79,7 @@ func (r *PreferFormattedHeredocsRule) Check(input rules.LintInput) []rules.Viola
 	var violations []rules.Violation
 
 	for _, doc := range heredocfmt.CollectDockerfileHeredocs(parseResult) {
-		if v, ok := r.checkDockerfileHeredoc(input.File, formatter, meta, doc); ok {
+		if v, ok := r.checkDockerfileHeredoc(input, formatter, meta, doc); ok {
 			violations = append(violations, v)
 		}
 	}
@@ -94,7 +94,7 @@ func (r *PreferFormattedHeredocsRule) Check(input rules.LintInput) []rules.Viola
 }
 
 func (r *PreferFormattedHeredocsRule) checkDockerfileHeredoc(
-	file string,
+	input rules.LintInput,
 	formatter *heredocfmt.Formatter,
 	meta rules.RuleMetadata,
 	doc heredocfmt.DockerfileHeredoc,
@@ -104,12 +104,12 @@ func (r *PreferFormattedHeredocsRule) checkDockerfileHeredoc(
 		return rules.Violation{}, false
 	}
 	if kind != "" {
-		return formattedTypedHeredocViolation(file, meta, doc, formatted, kind, ok)
+		return formattedTypedHeredocViolation(input.File, meta, doc, formatted, kind, ok)
 	}
 	if !strings.EqualFold(doc.Instruction, command.Copy) {
 		return rules.Violation{}, false
 	}
-	return r.checkCopyScriptHeredoc(file, formatter, meta, doc)
+	return r.checkCopyScriptHeredoc(input, formatter, meta, doc)
 }
 
 func formattedTypedHeredocViolation(
@@ -134,7 +134,7 @@ func formattedTypedHeredocViolation(
 }
 
 func (r *PreferFormattedHeredocsRule) checkCopyScriptHeredoc(
-	file string,
+	input rules.LintInput,
 	formatter *heredocfmt.Formatter,
 	meta rules.RuleMetadata,
 	doc heredocfmt.DockerfileHeredoc,
@@ -145,6 +145,9 @@ func (r *PreferFormattedHeredocsRule) checkCopyScriptHeredoc(
 		return rules.Violation{}, false
 	}
 	if !ok {
+		if !input.SlowChecksEnabled {
+			return rules.Violation{}, false
+		}
 		formatted, ok, err = r.formatPowerShellTarget(formatter, doc.TargetPath, doc.Content)
 		if err != nil {
 			return rules.Violation{}, false
@@ -161,7 +164,7 @@ func (r *PreferFormattedHeredocsRule) checkCopyScriptHeredoc(
 		formatLabel = "PowerShell"
 		description = "Pretty-print COPY PowerShell heredoc body"
 	}
-	loc := heredocBodyLocation(file, doc.BodyStartLine, doc.TerminatorLine)
+	loc := heredocBodyLocation(input.File, doc.BodyStartLine, doc.TerminatorLine)
 	message := doc.Instruction + " heredoc for " + doc.TargetPath + " should be pretty-printed as " + formatLabel
 	return formattedHeredocViolation(meta, loc, message, description, formatted, doc.BodyPrefix), true
 }
@@ -174,6 +177,9 @@ func (r *PreferFormattedHeredocsRule) checkRunHeredoc(
 ) (rules.Violation, bool) {
 	variant := heredocfmt.RunHeredocShellVariant(input.Stages, input.Semantic, doc)
 	if variant.IsPowerShell() {
+		if !input.SlowChecksEnabled {
+			return rules.Violation{}, false
+		}
 		formatted, ok, err := r.formatPowerShell(formatter, doc.Content)
 		if err != nil || !ok || formatted == doc.Content {
 			return rules.Violation{}, false

@@ -29,7 +29,7 @@ cmd and unknown shebang bodies are skipped.
 
 PowerShell heredocs are formatted with PSScriptAnalyzer's `Invoke-Formatter`. This applies to `COPY` heredocs targeting `.ps1`, `.psm1`, or `.psd1`
 files, and to `RUN <<EOF` bodies when the active Dockerfile `SHELL` is PowerShell or the heredoc has a PowerShell shebang. tally starts the
-PowerShell sidecar lazily, only when a PowerShell heredoc actually needs formatting.
+PowerShell sidecar lazily, only when slow checks are enabled and a PowerShell heredoc actually needs formatting.
 
 For structured payload EditorConfig lookup, tally resolves a virtual filename next to the Dockerfile using the destination basename. For example, a
 heredoc in `services/api/Dockerfile` targeting `/etc/app/config.yaml` is matched as `services/api/config.yaml`, so selectors such as `*.yaml` and
@@ -42,7 +42,7 @@ For `RUN` shell heredocs, tally resolves a virtual filename next to the Dockerfi
 `Dockerfile.heredoc.sh`, `Dockerfile.heredoc.bash`, or `Dockerfile.heredoc.zsh`.
 
 PowerShell heredocs use PSScriptAnalyzer's code formatter with command-casing rewrites disabled, so formatting is stable across Linux, macOS, and
-Windows hosts. They do not use EditorConfig today.
+Windows hosts. They are skipped when slow checks are disabled and do not use EditorConfig today.
 
 The formatter also runs as a final auto-fix pass. This means heredocs emitted by other rules, such as `tally/prefer-copy-heredoc`, are formatted in
 the same `--fix` run when this rule is enabled.

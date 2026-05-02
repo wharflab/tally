@@ -9,7 +9,7 @@ Runs PowerShell script diagnostics for PowerShell snippets embedded in Dockerfil
 |----------|-------|
 | Severity | Warning |
 | Category | Best Practices |
-| Default | Disabled |
+| Default | Enabled, gated by slow checks |
 | Auto-fix | No |
 
 ## Description
@@ -21,10 +21,12 @@ Diagnostics are reported in the `powershell/*` namespace using the upstream Powe
 concrete diagnostic links to its own tally documentation page, for example
 [`powershell/PSAvoidUsingWriteHost`](/rules/powershell/PSAvoidUsingWriteHost).
 
-The PowerShell analyzer sidecar starts lazily. Dockerfiles without PowerShell snippets do not start `pwsh`.
+The PowerShell analyzer is enabled by default, but it is gated by slow checks. With the default `slow-checks.mode = "auto"`, tally runs it locally and
+skips it in CI; use `--slow-checks=on` when CI should run PowerShell analysis, or `--slow-checks=off` to skip it explicitly.
 
-Enable this analyzer with `--select powershell/PowerShell`, `--select powershell/*`, or a specific rule such as
-`--select powershell/PSAvoidUsingWriteHost`.
+The sidecar still starts lazily. Dockerfiles without PowerShell snippets do not start `pwsh`, even when slow checks are enabled. Selecting
+`powershell/PowerShell`, `powershell/*`, or a specific rule such as `powershell/PSAvoidUsingWriteHost` controls rule filtering, but it does not
+bypass the slow-check gate.
 
 ## Requirements
 
@@ -59,8 +61,6 @@ powershell/PSAvoidUsingWriteHost
 ```
 
 ### Disable a specific PowerShell rule
-
-The ignore examples below assume PowerShell analysis is enabled through configuration or another selection path.
 
 ```bash
 tally lint --ignore powershell/PSAvoidUsingWriteHost Dockerfile

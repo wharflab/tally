@@ -8,6 +8,15 @@ import (
 	"github.com/wharflab/tally/internal/rules"
 )
 
+func TestEnabledRuleCodesPowerShellDefaultEnabled(t *testing.T) {
+	t.Parallel()
+
+	enabled := EnabledRuleCodes(config.Default())
+	if !slices.Contains(enabled, rules.PowerShellRulePrefix+"PowerShell") {
+		t.Fatalf("EnabledRuleCodes() = %#v, want powershell engine enabled by default", enabled)
+	}
+}
+
 func TestEnabledRuleCodesPowerShellDynamicConfigEnablesEngine(t *testing.T) {
 	t.Parallel()
 
@@ -40,7 +49,7 @@ func TestEnabledRuleCodesPowerShellDynamicOptionsConfigEnablesEngine(t *testing.
 	}
 }
 
-func TestEnabledRuleCodesPowerShellDynamicOptionsOffDoesNotEnableEngine(t *testing.T) {
+func TestEnabledRuleCodesPowerShellDynamicOptionsOffKeepsDefaultEngine(t *testing.T) {
 	t.Parallel()
 
 	cfg := config.Default()
@@ -52,8 +61,8 @@ func TestEnabledRuleCodesPowerShellDynamicOptionsOffDoesNotEnableEngine(t *testi
 	}
 
 	enabled := EnabledRuleCodes(cfg)
-	if slices.Contains(enabled, rules.PowerShellRulePrefix+"PowerShell") {
-		t.Fatalf("EnabledRuleCodes() = %#v, did not want powershell engine enabled by disabled concrete rule options", enabled)
+	if !slices.Contains(enabled, rules.PowerShellRulePrefix+"PowerShell") {
+		t.Fatalf("EnabledRuleCodes() = %#v, want default powershell engine despite disabled concrete rule options", enabled)
 	}
 }
 
@@ -113,12 +122,12 @@ func TestEnabledRuleCodesPowerShellInternalErrorIncludeEnablesEngine(t *testing.
 	}
 }
 
-func TestEnabledRuleCodesPowerShellDynamicConfigOffDoesNotEnableEngine(t *testing.T) {
+func TestEnabledRuleCodesPowerShellEngineCanBeDisabled(t *testing.T) {
 	t.Parallel()
 
 	cfg := config.Default()
 	cfg.Rules.Powershell = map[string]config.RuleConfig{
-		"PSAvoidUsingWriteHost": {
+		"PowerShell": {
 			Severity: "off",
 		},
 	}

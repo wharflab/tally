@@ -89,6 +89,7 @@ func MakeLintInputWithContext(
 		Semantic:          sem,
 		Facts:             fileFacts,
 		InvocationContext: invocationCtx,
+		SlowChecksEnabled: true,
 		Config:            nil, // Set by individual tests if needed
 	}
 }

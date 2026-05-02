@@ -134,6 +134,7 @@ func LintFile(input Input) (*Result, error) {
 	)
 
 	enabledRules := EnabledRuleCodes(cfg)
+	slowChecksEnabled := config.SlowChecksEnabled(cfg.SlowChecks.Mode)
 
 	baseInput := rules.LintInput{
 		File:               input.FilePath,
@@ -145,6 +146,7 @@ func LintFile(input Input) (*Result, error) {
 		Semantic:           sem,
 		Facts:              fileFacts,
 		EnabledRules:       enabledRules,
+		SlowChecksEnabled:  slowChecksEnabled,
 		HeredocMinCommands: heredocMinCommands(cfg),
 	}
 

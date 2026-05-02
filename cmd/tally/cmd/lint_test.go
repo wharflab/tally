@@ -265,3 +265,31 @@ func TestContextDirForViolationIgnoresNonLocalContext(t *testing.T) {
 		t.Fatalf("contextDirForViolation() = %q, want empty for non-dir context", got)
 	}
 }
+
+func TestFailFastViolationsExcludeSlowGatedPowerShell(t *testing.T) {
+	t.Parallel()
+
+	file := "Dockerfile"
+	powerShellError := rules.NewViolation(
+		rules.NewLineLocation(file, 1),
+		rules.PowerShellRulePrefix+"PSAvoidUsingPlainTextForPassword",
+		"message",
+		rules.SeverityError,
+	)
+	fastError := rules.NewViolation(
+		rules.NewLineLocation(file, 2),
+		"buildkit/InvalidDefaultArgInFrom",
+		"message",
+		rules.SeverityError,
+	)
+
+	onlyPowerShell := filesWithErrors(failFastViolations([]rules.Violation{powerShellError}))
+	if onlyPowerShell[asyncErrorKey(file, "")] {
+		t.Fatalf("PowerShell analyzer error should not trigger async fail-fast")
+	}
+
+	withFastError := filesWithErrors(failFastViolations([]rules.Violation{powerShellError, fastError}))
+	if !withFastError[asyncErrorKey(file, "")] {
+		t.Fatalf("non-slow error should still trigger async fail-fast")
+	}
+}

@@ -41,6 +41,31 @@ RUN echo hi
 	}
 }
 
+func TestRuleSkipsWhenSlowChecksDisabled(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeAnalyzer{diagnostics: []psanalyzer.Diagnostic{{
+		RuleName: "PSAvoidUsingWriteHost",
+		Severity: 1,
+		Message:  "Avoid using Write-Host.",
+	}}}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command"]
+RUN Write-Host hi
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+	input.SlowChecksEnabled = false
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations when slow checks are disabled, got %#v", violations)
+	}
+	if len(fake.scripts) != 0 {
+		t.Fatalf("analyzer was called when slow checks are disabled: %#v", fake.scripts)
+	}
+}
+
 func TestRuleChecksPowerShellShellRun(t *testing.T) {
 	t.Parallel()
 

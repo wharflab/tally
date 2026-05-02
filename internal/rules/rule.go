@@ -64,6 +64,10 @@ type LintInput struct {
 	// May be nil if not computed (for backward compatibility in tests).
 	EnabledRules []string
 
+	// SlowChecksEnabled reports whether rules gated by slow checks may perform
+	// expensive or external work.
+	SlowChecksEnabled bool
+
 	// HeredocMinCommands is the configured min-commands for the prefer-run-heredoc rule.
 	// Rules that coordinate with heredoc (like DL3003) should use this value.
 	// Zero means use the default (HeredocDefaultMinCommands).

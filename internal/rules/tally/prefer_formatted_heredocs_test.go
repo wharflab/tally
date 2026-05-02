@@ -387,6 +387,35 @@ EOF
 	}
 }
 
+func TestPreferFormattedHeredocsRule_PowerShellFormatterRequiresSlowChecks(t *testing.T) {
+	t.Parallel()
+	fake := &fakePowerShellFormatter{formatted: "unused\n"}
+	rule := newPreferFormattedHeredocsRuleWithPowerShellFormatter(fake)
+	content := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+SHELL ["pwsh", "-Command"]
+COPY <<EOF /opt/app/MyModule.psm1
+function Get-Greeting {
+Write-Host hi
+}
+EOF
+RUN <<EOF
+if ($true) {
+Write-Host hi
+}
+EOF
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	input.SlowChecksEnabled = false
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("got %d violations, want none when slow checks are disabled", len(violations))
+	}
+	if len(fake.calls) != 0 {
+		t.Fatalf("PowerShell formatter was called when slow checks are disabled: %#v", fake.calls)
+	}
+}
+
 func TestPreferFormattedHeredocsRule_FixRUNEditorConfigMaxLineLength(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

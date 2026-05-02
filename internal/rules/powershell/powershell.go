@@ -54,7 +54,7 @@ func (r *Rule) Metadata() rules.RuleMetadata {
 		Name:            "PowerShell",
 		Description:     "Runs PowerShell script diagnostics on PowerShell code embedded in Dockerfile instructions",
 		DocURL:          rules.TallyDocURL(PowerShellRuleCode),
-		DefaultSeverity: rules.SeverityOff,
+		DefaultSeverity: rules.SeverityWarning,
 		Category:        "best-practices",
 		IsExperimental:  true,
 	}
@@ -63,6 +63,9 @@ func (r *Rule) Metadata() rules.RuleMetadata {
 func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	if !input.IsRuleEnabled(meta.Code) {
+		return nil
+	}
+	if !input.SlowChecksEnabled {
 		return nil
 	}
 

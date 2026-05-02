@@ -54,6 +54,10 @@ if not, what ships instead.
   PowerShell target is `pwsh` 7.x syntax, and PSScriptAnalyzer hosted in 5.1
   uses the 5.1 parser. The cold-start tax amortizes over a session, and
   PSScriptAnalyzer's batch throughput on real fixtures is acceptable.
+- tally enables PowerShell analysis by default, but analyzer and formatter
+  sidecar calls are gated by the existing slow-checks mode. With
+  `slow-checks.mode = "auto"`, local runs may start the sidecar on the first
+  PowerShell snippet while CI skips it unless `--slow-checks=on` is set.
 
 ## What we verified on macOS (2026-04-21)
 

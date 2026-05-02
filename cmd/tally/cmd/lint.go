@@ -1352,7 +1352,7 @@ func filterAsyncPlans(res *lintResults) ([]async.CheckRequest, time.Duration) {
 	procCtx := processor.NewContext(res.fileConfigs, res.firstCfg, res.fileSources)
 	filtered := processor.NewSeverityOverride().Process(res.violations, procCtx)
 	filtered = processor.NewEnableFilter().Process(filtered, procCtx)
-	errorContexts := filesWithErrors(filtered)
+	errorContexts := filesWithErrors(failFastViolations(filtered))
 	maxTimeout := 20 * time.Second
 	plans := make([]async.CheckRequest, 0, len(res.asyncPlans))
 	var skippedAuto int
@@ -1400,6 +1400,17 @@ func filterAsyncPlans(res *lintResults) ([]async.CheckRequest, time.Duration) {
 	}
 
 	return plans, maxTimeout
+}
+
+func failFastViolations(violations []rules.Violation) []rules.Violation {
+	out := make([]rules.Violation, 0, len(violations))
+	for _, v := range violations {
+		if strings.HasPrefix(v.RuleCode, rules.PowerShellRulePrefix) {
+			continue
+		}
+		out = append(out, v)
+	}
+	return out
 }
 
 // reportSkipped prints summary notes for skipped async checks.
