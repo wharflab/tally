@@ -39,6 +39,14 @@ func editsOverlap(a, b rules.TextEdit) bool {
 	return true
 }
 
+func editsConflict(a, b rules.TextEdit) bool {
+	return editsOverlap(a, b) && !sameTextEdit(a, b)
+}
+
+func sameTextEdit(a, b rules.TextEdit) bool {
+	return a.Location == b.Location && a.NewText == b.NewText
+}
+
 // editContains returns true if edit A's range entirely contains edit B's range.
 //
 // For point edits (B.Start == B.End), strict containment is required: the point
@@ -91,7 +99,7 @@ func candidateSubsumes(a, b *fixCandidate) bool {
 func candidatesConflict(a, b *fixCandidate) bool {
 	return slices.ContainsFunc(a.fix.Edits, func(ae rules.TextEdit) bool {
 		return slices.ContainsFunc(b.fix.Edits, func(be rules.TextEdit) bool {
-			return editsOverlap(ae, be)
+			return editsConflict(ae, be)
 		})
 	})
 }

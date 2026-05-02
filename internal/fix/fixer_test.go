@@ -252,6 +252,61 @@ func TestFixer_Apply_ConflictingFixes(t *testing.T) {
 	}
 }
 
+func TestFixer_Apply_DuplicateEditsFixBothViolations(t *testing.T) {
+	t.Parallel()
+	sources := map[string][]byte{
+		"Dockerfile": []byte("RUN echo hello \n"),
+	}
+
+	edit := rules.TextEdit{
+		Location: rules.NewRangeLocation("Dockerfile", 1, 14, 1, 15),
+		NewText:  "",
+	}
+	violations := []rules.Violation{
+		{
+			Location: rules.NewRangeLocation("Dockerfile", 1, 14, 1, 15),
+			RuleCode: "rule1",
+			Message:  "Fix 1",
+			SuggestedFix: &rules.SuggestedFix{
+				Description: "Remove trailing whitespace",
+				Safety:      rules.FixSafe,
+				Edits:       []rules.TextEdit{edit},
+			},
+		},
+		{
+			Location: rules.NewRangeLocation("Dockerfile", 1, 14, 1, 15),
+			RuleCode: "rule2",
+			Message:  "Fix 2",
+			SuggestedFix: &rules.SuggestedFix{
+				Description: "Remove trailing whitespace",
+				Safety:      rules.FixSafe,
+				Edits:       []rules.TextEdit{edit},
+			},
+		},
+	}
+
+	fixer := &Fixer{SafetyThreshold: FixSafe}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("Apply error: %v", err)
+	}
+
+	if result.TotalApplied() != 2 {
+		t.Errorf("TotalApplied() = %d, want 2", result.TotalApplied())
+	}
+	if result.TotalSkipped() != 0 {
+		t.Errorf("TotalSkipped() = %d, want 0", result.TotalSkipped())
+	}
+
+	fc := result.Changes["Dockerfile"]
+	if fc == nil {
+		t.Fatal("FileChange for Dockerfile is nil")
+	}
+	if got, want := string(fc.ModifiedContent), "RUN echo hello\n"; got != want {
+		t.Errorf("ModifiedContent = %q, want %q", got, want)
+	}
+}
+
 func TestFixer_Apply_InterleavingConflict(t *testing.T) {
 	t.Parallel()
 	// Test that multi-edit fixes properly reserve all their edits to prevent

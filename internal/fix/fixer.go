@@ -473,8 +473,16 @@ func (f *Fixer) applyFixesToFile(fc *FileChange, candidates []*fixCandidate) {
 	}
 
 	var allEdits []editWithSource
+	editIndexes := make(map[rules.TextEdit]int)
 	for _, c := range selected {
 		for _, edit := range c.fix.Edits {
+			if idx, ok := editIndexes[edit]; ok {
+				if duplicateEditSourcePrecedes(c, allEdits[idx].candidate) {
+					allEdits[idx].candidate = c
+				}
+				continue
+			}
+			editIndexes[edit] = len(allEdits)
 			allEdits = append(allEdits, editWithSource{
 				edit:      edit,
 				candidate: c,
@@ -582,7 +590,7 @@ func selectNonConflictingCandidates(fc *FileChange, candidates []*fixCandidate) 
 	hasConflict := func(edits []rules.TextEdit, reserved []rules.TextEdit) bool {
 		for _, e := range edits {
 			for _, r := range reserved {
-				if editsOverlap(e, r) {
+				if editsConflict(e, r) {
 					return true
 				}
 			}
@@ -642,6 +650,16 @@ func selectNonConflictingCandidates(fc *FileChange, candidates []*fixCandidate) 
 	return selected
 }
 
+func duplicateEditSourcePrecedes(a, b *fixCandidate) bool {
+	if c := cmp.Compare(a.fix.Priority, b.fix.Priority); c != 0 {
+		return c < 0
+	}
+	if c := cmp.Compare(candidateImportanceRank(b), candidateImportanceRank(a)); c != 0 {
+		return c < 0
+	}
+	return a.violation.RuleCode < b.violation.RuleCode
+}
+
 // findAllSubsumedConflicts finds all selected candidates that conflict with c
 // and checks that c strictly subsumes every one of them. Returns their sorted
 // indices if ALL conflicting candidates are strictly subsumed, or nil if any
@@ -667,7 +685,7 @@ func removeEdits(reserved, remove []rules.TextEdit) []rules.TextEdit {
 	for _, r := range reserved {
 		keep := true
 		for _, rm := range remove {
-			if r.Location == rm.Location && r.NewText == rm.NewText {
+			if sameTextEdit(r, rm) {
 				keep = false
 				break
 			}
