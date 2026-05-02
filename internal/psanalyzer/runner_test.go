@@ -127,6 +127,86 @@ func TestRunnerFormatWithInstalledPSScriptAnalyzer(t *testing.T) {
 	}
 }
 
+func TestRunnerAnalyzeForwardsRuleSettings(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("pwsh sidecar is not available on js")
+	}
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh not available")
+	}
+
+	moduleRoot := t.TempDir()
+	homeDir := t.TempDir()
+	writeFakePSScriptAnalyzerModule(t, moduleRoot, `
+function Invoke-ScriptAnalyzer {
+    param(
+        [string] $Path,
+        [string] $ScriptDefinition,
+        [hashtable] $Settings
+    )
+    if ($null -eq $Settings) {
+        throw 'missing settings'
+    }
+    if (-not $Settings.ContainsKey('Rules')) {
+        throw 'missing Rules settings'
+    }
+    $ruleSettings = $Settings['Rules']['PSUseCompatibleTypes']
+    if ($null -eq $ruleSettings) {
+        throw 'missing PSUseCompatibleTypes settings'
+    }
+    if (-not [bool] $ruleSettings['Enable']) {
+        throw 'missing Enable setting'
+    }
+    $profiles = @($ruleSettings['TargetProfiles'])
+    if ($profiles.Count -ne 1 -or $profiles[0] -ne 'ubuntu_x64_18.04_6.1.3_x64_4.0.30319.42000_core') {
+        throw "unexpected TargetProfiles: $($profiles -join ',')"
+    }
+    [pscustomobject] @{
+        RuleName = 'PSUseCompatibleTypes'
+        Severity = 1
+        Line = 1
+        Column = 1
+        Message = 'settings forwarded'
+        ScriptPath = ''
+    }
+}
+`)
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(homeDir, ".local", "share"))
+	t.Setenv("PSModulePath", moduleRoot)
+	t.Setenv(progressNoticeEnv, progressNoticeEnvMute)
+
+	r := NewRunner()
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	defer func() {
+		closeCtx, closeCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer closeCancel()
+		_ = r.Close(closeCtx)
+	}()
+
+	diags, err := r.Analyze(ctx, AnalyzeRequest{
+		ScriptDefinition: "[System.Management.Automation.SemanticVersion]'1.18.0-rc1'\n",
+		Settings: Settings{
+			Rules: map[string]map[string]any{
+				"PSUseCompatibleTypes": {
+					"Enable": true,
+					"TargetProfiles": []string{
+						"ubuntu_x64_18.04_6.1.3_x64_4.0.30319.42000_core",
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Analyze() error = %v", err)
+	}
+	if len(diags) != 1 || diags[0].RuleName != "PSUseCompatibleTypes" {
+		t.Fatalf("diagnostics = %#v, want forwarded settings diagnostic", diags)
+	}
+}
+
 func TestSidecarBootstrapsMissingPSScriptAnalyzer(t *testing.T) {
 	t.Parallel()
 
@@ -213,6 +293,28 @@ function Invoke-ScriptAnalyzer {
 	}
 	if _, err := os.Stat(filepath.Join(moduleRoot, "PSScriptAnalyzer", "1.25.0", "PSScriptAnalyzer.psm1")); err != nil {
 		t.Fatalf("fake installer did not create module: %v", err)
+	}
+}
+
+func writeFakePSScriptAnalyzerModule(t *testing.T, moduleRoot, moduleScript string) {
+	t.Helper()
+
+	moduleDir := filepath.Join(moduleRoot, "PSScriptAnalyzer", "1.25.0")
+	if err := os.MkdirAll(moduleDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(moduleDir, "PSScriptAnalyzer.psm1"), []byte(moduleScript), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manifest := `@{
+    RootModule = 'PSScriptAnalyzer.psm1'
+    ModuleVersion = '1.25.0'
+    GUID = 'd6245804-193d-414e-bac3-f7f51deafabb'
+    FunctionsToExport = @('Invoke-ScriptAnalyzer')
+}
+`
+	if err := os.WriteFile(filepath.Join(moduleDir, "PSScriptAnalyzer.psd1"), []byte(manifest), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 

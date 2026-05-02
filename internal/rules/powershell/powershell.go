@@ -79,9 +79,10 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 		return nil
 	}
 
+	settings := analyzerSettings(input.Config)
 	violations := make([]rules.Violation, 0, len(tasks))
 	for _, task := range tasks {
-		violations = append(violations, r.checkMapping(input.File, task.mapping)...)
+		violations = append(violations, r.checkMapping(input.File, task.mapping, settings)...)
 	}
 	return violations
 }
@@ -220,7 +221,7 @@ func collectRunCommandTasks(
 	}}}
 }
 
-func (r *Rule) checkMapping(file string, mapping scriptMapping) []rules.Violation {
+func (r *Rule) checkMapping(file string, mapping scriptMapping, settings psanalyzer.Settings) []rules.Violation {
 	if strings.TrimSpace(mapping.Script) == "" {
 		return nil
 	}
@@ -228,7 +229,10 @@ func (r *Rule) checkMapping(file string, mapping scriptMapping) []rules.Violatio
 	ctx, cancel := context.WithTimeout(context.Background(), analyzerRunTimeout)
 	defer cancel()
 
-	diagnostics, err := r.analyzer.Analyze(ctx, psanalyzer.AnalyzeRequest{ScriptDefinition: mapping.Script})
+	diagnostics, err := r.analyzer.Analyze(ctx, psanalyzer.AnalyzeRequest{
+		ScriptDefinition: mapping.Script,
+		Settings:         settings,
+	})
 	if err != nil {
 		loc := rules.NewLineLocation(file, mapping.FallbackLine)
 		msg := "failed to run PowerShell analyzer"

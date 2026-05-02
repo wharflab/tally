@@ -107,10 +107,50 @@ function Get-TallyAnalyzerSetting {
     if ($null -ne $Request.settings.severity -and @($Request.settings.severity).Count -gt 0) {
         $settings['Severity'] = @($Request.settings.severity)
     }
+    if ($null -ne $Request.settings.rules) {
+        $rules = ConvertTo-TallyHashtable -Value $Request.settings.rules
+        if ($null -ne $rules -and $rules.Count -gt 0) {
+            $settings['Rules'] = $rules
+        }
+    }
     if ($settings.Count -eq 0) {
         return $null
     }
     return $settings
+}
+
+function ConvertTo-TallyHashtable {
+    param([object] $Value)
+
+    if ($null -eq $Value) {
+        return $null
+    }
+
+    if ($Value -is [System.Collections.IDictionary]) {
+        $result = @{}
+        foreach ($key in $Value.Keys) {
+            $result[[string] $key] = ConvertTo-TallyHashtable -Value $Value[$key]
+        }
+        return $result
+    }
+
+    if ($Value -is [System.Management.Automation.PSCustomObject]) {
+        $result = @{}
+        foreach ($property in $Value.PSObject.Properties) {
+            $result[$property.Name] = ConvertTo-TallyHashtable -Value $property.Value
+        }
+        return $result
+    }
+
+    if ($Value -is [System.Collections.IEnumerable] -and $Value -isnot [string]) {
+        return @(
+            foreach ($item in $Value) {
+                ConvertTo-TallyHashtable -Value $item
+            }
+        )
+    }
+
+    return $Value
 }
 
 function ConvertTo-TallyDiagnostic {

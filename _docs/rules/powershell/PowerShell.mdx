@@ -28,6 +28,9 @@ The sidecar still starts lazily. Dockerfiles without PowerShell snippets do not 
 `powershell/PowerShell`, `powershell/*`, or a specific rule such as `powershell/PSAvoidUsingWriteHost` controls rule filtering, but it does not
 bypass the slow-check gate.
 
+Rule-specific options under `rules.powershell.<RuleName>` are forwarded to PSScriptAnalyzer as `Settings.Rules` entries. This supports upstream
+options such as `Enable`, `TargetProfiles`, and compatibility profile settings documented on the concrete `powershell/*` rule pages.
+
 ## Requirements
 
 - PowerShell 7 (`pwsh`) must be available on `PATH`.

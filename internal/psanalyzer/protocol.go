@@ -11,9 +11,10 @@ type FormatRequest struct {
 }
 
 type Settings struct {
-	IncludeRules []string
-	ExcludeRules []string
-	Severity     []string
+	IncludeRules []string                  `json:"includeRules,omitempty"`
+	ExcludeRules []string                  `json:"excludeRules,omitempty"`
+	Severity     []string                  `json:"severity,omitempty"`
+	Rules        map[string]map[string]any `json:"rules,omitempty"`
 }
 
 type Diagnostic struct {

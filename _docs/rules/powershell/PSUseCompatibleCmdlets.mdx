@@ -23,8 +23,7 @@ enable the rule to check if your script is compatible on PowerShell Core on Wind
 following in your settings file:
 
 <Note>
-  This section describes upstream PSScriptAnalyzer settings. tally currently does not forward rule-specific settings such as `compatibility` to the
-  analyzer sidecar.
+  tally forwards matching `rules.powershell.PSUseCompatibleCmdlets` options, such as `compatibility`, to PSScriptAnalyzer.
 </Note>
 
 ```powershell

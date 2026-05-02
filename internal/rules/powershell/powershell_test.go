@@ -3,9 +3,11 @@ package powershell
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/wharflab/tally/internal/config"
 	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
@@ -15,10 +17,12 @@ type fakeAnalyzer struct {
 	diagnostics []psanalyzer.Diagnostic
 	err         error
 	scripts     []string
+	requests    []psanalyzer.AnalyzeRequest
 }
 
 func (f *fakeAnalyzer) Analyze(_ context.Context, req psanalyzer.AnalyzeRequest) ([]psanalyzer.Diagnostic, error) {
 	f.scripts = append(f.scripts, req.ScriptDefinition)
+	f.requests = append(f.requests, req)
 	return f.diagnostics, f.err
 }
 
@@ -104,6 +108,72 @@ RUN Write-Host hi
 	}
 	if len(fake.scripts) != 1 || fake.scripts[0] == "" {
 		t.Fatalf("expected one analyzed script, got %#v", fake.scripts)
+	}
+}
+
+func TestRulePassesPowerShellRuleSettings(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeAnalyzer{}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command"]
+RUN [System.Management.Automation.SemanticVersion]'1.18.0-rc1'
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+	input.Config = &config.RulesConfig{
+		Include: []string{"powershell/PSUseCompatibleTypes"},
+		Exclude: []string{"powershell/PSAvoidUsingWriteHost"},
+		Powershell: map[string]config.RuleConfig{
+			"PSUseCompatibleTypes": {
+				Options: map[string]any{
+					"Enable": true,
+					"TargetProfiles": []string{
+						"ubuntu_x64_18.04_6.1.3_x64_4.0.30319.42000_core",
+					},
+				},
+			},
+			"PSAvoidUsingWriteHost": {
+				Severity: config.SeverityOffValue,
+				Options:  map[string]any{"Enable": true},
+			},
+			"PowerShell": {
+				Options: map[string]any{"Ignored": true},
+			},
+		},
+	}
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations from fake analyzer, got %#v", violations)
+	}
+	if len(fake.requests) != 1 {
+		t.Fatalf("got %d analyzer requests, want 1", len(fake.requests))
+	}
+
+	settings := fake.requests[0].Settings
+	if len(settings.IncludeRules) != 0 {
+		t.Fatalf("IncludeRules = %#v, want none so tally include semantics do not restrict PSScriptAnalyzer", settings.IncludeRules)
+	}
+	if !slices.Equal(settings.ExcludeRules, []string{"PSAvoidUsingWriteHost"}) {
+		t.Fatalf("ExcludeRules = %#v", settings.ExcludeRules)
+	}
+	ruleSettings := settings.Rules["PSUseCompatibleTypes"]
+	if len(ruleSettings) != 2 {
+		t.Fatalf("PSUseCompatibleTypes settings = %#v", ruleSettings)
+	}
+	if ruleSettings["Enable"] != true {
+		t.Fatalf("Enable = %#v, want true", ruleSettings["Enable"])
+	}
+	profiles, ok := ruleSettings["TargetProfiles"].([]string)
+	if !ok || !slices.Equal(profiles, []string{"ubuntu_x64_18.04_6.1.3_x64_4.0.30319.42000_core"}) {
+		t.Fatalf("TargetProfiles = %#v", ruleSettings["TargetProfiles"])
+	}
+	if _, ok := settings.Rules["PSAvoidUsingWriteHost"]; ok {
+		t.Fatalf("disabled rule settings should not be forwarded: %#v", settings.Rules["PSAvoidUsingWriteHost"])
+	}
+	if _, ok := settings.Rules["PowerShell"]; ok {
+		t.Fatalf("engine settings should not be forwarded as analyzer rule settings")
 	}
 }
 

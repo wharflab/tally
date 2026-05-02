@@ -406,7 +406,10 @@ func (r *Runner) stderrSuffix() string {
 }
 
 func (s Settings) isZero() bool {
-	return len(s.IncludeRules) == 0 && len(s.ExcludeRules) == 0 && len(s.Severity) == 0
+	return len(s.IncludeRules) == 0 &&
+		len(s.ExcludeRules) == 0 &&
+		len(s.Severity) == 0 &&
+		len(s.Rules) == 0
 }
 
 func normalizePowerShellEnv(goos string, env []string) []string {

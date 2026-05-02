@@ -155,7 +155,7 @@ func LintFile(input Input) (*Result, error) {
 	// Run all registered rules.
 	for _, rule := range rules.All() {
 		ruleInput := baseInput
-		ruleInput.Config = cfg.Rules.GetOptions(rule.Metadata().Code)
+		ruleInput.Config = configForRuleInput(cfg, rule.Metadata().Code)
 		violations = append(violations, rule.Check(ruleInput)...)
 	}
 
@@ -266,6 +266,16 @@ func attachInvocation(violations []rules.Violation, inv *invocation.BuildInvocat
 			violations[i].Invocation = &source
 		}
 	}
+}
+
+func configForRuleInput(cfg *config.Config, ruleCode string) any {
+	if cfg == nil {
+		return nil
+	}
+	if ruleCode == rules.PowerShellRulePrefix+"PowerShell" {
+		return &cfg.Rules
+	}
+	return cfg.Rules.GetOptions(ruleCode)
 }
 
 func attachInvocationToAsyncRequest(req *async.CheckRequest, inv *invocation.BuildInvocation) {

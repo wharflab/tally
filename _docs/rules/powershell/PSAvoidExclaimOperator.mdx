@@ -17,8 +17,8 @@ sidebarTitle: "PSAvoidExclaimOperator"
 Avoid using the negation operator (`!`). Use `-not` for improved readability.
 
 <Note>
-  Upstream PSScriptAnalyzer does not enable this rule by default. tally currently does not forward rule-specific PSScriptAnalyzer settings to the sidecar,
-  so disabled-by-default upstream rules cannot be enabled through tally configuration yet.
+  Upstream PSScriptAnalyzer does not enable this rule by default. Configure `rules.powershell.PSAvoidExclaimOperator.Enable = true` to forward the
+  upstream setting to PSScriptAnalyzer.
 </Note>
 
 ## How to Fix
@@ -41,8 +41,8 @@ $MyVar = -not $true
 
 ## Configuration
 
-Upstream PSScriptAnalyzer supports the following rule setting when it is invoked with a settings file. tally does not currently forward this setting
-to PSScriptAnalyzer.
+Upstream PSScriptAnalyzer supports the following rule setting. tally forwards matching `rules.powershell.PSAvoidExclaimOperator` options to
+PSScriptAnalyzer.
 
 ```powershell
 Rules = @{

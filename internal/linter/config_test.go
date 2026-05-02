@@ -137,3 +137,40 @@ func TestEnabledRuleCodesPowerShellEngineCanBeDisabled(t *testing.T) {
 		t.Fatalf("EnabledRuleCodes() = %#v, did not want powershell engine enabled", enabled)
 	}
 }
+
+func TestConfigForRuleInputPassesPowerShellNamespaceConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.Default()
+	cfg.Rules.Powershell = map[string]config.RuleConfig{
+		"PSUseCompatibleTypes": {
+			Options: map[string]any{"Enable": true},
+		},
+		"PowerShell": {
+			Options: map[string]any{"ignored": true},
+		},
+	}
+	cfg.Rules.Tally = map[string]config.RuleConfig{
+		"max-lines": {
+			Options: map[string]any{"max": 10},
+		},
+	}
+
+	got := configForRuleInput(cfg, rules.PowerShellRulePrefix+"PowerShell")
+	rulesCfg, ok := got.(*config.RulesConfig)
+	if !ok {
+		t.Fatalf("PowerShell rule config = %T, want *config.RulesConfig", got)
+	}
+	if rulesCfg.Powershell["PSUseCompatibleTypes"].Options["Enable"] != true {
+		t.Fatalf("PowerShell namespace config was not passed through: %#v", rulesCfg.Powershell)
+	}
+
+	tallyConfig := configForRuleInput(cfg, rules.TallyRulePrefix+"max-lines")
+	tallyOptions, ok := tallyConfig.(map[string]any)
+	if !ok {
+		t.Fatalf("tally rule config = %T, want map[string]any", tallyConfig)
+	}
+	if tallyOptions["max"] != 10 {
+		t.Fatalf("tally max option = %#v, want 10", tallyOptions["max"])
+	}
+}
