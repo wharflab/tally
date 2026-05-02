@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/rules"
 )
 
@@ -18,6 +19,22 @@ type fakePowerShellFormatter struct {
 func (f *fakePowerShellFormatter) FormatPowerShell(_ context.Context, script string) (string, error) {
 	f.calls = append(f.calls, script)
 	return f.formatted, nil
+}
+
+func TestFormattedHeredocsFinalizerUsesSharedPowerShellRunner(t *testing.T) {
+	t.Parallel()
+
+	for _, finalizer := range registeredFinalizers() {
+		heredocFinalizer, ok := finalizer.(formattedHeredocsFinalizer)
+		if !ok {
+			continue
+		}
+		if heredocFinalizer.powerShellFormatter != psanalyzer.SharedRunner() {
+			t.Fatal("formatted heredocs finalizer does not use shared PowerShell runner")
+		}
+		return
+	}
+	t.Fatal("formatted heredocs finalizer is not registered")
 }
 
 func TestFormattedHeredocsFinalizerFormatsGeneratedHeredoc(t *testing.T) {

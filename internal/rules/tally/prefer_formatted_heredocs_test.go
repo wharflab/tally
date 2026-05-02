@@ -9,6 +9,7 @@ import (
 
 	"github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/heredocfmt"
+	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/testutil"
@@ -23,6 +24,15 @@ type fakePowerShellFormatter struct {
 func (f *fakePowerShellFormatter) FormatPowerShell(_ context.Context, script string) (string, error) {
 	f.calls = append(f.calls, script)
 	return f.formatted, f.err
+}
+
+func TestPreferFormattedHeredocsRuleUsesSharedPowerShellRunner(t *testing.T) {
+	t.Parallel()
+
+	rule := NewPreferFormattedHeredocsRule()
+	if rule.powerShellFormatter != psanalyzer.SharedRunner() {
+		t.Fatal("prefer-formatted-heredocs does not use shared PowerShell runner")
+	}
 }
 
 func TestPreferFormattedHeredocsRule_Metadata(t *testing.T) {

@@ -26,7 +26,7 @@ type PreferFormattedHeredocsRule struct {
 
 // NewPreferFormattedHeredocsRule creates a new prefer-formatted-heredocs rule instance.
 func NewPreferFormattedHeredocsRule() *PreferFormattedHeredocsRule {
-	return newPreferFormattedHeredocsRuleWithPowerShellFormatter(psanalyzer.NewRunner())
+	return newPreferFormattedHeredocsRuleWithPowerShellFormatter(psanalyzer.SharedRunner())
 }
 
 func newPreferFormattedHeredocsRuleWithPowerShellFormatter(

@@ -56,7 +56,7 @@ func (f formattedHeredocsFinalizer) Finalize(
 }
 
 func init() {
-	RegisterFinalizer(formattedHeredocsFinalizer{powerShellFormatter: psanalyzer.NewRunner()})
+	RegisterFinalizer(formattedHeredocsFinalizer{powerShellFormatter: psanalyzer.SharedRunner()})
 }
 
 func semanticModelForFinalizer(file string, result *dockerfile.ParseResult) *semantic.Model {

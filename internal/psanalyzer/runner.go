@@ -61,6 +61,14 @@ func NewRunner() *Runner {
 	return &Runner{}
 }
 
+var sharedRunner = sync.OnceValue(NewRunner)
+
+// SharedRunner returns the process-wide runner for callers that should share
+// one lazy PowerShell sidecar.
+func SharedRunner() *Runner {
+	return sharedRunner()
+}
+
 func (r *Runner) Analyze(ctx context.Context, req AnalyzeRequest) ([]Diagnostic, error) {
 	if strings.TrimSpace(req.Path) == "" && strings.TrimSpace(req.ScriptDefinition) == "" {
 		return nil, errors.New("path or script definition is required")
