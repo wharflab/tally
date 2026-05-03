@@ -77,8 +77,7 @@ func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocat
 	if exeToken == "" {
 		return explicitPowerShellInvocation{}, false
 	}
-	exe := shellutil.NormalizeShellExecutableName(shellutil.DropQuotes(exeToken))
-	if exe != "pwsh" {
+	if !isPowerShellExecutable(shellutil.DropQuotes(exeToken)) {
 		return explicitPowerShellInvocation{}, false
 	}
 
@@ -101,8 +100,7 @@ func parseExecFormPowerShellInvocation(args []string) (explicitPowerShellInvocat
 	if len(args) == 0 {
 		return explicitPowerShellInvocation{}, false
 	}
-	exe := shellutil.NormalizeShellExecutableName(args[0])
-	if exe != "pwsh" {
+	if !isPowerShellExecutable(args[0]) {
 		return explicitPowerShellInvocation{}, false
 	}
 
@@ -124,14 +122,45 @@ func parseExecFormPowerShellInvocation(args []string) (explicitPowerShellInvocat
 	return explicitPowerShellInvocation{}, false
 }
 
+func isPowerShellExecutable(exe string) bool {
+	switch shellutil.NormalizeShellExecutableName(exe) {
+	case "powershell", "pwsh":
+		return true
+	default:
+		return false
+	}
+}
+
 func invocationFromRemainder(script string, start int) (explicitPowerShellInvocation, bool) {
 	start = shellutil.SkipShellTokenSpaces(script, start)
 	if start >= len(script) {
 		return explicitPowerShellInvocation{}, false
 	}
 
-	rest := script[start:]
+	end := len(script)
+	next := start
+	for {
+		tokenStart := shellutil.SkipShellTokenSpaces(script, next)
+		if tokenStart >= len(script) {
+			break
+		}
+
+		token, tokenEnd := shellutil.NextShellToken(script, tokenStart)
+		if token == "" {
+			break
+		}
+		if !isQuotedShellToken(token) && isShellControlToken(token) {
+			end = tokenStart
+			break
+		}
+		next = tokenEnd
+	}
+
+	rest := script[start:end]
 	trimmed := strings.TrimSpace(rest)
+	if trimmed == "" {
+		return explicitPowerShellInvocation{}, false
+	}
 	trimStart := strings.Index(rest, trimmed)
 	if trimStart > 0 {
 		start += trimStart
@@ -157,4 +186,17 @@ func invocationFromRemainder(script string, start int) (explicitPowerShellInvoca
 		startLine:   line,
 		startColumn: col,
 	}, true
+}
+
+func isQuotedShellToken(token string) bool {
+	return strings.HasPrefix(token, `"`) || strings.HasPrefix(token, `'`)
+}
+
+func isShellControlToken(token string) bool {
+	switch token {
+	case "&&", "||", "|", "&", ";":
+		return true
+	default:
+		return false
+	}
 }

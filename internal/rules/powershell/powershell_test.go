@@ -337,10 +337,17 @@ RUN ["pwsh", "-NoProfile", "-Command", "Write-Host", "hi"]
 	}
 }
 
-func TestRuleRejectsWindowsPowerShellWrapper(t *testing.T) {
+func TestRuleChecksWindowsPowerShellWrapper(t *testing.T) {
 	t.Parallel()
 
-	fake := &fakeAnalyzer{}
+	line, col := 1, 1
+	fake := &fakeAnalyzer{diagnostics: []psanalyzer.Diagnostic{{
+		RuleName: "PSAvoidUsingWriteHost",
+		Severity: 1,
+		Line:     &line,
+		Column:   &col,
+		Message:  "Avoid using Write-Host.",
+	}}}
 	rule := newRuleWithAnalyzer(fake)
 	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
 RUN powershell -Command "Write-Host hi"
@@ -349,18 +356,48 @@ RUN powershell.exe -Command "Write-Host bye"
 	input.EnabledRules = []string{PowerShellRuleCode}
 
 	violations := rule.Check(input)
-	if len(violations) != 0 {
-		t.Fatalf("expected no violations, got %#v", violations)
+	if len(violations) != 2 {
+		t.Fatalf("got %d violations, want 2: %#v", len(violations), violations)
 	}
-	if len(fake.scripts) != 0 {
-		t.Fatalf("analyzer was called for Windows PowerShell wrapper: %#v", fake.scripts)
+	wantScripts := []string{"Write-Host hi", "Write-Host bye"}
+	if !slices.Equal(fake.scripts, wantScripts) {
+		t.Fatalf("analyzed scripts = %#v, want %#v", fake.scripts, wantScripts)
 	}
 }
 
-func TestRuleRejectsExecFormWindowsPowerShell(t *testing.T) {
+func TestRuleChecksExplicitPowerShellWrapperBeforeOuterShellChain(t *testing.T) {
 	t.Parallel()
 
 	fake := &fakeAnalyzer{}
+	rule := newRuleWithAnalyzer(fake)
+	content := "FROM alpine\n" +
+		`RUN @powershell -NoProfile -ExecutionPolicy Bypass -Command ` +
+		`"$env:ChocolateyUseWindowsCompression='false'; Write-Host hi" ` +
+		`&& SET "PATH=%PATH%;%ALLUSERSPROFILE%\chocolatey\bin"` + "\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations from fake analyzer, got %#v", violations)
+	}
+	wantScripts := []string{"$env:ChocolateyUseWindowsCompression='false'; Write-Host hi"}
+	if !slices.Equal(fake.scripts, wantScripts) {
+		t.Fatalf("analyzed scripts = %#v, want %#v", fake.scripts, wantScripts)
+	}
+}
+
+func TestRuleChecksExecFormWindowsPowerShell(t *testing.T) {
+	t.Parallel()
+
+	line, col := 1, 1
+	fake := &fakeAnalyzer{diagnostics: []psanalyzer.Diagnostic{{
+		RuleName: "PSAvoidUsingWriteHost",
+		Severity: 1,
+		Line:     &line,
+		Column:   &col,
+		Message:  "Avoid using Write-Host.",
+	}}}
 	rule := newRuleWithAnalyzer(fake)
 	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
 RUN ["powershell", "-Command", "Write-Host hi"]
@@ -369,11 +406,12 @@ RUN ["powershell.exe", "-Command", "Write-Host bye"]
 	input.EnabledRules = []string{PowerShellRuleCode}
 
 	violations := rule.Check(input)
-	if len(violations) != 0 {
-		t.Fatalf("expected no violations, got %#v", violations)
+	if len(violations) != 2 {
+		t.Fatalf("got %d violations, want 2: %#v", len(violations), violations)
 	}
-	if len(fake.scripts) != 0 {
-		t.Fatalf("analyzer was called for exec-form Windows PowerShell wrapper: %#v", fake.scripts)
+	wantScripts := []string{"Write-Host hi", "Write-Host bye"}
+	if !slices.Equal(fake.scripts, wantScripts) {
+		t.Fatalf("analyzed scripts = %#v, want %#v", fake.scripts, wantScripts)
 	}
 }
 
