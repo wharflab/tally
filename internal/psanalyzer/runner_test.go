@@ -1,6 +1,7 @@
 package psanalyzer
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -50,13 +51,27 @@ func TestSidecarEnvironmentPinsAnalyzerAndDisablesColor(t *testing.T) {
 	assertEnvHas(t, env, noColorEnv, noColorEnvSet)
 }
 
-func TestSidecarBootstrapCommandStaysSmall(t *testing.T) {
+func TestReadFrameSkipsNonProtocolOutput(t *testing.T) {
 	t.Parallel()
 
-	payload := sidecarPayload(sidecarScript)
-	encoded := encodedPowerShellCommand([]byte(sidecarBootstrapCommand(len(payload))))
-	if len(encoded) > 4096 {
-		t.Fatalf("encoded bootstrap command is too large for a stable Windows launch: %d bytes", len(encoded))
+	r := &Runner{
+		stdout: bufio.NewReader(strings.NewReader(
+			"PowerShell 7.5.4\n" +
+				"noise from module import\n" +
+				sidecarJSONStart + "\n" +
+				`{"ready":true}` + "\n" +
+				sidecarJSONEnd + "\n",
+		)),
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	payload, err := r.readFrame(ctx)
+	if err != nil {
+		t.Fatalf("readFrame() error = %v", err)
+	}
+	if string(payload) != `{"ready":true}` {
+		t.Fatalf("payload = %q", payload)
 	}
 }
 
@@ -403,28 +418,30 @@ function Invoke-ScriptAnalyzer {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	payload := sidecarPayload([]byte(prelude + string(sidecarScript)))
 	cmd := exec.CommandContext(
 		ctx,
 		"pwsh",
 		"-NoLogo",
 		"-NoProfile",
 		"-NonInteractive",
-		"-EncodedCommand",
-		encodedPowerShellCommand([]byte(sidecarBootstrapCommand(len(payload)))),
+		"-Command",
+		"-",
 	)
 	cmd.Env = append(sidecarEnvironment(runtime.GOOS, os.Environ(), requiredPSScriptAnalyzerVersion()),
 		"PSModulePath="+moduleRoot,
 		"TALLY_TEST_MODULE_ROOT="+moduleRoot,
 		"TALLY_TEST_REQUIRED_PSSA_VERSION="+requiredPSScriptAnalyzerVersion(),
 	)
-	cmd.Stdin = strings.NewReader(payload + "{\"id\":\"1\",\"op\":\"shutdown\"}\n")
+	cmd.Stdin = strings.NewReader(prelude + string(sidecarScript) + "\n{\"id\":\"1\",\"op\":\"shutdown\"}\n")
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("sidecar failed: %v\n%s", err, out)
 	}
 	output := string(out)
+	if !strings.Contains(output, sidecarJSONStart) || !strings.Contains(output, sidecarJSONEnd) {
+		t.Fatalf("sidecar output missing JSON frame markers: %s", output)
+	}
 	if !strings.Contains(output, `"progress":true`) {
 		t.Fatalf("sidecar output missing install progress event: %s", output)
 	}

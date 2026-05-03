@@ -183,9 +183,10 @@ returned **75** rules.
 ### Sidecar protocol smoke test
 
 A minimal `pwsh` 7 sidecar script was executed with newline-delimited JSON
-requests over stdio:
+requests over stdin and marker-framed JSON responses over stdout:
 
-- handshake line: `{"ready":true,"version":"<module-version>","ps":"..."}`
+- handshake frame payload:
+  `{"ready":true,"version":"<module-version>","ps":"..."}`
 - file-backed `Invoke-ScriptAnalyzer -Path <Bad.ps1>`
 - in-memory `Invoke-ScriptAnalyzer -ScriptDefinition <source>`
 - shutdown request
@@ -295,10 +296,21 @@ startup would be too expensive; startup once per tally session is acceptable.
 └─────────────────────┘                                └───────────────────────┘
 ```
 
-One long-lived `pwsh` 7.x subprocess. Tally writes newline-delimited JSON
-requests to stdin; the sidecar responds with newline-delimited JSON objects on
-stdout. Stderr is reserved for fatal errors and log diagnostics (logged at
-`debug` level by tally).
+One long-lived `pwsh` 7.x subprocess. Tally starts it with `pwsh -Command -`,
+writes the embedded sidecar script to stdin, then writes newline-delimited JSON
+requests to the same stream. The sidecar writes JSON responses on stdout
+between explicit marker lines:
+
+```text
+--- tally PSSA JSON start ---
+{"id":"42","ok":true}
+--- tally PSSA JSON end ---
+```
+
+Output outside those marker lines is ignored by the Go parser, which keeps
+PowerShell host chatter, module tooling output, and progress noise from
+corrupting the protocol. Stderr is reserved for fatal errors and log
+diagnostics (logged at `debug` level by tally).
 
 This matches the single-instance contract we already enforce for the
 ShellCheck reactor: one init, many checks, one teardown on shutdown.
@@ -317,7 +329,7 @@ internal/
 ```
 
 Only the Go side is linked into the tally binary. The `.ps1` sidecar is
-embedded via `//go:embed` and written to a temp dir at first run.
+embedded via `//go:embed` and piped to `pwsh -Command -` at first use.
 
 ### Sidecar protocol (first cut)
 
@@ -353,10 +365,10 @@ as regular diagnostics with `severity:3`.
 2. First `Analyze()` call:
    - Locate `pwsh` 7.x on `PATH` (configurable via `TALLY_POWERSHELL` env +
      tally config).
-   - Write `Tally.PSSA.Sidecar.ps1` to a per-session temp dir.
-   - Spawn `pwsh -NoProfile -NonInteractive -File <script>`.
-   - Read a `{"ready":true,"version":"<module-version>"}` handshake line (or bail with
-     timeout).
+   - Spawn `pwsh -NoProfile -NonInteractive -Command -`.
+   - Pipe `Tally.PSSA.Sidecar.ps1` to stdin followed by a blank line so the
+     final request loop starts executing.
+   - Read the framed ready handshake payload (or bail with timeout).
 3. Each subsequent call: write request, read response. Mutex-serialized —
    the sidecar handles one request at a time.
 4. On `Close()` or process exit, send `{"op":"shutdown"}` and wait for the
@@ -368,7 +380,15 @@ as regular diagnostics with `severity:3`.
 # Tally.PSSA.Sidecar.ps1 (abbreviated)
 $ErrorActionPreference = 'Stop'
 Import-Module PSScriptAnalyzer
-[Console]::Out.WriteLine((@{ready=$true; version=(Get-Module PSScriptAnalyzer).Version.ToString()} | ConvertTo-Json -Compress))
+
+function Write-JsonFrame($value) {
+    [Console]::Out.WriteLine('--- tally PSSA JSON start ---')
+    [Console]::Out.WriteLine(($value | ConvertTo-Json -Compress -Depth 8))
+    [Console]::Out.WriteLine('--- tally PSSA JSON end ---')
+    [Console]::Out.Flush()
+}
+
+Write-JsonFrame @{ready=$true; version=(Get-Module PSScriptAnalyzer).Version.ToString()}
 
 while (($line = [Console]::In.ReadLine()) -ne $null) {
     $req = $line | ConvertFrom-Json
@@ -382,7 +402,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
     } catch {
         $resp  = @{id=$req.id; ok=$false; error=$_.Exception.Message}
     }
-    [Console]::Out.WriteLine(($resp | ConvertTo-Json -Compress -Depth 5))
+    Write-JsonFrame $resp
 }
 ```
 

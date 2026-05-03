@@ -4,19 +4,23 @@ if ($null -ne (Get-Variable -Name PSStyle -ErrorAction SilentlyContinue)) {
 }
 
 $script:TallyPSScriptAnalyzerVersion = $env:TALLY_PSSCRIPTANALYZER_VERSION
+$script:TallyPSSAJsonStart = '--- tally PSSA JSON start ---'
+$script:TallyPSSAJsonEnd = '--- tally PSSA JSON end ---'
 
-function Write-JsonLine {
+function Write-JsonFrame {
     param([Parameter(Mandatory=$true)] [object] $Value)
 
     $json = $Value | ConvertTo-Json -Compress -Depth 8
+    [Console]::Out.WriteLine($script:TallyPSSAJsonStart)
     [Console]::Out.WriteLine($json)
+    [Console]::Out.WriteLine($script:TallyPSSAJsonEnd)
     [Console]::Out.Flush()
 }
 
 function Write-ProgressLine {
     param([Parameter(Mandatory=$true)] [string] $Message)
 
-    Write-JsonLine @{
+    Write-JsonFrame @{
         progress = $true
         message = $Message
     }
@@ -309,13 +313,13 @@ try {
 
     $module = Import-PSScriptAnalyzerModule
 
-    Write-JsonLine @{
+    Write-JsonFrame @{
         ready = $true
         version = $module.Version.ToString()
         ps = $PSVersionTable.PSVersion.ToString()
     }
 } catch {
-    Write-JsonLine @{
+    Write-JsonFrame @{
         ready = $false
         error = $_.Exception.Message
     }
@@ -332,14 +336,14 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
         $req = $line | ConvertFrom-Json -ErrorAction Stop
 
         if ($req.op -eq 'shutdown') {
-            Write-JsonLine @{ id = $req.id; ok = $true }
+            Write-JsonFrame @{ id = $req.id; ok = $true }
             break
         }
 
         if ($req.op -eq 'analyze') {
-            Write-JsonLine (Invoke-TallyAnalyzeRequest -Request $req)
+            Write-JsonFrame (Invoke-TallyAnalyzeRequest -Request $req)
         } elseif ($req.op -eq 'format') {
-            Write-JsonLine (Invoke-TallyFormatRequest -Request $req)
+            Write-JsonFrame (Invoke-TallyFormatRequest -Request $req)
         } else {
             throw "unsupported operation: $($req.op)"
         }
@@ -348,7 +352,7 @@ while ($null -ne ($line = [Console]::In.ReadLine())) {
         if ($null -ne $req) {
             $id = $req.id
         }
-        Write-JsonLine @{
+        Write-JsonFrame @{
             id = $id
             ok = $false
             error = $_.Exception.Message

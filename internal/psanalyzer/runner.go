@@ -5,8 +5,6 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
-	"encoding/base64"
-	"encoding/binary"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
@@ -18,7 +16,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode/utf16"
 )
 
 const (
@@ -32,6 +29,9 @@ const (
 	progressNoticeEnvMute = "0"
 	noColorEnv            = "NO_COLOR"
 	noColorEnvSet         = "1"
+	sidecarJSONStart      = "--- tally PSSA JSON start ---"
+	sidecarJSONEnd        = "--- tally PSSA JSON end ---"
+	maxSidecarFrameBytes  = 16 * 1024 * 1024
 )
 
 //go:embed sidecar/Tally.PSSA.Sidecar.ps1
@@ -182,16 +182,14 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 	if version == "" {
 		return nil, errors.New("PSScriptAnalyzer version pin is empty")
 	}
-	payload := sidecarPayload(sidecarScript)
 
-	//nolint:gosec // G204: exe is pwsh from PATH or explicit TALLY_POWERSHELL configuration; script is embedded.
 	cmd := exec.Command(
 		exe,
 		"-NoLogo",
 		"-NoProfile",
 		"-NonInteractive",
-		"-EncodedCommand",
-		encodedPowerShellCommand([]byte(sidecarBootstrapCommand(len(payload)))),
+		"-Command",
+		"-",
 	)
 	cmd.Env = sidecarEnvironment(runtime.GOOS, os.Environ(), version)
 
@@ -211,10 +209,10 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start %s: %w", exe, err)
 	}
-	if err := writeSidecarPayload(stdin, payload); err != nil {
+	if err := writeSidecarScript(stdin, sidecarScript); err != nil {
 		_ = stdin.Close()
 		cleanupStartedProcess(cmd)
-		return nil, fmt.Errorf("write psanalyzer sidecar payload: %w", err)
+		return nil, fmt.Errorf("write psanalyzer sidecar script: %w", err)
 	}
 
 	return &sidecarProcess{
@@ -225,43 +223,17 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 	}, nil
 }
 
-func sidecarBootstrapCommand(payloadLength int) string {
-	return fmt.Sprintf(`
-$ErrorActionPreference = 'Stop'
-if ($null -ne (Get-Variable -Name PSStyle -ErrorAction SilentlyContinue)) {
-    $PSStyle.OutputRendering = 'PlainText'
-}
-$scriptLength = %d
-$buffer = [char[]]::new($scriptLength)
-$offset = 0
-while ($offset -lt $scriptLength) {
-    $read = [Console]::In.Read($buffer, $offset, $scriptLength - $offset)
-    if ($read -le 0) {
-        throw 'PowerShell sidecar bootstrap ended before the script payload was complete.'
-    }
-    $offset += $read
-}
-$script = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64CharArray($buffer, 0, $scriptLength))
-[ScriptBlock]::Create($script).Invoke()
-`, payloadLength)
-}
-
-func sidecarPayload(script []byte) string {
-	return base64.StdEncoding.EncodeToString(script)
-}
-
-func writeSidecarPayload(w io.Writer, payload string) error {
-	_, err := io.WriteString(w, payload)
-	return err
-}
-
-func encodedPowerShellCommand(script []byte) string {
-	encoded := utf16.Encode([]rune(string(script)))
-	buf := make([]byte, len(encoded)*2)
-	for i, r := range encoded {
-		binary.LittleEndian.PutUint16(buf[i*2:], r)
+func writeSidecarScript(w io.Writer, script []byte) error {
+	if _, err := w.Write(script); err != nil {
+		return err
 	}
-	return base64.StdEncoding.EncodeToString(buf)
+	if len(script) == 0 || script[len(script)-1] != '\n' {
+		if _, err := io.WriteString(w, "\n"); err != nil {
+			return err
+		}
+	}
+	_, err := io.WriteString(w, "\n")
+	return err
 }
 
 func sidecarEnvironment(goos string, env []string, version string) []string {
@@ -296,13 +268,13 @@ func (r *Runner) awaitReady(ctx context.Context) error {
 	defer progress.stop()
 
 	for {
-		line, err := r.readLine(handshakeCtx)
+		payload, err := r.readFrame(handshakeCtx)
 		if err != nil {
 			return fmt.Errorf("read psanalyzer handshake: %w%s", err, r.stderrSuffix())
 		}
 
 		var resp response
-		if err := json.Unmarshal(bytes.TrimSpace(line), &resp); err != nil {
+		if err := json.Unmarshal(payload, &resp); err != nil {
 			return fmt.Errorf("parse psanalyzer handshake: %w%s", err, r.stderrSuffix())
 		}
 		if resp.Progress {
@@ -378,16 +350,43 @@ func (r *Runner) roundTrip(ctx context.Context, req request) (response, error) {
 		return response{}, fmt.Errorf("write psanalyzer request: %w%s", err, r.stderrSuffix())
 	}
 
-	line, err := r.readLine(ctx)
+	payload, err := r.readFrame(ctx)
 	if err != nil {
 		return response{}, fmt.Errorf("read psanalyzer response: %w%s", err, r.stderrSuffix())
 	}
 
 	var resp response
-	if err := json.Unmarshal(bytes.TrimSpace(line), &resp); err != nil {
+	if err := json.Unmarshal(payload, &resp); err != nil {
 		return response{}, fmt.Errorf("parse psanalyzer response: %w%s", err, r.stderrSuffix())
 	}
 	return resp, nil
+}
+
+func (r *Runner) readFrame(ctx context.Context) ([]byte, error) {
+	for {
+		line, err := r.readLine(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(string(line)) == sidecarJSONStart {
+			break
+		}
+	}
+
+	var payload bytes.Buffer
+	for {
+		line, err := r.readLine(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(string(line)) == sidecarJSONEnd {
+			return bytes.TrimSpace(payload.Bytes()), nil
+		}
+		if payload.Len()+len(line) > maxSidecarFrameBytes {
+			return nil, fmt.Errorf("psanalyzer response frame exceeded %d bytes", maxSidecarFrameBytes)
+		}
+		payload.Write(line)
+	}
 }
 
 func (r *Runner) readLine(ctx context.Context) ([]byte, error) {
