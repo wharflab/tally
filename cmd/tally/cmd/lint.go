@@ -47,6 +47,12 @@ const (
 
 const installPowerShellURL = "https://learn.microsoft.com/en-us/powershell/scripting/install/install-powershell"
 
+const powerShellRunnerCloseTimeout = 5 * time.Second
+
+type powerShellRunnerCloser interface {
+	Close(ctx stdcontext.Context) error
+}
+
 func lintCommand() *cobra.Command {
 	return newLintCommand(&lintOptions{})
 }
@@ -74,7 +80,21 @@ func newLintCommand(opts *lintOptions) *cobra.Command {
 
 func runLintWithPowerShellReporter(ctx stdcontext.Context, opts *lintOptions, args []string) error {
 	defer installPowerShellUnavailableReporter(os.Stderr)()
+	defer closeSharedPowerShellRunner(ctx)
 	return runLint(ctx, opts, args)
+}
+
+func closeSharedPowerShellRunner(ctx stdcontext.Context) {
+	closePowerShellRunner(ctx, func() powerShellRunnerCloser {
+		return psanalyzer.SharedRunner()
+	})
+}
+
+func closePowerShellRunner(ctx stdcontext.Context, runner func() powerShellRunnerCloser) {
+	closeCtx, cancel := stdcontext.WithTimeout(stdcontext.WithoutCancel(ctx), powerShellRunnerCloseTimeout)
+	defer cancel()
+
+	_ = runner().Close(closeCtx)
 }
 
 func installPowerShellUnavailableReporter(w io.Writer) func() {

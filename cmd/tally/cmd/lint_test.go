@@ -14,6 +14,17 @@ import (
 	"github.com/wharflab/tally/internal/rules"
 )
 
+type recordingPowerShellRunnerCloser struct {
+	closed          bool
+	receivedTimeout bool
+}
+
+func (r *recordingPowerShellRunnerCloser) Close(ctx context.Context) error {
+	r.closed = true
+	_, r.receivedTimeout = ctx.Deadline()
+	return nil
+}
+
 func TestParseACPCmd(t *testing.T) {
 	t.Parallel()
 
@@ -304,6 +315,22 @@ func TestPowerShellUnavailableReporterWritesInstallNoteOnce(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected note to contain %q, got:\n%s", want, got)
 		}
+	}
+}
+
+func TestClosePowerShellRunnerUsesTimeout(t *testing.T) {
+	t.Parallel()
+
+	runner := &recordingPowerShellRunnerCloser{}
+	closePowerShellRunner(context.Background(), func() powerShellRunnerCloser {
+		return runner
+	})
+
+	if !runner.closed {
+		t.Fatal("expected PowerShell runner to be closed")
+	}
+	if !runner.receivedTimeout {
+		t.Fatal("expected PowerShell runner close to use a timeout context")
 	}
 }
 
