@@ -27,6 +27,15 @@ func (f *fakeAnalyzer) Analyze(_ context.Context, req psanalyzer.AnalyzeRequest)
 	return f.diagnostics, f.err
 }
 
+func TestNewRuleUsesSharedPowerShellRunner(t *testing.T) {
+	t.Parallel()
+
+	rule := NewRule()
+	if rule.analyzer != psanalyzer.SharedRunner() {
+		t.Fatalf("NewRule analyzer = %#v, want shared PowerShell runner", rule.analyzer)
+	}
+}
+
 func TestRuleSkipsWhenNoPowerShellSnippet(t *testing.T) {
 	t.Parallel()
 

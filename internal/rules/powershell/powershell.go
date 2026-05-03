@@ -41,7 +41,7 @@ type Rule struct {
 }
 
 func NewRule() *Rule {
-	return &Rule{analyzer: psanalyzer.NewRunner()}
+	return &Rule{analyzer: psanalyzer.SharedRunner()}
 }
 
 func newRuleWithAnalyzer(a analyzer) *Rule {
