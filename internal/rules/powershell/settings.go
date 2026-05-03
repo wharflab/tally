@@ -25,6 +25,9 @@ func analyzerSettings(cfg any) psanalyzer.Settings {
 		if !isAnalyzerRuleName(name) {
 			continue
 		}
+		if _, excluded := excludeSet[name]; excluded {
+			continue
+		}
 		if ruleCfg.Severity == config.SeverityOffValue {
 			excludeSet[name] = struct{}{}
 			continue

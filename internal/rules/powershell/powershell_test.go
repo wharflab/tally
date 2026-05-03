@@ -234,8 +234,11 @@ RUN [System.Management.Automation.SemanticVersion]'1.18.0-rc1'
 	input.EnabledRules = []string{PowerShellRuleCode}
 	input.Config = &config.RulesConfig{
 		Include: []string{"powershell/PSUseCompatibleTypes"},
-		Exclude: []string{"powershell/PSAvoidUsingWriteHost"},
+		Exclude: []string{"powershell/PSAvoidExclaimOperator", "powershell/PSAvoidUsingWriteHost"},
 		Powershell: map[string]config.RuleConfig{
+			"PSAvoidExclaimOperator": {
+				Options: map[string]any{"Enable": true},
+			},
 			"PSUseCompatibleTypes": {
 				Options: map[string]any{
 					"Enable": true,
@@ -266,7 +269,7 @@ RUN [System.Management.Automation.SemanticVersion]'1.18.0-rc1'
 	if len(settings.IncludeRules) != 0 {
 		t.Fatalf("IncludeRules = %#v, want none so tally include semantics do not restrict PSScriptAnalyzer", settings.IncludeRules)
 	}
-	if !slices.Equal(settings.ExcludeRules, []string{"PSAvoidUsingWriteHost"}) {
+	if !slices.Equal(settings.ExcludeRules, []string{"PSAvoidExclaimOperator", "PSAvoidUsingWriteHost"}) {
 		t.Fatalf("ExcludeRules = %#v", settings.ExcludeRules)
 	}
 	ruleSettings := settings.Rules["PSUseCompatibleTypes"]
@@ -282,6 +285,9 @@ RUN [System.Management.Automation.SemanticVersion]'1.18.0-rc1'
 	}
 	if _, ok := settings.Rules["PSAvoidUsingWriteHost"]; ok {
 		t.Fatalf("disabled rule settings should not be forwarded: %#v", settings.Rules["PSAvoidUsingWriteHost"])
+	}
+	if _, ok := settings.Rules["PSAvoidExclaimOperator"]; ok {
+		t.Fatalf("excluded rule settings should not be forwarded: %#v", settings.Rules["PSAvoidExclaimOperator"])
 	}
 	if _, ok := settings.Rules["PowerShell"]; ok {
 		t.Fatalf("engine settings should not be forwarded as analyzer rule settings")
