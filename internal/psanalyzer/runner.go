@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
@@ -16,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf16"
 )
 
 const (
@@ -27,6 +30,8 @@ const (
 	progressNoticeRepeat  = 15 * time.Second
 	progressNoticeEnv     = "TALLY_POWERSHELL_PROGRESS"
 	progressNoticeEnvMute = "0"
+	noColorEnv            = "NO_COLOR"
+	noColorEnvSet         = "1"
 )
 
 //go:embed sidecar/Tally.PSSA.Sidecar.ps1
@@ -178,19 +183,16 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 		return nil, errors.New("PSScriptAnalyzer version pin is empty")
 	}
 
+	//nolint:gosec // G204: exe is pwsh from PATH or explicit TALLY_POWERSHELL configuration; script is embedded.
 	cmd := exec.Command(
 		exe,
 		"-NoLogo",
 		"-NoProfile",
 		"-NonInteractive",
-		"-Command",
-		"-",
+		"-EncodedCommand",
+		encodedPowerShellCommand(sidecarScript),
 	)
-	cmd.Env = appendEnvOverride(
-		normalizePowerShellEnv(runtime.GOOS, os.Environ()),
-		psscriptAnalyzerVersionEnv,
-		version,
-	)
+	cmd.Env = sidecarEnvironment(runtime.GOOS, os.Environ(), version)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -208,9 +210,6 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start %s: %w", exe, err)
 	}
-	if err := writeSidecarScript(stdin, cmd); err != nil {
-		return nil, err
-	}
 
 	return &sidecarProcess{
 		cmd:    cmd,
@@ -220,28 +219,20 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 	}, nil
 }
 
-func writeSidecarScript(stdin io.WriteCloser, cmd *exec.Cmd) error {
-	if _, err := stdin.Write(sidecarScript); err != nil {
-		return stopStartedSidecar(stdin, cmd, fmt.Errorf("write psanalyzer sidecar to stdin: %w", err))
+func encodedPowerShellCommand(script []byte) string {
+	encoded := utf16.Encode([]rune(string(script)))
+	buf := make([]byte, len(encoded)*2)
+	for i, r := range encoded {
+		binary.LittleEndian.PutUint16(buf[i*2:], r)
 	}
-	if len(sidecarScript) == 0 || sidecarScript[len(sidecarScript)-1] != '\n' {
-		if _, err := io.WriteString(stdin, "\n"); err != nil {
-			return stopStartedSidecar(stdin, cmd, fmt.Errorf("finish psanalyzer sidecar stdin: %w", err))
-		}
-	}
-	// In stdin command mode, PowerShell waits for a blank line before executing a
-	// multiline block. Keep the pipe open after the script so JSON requests can
-	// use the same stdin stream.
-	if _, err := io.WriteString(stdin, "\n"); err != nil {
-		return stopStartedSidecar(stdin, cmd, fmt.Errorf("finish psanalyzer sidecar stdin: %w", err))
-	}
-	return nil
+	return base64.StdEncoding.EncodeToString(buf)
 }
 
-func stopStartedSidecar(stdin io.Closer, cmd *exec.Cmd, err error) error {
-	_ = stdin.Close()
-	killProcess(cmd)
-	return errors.Join(err, cmd.Wait())
+func sidecarEnvironment(goos string, env []string, version string) []string {
+	out := normalizePowerShellEnv(goos, env)
+	out = appendEnvOverride(out, psscriptAnalyzerVersionEnv, version)
+	out = appendEnvOverride(out, noColorEnv, noColorEnvSet)
+	return out
 }
 
 func (r *Runner) attachProcess(proc *sidecarProcess) {

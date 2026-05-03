@@ -37,6 +37,19 @@ func TestNormalizePowerShellEnvLeavesNonWindowsUntouched(t *testing.T) {
 	}
 }
 
+func TestSidecarEnvironmentPinsAnalyzerAndDisablesColor(t *testing.T) {
+	t.Parallel()
+
+	env := sidecarEnvironment("linux", []string{
+		"PATH=/usr/bin",
+		psscriptAnalyzerVersionEnv + "=old",
+		noColorEnv + "=0",
+	}, "1.2.3")
+
+	assertEnvHas(t, env, psscriptAnalyzerVersionEnv, "1.2.3")
+	assertEnvHas(t, env, noColorEnv, noColorEnvSet)
+}
+
 func TestIsUnavailableRecognizesWrappedError(t *testing.T) {
 	t.Parallel()
 
@@ -380,14 +393,21 @@ function Invoke-ScriptAnalyzer {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "-")
-	cmd.Env = append(normalizePowerShellEnv(runtime.GOOS, os.Environ()),
+	cmd := exec.CommandContext(
+		ctx,
+		"pwsh",
+		"-NoLogo",
+		"-NoProfile",
+		"-NonInteractive",
+		"-EncodedCommand",
+		encodedPowerShellCommand([]byte(prelude+string(sidecarScript))),
+	)
+	cmd.Env = append(sidecarEnvironment(runtime.GOOS, os.Environ(), requiredPSScriptAnalyzerVersion()),
 		"PSModulePath="+moduleRoot,
-		psscriptAnalyzerVersionEnv+"="+requiredPSScriptAnalyzerVersion(),
 		"TALLY_TEST_MODULE_ROOT="+moduleRoot,
 		"TALLY_TEST_REQUIRED_PSSA_VERSION="+requiredPSScriptAnalyzerVersion(),
 	)
-	cmd.Stdin = strings.NewReader(prelude + string(sidecarScript) + "\n{\"id\":\"1\",\"op\":\"shutdown\"}\n")
+	cmd.Stdin = strings.NewReader("{\"id\":\"1\",\"op\":\"shutdown\"}\n")
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {

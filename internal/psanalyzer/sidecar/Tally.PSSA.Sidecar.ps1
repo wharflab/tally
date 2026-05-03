@@ -1,4 +1,8 @@
 $ErrorActionPreference = 'Stop'
+if ($null -ne (Get-Variable -Name PSStyle -ErrorAction SilentlyContinue)) {
+    $PSStyle.OutputRendering = 'PlainText'
+}
+
 $script:TallyPSScriptAnalyzerVersion = $env:TALLY_PSSCRIPTANALYZER_VERSION
 
 function Write-JsonLine {
