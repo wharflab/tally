@@ -70,6 +70,11 @@ func (r *PreferFormattedHeredocsRule) ValidateConfig(config any) error {
 
 // Check runs the prefer-formatted-heredocs rule.
 func (r *PreferFormattedHeredocsRule) Check(input rules.LintInput) []rules.Violation {
+	return r.CheckContext(context.Background(), input)
+}
+
+// CheckContext runs the prefer-formatted-heredocs rule with caller cancellation.
+func (r *PreferFormattedHeredocsRule) CheckContext(ctx context.Context, input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	parseResult := &dockerfile.ParseResult{
 		AST:    input.AST,
@@ -79,13 +84,13 @@ func (r *PreferFormattedHeredocsRule) Check(input rules.LintInput) []rules.Viola
 	var violations []rules.Violation
 
 	for _, doc := range heredocfmt.CollectDockerfileHeredocs(parseResult) {
-		if v, ok := r.checkDockerfileHeredoc(input, formatter, meta, doc); ok {
+		if v, ok := r.checkDockerfileHeredoc(ctx, input, formatter, meta, doc); ok {
 			violations = append(violations, v)
 		}
 	}
 
 	for _, doc := range heredocfmt.CollectRunHeredocs(parseResult) {
-		if v, ok := r.checkRunHeredoc(input, formatter, meta, doc); ok {
+		if v, ok := r.checkRunHeredoc(ctx, input, formatter, meta, doc); ok {
 			violations = append(violations, v)
 		}
 	}
@@ -94,6 +99,7 @@ func (r *PreferFormattedHeredocsRule) Check(input rules.LintInput) []rules.Viola
 }
 
 func (r *PreferFormattedHeredocsRule) checkDockerfileHeredoc(
+	ctx context.Context,
 	input rules.LintInput,
 	formatter *heredocfmt.Formatter,
 	meta rules.RuleMetadata,
@@ -107,10 +113,10 @@ func (r *PreferFormattedHeredocsRule) checkDockerfileHeredoc(
 		return formattedTypedHeredocViolation(input.File, meta, doc, formatted, kind, ok)
 	}
 	if strings.EqualFold(doc.Instruction, command.Copy) {
-		return r.checkCopyScriptHeredoc(input, formatter, meta, doc)
+		return r.checkCopyScriptHeredoc(ctx, input, formatter, meta, doc)
 	}
 	if strings.EqualFold(doc.Instruction, command.Add) {
-		return r.checkPowerShellScriptHeredoc(input, formatter, meta, doc)
+		return r.checkPowerShellScriptHeredoc(ctx, input, formatter, meta, doc)
 	}
 	return rules.Violation{}, false
 }
@@ -137,6 +143,7 @@ func formattedTypedHeredocViolation(
 }
 
 func (r *PreferFormattedHeredocsRule) checkCopyScriptHeredoc(
+	ctx context.Context,
 	input rules.LintInput,
 	formatter *heredocfmt.Formatter,
 	meta rules.RuleMetadata,
@@ -147,7 +154,7 @@ func (r *PreferFormattedHeredocsRule) checkCopyScriptHeredoc(
 		return rules.Violation{}, false
 	}
 	if !ok {
-		return r.checkPowerShellScriptHeredoc(input, formatter, meta, doc)
+		return r.checkPowerShellScriptHeredoc(ctx, input, formatter, meta, doc)
 	}
 	if formatted == doc.Content {
 		return rules.Violation{}, false
@@ -159,6 +166,7 @@ func (r *PreferFormattedHeredocsRule) checkCopyScriptHeredoc(
 }
 
 func (r *PreferFormattedHeredocsRule) checkPowerShellScriptHeredoc(
+	ctx context.Context,
 	input rules.LintInput,
 	formatter *heredocfmt.Formatter,
 	meta rules.RuleMetadata,
@@ -167,7 +175,7 @@ func (r *PreferFormattedHeredocsRule) checkPowerShellScriptHeredoc(
 	if !input.SlowChecksEnabled {
 		return rules.Violation{}, false
 	}
-	formatted, ok, err := r.formatPowerShellTarget(formatter, doc.TargetPath, doc.Content)
+	formatted, ok, err := r.formatPowerShellTarget(ctx, formatter, doc.TargetPath, doc.Content)
 	if err != nil || !ok || formatted == doc.Content {
 		return rules.Violation{}, false
 	}
@@ -179,6 +187,7 @@ func (r *PreferFormattedHeredocsRule) checkPowerShellScriptHeredoc(
 }
 
 func (r *PreferFormattedHeredocsRule) checkRunHeredoc(
+	ctx context.Context,
 	input rules.LintInput,
 	formatter *heredocfmt.Formatter,
 	meta rules.RuleMetadata,
@@ -189,7 +198,7 @@ func (r *PreferFormattedHeredocsRule) checkRunHeredoc(
 		if !input.SlowChecksEnabled {
 			return rules.Violation{}, false
 		}
-		formatted, ok, err := r.formatPowerShell(formatter, doc.Content)
+		formatted, ok, err := r.formatPowerShell(ctx, formatter, doc.Content)
 		if err != nil || !ok || formatted == doc.Content {
 			return rules.Violation{}, false
 		}
@@ -246,20 +255,22 @@ func formattedHeredocViolation(
 }
 
 func (r *PreferFormattedHeredocsRule) formatPowerShellTarget(
+	ctx context.Context,
 	formatter *heredocfmt.Formatter,
 	target string,
 	content string,
 ) (string, bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), powerShellFormatTimeout)
+	ctx, cancel := context.WithTimeout(ctx, powerShellFormatTimeout)
 	defer cancel()
 	return formatter.FormatPowerShellTarget(ctx, r.powerShellFormatter, target, content)
 }
 
 func (r *PreferFormattedHeredocsRule) formatPowerShell(
+	ctx context.Context,
 	formatter *heredocfmt.Formatter,
 	content string,
 ) (string, bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), powerShellFormatTimeout)
+	ctx, cancel := context.WithTimeout(ctx, powerShellFormatTimeout)
 	defer cancel()
 	return formatter.FormatPowerShell(ctx, r.powerShellFormatter, content)
 }

@@ -29,7 +29,7 @@ func (s *Server) handleFormatting(ctx context.Context, params *protocol.Document
 	fileKey := filepath.Clean(input.FilePath)
 
 	// 1. Lint + filter: reuse shared pipeline.
-	result, err := linter.LintFile(input)
+	result, err := linter.LintFileContext(ctx, input)
 	if err != nil {
 		return nil, nil //nolint:nilnil,nilerr // gracefully return no edits on lint error
 	}

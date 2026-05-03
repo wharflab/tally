@@ -383,7 +383,7 @@ func runLintStdin(ctx stdcontext.Context, opts *lintOptions) error {
 		return exitWith(ExitNoFiles)
 	}
 
-	res, cfg, err := lintStdinContent(opts, content)
+	res, cfg, err := lintStdinContent(ctx, opts, content)
 	if err != nil {
 		return err
 	}
@@ -400,7 +400,7 @@ func runLintStdin(ctx stdcontext.Context, opts *lintOptions) error {
 }
 
 // lintStdinContent parses and lints content read from stdin.
-func lintStdinContent(opts *lintOptions, content []byte) (*lintResults, *config.Config, error) {
+func lintStdinContent(ctx stdcontext.Context, opts *lintOptions, content []byte) (*lintResults, *config.Config, error) {
 	// Load config from CWD (stdin has no file path for cascading discovery).
 	cfg, err := loadConfigForFile(opts, ".")
 	if err != nil {
@@ -424,7 +424,7 @@ func lintStdinContent(opts *lintOptions, content []byte) (*lintResults, *config.
 	}
 
 	inv := invocationFromContextFlag(stdinPath, opts.contextDir)
-	result, err := linter.LintFile(linter.Input{
+	result, err := linter.LintFileContext(ctx, linter.Input{
 		FilePath:    stdinPath,
 		Config:      cfg,
 		ParseResult: parseResult,
@@ -708,7 +708,7 @@ func lintInvocations(ctx stdcontext.Context, invocations []invocation.BuildInvoc
 			parseCache[file] = parseResult
 		}
 
-		result, err := linter.LintFile(linter.Input{
+		result, err := linter.LintFileContext(ctx, linter.Input{
 			FilePath:    file,
 			Config:      cfg,
 			ParseResult: parseResult,
@@ -770,7 +770,7 @@ func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, op
 			inv = invocationFromContextFlag(file, df.ContextDir)
 		}
 
-		result, err := linter.LintFile(linter.Input{
+		result, err := linter.LintFileContext(ctx, linter.Input{
 			FilePath:    file,
 			Config:      cfg,
 			ParseResult: parseResult,

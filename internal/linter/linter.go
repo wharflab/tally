@@ -7,6 +7,7 @@ package linter
 
 import (
 	"bytes"
+	"context"
 	"os"
 
 	"github.com/wharflab/tally/internal/async"
@@ -94,6 +95,11 @@ type Result struct {
 // reused directly (avoiding a second parse); otherwise the file is parsed
 // from the resolved content.
 func LintFile(input Input) (*Result, error) {
+	return LintFileContext(context.Background(), input)
+}
+
+// LintFileContext runs the full lint pipeline with caller cancellation and deadlines.
+func LintFileContext(ctx context.Context, input Input) (*Result, error) {
 	cfg := input.Config
 	if cfg == nil {
 		var err error
@@ -156,7 +162,7 @@ func LintFile(input Input) (*Result, error) {
 	for _, rule := range rules.All() {
 		ruleInput := baseInput
 		ruleInput.Config = configForRuleInput(cfg, rule.Metadata().Code)
-		violations = append(violations, rule.Check(ruleInput)...)
+		violations = append(violations, checkRule(ctx, rule, ruleInput)...)
 	}
 
 	// Convert BuildKit warnings to violations.
@@ -171,7 +177,28 @@ func LintFile(input Input) (*Result, error) {
 	// Enrich BuildKit violations with auto-fix suggestions.
 	fixes.EnrichBuildKitFixes(violations, sem, content)
 
-	// Plan async checks from AsyncRule implementations.
+	asyncPlan := planAsyncChecks(baseInput, cfg, input.Invocation)
+
+	return &Result{
+		Violations:  violations,
+		AsyncPlan:   asyncPlan,
+		ParseResult: parseResult,
+		Config:      cfg,
+	}, nil
+}
+
+func checkRule(ctx context.Context, rule rules.Rule, input rules.LintInput) []rules.Violation {
+	if contextRule, ok := rule.(rules.ContextRule); ok {
+		return contextRule.CheckContext(ctx, input)
+	}
+	return rule.Check(input)
+}
+
+func planAsyncChecks(
+	baseInput rules.LintInput,
+	cfg *config.Config,
+	inv *invocation.BuildInvocation,
+) []async.CheckRequest {
 	// Only plan for rules that are enabled (respects --select/--ignore/config).
 	var asyncPlan []async.CheckRequest
 	for _, rule := range rules.All() {
@@ -191,17 +218,11 @@ func LintFile(input Input) (*Result, error) {
 		ruleInput := baseInput
 		ruleInput.Config = cfg.Rules.GetOptions(code)
 		for _, req := range ar.PlanAsync(ruleInput) {
-			attachInvocationToAsyncRequest(&req, input.Invocation)
+			attachInvocationToAsyncRequest(&req, inv)
 			asyncPlan = append(asyncPlan, req)
 		}
 	}
-
-	return &Result{
-		Violations:  violations,
-		AsyncPlan:   asyncPlan,
-		ParseResult: parseResult,
-		Config:      cfg,
-	}, nil
+	return asyncPlan
 }
 
 func resolveParseInput(input Input, cfg *config.Config) ([]byte, *dockerfile.ParseResult, error) {

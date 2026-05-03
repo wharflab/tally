@@ -16,13 +16,23 @@ import (
 )
 
 type fakePowerShellFormatter struct {
-	formatted string
-	err       error
-	calls     []string
+	formatted      string
+	err            error
+	respectContext bool
+	calls          []string
+	contexts       []context.Context
 }
 
-func (f *fakePowerShellFormatter) FormatPowerShell(_ context.Context, script string) (string, error) {
+func (f *fakePowerShellFormatter) FormatPowerShell(ctx context.Context, script string) (string, error) {
 	f.calls = append(f.calls, script)
+	f.contexts = append(f.contexts, ctx)
+	if f.respectContext {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		default:
+		}
+	}
 	return f.formatted, f.err
 }
 
@@ -466,6 +476,38 @@ EOF
 	}
 	if len(fake.calls) != 0 {
 		t.Fatalf("PowerShell formatter was called when slow checks are disabled: %#v", fake.calls)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_PowerShellFormatterUsesLintContext(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakePowerShellFormatter{
+		formatted:      "if ($true) {\n    Write-Host hi\n}\n",
+		respectContext: true,
+	}
+	rule := newPreferFormattedHeredocsRuleWithPowerShellFormatter(fake)
+	content := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+SHELL ["pwsh", "-Command"]
+RUN <<EOF
+if ($true) {
+Write-Host hi
+}
+EOF
+`
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+
+	violations := rule.CheckContext(ctx, input)
+	if len(violations) != 0 {
+		t.Fatalf("got %d violations, want none after cancellation", len(violations))
+	}
+	if len(fake.contexts) != 1 {
+		t.Fatalf("PowerShell formatter context count = %d, want 1", len(fake.contexts))
+	}
+	if err := fake.contexts[0].Err(); err != context.Canceled {
+		t.Fatalf("PowerShell formatter context error = %v, want context.Canceled", err)
 	}
 }
 

@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"context"
 	"slices"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -185,6 +186,12 @@ type Rule interface {
 	// The AST and Source fields are guaranteed non-nil. InvocationContext may
 	// be nil or lack a local reader when context-aware linting is unavailable.
 	Check(input LintInput) []Violation
+}
+
+// ContextRule is implemented by rules that need caller cancellation or deadlines.
+type ContextRule interface {
+	Rule
+	CheckContext(ctx context.Context, input LintInput) []Violation
 }
 
 // ConfigurableRule is an optional interface for rules that accept configuration.

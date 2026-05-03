@@ -504,7 +504,7 @@ func (r *resolver) validateWithLint(
 	lintCfg := *cfg
 	lintCfg.AI = config.AIConfig{Enabled: false}
 
-	violations, err := lintAndProcess(filePath, proposed, &lintCfg)
+	violations, err := lintAndProcess(ctx, filePath, proposed, &lintCfg)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -516,7 +516,7 @@ func (r *resolver) validateWithLint(
 		}
 		if !bytes.Equal(normalized, proposed) {
 			proposed = normalized
-			violations, err = lintAndProcess(filePath, proposed, &lintCfg)
+			violations, err = lintAndProcess(ctx, filePath, proposed, &lintCfg)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -527,8 +527,8 @@ func (r *resolver) validateWithLint(
 	return proposed, blocking, nil
 }
 
-func lintAndProcess(filePath string, content []byte, cfg *config.Config) ([]rules.Violation, error) {
-	res, err := linter.LintFile(linter.Input{
+func lintAndProcess(ctx context.Context, filePath string, content []byte, cfg *config.Config) ([]rules.Violation, error) {
+	res, err := linter.LintFileContext(ctx, linter.Input{
 		FilePath: filePath,
 		Content:  content,
 		Config:   cfg,

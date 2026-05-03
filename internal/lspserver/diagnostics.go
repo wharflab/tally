@@ -329,9 +329,9 @@ func contentHash(content []byte) string {
 	return hex.EncodeToString(h[:8])
 }
 
-// lintInput builds a linter.Input for the given document.
-// Config comes from s.resolveConfig() — currently disk-only,
-// but designed for future workspace/didChangeConfiguration support.
+// lintInput builds a linter.Input for the given document. Config comes from
+// s.resolveConfig() — currently disk-only, but designed for future
+// workspace/didChangeConfiguration support.
 func (s *Server) lintInput(docURI string, content []byte) linter.Input {
 	filePath := uriToPath(docURI)
 	return linter.Input{
@@ -396,7 +396,7 @@ func (s *Server) lintContentWithConfig(
 		ParseResult: parseResult,
 	}
 
-	result, err := linter.LintFile(input)
+	result, err := linter.LintFileContext(ctx, input)
 	if err != nil {
 		log.Printf("lsp: lint error for %s: %v", input.FilePath, err)
 		return lintResult{}
@@ -445,7 +445,7 @@ func (s *Server) lintContentWithInvocations(
 			ParseResult: parsed,
 			Invocation:  &inv,
 		}
-		result, err := linter.LintFile(input)
+		result, err := linter.LintFileContext(ctx, input)
 		if err != nil {
 			log.Printf("lsp: lint error for %s (%s): %v", input.FilePath, invocation.LabelForSource(&inv.Source), err)
 			continue
