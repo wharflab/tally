@@ -42,11 +42,12 @@ type Runner struct {
 
 	executable string
 
-	cmd    *exec.Cmd
-	stdin  io.WriteCloser
-	stdout *bufio.Reader
-	waitCh chan error
-	nextID int64
+	cmd          *exec.Cmd
+	stdin        io.WriteCloser
+	stdout       *bufio.Reader
+	stdoutCloser io.Closer
+	waitCh       chan error
+	nextID       int64
 
 	stderr tailBuffer
 }
@@ -248,6 +249,7 @@ func (r *Runner) attachProcess(proc *sidecarProcess) {
 	r.cmd = proc.cmd
 	r.stdin = proc.stdin
 	r.stdout = bufio.NewReader(proc.stdout)
+	r.stdoutCloser = proc.stdout
 	r.waitCh = make(chan error, 1)
 
 	go r.stderr.capture(proc.stderr)
@@ -408,6 +410,10 @@ func (r *Runner) readLine(ctx context.Context) ([]byte, error) {
 		}
 		return res.line, nil
 	case <-ctx.Done():
+		if err := r.closeStdout(); err != nil {
+			killProcess(r.cmd)
+			return nil, errors.Join(ctx.Err(), fmt.Errorf("close psanalyzer stdout: %w", err))
+		}
 		killProcess(r.cmd)
 		return nil, ctx.Err()
 	}
@@ -417,6 +423,9 @@ func (r *Runner) stopProcess() {
 	if r.stdin != nil {
 		_ = r.stdin.Close()
 	}
+	if err := r.closeStdout(); err != nil {
+		r.stderr.append([]byte("close psanalyzer stdout: " + err.Error()))
+	}
 	killProcess(r.cmd)
 	if r.waitCh != nil {
 		select {
@@ -425,6 +434,18 @@ func (r *Runner) stopProcess() {
 		}
 	}
 	r.clearProcess()
+}
+
+func (r *Runner) closeStdout() error {
+	if r.stdoutCloser == nil {
+		return nil
+	}
+	closer := r.stdoutCloser
+	r.stdoutCloser = nil
+	if err := closer.Close(); err != nil && !errors.Is(err, os.ErrClosed) && !errors.Is(err, io.ErrClosedPipe) {
+		return err
+	}
+	return nil
 }
 
 func killProcess(cmd *exec.Cmd) {
@@ -447,6 +468,7 @@ func (r *Runner) clearProcess() {
 	r.cmd = nil
 	r.stdin = nil
 	r.stdout = nil
+	r.stdoutCloser = nil
 	r.waitCh = nil
 }
 

@@ -5,11 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -75,6 +77,33 @@ func TestReadFrameSkipsNonProtocolOutput(t *testing.T) {
 	}
 }
 
+func TestReadLineClosesStdoutOnContextCancel(t *testing.T) {
+	t.Parallel()
+
+	reader := newBlockingReadCloser()
+	r := &Runner{
+		stdout:       bufio.NewReader(reader),
+		stdoutCloser: reader,
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := r.readLine(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("readLine() error = %v, want context.Canceled", err)
+	}
+	select {
+	case <-reader.closed:
+	case <-time.After(time.Second):
+		t.Fatal("readLine did not close stdout after context cancellation")
+	}
+	select {
+	case <-reader.readReturned:
+	case <-time.After(time.Second):
+		t.Fatal("blocked stdout read did not return after Close")
+	}
+}
+
 func TestIsUnavailableRecognizesWrappedError(t *testing.T) {
 	t.Parallel()
 
@@ -130,9 +159,38 @@ func TestRunnerStopProcessClearsProcessState(t *testing.T) {
 
 	r.stopProcess()
 
-	if r.cmd != nil || r.stdin != nil || r.stdout != nil || r.waitCh != nil {
+	if r.cmd != nil || r.stdin != nil || r.stdout != nil || r.stdoutCloser != nil || r.waitCh != nil {
 		t.Fatalf("runner process state not cleared: %#v", r)
 	}
+}
+
+type blockingReadCloser struct {
+	closed       chan struct{}
+	readReturned chan struct{}
+	closeOnce    sync.Once
+	readOnce     sync.Once
+}
+
+func newBlockingReadCloser() *blockingReadCloser {
+	return &blockingReadCloser{
+		closed:       make(chan struct{}),
+		readReturned: make(chan struct{}),
+	}
+}
+
+func (r *blockingReadCloser) Read([]byte) (int, error) {
+	<-r.closed
+	r.readOnce.Do(func() {
+		close(r.readReturned)
+	})
+	return 0, io.ErrClosedPipe
+}
+
+func (r *blockingReadCloser) Close() error {
+	r.closeOnce.Do(func() {
+		close(r.closed)
+	})
+	return nil
 }
 
 func TestRunnerAnalyzeWithInstalledPSScriptAnalyzer(t *testing.T) {
