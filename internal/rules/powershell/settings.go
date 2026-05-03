@@ -19,7 +19,7 @@ func analyzerSettings(cfg any) psanalyzer.Settings {
 	var settings psanalyzer.Settings
 	excludeSet := make(map[string]struct{})
 
-	addPowerShellRulePatterns(excludeSet, rulesCfg.Exclude)
+	addPowerShellRulePatterns(excludeSet, rulesCfg, rulesCfg.Exclude)
 
 	for name, ruleCfg := range rulesCfg.Powershell {
 		if !isAnalyzerRuleName(name) {
@@ -44,10 +44,13 @@ func analyzerSettings(cfg any) psanalyzer.Settings {
 	return settings
 }
 
-func addPowerShellRulePatterns(out map[string]struct{}, patterns []string) {
+func addPowerShellRulePatterns(out map[string]struct{}, rulesCfg *config.RulesConfig, patterns []string) {
 	for _, pattern := range patterns {
 		name, ok := strings.CutPrefix(pattern, rules.PowerShellRulePrefix)
 		if !ok || !isAnalyzerRuleName(name) {
+			continue
+		}
+		if enabled := rulesCfg.IsEnabled(pattern); enabled != nil && *enabled {
 			continue
 		}
 		out[name] = struct{}{}

@@ -279,6 +279,38 @@ RUN [System.Management.Automation.SemanticVersion]'1.18.0-rc1'
 	}
 }
 
+func TestRuleSettingsHonorPowerShellIncludeOverExclude(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeAnalyzer{}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command"]
+RUN Write-Host hi
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+	input.Config = &config.RulesConfig{
+		Include: []string{"powershell/PSAvoidUsingWriteHost"},
+		Exclude: []string{"powershell/PSAvoidUsingWriteHost"},
+	}
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations from fake analyzer, got %#v", violations)
+	}
+	if len(fake.requests) != 1 {
+		t.Fatalf("got %d analyzer requests, want 1", len(fake.requests))
+	}
+
+	settings := fake.requests[0].Settings
+	if len(settings.IncludeRules) != 0 {
+		t.Fatalf("IncludeRules = %#v, want none so tally include semantics do not restrict PSScriptAnalyzer", settings.IncludeRules)
+	}
+	if len(settings.ExcludeRules) != 0 {
+		t.Fatalf("ExcludeRules = %#v, want none because include takes precedence over exclude", settings.ExcludeRules)
+	}
+}
+
 func TestRuleChecksExplicitPowerShellWrapperLazily(t *testing.T) {
 	t.Parallel()
 
