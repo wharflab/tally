@@ -92,8 +92,11 @@ func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocat
 			next = end
 			continue
 		}
-		if tokenNorm == "-command" || tokenNorm == "-c" {
+		if isPowerShellCommandSwitch(tokenNorm) {
 			return invocationFromRemainder(script, end)
+		}
+		if isPowerShellCommandWithArgsSwitch(tokenNorm) {
+			return invocationFromNextToken(script, end)
 		}
 		if isPowerShellFileModeSwitch(tokenNorm) {
 			return explicitPowerShellInvocation{}, false
@@ -124,7 +127,7 @@ func parseExecFormPowerShellInvocation(args []string) (explicitPowerShellInvocat
 
 	for i := 1; i < len(args); i++ {
 		tokenNorm := strings.ToLower(args[i])
-		if tokenNorm != "-command" && tokenNorm != "-c" {
+		if !isPowerShellCommandSwitch(tokenNorm) && !isPowerShellCommandWithArgsSwitch(tokenNorm) {
 			if isPowerShellFileModeSwitch(tokenNorm) {
 				return explicitPowerShellInvocation{}, false
 			}
@@ -143,7 +146,11 @@ func parseExecFormPowerShellInvocation(args []string) (explicitPowerShellInvocat
 		if i+1 >= len(args) {
 			return explicitPowerShellInvocation{}, false
 		}
-		script := strings.TrimSpace(strings.Join(args[i+1:], " "))
+		script := args[i+1]
+		if isPowerShellCommandSwitch(tokenNorm) {
+			script = strings.Join(args[i+1:], " ")
+		}
+		script = strings.TrimSpace(script)
 		if script == "" {
 			return explicitPowerShellInvocation{}, false
 		}
@@ -153,13 +160,21 @@ func parseExecFormPowerShellInvocation(args []string) (explicitPowerShellInvocat
 	return explicitPowerShellInvocation{}, false
 }
 
+func isPowerShellCommandSwitch(token string) bool {
+	return token == "-command" || token == "-c"
+}
+
+func isPowerShellCommandWithArgsSwitch(token string) bool {
+	return token == "-commandwithargs" || token == "-cwa"
+}
+
 func isPowerShellContinuationToken(token string) bool {
 	return token == `\` || token == "`"
 }
 
 func isPowerShellFileModeSwitch(token string) bool {
 	switch powerShellOptionName(token) {
-	case "-file", "-f", "-encodedcommand", "-e", "-ec", "-commandwithargs":
+	case "-file", "-f", "-encodedcommand", "-e", "-ec":
 		return true
 	default:
 		return false
@@ -208,6 +223,35 @@ func isPowerShellExecutable(exe string) bool {
 	default:
 		return false
 	}
+}
+
+func invocationFromNextToken(script string, start int) (explicitPowerShellInvocation, bool) {
+	start = shellutil.SkipShellTokenSpaces(script, start)
+	if start >= len(script) {
+		return explicitPowerShellInvocation{}, false
+	}
+
+	token, _ := shellutil.NextShellToken(script, start)
+	if token == "" {
+		return explicitPowerShellInvocation{}, false
+	}
+	if !isQuotedShellToken(token) && isShellControlToken(token) {
+		return explicitPowerShellInvocation{}, false
+	}
+
+	unquoted := shellutil.DropQuotes(token)
+	if strings.TrimSpace(unquoted) == "" {
+		return explicitPowerShellInvocation{}, false
+	}
+	if unquoted != token {
+		start++
+	}
+	line, col := sourcemap.ByteToLineCol(script, start)
+	return explicitPowerShellInvocation{
+		script:      unquoted,
+		startLine:   line,
+		startColumn: col,
+	}, true
 }
 
 func invocationFromRemainder(script string, start int) (explicitPowerShellInvocation, bool) {

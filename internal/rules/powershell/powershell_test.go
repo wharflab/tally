@@ -416,6 +416,29 @@ RUN ["powershell", "-ExecutionPolicy", "Bypass", "-Command", "Write-Host ok"]
 	}
 }
 
+func TestRuleChecksPowerShellCommandWithArgs(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeAnalyzer{}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN pwsh -CommandWithArgs "Write-Host hi" foo
+RUN pwsh -cwa '$args[0]' foo
+RUN ["pwsh", "-CommandWithArgs", "Write-Host bye", "bar"]
+RUN ["pwsh", "-cwa", "$args[0]", "bar"]
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations from fake analyzer, got %#v", violations)
+	}
+	wantScripts := []string{"Write-Host hi", "$args[0]", "Write-Host bye", "$args[0]"}
+	if !slices.Equal(fake.scripts, wantScripts) {
+		t.Fatalf("analyzed scripts = %#v, want %#v", fake.scripts, wantScripts)
+	}
+}
+
 func TestRuleSkipsPowerShellFileInvocation(t *testing.T) {
 	t.Parallel()
 
