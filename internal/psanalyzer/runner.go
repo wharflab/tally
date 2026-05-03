@@ -182,6 +182,7 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 	if version == "" {
 		return nil, errors.New("PSScriptAnalyzer version pin is empty")
 	}
+	payload := sidecarPayload(sidecarScript)
 
 	//nolint:gosec // G204: exe is pwsh from PATH or explicit TALLY_POWERSHELL configuration; script is embedded.
 	cmd := exec.Command(
@@ -190,7 +191,7 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 		"-NoProfile",
 		"-NonInteractive",
 		"-EncodedCommand",
-		encodedPowerShellCommand(sidecarScript),
+		encodedPowerShellCommand([]byte(sidecarBootstrapCommand(len(payload)))),
 	)
 	cmd.Env = sidecarEnvironment(runtime.GOOS, os.Environ(), version)
 
@@ -210,6 +211,11 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start %s: %w", exe, err)
 	}
+	if err := writeSidecarPayload(stdin, payload); err != nil {
+		_ = stdin.Close()
+		cleanupStartedProcess(cmd)
+		return nil, fmt.Errorf("write psanalyzer sidecar payload: %w", err)
+	}
 
 	return &sidecarProcess{
 		cmd:    cmd,
@@ -217,6 +223,36 @@ func startSidecarProcess(exe string) (*sidecarProcess, error) {
 		stdout: stdoutPipe,
 		stderr: stderrPipe,
 	}, nil
+}
+
+func sidecarBootstrapCommand(payloadLength int) string {
+	return fmt.Sprintf(`
+$ErrorActionPreference = 'Stop'
+if ($null -ne (Get-Variable -Name PSStyle -ErrorAction SilentlyContinue)) {
+    $PSStyle.OutputRendering = 'PlainText'
+}
+$scriptLength = %d
+$buffer = [char[]]::new($scriptLength)
+$offset = 0
+while ($offset -lt $scriptLength) {
+    $read = [Console]::In.Read($buffer, $offset, $scriptLength - $offset)
+    if ($read -le 0) {
+        throw 'PowerShell sidecar bootstrap ended before the script payload was complete.'
+    }
+    $offset += $read
+}
+$script = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64CharArray($buffer, 0, $scriptLength))
+[ScriptBlock]::Create($script).Invoke()
+`, payloadLength)
+}
+
+func sidecarPayload(script []byte) string {
+	return base64.StdEncoding.EncodeToString(script)
+}
+
+func writeSidecarPayload(w io.Writer, payload string) error {
+	_, err := io.WriteString(w, payload)
+	return err
 }
 
 func encodedPowerShellCommand(script []byte) string {
@@ -397,6 +433,13 @@ func killProcess(cmd *exec.Cmd) {
 		return
 	}
 	if err := cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		return
+	}
+}
+
+func cleanupStartedProcess(cmd *exec.Cmd) {
+	killProcess(cmd)
+	if err := cmd.Wait(); err != nil {
 		return
 	}
 }

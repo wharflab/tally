@@ -50,6 +50,16 @@ func TestSidecarEnvironmentPinsAnalyzerAndDisablesColor(t *testing.T) {
 	assertEnvHas(t, env, noColorEnv, noColorEnvSet)
 }
 
+func TestSidecarBootstrapCommandStaysSmall(t *testing.T) {
+	t.Parallel()
+
+	payload := sidecarPayload(sidecarScript)
+	encoded := encodedPowerShellCommand([]byte(sidecarBootstrapCommand(len(payload))))
+	if len(encoded) > 4096 {
+		t.Fatalf("encoded bootstrap command is too large for a stable Windows launch: %d bytes", len(encoded))
+	}
+}
+
 func TestIsUnavailableRecognizesWrappedError(t *testing.T) {
 	t.Parallel()
 
@@ -393,6 +403,7 @@ function Invoke-ScriptAnalyzer {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
+	payload := sidecarPayload([]byte(prelude + string(sidecarScript)))
 	cmd := exec.CommandContext(
 		ctx,
 		"pwsh",
@@ -400,14 +411,14 @@ function Invoke-ScriptAnalyzer {
 		"-NoProfile",
 		"-NonInteractive",
 		"-EncodedCommand",
-		encodedPowerShellCommand([]byte(prelude+string(sidecarScript))),
+		encodedPowerShellCommand([]byte(sidecarBootstrapCommand(len(payload)))),
 	)
 	cmd.Env = append(sidecarEnvironment(runtime.GOOS, os.Environ(), requiredPSScriptAnalyzerVersion()),
 		"PSModulePath="+moduleRoot,
 		"TALLY_TEST_MODULE_ROOT="+moduleRoot,
 		"TALLY_TEST_REQUIRED_PSSA_VERSION="+requiredPSScriptAnalyzerVersion(),
 	)
-	cmd.Stdin = strings.NewReader("{\"id\":\"1\",\"op\":\"shutdown\"}\n")
+	cmd.Stdin = strings.NewReader(payload + "{\"id\":\"1\",\"op\":\"shutdown\"}\n")
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
