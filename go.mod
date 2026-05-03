@@ -53,7 +53,7 @@ require (
 	go.yaml.in/yaml/v4 v4.0.0-rc.4
 	golang.org/x/exp/jsonrpc2 v0.0.0-20250718183923-645b1fa84792
 	golang.org/x/sys v0.43.0
-	gopkg.in/ini.v1 v1.67.1
+	gopkg.in/ini.v1 v1.67.2
 	mvdan.cc/sh/v3 v3.13.1
 )
 
