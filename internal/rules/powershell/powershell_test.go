@@ -402,14 +402,15 @@ func TestRuleChecksExecFormWindowsPowerShell(t *testing.T) {
 	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
 RUN ["powershell", "-Command", "Write-Host hi"]
 RUN ["powershell.exe", "-Command", "Write-Host bye"]
+RUN ["powershell", "-ExecutionPolicy", "Bypass", "-Command", "Write-Host ok"]
 `)
 	input.EnabledRules = []string{PowerShellRuleCode}
 
 	violations := rule.Check(input)
-	if len(violations) != 2 {
-		t.Fatalf("got %d violations, want 2: %#v", len(violations), violations)
+	if len(violations) != 3 {
+		t.Fatalf("got %d violations, want 3: %#v", len(violations), violations)
 	}
-	wantScripts := []string{"Write-Host hi", "Write-Host bye"}
+	wantScripts := []string{"Write-Host hi", "Write-Host bye", "Write-Host ok"}
 	if !slices.Equal(fake.scripts, wantScripts) {
 		t.Fatalf("analyzed scripts = %#v, want %#v", fake.scripts, wantScripts)
 	}
@@ -429,9 +430,21 @@ RUN pwsh ./build.ps1 -Foo Bar
 `,
 		},
 		{
+			name: "shell form default file mode",
+			dockerfile: `FROM alpine
+RUN pwsh ./build.ps1 -Command Build
+`,
+		},
+		{
 			name: "exec form",
 			dockerfile: `FROM alpine
 RUN ["pwsh", "-File", "./build.ps1"]
+`,
+		},
+		{
+			name: "exec form default file mode",
+			dockerfile: `FROM alpine
+RUN ["pwsh", "./build.ps1", "-Command", "Build"]
 `,
 		},
 	}

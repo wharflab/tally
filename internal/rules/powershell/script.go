@@ -88,8 +88,26 @@ func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocat
 		}
 
 		tokenNorm := strings.ToLower(shellutil.DropQuotes(token))
+		if isPowerShellContinuationToken(tokenNorm) {
+			next = end
+			continue
+		}
 		if tokenNorm == "-command" || tokenNorm == "-c" {
 			return invocationFromRemainder(script, end)
+		}
+		if isPowerShellFileModeSwitch(tokenNorm) {
+			return explicitPowerShellInvocation{}, false
+		}
+		if powerShellOptionConsumesNextToken(tokenNorm) {
+			valueToken, valueEnd := shellutil.NextShellToken(script, end)
+			if valueToken == "" {
+				return explicitPowerShellInvocation{}, false
+			}
+			next = valueEnd
+			continue
+		}
+		if !strings.HasPrefix(tokenNorm, "-") {
+			return explicitPowerShellInvocation{}, false
 		}
 
 		next = end
@@ -107,6 +125,19 @@ func parseExecFormPowerShellInvocation(args []string) (explicitPowerShellInvocat
 	for i := 1; i < len(args); i++ {
 		tokenNorm := strings.ToLower(args[i])
 		if tokenNorm != "-command" && tokenNorm != "-c" {
+			if isPowerShellFileModeSwitch(tokenNorm) {
+				return explicitPowerShellInvocation{}, false
+			}
+			if powerShellOptionConsumesNextToken(tokenNorm) {
+				i++
+				if i >= len(args) {
+					return explicitPowerShellInvocation{}, false
+				}
+				continue
+			}
+			if !strings.HasPrefix(tokenNorm, "-") {
+				return explicitPowerShellInvocation{}, false
+			}
 			continue
 		}
 		if i+1 >= len(args) {
@@ -120,6 +151,54 @@ func parseExecFormPowerShellInvocation(args []string) (explicitPowerShellInvocat
 	}
 
 	return explicitPowerShellInvocation{}, false
+}
+
+func isPowerShellContinuationToken(token string) bool {
+	return token == `\` || token == "`"
+}
+
+func isPowerShellFileModeSwitch(token string) bool {
+	switch powerShellOptionName(token) {
+	case "-file", "-f", "-encodedcommand", "-e", "-ec", "-commandwithargs":
+		return true
+	default:
+		return false
+	}
+}
+
+func powerShellOptionConsumesNextToken(token string) bool {
+	if powerShellOptionHasInlineValue(token) {
+		return false
+	}
+	switch powerShellOptionName(token) {
+	case "-configurationname",
+		"-configurationfile",
+		"-custompipename",
+		"-encodedarguments",
+		"-executionpolicy",
+		"-inputformat",
+		"-outputformat",
+		"-psconsolefile",
+		"-settingsfile",
+		"-version",
+		"-windowstyle",
+		"-workingdirectory":
+		return true
+	default:
+		return false
+	}
+}
+
+func powerShellOptionName(token string) string {
+	name := token
+	if idx := strings.IndexAny(name, ":="); idx >= 0 {
+		name = name[:idx]
+	}
+	return name
+}
+
+func powerShellOptionHasInlineValue(token string) bool {
+	return strings.ContainsAny(token, ":=")
 }
 
 func isPowerShellExecutable(exe string) bool {
