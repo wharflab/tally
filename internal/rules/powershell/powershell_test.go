@@ -506,6 +506,18 @@ RUN ["pwsh", "-File", "./build.ps1"]
 `,
 		},
 		{
+			name: "shell form explicit file mode with command argument",
+			dockerfile: `FROM alpine
+RUN pwsh -File ./build.ps1 -Command Build
+`,
+		},
+		{
+			name: "exec form explicit file mode with command argument",
+			dockerfile: `FROM alpine
+RUN ["pwsh", "-File", "./build.ps1", "-Command", "Build"]
+`,
+		},
+		{
 			name: "exec form default file mode",
 			dockerfile: `FROM alpine
 RUN ["pwsh", "./build.ps1", "-Command", "Build"]
