@@ -311,6 +311,7 @@
               "rules/hadolint/DL3057",
               "rules/hadolint/DL3059",
               "rules/hadolint/DL3061",
+              "rules/hadolint/DL3063",
               "rules/hadolint/DL4000",
               "rules/hadolint/DL4001",
               "rules/hadolint/DL4003",

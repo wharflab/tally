@@ -19,6 +19,7 @@ import (
 	"strings"
 
 	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/ruledeprecation"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -56,6 +57,9 @@ type Context struct {
 	// SourceMaps caches parsed source maps by file path.
 	// Lazily populated by GetSourceMap.
 	sourceMaps map[string]*sourcemap.SourceMap
+
+	// RuleDeprecations collects deprecated rule-code usage found while processing.
+	RuleDeprecations *ruledeprecation.Collector
 }
 
 // NewContext creates a new processor context.
@@ -67,10 +71,11 @@ func NewContext(
 	fileSources map[string][]byte,
 ) *Context {
 	return &Context{
-		FileConfigs:   fileConfigs,
-		DefaultConfig: defaultCfg,
-		FileSources:   fileSources,
-		sourceMaps:    make(map[string]*sourcemap.SourceMap),
+		FileConfigs:      fileConfigs,
+		DefaultConfig:    defaultCfg,
+		FileSources:      fileSources,
+		sourceMaps:       make(map[string]*sourcemap.SourceMap),
+		RuleDeprecations: ruledeprecation.NewCollector(),
 	}
 }
 

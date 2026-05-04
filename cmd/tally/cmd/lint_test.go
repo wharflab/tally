@@ -11,6 +11,7 @@ import (
 
 	"github.com/wharflab/tally/internal/invocation"
 	"github.com/wharflab/tally/internal/psanalyzer"
+	"github.com/wharflab/tally/internal/ruledeprecation"
 	"github.com/wharflab/tally/internal/rules"
 )
 
@@ -116,6 +117,25 @@ func TestParseACPCmd(t *testing.T) {
 				t.Fatalf("parseACPCmd(%q) = %#v, want %#v", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestReportRuleDeprecationWarnings(t *testing.T) {
+	t.Parallel()
+
+	collector := ruledeprecation.NewCollector()
+	collector.AddCode("DL3063")
+	collector.AddCode("hadolint/DL3063")
+
+	var buf bytes.Buffer
+	reportRuleDeprecationWarnings(&buf, collector.Notices())
+
+	got := buf.String()
+	if strings.Count(got, "hadolint/DL3063") != 1 {
+		t.Fatalf("expected one deduplicated warning for hadolint/DL3063, got:\n%s", got)
+	}
+	if !strings.Contains(got, "use buildkit/ReservedStageName instead") {
+		t.Fatalf("expected replacement in warning, got:\n%s", got)
 	}
 }
 

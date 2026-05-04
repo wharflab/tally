@@ -165,6 +165,10 @@
       "status": "implemented",
       "tally_rule": "hadolint/DL3061"
     },
+    "DL3063": {
+      "status": "covered_by_buildkit",
+      "buildkit_rule": "ReservedStageName"
+    },
     "DL4000": {
       "status": "covered_by_buildkit",
       "buildkit_rule": "MaintainerDeprecated"

@@ -148,6 +148,15 @@ FROM ubuntu`
 	}
 }
 
+func TestDeprecatedDirectiveSuppressesReplacementRule(t *testing.T) {
+	t.Parallel()
+
+	d := Directive{Rules: []string{"DL3063"}}
+	if !d.SuppressesRule("buildkit/ReservedStageName") {
+		t.Fatal("expected deprecated DL3063 directive to suppress buildkit/ReservedStageName")
+	}
+}
+
 func TestParseCaseInsensitive(t *testing.T) {
 	t.Parallel()
 	content := `# TALLY IGNORE=DL3006

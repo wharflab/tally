@@ -648,6 +648,69 @@ func TestRulesConfigIncludeExclude(t *testing.T) {
 	}
 }
 
+func TestRulesConfigSupersededRuleAlias(t *testing.T) {
+	t.Parallel()
+
+	t.Run("exclude by deprecated code disables replacement", func(t *testing.T) {
+		t.Parallel()
+		rc := RulesConfig{Exclude: []string{"hadolint/DL3063"}}
+		enabled := rc.IsEnabled("buildkit/ReservedStageName")
+		if enabled == nil || *enabled {
+			t.Fatalf("IsEnabled(buildkit/ReservedStageName) = %v, want false", enabled)
+		}
+	})
+
+	t.Run("bare deprecated code disables replacement", func(t *testing.T) {
+		t.Parallel()
+		rc := RulesConfig{Exclude: []string{"DL3063"}}
+		enabled := rc.IsEnabled("buildkit/ReservedStageName")
+		if enabled == nil || *enabled {
+			t.Fatalf("IsEnabled(buildkit/ReservedStageName) = %v, want false", enabled)
+		}
+	})
+
+	t.Run("deprecated wildcard does not match replacement", func(t *testing.T) {
+		t.Parallel()
+		rc := RulesConfig{Exclude: []string{"hadolint/*"}}
+		enabled := rc.IsEnabled("buildkit/ReservedStageName")
+		if enabled != nil {
+			t.Fatalf("IsEnabled(buildkit/ReservedStageName) = %v, want nil", enabled)
+		}
+	})
+
+	t.Run("deprecated table config applies to replacement", func(t *testing.T) {
+		t.Parallel()
+		rc := RulesConfig{}
+		rc.Set("hadolint/DL3063", RuleConfig{Severity: "off"})
+		if got := rc.GetSeverity("buildkit/ReservedStageName"); got != "off" {
+			t.Fatalf("GetSeverity(buildkit/ReservedStageName) = %q, want off", got)
+		}
+	})
+
+	t.Run("replacement table config wins over deprecated table config", func(t *testing.T) {
+		t.Parallel()
+		rc := RulesConfig{}
+		rc.Set("hadolint/DL3063", RuleConfig{Severity: "off"})
+		rc.Set("buildkit/ReservedStageName", RuleConfig{Severity: "error"})
+		if got := rc.GetSeverity("buildkit/ReservedStageName"); got != "error" {
+			t.Fatalf("GetSeverity(buildkit/ReservedStageName) = %q, want error", got)
+		}
+	})
+
+	t.Run("deprecated references are deduplicated", func(t *testing.T) {
+		t.Parallel()
+		rc := RulesConfig{Exclude: []string{"DL3063"}}
+		rc.Set("hadolint/DL3063", RuleConfig{Severity: "off"})
+		notices := rc.DeprecatedReferences()
+		if len(notices) != 1 {
+			t.Fatalf("got %d notices, want 1", len(notices))
+		}
+		if notices[0].Entry.Code != "hadolint/DL3063" {
+			t.Fatalf("notice code = %q, want hadolint/DL3063", notices[0].Entry.Code)
+		}
+	})
+}
+
 func TestRulesConfigPowerShellInternalErrorIncludeEnablesEngine(t *testing.T) {
 	t.Parallel()
 

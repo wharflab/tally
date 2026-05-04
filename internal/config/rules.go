@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/wharflab/tally/internal/ruledeprecation"
 	"github.com/wharflab/tally/internal/rules/configutil"
 )
 
@@ -104,13 +105,13 @@ func (rc *RulesConfig) Get(ruleCode string) *RuleConfig {
 	if rc == nil {
 		return nil
 	}
-	ns, name := parseRuleCode(ruleCode)
-	nsMap := rc.namespaceMap(ns)
-	if nsMap == nil {
-		return nil
+	if cfg := rc.getExact(ruleCode); cfg != nil {
+		return cfg
 	}
-	if cfg, ok := nsMap[name]; ok {
-		return &cfg
+	for _, alias := range ruledeprecation.DeprecatedCodesFor(ruleCode) {
+		if cfg := rc.getExact(alias); cfg != nil {
+			return cfg
+		}
 	}
 	return nil
 }
@@ -134,17 +135,29 @@ func (rc *RulesConfig) IsEnabled(ruleCode string) *bool {
 	}
 
 	// Check Include first (takes precedence)
-	if matchesAnyIncludePattern(ruleCode, rc.Include) {
+	if matchesAnyIncludePattern(ruleCode, rc.Include) ||
+		matchesAnyDeprecatedExactPattern(ruleCode, rc.Include) {
 		return new(true)
 	}
 
 	// Check Exclude
-	if matchesAnyPattern(ruleCode, rc.Exclude) {
+	if matchesAnyPattern(ruleCode, rc.Exclude) ||
+		matchesAnyDeprecatedExactPattern(ruleCode, rc.Exclude) {
 		return new(false)
 	}
 
 	// No explicit config - use rule default
 	return nil
+}
+
+func matchesAnyDeprecatedExactPattern(ruleCode string, patterns []string) bool {
+	aliases := ruledeprecation.DeprecatedCodesFor(ruleCode)
+	if len(aliases) == 0 {
+		return false
+	}
+	return slices.ContainsFunc(patterns, func(pattern string) bool {
+		return slices.Contains(aliases, strings.TrimSpace(pattern))
+	})
 }
 
 // matchesAnyPattern checks if ruleCode matches any pattern in the list.
@@ -286,6 +299,34 @@ func (rc *RulesConfig) EnablesPowerShellAnalyzer() bool {
 	return false
 }
 
+// DeprecatedReferences returns deprecation notices for explicitly configured rule codes.
+func (rc *RulesConfig) DeprecatedReferences() []ruledeprecation.Notice {
+	if rc == nil {
+		return nil
+	}
+
+	collector := ruledeprecation.NewCollector()
+	for _, pattern := range rc.Include {
+		collector.AddCode(pattern)
+	}
+	for _, pattern := range rc.Exclude {
+		collector.AddCode(pattern)
+	}
+
+	addNamespaceCodes := func(namespace string, entries map[string]RuleConfig) {
+		for name := range entries {
+			collector.AddCode(namespace + "/" + name)
+		}
+	}
+	addNamespaceCodes("tally", rc.Tally)
+	addNamespaceCodes("buildkit", rc.Buildkit)
+	addNamespaceCodes("hadolint", rc.Hadolint)
+	addNamespaceCodes("shellcheck", rc.Shellcheck)
+	addNamespaceCodes("powershell", rc.Powershell)
+
+	return collector.Notices()
+}
+
 func isPowerShellAnalyzerRuleName(name string) bool {
 	switch name {
 	case "", "PowerShell":
@@ -348,6 +389,18 @@ func (rc *RulesConfig) Set(ruleCode string, cfg RuleConfig) bool {
 	default:
 		return false
 	}
+}
+
+func (rc *RulesConfig) getExact(ruleCode string) *RuleConfig {
+	ns, name := parseRuleCode(ruleCode)
+	nsMap := rc.namespaceMap(ns)
+	if nsMap == nil {
+		return nil
+	}
+	if cfg, ok := nsMap[name]; ok {
+		return &cfg
+	}
+	return nil
 }
 
 // namespaceMap returns the map for a given namespace.
