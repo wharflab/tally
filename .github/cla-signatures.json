@@ -1,3 +1,12 @@
 {
-   "signedContributors": []
+  "signedContributors": [
+    {
+      "name": "GuilhemBusset",
+      "id": 266254944,
+      "comment_id": 4374112219,
+      "created_at": "2026-05-04T20:06:01Z",
+      "repoId": 1141811828,
+      "pullRequestNo": 603
+    }
+  ]
 }
