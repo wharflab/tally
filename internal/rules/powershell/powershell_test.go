@@ -355,6 +355,25 @@ RUN pwsh -Command "Write-Host hi"
 	}
 }
 
+func TestRuleChecksExplicitPowerShellWrapperWithValueOptionAlias(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeAnalyzer{}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN pwsh -ep Bypass -Command "Write-Host hi"
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations from fake analyzer, got %#v", violations)
+	}
+	if len(fake.scripts) != 1 || fake.scripts[0] != "Write-Host hi" {
+		t.Fatalf("analyzed scripts = %#v, want wrapper body after value-option alias", fake.scripts)
+	}
+}
+
 func TestRuleChecksExecFormPowerShellCommandRun(t *testing.T) {
 	t.Parallel()
 
@@ -381,6 +400,25 @@ RUN ["pwsh", "-NoProfile", "-Command", "Write-Host", "hi"]
 	}
 	if violations[0].Location.Start.Line != 2 || violations[0].Location.Start.Column != 0 {
 		t.Fatalf("Location = %#v, want exec-form RUN line", violations[0].Location)
+	}
+}
+
+func TestRuleChecksExecFormPowerShellCommandRunWithValueOptionAlias(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakeAnalyzer{}
+	rule := newRuleWithAnalyzer(fake)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN ["pwsh", "-ex", "Bypass", "-Command", "Write-Host hi"]
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("expected no violations from fake analyzer, got %#v", violations)
+	}
+	if len(fake.scripts) != 1 || fake.scripts[0] != "Write-Host hi" {
+		t.Fatalf("analyzed scripts = %#v, want exec-form body after value-option alias", fake.scripts)
 	}
 }
 

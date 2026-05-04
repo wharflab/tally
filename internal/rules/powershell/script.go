@@ -187,16 +187,27 @@ func powerShellOptionConsumesNextToken(token string) bool {
 	}
 	switch powerShellOptionName(token) {
 	case "-configurationname",
+		"-config",
 		"-configurationfile",
 		"-custompipename",
 		"-encodedarguments",
 		"-executionpolicy",
+		"-ep",
+		"-ex",
 		"-inputformat",
+		"-if",
+		"-inp",
 		"-outputformat",
+		"-o",
+		"-of",
 		"-psconsolefile",
 		"-settingsfile",
+		"-settings",
 		"-version",
+		"-v",
 		"-windowstyle",
+		"-w",
+		"-wd",
 		"-workingdirectory":
 		return true
 	default:
