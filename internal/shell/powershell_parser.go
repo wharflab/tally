@@ -274,19 +274,18 @@ func PowerShellAssignment(script string) (string, string, bool) {
 		return "", "", false
 	}
 
-	cursor := assign.Walk()
-	defer cursor.Close()
-
-	children := assign.NamedChildren(cursor)
-	if len(children) != 3 {
-		return "", "", false
-	}
-	if children[0].Kind() != tspowershell.NodeLeftAssignmentExpression || children[2].Kind() != tspowershell.NodePipeline {
+	nameNode := assign.NamedChild(0)
+	if nameNode == nil || nameNode.Kind() != tspowershell.NodeLeftAssignmentExpression {
 		return "", "", false
 	}
 
-	name := strings.TrimSpace(children[0].Utf8Text(source))
-	value := strings.TrimSpace(children[2].Utf8Text(source))
+	valueNode := assign.ChildByFieldName(tspowershell.FieldValue)
+	if valueNode == nil {
+		return "", "", false
+	}
+
+	name := strings.TrimSpace(nameNode.Utf8Text(source))
+	value := strings.TrimSpace(valueNode.Utf8Text(source))
 	if name == "" || value == "" {
 		return "", "", false
 	}
