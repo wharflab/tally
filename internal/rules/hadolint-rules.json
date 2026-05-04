@@ -360,6 +360,12 @@
     "severity": "Warning"
   },
   {
+    "code": "DL3063",
+    "description": "Stage name should not be a reserved word.",
+    "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL3063",
+    "severity": "Warning"
+  },
+  {
     "code": "DL4000",
     "description": "MAINTAINER is deprecated.",
     "wiki_url": "https://github.com/hadolint/hadolint/wiki/DL4000",

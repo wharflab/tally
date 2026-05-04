@@ -166,6 +166,18 @@ func lintCases(t *testing.T) []lintCase {
 				mustSelectRules("buildkit/ReservedStageName", "buildkit/StageNameCasing")...),
 			wantExit: 1,
 		},
+		{
+			name: "deprecated-rule-alias-inline",
+			dir:  "deprecated-rule-alias-inline",
+			args: append([]string{"--format", "json"},
+				mustSelectRules("buildkit/ReservedStageName")...),
+			afterLint: func(t *testing.T, stderr string) {
+				t.Helper()
+				if !strings.Contains(stderr, "rule hadolint/DL3063 is deprecated; use buildkit/ReservedStageName instead") {
+					t.Fatalf("expected deprecated rule warning in stderr, got:\n%s", stderr)
+				}
+			},
+		},
 
 		// Semantic model construction-time violations
 		{

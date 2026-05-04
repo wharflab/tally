@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 
 	"github.com/wharflab/tally/internal/directive"
+	"github.com/wharflab/tally/internal/ruledeprecation"
 	"github.com/wharflab/tally/internal/rules"
 )
 
@@ -142,13 +143,18 @@ func (p *InlineDirectiveFilter) processFile(
 	var validator directive.RuleValidator
 	if cfg.InlineDirectives.ValidateRules {
 		validator = func(code string) bool {
-			return p.registry.Has(code) || rules.IsDynamicRuleCode(code)
+			return p.registry.Has(code) || rules.IsDynamicRuleCode(code) || ruledeprecation.IsKnown(code)
 		}
 	}
 
 	// Parse directives
 	spanIndex := directive.NewInstructionSpanIndexFromSource(sm.Source(), sm)
 	directiveResult := directive.Parse(sm, validator, spanIndex)
+	for _, d := range directiveResult.Directives {
+		for _, code := range d.Rules {
+			ctx.RuleDeprecations.AddCode(code)
+		}
+	}
 
 	// Report parse errors as warnings
 	for _, parseErr := range directiveResult.Errors {

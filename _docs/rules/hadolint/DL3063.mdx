@@ -1,0 +1,30 @@
+---
+title: "hadolint/DL3063"
+description: "Stage name should not be a reserved word."
+---
+
+Stage name should not be a reserved word.
+
+> **Superseded by [`buildkit/ReservedStageName`](../buildkit/ReservedStageName)**, which provides the same check.
+
+## Description
+
+Stage aliases in `FROM ... AS <name>` must not use reserved Dockerfile stage names such as `scratch` or `context`.
+
+## Examples
+
+### Problematic code
+
+```dockerfile
+FROM alpine:3.21 AS scratch
+```
+
+### Correct code
+
+```dockerfile
+FROM alpine:3.21 AS builder
+```
+
+## Reference
+
+- [hadolint/DL3063](https://github.com/hadolint/hadolint/wiki/DL3063)

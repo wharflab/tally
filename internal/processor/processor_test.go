@@ -183,6 +183,69 @@ func TestPathExclusionFilter(t *testing.T) {
 	}
 }
 
+func TestPathExclusionFilter_DeprecatedRuleAlias(t *testing.T) {
+	t.Parallel()
+	violations := []rules.Violation{
+		rules.NewViolation(
+			rules.NewLineLocation("vendor/Dockerfile", 1),
+			"buildkit/ReservedStageName",
+			"msg",
+			rules.SeverityError,
+		),
+	}
+
+	cfg := config.Default()
+	cfg.Rules.Set("hadolint/DL3063", config.RuleConfig{
+		Exclude: config.ExcludeConfig{
+			Paths: []string{"vendor/**"},
+		},
+	})
+
+	p := NewPathExclusionFilter()
+	ctx := NewContext(nil, cfg, nil)
+
+	result := p.Process(violations, ctx)
+	if len(result) != 0 {
+		t.Fatalf("expected deprecated alias path exclusion to filter violation, got %d", len(result))
+	}
+}
+
+func TestInlineDirectiveFilter_DeprecatedRuleAlias(t *testing.T) {
+	t.Parallel()
+	const file = "Dockerfile"
+	source := []byte(`# hadolint ignore=DL3063
+FROM alpine:3.21 AS scratch
+`)
+	violations := []rules.Violation{
+		rules.NewViolation(
+			rules.NewLineLocation(file, 2),
+			"buildkit/ReservedStageName",
+			"msg",
+			rules.SeverityError,
+		),
+	}
+
+	cfg := config.Default()
+	cfg.InlineDirectives.ValidateRules = true
+	p := NewInlineDirectiveFilter()
+	ctx := NewContext(nil, cfg, map[string][]byte{file: source})
+
+	result := p.Process(violations, ctx)
+	if len(result) != 0 {
+		t.Fatalf("expected deprecated directive to suppress replacement violation, got %d", len(result))
+	}
+	notices := ctx.RuleDeprecations.Notices()
+	if len(notices) != 1 {
+		t.Fatalf("got %d deprecation notices, want 1", len(notices))
+	}
+	if notices[0].Entry.Code != "hadolint/DL3063" {
+		t.Fatalf("notice code = %q, want hadolint/DL3063", notices[0].Entry.Code)
+	}
+	if additional := p.AdditionalViolations(); len(additional) != 0 {
+		t.Fatalf("got %d additional violations, want 0", len(additional))
+	}
+}
+
 func TestSnippetAttachment(t *testing.T) {
 	t.Parallel()
 	source := []byte("line 1\nline 2\nline 3\n")

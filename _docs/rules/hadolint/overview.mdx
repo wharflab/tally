@@ -78,6 +78,7 @@ coverage.
 | DL3029 | `buildkit/FromPlatformFlagConstDisallowed` + `tally/platform-mismatch` | `buildkit/FromPlatformFlagConstDisallowed` is off by default; `tally/platform-mismatch` provides a stricter registry-backed check |
 | DL3044 | `buildkit/UndefinedVar` | Covers referencing an ENV variable in the same ENV statement |
 | DL3059 | `tally/prefer-run-heredoc` 🔧 | Suggests heredoc syntax instead of consolidating consecutive RUN instructions |
+| DL3063 | `buildkit/ReservedStageName` | Covers reserved `scratch` and `context` FROM aliases |
 | DL4000 | `buildkit/MaintainerDeprecated` 🔧 | Covers deprecated MAINTAINER instruction |
 | DL4003 | `buildkit/MultipleInstructionsDisallowed` 🔧 | Covers multiple CMD instructions |
 | DL4004 | `buildkit/MultipleInstructionsDisallowed` 🔧 | Covers multiple ENTRYPOINT instructions |

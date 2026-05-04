@@ -31,6 +31,7 @@ import (
 	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/registry"
 	"github.com/wharflab/tally/internal/reporter"
+	"github.com/wharflab/tally/internal/ruledeprecation"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/syntax"
 	"github.com/wharflab/tally/internal/version"
@@ -453,6 +454,7 @@ func lintStdinContent(ctx stdcontext.Context, opts *lintOptions, content []byte)
 func processViolations(res *lintResults, cfg *config.Config) []rules.Violation {
 	chain, inlineFilter := linter.CLIProcessors()
 	procCtx := processor.NewContext(res.fileConfigs, cfg, res.fileSources)
+	collectConfigRuleDeprecations(procCtx, res.fileConfigs, cfg)
 	allViolations := chain.Process(res.violations, procCtx)
 
 	additionalViolations := inlineFilter.AdditionalViolations()
@@ -462,7 +464,40 @@ func processViolations(res *lintResults, cfg *config.Config) []rules.Violation {
 		allViolations = append(allViolations, additionalViolations...)
 		allViolations = reporter.SortViolations(allViolations)
 	}
+	reportRuleDeprecationWarnings(os.Stderr, procCtx.RuleDeprecations.Notices())
 	return allViolations
+}
+
+func collectConfigRuleDeprecations(
+	procCtx *processor.Context,
+	fileConfigs map[string]*config.Config,
+	defaultCfg *config.Config,
+) {
+	if procCtx == nil || procCtx.RuleDeprecations == nil {
+		return
+	}
+	seen := make(map[*config.Config]struct{})
+	for _, cfg := range fileConfigs {
+		if cfg == nil {
+			continue
+		}
+		if _, ok := seen[cfg]; ok {
+			continue
+		}
+		seen[cfg] = struct{}{}
+		procCtx.RuleDeprecations.AddNotices(cfg.Rules.DeprecatedReferences())
+	}
+	if defaultCfg != nil {
+		if _, ok := seen[defaultCfg]; !ok {
+			procCtx.RuleDeprecations.AddNotices(defaultCfg.Rules.DeprecatedReferences())
+		}
+	}
+}
+
+func reportRuleDeprecationWarnings(w io.Writer, notices []ruledeprecation.Notice) {
+	for _, notice := range notices {
+		fmt.Fprintf(w, "Warning: %s\n", notice.Message())
+	}
 }
 
 // applyStdinFixes applies fixes and writes the result to stdout.

@@ -11,6 +11,7 @@ import (
 	"github.com/knadh/koanf/v2"
 
 	"github.com/wharflab/tally/internal/ruleconfig"
+	"github.com/wharflab/tally/internal/ruledeprecation"
 	schemasembed "github.com/wharflab/tally/internal/schemas"
 	generatedconfig "github.com/wharflab/tally/internal/schemas/generated/config"
 	schemavalidator "github.com/wharflab/tally/internal/schemas/runtime"
@@ -226,7 +227,11 @@ func validateRuleOptions(raw map[string]any, validator schemavalidator.Validator
 
 		for name, entry := range namespaceRaw {
 			ruleCode := ns + "/" + name
-			if !validator.HasRuleSchema(ruleCode) {
+			schemaRuleCode := ruleCode
+			if replacement, ok := ruledeprecation.ReplacementFor(ruleCode); ok {
+				schemaRuleCode = replacement
+			}
+			if !validator.HasRuleSchema(schemaRuleCode) {
 				opts := optionsFromRuleEntry(entry)
 				if len(opts) == 0 {
 					continue
@@ -240,7 +245,7 @@ func validateRuleOptions(raw map[string]any, validator schemavalidator.Validator
 			}
 
 			if opts := optionsFromRuleEntry(entry); len(opts) > 0 {
-				if err := validator.ValidateRuleOptions(ruleCode, opts); err != nil {
+				if err := validator.ValidateRuleOptions(schemaRuleCode, opts); err != nil {
 					return err
 				}
 			}

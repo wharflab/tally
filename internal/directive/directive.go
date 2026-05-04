@@ -13,6 +13,8 @@ package directive
 import (
 	"math"
 	"strings"
+
+	"github.com/wharflab/tally/internal/ruledeprecation"
 )
 
 // DirectiveType indicates the scope of a directive.
@@ -134,6 +136,10 @@ func matchesRule(pattern, ruleCode string) bool {
 		if ruleCode == pattern[idx+1:] {
 			return true
 		}
+	}
+
+	if ruledeprecation.IsDeprecatedAliasFor(pattern, ruleCode) {
+		return true
 	}
 
 	return false
