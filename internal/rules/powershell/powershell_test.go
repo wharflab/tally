@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/wharflab/tally/internal/config"
 	fixpkg "github.com/wharflab/tally/internal/fix"
@@ -77,6 +78,56 @@ RUN Write-Host hi
 	}
 	if len(fake.scripts) != 0 {
 		t.Fatalf("analyzer was called when slow checks are disabled: %#v", fake.scripts)
+	}
+}
+
+type blockingAnalyzer struct {
+	ctxs chan context.Context
+}
+
+func (a *blockingAnalyzer) Analyze(ctx context.Context, _ psanalyzer.AnalyzeRequest) ([]psanalyzer.Diagnostic, error) {
+	a.ctxs <- ctx
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestRuleCheckContextCancelsAnalyzerWithCallerContext(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	analyzer := &blockingAnalyzer{ctxs: make(chan context.Context, 1)}
+	rule := newRuleWithAnalyzer(analyzer)
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine
+RUN pwsh -Command "Write-Host hi"
+`)
+	input.EnabledRules = []string{PowerShellRuleCode}
+
+	done := make(chan []rules.Violation, 1)
+	go func() {
+		done <- rule.CheckContext(ctx, input)
+	}()
+
+	var analyzerCtx context.Context
+	select {
+	case analyzerCtx = <-analyzer.ctxs:
+	case <-time.After(time.Second):
+		cancel()
+		t.Fatal("analyzer was not called")
+	}
+
+	cancel()
+
+	select {
+	case violations := <-done:
+		if len(violations) != 0 {
+			t.Fatalf("got %d violations after cancellation, want 0: %#v", len(violations), violations)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("CheckContext did not return after caller cancellation")
+	}
+
+	if err := analyzerCtx.Err(); !errors.Is(err, context.Canceled) {
+		t.Fatalf("analyzer context error = %v, want context.Canceled", err)
 	}
 }
 

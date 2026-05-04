@@ -61,6 +61,10 @@ func (r *Rule) Metadata() rules.RuleMetadata {
 }
 
 func (r *Rule) Check(input rules.LintInput) []rules.Violation {
+	return r.CheckContext(context.Background(), input)
+}
+
+func (r *Rule) CheckContext(ctx context.Context, input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	if !input.IsRuleEnabled(meta.Code) {
 		return nil
@@ -82,7 +86,10 @@ func (r *Rule) Check(input rules.LintInput) []rules.Violation {
 	settings := analyzerSettings(input.Config)
 	violations := make([]rules.Violation, 0, len(tasks))
 	for _, task := range tasks {
-		violations = append(violations, r.checkMapping(input.File, task.mapping, settings)...)
+		if ctx.Err() != nil {
+			return violations
+		}
+		violations = append(violations, r.checkMapping(ctx, input.File, task.mapping, settings)...)
 	}
 	return violations
 }
@@ -222,19 +229,30 @@ func collectRunCommandTasks(
 	}}}
 }
 
-func (r *Rule) checkMapping(file string, mapping scriptMapping, settings psanalyzer.Settings) []rules.Violation {
+func (r *Rule) checkMapping(
+	ctx context.Context,
+	file string,
+	mapping scriptMapping,
+	settings psanalyzer.Settings,
+) []rules.Violation {
 	if strings.TrimSpace(mapping.Script) == "" {
 		return nil
 	}
+	if ctx.Err() != nil {
+		return nil
+	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), analyzerRunTimeout)
+	analyzerCtx, cancel := context.WithTimeout(ctx, analyzerRunTimeout)
 	defer cancel()
 
-	diagnostics, err := r.analyzer.Analyze(ctx, psanalyzer.AnalyzeRequest{
+	diagnostics, err := r.analyzer.Analyze(analyzerCtx, psanalyzer.AnalyzeRequest{
 		ScriptDefinition: mapping.Script,
 		Settings:         settings,
 	})
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil
+		}
 		if psanalyzer.IsUnavailable(err) {
 			return nil
 		}
