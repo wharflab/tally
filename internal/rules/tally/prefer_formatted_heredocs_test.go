@@ -187,7 +187,7 @@ EOF
 			WantMessages:   []string{"COPY heredoc for /usr/local/bin/entrypoint should be pretty-printed as a shell script"},
 		},
 		{
-			Name: "ADD sh heredoc is skipped",
+			Name: "ADD sh heredoc without shebang",
 			Content: `FROM alpine
 ADD <<EOF /usr/local/bin/entrypoint.sh
 if true; then
@@ -195,7 +195,8 @@ if true; then
 fi
 EOF
 `,
-			WantViolations: 0,
+			WantViolations: 1,
+			WantMessages:   []string{"ADD heredoc for /usr/local/bin/entrypoint.sh should be pretty-printed as a shell script"},
 		},
 		{
 			Name: "ADD PowerShell module heredoc",
@@ -321,6 +322,34 @@ EOF
 	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
 	want := `FROM alpine
 COPY <<EOF /usr/local/bin/entrypoint.sh
+if true; then
+	echo hi
+fi
+EOF
+`
+	if got != want {
+		t.Fatalf("fixed content mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_FixADDShell(t *testing.T) {
+	t.Parallel()
+	content := `FROM alpine
+ADD <<EOF /usr/local/bin/entrypoint.sh
+if true; then
+ echo hi
+fi
+EOF
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewPreferFormattedHeredocsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	want := `FROM alpine
+ADD <<EOF /usr/local/bin/entrypoint.sh
 if true; then
 	echo hi
 fi

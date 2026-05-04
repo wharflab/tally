@@ -7,8 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/moby/buildkit/frontend/dockerfile/command"
-
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/heredocfmt"
 	"github.com/wharflab/tally/internal/psanalyzer"
@@ -112,11 +110,8 @@ func (r *PreferFormattedHeredocsRule) checkDockerfileHeredoc(
 	if kind != "" {
 		return formattedTypedHeredocViolation(input.File, meta, doc, formatted, kind, ok)
 	}
-	if strings.EqualFold(doc.Instruction, command.Copy) {
-		return r.checkCopyScriptHeredoc(ctx, input, formatter, meta, doc)
-	}
-	if strings.EqualFold(doc.Instruction, command.Add) {
-		return r.checkPowerShellScriptHeredoc(ctx, input, formatter, meta, doc)
+	if heredocfmt.IsShellTargetHeredocInstruction(doc.Instruction) {
+		return r.checkShellScriptHeredoc(ctx, input, formatter, meta, doc)
 	}
 	return rules.Violation{}, false
 }
@@ -142,7 +137,7 @@ func formattedTypedHeredocViolation(
 	return formattedHeredocViolation(meta, loc, message, "Pretty-print heredoc body", formatted, doc.BodyPrefix), true
 }
 
-func (r *PreferFormattedHeredocsRule) checkCopyScriptHeredoc(
+func (r *PreferFormattedHeredocsRule) checkShellScriptHeredoc(
 	ctx context.Context,
 	input rules.LintInput,
 	formatter *heredocfmt.Formatter,
@@ -162,7 +157,8 @@ func (r *PreferFormattedHeredocsRule) checkCopyScriptHeredoc(
 
 	loc := heredocBodyLocation(input.File, doc.BodyStartLine, doc.TerminatorLine)
 	message := doc.Instruction + " heredoc for " + doc.TargetPath + " should be pretty-printed as a shell script"
-	return formattedHeredocViolation(meta, loc, message, "Pretty-print COPY shell heredoc body", formatted, doc.BodyPrefix), true
+	description := "Pretty-print " + doc.Instruction + " shell heredoc body"
+	return formattedHeredocViolation(meta, loc, message, description, formatted, doc.BodyPrefix), true
 }
 
 func (r *PreferFormattedHeredocsRule) checkPowerShellScriptHeredoc(

@@ -199,7 +199,8 @@ func stageIndexAtLine(stages []instructions.Stage, line int) int {
 	return stageIdx
 }
 
-func isShellTargetHeredocInstruction(instruction string) bool {
+// IsShellTargetHeredocInstruction reports whether a COPY/ADD heredoc can target a shell script file.
+func IsShellTargetHeredocInstruction(instruction string) bool {
 	return strings.EqualFold(instruction, command.Copy) || strings.EqualFold(instruction, command.Add)
 }
 
@@ -219,7 +220,7 @@ func FormatDockerfileHeredocsWithPowerShell(
 		if err != nil {
 			return nil, err
 		}
-		if !ok && isShellTargetHeredocInstruction(doc.Instruction) {
+		if !ok && IsShellTargetHeredocInstruction(doc.Instruction) {
 			formatted, _, ok, err = formatter.FormatShellTarget(doc.TargetPath, doc.Content)
 			if err != nil {
 				return nil, err
