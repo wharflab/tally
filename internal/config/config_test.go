@@ -669,6 +669,15 @@ func TestRulesConfigSupersededRuleAlias(t *testing.T) {
 		}
 	})
 
+	t.Run("deprecated code with whitespace does not disable replacement", func(t *testing.T) {
+		t.Parallel()
+		rc := RulesConfig{Exclude: []string{" DL3063 "}}
+		enabled := rc.IsEnabled("buildkit/ReservedStageName")
+		if enabled != nil {
+			t.Fatalf("IsEnabled(buildkit/ReservedStageName) = %v, want nil", enabled)
+		}
+	})
+
 	t.Run("deprecated wildcard does not match replacement", func(t *testing.T) {
 		t.Parallel()
 		rc := RulesConfig{Exclude: []string{"hadolint/*"}}

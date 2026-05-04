@@ -87,7 +87,10 @@ var entries = []Entry{
 	supersededByBuildKit("DL4004", "MultipleInstructionsDisallowed", "duplicate ENTRYPOINT instructions"),
 }
 
-var lookupByCode = buildLookup(entries)
+var (
+	lookupByCode        = buildLookup(entries)
+	lookupByReplacement = buildReplacementLookup(entries)
+)
 
 func supersededByBuildKit(code, ruleName, subject string) Entry {
 	return Entry{
@@ -110,9 +113,21 @@ func buildLookup(in []Entry) map[string]Entry {
 	return out
 }
 
+func buildReplacementLookup(in []Entry) map[string][]string {
+	out := make(map[string][]string)
+	for _, entry := range in {
+		if entry.Kind != KindSuperseded || entry.Replacement == "" {
+			continue
+		}
+		out[entry.Replacement] = append(out[entry.Replacement], entry.Code)
+		out[entry.Replacement] = append(out[entry.Replacement], entry.Aliases...)
+	}
+	return out
+}
+
 // Lookup returns the deprecation entry for code or one of its aliases.
 func Lookup(code string) (Entry, bool) {
-	entry, ok := lookupByCode[strings.TrimSpace(code)]
+	entry, ok := lookupByCode[code]
 	return entry, ok
 }
 
@@ -133,15 +148,7 @@ func ReplacementFor(code string) (string, bool) {
 
 // DeprecatedCodesFor returns deprecated codes and aliases that target ruleCode.
 func DeprecatedCodesFor(ruleCode string) []string {
-	var out []string
-	for _, entry := range entries {
-		if entry.Kind != KindSuperseded || entry.Replacement != ruleCode {
-			continue
-		}
-		out = append(out, entry.Code)
-		out = append(out, entry.Aliases...)
-	}
-	return out
+	return slices.Clone(lookupByReplacement[ruleCode])
 }
 
 // IsDeprecatedAliasFor reports whether deprecatedCode is a superseded alias for ruleCode.

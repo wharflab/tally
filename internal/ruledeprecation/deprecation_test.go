@@ -52,6 +52,28 @@ func TestLookupSupersededAlias(t *testing.T) {
 	}
 }
 
+func TestLookupUsesExactCode(t *testing.T) {
+	t.Parallel()
+
+	if _, ok := Lookup(" DL3063 "); ok {
+		t.Fatal("Lookup accepted code with surrounding whitespace, want exact match only")
+	}
+}
+
+func TestDeprecatedCodesForReturnsClone(t *testing.T) {
+	t.Parallel()
+
+	codes := DeprecatedCodesFor("buildkit/ReservedStageName")
+	if !slices.Contains(codes, "hadolint/DL3063") || !slices.Contains(codes, "DL3063") {
+		t.Fatalf("DeprecatedCodesFor(buildkit/ReservedStageName) = %v, want DL3063 aliases", codes)
+	}
+
+	codes[0] = "mutated"
+	if got := DeprecatedCodesFor("buildkit/ReservedStageName"); slices.Contains(got, "mutated") {
+		t.Fatalf("DeprecatedCodesFor returned mutable backing storage: %v", got)
+	}
+}
+
 func TestCollectorDeduplicatesAliases(t *testing.T) {
 	t.Parallel()
 

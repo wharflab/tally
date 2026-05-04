@@ -156,7 +156,7 @@ func matchesAnyDeprecatedExactPattern(ruleCode string, patterns []string) bool {
 		return false
 	}
 	return slices.ContainsFunc(patterns, func(pattern string) bool {
-		return slices.Contains(aliases, strings.TrimSpace(pattern))
+		return slices.Contains(aliases, pattern)
 	})
 }
 
