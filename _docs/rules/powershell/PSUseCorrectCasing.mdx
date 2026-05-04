@@ -1,0 +1,85 @@
+---
+title: "powershell/PSUseCorrectCasing"
+description: "Use exact casing of cmdlet/function/parameter name."
+sidebarTitle: "PSUseCorrectCasing"
+---
+
+`powershell/PSUseCorrectCasing` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Information |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+This is a style/formatting rule. PowerShell is case insensitive wherever possible, so the casing of
+cmdlet names, parameters, keywords and operators doesn't matter. This rule nonetheless ensures
+consistent casing for clarity and readability. Using lowercase keywords helps distinguish them from
+commands. Using lowercase operators helps distinguish them from parameters.
+
+## How
+
+- Use exact casing for type names.
+- Use exact casing of the cmdlet and its parameters.
+- Use lowercase for language keywords and operators.
+
+## Configuration
+
+```powershell
+Rules = @{
+    PSUseCorrectCasing = @{
+        Enable        = $true
+        CheckCommands = $true
+        CheckKeyword  = $true
+        CheckOperator = $true
+    }
+}
+```
+
+## Parameters
+
+### Enable: bool (Default value is `$false`)
+
+Enable or disable the rule during ScriptAnalyzer invocation.
+
+### CheckCommands: bool (Default value is `$true`)
+
+If true, require the case of all command and parameter names to match their canonical casing.
+
+### CheckKeyword: bool (Default value is `$true`)
+
+If true, require the case of all keywords to be lowercase.
+
+### CheckOperator: bool (Default value is `$true`)
+
+If true, require the case of all operators to be lowercase. For example: `-eq`, `-ne`, `-gt`
+
+## Examples
+
+### Wrong way
+
+```powershell
+ForEach ($file in Get-childitem -Recurse) {
+    $file.Extension -EQ '.txt'
+}
+
+invoke-command { 'foo' } -runasadministrator
+```
+
+### Correct way
+
+```powershell
+foreach ($file in Get-ChildItem -Recurse) {
+    $file.Extension -eq '.txt'
+}
+
+Invoke-Command { 'foo' } -RunAsAdministrator
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseCorrectCasing](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseCorrectCasing.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

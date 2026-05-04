@@ -1,0 +1,84 @@
+---
+title: "powershell/PowerShell"
+description: "Runs PowerShell script diagnostics for PowerShell snippets embedded in Dockerfiles."
+---
+
+Runs PowerShell script diagnostics for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Best Practices |
+| Default | Enabled, gated by slow checks |
+| Auto-fix | Suggestions when PSScriptAnalyzer provides corrections |
+
+## Description
+
+tally analyzes Dockerfile `RUN` instructions that execute PowerShell, including stages with `SHELL ["pwsh", "-Command"]`, explicit `RUN pwsh -Command
+...` wrappers, and PowerShell heredoc bodies.
+
+Diagnostics are reported in the `powershell/*` namespace using the upstream PowerShell rule name, such as `powershell/PSAvoidUsingWriteHost`. Each
+concrete diagnostic links to its own tally documentation page, for example
+[`powershell/PSAvoidUsingWriteHost`](/rules/powershell/PSAvoidUsingWriteHost).
+
+The PowerShell analyzer is enabled by default, but it is gated by slow checks. With the default `slow-checks.mode = "auto"`, tally runs it locally and
+skips it in CI; use `--slow-checks=on` when CI should run PowerShell analysis, or `--slow-checks=off` to skip it explicitly.
+
+The sidecar still starts lazily. Dockerfiles without PowerShell snippets do not start `pwsh`, even when slow checks are enabled. Selecting
+`powershell/PowerShell`, `powershell/*`, or a specific rule such as `powershell/PSAvoidUsingWriteHost` controls rule filtering, but it does not
+bypass the slow-check gate.
+
+Rule-specific options under `rules.powershell.<RuleName>` are forwarded to PSScriptAnalyzer as `Settings.Rules` entries. This supports upstream
+options such as `Enable`, `TargetProfiles`, and compatibility profile settings documented on the concrete `powershell/*` rule pages.
+
+When an upstream PSScriptAnalyzer diagnostic includes suggested corrections, tally exposes them as normal fix suggestions. These fixes are only
+attached when the PowerShell snippet can be mapped back to precise Dockerfile source ranges.
+
+## Requirements
+
+- PowerShell 7 (`pwsh`) must be available on `PATH`.
+- Windows PowerShell 5.1 (`powershell.exe`) is not supported as an analyzer host; use PowerShell 7+ (`pwsh`).
+- The first PowerShell analyzer run installs tally's pinned `PSScriptAnalyzer` release automatically for that `pwsh` environment when the tested
+  version is missing.
+
+Use `TALLY_POWERSHELL=/path/to/pwsh` when `pwsh` is not on `PATH` or when tally should use a specific PowerShell installation.
+
+The automatic install uses the selected `pwsh` environment's PowerShell package tooling (`Install-PSResource` when available, otherwise
+`Install-Module`) and installs tally's pinned `PSScriptAnalyzer` release to `CurrentUser` scope. If the host has no network access or blocks
+PowerShell Gallery, preinstall the version pinned by your tally release and rerun tally.
+
+Cold installation downloads the PSScriptAnalyzer module and can take more than a few seconds depending on network speed. If the bootstrap is still
+running after 3 seconds, tally writes a progress note to stderr and repeats it periodically until the sidecar is ready. Set
+`TALLY_POWERSHELL_PROGRESS=0` to silence these notes.
+
+## Examples
+
+### Problematic code
+
+```dockerfile
+FROM mcr.microsoft.com/powershell:ubuntu-22.04
+SHELL ["pwsh", "-Command"]
+RUN Write-Host hi
+```
+
+### Reported diagnostic
+
+```text
+powershell/PSAvoidUsingWriteHost
+```
+
+### Disable a specific PowerShell rule
+
+```bash
+tally lint --ignore powershell/PSAvoidUsingWriteHost Dockerfile
+```
+
+### Disable PowerShell script analysis
+
+```bash
+tally lint --ignore powershell/* Dockerfile
+```
+
+## Reference
+
+- [PSScriptAnalyzer rules](https://learn.microsoft.com/en-us/powershell/utility-modules/psscriptanalyzer/rules/readme?view=ps-modules)

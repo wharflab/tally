@@ -55,7 +55,11 @@ func isRuleEnabled(ruleCode string, defaultSeverity rules.Severity, cfg *config.
 
 	// Respect explicit severity overrides (on/off).
 	if sev := cfg.Rules.GetSeverity(ruleCode); sev != "" {
-		return sev != "off"
+		return sev != config.SeverityOffValue
+	}
+
+	if ruleCode == rules.PowerShellRulePrefix+"PowerShell" && cfg.Rules.EnablesPowerShellAnalyzer() {
+		return true
 	}
 
 	// Check if "off" rule is auto-enabled by having config options.

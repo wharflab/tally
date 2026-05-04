@@ -1,0 +1,156 @@
+---
+title: "powershell/PSDSCStandardDSCFunctionsInResource"
+description: "Use Standard Get/Set/Test TargetResource functions in DSC Resource"
+sidebarTitle: "PSDSCStandardDSCFunctionsInResource"
+---
+
+`powershell/PSDSCStandardDSCFunctionsInResource` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Error |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+All DSC resources are required to implement the correct functions.
+
+For non-class-based resources:
+
+- `Set-TargetResource`
+- `Test-TargetResource`
+- `Get-TargetResource`
+
+For class-based resources:
+
+- `Set`
+- `Test`
+- `Get`
+
+## How
+
+Add the missing functions to the resource.
+
+## Example 1
+
+### Problematic code
+
+```powershell
+function Get-TargetResource
+{
+    [OutputType([Hashtable])]
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+
+function Set-TargetResource
+{
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+```
+
+### Correct code
+
+```powershell
+function Get-TargetResource
+{
+    [OutputType([Hashtable])]
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+
+function Set-TargetResource
+{
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+
+function Test-TargetResource
+{
+    [OutputType([System.Boolean])]
+    param
+    (
+        [parameter(Mandatory = $true)]
+        [String]
+        $Name
+    )
+    ...
+}
+```
+
+## Example 2
+
+### Problematic code
+
+```powershell
+[DscResource()]
+class MyDSCResource
+{
+    [DscProperty(Key)]
+    [string] $Name
+
+    [void] Set()
+    {
+        ...
+    }
+
+    [bool] Test()
+    {
+        ...
+    }
+}
+```
+
+### Correct code
+
+```powershell
+[DscResource()]
+class MyDSCResource
+{
+    [DscProperty(Key)]
+    [string] $Name
+
+    [MyDSCResource] Get()
+    {
+        ...
+    }
+
+    [void] Set()
+    {
+        ...
+    }
+
+    [bool] Test()
+    {
+        ...
+    }
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[DSCStandardDSCFunctionsInResource](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/DSCStandardDSCFunctionsInResource.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

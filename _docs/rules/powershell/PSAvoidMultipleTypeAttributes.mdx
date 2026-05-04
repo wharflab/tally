@@ -1,0 +1,59 @@
+---
+title: "powershell/PSAvoidMultipleTypeAttributes"
+description: "Avoid multiple type specifiers on parameters."
+sidebarTitle: "PSAvoidMultipleTypeAttributes"
+---
+
+`powershell/PSAvoidMultipleTypeAttributes` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Parameters should not have more than one type specifier. Multiple type specifiers on parameters
+can cause runtime errors.
+
+## How
+
+Ensure each parameter has only 1 type specifier.
+
+## Examples
+
+### Problematic code
+
+```powershell
+function Test-Script
+{
+    [CmdletBinding()]
+    Param
+    (
+        [switch]
+        [int]
+        $Switch
+    )
+}
+```
+
+### Correct code
+
+```powershell
+function Test-Script
+{
+    [CmdletBinding()]
+    Param
+    (
+        [switch]
+        $Switch
+    )
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidMultipleTypeAttributes](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidMultipleTypeAttributes.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -1,0 +1,64 @@
+---
+title: "powershell/PSAvoidUsingEmptyCatchBlock"
+description: "Avoid Using Empty Catch Block"
+sidebarTitle: "PSAvoidUsingEmptyCatchBlock"
+---
+
+`powershell/PSAvoidUsingEmptyCatchBlock` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Empty catch blocks are considered a poor design choice because any errors occurring in a
+`try` block cannot be handled.
+
+## How
+
+Use `Write-Error` or `throw` statements within the catch block.
+
+## Examples
+
+### Problematic code
+
+```powershell
+try
+{
+    1/0
+}
+catch [DivideByZeroException]
+{
+}
+```
+
+### Correct code
+
+```powershell
+try
+{
+    1/0
+}
+catch [DivideByZeroException]
+{
+    Write-Error 'DivideByZeroException'
+}
+
+try
+{
+    1/0
+}
+catch [DivideByZeroException]
+{
+    throw 'DivideByZeroException'
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidUsingEmptyCatchBlock](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingEmptyCatchBlock.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

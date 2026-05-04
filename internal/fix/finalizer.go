@@ -9,8 +9,9 @@ import (
 
 // FinalizeContext contains the current file content after all normal fixes have run.
 type FinalizeContext struct {
-	FilePath string
-	Content  []byte
+	FilePath          string
+	Content           []byte
+	SlowChecksEnabled bool
 }
 
 // Finalizer computes a final set of edits after sync and async fixes have been applied.

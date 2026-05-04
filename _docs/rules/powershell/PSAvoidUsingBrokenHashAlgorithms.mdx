@@ -1,0 +1,57 @@
+---
+title: "powershell/PSAvoidUsingBrokenHashAlgorithms"
+description: "Avoid using broken hash algorithms"
+sidebarTitle: "PSAvoidUsingBrokenHashAlgorithms"
+---
+
+`powershell/PSAvoidUsingBrokenHashAlgorithms` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Avoid using the broken algorithms MD5 or SHA-1.
+
+## How
+
+Replace broken algorithms with secure alternatives. MD5 and SHA-1 should be replaced with SHA256,
+SHA384, SHA512, or other safer algorithms when possible, with MD5 and SHA-1 only being utilized by
+necessity for backwards compatibility.
+
+## Example 1
+
+### Problematic code
+
+```powershell
+Get-FileHash foo.txt -Algorithm MD5
+```
+
+### Correct code
+
+```powershell
+Get-FileHash foo.txt -Algorithm SHA256
+```
+
+## Example 2
+
+### Problematic code
+
+```powershell
+Get-FileHash foo.txt -Algorithm SHA1
+```
+
+### Correct code
+
+```powershell
+Get-FileHash foo.txt
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidUsingBrokenHashAlgorithms](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingBrokenHashAlgorithms.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

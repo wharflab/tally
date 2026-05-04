@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -27,6 +28,7 @@ import (
 	"github.com/wharflab/tally/internal/invocation"
 	"github.com/wharflab/tally/internal/linter"
 	"github.com/wharflab/tally/internal/processor"
+	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/registry"
 	"github.com/wharflab/tally/internal/reporter"
 	"github.com/wharflab/tally/internal/rules"
@@ -42,6 +44,14 @@ const (
 	ExitNoFiles     = 3 // No Dockerfiles found (missing file, empty glob, empty directory)
 	ExitSyntaxError = 4 // Dockerfile has fatal syntax issues (unknown instructions, malformed directives)
 )
+
+const installPowerShellURL = "https://learn.microsoft.com/en-us/powershell/scripting/install/install-powershell"
+
+const powerShellRunnerCloseTimeout = 5 * time.Second
+
+type powerShellRunnerCloser interface {
+	Close(ctx stdcontext.Context) error
+}
 
 func lintCommand() *cobra.Command {
 	return newLintCommand(&lintOptions{})
@@ -60,12 +70,53 @@ func newLintCommand(opts *lintOptions) *cobra.Command {
 				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 				return exitWith(ExitConfigError)
 			}
-			return runLint(cmd.Context(), opts, args)
+			return runLintWithPowerShellReporter(cmd.Context(), opts, args)
 		},
 	}
 
 	addLintFlags(cmd.Flags(), opts)
 	return cmd
+}
+
+func runLintWithPowerShellReporter(ctx stdcontext.Context, opts *lintOptions, args []string) error {
+	defer installPowerShellUnavailableReporter(os.Stderr)()
+	defer closeSharedPowerShellRunner(ctx)
+	return runLint(ctx, opts, args)
+}
+
+func closeSharedPowerShellRunner(ctx stdcontext.Context) {
+	closePowerShellRunner(ctx, func() powerShellRunnerCloser {
+		return psanalyzer.SharedRunner()
+	})
+}
+
+func closePowerShellRunner(ctx stdcontext.Context, runner func() powerShellRunnerCloser) {
+	closeCtx, cancel := stdcontext.WithTimeout(stdcontext.WithoutCancel(ctx), powerShellRunnerCloseTimeout)
+	defer cancel()
+
+	_ = runner().Close(closeCtx)
+}
+
+func installPowerShellUnavailableReporter(w io.Writer) func() {
+	var once sync.Once
+	return psanalyzer.SetUnavailableReporter(func(event psanalyzer.UnavailableEvent) {
+		once.Do(func() {
+			detail := ""
+			if event.Err != nil {
+				detail = strings.TrimSpace(event.Err.Error())
+			}
+			if detail != "" {
+				detail = ": " + detail
+			}
+			fmt.Fprintf(
+				w,
+				"note: PowerShell script linting/formatting skipped%s. "+
+					"Requires a usable PowerShell 7+ installation and PSScriptAnalyzer; install PowerShell: %s\n",
+				detail,
+				installPowerShellURL,
+			)
+		})
+	})
 }
 
 // lintResults holds the aggregated results of linting all discovered files.
@@ -332,7 +383,7 @@ func runLintStdin(ctx stdcontext.Context, opts *lintOptions) error {
 		return exitWith(ExitNoFiles)
 	}
 
-	res, cfg, err := lintStdinContent(opts, content)
+	res, cfg, err := lintStdinContent(ctx, opts, content)
 	if err != nil {
 		return err
 	}
@@ -349,7 +400,7 @@ func runLintStdin(ctx stdcontext.Context, opts *lintOptions) error {
 }
 
 // lintStdinContent parses and lints content read from stdin.
-func lintStdinContent(opts *lintOptions, content []byte) (*lintResults, *config.Config, error) {
+func lintStdinContent(ctx stdcontext.Context, opts *lintOptions, content []byte) (*lintResults, *config.Config, error) {
 	// Load config from CWD (stdin has no file path for cascading discovery).
 	cfg, err := loadConfigForFile(opts, ".")
 	if err != nil {
@@ -373,7 +424,7 @@ func lintStdinContent(opts *lintOptions, content []byte) (*lintResults, *config.
 	}
 
 	inv := invocationFromContextFlag(stdinPath, opts.contextDir)
-	result, err := linter.LintFile(linter.Input{
+	result, err := linter.LintFileContext(ctx, linter.Input{
 		FilePath:    stdinPath,
 		Config:      cfg,
 		ParseResult: parseResult,
@@ -657,7 +708,7 @@ func lintInvocations(ctx stdcontext.Context, invocations []invocation.BuildInvoc
 			parseCache[file] = parseResult
 		}
 
-		result, err := linter.LintFile(linter.Input{
+		result, err := linter.LintFileContext(ctx, linter.Input{
 			FilePath:    file,
 			Config:      cfg,
 			ParseResult: parseResult,
@@ -719,7 +770,7 @@ func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, op
 			inv = invocationFromContextFlag(file, df.ContextDir)
 		}
 
-		result, err := linter.LintFile(linter.Input{
+		result, err := linter.LintFileContext(ctx, linter.Input{
 			FilePath:    file,
 			Config:      cfg,
 			ParseResult: parseResult,
@@ -1246,11 +1297,12 @@ func applyFixes(
 	defer stopSpinner()
 
 	fixer := &fix.Fixer{
-		SafetyThreshold: safetyThreshold,
-		RuleFilter:      ruleFilter,
-		EnabledRules:    buildPerFileEnabledRules(input.fileConfigs, input.sources),
-		FixModes:        fixModes,
-		Concurrency:     4,
+		SafetyThreshold:   safetyThreshold,
+		RuleFilter:        ruleFilter,
+		EnabledRules:      buildPerFileEnabledRules(input.fileConfigs, input.sources),
+		SlowChecksEnabled: buildPerFileSlowChecksEnabled(input.fileConfigs, input.sources),
+		FixModes:          fixModes,
+		Concurrency:       4,
 	}
 
 	result, err := fixer.Apply(ctx, input.violations, input.sources)
@@ -1309,6 +1361,21 @@ func buildPerFileEnabledRules(
 	return enabledRules
 }
 
+func buildPerFileSlowChecksEnabled(fileConfigs map[string]*config.Config, sources map[string][]byte) map[string]bool {
+	enabled := make(map[string]bool, len(sources))
+	for path := range sources {
+		cfg := fileConfigs[path]
+		if cfg == nil {
+			cfg = fileConfigs[filepath.ToSlash(path)]
+		}
+		if cfg == nil {
+			cfg = config.Default()
+		}
+		enabled[filepath.Clean(path)] = config.SlowChecksEnabled(cfg.SlowChecks.Mode)
+	}
+	return enabled
+}
+
 // runAsyncChecks executes async check plans if slow checks are enabled.
 // Returns nil if slow checks are disabled or no plans exist.
 // Respects per-file slow-checks configuration from res.fileConfigs.
@@ -1352,7 +1419,7 @@ func filterAsyncPlans(res *lintResults) ([]async.CheckRequest, time.Duration) {
 	procCtx := processor.NewContext(res.fileConfigs, res.firstCfg, res.fileSources)
 	filtered := processor.NewSeverityOverride().Process(res.violations, procCtx)
 	filtered = processor.NewEnableFilter().Process(filtered, procCtx)
-	errorContexts := filesWithErrors(filtered)
+	errorContexts := filesWithErrors(failFastViolations(filtered))
 	maxTimeout := 20 * time.Second
 	plans := make([]async.CheckRequest, 0, len(res.asyncPlans))
 	var skippedAuto int
@@ -1400,6 +1467,17 @@ func filterAsyncPlans(res *lintResults) ([]async.CheckRequest, time.Duration) {
 	}
 
 	return plans, maxTimeout
+}
+
+func failFastViolations(violations []rules.Violation) []rules.Violation {
+	out := make([]rules.Violation, 0, len(violations))
+	for _, v := range violations {
+		if strings.HasPrefix(v.RuleCode, rules.PowerShellRulePrefix) {
+			continue
+		}
+		out = append(out, v)
+	}
+	return out
 }
 
 // reportSkipped prints summary notes for skipped async checks.

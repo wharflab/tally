@@ -1,6 +1,7 @@
 package tally
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -8,10 +9,41 @@ import (
 
 	"github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/heredocfmt"
+	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/testutil"
 )
+
+type fakePowerShellFormatter struct {
+	formatted      string
+	err            error
+	respectContext bool
+	calls          []string
+	contexts       []context.Context
+}
+
+func (f *fakePowerShellFormatter) FormatPowerShell(ctx context.Context, script string) (string, error) {
+	f.calls = append(f.calls, script)
+	f.contexts = append(f.contexts, ctx)
+	if f.respectContext {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		default:
+		}
+	}
+	return f.formatted, f.err
+}
+
+func TestPreferFormattedHeredocsRuleUsesSharedPowerShellRunner(t *testing.T) {
+	t.Parallel()
+
+	rule := NewPreferFormattedHeredocsRule()
+	if rule.powerShellFormatter != psanalyzer.SharedRunner() {
+		t.Fatal("prefer-formatted-heredocs does not use shared PowerShell runner")
+	}
+}
 
 func TestPreferFormattedHeredocsRule_Metadata(t *testing.T) {
 	t.Parallel()
@@ -38,7 +70,9 @@ func TestRunHeredocShellVariantUnknownWithoutSemanticMetadata(t *testing.T) {
 
 func TestPreferFormattedHeredocsRule_Check(t *testing.T) {
 	t.Parallel()
-	rule := NewPreferFormattedHeredocsRule()
+	rule := newPreferFormattedHeredocsRuleWithPowerShellFormatter(&fakePowerShellFormatter{
+		formatted: "if ($true) {\n    Write-Host hi\n}\n",
+	})
 
 	testutil.RunRuleTests(t, rule, []testutil.RuleTestCase{
 		{
@@ -153,7 +187,7 @@ EOF
 			WantMessages:   []string{"COPY heredoc for /usr/local/bin/entrypoint should be pretty-printed as a shell script"},
 		},
 		{
-			Name: "ADD sh heredoc is skipped",
+			Name: "ADD sh heredoc without shebang",
 			Content: `FROM alpine
 ADD <<EOF /usr/local/bin/entrypoint.sh
 if true; then
@@ -161,7 +195,20 @@ if true; then
 fi
 EOF
 `,
-			WantViolations: 0,
+			WantViolations: 1,
+			WantMessages:   []string{"ADD heredoc for /usr/local/bin/entrypoint.sh should be pretty-printed as a shell script"},
+		},
+		{
+			Name: "ADD PowerShell module heredoc",
+			Content: `FROM alpine
+ADD <<EOF /opt/app/MyModule.psm1
+function Get-Greeting {
+Write-Host hi
+}
+EOF
+`,
+			WantViolations: 1,
+			WantMessages:   []string{"ADD heredoc for /opt/app/MyModule.psm1 should be pretty-printed as PowerShell"},
 		},
 		{
 			Name: "COPY sh heredoc with unsupported shebang is skipped",
@@ -185,7 +232,7 @@ EOF
 			WantViolations: 0,
 		},
 		{
-			Name: "PowerShell RUN heredoc is skipped",
+			Name: "PowerShell RUN heredoc",
 			Content: `FROM mcr.microsoft.com/powershell:nanoserver-ltsc2022
 SHELL ["pwsh", "-Command"]
 RUN <<EOF
@@ -194,7 +241,8 @@ if ($true) {
 }
 EOF
 `,
-			WantViolations: 0,
+			WantViolations: 1,
+			WantMessages:   []string{"RUN heredoc should be pretty-printed as PowerShell"},
 		},
 		{
 			Name: "already formatted JSON",
@@ -281,6 +329,214 @@ EOF
 `
 	if got != want {
 		t.Fatalf("fixed content mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_FixADDShell(t *testing.T) {
+	t.Parallel()
+	content := `FROM alpine
+ADD <<EOF /usr/local/bin/entrypoint.sh
+if true; then
+ echo hi
+fi
+EOF
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewPreferFormattedHeredocsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	want := `FROM alpine
+ADD <<EOF /usr/local/bin/entrypoint.sh
+if true; then
+	echo hi
+fi
+EOF
+`
+	if got != want {
+		t.Fatalf("fixed content mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_FixCOPYPowerShellModule(t *testing.T) {
+	t.Parallel()
+	content := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+COPY <<EOF /opt/app/MyModule.psm1
+function Get-Greeting {
+Write-Host hi
+}
+EOF
+`
+	rule := newPreferFormattedHeredocsRuleWithPowerShellFormatter(&fakePowerShellFormatter{
+		formatted: "function Get-Greeting {\n    Write-Host hi\n}\n",
+	})
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	want := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+COPY <<EOF /opt/app/MyModule.psm1
+function Get-Greeting {
+    Write-Host hi
+}
+EOF
+`
+	if got != want {
+		t.Fatalf("fixed content mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_FixADDPowerShellModule(t *testing.T) {
+	t.Parallel()
+	content := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+ADD <<EOF /opt/app/MyModule.psm1
+function Get-Greeting {
+Write-Host hi
+}
+EOF
+`
+	rule := newPreferFormattedHeredocsRuleWithPowerShellFormatter(&fakePowerShellFormatter{
+		formatted: "function Get-Greeting {\n    Write-Host hi\n}\n",
+	})
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	want := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+ADD <<EOF /opt/app/MyModule.psm1
+function Get-Greeting {
+    Write-Host hi
+}
+EOF
+`
+	if got != want {
+		t.Fatalf("fixed content mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_FixRUNPowerShell(t *testing.T) {
+	t.Parallel()
+	content := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+SHELL ["pwsh", "-Command"]
+RUN <<EOF
+if ($true) {
+Write-Host hi
+}
+EOF
+`
+	rule := newPreferFormattedHeredocsRuleWithPowerShellFormatter(&fakePowerShellFormatter{
+		formatted: "if ($true) {\n    Write-Host hi\n}\n",
+	})
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	got := string(fix.ApplyFix([]byte(content), violations[0].PreferredFix()))
+	want := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+SHELL ["pwsh", "-Command"]
+RUN <<EOF
+if ($true) {
+    Write-Host hi
+}
+EOF
+`
+	if got != want {
+		t.Fatalf("fixed content mismatch\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_PowerShellFormatterIsLazy(t *testing.T) {
+	t.Parallel()
+	fake := &fakePowerShellFormatter{formatted: "unused\n"}
+	rule := newPreferFormattedHeredocsRuleWithPowerShellFormatter(fake)
+	content := `FROM alpine
+COPY <<EOF /etc/app/config.json
+{"a":1}
+EOF
+RUN <<EOF
+if true; then
+ echo hi
+fi
+EOF
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := rule.Check(input)
+	if len(violations) != 2 {
+		t.Fatalf("got %d violations, want 2", len(violations))
+	}
+	if len(fake.calls) != 0 {
+		t.Fatalf("PowerShell formatter was called for non-PowerShell heredocs: %#v", fake.calls)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_PowerShellFormatterRequiresSlowChecks(t *testing.T) {
+	t.Parallel()
+	fake := &fakePowerShellFormatter{formatted: "unused\n"}
+	rule := newPreferFormattedHeredocsRuleWithPowerShellFormatter(fake)
+	content := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+SHELL ["pwsh", "-Command"]
+COPY <<EOF /opt/app/MyModule.psm1
+function Get-Greeting {
+Write-Host hi
+}
+EOF
+RUN <<EOF
+if ($true) {
+Write-Host hi
+}
+EOF
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	input.SlowChecksEnabled = false
+
+	violations := rule.Check(input)
+	if len(violations) != 0 {
+		t.Fatalf("got %d violations, want none when slow checks are disabled", len(violations))
+	}
+	if len(fake.calls) != 0 {
+		t.Fatalf("PowerShell formatter was called when slow checks are disabled: %#v", fake.calls)
+	}
+}
+
+func TestPreferFormattedHeredocsRule_PowerShellFormatterUsesLintContext(t *testing.T) {
+	t.Parallel()
+
+	fake := &fakePowerShellFormatter{
+		formatted:      "if ($true) {\n    Write-Host hi\n}\n",
+		respectContext: true,
+	}
+	rule := newPreferFormattedHeredocsRuleWithPowerShellFormatter(fake)
+	content := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+SHELL ["pwsh", "-Command"]
+RUN <<EOF
+if ($true) {
+Write-Host hi
+}
+EOF
+`
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+
+	violations := rule.CheckContext(ctx, input)
+	if len(violations) != 0 {
+		t.Fatalf("got %d violations, want none after cancellation", len(violations))
+	}
+	if len(fake.contexts) != 1 {
+		t.Fatalf("PowerShell formatter context count = %d, want 1", len(fake.contexts))
+	}
+	if err := fake.contexts[0].Err(); err != context.Canceled {
+		t.Fatalf("PowerShell formatter context error = %v, want context.Canceled", err)
 	}
 }
 

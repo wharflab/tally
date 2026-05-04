@@ -1,6 +1,7 @@
 package rules
 
 import (
+	"context"
 	"slices"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -63,6 +64,10 @@ type LintInput struct {
 	// if prefer-run-heredoc is enabled and would handle the command better.
 	// May be nil if not computed (for backward compatibility in tests).
 	EnabledRules []string
+
+	// SlowChecksEnabled reports whether rules gated by slow checks may perform
+	// expensive or external work.
+	SlowChecksEnabled bool
 
 	// HeredocMinCommands is the configured min-commands for the prefer-run-heredoc rule.
 	// Rules that coordinate with heredoc (like DL3003) should use this value.
@@ -181,6 +186,12 @@ type Rule interface {
 	// The AST and Source fields are guaranteed non-nil. InvocationContext may
 	// be nil or lack a local reader when context-aware linting is unavailable.
 	Check(input LintInput) []Violation
+}
+
+// ContextRule is implemented by rules that need caller cancellation or deadlines.
+type ContextRule interface {
+	Rule
+	CheckContext(ctx context.Context, input LintInput) []Violation
 }
 
 // ConfigurableRule is an optional interface for rules that accept configuration.

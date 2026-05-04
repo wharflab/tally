@@ -1,0 +1,151 @@
+---
+title: "powershell/PSDSCUseIdenticalMandatoryParametersForDSC"
+description: "Use identical mandatory parameters for DSC Get/Test/Set TargetResource functions"
+sidebarTitle: "PSDSCUseIdenticalMandatoryParametersForDSC"
+---
+
+`powershell/PSDSCUseIdenticalMandatoryParametersForDSC` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in
+Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Error |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+For script-based DSC resources, if a property is declared with attributes `Key` or `Required` in a
+MOF file, then it should be present as a mandatory parameter in the corresponding
+`Get-TargetResource`, `Set-TargetResource` and `Test-TargetResource` functions.
+
+## How
+
+Make sure all the properties with `Key` or `Required` attributes have equivalent mandatory
+parameters in the `Get/Set/Test` functions.
+
+## Examples
+
+Consider the following `mof` file.
+
+```powershell
+class WaitForAny : OMI_BaseResource
+{
+    [key, Description("Name of Resource on remote machine")]
+    string Name;
+
+    [required, Description("List of remote machines")]
+    string NodeName[];
+};
+```
+
+### Problematic code
+
+```powershell
+function Get-TargetResource
+{
+    [CmdletBinding()]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Message
+    )
+}
+
+function Set-TargetResource
+{
+    [CmdletBinding()]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Message,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Name
+    )
+}
+
+function Test-TargetResource
+{
+    [CmdletBinding()]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Message,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Name
+    )
+}
+```
+
+### Correct code
+
+```powershell
+function Get-TargetResource
+{
+    [CmdletBinding()]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Message,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Name
+    )
+}
+
+function Set-TargetResource
+{
+    [CmdletBinding()]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Message,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Name
+    )
+}
+
+function Test-TargetResource
+{
+    [CmdletBinding()]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Message,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [String]
+        $Name
+    )
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[DSCUseIdenticalMandatoryParametersForDSC](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/DSCUseIdenticalMandatoryParametersForDSC.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

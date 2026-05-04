@@ -25,9 +25,13 @@ type IndexSchemaJson_1 struct {
 	AdditionalProperties interface{} `mapstructure:",remain"`
 }
 
+// Schema for rules.powershell configuration; keys are rule names within the
+// powershell namespace.
+type IndexSchemaJson_2 map[string]ruleschema.GenericRuleConfig
+
 // Schema for rules.shellcheck configuration; keys are rule names within the
 // shellcheck namespace.
-type IndexSchemaJson_2 struct {
+type IndexSchemaJson_3 struct {
 	// ShellCheck corresponds to the JSON schema field "ShellCheck".
 	ShellCheck *ruleschema.GenericRuleConfig `json:"ShellCheck,omitempty,omitzero"`
 
@@ -38,7 +42,7 @@ type IndexSchemaJson_2 struct {
 
 // Schema for rules.tally configuration; keys are rule names within the tally
 // namespace.
-type IndexSchemaJson_3 struct {
+type IndexSchemaJson_4 struct {
 	// ConsistentIndentation corresponds to the JSON schema field
 	// "consistent-indentation".
 	ConsistentIndentation *tally.ConsistentIndentationSchemaJson `json:"consistent-indentation,omitempty,omitzero"`
@@ -202,11 +206,14 @@ type TallyConfigSchemaJsonRules struct {
 	// Glob patterns for rules to enable (e.g. "tally/*", "hadolint/DL3026").
 	Include []string `json:"include,omitempty,omitzero"`
 
+	// Powershell corresponds to the JSON schema field "powershell".
+	Powershell IndexSchemaJson_2 `json:"powershell,omitempty,omitzero"`
+
 	// Shellcheck corresponds to the JSON schema field "shellcheck".
-	Shellcheck *IndexSchemaJson_2 `json:"shellcheck,omitempty,omitzero"`
+	Shellcheck *IndexSchemaJson_3 `json:"shellcheck,omitempty,omitzero"`
 
 	// Tally corresponds to the JSON schema field "tally".
-	Tally *IndexSchemaJson_3 `json:"tally,omitempty,omitzero"`
+	Tally *IndexSchemaJson_4 `json:"tally,omitempty,omitzero"`
 }
 
 // Configure async checks that require network or other slow I/O (e.g. registry

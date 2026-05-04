@@ -5,8 +5,8 @@
 > **Status**: Design note — macOS host checks and Windows sidecar smoke tests
 > reproduced.
 > **Purpose**: Decide how tally should invoke PowerShell's PSScriptAnalyzer to
-> lint `.ps1` / `.psm1` content — both standalone and inside Dockerfile
-> `RUN pwsh -Command ...` / `SHELL ["pwsh", ...]` contexts.
+> lint and format `.ps1` / `.psm1` / `.psd1` content — both standalone and
+> inside Dockerfile `RUN pwsh -Command ...` / `SHELL ["pwsh", ...]` contexts.
 
 ## Goal
 
@@ -18,6 +18,11 @@ integration:
 - Single long-lived process for the linter session (amortize cold start).
 - Structured, line-/column-accurate diagnostics usable by existing
   `internal/lint` and `internal/lsp` pipelines.
+- PowerShell formatting via `Invoke-Formatter` for heredoc content, without
+  starting `pwsh` unless a PowerShell snippet actually needs analysis or
+  formatting. Formatting uses PSScriptAnalyzer's code-formatting settings with
+  `PSUseCorrectCasing` disabled so host-specific cmdlet discovery does not make
+  Dockerfile fixes differ by operating system.
 - Cross-platform: Windows, macOS, Linux — the three targets tally already
   supports.
 
@@ -44,11 +49,15 @@ if not, what ships instead.
   kills Go's cross-compilation story. For a linter, the juice isn't worth the
   squeeze.
 - A long-running `pwsh` 7.x subprocess speaking JSON-framed IPC gets us
-  everything we need with a single code path across all three OSes. Windows
+  diagnostics and formatting with a single code path across all three OSes. Windows
   PowerShell 5.1 is **not** a supported host fallback: tally's Dockerfile
   PowerShell target is `pwsh` 7.x syntax, and PSScriptAnalyzer hosted in 5.1
   uses the 5.1 parser. The cold-start tax amortizes over a session, and
   PSScriptAnalyzer's batch throughput on real fixtures is acceptable.
+- tally enables PowerShell analysis by default, but analyzer and formatter
+  sidecar calls are gated by the existing slow-checks mode. With
+  `slow-checks.mode = "auto"`, local runs may start the sidecar on the first
+  PowerShell snippet while CI skips it unless `--slow-checks=on` is set.
 
 ## What we verified on macOS (2026-04-21)
 
@@ -57,12 +66,12 @@ Host: `darwin 25.4.0` arm64, `pwsh 7.6.0` from Homebrew.
 ### Install and import
 
 ```text
-Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force \
+Install-Module -Name PSScriptAnalyzer -RequiredVersion <version> -Scope CurrentUser -Force \
   -AcceptLicense -SkipPublisherCheck
 ```
 
 - Clean install, no errors. Landed at
-  `~/.local/share/powershell/Modules/PSScriptAnalyzer/1.25.0/`.
+  `~/.local/share/powershell/Modules/PSScriptAnalyzer/<version>/`.
 - Module on disk: **286 MB**. The bulk is `compatibility_profiles/` (the JSON
   databases that power `PSUseCompatibleCmdlets` / `...Types`). The core DLLs
   (`Microsoft.Windows.PowerShell.ScriptAnalyzer.dll`,
@@ -162,7 +171,7 @@ Install-PSResource -Name PSScriptAnalyzer -Scope CurrentUser -TrustRepository -R
 Installed module:
 
 ```text
-C:\Users\tino\Documents\PowerShell\Modules\PSScriptAnalyzer\1.25.0
+C:\Users\tino\Documents\PowerShell\Modules\PSScriptAnalyzer\<version>
 ```
 
 Measured size: **285.5 MiB**, 50 files. This matches the macOS result: the
@@ -174,9 +183,10 @@ returned **75** rules.
 ### Sidecar protocol smoke test
 
 A minimal `pwsh` 7 sidecar script was executed with newline-delimited JSON
-requests over stdio:
+requests over stdin and marker-framed JSON responses over stdout:
 
-- handshake line: `{"ready":true,"version":"1.25.0","ps":"..."}`
+- handshake frame payload:
+  `{"ready":true,"version":"<module-version>","ps":"..."}`
 - file-backed `Invoke-ScriptAnalyzer -Path <Bad.ps1>`
 - in-memory `Invoke-ScriptAnalyzer -ScriptDefinition <source>`
 - shutdown request
@@ -214,8 +224,8 @@ Results:
 
 | Host | Result |
 | --- | --- |
-| `pwsh 7.6.1` + PSScriptAnalyzer 1.25.0 | Analyzed successfully with no diagnostics; `Invoke-Formatter` preserved valid syntax. |
-| Windows PowerShell 5.1 + PSScriptAnalyzer 1.25.0 | Reported parse errors for `??`, ternary `? :`, and `&&`; also misinterpreted `?` as the `Where-Object` alias. |
+| `pwsh 7.6.1` + the pinned PSScriptAnalyzer release | Analyzed successfully with no diagnostics; `Invoke-Formatter` preserved valid syntax. |
+| Windows PowerShell 5.1 + the pinned PSScriptAnalyzer release | Reported parse errors for `??`, ternary `? :`, and `&&`; also misinterpreted `?` as the `Where-Object` alias. |
 
 Conclusion: Windows PowerShell 5.1 must not be used as a host fallback for
 PSScriptAnalyzer in tally. A 5.1 host runs the 5.1 parser and cannot reliably
@@ -286,10 +296,21 @@ startup would be too expensive; startup once per tally session is acceptable.
 └─────────────────────┘                                └───────────────────────┘
 ```
 
-One long-lived `pwsh` 7.x subprocess. Tally writes newline-delimited JSON
-requests to stdin; the sidecar responds with newline-delimited JSON objects on
-stdout. Stderr is reserved for fatal errors and log diagnostics (logged at
-`debug` level by tally).
+One long-lived `pwsh` 7.x subprocess. Tally starts it with `pwsh -Command -`,
+writes the embedded sidecar script to stdin, then writes newline-delimited JSON
+requests to the same stream. The sidecar writes JSON responses on stdout
+between explicit marker lines:
+
+```text
+--- tally PSSA JSON start ---
+{"id":"42","ok":true}
+--- tally PSSA JSON end ---
+```
+
+Output outside those marker lines is ignored by the Go parser, which keeps
+PowerShell host chatter, module tooling output, and progress noise from
+corrupting the protocol. Stderr is reserved for fatal errors and log
+diagnostics (logged at `debug` level by tally).
 
 This matches the single-instance contract we already enforce for the
 ShellCheck reactor: one init, many checks, one teardown on shutdown.
@@ -308,7 +329,7 @@ internal/
 ```
 
 Only the Go side is linked into the tally binary. The `.ps1` sidecar is
-embedded via `//go:embed` and written to a temp dir at first run.
+embedded via `//go:embed` and piped to `pwsh -Command -` at first use.
 
 ### Sidecar protocol (first cut)
 
@@ -344,10 +365,10 @@ as regular diagnostics with `severity:3`.
 2. First `Analyze()` call:
    - Locate `pwsh` 7.x on `PATH` (configurable via `TALLY_POWERSHELL` env +
      tally config).
-   - Write `Tally.PSSA.Sidecar.ps1` to a per-session temp dir.
-   - Spawn `pwsh -NoProfile -NonInteractive -File <script>`.
-   - Read a `{"ready":true,"version":"1.25.0"}` handshake line (or bail with
-     timeout).
+   - Spawn `pwsh -NoProfile -NonInteractive -Command -`.
+   - Pipe `Tally.PSSA.Sidecar.ps1` to stdin followed by a blank line so the
+     final request loop starts executing.
+   - Read the framed ready handshake payload (or bail with timeout).
 3. Each subsequent call: write request, read response. Mutex-serialized —
    the sidecar handles one request at a time.
 4. On `Close()` or process exit, send `{"op":"shutdown"}` and wait for the
@@ -359,7 +380,15 @@ as regular diagnostics with `severity:3`.
 # Tally.PSSA.Sidecar.ps1 (abbreviated)
 $ErrorActionPreference = 'Stop'
 Import-Module PSScriptAnalyzer
-[Console]::Out.WriteLine((@{ready=$true; version=(Get-Module PSScriptAnalyzer).Version.ToString()} | ConvertTo-Json -Compress))
+
+function Write-JsonFrame($value) {
+    [Console]::Out.WriteLine('--- tally PSSA JSON start ---')
+    [Console]::Out.WriteLine(($value | ConvertTo-Json -Compress -Depth 8))
+    [Console]::Out.WriteLine('--- tally PSSA JSON end ---')
+    [Console]::Out.Flush()
+}
+
+Write-JsonFrame @{ready=$true; version=(Get-Module PSScriptAnalyzer).Version.ToString()}
 
 while (($line = [Console]::In.ReadLine()) -ne $null) {
     $req = $line | ConvertFrom-Json
@@ -373,7 +402,7 @@ while (($line = [Console]::In.ReadLine()) -ne $null) {
     } catch {
         $resp  = @{id=$req.id; ok=$false; error=$_.Exception.Message}
     }
-    [Console]::Out.WriteLine(($resp | ConvertTo-Json -Compress -Depth 5))
+    Write-JsonFrame $resp
 }
 ```
 
@@ -388,7 +417,7 @@ Two levers:
 | Concern                               | Strategy |
 | ------------------------------------- | -------- |
 | `pwsh` 7.x missing on PATH            | `tally doctor` surfaces it; lint flags `.ps1` files as "analyzer not available, pass `--no-psanalyzer` to silence" |
-| PSScriptAnalyzer module not installed | Sidecar attempts PSResourceGet/PowerShellGet install on handshake failure, guarded by `--allow-module-install` config |
+| Pinned PSScriptAnalyzer module not installed | Sidecar attempts a pinned PSResourceGet/PowerShellGet install on handshake failure, guarded by `--allow-module-install` config |
 | Sanitized Windows environment         | Runner ensures standard Windows env vars are present before spawning `pwsh`; bootstrap also repairs `APPDATA` / `LOCALAPPDATA` when absent |
 
 We do **not** bundle the 286 MB module in the tally release. The user's
@@ -476,7 +505,7 @@ reasonable default.
 - Microsoft Learn — "Using PSScriptAnalyzer", ScriptAnalyzer as a .NET library
   section: documents the `Initialize`/`AnalyzePath`/`GetRule` surface and its
   Runspace requirement.
-- PowerShell Gallery — `PSScriptAnalyzer 1.25.0` (what we installed).
+- PowerShell Gallery — PSScriptAnalyzer release used during prototyping.
 - GitHub `PowerShell/PSScriptAnalyzer#1056` — ongoing feature request to
   expose a hosted-scenario C# API that accepts a pre-parsed AST.
 - MS Q&A — "Blazor WASM to execute PowerShell script" — authoritative "no,

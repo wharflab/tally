@@ -1,12 +1,29 @@
 package cmd
 
 import (
+	"bytes"
+	"context"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/wharflab/tally/internal/invocation"
+	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/rules"
 )
+
+type recordingPowerShellRunnerCloser struct {
+	closed          bool
+	receivedTimeout bool
+}
+
+func (r *recordingPowerShellRunnerCloser) Close(ctx context.Context) error {
+	r.closed = true
+	_, r.receivedTimeout = ctx.Deadline()
+	return nil
+}
 
 func TestParseACPCmd(t *testing.T) {
 	t.Parallel()
@@ -263,5 +280,84 @@ func TestContextDirForViolationIgnoresNonLocalContext(t *testing.T) {
 	})
 	if got != "" {
 		t.Fatalf("contextDirForViolation() = %q, want empty for non-dir context", got)
+	}
+}
+
+func TestPowerShellUnavailableReporterWritesInstallNoteOnce(t *testing.T) {
+	var stderr bytes.Buffer
+	restore := installPowerShellUnavailableReporter(&stderr)
+	defer restore()
+
+	t.Setenv("TALLY_POWERSHELL", filepath.Join(t.TempDir(), "missing-pwsh"))
+
+	runner := psanalyzer.NewRunner()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	_, err := runner.Analyze(ctx, psanalyzer.AnalyzeRequest{ScriptDefinition: "Write-Host hi\n"})
+	if !psanalyzer.IsUnavailable(err) {
+		t.Fatalf("Analyze() error = %v, want unavailable", err)
+	}
+	_, err = runner.Format(ctx, psanalyzer.FormatRequest{ScriptDefinition: "Write-Host hi\n"})
+	if !psanalyzer.IsUnavailable(err) {
+		t.Fatalf("Format() error = %v, want unavailable", err)
+	}
+
+	got := stderr.String()
+	if strings.Count(got, "PowerShell script linting/formatting skipped") != 1 {
+		t.Fatalf("expected one PowerShell skip note, got:\n%s", got)
+	}
+	for _, want := range []string{
+		"note: PowerShell script linting/formatting skipped",
+		"PowerShell 7+",
+		installPowerShellURL,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected note to contain %q, got:\n%s", want, got)
+		}
+	}
+}
+
+func TestClosePowerShellRunnerUsesTimeout(t *testing.T) {
+	t.Parallel()
+
+	runner := &recordingPowerShellRunnerCloser{}
+	closePowerShellRunner(context.Background(), func() powerShellRunnerCloser {
+		return runner
+	})
+
+	if !runner.closed {
+		t.Fatal("expected PowerShell runner to be closed")
+	}
+	if !runner.receivedTimeout {
+		t.Fatal("expected PowerShell runner close to use a timeout context")
+	}
+}
+
+func TestFailFastViolationsExcludeSlowGatedPowerShell(t *testing.T) {
+	t.Parallel()
+
+	file := "Dockerfile"
+	powerShellError := rules.NewViolation(
+		rules.NewLineLocation(file, 1),
+		rules.PowerShellRulePrefix+"PSAvoidUsingPlainTextForPassword",
+		"message",
+		rules.SeverityError,
+	)
+	fastError := rules.NewViolation(
+		rules.NewLineLocation(file, 2),
+		"buildkit/InvalidDefaultArgInFrom",
+		"message",
+		rules.SeverityError,
+	)
+
+	onlyPowerShell := filesWithErrors(failFastViolations([]rules.Violation{powerShellError}))
+	if onlyPowerShell[asyncErrorKey(file, "")] {
+		t.Fatalf("PowerShell analyzer error should not trigger async fail-fast")
+	}
+
+	withFastError := filesWithErrors(failFastViolations([]rules.Violation{powerShellError, fastError}))
+	if !withFastError[asyncErrorKey(file, "")] {
+		t.Fatalf("non-slow error should still trigger async fail-fast")
 	}
 }

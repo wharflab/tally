@@ -70,7 +70,7 @@ func shellTokens(
 		return nil
 	}
 
-	nodesByStartLine := nodeIndex(parseResult.AST.AST)
+	nodesByStartLine := extract.NodeIndex(parseResult.AST.AST)
 	var out []core.Token
 
 	for stageIdx := range parseResult.Stages {
@@ -158,20 +158,6 @@ func shellMappingForCommand(
 	default:
 		return extract.Mapping{}, false
 	}
-}
-
-func nodeIndex(root *parser.Node) map[int]*parser.Node {
-	if root == nil {
-		return nil
-	}
-	out := make(map[int]*parser.Node)
-	for _, node := range root.Children {
-		if node == nil || node.StartLine <= 0 {
-			continue
-		}
-		out[node.StartLine] = node
-	}
-	return out
 }
 
 func effectiveShellVariant(baseVariant shell.Variant, mapping extract.Mapping) shell.Variant {

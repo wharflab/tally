@@ -1,0 +1,53 @@
+---
+title: "powershell/PSDSCUseVerboseMessageInDSCResource"
+description: "Use verbose message in DSC resource"
+sidebarTitle: "PSDSCUseVerboseMessageInDSCResource"
+---
+
+`powershell/PSDSCUseVerboseMessageInDSCResource` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Information |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Best practice recommends that additional user information is provided within commands, functions and
+scripts using `Write-Verbose`.
+
+## How
+
+Make use of the `Write-Verbose` command.
+
+## Examples
+
+### Problematic code
+
+```powershell
+Function Test-Function
+{
+    [CmdletBinding()]
+    Param()
+    ...
+}
+```
+
+### Correct code
+
+```powershell
+Function Test-Function
+{
+    [CmdletBinding()]
+    Param()
+    Write-Verbose 'Verbose output'
+    ...
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[DSCUseVerboseMessageInDSCResource](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/DSCUseVerboseMessageInDSCResource.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -1,0 +1,44 @@
+---
+title: "powershell/PSAvoidInvokingEmptyMembers"
+description: "Avoid Invoking Empty Members"
+sidebarTitle: "PSAvoidInvokingEmptyMembers"
+---
+
+`powershell/PSAvoidInvokingEmptyMembers` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Invoking non-constant members can cause potential bugs. Please double-check the syntax to make sure
+that invoked members are constants.
+
+## How
+
+Provide the requested members for a given type or class.
+
+## Examples
+
+### Problematic code
+
+```powershell
+$MyString = 'abc'
+$MyString.('len'+'gth')
+```
+
+### Correct code
+
+```powershell
+$MyString = 'abc'
+$MyString.('length')
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidInvokingEmptyMembers](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidInvokingEmptyMembers.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

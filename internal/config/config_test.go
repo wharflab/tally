@@ -628,6 +628,36 @@ func TestRulesConfigIncludeExclude(t *testing.T) {
 	if enabled == nil || *enabled != true {
 		t.Error("shellcheck/ShellCheck should be enabled when shellcheck/SC2086 is included")
 	}
+
+	// Excluding a specific PowerShell analyzer rule should not disable the engine.
+	rc6 := &RulesConfig{
+		Exclude: []string{"powershell/PSAvoidUsingWriteHost"},
+	}
+	enabled = rc6.IsEnabled("powershell/PowerShell")
+	if enabled != nil {
+		t.Errorf("powershell/PowerShell should be nil when excluding only powershell/PSAvoidUsingWriteHost, got %v", *enabled)
+	}
+
+	// Include coupling for PowerShell should still work.
+	rc7 := &RulesConfig{
+		Include: []string{"powershell/PSAvoidUsingWriteHost"},
+	}
+	enabled = rc7.IsEnabled("powershell/PowerShell")
+	if enabled == nil || *enabled != true {
+		t.Error("powershell/PowerShell should be enabled when powershell/PSAvoidUsingWriteHost is included")
+	}
+}
+
+func TestRulesConfigPowerShellInternalErrorIncludeEnablesEngine(t *testing.T) {
+	t.Parallel()
+
+	rc := &RulesConfig{
+		Include: []string{"powershell/PowerShellInternalError"},
+	}
+	enabled := rc.IsEnabled("powershell/PowerShell")
+	if enabled == nil || *enabled != true {
+		t.Error("powershell/PowerShell should be enabled when powershell/PowerShellInternalError is included")
+	}
 }
 
 func TestRulesConfigGetOptionsTyped(t *testing.T) {

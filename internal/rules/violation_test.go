@@ -180,6 +180,21 @@ func TestNewViolationFromBuildKitWarning(t *testing.T) {
 	}
 }
 
+func TestPowerShellDiagnosticDocURL(t *testing.T) {
+	t.Parallel()
+
+	const want = "https://tally.wharflab.com/rules/powershell/PSAvoidUsingWriteHost/"
+	if got := PowerShellDiagnosticDocURL("PSAvoidUsingWriteHost"); got != want {
+		t.Fatalf("PowerShellDiagnosticDocURL(bare) = %q, want %q", got, want)
+	}
+	if got := PowerShellDiagnosticDocURL("powershell/PSAvoidUsingWriteHost"); got != want {
+		t.Fatalf("PowerShellDiagnosticDocURL(namespaced) = %q, want %q", got, want)
+	}
+	if got := PowerShellDiagnosticDocURL("PowerShellInternalError"); got != TallyDocURL(PowerShellRulePrefix+"PowerShell") {
+		t.Fatalf("PowerShellDiagnosticDocURL(internal) = %q", got)
+	}
+}
+
 func TestNewViolationFromBuildKitWarning_NoLocation(t *testing.T) {
 	t.Parallel()
 	// Test without location (file-level warning)

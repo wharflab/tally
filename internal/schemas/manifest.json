@@ -15,6 +15,10 @@
     {
       "namespace": "shellcheck",
       "output": "internal/rules/shellcheck/index.schema.json"
+    },
+    {
+      "namespace": "powershell",
+      "output": "internal/rules/powershell/index.schema.json"
     }
   ],
   "schemas": [

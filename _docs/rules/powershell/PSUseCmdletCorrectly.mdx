@@ -1,0 +1,51 @@
+---
+title: "powershell/PSUseCmdletCorrectly"
+description: "Use Cmdlet Correctly"
+sidebarTitle: "PSUseCmdletCorrectly"
+---
+
+`powershell/PSUseCmdletCorrectly` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Whenever we call a command, care should be taken that it is invoked with the correct syntax and
+parameters.
+
+## How
+
+Specify all mandatory parameters when calling commands.
+
+## Examples
+
+### Problematic code
+
+```powershell
+Function Set-TodaysDate ()
+{
+    Set-Date
+    ...
+}
+```
+
+### Correct code
+
+```powershell
+Function Set-TodaysDate ()
+{
+    $date = Get-Date
+    Set-Date -Date $date
+    ...
+}
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[UseCmdletCorrectly](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/UseCmdletCorrectly.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

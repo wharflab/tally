@@ -119,8 +119,8 @@ func ShellFromShebang(line string) (string, bool) {
 	if s := fileutil.Shebang([]byte(line)); s != "" {
 		return s, true
 	}
-	// fileutil.Shebang covers sh/bash/mksh/bats/zsh but not plain ksh.
-	// Handle #!/bin/ksh and #!/usr/bin/env ksh for Dockerfile heredoc support.
+	// fileutil.Shebang covers sh/bash/mksh/bats/zsh but not plain ksh or PowerShell.
+	// Handle those explicitly for Dockerfile heredoc support.
 	if !strings.HasPrefix(line, "#!") {
 		return "", false
 	}
@@ -136,6 +136,10 @@ func ShellFromShebang(line string) (string, bool) {
 	const kshName = "ksh"
 	if path.Base(name) == kshName {
 		return kshName, true
+	}
+	switch NormalizeShellExecutableName(name) {
+	case "powershell", "pwsh":
+		return NormalizeShellExecutableName(name), true
 	}
 	return "", false
 }
@@ -153,7 +157,7 @@ func VariantFromShellCmd(shellCmd []string) Variant {
 // based on its file extension. Defaults to VariantBash for unknown extensions.
 func VariantFromScriptPath(filePath string) Variant {
 	switch strings.ToLower(path.Ext(filePath)) {
-	case ".ps1":
+	case ".ps1", ".psm1", ".psd1":
 		return VariantPowerShell
 	case ".cmd", ".bat":
 		return VariantCmd

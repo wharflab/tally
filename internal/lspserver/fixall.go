@@ -153,7 +153,7 @@ func computeFixedContent(
 		Config:   cfg,
 	}
 
-	result, err := linter.LintFile(input)
+	result, err := linter.LintFileContext(ctx, input)
 	if err != nil {
 		return nil, err
 	}

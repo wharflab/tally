@@ -3,6 +3,7 @@ package heredocfmt
 
 import (
 	"bytes"
+	"context"
 	"encoding/json/jsontext"
 	"encoding/xml"
 	"errors"
@@ -37,6 +38,11 @@ const (
 	KindXML  Kind = "xml"
 	KindINI  Kind = "ini"
 )
+
+// PowerShellFormatter formats PowerShell script text using an external formatter.
+type PowerShellFormatter interface {
+	FormatPowerShell(ctx context.Context, script string) (string, error)
+}
 
 // Formatter resolves EditorConfig style once per virtual target filename and formats heredoc content.
 type Formatter struct {
@@ -128,7 +134,7 @@ func (f *Formatter) FormatShell(content string, variant shell.Variant) (string, 
 	return formatted, true, nil
 }
 
-// FormatShellTarget formats a COPY heredoc body as a shell script when the destination or shebang implies one.
+// FormatShellTarget formats a COPY/ADD heredoc body as a shell script when the destination or shebang implies one.
 func (f *Formatter) FormatShellTarget(target, content string) (string, shell.Variant, bool, error) {
 	variant, ok := shellTargetVariant(target, content)
 	if !ok {
@@ -148,6 +154,28 @@ func (f *Formatter) FormatShellTarget(target, content string) (string, shell.Var
 		return "", variant, false, err
 	}
 	return formatted, variant, true, nil
+}
+
+// FormatPowerShell formats a RUN heredoc body as PowerShell.
+func (f *Formatter) FormatPowerShell(
+	ctx context.Context,
+	formatter PowerShellFormatter,
+	content string,
+) (string, bool, error) {
+	return formatPowerShell(ctx, formatter, content)
+}
+
+// FormatPowerShellTarget formats a COPY/ADD heredoc body as PowerShell when the destination is a PowerShell file.
+func (f *Formatter) FormatPowerShellTarget(
+	ctx context.Context,
+	formatter PowerShellFormatter,
+	target string,
+	content string,
+) (string, bool, error) {
+	if !IsPowerShellTarget(target) {
+		return "", false, nil
+	}
+	return formatPowerShell(ctx, formatter, content)
 }
 
 func (f *Formatter) styleForTarget(target string) (style, error) {
@@ -411,6 +439,31 @@ func isDotShTarget(target string) bool {
 	target = strings.TrimSpace(target)
 	target = strings.Trim(target, `"'`)
 	return strings.EqualFold(path.Ext(filepath.ToSlash(target)), ".sh")
+}
+
+// IsPowerShellTarget reports whether a COPY/ADD heredoc destination is a PowerShell script or module file.
+func IsPowerShellTarget(target string) bool {
+	switch strings.ToLower(path.Ext(targetBasenameAny(target))) {
+	case ".ps1", ".psm1", ".psd1":
+		return true
+	default:
+		return false
+	}
+}
+
+func formatPowerShell(ctx context.Context, formatter PowerShellFormatter, content string) (string, bool, error) {
+	if formatter == nil || strings.TrimSpace(content) == "" {
+		return "", false, nil
+	}
+
+	formatted, err := formatter.FormatPowerShell(ctx, content)
+	if err != nil {
+		return "", false, err
+	}
+	if strings.TrimSpace(formatted) == "" {
+		return "", false, nil
+	}
+	return ensureTrailingNewline(formatted), true, nil
 }
 
 func formatContent(kind Kind, content string, st style) (string, error) {

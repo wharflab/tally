@@ -60,6 +60,14 @@
     },
     {
       "customType": "regex",
+      "managerFilePatterns": ["/^internal/psanalyzer/psscriptanalyzer\\.version$/"],
+      "matchStrings": ["^(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s*$"],
+      "depNameTemplate": "PowerShell/PSScriptAnalyzer",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
       "managerFilePatterns": ["/^_tools/shellcheck-wasm/versions\\.env$/"],
       "matchStrings": ["GHC_WASM_META_COMMIT\\s*[:=]\\s*(?<currentDigest>[a-f0-9]{40})"],
       "currentValueTemplate": "master",

@@ -19,6 +19,9 @@ type Mapping struct {
 	// OriginStartLine is the 1-based Dockerfile line corresponding to script line 1.
 	OriginStartLine int
 
+	// OriginStartColumn is the 0-based Dockerfile column corresponding to script column 1.
+	OriginStartColumn int
+
 	// FallbackLine is the 1-based Dockerfile line to use if precise mapping fails.
 	FallbackLine int
 
@@ -92,6 +95,28 @@ func CommandStartLine(location []dfparser.Range) int {
 		return 0
 	}
 	return location[0].Start.Line
+}
+
+func NodeIndex(root *dfparser.Node) map[int]*dfparser.Node {
+	if root == nil {
+		return nil
+	}
+
+	out := make(map[int]*dfparser.Node, len(root.Children))
+	for _, node := range root.Children {
+		if node == nil || node.StartLine <= 0 {
+			continue
+		}
+		out[node.StartLine] = node
+	}
+	return out
+}
+
+func NodeIndexFromResult(ast *dfparser.Result) map[int]*dfparser.Node {
+	if ast == nil || ast.AST == nil {
+		return nil
+	}
+	return NodeIndex(ast.AST)
 }
 
 func extractRunLikeScript(

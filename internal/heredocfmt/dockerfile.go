@@ -1,6 +1,7 @@
 package heredocfmt
 
 import (
+	"context"
 	"path"
 	"strings"
 
@@ -10,6 +11,7 @@ import (
 
 	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/highlight/extract"
+	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
@@ -197,8 +199,20 @@ func stageIndexAtLine(stages []instructions.Stage, line int) int {
 	return stageIdx
 }
 
-// FormatDockerfileHeredocs builds text edits that pretty-print Dockerfile heredoc bodies.
-func FormatDockerfileHeredocs(file string, result *dockerfile.ParseResult, sem *semantic.Model) ([]rules.TextEdit, error) {
+// IsShellTargetHeredocInstruction reports whether a COPY/ADD heredoc can target a shell script file.
+func IsShellTargetHeredocInstruction(instruction string) bool {
+	return strings.EqualFold(instruction, command.Copy) || strings.EqualFold(instruction, command.Add)
+}
+
+// FormatDockerfileHeredocsWithPowerShell builds text edits that pretty-print Dockerfile heredoc bodies.
+// PowerShell formatting is attempted only when formatter is non-nil and the heredoc is clearly PowerShell.
+func FormatDockerfileHeredocsWithPowerShell(
+	ctx context.Context,
+	file string,
+	result *dockerfile.ParseResult,
+	sem *semantic.Model,
+	powerShellFormatter PowerShellFormatter,
+) ([]rules.TextEdit, error) {
 	formatter := NewFormatter(file)
 	var edits []rules.TextEdit
 	for _, doc := range CollectDockerfileHeredocs(result) {
@@ -206,10 +220,24 @@ func FormatDockerfileHeredocs(file string, result *dockerfile.ParseResult, sem *
 		if err != nil {
 			return nil, err
 		}
-		if !ok && strings.EqualFold(doc.Instruction, command.Copy) {
+		if !ok && IsShellTargetHeredocInstruction(doc.Instruction) {
 			formatted, _, ok, err = formatter.FormatShellTarget(doc.TargetPath, doc.Content)
 			if err != nil {
 				return nil, err
+			}
+		}
+		if !ok && isPowerShellFileHeredocInstruction(doc.Instruction) {
+			formatted, ok, err = formatter.FormatPowerShellTarget(
+				ctx,
+				powerShellFormatter,
+				doc.TargetPath,
+				doc.Content,
+			)
+			if err != nil {
+				if retErr := powerShellFormatError(ctx, err); retErr != nil {
+					return nil, retErr
+				}
+				continue
 			}
 		}
 		if !ok || formatted == doc.Content {
@@ -223,6 +251,24 @@ func FormatDockerfileHeredocs(file string, result *dockerfile.ParseResult, sem *
 	}
 	for _, doc := range CollectRunHeredocs(result) {
 		variant := RunHeredocShellVariant(result.Stages, sem, doc)
+		if variant.IsPowerShell() {
+			formatted, ok, err := formatter.FormatPowerShell(ctx, powerShellFormatter, doc.Content)
+			if err != nil {
+				if retErr := powerShellFormatError(ctx, err); retErr != nil {
+					return nil, retErr
+				}
+				continue
+			}
+			if !ok || formatted == doc.Content {
+				continue
+			}
+
+			edits = append(edits, rules.TextEdit{
+				Location: rules.NewRangeLocation(file, doc.BodyStartLine, 0, doc.TerminatorLine, 0),
+				NewText:  WithBodyPrefix(formatted, doc.BodyPrefix),
+			})
+			continue
+		}
 		if !variant.SupportsPOSIXShellAST() {
 			continue
 		}
@@ -241,6 +287,20 @@ func FormatDockerfileHeredocs(file string, result *dockerfile.ParseResult, sem *
 		})
 	}
 	return edits, nil
+}
+
+func powerShellFormatError(ctx context.Context, err error) error {
+	if psanalyzer.IsUnavailable(err) {
+		return nil
+	}
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+	return err
+}
+
+func isPowerShellFileHeredocInstruction(instruction string) bool {
+	return strings.EqualFold(instruction, command.Copy) || strings.EqualFold(instruction, command.Add)
 }
 
 type heredocBodySpan struct {

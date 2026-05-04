@@ -353,6 +353,30 @@ func TestVariantFromShellCmd(t *testing.T) {
 	}
 }
 
+func TestVariantFromScriptPath(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		path string
+		want Variant
+	}{
+		{"script.ps1", VariantPowerShell},
+		{"module.psm1", VariantPowerShell},
+		{"manifest.psd1", VariantPowerShell},
+		{"script.cmd", VariantCmd},
+		{"script.bat", VariantCmd},
+		{"script.unknown", VariantBash},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			t.Parallel()
+			if got := VariantFromScriptPath(tt.path); got != tt.want {
+				t.Errorf("VariantFromScriptPath(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCommandNamesWithVariant(t *testing.T) {
 	t.Parallel()
 	// Test that different variants parse correctly
@@ -594,6 +618,8 @@ func TestShellFromShebang(t *testing.T) {
 		{"#!/usr/bin/env bats", "bats", true},
 		{"#!/bin/ksh", "ksh", true},
 		{"#!/usr/bin/env ksh", "ksh", true},
+		{"#!/usr/bin/env pwsh", "pwsh", true},
+		{"#!/usr/bin/powershell", "powershell", true},
 		{"#!/usr/bin/python3", "", false},
 		{"#!/usr/bin/env python3", "", false},
 		{"echo hello", "", false},

@@ -1,0 +1,46 @@
+---
+title: "powershell/PSAvoidUsingAllowUnencryptedAuthentication"
+description: "Avoid sending credentials and secrets over unencrypted connections"
+sidebarTitle: "PSAvoidUsingAllowUnencryptedAuthentication"
+---
+
+`powershell/PSAvoidUsingAllowUnencryptedAuthentication` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in
+Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Avoid using the **AllowUnencryptedAuthentication** parameter of `Invoke-WebRequest` and
+`Invoke-RestMethod`. When using this parameter, the cmdlets send credentials and secrets over
+unencrypted connections. This should be avoided except for compatibility with legacy systems.
+
+For more details, see [Invoke-RestMethod](https://learn.microsoft.com/powershell/module/microsoft.powershell.utility/invoke-restmethod).
+
+## How
+
+Avoid using the **AllowUnencryptedAuthentication** parameter.
+
+## Example 1
+
+### Problematic code
+
+```powershell
+Invoke-WebRequest foo -AllowUnencryptedAuthentication
+```
+
+### Correct code
+
+```powershell
+Invoke-WebRequest foo
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidUsingAllowUnencryptedAuthentication](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingAllowUnencryptedAuthentication.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

@@ -1,0 +1,65 @@
+---
+title: "powershell/PSAvoidExclaimOperator"
+description: "Avoid exclaim operator"
+sidebarTitle: "PSAvoidExclaimOperator"
+---
+
+`powershell/PSAvoidExclaimOperator` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Avoid using the negation operator (`!`). Use `-not` for improved readability.
+
+<Note>
+  Upstream PSScriptAnalyzer does not enable this rule by default. Configure `rules.powershell.PSAvoidExclaimOperator.Enable = true` to forward the
+  upstream setting to PSScriptAnalyzer.
+</Note>
+
+## How to Fix
+
+Replace the `!` negation operator with the PowerShell `-not` operator.
+
+## Examples
+
+### Problematic code
+
+```powershell
+$MyVar = !$true
+```
+
+### Correct code
+
+```powershell
+$MyVar = -not $true
+```
+
+## Configuration
+
+Upstream PSScriptAnalyzer supports the following rule setting. tally forwards matching `rules.powershell.PSAvoidExclaimOperator` options to
+PSScriptAnalyzer.
+
+```powershell
+Rules = @{
+    PSAvoidExclaimOperator  = @{
+        Enable = $true
+    }
+}
+```
+
+### Parameters
+
+- `Enable`: **bool** (Default value is `$false`)
+
+  Enable or disable the rule during ScriptAnalyzer invocation.
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidExclaimOperator](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidExclaimOperator.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

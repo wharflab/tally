@@ -1,0 +1,45 @@
+---
+title: "powershell/PSAvoidUsingInvokeExpression"
+description: "Avoid Using Invoke-Expression"
+sidebarTitle: "PSAvoidUsingInvokeExpression"
+---
+
+`powershell/PSAvoidUsingInvokeExpression` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Care must be taken when using the `Invoke-Expression` command. The `Invoke-Expression` executes the
+specified string and returns the results.
+
+Code injection into your application or script can occur if the expression passed as a string
+includes any data provided from the user.
+
+## How
+
+Remove the use of `Invoke-Expression`.
+
+## Examples
+
+### Problematic code
+
+```powershell
+Invoke-Expression 'Get-Process'
+```
+
+### Correct code
+
+```powershell
+Get-Process
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidUsingInvokeExpression](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingInvokeExpression.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

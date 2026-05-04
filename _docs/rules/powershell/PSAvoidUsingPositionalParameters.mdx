@@ -1,0 +1,69 @@
+---
+title: "powershell/PSAvoidUsingPositionalParameters"
+description: "Avoid Using Positional Parameters"
+sidebarTitle: "PSAvoidUsingPositionalParameters"
+---
+
+`powershell/PSAvoidUsingPositionalParameters` is a PSScriptAnalyzer diagnostic emitted by tally for PowerShell snippets embedded in Dockerfiles.
+
+| Property | Value |
+|----------|-------|
+| Severity | Information |
+| Category | PSScriptAnalyzer |
+| Auto-fix | No |
+
+## Description
+
+Using positional parameters reduces the readability of code and can introduce errors. It is possible
+that a future version of the cmdlet could change in a way that would break existing scripts if calls
+to the cmdlet rely on the position of the parameters.
+
+For simple cmdlets with only a few positional parameters, the risk is much smaller. To prevent this
+rule from being too noisy, this rule gets only triggered when there are 3 or more parameters
+supplied. A simple example where the risk of using positional parameters is negligible, is
+`Test-Path $Path`.
+
+## Configuration
+
+```powershell
+Rules = @{
+    PSAvoidUsingPositionalParameters = @{
+        CommandAllowList = 'Join-Path', 'MyCmdletOrScript'
+        Enable           = $true
+    }
+}
+```
+
+### Parameters
+
+#### CommandAllowList: string[] (Default value is `@()`)
+
+Commands or scripts to be excluded from this rule.
+
+#### Enable: bool (Default value is `$true`)
+
+Enable or disable the rule during ScriptAnalyzer invocation.
+
+## How
+
+Use full parameter names when calling commands.
+
+## Examples
+
+### Problematic code
+
+```powershell
+Get-Command ChildItem Microsoft.PowerShell.Management
+```
+
+### Correct code
+
+```powershell
+Get-Command -Noun ChildItem -Module Microsoft.PowerShell.Management
+```
+
+## Source
+
+This rule documentation is adapted from Microsoft's PSScriptAnalyzer documentation for
+[AvoidUsingPositionalParameters](https://github.com/MicrosoftDocs/PowerShell-Docs-Modules/blob/main/reference/docs-conceptual/PSScriptAnalyzer/Rules/AvoidUsingPositionalParameters.md),
+licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).

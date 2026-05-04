@@ -12,6 +12,9 @@ import (
 type FixMode string
 
 const (
+	// SeverityOffValue is the config string that disables a rule.
+	SeverityOffValue = "off"
+
 	// FixModeNever disables fixes even with --fix.
 	FixModeNever FixMode = "never"
 
@@ -89,6 +92,9 @@ type RulesConfig struct {
 
 	// Shellcheck contains configuration for shellcheck/* rules.
 	Shellcheck map[string]RuleConfig `json:"shellcheck,omitempty" koanf:"shellcheck"`
+
+	// Powershell contains configuration for powershell/* rules.
+	Powershell map[string]RuleConfig `json:"powershell,omitempty" koanf:"powershell"`
 }
 
 // Get returns the configuration for a specific rule.
@@ -154,6 +160,7 @@ func matchesAnyPattern(ruleCode string, patterns []string) bool {
 // matchesAnyIncludePattern checks if ruleCode matches any include pattern.
 // It also applies ShellCheck include coupling so selecting the engine enables
 // all derived findings, and selecting any specific SC rule enables the engine.
+// PowerShell follows the same engine/derived-finding shape.
 func matchesAnyIncludePattern(ruleCode string, patterns []string) bool {
 	return slices.ContainsFunc(patterns, func(pattern string) bool {
 		if matchesPattern(ruleCode, pattern) {
@@ -164,6 +171,13 @@ func matchesAnyIncludePattern(ruleCode string, patterns []string) bool {
 		}
 		if ruleCode == "shellcheck/ShellCheck" {
 			return strings.HasPrefix(pattern, "shellcheck/SC")
+		}
+		if pattern == "powershell/PowerShell" {
+			return strings.HasPrefix(ruleCode, "powershell/")
+		}
+		if ruleCode == "powershell/PowerShell" {
+			name, ok := strings.CutPrefix(pattern, "powershell/")
+			return ok && isPowerShellAnalyzerRuleName(name)
 		}
 		return false
 	})
@@ -248,6 +262,44 @@ func (rc *RulesConfig) GetOptions(ruleCode string) map[string]any {
 	return nil
 }
 
+// EnablesPowerShellAnalyzer reports whether a concrete powershell/* analyzer
+// diagnostic config should activate the analyzer engine even though the
+// concrete rule is discovered dynamically from PSScriptAnalyzer output.
+func (rc *RulesConfig) EnablesPowerShellAnalyzer() bool {
+	if rc == nil {
+		return false
+	}
+	for name, cfg := range rc.Powershell {
+		if !isPowerShellAnalyzerRuleName(name) {
+			continue
+		}
+		if cfg.Severity == SeverityOffValue {
+			continue
+		}
+		if cfg.Severity != "" {
+			return true
+		}
+		if len(cfg.Options) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func isPowerShellAnalyzerRuleName(name string) bool {
+	switch name {
+	case "", "PowerShell":
+		return false
+	}
+	for _, r := range name {
+		if (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
 // GetOptionsTyped returns typed rule options merged over defaults.
 // Returns defaults if the rule has no options or decoding fails.
 func DecodeRuleOptions[T any](rc *RulesConfig, ruleCode string, defaults T) T {
@@ -287,6 +339,12 @@ func (rc *RulesConfig) Set(ruleCode string, cfg RuleConfig) bool {
 		}
 		rc.Shellcheck[name] = cfg
 		return true
+	case "powershell":
+		if rc.Powershell == nil {
+			rc.Powershell = make(map[string]RuleConfig)
+		}
+		rc.Powershell[name] = cfg
+		return true
 	default:
 		return false
 	}
@@ -303,6 +361,8 @@ func (rc *RulesConfig) namespaceMap(ns string) map[string]RuleConfig {
 		return rc.Hadolint
 	case "shellcheck":
 		return rc.Shellcheck
+	case "powershell":
+		return rc.Powershell
 	default:
 		return nil
 	}
