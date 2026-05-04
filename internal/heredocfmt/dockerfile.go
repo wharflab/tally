@@ -199,6 +199,10 @@ func stageIndexAtLine(stages []instructions.Stage, line int) int {
 	return stageIdx
 }
 
+func isShellTargetHeredocInstruction(instruction string) bool {
+	return strings.EqualFold(instruction, command.Copy) || strings.EqualFold(instruction, command.Add)
+}
+
 // FormatDockerfileHeredocsWithPowerShell builds text edits that pretty-print Dockerfile heredoc bodies.
 // PowerShell formatting is attempted only when formatter is non-nil and the heredoc is clearly PowerShell.
 func FormatDockerfileHeredocsWithPowerShell(
@@ -215,7 +219,7 @@ func FormatDockerfileHeredocsWithPowerShell(
 		if err != nil {
 			return nil, err
 		}
-		if !ok && strings.EqualFold(doc.Instruction, command.Copy) {
+		if !ok && isShellTargetHeredocInstruction(doc.Instruction) {
 			formatted, _, ok, err = formatter.FormatShellTarget(doc.TargetPath, doc.Content)
 			if err != nil {
 				return nil, err

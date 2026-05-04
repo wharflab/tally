@@ -134,7 +134,7 @@ func (f *Formatter) FormatShell(content string, variant shell.Variant) (string, 
 	return formatted, true, nil
 }
 
-// FormatShellTarget formats a COPY heredoc body as a shell script when the destination or shebang implies one.
+// FormatShellTarget formats a COPY/ADD heredoc body as a shell script when the destination or shebang implies one.
 func (f *Formatter) FormatShellTarget(target, content string) (string, shell.Variant, bool, error) {
 	variant, ok := shellTargetVariant(target, content)
 	if !ok {

@@ -88,3 +88,36 @@ EOF
 		t.Fatalf("edit text mismatch\ngot:\n%s\nwant:\n%s", edits[0].NewText, want)
 	}
 }
+
+func TestFormatDockerfileHeredocsFormatsAddShellTarget(t *testing.T) {
+	t.Parallel()
+
+	src := `FROM alpine
+ADD <<EOF /usr/local/bin/entrypoint.sh
+if true; then
+ echo hi
+fi
+EOF
+`
+	result, err := dockerfile.Parse(strings.NewReader(src), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	edits, err := FormatDockerfileHeredocsWithPowerShell(
+		context.Background(),
+		"Dockerfile",
+		result,
+		semantic.NewModel(result, nil, "Dockerfile"),
+		nil,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(edits) != 1 {
+		t.Fatalf("edits = %d, want 1", len(edits))
+	}
+	if want := "if true; then\n\techo hi\nfi\n"; edits[0].NewText != want {
+		t.Fatalf("edit text mismatch\ngot:\n%s\nwant:\n%s", edits[0].NewText, want)
+	}
+}
