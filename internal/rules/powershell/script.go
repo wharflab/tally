@@ -92,6 +92,9 @@ func parseExplicitPowerShellInvocation(script string) (explicitPowerShellInvocat
 			next = end
 			continue
 		}
+		if isPowerShellTerminalSwitch(tokenNorm) {
+			return explicitPowerShellInvocation{}, false
+		}
 		if isPowerShellCommandSwitch(tokenNorm) {
 			return invocationFromRemainder(script, end)
 		}
@@ -128,6 +131,9 @@ func parseExecFormPowerShellInvocation(args []string) (explicitPowerShellInvocat
 	for i := 1; i < len(args); i++ {
 		tokenNorm := strings.ToLower(args[i])
 		if !isPowerShellCommandSwitch(tokenNorm) && !isPowerShellCommandWithArgsSwitch(tokenNorm) {
+			if isPowerShellTerminalSwitch(tokenNorm) {
+				return explicitPowerShellInvocation{}, false
+			}
 			if isPowerShellFileModeSwitch(tokenNorm) {
 				return explicitPowerShellInvocation{}, false
 			}
@@ -161,11 +167,14 @@ func parseExecFormPowerShellInvocation(args []string) (explicitPowerShellInvocat
 }
 
 func isPowerShellCommandSwitch(token string) bool {
-	return token == "-command" || token == "-c"
+	return powerShellSwitchMatchesAny(token, powerShellSwitchSpec{match: "command", smallest: "c"})
 }
 
 func isPowerShellCommandWithArgsSwitch(token string) bool {
-	return token == "-commandwithargs" || token == "-cwa"
+	return powerShellSwitchMatchesAny(token,
+		powerShellSwitchSpec{match: "commandwithargs", smallest: "commandwithargs"},
+		powerShellSwitchSpec{match: "cwa", smallest: "cwa"},
+	)
 }
 
 func isPowerShellContinuationToken(token string) bool {
@@ -173,46 +182,43 @@ func isPowerShellContinuationToken(token string) bool {
 }
 
 func isPowerShellFileModeSwitch(token string) bool {
-	switch powerShellOptionName(token) {
-	case "-file", "-f", "-encodedcommand", "-e", "-ec":
-		return true
-	default:
-		return false
-	}
+	return powerShellSwitchMatchesAny(token,
+		powerShellSwitchSpec{match: "file", smallest: "f"},
+		powerShellSwitchSpec{match: "encodedcommand", smallest: "e"},
+		powerShellSwitchSpec{match: "ec", smallest: "e"},
+	)
+}
+
+func isPowerShellTerminalSwitch(token string) bool {
+	return powerShellSwitchMatchesAny(token,
+		powerShellSwitchSpec{match: "help", smallest: "h"},
+		powerShellSwitchSpec{match: "?", smallest: "?"},
+		powerShellSwitchSpec{match: "version", smallest: "v"},
+	)
 }
 
 func powerShellOptionConsumesNextToken(token string) bool {
 	if powerShellOptionHasInlineValue(token) {
 		return false
 	}
-	switch powerShellOptionName(token) {
-	case "-configurationname",
-		"-config",
-		"-configurationfile",
-		"-custompipename",
-		"-encodedarguments",
-		"-executionpolicy",
-		"-ep",
-		"-ex",
-		"-inputformat",
-		"-if",
-		"-inp",
-		"-outputformat",
-		"-o",
-		"-of",
-		"-psconsolefile",
-		"-settingsfile",
-		"-settings",
-		"-version",
-		"-v",
-		"-windowstyle",
-		"-w",
-		"-wd",
-		"-workingdirectory":
-		return true
-	default:
-		return false
-	}
+	return powerShellSwitchMatchesAny(token,
+		powerShellSwitchSpec{match: "configurationname", smallest: "config"},
+		powerShellSwitchSpec{match: "configurationfile", smallest: "configurationfile"},
+		powerShellSwitchSpec{match: "custompipename", smallest: "cus"},
+		powerShellSwitchSpec{match: "encodedarguments", smallest: "encodeda"},
+		powerShellSwitchSpec{match: "ea", smallest: "ea"},
+		powerShellSwitchSpec{match: "executionpolicy", smallest: "ex"},
+		powerShellSwitchSpec{match: "ep", smallest: "ep"},
+		powerShellSwitchSpec{match: "inputformat", smallest: "inp"},
+		powerShellSwitchSpec{match: "if", smallest: "if"},
+		powerShellSwitchSpec{match: "outputformat", smallest: "o"},
+		powerShellSwitchSpec{match: "of", smallest: "o"},
+		powerShellSwitchSpec{match: "psconsolefile", smallest: "psconsolefile"},
+		powerShellSwitchSpec{match: "settingsfile", smallest: "settings"},
+		powerShellSwitchSpec{match: "windowstyle", smallest: "w"},
+		powerShellSwitchSpec{match: "workingdirectory", smallest: "wo"},
+		powerShellSwitchSpec{match: "wd", smallest: "wd"},
+	)
 }
 
 func powerShellOptionName(token string) string {
@@ -225,6 +231,37 @@ func powerShellOptionName(token string) string {
 
 func powerShellOptionHasInlineValue(token string) bool {
 	return strings.ContainsAny(token, ":=")
+}
+
+type powerShellSwitchSpec struct {
+	match    string
+	smallest string
+}
+
+func powerShellSwitchMatchesAny(token string, specs ...powerShellSwitchSpec) bool {
+	key, ok := powerShellSwitchKey(token)
+	if !ok {
+		return false
+	}
+	for _, spec := range specs {
+		if powerShellSwitchMatches(key, spec.match, spec.smallest) {
+			return true
+		}
+	}
+	return false
+}
+
+func powerShellSwitchKey(token string) (string, bool) {
+	name := powerShellOptionName(token)
+	if !strings.HasPrefix(name, "-") {
+		return "", false
+	}
+	key := strings.TrimLeft(name, "-")
+	return key, key != ""
+}
+
+func powerShellSwitchMatches(key, match, smallest string) bool {
+	return len(key) >= len(smallest) && strings.HasPrefix(match, key)
 }
 
 func isPowerShellExecutable(exe string) bool {
