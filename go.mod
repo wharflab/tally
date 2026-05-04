@@ -45,7 +45,7 @@ require (
 	github.com/tetratelabs/wazero v1.11.0
 	github.com/tree-sitter/go-tree-sitter v0.24.0
 	github.com/wharflab/tree-sitter-batch v0.11.1
-	github.com/wharflab/tree-sitter-powershell v0.36.0
+	github.com/wharflab/tree-sitter-powershell v0.38.0
 	github.com/zricethezav/gitleaks/v8 v8.30.1
 	go.bug.st/lsp v0.1.3
 	go.opentelemetry.io/otel v1.43.0

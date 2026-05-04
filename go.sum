@@ -877,6 +877,8 @@ github.com/wharflab/tree-sitter-batch v0.11.1 h1:kR6GDsj4oHVmMMQcNnj3pbSNNPXwAK8
 github.com/wharflab/tree-sitter-batch v0.11.1/go.mod h1:pn5t1ZUQ6WNU5dCIaWbaR4D5dHgmIQKv66MM8qlMl+8=
 github.com/wharflab/tree-sitter-powershell v0.36.0 h1:IgtEzCyC+hK/rQy2Sewp0WK/N5+xbHfiaOht72rp5PI=
 github.com/wharflab/tree-sitter-powershell v0.36.0/go.mod h1:KI9j2ME0o0c4T/iHMxP0ei6UR485dRjWPkff85WWfco=
+github.com/wharflab/tree-sitter-powershell v0.38.0 h1:rn29a8x0TUinPp4x7/V0fWBlxxha5jf90G3BUfL7Afo=
+github.com/wharflab/tree-sitter-powershell v0.38.0/go.mod h1:KI9j2ME0o0c4T/iHMxP0ei6UR485dRjWPkff85WWfco=
 github.com/xeipuuv/gojsonpointer v0.0.0-20180127040702-4e3ac2762d5f/go.mod h1:N2zxlSyiKSe5eX1tZViRH5QA0qijqEDrYZiPEAiq3wU=
 github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb h1:zGWFAtiMcyryUHoUjUJX0/lt1H2+i2Ka2n+D3DImSNo=
 github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb/go.mod h1:N2zxlSyiKSe5eX1tZViRH5QA0qijqEDrYZiPEAiq3wU=
