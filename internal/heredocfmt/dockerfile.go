@@ -292,10 +292,10 @@ func powerShellFormatError(ctx context.Context, err error) error {
 	if psanalyzer.IsUnavailable(err) {
 		return nil
 	}
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
 	}
-	return nil
+	return err
 }
 
 func isPowerShellFileHeredocInstruction(instruction string) bool {

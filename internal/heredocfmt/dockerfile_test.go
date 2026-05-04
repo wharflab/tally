@@ -2,6 +2,7 @@ package heredocfmt
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -11,12 +12,13 @@ import (
 
 type fakePowerShellFormatter struct {
 	formatted string
+	err       error
 	calls     []string
 }
 
 func (f *fakePowerShellFormatter) FormatPowerShell(_ context.Context, script string) (string, error) {
 	f.calls = append(f.calls, script)
-	return f.formatted, nil
+	return f.formatted, f.err
 }
 
 func TestShellFromHeredocShebangIgnoresIndentedShebangComment(t *testing.T) {
@@ -119,5 +121,38 @@ EOF
 	}
 	if want := "if true; then\n\techo hi\nfi\n"; edits[0].NewText != want {
 		t.Fatalf("edit text mismatch\ngot:\n%s\nwant:\n%s", edits[0].NewText, want)
+	}
+}
+
+func TestFormatDockerfileHeredocsPropagatesPowerShellFormatterError(t *testing.T) {
+	t.Parallel()
+
+	src := `FROM mcr.microsoft.com/powershell:lts-alpine-3.20
+SHELL ["pwsh", "-Command"]
+RUN <<EOF
+if ($true) {
+Write-Host hi
+}
+EOF
+`
+	result, err := dockerfile.Parse(strings.NewReader(src), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantErr := errors.New("PowerShell formatter protocol failed")
+	formatter := &fakePowerShellFormatter{err: wantErr}
+
+	edits, err := FormatDockerfileHeredocsWithPowerShell(
+		context.Background(),
+		"Dockerfile",
+		result,
+		semantic.NewModel(result, nil, "Dockerfile"),
+		formatter,
+	)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("error = %v, want %v", err, wantErr)
+	}
+	if len(edits) != 0 {
+		t.Fatalf("edits = %d, want none", len(edits))
 	}
 }
