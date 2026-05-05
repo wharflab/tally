@@ -41,7 +41,7 @@ func newDockerLintPluginCommand(dockerCLI command.Cli) *cobra.Command {
 	opts := &lintOptions{}
 	cmd := newLintCommand(opts)
 	cmd.Version = version.Version()
-	cmd.SetVersionTemplate("docker-lint version {{.Version}}\n")
+	cmd.SetVersionTemplate("tally version {{.Version}}\n")
 	cmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		if err := plugin.PersistentPreRunE(cmd, args); err != nil {
 			return err

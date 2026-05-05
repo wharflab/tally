@@ -74,8 +74,8 @@ func TestDockerCLIPluginVersionFlag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("plugin version failed: %v\noutput:\n%s", err, output)
 	}
-	if !strings.Contains(string(output), "docker-lint version ") {
-		t.Fatalf("expected docker-lint version output, got:\n%s", output)
+	if !strings.Contains(string(output), "tally version ") {
+		t.Fatalf("expected tally version output, got:\n%s", output)
 	}
 }
 
