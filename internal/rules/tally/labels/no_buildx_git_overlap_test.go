@@ -287,6 +287,9 @@ LABEL org.opencontainers.image.revision="abc123" \
 	if violations[0].SuggestedFix != nil {
 		t.Fatal("SuggestedFix = non-nil, want nil")
 	}
+	if fixes := violations[0].AllFixes(); len(fixes) != 0 {
+		t.Fatalf("got %d fix options, want 0", len(fixes))
+	}
 }
 
 func TestNoBuildxGitOverlapRule_GroupedRevisionFixOptions(t *testing.T) {
@@ -324,6 +327,56 @@ LABEL org.opencontainers.image.revision="abc123" \
 		"LABEL org.opencontainers.image.title=\"app\"\n"
 	if gotDeleted != wantDeleted {
 		t.Errorf("delete fix mismatch\ngot:\n%s\nwant:\n%s", gotDeleted, wantDeleted)
+	}
+}
+
+func TestNoBuildxGitOverlapRule_GroupedRepeatedRevisionFixOptions(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM alpine:3.20
+LABEL org.opencontainers.image.revision="abc123" \
+      org.opencontainers.image.revision="def456" \
+      org.opencontainers.image.title="app"
+`
+	config := map[string]any{"buildx-git-labels": "full"}
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, config)
+
+	violations := NewNoBuildxGitOverlapRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	allFixes := violations[0].AllFixes()
+	if len(allFixes) != 2 {
+		t.Fatalf("got %d fix options, want 2", len(allFixes))
+	}
+
+	commentFix := allFixes[0]
+	gotCommented := string(fixpkg.ApplyFix([]byte(content), commentFix))
+	wantCommented := "FROM alpine:3.20\n" +
+		"# [commented out by tally - Buildx can generate org.opencontainers.image.revision]: " +
+		"LABEL org.opencontainers.image.revision=\"abc123\"\n" +
+		"# [commented out by tally - Buildx can generate org.opencontainers.image.revision]: " +
+		"LABEL org.opencontainers.image.revision=\"def456\"\n" +
+		"LABEL org.opencontainers.image.title=\"app\"\n"
+	if gotCommented != wantCommented {
+		t.Errorf("comment fix mismatch\ngot:\n%s\nwant:\n%s", gotCommented, wantCommented)
+	}
+	commentedInput := testutil.MakeLintInputWithConfig(t, "Dockerfile", gotCommented, config)
+	if got := NewNoBuildxGitOverlapRule().Check(commentedInput); len(got) != 0 {
+		t.Fatalf("comment fix left %d violations, want 0", len(got))
+	}
+
+	deleteFix := allFixes[1]
+	gotDeleted := string(fixpkg.ApplyFix([]byte(content), deleteFix))
+	wantDeleted := "FROM alpine:3.20\n" +
+		"LABEL org.opencontainers.image.title=\"app\"\n"
+	if gotDeleted != wantDeleted {
+		t.Errorf("delete fix mismatch\ngot:\n%s\nwant:\n%s", gotDeleted, wantDeleted)
+	}
+	deletedInput := testutil.MakeLintInputWithConfig(t, "Dockerfile", gotDeleted, config)
+	if got := NewNoBuildxGitOverlapRule().Check(deletedInput); len(got) != 0 {
+		t.Fatalf("delete fix left %d violations, want 0", len(got))
 	}
 }
 

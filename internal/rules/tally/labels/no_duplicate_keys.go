@@ -119,7 +119,7 @@ func buildDuplicateKeyFixes(
 	escapeToken rune,
 ) []*rules.SuggestedFix {
 	key := pair.Key
-	return buildStandaloneLabelInstructionFixes(file, sm, pair, escapeToken, labelInstructionFixOptions{
+	return buildLabelPairRemovalFixes(file, sm, pair, escapeToken, labelInstructionFixOptions{
 		CommentDescription: fmt.Sprintf("Comment out duplicate LABEL %q (Docker keeps the last value)", key),
 		DeleteDescription:  fmt.Sprintf("Delete duplicate LABEL %q", key),
 		CommentPrefix:      fmt.Sprintf("# [commented out by tally - Docker keeps the last LABEL value for %s]: ", key),

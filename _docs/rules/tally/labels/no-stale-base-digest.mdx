@@ -10,7 +10,7 @@ OCI base digest labels must be backed by a digest-pinned base image.
 | Severity | Warning |
 | Category | Correctness |
 | Default | Enabled |
-| Auto-fix | Suggestion, for standalone `LABEL` instructions |
+| Auto-fix | Suggestion, for standalone `LABEL` instructions and grouped `LABEL` pairs |
 
 ## Description
 
@@ -30,7 +30,7 @@ builder stages are ignored unless the final image inherits from that stage.
 
 ## Examples
 
-### Bad
+### Bad: Unpinned base
 
 ```dockerfile
 FROM alpine:3.20
@@ -41,7 +41,7 @@ LABEL org.opencontainers.image.base.digest="sha256:11111111111111111111111111111
 The `FROM` line is tag-based, so the Dockerfile does not prove the base image
 digest.
 
-### Bad
+### Bad: Mismatched digest
 
 ```dockerfile
 FROM alpine:3.20@sha256:1111111111111111111111111111111111111111111111111111111111111111
@@ -51,7 +51,7 @@ LABEL org.opencontainers.image.base.digest="sha256:22222222222222222222222222222
 
 The `FROM` line is digest-pinned, but the label disagrees with it.
 
-### Good
+### Good: Matching digest
 
 ```dockerfile
 FROM alpine:3.20@sha256:1111111111111111111111111111111111111111111111111111111111111111
@@ -59,7 +59,7 @@ FROM alpine:3.20@sha256:11111111111111111111111111111111111111111111111111111111
 LABEL org.opencontainers.image.base.digest="sha256:1111111111111111111111111111111111111111111111111111111111111111"
 ```
 
-### Good
+### Good: Omitted without pinned base
 
 ```dockerfile
 FROM alpine:3.20

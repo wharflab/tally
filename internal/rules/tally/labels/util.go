@@ -2,6 +2,7 @@ package labels
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -38,10 +39,23 @@ func buildStandaloneLabelInstructionFixes(
 	escapeToken rune,
 	opts labelInstructionFixOptions,
 ) []*rules.SuggestedFix {
-	if sm == nil || pair.Command == nil || len(pair.Command.Labels) != 1 {
+	if pair.Command == nil || len(pair.Command.Labels) != 1 {
 		return nil
 	}
-	locs := pair.Command.Location()
+	return buildLabelInstructionRemovalFixes(file, sm, pair.Command, escapeToken, opts)
+}
+
+func buildLabelInstructionRemovalFixes(
+	file string,
+	sm *sourcemap.SourceMap,
+	cmd *instructions.LabelCommand,
+	escapeToken rune,
+	opts labelInstructionFixOptions,
+) []*rules.SuggestedFix {
+	if sm == nil || cmd == nil {
+		return nil
+	}
+	locs := cmd.Location()
 	if len(locs) == 0 {
 		return nil
 	}
@@ -114,6 +128,80 @@ func buildLabelPairRemovalFixes(
 			Safety:      opts.Safety,
 			Priority:    opts.Priority,
 			Edits:       []rules.TextEdit{deleteEdit},
+		},
+	}
+}
+
+func buildLabelPairsRemovalFixes(
+	file string,
+	sm *sourcemap.SourceMap,
+	pairs []facts.LabelPairFact,
+	escapeToken rune,
+	opts labelInstructionFixOptions,
+) []*rules.SuggestedFix {
+	if len(pairs) == 0 {
+		return nil
+	}
+	if len(pairs) == 1 {
+		return buildLabelPairRemovalFixes(file, sm, pairs[0], escapeToken, opts)
+	}
+
+	cmd := pairs[0].Command
+	if sm == nil || cmd == nil {
+		return nil
+	}
+	for _, pair := range pairs[1:] {
+		if pair.Command != cmd {
+			return nil
+		}
+	}
+
+	spans := labelPairSourceSpans(sm, cmd, escapeToken)
+	if len(spans) == 0 {
+		return nil
+	}
+
+	pairIndexes := make([]int, 0, len(pairs))
+	seen := make(map[int]struct{}, len(pairs))
+	for _, pair := range pairs {
+		if pair.PairIndex < 0 || pair.PairIndex >= len(spans) {
+			return nil
+		}
+		if _, ok := seen[pair.PairIndex]; ok {
+			continue
+		}
+		seen[pair.PairIndex] = struct{}{}
+		pairIndexes = append(pairIndexes, pair.PairIndex)
+	}
+	if len(pairIndexes) == len(spans) {
+		return buildLabelInstructionRemovalFixes(file, sm, cmd, escapeToken, opts)
+	}
+
+	deleteEdits, ok := groupedLabelPairDeleteEdits(file, sm, spans, pairIndexes)
+	if !ok {
+		return nil
+	}
+	commentEdit, ok := groupedLabelPairsCommentEdit(file, sm, spans, pairs, opts)
+	if !ok {
+		return nil
+	}
+
+	commentEdits := make([]rules.TextEdit, 0, len(deleteEdits)+1)
+	commentEdits = append(commentEdits, commentEdit)
+	commentEdits = append(commentEdits, deleteEdits...)
+	return []*rules.SuggestedFix{
+		{
+			Description: opts.CommentDescription,
+			Safety:      opts.Safety,
+			Priority:    opts.Priority,
+			IsPreferred: true,
+			Edits:       commentEdits,
+		},
+		{
+			Description: opts.DeleteDescription,
+			Safety:      opts.Safety,
+			Priority:    opts.Priority,
+			Edits:       deleteEdits,
 		},
 	}
 }
@@ -373,25 +461,66 @@ func groupedLabelPairDeleteEdit(
 	spans []labelWordSpan,
 	pairIndex int,
 ) (rules.TextEdit, bool) {
-	if pairIndex < 0 || pairIndex >= len(spans) || len(spans) < 2 {
+	edits, ok := groupedLabelPairDeleteEdits(file, sm, spans, []int{pairIndex})
+	if !ok || len(edits) != 1 {
 		return rules.TextEdit{}, false
 	}
+	return edits[0], true
+}
 
-	start := spans[pairIndex].start
-	end := spans[pairIndex].end
-	if pairIndex == 0 {
-		end = spans[1].start
-	} else {
-		start = spans[pairIndex-1].end
-		if pairIndex == len(spans)-1 {
-			end = extendPositionThroughHorizontalWhitespace(sm, end)
+func groupedLabelPairDeleteEdits(
+	file string,
+	sm *sourcemap.SourceMap,
+	spans []labelWordSpan,
+	pairIndexes []int,
+) ([]rules.TextEdit, bool) {
+	if sm == nil || len(spans) < 2 || len(pairIndexes) == 0 {
+		return nil, false
+	}
+
+	indexes := slices.Clone(pairIndexes)
+	slices.Sort(indexes)
+	if indexes[0] < 0 || indexes[len(indexes)-1] >= len(spans) {
+		return nil, false
+	}
+	for idx := 1; idx < len(indexes); idx++ {
+		if indexes[idx] == indexes[idx-1] {
+			return nil, false
 		}
 	}
 
-	return rules.TextEdit{
-		Location: rules.NewRangeLocation(file, start.line, start.col, end.line, end.col),
-		NewText:  "",
-	}, true
+	edits := make([]rules.TextEdit, 0, len(indexes))
+	for pos := 0; pos < len(indexes); {
+		groupStart := indexes[pos]
+		groupEnd := groupStart
+		pos++
+		for pos < len(indexes) && indexes[pos] == groupEnd+1 {
+			groupEnd = indexes[pos]
+			pos++
+		}
+		if groupStart == 0 && groupEnd == len(spans)-1 {
+			return nil, false
+		}
+
+		start := spans[groupStart].start
+		end := spans[groupEnd].end
+		switch {
+		case groupStart == 0:
+			end = spans[groupEnd+1].start
+		case groupEnd == len(spans)-1:
+			start = spans[groupStart-1].end
+			end = extendPositionThroughHorizontalWhitespace(sm, end)
+		default:
+			end = spans[groupEnd+1].start
+		}
+
+		edits = append(edits, rules.TextEdit{
+			Location: rules.NewRangeLocation(file, start.line, start.col, end.line, end.col),
+			NewText:  "",
+		})
+	}
+
+	return edits, true
 }
 
 func extendPositionThroughHorizontalWhitespace(sm *sourcemap.SourceMap, pos sourcePosition) sourcePosition {
@@ -409,18 +538,53 @@ func groupedLabelPairCommentEdit(
 	pair facts.LabelPairFact,
 	opts labelInstructionFixOptions,
 ) (rules.TextEdit, bool) {
-	if span.start.line != span.end.line || strings.ContainsAny(span.text, "\r\n") {
+	if pair.PairIndex < 0 {
 		return rules.TextEdit{}, false
 	}
-	locs := pair.Command.Location()
+	spans := make([]labelWordSpan, pair.PairIndex+1)
+	spans[pair.PairIndex] = span
+	return groupedLabelPairsCommentEdit(file, sm, spans, []facts.LabelPairFact{pair}, opts)
+}
+
+func groupedLabelPairsCommentEdit(
+	file string,
+	sm *sourcemap.SourceMap,
+	spans []labelWordSpan,
+	pairs []facts.LabelPairFact,
+	opts labelInstructionFixOptions,
+) (rules.TextEdit, bool) {
+	if sm == nil || len(pairs) == 0 {
+		return rules.TextEdit{}, false
+	}
+	cmd := pairs[0].Command
+	if cmd == nil {
+		return rules.TextEdit{}, false
+	}
+	locs := cmd.Location()
 	if len(locs) == 0 {
 		return rules.TextEdit{}, false
 	}
+	ordered := slices.Clone(pairs)
+	slices.SortFunc(ordered, func(a, b facts.LabelPairFact) int {
+		return a.PairIndex - b.PairIndex
+	})
+
 	startLine := locs[0].Start.Line
 	indent := leadingHorizontalWhitespace(sm.Line(startLine - 1))
+	var builder strings.Builder
+	for _, pair := range ordered {
+		if pair.Command != cmd || pair.PairIndex < 0 || pair.PairIndex >= len(spans) {
+			return rules.TextEdit{}, false
+		}
+		span := spans[pair.PairIndex]
+		if span.start.line != span.end.line || strings.ContainsAny(span.text, "\r\n") {
+			return rules.TextEdit{}, false
+		}
+		fmt.Fprintf(&builder, "%s%sLABEL %s\n", indent, opts.CommentPrefix, span.text)
+	}
 	return rules.TextEdit{
 		Location: rules.NewRangeLocation(file, startLine, 0, startLine, 0),
-		NewText:  fmt.Sprintf("%s%sLABEL %s\n", indent, opts.CommentPrefix, span.text),
+		NewText:  builder.String(),
 	}, true
 }
 
