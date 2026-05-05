@@ -11,14 +11,14 @@
     "buildx-git-labels": {
       "type": "string",
       "enum": ["off", "true", "1", "full"],
-      "default": "off",
+      "default": "full",
       "description": "Controls which Buildx git label mode the rule models. \"off\" disables the check, \"true\" and \"1\" check revision and Dockerfile-path labels, and \"full\" also checks source labels.",
-      "examples": ["off", "full"]
+      "examples": ["full", "off"]
     }
   },
   "additionalProperties": false,
   "examples": [
-    { "buildx-git-labels": "off" },
+    { "buildx-git-labels": "full" },
     { "severity": "warning", "buildx-git-labels": "full" }
   ]
 }

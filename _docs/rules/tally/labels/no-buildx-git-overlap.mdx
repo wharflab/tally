@@ -10,7 +10,7 @@ Buildx.
 |----------|-------|
 | Severity | Warning |
 | Category | Correctness |
-| Default | Inactive until a Buildx git label mode is configured |
+| Default | Enabled, models `BUILDX_GIT_LABELS=full` |
 | Auto-fix | Suggestion, when `org.opencontainers.image.revision` can be mapped precisely |
 
 ## Description
@@ -84,8 +84,10 @@ rule; they may be intentional static project metadata in some build workflows.
 ## Configuration
 
 Tally does not infer builder configuration from its own process environment.
-Configure the Buildx git label mode explicitly so the rule models the build
-policy for the repository.
+By default, this rule models `BUILDX_GIT_LABELS=full` because the diagnostics
+are informational and help keep git-derived metadata owned by the build system.
+Configure the mode explicitly when the repository uses a narrower Buildx git
+label policy.
 
 ```toml
 [rules.tally.labels.no-buildx-git-overlap]

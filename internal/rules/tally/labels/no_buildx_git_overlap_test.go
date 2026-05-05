@@ -30,8 +30,8 @@ func TestNoBuildxGitOverlapRule_DefaultConfig(t *testing.T) {
 	if !ok {
 		t.Fatalf("DefaultConfig() type = %T, want NoBuildxGitOverlapConfig", cfg)
 	}
-	if cfg.BuildxGitLabels != "off" {
-		t.Fatalf("BuildxGitLabels = %q, want off", cfg.BuildxGitLabels)
+	if cfg.BuildxGitLabels != "full" {
+		t.Fatalf("BuildxGitLabels = %q, want full", cfg.BuildxGitLabels)
 	}
 }
 
@@ -73,6 +73,19 @@ func TestNoBuildxGitOverlapRule_CheckConfiguredModes(t *testing.T) {
 	t.Parallel()
 
 	testutil.RunRuleTests(t, NewNoBuildxGitOverlapRule(), []testutil.RuleTestCase{
+		{
+			Name: "default mode checks source revision and Dockerfile entrypoint",
+			Content: `FROM alpine:3.20
+LABEL org.opencontainers.image.revision="abc123" \
+      org.opencontainers.image.source="https://github.com/example/app" \
+      com.docker.image.source.entrypoint="Dockerfile"
+`,
+			WantViolations: 1,
+			WantMessages: []string{
+				`BUILDX_GIT_LABELS=full can emit labels "org.opencontainers.image.revision", ` +
+					`"org.opencontainers.image.source", "com.docker.image.source.entrypoint"`,
+			},
+		},
 		{
 			Name: "off mode skips matching labels",
 			Config: map[string]any{
@@ -189,8 +202,8 @@ RUN true
 	})
 }
 
-func TestNoBuildxGitOverlapRule_DefaultIgnoresEnvironment(t *testing.T) {
-	t.Setenv("BUILDX_GIT_LABELS", "full")
+func TestNoBuildxGitOverlapRule_DefaultDoesNotReadEnvironment(t *testing.T) {
+	t.Setenv("BUILDX_GIT_LABELS", "0")
 
 	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine:3.20
 LABEL org.opencontainers.image.revision="abc123" \
@@ -199,8 +212,8 @@ LABEL org.opencontainers.image.revision="abc123" \
 `)
 
 	violations := NewNoBuildxGitOverlapRule().Check(input)
-	if len(violations) != 0 {
-		t.Fatalf("got %d violations, want 0", len(violations))
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
 	}
 }
 
@@ -322,7 +335,7 @@ func TestConfiguredBuildxGitLabelsMode(t *testing.T) {
 		cfg  NoBuildxGitOverlapConfig
 		want buildxGitLabelsMode
 	}{
-		{name: "empty defaults off", cfg: NoBuildxGitOverlapConfig{}, want: buildxGitLabelsOff},
+		{name: "empty defaults full", cfg: NoBuildxGitOverlapConfig{}, want: buildxGitLabelsFull},
 		{name: "off", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "off"}, want: buildxGitLabelsOff},
 		{name: "true", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "true"}, want: buildxGitLabelsTrue},
 		{name: "one", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "1"}, want: buildxGitLabelsTrue},

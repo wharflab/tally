@@ -31,7 +31,7 @@ type NoBuildxGitOverlapConfig struct {
 
 // DefaultNoBuildxGitOverlapConfig returns the default configuration.
 func DefaultNoBuildxGitOverlapConfig() NoBuildxGitOverlapConfig {
-	return NoBuildxGitOverlapConfig{BuildxGitLabels: string(buildxGitLabelsOff)}
+	return NoBuildxGitOverlapConfig{BuildxGitLabels: string(buildxGitLabelsFull)}
 }
 
 // NoBuildxGitOverlapRule flags Dockerfile LABEL keys that Buildx can generate.
@@ -157,7 +157,9 @@ func configuredBuildxGitLabelsMode(cfg NoBuildxGitOverlapConfig) buildxGitLabels
 
 func normalizeBuildxGitLabelsMode(raw string) buildxGitLabelsMode {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "", string(buildxGitLabelsOff), "false", "0", "none":
+	case "":
+		return buildxGitLabelsFull
+	case string(buildxGitLabelsOff), "false", "0", "none":
 		return buildxGitLabelsOff
 	case string(buildxGitLabelsTrue), "1":
 		return buildxGitLabelsTrue
