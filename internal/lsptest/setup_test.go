@@ -207,9 +207,29 @@ func startTestServer(t *testing.T) *testServer {
 	ts.conn = conn
 
 	t.Cleanup(func() {
-		if err := conn.Close(); err != nil {
-			t.Logf("lsp conn close: %v", err)
+		// On Windows, closing the stdout pipe can block while jsonrpc2's reader is in Read.
+		// Kill the child if connection shutdown stalls so the package timeout does not fire.
+		closeDone := make(chan error, 1)
+		go func() { closeDone <- conn.Close() }()
+		select {
+		case err := <-closeDone:
+			if err != nil {
+				t.Logf("lsp conn close: %v", err)
+			}
+		case <-time.After(2 * time.Second):
+			if err := cmd.Process.Kill(); err != nil {
+				t.Logf("kill lsp server during conn close: %v", err)
+			}
+			select {
+			case err := <-closeDone:
+				if err != nil {
+					t.Logf("lsp conn close after kill: %v", err)
+				}
+			case <-time.After(5 * time.Second):
+				t.Log("timed out waiting for lsp conn close after kill")
+			}
 		}
+
 		// Wait for process with timeout; kill if it doesn't exit.
 		// Uses ts.wait() so cmd.Wait is only called once even if the
 		// test already waited (e.g., TestLSP_ShutdownExit).
