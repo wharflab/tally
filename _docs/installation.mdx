@@ -1,6 +1,6 @@
 ---
 title: "Installation"
-description: "Install tally via Homebrew, WinGet, npm, Bun, uv, pip, RubyGems, Docker, Go, or from source."
+description: "Install tally via Homebrew, mise, WinGet, npm, Bun, uv, pip, RubyGems, Docker, Go, or from source."
 ---
 
 tally is a single self-contained binary. Pick the method that fits your environment.
@@ -9,6 +9,10 @@ tally is a single self-contained binary. Pick the method that fits your environm
 
 ```bash Homebrew
 brew install wharflab/tap/tally
+```
+
+```bash mise
+mise use -g github:wharflab/tally@latest
 ```
 
 ```powershell WinGet
@@ -51,6 +55,14 @@ Run `tally register-docker-plugin` if you want Docker to discover the plugin wit
 
 Homebrew also installs a `docker-lint` symlink under Homebrew's Docker plugin directory. See
 [Docker CLI plugin](/integrations/docker-cli-plugin) if you prefer to configure Docker's `cliPluginsExtraDirs`.
+
+## mise
+
+```bash
+mise use -g github:wharflab/tally@latest
+```
+
+This installs the latest tally release from GitHub and exposes the `tally` binary through mise's global tool shims.
 
 ## WinGet (Windows)
 
