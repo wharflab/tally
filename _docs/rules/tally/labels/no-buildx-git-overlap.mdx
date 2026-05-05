@@ -10,7 +10,7 @@ Buildx.
 |----------|-------|
 | Severity | Warning |
 | Category | Correctness |
-| Default | Enabled, conditional |
+| Default | Inactive until a Buildx git label mode is configured |
 | Auto-fix | Suggestion, when `org.opencontainers.image.revision` can be mapped precisely |
 
 ## Description
@@ -33,7 +33,6 @@ builder stages are ignored unless the final image inherits from that stage.
 
 | Mode | Generated labels checked |
 |------|--------------------------|
-| `auto` | Reads `BUILDX_GIT_LABELS` from the lint environment |
 | `off` | Disabled |
 | `true` or `1` | `org.opencontainers.image.revision`, `com.docker.image.source.entrypoint` |
 | `full` | The `true` labels plus `org.opencontainers.image.source` |
@@ -84,9 +83,9 @@ rule; they may be intentional static project metadata in some build workflows.
 
 ## Configuration
 
-By default the rule uses `auto` mode and only reports when the lint environment
-has active Buildx git labels. Configure the mode explicitly when Tally is not
-running in the same environment as the Buildx invocation.
+Tally does not infer builder configuration from its own process environment.
+Configure the Buildx git label mode explicitly so the rule models the build
+policy for the repository.
 
 ```toml
 [rules.tally.labels.no-buildx-git-overlap]

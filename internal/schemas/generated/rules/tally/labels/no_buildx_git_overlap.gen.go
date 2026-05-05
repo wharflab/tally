@@ -6,9 +6,9 @@ import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ru
 
 // Configuration options for the tally/labels/no-buildx-git-overlap rule.
 type NoBuildxGitOverlapSchemaJson struct {
-	// Controls which Buildx git label mode is considered active. "auto" reads
-	// BUILDX_GIT_LABELS from the lint environment, "true" and "1" check revision and
-	// Dockerfile-path labels, and "full" also checks source labels.
+	// Controls which Buildx git label mode the rule models. "off" disables the check,
+	// "true" and "1" check revision and Dockerfile-path labels, and "full" also
+	// checks source labels.
 	BuildxGitLabels NoBuildxGitOverlapSchemaJsonBuildxGitLabels `json:"buildx-git-labels,omitempty,omitzero"`
 
 	// Exclude corresponds to the JSON schema field "exclude".
@@ -24,7 +24,6 @@ type NoBuildxGitOverlapSchemaJson struct {
 type NoBuildxGitOverlapSchemaJsonBuildxGitLabels string
 
 const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsA1 NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "1"
-const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsAuto NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "auto"
 const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsFull NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "full"
 const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsOff NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "off"
 const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsTrue NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "true"

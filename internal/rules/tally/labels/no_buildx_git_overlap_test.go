@@ -30,8 +30,8 @@ func TestNoBuildxGitOverlapRule_DefaultConfig(t *testing.T) {
 	if !ok {
 		t.Fatalf("DefaultConfig() type = %T, want NoBuildxGitOverlapConfig", cfg)
 	}
-	if cfg.BuildxGitLabels != "auto" {
-		t.Fatalf("BuildxGitLabels = %q, want auto", cfg.BuildxGitLabels)
+	if cfg.BuildxGitLabels != "off" {
+		t.Fatalf("BuildxGitLabels = %q, want off", cfg.BuildxGitLabels)
 	}
 }
 
@@ -45,12 +45,12 @@ func TestNoBuildxGitOverlapRule_ValidateConfig(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "nil", config: nil},
-		{name: "auto", config: map[string]any{"buildx-git-labels": "auto"}},
 		{name: "true", config: map[string]any{"buildx-git-labels": "true"}},
 		{name: "one", config: map[string]any{"buildx-git-labels": "1"}},
 		{name: "full", config: map[string]any{"buildx-git-labels": "full"}},
 		{name: "off", config: map[string]any{"buildx-git-labels": "off"}},
 		{name: "severity", config: map[string]any{"severity": "warning", "buildx-git-labels": "full"}},
+		{name: "auto mode", config: map[string]any{"buildx-git-labels": "auto"}, wantErr: true},
 		{name: "invalid mode", config: map[string]any{"buildx-git-labels": "maybe"}, wantErr: true},
 		{name: "boolean mode", config: map[string]any{"buildx-git-labels": true}, wantErr: true},
 		{name: "unknown option", config: map[string]any{"unknown": "x"}, wantErr: true},
@@ -189,26 +189,13 @@ RUN true
 	})
 }
 
-func TestNoBuildxGitOverlapRule_AutoReadsEnvironment(t *testing.T) {
+func TestNoBuildxGitOverlapRule_DefaultIgnoresEnvironment(t *testing.T) {
 	t.Setenv("BUILDX_GIT_LABELS", "full")
 
 	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine:3.20
 LABEL org.opencontainers.image.revision="abc123" \
       org.opencontainers.image.source="https://github.com/example/app" \
       com.docker.image.source.entrypoint="Dockerfile"
-`)
-
-	violations := NewNoBuildxGitOverlapRule().Check(input)
-	if len(violations) != 1 {
-		t.Fatalf("got %d violations, want 1", len(violations))
-	}
-}
-
-func TestNoBuildxGitOverlapRule_AutoWithoutActiveEnvironmentSkips(t *testing.T) {
-	t.Setenv("BUILDX_GIT_LABELS", "0")
-
-	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine:3.20
-LABEL org.opencontainers.image.revision="abc123"
 `)
 
 	violations := NewNoBuildxGitOverlapRule().Check(input)
@@ -327,32 +314,26 @@ LABEL org.opencontainers.image.revision="abc123" \
 	}
 }
 
-func TestActiveBuildxGitLabelsMode(t *testing.T) {
+func TestConfiguredBuildxGitLabelsMode(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range []struct {
 		name string
 		cfg  NoBuildxGitOverlapConfig
-		env  string
-		ok   bool
 		want buildxGitLabelsMode
 	}{
-		{name: "auto without env", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "auto"}, want: buildxGitLabelsOff},
-		{name: "auto env true", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "auto"}, env: "true", ok: true, want: buildxGitLabelsTrue},
-		{name: "auto env one", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "auto"}, env: "1", ok: true, want: buildxGitLabelsTrue},
-		{name: "auto env full", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "auto"}, env: "full", ok: true, want: buildxGitLabelsFull},
-		{name: "auto env false", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "auto"}, env: "false", ok: true, want: buildxGitLabelsOff},
-		{name: "config wins over env", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "off"}, env: "full", ok: true, want: buildxGitLabelsOff},
+		{name: "empty defaults off", cfg: NoBuildxGitOverlapConfig{}, want: buildxGitLabelsOff},
+		{name: "off", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "off"}, want: buildxGitLabelsOff},
+		{name: "true", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "true"}, want: buildxGitLabelsTrue},
+		{name: "one", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "1"}, want: buildxGitLabelsTrue},
 		{name: "config full", cfg: NoBuildxGitOverlapConfig{BuildxGitLabels: "full"}, want: buildxGitLabelsFull},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := activeBuildxGitLabelsMode(tt.cfg, func(string) (string, bool) {
-				return tt.env, tt.ok
-			})
+			got := configuredBuildxGitLabelsMode(tt.cfg)
 			if got != tt.want {
-				t.Fatalf("activeBuildxGitLabelsMode() = %q, want %q", got, tt.want)
+				t.Fatalf("configuredBuildxGitLabelsMode() = %q, want %q", got, tt.want)
 			}
 		})
 	}

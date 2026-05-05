@@ -305,7 +305,7 @@
       "description": "Configuration options for the tally/labels/no-buildx-git-overlap rule.",
       "examples": [
         {
-          "buildx-git-labels": "auto"
+          "buildx-git-labels": "off"
         },
         {
           "buildx-git-labels": "full",
@@ -314,17 +314,16 @@
       ],
       "properties": {
         "buildx-git-labels": {
-          "default": "auto",
-          "description": "Controls which Buildx git label mode is considered active. \"auto\" reads BUILDX_GIT_LABELS from the lint environment, \"true\" and \"1\" check revision and Dockerfile-path labels, and \"full\" also checks source labels.",
+          "default": "off",
+          "description": "Controls which Buildx git label mode the rule models. \"off\" disables the check, \"true\" and \"1\" check revision and Dockerfile-path labels, and \"full\" also checks source labels.",
           "enum": [
-            "auto",
             "off",
             "true",
             "1",
             "full"
           ],
           "examples": [
-            "auto",
+            "off",
             "full"
           ],
           "type": "string"

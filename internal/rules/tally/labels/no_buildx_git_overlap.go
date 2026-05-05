@@ -2,7 +2,6 @@ package labels
 
 import (
 	"fmt"
-	"os"
 	"slices"
 	"strings"
 
@@ -20,7 +19,6 @@ const NoBuildxGitOverlapRuleCode = rules.TallyRulePrefix + "labels/no-buildx-git
 type buildxGitLabelsMode string
 
 const (
-	buildxGitLabelsAuto buildxGitLabelsMode = "auto"
 	buildxGitLabelsOff  buildxGitLabelsMode = "off"
 	buildxGitLabelsTrue buildxGitLabelsMode = "true"
 	buildxGitLabelsFull buildxGitLabelsMode = "full"
@@ -33,7 +31,7 @@ type NoBuildxGitOverlapConfig struct {
 
 // DefaultNoBuildxGitOverlapConfig returns the default configuration.
 func DefaultNoBuildxGitOverlapConfig() NoBuildxGitOverlapConfig {
-	return NoBuildxGitOverlapConfig{BuildxGitLabels: string(buildxGitLabelsAuto)}
+	return NoBuildxGitOverlapConfig{BuildxGitLabels: string(buildxGitLabelsOff)}
 }
 
 // NoBuildxGitOverlapRule flags Dockerfile LABEL keys that Buildx can generate.
@@ -88,7 +86,7 @@ func (r *NoBuildxGitOverlapRule) Check(input rules.LintInput) []rules.Violation 
 	}
 
 	cfg := r.resolveConfig(input.Config)
-	mode := activeBuildxGitLabelsMode(cfg, os.LookupEnv)
+	mode := configuredBuildxGitLabelsMode(cfg)
 	if mode == buildxGitLabelsOff {
 		return nil
 	}
@@ -153,35 +151,13 @@ func (r *NoBuildxGitOverlapRule) resolveConfig(config any) NoBuildxGitOverlapCon
 	return configutil.Coerce(config, DefaultNoBuildxGitOverlapConfig())
 }
 
-func activeBuildxGitLabelsMode(
-	cfg NoBuildxGitOverlapConfig,
-	lookupEnv func(string) (string, bool),
-) buildxGitLabelsMode {
-	configured := normalizeBuildxGitLabelsMode(cfg.BuildxGitLabels)
-	if configured != buildxGitLabelsAuto {
-		return configured
-	}
-
-	raw, ok := lookupEnv("BUILDX_GIT_LABELS")
-	if !ok {
-		return buildxGitLabelsOff
-	}
-	envMode := normalizeBuildxGitLabelsMode(raw)
-	switch envMode {
-	case buildxGitLabelsTrue, buildxGitLabelsFull:
-		return envMode
-	case buildxGitLabelsAuto, buildxGitLabelsOff:
-		return buildxGitLabelsOff
-	default:
-		return buildxGitLabelsOff
-	}
+func configuredBuildxGitLabelsMode(cfg NoBuildxGitOverlapConfig) buildxGitLabelsMode {
+	return normalizeBuildxGitLabelsMode(cfg.BuildxGitLabels)
 }
 
 func normalizeBuildxGitLabelsMode(raw string) buildxGitLabelsMode {
 	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "", string(buildxGitLabelsAuto):
-		return buildxGitLabelsAuto
-	case string(buildxGitLabelsOff), "false", "0", "none":
+	case "", string(buildxGitLabelsOff), "false", "0", "none":
 		return buildxGitLabelsOff
 	case string(buildxGitLabelsTrue), "1":
 		return buildxGitLabelsTrue
@@ -205,7 +181,7 @@ func buildxGeneratedLabelKeys(mode buildxGitLabelsMode) map[string]struct{} {
 			ocispec.AnnotationSource:        {},
 			dockerfileSourceEntrypointLabel: {},
 		}
-	case buildxGitLabelsAuto, buildxGitLabelsOff:
+	case buildxGitLabelsOff:
 		return nil
 	default:
 		return nil
