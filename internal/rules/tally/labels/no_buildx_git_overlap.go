@@ -17,8 +17,6 @@ import (
 // NoBuildxGitOverlapRuleCode is the full rule code.
 const NoBuildxGitOverlapRuleCode = rules.TallyRulePrefix + "labels/no-buildx-git-overlap"
 
-const dockerfileSourceEntrypointLabel = "com.docker.image.source.entrypoint"
-
 type buildxGitLabelsMode string
 
 const (
