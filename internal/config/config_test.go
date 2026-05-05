@@ -443,6 +443,52 @@ target = "/root/.config/pip/pip.conf"
 	}
 }
 
+func TestLoad_NamespacedTallySubpackageRuleOptions(t *testing.T) {
+	t.Parallel()
+	tmpDir, dockerfilePath := setupTempProject(t)
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := `
+[rules.tally.labels.no-buildx-git-overlap]
+buildx-git-labels = "full"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := Load(dockerfilePath)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	opts := cfg.Rules.GetOptions("tally/labels/no-buildx-git-overlap")
+	if got := opts["buildx-git-labels"]; got != "full" {
+		t.Fatalf("buildx-git-labels = %v, want full", got)
+	}
+}
+
+func TestLoad_NamespacedTallySubpackageRuleOptionsValidate(t *testing.T) {
+	t.Parallel()
+	tmpDir, dockerfilePath := setupTempProject(t)
+
+	configPath := filepath.Join(tmpDir, ".tally.toml")
+	configContent := `
+[rules.tally.labels.no-buildx-git-overlap]
+buildx-git-labels = "maybe"
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := Load(dockerfilePath)
+	if err == nil {
+		t.Fatal("Load() error = nil, want schema validation error")
+	}
+	if !strings.Contains(err.Error(), "buildx-git-labels") {
+		t.Fatalf("Load() error = %q, want buildx-git-labels validation context", err)
+	}
+}
+
 func TestLoad_SeverityOverride(t *testing.T) {
 	t.Parallel()
 	tmpDir, dockerfilePath := setupTempProject(t)

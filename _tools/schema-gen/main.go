@@ -546,22 +546,23 @@ func renderRegistryGo(rootSchemaID string, ruleSchemaIDs map[string]string, sche
 }
 
 func parseRuleSchemaInput(inputRel string) (namespace string, filename string, ok bool) {
-	path := filepath.ToSlash(inputRel)
+	schemaPath := filepath.ToSlash(inputRel)
 	const prefix = "internal/rules/"
-	if !strings.HasPrefix(path, prefix) {
+	if !strings.HasPrefix(schemaPath, prefix) {
 		return "", "", false
 	}
-	rest := strings.TrimPrefix(path, prefix)
+	rest := strings.TrimPrefix(schemaPath, prefix)
 	parts := strings.Split(rest, "/")
-	if len(parts) != 2 {
+	if len(parts) < 2 {
 		return "", "", false
 	}
 	namespace = parts[0]
-	filename = parts[1]
+	filename = strings.Join(parts[1:], "/")
 	if !strings.HasSuffix(filename, ".schema.json") {
 		return "", "", false
 	}
-	if filename == "index.schema.json" || filename == "rule-config.schema.json" {
+	switch path.Base(filename) {
+	case "index.schema.json", "rule-config.schema.json":
 		return "", "", false
 	}
 	return namespace, filename, true

@@ -12,6 +12,9 @@
     "eol-last": {
       "$ref": "./eol_last.schema.json"
     },
+    "labels/no-buildx-git-overlap": {
+      "$ref": "./labels/no_buildx_git_overlap.schema.json"
+    },
     "max-lines": {
       "$ref": "./max_lines.schema.json"
     },

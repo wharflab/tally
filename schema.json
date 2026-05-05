@@ -300,6 +300,48 @@
       "title": "tally/eol-last rule config",
       "type": "object"
     },
+    "rule-tally-labels-no-buildx-git-overlap": {
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/labels/no-buildx-git-overlap rule.",
+      "examples": [
+        {
+          "buildx-git-labels": "auto"
+        },
+        {
+          "buildx-git-labels": "full",
+          "severity": "warning"
+        }
+      ],
+      "properties": {
+        "buildx-git-labels": {
+          "default": "auto",
+          "description": "Controls which Buildx git label mode is considered active. \"auto\" reads BUILDX_GIT_LABELS from the lint environment, \"true\" and \"1\" check revision and Dockerfile-path labels, and \"full\" also checks source labels.",
+          "enum": [
+            "auto",
+            "off",
+            "true",
+            "1",
+            "full"
+          ],
+          "examples": [
+            "auto",
+            "full"
+          ],
+          "type": "string"
+        },
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "tally/labels/no-buildx-git-overlap rule config",
+      "type": "object"
+    },
     "rule-tally-max-lines": {
       "additionalProperties": false,
       "description": "Configuration options for the tally/max-lines rule.",
@@ -1045,6 +1087,9 @@
         },
         "eol-last": {
           "$ref": "#/$defs/rule-tally-eol-last"
+        },
+        "labels/no-buildx-git-overlap": {
+          "$ref": "#/$defs/rule-tally-labels-no-buildx-git-overlap"
         },
         "max-lines": {
           "$ref": "#/$defs/rule-tally-max-lines"

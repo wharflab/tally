@@ -1,0 +1,105 @@
+---
+title: "tally/labels/no-stale-base-digest"
+description: "OCI base digest labels must be backed by a digest-pinned base image."
+---
+
+OCI base digest labels must be backed by a digest-pinned base image.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Correctness |
+| Default | Enabled |
+| Auto-fix | Suggestion, for standalone `LABEL` instructions |
+
+## Description
+
+`org.opencontainers.image.base.digest` is the digest of the image this image is
+based on. It is not the digest of the image produced by the current Dockerfile.
+
+For a Dockerfile-owned label to be trustworthy, the exported image's stage chain
+must include a digest-pinned external base image, such as
+`FROM alpine:3.20@sha256:...`, and the label value must match that digest. If
+the exported image is built from `FROM alpine:3.20`, `FROM scratch`, or a stage
+chain whose external base is not pinned by digest, a checked-in
+`org.opencontainers.image.base.digest` label can only drift from the actual base
+image selected during the build.
+
+This rule checks labels that affect the exported image. Labels in throwaway
+builder stages are ignored unless the final image inherits from that stage.
+
+## Examples
+
+### Bad
+
+```dockerfile
+FROM alpine:3.20
+
+LABEL org.opencontainers.image.base.digest="sha256:1111111111111111111111111111111111111111111111111111111111111111"
+```
+
+The `FROM` line is tag-based, so the Dockerfile does not prove the base image
+digest.
+
+### Bad
+
+```dockerfile
+FROM alpine:3.20@sha256:1111111111111111111111111111111111111111111111111111111111111111
+
+LABEL org.opencontainers.image.base.digest="sha256:2222222222222222222222222222222222222222222222222222222222222222"
+```
+
+The `FROM` line is digest-pinned, but the label disagrees with it.
+
+### Good
+
+```dockerfile
+FROM alpine:3.20@sha256:1111111111111111111111111111111111111111111111111111111111111111
+
+LABEL org.opencontainers.image.base.digest="sha256:1111111111111111111111111111111111111111111111111111111111111111"
+```
+
+### Good
+
+```dockerfile
+FROM alpine:3.20
+
+LABEL org.opencontainers.image.title="app"
+```
+
+When the base image is not digest-pinned, omit `org.opencontainers.image.base.digest`.
+
+## Multi-stage Builds
+
+When the final image inherits from another Dockerfile stage, Tally follows that
+`FROM <stage>` chain to the first external base image:
+
+```dockerfile
+FROM alpine:3.20@sha256:1111111111111111111111111111111111111111111111111111111111111111 AS base
+
+FROM base
+LABEL org.opencontainers.image.base.digest="sha256:1111111111111111111111111111111111111111111111111111111111111111"
+```
+
+This is valid because the exported image still traces back to a digest-pinned
+external base. A label in a builder-only stage is ignored when the exported
+image does not inherit from that stage.
+
+## Fixes
+
+For `LABEL org.opencontainers.image.base.digest=...`, Tally offers two
+suggestion-level fixes when the source pair can be mapped precisely:
+
+- comment out the instruction, preserving the original text for review
+- delete the instruction or pair
+
+When `org.opencontainers.image.base.digest` appears inside a grouped `LABEL`,
+Tally removes only that key/value pair and preserves the unrelated labels. The
+comment-out fix inserts a commented standalone `LABEL` before the grouped
+instruction, then removes the active pair from the group.
+
+## Related Rules
+
+- [`tally/labels/no-buildx-git-overlap`](/rules/tally/labels/no-buildx-git-overlap)
+- [`tally/labels/no-duplicate-keys`](/rules/tally/labels/no-duplicate-keys)
+- [`tally/labels/valid-key`](/rules/tally/labels/valid-key)

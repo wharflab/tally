@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/labels/no_buildx_git_overlap.schema.json",
+  "title": "tally/labels/no-buildx-git-overlap rule config",
+  "description": "Configuration options for the tally/labels/no-buildx-git-overlap rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../../rule-config.schema.json#/$defs/exclude" },
+    "buildx-git-labels": {
+      "type": "string",
+      "enum": ["auto", "off", "true", "1", "full"],
+      "default": "auto",
+      "description": "Controls which Buildx git label mode is considered active. \"auto\" reads BUILDX_GIT_LABELS from the lint environment, \"true\" and \"1\" check revision and Dockerfile-path labels, and \"full\" also checks source labels.",
+      "examples": ["auto", "full"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "buildx-git-labels": "auto" },
+    { "severity": "warning", "buildx-git-labels": "full" }
+  ]
+}

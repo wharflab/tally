@@ -123,6 +123,18 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/labels/valid-key")...),
 			wantExit: 1,
 		},
+		{
+			name:     "labels-no-buildx-git-overlap",
+			dir:      "labels-no-buildx-git-overlap",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/labels/no-buildx-git-overlap")...),
+			wantExit: 1,
+		},
+		{
+			name:     "labels-no-stale-base-digest",
+			dir:      "labels-no-stale-base-digest",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/labels/no-stale-base-digest")...),
+			wantExit: 1,
+		},
 
 		{
 			name:     "multiple-instructions-disallowed",
