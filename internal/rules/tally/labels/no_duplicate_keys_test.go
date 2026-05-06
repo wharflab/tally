@@ -180,6 +180,47 @@ LABEL org.opencontainers.image.title="demo2"
 	}
 }
 
+func TestNoDuplicateKeysRule_GroupedFixOptions(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM alpine:3.20
+LABEL org.opencontainers.image.title="demo" \
+      org.opencontainers.image.description="old" \
+      org.opencontainers.image.description="new"
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+
+	violations := NewNoDuplicateKeysRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	allFixes := violations[0].AllFixes()
+	if len(allFixes) != 2 {
+		t.Fatalf("got %d fix options, want 2", len(allFixes))
+	}
+
+	commentFix := allFixes[0]
+	gotCommented := string(fixpkg.ApplyFix([]byte(content), commentFix))
+	wantCommented := "FROM alpine:3.20\n" +
+		"# [commented out by tally - Docker keeps the last LABEL value for " +
+		"org.opencontainers.image.description]: LABEL org.opencontainers.image.description=\"old\"\n" +
+		"LABEL org.opencontainers.image.title=\"demo\" \\\n" +
+		"      org.opencontainers.image.description=\"new\"\n"
+	if gotCommented != wantCommented {
+		t.Errorf("comment fix mismatch\ngot:\n%s\nwant:\n%s", gotCommented, wantCommented)
+	}
+
+	deleteFix := allFixes[1]
+	gotDeleted := string(fixpkg.ApplyFix([]byte(content), deleteFix))
+	wantDeleted := "FROM alpine:3.20\n" +
+		"LABEL org.opencontainers.image.title=\"demo\" \\\n" +
+		"      org.opencontainers.image.description=\"new\"\n"
+	if gotDeleted != wantDeleted {
+		t.Errorf("delete fix mismatch\ngot:\n%s\nwant:\n%s", gotDeleted, wantDeleted)
+	}
+}
+
 func TestNoDuplicateKeysRule_FixAllPreviousLabels(t *testing.T) {
 	t.Parallel()
 

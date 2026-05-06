@@ -3,7 +3,6 @@ package labels
 import (
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
@@ -112,13 +111,6 @@ func allLabelValuesEqual(group []facts.LabelPairFact) bool {
 	return true
 }
 
-func labelEscapeToken(input rules.LintInput) rune {
-	if input.AST == nil {
-		return '\\'
-	}
-	return input.AST.EscapeToken
-}
-
 func buildDuplicateKeyFixes(
 	file string,
 	sm *sourcemap.SourceMap,
@@ -126,63 +118,14 @@ func buildDuplicateKeyFixes(
 	meta rules.RuleMetadata,
 	escapeToken rune,
 ) []*rules.SuggestedFix {
-	if sm == nil || pair.Command == nil || len(pair.Command.Labels) != 1 {
-		return nil
-	}
-	locs := pair.Command.Location()
-	if len(locs) == 0 {
-		return nil
-	}
-
-	startLine := locs[0].Start.Line
-	endLine := sm.ResolveEndLineWithEscape(locs[0].End.Line, escapeToken)
-	if startLine <= 0 || endLine < startLine || endLine > sm.LineCount() {
-		return nil
-	}
-
-	lastLine := sm.Line(endLine - 1)
-	editLoc := rules.NewRangeLocation(file, startLine, 0, endLine, len(lastLine))
-	deleteLoc := deleteInstructionLocation(file, sm, startLine, endLine)
 	key := pair.Key
-	commentedText := commentOutLabelInstruction(sm, startLine, endLine, key)
-
-	return []*rules.SuggestedFix{
-		{
-			Description: fmt.Sprintf("Comment out duplicate LABEL %q (Docker keeps the last value)", key),
-			Safety:      rules.FixSafe,
-			Priority:    meta.FixPriority,
-			IsPreferred: true,
-			Edits:       []rules.TextEdit{{Location: editLoc, NewText: commentedText}},
-		},
-		{
-			Description: fmt.Sprintf("Delete duplicate LABEL %q", key),
-			Safety:      rules.FixSafe,
-			Priority:    meta.FixPriority,
-			Edits:       []rules.TextEdit{{Location: deleteLoc, NewText: ""}},
-		},
-	}
-}
-
-func commentOutLabelInstruction(sm *sourcemap.SourceMap, startLine, endLine int, key string) string {
-	lines := make([]string, 0, endLine-startLine+1)
-	prefix := fmt.Sprintf("# [commented out by tally - Docker keeps the last LABEL value for %s]: ", key)
-	for lineNum := startLine; lineNum <= endLine; lineNum++ {
-		line := sm.Line(lineNum - 1)
-		if lineNum == startLine {
-			lines = append(lines, prefix+line)
-			continue
-		}
-		lines = append(lines, "# "+line)
-	}
-	return strings.Join(lines, "\n")
-}
-
-func deleteInstructionLocation(file string, sm *sourcemap.SourceMap, startLine, endLine int) rules.Location {
-	lastLine := sm.Line(endLine - 1)
-	if endLine < sm.LineCount() {
-		return rules.NewRangeLocation(file, startLine, 0, endLine+1, 0)
-	}
-	return rules.NewRangeLocation(file, startLine, 0, endLine, len(lastLine))
+	return buildLabelPairRemovalFixes(file, sm, pair, escapeToken, labelInstructionFixOptions{
+		CommentDescription: fmt.Sprintf("Comment out duplicate LABEL %q (Docker keeps the last value)", key),
+		DeleteDescription:  fmt.Sprintf("Delete duplicate LABEL %q", key),
+		CommentPrefix:      fmt.Sprintf("# [commented out by tally - Docker keeps the last LABEL value for %s]: ", key),
+		Safety:             rules.FixSafe,
+		Priority:           meta.FixPriority,
+	})
 }
 
 func init() {

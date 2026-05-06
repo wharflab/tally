@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tally.wharflab.com/rules/tally/labels/no_buildx_git_overlap.schema.json",
+  "title": "tally/labels/no-buildx-git-overlap rule config",
+  "description": "Configuration options for the tally/labels/no-buildx-git-overlap rule.",
+  "type": "object",
+  "properties": {
+    "severity": { "$ref": "../../rule-config.schema.json#/$defs/severity" },
+    "fix": { "$ref": "../../rule-config.schema.json#/$defs/fix" },
+    "exclude": { "$ref": "../../rule-config.schema.json#/$defs/exclude" },
+    "buildx-git-labels": {
+      "type": "string",
+      "enum": ["off", "none", "false", "False", "FALSE", "0", "f", "F", "true", "True", "TRUE", "1", "t", "T", "full"],
+      "default": "full",
+      "description": "Controls which Buildx git label mode the rule models. \"off\", \"none\", and strconv.ParseBool false values disable the check, strconv.ParseBool true values check revision and Dockerfile-path labels, and \"full\" also checks source labels.",
+      "examples": ["full", "T", "off"]
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    { "buildx-git-labels": "full" },
+    { "severity": "warning", "buildx-git-labels": "full" }
+  ]
+}

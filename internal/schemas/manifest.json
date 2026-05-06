@@ -108,6 +108,11 @@
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
     },
     {
+      "input": "internal/rules/tally/labels/no_buildx_git_overlap.schema.json",
+      "output": "internal/schemas/generated/rules/tally/labels/no_buildx_git_overlap.gen.go",
+      "package": "github.com/wharflab/tally/internal/schemas/generated/rules/tally/labels"
+    },
+    {
       "input": "internal/rules/hadolint/dl3001.schema.json",
       "output": "internal/schemas/generated/rules/hadolint/dl3001.gen.go",
       "package": "github.com/wharflab/tally/internal/schemas/generated/rules/hadolint"

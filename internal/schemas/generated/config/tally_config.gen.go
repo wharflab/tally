@@ -5,6 +5,7 @@ package config
 import hadolint "github.com/wharflab/tally/internal/schemas/generated/rules/hadolint"
 import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ruleschema"
 import tally "github.com/wharflab/tally/internal/schemas/generated/rules/tally"
+import labels "github.com/wharflab/tally/internal/schemas/generated/rules/tally/labels"
 
 // Schema for rules.buildkit configuration; keys are rule names within the buildkit
 // namespace.
@@ -49,6 +50,10 @@ type IndexSchemaJson_4 struct {
 
 	// EolLast corresponds to the JSON schema field "eol-last".
 	EolLast *tally.EolLastSchemaJson `json:"eol-last,omitempty,omitzero"`
+
+	// LabelsNoBuildxGitOverlap corresponds to the JSON schema field
+	// "labels/no-buildx-git-overlap".
+	LabelsNoBuildxGitOverlap *labels.NoBuildxGitOverlapSchemaJson `json:"labels/no-buildx-git-overlap,omitempty,omitzero"`
 
 	// MaxLines corresponds to the JSON schema field "max-lines".
 	MaxLines *tally.MaxLinesSchemaJson `json:"max-lines,omitempty,omitzero"`

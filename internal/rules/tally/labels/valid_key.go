@@ -163,7 +163,7 @@ func isReservedDockerNamespace(key string) bool {
 }
 
 func isAllowedDockerNamespaceKey(key string) bool {
-	return key == "com.docker.image.source.entrypoint" ||
+	return key == dockerfileSourceEntrypointLabel ||
 		strings.HasPrefix(key, "com.docker.extension.") ||
 		strings.HasPrefix(key, "com.docker.desktop.extension.")
 }

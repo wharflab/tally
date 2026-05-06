@@ -300,6 +300,59 @@
       "title": "tally/eol-last rule config",
       "type": "object"
     },
+    "rule-tally-labels-no-buildx-git-overlap": {
+      "additionalProperties": false,
+      "description": "Configuration options for the tally/labels/no-buildx-git-overlap rule.",
+      "examples": [
+        {
+          "buildx-git-labels": "full"
+        },
+        {
+          "buildx-git-labels": "full",
+          "severity": "warning"
+        }
+      ],
+      "properties": {
+        "buildx-git-labels": {
+          "default": "full",
+          "description": "Controls which Buildx git label mode the rule models. \"off\", \"none\", and strconv.ParseBool false values disable the check, strconv.ParseBool true values check revision and Dockerfile-path labels, and \"full\" also checks source labels.",
+          "enum": [
+            "off",
+            "none",
+            "false",
+            "False",
+            "FALSE",
+            "0",
+            "f",
+            "F",
+            "true",
+            "True",
+            "TRUE",
+            "1",
+            "t",
+            "T",
+            "full"
+          ],
+          "examples": [
+            "full",
+            "T",
+            "off"
+          ],
+          "type": "string"
+        },
+        "exclude": {
+          "$ref": "#/$defs/rule-config/$defs/exclude"
+        },
+        "fix": {
+          "$ref": "#/$defs/rule-config/$defs/fix"
+        },
+        "severity": {
+          "$ref": "#/$defs/rule-config/$defs/severity"
+        }
+      },
+      "title": "tally/labels/no-buildx-git-overlap rule config",
+      "type": "object"
+    },
     "rule-tally-max-lines": {
       "additionalProperties": false,
       "description": "Configuration options for the tally/max-lines rule.",
@@ -1045,6 +1098,9 @@
         },
         "eol-last": {
           "$ref": "#/$defs/rule-tally-eol-last"
+        },
+        "labels/no-buildx-git-overlap": {
+          "$ref": "#/$defs/rule-tally-labels-no-buildx-git-overlap"
         },
         "max-lines": {
           "$ref": "#/$defs/rule-tally-max-lines"

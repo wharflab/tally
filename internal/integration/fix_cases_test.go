@@ -344,6 +344,39 @@ RUN apt install curl
 			args:        []string{"--fix"},
 			wantApplied: 2,
 		},
+		{
+			name: "labels-no-buildx-git-overlap-no-fix",
+			input: "FROM alpine:3.20\n" +
+				"LABEL org.opencontainers.image.revision=\"abc123\" \\\n" +
+				"      org.opencontainers.image.source=\"https://github.com/example/app\"\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/labels/no-buildx-git-overlap")...),
+			wantApplied: 0,
+			config: `[rules.tally.labels.no-buildx-git-overlap]
+buildx-git-labels = "full"
+`,
+		},
+		{
+			name: "labels-no-buildx-git-overlap-revision-fix",
+			input: "FROM alpine:3.20\n" +
+				"LABEL org.opencontainers.image.revision=\"abc123\" \\\n" +
+				"      org.opencontainers.image.title=\"app\"\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/labels/no-buildx-git-overlap")...),
+			wantApplied: 1,
+			config: `[rules.tally.labels.no-buildx-git-overlap]
+buildx-git-labels = "full"
+`,
+		},
+		{
+			name: "labels-no-stale-base-digest-fix",
+			input: "FROM alpine:3.20\n" +
+				"LABEL org.opencontainers.image.title=\"demo\" \\\n" +
+				"      org.opencontainers.image.base.digest=\"sha256:2222222222222222222222222222222222222222222222222222222222222222\"\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/labels/no-stale-base-digest")...),
+			wantApplied: 1,
+		},
 		// ExposeProtoCasing: Lowercase protocol in EXPOSE
 		{
 			name:        "expose-proto-casing-single",
