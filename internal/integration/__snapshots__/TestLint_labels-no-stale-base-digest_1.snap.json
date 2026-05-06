@@ -27,6 +27,20 @@
               {
                 "location": {
                   "end": {
+                    "column": 59,
+                    "line": 8
+                  },
+                  "file": "testdata/labels-no-stale-base-digest/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 8
+                  }
+                },
+                "newText": "# [commented out by tally - org.opencontainers.image.base.digest needs a digest-pinned FROM]: LABEL org.opencontainers.image.base.digest=\"${BASE_DIGEST}\""
+              },
+              {
+                "location": {
+                  "end": {
                     "column": 116,
                     "line": 12
                   },
@@ -49,6 +63,20 @@
                 {
                   "location": {
                     "end": {
+                      "column": 59,
+                      "line": 8
+                    },
+                    "file": "testdata/labels-no-stale-base-digest/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 8
+                    }
+                  },
+                  "newText": "# [commented out by tally - org.opencontainers.image.base.digest needs a digest-pinned FROM]: LABEL org.opencontainers.image.base.digest=\"${BASE_DIGEST}\""
+                },
+                {
+                  "location": {
+                    "end": {
                       "column": 116,
                       "line": 12
                     },
@@ -67,6 +95,20 @@
             {
               "description": "Delete LABEL \"org.opencontainers.image.base.digest\" without a matching digest-pinned FROM",
               "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 9
+                    },
+                    "file": "testdata/labels-no-stale-base-digest/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 8
+                    }
+                  },
+                  "newText": ""
+                },
                 {
                   "location": {
                     "end": {

@@ -77,6 +77,11 @@ Tally removes only that key/value pair and preserves the unrelated labels. The
 comment-out fix inserts a commented standalone `LABEL` before the grouped
 instruction, then removes the active pair from the group.
 
+Fixes are scoped to the exported image's stage chain. If a final stage shadows
+an inherited `org.opencontainers.image.revision`, the suggested fix also removes
+the inherited copy so applying the fix once does not reveal the same issue
+again. Builder-only stages outside the exported chain are still ignored.
+
 `org.opencontainers.image.source` and
 `com.docker.image.source.entrypoint` are reported but not auto-fixed by this
 rule; they may be intentional static project metadata in some build workflows.

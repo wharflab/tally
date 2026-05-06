@@ -197,7 +197,7 @@ func removableStaleBaseDigestPairs(
 
 	pairs := make([]facts.LabelPairFact, 0, len(candidates))
 	for _, pair := range candidates {
-		if pair.StageIndex != active.StageIndex || pair.NoDelim {
+		if pair.NoDelim {
 			continue
 		}
 		if baseDigestViolationMessage(pair, base) == "" {

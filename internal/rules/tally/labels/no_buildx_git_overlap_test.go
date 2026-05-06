@@ -445,7 +445,7 @@ LABEL org.opencontainers.image.revision="def456"
 	}
 }
 
-func TestNoBuildxGitOverlapRule_RevisionFixDoesNotEditAncestorStage(t *testing.T) {
+func TestNoBuildxGitOverlapRule_RevisionFixEditsExportedAncestorStage(t *testing.T) {
 	t.Parallel()
 
 	content := `FROM alpine:3.20 AS metadata
@@ -464,12 +464,15 @@ LABEL org.opencontainers.image.revision="final"
 
 	gotDeleted := string(fixpkg.ApplyFix([]byte(content), violations[0].AllFixes()[1]))
 	wantDeleted := `FROM alpine:3.20 AS metadata
-LABEL org.opencontainers.image.revision="ancestor"
 
 FROM metadata
 `
 	if gotDeleted != wantDeleted {
 		t.Errorf("delete fix mismatch\ngot:\n%s\nwant:\n%s", gotDeleted, wantDeleted)
+	}
+	deletedInput := testutil.MakeLintInputWithConfig(t, "Dockerfile", gotDeleted, config)
+	if got := NewNoBuildxGitOverlapRule().Check(deletedInput); len(got) != 0 {
+		t.Fatalf("delete fix left %d violations, want 0", len(got))
 	}
 }
 

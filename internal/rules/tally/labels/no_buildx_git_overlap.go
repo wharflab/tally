@@ -269,7 +269,7 @@ func buildBuildxGitOverlapFixes(
 		}
 		revisionPairs = append(revisionPairs, pair)
 	}
-	if candidates := removableBuildxRevisionPairs(input, key, group.pairs[0].StageIndex); len(candidates) > 0 {
+	if candidates := removableBuildxRevisionPairs(input, key); len(candidates) > 0 {
 		revisionPairs = candidates
 	}
 	return buildLabelPairsRemovalFixesAcrossCommands(input.File, sm, revisionPairs, escapeToken, labelInstructionFixOptions{
@@ -281,7 +281,7 @@ func buildBuildxGitOverlapFixes(
 	})
 }
 
-func removableBuildxRevisionPairs(input rules.LintInput, key string, stageIndex int) []facts.LabelPairFact {
+func removableBuildxRevisionPairs(input rules.LintInput, key string) []facts.LabelPairFact {
 	candidates := exportedLabelPairsByKey(input, key)
 	if len(candidates) == 0 {
 		return nil
@@ -289,7 +289,7 @@ func removableBuildxRevisionPairs(input rules.LintInput, key string, stageIndex 
 
 	pairs := make([]facts.LabelPairFact, 0, len(candidates))
 	for _, pair := range candidates {
-		if pair.StageIndex != stageIndex || pair.NoDelim {
+		if pair.NoDelim {
 			continue
 		}
 		pairs = append(pairs, pair)

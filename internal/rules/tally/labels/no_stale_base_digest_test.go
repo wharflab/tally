@@ -290,7 +290,7 @@ LABEL org.opencontainers.image.base.digest="sha256:new"
 	}
 }
 
-func TestNoStaleBaseDigestRule_FixDoesNotEditAncestorStage(t *testing.T) {
+func TestNoStaleBaseDigestRule_FixEditsExportedAncestorStage(t *testing.T) {
 	t.Parallel()
 
 	content := `FROM alpine:3.20 AS metadata
@@ -308,12 +308,15 @@ LABEL org.opencontainers.image.base.digest="sha256:final"
 
 	gotDeleted := string(fixpkg.ApplyFix([]byte(content), violations[0].AllFixes()[1]))
 	wantDeleted := `FROM alpine:3.20 AS metadata
-LABEL org.opencontainers.image.base.digest="sha256:ancestor"
 
 FROM metadata
 `
 	if gotDeleted != wantDeleted {
 		t.Errorf("delete fix mismatch\ngot:\n%s\nwant:\n%s", gotDeleted, wantDeleted)
+	}
+	deletedInput := testutil.MakeLintInput(t, "Dockerfile", gotDeleted)
+	if got := NewNoStaleBaseDigestRule().Check(deletedInput); len(got) != 0 {
+		t.Fatalf("delete fix left %d violations, want 0", len(got))
 	}
 }
 
