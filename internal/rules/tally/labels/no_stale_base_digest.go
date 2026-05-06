@@ -86,6 +86,9 @@ func shouldCheckBaseDigestLabelPair(
 	exportedStages map[int]bool,
 	activePairs map[labelPairID]bool,
 ) bool {
+	if pair.Key != ocispec.AnnotationBaseImageDigest {
+		return false
+	}
 	if pair.NoDelim || pair.KeyIsDynamic || pair.Key == "" {
 		return false
 	}
@@ -95,7 +98,7 @@ func shouldCheckBaseDigestLabelPair(
 	if activePairs != nil && !activePairs[labelPairKey(pair)] {
 		return false
 	}
-	return pair.Key == ocispec.AnnotationBaseImageDigest
+	return true
 }
 
 func baseDigestViolationMessage(pair facts.LabelPairFact, base exportedBaseDigest) string {

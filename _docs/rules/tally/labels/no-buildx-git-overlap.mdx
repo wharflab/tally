@@ -33,8 +33,8 @@ builder stages are ignored unless the final image inherits from that stage.
 
 | Mode | Generated labels checked |
 |------|--------------------------|
-| `off` | Disabled |
-| `true` or `1` | `org.opencontainers.image.revision`, `com.docker.image.source.entrypoint` |
+| `off`, `none`, or `strconv.ParseBool` false values such as `false`, `0`, `f`, `F` | Disabled |
+| `strconv.ParseBool` true values such as `true`, `1`, `t`, `T` | `org.opencontainers.image.revision`, `com.docker.image.source.entrypoint` |
 | `full` | The `true` labels plus `org.opencontainers.image.source` |
 
 ## Examples
@@ -87,7 +87,9 @@ Tally does not infer builder configuration from its own process environment.
 By default, this rule models `BUILDX_GIT_LABELS=full` because the diagnostics
 are informational and help keep git-derived metadata owned by the build system.
 Configure the mode explicitly when the repository uses a narrower Buildx git
-label policy.
+label policy. Boolean string values are parsed like Docker/Buildx documents
+`BUILDX_GIT_LABELS` parsing: `true`, `1`, `t`, and `T` all select the narrower
+non-`full` generated-label set.
 
 ```toml
 [rules.tally.labels.no-buildx-git-overlap]

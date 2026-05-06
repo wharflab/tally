@@ -315,15 +315,27 @@
       "properties": {
         "buildx-git-labels": {
           "default": "full",
-          "description": "Controls which Buildx git label mode the rule models. \"off\" disables the check, \"true\" and \"1\" check revision and Dockerfile-path labels, and \"full\" also checks source labels.",
+          "description": "Controls which Buildx git label mode the rule models. \"off\", \"none\", and strconv.ParseBool false values disable the check, strconv.ParseBool true values check revision and Dockerfile-path labels, and \"full\" also checks source labels.",
           "enum": [
             "off",
+            "none",
+            "false",
+            "False",
+            "FALSE",
+            "0",
+            "f",
+            "F",
             "true",
+            "True",
+            "TRUE",
             "1",
+            "t",
+            "T",
             "full"
           ],
           "examples": [
             "full",
+            "T",
             "off"
           ],
           "type": "string"

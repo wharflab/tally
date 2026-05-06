@@ -3,6 +3,7 @@ package labels
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -40,7 +41,6 @@ type NoBuildxGitOverlapRule struct {
 }
 
 type buildxGitOverlapGroup struct {
-	first facts.LabelPairFact
 	pairs []facts.LabelPairFact
 	keys  []string
 }
@@ -143,7 +143,6 @@ func makeBuildxGitOverlapGroups(
 		if !ok {
 			groupIndex[key] = len(groups)
 			groups = append(groups, buildxGitOverlapGroup{
-				first: pair,
 				pairs: []facts.LabelPairFact{pair},
 			})
 			idx = len(groups) - 1
@@ -171,18 +170,24 @@ func configuredBuildxGitLabelsMode(cfg NoBuildxGitOverlapConfig) buildxGitLabels
 }
 
 func normalizeBuildxGitLabelsMode(raw string) buildxGitLabelsMode {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
+	trimmed := strings.TrimSpace(raw)
+	switch strings.ToLower(trimmed) {
 	case "":
 		return buildxGitLabelsFull
-	case string(buildxGitLabelsOff), "false", "0", "none":
+	case string(buildxGitLabelsOff), "none":
 		return buildxGitLabelsOff
-	case string(buildxGitLabelsTrue), "1":
-		return buildxGitLabelsTrue
 	case string(buildxGitLabelsFull):
 		return buildxGitLabelsFull
-	default:
+	}
+
+	enabled, err := strconv.ParseBool(trimmed)
+	if err != nil {
 		return buildxGitLabelsOff
 	}
+	if enabled {
+		return buildxGitLabelsTrue
+	}
+	return buildxGitLabelsOff
 }
 
 func buildxGeneratedLabelKeys(mode buildxGitLabelsMode) map[string]struct{} {
@@ -232,7 +237,7 @@ func buildxGitOverlapViolation(
 	mode buildxGitLabelsMode,
 ) rules.Violation {
 	return rules.NewViolation(
-		rules.NewLocationFromRanges(file, group.first.Location),
+		rules.NewLocationFromRanges(file, group.pairs[0].Location),
 		meta.Code,
 		fmt.Sprintf(
 			"Buildx with BUILDX_GIT_LABELS=%s can emit %s; remove the Dockerfile label or disable the generated label source",

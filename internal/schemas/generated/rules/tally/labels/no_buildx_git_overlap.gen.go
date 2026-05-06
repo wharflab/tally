@@ -6,9 +6,10 @@ import ruleschema "github.com/wharflab/tally/internal/schemas/generated/rules/ru
 
 // Configuration options for the tally/labels/no-buildx-git-overlap rule.
 type NoBuildxGitOverlapSchemaJson struct {
-	// Controls which Buildx git label mode the rule models. "off" disables the check,
-	// "true" and "1" check revision and Dockerfile-path labels, and "full" also
-	// checks source labels.
+	// Controls which Buildx git label mode the rule models. "off", "none", and
+	// strconv.ParseBool false values disable the check, strconv.ParseBool true values
+	// check revision and Dockerfile-path labels, and "full" also checks source
+	// labels.
 	BuildxGitLabels NoBuildxGitOverlapSchemaJsonBuildxGitLabels `json:"buildx-git-labels,omitempty,omitzero"`
 
 	// Exclude corresponds to the JSON schema field "exclude".
@@ -23,7 +24,14 @@ type NoBuildxGitOverlapSchemaJson struct {
 
 type NoBuildxGitOverlapSchemaJsonBuildxGitLabels string
 
+const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsA0 NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "0"
 const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsA1 NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "1"
+const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsF NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "f"
+const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsFALSE NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "FALSE"
+const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsFalse NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "false"
 const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsFull NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "full"
+const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsNone NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "none"
 const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsOff NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "off"
+const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsT NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "t"
+const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsTRUE NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "TRUE"
 const NoBuildxGitOverlapSchemaJsonBuildxGitLabelsTrue NoBuildxGitOverlapSchemaJsonBuildxGitLabels = "true"

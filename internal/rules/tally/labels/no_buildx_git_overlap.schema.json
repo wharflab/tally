@@ -10,10 +10,10 @@
     "exclude": { "$ref": "../../rule-config.schema.json#/$defs/exclude" },
     "buildx-git-labels": {
       "type": "string",
-      "enum": ["off", "true", "1", "full"],
+      "enum": ["off", "none", "false", "False", "FALSE", "0", "f", "F", "true", "True", "TRUE", "1", "t", "T", "full"],
       "default": "full",
-      "description": "Controls which Buildx git label mode the rule models. \"off\" disables the check, \"true\" and \"1\" check revision and Dockerfile-path labels, and \"full\" also checks source labels.",
-      "examples": ["full", "off"]
+      "description": "Controls which Buildx git label mode the rule models. \"off\", \"none\", and strconv.ParseBool false values disable the check, strconv.ParseBool true values check revision and Dockerfile-path labels, and \"full\" also checks source labels.",
+      "examples": ["full", "T", "off"]
     }
   },
   "additionalProperties": false,
