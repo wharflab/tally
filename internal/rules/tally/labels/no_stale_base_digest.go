@@ -53,9 +53,10 @@ func (r *NoStaleBaseDigestRule) Check(input rules.LintInput) []rules.Violation {
 	sm := input.SourceMap()
 	escapeToken := labelEscapeToken(input)
 	labels := input.Facts.Labels()
+	activePairs := activeExportedLabelPairIDs(input)
 	violations := make([]rules.Violation, 0, len(labels))
 	for _, pair := range labels {
-		if !shouldCheckBaseDigestLabelPair(pair, exportedStages) {
+		if !shouldCheckBaseDigestLabelPair(pair, exportedStages, activePairs) {
 			continue
 		}
 		message := baseDigestViolationMessage(pair, base)
@@ -80,11 +81,18 @@ func (r *NoStaleBaseDigestRule) Check(input rules.LintInput) []rules.Violation {
 	return violations
 }
 
-func shouldCheckBaseDigestLabelPair(pair facts.LabelPairFact, exportedStages map[int]bool) bool {
+func shouldCheckBaseDigestLabelPair(
+	pair facts.LabelPairFact,
+	exportedStages map[int]bool,
+	activePairs map[labelPairID]bool,
+) bool {
 	if pair.NoDelim || pair.KeyIsDynamic || pair.Key == "" {
 		return false
 	}
 	if exportedStages != nil && !exportedStages[pair.StageIndex] {
+		return false
+	}
+	if activePairs != nil && !activePairs[labelPairKey(pair)] {
 		return false
 	}
 	return pair.Key == ocispec.AnnotationBaseImageDigest

@@ -102,7 +102,8 @@ func (r *NoBuildxGitOverlapRule) Check(input rules.LintInput) []rules.Violation 
 	sm := input.SourceMap()
 	escapeToken := labelEscapeToken(input)
 	labels := input.Facts.Labels()
-	groups := makeBuildxGitOverlapGroups(labels, generated, exportedStages)
+	activeKeys := activeExportedLabelCommandKeys(input)
+	groups := makeBuildxGitOverlapGroups(labels, generated, exportedStages, activeKeys)
 	violations := make([]rules.Violation, 0, len(groups))
 	for _, group := range groups {
 		violation := buildxGitOverlapViolation(input.File, meta, group, mode)
@@ -118,6 +119,7 @@ func makeBuildxGitOverlapGroups(
 	labels []facts.LabelPairFact,
 	generated map[string]struct{},
 	exportedStages map[int]bool,
+	activeKeys map[labelCommandKey]bool,
 ) []buildxGitOverlapGroup {
 	groupIndex := make(map[[2]int]int)
 	groups := make([]buildxGitOverlapGroup, 0, len(labels))
@@ -126,6 +128,13 @@ func makeBuildxGitOverlapGroups(
 			continue
 		}
 		if _, ok := generated[pair.Key]; !ok {
+			continue
+		}
+		if activeKeys != nil && !activeKeys[labelCommandKey{
+			stageIndex:   pair.StageIndex,
+			commandIndex: pair.CommandIndex,
+			key:          pair.Key,
+		}] {
 			continue
 		}
 
@@ -197,23 +206,14 @@ func buildxGeneratedLabelKeys(mode buildxGitLabelsMode) map[string]struct{} {
 }
 
 func exportedImageStageIndexes(input rules.LintInput) map[int]bool {
-	finalStage := input.FinalStageIndex()
-	if finalStage < 0 {
+	chain := exportedImageStageChain(input)
+	if len(chain) == 0 {
 		return nil
 	}
 
-	indexes := map[int]bool{finalStage: true}
-	for current := finalStage; input.Semantic != nil; {
-		info := input.Semantic.StageInfo(current)
-		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
-			break
-		}
-		parent := info.BaseImage.StageIndex
-		if parent < 0 || indexes[parent] {
-			break
-		}
-		indexes[parent] = true
-		current = parent
+	indexes := make(map[int]bool, len(chain))
+	for _, stageIdx := range chain {
+		indexes[stageIdx] = true
 	}
 	return indexes
 }

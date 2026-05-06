@@ -199,6 +199,20 @@ RUN true
 			WantViolations: 1,
 			WantMessages:   []string{`org.opencontainers.image.revision`},
 		},
+		{
+			Name: "ancestor generated labels shadowed by final stage are not checked twice",
+			Config: map[string]any{
+				"buildx-git-labels": "full",
+			},
+			Content: `FROM alpine:3.20 AS metadata
+LABEL org.opencontainers.image.revision="ancestor"
+
+FROM metadata
+LABEL org.opencontainers.image.revision="final"
+`,
+			WantViolations: 1,
+			WantMessages:   []string{`org.opencontainers.image.revision`},
+		},
 	})
 }
 

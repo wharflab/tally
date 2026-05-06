@@ -9,89 +9,6 @@
           "location": {
             "end": {
               "column": 0,
-              "line": 8
-            },
-            "file": "testdata/labels-no-stale-base-digest/Dockerfile",
-            "start": {
-              "column": 0,
-              "line": 8
-            }
-          },
-          "message": "label \"org.opencontainers.image.base.digest\" requires a digest-pinned FROM in the exported image's stage chain",
-          "rule": "tally/labels/no-stale-base-digest",
-          "severity": "warning",
-          "sourceCode": "LABEL org.opencontainers.image.base.digest=\"${BASE_DIGEST}\"",
-          "suggestedFix": {
-            "description": "Comment out LABEL \"org.opencontainers.image.base.digest\" without a matching digest-pinned FROM",
-            "edits": [
-              {
-                "location": {
-                  "end": {
-                    "column": 59,
-                    "line": 8
-                  },
-                  "file": "testdata/labels-no-stale-base-digest/Dockerfile",
-                  "start": {
-                    "column": 0,
-                    "line": 8
-                  }
-                },
-                "newText": "# [commented out by tally - org.opencontainers.image.base.digest needs a digest-pinned FROM]: LABEL org.opencontainers.image.base.digest=\"${BASE_DIGEST}\""
-              }
-            ],
-            "isPreferred": true,
-            "safety": 1
-          },
-          "suggestedFixes": [
-            {
-              "description": "Comment out LABEL \"org.opencontainers.image.base.digest\" without a matching digest-pinned FROM",
-              "edits": [
-                {
-                  "location": {
-                    "end": {
-                      "column": 59,
-                      "line": 8
-                    },
-                    "file": "testdata/labels-no-stale-base-digest/Dockerfile",
-                    "start": {
-                      "column": 0,
-                      "line": 8
-                    }
-                  },
-                  "newText": "# [commented out by tally - org.opencontainers.image.base.digest needs a digest-pinned FROM]: LABEL org.opencontainers.image.base.digest=\"${BASE_DIGEST}\""
-                }
-              ],
-              "isPreferred": true,
-              "safety": 1
-            },
-            {
-              "description": "Delete LABEL \"org.opencontainers.image.base.digest\" without a matching digest-pinned FROM",
-              "edits": [
-                {
-                  "location": {
-                    "end": {
-                      "column": 0,
-                      "line": 9
-                    },
-                    "file": "testdata/labels-no-stale-base-digest/Dockerfile",
-                    "start": {
-                      "column": 0,
-                      "line": 8
-                    }
-                  },
-                  "newText": ""
-                }
-              ],
-              "safety": 1
-            }
-          ]
-        },
-        {
-          "detail": "org.opencontainers.image.base.digest identifies the base image manifest digest, not the final image digest. Keep it only when the exported image's external base is digest-pinned and the label mirrors that digest.",
-          "docUrl": "https://tally.wharflab.com/rules/tally/labels/no-stale-base-digest/",
-          "location": {
-            "end": {
-              "column": 0,
               "line": 12
             },
             "file": "testdata/labels-no-stale-base-digest/Dockerfile",
@@ -179,7 +96,7 @@
     "files": 1,
     "info": 0,
     "style": 0,
-    "total": 2,
-    "warnings": 2
+    "total": 1,
+    "warnings": 1
   }
 }

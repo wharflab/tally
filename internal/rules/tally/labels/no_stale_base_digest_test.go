@@ -94,6 +94,16 @@ RUN true
 			WantMessages:   []string{`requires a digest-pinned FROM`},
 		},
 		{
+			Name: "ancestor base digest label shadowed by final stage is ignored",
+			Content: `FROM alpine:3.20@` + baseDigestA + ` AS metadata
+LABEL org.opencontainers.image.base.digest="` + baseDigestB + `"
+
+FROM metadata
+LABEL org.opencontainers.image.base.digest="` + baseDigestA + `"
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "stage reference chain can carry a digest pinned external base",
 			Content: `FROM alpine:3.20@` + baseDigestA + ` AS base
 
