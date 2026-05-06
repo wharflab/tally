@@ -3,7 +3,7 @@ edition = "2021"
 license = "AGPL-3.0-only"
 name    = "zed-tally"
 publish = false
-version = "0.1.0"
+version = "0.41.0"
 
 [lib]
 crate-type = ["cdylib"]

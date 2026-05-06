@@ -4,7 +4,7 @@ id             = "tally"
 name           = "Tally"
 repository     = "https://github.com/wharflab/tally"
 schema_version = 1
-version        = "0.1.0"
+version = "0.41.0"
 
 [grammars.dockerfile]
 commit     = "971acdd908568b4531b0ba28a445bf0bb720aba5"
