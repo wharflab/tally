@@ -53,7 +53,7 @@
     "oxfmt": "0.47.0",
     "oxlint": "1.62.0",
     "oxlint-tsgolint": "0.22.1",
-    "vscode-python-envs": "github:microsoft/vscode-python-environments#v1.28.0"
+    "vscode-python-envs": "github:microsoft/vscode-python-environments#v1.30.0"
   },
   "contributes": {
     "commands": [
