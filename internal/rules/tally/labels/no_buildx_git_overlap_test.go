@@ -400,6 +400,79 @@ LABEL org.opencontainers.image.revision="abc123" \
 	}
 }
 
+func TestNoBuildxGitOverlapRule_SeparateRepeatedRevisionFixOptions(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM alpine:3.20
+LABEL org.opencontainers.image.revision="abc123"
+LABEL org.opencontainers.image.revision="def456"
+`
+	config := map[string]any{"buildx-git-labels": "full"}
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, config)
+
+	violations := NewNoBuildxGitOverlapRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	allFixes := violations[0].AllFixes()
+	if len(allFixes) != 2 {
+		t.Fatalf("got %d fix options, want 2", len(allFixes))
+	}
+
+	gotCommented := string(fixpkg.ApplyFix([]byte(content), allFixes[0]))
+	wantCommented := "FROM alpine:3.20\n" +
+		"# [commented out by tally - Buildx can generate org.opencontainers.image.revision]: " +
+		"LABEL org.opencontainers.image.revision=\"abc123\"\n" +
+		"# [commented out by tally - Buildx can generate org.opencontainers.image.revision]: " +
+		"LABEL org.opencontainers.image.revision=\"def456\"\n"
+	if gotCommented != wantCommented {
+		t.Errorf("comment fix mismatch\ngot:\n%s\nwant:\n%s", gotCommented, wantCommented)
+	}
+	commentedInput := testutil.MakeLintInputWithConfig(t, "Dockerfile", gotCommented, config)
+	if got := NewNoBuildxGitOverlapRule().Check(commentedInput); len(got) != 0 {
+		t.Fatalf("comment fix left %d violations, want 0", len(got))
+	}
+
+	gotDeleted := string(fixpkg.ApplyFix([]byte(content), allFixes[1]))
+	wantDeleted := "FROM alpine:3.20\n"
+	if gotDeleted != wantDeleted {
+		t.Errorf("delete fix mismatch\ngot:\n%s\nwant:\n%s", gotDeleted, wantDeleted)
+	}
+	deletedInput := testutil.MakeLintInputWithConfig(t, "Dockerfile", gotDeleted, config)
+	if got := NewNoBuildxGitOverlapRule().Check(deletedInput); len(got) != 0 {
+		t.Fatalf("delete fix left %d violations, want 0", len(got))
+	}
+}
+
+func TestNoBuildxGitOverlapRule_RevisionFixDoesNotEditAncestorStage(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM alpine:3.20 AS metadata
+LABEL org.opencontainers.image.revision="ancestor"
+
+FROM metadata
+LABEL org.opencontainers.image.revision="final"
+`
+	config := map[string]any{"buildx-git-labels": "full"}
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, config)
+
+	violations := NewNoBuildxGitOverlapRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	gotDeleted := string(fixpkg.ApplyFix([]byte(content), violations[0].AllFixes()[1]))
+	wantDeleted := `FROM alpine:3.20 AS metadata
+LABEL org.opencontainers.image.revision="ancestor"
+
+FROM metadata
+`
+	if gotDeleted != wantDeleted {
+		t.Errorf("delete fix mismatch\ngot:\n%s\nwant:\n%s", gotDeleted, wantDeleted)
+	}
+}
+
 func TestConfiguredBuildxGitLabelsMode(t *testing.T) {
 	t.Parallel()
 

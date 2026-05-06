@@ -73,7 +73,7 @@ func (r *NoStaleBaseDigestRule) Check(input rules.LintInput) []rules.Violation {
 			"org.opencontainers.image.base.digest identifies the base image manifest digest, not the final image digest. " +
 				"Keep it only when the exported image's external base is digest-pinned and the label mirrors that digest.",
 		)
-		if fixes := buildBaseDigestFixes(input.File, sm, pair, meta, escapeToken); len(fixes) > 0 {
+		if fixes := buildBaseDigestFixes(input, sm, pair, base, meta, escapeToken); len(fixes) > 0 {
 			violation = violation.WithSuggestedFixes(fixes)
 		}
 		violations = append(violations, violation)
@@ -167,20 +167,48 @@ func imageRefDigest(raw string) (string, bool) {
 }
 
 func buildBaseDigestFixes(
-	file string,
+	input rules.LintInput,
 	sm *sourcemap.SourceMap,
 	pair facts.LabelPairFact,
+	base exportedBaseDigest,
 	meta rules.RuleMetadata,
 	escapeToken rune,
 ) []*rules.SuggestedFix {
 	key := ocispec.AnnotationBaseImageDigest
-	return buildLabelPairRemovalFixes(file, sm, pair, escapeToken, labelInstructionFixOptions{
+	pairs := removableStaleBaseDigestPairs(input, pair, base)
+	return buildLabelPairsRemovalFixesAcrossCommands(input.File, sm, pairs, escapeToken, labelInstructionFixOptions{
 		CommentDescription: fmt.Sprintf("Comment out LABEL %q without a matching digest-pinned FROM", key),
 		DeleteDescription:  fmt.Sprintf("Delete LABEL %q without a matching digest-pinned FROM", key),
 		CommentPrefix:      fmt.Sprintf("# [commented out by tally - %s needs a digest-pinned FROM]: ", key),
 		Safety:             rules.FixSuggestion,
 		Priority:           meta.FixPriority,
 	})
+}
+
+func removableStaleBaseDigestPairs(
+	input rules.LintInput,
+	active facts.LabelPairFact,
+	base exportedBaseDigest,
+) []facts.LabelPairFact {
+	candidates := exportedLabelPairsByKey(input, ocispec.AnnotationBaseImageDigest)
+	if len(candidates) == 0 {
+		return []facts.LabelPairFact{active}
+	}
+
+	pairs := make([]facts.LabelPairFact, 0, len(candidates))
+	for _, pair := range candidates {
+		if pair.StageIndex != active.StageIndex || pair.NoDelim {
+			continue
+		}
+		if baseDigestViolationMessage(pair, base) == "" {
+			continue
+		}
+		pairs = append(pairs, pair)
+	}
+	if len(pairs) == 0 {
+		return []facts.LabelPairFact{active}
+	}
+	return pairs
 }
 
 func init() {

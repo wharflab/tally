@@ -206,6 +206,65 @@ func buildLabelPairsRemovalFixes(
 	}
 }
 
+func buildLabelPairsRemovalFixesAcrossCommands(
+	file string,
+	sm *sourcemap.SourceMap,
+	pairs []facts.LabelPairFact,
+	escapeToken rune,
+	opts labelInstructionFixOptions,
+) []*rules.SuggestedFix {
+	if len(pairs) == 0 {
+		return nil
+	}
+
+	type pairGroup struct {
+		pairs []facts.LabelPairFact
+	}
+	groups := make([]pairGroup, 0, len(pairs))
+	groupByCommand := map[*instructions.LabelCommand]int{}
+	for _, pair := range pairs {
+		if pair.Command == nil {
+			return nil
+		}
+		idx, ok := groupByCommand[pair.Command]
+		if !ok {
+			groupByCommand[pair.Command] = len(groups)
+			groups = append(groups, pairGroup{})
+			idx = len(groups) - 1
+		}
+		groups[idx].pairs = append(groups[idx].pairs, pair)
+	}
+	if len(groups) == 1 {
+		return buildLabelPairsRemovalFixes(file, sm, pairs, escapeToken, opts)
+	}
+
+	var commentEdits []rules.TextEdit
+	var deleteEdits []rules.TextEdit
+	for _, group := range groups {
+		fixes := buildLabelPairsRemovalFixes(file, sm, group.pairs, escapeToken, opts)
+		if len(fixes) != 2 {
+			return nil
+		}
+		commentEdits = append(commentEdits, fixes[0].Edits...)
+		deleteEdits = append(deleteEdits, fixes[1].Edits...)
+	}
+	return []*rules.SuggestedFix{
+		{
+			Description: opts.CommentDescription,
+			Safety:      opts.Safety,
+			Priority:    opts.Priority,
+			IsPreferred: true,
+			Edits:       commentEdits,
+		},
+		{
+			Description: opts.DeleteDescription,
+			Safety:      opts.Safety,
+			Priority:    opts.Priority,
+			Edits:       deleteEdits,
+		},
+	}
+}
+
 func commentOutLabelInstruction(sm *sourcemap.SourceMap, startLine, endLine int, prefix string) string {
 	lines := make([]string, 0, endLine-startLine+1)
 	for lineNum := startLine; lineNum <= endLine; lineNum++ {

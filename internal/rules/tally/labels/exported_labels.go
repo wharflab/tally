@@ -100,6 +100,32 @@ func activeExportedLabelPairsByKey(input rules.LintInput) map[string]facts.Label
 	return active
 }
 
+func exportedLabelPairsByKey(input rules.LintInput, key string) []facts.LabelPairFact {
+	if input.Facts == nil || key == "" {
+		return nil
+	}
+
+	chain := exportedImageStageChain(input)
+	if len(chain) == 0 {
+		return nil
+	}
+
+	stages := input.Facts.Stages()
+	var pairs []facts.LabelPairFact
+	for _, stageIdx := range chain {
+		if stageIdx < 0 || stageIdx >= len(stages) || stages[stageIdx] == nil {
+			continue
+		}
+		for _, pair := range stages[stageIdx].Labels {
+			if pair.KeyIsDynamic || pair.Key != key {
+				continue
+			}
+			pairs = append(pairs, pair)
+		}
+	}
+	return pairs
+}
+
 func labelPairKey(pair facts.LabelPairFact) labelPairID {
 	return labelPairID{
 		stageIndex:   pair.StageIndex,

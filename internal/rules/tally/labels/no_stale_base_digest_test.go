@@ -246,6 +246,77 @@ LABEL org.opencontainers.image.title="demo" \
 	}
 }
 
+func TestNoStaleBaseDigestRule_SeparateRepeatedStaleDigestFixOptions(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM alpine:3.20
+LABEL org.opencontainers.image.base.digest="sha256:old"
+LABEL org.opencontainers.image.base.digest="sha256:new"
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+
+	violations := NewNoStaleBaseDigestRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	allFixes := violations[0].AllFixes()
+	if len(allFixes) != 2 {
+		t.Fatalf("got %d fix options, want 2", len(allFixes))
+	}
+
+	gotCommented := string(fixpkg.ApplyFix([]byte(content), allFixes[0]))
+	wantCommented := "FROM alpine:3.20\n" +
+		"# [commented out by tally - org.opencontainers.image.base.digest needs a digest-pinned FROM]: " +
+		"LABEL org.opencontainers.image.base.digest=\"sha256:old\"\n" +
+		"# [commented out by tally - org.opencontainers.image.base.digest needs a digest-pinned FROM]: " +
+		"LABEL org.opencontainers.image.base.digest=\"sha256:new\"\n"
+	if gotCommented != wantCommented {
+		t.Errorf("comment fix mismatch\ngot:\n%s\nwant:\n%s", gotCommented, wantCommented)
+	}
+	commentedInput := testutil.MakeLintInput(t, "Dockerfile", gotCommented)
+	if got := NewNoStaleBaseDigestRule().Check(commentedInput); len(got) != 0 {
+		t.Fatalf("comment fix left %d violations, want 0", len(got))
+	}
+
+	gotDeleted := string(fixpkg.ApplyFix([]byte(content), allFixes[1]))
+	wantDeleted := "FROM alpine:3.20\n"
+	if gotDeleted != wantDeleted {
+		t.Errorf("delete fix mismatch\ngot:\n%s\nwant:\n%s", gotDeleted, wantDeleted)
+	}
+	deletedInput := testutil.MakeLintInput(t, "Dockerfile", gotDeleted)
+	if got := NewNoStaleBaseDigestRule().Check(deletedInput); len(got) != 0 {
+		t.Fatalf("delete fix left %d violations, want 0", len(got))
+	}
+}
+
+func TestNoStaleBaseDigestRule_FixDoesNotEditAncestorStage(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM alpine:3.20 AS metadata
+LABEL org.opencontainers.image.base.digest="sha256:ancestor"
+
+FROM metadata
+LABEL org.opencontainers.image.base.digest="sha256:final"
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+
+	violations := NewNoStaleBaseDigestRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	gotDeleted := string(fixpkg.ApplyFix([]byte(content), violations[0].AllFixes()[1]))
+	wantDeleted := `FROM alpine:3.20 AS metadata
+LABEL org.opencontainers.image.base.digest="sha256:ancestor"
+
+FROM metadata
+`
+	if gotDeleted != wantDeleted {
+		t.Errorf("delete fix mismatch\ngot:\n%s\nwant:\n%s", gotDeleted, wantDeleted)
+	}
+}
+
 func TestExportedBaseImageDigestFallbackWithoutSemantic(t *testing.T) {
 	t.Parallel()
 
