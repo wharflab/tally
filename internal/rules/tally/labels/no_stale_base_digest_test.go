@@ -333,6 +333,21 @@ RUN true
 		t.Fatalf("exportedBaseImageDigest() = %#v, want digest %q", got, baseDigestA)
 	}
 
+	stageRefInput := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine:3.20@`+baseDigestA+` AS base
+
+FROM base
+LABEL org.opencontainers.image.base.digest="`+baseDigestA+`"
+`)
+	stageRefInput.Semantic = nil
+
+	stageRefDigest := exportedBaseImageDigest(stageRefInput)
+	if !stageRefDigest.HasDigest || stageRefDigest.Digest != baseDigestA {
+		t.Fatalf("exportedBaseImageDigest(stage ref) = %#v, want digest %q", stageRefDigest, baseDigestA)
+	}
+	if got := NewNoStaleBaseDigestRule().Check(stageRefInput); len(got) != 0 {
+		t.Fatalf("semantic-less stage ref produced %d violations, want 0", len(got))
+	}
+
 	empty := exportedBaseImageDigest(rules.LintInput{})
 	if empty.HasDigest || empty.Digest != "" {
 		t.Fatalf("exportedBaseImageDigest(empty) = %#v, want no digest", empty)

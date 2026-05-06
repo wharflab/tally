@@ -124,7 +124,7 @@ func exportedBaseImageDigest(input rules.LintInput) exportedBaseDigest {
 		if finalStage >= len(input.Stages) {
 			return exportedBaseDigest{}
 		}
-		raw := input.Stages[finalStage].BaseName
+		raw := exportedBaseNameWithoutSemantic(input, finalStage)
 		digest, ok := imageRefDigest(raw)
 		return exportedBaseDigest{Digest: digest, HasDigest: ok}
 	}
@@ -149,6 +149,38 @@ func exportedBaseImageDigest(input rules.LintInput) exportedBaseDigest {
 		return exportedBaseDigest{Digest: digest, HasDigest: ok}
 	}
 	return exportedBaseDigest{}
+}
+
+func exportedBaseNameWithoutSemantic(input rules.LintInput, finalStage int) string {
+	visited := map[int]bool{}
+	for current := finalStage; current >= 0 && current < len(input.Stages); {
+		if visited[current] {
+			return ""
+		}
+		visited[current] = true
+
+		raw := input.Stages[current].BaseName
+		parent, ok := fallbackStageRefIndex(input, current, raw)
+		if !ok {
+			return raw
+		}
+		current = parent
+	}
+	return ""
+}
+
+func fallbackStageRefIndex(input rules.LintInput, current int, name string) (int, bool) {
+	if name == "" {
+		return 0, false
+	}
+
+	normalized := strings.ToLower(name)
+	for idx := min(current, len(input.Stages)-1); idx >= 0; idx-- {
+		if strings.EqualFold(input.Stages[idx].Name, normalized) {
+			return idx, true
+		}
+	}
+	return 0, false
 }
 
 func imageRefDigest(raw string) (string, bool) {
