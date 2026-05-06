@@ -237,6 +237,35 @@ LABEL org.opencontainers.image.revision="abc123" \
 	}
 }
 
+func TestNoBuildxGitOverlapRule_SemanticlessInheritedLabelIsChecked(t *testing.T) {
+	t.Parallel()
+
+	content := `FROM alpine:3.20 AS metadata
+LABEL org.opencontainers.image.revision="ancestor"
+
+FROM metadata
+RUN true
+`
+	config := map[string]any{"buildx-git-labels": "full"}
+	input := testutil.MakeLintInputWithConfig(t, "Dockerfile", content, config)
+	input.Semantic = nil
+
+	violations := NewNoBuildxGitOverlapRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	gotDeleted := string(fixpkg.ApplyFix([]byte(content), violations[0].AllFixes()[1]))
+	wantDeleted := `FROM alpine:3.20 AS metadata
+
+FROM metadata
+RUN true
+`
+	if gotDeleted != wantDeleted {
+		t.Errorf("delete fix mismatch\ngot:\n%s\nwant:\n%s", gotDeleted, wantDeleted)
+	}
+}
+
 func TestNoBuildxGitOverlapRule_RevisionFixOptions(t *testing.T) {
 	t.Parallel()
 

@@ -183,6 +183,26 @@ LABEL org.opencontainers.image.base.digest="sha256:deadbeef"
 	}
 }
 
+func TestNoStaleBaseDigestRule_SemanticlessInheritedLabelIsChecked(t *testing.T) {
+	t.Parallel()
+
+	input := testutil.MakeLintInput(t, "Dockerfile", `FROM alpine:3.20 AS metadata
+LABEL org.opencontainers.image.base.digest="sha256:deadbeef"
+
+FROM metadata
+RUN true
+`)
+	input.Semantic = nil
+
+	violations := NewNoStaleBaseDigestRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("SuggestedFix = nil, want fix for inherited stale label")
+	}
+}
+
 func TestNoStaleBaseDigestRule_GroupedFixOptions(t *testing.T) {
 	t.Parallel()
 

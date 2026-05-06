@@ -27,12 +27,11 @@ func exportedImageStageChain(input rules.LintInput) []int {
 
 	chain := []int{finalStage}
 	seen := map[int]bool{finalStage: true}
-	for current := finalStage; input.Semantic != nil; {
-		info := input.Semantic.StageInfo(current)
-		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
+	for current := finalStage; ; {
+		parent, ok := exportedParentStageIndex(input, current)
+		if !ok {
 			break
 		}
-		parent := info.BaseImage.StageIndex
 		if parent < 0 || seen[parent] {
 			break
 		}
@@ -42,6 +41,20 @@ func exportedImageStageChain(input rules.LintInput) []int {
 	}
 	slices.Reverse(chain)
 	return chain
+}
+
+func exportedParentStageIndex(input rules.LintInput, current int) (int, bool) {
+	if input.Semantic != nil {
+		info := input.Semantic.StageInfo(current)
+		if info == nil || info.BaseImage == nil || !info.BaseImage.IsStageRef {
+			return -1, false
+		}
+		return info.BaseImage.StageIndex, true
+	}
+	if current < 0 || current >= len(input.Stages) {
+		return -1, false
+	}
+	return fallbackStageRefIndex(input, current, input.Stages[current].BaseName)
 }
 
 func activeExportedLabelPairIDs(input rules.LintInput) map[labelPairID]bool {
