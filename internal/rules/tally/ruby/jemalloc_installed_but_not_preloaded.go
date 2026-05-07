@@ -1,6 +1,7 @@
 package ruby
 
 import (
+	"path"
 	"strings"
 
 	"github.com/wharflab/tally/internal/facts"
@@ -10,6 +11,18 @@ import (
 	"github.com/wharflab/tally/internal/sourcemap"
 	"github.com/wharflab/tally/internal/stagename"
 )
+
+// jemallocSymlinkCreatingCommands are the parsed command names that can
+// materialize a libjemalloc.so file at the target path. Substring scans on the
+// raw script are too loose — `find`, `echo`, or stray references would falsely
+// suppress the symlink half of the fix, leaving LD_PRELOAD pointing at a
+// missing file.
+var jemallocSymlinkCreatingCommands = map[string]bool{
+	"ln":      true,
+	"cp":      true,
+	"mv":      true,
+	"install": true,
+}
 
 // JemallocInstalledButNotPreloadedRuleCode is the full rule code.
 const JemallocInstalledButNotPreloadedRuleCode = rules.TallyRulePrefix + "ruby/jemalloc-installed-but-not-preloaded"
@@ -327,10 +340,17 @@ ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"
 }
 
 // stageReferencesJemallocSymlink reports whether the stage already contains a
-// RUN that references the libjemalloc.so shared object — typically a `ln -s`
-// step that creates the canonical symlink. Distro package names (libjemalloc2,
-// libjemalloc1, libjemalloc-dev) do not contain ".so", so the substring check
-// does not false-fire on the install line itself.
+// RUN that creates a libjemalloc.so file — typically a `ln -s` step that
+// materializes the canonical symlink, or a `cp`/`mv`/`install` of an
+// equivalently-named file.
+//
+// The check inspects parsed command invocations (not raw text) and only
+// matches when a non-flag argument's basename is exactly `libjemalloc.so`.
+// This rejects unrelated references like `find / -name 'libjemalloc.so*'`,
+// `echo` of a docs string, or matches on `libjemalloc.so.2` (the apt-shipped
+// versioned library, not the symlink target). Without this narrowing, the
+// fix could emit only `ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so` against
+// a stage that never creates that file, leaving jemalloc unloaded.
 func stageReferencesJemallocSymlink(sf *facts.StageFacts) bool {
 	if sf == nil {
 		return false
@@ -339,9 +359,18 @@ func stageReferencesJemallocSymlink(sf *facts.StageFacts) bool {
 		if rf == nil {
 			continue
 		}
-		if strings.Contains(rf.SourceScript, "libjemalloc.so") ||
-			strings.Contains(rf.CommandScript, "libjemalloc.so") {
-			return true
+		for _, ci := range rf.CommandInfos {
+			if !jemallocSymlinkCreatingCommands[ci.Name] {
+				continue
+			}
+			for _, arg := range ci.Args {
+				if strings.HasPrefix(arg, "-") {
+					continue
+				}
+				if path.Base(arg) == "libjemalloc.so" {
+					return true
+				}
+			}
 		}
 	}
 	return false

@@ -274,6 +274,32 @@ func TestStageReferencesJemallocSymlink(t *testing.T) {
 				"RUN apt-get install -y libjemalloc2 libjemalloc-dev\n",
 			want: false,
 		},
+		{
+			// Regression: a script that only echoes/finds the path must not
+			// suppress the symlink half of the fix.
+			name: "find/echo references do not count",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2\n" +
+				"RUN find / -name 'libjemalloc.so*' && echo 'see libjemalloc.so docs'\n",
+			want: false,
+		},
+		{
+			// Regression: a reference to libjemalloc.so.2 (the apt-shipped
+			// versioned library) is NOT the symlink target — basename is
+			// "libjemalloc.so.2", not "libjemalloc.so".
+			name: "reference to libjemalloc.so.2 only does not count",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2\n" +
+				"RUN ls -l /usr/lib/x86_64-linux-gnu/libjemalloc.so.2\n",
+			want: false,
+		},
+		{
+			name: "cp creating libjemalloc.so counts",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && cp /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n",
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
