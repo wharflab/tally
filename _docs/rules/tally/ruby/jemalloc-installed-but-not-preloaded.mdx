@@ -69,16 +69,20 @@ ENV MALLOC_CONF="narenas:2,background_thread:true,thp:never,dirty_decay_ms:1000,
 ## Auto-fix
 
 When the violating install command uses `apt-get` or `apt`, the rule offers a `FixSuggestion` that inserts
-two lines on the line immediately following the install `RUN`:
+the missing pieces on the line immediately following the install `RUN`:
 
 ```dockerfile
-RUN ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so
+RUN ln -sf /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so
 ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"
 ```
 
-The `$(uname -m)` form works on `amd64` and `arm64` Debian/Ubuntu images. Because the symlink target depends
-on the base image's multiarch path layout, the fix is `FixSuggestion` rather than `FixSafe` and requires
-`--fix-unsafe` to apply in batch mode.
+The `$(uname -m)` form works on `amd64` and `arm64` Debian/Ubuntu images. The fix uses `ln -sf` (force) so
+re-running on a layout that already has the symlink replaces it instead of failing the build with
+`File exists`. Because the symlink target depends on the base image's multiarch path layout, the fix is
+`FixSuggestion` rather than `FixSafe` and requires `--fix-unsafe` to apply in batch mode.
+
+If the stage already contains a `ln -s … libjemalloc.so` step and only forgot the `ENV LD_PRELOAD`, the fix
+emits **only** the missing `ENV` line — no redundant symlink.
 
 For Alpine, RHEL/Fedora, openSUSE, and other distros the canonical path differs, so no auto-fix is offered;
 the violation still fires. Add the equivalent symlink + `ENV LD_PRELOAD=…` (or `MALLOC_CONF`) for your

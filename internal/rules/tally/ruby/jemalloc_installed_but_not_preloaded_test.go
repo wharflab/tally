@@ -210,6 +210,87 @@ func TestJemallocInstalledButNotPreloadedRule_AptFix(t *testing.T) {
 	if !strings.Contains(edit.NewText, "libjemalloc.so.2") || !strings.Contains(edit.NewText, "LD_PRELOAD") {
 		t.Errorf("NewText missing canonical fix elements: %q", edit.NewText)
 	}
+	// Use idempotent `ln -sf` so a re-run on already-linked layouts replaces
+	// the symlink rather than failing the build with `File exists`.
+	if !strings.Contains(edit.NewText, "ln -sf ") {
+		t.Errorf("NewText must use idempotent `ln -sf`, got %q", edit.NewText)
+	}
+}
+
+// Regression: when the stage already creates the libjemalloc.so symlink and
+// only forgot to set LD_PRELOAD, the fix must NOT add a second `ln -s`. Adding
+// it would make `--fix-unsafe` rebuilds fail with `File exists`.
+func TestJemallocInstalledButNotPreloadedRule_FixSkipsSymlinkWhenAlreadyPresent(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ruby:3.3-slim\n" +
+		"RUN apt-get install -y libjemalloc2 \\\n" +
+		"    && ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix when stage already symlinked but missing LD_PRELOAD")
+	}
+	if len(fix.Edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(fix.Edits))
+	}
+	got := fix.Edits[0].NewText
+	if strings.Contains(got, "ln -s") {
+		t.Errorf("fix added a redundant ln -s when the stage already has one: %q", got)
+	}
+	if !strings.Contains(got, `ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"`) {
+		t.Errorf("fix must still emit the missing ENV LD_PRELOAD line: %q", got)
+	}
+}
+
+func TestStageReferencesJemallocSymlink(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		content string
+		want    bool
+	}{
+		{
+			name: "stage with ln -s libjemalloc.so",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n",
+			want: true,
+		},
+		{
+			name: "stage without symlink",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2\n",
+			want: false,
+		},
+		{
+			name: "package name libjemalloc2 alone does not count",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 libjemalloc-dev\n",
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			input := testutil.MakeLintInput(t, "Dockerfile", tt.content)
+			sf := input.Facts.Stage(input.FinalStageIndex())
+			if got := stageReferencesJemallocSymlink(sf); got != tt.want {
+				t.Errorf("stageReferencesJemallocSymlink = %v, want %v", got, tt.want)
+			}
+		})
+	}
+	t.Run("nil stage facts", func(t *testing.T) {
+		t.Parallel()
+		if got := stageReferencesJemallocSymlink(nil); got {
+			t.Errorf("stageReferencesJemallocSymlink(nil) = true, want false")
+		}
+	})
 }
 
 func TestJemallocInstalledButNotPreloadedRule_AptFixAfterMultiLineRun(t *testing.T) {
@@ -388,11 +469,11 @@ func TestJemallocViolationDetail_AptVsOther(t *testing.T) {
 	t.Parallel()
 
 	apt := jemallocViolationDetail("apt-get")
-	if !strings.Contains(apt, "ln -s /usr/lib/$(uname -m)") {
-		t.Errorf("apt detail missing canonical ln command: %q", apt)
+	if !strings.Contains(apt, "ln -sf /usr/lib/$(uname -m)") {
+		t.Errorf("apt detail missing canonical ln -sf command: %q", apt)
 	}
 	apk := jemallocViolationDetail("apk")
-	if strings.Contains(apk, "ln -s /usr/lib/$(uname -m)") {
-		t.Errorf("non-apt detail should not suggest a debian-multiarch ln command: %q", apk)
+	if strings.Contains(apk, "ln -sf /usr/lib/$(uname -m)") {
+		t.Errorf("non-apt detail should not suggest a debian-multiarch ln -sf command: %q", apk)
 	}
 }
