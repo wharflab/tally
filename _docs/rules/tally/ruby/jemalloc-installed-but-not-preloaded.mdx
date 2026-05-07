@@ -1,0 +1,92 @@
+---
+title: "tally/ruby/jemalloc-installed-but-not-preloaded"
+description: "Final image installs a jemalloc package but does not preload it via LD_PRELOAD or MALLOC_CONF."
+---
+
+Final image installs a jemalloc package but does not preload it via `LD_PRELOAD` or `MALLOC_CONF`.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Performance |
+| Default | Enabled |
+| Auto-fix | Yes (`apt`/`apt-get` only, suggestion) |
+
+## Description
+
+Long-running Rails worker processes fragment glibc malloc heaps over time, which manifests as steadily growing
+RSS — the canonical "Rails memory leak" that often turns out to be allocator behavior. The Ruby community
+has converged on jemalloc as the workaround: the Rails 7.1+ generator, Mastodon, GitLab, Discourse, and most
+production Rails Dockerfiles either link `libjemalloc.so` and set `LD_PRELOAD`, or set jemalloc-specific
+`MALLOC_CONF` knobs.
+
+Installing a jemalloc package without doing one of those means glibc malloc is still in use — the package
+takes ~350 KiB of disk and never loads. This rule fires when a final stage installs `libjemalloc1`,
+`libjemalloc2`, `libjemalloc-dev` (Debian/Ubuntu) or `jemalloc`, `jemalloc-dev` (Alpine, RHEL/Fedora, etc.)
+without a matching `ENV LD_PRELOAD=…jemalloc…` or `ENV MALLOC_CONF=…` carrying a jemalloc-specific knob.
+
+The rule recognizes any of the following as evidence jemalloc is loaded:
+
+- `LD_PRELOAD` whose value contains `jemalloc` (case-insensitive).
+- `MALLOC_CONF` whose value contains any of these jemalloc-only options:
+  `narenas:`, `background_thread:`, `dirty_decay_ms:`, `muzzy_decay_ms:`, `thp:`.
+
+Stages explicitly named `dev`, `development`, `test`, `testing`, `ci`, or `debug` are skipped, as are
+non-final stages and Windows-based stages.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM ruby:3.3-slim
+RUN apt-get update && apt-get install -y --no-install-recommends libjemalloc2 \
+    && rm -rf /var/lib/apt/lists/*
+CMD ["bin/rails", "server"]
+```
+
+### After
+
+The Rails-generator-style fix links the architecture-correct `libjemalloc.so.2` into a stable path and
+preloads it:
+
+```dockerfile
+FROM ruby:3.3-slim
+RUN apt-get update && apt-get install -y --no-install-recommends libjemalloc2 \
+    && rm -rf /var/lib/apt/lists/*
+RUN ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so
+ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"
+CMD ["bin/rails", "server"]
+```
+
+Mastodon's pattern — setting `MALLOC_CONF` to a tuning string — also satisfies the rule, because those knobs
+are only honored by jemalloc:
+
+```dockerfile
+ENV MALLOC_CONF="narenas:2,background_thread:true,thp:never,dirty_decay_ms:1000,muzzy_decay_ms:0"
+```
+
+## Auto-fix
+
+When the violating install command uses `apt-get` or `apt`, the rule offers a `FixSuggestion` that inserts
+two lines on the line immediately following the install `RUN`:
+
+```dockerfile
+RUN ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so
+ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"
+```
+
+The `$(uname -m)` form works on `amd64` and `arm64` Debian/Ubuntu images. Because the symlink target depends
+on the base image's multiarch path layout, the fix is `FixSuggestion` rather than `FixSafe` and requires
+`--fix-unsafe` to apply in batch mode.
+
+For Alpine, RHEL/Fedora, openSUSE, and other distros the canonical path differs, so no auto-fix is offered;
+the violation still fires. Add the equivalent symlink + `ENV LD_PRELOAD=…` (or `MALLOC_CONF`) for your
+distro.
+
+## References
+
+- [Rails 7.1 Dockerfile generator template](https://github.com/rails/rails/blob/main/railties/lib/rails/generators/rails/app/templates/Dockerfile.tt)
+- [Mastodon Dockerfile](https://github.com/mastodon/mastodon/blob/main/Dockerfile) — `MALLOC_CONF` tuning
+- [jemalloc tuning options](https://jemalloc.net/jemalloc.3.html#tuning)
+- [Nate Berkopec — Halve Your Memory Usage With These 12 Weird Tricks](https://www.speedshop.co/2017/12/04/malloc-doubles-ruby-memory.html)

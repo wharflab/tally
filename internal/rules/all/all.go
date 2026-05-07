@@ -15,5 +15,6 @@ import (
 	_ "github.com/wharflab/tally/internal/rules/tally/labels"
 	_ "github.com/wharflab/tally/internal/rules/tally/php"
 	_ "github.com/wharflab/tally/internal/rules/tally/powershell"
+	_ "github.com/wharflab/tally/internal/rules/tally/ruby"
 	_ "github.com/wharflab/tally/internal/rules/tally/windows"
 )

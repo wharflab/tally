@@ -1656,6 +1656,36 @@ severity = "warning"
 				)...),
 			wantApplied: 2,
 		},
+		// Ruby: jemalloc-installed-but-not-preloaded inserts the canonical
+		// `RUN ln -s … && ENV LD_PRELOAD=…` pair on the line *after* the
+		// install RUN. Fix is FixSuggestion safety, so --fix-unsafe is needed
+		// to apply it in batch mode.
+		{
+			name: "ruby-jemalloc-installed-but-not-preloaded-apt-fix",
+			input: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get update && apt-get install -y --no-install-recommends libjemalloc2 \\\n" +
+				"    && rm -rf /var/lib/apt/lists/*\n" +
+				"CMD [\"bin/rails\", \"server\"]\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules("tally/ruby/jemalloc-installed-but-not-preloaded")...),
+			wantApplied: 1,
+		},
+		// Ruby: jemalloc fix composed with sort-packages on the same install
+		// RUN. The jemalloc fix inserts a brand-new RUN/ENV block on the line
+		// after the install RUN, while sort-packages reorders tokens inside
+		// the install RUN itself — disjoint edit ranges, so both apply in a
+		// single --fix pass.
+		{
+			name: "ruby-jemalloc-with-sort-packages",
+			input: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 curl ca-certificates\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules(
+					"tally/ruby/jemalloc-installed-but-not-preloaded",
+					"tally/sort-packages",
+				)...),
+			wantApplied: 2,
+		},
 		// Full composition: two secret mounts (insertion) + two cache mounts
 		// (insertion) + cleanup removal (npm cache clean, --no-cache-dir)
 		// on the same RUN in a single --fix pass.

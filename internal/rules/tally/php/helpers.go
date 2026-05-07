@@ -11,6 +11,7 @@ import (
 	"github.com/wharflab/tally/internal/rules/runcheck"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
+	"github.com/wharflab/tally/internal/stagename"
 )
 
 const (
@@ -30,29 +31,12 @@ var phpExtensionCommandNames = []string{
 	cmdPecl,
 }
 
-var nonProductionStageTokens = []string{"dev", "development", "test", "testing", "ci", "debug"}
-
+// stageLooksLikeDev is a thin wrapper around stagename.LooksLikeDev so the PHP
+// rules continue to read naturally without leaking the import path. The
+// classification itself lives in internal/stagename so other rule packages
+// (e.g. tally/ruby) can share it.
 func stageLooksLikeDev(name string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(name))
-	if normalized == "" {
-		return false
-	}
-
-	parts := strings.FieldsFunc(normalized, func(r rune) bool {
-		switch r {
-		case '-', '_', '.', '/', ':':
-			return true
-		default:
-			return false
-		}
-	})
-	if len(parts) == 0 {
-		parts = []string{normalized}
-	}
-
-	return slices.ContainsFunc(parts, func(part string) bool {
-		return slices.Contains(nonProductionStageTokens, part)
-	})
+	return stagename.LooksLikeDev(name)
 }
 
 func composerNoDevEnabled(env facts.EnvFacts) bool {

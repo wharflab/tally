@@ -317,6 +317,13 @@ func lintCases(t *testing.T) []lintCase {
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/php/enable-opcache-in-production")...),
 			wantExit: 1,
 		},
+		{
+			name: "ruby-jemalloc-installed-but-not-preloaded",
+			dir:  "ruby-jemalloc-installed-but-not-preloaded",
+			args: append([]string{"--format", "json"},
+				mustSelectRules("tally/ruby/jemalloc-installed-but-not-preloaded")...),
+			wantExit: 1,
+		},
 
 		// Windows: RUN --mount not supported
 		{
