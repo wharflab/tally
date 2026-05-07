@@ -166,6 +166,12 @@
             ]
           },
           {
+            "group": "Ruby",
+            "pages": [
+              "rules/tally/ruby/jemalloc-installed-but-not-preloaded"
+            ]
+          },
+          {
             "group": "PowerShell",
             "pages": [
               "rules/powershell/PowerShell",
