@@ -190,8 +190,9 @@ func mallocConfHasJemallocKnob(value string) bool {
 	if value == "" {
 		return false
 	}
+	lower := strings.ToLower(value)
 	for _, knob := range jemallocMallocConfKnobs {
-		if strings.Contains(value, knob) {
+		if strings.Contains(lower, knob) {
 			return true
 		}
 	}

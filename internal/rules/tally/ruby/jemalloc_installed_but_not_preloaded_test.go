@@ -369,6 +369,8 @@ func TestMallocConfHasJemallocKnob(t *testing.T) {
 		{name: "narenas only", value: "narenas:2", want: true},
 		{name: "full mastodon-style", value: "narenas:2,background_thread:true,thp:never,dirty_decay_ms:1000,muzzy_decay_ms:0", want: true},
 		{name: "thp alone", value: "thp:never", want: true},
+		{name: "uppercased knob (case-insensitive)", value: "NARENAS:2", want: true},
+		{name: "mixed case knob", value: "Background_Thread:true", want: true},
 		{name: "no jemalloc keys", value: "M_MMAP_MAX=0", want: false},
 		{name: "empty", value: "", want: false},
 	}
