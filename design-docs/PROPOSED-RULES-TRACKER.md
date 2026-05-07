@@ -3,7 +3,7 @@
 Rules described in design docs but **not yet implemented**.
 Cross-referenced against the 52 rules currently in `internal/rules/tally/` and `RULES.md`.
 
-> Last updated: 2026-04-03
+> Last updated: 2026-05-07
 
 ---
 
@@ -55,6 +55,32 @@ Source: [35-php-container-rules.md](35-php-container-rules.md)
 | `tally/php/prefer-non-root-runtime` | Info | Suggest running as non-root (www-data) in production | |
 
 **Already implemented (3):** `composer-no-dev-in-production`, `no-xdebug-in-final-image`, `enable-opcache-in-production`
+
+---
+
+## Ruby Container Rules (`tally/ruby/*`)
+
+Source: [43-ruby-on-docker.md](43-ruby-on-docker.md)
+
+| Rule ID | Severity | Description | Notes |
+|---------|----------|-------------|-------|
+| `tally/ruby/jemalloc-installed-but-not-preloaded` | Warning | `libjemalloc` installed but `LD_PRELOAD`/`MALLOC_CONF` never set | |
+| `tally/ruby/asset-precompile-without-dummy-key` | Warning | `rails assets:precompile` without `SECRET_KEY_BASE_DUMMY=1` | |
+| `tally/ruby/bootsnap-precompile-without-j1` | Warning | `bootsnap precompile` without `-j 1` flag (QEMU multi-arch crash) | |
+| `tally/ruby/missing-bundle-deployment` | Warning | Production `bundle install` without `BUNDLE_DEPLOYMENT=1` | |
+| `tally/ruby/missing-bundle-without-development` | Warning | Production `bundle install` without `BUNDLE_WITHOUT="development"` | |
+| `tally/ruby/redundant-bundler-install` | Info | `gem install bundler` redundant on official `ruby:*` base | |
+| `tally/ruby/leftover-bundler-cache` | Info | `bundle install` not followed by canonical Bundler cache cleanup | |
+| `tally/ruby/prefer-bundler-cache-mount` | Info | `bundle install` without BuildKit `RUN --mount=type=cache` | |
+| `tally/ruby/eol-ruby-version` | Warning | EOL Ruby base image (2.x, 3.0, 3.1) | Needs resolver for EOL data |
+| `tally/ruby/state-paths-not-writable-as-non-root` | Warning | Non-root `USER` but `tmp`/`log`/`storage`/`db` not chowned | |
+| `tally/ruby/secrets-in-arg-or-env` | Warning | `SECRET_KEY_BASE`/`RAILS_MASTER_KEY` in `ARG`/`ENV` (history leak) | |
+| `tally/ruby/yjit-not-enabled-on-supported-runtime` | Suggestion | Ruby 3.3+ web/worker image without `RUBY_YJIT_ENABLE=1` | |
+| `tally/ruby/deprecated-bundler-install-flags` | Info | `bundle install --without`/`--deployment`/`--path` (deprecated 2.x flags) | |
+| `tally/ruby/prefer-gemfile-bind-mounts` | Info | Recommend `RUN --mount=type=bind` for `Gemfile`/`Gemfile.lock` over `COPY` | Educational |
+| `tally/ruby/healthcheck-rails-up-endpoint` | Suggestion | Promote `HEALTHCHECK CMD curl -fsS .../up` (Rails 7.1+ built-in) | Educational |
+| `tally/ruby/prefer-secret-mounts-for-build-credentials` | Info | Recommend `RUN --mount=type=secret` for `BUNDLE_GITHUB__COM`/`RAILS_MASTER_KEY` | Educational |
+| `tally/ruby/prefer-network-none-install` | Suggestion | Promote `bundle cache` + `RUN --network=none bundle install --local` split | Educational |
 
 ---
 
@@ -125,9 +151,10 @@ Source: [28-shellcheck-go-reimplementation-bridge-sc1040.md](28-shellcheck-go-re
 | GPU | 14 | 6 | **8** |
 | STOPSIGNAL | 8 | 3 | **5** |
 | PHP | 9 | 1 | **8** |
+| Ruby | 17 | 0 | **17** |
 | Windows | 6 | 3 | **3** |
 | PowerShell | 3 | 3 | **0** |
 | USER / Privilege | 7 | 4 | **3** |
 | BuildKit Phase 2 | 3 | 0 | **3** |
 | ShellCheck Native | 1 | 0 | **1** |
-| **Total** | **51** | **19** | **32** |
+| **Total** | **68** | **19** | **49** |
