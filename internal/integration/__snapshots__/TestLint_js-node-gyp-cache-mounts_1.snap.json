@@ -1,0 +1,59 @@
+{
+  "files": [
+    {
+      "file": "testdata/js-node-gyp-cache-mounts/Dockerfile",
+      "violations": [
+        {
+          "detail": "stage installs native build toolchain package python3; add --mount=type=cache,target=/root/.npm,id=npm, --mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked, --mount=type=tmpfs,target=/tmp",
+          "docUrl": "https://tally.wharflab.com/rules/tally/js/node-gyp-cache-mounts/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "testdata/js-node-gyp-cache-mounts/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "native Node addon builds should cache node-gyp headers",
+          "rule": "tally/js/node-gyp-cache-mounts",
+          "severity": "info",
+          "sourceCode": "RUN npm ci --omit=dev",
+          "suggestedFix": {
+            "description": "Add node-gyp native build cache mount(s)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 4,
+                    "line": 3
+                  },
+                  "file": "testdata/js-node-gyp-cache-mounts/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 3
+                  }
+                },
+                "newText": "--mount=type=cache,target=/root/.npm,id=npm --mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked --mount=type=tmpfs,target=/tmp NPM_CONFIG_DEVDIR=/root/.cache/node-gyp "
+              }
+            ],
+            "priority": 91,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

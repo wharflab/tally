@@ -820,6 +820,12 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 		{
+			name:     "js-node-gyp-cache-mounts",
+			dir:      "js-node-gyp-cache-mounts",
+			args:     append([]string{"--format", "json"}, mustSelectRules("tally/js/node-gyp-cache-mounts")...),
+			wantExit: 1,
+		},
+		{
 			name:     "require-secret-mounts",
 			dir:      "require-secret-mounts",
 			args:     append([]string{"--format", "json"}, mustSelectRules("tally/require-secret-mounts")...),
