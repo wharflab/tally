@@ -5,6 +5,15 @@ For repo layout, commands, and config details, start with `AGENTS.md`.
 The repo also includes an LSP server (`internal/lsp/`), IDE integrations (`_integrations/`),
 and a WASM-compiled shellcheck (`internal/shellcheck/`).
 
+## Tenets
+
+- Tally has three equally important pillars: correctness, reproducibility, and maintainability.
+- Tally has an education mission for both human and AI engineers - we want to help users understand modern Dockerfile features, best practices for
+  containerization, and what hermeticity means in practice. We are not afraid to suggest brand new patterns if they are well-documented and have a
+  clear rationale, even if they are not yet universally established.
+- Tally is a linting and fixing tool where heuristic fixes are a top priority. We believe a linter that doesn't propose a fix misses an opportunity
+  to help users and will ultimately be ignored. That's why we have AI (ACP) fixes for complex cases where deterministic heuristics aren't enough.
+
 ## Defaults
 
 - ALWAYS add/adjust a test when behavior changes.
