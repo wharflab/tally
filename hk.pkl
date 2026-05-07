@@ -75,7 +75,7 @@ local preCommitSteps = new Mapping<String, Step> {
   ["rumdl"] {
     glob = List("**/*.{md,mdx}")
     exclude = List("**/__snapshots__/**")
-    fix = "uv tool run rumdl==0.1.89 fmt {{files}}"
+    fix = "uv tool run rumdl==0.1.90 fmt {{files}}"
   }
   ["mintlify-docs-verify"] {
     glob = List("_docs/**")
