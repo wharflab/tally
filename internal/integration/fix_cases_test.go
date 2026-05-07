@@ -835,6 +835,18 @@ RUN printf 'zend_extension=opcache\n[opcache]\nopcache.enable=1\n' > /etc/app/ph
 			wantApplied: 4,
 		},
 		{
+			name: "js-node-gyp-cache-mounts-with-package-cache-mounts",
+			input: "FROM node:22\n" +
+				"RUN apt-get update && apt-get install -y python3 make g++\n" +
+				"RUN npm ci --omit=dev\n",
+			args: append([]string{"--fix", "--fix-unsafe", "--fail-level", "none"},
+				mustSelectRules(
+					"tally/js/node-gyp-cache-mounts",
+					"tally/prefer-package-cache-mounts",
+				)...),
+			wantApplied: 3,
+		},
+		{
 			name: "prefer-package-cache-mounts-no-cache-flags",
 			input: "FROM python:3.13\n" +
 				"RUN pip install --no-cache-dir -r requirements.txt && pip cache purge\n" +
