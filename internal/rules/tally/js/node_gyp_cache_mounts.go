@@ -27,7 +27,18 @@ const (
 	defaultNodeGypDevDir          = "/root/.cache/node-gyp"
 	preferPackageCacheMountsCode  = rules.TallyRulePrefix + "prefer-package-cache-mounts"
 	nodeGypDevDirEnvAssignmentKey = "NPM_CONFIG_DEVDIR"
+	nodeGypPackageConfigDevDirKey = "npm_package_config_node_gyp_devdir"
+	nodeGypLowerDevDirEnvKey      = "npm_config_devdir"
+	npmManager                    = "npm"
+	pnpmManager                   = "pnpm"
+	yarnManager                   = "yarn"
 )
+
+var nodeGypDevDirEnvKeyPrecedence = []string{
+	nodeGypPackageConfigDevDirKey,
+	nodeGypDevDirEnvAssignmentKey,
+	nodeGypLowerDevDirEnvKey,
+}
 
 var nativeToolchainPackages = map[string]bool{
 	"build-base":      true,
@@ -203,7 +214,7 @@ func isNativeAddonCommand(cmd shell.CommandInfo) bool {
 	switch cmd.Name {
 	case "node-gyp", "node-pre-gyp", "prebuild-install":
 		return true
-	case "npm", "pnpm", "yarn":
+	case npmManager, pnpmManager, yarnManager:
 		return cmd.Subcommand == "rebuild"
 	default:
 		return false
@@ -291,43 +302,40 @@ func jsInstallOrRebuildManager(runFacts *facts.RunFacts) (string, bool) {
 
 func jsInstallManager(cmd shell.CommandInfo) (string, bool) {
 	switch cmd.Name {
-	case "npm":
+	case npmManager:
 		if cmd.HasAnyArg("ci", "install", "i", "rebuild") {
-			return "npm", true
+			return npmManager, true
 		}
-	case "pnpm":
+	case pnpmManager:
 		if cmd.HasAnyArg("install", "i", "rebuild") {
-			return "pnpm", true
+			return pnpmManager, true
 		}
-	case "yarn":
+	case yarnManager:
 		if cmd.HasAnyArg("install", "add", "rebuild") { //nolint:customlint // "add" is a package manager subcommand, not Dockerfile ADD.
-			return "yarn", true
+			return yarnManager, true
 		}
 	}
 	return "", false
 }
 
 func configuredNodeGypDevDir(env facts.EnvFacts, workdir string) (string, bool) {
-	for key, value := range env.Values {
-		if !isNodeGypDevDirEnvKey(key) {
-			continue
+	for _, key := range nodeGypDevDirEnvKeyPrecedence {
+		if devdir, ok := normalizeNodeGypDevDir(env.Values[key], workdir); ok {
+			return devdir, true
 		}
-		value = strings.Trim(strings.TrimSpace(value), `"'`)
-		if value == "" || strings.Contains(value, "$") {
-			continue
-		}
-		if !path.IsAbs(value) {
-			value = path.Join(workdir, value)
-		}
-		return path.Clean(value), true
 	}
 	return defaultNodeGypDevDir, false
 }
 
-func isNodeGypDevDirEnvKey(key string) bool {
-	return key == "npm_package_config_node_gyp_devdir" ||
-		strings.EqualFold(key, "NPM_CONFIG_DEVDIR") ||
-		strings.EqualFold(key, "npm_config_devdir")
+func normalizeNodeGypDevDir(value, workdir string) (string, bool) {
+	value = strings.Trim(strings.TrimSpace(value), `"'`)
+	if value == "" || strings.Contains(value, "$") {
+		return "", false
+	}
+	if !path.IsAbs(value) {
+		value = path.Join(workdir, value)
+	}
+	return path.Clean(value), true
 }
 
 func runScriptHasNodeGypDevDir(script string) bool {
@@ -505,7 +513,7 @@ func buildNodeGypDevDirEnvEdit(
 		return rules.TextEdit{}, false
 	}
 
-	cmds, runStartLine := runcheck.FindCommands(run, shellVariant, sm, "npm", "pnpm", "yarn")
+	cmds, runStartLine := runcheck.FindCommands(run, shellVariant, sm, npmManager, pnpmManager, yarnManager)
 	if runStartLine == 0 {
 		return rules.TextEdit{}, false
 	}

@@ -157,6 +157,24 @@ RUN npm rebuild sharp
 	}
 }
 
+func TestConfiguredNodeGypDevDirUsesDeterministicPrecedence(t *testing.T) {
+	t.Parallel()
+
+	env := facts.EnvFacts{Values: map[string]string{
+		nodeGypPackageConfigDevDirKey: "pkg-cache/node-gyp",
+		nodeGypDevDirEnvAssignmentKey: "/cache/from-npm-config",
+		nodeGypLowerDevDirEnvKey:      "/cache/from-lower-npm-config",
+	}}
+
+	got, ok := configuredNodeGypDevDir(env, "/app")
+	if !ok {
+		t.Fatal("configuredNodeGypDevDir ok = false, want true")
+	}
+	if got != "/app/pkg-cache/node-gyp" {
+		t.Fatalf("configuredNodeGypDevDir = %q, want /app/pkg-cache/node-gyp", got)
+	}
+}
+
 func TestNodeGypCacheMountsRule_Fix(t *testing.T) {
 	t.Parallel()
 
@@ -186,10 +204,13 @@ RUN npm ci
 	}
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
-	want := `FROM node:20
-RUN apt-get update && apt-get install -y python3 make g++
-RUN --mount=type=cache,target=/root/.npm,id=npm --mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked --mount=type=tmpfs,target=/tmp NPM_CONFIG_DEVDIR=/root/.cache/node-gyp npm ci
-`
+	want := strings.Join([]string{
+		"FROM node:20",
+		"RUN apt-get update && apt-get install -y python3 make g++",
+		"RUN --mount=type=cache,target=/root/.npm,id=npm " +
+			"--mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked " +
+			"--mount=type=tmpfs,target=/tmp NPM_CONFIG_DEVDIR=/root/.cache/node-gyp npm ci",
+	}, "\n") + "\n"
 	if got != want {
 		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
 	}
@@ -218,10 +239,14 @@ RUN --network=none npm ci
 	}
 
 	got := string(result.Changes["Dockerfile"].ModifiedContent)
-	want := `FROM node:20
-RUN apt-get update && apt-get install -y python3 make g++
-RUN --mount=type=cache,target=/root/.npm,id=npm --mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked --mount=type=tmpfs,target=/tmp --network=none NPM_CONFIG_DEVDIR=/root/.cache/node-gyp npm ci
-`
+	want := strings.Join([]string{
+		"FROM node:20",
+		"RUN apt-get update && apt-get install -y python3 make g++",
+		"RUN --mount=type=cache,target=/root/.npm,id=npm " +
+			"--mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked " +
+			"--mount=type=tmpfs,target=/tmp --network=none " +
+			"NPM_CONFIG_DEVDIR=/root/.cache/node-gyp npm ci",
+	}, "\n") + "\n"
 	if got != want {
 		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
 	}
@@ -255,10 +280,12 @@ RUN npm ci
 	if strings.Contains(got, "/root/.npm") {
 		t.Fatalf("fixed content unexpectedly contains package-manager cache mount:\n%s", got)
 	}
-	want := `FROM node:20
-RUN apt-get update && apt-get install -y python3 make g++
-RUN --mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked --mount=type=tmpfs,target=/tmp NPM_CONFIG_DEVDIR=/root/.cache/node-gyp npm ci
-`
+	want := strings.Join([]string{
+		"FROM node:20",
+		"RUN apt-get update && apt-get install -y python3 make g++",
+		"RUN --mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked " +
+			"--mount=type=tmpfs,target=/tmp NPM_CONFIG_DEVDIR=/root/.cache/node-gyp npm ci",
+	}, "\n") + "\n"
 	if got != want {
 		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
 	}
