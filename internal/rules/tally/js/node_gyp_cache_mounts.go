@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"mvdan.cc/sh/v3/syntax"
 
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
@@ -135,7 +136,10 @@ func (r *NodeGypCacheMountsRule) checkStage(
 			continue
 		}
 
-		devdir, devdirConfigured := configuredNodeGypDevDir(runFacts.Env, runFacts.Workdir)
+		devdir, devdirConfigured, devdirKnown := nodeGypDevDirForRun(runFacts)
+		if !devdirKnown {
+			continue
+		}
 		existing := runmount.GetMounts(runFacts.Run)
 		if hasNodeGypHeaderCache(existing, devdir) {
 			continue
@@ -318,6 +322,17 @@ func jsInstallManager(cmd shell.CommandInfo) (string, bool) {
 	return "", false
 }
 
+func nodeGypDevDirForRun(runFacts *facts.RunFacts) (devdir string, configured, known bool) {
+	if runFacts == nil {
+		return defaultNodeGypDevDir, false, true
+	}
+	if devdir, found, ok := inlineNodeGypDevDir(runFacts.CommandScript, runFacts.Shell.Variant, runFacts.Workdir); found {
+		return devdir, true, ok
+	}
+	devdir, configured = configuredNodeGypDevDir(runFacts.Env, runFacts.Workdir)
+	return devdir, configured, true
+}
+
 func configuredNodeGypDevDir(env facts.EnvFacts, workdir string) (string, bool) {
 	for _, key := range nodeGypDevDirEnvKeyPrecedence {
 		if devdir, ok := normalizeNodeGypDevDir(env.Values[key], workdir); ok {
@@ -338,10 +353,115 @@ func normalizeNodeGypDevDir(value, workdir string) (string, bool) {
 	return path.Clean(value), true
 }
 
+func inlineNodeGypDevDir(script string, variant shell.Variant, workdir string) (devdir string, found, known bool) {
+	if strings.TrimSpace(script) == "" || !variant.SupportsPOSIXShellAST() {
+		return "", false, true
+	}
+
+	parser := syntax.NewParser(
+		syntax.Variant(nodeGypSyntaxVariant(variant)),
+		syntax.KeepComments(false),
+	)
+	prog, err := parser.Parse(strings.NewReader(script), "")
+	if err != nil {
+		return "", runScriptHasNodeGypDevDir(script), !runScriptHasNodeGypDevDir(script)
+	}
+
+	known = true
+	syntax.Walk(prog, func(node syntax.Node) bool {
+		call, ok := node.(*syntax.CallExpr)
+		if !ok || !callIsJSInstallManager(call) {
+			return true
+		}
+		if value, ok, valueKnown := callNodeGypDevDir(call, workdir); ok {
+			devdir = value
+			found = true
+			known = valueKnown
+			return false
+		}
+		return true
+	})
+	return devdir, found, known
+}
+
+func nodeGypSyntaxVariant(variant shell.Variant) syntax.LangVariant {
+	switch variant {
+	case shell.VariantBash:
+		return syntax.LangBash
+	case shell.VariantPOSIX:
+		return syntax.LangPOSIX
+	case shell.VariantMksh:
+		return syntax.LangMirBSDKorn
+	case shell.VariantBats:
+		return syntax.LangBats
+	case shell.VariantZsh:
+		return syntax.LangZsh
+	case shell.VariantPowerShell, shell.VariantCmd, shell.VariantUnknown:
+		return syntax.LangBash
+	default:
+		return syntax.LangBash
+	}
+}
+
+func callIsJSInstallManager(call *syntax.CallExpr) bool {
+	if call == nil || len(call.Args) == 0 {
+		return false
+	}
+	name := path.Base(call.Args[0].Lit())
+	if name == "" {
+		return false
+	}
+
+	cmd := shell.CommandInfo{Name: name}
+	for _, arg := range call.Args[1:] {
+		lit := arg.Lit()
+		if lit == "" {
+			continue
+		}
+		cmd.Args = append(cmd.Args, lit)
+		if cmd.Subcommand == "" && !strings.HasPrefix(lit, "-") {
+			cmd.Subcommand = lit
+		}
+	}
+	_, ok := jsInstallManager(cmd)
+	return ok
+}
+
+func callNodeGypDevDir(call *syntax.CallExpr, workdir string) (string, bool, bool) {
+	for _, key := range nodeGypDevDirEnvKeyPrecedence {
+		for _, assign := range call.Assigns {
+			if assign.Name == nil || assign.Name.Value != key {
+				continue
+			}
+			if assign.Append || assign.Naked || assign.Index != nil || assign.Array != nil || assign.Value == nil {
+				return "", true, false
+			}
+			value, ok := renderShellWord(assign.Value)
+			if !ok {
+				return "", true, false
+			}
+			devdir, ok := normalizeNodeGypDevDir(value, workdir)
+			return devdir, true, ok
+		}
+	}
+	return "", false, true
+}
+
+func renderShellWord(word *syntax.Word) (string, bool) {
+	if word == nil {
+		return "", false
+	}
+	var b strings.Builder
+	if err := syntax.NewPrinter().Print(&b, word); err != nil {
+		return "", false
+	}
+	return b.String(), true
+}
+
 func runScriptHasNodeGypDevDir(script string) bool {
 	script = strings.ToLower(script)
-	return strings.Contains(script, "npm_package_config_node_gyp_devdir=") ||
-		strings.Contains(script, "npm_config_devdir=")
+	return strings.Contains(script, nodeGypPackageConfigDevDirKey+"=") ||
+		strings.Contains(script, nodeGypLowerDevDirEnvKey+"=")
 }
 
 func hasNodeGypHeaderCache(existing []*instructions.Mount, devdir string) bool {
@@ -407,11 +527,11 @@ func packageManagerCacheMount(
 
 func packageManagerCacheTarget(manager string, overrides map[string]string) (target, id string, ok bool) {
 	switch manager {
-	case "npm":
+	case npmManager:
 		target = defaultNpmCachePath
-	case "pnpm":
+	case pnpmManager:
 		target = defaultPnpmStorePath
-	case "yarn":
+	case yarnManager:
 		target = defaultYarnCachePath
 	default:
 		return "", "", false
