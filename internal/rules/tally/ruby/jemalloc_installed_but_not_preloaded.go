@@ -133,7 +133,7 @@ func (r *JemallocInstalledButNotPreloadedRule) checkStage(
 				WithDocURL(meta.DocURL).
 				WithDetail(jemallocViolationDetail(ic.Manager))
 
-			if fix := buildJemallocPreloadFix(file, runFacts, ic, sm, meta.FixPriority); fix != nil {
+			if fix := buildJemallocPreloadFix(file, sf, runFacts, ic, sm, meta.FixPriority); fix != nil {
 				v = v.WithSuggestedFix(fix)
 			}
 			violations = append(violations, v)
@@ -146,7 +146,7 @@ func jemallocViolationDetail(manager string) string {
 	if aptPackageManagers[strings.ToLower(manager)] {
 		return "Installing libjemalloc only adds the package to the image; it is not loaded by Ruby unless " +
 			"LD_PRELOAD points at libjemalloc.so or MALLOC_CONF carries jemalloc-specific knobs. " +
-			"Add `ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so` to the " +
+			"Add `ln -sf /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so` to the " +
 			"install RUN, then set `ENV LD_PRELOAD=\"/usr/local/lib/libjemalloc.so\"` so long-lived Rails workers " +
 			"actually use jemalloc."
 	}
@@ -249,14 +249,28 @@ func jemallocViolationLocation(
 	return rules.NewLocationFromRanges(file, runFacts.Run.Location())
 }
 
-// buildJemallocPreloadFix returns the canonical Rails-style fix:
-// insert a new `RUN ln -s … && ENV LD_PRELOAD=…` block on the line *after*
-// the install RUN. Only emitted for the apt-family case where the path layout
-// is well-known. The edit is a single zero-width insertion at column 0 of
-// the line following the install RUN, so it does not collide with content
-// edits other rules might apply to the install RUN itself.
+// buildJemallocPreloadFix returns the canonical Rails-style fix: insert a new
+// `RUN ln -sf … && ENV LD_PRELOAD=…` block on the line *after* the install RUN.
+// Only emitted for the apt-family case where the path layout is well-known.
+// The edit is a single zero-width insertion at column 0 of the line following
+// the install RUN, so it does not collide with content edits other rules might
+// apply to the install RUN itself.
+//
+// Two compositional concerns:
+//
+//  1. The rule also fires when a stage already runs `ln -s ... libjemalloc.so`
+//     and only forgot the `ENV LD_PRELOAD`. In that case adding a second
+//     unconditional `ln -s` would fail with `File exists` once the user runs
+//     `--fix-unsafe`. The fix detects an existing reference to the canonical
+//     `libjemalloc.so` shared object in the stage and emits only the missing
+//     `ENV` line in that case.
+//  2. As a defense in depth even when no symlink reference is detected (e.g.
+//     a base-image inherited link the rule cannot see), the emitted command
+//     uses `ln -sf` so a re-run on already-linked layouts replaces rather than
+//     fails.
 func buildJemallocPreloadFix(
 	file string,
+	sf *facts.StageFacts,
 	runFacts *facts.RunFacts,
 	ic shell.InstallCommand,
 	sm *sourcemap.SourceMap,
@@ -279,11 +293,19 @@ func buildJemallocPreloadFix(
 	}
 
 	insertLine := endLine + 1
-	const fixText = `RUN ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so
+	var fixText, description string
+	if stageReferencesJemallocSymlink(sf) {
+		fixText = `ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"
+`
+		description = "Set LD_PRELOAD so the jemalloc symlink already in this stage is actually loaded"
+	} else {
+		fixText = `RUN ln -sf /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so
 ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"
 `
+		description = "Symlink libjemalloc.so and set LD_PRELOAD so jemalloc is actually loaded"
+	}
 	return &rules.SuggestedFix{
-		Description: "Symlink libjemalloc.so and set LD_PRELOAD so jemalloc is actually loaded",
+		Description: description,
 		Safety:      rules.FixSuggestion,
 		Priority:    priority,
 		IsPreferred: true,
@@ -292,6 +314,27 @@ ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"
 			NewText:  fixText,
 		}},
 	}
+}
+
+// stageReferencesJemallocSymlink reports whether the stage already contains a
+// RUN that references the libjemalloc.so shared object — typically a `ln -s`
+// step that creates the canonical symlink. Distro package names (libjemalloc2,
+// libjemalloc1, libjemalloc-dev) do not contain ".so", so the substring check
+// does not false-fire on the install line itself.
+func stageReferencesJemallocSymlink(sf *facts.StageFacts) bool {
+	if sf == nil {
+		return false
+	}
+	for _, rf := range sf.Runs {
+		if rf == nil {
+			continue
+		}
+		if strings.Contains(rf.SourceScript, "libjemalloc.so") ||
+			strings.Contains(rf.CommandScript, "libjemalloc.so") {
+			return true
+		}
+	}
+	return false
 }
 
 func init() {

@@ -4,7 +4,7 @@
       "file": "testdata/ruby-jemalloc-installed-but-not-preloaded/Dockerfile",
       "violations": [
         {
-          "detail": "Installing libjemalloc only adds the package to the image; it is not loaded by Ruby unless LD_PRELOAD points at libjemalloc.so or MALLOC_CONF carries jemalloc-specific knobs. Add `ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so` to the install RUN, then set `ENV LD_PRELOAD=\"/usr/local/lib/libjemalloc.so\"` so long-lived Rails workers actually use jemalloc.",
+          "detail": "Installing libjemalloc only adds the package to the image; it is not loaded by Ruby unless LD_PRELOAD points at libjemalloc.so or MALLOC_CONF carries jemalloc-specific knobs. Add `ln -sf /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so` to the install RUN, then set `ENV LD_PRELOAD=\"/usr/local/lib/libjemalloc.so\"` so long-lived Rails workers actually use jemalloc.",
           "docUrl": "https://tally.wharflab.com/rules/tally/ruby/jemalloc-installed-but-not-preloaded/",
           "location": {
             "end": {
@@ -36,7 +36,7 @@
                     "line": 28
                   }
                 },
-                "newText": "RUN ln -s /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\nENV LD_PRELOAD=\"/usr/local/lib/libjemalloc.so\"\n"
+                "newText": "RUN ln -sf /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\nENV LD_PRELOAD=\"/usr/local/lib/libjemalloc.so\"\n"
               }
             ],
             "isPreferred": true,
