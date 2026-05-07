@@ -81,9 +81,9 @@ The official sources are unusually useful for this namespace:
   runtime images.
   Source: [Node.js globals](https://nodejs.org/docs/latest/api/globals.html)
 - node-gyp documents Python, `make`, and a C/C++ compiler toolchain as Unix build prerequisites, downloads Node headers for the target version, and
-  exposes `--devdir` as the SDK/header download directory. Its docs also note that `npm_config_` environment-variable support is deprecated in npm 11
-  and recommend `npm_package_config_node_gyp_*` names instead.
-  Source: [node-gyp README](https://github.com/nodejs/node-gyp)
+  exposes `--devdir` as the SDK/header download directory. Its docs recommend `npm_package_config_node_gyp_*` names for node-gyp command options,
+  while npm v11 still documents `npm_config_`/`NPM_CONFIG_` environment variables for npm configuration generally.
+  Sources: [node-gyp README](https://github.com/nodejs/node-gyp), [npm config](https://docs.npmjs.com/cli/v11/using-npm/config/)
 - Vite and Create React App make the same public-env warning: `VITE_*` and `REACT_APP_*` values are build-time client bundle values, not runtime
   secrets.
   Sources: [Vite env variables](https://vite.dev/guide/env-and-mode/),
@@ -405,7 +405,8 @@ download directory, and optionally ccache if the image installs and configures i
 Recommended rule stance:
 
 - Promote cache mounts for the package-manager store/cache and node-gyp `--devdir`.
-- Prefer the npm 11-compatible environment name `npm_package_config_node_gyp_devdir=/root/.cache/node-gyp` over deprecated `npm_config_devdir`.
+- Accept both node-gyp's documented `npm_package_config_node_gyp_devdir` form and npm's documented `NPM_CONFIG_DEVDIR`/`npm_config_devdir`
+  configuration mechanism; do not claim the general npm config environment-variable mechanism is deprecated.
 - Optionally suggest `--mount=type=tmpfs,target=/tmp` for scratch I/O during native addon installs, but do not present tmpfs as a replacement for
   cache mounts.
 - Never suggest tmpfs for `node_modules` or addon package `build/` output because compiled `.node` artifacts must persist into the image layer.
@@ -666,7 +667,8 @@ signals, and **0 / 631** used a node-gyp-specific cache or tmpfs optimization.
 
 - Info severity by default because native packages, prebuilt binaries, libc, and package-manager behavior vary.
 - Do not suggest tmpfs for `node_modules`, package `build/` directories, or any path whose compiled `.node` output must remain in the image.
-- Prefer the npm 11-compatible `npm_package_config_node_gyp_devdir` environment name. Mention old `npm_config_devdir` only as a migration warning.
+- Accept both `npm_package_config_node_gyp_devdir` and `NPM_CONFIG_DEVDIR`/`npm_config_devdir`. Do not flag either form as deprecated without a
+  version-specific npm/node-gyp basis.
 - Skip stages that are already using language-appropriate native-build caches, ccache, or a custom prebuild artifact cache.
 - In context-aware mode, use observable `package.json` and lockfile content to raise confidence and avoid warning on images that merely install
   `make` for unrelated shell tasks.
@@ -680,7 +682,7 @@ scratch. Example npm shape:
 RUN --mount=type=cache,id=npm,target=/root/.npm,sharing=locked \
     --mount=type=cache,id=node-gyp,target=/root/.cache/node-gyp,sharing=locked \
     --mount=type=tmpfs,target=/tmp \
-    npm_package_config_node_gyp_devdir=/root/.cache/node-gyp \
+    NPM_CONFIG_DEVDIR=/root/.cache/node-gyp \
     npm ci --omit=dev
 ```
 
