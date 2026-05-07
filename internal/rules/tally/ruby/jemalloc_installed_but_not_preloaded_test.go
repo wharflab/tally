@@ -330,19 +330,52 @@ func TestJemallocInstalledButNotPreloadedRule_NoFixForApk(t *testing.T) {
 func TestJemallocInstalledButNotPreloadedRule_ViolationLocation(t *testing.T) {
 	t.Parallel()
 
-	content := "FROM ruby:3.3-slim\nRUN apt-get install -y libjemalloc2\n"
+	const runLine = "RUN apt-get install -y libjemalloc2"
+	content := "FROM ruby:3.3-slim\n" + runLine + "\n"
 	input := testutil.MakeLintInput(t, "Dockerfile", content)
 	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
 	if len(violations) != 1 {
 		t.Fatalf("expected 1 violation, got %d", len(violations))
 	}
 	loc := violations[0].Location
-	if loc.Start.Line != 2 {
-		t.Errorf("violation line = %d, want 2 (the install RUN)", loc.Start.Line)
+	if loc.Start.Line != 2 || loc.End.Line != 2 {
+		t.Errorf("violation line range = %d-%d, want 2-2", loc.Start.Line, loc.End.Line)
 	}
-	// The location should point to the package token, not to column 0 of RUN.
-	if loc.Start.Column == 0 {
-		t.Errorf("violation column = 0, expected non-zero (anchored on package token)")
+	// PackageArg columns on RUN line 0 are shell-relative; the rule must
+	// translate them to Dockerfile coordinates so the range covers exactly
+	// "libjemalloc2" in the Dockerfile source line.
+	wantStart := strings.Index(runLine, "libjemalloc2")
+	wantEnd := wantStart + len("libjemalloc2")
+	if loc.Start.Column != wantStart || loc.End.Column != wantEnd {
+		t.Errorf("violation columns = %d-%d, want %d-%d (covering %q)",
+			loc.Start.Column, loc.End.Column, wantStart, wantEnd, "libjemalloc2")
+	}
+}
+
+// Regression: when the package token sits on a continuation line (pkg.Line > 0),
+// the columns are already Dockerfile-relative and must NOT be offset by the
+// RUN-prefix translation. This guards against accidentally re-applying the
+// shell→dockerfile offset in the wrong branch.
+func TestJemallocInstalledButNotPreloadedRule_ViolationLocationOnContinuation(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ruby:3.3-slim\n" +
+		"RUN apt-get install -y \\\n" +
+		"    libjemalloc2\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	loc := violations[0].Location
+	if loc.Start.Line != 3 {
+		t.Errorf("violation line = %d, want 3 (continuation line)", loc.Start.Line)
+	}
+	wantStart := 4 // 4 spaces before libjemalloc2
+	wantEnd := wantStart + len("libjemalloc2")
+	if loc.Start.Column != wantStart || loc.End.Column != wantEnd {
+		t.Errorf("violation columns = %d-%d, want %d-%d",
+			loc.Start.Column, loc.End.Column, wantStart, wantEnd)
 	}
 }
 

@@ -8,12 +8,12 @@
           "docUrl": "https://tally.wharflab.com/rules/tally/ruby/jemalloc-installed-but-not-preloaded/",
           "location": {
             "end": {
-              "column": 73,
+              "column": 77,
               "line": 26
             },
             "file": "testdata/ruby-jemalloc-installed-but-not-preloaded/Dockerfile",
             "start": {
-              "column": 61,
+              "column": 65,
               "line": 26
             }
           },
