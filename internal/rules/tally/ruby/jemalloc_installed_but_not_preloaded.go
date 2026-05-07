@@ -128,7 +128,7 @@ func (r *JemallocInstalledButNotPreloadedRule) checkStage(
 				continue
 			}
 
-			loc := jemallocViolationLocation(file, runFacts, ic)
+			loc := jemallocViolationLocation(file, runFacts, ic, sm)
 			v := rules.NewViolation(loc, meta.Code, meta.Description, meta.DefaultSeverity).
 				WithDocURL(meta.DocURL).
 				WithDetail(jemallocViolationDetail(ic.Manager))
@@ -223,10 +223,17 @@ func isJemallocPackage(name string) bool {
 // jemallocViolationLocation returns the source location to attribute the
 // violation to: prefer the line of the package token itself, falling back to
 // the RUN instruction's first line if positions are unavailable.
+//
+// On RUN line 0, PackageArg.StartCol/EndCol are shell-relative because
+// facts.RunFacts.SourceScript is reconstructed via shell.ReconstructSourceText,
+// which strips the `RUN <flags>` prefix. We translate back to Dockerfile
+// coordinates by adding shell.DockerfileRunCommandStartCol of the RUN's first
+// line. Continuation lines (pkg.Line > 0) are already Dockerfile-relative.
 func jemallocViolationLocation(
 	file string,
 	runFacts *facts.RunFacts,
 	ic shell.InstallCommand,
+	sm *sourcemap.SourceMap,
 ) rules.Location {
 	if runFacts == nil || runFacts.Run == nil {
 		return rules.NewFileLocation(file)
@@ -240,11 +247,14 @@ func jemallocViolationLocation(
 		if len(runRanges) == 0 {
 			break
 		}
-		// PackageArg.Line is 0-based within the reconstructed source text
-		// returned by facts.RunFacts.SourceScript. The RUN's first line in
-		// the Dockerfile is the anchor.
 		line := runRanges[0].Start.Line + pkg.Line
-		return rules.NewRangeLocation(file, line, pkg.StartCol, line, pkg.EndCol)
+		startCol, endCol := pkg.StartCol, pkg.EndCol
+		if pkg.Line == 0 && sm != nil {
+			offset := shell.DockerfileRunCommandStartCol(sm.Line(line - 1))
+			startCol += offset
+			endCol += offset
+		}
+		return rules.NewRangeLocation(file, line, startCol, line, endCol)
 	}
 	return rules.NewLocationFromRanges(file, runFacts.Run.Location())
 }
