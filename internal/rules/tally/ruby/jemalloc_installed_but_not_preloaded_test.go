@@ -339,6 +339,34 @@ func TestStageReferencesJemallocSymlink(t *testing.T) {
 				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2\n",
 			want: false,
 		},
+		{
+			// Regression: `install -d /path` creates a directory at /path,
+			// not the shared object. LD_PRELOAD pointing at a directory
+			// does not load jemalloc.
+			name: "install -d at canonical path does not count",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && install -d /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
+			// Long-form --directory must also disqualify the install
+			// command from counting as "symlink already created".
+			name: "install --directory at canonical path does not count",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && install --directory /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
+			// `install` without -d copies the source file to the target,
+			// so it does materialize the canonical libjemalloc.so file.
+			name: "install copy mode at canonical target counts",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && install -m 644 /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n",
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

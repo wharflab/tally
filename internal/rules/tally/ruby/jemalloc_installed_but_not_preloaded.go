@@ -376,6 +376,12 @@ func stageReferencesJemallocSymlink(sf *facts.StageFacts) bool {
 			if !jemallocSymlinkCreatingCommands[ci.Name] {
 				continue
 			}
+			// `install -d /path` creates a directory at /path, not a file —
+			// LD_PRELOAD pointing at a directory does not load jemalloc, so
+			// the symlink half of the fix must still run.
+			if ci.Name == "install" && (ci.HasFlag("-d") || ci.HasFlag("--directory")) {
+				continue
+			}
 			target := lastNonFlagArg(ci.Args)
 			if target == "" {
 				continue
