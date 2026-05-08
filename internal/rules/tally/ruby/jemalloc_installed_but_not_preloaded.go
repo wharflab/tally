@@ -754,7 +754,8 @@ func mvSourceArgs(ci shell.CommandInfo) []string {
 
 // targetDirectoryArgIndex returns the index of the args entry that supplies
 // the directory value to `-t` / `--target-directory` (the *value* token, not
-// the flag itself). For `--target-directory=DIR` and `-t=DIR` the value is
+// the flag itself). For `--target-directory=DIR`, `-t=DIR`, and the GNU
+// short form `-tDIR` (value attached directly to the flag) the value is
 // embedded in the same token and the returned index is -1 (nothing extra to
 // skip beyond the flag prefix, which is filtered out by the leading `-`
 // check). ok=false means the flag is not present.
@@ -768,6 +769,12 @@ func targetDirectoryArgIndex(ci shell.CommandInfo) (int, bool) {
 		case strings.HasPrefix(arg, "--target-directory="):
 			return -1, true
 		case strings.HasPrefix(arg, "-t="):
+			return -1, true
+		// GNU short flag with attached value: `-tDIR` (no `=` separator).
+		// Only matches when the character after `-t` is non-empty and not
+		// itself a flag separator, to avoid confusing `-t` followed by
+		// other clustered short flags.
+		case len(arg) > 2 && strings.HasPrefix(arg, "-t") && arg[2] != '-':
 			return -1, true
 		}
 	}
