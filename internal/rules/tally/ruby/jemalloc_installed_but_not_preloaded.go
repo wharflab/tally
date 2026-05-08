@@ -5,6 +5,9 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/distribution/reference"
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
@@ -123,6 +126,13 @@ func (r *JemallocInstalledButNotPreloadedRule) Check(input rules.LintInput) []ru
 			continue
 		}
 
+		// Ruby-namespaced rule: only fire on stages that look like a Ruby
+		// runtime. A non-Ruby image (Node, Python, ...) installing jemalloc
+		// for unrelated reasons shouldn't get a Rails-flavored warning.
+		if !stageLooksLikeRuby(input.Semantic.StageInfo(stageIdx), stage, sf) {
+			continue
+		}
+
 		if stageHasJemallocLoadSignal(sf) {
 			continue
 		}
@@ -130,6 +140,122 @@ func (r *JemallocInstalledButNotPreloadedRule) Check(input rules.LintInput) []ru
 		violations = append(violations, r.checkStage(input.File, sf, input.SourceMap(), meta)...)
 	}
 	return violations
+}
+
+// rubyEnvSignals are environment variable keys that strongly suggest a Ruby
+// or Rails workload is the target of the stage.
+var rubyEnvSignals = map[string]bool{
+	"RUBY_VERSION":      true,
+	"RUBY_MAJOR":        true,
+	"RUBY_YJIT_ENABLE":  true,
+	"RAILS_ENV":         true,
+	"BUNDLER_VERSION":   true,
+	"BUNDLE_PATH":       true,
+	"BUNDLE_DEPLOYMENT": true,
+	"BUNDLE_WITHOUT":    true,
+	"GEM_HOME":          true,
+}
+
+// rubyRuntimeCommandNames are executable basenames whose presence as
+// ENTRYPOINT or CMD strongly suggests a Ruby runtime.
+var rubyRuntimeCommandNames = map[string]bool{
+	"ruby":      true,
+	"rails":     true,
+	"bundle":    true,
+	"rake":      true,
+	"rackup":    true,
+	"puma":      true,
+	"unicorn":   true,
+	"thin":      true,
+	"passenger": true,
+	"falcon":    true,
+	"sidekiq":   true,
+	"iodine":    true,
+}
+
+// rubyDerivativeImages are non-official image repositories widely used as
+// Ruby/Rails runtime bases. Matched against the familiar name (no domain,
+// no tag).
+var rubyDerivativeImages = map[string]bool{
+	"jruby":                  true,
+	"truffleruby":            true,
+	"rubylang/ruby":          true,
+	"phusion/passenger-ruby": true,
+}
+
+// stageLooksLikeRuby reports whether the stage looks like a Ruby/Rails
+// runtime: an official ruby:* base, a known Ruby-runtime derivative,
+// a stage env with Ruby/Rails/Bundler signals, or a runtime command that
+// matches a Ruby app server. Stage refs (`FROM <stage>`) inherit the
+// signal from their parent via facts.StageFacts.EffectiveEnv and the
+// semantic model's resolved base image.
+func stageLooksLikeRuby(info *semantic.StageInfo, stage instructions.Stage, sf *facts.StageFacts) bool {
+	if info != nil && info.BaseImage != nil && !info.BaseImage.IsStageRef && baseImageLooksLikeRuby(info.BaseImage.Raw) {
+		return true
+	}
+	if sf != nil {
+		for key := range sf.EffectiveEnv.Values {
+			if rubyEnvSignals[key] || strings.HasPrefix(key, "BUNDLE_") {
+				return true
+			}
+		}
+	}
+	for _, name := range stageRuntimeCommandBasenames(stage) {
+		if rubyRuntimeCommandNames[name] {
+			return true
+		}
+	}
+	return false
+}
+
+// baseImageLooksLikeRuby reports whether a base image reference points at
+// a Ruby or Rails runtime — the official ruby:* image, a familiar name
+// that mentions "ruby" or "rails", or a known derivative.
+func baseImageLooksLikeRuby(raw string) bool {
+	named, err := reference.ParseNormalizedNamed(strings.ToLower(raw))
+	if err != nil {
+		return false
+	}
+	familiar := reference.FamiliarName(named)
+	if familiar == "ruby" || rubyDerivativeImages[familiar] {
+		return true
+	}
+	return strings.Contains(familiar, "ruby") || strings.Contains(familiar, "rails")
+}
+
+// stageRuntimeCommandBasenames returns the lowercased basename of the first
+// executable in the stage's last ENTRYPOINT and CMD, in declaration order.
+// Returns an empty slice when neither ENTRYPOINT nor CMD is present.
+func stageRuntimeCommandBasenames(stage instructions.Stage) []string {
+	var lastEntrypoint *instructions.EntrypointCommand
+	var lastCmd *instructions.CmdCommand
+	for _, c := range stage.Commands {
+		switch cc := c.(type) {
+		case *instructions.EntrypointCommand:
+			lastEntrypoint = cc
+		case *instructions.CmdCommand:
+			lastCmd = cc
+		}
+	}
+	var out []string
+	if lastEntrypoint != nil && len(lastEntrypoint.CmdLine) > 0 {
+		out = append(out, commandBasename(lastEntrypoint.CmdLine[0]))
+	}
+	if lastCmd != nil && len(lastCmd.CmdLine) > 0 {
+		out = append(out, commandBasename(lastCmd.CmdLine[0]))
+	}
+	return out
+}
+
+func commandBasename(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if fields := strings.Fields(s); len(fields) > 0 {
+		s = fields[0]
+	}
+	return strings.ToLower(path.Base(s))
 }
 
 func (r *JemallocInstalledButNotPreloadedRule) checkStage(

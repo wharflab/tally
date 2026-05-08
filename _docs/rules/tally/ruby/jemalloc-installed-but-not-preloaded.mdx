@@ -35,6 +35,13 @@ The rule recognizes any of the following as evidence jemalloc is loaded:
 Stages explicitly named `dev`, `development`, `test`, `testing`, `ci`, or `debug` are skipped, as are
 non-final stages and Windows-based stages.
 
+Because the rule lives in the Ruby namespace and its remedy is Rails-flavored, it only fires on stages
+that look like a Ruby runtime: an official `ruby:*` base, a familiar name containing `ruby` or `rails`,
+a Ruby-runtime derivative (e.g. `phusion/passenger-ruby*`, `jruby`, `truffleruby`), a stage env carrying
+Ruby/Rails/Bundler signals (`RUBY_VERSION`, `RAILS_ENV`, `BUNDLE_*`, `GEM_HOME`, ...), or an
+ENTRYPOINT/CMD that invokes `ruby`, `rails`, `bundle`, `puma`, `unicorn`, `passenger`, `sidekiq`, etc.
+A non-Ruby image installing jemalloc for unrelated reasons does not trip this rule.
+
 ## Examples
 
 ### Before

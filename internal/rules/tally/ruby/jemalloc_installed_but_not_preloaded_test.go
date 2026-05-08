@@ -176,6 +176,47 @@ RUN apt-get install -y libjemalloc2
 `,
 			WantViolations: 0,
 		},
+		// --- Non-Ruby stage is out of scope for this Ruby-namespaced rule ---
+		{
+			Name: "python image installing libjemalloc2 is not a Ruby concern",
+			Content: `FROM python:3.12-slim
+RUN apt-get install -y libjemalloc2
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "node image installing libjemalloc2 is not a Ruby concern",
+			Content: `FROM node:20
+RUN apt-get install -y libjemalloc2
+`,
+			WantViolations: 0,
+		},
+		// --- Ruby signal via env var (no ruby:* base) ---
+		{
+			Name: "RAILS_ENV signals a Ruby stage even on debian base",
+			Content: `FROM debian:12-slim
+ENV RAILS_ENV=production
+RUN apt-get install -y libjemalloc2
+`,
+			WantViolations: 1,
+		},
+		// --- Ruby signal via runtime command ---
+		{
+			Name: "puma CMD signals a Ruby stage on debian base",
+			Content: `FROM debian:12-slim
+RUN apt-get install -y libjemalloc2
+CMD ["puma", "-C", "config/puma.rb"]
+`,
+			WantViolations: 1,
+		},
+		// --- Ruby derivative image ---
+		{
+			Name: "phusion passenger-ruby base counts as Ruby",
+			Content: `FROM phusion/passenger-ruby33:latest
+RUN apt-get install -y libjemalloc2
+`,
+			WantViolations: 1,
+		},
 	})
 }
 
