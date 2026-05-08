@@ -625,6 +625,60 @@ func TestStageReferencesJemallocSymlink(t *testing.T) {
 	})
 }
 
+// Regression: a later `ENV LD_PRELOAD=""` (or any non-jemalloc value) after
+// the install RUN would clobber a fix inserted on the install line. The
+// inserted fix must land *after* the latest ENV write to LD_PRELOAD or
+// MALLOC_CONF so the runtime env actually carries our value.
+func TestJemallocInstalledButNotPreloadedRule_FixInsertsAfterLaterEnvClobber(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ruby:3.3-slim\n" + // L1
+		"RUN apt-get install -y libjemalloc2\n" + // L2
+		"ENV SOMETHING_ELSE=ok\n" + // L3
+		"ENV LD_PRELOAD=\"\"\n" + // L4 — this would clobber a fix inserted at L3
+		"CMD [\"bin/rails\", \"server\"]\n" // L5
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix")
+	}
+	if len(fix.Edits) != 1 {
+		t.Fatalf("expected 1 edit, got %d", len(fix.Edits))
+	}
+	// Insert anchor must be line 5 (after the clobbering ENV at L4),
+	// NOT line 3 (which would land before the clobber).
+	if got := fix.Edits[0].Location.Start.Line; got != 5 {
+		t.Errorf("insert anchor line = %d, want 5 (after the later ENV LD_PRELOAD clobber)", got)
+	}
+}
+
+func TestJemallocInstalledButNotPreloadedRule_FixSkipsClobberPushWhenEnvIsBeforeInstall(t *testing.T) {
+	t.Parallel()
+
+	// `ENV LD_PRELOAD=""` BEFORE the install — no need to push past it,
+	// the fix's own ENV (placed after install) will be the last writer.
+	content := "FROM ruby:3.3-slim\n" + // L1
+		"ENV LD_PRELOAD=\"\"\n" + // L2 — pre-install, irrelevant
+		"RUN apt-get install -y libjemalloc2\n" + // L3
+		"CMD [\"bin/rails\", \"server\"]\n" // L4
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix")
+	}
+	if got := fix.Edits[0].Location.Start.Line; got != 4 {
+		t.Errorf("insert anchor line = %d, want 4 (right after install RUN; pre-install ENV is irrelevant)", got)
+	}
+}
+
 func TestJemallocInstalledButNotPreloadedRule_AptFixAfterMultiLineRun(t *testing.T) {
 	t.Parallel()
 

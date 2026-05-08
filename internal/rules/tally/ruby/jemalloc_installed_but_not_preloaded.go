@@ -398,6 +398,25 @@ func stageHasJemallocLoadSignal(sf *facts.StageFacts) bool {
 	return false
 }
 
+// lastEnvWriteEndLine returns the (1-based, multi-line-aware) end line of
+// the last ENV instruction that wrote `key` in the stage, or 0 when no such
+// binding exists. The Bindings map records the final write, so a single
+// lookup is sufficient even when multiple ENV instructions touch the key.
+func lastEnvWriteEndLine(sf *facts.StageFacts, key string, sm *sourcemap.SourceMap) int {
+	if sf == nil || sm == nil {
+		return 0
+	}
+	binding, ok := sf.EffectiveEnv.Bindings[key]
+	if !ok || binding.Command == nil {
+		return 0
+	}
+	locs := binding.Command.Location()
+	if len(locs) == 0 {
+		return 0
+	}
+	return sm.ResolveEndLine(locs[len(locs)-1].End.Line)
+}
+
 // envBoundValue returns the *resolved* value of an env key that was set by
 // an `ENV` instruction (or inherited from a parent stage's ENV). Values
 // present only in EffectiveEnv.Values via ARG promotion return "" — those
@@ -570,7 +589,17 @@ func buildJemallocPreloadFix(
 		return nil
 	}
 
+	// Insert after the install RUN by default, but push past any later
+	// ENV writes that would neutralize the inserted LD_PRELOAD —
+	// `ENV LD_PRELOAD=""` or `ENV LD_PRELOAD=/some/other/path` later in
+	// the stage would otherwise overwrite our suggestion and the next
+	// lint run would still fire.
 	insertLine := endLine + 1
+	for _, key := range []string{"LD_PRELOAD", "MALLOC_CONF"} {
+		if line := lastEnvWriteEndLine(sf, key, sm); line > endLine && line+1 > insertLine {
+			insertLine = line + 1
+		}
+	}
 	var fixText, description string
 	if stageReferencesJemallocSymlink(sf) {
 		fixText = `ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"
