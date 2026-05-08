@@ -78,6 +78,13 @@ RUN dnf install -y jemalloc
 			WantViolations: 1,
 		},
 		{
+			Name: "dnf install jemalloc-devel on UBI triggers",
+			Content: `FROM registry.access.redhat.com/ubi9/ruby-33
+RUN dnf install -y jemalloc-devel
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "multi-stage final stage violates only once",
 			Content: `FROM ruby:3.3-slim AS builder
 RUN apt-get install -y libjemalloc2 build-essential
@@ -486,6 +493,7 @@ func TestIsJemallocPackage(t *testing.T) {
 		{name: "libjemalloc-dev", want: true},
 		{name: "jemalloc", want: true},
 		{name: "jemalloc-dev", want: true},
+		{name: "jemalloc-devel", want: true},
 		{name: "libjemalloc2=5.3.0-1", want: true},
 		{name: "libjemalloc2:amd64", want: true},
 		{name: "LIBJEMALLOC2", want: true},

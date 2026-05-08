@@ -88,8 +88,9 @@ var jemallocPackageNames = map[string]bool{
 	"libjemalloc1":    true, // Debian/Ubuntu legacy
 	"libjemalloc2":    true, // Debian/Ubuntu current
 	"libjemalloc-dev": true, // Debian/Ubuntu dev headers
-	"jemalloc":        true, // Alpine, Arch
+	"jemalloc":        true, // Alpine, Arch, RHEL/Fedora/CentOS
 	"jemalloc-dev":    true, // Alpine dev headers
+	"jemalloc-devel":  true, // RHEL/Fedora/CentOS dev headers
 }
 
 // jemallocMallocConfKnobs are the option keys that only have meaning to
