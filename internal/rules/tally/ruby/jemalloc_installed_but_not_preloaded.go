@@ -683,23 +683,12 @@ var jemallocSymlinkRemovingCommands = map[string]bool{
 //   - unlink /usr/local/lib/libjemalloc.so      → any non-flag arg counts
 //   - mv /usr/local/lib/libjemalloc.so DST       → only the SOURCE counts;
 //     the target (last non-flag arg) means it was created, not removed
+//   - mv -t DIR /usr/local/lib/libjemalloc.so    → all args after the -t
+//     value are sources, even though they appear after the target
 func commandRemovesJemallocSymlink(ci shell.CommandInfo) bool {
 	if ci.Name == "mv" {
-		// All non-flag args except the last (target) are sources.
-		targetIdx := -1
-		for i, arg := range slices.Backward(ci.Args) {
-			if !strings.HasPrefix(arg, "-") {
-				targetIdx = i
-				break
-			}
-		}
-		if targetIdx <= 0 {
-			return false
-		}
-		for _, arg := range ci.Args[:targetIdx] {
-			if strings.HasPrefix(arg, "-") {
-				continue
-			}
+		sources := mvSourceArgs(ci)
+		for _, arg := range sources {
 			if path.Clean(arg) == jemallocCanonicalSymlinkPath {
 				return true
 			}
@@ -716,6 +705,73 @@ func commandRemovesJemallocSymlink(ci shell.CommandInfo) bool {
 		}
 	}
 	return false
+}
+
+// mvSourceArgs returns the non-flag arguments to a `mv` invocation that act
+// as sources (i.e. the files removed by the move). Two syntactic forms are
+// supported:
+//
+//   - `mv [OPTION...] SRC... DST`              → all non-flag args before the
+//     final non-flag (the destination) are sources.
+//   - `mv [OPTION...] -t DIR SRC...`           → DIR is the destination;
+//     all non-flag args other than DIR are sources. The long form
+//     `--target-directory[=DIR]` is also recognized.
+func mvSourceArgs(ci shell.CommandInfo) []string {
+	skipIdx, ok := targetDirectoryArgIndex(ci)
+	if ok {
+		var sources []string
+		for i, arg := range ci.Args {
+			if i == skipIdx {
+				continue
+			}
+			if strings.HasPrefix(arg, "-") {
+				continue
+			}
+			sources = append(sources, arg)
+		}
+		return sources
+	}
+	// Default form: last non-flag is destination, the rest are sources.
+	targetIdx := -1
+	for i, arg := range slices.Backward(ci.Args) {
+		if !strings.HasPrefix(arg, "-") {
+			targetIdx = i
+			break
+		}
+	}
+	if targetIdx <= 0 {
+		return nil
+	}
+	var sources []string
+	for _, arg := range ci.Args[:targetIdx] {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		sources = append(sources, arg)
+	}
+	return sources
+}
+
+// targetDirectoryArgIndex returns the index of the args entry that supplies
+// the directory value to `-t` / `--target-directory` (the *value* token, not
+// the flag itself). For `--target-directory=DIR` and `-t=DIR` the value is
+// embedded in the same token and the returned index is -1 (nothing extra to
+// skip beyond the flag prefix, which is filtered out by the leading `-`
+// check). ok=false means the flag is not present.
+func targetDirectoryArgIndex(ci shell.CommandInfo) (int, bool) {
+	for i, arg := range ci.Args {
+		switch {
+		case arg == "-t" || arg == "--target-directory":
+			if i+1 < len(ci.Args) && !strings.HasPrefix(ci.Args[i+1], "-") {
+				return i + 1, true
+			}
+		case strings.HasPrefix(arg, "--target-directory="):
+			return -1, true
+		case strings.HasPrefix(arg, "-t="):
+			return -1, true
+		}
+	}
+	return 0, false
 }
 
 // lastNonFlagArg returns the last argument that does not start with `-`,

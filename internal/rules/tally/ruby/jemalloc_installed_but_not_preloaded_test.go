@@ -513,6 +513,34 @@ func TestStageReferencesJemallocSymlink(t *testing.T) {
 			want: false,
 		},
 		{
+			// Regression: GNU `mv -t DIR SRC...` reverses arg order.
+			// SRC is /usr/local/lib/libjemalloc.so → still removed.
+			name: "later mv -t away from canonical path undoes earlier ln",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN mv -t /tmp /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
+			// Same as above but using long form `--target-directory`.
+			name: "mv --target-directory removes canonical source",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN mv --target-directory /tmp /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
+			// Combined `-t=DIR` form keeps the value in the same token.
+			name: "mv -t=DIR removes canonical source",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN mv -t=/tmp /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
 			// Regression: unlink also removes.
 			name: "unlink of canonical path undoes earlier ln",
 			content: "FROM ruby:3.3-slim\n" +
