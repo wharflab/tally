@@ -240,6 +240,26 @@ RUN apt-get install -y libjemalloc2
 `,
 			WantViolations: 1,
 		},
+		// Regression: an ARG-promoted RAILS_ENV is build-time only and must
+		// NOT classify a non-Ruby stage as Ruby — the rule should stay out
+		// of scope rather than warn on a debian image that just happens to
+		// declare a Rails-flavored ARG.
+		{
+			Name: "ARG-only RAILS_ENV does not classify debian as Ruby",
+			Content: `FROM debian:12-slim
+ARG RAILS_ENV=production
+RUN apt-get install -y libjemalloc2
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "ARG-only BUNDLE_PATH does not classify alpine as Ruby",
+			Content: `FROM alpine:3.20
+ARG BUNDLE_PATH=/vendor/bundle
+RUN apk add --no-cache jemalloc
+`,
+			WantViolations: 0,
+		},
 		// --- Ruby signal via runtime command ---
 		{
 			Name: "puma CMD signals a Ruby stage on debian base",

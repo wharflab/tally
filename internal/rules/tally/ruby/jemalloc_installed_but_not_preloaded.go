@@ -205,8 +205,12 @@ func stageLooksLikeRuby(
 	if base := sem.ExternalBase(stageIdx); base != nil && baseImageLooksLikeRuby(base.Raw, metaArgs) {
 		return true
 	}
+	// Ruby env signals must come from an actual ENV instruction. ARG values
+	// are also visible in EffectiveEnv.Values, but they are build-time only
+	// and don't make a stage a Ruby runtime — `FROM debian` +
+	// `ARG RAILS_ENV=production` should not be classified as Ruby.
 	if sf != nil {
-		for key := range sf.EffectiveEnv.Values {
+		for key := range sf.EffectiveEnv.Bindings {
 			if rubyEnvSignals[key] || strings.HasPrefix(key, "BUNDLE_") {
 				return true
 			}
