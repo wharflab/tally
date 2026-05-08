@@ -145,6 +145,84 @@ COPY --from=builder /app /app
 	}
 }
 
+func TestExternalBase(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		content  string
+		stageIdx int
+		wantRaw  string
+		wantNil  bool
+	}{
+		{
+			name:     "single external base resolves directly",
+			content:  "FROM ruby:3.3-slim\n",
+			stageIdx: 0,
+			wantRaw:  "ruby:3.3-slim",
+		},
+		{
+			name: "stage ref resolves to parent's external base",
+			content: "FROM ruby:3.3-slim AS builder\n" +
+				"FROM builder\n",
+			stageIdx: 1,
+			wantRaw:  "ruby:3.3-slim",
+		},
+		{
+			name: "multi-hop stage refs resolve to terminal external base",
+			content: "FROM ruby:3.3-slim AS base\n" +
+				"FROM base AS deps\n" +
+				"FROM deps\n",
+			stageIdx: 2,
+			wantRaw:  "ruby:3.3-slim",
+		},
+		{
+			name:     "scratch base is returned as the external base",
+			content:  "FROM scratch\n",
+			stageIdx: 0,
+			wantRaw:  "scratch",
+		},
+		{
+			name:     "out-of-range stage returns nil",
+			content:  "FROM ruby:3.3-slim\n",
+			stageIdx: 5,
+			wantNil:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			pr := parseDockerfile(t, tt.content)
+			model := NewModel(pr, nil, "Dockerfile")
+			got := model.ExternalBase(tt.stageIdx)
+			if tt.wantNil {
+				if got != nil {
+					t.Fatalf("ExternalBase(%d) = %+v, want nil", tt.stageIdx, got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("ExternalBase(%d) = nil, want %q", tt.stageIdx, tt.wantRaw)
+			}
+			if got.Raw != tt.wantRaw {
+				t.Errorf("ExternalBase(%d).Raw = %q, want %q", tt.stageIdx, got.Raw, tt.wantRaw)
+			}
+			if got.IsStageRef {
+				t.Errorf("ExternalBase(%d).IsStageRef = true, want false", tt.stageIdx)
+			}
+		})
+	}
+}
+
+func TestExternalBase_NilModel(t *testing.T) {
+	t.Parallel()
+	var m *Model
+	if got := m.ExternalBase(0); got != nil {
+		t.Errorf("nil model ExternalBase = %+v, want nil", got)
+	}
+}
+
 func TestNamedAndUnnamedStages(t *testing.T) {
 	t.Parallel()
 	content := `FROM alpine:3.18 AS first

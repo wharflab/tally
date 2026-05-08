@@ -257,6 +257,26 @@ RUN apt-get install -y libjemalloc2
 `,
 			WantViolations: 1,
 		},
+		// --- Multi-stage FROM <prev-stage>: must walk ancestry to find Ruby base ---
+		{
+			Name: "final stage FROM builder where builder is ruby:* fires",
+			Content: `FROM ruby:3.3-slim AS builder
+RUN echo build steps
+
+FROM builder
+RUN apt-get install -y libjemalloc2
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "multi-hop FROM ancestry still resolves to ruby base",
+			Content: `FROM ruby:3.3-slim AS base
+FROM base AS deps
+FROM deps
+RUN apt-get install -y libjemalloc2
+`,
+			WantViolations: 1,
+		},
 		// --- ARG-templated FROM: must expand against meta ARGs ---
 		{
 			Name: "ARG-templated ruby image with default value resolves",

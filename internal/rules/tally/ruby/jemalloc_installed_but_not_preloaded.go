@@ -130,7 +130,7 @@ func (r *JemallocInstalledButNotPreloadedRule) Check(input rules.LintInput) []ru
 		// Ruby-namespaced rule: only fire on stages that look like a Ruby
 		// runtime. A non-Ruby image (Node, Python, ...) installing jemalloc
 		// for unrelated reasons shouldn't get a Rails-flavored warning.
-		if !stageLooksLikeRuby(input.Semantic.StageInfo(stageIdx), stage, sf, input.MetaArgs) {
+		if !stageLooksLikeRuby(input.Semantic, stageIdx, stage, sf, input.MetaArgs) {
 			continue
 		}
 
@@ -188,17 +188,21 @@ var rubyDerivativeImages = map[string]bool{
 // runtime: an official ruby:* base (including ARG-templated forms like
 // `FROM ${RUBY_IMAGE}` resolved against meta ARGs), a known Ruby-runtime
 // derivative, a stage env with Ruby/Rails/Bundler signals, or a runtime
-// command that matches a Ruby app server. Stage refs (`FROM <stage>`)
-// inherit the signal from their parent via facts.StageFacts.EffectiveEnv
-// and the semantic model's resolved base image.
+// command that matches a Ruby app server.
+//
+// For stage refs (`FROM <stage>`) the classifier walks the StageRef
+// ancestry until it finds the original external base image — a final
+// stage `FROM builder` where `builder` is `FROM ruby:3.3-slim` is still
+// classified as Ruby even when the final stage carries no explicit Ruby
+// env or runtime command.
 func stageLooksLikeRuby(
-	info *semantic.StageInfo,
+	sem *semantic.Model,
+	stageIdx int,
 	stage instructions.Stage,
 	sf *facts.StageFacts,
 	metaArgs []instructions.ArgCommand,
 ) bool {
-	if info != nil && info.BaseImage != nil && !info.BaseImage.IsStageRef &&
-		baseImageLooksLikeRuby(info.BaseImage.Raw, metaArgs) {
+	if base := sem.ExternalBase(stageIdx); base != nil && baseImageLooksLikeRuby(base.Raw, metaArgs) {
 		return true
 	}
 	if sf != nil {

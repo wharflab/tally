@@ -95,6 +95,37 @@ func (m *Model) StageInfo(index int) *StageInfo {
 	return m.stageInfo[index]
 }
 
+// ExternalBase walks the FROM-ancestry of the stage at stageIdx through any
+// number of `FROM <stage>` stage references and returns the BaseImageRef of
+// the first non-stage-ref base — i.e. the original external image (or
+// `scratch`) that ultimately backs the stage. Returns nil when the stage
+// index is unknown, the chain is broken, or the depth bound is exceeded
+// (which should not happen on valid Dockerfiles but is cheap to guard).
+//
+// Rules that need to classify a final stage by its underlying base image
+// (e.g. detecting a Ruby/Rails runtime in a multi-stage `FROM builder`
+// pattern) should prefer this over reading `BaseImage.Raw` directly.
+func (m *Model) ExternalBase(stageIdx int) *BaseImageRef {
+	if m == nil {
+		return nil
+	}
+	const maxHops = 64
+	for range maxHops {
+		info := m.StageInfo(stageIdx)
+		if info == nil || info.BaseImage == nil {
+			return nil
+		}
+		if !info.BaseImage.IsStageRef {
+			return info.BaseImage
+		}
+		if info.BaseImage.StageIndex < 0 {
+			return nil
+		}
+		stageIdx = info.BaseImage.StageIndex
+	}
+	return nil
+}
+
 // OnbuildInstructions returns parsed ONBUILD commands for the given stage.
 // Returns nil if the index is out of bounds or the stage has no ONBUILD instructions.
 func (m *Model) OnbuildInstructions(stageIdx int) []OnbuildInstruction {
