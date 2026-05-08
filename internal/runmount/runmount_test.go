@@ -6,6 +6,8 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
+
+	"github.com/wharflab/tally/internal/sourcemap"
 )
 
 func parseRun(t *testing.T, dockerfile string) *instructions.RunCommand {
@@ -253,6 +255,61 @@ func TestMountsEqual(t *testing.T) {
 			got := MountsEqual(tt.a, tt.b)
 			if got != tt.want {
 				t.Errorf("MountsEqual() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRunKeywordEndColumn_DockerfileWhitespace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		line string
+		want int
+	}{
+		{
+			name: "plain run with space",
+			line: "RUN npm ci",
+			want: len("RUN "),
+		},
+		{
+			name: "plain run with tab",
+			line: "RUN\tnpm ci",
+			want: len("RUN\t"),
+		},
+		{
+			name: "onbuild run with space",
+			line: "ONBUILD RUN npm ci",
+			want: len("ONBUILD RUN "),
+		},
+		{
+			name: "onbuild run with tab after run",
+			line: "ONBUILD RUN\tnpm ci",
+			want: len("ONBUILD RUN\t"),
+		},
+		{
+			name: "onbuild run with tab between keywords",
+			line: "ONBUILD\tRUN\tnpm ci",
+			want: len("ONBUILD\tRUN\t"),
+		},
+		{
+			name: "indented onbuild run with tabs",
+			line: "  ONBUILD\tRUN\tnpm ci",
+			want: len("  ONBUILD\tRUN\t"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			source := "FROM alpine\n" + tt.line + "\n"
+			sm := sourcemap.New([]byte(source))
+			loc := []parser.Range{{Start: parser.Position{Line: 2, Character: 0}}}
+
+			if got := RunKeywordEndColumn(loc, sm); got != tt.want {
+				t.Fatalf("RunKeywordEndColumn(%q) = %d, want %d", tt.line, got, tt.want)
 			}
 		})
 	}
