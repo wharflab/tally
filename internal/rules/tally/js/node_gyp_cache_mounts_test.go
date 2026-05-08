@@ -65,6 +65,23 @@ RUN npm ci
 			wantDetail:     "python3",
 		},
 		{
+			name: "toolchain stage plus npm ci ignore scripts does not trigger",
+			content: `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN npm ci --ignore-scripts
+`,
+			wantViolations: 0,
+		},
+		{
+			name: "toolchain stage plus npm ci ignore scripts false still triggers",
+			content: `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN npm ci --ignore-scripts=false
+`,
+			wantViolations: 1,
+			wantDetail:     "python3",
+		},
+		{
 			name: "toolchain stage plus exec form npm ci triggers",
 			content: `FROM node:20
 RUN apt-get update && apt-get install -y python3 make g++
@@ -81,6 +98,14 @@ RUN ["pnpm", "install"]
 `,
 			wantViolations: 1,
 			wantDetail:     "python3",
+		},
+		{
+			name: "toolchain stage plus exec form pnpm ignore scripts does not trigger",
+			content: `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN ["pnpm", "install", "--ignore-scripts"]
+`,
+			wantViolations: 0,
 		},
 		{
 			name: "same RUN toolchain and npm ci triggers",
@@ -106,6 +131,14 @@ RUN npm rebuild sharp
 			wantDetail:     "npm",
 		},
 		{
+			name: "ignored npm rebuild is not an explicit native addon signal",
+			content: `FROM node:20
+RUN npm rebuild sharp --ignore-scripts
+RUN npm ci
+`,
+			wantViolations: 0,
+		},
+		{
 			name: "context package json with native dependency triggers",
 			content: `FROM node:20
 WORKDIR /app
@@ -117,6 +150,18 @@ RUN npm ci
 			},
 			wantViolations: 1,
 			wantDetail:     "sharp",
+		},
+		{
+			name: "context package json with native dependency and ignored scripts does not trigger",
+			content: `FROM node:20
+WORKDIR /app
+COPY package.json ./package.json
+RUN npm ci --ignore-scripts
+`,
+			contextFiles: map[string]string{
+				"package.json": `{"dependencies":{"sharp":"0.33.5"}}`,
+			},
+			wantViolations: 0,
 		},
 		{
 			name: "runtime native dependency still triggers when npm omits dev dependencies",

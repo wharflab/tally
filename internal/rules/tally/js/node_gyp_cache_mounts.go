@@ -248,7 +248,7 @@ func isNativeAddonCommand(cmd shell.CommandInfo) bool {
 	case "node-gyp", "node-pre-gyp", "prebuild-install":
 		return true
 	case npmManager, pnpmManager, yarnManager:
-		return cmd.Subcommand == "rebuild"
+		return cmd.Subcommand == "rebuild" && !jsInstallIgnoresLifecycleScripts(cmd)
 	default:
 		return false
 	}
@@ -377,11 +377,11 @@ func execFormCommandInfo(run *instructions.RunCommand) (shell.CommandInfo, bool)
 func jsInstallManager(cmd shell.CommandInfo) (string, bool) {
 	switch cmd.Name {
 	case npmManager:
-		if cmd.HasAnyArg("ci", "install", "i", "rebuild") {
+		if cmd.HasAnyArg("ci", "install", "i", "rebuild") && !jsInstallIgnoresLifecycleScripts(cmd) {
 			return npmManager, true
 		}
 	case pnpmManager:
-		if cmd.HasAnyArg("install", "i", "rebuild") {
+		if cmd.HasAnyArg("install", "i", "rebuild") && !jsInstallIgnoresLifecycleScripts(cmd) {
 			return pnpmManager, true
 		}
 	case yarnManager:
@@ -390,11 +390,16 @@ func jsInstallManager(cmd shell.CommandInfo) (string, bool) {
 			"add", //nolint:customlint // Package manager subcommand, not Dockerfile ADD.
 			"rebuild",
 		)
-		if yarnBareInstall(cmd) || hasInstallSubcommand {
+		if (yarnBareInstall(cmd) || hasInstallSubcommand) && !jsInstallIgnoresLifecycleScripts(cmd) {
 			return yarnManager, true
 		}
 	}
 	return "", false
+}
+
+func jsInstallIgnoresLifecycleScripts(cmd shell.CommandInfo) bool {
+	value, found := commandBoolFlagValue(cmd, "--ignore-scripts")
+	return found && value
 }
 
 func yarnBareInstall(cmd shell.CommandInfo) bool {
@@ -484,6 +489,43 @@ func commandHasBoolFlagValue(cmd shell.CommandInfo, want bool, flags ...string) 
 		}
 	}
 	return false
+}
+
+func commandBoolFlagValue(cmd shell.CommandInfo, flag string) (bool, bool) {
+	negativeFlag := "--no-" + strings.TrimPrefix(flag, "--")
+	value := false
+	found := false
+	for i, arg := range cmd.Args {
+		arg = shell.DropQuotes(arg)
+		switch arg {
+		case negativeFlag:
+			value = false
+			found = true
+		case flag:
+			value = true
+			found = true
+			if i+1 >= len(cmd.Args) {
+				continue
+			}
+			next := shell.DropQuotes(cmd.Args[i+1])
+			if next == "" || strings.HasPrefix(next, "-") {
+				continue
+			}
+			if parsed, ok := parseBoolFlagValue(next); ok {
+				value = parsed
+			}
+		default:
+			raw, ok := strings.CutPrefix(arg, flag+"=")
+			if !ok {
+				continue
+			}
+			if parsed, ok := parseBoolFlagValue(shell.DropQuotes(raw)); ok {
+				value = parsed
+				found = true
+			}
+		}
+	}
+	return value, found
 }
 
 func commandFlagValues(cmd shell.CommandInfo, flag string) []string {
