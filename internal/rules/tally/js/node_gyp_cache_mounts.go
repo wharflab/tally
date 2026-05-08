@@ -4,6 +4,7 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"path"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -69,6 +70,11 @@ type packageManifest struct {
 	PeerDependencies     map[string]string `json:"peerDependencies"`
 }
 
+type nativePackageDependency struct {
+	Name    string
+	DevOnly bool
+}
+
 // NodeGypCacheMountsRule suggests BuildKit caches for native Node addon builds.
 type NodeGypCacheMountsRule struct{}
 
@@ -125,14 +131,20 @@ func (r *NodeGypCacheMountsRule) checkStage(
 		return nil
 	}
 
-	signal, ok := stageNativeAddonSignal(stageFacts)
-	if !ok {
+	stageSignal, hasStageSignal := stageNativeAddonSignal(stageFacts)
+	manifestSignal, hasManifestSignal := stagePackageJSONNativeDependency(stageFacts)
+	if !hasStageSignal && !hasManifestSignal {
 		return nil
 	}
 
 	var violations []rules.Violation
 	for _, runFacts := range stageFacts.Runs {
 		manager, ok := jsInstallOrRebuildManager(runFacts)
+		if !ok {
+			continue
+		}
+
+		signal, ok := nativeAddonSignalForRun(stageSignal, hasStageSignal, manifestSignal, hasManifestSignal, runFacts)
 		if !ok {
 			continue
 		}
@@ -200,10 +212,26 @@ func stageNativeAddonSignal(stageFacts *facts.StageFacts) (string, bool) {
 		}
 	}
 
-	if dep, ok := stagePackageJSONNativeDependency(stageFacts); ok {
-		return "package.json declares native addon dependency " + dep, true
-	}
 	return "", false
+}
+
+func nativeAddonSignalForRun(
+	stageSignal string,
+	hasStageSignal bool,
+	manifestSignal nativePackageDependency,
+	hasManifestSignal bool,
+	runFacts *facts.RunFacts,
+) (string, bool) {
+	if hasStageSignal {
+		return stageSignal, true
+	}
+	if !hasManifestSignal {
+		return "", false
+	}
+	if manifestSignal.DevOnly && !runInstallsDevDependencies(runFacts) {
+		return "", false
+	}
+	return "package.json declares native addon dependency " + manifestSignal.Name, true
 }
 
 func isOSPackageInstallManager(manager string) bool {
@@ -234,8 +262,8 @@ func scriptMentionsNativeAddon(script string) bool {
 		strings.Contains(script, "prebuild-install")
 }
 
-func stagePackageJSONNativeDependency(stageFacts *facts.StageFacts) (string, bool) {
-	var dependency string
+func stagePackageJSONNativeDependency(stageFacts *facts.StageFacts) (nativePackageDependency, bool) {
+	var dependency nativePackageDependency
 	stageFacts.ScanObservableFiles(func(file *facts.ObservableFile, pathView facts.ObservablePathView) bool {
 		if pathView.Base() != "package.json" {
 			return true
@@ -251,24 +279,28 @@ func stagePackageJSONNativeDependency(stageFacts *facts.StageFacts) (string, boo
 		}
 		return true
 	})
-	return dependency, dependency != ""
+	return dependency, dependency.Name != ""
 }
 
-func packageJSONNativeDependency(content string) (string, bool) {
+func packageJSONNativeDependency(content string) (nativePackageDependency, bool) {
 	var manifest packageManifest
 	if err := json.Unmarshal([]byte(content), &manifest); err != nil {
-		return "", false
+		return nativePackageDependency{}, false
 	}
 
 	for _, name := range nativePackageNames {
 		if manifest.Dependencies[name] != "" ||
-			manifest.DevDependencies[name] != "" ||
 			manifest.OptionalDependencies[name] != "" ||
 			manifest.PeerDependencies[name] != "" {
-			return name, true
+			return nativePackageDependency{Name: name}, true
 		}
 	}
-	return "", false
+	for _, name := range nativePackageNames {
+		if manifest.DevDependencies[name] != "" {
+			return nativePackageDependency{Name: name, DevOnly: true}, true
+		}
+	}
+	return nativePackageDependency{}, false
 }
 
 func stageHasCustomNativeBuildCache(stageFacts *facts.StageFacts) bool {
@@ -316,11 +348,137 @@ func jsInstallManager(cmd shell.CommandInfo) (string, bool) {
 			return pnpmManager, true
 		}
 	case yarnManager:
-		if cmd.HasAnyArg("install", "add", "rebuild") { //nolint:customlint // "add" is a package manager subcommand, not Dockerfile ADD.
+		hasInstallSubcommand := cmd.HasAnyArg(
+			"install",
+			"add", //nolint:customlint // Package manager subcommand, not Dockerfile ADD.
+			"rebuild",
+		)
+		if yarnBareInstall(cmd) || hasInstallSubcommand {
 			return yarnManager, true
 		}
 	}
 	return "", false
+}
+
+func yarnBareInstall(cmd shell.CommandInfo) bool {
+	if cmd.Subcommand != "" {
+		return false
+	}
+	for _, arg := range cmd.Args {
+		arg = strings.ToLower(shell.DropQuotes(arg))
+		if arg == "-h" || arg == "--help" || arg == "-v" || arg == "--version" ||
+			strings.HasPrefix(arg, "--help=") || strings.HasPrefix(arg, "--version=") {
+			return false
+		}
+	}
+	return true
+}
+
+func runInstallsDevDependencies(runFacts *facts.RunFacts) bool {
+	if runFacts == nil {
+		return false
+	}
+	for _, cmd := range runFacts.CommandInfos {
+		manager, ok := jsInstallManager(cmd)
+		if !ok {
+			continue
+		}
+		if !jsInstallOmitsDevDependencies(manager, cmd) {
+			return true
+		}
+	}
+	return false
+}
+
+func jsInstallOmitsDevDependencies(manager string, cmd shell.CommandInfo) bool {
+	if manager != npmManager && manager != pnpmManager && manager != yarnManager {
+		return false
+	}
+	if commandHasDevDependencyTypeFlag(cmd, "--include") ||
+		commandHasAnyFlag(cmd, "--no-production", "--no-prod") ||
+		commandHasBoolFlagValue(cmd, false, "--production", "--prod") {
+		return false
+	}
+	return commandHasDevDependencyTypeFlag(cmd, "--omit") ||
+		commandHasProductionOnlyFlag(cmd) ||
+		commandHasBoolFlagValue(cmd, true, "--production", "--prod") ||
+		commandHasAnyFlag(cmd, "--production", "--prod")
+}
+
+func commandHasAnyFlag(cmd shell.CommandInfo, flags ...string) bool {
+	for _, arg := range cmd.Args {
+		arg = shell.DropQuotes(arg)
+		if slices.Contains(flags, arg) {
+			return true
+		}
+	}
+	return false
+}
+
+func commandHasDevDependencyTypeFlag(cmd shell.CommandInfo, flag string) bool {
+	for _, value := range commandFlagValues(cmd, flag) {
+		for _, part := range strings.FieldsFunc(value, func(r rune) bool {
+			return r == ',' || unicode.IsSpace(r)
+		}) {
+			if strings.EqualFold(part, "dev") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func commandHasProductionOnlyFlag(cmd shell.CommandInfo) bool {
+	for _, value := range commandFlagValues(cmd, "--only") {
+		switch strings.ToLower(value) {
+		case "prod", "production":
+			return true
+		}
+	}
+	return false
+}
+
+func commandHasBoolFlagValue(cmd shell.CommandInfo, want bool, flags ...string) bool {
+	for _, flag := range flags {
+		for _, value := range commandFlagValues(cmd, flag) {
+			if got, ok := parseBoolFlagValue(value); ok && got == want {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func commandFlagValues(cmd shell.CommandInfo, flag string) []string {
+	var values []string
+	for i, arg := range cmd.Args {
+		arg = shell.DropQuotes(arg)
+		if arg == flag {
+			if i+1 >= len(cmd.Args) {
+				continue
+			}
+			next := shell.DropQuotes(cmd.Args[i+1])
+			if next != "" && !strings.HasPrefix(next, "-") {
+				values = append(values, next)
+			}
+			continue
+		}
+		if value, ok := strings.CutPrefix(arg, flag+"="); ok {
+			values = append(values, shell.DropQuotes(value))
+		}
+	}
+	return values
+}
+
+func parseBoolFlagValue(value string) (bool, bool) {
+	switch strings.ToLower(value) {
+	case "1", "true", "yes":
+		return true, true
+	case "0", "false", "no":
+		return false, true
+	default:
+		return false, false
+	}
 }
 
 func nodeGypDevDirForRun(runFacts *facts.RunFacts) (devdir string, configured, known bool) {

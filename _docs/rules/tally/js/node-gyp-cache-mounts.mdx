@@ -23,6 +23,7 @@ The rule looks for native build signals such as:
 - native addon helpers: `node-gyp`, `node-pre-gyp`, or `prebuild-install`
 - rebuild commands: `npm rebuild`, `pnpm rebuild`, or `yarn rebuild`
 - observable `package.json` dependencies such as `sharp`, `canvas`, `bcrypt`, `sqlite3`, `better-sqlite3`, `node-rdkafka`, `grpc`, or `isolated-vm`
+- dev-only native dependencies, but only when the install command includes dev packages
 
 ## What The Fix Adds
 

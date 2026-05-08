@@ -101,6 +101,61 @@ RUN npm ci
 			wantDetail:     "sharp",
 		},
 		{
+			name: "runtime native dependency still triggers when npm omits dev dependencies",
+			content: `FROM node:20
+WORKDIR /app
+COPY package.json ./package.json
+RUN npm ci --omit=dev
+`,
+			contextFiles: map[string]string{
+				"package.json": `{"dependencies":{"sharp":"0.33.5"}}`,
+			},
+			wantViolations: 1,
+			wantDetail:     "sharp",
+		},
+		{
+			name: "dev-only native dependency does not trigger when npm omits dev dependencies",
+			content: `FROM node:20
+WORKDIR /app
+COPY package.json ./package.json
+RUN npm ci --omit=dev
+`,
+			contextFiles: map[string]string{
+				"package.json": `{"devDependencies":{"sharp":"0.33.5"}}`,
+			},
+			wantViolations: 0,
+		},
+		{
+			name: "dev-only native dependency triggers when npm installs dev dependencies",
+			content: `FROM node:20
+WORKDIR /app
+COPY package.json ./package.json
+RUN npm ci
+`,
+			contextFiles: map[string]string{
+				"package.json": `{"devDependencies":{"sharp":"0.33.5"}}`,
+			},
+			wantViolations: 1,
+			wantDetail:     "sharp",
+		},
+		{
+			name: "bare yarn immutable install triggers",
+			content: `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN yarn --immutable
+`,
+			wantViolations: 1,
+			wantDetail:     "python3",
+		},
+		{
+			name: "bare yarn version command does not trigger",
+			content: `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN yarn --version
+`,
+			wantViolations: 0,
+		},
+		{
 			name: "existing node-gyp cache mount suppresses violation",
 			content: `FROM node:20
 RUN apt-get update && apt-get install -y python3 make g++
