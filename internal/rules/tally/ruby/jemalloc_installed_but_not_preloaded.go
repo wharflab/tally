@@ -279,9 +279,38 @@ func jemallocViolationLocation(
 	return rules.NewLocationFromRanges(file, runFacts.Run.Location())
 }
 
+// libjemalloc2ProvidingPackages are the apt-family packages that install
+// libjemalloc.so.2 — the file the canonical fix symlinks to. libjemalloc1
+// is intentionally excluded because it ships libjemalloc.so.1 instead, so
+// a generated `ln -sf … libjemalloc.so.2 …` would point at a non-existent
+// file and the suggested fix would not actually load jemalloc.
+var libjemalloc2ProvidingPackages = map[string]bool{
+	"libjemalloc2":    true, // ships /usr/lib/<arch>-linux-gnu/libjemalloc.so.2
+	"libjemalloc-dev": true, // depends on libjemalloc2 and adds the unversioned link
+}
+
+// installCommandProvidesLibjemalloc2 reports whether the install command
+// adds a package that ships /usr/lib/<arch>-linux-gnu/libjemalloc.so.2.
+func installCommandProvidesLibjemalloc2(ic shell.InstallCommand) bool {
+	if !aptPackageManagers[strings.ToLower(ic.Manager)] {
+		return false
+	}
+	for _, pkg := range ic.Packages {
+		stripped := strings.ToLower(shell.StripPackageVersion(pkg.Normalized))
+		if libjemalloc2ProvidingPackages[stripped] {
+			return true
+		}
+	}
+	return false
+}
+
 // buildJemallocPreloadFix returns the canonical Rails-style fix: insert a new
 // `RUN ln -sf … && ENV LD_PRELOAD=…` block on the line *after* the install RUN.
-// Only emitted for the apt-family case where the path layout is well-known.
+// Only emitted for apt-family installs of a package that actually ships
+// libjemalloc.so.2 (libjemalloc2 / libjemalloc-dev). For libjemalloc1 the
+// canonical fix would link to a non-existent `.so.2` file, so no fix is
+// offered there; the violation still fires.
+//
 // The edit is a single zero-width insertion at column 0 of the line following
 // the install RUN, so it does not collide with content edits other rules might
 // apply to the install RUN itself.
@@ -309,7 +338,7 @@ func buildJemallocPreloadFix(
 	if runFacts == nil || runFacts.Run == nil || sm == nil {
 		return nil
 	}
-	if !aptPackageManagers[strings.ToLower(ic.Manager)] {
+	if !installCommandProvidesLibjemalloc2(ic) {
 		return nil
 	}
 

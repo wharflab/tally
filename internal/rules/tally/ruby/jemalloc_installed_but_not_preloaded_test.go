@@ -427,6 +427,73 @@ func TestJemallocInstalledButNotPreloadedRule_NoFixForApk(t *testing.T) {
 	}
 }
 
+// Regression: libjemalloc1 ships libjemalloc.so.1, not .so.2, so the
+// canonical fix would link to a non-existent file. The rule still fires,
+// but the auto-fix must be omitted for that legacy package.
+func TestJemallocInstalledButNotPreloadedRule_NoFixForLibjemalloc1(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ruby:3.3-slim\nRUN apt-get install -y libjemalloc1\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	if violations[0].SuggestedFix != nil {
+		t.Errorf("expected no SuggestedFix for libjemalloc1 (.so.2 target does not exist), got fix with NewText=%q",
+			violations[0].SuggestedFix.Edits[0].NewText)
+	}
+}
+
+func TestJemallocInstalledButNotPreloadedRule_FixForLibjemallocDev(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ruby:3.3-slim\nRUN apt-get install -y libjemalloc-dev\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected SuggestedFix for libjemalloc-dev (depends on libjemalloc2)")
+	}
+}
+
+func TestInstallCommandProvidesLibjemalloc2(t *testing.T) {
+	t.Parallel()
+
+	makeIC := func(manager string, names ...string) shell.InstallCommand {
+		pkgs := make([]shell.PackageArg, 0, len(names))
+		for _, n := range names {
+			pkgs = append(pkgs, shell.PackageArg{Normalized: n})
+		}
+		return shell.InstallCommand{Manager: manager, Packages: pkgs}
+	}
+
+	tests := []struct {
+		name string
+		ic   shell.InstallCommand
+		want bool
+	}{
+		{name: "apt-get libjemalloc2", ic: makeIC("apt-get", "libjemalloc2"), want: true},
+		{name: "apt-get libjemalloc-dev", ic: makeIC("apt-get", "libjemalloc-dev"), want: true},
+		{name: "apt-get libjemalloc2 versioned", ic: makeIC("apt-get", "libjemalloc2=5.3.0-1"), want: true},
+		{name: "apt-get mixed with libjemalloc2", ic: makeIC("apt-get", "curl", "libjemalloc2"), want: true},
+		{name: "apt-get libjemalloc1 only", ic: makeIC("apt-get", "libjemalloc1"), want: false},
+		{name: "apt-get other packages only", ic: makeIC("apt-get", "curl"), want: false},
+		{name: "apk jemalloc not apt family", ic: makeIC("apk", "jemalloc"), want: false},
+		{name: "dnf jemalloc not apt family", ic: makeIC("dnf", "jemalloc"), want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := installCommandProvidesLibjemalloc2(tt.ic); got != tt.want {
+				t.Errorf("installCommandProvidesLibjemalloc2(%v) = %v, want %v", tt.ic.Packages, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestJemallocInstalledButNotPreloadedRule_ViolationLocation(t *testing.T) {
 	t.Parallel()
 

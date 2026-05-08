@@ -85,6 +85,11 @@ re-running on a layout that already has the symlink replaces it instead of faili
 If the stage already contains a `ln -s … libjemalloc.so` step and only forgot the `ENV LD_PRELOAD`, the fix
 emits **only** the missing `ENV` line — no redundant symlink.
 
+The auto-fix is offered only for installs of `libjemalloc2` or `libjemalloc-dev`, which both ship
+`libjemalloc.so.2` at `/usr/lib/<arch>-linux-gnu/`. The legacy `libjemalloc1` package ships `libjemalloc.so.1`
+instead, so the canonical `.so.2` target does not exist there — the violation still fires but no auto-fix is
+emitted. Migrate to `libjemalloc2` for production images.
+
 For Alpine, RHEL/Fedora, openSUSE, and other distros the canonical path differs, so no auto-fix is offered;
 the violation still fires. Add the equivalent symlink + `ENV LD_PRELOAD=…` (or `MALLOC_CONF`) for your
 distro.
