@@ -248,6 +248,23 @@ RUN --mount=type=cache,target=/cache/node-gyp npm_config_devdir=/cache/node-gyp 
 			wantViolations: 0,
 		},
 		{
+			name: "inline devdir on first command does not suppress later default command",
+			content: `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN --mount=type=cache,target=/cache/gyp npm_config_devdir=/cache/gyp npm ci && npm rebuild sharp
+`,
+			wantViolations: 1,
+			wantDetail:     "python3",
+		},
+		{
+			name: "same inline devdir on each command suppresses violation",
+			content: `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN --mount=type=cache,target=/cache/gyp npm_config_devdir=/cache/gyp npm ci && npm_config_devdir=/cache/gyp npm rebuild sharp
+`,
+			wantViolations: 0,
+		},
+		{
 			name: "exported node-gyp devdir cache mount suppresses violation",
 			content: `FROM node:20
 RUN apt-get update && apt-get install -y python3 make g++
@@ -443,6 +460,45 @@ RUN npm_config_devdir=/cache/node-gyp npm ci
 	}, "\n") + "\n"
 	if got != want {
 		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestNodeGypCacheMountsRule_FixWithMixedInlineDevDirs(t *testing.T) {
+	t.Parallel()
+
+	const content = `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN npm_config_devdir=/cache/node-gyp npm ci && npm rebuild sharp
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewNodeGypCacheMountsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	result, err := (&fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}).Apply(
+		context.Background(),
+		violations,
+		map[string][]byte{"Dockerfile": []byte(content)},
+	)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := strings.Join([]string{
+		"FROM node:20",
+		"RUN apt-get update && apt-get install -y python3 make g++",
+		"RUN --mount=type=cache,target=/root/.npm,id=npm " +
+			"--mount=type=cache,target=/cache/node-gyp,id=node-gyp,sharing=locked " +
+			"--mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked " +
+			"--mount=type=tmpfs,target=/tmp npm_config_devdir=/cache/node-gyp npm ci && npm rebuild sharp",
+	}, "\n") + "\n"
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+	if strings.Contains(got, `NPM_CONFIG_DEVDIR="`) {
+		t.Fatalf("mixed inline/default devdirs must not get blanket env prefix; got:\n%s", got)
 	}
 }
 

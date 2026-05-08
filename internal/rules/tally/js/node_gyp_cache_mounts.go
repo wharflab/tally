@@ -149,12 +149,12 @@ func (r *NodeGypCacheMountsRule) checkStage(
 			continue
 		}
 
-		devdir, devdirConfigured, devdirKnown := nodeGypDevDirForRun(runFacts)
+		devdirs, devdirConfigured, devdirKnown := nodeGypDevDirsForRun(runFacts)
 		if !devdirKnown {
 			continue
 		}
 		existing := runmount.GetMounts(runFacts.Run)
-		if hasNodeGypHeaderCache(existing, devdir) {
+		if hasNodeGypHeaderCaches(existing, devdirs) {
 			continue
 		}
 
@@ -162,7 +162,7 @@ func (r *NodeGypCacheMountsRule) checkStage(
 			manager,
 			runFacts,
 			existing,
-			devdir,
+			devdirs,
 			preferPackageCacheMountsEnabled,
 		)
 		if len(mounts) == 0 {
@@ -176,7 +176,7 @@ func (r *NodeGypCacheMountsRule) checkStage(
 			meta,
 			sm,
 			mounts,
-			devdir,
+			devdirs[0],
 			!devdirConfigured && !runScriptHasNodeGypDevDir(runFacts.CommandScript),
 		); fix != nil {
 			v = v.WithSuggestedFix(fix)
@@ -560,15 +560,24 @@ func parseBoolFlagValue(value string) (bool, bool) {
 	}
 }
 
-func nodeGypDevDirForRun(runFacts *facts.RunFacts) (devdir string, configured, known bool) {
+func nodeGypDevDirsForRun(runFacts *facts.RunFacts) (devdirs []string, configured, known bool) {
 	if runFacts == nil {
-		return defaultNodeGypDevDir, false, true
+		return []string{defaultNodeGypDevDir}, false, true
 	}
-	if devdir, found, ok := inlineNodeGypDevDir(runFacts.CommandScript, runFacts.Shell.Variant, runFacts.Workdir); found {
-		return devdir, true, ok
+	fallbackDevDir, envConfigured := configuredNodeGypDevDir(runFacts.Env, runFacts.Workdir)
+	inlineDevDirs, inlineConfigured, inlineKnown := inlineNodeGypDevDirs(
+		runFacts.CommandScript,
+		runFacts.Shell.Variant,
+		runFacts.Workdir,
+		fallbackDevDir,
+	)
+	if !inlineKnown {
+		return nil, false, false
 	}
-	devdir, configured = configuredNodeGypDevDir(runFacts.Env, runFacts.Workdir)
-	return devdir, configured, true
+	if len(inlineDevDirs) > 0 {
+		return inlineDevDirs, envConfigured || inlineConfigured, true
+	}
+	return []string{fallbackDevDir}, envConfigured, true
 }
 
 func configuredNodeGypDevDir(env facts.EnvFacts, workdir string) (string, bool) {
@@ -600,9 +609,14 @@ func hasControlChar(value string) bool {
 	return false
 }
 
-func inlineNodeGypDevDir(script string, variant shell.Variant, workdir string) (devdir string, found, known bool) {
+func inlineNodeGypDevDirs(
+	script string,
+	variant shell.Variant,
+	workdir string,
+	fallbackDevDir string,
+) (devdirs []string, configured, known bool) {
 	if strings.TrimSpace(script) == "" || !variant.SupportsPOSIXShellAST() {
-		return "", false, true
+		return nil, false, true
 	}
 
 	parser := syntax.NewParser(
@@ -611,7 +625,8 @@ func inlineNodeGypDevDir(script string, variant shell.Variant, workdir string) (
 	)
 	prog, err := parser.Parse(strings.NewReader(script), "")
 	if err != nil {
-		return "", runScriptHasNodeGypDevDir(script), !runScriptHasNodeGypDevDir(script)
+		hasDevDir := runScriptHasNodeGypDevDir(script)
+		return nil, hasDevDir, !hasDevDir
 	}
 
 	known = true
@@ -625,6 +640,7 @@ func inlineNodeGypDevDir(script string, variant shell.Variant, workdir string) (
 				exportedDevDir = value
 				exportedFound = true
 				exportedKnown = valueKnown
+				configured = true
 			}
 			return true
 		case *syntax.CallExpr:
@@ -632,29 +648,44 @@ func inlineNodeGypDevDir(script string, variant shell.Variant, workdir string) (
 				exportedDevDir = value
 				exportedFound = true
 				exportedKnown = valueKnown
+				configured = true
 				return true
 			}
 			if !callIsJSInstallManager(n) {
 				return true
 			}
 			if value, ok, valueKnown := callNodeGypDevDir(n, workdir); ok {
-				devdir = value
-				found = true
-				known = valueKnown
-				return false
+				configured = true
+				if !valueKnown {
+					known = false
+					return false
+				}
+				devdirs = appendUniqueDevDir(devdirs, value)
+				return true
 			}
 			if exportedFound {
-				devdir = exportedDevDir
-				found = true
-				known = exportedKnown
-				return false
+				if !exportedKnown {
+					known = false
+					return false
+				}
+				devdirs = appendUniqueDevDir(devdirs, exportedDevDir)
+				return true
 			}
-			return false
+			devdirs = appendUniqueDevDir(devdirs, fallbackDevDir)
+			return true
 		default:
 			return true
 		}
 	})
-	return devdir, found, known
+	return devdirs, configured, known
+}
+
+func appendUniqueDevDir(devdirs []string, devdir string) []string {
+	devdir = path.Clean(devdir)
+	if slices.Contains(devdirs, devdir) {
+		return devdirs
+	}
+	return append(devdirs, devdir)
 }
 
 func nodeGypSyntaxVariant(variant shell.Variant) syntax.LangVariant {
@@ -828,32 +859,29 @@ func runScriptHasNodeGypDevDir(script string) bool {
 		strings.Contains(script, nodeGypLowerDevDirEnvKey+"=")
 }
 
-// hasNodeGypHeaderCache reports whether `existing` already mounts a cache at
-// the resolved node-gyp devdir. The match is strict on `target` rather than
+// hasNodeGypHeaderCaches reports whether `existing` already mounts caches at
+// all resolved node-gyp devdirs. The match is strict on `target` rather than
 // loose on the cache id, because a mount like
 // `--mount=type=cache,target=/tmp,id=node-gyp` carries a node-gyp-flavored
 // id while caching the wrong directory — node-gyp would still write to its
 // real devdir and the rule must keep reporting.
-func hasNodeGypHeaderCache(existing []*instructions.Mount, devdir string) bool {
-	if devdir == "" {
+func hasNodeGypHeaderCaches(existing []*instructions.Mount, devdirs []string) bool {
+	if len(devdirs) == 0 {
 		return false
 	}
-	for _, mount := range existing {
-		if mount == nil || mount.Type != instructions.MountTypeCache {
-			continue
-		}
-		if path.Clean(mount.Target) == devdir {
-			return true
+	for _, devdir := range devdirs {
+		if !hasCacheMountTarget(existing, devdir) {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 func requiredNativeBuildMounts(
 	manager string,
 	runFacts *facts.RunFacts,
 	existing []*instructions.Mount,
-	devdir string,
+	devdirs []string,
 	preferPackageCacheMountsEnabled bool,
 ) []*instructions.Mount {
 	var mounts []*instructions.Mount
@@ -863,7 +891,10 @@ func requiredNativeBuildMounts(
 		}
 	}
 
-	if !hasCacheMountTarget(existing, devdir) {
+	for _, devdir := range devdirs {
+		if hasCacheMountTarget(existing, devdir) {
+			continue
+		}
 		mounts = append(mounts, &instructions.Mount{
 			Type:         instructions.MountTypeCache,
 			Target:       devdir,
