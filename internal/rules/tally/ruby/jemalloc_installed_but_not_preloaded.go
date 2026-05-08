@@ -542,9 +542,17 @@ func stageReferencesJemallocSymlink(sf *facts.StageFacts) bool {
 			if target == "" {
 				continue
 			}
-			if path.Clean(target) == jemallocCanonicalSymlinkPath {
-				return true
+			if path.Clean(target) != jemallocCanonicalSymlinkPath {
+				continue
 			}
+			// Source must reference a jemalloc shared object — otherwise a
+			// command like `cp /tmp/libfoo.so /usr/local/lib/libjemalloc.so`
+			// would suppress the symlink half of the fix, leaving LD_PRELOAD
+			// pointing at a non-jemalloc library.
+			if !nonTargetArgsReferenceJemalloc(ci.Args) {
+				continue
+			}
+			return true
 		}
 	}
 	return false
@@ -559,6 +567,33 @@ func lastNonFlagArg(args []string) string {
 		}
 	}
 	return ""
+}
+
+// nonTargetArgsReferenceJemalloc reports whether any non-flag arg *other than
+// the last one* (the target of a create/move command) references a jemalloc
+// shared object. Used to verify that a `cp`/`mv`/`install`/`ln` writing into
+// /usr/local/lib/libjemalloc.so is actually copying jemalloc, not an
+// unrelated `.so`.
+func nonTargetArgsReferenceJemalloc(args []string) bool {
+	targetIdx := -1
+	for i, arg := range slices.Backward(args) {
+		if !strings.HasPrefix(arg, "-") {
+			targetIdx = i
+			break
+		}
+	}
+	if targetIdx <= 0 {
+		return false
+	}
+	for _, arg := range args[:targetIdx] {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		if strings.Contains(strings.ToLower(arg), "libjemalloc") {
+			return true
+		}
+	}
+	return false
 }
 
 func init() {

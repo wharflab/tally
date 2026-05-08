@@ -415,6 +415,24 @@ func TestStageReferencesJemallocSymlink(t *testing.T) {
 				"    && install -m 644 /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n",
 			want: true,
 		},
+		{
+			// Regression: target is canonical but the source is some
+			// unrelated .so. Counting this would have LD_PRELOAD load a
+			// non-jemalloc library.
+			name: "cp of unrelated .so to canonical path does not count",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && cp /tmp/libfoo.so /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
+			// Regression: ln -s pointing at an unrelated source. Same risk.
+			name: "ln -s of unrelated .so to canonical path does not count",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /tmp/libfoo.so /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
