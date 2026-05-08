@@ -381,6 +381,40 @@ RUN npm install && npm rebuild sharp
 	}
 }
 
+// Regression: when a stage uses a non-POSIX shell (e.g. PowerShell via
+// `SHELL ["pwsh", "-Command"]`), the inline `KEY="…" cmd` env-prefix is
+// not valid POSIX syntax and would break the RUN. The rule must skip the
+// inline env edits in that case (the cache-mount edits, which live on
+// the RUN flag prefix, are still safe and remain).
+func TestNodeGypCacheMountsRule_FixSkipsDevDirEnvUnderPowerShell(t *testing.T) {
+	t.Parallel()
+
+	const content = `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+SHELL ["pwsh", "-Command"]
+RUN npm install
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewNodeGypCacheMountsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	result, err := (&fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}).Apply(
+		context.Background(),
+		violations,
+		map[string][]byte{"Dockerfile": []byte(content)},
+	)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	if strings.Contains(got, `NPM_CONFIG_DEVDIR="`) {
+		t.Errorf("PowerShell stage must not get POSIX-style env prefix; got:\n%s", got)
+	}
+}
+
 func TestNodeGypCacheMountsRule_FixWithExistingRunFlag(t *testing.T) {
 	t.Parallel()
 

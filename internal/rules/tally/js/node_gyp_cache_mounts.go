@@ -761,6 +761,13 @@ func buildNodeGypDevDirEnvEdits(
 	if run == nil || sm == nil || !run.PrependShell || len(run.Files) > 0 {
 		return nil, false
 	}
+	// The inline assignment `NPM_CONFIG_DEVDIR="…" npm install …` is POSIX
+	// shell syntax. PowerShell and other non-POSIX shells parse it as a bare
+	// token and the resulting RUN fails to execute, so skip the env edits
+	// when the active shell variant is not POSIX-compatible.
+	if !shellVariant.SupportsPOSIXShellAST() {
+		return nil, false
+	}
 	envAssignment, ok := nodeGypDevDirEnvAssignment(devdir)
 	if !ok {
 		return nil, false
