@@ -737,6 +737,56 @@ func TestJemallocInstalledButNotPreloadedRule_FixInsertsAfterLaterSymlinkRemoval
 	}
 }
 
+// Regression: a later `cp /tmp/libfoo.so /usr/local/lib/libjemalloc.so`
+// overwrites the canonical path with an unrelated .so. The fix must
+// land *after* that overwrite so the recreated symlink survives.
+func TestJemallocInstalledButNotPreloadedRule_FixInsertsAfterLaterCpOverwrite(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ruby:3.3-slim\n" + // L1
+		"RUN apt-get install -y libjemalloc2\n" + // L2
+		"RUN cp /tmp/libfoo.so /usr/local/lib/libjemalloc.so\n" + // L3 — overwrites
+		"CMD [\"bin/rails\", \"server\"]\n" // L4
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix")
+	}
+	if got := fix.Edits[0].Location.Start.Line; got != 4 {
+		t.Errorf("insert anchor line = %d, want 4 (after the cp overwrite at L3)", got)
+	}
+	if !strings.Contains(fix.Edits[0].NewText, "ln -sf") {
+		t.Errorf("expected ln -sf in fix text after invalidation, got %q", fix.Edits[0].NewText)
+	}
+}
+
+// A jemalloc-sourced overwrite is fine — canonical path stays valid, so
+// the fix anchor does NOT need to be pushed past it.
+func TestJemallocInstalledButNotPreloadedRule_FixDoesNotPushPastJemallocOverwrite(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ruby:3.3-slim\n" + // L1
+		"RUN apt-get install -y libjemalloc2\n" + // L2
+		"RUN cp /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" + // L3 — valid recreate
+		"CMD [\"bin/rails\", \"server\"]\n" // L4
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	// The L3 RUN counts as a creation (jemalloc-sourced), so present is
+	// true at the end → fix is the ENV-only branch and lands at L3 (right
+	// after the install RUN at L2). It must NOT be pushed to L4 by the
+	// invalidating-run logic.
+	if got := violations[0].SuggestedFix.Edits[0].Location.Start.Line; got != 3 {
+		t.Errorf("insert anchor line = %d, want 3 (jemalloc overwrite is not invalidating)", got)
+	}
+}
+
 func TestJemallocInstalledButNotPreloadedRule_FixInsertsAfterLaterMvAway(t *testing.T) {
 	t.Parallel()
 

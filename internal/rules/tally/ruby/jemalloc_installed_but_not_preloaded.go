@@ -431,11 +431,18 @@ func envValueIsAwkwardToQuote(s string) bool {
 	return strings.ContainsAny(s, "\"\\")
 }
 
-// lastJemallocSymlinkRemovalRunEndLine returns the (1-based, multi-line-aware)
-// end line of the *last* RUN in the stage whose parsed commands include a
-// removal of the canonical /usr/local/lib/libjemalloc.so path (rm, unlink,
-// or mv away from it). Returns 0 when no such RUN exists.
-func lastJemallocSymlinkRemovalRunEndLine(sf *facts.StageFacts, sm *sourcemap.SourceMap) int {
+// lastJemallocSymlinkInvalidatingRunEndLine returns the (1-based,
+// multi-line-aware) end line of the *last* RUN in the stage whose parsed
+// commands invalidate the canonical /usr/local/lib/libjemalloc.so path —
+// either by removing it (rm, unlink, mv-away) or by overwriting it with a
+// non-jemalloc source (cp/mv/install/ln targeting the canonical path with
+// a source that does not reference jemalloc). Returns 0 when no such RUN
+// exists.
+//
+// An overwrite with a *jemalloc* source is intentionally not counted: the
+// canonical path remains valid jemalloc afterwards, so there's nothing to
+// recover and pushing the fix past it would be cosmetic noise.
+func lastJemallocSymlinkInvalidatingRunEndLine(sf *facts.StageFacts, sm *sourcemap.SourceMap) int {
 	if sf == nil || sm == nil {
 		return 0
 	}
@@ -444,23 +451,26 @@ func lastJemallocSymlinkRemovalRunEndLine(sf *facts.StageFacts, sm *sourcemap.So
 		if rf == nil || rf.Run == nil {
 			continue
 		}
-		removes := false
+		invalidates := false
 		for _, ci := range rf.CommandInfos {
 			switch {
 			case jemallocSymlinkRemovingCommands[ci.Name]:
 				if commandRemovesJemallocSymlink(ci) {
-					removes = true
+					invalidates = true
 				}
-			case ci.Name == "mv":
-				if commandRemovesJemallocSymlink(ci) {
-					removes = true
+			case jemallocSymlinkCreatingCommands[ci.Name]:
+				if ci.Name == "mv" && commandRemovesJemallocSymlink(ci) {
+					invalidates = true
+				}
+				if commandTargetsCanonicalSymlinkPath(ci) && !nonTargetArgsReferenceJemalloc(ci.Args) {
+					invalidates = true
 				}
 			}
-			if removes {
+			if invalidates {
 				break
 			}
 		}
-		if !removes {
+		if !invalidates {
 			continue
 		}
 		locs := rf.Run.Location()
@@ -680,7 +690,7 @@ func buildJemallocPreloadFix(
 			insertLine = line + 1
 		}
 	}
-	if line := lastJemallocSymlinkRemovalRunEndLine(sf, sm); line > endLine && line+1 > insertLine {
+	if line := lastJemallocSymlinkInvalidatingRunEndLine(sf, sm); line > endLine && line+1 > insertLine {
 		insertLine = line + 1
 	}
 	envLine := buildJemallocLDPreloadEnvLine(sf)
