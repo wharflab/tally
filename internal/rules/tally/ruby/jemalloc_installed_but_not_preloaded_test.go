@@ -300,6 +300,45 @@ func TestStageReferencesJemallocSymlink(t *testing.T) {
 				"    && cp /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n",
 			want: true,
 		},
+		{
+			// Regression: cp where libjemalloc.so is the SOURCE, not the
+			// target. The canonical file is not created here; the fix must
+			// keep emitting the ln -sf step.
+			name: "cp with libjemalloc.so as source not target",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && cp /opt/libjemalloc.so /tmp/backup.so\n",
+			want: false,
+		},
+		{
+			// Regression: mv from the canonical target REMOVES the file
+			// rather than creating it. Counting this would leave LD_PRELOAD
+			// pointing at a missing file.
+			name: "mv from canonical target removes the file",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && mv /usr/local/lib/libjemalloc.so /tmp/old.so\n",
+			want: false,
+		},
+		{
+			// Symlink TARGET written with redundant `..` segments still
+			// resolves to the canonical path under path.Clean.
+			name: "ln target with .. segments resolves to canonical",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/../lib/libjemalloc.so\n",
+			want: true,
+		},
+		{
+			// `ln -s SRC` form (no explicit target) creates the symlink in
+			// the current directory with the basename of SRC. Without a
+			// canonical target, we conservatively don't suppress the fix.
+			name: "ln without explicit target does not count",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2\n",
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

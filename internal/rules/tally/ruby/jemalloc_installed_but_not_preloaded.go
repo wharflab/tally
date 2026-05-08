@@ -2,6 +2,7 @@ package ruby
 
 import (
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/wharflab/tally/internal/facts"
@@ -12,11 +13,16 @@ import (
 	"github.com/wharflab/tally/internal/stagename"
 )
 
+// jemallocCanonicalSymlinkPath is the path our suggested fix points
+// LD_PRELOAD at. The "stage already creates the symlink" guardrail must
+// verify this exact path is the *target* of an existing create/move, not just
+// that the path appears anywhere in the script.
+const jemallocCanonicalSymlinkPath = "/usr/local/lib/libjemalloc.so"
+
 // jemallocSymlinkCreatingCommands are the parsed command names that can
-// materialize a libjemalloc.so file at the target path. Substring scans on the
-// raw script are too loose — `find`, `echo`, or stray references would falsely
-// suppress the symlink half of the fix, leaving LD_PRELOAD pointing at a
-// missing file.
+// materialize a file at a target path. Substring scans on the raw script are
+// too loose — `find`, `echo`, or stray references would falsely suppress the
+// symlink half of the fix, leaving LD_PRELOAD pointing at a missing file.
 var jemallocSymlinkCreatingCommands = map[string]bool{
 	"ln":      true,
 	"cp":      true,
@@ -340,17 +346,24 @@ ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"
 }
 
 // stageReferencesJemallocSymlink reports whether the stage already contains a
-// RUN that creates a libjemalloc.so file — typically a `ln -s` step that
-// materializes the canonical symlink, or a `cp`/`mv`/`install` of an
-// equivalently-named file.
+// RUN that creates the canonical /usr/local/lib/libjemalloc.so file — i.e.
+// the exact path our suggested fix points LD_PRELOAD at. Typically this is a
+// `ln -s SRC /usr/local/lib/libjemalloc.so` step, but `cp`, `mv`, and
+// `install` with the same target are also accepted.
 //
 // The check inspects parsed command invocations (not raw text) and only
-// matches when a non-flag argument's basename is exactly `libjemalloc.so`.
-// This rejects unrelated references like `find / -name 'libjemalloc.so*'`,
-// `echo` of a docs string, or matches on `libjemalloc.so.2` (the apt-shipped
-// versioned library, not the symlink target). Without this narrowing, the
-// fix could emit only `ENV LD_PRELOAD=/usr/local/lib/libjemalloc.so` against
-// a stage that never creates that file, leaving jemalloc unloaded.
+// matches when the LAST non-flag argument of a create/move command resolves
+// to /usr/local/lib/libjemalloc.so under path.Clean. Earlier non-flag args
+// are intentionally ignored: they are the source(s), and matching them would
+// cause `cp /opt/libjemalloc.so /tmp/backup.so` or
+// `mv /usr/local/lib/libjemalloc.so /tmp/old.so` to be treated as "the
+// symlink exists" — the latter actually removes the canonical file, so
+// suppressing the symlink half of the fix would leave LD_PRELOAD pointing at
+// a missing file.
+//
+// References that are not create/move (find, echo, ls, ...) and references to
+// libjemalloc.so.2 (the apt-shipped versioned library, not the symlink
+// target) are rejected by construction.
 func stageReferencesJemallocSymlink(sf *facts.StageFacts) bool {
 	if sf == nil {
 		return false
@@ -363,17 +376,27 @@ func stageReferencesJemallocSymlink(sf *facts.StageFacts) bool {
 			if !jemallocSymlinkCreatingCommands[ci.Name] {
 				continue
 			}
-			for _, arg := range ci.Args {
-				if strings.HasPrefix(arg, "-") {
-					continue
-				}
-				if path.Base(arg) == "libjemalloc.so" {
-					return true
-				}
+			target := lastNonFlagArg(ci.Args)
+			if target == "" {
+				continue
+			}
+			if path.Clean(target) == jemallocCanonicalSymlinkPath {
+				return true
 			}
 		}
 	}
 	return false
+}
+
+// lastNonFlagArg returns the last argument that does not start with `-`,
+// or "" if every arg is a flag.
+func lastNonFlagArg(args []string) string {
+	for _, arg := range slices.Backward(args) {
+		if !strings.HasPrefix(arg, "-") {
+			return arg
+		}
+	}
+	return ""
 }
 
 func init() {
