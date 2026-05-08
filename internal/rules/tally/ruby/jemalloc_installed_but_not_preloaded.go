@@ -394,18 +394,24 @@ func stageHasJemallocLoadSignal(sf *facts.StageFacts) bool {
 	return false
 }
 
-// envBoundValue returns the value of an env key that was set by an `ENV`
-// instruction (or inherited from a parent stage's ENV). Values present only
-// in EffectiveEnv.Values via ARG promotion return "" — those are build-time
-// only and do not exist in the final image runtime.
+// envBoundValue returns the *resolved* value of an env key that was set by
+// an `ENV` instruction (or inherited from a parent stage's ENV). Values
+// present only in EffectiveEnv.Values via ARG promotion return "" — those
+// are build-time only and do not exist in the final image runtime.
+//
+// The Bindings map confirms the key was actually written by an ENV
+// instruction; the resolved (variable-expanded) value comes from
+// EffectiveEnv.Values, since binding.Value is the literal right-hand side
+// of the ENV instruction (e.g. `$JEMALLOC_PATH`) and would miss valid
+// chained patterns like `ENV LD_PRELOAD=$JEMALLOC_PATH`.
 func envBoundValue(sf *facts.StageFacts, key string) string {
 	if sf == nil {
 		return ""
 	}
-	if binding, ok := sf.EffectiveEnv.Bindings[key]; ok {
-		return binding.Value
+	if _, ok := sf.EffectiveEnv.Bindings[key]; !ok {
+		return ""
 	}
-	return ""
+	return sf.EffectiveEnv.Values[key]
 }
 
 func envContainsJemallocLDPreload(value string) bool {

@@ -128,6 +128,27 @@ ENV MALLOC_CONF="thp:never"
 `,
 			WantViolations: 0,
 		},
+		// Regression: ENV chaining (LD_PRELOAD=$JEMALLOC_PATH) must resolve
+		// through EffectiveEnv.Values, not the literal binding.Value, so
+		// the load signal is recognized.
+		{
+			Name: "chained ENV LD_PRELOAD via $JEMALLOC_PATH suppresses",
+			Content: `FROM ruby:3.3-slim
+RUN apt-get install -y libjemalloc2
+ENV JEMALLOC_PATH=/usr/local/lib/libjemalloc.so
+ENV LD_PRELOAD=$JEMALLOC_PATH
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "chained ENV MALLOC_CONF via $MALLOC_TUNING suppresses",
+			Content: `FROM ruby:3.3-slim
+RUN apt-get install -y libjemalloc2
+ENV MALLOC_TUNING=narenas:2,background_thread:true,thp:never
+ENV MALLOC_CONF=$MALLOC_TUNING
+`,
+			WantViolations: 0,
+		},
 		// Regression: ARG values are build-time only and absent from the
 		// final image runtime, so an ARG-only LD_PRELOAD must NOT suppress
 		// the violation — the running process still uses glibc malloc.
