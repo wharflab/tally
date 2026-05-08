@@ -801,6 +801,79 @@ func TestJemallocInstalledButNotPreloadedRule_AptFixAfterMultiLineRun(t *testing
 	}
 }
 
+// Regression: when the stage already has a non-jemalloc LD_PRELOAD set via
+// ENV, the fix must preserve that value by prepending the jemalloc path —
+// not overwrite it. Otherwise --fix-unsafe silently drops a deliberate
+// preload chain (instrumentation, sanitizers, etc.).
+func TestJemallocInstalledButNotPreloadedRule_FixPreservesExistingLDPreload(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ruby:3.3-slim\n" + // L1
+		"RUN apt-get install -y libjemalloc2\n" + // L2
+		"ENV LD_PRELOAD=/opt/instrumentation/libtrace.so\n" + // L3 — non-jemalloc
+		"CMD [\"bin/rails\", \"server\"]\n" // L4
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix")
+	}
+	got := fix.Edits[0].NewText
+	want := `ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so /opt/instrumentation/libtrace.so"`
+	if !strings.Contains(got, want) {
+		t.Errorf("fix must preserve existing LD_PRELOAD by prepending jemalloc: got %q, want substring %q", got, want)
+	}
+}
+
+func TestJemallocInstalledButNotPreloadedRule_FixIgnoresUnquotableLDPreload(t *testing.T) {
+	t.Parallel()
+
+	// Awkward existing value (embedded `"`) — fall back to the canonical
+	// path alone so we don't emit a malformed ENV literal.
+	content := "FROM ruby:3.3-slim\n" +
+		"RUN apt-get install -y libjemalloc2\n" +
+		"ENV LD_PRELOAD=/opt/with\"quote.so\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix")
+	}
+	got := fix.Edits[0].NewText
+	if !strings.Contains(got, `ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"`) {
+		t.Errorf("fallback should emit canonical-only ENV: %q", got)
+	}
+	if strings.Contains(got, "with\"quote") {
+		t.Errorf("fix must not splice an awkward-to-quote value into the ENV literal: %q", got)
+	}
+}
+
+// Sanity: no existing LD_PRELOAD ENV — emit just the canonical path.
+func TestJemallocInstalledButNotPreloadedRule_FixNoExistingLDPreloadEmitsCanonical(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ruby:3.3-slim\nRUN apt-get install -y libjemalloc2\n"
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	got := violations[0].SuggestedFix.Edits[0].NewText
+	want := `ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"`
+	if !strings.Contains(got, want) {
+		t.Errorf("expected canonical-only ENV: got %q want substring %q", got, want)
+	}
+	if strings.Contains(got, "/usr/local/lib/libjemalloc.so /") {
+		t.Errorf("no existing LD_PRELOAD should not produce a multi-path value: %q", got)
+	}
+}
+
 func TestJemallocInstalledButNotPreloadedRule_NoFixForApk(t *testing.T) {
 	t.Parallel()
 

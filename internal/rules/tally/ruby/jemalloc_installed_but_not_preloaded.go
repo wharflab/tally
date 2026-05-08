@@ -402,6 +402,35 @@ func stageHasJemallocLoadSignal(sf *facts.StageFacts) bool {
 	return false
 }
 
+// buildJemallocLDPreloadEnvLine returns the `ENV LD_PRELOAD=…` line the fix
+// should emit. When the stage already has an explicit ENV-bound LD_PRELOAD
+// value (one that doesn't already mention jemalloc — otherwise the rule
+// wouldn't have fired), the canonical jemalloc path is *prepended* to that
+// value so the existing preload chain is preserved instead of being
+// silently dropped. The dynamic linker honors space-separated LD_PRELOAD
+// entries and applies them left-to-right, so prepending puts jemalloc
+// first while keeping the user's preload(s) in effect.
+//
+// If the existing value contains characters that would break a simple
+// double-quoted ENV literal (a `"` or trailing backslash), the fix falls
+// back to setting just the canonical path — the user can hand-merge their
+// preload chain afterwards.
+func buildJemallocLDPreloadEnvLine(sf *facts.StageFacts) string {
+	const canonical = jemallocCanonicalSymlinkPath
+	existing := strings.TrimSpace(envBoundValue(sf, "LD_PRELOAD"))
+	if existing == "" || envValueIsAwkwardToQuote(existing) {
+		return "ENV LD_PRELOAD=\"" + canonical + "\"\n"
+	}
+	return "ENV LD_PRELOAD=\"" + canonical + " " + existing + "\"\n"
+}
+
+// envValueIsAwkwardToQuote reports whether an ENV value contains characters
+// that would require non-trivial Dockerfile escaping inside a simple
+// double-quoted literal. Conservatively skips merging in those cases.
+func envValueIsAwkwardToQuote(s string) bool {
+	return strings.ContainsAny(s, "\"\\")
+}
+
 // lastJemallocSymlinkRemovalRunEndLine returns the (1-based, multi-line-aware)
 // end line of the *last* RUN in the stage whose parsed commands include a
 // removal of the canonical /usr/local/lib/libjemalloc.so path (rm, unlink,
@@ -654,15 +683,14 @@ func buildJemallocPreloadFix(
 	if line := lastJemallocSymlinkRemovalRunEndLine(sf, sm); line > endLine && line+1 > insertLine {
 		insertLine = line + 1
 	}
+	envLine := buildJemallocLDPreloadEnvLine(sf)
 	var fixText, description string
 	if stageReferencesJemallocSymlink(sf) {
-		fixText = `ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"
-`
+		fixText = envLine
 		description = "Set LD_PRELOAD so the jemalloc symlink already in this stage is actually loaded"
 	} else {
-		fixText = `RUN ln -sf /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so
-ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so"
-`
+		fixText = "RUN ln -sf /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+			envLine
 		description = "Symlink libjemalloc.so and set LD_PRELOAD so jemalloc is actually loaded"
 	}
 	return &rules.SuggestedFix{

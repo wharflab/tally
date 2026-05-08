@@ -92,6 +92,15 @@ re-running on a layout that already has the symlink replaces it instead of faili
 If the stage already contains a `ln -s … libjemalloc.so` step and only forgot the `ENV LD_PRELOAD`, the fix
 emits **only** the missing `ENV` line — no redundant symlink.
 
+When the stage already sets a non-jemalloc `ENV LD_PRELOAD=…` (for example, an instrumentation/sanitizer
+preload), the fix **preserves** that value by prepending the jemalloc path instead of overwriting it. The
+dynamic linker honors space-separated LD_PRELOAD entries left-to-right, so jemalloc loads first while your
+existing preloads remain in effect:
+
+```dockerfile
+ENV LD_PRELOAD="/usr/local/lib/libjemalloc.so /opt/instrumentation/libtrace.so"
+```
+
 The auto-fix is offered only for installs of `libjemalloc2` or `libjemalloc-dev`, which both ship
 `libjemalloc.so.2` at `/usr/lib/<arch>-linux-gnu/`. The legacy `libjemalloc1` package ships `libjemalloc.so.1`
 instead, so the canonical `.so.2` target does not exist there — the violation still fires but no auto-fix is
