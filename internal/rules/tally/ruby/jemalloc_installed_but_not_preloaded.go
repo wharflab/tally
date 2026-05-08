@@ -7,6 +7,7 @@ import (
 
 	"github.com/distribution/reference"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	dfshell "github.com/moby/buildkit/frontend/dockerfile/shell"
 
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
@@ -129,7 +130,7 @@ func (r *JemallocInstalledButNotPreloadedRule) Check(input rules.LintInput) []ru
 		// Ruby-namespaced rule: only fire on stages that look like a Ruby
 		// runtime. A non-Ruby image (Node, Python, ...) installing jemalloc
 		// for unrelated reasons shouldn't get a Rails-flavored warning.
-		if !stageLooksLikeRuby(input.Semantic.StageInfo(stageIdx), stage, sf) {
+		if !stageLooksLikeRuby(input.Semantic.StageInfo(stageIdx), stage, sf, input.MetaArgs) {
 			continue
 		}
 
@@ -184,13 +185,20 @@ var rubyDerivativeImages = map[string]bool{
 }
 
 // stageLooksLikeRuby reports whether the stage looks like a Ruby/Rails
-// runtime: an official ruby:* base, a known Ruby-runtime derivative,
-// a stage env with Ruby/Rails/Bundler signals, or a runtime command that
-// matches a Ruby app server. Stage refs (`FROM <stage>`) inherit the
-// signal from their parent via facts.StageFacts.EffectiveEnv and the
-// semantic model's resolved base image.
-func stageLooksLikeRuby(info *semantic.StageInfo, stage instructions.Stage, sf *facts.StageFacts) bool {
-	if info != nil && info.BaseImage != nil && !info.BaseImage.IsStageRef && baseImageLooksLikeRuby(info.BaseImage.Raw) {
+// runtime: an official ruby:* base (including ARG-templated forms like
+// `FROM ${RUBY_IMAGE}` resolved against meta ARGs), a known Ruby-runtime
+// derivative, a stage env with Ruby/Rails/Bundler signals, or a runtime
+// command that matches a Ruby app server. Stage refs (`FROM <stage>`)
+// inherit the signal from their parent via facts.StageFacts.EffectiveEnv
+// and the semantic model's resolved base image.
+func stageLooksLikeRuby(
+	info *semantic.StageInfo,
+	stage instructions.Stage,
+	sf *facts.StageFacts,
+	metaArgs []instructions.ArgCommand,
+) bool {
+	if info != nil && info.BaseImage != nil && !info.BaseImage.IsStageRef &&
+		baseImageLooksLikeRuby(info.BaseImage.Raw, metaArgs) {
 		return true
 	}
 	if sf != nil {
@@ -210,9 +218,25 @@ func stageLooksLikeRuby(info *semantic.StageInfo, stage instructions.Stage, sf *
 
 // baseImageLooksLikeRuby reports whether a base image reference points at
 // a Ruby or Rails runtime — the official ruby:* image, a familiar name
-// that mentions "ruby" or "rails", or a known derivative.
-func baseImageLooksLikeRuby(raw string) bool {
-	named, err := reference.ParseNormalizedNamed(strings.ToLower(raw))
+// that mentions "ruby" or "rails", or a known derivative. ARG-templated
+// references like `FROM ${RUBY_IMAGE}` are resolved against meta ARGs
+// (the ones declared before the first FROM) so the classification still
+// works on Dockerfiles that parameterize the base image.
+func baseImageLooksLikeRuby(raw string, metaArgs []instructions.ArgCommand) bool {
+	if rawLooksLikeRuby(raw) {
+		return true
+	}
+	if expanded, ok := expandWithMetaArgs(raw, metaArgs); ok && expanded != raw {
+		return rawLooksLikeRuby(expanded)
+	}
+	return false
+}
+
+// rawLooksLikeRuby parses a base image reference and matches against the
+// known Ruby/Rails name set. Returns false when the reference is unparsable
+// (e.g. still contains a `${VAR}` placeholder).
+func rawLooksLikeRuby(s string) bool {
+	named, err := reference.ParseNormalizedNamed(strings.ToLower(s))
 	if err != nil {
 		return false
 	}
@@ -221,6 +245,32 @@ func baseImageLooksLikeRuby(raw string) bool {
 		return true
 	}
 	return strings.Contains(familiar, "ruby") || strings.Contains(familiar, "rails")
+}
+
+// expandWithMetaArgs resolves `${VAR}`/`$VAR` references in `raw` against
+// the default values of meta ARGs (those declared before the first FROM,
+// which are the only ARGs in scope for FROM expansion). Returns the
+// expanded string and ok=true when expansion succeeded with no unmatched
+// references.
+func expandWithMetaArgs(raw string, metaArgs []instructions.ArgCommand) (string, bool) {
+	if raw == "" || !strings.ContainsAny(raw, "$") {
+		return raw, false
+	}
+	env := make([]string, 0, len(metaArgs))
+	for _, arg := range metaArgs {
+		for _, kv := range arg.Args {
+			if kv.Value == nil {
+				continue
+			}
+			env = append(env, kv.Key+"="+*kv.Value)
+		}
+	}
+	lex := dfshell.NewLex('\\')
+	res, err := lex.ProcessWordWithMatches(raw, dfshell.EnvsFromSlice(env))
+	if err != nil || len(res.Unmatched) > 0 || res.Result == "" {
+		return raw, false
+	}
+	return res.Result, true
 }
 
 // stageRuntimeCommandBasenames returns the lowercased basename of the first

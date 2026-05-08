@@ -236,6 +236,34 @@ RUN apt-get install -y libjemalloc2
 `,
 			WantViolations: 1,
 		},
+		// --- ARG-templated FROM: must expand against meta ARGs ---
+		{
+			Name: "ARG-templated ruby image with default value resolves",
+			Content: `ARG RUBY_IMAGE=ruby:3.3-slim
+FROM ${RUBY_IMAGE}
+RUN apt-get install -y libjemalloc2
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "ARG-templated rails image resolves to non-default",
+			Content: `ARG BASE_IMAGE=ruby:3.3-slim
+FROM $BASE_IMAGE
+RUN apt-get install -y libjemalloc2
+`,
+			WantViolations: 1,
+		},
+		{
+			// Without expansion the rule used to skip this stage entirely;
+			// classification must still fire on the templated-but-non-Ruby
+			// case only when the resolved name is Ruby.
+			Name: "ARG-templated non-Ruby base does not fire",
+			Content: `ARG BASE_IMAGE=python:3.12-slim
+FROM ${BASE_IMAGE}
+RUN apt-get install -y libjemalloc2
+`,
+			WantViolations: 0,
+		},
 	})
 }
 
