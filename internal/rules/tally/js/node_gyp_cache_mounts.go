@@ -368,18 +368,44 @@ func inlineNodeGypDevDir(script string, variant shell.Variant, workdir string) (
 	}
 
 	known = true
+	var exportedDevDir string
+	exportedFound := false
+	exportedKnown := true
 	syntax.Walk(prog, func(node syntax.Node) bool {
-		call, ok := node.(*syntax.CallExpr)
-		if !ok || !callIsJSInstallManager(call) {
+		switch n := node.(type) {
+		case *syntax.DeclClause:
+			if value, ok, valueKnown := declarationNodeGypDevDir(n, workdir); ok {
+				exportedDevDir = value
+				exportedFound = true
+				exportedKnown = valueKnown
+			}
+			return true
+		case *syntax.CallExpr:
+			if value, ok, valueKnown := exportCallNodeGypDevDir(n, workdir); ok {
+				exportedDevDir = value
+				exportedFound = true
+				exportedKnown = valueKnown
+				return true
+			}
+			if !callIsJSInstallManager(n) {
+				return true
+			}
+			if value, ok, valueKnown := callNodeGypDevDir(n, workdir); ok {
+				devdir = value
+				found = true
+				known = valueKnown
+				return false
+			}
+			if exportedFound {
+				devdir = exportedDevDir
+				found = true
+				known = exportedKnown
+				return false
+			}
+			return false
+		default:
 			return true
 		}
-		if value, ok, valueKnown := callNodeGypDevDir(call, workdir); ok {
-			devdir = value
-			found = true
-			known = valueKnown
-			return false
-		}
-		return true
 	})
 	return devdir, found, known
 }
@@ -428,8 +454,19 @@ func callIsJSInstallManager(call *syntax.CallExpr) bool {
 }
 
 func callNodeGypDevDir(call *syntax.CallExpr, workdir string) (string, bool, bool) {
+	return assignmentNodeGypDevDir(call.Assigns, workdir)
+}
+
+func declarationNodeGypDevDir(decl *syntax.DeclClause, workdir string) (string, bool, bool) {
+	if decl == nil || decl.Variant == nil || decl.Variant.Value != "export" {
+		return "", false, true
+	}
+	return assignmentNodeGypDevDir(decl.Args, workdir)
+}
+
+func assignmentNodeGypDevDir(assigns []*syntax.Assign, workdir string) (string, bool, bool) {
 	for _, key := range nodeGypDevDirEnvKeyPrecedence {
-		for _, assign := range call.Assigns {
+		for _, assign := range assigns {
 			if assign.Name == nil || assign.Name.Value != key {
 				continue
 			}
@@ -445,6 +482,49 @@ func callNodeGypDevDir(call *syntax.CallExpr, workdir string) (string, bool, boo
 		}
 	}
 	return "", false, true
+}
+
+func exportCallNodeGypDevDir(call *syntax.CallExpr, workdir string) (string, bool, bool) {
+	if call == nil || len(call.Args) == 0 || call.Args[0].Lit() != "export" {
+		return "", false, true
+	}
+	return exportedArgNodeGypDevDir(call.Args[1:], workdir)
+}
+
+func exportedArgNodeGypDevDir(args []*syntax.Word, workdir string) (string, bool, bool) {
+	for _, key := range nodeGypDevDirEnvKeyPrecedence {
+		for _, arg := range args {
+			value, ok, known := exportedArgValue(arg, key)
+			if !ok {
+				if !known {
+					return "", true, false
+				}
+				continue
+			}
+			devdir, ok := normalizeNodeGypDevDir(value, workdir)
+			return devdir, true, ok
+		}
+	}
+	return "", false, true
+}
+
+func exportedArgValue(arg *syntax.Word, key string) (string, bool, bool) {
+	lit := arg.Lit()
+	if lit == "" {
+		raw, ok := renderShellWord(arg)
+		if !ok {
+			return "", false, true
+		}
+		if strings.HasPrefix(raw, key+"=") {
+			return "", false, false
+		}
+		return "", false, true
+	}
+	gotKey, value, ok := strings.Cut(lit, "=")
+	if !ok || gotKey != key {
+		return "", false, true
+	}
+	return value, true, true
 }
 
 func renderShellWord(word *syntax.Word) (string, bool) {
