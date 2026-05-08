@@ -38,7 +38,7 @@ When `tally/prefer-package-cache-mounts` is not enabled for the same run, the fi
 For shell-form `RUN` instructions, the fix also inserts:
 
 ```dockerfile
-NPM_CONFIG_DEVDIR=/root/.cache/node-gyp
+NPM_CONFIG_DEVDIR="/root/.cache/node-gyp"
 ```
 
 If the stage already sets `NPM_CONFIG_DEVDIR`, `npm_config_devdir`, or `npm_package_config_node_gyp_devdir`, the rule uses that path for the cache
@@ -62,7 +62,7 @@ RUN apt-get update && apt-get install -y python3 make g++
 RUN --mount=type=cache,target=/root/.npm,id=npm \
     --mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked \
     --mount=type=tmpfs,target=/tmp \
-    NPM_CONFIG_DEVDIR=/root/.cache/node-gyp npm ci --omit=dev
+    NPM_CONFIG_DEVDIR="/root/.cache/node-gyp" npm ci --omit=dev
 ```
 
 ### Existing devdir

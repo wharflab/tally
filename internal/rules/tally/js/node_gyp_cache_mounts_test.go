@@ -126,6 +126,14 @@ RUN --mount=type=cache,target=/cache/node-gyp export npm_config_devdir=/cache/no
 			wantViolations: 0,
 		},
 		{
+			name: "quoted exported node-gyp devdir cache mount suppresses violation",
+			content: `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN --mount=type=cache,target=/cache/node-gyp export npm_config_devdir='/cache/node-gyp' && npm ci
+`,
+			wantViolations: 0,
+		},
+		{
 			name: "ccache cache mount suppresses stage",
 			content: `FROM node:20
 RUN --mount=type=cache,target=/root/.cache/ccache apt-get update && apt-get install -y python3 make g++
@@ -225,7 +233,7 @@ RUN npm ci
 		"RUN apt-get update && apt-get install -y python3 make g++",
 		"RUN --mount=type=cache,target=/root/.npm,id=npm " +
 			"--mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked " +
-			"--mount=type=tmpfs,target=/tmp NPM_CONFIG_DEVDIR=/root/.cache/node-gyp npm ci",
+			"--mount=type=tmpfs,target=/tmp NPM_CONFIG_DEVDIR=\"/root/.cache/node-gyp\" npm ci",
 	}, "\n") + "\n"
 	if got != want {
 		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
@@ -302,6 +310,77 @@ RUN export npm_config_devdir=/cache/node-gyp && npm ci
 	}
 }
 
+func TestNodeGypCacheMountsRule_FixWithQuotedExportedDevDir(t *testing.T) {
+	t.Parallel()
+
+	const content = `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN export npm_config_devdir='/cache/node-gyp' && npm ci
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewNodeGypCacheMountsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	result, err := (&fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}).Apply(
+		context.Background(),
+		violations,
+		map[string][]byte{"Dockerfile": []byte(content)},
+	)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := strings.Join([]string{
+		"FROM node:20",
+		"RUN apt-get update && apt-get install -y python3 make g++",
+		"RUN --mount=type=cache,target=/root/.npm,id=npm " +
+			"--mount=type=cache,target=/cache/node-gyp,id=node-gyp,sharing=locked " +
+			"--mount=type=tmpfs,target=/tmp export npm_config_devdir='/cache/node-gyp' && npm ci",
+	}, "\n") + "\n"
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestNodeGypCacheMountsRule_FixAddsDevDirEnvToEachInstallCommand(t *testing.T) {
+	t.Parallel()
+
+	const content = `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN npm install && npm rebuild sharp
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewNodeGypCacheMountsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+
+	result, err := (&fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}).Apply(
+		context.Background(),
+		violations,
+		map[string][]byte{"Dockerfile": []byte(content)},
+	)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := strings.Join([]string{
+		"FROM node:20",
+		"RUN apt-get update && apt-get install -y python3 make g++",
+		"RUN --mount=type=cache,target=/root/.npm,id=npm " +
+			"--mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked " +
+			"--mount=type=tmpfs,target=/tmp NPM_CONFIG_DEVDIR=\"/root/.cache/node-gyp\" npm install && " +
+			"NPM_CONFIG_DEVDIR=\"/root/.cache/node-gyp\" npm rebuild sharp",
+	}, "\n") + "\n"
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+}
+
 func TestNodeGypCacheMountsRule_FixWithExistingRunFlag(t *testing.T) {
 	t.Parallel()
 
@@ -331,7 +410,7 @@ RUN --network=none npm ci
 		"RUN --mount=type=cache,target=/root/.npm,id=npm " +
 			"--mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked " +
 			"--mount=type=tmpfs,target=/tmp --network=none " +
-			"NPM_CONFIG_DEVDIR=/root/.cache/node-gyp npm ci",
+			"NPM_CONFIG_DEVDIR=\"/root/.cache/node-gyp\" npm ci",
 	}, "\n") + "\n"
 	if got != want {
 		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
@@ -370,7 +449,7 @@ RUN npm ci
 		"FROM node:20",
 		"RUN apt-get update && apt-get install -y python3 make g++",
 		"RUN --mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked " +
-			"--mount=type=tmpfs,target=/tmp NPM_CONFIG_DEVDIR=/root/.cache/node-gyp npm ci",
+			"--mount=type=tmpfs,target=/tmp NPM_CONFIG_DEVDIR=\"/root/.cache/node-gyp\" npm ci",
 	}, "\n") + "\n"
 	if got != want {
 		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"unicode"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
 	"mvdan.cc/sh/v3/syntax"
@@ -343,14 +344,23 @@ func configuredNodeGypDevDir(env facts.EnvFacts, workdir string) (string, bool) 
 }
 
 func normalizeNodeGypDevDir(value, workdir string) (string, bool) {
-	value = strings.Trim(strings.TrimSpace(value), `"'`)
-	if value == "" || strings.Contains(value, "$") {
+	value = shell.DropQuotes(strings.TrimSpace(value))
+	if value == "" || strings.Contains(value, "$") || hasControlChar(value) {
 		return "", false
 	}
 	if !path.IsAbs(value) {
 		value = path.Join(workdir, value)
 	}
 	return path.Clean(value), true
+}
+
+func hasControlChar(value string) bool {
+	for _, r := range value {
+		if unicode.IsControl(r) {
+			return true
+		}
+	}
+	return false
 }
 
 func inlineNodeGypDevDir(script string, variant shell.Variant, workdir string) (devdir string, found, known bool) {
@@ -473,7 +483,7 @@ func assignmentNodeGypDevDir(assigns []*syntax.Assign, workdir string) (string, 
 			if assign.Append || assign.Naked || assign.Index != nil || assign.Array != nil || assign.Value == nil {
 				return "", true, false
 			}
-			value, ok := renderShellWord(assign.Value)
+			value, ok := staticShellWordValue(assign.Value)
 			if !ok {
 				return "", true, false
 			}
@@ -509,22 +519,58 @@ func exportedArgNodeGypDevDir(args []*syntax.Word, workdir string) (string, bool
 }
 
 func exportedArgValue(arg *syntax.Word, key string) (string, bool, bool) {
-	lit := arg.Lit()
-	if lit == "" {
+	word, literal := staticShellWordValue(arg)
+	if !literal {
 		raw, ok := renderShellWord(arg)
 		if !ok {
 			return "", false, true
 		}
 		if strings.HasPrefix(raw, key+"=") {
-			return "", false, false
+			return "", true, false
 		}
 		return "", false, true
 	}
-	gotKey, value, ok := strings.Cut(lit, "=")
+	gotKey, value, ok := strings.Cut(word, "=")
 	if !ok || gotKey != key {
 		return "", false, true
 	}
 	return value, true, true
+}
+
+func staticShellWordValue(word *syntax.Word) (string, bool) {
+	if word == nil {
+		return "", false
+	}
+	var b strings.Builder
+	for _, part := range word.Parts {
+		value, ok := staticShellWordPartValue(part)
+		if !ok {
+			return "", false
+		}
+		b.WriteString(value)
+	}
+	return b.String(), true
+}
+
+func staticShellWordPartValue(part syntax.WordPart) (string, bool) {
+	switch p := part.(type) {
+	case *syntax.Lit:
+		return p.Value, true
+	case *syntax.SglQuoted:
+		return p.Value, true
+	case *syntax.DblQuoted:
+		var b strings.Builder
+		for _, nested := range p.Parts {
+			value, ok := staticShellWordPartValue(nested)
+			if !ok {
+				return "", false
+			}
+			b.WriteString(value)
+		}
+		return b.String(), true
+	default:
+		return "", false
+	}
 }
 
 func renderShellWord(word *syntax.Word) (string, bool) {
@@ -541,6 +587,7 @@ func renderShellWord(word *syntax.Word) (string, bool) {
 func runScriptHasNodeGypDevDir(script string) bool {
 	script = strings.ToLower(script)
 	return strings.Contains(script, nodeGypPackageConfigDevDirKey+"=") ||
+		strings.Contains(script, strings.ToLower(nodeGypDevDirEnvAssignmentKey)+"=") ||
 		strings.Contains(script, nodeGypLowerDevDirEnvKey+"=")
 }
 
@@ -685,11 +732,13 @@ func buildNodeGypCacheFix(
 	edits := []rules.TextEdit{mountEdit}
 
 	if addDevDirEnv {
-		if edit, ok := buildNodeGypDevDirEnvEdit(file, runFacts.Run, runFacts.Shell.Variant, sm, devdir); ok {
-			if edit.Location == mountEdit.Location {
-				edits[0].NewText += edit.NewText
-			} else {
-				edits = append(edits, edit)
+		if envEdits, ok := buildNodeGypDevDirEnvEdits(file, runFacts.Run, runFacts.Shell.Variant, sm, devdir); ok {
+			for _, edit := range envEdits {
+				if edit.Location == mountEdit.Location {
+					edits[0].NewText += edit.NewText
+				} else {
+					edits = append(edits, edit)
+				}
 			}
 		}
 	}
@@ -702,21 +751,26 @@ func buildNodeGypCacheFix(
 	}
 }
 
-func buildNodeGypDevDirEnvEdit(
+func buildNodeGypDevDirEnvEdits(
 	file string,
 	run *instructions.RunCommand,
 	shellVariant shell.Variant,
 	sm *sourcemap.SourceMap,
 	devdir string,
-) (rules.TextEdit, bool) {
+) ([]rules.TextEdit, bool) {
 	if run == nil || sm == nil || !run.PrependShell || len(run.Files) > 0 {
-		return rules.TextEdit{}, false
+		return nil, false
+	}
+	envAssignment, ok := nodeGypDevDirEnvAssignment(devdir)
+	if !ok {
+		return nil, false
 	}
 
 	cmds, runStartLine := runcheck.FindCommands(run, shellVariant, sm, npmManager, pnpmManager, yarnManager)
 	if runStartLine == 0 {
-		return rules.TextEdit{}, false
+		return nil, false
 	}
+	var edits []rules.TextEdit
 	for _, cmd := range cmds {
 		if cmd.SourceKind != shell.CommandSourceKindDirect {
 			continue
@@ -728,14 +782,22 @@ func buildNodeGypDevDirEnvEdit(
 		editLine := runStartLine + cmd.Line
 		lineIdx := editLine - 1
 		if lineIdx < 0 || lineIdx >= sm.LineCount() || cmd.StartCol < 0 || cmd.StartCol > len(sm.Line(lineIdx)) {
-			return rules.TextEdit{}, false
+			return nil, false
 		}
-		return rules.TextEdit{
+		edits = append(edits, rules.TextEdit{
 			Location: rules.NewRangeLocation(file, editLine, cmd.StartCol, editLine, cmd.StartCol),
-			NewText:  nodeGypDevDirEnvAssignmentKey + "=" + devdir + " ",
-		}, true
+			NewText:  envAssignment,
+		})
 	}
-	return rules.TextEdit{}, false
+	return edits, len(edits) > 0
+}
+
+func nodeGypDevDirEnvAssignment(devdir string) (string, bool) {
+	devdir = shell.DropQuotes(strings.TrimSpace(devdir))
+	if devdir == "" || hasControlChar(devdir) {
+		return "", false
+	}
+	return fmt.Sprintf("%s=%q ", nodeGypDevDirEnvAssignmentKey, devdir), true
 }
 
 func init() {
