@@ -65,6 +65,24 @@ RUN npm ci
 			wantDetail:     "python3",
 		},
 		{
+			name: "toolchain stage plus exec form npm ci triggers",
+			content: `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN ["npm", "ci"]
+`,
+			wantViolations: 1,
+			wantDetail:     "python3",
+		},
+		{
+			name: "toolchain stage plus exec form pnpm install triggers",
+			content: `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN ["pnpm", "install"]
+`,
+			wantViolations: 1,
+			wantDetail:     "python3",
+		},
+		{
 			name: "same RUN toolchain and npm ci triggers",
 			content: `FROM node:20
 RUN apt-get update && apt-get install -y build-essential && npm ci
@@ -119,6 +137,18 @@ RUN npm ci --omit=dev
 WORKDIR /app
 COPY package.json ./package.json
 RUN npm ci --omit=dev
+`,
+			contextFiles: map[string]string{
+				"package.json": `{"devDependencies":{"sharp":"0.33.5"}}`,
+			},
+			wantViolations: 0,
+		},
+		{
+			name: "dev-only native dependency does not trigger when exec form npm omits dev dependencies",
+			content: `FROM node:20
+WORKDIR /app
+COPY package.json ./package.json
+RUN ["npm", "ci", "--omit=dev"]
 `,
 			contextFiles: map[string]string{
 				"package.json": `{"devDependencies":{"sharp":"0.33.5"}}`,
@@ -233,6 +263,47 @@ RUN npm rebuild sharp
 				t.Fatalf("detail = %q, want substring %q", violations[0].Detail, tt.wantDetail)
 			}
 		})
+	}
+}
+
+func TestNodeGypCacheMountsRule_FixExecFormRun(t *testing.T) {
+	t.Parallel()
+
+	const content = `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN ["npm", "ci"]
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewNodeGypCacheMountsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1", len(violations))
+	}
+	if violations[0].SuggestedFix == nil {
+		t.Fatal("expected suggested fix")
+	}
+
+	result, err := (&fixpkg.Fixer{SafetyThreshold: rules.FixSuggestion}).Apply(
+		context.Background(),
+		violations,
+		map[string][]byte{"Dockerfile": []byte(content)},
+	)
+	if err != nil {
+		t.Fatalf("apply fixes: %v", err)
+	}
+
+	got := string(result.Changes["Dockerfile"].ModifiedContent)
+	want := strings.Join([]string{
+		"FROM node:20",
+		"RUN apt-get update && apt-get install -y python3 make g++",
+		"RUN --mount=type=cache,target=/root/.npm,id=npm " +
+			"--mount=type=cache,target=/root/.cache/node-gyp,id=node-gyp,sharing=locked " +
+			`--mount=type=tmpfs,target=/tmp ["npm", "ci"]`,
+	}, "\n") + "\n"
+	if got != want {
+		t.Fatalf("fixed content =\n%s\nwant:\n%s", got, want)
+	}
+	if strings.Contains(got, `NPM_CONFIG_DEVDIR="`) {
+		t.Fatalf("exec-form fix must not inject shell env syntax; got:\n%s", got)
 	}
 }
 

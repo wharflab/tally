@@ -325,16 +325,53 @@ func stageHasCustomNativeBuildCache(stageFacts *facts.StageFacts) bool {
 }
 
 func jsInstallOrRebuildManager(runFacts *facts.RunFacts) (string, bool) {
-	if runFacts == nil || !runFacts.UsesShell || !runFacts.Shell.HasParser || runFacts.CommandScript == "" {
+	if runFacts == nil || runFacts.CommandScript == "" {
+		return "", false
+	}
+	if runFacts.UsesShell && !runFacts.Shell.HasParser {
 		return "", false
 	}
 
-	for _, cmd := range runFacts.CommandInfos {
+	for _, cmd := range jsInstallCommandInfos(runFacts) {
 		if manager, ok := jsInstallManager(cmd); ok {
 			return manager, true
 		}
 	}
 	return "", false
+}
+
+func jsInstallCommandInfos(runFacts *facts.RunFacts) []shell.CommandInfo {
+	if runFacts == nil {
+		return nil
+	}
+	if runFacts.UsesShell {
+		return runFacts.CommandInfos
+	}
+	if cmd, ok := execFormCommandInfo(runFacts.Run); ok {
+		return []shell.CommandInfo{cmd}
+	}
+	return nil
+}
+
+func execFormCommandInfo(run *instructions.RunCommand) (shell.CommandInfo, bool) {
+	if run == nil || run.PrependShell || len(run.CmdLine) == 0 {
+		return shell.CommandInfo{}, false
+	}
+
+	name := path.Base(run.CmdLine[0])
+	if name == "" {
+		return shell.CommandInfo{}, false
+	}
+
+	cmd := shell.CommandInfo{Name: name}
+	for _, arg := range run.CmdLine[1:] {
+		cmd.Args = append(cmd.Args, arg)
+		cmd.ArgLiteral = append(cmd.ArgLiteral, true)
+		if cmd.Subcommand == "" && !strings.HasPrefix(arg, "-") {
+			cmd.Subcommand = arg
+		}
+	}
+	return cmd, true
 }
 
 func jsInstallManager(cmd shell.CommandInfo) (string, bool) {
@@ -378,7 +415,7 @@ func runInstallsDevDependencies(runFacts *facts.RunFacts) bool {
 	if runFacts == nil {
 		return false
 	}
-	for _, cmd := range runFacts.CommandInfos {
+	for _, cmd := range jsInstallCommandInfos(runFacts) {
 		manager, ok := jsInstallManager(cmd)
 		if !ok {
 			continue
