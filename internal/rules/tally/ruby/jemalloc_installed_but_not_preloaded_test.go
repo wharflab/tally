@@ -484,6 +484,54 @@ func TestStageReferencesJemallocSymlink(t *testing.T) {
 			want: true,
 		},
 		{
+			// Regression: a later `rm` removes the canonical file. The
+			// symlink is not present at the end of the stage, so the
+			// fix must still emit the ln -sf step.
+			name: "later rm of canonical path undoes earlier ln",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN rm /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
+			// Regression: rm -f same path also undoes the symlink.
+			name: "later rm -f of canonical path undoes earlier ln",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so \\\n" +
+				"    && rm -f /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
+			// Regression: mv away from canonical path is also a removal.
+			name: "later mv away from canonical path undoes earlier ln",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN mv /usr/local/lib/libjemalloc.so /tmp/old.so\n",
+			want: false,
+		},
+		{
+			// Regression: unlink also removes.
+			name: "unlink of canonical path undoes earlier ln",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so \\\n" +
+				"    && unlink /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
+			// Order matters: a `rm` followed by a re-creation leaves the
+			// file present at the end of the stage.
+			name: "rm followed by recreate is present",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && rm -f /usr/local/lib/libjemalloc.so \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n",
+			want: true,
+		},
+		{
 			// Regression: target is canonical but the source is some
 			// unrelated .so. Counting this would have LD_PRELOAD load a
 			// non-jemalloc library.

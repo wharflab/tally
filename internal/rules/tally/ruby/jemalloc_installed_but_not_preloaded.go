@@ -613,34 +613,105 @@ func stageReferencesJemallocSymlink(sf *facts.StageFacts) bool {
 	if sf == nil {
 		return false
 	}
+	// Walk the stage in source order and track whether the canonical
+	// symlink is *currently* present at the end of the stage. A later
+	// `rm /usr/local/lib/libjemalloc.so` (or `mv` away from it) undoes
+	// an earlier creation, so a single creation early in the stage is
+	// not sufficient evidence.
+	present := false
 	for _, rf := range sf.Runs {
 		if rf == nil {
 			continue
 		}
 		for _, ci := range rf.CommandInfos {
-			if !jemallocSymlinkCreatingCommands[ci.Name] {
+			switch {
+			case jemallocSymlinkCreatingCommands[ci.Name]:
+				if commandCreatesJemallocSymlink(ci) {
+					present = true
+				}
+				if ci.Name == "mv" && commandRemovesJemallocSymlink(ci) {
+					// `mv /usr/local/lib/libjemalloc.so DST` removes the
+					// source. The target check above does NOT match this
+					// shape (target is DST), so the present flag stays
+					// untouched there; this branch handles the removal.
+					present = false
+				}
+			case jemallocSymlinkRemovingCommands[ci.Name]:
+				if commandRemovesJemallocSymlink(ci) {
+					present = false
+				}
+			}
+		}
+	}
+	return present
+}
+
+// commandCreatesJemallocSymlink reports whether the parsed command writes
+// the canonical /usr/local/lib/libjemalloc.so file with a jemalloc source.
+func commandCreatesJemallocSymlink(ci shell.CommandInfo) bool {
+	// `install -d /path` creates a directory at /path, not a file —
+	// LD_PRELOAD pointing at a directory does not load jemalloc.
+	if ci.Name == "install" && (ci.HasFlag("-d") || ci.HasFlag("--directory")) {
+		return false
+	}
+	target := lastNonFlagArg(ci.Args)
+	if target == "" {
+		return false
+	}
+	if path.Clean(target) != jemallocCanonicalSymlinkPath {
+		return false
+	}
+	// Source must reference a jemalloc shared object — otherwise a
+	// command like `cp /tmp/libfoo.so /usr/local/lib/libjemalloc.so`
+	// would suppress the symlink half of the fix, leaving LD_PRELOAD
+	// pointing at a non-jemalloc library.
+	return nonTargetArgsReferenceJemalloc(ci.Args)
+}
+
+// jemallocSymlinkRemovingCommands are command names that, when invoked
+// with the canonical path as a non-flag arg, remove the symlink.
+var jemallocSymlinkRemovingCommands = map[string]bool{
+	"rm":     true,
+	"unlink": true,
+}
+
+// commandRemovesJemallocSymlink reports whether the parsed command takes
+// the canonical /usr/local/lib/libjemalloc.so as one of its non-flag args
+// in a position that causes removal:
+//
+//   - rm /usr/local/lib/libjemalloc.so          → any non-flag arg counts
+//   - unlink /usr/local/lib/libjemalloc.so      → any non-flag arg counts
+//   - mv /usr/local/lib/libjemalloc.so DST       → only the SOURCE counts;
+//     the target (last non-flag arg) means it was created, not removed
+func commandRemovesJemallocSymlink(ci shell.CommandInfo) bool {
+	if ci.Name == "mv" {
+		// All non-flag args except the last (target) are sources.
+		targetIdx := -1
+		for i, arg := range slices.Backward(ci.Args) {
+			if !strings.HasPrefix(arg, "-") {
+				targetIdx = i
+				break
+			}
+		}
+		if targetIdx <= 0 {
+			return false
+		}
+		for _, arg := range ci.Args[:targetIdx] {
+			if strings.HasPrefix(arg, "-") {
 				continue
 			}
-			// `install -d /path` creates a directory at /path, not a file —
-			// LD_PRELOAD pointing at a directory does not load jemalloc, so
-			// the symlink half of the fix must still run.
-			if ci.Name == "install" && (ci.HasFlag("-d") || ci.HasFlag("--directory")) {
-				continue
+			if path.Clean(arg) == jemallocCanonicalSymlinkPath {
+				return true
 			}
-			target := lastNonFlagArg(ci.Args)
-			if target == "" {
-				continue
-			}
-			if path.Clean(target) != jemallocCanonicalSymlinkPath {
-				continue
-			}
-			// Source must reference a jemalloc shared object — otherwise a
-			// command like `cp /tmp/libfoo.so /usr/local/lib/libjemalloc.so`
-			// would suppress the symlink half of the fix, leaving LD_PRELOAD
-			// pointing at a non-jemalloc library.
-			if !nonTargetArgsReferenceJemalloc(ci.Args) {
-				continue
-			}
+		}
+		return false
+	}
+	// rm / unlink: any non-flag arg pointing at the canonical path removes it.
+	for _, arg := range ci.Args {
+		if strings.HasPrefix(arg, "-") {
+			continue
+		}
+		if path.Clean(arg) == jemallocCanonicalSymlinkPath {
 			return true
 		}
 	}
