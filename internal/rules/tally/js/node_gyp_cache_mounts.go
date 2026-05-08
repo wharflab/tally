@@ -591,14 +591,21 @@ func runScriptHasNodeGypDevDir(script string) bool {
 		strings.Contains(script, nodeGypLowerDevDirEnvKey+"=")
 }
 
+// hasNodeGypHeaderCache reports whether `existing` already mounts a cache at
+// the resolved node-gyp devdir. The match is strict on `target` rather than
+// loose on the cache id, because a mount like
+// `--mount=type=cache,target=/tmp,id=node-gyp` carries a node-gyp-flavored
+// id while caching the wrong directory — node-gyp would still write to its
+// real devdir and the rule must keep reporting.
 func hasNodeGypHeaderCache(existing []*instructions.Mount, devdir string) bool {
+	if devdir == "" {
+		return false
+	}
 	for _, mount := range existing {
 		if mount == nil || mount.Type != instructions.MountTypeCache {
 			continue
 		}
-		target := path.Clean(mount.Target)
-		key := strings.ToLower(target + " " + mount.CacheID)
-		if target == devdir || strings.Contains(key, "node-gyp") {
+		if path.Clean(mount.Target) == devdir {
 			return true
 		}
 	}

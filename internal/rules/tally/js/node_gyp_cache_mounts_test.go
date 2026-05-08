@@ -381,6 +381,24 @@ RUN npm install && npm rebuild sharp
 	}
 }
 
+// Regression: a cache mount whose target is unrelated to the actual
+// devdir but happens to carry id=node-gyp must NOT suppress the rule.
+// node-gyp still writes to its real devdir, so the build is still
+// uncached and the violation must fire.
+func TestNodeGypCacheMountsRule_FiresWhenCacheTargetMismatchesDevDir(t *testing.T) {
+	t.Parallel()
+
+	const content = `FROM node:20
+RUN apt-get update && apt-get install -y python3 make g++
+RUN --mount=type=cache,target=/tmp,id=node-gyp npm install
+`
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewNodeGypCacheMountsRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("got %d violations, want 1 (id=node-gyp on /tmp does not cache the real devdir)", len(violations))
+	}
+}
+
 // Regression: when a stage uses a non-POSIX shell (e.g. PowerShell via
 // `SHELL ["pwsh", "-Command"]`), the inline `KEY="…" cmd` env-prefix is
 // not valid POSIX syntax and would break the RUN. The rule must skip the
