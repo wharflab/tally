@@ -90,6 +90,15 @@ func (b *Builder) Build() *Model {
 		info.BaseImage = b.processBaseImage(stage, i, graph)
 		effectiveBaseName := resolveFromEvalWord(stage.BaseName, fromEval)
 		effectivePlatform := resolveFromEvalWord(stage.Platform, fromEval)
+		// Expose the resolved external base name on the BaseImageRef so
+		// rules that classify images can match against build-arg-aware
+		// values without re-implementing FROM expansion. Stage refs and
+		// scratch keep Effective == Raw.
+		if info.BaseImage != nil && !info.BaseImage.IsStageRef {
+			info.BaseImage.Effective = effectiveBaseName
+		} else if info.BaseImage != nil {
+			info.BaseImage.Effective = info.BaseImage.Raw
+		}
 
 		// Detect base image OS from name and platform heuristics.
 		info.BaseImageOS = detectBaseImageOS(effectiveBaseName, effectivePlatform)
@@ -474,9 +483,10 @@ func (b *Builder) processStageNaming(stage *instructions.Stage, index int) {
 // processBaseImage analyzes the FROM instruction's base image.
 func (b *Builder) processBaseImage(stage *instructions.Stage, stageIndex int, graph *StageGraph) *BaseImageRef {
 	ref := &BaseImageRef{
-		Raw:      stage.BaseName,
-		Platform: stage.Platform,
-		Location: stage.Location,
+		Raw:       stage.BaseName,
+		Effective: stage.BaseName, // overwritten with the ARG-resolved form below when applicable
+		Platform:  stage.Platform,
+		Location:  stage.Location,
 	}
 
 	// Check if base name references another stage

@@ -215,6 +215,41 @@ func TestExternalBase(t *testing.T) {
 	}
 }
 
+// Regression: a templated FROM resolved through CLI --build-arg overrides
+// (not just in-file ARG defaults) must produce a populated Effective on
+// the BaseImageRef, so rules can classify the image accurately.
+func TestExternalBase_BuildArgOverrideExposedAsEffective(t *testing.T) {
+	t.Parallel()
+
+	content := "ARG RUBY_IMAGE=alpine:3.20\n" + // in-file default is non-Ruby
+		"FROM ${RUBY_IMAGE}\n"
+	pr := parseDockerfile(t, content)
+
+	// Without overrides: Effective resolves to the in-file default.
+	plain := NewModel(pr, nil, "Dockerfile")
+	got := plain.ExternalBase(0)
+	if got == nil {
+		t.Fatal("plain ExternalBase = nil")
+	}
+	if got.Effective != "alpine:3.20" {
+		t.Errorf("plain Effective = %q, want %q", got.Effective, "alpine:3.20")
+	}
+
+	// With a CLI --build-arg style override: Effective picks up the override.
+	overridden := NewModel(pr, map[string]string{"RUBY_IMAGE": "ruby:3.3-slim"}, "Dockerfile")
+	got = overridden.ExternalBase(0)
+	if got == nil {
+		t.Fatal("overridden ExternalBase = nil")
+	}
+	if got.Effective != "ruby:3.3-slim" {
+		t.Errorf("overridden Effective = %q, want %q", got.Effective, "ruby:3.3-slim")
+	}
+	// Raw stays as the unexpanded source token.
+	if got.Raw != "${RUBY_IMAGE}" {
+		t.Errorf("Raw = %q, want %q (unexpanded)", got.Raw, "${RUBY_IMAGE}")
+	}
+}
+
 func TestExternalBase_NilModel(t *testing.T) {
 	t.Parallel()
 	var m *Model
