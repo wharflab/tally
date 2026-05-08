@@ -772,15 +772,47 @@ func TestMallocConfHasJemallocKnob(t *testing.T) {
 	}
 }
 
-func TestJemallocViolationDetail_AptVsOther(t *testing.T) {
+func TestJemallocViolationDetail_AptLibjemalloc2(t *testing.T) {
 	t.Parallel()
 
-	apt := jemallocViolationDetail("apt-get")
-	if !strings.Contains(apt, "ln -sf /usr/lib/$(uname -m)") {
-		t.Errorf("apt detail missing canonical ln -sf command: %q", apt)
+	ic := shell.InstallCommand{
+		Manager:  "apt-get",
+		Packages: []shell.PackageArg{{Normalized: "libjemalloc2"}},
 	}
-	apk := jemallocViolationDetail("apk")
-	if strings.Contains(apk, "ln -sf /usr/lib/$(uname -m)") {
-		t.Errorf("non-apt detail should not suggest a debian-multiarch ln -sf command: %q", apk)
+	got := jemallocViolationDetail(ic)
+	if !strings.Contains(got, "ln -sf /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so") {
+		t.Errorf("apt+libjemalloc2 detail missing canonical ln -sf: %q", got)
+	}
+}
+
+// Regression: libjemalloc1 ships libjemalloc.so.1, not .so.2. The detail
+// must NOT propose the hardcoded .so.2 symlink — that would steer users
+// toward a dangling link.
+func TestJemallocViolationDetail_AptLibjemalloc1AvoidsSo2Suggestion(t *testing.T) {
+	t.Parallel()
+
+	ic := shell.InstallCommand{
+		Manager:  "apt-get",
+		Packages: []shell.PackageArg{{Normalized: "libjemalloc1"}},
+	}
+	got := jemallocViolationDetail(ic)
+	if strings.Contains(got, "libjemalloc.so.2") {
+		t.Errorf("libjemalloc1 detail must not mention .so.2 — that would propose a dangling symlink: %q", got)
+	}
+	if !strings.Contains(got, "migrate to libjemalloc2") {
+		t.Errorf("libjemalloc1 detail should recommend migrating to libjemalloc2: %q", got)
+	}
+}
+
+func TestJemallocViolationDetail_NonAptManager(t *testing.T) {
+	t.Parallel()
+
+	ic := shell.InstallCommand{
+		Manager:  "apk",
+		Packages: []shell.PackageArg{{Normalized: "jemalloc"}},
+	}
+	got := jemallocViolationDetail(ic)
+	if strings.Contains(got, "ln -sf /usr/lib/$(uname -m)") {
+		t.Errorf("non-apt detail should not suggest a debian-multiarch ln -sf command: %q", got)
 	}
 }

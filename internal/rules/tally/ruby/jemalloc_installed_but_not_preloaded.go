@@ -327,7 +327,7 @@ func (r *JemallocInstalledButNotPreloadedRule) checkStage(
 			loc := jemallocViolationLocation(file, runFacts, ic, sm)
 			v := rules.NewViolation(loc, meta.Code, meta.Description, meta.DefaultSeverity).
 				WithDocURL(meta.DocURL).
-				WithDetail(jemallocViolationDetail(ic.Manager))
+				WithDetail(jemallocViolationDetail(ic))
 
 			if fix := buildJemallocPreloadFix(file, sf, runFacts, ic, sm, meta.FixPriority); fix != nil {
 				v = v.WithSuggestedFix(fix)
@@ -338,13 +338,28 @@ func (r *JemallocInstalledButNotPreloadedRule) checkStage(
 	return violations
 }
 
-func jemallocViolationDetail(manager string) string {
-	if aptPackageManagers[strings.ToLower(manager)] {
+// jemallocViolationDetail returns the human-readable detail attached to a
+// violation. The canonical `ln -sf … libjemalloc.so.2 …` suggestion is only
+// included when the install actually ships libjemalloc.so.2 — otherwise the
+// advice would create a dangling symlink (e.g. libjemalloc1 ships .so.1).
+func jemallocViolationDetail(ic shell.InstallCommand) string {
+	if installCommandProvidesLibjemalloc2(ic) {
 		return "Installing libjemalloc only adds the package to the image; it is not loaded by Ruby unless " +
 			"LD_PRELOAD points at libjemalloc.so or MALLOC_CONF carries jemalloc-specific knobs. " +
 			"Add `ln -sf /usr/lib/$(uname -m)-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so` to the " +
 			"install RUN, then set `ENV LD_PRELOAD=\"/usr/local/lib/libjemalloc.so\"` so long-lived Rails workers " +
 			"actually use jemalloc."
+	}
+	if aptPackageManagers[strings.ToLower(ic.Manager)] {
+		// libjemalloc1 (and any future apt variant we don't recognize as
+		// libjemalloc.so.2-providing) ships a different .so version. Don't
+		// suggest a hardcoded path here — that would steer users toward a
+		// dangling symlink. Recommend migrating to libjemalloc2 instead.
+		return "Installing libjemalloc only adds the package to the image; it is not loaded by Ruby unless " +
+			"LD_PRELOAD points at the matching libjemalloc shared object in the runtime environment. " +
+			"This package (e.g. libjemalloc1) is legacy and ships a different .so version than the " +
+			"canonical Rails-generator pattern targets — migrate to libjemalloc2 so the standard symlink + " +
+			"LD_PRELOAD recipe applies."
 	}
 	return "Installing a jemalloc package only adds it to the image; it is not loaded by Ruby unless " +
 		"LD_PRELOAD points at the jemalloc shared object or MALLOC_CONF carries jemalloc-specific knobs " +
