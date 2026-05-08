@@ -402,6 +402,50 @@ func stageHasJemallocLoadSignal(sf *facts.StageFacts) bool {
 	return false
 }
 
+// lastJemallocSymlinkRemovalRunEndLine returns the (1-based, multi-line-aware)
+// end line of the *last* RUN in the stage whose parsed commands include a
+// removal of the canonical /usr/local/lib/libjemalloc.so path (rm, unlink,
+// or mv away from it). Returns 0 when no such RUN exists.
+func lastJemallocSymlinkRemovalRunEndLine(sf *facts.StageFacts, sm *sourcemap.SourceMap) int {
+	if sf == nil || sm == nil {
+		return 0
+	}
+	last := 0
+	for _, rf := range sf.Runs {
+		if rf == nil || rf.Run == nil {
+			continue
+		}
+		removes := false
+		for _, ci := range rf.CommandInfos {
+			switch {
+			case jemallocSymlinkRemovingCommands[ci.Name]:
+				if commandRemovesJemallocSymlink(ci) {
+					removes = true
+				}
+			case ci.Name == "mv":
+				if commandRemovesJemallocSymlink(ci) {
+					removes = true
+				}
+			}
+			if removes {
+				break
+			}
+		}
+		if !removes {
+			continue
+		}
+		locs := rf.Run.Location()
+		if len(locs) == 0 {
+			continue
+		}
+		end := sm.ResolveEndLine(locs[len(locs)-1].End.Line)
+		if end > last {
+			last = end
+		}
+	}
+	return last
+}
+
 // lastEnvWriteEndLine returns the (1-based, multi-line-aware) end line of
 // the last ENV instruction that wrote `key` in the stage, or 0 when no such
 // binding exists. The Bindings map records the final write, so a single
@@ -594,15 +638,21 @@ func buildJemallocPreloadFix(
 	}
 
 	// Insert after the install RUN by default, but push past any later
-	// ENV writes that would neutralize the inserted LD_PRELOAD —
-	// `ENV LD_PRELOAD=""` or `ENV LD_PRELOAD=/some/other/path` later in
-	// the stage would otherwise overwrite our suggestion and the next
-	// lint run would still fire.
+	// instructions that would neutralize the fix:
+	//
+	//   - `ENV LD_PRELOAD=""` (or any non-jemalloc value) after the
+	//     install RUN would otherwise overwrite our ENV write.
+	//   - A later `rm /usr/local/lib/libjemalloc.so` (or `mv` away from
+	//     it) would otherwise delete the symlink we just created,
+	//     leaving LD_PRELOAD pointing at a missing file.
 	insertLine := endLine + 1
 	for _, key := range []string{"LD_PRELOAD", "MALLOC_CONF"} {
 		if line := lastEnvWriteEndLine(sf, key, sm); line > endLine && line+1 > insertLine {
 			insertLine = line + 1
 		}
+	}
+	if line := lastJemallocSymlinkRemovalRunEndLine(sf, sm); line > endLine && line+1 > insertLine {
+		insertLine = line + 1
 	}
 	var fixText, description string
 	if stageReferencesJemallocSymlink(sf) {

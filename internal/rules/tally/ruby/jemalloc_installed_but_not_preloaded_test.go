@@ -676,6 +676,55 @@ func TestJemallocInstalledButNotPreloadedRule_FixInsertsAfterLaterEnvClobber(t *
 	}
 }
 
+// Regression: a later `RUN rm /usr/local/lib/libjemalloc.so` would delete
+// the symlink we just inserted. The fix anchor must move past that
+// removal so the recreated `ln -sf` survives.
+func TestJemallocInstalledButNotPreloadedRule_FixInsertsAfterLaterSymlinkRemoval(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ruby:3.3-slim\n" + // L1
+		"RUN apt-get install -y libjemalloc2\n" + // L2
+		"RUN rm /usr/local/lib/libjemalloc.so\n" + // L3 — would delete our symlink
+		"CMD [\"bin/rails\", \"server\"]\n" // L4
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix")
+	}
+	if got := fix.Edits[0].Location.Start.Line; got != 4 {
+		t.Errorf("insert anchor line = %d, want 4 (after the rm at L3)", got)
+	}
+	// Sanity: this branch must emit the symlink-creation step.
+	if !strings.Contains(fix.Edits[0].NewText, "ln -sf") {
+		t.Errorf("expected ln -sf in fix text, got %q", fix.Edits[0].NewText)
+	}
+}
+
+func TestJemallocInstalledButNotPreloadedRule_FixInsertsAfterLaterMvAway(t *testing.T) {
+	t.Parallel()
+
+	content := "FROM ruby:3.3-slim\n" + // L1
+		"RUN apt-get install -y libjemalloc2\n" + // L2
+		"RUN mv /usr/local/lib/libjemalloc.so /tmp/old.so\n" + // L3 — undoes our symlink
+		"CMD [\"bin/rails\", \"server\"]\n" // L4
+	input := testutil.MakeLintInput(t, "Dockerfile", content)
+	violations := NewJemallocInstalledButNotPreloadedRule().Check(input)
+	if len(violations) != 1 {
+		t.Fatalf("expected 1 violation, got %d", len(violations))
+	}
+	fix := violations[0].SuggestedFix
+	if fix == nil {
+		t.Fatal("expected SuggestedFix")
+	}
+	if got := fix.Edits[0].Location.Start.Line; got != 4 {
+		t.Errorf("insert anchor line = %d, want 4 (after the mv at L3)", got)
+	}
+}
+
 func TestJemallocInstalledButNotPreloadedRule_FixSkipsClobberPushWhenEnvIsBeforeInstall(t *testing.T) {
 	t.Parallel()
 
