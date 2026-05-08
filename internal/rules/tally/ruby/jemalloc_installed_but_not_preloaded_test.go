@@ -609,6 +609,39 @@ func TestStageReferencesJemallocSymlink(t *testing.T) {
 			want: true,
 		},
 		{
+			// Regression: a later `cp /tmp/libfoo.so` to the canonical
+			// target overwrites the earlier valid symlink with an
+			// unrelated .so. The runtime LD_PRELOAD would load the wrong
+			// library, so present must be cleared.
+			name: "later cp of unrelated .so to canonical overwrites valid symlink",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN cp /tmp/libfoo.so /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
+			// Same idea with mv: `mv /tmp/libfoo.so /usr/local/lib/libjemalloc.so`
+			// has the canonical path as DESTINATION (not source), so it's
+			// an overwrite, not a removal — but the source is non-jemalloc.
+			name: "later mv of unrelated .so to canonical overwrites valid symlink",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN mv /tmp/libfoo.so /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
+			// Sanity: an overwrite with a jemalloc source still keeps
+			// present=true (it's effectively a re-create).
+			name: "later cp of jemalloc.so.2 to canonical keeps present",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN cp /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n",
+			want: true,
+		},
+		{
 			// Regression: target is canonical but the source is some
 			// unrelated .so. Counting this would have LD_PRELOAD load a
 			// non-jemalloc library.

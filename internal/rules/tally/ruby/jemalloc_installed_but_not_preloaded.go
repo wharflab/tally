@@ -713,8 +713,19 @@ func stageReferencesJemallocSymlink(sf *facts.StageFacts) bool {
 		for _, ci := range rf.CommandInfos {
 			switch {
 			case jemallocSymlinkCreatingCommands[ci.Name]:
-				if commandCreatesJemallocSymlink(ci) {
-					present = true
+				if commandTargetsCanonicalSymlinkPath(ci) {
+					// Any write to the canonical target redefines what
+					// lives there. Set present only when the source is
+					// jemalloc; clear it otherwise — e.g.
+					// `cp /tmp/libfoo.so /usr/local/lib/libjemalloc.so`
+					// overwrites a previously-valid symlink with an
+					// unrelated `.so`, so the runtime LD_PRELOAD would
+					// load the wrong library.
+					if nonTargetArgsReferenceJemalloc(ci.Args) {
+						present = true
+					} else {
+						present = false
+					}
 				}
 				if ci.Name == "mv" && commandRemovesJemallocSymlink(ci) {
 					// `mv /usr/local/lib/libjemalloc.so DST` removes the
@@ -733,11 +744,12 @@ func stageReferencesJemallocSymlink(sf *facts.StageFacts) bool {
 	return present
 }
 
-// commandCreatesJemallocSymlink reports whether the parsed command writes
-// the canonical /usr/local/lib/libjemalloc.so file with a jemalloc source.
-func commandCreatesJemallocSymlink(ci shell.CommandInfo) bool {
-	// `install -d /path` creates a directory at /path, not a file —
-	// LD_PRELOAD pointing at a directory does not load jemalloc.
+// commandTargetsCanonicalSymlinkPath reports whether the command's
+// destination — the last non-flag arg under the standard
+// `cmd [OPTION...] SRC... DST` form — resolves to the canonical
+// /usr/local/lib/libjemalloc.so path. Skips `install -d` (which creates
+// a directory at the target, not a file).
+func commandTargetsCanonicalSymlinkPath(ci shell.CommandInfo) bool {
 	if ci.Name == "install" && (ci.HasFlag("-d") || ci.HasFlag("--directory")) {
 		return false
 	}
@@ -745,14 +757,7 @@ func commandCreatesJemallocSymlink(ci shell.CommandInfo) bool {
 	if target == "" {
 		return false
 	}
-	if path.Clean(target) != jemallocCanonicalSymlinkPath {
-		return false
-	}
-	// Source must reference a jemalloc shared object — otherwise a
-	// command like `cp /tmp/libfoo.so /usr/local/lib/libjemalloc.so`
-	// would suppress the symlink half of the fix, leaving LD_PRELOAD
-	// pointing at a non-jemalloc library.
-	return nonTargetArgsReferenceJemalloc(ci.Args)
+	return path.Clean(target) == jemallocCanonicalSymlinkPath
 }
 
 // jemallocSymlinkRemovingCommands are command names that, when invoked
