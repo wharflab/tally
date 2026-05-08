@@ -128,6 +128,25 @@ ENV MALLOC_CONF="thp:never"
 `,
 			WantViolations: 0,
 		},
+		// Regression: ARG values are build-time only and absent from the
+		// final image runtime, so an ARG-only LD_PRELOAD must NOT suppress
+		// the violation — the running process still uses glibc malloc.
+		{
+			Name: "ARG-only LD_PRELOAD does not suppress",
+			Content: `FROM ruby:3.3-slim
+ARG LD_PRELOAD=/usr/local/lib/libjemalloc.so
+RUN apt-get install -y libjemalloc2
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "ARG-only MALLOC_CONF does not suppress",
+			Content: `FROM ruby:3.3-slim
+ARG MALLOC_CONF=narenas:2,background_thread:true
+RUN apt-get install -y libjemalloc2
+`,
+			WantViolations: 1,
+		},
 		// --- No violation: skipped stages ---
 		{
 			Name: "non-final builder stage skipped",

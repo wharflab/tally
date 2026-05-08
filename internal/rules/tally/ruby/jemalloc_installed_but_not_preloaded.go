@@ -305,6 +305,10 @@ func jemallocViolationDetail(manager string) string {
 // shows that jemalloc will be loaded — either via LD_PRELOAD pointing at a
 // jemalloc shared object, or via MALLOC_CONF carrying a jemalloc-specific knob.
 //
+// Only values bound by an `ENV` instruction count: ARG-derived values live
+// in EffectiveEnv.Values but are build-time only and absent from the final
+// image runtime, so they do not actually load jemalloc at startup.
+//
 // LD_PRELOAD detection is substring-based on "jemalloc" because the canonical
 // paths vary by distro (e.g. /usr/lib/x86_64-linux-gnu/libjemalloc.so.2,
 // /usr/local/lib/libjemalloc.so, /usr/lib/libjemalloc.so.2).
@@ -316,13 +320,27 @@ func stageHasJemallocLoadSignal(sf *facts.StageFacts) bool {
 	if sf == nil {
 		return false
 	}
-	if envContainsJemallocLDPreload(sf.EffectiveEnv.Values["LD_PRELOAD"]) {
+	if envContainsJemallocLDPreload(envBoundValue(sf, "LD_PRELOAD")) {
 		return true
 	}
-	if mallocConfHasJemallocKnob(sf.EffectiveEnv.Values["MALLOC_CONF"]) {
+	if mallocConfHasJemallocKnob(envBoundValue(sf, "MALLOC_CONF")) {
 		return true
 	}
 	return false
+}
+
+// envBoundValue returns the value of an env key that was set by an `ENV`
+// instruction (or inherited from a parent stage's ENV). Values present only
+// in EffectiveEnv.Values via ARG promotion return "" — those are build-time
+// only and do not exist in the final image runtime.
+func envBoundValue(sf *facts.StageFacts, key string) string {
+	if sf == nil {
+		return ""
+	}
+	if binding, ok := sf.EffectiveEnv.Bindings[key]; ok {
+		return binding.Value
+	}
+	return ""
 }
 
 func envContainsJemallocLDPreload(value string) bool {
