@@ -12,6 +12,7 @@ import (
 	_ "github.com/wharflab/tally/internal/rules/shellcheck"
 	_ "github.com/wharflab/tally/internal/rules/tally"
 	_ "github.com/wharflab/tally/internal/rules/tally/gpu"
+	_ "github.com/wharflab/tally/internal/rules/tally/js"
 	_ "github.com/wharflab/tally/internal/rules/tally/labels"
 	_ "github.com/wharflab/tally/internal/rules/tally/php"
 	_ "github.com/wharflab/tally/internal/rules/tally/powershell"

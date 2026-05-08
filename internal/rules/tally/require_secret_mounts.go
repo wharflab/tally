@@ -317,7 +317,7 @@ func buildSecretMountInsertEdit(
 
 	// Insert right after "RUN " (keyword is always 3 chars + 1 space).
 	insertLine := runLoc[0].Start.Line
-	insertCol := runKeywordEndColumn(runLoc, sm)
+	insertCol := runmount.RunKeywordEndColumn(runLoc, sm)
 
 	return []rules.TextEdit{
 		{

@@ -113,6 +113,12 @@
             ]
           },
           {
+            "group": "JavaScript",
+            "pages": [
+              "rules/tally/js/node-gyp-cache-mounts"
+            ]
+          },
+          {
             "group": "Style",
             "pages": [
               "rules/tally/newline-between-instructions",

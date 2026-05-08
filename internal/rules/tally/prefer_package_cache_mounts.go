@@ -318,7 +318,7 @@ func buildCacheMountEdits(p cacheMountEditParams) cacheMountEditResult {
 	// Skipped when another edit already covers all mounts.
 	if !skipMountInsert && len(newMounts) > 0 {
 		insertLine := runLoc[0].Start.Line
-		insertCol := runKeywordEndColumn(runLoc, p.sm)
+		insertCol := runmount.RunKeywordEndColumn(runLoc, p.sm)
 
 		mountText := runmount.FormatMounts(newMounts) + " "
 		edits = append(edits, rules.TextEdit{
@@ -361,7 +361,7 @@ func cleanupEditsOverlapMountInsert(
 	}
 
 	line := runLoc[0].Start.Line
-	col := runKeywordEndColumn(runLoc, sm)
+	col := runmount.RunKeywordEndColumn(runLoc, sm)
 	for _, edit := range edits {
 		if locationContainsPoint(edit.Location, line, col) {
 			return true
@@ -387,7 +387,7 @@ func comparePosition(a, b rules.Position) int {
 // (mount mutation, heredoc cleanup fallback).
 func buildTailRewrite(p cacheMountEditParams, mounts []*instructions.Mount) []rules.TextEdit {
 	startLine := p.runLoc[0].Start.Line
-	startCol := runKeywordEndColumn(p.runLoc, p.sm)
+	startCol := runmount.RunKeywordEndColumn(p.runLoc, p.sm)
 	endLine, endCol := resolveRunEndPosition(p.runLoc, p.sm, p.run)
 
 	script := getRunScriptFromCmd(p.run)
@@ -416,7 +416,7 @@ func buildMountFlagEdit(p cacheMountEditParams, mounts []*instructions.Mount) []
 		return nil
 	}
 	startLine := p.runLoc[0].Start.Line
-	startCol := runKeywordEndColumn(p.runLoc, p.sm)
+	startCol := runmount.RunKeywordEndColumn(p.runLoc, p.sm)
 	endLine := p.runLoc[len(p.runLoc)-1].End.Line
 
 	// Search all lines of the RUN instruction for the heredoc marker ("<<" or "<<-").
@@ -514,23 +514,6 @@ func computeHeredocCleanupEdits(
 		}
 	}
 	return edits
-}
-
-func runKeywordEndColumn(runLoc []parser.Range, sm *sourcemap.SourceMap) int {
-	if len(runLoc) == 0 {
-		return 4 //nolint:mnd // len("RUN ")
-	}
-
-	if sm != nil && runLoc[0].Start.Line > 0 {
-		line := sm.Line(runLoc[0].Start.Line - 1)
-		// Search for "RUN " in the line to handle both plain RUN and ONBUILD RUN.
-		if idx := strings.Index(strings.ToUpper(line), "RUN "); idx >= 0 {
-			return idx + 4 //nolint:mnd // len("RUN ")
-		}
-		return len(leadingWhitespace(line)) + 4 //nolint:mnd // len("RUN ")
-	}
-
-	return runLoc[0].Start.Character + 4 //nolint:mnd // len("RUN ")
 }
 
 // computeCleanupEdits produces targeted deletion edits for cache cleanup
