@@ -282,7 +282,7 @@ func (s *StageInfo) IsScratch() bool {
 func parseImageRef(raw string) (string, string, string) {
 	named, err := reference.ParseNormalizedNamed(raw)
 	if err != nil {
-		// Fallback for unparseable refs (e.g. stage names, empty strings).
+		// Fallback for unparsable refs (e.g. stage names, empty strings).
 		// Simple split: everything before first ":" or "@" is the name.
 		name := raw
 		var tag string
@@ -590,6 +590,14 @@ func (s *StageInfo) PackageManagers() []shell.PackageManager {
 type BaseImageRef struct {
 	// Raw is the original base image string (e.g., "ubuntu:22.04", "builder").
 	Raw string
+
+	// Effective is Raw with `${VAR}`/`$VAR` references expanded against the
+	// scope visible to FROM (meta-ARG defaults plus any --build-arg
+	// overrides supplied via the invocation). When expansion fails or the
+	// reference is to another stage (IsStageRef), Effective is set to Raw.
+	// Use this for image-classification heuristics that need the actual
+	// resolved image name; use Raw when you need the unexpanded source.
+	Effective string
 
 	// IsStageRef is true if this references another stage in the Dockerfile.
 	IsStageRef bool

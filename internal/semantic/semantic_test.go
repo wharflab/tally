@@ -145,6 +145,119 @@ COPY --from=builder /app /app
 	}
 }
 
+func TestExternalBase(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		content  string
+		stageIdx int
+		wantRaw  string
+		wantNil  bool
+	}{
+		{
+			name:     "single external base resolves directly",
+			content:  "FROM ruby:3.3-slim\n",
+			stageIdx: 0,
+			wantRaw:  "ruby:3.3-slim",
+		},
+		{
+			name: "stage ref resolves to parent's external base",
+			content: "FROM ruby:3.3-slim AS builder\n" +
+				"FROM builder\n",
+			stageIdx: 1,
+			wantRaw:  "ruby:3.3-slim",
+		},
+		{
+			name: "multi-hop stage refs resolve to terminal external base",
+			content: "FROM ruby:3.3-slim AS base\n" +
+				"FROM base AS deps\n" +
+				"FROM deps\n",
+			stageIdx: 2,
+			wantRaw:  "ruby:3.3-slim",
+		},
+		{
+			name:     "scratch base is returned as the external base",
+			content:  "FROM scratch\n",
+			stageIdx: 0,
+			wantRaw:  "scratch",
+		},
+		{
+			name:     "out-of-range stage returns nil",
+			content:  "FROM ruby:3.3-slim\n",
+			stageIdx: 5,
+			wantNil:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			pr := parseDockerfile(t, tt.content)
+			model := NewModel(pr, nil, "Dockerfile")
+			got := model.ExternalBase(tt.stageIdx)
+			if tt.wantNil {
+				if got != nil {
+					t.Fatalf("ExternalBase(%d) = %+v, want nil", tt.stageIdx, got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatalf("ExternalBase(%d) = nil, want %q", tt.stageIdx, tt.wantRaw)
+			}
+			if got.Raw != tt.wantRaw {
+				t.Errorf("ExternalBase(%d).Raw = %q, want %q", tt.stageIdx, got.Raw, tt.wantRaw)
+			}
+			if got.IsStageRef {
+				t.Errorf("ExternalBase(%d).IsStageRef = true, want false", tt.stageIdx)
+			}
+		})
+	}
+}
+
+// Regression: a templated FROM resolved through CLI --build-arg overrides
+// (not just in-file ARG defaults) must produce a populated Effective on
+// the BaseImageRef, so rules can classify the image accurately.
+func TestExternalBase_BuildArgOverrideExposedAsEffective(t *testing.T) {
+	t.Parallel()
+
+	content := "ARG RUBY_IMAGE=alpine:3.20\n" + // in-file default is non-Ruby
+		"FROM ${RUBY_IMAGE}\n"
+	pr := parseDockerfile(t, content)
+
+	// Without overrides: Effective resolves to the in-file default.
+	plain := NewModel(pr, nil, "Dockerfile")
+	got := plain.ExternalBase(0)
+	if got == nil {
+		t.Fatal("plain ExternalBase = nil")
+	}
+	if got.Effective != "alpine:3.20" {
+		t.Errorf("plain Effective = %q, want %q", got.Effective, "alpine:3.20")
+	}
+
+	// With a CLI --build-arg style override: Effective picks up the override.
+	overridden := NewModel(pr, map[string]string{"RUBY_IMAGE": "ruby:3.3-slim"}, "Dockerfile")
+	got = overridden.ExternalBase(0)
+	if got == nil {
+		t.Fatal("overridden ExternalBase = nil")
+	}
+	if got.Effective != "ruby:3.3-slim" {
+		t.Errorf("overridden Effective = %q, want %q", got.Effective, "ruby:3.3-slim")
+	}
+	// Raw stays as the unexpanded source token.
+	if got.Raw != "${RUBY_IMAGE}" {
+		t.Errorf("Raw = %q, want %q (unexpanded)", got.Raw, "${RUBY_IMAGE}")
+	}
+}
+
+func TestExternalBase_NilModel(t *testing.T) {
+	t.Parallel()
+	var m *Model
+	if got := m.ExternalBase(0); got != nil {
+		t.Errorf("nil model ExternalBase = %+v, want nil", got)
+	}
+}
+
 func TestNamedAndUnnamedStages(t *testing.T) {
 	t.Parallel()
 	content := `FROM alpine:3.18 AS first
