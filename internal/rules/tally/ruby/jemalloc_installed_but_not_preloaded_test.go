@@ -659,6 +659,44 @@ func TestStageReferencesJemallocSymlink(t *testing.T) {
 			want: true,
 		},
 		{
+			// Regression: a common cleanup `rm -f /usr/local/lib/libjemalloc*`
+			// uses a glob that matches the canonical file.
+			name: "rm -f with glob matching canonical undoes earlier ln",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN rm -f /usr/local/lib/libjemalloc*\n",
+			want: false,
+		},
+		{
+			// Suffix-only glob that still matches: libjemalloc.so*.
+			name: "rm with libjemalloc.so* glob undoes",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN rm -f /usr/local/lib/libjemalloc.so*\n",
+			want: false,
+		},
+		{
+			// Non-matching glob: rm -f /usr/local/lib/libfoo* doesn't
+			// match the canonical file.
+			name: "rm with glob not matching canonical does not undo",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN rm -f /usr/local/lib/libfoo*\n",
+			want: true,
+		},
+		{
+			// rm -rf with a glob that matches an ancestor directory.
+			name: "rm -rf with ancestor glob undoes",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN rm -rf /usr/local/li*\n",
+			want: false,
+		},
+		{
 			// Order matters: a `rm` followed by a re-creation leaves the
 			// file present at the end of the stage.
 			name: "rm followed by recreate is present",

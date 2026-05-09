@@ -830,8 +830,7 @@ func commandRemovesJemallocSymlink(ci shell.CommandInfo) bool {
 			if strings.HasPrefix(arg, "-") {
 				continue
 			}
-			cleaned := path.Clean(arg)
-			if cleaned == jemallocCanonicalSymlinkPath {
+			if argHitsJemallocCanonicalFile(arg) {
 				return true
 			}
 			// `rm DIR` without -r/-R fails on a directory; only count
@@ -842,30 +841,62 @@ func commandRemovesJemallocSymlink(ci shell.CommandInfo) bool {
 		}
 		return false
 	}
-	// unlink: single-file removal, no recursion. Exact path only.
+	// unlink: single-file removal, no recursion.
 	for _, arg := range ci.Args {
 		if strings.HasPrefix(arg, "-") {
 			continue
 		}
-		if path.Clean(arg) == jemallocCanonicalSymlinkPath {
+		if argHitsJemallocCanonicalFile(arg) {
 			return true
 		}
 	}
 	return false
 }
 
+// argHitsJemallocCanonicalFile reports whether `arg` names the canonical
+// libjemalloc.so file — either exactly, or via a shell glob like
+// `/usr/local/lib/libjemalloc*` that matches it. Glob characters that
+// cross `/` are not handled (Go's path.Match doesn't support `**`), but
+// flat patterns within a single path segment cover the common
+// `rm -f /usr/local/lib/libjemalloc*` cleanup form.
+func argHitsJemallocCanonicalFile(arg string) bool {
+	if path.Clean(arg) == jemallocCanonicalSymlinkPath {
+		return true
+	}
+	matched, err := path.Match(arg, jemallocCanonicalSymlinkPath)
+	return err == nil && matched
+}
+
+// jemallocCanonicalAncestorDirs lists the ancestor directories of the
+// canonical symlink path. Used by isJemallocCanonicalOrAncestor for glob
+// matching like `rm -rf /usr/local/li*`.
+var jemallocCanonicalAncestorDirs = []string{
+	"/usr/local/lib",
+	"/usr/local",
+	"/usr",
+}
+
 // isJemallocCanonicalOrAncestor reports whether p resolves to the canonical
 // libjemalloc.so path or to any ancestor directory of it. Used by recursive
 // removals (`rm -rf /usr/local/lib`) and by mv (which moves whole subtrees).
+// Glob forms (e.g. `/usr/local/lib*`) match against each candidate path.
 func isJemallocCanonicalOrAncestor(p string) bool {
-	cleaned := path.Clean(p)
-	if cleaned == jemallocCanonicalSymlinkPath {
+	if argHitsJemallocCanonicalFile(p) {
 		return true
 	}
+	cleaned := path.Clean(p)
 	if cleaned == "/" {
 		return true
 	}
-	return strings.HasPrefix(jemallocCanonicalSymlinkPath, cleaned+"/")
+	if strings.HasPrefix(jemallocCanonicalSymlinkPath, cleaned+"/") {
+		return true
+	}
+	for _, ancestor := range jemallocCanonicalAncestorDirs {
+		if matched, err := path.Match(p, ancestor); err == nil && matched {
+			return true
+		}
+	}
+	return false
 }
 
 // rmIsRecursive reports whether a `rm` invocation requested recursive
