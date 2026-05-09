@@ -1228,6 +1228,17 @@ func TestEnvContainsJemallocLDPreload(t *testing.T) {
 		{name: "uppercase path", value: "/USR/LIB/libJemalloc.so", want: true},
 		{name: "non-jemalloc preload", value: "/usr/lib/libfoo.so", want: false},
 		{name: "empty", value: "", want: false},
+		// Regression: directory name contains "libjemalloc" but the actual
+		// preloaded basename is unrelated. The substring matcher used to
+		// false-suppress here.
+		{name: "libjemalloc in dirname only", value: "/opt/libjemalloc-backups/libfoo.so", want: false},
+		// Lookalike basename: must not match.
+		{name: "libjemalloc.so.2-backup lookalike", value: "/tmp/libjemalloc.so.2-backup", want: false},
+		// Multi-entry preload chains: jemalloc anywhere in the chain counts.
+		{name: "space-separated chain with jemalloc first", value: "/usr/local/lib/libjemalloc.so /opt/x/libtrace.so", want: true},
+		{name: "space-separated chain with jemalloc last", value: "/opt/x/libtrace.so /usr/local/lib/libjemalloc.so", want: true},
+		{name: "colon-separated chain with jemalloc", value: "/opt/x/libtrace.so:/usr/local/lib/libjemalloc.so.2", want: true},
+		{name: "chain of unrelated entries", value: "/opt/x/libtrace.so /opt/y/libfoo.so", want: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -515,11 +515,22 @@ func envBoundValue(sf *facts.StageFacts, key string) string {
 	return sf.EffectiveEnv.Values[key]
 }
 
+// envContainsJemallocLDPreload reports whether an LD_PRELOAD value loads a
+// jemalloc shared object. The dynamic linker accepts space- and
+// colon-separated entries, so we tokenize on both and verify the basename
+// of at least one entry matches the canonical jemalloc soname pattern.
+//
+// Substring matching used to false-suppress on lookalikes like
+// `LD_PRELOAD=/opt/libjemalloc-backups/libfoo.so` — directory contained
+// "libjemalloc" but the actual preloaded object was unrelated.
 func envContainsJemallocLDPreload(value string) bool {
 	if value == "" {
 		return false
 	}
-	return strings.Contains(strings.ToLower(value), "jemalloc")
+	entries := strings.FieldsFunc(value, func(r rune) bool {
+		return r == ' ' || r == ':' || r == '\t'
+	})
+	return slices.ContainsFunc(entries, isJemallocSharedObjectPath)
 }
 
 func mallocConfHasJemallocKnob(value string) bool {
