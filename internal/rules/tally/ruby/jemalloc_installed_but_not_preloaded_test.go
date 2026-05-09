@@ -599,6 +599,66 @@ func TestStageReferencesJemallocSymlink(t *testing.T) {
 			want: false,
 		},
 		{
+			// Regression: `rm -rf /usr/local/lib` deletes the parent
+			// directory and therefore the canonical symlink. The walk
+			// must see this as a removal even though the path doesn't
+			// exactly match the canonical symlink path.
+			name: "rm -rf parent directory undoes earlier ln",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN rm -rf /usr/local/lib\n",
+			want: false,
+		},
+		{
+			// Same for higher ancestors: `rm -rf /usr/local` removes the
+			// canonical symlink transitively.
+			name: "rm -rf grand-ancestor undoes earlier ln",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN rm -rf /usr/local\n",
+			want: false,
+		},
+		{
+			// `rm /usr/local/lib` (no -r) on a directory fails — must NOT
+			// be counted as a removal.
+			name: "rm without -r on parent directory does not count",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN rm /usr/local/lib\n",
+			want: true,
+		},
+		{
+			// Combined short flags `rm -Rf` count as recursive too.
+			name: "rm -Rf parent undoes via combined short flag",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN rm -Rf /usr/local/lib\n",
+			want: false,
+		},
+		{
+			// `mv` of an ancestor directory also deletes the canonical
+			// symlink (the source subtree is gone).
+			name: "mv parent directory away undoes earlier ln",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN mv /usr/local/lib /tmp/old-lib\n",
+			want: false,
+		},
+		{
+			// rm of an unrelated dir must not affect the symlink.
+			name: "rm -rf of unrelated path does not undo",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /usr/lib/x86_64-linux-gnu/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n" +
+				"RUN rm -rf /var/cache/apt\n",
+			want: true,
+		},
+		{
 			// Order matters: a `rm` followed by a re-creation leaves the
 			// file present at the end of the stage.
 			name: "rm followed by recreate is present",

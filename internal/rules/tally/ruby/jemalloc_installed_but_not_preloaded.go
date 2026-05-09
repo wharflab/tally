@@ -808,21 +808,70 @@ var jemallocSymlinkRemovingCommands = map[string]bool{
 //     value are sources, even though they appear after the target
 func commandRemovesJemallocSymlink(ci shell.CommandInfo) bool {
 	if ci.Name == "mv" {
-		sources := mvSourceArgs(ci)
-		for _, arg := range sources {
-			if path.Clean(arg) == jemallocCanonicalSymlinkPath {
+		// `mv DIR DST` (default form) and `mv -t DST DIR` (target-dir form)
+		// both move the whole subtree, so a SOURCE that is the canonical
+		// path *or any ancestor directory* of it counts as a removal.
+		return slices.ContainsFunc(mvSourceArgs(ci), isJemallocCanonicalOrAncestor)
+	}
+	if ci.Name == "rm" {
+		recursive := rmIsRecursive(ci)
+		for _, arg := range ci.Args {
+			if strings.HasPrefix(arg, "-") {
+				continue
+			}
+			cleaned := path.Clean(arg)
+			if cleaned == jemallocCanonicalSymlinkPath {
+				return true
+			}
+			// `rm DIR` without -r/-R fails on a directory; only count
+			// ancestor-path removals when recursive deletion was requested.
+			if recursive && isJemallocCanonicalOrAncestor(arg) {
 				return true
 			}
 		}
 		return false
 	}
-	// rm / unlink: any non-flag arg pointing at the canonical path removes it.
+	// unlink: single-file removal, no recursion. Exact path only.
 	for _, arg := range ci.Args {
 		if strings.HasPrefix(arg, "-") {
 			continue
 		}
 		if path.Clean(arg) == jemallocCanonicalSymlinkPath {
 			return true
+		}
+	}
+	return false
+}
+
+// isJemallocCanonicalOrAncestor reports whether p resolves to the canonical
+// libjemalloc.so path or to any ancestor directory of it. Used by recursive
+// removals (`rm -rf /usr/local/lib`) and by mv (which moves whole subtrees).
+func isJemallocCanonicalOrAncestor(p string) bool {
+	cleaned := path.Clean(p)
+	if cleaned == jemallocCanonicalSymlinkPath {
+		return true
+	}
+	if cleaned == "/" {
+		return true
+	}
+	return strings.HasPrefix(jemallocCanonicalSymlinkPath, cleaned+"/")
+}
+
+// rmIsRecursive reports whether a `rm` invocation requested recursive
+// deletion via -r, -R, --recursive, or any combined short-flag token
+// containing 'r' or 'R' (-rf, -Rf, -fr, …).
+func rmIsRecursive(ci shell.CommandInfo) bool {
+	if ci.HasFlag("-r") || ci.HasFlag("-R") || ci.HasFlag("--recursive") {
+		return true
+	}
+	for _, arg := range ci.Args {
+		if !strings.HasPrefix(arg, "-") || strings.HasPrefix(arg, "--") {
+			continue
+		}
+		for _, c := range arg[1:] {
+			if c == 'r' || c == 'R' {
+				return true
+			}
 		}
 	}
 	return false
