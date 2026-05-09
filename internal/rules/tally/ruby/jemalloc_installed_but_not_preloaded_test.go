@@ -642,6 +642,34 @@ func TestStageReferencesJemallocSymlink(t *testing.T) {
 			want: true,
 		},
 		{
+			// Regression: a directory NAMED libjemalloc-backups must NOT
+			// fool the matcher when the basename of the source is some
+			// unrelated `.so`. Substring matching the full path used to
+			// accept this.
+			name: "libjemalloc in dirname but unrelated .so basename does not count",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && cp /opt/libjemalloc-backups/libfoo.so /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
+			// `libjemalloc.so.2-backup` is a lookalike, not jemalloc.
+			name: "lookalike libjemalloc.so.2-backup basename does not count",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && cp /tmp/libjemalloc.so.2-backup /usr/local/lib/libjemalloc.so\n",
+			want: false,
+		},
+		{
+			// Non-canonical paths to genuine jemalloc shared objects still
+			// count via basename matching.
+			name: "ln from non-standard path with jemalloc basename counts",
+			content: "FROM ruby:3.3-slim\n" +
+				"RUN apt-get install -y libjemalloc2 \\\n" +
+				"    && ln -s /opt/jemalloc/libjemalloc.so.2 /usr/local/lib/libjemalloc.so\n",
+			want: true,
+		},
+		{
 			// Regression: target is canonical but the source is some
 			// unrelated .so. Counting this would have LD_PRELOAD load a
 			// non-jemalloc library.

@@ -2,6 +2,7 @@ package ruby
 
 import (
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -15,6 +16,19 @@ import (
 	"github.com/wharflab/tally/internal/sourcemap"
 	"github.com/wharflab/tally/internal/stagename"
 )
+
+// jemallocSourceBasenamePattern matches the canonical jemalloc shared-object
+// filenames. Anchored on the basename (path.Base) of a source argument:
+//
+//   - libjemalloc.so       — the unversioned symlink target
+//   - libjemalloc.so.1     — legacy ABI
+//   - libjemalloc.so.2     — current ABI
+//   - libjemalloc.so.2.x.y — fully-versioned variants
+//
+// Excludes lookalikes such as `libjemalloc.so.2-backup` or
+// `libjemalloc.so.bak`: anything after `libjemalloc.so.` must be a
+// dot-separated numeric version.
+var jemallocSourceBasenamePattern = regexp.MustCompile(`^libjemalloc\.so(?:\.\d+(?:\.\d+)*)?$`)
 
 // jemallocCanonicalSymlinkPath is the path our suggested fix points
 // LD_PRELOAD at. The "stage already creates the symlink" guardrail must
@@ -904,6 +918,11 @@ func lastNonFlagArg(args []string) string {
 // shared object. Used to verify that a `cp`/`mv`/`install`/`ln` writing into
 // /usr/local/lib/libjemalloc.so is actually copying jemalloc, not an
 // unrelated `.so`.
+//
+// Matching is anchored on the source's basename rather than a substring scan
+// of the full path, so directory names that contain "libjemalloc" (for
+// example `cp /opt/libjemalloc-backups/libfoo.so /usr/local/lib/libjemalloc.so`)
+// don't fool the check into accepting an unrelated source.
 func nonTargetArgsReferenceJemalloc(args []string) bool {
 	targetIdx := -1
 	for i, arg := range slices.Backward(args) {
@@ -919,11 +938,18 @@ func nonTargetArgsReferenceJemalloc(args []string) bool {
 		if strings.HasPrefix(arg, "-") {
 			continue
 		}
-		if strings.Contains(strings.ToLower(arg), "libjemalloc") {
+		if isJemallocSharedObjectPath(arg) {
 			return true
 		}
 	}
 	return false
+}
+
+// isJemallocSharedObjectPath reports whether a source argument's basename
+// matches a canonical jemalloc shared-object filename — `libjemalloc.so`
+// optionally followed by a dot-separated numeric version.
+func isJemallocSharedObjectPath(arg string) bool {
+	return jemallocSourceBasenamePattern.MatchString(strings.ToLower(path.Base(arg)))
 }
 
 func init() {
