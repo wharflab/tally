@@ -313,8 +313,7 @@ func exitCodeFromWaitErr(err error) *int {
 		code := 0
 		return &code
 	}
-	var ee *exec.ExitError
-	if errors.As(err, &ee) {
+	if ee, ok := errors.AsType[*exec.ExitError](err); ok {
 		code := ee.ExitCode()
 		return &code
 	}

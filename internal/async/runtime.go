@@ -255,8 +255,10 @@ func classifyError(err error) SkipReason {
 	}
 
 	// Check for typed errors from the registry package.
-	var skipErr interface{ SkipReason() SkipReason }
-	if errors.As(err, &skipErr) {
+	if skipErr, ok := errors.AsType[interface {
+		error
+		SkipReason() SkipReason
+	}](err); ok {
 		return skipErr.SkipReason()
 	}
 

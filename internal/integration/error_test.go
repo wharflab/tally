@@ -13,11 +13,11 @@ import (
 )
 
 // TestLintErrors verifies tally's behavior with files that cannot be linted normally:
-// unparseable content, binary files, non-existent paths, permission errors, and syntax errors.
+// unparsable content, binary files, non-existent paths, permission errors, and syntax errors.
 func TestLintErrors(t *testing.T) {
 	t.Parallel()
 
-	t.Run("unparseable-json-file", testLintErrorUnparseableJSON)
+	t.Run("unparsable-json-file", testLintErrorUnparsableJSON)
 	t.Run("too-small-file", testLintErrorTooSmallFile)
 	t.Run("binary-file", testLintErrorBinaryFile)
 	t.Run("large-file", testLintErrorLargeFile)
@@ -33,10 +33,10 @@ func TestLintErrors(t *testing.T) {
 	t.Run("require-stages-no-from", testLintErrorRequireStagesNoFrom)
 }
 
-func testLintErrorUnparseableJSON(t *testing.T) {
+func testLintErrorUnparsableJSON(t *testing.T) {
 	t.Parallel()
 
-	target := filepath.Join("testdata", "error-unparseable-json", "Dockerfile")
+	target := filepath.Join("testdata", "error-unparsable-json", "Dockerfile")
 	stdout, stderr, exitCode := runTallyLintRaw(t, target)
 
 	t.Logf("exit=%d\nstdout:\n%s\nstderr:\n%s", exitCode, stdout, stderr)
@@ -422,8 +422,7 @@ func runTallyLintRaw(t *testing.T, target string) (string, string, int) {
 	var exitCode int
 	err := cmd.Run()
 	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
 			t.Fatalf("command failed to start: %v", err)

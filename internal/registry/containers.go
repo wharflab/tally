@@ -297,8 +297,7 @@ func classifyContainersError(ref string, err error) error {
 	}
 
 	// Typed error: containers/image returns ErrUnauthorizedForCredentials for 401.
-	var authCredErr docker.ErrUnauthorizedForCredentials
-	if errors.As(err, &authCredErr) {
+	if _, ok := errors.AsType[docker.ErrUnauthorizedForCredentials](err); ok {
 		return &AuthError{Err: err}
 	}
 
@@ -308,9 +307,10 @@ func classifyContainersError(ref string, err error) error {
 	}
 
 	// Typed error: errcode.ErrorCoder carries the registry API error code.
-	var ecoder errcode.ErrorCoder
-	if errors.As(err, &ecoder) {
-		switch ecoder.ErrorCode() {
+	// errcode.ErrorCoder does not embed error, so use errors.As rather than errors.AsType.
+	var errCoder errcode.ErrorCoder
+	if errors.As(err, &errCoder) { //nolint:modernize // ErrorCoder does not embed error (required by AsType)
+		switch errCoder.ErrorCode() {
 		case errcode.ErrorCodeUnauthorized, errcode.ErrorCodeDenied:
 			return &AuthError{Err: err}
 		case v2.ErrorCodeManifestUnknown, v2.ErrorCodeNameUnknown, v2.ErrorCodeBlobUnknown:
@@ -321,8 +321,7 @@ func classifyContainersError(ref string, err error) error {
 	}
 
 	// Typed error: UnexpectedHTTPStatusError carries the HTTP status code directly.
-	var httpErr docker.UnexpectedHTTPStatusError
-	if errors.As(err, &httpErr) {
+	if httpErr, ok := errors.AsType[docker.UnexpectedHTTPStatusError](err); ok {
 		switch httpErr.StatusCode {
 		case http.StatusUnauthorized, http.StatusForbidden:
 			return &AuthError{Err: err}
@@ -334,8 +333,7 @@ func classifyContainersError(ref string, err error) error {
 	}
 
 	// Typed error: net.Error for network-level failures.
-	var netErr net.Error
-	if errors.As(err, &netErr) {
+	if _, ok := errors.AsType[net.Error](err); ok {
 		return &NetworkError{Err: err}
 	}
 

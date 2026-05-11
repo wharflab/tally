@@ -279,8 +279,7 @@ func runLint(ctx stdcontext.Context, opts *lintOptions, args []string) error {
 
 	discovered, err := discovery.Discover(inputs, discoveryOpts)
 	if err != nil {
-		var notFound *discovery.FileNotFoundError
-		if errors.As(err, &notFound) {
+		if notFound, ok := errors.AsType[*discovery.FileNotFoundError](err); ok {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", notFound)
 			return exitWith(ExitNoFiles)
 		}
@@ -830,8 +829,7 @@ func lintFiles(ctx stdcontext.Context, discovered []discovery.DiscoveredFile, op
 // Syntax errors (unknown instructions, directive typos) return ExitSyntaxError;
 // all other errors return ExitConfigError.
 func handleLintError(err error) error {
-	var syntaxErr *syntax.CheckError
-	if errors.As(err, &syntaxErr) {
+	if syntaxErr, ok := errors.AsType[*syntax.CheckError](err); ok {
 		for _, e := range syntaxErr.Errors {
 			fmt.Fprintf(os.Stderr, "Error: %s\n", e.Error())
 		}
