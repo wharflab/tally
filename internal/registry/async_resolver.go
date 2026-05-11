@@ -41,8 +41,7 @@ func (r *AsyncImageResolver) Resolve(ctx context.Context, data any) (any, error)
 		// PlatformMismatchError is NOT a skip — return the error itself as the
 		// resolved value so handlers can access Available platforms for the
 		// violation message (rather than a zero-value ImageConfig).
-		var platErr *PlatformMismatchError
-		if errors.As(err, &platErr) {
+		if platErr, ok := errors.AsType[*PlatformMismatchError](err); ok {
 			return platErr, nil
 		}
 		return nil, err
@@ -60,20 +59,17 @@ func (r *AsyncImageResolver) resolveWithRetry(ctx context.Context, ref, platform
 		}
 
 		// PlatformMismatchError: not a skip, return partial config for rule to handle.
-		var platErr *PlatformMismatchError
-		if errors.As(err, &platErr) {
+		if _, ok := errors.AsType[*PlatformMismatchError](err); ok {
 			return cfg, backoff.Permanent(err)
 		}
 
 		// NotFoundError: permanent, no retry.
-		var notFound *NotFoundError
-		if errors.As(err, &notFound) {
+		if _, ok := errors.AsType[*NotFoundError](err); ok {
 			return ImageConfig{}, backoff.Permanent(err)
 		}
 
 		// AuthError: retry once, then give up.
-		var authErr *AuthError
-		if errors.As(err, &authErr) {
+		if _, ok := errors.AsType[*AuthError](err); ok {
 			if authRetried {
 				return ImageConfig{}, backoff.Permanent(err)
 			}

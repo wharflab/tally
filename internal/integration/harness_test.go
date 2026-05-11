@@ -77,8 +77,7 @@ func runLintCase(t *testing.T, tc lintCase) {
 	// Check exit code
 	exitCode := 0
 	if err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
 			t.Fatalf("command failed to start: %v", err)
@@ -242,8 +241,7 @@ func runTallyStdin(t *testing.T, input string, args ...string) (string, string, 
 
 	exitCode := 0
 	if err := cmd.Run(); err != nil {
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 			exitCode = exitErr.ExitCode()
 		} else {
 			t.Fatalf("command failed to start: %v", err)

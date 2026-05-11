@@ -89,8 +89,7 @@ func TestDebugResolveDockerHub(t *testing.T) {
 	if err != nil {
 		t.Logf("error type: %T", err)
 		t.Logf("error: %v", err)
-		var netErr *NetworkError
-		if errors.As(err, &netErr) {
+		if _, ok := errors.AsType[*NetworkError](err); ok {
 			t.Logf("correctly classified as NetworkError")
 		} else {
 			t.Errorf("expected NetworkError, got %T: %v", err, err)

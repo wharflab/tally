@@ -83,13 +83,11 @@ func dockerPluginContextFrom(dockerCLI command.Cli) *dockerPluginContext {
 // optional message is for Docker CLI status errors; ExitError messages are
 // already written by command handlers before returning.
 func ExitStatus(err error) (code int, message string, ok bool) {
-	var exitErr *ExitError
-	if errors.As(err, &exitErr) {
+	if exitErr, ok := errors.AsType[*ExitError](err); ok {
 		return exitErr.Code, "", true
 	}
 
-	var statusErr dockercli.StatusError
-	if errors.As(err, &statusErr) {
+	if statusErr, ok := errors.AsType[dockercli.StatusError](err); ok {
 		code := statusErr.StatusCode
 		if code == 0 {
 			code = 1

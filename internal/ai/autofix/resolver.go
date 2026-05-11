@@ -171,8 +171,7 @@ func (r *resolver) proposeDockerfile(
 		}
 
 		result, err := r.runRound(ctx, ac, prompt, roundInput, rp, mode)
-		var fallbackErr *patchFallbackError
-		if errors.As(err, &fallbackErr) {
+		if _, ok := errors.AsType[*patchFallbackError](err); ok {
 			mode = autofixdata.OutputDockerfile
 			goto retryCurrentRound
 		}

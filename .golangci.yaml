@@ -195,6 +195,14 @@ linters:
           - errcheck
         text: "Error return value is not checked"
         source: "defer func\\(\\) \\{ _ ="
+      # errcheck: errors.AsType[E](err) returns (E, bool); discarding the typed
+      # match with _ is intentional (existence check only).
+      # exclude-functions does not reach generic calls — call.Fun is *ast.IndexExpr,
+      # which errcheck.selectorAndFunc rejects (kisielk/errcheck#v1.10.0).
+      - linters:
+          - errcheck
+        text: "Error return value is not checked"
+        source: "errors\\.AsType\\["
       # depguard: keep stdlib encoding/json only at the jsonrpc2 interop boundary.
       - linters:
           - depguard
