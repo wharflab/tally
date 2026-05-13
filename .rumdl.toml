@@ -1,20 +1,20 @@
 [global]
-exclude = ["**/__snapshots__/*.snap.md", "_integrations/zed-tally/grammars/*"]
 disable = ["MD036", "MD058"]
+exclude = ["**/__snapshots__/*.snap.md", "**/internal/integration/fixtures/**", "_integrations/zed-tally/grammars/*"]
 
 [MD013]
-line_length = 150
-headings = false
-reflow = true
 code-blocks = false
+headings    = false
+line_length = 150
+reflow      = true
 
 [MD031]
 
 [MD040]
 
 [MD060]
-style = "aligned"
-max-width = 0     # Uses MD013's line-length (100)
+max-width = 0         # Uses MD013's line-length (100)
+style     = "aligned"
 
 # Headings: ATX-style (# Heading) - Prettier converts setext to ATX
 [MD003]
