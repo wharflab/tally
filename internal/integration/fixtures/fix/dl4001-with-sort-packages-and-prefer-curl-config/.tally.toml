@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["hadolint/DL4001", "tally/prefer-curl-config", "tally/sort-packages"]
+exclude = ["*"]
+
+[rules.hadolint.DL4001]
+fix-preference = "wget"

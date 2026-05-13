@@ -76,6 +76,17 @@ tally lint --config /path/to/.tally.toml Dockerfile
     | `show-source` | `true` | Show source code snippets alongside violations |
     | `fail-level` | `"style"` | Minimum severity that produces exit code 1: `error`, `warning`, `info`, `style`, `none` |
   </Tab>
+  <Tab title="Fixes">
+    Controls auto-fix safety when fixes are requested.
+
+    ```toml
+    unsafe-fixes = true
+    ```
+
+    | Option | Default | Description |
+    |--------|---------|-------------|
+    | `unsafe-fixes` | unset | Enable application of unsafe fixes when `--fix` is used |
+  </Tab>
   <Tab title="[rules]">
     Controls which rules are enabled and how they are configured.
 
@@ -245,6 +256,7 @@ tally lint --config /path/to/.tally.toml Dockerfile
     | `TALLY_SLOW_CHECKS_TIMEOUT` | Timeout for slow checks (e.g. `20s`) |
     | `TALLY_FIX` | Apply safe fixes automatically: `true` / `false` |
     | `TALLY_FIX_UNSAFE` | Also apply unsafe fixes: `true` / `false` |
+    | `TALLY_UNSAFE_FIXES` | Config-shaped alias for `unsafe-fixes`: `true` / `false` |
     | `TALLY_FIX_RULE` | Limit fixes to specific rules (comma-separated) |
   </Tab>
   <Tab title="Directive variables">
@@ -274,6 +286,7 @@ tally lint --config /path/to/.tally.toml Dockerfile
     | Flag | Description |
     |------|-------------|
     | `--config, -c` | Path to config file (overrides discovery) |
+    | `--no-config` | Skip config file discovery and use defaults plus env/CLI overrides |
     | `--exclude` | Glob pattern(s) to exclude files (repeatable) |
     | `--context` | Build context directory for direct Dockerfile linting |
     | `--target` | Bake target or group to lint (repeatable; Bake entrypoints only) |

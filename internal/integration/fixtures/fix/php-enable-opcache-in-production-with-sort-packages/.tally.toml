@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/php/enable-opcache-in-production", "tally/sort-packages"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

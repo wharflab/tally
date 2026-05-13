@@ -1,0 +1,8 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/prefer-package-cache-mounts"]
+exclude = ["*"]
+
+

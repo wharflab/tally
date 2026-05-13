@@ -1,0 +1,3 @@
+FROM fedora:40
+STOPSIGNAL SIGKILL
+ENTRYPOINT ["/sbin/init"]

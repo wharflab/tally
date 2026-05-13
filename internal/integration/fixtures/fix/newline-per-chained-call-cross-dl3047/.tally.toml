@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/newline-per-chained-call", "hadolint/DL3047"]
+exclude = ["*"]

@@ -1,0 +1,11 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/labels/no-buildx-git-overlap"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"
+
+[rules.tally.labels.no-buildx-git-overlap]
+buildx-git-labels = "full"

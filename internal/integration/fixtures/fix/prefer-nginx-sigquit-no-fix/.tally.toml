@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/prefer-nginx-sigquit"]
+exclude = ["*"]

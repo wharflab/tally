@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/invalid-json-form", "buildkit/JSONArgsRecommended"]
+exclude = ["*"]

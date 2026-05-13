@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/ruby/jemalloc-installed-but-not-preloaded", "tally/sort-packages"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

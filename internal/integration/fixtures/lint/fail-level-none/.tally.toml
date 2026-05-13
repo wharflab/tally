@@ -1,0 +1,9 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["buildkit/InvalidDefinitionDescription", "buildkit/StageNameCasing", "buildkit/MaintainerDeprecated", "buildkit/JSONArgsRecommended"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

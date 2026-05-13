@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/prefer-curl-config", "tally/prefer-add-unpack"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

@@ -1384,6 +1384,14 @@
         }
       },
       "type": "object"
+    },
+    "unsafe-fixes": {
+      "default": null,
+      "description": "Enable application of unsafe fixes. When omitted, unsafe fixes are not applied and callers may display a hint when unsafe fixes are available.",
+      "type": [
+        "boolean",
+        "null"
+      ]
     }
   },
   "title": "tally configuration",

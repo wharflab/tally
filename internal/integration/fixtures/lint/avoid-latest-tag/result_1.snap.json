@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/avoid-latest-tag/Dockerfile",
+      "violations": [
+        {
+          "detail": "The :latest tag can change at any time, potentially breaking builds or introducing unexpected behavior. Use a specific version tag for reproducibility.",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3007/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 1
+            },
+            "file": "fixtures/lint/avoid-latest-tag/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 1
+            }
+          },
+          "message": "using :latest tag for image \"ubuntu:latest\" is prone to errors; pin a specific version instead (e.g., ubuntu:22.04)",
+          "rule": "hadolint/DL3007",
+          "severity": "warning",
+          "sourceCode": "FROM ubuntu:latest"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

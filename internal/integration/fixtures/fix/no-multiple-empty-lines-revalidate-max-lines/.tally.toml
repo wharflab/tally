@@ -1,0 +1,9 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/no-multiple-empty-lines", "tally/max-lines"]
+exclude = ["*"]
+
+[rules.tally.max-lines]
+max = 7
+skip-blank-lines = false

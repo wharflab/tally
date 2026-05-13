@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/windows/no-chown-flag", "tally/copy-after-user-without-chown"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

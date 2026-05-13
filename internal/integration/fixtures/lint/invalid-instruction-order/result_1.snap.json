@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/invalid-instruction-order/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3061/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 1
+            },
+            "file": "fixtures/lint/invalid-instruction-order/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 1
+            }
+          },
+          "message": "Invalid instruction order. Dockerfile must begin with `FROM`, `ARG` or comment.",
+          "rule": "hadolint/DL3061",
+          "severity": "error",
+          "sourceCode": "RUN echo \"hello\""
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 1,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

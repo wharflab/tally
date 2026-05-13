@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -35,6 +36,7 @@ type lintOptions struct {
 
 	// Standalone config discovery.
 	configPath string
+	noConfig   bool
 
 	// Append-semantics rule selection.
 	selectR []string // --select (append to cfg.Rules.Include)
@@ -52,10 +54,11 @@ type lintOptions struct {
 	services   []string
 
 	// Operational flags.
-	exclude   []string
-	fix       bool
-	fixRule   []string
-	fixUnsafe bool
+	exclude      []string
+	fix          bool
+	fixRule      []string
+	fixUnsafe    bool
+	fixUnsafeSet bool
 
 	// Complex (shell-quoted) AI flag: parsed then folded into the config.
 	acpCommand    string
@@ -77,6 +80,7 @@ type dockerPluginContext struct {
 // up via posflag.
 func addLintFlags(fs *pflag.FlagSet, opts *lintOptions) {
 	fs.StringVarP(&opts.configPath, "config", "c", "", "Path to config file (default: auto-discover)")
+	fs.BoolVar(&opts.noConfig, "no-config", false, "Do not discover or load config files")
 
 	// Config-shaped flags. Values are read back by the koanf posflag layer;
 	// we don't need Go-side variables for these.
@@ -223,6 +227,9 @@ func finalizeLintOptions(fs *pflag.FlagSet, opts *lintOptions) error {
 	if err := validateLintFlagFormat(fs); err != nil {
 		return err
 	}
+	if opts.configPath != "" && opts.noConfig {
+		return errors.New("--config and --no-config cannot be used together")
+	}
 	if err := resolveLintInversions(fs, opts); err != nil {
 		return err
 	}
@@ -265,11 +272,14 @@ func finalizeLintOptions(fs *pflag.FlagSet, opts *lintOptions) error {
 			opts.fix = v
 		}
 	}
-	if !fs.Changed("fix-unsafe") {
+	if fs.Changed("fix-unsafe") {
+		opts.fixUnsafeSet = true
+	} else if !fs.Changed("fix-unsafe") {
 		if v, ok, err := parseEnvBool("TALLY_FIX_UNSAFE"); err != nil {
 			return err
 		} else if ok {
 			opts.fixUnsafe = v
+			opts.fixUnsafeSet = true
 		}
 	}
 

@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/trusted-registries-untrusted/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3026/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 1
+            },
+            "file": "fixtures/lint/trusted-registries-untrusted/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 1
+            }
+          },
+          "message": "image \"quay.io/prometheus/node-exporter:latest\" is from untrusted registry \"quay.io\" (allowed: docker.io)",
+          "rule": "hadolint/DL3026",
+          "severity": "warning",
+          "sourceCode": "FROM quay.io/prometheus/node-exporter:latest"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

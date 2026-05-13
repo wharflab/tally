@@ -1,0 +1,5 @@
+unsafe-fixes = false
+
+[rules]
+include = ["tally/gpu/prefer-minimal-driver-capabilities"]
+exclude = ["*"]

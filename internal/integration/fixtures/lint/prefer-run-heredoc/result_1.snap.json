@@ -1,0 +1,71 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/prefer-run-heredoc/Dockerfile",
+      "violations": [
+        {
+          "detail": "3 consecutive RUN instructions with 3 total commands can be combined into a single heredoc RUN",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-run-heredoc/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "fixtures/lint/prefer-run-heredoc/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "consecutive RUN instructions can be combined using heredoc syntax",
+          "rule": "tally/prefer-run-heredoc",
+          "severity": "style",
+          "sourceCode": "RUN apt-get update",
+          "suggestedFix": {
+            "description": "Combine 3 commands into heredoc",
+            "needsResolve": true,
+            "priority": 100,
+            "resolverId": "prefer-run-heredoc",
+            "safety": 1
+          }
+        },
+        {
+          "detail": "RUN has 3 chained commands; consider using heredoc syntax for better readability",
+          "docUrl": "https://tally.wharflab.com/rules/tally/prefer-run-heredoc/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 12
+            },
+            "file": "fixtures/lint/prefer-run-heredoc/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 12
+            }
+          },
+          "message": "RUN instruction with chained commands can use heredoc syntax",
+          "rule": "tally/prefer-run-heredoc",
+          "severity": "style",
+          "sourceCode": "RUN echo step1 \u0026\u0026 echo step2 \u0026\u0026 echo step3",
+          "suggestedFix": {
+            "description": "Convert chained commands to heredoc (3 commands)",
+            "needsResolve": true,
+            "priority": 100,
+            "resolverId": "prefer-run-heredoc",
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 2,
+    "total": 2,
+    "warnings": 0
+  }
+}

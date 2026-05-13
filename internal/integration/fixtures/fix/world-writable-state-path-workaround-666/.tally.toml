@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/world-writable-state-path-workaround"]
+exclude = ["*"]

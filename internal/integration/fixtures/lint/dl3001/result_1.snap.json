@@ -1,0 +1,101 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/dl3001/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3001/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "fixtures/lint/dl3001/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "command top has no purpose in a Docker container; avoid commands like free, kill, mount, ps, service, shutdown, ssh, top, vim",
+          "rule": "hadolint/DL3001",
+          "severity": "info",
+          "sourceCode": "RUN top",
+          "suggestedFix": {
+            "description": "Comment out RUN instruction that only runs container-irrelevant commands",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 7,
+                    "line": 4
+                  },
+                  "file": "fixtures/lint/dl3001/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 4
+                  }
+                },
+                "newText": "# [commented out by tally - command has no purpose in a container]: RUN top"
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          },
+          "suggestedFixes": [
+            {
+              "description": "Comment out RUN instruction that only runs container-irrelevant commands",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 7,
+                      "line": 4
+                    },
+                    "file": "fixtures/lint/dl3001/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 4
+                    }
+                  },
+                  "newText": "# [commented out by tally - command has no purpose in a container]: RUN top"
+                }
+              ],
+              "isPreferred": true,
+              "safety": 1
+            },
+            {
+              "description": "Delete RUN instruction",
+              "edits": [
+                {
+                  "location": {
+                    "end": {
+                      "column": 0,
+                      "line": 5
+                    },
+                    "file": "fixtures/lint/dl3001/Dockerfile",
+                    "start": {
+                      "column": 0,
+                      "line": 4
+                    }
+                  },
+                  "newText": ""
+                }
+              ],
+              "safety": 2
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

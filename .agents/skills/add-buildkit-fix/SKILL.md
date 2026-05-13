@@ -197,32 +197,29 @@ func Test${ARGUMENTS}Fix(t *testing.T) {
 
 ## Step 7: Add Integration Tests
 
-### Create test fixture
+### Add directory fixtures
+
+Use the directory harness for normal BuildKit fix coverage:
+
+- `internal/integration/fixtures/lint/$ARGUMENTS-kebab-case/Dockerfile`
+- `internal/integration/fixtures/lint/$ARGUMENTS-kebab-case/.tally.toml`
+- `internal/integration/fixtures/fix/$ARGUMENTS-kebab-case/Dockerfile`
+- `internal/integration/fixtures/fix/$ARGUMENTS-kebab-case/.tally.toml`
+
+Select the target rule in `.tally.toml`; add overlap rules there when the fix must be validated in a combined run. Set `unsafe-fixes = true` if
+the fixture needs unsafe fix application.
+
+Create/update snapshots with go-snaps:
 
 ```bash
-mkdir -p internal/integration/testdata/$ARGUMENTS-kebab-case
-# Create Dockerfile that triggers the rule
+UPDATE_SNAPS=true go test ./internal/integration -run 'Test(Lint|Fix)Fixtures' -count=1
+go test ./internal/integration -run 'Test(Lint|Fix)Fixtures' -count=1
 ```
 
-### Add to TestCheck (detection test)
+Expected snapshot files are fixture-local: `result_1.snap.json`, `fixed_1.snap.Dockerfile`, and optional `report_1.snap.md`.
 
-In `internal/integration/integration_test.go`:
-
-```go
-{name: "$ARGUMENTS-kebab-case", dir: "$ARGUMENTS-kebab-case", args: []string{"--format", "json"}, wantExit: 1},
-```
-
-### Add to TestFix (fix test)
-
-```go
-{
-    name:        "$ARGUMENTS-fix",
-    input:       "...\n",
-    want:        "...\n",
-    args:        []string{"--fix"},
-    wantApplied: 1,
-},
-```
+Add explicit Go integration tests only for behavior the directory harness cannot express, such as custom CLI formats, config discovery, stdin-only
+behavior, or multi-file contexts.
 
 ## Step 8: Run All Checks
 
@@ -271,8 +268,8 @@ Update `_docs/rules/buildkit/$ARGUMENTS.mdx` — add an `## Auto-fix` section wi
 - [ ] Fix enricher created in `internal/rules/buildkit/fixes/`
 - [ ] Enricher registered in `enricher.go` switch
 - [ ] Unit tests in `fixes_test.go`
-- [ ] Integration test fixture in `testdata/`
-- [ ] Integration test cases in `integration_test.go` (TestCheck + TestFix)
+- [ ] Lint fixture in `internal/integration/fixtures/lint/`
+- [ ] Fix fixture in `internal/integration/fixtures/fix/`
 - [ ] `go test ./...` passes
 - [ ] `make lint` passes
 - [ ] Manual `--fix` verification works

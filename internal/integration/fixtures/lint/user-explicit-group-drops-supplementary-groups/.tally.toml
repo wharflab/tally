@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/user-explicit-group-drops-supplementary-groups"]
+exclude = ["*"]

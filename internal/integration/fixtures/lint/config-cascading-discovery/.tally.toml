@@ -1,0 +1,9 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/max-lines"]
+exclude = ["*"]
+
+[rules.tally.max-lines]
+max = 2

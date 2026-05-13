@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/dl3021/Dockerfile",
+      "violations": [
+        {
+          "detail": "When copying multiple source files, the destination must be a directory (indicated by a trailing /). Without it, the build will fail.",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3021/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "fixtures/lint/dl3021/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "COPY with more than 2 arguments requires the last argument to end with /",
+          "rule": "hadolint/DL3021",
+          "severity": "error",
+          "sourceCode": "COPY foo bar baz"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 1,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

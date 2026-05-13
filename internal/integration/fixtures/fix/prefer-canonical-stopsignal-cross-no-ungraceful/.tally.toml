@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/prefer-canonical-stopsignal", "tally/no-ungraceful-stopsignal"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

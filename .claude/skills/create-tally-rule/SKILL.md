@@ -327,10 +327,9 @@ Two edits on the same line overlap iff neither is completely before the other:
 
 ### Integration test for cross-rule fixes
 
-Always add a `TestFix*` scenario that enables **all interacting rules simultaneously** and snapshots the
-result. This catches regressions in edit width, priority ordering, and conflict resolution. See
-`TestFixCrossRuleMultiSpacesIndentationChain` for a 3-rule example (`no-multi-spaces` + `consistent-indentation`
-and `newline-per-chained-call`).
+Always add a fix directory fixture that enables **all interacting rules simultaneously** in `.tally.toml` and snapshots the result. This catches
+regressions in edit width, priority ordering, and conflict resolution without forcing contributors to edit shared Go test tables. Use an explicit
+`TestFix*` scenario only when the directory fixture harness cannot express the interaction.
 
 ## Step 5: Add Unit Tests
 
@@ -363,14 +362,18 @@ go tool cover -func=/tmp/tally.cover
 
 ## Step 6: Add Integration Coverage
 
-1. Create fixture:
-   - `internal/integration/testdata/<rule_slug>/Dockerfile`
-   - Optional: `.tally.toml` for rule enablement/tuning
+Use directory fixtures for ordinary rule coverage. Do not add a new shared case-table entry unless the behavior cannot be represented by a Dockerfile
+plus optional `.tally.toml`.
 
-2. Add `TestCheck` case in `internal/integration/integration_test.go`:
-   - Use `selectRules("tally/<rule_slug>")` to isolate behavior
+1. Create a lint fixture:
+   - `internal/integration/fixtures/lint/<rule_slug>/Dockerfile`
+   - `internal/integration/fixtures/lint/<rule_slug>/.tally.toml`
+   - Select the new rule in `.tally.toml`; include overlap rules there when the case needs them.
 
-3. If the rule has fixes, add/extend `TestFix` case(s) as a **requirement**, not an option.
+2. If the rule has fixes, create a fix fixture as a **requirement**, not an option:
+   - `internal/integration/fixtures/fix/<rule_slug>/Dockerfile`
+   - `internal/integration/fixtures/fix/<rule_slug>/.tally.toml` when rule selection, config, or `unsafe-fixes` is needed.
+   - Set `unsafe-fixes = true` in `.tally.toml` when the fixture must exercise unsafe fixes.
    - Do not "fix" failing integration behavior by dropping fix coverage. A fix-capable rule must have fix integration coverage.
    - The primary fixture must not be a trivial green path. Make it intentionally mixed and adversarial.
    - Include multiple cases for the same rule in the fixture:
@@ -386,17 +389,34 @@ go tool cover -func=/tmp/tally.cover
    - If the rule is experimental or overlap rules need config, enable them in the fixture config so the combined `--fix` run matches the planning
      assumptions.
 
-4. Use existing cross-rule fix scenarios as the model for test shape and assertions:
-   - `internal/integration/fix_scenarios_test.go`
-   - `internal/integration/fix_cases_test.go`
+3. Let go-snaps create or update fixture-local snapshots:
 
-5. Update snapshots:
+```bash
+UPDATE_SNAPS=true go test ./internal/integration -run 'Test(Lint|Fix)Fixtures' -count=1
+go test ./internal/integration -run 'Test(Lint|Fix)Fixtures' -count=1
+```
+
+Expected snapshot files:
+
+- lint: `result_1.snap.json`
+- fixed Dockerfile: `fixed_1.snap.Dockerfile`
+- fix report stderr, when present: `report_1.snap.md`
+
+4. Add explicit Go integration tests only when needed for harness behavior the directory fixtures cannot express:
+   - CLI format-specific output
+   - config discovery or env/CLI precedence
+   - stdin-only behavior beyond normal fix fixtures
+   - multi-file build contexts
+   - dynamic external resolver scenarios
+
+5. If explicit tests are needed, use the existing scenario files as the model:
+   - `internal/integration/lint_cases_test.go`
+   - `internal/integration/fix_cases_test.go`
+   - `internal/integration/fix_scenarios_test.go`
 
 ```bash
 UPDATE_SNAPS=true go test ./internal/integration/...
 ```
-
-Important: adding a new enabled rule can change `rules_enabled` values and the `total-rules-enabled` snapshot.
 
 ## Step 6.5: Use Real-World Dockerfile Examples
 
@@ -465,8 +485,9 @@ Confirm:
 - [ ] Helper tests added for extracted utilities
 - [ ] Shared logic was extracted instead of copy-pasted when a near-match existed in another rule
 - [ ] New rule/helper files are covered at >=85%
-- [ ] Integration fixture + `TestCheck` case added
-- [ ] `TestFix` coverage added for fix-capable rules; integration fixes were not omitted to avoid conflicts
+- [ ] Lint integration fixture added under `internal/integration/fixtures/lint/<rule_slug>/`
+- [ ] Fix integration fixture added for fix-capable rules under `internal/integration/fixtures/fix/<rule_slug>/`; integration fixes were not omitted
+      to avoid conflicts
 - [ ] Fix fixture is intentionally mixed: fix, no-fix, and clean/nearby cases for the same rule when practical
 - [ ] Combined-rule fix test enables the overlapping rules identified during planning
 - [ ] Combined snapshot/test documents expected precedence, suppression, or skipped-fix behavior

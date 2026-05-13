@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/sort-packages", "shellcheck/SC2086"]
+exclude = ["*"]

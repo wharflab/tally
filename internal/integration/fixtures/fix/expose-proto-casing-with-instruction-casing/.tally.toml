@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["buildkit/ExposeProtoCasing", "buildkit/ConsistentInstructionCasing"]
+exclude = ["*"]

@@ -1,0 +1,57 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/dl3046/Dockerfile",
+      "violations": [
+        {
+          "detail": "When useradd creates a user with a high UID (\u003e99999), it writes entries to /var/log/lastlog and /var/log/faillog. These files are sparse but can bloat the image layer. Use the -l (--no-log-init) flag to skip these log entries.",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3046/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "fixtures/lint/dl3046/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "`useradd` without flag `-l` and high UID will result in excessively large Image",
+          "rule": "hadolint/DL3046",
+          "severity": "warning",
+          "sourceCode": "RUN useradd -u 123456 appuser",
+          "suggestedFix": {
+            "description": "Add -l flag to useradd",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 11,
+                    "line": 5
+                  },
+                  "file": "fixtures/lint/dl3046/Dockerfile",
+                  "start": {
+                    "column": 11,
+                    "line": 5
+                  }
+                },
+                "newText": " -l"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

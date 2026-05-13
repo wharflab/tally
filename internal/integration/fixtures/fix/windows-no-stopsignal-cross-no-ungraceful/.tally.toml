@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/windows/no-stopsignal", "tally/no-ungraceful-stopsignal"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

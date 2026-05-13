@@ -1,0 +1,175 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/fail-level-warning/Dockerfile",
+      "violations": [
+        {
+          "detail": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment.",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/InvalidDefinitionDescription/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "fixtures/lint/fail-level-warning/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "Comment for FROM should follow the format: `# builder \u003cdescription\u003e`",
+          "rule": "buildkit/InvalidDefinitionDescription",
+          "severity": "warning",
+          "sourceCode": "FROM alpine:3.18 AS Builder",
+          "suggestedFix": {
+            "description": "Add empty line between comment and instruction",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 40,
+                    "line": 1
+                  },
+                  "file": "fixtures/lint/fail-level-warning/Dockerfile",
+                  "start": {
+                    "column": 40,
+                    "line": 1
+                  }
+                },
+                "newText": "\n"
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "detail": "Stage names should be lowercase",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/StageNameCasing/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "fixtures/lint/fail-level-warning/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "Stage name 'Builder' should be lowercase",
+          "rule": "buildkit/StageNameCasing",
+          "severity": "warning",
+          "sourceCode": "FROM alpine:3.18 AS Builder",
+          "suggestedFix": {
+            "description": "Rename stage 'Builder' to 'builder'",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 27,
+                    "line": 2
+                  },
+                  "file": "fixtures/lint/fail-level-warning/Dockerfile",
+                  "start": {
+                    "column": 20,
+                    "line": 2
+                  }
+                },
+                "newText": "builder"
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "detail": "The MAINTAINER instruction is deprecated, use a label instead to define an image author",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/MaintainerDeprecated/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 3
+            },
+            "file": "fixtures/lint/fail-level-warning/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "Maintainer instruction is deprecated in favor of using label",
+          "rule": "buildkit/MaintainerDeprecated",
+          "severity": "warning",
+          "sourceCode": "MAINTAINER test@example.com",
+          "suggestedFix": {
+            "description": "Replace MAINTAINER with org.opencontainers.image.authors label",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 27,
+                    "line": 3
+                  },
+                  "file": "fixtures/lint/fail-level-warning/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 3
+                  }
+                },
+                "newText": "LABEL org.opencontainers.image.authors=\"test@example.com\""
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/JSONArgsRecommended/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "fixtures/lint/fail-level-warning/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "JSON arguments recommended for CMD to prevent unintended behavior related to OS signals",
+          "rule": "buildkit/JSONArgsRecommended",
+          "severity": "info",
+          "sourceCode": "CMD echo hello",
+          "suggestedFix": {
+            "description": "Convert CMD to exec form JSON array",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 14,
+                    "line": 5
+                  },
+                  "file": "fixtures/lint/fail-level-warning/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 5
+                  }
+                },
+                "newText": "[\"echo\",\"hello\"]"
+              }
+            ],
+            "isPreferred": true,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 4,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 4,
+    "warnings": 3
+  }
+}

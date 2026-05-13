@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["buildkit/WorkdirRelativePath", "hadolint/DL3003", "hadolint/DL3045"]
+exclude = ["*"]

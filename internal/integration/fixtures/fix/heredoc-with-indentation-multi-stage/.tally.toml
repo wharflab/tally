@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/consistent-indentation", "tally/prefer-run-heredoc"]
+exclude = ["*"]
+
+[rules.tally.consistent-indentation]
+severity = "style"

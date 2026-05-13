@@ -1,0 +1,14 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/curl-should-follow-redirects", "tally/prefer-add-unpack"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"
+
+[rules.tally.curl-should-follow-redirects]
+severity = "error"
+
+[rules.tally.prefer-add-unpack]
+severity = "error"

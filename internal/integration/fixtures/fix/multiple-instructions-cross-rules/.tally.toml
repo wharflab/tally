@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["buildkit/MultipleInstructionsDisallowed", "buildkit/ConsistentInstructionCasing", "buildkit/JSONArgsRecommended"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

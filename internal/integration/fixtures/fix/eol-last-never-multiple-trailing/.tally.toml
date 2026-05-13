@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/eol-last"]
+exclude = ["*"]
+
+[rules.tally.eol-last]
+mode = "never"

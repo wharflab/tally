@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["hadolint/DL3003", "hadolint/DL3027", "tally/prefer-curl-config"]
+exclude = ["*"]

@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["buildkit/DuplicateStageName", "tally/no-unreachable-stages"]
+exclude = ["*"]

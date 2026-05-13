@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/max-lines", "hadolint/DL3006"]
+exclude = ["*"]

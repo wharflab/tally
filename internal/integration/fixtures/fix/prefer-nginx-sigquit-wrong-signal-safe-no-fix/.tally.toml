@@ -1,0 +1,8 @@
+unsafe-fixes = false
+
+[rules]
+include = ["tally/prefer-nginx-sigquit"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/named-identity-in-passwdless-stage"]
+exclude = ["*"]

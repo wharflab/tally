@@ -1,0 +1,175 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/invalid-definition-description/Dockerfile",
+      "violations": [
+        {
+          "detail": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment.",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/InvalidDefinitionDescription/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "fixtures/lint/invalid-definition-description/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "Comment for ARG should follow the format: `# foo \u003cdescription\u003e`",
+          "rule": "buildkit/InvalidDefinitionDescription",
+          "severity": "warning",
+          "sourceCode": "ARG foo=bar",
+          "suggestedFix": {
+            "description": "Add empty line between comment and instruction",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 21,
+                    "line": 3
+                  },
+                  "file": "fixtures/lint/invalid-definition-description/Dockerfile",
+                  "start": {
+                    "column": 21,
+                    "line": 3
+                  }
+                },
+                "newText": "\n"
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "detail": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment.",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/InvalidDefinitionDescription/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "fixtures/lint/invalid-definition-description/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "Comment for FROM should follow the format: `# base \u003cdescription\u003e`",
+          "rule": "buildkit/InvalidDefinitionDescription",
+          "severity": "warning",
+          "sourceCode": "FROM scratch AS base",
+          "suggestedFix": {
+            "description": "Add empty line between comment and instruction",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 29,
+                    "line": 5
+                  },
+                  "file": "fixtures/lint/invalid-definition-description/Dockerfile",
+                  "start": {
+                    "column": 29,
+                    "line": 5
+                  }
+                },
+                "newText": "\n"
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "detail": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment.",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/InvalidDefinitionDescription/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 8
+            },
+            "file": "fixtures/lint/invalid-definition-description/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 8
+            }
+          },
+          "message": "Comment for ARG should follow the format: `# version \u003cdescription\u003e`",
+          "rule": "buildkit/InvalidDefinitionDescription",
+          "severity": "warning",
+          "sourceCode": "ARG version=latest",
+          "suggestedFix": {
+            "description": "Add empty line between comment and instruction",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 26,
+                    "line": 7
+                  },
+                  "file": "fixtures/lint/invalid-definition-description/Dockerfile",
+                  "start": {
+                    "column": 26,
+                    "line": 7
+                  }
+                },
+                "newText": "\n"
+              }
+            ],
+            "isPreferred": true
+          }
+        },
+        {
+          "detail": "Comment for build stage or argument should follow the format: `# \u003carg/stage name\u003e \u003cdescription\u003e`. If this is not intended to be a description comment, add an empty line or comment between the instruction and the comment.",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/InvalidDefinitionDescription/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "fixtures/lint/invalid-definition-description/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "Comment for ARG should follow the format: `# baz \u003cdescription\u003e`",
+          "rule": "buildkit/InvalidDefinitionDescription",
+          "severity": "warning",
+          "sourceCode": "ARG baz=quux",
+          "suggestedFix": {
+            "description": "Add empty line between comment and instruction",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 26,
+                    "line": 9
+                  },
+                  "file": "fixtures/lint/invalid-definition-description/Dockerfile",
+                  "start": {
+                    "column": 26,
+                    "line": 9
+                  }
+                },
+                "newText": "\n"
+              }
+            ],
+            "isPreferred": true
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 4,
+    "warnings": 4
+  }
+}

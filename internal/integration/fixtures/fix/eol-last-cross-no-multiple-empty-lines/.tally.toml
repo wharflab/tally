@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/eol-last", "tally/no-multiple-empty-lines"]
+exclude = ["*"]

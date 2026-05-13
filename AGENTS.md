@@ -13,9 +13,14 @@ common mistakes.
   - `internal/lint/`: linting rules
   - `internal/version/`: version info
 - `internal/integration/`: end-to-end tests with snapshots and fixtures
-  - `internal/integration/testdata/<case>/Dockerfile`: test Dockerfiles
-  - `internal/integration/testdata/<case>/.tally.toml`: test config files
-  - `internal/integration/__snapshots__/`: `go-snaps` snapshot outputs
+  - `internal/integration/fixtures/lint/<case>/Dockerfile`: directory-driven lint fixture
+  - `internal/integration/fixtures/lint/<case>/.tally.toml`: optional case-local config
+  - `internal/integration/fixtures/lint/<case>/result_1.snap.json`: go-snaps lint snapshot
+  - `internal/integration/fixtures/fix/<case>/Dockerfile`: directory-driven fix fixture
+  - `internal/integration/fixtures/fix/<case>/fixed_1.snap.Dockerfile`: go-snaps fixed-output snapshot
+  - `internal/integration/fixtures/fix/<case>/report_1.snap.md`: optional go-snaps markdown report snapshot
+  - `internal/integration/testdata/` and `internal/integration/__snapshots__/`: explicit integration tests for behavior not representable by a
+    directory fixture
 - `_docs/`: Mintlify documentation source (published via `wharflab/docs` repo)
   - `_docs/rules/<namespace>/<rule>.mdx`: one page per rule
   - `_docs/guides/`: user guides
@@ -87,6 +92,13 @@ skip-blank-lines = true
 
 - Unit tests live alongside packages in `internal/**`.
 - Integration tests (`internal/integration`) build the binary once and run it against test fixtures.
+- For ordinary rule coverage, add a directory fixture instead of editing shared case tables:
+  - lint: `internal/integration/fixtures/lint/<case>/Dockerfile`
+  - fix: `internal/integration/fixtures/fix/<case>/Dockerfile`
+  - add `.tally.toml` alongside the Dockerfile when the case needs rule selection or config.
+  - run with `UPDATE_SNAPS=true` once to create/update `result_1.snap.json`, `fixed_1.snap.Dockerfile`, and optional `report_1.snap.md`.
+- Use explicit Go integration tests only for CLI behavior, config discovery, stdin-specific behavior, output formats, or multi-file contexts that the
+  directory fixture harness cannot express.
 - Integration test placement decision tree:
   [`design-docs/16-integration-tests-refactor-and-placement.md` §8](design-docs/16-integration-tests-refactor-and-placement.md#8-decision-tree-where-should-this-test-go)
 - Update snapshots when intentional output changes:

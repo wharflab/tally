@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/copy-after-user-without-chown"]
+exclude = ["*"]

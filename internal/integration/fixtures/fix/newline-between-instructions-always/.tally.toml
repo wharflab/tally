@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/newline-between-instructions"]
+exclude = ["*"]
+
+[rules.tally.newline-between-instructions]
+mode = "always"

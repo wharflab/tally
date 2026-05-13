@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "on"
+
+[rules]
+include = ["hadolint/DL3057"]
+exclude = ["*"]

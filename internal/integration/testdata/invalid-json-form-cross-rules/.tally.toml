@@ -1,4 +1,0 @@
-# Elevate JSONArgsRecommended to error so supersession does not suppress it,
-# allowing the test to assert both rules fire on the same line.
-[rules.buildkit.JSONArgsRecommended]
-severity = "error"

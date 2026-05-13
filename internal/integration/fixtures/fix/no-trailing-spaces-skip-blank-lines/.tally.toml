@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/no-trailing-spaces"]
+exclude = ["*"]
+
+[rules.tally.no-trailing-spaces]
+skip-blank-lines = true

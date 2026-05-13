@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/prefer-wget-config", "tally/prefer-add-unpack"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

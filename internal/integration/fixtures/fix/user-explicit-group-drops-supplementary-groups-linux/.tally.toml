@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/user-explicit-group-drops-supplementary-groups"]
+exclude = ["*"]

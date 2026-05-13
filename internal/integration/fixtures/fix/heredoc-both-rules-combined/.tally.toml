@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/prefer-copy-heredoc", "tally/prefer-run-heredoc", "tally/prefer-package-cache-mounts", "tally/prefer-curl-config"]
+exclude = ["*"]

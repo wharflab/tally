@@ -402,7 +402,9 @@ func runLintStdin(ctx stdcontext.Context, opts *lintOptions) error {
 // lintStdinContent parses and lints content read from stdin.
 func lintStdinContent(ctx stdcontext.Context, opts *lintOptions, content []byte) (*lintResults, *config.Config, error) {
 	// Load config from CWD (stdin has no file path for cascading discovery).
-	cfg, err := loadConfigForFile(opts, ".")
+	// Use a synthetic file under "." because config discovery starts from the
+	// target file's directory.
+	cfg, err := loadConfigForFile(opts, filepath.Join(".", "Dockerfile"))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to load config: %v\n", err)
 		return nil, nil, exitWith(ExitConfigError)
@@ -925,9 +927,12 @@ func writeReportTo(
 func loadConfigForFile(opts *lintOptions, targetPath string) (*config.Config, error) {
 	var cfg *config.Config
 	var err error
-	if opts.configPath != "" {
+	switch {
+	case opts.noConfig:
+		cfg, err = config.LoadNoFileWithFlags(opts.flags, lintFlagMapper())
+	case opts.configPath != "":
 		cfg, err = config.LoadFromFileWithFlags(opts.configPath, opts.flags, lintFlagMapper())
-	} else {
+	default:
 		cfg, err = config.LoadWithFlags(targetPath, opts.flags, lintFlagMapper())
 	}
 	if err != nil {
@@ -1256,11 +1261,7 @@ func applyFixes(
 	opts *lintOptions,
 	input applyFixesInput,
 ) (*fix.Result, error) {
-	// Determine safety threshold
-	safetyThreshold := fix.FixSafe
-	if opts.fixUnsafe {
-		safetyThreshold = fix.FixUnsafe
-	}
+	safetyThreshold := fixSafetyThreshold(opts, input.fileConfigs)
 
 	// Get rule filter
 	ruleFilter := opts.fixRule
@@ -1344,6 +1345,21 @@ func applyFixes(
 	}
 
 	return result, nil
+}
+
+func fixSafetyThreshold(opts *lintOptions, fileConfigs map[string]*config.Config) fix.FixSafety {
+	if opts.fixUnsafe {
+		return fix.FixUnsafe
+	}
+	if opts.fixUnsafeSet {
+		return fix.FixSafe
+	}
+	for _, cfg := range fileConfigs {
+		if cfg != nil && cfg.UnsafeFixes != nil && *cfg.UnsafeFixes {
+			return fix.FixUnsafe
+		}
+	}
+	return fix.FixSafe
 }
 
 // writeFixedFiles writes modified files back to disk, preserving original permissions.

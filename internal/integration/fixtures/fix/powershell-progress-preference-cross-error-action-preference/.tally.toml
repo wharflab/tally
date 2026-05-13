@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/powershell/progress-preference", "tally/powershell/error-action-preference"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

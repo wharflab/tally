@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["shellcheck/SC1040"]
+exclude = ["*"]

@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["hadolint/DL4005"]
+exclude = ["*"]

@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/slow-checks-platform-meta-arg/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/InvalidBaseImagePlatform/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "fixtures/lint/slow-checks-platform-meta-arg/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "Base image python:3.12 was pulled with platform \"linux/arm64\", expected \"linux/amd64\" for current build",
+          "rule": "buildkit/InvalidBaseImagePlatform",
+          "severity": "warning",
+          "sourceCode": "FROM --platform=$PLATFORM python:3.12"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

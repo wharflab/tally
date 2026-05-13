@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/epilogue-order", "tally/newline-between-instructions"]
+exclude = ["*"]

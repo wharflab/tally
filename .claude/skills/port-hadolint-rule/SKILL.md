@@ -239,12 +239,17 @@ Ensure ALL original Hadolint test cases pass.
 
 ## Step 8: Add Integration Test
 
-Add an integration test case for the new rule:
+Add a directory fixture for the new rule:
 
-1. Create directory `internal/integration/testdata/$ARGUMENTS/`
-2. Add a `Dockerfile` that triggers the rule
-3. Add test case to `internal/integration/integration_test.go`
-4. Run `UPDATE_SNAPS=true go test ./internal/integration/...`
+1. Create `internal/integration/fixtures/lint/$ARGUMENTS/Dockerfile`.
+2. Add `internal/integration/fixtures/lint/$ARGUMENTS/.tally.toml` selecting the Hadolint rule and any overlap rules needed by the case.
+3. If the port includes a fix, also create `internal/integration/fixtures/fix/$ARGUMENTS/Dockerfile` and optional `.tally.toml`.
+4. Run `UPDATE_SNAPS=true go test ./internal/integration -run 'Test(Lint|Fix)Fixtures' -count=1`.
+5. Re-run without `UPDATE_SNAPS`.
+
+The fixture harness writes go-snaps files next to the Dockerfile: `result_1.snap.json` for lint, `fixed_1.snap.Dockerfile` for fix output, and
+optional `report_1.snap.md` for fix reports. Use explicit Go integration tests only for behavior that needs CLI/config/discovery/stdin/multi-file
+coverage outside the directory harness.
 
 ## Step 9: Consider Auto-Fix Support
 
@@ -331,13 +336,11 @@ After implementation is complete, update the tracking files:
 
    This updates the Hadolint compatibility table in the documentation.
 
-3. **Update all integration test snapshots** (if needed):
+3. **Update integration test snapshots** (if needed):
 
    ```bash
    UPDATE_SNAPS=true go test ./internal/integration/...
    ```
-
-   This updates the `rules_enabled` count in all snapshots.
 
 ## Step 11: Create Rule Documentation
 
@@ -361,7 +364,7 @@ Add the rule to `_docs/rules/hadolint/overview.mdx` in the main table.
 - [ ] `init()` function registers the rule
 - [ ] Unit tests cover ALL original test cases
 - [ ] Tests pass: `go test ./internal/rules/hadolint/... -run $ARGUMENTS -v`
-- [ ] Integration test added with testdata directory and snapshot
+- [ ] Integration fixture added under `internal/integration/fixtures/lint/` and, when fix-capable, `internal/integration/fixtures/fix/`
 - [ ] Auto-fix considered (add if rule is a good candidate)
 - [ ] `hadolint-status.json` updated with new rule
 - [ ] Documentation regenerated with `generate-hadolint-table.sh --update`

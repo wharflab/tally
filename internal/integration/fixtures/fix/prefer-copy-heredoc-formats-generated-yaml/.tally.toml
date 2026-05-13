@@ -1,0 +1,5 @@
+unsafe-fixes = true
+
+[rules]
+include = ["tally/prefer-copy-heredoc", "tally/prefer-formatted-heredocs"]
+exclude = ["*"]
