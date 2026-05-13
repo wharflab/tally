@@ -11,62 +11,6 @@ import (
 	"github.com/gkampitakis/go-snaps/snaps"
 )
 
-// TestFixRealWorld tests the auto-fix functionality on a real-world Dockerfile
-// from a public repository, verifying that multiple fixes apply correctly.
-// Source: https://github.com/tle211212/deepspeed_distributed_sagemaker_sample
-func TestFixRealWorld(t *testing.T) {
-	t.Parallel()
-	testdataDir := filepath.Join("testdata", "benchmark-real-world-fix")
-
-	// Read the original Dockerfile
-	originalContent, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile"))
-	if err != nil {
-		t.Fatalf("failed to read original Dockerfile: %v", err)
-	}
-
-	// Create a temp directory and copy the Dockerfile
-	tmpDir := t.TempDir()
-	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
-	if err := os.WriteFile(dockerfilePath, originalContent, 0o644); err != nil {
-		t.Fatalf("failed to write Dockerfile: %v", err)
-	}
-
-	// Copy the config file to disable max-lines
-	configContent, err := os.ReadFile(filepath.Join(testdataDir, ".tally.toml"))
-	if err != nil {
-		t.Fatalf("failed to read config: %v", err)
-	}
-	configPath := filepath.Join(tmpDir, ".tally.toml")
-	if err := os.WriteFile(configPath, configContent, 0o644); err != nil {
-		t.Fatalf("failed to write config: %v", err)
-	}
-
-	// Run tally lint --fix --fix-unsafe (all rules enabled, slow checks off)
-	args := []string{"lint", "--config", configPath, "--slow-checks=off", "--fix", "--fix-unsafe", dockerfilePath}
-	cmd := exec.Command(binaryPath, args...)
-	cmd.Env = append(os.Environ(),
-		"GOCOVERDIR="+coverageDir,
-	)
-	output, err := cmd.CombinedOutput()
-	// Exit code 1 is expected due to remaining unfixable violations
-	expectExitCode1(t, output, err)
-
-	// Read the fixed Dockerfile
-	fixedContent, err := os.ReadFile(dockerfilePath)
-	if err != nil {
-		t.Fatalf("failed to read fixed Dockerfile: %v", err)
-	}
-
-	// Use snapshot testing for easier maintenance
-	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
-
-	// Verify that fixes were applied (check output contains "Fixed")
-	outputStr := string(output)
-	if !strings.Contains(outputStr, "Fixed") {
-		t.Errorf("expected 'Fixed' in output, got: %s", outputStr)
-	}
-}
-
 // TestFixHeredocCombined tests auto-fix with both prefer-copy-heredoc and prefer-run-heredoc
 // enabled together on a multi-stage Dockerfile that also has consistent-indentation enabled.
 // The snapshot makes it easy to review the final fixed Dockerfile.

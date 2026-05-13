@@ -123,7 +123,7 @@ func BenchmarkComplexNolus(b *testing.B) {
 func BenchmarkRealWorldFix(b *testing.B) {
 	ensureBinary(b)
 
-	dockerfile := filepath.Join("testdata", "benchmark-real-world-fix", "Dockerfile")
+	dockerfile := filepath.Join("fixtures", "fix", "benchmark-real-world-fix", "Dockerfile")
 	absPath, err := filepath.Abs(dockerfile)
 	if err != nil {
 		b.Fatal(err)

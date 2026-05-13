@@ -1,3 +1,8 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
 # Disable max-lines for this benchmark test
 [rules.max-lines]
 max = 0
