@@ -1,5 +1,8 @@
 unsafe-fixes = true
 
+[slow-checks]
+mode = "off"
+
 [rules]
 include = ["tally/powershell/error-action-preference", "tally/powershell/prefer-shell-instruction"]
 exclude = ["*"]

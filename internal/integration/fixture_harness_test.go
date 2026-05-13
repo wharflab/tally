@@ -101,7 +101,7 @@ func runFixFixture(t *testing.T, dir string) {
 	t.Helper()
 
 	input := readFixtureFile(t, filepath.Join(dir, "Dockerfile"))
-	args := []string{"lint", "--format", "markdown", "--fix", "--slow-checks=off"}
+	args := []string{"lint", "--format", "markdown", "--fix"}
 	if !fileExists(filepath.Join(dir, ".tally.toml")) && !fileExists(filepath.Join(dir, "tally.toml")) {
 		args = append(args, "--no-config")
 	}

@@ -1,5 +1,8 @@
 unsafe-fixes = true
 
+[slow-checks]
+mode = "off"
+
 [rules]
 include = ["tally/no-multi-spaces", "tally/consistent-indentation", "tally/php/composer-no-dev-in-production", "tally/prefer-package-cache-mounts", "tally/newline-per-chained-call"]
 exclude = ["*"]
