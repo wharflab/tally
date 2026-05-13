@@ -139,32 +139,5 @@ func lintCases(t *testing.T) []lintCase {
 			isDir:    true,
 			wantExit: 1,
 		},
-		{
-			name: "slow-checks-fail-fast",
-			dir:  "slow-checks-fail-fast",
-			args: append(
-				[]string{"--format", "json", "--slow-checks=on", "--slow-checks-timeout=2s"},
-				mustSelectRules("buildkit/DuplicateStageName", "buildkit/InvalidBaseImagePlatform")...),
-			wantExit: 1,
-			afterLint: func(t *testing.T, _ string) {
-				t.Helper()
-				if mockRegistry.HasRequest("library/slowfailfast") {
-					t.Error("fail-fast should have prevented async check from fetching the slow image")
-				}
-			},
-		},
-		{
-			name: "slow-checks-timeout",
-			dir:  "slow-checks-timeout",
-			args: append(
-				[]string{"--format", "json", "--slow-checks=on", "--slow-checks-timeout=1s"},
-				mustSelectRules("buildkit/InvalidBaseImagePlatform")...),
-			afterLint: func(t *testing.T, stderr string) {
-				t.Helper()
-				if !strings.Contains(stderr, "timed out") {
-					t.Errorf("expected timeout note in stderr, got: %q", stderr)
-				}
-			},
-		},
 	}
 }

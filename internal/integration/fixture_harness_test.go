@@ -85,16 +85,26 @@ func runLintFixture(t *testing.T, dir string) {
 	if exitCode != 0 && exitCode != 1 {
 		t.Fatalf("unexpected exit code %d\nstdout:\n%s\nstderr:\n%s", exitCode, stdoutBuf.String(), stderrBuf.String())
 	}
-	if stderrBuf.Len() > 0 {
-		t.Fatalf("unexpected stderr:\n%s", stderrBuf.String())
-	}
-
 	got := normalizeFixtureOutput(t, stdoutBuf.String())
 	snaps.WithConfig(
 		snaps.Dir(dir),
 		snaps.Filename("result"),
 		snaps.JSON(snaps.JSONConfig{Indent: "  ", SortKeys: true}),
 	).MatchStandaloneJSON(t, got)
+
+	if stderrBuf.Len() > 0 || fixtureSnapshotExists(t, dir, "stderr", ".txt") {
+		gotStderr := normalizeFixtureOutput(t, stderrBuf.String())
+		snaps.WithConfig(
+			snaps.Dir(dir),
+			snaps.Filename("stderr"),
+			snaps.Ext(".txt"),
+			snaps.Raw(),
+		).MatchStandaloneSnapshot(t, gotStderr)
+	}
+
+	if filepath.Base(dir) == "slow-checks-fail-fast" && mockRegistry.HasRequest("library/slowfailfast") {
+		t.Error("fail-fast should have prevented async check from fetching the slow image")
+	}
 }
 
 func runFixFixture(t *testing.T, dir string) {

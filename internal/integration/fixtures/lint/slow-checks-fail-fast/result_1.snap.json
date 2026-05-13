@@ -1,7 +1,7 @@
 {
   "files": [
     {
-      "file": "testdata/slow-checks-fail-fast/Dockerfile",
+      "file": "fixtures/lint/slow-checks-fail-fast/Dockerfile",
       "violations": [
         {
           "docUrl": "https://tally.wharflab.com/rules/buildkit/DuplicateStageName/",
@@ -10,7 +10,7 @@
               "column": 0,
               "line": 7
             },
-            "file": "testdata/slow-checks-fail-fast/Dockerfile",
+            "file": "fixtures/lint/slow-checks-fail-fast/Dockerfile",
             "start": {
               "column": 0,
               "line": 7

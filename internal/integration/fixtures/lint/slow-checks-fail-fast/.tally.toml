@@ -1,0 +1,7 @@
+[slow-checks]
+mode = "on"
+timeout = "2s"
+
+[rules]
+include = ["buildkit/DuplicateStageName", "buildkit/InvalidBaseImagePlatform"]
+exclude = ["*"]
