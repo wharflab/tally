@@ -19,6 +19,7 @@ import (
 func planAcpFixSpinner(
 	violations []rules.Violation,
 	safetyThreshold fix.FixSafety,
+	safetyThresholds map[string]fix.FixSafety,
 	ruleFilter []string,
 	fixModes map[string]map[string]fix.FixMode,
 	fileConfigs map[string]*config.Config,
@@ -39,13 +40,14 @@ func planAcpFixSpinner(
 		if sf.ResolverID != autofixdata.ResolverID {
 			continue
 		}
-		if sf.Safety > safetyThreshold {
+		fileSafetyThreshold := safetyThresholdForFile(v.File(), safetyThreshold, safetyThresholds)
+		if sf.Safety > fileSafetyThreshold {
 			continue
 		}
 		if len(ruleFilter) > 0 && !containsString(ruleFilter, v.RuleCode) {
 			continue
 		}
-		if !fixModeAllowed(fixModes, safetyThreshold, ruleFilter, v.File(), v.RuleCode) {
+		if !fixModeAllowed(fixModes, fileSafetyThreshold, ruleFilter, v.File(), v.RuleCode) {
 			continue
 		}
 
@@ -61,6 +63,27 @@ func planAcpFixSpinner(
 	}
 
 	return count, maxTimeout
+}
+
+func safetyThresholdForFile(
+	filePath string,
+	defaultThreshold fix.FixSafety,
+	safetyThresholds map[string]fix.FixSafety,
+) fix.FixSafety {
+	if safetyThresholds == nil {
+		return defaultThreshold
+	}
+	normalizedPath := filepath.Clean(filePath)
+	if threshold, ok := safetyThresholds[normalizedPath]; ok {
+		return threshold
+	}
+	if threshold, ok := safetyThresholds[filepath.ToSlash(normalizedPath)]; ok {
+		return threshold
+	}
+	if threshold, ok := safetyThresholds[filePath]; ok {
+		return threshold
+	}
+	return defaultThreshold
 }
 
 func startAcpFixSpinner(count int, timeout time.Duration) func() {

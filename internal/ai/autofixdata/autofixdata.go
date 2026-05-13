@@ -26,9 +26,10 @@ const (
 // FixContext carries the outer fix-application intent into the resolver so the
 // agent loop can respect CLI restrictions (safety threshold, --fix-rule, fix modes).
 type FixContext struct {
-	SafetyThreshold rules.FixSafety
-	RuleFilter      []string
-	FixModes        map[string]map[string]config.FixMode
+	SafetyThreshold  rules.FixSafety
+	SafetyThresholds map[string]rules.FixSafety
+	RuleFilter       []string
+	FixModes         map[string]map[string]config.FixMode
 }
 
 type SignalKind string

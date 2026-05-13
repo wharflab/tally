@@ -1262,6 +1262,7 @@ func applyFixes(
 	input applyFixesInput,
 ) (*fix.Result, error) {
 	safetyThreshold := fixSafetyThreshold(opts, input.fileConfigs)
+	safetyThresholds := buildPerFileSafetyThresholds(opts, input.fileConfigs, input.sources)
 
 	// Get rule filter
 	ruleFilter := opts.fixRule
@@ -1286,9 +1287,10 @@ func applyFixes(
 
 	// Enrich AI resolver requests with per-file config + outer fix context.
 	fixCtx := autofixdata.FixContext{
-		SafetyThreshold: safetyThreshold,
-		RuleFilter:      ruleFilter,
-		FixModes:        fixModes,
+		SafetyThreshold:  safetyThreshold,
+		SafetyThresholds: safetyThresholds,
+		RuleFilter:       ruleFilter,
+		FixModes:         fixModes,
 	}
 	for i := range input.violations {
 		v := &input.violations[i]
@@ -1326,12 +1328,13 @@ func applyFixes(
 		}
 	}
 
-	aiFixes, maxAITimeout := planAcpFixSpinner(input.violations, safetyThreshold, ruleFilter, fixModes, normalizedConfigs)
+	aiFixes, maxAITimeout := planAcpFixSpinner(input.violations, safetyThreshold, safetyThresholds, ruleFilter, fixModes, normalizedConfigs)
 	stopSpinner := startAcpFixSpinner(aiFixes, maxAITimeout)
 	defer stopSpinner()
 
 	fixer := &fix.Fixer{
 		SafetyThreshold:   safetyThreshold,
+		SafetyThresholds:  safetyThresholds,
 		RuleFilter:        ruleFilter,
 		EnabledRules:      buildPerFileEnabledRules(input.fileConfigs, input.sources),
 		SlowChecksEnabled: buildPerFileSlowChecksEnabled(input.fileConfigs, input.sources),
@@ -1347,17 +1350,40 @@ func applyFixes(
 	return result, nil
 }
 
-func fixSafetyThreshold(opts *lintOptions, fileConfigs map[string]*config.Config) fix.FixSafety {
+func fixSafetyThreshold(opts *lintOptions, _ map[string]*config.Config) fix.FixSafety {
 	if opts.fixUnsafe {
 		return fix.FixUnsafe
 	}
 	if opts.fixUnsafeSet {
 		return fix.FixSafe
 	}
-	for _, cfg := range fileConfigs {
-		if cfg != nil && cfg.UnsafeFixes != nil && *cfg.UnsafeFixes {
-			return fix.FixUnsafe
-		}
+	return fix.FixSafe
+}
+
+func buildPerFileSafetyThresholds(
+	opts *lintOptions,
+	fileConfigs map[string]*config.Config,
+	sources map[string][]byte,
+) map[string]fix.FixSafety {
+	thresholds := make(map[string]fix.FixSafety, len(sources))
+	for path := range sources {
+		thresholds[filepath.Clean(path)] = fixSafetyThresholdForConfig(opts, fileConfigs[path])
+	}
+	for path, cfg := range fileConfigs {
+		thresholds[filepath.Clean(path)] = fixSafetyThresholdForConfig(opts, cfg)
+	}
+	return thresholds
+}
+
+func fixSafetyThresholdForConfig(opts *lintOptions, cfg *config.Config) fix.FixSafety {
+	if opts.fixUnsafe {
+		return fix.FixUnsafe
+	}
+	if opts.fixUnsafeSet {
+		return fix.FixSafe
+	}
+	if cfg != nil && cfg.UnsafeFixes != nil && *cfg.UnsafeFixes {
+		return fix.FixUnsafe
 	}
 	return fix.FixSafe
 }

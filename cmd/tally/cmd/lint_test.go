@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/invocation"
 	"github.com/wharflab/tally/internal/psanalyzer"
 	"github.com/wharflab/tally/internal/ruledeprecation"
@@ -24,6 +26,52 @@ func (r *recordingPowerShellRunnerCloser) Close(ctx context.Context) error {
 	r.closed = true
 	_, r.receivedTimeout = ctx.Deadline()
 	return nil
+}
+
+func TestBuildPerFileSafetyThresholds(t *testing.T) {
+	t.Parallel()
+	unsafeFixes := true
+	safeFixes := false
+	fileConfigs := map[string]*config.Config{
+		"unsafe.Dockerfile": {UnsafeFixes: &unsafeFixes},
+		"safe.Dockerfile":   {UnsafeFixes: &safeFixes},
+	}
+	sources := map[string][]byte{
+		"unsafe.Dockerfile": []byte("FROM alpine"),
+		"safe.Dockerfile":   []byte("FROM alpine"),
+		"unset.Dockerfile":  []byte("FROM alpine"),
+	}
+
+	thresholds := buildPerFileSafetyThresholds(&lintOptions{}, fileConfigs, sources)
+
+	if thresholds["unsafe.Dockerfile"] != fix.FixUnsafe {
+		t.Errorf("unsafe.Dockerfile threshold = %v, want %v", thresholds["unsafe.Dockerfile"], fix.FixUnsafe)
+	}
+	if thresholds["safe.Dockerfile"] != fix.FixSafe {
+		t.Errorf("safe.Dockerfile threshold = %v, want %v", thresholds["safe.Dockerfile"], fix.FixSafe)
+	}
+	if thresholds["unset.Dockerfile"] != fix.FixSafe {
+		t.Errorf("unset.Dockerfile threshold = %v, want %v", thresholds["unset.Dockerfile"], fix.FixSafe)
+	}
+}
+
+func TestBuildPerFileSafetyThresholdsFlagOverridesConfig(t *testing.T) {
+	t.Parallel()
+	unsafeFixes := true
+	fileConfigs := map[string]*config.Config{
+		"Dockerfile": {UnsafeFixes: &unsafeFixes},
+	}
+	sources := map[string][]byte{"Dockerfile": []byte("FROM alpine")}
+
+	thresholds := buildPerFileSafetyThresholds(&lintOptions{fixUnsafeSet: true}, fileConfigs, sources)
+	if thresholds["Dockerfile"] != fix.FixSafe {
+		t.Errorf("explicit --fix-unsafe=false threshold = %v, want %v", thresholds["Dockerfile"], fix.FixSafe)
+	}
+
+	thresholds = buildPerFileSafetyThresholds(&lintOptions{fixUnsafe: true, fixUnsafeSet: true}, fileConfigs, sources)
+	if thresholds["Dockerfile"] != fix.FixUnsafe {
+		t.Errorf("--fix-unsafe threshold = %v, want %v", thresholds["Dockerfile"], fix.FixUnsafe)
+	}
 }
 
 func TestParseACPCmd(t *testing.T) {
