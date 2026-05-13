@@ -307,9 +307,9 @@ func classifyContainersError(ref string, err error) error {
 	}
 
 	// Typed error: errcode.ErrorCoder carries the registry API error code.
-	// errcode.ErrorCoder does not embed error, so use errors.As rather than errors.AsType.
+	// errcode.ErrorCoder does not implement error, so errors.AsType cannot be used.
 	var errCoder errcode.ErrorCoder
-	if errors.As(err, &errCoder) {
+	if errors.As(err, &errCoder) { //nolint:modernize,nolintlint
 		switch errCoder.ErrorCode() {
 		case errcode.ErrorCodeUnauthorized, errcode.ErrorCodeDenied:
 			return &AuthError{Err: err}
