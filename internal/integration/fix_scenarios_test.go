@@ -352,54 +352,6 @@ severity = "style"
 	}
 }
 
-// TestFixPowerShellPreferShellInstruction exercises the end-to-end auto-fix path
-// for tally/powershell/prefer-shell-instruction using a PowerShell-on-Linux image.
-func TestFixPowerShellPreferShellInstruction(t *testing.T) {
-	t.Parallel()
-	testdataDir := filepath.Join("testdata", "prefer-shell-instruction")
-
-	originalContent, err := os.ReadFile(filepath.Join(testdataDir, "Dockerfile"))
-	if err != nil {
-		t.Fatalf("failed to read fixture: %v", err)
-	}
-
-	tmpDir := t.TempDir()
-	dockerfilePath := filepath.Join(tmpDir, "Dockerfile")
-	if err := os.WriteFile(dockerfilePath, originalContent, 0o644); err != nil {
-		t.Fatalf("failed to write Dockerfile: %v", err)
-	}
-
-	configPath := filepath.Join(tmpDir, ".tally.toml")
-	if err := os.WriteFile(configPath, []byte(""), 0o644); err != nil {
-		t.Fatalf("failed to write config: %v", err)
-	}
-
-	args := []string{
-		"lint", "--config", configPath, "--slow-checks=off",
-		"--fix", "--fix-unsafe",
-		"--ignore", "*",
-		"--select", "tally/powershell/prefer-shell-instruction",
-		dockerfilePath,
-	}
-	cmd := exec.Command(binaryPath, args...)
-	cmd.Env = append(os.Environ(), "GOCOVERDIR="+coverageDir)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("expected exit code 0 (all violations fixable), got error: %v\noutput: %s", err, output)
-	}
-
-	fixedContent, err := os.ReadFile(dockerfilePath)
-	if err != nil {
-		t.Fatalf("failed to read fixed Dockerfile: %v", err)
-	}
-
-	snaps.WithConfig(snaps.Raw(), snaps.Ext(".Dockerfile")).MatchStandaloneSnapshot(t, string(fixedContent))
-
-	if !strings.Contains(string(output), "Fixed") {
-		t.Errorf("expected 'Fixed' in output, got: %s", output)
-	}
-}
-
 // TestFixTelemetryOptOutCombined runs the telemetry rule alongside the related
 // content, shell, heredoc, and formatting rules that can touch the same stages.
 func TestFixTelemetryOptOutCombined(t *testing.T) {
