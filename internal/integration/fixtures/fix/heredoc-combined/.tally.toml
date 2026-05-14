@@ -1,0 +1,11 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/consistent-indentation", "tally/prefer-copy-heredoc", "tally/prefer-run-heredoc"]
+exclude = ["*"]
+
+[rules.tally.consistent-indentation]
+severity = "style"
