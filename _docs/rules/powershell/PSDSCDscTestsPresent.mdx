@@ -10,7 +10,15 @@ sidebarTitle: "PSDSCDscTestsPresent"
 |----------|-------|
 | Severity | Information |
 | Category | PSScriptAnalyzer |
+| Default  | Disabled in tally |
 | Auto-fix | No |
+
+<Note>
+  tally disables this rule by default because Desired State Configuration resources are out
+  of scope for Dockerfile `RUN` analysis. Re-enable it with
+  `include = ["powershell/PSDSCDscTestsPresent"]` or by setting
+  `rules.powershell.PSDSCDscTestsPresent.severity = "warning"` in `.tally.toml`.
+</Note>
 
 ## Description
 

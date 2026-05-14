@@ -2,7 +2,7 @@ Fixed 16 issues
 Skipped 1 fixes
 note: 1 AI fix(es) failed (see details below)
 note: skipped fix tally/prefer-multi-stage-build (<stdin>): resolver not registered: ai-autofix
-**24 issues** in `<stdin>`
+**21 issues** in `<stdin>`
 
 | Line | Issue |
 |------|-------|
@@ -23,10 +23,7 @@ note: skipped fix tally/prefer-multi-stage-build (<stdin>): resolver not registe
 | 78 | ⚠️ PowerShell RUN is missing $ErrorActionPreference = 'Stop' and $PSNativeCommandUseErrorActionPreference = $true |
 | 78 | 💅 PowerShell Invoke-WebRequest without $ProgressPreference = 'SilentlyContinue' |
 | 78 | 💅 RUN instruction with chained commands can use heredoc syntax |
-| 83 | ⚠️ Script definition uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information. |
-| 85 | ⚠️ Script definition uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information. |
 | 90 | 💅 expected blank line between RUN and ENV |
 | 91 | ❌ The string is missing the terminator: ". |
 | 101 | 💅 expected blank line between ARG and RUN |
-| 105 | ⚠️ Script definition uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information. |
 | 114 | 💅 expected blank line between COPY and RUN |

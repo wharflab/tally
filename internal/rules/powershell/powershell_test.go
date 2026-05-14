@@ -320,8 +320,10 @@ RUN [System.Management.Automation.SemanticVersion]'1.18.0-rc1'
 	if len(settings.IncludeRules) != 0 {
 		t.Fatalf("IncludeRules = %#v, want none so tally include semantics do not restrict PSScriptAnalyzer", settings.IncludeRules)
 	}
-	if !slices.Equal(settings.ExcludeRules, []string{"PSAvoidExclaimOperator", "PSAvoidUsingWriteHost"}) {
-		t.Fatalf("ExcludeRules = %#v", settings.ExcludeRules)
+	for _, name := range []string{"PSAvoidExclaimOperator", "PSAvoidUsingWriteHost"} {
+		if !slices.Contains(settings.ExcludeRules, name) {
+			t.Fatalf("ExcludeRules = %#v, want to contain %q", settings.ExcludeRules, name)
+		}
 	}
 	ruleSettings := settings.Rules["PSUseCompatibleTypes"]
 	if len(ruleSettings) != 2 {
@@ -372,8 +374,148 @@ RUN Write-Host hi
 	if len(settings.IncludeRules) != 0 {
 		t.Fatalf("IncludeRules = %#v, want none so tally include semantics do not restrict PSScriptAnalyzer", settings.IncludeRules)
 	}
-	if len(settings.ExcludeRules) != 0 {
-		t.Fatalf("ExcludeRules = %#v, want none because include takes precedence over exclude", settings.ExcludeRules)
+	if slices.Contains(settings.ExcludeRules, "PSAvoidUsingWriteHost") {
+		t.Fatalf(
+			"ExcludeRules = %#v, want PSAvoidUsingWriteHost absent (include beats user+default exclude)",
+			settings.ExcludeRules,
+		)
+	}
+}
+
+func TestAnalyzerSettingsAppliesDefaultExcludes(t *testing.T) {
+	t.Parallel()
+
+	settings := analyzerSettings(&config.RulesConfig{})
+
+	if len(settings.IncludeRules) != 0 {
+		t.Fatalf("IncludeRules = %#v, want none", settings.IncludeRules)
+	}
+	for name := range defaultExcludedAnalyzerRules {
+		if !slices.Contains(settings.ExcludeRules, name) {
+			t.Fatalf("ExcludeRules missing default-disabled rule %q: got %#v", name, settings.ExcludeRules)
+		}
+	}
+}
+
+func TestAnalyzerSettingsDefaultExcludesWhenConfigNil(t *testing.T) {
+	t.Parallel()
+
+	settings := analyzerSettings(nil)
+
+	for name := range defaultExcludedAnalyzerRules {
+		if !slices.Contains(settings.ExcludeRules, name) {
+			t.Fatalf("ExcludeRules missing default-disabled rule %q when config is nil: got %#v", name, settings.ExcludeRules)
+		}
+	}
+}
+
+func TestAnalyzerSettingsIncludeReenablesDefaultExcludedRule(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.RulesConfig{
+		Include: []string{"powershell/PSAvoidUsingWriteHost"},
+	}
+	settings := analyzerSettings(cfg)
+
+	if slices.Contains(settings.ExcludeRules, "PSAvoidUsingWriteHost") {
+		t.Fatalf("ExcludeRules = %#v, want PSAvoidUsingWriteHost absent after explicit include", settings.ExcludeRules)
+	}
+	for _, name := range []string{"PSAvoidUsingPositionalParameters", "PSProvideCommentHelp"} {
+		if !slices.Contains(settings.ExcludeRules, name) {
+			t.Fatalf("ExcludeRules = %#v, want untouched default %q to remain excluded", settings.ExcludeRules, name)
+		}
+	}
+}
+
+func TestAnalyzerSettingsNamespaceWildcardIncludeReenablesAllDefaults(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.RulesConfig{
+		Include: []string{"powershell/*"},
+	}
+	settings := analyzerSettings(cfg)
+
+	for name := range defaultExcludedAnalyzerRules {
+		if slices.Contains(settings.ExcludeRules, name) {
+			t.Fatalf("ExcludeRules = %#v, want %q absent after powershell/* include", settings.ExcludeRules, name)
+		}
+	}
+}
+
+func TestAnalyzerSettingsEngineIncludeDoesNotReenableDefaultExcludes(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.RulesConfig{
+		Include: []string{"powershell/PowerShell"},
+	}
+	settings := analyzerSettings(cfg)
+
+	if !slices.Contains(settings.ExcludeRules, "PSAvoidUsingWriteHost") {
+		t.Fatalf(
+			"ExcludeRules = %#v, want PSAvoidUsingWriteHost still excluded; engine selector is not a per-rule opt-in",
+			settings.ExcludeRules,
+		)
+	}
+}
+
+func TestAnalyzerSettingsPerRuleSeverityReenablesDefaultExcludedRule(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.RulesConfig{
+		Powershell: map[string]config.RuleConfig{
+			"PSAvoidUsingWriteHost": {Severity: "warning"},
+		},
+	}
+	settings := analyzerSettings(cfg)
+
+	if slices.Contains(settings.ExcludeRules, "PSAvoidUsingWriteHost") {
+		t.Fatalf("ExcludeRules = %#v, want PSAvoidUsingWriteHost absent after explicit per-rule severity", settings.ExcludeRules)
+	}
+}
+
+func TestAnalyzerSettingsPerRuleOptionsReenableDefaultExcludedRule(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.RulesConfig{
+		Powershell: map[string]config.RuleConfig{
+			"PSAvoidUsingWriteHost": {Options: map[string]any{"Enable": true}},
+		},
+	}
+	settings := analyzerSettings(cfg)
+
+	if slices.Contains(settings.ExcludeRules, "PSAvoidUsingWriteHost") {
+		t.Fatalf("ExcludeRules = %#v, want PSAvoidUsingWriteHost absent after per-rule options entry", settings.ExcludeRules)
+	}
+}
+
+func TestAnalyzerSettingsPerRuleSeverityOffKeepsDefaultExcluded(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.RulesConfig{
+		Powershell: map[string]config.RuleConfig{
+			"PSAvoidUsingWriteHost": {Severity: config.SeverityOffValue},
+		},
+	}
+	settings := analyzerSettings(cfg)
+
+	if !slices.Contains(settings.ExcludeRules, "PSAvoidUsingWriteHost") {
+		t.Fatalf("ExcludeRules = %#v, want PSAvoidUsingWriteHost excluded when user severity = off", settings.ExcludeRules)
+	}
+}
+
+func TestAnalyzerSettingsUserExcludeAddsToDefaultExcludes(t *testing.T) {
+	t.Parallel()
+
+	cfg := &config.RulesConfig{
+		Exclude: []string{"powershell/PSMisleadingBacktick"},
+	}
+	settings := analyzerSettings(cfg)
+
+	if !slices.Contains(settings.ExcludeRules, "PSMisleadingBacktick") {
+		t.Fatalf("ExcludeRules = %#v, want PSMisleadingBacktick excluded by user config", settings.ExcludeRules)
+	}
+	if !slices.Contains(settings.ExcludeRules, "PSAvoidUsingWriteHost") {
+		t.Fatalf("ExcludeRules = %#v, want default PSAvoidUsingWriteHost still present", settings.ExcludeRules)
 	}
 }
 

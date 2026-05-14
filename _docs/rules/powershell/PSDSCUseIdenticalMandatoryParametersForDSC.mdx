@@ -11,7 +11,15 @@ Dockerfiles.
 |----------|-------|
 | Severity | Error |
 | Category | PSScriptAnalyzer |
+| Default  | Disabled in tally |
 | Auto-fix | No |
+
+<Note>
+  tally disables this rule by default because Desired State Configuration resources are out
+  of scope for Dockerfile `RUN` analysis. Re-enable it with
+  `include = ["powershell/PSDSCUseIdenticalMandatoryParametersForDSC"]` or by setting
+  `rules.powershell.PSDSCUseIdenticalMandatoryParametersForDSC.severity = "warning"` in `.tally.toml`.
+</Note>
 
 ## Description
 

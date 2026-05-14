@@ -10,7 +10,16 @@ sidebarTitle: "PSAvoidUsingPositionalParameters"
 |----------|-------|
 | Severity | Information |
 | Category | PSScriptAnalyzer |
+| Default  | Disabled in tally |
 | Auto-fix | No |
+
+<Note>
+  tally disables this rule by default for Dockerfile `RUN` snippets because there is no
+  downstream pipeline or caller in a one-shot container build, so the script-reusability
+  concerns this rule targets do not apply. Re-enable it with
+  `include = ["powershell/PSAvoidUsingPositionalParameters"]` or by setting
+  `rules.powershell.PSAvoidUsingPositionalParameters.severity = "warning"` in `.tally.toml`.
+</Note>
 
 ## Description
 
