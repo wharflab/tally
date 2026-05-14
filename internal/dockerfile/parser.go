@@ -519,15 +519,26 @@ func bridgeRunSourceDockerfileCommentContinuations(
 		return shell.BridgeDockerfileCommentContinuations(lines, escapeToken, escapeToken)
 	}
 
-	openerIdx := firstRunHeredocOpenerLine(lines, run.Files[0].Name)
-	if openerIdx < 0 {
+	headerEndIdx := runHeredocHeaderEndLine(lines, run.Files)
+	if headerEndIdx < 0 {
 		return lines
 	}
 
-	header := shell.BridgeDockerfileCommentContinuations(lines[:openerIdx+1], escapeToken, escapeToken)
+	header := shell.BridgeDockerfileCommentContinuations(lines[:headerEndIdx+1], escapeToken, escapeToken)
 	out := append([]string(nil), lines...)
-	copy(out[:openerIdx+1], header)
+	copy(out[:headerEndIdx+1], header)
 	return out
+}
+
+func runHeredocHeaderEndLine(lines []string, files []instructions.ShellInlineFile) int {
+	headerEndIdx := -1
+	for _, file := range files {
+		openerIdx := firstRunHeredocOpenerLine(lines, file.Name)
+		if openerIdx > headerEndIdx {
+			headerEndIdx = openerIdx
+		}
+	}
+	return headerEndIdx
 }
 
 func firstRunHeredocOpenerLine(lines []string, delimiter string) int {

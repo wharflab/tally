@@ -315,3 +315,40 @@ EOF
 		t.Fatalf("start line = %d, want 2", startLine)
 	}
 }
+
+func TestRunSourceScript_BridgesCommentsBetweenHeredocOpeners(t *testing.T) {
+	t.Parallel()
+
+	dockerfile := `FROM alpine
+RUN <<FILE1 cat > /tmp/one && \
+    # Dockerfile header comment
+    <<FILE2 cat > /tmp/two
+one \
+# shell body comment
+FILE1
+two
+FILE2
+`
+
+	result, err := Parse(strings.NewReader(dockerfile), nil)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	sm := sourcemap.New(result.Source)
+
+	run, ok := result.Stages[0].Commands[0].(*instructions.RunCommand)
+	if !ok {
+		t.Fatal("expected RUN command")
+	}
+
+	got, startLine := RunSourceScript(run, sm, result.AST.EscapeToken)
+	if strings.Contains(got, "Dockerfile header comment") {
+		t.Fatalf("expected Dockerfile header comment between heredoc openers to be elided, got %q", got)
+	}
+	if !strings.Contains(got, "# shell body comment") {
+		t.Fatalf("expected heredoc body comment to be preserved, got %q", got)
+	}
+	if startLine != 2 {
+		t.Fatalf("start line = %d, want 2", startLine)
+	}
+}
