@@ -83,7 +83,8 @@ async function runSmoke() {
     workspaceRoot,
     "internal",
     "integration",
-    "testdata",
+    "fixtures",
+    "fix",
     "benchmark-real-world-fix",
     "Dockerfile",
   );

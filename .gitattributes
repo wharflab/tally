@@ -3,6 +3,7 @@
 
 # Ensure snapshot files always have LF line endings (for cross-platform testing)
 **/testdata/** text eol=lf
+**/fixtures/** text eol=lf linguist-vendored
 **/__snapshots__/** text eol=lf linguist-vendored
 *.snap.json text eol=lf
 *.snap.txt text eol=lf
@@ -46,3 +47,4 @@ internal/rules/*/index.schema.json linguist-generated=true
 schema.json linguist-generated=true
 # exclude fixtures and snapshots from statistics
 internal/integration/testdata/** linguist-vendored
+internal/integration/fixtures/** linguist-vendored
