@@ -222,14 +222,14 @@ See [Build invocations](/guides/build-invocations) for CLI examples and supporte
 
     | Line | Issue                                       |
     | ---- | ------------------------------------------- |
-    | 10   | ❌ Use absolute WORKDIR                     |
     | 2    | ⚠️ Stage name 'Builder' should be lowercase |
+    | 10   | ❌ Use absolute WORKDIR                     |
     ```
 
     Features:
 
     - Summary line with total issue count upfront.
-    - Violations sorted by severity (errors first).
+    - Violations sorted by invocation, file, line, column, and rule code.
     - Emoji severity indicators: ❌ error, ⚠️ warning, ℹ️ info, 💅 style.
     - No rule codes or doc URLs — optimized for token efficiency.
     - Adds a `File` column automatically when linting multiple files.
