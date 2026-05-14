@@ -47,6 +47,15 @@ type ParseResult struct {
 	Warnings []LintWarning
 }
 
+// ASTEscapeToken returns the Dockerfile escape token from a BuildKit AST,
+// defaulting to backslash when the AST is absent or does not specify one.
+func ASTEscapeToken(ast *parser.Result) rune {
+	if ast != nil && ast.EscapeToken != 0 {
+		return ast.EscapeToken
+	}
+	return '\\'
+}
+
 // openDockerfile opens a Dockerfile path for reading.
 // If path is "-", returns os.Stdin and a no-op closer.
 // Otherwise, opens the file and returns it with its Close method.
@@ -441,7 +450,8 @@ func ResolveRunSource(run *instructions.RunCommand, sm *sourcemap.SourceMap) (Ru
 //
 // Returns the script and the 1-based start line number, or ("", 0) if the
 // instruction has no location or no source lines.
-func RunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (string, int) {
+func RunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap, escapeToken rune) (string, int) {
+	escapeToken = defaultDockerfileEscapeToken(escapeToken)
 	runLoc := run.Location()
 	if len(runLoc) == 0 {
 		return "", 0
@@ -495,9 +505,16 @@ func RunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (str
 	// that appear between "RUN " and the shell script. These are Dockerfile-level
 	// options, not shell arguments, and would confuse the shell parser.
 	lines[0] = blankRunFlags(lines[0])
-	lines = shell.BridgeDockerfileCommentContinuations(lines, '\\', '\\')
+	lines = shell.BridgeDockerfileCommentContinuations(lines, escapeToken, escapeToken)
 
 	return strings.Join(lines, "\n"), startLine
+}
+
+func defaultDockerfileEscapeToken(escapeToken rune) rune {
+	if escapeToken == 0 {
+		return '\\'
+	}
+	return escapeToken
 }
 
 // blankRunFlags replaces BuildKit RUN flags (--mount, --network, --security)

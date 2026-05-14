@@ -94,7 +94,7 @@ func (r *WorldWritableStatePathWorkaroundRule) checkRun(
 	var sourceScript string
 	var runStartLine int
 	if sm := input.SourceMap(); sm != nil && runFacts.Run.PrependShell {
-		sourceScript, runStartLine = dockerfile.RunSourceScript(runFacts.Run, sm)
+		sourceScript, runStartLine = dockerfile.RunSourceScript(runFacts.Run, sm, runFacts.EscapeToken)
 	}
 
 	// Pre-parse sourceScript chmods for column-accurate fix positions.

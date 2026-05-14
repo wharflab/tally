@@ -61,6 +61,7 @@ var aptCommandMapping = map[string]struct {
 func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
+	escapeToken := dockerfile.ASTEscapeToken(input.AST)
 
 	return ScanRunCommandsWithPOSIXShell(
 		input,
@@ -73,7 +74,7 @@ func (r *DL3027Rule) Check(input rules.LintInput) []rules.Violation {
 			if run.PrependShell {
 				// Shell form: parse original source with "RUN " replaced by spaces
 				// This preserves column positions for accurate edits on multi-line commands
-				script, startLine := dockerfile.RunSourceScript(run, sm)
+				script, startLine := dockerfile.RunSourceScript(run, sm, escapeToken)
 				if script == "" {
 					return nil
 				}

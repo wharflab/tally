@@ -117,7 +117,7 @@ func (r *DL3046Rule) createAutoFix(
 	}
 
 	sm := input.SourceMap()
-	sourceScript, scriptStartLine := dockerfile.RunSourceScript(run, sm)
+	sourceScript, scriptStartLine := dockerfile.RunSourceScript(run, sm, dockerfile.ASTEscapeToken(input.AST))
 	if sourceScript == "" {
 		return nil
 	}

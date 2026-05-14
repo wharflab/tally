@@ -81,6 +81,7 @@ func wgetHasProgressSuppression(cmd *shell.CommandInfo) bool {
 func (r *DL3047Rule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
+	escapeToken := dockerfile.ASTEscapeToken(input.AST)
 
 	return ScanRunCommandsWithPOSIXShell(
 		input,
@@ -90,7 +91,7 @@ func (r *DL3047Rule) Check(input rules.LintInput) []rules.Violation {
 
 			if run.PrependShell {
 				// Shell form: parse original source preserving column positions.
-				script, startLine := dockerfile.RunSourceScript(run, sm)
+				script, startLine := dockerfile.RunSourceScript(run, sm, escapeToken)
 				if script == "" {
 					return nil
 				}

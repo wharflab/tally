@@ -240,12 +240,42 @@ RUN echo one \
 		t.Fatal("expected RUN command")
 	}
 
-	got, startLine := RunSourceScript(run, sm)
+	got, startLine := RunSourceScript(run, sm, result.AST.EscapeToken)
 	want := "    echo one \\\n    \\\n    && echo two"
 	if got != want {
 		t.Fatalf("RunSourceScript() = %q, want %q", got, want)
 	}
 	if startLine != 2 {
 		t.Fatalf("start line = %d, want 2", startLine)
+	}
+}
+
+func TestRunSourceScript_BridgesDockerfileCommentsWithBacktickEscape(t *testing.T) {
+	t.Parallel()
+
+	dockerfile := "# escape=`\n" +
+		"FROM mcr.microsoft.com/powershell:7.4-ubuntu-22.04\n" +
+		"RUN Write-Host 'one' `\n" +
+		"    # Dockerfile comment\n" +
+		"    && Write-Host 'two'\n"
+
+	result, err := Parse(strings.NewReader(dockerfile), nil)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	sm := sourcemap.New(result.Source)
+
+	run, ok := result.Stages[0].Commands[0].(*instructions.RunCommand)
+	if !ok {
+		t.Fatal("expected RUN command")
+	}
+
+	got, startLine := RunSourceScript(run, sm, result.AST.EscapeToken)
+	want := "    Write-Host 'one' `\n    `\n    && Write-Host 'two'"
+	if got != want {
+		t.Fatalf("RunSourceScript() = %q, want %q", got, want)
+	}
+	if startLine != 3 {
+		t.Fatalf("start line = %d, want 3", startLine)
 	}
 }

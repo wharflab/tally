@@ -124,12 +124,13 @@ func buildCommandOperationFacts(
 	run *instructions.RunCommand,
 	sm *sourcemap.SourceMap,
 	shellFacts ShellFacts,
+	escapeToken rune,
 ) []CommandOperationFact {
 	if run == nil {
 		return nil
 	}
 
-	script, startLine, hasMappedSource := commandOperationScript(run, sm)
+	script, startLine, hasMappedSource := commandOperationScript(run, sm, escapeToken)
 	if script == "" {
 		return nil
 	}
@@ -169,12 +170,12 @@ func buildCommandOperationFacts(
 	return facts
 }
 
-func commandOperationScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (string, int, bool) {
+func commandOperationScript(run *instructions.RunCommand, sm *sourcemap.SourceMap, escapeToken rune) (string, int, bool) {
 	if run == nil {
 		return "", 0, false
 	}
 	if run.PrependShell && len(run.Files) == 0 && sm != nil {
-		if script, startLine := dockerfile.RunSourceScript(run, sm); script != "" && startLine > 0 {
+		if script, startLine := dockerfile.RunSourceScript(run, sm, escapeToken); script != "" && startLine > 0 {
 			return script, startLine, true
 		}
 	}

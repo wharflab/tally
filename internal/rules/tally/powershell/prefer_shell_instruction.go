@@ -583,7 +583,7 @@ func adaptImpactedRunForPowerShell(
 			return rules.TextEdit{}, false, false
 		}
 
-		edit, ok := buildRunBodyRewriteEdit(file, sm, run, newScript)
+		edit, ok := buildRunBodyRewriteEdit(file, sm, run, newScript, escapeToken)
 		if !ok {
 			return rules.TextEdit{}, false, false
 		}
@@ -601,7 +601,7 @@ func adaptImpactedRunForPowerShell(
 		return rules.TextEdit{}, false, true
 	}
 
-	edit, ok := buildRunBodyRewriteEdit(file, sm, run, newScript)
+	edit, ok := buildRunBodyRewriteEdit(file, sm, run, newScript, escapeToken)
 	if !ok {
 		return rules.TextEdit{}, false, false
 	}
@@ -962,7 +962,7 @@ func buildPowerShellWrapperRewriteEdit(
 	if !ok || strings.TrimSpace(newScript) == "" {
 		return rules.TextEdit{}, false
 	}
-	return buildRunBodyRewriteEdit(file, sm, item.run, newScript)
+	return buildRunBodyRewriteEdit(file, sm, item.run, newScript, escapeToken)
 }
 
 func buildRunBodyRewriteEdit(
@@ -970,6 +970,7 @@ func buildRunBodyRewriteEdit(
 	sm *sourcemap.SourceMap,
 	run *instructions.RunCommand,
 	newScript string,
+	escapeToken rune,
 ) (rules.TextEdit, bool) {
 	resolved, ok := dockerfile.ResolveRunSource(run, sm)
 	if ok {
@@ -987,7 +988,7 @@ func buildRunBodyRewriteEdit(
 		return *edit, true
 	}
 
-	source, startLine, scriptIndex, ok := resolveRunInstructionScriptRange(run, sm)
+	source, startLine, scriptIndex, ok := resolveRunInstructionScriptRange(run, sm, escapeToken)
 	if !ok {
 		return rules.TextEdit{}, false
 	}
@@ -1022,12 +1023,13 @@ func buildShellDependantCommandRewriteEdit(
 func resolveRunInstructionScriptRange(
 	run *instructions.RunCommand,
 	sm *sourcemap.SourceMap,
+	escapeToken rune,
 ) (string, int, int, bool) {
 	if run == nil || sm == nil {
 		return "", 0, 0, false
 	}
 
-	source, startLine := dockerfile.RunSourceScript(run, sm)
+	source, startLine := dockerfile.RunSourceScript(run, sm, escapeToken)
 	if source == "" || startLine == 0 {
 		return "", 0, 0, false
 	}

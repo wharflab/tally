@@ -46,6 +46,7 @@ func (r *CurlShouldFollowRedirectsRule) Metadata() rules.RuleMetadata {
 func (r *CurlShouldFollowRedirectsRule) Check(input rules.LintInput) []rules.Violation {
 	meta := r.Metadata()
 	sm := input.SourceMap()
+	escapeToken := dockerfile.ASTEscapeToken(input.AST)
 
 	return hadolint.ScanRunCommandsWithPOSIXShell(
 		input,
@@ -57,7 +58,7 @@ func (r *CurlShouldFollowRedirectsRule) Check(input rules.LintInput) []rules.Vio
 			var runStartLine int
 
 			if run.PrependShell && sm != nil {
-				script, startLine := dockerfile.RunSourceScript(run, sm)
+				script, startLine := dockerfile.RunSourceScript(run, sm, escapeToken)
 				if script == "" {
 					return nil
 				}

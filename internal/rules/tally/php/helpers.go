@@ -67,9 +67,10 @@ func findComposerCommands(
 	run *instructions.RunCommand,
 	shellVariant shell.Variant,
 	sm *sourcemap.SourceMap,
+	escapeToken rune,
 	subcommands ...string,
 ) ([]shell.CommandInfo, int) {
-	cmds, runStartLine := runcheck.FindCommands(run, shellVariant, sm, "composer")
+	cmds, runStartLine := runcheck.FindCommands(run, shellVariant, sm, escapeToken, "composer")
 	if len(subcommands) == 0 {
 		return cmds, runStartLine
 	}
@@ -115,7 +116,7 @@ func findXdebugCommands(
 	names = append(names, phpExtensionCommandNames...)
 	names = append(names, osPackageManagersForPHPSorted...)
 
-	cmds, runStartLine := runcheck.FindCommands(runFacts.Run, shellVariant, sm, names...)
+	cmds, runStartLine := runcheck.FindCommands(runFacts.Run, shellVariant, sm, runFacts.EscapeToken, names...)
 	if len(cmds) == 0 {
 		return nil, 0
 	}

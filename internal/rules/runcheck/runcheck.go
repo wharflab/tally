@@ -85,6 +85,7 @@ func FindCommands(
 	run *instructions.RunCommand,
 	shellVariant shell.Variant,
 	sm *sourcemap.SourceMap,
+	escapeToken rune,
 	names ...string,
 ) ([]shell.CommandInfo, int) {
 	if run == nil {
@@ -92,7 +93,7 @@ func FindCommands(
 	}
 
 	if run.PrependShell && sm != nil {
-		script, startLine := dockerfile.RunSourceScript(run, sm)
+		script, startLine := dockerfile.RunSourceScript(run, sm, escapeToken)
 		if script == "" {
 			return nil, 0
 		}
@@ -155,11 +156,12 @@ func BuildInsertAfterSubcommandFix(
 // a command name and subcommand.
 func CheckCommandFlag(input rules.LintInput, meta rules.RuleMetadata, config CommandFlagRuleConfig) []rules.Violation {
 	sm := input.SourceMap()
+	escapeToken := dockerfile.ASTEscapeToken(input.AST)
 
 	return ScanRunCommandsWithPOSIXShell(
 		input,
 		func(run *instructions.RunCommand, shellVariant shell.Variant, file string) []rules.Violation {
-			cmds, runStartLine := FindCommands(run, shellVariant, sm, config.CommandNames...)
+			cmds, runStartLine := FindCommands(run, shellVariant, sm, escapeToken, config.CommandNames...)
 			if len(cmds) == 0 {
 				return nil
 			}
