@@ -7,6 +7,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	dfparser "github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -141,6 +142,7 @@ func extractRunLikeScript(
 			linesForSpan(sm, start, end),
 			escapeToken,
 			blankLeadingFlags,
+			node.Heredocs,
 		); bodyOnly {
 			bodyStart := start + openerOffset + 1
 			bodyEnd := end - 1
@@ -161,7 +163,7 @@ func extractRunLikeScript(
 	lines := linesForSpan(sm, start, end)
 	lines = blankLeadingFlags(lines, escapeToken)
 	if hasHeredoc {
-		lines = bridgeDockerfileCommentContinuationsBeforeHeredocBody(lines, escapeToken)
+		lines = bridgeDockerfileCommentContinuationsBeforeHeredocBody(lines, escapeToken, node.Heredocs)
 	} else {
 		lines = shell.BridgeDockerfileCommentContinuations(lines, escapeToken, escapeToken)
 	}
@@ -183,13 +185,14 @@ func heredocBodyScriptMode(
 	lines []string,
 	escapeToken rune,
 	blankLeadingFlags func(lines []string, escapeToken rune) []string,
+	heredocs []dfparser.Heredoc,
 ) (string, int, bool) {
 	if len(lines) == 0 {
 		return "", 0, false
 	}
 
 	blanked := blankLeadingFlags(lines, escapeToken)
-	blanked = bridgeDockerfileCommentContinuationsBeforeHeredocBody(blanked, escapeToken)
+	blanked = bridgeDockerfileCommentContinuationsBeforeHeredocBody(blanked, escapeToken, heredocs)
 	headerIdx, header := firstHeaderLine(blanked, escapeToken)
 	if header == "" {
 		return "", 0, false
@@ -210,19 +213,38 @@ func heredocBodyScriptMode(
 	return shellName, headerIdx, true
 }
 
-func bridgeDockerfileCommentContinuationsBeforeHeredocBody(lines []string, escapeToken rune) []string {
-	openerIdx := heredocOpenerLine(lines)
-	if openerIdx < 0 {
+func bridgeDockerfileCommentContinuationsBeforeHeredocBody(
+	lines []string,
+	escapeToken rune,
+	heredocs []dfparser.Heredoc,
+) []string {
+	headerEndIdx := heredocHeaderEndLine(lines, heredocs)
+	if headerEndIdx < 0 {
 		return lines
 	}
 
-	header := shell.BridgeDockerfileCommentContinuations(lines[:openerIdx+1], escapeToken, escapeToken)
+	header := shell.BridgeDockerfileCommentContinuations(lines[:headerEndIdx+1], escapeToken, escapeToken)
 	out := append([]string(nil), lines...)
-	copy(out[:openerIdx+1], header)
+	copy(out[:headerEndIdx+1], header)
 	return out
 }
 
-func heredocOpenerLine(lines []string) int {
+func heredocHeaderEndLine(lines []string, heredocs []dfparser.Heredoc) int {
+	if len(heredocs) == 0 {
+		return firstHeredocOpenerLine(lines)
+	}
+
+	headerEndIdx := -1
+	for _, heredoc := range heredocs {
+		openerIdx := dockerfile.HeredocOpenerLine(lines, heredoc.Name)
+		if openerIdx > headerEndIdx {
+			headerEndIdx = openerIdx
+		}
+	}
+	return headerEndIdx
+}
+
+func firstHeredocOpenerLine(lines []string) int {
 	for i, line := range lines {
 		if _, ok := heredocCommandRemainder(line); ok {
 			return i

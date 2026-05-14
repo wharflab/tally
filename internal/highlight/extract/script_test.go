@@ -142,6 +142,31 @@ EOF
 	}
 }
 
+func TestExtractRunScript_BridgesCommentsBetweenHeredocPayloadOpeners(t *testing.T) {
+	t.Parallel()
+
+	mapping := extractRunScriptForTest(t, `FROM alpine
+RUN <<FILE1 cat > /tmp/one && \
+    # Dockerfile header comment
+    <<FILE2 cat > /tmp/two
+one \
+# payload comment
+FILE1
+two
+FILE2
+`)
+
+	if mapping.IsHeredoc {
+		t.Fatalf("expected file-payload heredocs to remain part of full shell command, got Script=%q", mapping.Script)
+	}
+	if strings.Contains(mapping.Script, "Dockerfile header comment") {
+		t.Fatalf("expected Dockerfile header comment between heredoc openers to be elided, got %q", mapping.Script)
+	}
+	if !strings.Contains(mapping.Script, "# payload comment") {
+		t.Fatalf("expected heredoc payload comment to be preserved, got %q", mapping.Script)
+	}
+}
+
 func TestExtractRunScript_ExplicitShellUsesBodyWithOverride(t *testing.T) {
 	t.Parallel()
 

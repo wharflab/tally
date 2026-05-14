@@ -533,7 +533,7 @@ func bridgeRunSourceDockerfileCommentContinuations(
 func runHeredocHeaderEndLine(lines []string, files []instructions.ShellInlineFile) int {
 	headerEndIdx := -1
 	for _, file := range files {
-		openerIdx := firstRunHeredocOpenerLine(lines, file.Name)
+		openerIdx := HeredocOpenerLine(lines, file.Name)
 		if openerIdx > headerEndIdx {
 			headerEndIdx = openerIdx
 		}
@@ -541,7 +541,9 @@ func runHeredocHeaderEndLine(lines []string, files []instructions.ShellInlineFil
 	return headerEndIdx
 }
 
-func firstRunHeredocOpenerLine(lines []string, delimiter string) int {
+// HeredocOpenerLine returns the first physical line containing an opener for
+// delimiter, or -1 if the opener is not present.
+func HeredocOpenerLine(lines []string, delimiter string) int {
 	if delimiter == "" {
 		return -1
 	}
