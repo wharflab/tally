@@ -56,7 +56,7 @@ func fixtureDirs(t *testing.T, root string) []string {
 			continue
 		}
 		dir := filepath.Join(root, entry.Name())
-		if !fileExists(filepath.Join(dir, "Dockerfile")) {
+		if fixtureBuildFile(dir) == "" {
 			continue
 		}
 		dirs = append(dirs, dir)
@@ -68,7 +68,7 @@ func fixtureDirs(t *testing.T, root string) []string {
 func runLintFixture(t *testing.T, dir string) {
 	t.Helper()
 
-	dockerfilePath := filepath.Join(dir, "Dockerfile")
+	dockerfilePath := fixtureBuildFile(dir)
 	args := []string{"lint", "--format", "json"}
 	if !fileExists(filepath.Join(dir, ".tally.toml")) && !fileExists(filepath.Join(dir, "tally.toml")) {
 		args = append(args, "--no-config")
@@ -110,7 +110,8 @@ func runLintFixture(t *testing.T, dir string) {
 func runFixFixture(t *testing.T, dir string) {
 	t.Helper()
 
-	input := readFixtureFile(t, filepath.Join(dir, "Dockerfile"))
+	buildFile := fixtureBuildFile(dir)
+	input := readFixtureFile(t, buildFile)
 	args := []string{"lint", "--format", "markdown", "--fix"}
 	if !fileExists(filepath.Join(dir, ".tally.toml")) && !fileExists(filepath.Join(dir, "tally.toml")) {
 		args = append(args, "--no-config")
@@ -134,7 +135,7 @@ func runFixFixture(t *testing.T, dir string) {
 	snaps.WithConfig(
 		snaps.Dir(dir),
 		snaps.Filename("fixed"),
-		snaps.Ext(".Dockerfile"),
+		snaps.Ext("."+filepath.Base(buildFile)),
 		snaps.Raw(),
 	).MatchStandaloneSnapshot(t, gotFixed)
 
@@ -184,6 +185,16 @@ func readFixtureFile(t *testing.T, path string) string {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func fixtureBuildFile(dir string) string {
+	for _, name := range []string{"Dockerfile", "Containerfile"} {
+		path := filepath.Join(dir, name)
+		if fileExists(path) {
+			return path
+		}
+	}
+	return ""
 }
 
 func fixtureSnapshotExists(t *testing.T, dir, filename, ext string) bool {

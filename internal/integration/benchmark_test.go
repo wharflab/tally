@@ -74,7 +74,7 @@ func BenchmarkDiscovery(b *testing.B) {
 func BenchmarkComplexAria(b *testing.B) {
 	ensureBinary(b)
 
-	dockerfile := filepath.Join("testdata", "bench-complex-aria", "Dockerfile")
+	dockerfile := filepath.Join("fixtures", "fix", "real-world-aria", "Dockerfile")
 	absPath, err := filepath.Abs(dockerfile)
 	if err != nil {
 		b.Fatal(err)
@@ -98,7 +98,7 @@ func BenchmarkComplexAria(b *testing.B) {
 func BenchmarkComplexNolus(b *testing.B) {
 	ensureBinary(b)
 
-	containerfile := filepath.Join("testdata", "bench-complex-nolus", "Containerfile")
+	containerfile := filepath.Join("fixtures", "fix", "real-world-nolus", "Containerfile")
 	absPath, err := filepath.Abs(containerfile)
 	if err != nil {
 		b.Fatal(err)
