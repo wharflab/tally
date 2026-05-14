@@ -91,6 +91,57 @@ EOF
 	}
 }
 
+func TestExtractRunScript_BridgesDockerfileCommentsInHeredocHeader(t *testing.T) {
+	t.Parallel()
+
+	mapping := extractRunScriptForTest(t, `FROM alpine
+RUN --mount=type=cache,target=/root/.cache \
+    # Dockerfile comment
+    <<EOF
+echo one
+# shell comment
+echo two
+EOF
+`)
+
+	if !mapping.IsHeredoc {
+		t.Fatalf("expected header comment to preserve heredoc body mapping, got Script=%q", mapping.Script)
+	}
+	want := "echo one\n# shell comment\necho two"
+	if mapping.Script != want {
+		t.Fatalf("expected body-only script, got %q", mapping.Script)
+	}
+	if mapping.OriginStartLine != 5 {
+		t.Fatalf("expected body origin line 5, got %d", mapping.OriginStartLine)
+	}
+}
+
+func TestExtractRunScript_BridgesHeaderCommentsForHeredocPayload(t *testing.T) {
+	t.Parallel()
+
+	mapping := extractRunScriptForTest(t, `FROM alpine
+RUN --mount=type=cache,target=/root/.cache \
+    # Dockerfile comment
+    <<EOF cat > /etc/app.conf
+# payload comment
+enable-rpc=true
+EOF
+`)
+
+	if mapping.IsHeredoc {
+		t.Fatalf("expected file payload heredoc to remain part of full shell command, got Script=%q", mapping.Script)
+	}
+	if strings.Contains(mapping.Script, "Dockerfile comment") {
+		t.Fatalf("expected Dockerfile header comment to be elided from shell script, got %q", mapping.Script)
+	}
+	if !strings.Contains(mapping.Script, "\n    \\\n") {
+		t.Fatalf("expected header comment line to be bridged as a continuation line, got %q", mapping.Script)
+	}
+	if !strings.Contains(mapping.Script, "# payload comment") {
+		t.Fatalf("expected heredoc payload comment to be preserved, got %q", mapping.Script)
+	}
+}
+
 func TestExtractRunScript_ExplicitShellUsesBodyWithOverride(t *testing.T) {
 	t.Parallel()
 

@@ -160,7 +160,9 @@ func extractRunLikeScript(
 
 	lines := linesForSpan(sm, start, end)
 	lines = blankLeadingFlags(lines, escapeToken)
-	if !hasHeredoc {
+	if hasHeredoc {
+		lines = bridgeDockerfileCommentContinuationsBeforeHeredocBody(lines, escapeToken)
+	} else {
 		lines = shell.BridgeDockerfileCommentContinuations(lines, escapeToken, escapeToken)
 	}
 
@@ -187,6 +189,7 @@ func heredocBodyScriptMode(
 	}
 
 	blanked := blankLeadingFlags(lines, escapeToken)
+	blanked = bridgeDockerfileCommentContinuationsBeforeHeredocBody(blanked, escapeToken)
 	headerIdx, header := firstHeaderLine(blanked, escapeToken)
 	if header == "" {
 		return "", 0, false
@@ -205,6 +208,27 @@ func heredocBodyScriptMode(
 		return "", 0, false
 	}
 	return shellName, headerIdx, true
+}
+
+func bridgeDockerfileCommentContinuationsBeforeHeredocBody(lines []string, escapeToken rune) []string {
+	openerIdx := heredocOpenerLine(lines)
+	if openerIdx < 0 {
+		return lines
+	}
+
+	header := shell.BridgeDockerfileCommentContinuations(lines[:openerIdx+1], escapeToken, escapeToken)
+	out := append([]string(nil), lines...)
+	copy(out[:openerIdx+1], header)
+	return out
+}
+
+func heredocOpenerLine(lines []string) int {
+	for i, line := range lines {
+		if _, ok := heredocCommandRemainder(line); ok {
+			return i
+		}
+	}
+	return -1
 }
 
 // firstHeaderLine returns the index and content of the first line that carries
