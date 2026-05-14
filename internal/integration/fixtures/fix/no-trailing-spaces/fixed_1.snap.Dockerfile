@@ -1,4 +1,8 @@
 FROM alpine:3.20
-RUN echo hello
-# comment
+
+RUN apk add --no-cache curl
+
+# Install app
 COPY . /app
+
+CMD ["sh"]
