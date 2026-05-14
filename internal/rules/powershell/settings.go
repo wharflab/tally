@@ -67,7 +67,7 @@ var defaultExcludedAnalyzerRules = map[string]struct{}{
 func analyzerSettings(cfg any) psanalyzer.Settings {
 	rulesCfg, ok := cfg.(*config.RulesConfig)
 	if !ok || rulesCfg == nil {
-		return defaultAnalyzerSettings(nil)
+		return defaultAnalyzerSettings()
 	}
 
 	var settings psanalyzer.Settings
@@ -106,7 +106,7 @@ func analyzerSettings(cfg any) psanalyzer.Settings {
 // defaultAnalyzerSettings returns the analyzer settings to use when no rules
 // config is available. It still applies the default-exclude list so the
 // curated set of off-by-default PSSA rules stays consistent.
-func defaultAnalyzerSettings(_ *config.RulesConfig) psanalyzer.Settings {
+func defaultAnalyzerSettings() psanalyzer.Settings {
 	excludeSet := make(map[string]struct{}, len(defaultExcludedAnalyzerRules))
 	for name := range defaultExcludedAnalyzerRules {
 		excludeSet[name] = struct{}{}
