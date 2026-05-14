@@ -145,8 +145,9 @@ func runFixFixture(t *testing.T, dir string) {
 	cmd.Stderr = &stderrBuf
 	err := cmd.Run()
 	exitCode := commandExitCode(t, err, stdoutBuf.String(), stderrBuf.String())
-	if exitCode != 0 && exitCode != 1 {
-		t.Fatalf("unexpected exit code %d\nstdout:\n%s\nstderr:\n%s", exitCode, stdoutBuf.String(), stderrBuf.String())
+	wantExitCode := fixFixtureExpectedExitCode(t, dir, stderrBuf.String())
+	if exitCode != wantExitCode {
+		t.Fatalf("expected exit code %d, got %d\nstdout:\n%s\nstderr:\n%s", wantExitCode, exitCode, stdoutBuf.String(), stderrBuf.String())
 	}
 
 	gotFixed := normalizeFixtureOutput(t, stdoutBuf.String())
@@ -186,6 +187,7 @@ func normalizeFixtureOutput(t *testing.T, output string) string {
 	output = strings.ReplaceAll(output, "\r\n", "\n")
 	wd, err := os.Getwd()
 	if err == nil {
+		output = strings.ReplaceAll(output, wd+string(os.PathSeparator), "")
 		output = strings.ReplaceAll(output, filepath.ToSlash(wd)+"/", "")
 	}
 	return buildkitVersionRE.ReplaceAllString(output, "${1}0.0.0")
@@ -215,18 +217,21 @@ func fixtureBuildFile(dir string) string {
 	return ""
 }
 
-func lintFixtureOutputFormat(t *testing.T, dir string) string {
+type fixtureHarnessConfig struct {
+	Output struct {
+		Format    string `toml:"format"`
+		FailLevel string `toml:"fail-level"`
+	} `toml:"output"`
+}
+
+func readFixtureHarnessConfig(t *testing.T, dir string) fixtureHarnessConfig {
 	t.Helper()
 	for _, name := range []string{".tally.toml", "tally.toml"} {
 		path := filepath.Join(dir, name)
 		if !fileExists(path) {
 			continue
 		}
-		var cfg struct {
-			Output struct {
-				Format string `toml:"format"`
-			} `toml:"output"`
-		}
+		var cfg fixtureHarnessConfig
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)
@@ -234,9 +239,25 @@ func lintFixtureOutputFormat(t *testing.T, dir string) string {
 		if err := toml.Unmarshal(data, &cfg); err != nil {
 			t.Fatalf("parse %s: %v", path, err)
 		}
-		return cfg.Output.Format
+		return cfg
 	}
-	return ""
+	return fixtureHarnessConfig{}
+}
+
+func lintFixtureOutputFormat(t *testing.T, dir string) string {
+	t.Helper()
+	return readFixtureHarnessConfig(t, dir).Output.Format
+}
+
+func fixFixtureExpectedExitCode(t *testing.T, dir, stderr string) int {
+	t.Helper()
+	if readFixtureHarnessConfig(t, dir).Output.FailLevel == "none" {
+		return 0
+	}
+	if stderr == "" || strings.Contains(stderr, "**No issues found**") {
+		return 0
+	}
+	return 1
 }
 
 func lintFixtureSnapshotExt(format string) string {

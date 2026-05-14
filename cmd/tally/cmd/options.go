@@ -74,6 +74,8 @@ type dockerPluginContext struct {
 	EndpointHost   string
 }
 
+const fixUnsafeFlagName = "fix-unsafe"
+
 // addLintFlags registers all lint flags on the given FlagSet. The flags are
 // bound either directly to fields of opts (for operational/transform flags)
 // or live inside the pflag.FlagSet itself so the config loader can pick them
@@ -120,7 +122,7 @@ func addLintFlags(fs *pflag.FlagSet, opts *lintOptions) {
 
 	fs.BoolVar(&opts.fix, "fix", false, "Apply all safe fixes automatically")
 	fs.StringSliceVar(&opts.fixRule, "fix-rule", nil, "Only fix specific rules (can be repeated)")
-	fs.BoolVar(&opts.fixUnsafe, "fix-unsafe", false, "Also apply suggestion/unsafe fixes (requires --fix)")
+	fs.BoolVar(&opts.fixUnsafe, fixUnsafeFlagName, false, "Also apply suggestion/unsafe fixes (requires --fix)")
 
 	fs.StringVar(&opts.acpCommand, "acp-command", "",
 		`ACP agent command line (e.g. "gemini --experimental-acp --allowed-mcp-server-names=none --model=gemini-3-flash-preview")`)
@@ -272,9 +274,9 @@ func finalizeLintOptions(fs *pflag.FlagSet, opts *lintOptions) error {
 			opts.fix = v
 		}
 	}
-	if fs.Changed("fix-unsafe") {
+	if fs.Changed(fixUnsafeFlagName) {
 		opts.fixUnsafeSet = true
-	} else if !fs.Changed("fix-unsafe") {
+	} else {
 		if v, ok, err := parseEnvBool("TALLY_FIX_UNSAFE"); err != nil {
 			return err
 		} else if ok {
