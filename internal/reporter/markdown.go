@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -29,7 +28,7 @@ func (r *MarkdownReporter) Report(violations []rules.Violation, _ map[string][]b
 		return err
 	}
 
-	sorted := SortViolationsBySeverity(violations)
+	sorted := SortViolations(violations)
 
 	// Normalize file paths for consistent output
 	for i := range sorted {
@@ -152,60 +151,6 @@ func formatLineNumber(v rules.Violation) string {
 		return strconv.Itoa(line)
 	}
 	return "-"
-}
-
-// SortViolationsBySeverity sorts violations by severity (errors first), then by file and line.
-// Uses stable sort to preserve original order for equal-priority items.
-func SortViolationsBySeverity(violations []rules.Violation) []rules.Violation {
-	sorted := make([]rules.Violation, len(violations))
-	copy(sorted, violations)
-
-	sort.SliceStable(sorted, func(i, j int) bool {
-		// shouldSwap returns true if i should come AFTER j,
-		// so we invert arguments to get "less than" semantics
-		return shouldSwap(sorted[j], sorted[i])
-	})
-
-	return sorted
-}
-
-// shouldSwap returns true if a should come after b in the sorted output.
-func shouldSwap(a, b rules.Violation) bool {
-	// Sort by severity first (error < warning < info < style)
-	aPriority := severityPriority(a.Severity)
-	bPriority := severityPriority(b.Severity)
-	if aPriority != bPriority {
-		return aPriority > bPriority
-	}
-
-	// Then by file
-	if InvocationLabel(a) != InvocationLabel(b) {
-		return InvocationLabel(a) > InvocationLabel(b)
-	}
-	if a.Location.File != b.Location.File {
-		return a.Location.File > b.Location.File
-	}
-
-	// Then by line
-	return a.Location.Start.Line > b.Location.Start.Line
-}
-
-// severityPriority returns a numeric priority for sorting (lower = more severe).
-func severityPriority(s rules.Severity) int {
-	switch s {
-	case rules.SeverityError:
-		return 0
-	case rules.SeverityWarning:
-		return 1
-	case rules.SeverityInfo:
-		return 2
-	case rules.SeverityStyle:
-		return 3
-	case rules.SeverityOff:
-		return 5 // Should never reach here
-	default:
-		return 4
-	}
 }
 
 // severityEmoji returns an emoji indicator for the severity level.

@@ -51,7 +51,7 @@ func TestMarkdownReporterSingleFile(t *testing.T) {
 		t.Errorf("Expected table header, got: %s", output)
 	}
 
-	// Check error comes first (severity sorting)
+	// Check earlier line comes first even when a later issue is more severe.
 	lines := strings.Split(output, "\n")
 	errorLine := -1
 	warningLine := -1
@@ -70,8 +70,8 @@ func TestMarkdownReporterSingleFile(t *testing.T) {
 			warningLine,
 		)
 	}
-	if errorLine >= warningLine {
-		t.Error("Expected error to come before warning in output")
+	if warningLine >= errorLine {
+		t.Error("Expected lower line number to come before later error in output")
 	}
 
 	// Check emoji indicators
@@ -232,45 +232,41 @@ func TestMarkdownReporterFileLevelViolation(t *testing.T) {
 	}
 }
 
-func TestSortViolationsBySeverity(t *testing.T) {
+func TestMarkdownReporterSortsByLocation(t *testing.T) {
 	t.Parallel()
 	violations := []rules.Violation{
 		{
-			Location: rules.Location{File: "a.txt", Start: rules.Position{Line: 1}},
-			Severity: rules.SeverityStyle,
-		},
-		{
-			Location: rules.Location{File: "a.txt", Start: rules.Position{Line: 2}},
+			Location: rules.Location{File: "Dockerfile", Start: rules.Position{Line: 20}},
+			Message:  "later error",
 			Severity: rules.SeverityError,
 		},
 		{
-			Location: rules.Location{File: "a.txt", Start: rules.Position{Line: 3}},
+			Location: rules.Location{File: "Dockerfile", Start: rules.Position{Line: 5}},
+			Message:  "earlier warning",
 			Severity: rules.SeverityWarning,
 		},
 		{
-			Location: rules.Location{File: "a.txt", Start: rules.Position{Line: 4}},
+			Location: rules.Location{File: "Dockerfile", Start: rules.Position{Line: 12}},
+			Message:  "middle info",
 			Severity: rules.SeverityInfo,
 		},
 	}
 
-	sorted := SortViolationsBySeverity(violations)
-
-	// Should be: error, warning, info, style
-	expectedOrder := []rules.Severity{
-		rules.SeverityError,
-		rules.SeverityWarning,
-		rules.SeverityInfo,
-		rules.SeverityStyle,
+	var buf bytes.Buffer
+	reporter := NewMarkdownReporter(&buf)
+	if err := reporter.Report(violations, nil, ReportMetadata{}); err != nil {
+		t.Fatalf("Report() error = %v", err)
 	}
 
-	if len(sorted) != len(expectedOrder) {
-		t.Fatalf("expected %d violations, got %d", len(expectedOrder), len(sorted))
+	output := buf.String()
+	earlier := strings.Index(output, "earlier warning")
+	middle := strings.Index(output, "middle info")
+	later := strings.Index(output, "later error")
+	if earlier == -1 || middle == -1 || later == -1 {
+		t.Fatalf("expected all messages in output, got: %s", output)
 	}
-
-	for i, expected := range expectedOrder {
-		if sorted[i].Severity != expected {
-			t.Errorf("Position %d: expected %v, got %v", i, expected, sorted[i].Severity)
-		}
+	if earlier >= middle || middle >= later {
+		t.Fatalf("expected markdown output sorted by line number, got: %s", output)
 	}
 }
 
