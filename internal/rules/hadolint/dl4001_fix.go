@@ -589,7 +589,7 @@ func runSourceScript(parsed *dockerfile.ParseResult, run *instructions.RunComman
 	if parsed == nil {
 		return strings.Join(run.CmdLine, " ")
 	}
-	if script, _ := dockerfile.RunSourceScript(run, sourcemap.New(parsed.Source)); script != "" {
+	if script, _ := dockerfile.RunSourceScript(run, sourcemap.New(parsed.Source), dockerfile.ASTEscapeToken(parsed.AST)); script != "" {
 		return script
 	}
 	return strings.Join(run.CmdLine, " ")

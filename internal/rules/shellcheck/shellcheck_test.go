@@ -231,6 +231,7 @@ enable-rpc=true
 rpc-listen-all=true
 EOF
 `)
+	input.EnabledRules = []string{ShellCheckRuleCode}
 
 	violations := NewRule().Check(input)
 	if len(violations) != 0 {
@@ -238,10 +239,35 @@ EOF
 	}
 }
 
+func TestRule_BridgesDockerfileCommentsInContinuedRun(t *testing.T) {
+	t.Parallel()
+
+	input := makeShellcheckLintInput(t, `FROM alpine
+RUN echo one \
+    # Dockerfile comment
+    && echo $(date)
+`)
+
+	violations := NewRule().Check(input)
+	for _, v := range violations {
+		switch v.RuleCode {
+		case "shellcheck/SC1070", "shellcheck/SC1133":
+			t.Fatalf("unexpected parse violation after Dockerfile comment bridge: %+v", v)
+		}
+	}
+
+	for _, v := range violations {
+		if v.RuleCode == "shellcheck/SC2046" && v.Location.Start.Line == 4 {
+			return
+		}
+	}
+	t.Fatalf("expected mapped SC2046 on line 4, got %+v", violations)
+}
+
 func TestRule_DoesNotLintCmdStageAsPOSIXAfterSeparatePowerShellStage(t *testing.T) {
 	t.Parallel()
 
-	input := makeShellcheckLintInput(t, "Dockerfile", `FROM mcr.microsoft.com/powershell:nanoserver-ltsc2022 AS base
+	input := makeShellcheckLintInput(t, `FROM mcr.microsoft.com/powershell:nanoserver-ltsc2022 AS base
 SHELL ["pwsh", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 RUN Write-Host hi
 
@@ -261,7 +287,7 @@ RUN cmd /c icacls.exe C:\\BuildAgent\\* /grant:r Users:(OI)(CI)F
 func TestRule_DoesNotLintExplicitPwshWrapperInCmdStage(t *testing.T) {
 	t.Parallel()
 
-	input := makeShellcheckLintInput(t, "Dockerfile", `FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
+	input := makeShellcheckLintInput(t, `FROM mcr.microsoft.com/windows/nanoserver:ltsc2022
 RUN pwsh -NoLogo -NoProfile -Command " \
     $stopTime = (get-date).AddMinutes(15); \
     $ErrorActionPreference = 'Stop' ; \
@@ -282,7 +308,7 @@ RUN pwsh -NoLogo -NoProfile -Command " \
 func TestRule_DoesNotLintExplicitWrappersWhenBaseImageOSIsUnknown(t *testing.T) {
 	t.Parallel()
 
-	input := makeShellcheckLintInput(t, "Dockerfile", `ARG base
+	input := makeShellcheckLintInput(t, `ARG base
 FROM ${base}
 RUN pwsh -NoLogo -NoProfile -Command "Write-Host hi"
 RUN cmd /c icacls.exe C:\\BuildAgent\\* /grant:r Users:(OI)(CI)F
@@ -294,8 +320,10 @@ RUN cmd /c icacls.exe C:\\BuildAgent\\* /grant:r Users:(OI)(CI)F
 	}
 }
 
-func makeShellcheckLintInput(tb testing.TB, file, content string) rules.LintInput {
+func makeShellcheckLintInput(tb testing.TB, content string) rules.LintInput {
 	tb.Helper()
+
+	const file = "Dockerfile"
 
 	result, err := dockerfile.Parse(strings.NewReader(content), nil)
 	if err != nil {
@@ -309,12 +337,13 @@ func makeShellcheckLintInput(tb testing.TB, file, content string) rules.LintInpu
 		Build()
 
 	return rules.LintInput{
-		File:     file,
-		AST:      result.AST,
-		Stages:   result.Stages,
-		MetaArgs: result.MetaArgs,
-		Source:   result.Source,
-		Semantic: sem,
+		File:         file,
+		AST:          result.AST,
+		Stages:       result.Stages,
+		MetaArgs:     result.MetaArgs,
+		Source:       result.Source,
+		Semantic:     sem,
+		EnabledRules: []string{ShellCheckRuleCode},
 	}
 }
 

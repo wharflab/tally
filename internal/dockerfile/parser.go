@@ -14,6 +14,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
 
@@ -44,6 +45,15 @@ type ParseResult struct {
 	Source []byte
 	// Warnings contains lint warnings from BuildKit's built-in linter
 	Warnings []LintWarning
+}
+
+// ASTEscapeToken returns the Dockerfile escape token from a BuildKit AST,
+// defaulting to backslash when the AST is absent or does not specify one.
+func ASTEscapeToken(ast *parser.Result) rune {
+	if ast != nil && ast.EscapeToken != 0 {
+		return ast.EscapeToken
+	}
+	return '\\'
 }
 
 // openDockerfile opens a Dockerfile path for reading.
@@ -440,7 +450,8 @@ func ResolveRunSource(run *instructions.RunCommand, sm *sourcemap.SourceMap) (Ru
 //
 // Returns the script and the 1-based start line number, or ("", 0) if the
 // instruction has no location or no source lines.
-func RunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (string, int) {
+func RunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap, escapeToken rune) (string, int) {
+	escapeToken = defaultDockerfileEscapeToken(escapeToken)
 	runLoc := run.Location()
 	if len(runLoc) == 0 {
 		return "", 0
@@ -494,8 +505,97 @@ func RunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (str
 	// that appear between "RUN " and the shell script. These are Dockerfile-level
 	// options, not shell arguments, and would confuse the shell parser.
 	lines[0] = blankRunFlags(lines[0])
+	lines = bridgeRunSourceDockerfileCommentContinuations(run, lines, escapeToken)
 
 	return strings.Join(lines, "\n"), startLine
+}
+
+func bridgeRunSourceDockerfileCommentContinuations(
+	run *instructions.RunCommand,
+	lines []string,
+	escapeToken rune,
+) []string {
+	if len(run.Files) == 0 {
+		return shell.BridgeDockerfileCommentContinuations(lines, escapeToken, escapeToken)
+	}
+
+	headerEndIdx := runHeredocHeaderEndLine(lines, run.Files)
+	if headerEndIdx < 0 {
+		return lines
+	}
+
+	header := shell.BridgeDockerfileCommentContinuations(lines[:headerEndIdx+1], escapeToken, escapeToken)
+	out := append([]string(nil), lines...)
+	copy(out[:headerEndIdx+1], header)
+	return out
+}
+
+func runHeredocHeaderEndLine(lines []string, files []instructions.ShellInlineFile) int {
+	headerEndIdx := -1
+	for _, file := range files {
+		openerIdx := HeredocOpenerLine(lines, file.Name)
+		if openerIdx > headerEndIdx {
+			headerEndIdx = openerIdx
+		}
+	}
+	return headerEndIdx
+}
+
+// HeredocOpenerLine returns the first physical line containing an opener for
+// delimiter, or -1 if the opener is not present.
+func HeredocOpenerLine(lines []string, delimiter string) int {
+	if delimiter == "" {
+		return -1
+	}
+	for i, line := range lines {
+		if hasRunHeredocOpener(line, delimiter) {
+			return i
+		}
+	}
+	return -1
+}
+
+func hasRunHeredocOpener(line, delimiter string) bool {
+	for {
+		idx := strings.Index(line, "<<")
+		if idx < 0 {
+			return false
+		}
+		rest := line[idx+len("<<"):]
+		rest = strings.TrimPrefix(rest, "-")
+		rest = strings.TrimLeft(rest, " \t")
+		token := heredocDelimiterToken(rest)
+		if token == delimiter {
+			return true
+		}
+		line = rest
+	}
+}
+
+func heredocDelimiterToken(text string) string {
+	if text == "" {
+		return ""
+	}
+	if text[0] == '\'' || text[0] == '"' {
+		quote := text[0]
+		end := strings.IndexByte(text[1:], quote)
+		if end < 0 {
+			return ""
+		}
+		return text[1 : 1+end]
+	}
+	end := 0
+	for end < len(text) && text[end] != ' ' && text[end] != '\t' {
+		end++
+	}
+	return text[:end]
+}
+
+func defaultDockerfileEscapeToken(escapeToken rune) rune {
+	if escapeToken == 0 {
+		return '\\'
+	}
+	return escapeToken
 }
 
 // blankRunFlags replaces BuildKit RUN flags (--mount, --network, --security)

@@ -249,6 +249,8 @@ func reconstructSourceTextWithTarget(
 	escapeToken rune,
 	target rune,
 ) string {
+	lines = BridgeDockerfileCommentContinuations(lines, escapeToken, target)
+
 	var sb strings.Builder
 	escByte := byte(escapeToken)
 	needsRewrite := escapeToken != target && escapeToken != 0

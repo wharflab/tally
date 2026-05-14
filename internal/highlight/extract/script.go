@@ -7,6 +7,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	dfparser "github.com/moby/buildkit/frontend/dockerfile/parser"
 
+	"github.com/wharflab/tally/internal/dockerfile"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
@@ -57,6 +58,7 @@ func ExtractShellFormScript(
 
 	lines := linesForSpan(sm, start, end)
 	lines = blankLeadingKeywordOnly(lines, keyword, escapeToken)
+	lines = shell.BridgeDockerfileCommentContinuations(lines, escapeToken, escapeToken)
 
 	return Mapping{
 		Script:          strings.Join(lines, "\n"),
@@ -83,6 +85,7 @@ func ExtractHealthcheckCmdShellScript(
 	if !ok {
 		return Mapping{}, false
 	}
+	out = shell.BridgeDockerfileCommentContinuations(out, escapeToken, escapeToken)
 	return Mapping{
 		Script:          strings.Join(out, "\n"),
 		OriginStartLine: start,
@@ -133,11 +136,13 @@ func extractRunLikeScript(
 	end := sm.ResolveEndLineWithEscape(node.EndLine, escapeToken)
 	end = max(end, start)
 
-	if len(node.Heredocs) > 0 {
+	hasHeredoc := len(node.Heredocs) > 0
+	if hasHeredoc {
 		if overrideShell, openerOffset, bodyOnly := heredocBodyScriptMode(
 			linesForSpan(sm, start, end),
 			escapeToken,
 			blankLeadingFlags,
+			node.Heredocs,
 		); bodyOnly {
 			bodyStart := start + openerOffset + 1
 			bodyEnd := end - 1
@@ -157,6 +162,11 @@ func extractRunLikeScript(
 
 	lines := linesForSpan(sm, start, end)
 	lines = blankLeadingFlags(lines, escapeToken)
+	if hasHeredoc {
+		lines = bridgeDockerfileCommentContinuationsBeforeHeredocBody(lines, escapeToken, node.Heredocs)
+	} else {
+		lines = shell.BridgeDockerfileCommentContinuations(lines, escapeToken, escapeToken)
+	}
 
 	return Mapping{
 		Script:          strings.Join(lines, "\n"),
@@ -175,12 +185,14 @@ func heredocBodyScriptMode(
 	lines []string,
 	escapeToken rune,
 	blankLeadingFlags func(lines []string, escapeToken rune) []string,
+	heredocs []dfparser.Heredoc,
 ) (string, int, bool) {
 	if len(lines) == 0 {
 		return "", 0, false
 	}
 
 	blanked := blankLeadingFlags(lines, escapeToken)
+	blanked = bridgeDockerfileCommentContinuationsBeforeHeredocBody(blanked, escapeToken, heredocs)
 	headerIdx, header := firstHeaderLine(blanked, escapeToken)
 	if header == "" {
 		return "", 0, false
@@ -199,6 +211,46 @@ func heredocBodyScriptMode(
 		return "", 0, false
 	}
 	return shellName, headerIdx, true
+}
+
+func bridgeDockerfileCommentContinuationsBeforeHeredocBody(
+	lines []string,
+	escapeToken rune,
+	heredocs []dfparser.Heredoc,
+) []string {
+	headerEndIdx := heredocHeaderEndLine(lines, heredocs)
+	if headerEndIdx < 0 {
+		return lines
+	}
+
+	header := shell.BridgeDockerfileCommentContinuations(lines[:headerEndIdx+1], escapeToken, escapeToken)
+	out := append([]string(nil), lines...)
+	copy(out[:headerEndIdx+1], header)
+	return out
+}
+
+func heredocHeaderEndLine(lines []string, heredocs []dfparser.Heredoc) int {
+	if len(heredocs) == 0 {
+		return firstHeredocOpenerLine(lines)
+	}
+
+	headerEndIdx := -1
+	for _, heredoc := range heredocs {
+		openerIdx := dockerfile.HeredocOpenerLine(lines, heredoc.Name)
+		if openerIdx > headerEndIdx {
+			headerEndIdx = openerIdx
+		}
+	}
+	return headerEndIdx
+}
+
+func firstHeredocOpenerLine(lines []string) int {
+	for i, line := range lines {
+		if _, ok := heredocCommandRemainder(line); ok {
+			return i
+		}
+	}
+	return -1
 }
 
 // firstHeaderLine returns the index and content of the first line that carries

@@ -73,7 +73,7 @@ func (r *ComposerNoDevInProductionRule) checkStageWithFacts(
 			continue
 		}
 
-		violations = append(violations, r.checkRun(runFacts.Run, shellVariant, file, meta, sm)...)
+		violations = append(violations, r.checkRun(runFacts.Run, shellVariant, file, meta, sm, runFacts.EscapeToken)...)
 	}
 
 	return violations
@@ -98,8 +98,9 @@ func (r *ComposerNoDevInProductionRule) checkRun(
 	file string,
 	meta rules.RuleMetadata,
 	sm *sourcemap.SourceMap,
+	escapeToken rune,
 ) []rules.Violation {
-	cmds, runStartLine := findComposerCommands(run, shellVariant, sm, "install")
+	cmds, runStartLine := findComposerCommands(run, shellVariant, sm, escapeToken, "install")
 	if len(cmds) == 0 {
 		return nil
 	}

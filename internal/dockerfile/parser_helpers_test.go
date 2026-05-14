@@ -219,3 +219,136 @@ EOF
 		})
 	}
 }
+
+func TestRunSourceScript_BridgesDockerfileCommentsInContinuedRun(t *testing.T) {
+	t.Parallel()
+
+	dockerfile := `FROM alpine
+RUN echo one \
+    # Dockerfile comment
+    && echo two
+`
+
+	result, err := Parse(strings.NewReader(dockerfile), nil)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	sm := sourcemap.New(result.Source)
+
+	run, ok := result.Stages[0].Commands[0].(*instructions.RunCommand)
+	if !ok {
+		t.Fatal("expected RUN command")
+	}
+
+	got, startLine := RunSourceScript(run, sm, result.AST.EscapeToken)
+	want := "    echo one \\\n    \\\n    && echo two"
+	if got != want {
+		t.Fatalf("RunSourceScript() = %q, want %q", got, want)
+	}
+	if startLine != 2 {
+		t.Fatalf("start line = %d, want 2", startLine)
+	}
+}
+
+func TestRunSourceScript_BridgesDockerfileCommentsWithBacktickEscape(t *testing.T) {
+	t.Parallel()
+
+	dockerfile := "# escape=`\n" +
+		"FROM mcr.microsoft.com/powershell:7.4-ubuntu-22.04\n" +
+		"RUN Write-Host 'one' `\n" +
+		"    # Dockerfile comment\n" +
+		"    && Write-Host 'two'\n"
+
+	result, err := Parse(strings.NewReader(dockerfile), nil)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	sm := sourcemap.New(result.Source)
+
+	run, ok := result.Stages[0].Commands[0].(*instructions.RunCommand)
+	if !ok {
+		t.Fatal("expected RUN command")
+	}
+
+	got, startLine := RunSourceScript(run, sm, result.AST.EscapeToken)
+	want := "    Write-Host 'one' `\n    `\n    && Write-Host 'two'"
+	if got != want {
+		t.Fatalf("RunSourceScript() = %q, want %q", got, want)
+	}
+	if startLine != 3 {
+		t.Fatalf("start line = %d, want 3", startLine)
+	}
+}
+
+func TestRunSourceScript_BridgesHeaderCommentsWithoutChangingHeredocBody(t *testing.T) {
+	t.Parallel()
+
+	dockerfile := `FROM alpine
+RUN --mount=type=cache,target=/root/.cache \
+    # Dockerfile header comment
+    <<EOF
+echo one \
+# shell body comment
+echo two
+EOF
+`
+
+	result, err := Parse(strings.NewReader(dockerfile), nil)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	sm := sourcemap.New(result.Source)
+
+	run, ok := result.Stages[0].Commands[0].(*instructions.RunCommand)
+	if !ok {
+		t.Fatal("expected RUN command")
+	}
+
+	got, startLine := RunSourceScript(run, sm, result.AST.EscapeToken)
+	if strings.Contains(got, "Dockerfile header comment") {
+		t.Fatalf("expected Dockerfile header comment to be elided from shell script, got %q", got)
+	}
+	if !strings.Contains(got, "# shell body comment") {
+		t.Fatalf("expected heredoc body comment to be preserved, got %q", got)
+	}
+	if startLine != 2 {
+		t.Fatalf("start line = %d, want 2", startLine)
+	}
+}
+
+func TestRunSourceScript_BridgesCommentsBetweenHeredocOpeners(t *testing.T) {
+	t.Parallel()
+
+	dockerfile := `FROM alpine
+RUN <<FILE1 cat > /tmp/one && \
+    # Dockerfile header comment
+    <<FILE2 cat > /tmp/two
+one \
+# shell body comment
+FILE1
+two
+FILE2
+`
+
+	result, err := Parse(strings.NewReader(dockerfile), nil)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	sm := sourcemap.New(result.Source)
+
+	run, ok := result.Stages[0].Commands[0].(*instructions.RunCommand)
+	if !ok {
+		t.Fatal("expected RUN command")
+	}
+
+	got, startLine := RunSourceScript(run, sm, result.AST.EscapeToken)
+	if strings.Contains(got, "Dockerfile header comment") {
+		t.Fatalf("expected Dockerfile header comment between heredoc openers to be elided, got %q", got)
+	}
+	if !strings.Contains(got, "# shell body comment") {
+		t.Fatalf("expected heredoc body comment to be preserved, got %q", got)
+	}
+	if startLine != 2 {
+		t.Fatalf("start line = %d, want 2", startLine)
+	}
+}

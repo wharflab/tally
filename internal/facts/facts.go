@@ -45,7 +45,7 @@ type StageFacts struct {
 	// base image tag. Only populated for nvidia/cuda:* base images with a
 	// parseable version tag (e.g., nvidia/cuda:12.2.0-devel-ubuntu22.04 →
 	// CUDAMajor=12, CUDAMinor=2). Zero values mean the version is unknown
-	// (non-CUDA image, ARG-based tag, digest reference, or unparseable tag).
+	// (non-CUDA image, ARG-based tag, digest reference, or unparsable tag).
 	CUDAMajor int
 	CUDAMinor int
 
@@ -112,6 +112,7 @@ type RunFacts struct {
 	CommandIndex int
 	Run          *instructions.RunCommand
 	UsesShell    bool
+	EscapeToken  rune
 
 	Workdir       string
 	CommandScript string
@@ -346,10 +347,7 @@ func (f *FileFacts) build() {
 
 func factsBuildContext(parseResult *dockerfile.ParseResult) (*sourcemap.SourceMap, rune) {
 	sm := sourcemap.New(parseResult.Source)
-	escapeToken := rune('\\')
-	if parseResult.AST != nil {
-		escapeToken = parseResult.AST.EscapeToken
-	}
+	escapeToken := dockerfile.ASTEscapeToken(parseResult.AST)
 	return sm, escapeToken
 }
 
@@ -435,7 +433,7 @@ const nvidiaCUDAFamiliarName = "nvidia/cuda"
 // parseCUDAVersionFromBaseImage extracts CUDA major.minor version from an
 // nvidia/cuda:* base image tag using the distribution/reference library for
 // proper OCI image reference parsing. Returns (0, 0) for non-CUDA images,
-// stage references, digest-only references, or unparseable tags.
+// stage references, digest-only references, or unparsable tags.
 func parseCUDAVersionFromBaseImage(info *semantic.StageInfo) (major, minor int) {
 	if info == nil || info.BaseImage == nil || info.BaseImage.IsStageRef {
 		return 0, 0
@@ -1216,13 +1214,14 @@ func buildRunFacts(params runFactBuildParams) *RunFacts {
 		CommandIndex:          params.commandIdx,
 		Run:                   params.run,
 		UsesShell:             params.run != nil && params.run.PrependShell,
+		EscapeToken:           params.escape,
 		Workdir:               params.workdir,
 		CommandScript:         commandScript,
 		SourceScript:          sourceScript,
 		Shell:                 params.shell,
 		Env:                   envFacts,
 		CommandInfos:          commandInfos,
-		CommandOperationFacts: buildCommandOperationFacts(params.run, params.sm, params.shell),
+		CommandOperationFacts: buildCommandOperationFacts(params.run, params.sm, params.shell, params.escape),
 		InstallCommands:       shell.FindInstallPackages(sourceScript, installVariant),
 		CachePathOverrides:    deriveCachePathOverrides(envFacts.Values, params.workdir),
 		CacheDisablingEnv:     append([]EnvBinding(nil), params.cacheDisablingEnv...),

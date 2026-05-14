@@ -1007,7 +1007,7 @@ func buildNodeGypCacheFix(
 	edits := []rules.TextEdit{mountEdit}
 
 	if addDevDirEnv {
-		if envEdits, ok := buildNodeGypDevDirEnvEdits(file, runFacts.Run, runFacts.Shell.Variant, sm, devdir); ok {
+		if envEdits, ok := buildNodeGypDevDirEnvEdits(file, runFacts.Run, runFacts.Shell.Variant, sm, runFacts.EscapeToken, devdir); ok {
 			for _, edit := range envEdits {
 				if edit.Location == mountEdit.Location {
 					edits[0].NewText += edit.NewText
@@ -1031,6 +1031,7 @@ func buildNodeGypDevDirEnvEdits(
 	run *instructions.RunCommand,
 	shellVariant shell.Variant,
 	sm *sourcemap.SourceMap,
+	escapeToken rune,
 	devdir string,
 ) ([]rules.TextEdit, bool) {
 	if run == nil || sm == nil || !run.PrependShell || len(run.Files) > 0 {
@@ -1048,7 +1049,7 @@ func buildNodeGypDevDirEnvEdits(
 		return nil, false
 	}
 
-	cmds, runStartLine := runcheck.FindCommands(run, shellVariant, sm, npmManager, pnpmManager, yarnManager)
+	cmds, runStartLine := runcheck.FindCommands(run, shellVariant, sm, escapeToken, npmManager, pnpmManager, yarnManager)
 	if runStartLine == 0 {
 		return nil, false
 	}
