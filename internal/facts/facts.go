@@ -347,10 +347,7 @@ func (f *FileFacts) build() {
 
 func factsBuildContext(parseResult *dockerfile.ParseResult) (*sourcemap.SourceMap, rune) {
 	sm := sourcemap.New(parseResult.Source)
-	escapeToken := rune('\\')
-	if parseResult.AST != nil {
-		escapeToken = parseResult.AST.EscapeToken
-	}
+	escapeToken := dockerfile.ASTEscapeToken(parseResult.AST)
 	return sm, escapeToken
 }
 
