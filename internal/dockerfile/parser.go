@@ -505,9 +505,77 @@ func RunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap, esca
 	// that appear between "RUN " and the shell script. These are Dockerfile-level
 	// options, not shell arguments, and would confuse the shell parser.
 	lines[0] = blankRunFlags(lines[0])
-	lines = shell.BridgeDockerfileCommentContinuations(lines, escapeToken, escapeToken)
+	lines = bridgeRunSourceDockerfileCommentContinuations(run, lines, escapeToken)
 
 	return strings.Join(lines, "\n"), startLine
+}
+
+func bridgeRunSourceDockerfileCommentContinuations(
+	run *instructions.RunCommand,
+	lines []string,
+	escapeToken rune,
+) []string {
+	if len(run.Files) == 0 {
+		return shell.BridgeDockerfileCommentContinuations(lines, escapeToken, escapeToken)
+	}
+
+	openerIdx := firstRunHeredocOpenerLine(lines, run.Files[0].Name)
+	if openerIdx < 0 {
+		return lines
+	}
+
+	header := shell.BridgeDockerfileCommentContinuations(lines[:openerIdx+1], escapeToken, escapeToken)
+	out := append([]string(nil), lines...)
+	copy(out[:openerIdx+1], header)
+	return out
+}
+
+func firstRunHeredocOpenerLine(lines []string, delimiter string) int {
+	if delimiter == "" {
+		return -1
+	}
+	for i, line := range lines {
+		if hasRunHeredocOpener(line, delimiter) {
+			return i
+		}
+	}
+	return -1
+}
+
+func hasRunHeredocOpener(line, delimiter string) bool {
+	for {
+		idx := strings.Index(line, "<<")
+		if idx < 0 {
+			return false
+		}
+		rest := line[idx+len("<<"):]
+		rest = strings.TrimPrefix(rest, "-")
+		rest = strings.TrimLeft(rest, " \t")
+		token := heredocDelimiterToken(rest)
+		if token == delimiter {
+			return true
+		}
+		line = rest
+	}
+}
+
+func heredocDelimiterToken(text string) string {
+	if text == "" {
+		return ""
+	}
+	if text[0] == '\'' || text[0] == '"' {
+		quote := text[0]
+		end := strings.IndexByte(text[1:], quote)
+		if end < 0 {
+			return ""
+		}
+		return text[1 : 1+end]
+	}
+	end := 0
+	for end < len(text) && text[end] != ' ' && text[end] != '\t' {
+		end++
+	}
+	return text[:end]
 }
 
 func defaultDockerfileEscapeToken(escapeToken rune) rune {
