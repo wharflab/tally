@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/gkampitakis/go-snaps/snaps"
+	"github.com/pelletier/go-toml/v2"
 )
 
 const fixtureRoot = "fixtures"
@@ -69,7 +70,12 @@ func runLintFixture(t *testing.T, dir string) {
 	t.Helper()
 
 	dockerfilePath := fixtureBuildFile(dir)
-	args := []string{"lint", "--format", "json"}
+	outputFormat := lintFixtureOutputFormat(t, dir)
+	args := []string{"lint"}
+	if outputFormat == "" {
+		outputFormat = "json"
+		args = append(args, "--format", "json")
+	}
 	if !fileExists(filepath.Join(dir, ".tally.toml")) && !fileExists(filepath.Join(dir, "tally.toml")) {
 		args = append(args, "--no-config")
 	}
@@ -86,11 +92,23 @@ func runLintFixture(t *testing.T, dir string) {
 		t.Fatalf("unexpected exit code %d\nstdout:\n%s\nstderr:\n%s", exitCode, stdoutBuf.String(), stderrBuf.String())
 	}
 	got := normalizeFixtureOutput(t, stdoutBuf.String())
-	snaps.WithConfig(
-		snaps.Dir(dir),
-		snaps.Filename("result"),
-		snaps.JSON(snaps.JSONConfig{Indent: "  ", SortKeys: true}),
-	).MatchStandaloneJSON(t, got)
+	if outputFormat == "json" || outputFormat == "sarif" {
+		opts := []func(*snaps.Config){
+			snaps.Dir(dir),
+			snaps.Filename("result"),
+			snaps.JSON(snaps.JSONConfig{Indent: "  ", SortKeys: true}),
+		}
+		if outputFormat == "sarif" {
+			opts = append(opts, snaps.Ext(".sarif"))
+		}
+		snaps.WithConfig(opts...).MatchStandaloneJSON(t, got)
+	} else {
+		snaps.WithConfig(
+			snaps.Dir(dir),
+			snaps.Filename("result"),
+			snaps.Ext(lintFixtureSnapshotExt(outputFormat)),
+		).MatchStandaloneSnapshot(t, got)
+	}
 
 	if stderrBuf.Len() > 0 || fixtureSnapshotExists(t, dir, "stderr", ".txt") {
 		gotStderr := normalizeFixtureOutput(t, stderrBuf.String())
@@ -195,6 +213,41 @@ func fixtureBuildFile(dir string) string {
 		}
 	}
 	return ""
+}
+
+func lintFixtureOutputFormat(t *testing.T, dir string) string {
+	t.Helper()
+	for _, name := range []string{".tally.toml", "tally.toml"} {
+		path := filepath.Join(dir, name)
+		if !fileExists(path) {
+			continue
+		}
+		var cfg struct {
+			Output struct {
+				Format string `toml:"format"`
+			} `toml:"output"`
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		if err := toml.Unmarshal(data, &cfg); err != nil {
+			t.Fatalf("parse %s: %v", path, err)
+		}
+		return cfg.Output.Format
+	}
+	return ""
+}
+
+func lintFixtureSnapshotExt(format string) string {
+	switch format {
+	case "github-actions":
+		return ".txt"
+	case "markdown":
+		return ".md"
+	default:
+		return "." + format
+	}
 }
 
 func fixtureSnapshotExists(t *testing.T, dir, filename, ext string) bool {

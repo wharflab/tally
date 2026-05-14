@@ -1,9 +1,6 @@
 package integration
 
-import (
-	"strings"
-	"testing"
-)
+import "testing"
 
 func lintCases(t *testing.T) []lintCase {
 	t.Helper()
@@ -42,18 +39,6 @@ func lintCases(t *testing.T) []lintCase {
 			wantExit: 1,
 		},
 		{
-			name: "deprecated-rule-alias-inline",
-			dir:  "deprecated-rule-alias-inline",
-			args: append([]string{"--format", "json"},
-				mustSelectRules("buildkit/ReservedStageName")...),
-			afterLint: func(t *testing.T, stderr string) {
-				t.Helper()
-				if !strings.Contains(stderr, "rule hadolint/DL3063 is deprecated; use buildkit/ReservedStageName instead") {
-					t.Fatalf("expected deprecated rule warning in stderr, got:\n%s", stderr)
-				}
-			},
-		},
-		{
 			name:     "inline-unused-directive",
 			dir:      "inline-unused-directive",
 			args:     append([]string{"--format", "json", "--warn-unused-directives"}, mustSelectRules("hadolint/DL3006")...),
@@ -72,38 +57,6 @@ func lintCases(t *testing.T) []lintCase {
 				[]string{"--format", "json", "--require-reason"},
 				mustSelectRules("buildkit/StageNameCasing", "tally/max-lines")...),
 			wantExit: 1,
-		},
-		{
-			name: "format-sarif",
-			dir:  "buildkit-warnings",
-			args: append([]string{"--format", "sarif"}, mustSelectRules(
-				"buildkit/InvalidDefinitionDescription", "buildkit/StageNameCasing",
-				"buildkit/MaintainerDeprecated", "buildkit/JSONArgsRecommended",
-			)...),
-			wantExit: 1,
-			snapExt:  ".sarif",
-		},
-		{
-			name: "format-github-actions",
-			dir:  "buildkit-warnings",
-			args: append([]string{"--format", "github-actions"}, mustSelectRules(
-				"buildkit/InvalidDefinitionDescription", "buildkit/StageNameCasing",
-				"buildkit/MaintainerDeprecated", "buildkit/JSONArgsRecommended",
-			)...),
-			wantExit: 1,
-			snapExt:  ".txt",
-			snapRaw:  true,
-		},
-		{
-			name: "format-markdown",
-			dir:  "buildkit-warnings",
-			args: append([]string{"--format", "markdown"}, mustSelectRules(
-				"buildkit/InvalidDefinitionDescription", "buildkit/StageNameCasing",
-				"buildkit/MaintainerDeprecated", "buildkit/JSONArgsRecommended",
-			)...),
-			wantExit: 1,
-			snapExt:  ".md",
-			snapRaw:  true,
 		},
 		{
 			name:       "context-copy-ignored",

@@ -9,7 +9,7 @@
           "length": -1,
           "location": {
             "index": -1,
-            "uri": "testdata/buildkit-warnings/Dockerfile"
+            "uri": "fixtures/lint/buildkit-warnings-sarif/Dockerfile"
           },
           "parentIndex": -1,
           "roles": []
@@ -42,7 +42,7 @@
               "physicalLocation": {
                 "artifactLocation": {
                   "index": -1,
-                  "uri": "testdata/buildkit-warnings/Dockerfile"
+                  "uri": "fixtures/lint/buildkit-warnings-sarif/Dockerfile"
                 },
                 "region": {
                   "byteOffset": -1,
@@ -84,7 +84,7 @@
               "physicalLocation": {
                 "artifactLocation": {
                   "index": -1,
-                  "uri": "testdata/buildkit-warnings/Dockerfile"
+                  "uri": "fixtures/lint/buildkit-warnings-sarif/Dockerfile"
                 },
                 "region": {
                   "byteOffset": -1,
@@ -126,7 +126,7 @@
               "physicalLocation": {
                 "artifactLocation": {
                   "index": -1,
-                  "uri": "testdata/buildkit-warnings/Dockerfile"
+                  "uri": "fixtures/lint/buildkit-warnings-sarif/Dockerfile"
                 },
                 "region": {
                   "byteOffset": -1,
@@ -168,7 +168,7 @@
               "physicalLocation": {
                 "artifactLocation": {
                   "index": -1,
-                  "uri": "testdata/buildkit-warnings/Dockerfile"
+                  "uri": "fixtures/lint/buildkit-warnings-sarif/Dockerfile"
                 },
                 "region": {
                   "byteOffset": -1,

@@ -1,4 +1,4 @@
-**4 issues** in `testdata/buildkit-warnings/Dockerfile`
+**4 issues** in `fixtures/lint/buildkit-warnings-markdown/Dockerfile`
 
 | Line | Issue |
 |------|-------|
