@@ -10,7 +10,16 @@ sidebarTitle: "PSAvoidUsingDeprecatedManifestFields"
 |----------|-------|
 | Severity | Warning |
 | Category | PSScriptAnalyzer |
+| Default  | Disabled in tally |
 | Auto-fix | No |
+
+<Note>
+  tally disables this rule by default because Dockerfiles do not ship PowerShell module
+  manifests (`.psd1` files) — this rule targets module-authoring artifacts that are out of
+  scope for container builds. Re-enable it with
+  `include = ["powershell/PSAvoidUsingDeprecatedManifestFields"]` or by setting
+  `rules.powershell.PSAvoidUsingDeprecatedManifestFields.severity = "warning"` in `.tally.toml`.
+</Note>
 
 ## Description
 

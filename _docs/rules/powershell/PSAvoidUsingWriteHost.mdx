@@ -10,7 +10,16 @@ sidebarTitle: "PSAvoidUsingWriteHost"
 |----------|-------|
 | Severity | Warning |
 | Category | PSScriptAnalyzer |
+| Default  | Disabled in tally |
 | Auto-fix | No |
+
+<Note>
+  tally disables this rule by default for Dockerfile `RUN` snippets because there is no downstream
+  pipeline or interactive host inside a one-shot container build — the script-reusability concerns
+  this rule targets do not apply. Re-enable it with
+  `include = ["powershell/PSAvoidUsingWriteHost"]` or by setting
+  `rules.powershell.PSAvoidUsingWriteHost.severity = "warning"` in `.tally.toml`.
+</Note>
 
 ## Description
 

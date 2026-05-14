@@ -10,7 +10,15 @@ sidebarTitle: "PSUseUTF8EncodingForHelpFile"
 |----------|-------|
 | Severity | Warning |
 | Category | PSScriptAnalyzer |
+| Default  | Disabled in tally |
 | Auto-fix | No |
+
+<Note>
+  tally disables this rule by default because Dockerfile `RUN` bodies are inline strings, not
+  files on disk with encoding metadata. Re-enable it with
+  `include = ["powershell/PSUseUTF8EncodingForHelpFile"]` or by setting
+  `rules.powershell.PSUseUTF8EncodingForHelpFile.severity = "warning"` in `.tally.toml`.
+</Note>
 
 ## Description
 

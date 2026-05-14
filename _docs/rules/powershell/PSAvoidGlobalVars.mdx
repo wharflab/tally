@@ -10,7 +10,15 @@ sidebarTitle: "PSAvoidGlobalVars"
 |----------|-------|
 | Severity | Warning |
 | Category | PSScriptAnalyzer |
+| Default  | Disabled in tally |
 | Auto-fix | No |
+
+<Note>
+  tally disables this rule by default for Dockerfile `RUN` snippets because a `RUN` executes
+  statements inline rather than defining cmdlets, parameters, or modules with external callers. Re-enable it with
+  `include = ["powershell/PSAvoidGlobalVars"]` or by setting
+  `rules.powershell.PSAvoidGlobalVars.severity = "warning"` in `.tally.toml`.
+</Note>
 
 ## Description
 

@@ -10,7 +10,15 @@ sidebarTitle: "PSAvoidDefaultValueSwitchParameter"
 |----------|-------|
 | Severity | Warning |
 | Category | PSScriptAnalyzer |
+| Default  | Disabled in tally |
 | Auto-fix | No |
+
+<Note>
+  tally disables this rule by default for Dockerfile `RUN` snippets because a `RUN` executes
+  statements inline rather than defining cmdlets, parameters, or modules with external callers. Re-enable it with
+  `include = ["powershell/PSAvoidDefaultValueSwitchParameter"]` or by setting
+  `rules.powershell.PSAvoidDefaultValueSwitchParameter.severity = "warning"` in `.tally.toml`.
+</Note>
 
 ## Description
 

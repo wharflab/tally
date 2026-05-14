@@ -1,5 +1,5 @@
 Fixed 11 issues
-**12 issues** in `<stdin>`
+**11 issues** in `<stdin>`
 
 | Line | Issue |
 |------|-------|
@@ -11,7 +11,6 @@ Fixed 11 issues
 | 56 | ⚠️ Usage of undefined variable '$ProgramFiles' |
 | 67 | 💅 expected blank line between USER and RUN |
 | 68 | 💅 expected blank line between RUN and USER |
-| 76 | ⚠️ Script definition uses Write-Host. Avoid using Write-Host because it might not work in all hosts, does not work when there is no host, and (prior to PS 5.0) cannot be suppressed, captured, or redirected. Instead, use Write-Output, Write-Verbose, or Write-Information. |
 | 81 | ⚠️ COPY without --chown creates root-owned files despite USER ContainerUser |
 | 90 | 💅 expected blank line between USER and RUN |
 | 92 | 💅 expected blank line between RUN and USER |

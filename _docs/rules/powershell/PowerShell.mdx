@@ -34,6 +34,28 @@ options such as `Enable`, `TargetProfiles`, and compatibility profile settings d
 When an upstream PSScriptAnalyzer diagnostic includes suggested corrections, tally exposes them as normal fix suggestions. These fixes are only
 attached when the PowerShell snippet can be mapped back to precise Dockerfile source ranges.
 
+## Default-disabled PSScriptAnalyzer rules
+
+A subset of PSScriptAnalyzer rules is targeted at long-lived script reusability, function or module authoring, manifest authoring, or Desired State
+Configuration — concerns that do not apply to a one-shot Dockerfile `RUN`. tally ships with these rules disabled by default so the diagnostics you see
+are correctness, security, and compatibility findings. Each affected rule's documentation page has a `Default: Disabled in tally` row and a note
+explaining why.
+
+To re-enable a default-disabled rule for your project, opt in explicitly:
+
+```toml
+# .tally.toml
+[rules]
+include = ["powershell/PSAvoidUsingWriteHost"]
+
+# Or per-rule:
+[rules.powershell.PSAvoidUsingWriteHost]
+severity = "warning"
+```
+
+To re-enable the entire default-disabled set, use the namespace wildcard: `include = ["powershell/*"]`. The engine selector
+`include = ["powershell/PowerShell"]` only toggles the analyzer engine and does **not** override per-rule defaults.
+
 ## Requirements
 
 - PowerShell 7 (`pwsh`) must be available on `PATH`.
