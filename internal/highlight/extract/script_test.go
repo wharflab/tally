@@ -54,6 +54,43 @@ EOF
 	}
 }
 
+func TestExtractRunScript_BridgesDockerfileCommentsInContinuedRun(t *testing.T) {
+	t.Parallel()
+
+	mapping := extractRunScriptForTest(t, `FROM alpine
+RUN echo one \
+    # Dockerfile comment
+    && echo two
+`)
+
+	want := "    echo one \\\n    \\\n    && echo two"
+	if mapping.Script != want {
+		t.Fatalf("script = %q, want %q", mapping.Script, want)
+	}
+	if strings.Contains(mapping.Script, "Dockerfile comment") {
+		t.Fatalf("expected Dockerfile comment to be elided from shell script, got %q", mapping.Script)
+	}
+	if mapping.OriginStartLine != 2 {
+		t.Fatalf("expected origin line 2, got %d", mapping.OriginStartLine)
+	}
+}
+
+func TestExtractRunScript_KeepsHeredocBodyComments(t *testing.T) {
+	t.Parallel()
+
+	mapping := extractRunScriptForTest(t, `FROM alpine
+RUN <<EOF
+echo one
+# shell comment
+echo two
+EOF
+`)
+
+	if mapping.Script != "echo one\n# shell comment\necho two" {
+		t.Fatalf("expected heredoc body comments to be preserved, got %q", mapping.Script)
+	}
+}
+
 func TestExtractRunScript_ExplicitShellUsesBodyWithOverride(t *testing.T) {
 	t.Parallel()
 

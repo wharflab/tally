@@ -1,6 +1,6 @@
 Fixed 17 issues
 Skipped 4 fixes
-**21 issues** in `<stdin>`
+**19 issues** in `<stdin>`
 
 | Line | Issue |
 |------|-------|
@@ -18,8 +18,6 @@ Skipped 4 fixes
 | 62 | 💅 split chained commands onto separate lines |
 | 62 | ℹ️ use cache mounts for package manager cache directories |
 | 62 | 💅 packages in apt-get install are not sorted alphabetically |
-| 81 | ❌ Parsing stopped here. Mismatched keywords or invalid parentheses? |
-| 81 | ❌ Unexpected start of line. If breaking lines, \|/\|\|/&& should be at the end of the previous one. |
 | 91 | 💅 expected blank line between ARG and ADD |
 | 93 | 💅 expected blank line between ADD and RUN |
 | 93 | 💅 consecutive RUN instructions can be combined using heredoc syntax |

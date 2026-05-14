@@ -79,3 +79,91 @@ func TestSkipDockerfileFlagValue(t *testing.T) {
 		})
 	}
 }
+
+func TestBridgeDockerfileCommentContinuations(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		lines       []string
+		escapeToken rune
+		target      rune
+		want        []string
+	}{
+		{
+			name: "comment between continued shell lines",
+			lines: []string{
+				`RUN echo one \`,
+				`    # Dockerfile comment`,
+				`    && echo two`,
+			},
+			escapeToken: '\\',
+			target:      '\\',
+			want: []string{
+				`RUN echo one \`,
+				`    \`,
+				`    && echo two`,
+			},
+		},
+		{
+			name: "consecutive comments stay in continued span",
+			lines: []string{
+				`RUN echo one \`,
+				`    # first`,
+				`    # second`,
+				`    && echo two`,
+			},
+			escapeToken: '\\',
+			target:      '\\',
+			want: []string{
+				`RUN echo one \`,
+				`    \`,
+				`    \`,
+				`    && echo two`,
+			},
+		},
+		{
+			name: "comment outside continuation is unchanged",
+			lines: []string{
+				`RUN echo one`,
+				`# normal Dockerfile comment`,
+			},
+			escapeToken: '\\',
+			target:      '\\',
+			want: []string{
+				`RUN echo one`,
+				`# normal Dockerfile comment`,
+			},
+		},
+		{
+			name: "rewrites to requested target continuation",
+			lines: []string{
+				"RUN Write-Host one `",
+				"    # Dockerfile comment",
+				"    ; Write-Host two",
+			},
+			escapeToken: '`',
+			target:      '`',
+			want: []string{
+				"RUN Write-Host one `",
+				"    `",
+				"    ; Write-Host two",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := BridgeDockerfileCommentContinuations(tt.lines, tt.escapeToken, tt.target)
+			if len(got) != len(tt.want) {
+				t.Fatalf("line count = %d, want %d", len(got), len(tt.want))
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("line %d = %q, want %q", i, got[i], tt.want[i])
+				}
+			}
+		})
+	}
+}

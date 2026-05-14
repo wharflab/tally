@@ -58,3 +58,54 @@ func SkipDockerfileFlagValue(line string, offset int, stopAtLineContinuation boo
 	}
 	return offset
 }
+
+// BridgeDockerfileCommentContinuations replaces Dockerfile comment-only lines
+// inside a continued shell-form instruction with a synthetic continuation line.
+// Dockerfile comments are removed before the shell sees the instruction; keeping
+// them as shell comments can make a valid Dockerfile look like an invalid shell
+// script when the preceding line ends with a continuation marker.
+func BridgeDockerfileCommentContinuations(lines []string, escapeToken, target rune) []string {
+	if len(lines) == 0 || escapeToken == 0 {
+		return lines
+	}
+	if target == 0 {
+		target = '\\'
+	}
+
+	var out []string
+	continued := false
+	for i, line := range lines {
+		if isDockerfileCommentLine(line) {
+			if continued {
+				if out == nil {
+					out = append([]string(nil), lines...)
+				}
+				out[i] = dockerfileContinuationBridgeLine(line, target)
+			}
+			continue
+		}
+		continued = dockerfileLineContinues(line, escapeToken)
+	}
+	if out == nil {
+		return lines
+	}
+	return out
+}
+
+func isDockerfileCommentLine(line string) bool {
+	trimmed := strings.TrimLeft(line, " \t")
+	return strings.HasPrefix(trimmed, "#")
+}
+
+func dockerfileLineContinues(line string, escapeToken rune) bool {
+	trimmed := strings.TrimRight(line, " \t")
+	return trimmed != "" && strings.HasSuffix(trimmed, string(escapeToken))
+}
+
+func dockerfileContinuationBridgeLine(line string, target rune) string {
+	i := 0
+	for i < len(line) && (line[i] == ' ' || line[i] == '\t') {
+		i++
+	}
+	return line[:i] + string(target)
+}

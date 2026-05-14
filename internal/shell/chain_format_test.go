@@ -281,6 +281,13 @@ func TestReconstructSourceText(t *testing.T) {
 			want:        "echo hello \\\n    && echo world",
 		},
 		{
+			name:        "dockerfile comment inside continued instruction",
+			lines:       []string{`RUN echo hello \`, `    # Dockerfile comment`, `    && echo world`},
+			cmdStartCol: 4,
+			escapeToken: '\\',
+			want:        "echo hello \\\n    \\\n    && echo world",
+		},
+		{
 			name:        "with mount prefix",
 			lines:       []string{"RUN --mount=type=cache,target=/var apt-get update"},
 			cmdStartCol: 35,

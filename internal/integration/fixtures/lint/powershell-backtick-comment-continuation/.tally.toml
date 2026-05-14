@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "on"
+
+[rules]
+include = ["powershell/UnexpectedToken"]
+exclude = ["*"]

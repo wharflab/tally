@@ -219,3 +219,33 @@ EOF
 		})
 	}
 }
+
+func TestRunSourceScript_BridgesDockerfileCommentsInContinuedRun(t *testing.T) {
+	t.Parallel()
+
+	dockerfile := `FROM alpine
+RUN echo one \
+    # Dockerfile comment
+    && echo two
+`
+
+	result, err := Parse(strings.NewReader(dockerfile), nil)
+	if err != nil {
+		t.Fatalf("Parse failed: %v", err)
+	}
+	sm := sourcemap.New(result.Source)
+
+	run, ok := result.Stages[0].Commands[0].(*instructions.RunCommand)
+	if !ok {
+		t.Fatal("expected RUN command")
+	}
+
+	got, startLine := RunSourceScript(run, sm)
+	want := "    echo one \\\n    \\\n    && echo two"
+	if got != want {
+		t.Fatalf("RunSourceScript() = %q, want %q", got, want)
+	}
+	if startLine != 2 {
+		t.Fatalf("start line = %d, want 2", startLine)
+	}
+}

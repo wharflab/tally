@@ -14,6 +14,7 @@ import (
 	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/config"
+	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
 )
 
@@ -494,6 +495,7 @@ func RunSourceScript(run *instructions.RunCommand, sm *sourcemap.SourceMap) (str
 	// that appear between "RUN " and the shell script. These are Dockerfile-level
 	// options, not shell arguments, and would confuse the shell parser.
 	lines[0] = blankRunFlags(lines[0])
+	lines = shell.BridgeDockerfileCommentContinuations(lines, '\\', '\\')
 
 	return strings.Join(lines, "\n"), startLine
 }

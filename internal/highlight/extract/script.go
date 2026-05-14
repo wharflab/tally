@@ -57,6 +57,7 @@ func ExtractShellFormScript(
 
 	lines := linesForSpan(sm, start, end)
 	lines = blankLeadingKeywordOnly(lines, keyword, escapeToken)
+	lines = shell.BridgeDockerfileCommentContinuations(lines, escapeToken, escapeToken)
 
 	return Mapping{
 		Script:          strings.Join(lines, "\n"),
@@ -83,6 +84,7 @@ func ExtractHealthcheckCmdShellScript(
 	if !ok {
 		return Mapping{}, false
 	}
+	out = shell.BridgeDockerfileCommentContinuations(out, escapeToken, escapeToken)
 	return Mapping{
 		Script:          strings.Join(out, "\n"),
 		OriginStartLine: start,
@@ -133,7 +135,8 @@ func extractRunLikeScript(
 	end := sm.ResolveEndLineWithEscape(node.EndLine, escapeToken)
 	end = max(end, start)
 
-	if len(node.Heredocs) > 0 {
+	hasHeredoc := len(node.Heredocs) > 0
+	if hasHeredoc {
 		if overrideShell, openerOffset, bodyOnly := heredocBodyScriptMode(
 			linesForSpan(sm, start, end),
 			escapeToken,
@@ -157,6 +160,9 @@ func extractRunLikeScript(
 
 	lines := linesForSpan(sm, start, end)
 	lines = blankLeadingFlags(lines, escapeToken)
+	if !hasHeredoc {
+		lines = shell.BridgeDockerfileCommentContinuations(lines, escapeToken, escapeToken)
+	}
 
 	return Mapping{
 		Script:          strings.Join(lines, "\n"),
