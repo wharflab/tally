@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/slow-checks-fail-fast/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/DuplicateStageName/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 7
+            },
+            "file": "fixtures/lint/slow-checks-fail-fast/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 7
+            }
+          },
+          "message": "Stage name \"builder\" is already used on stage 0",
+          "rule": "buildkit/DuplicateStageName",
+          "severity": "error",
+          "sourceCode": "FROM slowfailfast:latest AS builder"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 2,
+  "summary": {
+    "errors": 1,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

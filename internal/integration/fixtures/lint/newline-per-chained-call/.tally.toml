@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/newline-per-chained-call"]
+exclude = ["*"]

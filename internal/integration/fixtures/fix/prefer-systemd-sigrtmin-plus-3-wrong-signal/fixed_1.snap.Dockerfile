@@ -1,0 +1,3 @@
+FROM fedora:40
+STOPSIGNAL SIGRTMIN+3
+ENTRYPOINT ["/sbin/init"]

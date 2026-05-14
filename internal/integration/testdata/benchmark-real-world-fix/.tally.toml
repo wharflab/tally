@@ -1,7 +1,0 @@
-# Disable max-lines for this benchmark test
-[rules.max-lines]
-max = 0
-
-# Demonstrate that individual ShellCheck diagnostics can be disabled via config.
-[rules.shellcheck.SC1015]
-severity = "off"

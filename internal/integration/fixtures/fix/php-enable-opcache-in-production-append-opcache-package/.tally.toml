@@ -1,0 +1,11 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/php/enable-opcache-in-production"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/named-identity-in-passwdless-stage"]
+exclude = ["*"]

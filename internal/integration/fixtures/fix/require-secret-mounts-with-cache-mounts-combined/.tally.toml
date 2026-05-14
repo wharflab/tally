@@ -1,0 +1,18 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/require-secret-mounts", "tally/prefer-package-cache-mounts"]
+exclude = ["*"]
+
+[rules.tally.require-secret-mounts]
+severity = "error"
+
+[rules.tally.require-secret-mounts.commands.pip]
+id = "pipconf"
+target = "/root/.config/pip/pip.conf"
+
+[rules.tally.prefer-package-cache-mounts]
+severity = "error"

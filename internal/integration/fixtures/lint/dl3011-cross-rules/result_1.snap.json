@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/dl3011-cross-rules/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3011/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "fixtures/lint/dl3011-cross-rules/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "valid UNIX ports range from 0 to 65535; 70000 is out of range",
+          "rule": "hadolint/DL3011",
+          "severity": "error",
+          "sourceCode": "EXPOSE 70000/TCP"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 2,
+  "summary": {
+    "errors": 1,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

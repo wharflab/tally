@@ -46,6 +46,10 @@ type Config struct {
 	// AI configures opt-in AI features (e.g., AI AutoFix).
 	AI AIConfig `json:"ai" koanf:"ai"`
 
+	// UnsafeFixes enables suggestion/unsafe fixes when fixes are applied.
+	// nil means unset, matching Ruff's tri-state unsafe-fixes option.
+	UnsafeFixes *bool `json:"unsafe-fixes,omitempty" koanf:"unsafe-fixes"`
+
 	// FileValidation configures pre-parse file validation checks.
 	FileValidation FileValidationConfig `json:"file-validation" koanf:"file-validation"`
 
@@ -208,6 +212,12 @@ func LoadFromFileWithFlags(configPath string, flags *pflag.FlagSet, mapper FlagK
 	return loadWithConfigPath(configPath, flagLayer(flags, mapper))
 }
 
+// LoadNoFileWithFlags loads defaults, environment variables, and CLI flags
+// without filesystem config discovery.
+func LoadNoFileWithFlags(flags *pflag.FlagSet, mapper FlagKeyMapper) (*Config, error) {
+	return loadWithConfigPath("", flagLayer(flags, mapper))
+}
+
 type flagProvider struct {
 	flags  *pflag.FlagSet
 	mapper FlagKeyMapper
@@ -283,6 +293,7 @@ var knownHyphenatedKeys = map[string]string{
 	"redact.secrets":               "redact-secrets",
 	"slow.checks":                  "slow-checks",
 	"fail.fast":                    "fail-fast",
+	"unsafe.fixes":                 "unsafe-fixes",
 	"newline.between.instructions": "newline-between-instructions",
 	"file.validation":              "file-validation",
 	"max.file.size":                "max-file-size",
@@ -293,6 +304,7 @@ var allowedEnvTopLevelKeys = map[string]struct{}{
 	"output":            {},
 	"inline-directives": {},
 	"ai":                {},
+	"unsafe-fixes":      {},
 	"slow-checks":       {},
 	"file-validation":   {},
 	// Compatibility aliases normalized in normalizeOutputAliases.

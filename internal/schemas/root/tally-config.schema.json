@@ -150,6 +150,11 @@
         }
       }
     },
+    "unsafe-fixes": {
+      "description": "Enable application of unsafe fixes. When omitted, unsafe fixes are not applied and callers may display a hint when unsafe fixes are available.",
+      "type": ["boolean", "null"],
+      "default": null
+    },
     "file-validation": {
       "type": "object",
       "description": "Pre-parse file validation checks.",

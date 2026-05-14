@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["hadolint/DL3022", "hadolint/DL3023"]
+exclude = ["*"]

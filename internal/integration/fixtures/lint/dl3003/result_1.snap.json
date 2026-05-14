@@ -1,0 +1,58 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/dl3003/Dockerfile",
+      "violations": [
+        {
+          "detail": "The cd command in a RUN instruction only affects that single instruction. Use WORKDIR to set the working directory persistently for subsequent instructions. Alternatively, use absolute paths in your commands.",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3003/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "fixtures/lint/dl3003/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "use WORKDIR to switch to a directory",
+          "rule": "hadolint/DL3003",
+          "severity": "warning",
+          "sourceCode": "RUN cd /opt \u0026\u0026 echo \"hello\"",
+          "suggestedFix": {
+            "description": "Convert cd commands to WORKDIR instructions",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 27,
+                    "line": 4
+                  },
+                  "file": "fixtures/lint/dl3003/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 4
+                  }
+                },
+                "newText": "WORKDIR /opt\nRUN echo \"hello\""
+              }
+            ],
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

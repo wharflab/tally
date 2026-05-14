@@ -108,6 +108,8 @@ func configFromSchema(schemaCfg *generatedconfig.TallyConfigSchemaJson) *Config 
 		}
 	}
 
+	cfg.UnsafeFixes = schemaCfg.UnsafeFixes
+
 	if slowChecks := schemaCfg.SlowChecks; slowChecks != nil {
 		cfg.SlowChecks = SlowChecksConfig{
 			Mode:     string(slowChecks.Mode),

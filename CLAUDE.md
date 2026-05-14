@@ -44,11 +44,18 @@ and a WASM-compiled shellcheck (`internal/shellcheck/`).
 
 ## Snapshots (Maintainer Preference)
 
+- Prefer directory fixtures for ordinary lint/fix integration cases:
+  - lint: `internal/integration/fixtures/lint/<case>/Dockerfile`
+  - fix: `internal/integration/fixtures/fix/<case>/Dockerfile`
+  - optional config: `.tally.toml` alongside the Dockerfile
+- The fixture harness uses go-snaps standalone snapshots in the fixture directory:
+  - lint output: `result_1.snap.json`
+  - fixed Dockerfile: `fixed_1.snap.Dockerfile`
+  - fix report stderr, when present: `report_1.snap.md`
 - If you change output, update snapshots intentionally:
   - `UPDATE_SNAPS=true go test ./internal/integration/...`
-- If you touch fixes/formatting, add/update a snapshot of the fixed Dockerfile too.
-  - Fix tests snapshot the final file with `snaps.Ext(".Dockerfile")` under `internal/integration/__snapshots__/`.
-- When adding new cases, copy existing patterns in `internal/integration/integration_test.go`.
+- Add explicit Go integration tests only when the directory fixture harness cannot express the behavior, such as CLI formats, config discovery,
+  stdin-only behavior, or multi-file contexts.
 
 ## Rules & Fixes
 
@@ -57,7 +64,8 @@ and a WASM-compiled shellcheck (`internal/shellcheck/`).
   - Use `input.Facts` (`*facts.FileFacts` via type assertion) for shared derived state such as effective `ENV`, active `SHELL`, parsed `RUN`
     commands, install/package heuristics, and cache/registry signals.
   - Extend `internal/facts/` when multiple rules would otherwise re-derive the same heuristic; rules should consume facts, not mutate them.
-- New behavior should come with an integration fixture under `internal/integration/testdata/<case>/`.
+- New rule behavior should come with an integration fixture under `internal/integration/fixtures/lint/<case>/` and, for fix-capable rules,
+  `internal/integration/fixtures/fix/<case>/`.
 - Fixes:
   - Use `Violation.WithSuggestedFix()` and pick the narrowest safety level.
   - `FixSafe` is eligible for `--fix`; `FixSuggestion`/`FixUnsafe` must stay behind `--fix-unsafe`.

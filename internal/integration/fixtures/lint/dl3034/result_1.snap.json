@@ -1,0 +1,171 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/dl3034/Dockerfile",
+      "violations": [
+        {
+          "detail": "Running zypper install without -n will cause the command to wait for user confirmation, which will hang in Docker builds. Use -n, --non-interactive, -y, or --no-confirm to automatically confirm.",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3034/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "fixtures/lint/dl3034/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "Non-interactive switch missing from `zypper` command: `zypper install -y`",
+          "rule": "hadolint/DL3034",
+          "severity": "warning",
+          "sourceCode": "RUN zypper install httpd",
+          "suggestedFix": {
+            "description": "Add -n flag to zypper command",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 18,
+                    "line": 4
+                  },
+                  "file": "fixtures/lint/dl3034/Dockerfile",
+                  "start": {
+                    "column": 18,
+                    "line": 4
+                  }
+                },
+                "newText": " -n"
+              }
+            ]
+          }
+        },
+        {
+          "detail": "Running zypper install without -n will cause the command to wait for user confirmation, which will hang in Docker builds. Use -n, --non-interactive, -y, or --no-confirm to automatically confirm.",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3034/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 7
+            },
+            "file": "fixtures/lint/dl3034/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 7
+            }
+          },
+          "message": "Non-interactive switch missing from `zypper` command: `zypper install -y`",
+          "rule": "hadolint/DL3034",
+          "severity": "warning",
+          "sourceCode": "RUN zypper in vim",
+          "suggestedFix": {
+            "description": "Add -n flag to zypper command",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 13,
+                    "line": 7
+                  },
+                  "file": "fixtures/lint/dl3034/Dockerfile",
+                  "start": {
+                    "column": 13,
+                    "line": 7
+                  }
+                },
+                "newText": " -n"
+              }
+            ]
+          }
+        },
+        {
+          "detail": "Running zypper install without -n will cause the command to wait for user confirmation, which will hang in Docker builds. Use -n, --non-interactive, -y, or --no-confirm to automatically confirm.",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3034/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 10
+            },
+            "file": "fixtures/lint/dl3034/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 10
+            }
+          },
+          "message": "Non-interactive switch missing from `zypper` command: `zypper install -y`",
+          "rule": "hadolint/DL3034",
+          "severity": "warning",
+          "sourceCode": "RUN zypper remove nano",
+          "suggestedFix": {
+            "description": "Add -n flag to zypper command",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 17,
+                    "line": 10
+                  },
+                  "file": "fixtures/lint/dl3034/Dockerfile",
+                  "start": {
+                    "column": 17,
+                    "line": 10
+                  }
+                },
+                "newText": " -n"
+              }
+            ]
+          }
+        },
+        {
+          "detail": "Running zypper install without -n will cause the command to wait for user confirmation, which will hang in Docker builds. Use -n, --non-interactive, -y, or --no-confirm to automatically confirm.",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3034/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 13
+            },
+            "file": "fixtures/lint/dl3034/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 13
+            }
+          },
+          "message": "Non-interactive switch missing from `zypper` command: `zypper install -y`",
+          "rule": "hadolint/DL3034",
+          "severity": "warning",
+          "sourceCode": "RUN zypper patch",
+          "suggestedFix": {
+            "description": "Add -n flag to zypper command",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 16,
+                    "line": 13
+                  },
+                  "file": "fixtures/lint/dl3034/Dockerfile",
+                  "start": {
+                    "column": 16,
+                    "line": 13
+                  }
+                },
+                "newText": " -n"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 4,
+    "warnings": 4
+  }
+}

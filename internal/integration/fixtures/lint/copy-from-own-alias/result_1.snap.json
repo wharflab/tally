@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/copy-from-own-alias/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3023/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "fixtures/lint/copy-from-own-alias/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "`COPY --from` cannot reference its own `FROM` alias",
+          "rule": "hadolint/DL3023",
+          "severity": "error",
+          "sourceCode": "COPY --from=foo bar ."
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 2,
+  "summary": {
+    "errors": 1,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

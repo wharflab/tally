@@ -1,6 +1,0 @@
-[rules.tally.require-secret-mounts]
-severity = "warning"
-
-[rules.tally.require-secret-mounts.commands.pip]
-id = "pipconf"
-target = "/root/.config/pip/pip.conf"

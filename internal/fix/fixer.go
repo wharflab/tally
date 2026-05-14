@@ -22,7 +22,12 @@ func normalizePath(path string) string {
 type Fixer struct {
 	// SafetyThreshold determines the minimum safety level for fixes.
 	// Only fixes with Safety <= SafetyThreshold will be applied.
+	// Used as the default when SafetyThresholds does not contain a file.
 	SafetyThreshold FixSafety
+
+	// SafetyThresholds maps file paths to their per-file fix safety threshold.
+	// Outer key is the normalized file path.
+	SafetyThresholds map[string]FixSafety
 
 	// RuleFilter limits fixes to specific rule codes.
 	// If empty, all rules are eligible.
@@ -157,7 +162,7 @@ func (f *Fixer) classifyViolations(violations []rules.Violation, changes map[str
 			recordSkipped(changes, v, SkipRuleFilter, "")
 			continue
 		}
-		if pf.Safety > f.SafetyThreshold {
+		if pf.Safety > f.safetyThresholdForFile(v.File()) {
 			recordSkipped(changes, v, SkipSafety, "")
 			continue
 		}
@@ -248,8 +253,8 @@ func (f *Fixer) fixModeAllowed(filePath, ruleCode string) bool {
 		// Only apply if rule is in --fix-rule list
 		return len(f.RuleFilter) > 0 && slices.Contains(f.RuleFilter, ruleCode)
 	case config.FixModeUnsafeOnly:
-		// Only apply if --fix-unsafe was used (SafetyThreshold >= FixUnsafe)
-		return f.SafetyThreshold >= rules.FixUnsafe
+		// Only apply when the file is allowed to receive unsafe fixes.
+		return f.safetyThresholdForFile(filePath) >= rules.FixUnsafe
 	case config.FixModeAlways:
 		// Always apply (safety already checked)
 		return true
@@ -370,10 +375,27 @@ func (f *Fixer) finalizerAllowed(filePath string, finalizer Finalizer) bool {
 	if !f.ruleAllowed(ruleCode) {
 		return false
 	}
-	if finalizer.Safety() > f.SafetyThreshold {
+	if finalizer.Safety() > f.safetyThresholdForFile(filePath) {
 		return false
 	}
 	return f.fixModeAllowed(filePath, ruleCode)
+}
+
+func (f *Fixer) safetyThresholdForFile(filePath string) FixSafety {
+	if f.SafetyThresholds == nil {
+		return f.SafetyThreshold
+	}
+	normalizedPath := normalizePath(filePath)
+	if threshold, ok := f.SafetyThresholds[normalizedPath]; ok {
+		return threshold
+	}
+	if threshold, ok := f.SafetyThresholds[filepath.ToSlash(normalizedPath)]; ok {
+		return threshold
+	}
+	if threshold, ok := f.SafetyThresholds[filePath]; ok {
+		return threshold
+	}
+	return f.SafetyThreshold
 }
 
 // resolveAsyncFixes runs resolvers for fixes that need external data.

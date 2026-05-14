@@ -173,21 +173,27 @@ Run:
 
 ## Step 6: Integration Tests and Snapshots
 
-Add or update fixtures under:
+Add or update directory fixtures under:
 
-- `internal/integration/testdata/<case>/Dockerfile`
+- lint: `internal/integration/fixtures/lint/<case>/Dockerfile`
+- fix: `internal/integration/fixtures/fix/<case>/Dockerfile`
+- optional case config: `.tally.toml` alongside the Dockerfile
 
 Add lint and fix coverage:
 
-1. `TestLint` case proving detection and mapped location.
-2. `TestFix` case proving `--fix` behavior.
-3. For new fix mechanics, add one standalone integration test that snapshots the fixed Dockerfile end-to-end.
+1. Lint fixture proving detection and mapped location.
+2. Fix fixture proving `--fix` behavior when the rule has a fix.
+3. Select the ShellCheck rule and any overlap rules in fixture-local `.tally.toml`.
+4. Add explicit Go integration tests only when the behavior needs CLI/config/discovery/stdin/multi-file coverage outside the directory harness.
 
 Update snapshots intentionally:
 
-- `UPDATE_SNAPS=true GOEXPERIMENT=jsonv2 go test ./internal/integration -run '<pattern>' -count=1`
+- `UPDATE_SNAPS=true GOEXPERIMENT=jsonv2 go test ./internal/integration -run 'Test(Lint|Fix)Fixtures' -count=1`
 
 Then re-run without `UPDATE_SNAPS`.
+
+The directory harness stores go-snaps files next to the Dockerfile: `result_1.snap.json`, `fixed_1.snap.Dockerfile`, and optional
+`report_1.snap.md`.
 
 ## Step 7: Documentation Ownership
 

@@ -1,0 +1,8 @@
+unsafe-fixes = true
+
+# Disable max-lines for this real-world fix test
+[rules.max-lines]
+max = 0
+
+[slow-checks]
+mode = "on"

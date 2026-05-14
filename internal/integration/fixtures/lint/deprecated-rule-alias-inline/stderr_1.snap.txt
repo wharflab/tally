@@ -1,0 +1,1 @@
+Warning: rule hadolint/DL3063 is deprecated; use buildkit/ReservedStageName instead: tally uses the BuildKit implementation for reserved stage names

@@ -1,0 +1,19 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = [
+  "tally/prefer-add-git",
+  "tally/prefer-run-heredoc",
+  "tally/newline-per-chained-call",
+  "hadolint/DL3003",
+  "tally/no-multi-spaces",
+  "tally/no-trailing-spaces",
+  "tally/consistent-indentation",
+]
+exclude = ["*"]
+
+[rules.tally.consistent-indentation]
+severity = "style"

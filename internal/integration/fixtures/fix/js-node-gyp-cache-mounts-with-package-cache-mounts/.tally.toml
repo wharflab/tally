@@ -1,0 +1,11 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/js/node-gyp-cache-mounts", "tally/prefer-package-cache-mounts"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

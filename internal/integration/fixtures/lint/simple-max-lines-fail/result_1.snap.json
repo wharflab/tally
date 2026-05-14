@@ -1,0 +1,37 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/simple-max-lines-fail/Dockerfile",
+      "violations": [
+        {
+          "docUrl": "https://tally.wharflab.com/rules/tally/max-lines/",
+          "location": {
+            "end": {
+              "column": -1,
+              "line": -1
+            },
+            "file": "fixtures/lint/simple-max-lines-fail/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 3
+            }
+          },
+          "message": "file has 3 lines, maximum allowed is 2",
+          "rule": "tally/max-lines",
+          "severity": "error",
+          "sourceCode": "RUN apk add --no-cache curl"
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 1,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

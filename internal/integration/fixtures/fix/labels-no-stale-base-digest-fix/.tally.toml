@@ -1,0 +1,11 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/labels/no-stale-base-digest"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

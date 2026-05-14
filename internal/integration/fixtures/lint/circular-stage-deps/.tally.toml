@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/circular-stage-deps"]
+exclude = ["*"]

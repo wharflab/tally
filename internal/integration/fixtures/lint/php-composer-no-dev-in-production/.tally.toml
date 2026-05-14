@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/php/composer-no-dev-in-production"]
+exclude = ["*"]

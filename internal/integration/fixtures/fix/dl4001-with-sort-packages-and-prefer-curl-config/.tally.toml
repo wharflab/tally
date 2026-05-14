@@ -1,0 +1,11 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["hadolint/DL4001", "tally/prefer-curl-config", "tally/sort-packages"]
+exclude = ["*"]
+
+[rules.hadolint.DL4001]
+fix-preference = "wget"

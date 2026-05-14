@@ -1,0 +1,11 @@
+unsafe-fixes = false
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/prefer-nginx-sigquit"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

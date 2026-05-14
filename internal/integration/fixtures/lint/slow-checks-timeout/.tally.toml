@@ -1,0 +1,7 @@
+[slow-checks]
+mode = "on"
+timeout = "1s"
+
+[rules]
+include = ["buildkit/InvalidBaseImagePlatform"]
+exclude = ["*"]

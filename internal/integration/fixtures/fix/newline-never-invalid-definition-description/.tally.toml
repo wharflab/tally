@@ -1,0 +1,12 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["buildkit/InvalidDefinitionDescription", "tally/newline-between-instructions"]
+exclude = ["*"]
+
+[rules.buildkit.InvalidDefinitionDescription]
+severity = "info"
+
+[rules.tally.newline-between-instructions]
+mode = "never"

@@ -1,0 +1,10 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+exclude = ["hadolint/DL3057", "tally/newline-between-instructions", "tally/newline-per-chained-call", "shellcheck/*"]
+
+[output]
+fail-level = "none"

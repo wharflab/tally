@@ -1,0 +1,32 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = [
+  "tally/prefer-telemetry-opt-out",
+  "tally/prefer-curl-config",
+  "tally/prefer-package-cache-mounts",
+  "tally/powershell/prefer-shell-instruction",
+  "hadolint/DL4006",
+  "tally/prefer-run-heredoc",
+  "tally/newline-between-instructions",
+  "tally/consistent-indentation",
+]
+exclude = ["*"]
+
+[rules.tally.prefer-telemetry-opt-out]
+severity = "info"
+
+[rules.tally.prefer-package-cache-mounts]
+severity = "info"
+
+[rules.tally.prefer-run-heredoc]
+severity = "style"
+
+[rules.tally.consistent-indentation]
+severity = "style"
+
+[rules.tally.newline-between-instructions]
+severity = "style"

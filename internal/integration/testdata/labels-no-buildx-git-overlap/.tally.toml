@@ -1,2 +1,0 @@
-[rules.tally.labels.no-buildx-git-overlap]
-buildx-git-labels = "full"

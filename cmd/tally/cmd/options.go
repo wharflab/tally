@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -35,6 +36,7 @@ type lintOptions struct {
 
 	// Standalone config discovery.
 	configPath string
+	noConfig   bool
 
 	// Append-semantics rule selection.
 	selectR []string // --select (append to cfg.Rules.Include)
@@ -52,10 +54,11 @@ type lintOptions struct {
 	services   []string
 
 	// Operational flags.
-	exclude   []string
-	fix       bool
-	fixRule   []string
-	fixUnsafe bool
+	exclude      []string
+	fix          bool
+	fixRule      []string
+	fixUnsafe    bool
+	fixUnsafeSet bool
 
 	// Complex (shell-quoted) AI flag: parsed then folded into the config.
 	acpCommand    string
@@ -71,12 +74,15 @@ type dockerPluginContext struct {
 	EndpointHost   string
 }
 
+const fixUnsafeFlagName = "fix-unsafe"
+
 // addLintFlags registers all lint flags on the given FlagSet. The flags are
 // bound either directly to fields of opts (for operational/transform flags)
 // or live inside the pflag.FlagSet itself so the config loader can pick them
 // up via posflag.
 func addLintFlags(fs *pflag.FlagSet, opts *lintOptions) {
 	fs.StringVarP(&opts.configPath, "config", "c", "", "Path to config file (default: auto-discover)")
+	fs.BoolVar(&opts.noConfig, "no-config", false, "Do not discover or load config files")
 
 	// Config-shaped flags. Values are read back by the koanf posflag layer;
 	// we don't need Go-side variables for these.
@@ -116,7 +122,7 @@ func addLintFlags(fs *pflag.FlagSet, opts *lintOptions) {
 
 	fs.BoolVar(&opts.fix, "fix", false, "Apply all safe fixes automatically")
 	fs.StringSliceVar(&opts.fixRule, "fix-rule", nil, "Only fix specific rules (can be repeated)")
-	fs.BoolVar(&opts.fixUnsafe, "fix-unsafe", false, "Also apply suggestion/unsafe fixes (requires --fix)")
+	fs.BoolVar(&opts.fixUnsafe, fixUnsafeFlagName, false, "Also apply suggestion/unsafe fixes (requires --fix)")
 
 	fs.StringVar(&opts.acpCommand, "acp-command", "",
 		`ACP agent command line (e.g. "gemini --experimental-acp --allowed-mcp-server-names=none --model=gemini-3-flash-preview")`)
@@ -223,6 +229,9 @@ func finalizeLintOptions(fs *pflag.FlagSet, opts *lintOptions) error {
 	if err := validateLintFlagFormat(fs); err != nil {
 		return err
 	}
+	if opts.configPath != "" && opts.noConfig {
+		return errors.New("--config and --no-config cannot be used together")
+	}
 	if err := resolveLintInversions(fs, opts); err != nil {
 		return err
 	}
@@ -265,11 +274,14 @@ func finalizeLintOptions(fs *pflag.FlagSet, opts *lintOptions) error {
 			opts.fix = v
 		}
 	}
-	if !fs.Changed("fix-unsafe") {
+	if fs.Changed(fixUnsafeFlagName) {
+		opts.fixUnsafeSet = true
+	} else {
 		if v, ok, err := parseEnvBool("TALLY_FIX_UNSAFE"); err != nil {
 			return err
 		} else if ok {
 			opts.fixUnsafe = v
+			opts.fixUnsafeSet = true
 		}
 	}
 

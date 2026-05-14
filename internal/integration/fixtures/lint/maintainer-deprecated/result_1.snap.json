@@ -1,0 +1,58 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/maintainer-deprecated/Dockerfile",
+      "violations": [
+        {
+          "detail": "The MAINTAINER instruction is deprecated, use a label instead to define an image author",
+          "docUrl": "https://tally.wharflab.com/rules/buildkit/MaintainerDeprecated/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "fixtures/lint/maintainer-deprecated/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "Maintainer instruction is deprecated in favor of using label",
+          "rule": "buildkit/MaintainerDeprecated",
+          "severity": "warning",
+          "sourceCode": "MAINTAINER John Doe \u003cjohn@example.com\u003e",
+          "suggestedFix": {
+            "description": "Replace MAINTAINER with org.opencontainers.image.authors label",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 38,
+                    "line": 2
+                  },
+                  "file": "fixtures/lint/maintainer-deprecated/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 2
+                  }
+                },
+                "newText": "LABEL org.opencontainers.image.authors=\"John Doe \u003cjohn@example.com\u003e\""
+              }
+            ],
+            "isPreferred": true
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/js/node-gyp-cache-mounts"]
+exclude = ["*"]

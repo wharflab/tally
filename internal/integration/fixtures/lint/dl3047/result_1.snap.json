@@ -1,0 +1,136 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/dl3047/Dockerfile",
+      "violations": [
+        {
+          "detail": "When downloading large files, wget's default progress output produces excessive log lines in Docker builds. Use --progress=dot:giga for a compact progress indicator, or -q/--quiet/-nv/--no-verbose to suppress output entirely.",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3047/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "fixtures/lint/dl3047/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "wget without progress bar will bloat build logs; use `wget --progress=dot:giga`, `-q`, or `-nv`",
+          "rule": "hadolint/DL3047",
+          "severity": "info",
+          "sourceCode": "RUN wget http://example.com/large-file.tar.gz",
+          "suggestedFix": {
+            "description": "Add --progress=dot:giga to wget",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 8,
+                    "line": 4
+                  },
+                  "file": "fixtures/lint/dl3047/Dockerfile",
+                  "start": {
+                    "column": 8,
+                    "line": 4
+                  }
+                },
+                "newText": " --progress=dot:giga"
+              }
+            ],
+            "priority": 96
+          }
+        },
+        {
+          "detail": "When downloading large files, wget's default progress output produces excessive log lines in Docker builds. Use --progress=dot:giga for a compact progress indicator, or -q/--quiet/-nv/--no-verbose to suppress output entirely.",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3047/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 7
+            },
+            "file": "fixtures/lint/dl3047/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 7
+            }
+          },
+          "message": "wget without progress bar will bloat build logs; use `wget --progress=dot:giga`, `-q`, or `-nv`",
+          "rule": "hadolint/DL3047",
+          "severity": "info",
+          "sourceCode": "RUN wget http://example.com/archive.tar.gz | tar xz",
+          "suggestedFix": {
+            "description": "Add --progress=dot:giga to wget",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 8,
+                    "line": 7
+                  },
+                  "file": "fixtures/lint/dl3047/Dockerfile",
+                  "start": {
+                    "column": 8,
+                    "line": 7
+                  }
+                },
+                "newText": " --progress=dot:giga"
+              }
+            ],
+            "priority": 96
+          }
+        },
+        {
+          "detail": "When downloading large files, wget's default progress output produces excessive log lines in Docker builds. Use --progress=dot:giga for a compact progress indicator, or -q/--quiet/-nv/--no-verbose to suppress output entirely.",
+          "docUrl": "https://tally.wharflab.com/rules/hadolint/DL3047/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 22
+            },
+            "file": "fixtures/lint/dl3047/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 22
+            }
+          },
+          "message": "wget without progress bar will bloat build logs; use `wget --progress=dot:giga`, `-q`, or `-nv`",
+          "rule": "hadolint/DL3047",
+          "severity": "info",
+          "sourceCode": "RUN apt-get update \u0026\u0026 \\",
+          "suggestedFix": {
+            "description": "Add --progress=dot:giga to wget",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 8,
+                    "line": 23
+                  },
+                  "file": "fixtures/lint/dl3047/Dockerfile",
+                  "start": {
+                    "column": 8,
+                    "line": 23
+                  }
+                },
+                "newText": " --progress=dot:giga"
+              }
+            ],
+            "priority": 96
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 3,
+    "style": 0,
+    "total": 3,
+    "warnings": 0
+  }
+}

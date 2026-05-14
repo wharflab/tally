@@ -1,0 +1,13 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = [
+  "tally/no-multi-spaces",
+  "tally/consistent-indentation",
+  "tally/newline-per-chained-call",
+]
+exclude = ["*"]
+
+[rules.tally.consistent-indentation]
+severity = "style"

@@ -1,0 +1,11 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/ruby/jemalloc-installed-but-not-preloaded"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

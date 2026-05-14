@@ -1,0 +1,9 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/labels/no-buildx-git-overlap"]
+exclude = ["*"]
+
+[rules.tally.labels.no-buildx-git-overlap]
+buildx-git-labels = "full"

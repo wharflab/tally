@@ -126,6 +126,10 @@ type TallyConfigSchemaJson struct {
 	// Configure async checks that require network or other slow I/O (e.g. registry
 	// lookups).
 	SlowChecks *TallyConfigSchemaJsonSlowChecks `json:"slow-checks,omitempty,omitzero"`
+
+	// Enable application of unsafe fixes. When omitted, unsafe fixes are not applied
+	// and callers may display a hint when unsafe fixes are available.
+	UnsafeFixes TallyConfigSchemaJsonUnsafeFixes `json:"unsafe-fixes,omitempty,omitzero"`
 }
 
 // Configure opt-in AI AutoFix features (requires an ACP-capable agent).
@@ -239,3 +243,7 @@ type TallyConfigSchemaJsonSlowChecksMode string
 const TallyConfigSchemaJsonSlowChecksModeAuto TallyConfigSchemaJsonSlowChecksMode = "auto"
 const TallyConfigSchemaJsonSlowChecksModeOff TallyConfigSchemaJsonSlowChecksMode = "off"
 const TallyConfigSchemaJsonSlowChecksModeOn TallyConfigSchemaJsonSlowChecksMode = "on"
+
+// Enable application of unsafe fixes. When omitted, unsafe fixes are not applied
+// and callers may display a hint when unsafe fixes are available.
+type TallyConfigSchemaJsonUnsafeFixes *bool

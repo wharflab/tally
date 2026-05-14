@@ -1,0 +1,8 @@
+unsafe-fixes = false
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/gpu/prefer-minimal-driver-capabilities"]
+exclude = ["*"]

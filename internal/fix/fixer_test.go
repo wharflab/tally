@@ -1009,6 +1009,78 @@ func TestFixer_Apply_PerFileFixModes(t *testing.T) {
 	}
 }
 
+func TestFixer_Apply_PerFileSafetyThresholds(t *testing.T) {
+	t.Parallel()
+	sources := map[string][]byte{
+		"file1.Dockerfile": []byte("RUN apt install curl"),
+		"file2.Dockerfile": []byte("RUN apt install wget"),
+	}
+	violations := []rules.Violation{
+		{
+			RuleCode: "hadolint/DL3027",
+			Message:  "Do not use apt",
+			Location: rules.NewRangeLocation("file1.Dockerfile", 1, 4, 1, 7),
+			SuggestedFix: &rules.SuggestedFix{
+				Description: "Replace apt with apt-get",
+				Safety:      rules.FixUnsafe,
+				Edits: []rules.TextEdit{
+					{
+						Location: rules.NewRangeLocation("file1.Dockerfile", 1, 4, 1, 7),
+						NewText:  "apt-get",
+					},
+				},
+			},
+		},
+		{
+			RuleCode: "hadolint/DL3027",
+			Message:  "Do not use apt",
+			Location: rules.NewRangeLocation("file2.Dockerfile", 1, 4, 1, 7),
+			SuggestedFix: &rules.SuggestedFix{
+				Description: "Replace apt with apt-get",
+				Safety:      rules.FixUnsafe,
+				Edits: []rules.TextEdit{
+					{
+						Location: rules.NewRangeLocation("file2.Dockerfile", 1, 4, 1, 7),
+						NewText:  "apt-get",
+					},
+				},
+			},
+		},
+	}
+
+	fixer := &Fixer{
+		SafetyThreshold: FixSafe,
+		SafetyThresholds: map[string]FixSafety{
+			"file1.Dockerfile": FixUnsafe,
+			"file2.Dockerfile": FixSafe,
+		},
+	}
+	result, err := fixer.Apply(context.Background(), violations, sources)
+	if err != nil {
+		t.Fatalf("Apply error: %v", err)
+	}
+
+	if result.TotalApplied() != 1 {
+		t.Errorf("TotalApplied() = %d, want 1", result.TotalApplied())
+	}
+	if result.TotalSkipped() != 1 {
+		t.Errorf("TotalSkipped() = %d, want 1", result.TotalSkipped())
+	}
+	if fc := result.Changes["file1.Dockerfile"]; fc == nil || !fc.HasChanges() {
+		t.Error("file1.Dockerfile should have unsafe fix applied")
+	}
+	fc := result.Changes["file2.Dockerfile"]
+	if fc == nil {
+		t.Fatal("file2.Dockerfile should exist in changes")
+	}
+	if fc.HasChanges() {
+		t.Error("file2.Dockerfile should not have unsafe fix applied")
+	}
+	if len(fc.FixesSkipped) != 1 || fc.FixesSkipped[0].Reason != SkipSafety {
+		t.Errorf("file2.Dockerfile skip = %#v, want one SkipSafety", fc.FixesSkipped)
+	}
+}
+
 func TestApplyEdit_CRLF(t *testing.T) {
 	t.Parallel()
 	// Test with Windows-style line endings

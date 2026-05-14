@@ -1,0 +1,5 @@
+[slow-checks]
+mode = "off"
+
+[rules.tally.consistent-indentation]
+severity = "style"

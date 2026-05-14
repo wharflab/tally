@@ -1,0 +1,21 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/require-secret-mounts", "hadolint/DL3030", "tally/prefer-package-cache-mounts", "tally/prefer-curl-config"]
+exclude = ["*"]
+
+[rules.tally.require-secret-mounts]
+severity = "warning"
+
+[rules.tally.require-secret-mounts.commands.yum]
+id = "YUM_CONF"
+target = "/etc/yum.conf"
+
+[rules.tally.prefer-package-cache-mounts]
+severity = "warning"
+
+[rules.hadolint.DL3030]
+severity = "warning"

@@ -193,7 +193,7 @@ ENTRYPOINT cmd /c echo hi
 func TestBuilderRealWorldTeamCityNanoServerFixtureInfersWindowsSecondStage(t *testing.T) {
 	t.Parallel()
 
-	content, err := os.ReadFile(filepath.Join("..", "integration", "testdata", "real-world-fix-teamcity-nanoserver", "Dockerfile"))
+	content, err := os.ReadFile(filepath.Join("..", "integration", "fixtures", "fix", "real-world-teamcity-nanoserver", "Dockerfile"))
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestBuilderRealWorldTeamCityNanoServerFixtureInfersWindowsSecondStage(t *te
 func TestBuilderRealWorldPowerShellAlpineFixtureStaysLinux(t *testing.T) {
 	t.Parallel()
 
-	content, err := os.ReadFile(filepath.Join("..", "integration", "testdata", "real-world-fix-powershell-alpine", "Dockerfile"))
+	content, err := os.ReadFile(filepath.Join("..", "integration", "fixtures", "fix", "real-world-powershell-alpine", "Dockerfile"))
 	if err != nil {
 		t.Fatalf("read fixture: %v", err)
 	}

@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/php/no-xdebug-in-final-image"]
+exclude = ["*"]

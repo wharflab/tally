@@ -135,6 +135,7 @@ func TestKoanfFlagMap_OperationalFlagsAreDropped(t *testing.T) {
 		argv []string
 	}{
 		{"config", []string{"--config", "tally.toml"}},
+		{"no-config", []string{"--no-config"}},
 		{"context", []string{"--context", "/tmp"}},
 		{"exclude", []string{"--exclude", "*.bak"}},
 		{"select", []string{"--select", "tally/*"}},
@@ -167,6 +168,16 @@ func TestKoanfFlagMap_OperationalFlagsAreDropped(t *testing.T) {
 				t.Errorf("operational flag %q leaked into koanf as %q=%v", tc.flag, key, val)
 			}
 		})
+	}
+}
+
+func TestFinalizeLintOptions_ConfigFlagsAreMutuallyExclusive(t *testing.T) {
+	t.Parallel()
+
+	cmd, _ := buildLintCommandForTest()
+	cmd.SetArgs([]string{"--config", "tally.toml", "--no-config"})
+	if err := cmd.Execute(); err == nil {
+		t.Fatal("expected --config and --no-config to be rejected")
 	}
 }
 

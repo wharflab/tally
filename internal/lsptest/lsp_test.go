@@ -471,7 +471,7 @@ func TestLSP_ExecuteCommandApplyAllFixesRealWorld(t *testing.T) {
 	ts := startTestServer(t)
 	ts.initialize(t)
 
-	original, err := os.ReadFile("../integration/testdata/benchmark-real-world-fix/Dockerfile")
+	original, err := os.ReadFile("../integration/fixtures/fix/benchmark-real-world-fix/Dockerfile")
 	require.NoError(t, err)
 
 	uri := "file:///tmp/test-fixall-realworld/Dockerfile"
@@ -838,8 +838,8 @@ func TestLSP_FormattingRealWorld(t *testing.T) {
 	ts := startTestServer(t)
 	ts.initialize(t)
 
-	// Real-world Dockerfile from internal/integration/testdata/benchmark-real-world-fix/.
-	original, err := os.ReadFile("../integration/testdata/benchmark-real-world-fix/Dockerfile")
+	// Real-world Dockerfile from internal/integration/fixtures/fix/benchmark-real-world-fix/.
+	original, err := os.ReadFile("../integration/fixtures/fix/benchmark-real-world-fix/Dockerfile")
 	require.NoError(t, err)
 
 	uri := "file:///tmp/test-formatting-realworld/Dockerfile"

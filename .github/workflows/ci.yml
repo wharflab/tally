@@ -26,22 +26,21 @@ jobs:
           fetch-depth: 0
       - uses: ophidiarium/mehen@v0
         with:
-          install-method: cargo
           github-token: ${{ secrets.GITHUB_TOKEN }}
           paths: |
             main.go
             cmd
             internal
+            _docs
+            design-docs
             _tools
             _integrations/vscode-tally/src
-            _integrations/vscode-tally/test
-            _integrations/zed-tally
+            _integrations/intellij-tally/src
+            _integrations/zed-tally/src
             packaging/pypi
             scripts
           exclude: |
-            **/node_modules/**
-            **/target/**
-            **/dist/**
+            **/internal/integration/**
   # Producer job: rebuilds/restores shellcheck.wasm from the buildx GHA cache
   # (~15s on cache hit) and uploads it as a workflow artifact for
   # test-windows, which cannot run BuildKit. Linux jobs here call the

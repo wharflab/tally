@@ -1,0 +1,17 @@
+unsafe-fixes = true
+
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/curl-should-follow-redirects", "tally/newline-per-chained-call"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"
+
+[rules.tally.curl-should-follow-redirects]
+severity = "error"
+
+[rules.tally.newline-per-chained-call]
+severity = "error"

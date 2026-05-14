@@ -1,0 +1,9 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/consistent-indentation"]
+exclude = ["*"]
+
+[rules.tally.consistent-indentation]
+severity = "style"
