@@ -131,6 +131,9 @@ func runFixFixture(t *testing.T, dir string) {
 	buildFile := fixtureBuildFile(dir)
 	input := readFixtureFile(t, buildFile)
 	args := []string{"lint", "--format", "markdown", "--fix"}
+	if fixtureHasContextFiles(t, dir) {
+		args = append(args, "--context", ".")
+	}
 	if !fileExists(filepath.Join(dir, ".tally.toml")) && !fileExists(filepath.Join(dir, "tally.toml")) {
 		args = append(args, "--no-config")
 	}
@@ -215,6 +218,25 @@ func fixtureBuildFile(dir string) string {
 		}
 	}
 	return ""
+}
+
+func fixtureHasContextFiles(t *testing.T, dir string) bool {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read fixture dir %s: %v", dir, err)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if name == "Dockerfile" || name == "Containerfile" || name == ".tally.toml" || name == "tally.toml" {
+			continue
+		}
+		if strings.Contains(name, ".snap.") {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 type fixtureHarnessConfig struct {

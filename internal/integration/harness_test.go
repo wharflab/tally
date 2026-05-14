@@ -250,20 +250,3 @@ func runTallyStdin(t *testing.T, input string, args ...string) (string, string, 
 
 	return stdoutBuf.String(), stderrBuf.String(), exitCode
 }
-
-func expectExitCode1(t *testing.T, output []byte, err error) {
-	t.Helper()
-
-	if err == nil {
-		t.Fatalf("expected exit code 1 but command succeeded\noutput:\n%s", output)
-	}
-
-	var exitErr *exec.ExitError
-	if !errors.As(err, &exitErr) {
-		t.Fatalf("command failed to run: %v\noutput:\n%s", err, output)
-	}
-
-	if exitErr.ExitCode() != 1 {
-		t.Fatalf("unexpected exit code %d: %v\noutput:\n%s", exitErr.ExitCode(), err, output)
-	}
-}
