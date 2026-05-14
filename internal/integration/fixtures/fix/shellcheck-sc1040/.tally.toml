@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["shellcheck/SC1040"]
+exclude = ["*"]
