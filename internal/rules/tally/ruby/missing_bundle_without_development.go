@@ -4,12 +4,12 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
-	"github.com/wharflab/tally/internal/stagename"
 )
 
 // MissingBundleWithoutDevelopmentRuleCode is the full rule code.
@@ -73,25 +73,12 @@ func (r *MissingBundleWithoutDevelopmentRule) Check(input rules.LintInput) []rul
 
 	sm := input.SourceMap()
 	var violations []rules.Violation
-	for stageIdx, stage := range input.Stages {
-		if stagename.LooksLikeDev(stage.Name) {
-			continue
-		}
-		sf := input.Facts.Stage(stageIdx)
-		if sf == nil {
-			continue
-		}
-		if sf.BaseImageOS == semantic.BaseImageOSWindows {
-			continue
-		}
-		if !stageLooksLikeRuby(input.Semantic, stageIdx, stage, sf) {
-			continue
-		}
+	forEachRubyStage(input, func(_ int, _ instructions.Stage, sf *facts.StageFacts) {
 		if !stageLooksProduction(input, sf) {
-			continue
+			return
 		}
 		violations = append(violations, r.checkStage(input, sf, sm, meta)...)
-	}
+	})
 	return violations
 }
 
@@ -417,28 +404,16 @@ func buildBundleWithoutDevelopmentFix(
 	sm *sourcemap.SourceMap,
 	priority int,
 ) *rules.SuggestedFix {
-	if sf == nil || sm == nil {
+	if sm == nil {
 		return nil
 	}
-	if sf.Index < 0 || sf.Index >= len(input.Stages) {
-		return nil
-	}
-	stage := input.Stages[sf.Index]
-	if len(stage.Location) == 0 {
-		return nil
-	}
-	insertLine := stage.Location[len(stage.Location)-1].End.Line + 1
 	value := chooseBundleWithoutValue(input)
-	return &rules.SuggestedFix{
-		Description: `Add ENV BUNDLE_WITHOUT="` + value + `" to exclude development gems from the production image`,
-		Safety:      rules.FixSafe,
-		Priority:    priority,
-		IsPreferred: true,
-		Edits: []rules.TextEdit{{
-			Location: rules.NewRangeLocation(input.File, insertLine, 0, insertLine, 0),
-			NewText:  `ENV BUNDLE_WITHOUT="` + value + "\"\n",
-		}},
-	}
+	return buildStageTopEnvFix(
+		input, sf, sm, priority,
+		`ENV BUNDLE_WITHOUT="`+value+`"`,
+		`Add ENV BUNDLE_WITHOUT="`+value+`" to exclude development gems from the production image`,
+		true,
+	)
 }
 
 // chooseBundleWithoutValue picks the BUNDLE_WITHOUT value the fix should

@@ -4,14 +4,14 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
 	rubyfacts "github.com/wharflab/tally/internal/facts/ruby"
 
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
-	"github.com/wharflab/tally/internal/stagename"
 )
 
 // MissingBundleDeploymentRuleCode is the full rule code.
@@ -52,25 +52,12 @@ func (r *MissingBundleDeploymentRule) Check(input rules.LintInput) []rules.Viola
 	rubyFacts := input.Facts.RubyFacts()
 
 	var violations []rules.Violation
-	for stageIdx, stage := range input.Stages {
-		if stagename.LooksLikeDev(stage.Name) {
-			continue
-		}
-		sf := input.Facts.Stage(stageIdx)
-		if sf == nil {
-			continue
-		}
-		if sf.BaseImageOS == semantic.BaseImageOSWindows {
-			continue
-		}
-		if !stageLooksLikeRuby(input.Semantic, stageIdx, stage, sf) {
-			continue
-		}
+	forEachRubyStage(input, func(_ int, _ instructions.Stage, sf *facts.StageFacts) {
 		if !stageLooksProduction(input, sf) {
-			continue
+			return
 		}
 		violations = append(violations, r.checkStage(input, sf, sm, rubyFacts, meta)...)
-	}
+	})
 	return violations
 }
 
@@ -295,27 +282,15 @@ func buildBundleDeploymentFix(
 	sm *sourcemap.SourceMap,
 	priority int,
 ) *rules.SuggestedFix {
-	if sf == nil || sm == nil {
+	if sm == nil {
 		return nil
 	}
-	if sf.Index < 0 || sf.Index >= len(input.Stages) {
-		return nil
-	}
-	stage := input.Stages[sf.Index]
-	if len(stage.Location) == 0 {
-		return nil
-	}
-	insertLine := stage.Location[len(stage.Location)-1].End.Line + 1
-	return &rules.SuggestedFix{
-		Description: `Add ENV BUNDLE_DEPLOYMENT="1" to enforce Bundler deployment-mode contract`,
-		Safety:      rules.FixSafe,
-		Priority:    priority,
-		IsPreferred: true,
-		Edits: []rules.TextEdit{{
-			Location: rules.NewRangeLocation(input.File, insertLine, 0, insertLine, 0),
-			NewText:  "ENV BUNDLE_DEPLOYMENT=\"1\"\n",
-		}},
-	}
+	return buildStageTopEnvFix(
+		input, sf, sm, priority,
+		`ENV BUNDLE_DEPLOYMENT="1"`,
+		`Add ENV BUNDLE_DEPLOYMENT="1" to enforce Bundler deployment-mode contract`,
+		true,
+	)
 }
 
 func init() {

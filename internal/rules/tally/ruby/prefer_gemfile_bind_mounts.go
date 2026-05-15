@@ -8,8 +8,6 @@ import (
 
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
-	"github.com/wharflab/tally/internal/semantic"
-	"github.com/wharflab/tally/internal/stagename"
 )
 
 // PreferGemfileBindMountsRuleCode is the full rule code.
@@ -53,26 +51,12 @@ func (r *PreferGemfileBindMountsRule) Check(input rules.LintInput) []rules.Viola
 	}
 
 	var violations []rules.Violation
-	for stageIdx, stage := range input.Stages {
-		if stagename.LooksLikeDev(stage.Name) {
-			continue
-		}
-		sf := input.Facts.Stage(stageIdx)
-		if sf == nil {
-			continue
-		}
-		if sf.BaseImageOS == semantic.BaseImageOSWindows {
-			continue
-		}
-		if !stageLooksLikeRuby(input.Semantic, stageIdx, stage, sf) {
-			continue
-		}
-
+	forEachRubyStage(input, func(_ int, stage instructions.Stage, sf *facts.StageFacts) {
 		// Find a `COPY Gemfile Gemfile.lock ...` instruction followed
 		// later in the same stage by `bundle install`.
 		copyCmd := findGemfileCopy(stage)
 		if copyCmd == nil {
-			continue
+			return
 		}
 		// Only fire when bundle install runs AFTER the COPY in source
 		// order. A `bundle install` before any Gemfile COPY (or a COPY
@@ -80,7 +64,7 @@ func (r *PreferGemfileBindMountsRule) Check(input rules.LintInput) []rules.Viola
 		// a final-stage runtime that doesn't run install) is not the
 		// pattern this rule targets.
 		if !stageHasBundleInstallAfter(sf, copyStartLine(copyCmd)) {
-			continue
+			return
 		}
 
 		loc := copyInstructionLocation(input.File, copyCmd)
@@ -97,10 +81,10 @@ func (r *PreferGemfileBindMountsRule) Check(input rules.LintInput) []rules.Viola
 				IsPreferred: false,
 			})
 		violations = append(violations, v)
-		// Report once per stage; continue scanning subsequent stages
-		// in case a multi-stage Dockerfile has multiple Ruby stages
-		// with the same pattern.
-	}
+		// Report once per stage; the visitor will continue with the
+		// next stage in case a multi-stage Dockerfile has multiple
+		// Ruby stages with the same pattern.
+	})
 	return violations
 }
 

@@ -6,8 +6,6 @@ import (
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/runmount"
-	"github.com/wharflab/tally/internal/semantic"
-	"github.com/wharflab/tally/internal/stagename"
 )
 
 // PreferNetworkNoneInstallRuleCode is the full rule code.
@@ -58,38 +56,24 @@ func (r *PreferNetworkNoneInstallRule) Check(input rules.LintInput) []rules.Viol
 	}
 
 	var violations []rules.Violation
-	for stageIdx, stage := range input.Stages {
-		if stagename.LooksLikeDev(stage.Name) {
-			continue
-		}
-		sf := input.Facts.Stage(stageIdx)
-		if sf == nil {
-			continue
-		}
-		if sf.BaseImageOS == semantic.BaseImageOSWindows {
-			continue
-		}
-		if !stageLooksLikeRuby(input.Semantic, stageIdx, stage, sf) {
-			continue
-		}
-
+	forEachRubyStage(input, func(_ int, _ instructions.Stage, sf *facts.StageFacts) {
 		// Find a `bundle install` RUN that doesn't already use both
 		// the bind-mount + cache-mount pattern. The advisory only
 		// fires when the user is already on BuildKit AND is using
 		// the modern manifest pattern — surfacing the further upgrade.
 		runFacts := findBundleInstallRun(sf)
 		if runFacts == nil {
-			continue
+			return
 		}
 		if !runUsesBundleManifestBindAndCache(runFacts) {
 			// The user hasn't even adopted the bind-mount + cache-mount
 			// pattern yet. The prefer-gemfile-bind-mounts and
 			// prefer-bundler-cache-mount rules cover that step.
 			// Don't pile on with a second educational suggestion.
-			continue
+			return
 		}
 		if runHasNetworkNoneFlag(runFacts) {
-			continue
+			return
 		}
 
 		loc := bundleInstallViolationLocation(input.File, runFacts, *findFirstBundleInstall(runFacts), input.SourceMap())
@@ -106,7 +90,7 @@ func (r *PreferNetworkNoneInstallRule) Check(input rules.LintInput) []rules.Viol
 				IsPreferred: false,
 			})
 		violations = append(violations, v)
-	}
+	})
 	return violations
 }
 
