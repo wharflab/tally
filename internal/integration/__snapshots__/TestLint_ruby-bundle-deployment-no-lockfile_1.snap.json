@@ -4,7 +4,7 @@
       "file": "testdata/ruby-bundle-deployment-no-lockfile/Dockerfile",
       "violations": [
         {
-          "detail": "Production stages that run `bundle install` should set `ENV BUNDLE_DEPLOYMENT=\"1\"` (or `bundle config set --local deployment 'true'`). Without it, Bundler may mutate `Gemfile.lock` at build time, install gems outside the project, and skip the lockfile-required check — defeating the \"the lockfile is the build input\" property. No `Gemfile.lock` is observable in the build context — without one, Bundler resolves from `Gemfile` fresh on every build and produces an undeterministic image.",
+          "detail": "Production stages that run `bundle install` should set `ENV BUNDLE_DEPLOYMENT=\"1\"` (or `bundle config set --local deployment 'true'`). Without it, Bundler may mutate `Gemfile.lock` at build time, install gems outside the project, and skip the lockfile-required check — defeating the \"the lockfile is the build input\" property. No `Gemfile.lock` is observable in the build context — without one, Bundler resolves from `Gemfile` fresh on every build and produces an indeterministic image.",
           "docUrl": "https://tally.wharflab.com/rules/tally/ruby/missing-bundle-deployment/",
           "location": {
             "end": {
