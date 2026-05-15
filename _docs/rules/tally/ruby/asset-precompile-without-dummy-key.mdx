@@ -1,0 +1,120 @@
+---
+title: "tally/ruby/asset-precompile-without-dummy-key"
+description: "Rails `assets:precompile` runs without `SECRET_KEY_BASE_DUMMY=1`, forcing real secrets into image history."
+---
+
+Rails `assets:precompile` runs without `SECRET_KEY_BASE_DUMMY=1`, which pushes users toward baking
+`RAILS_MASTER_KEY` (or a real `SECRET_KEY_BASE`) into image history.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning (Rails 7.1+) / Suggestion (older Rails) |
+| Category | Security |
+| Default | Enabled |
+| Auto-fix | Yes (FixSafe — Rails 7.1+) |
+
+## Description
+
+Rails 7.1 added `SECRET_KEY_BASE_DUMMY=1` so that `bin/rails assets:precompile` can run at build time without
+a real `secret_key_base` and without `RAILS_MASTER_KEY`. Without this placeholder, projects are pushed toward
+exactly the wrong workaround: passing `RAILS_MASTER_KEY` (or a real `SECRET_KEY_BASE`) into the build via
+`ARG`/`ENV`, which bakes the secret into the image's per-layer history. Anyone who can pull the image can then
+read `docker history --no-trunc <image>` and recover the secret.
+
+The Rails generator template runs:
+
+```dockerfile
+RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
+```
+
+…and explicitly comments that this avoids requiring the real master key at build time. This rule fires when a
+Ruby-shaped stage runs one of:
+
+- `rails assets:precompile`
+- `bin/rails assets:precompile`
+- `bundle exec rake assets:precompile`
+- `rake assets:precompile`
+
+…and that same `RUN` does **not** set `SECRET_KEY_BASE_DUMMY=1` and does **not** set `SECRET_KEY_BASE=1`
+(which Rails accepts as the placeholder contract too). Stage-level `ENV SECRET_KEY_BASE_DUMMY=1` (or
+`SECRET_KEY_BASE=1`) set before the offending RUN also satisfies the rule.
+
+A BuildKit secret-mount-driven precompile is the supported alternative path:
+
+```dockerfile
+RUN --mount=type=secret,id=rails_master_key,env=RAILS_MASTER_KEY \
+    bin/rails assets:precompile
+```
+
+The rule recognizes this shape and stays silent. The secret is exposed only inside that one `RUN` and never
+reaches the image cache key.
+
+Stages explicitly named `dev`, `development`, `test`, `testing`, `ci`, or `debug` are skipped, as are
+non-Ruby and Windows-based stages.
+
+### Context-aware refinements
+
+When tally is invoked with `--context` (or via Bake/Compose), the rule consults the project's `Gemfile`,
+`Gemfile.lock`, and `config/credentials*.yml.enc` files to sharpen its behavior:
+
+- **Rails-version gating.** The Rails 7.1 release note that introduced `SECRET_KEY_BASE_DUMMY=1` doesn't
+  apply to older Rails. If `Gemfile.lock` shows Rails `< 7.1`, the rule's auto-fix demotes from `FixSafe` to
+  a `FixSuggestion` and the wording recommends the BuildKit secret-mount path
+  (`RUN --mount=type=secret,id=rails_master_key,env=RAILS_MASTER_KEY`) instead of the dummy constant. The
+  violation still fires.
+- **Severity demotion when credentials aren't used.** If neither `config/credentials.yml.enc` nor any
+  `config/credentials/<env>.yml.enc` file exists in the build context, the rule's severity demotes from
+  `warning` to `info`: the dummy key is hygiene rather than a hard correctness fix when the project doesn't
+  use Rails encrypted credentials at all.
+
+When the build context is unobservable (Dockerfile-only mode), the rule applies with default severity and
+emits the Rails 7.1+ fix.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM ruby:3.3-slim AS app
+COPY . .
+RUN bin/rails assets:precompile
+CMD ["bin/rails", "server"]
+```
+
+### After
+
+The Rails-generator-style fix prepends `SECRET_KEY_BASE_DUMMY=1` directly to the offending command:
+
+```dockerfile
+FROM ruby:3.3-slim AS app
+COPY . .
+RUN SECRET_KEY_BASE_DUMMY=1 bin/rails assets:precompile
+CMD ["bin/rails", "server"]
+```
+
+For projects on Rails &lt; 7.1, the recommended alternative is BuildKit secret mounts:
+
+```dockerfile
+RUN --mount=type=secret,id=rails_master_key,env=RAILS_MASTER_KEY \
+    bin/rails assets:precompile
+```
+
+This is also the right shape for any Rails version when the precompile genuinely needs the master key
+(for example, decrypting per-environment configuration during the asset build).
+
+## Auto-fix
+
+On Rails 7.1+ projects (and in Dockerfile-only mode), the rule offers a `FixSafe` that prepends
+`SECRET_KEY_BASE_DUMMY=1` directly to the offending command in the same `RUN`. The fix preserves any
+chained commands (`&&`/`;`) and any continuation lines.
+
+When tally observes `Gemfile.lock` showing Rails older than 7.1, the auto-fix demotes to `FixSuggestion`
+and recommends the BuildKit secret-mount path instead. The user is expected to wire `--secret` into their
+build invocation explicitly.
+
+## References
+
+- [Rails 7.1 release notes — `assets:precompile` no longer requires credentials](https://guides.rubyonrails.org/7_1_release_notes.html#assets-precompile-no-longer-requires-credentials)
+- [Rails security guide — environmental security](https://guides.rubyonrails.org/security.html#environmental-security)
+- [Rails Dockerfile generator template](https://github.com/rails/rails/blob/main/railties/lib/rails/generators/rails/app/templates/Dockerfile.tt)
+- [BuildKit `RUN --mount=type=secret` documentation](https://docs.docker.com/build/building/secrets/)

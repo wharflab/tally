@@ -1,0 +1,43 @@
+{
+  "files": [
+    {
+      "file": "testdata/ruby-asset-precompile-rails-old/Dockerfile",
+      "violations": [
+        {
+          "detail": "Rails 7.0.8 predates SECRET_KEY_BASE_DUMMY (added in Rails 7.1). Pass RAILS_MASTER_KEY through a BuildKit secret mount (`--mount=type=secret,id=rails_master_key,env=RAILS_MASTER_KEY`) or set SECRET_KEY_BASE to a random ephemeral value for this build so neither secret ends up in image history.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/asset-precompile-without-dummy-key/",
+          "location": {
+            "end": {
+              "column": 31,
+              "line": 3
+            },
+            "file": "testdata/ruby-asset-precompile-rails-old/Dockerfile",
+            "start": {
+              "column": 14,
+              "line": 3
+            }
+          },
+          "message": "Rails assets:precompile runs without SECRET_KEY_BASE_DUMMY=1, which forces RAILS_MASTER_KEY into image history",
+          "rule": "tally/ruby/asset-precompile-without-dummy-key",
+          "severity": "info",
+          "sourceCode": "RUN bin/rails assets:precompile",
+          "suggestedFix": {
+            "description": "Pass RAILS_MASTER_KEY via a BuildKit secret mount (Rails \u003c 7.1 does not honor SECRET_KEY_BASE_DUMMY)",
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

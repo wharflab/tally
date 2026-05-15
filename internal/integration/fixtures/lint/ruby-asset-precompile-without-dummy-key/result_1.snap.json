@@ -1,0 +1,99 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-asset-precompile-without-dummy-key/Dockerfile",
+      "violations": [
+        {
+          "detail": "Running `assets:precompile` without `SECRET_KEY_BASE_DUMMY=1` forces Rails to decrypt credentials at build time, which pushes users toward passing `RAILS_MASTER_KEY` via `ARG`/`ENV` — both end up in image history. Prepend `SECRET_KEY_BASE_DUMMY=1` to the command (Rails 7.1+ honors it as the build-time placeholder) or consume the master key through `RUN --mount=type=secret`.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/asset-precompile-without-dummy-key/",
+          "location": {
+            "end": {
+              "column": 56,
+              "line": 5
+            },
+            "file": "fixtures/lint/ruby-asset-precompile-without-dummy-key/Dockerfile",
+            "start": {
+              "column": 39,
+              "line": 5
+            }
+          },
+          "message": "Rails assets:precompile runs without SECRET_KEY_BASE_DUMMY=1, which forces RAILS_MASTER_KEY into image history",
+          "rule": "tally/ruby/asset-precompile-without-dummy-key",
+          "severity": "warning",
+          "sourceCode": "RUN bundle install \u0026\u0026 bundle exec rake assets:precompile",
+          "suggestedFix": {
+            "description": "Prepend SECRET_KEY_BASE_DUMMY=1 to the assets:precompile command so the build never needs RAILS_MASTER_KEY",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 22,
+                    "line": 5
+                  },
+                  "file": "fixtures/lint/ruby-asset-precompile-without-dummy-key/Dockerfile",
+                  "start": {
+                    "column": 22,
+                    "line": 5
+                  }
+                },
+                "newText": "SECRET_KEY_BASE_DUMMY=1 "
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88
+          }
+        },
+        {
+          "detail": "Running `assets:precompile` without `SECRET_KEY_BASE_DUMMY=1` forces Rails to decrypt credentials at build time, which pushes users toward passing `RAILS_MASTER_KEY` via `ARG`/`ENV` — both end up in image history. Prepend `SECRET_KEY_BASE_DUMMY=1` to the command (Rails 7.1+ honors it as the build-time placeholder) or consume the master key through `RUN --mount=type=secret`.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/asset-precompile-without-dummy-key/",
+          "location": {
+            "end": {
+              "column": 31,
+              "line": 29
+            },
+            "file": "fixtures/lint/ruby-asset-precompile-without-dummy-key/Dockerfile",
+            "start": {
+              "column": 14,
+              "line": 29
+            }
+          },
+          "message": "Rails assets:precompile runs without SECRET_KEY_BASE_DUMMY=1, which forces RAILS_MASTER_KEY into image history",
+          "rule": "tally/ruby/asset-precompile-without-dummy-key",
+          "severity": "warning",
+          "sourceCode": "RUN bin/rails assets:precompile",
+          "suggestedFix": {
+            "description": "Prepend SECRET_KEY_BASE_DUMMY=1 to the assets:precompile command so the build never needs RAILS_MASTER_KEY",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 4,
+                    "line": 29
+                  },
+                  "file": "fixtures/lint/ruby-asset-precompile-without-dummy-key/Dockerfile",
+                  "start": {
+                    "column": 4,
+                    "line": 29
+                  }
+                },
+                "newText": "SECRET_KEY_BASE_DUMMY=1 "
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}

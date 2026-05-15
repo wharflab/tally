@@ -31,6 +31,18 @@ type RubyFacts struct {
 	//
 	// Empty when none of the sources yield a value.
 	RubyVersion string
+
+	// HasEncryptedCredentials reports whether the project ships any of the
+	// canonical Rails encrypted-credentials files (config/credentials.yml.enc
+	// or config/credentials/<env>.yml.enc for one of the standard envs).
+	// Rules that need to know whether RAILS_MASTER_KEY is actually load-bearing
+	// at build time (e.g. asset-precompile-without-dummy-key) consult this.
+	HasEncryptedCredentials bool
+
+	// EncryptedCredentialsPaths records the observed credentials files in the
+	// build context. Order matches the probe order. Empty when no credentials
+	// files are observable.
+	EncryptedCredentialsPaths []string
 }
 
 // ContextFileReader is the minimal subset of internal/context.BuildContext
@@ -53,12 +65,25 @@ type ContextFileReader interface {
 
 // Standard project-root paths the loader inspects. Using slashes matches the
 // build context's path semantics across operating systems.
+//
+// The credentialsEnc* names are file paths the loader probes with
+// FileExists, not secret material — gosec G101 false-positives on the
+// "credentials" substring.
 const (
-	gemfileLockPath  = "Gemfile.lock"
-	gemfilePath      = "Gemfile"
-	rubyVersionPath  = ".ruby-version"
-	toolVersionsPath = ".tool-versions"
+	gemfileLockPath              = "Gemfile.lock"
+	gemfilePath                  = "Gemfile"
+	rubyVersionPath              = ".ruby-version"
+	toolVersionsPath             = ".tool-versions"
+	credentialsEncFilePath       = "config/credentials.yml.enc" // #nosec G101 -- file path, not a secret
+	credentialsEncEnvDirPath     = "config/credentials"         // #nosec G101 -- directory path, not a secret
+	credentialsEncFilenameSuffix = ".yml.enc"                   // #nosec G101 -- filename suffix, not a secret
 )
+
+// credentialsEncEnvNames is the curated list of Rails environments whose
+// per-env encrypted credentials file we probe. Rails ships `production`,
+// `development`, and `test` by default; `staging` is the most common
+// custom env we see in the corpus.
+var credentialsEncEnvNames = []string{"production", "development", "test", "staging"}
 
 // Load reads the four well-known Ruby project files from the build context
 // and returns parsed RubyFacts. A nil reader yields a non-nil RubyFacts with
@@ -81,7 +106,49 @@ func Load(reader ContextFileReader) *RubyFacts {
 		facts.Gemfile = ParseGemfile(data)
 	}
 	facts.RubyVersion = resolveRubyVersion(reader, facts.Lockfile)
+	facts.EncryptedCredentialsPaths = probeEncryptedCredentials(reader)
+	facts.HasEncryptedCredentials = len(facts.EncryptedCredentialsPaths) > 0
 	return facts
+}
+
+// probeEncryptedCredentials returns every observable Rails encrypted-credentials
+// file in the build context. Both the canonical single-file form
+// (`config/credentials.yml.enc`) and the per-environment form
+// (`config/credentials/<env>.yml.enc`) are supported. Paths returned by this
+// function pass the .dockerignore filter — i.e. they are observable to the
+// build process.
+func probeEncryptedCredentials(reader ContextFileReader) []string {
+	if reader == nil {
+		return nil
+	}
+	candidates := make([]string, 0, 1+len(credentialsEncEnvNames))
+	candidates = append(candidates, credentialsEncFilePath)
+	for _, env := range credentialsEncEnvNames {
+		candidates = append(candidates, credentialsEncEnvDirPath+"/"+env+credentialsEncFilenameSuffix)
+	}
+	var found []string
+	for _, candidate := range candidates {
+		if !contextFileObservable(reader, candidate) {
+			continue
+		}
+		found = append(found, candidate)
+	}
+	return found
+}
+
+// contextFileObservable reports whether path resolves to a regular file in
+// the build context that is not excluded by .dockerignore. Read errors are
+// treated as "not observable" so rules degrade gracefully when the build
+// context cannot answer.
+func contextFileObservable(reader ContextFileReader, path string) bool {
+	if reader == nil {
+		return false
+	}
+	ignored, err := reader.IsIgnored(path)
+	if err != nil || ignored {
+		return false
+	}
+	return reader.FileExists(path)
 }
 
 // resolveRubyVersion picks the highest-priority Ruby version available.

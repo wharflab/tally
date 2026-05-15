@@ -1,0 +1,18 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    rails (7.0.8)
+      actionpack (= 7.0.8)
+    actionpack (7.0.8)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  rails (= 7.0.8)
+
+RUBY VERSION
+   ruby 3.2.2p53
+
+BUNDLED WITH
+   2.4.10
