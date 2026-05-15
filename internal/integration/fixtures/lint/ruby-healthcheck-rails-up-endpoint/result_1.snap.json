@@ -4,7 +4,7 @@
       "file": "fixtures/lint/ruby-healthcheck-rails-up-endpoint/Dockerfile",
       "violations": [
         {
-          "detail": "Rails 7.1+ mounts `Rails::HealthController` at `/up` by default. The Ruby stdlib's Net::HTTP (already in the image) is the cheapest way to probe it — no extra apt install for `curl`. Add a HEALTHCHECK that calls `/up` via `ruby -rnet/http -e ...`.",
+          "detail": "Ruby web server runtime image has no HEALTHCHECK. Rails 7.1+ mounts `Rails::HealthController` at `/up` by default; if the app is Rails 7.1+, probe `/up`, otherwise probe whatever endpoint the app exposes (substitute the path below). The Ruby stdlib's Net::HTTP is already in the image, so this is the cheapest probe — no extra apt install for `curl`. Add a HEALTHCHECK that calls the endpoint via `ruby -rnet/http -e ...`.",
           "docUrl": "https://tally.wharflab.com/rules/tally/ruby/healthcheck-rails-up-endpoint/",
           "location": {
             "end": {

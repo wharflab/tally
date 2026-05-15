@@ -93,6 +93,13 @@ ENTRYPOINT ["mygem"]
 			WantViolations: 0,
 		},
 		{
+			Name: "sidekiq worker stage skipped (not a web server)",
+			Content: `FROM ruby:3.3-slim
+CMD ["bundle", "exec", "sidekiq"]
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "dev stage skipped",
 			Content: `FROM ruby:3.3-slim AS dev
 CMD ["bin/rails", "server"]

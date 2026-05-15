@@ -64,7 +64,10 @@ func (r *HealthcheckRailsUpEndpointRule) Check(input rules.LintInput) []rules.Vi
 	if !stageLooksLikeRuby(input.Semantic, finalIdx, stage, sf) {
 		return nil
 	}
-	if !stageLooksLikeLongRunningRubyServer(stage, sf) {
+	if !stageLooksLikeRubyWebServer(stage, sf) {
+		// Workers (sidekiq/resque) don't expose an HTTP endpoint; the
+		// `/up` healthcheck recommendation only applies to Rails web
+		// servers.
 		return nil
 	}
 
@@ -80,6 +83,9 @@ func (r *HealthcheckRailsUpEndpointRule) Check(input rules.LintInput) []rules.Vi
 	}
 
 	// Variant 2: HEALTHCHECK is NONE — explicit opt-out, suppress.
+	if healthCheck.Health == nil || len(healthCheck.Health.Test) == 0 {
+		return nil
+	}
 	if strings.EqualFold(healthCheck.Health.Test[0], "NONE") {
 		return nil
 	}
@@ -98,15 +104,71 @@ func (r *HealthcheckRailsUpEndpointRule) Check(input rules.LintInput) []rules.Vi
 }
 
 func missingHealthCheckDetail() string {
-	return "Rails 7.1+ mounts `Rails::HealthController` at `/up` by default. The Ruby stdlib's Net::HTTP " +
-		"(already in the image) is the cheapest way to probe it — no extra apt install for `curl`. " +
-		"Add a HEALTHCHECK that calls `/up` via `ruby -rnet/http -e ...`."
+	return "Ruby web server runtime image has no HEALTHCHECK. Rails 7.1+ mounts `Rails::HealthController` " +
+		"at `/up` by default; if the app is Rails 7.1+, probe `/up`, otherwise probe whatever endpoint the " +
+		"app exposes (substitute the path below). The Ruby stdlib's Net::HTTP is already in the image, so " +
+		"this is the cheapest probe — no extra apt install for `curl`. Add a HEALTHCHECK that calls the " +
+		"endpoint via `ruby -rnet/http -e ...`."
 }
 
 func curlBasedHealthCheckDetail() string {
 	return "Healthcheck uses `curl`/`wget`, which on `ruby:*-slim`/`ruby:*-alpine` bases requires an extra " +
 		"`apt-get install curl` step — ~3 MiB to add a tool that's already in the image as the Ruby " +
 		"stdlib's Net::HTTP. Switch to the Ruby-native form to drop the dependency."
+}
+
+// rubyWebServerCommands is the subset of long-running Ruby servers that
+// terminate HTTP — the only ones for which a `/up` HTTP healthcheck
+// makes sense. Workers (`sidekiq`, `resque`) listen on a queue, not a
+// port, so probing them for HTTP would surface a permanently failing
+// healthcheck.
+var rubyWebServerCommands = map[string]bool{
+	"rails":     true,
+	"puma":      true,
+	"unicorn":   true,
+	"thrust":    true,
+	"rackup":    true,
+	"falcon":    true,
+	"thin":      true,
+	"passenger": true,
+	"iodine":    true,
+}
+
+// stageLooksLikeRubyWebServer reports whether the stage's
+// ENTRYPOINT/CMD argv designates a Ruby HTTP server (not a worker like
+// sidekiq).
+func stageLooksLikeRubyWebServer(stage instructions.Stage, sf *facts.StageFacts) bool {
+	var lastEntrypoint *instructions.EntrypointCommand
+	var lastCmd *instructions.CmdCommand
+	for _, c := range stage.Commands {
+		switch cc := c.(type) {
+		case *instructions.EntrypointCommand:
+			lastEntrypoint = cc
+		case *instructions.CmdCommand:
+			lastCmd = cc
+		}
+	}
+	if lastEntrypoint != nil && argvIncludesRubyWebServer(lastEntrypoint.CmdLine) {
+		return true
+	}
+	if lastCmd != nil && argvIncludesRubyWebServer(lastCmd.CmdLine) {
+		return true
+	}
+	_ = sf
+	return false
+}
+
+// argvIncludesRubyWebServer reports whether any argv token's basename
+// matches a Ruby HTTP server name.
+func argvIncludesRubyWebServer(argv []string) bool {
+	for _, token := range argv {
+		for word := range strings.FieldsSeq(token) {
+			if rubyWebServerCommands[strings.ToLower(commandBasename(word))] {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // findLastHealthCheck returns the last HEALTHCHECK instruction in the
@@ -178,10 +240,6 @@ func buildCurlHealthCheckRewriteFix(priority int) *rules.SuggestedFix {
 		IsPreferred: false,
 	}
 }
-
-// Compile-time assertion that we're consuming a stable CopyCommand
-// reference (used by stageLooksLikeRailsApp).
-var _ = (*facts.StageFacts)(nil)
 
 func init() {
 	rules.Register(NewHealthcheckRailsUpEndpointRule())

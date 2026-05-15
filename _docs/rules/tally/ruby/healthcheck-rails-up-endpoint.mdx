@@ -37,9 +37,13 @@ The corpus shows:
 
 This rule fires when:
 
-- The final stage is a Rails app runtime (Ruby base + ENTRYPOINT/CMD references `rails`/`puma`/`unicorn`/etc.).
+- The final stage is a Rails web-server runtime (Ruby base + ENTRYPOINT/CMD references
+  `rails`/`puma`/`unicorn`/`thrust`/`rackup`/`falcon`/`thin`/`passenger`/`iodine`).
 - Variant 1: no `HEALTHCHECK` at all.
 - Variant 2: `HEALTHCHECK` present and the command starts with `curl` or `wget`.
+
+The rule deliberately ignores worker stages (`sidekiq`, `resque`, …) — they don't expose an HTTP
+endpoint, so `/up` would not respond there.
 
 `HEALTHCHECK NONE` (the explicit "I have an external orchestrator" signal) is recognized as a deliberate
 opt-out and suppresses the rule.
