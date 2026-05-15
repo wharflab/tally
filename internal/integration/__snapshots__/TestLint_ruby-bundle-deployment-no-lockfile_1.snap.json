@@ -1,0 +1,59 @@
+{
+  "files": [
+    {
+      "file": "testdata/ruby-bundle-deployment-no-lockfile/Dockerfile",
+      "violations": [
+        {
+          "detail": "Production stages that run `bundle install` should set `ENV BUNDLE_DEPLOYMENT=\"1\"` (or `bundle config set --local deployment 'true'`). Without it, Bundler may mutate `Gemfile.lock` at build time, install gems outside the project, and skip the lockfile-required check — defeating the \"the lockfile is the build input\" property. No `Gemfile.lock` is observable in the build context — without one, Bundler resolves from `Gemfile` fresh on every build and produces an indeterministic image.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/missing-bundle-deployment/",
+          "location": {
+            "end": {
+              "column": 18,
+              "line": 4
+            },
+            "file": "testdata/ruby-bundle-deployment-no-lockfile/Dockerfile",
+            "start": {
+              "column": 11,
+              "line": 4
+            }
+          },
+          "message": "Production stage runs bundle install without BUNDLE_DEPLOYMENT=1",
+          "rule": "tally/ruby/missing-bundle-deployment",
+          "severity": "error",
+          "sourceCode": "RUN bundle install",
+          "suggestedFix": {
+            "description": "Add ENV BUNDLE_DEPLOYMENT=\"1\" to enforce Bundler deployment-mode contract",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 2
+                  },
+                  "file": "testdata/ruby-bundle-deployment-no-lockfile/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 2
+                  }
+                },
+                "newText": "ENV BUNDLE_DEPLOYMENT=\"1\"\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 1,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}
