@@ -44,7 +44,7 @@ func TestParseGemfile_GitGems(t *testing.T) {
 	if !slices.Equal(gem.Sources, wantSources) {
 		t.Errorf("Sources = %v, want %v", gem.Sources, wantSources)
 	}
-	wantGit := []string{"rails", "rspec", "old-style"}
+	wantGit := []string{"rails", "rspec", "old-style", "multi-line"}
 	if !slices.Equal(gem.GitGems, wantGit) {
 		t.Errorf("GitGems = %v, want %v", gem.GitGems, wantGit)
 	}
@@ -118,6 +118,34 @@ gem "with#hash", "1.0" # the hash inside double quotes is preserved
 	}
 	if slices.Contains(gem.GitGems, "with#hash") {
 		t.Errorf("GitGems unexpectedly contains 'with#hash' (no git option): %v", gem.GitGems)
+	}
+}
+
+func TestParseGemfile_MultiLineGitOptions(t *testing.T) {
+	t.Parallel()
+
+	const content = `source "https://rubygems.org"
+
+gem "split-options",
+    "~> 1.0",
+    git: "https://example.com/split-options.git"
+
+gem "after-comment", # trailing comment
+    github: "owner/after-comment"
+
+gem "backslash-cont", \
+    git: "https://example.com/backslash.git"
+
+gem "no-continuation"
+gem "regular-version", "~> 5.0"
+`
+	gem := ParseGemfile([]byte(content))
+	if gem == nil {
+		t.Fatal("ParseGemfile returned nil")
+	}
+	want := []string{"split-options", "after-comment", "backslash-cont"}
+	if !slices.Equal(gem.GitGems, want) {
+		t.Errorf("GitGems = %v, want %v", gem.GitGems, want)
 	}
 }
 

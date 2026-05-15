@@ -7,10 +7,6 @@
 // rules then degrade gracefully to Dockerfile-only mode.
 package ruby
 
-import (
-	"sync"
-)
-
 // RubyFacts bundles every observable Ruby project file the rule namespace
 // cares about. Each pointer is nil when the underlying file is missing,
 // unobservable, or malformed.
@@ -37,11 +33,18 @@ type RubyFacts struct {
 // that the loader needs. Declared locally so the package does not import
 // internal/facts or internal/context, keeping import direction clean.
 type ContextFileReader interface {
-	// FileExists reports whether path resolves to a regular file.
+	// FileExists reports whether path resolves to a regular file in the
+	// build context.
 	FileExists(path string) bool
 
-	// ReadFile reads a regular file's content.
+	// ReadFile reads a regular file's content from the build context.
 	ReadFile(path string) ([]byte, error)
+
+	// IsIgnored reports whether the path is excluded by .dockerignore.
+	// Implementations that don't model .dockerignore should return
+	// (false, nil); a non-nil error reduces to "treat as ignored" so we
+	// don't reason over inputs the build process cannot see.
+	IsIgnored(path string) (bool, error)
 }
 
 // Standard project-root paths the loader inspects. Using slashes matches the
@@ -56,11 +59,11 @@ const (
 // Load reads the four well-known Ruby project files from the build context
 // and returns parsed RubyFacts. A nil reader yields a non-nil RubyFacts with
 // every pointer field nil (rules can then call .Lockfile == nil etc. without
-// special-casing). Read errors are silently treated as "no signal" — the
-// corresponding pointer is left nil.
+// special-casing). Read errors and .dockerignore-excluded paths are silently
+// treated as "no signal" — the corresponding pointer is left nil.
 //
-// Load itself is not memoized. Callers that need per-file caching should use
-// LoadCached, which keys a sync.Once result by the supplied reader.
+// Memoization is the caller's responsibility; for the standard rule pipeline
+// it happens inside *facts.FileFacts via sync.Once.
 func Load(reader ContextFileReader) *RubyFacts {
 	facts := &RubyFacts{}
 	if reader == nil {
@@ -142,55 +145,20 @@ func splitFieldsLimit(s string, limit int) []string {
 }
 
 // safeRead wraps reader.ReadFile so callers do not need to discriminate
-// "missing" from "unreadable" errors: both reduce to "no observable signal".
-// FileExists is checked first so callers bypass costly reads (and any
-// caching side effects) for absent files.
+// "missing", "unreadable", or "ignored by .dockerignore" — all three reduce
+// to "no observable signal". The .dockerignore check happens first so we
+// never reason over inputs the build process would not see.
 func safeRead(reader ContextFileReader, path string) ([]byte, bool) {
+	ignored, err := reader.IsIgnored(path)
+	if err != nil || ignored {
+		return nil, false
+	}
 	if !reader.FileExists(path) {
 		return nil, false
 	}
-	data, err := reader.ReadFile(path)
-	if err != nil {
+	data, readErr := reader.ReadFile(path)
+	if readErr != nil {
 		return nil, false
 	}
 	return data, true
-}
-
-// cacheEntry pairs a memoized RubyFacts result with the sync.Once that
-// produced it.
-type cacheEntry struct {
-	once  sync.Once
-	facts *RubyFacts
-}
-
-// loaderCache memoizes RubyFacts per ContextFileReader. The cache is keyed by
-// the interface value (which compares the underlying pointer for the
-// *context.BuildContext implementation), so each Dockerfile gets its own
-// entry. The cache lives for the lifetime of the process; in normal tally
-// runs the number of distinct readers is bounded by the number of linted
-// invocations, so a sync.Map is appropriate.
-var loaderCache sync.Map
-
-// LoadCached returns the cached RubyFacts for the supplied reader, computing
-// it on first call. Subsequent calls with the same reader value return the
-// same *RubyFacts, so rules that re-enter Check() do not re-parse Ruby files.
-//
-// LoadCached(nil) is equivalent to Load(nil) and is not cached.
-func LoadCached(reader ContextFileReader) *RubyFacts {
-	if reader == nil {
-		return Load(nil)
-	}
-
-	value, _ := loaderCache.LoadOrStore(reader, &cacheEntry{})
-	entry, ok := value.(*cacheEntry)
-	if !ok {
-		// Defensive: only this package writes to loaderCache, so the cast
-		// should always succeed. Falling back to an uncached Load avoids a
-		// panic if the cache is somehow corrupted.
-		return Load(reader)
-	}
-	entry.once.Do(func() {
-		entry.facts = Load(reader)
-	})
-	return entry.facts
 }

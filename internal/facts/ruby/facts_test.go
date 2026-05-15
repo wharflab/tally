@@ -10,9 +10,11 @@ import (
 
 // fakeReader is a minimal in-memory ContextFileReader.
 type fakeReader struct {
-	files map[string][]byte
-	errs  map[string]error
-	reads atomic.Int32
+	files     map[string][]byte
+	errs      map[string]error
+	ignored   map[string]bool
+	ignoreErr map[string]error
+	reads     atomic.Int32
 }
 
 func (r *fakeReader) FileExists(path string) bool {
@@ -38,6 +40,16 @@ func (r *fakeReader) ReadFile(path string) ([]byte, error) {
 		return append([]byte(nil), data...), nil
 	}
 	return nil, os.ErrNotExist
+}
+
+func (r *fakeReader) IsIgnored(path string) (bool, error) {
+	if r == nil {
+		return false, nil
+	}
+	if err, ok := r.ignoreErr[path]; ok {
+		return false, err
+	}
+	return r.ignored[path], nil
 }
 
 func TestLoad_NilReader(t *testing.T) {
@@ -218,42 +230,52 @@ func TestExtractRubyVersionFromLockfile(t *testing.T) {
 	}
 }
 
-func TestLoadCached_SameReaderSameResult(t *testing.T) {
+func TestLoad_DockerignoredFilesAreSkipped(t *testing.T) {
 	t.Parallel()
-	// Each test creates a fresh fakeReader, so the global cache entry never
-	// collides with concurrent tests; no global reset is required.
+
+	reader := &fakeReader{
+		files: map[string][]byte{
+			gemfileLockPath: mustReadTestdata(t, "gemfile.lock.basic"),
+			gemfilePath:     mustReadTestdata(t, "Gemfile.basic"),
+			rubyVersionPath: []byte("3.3.5\n"),
+		},
+		ignored: map[string]bool{
+			gemfileLockPath: true,
+			gemfilePath:     true,
+			rubyVersionPath: true,
+		},
+	}
+
+	facts := Load(reader)
+	if facts.Lockfile != nil {
+		t.Errorf("Lockfile = %+v, want nil for ignored path", facts.Lockfile)
+	}
+	if facts.Gemfile != nil {
+		t.Errorf("Gemfile = %+v, want nil for ignored path", facts.Gemfile)
+	}
+	if facts.RubyVersion != "" {
+		t.Errorf("RubyVersion = %q, want empty when .ruby-version is ignored", facts.RubyVersion)
+	}
+	if reader.reads.Load() != 0 {
+		t.Errorf("ReadFile called %d times for ignored paths; want 0", reader.reads.Load())
+	}
+}
+
+func TestLoad_IgnoredCheckErrorTreatedAsIgnored(t *testing.T) {
+	t.Parallel()
+
 	reader := &fakeReader{
 		files: map[string][]byte{
 			gemfileLockPath: mustReadTestdata(t, "gemfile.lock.basic"),
 		},
+		ignoreErr: map[string]error{
+			gemfileLockPath: errors.New("dockerignore unreadable"),
+		},
 	}
 
-	first := LoadCached(reader)
-	second := LoadCached(reader)
-
-	if first != second {
-		t.Errorf("LoadCached returned different pointers: %p vs %p", first, second)
-	}
-	// First call reads Gemfile.lock; the second call must not re-read.
-	if reader.reads.Load() == 0 {
-		t.Errorf("expected at least one read on first call")
-	}
-	readsAfterFirst := reader.reads.Load()
-	_ = LoadCached(reader)
-	if got := reader.reads.Load(); got != readsAfterFirst {
-		t.Errorf("LoadCached re-read after cache hit: %d > %d", got, readsAfterFirst)
-	}
-}
-
-func TestLoadCached_NilReader(t *testing.T) {
-	t.Parallel()
-
-	facts := LoadCached(nil)
-	if facts == nil {
-		t.Fatal("LoadCached(nil) = nil, want non-nil")
-	}
-	if facts.Lockfile != nil || facts.Gemfile != nil {
-		t.Errorf("LoadCached(nil) returned populated facts: %+v", facts)
+	facts := Load(reader)
+	if facts.Lockfile != nil {
+		t.Errorf("Lockfile = %+v, want nil when IsIgnored returns an error", facts.Lockfile)
 	}
 }
 

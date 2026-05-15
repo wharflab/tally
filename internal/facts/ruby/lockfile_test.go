@@ -267,6 +267,45 @@ BUNDLED WITH
 	}
 }
 
+// regression: HasGitGems/HasPathGems must flag on section entry, even when
+// the (hand-edited) lockfile omits the conventional `remote:` line.
+func TestParseLockfile_GitPathSectionWithoutRemote(t *testing.T) {
+	t.Parallel()
+
+	const lockfile = `GIT
+  revision: deadbeef
+  specs:
+    git-only (1.0.0)
+
+PATH
+  specs:
+    path-only (0.1.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    rake (13.2.1)
+
+DEPENDENCIES
+  git-only!
+  path-only!
+  rake
+
+BUNDLED WITH
+   2.5.6
+`
+	lock := ParseLockfile([]byte(lockfile))
+	if lock == nil {
+		t.Fatal("ParseLockfile returned nil")
+	}
+	if !lock.HasGitGems {
+		t.Errorf("HasGitGems = false, want true (GIT section opened without remote:)")
+	}
+	if !lock.HasPathGems {
+		t.Errorf("HasPathGems = false, want true (PATH section opened without remote:)")
+	}
+}
+
 func TestParseLockfile_PathBlock(t *testing.T) {
 	t.Parallel()
 

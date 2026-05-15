@@ -149,7 +149,7 @@ func (s *lockfileScanner) feed(rawLine string, facts *LockfileFacts) {
 		return
 	}
 
-	if s.handleSectionHeader(line, trimmed) {
+	if s.handleSectionHeader(line, trimmed, facts) {
 		return
 	}
 
@@ -174,8 +174,11 @@ func (s *lockfileScanner) feed(rawLine string, facts *LockfileFacts) {
 }
 
 // handleSectionHeader detects top-level section keywords at column 0 and
-// returns true when the line is consumed as a section header.
-func (s *lockfileScanner) handleSectionHeader(line, trimmed string) bool {
+// returns true when the line is consumed as a section header. HasGitGems
+// and HasPathGems are set as soon as a GIT or PATH section opens, so a
+// hand-edited lockfile that omits the `remote:` line still flags those
+// sections.
+func (s *lockfileScanner) handleSectionHeader(line, trimmed string, facts *LockfileFacts) bool {
 	if line == "" || line[0] == ' ' || line[0] == '\t' {
 		return false
 	}
@@ -187,10 +190,12 @@ func (s *lockfileScanner) handleSectionHeader(line, trimmed string) bool {
 	case "GIT":
 		s.current = sectionGit
 		s.inSpecs = false
+		facts.HasGitGems = true
 		return true
 	case "PATH":
 		s.current = sectionPath
 		s.inSpecs = false
+		facts.HasPathGems = true
 		return true
 	case "PLUGIN SOURCE":
 		s.current = sectionPluginSource
@@ -233,12 +238,6 @@ func (s *lockfileScanner) handleSourceBlockLine(line, trimmed string, facts *Loc
 			url := strings.TrimSpace(strings.TrimPrefix(trimmed, "remote:"))
 			if url != "" {
 				facts.Sources = append(facts.Sources, url)
-			}
-			if s.current == sectionGit {
-				facts.HasGitGems = true
-			}
-			if s.current == sectionPath {
-				facts.HasPathGems = true
 			}
 		case trimmed == "specs:":
 			s.inSpecs = true

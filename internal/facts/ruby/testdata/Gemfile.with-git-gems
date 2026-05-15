@@ -8,6 +8,9 @@ ruby '3.4.0'
 gem "rails", git: "https://github.com/rails/rails.git", branch: "main"
 gem "rspec", github: "rspec/rspec"
 gem "old-style", :git => "https://example.com/old-style.git"
+gem "multi-line",
+    git: "https://example.com/multi-line.git",
+    branch: "main"
 gem "puma"
 
 # A comment with "fake" string contents inside that should be ignored.

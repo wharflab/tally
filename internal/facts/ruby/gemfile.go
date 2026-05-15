@@ -41,10 +41,10 @@ var gemfileRubyRe = regexp.MustCompile(`(?m)^\s*ruby\s+['"]([^'"]+)['"]`)
 // gem option hashes.
 var gemfileSourceRe = regexp.MustCompile(`(?m)^\s*source\s+['"]([^'"]+)['"]`)
 
-// gemfileGemRe matches a `gem "name"` line and captures the full remainder
-// (everything after the gem name). The remainder is then scanned for git: or
-// github: options.
-var gemfileGemRe = regexp.MustCompile(`(?m)^\s*gem\s+['"]([^'"]+)['"](.*)$`)
+// gemfileGemHeadRe matches the start of a `gem "name"` declaration and
+// captures the remainder of that line. The remainder is then scanned for
+// git: or github: options after joining any trailing continuation lines.
+var gemfileGemHeadRe = regexp.MustCompile(`(?m)^\s*gem\s+['"]([^'"]+)['"](.*)$`)
 
 // gemfileGroupRe matches a `group :a, :b do` block opener and captures the
 // comma-separated symbol list (`:a, :b`). The capture is the text between
@@ -81,9 +81,11 @@ func ParseGemfile(content []byte) *GemfileFacts {
 	}
 
 	seenGit := map[string]bool{}
-	for _, m := range gemfileGemRe.FindAllStringSubmatch(text, -1) {
-		name := m[1]
-		rest := m[2]
+	for _, m := range gemfileGemHeadRe.FindAllStringSubmatchIndex(text, -1) {
+		// m[0]/m[1] = whole-match span, m[2]/m[3] = name span,
+		// m[4]/m[5] = "rest of head line" span.
+		name := text[m[2]:m[3]]
+		rest := joinGemDeclaration(text, m[4], m[5])
 		if hasGitOrGithubOption(rest) && !seenGit[name] {
 			seenGit[name] = true
 			facts.GitGems = append(facts.GitGems, name)
@@ -175,6 +177,58 @@ func hasGitOrGithubOption(rest string) bool {
 		return false
 	}
 	return gitOptionRe.MatchString(rest) || githubOptionRe.MatchString(rest)
+}
+
+// joinGemDeclaration returns the gem-declaration tail starting at restStart,
+// extending across continuation lines while the previous logical line ends
+// with `,` or `\` (Ruby's argument-continuation tokens). The walk stops at
+// the first non-continuing line so unrelated `gem` calls below do not pollute
+// the option scan.
+func joinGemDeclaration(text string, restStart, restEnd int) string {
+	if restStart >= len(text) {
+		return ""
+	}
+	rest := text[restStart:restEnd]
+	cursor := restEnd
+	for continuesGemDeclaration(rest) && cursor < len(text) {
+		// Skip past the trailing newline.
+		if cursor < len(text) && text[cursor] == '\n' {
+			cursor++
+		}
+		// Find the next newline (or EOF) and capture the line.
+		next := indexByteFrom(text, '\n', cursor)
+		if next < 0 {
+			next = len(text)
+		}
+		line := text[cursor:next]
+		rest += "\n" + line
+		cursor = next
+	}
+	return rest
+}
+
+func indexByteFrom(s string, b byte, start int) int {
+	if start >= len(s) {
+		return -1
+	}
+	idx := strings.IndexByte(s[start:], b)
+	if idx < 0 {
+		return -1
+	}
+	return start + idx
+}
+
+// continuesGemDeclaration reports whether the supplied gem-declaration tail
+// is syntactically incomplete and therefore continues onto the next line.
+// We strip whitespace and trailing comments first so noise after the comma
+// does not interfere.
+func continuesGemDeclaration(rest string) bool {
+	stripped := strings.TrimRight(stripGemfileLineComment(rest), " \t\r\n")
+	if stripped == "" {
+		return false
+	}
+	last := stripped[len(stripped)-1]
+	return last == ',' || last == '\\'
 }
 
 // parseGroupSymbols extracts the list of group symbols from the captured
