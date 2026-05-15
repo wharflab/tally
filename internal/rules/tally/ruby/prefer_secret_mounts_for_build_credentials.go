@@ -5,6 +5,7 @@ import (
 
 	"github.com/moby/buildkit/frontend/dockerfile/command"
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+	"github.com/moby/buildkit/frontend/dockerfile/parser"
 
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/semantic"
@@ -67,14 +68,22 @@ func (r *PreferSecretMountsForBuildCredentialsRule) Check(input rules.LintInput)
 
 	var violations []rules.Violation
 
-	for _, arg := range input.MetaArgs {
-		if v := r.checkArg(input, &arg, meta); v != nil {
-			violations = append(violations, *v)
+	// Meta-ARG (before any FROM) only counts when the Dockerfile has at
+	// least one Ruby-shaped stage — otherwise this is a generic
+	// Node.js/Python/etc. Dockerfile that happens to declare an env var
+	// with one of the names we recognize, and the rule's Ruby-specific
+	// recommendation doesn't apply.
+	if dockerfileHasRubyStage(input) {
+		for _, arg := range input.MetaArgs {
+			violations = append(violations, r.checkArg(input, &arg, meta)...)
 		}
 	}
 
 	for stageIdx, stage := range input.Stages {
 		if stagename.LooksLikeDev(stage.Name) {
+			continue
+		}
+		if input.Facts == nil {
 			continue
 		}
 		sf := input.Facts.Stage(stageIdx)
@@ -84,12 +93,16 @@ func (r *PreferSecretMountsForBuildCredentialsRule) Check(input rules.LintInput)
 		if sf.BaseImageOS == semantic.BaseImageOSWindows {
 			continue
 		}
+		// Gate per-stage checks on the Ruby-shape signal so this rule's
+		// Ruby-specific recommendation doesn't fire on Node/Python/etc.
+		// Dockerfiles that happen to use one of the env-var names.
+		if !stageLooksLikeRuby(input.Semantic, stageIdx, stage, sf) {
+			continue
+		}
 		for _, cmd := range stage.Commands {
 			switch c := cmd.(type) {
 			case *instructions.ArgCommand:
-				if v := r.checkArg(input, c, meta); v != nil {
-					violations = append(violations, *v)
-				}
+				violations = append(violations, r.checkArg(input, c, meta)...)
 			case *instructions.EnvCommand:
 				violations = append(violations, r.checkEnv(input, c, meta)...)
 			}
@@ -98,27 +111,38 @@ func (r *PreferSecretMountsForBuildCredentialsRule) Check(input rules.LintInput)
 	return violations
 }
 
+// dockerfileHasRubyStage reports whether at least one stage in the
+// Dockerfile is Ruby-shaped — used to gate meta-ARG checks (which run
+// before any FROM and so can't be tied to a specific stage).
+func dockerfileHasRubyStage(input rules.LintInput) bool {
+	if input.Facts == nil {
+		return false
+	}
+	for stageIdx, stage := range input.Stages {
+		sf := input.Facts.Stage(stageIdx)
+		if sf == nil {
+			continue
+		}
+		if stageLooksLikeRuby(input.Semantic, stageIdx, stage, sf) {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *PreferSecretMountsForBuildCredentialsRule) checkArg(
 	input rules.LintInput,
 	cmd *instructions.ArgCommand,
 	meta rules.RuleMetadata,
-) *rules.Violation {
+) []rules.Violation {
 	if cmd == nil {
 		return nil
 	}
+	keys := make([]string, 0, len(cmd.Args))
 	for _, arg := range cmd.Args {
-		secretID, ok := matchRubyBuildCredentialKey(arg.Key)
-		if !ok {
-			continue
-		}
-		loc := rules.NewLocationFromRanges(input.File, cmd.Location())
-		v := rules.NewViolation(loc, meta.Code, meta.Description, meta.DefaultSeverity).
-			WithDocURL(meta.DocURL).
-			WithDetail(preferSecretMountsDetail(arg.Key, secretID, strings.ToUpper(command.Arg))).
-			WithSuggestedFix(buildSecretMountFix(arg.Key, secretID, meta.FixPriority))
-		return &v
+		keys = append(keys, arg.Key)
 	}
-	return nil
+	return r.emitViolations(input, cmd.Location(), keys, strings.ToUpper(command.Arg), meta)
 }
 
 func (r *PreferSecretMountsForBuildCredentialsRule) checkEnv(
@@ -129,17 +153,34 @@ func (r *PreferSecretMountsForBuildCredentialsRule) checkEnv(
 	if cmd == nil {
 		return nil
 	}
-	var violations []rules.Violation
+	keys := make([]string, 0, len(cmd.Env))
 	for _, kv := range cmd.Env {
-		secretID, ok := matchRubyBuildCredentialKey(kv.Key)
+		keys = append(keys, kv.Key)
+	}
+	return r.emitViolations(input, cmd.Location(), keys, strings.ToUpper(command.Env), meta)
+}
+
+// emitViolations builds one violation per recognized credential env-var
+// key in keys. Common to both ARG and ENV — the only difference is the
+// instruction label that appears in the user-visible detail message.
+func (r *PreferSecretMountsForBuildCredentialsRule) emitViolations(
+	input rules.LintInput,
+	cmdLoc []parser.Range,
+	keys []string,
+	instruction string,
+	meta rules.RuleMetadata,
+) []rules.Violation {
+	var violations []rules.Violation
+	for _, key := range keys {
+		secretID, ok := matchRubyBuildCredentialKey(key)
 		if !ok {
 			continue
 		}
-		loc := rules.NewLocationFromRanges(input.File, cmd.Location())
+		loc := rules.NewLocationFromRanges(input.File, cmdLoc)
 		v := rules.NewViolation(loc, meta.Code, meta.Description, meta.DefaultSeverity).
 			WithDocURL(meta.DocURL).
-			WithDetail(preferSecretMountsDetail(kv.Key, secretID, strings.ToUpper(command.Env))).
-			WithSuggestedFix(buildSecretMountFix(kv.Key, secretID, meta.FixPriority))
+			WithDetail(preferSecretMountsDetail(key, secretID, instruction)).
+			WithSuggestedFix(buildSecretMountFix(key, secretID, meta.FixPriority))
 		violations = append(violations, v)
 	}
 	return violations
@@ -181,7 +222,7 @@ func preferSecretMountsDetail(envKey, secretID, instruction string) string {
 		"value into image history (`docker history --no-trunc <image>`) and into the build cache key " +
 		"data. Pass it through a BuildKit secret mount instead — the secret exists for the duration of " +
 		"the RUN it's mounted into and never enters image content or cache key data: " +
-		"`RUN --mount=type=secret,id=" + secretID + ",env=" + envKey + " bundle install`."
+		"`RUN --mount=type=secret,id=" + secretID + ",env=" + envKey + " <command>`."
 }
 
 // buildSecretMountFix emits a non-edit suggestion. The exact rewrite

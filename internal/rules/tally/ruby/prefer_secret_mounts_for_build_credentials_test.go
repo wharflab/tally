@@ -97,5 +97,38 @@ ENV BUNDLE_GITHUB__COM="user:token"
 `,
 			WantViolations: 0,
 		},
+		// --- Ruby gate: non-Ruby Dockerfiles should not trigger ---
+		{
+			Name: "Node.js stage with NPM_TOKEN does not trigger (not a Ruby rule's concern)",
+			Content: `FROM node:20-slim
+ENV NPM_TOKEN="abc"
+RUN npm ci
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "non-Ruby stage with YARN_AUTH_TOKEN does not trigger",
+			Content: `FROM node:20-slim
+ARG YARN_AUTH_TOKEN
+RUN yarn install
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "meta-ARG without any Ruby stage does not trigger",
+			Content: `ARG BUNDLE_GITHUB__COM
+FROM node:20-slim
+`,
+			WantViolations: 0,
+		},
+		// --- Multiple ARG vars on a single line ---
+		{
+			Name: "ARG with multiple credential vars yields one violation per var",
+			Content: `FROM ruby:3.3-slim
+ARG BUNDLE_GITHUB__COM BUNDLE_GITLAB__COM
+RUN bundle install
+`,
+			WantViolations: 2,
+		},
 	})
 }
