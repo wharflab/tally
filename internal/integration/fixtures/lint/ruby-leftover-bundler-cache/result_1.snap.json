@@ -1,0 +1,60 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-leftover-bundler-cache/Dockerfile",
+      "violations": [
+        {
+          "detail": "After `bundle install` runs, Bundler leaves three cache directories behind that ship in the final image layer: `~/.bundle/`, `${BUNDLE_PATH}/ruby/*/cache` (gem `.gem` archives), and `${BUNDLE_PATH}/ruby/*/bundler/gems/*/.git` (full git history of git-sourced gems). The Rails generator template explicitly removes them after install. For non-trivial Rails apps these can cost 50–200 MiB of final-image weight.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/leftover-bundler-cache/",
+          "location": {
+            "end": {
+              "column": 18,
+              "line": 3
+            },
+            "file": "fixtures/lint/ruby-leftover-bundler-cache/Dockerfile",
+            "start": {
+              "column": 11,
+              "line": 3
+            }
+          },
+          "message": "`bundle install` leaves cache directories behind that bloat the final image",
+          "rule": "tally/ruby/leftover-bundler-cache",
+          "severity": "info",
+          "sourceCode": "RUN bundle install",
+          "suggestedFix": {
+            "description": "Strip Bundler's cache directories after install (matches the Rails generator template)",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 4
+                  },
+                  "file": "fixtures/lint/ruby-leftover-bundler-cache/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 4
+                  }
+                },
+                "newText": "RUN rm -rf ~/.bundle/ \"${BUNDLE_PATH}\"/ruby/*/cache \"${BUNDLE_PATH}\"/ruby/*/bundler/gems/*/.git\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

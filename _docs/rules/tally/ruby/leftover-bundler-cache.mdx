@@ -1,0 +1,115 @@
+---
+title: "tally/ruby/leftover-bundler-cache"
+description: "`bundle install` leaves Bundler's cache directories behind, bloating the final image."
+---
+
+`bundle install` leaves cache directories behind that ship in the final image layer.
+
+| Property | Value |
+|----------|-------|
+| Severity | Info (default) / Warning (≥ 80 gems in `Gemfile.lock`) |
+| Category | Performance |
+| Default | Enabled |
+| Auto-fix | Yes (`FixSuggestion`) |
+
+## Description
+
+After `bundle install` runs, Bundler leaves three cache directories behind that the Rails generator template
+explicitly removes:
+
+1. `~/.bundle/` — Bundler's user-level config and runtime cache.
+2. `${BUNDLE_PATH}/ruby/*/cache` — gem `.gem` archives that were used to install gems and are no longer needed.
+3. `${BUNDLE_PATH}/ruby/*/bundler/gems/*/.git` — the full git history of any git-sourced gems.
+
+For non-trivial Rails apps these can cost 50–200 MiB of final-image weight. The Rails generator template runs:
+
+```dockerfile
+RUN bundle install \
+    && rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git
+```
+
+The corpus shows only **38 of 196** Dockerfiles do this cleanup; the other 75 % of `bundle install` invocations
+ship the caches in the final image.
+
+This rule fires when:
+
+- A Ruby-shaped stage runs `bundle install`.
+- Neither the same RUN nor any later RUN in the same stage performs cleanup of the cache directories.
+
+`bundle clean --force` (Bundler's own cleanup mechanism) is recognized as compliant for the `cache/`
+directory.
+
+### Suppressions
+
+The rule does NOT fire on:
+
+- Builder stages whose layers are not part of the final image (any stage referenced by a later
+  `COPY --from=<stage>` is exported, not copied wholesale).
+- Stages explicitly named `dev`, `development`, `test`, `testing`, `ci`, or `debug`.
+- Non-Ruby stages.
+- Windows stages.
+
+### Context-aware refinement
+
+When tally is invoked with `--context` and `Gemfile.lock` is observable, severity escalates from `info` to
+`warning` for projects with **≥ 80 resolved gems**. The rationale: the absolute size of the leftover cache
+scales with the gem count, so projects with large `Gemfile.lock` files pay a much steeper image-size cost
+when this rule fires.
+
+The detail text also names the exact gem count when the lockfile is observable.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM ruby:3.3-slim
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+```
+
+### After
+
+The Rails-generator-style fix appends the cleanup to a RUN after the install:
+
+```dockerfile
+FROM ruby:3.3-slim
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+RUN rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git
+```
+
+The cleanup can also be chained directly to the install RUN to avoid an extra layer:
+
+```dockerfile
+FROM ruby:3.3-slim
+COPY Gemfile Gemfile.lock ./
+RUN bundle install \
+    && rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git
+```
+
+`bundle clean --force` is also accepted:
+
+```dockerfile
+RUN bundle install && bundle clean --force
+```
+
+## Auto-fix
+
+The rule offers a `FixSuggestion` that inserts a new `RUN` line immediately after the offending `bundle
+install`:
+
+```dockerfile
+RUN rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git
+```
+
+The fix is `FixSuggestion` (not `FixSafe`) because the canonical paths assume `BUNDLE_PATH` follows the Rails
+generator's default placement. Projects with custom `BUNDLE_PATH` values may need to adjust the paths after
+applying the fix.
+
+## References
+
+- [Rails Dockerfile generator template](https://github.com/rails/rails/blob/main/railties/lib/rails/generators/rails/app/templates/Dockerfile.tt) —
+  performs the canonical cleanup after `bundle install`.
+- [Bundler `bundle clean` documentation](https://bundler.io/v2.5/man/bundle-clean.1.html) — Bundler's own
+  cleanup mechanism for the `cache/` directory.
