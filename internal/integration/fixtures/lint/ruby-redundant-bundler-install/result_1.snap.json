@@ -1,0 +1,125 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-redundant-bundler-install/Dockerfile",
+      "violations": [
+        {
+          "detail": "Official `ruby:*` images ship Bundler 2.x pre-installed and resolved on `$PATH`. Reinstalling Bundler via `gem install bundler` re-downloads and recompiles a tool that's already there, slowing every build and introducing version drift between development and CI. If a specific Bundler version is required, the `Gemfile.lock` BUNDLED WITH block plus Bundler's version-aware shim (`bundle _\u003cversion\u003e_ install`) handles it without a fresh `gem install`.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/redundant-bundler-install/",
+          "location": {
+            "end": {
+              "column": 23,
+              "line": 3
+            },
+            "file": "fixtures/lint/ruby-redundant-bundler-install/Dockerfile",
+            "start": {
+              "column": 4,
+              "line": 3
+            }
+          },
+          "message": "`gem install bundler` is redundant on official ruby:* images that already ship Bundler 2.x",
+          "rule": "tally/ruby/redundant-bundler-install",
+          "severity": "warning",
+          "sourceCode": "RUN gem install bundler",
+          "suggestedFix": {
+            "description": "Remove `gem install bundler` — Bundler 2.x ships with the official ruby:* image",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 4
+                  },
+                  "file": "fixtures/lint/ruby-redundant-bundler-install/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 3
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Official `ruby:*` images ship Bundler 2.x pre-installed and resolved on `$PATH`. Reinstalling Bundler via `gem install bundler` re-downloads and recompiles a tool that's already there, slowing every build and introducing version drift between development and CI. If a specific Bundler version is required, the `Gemfile.lock` BUNDLED WITH block plus Bundler's version-aware shim (`bundle _\u003cversion\u003e_ install`) handles it without a fresh `gem install`.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/redundant-bundler-install/",
+          "location": {
+            "end": {
+              "column": 32,
+              "line": 9
+            },
+            "file": "fixtures/lint/ruby-redundant-bundler-install/Dockerfile",
+            "start": {
+              "column": 4,
+              "line": 9
+            }
+          },
+          "message": "`gem install bundler` is redundant on official ruby:* images that already ship Bundler 2.x",
+          "rule": "tally/ruby/redundant-bundler-install",
+          "severity": "warning",
+          "sourceCode": "RUN gem install bundler -v 2.5.6",
+          "suggestedFix": {
+            "description": "Remove `gem install bundler` — Bundler 2.x ships with the official ruby:* image",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 10
+                  },
+                  "file": "fixtures/lint/ruby-redundant-bundler-install/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 9
+                  }
+                },
+                "newText": ""
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88,
+            "safety": 1
+          }
+        },
+        {
+          "detail": "Official `ruby:*` images ship Bundler 2.x pre-installed and resolved on `$PATH`. Reinstalling Bundler via `gem install bundler` re-downloads and recompiles a tool that's already there, slowing every build and introducing version drift between development and CI. If a specific Bundler version is required, the `Gemfile.lock` BUNDLED WITH block plus Bundler's version-aware shim (`bundle _\u003cversion\u003e_ install`) handles it without a fresh `gem install`.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/redundant-bundler-install/",
+          "location": {
+            "end": {
+              "column": 41,
+              "line": 13
+            },
+            "file": "fixtures/lint/ruby-redundant-bundler-install/Dockerfile",
+            "start": {
+              "column": 22,
+              "line": 13
+            }
+          },
+          "message": "`gem install bundler` is redundant on official ruby:* images that already ship Bundler 2.x",
+          "rule": "tally/ruby/redundant-bundler-install",
+          "severity": "warning",
+          "sourceCode": "RUN apt-get update \u0026\u0026 gem install bundler \u0026\u0026 bundle install",
+          "suggestedFix": {
+            "description": "Remove the `gem install bundler` step from this chain — Bundler 2.x ships with the official ruby:* image",
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 3,
+    "warnings": 3
+  }
+}
