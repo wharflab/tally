@@ -13,7 +13,7 @@ FROM downloader AS fetcher
 RUN wget https://example.com/data.json -O /tmp/data.json
 
 # Stage 4: dotfile config already present — should NOT trigger
-FROM debian:bookworm AS configured-user
+FROM debian:bookworm-20260505@sha256:85019db29298555fd1a5f4bb57673ae989414a9884117c75d7a3e1a6cce21688 AS configured-user
 RUN echo -e "retry_connrefused = on\ntimeout=15\ntries=5\nretry-on-host-error=on\n" > /root/.wgetrc
 RUN wget https://github.com/unicode-org/icu/releases/download/release-67-1/icu4c-67_1-src.tgz -O /tmp/icu.tgz
 

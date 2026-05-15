@@ -19,7 +19,7 @@ RUN echo "arm64 only"
 FROM --platform=linux/arm/v7 debian:bookworm-slim
 
 # Hadolint DL3029 case 1: Single-component constant platform → should warn
-FROM --platform=linux debian:bookworm
+FROM --platform=linux debian:bookworm-20260505@sha256:85019db29298555fd1a5f4bb57673ae989414a9884117c75d7a3e1a6cce21688
 
 # Variable with default expansion → should NOT warn
 FROM --platform=${BUILDPLATFORM:-} alpine:3.21

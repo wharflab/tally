@@ -1,2 +1,2 @@
-FROM debian:bookworm
+FROM debian:bookworm-20260505@sha256:85019db29298555fd1a5f4bb57673ae989414a9884117c75d7a3e1a6cce21688
 RUN useradd -l -u 123456 appuser
