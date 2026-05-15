@@ -1,0 +1,112 @@
+---
+title: "tally/ruby/missing-bundle-without-development"
+description: "Production stage runs `bundle install` without excluding the `development` gem group."
+---
+
+Production stage runs `bundle install` without excluding the `development` gem group via `BUNDLE_WITHOUT`.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Security |
+| Default | Enabled |
+| Auto-fix | Yes (FixSafe) |
+
+## Description
+
+Bundler installs every gem in the `Gemfile` by default. The Rails generator template explicitly excludes the
+`development` group at the image level via `ENV BUNDLE_WITHOUT="development"` precisely because, without it,
+production images ship `web-console`, `byebug`, `pry`, `rspec-rails`, `letter_opener`, `bullet`, `spring`, and
+similar development-only gems — bloating image size and exposing development-only attack surface.
+
+`web-console` in particular has documented RCE history when it leaks into production. The
+[Rails security guide](https://guides.rubyonrails.org/security.html) calls this out, and Bundler 2.x documents
+[`BUNDLE_WITHOUT`](https://bundler.io/v2.5/man/bundle-config.1.html) and `bundle config set without` as the
+supported mechanism to scope the install.
+
+This rule fires when a Ruby-shaped production stage runs `bundle install` and:
+
+- Neither `ENV BUNDLE_WITHOUT=...` (with `development` in the value) nor a prior
+  `bundle config set [--local|--global] without ...development...` invocation is observable in the stage, AND
+- `ENV BUNDLE_ONLY=...` (the Bundler 2.5+ inverse selector) does not contain `production`.
+
+The "production-shaped" heuristic mirrors the
+[`tally/ruby/missing-bundle-deployment`](/rules/tally/ruby/missing-bundle-deployment/) rule:
+the Dockerfile binds `RAILS_ENV` (or `RACK_ENV`) to `"production"` somewhere, **or** the stage has no
+explicit non-production marker and the rest of the stage shape (Ruby base, no dev-stage name, etc.) implies a
+runtime image.
+
+Stages explicitly named `dev`, `development`, `test`, `testing`, `ci`, or `debug` are skipped, as are stages
+whose effective env binds `RAILS_ENV`/`RACK_ENV` to `development` or `test`.
+
+Because the rule lives in the Ruby namespace and its remedy is Rails-flavored, it only fires on stages that
+look like a Ruby runtime: an official `ruby:*` base, a familiar name containing `ruby` or `rails`, a
+Ruby-runtime derivative, a stage env carrying Ruby/Rails/Bundler signals, or an ENTRYPOINT/CMD that invokes
+`ruby`, `rails`, `bundle`, `puma`, etc.
+
+### Context-aware refinement
+
+When tally is invoked with `--context` (or via Bake/Compose), the rule consults the project's `Gemfile` to
+sharpen its behavior:
+
+- **Suppressed when there is nothing to exclude.** If the `Gemfile` is observable and contains no
+  `group :development do` block (some library-style or ops-tool gems don't), the rule skips entirely — the
+  recommendation would be moot.
+- **Smarter fix wording.** If the `Gemfile` contains both `group :development` and `group :test` blocks,
+  the auto-fix emits `ENV BUNDLE_WITHOUT="development:test"` so production images don't ship `rspec-rails`,
+  `capybara`, or other test-only gems either. With only `:development`, the fix uses the Rails generator's
+  exact wording, `ENV BUNDLE_WITHOUT="development"`.
+
+If the `Gemfile` is not observable (Dockerfile-only mode), the rule applies and the fix defaults to
+`ENV BUNDLE_WITHOUT="development"`.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM ruby:3.3-slim
+ENV RAILS_ENV="production"
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+COPY . .
+CMD ["bin/rails", "server"]
+```
+
+### After
+
+The Rails-generator-style fix declares `BUNDLE_WITHOUT` once at the top of the stage so every nested
+`bundle install` (including any inside CI scripts or entrypoints) honors it:
+
+```dockerfile
+FROM ruby:3.3-slim
+ENV RAILS_ENV="production"
+ENV BUNDLE_WITHOUT="development"
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+COPY . .
+CMD ["bin/rails", "server"]
+```
+
+The Bundler 2.5+ inverse selector also satisfies the rule:
+
+```dockerfile
+ENV BUNDLE_ONLY="default:production"
+```
+
+## Auto-fix
+
+The rule offers a `FixSafe` that inserts `ENV BUNDLE_WITHOUT="development"` (or `"development:test"` when
+both groups are observable in the project's `Gemfile`) on the line immediately following the stage's `FROM`.
+Insertion is zero-width at column 0, so it composes cleanly with other rule edits in the same stage.
+
+## References
+
+- [Rails Dockerfile generator template](https://github.com/rails/rails/blob/main/railties/lib/rails/generators/rails/app/templates/Dockerfile.tt) —
+  emits `ENV BUNDLE_WITHOUT="development"` in the base stage.
+- [Bundler `bundle config` documentation](https://bundler.io/v2.5/man/bundle-config.1.html) —
+  `BUNDLE_WITHOUT` and `BUNDLE_ONLY` semantics.
+- [Bundler 2 upgrade guide](https://bundler.io/guides/bundler_2_upgrade.html) — deprecation of
+  `bundle install --without`.
+- [Rails security guide](https://guides.rubyonrails.org/security.html) — context for keeping development-only
+  gems out of production images.
