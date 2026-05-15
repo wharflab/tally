@@ -10,7 +10,7 @@
 ################################################################################
 
 ### 3.22.1
-ARG alpine_digest="sha256:4bcff63911fcb4448bd4fdacec207030997caf25e9bea4045fa6c8c44de311d1"
+ARG alpine_digest="sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11"
 
 ARG binaryen_checksum="e959f2170af4c20c552e9de3a0253704d6a9d2766e8fdb88e4d6ac4bae9388fe"
 
