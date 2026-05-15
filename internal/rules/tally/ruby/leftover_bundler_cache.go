@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/moby/buildkit/frontend/dockerfile/instructions"
+
 	rubyfacts "github.com/wharflab/tally/internal/facts/ruby"
 
 	"github.com/wharflab/tally/internal/facts"
@@ -11,7 +13,6 @@ import (
 	"github.com/wharflab/tally/internal/semantic"
 	"github.com/wharflab/tally/internal/shell"
 	"github.com/wharflab/tally/internal/sourcemap"
-	"github.com/wharflab/tally/internal/stagename"
 )
 
 // LeftoverBundlerCacheRuleCode is the full rule code.
@@ -55,28 +56,15 @@ func (r *LeftoverBundlerCacheRule) Check(input rules.LintInput) []rules.Violatio
 	rubyFacts := input.Facts.RubyFacts()
 
 	var violations []rules.Violation
-	for stageIdx, stage := range input.Stages {
-		if stagename.LooksLikeDev(stage.Name) {
-			continue
-		}
-		sf := input.Facts.Stage(stageIdx)
-		if sf == nil {
-			continue
-		}
-		if sf.BaseImageOS == semantic.BaseImageOSWindows {
-			continue
-		}
-		if !stageLooksLikeRuby(input.Semantic, stageIdx, stage, sf) {
-			continue
-		}
+	forEachRubyStage(input, func(stageIdx int, _ instructions.Stage, sf *facts.StageFacts) {
 		// Skip stages whose only purpose is to build gems for COPY-out
 		// (the cache only matters in stages whose layers ship in the
 		// final image).
 		if stageIsBuilderForCopyOut(input.Semantic, stageIdx, len(input.Stages)) {
-			continue
+			return
 		}
 		violations = append(violations, r.checkStage(input, sf, sm, rubyFacts, meta)...)
-	}
+	})
 	return violations
 }
 
