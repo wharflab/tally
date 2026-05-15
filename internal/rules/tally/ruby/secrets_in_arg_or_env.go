@@ -111,6 +111,11 @@ func (r *SecretsInArgOrEnvRule) checkArgValue(
 		if arg.Value != nil {
 			value = strings.TrimSpace(*arg.Value)
 		}
+		// BuildKit preserves quote characters in arg.Value, so a
+		// quoted placeholder like `ARG SECRET_KEY_BASE="dummy"`
+		// arrives as `"dummy"` (with literal quote bytes). Strip
+		// surrounding quotes before the placeholder check.
+		value = stripSurroundingQuotes(value)
 		if isPlaceholderSecretValue(value) {
 			continue
 		}
@@ -138,13 +143,7 @@ func (r *SecretsInArgOrEnvRule) checkEnvValues(
 			continue
 		}
 		value := strings.TrimSpace(kv.Value)
-		// Strip surrounding quotes for placeholder check.
-		unquoted := value
-		if len(unquoted) >= 2 &&
-			((unquoted[0] == '"' && unquoted[len(unquoted)-1] == '"') ||
-				(unquoted[0] == '\'' && unquoted[len(unquoted)-1] == '\'')) {
-			unquoted = unquoted[1 : len(unquoted)-1]
-		}
+		unquoted := stripSurroundingQuotes(value)
 		if isPlaceholderSecretValue(unquoted) {
 			continue
 		}
@@ -156,6 +155,18 @@ func (r *SecretsInArgOrEnvRule) checkEnvValues(
 		violations = append(violations, v)
 	}
 	return violations
+}
+
+// stripSurroundingQuotes removes a single layer of matching `"` or `'`
+// quotes. Used because BuildKit preserves the literal quote characters
+// in ENV/ARG values.
+func stripSurroundingQuotes(s string) string {
+	if len(s) >= 2 &&
+		((s[0] == '"' && s[len(s)-1] == '"') ||
+			(s[0] == '\'' && s[len(s)-1] == '\'')) {
+		return s[1 : len(s)-1]
+	}
+	return s
 }
 
 // isPlaceholderSecretValue reports whether a value is a known Rails
