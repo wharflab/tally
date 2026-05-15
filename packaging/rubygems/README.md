@@ -105,6 +105,7 @@ After (the Rails generator's canonical shape, derived):
 ```dockerfile
 # syntax=docker/dockerfile:1
 FROM ruby:3.3-slim AS base
+WORKDIR /rails
 ENV RAILS_ENV=production \
     BUNDLE_DEPLOYMENT=1 \
     BUNDLE_PATH=/usr/local/bundle \
@@ -116,7 +117,7 @@ RUN --mount=type=bind,source=Gemfile,target=Gemfile \
     --mount=type=bind,source=Gemfile.lock,target=Gemfile.lock \
     --mount=type=cache,target=${BUNDLE_PATH}/cache,sharing=locked \
     bundle install --jobs=4 \
- && rm -rf "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git \
+ && rm -rf ~/.bundle/ "${BUNDLE_PATH}"/ruby/*/cache "${BUNDLE_PATH}"/ruby/*/bundler/gems/*/.git \
  && bundle exec bootsnap precompile -j 1 --gemfile
 
 COPY . .
@@ -124,9 +125,9 @@ RUN bundle exec bootsnap precompile -j 1 app/ lib/ \
  && SECRET_KEY_BASE_DUMMY=1 bin/rails assets:precompile
 
 FROM base
-COPY --from=build /usr/local/bundle /usr/local/bundle
-COPY --from=build /rails /rails
-RUN useradd -u 1000 rails && chown -R rails:rails /rails tmp log storage db
+RUN useradd -u 1000 rails
+COPY --chown=rails:rails --from=build /usr/local/bundle /usr/local/bundle
+COPY --chown=rails:rails --from=build /rails /rails
 USER rails:rails
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD ["ruby", "-rnet/http", "-e", \
