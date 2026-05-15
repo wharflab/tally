@@ -889,6 +889,57 @@ VOLUME /data
 	}
 }
 
+func TestFileFacts_RubyFacts_NilContextReader(t *testing.T) {
+	t.Parallel()
+
+	fileFacts := makeFileFacts(t, "FROM ruby:3.3\n")
+
+	got := fileFacts.RubyFacts()
+	if got == nil {
+		t.Fatal("RubyFacts() = nil, want non-nil")
+	}
+	if got.Lockfile != nil || got.Gemfile != nil || got.RubyVersion != "" {
+		t.Errorf("RubyFacts() = %+v, want all-nil for nil reader", got)
+	}
+}
+
+func TestFileFacts_RubyFacts_ReadsFromContext(t *testing.T) {
+	t.Parallel()
+
+	const lockfile = `GEM
+  remote: https://rubygems.org/
+  specs:
+    rake (13.2.1)
+
+DEPENDENCIES
+  rake
+
+BUNDLED WITH
+   2.5.6
+`
+	reader := &countingContextReader{
+		files: map[string]string{
+			"Gemfile.lock": lockfile,
+		},
+	}
+
+	fileFacts := makeFileFactsWithContext(t, "FROM ruby:3.3\n", reader)
+
+	first := fileFacts.RubyFacts()
+	if first == nil || first.Lockfile == nil {
+		t.Fatal("RubyFacts().Lockfile = nil, want non-nil")
+	}
+	if got, want := first.Lockfile.BundledWith, "2.5.6"; got != want {
+		t.Errorf("BundledWith = %q, want %q", got, want)
+	}
+
+	// Repeated calls must return the same memoized pointer.
+	second := fileFacts.RubyFacts()
+	if first != second {
+		t.Errorf("RubyFacts() returned different pointers on repeat call: %p vs %p", first, second)
+	}
+}
+
 func makeFileFacts(t *testing.T, content string) *FileFacts {
 	t.Helper()
 	return makeFileFactsWithContext(t, content, nil)

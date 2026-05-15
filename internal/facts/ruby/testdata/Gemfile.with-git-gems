@@ -1,0 +1,18 @@
+source "https://rubygems.org"
+source "https://gems.example.com" do
+  gem "private-widget"
+end
+
+ruby '3.4.0'
+
+gem "rails", git: "https://github.com/rails/rails.git", branch: "main"
+gem "rspec", github: "rspec/rspec"
+gem "old-style", :git => "https://example.com/old-style.git"
+gem "puma"
+
+# A comment with "fake" string contents inside that should be ignored.
+# gem "ignored", git: "https://nope.example.com" -- this is a comment
+
+group :test do
+  gem "capybara"
+end

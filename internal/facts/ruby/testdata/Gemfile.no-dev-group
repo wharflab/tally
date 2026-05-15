@@ -1,0 +1,6 @@
+source "https://rubygems.org"
+
+# Library-style gem with no :development group.
+gemspec
+
+gem "rake"
