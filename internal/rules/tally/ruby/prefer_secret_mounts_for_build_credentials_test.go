@@ -153,6 +153,34 @@ ENV BUNDLE_BUILD__NOKOGIRI=--use-system-libraries
 			WantViolations: 0,
 		},
 		{
+			Name: "BUNDLE_PATH__SYSTEM is path.system config, not a credential",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_PATH__SYSTEM=true
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "BUNDLE_GEM__COC is gem-template flag, not a credential",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_GEM__COC=true
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "BUNDLE_CACHE__ALL is cache config, not a credential",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_CACHE__ALL=true
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "BUNDLE_DISABLE__VERSION_CHECK is feature flag, not a credential",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_DISABLE__VERSION_CHECK=true
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "BUNDLE_GEMS__ACME__CO__UK triggers (compound TLD)",
 			Content: `FROM ruby:3.3-slim
 ENV BUNDLE_GEMS__ACME__CO__UK="user:token"

@@ -219,18 +219,26 @@ func matchRubyBuildCredentialKey(key string) (string, bool) {
 // topic in this list is a config key, not a host credential.
 //
 // Source: bundler/bundler config namespaces — the host-credential
-// path uses `BUNDLE_<HOST>__<TLD>` but a few `__`-encoded namespaces
-// describe gem identity rather than a host:
+// path uses `BUNDLE_<HOST>__<TLD>` but several `__`-encoded namespaces
+// describe gem identity, paths, or other non-secret config:
 //   - LOCAL: `local.<gem>` overrides for development paths
 //   - BUILD: `build.<gem>` per-gem build flags
+//   - PATH:  `path.system` boolean and similar
+//   - GEM:   `gem.coc`/`gem.mit`/`gem.test`/etc. — gem-template flags
+//   - CACHE: `cache.all`/`cache.path` — cache config
+//   - DISABLE: `disable.foo` — feature disable flags
 //
 // We err toward `true` for everything else (any `BUNDLE_*__*` not in
 // this list) — Bundler's host-credential surface is open-ended, so an
 // allowlist would miss valid public-suffix TLDs (`.co.uk`, `.de`,
 // `.com.br`, etc.).
 var bundlerNonHostConfigPrefixes = map[string]bool{
-	"LOCAL": true,
-	"BUILD": true,
+	"LOCAL":   true,
+	"BUILD":   true,
+	"PATH":    true,
+	"GEM":     true,
+	"CACHE":   true,
+	"DISABLE": true,
 }
 
 // isBundlerHostCredentialKey reports whether a key matches Bundler's
