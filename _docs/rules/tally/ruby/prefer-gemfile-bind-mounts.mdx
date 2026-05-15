@@ -1,0 +1,78 @@
+---
+title: "tally/ruby/prefer-gemfile-bind-mounts"
+description: "`COPY Gemfile Gemfile.lock` + `RUN bundle install` can become a BuildKit bind mount."
+---
+
+`COPY Gemfile Gemfile.lock` followed by `RUN bundle install` can be replaced by a BuildKit bind-mount on the
+manifests, eliminating the layer that just carries the manifest files.
+
+| Property | Value |
+|----------|-------|
+| Severity | Info |
+| Category | Performance |
+| Default | Enabled (advisory) |
+| Auto-fix | `FixSuggestion` (no-edit) |
+
+## Description
+
+The dominant pattern in the corpus is:
+
+```dockerfile
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+```
+
+That bakes the manifest files into an image layer that is later overwritten by `COPY . .` and rewritten by
+every `assets:precompile` and `bootsnap precompile` invocation. With BuildKit, the manifests can be
+bind-mounted directly into the `RUN`, never appearing as layer content at all.
+
+The corpus shows **94 of 196** Rails Dockerfiles `COPY Gemfile Gemfile.lock` (plus standalone files), and
+**0 of 196** use a BuildKit bind mount. This rule's job is to surface the pattern at the moment a user
+reaches for the older one.
+
+The rule fires only when:
+
+- The Dockerfile carries `# syntax=docker/dockerfile:1` (or compatible) — bind mounts require BuildKit.
+- A Ruby-shaped stage has a `COPY Gemfile Gemfile.lock ...` (or `COPY Gemfile* ./`) instruction.
+- The same stage runs `bundle install`.
+
+`COPY . .` (wholesale tree copy) doesn't trigger the rule — that's a different pattern with different
+trade-offs.
+
+Stages explicitly named `dev`/`development`/`test`/`testing`/`ci`/`debug` are skipped.
+
+## Examples
+
+### Before
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM ruby:3.3-slim
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+```
+
+### After
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM ruby:3.3-slim
+RUN --mount=type=bind,source=Gemfile,target=Gemfile \
+    --mount=type=bind,source=Gemfile.lock,target=Gemfile.lock \
+    --mount=type=cache,target=${BUNDLE_PATH}/cache,sharing=locked \
+    bundle install
+```
+
+The manifests are visible to `bundle install` for the duration of the RUN but never become layer content.
+Combined with the cache mount on `${BUNDLE_PATH}/cache`, this is the modern shape of a Ruby dependency stage.
+
+## Auto-fix
+
+`FixSuggestion` (no-edit). The rule emits a description-only suggestion: rewriting `COPY` + `RUN` into a
+single `RUN --mount=type=bind` block is too easy to get wrong on multi-line `RUN` chains. The user applies
+the rewrite manually.
+
+## References
+
+- [Docker BuildKit `RUN --mount=type=bind` documentation](https://docs.docker.com/build/cache/optimize/#use-bind-mounts).
+- [Bundler `bundle install` documentation](https://bundler.io/v2.5/man/bundle-install.1.html).

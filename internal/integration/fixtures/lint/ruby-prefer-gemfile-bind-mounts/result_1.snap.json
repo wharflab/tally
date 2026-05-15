@@ -1,0 +1,43 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-prefer-gemfile-bind-mounts/Dockerfile",
+      "violations": [
+        {
+          "detail": "94 of 196 Rails Dockerfiles in the corpus `COPY Gemfile Gemfile.lock`; 0 use a BuildKit bind mount. With `# syntax=docker/dockerfile:1`, the manifests can be bind-mounted directly into the `bundle install` RUN — they never appear as layer content. Combined with `--mount=type=cache` for `${BUNDLE_PATH}/cache`, this is the modern shape of a Ruby dependency stage.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/prefer-gemfile-bind-mounts/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 4
+            },
+            "file": "fixtures/lint/ruby-prefer-gemfile-bind-mounts/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 4
+            }
+          },
+          "message": "`COPY Gemfile Gemfile.lock` followed by `bundle install` can be replaced by a BuildKit bind mount",
+          "rule": "tally/ruby/prefer-gemfile-bind-mounts",
+          "severity": "info",
+          "sourceCode": "COPY Gemfile Gemfile.lock ./",
+          "suggestedFix": {
+            "description": "Replace COPY Gemfile Gemfile.lock + RUN bundle install with `RUN --mount=type=bind,source=Gemfile,target=Gemfile --mount=type=bind,source=Gemfile.lock,target=Gemfile.lock --mount=type=cache,target=${BUNDLE_PATH}/cache,sharing=locked bundle install`",
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}
