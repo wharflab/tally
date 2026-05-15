@@ -1,0 +1,21 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    bootsnap (1.18.4)
+      msgpack (~> 1.2)
+    msgpack (1.7.2)
+    rails (8.0.0)
+
+PLATFORMS
+  ruby
+  x86_64-linux
+
+DEPENDENCIES
+  bootsnap
+  rails (~> 8.0)
+
+RUBY VERSION
+   ruby 3.3.5p100
+
+BUNDLED WITH
+   2.5.22

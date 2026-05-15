@@ -1,0 +1,9 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/ruby/bootsnap-precompile-without-j1"]
+exclude = ["*"]
+
+[output]
+fail-level = "none"

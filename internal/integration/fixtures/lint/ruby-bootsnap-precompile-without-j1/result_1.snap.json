@@ -1,0 +1,99 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+      "violations": [
+        {
+          "detail": "`bootsnap precompile` defaults to host CPU parallelism, which crashes under QEMU multi-arch builds (see https://github.com/Shopify/bootsnap/issues/495). The Rails generator template carries `-j 1` for exactly this reason.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/bootsnap-precompile-without-j1/",
+          "location": {
+            "end": {
+              "column": 38,
+              "line": 6
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 19,
+              "line": 6
+            }
+          },
+          "message": "`bootsnap precompile` runs without `-j 1`, which crashes under QEMU multi-arch builds",
+          "rule": "tally/ruby/bootsnap-precompile-without-j1",
+          "severity": "warning",
+          "sourceCode": "    \u0026\u0026 bundle exec bootsnap precompile --gemfile",
+          "suggestedFix": {
+            "description": "Insert `-j 1` after `bootsnap precompile` to avoid the QEMU multi-arch crash",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 38,
+                    "line": 6
+                  },
+                  "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+                  "start": {
+                    "column": 38,
+                    "line": 6
+                  }
+                },
+                "newText": " -j 1"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88
+          }
+        },
+        {
+          "detail": "`bootsnap precompile` defaults to host CPU parallelism, which crashes under QEMU multi-arch builds (see https://github.com/Shopify/bootsnap/issues/495). The Rails generator template carries `-j 1` for exactly this reason.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/bootsnap-precompile-without-j1/",
+          "location": {
+            "end": {
+              "column": 35,
+              "line": 32
+            },
+            "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+            "start": {
+              "column": 16,
+              "line": 32
+            }
+          },
+          "message": "`bootsnap precompile` runs without `-j 1`, which crashes under QEMU multi-arch builds",
+          "rule": "tally/ruby/bootsnap-precompile-without-j1",
+          "severity": "warning",
+          "sourceCode": "RUN bundle exec bootsnap precompile app/ lib/",
+          "suggestedFix": {
+            "description": "Insert `-j 1` after `bootsnap precompile` to avoid the QEMU multi-arch crash",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 35,
+                    "line": 32
+                  },
+                  "file": "fixtures/lint/ruby-bootsnap-precompile-without-j1/Dockerfile",
+                  "start": {
+                    "column": 35,
+                    "line": 32
+                  }
+                },
+                "newText": " -j 1"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 2,
+    "warnings": 2
+  }
+}

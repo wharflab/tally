@@ -1,0 +1,83 @@
+---
+title: "tally/ruby/bootsnap-precompile-without-j1"
+description: "`bootsnap precompile` runs without `-j 1`, which crashes under QEMU multi-arch builds."
+---
+
+`bootsnap precompile` defaults to host-CPU parallelism. Inside `docker buildx`'s QEMU emulation —
+the standard path for any multi-arch Rails container build — that parallel mode trips a known QEMU
+bug and crashes the build. The Rails 7.1+ generator template carries `-j 1` and a code comment
+about this exact failure mode.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Correctness |
+| Default | Enabled |
+| Auto-fix | Yes (safe) |
+
+## Description
+
+This rule fires when a `RUN` instruction executes `bootsnap precompile` (with or without a
+`bundle exec` prefix) and does not carry `-j 1` (or any of the equivalent forms `-j1`, `-j=1`,
+`--jobs 1`, `--jobs=1`).
+
+Recognized as compliant:
+
+- `-j 1` / `-j1` / `-j=1`
+- `--jobs 1` / `--jobs=1`
+- The same `RUN` is wrapped in a `BUILDPLATFORM == TARGETPLATFORM` shell check (the user has
+  explicitly avoided emulated paths). Detection is heuristic: both `BUILDPLATFORM` and
+  `TARGETPLATFORM` must appear in the script alongside the bootsnap call.
+
+The rule only fires on stages that look like a Ruby/Rails runtime — official `ruby:*` bases,
+known derivatives, or stages whose env or runtime command signals Ruby/Rails. Stages explicitly
+named `dev`, `development`, `test`, `testing`, `ci`, or `debug` are skipped, as are Windows-based
+stages.
+
+When `Gemfile.lock` is observable in the build context (via `--context`, Bake, or Compose), the
+rule additionally suppresses if the lockfile does not list `bootsnap` as a dependency. Some
+boilerplate Dockerfiles still carry `bootsnap precompile` for projects that have removed
+`bootsnap` from their `Gemfile`; the rule should not fire on those.
+
+The rule does not fire on `bootsnap` invocations other than `precompile` (for example,
+`bootsnap doctor`).
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM ruby:3.3-slim
+RUN bundle install \
+    && bundle exec bootsnap precompile app/ lib/
+CMD ["bin/rails", "server"]
+```
+
+### After
+
+The Rails-generator-style fix inserts `-j 1` directly after `bootsnap precompile`. Bootsnap then
+compiles serially and avoids the QEMU emulation crash.
+
+```dockerfile
+FROM ruby:3.3-slim
+RUN bundle install \
+    && bundle exec bootsnap precompile -j 1 app/ lib/
+CMD ["bin/rails", "server"]
+```
+
+If your build is gated by an explicit
+`if [ "$BUILDPLATFORM" = "$TARGETPLATFORM" ]; then …; fi` check, the rule stands down — the
+parallel path is provably never reached under QEMU.
+
+## Auto-fix
+
+The rule offers a `FixSafe` text edit that inserts `-j 1` immediately after the
+`bootsnap precompile` token. The edit is structural-neutral: it adds one flag without rewriting
+any surrounding shell or moving any other arguments, so it is eligible for batch `--fix` runs.
+
+## References
+
+- [bootsnap issue #495](https://github.com/Shopify/bootsnap/issues/495) — upstream tracking issue
+  for the QEMU multi-arch crash that motivated the `-j 1` flag.
+- [Rails Dockerfile generator template](https://github.com/rails/rails/blob/main/railties/lib/rails/generators/rails/app/templates/Dockerfile.tt)
+  — emits `bundle exec bootsnap precompile -j 1 …` with a code comment about the QEMU bug.

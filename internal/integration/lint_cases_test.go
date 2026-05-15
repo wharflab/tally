@@ -72,6 +72,23 @@ func lintCases(t *testing.T) []lintCase {
 			useContext: true,
 		},
 		{
+			// Context-aware refinement for tally/ruby/bootsnap-precompile-without-j1:
+			// Gemfile.lock lists bootsnap, so the rule fires.
+			name:       "ruby-bootsnap-with-lockfile",
+			dir:        "ruby-bootsnap-with-lockfile",
+			args:       append([]string{"--format", "json"}, mustSelectRules("tally/ruby/bootsnap-precompile-without-j1")...),
+			wantExit:   1,
+			useContext: true,
+		},
+		{
+			// Context-aware refinement for tally/ruby/bootsnap-precompile-without-j1:
+			// Gemfile.lock does NOT list bootsnap, so the rule must suppress.
+			name:       "ruby-bootsnap-without-lockfile",
+			dir:        "ruby-bootsnap-without-lockfile",
+			args:       append([]string{"--format", "json"}, mustSelectRules("tally/ruby/bootsnap-precompile-without-j1")...),
+			useContext: true,
+		},
+		{
 			name:  "discovery-directory",
 			dir:   "discovery-directory",
 			args:  append([]string{"--format", "json"}, mustSelectRules("tally/max-lines")...),
