@@ -27,12 +27,12 @@
               {
                 "location": {
                   "end": {
-                    "column": 6,
+                    "column": 5,
                     "line": 5
                   },
                   "file": "fixtures/lint/ruby-state-paths-not-writable-as-non-root/Dockerfile",
                   "start": {
-                    "column": 6,
+                    "column": 5,
                     "line": 5
                   }
                 },

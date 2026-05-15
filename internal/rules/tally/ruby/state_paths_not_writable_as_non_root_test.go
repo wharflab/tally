@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/wharflab/tally/internal/fix"
 	"github.com/wharflab/tally/internal/rules"
 	"github.com/wharflab/tally/internal/testutil"
 )
@@ -132,6 +133,41 @@ COPY . .
 `,
 			WantViolations: 0,
 		},
+		// --- Regression: chown BEFORE COPY does NOT count ---
+		{
+			Name: "chown -R before COPY does NOT suppress (COPY would re-introduce root-owned files)",
+			Content: `FROM ruby:3.3-slim
+WORKDIR /rails
+RUN chown -R rails:rails db log storage tmp
+COPY . .
+USER rails:rails
+CMD ["bin/rails", "server"]
+`,
+			WantViolations: 1,
+		},
+		// --- Compliance: chown -R . (project root) covers everything ---
+		{
+			Name: "chown -R rails . after COPY suppresses (covers all dirs under WORKDIR)",
+			Content: `FROM ruby:3.3-slim
+WORKDIR /rails
+COPY . .
+RUN chown -R rails:rails .
+USER rails:rails
+CMD ["bin/rails", "server"]
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "chown -R rails:rails /rails after COPY suppresses (covers all dirs under WORKDIR)",
+			Content: `FROM ruby:3.3-slim
+WORKDIR /rails
+COPY . .
+RUN chown -R rails:rails /rails
+USER rails:rails
+CMD ["bin/rails", "server"]
+`,
+			WantViolations: 0,
+		},
 	})
 }
 
@@ -156,9 +192,15 @@ CMD ["bin/rails", "server"]
 	if v.SuggestedFix.Safety != rules.FixSuggestion {
 		t.Errorf("Safety = %v, want FixSuggestion", v.SuggestedFix.Safety)
 	}
-	got := v.SuggestedFix.Edits[0].NewText
-	want := "--chown=rails:rails "
-	if !strings.Contains(got, want) {
-		t.Errorf("fix should contain %q; got: %q", want, got)
+	if len(v.SuggestedFix.Edits) == 0 {
+		t.Fatalf("expected at least one edit; got %d", len(v.SuggestedFix.Edits))
+	}
+
+	// Apply the fix to verify the output is a syntactically correct
+	// Dockerfile (regression test for the off-by-one column bug that
+	// produced `COPY .--chown=...`).
+	got := string(fix.ApplyFix([]byte(content), v.SuggestedFix))
+	if !strings.Contains(got, "COPY --chown=rails:rails . .") {
+		t.Errorf("applied fix should produce `COPY --chown=rails:rails . .`; got:\n%s", got)
 	}
 }

@@ -1,6 +1,7 @@
 package ruby
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/moby/buildkit/frontend/dockerfile/instructions"
@@ -25,6 +26,11 @@ var railsStateDirs = []string{"tmp", "log", "storage", "db"}
 // railsServerCommand is the Rails CLI binary basename used to detect
 // Rails-app-shaped runtime stages.
 const railsServerCommand = "rails"
+
+// railsAppWorkdirs are the canonical WORKDIR values for a Rails app,
+// used to detect Rails-shaped runtime stages and to recognize
+// `chown -R user <dir>` as covering all state dirs under that root.
+var railsAppWorkdirs = []string{"/rails", "/app"}
 
 // StatePathsNotWritableAsNonRootRule flags Rails app stages that switch
 // to a non-root USER but `COPY` application content without `--chown` (or
@@ -106,9 +112,12 @@ func (r *StatePathsNotWritableAsNonRootRule) checkStage(
 		if copyHasChownToUser(copyCmd, user) {
 			continue
 		}
-		// If a later RUN performs `chown -R user dir(s)` covering all
-		// observed state dirs, the COPY is acceptable.
-		if stageHasRuntimeChown(sf, user) {
+		// If a RUN chown -R covering all canonical state dirs runs
+		// AFTER the COPY (in source order), the chown corrects the
+		// COPY's ownership and the rule is satisfied. A chown that
+		// runs BEFORE the COPY does not — the COPY would re-introduce
+		// root-owned files.
+		if stageHasRuntimeChownAfter(sf, user, copyStartLine(copyCmd)) {
 			continue
 		}
 
@@ -140,10 +149,10 @@ func statePathsDetail(user string) string {
 // gem images (no Rails) are out of scope.
 func stageLooksLikeRailsApp(stage instructions.Stage, sf *facts.StageFacts) bool {
 	// Quick wins: WORKDIR pointing at a typical Rails app directory.
-	if sf.FinalWorkdir == "/rails" || sf.FinalWorkdir == "/app" ||
-		strings.HasSuffix(sf.FinalWorkdir, "/rails") ||
-		strings.HasSuffix(sf.FinalWorkdir, "/app") {
-		return true
+	for _, workdir := range railsAppWorkdirs {
+		if sf.FinalWorkdir == workdir || strings.HasSuffix(sf.FinalWorkdir, workdir) {
+			return true
+		}
 	}
 	// ENTRYPOINT/CMD references rails-style binaries.
 	for _, name := range stageRuntimeCommandBasenames(stage) {
@@ -203,16 +212,32 @@ func copyHasChownToUser(cmd *instructions.CopyCommand, user string) bool {
 	return strings.EqualFold(strings.TrimSpace(chown), user)
 }
 
-// stageHasRuntimeChown reports whether any RUN in the stage performs
-// `chown -R user[:group] <state-dirs>` covering all four canonical Rails
-// state directories. A partial chown (e.g. only `tmp log`) is not
-// sufficient — Rails crashes on whichever directory is missing.
-func stageHasRuntimeChown(sf *facts.StageFacts, user string) bool {
+// stageHasRuntimeChownAfter reports whether any RUN at-or-after the
+// supplied source line performs `chown -R user[:group] <state-dirs>`
+// covering all four canonical Rails state directories. A chown BEFORE
+// the line does not count: it would be undone by the COPY at `line`
+// re-introducing root-owned files.
+//
+// `chown -R user .` or `chown -R user /rails` (the WORKDIR root) also
+// count as covering all state dirs because Rails state lives under
+// the WORKDIR.
+//
+// Partial chowns (e.g. only `tmp log`) are not sufficient — Rails
+// crashes on whichever directory is missing.
+func stageHasRuntimeChownAfter(sf *facts.StageFacts, user string, line int) bool {
 	if sf == nil {
 		return false
 	}
 	for _, runFacts := range sf.Runs {
-		if runFacts == nil {
+		if runFacts == nil || runFacts.Run == nil {
+			continue
+		}
+		runRanges := runFacts.Run.Location()
+		if len(runRanges) == 0 {
+			continue
+		}
+		runLine := runRanges[0].Start.Line
+		if runLine < line {
 			continue
 		}
 		for _, ci := range runFacts.CommandInfos {
@@ -231,6 +256,19 @@ func stageHasRuntimeChown(sf *facts.StageFacts, user string) bool {
 		}
 	}
 	return false
+}
+
+// copyStartLine returns the 1-based line of the COPY instruction's
+// first character, or 0 when the location is missing.
+func copyStartLine(cmd *instructions.CopyCommand) int {
+	if cmd == nil {
+		return 0
+	}
+	loc := cmd.Location()
+	if len(loc) == 0 {
+		return 0
+	}
+	return loc[0].Start.Line
 }
 
 func chownTargetsUser(args []string, user string) bool {
@@ -277,9 +315,17 @@ func chownCoversAllStateDirs(args []string) bool {
 			sawUserSpec = true
 			continue
 		}
-		// Strip leading ./ or trailing /
-		path := strings.TrimPrefix(a, "./")
-		path = strings.TrimSuffix(path, "/")
+		// A chown -R on the project root or workdir covers everything
+		// inside it, including all four state dirs.
+		path := strings.TrimSuffix(a, "/")
+		if path == "." || path == "./" {
+			return true
+		}
+		if slices.Contains(railsAppWorkdirs, path) {
+			return true
+		}
+		// Strip leading ./
+		path = strings.TrimPrefix(path, "./")
 		// Match against state dir basenames.
 		for _, d := range railsStateDirs {
 			if path == d || strings.HasSuffix(path, "/"+d) {
@@ -325,12 +371,11 @@ func buildStatePathsFix(
 		return nil
 	}
 	startLine := loc[0].Start.Line
-	// Position.Character is the 0-based column; rules.NewRangeLocation
-	// expects 1-based columns.
-	startCol := loc[0].Start.Character + 1
-	// Insert the --chown flag immediately after `COPY` (4 chars + space = 5).
+	// rules.NewRangeLocation columns are 0-based; Position.Character is
+	// also 0-based. Insert `--chown=...` immediately after `COPY ` (5
+	// chars) on the same line.
 	const copyKeywordLen = len("COPY ")
-	insertCol := startCol + copyKeywordLen
+	insertCol := loc[0].Start.Character + copyKeywordLen
 	chownFlag := "--chown=" + user + ":" + user + " "
 	return &rules.SuggestedFix{
 		Description: "Add --chown=" + user + ":" + user + " so Rails state dirs are writable at runtime",
