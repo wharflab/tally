@@ -12,17 +12,27 @@ var dockerfileSyntaxBuildKitMarkers = []string{"docker/dockerfile", "dockerfile/
 
 // hasBuildKitSyntaxPragma reports whether the Dockerfile carries a
 // `# syntax=docker/dockerfile:1` (or compatible) directive at its top.
+//
+// BuildKit recognizes parser directives as a contiguous run of `# k=v`
+// comment lines at the start of the file. A bare `#` (empty comment)
+// terminates the directive block, as does the first non-comment line.
+// Whitespace around `=` is tolerated to match BuildKit's parser.
 func hasBuildKitSyntaxPragma(input rules.LintInput) bool {
 	for line := range strings.SplitSeq(string(input.Source), "\n") {
 		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "#") {
-			break
+		// A bare `#` or any non-comment line ends the directive block.
+		if trimmed == "#" || !strings.HasPrefix(trimmed, "#") {
+			return false
 		}
-		if strings.Contains(trimmed, "syntax=") {
-			for _, m := range dockerfileSyntaxBuildKitMarkers {
-				if strings.Contains(trimmed, m) {
-					return true
-				}
+		directive := strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
+		name, value, ok := strings.Cut(directive, "=")
+		if !ok || strings.TrimSpace(name) != "syntax" {
+			continue
+		}
+		v := strings.TrimSpace(value)
+		for _, m := range dockerfileSyntaxBuildKitMarkers {
+			if strings.Contains(v, m) {
+				return true
 			}
 		}
 	}
