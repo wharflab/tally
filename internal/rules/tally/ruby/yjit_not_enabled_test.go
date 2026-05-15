@@ -114,6 +114,61 @@ CMD ["bin/rails", "server"]
 `,
 			WantViolations: 0,
 		},
+		// --- Regression: bundle exec X recognized as long-running ---
+		{
+			Name: `CMD bundle exec puma triggers (bundle exec server is long-running)`,
+			Content: `FROM ruby:3.3-slim
+CMD ["bundle", "exec", "puma"]
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: `ENTRYPOINT bundle exec rails server triggers`,
+			Content: `FROM ruby:3.3-slim
+ENTRYPOINT ["bundle", "exec", "rails", "server"]
+`,
+			WantViolations: 1,
+		},
+		// --- Regression: ENTRYPOINT with --yjit suppresses ---
+		{
+			Name: `ENTRYPOINT bundle exec puma --yjit suppresses`,
+			Content: `FROM ruby:3.3-slim
+ENTRYPOINT ["bundle", "exec", "puma", "--yjit"]
+`,
+			WantViolations: 0,
+		},
+		// --- Regression: falsy RUBY_YJIT_ENABLE values still trigger ---
+		{
+			Name: `ENV RUBY_YJIT_ENABLE=0 still triggers (falsy value doesn't enable YJIT)`,
+			Content: `FROM ruby:3.3-slim
+ENV RUBY_YJIT_ENABLE="0"
+CMD ["bin/rails", "server"]
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: `ENV RUBY_YJIT_ENABLE=false still triggers`,
+			Content: `FROM ruby:3.3-slim
+ENV RUBY_YJIT_ENABLE="false"
+CMD ["bin/rails", "server"]
+`,
+			WantViolations: 1,
+		},
+		// --- Regression: shell-form CMD/ENTRYPOINT scan ---
+		{
+			Name: `CMD sh -c RUBY_YJIT_ENABLE=0 bin/rails server triggers (falsy inline)`,
+			Content: `FROM ruby:3.3-slim
+CMD ["sh", "-c", "RUBY_YJIT_ENABLE=0 bin/rails server"]
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: `CMD sh -c RUBY_YJIT_ENABLE=1 bin/rails server suppresses (truthy inline)`,
+			Content: `FROM ruby:3.3-slim
+CMD ["sh", "-c", "RUBY_YJIT_ENABLE=1 bin/rails server"]
+`,
+			WantViolations: 0,
+		},
 	})
 }
 

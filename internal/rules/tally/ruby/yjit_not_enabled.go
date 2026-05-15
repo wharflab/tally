@@ -19,6 +19,12 @@ import (
 // "3.3-slim", "3.0.6-bookworm", "2.7.0p100-alpine3.18".
 var rubyImageVersionRE = regexp.MustCompile(`^(\d+)\.(\d+)`)
 
+// officialRubyImageFamiliarName is the familiar name returned by
+// `reference.FamiliarName` for the official `ruby:*` image. Pulled into
+// a named constant to avoid the string literal living next to other
+// `"ruby"` mentions in this file.
+const officialRubyImageFamiliarName = "ruby"
+
 // longRunningRubyServerCommands is the set of ENTRYPOINT/CMD basenames
 // that mark a stage as a long-running Ruby server (web app or worker).
 // YJIT delivers its 15-30% speedup on these workloads.
@@ -163,7 +169,7 @@ func rubyVersionSupportsYJIT(input rules.LintInput, stageIdx int, rubyFacts *rub
 //  3. ENTRYPOINT/CMD passes --yjit to the Ruby/Rails binary.
 //  4. ENTRYPOINT/CMD sets RUBYOPT inline before invoking Ruby.
 func stageEnablesYJIT(sf *facts.StageFacts, stage instructions.Stage) bool {
-	if envBoundValue(sf, "RUBY_YJIT_ENABLE") != "" {
+	if isYJITEnableTruthy(envBoundValue(sf, "RUBY_YJIT_ENABLE")) {
 		return true
 	}
 	if rubyopt := envBoundValue(sf, "RUBYOPT"); strings.Contains(rubyopt, "--yjit") {
@@ -184,14 +190,69 @@ func stageEnablesYJIT(sf *facts.StageFacts, stage instructions.Stage) bool {
 	return false
 }
 
+// isYJITEnableTruthy reports whether a RUBY_YJIT_ENABLE value would
+// actually turn YJIT on at Ruby startup. Ruby's YJIT init checks the
+// env var via `getenv` and treats only the documented truthy values
+// (case-insensitive) as enabling the JIT — anything else (including
+// `0`, `false`, `no`, empty, missing) leaves YJIT off.
+func isYJITEnableTruthy(value string) bool {
+	v := strings.ToLower(strings.TrimSpace(strings.Trim(value, `"'`)))
+	switch v {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
+// cmdLineHasYJIT reports whether an ENTRYPOINT/CMD argv-like sequence
+// enables YJIT. Recognized shapes:
+//
+//	["ruby", "--yjit", ...]                    (any token == --yjit or contains --yjit=...)
+//	["sh", "-c", "RUBY_YJIT_ENABLE=1 bin/rails server"]   (truthy inline assignment)
+//	["sh", "-c", "RUBY_YJIT_ENABLE=true bundle exec puma"]
+//
+// `RUBY_YJIT_ENABLE=0` (or any falsey value) is correctly NOT treated
+// as enabling YJIT.
 func cmdLineHasYJIT(cmdLine []string) bool {
 	for _, a := range cmdLine {
 		if strings.Contains(a, "--yjit") {
 			return true
 		}
-		if strings.Contains(a, "RUBY_YJIT_ENABLE") {
+		if cmdTokenSetsYJITTruthy(a) {
 			return true
 		}
+	}
+	return false
+}
+
+// cmdTokenSetsYJITTruthy reports whether a single argv token contains
+// a `RUBY_YJIT_ENABLE=<truthy>` assignment. The token may be a plain
+// `RUBY_YJIT_ENABLE=1` env-prefix or embedded inside a longer shell
+// string passed to `sh -c`.
+func cmdTokenSetsYJITTruthy(token string) bool {
+	idx := 0
+	for idx < len(token) {
+		next := strings.Index(token[idx:], "RUBY_YJIT_ENABLE=")
+		if next < 0 {
+			return false
+		}
+		valStart := idx + next + len("RUBY_YJIT_ENABLE=")
+		valEnd := valStart
+		for valEnd < len(token) && !isShellTokenBoundary(token[valEnd]) {
+			valEnd++
+		}
+		if isYJITEnableTruthy(token[valStart:valEnd]) {
+			return true
+		}
+		idx = valEnd
+	}
+	return false
+}
+
+func isShellTokenBoundary(c byte) bool {
+	switch c {
+	case ' ', '\t', '\n', ';', '&', '|':
+		return true
 	}
 	return false
 }
@@ -200,14 +261,52 @@ func cmdLineHasYJIT(cmdLine []string) bool {
 // shape of a long-running Ruby server (web app or worker process), which
 // is where YJIT delivers its 15-30% speedup. Short-lived CLI images are
 // out of scope — JIT warmup dominates.
+//
+// Recognized argv shapes (we walk the full ENTRYPOINT/CMD argv, not just
+// the first token, because `bundle exec puma` is the canonical Rails
+// production form and the first token there is `bundle`):
+//
+//	["puma"]                          → puma
+//	["bin/rails", "server"]           → rails
+//	["bundle", "exec", "puma"]        → puma (via wrapper)
+//	["bundle", "exec", "rails", ...]  → rails
+//	["sh", "-c", "exec puma"]         → puma (best-effort scan of the script body)
 func stageLooksLikeLongRunningRubyServer(stage instructions.Stage, sf *facts.StageFacts) bool {
-	for _, name := range stageRuntimeCommandBasenames(stage) {
-		if longRunningRubyServerCommands[name] {
-			return true
+	var lastEntrypoint *instructions.EntrypointCommand
+	var lastCmd *instructions.CmdCommand
+	for _, c := range stage.Commands {
+		switch cc := c.(type) {
+		case *instructions.EntrypointCommand:
+			lastEntrypoint = cc
+		case *instructions.CmdCommand:
+			lastCmd = cc
 		}
+	}
+	if lastEntrypoint != nil && argvIncludesRubyServer(lastEntrypoint.CmdLine) {
+		return true
+	}
+	if lastCmd != nil && argvIncludesRubyServer(lastCmd.CmdLine) {
+		return true
 	}
 	// sf reserved for future EXPOSE/HEALTHCHECK heuristics.
 	_ = sf
+	return false
+}
+
+// argvIncludesRubyServer reports whether any argv token's basename
+// matches a long-running Ruby server name. Token splitting handles both
+// list-form ENTRYPOINT/CMD (each arg is a separate token) and
+// string-form (a single token containing `puma --bind ...` etc.).
+func argvIncludesRubyServer(argv []string) bool {
+	for _, token := range argv {
+		// Split on whitespace so string-form CMD/ENTRYPOINT (e.g.
+		// `CMD bundle exec puma`) is handled the same as list-form.
+		for word := range strings.FieldsSeq(token) {
+			if longRunningRubyServerCommands[strings.ToLower(commandBasename(word))] {
+				return true
+			}
+		}
+	}
 	return false
 }
 
@@ -235,7 +334,7 @@ func extractRubyBranchFromImageRef(raw string) string {
 	if err != nil {
 		return ""
 	}
-	if reference.FamiliarName(named) != "ruby" {
+	if reference.FamiliarName(named) != officialRubyImageFamiliarName {
 		return ""
 	}
 	tagged, ok := named.(reference.Tagged)
