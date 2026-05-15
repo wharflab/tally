@@ -1,0 +1,43 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-healthcheck-rails-up-endpoint-curl/Dockerfile",
+      "violations": [
+        {
+          "detail": "Healthcheck uses `curl`/`wget`, which on `ruby:*-slim`/`ruby:*-alpine` bases requires an extra `apt-get install curl` step — ~3 MiB to add a tool that's already in the image as the Ruby stdlib's Net::HTTP. Switch to the Ruby-native form to drop the dependency.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/healthcheck-rails-up-endpoint/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 5
+            },
+            "file": "fixtures/lint/ruby-healthcheck-rails-up-endpoint-curl/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 5
+            }
+          },
+          "message": "Rails runtime image lacks HEALTHCHECK or uses curl/wget instead of Ruby stdlib Net::HTTP",
+          "rule": "tally/ruby/healthcheck-rails-up-endpoint",
+          "severity": "info",
+          "sourceCode": "HEALTHCHECK CMD curl -fsS http://127.0.0.1:3000/up || exit 1",
+          "suggestedFix": {
+            "description": "Replace the curl/wget HEALTHCHECK with the Ruby-native form (drops the apt-get install): CMD [\"ruby\", \"-rnet/http\", \"-e\", \"exit Net::HTTP.get_response(URI('http://127.0.0.1:3000/up')).is_a?(Net::HTTPSuccess) ? 0 : 1\"]",
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}
