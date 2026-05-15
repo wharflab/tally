@@ -47,10 +47,12 @@ var gemfileSourceRe = regexp.MustCompile(`(?m)^\s*source\s+['"]([^'"]+)['"]`)
 // option-scanning after joining any trailing continuation lines.
 var gemfileGemHeadRe = regexp.MustCompile(`(?m)^\s*gem\s*[\s(]\s*['"]([^'"]+)['"](.*)$`)
 
-// gemfileGroupRe matches a `group :a, :b do` block opener and captures the
-// comma-separated symbol list (`:a, :b`). The capture is the text between
-// `group` and the final ` do` on the same line.
-var gemfileGroupRe = regexp.MustCompile(`(?m)^\s*group\s+(.+?)\s+do\b`)
+// gemfileGroupRe matches a `group :a, :b do` block opener (or its
+// parenthesized DSL form `group(:a, :b) do`) and captures the comma-separated
+// symbol list (`:a, :b`). The capture is the text between the `group`
+// keyword and the trailing ` do` on the same line; surrounding parentheses
+// are stripped before the symbol list is parsed.
+var gemfileGroupRe = regexp.MustCompile(`(?m)^\s*group\s*[\s(]\s*(.+?)\s*\)?\s+do\b`)
 
 // gitBlockOpenerRe matches the start of a Bundler git/git_source block
 // (`git "URL" do`, `git_source(:foo) do`). The pattern is anchored to a

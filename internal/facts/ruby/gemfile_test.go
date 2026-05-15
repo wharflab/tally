@@ -227,6 +227,35 @@ end
 	}
 }
 
+func TestParseGemfile_ParenthesizedGroupBlock(t *testing.T) {
+	t.Parallel()
+
+	const content = `source "https://rubygems.org"
+
+group(:development, :test) do
+  gem "debug"
+end
+
+group(:development) do
+  gem "web-console"
+end
+
+group(:test) do
+  gem "capybara"
+end
+`
+	gem := ParseGemfile([]byte(content))
+	if gem == nil {
+		t.Fatal("ParseGemfile returned nil")
+	}
+	if !gem.HasDevGroup {
+		t.Errorf("HasDevGroup = false, want true")
+	}
+	if !gem.HasTestGroup {
+		t.Errorf("HasTestGroup = false, want true")
+	}
+}
+
 func TestParseGroupSymbols(t *testing.T) {
 	t.Parallel()
 
