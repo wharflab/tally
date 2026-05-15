@@ -16,5 +16,5 @@ FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04 AS gpu-app
 RUN apt-get update && apt-get install -y python3 python3-pip
 
 # Stage 4: Plain Linux stage with no GPU packages — should NOT fire
-FROM alpine:3.18 AS builder
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS builder
 RUN apk add --no-cache curl wget

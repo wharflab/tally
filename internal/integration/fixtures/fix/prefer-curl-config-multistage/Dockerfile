@@ -4,7 +4,7 @@ RUN apt-get update && apt-get install -y ca-certificates curl
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 
 # Stage 2: curl config already present — should NOT trigger
-FROM alpine:3.20 AS configured
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS configured
 ENV CURL_HOME=/etc/curl
 COPY --chmod=0644 <<EOF /etc/curl/.curlrc
 --retry 5

@@ -1,5 +1,5 @@
 # Test file for BuildKit linter warnings
-FROM alpine:3.18 AS Builder
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS Builder
 MAINTAINER test@example.com
 RUN echo hello
 CMD echo hello

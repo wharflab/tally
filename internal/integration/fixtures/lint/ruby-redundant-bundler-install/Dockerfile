@@ -13,7 +13,7 @@ FROM ruby:3.3-slim AS app-chained
 RUN apt-get update && gem install bundler && bundle install
 
 # Compliant: alpine base not from official ruby:*, manual install of Ruby.
-FROM alpine:3.20 AS alpine-app
+FROM alpine:3.23@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11 AS alpine-app
 RUN apk add ruby ruby-dev && gem install bundler
 
 # Compliant: jruby is a Ruby derivative, not official ruby:*; no Bundler
