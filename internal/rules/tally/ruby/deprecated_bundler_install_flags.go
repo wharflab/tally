@@ -248,19 +248,53 @@ func deprecatedFlagDetail(flag, envVar string) string {
 // is functionally equivalent), and FixSuggestion for `--path` (the user
 // may have a downstream BUNDLE_PATH expectation that depends on the
 // current setup).
+//
+// When the flag's value can't be recovered as a literal (typically because
+// it was passed via shell expansion like `--without "$BUNDLE_WITHOUT"`),
+// the rule emits a generic, value-free recommendation rather than a
+// concrete `ENV X=""` rewrite that would actually change behavior.
 func buildDeprecatedFlagFix(flag, envVar, value string, priority int) *rules.SuggestedFix {
-	safety := rules.FixSafe
-	envValue := value
 	switch flag {
 	case flagDeployment:
-		envValue = "1"
+		return &rules.SuggestedFix{
+			Description: "Replace `" + flag + "` with `ENV " + envVar + `="1"` +
+				"` (Bundler 2.x prefers the env-var form)",
+			Safety:      rules.FixSafe,
+			Priority:    priority,
+			IsPreferred: false,
+		}
 	case flagPath:
-		safety = rules.FixSuggestion
+		if value == "" {
+			return &rules.SuggestedFix{
+				Description: "Replace `" + flag + " <path>` with `ENV " + envVar + "=<path>` " +
+					"(Bundler 2.x prefers the env-var form)",
+				Safety:      rules.FixSuggestion,
+				Priority:    priority,
+				IsPreferred: false,
+			}
+		}
+		return &rules.SuggestedFix{
+			Description: "Replace `" + flag + "` with `ENV " + envVar + `="` + value + `"` +
+				"` (Bundler 2.x prefers the env-var form)",
+			Safety:      rules.FixSuggestion,
+			Priority:    priority,
+			IsPreferred: false,
+		}
+	}
+	// flagWithout (and any future single-value flag).
+	if value == "" {
+		return &rules.SuggestedFix{
+			Description: "Replace `" + flag + " <groups>` with `ENV " + envVar + "=<groups>` " +
+				"(Bundler 2.x prefers the env-var form)",
+			Safety:      rules.FixSuggestion,
+			Priority:    priority,
+			IsPreferred: false,
+		}
 	}
 	return &rules.SuggestedFix{
-		Description: "Replace `" + flag + "` with `ENV " + envVar + `="` + envValue + `"` +
+		Description: "Replace `" + flag + "` with `ENV " + envVar + `="` + value + `"` +
 			"` (Bundler 2.x prefers the env-var form)",
-		Safety:      safety,
+		Safety:      rules.FixSafe,
 		Priority:    priority,
 		IsPreferred: false,
 	}

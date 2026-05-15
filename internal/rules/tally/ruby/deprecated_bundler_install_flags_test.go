@@ -120,6 +120,24 @@ RUN bundle install --path vendor/bundle
 			wantEnvVar: "BUNDLE_PATH",
 			wantInDesc: "BUNDLE_PATH",
 		},
+		{
+			name: "--without with shell-expansion value downgrades to FixSuggestion",
+			content: `FROM ruby:3.3-slim
+RUN bundle install --without "$BUNDLE_WITHOUT"
+`,
+			wantSafety: rules.FixSuggestion,
+			wantEnvVar: "BUNDLE_WITHOUT",
+			wantInDesc: "<groups>",
+		},
+		{
+			name: "--path with shell-expansion value uses placeholder",
+			content: `FROM ruby:3.3-slim
+RUN bundle install --path "$BUNDLE_PATH"
+`,
+			wantSafety: rules.FixSuggestion,
+			wantEnvVar: "BUNDLE_PATH",
+			wantInDesc: "<path>",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
