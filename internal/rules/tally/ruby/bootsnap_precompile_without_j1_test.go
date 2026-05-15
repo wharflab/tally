@@ -348,9 +348,14 @@ func TestCommandEndOffset(t *testing.T) {
 		{name: "newline", in: " app/\nNEXT", want: 5},
 		{name: "semicolon", in: " app/ ; next", want: 6},
 		{name: "double-amp", in: " app/ && next", want: 6},
-		{name: "single-amp does not split", in: " app/ & next", want: -1},
+		{name: "single-amp ends command", in: " app/ & next", want: 6},
 		{name: "pipe ends command", in: " app/ | grep", want: 6},
 		{name: "or-list ends command", in: " app/ || true", want: 6},
+		{name: "separator at offset 0 reported", in: ";", want: 0},
+		{name: "single-quoted semicolon ignored", in: ` 'a;b' ;`, want: 7},
+		{name: "double-quoted ampersand ignored", in: ` "a&b" ;`, want: 7},
+		{name: "backslash-escaped newline ignored", in: " app/\\\n  -j 1", want: -1},
+		{name: "backslash-escaped semicolon ignored", in: ` app/\;next`, want: -1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -402,8 +407,22 @@ func TestScriptIsPlatformGuarded(t *testing.T) {
 		want   bool
 	}{
 		{name: "both literals present", script: `if [ "$BUILDPLATFORM" = "$TARGETPLATFORM" ]; then bootsnap precompile; fi`, want: true},
+		{name: "double-equals operator", script: `if [ "$BUILDPLATFORM" == "$TARGETPLATFORM" ]; then bootsnap precompile; fi`, want: true},
+		{name: "test command form", script: `test "$BUILDPLATFORM" = "$TARGETPLATFORM" && bootsnap precompile`, want: true},
+		{name: "reverse comparison", script: `if [ "$TARGETPLATFORM" = "$BUILDPLATFORM" ]; then bootsnap precompile; fi`, want: true},
+		{name: "braced variant", script: `if [ "${BUILDPLATFORM}" = "${TARGETPLATFORM}" ]; then bootsnap precompile; fi`, want: true},
+		{
+			name:   "not-equal still matches",
+			script: `if [ "$BUILDPLATFORM" != "$TARGETPLATFORM" ]; then exit 0; fi; bootsnap precompile`,
+			want:   true,
+		},
 		{name: "only BUILDPLATFORM", script: `echo $BUILDPLATFORM && bootsnap precompile`, want: false},
 		{name: "only TARGETPLATFORM", script: `echo $TARGETPLATFORM && bootsnap precompile`, want: false},
+		{
+			name:   "both vars referenced but not compared",
+			script: `echo "$BUILDPLATFORM $TARGETPLATFORM" && bootsnap precompile`,
+			want:   false,
+		},
 		{name: "neither", script: `bootsnap precompile`, want: false},
 	}
 	for _, tt := range tests {

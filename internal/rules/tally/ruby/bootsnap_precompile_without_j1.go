@@ -2,7 +2,6 @@ package ruby
 
 import (
 	"regexp"
-	"strings"
 
 	"github.com/wharflab/tally/internal/facts"
 	"github.com/wharflab/tally/internal/rules"
@@ -37,17 +36,6 @@ var bootsnapPrecompileRE = regexp.MustCompile(`(?m)\bbootsnap[ \t]+precompile\b`
 // We only suppress on `1` because that is the documented QEMU-safe value;
 // `-j 2` etc. still risk the bug per bootsnap issue #495.
 var jobsFlagRE = regexp.MustCompile(`(?:^|[ \t])(?:-j[ \t=]?1\b|--jobs[ \t=]+1\b)`)
-
-// bootsnapPlatformGuardLiterals are the `--platform`-style ARGs whose
-// co-occurrence in a script is the suppress signal: when the user wraps
-// the bootsnap call in a `BUILDPLATFORM == TARGETPLATFORM` shell check,
-// they have explicitly avoided emulated paths and the rule should stand
-// down. Matching is heuristic; false negatives are cheaper than false
-// positives here.
-var bootsnapPlatformGuardLiterals = []string{
-	"BUILDPLATFORM",
-	"TARGETPLATFORM",
-}
 
 // BootsnapPrecompileWithoutJ1Rule flags Ruby/Rails stages that run
 // `bootsnap precompile` without `-j 1`, the QEMU-safe parallelism flag.
@@ -127,6 +115,14 @@ func (r *BootsnapPrecompileWithoutJ1Rule) checkStage(
 		if runFacts == nil || runFacts.Run == nil {
 			continue
 		}
+		// Exec-form RUN (`RUN ["foo", "bar"]`) is not a shell script, so the
+		// SourceScript-relative offsets we use to compute the fix position
+		// would be wrong. The exec form also does not invoke a shell at all,
+		// so a literal `bootsnap precompile` argv is a niche edge case
+		// (typically users wrap with `sh -c`). Skip cleanly.
+		if !runFacts.UsesShell {
+			continue
+		}
 		script := runFacts.SourceScript
 		if script == "" {
 			continue
@@ -169,32 +165,54 @@ func (r *BootsnapPrecompileWithoutJ1Rule) checkStage(
 	return violations
 }
 
-// scriptIsPlatformGuarded reports whether the run script references both
-// BUILDPLATFORM and TARGETPLATFORM, which is the canonical shape of a
-// `[ "$BUILDPLATFORM" = "$TARGETPLATFORM" ]` (or equivalent) guard. This is
-// a heuristic — the user may have explicitly opted out of emulated paths
-// for the bootsnap call, in which case the rule should stand down.
+// scriptIsPlatformGuarded reports whether the run script gates the bootsnap
+// call behind a `BUILDPLATFORM == TARGETPLATFORM`-style check. The canonical
+// shapes we recognize:
+//
+//	if [ "$BUILDPLATFORM" = "$TARGETPLATFORM" ]; then ... bootsnap precompile ...
+//	test "$BUILDPLATFORM" = "$TARGETPLATFORM" && ... bootsnap precompile ...
+//	[ "$BUILDPLATFORM" = "$TARGETPLATFORM" ] && bootsnap precompile ...
+//
+// The check requires a comparison of the two ARGs (either `=` or `==`) on
+// the same line; mere references to the variables alone are not sufficient.
+// This is heuristic — false negatives (real guards we miss) are cheaper than
+// false positives (suppressing a legitimate violation).
 func scriptIsPlatformGuarded(script string) bool {
-	for _, lit := range bootsnapPlatformGuardLiterals {
-		if !strings.Contains(script, lit) {
-			return false
-		}
-	}
-	return true
+	return platformGuardRE.MatchString(script)
 }
+
+// platformGuardRE matches a `BUILDPLATFORM`/`TARGETPLATFORM` comparison in
+// either direction, regardless of `$VAR` vs `${VAR}` form, with optional
+// quotes around either side. The two variables must appear in the same
+// comparison expression — otherwise the check is too loose. Recognized
+// comparison operators: `=`, `==`, `!=`.
+var platformGuardRE = regexp.MustCompile(
+	`(?:` +
+		`\$\{?BUILDPLATFORM\}?"?\s*(?:!=|==?)\s*"?\$\{?TARGETPLATFORM` +
+		`|` +
+		`\$\{?TARGETPLATFORM\}?"?\s*(?:!=|==?)\s*"?\$\{?BUILDPLATFORM` +
+		`)`,
+)
 
 // invocationHasJobsOne reports whether the bootsnap precompile invocation
 // starting at endIdx (the byte offset just past the `precompile` token)
 // already carries a `-j 1`-equivalent flag in the same shell command. The
-// search window stops at the first `&&`, `||`, `;`, `|`, or newline so a
-// later command's `-j 1` does not accidentally suppress the violation.
+// search window stops at the first command separator (`&`, `&&`, `||`, `;`,
+// `|`, or unescaped newline) so a later command's `-j 1` does not
+// accidentally suppress the violation.
+//
+// The scanner respects shell quoting (single, double, backtick) and
+// backslash escapes so a `;` or `&` inside `"..."`/`'...'` does not end the
+// command. It does not parse heredocs, parameter expansion, or
+// command substitution; those edge cases are rare in
+// `RUN bundle exec bootsnap precompile -j 1` shapes.
 func invocationHasJobsOne(script string, endIdx int) bool {
 	if endIdx >= len(script) {
 		return false
 	}
 	tail := script[endIdx:]
 	stop := commandEndOffset(tail)
-	if stop > 0 {
+	if stop >= 0 {
 		tail = tail[:stop]
 	}
 	return jobsFlagRE.MatchString(tail)
@@ -203,22 +221,76 @@ func invocationHasJobsOne(script string, endIdx int) bool {
 // commandEndOffset returns the byte offset of the first command separator in
 // the script tail (i.e. the end of the current shell command). Returns -1
 // when no separator is found, in which case the whole tail is one command.
+// A separator at offset 0 returns 0 (caller's `stop >= 0` check handles the
+// empty-window case correctly).
 //
-// Single `&` (background spawn) is intentionally NOT a separator: it forks
-// the running command, but `-j 1` could still legitimately apply to the
-// bootsnap call before it. Conservatively keep scanning past it.
+// Quoted strings (single, double, backtick) and backslash escapes are
+// respected so that `echo ";"` and `echo "&&"` do not terminate the command.
+// Backslash followed by newline is the Dockerfile-style line continuation
+// and does NOT terminate the command. A bare newline does.
+//
+// Recognized terminators:
+//   - `;`            — sequence
+//   - `|`            — pipe (also handles `||`)
+//   - `&` / `&&`     — background spawn / and-list (both end the current
+//     command for our purposes; `-j 1` cannot apply across either)
+//   - unescaped `\n` — newline-as-separator
 func commandEndOffset(tail string) int {
-	for i := range len(tail) {
-		switch tail[i] {
+	const (
+		stateNormal = iota
+		stateSingleQuote
+		stateDoubleQuote
+		stateBacktick
+	)
+	state := stateNormal
+	for i := 0; i < len(tail); i++ {
+		c := tail[i]
+		switch state {
+		case stateSingleQuote:
+			// Single-quoted strings: only `'` ends the quote, no escapes.
+			if c == '\'' {
+				state = stateNormal
+			}
+			continue
+		case stateDoubleQuote:
+			if c == '\\' && i+1 < len(tail) {
+				i++ // skip the escaped character
+				continue
+			}
+			if c == '"' {
+				state = stateNormal
+			}
+			continue
+		case stateBacktick:
+			if c == '\\' && i+1 < len(tail) {
+				i++
+				continue
+			}
+			if c == '`' {
+				state = stateNormal
+			}
+			continue
+		}
+		// Normal state.
+		switch c {
+		case '\\':
+			// Backslash-newline is a line continuation, NOT a separator.
+			// Any other escaped char is consumed.
+			if i+1 < len(tail) {
+				i++
+			}
+		case '\'':
+			state = stateSingleQuote
+		case '"':
+			state = stateDoubleQuote
+		case '`':
+			state = stateBacktick
 		case '\n', ';':
 			return i
 		case '|':
-			// Both `|` (pipe) and `||` (or-list) end the current command.
 			return i
 		case '&':
-			if i+1 < len(tail) && tail[i+1] == '&' {
-				return i
-			}
+			return i
 		}
 	}
 	return -1
