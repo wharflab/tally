@@ -36,6 +36,21 @@ func TestAssetPrecompileWithoutDummyKeyRule_Check(t *testing.T) {
 	t.Parallel()
 
 	testutil.RunRuleTests(t, NewAssetPrecompileWithoutDummyKeyRule(), []testutil.RuleTestCase{
+		// --- Regression: inline assignment must be scoped to the precompile command ---
+		{
+			Name: "inline assignment on a chained earlier command does NOT suppress (POSIX scoping)",
+			Content: `FROM ruby:3.3-slim
+RUN SECRET_KEY_BASE_DUMMY=1 echo ok && bin/rails assets:precompile
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "inline assignment after a separator before the precompile does NOT suppress",
+			Content: `FROM ruby:3.3-slim
+RUN echo first; SECRET_KEY_BASE_DUMMY=1 echo second && bin/rails assets:precompile
+`,
+			WantViolations: 1,
+		},
 		// --- Violations ---
 		{
 			Name: "rails assets:precompile triggers",

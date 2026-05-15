@@ -361,16 +361,21 @@ var masterKeyFromSecretFileRe = regexp.MustCompile(
 	`RAILS_MASTER_KEY\s*=\s*["']?\$\(\s*cat\s+["']?/run/secrets/[A-Za-z0-9_./-]+`,
 )
 
-// runScriptHasInlineDummyAssignment reports whether the RUN script contains
-// an inline "SECRET_KEY_BASE_DUMMY=<non-empty>" (or "SECRET_KEY_BASE=1") on
-// the same logical line as, and immediately preceding, the asset-compile
-// command. The parser's CommandInfo doesn't expose Bash assignment-prefix
-// tokens, so we fall back to a small text scan over the script.
+// runScriptHasInlineDummyAssignment reports whether the RUN script's
+// preface preceding the asset-compile command sets the dummy key in a way
+// that actually applies to the command:
 //
-// The check tolerates `export SECRET_KEY_BASE_DUMMY=1 && ...` chains because
-// it matches anywhere in the script that precedes the asset-compile command.
-// That is intentionally generous: setting the dummy key earlier in the same
-// RUN is functionally equivalent to inline.
+//  1. As an inline assignment-prefix attached directly to the precompile
+//     command itself (`SECRET_KEY_BASE_DUMMY=1 bin/rails assets:precompile`).
+//     POSIX `VAR=value cmd` semantics: the assignment is scoped to that
+//     single command's environment.
+//  2. As an `export` statement earlier in the same shell — those persist for
+//     every command that follows in the same shell, so the precompile
+//     inherits the setting.
+//
+// Plain assignments without `export` (e.g. `SECRET_KEY_BASE_DUMMY=1 echo ok &&
+// bin/rails ...`) are NOT counted: those scope only to the single command
+// they prefix (`echo ok`), not to the subsequent `bin/rails`.
 func runScriptHasInlineDummyAssignment(script string, ac assetPrecompileCommand) bool {
 	if script == "" {
 		return false
@@ -384,13 +389,51 @@ func runScriptHasInlineDummyAssignment(script string, ac assetPrecompileCommand)
 		cutoff = len(script)
 	}
 	preface := script[:cutoff]
-	if dummyAssignmentRe.MatchString(preface) {
+
+	// Case 1: assignment-prefix immediately before the command. The prefix
+	// is the run of `VAR=value` tokens that ends at the command itself, with
+	// no `&&`/`;`/`|`/`\n` in between. We anchor the scan at the cutoff and
+	// walk backwards to find the closest preceding shell separator; the
+	// assignment must live in that final segment.
+	finalSegment := preface
+	if sep := lastShellSeparatorOffset(preface); sep >= 0 {
+		finalSegment = preface[sep+1:]
+	}
+	if dummyAssignmentRe.MatchString(finalSegment) {
 		return true
 	}
-	if realKeyEqualsOneRe.MatchString(preface) {
+	if realKeyEqualsOneRe.MatchString(finalSegment) {
+		return true
+	}
+
+	// Case 2: `export SECRET_KEY_BASE_DUMMY=...` (or `SECRET_KEY_BASE=1`)
+	// anywhere in the preface. Exported values persist across separators
+	// so they affect any subsequent command in the same shell.
+	if exportedDummyAssignmentRe.MatchString(preface) {
+		return true
+	}
+	if exportedRealKeyEqualsOneRe.MatchString(preface) {
 		return true
 	}
 	return false
+}
+
+// lastShellSeparatorOffset returns the byte offset of the last shell
+// command separator in the input (the position of the separator character
+// itself), or -1 if none. Recognized separators: `;`, `&`, `&&`, `|`,
+// `||`, `\n`. Quoting is not modeled here — a separator inside `"..."`
+// would still match — but `RUN` scripts in the corpus that we're trying
+// to match against (Rails-generator-style) don't put separators inside
+// quoted strings, so this is acceptable.
+func lastShellSeparatorOffset(s string) int {
+	last := -1
+	for i := range len(s) {
+		switch s[i] {
+		case ';', '&', '|', '\n':
+			last = i
+		}
+	}
+	return last
 }
 
 // dummyAssignmentRe matches SECRET_KEY_BASE_DUMMY=<non-empty>, where the
@@ -411,6 +454,19 @@ var dummyAssignmentRe = regexp.MustCompile(
 // SECRET_KEY_BASE=1 as also acceptable as the placeholder contract.
 var realKeyEqualsOneRe = regexp.MustCompile(
 	`(?:^|[\s;&|(])` + regexp.QuoteMeta(realKeyVar) + `=(?:1|"1"|'1')(?:\s|$|[;&|)])`,
+)
+
+// exportedDummyAssignmentRe matches `export SECRET_KEY_BASE_DUMMY=...`. Unlike
+// the bare assignment form, an exported value persists across separators in
+// the same shell, so it counts as compliant for any subsequent command.
+var exportedDummyAssignmentRe = regexp.MustCompile(
+	`(?:^|[\s;&|(])export\s+` + regexp.QuoteMeta(dummyKeyVar) + `=(?:"[^"]+"|'[^']+'|\S+)`,
+)
+
+// exportedRealKeyEqualsOneRe matches `export SECRET_KEY_BASE=1`. Same scoping
+// rationale as exportedDummyAssignmentRe.
+var exportedRealKeyEqualsOneRe = regexp.MustCompile(
+	`(?:^|[\s;&|(])export\s+` + regexp.QuoteMeta(realKeyVar) + `=(?:1|"1"|'1')(?:\s|$|[;&|)])`,
 )
 
 // assetPrecompileScriptOffset returns the byte offset within the
@@ -483,7 +539,7 @@ func assetPrecompileLocation(
 	if ac.cmd.HasCommandRange {
 		line := runRanges[0].Start.Line + ac.cmd.Line
 		startCol, endCol := ac.cmd.StartCol, ac.cmd.EndCol
-		if ac.cmd.Line == 0 {
+		if ac.cmd.Line == 0 && sm != nil {
 			offset := shell.DockerfileRunCommandStartCol(sm.Line(line - 1))
 			startCol += offset
 			endCol += offset

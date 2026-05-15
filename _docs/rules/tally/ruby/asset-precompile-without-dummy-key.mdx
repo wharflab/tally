@@ -8,10 +8,10 @@ Rails `assets:precompile` runs without `SECRET_KEY_BASE_DUMMY=1`, which pushes u
 
 | Property | Value |
 |----------|-------|
-| Severity | Warning (Rails 7.1+) / Suggestion (older Rails) |
+| Severity | Warning (default) / Info (no observable Rails credentials in the build context) |
 | Category | Security |
 | Default | Enabled |
-| Auto-fix | Yes (FixSafe — Rails 7.1+) |
+| Auto-fix | Yes — `FixSafe` on Rails 7.1+, `FixSuggestion` on older Rails |
 
 ## Description
 
