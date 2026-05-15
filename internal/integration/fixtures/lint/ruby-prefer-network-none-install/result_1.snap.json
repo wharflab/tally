@@ -1,0 +1,43 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-prefer-network-none-install/Dockerfile",
+      "violations": [
+        {
+          "detail": "Once `bundle install` runs with `--mount=type=bind` for the manifests and `--mount=type=cache` for the gem cache, the next-best step is to split the install into two RUNs: `bundle cache --no-install --all-platforms` (network required) and `RUN --network=none bundle install --local` (network disabled). The result is a strictly reproducible install step and a defense-in-depth boundary against malicious gems exfiltrating data at build time. Corpus uptake: 0/196 — this is a niche but well-documented BuildKit feature worth surfacing.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/prefer-network-none-install/",
+          "location": {
+            "end": {
+              "column": 66,
+              "line": 4
+            },
+            "file": "fixtures/lint/ruby-prefer-network-none-install/Dockerfile",
+            "start": {
+              "column": 59,
+              "line": 4
+            }
+          },
+          "message": "BuildKit `RUN --network=none` enables a strictly reproducible offline install phase",
+          "rule": "tally/ruby/prefer-network-none-install",
+          "severity": "info",
+          "sourceCode": "RUN --mount=type=bind,source=Gemfile,target=Gemfile \\",
+          "suggestedFix": {
+            "description": "Split bundle install into two phases: `RUN bundle cache --no-install --all-platforms` (network required), then `RUN --network=none bundle install --local` (network disabled, strictly reproducible)",
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}

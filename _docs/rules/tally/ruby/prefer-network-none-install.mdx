@@ -1,0 +1,90 @@
+---
+title: "tally/ruby/prefer-network-none-install"
+description: "Once on BuildKit bind+cache mounts, prefer the `bundle cache` + `RUN --network=none` two-phase install."
+---
+
+Educational rule: once `bundle install` runs with `--mount=type=bind` for the manifests and
+`--mount=type=cache` for the gem cache, the next-best step is to split the install into two RUNs — one
+that fetches with the network on, one that installs with the network off.
+
+| Property | Value |
+|----------|-------|
+| Severity | Info |
+| Category | Security |
+| Default | Enabled (advisory) |
+| Auto-fix | `FixSuggestion` (no-edit) |
+
+## Description
+
+Bundler can split the dependency lifecycle into two halves:
+
+- `bundle cache --no-install --all-platforms` — downloads `.gem` files into a cache directory. Network
+  required.
+- `bundle install --local` — installs from the cache only. Network not required.
+
+With BuildKit, the install half can be wrapped in `RUN --network=none`, which guarantees that nothing in the
+install path — including post-install C-extension build scripts — is making outbound network calls. The
+result is a strictly reproducible install step and a real defense-in-depth boundary against malicious gems
+exfiltrating data at build time.
+
+The corpus shows **0 of 196** Rails Dockerfiles using this pattern. This rule is intentionally niche — it
+fires only when the user has *already* opted into BuildKit cache and bind mounts, surfacing the further
+upgrade at the moment of relevance.
+
+This rule fires when:
+
+- The Dockerfile carries `# syntax=docker/dockerfile:1` (or compatible).
+- A Ruby-shaped stage's `bundle install` RUN already has `--mount=type=bind` on the Gemfile/Gemfile.lock
+  AND `--mount=type=cache` on `${BUNDLE_PATH}/cache`.
+- The same RUN does NOT have `--network=none`.
+
+If the user is still on the `COPY Gemfile + RUN bundle install` shape, the
+[`tally/ruby/prefer-gemfile-bind-mounts`](/rules/tally/ruby/prefer-gemfile-bind-mounts/) rule covers that
+step first; this rule stays silent until the user gets there.
+
+## Examples
+
+### Before
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM ruby:3.3-slim
+RUN --mount=type=bind,source=Gemfile,target=Gemfile \
+    --mount=type=bind,source=Gemfile.lock,target=Gemfile.lock \
+    --mount=type=cache,target=${BUNDLE_PATH}/cache,sharing=locked \
+    bundle install
+```
+
+### After
+
+Split into two RUNs:
+
+```dockerfile
+# syntax=docker/dockerfile:1
+FROM ruby:3.3-slim
+RUN --mount=type=bind,source=Gemfile,target=Gemfile \
+    --mount=type=bind,source=Gemfile.lock,target=Gemfile.lock \
+    --mount=type=cache,target=${BUNDLE_PATH}/cache,sharing=locked \
+    bundle config set --local cache_path "${BUNDLE_PATH}/cache" && \
+    bundle cache --no-install --all-platforms
+
+RUN --network=none \
+    --mount=type=bind,source=Gemfile,target=Gemfile \
+    --mount=type=bind,source=Gemfile.lock,target=Gemfile.lock \
+    --mount=type=cache,target=${BUNDLE_PATH}/cache,sharing=locked \
+    bundle config set --local cache_path "${BUNDLE_PATH}/cache" && \
+    bundle install --local
+```
+
+## Auto-fix
+
+`FixSuggestion` (no-edit). The split is structural — the user keeps the bind/cache mount setup, copies it to
+a second RUN, and adds `--network=none` plus `--local`. Description points at the canonical shape.
+
+## References
+
+- [Bundler `bundle cache` documentation](https://bundler.io/v2.5/man/bundle-cache.1.html) — describes the
+  cache-only install path.
+- [Docker BuildKit `RUN --network=none`](https://docs.docker.com/reference/dockerfile/#run---network).
+- [`xz` upstream supply-chain compromise](https://access.redhat.com/security/cve/cve-2024-3094) — context for
+  why offline install matters as defense-in-depth.
