@@ -145,6 +145,27 @@ ENV BUNDLE_GEMFURY__IO="user:token"
 `,
 			WantViolations: 1,
 		},
+		{
+			Name: "BUNDLE_BUILD__NOKOGIRI is per-gem build flag, not a credential",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_BUILD__NOKOGIRI=--use-system-libraries
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "BUNDLE_GEMS__ACME__CO__UK triggers (compound TLD)",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_GEMS__ACME__CO__UK="user:token"
+`,
+			WantViolations: 1,
+		},
+		{
+			Name: "BUNDLE_PRIVATE__HOST__DE triggers (German TLD)",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_PRIVATE__HOST__DE="user:token"
+`,
+			WantViolations: 1,
+		},
 		// --- Meta-ARG suppression honors per-stage filters (codex P2) ---
 		{
 			Name: "meta-ARG with only dev Ruby stage does not trigger",

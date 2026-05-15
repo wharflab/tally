@@ -212,45 +212,43 @@ func matchRubyBuildCredentialKey(key string) (string, bool) {
 	return "", false
 }
 
-// bundlerHostCredentialTLDs is the set of TLDs that, when they appear
-// as the trailing `__<TLD>` segment of a `BUNDLE_*` key, signal a
-// host-credential rather than a generic dotted config key.
+// bundlerNonHostConfigPrefixes lists the `BUNDLE_<TOPIC>` prefixes
+// where Bundler uses `__` to encode dots in non-host config namespaces
+// (e.g. `BUNDLE_LOCAL__RACK` is the `local.rack` config, not a
+// credential for `local.rack`). Any `BUNDLE_<TOPIC>__*` key with a
+// topic in this list is a config key, not a host credential.
 //
-// Bundler's `__` is overloaded — it encodes `.` for both
-// `BUNDLE_GITHUB__COM` (a credential) AND `BUNDLE_LOCAL__RACK` (a
-// config key for `local.rack`). Trailing-TLD discrimination is the
-// least bad heuristic without a registry of known config keys. We err
-// on the side of completeness and include the public-suffix TLDs
-// commonly seen on gem-host URLs.
-var bundlerHostCredentialTLDs = map[string]bool{
-	"COM": true,
-	"ORG": true,
-	"NET": true,
-	"IO":  true,
-	"DEV": true,
-	"CO":  true,
-	"AI":  true,
+// Source: bundler/bundler config namespaces — the host-credential
+// path uses `BUNDLE_<HOST>__<TLD>` but a few `__`-encoded namespaces
+// describe gem identity rather than a host:
+//   - LOCAL: `local.<gem>` overrides for development paths
+//   - BUILD: `build.<gem>` per-gem build flags
+//
+// We err toward `true` for everything else (any `BUNDLE_*__*` not in
+// this list) — Bundler's host-credential surface is open-ended, so an
+// allowlist would miss valid public-suffix TLDs (`.co.uk`, `.de`,
+// `.com.br`, etc.).
+var bundlerNonHostConfigPrefixes = map[string]bool{
+	"LOCAL": true,
+	"BUILD": true,
 }
 
 // isBundlerHostCredentialKey reports whether a key matches Bundler's
 // `BUNDLE_<HOST>__<TLD>` host-credential convention. Host names use
 // `__` (double underscore) for `.` (dot), so a real Bundler key has at
-// least one `__` separator AND ends with a known TLD segment to
-// distinguish from configuration keys like `BUNDLE_LOCAL__RACK`
-// (Bundler's `local.rack` config).
+// least one `__` separator. We exclude a small denylist of known
+// non-host namespaces (`LOCAL`, `BUILD`) where `__` encodes a gem name
+// rather than a hostname dot.
 func isBundlerHostCredentialKey(key string) bool {
 	if !strings.HasPrefix(key, "BUNDLE_") {
 		return false
 	}
 	rest := strings.TrimPrefix(key, "BUNDLE_")
-	if !strings.Contains(rest, "__") {
+	first, _, hasSep := strings.Cut(rest, "__")
+	if !hasSep {
 		return false
 	}
-	// The trailing `__<TLD>` segment must be a recognized public-suffix
-	// TLD. Take the last `__`-separated token.
-	idx := strings.LastIndex(rest, "__")
-	tld := rest[idx+2:]
-	return bundlerHostCredentialTLDs[tld]
+	return !bundlerNonHostConfigPrefixes[first]
 }
 
 func preferSecretMountsDetail(envKey, secretID, instruction string) string {
