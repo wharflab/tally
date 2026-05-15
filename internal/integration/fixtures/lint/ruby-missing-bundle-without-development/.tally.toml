@@ -1,0 +1,6 @@
+[slow-checks]
+mode = "off"
+
+[rules]
+include = ["tally/ruby/missing-bundle-without-development"]
+exclude = ["*"]

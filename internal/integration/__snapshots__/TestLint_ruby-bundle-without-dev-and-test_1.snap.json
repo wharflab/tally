@@ -1,0 +1,59 @@
+{
+  "files": [
+    {
+      "file": "testdata/ruby-bundle-without-dev-and-test/Dockerfile",
+      "violations": [
+        {
+          "detail": "Production stages that run `bundle install` should exclude the `development` gem group via `ENV BUNDLE_WITHOUT=\"development\"` (or `bundle config set --local without development`). Otherwise gems like `web-console`, `byebug`, `pry`, `rspec-rails`, `letter_opener`, and `bullet` ship into the production image, inflating size and exposing development-only attack surface (`web-console` in particular has documented RCE history when it leaks into production).",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/missing-bundle-without-development/",
+          "location": {
+            "end": {
+              "column": 18,
+              "line": 4
+            },
+            "file": "testdata/ruby-bundle-without-dev-and-test/Dockerfile",
+            "start": {
+              "column": 11,
+              "line": 4
+            }
+          },
+          "message": "Production stage runs bundle install without BUNDLE_WITHOUT excluding the development group",
+          "rule": "tally/ruby/missing-bundle-without-development",
+          "severity": "warning",
+          "sourceCode": "RUN bundle install",
+          "suggestedFix": {
+            "description": "Add ENV BUNDLE_WITHOUT=\"development:test\" to exclude development gems from the production image",
+            "edits": [
+              {
+                "location": {
+                  "end": {
+                    "column": 0,
+                    "line": 2
+                  },
+                  "file": "testdata/ruby-bundle-without-dev-and-test/Dockerfile",
+                  "start": {
+                    "column": 0,
+                    "line": 2
+                  }
+                },
+                "newText": "ENV BUNDLE_WITHOUT=\"development:test\"\n"
+              }
+            ],
+            "isPreferred": true,
+            "priority": 88
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 1,
+    "warnings": 1
+  }
+}

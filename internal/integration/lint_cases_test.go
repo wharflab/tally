@@ -89,6 +89,24 @@ func lintCases(t *testing.T) []lintCase {
 			useContext: true,
 		},
 		{
+			// Context-aware refinement for tally/ruby/missing-bundle-without-development:
+			// Gemfile shows both :development and :test groups, so the fix should
+			// recommend `BUNDLE_WITHOUT="development:test"` (not just "development").
+			name:       "ruby-bundle-without-dev-and-test",
+			dir:        "ruby-bundle-without-dev-and-test",
+			args:       append([]string{"--format", "json"}, mustSelectRules("tally/ruby/missing-bundle-without-development")...),
+			wantExit:   1,
+			useContext: true,
+		},
+		{
+			// Context-aware refinement for tally/ruby/missing-bundle-without-development:
+			// Gemfile has no :development group, so the rule must suppress entirely.
+			name:       "ruby-bundle-without-no-dev-group",
+			dir:        "ruby-bundle-without-no-dev-group",
+			args:       append([]string{"--format", "json"}, mustSelectRules("tally/ruby/missing-bundle-without-development")...),
+			useContext: true,
+		},
+		{
 			name:  "discovery-directory",
 			dir:   "discovery-directory",
 			args:  append([]string{"--format", "json"}, mustSelectRules("tally/max-lines")...),
