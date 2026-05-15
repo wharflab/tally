@@ -181,6 +181,13 @@ ENV BUNDLE_DISABLE__VERSION_CHECK=true
 			WantViolations: 0,
 		},
 		{
+			Name: "BUNDLE_IGNORE_MESSAGES__HTTPARTY is config, not a credential",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_IGNORE_MESSAGES__HTTPARTY=true
+`,
+			WantViolations: 0,
+		},
+		{
 			Name: "BUNDLE_GEMS__ACME__CO__UK triggers (compound TLD)",
 			Content: `FROM ruby:3.3-slim
 ENV BUNDLE_GEMS__ACME__CO__UK="user:token"

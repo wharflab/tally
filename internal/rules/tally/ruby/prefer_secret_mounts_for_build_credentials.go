@@ -212,51 +212,80 @@ func matchRubyBuildCredentialKey(key string) (string, bool) {
 	return "", false
 }
 
-// bundlerNonHostConfigPrefixes lists the `BUNDLE_<TOPIC>` prefixes
-// where Bundler uses `__` to encode dots in non-host config namespaces
-// (e.g. `BUNDLE_LOCAL__RACK` is the `local.rack` config, not a
-// credential for `local.rack`). Any `BUNDLE_<TOPIC>__*` key with a
-// topic in this list is a config key, not a host credential.
+// commonHostCredentialTLDs is the set of TLDs that, when they appear
+// as the trailing `__<TLD>` segment of a `BUNDLE_*` key, signal a
+// host-credential. Bundler's `__` is overloaded: it encodes `.` for
+// both `BUNDLE_GITHUB__COM` (a credential for github.com) and
+// `BUNDLE_LOCAL__RACK` / `BUNDLE_PATH__SYSTEM` /
+// `BUNDLE_IGNORE_MESSAGES__HTTPARTY` (config keys with dotted names
+// where the trailing segment is a gem name, not a TLD).
 //
-// Source: bundler/bundler config namespaces — the host-credential
-// path uses `BUNDLE_<HOST>__<TLD>` but several `__`-encoded namespaces
-// describe gem identity, paths, or other non-secret config:
-//   - LOCAL: `local.<gem>` overrides for development paths
-//   - BUILD: `build.<gem>` per-gem build flags
-//   - PATH:  `path.system` boolean and similar
-//   - GEM:   `gem.coc`/`gem.mit`/`gem.test`/etc. — gem-template flags
-//   - CACHE: `cache.all`/`cache.path` — cache config
-//   - DISABLE: `disable.foo` — feature disable flags
-//
-// We err toward `true` for everything else (any `BUNDLE_*__*` not in
-// this list) — Bundler's host-credential surface is open-ended, so an
-// allowlist would miss valid public-suffix TLDs (`.co.uk`, `.de`,
-// `.com.br`, etc.).
-var bundlerNonHostConfigPrefixes = map[string]bool{
-	"LOCAL":   true,
-	"BUILD":   true,
-	"PATH":    true,
-	"GEM":     true,
-	"CACHE":   true,
-	"DISABLE": true,
+// Trailing-TLD discrimination is the most reliable heuristic without
+// hard-coding every Bundler config namespace (which keeps growing).
+// We cover:
+//   - the standard generic TLDs (com/org/net/io/dev/co/ai/edu/gov/info/biz)
+//   - all 2-letter ISO country code TLDs (handled separately by length+alphabetic check)
+var commonHostCredentialTLDs = map[string]bool{
+	"com":  true,
+	"org":  true,
+	"net":  true,
+	"io":   true,
+	"dev":  true,
+	"co":   true,
+	"ai":   true,
+	"edu":  true,
+	"gov":  true,
+	"info": true,
+	"biz":  true,
+	"app":  true,
 }
 
 // isBundlerHostCredentialKey reports whether a key matches Bundler's
 // `BUNDLE_<HOST>__<TLD>` host-credential convention. Host names use
 // `__` (double underscore) for `.` (dot), so a real Bundler key has at
-// least one `__` separator. We exclude a small denylist of known
-// non-host namespaces (`LOCAL`, `BUILD`) where `__` encodes a gem name
-// rather than a hostname dot.
+// least one `__` separator AND the trailing `__<TLD>` segment must
+// look like a TLD.
+//
+// Acceptance: trailing token is in the curated common-TLD list, OR is
+// a 2-letter all-alphabetic token (covers ISO country code TLDs like
+// `de`, `uk`, `jp`, `br`, etc.).
+//
+// This positively identifies host credentials and naturally excludes
+// Bundler's many `__`-encoded config namespaces (`local.<gem>`,
+// `build.<gem>`, `path.system`, `gem.<flag>`, `cache.<flag>`,
+// `disable.<flag>`, `ignore_messages.<gem>`, …) without requiring an
+// ever-growing denylist.
 func isBundlerHostCredentialKey(key string) bool {
 	if !strings.HasPrefix(key, "BUNDLE_") {
 		return false
 	}
 	rest := strings.TrimPrefix(key, "BUNDLE_")
-	first, _, hasSep := strings.Cut(rest, "__")
-	if !hasSep {
+	if !strings.Contains(rest, "__") {
 		return false
 	}
-	return !bundlerNonHostConfigPrefixes[first]
+	idx := strings.LastIndex(rest, "__")
+	tld := strings.ToLower(rest[idx+2:])
+	if commonHostCredentialTLDs[tld] {
+		return true
+	}
+	// 2-letter all-alphabetic ccTLD (e.g. `de`, `uk`, `jp`, `br`).
+	if len(tld) == 2 && isAllAlpha(tld) {
+		return true
+	}
+	return false
+}
+
+// isAllAlpha reports whether s consists entirely of ASCII letters.
+func isAllAlpha(s string) bool {
+	for i := range len(s) {
+		c := s[i]
+		isLower := c >= 'a' && c <= 'z'
+		isUpper := c >= 'A' && c <= 'Z'
+		if !isLower && !isUpper {
+			return false
+		}
+	}
+	return s != ""
 }
 
 func preferSecretMountsDetail(envKey, secretID, instruction string) string {
