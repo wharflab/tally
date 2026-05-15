@@ -1,0 +1,97 @@
+---
+title: "tally/ruby/redundant-bundler-install"
+description: "`gem install bundler` on official `ruby:*` images is redundant and re-installs an already-present tool."
+---
+
+`gem install bundler` on official `ruby:*` images is redundant — Bundler 2.x already ships with the image.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Performance |
+| Default | Enabled |
+| Auto-fix | Yes (`FixSuggestion`) |
+
+## Description
+
+The official [`docker-library/ruby`](https://github.com/docker-library/ruby/blob/master/Dockerfile-debian.template)
+image installs and pre-resolves Bundler before publishing each tag. Bundler is on `$PATH` immediately, ready
+to use. Running `gem install bundler` after `FROM ruby:...` re-downloads, recompiles, and re-installs the
+same tool — wasting build time and introducing version drift between local development and CI.
+
+The corpus shows this pattern in **55 of 196 Dockerfiles**, including some from large projects
+(`basecamp/kamal`, `basecamp/fizzy`, `chatwoot/chatwoot`).
+
+This rule fires when:
+
+- The stage's effective base image is an official `ruby:*` image (or a known devcontainer Ruby image).
+- A `RUN` instruction invokes `gem install bundler` (in any of its parsed forms).
+
+The rule treats stage refs (`FROM <stage>`) as inheriting the original external base, so a stage that's
+based on an earlier `FROM ruby:3.3-slim AS builder` is also flagged.
+
+Stages explicitly named `dev`, `development`, `test`, `testing`, `ci`, or `debug` are skipped.
+
+### Suppressions
+
+The rule does NOT fire when the base image is **not** an official `ruby:*` image — for example
+`FROM debian:bookworm-slim` followed by manual Ruby installation, or `FROM alpine` plus `apk add ruby`. In
+those cases `gem install bundler` may be the right thing to do because the base image doesn't ship Bundler.
+
+It also does NOT fire on Ruby derivatives like `jruby:*`, `truffleruby:*`, or `phusion/passenger-ruby:*`.
+These images don't carry the same Bundler-pre-install guarantee, so a manual install may be intentional.
+
+### Context-aware refinement
+
+When tally is invoked with `--context` and `Gemfile.lock` is observable, the violation detail mentions the
+exact Bundler version recorded in the lockfile's `BUNDLED WITH` block. If a project genuinely needs that
+specific Bundler version, the recommended replacement is Bundler's own version-aware shim:
+
+```dockerfile
+RUN bundle _2.5.6_ install
+```
+
+— which uses the BUNDLED WITH version from `Gemfile.lock` directly, without a fresh `gem install`.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM ruby:3.3-slim
+RUN gem install bundler
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+```
+
+### After
+
+```dockerfile
+FROM ruby:3.3-slim
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+```
+
+If a specific Bundler version is required:
+
+```dockerfile
+FROM ruby:3.3-slim
+COPY Gemfile Gemfile.lock ./
+RUN bundle _2.5.6_ install
+```
+
+## Auto-fix
+
+The rule offers a `FixSuggestion`:
+
+- When the offending `RUN` contains **only** `gem install bundler`, the fix deletes the entire `RUN` line.
+- When the install is part of a chained command (`RUN gem install bundler && bundle install`), the fix is a
+  non-edit suggestion — chained command rewrites are too easy to get wrong, so the rule explains what to do
+  but doesn't auto-rewrite. Edit the chain manually.
+
+## References
+
+- [docker-library/ruby Dockerfile.template](https://github.com/docker-library/ruby/blob/master/Dockerfile-debian.template) —
+  Bundler is installed and pre-resolved before publishing.
+- [Bundler `bundle _<version>_` version-shim documentation](https://bundler.io/v2.5/man/bundle.1.html) —
+  the right way to pin a specific Bundler version.
