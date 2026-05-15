@@ -1,0 +1,43 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-prefer-bundler-cache-mount/Dockerfile",
+      "violations": [
+        {
+          "detail": "BuildKit's `RUN --mount=type=cache,target=${BUNDLE_PATH}/cache` is the documented way to keep the gem-extraction cache across builds. Without it, every cache-busted `bundle install` re-fetches and (for native-extension gems) recompiles every gem from scratch — typically 30s+ on a non-trivial Rails project.",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/prefer-bundler-cache-mount/",
+          "location": {
+            "end": {
+              "column": 18,
+              "line": 4
+            },
+            "file": "fixtures/lint/ruby-prefer-bundler-cache-mount/Dockerfile",
+            "start": {
+              "column": 11,
+              "line": 4
+            }
+          },
+          "message": "`bundle install` doesn't use a BuildKit cache mount; native-extension gems will recompile on every cache-busted build",
+          "rule": "tally/ruby/prefer-bundler-cache-mount",
+          "severity": "info",
+          "sourceCode": "RUN bundle install",
+          "suggestedFix": {
+            "description": "Add `--mount=type=cache,id=bundler,target=${BUNDLE_PATH}/cache,sharing=locked` to the bundle install RUN",
+            "priority": 88,
+            "safety": 1
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 0,
+    "files": 1,
+    "info": 1,
+    "style": 0,
+    "total": 1,
+    "warnings": 0
+  }
+}
