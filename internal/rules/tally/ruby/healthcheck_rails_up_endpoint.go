@@ -173,14 +173,18 @@ func stageLooksLikeRubyWebServerWithParents(
 
 // resolveEffectiveEntrypointAndCmd returns the effective
 // ENTRYPOINT/CMD argv for stage by walking the parent stage chain
-// inside the same Dockerfile. CMD and ENTRYPOINT are resolved
-// independently because Docker inherits them as separate slots.
+// inside the same Dockerfile.
 //
 // Rules per Docker semantics:
-//   - If the local stage sets ENTRYPOINT, that's the effective value
-//     and the local CMD is used (or empty if not set).
+//   - If the local stage sets both ENTRYPOINT and CMD, those are the
+//     effective values.
+//   - If the local stage sets ENTRYPOINT but not CMD, CMD is reset to
+//     empty (NOT inherited from parent).
 //   - If the local stage sets only CMD, ENTRYPOINT is inherited.
 //   - If the local stage sets neither, both are inherited.
+//
+// Source: Dockerfile reference — "If `ENTRYPOINT` is set in a derived
+// image, a `CMD` set in the base image is reset to an empty value."
 func resolveEffectiveEntrypointAndCmd(
 	input rules.LintInput, stage instructions.Stage,
 ) (*instructions.EntrypointCommand, *instructions.CmdCommand) {
@@ -188,6 +192,8 @@ func resolveEffectiveEntrypointAndCmd(
 	if entry != nil && cmd != nil {
 		return entry, cmd
 	}
+	// Setting ENTRYPOINT locally resets parent CMD to empty.
+	cmdCanInherit := entry == nil
 	// One or both missing — walk parent chain for the missing slot(s).
 	stagesByName := make(map[string]instructions.Stage, len(input.Stages))
 	for _, s := range input.Stages {
@@ -205,10 +211,16 @@ func resolveEffectiveEntrypointAndCmd(
 		if entry == nil && parentEntry != nil {
 			entry = parentEntry
 		}
-		if cmd == nil && parentCmd != nil {
+		if cmdCanInherit && cmd == nil && parentCmd != nil {
 			cmd = parentCmd
 		}
-		if entry != nil && cmd != nil {
+		// Once we see a parent that defines its own ENTRYPOINT, any
+		// earlier (further-up) ancestor's CMD is reset by that
+		// ENTRYPOINT — stop propagating CMD up.
+		if cmd == nil && parentEntry != nil {
+			cmdCanInherit = false
+		}
+		if entry != nil && (cmd != nil || !cmdCanInherit) {
 			return entry, cmd
 		}
 		parent = parentStage.BaseName

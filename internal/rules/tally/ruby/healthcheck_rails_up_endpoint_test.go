@@ -160,6 +160,16 @@ CMD ["-C", "config/puma.rb"]
 `,
 			WantViolations: 1,
 		},
+		{
+			Name: "local ENTRYPOINT resets parent CMD per Docker semantics",
+			Content: `FROM ruby:3.3-slim AS base
+CMD ["bin/rails", "server"]
+
+FROM base AS job-runner
+ENTRYPOINT ["./run-job"]
+`,
+			WantViolations: 0,
+		},
 	})
 }
 
