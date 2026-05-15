@@ -1,0 +1,109 @@
+---
+title: "tally/ruby/missing-bundle-deployment"
+description: "Production stage runs `bundle install` without enforcing Bundler deployment mode."
+---
+
+Production stage runs `bundle install` without enforcing Bundler deployment mode.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning (default) / Error (no observable `Gemfile.lock` in build context) |
+| Category | Correctness |
+| Default | Enabled |
+| Auto-fix | Yes (FixSafe) |
+
+## Description
+
+Bundler 2.x's deployment mode is the production contract: it requires `Gemfile.lock` to exist, refuses to mutate
+the lockfile at build time, installs gems into `BUNDLE_PATH`, and skips dev/test gem groups (when
+`BUNDLE_WITHOUT` is set). The Rails generator template enables it via `ENV BUNDLE_DEPLOYMENT="1"` in the base
+stage precisely because the alternative — letting Bundler resolve afresh on every build — defeats the "the
+lockfile is the build input" property and pushes Bundler back into 1.x semantics.
+
+This rule fires when a Ruby-shaped production stage runs `bundle install` and:
+
+- Neither `ENV BUNDLE_DEPLOYMENT=...` (truthy: `1`/`true`) nor `bundle config set [--local|--global] deployment 'true'`
+  is in scope at the install site.
+- `bundle install --deployment` (the deprecated 2.x flag) is treated as compliant for this rule — the separate
+  [`tally/ruby/deprecated-bundler-install-flags`](/rules/tally/ruby/deprecated-bundler-install-flags/) rule
+  catches that pattern.
+
+The "production-shaped" heuristic mirrors
+[`tally/ruby/missing-bundle-without-development`](/rules/tally/ruby/missing-bundle-without-development/):
+the Dockerfile binds `RAILS_ENV` (or `RACK_ENV`) to `"production"` somewhere, **or** the stage has no explicit
+non-production marker and the rest of the stage shape (Ruby base, no dev-stage name) implies a runtime image.
+
+Stages explicitly named `dev`, `development`, `test`, `testing`, `ci`, or `debug` are skipped, as are stages
+whose effective env binds `RAILS_ENV`/`RACK_ENV` to `development` or `test`. Non-Ruby stages and Windows
+stages are also skipped.
+
+The compliance check honors POSIX/Docker ordering semantics:
+
+- **`ENV BUNDLE_DEPLOYMENT`** is evaluated at the env state *visible to the install RUN*. An `ENV` that
+  lands AFTER the install does not retroactively make the install compliant.
+- **`bundle config set ... deployment ...`** is recognized either when it runs in an earlier RUN, or when it
+  precedes the `bundle install` in the same RUN's parsed command chain. A `bundle config set` in a LATER RUN
+  is not enough — Bundler config only affects subsequent installs.
+
+### Context-aware refinement
+
+When tally is invoked with `--context` (or via Bake/Compose), the rule consults the project's `Gemfile.lock`:
+
+- **Severity escalation when no lockfile exists.** If `Gemfile.lock` is not observable in the build context
+  (no checked-in lockfile, or `.dockerignore` excludes it), the rule's severity escalates from `warning` to
+  `error`. Without a lockfile, Bundler resolves dependencies from `Gemfile` afresh on every build, which
+  produces non-deterministic images. Combined with the missing `BUNDLE_DEPLOYMENT`, this is a hard
+  reproducibility failure, not just a hygiene issue.
+- **Fix wording when the stage has `bundle config set frozen 'true'`.** The detail text mentions that
+  `BUNDLE_DEPLOYMENT=1` is the strict superset — `frozen` only locks the lockfile, while `deployment` also
+  pins `BUNDLE_PATH`, requires the lockfile to exist, and excludes dev/test gems. The fix itself is unchanged.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM ruby:3.3-slim
+ENV RAILS_ENV="production"
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+COPY . .
+CMD ["bin/rails", "server"]
+```
+
+### After
+
+The Rails-generator-style fix declares `BUNDLE_DEPLOYMENT` once at the top of the stage so every nested
+`bundle install` (including any inside CI scripts or entrypoints) honors it:
+
+```dockerfile
+FROM ruby:3.3-slim
+ENV RAILS_ENV="production"
+ENV BUNDLE_DEPLOYMENT="1"
+COPY Gemfile Gemfile.lock ./
+RUN bundle install
+COPY . .
+CMD ["bin/rails", "server"]
+```
+
+`bundle config set --local deployment 'true'` is also accepted:
+
+```dockerfile
+FROM ruby:3.3-slim
+COPY Gemfile Gemfile.lock ./
+RUN bundle config set --local deployment 'true' \
+    && bundle install
+```
+
+## Auto-fix
+
+The rule offers a `FixSafe` that inserts `ENV BUNDLE_DEPLOYMENT="1"` on the line immediately following the
+stage's `FROM`. Insertion is zero-width at column 0, so it composes cleanly with other rule edits in the same
+stage.
+
+## References
+
+- [Rails Dockerfile generator template](https://github.com/rails/rails/blob/main/railties/lib/rails/generators/rails/app/templates/Dockerfile.tt) —
+  emits `ENV BUNDLE_DEPLOYMENT="1"` in the base stage.
+- [Bundler `bundle install` documentation](https://bundler.io/v2.5/man/bundle-install.1.html) — deployment-mode contract.
+- [Bundler 2 upgrade guide](https://bundler.io/guides/bundler_2_upgrade.html) — deprecation of `bundle install --deployment` flag form.

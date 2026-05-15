@@ -127,6 +127,16 @@ func lintCases(t *testing.T) []lintCase {
 			useContext: true,
 		},
 		{
+			// Context-aware refinement for tally/ruby/missing-bundle-deployment:
+			// no Gemfile.lock observable in the build context — severity should
+			// escalate to error.
+			name:       "ruby-bundle-deployment-no-lockfile",
+			dir:        "ruby-bundle-deployment-no-lockfile",
+			args:       append([]string{"--format", "json"}, mustSelectRules("tally/ruby/missing-bundle-deployment")...),
+			wantExit:   1,
+			useContext: true,
+		},
+		{
 			name:  "discovery-directory",
 			dir:   "discovery-directory",
 			args:  append([]string{"--format", "json"}, mustSelectRules("tally/max-lines")...),
