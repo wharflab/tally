@@ -212,32 +212,24 @@ func matchRubyBuildCredentialKey(key string) (string, bool) {
 	return "", false
 }
 
-// commonHostCredentialTLDs is the set of TLDs that, when they appear
-// as the trailing `__<TLD>` segment of a `BUNDLE_*` key, signal a
-// host-credential. Bundler's `__` is overloaded: it encodes `.` for
-// both `BUNDLE_GITHUB__COM` (a credential for github.com) and
-// `BUNDLE_LOCAL__RACK` / `BUNDLE_PATH__SYSTEM` /
-// `BUNDLE_IGNORE_MESSAGES__HTTPARTY` (config keys with dotted names
-// where the trailing segment is a gem name, not a TLD).
+// bundlerNonHostConfigPrefixes lists the `BUNDLE_<TOPIC>` prefixes
+// where Bundler uses `__` to encode dots in non-host config namespaces.
+// Any `BUNDLE_<TOPIC>__*` key with a topic in this list is treated as
+// configuration, NOT a host credential — even if the trailing token
+// happens to look like a TLD (e.g. `BUNDLE_LOCAL__AI` for `local.ai`,
+// or `BUNDLE_BUILD__JEMALLOC__CO` for a hypothetical gem).
 //
-// Trailing-TLD discrimination is the most reliable heuristic without
-// hard-coding every Bundler config namespace (which keeps growing).
-// We cover:
-//   - the standard generic TLDs (com/org/net/io/dev/co/ai/edu/gov/info/biz)
-//   - all 2-letter ISO country code TLDs (handled separately by length+alphabetic check)
-var commonHostCredentialTLDs = map[string]bool{
-	"com":  true,
-	"org":  true,
-	"net":  true,
-	"io":   true,
-	"dev":  true,
-	"co":   true,
-	"ai":   true,
-	"edu":  true,
-	"gov":  true,
-	"info": true,
-	"biz":  true,
-	"app":  true,
+// Source: Bundler config reference. Captures every dotted namespace we
+// know of (the matcher is conservative — we'd rather miss a less-common
+// host pattern than emit a false-positive security finding).
+var bundlerNonHostConfigPrefixes = map[string]bool{
+	"LOCAL":           true,
+	"BUILD":           true,
+	"PATH":            true,
+	"GEM":             true,
+	"CACHE":           true,
+	"DISABLE":         true,
+	"IGNORE_MESSAGES": true,
 }
 
 // isBundlerHostCredentialKey reports whether a key matches Bundler's
@@ -246,37 +238,44 @@ var commonHostCredentialTLDs = map[string]bool{
 // least one `__` separator AND the trailing `__<TLD>` segment must
 // look like a TLD.
 //
-// Acceptance: trailing token is in the curated common-TLD list, OR is
-// a 2-letter all-alphabetic token (covers ISO country code TLDs like
-// `de`, `uk`, `jp`, `br`, etc.).
+// Acceptance is the AND of two checks:
 //
-// This positively identifies host credentials and naturally excludes
-// Bundler's many `__`-encoded config namespaces (`local.<gem>`,
-// `build.<gem>`, `path.system`, `gem.<flag>`, `cache.<flag>`,
-// `disable.<flag>`, `ignore_messages.<gem>`, …) without requiring an
-// ever-growing denylist.
+//  1. The leading topic (everything before the first `__`) is NOT one
+//     of Bundler's known dotted-config namespaces.
+//  2. The trailing `__<TLD>` segment is shaped like a TLD: a 2-6 char
+//     all-alphabetic token. This rejects `BUNDLE_<X>__<GEM_NAME>`
+//     (gem names tend to be longer and contain digits/underscores) and
+//     keeps acceptance broad for the long tail of legitimate TLDs
+//     (`de`/`uk`/`xyz`/`museum` aren't all in a curated allowlist).
+//
+// Combining both gates is what protects against false positives like
+// `BUNDLE_LOCAL__AI` (config; topic is `LOCAL`) without losing
+// coverage on legitimate credentials with less common TLDs.
 func isBundlerHostCredentialKey(key string) bool {
 	if !strings.HasPrefix(key, "BUNDLE_") {
 		return false
 	}
 	rest := strings.TrimPrefix(key, "BUNDLE_")
-	if !strings.Contains(rest, "__") {
+	first, _, hasSep := strings.Cut(rest, "__")
+	if !hasSep {
+		return false
+	}
+	if bundlerNonHostConfigPrefixes[first] {
 		return false
 	}
 	idx := strings.LastIndex(rest, "__")
-	tld := strings.ToLower(rest[idx+2:])
-	if commonHostCredentialTLDs[tld] {
-		return true
-	}
-	// 2-letter all-alphabetic ccTLD (e.g. `de`, `uk`, `jp`, `br`).
-	if len(tld) == 2 && isAllAlpha(tld) {
-		return true
-	}
-	return false
+	tld := rest[idx+2:]
+	return looksLikeTLD(tld)
 }
 
-// isAllAlpha reports whether s consists entirely of ASCII letters.
-func isAllAlpha(s string) bool {
+// looksLikeTLD reports whether s is shaped like a TLD: 2-6 chars,
+// all ASCII letters. Real TLDs span `aa`..`museum`; this filter rejects
+// gem names (which are typically longer or contain digits/underscores)
+// while accepting the long tail of legitimate TLDs.
+func looksLikeTLD(s string) bool {
+	if len(s) < 2 || len(s) > 6 {
+		return false
+	}
 	for i := range len(s) {
 		c := s[i]
 		isLower := c >= 'a' && c <= 'z'
@@ -285,7 +284,7 @@ func isAllAlpha(s string) bool {
 			return false
 		}
 	}
-	return s != ""
+	return true
 }
 
 func preferSecretMountsDetail(envKey, secretID, instruction string) string {

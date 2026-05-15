@@ -188,6 +188,20 @@ ENV BUNDLE_IGNORE_MESSAGES__HTTPARTY=true
 			WantViolations: 0,
 		},
 		{
+			Name: "BUNDLE_LOCAL__AI is config (local.ai), not credential despite TLD-shaped suffix",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_LOCAL__AI=/path/to/ai-gem
+`,
+			WantViolations: 0,
+		},
+		{
+			Name: "BUNDLE_GEMS__ACME__MUSEUM triggers (less common TLD)",
+			Content: `FROM ruby:3.3-slim
+ENV BUNDLE_GEMS__ACME__MUSEUM="user:token"
+`,
+			WantViolations: 1,
+		},
+		{
 			Name: "BUNDLE_GEMS__ACME__CO__UK triggers (compound TLD)",
 			Content: `FROM ruby:3.3-slim
 ENV BUNDLE_GEMS__ACME__CO__UK="user:token"
