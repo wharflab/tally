@@ -1,0 +1,91 @@
+{
+  "files": [
+    {
+      "file": "fixtures/lint/ruby-secrets-in-arg-or-env/Dockerfile",
+      "violations": [
+        {
+          "detail": "Setting `RAILS_MASTER_KEY` via ARG bakes the value into the image's per-layer history (`docker history --no-trunc \u003cimage\u003e`) and into the build cache key data. Anyone who can pull the image can recover the secret. Use BuildKit secret mounts (`RUN --mount=type=secret,id=rails_master_key,env=RAILS_MASTER_KEY`) for build-time access; for asset compilation specifically, use `SECRET_KEY_BASE_DUMMY=1` so the build doesn't need the real key at all (Rails 7.1+).",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/secrets-in-arg-or-env/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 2
+            },
+            "file": "fixtures/lint/ruby-secrets-in-arg-or-env/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 2
+            }
+          },
+          "message": "Rails secret declared via ARG/ENV bakes the secret into image history",
+          "rule": "tally/ruby/secrets-in-arg-or-env",
+          "severity": "error",
+          "sourceCode": "ARG RAILS_MASTER_KEY=abc123def",
+          "suggestedFix": {
+            "description": "Pass the secret via `RUN --mount=type=secret,id=...,env=...` instead of ARG/ENV. For asset compilation use SECRET_KEY_BASE_DUMMY=1 (Rails 7.1+) to avoid needing the real key at build time entirely.",
+            "priority": 88,
+            "safety": 2
+          }
+        },
+        {
+          "detail": "Setting `SECRET_KEY_BASE` via ENV bakes the value into the image's per-layer history (`docker history --no-trunc \u003cimage\u003e`) and into the build cache key data. Anyone who can pull the image can recover the secret. Use BuildKit secret mounts (`RUN --mount=type=secret,id=secret_key_base,env=SECRET_KEY_BASE`) for build-time access; for asset compilation specifically, use `SECRET_KEY_BASE_DUMMY=1` so the build doesn't need the real key at all (Rails 7.1+).",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/secrets-in-arg-or-env/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 6
+            },
+            "file": "fixtures/lint/ruby-secrets-in-arg-or-env/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 6
+            }
+          },
+          "message": "Rails secret declared via ARG/ENV bakes the secret into image history",
+          "rule": "tally/ruby/secrets-in-arg-or-env",
+          "severity": "error",
+          "sourceCode": "ENV SECRET_KEY_BASE=\"literal-secret-here\"",
+          "suggestedFix": {
+            "description": "Pass the secret via `RUN --mount=type=secret,id=...,env=...` instead of ARG/ENV. For asset compilation use SECRET_KEY_BASE_DUMMY=1 (Rails 7.1+) to avoid needing the real key at build time entirely.",
+            "priority": 88,
+            "safety": 2
+          }
+        },
+        {
+          "detail": "Setting `DEVISE_SECRET_KEY` via ENV bakes the value into the image's per-layer history (`docker history --no-trunc \u003cimage\u003e`) and into the build cache key data. Anyone who can pull the image can recover the secret. Use BuildKit secret mounts (`RUN --mount=type=secret,id=devise_secret_key,env=DEVISE_SECRET_KEY`) for build-time access; for asset compilation specifically, use `SECRET_KEY_BASE_DUMMY=1` so the build doesn't need the real key at all (Rails 7.1+).",
+          "docUrl": "https://tally.wharflab.com/rules/tally/ruby/secrets-in-arg-or-env/",
+          "location": {
+            "end": {
+              "column": 0,
+              "line": 7
+            },
+            "file": "fixtures/lint/ruby-secrets-in-arg-or-env/Dockerfile",
+            "start": {
+              "column": 0,
+              "line": 7
+            }
+          },
+          "message": "Rails secret declared via ARG/ENV bakes the secret into image history",
+          "rule": "tally/ruby/secrets-in-arg-or-env",
+          "severity": "error",
+          "sourceCode": "ENV DEVISE_SECRET_KEY=\"some-pepper\"",
+          "suggestedFix": {
+            "description": "Pass the secret via `RUN --mount=type=secret,id=...,env=...` instead of ARG/ENV. For asset compilation use SECRET_KEY_BASE_DUMMY=1 (Rails 7.1+) to avoid needing the real key at build time entirely.",
+            "priority": 88,
+            "safety": 2
+          }
+        }
+      ]
+    }
+  ],
+  "files_scanned": 1,
+  "rules_enabled": 1,
+  "summary": {
+    "errors": 3,
+    "files": 1,
+    "info": 0,
+    "style": 0,
+    "total": 3,
+    "warnings": 0
+  }
+}
