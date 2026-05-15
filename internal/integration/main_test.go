@@ -1,6 +1,8 @@
 package integration
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -146,8 +148,12 @@ func buildIntegrationAcpAgent(tmpDir string) error {
 // the main tally binary on this codebase).
 //
 // extraArgs are forwarded verbatim to `go install` (e.g. `-tags`, `-cover`).
+//
+// The cache is keyed by the (importPath, extraArgs, GOOS, GOARCH) tuple so
+// concurrent `go test` invocations with different flags (e.g. -race vs no
+// race, different -tags) don't race on the same `<cache>/<binName>` file.
 func installCachedBinary(importPath, binName, dst string, extraArgs []string) error {
-	cacheDir, err := integrationBinaryCacheDir()
+	cacheDir, err := integrationBinaryCacheDir(importPath, extraArgs)
 	if err != nil {
 		return err
 	}
@@ -168,16 +174,28 @@ func installCachedBinary(importPath, binName, dst string, extraArgs []string) er
 	return nil
 }
 
-// integrationBinaryCacheDir returns the per-user directory where this package
-// caches integration-test binaries. It's outside of the test's tmpDir so the
-// cache survives between `go test` runs and Go's link cache can hit.
-func integrationBinaryCacheDir() (string, error) {
+// integrationBinaryCacheDir returns the per-user, per-variant directory where
+// this package caches integration-test binaries. The variant key includes the
+// import path, the install flags, and GOOS/GOARCH so concurrent `go test`
+// runs with different build tuples (e.g. -race vs no race) don't trample each
+// other's GOBIN. The cache lives outside the test's tmpDir so it survives
+// between runs and Go's link cache can hit.
+func integrationBinaryCacheDir(importPath string, extraArgs []string) (string, error) {
 	base, err := os.UserCacheDir()
 	if err != nil {
 		// Fall back to /tmp; UserCacheDir only fails when HOME is unset.
 		base = os.TempDir()
 	}
-	dir := filepath.Join(base, "tally-integration-test-bin")
+	h := sha256.New()
+	fmt.Fprintln(h, runtime.GOOS)
+	fmt.Fprintln(h, runtime.GOARCH)
+	fmt.Fprintln(h, importPath)
+	for _, a := range extraArgs {
+		fmt.Fprintln(h, a)
+	}
+	variant := hex.EncodeToString(h.Sum(nil))[:16]
+
+	dir := filepath.Join(base, "tally-integration-test-bin", variant)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return "", fmt.Errorf("create binary cache dir %q: %w", dir, err)
 	}
