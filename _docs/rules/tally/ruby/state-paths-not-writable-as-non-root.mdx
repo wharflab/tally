@@ -1,0 +1,90 @@
+---
+title: "tally/ruby/state-paths-not-writable-as-non-root"
+description: "Rails app COPY without `--chown` leaves state dirs (tmp, log, storage, db) root-owned at runtime."
+---
+
+A Rails app stage that switches to a non-root `USER` but `COPY`s application content without `--chown` (or a
+matching runtime `chown -R`) leaves Rails state directories root-owned. The app crashes on first request
+when ActionView, ActiveStorage, ActiveRecord, or `bin/rails db:prepare` tries to write to them.
+
+| Property | Value |
+|----------|-------|
+| Severity | Warning |
+| Category | Correctness |
+| Default | Enabled |
+| Auto-fix | Yes (`FixSuggestion`) |
+
+## Description
+
+Rails maintains four canonical state directories that need to be writable by the runtime user: `tmp/`,
+`log/`, `storage/`, and `db/`. The Rails generator template handles ownership in its final-stage COPY:
+
+```dockerfile
+COPY --chown=rails:rails --from=build "${BUNDLE_PATH}" "${BUNDLE_PATH}"
+COPY --chown=rails:rails --from=build /rails /rails
+USER rails:rails
+```
+
+Forks of that template that drop `--chown` (or that introduce a non-root `USER` independent of the generator
+pattern) end up with root-owned `tmp/cache` directories. ActionView writes there on first render;
+ActiveStorage on first upload; `bin/rails db:prepare` on schema load. The result is a 500 on first request,
+or worse: a permission-denied that gets logged but doesn't crash the app, leaving the user staring at
+mysteriously broken behavior.
+
+This rule fires when:
+
+- The stage explicitly sets `USER` to a non-root identity.
+- The stage `COPY`s application content (canonical shapes: `COPY . .`, `COPY /rails /rails`, `COPY --from=build /rails /rails`).
+- Neither the COPY carries `--chown=<user>...` matching the runtime user, nor a subsequent `RUN chown -R <user>...` covers all four state directories.
+- The base image is plausibly a Rails app (Ruby base + WORKDIR /rails or /app, or ENTRYPOINT/CMD references rails).
+
+CLI-only gem images (no `WORKDIR /rails`/`/app`, no `bin/rails`, no `RAILS_ENV` env binding) are skipped —
+they don't ship Rails state directories.
+
+## Examples
+
+### Before
+
+```dockerfile
+FROM ruby:3.3-slim
+WORKDIR /rails
+USER rails:rails
+COPY . .
+CMD ["bin/rails", "server"]
+```
+
+### After
+
+The Rails-generator-style fix adds `--chown` to the offending COPY:
+
+```dockerfile
+FROM ruby:3.3-slim
+WORKDIR /rails
+USER rails:rails
+COPY --chown=rails:rails . .
+CMD ["bin/rails", "server"]
+```
+
+A runtime `chown -R` covering all four directories is also accepted (matches `basecamp/writebook`'s pattern):
+
+```dockerfile
+FROM ruby:3.3-slim
+WORKDIR /rails
+COPY . .
+RUN chown -R rails:rails db log storage tmp
+USER rails:rails
+CMD ["bin/rails", "server"]
+```
+
+## Auto-fix
+
+`FixSuggestion`. Inserts `--chown=<user>:<user>` immediately after the `COPY` keyword on the offending
+instruction. The fix is `FixSuggestion` (not `FixSafe`) because the user/group name may need adjustment in
+unusual setups (group not matching user, numeric uid/gid, etc.).
+
+## References
+
+- [Rails Dockerfile generator template](https://github.com/rails/rails/blob/main/railties/lib/rails/generators/rails/app/templates/Dockerfile.tt) —
+  uses `COPY --chown=rails:rails` for both the bundle and app trees.
+- [`basecamp/writebook` Dockerfile](https://github.com/basecamp/writebook/blob/main/Dockerfile) —
+  the runtime-`chown` pattern.
